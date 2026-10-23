@@ -1,0 +1,11 @@
+---
+import AppSwitcher from '@kaynooo/kayjs-ui/app-switcher.kay'
+
+const apps = [
+  { id: 'atlas', href: '#atlas', label: 'Atlas', icon: 'globe', description: 'Maps and places' },
+  { id: 'aurora', href: '#aurora', label: 'Aurora', icon: 'star' },
+  { id: 'hubble', href: '#hubble', label: 'Hubble', icon: 'search' },
+  { id: 'relay', href: '#relay', label: 'Relay' },
+] as const
+---
+AppSwitcher(apps={apps} current="hubble")

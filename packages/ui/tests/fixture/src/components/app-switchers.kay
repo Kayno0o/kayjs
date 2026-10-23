@@ -1,0 +1,18 @@
+---
+// kay-island
+import type { SwitcherApp } from '@kaynooo/kayjs-ui'
+import AppSwitcher from '@kaynooo/kayjs-ui/app-switcher.kay'
+
+const apps: SwitcherApp[] = [
+  { id: 'atlas', href: '/atlas', label: 'Atlas', icon: 'globe' },
+  { id: 'aurora', href: '/aurora', label: 'Aurora' },
+  { id: 'hubble', href: 'https://hubble.example.com/', label: 'Hubble', description: 'Telescope' },
+  { id: 'relay', href: '/relay', label: 'Relay' },
+  { id: 'sage', href: '/sage', label: 'Sage' },
+]
+---
+AppSwitcher(id="plain" apps={apps} current="aurora")
+AppSwitcher(id="named" apps={apps} label="Our apps" icon="plus" newTab)
+AppSwitcher(id="custom" apps={apps.slice(0, 2)})
+  @tile(app)
+    em {app.label}!

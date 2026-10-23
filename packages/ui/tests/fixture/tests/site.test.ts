@@ -211,6 +211,17 @@ describe('layout', () => {
     expect((await find('/layout', '#app-header-bare header [data-part="brand"], #app-header-bare header [data-part="end"]'))).toEqual([])
   })
 
+  test('AppSwitcher sits in the end area as a trigger and a panel of links, the current app marked and every tile in the same tab unless it asks for a new one', async () => {
+    expect(await attributes('/layout', '#app-switcher header > [data-part="end"] button[popovertarget="family"]', ['aria-label', 'aria-haspopup', 'popovertarget'])).toEqual([{ 'aria-label': 'Apps', 'aria-haspopup': 'true', 'popovertarget': 'family' }])
+    expect(await attributes('/layout', '#app-switcher #family [data-part="tile"]', ['href', 'aria-current', 'target', 'rel', 'data-new-tab', 'data-tooltip'])).toEqual([
+      { 'href': 'https://atlas.example.com/', 'aria-current': null, 'target': '_self', 'rel': null, 'data-new-tab': null, 'data-tooltip': 'Maps' },
+      { 'href': 'https://hubble.example.com/', 'aria-current': 'true', 'target': '_self', 'rel': null, 'data-new-tab': null, 'data-tooltip': null },
+      { 'href': 'https://relay.example.com/', 'aria-current': null, 'target': '_blank', 'rel': 'noopener noreferrer', 'data-new-tab': '', 'data-tooltip': null },
+    ])
+    expect((await find('/layout', '#app-switcher #family [data-part="name"]')).map(found => found.text)).toEqual(['Atlas', 'Hubble', 'Relay'])
+    expect((await find('/layout', '#app-switcher #family [data-part="initial"]')).map(found => found.text)).toEqual(['H', 'R'])
+  })
+
   test('SiteNav takes the URL as current, and Select marks itself busy by busy or by its old loading', async () => {
     expect(await attributes('/layout', '#url-links [data-part="link"]', ['aria-current'])).toEqual([{ 'aria-current': null }, { 'aria-current': 'page' }])
     expect(await attributes('/layout', '#busy-select select', ['id', 'aria-busy'])).toEqual([{ 'id': 'busy-new', 'aria-busy': 'false' }, { 'id': 'busy-new-plain', 'aria-busy': 'true' }, { 'id': 'busy-old', 'aria-busy': 'true' }, { 'id': 'idle', 'aria-busy': null }])

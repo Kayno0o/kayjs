@@ -1,5 +1,6 @@
 ---
 import AppHeader from '@kaynooo/kayjs-ui/app-header.kay'
+import AppSwitcher from '@kaynooo/kayjs-ui/app-switcher.kay'
 import Badge from '@kaynooo/kayjs-ui/badge.kay'
 import CardRow from '@kaynooo/kayjs-ui/card-row.kay'
 import CollapsibleSection from '@kaynooo/kayjs-ui/collapsible-section.kay'
@@ -70,3 +71,7 @@ main
     Select#idle(value="a" options={[{ value: 'a', label: 'A' }]})
   article#app-header-bare
     AppHeader(links={[{ href: '/', label: 'Home' }]} current="/" label="Bare" sticky={false})
+  article#app-switcher
+    AppHeader(links={[{ href: '/', label: 'Home' }]} current="/" label="Switch")
+      @end
+        AppSwitcher(id="family" apps={[{ id: 'atlas', href: 'https://atlas.example.com/', label: 'Atlas', icon: 'globe', description: 'Maps' }, { id: 'hubble', href: 'https://hubble.example.com/', label: 'Hubble' }, { id: 'relay', href: 'https://relay.example.com/', label: 'Relay', newTab: true, rel: 'noopener noreferrer' }]} current="hubble")

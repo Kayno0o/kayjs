@@ -1,3 +1,4 @@
+export type { SwitcherApp } from './app-switcher'
 export type { ComboboxOption, ComboboxOptions, ComboboxQuery } from './combobox'
 export type { ContributionDay } from './contribution'
 export type { DateRange } from './date'

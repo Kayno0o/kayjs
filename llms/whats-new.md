@@ -4,6 +4,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 
 ## Unreleased
 
+- kayjs-ui has an `AppSwitcher`, a grid of dots opening tiles that link sibling apps ([Navigation](../packages/ui/llms/tables-navigation-and-layout.md)).
 - `SubscribeForm` links the `privacy` page its `mail.list(name, { privacy })` declares, so an app names it once; kayjs-mail's list sweep timers end when `kay dev` reloads.
 - kayjs-cms keeps its on-page drafts per signed-in person and forgets them at Sign out, closes the activity log to a role that may not `delete` (see Upgrading), and asks for a click before a link from another site opens edit mode ([Editor](../packages/cms/llms/editor.md)).
 - A queue job whose store fails to mark it finished is no longer retried or kept as failed for it, and kay's own report routes and a proof of work's used solutions now count in the app store's `rates`, shared by replicas ([Queues](queues.md), [Proof of work](action-protection.md)).

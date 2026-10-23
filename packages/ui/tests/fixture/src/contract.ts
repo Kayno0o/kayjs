@@ -1,6 +1,7 @@
 import type { JSX } from 'kay'
 import Accordion from '@kaynooo/kayjs-ui/accordion.kay'
 import AppHeader from '@kaynooo/kayjs-ui/app-header.kay'
+import AppSwitcher from '@kaynooo/kayjs-ui/app-switcher.kay'
 import Avatar from '@kaynooo/kayjs-ui/avatar.kay'
 import Badge from '@kaynooo/kayjs-ui/badge.kay'
 import BarChart from '@kaynooo/kayjs-ui/bar-chart.kay'
@@ -101,6 +102,7 @@ export const VARIANTS: Record<string, { of: string, props: Record<string, unknow
 export const COMPONENTS = {
   'accordion': Accordion,
   'app-header': AppHeader,
+  'app-switcher': AppSwitcher,
   'avatar': Avatar,
   'badge': Badge,
   'bar-chart': BarChart,
@@ -184,6 +186,7 @@ export const COMPONENTS = {
 export const CASES: Record<string, Record<string, unknown>> = {
   'accordion': { items: [{ value: 'mars', title: 'Mars' }, { value: 'venus', title: 'Venus', open: true }], panel: (value: string) => value },
   'app-header': { links: [{ href: '/', label: 'Home', icon }, { href: '/data', label: 'Data' }], current: '/data', label: 'Main', brand: 'Moons', end: 'Ada' },
+  'app-switcher': { apps: [{ id: 'atlas', href: '/atlas', label: 'Atlas', icon }, { id: 'hubble', href: '/hubble', label: 'Hubble' }], current: 'hubble' },
   'avatar': { name: 'Grace', label: 'Grace' },
   'badge': { label: 'Draft', icon },
   'bar-chart': { labels: ['a', 'b'], series: [{ name: 'Runs', values: [1, 2] }], label: 'Runs' },

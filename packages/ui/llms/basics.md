@@ -2,7 +2,7 @@
 
 ## Common tasks
 
-Each component spreads the other attributes it is given onto its root element, `id`, `aria-*` and `data-*` included. The exceptions: Toggle and Checkbox spread them on their checkbox, Popover on its panel, and CommandPalette, ConfirmDelete, FormField, FormDialog, SaveForm, Menu, Toaster, TooltipHost, LoadMore and WhenVisible take none.
+Each component spreads the other attributes it is given onto its root element, `id`, `aria-*` and `data-*` included. The exceptions: Toggle and Checkbox spread them on their checkbox, Popover on its panel, and AppSwitcher, CommandPalette, ConfirmDelete, FormField, FormDialog, SaveForm, Menu, Toaster, TooltipHost, LoadMore and WhenVisible take none.
 
 ### Icon, Button, IconButton
 

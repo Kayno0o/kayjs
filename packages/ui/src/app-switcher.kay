@@ -1,0 +1,101 @@
+---
+import type { IconProps } from 'kay/icons'
+import type { Snippet } from 'kay'
+import type { SwitcherApp } from './app-switcher'
+import type { IconSlot } from './defaults'
+import type { PopoverPlacement } from './popover'
+import { recipe } from 'kay'
+import { wording } from 'kay/words'
+import { stepIndex } from './cycle'
+import Icon from './icon.kay'
+import IconButton from './icon-button.kay'
+import Popover from './popover.kay'
+
+// The panel is the Popover of a Menu: its own frame, the browser closing it on Escape or a click outside and giving the focus back to the trigger. The tile marking the current app carries a bar under it, so the mark is not a colour alone.
+const look = recipe({
+  parts: {
+    root: '',
+    menu: 'kui-app-switcher w-[min(20rem,calc(100vw-2rem))]',
+    grid: 'grid grid-cols-3 gap-1 p-2',
+    tile: 'flex min-w-0 flex-col items-center gap-1 rounded-md p-2 text-center text-sm text-foreground no-underline outline-none hover:bg-hover focus-visible:bg-hover focus-visible:[outline:2px_solid_var(--color-accent)] aria-[current]:font-semibold aria-[current]:[box-shadow:inset_0_-3px_0_var(--color-accent)]',
+    icon: 'size-8 shrink-0',
+    initial: 'grid size-8 shrink-0 place-items-center rounded-md bg-hover font-semibold uppercase',
+    name: 'min-w-0 [overflow-wrap:anywhere]',
+  },
+})
+
+// The tiles sit in this many columns, so the up and down arrows step that far.
+const COLUMNS = 3
+const MOVES: Partial<Record<string, (index: number, count: number) => number>> = {
+  ArrowLeft: (index, count) => stepIndex(index, -1, count),
+  ArrowRight: (index, count) => stepIndex(index, 1, count),
+  ArrowUp: index => index - COLUMNS >= 0 ? index - COLUMNS : index,
+  ArrowDown: (index, count) => index + COLUMNS < count ? index + COLUMNS : index,
+  Home: () => 0,
+  End: (_, count) => count - 1,
+}
+
+const { id, apps, current, label = wording('ui.appSwitcher.label', 'Apps'), icon = 'apps', placement = 'bottom-end', newTab = false, tile } = props<{
+  // The panel's id, unique on the page; one is drawn when none is given.
+  id?: string | undefined
+  apps: readonly SwitcherApp[]
+  // The `id` of the app on screen: its tile is marked with `aria-current`.
+  current?: string | undefined
+  // Names the trigger and the panel; the `ui.appSwitcher.label` message by default.
+  label?: string | undefined
+  // The trigger's icon, a grid of dots by default.
+  icon?: IconSlot | IconProps | undefined
+  placement?: PopoverPlacement | undefined
+  // Opens the tiles in a new tab; they stay in the same one by default, as the apps are one place to the visitor. An app's own `newTab` wins.
+  newTab?: boolean | undefined
+  // Replaces the text under a tile's icon: `@tile(app)`.
+  tile?: Snippet<[app: SwitcherApp]> | undefined
+}>()
+
+let grid: HTMLElement | undefined
+
+function tiles(): HTMLAnchorElement[] {
+  return [...grid?.querySelectorAll<HTMLAnchorElement>('[data-part=tile]') ?? []]
+}
+
+// Lands on the tile of the app on screen, else on the first.
+function focusOpened(open: boolean) {
+  if (!open)
+    return
+
+  const all = tiles()
+
+  ;(all.find(link => link.hasAttribute('aria-current')) ?? all[0])?.focus()
+}
+
+function keyDown(event: KeyboardEvent) {
+  const move = MOVES[event.key]
+  const all = tiles()
+
+  if (!move || all.length === 0 || event.altKey || event.ctrlKey || event.metaKey)
+    return
+
+  event.preventDefault()
+  all[move(all.indexOf(document.activeElement as HTMLAnchorElement), all.length)]?.focus()
+}
+
+const opensNew = (app: SwitcherApp) => app.newTab ?? newTab
+
+// `_self` is written out so kay's own new tab for a link to another origin does not apply; one in a new tab carries the mark the page's screen reader rule reads.
+const tabOf = (app: SwitcherApp) => opensNew(app) ? { 'target': '_blank', 'rel': app.rel ?? 'noopener', 'data-new-tab': '' } : { target: '_self', rel: app.rel }
+---
+Popover(id={id} placement={placement} part="menu" onOpenChange={focusOpened})
+  @trigger(attributes)
+    IconButton({...attributes} icon={icon} label={label} variant="ghost" aria-haspopup="true" part="root")
+  div(part="grid" ref={element => grid = element} role="group" aria-label={label} onKeyDown={keyDown})
+    for app of apps key={app.id}
+      a(part="tile" href={app.href} {...tabOf(app)} aria-current={app.id === current ? 'true' : undefined} data-tooltip={app.description})
+        if app.icon
+          Icon(icon={app.icon} part="icon")
+        else
+          span(part="initial" aria-hidden="true") {app.label.slice(0, 1)}
+        span(part="name")
+          if tile
+            | {tile(app)}
+          else
+            | {app.label}
