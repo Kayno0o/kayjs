@@ -522,8 +522,8 @@ describe('uncalled-signal', () => {
     ])
   })
 
-  it('reports a signal prop in a class object, written in full or as a shorthand', () => {
-    const source = '---\nimport type { Signal } from \'kay\'\n\nconst { on, open } = props<{ on: Signal<boolean>, open: Signal<boolean> }>()\n---\np(class={{ active: on, open }}) x\np(class={{ active: on(), open: open() }}) y\n'
+  it('reports a signal in a class object, written in full or as a shorthand', () => {
+    const source = '---\n\nconst on = signal(false)\nconst open = signal(false)\n---\np(class={{ active: on, open }}) x\np(class={{ active: on(), open: open() }}) y\n'
     const found = compileKay(source, 'tab.kay', { check: true }).diagnostics.filter(d => d.code === 'uncalled-signal')
 
     expect(found.map(d => [source.slice(d.start, d.end), d.fixes?.[0]?.edits[0]?.text])).toEqual([['on', '()'], ['open', ': open()']])
@@ -563,14 +563,12 @@ describe('uncalled-signal', () => {
     expect(compileKay(fixed, 'list.kay', { check: true }).diagnostics.filter(d => d.code === 'uncalled-signal')).toEqual([])
   })
 
-  it('reports a signal a module exports and a prop typed Signal<T> or Memo<T>, as the script\'s own', () => {
-    const source = '---\nimport type { Memo, Signal } from \'kay\'\nimport { cart } from \'./cart\'\n\nconst { open, total } = props<{ open: Signal<boolean>, total: Memo<number> }>()\n---\np {cart.length} {open ? \'open\' : \'closed\'} {total}\n'
+  it('reports a signal a module exports, as the script\'s own', () => {
+    const source = '---\nimport { cart } from \'./cart\'\n---\np {cart.length}\n'
     const found = compileKay(source, 'cart.kay', { check: true, importedSignals: { './cart': { cart: 'signal' } } }).diagnostics.filter(d => d.code === 'uncalled-signal')
 
     expect(found.map(d => [source.slice(d.start, d.end), d.message])).toEqual([
       ['cart', '`cart` is a signal, read by calling it'],
-      ['open', '`open` is a signal, read by calling it'],
-      ['total', '`total` is a memo, read by calling it'],
     ])
   })
 

@@ -331,10 +331,7 @@ async function checkProject(root: string, config: KayConfig, tsconfig: string, e
 
   // `since` narrows what is fixed and reported to the deprecations of one minor, which `kay upgrade` applies in order.
   const inMinor = (diagnostic: CheckDiagnostic) => isLint(diagnostic.code) && (LINTS[diagnostic.code] as Lint).since === since
-  // A prop's type, its reads and the tags passing it are fixed together, so a run narrowed to one file fixes the others of that migration too.
-  const migration = (diagnostic: CheckDiagnostic) => diagnostic.code === 'deprecated-signal-prop'
-  const fixable = diagnostics.some(migration) ? [...diagnostics, ...everything.filter(diagnostic => migration(diagnostic) && !diagnostics.includes(diagnostic))] : diagnostics
-  const fixed = fix ? await applySafeFixes(root, since === undefined ? fixable : fixable.filter(inMinor), !dryRun) : 0
+  const fixed = fix ? await applySafeFixes(root, since === undefined ? diagnostics : diagnostics.filter(inMinor), !dryRun) : 0
 
   if (fixed > 0) {
     // JSON is the whole of stdout; quiet, what is left is all that is said.

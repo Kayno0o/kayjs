@@ -1181,12 +1181,7 @@ describe('signal writes', () => {
     expect(code).toContain('count.set((KayCurrent) => KayCurrent + 1); open.set(!open())')
   })
 
-  it('read by calling and write by name a prop typed Signal, inline or through a type of the script, and a signal a module exports', () => {
-    const typed = '---\nimport type { Signal as S } from \'kay\'\ninterface Props { open: S<boolean>, label: string }\nconst { open, label } = props<Props>()\n---\nbutton(onClick={() => open = false}) {open()} {label}'
-
-    expect(jsx(typed)).toBe('<button onClick={() => __props.open.set(false)}>{(void __props.open, __values.open)} {__props.label}</button>')
-    expect(tsx(typed)).toContain('const __values = { open: __props.open() }')
-
+  it('read by calling and write by name a signal a module exports', () => {
     const imported = compileKay('---\nimport { accent as tone } from \'./theme\'\n---\nbutton(onClick={() => tone += \'!\'}) {tone()}', 'test.kay', { importedSignals: { './theme': { accent: 'signal' } } })
 
     expect(imported.tsx).toContain('<button onClick={() => tone.set((KayCurrent) => KayCurrent + (\'!\'))}>{(void tone, __values.tone)}</button>')
@@ -1227,7 +1222,7 @@ describe('signal writes', () => {
   })
 
   it('keep a parenthesized right side whole, in a plain, compound or logical assignment, on the server, in an island and when type checking', () => {
-    const source = '---\nimport { accent } from \'./theme\'\nimport type { Signal } from \'kay\'\nconst { open } = props<{ open: Signal<boolean> }>()\nconst count = signal(0)\nconst pair = signal(0)\nfunction f() {\n  count = (2)\n  count += (1 as number)\n  count = ((3))\n  pair = (count(), 4)\n  count ??= ( 5 )\n  count ||= (9)\n  count &&= (10)\n  count = /* six */ (6)\n  count = (7) + (8)\n  accent = (\'red\')\n  open = (false)\n}\n---\nbutton(onClick={() => count = (count() + 1)}) {count()} {pair()} {open()}'
+    const source = '---\nimport { accent } from \'./theme\'\nconst open = signal(false)\nconst count = signal(0)\nconst pair = signal(0)\nfunction f() {\n  count = (2)\n  count += (1 as number)\n  count = ((3))\n  pair = (count(), 4)\n  count ??= ( 5 )\n  count ||= (9)\n  count &&= (10)\n  count = /* six */ (6)\n  count = (7) + (8)\n  accent = (\'red\')\n  open = (false)\n}\n---\nbutton(onClick={() => count = (count() + 1)}) {count()} {pair()} {open()}'
     const runs = compileKay(source, 'test.kay', { output: 'dom' })
     const served = compileKay(source, 'test.kay', { output: 'html' })
     const checked = compileKay(source, 'test.kay', { check: true })
@@ -1238,7 +1233,7 @@ describe('signal writes', () => {
     }
 
     for (const { tsx: code } of [runs, served]) {
-      expect(code).toContain('count.set((2))\n  count.set((KayCurrent) => KayCurrent + ((1 as number)))\n  count.set(((3)))\n  pair.set((count(), 4))\n  count.set((KayCurrent) => KayCurrent ?? (( 5 )))\n  count.set((KayCurrent) => KayCurrent || ((9)))\n  count.set((KayCurrent) => KayCurrent && ((10)))\n  count.set((6))\n  count.set((7) + (8))\n  accent.set((\'red\'))\n  __props.open.set((false))')
+      expect(code).toContain('count.set((2))\n  count.set((KayCurrent) => KayCurrent + ((1 as number)))\n  count.set(((3)))\n  pair.set((count(), 4))\n  count.set((KayCurrent) => KayCurrent ?? (( 5 )))\n  count.set((KayCurrent) => KayCurrent || ((9)))\n  count.set((KayCurrent) => KayCurrent && ((10)))\n  count.set((6))\n  count.set((7) + (8))\n  accent.set((\'red\'))\n  open.set((false))')
     }
 
     expect(runs.tsx).toContain('count.set((count() + 1))')

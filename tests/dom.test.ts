@@ -518,11 +518,11 @@ describe('signal writes', () => {
 
   const mount12 = site({
     'theme.ts': 'import { memo, signal } from \'kay\'\n\nexport const accent = signal(\'red\')\nexport const loud = memo(() => accent().toUpperCase())\n',
-    'toggle.kay': '---\nimport type { Signal } from \'kay\'\n\nconst { open } = props<{ open: Signal<boolean> }>()\n---\nbutton.toggle(onClick={() => open = !open()}) {open() ? \'open\' : \'closed\'}\n',
-    'main.kay': '---\nimport { accent, loud } from \'./theme\'\nimport Toggle from \'./toggle.kay\'\n\nconst count = signal(0)\nconst open = signal(false)\n\nfunction reset() {\n  count = 0\n}\n---\nbutton.more(onClick={() => count++}) {count()}\nbutton.ten(onClick={() => count += 10}) ten\nbutton.reset(onClick={reset}) reset\nbutton.accent(onClick={() => accent = accent() === \'red\' ? \'blue\' : \'red\'}) {accent()} {loud()}\nToggle(open={open})\np.state {open() ? \'yes\' : \'no\'}\n',
+    'toggle.kay': '---\nimport type { Bindable } from \'kay\'\n\nconst { open } = props<{ open: Bindable<boolean> }>()\n---\nbutton.toggle(onClick={() => open = !open}) {open ? \'open\' : \'closed\'}\n',
+    'main.kay': '---\nimport { accent, loud } from \'./theme\'\nimport Toggle from \'./toggle.kay\'\n\nconst count = signal(0)\nconst open = signal(false)\n\nfunction reset() {\n  count = 0\n}\n---\nbutton.more(onClick={() => count++}) {count()}\nbutton.ten(onClick={() => count += 10}) ten\nbutton.reset(onClick={reset}) reset\nbutton.accent(onClick={() => accent = accent() === \'red\' ? \'blue\' : \'red\'}) {accent()} {loud()}\nToggle(bind:open={open})\np.state {open() ? \'yes\' : \'no\'}\n',
   })
 
-  it('assigns a signal by name, its own, a module\'s and one a prop holds, reads them all by calling them, and hands a component the signal itself', async () => {
+  it('assigns a signal by name, its own, a module\'s and one a bound prop holds, reads them all by calling them, and binds a component to it', async () => {
     const { root, dispose } = await mount12()
     const text = (selector: string) => root.querySelector(selector)!.textContent
     const click = async (selector: string) => {

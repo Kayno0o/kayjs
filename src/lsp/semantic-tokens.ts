@@ -94,7 +94,7 @@ export function semanticTokens(source: string, imported: ImportedSignals = {}): 
     for (const binding of analysis.props?.bindings ?? []) {
       const name = source.slice(binding.local.start, binding.local.end)
 
-      own.set(name, { type: PROPERTY, modifiers: PROP | (binding.signal ? SIGNAL | (binding.signal === 'memo' ? READONLY : 0) : 0) })
+      own.set(name, { type: PROPERTY, modifiers: PROP })
     }
   }
 

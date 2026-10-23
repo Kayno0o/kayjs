@@ -388,10 +388,9 @@ describe.concurrent('kay check, edge cases', () => {
   it('narrows a signal the template reads twice in one expression, but not in a function it writes, which runs later', async () => {
     const meter = [
       '---',
-      'import type { Memo } from \'kay\'',
       'import { memo, signal } from \'kay\'',
       '',
-      'const { total } = props<{ total: Memo<number | undefined> }>()',
+      'const total = memo<number | undefined>(() => undefined)',
       'const sent = signal<number | undefined>(undefined)',
       'const doubled = memo(() => sent() === undefined ? undefined : sent()! * 2)',
       '---',
@@ -408,7 +407,7 @@ describe.concurrent('kay check, edge cases', () => {
     const root = await scratchProject({ 'src/components/meter.kay': meter })
 
     try {
-      expect((await check(root, { lints: { 'deprecated-signal-prop': 'allow' } })).map(d => [d.line, d.column, d.code, d.message])).toEqual([[13, 38, 'TS2532', 'Object is possibly \'undefined\'.'], [14, 4, 'TS2532', 'Object is possibly \'undefined\'.'], [15, 52, 'TS2532', 'Object is possibly \'undefined\'.'], [16, 44, 'TS2532', 'Object is possibly \'undefined\'.']])
+      expect((await check(root, {})).map(d => [d.line, d.column, d.code, d.message])).toEqual([[12, 38, 'TS2532', 'Object is possibly \'undefined\'.'], [13, 4, 'TS2532', 'Object is possibly \'undefined\'.'], [14, 52, 'TS2532', 'Object is possibly \'undefined\'.'], [15, 44, 'TS2532', 'Object is possibly \'undefined\'.']])
     }
     finally {
       await rm(root, { recursive: true, force: true })
@@ -852,12 +851,9 @@ describe.concurrent('kay check, edge cases', () => {
 
     const toggle = [
       '---',
-      'import type { Signal } from \'kay\'',
-      '',
-      'const { open, anything } = props<{ open: Signal<boolean>, anything: unknown }>()',
+      'const { anything } = props<{ anything: unknown }>()',
       '---',
-      'button(onClick={() => open.set(!open())}) {String(anything)}',
-      'p {String(open)}',
+      'p {String(anything)}',
       '',
     ].join('\n')
 
@@ -870,14 +866,13 @@ describe.concurrent('kay check, edge cases', () => {
       '',
       'const count = signal(0)',
       'const double = memo(() => count() * 2)',
-      'const open = signal(false)',
       '---',
       'p {show(count)}',
       'p {showAny(double)}',
       'p {String(count)}',
       'p {JSON.stringify(count)}',
       'p {read(count)} {readMemo(double)} {run(double)} {same(count)()} {label(count())}',
-      'Toggle(open={open} anything={count})',
+      'Toggle(anything={count})',
       'button(onClick={() => show(count)}) go',
       'p {readGeneric(count)} {identity(count)()}',
       'button(onClick={() => readGeneric(count)}) go',
@@ -888,7 +883,7 @@ describe.concurrent('kay check, edge cases', () => {
     const root = await scratchProject({ 'src/shared.ts': 'import { signal } from \'kay\'\n\nexport const shared = signal(1)\n', 'src/lib.ts': lib, 'src/components/Toggle.kay': toggle, 'src/routes/index.kay': page })
 
     try {
-      expect((await check(root, { lints: { 'deprecated-signal-prop': 'allow' } })).map(d => [basename(d.file), d.line, d.code])).toEqual([['Toggle.kay', 7, 'uncalled-signal'], ...[11, 12, 13, 14, 16, 17, 20, 20].map(line => ['index.kay', line, 'uncalled-signal'])])
+      expect((await check(root, {})).map(d => [basename(d.file), d.line, d.code])).toEqual([10, 11, 12, 13, 15, 16, 19, 19].map(line => ['index.kay', line, 'uncalled-signal']))
     }
     finally {
       await rm(root, { recursive: true, force: true })
