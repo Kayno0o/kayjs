@@ -10,11 +10,14 @@ const COMPONENT_TAGS = /<kay-component\b[^>]*>|<\/kay-component>/g
 const HEADING_ANCHOR = /<a href="#[^"]*"[^>]*>(.*?)<\/a>/gs
 const LINK = /<a /g
 
+// The most a preview request may send: an entry's text is far smaller, and the route renders and sanitizes all of it.
+const MAX_MARKDOWN = '1mb'
+
 // What the editor's preview keeps besides formatted text: images, and tables as the pages show them.
 const KEPT = { tags: ['img', 'table', 'thead', 'tbody', 'tr', 'th', 'td'], attributes: { img: ['src', 'alt', 'width', 'height'] } }
 
 // A Markdown text rendered by the site's own parser, for the editor's Preview: its structure, with a component shown as its content, code highlighted by the site's highlighter, and an image written as a path in the entry's folder shown from there. The HTML is sanitized, as it is shown inside the screens, which a `<script>` in a text must not run in; a link opens in a new tab so a click never leaves a draft.
-const markdown = api()
+const markdown = api({ maxSize: MAX_MARKDOWN })
   .onError(({ error, status }) => error instanceof UnknownCollectionError ? status(404, error.message) : undefined)
   .post('/', async ({ body, request, status }) => {
     try {

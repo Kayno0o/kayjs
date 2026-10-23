@@ -113,3 +113,10 @@ test('lets the browser keep a preview image but ask again, an unchanged file ans
   expect(again.status).toBe(304)
   expect(await again.text()).toBe('')
 })
+
+test('refuses a text over a megabyte before rendering it', async () => {
+  const response = await render('a'.repeat(1024 * 1024 + 1))
+
+  expect(response.status).toBe(413)
+  expect((await render('# Title')).status).toBe(200)
+})

@@ -595,7 +595,7 @@ newsletter: {
 },
 ```
 
-The Newsletter button opens a preview of the mail. Send me a test mails it to the signed-in editor's email. Give a collection a `testTo` to use another address, which a site on the password guard needs, as it knows no email. Send to the list asks twice, then queues the mail for every subscriber. With `roles` all of it is a publisher's action. A draft can be previewed and tested but not sent.
+The Newsletter button opens a preview of the mail. Send me a test mails it to the signed-in editor's email. Give a collection a `testTo` to use another address, which a site on the password guard needs, as it knows no email. Send to the list asks twice, then queues the mail for every subscriber. With `roles` all of it is a publisher's action. A draft can be previewed and tested but not sent. The same version is not sent twice, even after a restart, when your app has a `store.cache`.
 
 <ReadMore href="/llms/kayjs-cms-newsletter">The routes, the errors and the texts of the newsletter button.</ReadMore>
 

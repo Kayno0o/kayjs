@@ -1,4 +1,6 @@
-import { beforeEach, describe, expect, mock, test } from 'bun:test'
+import type { CacheStore, StoredValue } from '../../../src/runtime/cache'
+import { afterEach, beforeEach, describe, expect, mock, test } from 'bun:test'
+import { setupStore } from '../../../src/server/app-store'
 import { testAddresses } from '../src/authors'
 import { configure } from '../src/settings'
 
@@ -50,6 +52,65 @@ beforeEach(() => {
   failing = false
   version = `v${++runs}`
   configure({ newsletter: { posts: { list, message: entry => ({ subject: String(entry.data?.title) }) } } })
+})
+
+afterEach(() => setupStore(undefined))
+
+function memoryCache(): CacheStore & { rows: Map<string, StoredValue> } {
+  const rows = new Map<string, StoredValue>()
+
+  return { rows, get: key => rows.get(key), set: (key, text, freshUntil) => void rows.set(key, { text, freshUntil }), delete: key => void rows.delete(key), keys: () => [...rows.keys()] }
+}
+
+describe('the ledger of sends in the app\'s store', () => {
+  test('remembers a send in store.cache, and refuses a version a restart or another process already sent', async () => {
+    const cache = memoryCache()
+
+    setupStore({ cache })
+    expect((await post('/posts/hello/send')).status).toBe(200)
+    expect([...cache.rows.keys()]).toEqual(['kayjs-cms:newsletter:posts/hello/'])
+
+    // The same version, sent by another process: this one's own memory knows nothing of it.
+    version = 'v-other'
+    cache.rows.set('kayjs-cms:newsletter:posts/hello/', { text: 'v-other', freshUntil: Date.now() + 1000 })
+    calls.length = 0
+
+    expect((await post('/posts/hello/send')).status).toBe(409)
+    expect(calls).toEqual([])
+  })
+
+  test('lets a changed version and an expired entry send, and does not keep a failed send', async () => {
+    const cache = memoryCache()
+
+    setupStore({ cache })
+    cache.rows.set('kayjs-cms:newsletter:posts/hello/', { text: 'older', freshUntil: Date.now() + 1000 })
+    expect((await post('/posts/hello/send')).status).toBe(200)
+
+    version = 'v-next'
+    cache.rows.set('kayjs-cms:newsletter:posts/hello/', { text: 'v-next', freshUntil: Date.now() - 1 })
+    failing = true
+    expect((await post('/posts/hello/send')).status).toBe(500)
+    expect(cache.rows.get('kayjs-cms:newsletter:posts/hello/')?.text).toBe('v-next')
+
+    failing = false
+    expect((await post('/posts/hello/send')).status).toBe(200)
+  })
+
+  test('still sends when the store cannot write, and refuses when it cannot read', async () => {
+    const cache = memoryCache()
+
+    setupStore({ cache: { ...cache, set: () => {
+      throw new Error('read only')
+    } } })
+    expect((await post('/posts/hello/send')).status).toBe(200)
+
+    version = 'v-after'
+    setupStore({ cache: { ...cache, get: () => {
+      throw new Error('down')
+    } } })
+    expect((await post('/posts/hello/send')).status).toBe(500)
+    expect(calls).toEqual(['send Hello'])
+  })
 })
 
 describe('sending an entry to a list', () => {

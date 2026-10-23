@@ -1,8 +1,10 @@
 import type { EntryRef } from '../kay/contract'
 import { s } from 'kay'
+import { appStore } from 'kay/library'
 import { api } from 'kay/server'
 import { wording } from 'kay/words'
 import { testAddresses } from '../authors'
+import { log } from '../log'
 import { settings } from '../settings'
 import { entryOf } from '../store'
 
@@ -16,6 +18,24 @@ const locale = s.Object({ locale: s.Optional(s.String()) })
 
 // The entry versions sent or being sent in this process, so a double click or a second editor cannot mail a list twice by accident. A folder entry outside a repository has no version, so its content stands for it.
 const sent = new Map<string, string>()
+// What the app's `store.cache` keeps of them, so a restart or a second process does not mail a list again; a send is remembered for a year.
+const LEDGER = 'kayjs-cms:newsletter:'
+const LEDGER_MS = 365 * 86_400_000
+
+async function sentBefore(key: string, version: string): Promise<boolean> {
+  const stored = await appStore()?.cache?.get(LEDGER + key)
+
+  return stored !== undefined && stored.text === version && stored.freshUntil > Date.now()
+}
+
+async function remember(key: string, version: string): Promise<void> {
+  try {
+    await appStore()?.cache?.set(LEDGER + key, version, Date.now() + LEDGER_MS)
+  }
+  catch (error) {
+    log.error(`the send of ${key} could not be written to the store, so a restart may mail it again`, error)
+  }
+}
 
 async function loaded(ref: EntryRef) {
   const options = settings().newsletter.get(ref.collection)
@@ -65,14 +85,22 @@ export default api()
     if (sent.get(key) === version)
       throw new Refused(409, wording('cms.newsletter.again', 'This version of the entry was already sent to the list'))
 
-    // Claimed before the send is awaited, so two requests at once cannot both pass.
+    // Claimed before anything is awaited, so two requests at once cannot both pass.
     sent.set(key, version)
 
     try {
-      return await options.list.send(message as never)
+      if (await sentBefore(key, version))
+        throw new Refused(409, wording('cms.newsletter.again', 'This version of the entry was already sent to the list'))
+
+      const result = await options.list.send(message as never)
+
+      await remember(key, version)
+
+      return result
     }
     catch (error) {
-      sent.delete(key)
+      if (!(error instanceof Refused))
+        sent.delete(key)
 
       throw error
     }
