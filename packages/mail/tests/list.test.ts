@@ -7,6 +7,7 @@ import { createLists } from '../src/list'
 import { normalizeAddress } from '../src/list-address'
 import { openLists } from '../src/list-store'
 import { checkToken, signToken } from '../src/list-token'
+import { mailer } from '../src/mailer'
 import { outbox } from '../src/outbox'
 
 interface Subscribe { email: string }
@@ -413,6 +414,16 @@ describe('erasing a person', () => {
 })
 
 describe('list names', () => {
+  it('refuses a second call naming another file or store than the list was made with', () => {
+    const app = mailer({ from: 'a@fixture.test' })
+
+    app.list('twice', { file: ':memory:' })
+    expect(() => app.list('twice', { file: ':memory:', pace: { batch: 3 } })).not.toThrow()
+    expect(() => app.list('twice', { file: 'other.sqlite' })).toThrow('a list keeps one')
+    expect(() => app.list('twice', { store: openLists(':memory:') })).toThrow('another store')
+    expect(() => app.list('twice')).not.toThrow()
+  })
+
   it('refuses a name that is no plain word', () => {
     for (const name of ['', 'a b', '../x', 'a'.repeat(41), 'news\nletter'])
       expect(() => mail.list(name)).toThrow('a list\'s name')
@@ -453,7 +464,7 @@ describe('a link of a list this process does not declare', () => {
     store.confirm('elsewhere', second.id)
     store.close()
 
-    const lists = createLists(host, file)
+    const lists = createLists(host, { file })
 
     expect(await lists.confirm(signToken('confirm', { list: 'elsewhere', id: first.id, locale: 'en' }))).toMatchObject({ kind: 'confirmed' })
     expect(await lists.unsubscribe(signToken('unsubscribe', { list: 'elsewhere', id: second.id, locale: 'en' }))).toMatchObject({ valid: true })
@@ -486,20 +497,31 @@ describe('the subscribe form\'s queue insert', () => {
       deliver: async () => undefined,
     })
 
-    // A queue that never answers: the form must not wait for it.
+    // A queue that answers when told to: the form must not wait for it.
+    const release = Promise.withResolvers<string>()
+
     lists.connect({ enqueueMail: async (mail) => {
       queued.push(String(mail.to))
 
-      return new Promise<string>(() => undefined)
+      return release.promise
     }, enqueueRun: async () => '', activate: () => undefined })
 
     const [, handler] = lists.list('news', { file }).form()
     const ask = async (email: string) => handler({ email }, { fail: (status: number) => ({ status }) } as never)
     const fresher = fresh()
 
-    expect(await ask(known)).toBeUndefined()
-    expect(await ask(fresher)).toBeUndefined()
-    expect(rendered).toEqual([known, fresher])
-    expect(queued).toEqual([fresher])
+    try {
+      expect(await ask(known)).toBeUndefined()
+      expect(await ask(fresher)).toBeUndefined()
+      expect(rendered).toEqual([known, fresher])
+      // Not even the insert has started when the answer is back.
+      expect(queued).toEqual([])
+      await Bun.sleep(10)
+      expect(queued).toEqual([fresher])
+    }
+    finally {
+      release.resolve('job')
+      await site.runJobs()
+    }
   })
 })

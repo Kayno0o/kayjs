@@ -5,7 +5,7 @@ import type { Address, Mail, MailMessage } from './types'
 import { existsSync } from 'node:fs'
 import process from 'node:process'
 import { s } from 'kay'
-import { configError, durationSeconds, inFlightWork, keyedDigest } from 'kay/library'
+import { configError, durationSeconds, keyedDigest, trackDetached } from 'kay/library'
 import { siteOrigin } from 'kay/seo'
 import { rateLimit, renderLocale, renderToString, retryLater } from 'kay/server'
 import { wording } from 'kay/words'
@@ -106,6 +106,8 @@ interface Entry {
   list: MailingList
   // Opened on first use, so building or checking an app makes no file.
   readonly lists: ListStore
+  // What the list was made with, `file` or `store`, which a later call must not contradict.
+  readonly source: ListStore | string | undefined
   pace: { batch: number, every: Duration }
 }
 
@@ -155,8 +157,8 @@ function personalise(message: StoredMessage, subscriber: Subscriber, list: strin
   }
 }
 
-// `defaultPath` is the file a link of an undeclared list falls back to, which a test names as the default file is skipped under `bun test`.
-export function createLists(base: Omit<ListHost, 'enqueueMail' | 'enqueueRun' | 'activate'>, defaultPath?: string) {
+// `fallback` is where a list with no store of its own lives and a link of an undeclared list looks: the mailer's `listStore`, else the default SQLite file, which a test names as `file` since the default is skipped under `bun test`.
+export function createLists(base: Omit<ListHost, 'enqueueMail' | 'enqueueRun' | 'activate'>, fallback: { file?: string | undefined, store?: ListStore | undefined } = {}) {
   // The queues are made after the lists, which they run: the mailer hands them over with `connect`.
   let queues: Pick<ListHost, 'enqueueMail' | 'enqueueRun' | 'activate'> | undefined
   const host: ListHost = {
@@ -169,7 +171,7 @@ export function createLists(base: Omit<ListHost, 'enqueueMail' | 'enqueueRun' | 
   const entries = new Map<string, Entry>()
   const files = new Map<string, ListStore>()
   // The stores given to a list, which an erase reaches beside the files.
-  const given = new Set<ListStore>()
+  const given = new Set<ListStore>(fallback.store === undefined ? [] : [fallback.store])
   const addressLimit = rateLimit('kmail-list-address', { max: 3, window: '1h' })
 
   const open = (file: string): ListStore => {
@@ -183,7 +185,10 @@ export function createLists(base: Omit<ListHost, 'enqueueMail' | 'enqueueRun' | 
 
   // The default file once it exists, whichever list this process declared: a link in a mail outlives the code that declared its list.
   const defaultFile = (): ListStore | undefined => {
-    const fallbackFile = defaultPath ?? (process.env.NODE_ENV === 'test' ? undefined : LIST_FILE)
+    if (fallback.store !== undefined)
+      return fallback.store
+
+    const fallbackFile = fallback.file ?? (process.env.NODE_ENV === 'test' ? undefined : LIST_FILE)
 
     return fallbackFile !== undefined && (files.has(fallbackFile) || existsSync(fallbackFile)) ? open(fallbackFile) : undefined
   }
@@ -197,10 +202,8 @@ export function createLists(base: Omit<ListHost, 'enqueueMail' | 'enqueueRun' | 
       throw configError(`mail.list(${JSON.stringify(name)}): give a store or a file, not both`)
 
     const file = options.file ?? (process.env.NODE_ENV === 'test' ? ':memory:' : LIST_FILE)
-    const lists = { get: (): ListStore => options.store ?? open(file) }
-
-    if (options.store !== undefined)
-      given.add(options.store)
+    const chosen = options.store ?? (options.file === undefined ? fallback.store : undefined)
+    const lists = { get: (): ListStore => chosen ?? open(file) }
 
     const pace = { batch: options.pace?.batch ?? 20, every: options.pace?.every ?? '1m' }
 
@@ -208,6 +211,9 @@ export function createLists(base: Omit<ListHost, 'enqueueMail' | 'enqueueRun' | 
       throw configError(`mail.list(${JSON.stringify(name)}): pace.batch is ${pace.batch}, a whole number of at least 1`)
 
     durationSeconds(pace.every, `mail.list(${JSON.stringify(name)})'s pace.every`)
+
+    if (options.store !== undefined)
+      given.add(options.store)
 
     const honeypot = options.honeypot ?? 'website'
     const emailError = () => wording('mail.list.errors.email', 'Please write a valid email address.')
@@ -222,6 +228,9 @@ export function createLists(base: Omit<ListHost, 'enqueueMail' | 'enqueueRun' | 
     }
 
     const queueConfirmation = async (mail: Mail): Promise<void> => {
+      // After the answer's tick, as a queue's store may insert synchronously.
+      await Bun.sleep(0)
+
       try {
         await host.enqueueMail(mail)
       }
@@ -262,7 +271,7 @@ export function createLists(base: Omit<ListHost, 'enqueueMail' | 'enqueueRun' | 
             const mail = await host.render<ListConfirmProps>(confirmation)
 
             if (subscriber.status === 'pending')
-              void inFlightWork(async () => queueConfirmation(mail))
+              trackDetached(queueConfirmation(mail))
           }
           catch (error) {
             log.error('the confirmation mail of a list could not be rendered', error)
@@ -346,7 +355,7 @@ export function createLists(base: Omit<ListHost, 'enqueueMail' | 'enqueueRun' | 
       },
     }
 
-    return { list, get lists() {
+    return { list, source: options.store ?? options.file, get lists() {
       return lists.get()
     }, pace }
   }
@@ -382,12 +391,16 @@ export function createLists(base: Omit<ListHost, 'enqueueMail' | 'enqueueRun' | 
           footers.set(subscriber.locale, footer = await footerOf(subscriber.locale))
 
         await host.deliver(personalise(message, subscriber, name, footer))
-        await lists.sent(id, subscriber.id)
       }
       catch (error) {
         await lists.release(id, subscriber.id)
         log.warn(`a mail of the list ${name} could not be sent to one subscriber: ${error instanceof Error ? error.message : String(error)}`)
+
+        continue
       }
+
+      // Outside the try: a store failing here must leave the delivery claimed (counted unsure), not give a mail that left back for another send.
+      await lists.sent(id, subscriber.id)
     }
 
     if ((await lists.next(stored, 1)).length > 0)
@@ -403,6 +416,9 @@ export function createLists(base: Omit<ListHost, 'enqueueMail' | 'enqueueRun' | 
       if (!entry) {
         entries.set(name, entry = make(name, options))
         host.activate()
+      }
+      else if ((options.store ?? options.file) !== undefined && (options.store ?? options.file) !== entry.source) {
+        throw configError(`mail.list(${JSON.stringify(name)}): the list was made with another ${options.store === undefined ? 'file' : 'store'}, and a list keeps one`)
       }
 
       return entry.list
@@ -439,8 +455,15 @@ export function createLists(base: Omit<ListHost, 'enqueueMail' | 'enqueueRun' | 
       if (store === undefined)
         return { kind: 'unavailable', locale: checked.claims.locale }
 
-      // A subscriber that is gone, unsubscribed or erased, answers as a link that does not work.
-      return { kind: await store.confirm(checked.claims.list, checked.claims.id) ? 'confirmed' : 'invalid', locale: checked.claims.locale }
+      try {
+        // A subscriber that is gone, unsubscribed or erased, answers as a link that does not work.
+        return { kind: await store.confirm(checked.claims.list, checked.claims.id) ? 'confirmed' : 'invalid', locale: checked.claims.locale }
+      }
+      catch (error) {
+        log.error('a confirmation link could not be checked against the store of its list', error)
+
+        return { kind: 'unavailable', locale: checked.claims.locale }
+      }
     },
     async unsubscribe(token: unknown): Promise<{ locale?: string | undefined, valid: boolean, unavailable?: true }> {
       const checked = checkToken('unsubscribe', token)
@@ -454,7 +477,14 @@ export function createLists(base: Omit<ListHost, 'enqueueMail' | 'enqueueRun' | 
       if (store === undefined)
         return { valid: false, unavailable: true, locale: checked.claims.locale }
 
-      await store.remove(checked.claims.list, checked.claims.id)
+      try {
+        await store.remove(checked.claims.list, checked.claims.id)
+      }
+      catch (error) {
+        log.error('an unsubscribe link could not be applied to the store of its list', error)
+
+        return { valid: false, unavailable: true, locale: checked.claims.locale }
+      }
 
       return { valid: true, locale: checked.claims.locale }
     },

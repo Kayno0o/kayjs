@@ -1,4 +1,5 @@
 import type { JobStore } from 'kay/server'
+import type { ListStore } from '../src/list-store'
 import type { Mail, Transport } from '../src/types'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test'
@@ -206,6 +207,25 @@ describe('a broadcast', () => {
 
     await expect(app.list('news', { file }).send({ subject: 'x', text: 'x', attachments: [] } as never)).rejects.toThrow('takes no attachments')
     expect(() => app.list('paced', { file, pace: { batch: 0 } })).toThrow('pace.batch')
+  })
+})
+
+describe('a store failing after a mail left', () => {
+  it('leaves the delivery claimed instead of giving it back for another send', async () => {
+    const emails = seed(1)
+    const inner = openLists(file)
+    const store: ListStore = { ...inner, sent: () => {
+      throw new Error('the store went away')
+    } }
+    const app = mailer({ from: 'a@fixture.test', queue: { store: memoryJobs() } })
+    const list = app.list('news', { store, pace: PACE })
+    const { id } = await list.send({ subject: 'News', text: 'Hello' })
+
+    await app.drain()
+
+    expect(sentTo(emails[0]!)).toHaveLength(1)
+    expect(await list.status(id)).toMatchObject({ done: false, sent: 0, unsure: 1, retrying: 0, waiting: 0 })
+    expect(await inner.next((await inner.broadcast(id))!, 10)).toEqual([])
   })
 })
 

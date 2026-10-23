@@ -197,5 +197,3 @@ export function openLists(path: string) {
     },
   }
 }
-
-export type Lists = ReturnType<typeof openLists>

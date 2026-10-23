@@ -130,6 +130,8 @@ A failed job keeps the last value it reported. The next run of a retried job sta
 
 The handler takes an `AbortSignal` as its second argument. It aborts when the run passes `lostAfter`, and when the server stops. A handler that passes it on, to `fetch` for example, stops by itself instead of running beside the retry, so a slow mail is not sent twice. A job stopped by a shutdown is handed back without losing an attempt, and another process takes it without waiting out `lostAfter`.
 
+A queue made with `lazy: true` starts no worker with the server. The first `enqueue`, or a call to `activate()`, starts it. Use it for a queue an app may never need, so it costs no idle poll.
+
 A failed job is kept 30 days, its payload included, or as long as `keepFailed` says. To erase a person's jobs, call `remove(match)`. It removes every waiting or failed job whose payload matches.
 
 ```ts

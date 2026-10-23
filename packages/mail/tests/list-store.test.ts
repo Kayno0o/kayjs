@@ -250,29 +250,83 @@ describe.skipIf(url === '')('a list on Postgres', () => {
     }
   })
 
-  it('leaves no delivery behind an erase racing a claim', async () => {
+  it('makes a claim wait for an erase holding the subscriber, then refuse it', async () => {
     const db = new Bun.SQL(url)
 
     try {
       const { list, email } = names()
       const broadcast = `b${run}-erace-${counter}`
+      const address = email('r')
 
       await pg!.addBroadcast(broadcast, list, '{}', 3000)
 
-      for (let round = 0; round < 15; round++) {
-        const address = email(`r${round}`)
-        const subscriber = await pg!.ask(list, address, `r-${round}`, 'en')
+      const subscriber = await pg!.ask(list, address, `r-${run}`, 'en')
 
-        await pg!.confirm(list, subscriber.id, 2000)
-        await Promise.all([pg!.erase(address), pg!.claim(broadcast, subscriber.id)])
+      await pg!.confirm(list, subscriber.id, 2000)
 
-        const left = await db.unsafe<unknown[]>('SELECT 1 FROM kay_mail_deliveries WHERE subscriber = $1', [subscriber.id])
+      let settled = false
+      let claim: Promise<boolean> | undefined
 
-        expect(left).toHaveLength(0)
-      }
+      await db.begin(async (tx) => {
+        await tx.unsafe('SELECT id FROM kay_mail_subscribers WHERE id = $1 FOR UPDATE', [subscriber.id])
+        claim = (async () => {
+          try {
+            return await pg!.claim(broadcast, subscriber.id)
+          }
+          finally {
+            settled = true
+          }
+        })()
+        await Bun.sleep(150)
+        expect(settled).toBe(false)
+        await tx.unsafe('DELETE FROM kay_mail_subscribers WHERE id = $1', [subscriber.id])
+      })
+
+      expect(await claim).toBe(false)
+      expect(await db.unsafe<unknown[]>('SELECT 1 FROM kay_mail_deliveries WHERE subscriber = $1', [subscriber.id])).toHaveLength(0)
     }
     finally {
       await db.close()
+    }
+  })
+
+  it('takes a delivery claimed before an erase away with the subscriber', async () => {
+    const { list, email } = names()
+    const broadcast = `b${run}-eclaim-${counter}`
+    const address = email('c')
+
+    await pg!.addBroadcast(broadcast, list, '{}', 3000)
+
+    const subscriber = await pg!.ask(list, address, `c-${run}`, 'en')
+
+    await pg!.confirm(list, subscriber.id, 2000)
+    expect(await pg!.claim(broadcast, subscriber.id)).toBe(true)
+    expect(await pg!.erase(address)).toBe(1)
+    expect(await pg!.progress((await pg!.broadcast(broadcast))!)).toMatchObject({ unsure: 0 })
+  })
+
+  it('is the store of the lists of a mailer, its links and its erase when given as listStore', async () => {
+    const { list, email } = names()
+    const store = pgLists(url)
+    const address = email('m')
+
+    try {
+      const subscriber = await store.ask(list, address, `m-${run}`, 'en')
+
+      await store.confirm(list, subscriber.id, 2000)
+
+      const app = mailer({ from: 'a@fixture.test', listStore: store })
+
+      // A link of a list this mailer has not declared finds the store, and so does an erase.
+      expect(await app.list(list).count()).toBe(1)
+
+      const other = mailer({ from: 'a@fixture.test', listStore: store })
+
+      expect(await other.erase(address)).toBe(1)
+      expect(await store.count(list)).toBe(0)
+    }
+    finally {
+      await store.close()
     }
   })
 

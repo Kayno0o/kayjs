@@ -1,5 +1,6 @@
 import type { EnqueueOptions, FailedJob, KayExtension, QueueOptions } from 'kay/server'
 import type { ListOptions, ListRun, MailingList } from './list'
+import type { ListStore } from './list-store'
 import type { Relayed } from './outbox'
 import type { Relay } from './preview'
 import type { SmtpOverrides } from './smtp'
@@ -69,6 +70,8 @@ export interface MailerOptions {
   logRecipients?: boolean | undefined
   // Names each mail's subject in the log, which says `A mail` otherwise: a subject can hold a visitor's name or an organization's.
   logSubjects?: boolean | undefined
+  // Where the mailing lists live unless a list names its own `store` or `file`, such as `pgLists(db)` for a site on Postgres. It is also where a link of a list this process has not declared yet looks, and what `mail.erase` reaches, so declare it here rather than on each list.
+  listStore?: ListStore | undefined
   // Lets a server lacking `MAIL_URL` or a sender boot anyway, each send then throwing `MailNotConfiguredError`, for a site whose mail can wait to be set up.
   optional?: boolean | undefined
 }
@@ -487,7 +490,7 @@ export function mailer(options: MailerOptions = {}): Mailer {
     configured: () => (configured?.missing() ?? []).length === 0 && !senderless(),
     render,
     deliver,
-  })
+  }, { store: options.listStore })
   // The mails of a list are sent by a job of their own, a batch at a time, so a broadcast to a long list resumes after a restart where it stopped. Its worker starts with the first `mail.list()`, so a mailer with no list runs no more queue than before lists.
   const listJobs = queue<ListRun>(`${name}-list`, async (run, signal) => lists.run(run, signal), defined({ lazy: true, store: queueOptions.store, attempts: queueOptions.attempts, backoff: queueOptions.backoff, lostAfter: queueOptions.lostAfter, idlePoll: queueOptions.idlePoll }))
   const plugin = new Elysia().use(jobs).use(listJobs)
