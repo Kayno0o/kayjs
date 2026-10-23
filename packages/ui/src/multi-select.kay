@@ -4,7 +4,7 @@ import type { MultiSelectOption } from './multi-select'
 import type { PopoverPlacement } from './popover'
 import { effect, recipe, signal } from 'kay'
 import { stepIndex } from './cycle'
-import { onFormDefaults, onFormReset, startRef } from './form-reset'
+import { defaultKept, onFormReset, startRef } from './form-reset'
 import Icon from './icon.kay'
 import { pickedLabels, pickedShown, selectionSummary, toggledValue } from './multi-select'
 import Popover from './popover.kay'
@@ -71,8 +71,6 @@ const { id, options, value = [], label, placeholder = wording('ui.multiSelect.pl
 const picked = signal<readonly Value[]>(value)
 const query = signal('')
 let root: HTMLElement | undefined
-// What a reset goes back to: the values it started with, or the ones last saved by a SaveForm.
-let initial: readonly Value[] = value
 
 effect(() => picked.set(value))
 
@@ -90,14 +88,18 @@ function set(next: Value[]) {
   onChange?.(next)
 }
 
+// What a reset goes back to: the values it started with, or the ones last saved by a SaveForm.
+const initial = defaultKept<readonly Value[]>(() => root, picked, value)
+
 // A reset puts the boxes back on their defaults, which are not the picked values; the control goes back to `initial` with an empty search and tells the app.
 onFormReset(() => root, () => {
-  const same = initial.length === picked().length && initial.every(one => picked().includes(one))
+  const start = initial()
+  const same = start.length === picked().length && start.every(one => picked().includes(one))
 
   query.set('')
 
   if (!same)
-    set([...initial])
+    set([...start])
 
   for (const [index, box] of [...root?.querySelectorAll<HTMLInputElement>('[data-part=checkbox]') ?? []].entries()) {
     const option = shown()[index]
@@ -107,14 +109,6 @@ onFormReset(() => root, () => {
 })
 
 const ref = startRef<HTMLElement>(element => root = element, rest.ref)
-
-onFormDefaults(() => root, () => {
-  const held = picked()
-
-  return () => {
-    initial = held
-  }
-})
 
 // The panel only shows once the browser has opened the popover, so focus moves on its toggle rather than on the click; closing clears the search.
 function toggled(open: boolean) {

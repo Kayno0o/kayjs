@@ -6,7 +6,7 @@ import { CHECKBOX } from './field-look'
 
 const look = recipe({ parts: { root: CHECKBOX.root, input: CHECKBOX.input, label: CHECKBOX.label, hint: CHECKBOX.hint } })
 
-const { checked = false, indeterminate = false, label, hint, onChange, ...rest } = props<Omit<JSX.IntrinsicElements['input'], 'type' | 'checked' | 'class' | 'children' | 'onChange' | 'ref'> & {
+const { checked = false, indeterminate = false, label, hint, onChange, ...rest } = props<Omit<JSX.IntrinsicElements['input'], 'type' | 'checked' | 'class' | 'children' | 'onChange'> & {
   // Whether it starts ticked; a box whose parent passes another value follows it.
   checked?: boolean | undefined
   // Neither ticked nor not, for a box standing over a partly ticked set; a click toggles it from `checked`, and the box stays drawn so while the parent keeps it.
@@ -32,6 +32,7 @@ const { on, busy, ref, change } = controlledCheckbox({
   },
   // The click cleared it, whatever the parent still says.
   settled: input => input.indeterminate = indeterminate,
+  appRef: rest.ref,
 })
 
 // A property only, which no attribute sets.

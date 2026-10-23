@@ -262,7 +262,7 @@ describe('the app\'s ref on a control', () => {
     click(mounted.root.querySelector('#change'))
     await settle()
 
-    expect(got.sort()).toEqual(['icon:DIV', 'markdown:TEXTAREA', 'plain-first:INPUT', 'select:SELECT', 'text:INPUT', 'textarea:TEXTAREA'])
+    expect(got.sort()).toEqual(['checkbox:INPUT', 'colour:INPUT', 'icon:DIV', 'markdown:TEXTAREA', 'plain-first:INPUT', 'select:SELECT', 'slider:INPUT', 'text:INPUT', 'textarea:TEXTAREA', 'toggle:INPUT'])
   })
 
   test('runs a ref swapped for another on the element again, and the old one no more', async () => {

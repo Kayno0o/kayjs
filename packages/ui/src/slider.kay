@@ -1,8 +1,7 @@
 ---
 import type { JSX } from 'kay'
-import { effect, recipe, signal, untrack } from 'kay'
-import { changeAccepted } from './change'
-import { onFormReset, resetWhenIdle, startRef } from './form-reset'
+import { recipe } from 'kay'
+import { controlledInput } from './controlled-input'
 
 // The track and the thumb of both engines are drawn from the field and accent tokens.
 const look = recipe({
@@ -34,99 +33,31 @@ const { value, min = 0, max = 100, step, label, showValue = true, formatValue, o
   onChange?: ((value: number) => unknown) | undefined
 }>()
 
-const shown = signal(untrack(() => value))
-const busy = signal(false)
-let slider: HTMLInputElement | undefined
-// The value the app last accepted, which a refused change puts back.
-let settled = untrack(() => value)
-// How often the parent's `value` reached the slider, so a change under way knows whether the parent answered it.
-let synced = 0
-
-// A parent echoing the dragged value from `onInput` is not setting it, so only a value other than the shown one counts.
-effect(() => {
-  if (value === untrack(shown))
-    return
-
-  shown.set(value)
-  settled = value
-  synced++
+const { shown, busy, ref: sliderRef, move, change: released } = controlledInput<number>({
+  control: 'Slider',
+  value: () => value,
+  onChange: () => onChange,
+  read: input => Number(input.value),
+  write: (input, next) => {
+    input.value = String(next)
+  },
+  defaultOf: input => Number(input.defaultValue),
+  setDefault: (input, next) => {
+    input.defaultValue = String(next)
+  },
+  // The app that follows `onInput` is told the value put back, as after a reset.
+  restored: next => onInput?.(next),
+  appRef: rest.ref,
 })
 
 const words = (number: number) => formatValue ? formatValue(number) : String(number)
-const sliderRef = startRef<HTMLInputElement>((element) => {
-  slider = element
-  element.defaultValue = String(untrack(() => value))
-})
 
 function moved(event: Event) {
   const input = event.currentTarget as HTMLInputElement
 
-  // Whatever input method got past the held gestures moves nothing while a change is under way.
-  if (busy()) {
-    input.value = String(shown())
-
-    return
-  }
-
-  const next = Number(input.value)
-
-  shown.set(next)
-  onInput?.(next)
+  if (move(input))
+    onInput?.(Number(input.value))
 }
-
-async function released(input: HTMLInputElement) {
-  if (busy()) {
-    input.value = String(shown())
-
-    return
-  }
-
-  const next = Number(input.value)
-  const before = settled
-  const syncedBefore = synced
-  const heldBefore = untrack(() => value)
-
-  shown.set(next)
-
-  // Put back unless the parent set `value` meanwhile, which has the last word.
-  const accepted = await changeAccepted('Slider', () => onChange?.(next), busy.set)
-
-  if (synced !== syncedBefore) {
-    resetting.idle()
-
-    return
-  }
-
-  // A `value` already equal to the number at release is the `onInput` echo; one that moved onto it since, even from inside `onChange`, is the parent holding it whatever the answer.
-  if (accepted || (heldBefore !== next && untrack(() => value) === next)) {
-    settled = next
-  }
-  else {
-    shown.set(before)
-    input.value = String(before)
-    // The app that follows `onInput` is told the value put back, as after a reset.
-    onInput?.(before)
-  }
-
-  resetting.idle()
-}
-
-// A reset puts the thumb back on its default, which the app's `onInput` and `onChange` then hear of; one meeting a change under way waits for it.
-const resetting = resetWhenIdle(busy, () => {
-  if (!slider)
-    return
-
-  const next = Number(slider.value)
-
-  if (next === shown())
-    return
-
-  shown.set(next)
-  onInput?.(next)
-  void released(slider)
-})
-
-onFormReset(() => slider, resetting.reset)
 
 const STEPS = new Set(['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End', 'PageUp', 'PageDown'])
 

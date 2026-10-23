@@ -4,7 +4,7 @@ import type { IconChoice } from './icon-picker'
 import { batch, effect, flush, onCleanup, recipe, signal } from 'kay'
 import Icon from './icon.kay'
 import IconButton from './icon-button.kay'
-import { onFormDefaults, onFormReset } from './form-reset'
+import { defaultKept, onFormReset } from './form-reset'
 import { nameOf } from './icon-picker'
 import { wording } from 'kay/words'
 
@@ -46,8 +46,6 @@ const failed = signal(false)
 const last = signal<IconChoice>()
 let hidden: HTMLInputElement | undefined
 let searchBox: HTMLInputElement | undefined
-// What a reset goes back to: the icon it started with, or the one last saved by a SaveForm.
-let initial = value
 let request = 0
 // The search the grid shows, and where its next page starts: a Show more asks for these, whatever has been typed since.
 let shownQuery = ''
@@ -125,20 +123,15 @@ function pick(next: string) {
 // Read once: a ref an app writes inline is a new function on every read of the prop, which kay would run again on the root each time its attributes change.
 const ref = rest.ref
 
+// What a reset goes back to: the icon it started with, or the one last saved by a SaveForm.
+const initial = defaultKept(() => searchBox, picked, value)
+
 // The hidden input is no default of its own to reset to, so a reset sends the picker back to `initial`, and empties the search the browser emptied.
 onFormReset(() => searchBox, () => {
   typed.set('')
 
-  if (picked() !== initial)
-    pick(initial)
-})
-
-onFormDefaults(() => searchBox, () => {
-  const held = picked()
-
-  return () => {
-    initial = held
-  }
+  if (picked() !== initial())
+    pick(initial())
 })
 
 function choose(choice: IconChoice) {

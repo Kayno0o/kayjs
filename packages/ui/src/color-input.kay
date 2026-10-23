@@ -1,8 +1,7 @@
 ---
 import type { JSX } from 'kay'
-import { effect, recipe, signal, untrack } from 'kay'
-import { changeAccepted } from './change'
-import { onFormReset, resetWhenIdle, startRef } from './form-reset'
+import { recipe } from 'kay'
+import { controlledInput } from './controlled-input'
 
 // The swatch of both engines has no native chrome around it, in the keyline and radius of the fields.
 const look = recipe({
@@ -30,89 +29,25 @@ const { value, label, onChange, ...rest } = props<Omit<JSX.IntrinsicElements['in
 const HEX = /^#[\da-f]{6}$/i
 const normal = (colour: string) => HEX.test(colour) ? colour.toLowerCase() : '#000000'
 
-const shown = signal(untrack(() => normal(value)))
-const busy = signal(false)
-let box: HTMLInputElement | undefined
-// The colour the app last accepted, which a refused change puts back.
-let settled = untrack(() => normal(value))
-// How often the parent's `value` reached the input, so a change under way knows whether the parent answered it.
-let synced = 0
-
-// A parent echoing the colour chosen from `onChange` is not setting it, so only one other than the shown colour counts.
-effect(() => {
-  const wanted = normal(value)
-
-  if (wanted === untrack(shown))
-    return
-
-  shown.set(wanted)
-  settled = wanted
-  synced++
+const { shown, busy, ref: boxRef, move, change: chosen } = controlledInput<string>({
+  control: 'ColorInput',
+  value: () => normal(value),
+  onChange: () => onChange,
+  read: input => input.value,
+  write: (input, next) => {
+    input.value = next
+  },
+  defaultOf: input => input.defaultValue,
+  setDefault: (input, next) => {
+    input.defaultValue = next
+  },
+  appRef: rest.ref,
 })
-
-const boxRef = startRef<HTMLInputElement>((element) => {
-  box = element
-  element.defaultValue = normal(untrack(() => value))
-}, rest.ref)
 
 // The swatch follows the picker while it is dragged over, without telling the app.
 function moved(event: Event) {
-  const input = event.currentTarget as HTMLInputElement
-
-  // Whatever got past the held click moves nothing while a change is under way.
-  if (busy()) {
-    input.value = shown()
-
-    return
-  }
-
-  shown.set(input.value)
+  move(event.currentTarget as HTMLInputElement)
 }
-
-async function chosen(input: HTMLInputElement) {
-  if (busy()) {
-    input.value = shown()
-
-    return
-  }
-
-  const next = input.value
-  const before = settled
-  const syncedBefore = synced
-  const heldBefore = untrack(() => normal(value))
-
-  shown.set(next)
-
-  const accepted = await changeAccepted('ColorInput', () => onChange?.(next), busy.set)
-
-  // The parent set `value` meanwhile, which has the last word.
-  if (synced !== syncedBefore) {
-    resetting.idle()
-
-    return
-  }
-
-  // A `value` already equal to the colour at the start is an echo; one that moved onto it since, even from inside `onChange`, is the parent holding it whatever the answer.
-  if (accepted || (heldBefore !== next && untrack(() => normal(value)) === next)) {
-    settled = next
-  }
-  else {
-    shown.set(before)
-    input.value = before
-  }
-
-  resetting.idle()
-}
-
-// A reset puts the colour back on its default, which the app's `onChange` then hears of; one meeting a change under way waits for it.
-const resetting = resetWhenIdle(busy, () => {
-  if (!box || box.value === shown())
-    return
-
-  void chosen(box)
-})
-
-onFormReset(() => box, resetting.reset)
 ---
 // A native colour input drawn as a swatch, so the picker, the keyboard and the form post come with it. A click while a change is under way opens nothing.
 label(part="root")

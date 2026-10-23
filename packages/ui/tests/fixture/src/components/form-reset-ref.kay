@@ -1,10 +1,14 @@
 ---
 import { signal } from 'kay'
+import Checkbox from '@kaynooo/kayjs-ui/checkbox.kay'
+import ColorInput from '@kaynooo/kayjs-ui/color-input.kay'
 import MarkdownEditor from '@kaynooo/kayjs-ui/markdown-editor.kay'
 import IconPicker from '@kaynooo/kayjs-ui/icon-picker.kay'
 import Select from '@kaynooo/kayjs-ui/select.kay'
+import Slider from '@kaynooo/kayjs-ui/slider.kay'
 import Textarea from '@kaynooo/kayjs-ui/textarea.kay'
 import TextInput from '@kaynooo/kayjs-ui/text-input.kay'
+import Toggle from '@kaynooo/kayjs-ui/toggle.kay'
 
 // The app's `ref` on each control, and a button changing the attributes they spread, which kay answers by running a ref again only when its identity changes.
 // `plain` is a spread element of the page's own: a ref kept as it is runs once, a ref swapped for another runs once more.
@@ -30,6 +34,10 @@ form
   MarkdownEditor(placeholder={hint()} ref={element => note('markdown', element)})
   Select(name="level" options={levels} value="a" class={hint()} ref={element => note('select', element)})
   IconPicker(search={none} ref={element => note('icon', element)} class={hint()})
+  Checkbox(label="Box" class={hint()} ref={element => note('checkbox', element)})
+  Toggle(label="Switch" class={hint()} ref={element => note('toggle', element)})
+  Slider(label="Level" value={1} class={hint()} ref={element => note('slider', element)})
+  ColorInput(label="Colour" value="#112233" class={hint()} ref={element => note('colour', element)})
   input#plain({...{ placeholder: hint() }} ref={plain() === 'first' ? first : second})
   button#swap(type="button" onClick={() => plain.set('second')}) Swap
   button#change(type="button" onClick={() => hint.set('b')}) Change

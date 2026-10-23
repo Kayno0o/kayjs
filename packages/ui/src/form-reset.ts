@@ -90,6 +90,21 @@ export function onFormDefaults(element: () => Element | undefined, hold: () => (
   })
 }
 
+// What MultiSelect and IconPicker go back to on a reset: the value they started with, or the one last saved by a SaveForm.
+export function defaultKept<Value>(element: () => Element | undefined, current: () => Value, start: Value): () => Value {
+  let initial = start
+
+  onFormDefaults(element, () => {
+    const held = current()
+
+    return () => {
+      initial = held
+    }
+  })
+
+  return () => initial
+}
+
 // Asks the controls of a form that keep their default in a signal to hold what they show now; the returned function makes it their default.
 export function holdDefaults(form: HTMLFormElement): () => void {
   const adopt: (() => void)[] = []
