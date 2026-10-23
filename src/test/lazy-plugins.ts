@@ -5,6 +5,7 @@ import { plugin } from 'bun'
 // Plugins that load a native addon, which Bun keeps its global alive for: under `bun test --isolate` every file then pins its whole module graph for the rest of the run.
 const NATIVE_PLUGINS = ['bun-plugin-tailwind']
 let registered = false
+const STYLESHEET = /\.css$/
 
 // A config importing one of NATIVE_PLUGINS gets a plugin that loads the real one when a build runs it, not when the config is read, so a file that never builds a client for a browser loads no addon.
 export function lazyNativePlugins(root: string): void {
@@ -35,7 +36,17 @@ export function lazyNativePlugins(root: string): void {
   }
 }
 
-// The options of a build only run as a check, whose stylesheets nothing reads: without the plugins loading an addon, which that build would otherwise load.
+// The options of a build only run as a check, whose stylesheets nothing reads: a native plugin is swapped for one answering every stylesheet with an empty one, so no addon loads and Bun's own CSS parser, which fails on Tailwind's `source(...)`, never sees them.
 export function checkOnly(options: ClientOptions): ClientOptions {
-  return options.plugins === undefined ? options : { ...options, plugins: options.plugins.filter(one => !(one as BunPlugin & { kayNative?: boolean }).kayNative) }
+  if (options.plugins === undefined)
+    return options
+
+  const emptyStyles = (name: string): BunPlugin => ({
+    name,
+    setup(build) {
+      build.onLoad({ filter: STYLESHEET }, () => ({ contents: '', loader: 'css' }))
+    },
+  })
+
+  return { ...options, plugins: options.plugins.map(one => (one as BunPlugin & { kayNative?: boolean }).kayNative ? emptyStyles(one.name ?? 'kay-native') : one) }
 }

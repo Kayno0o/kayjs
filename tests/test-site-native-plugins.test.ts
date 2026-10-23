@@ -9,6 +9,9 @@ it.skipIf(!existsSync('/proc/self/maps'))('a site that builds no client for a br
   const root = resolve(await fixtureCopy('bare'))
   const script = join(await scratchDir('native-'), 'run.ts')
 
+  // A stylesheet only Tailwind's plugin parses, which the check build must not hand to Bun's own parser.
+  await Bun.write(join(root, 'src/app.css'), '@import "tailwindcss" source("..");\n')
+  await Bun.write(join(root, 'src/routes/_layout.kay'), `---\nimport '../app.css'\n---\nslot\n`)
   await Bun.write(join(root, 'kay.config.ts'), `import tailwind from 'bun-plugin-tailwind'\nimport { defineConfig } from 'kay/server'\n\nexport default defineConfig({ plugins: [tailwind] })\n`)
   await Bun.write(script, `import { readFileSync } from 'node:fs'
 import { testSite } from ${JSON.stringify(resolve('src/test'))}

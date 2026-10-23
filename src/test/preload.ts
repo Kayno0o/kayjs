@@ -15,6 +15,9 @@ import './timeout'
 isolateEnv()
 
 const { registerLoader } = await import('../server/loader')
+const { lazyNativePlugins } = await import('./lazy-plugins')
+
+lazyNativePlugins(testRoot())
 
 await registerLoader(testRoot())
 

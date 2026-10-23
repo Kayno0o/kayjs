@@ -10,6 +10,7 @@ import { COOKIE_NAME } from '../runtime/persist'
 import { sendValue } from '../runtime/send'
 import { decodeValue } from '../runtime/wire'
 import { apiStubs, apiTrees } from '../server/api-modules'
+import { lazyNativePlugins } from './lazy-plugins'
 import { testRoot } from './root'
 
 export interface Mounted {
@@ -150,6 +151,8 @@ async function bundle(root: string, file: string): Promise<string> {
 
   try {
     await Bun.write(join(work, 'entry.ts'), entry(file))
+
+    lazyNativePlugins(root)
 
     const loaded = await loadConfig(root)
     const trees = apiTrees(root, loaded)
