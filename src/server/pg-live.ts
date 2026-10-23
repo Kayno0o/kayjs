@@ -4,16 +4,12 @@ import type { PgHandle } from './pg-data'
 import type { Stop } from './pg-poll'
 import { kayLog } from '../runtime/log'
 import { DB_TIMEOUT_MS, EVENT_TTL_MS, eventWindow, OVERLAP, POLL_MS, pollerOf, timeLimited } from './pg-poll'
-import { NOW, query } from './pg-sql'
+import { escaped, NOW, query, unescaped } from './pg-sql'
 import { onReload } from './reload'
 
 // Writes waiting behind a database that stopped answering: past this many a new one is dropped and logged, rather than held in memory.
 const MAX_QUEUED = 10_000
-const ESCAPED = /\\(.)/g
 
-// Postgres text holds no NUL, which a key made of a visitor's input may carry: it is stored as `\0`, a backslash doubled.
-const escaped = (text: string): string => text.replaceAll('\\', '\\\\').replaceAll('\0', '\\0')
-const unescaped = (text: string): string => text.replace(ESCAPED, (_, char: string) => char === '0' ? '\0' : char)
 
 type Listener = Parameters<LiveStore['subscribe']>[0]
 
