@@ -102,6 +102,7 @@ export async function archive(scan: File) {
 - Under a `base`, `kay_flash` and `kay_locale` are set for that path alone, as `kay_preview` is.
 - `kay_analytics`: the visitor's answer to the notice `analytics({ consent })` shows or to the information line of a counter that asks no one, `yes` or `no` (`no` is the opt-out); necessary to remember the choice, 180 days by default (`consent.maxAge`).
 - `kay_preview`: preview mode for an editor, set only by `enterPreview`; necessary, `preview.maxAge`, an hour by default.
+- `kay_preview_admitted`: set beside an edit-mode `kay_preview` once the cms guard admitted its holder, so presence shows editor names without asking the guard again; necessary, same lifetime and prefix rule as `kay_preview`.
 - `kay_user` (kayjs-auth, also read by kayjs-cms): a random value, readable by scripts, set while a person is signed in so a library's script asks the server only for a browser that may get an answer; necessary, for the sign-in's `maxAge` or the browser session, ended at sign-out.
 - `kay_editor` (kayjs-cms): marks the browser as an editor's, readable by scripts, so the Edit this page link looks for an answer; necessary, 90 days slid forward each time the guard lets the editor through, ended at sign-out.
 - `kay_editor_who` (kayjs-cms): a digest naming which editor is signed in, readable by scripts, so the on-page editor keeps its drafts per person; necessary, 90 days, set when the guard lets the editor through, ended at sign-out.

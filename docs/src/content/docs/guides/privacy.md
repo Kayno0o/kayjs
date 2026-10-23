@@ -17,6 +17,7 @@ This page lists what each feature keeps, for a site's privacy notice and for the
 | `kay_locale` | a visitor picking a locale | a year |
 | `kay_analytics` | the consent notice or information line of `analytics()` | 180 days, or the `maxAge` you set |
 | `kay_preview` | `enterPreview()`, for an editor | an hour by default |
+| `kay_preview_admitted` | kayjs-cms, an editor in edit mode whose guard admitted them, so presence names the other editors | the same as `kay_preview` |
 | `kay_user` | kayjs-auth, while a person is signed in | the sign-in's `maxAge` or the browser session, ended at sign-out |
 | `kay_editor` | kayjs-cms, for an editor | 90 days, slid forward each visit, ended at sign-out |
 | `kay_editor_who` | kayjs-cms, a digest naming the signed-in editor so drafts are kept per person | 90 days, ended at sign-out |
