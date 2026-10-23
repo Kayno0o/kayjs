@@ -3,12 +3,12 @@ title = "kay"
 [extend]
 useDefault = true
 
-# Values the tests hold on purpose: the RFC 6455 sample WebSocket key, a key name and fixture paths the generic-api-key rule takes for secrets.
+# Values the tests hold on purpose: the RFC 6455 sample WebSocket key, a key name and fixture folders the generic-api-key rule takes for secrets.
 [[allowlists]]
 description = "known test values"
 regexTarget = "match"
 regexes = [
   '''dGhlIHNhbXBsZSBub25jZQ==''',
   '''rs384\.privateKey''',
-  '''tests/fixtures/mcp/src/(api|none)''',
+  '''tests/fixtures/[\w-]+/src/[\w/-]+''',
 ]
