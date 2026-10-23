@@ -35,7 +35,7 @@ import { apiRoutePath, withoutSlash } from './routes'
 import { VARY_COOKIE, wasReadPersonally } from './scope'
 import { carriedNames, carryContext } from './security'
 import { answered, failed, SERVER_SPAN, startSpan } from './trace'
-import { withSocketLimits } from './ws-limits'
+import { socketLimits } from './ws-limits'
 
 // What a body Elysia streams, awaits or asks for its response has: a generator, a thenable, an object with `toResponse()`.
 const STREAMED = ['next', 'then', 'toResponse']
@@ -116,7 +116,11 @@ export async function serveApi(app: Elysia, modules: ApiModule[], options: Actio
       if (typeof route.handler === 'function')
         route.handler = inRequestLocale(route.handler as Handler, options, route.method === 'GET')
 
-      const hooks = route.hooks as { error?: unknown } | undefined
+      const hooks = route.hooks as { error?: unknown, beforeHandle?: unknown, detail?: { messages?: SocketLimits } } | undefined
+
+      // Whichever way the module chains its `.ws()` (in a group, a guard or a used plugin), every websocket route is held to its limits.
+      if (hooks && route.method === 'WS')
+        hooks.beforeHandle = [socketLimits(route.path, hooks.detail?.messages), ...[hooks.beforeHandle ?? []].flat()]
 
       if (hooks?.error !== undefined)
         hooks.error = [hooks.error].flat().map(hook => localizedHook(hook, options))
@@ -653,7 +657,7 @@ export function api(options: ApiOptions = {}): Elysia<'', { decorator: Empty, st
   const socketRoute = instance.ws.bind(instance) as (path: string, options: SocketOptions) => unknown
 
   // `.ws()` returns the instance, so the chain goes on as it was written.
-  instance.ws = ((path: string, socketOptions: SocketOptions) => socketRoute(path, withSocketLimits(path, decoded(instance, path, socketOptions)))) as typeof instance.ws
+  instance.ws = ((path: string, socketOptions: SocketOptions) => socketRoute(path, decoded(instance, path, socketOptions))) as typeof instance.ws
 
   return instance as unknown as Elysia<'', { decorator: Empty, store: Empty, derive: Empty, resolve: ApiLocals }>
 }

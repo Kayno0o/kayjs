@@ -102,27 +102,14 @@ function limitUpgrades(server: Upgradable): void {
   }
 }
 
-// The route's options with its limits checked now and put on each upgrade, run before the user's `beforeHandle`.
-export function withSocketLimits<Options extends { beforeHandle?: unknown, detail?: unknown }>(path: string, options: Options): Options {
-  const limits = limitsOf(path, (options.detail as { messages?: SocketLimits } | undefined)?.messages)
-  const before = [options.beforeHandle ?? []].flat() as ((context: RouteContext) => unknown)[]
+// A hook run before a websocket route's upgrade, its limits checked when the module mounts: it puts them on the context, which Elysia copies into the socket's data.
+export function socketLimits(path: string, given: SocketLimits | undefined): (context: RouteContext) => void {
+  const limits = limitsOf(path, given)
 
-  return {
-    ...options,
-    beforeHandle: async (context: RouteContext) => {
-      context[LIMITS] = limits
+  return (context) => {
+    context[LIMITS] = limits
 
-      if (context.server)
-        limitUpgrades(context.server)
-
-      for (const handler of before) {
-        const result = await handler(context)
-
-        if (result !== undefined)
-          return result
-      }
-
-      return undefined
-    },
+    if (context.server)
+      limitUpgrades(context.server)
   }
 }

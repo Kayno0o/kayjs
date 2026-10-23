@@ -1,6 +1,6 @@
 import { resolve } from 'node:path'
 import { afterAll, describe, expect, it } from 'bun:test'
-import { api } from '../src/server'
+import { socketLimits } from '../src/server/ws-limits'
 import { testSite } from '../src/test'
 
 const root = resolve(import.meta.dir, 'fixtures/ws-limits')
@@ -141,13 +141,34 @@ describe('the rate of a websocket\'s messages', () => {
   })
 })
 
+describe('every websocket route', () => {
+  it('is held to the limits however the module chains it, or builds its instance', async () => {
+    for (const path of ['/grouped', '/guarded', '/used'])
+      expect((await talk(path, 'x'.repeat(1_100_000))).code).toBe(1009)
+
+    const plain = new WebSocket(`ws://localhost:${port}/api/plain`)
+    const outcome: Outcome = { received: [], code: undefined, reason: undefined }
+
+    plain.onclose = (event) => {
+      outcome.code = event.code
+    }
+    await new Promise<void>(resolve => (plain.onopen = () => resolve()))
+    plain.send('x'.repeat(1_100_000))
+    await Bun.sleep(200)
+    expect(outcome.code).toBe(1009)
+  })
+
+  it('runs the route\x27s own beforeHandle hooks once', async () => {
+    expect((await talk('/hooked', 'a')).received).toEqual(['echo:1'])
+    expect(await (await site.fetch('/api/chat/hooked-count')).json()).toBe(1)
+  })
+})
+
 describe('the options of a websocket route', () => {
   it('throw when they are no size or rate', () => {
-    const message = () => undefined
-
-    expect(() => api().ws('/', { detail: { messages: { maxSize: 0 } }, message })).toThrow('maxSize')
-    expect(() => api().ws('/', { detail: { messages: { maxSize: 'big' } }, message } as never)).toThrow('maxSize')
-    expect(() => api().ws('/', { detail: { messages: { rateLimit: { max: 0, window: '1s' } } }, message } as never)).toThrow('rateLimit')
-    expect(() => api().ws('/', { detail: { messages: { rateLimit: { max: 5, window: 3 } } }, message } as never)).toThrow('rateLimit')
+    expect(() => socketLimits('/', { maxSize: 0 })).toThrow('maxSize')
+    expect(() => socketLimits('/', { maxSize: 'big' as never })).toThrow('maxSize')
+    expect(() => socketLimits('/', { rateLimit: { max: 0, window: '1s' } })).toThrow('rateLimit')
+    expect(() => socketLimits('/', { rateLimit: { max: 5, window: 3 as never } })).toThrow('rateLimit')
   })
 })

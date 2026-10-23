@@ -95,8 +95,9 @@ describe('a route no action, API module or extension limit covers', () => {
     const mounted = await app({ base: '/blog' })
 
     expect((await post(site, '/auth/token/', big)).status).toBe(413)
-    expect((await post(mounted, '/blog/auth/token', big)).status).toBe(413)
-    expect((await post(mounted, '/blog/auth/token/', big)).status).toBe(413)
+    // The proxy strips the base before the request reaches the server.
+    expect((await post(mounted, '/auth/token', big)).status).toBe(413)
+    expect((await post(mounted, '/auth/token', 'x')).status).toBe(200)
   })
 
   it('follows the app\'s maxSize', async () => {

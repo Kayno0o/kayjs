@@ -321,7 +321,7 @@ describe('API modules', () => {
     expect(listening).toBe(0)
   })
 
-  it('sends the last 100 messages queued while connecting, and none once closed', () => {
+  it('sends the last 50 messages queued while connecting, and none once closed', () => {
     const sent: string[] = []
     const ws = Object.assign(new EventTarget(), { readyState: 0, send: (text: string) => sent.push(text), close: () => undefined }) as unknown as WebSocket
     const room = openSocket<number, never>(() => ws)
@@ -333,7 +333,7 @@ describe('API modules', () => {
 
     ws.dispatchEvent(new Event('open'))
 
-    expect([sent.length, sent[0], sent.at(-1)]).toEqual([100, '50', '149'])
+    expect([sent.length, sent[0], sent.at(-1)]).toEqual([50, '100', '149'])
 
     sent.length = 0
     room.close()

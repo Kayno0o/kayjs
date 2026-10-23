@@ -25,8 +25,8 @@ const MAX_RECONNECT_MS = 30_000
 const OFFLINE_RETRY_MS = 60_000
 // The close code of a connection either side ended on purpose, which is not reconnected.
 const NORMAL_CLOSURE = 1000
-// What a socket keeps to send while it connects, the oldest dropped past it.
-const MAX_QUEUED = 100
+// What a socket keeps to send while it connects, the oldest dropped past it: half the 100 messages a second a route takes by default, so the flush after a reconnect stays under it.
+const MAX_QUEUED = 50
 // What Elysia's websocket parser reads as JSON, by first character: `"`, `[`, `{`.
 const JSON_START = /^["[{]/
 const NUMERIC = /^-?\d+(?:\.\d+)?(?:e[+-]?\d+)?$/i
