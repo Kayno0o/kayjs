@@ -136,10 +136,10 @@ export function pgLists(source: PgJobsSource): ListStore & { close: () => Promis
 
       return subscriberOf(row)
     },
-    async confirm(list, id, now = Date.now()): Promise<boolean> {
-      await query('UPDATE kay_mail_subscribers SET status = \'confirmed\', confirmed_at = $3::bigint WHERE list = $1 AND id = $2 AND status = \'pending\'', [list, id, now])
+    async confirm(list, id, now = Date.now(), issuedAt = Number.MAX_SAFE_INTEGER): Promise<boolean> {
+      await query('UPDATE kay_mail_subscribers SET status = \'confirmed\', confirmed_at = $3::bigint WHERE list = $1 AND id = $2 AND status = \'pending\' AND created_at <= $4::bigint', [list, id, now, issuedAt])
 
-      return (await query('SELECT 1 FROM kay_mail_subscribers WHERE list = $1 AND id = $2', [list, id])).length > 0
+      return (await query('SELECT 1 FROM kay_mail_subscribers WHERE list = $1 AND id = $2 AND status = \'confirmed\'', [list, id])).length > 0
     },
     async remove(list, id): Promise<boolean> {
       return await removeWhere('list = $1 AND id = $2', [list, id]) > 0

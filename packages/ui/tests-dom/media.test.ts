@@ -349,6 +349,26 @@ describe('Masonry and WhenVisible', () => {
     expect(observer.observed).toHaveLength(2)
   })
 
+  test('forgets the height of a tile that left, so one coming back waits to be measured', async () => {
+    const root = await media()
+    const masonry = root.querySelector<HTMLElement>('#masonry')!
+    const tiles = [...masonry.querySelectorAll<HTMLElement>('.kui-masonry-item')]
+    const layout = Observer.made.find(made => made.observed.includes(masonry))!
+    const heights = Observer.made.find(made => made.observed.includes(tiles[0]!))!
+
+    layout.callback([{ target: masonry, contentRect: { width: 524, height: 0 } }])
+    heights.callback(tiles.map((tile, index) => ({ target: tile, borderBoxSize: [{ blockSize: [100, 40, 60][index] }] })))
+    await settle()
+    setTiles(['a', 'c'])
+    await settle()
+    setTiles(['a', 'b', 'c'])
+    await settle()
+
+    const back = [...masonry.querySelectorAll<HTMLElement>('.kui-masonry-item')][1]!
+
+    expect(back.hasAttribute('data-pending')).toBe(true)
+  })
+
   test('asks for more once the sentinel comes into view', async () => {
     const root = await media()
     const sentinel = root.querySelector('.kui-when-visible')!

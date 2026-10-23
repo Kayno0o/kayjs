@@ -138,6 +138,31 @@ describe('Sortable, from the keyboard', () => {
     expect(dialog.querySelector(':scope > [data-kui-announce]')?.textContent).toBe('Moved to 2 of 2')
   })
 
+  test('steps over an item that left the page, whose registration is dropped', async () => {
+    const list = document.createElement('ul')
+
+    stage().append(list)
+
+    const sortable = new Sortable({ onReorder: () => undefined })
+    const rows = [1, 2, 3].map((id) => {
+      const row = document.createElement('li')
+      const handle = document.createElement('button')
+
+      row.append(handle)
+      list.append(row)
+      sortable.item(id)(row)
+      sortable.handle(id)(handle)
+
+      return { row, handle }
+    })
+
+    rows[1]!.row.remove()
+    press(rows[0]!.handle, 'ArrowDown')
+    await Bun.sleep(150)
+
+    expect(said()).toBe('Moved to 2 of 2')
+  })
+
   test('keeps the latest words when a second move is said before a fresh region has settled', async () => {
     const dialog = document.createElement('dialog')
 

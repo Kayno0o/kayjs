@@ -67,7 +67,7 @@ describe('list tokens', () => {
   const claims = { list: 'default', id: 'abc', locale: 'fr' }
 
   it('carries the claims of the purpose it was signed for', () => {
-    expect(checkToken('confirm', signToken('confirm', claims))).toEqual({ ok: true, claims })
+    expect(checkToken('confirm', signToken('confirm', claims))).toMatchObject({ ok: true, claims })
     expect(checkToken('unsubscribe', signToken('unsubscribe', claims))).toEqual({ ok: true, claims })
   })
 
@@ -192,6 +192,27 @@ describe('the subscribe form', () => {
     expect(new Set(answers.map(answer => JSON.stringify(answer))).size).toBe(1)
     expect(emails.filter(email => outbox.to(email).length > 0)).toHaveLength(CONFIRMS_PER_HOUR)
     expect(outbox.to(emails.at(-1)!)).toHaveLength(0)
+  })
+
+  it('confirms only a sign-up asked before the link was made, so an old mail cannot confirm a later one', async () => {
+    const email = fresh()
+    const page = async (token: string) => (await site.fetch(`/_kay/mail/list/confirm?token=${token}`)).text()
+
+    await site.call(subscribe, { email })
+
+    const old = tokenOf(await confirmationOf(email), '/confirm')
+
+    await mail.list().unsubscribe(email)
+    await Bun.sleep(5)
+    await site.call(subscribe, { email })
+    await site.runJobs()
+
+    const newest = tokenOf(outbox.to(email).filter(sent => sent.subject.startsWith('Confirm')).at(-1)!, '/confirm')
+
+    expect(await page(old)).toContain('This link does not work')
+    expect((await mail.list().subscribers()).map(row => row.email)).not.toContain(email)
+    expect(await page(newest)).toContain('Subscription confirmed')
+    expect((await mail.list().subscribers()).map(row => row.email)).toContain(email)
   })
 
   it('refuses a post past the limit of its address, the same whatever the address is', async () => {

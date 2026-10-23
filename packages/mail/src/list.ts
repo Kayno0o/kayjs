@@ -555,7 +555,7 @@ export function createLists(base: Omit<ListHost, 'enqueueMail' | 'enqueueRun' | 
 
       try {
         // A subscriber that is gone, unsubscribed or erased, answers as a link that does not work.
-        return { kind: await store.confirm(checked.claims.list, checked.claims.id) ? 'confirmed' : 'invalid', locale: checked.claims.locale }
+        return { kind: await store.confirm(checked.claims.list, checked.claims.id, undefined, checked.claims.issuedAt) ? 'confirmed' : 'invalid', locale: checked.claims.locale }
       }
       catch (error) {
         log.error('a confirmation link could not be checked against the store of its list', error)

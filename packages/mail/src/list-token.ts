@@ -7,6 +7,8 @@ export interface TokenClaims {
   // The subscriber's id, never their address.
   id: string
   locale?: string | undefined
+  // When a confirmation link was made, read off its expiry.
+  issuedAt?: number | undefined
 }
 
 // How long the link of a confirmation mail works.
@@ -70,5 +72,5 @@ export function checkToken(purpose: TokenPurpose, token: unknown, now = Date.now
   if (purpose === 'confirm' && (typeof claims.e !== 'number' || claims.e < now))
     return { ok: false, reason: 'expired' }
 
-  return { ok: true, claims: { list: claims.l, id: claims.i, ...typeof claims.c === 'string' ? { locale: claims.c } : {} } }
+  return { ok: true, claims: { list: claims.l, id: claims.i, ...typeof claims.c === 'string' ? { locale: claims.c } : {}, ...purpose === 'confirm' ? { issuedAt: (claims.e as number) - CONFIRM_MAX_AGE_MS } : {} } }
 }

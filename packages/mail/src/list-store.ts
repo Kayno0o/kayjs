@@ -41,8 +41,8 @@ export interface ListStore {
   ask: (list: string, email: string, id: string, locale: string, now?: number, proof?: Proof) => Maybe<Subscriber>
   // Forgets the confirmations nobody clicked in 7 days and the broadcasts finished 30 days ago with their deliveries, which the lists run when a store opens and every hour.
   sweep: (now?: number) => Maybe<void>
-  // Whether the subscriber exists after the call; one confirmed already stays as it is.
-  confirm: (list: string, id: string, now?: number) => Maybe<boolean>
+  // Whether the subscriber is confirmed after the call; one confirmed already stays as it is. A `issuedAt` confirms only a row asked before it, so the link of an earlier mail cannot confirm a later sign-up.
+  confirm: (list: string, id: string, now?: number, issuedAt?: number) => Maybe<boolean>
   remove: (list: string, id: string) => Maybe<boolean>
   removeEmail: (list: string, email: string) => Maybe<boolean>
   // Takes the address off every list of the store, with its deliveries; how many rows went.
@@ -106,7 +106,7 @@ export function openLists(path: string) {
   const insertPending = db.query('INSERT OR IGNORE INTO kay_mail_subscribers (id, list, email, status, locale, created_at, source, wording) VALUES (?1, ?2, ?3, \'pending\', ?4, ?5, ?6, ?7)')
   const byEmail = db.query<SubscriberRow, [string, string]>('SELECT * FROM kay_mail_subscribers WHERE list = ?1 AND email = ?2')
   const byId = db.query<SubscriberRow, [string, string]>('SELECT * FROM kay_mail_subscribers WHERE list = ?1 AND id = ?2')
-  const confirmRow = db.query('UPDATE kay_mail_subscribers SET status = \'confirmed\', confirmed_at = ?3 WHERE list = ?1 AND id = ?2 AND status = \'pending\'')
+  const confirmRow = db.query('UPDATE kay_mail_subscribers SET status = \'confirmed\', confirmed_at = ?3 WHERE list = ?1 AND id = ?2 AND status = \'pending\' AND created_at <= ?4')
   const deleteDeliveries = db.query('DELETE FROM kay_mail_deliveries WHERE subscriber = ?1')
   const deleteSubscriber = db.query('DELETE FROM kay_mail_subscribers WHERE list = ?1 AND id = ?2')
   const byEmailId = db.query<{ id: string }, [string, string]>('SELECT id FROM kay_mail_subscribers WHERE list = ?1 AND email = ?2')
@@ -183,11 +183,11 @@ export function openLists(path: string) {
 
       return row ? subscriberOf(row) : undefined
     },
-    // Whether the subscriber exists after the call; one confirmed already stays as it is.
-    confirm(list: string, id: string, now = Date.now()): boolean {
-      confirmRow.run(list, id, now)
+    // Whether the subscriber is confirmed after the call; one confirmed already stays as it is.
+    confirm(list: string, id: string, now = Date.now(), issuedAt = Number.MAX_SAFE_INTEGER): boolean {
+      confirmRow.run(list, id, now, issuedAt)
 
-      return byId.get(list, id) != null
+      return byId.get(list, id)?.status === 'confirmed'
     },
     remove,
     // Immediate, as these read before they write and two processes may share the file.
