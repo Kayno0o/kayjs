@@ -208,3 +208,53 @@ test('a Markdown field of the entry is typed block by block like the body', asyn
   await type(paragraph, 'Intro **text** more')
   expect((await draft())?.data.intro).toBe('Intro **text** more')
 })
+
+// The page renders the block again as another tag once its marker changes, which the test does by hand as happy-dom runs no page.
+function swapTag(block: HTMLElement, tag: string, html: string): HTMLElement {
+  const next = document.createElement(tag)
+
+  next.innerHTML = html
+  block.replaceWith(next)
+  Object.defineProperty(next, 'innerText', { get: () => next.textContent })
+
+  return next
+}
+
+async function typeAt(element: HTMLElement, text: string, caret: number): Promise<void> {
+  element.textContent = text
+  document.getSelection()?.collapse(element.firstChild, caret)
+  element.dispatchEvent(new Event('input', { bubbles: true }))
+  await Bun.sleep(0)
+}
+
+test('typing a heading marker at the start of a paragraph goes on in the heading it becomes, the caret kept', async () => {
+  const { blocks: [, second], click, draft } = await open()
+
+  await click(second!)
+  await typeAt(second!, '# Second [one](https://x.test) here.', 2)
+
+  const heading = swapTag(second!, 'h1', 'Second <a href="https://x.test">one</a> here.')
+
+  await Bun.sleep(30)
+
+  expect(heading.getAttribute('contenteditable')).toBe('plaintext-only')
+  expect(heading.textContent).toBe('# Second [one](https://x.test) here.')
+  expect(document.activeElement).toBe(heading)
+  expect(document.getSelection()?.anchorOffset).toBe(2)
+  expect((await draft())?.body).toBe(BODY.replace('Second [one](https://x.test) here.', '# Second [one](https://x.test) here.'))
+})
+
+test('deleting the marker of a heading goes on in the paragraph it becomes', async () => {
+  const { blocks: [, , heading], click } = await open()
+
+  await click(heading!)
+  await typeAt(heading!, 'A heading', 0)
+
+  const paragraph = swapTag(heading!, 'p', 'A heading')
+
+  await Bun.sleep(30)
+
+  expect(paragraph.getAttribute('contenteditable')).toBe('plaintext-only')
+  expect(document.activeElement).toBe(paragraph)
+  expect(document.getSelection()?.anchorOffset).toBe(0)
+})

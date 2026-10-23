@@ -139,7 +139,7 @@ While you edit, point at an image the page shows from an image field, or Tab to 
 
 Click a text on the page and type in it where it stands, with no form to find. The text is edited as plain text: what you type or paste stays text, never markup, and in a one-line text a line break becomes a space. Enter keeps the text and ends the edit, as does a click elsewhere, and Escape puts back the text from before. Switching to another window does not end it.
 
-A long text keeps its line breaks: Enter starts a new line, and Ctrl+Enter (Cmd+Enter on a Mac) keeps the text. Markdown is typed one paragraph, heading or list item at a time, as the Markdown you would write in the form, so `**bold**` and `[a link](/page)` are typed as they are. Leaving the block shows it formatted again, and Escape puts it back. A block the editor cannot match to its Markdown, such as a table cell or text with an image in it, opens in the form.
+A long text keeps its line breaks: Enter starts a new line, and Ctrl+Enter (Cmd+Enter on a Mac) keeps the text. Markdown is typed one paragraph, heading or list item at a time, as the Markdown you would write in the form, so `**bold**` and `[a link](/page)` are typed as they are. Leaving the block shows it formatted again, and Escape puts it back. Typing `# ` at the start of a paragraph, or deleting it from a heading, turns the block into another tag and you keep typing in it where you were. A block the editor cannot match to its Markdown, such as a table cell or text with an image in it, opens in the form.
 
 Tab reaches a marked text and Enter starts the edit. The form beside the page shows each keystroke, and the page keeps the text you are typing while it renders the draft again.
 

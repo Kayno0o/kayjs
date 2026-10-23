@@ -5,7 +5,7 @@ import type { FieldMarker, FieldPath, MarkedField } from '../markers'
 import { announce } from '@kaynooo/kayjs-ui/announce'
 import { wording } from 'kay/words'
 import { checkField, fieldsOf, itemAt } from '../fields'
-import { BODY, entryKey, markedRange, markersOf } from '../markers'
+import { allMarked, BODY, entryKey, markedRange, markersOf } from '../markers'
 import { joinPath, pathSegments, valueAt } from '../paths'
 import { plainText, sourceOffset, squeeze } from './caret'
 import { OWN } from './own'
@@ -425,8 +425,70 @@ function sourceOf(whole: unknown, block: InlineTarget['block'], field: Field | u
   return field?.kind === 'textarea' ? String(whole ?? '') : undefined
 }
 
+// The text of an element being typed in as the browser lays it out, a line break for each `br` and for each block it makes of a pasted line, but not as CSS transforms it: `innerText` would write an uppercased text into the source.
+function typedText(element: Element): string {
+  let text = ''
+
+  const walk = (parent: Node) => {
+    for (const child of parent.childNodes) {
+      if (child.nodeType === Node.TEXT_NODE) {
+        text += (child as Text).data
+
+        continue
+      }
+
+      if (!(child instanceof Element))
+        continue
+
+      if (child.localName === 'br') {
+        text += '\n'
+
+        continue
+      }
+
+      const lined = child.localName === 'div' || child.localName === 'p'
+
+      if (lined && text !== '' && !text.endsWith('\n'))
+        text += '\n'
+
+      walk(child)
+
+      if (lined && !text.endsWith('\n'))
+        text += '\n'
+    }
+  }
+
+  walk(element)
+
+  return text
+}
+
+// The page renders a block again as another tag when its first characters change (`# `, `- `, `1. `), which drops the element being typed in. Once it has, this finds the block of the new page that holds the caret and goes on typing there.
+function continueTyping(marker: FieldMarker, drafts: Drafts, offset: number, tries = 4): void {
+  const field = allMarked().find(found => found.attribute === undefined && found.marker.path === marker.path && entryKey(found.marker) === entryKey(marker))
+  const range = field && markedRange(field)
+
+  if (field && range) {
+    for (const element of field.element.querySelectorAll<HTMLElement>(BLOCKS)) {
+      if (range.comparePoint(element, 0) !== 0)
+        continue
+
+      const target = blockTargetOf(field, element, drafts)
+
+      if (target?.element === element && target.block && target.block.from <= offset && offset <= target.block.to) {
+        startInline(target, drafts, undefined, offset - target.block.from)
+
+        return
+      }
+    }
+  }
+
+  if (tries > 0)
+    requestAnimationFrame(() => continueTyping(marker, drafts, offset, tries - 1))
+}
+
 // Makes the element a plain-text box until the focus leaves it, writing each keystroke to the draft as text: what is typed or pasted never becomes markup. A one-line text keeps no line break and Enter keeps the text; a long text or a block of Markdown, which is typed as its source, takes Enter as a line break and Ctrl+Enter keeps the text. Escape puts back the text from before the edit. The page renders the draft again meanwhile, which leaves this element alone, and once a block's edit ends it renders its Markdown again.
-export function startInline({ entry, path, field, label, element, busy, block }: InlineTarget, drafts: Drafts, at?: { x: number, y: number }): void {
+export function startInline({ entry, path, field, label, element, busy, block }: InlineTarget, drafts: Drafts, at?: { x: number, y: number }, resume?: number): void {
   active?.end()
 
   const point = at ? document.caretPositionFromPoint(at.x, at.y) : null
@@ -444,12 +506,25 @@ export function startInline({ entry, path, field, label, element, busy, block }:
   let cancelled = false
   let edited = false
   let blockEnd = block?.to ?? 0
-  // Read as rendered, as the browser makes a line of its own for a pasted line break (a `div` or `br`) that `textContent` would glue to the text around it.
-  // eslint-disable-next-line unicorn/prefer-dom-node-text-content -- innerText is the rendered text, with the line breaks textContent lacks
-  const typed = () => element.innerText.replaceAll(/\r\n?/g, '\n').replace(EDGE_BREAKS, '')
+  const typed = () => typedText(element).replaceAll(/\r\n?/g, '\n').replace(EDGE_BREAKS, '')
+  // Where the caret is in the typed text, which a block turned into another tag by its markup goes on from.
+  let caret: number | undefined
+  const noteCaret = () => {
+    const selection = document.getSelection()
+
+    if (!selection?.focusNode || !element.contains(selection.focusNode))
+      return
+
+    const head = document.createRange()
+
+    head.selectNodeContents(element)
+    head.setEnd(selection.focusNode, selection.focusOffset)
+    caret = head.toString().length
+  }
   const commit = () => {
     if (!block) {
-      drafts.set(entry, path, inlineValue(field!, typed()))
+      if (field)
+        drafts.set(entry, path, inlineValue(field, typed()))
 
       return
     }
@@ -500,17 +575,27 @@ export function startInline({ entry, path, field, label, element, busy, block }:
 
       head.selectNodeContents(element)
       head.setEnd(point.offsetNode, point.offset)
-      offset = sourceOffset(initial, element.textContent ?? '', head.toString().length, block !== undefined || field?.kind === 'markdown')
+      offset = sourceOffset(initial, element.textContent ?? '', head.toString().length, block !== undefined)
     }
 
     element.textContent = initial
   }
 
+  if (resume !== undefined)
+    offset = resume
+
   active = { element, end }
   // An element the page took away can no longer be blurred, so the edit ends with it.
   gone = new MutationObserver(() => {
-    if (!element.isConnected)
-      end()
+    if (element.isConnected)
+      return
+
+    const resumeAt = block && edited && caret !== undefined && !cancelled ? block.from + caret : undefined
+
+    end()
+
+    if (resumeAt !== undefined)
+      continueTyping({ ...entry, path }, drafts, resumeAt)
   })
   gone.observe(document.documentElement, { childList: true, subtree: true })
   element.setAttribute('contenteditable', 'plaintext-only')
@@ -529,6 +614,7 @@ export function startInline({ entry, path, field, label, element, busy, block }:
   }, { signal })
   element.addEventListener('input', () => {
     edited = true
+    noteCaret()
     emptied = field !== undefined && !block && !field.required && typed() === ''
     note?.show(field && checkField(field, inlineValue(field, typed())))
 

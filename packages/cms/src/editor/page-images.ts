@@ -4,7 +4,7 @@ import type { FieldMarker, MarkedField } from '../markers'
 import { messageOf, toast } from '@kaynooo/kayjs-ui'
 import { announce } from '@kaynooo/kayjs-ui/announce'
 import { wording } from 'kay/words'
-import { fieldsAt } from '../markers'
+import { entryKey, fieldsAt } from '../markers'
 import { setImageSize } from './image-value'
 import { fieldOfMarker, isBusy } from './inline'
 import { OWN } from './own'
@@ -57,16 +57,32 @@ function barOf(found: MarkedField, label: string, accept: string | undefined): I
   return { entry: found.marker, path: found.marker.path as string, label, accept, style: `left: ${right - SIZE - MARGIN}px; top: ${top + MARGIN}px` }
 }
 
+function sameBar(left: ImageBar | undefined, right: ImageBar | undefined): boolean {
+  if (!left || !right)
+    return left === right
+
+  return left.style === right.style && left.path === right.path && left.accept === right.accept && left.label === right.label && entryKey(left.entry) === entryKey(right.entry)
+}
+
 // Offers the replace button over the page's images while the editor is open, and takes a file dropped on one.
 export function watchImages(drafts: Drafts, show: (bar: ImageBar | undefined) => void, replace: (bar: ImageBar, file: File) => void): ImageWatch {
   const follow = new AbortController()
   const { signal } = follow
   let current: { found: MarkedField, label: string, accept: string | undefined } | undefined
   let dropping: Element | undefined
+  let shown: ImageBar | undefined
 
   const offer = (next: typeof current) => {
+    const bar = next && barOf(next.found, next.label, next.accept)
+
     current = next
-    show(next && barOf(next.found, next.label, next.accept))
+
+    // A scroll or a resize that moved nothing writes nothing, as the bar is a signal the editor renders from.
+    if (sameBar(bar, shown))
+      return
+
+    shown = bar
+    show(bar)
   }
   const inBar = (node: EventTarget | null) => node instanceof Element && node.closest(`[${BAR}]`) !== null
   const reached = (event: Event) => {
@@ -130,6 +146,7 @@ export function watchImages(drafts: Drafts, show: (bar: ImageBar | undefined) =>
     destroy() {
       follow.abort()
       stopDrop()
+      shown = undefined
       show(undefined)
     },
   }

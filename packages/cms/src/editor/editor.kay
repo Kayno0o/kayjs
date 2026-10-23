@@ -690,10 +690,12 @@ let waiting = 0
 
 // Runs the edit once the field's entry has loaded or failed to, or after a few seconds. A later click, or the editor closing, ends the wait.
 async function editOnceLoaded(field: MarkedField, ticket: number, run: () => void): Promise<void> {
-  for (let tries = 0; tries < 50 && !isSettled(field.marker) && ticket === waiting && open(); tries++)
+  const waits = () => ticket === waiting && open()
+
+  for (let tries = 0; tries < 50 && !isSettled(field.marker) && waits(); tries++)
     await new Promise(resolve => setTimeout(resolve, 100))
 
-  if (ticket === waiting && open())
+  if (waits())
     run()
 }
 

@@ -177,6 +177,11 @@ export function notePlace(field: MarkedField, x?: number, y?: number): void {
   placed = { key: entryKey(field.marker), path: pathOf(field.marker), text: region.toString(), caret: before.toString().length }
 }
 
+// Drops the place a click noted, for a click whose field the form does not show, which no control will place a caret for.
+export function forgetPlace(): void {
+  placed = undefined
+}
+
 // Puts the caret of the text control that was just focused where the click was, when the click was on the field of that path.
 export function placeCaret(control: HTMLElement | null | undefined, entry: EntryRef, path: string, markdown: boolean): void {
   const at = placed

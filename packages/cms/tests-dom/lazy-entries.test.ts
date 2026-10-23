@@ -38,7 +38,7 @@ function server(slow = 0, mode?: 'fail' | 'hang'): void {
       return Response.json({ denied: {}, prefix: '/admin' })
 
     if (mode === 'hang')
-      await new Promise(() => {})
+      await new Promise(() => undefined)
 
     await Bun.sleep(slow)
 

@@ -247,3 +247,15 @@ test('a text clicked before its entry has loaded is left to the form', async () 
 
   expect(page.hasAttribute('contenteditable')).toBe(false)
 })
+
+test('a text the page shows transformed by CSS is stored as typed, not as shown', async () => {
+  const { elements: [title], draft, click } = await open([{ marker: 'pages:home:title', text: 'Home' }])
+
+  Object.defineProperty(title!, 'innerText', { get: () => title!.textContent.toUpperCase(), configurable: true })
+  await click(title!)
+  title!.textContent = 'Welcome home'
+  title!.dispatchEvent(new Event('input', { bubbles: true }))
+  await settle()
+
+  expect(await draft('title')).toBe('Welcome home')
+})
