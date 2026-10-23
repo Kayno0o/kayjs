@@ -94,7 +94,11 @@ describe('restyling the chat from src/ui.ts', () => {
   })
 
   test('the field and the buttons keep the kayjs-ui classes the theme styles', () => {
-    expect(html).toContain('class="kui-field-input"')
+    const field = html.match(/<textarea[^>]*class="([^"]*)"/)?.[1] ?? ''
+
+    expect(field).toContain('kui-field-input')
+    expect(field).toContain('rounded-[1.25rem] px-3.5')
+    expect(field).toContain('focus-visible:outline-offset-2')
     expect(html).toContain('class="kui-icon-btn kai-chat-send size-12"')
   })
 })

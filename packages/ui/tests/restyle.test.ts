@@ -186,7 +186,7 @@ describe('restyling a component of kayjs-ui from src/ui.ts', () => {
   })
 
   test('an IconButton and the trigger of a Menu take the restyle, a Menu class string going to the trigger', () => {
-    expect(classesOfTag('id="icon-button"')).toEqual(expect.arrayContaining(['kui-shell', 'kui-icon-btn', 'size-7']))
+    expect(classesOfTag('id="icon-button"')).toEqual(expect.arrayContaining(['kui-shell', 'kui-icon-btn']))
     expect(classesOfTag('id="icon-button"').at(-1)).toBe('rounded-full')
     expect(classesOfTag('aria-haspopup="menu"').slice(-2)).toEqual(['rounded-full', 'menu-trigger'])
   })
@@ -263,7 +263,6 @@ describe('the buttons and fields whose recipe holds their look', () => {
     ['checkbox', 'input', 'accent-kui-accent', 'size-5'],
     ['checkbox', 'hint', 'text-kui-subtext0', 'opacity-70'],
     ['toggle', 'track', 'bg-kui-surface0', 'w-12'],
-    ['icon-button', undefined, 'size-7', 'rounded-full'],
   ] as const)('%s %s draws its base, then what src/ui.ts sets after it', (id, part, base, restyle) => {
     const classes = classesOfPart(id, part)
 
@@ -271,6 +270,15 @@ describe('the buttons and fields whose recipe holds their look', () => {
 
     if (restyle !== undefined)
       expect(classes.at(-1)).toBe(restyle)
+  })
+
+  test('a Button leaves its padding and size to the per-size rules, and its pointer to an enabled one', () => {
+    const classes = classesOfPart('plain')
+
+    for (const name of ['px-3', 'py-1', 'text-xs', 'cursor-pointer'])
+      expect(classes, name).not.toContain(name)
+
+    expect(classes).toContain('enabled:not-aria-busy:cursor-pointer')
   })
 
   test('only a root keeps a kui class, and the label type FormField shares with Table', () => {
