@@ -4,6 +4,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 
 ## Unreleased
 
+- A link pressed while a view transition runs no longer reports an `AbortError` to `/_kay/error` when the transition is skipped before its animations start.
 - kayjs-ui: `SidePanel` takes `dock` to sit beside the page as a resizable tool panel, and `Menu` and `Popover` take `at` to open at a point with no trigger, and every `Menu` scrolls past the window height and has taller entries on touch ([SidePanel](../packages/ui/llms/page-layout-palette-and-trees.md), [Menu](../packages/ui/llms/forms.md)).
 - kayjs-cms: an image the page shows from an image field is replaced on the page, with a Replace button over it or a file dropped on it ([Editor](../packages/cms/llms/editor.md)).
 - kayjs-cms: a long text and the paragraphs, headings and list items of Markdown are typed in place on the page, as their source, with the caret where the click landed ([Editor](../packages/cms/llms/editor.md)).

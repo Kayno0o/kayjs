@@ -292,6 +292,27 @@ describe.skipIf(chrome === undefined && (process.env.CI ?? '') === '')('a refres
     expect(page.errors).toEqual([])
   }, 30_000)
 
+  it('a view transition skipped before its animations start reports no error', async () => {
+    await using page = await opened(true)
+
+    await page.evaluate(() => {
+      const start = document.startViewTransition.bind(document)
+
+      document.startViewTransition = ((update: () => void) => {
+        const real = start(update)
+
+        real.skipTransition()
+
+        return real
+      }) as typeof document.startViewTransition
+    })
+    await page.click('a.cross')
+    await page.waitFor('h1', { text: 'Other' })
+    await page.evaluate(async () => new Promise(resolve => setTimeout(resolve, 200)))
+
+    expect(page.errors).toEqual([])
+  }, 30_000)
+
   it('a link pressed during the view transition of another is followed', async () => {
     await using page = await opened(true)
 
@@ -304,6 +325,8 @@ describe.skipIf(chrome === undefined && (process.env.CI ?? '') === '')('a refres
     })
     await page.click('a.cross')
     await page.waitFor('h1', { text: 'Other' })
+    // The animations start a frame after the swap commits, later on a loaded runner.
+    await page.waitUntil(() => document.getAnimations().some(animation => (animation.effect as KeyframeEffect | null)?.pseudoElement?.startsWith('::view-transition')), { timeout: '5s' })
 
     const running = await page.evaluate(() => document.getAnimations().some(animation => (animation.effect as KeyframeEffect | null)?.pseudoElement?.startsWith('::view-transition')))
     const [x, y] = await page.evaluate(() => {

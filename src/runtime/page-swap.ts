@@ -184,6 +184,14 @@ async function bounded<T>(work: Promise<T>, ms: number): Promise<T | typeof LATE
   }
 }
 
+// Waits out a promise whose rejection is expected, so it is no unhandled one.
+async function settled(work: Promise<unknown>): Promise<void> {
+  try {
+    await work
+  }
+  catch {}
+}
+
 // The intent's policy, with history replaced as the swap asks, and the top for a traversal to an entry that saved no position.
 function policyOf(swap: Swap): Policy {
   const policy = { ...POLICIES[swap.intent] }
@@ -432,6 +440,9 @@ export async function show(page: FetchedPage, hash: string, swap: Swap, isCurren
     const transition = (document as Document & { startViewTransition: (update: () => void) => ViewTransition }).startViewTransition(commit)
 
     const skip = () => transition.skipTransition()
+
+    // A transition skipped before its animations start rejects `ready` with an AbortError, which is expected and no error of the page.
+    void settled(transition.ready)
     const onRoot = (event: MouseEvent) => linkUnderTransition(event, skip)
 
     // A newer transition skips the older one, so the older listener goes now rather than when its swap settles.
