@@ -44,6 +44,10 @@ A `ui.*` or `cms.*` key ended in `Label` (`ui.table.filterLabel`, `cms.admin.sea
 
 `ConfirmDelete(onOpen)` is `onOpenChange`, called with `true` when the trigger is pressed and with `false` once the dialog or the armed pair goes, as Dialog's is, so `onOpen={ask}` becomes `onOpenChange={open => open && ask()}`. `SplitLayout(onSidebarClose)` is `onSidebarOpenChange`, called with `false` when the back button closes the sidebar. The old names work until 1.75, and `deprecated-ui-callback` reports them; `kay upgrade` renames `onSidebarClose` where the handler is written `() => ...`, and leaves `onOpen` to you, as `onOpenChange` is called on closing too.
 
+### kayjs-ui `MarkdownEditor` sanitizes its preview
+
+The HTML of `preview` goes through `sanitizeHtml` (images and tables kept), so the classes, ids and styles of an app's own renderer are dropped. An app whose renderer already sanitizes sets `previewTrusted` to insert the HTML as it comes.
+
 ## 1.71.0
 
 ### kayjs-ui parts are selected by data-part
