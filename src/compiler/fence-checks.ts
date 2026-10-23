@@ -624,6 +624,7 @@ export function openRedirects(fence: ParsedFence): Diagnostic[] {
     diagnostics.push({
       ...fence.shift(node.arguments[0]),
       code: 'external-redirect',
+      checkOnly: true,
       message: 'This redirect goes where its value says, which may be any site',
       note: 'a target read from the request, a store or a variable is an open redirect when it is a full URL: a link on your domain sends a visitor to a phishing page',
       help: 'wrap a `?next=` value in `localPath(value, fallback)`, or write `// kay-allow external-redirect` for a URL you chose',
