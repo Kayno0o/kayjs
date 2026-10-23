@@ -577,9 +577,10 @@ export function refuseForeignHosts(app: Elysia, site: string | undefined): void 
 const GUARDED_PATHS = [DEV_DATA, DEV_UI, DEV_JOBS, DEV_NOT_FOUND]
 const LOOPBACK = /^(?:127\.|::1$|::ffff:127\.)/
 
-// Under `kay dev`, the data, UI, jobs and not-found routes answer a peer on this machine only, as `kay dev --host` would otherwise let the network read the database and rewrite files; `KAY_DEV_REMOTE=1` lets any peer in.
+// The data, UI, jobs and not-found routes answer a peer on this machine only, as `kay dev --host` would otherwise let the network read the database and rewrite files; `KAY_DEV_REMOTE=1` lets any peer in.
+// The peer is the socket's, so a proxy or tunnel on this machine passes as local.
 export function refuseRemoteDevTools(app: Elysia): void {
-  if (!underKayDev() || process.env.KAY_DEV_REMOTE === '1')
+  if (process.env.KAY_DEV_REMOTE === '1')
     return
 
   app.onBeforeHandle(({ request, server }) => {
@@ -590,7 +591,7 @@ export function refuseRemoteDevTools(app: Elysia): void {
 
     const address = server?.requestIP(request)?.address
 
-    if (address !== undefined && LOOPBACK.test(address))
+    if (address === undefined || LOOPBACK.test(address))
       return
 
     return new Response('kay dev serves this tool to this machine only; set KAY_DEV_REMOTE=1 to open it to the network\n', { status: 403, headers: { 'content-type': 'text/plain; charset=utf-8' } })

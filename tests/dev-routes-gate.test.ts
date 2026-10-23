@@ -3,13 +3,13 @@ import { join } from 'node:path'
 import process from 'node:process'
 import { afterEach, describe, expect, it } from 'bun:test'
 import { modeOf } from '../src/project'
-import { DEV_DATA, DEV_DATA_QUERY, DEV_FOOTPRINT, DEV_HEAD, DEV_JOBS, DEV_JOBS_DELETE, DEV_JOBS_RETRY, DEV_NOT_FOUND, DEV_ROUTES, DEV_SIZES, DEV_TOOL, DEV_UI } from '../src/server/dev'
+import { DEV_A11Y, DEV_AXE, DEV_DATA, DEV_DATA_QUERY, DEV_DATA_ROWS, DEV_EVENTS, DEV_FOOTPRINT, DEV_HEAD, DEV_INSPECTOR, DEV_JOBS, DEV_JOBS_DELETE, DEV_JOBS_RETRY, DEV_NOT_FOUND, DEV_OPEN, DEV_PATCH, DEV_ROUTES, DEV_SIZES, DEV_STACK, DEV_STYLES, DEV_TAB, DEV_TOOL, DEV_UI } from '../src/server/dev'
 import { scratchDir } from './scratch'
 import { pages } from './shared-pages'
 
 const HEADERS = { 'x-kay-dev': '1', 'content-type': 'application/json' }
-const READS = [DEV_ROUTES, DEV_UI, DEV_JOBS, DEV_DATA, DEV_SIZES, DEV_FOOTPRINT, DEV_NOT_FOUND, DEV_TOOL]
-const WRITES = [DEV_UI, DEV_JOBS_RETRY, DEV_JOBS_DELETE, DEV_DATA_QUERY, DEV_NOT_FOUND, DEV_HEAD]
+const READS = [DEV_EVENTS, DEV_PATCH, DEV_A11Y, DEV_STYLES, DEV_AXE, DEV_INSPECTOR, `${DEV_TAB}data.js`, DEV_ROUTES, DEV_UI, DEV_JOBS, DEV_DATA, DEV_SIZES, DEV_FOOTPRINT, DEV_NOT_FOUND, DEV_TOOL]
+const WRITES = [DEV_STACK, DEV_OPEN, DEV_UI, DEV_JOBS_RETRY, DEV_JOBS_DELETE, DEV_DATA_QUERY, DEV_NOT_FOUND, DEV_HEAD]
 
 const saved = { NODE_ENV: process.env.NODE_ENV, KAY_DEV_CODE: process.env.KAY_DEV_CODE, KAY_DEV_REMOTE: process.env.KAY_DEV_REMOTE }
 
@@ -75,7 +75,7 @@ describe('who gets the dev routes', () => {
 })
 
 describe('kay dev --host', () => {
-  async function reach(address: string | undefined, path: string) {
+  async function reach(address: string | undefined, path: string, method = 'GET') {
     process.env.KAY_DEV_CODE = '1'
     process.env.NODE_ENV = 'development'
 
@@ -85,12 +85,15 @@ describe('kay dev --host', () => {
     // Elysia hands a handler the server it listens on, which `handle` has none of.
     app.server = server
 
-    return (await app.handle(new Request(`http://localhost${path}`, { headers: HEADERS }))).status
+    return (await app.handle(new Request(`http://localhost${path}`, { method, headers: HEADERS, ...method === 'POST' && { body: '{}' } }))).status
   }
 
   it('refuses the data, UI, jobs and not-found routes from a peer that is not this machine', async () => {
-    for (const path of [DEV_DATA, DEV_UI, DEV_JOBS, DEV_NOT_FOUND])
+    for (const path of [DEV_DATA, DEV_DATA_ROWS, DEV_UI, DEV_JOBS, DEV_NOT_FOUND])
       expect([path, await reach('192.168.1.40', path)]).toEqual([path, 403])
+
+    for (const path of [DEV_JOBS_RETRY, DEV_JOBS_DELETE, DEV_DATA_QUERY, DEV_UI, DEV_NOT_FOUND])
+      expect([path, await reach('192.168.1.40', path, 'POST')]).toEqual([path, 403])
   })
 
   // The UI route reaches its own check, which wants a file, once the peer is let in.

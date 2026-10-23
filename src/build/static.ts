@@ -322,12 +322,14 @@ async function writeRefresh(out: string, from: string, to: string, origin: strin
   const written: string[] = []
 
   for (const target of pageFiles(from)) {
-    if (existsSync(join(out, target)))
+    const file = inside(out, target)
+
+    if (existsSync(file))
       continue
 
-    await mkdir(dirname(join(out, target)), { recursive: true })
-    await Bun.write(join(out, target), html)
-    written.push(join(out, target))
+    await mkdir(dirname(file), { recursive: true })
+    await Bun.write(file, html)
+    written.push(file)
   }
 
   return written

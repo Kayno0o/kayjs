@@ -592,7 +592,7 @@ export async function pagesApp(project: Project<PagesOptions>, loadClient: () =>
   useAppOnError(options.onError)
   serveErrorReports(app, options.onError, mapStack)
 
-  if (mode.dev)
+  if (mode.devRoutes)
     app.post(DEV_STACK, async ({ request }) => devStack(request, mapStack))
 
   serveLive(app, options.live)

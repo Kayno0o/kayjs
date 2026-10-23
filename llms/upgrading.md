@@ -35,6 +35,8 @@ A tool offered to `ask` with no `confirm` no longer runs on the model's word: it
 
 A server started with `NODE_ENV=development` outside `kay dev` no longer serves `/_kay/dev/*` nor the dev tool's scripts on its pages. Run it through `kay dev`, or pass `dev: true` to `pages()` yourself. Under `kay dev --host`, the Data, UI, Jobs and not-found routes answer this machine only; `KAY_DEV_REMOTE=1` opens them to the network.
 
+A plain param value listed by `prerender` (a slug) holding `/`, `\` or a NUL is refused; only a catch-all keeps its slashes.
+
 ### kayjs-ui props take enum values: `variant`, `size` and `pixels`
 
 `Badge`'s booleans are values of `variant` (`outline` by default, `solid`, `stamp`): `stamp` is `variant="stamp"` and `solid` is `variant="solid"`. `compact` of `FormField`, `FileDrop` and `Notice` is `size="sm"` (`md` by default), as `size` is a step in the other components. `QrCode`'s `size` in pixels is `pixels`, so `size` means a step everywhere. The old props work until 1.75, and `kay upgrade` rewrites them (the `deprecated-ui-prop` lint): `compact={flag}` becomes `size={flag ? 'sm' : 'md'}`, and a tag giving the new prop beside the old one, or both `stamp` and `solid`, is reported and left to you. An explicit `variant` beats `stamp` and `solid`, while `size="md"` beside `compact` still gives the compact look. Table's `onSelect` gets the picked rows after the keys and TreeView's the node after the id, so a handler taking one argument keeps working.

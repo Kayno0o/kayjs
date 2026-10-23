@@ -110,7 +110,9 @@ export const PRODUCTION: Mode = { dev: false, prebuilt: true, underKayDev: false
 
 // The mode a server takes from its options, or else from `NODE_ENV` and `kay dev`.
 export function modeOf(options: { dev?: boolean | undefined, prebuilt?: boolean | undefined } = {}): Mode {
-  return { dev: options.dev ?? process.env.NODE_ENV === 'development', prebuilt: options.prebuilt ?? process.env.NODE_ENV === 'production', underKayDev: underKayDev(), devRoutes: underKayDev() || options.dev === true }
+  const dev = options.dev ?? process.env.NODE_ENV === 'development'
+
+  return { dev, prebuilt: options.prebuilt ?? process.env.NODE_ENV === 'production', underKayDev: underKayDev(), devRoutes: dev && (underKayDev() || options.dev === true) }
 }
 
 // Whether pages register the service worker: never in development, which serves one unregistering itself instead.

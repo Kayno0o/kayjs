@@ -4,6 +4,7 @@ import { KayError } from '../compiler/errors'
 import { isCollection, isPaginated } from '../content'
 
 // The locales holding a localized collection's entry, which a page listing it is served in, with every other one when the default locale holds it.
+const FILE_BREAKERS = /[\\\0]/
 const ENTRY_LOCALES = Symbol('kay.entryLocales')
 
 // The locales a paginated list has a page in, each counting its own entries.
@@ -100,8 +101,6 @@ export async function listedParams(route: Pick<Route, 'params' | 'optional' | 'c
 
   return list as Record<string, string>[]
 }
-
-const FILE_BREAKERS = /[\\\0]/
 
 // A segment, or for a catch-all a slash-separated run of them, that names a file inside the prerendered pages; an optional param may be left out.
 // A plain param is one segment, so it holds no slash, and none holds a backslash or a NUL, which a file system reads as a separator or an end.
