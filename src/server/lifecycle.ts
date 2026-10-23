@@ -235,11 +235,11 @@ export async function shutdown(app: AnyElysia, force = false): Promise<void> {
   if (!server)
     return
 
-  // A forced stop closes every connection by itself, and ending streams is not this app's to do for the others in the process.
-  if (!force)
-    endEventStreams()
-
   try {
+    // A forced stop closes every connection by itself, and ending streams is not this app's to do for the others in the process.
+    if (!force)
+      endEventStreams()
+
     await stopServer(server, force)
     app.server = null
 
