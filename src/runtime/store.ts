@@ -158,11 +158,11 @@ const handler: ProxyHandler<object> = {
       touchShape(target)
 
       // Shrinking drops the elements past the new end, which readers of them see go.
-      for (const key of metas.get(target)?.keys.keys() ?? []) {
-        const index = Number(key)
+      for (const tracked of metas.get(target)?.keys.keys() ?? []) {
+        const index = Number(tracked)
 
         if (Number.isInteger(index) && index >= target.length && index < length)
-          touch(target, key)
+          touch(target, tracked)
       }
     }
 

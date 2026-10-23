@@ -364,3 +364,15 @@ describe('store edge cases', () => {
     seen.stop()
   })
 })
+
+describe('store array shrink', () => {
+  it('notifies a reader of an index a shorter length drops', () => {
+    const list = store({ items: [1, 2, 3] })
+    const last = watching(() => list.items[2])
+
+    list.items.length = 1
+    flush()
+    expect(last.seen).toEqual([3, undefined])
+    last.stop()
+  })
+})
