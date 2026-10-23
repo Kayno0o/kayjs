@@ -146,8 +146,8 @@ describe('Table on the server', () => {
     expect((await visit('/table')).text('#selectable')).toContain('1 selected')
     expect((await find('/table', '#selectable [data-part="selectHead"]')).map(cell => cell.text)).toContain('Select all')
     expect((await find('/table', '#selectable tbody input')).map(box => box.attributes['aria-label'])).toEqual(['Select Mars', 'Select Earth', 'Select Venus'])
-    expect(rows.map(row => attr(row, 'data-selected'))).toEqual([null, '', null])
-    expect((await attributes('/table', '#selectable tr[data-selected] input', ['aria-label', 'checked']))).toEqual([{ 'aria-label': 'Select Earth', 'checked': '' }])
+    expect(rows.map(row => attr(row, 'aria-selected'))).toEqual(['false', 'true', 'false'])
+    expect((await attributes('/table', '#selectable tr[aria-selected="true"] input', ['aria-label', 'checked']))).toEqual([{ 'aria-label': 'Select Earth', 'checked': '' }])
   })
 
   test('filters by the text its query param holds, shown in its search box', async () => {

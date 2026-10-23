@@ -1877,11 +1877,11 @@
       @apply text-muted;
     }
 
-    &:where([data-today]) {
+    &:where([aria-current='date']) {
       @apply font-semibold text-accent;
     }
 
-    &:where([data-selected]) {
+    :where([aria-selected='true']) > & {
       @apply bg-accent text-accent-foreground hover:bg-accent;
     }
 
@@ -2739,7 +2739,7 @@
     @apply border-b border-border;
 
     &:hover,
-    &:where([data-selected]) {
+    &:where([aria-selected='true']) {
       @apply bg-hover;
     }
   }

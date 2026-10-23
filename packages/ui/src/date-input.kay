@@ -21,7 +21,7 @@ const look = recipe({
     stepIcon: 'group-data-[direction=previous]/step:rotate-90 group-data-[direction=previous]/step:rtl:-rotate-90 group-data-[direction=next]/step:-rotate-90 group-data-[direction=next]/step:rtl:rotate-90',
     grid: 'w-full table-fixed border-collapse text-center text-sm',
     weekday: 'py-1 text-2xs font-normal text-muted [font-family:var(--font-label,var(--font-kui-body,inherit))] [text-transform:var(--label-case)]',
-    day: 'h-8 w-full cursor-pointer rounded-md tabular-nums hover:bg-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-default disabled:opacity-30 disabled:hover:bg-transparent data-outside:text-muted data-today:font-semibold data-today:text-accent data-selected:bg-accent data-selected:text-accent-foreground data-selected:hover:bg-accent data-selected:data-today:text-accent-foreground',
+    day: 'h-8 w-full cursor-pointer rounded-md tabular-nums hover:bg-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-default disabled:opacity-30 disabled:hover:bg-transparent data-outside:text-muted aria-[current=date]:font-semibold aria-[current=date]:text-accent [[aria-selected=true]>&]:bg-accent [[aria-selected=true]>&]:text-accent-foreground [[aria-selected=true]>&]:hover:bg-accent [[aria-selected=true]>&]:aria-[current=date]:text-accent-foreground',
     today: 'mt-1 w-full cursor-pointer rounded-md py-1 text-center text-2xs tracking-label text-muted [font-family:var(--font-label,var(--font-kui-body,inherit))] [text-transform:var(--label-case)] hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-default disabled:opacity-40',
   },
 })
@@ -167,5 +167,5 @@ div(ref={element => root = element})
               tr(part="week")
                 for day of week key={day}
                   td(part="cell" role="gridcell" aria-selected={current() === day ? 'true' : 'false'})
-                    button(part="day" type="button" tabindex={day === cursor() ? 0 : -1} data-day={day} data-cursor={day === cursor() ? '' : undefined} data-today={day === now() ? '' : undefined} data-selected={current() === day ? '' : undefined} data-outside={sameMonth(day, cursor()) ? undefined : ''} aria-label={dayName(day, pageLocale())} aria-current={day === now() ? 'date' : undefined} disabled={!withinBounds(day, min, max)} onClick={() => pick(day)}) {Number(day.slice(8))}
+                    button(part="day" type="button" tabindex={day === cursor() ? 0 : -1} data-day={day} data-cursor={day === cursor() ? '' : undefined} data-outside={sameMonth(day, cursor()) ? undefined : ''} aria-label={dayName(day, pageLocale())} aria-current={day === now() ? 'date' : undefined} disabled={!withinBounds(day, min, max)} onClick={() => pick(day)}) {Number(day.slice(8))}
       button(part="today" type="button" disabled={!withinBounds(now(), min, max)} onClick={() => pick(now())}) {todayLabel}

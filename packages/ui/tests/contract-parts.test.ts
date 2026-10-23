@@ -22,9 +22,6 @@ const STRUCTURE: Record<string, Record<string, number>> = {
 // The states ARIA has an attribute for: a `data-*` of the same name is a second source of truth, so it stays out unless listed here with the reason it says something else.
 const ARIA_STATES = ['busy', 'checked', 'current', 'disabled', 'expanded', 'hidden', 'invalid', 'pressed', 'readonly', 'required', 'selected']
 
-// The day button and the Table row mark what is chosen on an element that is no gridcell or row of its own role.
-const BARE_ARIA_NAMES = new Set(['date-input.kay:data-selected', 'table.kay:data-selected'])
-
 // A generic name says nothing about the state it holds.
 const GENERIC_STATE = new Set(['data-state', 'data-status', 'data-open', 'data-active'])
 
@@ -86,7 +83,7 @@ function unmarked(template: Template): string[] {
 
 // The attributes of an element that stand for a state in a way the contract refuses.
 function badStates(template: Template): string[] {
-  const { file, source, elements } = template
+  const { source, elements } = template
   const found: string[] = []
 
   for (const element of elements) {
@@ -100,7 +97,7 @@ function badStates(template: Template): string[] {
         found.push(`${place(template, element)} ${name} is no named state`)
 
       for (const state of ARIA_STATES) {
-        if (name === `data-${state}` && !BARE_ARIA_NAMES.has(`${file}:${name}`))
+        if (name === `data-${state}`)
           found.push(`${place(template, element)} ${name} repeats ${state === 'disabled' ? 'aria-disabled or disabled' : `aria-${state}`}`)
       }
     }

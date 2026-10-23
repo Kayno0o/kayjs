@@ -30,7 +30,7 @@ const look = recipe({
     selectText: 'sr-only',
     sortButton: 'group/sort inline-flex cursor-pointer items-center gap-1 border-0 bg-transparent p-0 text-inherit [font-family:var(--font-label,var(--font-kui-body,inherit))] [text-transform:var(--label-case)] @max-[30rem]/table:min-h-8 @max-[30rem]/table:border-solid @max-[30rem]/table:border-[length:var(--kui-border-width,var(--border-width))] @max-[30rem]/table:border-border @max-[30rem]/table:px-2 @max-[30rem]/table:py-0.5',
     sortIcon: 'size-3.5 group-data-[direction=asc]/sort:rotate-180',
-    row: 'border-b border-border hover:bg-hover data-selected:bg-hover @max-[30rem]/table:grid @max-[30rem]/table:grid-cols-[fit-content(40%)_minmax(0,1fr)] @max-[30rem]/table:gap-x-4 @max-[30rem]/table:px-3 @max-[30rem]/table:py-2',
+    row: 'border-b border-border hover:bg-hover aria-selected:bg-hover @max-[30rem]/table:grid @max-[30rem]/table:grid-cols-[fit-content(40%)_minmax(0,1fr)] @max-[30rem]/table:gap-x-4 @max-[30rem]/table:px-3 @max-[30rem]/table:py-2',
     cell: 'px-3 py-1.5 text-foreground data-[numeric]:tabular-nums data-[align=center]:text-center data-[align=end]:text-right @max-[30rem]/table:col-span-full @max-[30rem]/table:grid @max-[30rem]/table:grid-cols-subgrid @max-[30rem]/table:items-baseline @max-[30rem]/table:px-0 @max-[30rem]/table:py-1 @max-[30rem]/table:data-[align]:text-left',
     // The box is 1rem, so its label grows to the 1.5rem a finger needs.
     selectCell: 'px-3 py-1.5 text-foreground data-[numeric]:tabular-nums data-[align=center]:text-center data-[align=end]:text-right @max-[30rem]/table:col-span-full @max-[30rem]/table:grid @max-[30rem]/table:grid-cols-subgrid @max-[30rem]/table:items-baseline @max-[30rem]/table:px-0 @max-[30rem]/table:py-1 @max-[30rem]/table:data-[align]:text-left w-0 @max-[30rem]/table:w-auto [&_.kui-checkbox]:min-h-6 [&_.kui-checkbox]:min-w-6 [&_.kui-checkbox]:justify-center',
@@ -233,7 +233,7 @@ div({...rest} ref={element => box = element} data-narrow={narrow} data-virtual={
         tr(part="spacer" aria-hidden="true" style={`height: ${windowed.before()}px`})
           td(colspan={given.length + (selectable ? 1 : 0)} style="padding: 0; border: 0")
       for row, position of drawn() key={rowKeyOf(row, rowKey)}
-        tr(part="row" data-virtual-index={windowed ? windowed.start() + position : undefined} aria-rowindex={windowed ? windowed.start() + position + 2 : undefined} data-selected={chosenSet().has(rowKeyOf(row, rowKey)) ? '' : undefined})
+        tr(part="row" data-virtual-index={windowed ? windowed.start() + position : undefined} aria-rowindex={windowed ? windowed.start() + position + 2 : undefined} aria-selected={selectable ? (chosenSet().has(rowKeyOf(row, rowKey)) ? 'true' : 'false') : undefined})
           if selectable
             td(part="selectCell")
               div(part="cellBody")
