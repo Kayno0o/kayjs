@@ -241,10 +241,6 @@
     "bench:check:kay": "$npm_execpath src/cli.ts check bench/apps/kay",
     "bench:check:apps": "$npm_execpath src/tsgo.ts --noEmit -p bench/apps/solid && $npm_execpath src/tsgo.ts --noEmit -p bench/apps/svelte && $npm_execpath src/tsgo.ts --noEmit -p bench/apps/next && $npm_execpath --cwd=bench/apps/nuxt --bun run check && $npm_execpath --cwd=bench/apps/astro --bun run check"
   },
-  "overrides": {
-    "katex": "^0.18.2",
-    "tinypool": "^2.1.2"
-  },
   "peerDependencies": {
     "@happy-dom/global-registrator": "^20.14.6 || ^21.0.3",
     "@kaynooo/pg-orm": "^7.0.0",
@@ -291,6 +287,10 @@
     "shiki": "^4.5.0",
     "tailwindcss": "^4.3.3",
     "typescript": "^6.0.3"
+  },
+  "overrides": {
+    "katex": "^0.18.2",
+    "tinypool": "^2.1.2"
   },
   "workspaces": [
     "docs",
