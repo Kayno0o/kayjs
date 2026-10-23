@@ -7,7 +7,28 @@ import Icon from './icon.kay'
 import { isPaletteLink, paletteHits, paletteMatches, paletteSections, splitMatches, withRecent } from './palette'
 import { wording } from 'kay/words'
 
-const look = recipe({ parts: { root: 'kui-command-palette', search: 'kui-command-palette-search', input: 'kui-command-palette-input', list: 'kui-command-palette-list', heading: 'kui-command-palette-heading', option: 'kui-command-palette-option', text: 'kui-command-palette-text', label: 'kui-command-palette-label', snippet: 'kui-command-palette-snippet', more: 'kui-command-palette-more', group: 'kui-command-palette-group', empty: 'kui-command-palette-empty', count: 'kui-command-palette-count' } })
+// 'kui-command-palette' stays as the component's name for an app's CSS and the always-hidden guard; theme.css still has its old rule until 1.74.
+const look = recipe({
+  parts: {
+    root: 'kui-command-palette mx-auto mt-[10vh] mb-auto flex max-h-[min(70dvh,40rem)] w-full max-w-[min(36rem,calc(100vw-2rem))] flex-col overflow-hidden rounded-kui-card border-solid border-(length:--kui-border-width) border-kui-overlay0 bg-kui-surface0 p-0 text-kui-text',
+    search: 'flex shrink-0 items-center gap-2 border-b border-kui-surface2 px-4',
+    // The icon of the search line and of an option.
+    icon: 'size-5 shrink-0 text-kui-overlay1',
+    input: 'h-11 min-w-0 flex-1 bg-transparent text-sm text-kui-text outline-none placeholder:text-kui-overlay1 focus-visible:[outline:2px_solid_var(--color-kui-accent)] focus-visible:[outline-offset:-2px]',
+    list: 'min-h-0 flex-1 overflow-y-auto py-1',
+    heading: 'px-4 pt-2 pb-1',
+    // The tint alone is too faint to find, so an accent bar marks the option Enter opens; forced colours drop both and paint the transparent outline instead. One holding a section the site search found writes data-snippet, taller than the others.
+    option: 'flex h-11 w-full cursor-pointer items-center gap-3 px-4 text-left text-sm text-kui-text no-underline outline-none aria-selected:bg-kui-row-hover aria-selected:[box-shadow:inset_2px_0_0_var(--color-kui-accent)] aria-selected:[outline-offset:-2px] aria-selected:[outline:2px_solid_transparent] data-snippet:h-auto data-snippet:py-2',
+    label: 'min-w-0 flex-1 truncate',
+    group: 'max-w-[40%] shrink-0 truncate text-xs text-kui-subtext0',
+    text: 'flex min-w-0 flex-1 flex-col',
+    snippet: 'line-clamp-2 text-xs text-kui-subtext0',
+    more: 'text-xs text-kui-subtext0',
+    mark: 'bg-transparent font-semibold text-kui-accent',
+    empty: 'px-4 py-6 text-center text-sm text-kui-subtext0',
+    count: 'sr-only',
+  },
+})
 
 const { open = false, onOpenChange, entries, groups = [], recent = [], onRecentChange, hotkey = 'k', siteSearch = false, siteSearchLabel = wording('ui.commandPalette.siteSearch', 'In the pages'), siteSearchError = wording('ui.commandPalette.siteSearchError', 'The pages could not be searched'), label = wording('ui.commandPalette.label', 'Search'), placeholder = wording('ui.commandPalette.placeholder', 'Search'), emptyLabel = wording('ui.commandPalette.empty', 'No results'), recentLabel = wording('ui.commandPalette.recent', 'Recent'), resultsLabel, siteSearchMore } = props<{
   // Shows the palette; the hotkey opens and closes it too, and `onOpenChange` reports every change for a parent driving it.
@@ -186,7 +207,7 @@ function keyDown(event: KeyboardEvent) {
 dialog(part="root" ref={element => dialog = element} closedby="any" aria-label={label} onClose={closed})
   if shown()
     div(part="search")
-      Icon(icon="search")
+      Icon(icon="search" part="icon")
       input(part="input" value={query()} onInput={event => { query.set(event.currentTarget.value); selected.set(0) }} onKeyDown={keyDown} role="combobox" aria-label={label} aria-expanded="true" aria-controls={`${id}-list`} aria-autocomplete="list" aria-activedescendant={rows()[active()] ? optionId(active()) : undefined} autocomplete="off" spellcheck="false" placeholder={placeholder})
     div(part="list" id={`${id}-list`} role="listbox" aria-label={label})
       for section, sectionIndex of sections() key={sectionIndex}
@@ -195,21 +216,21 @@ dialog(part="root" ref={element => dialog = element} closedby="any" aria-label={
             div.kui-heading-section(part="heading" id={`${id}-group-${sectionIndex}`}) {section.group}
           for row of section.rows key={row.index}
             if linkOf(row.entry) as link
-              a(part="option" href={link.href} {...link.external ? EXTERNAL : {}} id={optionId(row.index)} role="option" aria-selected={row.index === active() ? 'true' : 'false'} tabindex="-1" onPointerMove={() => selected.set(row.index)} onClick={() => followed(link, row.snippet !== undefined)})
+              a(part="option" data-snippet={row.snippet ? '' : undefined} href={link.href} {...link.external ? EXTERNAL : {}} id={optionId(row.index)} role="option" aria-selected={row.index === active() ? 'true' : 'false'} tabindex="-1" onPointerMove={() => selected.set(row.index)} onClick={() => followed(link, row.snippet !== undefined)})
                 if link.icon as icon
-                  Icon(icon={icon})
+                  Icon(icon={icon} part="icon")
                 if row.snippet as snippet
                   span(part="text")
                     span(part="label")
                       for part, partIndex of row.labelParts ?? [{ text: row.entry.label, hit: false }] key={partIndex}
                         if part.hit
-                          mark {part.text}
+                          mark(part="mark") {part.text}
                         else
                           | {part.text}
                     span(part="snippet")
                       for part, partIndex of snippet key={partIndex}
                         if part.hit
-                          mark {part.text}
+                          mark(part="mark") {part.text}
                         else
                           | {part.text}
                     if row.more as more
@@ -221,7 +242,7 @@ dialog(part="root" ref={element => dialog = element} closedby="any" aria-label={
             else if actionOf(row.entry) as action
               button(part="option" type="button" id={optionId(row.index)} role="option" aria-selected={row.index === active() ? 'true' : 'false'} tabindex="-1" onPointerMove={() => selected.set(row.index)} onClick={() => act(action)})
                 if action.icon as icon
-                  Icon(icon={icon})
+                  Icon(icon={icon} part="icon")
                 span(part="label") {row.entry.label}
                 if query().trim() && row.entry.group
                   span(part="group") {row.entry.group}

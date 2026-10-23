@@ -17,14 +17,14 @@ test('a toast shows in the toaster and is read from a region kept in the page, a
 
   const toasts = [...mounted.root.querySelectorAll('.kui-toast')]
 
-  expect(toasts.map(item => [item.getAttribute('data-tone'), item.getAttribute('data-type'), item.querySelector('.kui-toast-message')?.textContent])).toEqual([['success', 'success', 'Saved'], ['danger', 'error', 'Refused']])
-  expect([...mounted.root.querySelectorAll('.kui-toaster-live')].map(region => [region.getAttribute('role'), region.textContent])).toEqual([['status', 'Saved'], ['alert', 'Refused']])
+  expect(toasts.map(item => [item.getAttribute('data-tone'), item.getAttribute('data-type'), item.querySelector('.kui-toast [data-part=message]')?.textContent])).toEqual([['success', 'success', 'Saved'], ['danger', 'error', 'Refused']])
+  expect([...mounted.root.querySelectorAll('[data-part=live]')].map(region => [region.getAttribute('role'), region.textContent])).toEqual([['status', 'Saved'], ['alert', 'Refused']])
   expect(mounted.root.querySelector('.kui-toaster')?.matches(':popover-open')).toBe(true)
 
-  click(toasts[0]!.querySelector('.kui-toast-dismiss'))
+  click(toasts[0]!.querySelector('.kui-toast [data-part=dismiss]'))
   await settle()
 
-  expect([...mounted.root.querySelectorAll('.kui-toast-message')].map(item => item.textContent)).toEqual(['Refused'])
+  expect([...mounted.root.querySelectorAll('.kui-toast [data-part=message]')].map(item => item.textContent)).toEqual(['Refused'])
 })
 
 // Runs the timers due within `ms` of fake time, then lets the DOM updates they queued land.
@@ -36,10 +36,10 @@ async function elapse(ms: number) {
 test('the toasts hold while the pointer rests on them, and run out once it leaves', async () => {
   mounted = await mountComponent('src/components/toasts.kay')
   const { root } = mounted
-  const messages = () => [...root.querySelectorAll('.kui-toast-message')].map(item => item.textContent)
+  const messages = () => [...root.querySelectorAll('.kui-toast [data-part=message]')].map(item => item.textContent)
 
   // The toasts a test before left, on a timer this test's fake clock does not run.
-  for (const dismiss of root.querySelectorAll('.kui-toast-dismiss'))
+  for (const dismiss of root.querySelectorAll('.kui-toast [data-part=dismiss]'))
     click(dismiss)
 
   jest.useFakeTimers()
@@ -68,9 +68,9 @@ test('the toasts hold while the pointer rests on them, and run out once it leave
 test('an info toast is drawn in the info tone, and a sticky one stays until it is dismissed', async () => {
   mounted = await mountComponent('src/components/toasts.kay')
   const { root } = mounted
-  const messages = () => [...root.querySelectorAll('.kui-toast-message')].map(item => item.textContent)
+  const messages = () => [...root.querySelectorAll('.kui-toast [data-part=message]')].map(item => item.textContent)
 
-  for (const dismiss of root.querySelectorAll('.kui-toast-dismiss'))
+  for (const dismiss of root.querySelectorAll('.kui-toast [data-part=dismiss]'))
     click(dismiss)
 
   jest.useFakeTimers()
@@ -86,7 +86,7 @@ test('an info toast is drawn in the info tone, and a sticky one stays until it i
 
     expect(messages()).toEqual(['Stuck'])
 
-    click(root.querySelector('.kui-toast-dismiss'))
+    click(root.querySelector('.kui-toast [data-part=dismiss]'))
     await elapse(0)
 
     expect(messages()).toEqual([])
@@ -107,7 +107,7 @@ test('a second Toaster renders nothing while the first is mounted, and takes ove
   const [first] = toasters()
 
   expect(toasters()).toHaveLength(1)
-  expect([...root.querySelectorAll('.kui-toast-message')].map(item => item.textContent)).toEqual(['Saved'])
+  expect([...root.querySelectorAll('.kui-toast [data-part=message]')].map(item => item.textContent)).toEqual(['Saved'])
 
   click(root.querySelector('#unmount'))
   await settle()
@@ -115,7 +115,7 @@ test('a second Toaster renders nothing while the first is mounted, and takes ove
   expect(toasters()).toHaveLength(1)
   expect(toasters()[0]).not.toBe(first)
   expect(toasters()[0]?.matches(':popover-open')).toBe(true)
-  expect([...root.querySelectorAll('.kui-toast-message')].map(item => item.textContent)).toEqual(['Saved'])
+  expect([...root.querySelectorAll('.kui-toast [data-part=message]')].map(item => item.textContent)).toEqual(['Saved'])
 })
 
 test('Alt+T moves focus to the toasts and Escape dismisses the focused one', async () => {
@@ -126,13 +126,13 @@ test('Alt+T moves focus to the toasts and Escape dismisses the focused one', asy
   window.dispatchEvent(new KeyboardEvent('keydown', { key: 't', altKey: true, bubbles: true, cancelable: true }))
   await settle()
 
-  expect(document.activeElement?.closest('.kui-toast')?.querySelector('.kui-toast-message')?.textContent).toBe('Saved')
+  expect(document.activeElement?.closest('.kui-toast')?.querySelector('.kui-toast [data-part=message]')?.textContent).toBe('Saved')
 
   document.activeElement!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }))
   await settle()
 
-  expect([...mounted.root.querySelectorAll('.kui-toast-message')].map(item => item.textContent)).toEqual(['Refused'])
-  expect(document.activeElement?.closest('.kui-toast')?.querySelector('.kui-toast-message')?.textContent).toBe('Refused')
+  expect([...mounted.root.querySelectorAll('.kui-toast [data-part=message]')].map(item => item.textContent)).toEqual(['Refused'])
+  expect(document.activeElement?.closest('.kui-toast')?.querySelector('.kui-toast [data-part=message]')?.textContent).toBe('Refused')
 })
 
 test('Alt+T leaves the key alone when no toast is on screen', async () => {

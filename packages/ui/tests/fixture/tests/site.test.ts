@@ -1056,7 +1056,7 @@ test('a page swap with a toast on screen hydrates the next toaster without a mis
     await page.waitUntil(() => document.querySelector('.kui-toast') !== null)
     await page.click('#next')
     await page.waitUntil(() => document.querySelector('h1')?.textContent === 'Toast b')
-    await page.waitUntil(() => document.querySelector('.kui-toast-message')?.textContent === 'Saved')
+    await page.waitUntil(() => document.querySelector('.kui-toast [data-part=message]')?.textContent === 'Saved')
     expect(page.errors).toEqual([])
   }
   finally {

@@ -36,9 +36,9 @@ describe('SidePanel', () => {
     expect(panel.open).toBe(true)
     expect(panel.getAttribute('aria-label')).toBe('Mars')
     expect(panel.getAttribute('closedby')).toBe('any')
-    expect([...panel.querySelectorAll('.kui-side-panel-head > *')].map(element => element.textContent || element.getAttribute('aria-label'))).toEqual(['Mars', 'Next', 'Close'])
-    expect(panel.querySelector('.kui-side-panel-body #body')).not.toBeNull()
-    expect(panel.querySelector('.kui-side-panel-footer #save')).not.toBeNull()
+    expect([...panel.querySelectorAll('[data-part=head] > *')].map(element => element.textContent || element.getAttribute('aria-label'))).toEqual(['Mars', 'Next', 'Close'])
+    expect(panel.querySelector('[data-part=body] #body')).not.toBeNull()
+    expect(panel.querySelector('[data-part=footer] #save')).not.toBeNull()
 
     click(panel.querySelector('.kui-icon-btn[aria-label="Close"]'))
     await settle()

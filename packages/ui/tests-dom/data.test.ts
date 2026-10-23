@@ -125,7 +125,7 @@ describe('CopyButton', () => {
     click(root.querySelector('#copy'))
     await settle()
 
-    expect([...root.querySelectorAll('.kui-toast-message')].at(-1)?.textContent).toBe('Could not copy to the clipboard')
+    expect([...root.querySelectorAll('.kui-toast [data-part=message]')].at(-1)?.textContent).toBe('Could not copy to the clipboard')
     expect(root.querySelector('#copy')?.textContent).toBe('Copy link')
   })
 })

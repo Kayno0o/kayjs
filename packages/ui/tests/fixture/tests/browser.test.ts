@@ -985,11 +985,11 @@ inBrowser('a SaveForm passed an action by a page with a server fence', () => {
 
     await page.fill('#name', 'Grace')
     await page.click('button[type="submit"]')
-    await page.waitFor('.kui-toast-message', { text: 'Saved.' })
+    await page.waitFor('.kui-toast [data-part=message]', { text: 'Saved.' })
 
     await page.fill('#name', 'G')
     await page.click('button[type="submit"]')
-    await page.waitFor('.kui-toast-message', { text: 'Two letters at least' })
+    await page.waitFor('.kui-toast [data-part=message]', { text: 'Two letters at least' })
     expect(page.errors).toEqual([])
   }, 120_000)
 })

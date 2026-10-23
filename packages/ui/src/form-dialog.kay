@@ -7,7 +7,7 @@ import { callAction, formIssues } from './forms'
 import { wording } from 'kay/words'
 
 
-const look = recipe({ parts: { root: '', footer: 'kui-form-dialog-footer', actions: 'kui-form-dialog-actions', form: 'kui-form-grid' } })
+const look = recipe({ parts: { root: '', footer: 'flex w-full flex-wrap items-center gap-2', actions: 'ml-auto flex flex-wrap justify-end gap-2', form: 'kui-form-grid' } })
 
 const { open, title, action, submitLabel, savingLabel = wording('ui.formDialog.saving', 'Saving…'), cancelLabel = wording('ui.formDialog.cancel', 'Cancel'), failure, refused, onSaved, onOpenChange, extra, id } = props<{
   // Shows the dialog; the parent sets it back to false in `onOpenChange`.

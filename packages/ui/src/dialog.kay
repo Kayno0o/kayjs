@@ -2,11 +2,23 @@
 import type { JSX, Snippet } from 'kay'
 import { effect, recipe, signal } from 'kay'
 
+// 'kui-dialog' stays as the component's name for an app's CSS and the always-hidden guard; theme.css still has its old rule until 1.74.
 const look = recipe({
-  parts: { root: 'kui-dialog', title: 'kui-dialog-title', body: 'kui-dialog-body', footer: 'kui-dialog-footer' },
+  parts: {
+    root: 'kui-dialog m-auto flex max-h-[calc(100dvh-2rem)] w-full max-w-[min(42rem,calc(100vw-2rem))] flex-col overflow-hidden rounded-kui-card border-solid border-(length:--kui-border-width) border-kui-overlay0 bg-kui-surface0 p-0',
+    title: 'shrink-0 border-b border-kui-surface2 px-5 py-4 text-lg font-kui-heading tracking-kui-label text-kui-text [font-family:var(--kui-label-font,var(--font-kui-body,inherit))] [text-transform:var(--kui-label-case)]',
+    // The body of a `bare` dialog writes data-bare too, as a child cannot read the attribute of its parent in a utility.
+    body: 'min-h-0 flex-1 overflow-y-auto px-5 py-4 data-bare:overflow-hidden data-bare:p-0',
+    footer: 'flex shrink-0 flex-wrap justify-end gap-2 border-t border-kui-surface2 px-5 py-4',
+  },
   variants: {
     // The width: `sm`, `md` (the default), `lg`, or `full`, which takes the whole viewport width and height less the margin, for content such as a canvas that fills the dialog.
-    size: { sm: '', md: '', lg: '', full: '' },
+    size: {
+      sm: { root: 'max-w-[min(28rem,calc(100vw-2rem))]' },
+      md: '',
+      lg: { root: 'max-w-[min(72rem,calc(100vw-2rem))]' },
+      full: { root: 'h-[calc(100dvh-2rem)] max-w-[calc(100vw-2rem)]' },
+    },
   },
   defaults: { size: 'md' },
 })
@@ -71,7 +83,7 @@ dialog(aria-label={title} {...rest} data-size={size === 'md' ? undefined : size}
       h5(part="title") {title}
     else
       h6(part="title") {title}
-    div(part="body")
+    div(part="body" data-bare={bare ? '' : undefined})
       slot
     if footer
       div(part="footer")

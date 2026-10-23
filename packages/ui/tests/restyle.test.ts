@@ -55,22 +55,13 @@ const classesOfTag = (text: string, tag = '[a-z0-9]+') => (html.match(new RegExp
 describe('restyling a component of kayjs-ui from src/ui.ts', () => {
   // Each part keeps the kui class theme.css styles, then takes what the app's src/ui.ts sets on it, and the caller's class object comes last.
   const restyled = [
-    'kui-dialog-title text-xl',
-    'kui-dialog-footer justify-end',
     'kui-field-input kui-range-input-box w-24',
     'kui-range-input-unit ml-1',
-    'kui-menu-item py-3',
-    'kui-menu-list min-w-48',
     'kui-collapsible-section-summary py-3',
     'kui-collapsible-section-body pt-2',
-    'kui-popover shadow-xl',
-    'kui-side-panel-head px-6',
-    'kui-side-panel-title text-lg',
-    'kui-side-panel-body px-6',
     'kui-save-bar sticky',
     'kui-save-bar-status italic',
     'kui-save-bar-actions gap-4',
-    'kui-command-palette rounded-2xl',
     'kui-split-layout-sidebar-head h-14',
     'kui-split-layout-list overflow-auto',
     'kui-split-layout-detail p-6',
@@ -83,11 +74,6 @@ describe('restyling a component of kayjs-ui from src/ui.ts', () => {
     'kui-markdown-grid gap-6',
     'kui-markdown-bar px-4',
     'kui-accordion gap-5',
-    'kui-toaster z-50',
-    'kui-toaster-live gap-2',
-    'kui-tooltip text-xs',
-    'kui-form-dialog-footer pt-4',
-    'kui-form-dialog-actions gap-3',
     'kui-form-grid gap-5',
     'kui-contact-form gap-7',
     'kui-when-visible min-h-4',
@@ -162,10 +148,6 @@ describe('restyling a component of kayjs-ui from src/ui.ts', () => {
       '`@kaynooo/kayjs-ui/card.kay` has no part `foot`',
     ])
     expect(uiProblems(ROOT)).toEqual([])
-  })
-
-  test('a part nothing restyles keeps its kui class alone', () => {
-    expect(html).toContain('class="kui-dialog-body"')
   })
 })
 
@@ -529,5 +511,58 @@ describe('the tables and navigation whose recipe holds their look', () => {
 
     expect(root).toContain('data-[narrow=stack]:@container/table')
     expect(partClasses('table', 'row')).toContain('@max-[30rem]/table:grid')
+  })
+})
+
+describe('the overlays whose recipe holds their look', () => {
+  // The classes of the element a data-part selects, from the element an id names, or the root a kui class names when it takes no id. A part written as 'footer#2' is the second one after it.
+  const classesOfPart = (id: string, part?: string) => {
+    const root = id.startsWith('kui-') ? html.indexOf(`class="${id} `) : html.indexOf(`id="${id}"`)
+    const [name = '', nth = '1'] = (part ?? '').split('#')
+    let start = root
+
+    for (let at = 0; at < (part === undefined ? 0 : Number(nth)); at++)
+      start = html.indexOf(`data-part="${name}"`, start + 1)
+
+    const tag = html.slice(html.lastIndexOf('<', start), html.indexOf('>', start))
+
+    return (tag.match(/ class="([^"]*)"/)?.[1] ?? '').split(' ')
+  }
+
+  test.each([
+    ['dialog', undefined, 'overflow-hidden', undefined],
+    ['dialog', 'title', 'shrink-0', 'text-xl'],
+    ['dialog', 'body', 'overflow-y-auto', undefined],
+    ['menu', 'list', 'flex-col', 'min-w-48'],
+    ['menu', 'item', 'cursor-pointer', 'py-3'],
+    ['popover', undefined, 'bg-kui-mantle', 'shadow-xl'],
+    ['side', undefined, 'h-dvh', undefined],
+    ['side', 'head', 'border-b', 'px-6'],
+    ['side', 'title', 'truncate', 'text-lg'],
+    ['side', 'body', 'overflow-y-auto', 'px-6'],
+    ['kui-command-palette', undefined, 'max-h-[min(70dvh,40rem)]', 'rounded-2xl'],
+    ['kui-toaster', undefined, 'fixed', 'z-50'],
+    ['kui-tooltip', undefined, 'bg-kui-surface1', 'text-xs'],
+    ['form-dialog', 'footer#2', 'items-center', 'pt-4'],
+    ['form-dialog', 'actions', 'ml-auto', 'gap-3'],
+  ] as const)('%s %s draws its base, then what src/ui.ts sets after it', (id, part, base, restyle) => {
+    const classes = classesOfPart(id, part)
+
+    expect(classes).toContain(base)
+
+    if (restyle !== undefined)
+      expect(classes.at(-1)).toBe(restyle)
+  })
+
+  test('only a root keeps a kui class, and no part writes the class of its old rule', () => {
+    for (const [id, part] of [['dialog', 'title'], ['dialog', 'body'], ['menu', 'list'], ['menu', 'item'], ['side', 'head'], ['side', 'body'], ['form-dialog', 'footer#2'], ['form-dialog', 'actions']] as const)
+      expect(classesOfPart(id, part).filter(name => name.startsWith('kui-')), `${id} ${part}`).toEqual([])
+
+    expect(html).not.toMatch(REMOVED_CLASS)
+  })
+
+  test('a Dialog size is a variant of its root that replaces the width, and a bare body writes data-bare', () => {
+    expect(html.match(/<dialog[^>]*id="dialog"[^>]*>/)![0]).not.toContain('data-size')
+    expect(classesOfPart('dialog').filter(name => name.startsWith('max-w-'))).toHaveLength(1)
   })
 })

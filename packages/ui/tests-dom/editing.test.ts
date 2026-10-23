@@ -12,7 +12,7 @@ afterEach(() => {
 test('editing opens one dialog on a row or a draft, and forgets it once the dialog closes', async () => {
   const mounted = await mountComponent('src/components/editing.kay')
   const dialog = mounted.root.querySelector<HTMLDialogElement>('#friend')!
-  const state = () => [dialog.open, dialog.querySelector('.kui-dialog-title')?.textContent, dialog.querySelector('#name')?.textContent]
+  const state = () => [dialog.open, dialog.querySelector('.kui-dialog [data-part=title]')?.textContent, dialog.querySelector('#name')?.textContent]
 
   unmount = mounted.unmount
 

@@ -114,7 +114,7 @@ describe('FormDialog', () => {
     await settle()
 
     expect(root.querySelector('[data-part="issue"]')?.textContent).toBe('Taken')
-    expect([...root.querySelectorAll('.kui-toast-message')].map(toast => toast.textContent).slice(-2)).toEqual(['Too long', 'Slow down'])
+    expect([...root.querySelectorAll('.kui-toast [data-part=message]')].map(toast => toast.textContent).slice(-2)).toEqual(['Too long', 'Slow down'])
 
     click(root.querySelector('#hide'))
     await settle()
@@ -129,7 +129,7 @@ describe('FormDialog', () => {
     let answer: Answer = { fail: { error: 'You already filed that slug', field: 'name' } }
     const root = await formDialog(async () => answer)
     // Toasts outlive a mounted dialog, so only new ones count.
-    const toasts = () => root.querySelectorAll('.kui-toast-message').length
+    const toasts = () => root.querySelectorAll('.kui-toast [data-part=message]').length
     const before = toasts()
 
     submit(root)
@@ -143,13 +143,13 @@ describe('FormDialog', () => {
     await settle()
 
     expect(root.querySelector('[data-part="issue"]')).toBeNull()
-    expect([...root.querySelectorAll('.kui-toast-message')].at(-1)?.textContent).toBe('Too many short links')
+    expect([...root.querySelectorAll('.kui-toast [data-part=message]')].at(-1)?.textContent).toBe('Too many short links')
 
     answer = { fail: { error: '' } }
     submit(root)
     await settle()
 
-    expect([...root.querySelectorAll('.kui-toast-message')].at(-1)?.textContent).toBe('Could not rename')
+    expect([...root.querySelectorAll('.kui-toast [data-part=message]')].at(-1)?.textContent).toBe('Could not rename')
     expect(root.querySelector<HTMLDialogElement>('dialog')?.open).toBe(true)
   })
 
@@ -160,7 +160,7 @@ describe('FormDialog', () => {
     await settle()
 
     expect(root.querySelector('[data-part="issue"]')).toBeNull()
-    expect([...root.querySelectorAll('.kui-toast-message')].at(-1)?.textContent).toBe('Could not rename')
+    expect([...root.querySelectorAll('.kui-toast [data-part=message]')].at(-1)?.textContent).toBe('Could not rename')
   })
 
   test('submits on Ctrl+Enter from a textarea, which keeps a plain Enter for new lines', async () => {
@@ -190,12 +190,12 @@ describe('FormDialog', () => {
     submit(root)
     await settle()
 
-    expect([...root.querySelectorAll<HTMLButtonElement>('.kui-form-dialog-actions button')].map(button => [button.textContent, button.disabled])).toEqual([['Cancel', true], ['Saving…', true]])
+    expect([...root.querySelectorAll<HTMLButtonElement>('[data-part=actions] button')].map(button => [button.textContent, button.disabled])).toEqual([['Cancel', true], ['Saving…', true]])
 
     reject(new Error('offline'))
     await settle()
 
-    expect([...root.querySelectorAll('.kui-toast-message')].at(-1)?.textContent).toBe('Could not rename')
+    expect([...root.querySelectorAll('.kui-toast [data-part=message]')].at(-1)?.textContent).toBe('Could not rename')
     expect(root.querySelector<HTMLDialogElement>('dialog')?.open).toBe(true)
   })
 })

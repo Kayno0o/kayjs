@@ -26,6 +26,6 @@ test('a Dialog is medium and padded by default, and says its size and bare to th
 test('a bare Dialog keeps its title and holds its content in a body the stylesheet leaves no inset or scroll', async () => {
   const dialog = await open()
 
-  expect(dialog('full').querySelector('h2.kui-dialog-title')?.textContent).toBe('Full')
-  expect(dialog('full').querySelector('.kui-dialog-body #canvas')).not.toBeNull()
+  expect(dialog('full').querySelector('h2[data-part=title]')?.textContent).toBe('Full')
+  expect(dialog('full').querySelector('.kui-dialog [data-part=body] #canvas')).not.toBeNull()
 })

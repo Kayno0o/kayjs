@@ -298,7 +298,7 @@ describe('Menu', () => {
 
     expect(focused()).toBe('Rename')
 
-    click(root.querySelectorAll('.kui-menu-item')[2]!)
+    click(root.querySelectorAll('[data-part=item]')[2]!)
 
     expect(seen.actions).toEqual([['delete', false]])
   })

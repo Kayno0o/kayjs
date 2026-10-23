@@ -29,9 +29,9 @@ describe('Dialog', () => {
     await settle()
 
     expect(dialog.open).toBe(true)
-    expect(dialog.querySelector('h2.kui-dialog-title')?.textContent).toBe('Rename')
+    expect(dialog.querySelector('h2[data-part=title]')?.textContent).toBe('Rename')
     expect(dialog.getAttribute('aria-label')).toBe('Rename')
-    expect(dialog.querySelector('.kui-dialog-footer #cancel')).not.toBeNull()
+    expect(dialog.querySelector('.kui-dialog [data-part=footer] #cancel')).not.toBeNull()
 
     click(root.querySelector('#cancel'))
     await settle()
@@ -113,7 +113,7 @@ describe('ConfirmDelete', () => {
     click(root.querySelectorAll('dialog')[2]!.querySelector('.kui-btn-danger'))
     await settle()
 
-    expect([[...root.querySelectorAll('.kui-toast-message')].at(-1)?.textContent, root.querySelectorAll('dialog')[2]!.open]).toEqual(['Still referenced', true])
+    expect([[...root.querySelectorAll('.kui-toast [data-part=message]')].at(-1)?.textContent, root.querySelectorAll('dialog')[2]!.open]).toEqual(['Still referenced', true])
   })
 
   // A delete made with `call()` throws ApiError, which refuses as an action does: the dialog stays open and enabled with the route's message toasted.
@@ -133,7 +133,7 @@ describe('ConfirmDelete', () => {
     click(shown.querySelector('.kui-btn-danger'))
     await settle()
 
-    expect([root.querySelector('.kui-toast-message')?.textContent, shown.open, shown.querySelector('.kui-btn-danger')?.hasAttribute('disabled')]).toEqual([toast, true, false])
+    expect([root.querySelector('.kui-toast [data-part=message]')?.textContent, shown.open, shown.querySelector('.kui-btn-danger')?.hasAttribute('disabled')]).toEqual([toast, true, false])
   })
 
   test('toasts failure and re-enables the buttons when `refused` throws on an answer it did not expect', async () => {
@@ -148,7 +148,7 @@ describe('ConfirmDelete', () => {
     click(shown.querySelector('.kui-btn-danger'))
     await settle()
 
-    expect([root.querySelector('.kui-toast-message')?.textContent, shown.open, shown.querySelector('.kui-btn-danger')?.hasAttribute('disabled')]).toEqual(['Could not release', true, false])
+    expect([root.querySelector('.kui-toast [data-part=message]')?.textContent, shown.open, shown.querySelector('.kui-btn-danger')?.hasAttribute('disabled')]).toEqual(['Could not release', true, false])
     expect(spy).toHaveBeenCalledTimes(1)
     spy.mockRestore()
   })
@@ -188,14 +188,14 @@ describe('ConfirmDelete', () => {
     await settle()
 
     const dialog = root.querySelectorAll<HTMLDialogElement>('dialog')[place]!
-    const button = dialog.querySelector<HTMLButtonElement>('.kui-dialog-footer button:last-child')!
+    const button = dialog.querySelector<HTMLButtonElement>('.kui-dialog [data-part=footer] button:last-child')!
 
-    expect([dialog.open, dialog.querySelector('.kui-dialog-title')?.textContent, kuiClasses(button), button.textContent]).toEqual([true, title, ...confirm])
+    expect([dialog.open, dialog.querySelector('.kui-dialog [data-part=title]')?.textContent, kuiClasses(button), button.textContent]).toEqual([true, title, ...confirm])
 
     click(button)
     await settle()
 
-    expect([dialog.open, root.querySelector('.kui-toast-message')?.textContent]).toEqual([false, toast])
+    expect([dialog.open, root.querySelector('.kui-toast [data-part=message]')?.textContent]).toEqual([false, toast])
   })
 
   test('asks inline when told to: armed by a click, it deletes or cancels in place, and hands the focus back', async () => {
@@ -243,7 +243,7 @@ describe('ConfirmDelete', () => {
     click(confirmation(root).querySelector('.kui-btn-danger'))
     await settle()
 
-    expect([confirmation(root).querySelector('.kui-btn-danger')?.hasAttribute('disabled'), root.querySelector('.kui-toast-message')?.textContent, confirmation(root).closest('dialog')?.open ?? true]).toEqual([false, toast, true])
+    expect([confirmation(root).querySelector('.kui-btn-danger')?.hasAttribute('disabled'), root.querySelector('.kui-toast [data-part=message]')?.textContent, confirmation(root).closest('dialog')?.open ?? true]).toEqual([false, toast, true])
 
     if (focused !== undefined)
       expect(document.activeElement?.textContent).toBe(focused)

@@ -55,9 +55,9 @@ describe.skipIf(chrome === undefined && (process.env.CI ?? '') === '')('the Bell
     try {
       await page.waitUntil(() => document.querySelector('.kui-bell button')?.getAttribute('aria-label') === 'Notifications, 1 non lue')
       await page.click('.kui-bell button')
-      expect(await page.evaluate(() => document.querySelector('.kui-menu-list a')?.getAttribute('href'))).toBe('/repo/fr/plain')
-      expect(await page.text('.kui-menu-list button.kui-menu-item')).toBe('Tout marquer comme lu')
-      await page.click('.kui-menu-list a')
+      expect(await page.evaluate(() => document.querySelector('.kui-bell [data-part=list] a')?.getAttribute('href'))).toBe('/repo/fr/plain')
+      expect(await page.text('.kui-bell [data-part=all]')).toBe('Tout marquer comme lu')
+      await page.click('.kui-bell [data-part=list] a')
       await page.waitUntil(() => location.pathname === '/repo/fr/plain')
       expect(page.errors).toEqual([])
     }

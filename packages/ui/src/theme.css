@@ -234,6 +234,7 @@
     }
   }
 
+  /* Stays after 1.74 for the toast, whose shadow a skin replaces by its selector, which a utility on the toast would beat. */
   :is(.kui-card, .kui-card-row, .kui-widget, .kui-toast) {
     box-shadow: var(--kui-shadow-raised);
   }
@@ -2199,12 +2200,17 @@
 
     /* Shown with show(), beside the page: a dialog not shown as a modal is positioned absolute and sits in the page, so it is fixed to the edge and above the page. */
     &:where([data-modal='false']) {
-      @apply fixed z-30 [box-shadow:var(--kui-shadow-raised)];
+      @apply fixed z-30;
     }
 
     &::backdrop {
       @apply bg-black/50;
     }
+  }
+
+  /* Stays after 1.74: a shadow a skin replaces by this selector, which a utility on the panel would beat. */
+  .kui-side-panel:where([data-modal='false']) {
+    box-shadow: var(--kui-shadow-raised);
   }
 
   .kui-side-panel-head {

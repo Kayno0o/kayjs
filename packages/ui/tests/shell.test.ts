@@ -39,7 +39,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the ui ext
 
     await page.click('#saved')
     await page.waitFor('.kui-toast')
-    expect(await page.text('.kui-toast-message')).toBe('Saved')
+    expect(await page.text('.kui-toast [data-part=message]')).toBe('Saved')
     expect(await page.count('.kui-toaster')).toBe(1)
 
     await page.hover('#help')

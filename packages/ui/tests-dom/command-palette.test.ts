@@ -33,9 +33,9 @@ async function palette(props: { recent?: string[], hotkey?: string | null, siteS
 
   const { root } = mounted
   const dialog = root.querySelector<HTMLDialogElement>('dialog')!
-  const input = () => root.querySelector<HTMLInputElement>('.kui-command-palette-input')
-  const labels = () => [...root.querySelectorAll('.kui-command-palette-heading, .kui-command-palette-label')].map(element => element.classList.contains('kui-command-palette-heading') ? `# ${element.textContent}` : element.textContent)
-  const active = () => root.querySelector(`#${input()!.getAttribute('aria-activedescendant')}`)?.querySelector('.kui-command-palette-label')?.textContent
+  const input = () => root.querySelector<HTMLInputElement>('[data-part=input]')
+  const labels = () => [...root.querySelectorAll('[data-part=heading], [data-part=label]')].map(element => element.getAttribute('data-part') === 'heading' ? `# ${element.textContent}` : element.textContent)
+  const active = () => root.querySelector(`#${input()!.getAttribute('aria-activedescendant')}`)?.querySelector('[data-part=label]')?.textContent
 
   return { root, dialog, input, labels, active }
 }
@@ -75,7 +75,7 @@ describe('CommandPalette', () => {
     await settle()
     expect(dialog.open).toBe(true)
 
-    const targets = [...root.querySelectorAll<HTMLAnchorElement>('a.kui-command-palette-option')].map(link => [link.querySelector('.kui-command-palette-label')?.textContent, link.getAttribute('target'), link.getAttribute('rel')])
+    const targets = [...root.querySelectorAll<HTMLAnchorElement>('a[data-part=option]')].map(link => [link.querySelector('[data-part=label]')?.textContent, link.getAttribute('target'), link.getAttribute('rel')])
 
     expect(targets.find(([label]) => label === 'Docs')).toEqual(['Docs', '_blank', 'noopener noreferrer'])
     expect(targets.filter(([label]) => label !== 'Docs').every(([, target, rel]) => target === null && rel === null)).toBe(true)
@@ -233,10 +233,10 @@ describe('CommandPalette with siteSearch', () => {
     press(window, 'k', { ctrlKey: true })
     await settle()
     await search(input()!, 'table')
-    await until(() => root.querySelector('.kui-command-palette-empty') !== null)
+    await until(() => root.querySelector('[data-part=empty]') !== null)
 
     expect(labels()).toEqual(['Table'])
-    expect(root.querySelector('.kui-command-palette-empty')?.textContent).toBe('The pages could not be searched')
+    expect(root.querySelector('[data-part=empty]')?.textContent).toBe('The pages could not be searched')
   })
 
   test('lists the sections found after the entries, leaving out one an entry links, and follows one without keeping it as recent', async () => {
@@ -248,8 +248,8 @@ describe('CommandPalette with siteSearch', () => {
     await until(() => labels().includes('Sorting'))
 
     expect(labels()).toEqual(['Table', '# In the pages', 'Sorting'])
-    expect(root.querySelector('.kui-command-palette-snippet mark')?.textContent).toBe('table')
-    expect(root.querySelector('.kui-command-palette-more')).toBeNull()
+    expect(root.querySelector('[data-part=snippet] mark')?.textContent).toBe('table')
+    expect(root.querySelector('[data-part=more]')).toBeNull()
 
     press(input()!, 'ArrowDown')
     await settle()
@@ -282,7 +282,7 @@ describe('CommandPalette with siteSearch', () => {
 
   test('marks the words found in a section\'s heading, and shows a heading with none found as it reads', async () => {
     const { root, input, labels } = await palette({ siteSearch: true })
-    const marked = () => [...root.querySelectorAll('.kui-command-palette-label mark')].map(mark => mark.textContent)
+    const marked = () => [...root.querySelectorAll('[data-part=label] mark')].map(mark => mark.textContent)
 
     press(window, 'k', { ctrlKey: true })
     await settle()
@@ -290,7 +290,7 @@ describe('CommandPalette with siteSearch', () => {
     await until(() => labels().includes('Sorting'))
 
     expect(marked()).toEqual(['Sort'])
-    expect(root.querySelector('.kui-command-palette-more')?.textContent).toBe('2 more matches')
+    expect(root.querySelector('[data-part=more]')?.textContent).toBe('2 more matches')
 
     await search(input()!, 'column')
     await until(() => !labels().includes('Sorting'))

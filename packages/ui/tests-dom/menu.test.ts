@@ -11,7 +11,7 @@ afterEach(() => {
 test('a Menu entry is destructive by its tone or the deprecated danger flag, the tone winning', async () => {
   mounted = await mountComponent('src/components/menus.kay')
 
-  const items = [...mounted.root.querySelectorAll('#by-tone .kui-menu-item')].map(item => [item.textContent, item.hasAttribute('data-danger')])
+  const items = [...mounted.root.querySelectorAll('#by-tone [data-part=item]')].map(item => [item.textContent, item.hasAttribute('data-danger')])
 
   expect(items).toEqual([['Tone', true], ['Old', true], ['Wins', false], ['Plain', false]])
 })
