@@ -23,7 +23,7 @@ export async function limited<Result>(what: string, work: () => Promise<Result>,
   }
 }
 
-// Puts every function of a store under the time limit, in place, so a method added later is limited without being listed; the `unlimited` ones, such as a listener registration that does not touch the database, stay as they are. `ready` is awaited first under its own, longer limit: the first call creates the tables, which may take a while. The `slow` methods scan a table and have the maintenance limit.
+// Puts every function of a store under the time limit, in place, so a method added later is limited without being listed; the `unlimited` ones, such as a listener registration that does not touch the database, stay as they are. A member that is not an async function and not named in `unlimited` throws, as wrapping it would turn its synchronous value into a promise. `ready` is awaited first under its own, longer limit: the first call creates the tables, which may take a while. The `slow` methods scan a table and have the maintenance limit.
 export function limitedStore<Store extends object>(store: Store, what: string, options: { ready?: () => Promise<unknown>, slow?: readonly (keyof Store & string)[], unlimited?: readonly (keyof Store & string)[] } = {}): Store {
   const { ready, slow = [], unlimited = [] } = options
   let found = false
@@ -33,6 +33,9 @@ export function limitedStore<Store extends object>(store: Store, what: string, o
 
     if (typeof method !== 'function' || unlimited.includes(name))
       continue
+
+    if (method.constructor.name !== 'AsyncFunction')
+      throw new Error(`${what} ${name} is not an async function: name it in unlimited to keep it synchronous, or make it async`)
 
     store[name] = (async (...args: unknown[]) => {
       if (ready && !found) {

@@ -117,17 +117,18 @@ describe('the rooms store under a database that does not answer', () => {
 
 describe('limitedStore', () => {
   it('limits every method of a store, so one added later needs no listing, and leaves the unlimited ones alone', async () => {
-    const store = limitedStore({ added: () => 1, later: async () => 2, listen: () => 3, name: 'x' }, 'a store', { unlimited: ['listen'] })
+    const store = limitedStore({ added: async () => 1, later: async () => 2, listen: () => 3, name: 'x' }, 'a store', { unlimited: ['listen'] })
 
     expect(store.listen()).toBe(3)
     expect(store.name).toBe('x')
 
-    // A synchronous method comes back as a promise, as every limited call does.
-    const added = store.added()
-
-    expect(added).toBeInstanceOf(Promise)
-    expect(await added).toBe(1)
+    expect(await store.added()).toBe(1)
     expect(await store.later()).toBe(2)
+  })
+
+  it('refuses a synchronous method nobody named as unlimited, instead of turning it into a promise', () => {
+    expect(() => limitedStore({ close: () => undefined }, 'a store')).toThrow('close is not an async function')
+    expect(() => limitedStore({ close: () => undefined }, 'a store', { unlimited: ['close'] })).not.toThrow()
   })
 
   it('leaves the cache store\'s subscribe synchronous', () => {
