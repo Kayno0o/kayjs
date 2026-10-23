@@ -61,6 +61,7 @@ export function lazyNativePlugins(): void {
 }
 
 const START_NOT_IDENTIFIER = /^(?:\d|-\d)/
+const SCOPE_BEFORE = /@scope$/i
 const WORD_BEFORE = /[\w-]$/
 const NEWLINE = /[\n\r\f]/
 const PSEUDO_BEFORE = /:[\w-]+$/
@@ -194,7 +195,7 @@ function identifier(css: string, start: number): { name: string, end: number } |
     index++
   }
 
-  return name === '' || name === '-' || START_NOT_IDENTIFIER.test(css.slice(start, start + 2)) ? undefined : { name, end: index }
+  return name === '' || (name === '-' && css[start] === '-') || START_NOT_IDENTIFIER.test(css.slice(start, start + 2)) ? undefined : { name, end: index }
 }
 
 // Every class name the selectors of a stylesheet mention, found by one pass that skips comments, strings and `url()` arguments.
@@ -224,7 +225,7 @@ export function classNameList(css: string): string[] {
     else if (char === '(' && URL_BEFORE.test(css.slice(Math.max(0, index - 3), index))) {
       index = urlEnd(css, index)
     }
-    else if (char === '(' && WORD_BEFORE.test(css.slice(Math.max(0, index - 1), index)) && !PSEUDO_BEFORE.test(css.slice(Math.max(0, index - 64), index))) {
+    else if (char === '(' && WORD_BEFORE.test(css.slice(Math.max(0, index - 1), index)) && !PSEUDO_BEFORE.test(css.slice(Math.max(0, index - 64), index)) && !SCOPE_BEFORE.test(css.slice(Math.max(0, index - 6), index))) {
       index = parenEnd(css, index)
     }
     else if (char === '.') {

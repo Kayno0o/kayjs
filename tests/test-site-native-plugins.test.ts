@@ -140,6 +140,7 @@ it('the class names of a stylesheet are read past hostile and unusual input', ()
   expect(classNameList('.\\110000 a, .\\D800 b, .\\0 c { }')).toEqual(['\uFFFDa', '\uFFFDb', '\uFFFDc'])
   expect(classNameList('@layer framework.layout, base; @layer a.b { .x { background: image-set(local(x.woff)) } } @import url(a.css) layer(a.b); .y { src: local(x.woff) } .z:is(.w, .v):not(.u) {}')).toEqual(['x', 'y', 'z', 'w', 'v', 'u'])
   expect(classNameList('@scope (.card) to (.body) { .t {} } @media (min-width: 40em) { .m {} }')).toEqual(['card', 'body', 't', 'm'])
+  expect(classNameList('.\\-{} @scope(.a){.b{}}')).toEqual(['-', 'a', 'b'])
 })
 
 it('the shim lists the exports of the real plugin once per file, string names included, and refuses an export *', async () => {
