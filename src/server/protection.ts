@@ -15,6 +15,8 @@ import { NAVIGATE_HEADER, WORK_HEADER } from '../runtime/swap'
 import { appStore } from './app-store'
 import { nodeNet } from './builtins'
 import { checkRequestIdHeader } from './config-limits'
+import { STORE_TIMEOUT_MS } from './pg-limit'
+import { timeLimited } from './pg-poll'
 import { onReload } from './reload'
 import { rewrittenAddress } from './rewrite'
 import { sharedKey, stampTime } from './stamp'
@@ -545,7 +547,10 @@ function filledIn(value: unknown): boolean {
   return typeof value === 'string' ? value !== '' : value !== undefined && value !== null
 }
 
-// Seconds until the client may try again under `name`, in the app's `store.rates` else this process's memory, or undefined while it is under the limit: for kay's own routes. A rates store that fails counts in memory instead, so a route is never refused for it.
+// The routes whose rates store failure was logged and has not answered since.
+const failing = new Set<string>()
+
+// Seconds until the client may try again under `name`, in the app's `store.rates` else this process's memory, or undefined while it is under the limit: for kay's own routes. A rates store that fails or takes longer than the store time limit counts in memory instead, logged once per route until it answers again, so a route is never refused or held for it.
 export async function overLimit(name: string, client: string, max: number, windowMs: number): Promise<number | undefined> {
   const key = limitKey(name, client)
   const window = `${windowMs}ms` as const
@@ -553,19 +558,21 @@ export async function overLimit(name: string, client: string, max: number, windo
 
   if (shared) {
     try {
-      return waitFor(await shared.hit(key, window), max)
+      const hit = await timeLimited(async () => shared.hit(key, window), STORE_TIMEOUT_MS, `the rates store counting ${name}`)
+
+      failing.delete(name)
+
+      return waitFor(hit, max)
     }
     catch (error) {
-      kayLog('warn', `the rates store failed counting ${name}, so this process's memory counts instead`, error)
+      if (!failing.has(name)) {
+        failing.add(name)
+        kayLog('warn', `the rates store failed counting ${name}, so this process's memory counts instead`, error)
+      }
     }
   }
 
   return waitFor(memoryOf(name).hit(key, window), max)
-}
-
-// `overLimit` counting in the app's `store.rates` where one is set, so replicas share the limit.
-export async function sharedLimit(name: string, client: string, max: number, windowMs: number): Promise<number | undefined> {
-  return waitFor(await sharedRates(name).hit(limitKey(name, client), `${windowMs}ms`), max)
 }
 
 // The store a limit counts in when it names none: the app's `store.rates`, else this process's memory.

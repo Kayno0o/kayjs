@@ -1,6 +1,6 @@
 import type { RateStore } from '../src/runtime/action'
 import { join } from 'node:path'
-import { afterEach, describe, expect, it, setSystemTime, spyOn } from 'bun:test'
+import { afterEach, describe, expect, it, jest, setSystemTime, spyOn } from 'bun:test'
 import { Elysia, t } from 'elysia'
 import { sqliteCache } from '../src/runtime/cache.server'
 import { solveWork } from '../src/runtime/work'
@@ -52,6 +52,33 @@ describe('overLimit', () => {
     } } })
     expect(await overLimit('gaps-failing', '10.0.0.3', 1, 60_000)).toBeUndefined()
     expect(await overLimit('gaps-failing', '10.0.0.3', 1, 60_000)).toBeGreaterThan(0)
+  })
+})
+
+describe('overLimit with a rates store that hangs', () => {
+  it('counts in memory once the store time limit passes, and logs it once', async () => {
+    jest.useFakeTimers()
+
+    const log = spyOn(console, 'warn').mockReturnValue()
+
+    try {
+      setupStore({ rates: { hit: async () => new Promise<never>(Function.prototype as never) } })
+
+      const first = overLimit('gaps-hanging', '10.0.0.4', 1, 60_000)
+
+      jest.advanceTimersByTime(8_000)
+      expect(await first).toBeUndefined()
+
+      const second = overLimit('gaps-hanging', '10.0.0.4', 1, 60_000)
+
+      jest.advanceTimersByTime(8_000)
+      expect(await second).toBeGreaterThan(0)
+      expect(log.mock.calls.filter(call => String(call[0]).includes('gaps-hanging'))).toHaveLength(1)
+    }
+    finally {
+      jest.useRealTimers()
+      log.mockRestore()
+    }
   })
 })
 

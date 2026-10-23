@@ -8,6 +8,7 @@ import { files, memoryFiles, pages } from '../src/server'
 import { readClient } from '../src/server/client'
 import { loadGuards } from '../src/server/guards'
 import { localeSettings } from '../src/server/i18n'
+import { countWrites } from '../src/server/kept-pages'
 import { pageResponder } from '../src/server/page-routes'
 import { routeMatch, routeTable } from '../src/server/route-table'
 import { routeOf, scanRoutes } from '../src/server/routes'
@@ -80,6 +81,40 @@ describe('pageResponder', () => {
     // A path the build did not render renders per request, as any cache may keep it.
     expect(await visit('/about/')).toMatchObject({ html: '<p>Built</p>' })
     expect(await visit('/elsewhere')).toMatchObject({ html: expect.stringContaining('<h1>About</h1>'), cache: null })
+  })
+
+  it('keeps a kept page after a refused write and renders it live after one that went through', async () => {
+    await pages({ routes: 'tests/fixtures/site/src/routes', prebuilt: false })
+    const about = { ...(await scanRoutes(join(root, 'tests/fixtures/site/src/routes'))).find(route => route.pattern === '/about')!, guards: [] }
+    const copies = built('/about')
+    const page = copies.get('/about')!
+
+    // The built copy differs from the live render, so a check that ran would drop the page.
+    page.kept = true
+
+    const app = new Elysia()
+    const writes = countWrites(app)
+
+    app.post('/refused', ({ set }) => {
+      set.status = 403
+
+      return 'no'
+    })
+    app.post('/saved', () => 'ok')
+
+    const respond = pageResponder({ client: (await readClient(root))!, renderOptions: {}, prerendered: new Map([['/about', copies]]), settings: undefined, transforms: [], pageFile: async () => undefined, writes })
+    const visit = async () => (await respond(about, {}, { request: new Request('http://localhost/about') }, new URL('http://localhost/about'))).text()
+    const post = async (path: string) => app.handle(new Request(`http://localhost${path}`, { method: 'POST' }))
+
+    expect((await post('/refused')).status).toBe(403)
+    expect(writes.count).toBe(0)
+    expect(await visit()).toBe('<p>Built</p>')
+    expect(page.checkedAt).toBeUndefined()
+    expect(copies.has('/about')).toBe(true)
+
+    expect((await post('/saved')).status).toBe(200)
+    expect(await visit()).toContain('<h1>About</h1>')
+    expect(copies.has('/about')).toBe(false)
   })
 
   it('answers a visitor the guard of a prerendered page turns away with the error page, under the mount point', async () => {

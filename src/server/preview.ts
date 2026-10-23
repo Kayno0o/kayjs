@@ -86,16 +86,18 @@ export function setupPreview(config: PreviewConfig | false | undefined, base: st
 
   const configured: unknown = config.secret
   const secrets: unknown = configured ?? appPreviewSecrets()
-  const [secret] = [secrets].flat()
-
-  if (typeof secret !== 'string' || secret.length < MIN_SECRET_LENGTH)
-    throw new KayError('config-invalid', `kay: preview.secret in kay.config.ts is ${typeof secret === 'string' ? `${secret.length} characters long` : 'missing'}: it signs preview links and cookies, so it is at least ${MIN_SECRET_LENGTH} random characters, read from the environment`)
-
   const all = [secrets].flat()
-  const weak = all.find(one => typeof one !== 'string' || one.length < MIN_SECRET_LENGTH)
+  const weakAt = all.length === 0 ? 0 : all.findIndex(one => typeof one !== 'string' || one.length < MIN_SECRET_LENGTH)
 
-  if (weak !== undefined)
-    throw new KayError('config-invalid', `kay: preview.secret in kay.config.ts lists a secret that is ${typeof weak === 'string' ? `${weak.length} characters long` : 'not a string'}: each is at least ${MIN_SECRET_LENGTH} random characters, read from the environment`)
+  if (weakAt >= 0) {
+    const weak = all[weakAt]
+    const found = typeof weak === 'string' ? `${weak.length} characters long` : undefined
+
+    // The first secret signs, so a missing one is named as such; a later one is a rotated-out secret that only verifies.
+    throw new KayError('config-invalid', weakAt === 0
+      ? `kay: preview.secret in kay.config.ts is ${found ?? 'missing'}: it signs preview links and cookies, so it is at least ${MIN_SECRET_LENGTH} random characters, read from the environment`
+      : `kay: preview.secret in kay.config.ts lists a secret that is ${found ?? 'not a string'}: each is at least ${MIN_SECRET_LENGTH} random characters, read from the environment`)
+  }
 
   if (configured !== undefined)
     warnLowEntropy(all as string[], '`preview.secret` in kay.config.ts')
