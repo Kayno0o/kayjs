@@ -15,7 +15,7 @@ const look = recipe({
   parts: {
     root: 'kui-multi-select inline-flex min-w-0',
     panel: 'flex max-h-80 w-64 flex-col [min-inline-size:anchor-size(width)]',
-    trigger: 'flex w-full min-w-0 cursor-pointer items-center gap-2 text-left data-empty:text-kui-overlay1',
+    trigger: 'flex w-full min-w-0 cursor-pointer items-center gap-2 text-left disabled:cursor-default data-empty:text-kui-overlay1',
     summary: 'min-w-0 flex-1 truncate',
     chevron: 'size-4 shrink-0 text-kui-subtext0',
     search: 'm-2 mb-0',

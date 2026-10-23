@@ -574,8 +574,8 @@ describe('theme.css', () => {
       expect(await source(name), name).toContain('--kui-control-line')
 
     // A part a skin selects by data-part is one the component still sets.
-    expect(await source('combobox')).toContain('list: ')
-    expect(await source('multi-select')).toContain('checkbox: ')
+    expect(await source('combobox')).toMatch(/^ {4}list: /m)
+    expect(await source('multi-select')).toMatch(/^ {4}checkbox: /m)
     expect(skin).toContain(`.kui-combobox [data-part='list']`)
     expect(skin).toContain(`.kui-multi-select [data-part='checkbox']`)
   })

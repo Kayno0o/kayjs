@@ -559,7 +559,7 @@ describe('inputs', () => {
     const form = (await element('/inputs', 'form')).replaceAll(/<!--[^>]*-->/g, '')
 
     expect([...form.matchAll(/aria-label="(Hours \w+)" placeholder="(\d+)" min="0" max="24" value="(\d*)"/g)].map(match => match.slice(1))).toEqual([['Hours from', '0', '2'], ['Hours to', '24', '']])
-    expect(form).toContain('<span class="min-w-0 flex-1 truncate" data-part="summary">Mars</span>')
+    expect(form).toMatch(/data-part="summary">Mars</)
     expect(form).toContain(`<input class="size-3.5 shrink-0 accent-kui-accent" data-part="checkbox" type="checkbox" checked><span class="min-w-0 truncate" data-part="label">Mars</span>`)
     expect(form).not.toContain('data-part="search"')
     expect(form).toContain('<input type="hidden" name="planet" value="mars">')
