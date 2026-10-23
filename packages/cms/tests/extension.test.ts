@@ -236,6 +236,34 @@ describe('cms() check', () => {
     })
   })
 
+  test('warns of a loader collection in rawHtml that is not trusted, at boot and in the check, and not of a trusted one', async () => {
+    const { s } = await import('kay')
+    const { collection } = await import('kay/content')
+    const { check, server } = cms({ files: workingTree(), guard: () => undefined, rawHtml: ['plain', 'raw'] })
+    const plain = collection({ name: 'plain', load: () => [] }, { schema: s.Object({ name: s.String() }) })
+    const raw = collection({ name: 'raw', load: () => [] }, { schema: s.Object({ name: s.String() }), trusted: true })
+
+    await withCollections({ plain, raw }, async () => {
+      const line = 'cms({ rawHtml }) names plain, a loader\'s collection whose HTML the page sanitizes: set `trusted: true` on the collection to keep it raw, or drop it from rawHtml'
+
+      expect(await check!()).toEqual([{ message: line }])
+
+      const warned = spyOn(console, 'warn').mockImplementation(() => undefined)
+      const app = (typeof server === 'function' ? await server({ root: process.cwd(), modules: {}, extensions: [] }) : server)!
+
+      try {
+        app.listen(0)
+        await Bun.sleep(50)
+
+        expect(warned.mock.calls.map(call => String(call[0]))).toEqual([`kayjs-cms: ${line}`])
+      }
+      finally {
+        await app.stop()
+        warned.mockRestore()
+      }
+    })
+  })
+
   test('stops a layout wording a body on a collection that has none, as an error', async () => {
     const { s } = await import('kay')
     const { collection } = await import('kay/content')

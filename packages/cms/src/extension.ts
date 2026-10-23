@@ -29,11 +29,16 @@ async function bodyProblem(): Promise<string | undefined> {
   return bodylessLayout((await Promise.all(worded.map(async name => collectionInfo(name)))).filter(found => found !== undefined), settings().layouts)
 }
 
-// The lines naming a collection and a field path that the editor would misshow: a kind with no component, a hint or layout naming what the schema lacks, a `when` waiting for none.
+// A loader's collection in `rawHtml` without `trusted: true` lets an editor save raw HTML that the page strips.
+function untrustedRawHtml(listed: readonly { name: string, kind: string, trusted?: true | undefined }[]): string[] {
+  return listed.filter(found => found.kind === 'loaded' && found.trusted !== true && settings().rawHtml.has(found.name)).map(found => `cms({ rawHtml }) names ${found.name}, a loader's collection whose HTML the page sanitizes: set \`trusted: true\` on the collection to keep it raw, or drop it from rawHtml`)
+}
+
+// The lines naming a collection and a field path that the editor would misshow: a kind with no component, a hint or layout naming what the schema lacks, a `when` waiting for none, or a loader's collection in `rawHtml` that the page still sanitizes.
 async function setupWarnings(): Promise<string[]> {
   const listed = await collections({ counts: false })
 
-  return [...hintProblems(listed), ...missingKindLines(await serverRoot(), listed), ...layoutProblems(listed, settings().layouts), ...whenProblems(listed)]
+  return [...hintProblems(listed), ...missingKindLines(await serverRoot(), listed), ...layoutProblems(listed, settings().layouts), ...whenProblems(listed), ...untrustedRawHtml(listed)]
 }
 
 // What a production server with no `cms({ files })` commits through, listed for `kay env`.

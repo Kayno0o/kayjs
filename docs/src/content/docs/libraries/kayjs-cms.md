@@ -492,7 +492,7 @@ A Markdown body whose HTML would run as the site or cover it is refused on save.
 
 List the collection in `rawHtml` to allow it.
 
-A collection filled by a loader is the exception: the page sanitizes its bodies unless the collection sets `trusted: true`, so its HTML is never run, nothing is refused, and its preview shows only what the page keeps. What an editor saves there is stored as written, so an app reading the entries elsewhere sanitizes them too.
+A collection filled by a loader is the exception: the page sanitizes its bodies unless the collection sets `trusted: true`, so its HTML is never run, nothing is refused, and its preview shows only what the page keeps. What an editor saves there is stored as written, so an app reading the entries elsewhere sanitizes them too. Listing such a collection in `rawHtml` without `trusted: true` logs one warning at startup, and `kay check` reports it.
 
 To keep raw HTML in one, set `trusted: true` on the collection and list it in `rawHtml`. The collection's own components and HTML shown in a code block are always fine.
 
