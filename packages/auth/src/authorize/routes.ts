@@ -55,6 +55,16 @@ export function serveOAuthServer(plugin: Elysia, core: Core, stateOf: (ctx: unkn
       return reply(await (await import('./token')).tokenEndpoint(core, state.client, new URLSearchParams(text), siteRoot(core, ctx.request)))
     }, { parse: 'none' })
     .options(`${core.prefix}/oauth/token`, preflight)
+    .post(`${core.prefix}/oauth/revoke`, async (ctx) => {
+      const state = stateOf(ctx)
+      const text = await read(ctx.request)
+
+      if (text === undefined)
+        return reply(refused('invalid_request', 'The request is too large'))
+
+      return reply(await (await import('./revoke')).revokeEndpoint(core, state.client, new URLSearchParams(text)))
+    }, { parse: 'none' })
+    .options(`${core.prefix}/oauth/revoke`, preflight)
     .post(`${core.prefix}/oauth/register`, async (ctx) => {
       const state = stateOf(ctx)
       const text = await read(ctx.request)

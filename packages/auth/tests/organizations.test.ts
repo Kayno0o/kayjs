@@ -233,6 +233,58 @@ describe('organizations', () => {
     expect((await ada.browser.callOk('invitations', org)).invitations).toEqual([])
   })
 
+  describe('an invitation stands only while its sender may still grant it', () => {
+    async function sentByBob() {
+      const context = await setup()
+      const { ada, org, person } = context
+      const bob = await person('bob@example.com')
+      const grace = await person('grace@example.com')
+
+      await context.join(ada, bob, 'bob@example.com', ['admin'])
+
+      const { invitation } = await bob.browser.callOk('invite', org, 'grace@example.com', ['admin'])
+
+      return { ...context, bob, grace, invitation }
+    }
+
+    test('is accepted while the sender still manages the organization', async () => {
+      const { grace, invitation } = await sentByBob()
+
+      expect(await grace.browser.call('acceptInvitation', invitation.id)).toMatchObject({ ok: true, membership: { roles: ['admin'] } })
+    })
+
+    test('is dead once the sender is removed', async () => {
+      const { ada, bob, grace, invitation, org } = await sentByBob()
+
+      expect(await ada.browser.call('deleteMember', org, bob.id)).toEqual({ ok: true })
+      expect(await grace.browser.call('getInvitation', invitation.id)).toBeFalsy()
+      expect(await grace.browser.call('myInvitations')).toEqual([])
+      expect(await grace.browser.call('acceptInvitation', invitation.id)).toEqual({ ok: false, error: 'not-found' })
+    })
+
+    test('is dead once the sender left', async () => {
+      const { bob, grace, invitation, org } = await sentByBob()
+
+      expect(await bob.browser.call('leaveOrganization', org)).toEqual({ ok: true })
+      expect(await grace.browser.call('acceptInvitation', invitation.id)).toEqual({ ok: false, error: 'not-found' })
+    })
+
+    test('is dead once the sender no longer holds the roles it gives or manages the organization', async () => {
+      const { ada, bob, grace, invitation, org } = await sentByBob()
+
+      expect(await ada.browser.call('setMemberRoles', org, bob.id, ['member'])).toEqual({ ok: true })
+      expect(await grace.browser.call('acceptInvitation', invitation.id)).toEqual({ ok: false, error: 'not-found' })
+    })
+
+    test('stands when the sender is unknown, as after their account was deleted', async () => {
+      const { bob, grace, invitation, store } = await sentByBob()
+
+      expect(await bob.browser.call('deleteAccount', { password: PASSWORD })).toEqual({ ok: true })
+      expect((await store.invitations?.get(invitation.id))?.invitedBy).toBeNull()
+      expect(await grace.browser.call('acceptInvitation', invitation.id)).toMatchObject({ ok: true })
+    })
+  })
+
   test('a manager gives only roles they hold, to members holding none above theirs, and the last owner stays', async () => {
     const { ada, org, person, join, heard } = await setup()
     const grace = await person('grace@example.com')

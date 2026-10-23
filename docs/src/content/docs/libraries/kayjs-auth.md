@@ -582,7 +582,7 @@ if (made.ok)
 - `updateOrganization(ref, { name, slug })` renames it and `deleteOrganization(ref)` deletes it. Only owners delete.
 - Creating, renaming or deleting an organization, changing roles, removing members and everything about invitations (sending, listing, revoking, accepting, declining) need a signed-in browser session. A bearer token or an OAuth token for an API client or an AI agent cannot do them, so a leaked key cannot wipe a team.
 
-`invite(ref, email, roles?)` mails a link to `invitationPage` with `?invitation=<id>`, or to the prebuilt `/auth/invitation` page when you set none. It needs a mailer. The page reads `getInvitation(id)` and posts to an action calling `acceptInvitation(id)`. Only an account verified at the invited address joins.
+`invite(ref, email, roles?)` mails a link to `invitationPage` with `?invitation=<id>`, or to the prebuilt `/auth/invitation` page when you set none. It needs a mailer. The page reads `getInvitation(id)` and posts to an action calling `acceptInvitation(id)`. Only an account verified at the invited address joins, and only while the member who invited them still manages the organization and holds the roles it gives.
 
 `listMyInvitations()` lists those open to the user, and `rejectInvitation(id)` turns one down and answers `{ ok }`, `{ ok: false, error: 'not-found' }` for one not open to the user. `listInvitations(ref)` and `revokeInvitation(ref, id)` are for managers.
 
@@ -736,6 +736,8 @@ An agent that names a `resource` when it asks to sign in gets tokens bound to it
 A bound token works only on requests to that resource or under its path: a token asked for `/mcp` gets a 401 on `/api`. A token that asked for no resource works on every route within its scopes.
 
 The calls kay's `/mcp` makes to your tools count as made to `/mcp`. `userFromToken(token, url)` for a websocket takes the address of the handshake, and refuses a bound token without it.
+
+An agent can end its own sign-in at `/auth/oauth/revoke` (RFC 7009), sending `token` and `client_id`; the metadata lists it as `revocation_endpoint`. A client that registered and that nobody approved within 24 hours is deleted, and registers again.
 
 A refresh refused for its resource or scope keeps its token, so the agent can try again, and so does a code exchange refused for its resource or `redirect_uri`, within the code's 60 seconds.
 

@@ -52,6 +52,8 @@ describe('discovery', () => {
         authorization_endpoint: 'http://localhost/auth/oauth/authorize',
         token_endpoint: 'http://localhost/auth/oauth/token',
         registration_endpoint: 'http://localhost/auth/oauth/register',
+        revocation_endpoint: 'http://localhost/auth/oauth/revoke',
+        revocation_endpoint_auth_methods_supported: ['none'],
         response_types_supported: ['code'],
         response_modes_supported: ['query'],
         grant_types_supported: ['authorization_code', 'refresh_token'],

@@ -29,6 +29,7 @@ export function endpoints(core: Core, root: string) {
     authorization: `${root}${core.pages!.prefix}/oauth/authorize`,
     token: `${root}${core.prefix}/oauth/token`,
     registration: `${root}${core.prefix}/oauth/register`,
+    revocation: `${root}${core.prefix}/oauth/revoke`,
   }
 }
 
@@ -41,6 +42,8 @@ export function authorizationServerMetadata(core: Core, root: string): Record<st
     authorization_endpoint: where.authorization,
     token_endpoint: where.token,
     registration_endpoint: where.registration,
+    revocation_endpoint: where.revocation,
+    revocation_endpoint_auth_methods_supported: ['none'],
     response_types_supported: ['code'],
     response_modes_supported: ['query'],
     grant_types_supported: ['authorization_code', 'refresh_token'],

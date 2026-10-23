@@ -313,6 +313,10 @@ function oauthServerOf(options: { oauthServer?: boolean | { fetch?: ((url: strin
   if (defaultScopes.some(scope => !options.scopes?.includes(scope)))
     throw configError('`oauthServer.defaultScopes` names a scope that `scopes` does not declare')
 
+  // Switched on by the app, not by the pages and the store alone, which every app with the prebuilt pages has.
+  if (wanted !== undefined && (options.scopes?.length ?? 0) === 0)
+    log.warn('oauthServer is on but createAuth declares no `scopes`, so every OAuth token gets every scope: declare `scopes` and give routes a `scope:`')
+
   return { fetchDocument: async url => (await import('./authorize/clients')).documentFetcher(custom)(url), documents: new Map(), defaultScopes }
 }
 

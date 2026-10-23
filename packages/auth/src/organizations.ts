@@ -407,14 +407,14 @@ export async function revokeInvitation(state: RequestState, ref: string, invitat
 
 // The invitations open to the signed-in user's verified address, oldest first.
 export async function myInvitations(state: RequestState): Promise<Invitation[]> {
-  const { store } = organizationsOf(state.core)
+  const { config, store } = organizationsOf(state.core)
   const record = await state.current()
 
   if (record?.email == null || record.email === '' || record.emailVerifiedAt === null)
     return []
 
   const invitations: Invitation[] = []
-  const pending = open(await store.invitations.listByEmail(record.email))
+  const pending = await grantable(config, store, open(await store.invitations.listByEmail(record.email)))
   const organizations = await organizationsById(store.organizations, pending.map(invitation => invitation.organizationId))
 
   for (const invitation of pending) {
@@ -451,8 +451,8 @@ export async function exportedInvitations(state: RequestState): Promise<{ receiv
 
 // What the link's page shows anyone holding it: which organization, for which address; null once revoked, spent or expired.
 export async function getInvitation(state: RequestState, invitationId: string): Promise<Invitation | null> {
-  const { store } = organizationsOf(state.core)
-  const invitation = await live(store, invitationId)
+  const { config, store } = organizationsOf(state.core)
+  const invitation = await grantableOne(config, store, await live(store, invitationId))
   const organization = invitation && await store.organizations.get(invitation.organizationId)
 
   return invitation && organization ? publicInvitation(invitation, organization) : null
@@ -460,13 +460,13 @@ export async function getInvitation(state: RequestState, invitationId: string): 
 
 // Only an account verified at the invited address accepts, so a forwarded link is worth nothing to anyone else.
 export async function acceptInvitation(state: RequestState, invitationId: string): Promise<AcceptResult> {
-  const { store } = organizationsOf(state.core)
+  const { config, store } = organizationsOf(state.core)
   const record = await state.current()
 
   if (!record || state.via() !== 'session')
     return { ok: false, error: 'signed-out' }
 
-  const invitation = await live(store, invitationId)
+  const invitation = await grantableOne(config, store, await live(store, invitationId))
   const organization = invitation && await store.organizations.get(invitation.organizationId)
 
   if (!invitation || !organization)
@@ -562,6 +562,24 @@ async function live(store: Stores, invitationId: string): Promise<InvitationReco
   const invitation = await store.invitations.get(invitationId)
 
   return invitation && invitation.expiresAt.getTime() > Date.now() ? invitation : undefined
+}
+
+// Whether whoever sent the invitation still may grant what it gives: a member of the organization who manages it and holds its roles. One whose sender is unknown (deleted, or made by the app) stays open.
+async function grantable(config: OrganizationsCore, store: Stores, invitations: InvitationRecord[]): Promise<InvitationRecord[]> {
+  const kept: InvitationRecord[] = []
+
+  for (const invitation of invitations) {
+    const sender = invitation.invitedBy === null ? undefined : await store.members.get(invitation.organizationId, invitation.invitedBy)
+
+    if (invitation.invitedBy === null || (sender && config.isGranted(config.manage, sender.roles) && reaches(config, sender.roles, invitation.roles)))
+      kept.push(invitation)
+  }
+
+  return kept
+}
+
+async function grantableOne(config: OrganizationsCore, store: Stores, invitation: InvitationRecord | undefined): Promise<InvitationRecord | undefined> {
+  return invitation && (await grantable(config, store, [invitation])).at(0)
 }
 
 // The invitations not yet expired; the store's pruning deletes the others.
