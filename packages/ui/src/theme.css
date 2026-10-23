@@ -21,6 +21,11 @@
   inherits: false;
 }
 
+@property --_field-height {
+  syntax: '*';
+  inherits: false;
+}
+
 @property --_notice-ground {
   syntax: '*';
   inherits: false;
@@ -52,14 +57,6 @@
   --color-hover: var(--color-kui-row-hover, color-mix(in srgb, var(--color-foreground) 4.5%, transparent));
   --color-ring: var(--color-kui-field-focus, var(--color-accent));
 
-  /* The colours a chart series takes when it names none, in order. */
-  --color-chart-1: var(--color-kui-chart-1, var(--color-accent));
-  --color-chart-2: var(--color-kui-chart-2, var(--color-success));
-  --color-chart-3: var(--color-kui-chart-3, var(--color-info));
-  --color-chart-4: var(--color-kui-chart-4, var(--color-warning));
-  --color-chart-5: var(--color-kui-chart-5, light-dark(#6b4fa3, #b9a3de));
-  --color-chart-6: var(--color-kui-chart-6, light-dark(#2a7d6c, #7fc8b8));
-
   /* Tailwind's own radius steps and mono stack, the value an app that sets nothing gets, each reading the old name first until 1.75. kayjs-ui reads --radius-md for what is pressed, --radius-lg for boxes and --radius-sm for a thumb or a badge. */
   --radius-sm: var(--radius-kui-sm, 0.25rem);
   --radius-md: var(--radius-kui-md, var(--radius-kui-card, 0.375rem));
@@ -82,6 +79,16 @@
   --shadow-raised: var(--kui-shadow-raised, none);
   --shadow-press: var(--kui-shadow-press, none);
   --press-travel: var(--kui-press-travel, 0px);
+}
+
+/* The colours a chart series takes when it names none, in order. Static, as script reads them and Tailwind would otherwise write only the ones a utility names. */
+@theme default static {
+  --color-chart-1: var(--color-kui-chart-1, var(--color-accent));
+  --color-chart-2: var(--color-kui-chart-2, var(--color-success));
+  --color-chart-3: var(--color-kui-chart-3, var(--color-info));
+  --color-chart-4: var(--color-kui-chart-4, var(--color-warning));
+  --color-chart-5: var(--color-kui-chart-5, light-dark(#6b4fa3, #b9a3de));
+  --color-chart-6: var(--color-kui-chart-6, light-dark(#2a7d6c, #7fc8b8));
 }
 
 /* The names kayjs-ui used before 1.72, kept until 1.75 so an old utility still builds: each reads the new name and is never written to the page, so it forms no cycle with the new name reading it. */
@@ -365,9 +372,14 @@
     @apply px-4 py-1.5 text-sm;
   }
 
+  /* The height of a text field, a select and a medium button beside one: its two borders, two paddings and a line of text. Written once, here, and read by the select recipe and the rules below. */
+  :where(.kui-field-input, .kui-form-field select, .kui-btn) {
+    --_field-height: var(--spacing-kui-field-height, calc(2 * var(--kui-border-input, var(--kui-border-width, var(--border-width))) + 2 * var(--spacing-kui-field-y, calc(var(--spacing) * var(--density))) + var(--text-sm) * var(--text-sm--line-height)));
+  }
+
   /* A medium button in a row of compact fields or bare single-line field controls (a Textarea not), an island's slot wrapper between the row and the field included is as tall as they are at any density; a rule here rather than a utility, so no other button carries the selector. */
   :where(:has(> .kui-form-field[data-compact], > .kui-field-input:not(textarea), > .kui-multi-select, > slot > .kui-form-field[data-compact], > slot > .kui-field-input:not(textarea), > slot > .kui-multi-select)) > .kui-btn:where([data-size=md]:not([data-variant=inline])) {
-    height: var(--spacing-kui-field-height, calc(2 * var(--kui-border-input, var(--kui-border-width, var(--border-width))) + 2 * var(--spacing-kui-field-y, calc(var(--spacing) * var(--density))) + var(--text-sm) * var(--text-sm--line-height)));
+    height: var(--_field-height);
   }
 
   /* A toggle button that is on: the keyline in the accent, after the variants and tones so it shows on each, and over the hover line. A filled accent button shows no difference, its fill being the accent already. */
@@ -929,7 +941,7 @@
   /* A select draws its text a little lower than a text box does, so it takes the height of one. */
   select.kui-field-input,
   .kui-form-field :where(select) {
-    min-height: var(--spacing-kui-field-height, calc(2 * var(--kui-border-input, var(--kui-border-width, var(--border-width))) + 2 * var(--spacing-kui-field-y, calc(var(--spacing) * var(--density))) + var(--text-sm) * var(--text-sm--line-height)));
+    min-height: var(--_field-height);
   }
 
   /* A compact field is as wide as its select, which then fits its options, as in a filter bar. */
@@ -1106,10 +1118,8 @@
 
 
   /* chartist draws the plot; only the rules a line chart needs from its own stylesheet are here, so the app imports none. */
-  /* Tailwind emits a theme variable only where something reads it, and a series colour is read from script, so the palette is named here for the app's `--color-chart-*` to survive its build. */
   .kui-line-chart {
     @apply flex flex-col gap-2;
-    --_chart-palette: var(--color-chart-1) var(--color-chart-2) var(--color-chart-3) var(--color-chart-4) var(--color-chart-5) var(--color-chart-6);
   }
 
   .kui-line-chart-frame {

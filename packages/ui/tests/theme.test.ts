@@ -760,4 +760,25 @@ describe('the knobs folded in 1.72', () => {
         expect(found, `${knob} is read bare`).toBe('')
     }
   })
+
+  test('writes the height of a field once, in a private property the select recipe and the button row read', async () => {
+    const select = await Bun.file(`${ROOT}src/select.kay`).text()
+    const line = '--text-sm--line-height'
+
+    expect(theme.match(/--_field-height: /g)).toHaveLength(1)
+    expect(theme.match(/var\(--_field-height\)/g)).toHaveLength(2)
+    // The other is the old --spacing-kui-field-height alias, which goes in 1.75.
+    expect(theme.split(line).length - 1).toBe(2)
+    expect(select).toContain('min-h-(--_field-height)')
+    expect(select).not.toContain(line)
+  })
+
+  test('writes the chart series colours whatever the page uses, as script reads them and no utility names them', async () => {
+    const css = await built('')
+
+    for (const index of [1, 2, 3, 4, 5, 6])
+      expect(css, `chart-${index}`).toMatch(new RegExp(`--color-chart-${index}: `))
+
+    expect(theme).not.toContain('--_chart-palette')
+  })
 })
