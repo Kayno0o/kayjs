@@ -10,7 +10,7 @@ import { rateLimit, rooms } from '../src/server'
 import { appName, claimDatabase } from '../src/server/app-identity'
 import { appStore, setupStore } from '../src/server/app-store'
 import { registerBundle } from '../src/server/bundle'
-import { createDataTables, dataTables, pgData, pgHandle } from '../src/server/pg-data'
+import { createDataTables, dataTables, pgData as openPgData, pgHandle } from '../src/server/pg-data'
 import { createMissingIndexes, indexStatement, pgJobs } from '../src/server/pg-jobs'
 import { pgRooms } from '../src/server/pg-rooms'
 import { pgRates, pgSessions, pgVitals } from '../src/server/pg-stores'
@@ -57,11 +57,31 @@ async function closed(...stores: { close: () => void }[]): Promise<void> {
 }
 
 // Handles on separate connections, as replicas of an app have.
-function handles(count: number): PgHandle[] {
-  return replicas(count).map(sql => pgHandle(sql))
+const opened: { close: () => Promise<void> }[] = []
+
+function pgData(...args: Parameters<typeof openPgData>): ReturnType<typeof openPgData> {
+  const store = openPgData(...args)
+
+  opened.push(store)
+
+  return store
 }
 
-afterEach(async () => setupStore(undefined))
+function handles(count: number): PgHandle[] {
+  return replicas(count).map((sql) => {
+    const handle = pgHandle(sql)
+
+    opened.push(handle)
+
+    return handle
+  })
+}
+
+// Ends the polling of every store a case opened, so none reads the tables the next case drops.
+afterEach(async () => {
+  setupStore(undefined)
+  await Promise.all(opened.splice(0).map(async handle => handle.close()))
+})
 
 pgDescribe('pgData', () => {
   pgIt('gives each kind the SQLite one gives', async () => {

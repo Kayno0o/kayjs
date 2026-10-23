@@ -2,7 +2,7 @@ import type { LiveStore } from '../src/runtime/live-value'
 import { afterEach, expect, setSystemTime } from 'bun:test'
 import { live, liveSlot, liveStoreReady, setLiveStore } from '../src/runtime/live-value'
 import { setupStore } from '../src/server/app-store'
-import { createDataTables, dataTables, pgData, pgHandle } from '../src/server/pg-data'
+import { createDataTables, dataTables, pgData as openPgData, pgHandle as openPgHandle } from '../src/server/pg-data'
 import { pgLive } from '../src/server/pg-live'
 import { unescaped } from '../src/server/pg-sql'
 import { cleanUpAfterFile, pgDescribe, pgIt, postgres, replicas } from './job-stores'
@@ -36,6 +36,24 @@ async function fresh() {
   return sql
 }
 
+const opened: { close: () => Promise<void> }[] = []
+
+function pgData(...args: Parameters<typeof openPgData>): ReturnType<typeof openPgData> {
+  const store = openPgData(...args)
+
+  opened.push(store)
+
+  return store
+}
+
+function pgHandle(...args: Parameters<typeof openPgHandle>): ReturnType<typeof openPgHandle> {
+  const handle = openPgHandle(...args)
+
+  opened.push(handle)
+
+  return handle
+}
+
 // Two stores on separate connections, as two replicas have.
 function twoReplicas(): [LiveStore, LiveStore] {
   const [first, second] = replicas(2)
@@ -53,9 +71,11 @@ function listen(store: LiveStore): Heard[] {
   return heard
 }
 
-afterEach(() => {
+// Ends the polling of every store a case opened, so none reads the tables the next case drops.
+afterEach(async () => {
   setupStore(undefined)
   setLiveStore(undefined)
+  await Promise.all(opened.splice(0).map(async store => store.close()))
 })
 
 pgDescribe('pgData live values', () => {
