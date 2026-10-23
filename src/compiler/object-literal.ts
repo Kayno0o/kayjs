@@ -1,0 +1,91 @@
+// The one reader of an exported object literal that the config, the `ui` file and the message catalogs share: the object a module exports by default, through type wrappers, single-argument calls and top-level consts.
+import type * as t from '@babel/types'
+
+const WRAPPERS = new Set(['TSAsExpression', 'TSSatisfiesExpression', 'TSNonNullExpression', 'TSTypeAssertion', 'ParenthesizedExpression'])
+
+// The top-level `const` bindings of a module by name, which an identifier in the exported object may name.
+export type Bindings = Map<string, t.Expression>
+
+export function constBindings(program: t.Program): Bindings {
+  const bindings: Bindings = new Map()
+
+  for (const statement of program.body) {
+    const declaration = statement.type === 'ExportNamedDeclaration' ? statement.declaration : statement
+
+    if (declaration?.type !== 'VariableDeclaration' || declaration.kind !== 'const')
+      continue
+
+    for (const declarator of declaration.declarations) {
+      if (declarator.id.type === 'Identifier' && declarator.init)
+        bindings.set(declarator.id.name, declarator.init)
+    }
+  }
+
+  return bindings
+}
+
+// What `as`, `satisfies`, `!`, `<T>` and parentheses wrap.
+export function unwrapped(node: t.Node): t.Node {
+  let found = node
+
+  while (WRAPPERS.has(found.type))
+    found = (found as t.TSAsExpression).expression
+
+  return found
+}
+
+// The node a module exports as its default: `export default <node>`, or `export { name as default }`, which answers the identifier.
+export function exportedDefault(program: t.Program): t.Node | undefined {
+  let exported: t.Node | undefined
+
+  for (const statement of program.body) {
+    if (statement.type === 'ExportDefaultDeclaration')
+      exported = statement.declaration
+
+    if (statement.type !== 'ExportNamedDeclaration' || statement.source)
+      continue
+
+    for (const specifier of statement.specifiers) {
+      if (specifier.type === 'ExportSpecifier' && (specifier.exported.type === 'Identifier' ? specifier.exported.name : specifier.exported.value) === 'default')
+        exported = specifier.local
+    }
+  }
+
+  return exported
+}
+
+// The object literal `node` is or wraps, followed through top-level consts. With `calls`, a call handed one argument is transparent too (`defineMessages({ ... })`, `omit({ ... })`), which only the exported value is: inside it a call is a value.
+export function objectOf(node: t.Node | null | undefined, bindings: Bindings, calls = false, seen: ReadonlySet<string> = new Set()): t.ObjectExpression | undefined {
+  const value = node && unwrapped(node)
+
+  if (!value)
+    return undefined
+
+  if (value.type === 'ObjectExpression')
+    return value
+
+  if (calls && value.type === 'CallExpression' && value.arguments.length === 1)
+    return objectOf(value.arguments[0], bindings, calls, seen)
+
+  if (value.type === 'Identifier' && !seen.has(value.name))
+    return objectOf(bindings.get(value.name), bindings, calls, new Set([...seen, value.name]))
+
+  return undefined
+}
+
+export function exportedObject(program: t.Program): t.ObjectExpression | undefined {
+  return objectOf(exportedDefault(program), constBindings(program), true)
+}
+
+// The properties of an object with the spread of a const object replaced by that object's own, in order, so a key written by `{ ...base }` reads as written in place. A spread that is not a const object stays as it is.
+export function propertiesOf(object: t.ObjectExpression, bindings: Bindings, seen: ReadonlySet<string> = new Set()): t.ObjectExpression['properties'] {
+  return object.properties.flatMap((property) => {
+    if (property.type !== 'SpreadElement')
+      return [property]
+
+    const name = unwrapped(property.argument)
+    const spread = name.type === 'Identifier' && !seen.has(name.name) ? objectOf(name, bindings, true) : undefined
+
+    return spread ? propertiesOf(spread, bindings, new Set([...seen, (name as t.Identifier).name])) : [property]
+  })
+}

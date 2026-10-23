@@ -2,6 +2,7 @@ import type * as t from '@babel/types'
 import type { Node } from '../compiler/ast'
 import { parse } from '@babel/parser'
 import { elementsIn } from '../compiler/ast'
+import { objectOf, unwrapped } from '../compiler/object-literal'
 import { KAY_FILE } from './files'
 
 // `Content`, or `post.Content`: an entry's body, rendering the components of its collection.
@@ -88,14 +89,6 @@ export function collectionComponents(code: string): Map<string, string[]> {
 
     return binding?.source === 'kay/content' && binding.imported === 'collection'
   }
-  const object = (node: t.Node | undefined): t.ObjectExpression | undefined => {
-    const value = node && unwrapped(node)
-
-    if (value?.type === 'ObjectExpression')
-      return value
-
-    return value?.type === 'Identifier' ? object(declared.get(value.name)) : undefined
-  }
   const components = new Map<string, string[]>()
 
   for (const [name, local] of exported) {
@@ -105,8 +98,8 @@ export function collectionComponents(code: string): Map<string, string[]> {
     if (call?.type !== 'CallExpression' || !isCollection(call.callee))
       continue
 
-    const property = object(call.arguments[1])?.properties.find((candidate): candidate is t.ObjectProperty => candidate.type === 'ObjectProperty' && !candidate.computed && keyOf(candidate.key) === 'components')
-    const files = (object(property?.value)?.properties ?? []).flatMap((entry) => {
+    const property = objectOf(call.arguments[1], declared)?.properties.find((candidate): candidate is t.ObjectProperty => candidate.type === 'ObjectProperty' && !candidate.computed && keyOf(candidate.key) === 'components')
+    const files = (objectOf(property?.value, declared)?.properties ?? []).flatMap((entry) => {
       const value = entry.type === 'ObjectProperty' ? unwrapped(entry.value) : undefined
       const binding = value?.type === 'Identifier' ? bindings.get(value.name) : undefined
 
@@ -126,10 +119,6 @@ function parsed(code: string): t.File | undefined {
   catch {
     return undefined
   }
-}
-
-function unwrapped(node: t.Node): t.Node {
-  return node.type === 'TSAsExpression' || node.type === 'TSSatisfiesExpression' || node.type === 'TSNonNullExpression' || node.type === 'ParenthesizedExpression' ? unwrapped(node.expression) : node
 }
 
 function nameOf(node: t.Identifier | t.StringLiteral): string {

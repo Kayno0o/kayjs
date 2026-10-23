@@ -1,5 +1,6 @@
 import type * as t from '@babel/types'
 import { parse } from '@babel/parser'
+import { constBindings, exportedDefault, objectOf, unwrapped } from '../compiler/object-literal'
 
 export interface ConfigPosition {
   line: number
@@ -7,15 +8,6 @@ export interface ConfigPosition {
 }
 
 const START: ConfigPosition = { line: 1, column: 1 }
-
-function bare(node: t.Node | null | undefined): t.Node | null | undefined {
-  let current = node
-
-  while (current && (current.type === 'TSAsExpression' || current.type === 'TSSatisfiesExpression' || current.type === 'ParenthesizedExpression' || current.type === 'TSNonNullExpression'))
-    current = current.expression
-
-  return current
-}
 
 function keyName(property: t.ObjectProperty): string | undefined {
   if (property.computed)
@@ -29,13 +21,6 @@ function keyName(property: t.ObjectProperty): string | undefined {
 
 function positionOf(node: t.Node): ConfigPosition {
   return node.loc ? { line: node.loc.start.line, column: node.loc.start.column + 1 } : START
-}
-
-function declarationsOf(statement: t.Statement): t.VariableDeclarator[] {
-  if (statement.type === 'VariableDeclaration')
-    return statement.declarations
-
-  return statement.type === 'ExportNamedDeclaration' && statement.declaration?.type === 'VariableDeclaration' ? statement.declaration.declarations : []
 }
 
 // Where a key sits in kay.config.ts's source: the key itself when it is set, whatever its value, else the deepest key above it that is, else the `defineConfig` call or the default export. A source that cannot be read or has no such export puts everything at line 1.
@@ -52,36 +37,15 @@ export function configLocator(source: string | undefined): (path: string[]) => C
     return () => START
   }
 
-  const objects = new Map<string, t.ObjectExpression>()
-  let exported: t.Node | null | undefined
-
-  for (const statement of ast.program.body) {
-    if (statement.type === 'ExportDefaultDeclaration')
-      exported = statement.declaration
-
-    for (const declaration of declarationsOf(statement)) {
-      const init = bare(declaration.init)
-
-      if (declaration.id.type === 'Identifier' && init?.type === 'ObjectExpression')
-        objects.set(declaration.id.name, init)
-    }
-  }
-
-  const root = bare(exported)
+  const bindings = constBindings(ast.program)
+  const exported = exportedDefault(ast.program)
+  const root = exported && unwrapped(exported)
 
   if (!root)
     return () => START
 
   const anchor = positionOf(root)
-  const objectOf = (node: t.Node | null | undefined): t.ObjectExpression | undefined => {
-    const value = bare(node)
-
-    if (value?.type === 'Identifier')
-      return objects.get(value.name)
-
-    return value?.type === 'ObjectExpression' ? value : undefined
-  }
-  const config = root.type === 'CallExpression' ? objectOf(root.arguments[0]) : objectOf(root)
+  const config = objectOf(root, bindings, true)
 
   return (path) => {
     let found = anchor
@@ -94,7 +58,7 @@ export function configLocator(source: string | undefined): (path: string[]) => C
         break
 
       found = positionOf(property.key)
-      object = objectOf(property.value)
+      object = objectOf(property.value, bindings)
     }
 
     return found

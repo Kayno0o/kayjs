@@ -3,6 +3,7 @@ import type * as t from '@babel/types'
 import { basename, dirname } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { parse } from '@babel/parser'
+import { exportedObject } from '../compiler/object-literal'
 import { loadTraverse } from '../compiler/rewrite'
 
 interface Range {
@@ -15,7 +16,6 @@ interface Token extends Range {
 }
 
 const COMMENTS = new Set(['CommentBlock', 'CommentLine'])
-const TS_WRAPPERS = new Set(['TSAsExpression', 'TSSatisfiesExpression', 'TSNonNullExpression', 'TSTypeAssertion', 'ParenthesizedExpression'])
 
 // The config's source without the `plugins` of the object it exports by default, nor the imports and top-level declarations only they referenced; undefined when they cannot be told apart from the rest.
 // A declaration referencing itself, or one a type mentions, stays: what is left must run as it did.
@@ -33,7 +33,7 @@ export function withoutPlugins(source: string): string | undefined {
     },
   })
 
-  const config = program && exportedObject(program)
+  const config = program && exportedObject(program.node)
 
   // A spread may carry plugins of its own.
   if (!program || !config || config.properties.some(entry => entry.type === 'SpreadElement'))
@@ -132,35 +132,6 @@ function parseModule(source: string, tokens: boolean): ReturnType<typeof parse> 
   catch {
     return undefined
   }
-}
-
-// The object literal the module exports by default, through `defineConfig(...)`, a type assertion or a top-level const.
-function exportedObject(program: NodePath<t.Program>): t.ObjectExpression | undefined {
-  const exported = program.node.body.find(statement => statement.type === 'ExportDefaultDeclaration')
-
-  return exported && objectOf(exported.declaration, program)
-}
-
-function objectOf(node: t.Node | null | undefined, program: NodePath<t.Program>): t.ObjectExpression | undefined {
-  if (!node)
-    return undefined
-
-  if (node.type === 'ObjectExpression')
-    return node
-
-  if (TS_WRAPPERS.has(node.type))
-    return objectOf((node as t.TSAsExpression).expression, program)
-
-  if (node.type === 'CallExpression' && node.arguments.length === 1)
-    return objectOf(node.arguments[0], program)
-
-  if (node.type === 'Identifier') {
-    const declarator = program.scope.getBinding(node.name)?.path.node
-
-    return declarator?.type === 'VariableDeclarator' ? objectOf(declarator.init, program) : undefined
-  }
-
-  return undefined
 }
 
 function keyName(key: t.Node): string | undefined {

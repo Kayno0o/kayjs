@@ -1,5 +1,6 @@
 // Draft messages: a machine's translation waiting for a person, a message whose line in its locale's file ends on a `// draft` comment.
 import type * as t from '@babel/types'
+import type { Bindings } from '../compiler/object-literal'
 import type { KayConfig } from '../config'
 import type { Message } from '../runtime/i18n'
 import { existsSync } from 'node:fs'
@@ -8,6 +9,7 @@ import { dirname } from 'node:path'
 import process from 'node:process'
 import { parse } from '@babel/parser'
 import { KayError } from '../compiler/errors'
+import { constBindings, exportedObject, objectOf, propertiesOf, unwrapped } from '../compiler/object-literal'
 import { messagesFile } from './i18n'
 
 const COMMENTS = /\/\/[^\n]*|\/\*[\s\S]*?\*\//g
@@ -108,21 +110,25 @@ function styleOf(source: string): Style {
 
 // The source with one message added under its key, or as it was when the key is there already, or a part of it is a message rather than a group.
 function withMessage(source: string, parts: string[], message: Message, style: Style): string {
-  let object: t.ObjectExpression | undefined = messagesObject(source)
+  const catalog = messagesObject(source)
 
-  if (!object)
-    throw new KayError('locales-invalid', 'kay: the messages file does not export its messages as `export default defineMessages({ ... })`')
+  if (!catalog)
+    throw new KayError('locales-invalid', 'kay: the messages file does not export its messages as an object, `export default defineMessages({ ... })` or a const exported later')
+
+  let { object } = catalog
 
   for (const [index, part] of parts.entries()) {
-    const found: t.ObjectProperty | undefined = object.properties.find((property): property is t.ObjectProperty => property.type === 'ObjectProperty' && keyName(property) === part)
+    const found: t.ObjectProperty | undefined = propertiesOf(object, catalog.bindings).findLast((property): property is t.ObjectProperty => property.type === 'ObjectProperty' && keyName(property) === part)
 
     if (!found)
       return inserted(source, object, entryText(parts.slice(index), message, style.unit), style)
 
-    if (index === parts.length - 1 || found.value.type !== 'ObjectExpression' || isPluralObject(found.value))
+    const group = objectOf(found.value, catalog.bindings)
+
+    if (index === parts.length - 1 || !group || isPluralObject(group))
       return source
 
-    object = found.value
+    object = group
   }
 
   return source
@@ -199,15 +205,16 @@ function lineIndent(source: string, offset: number): string {
 // Every message the file's default export writes as a literal, with its `// draft` comment.
 function writtenMessages(source: string): WrittenMessage[] {
   const ast = parsed(source)
-  const object = ast && messagesObjectOf(ast)
+  const object = ast && exportedObject(ast.program)
 
   if (!object)
     return []
 
   const drafts = new Map((ast.comments ?? []).filter((comment): comment is t.CommentLine => comment.type === 'CommentLine' && DRAFT.test(comment.value)).map(comment => [comment.loc!.start.line, comment]))
+  const bindings = constBindings(ast.program)
   const found: WrittenMessage[] = []
   const walk = (node: t.ObjectExpression, prefix: string) => {
-    for (const property of node.properties) {
+    for (const property of propertiesOf(node, bindings)) {
       if (property.type !== 'ObjectProperty')
         continue
 
@@ -217,16 +224,21 @@ function writtenMessages(source: string): WrittenMessage[] {
         continue
 
       const key = `${prefix}${name}`
-      const { value } = property
+      const value = unwrapped(property.value)
+      const group = objectOf(value, bindings)
 
-      if (value.type === 'ObjectExpression' && !isPluralObject(value)) {
-        walk(value, `${key}.`)
+      if (group && !isPluralObject(group)) {
+        walk(group, `${key}.`)
 
         continue
       }
 
-      if (value.type === 'StringLiteral' || value.type === 'TemplateLiteral' || value.type === 'ObjectExpression') {
+      if (value.type === 'StringLiteral' || value.type === 'TemplateLiteral' || group) {
         const line = property.loc!.start.line
+
+        // A const group spread or named twice is walked twice.
+        if (found.some(message => message.key === key && message.line === line))
+          continue
 
         found.push({ key, line, draft: drafts.get(line) })
       }
@@ -238,10 +250,11 @@ function writtenMessages(source: string): WrittenMessage[] {
   return found
 }
 
-function messagesObject(source: string): t.ObjectExpression | undefined {
+function messagesObject(source: string): { object: t.ObjectExpression, bindings: Bindings } | undefined {
   const ast = parsed(source)
+  const object = ast && exportedObject(ast.program)
 
-  return ast && messagesObjectOf(ast)
+  return ast && object ? { object, bindings: constBindings(ast.program) } : undefined
 }
 
 function parsed(source: string): t.File | undefined {
@@ -251,20 +264,6 @@ function parsed(source: string): t.File | undefined {
   catch {
     return undefined
   }
-}
-
-// The object `export default defineMessages({ ... })` or `export default { ... }` gives, through `satisfies`, `as` and parentheses.
-function messagesObjectOf(ast: t.File): t.ObjectExpression | undefined {
-  const exported = ast.program.body.find((statement): statement is t.ExportDefaultDeclaration => statement.type === 'ExportDefaultDeclaration')
-  let node: t.Node | undefined = exported?.declaration
-
-  while (node && (node.type === 'TSSatisfiesExpression' || node.type === 'TSAsExpression' || node.type === 'ParenthesizedExpression'))
-    node = node.expression
-
-  if (node?.type === 'CallExpression')
-    node = node.arguments[0]
-
-  return node?.type === 'ObjectExpression' ? node : undefined
 }
 
 function keyName(property: t.ObjectProperty): string | undefined {

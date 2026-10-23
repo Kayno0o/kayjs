@@ -1,10 +1,12 @@
 import type * as t from '@babel/types'
 import type { CheckDiagnostic, CheckOptions } from '.'
 import type { LintLevel } from '../compiler/lints'
+import type { Bindings } from '../compiler/object-literal'
 import { existsSync } from 'node:fs'
 import { parse } from '@babel/parser'
 import { lintLevel } from '../compiler/lints'
 import { positionAt } from '../compiler/mapping'
+import { constBindings, exportedObject, objectOf, propertiesOf } from '../compiler/object-literal'
 import { PLURAL_CATEGORIES } from '../runtime/i18n'
 import { messagesFile } from '../server/i18n'
 import { renamedMessageKey } from '../server/legacy-keys'
@@ -39,71 +41,13 @@ export async function renamedMessageKeys(root: string, options: CheckOptions): P
       continue
     }
 
-    const tree = defaultCatalog(ast.program)
+    const tree = exportedObject(ast.program)
 
     if (tree)
-      visit(tree, [], { file, source, level, found })
+      visit(tree, [], { file, source, level, found, bindings: constBindings(ast.program) })
   }
 
   return found
-}
-
-const WRAPPERS = new Set(['TSAsExpression', 'TSSatisfiesExpression', 'TSNonNullExpression', 'TSTypeAssertion', 'ParenthesizedExpression'])
-
-// The object literal a catalog exports by default, through `defineMessages(...)`, `as const`, `satisfies`, or a top-level `const` exported later as `export default name` or `export { name as default }`.
-function defaultCatalog(program: t.Program): t.ObjectExpression | undefined {
-  const bindings = new Map<string, t.Expression>()
-  let exported: t.Node | null | undefined
-
-  for (const statement of program.body) {
-    const declaration = statement.type === 'ExportNamedDeclaration' ? statement.declaration : statement
-
-    if (declaration?.type === 'VariableDeclaration' && declaration.kind === 'const') {
-      for (const declarator of declaration.declarations) {
-        if (declarator.id.type === 'Identifier' && declarator.init)
-          bindings.set(declarator.id.name, declarator.init)
-      }
-    }
-
-    if (statement.type === 'ExportDefaultDeclaration')
-      exported = statement.declaration
-
-    if (statement.type === 'ExportNamedDeclaration' && !statement.source) {
-      for (const specifier of statement.specifiers) {
-        if (specifier.type === 'ExportSpecifier' && (specifier.exported.type === 'Identifier' ? specifier.exported.name : specifier.exported.value) === 'default')
-          exported = specifier.local
-      }
-    }
-  }
-
-  return objectOf(exported, bindings, new Set())
-}
-
-// A nested group may be wrapped too (`{ ... } as const`), but a call there is a message value, not a group.
-function unwrapped(node: t.Node): t.ObjectExpression | undefined {
-  if (WRAPPERS.has(node.type))
-    return unwrapped((node as t.TSAsExpression).expression)
-
-  return node.type === 'ObjectExpression' ? node : undefined
-}
-
-function objectOf(node: t.Node | null | undefined, bindings: Map<string, t.Expression>, seen: Set<string>): t.ObjectExpression | undefined {
-  if (!node)
-    return undefined
-
-  if (node.type === 'ObjectExpression')
-    return node
-
-  if (WRAPPERS.has(node.type))
-    return objectOf((node as t.TSAsExpression).expression, bindings, seen)
-
-  if (node.type === 'CallExpression' && node.arguments.length === 1)
-    return objectOf(node.arguments[0], bindings, seen)
-
-  if (node.type === 'Identifier' && !seen.has(node.name))
-    return objectOf(bindings.get(node.name), bindings, new Set([...seen, node.name]))
-
-  return undefined
 }
 
 interface Context {
@@ -111,15 +55,16 @@ interface Context {
   source: string
   level: Exclude<LintLevel, 'allow'>
   found: CheckDiagnostic[]
+  bindings: Bindings
 }
 
 // Reports each renamed key of an object and of those nested in it, with the dotted path it sits at.
 function visit(object: t.ObjectExpression, path: string[], context: Context): void {
-  const { file, source, level, found } = context
+  const { file, source, level, found, bindings } = context
+  const properties = propertiesOf(object, bindings)
+  const siblings = new Set(properties.flatMap(property => property.type === 'ObjectProperty' ? keyOf(property) ?? [] : []))
 
-  const siblings = new Set(object.properties.flatMap(property => property.type === 'ObjectProperty' ? keyOf(property) ?? [] : []))
-
-  for (const property of object.properties) {
+  for (const property of properties) {
     if (property.type !== 'ObjectProperty')
       continue
 
@@ -128,7 +73,7 @@ function visit(object: t.ObjectExpression, path: string[], context: Context): vo
     if (name === undefined)
       continue
 
-    const value = unwrapped(property.value)
+    const value = objectOf(property.value, bindings)
 
     if (value && !pluralForms(value)) {
       visit(value, [...path, name], context)
@@ -139,6 +84,10 @@ function visit(object: t.ObjectExpression, path: string[], context: Context): vo
     const renamed = renamedMessageKey([...path, name].join('.'))
 
     if (renamed === undefined)
+      continue
+
+    // A const group used twice is visited twice but renamed once.
+    if (found.some(diagnostic => diagnostic.end === property.key.end))
       continue
 
     const replacement = renamed.slice(renamed.lastIndexOf('.') + 1)

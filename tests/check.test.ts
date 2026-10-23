@@ -4365,6 +4365,30 @@ describe.concurrent('kay check, unused code', () => {
     }
   })
 
+  it('follows a nested group bound to a const, a spread of a const catalog and any call handed one argument', async () => {
+    const cases: [string, number][] = [
+      ['const table = { filterLabel: "a" }\nexport default { ui: { table } }', 1],
+      ['const ui = { table: { filterLabel: "a" } }\nexport default { ui }', 1],
+      ['const base = { ui: { table: { filterLabel: "a" } } }\nexport default { ...base, other: "x" }', 1],
+      ['const base = { ui: { table: { filterLabel: "a" } } }\nexport default { ui: { table: { selectedLabel: "b" } }, ...base }', 2],
+      ['const table = { filterLabel: "a" }\nexport default { ui: { table }, cms: { table } }', 1],
+      ['export default omit({ ui: { table: { filterLabel: "a" } } })', 1],
+    ]
+
+    for (const [form, count] of cases) {
+      const root = await scratchProject({ 'src/routes/index.kay': 'p hi\n', 'src/messages/fr.ts': `${form}\n`, 'kay.config.ts': 'export default { i18n: { locales: [\'fr\'], defaultLocale: \'fr\' } }\n' })
+
+      try {
+        expect((await runCheck(root)).output.match(/warning\[deprecated-message-key\]/g)?.length ?? 0, form).toBe(count)
+        await runCheck(root, '--fix')
+        expect(await Bun.file(join(root, 'src/messages/fr.ts')).text(), form).not.toContain('Label')
+      }
+      finally {
+        await rm(root, { recursive: true, force: true })
+      }
+    }
+  })
+
   it('reports but does not fix a shorthand key, and reads no reassigned let or multi-argument call', async () => {
     const cases: [string, number, boolean][] = [
       ['const filterLabel = "x"\nexport default { ui: { table: { filterLabel } } }', 1, false],

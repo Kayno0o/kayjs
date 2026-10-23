@@ -99,6 +99,29 @@ describe('draft messages', () => {
     expect(Object.fromEntries(flattenMessages(tree))).toEqual({ 'nav.home': 'Accueil', 'nav.about': 'À propos', 'short.a': 'A', 'short.b': 'B', 'deep.er.key': 'Profond', 'items': { one: '{count} article', other: '{count} articles' }, 'it\'s': 'l\'apostrophe\nligne' })
   })
 
+  it('read the catalog forms the server imports: a const exported later, a wrapped call, a group or a spread bound to a const', async () => {
+    const forms = [
+      'const m = { nav: { home: \'Accueil\' } }\nexport default m',
+      'const m = { nav: { home: \'Accueil\' } } as const\nexport { m as default }',
+      'export default omit({ nav: { home: \'Accueil\' } })',
+      'const nav = { home: \'Accueil\' }\nexport default { nav }',
+      'const base = { nav: { home: \'Accueil\' } }\nexport default { ...base }',
+    ]
+
+    for (const form of forms) {
+      expect(draftMessages(`${form.replace('\'Accueil\' }', '\'Accueil\', // draft\n}')}\n`).map(({ key }) => key), form).toEqual(['nav.home'])
+
+      const root = await project({ 'src/messages/fr.ts': `${form}\n` })
+
+      expect(await writeDraftMessages(root, { i18n }, 'fr', { 'nav.home': 'Maison', 'nav.about': 'À propos', 'footer': 'Pied' }), form).toEqual(['nav.about', 'footer'])
+
+      const text = await Bun.file(join(root, 'src/messages/fr.ts')).text()
+
+      expect(text.match(/home:/g), form).toHaveLength(1)
+      expect(draftMessages(text).map(({ key }) => key), form).toEqual(['nav.about', 'footer'])
+    }
+  })
+
   it('create the locale\'s file when it is missing, and the default export of an empty one', async () => {
     const root = await project({ 'src/messages/fr.ts': messages('{}') })
 

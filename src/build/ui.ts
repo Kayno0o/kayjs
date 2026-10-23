@@ -6,6 +6,7 @@ import { readdirSync, readFileSync, realpathSync, statSync } from 'node:fs'
 import { basename, dirname, join } from 'node:path'
 import { parse } from '@babel/parser'
 import { componentName, ROUTE_FILES } from '../compiler'
+import { unwrapped } from '../compiler/object-literal'
 import { parseKay } from '../compiler/parser'
 
 // Where an app sets the parts and variants of its components and its libraries'.
@@ -42,8 +43,6 @@ export interface UiSource {
   index?: NameIndex | undefined
 }
 
-const OBJECT_WRAPPERS = new Set(['TSAsExpression', 'TSSatisfiesExpression', 'TSNonNullExpression', 'ParenthesizedExpression'])
-
 export const KAY_EXTENSION = /\.kay$/
 // A key written as a component's name, `Card`, rather than as a specifier.
 const COMPONENT_NAME = /^[A-Z_$][\w$]*$/i
@@ -60,15 +59,6 @@ function record<T>(): Record<string, T> {
 
 function span(node: t.Node): Span {
   return { start: node.start ?? 0, end: node.end ?? 0 }
-}
-
-export function unwrapped(node: t.Node): t.Node {
-  let found = node
-
-  while (OBJECT_WRAPPERS.has(found.type))
-    found = (found as t.TSAsExpression).expression
-
-  return found
 }
 
 export function keyOf(property: t.ObjectProperty): string | undefined {
