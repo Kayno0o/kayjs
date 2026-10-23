@@ -95,6 +95,16 @@ describe.skipIf(treeSitter === null)('tree-sitter grammar', () => {
     expect(output).toMatch(TREE_ERROR)
   })
 
+  it('keeps balancing brackets nested past the scanner stack', async () => {
+    const dir = await scratchDir('tree-sitter-')
+    const depth = 100
+
+    await Bun.write(join(dir, 'deep.kay'), `div(a={${'{'.repeat(depth)}1${'}'.repeat(depth)}})\n  p x\n`)
+    const { output } = await run([treeSitter!, 'parse', '--quiet', join(dir, 'deep.kay')], { libdir: dir })
+
+    expect(output).not.toMatch(TREE_ERROR)
+  })
+
   it('has its generated parser up to date with grammar.js and its scanner', async () => {
     const dir = await scratchDir('tree-sitter-')
     const copy = join(dir, 'tree-sitter-kay')

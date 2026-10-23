@@ -55,13 +55,15 @@ static void consume_line_break(TSLexer *lexer) {
 }
 
 // Code scanning: strings, template literals and comments are skipped as units, so a bracket or a `---` inside them means nothing.
+// The depth keeps counting past the stored kinds, so the closers of a deeper nesting still balance its openers. Only the kind of a level past MAX_NESTING is lost, read as a plain bracket.
 typedef struct {
   char stack[MAX_NESTING];
   int depth;
 } Nesting;
 
 static void push(Nesting *nesting, char kind) {
-  if (nesting->depth < MAX_NESTING) nesting->stack[nesting->depth++] = kind;
+  if (nesting->depth < MAX_NESTING) nesting->stack[nesting->depth] = kind;
+  nesting->depth++;
 }
 
 static void skip_string(TSLexer *lexer) {
@@ -104,7 +106,7 @@ static void skip_slash(TSLexer *lexer) {
 // One lexical unit of code. `brackets` counts ( [ { in code; without it only the braces of a `${` do.
 static void step_code(TSLexer *lexer, Nesting *nesting, bool brackets) {
   int32_t c = lexer->lookahead;
-  char top = nesting->depth > 0 ? nesting->stack[nesting->depth - 1] : 0;
+  char top = nesting->depth > 0 ? (nesting->depth <= MAX_NESTING ? nesting->stack[nesting->depth - 1] : '{') : 0;
 
   if (top == '`') {
     if (c == '\\') {
