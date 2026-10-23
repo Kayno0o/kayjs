@@ -1,5 +1,5 @@
 import type { ContentLoader, LoadedEntry } from 'kay/content'
-import { ContentChanged, contentKey } from 'kay/content'
+import { ContentChangedError, contentKey } from 'kay/content'
 import { configError, durationSeconds, invalidateLocally, onKeysInvalidated } from 'kay/library'
 
 // An entry a loader holds from its first start: the app's initial content.
@@ -81,13 +81,13 @@ export function swappedData(name: string, stored: string | undefined, entry: Sav
   const place = placeOf(entry)
 
   if (stored === undefined)
-    throw new ContentChanged(`${name}: ${place} was deleted since`)
+    throw new ContentChangedError(`${name}: ${place} was deleted since`)
 
   const data = JSON.parse(stored) as Record<string, unknown>
   const held = data[field]
 
   if ((typeof held === 'number' && Number.isFinite(held) ? held : undefined) !== was)
-    throw new ContentChanged(`${name}: ${place} was reordered since`)
+    throw new ContentChangedError(`${name}: ${place} was reordered since`)
 
   return JSON.stringify({ ...data, [field]: (entry.data as Record<string, unknown>)[field] })
 }

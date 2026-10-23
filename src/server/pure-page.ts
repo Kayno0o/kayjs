@@ -90,6 +90,7 @@ export const CONTENT_EXPORTS: Record<string, 'free' | 'request' | 'folder'> = {
   COLLECTION: 'free',
   PUBLISH_TIMES: 'free',
   contentKey: 'free',
+  ContentChangedError: 'free',
   reference: 'free',
   imageField: 'free',
   fileField: 'free',

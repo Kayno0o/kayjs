@@ -18,7 +18,7 @@ import { kayLog } from '../runtime/log'
 import { html } from '../runtime/rendered'
 import { isDraft } from './drafts'
 import { entryPath } from './entry-route'
-import { ContentChanged, contentKey } from './key'
+import { ContentChangedError, contentKey } from './key'
 import { collectionFolder, contentPlace, entryFiles, entrySlug, markdownOf, parseEntry, slugOf, sourcePath, STAMP_SETTLED_MS, translationKey, writableFolder } from './load'
 import { compileMarkdown, MarkdownError, splitFrontmatter } from './markdown'
 import { migrateData } from './migrate'
@@ -882,7 +882,7 @@ export async function saveEntries(name: string, written: WrittenEntry[]): Promis
       }
     }
     catch (error) {
-      if (error instanceof ContentChanged || (error instanceof Error && error.name === 'ContentChanged'))
+      if (error instanceof ContentChangedError || (error instanceof Error && error.name === 'ContentChangedError'))
         return { changed: true }
 
       throw error

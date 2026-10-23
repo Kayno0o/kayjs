@@ -5,7 +5,7 @@ import { SQL } from 'bun'
 import { Database } from 'bun:sqlite'
 import { afterAll, describe, expect, test } from 'bun:test'
 import { s } from 'kay'
-import { collection, ContentChanged } from 'kay/content'
+import { collection, ContentChangedError } from 'kay/content'
 import { scratchDir } from 'kay/test'
 import { pgLoader } from '../src/loaders/pg'
 import { sqliteLoader } from '../src/loaders/sqlite'
@@ -114,10 +114,10 @@ function contract(label: string, make: (options: { name: string, seed?: SeedEntr
       expect((await mine.get!('b', { preview: false }))!.data).toEqual({ title: 'B', order: 1 })
 
       // Another process moved them already: nothing of this move is written.
-      await expect(mine.saveMany!(swap)).rejects.toBeInstanceOf(ContentChanged)
+      await expect(mine.saveMany!(swap)).rejects.toBeInstanceOf(ContentChangedError)
       expect((await mine.get!('a', { preview: false }))!.data).toEqual({ title: 'A edited', order: 2 })
       await other.remove!({ slug: 'b' })
-      await expect(mine.saveMany!([{ slug: 'a', data: { title: 'A', order: 1 }, expect: { field: 'order', was: 2 } }, { slug: 'b', data: { title: 'B', order: 2 }, expect: { field: 'order', was: 1 } }])).rejects.toBeInstanceOf(ContentChanged)
+      await expect(mine.saveMany!([{ slug: 'a', data: { title: 'A', order: 1 }, expect: { field: 'order', was: 2 } }, { slug: 'b', data: { title: 'B', order: 2 }, expect: { field: 'order', was: 1 } }])).rejects.toBeInstanceOf(ContentChangedError)
       expect((await mine.get!('a', { preview: false }))!.data).toEqual({ title: 'A edited', order: 2 })
     })
 

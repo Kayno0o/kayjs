@@ -11,7 +11,7 @@ import { sqliteLoader } from '../packages/cms/src/loaders/sqlite'
 import { readClientSources } from '../src/build/client'
 import { blocks, collection, collectionInfo, collections, colorField, customField, entries, entryFile, entryPage, entrySource, fieldInput, fileField, findIcons, geoField, iconField, imageField, linkField, moneyField, reference, removeEntry, saveEntries, saveEntry, tagsField } from '../src/content'
 import { entryIssues, registerCollections, registerEditSite } from '../src/content/edit'
-import { ContentChanged } from '../src/content/key'
+import { ContentChangedError } from '../src/content/key'
 import { contentPlace, parseEntry, setContentPlace } from '../src/content/load'
 import { MarkdownError } from '../src/content/markdown'
 import * as validate from '../src/content/validate'
@@ -1207,7 +1207,7 @@ describe('the collections a CMS edits', () => {
     })
   })
 
-  it('hands a saveMany its entries\' expect, and answers changed, reading again, when it throws ContentChanged', async () => {
+  it('hands a saveMany its entries\' expect, and answers changed, reading again, when it throws ContentChangedError', async () => {
     const schema = t.Object({ title: t.String(), order: t.Optional(t.Number()) })
     const given: unknown[] = []
     let reads = 0
@@ -1220,7 +1220,7 @@ describe('the collections a CMS edits', () => {
       given.push(...entries.map(entry => entry.expect))
 
       if (moved)
-        throw new ContentChanged('swapped: a was reordered since')
+        throw new ContentChangedError('swapped: a was reordered since')
     } }, { schema })
 
     await exporting([['swapped', swapped]], async () => {

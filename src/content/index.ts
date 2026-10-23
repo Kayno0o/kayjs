@@ -21,7 +21,7 @@ import { previewing, previewState, sharedDraft } from '../runtime/preview'
 import { checkPublishField, isDraft, publishTime } from './drafts'
 import { entryPath } from './entry-route'
 import { sizedImages } from './images'
-import { ContentChanged, contentKey } from './key'
+import { ContentChangedError, contentKey } from './key'
 import { contentMode, loadEntries, markdownOf, translationKey } from './load'
 import { compileMarkdown, countWords, MarkdownError, sanitizedHtml } from './markdown'
 import { hasSteps, migrateEntries, migrateLoaded, withMigrationHint, writeBack } from './migrate'
@@ -42,7 +42,7 @@ export const COLLECTION = Symbol.for('kay.collection')
 export const PUBLISH_TIMES = Symbol.for('kay.publishTimes')
 // Never set: it only carries a feed's path in the collection's type, for `kay check` to count it as served.
 declare const FEED_PATH: unique symbol
-export { ContentChanged, contentKey }
+export { ContentChangedError, contentKey }
 // Loaded entries are kept until `invalidate()` or a restart unless the loader sets a `ttl`: about thirty years.
 const FOREVER = '11574d'
 
@@ -106,7 +106,7 @@ export interface ContentLoader<Data = unknown> {
   // Writes an entry a CMS saved, new or changed, once its collection accepts it: what `saveEntry` from `kay/content` hands on. `data` is typed from the collection's `schema`, which kay has checked it against, with each missing default filled in and a date as its text. `create` is true for an entry the CMS creates: throw when it exists, or another process's new entry is overwritten.
   save?: ((entry: { slug: string, locale?: string | undefined, data: Data, body?: string | undefined, create?: true }) => void | Promise<void>) | undefined
   // Writes several entries a CMS saved together, such as the two a move swaps, all or none: what `saveEntries` from `kay/content` hands on, in a transaction for a database. Without it they go to `save` one at a time, so a failure in between leaves the earlier ones written.
-  // An entry with `expect` is a compare-and-swap of one field: the loader writes `data[expect.field]` alone into the stored entry, leaving the rest as stored, and throws `ContentChanged` with nothing written when the stored entry is gone or holds a number other than `expect.was` there (`undefined` for none). A loader that ignores `expect` writes the whole entry.
+  // An entry with `expect` is a compare-and-swap of one field: the loader writes `data[expect.field]` alone into the stored entry, leaving the rest as stored, and throws `ContentChangedError` with nothing written when the stored entry is gone or holds a number other than `expect.was` there (`undefined` for none). A loader that ignores `expect` writes the whole entry.
   saveMany?: ((entries: { slug: string, locale?: string | undefined, data: Data, body?: string | undefined, expect?: { field: string, was: number | undefined } | undefined }[]) => void | Promise<void>) | undefined
   // Deletes an entry, which `removeEntry` from `kay/content` asks.
   remove?: ((entry: { slug: string, locale?: string | undefined }) => void | Promise<void>) | undefined
