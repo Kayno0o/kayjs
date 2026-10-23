@@ -125,7 +125,7 @@ test('does not take the sweep marker for a revision that holds an upload', async
   const key = await storeUpload(png())
 
   await saveEntry({ ...ref, data: { title: 'One' } }, { create: true })
-  await hidden.hiddenOf('notes', 'history')!.save!({ slug: hidden.SWEEP_MARKER, data: { full: 0, trash: { oldest: 0, slugs: '', places: [key] } } })
+  await hidden.hiddenOf('notes', 'history')!.save!({ slug: hidden.SWEEP_MARKER, data: { full: 0, trash: { oldest: 0, rev: '', places: [key] } } })
   aged()
 
   expect(await unusedKeys()).toEqual([key])

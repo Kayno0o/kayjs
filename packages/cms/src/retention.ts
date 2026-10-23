@@ -6,7 +6,7 @@ import { collections, entries } from './kay/content'
 import { log } from './log'
 import { placeOf, pruneRevisions } from './revisions'
 import { settings } from './settings'
-import { isRow, purge, trashHash } from './trash'
+import { isRow, purge, trashRevision } from './trash'
 
 // How often a server drops what its trash, revisions and activity may no longer keep, and how long after it starts the first sweep waits, so it is not on the boot path.
 const SWEEP_EVERY = 60 * 60 * 1000
@@ -20,10 +20,10 @@ const FORGOTTEN = 'Former editor'
 
 const KINDS = ['history', 'trash', 'activity'] as const
 
-// What the last sweeps left of a collection's history: when a full one ran, and what the trash (a hash of its slugs) and the activity hold, so a light sweep reads neither before a row can expire. `oldest` is a time before which no row of theirs was written.
+// What the last sweeps left of a collection's history: when a full one ran, and what the trash (a revision that changes when an entry is put there) and the activity hold, so a light sweep reads neither before a row can expire. `oldest` is a time before which no row of theirs was written.
 interface Marks {
   full: number
-  trash?: { oldest: number, slugs: string, places: string[] } | undefined
+  trash?: { oldest: number, rev: string, places: string[] } | undefined
   activity?: { oldest: number } | undefined
 }
 
@@ -46,7 +46,7 @@ async function readMarks(history: ContentLoader): Promise<Marks | undefined> {
 }
 
 // Drops what the trash and the history may no longer keep: the trash past `history.trash`, the revisions and activity past `history.maxAge`. Never throws.
-// A full sweep reads every history row, which finds a revision left out of its index. A light one reads the indexes of the entries the collection and its trash hold, and the activity only once a row of theirs can have expired, and the trash only once a row of its can have expired or its slugs changed, as the last sweep marked in the history store. Left out, `full` is true once a day, and for a collection no sweep has marked.
+// A full sweep reads every history row, which finds a revision left out of its index. A light one reads the indexes of the entries the collection and its trash hold, and the activity only once a row of theirs can have expired, and the trash only once a row of its can have expired or an entry was put there, as the last sweep marked in the history store. Left out, `full` is true once a day, and for a collection no sweep has marked.
 export async function sweepHistory({ full }: { full?: boolean } = {}): Promise<void> {
   const history = settings().history
 
@@ -83,9 +83,9 @@ async function sweepCollection(name: string, cutoff: number | undefined, request
 
   if (trash !== undefined && kept !== undefined) {
     const known = marks?.trash
-    const seen = everything || known === undefined ? undefined : await trashHash(name)
+    const seen = everything || known === undefined ? undefined : await trashRevision(name)
 
-    if (known !== undefined && seen !== undefined && seen === known.slugs && known.oldest - SKEW >= now - kept) {
+    if (known !== undefined && seen !== undefined && seen === known.rev && known.oldest - SKEW >= now - kept) {
       next.trash = known
       places = known.places
     }
@@ -94,7 +94,7 @@ async function sweepCollection(name: string, cutoff: number | undefined, request
 
       if (left !== undefined) {
         places = left.places
-        next.trash = { oldest: left.oldest, slugs: left.slugs, places }
+        next.trash = { oldest: left.oldest, rev: left.rev, places }
       }
       // A trash that could not be read keeps the places the last sweep read, and its mark, so the next sweep reads it again.
       else if (known !== undefined) {

@@ -38,20 +38,21 @@ function trashedOf(id: string, row: Row): Trashed {
 // What a purge leaves in the trash: the places of the entries it holds, and a time before which none of its rows was put there, so the next sweep knows when a row can first expire.
 export interface Purged {
   oldest: number
-  // A hash of the slugs of the rows the trash keeps, so a later sweep tells the trash changed even when it holds as many rows.
-  slugs: string
+  // The trash's revision row as it was before the purge read the rows, so a later sweep tells an entry was put there since, even when the trash holds as many rows.
+  rev: string
   places: string[]
 }
 
-// A hash of the slugs of the trash rows, in any order.
-export function slugsHash(rows: readonly { slug: string }[]): string {
-  return Bun.hash(rows.map(row => row.slug).sort().join('\u0000')).toString(36)
-}
+// The row of the trash that changes whenever an entry is put there, so a sweep tells a trash that gained an entry from this row alone: no entry has its place, and `isRow` refuses its data.
+export const TRASH_REVISION = '\u0002rev'
 
-// The hash of the trash as it is now; undefined when it could not be read.
-export async function trashHash(collection: string): Promise<string | undefined> {
+// What the trash's revision row holds now, empty when it has none; undefined when it could not be read.
+export async function trashRevision(collection: string): Promise<string | undefined> {
   try {
-    return slugsHash((await hiddenOf(collection, 'trash')?.load({ preview: true }) ?? []).filter(row => isRow(row.data)))
+    const trash = hiddenOf(collection, 'trash')
+    const rev = ((trash && await rowOf(trash, TRASH_REVISION))?.data as { rev?: unknown } | undefined)?.rev
+
+    return rev === undefined ? '' : String(rev)
   }
   catch {
     return undefined
@@ -67,6 +68,7 @@ export async function purge(collection: string): Promise<Purged | undefined> {
     return undefined
 
   try {
+    const rev = await trashRevision(collection) ?? ''
     const rows = (await trash.load({ preview: true })).filter(row => isRow(row.data))
     const expired = rows.filter(row => (row.data as Row).at < Date.now() - kept)
     const staying = rows.filter(row => !expired.includes(row))
@@ -84,7 +86,7 @@ export async function purge(collection: string): Promise<Purged | undefined> {
         await forgetRevisions({ collection, slug, locale })
     }
 
-    return { oldest: Math.min(Date.now(), ...staying.map(row => (row.data as Row).at)), slugs: slugsHash(staying), places: [...new Set(staying.map(row => placeOf(row.data as EntryRef)))] }
+    return { oldest: Math.min(Date.now(), ...staying.map(row => (row.data as Row).at)), rev, places: [...new Set(staying.map(row => placeOf(row.data as EntryRef)))] }
   }
   catch (error) {
     log.error(`${collection}'s trash could not be emptied of what expired`, error)
@@ -128,6 +130,7 @@ export async function keepDeleted(ref: EntryRef, entry: { data: Record<string, u
     const row: Row = { at, ...author && { author: author.name }, slug: ref.slug, ...ref.locale !== undefined && { locale: ref.locale }, data: entry.data, ...entry.body !== undefined && { body: entry.body } }
 
     await trash.save!({ slug: String(at), data: row })
+    await trash.save!({ slug: TRASH_REVISION, data: { rev: crypto.randomUUID() } })
 
     return String(at)
   }

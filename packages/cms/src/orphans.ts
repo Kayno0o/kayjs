@@ -5,6 +5,7 @@ import { hiddenOf, SWEEP_MARKER } from './hidden'
 import { collections, entries } from './kay/content'
 import { log } from './log'
 import { forgetUploads, MEDIA_FOLDER, mediaIndex, movedKeys } from './media'
+import { TRASH_REVISION } from './trash'
 import { uploadFolder } from './uploads'
 
 export interface UnusedUpload {
@@ -116,7 +117,7 @@ export async function readUploads(listing?: { stored: Stored[], listed: Collecti
     for (const kind of history === undefined ? [] : ['history', 'trash'] as const) {
       try {
         for (const row of await hiddenOf(collection.name, kind)?.load({ preview: true }) ?? []) {
-          if (row.slug === SWEEP_MARKER)
+          if (row.slug === SWEEP_MARKER || row.slug === TRASH_REVISION)
             continue
 
           for (const id of idsIn(row.data, row.body))

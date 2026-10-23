@@ -27,7 +27,7 @@ function notes(): void {
 }
 
 async function rowCount(kind: 'history' | 'trash' | 'activity'): Promise<number> {
-  return (await hiddenOf('notes', kind, { anyway: true })!.load({ preview: true })).length
+  return (await hiddenOf('notes', kind, { anyway: true })!.load({ preview: true })).filter(row => !row.slug.startsWith('\u0002')).length
 }
 
 // How many times the trash and the activity log were read from now on.
@@ -138,7 +138,7 @@ describe('sweepHistory', () => {
     expect((await revisionsOf(ref)).map(revision => revision.data.title)).toEqual(['Three'])
   })
 
-  test('reads the activity not at all and the trash only for its slugs on a light sweep before a row of theirs can expire, also the first after a restart', async () => {
+  test('reads neither the activity nor a row of the trash on a light sweep before a row of theirs can expire, also the first after a restart', async () => {
     await saveEntry({ ...ref, data: { title: 'One' } }, { create: true, author: ada })
     await deleteEntry(ref, ada)
     await sweepHistory()
@@ -148,7 +148,7 @@ describe('sweepHistory', () => {
     // Another process, a restart: the sweep knows only what the history store marked.
     await sweepHistory()
     await sweepHistory({ full: false })
-    expect(loads()).toEqual({ trash: 2, activity: 0 })
+    expect(loads()).toEqual({ trash: 0, activity: 0 })
     expect(await rowCount('trash')).toBe(1)
   })
 
@@ -205,7 +205,7 @@ describe('sweepHistory', () => {
   })
 })
 
-async function marker(): Promise<{ full: number, trash?: { places: string[], slugs: string }, activity?: { oldest: number } } | undefined> {
+async function marker(): Promise<{ full: number, trash?: { places: string[], rev: string }, activity?: { oldest: number } } | undefined> {
   const row = (await hiddenOf('notes', 'history', { anyway: true })!.load({ preview: true })).find(found => found.slug === SWEEP_MARKER)
 
   return row?.data as never
@@ -226,11 +226,11 @@ describe('the sweep marker', () => {
     // The trashed row is two hours old minus the skew: the sweep still leaves the purge alone.
     setSystemTime(new Date(start + 2 * 60 * 60 * 1000 - 60 * 1000))
     await sweepHistory({ full: false })
-    expect(loads().trash).toBe(1)
+    expect(loads().trash).toBe(0)
 
     setSystemTime(new Date(start + 2 * 60 * 60 * 1000 - 60 * 1000 + 100))
     await sweepHistory({ full: false })
-    expect(loads().trash).toBe(3)
+    expect(loads().trash).toBe(1)
   })
 
   test('prunes the revisions of an entry trashed while another left the trash, the count staying the same', async () => {

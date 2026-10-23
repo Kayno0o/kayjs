@@ -384,7 +384,8 @@ describe('history gaps', () => {
 
     expect(item).toMatchObject({ slug: 'first', data: { title: 'Three' } })
     expect(await restoreTrashed('notes', item!.id)).toMatchObject({ saved: true })
-    expect(trash.size).toBe(0)
+    // Only the trash's revision row is left.
+    expect([...trash.keys()]).toEqual(['\u0002rev'])
     expect((await entryOf(ref))?.data).toEqual({ title: 'Three' })
   })
 })
