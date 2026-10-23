@@ -5,10 +5,11 @@ import { messageOf, toast } from '@kaynooo/kayjs-ui'
 import { announce } from '@kaynooo/kayjs-ui/announce'
 import { acceptsFile } from '@kaynooo/kayjs-ui/lib/accept'
 import { wording } from 'kay/words'
-import { entryKey, fieldsAt } from '../markers'
+import { fieldsAt } from '../markers'
 import { notTaken } from '../upload-text'
+import { sameBar } from './image-bar'
 import { setImageSize } from './image-value'
-import { fieldOfMarker, holdEntry, isBusy, isLoaded, untilSettled } from './inline'
+import { fieldOfMarker, holdEntry, isLoaded, isSaving, untilSettled } from './inline'
 import { openEntry } from './opened'
 import { OWN } from './own'
 import { uploadDenied, uploadFile, uploadRules } from './upload'
@@ -68,13 +69,6 @@ function barOf(found: MarkedField, label: string, accept: string | undefined): I
     return undefined
 
   return { entry: found.marker, path: found.marker.path as string, label, accept, style: `left: ${right - SIZE - MARGIN}px; top: ${top + MARGIN}px` }
-}
-
-function sameBar(left: ImageBar | undefined, right: ImageBar | undefined): boolean {
-  if (!left || !right)
-    return left === right
-
-  return left.style === right.style && left.path === right.path && left.accept === right.accept && left.label === right.label && entryKey(left.entry) === entryKey(right.entry)
 }
 
 // Offers the replace button over the page's images while the editor is open, and takes a file dropped on one.
@@ -183,7 +177,14 @@ export async function replaceImage(drafts: Drafts, bar: Pick<ImageBar, 'entry' |
 
   const field = fieldOfMarker(marker, drafts)
 
-  if (field?.kind !== 'image' || isBusy(marker))
+  // The entry never loaded, so the file the browser was kept from opening goes nowhere: say so.
+  if (!isLoaded(marker)) {
+    toast.error(wording('cms.file.failure', 'Could not upload'))
+
+    return
+  }
+
+  if (field?.kind !== 'image' || isSaving(marker))
     return
 
   const release = IN_LIST.test(bar.path) ? holdEntry(marker) : undefined

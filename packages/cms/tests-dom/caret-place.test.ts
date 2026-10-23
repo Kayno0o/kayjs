@@ -2,6 +2,7 @@ import type { Mounted } from 'kay/test'
 import { join } from 'node:path'
 import { afterEach, expect, mock, spyOn, test } from 'bun:test'
 import { mountComponent, settle } from 'kay/test'
+import { forgetPlace, notePlace, placeCaret } from '../src/editor/caret'
 
 const EDITOR = join(import.meta.dir, '../src/editor/editor.kay')
 const POSTS = { name: 'posts', title: 'Posts', kind: 'folder', localized: false, components: [], body: {}, schema: { type: 'object', properties: { title: { type: 'string' }, summary: { type: 'string', maxLength: 500 } } } }
@@ -103,4 +104,19 @@ test('a click the browser cannot place leaves the field focused as before', asyn
   await until(() => document.activeElement instanceof HTMLTextAreaElement)
 
   expect(document.activeElement).toBeInstanceOf(HTMLTextAreaElement)
+})
+
+test('a place noted for a click whose field the form does not show is dropped, not kept for a later reveal', async () => {
+  const { page } = await open()
+  const summary = page.querySelector<HTMLElement>('[data-kay-field]')!
+
+  caret = { node: summary.firstChild!, offset: 3 }
+  notePlace({ marker: { collection: 'posts', slug: 'hello', path: 'summary' }, element: summary }, 1, 1)
+  forgetPlace()
+
+  const area = document.createElement('textarea')
+
+  area.value = SUMMARY
+  placeCaret(area, { collection: 'posts', slug: 'hello' }, 'summary', false)
+  expect(area.selectionStart).toBe(area.value.length)
 })

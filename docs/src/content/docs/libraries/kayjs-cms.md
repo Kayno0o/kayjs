@@ -133,13 +133,17 @@ If you decline to leave because other entries hold edits not saved, the form is 
 
 ### Replacing an image on the page
 
-While you edit, point at an image the page shows from an image field, or Tab to it, and a Replace button appears over its top right corner. It picks a file, uploads it as the field's own upload does and swaps it in the draft, with its width and height when the field keeps them. A file dragged from your computer onto the image does the same. A file the field does not accept, or one the server refuses, is toasted with its reason and the image stays as it was. A file dropped on an image of an entry the editor has not opened yet opens it first. While an image in a list uploads, the list's toolbar and keys on the page change nothing, so the image lands in its own item. The page needs nothing: it renders the field as usual.
+While you edit, point at an image the page shows from an image field, or Tab to it, and a Replace button appears over its top right corner. It picks a file, uploads it as the field's own upload does and swaps it in the draft, with its width and height when the field keeps them. A file dragged from your computer onto the image does the same.
+
+A file the field does not accept, or one the server refuses, is toasted with its reason and the image stays as it was. A file dropped on an image of an entry the editor has not opened yet opens it first. While an image in a list uploads, the list's toolbar and keys on the page change nothing, so the image lands in its own item. The page needs nothing: it renders the field as usual.
 
 ### Typing on the page
 
 Click a text on the page and type in it where it stands, with no form to find. The text is edited as plain text: what you type or paste stays text, never markup, and in a one-line text a line break becomes a space. Enter keeps the text and ends the edit, as does a click elsewhere, and Escape puts back the text from before. Switching to another window does not end it.
 
-A long text keeps its line breaks: Enter starts a new line, and Ctrl+Enter (Cmd+Enter on a Mac) keeps the text. Markdown is typed one paragraph, heading or list item at a time, as the Markdown you would write in the form, so `**bold**` and `[a link](/page)` are typed as they are. Leaving the block shows it formatted again, and Escape puts it back. Typing `# ` at the start of a paragraph, or deleting it from a heading, turns the block into another tag and you keep typing in it where you were. A block the editor cannot match to its Markdown, such as a table cell or text with an image in it, opens in the form.
+A long text keeps its line breaks: Enter starts a new line, and Ctrl+Enter (Cmd+Enter on a Mac) keeps the text. Markdown is typed one paragraph, heading or list item at a time, as the Markdown you would write in the form, so `**bold**` and `[a link](/page)` are typed as they are. Leaving the block shows it formatted again, and Escape puts it back.
+
+Typing `# ` at the start of a paragraph, or deleting it from a heading, turns the block into another tag and you keep typing in it where you were. A block the editor cannot match to its Markdown, such as a table cell or text with an image in it, opens in the form.
 
 Tab reaches a marked text and Enter starts the edit. The form beside the page shows each keystroke, and the page keeps the text you are typing while it renders the draft again.
 

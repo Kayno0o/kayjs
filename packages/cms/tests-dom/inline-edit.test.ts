@@ -187,8 +187,6 @@ test('HTML typed or pasted stays text, and line breaks do not stay', async () =>
   expect(await draft('title')).toBe('<img src=x onerror="alert(1)"> & <b>bold</b>')
   expect(title!.children).toHaveLength(0)
 
-  // happy-dom lays nothing out, so its `innerText` stands for the rendered text, which keeps a line break as one.
-  Object.defineProperty(title!, 'innerText', { get: () => title!.textContent })
   await type(title!, 'one\ntwo three')
 
   expect(await draft('title')).toBe('one two three')
@@ -258,4 +256,15 @@ test('a text the page shows transformed by CSS is stored as typed, not as shown'
   await settle()
 
   expect(await draft('title')).toBe('Welcome home')
+})
+
+test('a line break the browser makes of a pasted line is a space in a one-line text', async () => {
+  const { elements: [title], draft, click } = await open([{ marker: 'pages:home:title', text: 'Home' }])
+
+  await click(title!)
+  title!.innerHTML = 'one<div>two</div>three<br>four'
+  title!.dispatchEvent(new Event('input', { bubbles: true }))
+  await settle()
+
+  expect(await draft('title')).toBe('one two three four')
 })

@@ -35,10 +35,6 @@ async function open(fields = '', data: Record<string, unknown> = DATA) {
   page.innerHTML = `<div data-kay-body="pages:home">${HTML}</div>${fields}`
   document.body.append(page)
 
-  // happy-dom lays nothing out, so its `innerText` stands for the rendered text.
-  for (const element of page.querySelectorAll('*'))
-    Object.defineProperty(element, 'innerText', { get: () => element.textContent })
-
   mounted = await mountComponent(EDITOR, { entries: [{ collection: 'pages', slug: 'home' }], unclickable: [] })
   await settle()
   await Bun.sleep(50)
@@ -215,7 +211,6 @@ function swapTag(block: HTMLElement, tag: string, html: string): HTMLElement {
 
   next.innerHTML = html
   block.replaceWith(next)
-  Object.defineProperty(next, 'innerText', { get: () => next.textContent })
 
   return next
 }
@@ -257,4 +252,19 @@ test('deleting the marker of a heading goes on in the paragraph it becomes', asy
   expect(paragraph.getAttribute('contenteditable')).toBe('plaintext-only')
   expect(document.activeElement).toBe(paragraph)
   expect(document.getSelection()?.anchorOffset).toBe(0)
+})
+
+test('Escape after a tag change puts the paragraph back as it was before the first keystroke', async () => {
+  const { blocks: [, second], click, draft } = await open()
+
+  await click(second!)
+  await typeAt(second!, '# Second [one](https://x.test) here.', 2)
+
+  const heading = swapTag(second!, 'h1', 'Second <a href="https://x.test">one</a> here.')
+
+  await Bun.sleep(30)
+  expect(heading.getAttribute('contenteditable')).toBe('plaintext-only')
+  key(heading, { key: 'Escape' })
+  expect(heading.hasAttribute('contenteditable')).toBe(false)
+  expect(await draft()).toBeUndefined()
 })

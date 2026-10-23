@@ -324,9 +324,14 @@ export function holdEntry(marker: FieldMarker): () => void {
   }
 }
 
-// Whether a save or an upload into a list item holds the entry's fields still.
+// Whether a save holds the entry's fields still.
+export function isSaving(marker: FieldMarker): boolean {
+  return sources.get(entryKey(marker))?.busy() === true
+}
+
+// Whether a save or an upload into a list item holds the entry's lists still.
 export function isBusy(marker: FieldMarker): boolean {
-  return held.has(entryKey(marker)) || sources.get(entryKey(marker))?.busy() === true
+  return held.has(entryKey(marker)) || isSaving(marker)
 }
 
 // The name the form gives a marked field: its schema label, none while its form has not loaded or for the Markdown body.
@@ -488,7 +493,11 @@ function typedText(element: Element): string {
 }
 
 // The page renders a block again as another tag when its first characters change (`# `, `- `, `1. `), which drops the element being typed in. Once it has, this finds the block of the new page that holds the caret and goes on typing there.
-function continueTyping(marker: FieldMarker, drafts: Drafts, offset: number, tries = 4): void {
+function continueTyping(marker: FieldMarker, drafts: Drafts, offset: number, before: unknown, tries = 4): void {
+  // Another edit started meanwhile, such as a click into another block, which is not taken from.
+  if (active)
+    return
+
   const field = allMarked().find(found => found.attribute === undefined && found.marker.path === marker.path && entryKey(found.marker) === entryKey(marker))
   const range = field && markedRange(field)
 
@@ -500,7 +509,7 @@ function continueTyping(marker: FieldMarker, drafts: Drafts, offset: number, tri
       const target = blockTargetOf(field, element, drafts)
 
       if (target?.element === element && target.block && target.block.from <= offset && offset <= target.block.to) {
-        startInline(target, drafts, undefined, offset - target.block.from)
+        startInline(target, drafts, undefined, { offset: offset - target.block.from, before })
 
         return
       }
@@ -508,18 +517,19 @@ function continueTyping(marker: FieldMarker, drafts: Drafts, offset: number, tri
   }
 
   if (tries > 0)
-    requestAnimationFrame(() => continueTyping(marker, drafts, offset, tries - 1))
+    requestAnimationFrame(() => continueTyping(marker, drafts, offset, before, tries - 1))
 }
 
 // Makes the element a plain-text box until the focus leaves it, writing each keystroke to the draft as text: what is typed or pasted never becomes markup. A one-line text keeps no line break and Enter keeps the text; a long text or a block of Markdown, which is typed as its source, takes Enter as a line break and Ctrl+Enter keeps the text. Escape puts back the text from before the edit. The page renders the draft again meanwhile, which leaves this element alone, and once a block's edit ends it renders its Markdown again.
-export function startInline({ entry, path, field, label, element, busy, block }: InlineTarget, drafts: Drafts, at?: { x: number, y: number }, resume?: number): void {
+export function startInline({ entry, path, field, label, element, busy, block }: InlineTarget, drafts: Drafts, at?: { x: number, y: number }, resume?: { offset: number, before: unknown }): void {
   active?.end()
 
   const point = at ? document.caretPositionFromPoint(at.x, at.y) : null
   const controller = new AbortController()
   const { signal } = controller
-  const before = drafts.value(entry, path)
-  const initial = sourceOf(before, block, field)
+  // A resumed edit puts back the text from before the first one, not the one the tag change cut in two.
+  const before = resume ? resume.before : drafts.value(entry, path)
+  const initial = sourceOf(drafts.value(entry, path), block, field)
   const multiline = initial !== undefined
   const beforeHtml = element.innerHTML
   const note = field && !block ? createIssueNote(element) : undefined
@@ -571,8 +581,13 @@ export function startInline({ entry, path, field, label, element, busy, block }:
     }
 
     if (cancelled) {
-      element.innerHTML = beforeHtml
+      if (!resume)
+        element.innerHTML = beforeHtml
+
       drafts.set(entry, path, before)
+
+      if (resume)
+        drafts.reapply()
     }
     // An emptied optional text is unset once the edit ends: the page renders nothing for it, which would take the element being typed in away.
     else if (emptied) {
@@ -605,8 +620,8 @@ export function startInline({ entry, path, field, label, element, busy, block }:
     element.textContent = initial
   }
 
-  if (resume !== undefined)
-    offset = resume
+  if (resume)
+    ({ offset } = resume)
 
   active = { element, end }
   // An element the page took away can no longer be blurred, so the edit ends with it.
@@ -619,7 +634,7 @@ export function startInline({ entry, path, field, label, element, busy, block }:
     end()
 
     if (resumeAt !== undefined)
-      continueTyping({ ...entry, path }, drafts, resumeAt)
+      continueTyping({ ...entry, path }, drafts, resumeAt, before)
   })
   gone.observe(document.documentElement, { childList: true, subtree: true })
   element.setAttribute('contenteditable', 'plaintext-only')

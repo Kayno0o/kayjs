@@ -2,6 +2,7 @@ import type { Mounted } from 'kay/test'
 import { join } from 'node:path'
 import { afterEach, expect, mock, spyOn, test } from 'bun:test'
 import { mountComponent, settle } from 'kay/test'
+import { sameBar } from '../src/editor/image-bar'
 import { EDITOR_COOKIE } from '../src/page-link'
 
 const EDITOR = join(import.meta.dir, '../src/editor/editor.kay')
@@ -303,7 +304,7 @@ test('an image of a list item lands in its item, whose page bars cannot move it 
   server()
   slow = 150
 
-  const { root } = await open()
+  await open()
   const [, second] = gallery()
 
   await settle()
@@ -313,7 +314,6 @@ test('an image of a list item lands in its item, whose page bars cannot move it 
   keyDown(second!, 'Delete')
   await until(() => (data().gallery as { image: string }[] | undefined)?.[1]?.image === '/_kay/files/posts/new.png')
   expect(data().gallery).toEqual([{ image: '/a.png' }, { image: '/_kay/files/posts/new.png' }])
-  expect(root).toBeDefined()
 })
 
 test('a list item moves again once its image has landed', async () => {
@@ -342,4 +342,14 @@ test('a session that ended during the upload of a list item\'s image toasts it a
   drop(second!, [file()])
   await until(() => document.body.textContent.includes('Your session has ended') || root.textContent.includes('Your session has ended'))
   expect(data().gallery).toBeUndefined()
+})
+
+test('a bar that moved nothing is the same bar, one that moved or names another image is not', () => {
+  const bar = { entry: HELLO, path: 'photo', label: 'Photo', accept: undefined, style: 'left: 1px; top: 2px' }
+
+  expect(sameBar(bar, { ...bar, entry: { ...HELLO } })).toBe(true)
+  expect(sameBar(bar, { ...bar, style: 'left: 2px; top: 2px' })).toBe(false)
+  expect(sameBar(bar, { ...bar, path: 'logo' })).toBe(false)
+  expect(sameBar(bar, undefined)).toBe(false)
+  expect(sameBar(undefined, undefined)).toBe(true)
 })
