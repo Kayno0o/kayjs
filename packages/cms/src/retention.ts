@@ -1,3 +1,4 @@
+import type { ContentLoader } from 'kay/content'
 import type { EntryRef } from './kay/contract'
 import { isEvent, pruneActivity } from './activity'
 import { hiddenOf, rowOf } from './hidden'
@@ -10,12 +11,23 @@ import { isRow, purge } from './trash'
 // How often a server drops what its trash, revisions and activity may no longer keep, and how long after it starts the first sweep waits, so it is not on the boot path.
 const SWEEP_EVERY = 60 * 60 * 1000
 const FIRST_SWEEP = 5 * 60 * 1000
-// Every this many sweeps reads every history row, to find a revision left out of an index; the others read only the indexes of the entries.
-const FULL_EVERY = 24
+// A sweep reads every history row, to find a revision left out of an index, once this long after the last one that did, whichever process made it; the others read only what the last sweep left marked.
+const FULL_AFTER = 24 * 60 * 60 * 1000
+// What a clock of another replica may be off by, in the times a sweep leans on.
+const SKEW = 60 * 1000
+// The row of the history store that remembers what the sweeps found: no entry has its place, and no revision or index is taken for it.
+const MARKER = '\u0002sweep'
 // What a forgotten editor's name is replaced by.
 const FORGOTTEN = 'Former editor'
 
 const KINDS = ['history', 'trash', 'activity'] as const
+
+// What the last sweeps left of a collection's history: when a full one ran, and what the trash and the activity hold, so a light sweep reads neither before a row can expire. `oldest` is a time before which no row of theirs was written.
+interface Marks {
+  full: number
+  trash?: { oldest: number, count: number | undefined, places: string[] } | undefined
+  activity?: { oldest: number } | undefined
+}
 
 // A row another kind wrote into the same store, a blog entry with an `author` field for one, is not touched.
 function isOfKind(kind: (typeof KINDS)[number], slug: string, data: unknown): boolean {
@@ -29,17 +41,15 @@ async function loadedNames(): Promise<string[]> {
   return (await collections({ counts: false })).filter(collection => collection.kind === 'loaded').map(collection => collection.name)
 }
 
-// The places of the entries that can hold revisions: those the collection holds and those in its trash.
-async function revisionPlaces(name: string): Promise<string[]> {
-  const trash = hiddenOf(name, 'trash')
-  const trashed = trash === undefined ? [] : (await trash.load({ preview: true })).filter(row => isRow(row.data)).map(row => placeOf(row.data as EntryRef))
+async function readMarks(history: ContentLoader): Promise<Marks | undefined> {
+  const marks = (await rowOf(history, MARKER))?.data as Partial<Marks> | undefined
 
-  return [...new Set([...(await entries(name)).map(placeOf), ...trashed])]
+  return typeof marks?.full === 'number' ? marks as Marks : undefined
 }
 
 // Drops what the trash and the history may no longer keep: the trash past `history.trash`, the revisions and activity past `history.maxAge`. Never throws.
-// `full` reads every history row, which finds a revision left out of its index; without it only the indexes of the entries the collection and its trash hold are read.
-export async function sweepHistory({ full = true }: { full?: boolean } = {}): Promise<void> {
+// A full sweep reads every history row, which finds a revision left out of its index. A light one reads the indexes of the entries the collection and its trash hold, and the trash and the activity only once a row of theirs can have expired or the trash changed size, as the last sweep marked in the history store. Left out, `full` is true once a day, and for a collection no sweep has marked.
+export async function sweepHistory({ full }: { full?: boolean } = {}): Promise<void> {
   const history = settings().history
 
   if (history === undefined)
@@ -49,15 +59,9 @@ export async function sweepHistory({ full = true }: { full?: boolean } = {}): Pr
     const cutoff = history.maxAge === undefined ? undefined : Date.now() - history.maxAge
 
     for (const name of await loadedNames()) {
-      await purge(name)
-
-      if (cutoff === undefined)
-        continue
-
       // A collection whose loader fails must not stop the others from being swept.
       try {
-        await pruneRevisions(name, cutoff, full ? undefined : await revisionPlaces(name))
-        await pruneActivity(name, cutoff)
+        await sweepCollection(name, cutoff, full)
       }
       catch (error) {
         log.error(`the history of ${name} could not be swept`, error)
@@ -69,6 +73,54 @@ export async function sweepHistory({ full = true }: { full?: boolean } = {}): Pr
   }
 }
 
+async function sweepCollection(name: string, cutoff: number | undefined, requested: boolean | undefined): Promise<void> {
+  const now = Date.now()
+  const kept = settings().history?.trash
+  const store = hiddenOf(name, 'history')
+  const marks = store === undefined || requested === true ? undefined : await readMarks(store)
+  const everything = requested === true || (requested === undefined && (marks === undefined || now - marks.full >= FULL_AFTER))
+  const next: Marks = { full: everything ? now : marks?.full ?? 0 }
+  const trash = hiddenOf(name, 'trash')
+  let places: string[] = []
+
+  if (trash !== undefined && kept !== undefined) {
+    const count = await trash.count?.({ preview: true })
+    const known = marks?.trash
+
+    if (!everything && known !== undefined && count !== undefined && count === known.count && known.oldest - SKEW >= now - kept) {
+      next.trash = known
+      places = known.places
+    }
+    else {
+      const left = await purge(name)
+
+      if (left !== undefined) {
+        places = left.places
+        next.trash = { oldest: left.oldest, count: await trash.count?.({ preview: true }), places }
+      }
+    }
+  }
+
+  if (cutoff !== undefined) {
+    const known = marks?.activity
+
+    if (!everything && known !== undefined && known.oldest - SKEW >= cutoff) {
+      next.activity = known
+    }
+    else {
+      const oldest = await pruneActivity(name, cutoff)
+
+      if (oldest !== undefined)
+        next.activity = { oldest }
+    }
+
+    await pruneRevisions(name, cutoff, everything ? undefined : [...new Set([...(await entries(name)).map(placeOf), ...places])])
+  }
+
+  if (store !== undefined && JSON.stringify(next) !== JSON.stringify(marks))
+    await store.save!({ slug: MARKER, data: next })
+}
+
 let sweeping: ReturnType<typeof setTimeout> | undefined
 
 // Sweeps a few minutes after the server starts and every hour from then on, on timers that do not keep the process alive, so what expired goes whether or not anyone opens the trash.
@@ -76,8 +128,7 @@ export function startSweeping(): void {
   if (sweeping !== undefined)
     return
 
-  let sweeps = 0
-  const sweep = () => void sweepHistory({ full: sweeps++ % FULL_EVERY === 0 })
+  const sweep = () => void sweepHistory()
 
   sweeping = setTimeout(() => {
     sweep()

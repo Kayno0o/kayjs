@@ -88,20 +88,25 @@ export async function recordActivity(event: SaveEvent): Promise<void> {
   }
 }
 
-// Drops the events older than `cutoff`. Never throws.
-export async function pruneActivity(collection: string, cutoff: number): Promise<void> {
+// Drops the events older than `cutoff`, and gives a time before which no event of the log was written, from the oldest it keeps: the next sweep need not read the log before then. Never throws; undefined when it could not read the log.
+export async function pruneActivity(collection: string, cutoff: number): Promise<number | undefined> {
   const hidden = hiddenOf(collection, 'activity')
 
   if (hidden === undefined)
-    return
+    return undefined
 
   try {
-    const old = (await hidden.load({ preview: true })).filter(row => isEvent(row.data) && row.data.at < cutoff)
+    const events = (await hidden.load({ preview: true })).filter(row => isEvent(row.data))
+    const old = events.filter(row => (row.data as Row).at < cutoff)
 
     await Promise.all(old.map(async row => hidden.remove!({ slug: row.slug })))
+
+    return Math.min(Date.now(), ...events.filter(row => !old.includes(row)).map(row => (row.data as Row).at))
   }
   catch (error) {
     log.error(`${collection}'s old activity could not be dropped`, error)
+
+    return undefined
   }
 }
 

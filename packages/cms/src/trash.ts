@@ -3,7 +3,7 @@ import type { EntryRef } from './kay/contract'
 import { hiddenOf, rowOf } from './hidden'
 import { entries } from './kay/content'
 import { log } from './log'
-import { forgetRevisions } from './revisions'
+import { forgetRevisions, placeOf } from './revisions'
 import { settings } from './settings'
 
 // An entry deleted from a loaded collection, kept until `cms({ history: { trash } })` runs out. `id` names it for a restore.
@@ -35,13 +35,19 @@ function trashedOf(id: string, row: Row): Trashed {
   return { id, at: row.at, author: row.author, slug: row.slug, locale: row.locale, data: row.data, body: row.body }
 }
 
-// Drops what has been in the trash longer than it is kept, with the history of an entry that was never made again, which the cms does on its own every hour and when the trash is read. Never throws.
-export async function purge(collection: string): Promise<void> {
+// What a purge leaves in the trash: the places of the entries it holds, and a time before which none of its rows was put there, so the next sweep knows when a row can first expire.
+export interface Purged {
+  oldest: number
+  places: string[]
+}
+
+// Drops what has been in the trash longer than it is kept, with the history of an entry that was never made again, which the cms does on its own every hour and when the trash is read. Never throws; undefined when it could not read the trash.
+export async function purge(collection: string): Promise<Purged | undefined> {
   const trash = hiddenOf(collection, 'trash')
   const kept = settings().history?.trash
 
   if (trash === undefined || kept === undefined)
-    return
+    return undefined
 
   try {
     const rows = (await trash.load({ preview: true })).filter(row => isRow(row.data))
@@ -60,9 +66,13 @@ export async function purge(collection: string): Promise<void> {
       if ((await entries(collection, { slug, locale })).length === 0)
         await forgetRevisions({ collection, slug, locale })
     }
+
+    return { oldest: Math.min(Date.now(), ...staying.map(row => (row.data as Row).at)), places: [...new Set(staying.map(row => placeOf(row.data as EntryRef)))] }
   }
   catch (error) {
     log.error(`${collection}'s trash could not be emptied of what expired`, error)
+
+    return undefined
   }
 }
 

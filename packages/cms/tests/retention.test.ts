@@ -26,6 +26,24 @@ async function rowCount(kind: 'history' | 'trash' | 'activity'): Promise<number>
   return (await hiddenOf('notes', kind, { anyway: true })!.load({ preview: true })).length
 }
 
+// How many times the trash and the activity log were read from now on.
+function spyOnLoads(): () => { trash: number, activity: number } {
+  const reads = { trash: 0, activity: 0 }
+
+  for (const kind of ['trash', 'activity'] as const) {
+    const hidden = hiddenOf('notes', kind, { anyway: true })!
+    const load = hidden.load.bind(hidden)
+
+    hidden.load = async (context) => {
+      reads[kind]++
+
+      return load(context)
+    }
+  }
+
+  return () => ({ ...reads })
+}
+
 beforeEach(() => {
   configure({})
   notes()
@@ -113,6 +131,56 @@ describe('sweepHistory', () => {
 
     expect(await rowCount('trash')).toBe(1)
     expect((await revisionsOf(ref)).map(revision => revision.data.title)).toEqual(['Three'])
+  })
+
+  test('reads neither the trash nor the activity on a light sweep before a row of theirs can expire, also the first after a restart', async () => {
+    await saveEntry({ ...ref, data: { title: 'One' } }, { create: true, author: ada })
+    await deleteEntry(ref, ada)
+    await sweepHistory()
+
+    const loads = spyOnLoads()
+
+    // Another process, a restart: the sweep knows only what the history store marked.
+    await sweepHistory()
+    await sweepHistory({ full: false })
+    expect(loads()).toEqual({ trash: 0, activity: 0 })
+    expect(await rowCount('trash')).toBe(1)
+  })
+
+  test('reads the trash and the activity on a light sweep once a row of theirs can have expired, and when the trash changed size', async () => {
+    configure({ history: { trash: '2h' } })
+    await saveEntry({ ...ref, data: { title: 'One' } }, { create: true })
+    await deleteEntry(ref, ada)
+    await sweepHistory()
+
+    const loads = spyOnLoads()
+
+    await saveEntry({ ...ref, slug: 'second', data: { title: 'Two' } }, { create: true })
+    await deleteEntry({ ...ref, slug: 'second' }, ada)
+    await sweepHistory()
+    expect(loads().trash).toBeGreaterThan(0)
+    expect(await rowCount('trash')).toBe(2)
+
+    setSystemTime(new Date(Date.now() + 3 * 60 * 60 * 1000))
+    await sweepHistory()
+    expect(await rowCount('trash')).toBe(0)
+  })
+
+  test('reads every history row once a day, whichever process swept last', async () => {
+    await saveEntry({ ...ref, data: { title: 'One' } }, { create: true })
+    await saveEntry({ ...ref, data: { title: 'Two' } })
+    await sweepHistory()
+
+    const history = hiddenOf('notes', 'history', { anyway: true })!
+    const place = (await history.load({ preview: true })).find(row => !row.slug.includes('\u0001') && Array.isArray((row.data as { ats?: unknown }).ats))!.slug
+
+    await history.save!({ slug: `${place}\u00011000`, data: { verb: 'update', title: 'Lost' } })
+    setSystemTime(new Date(Date.now() + 60 * 60 * 1000))
+    await sweepHistory()
+    expect((await history.load({ preview: true })).some(row => row.slug.endsWith('\u00011000'))).toBe(true)
+    setSystemTime(new Date(Date.now() + 24 * 60 * 60 * 1000))
+    await sweepHistory()
+    expect((await history.load({ preview: true })).some(row => row.slug.endsWith('\u00011000'))).toBe(false)
   })
 
   test('keeps everything when maxAge is false', async () => {
