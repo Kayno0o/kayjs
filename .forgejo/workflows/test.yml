@@ -26,7 +26,9 @@ concurrency:
 
 jobs:
   # A push's run tests every commit since the last one passed, so a run whose commit is no longer the branch's head leaves its tests to the newer push's.
+  # A pull request from a fork never reaches the shared host runner: its code would run beside the repository secrets and the other jobs. Its job being skipped skips the test job that needs it.
   latest:
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     runs-on: alpine
     timeout-minutes: 2
     outputs:
