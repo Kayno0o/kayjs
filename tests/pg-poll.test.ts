@@ -13,6 +13,20 @@ import { cleanUpAfterFile, pgIt, postgres } from './job-stores'
 cleanUpAfterFile()
 
 // A handle counting how often it is asked for the database.
+// The statements still running that start with `statement`, once a cancel had up to two seconds to reach the server, which a loaded runner takes longer than a fixed pause.
+async function activeAfterCancel(sql: SQL, statement: string): Promise<number> {
+  const deadline = performance.now() + 2000
+
+  for (;;) {
+    const [{ busy }] = await sql<[{ busy: number }]>`SELECT count(*)::int AS busy FROM pg_stat_activity WHERE query LIKE ${`${statement}%`} AND state = 'active' AND pid != pg_backend_pid()`
+
+    if (busy === 0 || performance.now() > deadline)
+      return busy
+
+    await Bun.sleep(50)
+  }
+}
+
 function counted(inner: PgHandle): { handle: PgHandle, calls: () => number } {
   let calls = 0
 
@@ -56,11 +70,7 @@ describe('the shared event poller', () => {
     const started = performance.now()
 
     await expect(timeLimited(async () => rowsOf(sql.unsafe('SELECT pg_sleep(10)')), 100, 'the read')).rejects.toThrow('the read took more than')
-    await Bun.sleep(100)
-
-    const [{ busy }] = await sql`SELECT count(*)::int AS busy FROM pg_stat_activity WHERE query LIKE 'SELECT pg_sleep(10)%' AND state = 'active' AND pid != pg_backend_pid()`
-
-    expect(busy).toBe(0)
+    expect(await activeAfterCancel(sql, 'SELECT pg_sleep(10)')).toBe(0)
     expect(performance.now() - started).toBeLessThan(2000)
   })
 
@@ -73,11 +83,8 @@ describe('the shared event poller', () => {
     await expect(timeLimited(async () => sql.begin(async (tx) => {
       await tx`SELECT pg_sleep(12)`
     }), 100, 'the write')).rejects.toThrow('the write took more than')
-    await Bun.sleep(150)
-
-    const [{ busy }] = await sql`SELECT count(*)::int AS busy FROM pg_stat_activity WHERE (query LIKE 'SELECT pg_sleep(11)%' OR query LIKE 'SELECT pg_sleep(12)%') AND state = 'active' AND pid != pg_backend_pid()`
-
-    expect(busy).toBe(0)
+    expect(await activeAfterCancel(sql, 'SELECT pg_sleep(11)')).toBe(0)
+    expect(await activeAfterCancel(sql, 'SELECT pg_sleep(12)')).toBe(0)
   })
 
   pgIt('cancels a statement that abandoned work starts after the limit', async () => {
@@ -89,9 +96,7 @@ describe('the shared event poller', () => {
     }, 50, 'the read')).rejects.toThrow('the read took more than')
     await Bun.sleep(400)
 
-    const [{ busy }] = await sql`SELECT count(*)::int AS busy FROM pg_stat_activity WHERE query LIKE 'SELECT pg_sleep(13)%' AND state = 'active' AND pid != pg_backend_pid()`
-
-    expect(busy).toBe(0)
+    expect(await activeAfterCancel(sql, 'SELECT pg_sleep(13)')).toBe(0)
   })
 
   pgIt('leaves alone a statement a timer started from a run that succeeded', async () => {
@@ -116,11 +121,7 @@ describe('the shared event poller', () => {
     const { sql } = await postgres()
 
     await expect(timeLimited(async () => Promise.all([sql`SELECT pg_sleep(14)`, sql`SELECT 1/0`]), 5000, 'the read')).rejects.toThrow()
-    await Bun.sleep(150)
-
-    const [{ busy }] = await sql`SELECT count(*)::int AS busy FROM pg_stat_activity WHERE query LIKE 'SELECT pg_sleep(14)%' AND state = 'active' AND pid != pg_backend_pid()`
-
-    expect(busy).toBe(0)
+    expect(await activeAfterCancel(sql, 'SELECT pg_sleep(14)')).toBe(0)
   })
 
   it('does not run a task again before its last run ended', async () => {
