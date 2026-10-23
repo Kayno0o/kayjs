@@ -95,7 +95,7 @@ HEALTHCHECK --interval=30s --timeout=6s CMD ["./server", "--health"]
 CMD ["./server"]
 ```
 
-The base images of the Dockerfile and the compose files are pinned by digest, so a build gets the bytes `kay new` reviewed. Refresh one with `docker buildx imagetools inspect <tag>`.
+The runtime, Postgres and nginx images are pinned by digest (the build stage by the exact Bun version), so a build gets the bytes `kay new` reviewed. Refresh one with `docker buildx imagetools inspect <tag>`.
 
 Its `compose.prod.yaml` drops every Linux capability of the app and forbids a privilege gain (`cap_drop: [ALL]`, `no-new-privileges`). It publishes the app on `127.0.0.1:3000` alone, for the reverse proxy serving it over HTTPS, and its `kay.config.ts` sets `proxy: true` so that rate limits count each visitor.
 

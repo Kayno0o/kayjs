@@ -85,14 +85,13 @@ describe('large-public-image', () => {
 
   it('also sees a raster in a CSS url(), a style attribute, a social card meta and a Markdown image', async () => {
     const problems = await bare({
-      'src/routes/index.kay': ['div(style="background: url(/big.jpg)")', 'div(style="background: url(\'/my%20photo.jpg\')")', 'meta(property="og:image" content="/big.jpg")', 'meta(name="twitter:image" content="/big.jpg?v=2")', 'meta(property="og:title" content="/big.jpg")', 'div(style="background: url(/small.jpg)")', 'div(style="background: url(https://example.com/big.jpg)")', ''].join('\n'),
+      'src/routes/index.kay': ['div(style="background: url(/big.jpg)")', 'div(style="background: url(\'/my%20photo.jpg\')")', 'meta(property="og:image" content="/big.jpg")', 'meta(name="twitter:image" content="/big.jpg?v=2")', 'meta(property="og:title" content="/big.jpg")', 'div(style="background: URL(/big.jpg?v=1#x)")', 'div(style="background: url(/small.jpg)")', 'div(style="background: url(https://example.com/big.jpg)")', ''].join('\n'),
       'src/components/Hero.kay': `div(style='background: image-set(url("/big.jpg") 1x)')\n`,
-      'src/styles.css': '.a { background: url(/big.jpg) }\n.b { background: url(/missing.jpg) }\n',
-      'src/routes/post.md': '![hero](/big.jpg)\n\n![none](/missing.jpg)\n\n![spaced](/docs/big.jpg "title")\n',
+      'src/styles.css': '/* url(/big.jpg) */\n.a { background: url(/big.jpg) }\n.b { background: url(/missing.jpg) }\n',
+      'src/routes/post.md': '![hero](/big.jpg)\n\n![none](/missing.jpg)\n\n![spaced](/docs/big.jpg "title")\n\n`![inline](/big.jpg)`\n\n```md\n![fenced](/big.jpg)\n```\n',
     }, '/docs')
 
-    expect(problems.map(problem => [problem.file.split('/').pop(), problem.line])).toEqual(expect.arrayContaining([['index.kay', 1], ['index.kay', 2], ['index.kay', 3], ['index.kay', 4], ['Hero.kay', 1], ['styles.css', 1], ['post.md', 1], ['post.md', 5]]))
-    expect(problems.length).toBe(8)
+    expect(problems.map(problem => `${problem.file.split('/').pop()}:${problem.line}`).toSorted()).toEqual(['Hero.kay:1', 'index.kay:1', 'index.kay:2', 'index.kay:3', 'index.kay:4', 'index.kay:6', 'post.md:1', 'post.md:5', 'styles.css:2'])
   })
 
   it('does not throw on a dangling symlink in public', async () => {

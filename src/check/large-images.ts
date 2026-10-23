@@ -15,8 +15,17 @@ const QUERY_OR_HASH = /[?#].*$/
 const TRAILING_SLASHES = /\/+$/
 const SOCIAL_IMAGE = /^(?:og|twitter):image(?::url)?$/i
 const STYLE_OR_MARKDOWN = /\.(?:css|md|mdx)$/i
+const CSS_COMMENT = /\/\*[\s\S]*?\*\//g
+const MARKDOWN_CODE = /```[\s\S]*?(?:```|$)|`[^`\n]*`/g
+const NOT_NEWLINE = /[^\n]/g
+const URL_CALL = /url\(/i
 const CSS_URL = /url\(\s*(?:"([^"]+)"|'([^']+)'|([^"')\s]+))\s*\)/gi
 const MARKDOWN_IMAGE_OR_CSS_URL = new RegExp(`!\\[[^\\]]*\\]\\(\\s*<?([^)\\s>]+)|${CSS_URL.source}`, 'gi')
+
+// Code a reader does not load is blanked, keeping every offset.
+function blank(text: string, pattern: RegExp): string {
+  return text.replace(pattern, span => span.replaceAll(NOT_NEWLINE, ' '))
+}
 
 // A url as the server compares it, percent-escapes decoded; a malformed escape is left as written.
 function decoded(url: string): string {
@@ -67,21 +76,21 @@ export async function largePublicImages(options: CheckOptions, root: string, { p
   })
 
   // The files that name a raster outside an `img`: a CSS `url()` in a stylesheet, a `style` block or attribute, and a Markdown image.
-  const scanText = (file: string, source: string, pattern: RegExp) => {
+  const scanText = (file: string, source: string, pattern: RegExp, shown = source) => {
     for (const match of source.matchAll(pattern)) {
       const url = (match.slice(1).find(group => group !== undefined) ?? '').replace(QUERY_OR_HASH, '')
       const size = bySrc(url)
 
       if (size !== undefined)
-        report(file, source, match.index, match.index + match[0].length, url, size)
+        report(file, shown, match.index, match.index + match[0].length, url, size)
     }
   }
 
   for (const file of await findKayFiles(root, { project: true, ownKayOnly: true })) {
     const source = await Bun.file(file).text()
 
-    if (source.includes('url('))
-      scanText(file, source, CSS_URL)
+    if (URL_CALL.test(source))
+      scanText(file, blank(source, CSS_COMMENT), CSS_URL, source)
 
     if (!source.includes('img') && !source.includes('image'))
       continue
@@ -115,7 +124,7 @@ export async function largePublicImages(options: CheckOptions, root: string, { p
   for (const file of await findProjectFiles(root, STYLE_OR_MARKDOWN, { project: true, ownKayOnly: true })) {
     const source = await Bun.file(file).text()
 
-    scanText(file, source, file.endsWith('.css') ? CSS_URL : MARKDOWN_IMAGE_OR_CSS_URL)
+    scanText(file, file.endsWith('.css') ? blank(source, CSS_COMMENT) : blank(source, MARKDOWN_CODE), file.endsWith('.css') ? CSS_URL : MARKDOWN_IMAGE_OR_CSS_URL, source)
   }
 
   return found

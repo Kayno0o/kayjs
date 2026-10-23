@@ -766,6 +766,8 @@ describe('kay new', () => {
 
       expect(compose).toContain('KAY_SECRET: ${KAY_SECRET:?set KAY_SECRET}')
       expect(compose).toContain('- data:/app/data')
+      expect(compose).toContain('cap_drop: [ALL]')
+      expect(compose).toContain('no-new-privileges:true')
       expect(compose).not.toContain('postgres')
 
       await installKay(dir)
