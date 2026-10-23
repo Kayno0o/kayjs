@@ -4,7 +4,7 @@ description: A value drawn as a QR code, an SVG image rendered where the page re
 
 <Demo name="qr-code/basic" />
 
-`label` is the image's `alt`, such as where the code leads, and `size` its width and height in pixels. The code is drawn on the server for a static page.
+`label` is the image's `alt`, such as where the code leads, and `pixels` its width and height. The code is drawn on the server for a static page.
 
 ## Styling
 

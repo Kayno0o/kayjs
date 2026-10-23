@@ -10,7 +10,7 @@ description: Nested nodes, such as folders, with branches that open and close an
 
 `selected` marks a node. The branches holding it are drawn open from the server's HTML on. A tree whose parent passes another follows it, opening those branches.
 
-`expanded` lists the branches open to start with. `onSelect` runs on a click on a row, or Enter or Space on the focused one. The chevron opens or closes its branch alone.
+`expanded` lists the branches open to start with. `onSelect(id, node)` runs on a click on a row, or Enter or Space on the focused one, with the id `selected` takes, so `onSelect={folder.set}` keeps the pick, and the node. The chevron opens or closes its branch alone.
 
 ## Keyboard
 

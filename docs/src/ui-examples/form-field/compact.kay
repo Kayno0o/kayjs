@@ -14,10 +14,10 @@ const STATUSES = [
 ]
 ---
 form.flex.flex-wrap.items-end.gap-3(method="get" role="search")
-  FormField(label="Search" compact)
+  FormField(label="Search" size="sm")
     TextInput(name="q" type="search")
-  FormField(label="Period" compact)
+  FormField(label="Period" size="sm")
     Select(name="period" value="" options={PERIODS} emptyOption="Last 7 days")
-  FormField(label="Status" compact)
+  FormField(label="Status" size="sm")
     Select(name="status" value="" options={STATUSES} emptyOption="Any")
   Button(type="submit" label="Filter")

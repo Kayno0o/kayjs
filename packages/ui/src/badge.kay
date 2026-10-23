@@ -24,17 +24,22 @@ const look = recipe({
   defaults: { tone: 'neutral' },
 })
 
-const { tone = 'neutral', icon, label, stamp = false, solid = false, ...rest } = props<Omit<JSX.IntrinsicElements['span'], 'class'> & {
+const { tone = 'neutral', variant, icon, label, stamp = false, solid = false, ...rest } = props<Omit<JSX.IntrinsicElements['span'], 'class'> & {
   icon?: IconSlot | IconProps | undefined
   label?: string | number | undefined
-  // Drawn as a rubber stamp: a hairline in its text colour, small spaced capitals, filled again while a `.group` holding it is hovered.
+  // `outline` is a hairline in the tone. `solid` is filled with the tone, its text in `--kui-badge-solid-text`. `stamp` is a rubber stamp: a hairline in its text colour, small spaced capitals, filled again while a `.group` holding it is hovered.
+  variant?: 'outline' | 'solid' | 'stamp' | undefined
+  // Deprecated since 1.72, `variant="stamp"` is it.
   stamp?: boolean | undefined
-  // Filled with the tone, its text in `--kui-badge-solid-text`. A stamp keeps its own ground.
+  // Deprecated since 1.72, `variant="solid"` is it.
   solid?: boolean | undefined
 }>()
+
+const stamped = () => variant === 'stamp' || (variant === undefined && stamp)
+const filled = () => variant === 'solid' || (variant === undefined && solid)
 ---
 // A label that does nothing: a count, a status, a tag.
-span({...rest} data-tone={tone} data-stamp={stamp ? '' : undefined} data-solid={solid && !stamp ? '' : undefined})
+span({...rest} data-tone={tone} data-stamp={stamped() ? '' : undefined} data-solid={filled() && !stamped() ? '' : undefined})
   if icon
     Icon(icon={icon} part="icon")
   | {label}

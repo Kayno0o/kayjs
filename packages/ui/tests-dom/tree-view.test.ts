@@ -5,14 +5,19 @@ import { click } from './dom'
 
 let mounted: Mounted | undefined
 let picks: string[] = []
+let nodes: string[] = []
 
 afterEach(() => {
   mounted?.unmount()
   picks = []
+  nodes = []
 })
 
 async function tree() {
-  mounted = await mountComponent('src/components/tree.kay', { onSelect: (id: string) => picks.push(id) })
+  mounted = await mountComponent('src/components/tree.kay', { onSelect: (id: string, node: { label: string }) => {
+    picks.push(id)
+    nodes.push(node.label)
+  } })
 
   return mounted.root.querySelector('#tree')!
 }
@@ -50,7 +55,7 @@ test('a click on a row selects it, and one on a chevron opens or closes its bran
   click(root.querySelectorAll('[role="treeitem"]')[2]!)
   await settle()
 
-  expect([rows(root)[2], picks]).toEqual(['API 3 1/1  true 0', ['api']])
+  expect([rows(root)[2], picks, nodes]).toEqual(['API 3 1/1  true 0', ['api'], ['API']])
 
   click(root.querySelector('.kui-tree-view-toggle'))
   await settle()

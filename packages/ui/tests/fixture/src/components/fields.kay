@@ -43,5 +43,5 @@ button#send(onClick={() => draft.set('')}) Send
 button#restore(onClick={() => draft.set('Back')}) Restore
 Textarea#live(aria-label="Live" writeFocused value={draft()} onInput={draft.set})
 form#filters(method="get" onSubmit={event => { event.preventDefault(); onFilter?.(String(new FormData(event.currentTarget).get('period'))) }})
-  FormField(label="Period" compact)
+  FormField(label="Period" size="sm")
     Select(name="period" value="" emptyOption="Any" submit options={[{ value: '7d', label: '7 days' }]})

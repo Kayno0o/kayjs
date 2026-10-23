@@ -4287,27 +4287,82 @@ describe.concurrent('kay check, unused code', () => {
       await rm(root, { recursive: true, force: true })
     }
   })
-
-  it('reports data-cms-edit-page and --fix renames it to data-kcms-edit-page, leaving a tag that gives both', async () => {
+  it('reports the booleans of kayjs-ui that became enum values and QrCode(size), and --fix writes the new form where it is safe', async () => {
     const page = [
-      'a(data-cms-edit-page href="/admin") Edit',
-      'a(data-cms-edit-page data-kcms-edit-page href="/admin") Edit',
-      '// kay-allow deprecated-cms-edit-page',
-      'a(data-cms-edit-page href="/admin") Edit',
-      'a(data-kcms-edit-page href="/admin") Edit',
+      '---',
+      'import Badge from \'@kaynooo/kayjs-ui/badge.kay\'',
+      'import Notice from \'@kaynooo/kayjs-ui/notice.kay\'',
+      'import FormField from \'@kaynooo/kayjs-ui/form-field.kay\'',
+      'import FileDrop from \'@kaynooo/kayjs-ui/file-drop.kay\'',
+      'import QrCode from \'@kaynooo/kayjs-ui/qr-code.kay\'',
+      'import Other from \'./other.kay\'',
+      'const tight = true',
+      '---',
+      'Badge(label="a" stamp)',
+      'Badge(label="b" solid={tight})',
+      'Badge(label="c" stamp solid)',
+      'Badge(label="d" solid variant="outline")',
+      'Notice(compact label="e")',
+      'Notice(compact={tight && true} label="f")',
+      'FormField(label="g" {compact})',
+      'FileDrop(compact size="md" onFiles={() => {}})',
+      'FileDrop(compact onFiles={() => {}})',
+      'QrCode(value="x" size={160})',
+      'QrCode(value="x" size={160} pixels={120})',
+      '// kay-allow deprecated-ui-prop',
+      'Badge(label="h" stamp)',
+      'Other(stamp compact size={1})',
       '',
     ].join('\n')
-    const root = await scratchProject({ 'src/routes/index.kay': page })
+    const fixed = [
+      'Badge(label="a" variant="stamp")',
+      'Badge(label="b" variant={tight ? \'solid\' : \'outline\'})',
+      'Badge(label="c" stamp solid)',
+      'Badge(label="d" solid variant="outline")',
+      'Notice(size="sm" label="e")',
+      'Notice(size={(tight && true) ? \'sm\' : \'md\'} label="f")',
+      'FormField(label="g" size={compact ? \'sm\' : \'md\'})',
+      'FileDrop(compact size="md" onFiles={() => {}})',
+      'FileDrop(size="sm" onFiles={() => {}})',
+      'QrCode(value="x" pixels={160})',
+      'QrCode(value="x" size={160} pixels={120})',
+    ]
+    const root = await scratchProject({ 'src/routes/index.kay': page, 'src/routes/other.kay': '---\nconst { stamp, compact, size } = props<{ stamp: boolean, compact: boolean, size: number }>()\n---\np {stamp} {compact} {size}\n' })
 
     try {
-      expect((await runCheck(root)).output.match(/warning\[deprecated-cms-edit-page\]/g)).toHaveLength(2)
+      expect((await runCheck(root)).output.match(/deprecated-ui-prop/g)).toHaveLength(12)
       await runCheck(root, '--fix')
-      expect(await Bun.file(join(root, 'src/routes/index.kay')).text()).toBe(page.replace('a(data-cms-edit-page href="/admin") Edit\na(data-cms', 'a(data-kcms-edit-page href="/admin") Edit\na(data-cms'))
+
+      const after = (await Bun.file(join(root, 'src/routes/index.kay')).text()).split('\n')
+
+      expect(after.slice(9, 20)).toEqual(fixed)
+      expect(after.slice(20)).toEqual(['// kay-allow deprecated-ui-prop', 'Badge(label="h" stamp)', 'Other(stamp compact size={1})', ''])
     }
     finally {
       await rm(root, { recursive: true, force: true })
     }
   })
+
+  it('reports data-cms-edit-page and --fix renames it to data-kcms-edit-page, leaving a tag that gives both', async () => {
+  const page = [
+    'a(data-cms-edit-page href="/admin") Edit',
+    'a(data-cms-edit-page data-kcms-edit-page href="/admin") Edit',
+    '// kay-allow deprecated-cms-edit-page',
+    'a(data-cms-edit-page href="/admin") Edit',
+    'a(data-kcms-edit-page href="/admin") Edit',
+    '',
+  ].join('\n')
+  const root = await scratchProject({ 'src/routes/index.kay': page })
+
+  try {
+    expect((await runCheck(root)).output.match(/warning\[deprecated-cms-edit-page\]/g)).toHaveLength(2)
+    await runCheck(root, '--fix')
+    expect(await Bun.file(join(root, 'src/routes/index.kay')).text()).toBe(page.replace('a(data-cms-edit-page href="/admin") Edit\na(data-cms', 'a(data-kcms-edit-page href="/admin") Edit\na(data-cms'))
+  }
+  finally {
+    await rm(root, { recursive: true, force: true })
+  }
+})
 
   it('reports a stylesheet selecting a part class kayjs-ui components no longer set, with no fix, leaving their roots and comments', async () => {
     const css = [

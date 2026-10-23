@@ -24,11 +24,12 @@ main
   Card#untitled(level={1})
     p No title
   Badge#badge Draft
-  Badge#solid(tone="success" solid label="<b>Done</b>")
+  Badge#solid(tone="success" variant="solid" label="<b>Done</b>")
   a.group#solid-stamp(href="/data")
+    // kay-allow deprecated-ui-prop
     Badge(stamp solid label="Winner")
   a.group#stamped(href="/data")
-    Badge(stamp label="Winner")
+    Badge(variant="stamp" label="Winner")
   EmptyState#empty(title="No moons" description="Add one to start")
   EmptyState#empty-action(title="No rockets")
     @actions
@@ -36,7 +37,7 @@ main
   article#notice
     Notice(label="Saved")
   article#notice-error
-    Notice(tone="danger" compact)
+    Notice(tone="danger" size="sm")
       | Could not save. #[a(href="/data") Retry]
   article#avatar
     Avatar(src="/ada.png" name="Ada" size="sm")

@@ -54,6 +54,6 @@ form(part="root" action={action} novalidate)
           span(part="issue") {issue}
   Button(type="submit" tone="accent" label={submitLabel})
   if action.succeeded()
-    Notice(tone="success" compact) {sentLabel}
+    Notice(tone="success" size="sm") {sentLabel}
   else if action.error() as message
-    Notice(tone="danger" compact) {message}
+    Notice(tone="danger" size="sm") {message}

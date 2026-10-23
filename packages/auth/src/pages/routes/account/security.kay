@@ -117,7 +117,7 @@ if features.twoFactor || user.twoFactor
           Button(type="submit" tone="danger" label={wording('auth.account.twoFactor.disable', 'Turn off')})
       else if setupUri && features.twoFactor
         p {wording('auth.account.twoFactor.scan', 'Scan this code with your authenticator app, or type the key, then type the code it shows.')}
-        QrCode(value={setupUri} label={wording('auth.account.twoFactor.qr', 'QR code for your authenticator app')} size={192})
+        QrCode(value={setupUri} label={wording('auth.account.twoFactor.qr', 'QR code for your authenticator app')} pixels={192})
         if setupKey
           p
             | {wording('auth.account.twoFactor.key', 'Key')}: #[code#kauth-key {setupKey}]

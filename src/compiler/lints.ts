@@ -659,11 +659,11 @@ export const LINTS = {
   'deprecated-ui-prop': {
     level: 'warn',
     group: 'deprecated',
-    since: '1.70',
+    since: '1.72',
     site: true,
-    summary: 'A prop of a kayjs-ui component under its old name: `loading` of `Select`, which is `busy` since 1.70, as a control waiting on work is busy across kayjs-ui. The old name works three minors. The tag is found through the default import of the component from `@kaynooo/kayjs-ui/` in the project\'s `.kay` files, and the fix renames the prop, unless the new name is given beside it.',
-    wrong: 'Select(value={size} options={sizes} loading={sizes.length === 0})',
-    right: 'Select(value={size} options={sizes} busy={sizes.length === 0})',
+    summary: 'A prop of a kayjs-ui component under its old form: `loading` of `Select` is `busy`, `QrCode`\'s `size` in pixels is `pixels`, and the booleans `stamp` and `solid` of `Badge` and `compact` of `FormField`, `FileDrop` and `Notice` are a value of the enum `variant` (`stamp`, `solid`) or `size` (`sm`), as a look is a `variant`, a step a `size` and a control waiting on work `busy` across kayjs-ui. The old form works three minors. The tag is found through the default import of the component from `@kaynooo/kayjs-ui/` in the project\'s `.kay` files, and the fix writes the new form, an expression as `size={flag ? \'sm\' : \'md\'}`, unless the new prop is given beside it or two old props become the same one (`stamp solid`).',
+    wrong: 'Select(value={size} options={sizes} loading={sizes.length === 0})\nBadge(label="New" stamp)\nFormField(label="Search" compact)',
+    right: 'Select(value={size} options={sizes} busy={sizes.length === 0})\nBadge(label="New" variant="stamp")\nFormField(label="Search" size="sm")',
   },
   'deprecated-ui-callback': {
     level: 'warn',

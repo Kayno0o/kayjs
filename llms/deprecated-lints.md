@@ -14,7 +14,7 @@ The lints of the `deprecated` group, each the old form a minor replaced, reporte
 | --- | --- | --- | --- |
 | `deprecated-library-registration` | warn | deprecated | `authPages`, `authExtension` or `mailExtension` in `kay.config.ts`, since 1.70: libraries register with `auth({ module })` and `mail({ module })`. `kay upgrade` rewrites the calls and the import where the module is a literal path. Found in `kay.config.ts`. |
 | `deprecated-body-limit` | warn | deprecated | `bodyLimit` in `kay.config.ts`, an action's options, `api()` or a route's `detail`, since 1.70: it is `maxSize` now, like every size limit. `kay upgrade` renames it. |
-| `deprecated-ui-prop` | warn | deprecated | `loading` of kayjs-ui's `Select`, since 1.70: it is `busy` now. |
+| `deprecated-ui-prop` | warn | deprecated | Since 1.72, `loading` of kayjs-ui's `Select` is `busy`, `QrCode`'s `size` is `pixels`, `stamp` and `solid` of `Badge` are `variant`, and `compact` of `FormField`, `FileDrop` and `Notice` is `size="sm"`. `kay upgrade` rewrites them. |
 | `deprecated-ui-callback` | warn | deprecated | `onOpen` of kayjs-ui's `ConfirmDelete` and `onSidebarClose` of `SplitLayout`, since 1.72: they are `onOpenChange` and `onSidebarOpenChange` now. `kay upgrade` renames `onSidebarClose` where the handler is written `() => ...`, and leaves `onOpen` (`onOpenChange` is called on closing too). |
 | `deprecated-page-size` | warn | deprecated | `size` in the options of kayjs-ui's `infiniteList()`, since 1.70: it is `pageSize` now. `kay upgrade` renames it. |
 | `deprecated-ctx-outcome` | warn | deprecated | `ctx.failed(action)` and `ctx.succeeded(action)`, since 1.70: they are `action.failed()` and `action.succeeded()`. `kay upgrade` rewrites them. |

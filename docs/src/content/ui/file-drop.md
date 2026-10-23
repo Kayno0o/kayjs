@@ -22,7 +22,7 @@ A dropped file is a `File`, so `URL.createObjectURL` turns it into an image sour
 
 ## Compact
 
-`compact` draws the zone as a slim row, its content from the left, to sit beside other fields in a form.
+`size="sm"` draws the zone as a slim row, its content from the left, to sit beside other fields in a form.
 
 <Demo name="file-drop/compact" />
 

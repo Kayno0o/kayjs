@@ -38,7 +38,7 @@ The theme's tokens are `@theme default`, so the app's `@theme` overrides any of 
 - State: `accent`, `accent-hi` (its hover), `on-accent` (text on it), `success`, `warning`, `info` and `error`.
 - Fills: `fill-hover`, `fill-danger` and `row-hover`.
 - Fields: `field-border`, the solid border of a text field, which buttons, Toggle tracks, carousel dots and empty Rating stars draw too, at 3:1 on every surface, so an app changing its surfaces sets it to match; and `field-focus`, the border of a focused text field, `accent` unless set.
-- Stamps (`Badge(stamp)`): `stamp` (its ink and hairline), `stamp-fill` and `stamp-fill-hover` (its ground while a `.group` holding it is hovered).
+- Stamps (`Badge(variant="stamp")`): `stamp` (its ink and hairline), `stamp-fill` and `stamp-fill-hover` (its ground while a `.group` holding it is hovered).
 - Chart series: `chart-1` to `chart-6`.
 
 A few components take tokens for their box and type, for a skin restyling them without redeclaring their selector:
@@ -52,7 +52,7 @@ A few components take tokens for their box and type, for a skin restyling them w
 - Radius steps for what sits inside a framed box, `0px` by default except `full`: `--radius-kui-sm` (Badge, a Toggle's thumb), `--radius-kui-md` (ChipGroup's chips, a Toggle's track) and `--radius-kui-full` (`9999px`, an Avatar and its skeleton; a skin squares it with `0px`).
 - Fonts: `--font-kui-mono` (`var(--font-mono)`), the monospace of the markdown editor, code and stamps, which the brutalist skin also gives the labels, and `--font-kui-body`, unset by default so labels and text fields keep the text's font, which an app sets to give them its own.
 - Density: `--kui-density`, `1` by default, multiplies `--spacing-kui-card`, `--spacing-kui-inline`, `--spacing-kui-section` and the field insets, so `0.75` packs a whole app tighter.
-- Notice: `--kui-border-notice` and `--font-weight-kui-notice`, which a compact one takes too.
+- Notice: `--kui-border-notice` and `--font-weight-kui-notice`, which a `size="sm"` one takes too.
 - Avatar: `--kui-border-avatar` and the colour `--color-kui-avatar-ring` for its ring, `--font-weight-kui-avatar` for the initial. The two borders follow `--kui-border-width` unless set.
 - Offset shadows and a press-down, `none` and `0px` by default: `--kui-shadow-raised` under a Card, CardRow, Widget and toast, `--kui-shadow-press` under a Button and a framed IconButton (solid or danger), which move down by `--kui-press-travel` and drop that shadow while pressed. A brutalist skin: `--kui-shadow-raised: 4px 4px 0 var(--color-kui-text)`, `--kui-shadow-press: 3px 3px 0 var(--color-kui-text)`, `--kui-press-travel: 3px`.
 

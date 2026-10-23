@@ -10,9 +10,9 @@ import '../app.css'
 ---
 main
   form#row.flex.items-end.gap-3
-    FormField(label="Search" compact)
+    FormField(label="Search" size="sm")
       TextInput#search(name="q")
-    FormField(label="Status" compact)
+    FormField(label="Status" size="sm")
       Select#status(name="status" value="" options={[{ value: 'ok', label: 'OK' }]} emptyOption="Any")
     Button#filter(type="submit" label="Filter")
     Button#filter-xs(type="submit" label="Filter" size="xs")
@@ -25,7 +25,7 @@ main
     Button#beside-plain(type="submit" label="Filter")
   div.flex.items-end.gap-3
     div
-      FormField(label="Search" compact)
+      FormField(label="Search" size="sm")
         TextInput#wrapped-search(name="wrapped")
     div
       Button#wrapped(type="submit" label="Filter")

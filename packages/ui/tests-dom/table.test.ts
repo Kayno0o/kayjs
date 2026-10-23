@@ -202,6 +202,18 @@ describe('Table with a selection', () => {
     expect(seen).toEqual([[3], [1, 3]])
   })
 
+  test('hands the picked rows beside the keys, in the rows\' order', async () => {
+    const seen: unknown[][] = []
+
+    mounted = await mountComponent('src/components/selectable-table.kay', { rows: MOONS, onSelect: (keys: unknown[], rows: unknown[]) => seen.push([keys, rows]) })
+    toggle(boxes(mounted.root)[2]!)
+    await settle()
+    toggle(boxes(mounted.root)[0]!)
+    await settle()
+
+    expect(seen.at(-1)).toEqual([[1, 3], [MOONS[0], MOONS[2]]])
+  })
+
   test('keeps the bulk block mounted when the rows are replaced by others with the same keys', async () => {
     mounted = await mountComponent('src/components/selectable-table.kay', { rows: MOONS, selected: [1] })
     await settle()

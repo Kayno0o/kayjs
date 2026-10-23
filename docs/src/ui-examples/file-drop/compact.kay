@@ -6,7 +6,7 @@ const name = signal('')
 ---
 FileDrop(
   accept="image/*"
-  compact
+  size="sm"
   onFiles={files => name.set(files[0]!.name)}
 )
   @content(zone)

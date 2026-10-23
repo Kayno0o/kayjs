@@ -4,6 +4,10 @@ What each minor release breaks, and what an app changes to move to it. kay and i
 
 ## 1.72.0
 
+### kayjs-ui props take enum values: `variant`, `size` and `pixels`
+
+`Badge`'s booleans are values of `variant` (`outline` by default, `solid`, `stamp`): `stamp` is `variant="stamp"` and `solid` is `variant="solid"`. `compact` of `FormField`, `FileDrop` and `Notice` is `size="sm"` (`md` by default), as `size` is a step in the other components. `QrCode`'s `size` in pixels is `pixels`, so `size` means a step everywhere. The old props work until 1.75, and `kay upgrade` rewrites them (the `deprecated-ui-prop` lint): `compact={flag}` becomes `size={flag ? 'sm' : 'md'}`, and a tag giving the new prop beside the old one, or both `stamp` and `solid`, is reported and left to you. Table's `onSelect` gets the picked rows after the keys and TreeView's the node after the id, so a handler taking one argument keeps working.
+
 ### `auth()` keeps its users in the app's database
 
 A bare `auth()` on a new app keeps its users in the database of the app's `store` in kay.config.ts (`sqliteData(path)`, `pgData(url)`) instead of `data/auth.db`, creating its `kay_*` tables there and leaving the others alone. An app whose `data/auth.db` exists keeps using it and logs once; nothing is lost, and moving the users into the app's database and setting `KAYJS_AUTH_DATABASE_URL` to it is optional. `KAYJS_AUTH_DATABASE_URL` and `auth({ store })` win over the app's store. A static export keeps users in memory and touches no database. No `kay check` lint can tell which database an app meant. kayjs-auth needs pg-orm 7.1.2 or later (`bun update @kaynooo/pg-orm`), whose SQLite driver waits out a second process opening the same file, such as `kay auth create-user` beside the server.

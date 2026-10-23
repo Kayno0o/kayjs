@@ -11,13 +11,15 @@ const look = recipe({
   defaults: { tone: 'info' },
 })
 
-const { tone = 'info', label, compact = false, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'role'> & {
+const { tone = 'info', label, size = 'md', compact = false, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'role'> & {
   label?: string | undefined
-  // A line of text without the box, such as under a form's fields.
+  // `sm` is a line of text without the box, such as under a form's fields.
+  size?: 'sm' | 'md' | undefined
+  // Deprecated since 1.72, `size="sm"` is it.
   compact?: boolean | undefined
 }>()
 ---
 // A form's outcome or a refusal, in place: what a toast says in passing, said where the page stays.
-div({...rest} role={tone === 'danger' ? 'alert' : 'status'} data-tone={tone} data-compact={compact ? '' : undefined})
+div({...rest} role={tone === 'danger' ? 'alert' : 'status'} data-tone={tone} data-compact={size === 'sm' || compact ? '' : undefined})
   | {label}
   slot

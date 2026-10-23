@@ -12,7 +12,7 @@ interface Moon {
 const { rows, selected, onSelect, filter, narrow, selectAllLabel, selectedLabel, selectRowLabel, onBulk } = props<{
   rows: Moon[]
   selected?: number[]
-  onSelect?: (keys: number[]) => void
+  onSelect?: (keys: number[], rows: Moon[]) => void
   filter?: boolean
   narrow?: 'stack' | 'scroll'
   selectAllLabel?: string

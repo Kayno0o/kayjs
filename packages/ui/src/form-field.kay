@@ -20,12 +20,14 @@ const look = recipe({
     issue: FIELD_MESSAGE.issue,
   },
   variants: {
-    // Sized by its control rather than the row, for a filter bar of fields side by side; it holds no message unless given a `name` or an `issue`.
+    // `sm` is sized by its control rather than the row, for a filter bar of fields side by side; it holds no message unless given a `name` or an `issue`.
+    size: { sm: 'w-auto', md: '' },
+    // Deprecated since 1.72, `size="sm"` is it.
     compact: { true: 'w-auto', false: '' },
   },
 })
 
-const { label, name, issue, hint, required = false, group = false, compact = false, action } = props<{
+const { label, name, issue, hint, required = false, group = false, size = 'md', compact = false, action } = props<{
   label: string
   // The field the control posts as: inside a FormDialog, the message its call was refused with for that field shows here.
   name?: string | undefined
@@ -40,15 +42,16 @@ const { label, name, issue, hint, required = false, group = false, compact = fal
   action?: Snippet
 }>()
 
+const small = () => size === 'sm' || compact
 const refused = formIssues.use()
-const reports = () => !compact || name !== undefined || issue !== undefined
+const reports = () => !small() || name !== undefined || issue !== undefined
 const messages = () => [name === undefined ? undefined : refused?.()[name], issue].filter(message => message !== undefined)
 const links = fieldLinks(group, hint !== undefined && hint !== '', messages, required)
 ---
 // The control, as children, takes the `kui-field-input` look with no class of its own.
 // The hint and the messages sit outside the label, so the control is named by its label alone; the action too, since a button inside a label would take the label from the control.
 if group
-  fieldset.kui-form-field-group(part="root" data-kui-field={links.frame} aria-describedby={links.described().join(' ') || undefined} data-compact={compact ? '' : undefined})
+  fieldset.kui-form-field-group(part="root" data-kui-field={links.frame} aria-describedby={links.described().join(' ') || undefined} data-compact={small() ? '' : undefined})
     legend(part="head")
       span(part="text")
         | {label}
@@ -65,7 +68,7 @@ if group
         for message, index of messages() key={index}
           span(part="issue") {message}
 else
-  div(part="root" data-kui-field={links.frame} data-compact={compact ? '' : undefined})
+  div(part="root" data-kui-field={links.frame} data-compact={small() ? '' : undefined})
     label(part="label")
       span(part="head")
         span(part="text")

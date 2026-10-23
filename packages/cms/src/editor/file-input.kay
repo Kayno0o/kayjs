@@ -181,7 +181,7 @@ function pick(path: string, event: Event): void {
     for issue of sizeIssues key={issue.id}
       p.kcms-file-error(id={issue.id} role="alert") {issue.message}
   // A disabled zone is a div, so the tooltip is reachable by hover and keyboard where a disabled button's would not be.
-  FileDrop.kcms-file-drop(compact accept={accept() ?? (image ? 'image/*' : undefined)} multiple={many} disabled={sent() !== undefined || denied() !== undefined} data-tooltip={denied()} tabindex={denied() === undefined ? undefined : '0'} onFiles={send} onReject={reject})
+  FileDrop.kcms-file-drop(size="sm" accept={accept() ?? (image ? 'image/*' : undefined)} multiple={many} disabled={sent() !== undefined || denied() !== undefined} data-tooltip={denied()} tabindex={denied() === undefined ? undefined : '0'} onFiles={send} onReject={reject})
     @content(zone)
       Button(label={label()} busy={sent() !== undefined} disabled={denied() !== undefined} onClick={zone.open})
       if sent() !== undefined

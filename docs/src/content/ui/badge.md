@@ -12,7 +12,7 @@ description: A small label for a status, a tag or a count.
 
 ## Solid
 
-Set `solid` to fill the badge with its tone. The text takes `--color-kui-on-accent`, which every tone reads at 4.5:1 in both color schemes, and a skin can change it with `--kui-badge-solid-text`.
+Set `variant="solid"` to fill the badge with its tone. The text takes `--color-kui-on-accent`, which every tone reads at 4.5:1 in both color schemes, and a skin can change it with `--kui-badge-solid-text`.
 
 <Demo name="badge/solid" />
 
@@ -24,4 +24,4 @@ Set `solid` to fill the badge with its tone. The text takes `--color-kui-on-acce
 
 ## Stamp
 
-Set `stamp` to draw the badge as a rubber stamp: a hairline in its text color and small spaced capitals. It fills again while a `.group` holding it is hovered. A stamp is never solid.
+Set `variant="stamp"` to draw the badge as a rubber stamp: a hairline in its text color and small spaced capitals. It fills again while a `.group` holding it is hovered. The default `variant` is `outline`.

@@ -66,7 +66,7 @@ FormField also works outside a dialog, in a plain form posting to an action:
 - Inside an island, as in a FormDialog, the control's `aria-describedby` gains the hint and, while one shows, the messages, beside the ids it had, and the control is `aria-invalid` while a message shows. A FormDialog refusing a field focuses the first one marked so. On a static page, kay marks the fields of a refused plain post `aria-invalid` itself.
 - `group` makes it a `fieldset` with a `legend`, for a control made of several inputs.
 - Its messages sit in an `aria-live` region, so a screen reader reads them as they appear.
-- `compact` sizes it by its control rather than the row, for a filter bar of fields side by side, a Select inside as wide as its options with no class. It holds no message region then unless given a `name` or an `issue`, and a `class` such as `w-48` on it replaces its width. A medium Button in the same parent, such as the submit button below, or beside a MultiSelect or any island holding such fields, is as tall as the fields at any `--kui-density`; another size, `variant="inline"` and a Button elsewhere keep their height.
+- `size="sm"` (`md` by default) sizes it by its control rather than the row, for a filter bar of fields side by side, a Select inside as wide as its options with no class. It holds no message region then unless given a `name` or an `issue`, and a `class` such as `w-48` on it replaces its width. A medium Button in the same parent, such as the submit button below, or beside a MultiSelect or any island holding such fields, is as tall as the fields at any `--kui-density`; another size, `variant="inline"` and a Button elsewhere keep their height.
 
 `ContactForm(action={contact})` is the form for the action `contactForm(mail, ...)` from kayjs-mail builds (any action with `name`, `email` and `message` fields works): a `form` posting without JavaScript, a FormField per field with the message the action refused it with, a submit button, and a `Notice` that the message went out (`sentLabel`) or why not (`contact.error()`). The labels read the `ui.contactForm.*` messages, then kayjs-mail's `mail.contact.form` ones in the page's language (English else), and the `*Label` props replace them.
 
@@ -78,9 +78,9 @@ A GET filter form, whose every pick lands in the URL, submits as soon as a Selec
 
 ```kay
 form.flex.flex-wrap.items-end.gap-3(method="get" role="search")
-  FormField(label="Period" compact)
+  FormField(label="Period" size="sm")
     Select(name="period" value={filters.period} options={PERIODS} emptyOption="Last 7 days" submit)
-  FormField(label="Host" compact)
+  FormField(label="Host" size="sm")
     input(name="host" value={filters.host} autocomplete="off")
   Button(type="submit" label="Filter")
 ```

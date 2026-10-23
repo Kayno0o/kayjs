@@ -15,8 +15,8 @@ const { nodes, label, selected, expanded = [], onSelect, ...rest } = props<Omit<
   selected?: Id | undefined
   // The branches open to start with.
   expanded?: readonly Id[] | undefined
-  // Runs on a click on a row, or Enter or Space on the focused one.
-  onSelect?: ((id: Id) => unknown) | undefined
+  // Runs on a click on a row, or Enter or Space on the focused one, with the id `selected` takes and the node picked.
+  onSelect?: ((id: Id, node: TreeNode<Id>) => unknown) | undefined
 }>()
 
 const path = (id: TreeId | undefined) => id === undefined ? undefined : treePath(nodes, id)
@@ -62,7 +62,7 @@ function toggle(id: TreeId) {
 function pick(row: TreeRow<Id>) {
   current.set(row.node.id)
   focused.set(row.node.id)
-  onSelect?.(row.node.id)
+  onSelect?.(row.node.id, row.node)
 }
 
 // A branch's chevron opens or closes it, the rest of the row selects it; the keyboard does both through the row itself.

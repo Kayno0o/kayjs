@@ -22,13 +22,13 @@ main
   article#open-single
     Pagination(offset={0} limit={20} more={false} url="/gallery")
   article#qr
-    QrCode(value="https://kaynooo.fr" label="kaynooo.fr" size={160})
+    QrCode(value="https://kaynooo.fr" label="kaynooo.fr" pixels={160})
   article#qr-other
     QrCode(value="https://kaynooo.fr/t" label="Tier lists")
   article#qr-styled
     QrCode(value="https://kaynooo.fr" label="Styled" options={{ foreground: '#7aa2f7' }})
   article#qr-inline
-    QrCode(value="https://kaynooo.fr" label="Inline" size={120} inline options={{ foreground: 'currentColor', eyeColor: 'var(--color-accent)' }})
+    QrCode(value="https://kaynooo.fr" label="Inline" pixels={120} inline options={{ foreground: 'currentColor', eyeColor: 'var(--color-accent)' }})
   article#qr-decor
     QrCode(value="https://kaynooo.fr")
   article#qr-decor-inline

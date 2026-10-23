@@ -4,7 +4,7 @@ import { signal } from 'kay'
 import TreeView from '@kaynooo/kayjs-ui/tree-view.kay'
 
 // What the test reads back: every node picked, and buttons standing for the parent picking a node itself or sending new nodes.
-const { onSelect } = props<{ onSelect: (id: string) => void }>()
+const { onSelect } = props<{ onSelect: (id: string, node: TreeNode) => void }>()
 
 const picked = signal<string | undefined>('notes')
 const nodes = signal<TreeNode[]>([
@@ -12,9 +12,9 @@ const nodes = signal<TreeNode[]>([
   { id: 'inbox', label: 'Inbox' },
 ])
 
-function select(id: string) {
+function select(id: string, node: TreeNode) {
   picked.set(id)
-  onSelect(id)
+  onSelect(id, node)
 }
 ---
 TreeView#tree(nodes={nodes()} label="Folders" selected={picked()} onSelect={select})

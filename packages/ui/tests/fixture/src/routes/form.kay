@@ -22,5 +22,5 @@ main
     button Rename
   form#filters(method="get")
     section#compact
-      FormField(label="Period" compact)
+      FormField(label="Period" size="sm")
         select(name="period")
