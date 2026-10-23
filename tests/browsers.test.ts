@@ -20,12 +20,15 @@ const PAST_THE_FLOOR: [RegExp, string][] = [
 const UNGUARDED_POPOVER = /querySelector(?:All)?\(':popover-open'/
 const POPOVER_CHECK = /'popover' in /
 
-// The code an island ships: kay's runtime, its server-only and dev-only modules left out, and kayjs-ui's components.
+// kayjs-ui's `kay ui eject` and `kay ui diff`, which run under Bun in the app's checkout and reach no page.
+const UI_COMMANDS = /^packages\/ui\/src\/(?:eject|[a-z-]+-command)\.ts$/
+
+// The code an island ships: kay's runtime, its server-only and dev-only modules left out, and kayjs-ui's components, its commands left out.
 async function browserFiles(): Promise<string[]> {
   const runtime = await Array.fromAsync(new Bun.Glob('src/runtime/*.ts').scan({ cwd: root }))
   const ui = await Array.fromAsync(new Bun.Glob('packages/ui/src/**/*.{ts,kay}').scan({ cwd: root }))
 
-  return [...runtime.filter(path => !path.endsWith('.server.ts') && !path.includes('/dev-')), ...ui.filter(path => !path.endsWith('.test.ts'))]
+  return [...runtime.filter(path => !path.endsWith('.server.ts') && !path.includes('/dev-')), ...ui.filter(path => !path.endsWith('.test.ts') && !UI_COMMANDS.test(path))]
 }
 
 describe('the browsers kay supports', () => {
