@@ -57,6 +57,8 @@ export const DEV_DATA_QUERY = '/_kay/dev/data/query'
 export const DEV_JOBS = '/_kay/dev/jobs'
 export const DEV_JOBS_RETRY = '/_kay/dev/jobs/retry'
 export const DEV_JOBS_DELETE = '/_kay/dev/jobs/delete'
+export const DEV_JOBS_SEND = '/_kay/dev/jobs/send'
+export const DEV_JOBS_CANCEL = '/_kay/dev/jobs/cancel'
 export const DEV_UI = '/_kay/dev/ui'
 export const DEV_TAB = '/_kay/dev/tab/'
 

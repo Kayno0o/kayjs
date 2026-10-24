@@ -1,7 +1,8 @@
 import type { Guard } from '../src/runtime'
 import { join } from 'node:path'
 import { describe, expect, it, spyOn } from 'bun:test'
-import { queue } from '../src/server'
+import { queue, workflow } from '../src/server'
+import { jobOverview } from '../src/server/job-admin'
 import { memoryJobs } from '../src/server/queue'
 import { cleanUpAfterFile } from './job-stores'
 import { scratchDir } from './scratch'
@@ -168,5 +169,51 @@ describe('the production jobs page', () => {
     const site = await app({ jobs: { guard: allow } })
 
     expect((await get(site, '/_kay/jobs')).status).toBe(200)
+  })
+})
+
+// The one job of a workflow's queue.
+async function runOf(name: string) {
+  const queues = await jobOverview()
+
+  return queues.find(queued => queued.name === `workflow:${name}`)!.jobs[0]!
+}
+
+describe('the production jobs page for a workflow run', () => {
+  it('shows its state and steps without script, sends its event and cancels it', async () => {
+    const site = await app({ jobs: { guard: allow } })
+    const name = `page-flow-${++counter}`
+    const flow = workflow<undefined, { paid: number }>(name, async ({ step }) => {
+      await step.run('charge <b>', () => 1)
+      await step.waitFor('paid')
+    }, { store: memoryJobs() })
+    const id = await flow.start(undefined, { id: 'order-1' })
+
+    await flow.drain()
+
+    const html = await (await get(site, '/_kay/jobs')).text()
+
+    expect(html).toContain('<strong>waiting</strong>')
+    expect(html).toContain('workflow run waiting for event <code>paid</code>, 1 steps done: <code>run charge &lt;b&gt;</code>')
+    expect(html).not.toContain('<script')
+    expect(html).toContain('action="/_kay/jobs/send"')
+    expect(html).toContain('Cancel')
+
+    const job = await runOf(name)
+    const sent = await post(site, '/_kay/jobs/send', { queue: `workflow:${name}`, id: job.id })
+
+    expect(sent.status).toBe(303)
+    await flow.drain()
+    expect(await flow.status(id)).toBeUndefined()
+
+    const second = await flow.start(undefined, { id: 'order-2' })
+
+    await flow.drain()
+
+    const again = await runOf(name)
+
+    expect((await post(site, '/_kay/jobs/cancel', { queue: `workflow:${name}`, id: again.id })).status).toBe(303)
+    expect(await flow.status(second)).toBeUndefined()
+    expect((await post(site, '/_kay/jobs/send', { queue: `workflow:${name}`, id: again.id })).status).toBe(404)
   })
 })

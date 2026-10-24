@@ -88,6 +88,26 @@ describe('the Jobs tab', () => {
     done()
   })
 
+  it('shows a workflow run by its state and steps, with send for a waiting run and cancel for any', async () => {
+    const run = (state: 'waiting' | 'sleeping', extra = {}) => ({ state, steps: ['run charge', 'sleep'], ...extra })
+    const { panel, calls, done } = open(() => Response.json({ queues: [queueOf({ name: 'workflow:order', jobs: [job({ id: 'a', key: 'order-1', workflow: run('waiting', { event: 'paid' }) }), job({ id: 'b', status: 'running', workflow: { state: 'running', steps: [] } }), job({ id: 'c', workflow: run('sleeping', { until: 3_600_000 }) })] })] }))
+
+    await Bun.sleep(0)
+    expect([...panel.querySelectorAll('.row .pill')].map(pill => pill.textContent)).toEqual(['waiting', 'running', 'sleeping'])
+    expect([...panel.querySelectorAll('.row')].map(row => [...row.querySelectorAll('button')].map(button => button.textContent).join('+'))).toEqual(['Send paid+Cancel', 'Cancel', 'Cancel'])
+    expect(panel.textContent).toContain('waiting for paid, 2 steps done: run charge, sleep')
+    expect(panel.textContent).toContain('sleeping until 1970-01-01T01:00:00.000Z')
+    expect(panel.querySelectorAll<HTMLButtonElement>('.row')[1]!.querySelector('button')!.disabled).toBe(false)
+    ;[...panel.querySelectorAll<HTMLButtonElement>('button')].find(button => button.textContent === 'Send paid')!.click()
+    await Bun.sleep(0)
+    expect(calls.find(([call]) => call === 'POST /_kay/dev/jobs/send')![1]).toBe(JSON.stringify({ queue: 'workflow:order', id: 'a' }))
+    expect(panel.querySelector('.note')!.textContent).toBe('Sent the event to workflow:order.')
+    ;[...panel.querySelectorAll<HTMLButtonElement>('button')].find(button => button.textContent === 'Cancel')!.click()
+    await Bun.sleep(0)
+    expect(calls.find(([call]) => call === 'POST /_kay/dev/jobs/cancel')![1]).toBe(JSON.stringify({ queue: 'workflow:order', id: 'a' }))
+    done()
+  })
+
   it('says why a retry failed and leaves the job to try again', async () => {
     const { panel, done } = open((_url, init) => init?.method === 'POST' ? Response.json({ error: 'the queue has no such job any more' }, { status: 404 }) : Response.json({ queues: [queueOf({ jobs: [job({ id: 'c', status: 'failed', error: 'boom' })] })] }))
 

@@ -85,7 +85,7 @@ The server runs it with `.use(welcomeMails)`. An action calls `await welcomeMail
 
 A job that throws is retried after a growing wait. One that runs out of attempts is kept as failed and passed to `onFailed` as `{ payload, error }`. So is a run outlasting `lostAfter`, 10 minutes by default, or one whose process died each time.
 
-Under `kay dev`, the dev tool's Jobs tab lists every queue's jobs and retries or deletes a failed one ([the dev tool](/guides/performance/#jobs)). In production, `jobs: { guard }` in `kay.config.ts` serves that list at `/_kay/jobs`, behind the guard you give it: `jobs: { guard: ctx => ctx.locals.auth.requireAdmin() }` with kayjs-auth, or any guard. Without a guard the server does not start, and `jobs: { guard, path }` moves the page.
+Under `kay dev`, the dev tool's Jobs tab lists every queue's jobs and retries or deletes a failed one ([the dev tool](/guides/performance/#jobs)). A workflow run shows as its state, running, sleeping until a time, waiting for an event or failed, with the steps it has done, a button to send the event it waits for (without data) and one to cancel it, and the production page shows the same. In production, `jobs: { guard }` in `kay.config.ts` serves that list at `/_kay/jobs`, behind the guard you give it: `jobs: { guard: ctx => ctx.locals.auth.requireAdmin() }` with kayjs-auth, or any guard. Without a guard the server does not start, and `jobs: { guard, path }` moves the page.
 
 Some failures are nobody's fault: a full disk, a service asking you to slow down. To try again later without spending an attempt, throw `retryLater` with how long to wait.
 

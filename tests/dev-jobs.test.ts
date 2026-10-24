@@ -1,8 +1,8 @@
 import type { JobStore } from '../src/server'
 import type { JobView, QueueView } from '../src/server/job-admin'
 import { join } from 'node:path'
-import { describe, expect, it, spyOn } from 'bun:test'
-import { queue } from '../src/server'
+import { describe, expect, it, setSystemTime, spyOn } from 'bun:test'
+import { queue, workflow } from '../src/server'
 import { forgetQueue } from '../src/server/queue'
 import { cleanUpAfterFile, kinds } from './job-stores'
 import { scratchDir } from './scratch'
@@ -30,7 +30,7 @@ async function listed(site: App): Promise<QueueView[]> {
   return (await (await site.handle(new Request('http://localhost/_kay/dev/jobs', { headers: HEADERS }))).json() as { queues: QueueView[] }).queues
 }
 
-async function act(site: App, action: 'retry' | 'delete', queueName: string, id: string, headers: Record<string, string> = HEADERS) {
+async function act(site: App, action: 'retry' | 'delete' | 'send' | 'cancel', queueName: string, id: string, headers: Record<string, string> = HEADERS) {
   return site.handle(new Request(`http://localhost/_kay/dev/jobs/${action}`, { method: 'POST', headers: { 'content-type': 'application/json', ...headers }, body: JSON.stringify({ queue: queueName, id }) }))
 }
 
@@ -255,5 +255,64 @@ describe('a queue on a store without revive or state', () => {
     expect(view.jobs).toMatchObject([{ id, status: 'failed' }])
     expect((await act(site, 'retry', 'bare', id)).status).toBe(409)
     forgetQueue(queued)
+  })
+})
+
+describe.each(kinds)('the Jobs tab\'s workflow runs on a $name store', ({ name, open }) => {
+  async function flowOf(label: string) {
+    const queueName = `${name}-${label}`
+    const flow = workflow<undefined, { paid: number }>(queueName, async ({ step }) => {
+      await step.run('charge', () => 1)
+      await step.sleep('1h')
+      await step.waitFor('paid')
+      await step.run('ship', () => 2)
+    }, { store: await open() })
+
+    return { flow, queueName: `workflow:${queueName}` }
+  }
+
+  it('shows a run sleeping, then waiting for an event with its steps, and sends the event', async () => {
+    const { flow, queueName } = await flowOf('send')
+    const site = await app()
+    const id = await flow.start(undefined, { id: 'order-1' })
+
+    await flow.drain()
+
+    const [sleeping] = (await listed(site)).find(queued => queued.name === queueName)!.jobs as [JobView]
+
+    expect(sleeping.workflow).toMatchObject({ state: 'sleeping', steps: ['run charge', 'sleep'] })
+    expect(sleeping.workflow!.until).toBeGreaterThan(Date.now())
+    setSystemTime(Date.now() + 2 * 3600_000)
+    await flow.drain()
+
+    const [waiting] = (await listed(site)).find(queued => queued.name === queueName)!.jobs as [JobView]
+
+    expect(waiting.workflow).toMatchObject({ state: 'waiting', event: 'paid', steps: ['run charge', 'sleep'] })
+    expect(waiting.workflow!.until).toBeUndefined()
+    expect((await act(site, 'send', queueName, waiting.id)).status).toBe(200)
+    await flow.drain()
+    expect(await flow.status(id)).toBeUndefined()
+    setSystemTime()
+  })
+
+  it('cancels a run, and refuses to send an event to one that does not wait or to a plain queue', async () => {
+    const { flow, queueName } = await flowOf('cancel')
+    const site = await app()
+
+    await flow.start()
+    await flow.drain()
+
+    const [run] = (await listed(site)).find(queued => queued.name === queueName)!.jobs as [JobView]
+
+    expect((await act(site, 'send', queueName, run.id)).status).toBe(409)
+    expect((await act(site, 'cancel', queueName, run.id)).status).toBe(200)
+    expect((await act(site, 'cancel', queueName, run.id)).status).toBe(404)
+
+    const plain = queue<{ n: number }>(`${name}-plain-wf`, () => undefined, { store: await open() })
+    const plainId = await plain.enqueue({ n: 1 })
+
+    expect((await act(site, 'cancel', `${name}-plain-wf`, plainId)).status).toBe(409)
+    expect((await act(site, 'send', `${name}-plain-wf`, plainId)).status).toBe(409)
+    expect((await act(site, 'send', 'nope', 'x')).status).toBe(404)
   })
 })

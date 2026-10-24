@@ -1,16 +1,8 @@
-import type { JobAction } from './job-admin'
+import type { JobActionName } from './job-admin'
 import { isCrossSite } from './actions'
-import { deleteJob, jobOverview, retryJob } from './job-admin'
+import { JOB_MESSAGES, jobActions, jobOverview } from './job-admin'
 
 const HEADER = 'x-kay-dev'
-
-const MESSAGES: Record<Exclude<JobAction, 'done'>, [number, string]> = {
-  'no-queue': [404, 'this server has no such queue'],
-  'no-job': [404, 'the queue has no such job any more'],
-  'not-failed': [409, 'only a failed job can be retried'],
-  'running': [409, 'a running job cannot be removed'],
-  'unsupported': [409, 'the queue\'s store cannot put a failed job back: it has no revive()'],
-}
 
 function guarded(request: Request): Response | undefined {
   return request.headers.get(HEADER) === null || isCrossSite(request) ? new Response(null, { status: 403 }) : undefined
@@ -31,8 +23,8 @@ export async function devJobs(request: Request): Promise<Response> {
   }
 }
 
-// Retries or deletes the job a click names.
-export async function devJobAction(request: Request, act: 'retry' | 'delete'): Promise<Response> {
+// Retries, deletes, sends an event to or cancels the job a click names.
+export async function devJobAction(request: Request, act: JobActionName): Promise<Response> {
   const denied = guarded(request)
 
   if (denied)
@@ -51,12 +43,12 @@ export async function devJobAction(request: Request, act: 'retry' | 'delete'): P
     return Response.json({ error: 'queue and id are texts' }, { status: 400 })
 
   try {
-    const done = await (act === 'retry' ? retryJob : deleteJob)(body.queue, body.id)
+    const done = await jobActions[act](body.queue, body.id)
 
     if (done === 'done')
       return Response.json({ done: true })
 
-    const [status, error] = MESSAGES[done]
+    const [status, error] = JOB_MESSAGES[done]
 
     return Response.json({ error }, { status })
   }

@@ -6,6 +6,7 @@ import { KayError } from '../compiler/errors'
 import { durationSeconds } from '../runtime/duration'
 import { kayLog } from '../runtime/log'
 import { claimHolds, defaultJobStore, GiveUpError, handedBack, queue, wakeQueue } from './queue'
+import { onReload } from './reload'
 
 type Events = Record<string, unknown>
 
@@ -89,7 +90,52 @@ const RELEASE_TRIES = 3
 export const INBOX_LIMIT = 50
 
 // A wait without timeout is due never: the last instant a Date holds.
-const NEVER = 8.64e15
+export const NEVER = 8.64e15
+
+// What the dev tool and the jobs page show of a run: where it stands and the steps it has kept, as `run <name>`, `sleep` and `wait <event>`.
+export interface RunView {
+  state: WorkflowStatus['status']
+  // The event a `waiting` run waits for.
+  event?: string
+  // When a `sleeping` run or a `waiting` one with a timeout is due.
+  until?: number
+  steps: string[]
+}
+
+// What a queue job of `workflow:<name>` is, read from its stored payload; undefined when the payload is not a run's.
+export function runView(status: 'waiting' | 'running' | 'failed', payloadText: string, runAt: number): RunView | undefined {
+  let payload: Payload<unknown>
+
+  try {
+    payload = parse(payloadText) as Payload<unknown>
+  }
+  catch {
+    return undefined
+  }
+
+  if (!Array.isArray(payload?.memo))
+    return undefined
+
+  const steps = payload.memo.map(entry => entry.kind === 'sleep' ? 'sleep' : `${entry.kind} ${entry.name}`)
+  const until = runAt < NEVER ? { until: runAt } : {}
+
+  if (status === 'waiting' && payload.waiting)
+    return { state: 'waiting', event: payload.waiting.event, ...until, steps }
+
+  return { state: status === 'waiting' ? 'sleeping' : status, ...status === 'waiting' && until, steps }
+}
+
+// What the dev tool and the jobs page act on a run with, by the name of its queue.
+export interface WorkflowAdmin {
+  send: (id: string, event: string) => Promise<boolean>
+  cancel: (id: string) => Promise<boolean>
+}
+
+const workflowAdmins = new Map<string, WorkflowAdmin>()
+
+export function workflowAdminOf(queueName: string): WorkflowAdmin | undefined {
+  return workflowAdmins.get(queueName)
+}
 
 function needs(store: JobStore, name: string): { [Method in 'update' | 'release' | 'state']-?: NonNullable<JobStore[Method]> } {
   const { update, release, state } = store
@@ -277,6 +323,55 @@ export function workflow<Input = undefined, Known extends Events = Events>(name:
     return job && { job, payload: parse(job.payload) as Payload<Input> }
   }
 
+  const flowSend = async (id: string, event: string, data?: unknown) => {
+    const store = storeOf()
+    const { update } = needs(store, name)
+    const run = await found(id)
+
+    // A run a step is running, or a worker has just taken, is held: its event is dropped.
+    if (run?.job.status !== 'waiting')
+      return false
+
+    const now = Date.now()
+
+    // A run not waiting for it yet keeps the event for the wait that names it.
+    if (run.payload.waiting?.event !== event) {
+      const inbox = [...run.payload.inbox ?? [], { event, data }]
+
+      if (inbox.length > INBOX_LIMIT) {
+        const [dropped] = inbox.splice(0, inbox.length - INBOX_LIMIT)
+
+        kayLog('warn', `workflow('${name}') run '${id}' kept more than ${INBOX_LIMIT} events no wait named: the oldest, '${dropped!.event}', was dropped`)
+      }
+
+      return update(run.job.id, { payload: stringify({ ...run.payload, inbox }) }, { payload: run.job.payload, now })
+    }
+
+    const memo: Entry[] = [...run.payload.memo, { kind: 'wait', name: event, value: { timedOut: false, data } satisfies WaitResult<unknown> }]
+    const woken = await update(run.job.id, { payload: stringify({ ...run.payload, memo, waiting: undefined }), runAt: now }, { payload: run.job.payload, now })
+
+    if (woken)
+      wakeQueue(queueName)
+
+    return woken
+  }
+
+  const flowCancel = async (id: string) => {
+    const run = await found(id)
+
+    if (run === undefined)
+      return false
+
+    await storeOf().complete(run.job.id)
+
+    return true
+  }
+
+  workflowAdmins.set(queueName, { send: flowSend, cancel: flowCancel })
+  onReload(() => {
+    workflowAdmins.delete(queueName)
+  })
+
   return Object.assign(queued as Elysia, {
     start: async (input?: Input, startOptions: StartOptions = {}) => {
       const id = startOptions.id ?? crypto.randomUUID()
@@ -288,38 +383,7 @@ export function workflow<Input = undefined, Known extends Events = Events>(name:
 
       return id
     },
-    send: async (id: string, event: string, data?: unknown) => {
-      const store = storeOf()
-      const { update } = needs(store, name)
-      const run = await found(id)
-
-      // A run a step is running, or a worker has just taken, is held: its event is dropped.
-      if (run?.job.status !== 'waiting')
-        return false
-
-      const now = Date.now()
-
-      // A run not waiting for it yet keeps the event for the wait that names it.
-      if (run.payload.waiting?.event !== event) {
-        const inbox = [...run.payload.inbox ?? [], { event, data }]
-
-        if (inbox.length > INBOX_LIMIT) {
-          const [dropped] = inbox.splice(0, inbox.length - INBOX_LIMIT)
-
-          kayLog('warn', `workflow('${name}') run '${id}' kept more than ${INBOX_LIMIT} events no wait named: the oldest, '${dropped!.event}', was dropped`)
-        }
-
-        return update(run.job.id, { payload: stringify({ ...run.payload, inbox }) }, { payload: run.job.payload, now })
-      }
-
-      const memo: Entry[] = [...run.payload.memo, { kind: 'wait', name: event, value: { timedOut: false, data } satisfies WaitResult<unknown> }]
-      const woken = await update(run.job.id, { payload: stringify({ ...run.payload, memo, waiting: undefined }), runAt: now }, { payload: run.job.payload, now })
-
-      if (woken)
-        wakeQueue(queueName)
-
-      return woken
-    },
+    send: flowSend,
     status: async (id: string): Promise<WorkflowStatus | undefined> => {
       const run = await found(id)
 
@@ -334,16 +398,7 @@ export function workflow<Input = undefined, Known extends Events = Events>(name:
 
       return { status: job.status === 'waiting' ? 'sleeping' : job.status, ...base }
     },
-    cancel: async (id: string) => {
-      const run = await found(id)
-
-      if (run === undefined)
-        return false
-
-      await storeOf().complete(run.job.id)
-
-      return true
-    },
+    cancel: flowCancel,
     drain: queued.drain,
   })
 }

@@ -1,7 +1,7 @@
 import type { QueueView } from '../server/job-admin'
 import type { DevTab, DevTool } from './dev-tool'
 
-// The Jobs tab's code, fetched the first time the tab opens: each queue of the app with its running, waiting and failed jobs, a failed one's payload and error, and a button to retry or delete it. It imports types only, as the browser loads it as it is.
+// The Jobs tab's code, fetched the first time the tab opens: each queue of the app with its running, waiting and failed jobs, a failed one's payload and error, a button to retry or delete it, and for a workflow run its state and steps with buttons to send the event it waits for or cancel it. It imports types only, as the browser loads it as it is.
 const HEADERS = { 'x-kay-dev': '1', 'content-type': 'application/json' }
 
 const failure = (error: unknown) => error instanceof Error ? error.message : String(error)
@@ -23,7 +23,9 @@ async function ask<Answer>(url: string, init?: RequestInit): Promise<Answer> {
   return answer
 }
 
-const TONES = { failed: 'error', running: 'accent', waiting: 'ok' } as const
+const TONES = { failed: 'error', running: 'accent', waiting: 'ok', sleeping: 'ok' } as const
+
+const DONE = { retry: 'Put back in', delete: 'Removed from', send: 'Sent the event to', cancel: 'Cancelled in' } as const
 
 export default function jobsTab(tool: DevTool, tab: DevTab): () => void {
   const status = tool.make('div', 'note')
@@ -31,15 +33,15 @@ export default function jobsTab(tool: DevTool, tab: DevTab): () => void {
   let asked = 0
   let reread: (() => Promise<void>) | undefined
 
-  const act = async (action: 'retry' | 'delete', queue: string, id: string, button: HTMLButtonElement) => {
+  const act = async (action: keyof typeof DONE, queue: string, id: string, button: HTMLButtonElement) => {
     button.disabled = true
 
     try {
       await ask(`/_kay/dev/jobs/${action}`, { method: 'POST', body: JSON.stringify({ queue, id }) })
-      status.textContent = `${action === 'retry' ? 'Put back in' : 'Removed from'} ${queue}.`
+      status.textContent = `${DONE[action]} ${queue}.`
     }
     catch (error) {
-      status.textContent = `Could not ${action} the job: ${failure(error)}`
+      status.textContent = `Could not ${action === 'send' ? 'send the event to' : action} the job: ${failure(error)}`
       button.disabled = false
 
       return
@@ -52,7 +54,8 @@ export default function jobsTab(tool: DevTool, tab: DevTab): () => void {
     const row = tool.make('div', 'row')
     const line = tool.make('div', 'actions')
     const retry = tool.make('button', 'tool', 'Retry')
-    const remove = tool.make('button', 'tool', 'Delete')
+    const run = job.workflow
+    const remove = tool.make('button', 'tool', run ? 'Cancel' : 'Delete')
     const details = tool.make('details', 'json')
     const body = tool.make('pre', '', job.payload)
 
@@ -60,12 +63,22 @@ export default function jobsTab(tool: DevTool, tab: DevTab): () => void {
     retry.title = queue.canRetry ? 'Run the job again from its first attempt' : 'The queue\'s store cannot put a failed job back'
     retry.disabled = !queue.canRetry
     retry.onclick = async () => act('retry', queue.name, job.id, retry)
-    remove.disabled = job.status === 'running'
-    remove.onclick = async () => act('delete', queue.name, job.id, remove)
-    line.append(tool.make('span', `pill ${TONES[job.status]}`, job.status), tool.make('span', 'mono', job.id), tool.make('span', 'note', `${job.attempts} of ${queue.attempts} attempts`))
+    remove.disabled = job.status === 'running' && !run
+    remove.title = run ? 'End the run: now when it is not running, at its next step otherwise' : ''
+    remove.onclick = async () => act(run ? 'cancel' : 'delete', queue.name, job.id, remove)
+    line.append(tool.make('span', `pill ${TONES[run?.state ?? job.status]}`, run?.state ?? job.status), tool.make('span', 'mono', job.id), tool.make('span', 'note', `${job.attempts} of ${queue.attempts} attempts`))
 
     if (job.key !== undefined)
       line.append(tool.make('span', 'chip', `key ${job.key}`))
+
+    if (run?.state === 'waiting') {
+      const send = tool.make('button', 'tool', `Send ${run.event}`)
+
+      send.type = 'button'
+      send.title = 'Send the event, without data, to the run'
+      send.onclick = async () => act('send', queue.name, job.id, send)
+      line.append(send)
+    }
 
     if (job.status === 'failed')
       line.append(retry)
@@ -76,6 +89,12 @@ export default function jobsTab(tool: DevTool, tab: DevTab): () => void {
 
     details.append(summary, body)
     row.append(line)
+
+    if (run) {
+      const until = run.until === undefined ? '' : ` until ${new Date(run.until).toISOString()}`
+
+      row.append(tool.make('div', 'note', `${run.state}${run.event === undefined ? '' : ` for ${run.event}`}${until}, ${run.steps.length} steps done${run.steps.length === 0 ? '' : `: ${run.steps.join(', ')}`}`))
+    }
 
     if (job.error !== undefined)
       row.append(tool.make('pre', 'value error', job.error))

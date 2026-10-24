@@ -3,23 +3,15 @@ import type { JobsConfig } from '../config'
 import type { Guard } from '../runtime'
 import type { ActionOptions } from './actions'
 import type { LoadedGuard } from './guards'
-import type { JobAction, JobView, QueueView } from './job-admin'
+import type { JobView, QueueView } from './job-admin'
 import { KayError } from '../compiler/errors'
 import { isCrossSite, passGuards } from './actions'
 import { escapeHtml } from './escape-html'
-import { deleteJob, jobOverview, retryJob } from './job-admin'
+import { JOB_MESSAGES, jobActions, jobOverview } from './job-admin'
 
 export const JOBS_PATH = '/_kay/jobs'
 const HTML = 'text/html; charset=utf-8'
 const HEADERS = { 'cache-control': 'no-store', 'x-robots-tag': 'noindex, nofollow', 'referrer-policy': 'no-referrer' }
-
-const MESSAGES: Record<Exclude<JobAction, 'done'>, [number, string]> = {
-  'no-queue': [404, 'this server has no such queue'],
-  'no-job': [404, 'the queue has no such job any more'],
-  'not-failed': [409, 'only a failed job can be retried'],
-  'running': [409, 'a running job cannot be removed'],
-  'unsupported': [409, 'the queue\'s store cannot put a failed job back: it has no revive()'],
-}
 
 export interface JobsPage {
   path: string
@@ -49,11 +41,14 @@ export function jobsPageOf(setting: JobsConfig | undefined): JobsPage | undefine
 const time = (at: number) => Number.isNaN(new Date(at).getTime()) ? String(at) : new Date(at).toISOString()
 
 function jobMarkup(queue: QueueView, job: JobView, action: (name: string) => string): string {
-  const form = (name: 'retry' | 'delete', label: string) => `<form method="post" action="${escapeHtml(action(name))}"><input type="hidden" name="queue" value="${escapeHtml(queue.name)}"><input type="hidden" name="id" value="${escapeHtml(job.id)}"><button>${label}</button></form>`
+  const form = (name: 'retry' | 'delete' | 'send' | 'cancel', label: string) => `<form method="post" action="${escapeHtml(action(name))}"><input type="hidden" name="queue" value="${escapeHtml(queue.name)}"><input type="hidden" name="id" value="${escapeHtml(job.id)}"><button>${label}</button></form>`
   const retry = job.status === 'failed' && queue.canRetry ? form('retry', 'Retry') : ''
-  const remove = job.status === 'running' ? '' : form('delete', 'Delete')
+  const run = job.workflow
+  const send = run?.state === 'waiting' ? form('send', `Send ${escapeHtml(run.event ?? '')}`) : ''
+  const remove = run || job.status !== 'running' ? form(run ? 'cancel' : 'delete', run ? 'Cancel' : 'Delete') : ''
+  const where = run === undefined ? '' : `<p>workflow run ${run.state}${run.event === undefined ? '' : ` for event <code>${escapeHtml(run.event)}</code>`}${run.until === undefined ? '' : ` until ${time(run.until)}`}, ${run.steps.length} steps done${run.steps.length === 0 ? '' : `: ${run.steps.map(step => `<code>${escapeHtml(step)}</code>`).join(' ')}`}</p>`
 
-  return `<li><p><strong>${job.status}</strong> <code>${escapeHtml(job.id)}</code> ${job.attempts} of ${queue.attempts} attempts, due ${time(job.runAt)}${job.key === undefined ? '' : ` key <code>${escapeHtml(job.key)}</code>`}${job.progress === undefined ? '' : ` progress ${escapeHtml(job.progress)}`}</p>${job.error === undefined ? '' : `<pre>${escapeHtml(job.error)}</pre>`}<details><summary>Payload</summary><pre>${escapeHtml(job.payload)}</pre></details><div>${retry}${remove}</div></li>`
+  return `<li><p><strong>${run?.state ?? job.status}</strong> <code>${escapeHtml(job.id)}</code> ${job.attempts} of ${queue.attempts} attempts${run === undefined ? `, due ${time(job.runAt)}` : ''}${job.key === undefined ? '' : ` key <code>${escapeHtml(job.key)}</code>`}${job.progress === undefined ? '' : ` progress ${escapeHtml(job.progress)}`}</p>${where}${job.error === undefined ? '' : `<pre>${escapeHtml(job.error)}</pre>`}<details><summary>Payload</summary><pre>${escapeHtml(job.payload)}</pre></details><div>${send}${retry}${remove}</div></li>`
 }
 
 function pageMarkup(queues: QueueView[], action: (name: string) => string): string {
@@ -84,7 +79,7 @@ export function serveJobsPage(app: Elysia, page: JobsPage, options: ActionOption
     return new Response(pageMarkup(await jobOverview(), action), { headers: { 'content-type': HTML, ...HEADERS } })
   })
 
-  for (const act of ['retry', 'delete'] as const) {
+  for (const act of ['retry', 'delete', 'send', 'cancel'] as const) {
     app.post(`${page.path}/${act}`, async (context) => {
       const { request } = context
 
@@ -104,10 +99,10 @@ export function serveJobsPage(app: Elysia, page: JobsPage, options: ActionOption
       if (typeof queue !== 'string' || typeof id !== 'string')
         return new Response('Bad Request', { status: 400, headers: HEADERS })
 
-      const done = await (act === 'retry' ? retryJob : deleteJob)(queue, id)
+      const done = await jobActions[act](queue, id)
 
       if (done !== 'done') {
-        const [status, message] = MESSAGES[done]
+        const [status, message] = JOB_MESSAGES[done]
 
         return new Response(message, { status, headers: { 'content-type': 'text/plain; charset=utf-8', ...HEADERS } })
       }
