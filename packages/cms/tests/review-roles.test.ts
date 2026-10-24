@@ -145,7 +145,7 @@ describe('submitting, approving and sending back', () => {
     expect(await statusOf(ask(SUBMIT, authOf('wanda', [], orgs)))).toBe(200)
   })
 
-  test('a reviewer without publish approves, and still cannot publish by the route nor by a save', async () => {
+  test('a reviewer without publish approves, and still cannot publish by the route', async () => {
     organizations({ reviewer: ['review'] })
 
     const rex = authOf('rex', ['reviewer'], orgs)

@@ -6,7 +6,7 @@ import { notify } from 'kay/server'
 import { wording } from 'kay/words'
 import { entryPath, entryTitle } from './listing'
 import { log } from './log'
-import { readReview, reviewable, viewOf, writeReview } from './review'
+import { readReview, reviewable, settleReview, viewOf, writeReview } from './review'
 import { settings } from './settings'
 import { collectionNamed, entryOf, publishEntry, refused } from './store'
 
@@ -112,8 +112,12 @@ export async function approveEntry(ref: EntryRef, actor: Actor, author?: Identit
   const next: Review = { ...review, status: 'approved', events: [...review.events, { at: Date.now(), verb: 'approve', by: actor.name }] }
   const failed = await keep(ref, next, author, 'approve')
 
-  if (failed)
+  if (failed) {
+    // The entry is live already: its review ends as a publication rather than staying in review.
+    await settleReview(ref, author)
+
     return failed
+  }
 
   await tell(review.byId === undefined ? [] : [review.byId], wording('cms.review.approved', '{name} approved {title}', { name: actor.name, title: entryTitle(collection, entry) }), ref)
 

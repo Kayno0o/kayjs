@@ -1,5 +1,6 @@
 import type { StoredEntry } from '../kay/contract'
 import { s } from 'kay'
+import { editSessionAdmitted } from 'kay/library'
 import { api } from 'kay/server'
 import { wording } from 'kay/words'
 import { actors, authors } from '../authors'
@@ -16,7 +17,7 @@ const versioned = s.Object({ locale: s.Optional(s.String()), version: s.Optional
 export default api()
   .onError(({ error, status }) => error instanceof UnknownCollectionError ? status(404, error.message) : undefined)
   .get('/:collection', async ({ params }) => referenceChoices(params.collection))
-  .get('/:collection/:slug', async ({ params, query, status }) => {
+  .get('/:collection/:slug', async ({ params, query, status, request }) => {
     const screen = await entryScreen({ collection: params.collection, slug: params.slug, locale: query.locale })
 
     if (!screen)
@@ -32,7 +33,8 @@ export default api()
       return { collection: screen.collection, entry, seeded: true as const }
     }
 
-    const review = screen.entry ? await readReview({ collection: params.collection, slug: params.slug, locale: query.locale }) : undefined
+    // The names and notes of a review are for the staff the guard admits, not for an edit link's holder.
+    const review = screen.entry && !editSessionAdmitted(request) ? await readReview({ collection: params.collection, slug: params.slug, locale: query.locale }) : undefined
 
     return screen.entry ? { collection: screen.collection, entry: screen.entry, review: review && viewOf(review) } : status(404, wording('cms.store.noEntry', 'No entry {slug} in {collection}', { slug: params.slug, collection: params.collection }))
   }, { query: locale })

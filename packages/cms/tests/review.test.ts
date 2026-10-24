@@ -184,4 +184,42 @@ describe('review', () => {
     expect(saved.map(({ repoPath, message }) => [repoPath, message])).toEqual([['.cms/review/posts/first.json', 'content(posts): submit first']])
     expect(JSON.parse(saved[0]!.text!)).toMatchObject({ status: 'review', by: 'Wanda' })
   })
+
+  test('a folder review is written against the version of the file it read, so a stale one conflicts', async () => {
+    const ref = await draft('posts')
+    const bases: (string | null | undefined)[] = []
+
+    configure({ files: { save: async (change) => {
+      bases.push(change.base)
+
+      return undefined
+    } } })
+    await submitEntry(ref, writer)
+    expect(bases).toEqual([null])
+  })
+
+  test('a review file with a name that is not encoded leaves the other badges', async () => {
+    const ref = await draft('posts')
+
+    await submitEntry(ref, writer)
+    await Bun.write(join(contentPlace().root, '.cms/review/posts/%.json'), '{}')
+    expect([...(await reviewsOf('posts')).keys()]).toEqual(['first'])
+  })
+
+  test('an approval whose review cannot be kept leaves the published entry settled, not in review', async () => {
+    const ref = await draft('posts')
+
+    await submitEntry(ref, writer)
+
+    const real = (await import('../src/settings')).settings().files
+
+    configure({ files: { ...real, save: async (change) => {
+      if (change.repoPath.startsWith('.cms/review'))
+        throw new Error('forge down')
+
+      return real.save(change)
+    } } })
+    expect(await approveEntry(ref, reviewer)).toMatchObject({ issues: [{ message: expect.stringContaining('could not be kept') }] })
+    expect((await entryOf(ref))?.draft).toBe(false)
+  })
 })

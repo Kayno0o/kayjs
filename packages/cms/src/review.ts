@@ -4,6 +4,7 @@ import type { CollectionInfo, EntryRef } from './kay/contract'
 import { mkdir, readdir } from 'node:fs/promises'
 import { join, relative } from 'node:path'
 import { repositoryRoot } from 'kay/content'
+import { fileVersion } from './files'
 import { rowOf } from './hidden'
 import { collectionLoader } from './kay/content'
 import { log } from './log'
@@ -37,6 +38,16 @@ const KEPT_EVENTS = 50
 
 const STATUSES: ReadonlySet<string> = new Set(['review', 'sent-back', 'approved'])
 const VERBS: ReadonlySet<string> = new Set(['submit', 'approve', 'send-back', 'publish'])
+
+// The place a review file is for, undefined for a name that is not an encoded one.
+function placeNamed(name: string): string | undefined {
+  try {
+    return decodeURIComponent(name.slice(0, -'.json'.length))
+  }
+  catch {
+    return undefined
+  }
+}
 
 async function namesIn(dir: string): Promise<string[]> {
   try {
@@ -99,7 +110,12 @@ export function reviewable(collection: Pick<CollectionInfo, 'kind' | 'name' | 'd
   if (collection.draftField === undefined)
     return false
 
-  return collection.kind === 'folder' || storeOf(collection.name) !== undefined
+  if (collection.kind === 'folder')
+    return true
+
+  const store = storeOf(collection.name)
+
+  return store?.save !== undefined && store.remove !== undefined
 }
 
 const directory = (collection: string) => join(repositoryRoot(), '.cms', 'review', encodeURIComponent(collection))
@@ -142,9 +158,10 @@ export async function reviewsOf(collection: string): Promise<Map<string, Review>
 
       for (const name of names.filter(file => file.endsWith('.json'))) {
         const review = parse(await jsonOf(join(dir, name)))
+        const place = placeNamed(name)
 
-        if (review)
-          found.set(decodeURIComponent(name.slice(0, -'.json'.length)), review)
+        if (review && place !== undefined)
+          found.set(place, review)
       }
 
       return found
@@ -176,8 +193,12 @@ export async function writeReview(ref: EntryRef, review: Review | undefined, { a
     if (kept === undefined && !await Bun.file(absolute).exists())
       return
 
+    const file = Bun.file(absolute)
+    const base = await file.exists() ? fileVersion(await file.bytes()) : null
+
     await mkdir(dir, { recursive: true })
     await settings().files.save({
+      base,
       repoPath: relative(repositoryRoot(), absolute).split('\\').join('/'),
       absolute,
       text: kept === undefined ? undefined : `${JSON.stringify(kept, null, 2)}\n`,
