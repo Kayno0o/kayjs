@@ -25,6 +25,7 @@ import { requestCookies } from '../src/server/cookies'
 import { sourceHash } from '../src/server/csp'
 import { submittedValues } from '../src/server/flash'
 import { historyScript } from '../src/server/history'
+import { INSTALL_OFFER } from '../src/server/offline'
 import { htmlFallbacks, publicFiles, servedPublicly } from '../src/server/public'
 import { renderPage } from '../src/server/render'
 import { requestUrl } from '../src/server/request-url'
@@ -1384,7 +1385,8 @@ describe('content security policy', () => {
   it('lists a hash for every inline script a page carries, streamed ones included', async () => {
     const hashes = new Set(inlineScriptHashes())
     const pagesHtml = await Promise.all(['/', '/about', '/feed', '/live'].map(async path => (await app.handle(new Request(`http://localhost${path}`))).text()))
-    const inline = pagesHtml.flatMap(html => [...html.matchAll(EVERY_INLINE_SCRIPT)].map(match => match[1]!))
+    // The install capture is hashed per response, and the shared build holds the install-offer fixture's island, so streamed pages carry it here.
+    const inline = pagesHtml.flatMap(html => [...html.matchAll(EVERY_INLINE_SCRIPT)].map(match => match[1]!)).filter(script => script !== INSTALL_OFFER)
 
     expect(new Set(inline).size).toBe(5)
     for (const script of inline)
