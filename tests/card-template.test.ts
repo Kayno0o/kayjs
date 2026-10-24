@@ -5,7 +5,7 @@ import process from 'node:process'
 import tailwind from 'bun-plugin-tailwind'
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, mock, spyOn } from 'bun:test'
 import { Elysia } from 'elysia'
-import { clientDir } from '../src/build/assets'
+import { clientDir, outputDir } from '../src/build/assets'
 import { setCardMaker, setRemoteImages, shareCard } from '../src/runtime/image'
 import { runInLocale } from '../src/runtime/locale-state'
 import { pages } from '../src/server'
@@ -365,7 +365,7 @@ div(class={'relative h-[630px] w-[1200px] ' + background})
   }, 120_000)
 })
 
-// A `kay build --compile` of the fixture, run from a folder with none of its files.
+// A `kay build --compile` of the fixture, run from a folder with none of its files; a worker of `bun test --parallel` builds into a folder of its own, which `outputDir` names.
 describe('a share card template in an executable', () => {
   const SERVER = 'import process from \'node:process\'\nimport { Elysia } from \'elysia\'\nimport { pages } from \'kay/server\'\n\nconst app = new Elysia().use(await pages()).listen(Number(process.env.PORT ?? 0))\n\nconsole.log(`listening ${app.server?.port}`)\n'
   let root = ''
@@ -390,14 +390,14 @@ describe('a share card template in an executable', () => {
 
     expect({ code, errors }).toEqual({ code: 0, errors: '' })
 
-    const built = join(root, '.kay/client/dist/images')
+    const built = join(clientDir(root), 'images')
     const names = (await readdir(built)).filter(name => name.startsWith('card-')).toSorted()
 
     expect(names).toHaveLength(2)
 
     const wrote = await Promise.all(names.map(async name => Buffer.from(await Bun.file(join(built, name)).bytes()).toString('base64')))
 
-    expect((await Bun.file(join(root, '.kay/client/card-template.txt')).text()).length).toBeGreaterThan(0)
+    expect((await Bun.file(join(outputDir(root), 'card-template.txt')).text()).length).toBeGreaterThan(0)
 
     running = Bun.spawn([executable], { cwd: elsewhere, stdin: 'ignore', stdout: 'pipe', stderr: 'pipe', env: { ...process.env, NODE_ENV: 'production', PORT: '0', KAY_EPHEMERAL_SECRET: '1', BUN_CHROME_PATH: join(elsewhere, 'no-chrome-here') } })
 
