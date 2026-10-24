@@ -100,18 +100,18 @@ export function inLiveReads<T>(run: () => T, request?: Request, chain?: string, 
   return cacheReads.run(reads, async () => {
     const result = await run()
 
-    // A streamed block reads the user after this render settles, when it is too late to render again: the user is asked now, before the body is sent.
-    if (reads.streams === true && reads.user === undefined && ownLiveDeclared()) {
+    if (reads.missed === true) {
       readers.add(chain)
-      reads.user = await userOf(request)
-      reads.lazy = false
+      missed?.()
 
       return result
     }
 
-    if (reads.missed === true) {
+    // A streamed block reads the user after this render settles, when it is too late to render again: the user is asked now, before the body is sent.
+    if (reads.streams === true && reads.user === undefined && ownLiveDeclared()) {
+      reads.user = await userOf(request)
       readers.add(chain)
-      missed?.()
+      reads.lazy = false
     }
 
     return result

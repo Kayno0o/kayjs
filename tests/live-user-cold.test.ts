@@ -47,6 +47,18 @@ describe('who is signed in, asked for the pages that read a value of each user o
     asked = 0
   })
 
+  it('renders a streamed page reading the value of its user outside the block again for that user', async () => {
+    const live = await import(resolve('tests/fixtures/live-user/src/live.ts')) as typeof import('./fixtures/live-user/src/live')
+
+    live.unread.set('alice', 4)
+
+    const html = await visit('/streamed-head')
+
+    expect(html).toContain('<!--[-->4<!--]--> unread')
+    live.unread.delete('alice')
+    asked = 0
+  })
+
   it('never asks for a page reading none', async () => {
     await visit('/about')
     await visit('/about')
