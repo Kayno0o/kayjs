@@ -137,7 +137,9 @@ A tab you cannot see waits and loads the page when you come back. An `invalidate
 
 Read the value in the page's server fence or a layout's. A page that follows a value is rendered for each request, so a static export of it fails. A value that only expires by its `ttl` is not pushed: call `invalidate` when it changes.
 
-A deferred server island follows a value on its own. When the island's fetch reads the value, an `invalidate` fetches just that island again and swaps it in, with no request for the page, so the rest of the page and its typed fields are not touched. The island starts afresh, so keep state it must hold outside it. A value read in a page's own render still loads the page again, and a plain island follows through `resource`. On a prerendered page the build warns, naming the page and the key, because what the page itself shows of the value is built once and goes stale.
+A deferred server island follows a value on its own. When the island's fetch reads the value, an `invalidate` fetches just that island again and swaps it in, with no request for the page, so the rest of the page and its typed fields are not touched. The island starts afresh, so keep state it must hold outside it.
+
+A value read in a page's own render still loads the page again, and a plain island follows through `resource`. On a prerendered page the build warns, naming the page and the key, because what the page itself shows of the value is built once and goes stale.
 
 A collection follows when you add `live: true` to it. See [Showing edits in open tabs](/guides/content#showing-edits-in-open-tabs). A page that reads the collection then shows an edit in every open tab, a CMS save included.
 

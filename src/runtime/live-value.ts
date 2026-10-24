@@ -932,7 +932,7 @@ function settle(): void {
 }
 
 // Asks for the page again and takes its live scripts in place of the page's own, so a proof the server no longer takes, or is about to stop taking, is replaced by one it made now; `gone` when the page no longer holds any, as one the visitor may not see, `failed` when it could not be asked.
-async function renewProofs(signal?: AbortSignal): Promise<'renewed' | 'gone' | 'failed'> {
+async function renewProofs(signal: AbortSignal | null = null): Promise<'renewed' | 'gone' | 'failed'> {
   // The deferred islands holding live values fetch themselves again, as their proofs are theirs.
   dispatchEvent(new Event(RENEW_EVENT))
 
