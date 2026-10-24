@@ -153,7 +153,7 @@ describe('the share card template stamp', () => {
 
       // Those already waiting are not turned away: they fail with the render, not with a 503.
       gate.reject(new Error('released'))
-      expect((await Promise.all(asked)).map(response => response.status)).toEqual(Array.from({ length: MAX_QUEUED }).fill(500))
+      expect((await Promise.all(asked)).map(response => response.status)).toEqual(Array.from<number>({ length: MAX_QUEUED }).fill(500))
     }
     finally {
       setCardMaker(() => '')
