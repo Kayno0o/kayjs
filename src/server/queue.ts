@@ -1,5 +1,6 @@
 import type { Database } from 'bun:sqlite'
 import type { Duration } from '../runtime/duration'
+import type { WorkflowAdmin } from './workflow'
 import { AsyncLocalStorage } from 'node:async_hooks'
 import { existsSync } from 'node:fs'
 import process from 'node:process'
@@ -205,10 +206,20 @@ export interface QueueAdmin {
   remove: (id: string) => Promise<number>
   // Wakes the worker looking for jobs, for a job another call made due now.
   wake: () => void
+  // Set by `workflow()` for its queue: what the tab and the page send an event or cancel a run with.
+  workflow?: WorkflowAdmin
 }
 
 // The queues this process made, by name: a queue made again under the same name (a reload) replaces the earlier one.
 const admins = new Map<string, QueueAdmin>()
+
+// Gives the queue of that name the calls of its workflow; they go with the queue when it is forgotten.
+export function attachWorkflow(name: string, workflow: WorkflowAdmin): void {
+  const admin = admins.get(name)
+
+  if (admin)
+    admin.workflow = workflow
+}
 
 export function queueAdmins(): QueueAdmin[] {
   return [...admins.values()]

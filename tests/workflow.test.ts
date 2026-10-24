@@ -1,8 +1,8 @@
 import type { JobStore } from '../src/server'
 import { afterEach, describe, expect, it, setSystemTime, spyOn } from 'bun:test'
 import { parse } from 'devalue'
-import { workflow as makeWorkflow, memoryJobs, pgJobs } from '../src/server'
-import { forgetQueue } from '../src/server/queue'
+import { workflow as makeWorkflow, memoryJobs, pgJobs, queue } from '../src/server'
+import { forgetQueue, queueAdmins } from '../src/server/queue'
 import { INBOX_LIMIT } from '../src/server/workflow'
 import { cleanUpAfterFile, freshPg, kinds, pgDescribe, replicas } from './job-stores'
 
@@ -412,6 +412,19 @@ describe.each(kinds)('a workflow on a $name store', ({ open }) => {
     await flow.drain()
     expect(failures.some(message => message.includes('devalue cannot keep'))).toBe(true)
     expect(failures.some(message => message.includes('two steps at once'))).toBe(true)
+  })
+})
+
+describe('a workflow\'s admin calls', () => {
+  it('go with the queue when it is forgotten', async () => {
+    const name = named()
+    const flow = workflow<undefined>(name, () => undefined, { store: memoryJobs() })
+
+    expect(queueAdmins().find(admin => admin.name === `workflow:${name}`)?.workflow).toBeDefined()
+    forgetQueue(flow)
+    expect(queueAdmins().find(admin => admin.name === `workflow:${name}`)).toBeUndefined()
+    queue(`workflow:${name}`, () => undefined, { store: memoryJobs() })
+    expect(queueAdmins().find(admin => admin.name === `workflow:${name}`)?.workflow).toBeUndefined()
   })
 })
 

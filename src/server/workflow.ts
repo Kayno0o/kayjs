@@ -5,8 +5,7 @@ import { parse, stringify } from 'devalue'
 import { KayError } from '../compiler/errors'
 import { durationSeconds } from '../runtime/duration'
 import { kayLog } from '../runtime/log'
-import { claimHolds, defaultJobStore, GiveUpError, handedBack, queue, wakeQueue } from './queue'
-import { onReload } from './reload'
+import { attachWorkflow, claimHolds, defaultJobStore, GiveUpError, handedBack, queue, wakeQueue } from './queue'
 
 type Events = Record<string, unknown>
 
@@ -140,12 +139,6 @@ export interface WorkflowAdmin {
   send: (id: string, event: string) => Promise<boolean>
   // Ends the run held by that job of the queue.
   cancel: (jobId: string) => Promise<void>
-}
-
-const workflowAdmins = new Map<string, WorkflowAdmin>()
-
-export function workflowAdminOf(queueName: string): WorkflowAdmin | undefined {
-  return workflowAdmins.get(queueName)
 }
 
 function needs(store: JobStore, name: string): { [Method in 'update' | 'release' | 'state']-?: NonNullable<JobStore[Method]> } {
@@ -378,10 +371,7 @@ export function workflow<Input = undefined, Known extends Events = Events>(name:
     return true
   }
 
-  workflowAdmins.set(queueName, { send: flowSend, cancel: async jobId => storeOf().complete(jobId) })
-  onReload(() => {
-    workflowAdmins.delete(queueName)
-  })
+  attachWorkflow(queueName, { send: flowSend, cancel: async jobId => storeOf().complete(jobId) })
 
   return Object.assign(queued as Elysia, {
     start: async (input?: Input, startOptions: StartOptions = {}) => {

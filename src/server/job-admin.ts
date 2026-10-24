@@ -1,7 +1,7 @@
 import type { StoredJob, StoredJobState } from './queue'
 import type { RunView, WorkflowAdmin } from './workflow'
 import { queueAdmins } from './queue'
-import { runView, WORKFLOW_PREFIX, workflowAdminOf } from './workflow'
+import { runView, WORKFLOW_PREFIX } from './workflow'
 
 const LIVE_LIMIT = 100
 const FAILED_LIMIT = 100
@@ -139,7 +139,7 @@ export async function deleteJob(queue: string, id: string): Promise<JobAction> {
 // The run of a workflow queue a click names, and what drives it.
 async function runOf(queue: string, id: string): Promise<{ fail: Exclude<JobAction, 'done'> } | { fail?: undefined, flow: WorkflowAdmin, state: StoredJobState, key: string }> {
   const { admin, state } = await stateOf(queue, id)
-  const flow = workflowAdminOf(queue)
+  const flow = admin?.workflow
 
   if (admin === undefined)
     return { fail: 'no-queue' }
