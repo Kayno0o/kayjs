@@ -359,6 +359,8 @@ async function refetchIsland(slot: HTMLElement): Promise<void> {
     const focus = await refetchServerIsland(slot, () => hooks.dispose(slot))
 
     await hooks.hydrate(slot)
+    // The read times of the island now shown, which the changes that came meanwhile are held against.
+    followCaches()
     focus()
   }
   // A fetch that failed leaves the island as it was, shown until the next change, and the connection a refused proof closed opens again.

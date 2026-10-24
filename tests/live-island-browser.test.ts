@@ -26,6 +26,8 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('a deferred 
       let failing = false
       // The next connection of a tab is refused as a proof gone stale, and the open ones can be dropped.
       let refuseOnce = false
+      // Holds the fetch of an island before it reaches the server, until released.
+      let held: Promise<void> | undefined
       const cut = new Set<() => void>()
 
       const path = (to: string) => `${root}${to}${site.trailingSlash === 'always' && to !== '/' ? '/' : ''}`
@@ -64,6 +66,9 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('a deferred 
 
             if (failing && url.search.includes('kay_island='))
               return new Response(null, { status: 500 })
+
+            if (url.search.includes('kay_island='))
+              await held
 
             if (refuseOnce && request.method === 'POST' && inner.endsWith('/_kay/live')) {
               refuseOnce = false
@@ -239,6 +244,35 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('a deferred 
         await Bun.sleep(1500)
         change(61)
         await page.waitUntil(...shows(61))
+      })
+
+      it('does not fetch the island again for a change older than the render it was fetched with', async () => {
+        change(70)
+        const page = await open()
+
+        await page.waitUntil(...shows(70))
+        await Bun.sleep(500)
+
+        let release = (): void => undefined
+
+        held = new Promise<void>((resolve) => {
+          release = resolve
+        })
+        asked.length = 0
+        change(71)
+
+        for (let waited = 0; islandLoads().length === 0 && waited < 4000; waited += 25)
+          await Bun.sleep(25)
+
+        // The change arrives while the island is fetched, and the server renders it afterwards: the render it sends already holds it.
+        change(72)
+        await Bun.sleep(300)
+        held = undefined
+        release()
+        await page.waitUntil(...shows(72))
+        await Bun.sleep(1500)
+        expect(islandLoads()).toHaveLength(1)
+        expect(page.errors).toEqual([])
       })
 
       it('keeps the island as it was when its fetch fails, and fetches it again at the next change', async () => {
