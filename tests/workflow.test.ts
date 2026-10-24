@@ -1,10 +1,10 @@
 import type { JobStore } from '../src/server'
 import { afterEach, describe, expect, it, setSystemTime, spyOn } from 'bun:test'
 import { parse } from 'devalue'
-import { workflow as makeWorkflow, memoryJobs } from '../src/server'
+import { workflow as makeWorkflow, memoryJobs, pgJobs } from '../src/server'
 import { forgetQueue } from '../src/server/queue'
 import { INBOX_LIMIT } from '../src/server/workflow'
-import { cleanUpAfterFile, kinds } from './job-stores'
+import { cleanUpAfterFile, freshPg, kinds, pgDescribe, replicas } from './job-stores'
 
 cleanUpAfterFile()
 
@@ -421,5 +421,93 @@ describe('a workflow needs a store with update', () => {
     const flow = workflow<undefined>(named(), () => undefined, { store })
 
     await expect(flow.status('x')).rejects.toThrow('update()')
+  })
+})
+
+pgDescribe('two workflows on separate Postgres connections', () => {
+  // Two processes of one app: the same flow on its own connection to one database.
+  async function pair(flow: Parameters<typeof makeWorkflow<undefined, { go: number }>>[1], options: Parameters<typeof makeWorkflow>[2] = {}) {
+    await freshPg()
+
+    const [first, second] = replicas(2).map(pgJobs)
+    const name = named()
+
+    return {
+      first: workflow<undefined, { go: number }>(name, flow, { ...options, store: first! }),
+      second: workflow<undefined, { go: number }>(name, flow, { ...options, store: second! }),
+    }
+  }
+
+  it('lets the other connection take a run after its sleep', async () => {
+    const calls: string[] = []
+    const { first, second } = await pair(async ({ step }) => {
+      await step.run('before', () => void calls.push('before'))
+      await step.sleep('1h')
+      await step.run('after', () => void calls.push('after'))
+    })
+    const id = await first.start()
+
+    expect(await first.drain()).toBe(1)
+    expect(await second.drain()).toBe(0)
+    expect(await second.status(id)).toMatchObject({ status: 'sleeping', steps: 2 })
+    later(2 * 60 * MINUTE)
+    expect(await second.drain()).toBe(1)
+    expect(calls).toEqual(['before', 'after'])
+    expect(await first.status(id)).toBeUndefined()
+  })
+
+  it('wakes a run waiting on one connection with a send from the other, once, against its timeout', async () => {
+    const got: unknown[] = []
+    const { first, second } = await pair(async ({ step }) => {
+      got.push(await step.waitFor('go', { timeout: '1h' }))
+    })
+    const id = await first.start()
+
+    await first.drain()
+    expect(await second.send(id, 'go', 1)).toBe(true)
+    await first.drain()
+    expect(got).toEqual([{ timedOut: false, data: 1 }])
+
+    const raced = await first.start(undefined, { id: 'raced' })
+
+    await first.drain()
+    later(61 * MINUTE)
+
+    const [sent] = await Promise.all([second.send(raced, 'go', 3), first.drain()])
+
+    await Promise.all([first.drain(), second.drain()])
+    expect(got).toHaveLength(2)
+    expect(got[1]).toEqual(sent ? { timedOut: false, data: 3 } : { timedOut: true })
+    expect(await first.status(raced)).toBeUndefined()
+  })
+
+  it('keeps a run held by one connection from the other until its hold lapses', async () => {
+    const calls: string[] = []
+    let hang = true
+    const { first, second } = await pair(async ({ step }) => {
+      await step.run('one', () => void calls.push('one'))
+      await step.run('two', async () => {
+        if (hang)
+          await new Promise<void>(noop)
+
+        calls.push('two')
+      })
+    }, { lostAfter: '1s' })
+    const id = await first.start()
+    const stuck = first.drain()
+
+    await Bun.sleep(100)
+    forgetQueue(first)
+    expect(await second.status(id)).toMatchObject({ status: 'running', steps: 1 })
+    expect(await second.drain()).toBe(0)
+    expect(await second.send(id, 'go', 1)).toBe(false)
+
+    // The first connection gives the run up at lostAfter, to retry once its backoff passes.
+    await Bun.sleep(1200)
+    hang = false
+    later(MINUTE)
+    expect(await second.drain()).toBe(1)
+    expect(calls).toEqual(['one', 'two'])
+    void stuck
   })
 })
