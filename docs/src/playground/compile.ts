@@ -1,5 +1,5 @@
 import { compileKay, formatDiagnostic } from '../../../src/compiler'
-import { StripError, stripTypes } from './strip'
+import { stripTypes } from './strip'
 
 export interface Problem {
   // 1-based, where the problem sits in the source, or 0 for one that has no line.
@@ -45,6 +45,6 @@ export function compile(source: string): Compiled {
   }
   catch (error) {
     // A syntax error Babel found in the generated code, or what the stripper refuses: no line of the file to point at.
-    return { problems: [{ line: 0, report: error instanceof Error && !(error instanceof StripError) ? `The generated code does not parse: ${error.message}` : String(error instanceof Error ? error.message : error) }] }
+    return { problems: [{ line: 0, report: error instanceof SyntaxError ? `The generated code does not parse: ${error.message}` : String(error instanceof Error ? error.message : error) }] }
   }
 }

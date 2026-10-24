@@ -3,6 +3,7 @@ import { beforeAll, describe, expect, it } from 'bun:test'
 import { highlight } from '../docs/src/highlight'
 import { runs } from '../docs/src/playground/check'
 import { isRunnable, playgroundHref, sourceOfHash } from '../docs/src/playground/runnable'
+import { renderServer } from '../docs/src/playground/runtime'
 import { stripTypes } from '../docs/src/playground/strip'
 import { compileKay } from '../src/compiler'
 import { scratchDir } from './scratch'
@@ -14,7 +15,20 @@ const KAY_BLOCK = /```kay\n([\s\S]*?)```/g
 const SCOPE = /data-k-[0-9a-z]{8}/g
 
 const examples = (await Promise.all([...new Bun.Glob('**/*.md').scanSync(pagesDir)].toSorted().map(async file => [...(await Bun.file(join(pagesDir, file)).text()).matchAll(KAY_BLOCK)].map((match, index) => [`${file} #${index + 1}`, match[1]!] as const)))).flat()
-const runnable = examples.filter(([, source]) => runs(source))
+
+// Examples that also render with no props: a fragment of a larger file, or one needing a prop, is offered by the playground but shows its error there.
+function renders(source: string): boolean {
+  try {
+    renderServer(stripTypes(compileKay(source, '/playground.kay', { root: '/', output: 'html' }).tsx))
+
+    return true
+  }
+  catch {
+    return false
+  }
+}
+
+const runnable = examples.filter(([, source]) => runs(source) && renders(source))
 
 let browserCompile: typeof import('../docs/src/playground/compile').compile
 
@@ -34,7 +48,7 @@ describe('the playground\'s compiler', () => {
     expect(isRunnable('---\nimport { signal } from \'kay\'\n---\np hi')).toBe(true)
     expect(isRunnable('---\nimport x from \'./x.kay\'\n---\nx')).toBe(false)
     expect(isRunnable('---\nimport { t } from \'kay/i18n\'\n---\np {t(\'a\')}')).toBe(false)
-    expect(runs('---\nconst a = props.nothing.deep\n---\np {a}\n')).toBe(false)
+    expect(renders('---\nconst a = props.nothing.deep\n---\np {a}\n')).toBe(false)
     expect(isRunnable('markdown\n  # hi')).toBe(false)
   })
 
@@ -76,5 +90,11 @@ describe('the docs\' examples', () => {
     expect(withLink).toContain('href="/getting-started/playground#code=')
     expect(withServer).not.toContain('playground')
     expect(typescript).not.toContain('playground')
+  })
+
+  it('never runs an example while highlighting it', async () => {
+    await highlight('---\nglobalThis.__playgroundRan = true\n---\np hi\n', 'kay')
+
+    expect((globalThis as { __playgroundRan?: boolean }).__playgroundRan).toBeUndefined()
   })
 })

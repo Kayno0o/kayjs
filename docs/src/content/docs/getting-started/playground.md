@@ -19,4 +19,4 @@ A component runs here when it imports only from `kay`. That leaves out:
 - Pages and anything with a `--- server` fence: data, actions, the request and the session.
 - A `--- module` fence, a `markdown` block, and imports from other files, packages or `kay/...` modules such as `kay/i18n` or `kay/image`.
 
-`await` blocks are not waited for in the HTML. Each `kay` example in these docs that the playground can run has an "Open in playground" link in its header.
+The compiler's check that a component does not read `window` or `document` while rendering is off here, so such a component compiles where `kay check` would refuse it. `await` blocks are not waited for in the HTML. Each `kay` example in these docs that the playground can run has an "Open in playground" link in its header.

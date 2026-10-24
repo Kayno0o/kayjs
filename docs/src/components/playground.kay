@@ -38,7 +38,12 @@ function build() {
   const result = compiler.compile(source())
 
   // The address holds the source, so a tab can be shared or reloaded.
-  history.replaceState(null, '', `#code=${encodeSource(source())}`)
+  try {
+    history.replaceState(null, '', `#code=${encodeSource(source())}`)
+  }
+  catch {
+    // A source too long for an address stays out of it.
+  }
 
   problems.set(result.problems)
 

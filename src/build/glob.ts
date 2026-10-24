@@ -3,7 +3,7 @@ import { existsSync } from 'node:fs'
 import { dirname, join, relative, resolve, sep } from 'node:path'
 import { parse } from '@babel/parser'
 import { KayError } from '../compiler/errors'
-import { loadTraverse } from '../compiler/rewrite'
+import { loadTraverse } from '../compiler/host'
 import { GLOBBED } from './globbed'
 import { ICON_IMPORT, iconNames, installedIconSets } from './icons'
 

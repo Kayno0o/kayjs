@@ -1282,5 +1282,3 @@ function withShorthand(reference: NodePath, name: string, rewrite: Rewrite): Rew
 
   return rewrite
 }
-
-export { loadTraverse }

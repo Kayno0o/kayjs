@@ -13,7 +13,7 @@ export function isRunnable(source: string): boolean {
 
 // The source as base64url, the form the link to the playground and its address carry it in.
 export function encodeSource(source: string): string {
-  return btoa(String.fromCodePoint(...new TextEncoder().encode(source))).replaceAll('+', '-').replaceAll('/', '_').replaceAll('=', '')
+  return btoa(Array.from(new TextEncoder().encode(source), byte => String.fromCodePoint(byte)).join('')).replaceAll('+', '-').replaceAll('/', '_').replaceAll('=', '')
 }
 
 // The link to the playground with the example in its fragment, which no server sees.

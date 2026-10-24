@@ -1,7 +1,7 @@
 import type { Server } from 'bun'
 import { join } from 'node:path'
 import process from 'node:process'
-import { loadTraverse } from '../compiler/rewrite'
+import { loadTraverse } from '../compiler/host'
 import { CONFIG_FILE, declaredAppFiles, loadConfig } from '../config'
 import { reloadableFolders } from '../content/edit'
 import { projectPaths } from '../project'

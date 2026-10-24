@@ -96,7 +96,7 @@ export async function highlight(code: string, language: string | undefined): Pro
     return known
 
   const { highlighter, languages } = await (ready ??= load())
-  // Run by the playground check only for a kay example, imported then so loading the config alone pays nothing for the runtime.
+  // Checked only for a kay example, imported then so loading the config alone pays nothing for the playground.
   const playable = language === 'kay' && (await import('./playground/check')).runs(code)
   const lang = language !== undefined && languages.has(language) ? language : 'text'
   // Inside the function: kay caches compiled pages by this function's source, so a change here recompiles them.

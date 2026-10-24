@@ -3,8 +3,8 @@ import type * as t from '@babel/types'
 import { basename, dirname } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { parse } from '@babel/parser'
+import { loadTraverse } from '../compiler/host'
 import { constBindings, exportedObject } from '../compiler/object-literal'
-import { loadTraverse } from '../compiler/rewrite'
 
 interface Range {
   start: number
