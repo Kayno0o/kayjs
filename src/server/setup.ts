@@ -16,6 +16,7 @@ import { setContentMode, setMarkdownDefaults } from '../content/load'
 import { projectCollections } from '../content/server'
 import { renderOptionsOf } from '../project'
 import { liveStoreReady } from '../runtime/live-value'
+import { runInLocale } from '../runtime/locale-state'
 import { setSite } from '../runtime/site'
 import { setAppRoot } from './app-identity'
 import { setupStore } from './app-store'
@@ -23,7 +24,7 @@ import { basePath } from './base'
 import { checkCardConfig, drawLogo, setupCards } from './card'
 import { chooseInlineStyles } from './client'
 import { appServesManifest } from './favicon'
-import { entryFilePaths, followEntryFiles, implicitI18n, linkedSettings, loadI18n, routedSettings, serveLocales } from './i18n'
+import { entryFilePaths, followEntryFiles, implicitI18n, linkedSettings, loadI18n, routedSettings, serveLocales, stateFor } from './i18n'
 import { applyImageConfig } from './image'
 import { loadMatchers } from './params'
 import { setupPreview } from './preview'
@@ -213,8 +214,15 @@ async function setupWith<Claimed>(project: Project, loadClient: () => Promise<Cl
 
   const renderOptions: RenderOptions = { ...renderOptionsOf(config, mode, { head, maxDensity, fontCss, islandPreloads: mode.dev ? undefined : islandOnlyChunks(client), editor: source.editor(root, config), contexts: extensionContexts(root, config.extensions) }), redirectSpelling }
 
-  if (cards.template && cardPage)
-    cards.template.render = async card => (await import('./render')).renderCardPage(cardPage, card, client, renderOptions)
+  if (cards.template && cardPage) {
+    cards.template.render = async ({ locale, ...card }) => {
+      const { renderCardPage } = await import('./render')
+      const state = stateFor(locales, locales.translations.has(locale ?? '') ? locale! : locales.settings.defaultLocale, '/', new Request('http://localhost/_kay/card'))
+
+      // The page's own locale, as its pages are rendered in, so the template's messages and `lang` follow it.
+      return runInLocale(state, async () => renderCardPage(cardPage, card, client, renderOptions))
+    }
+  }
 
   return { source, client, mounts, routes, matchers, collections, i18n, locales, base, site, imageCache, scripts, styles, renderOptions, cards, files, endpoints, appManifest: ownManifest, extensions, api, claimed }
 }

@@ -1,12 +1,15 @@
-import { readFileSync } from 'node:fs'
-import { resolve, sep } from 'node:path'
+import type { ImageRouteOptions } from './image'
+import { existsSync, readFileSync } from 'node:fs'
+import { dirname, join, resolve, sep } from 'node:path'
 import { ASSET_PREFIX } from '../build/assets'
 import { resolveFrom } from '../build/files'
 import { KayError } from '../compiler/errors'
-import { CARD } from '../runtime/image'
+import { CARD, IMAGE_ROUTE } from '../runtime/image'
 import { decodePath } from './routes'
 
-const KAY_IMPORT = /\bfrom\s+['"]([^'"]+\.kay)['"]/g
+const IMPORT = /\b(?:from|import)\s*(?:\(\s*)?['"]([^'"]+)['"]/g
+const SOURCE_FILE = /\.(?:kay|[cm]?[jt]sx?)$/
+const NODE_MODULES = `${sep}node_modules${sep}`
 const HTML = { 'content-type': 'text/html; charset=utf-8' }
 // What a card's page may load from the build: its stylesheets, fonts and images, never the prerendered pages or a script.
 const LOADABLE = /\.(?:css|woff2?|ttf|otf|png|jpe?g|webp|avif|gif|svg)$/i
@@ -30,10 +33,21 @@ export function setCardShotLimit(ms = DEFAULT_SHOT_MS): void {
   shotMs = ms
 }
 
-// What a card drawn from `_card.kay` depends on that no setting names: the text of the template and of every `.kay` file it imports, however deep, and the stylesheet the build made of them.
-export function templateStamp(file: string, styles: string | undefined): string {
+// The folder the app's own files live in: the nearest one holding kay.config.ts above the template, or the template's own.
+function projectRoot(file: string): string {
+  for (let dir = dirname(file); dir !== dirname(dir); dir = dirname(dir)) {
+    if (existsSync(join(dir, 'kay.config.ts')))
+      return dir
+  }
+
+  return dirname(file)
+}
+
+// What a card drawn from `_card.kay` depends on that no setting names: the text of the template and of every `.kay`, `.ts` or `.js` file of the app it imports, however deep, the stylesheet the build made of them and the font rules the page carries.
+export function templateStamp(file: string, styles: string | undefined, fonts?: string | undefined): string {
   const seen = new Set<string>()
   const texts: string[] = []
+  const root = projectRoot(file) + sep
   const read = (path: string) => {
     if (seen.has(path))
       return
@@ -51,25 +65,29 @@ export function templateStamp(file: string, styles: string | undefined): string 
 
     texts.push(path, source)
 
-    for (const [, specifier] of source.matchAll(KAY_IMPORT)) {
+    for (const [, specifier] of source.matchAll(IMPORT)) {
       const imported = resolveFrom(specifier!, path)
 
-      if (imported !== undefined)
+      // Another package's files are its version's, and the framework's own are kay's.
+      if (imported !== undefined && imported.startsWith(root) && !imported.includes(NODE_MODULES) && SOURCE_FILE.test(imported))
         read(imported)
     }
   }
 
   read(file)
 
-  return Bun.hash(JSON.stringify([texts, styles ?? ''])).toString(36)
+  return Bun.hash(JSON.stringify([texts, styles ?? '', fonts ?? ''])).toString(36)
 }
 
-// The page and the build's own stylesheets, fonts and images, for the browser a card is drawn in; a link to another host is the browser's to follow.
-export async function answer(request: Request, html: string, clientDir: string): Promise<Response> {
+// The page, the build's own stylesheets, fonts and images, and the image route for the images the build holds no file of, for the browser a card is drawn in; a link to another host is the browser's to follow.
+export async function answer(request: Request, html: string, clientDir: string, images?: ((request: Request) => Promise<Response>) | undefined): Promise<Response> {
   const path = new URL(request.url).pathname
 
   if (path === '/')
     return new Response(html.replace(HEAD, head => head + FRAME), { headers: HTML })
+
+  if (path === IMAGE_ROUTE && images !== undefined)
+    return images(request)
 
   const parts = path.startsWith(ASSET_PREFIX) ? path.slice(ASSET_PREFIX.length).split('/') : []
   const names = parts.flatMap(part => decodePath(part) ?? [])
@@ -92,7 +110,7 @@ let idle: Timer | undefined
 let browser: typeof import('../test/browser') | undefined
 
 // The JPEG of the page `render` gives, kay's render of `_card.kay` given the address it is served at, as Chrome draws it at the card's size, from a server of its own on a port nothing else knows that serves the page and the build's files. The browser is the one kay's tests and `kay screenshot` start, which closes once no page is left.
-export async function shootCard(clientDir: string, quality: number, render: (origin: string) => Promise<string>): Promise<Uint8Array> {
+export async function shootCard(clientDir: string, quality: number, render: (origin: string) => Promise<string>, images?: ImageRouteOptions | undefined): Promise<Uint8Array> {
   const previous = tail
   const { promise, resolve } = Promise.withResolvers<void>()
 
@@ -103,7 +121,7 @@ export async function shootCard(clientDir: string, quality: number, render: (ori
   try {
     await previous
 
-    return await draw(clientDir, quality, render)
+    return await draw(clientDir, quality, render, images)
   }
   finally {
     resolve()
@@ -115,15 +133,27 @@ export async function shootCard(clientDir: string, quality: number, render: (ori
   }
 }
 
-async function draw(clientDir: string, quality: number, render: (origin: string) => Promise<string>): Promise<Uint8Array> {
+// The image route over `options`, answering in this process: the images of `images.dirs` and `images.remote`, and the variants of an imported one, as the app's own route would.
+async function imageRoute(options: ImageRouteOptions): Promise<(request: Request) => Promise<Response>> {
+  const [{ Elysia }, { serveImages }] = await Promise.all([import('elysia'), import('./image')])
+  const app = new Elysia()
+
+  // No guard of `images.resolve` runs: a card shows what is public.
+  serveImages(app, { ...options, resolve: undefined })
+
+  return async request => app.handle(request)
+}
+
+async function draw(clientDir: string, quality: number, render: (origin: string) => Promise<string>, images: ImageRouteOptions | undefined): Promise<Uint8Array> {
   // Imported as it is asked for: only an app with a card template needs the browser module.
   const { browse, browserPath } = browser ??= await import('../test/browser')
 
   if (browserPath() === undefined)
     throw new KayError('share-card-invalid', 'kay: src/routes/_card.kay is drawn in Chrome or Chromium, and none was found; install one, or give its path as BUN_CHROME_PATH')
 
+  const route = images && await imageRoute(images)
   let html = ''
-  const server = Bun.serve({ hostname: '127.0.0.1', port: 0, fetch: async request => answer(request, html, clientDir) })
+  const server = Bun.serve({ hostname: '127.0.0.1', port: 0, fetch: async request => answer(request, html, clientDir, route) })
   let timer: Timer | undefined
   let opened: { close: () => void } | undefined
   let expired = false

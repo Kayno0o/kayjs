@@ -14,7 +14,7 @@ import { ASSET_PREFIX } from '../build/assets'
 import { countCache } from '../build/cache'
 import { SVG_FILE, writeAtomically } from '../build/files'
 import { KayError } from '../compiler/errors'
-import { CARD, CARD_ROUTE, IMPORTED, setCardMaker, variantFilesLinked, VARIANTS } from '../runtime/image'
+import { CARD, CARD_ROUTE, IMAGE_ROUTE, IMPORTED, setCardMaker, variantFilesLinked, VARIANTS, withoutVariantFiles } from '../runtime/image'
 import { localeState } from '../runtime/locale-state'
 import { localizedText } from '../runtime/localized'
 import { nodeCrypto } from './builtins'
@@ -56,9 +56,17 @@ export interface CardSetup {
   template?: { file: string, styles: string | undefined } | undefined
 }
 
+// What one card shows: the locale is the page's when it is not the default one, which the template renders in.
+export interface CardContent {
+  title: string
+  image?: string | undefined
+  name?: string | undefined
+  locale?: string | undefined
+}
+
 // What a card's `_card.kay` is drawn from, the render of its page, which the server sets once its render options exist.
 export interface CardTemplate {
-  render?: ((card: { title: string, image?: string | undefined, name?: string | undefined }) => Promise<string>) | undefined
+  render?: ((card: CardContent) => Promise<string>) | undefined
 }
 
 // What one setup draws and signs cards with. The face is read on the first card drawn and the key made on the first card linked, so an app drawing none reads and writes nothing for them.
@@ -102,11 +110,13 @@ const DEFAULT_WEIGHT = 700
 // Past this many characters a title is cut before it is signed: three lines of the smallest size hold far fewer.
 const MAX_TITLE = 200
 const REMOTE = /^https?:\/\//i
+// Where a build keeps the variants the images of a template card are served from, beside the key.
+const CARD_IMAGES_DIR = 'card-images'
 
 // The setup pages link cards with, and the cards prerendered pages asked for, by file name, for `kay build` to write.
 let current: Cards | undefined
 const svgDrawings = new Map<string, Promise<Uint8Array>>()
-const requested = new Map<string, { title: string, image?: string | undefined, name?: string | undefined }>()
+const requested = new Map<string, CardContent>()
 
 // What `images.card` refuses that needs no build: a colour that is none, a face the explicit `fonts` lack (a Fontsource family's faces are known once built).
 export function checkCardConfig(config: CardConfig | undefined, fonts: KayConfig['fonts']): void {
@@ -274,7 +284,7 @@ async function cardTemplateStamp(setup: CardSetup): Promise<string | undefined> 
   if (setup.bundled)
     throw new KayError('executable-incomplete', 'kay: this executable holds no record of src/routes/_card.kay; build it again with kay build --compile')
 
-  const stamp = templateStamp(setup.template.file, setup.template.styles)
+  const stamp = templateStamp(setup.template.file, setup.template.styles, setup.fonts?.css)
 
   if (setup.collect)
     await Bun.write(built, stamp)
@@ -430,12 +440,9 @@ function cardUrl(cards: Cards, title: unknown, image: string | undefined): strin
   if (text === '')
     throw new KayError('share-card-invalid', 'kay: shareCard() was given an empty title')
 
-  // The template's page loads the image from the build, which holds an imported one alone.
-  if (cards.template && image !== undefined && !image.startsWith(IMPORTED))
-    throw new KayError('share-card-invalid', `kay: shareCard() was given ${image}, which src/routes/_card.kay cannot show: its cards take an imported image`)
-
   const name = nameFor(cards)
-  const spec = cardSpec(text, image, name)
+  const locale = cards.template ? localeFor(cards) : undefined
+  const spec = cardSpec(text, image, name, locale)
   const linked = variantFilesLinked()
 
   // A static export downloads a remote image to draw its card; a server draws it on request, from the copy the image route keeps fresh.
@@ -444,13 +451,13 @@ function cardUrl(cards: Cards, title: unknown, image: string | undefined): strin
       throw new KayError('share-card-invalid', `kay: shareCard() was given ${image}, which a static export holds no file of: only the card of an imported image, or one images.remote lists, is written at build`)
   }
   else if (cards.collect) {
-    requested.set(cardFile(cards, spec), { title: text, image, name })
+    requested.set(cardFile(cards, spec), { title: text, image, name, locale })
   }
 
   if (linked)
     return `${VARIANTS}${cardFile(cards, spec)}`
 
-  return `${CARD_ROUTE}?${new URLSearchParams({ title: text, ...(image === undefined ? {} : { src: image }), ...(name === undefined ? {} : { name }), v: cards.look, sig: signature(signingKey(cards), spec) })}`
+  return `${CARD_ROUTE}?${new URLSearchParams({ title: text, ...(image === undefined ? {} : { src: image }), ...(name === undefined ? {} : { name }), ...(locale === undefined ? {} : { locale }), v: cards.look, sig: signature(signingKey(cards), spec) })}`
 }
 
 function cardTitle(title: string): string {
@@ -464,8 +471,18 @@ function nameFor(cards: Cards): string | undefined {
   return name === cards.name ? undefined : name
 }
 
-// A name of its own is part of what is signed, so it cannot be made up either.
-function cardSpec(title: string, image: string | undefined, name?: string): string {
+// The locale a template card of a page outside the default locale is drawn in, undefined for the default one, so those cards and their URLs are the same as before.
+function localeFor(cards: Cards): string | undefined {
+  const locale = localeState()?.locale
+
+  return locale === cards.defaultLocale ? undefined : locale
+}
+
+// A name or locale of its own is part of what is signed, so it cannot be made up either.
+function cardSpec(title: string, image: string | undefined, name?: string, locale?: string): string {
+  if (locale !== undefined)
+    return JSON.stringify([title, image ?? '', name ?? '', locale])
+
   return JSON.stringify(name === undefined ? [title, image ?? ''] : [title, image ?? '', name])
 }
 
@@ -491,7 +508,8 @@ export function serveCards(app: Elysia, cards: Cards, options: ImageRouteOptions
     const title = url.searchParams.get('title') ?? ''
     const src = url.searchParams.get('src') ?? undefined
     const siteName = url.searchParams.get('name') ?? undefined
-    const spec = cardSpec(title, src, siteName)
+    const locale = url.searchParams.get('locale') ?? undefined
+    const spec = cardSpec(title, src, siteName, locale)
     const key = cards.key ??= existingKey(cards)
 
     if (!key || (cards.font instanceof Error && !cards.template) || !signed(key, spec, url.searchParams.get('sig') ?? ''))
@@ -538,7 +556,7 @@ export function serveCards(app: Elysia, cards: Cards, options: ImageRouteOptions
       if (!writing) {
         writing = (async () => {
           try {
-            await drawing(async () => cards.template ? writeTemplateCard(cards, file, { title, image: src, name: siteName ?? cards.name }) : writeCard(cards, file, title, siteName, svg ? { input: await cardSvg(cards, src) } : source && { input: Bun.file(source.path), maxPixels: source.immutable ? undefined : MAX_UPLOAD_PIXELS }))
+            await drawing(async () => cards.template ? writeTemplateCard(cards, file, { title, image: src, name: siteName ?? cards.name, locale }, options) : writeCard(cards, file, title, siteName, svg ? { input: await cardSvg(cards, src) } : source && { input: Bun.file(source.path), maxPixels: source.immutable ? undefined : MAX_UPLOAD_PIXELS }))
           }
           finally {
             pending.delete(file)
@@ -592,7 +610,7 @@ export async function writeCards(clientDir: string, cacheDir?: string, remote?: 
     countCache('share cards', kept)
 
     if (!kept && current!.template) {
-      await writeTemplateCard(current!, cached ?? target, { title: card.title, image: card.image, name: card.name ?? current!.name })
+      await writeTemplateCard(current!, cached ?? target, { title: card.title, image: card.image, name: card.name ?? current!.name, locale: card.locale }, { clientDir, cacheDir: join(current!.dir, CARD_IMAGES_DIR), remote })
       drawn++
     }
     else if (!kept) {
@@ -623,14 +641,18 @@ export async function writeCards(clientDir: string, cacheDir?: string, remote?: 
 }
 
 // The card the app's `_card.kay` lays out: its page rendered, then drawn by Chrome.
-async function writeTemplateCard(cards: Cards, target: string, content: { title: string, image?: string | undefined, name?: string | undefined }): Promise<void> {
+async function writeTemplateCard(cards: Cards, target: string, content: CardContent, images: ImageRouteOptions): Promise<void> {
   if (!cards.template?.render)
     throw new KayError('share-card-invalid', 'kay: src/routes/_card.kay was not ready to draw a card')
 
   const { render } = cards.template
 
-  // The page names the image by the address the browser reaches the build's files at.
-  await writeAtomically(target, await shootCard(cards.clientDir, cards.quality, async origin => render({ ...content, image: content.image === undefined ? undefined : `${origin}${content.image}` })))
+  // The page names the image by the address the browser reaches it at: an imported one is a file of the build, any other the image route's card-sized variant. Its own images link the route too, as a static export has no variant files for them yet.
+  await writeAtomically(target, await shootCard(cards.clientDir, cards.quality, async origin => withoutVariantFiles(async () => render({ ...content, image: content.image === undefined ? undefined : `${origin}${imageAddress(content.image)}` })), images))
+}
+
+function imageAddress(image: string): string {
+  return image.startsWith(IMPORTED) ? image : `${IMAGE_ROUTE}?${new URLSearchParams({ src: image, card: '' })}`
 }
 
 async function writeCard(cards: Cards, target: string, title: string, name: string | undefined, image?: { input: Blob | Uint8Array, maxPixels?: number | undefined }): Promise<void> {

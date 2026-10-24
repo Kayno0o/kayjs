@@ -6,7 +6,8 @@ import tailwind from 'bun-plugin-tailwind'
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, mock, spyOn } from 'bun:test'
 import { Elysia } from 'elysia'
 import { clientDir } from '../src/build/assets'
-import { setCardMaker, shareCard } from '../src/runtime/image'
+import { setCardMaker, setRemoteImages, shareCard } from '../src/runtime/image'
+import { runInLocale } from '../src/runtime/locale-state'
 import { pages } from '../src/server'
 import { serveCards, setupCards } from '../src/server/card'
 import { answer, MAX_QUEUED, setCardShotLimit, shootCard, templateStamp } from '../src/server/card-template'
@@ -15,6 +16,7 @@ import * as browserModule from '../src/test/browser'
 import { browserPath } from '../src/test/browser'
 import { listeningPort } from './listening'
 import { fixtureCopy, scratchDir } from './scratch'
+import { fixtureCopy } from './scratch'
 
 const FIXTURE = resolve('tests/fixtures/card-template')
 const CLI = resolve('src/cli.ts')
@@ -54,6 +56,8 @@ async function expectTemplateCard(jpeg: Uint8Array, image: boolean): Promise<voi
   // The template's own Tailwind background, and the image it was given on the left.
   expect(near(pixel(1150, 30), [30, 64, 175])).toBe(true)
   expect(near(pixel(160, 160), [15, 159, 89])).toBe(image)
+  // The image the template imports and shows itself, through the image route.
+  expect(near(pixel(950, 70), [15, 159, 89])).toBe(true)
   expect(await hasTitle(jpeg)).toBe(true)
 }
 
@@ -78,6 +82,28 @@ describe('the share card template stamp', () => {
     }
   })
 
+  it('changes with a .ts helper the template reaches, however deep, and with the fonts, but not with a package or the framework', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'kay-card-stamp-'))
+
+    try {
+      await Bun.write(join(dir, 'kay.config.ts'), '')
+      await Bun.write(join(dir, 'src/lib/deep.ts'), 'export const deep = 1')
+      await Bun.write(join(dir, 'src/lib/helper.ts'), 'import { deep } from \'./deep\'\nexport const helper = deep')
+      await Bun.write(join(dir, 'src/routes/_card.kay'), '---\nimport { helper } from \'../lib/helper\'\nimport { Elysia } from \'elysia\'\nimport { shareCard } from \'kay/image\'\n---\np {helper}')
+
+      const file = join(dir, 'src/routes/_card.kay')
+      const stamp = templateStamp(file, undefined, 'a{}')
+
+      expect(templateStamp(file, undefined, 'a{}')).toBe(stamp)
+      expect(templateStamp(file, undefined, 'b{}')).not.toBe(stamp)
+      await Bun.write(join(dir, 'src/lib/deep.ts'), 'export const deep = 2')
+      expect(templateStamp(file, undefined, 'a{}')).not.toBe(stamp)
+    }
+    finally {
+      await rm(dir, { recursive: true, force: true })
+    }
+  })
+
   it('renames the cards of a changed template, and keeps the fixed layout\'s look without one', async () => {
     const dir = await mkdtemp(join(tmpdir(), 'kay-card-stamp-'))
     const looks: string[] = []
@@ -87,6 +113,11 @@ describe('the share card template stamp', () => {
         looks.push((await setupCards({ dir, clientDir: clientDir(FIXTURE), fonts: undefined, template })).look)
 
       expect(new Set(looks).size).toBe(3)
+
+      const font = (css: string) => ({ css, preload: [] })
+
+      looks.push((await setupCards({ dir, clientDir: clientDir(FIXTURE), fonts: font('a{}'), template: { file: CARD, styles: undefined } })).look, (await setupCards({ dir, clientDir: clientDir(FIXTURE), fonts: font('b{}'), template: { file: CARD, styles: undefined } })).look)
+      expect(new Set(looks).size).toBe(5)
       expect((await setupCards({ dir, clientDir: clientDir(FIXTURE), fonts: undefined })).look).toBe(looks[0]!)
     }
     finally {
@@ -94,7 +125,7 @@ describe('the share card template stamp', () => {
     }
   })
 
-  it('takes an imported image alone for a template, and draws with no font of the config', async () => {
+  it('takes any image kay can draw a card on for a template, and draws with no font of the config', async () => {
     const dir = await mkdtemp(join(tmpdir(), 'kay-card-stamp-'))
 
     try {
@@ -104,7 +135,40 @@ describe('the share card template stamp', () => {
       expect(shareCard({ title: 'Hello', image: '/_kay/assets/hero-1.png' })).toContain('src=')
 
       for (const image of ['/uploads/photo.png', 'https://cdn.example/photo.png'])
-        expect(() => shareCard({ title: 'Hello', image })).toThrow('its cards take an imported image')
+        expect(shareCard({ title: 'Hello', image })).toContain('src=')
+    }
+    finally {
+      setCardMaker(() => '')
+      await rm(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('signs the locale a template card of another locale is drawn in, and links the default locale\'s as before', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'kay-card-locale-'))
+    const settings = { locales: ['en', 'fr'], defaultLocale: 'en', prefixDefault: false }
+    const inLocale = (locale: string) => runInLocale({ settings, path: '/', locale, messages: new Map() }, () => shareCard({ title: 'Hello' }))
+
+    try {
+      const cards = await setupCards({ dir, clientDir: clientDir(FIXTURE), fonts: undefined, defaultLocale: 'en', template: { file: CARD, styles: undefined } })
+      const server = new Elysia()
+
+      serveCards(server, cards, { clientDir: clientDir(FIXTURE), cacheDir: join(dir, 'cache') })
+
+      const english = new URL(inLocale('en'), 'http://localhost')
+      const french = new URL(inLocale('fr'), 'http://localhost')
+
+      expect(english.searchParams.has('locale')).toBe(false)
+      expect(shareCard({ title: 'Hello' })).toBe(inLocale('en'))
+      expect(french.searchParams.get('locale')).toBe('fr')
+      expect(french.searchParams.get('sig')).not.toBe(english.searchParams.get('sig'))
+
+      // The locale cannot be made up or dropped from a signed URL.
+      const tampered = new URL(french)
+
+      tampered.searchParams.set('locale', 'en')
+      expect((await server.handle(new Request(tampered))).status).toBe(404)
+      tampered.searchParams.delete('locale')
+      expect((await server.handle(new Request(tampered))).status).toBe(404)
     }
     finally {
       setCardMaker(() => '')
@@ -214,6 +278,63 @@ describe.skipIf(!chrome)('a share card laid out in _card.kay', () => {
 
     // A title nobody signed is not drawn.
     expect((await app.handle(new Request(`http://localhost${home.replace('Hello+template', 'Another')}`))).status).toBe(404)
+  }, 60_000)
+
+  it('shows an image of images.dirs and of images.remote, which the route draws the card variant of', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'kay-card-images-'))
+    const uploads = join(dir, 'uploads')
+
+    try {
+      await Bun.write(join(uploads, 'photo.png'), Bun.file(join(FIXTURE, 'src/hero.png')))
+
+      const cards = await setupCards({ dir, clientDir: clientDir(FIXTURE), fonts: undefined, template: { file: CARD, styles: undefined } })
+      const server = new Elysia()
+      const remote = async () => ({ path: join(uploads, 'photo.png'), key: 'photo' })
+
+      setRemoteImages(() => true)
+
+      serveCards(server, cards, { clientDir: clientDir(FIXTURE), cacheDir: join(dir, 'cache'), dirs: { '/uploads/': uploads }, remote })
+      cards.template!.render = async card => `<body style="margin:0;background:#1e40af"><img src="${card.image}" style="display:block;width:400px;height:630px;object-fit:cover"></body>`
+
+      for (const image of ['/uploads/photo.png', 'https://cdn.example/photo.png']) {
+        const served = await server.handle(new Request(`http://localhost${shareCard({ title: 'Hello', image })}`))
+
+        expect([image, served.status]).toEqual([image, 200])
+        // Green, as the route's variant has no colour profile for Chrome to shift it by.
+        expect([image, near((await pixelsOf(await served.bytes()))(160, 160), [0, 255, 0])]).toEqual([image, true])
+      }
+    }
+    finally {
+      setRemoteImages(undefined)
+      setCardMaker(() => '')
+      await rm(dir, { recursive: true, force: true })
+    }
+  }, 60_000)
+
+  it('renders the template in the locale of the page the card is for', async () => {
+    const copy = await fixtureCopy('card-template')
+    const template = join(copy, 'src/routes/_card.kay')
+
+    await Bun.write(template, `--- server
+import '../app.css'
+import { t } from 'kay/i18n'
+
+const { title } = ctx.card
+const background = t('nav.home') === 'Accueil' ? 'bg-[#dc2626]' : 'bg-[#1e40af]'
+---
+div(class={'relative h-[630px] w-[1200px] ' + background})
+  h1(class="m-0 text-6xl font-black text-white") {title}
+`)
+    const app = await pages({ site: 'https://cards.example', seo: { name: 'Cards' }, plugins: [tailwind], root: copy, prebuilt: false, i18n: { locales: ['en', 'fr'], defaultLocale: 'en', messages: resolve('tests/fixtures/i18n/src/messages') } })
+
+    for (const [page, background] of [['/', [30, 64, 175]], ['/fr', [220, 38, 38]]] as const) {
+      const html = await (await app.handle(new Request(`http://localhost${page}`))).text()
+      const link = (/<meta property="og:image" content="([^"]+)">/).exec(html)![1]!.replaceAll('&amp;', '&').slice('https://cards.example'.length)
+      const served = await app.handle(new Request(`http://localhost${link}`))
+
+      expect([page, served.status]).toEqual([page, 200])
+      expect([page, near((await pixelsOf(await served.bytes()))(1150, 30), [...background])]).toEqual([page, true])
+    }
   }, 60_000)
 
   it('is written at build for the prerendered pages, and drawn again by nothing while its files are cached', async () => {
