@@ -1,7 +1,7 @@
 import type { LiveRequest } from '../src/runtime/live-value'
 import { join } from 'node:path'
 import process from 'node:process'
-import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
+import { afterAll, beforeAll, describe, expect, it, spyOn } from 'bun:test'
 import { invalidate } from '../src/runtime/cache'
 import { CACHE_LIVE_ID } from '../src/runtime/cache-live-id'
 import { ISLAND_HEADER } from '../src/runtime/server-islands'
@@ -16,6 +16,8 @@ const SLOT = '<slot data-kay-server='
 describe('a deferred server island following a cached value', () => {
   let build: Awaited<ReturnType<typeof scratchBuild>>
   let app: Awaited<ReturnType<typeof build.serve>>
+  // What the build warned of.
+  const warned: string[] = []
 
   const visit = async (path: string, headers: Record<string, string> = {}) => app.handle(new Request(`http://localhost${path}`, { headers }))
   const island = async (path = '/') => (await visit(`${path}?kay_island=0`, { [ISLAND_HEADER]: '1' })).text()
@@ -24,7 +26,17 @@ describe('a deferred server island following a cached value', () => {
   beforeAll(async () => {
     await pages({ root: ROOT, prebuilt: false })
     build = await scratchBuild({}, false, join(process.cwd(), ROOT))
-    await build.prerender({})
+    const warn = spyOn(console, 'warn').mockImplementation((message: string) => {
+      warned.push(message)
+    })
+
+    try {
+      await build.prerender({})
+    }
+    finally {
+      warn.mockRestore()
+    }
+
     app = await build.serve({ security: false })
     db.stock = 5
   }, 120_000)
@@ -33,6 +45,10 @@ describe('a deferred server island following a cached value', () => {
     db.stock = 5
     invalidate(() => true)
     await build?.remove()
+  })
+
+  it('warns once, naming the page and the key, when the build drops the live scripts of a page holding the island', () => {
+    expect(warned.filter(message => message.includes('reads'))).toEqual([expect.stringContaining('/ reads \'stock\' with `live: true`')])
   })
 
   it('carries the proof of what the island read inside the island, and the prerendered page carries none', async () => {

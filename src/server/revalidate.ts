@@ -75,7 +75,7 @@ async function rerender(page: ServedPage, render: () => Promise<Response>, reval
     }
 
     // As when it was built, a page holding server islands follows no cached value: its islands do, through their own fetch.
-    const html = page.islands !== undefined && page.islands.length > 0 ? withoutCacheScripts(rendered) ?? rendered : rendered
+    const html = page.islands !== undefined && page.islands.length > 0 ? withoutCacheScripts(rendered)?.html ?? rendered : rendered
     const encoded = await compressText(html)
 
     // All at once, so no request reads the new html with the old tag.

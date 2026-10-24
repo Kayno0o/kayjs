@@ -161,14 +161,21 @@ readViewerWith(() => {
 
 const LIVE_SCRIPT = /<script type="application\/json" data-kay-live[^>]*>([^<]*)<\/script>/g
 
-// The page without the scripts that follow cached values, for a page built once whose server islands follow them alone; undefined when a script holds a live value too, which its islands hydrate from.
-export function withoutCacheScripts(html: string): string | undefined {
+// The page without the scripts that follow cached values, for a page built once whose server islands follow them alone, and the keys they followed; undefined when a script holds a live value too, which its islands hydrate from.
+export function withoutCacheScripts(html: string): { html: string, keys: string[] } | undefined {
+  const keys = new Set<string>()
+
   for (const [, text] of html.matchAll(LIVE_SCRIPT)) {
-    if ((decodeServerValue(text!) as LivePage).values.some(([id]) => id !== CACHE_LIVE_ID))
+    const { values } = decodeServerValue(text!) as LivePage
+
+    if (values.some(([id]) => id !== CACHE_LIVE_ID))
       return undefined
+
+    for (const [, key] of values)
+      keys.add(key)
   }
 
-  return html.replace(LIVE_SCRIPT, '')
+  return { html: html.replace(LIVE_SCRIPT, ''), keys: [...keys] }
 }
 
 // Runs the render of a deferred server island a browser fetched, and gives the script it follows: the cached values it read with `live: true` are the island's to follow, not the page's, which the prerendered file read none of.

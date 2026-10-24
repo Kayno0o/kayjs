@@ -15,6 +15,7 @@ import { isAction } from '../runtime/action'
 import { durationSeconds } from '../runtime/duration'
 import { IMAGE_ROUTE } from '../runtime/image'
 import { runInLocale } from '../runtime/locale-state'
+import { kayLog } from '../runtime/log'
 import { standInReads } from '../runtime/site'
 import { withPageToken } from '../runtime/uid.server'
 import { projectApi } from './api-modules'
@@ -231,8 +232,10 @@ export async function prerenderPages(project: Project, client: ClientBuild, opti
         if (livesOn && unfollowed === undefined)
           throw new KayError('export-server-render', 'kay: it reads a live value, which only a server holds and signs the connection to per request; drop `prerender` from `export const page`, or read the value in a component the page does not render at build time')
 
-        if (unfollowed !== undefined)
-          html = unfollowed
+        if (unfollowed !== undefined) {
+          html = unfollowed.html
+          kayLog('warn', `${copy.path} reads ${unfollowed.keys.map(key => `'${key}'`).join(', ')} with \`live: true\` in its own render, which the build runs once: what the page shows of it itself goes stale and only its server islands follow, so drop \`prerender\` from \`export const page\` if the page shows it`)
+        }
 
         if (options.exportAll && readsSite)
           throw new KayError('export-site-url', 'kay: it reads the site, through siteUrl() or siteOrigin(), which neither `site` in kay.config.ts nor SITE_URL sets')
