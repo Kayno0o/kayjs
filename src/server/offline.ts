@@ -9,7 +9,7 @@ import { ASSET_PREFIX, ASSETS_DIR } from '../build/assets'
 import { NOTICES_FILE } from '../build/licenses'
 import { escape, escapeAttribute } from '../runtime/escape'
 import { textDirection } from '../runtime/i18n'
-import { MOST_WAIT_MS, RETRY_LATER } from '../runtime/local-status'
+import { MOST_FAULTS, MOST_WAIT_MS, RETRY_LATER } from '../runtime/local-status'
 import { runInLocale } from '../runtime/locale-state'
 import { kayLog } from '../runtime/log'
 import { PRERENDERED_DIR } from './client'
@@ -308,8 +308,19 @@ async function sendQueued() {
 
       const response = await fetch(entry.url, { method: 'POST', credentials: 'same-origin', redirect: 'manual', signal: AbortSignal.timeout(${MOST_WAIT_MS}), headers: { ...entry.headers, 'x-kay-write': entry.id }, body: entry.body })
 
-      if (response.type === 'opaqueredirect' || response.headers.has('x-kay-redirect') || response.status >= 500 || ${JSON.stringify([401, ...RETRY_LATER])}.includes(response.status))
+      if (response.type === 'opaqueredirect' || response.headers.has('x-kay-redirect') || ${JSON.stringify([401, ...RETRY_LATER])}.includes(response.status))
         throw new Error('a queued write was not answered')
+
+      // A 5xx is counted on the write, as the page counts it: the fifth is its answer, so a write that always throws is rejected with no page open.
+      if (response.status >= 500 && (entry.faults || 0) + 1 < ${MOST_FAULTS}) {
+        entry.faults = (entry.faults || 0) + 1
+
+        const faulted = db.transaction('outbox', 'readwrite')
+
+        faulted.objectStore('outbox').put(entry)
+        await new Promise(resolve => faulted.oncomplete = resolve)
+        throw new Error('a queued write was not answered')
+      }
 
       entry.answer = { status: response.status, failure: response.headers.get('x-kay-failure'), body: await response.text() }
 

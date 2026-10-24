@@ -1,7 +1,7 @@
 import type { Action } from './action'
 import { encodeCall } from './action'
 import { withBase } from './base'
-import { MOST_WAIT_MS, RETRY_LATER } from './local-status'
+import { MOST_FAULTS, MOST_WAIT_MS, RETRY_LATER } from './local-status'
 import { createSignal, getOwner, onCleanup } from './reactive'
 import { FAILURE_HEADER, PAGE_HEADER, REDIRECT_HEADER } from './swap'
 import { decodeServerValue } from './wire'
@@ -39,8 +39,8 @@ export interface LocalConflict<Row> {
 export interface LocalOptions<Row extends object, Key extends keyof Row & string> {
   // The field naming a row: a string or a number.
   key: Key
-  // The server's rows, read while online: after loading, after the queue was sent and on `sync()`.
-  read: () => Promise<readonly Row[]> | readonly Row[]
+  // The server's rows, read while online: after loading, after the queue was sent and on `sync()`. The signal aborts when the read takes over 30 seconds, so pass it to the call (`call(api, '/', { signal })`).
+  read: (signal: AbortSignal) => Promise<readonly Row[]> | readonly Row[]
   // The action a write of a row replays through, so its guards, schema and limits apply as to any call.
   put: Action<Row, unknown>
   remove?: Action<Pick<Row, Key>, unknown> | undefined
@@ -108,8 +108,6 @@ const MOST_CONFLICTS = 3
 const RETRY_MS = [5000, 15_000, 60_000, 300_000]
 // A write answered with one of these may succeed later, so it stays queued.
 const TRANSIENT = new Set<number>(RETRY_LATER)
-// A write the server answers 5xx this many times is rejected, so one that always throws does not hold the queue forever.
-const MOST_FAULTS = 5
 // The issues kept per collection: the oldest go first, so a page nobody dismisses on does not fill the browser.
 const MOST_ISSUES = 50
 
@@ -718,11 +716,17 @@ class Collection<Row extends object, Key extends keyof Row & string> {
   private async refresh(): Promise<void> {
     const seen = this.changes
     let server: readonly Row[]
+    const controller = new AbortController()
     let waiting: ReturnType<typeof setTimeout> | undefined
 
     try {
-      server = await Promise.race([this.options.read(), new Promise<never>((_, reject) => {
-        waiting = setTimeout(reject, MOST_WAIT_MS, new Error('kay: the local() read took too long'))
+      server = await Promise.race([this.options.read(controller.signal), new Promise<never>((_, reject) => {
+        waiting = setTimeout(() => {
+          const error = new Error('kay: the local() read took too long')
+
+          controller.abort(error)
+          reject(error)
+        }, MOST_WAIT_MS)
       })])
     }
     catch {

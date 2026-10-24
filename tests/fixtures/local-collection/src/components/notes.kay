@@ -3,10 +3,13 @@ import { call, local } from 'kay'
 import { drop, save } from '../routes/index.kay'
 import notesApi from '../api/notes'
 
-const { theirs = false, both = false, version = 1 } = props<{ theirs?: boolean, both?: boolean, version?: number }>()
+const { theirs = false, both = false, hang = false, version = 1 } = props<{ theirs?: boolean, both?: boolean, hang?: boolean, version?: number }>()
 const notes = local({
   key: 'id',
-  read: async () => call(notesApi, '/'),
+  read: async signal => hang ? new Promise<never>((_, reject) => signal.addEventListener('abort', () => {
+    document.body.dataset.aborted = 'yes'
+    reject(signal.reason)
+  })) : call(notesApi, '/', { signal }),
   put: save,
   remove: drop,
   version,

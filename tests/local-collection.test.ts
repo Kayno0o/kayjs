@@ -50,6 +50,51 @@ async function stored(page: TestPage): Promise<{ rows: { k: string, row: { title
   })
 }
 
+// Runs the worker's own sync code in the page, as the browser would run it in the worker: true when it settled, false when it threw for the browser to try again.
+async function workerSends(page: TestPage, script: string): Promise<boolean> {
+  return page.evaluate(async (code) => {
+    const noop = (): void => undefined
+    // The page's CSP refuses an inline script, so the worker's code is compiled with the constructor.
+    // eslint-disable-next-line no-new-func
+    const make = new Function('self', `${code.slice(code.indexOf('self.addEventListener(\'sync\''))}\nreturn sendQueued`) as (scope: object) => () => Promise<void>
+
+    try {
+      await make({ addEventListener: noop })()
+
+      return true
+    }
+    catch {
+      return false
+    }
+  }, script)
+}
+
+async function faults(page: TestPage): Promise<number | undefined> {
+  return ((await stored(page)).outbox[0] as { faults?: number }).faults
+}
+
+// Waits for the page to have counted a 5xx on the write: it settles after the click.
+async function expectFaults(page: TestPage, count: number): Promise<void> {
+  for (let tries = 0; tries < 100 && await faults(page) !== count; tries++)
+    await Bun.sleep(50)
+
+  expect(await faults(page)).toBe(count)
+}
+
+// Queues one write with the page signed out, so the page leaves it be, then lets the server answer 500.
+async function queuedFaulty(page: TestPage, title: string): Promise<void> {
+  await page.evaluate(() => {
+    document.cookie = 'refuse=401; path=/'
+  })
+  await page.offline()
+  await write(page, 'button.add', title)
+  await page.online()
+  await page.waitUntil(() => document.querySelector('.status')?.textContent === 'signed-out')
+  await page.evaluate(() => {
+    document.cookie = 'refuse=500; path=/'
+  })
+}
+
 beforeEach(async () => {
   await site?.fetch('/api/notes/reset', { method: 'POST' })
   await worker?.fetch('/api/notes/reset', { method: 'POST' })
@@ -237,6 +282,53 @@ describe.skipIf(path === undefined)('a local() collection in the browser', () =>
 
     expect(await page.text('li.issue')).toBe('rejected a 500')
     expect(await page.text('p.pending')).toBe('0')
+  }, 60_000)
+
+  it('has the worker reject a write after five 5xx answers with no page sending it', async () => {
+    const script = await (await worker!.fetch('/sw.js')).text()
+    const page = await opened()
+
+    await queuedFaulty(page, 'worker fault')
+
+    for (let attempt = 1; attempt < 5; attempt++) {
+      expect(await workerSends(page, script)).toBe(false)
+      expect(await faults(page)).toBe(attempt)
+    }
+
+    expect(await workerSends(page, script)).toBe(true)
+    await page.waitUntil(() => document.querySelector('li.issue') !== null)
+
+    expect(await page.text('li.issue')).toBe('rejected a 500')
+    expect(await page.text('p.pending')).toBe('0')
+  }, 60_000)
+
+  it('counts the 5xx answers of the page and of the worker on the same write', async () => {
+    const script = await (await worker!.fetch('/sw.js')).text()
+    const page = await opened()
+
+    await queuedFaulty(page, 'shared fault')
+
+    for (let attempt = 1; attempt <= 2; attempt++) {
+      await page.click('button.sync')
+      await expectFaults(page, attempt)
+    }
+
+    expect(await workerSends(page, script)).toBe(false)
+    expect(await workerSends(page, script)).toBe(false)
+    expect(await faults(page)).toBe(4)
+
+    await page.click('button.sync')
+    await page.waitUntil(() => document.querySelector('li.issue') !== null)
+
+    expect(await page.text('li.issue')).toBe('rejected a 500')
+    expect(await page.text('p.pending')).toBe('0')
+  }, 60_000)
+
+  it('aborts a read that takes over thirty seconds', async () => {
+    const page = await site!.open('/hang')
+
+    await page.waitUntil(() => document.body.dataset.aborted === 'yes', { timeout: '40s' })
+    await page.waitUntil(() => document.querySelector('.status')?.textContent === 'offline')
   }, 60_000)
 
   it('forgets a collection\'s rows and queue on clear()', async () => {

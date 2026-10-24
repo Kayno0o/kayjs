@@ -14,7 +14,7 @@ import { call, local } from 'kay'
 import { remove, save } from '../routes/todos.kay'
 import todosApi from '../api/todos'
 
-const todos = local({ key: 'id', read: async () => call(todosApi, '/'), put: save, remove })
+const todos = local({ key: 'id', read: async signal => call(todosApi, '/', { signal }), put: save, remove })
 ---
 p {todos.status()}
 ul
@@ -30,6 +30,8 @@ button(onClick={() => todos.put({ id: crypto.randomUUID(), title: 'New', rev: 0 
 Each write is queued and sent in order through the action you named. The action's guards, its schema and its rate limits all apply, as for any call. kay adds an id to every write, and the server runs an action only once per id, so a write whose answer was lost is never applied twice.
 
 The queue is sent when the page loads, when the connection returns and when the tab becomes visible. If your site has `offline` or `push()` on, Chromium also sends it when every tab is closed.
+
+A write the server answers with a 5xx five times is rejected, so one that always fails does not hold the queue. The count is kept on the write, so the page and the worker add to the same one. A read or a request that takes over 30 seconds counts as offline, and the `signal` given to `read` aborts then.
 
 If the server refuses a write, for example because the schema rejects it or a guard says no, the row goes back to what the server last gave. `todos.issues()` lists the refusal, with the errors per field.
 
