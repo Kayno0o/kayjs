@@ -61,6 +61,19 @@ export async function pushServer(): Promise<AnyElysia> {
       if (subscription === undefined)
         return none(400)
 
+      // A page replacing the endpoint it last posted is heard only from the person who holds that one (or already holds the new one): a browser's subscription is never taken over by whoever signed in next.
+      const replaces = (body as { replaces?: unknown }).replaces
+
+      if (replaces !== undefined) {
+        const held = (await pushStore().list(user)).map(({ endpoint }) => endpoint)
+
+        if (typeof replaces !== 'string' || !held.some(endpoint => endpoint === replaces || endpoint === subscription.endpoint))
+          return none(403)
+
+        if (replaces !== subscription.endpoint)
+          await pushStore().remove(replaces, user)
+      }
+
       await pushStore().add(user, subscription, MOST_DEVICES)
 
       return new Response(null, { status: 204, headers: { 'cache-control': 'no-store', 'set-cookie': pushDeviceCookie(subscription.endpoint, overHttps(request)) } })

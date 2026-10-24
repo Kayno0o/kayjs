@@ -432,6 +432,22 @@ describe('the routes a browser calls', () => {
     expect(await pushSubscriptions.list('ada')).toEqual([])
   })
 
+  it('hears a page replacing an endpoint only from the person holding it', async () => {
+    const old = await device('old')
+    const fresh = await device('fresh')
+    const entry = (each: Device, replaces?: string) => ({ endpoint: each.endpoint, keys: { p256dh: each.keys.publicKey, auth: each.auth }, replaces })
+
+    await post('subscribe', entry(old))
+    signedIn = 'grace'
+    expect((await post('subscribe', entry(fresh, old.endpoint))).status).toBe(403)
+    expect(await pushSubscriptions.list('grace')).toEqual([])
+    signedIn = 'ada'
+    expect((await post('subscribe', entry(fresh, 7 as unknown as string))).status).toBe(403)
+    expect((await post('subscribe', entry(fresh, old.endpoint))).status).toBe(204)
+    expect((await pushSubscriptions.list('ada')).map(each => each.endpoint)).toEqual([fresh.endpoint])
+    expect((await post('subscribe', entry(fresh, old.endpoint))).status).toBe(204)
+  })
+
   it('unsubscribes only the user\'s own device', async () => {
     const phone = await device('phone')
     const body = { endpoint: phone.endpoint, keys: { p256dh: phone.keys.publicKey, auth: phone.auth } }

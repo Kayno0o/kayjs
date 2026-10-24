@@ -63,31 +63,53 @@ async function worker(): Promise<ServiceWorkerRegistration | undefined> {
 }
 
 const POSTED_KEY = 'kay-push-posted'
+const REFUSED_KEY = 'kay-push-refused'
 
-// The endpoint the server last accepted from this browser, so a load can tell a subscription the browser rotated while no page or worker could tell the server.
-function posted(endpoint?: string | null): string | null {
+// Reads, writes (a string) or removes (null) a key of a storage that may be blocked.
+function kept(storage: () => Storage, key: string, value?: string | null): string | null {
   try {
-    if (endpoint === undefined)
-      return localStorage.getItem(POSTED_KEY)
+    if (value === undefined)
+      return storage().getItem(key)
 
-    if (endpoint === null)
-      localStorage.removeItem(POSTED_KEY)
+    if (value === null)
+      storage().removeItem(key)
     else
-      localStorage.setItem(POSTED_KEY, endpoint)
+      storage().setItem(key, value)
   }
   catch {}
 
   return null
 }
 
-// Tells the server about the subscription the browser holds when it is not the one last posted; a refusal (signed out) is tried again on the next load.
-async function reconcile(subscription: PushSubscription): Promise<void> {
-  if (posted() === subscription.endpoint)
+// The endpoint the server last accepted from this browser, so a load can tell a subscription the browser rotated while no page or worker could tell the server.
+const posted = (endpoint?: string | null): string | null => kept(() => localStorage, POSTED_KEY, endpoint)
+
+// The endpoint a signed-out visitor was refused with, for the rest of this tab's session, so a load does not post it again.
+const refused = (endpoint?: string | null): string | null => kept(() => sessionStorage, REFUSED_KEY, endpoint)
+
+// Bumped by `subscribe()` and `unsubscribe()`, so a reconcile that began before one never records an endpoint after it.
+let turn = 0
+let settling: Promise<void> | undefined
+
+// Tells the server about the subscription the browser rotated since the last one it accepted, naming that one so the server posts it only for the person who owns it: a held subscription never becomes another signed-in person's, nor one nobody posted. A 401 is not repeated this session, a 403 (not this person's) forgets the record, any other failure is tried again on the next load.
+async function reconcile(subscription: PushSubscription, since: number): Promise<void> {
+  const recorded = posted()
+
+  if (recorded === null || recorded === subscription.endpoint || refused() === subscription.endpoint)
     return
 
   try {
-    if ((await post('subscribe', subscription.toJSON())).ok)
+    const sent = await post('subscribe', { ...subscription.toJSON(), replaces: recorded })
+
+    if (since !== turn)
+      return
+
+    if (sent.ok)
       posted(subscription.endpoint)
+    else if (sent.status === 401)
+      refused(subscription.endpoint)
+    else if (sent.status === 403)
+      posted(null)
   }
   catch {}
 }
@@ -101,6 +123,8 @@ async function probe(write: (value: PushState) => void): Promise<void> {
   if (Notification.permission === 'denied')
     return write('denied')
 
+  const since = turn
+
   try {
     const registration = await worker()
 
@@ -110,7 +134,7 @@ async function probe(write: (value: PushState) => void): Promise<void> {
       write(held === null ? 'off' : 'subscribed')
 
       if (held !== null)
-        await reconcile(held)
+        await (settling = reconcile(held, since))
     }
   }
   catch {}
@@ -140,6 +164,7 @@ export const webPush = {
       return 'unsupported'
 
     pushSignal()
+    turn++
 
     if (Notification.permission === 'denied')
       return 'denied'
@@ -197,6 +222,7 @@ export const webPush = {
       }
 
       posted(subscription.endpoint)
+      refused(null)
       setState?.('subscribed')
 
       return 'subscribed'
@@ -209,7 +235,11 @@ export const webPush = {
     if (onServer() || !capable())
       return false
 
+    turn++
+
     try {
+      await settling
+
       const subscription = await (await worker())?.pushManager.getSubscription()
 
       if (!subscription)
