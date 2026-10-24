@@ -51,7 +51,7 @@ import { runGuards } from './guards'
 import { historyScript } from './history'
 import { hydrationScript } from './hydration'
 import { DEFAULT_LANG, invalidKeys, messagesScript } from './i18n'
-import { followsCaches, inLiveReads, liveScript, retryForViewer } from './live'
+import { followsCaches, inLiveReads, liveScript, noteStreams, retryForViewer } from './live'
 import { newTabRule } from './new-tab'
 import { INSTALL_OFFER, registerScript } from './offline'
 import { errorPage } from './overlay'
@@ -1034,6 +1034,9 @@ function documentOf(files: string[], modules: PageModule[], data: Record<string,
   const styled = file === undefined || editor === undefined ? files : [...files, file]
   const { result: { result: { html: markup, islands, deferred }, head }, forms } = withFieldMarks(marks, () => collectForms(() => collectHead(() => scan ? withServerIslands(scan, () => renderStatic(shown, undefined, chunks)) : renderStatic(shown, undefined, chunks), pageHead(modules, options.head?.(rendering.ctx.url, rendering.status)))))
   const streamed = deferred.length > 0
+
+  if (streamed)
+    noteStreams()
 
   if (marks)
     noteProbedEntries(rendering.ctx.request, marks.entries.values())

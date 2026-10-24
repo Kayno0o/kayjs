@@ -1,4 +1,5 @@
 import type { TestSite } from '../src/test'
+import { resolve } from 'node:path'
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
 import { Elysia } from 'elysia'
 import { nameUser } from '../src/server/request-user'
@@ -32,6 +33,18 @@ describe('who is signed in, asked for the pages that read a value of each user o
 
   afterAll(async () => {
     await site.close()
+  })
+
+  it('gives a streamed page its user\'s value on the first request, as the response is not sent until it is settled', async () => {
+    const live = await import(resolve('tests/fixtures/live-user/src/live.ts')) as typeof import('./fixtures/live-user/src/live')
+
+    live.unread.set('alice', 3)
+
+    const html = await visit('/streamed')
+
+    expect(html).toContain('<!--[-->3<!--]--> unread')
+    live.unread.delete('alice')
+    asked = 0
   })
 
   it('never asks for a page reading none', async () => {

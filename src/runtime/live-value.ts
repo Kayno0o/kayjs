@@ -325,6 +325,11 @@ function notify(slot: ServerSlot, key: string): void {
 
 const slotOfHandle = new WeakMap<object, ServerSlot>()
 
+// Whether any value of each user is declared, which a streamed page's render cannot wait to find out.
+export function ownLiveDeclared(): boolean {
+  return slots().values().some(slot => slot.own)
+}
+
 // The signed-in user of the render in progress, which the server resolves for a render that reads a value of each user; installed by the server.
 export function readViewerWith(viewer: () => string | undefined): void {
   state().viewer = viewer

@@ -5,7 +5,7 @@ import type { ServerScope } from '../runtime/reactive'
 import { AsyncLocalStorage } from 'node:async_hooks'
 import { broadcast, onClockHeard, onKeysInvalidated, onLiveRead } from '../runtime/cache'
 import { CACHE_LIVE_ID } from '../runtime/cache-live-id'
-import { checkLiveWrites, live, LIVE_ROUTE, liveSlot, PROOF_LIFETIME_MS, readViewerWith, slotValue, watchSlot } from '../runtime/live-value'
+import { checkLiveWrites, live, LIVE_ROUTE, liveSlot, ownLiveDeclared, PROOF_LIFETIME_MS, readViewerWith, slotValue, watchSlot } from '../runtime/live-value'
 import { PRESENCE_LIVE_ID } from '../runtime/presence'
 import { currentServerScope } from '../runtime/reactive'
 import { decodeServerValue, encodeValue, unsendable } from '../runtime/wire'
@@ -65,6 +65,8 @@ interface CacheReads {
   // A render run before the user is known, and whether it read a value of each user meanwhile.
   lazy?: boolean
   missed?: boolean
+  // A page that streams blocks after its head, whose renders read the user later than the render this runs for settles.
+  streams?: boolean
 }
 
 const cacheReads = new AsyncLocalStorage<CacheReads>()
@@ -98,6 +100,15 @@ export function inLiveReads<T>(run: () => T, request?: Request, chain?: string, 
   return cacheReads.run(reads, async () => {
     const result = await run()
 
+    // A streamed block reads the user after this render settles, when it is too late to render again: the user is asked now, before the body is sent.
+    if (reads.streams === true && reads.user === undefined && ownLiveDeclared()) {
+      readers.add(chain)
+      reads.user = await userOf(request)
+      reads.lazy = false
+
+      return result
+    }
+
     if (reads.missed === true) {
       readers.add(chain)
       missed?.()
@@ -105,6 +116,14 @@ export function inLiveReads<T>(run: () => T, request?: Request, chain?: string, 
 
     return result
   })
+}
+
+// Notes that the render in progress streams blocks after its head.
+export function noteStreams(): void {
+  const reads = cacheReads.getStore()
+
+  if (reads !== undefined)
+    reads.streams = true
 }
 
 // Runs a render and, when it read a value of each user before the user was known, once more with the user resolved: the first render of such a chain only.

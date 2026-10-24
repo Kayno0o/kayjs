@@ -1,0 +1,10 @@
+--- server
+const slow = new Promise<number>(resolve => setTimeout(() => resolve(1), 30))
+--- script
+import Inbox from '../components/inbox.kay'
+---
+h1 Streamed
+await slow
+  p Loading
+then _value
+  Inbox
