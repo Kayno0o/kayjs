@@ -46,6 +46,8 @@ export interface CardSetup {
   // The locale a page outside any locale reads the name in.
   defaultLocale?: string | undefined
   quality?: number | undefined
+  // `images.aspects` and `images.avif`, which the variants a template's images are served as depend on.
+  variants?: { aspects?: readonly string[] | undefined, avif?: unknown } | undefined
   // An executable, which only reads what its build wrote.
   bundled?: boolean | undefined
   // A server on a build, which reads the logo the build drew, so a resvg or Bun.Image of its own still finds the cards prerendered under their names.
@@ -159,7 +161,7 @@ export async function setupCards(setup: CardSetup): Promise<Cards> {
     prebuilt: setup.prebuilt ?? false,
     clientDir: setup.clientDir,
     // The other locales' names are part of each card's spec, so a change to one renames its cards alone.
-    look: Bun.hash(JSON.stringify([DRAWING, font instanceof Error ? '' : font.path, background, color, localizedText(setup.name, setup.defaultLocale, setup.defaultLocale) ?? '', quality, ...logo === undefined ? [] : [Bun.hash(logo).toString(36)], ...stamp === undefined ? [] : [stamp]])).toString(36),
+    look: Bun.hash(JSON.stringify([DRAWING, font instanceof Error ? '' : font.path, background, color, localizedText(setup.name, setup.defaultLocale, setup.defaultLocale) ?? '', quality, ...logo === undefined ? [] : [Bun.hash(logo).toString(36)], ...stamp === undefined ? [] : [stamp, setup.variants?.aspects ?? null, setup.variants?.avif ?? null]])).toString(36),
     background,
     color,
     name: localizedText(setup.name, setup.defaultLocale, setup.defaultLocale),

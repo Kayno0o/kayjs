@@ -124,6 +124,15 @@ describe('the share card template stamp', () => {
       looks.push((await setupCards({ dir, clientDir: clientDir(FIXTURE), fonts: font('a{}'), template: { file: CARD, styles: undefined } })).look, (await setupCards({ dir, clientDir: clientDir(FIXTURE), fonts: font('b{}'), template: { file: CARD, styles: undefined } })).look)
       expect(new Set(looks).size).toBe(5)
       expect((await setupCards({ dir, clientDir: clientDir(FIXTURE), fonts: undefined })).look).toBe(looks[0]!)
+
+      // The variants a template's images are served as, named by the aspects and AVIF the app sets; the fixed layout draws none.
+      const template = { file: CARD, styles: undefined }
+      const variants = async (setup: Partial<Parameters<typeof setupCards>[0]>) => (await setupCards({ dir, clientDir: clientDir(FIXTURE), fonts: undefined, ...setup })).look
+      const plain = await variants({ template })
+
+      expect(await variants({ template, variants: { aspects: ['2/1'] } })).not.toBe(plain)
+      expect(await variants({ template, variants: { avif: { quality: 40 } } })).not.toBe(plain)
+      expect(await variants({ variants: { aspects: ['2/1'] } })).toBe(looks[0]!)
     }
     finally {
       await rm(dir, { recursive: true, force: true })
