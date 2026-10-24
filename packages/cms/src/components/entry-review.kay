@@ -1,0 +1,73 @@
+---
+import type { Denials } from '../access'
+import type { ReviewView } from '../review'
+import Badge from '@kaynooo/kayjs-ui/badge.kay'
+import Button from '@kaynooo/kayjs-ui/button.kay'
+import Dialog from '@kaynooo/kayjs-ui/dialog.kay'
+import FormField from '@kaynooo/kayjs-ui/form-field.kay'
+import Textarea from '@kaynooo/kayjs-ui/textarea.kay'
+import { signal } from 'kay'
+import { wording } from 'kay/words'
+import Refused from './refused.kay'
+
+// Where a draft stands in review, and the buttons of it: Submit for review for a person who may not publish, Approve and Send back, which asks for a note, for one who may review. `dirty` disables them, as each acts on the entry as saved.
+// `denied`, from `denials`, lists the actions the signed-in person's role may not do.
+const { review, draft, denied = {}, dirty, busy, onSubmit, onApprove, onSendBack } = props<{
+  review: ReviewView | undefined
+  draft: boolean
+  denied?: Denials | undefined
+  dirty: boolean
+  busy: boolean
+  onSubmit: () => unknown
+  onApprove: () => unknown
+  onSendBack: (note: string) => Promise<boolean>
+}>()
+
+const asking = signal(false)
+const note = signal('')
+const sending = signal(false)
+
+const waiting = () => draft && review?.status === 'review'
+const reason = () => dirty ? wording('cms.share.dirty', 'Save or reset your edits first') : undefined
+
+async function sendBack(): Promise<void> {
+  if (note().trim() === '' || sending())
+    return
+
+  sending = true
+
+  try {
+    if (await onSendBack(note())) {
+      asking = false
+      note = ''
+    }
+  }
+  finally {
+    sending = false
+  }
+}
+---
+if draft && review?.status === 'review'
+  Badge(tone="info" label={wording('cms.review.inReview', 'In review')})
+else if draft && review?.status === 'sent-back'
+  Badge(tone="warning" label={wording('cms.review.sentBackBadge', 'Sent back')})
+if draft && !waiting() && denied.publish !== undefined
+  if reason() !== undefined
+    Refused(label={wording('cms.review.submit', 'Submit for review')} reason={reason()})
+  else
+    Button(label={wording('cms.review.submit', 'Submit for review')} disabled={busy} onClick={onSubmit})
+if waiting() && denied.review === undefined
+  if reason() !== undefined
+    Refused(label={wording('cms.review.approve', 'Approve')} reason={reason()})
+    Refused(label={wording('cms.review.sendBack', 'Send back')} reason={reason()})
+  else
+    Button(label={wording('cms.review.approve', 'Approve')} tone="accent" disabled={busy} onClick={onApprove})
+    Button(label={wording('cms.review.sendBack', 'Send back')} disabled={busy} onClick={() => { asking = true }})
+Dialog(open={asking()} title={wording('cms.review.sendBackTitle', 'Send back to the writer')} dirty={sending()} onOpenChange={shown => { asking = shown }})
+  @footer
+    Button(label={wording('cms.entry.cancel', 'Cancel')} disabled={sending()} onClick={() => { asking = false }})
+    Button(label={wording('cms.review.sendBack', 'Send back')} tone="accent" busy={sending()} disabled={sending() || note().trim() === ''} onClick={sendBack})
+  // The dialog may sit inside the entry's form, whose own submit saves the edits: this one must not reach it.
+  form(onSubmit={(event) => { event.preventDefault(); event.stopPropagation(); void sendBack() }})
+    FormField(label={wording('cms.review.note', 'What to change')})
+      Textarea(autofocus rows="4" value={note()} onInput={text => { note = text }} maxlength="1000")

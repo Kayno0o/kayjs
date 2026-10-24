@@ -15,6 +15,7 @@ import { collectionTitle, rowsOf, SINGLE_SLUG } from './listing'
 import { log } from './log'
 import { movable, moveChanges, orderValue, sortOrdered } from './order'
 import { missingReferences, pointReferences, referrersWith, UnreadReferrersError } from './references'
+import { forgetReview, moveReview, readReview, reviewable, settleReview } from './review'
 import { moveRevisions, openTrail } from './revisions'
 import { settings } from './settings'
 import { pairKey } from './translations'
@@ -45,9 +46,10 @@ export async function findCollection(name: string): Promise<ScreenCollection | u
   const history = kept && hiddenOf(name, 'history') !== undefined ? { history: true as const } : {}
   const trash = kept && hiddenOf(name, 'trash') !== undefined ? { trash: true as const } : {}
   const newsletter = settings().newsletter.has(name) ? { newsletter: true as const } : {}
+  const review = found && reviewable(found) ? { review: true as const } : {}
 
   // Without the icon, which the content list draws on the server and the editor's islands would otherwise carry with each page.
-  return found && { ...found, ...given && { layout: { group: given.group, order: given.order, form: given.form, list: given.list } }, ...history, ...trash, ...newsletter }
+  return found && { ...found, ...given && { layout: { group: given.group, order: given.order, form: given.form, list: given.list } }, ...history, ...trash, ...newsletter, ...review }
 }
 
 // The collection with no `body`, `count` or `problem`, which a loaded one's loader is run to tell: for a save, a delete or an upload, which need its kind and its folder alone.
@@ -234,10 +236,24 @@ export async function saveEntry(entry: DraftEntry, options: SaveOptions = {}): P
     forgetCounts()
   }
 
+  if ('saved' in outcome && options.reviewed !== true)
+    await settlePublished(entry, options.author)
+
   if ('saved' in outcome)
     await saved({ collection: entry.collection, slug: entry.slug, ...entry.locale !== undefined && { locale: entry.locale }, verb: options.verb ?? (options.create === true ? 'add' : 'update'), ...options.author !== undefined && { author: options.author }, ...outcome.commit !== undefined && { commit: outcome.commit } })
 
   return outcome
+}
+
+// An entry saved published while it waited for review is no longer waiting.
+async function settlePublished(entry: DraftEntry, author: Identity | undefined): Promise<void> {
+  if (await readReview(entry) === undefined)
+    return
+
+  const { draftField } = await collectionNamed(entry.collection)
+
+  if (draftField !== undefined && entry.data[draftField] === false)
+    await settleReview(entry, author)
 }
 
 interface SaveOptions extends VersionRule {
@@ -249,6 +265,8 @@ interface SaveOptions extends VersionRule {
   heldData?: Record<string, unknown> | undefined
   // A new entry that is an old one coming back, whose history goes on rather than starting over.
   revived?: boolean | undefined
+  // A save that is a reviewer's approval, which writes the review itself.
+  reviewed?: boolean | undefined
 }
 
 async function writeEntry(entry: DraftEntry, { create = false, version, required = false, verb, author, bodyKept = false, heldData, revived = false }: SaveOptions): Promise<SaveOutcome> {
@@ -332,6 +350,9 @@ export async function deleteEntry(ref: EntryRef, author?: Identity, options: { v
   }
 
   if ('saved' in outcome)
+    await forgetReview(ref, author)
+
+  if ('saved' in outcome)
     await saved({ collection: ref.collection, slug: ref.slug, ...ref.locale !== undefined && { locale: ref.locale }, verb: 'delete', ...author !== undefined && { author }, ...outcome.commit !== undefined && { commit: outcome.commit } })
 
   return outcome
@@ -399,7 +420,7 @@ function storedState(entry: SourceEntry | undefined): { data: Record<string, unk
 }
 
 // Sets the collection's draft field to false, keeping the rest of the entry as saved.
-export async function publishEntry(ref: EntryRef, author?: Identity): Promise<SaveOutcome> {
+export async function publishEntry(ref: EntryRef, author?: Identity, { reviewed = false }: { reviewed?: boolean } = {}): Promise<SaveOutcome> {
   const collection = await collectionNamed(ref.collection)
 
   if (collection.draftField === undefined)
@@ -413,7 +434,7 @@ export async function publishEntry(ref: EntryRef, author?: Identity): Promise<Sa
   if (!existing.data)
     return refused(ref, wording('cms.store.parseFailure', '{slug}\'s file does not parse: {problem}', { slug: ref.slug, problem: existing.problem ?? '' }))
 
-  return saveEntry({ ...ref, data: { ...existing.data, [collection.draftField]: false }, body: existing.body }, { version: existing.version, verb: 'publish', author, bodyKept: true })
+  return saveEntry({ ...ref, data: { ...existing.data, [collection.draftField]: false }, body: existing.body }, { version: existing.version, verb: 'publish', author, bodyKept: true, reviewed })
 }
 
 // Turns a published entry back into a draft, the way Publish turns a draft public.
@@ -676,6 +697,9 @@ export async function renameEntry(ref: EntryRef, slug: string, options: { author
   finally {
     forgetCounts()
   }
+
+  if ('saved' in outcome)
+    await moveReview(ref, { ...ref, slug }, options.author)
 
   return !('saved' in outcome) ? outcome : { ...outcome, slug }
 }

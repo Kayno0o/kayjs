@@ -35,6 +35,8 @@ export interface EntryRow {
   // For a folder entry, when its file was last edited in milliseconds and by whom, from the repository's history, none for a file with no commit.
   modifiedAt?: number | undefined
   author?: string | undefined
+  // For a draft sent for review, whether it waits for a reviewer (`review`) or for its writer after a send-back.
+  review?: 'review' | 'sent-back' | undefined
 }
 
 // The page size when `cms({ pageSize })` says none.

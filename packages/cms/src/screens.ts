@@ -3,6 +3,7 @@ import type { Change } from './changes'
 import type { Edit } from './history'
 import type { CollectionInfo, EntryRef, GivenLayout, ScreenCollection, SourceEntry, StoredEntry } from './kay/contract'
 import type { EntryRow, ListView } from './listing'
+import type { ReviewView } from './review'
 import type { EntryTranslations, PairedEntry, TranslationRow } from './translations'
 import { activityOf } from './activity'
 import { changesBetween } from './changes'
@@ -12,7 +13,8 @@ import { readEdits, readLastEdit } from './history'
 import { collections, entries, translations } from './kay/content'
 import { collectionPath, collectionTitle, entryPath, entryTitle, newEntryPath, pageOf, pageRows } from './listing'
 import { log } from './log'
-import { revisionsOf } from './revisions'
+import { readReview, reviewsOf, viewOf } from './review'
+import { placeOf, revisionsOf } from './revisions'
 import { settings } from './settings'
 import { findCollection, entryScreen as readEntry, versionOf } from './store'
 import { pairKey, translationReport } from './translations'
@@ -23,6 +25,8 @@ export interface EntryScreen {
   collection: ScreenCollection
   // Undefined when the collection cannot be read (its `problem` says why) or holds no such entry.
   entry: StoredEntry | undefined
+  // Where the draft stands in review, none for an entry never sent for it.
+  review?: ReviewView | undefined
 }
 
 export interface ListScreen {
@@ -38,8 +42,9 @@ export interface ListScreen {
 // What an entry's screen reads, for an app's page at that screen's path: undefined for a collection the site lacks. Reads only: the extension's guard covers a page at a screen's path, a page outside the prefix needs its own.
 export async function entryScreen(ref: EntryRef): Promise<EntryScreen | undefined> {
   const screen = await readEntry(ref)
+  const review = screen?.entry && screen.collection.review ? await readReview(ref) : undefined
 
-  return screen && { prefix: settings().prefix, ...screen }
+  return screen && { prefix: settings().prefix, ...screen, ...review && { review: viewOf(review) } }
 }
 
 // What a new entry's screen reads: the collection alone.
@@ -60,7 +65,21 @@ export async function listScreen({ collection: name, q = '', page = 1, status, s
 
   const listed = await pageRows(collection, q, page, async filter => entries(collection.name, filter), versionOf, pageSize, { status, sort, direction: dir, translations: async () => translations(collection.name), edits: readEdits })
 
-  return { prefix, collection, ...listed }
+  return { prefix, collection, ...listed, rows: await withReviews(collection, listed.rows) }
+}
+
+// The rows with where their drafts stand in review, for a collection that can be reviewed.
+async function withReviews(collection: ScreenCollection, rows: EntryRow[]): Promise<EntryRow[]> {
+  if (!collection.review || !rows.some(row => row.draft))
+    return rows
+
+  const reviews = await reviewsOf(collection.name)
+
+  return rows.map((row) => {
+    const status = row.draft ? reviews.get(placeOf(row))?.status : undefined
+
+    return status === 'review' || status === 'sent-back' ? { ...row, review: status } : row
+  })
 }
 
 function paired(entry: Pick<SourceEntry, 'locale' | 'slug' | 'data' | 'body'> | undefined): PairedEntry | undefined {
@@ -205,6 +224,8 @@ export interface HistoryScreen {
   entry: StoredEntry
   // Newest first.
   rows: HistoryRow[]
+  // The entry's review, whose steps are listed above its versions.
+  review?: ReviewView | undefined
 }
 
 // What an entry's history reads; undefined for a collection or an entry the site lacks, or a collection that keeps no history.
@@ -224,7 +245,9 @@ export async function historyScreen(ref: EntryRef): Promise<HistoryScreen | unde
     current: Bun.deepEquals(revision.data, entry.data) && (revision.body ?? '') === (entry.body ?? ''),
   }))
 
-  return { prefix: settings().prefix, collection, entry, rows: rows.reverse() }
+  const review = await readReview(ref)
+
+  return { prefix: settings().prefix, collection, entry, rows: rows.reverse(), ...review && { review: viewOf(review) } }
 }
 
 // A trashed entry as the page shows it: the entry itself stays server side.

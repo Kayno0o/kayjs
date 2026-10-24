@@ -2,6 +2,7 @@ import type { Attempted } from '@kaynooo/kayjs-ui'
 import type { Drafts } from '../drafts'
 import type { EntryRef, Issue } from '../kay/contract'
 import type { RedirectStatus } from '../missing'
+import type { ReviewView } from '../review'
 import { attempt as attemptCall, toast } from '@kaynooo/kayjs-ui'
 import { call, focusInvalid } from 'kay'
 import { wording } from 'kay/words'
@@ -286,6 +287,50 @@ export async function unpublishSaved(ref: EntryRef): Promise<boolean> {
   }), wording('cms.entry.unpublishFailure', 'Could not unpublish'))
 
   return settled(outcome, wording('cms.save.unpublished', 'Unpublished'), wording('cms.save.notUnpublished', 'Not unpublished'))
+}
+
+// What a review step answers: the entry's review as it stands, and after an approval the entry the publication left, for the form to take as saved.
+export interface ReviewReply {
+  review: ReviewView
+  entry?: { data: Record<string, unknown> | undefined, body: string | undefined, version: string | undefined } | undefined
+}
+
+function replyOf(outcome: Outcome | undefined, done: string, refused: string): ReviewReply | undefined {
+  return settled(outcome, done, refused) && outcome && 'review' in outcome ? outcome as unknown as ReviewReply : undefined
+}
+
+// Sends a draft for review and says how it went.
+export async function submitSaved(ref: EntryRef): Promise<ReviewReply | undefined> {
+  const outcome = await attempt(async () => call(entriesApi, '/:collection/:slug/submit', {
+    method: 'post',
+    params: { collection: ref.collection, slug: ref.slug },
+    query: localeOf(ref),
+  }), wording('cms.review.submitFailure', 'Could not send for review'))
+
+  return replyOf(outcome, wording('cms.review.submittedToast', 'Sent for review'), wording('cms.review.notSubmitted', 'Not sent for review'))
+}
+
+// Approves an entry in review, which publishes it, and says how it went.
+export async function approveSaved(ref: EntryRef): Promise<ReviewReply | undefined> {
+  const outcome = await attempt(async () => call(entriesApi, '/:collection/:slug/approve', {
+    method: 'post',
+    params: { collection: ref.collection, slug: ref.slug },
+    query: localeOf(ref),
+  }), wording('cms.review.approveFailure', 'Could not approve'))
+
+  return replyOf(outcome, wording('cms.review.approvedToast', 'Approved'), wording('cms.review.notApproved', 'Not approved'))
+}
+
+// Sends an entry in review back to its writer with a note and says how it went.
+export async function sendBackSaved(ref: EntryRef, note: string): Promise<ReviewReply | undefined> {
+  const outcome = await attempt(async () => call(entriesApi, '/:collection/:slug/send-back', {
+    method: 'post',
+    params: { collection: ref.collection, slug: ref.slug },
+    query: localeOf(ref),
+    body: { note },
+  }), wording('cms.review.sendBackFailure', 'Could not send back'))
+
+  return replyOf(outcome, wording('cms.review.sentBackToast', 'Sent back'), wording('cms.review.notSentBack', 'Not sent back'))
 }
 
 // Tells the editor a publish, an unpublish or a schedule change waits for the edits typed so far to be saved, which they would otherwise carry along.

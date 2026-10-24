@@ -134,6 +134,10 @@ Table.kcms-entries(columns={columns} rows={rows} rowKey={keyOf} sort={sort} serv
     else if column.key === 'draft'
       if row.draft
         Badge(tone="warning" label={wording('cms.entry.draft', 'Draft')})
+        if row.review === 'review'
+          Badge(tone="info" label={wording('cms.review.inReview', 'In review')})
+        else if row.review === 'sent-back'
+          Badge(tone="warning" label={wording('cms.review.sentBackBadge', 'Sent back')})
       else
         EntryStatus(at={row.scheduledAt} end={row.endsAt})
     else

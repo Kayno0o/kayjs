@@ -1,5 +1,5 @@
 // What a role may do beyond editing an entry, which anyone the guard admits can.
-export const ACTIONS = ['publish', 'delete', 'upload', 'redirects'] as const
+export const ACTIONS = ['publish', 'review', 'delete', 'upload', 'redirects'] as const
 
 export type Action = typeof ACTIONS[number]
 

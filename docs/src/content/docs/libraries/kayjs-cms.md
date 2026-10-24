@@ -93,15 +93,27 @@ By default everyone the guard admits can do everything. `roles` limits what a ro
 ```ts
 cms({
   guard: auth.guard({ require: 'staff' }),
-  roles: { staff: [], publisher: ['publish'], admin: ['publish', 'delete', 'upload', 'redirects'] },
+  roles: { staff: [], publisher: ['publish', 'review'], admin: ['publish', 'review', 'delete', 'upload', 'redirects'] },
 })
 ```
 
-The actions are `publish` (publish, unpublish, and any save that changes the draft flag or a publish or unpublish date), `delete` (entries, unused uploads, and erasing from the trash, revisions and activity), `upload` and `redirects` (the missing pages screen and its API).
+The actions are `publish` (publish, unpublish, and any save that changes the draft flag or a publish or unpublish date), `review` (approve or send back a draft sent for review, see below), `delete` (entries, unused uploads, and erasing from the trash, revisions and activity), `upload` and `redirects` (the missing pages screen and its API).
 
 A person's roles add up, and one whose roles are not listed can only edit. With kayjs-auth the roles are the user's, with its hierarchy, so `admin` holding `editor` counts. A refused action answers 403 and says which action the role lacks. The screens show its button disabled, with that sentence as a tooltip. A role without `publish` sees the draft flag and the publish and end dates of an entry read-only, and one without `upload` gets no image drop or paste in a Markdown box.
 
 A role without `publish` can still add an entry to a collection that has a publish date and no draft flag. The server holds it back with a far publish date until a publisher sets one.
+
+A key of `roles` written `org:<role>` is a role held in any kayjs-auth organization the person belongs to, and `org:<organization>:<role>` one in that organization. They count with the organization's own hierarchy.
+
+### Review before publishing
+
+A writer whose roles lack `publish` sends a draft for review with Submit for review, on its entry screen and in the editor on the page. The list, the entry screen and the editor then show it as In review. A person with `review` approves it, which publishes it (or schedules it at its publish date), or sends it back with a note the writer reads above the form. Anyone admitted may send a draft for review.
+
+Approving and sending back are checked on the server for kayjs-auth, `passwordGuard` and `member` roles alike. Every step is kept with who took it and when, in a log on the entry screen.
+
+The state is kept outside the entry, so no schema changes. A loaded collection keeps it in a hidden collection of its loader, a folder collection in a small file under `.cms/review` written through the `files` saver. The other holders of the `org:` reviewing role in the writer's organizations are told of a submission with `notify()`, and the writer of an approval or a send-back. The collection needs a draft flag.
+
+<ReadMore href="/llms/kayjs-cms-review">The routes, the storage, the notifications and what they cannot reach.</ReadMore>
 
 A guard of your own, neither kayjs-auth nor `passwordGuard`, holds no role until `member` says who it let in. It also runs on screens the guard does not cover, so it returns nothing for a visitor who is not signed in. When given, it replaces kayjs-auth's lookup and never falls back to it:
 

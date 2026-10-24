@@ -19,6 +19,7 @@ import { fieldAtPath, registerInline } from './inline'
 import { savedHandler } from './live'
 import { readReferrers } from './referrers'
 import { rebuildFinished, rebuildStarted } from './rebuild'
+import { createReview } from './review'
 import { unfoldAround } from './reorder'
 import { anchorsOf, keyOfPath, ownerOf } from './anchors'
 import { forgetPlace, placeCaret } from './caret'
@@ -27,6 +28,8 @@ import EntryFields from './entry-fields.kay'
 import { formScope } from '../form'
 import EntryPresence from '../components/entry-presence.kay'
 import EntrySaveState from '../components/entry-save-state.kay'
+import EntryReview from '../components/entry-review.kay'
+import EntryReviewLog from '../components/entry-review-log.kay'
 import EntryState from '../components/entry-state.kay'
 import ResetButton from '../components/reset-button.kay'
 import { entryRoom } from '../room'
@@ -198,6 +201,15 @@ async function save(): Promise<boolean> {
 
 // Publish and Unpublish change the draft flag alone: with edits not saved they refuse, saving nothing, and a refused save puts the flag back.
 const draftField = () => source.value()?.collection.draftField
+const stages = createReview(entry, undefined, drafts)
+
+effect(() => {
+  const answer = source.value()
+
+  if (answer)
+    stages.review.set(answer.review)
+})
+
 const isDraft = () => { const field = draftField(); return field !== undefined && drafts.value(entry, field) === true }
 
 async function setDraft(value: boolean): Promise<void> {
@@ -261,7 +273,11 @@ PageSection.kcms-entry(title={isSingle() ? collectionName() : title()} level={3}
     if draftField() !== undefined || (!isSingle() && !answer.seeded)
       .kcms-entry-more
         EntryState(draftField={draftField()} draft={isDraft()} dirty={unsaved()} saving={saving() || removed()} denied={can.value()?.denied} title={title()} url={answer.entry.url} referrers={referrers()} deletable={!isSingle() && !answer.seeded} onPublish={() => setDraft(false)} onUnpublish={() => setDraft(true)} onRemove={remove} onAskReferrers={askReferrers})
+        if answer.collection.review && !answer.seeded
+          EntryReview(review={stages.review()} draft={isDraft()} denied={can.value()?.denied} dirty={unsaved()} busy={saving() || removed() || stages.busy()} onSubmit={stages.submit} onApprove={stages.approve} onSendBack={stages.sendBack})
   EntryPresence(room={room.room} member={room.member})
+  if stages.review() as stage
+    EntryReviewLog(review={stage} draft={isDraft()})
   if stranded() as screen
     Notice.kcms-entry-failure(tone="danger" size="sm" label={wording('cms.entry.deleted', 'This entry is deleted.')})
       a(href={screen}) {wording('cms.entry.deletedLeave', 'Go to the collection')}

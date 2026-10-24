@@ -63,7 +63,7 @@ async function statusOf(ctx: GuardContext): Promise<number> {
   }
 }
 
-const roles = { editor: [], publisher: ['publish'], uploader: ['upload'], admin: ['publish', 'delete', 'upload', 'redirects'] } as const
+const roles = { editor: [], publisher: ['publish'], uploader: ['upload'], reviewer: ['review'], admin: ['publish', 'review', 'delete', 'upload', 'redirects'] } as const
 
 function auth(): void {
   configure({ guard: async ({ locals }) => {
@@ -76,6 +76,8 @@ const RESTRICTED = [
   ['POST', '/entries/posts/hello/publish', 'publish'],
   ['POST', '/entries/posts/hello/unpublish', 'publish'],
   ['POST', '/entries/posts/hello/share', 'publish'],
+  ['POST', '/entries/posts/hello/approve', 'review'],
+  ['POST', '/entries/posts/hello/send-back', 'review'],
   ['POST', '/newsletter/posts/hello/preview', 'publish'],
   ['POST', '/newsletter/posts/hello/test', 'publish'],
   ['POST', '/newsletter/posts/hello/send', 'publish'],
@@ -262,7 +264,7 @@ describe('a custom guard', () => {
     const ctx = as(['publisher'])
 
     expect(await memberOf(ctx)).toEqual({ name: 'a@b.c', held: ['publisher'] })
-    expect(Object.keys(await denials(ctx)).toSorted()).toEqual(['delete', 'redirects', 'upload'])
+    expect(Object.keys(await denials(ctx)).toSorted()).toEqual(['delete', 'redirects', 'review', 'upload'])
     expect(await denials(as(['admin']))).toEqual({})
 
     configure({ guard: () => undefined })
@@ -278,7 +280,7 @@ describe('what the screens may offer', () => {
     const ctx = ask({ method: 'GET', path: '/editor/can', user: { roles: ['uploader'] } })
 
     expect(await statusOf(ctx)).toBe(200)
-    expect(Object.keys(await denialsOf(ctx.request)).toSorted()).toEqual(['delete', 'publish', 'redirects'])
+    expect(Object.keys(await denialsOf(ctx.request)).toSorted()).toEqual(['delete', 'publish', 'redirects', 'review'])
   })
 })
 

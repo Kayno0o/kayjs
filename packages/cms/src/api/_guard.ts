@@ -5,8 +5,10 @@ import { editSessionAdmitted, READ_METHODS, underKayDev } from 'kay/library'
 import { editedEntry, editRequested } from 'kay/server'
 import { wording } from 'kay/words'
 import { forbidden, may, memberOf, refusalStatus, routePath } from '../access'
-import { authors, testAddresses } from '../authors'
+import { authOf, organizationMembers } from '../auth-like'
+import { actors, authors, testAddresses } from '../authors'
 import { admitEditor } from '../editor-names'
+import { log } from '../log'
 import { leavesPublication, restrain } from '../publishing'
 import { settings } from '../settings'
 import devApi from './dev'
@@ -78,6 +80,9 @@ const PUBLISH = /^\/entries\/[^/]+\/[^/]+\/(?:publish|unpublish|share)$/
 const NEWSLETTER = /^\/newsletter\/[^/]+\/[^/]+\/(?:preview|test|send)$/
 // The test send, whose collection tells where it goes.
 const NEWSLETTER_TEST = /^\/newsletter\/([^/]+)\/[^/]+\/test$/
+// Sending a draft for review is any editor's; approving it, which publishes, or sending it back is a reviewer's.
+const SUBMIT = /^\/entries\/[^/]+\/[^/]+\/submit$/
+const REVIEW = /^\/entries\/[^/]+\/[^/]+\/(?:approve|send-back)$/
 const ENTRY_RENAME = /^\/entries\/[^/]+\/[^/]+\/rename$/
 const REDIRECTS = /^\/redirects(?:\/|$)/
 const UPLOAD = /^\/files\/[^/]+$/
@@ -98,7 +103,27 @@ function actionOf(method: string, path: string): Action | undefined {
   if (method === 'POST' && (PUBLISH.test(path) || NEWSLETTER.test(path)))
     return 'publish'
 
+  if (method === 'POST' && REVIEW.test(path))
+    return 'review'
+
   return method === 'POST' && (UPLOAD.test(path) || MEDIA_RENAME.test(path)) ? 'upload' : undefined
+}
+
+// Finds who is behind a review request, and for a submission whom it is told to: the other holders of a reviewing organization role, which kayjs-auth lists for a member of the organization.
+async function noteActor(ctx: GuardContext, submitting: boolean): Promise<void> {
+  const member = await memberOf(ctx)
+  const auth = authOf(ctx)
+  const reviewing = [...settings().roles ?? []].filter(([, actions]) => actions.has('review')).map(([role]) => role)
+  let reviewers: string[] = []
+
+  try {
+    reviewers = submitting && auth ? await organizationMembers(auth, reviewing, member?.id) : []
+  }
+  catch (error) {
+    log.error('the reviewers of a submission could not be listed', error)
+  }
+
+  actors.set(ctx.request, { name: member?.name ?? '', id: member?.id, reviewers })
 }
 
 // Marks the edit cookie of a person the app's guard lets in who only reads. An edit link's holder, whom it turns away, reads on all the same, and the guard is asked again at each of their reads.
@@ -197,6 +222,13 @@ export default guard(async (ctx) => {
     // A save that flips the draft flag or a publish date is a publish as much as the route is.
     if (method === 'POST' && needed === undefined && !await may(ctx, 'publish') && !await leavesPublication(ctx.request, path))
       return forbidden(ctx, 'publish')
+  }
+
+  if (method === 'POST') {
+    const path = ownPath(routePath(ctx.url), root)
+
+    if (SUBMIT.test(path) || REVIEW.test(path))
+      await noteActor(ctx, SUBMIT.test(path))
   }
 
   const [, testing] = method === 'POST' ? NEWSLETTER_TEST.exec(ownPath(routePath(ctx.url), root)) ?? [] : []

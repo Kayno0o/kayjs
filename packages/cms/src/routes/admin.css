@@ -355,3 +355,23 @@ body {
   display: block;
   text-decoration: none;
 }
+
+.kcms-review-log {
+  display: grid;
+  gap: 0.25rem;
+  margin: 0.5rem 0;
+  padding: 0;
+  list-style: none;
+  font-size: 0.875rem;
+}
+
+.kcms-review-event {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: baseline;
+}
+
+.kcms-review-event-note {
+  white-space: pre-wrap;
+}

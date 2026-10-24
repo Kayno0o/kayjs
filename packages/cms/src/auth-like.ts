@@ -9,6 +9,9 @@ interface AuthLike {
   bareUser?: () => Promise<MemberLike | null>
   user?: () => Promise<MemberLike | null>
   isGranted?: (role: string, user: MemberLike) => boolean
+  listOrganizations?: () => Promise<MembershipLike[]>
+  isMember?: (organization: string, role?: string) => Promise<boolean>
+  listMembers?: (organization: string) => Promise<{ ok: true, members: { user: { id: unknown }, roles: readonly string[] }[] } | { ok: false }>
   signInUrl?: (back?: string) => string
   signOut?: () => Promise<void>
   requireUser?: (options: { require: string, bare: true }) => Promise<unknown>
@@ -46,4 +49,79 @@ export function roleGuard(role: string): Guard {
 
     await auth.requireUser({ require: role, bare: true })
   }
+}
+
+// The part of a kayjs-auth organization membership the cms reads.
+export interface MembershipLike {
+  organization: { id: string, slug?: string | null }
+  roles: readonly string[]
+}
+
+// A key of `cms({ roles })` naming a role held in a kayjs-auth organization: `org:<role>` in any of the person's organizations, `org:<organization>:<role>` in that one (its id or slug).
+const ORGANIZATION_ROLE = /^org:(?:([^:]+):)?([^:]+)$/
+
+export function isOrganizationRole(key: string): boolean {
+  return ORGANIZATION_ROLE.test(key)
+}
+
+export function organizationRole(key: string): { organization: string | undefined, role: string } | undefined {
+  const [, organization, role] = ORGANIZATION_ROLE.exec(key) ?? []
+
+  return role === undefined ? undefined : { organization, role }
+}
+
+const inOrganization = (membership: MembershipLike, organization: string) => membership.organization.id === organization || membership.organization.slug === organization
+
+// The `org:` keys among `keys` the signed-in person holds, the organization's own hierarchy counting through `auth.isMember`.
+export async function heldInOrganizations(auth: AuthLike, keys: readonly string[]): Promise<string[]> {
+  const wanted = keys.filter(isOrganizationRole)
+
+  if (wanted.length === 0 || typeof auth.listOrganizations !== 'function' || typeof auth.isMember !== 'function')
+    return []
+
+  const memberships = await auth.listOrganizations()
+  const held: string[] = []
+
+  for (const key of wanted) {
+    const { organization, role } = organizationRole(key)!
+
+    for (const membership of memberships) {
+      if ((organization === undefined || inOrganization(membership, organization)) && await auth.isMember(membership.organization.id, role)) {
+        held.push(key)
+
+        break
+      }
+    }
+  }
+
+  return held
+}
+
+// The ids of the people who hold a role of `keys` in an organization of the signed-in person, themselves left out: whom a submission is told to. A member counts when they hold the role itself, as kayjs-auth does not tell a role's hierarchy.
+export async function organizationMembers(auth: AuthLike, keys: readonly string[], except: string | undefined): Promise<string[]> {
+  const wanted = keys.filter(isOrganizationRole)
+
+  if (wanted.length === 0 || typeof auth.listOrganizations !== 'function' || typeof auth.listMembers !== 'function')
+    return []
+
+  const memberships = await auth.listOrganizations()
+  const found = new Set<string>()
+
+  for (const key of wanted) {
+    const { organization, role } = organizationRole(key)!
+
+    for (const membership of memberships) {
+      if (organization !== undefined && !inOrganization(membership, organization))
+        continue
+
+      const listed = await auth.listMembers(membership.organization.id)
+
+      for (const member of listed.ok ? listed.members : []) {
+        if (member.roles.includes(role) && String(member.user.id) !== except)
+          found.add(String(member.user.id))
+      }
+    }
+  }
+
+  return [...found]
 }

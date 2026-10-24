@@ -1,0 +1,31 @@
+---
+import type { ReviewView } from '../review'
+import Notice from '@kaynooo/kayjs-ui/notice.kay'
+import { wording } from 'kay/words'
+import EntryEdited from './entry-edited.kay'
+
+// What came of an entry's review, newest first: who sent it for review, approved it or sent it back with what to change. A draft sent back shows the last note above, as it is what its writer acts on.
+const { review, draft } = props<{ review: ReviewView, draft: boolean }>()
+
+const verbs: Record<string, string> = {
+  'submit': wording('cms.review.logSubmit', 'Sent for review'),
+  'approve': wording('cms.review.logApprove', 'Approved'),
+  'send-back': wording('cms.review.logSendBack', 'Sent back'),
+  'publish': wording('cms.review.logPublish', 'Published while in review'),
+}
+
+const events = () => [...review.events].reverse()
+const lastNote = () => draft && review.status === 'sent-back' ? events().find(event => event.verb === 'send-back') : undefined
+---
+if lastNote() as sent
+  Notice.kcms-review-note(tone="warning" size="sm" label={wording('cms.review.sentBackNote', 'Sent back by {name}: {note}', { name: sent.by ?? '', note: sent.note ?? '' })})
+if review.events.length > 0
+  ol.kcms-review-log(aria-label={wording('cms.review.log', 'Review')})
+    for event of events() key={event.at}
+      li.kcms-review-event
+        EntryEdited(at={event.at} moment author={event.by})
+        span {verbs[event.verb] ?? event.verb}
+        if event.by
+          span {event.by}
+        if event.note
+          span.kcms-review-event-note {event.note}

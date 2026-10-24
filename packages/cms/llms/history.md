@@ -70,3 +70,5 @@ const loader = {
 - A loader of your own gets history by giving `sibling(kind)`, which returns a loader for a hidden collection of that kind (`'history'`, `'trash'`, `'activity'`: a loader answering the others for a kind it does not know would mix the activity into its trash) in the same store. Without it the collection keeps none, and its screens show no History button. Give the hidden loader a `get(place)` too, or each read of a revision loads the whole hidden collection.
 - A folder collection keeps none: its files are in git, and the forge or the repository has their history.
 - Every read and write is a `get` and a `save` of one row per entry; each revision is its own row beside an index row, so a save reads the index and the newest revision, then writes the new revision and the index, and a revision beyond the cap is removed.
+
+A loaded collection keeps the state of a draft sent for review in a hidden `review` collection of its loader beside `history`, see [Review](review.md).

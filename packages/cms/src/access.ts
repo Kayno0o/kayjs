@@ -4,13 +4,15 @@ import type { Action } from './roles'
 import { localPath } from 'kay'
 import { keyedDigest, READ_METHODS } from 'kay/library'
 import { wording } from 'kay/words'
-import { authOf } from './auth-like'
+import { authOf, heldInOrganizations, isOrganizationRole } from './auth-like'
 import { activePasswords, HOST_SESSION_COOKIE, SESSION_COOKIE, sessionCookiesOf, signedInBy } from './password'
 import { screenPath } from './paths'
 import { ACTIONS } from './roles'
 import { settings } from './settings'
 
 export interface Member {
+  // The signed-in person's kayjs-auth id, which a notification is addressed to; none for a password or a custom guard.
+  id?: string | undefined
   // What the admin calls the person: a username, else an email, else the role a password opened.
   name: string
   // The names `cms({ roles })` lists that the person holds.
@@ -34,6 +36,7 @@ const REPEATED_SLASHES = /\/{2,}/g
 // The name of each action in a refusal.
 const ACTION_NAMES: Record<Action, () => string> = {
   publish: () => wording('cms.role.publish', 'publish or unpublish'),
+  review: () => wording('cms.role.review', 'approve or send back an entry in review'),
   delete: () => wording('cms.role.delete', 'delete'),
   upload: () => wording('cms.role.upload', 'upload a file'),
   redirects: () => wording('cms.role.redirects', 'change redirects'),
@@ -76,10 +79,12 @@ async function readMember(ctx: GuardContext): Promise<Member | undefined> {
     return undefined
 
   const owned = Array.isArray(user.roles) ? user.roles.filter(role => typeof role === 'string') : []
-  const held = [...roles?.keys() ?? []].filter(role => auth.isGranted ? auth.isGranted(role, user) : owned.includes(role))
+  const named = [...roles?.keys() ?? []]
+  const held = [...named.filter(role => !isOrganizationRole(role)).filter(role => auth.isGranted ? auth.isGranted(role, user) : owned.includes(role)), ...await heldInOrganizations(auth, named)]
   const name = [user.username, user.email, user.id].find(value => (typeof value === 'string' && value !== '') || typeof value === 'number')
+  const id = typeof user.id === 'string' || typeof user.id === 'number' ? String(user.id) : undefined
 
-  return { name: String(name ?? ''), held, email: typeof user.email === 'string' && user.email !== '' ? user.email : undefined }
+  return { name: String(name ?? ''), held, id, email: typeof user.email === 'string' && user.email !== '' ? user.email : undefined }
 }
 
 // A digest naming the signed-in person, keyed by the app's secret so a guessed email cannot be checked against it, which tells two people on one browser apart; the same for every person a guard without a name admits.

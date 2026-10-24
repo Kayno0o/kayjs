@@ -4,6 +4,7 @@ import type { Drafts } from './drafts'
 import type { SavedState } from './editor/live'
 import type { HeldSlug } from './editor/slugs'
 import type { EntryRef, ScreenCollection, StoredEntry } from './kay/contract'
+import type { ReviewView } from './review'
 import type { SlugReport } from './slug'
 import type { PairedEntry } from './translations'
 import { effect, guardLeave, navigate, onCleanup, signal, untrack } from 'kay'
@@ -13,6 +14,7 @@ import { createDrafts } from './drafts'
 import { savedHandler } from './editor/live'
 import { rebuildFinished } from './editor/rebuild'
 import { readReferrers } from './editor/referrers'
+import { createReview } from './editor/review'
 import { changeField, deleteSaved, renameSaved, saveDraft, showRefusal } from './editor/save'
 import { saveShortcut } from './editor/shortcut'
 import { readHeldSlugs, reportSlug } from './editor/slugs'
@@ -92,6 +94,12 @@ export interface EntryForm extends FormScope {
   publishNow: () => Promise<void>
   unschedule: () => Promise<void>
   clearEnd: () => Promise<void>
+  // Where the draft stands in review (none for an entry never sent), whether a step is on its way, and the steps: Submit for review, Approve (which publishes) and Send back with a note. Each acts on the entry as saved, so with edits not saved yet it refuses; true once it went through.
+  review: () => ReviewView | undefined
+  reviewing: () => boolean
+  submit: () => Promise<boolean>
+  approve: () => Promise<boolean>
+  sendBack: (note: string) => Promise<boolean>
   // The entries naming this one in a reference field, as `Collection: title`, read by `askReferrers` when the delete confirmation opens.
   referrers: () => string[]
   askReferrers: () => Promise<void>
@@ -135,7 +143,7 @@ function slugLine(entry: StoredEntry): string {
 // An entry's form on its own screen, or a new entry's when `entry` is left out: the drafts, the save, publish and delete, and the guard against leaving with edits. Called in a component's script, it is what the default screen runs.
 // `entry` may be a function returning it, read each time the form needs it: for a screen that stays when the page refreshes in place (a `persist` island) and takes new props, `entry: () => all.entry`, so `stored`, `name` and `subtitle` follow the refreshed entry.
 // `copy` starts a new entry as a copy of a translation, `source` is the default locale's entry the form marks untranslated fields against.
-export function createEntryForm({ prefix, collection, entry, locale, copy, source, denied }: { denied?: Denials | undefined, prefix: string, collection: ScreenCollection, entry?: StoredEntry | undefined | (() => StoredEntry | undefined), locale?: string | undefined, copy?: PairedEntry | undefined, source?: PairedEntry | undefined }): EntryForm {
+export function createEntryForm({ prefix, collection, entry, locale, copy, source, denied, review: reviewed }: { review?: ReviewView | undefined, denied?: Denials | undefined, prefix: string, collection: ScreenCollection, entry?: StoredEntry | undefined | (() => StoredEntry | undefined), locale?: string | undefined, copy?: PairedEntry | undefined, source?: PairedEntry | undefined }): EntryForm {
   const read = typeof entry === 'function' ? entry : () => entry
   const first = read()
 
@@ -211,6 +219,8 @@ export function createEntryForm({ prefix, collection, entry, locale, copy, sourc
   guardLeave(() => !saving() && drafts.changed(ref))
 
   // The entry as it is now, the one the form opened with once it is gone.
+  const stages = createReview(ref, reviewed, drafts)
+
   const stored = () => first && (read() ?? first)
   // The entry's own title, its slug beneath when that is not the title; a new entry has neither.
   const nameOf = () => {
@@ -372,6 +382,11 @@ export function createEntryForm({ prefix, collection, entry, locale, copy, sourc
     publishNow: async () => change(collection.publishField, new Date().toISOString()),
     unschedule: async () => change(collection.publishField, undefined),
     clearEnd: async () => change(collection.unpublishField, undefined),
+    review: () => stages.review(),
+    reviewing: () => stages.busy(),
+    submit: stages.submit,
+    approve: stages.approve,
+    sendBack: stages.sendBack,
     referrers: () => referrers(),
     askReferrers,
     async remove() {
