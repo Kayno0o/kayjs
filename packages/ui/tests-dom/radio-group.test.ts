@@ -77,9 +77,18 @@ test('an option with value null is checked while the group holds null, and picki
   await settle()
 
   expect(away().map(radio => radio.checked)).toEqual([false, true])
+  expect(root.querySelector('#away')?.textContent).toBe('"evening"')
 
   click(away()[0] ?? null)
   await settle()
 
   expect(away().map(radio => radio.checked)).toEqual([true, false])
+  expect(root.querySelector('#away')?.textContent).toBe('null')
+
+  click(away()[1] ?? null)
+  await settle()
+  click(root.querySelector('#reset'))
+  await settle()
+
+  expect([away().map(radio => radio.checked), root.querySelector('#away')?.textContent]).toEqual([[true, false], 'null'])
 })

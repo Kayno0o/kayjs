@@ -13,4 +13,5 @@ form#form
   FormField(label="Plan" name="plan" issue="Pick a plan" group)
     RadioGroup(name="plan" options={plans} value={1 as 1 | 2 | 3} onChange={onChange})
   RadioGroup(name="away" label="Away" options={awayOptions} value={away()} onChange={(value: 'evening' | null) => away.set(value)})
+  p#away {JSON.stringify(away())}
   button#reset(type="reset") Reset

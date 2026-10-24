@@ -22,7 +22,7 @@ A `value` may be a number, such as a page size or a count: `onChange` hears the 
 
 A `value` of `null` picks no option, for a moment when what shows matches none of them, such as a zoomed chart beside a period picker. Picking one, or the parent passing one, checks it again.
 
-To offer "none" as a choice of its own, give an option `value: null` when `value` is typed to allow `null`. It is checked while the group holds `null`, and picking it tells `onChange` `null`.
+To offer "none" as a choice of its own, give an option `value: null` when `value` is typed to allow `null`. It is checked while the group holds `null`, and picking it tells `onChange` `null`. In a form it posts an empty string, where a group with nothing checked posts nothing.
 
 When `value` is typed to allow `null`, `onChange` is typed to hear `null` too, which is what a form reset sends a group that started with none picked. A group whose `value` is never `null` keeps `onChange: (value: Value) => ...`.
 
