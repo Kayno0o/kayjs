@@ -45,6 +45,19 @@ window.parent.postMessage({ id: 999999, html: 'FORGED' }, '*')
 p probe:{results.join(',')}
 `
 
+// Answers at once, then blocks the frame from a timer, which a watchdog that stops at the first reply misses.
+const LATE = `---
+import { onMount } from 'kay'
+
+onMount(() => {
+  setInterval(() => {
+    while (true) {}
+  }, 500)
+})
+---
+p fine
+`
+
 let server: Bun.Subprocess
 let origin: string
 let page: TestPage
@@ -79,11 +92,11 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the docs p
     await page.goto(`/getting-started/playground#code=${encodeSource(COUNTER)}`)
     await page.click('.playground-result button')
     await page.waitUntil(() => document.querySelector('.playground-markup code')?.textContent?.includes('Clicked 0 times'))
-    await page.waitUntil(() => document.querySelector('.playground-frame')?.getAttribute('data-live') === 'Clicked 0 times')
+    await page.waitUntil(() => document.querySelector('.playground-frame')?.getAttribute('data-test-live') === 'Clicked 0 times')
 
     await page.fill('.playground-input textarea', '---\n---\np Hello from the playground\n')
     await page.waitUntil(() => document.querySelector('.playground-markup code')?.textContent?.includes('Hello from the playground'))
-    await page.waitUntil(() => document.querySelector('.playground-frame')?.getAttribute('data-live') === 'Hello from the playground')
+    await page.waitUntil(() => document.querySelector('.playground-frame')?.getAttribute('data-test-live') === 'Hello from the playground')
     expect(await page.count('.playground-problems')).toBe(0)
     expect((await page.a11y('.playground')).map(violation => `${violation.id} ${violation.nodes.map(node => node.target).join(' ')}`)).toEqual([])
     expect(page.errors).toEqual([])
@@ -106,14 +119,29 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the docs p
     expect(await page.evaluate(() => document.querySelector('.playground-frame')?.getAttribute('sandbox'))).toBe('allow-scripts')
   })
 
-  it('revalidates the compiler bundle with its ETag instead of sending it again', async () => {
-    const first = await fetch(`${origin}playground/compiler.js`)
-    const etag = first.headers.get('etag') ?? ''
-    const again = await fetch(`${origin}playground/compiler.js`, { headers: { 'if-none-match': etag } })
+  it('revalidates the compiler bundle with an ETag per encoding, as RFC 9110 reads If-None-Match', async () => {
+    const url = `${origin}playground/compiler.js`
+    const brotli = await fetch(url, { headers: { 'accept-encoding': 'br' } })
+    const plain = await fetch(url, { headers: { 'accept-encoding': 'identity' } })
+    const brotliTag = brotli.headers.get('etag') ?? ''
+    const plainTag = plain.headers.get('etag') ?? ''
+    const asked = async (tag: string, encoding: string) => fetch(url, { headers: { 'accept-encoding': encoding, 'if-none-match': tag } })
 
-    expect(etag).toMatch(/^"[0-9a-z]+"$/)
+    expect(brotliTag).toMatch(/^"[0-9a-z]+-br"$/)
+    expect(plainTag).toMatch(/^"[0-9a-z]+"$/)
+    expect(brotli.headers.get('content-encoding')).toBe('br')
+    expect(plain.headers.get('content-encoding')).toBeNull()
+
+    const again = await asked(brotliTag, 'br')
+
     expect(again.status).toBe(304)
-    expect((await fetch(`${origin}playground/compiler.js`)).headers.get('etag')).toBe(etag)
+    expect(again.headers.get('vary')).toBe('accept-encoding')
+    expect((await asked(plainTag, 'identity')).status).toBe(304)
+    expect((await asked(plainTag, 'br')).status).toBe(200)
+    expect((await asked(brotliTag, 'identity')).status).toBe(200)
+    expect((await asked(`"other", W/${brotliTag}`, 'br')).status).toBe(304)
+    expect((await asked('*', 'br')).status).toBe(304)
+    expect((await asked('"other"', 'br')).status).toBe(200)
   })
 
   it('keeps code in the frame from reaching the docs page: its document, storage, cookies and state', async () => {
@@ -125,9 +153,9 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the docs p
     await page.goto('/getting-started/playground')
     await page.waitFor('.playground-frame')
     await page.fill('.playground-input textarea', PROBE)
-    await page.waitUntil(() => document.querySelector('.playground-frame')?.getAttribute('data-live')?.startsWith('probe:'))
+    await page.waitUntil(() => document.querySelector('.playground-frame')?.getAttribute('data-test-live')?.startsWith('probe:'))
 
-    const outcome = await page.evaluate(() => document.querySelector('.playground-frame')?.getAttribute('data-live'))
+    const outcome = await page.evaluate(() => document.querySelector('.playground-frame')?.getAttribute('data-test-live'))
 
     expect(outcome).toBe('probe:blocked,blocked,blocked,blocked,blocked,blocked')
     expect(await page.evaluate(() => localStorage.getItem('secret'))).toBe('parent')
@@ -140,28 +168,62 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the docs p
     await page.goto(`/getting-started/playground#code=${encodeSource(COUNTER)}`)
     await page.waitFor('.playground-held')
     await page.waitUntil(() => document.querySelector('.playground-input textarea') instanceof HTMLTextAreaElement && (document.querySelector('.playground-input textarea') as HTMLTextAreaElement).value.includes('Clicked'))
-    await Bun.sleep(1500)
-    expect(await page.evaluate(() => document.querySelector('.playground-frame')?.getAttribute('data-live'))).toBe('')
+    await page.waitFor('.playground-result[aria-busy="false"]')
+    expect(await page.evaluate(() => document.querySelector('.playground-frame')?.getAttribute('data-test-live'))).toBe('')
     expect(await page.text('.playground-markup code')).toBe('')
 
     await page.click('.playground-result button')
-    await page.waitUntil(() => document.querySelector('.playground-frame')?.getAttribute('data-live') === 'Clicked 0 times')
+    await page.waitUntil(() => document.querySelector('.playground-frame')?.getAttribute('data-test-live') === 'Clicked 0 times')
     expect(await page.count('.playground-held')).toBe(0)
 
     await page.fill('.playground-input textarea', '---\n---\np Typed\n')
-    await page.waitUntil(() => document.querySelector('.playground-frame')?.getAttribute('data-live') === 'Typed')
+    await page.waitUntil(() => document.querySelector('.playground-frame')?.getAttribute('data-test-live') === 'Typed')
   }, 60_000)
 
-  it('resets a box whose code never finishes, and says so', async () => {
+  it('reads a link pasted onto the page, holding its code until Run', async () => {
+    await page.goto('/getting-started/playground')
+    await page.waitFor('.playground-result[aria-busy="false"]')
+    await page.fill('.playground-input textarea', '---\n---\np Typed\n')
+    await page.waitUntil(() => document.querySelector('.playground-frame')?.getAttribute('data-test-live') === 'Typed')
+
+    await page.evaluate((hash: string) => {
+      location.hash = hash
+    }, `#code=${encodeSource('---\n---\np Pasted\n')}`)
+    await page.waitFor('.playground-held')
+    await page.waitUntil(() => (document.querySelector('.playground-input textarea') as HTMLTextAreaElement).value.includes('Pasted'))
+    await page.click('.playground-result button')
+    await page.waitUntil(() => document.querySelector('.playground-frame')?.getAttribute('data-test-live') === 'Pasted')
+  }, 60_000)
+
+  it('resets a box whose code never finishes, and runs the next code in a new frame', async () => {
     await page.goto('/getting-started/introduction')
     await page.goto('/getting-started/playground')
-    await page.waitFor('.playground-frame')
+    await page.waitFor('.playground-result[aria-busy="false"]')
+    await page.evaluate(() => {
+      (window as unknown as { hung: Element | null }).hung = document.querySelector('.playground-frame')
+    })
     await page.fill('.playground-input textarea', '---\nwhile (true) {}\n---\np loop\n')
     await page.waitFor('.playground-error', { timeout: '15s' })
-    expect(await page.text('.playground-error')).toContain('did not finish')
-
-    // Whether the replacement frame runs depends on Chromium giving it a process of its own, so only the notice is held to.
+    expect(await page.text('.playground-error')).toContain('stopped responding')
+    expect(await page.text('.playground-markup code')).toBe('')
+    await page.waitFor('.playground-result[aria-busy="false"]', { timeout: '15s' })
     expect(await page.evaluate(() => document.querySelectorAll('.playground-frame').length)).toBe(1)
+    expect(await page.evaluate(() => document.querySelector('.playground-frame') !== (window as unknown as { hung: Element | null }).hung)).toBe(true)
+
+    await page.fill('.playground-input textarea', '---\n---\np Recovered\n')
+    await page.waitUntil(() => document.querySelector('.playground-frame')?.getAttribute('data-test-live') === 'Recovered', { timeout: '15s' })
+    expect(await page.count('.playground-error')).toBe(0)
+  }, 60_000)
+
+  it('resets a box whose code answers first and blocks later', async () => {
+    await page.fill('.playground-input textarea', LATE)
+    await page.waitUntil(() => document.querySelector('.playground-frame')?.getAttribute('data-test-live') === 'fine', { timeout: '15s' })
+    await page.waitFor('.playground-error', { timeout: '15s' })
+    expect(await page.text('.playground-error')).toContain('stopped responding')
+    await page.waitFor('.playground-result[aria-busy="false"]', { timeout: '15s' })
+
+    await page.fill('.playground-input textarea', '---\n---\np Back\n')
+    await page.waitUntil(() => document.querySelector('.playground-frame')?.getAttribute('data-test-live') === 'Back', { timeout: '15s' })
   }, 60_000)
 
   it('leaves the other pages\' policy without eval', async () => {

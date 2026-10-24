@@ -8,49 +8,87 @@ import { encodeSource, sourceOfHash } from '../playground/runnable'
 import { SAMPLE } from '../playground/sample'
 
 const DEBOUNCE_MS = 150
+const BEAT_MS = 1000
 const RUN_LIMIT_MS = 3000
 
 const source = signal(SAMPLE)
 const problems = signal<Problem[]>([])
 const markup = signal('')
 const failure = signal('')
-// What the component shows in the frame, which the page cannot read itself.
-const live = signal('')
+// What the component shows in the frame, which the page cannot read from its sandbox: only the browser tests look at it, through the frame's `data-test-live`.
+const shownInFrame = signal('')
 const loading = signal(true)
+// Whether the frame said it is ready to run code.
+const ready = signal(false)
 // Code that came from a link waits for a click on Run, as a link can carry anyone's code.
 const held = signal(false)
-// Turned off and on again to replace the frame.
+// Turned off and on again to replace the frame, under a new address each time so the browser starts the replacement apart from the one that hung.
 const framed = signal(true)
+const generation = signal(0)
 
 let frame: HTMLIFrameElement | undefined
 let compiled: { server: string, dom: string } | undefined
 let compiler: Awaited<ReturnType<typeof loadCompiler>> | undefined
 let timer: ReturnType<typeof setTimeout> | undefined
 let sent = 0
-let ready = false
-let watchdog: ReturnType<typeof setTimeout> | undefined
+let monitor: ReturnType<typeof setInterval> | undefined
+let revive: ReturnType<typeof setTimeout> | undefined
+let lastHeard = 0
 
 // The frame runs the code: this page only reads text, so nothing a visitor types runs with the docs' origin. A frame that has not loaded drops the message and says it is ready when it has, which sends it again.
 function send() {
-  if (held() || !ready || !frame?.contentWindow || !compiled)
+  if (held() || !ready() || !frame?.contentWindow || !compiled)
     return
 
   sent++
-  clearTimeout(watchdog)
-  watchdog = setTimeout(stuck, RUN_LIMIT_MS)
   frame.contentWindow.postMessage({ id: sent, ...compiled }, '*')
 }
 
-// A frame that never answers is stuck in the code it was given: it is replaced, which ends that code, and the code is not sent again until the next edit.
+// A frame that stops answering the page's pings is stuck in the code it was given, at once or later: it is replaced, which ends that code, and the code is not sent again until the next edit.
 function stuck() {
-  if (!frame)
+  frame = undefined
+  ready.set(false)
+  compiled = undefined
+  markup.set('')
+  shownInFrame.set('')
+  failure.set(`The code stopped responding for ${RUN_LIMIT_MS / 1000} seconds, so the box was reset. Edit the code to run it again, or reload the page if the box stays blank.`)
+  dropFrame()
+  revive = setTimeout(showFrame, 0)
+}
+
+function dropFrame() {
+  frame = undefined
+  ready.set(false)
+  framed.set(false)
+}
+
+function showFrame() {
+  generation.set(generation() + 1)
+  framed.set(true)
+}
+
+// A page kept for the back button keeps its frame, and Chromium starts a new frame of the same site in the process of one that lives: a frame left behind would be the process a later hung frame is replaced in. So the frame goes with the page and comes back with it.
+function pageShown(event: PageTransitionEvent) {
+  if (event.persisted)
+    showFrame()
+}
+
+// A frame is pinged while it is shown. A hidden tab throttles the page's own timers, so its silence is not held against the frame.
+function watch() {
+  if (!ready() || document.hidden || !frame?.contentWindow)
     return
 
-  ready = false
-  compiled = undefined
-  failure.set(`The code did not finish in ${RUN_LIMIT_MS / 1000} seconds, so the box was reset. Edit the code to run it again, or reload the page if the box stays blank.`)
-  framed.set(false)
-  setTimeout(() => framed.set(true), 0)
+  if (performance.now() - lastHeard > RUN_LIMIT_MS) {
+    stuck()
+
+    return
+  }
+
+  frame.contentWindow.postMessage({ ping: true }, '*')
+}
+
+function seen() {
+  lastHeard = performance.now()
 }
 
 function build() {
@@ -89,12 +127,14 @@ function edit(value: string) {
   timer = setTimeout(build, DEBOUNCE_MS)
 }
 
-function heard(event: MessageEvent<{ ready?: boolean, id?: number, html?: string, live?: string, error?: string }>) {
+function heard(event: MessageEvent<{ ready?: boolean, pong?: boolean, id?: number, html?: string, live?: string, error?: string }>) {
   if (event.source !== frame?.contentWindow)
     return
 
+  seen()
+
   if (event.data.ready) {
-    ready = true
+    ready.set(true)
     send()
 
     return
@@ -103,22 +143,33 @@ function heard(event: MessageEvent<{ ready?: boolean, id?: number, html?: string
   if (event.data.id !== sent)
     return
 
-  clearTimeout(watchdog)
-
   markup.set(event.data.html ?? '')
-  live.set(event.data.live ?? '')
+  shownInFrame.set(event.data.live ?? '')
   failure.set(event.data.error ?? '')
+}
+
+// Code from the address waits for Run, whether the page opened on it or a link to it was pasted onto the page.
+function openLinked() {
+  const given = sourceOfHash(location.hash)
+
+  if (given === undefined)
+    return
+
+  source.set(given)
+  held.set(true)
+  clearTimeout(timer)
+  timer = setTimeout(build, DEBOUNCE_MS)
 }
 
 onMount(async () => {
   window.addEventListener('message', heard)
-
-  const given = sourceOfHash(location.hash)
-
-  if (given !== undefined) {
-    source.set(given)
-    held.set(true)
-  }
+  window.addEventListener('hashchange', openLinked)
+  window.addEventListener('pagehide', dropFrame)
+  window.addEventListener('pageshow', pageShown)
+  document.addEventListener('visibilitychange', seen)
+  monitor = setInterval(watch, BEAT_MS)
+  seen()
+  openLinked()
 
   try {
     compiler = await loadCompiler()
@@ -134,24 +185,29 @@ onMount(async () => {
 
 onCleanup(() => {
   window.removeEventListener('message', heard)
+  window.removeEventListener('hashchange', openLinked)
+  window.removeEventListener('pagehide', dropFrame)
+  window.removeEventListener('pageshow', pageShown)
+  document.removeEventListener('visibilitychange', seen)
+  clearInterval(monitor)
   clearTimeout(timer)
-  clearTimeout(watchdog)
+  clearTimeout(revive)
 })
 ---
 .playground
   label.playground-input
     span Component
-    Textarea(rows={14} spellcheck={false} value={source()} onInput={value => edit(value)})
-  .playground-result
-    span.playground-label Result
+    Textarea(rows={14} spellcheck={false} writeFocused value={source()} onInput={value => edit(value)})
+  .playground-result(aria-busy={loading() || !ready()})
+    span Result
     if held()
       p.playground-held The code in this link has not run. Read it, then run it.
       Button(label="Run" tone="accent" onClick={() => run()})
     if framed()
-      iframe.playground-frame(ref={element => frame = element} title="The component running" sandbox="allow-scripts" data-live={live()} src="/playground/frame.html" loading="lazy")
+      iframe.playground-frame(ref={element => frame = element} title="The component running" sandbox="allow-scripts" data-test-live={shownInFrame()} src={`/playground/frame.html?frame=${generation()}`} loading="lazy")
   if problems().length > 0
     ul.playground-problems(role="alert")
-      for problem of problems() key={problem.report}
+      for problem of problems()
         li
           pre {problem.report}
   if failure()

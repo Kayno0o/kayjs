@@ -4,8 +4,18 @@ import { mount, renderServer } from './runtime'
 const root = document.getElementById('root')!
 let unmount: (() => void) | undefined
 
-addEventListener('message', (event: MessageEvent<{ id: number, server: string, dom: string }>) => {
-  if (event.source !== parent || typeof event.data?.server !== 'string' || typeof event.data.dom !== 'string')
+addEventListener('message', (event: MessageEvent<{ ping?: boolean, id: number, server: string, dom: string }>) => {
+  if (event.source !== parent)
+    return
+
+  // The page pings while it shows the frame: code that blocks this thread, now or later, leaves the ping unanswered.
+  if (event.data?.ping) {
+    parent.postMessage({ pong: true }, '*')
+
+    return
+  }
+
+  if (typeof event.data?.server !== 'string' || typeof event.data.dom !== 'string')
     return
 
   const { id, server, dom } = event.data

@@ -7,7 +7,9 @@ const compress = promisify(brotliCompress)
 export interface Bundled {
   text: string
   brotli: Uint8Array<ArrayBuffer>
+  // One validator per encoding, as the plain and the brotli body are different representations.
   etag: string
+  brotliEtag: string
 }
 
 // The server render keeps its locale and island ids in an AsyncLocalStorage, which a browser lacks: the playground renders synchronously, so a stack of one is the same storage.
@@ -59,7 +61,9 @@ export function bundled(file: string, minify: boolean): () => Promise<Bundled> {
 
     const text = await result.outputs[0]!.text()
 
-    return { text, brotli: new Uint8Array(await compress(text)), etag: `"${Bun.hash(text).toString(36)}"` }
+    const hash = Bun.hash(text).toString(36)
+
+    return { text, brotli: new Uint8Array(await compress(text)), etag: `"${hash}"`, brotliEtag: `"${hash}-br"` }
   }
 
   return async () => {
@@ -76,14 +80,34 @@ export function bundled(file: string, minify: boolean): () => Promise<Bundled> {
   }
 }
 
-// The body in the form the request accepts, brotli when it does.
+const WEAK_PREFIX = /^W\//
+const BROTLI_REFUSED = /(?:^|,)\s*br\s*;\s*q=0(?:\.0{0,3})?\s*(?:,|$)/i
+const BROTLI_TOKEN = /(?:^|,)\s*br\s*(?:;|,|$)/i
+
+// RFC 9110 section 13.1.2: `*` or a list of entity-tags, compared weakly, so `W/` forms match their strong twins.
+function listed(header: string | null, etag: string): boolean {
+  if (header === null)
+    return false
+
+  if (header.trim() === '*')
+    return true
+
+  return header.split(',').some(tag => tag.trim().replace(WEAK_PREFIX, '') === etag)
+}
+
+// The body in the form the request accepts, brotli when it does, under the validator of that form.
 export function respond(request: Request, built: Bundled, headers: Record<string, string>): Response {
+  const accepted = request.headers.get('accept-encoding') ?? ''
+  const brotli = BROTLI_TOKEN.test(accepted) && !BROTLI_REFUSED.test(accepted)
+  const etag = brotli ? built.brotliEtag : built.etag
+  const cacheControl = headers['cache-control'] ?? 'no-cache'
+
   // Revalidated on each visit, so an unchanged bundle costs a 304 and not the download.
-  if (request.headers.get('if-none-match') === built.etag)
-    return new Response(null, { status: 304, headers: { 'etag': built.etag, 'cache-control': headers['cache-control'] ?? 'no-cache' } })
+  if (listed(request.headers.get('if-none-match'), etag))
+    return new Response(null, { status: 304, headers: { etag, 'cache-control': cacheControl, 'vary': 'accept-encoding' } })
 
-  if (request.headers.get('accept-encoding')?.includes('br'))
-    return new Response(built.brotli, { headers: { ...headers, 'etag': built.etag, 'content-encoding': 'br', 'vary': 'accept-encoding' } })
+  if (brotli)
+    return new Response(built.brotli, { headers: { ...headers, 'etag': etag, 'content-encoding': 'br', 'vary': 'accept-encoding' } })
 
-  return new Response(built.text, { headers: { ...headers, etag: built.etag, vary: 'accept-encoding' } })
+  return new Response(built.text, { headers: { ...headers, etag, vary: 'accept-encoding' } })
 }
