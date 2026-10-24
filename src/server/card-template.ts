@@ -1,6 +1,6 @@
 import type { ImageRouteOptions } from './image'
-import { existsSync, readFileSync } from 'node:fs'
-import { dirname, join, resolve, sep } from 'node:path'
+import { readFileSync } from 'node:fs'
+import { dirname, resolve, sep } from 'node:path'
 import { ASSET_PREFIX } from '../build/assets'
 import { resolveFrom } from '../build/files'
 import { KayError } from '../compiler/errors'
@@ -33,35 +33,33 @@ export function setCardShotLimit(ms = DEFAULT_SHOT_MS): void {
   shotMs = ms
 }
 
-// The folder the app's own files live in: the nearest one holding kay.config.ts above the template, or the template's own.
-function projectRoot(file: string): string {
-  for (let dir = dirname(file); dir !== dirname(dir); dir = dirname(dir)) {
-    if (existsSync(join(dir, 'kay.config.ts')))
-      return dir
-  }
-
-  return dirname(file)
-}
-
-// What a card drawn from `_card.kay` depends on that no setting names: the text of the template and of every `.kay`, `.ts` or `.js` file of the app it imports, however deep, the stylesheet the build made of them and the font rules the page carries.
-export function templateStamp(file: string, styles: string | undefined, fonts?: string | undefined): string {
+// What a card drawn from `_card.kay` depends on that no setting names: the text of the template and of every `.kay`, `.ts` or `.js` file of the app it imports, however deep, the content of the images and other files it imports, the stylesheet the build made of them and the font rules the page carries.
+export function templateStamp(file: string, styles: string | undefined, fonts?: string | undefined, projectDir: string = dirname(file)): string {
   const seen = new Set<string>()
   const texts: string[] = []
-  const root = projectRoot(file) + sep
+  const root = projectDir + sep
   const read = (path: string) => {
     if (seen.has(path))
       return
 
     seen.add(path)
 
-    let source: string
+    let bytes: Buffer
 
     try {
-      source = readFileSync(path, 'utf8')
+      bytes = readFileSync(path)
     }
     catch {
       return
     }
+
+    if (!SOURCE_FILE.test(path)) {
+      texts.push(path, Bun.hash(bytes).toString(36))
+
+      return
+    }
+
+    const source = bytes.toString('utf8')
 
     texts.push(path, source)
 
@@ -69,7 +67,7 @@ export function templateStamp(file: string, styles: string | undefined, fonts?: 
       const imported = resolveFrom(specifier!, path)
 
       // Another package's files are its version's, and the framework's own are kay's.
-      if (imported !== undefined && imported.startsWith(root) && !imported.includes(NODE_MODULES) && SOURCE_FILE.test(imported))
+      if (imported !== undefined && imported.startsWith(root) && !imported.includes(NODE_MODULES))
         read(imported)
     }
   }

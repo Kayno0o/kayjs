@@ -470,7 +470,7 @@ async function outputStage(project: Project, exported: boolean, client: ClientBu
   await writeImageVariants(client.dir, webpQuality(config.images), cacheDir(root, 'variants'), { avif: exported ? undefined : avifQuality(config.images), onImage: imageProgress(report) })
   report({ step: 'writing images, cards and favicons' })
   await writeRemoteVariants(client.dir, remote, webpQuality(config.images))
-  await writeCards(client.dir, cacheDir(root, 'cards'), remote)
+  await writeCards(client.dir, cacheDir(root, 'cards'), remote, { aspects: config.images?.aspects, quality: webpQuality(config.images), avif: exported ? undefined : avifQuality(config.images) })
   lap('images and cards')
 
   const favicon = faviconSource(root, config.favicon, config.manifest)

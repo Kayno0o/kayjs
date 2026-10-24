@@ -53,7 +53,7 @@ export interface CardSetup {
   // Keeps the cards pages ask for, for `kay build` to write: on while prerendering.
   collect?: boolean | undefined
   // The app's `_card.kay`, which lays the cards out in place of kay's fixed layout, and the stylesheet the build made of it.
-  template?: { file: string, styles: string | undefined } | undefined
+  template?: { file: string, styles: string | undefined, root?: string | undefined } | undefined
 }
 
 // What one card shows: the locale is the page's when it is not the default one, which the template renders in.
@@ -284,7 +284,7 @@ async function cardTemplateStamp(setup: CardSetup): Promise<string | undefined> 
   if (setup.bundled)
     throw new KayError('executable-incomplete', 'kay: this executable holds no record of src/routes/_card.kay; build it again with kay build --compile')
 
-  const stamp = templateStamp(setup.template.file, setup.template.styles, setup.fonts?.css)
+  const stamp = templateStamp(setup.template.file, setup.template.styles, setup.fonts?.css, setup.template.root)
 
   if (setup.collect)
     await Bun.write(built, stamp)
@@ -590,7 +590,7 @@ export function serveCards(app: Elysia, cards: Cards, options: ImageRouteOptions
 }
 
 // The cards prerendered pages asked for, written beside the image variants for the route or a static host to serve as files; returns how many were drawn. A card an earlier build drew is copied from the cache, which keeps only this build's.
-export async function writeCards(clientDir: string, cacheDir?: string, remote?: RemoteImages): Promise<number> {
+export async function writeCards(clientDir: string, cacheDir?: string, remote?: RemoteImages, images?: Pick<ImageRouteOptions, 'aspects' | 'quality' | 'avif'>): Promise<number> {
   let drawn = 0
 
   for (const [name, card] of requested) {
@@ -610,7 +610,7 @@ export async function writeCards(clientDir: string, cacheDir?: string, remote?: 
     countCache('share cards', kept)
 
     if (!kept && current!.template) {
-      await writeTemplateCard(current!, cached ?? target, { title: card.title, image: card.image, name: card.name ?? current!.name, locale: card.locale }, { clientDir, cacheDir: join(current!.dir, CARD_IMAGES_DIR), remote })
+      await writeTemplateCard(current!, cached ?? target, { title: card.title, image: card.image, name: card.name ?? current!.name, locale: card.locale }, { ...images, clientDir, cacheDir: join(current!.dir, CARD_IMAGES_DIR), remote })
       drawn++
     }
     else if (!kept) {

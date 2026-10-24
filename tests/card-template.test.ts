@@ -86,18 +86,24 @@ describe('the share card template stamp', () => {
     const dir = await mkdtemp(join(tmpdir(), 'kay-card-stamp-'))
 
     try {
-      await Bun.write(join(dir, 'kay.config.ts'), '')
+      await Bun.write(join(dir, 'src/hero.png'), 'one')
       await Bun.write(join(dir, 'src/lib/deep.ts'), 'export const deep = 1')
       await Bun.write(join(dir, 'src/lib/helper.ts'), 'import { deep } from \'./deep\'\nexport const helper = deep')
-      await Bun.write(join(dir, 'src/routes/_card.kay'), '---\nimport { helper } from \'../lib/helper\'\nimport { Elysia } from \'elysia\'\nimport { shareCard } from \'kay/image\'\n---\np {helper}')
+      await Bun.write(join(dir, 'src/routes/_card.kay'), '---\nimport { helper } from \'../lib/helper\'\nimport { Elysia } from \'elysia\'\nimport { shareCard } from \'kay/image\'\nimport hero from \'../hero.png\'\n---\np {helper}')
 
       const file = join(dir, 'src/routes/_card.kay')
-      const stamp = templateStamp(file, undefined, 'a{}')
+      const stamp = templateStamp(file, undefined, 'a{}', dir)
 
-      expect(templateStamp(file, undefined, 'a{}')).toBe(stamp)
-      expect(templateStamp(file, undefined, 'b{}')).not.toBe(stamp)
+      expect(templateStamp(file, undefined, 'a{}', dir)).toBe(stamp)
+      expect(templateStamp(file, undefined, 'b{}', dir)).not.toBe(stamp)
       await Bun.write(join(dir, 'src/lib/deep.ts'), 'export const deep = 2')
-      expect(templateStamp(file, undefined, 'a{}')).not.toBe(stamp)
+
+      const changed = templateStamp(file, undefined, 'a{}', dir)
+
+      expect(changed).not.toBe(stamp)
+      // The image the template imports, replaced in place.
+      await Bun.write(join(dir, 'src/hero.png'), 'two')
+      expect(templateStamp(file, undefined, 'a{}', dir)).not.toBe(changed)
     }
     finally {
       await rm(dir, { recursive: true, force: true })

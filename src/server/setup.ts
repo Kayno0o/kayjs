@@ -199,7 +199,7 @@ async function setupWith<Claimed>(project: Project, loadClient: () => Promise<Cl
   const headAndCards = async () => {
     const { fonts, ...head } = await configHead(root, config, client.dir, source.embedded, ownManifest)
 
-    return { ...head, fontCss: fonts?.css, cards: await setupCards({ dir: join(client.dir, '..'), clientDir: client.dir, fonts, config: config.images?.card, logo: logoFile, logoDrawn, name: config.seo?.name, defaultLocale: locales.settings.defaultLocale, quality: config.images?.quality, bundled: source.embedded, prebuilt: mode.prebuilt, collect: prerendering, template: cardPage && { file: cardPage.file, styles: client.styles.get(cardPage.file) } }) }
+    return { ...head, fontCss: fonts?.css, cards: await setupCards({ dir: join(client.dir, '..'), clientDir: client.dir, fonts, config: config.images?.card, logo: logoFile, logoDrawn, name: config.seo?.name, defaultLocale: locales.settings.defaultLocale, quality: config.images?.quality, bundled: source.embedded, prebuilt: mode.prebuilt, collect: prerendering, template: cardPage && { file: cardPage.file, styles: client.styles.get(cardPage.file), root } }) }
   }
 
   const { head, scripts, styles, cards, fontCss } = await headAndCards()

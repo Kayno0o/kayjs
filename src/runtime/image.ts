@@ -511,7 +511,7 @@ export function linkVariantFiles(): void {
   variantFiles = true
 }
 
-// Runs `run` with the pages linking the image route, as a server does, in place of the files a static export wrote: for a page drawn in a browser that reaches the route and no files the build has not written yet.
+// Runs `run` with the pages linking the image route, as a server does, in place of the files a static export wrote: for a page drawn in a browser that reaches the route and no files the build has not written yet. It flips a global across awaits, so it relies on the card queue drawing one card at a time.
 export async function withoutVariantFiles<T>(run: () => Promise<T>): Promise<T> {
   const linked = variantFiles
 
