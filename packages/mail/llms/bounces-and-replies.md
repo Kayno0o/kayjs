@@ -44,8 +44,8 @@ export const mail = mailer({
 })
 ```
 
-- A `Reply` is `{ from, fromName, to, subject, date, messageId, inReplyTo, references, text, html, headers, attachments }`, headers read and bodies decoded (quoted-printable, base64, charsets), `attachments` being `{ filename, contentType, content }`. The `Message-ID` of every mail kayjs-mail sends is in its `headers` and the outbox, so a reply can be matched to it. Without `inbound` a reply is acknowledged and dropped.
-- The function runs for whoever holds the secret: treat the message as untrusted input, the sender's address and the attachments' file names included (sanitise them before using one as a path).
+- A `Reply` is `{ from, fromName, to, subject, date, messageId, inReplyTo, references, text, html, headers, attachments }`, headers read and bodies decoded (quoted-printable, base64, charsets), `attachments` being `{ filename, contentType, content }`, a `filename` decoded (RFC 2231 `filename*=` and RFC 2047 words) and always a bare file name: a directory part, a control character or an empty name is dropped, `attachment` standing for what is left of none. The `Message-ID` of every mail kayjs-mail sends is in its `headers` and the outbox, so a reply can be matched to it. Without `inbound` a reply is acknowledged and dropped.
+- The function runs for whoever holds the secret: treat the message as untrusted input, the sender's address and the attachments' file names included (a name is bare, but still pick your own storage name rather than trust it).
 
 ## Reference
 

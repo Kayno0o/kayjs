@@ -19,10 +19,15 @@ const WHITESPACE = /\s+/g
 const HEX_PAIR = /^[\da-f]{2}$/i
 const LINE_BREAKS = /\r?\n/
 const FOLDED = /^[ \t]/
-const QUOTED = /^"(.*)"$/
+const QUOTED = /^"(.*)"$/s
+// Only the quote and the backslash are unescaped in a quoted value, so a Windows path a client sent raw keeps its separators for fileNameOf.
+const ESCAPED = /\\(["\\])/g
+const EXTENDED = /^([^*]+)\*(?:(\d+)(\*)?)?$/
 const BLANK_LINE = /\r?\n\r?\n/
 const FIRST_BREAK = /^\r?\n/
 const SPACES = /\s+/
+const CONTROL = /\p{Cc}/gu
+const PATH_SEPARATORS = /[/\\]/
 const BOUNDARY_SAFE = /[.*+?^${}()|[\]\\]/g
 
 function latin1(bytes: Uint8Array): string {
@@ -105,19 +110,118 @@ function parseHeaders(block: string): Record<string, string> {
   return headers
 }
 
+// `;`-separated pieces of a header value, a quoted string kept whole.
+function splitParams(value: string): string[] {
+  const pieces: string[] = []
+  let current = ''
+  let quoted = false
+
+  for (let index = 0; index < value.length; index++) {
+    const char = value[index]!
+
+    if (quoted && char === '\\' && index + 1 < value.length) {
+      current += char + value[++index]!
+
+      continue
+    }
+
+    if (char === '"')
+      quoted = !quoted
+
+    if (char === ';' && !quoted) {
+      pieces.push(current)
+      current = ''
+    }
+    else {
+      current += char
+    }
+  }
+
+  pieces.push(current)
+
+  return pieces
+}
+
+function unquote(value: string): string {
+  const match = QUOTED.exec(value)
+
+  return match === null ? value : match[1]!.replaceAll(ESCAPED, '$1')
+}
+
+function percentDecoded(text: string, charset: string | undefined): string {
+  const bytes: number[] = []
+
+  for (let index = 0; index < text.length; index++) {
+    const hex = text[index] === '%' ? text.slice(index + 1, index + 3) : ''
+
+    if (HEX_PAIR.test(hex)) {
+      bytes.push(Number.parseInt(hex, 16))
+      index += 2
+    }
+    else {
+      for (const byte of new TextEncoder().encode(text[index]))
+        bytes.push(byte)
+    }
+  }
+
+  return decode(Uint8Array.from(bytes), charset)
+}
+
+// RFC 2231: `name*=charset'lang'%C3%A9` and the continuations `name*0`, `name*1*`, joined into `name`; an extended `name*` wins over a plain `name`.
+function resolveExtended(raw: Record<string, string>): Record<string, string> {
+  const params: Record<string, string> = {}
+  const pieces: Record<string, { index: number, encoded: boolean, value: string }[]> = {}
+
+  for (const [key, value] of Object.entries(raw)) {
+    const match = EXTENDED.exec(key)
+
+    if (match === null) {
+      params[key] ??= value
+
+      continue
+    }
+
+    (pieces[match[1]!] ??= []).push({ index: match[2] === undefined ? 0 : Number(match[2]), encoded: match[3] === '*' || match[2] === undefined, value })
+  }
+
+  for (const [name, list] of Object.entries(pieces)) {
+    let charset: string | undefined
+    let joined = ''
+
+    for (const [position, piece] of list.toSorted((first, second) => first.index - second.index).entries()) {
+      let text = piece.value
+
+      if (piece.encoded && position === 0) {
+        const quotes = text.split('\'')
+
+        if (quotes.length >= 3) {
+          charset = (quotes[0] === '' ? undefined : quotes[0])
+          text = quotes.slice(2).join('\'')
+        }
+      }
+
+      joined += piece.encoded ? percentDecoded(text, charset) : text
+    }
+
+    params[name] = joined
+  }
+
+  return params
+}
+
 // `text/plain; charset="utf-8"` as its type and parameters.
 function contentType(value: string | undefined): { type: string, params: Record<string, string> } {
-  const [type = '', ...rest] = (value ?? 'text/plain').split(';')
-  const params: Record<string, string> = {}
+  const [type = '', ...rest] = splitParams(value ?? 'text/plain')
+  const raw: Record<string, string> = {}
 
   for (const item of rest) {
     const equals = item.indexOf('=')
 
     if (equals > 0)
-      params[item.slice(0, equals).trim().toLowerCase()] = item.slice(equals + 1).trim().replace(QUOTED, '$1')
+      raw[item.slice(0, equals).trim().toLowerCase()] ??= unquote(item.slice(equals + 1).trim())
   }
 
-  return { type: type.trim().toLowerCase() || 'text/plain', params }
+  return { type: type.trim().toLowerCase() || 'text/plain', params: resolveExtended(raw) }
 }
 
 function transferDecoded(raw: string, encoding: string | undefined): Uint8Array {
@@ -219,10 +323,18 @@ export function addressesOf(value: string | undefined): { name: string, address:
   return parseAddresses(decodeWords(value), { flatten: true }).filter(entry => Boolean(entry.address)).map(entry => ({ name: entry.name, address: entry.address.toLowerCase() }))
 }
 
+// A bare file name: encoded words decoded, any directory part and control character dropped.
+function fileNameOf(raw: string): string {
+  const base = decodeWords(raw).replaceAll(CONTROL, '').split(PATH_SEPARATORS).pop()!.trim()
+
+  return base === '' || base === '.' || base === '..' ? 'attachment' : base
+}
+
 function filenameOf(part: Part): string | undefined {
   const disposition = contentType(part.headers['content-disposition'])
+  const name = disposition.params.filename ?? part.params.name
 
-  return part.params.name ?? disposition.params.filename
+  return name === undefined ? undefined : fileNameOf(name)
 }
 
 // The message as an app function reads it: bodies decoded, encoded headers read, parts that carry a file separated.
