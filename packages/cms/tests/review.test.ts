@@ -51,6 +51,11 @@ afterEach(async () => {
     await notifications.erase(id)
 })
 
+// An approval of the entry as it stands, as a reviewer who has just opened it sends it.
+async function approve(ref: { collection: string, slug: string }) {
+  return approveEntry(ref, reviewer, undefined, (await entryOf(ref))?.version)
+}
+
 async function draft(name: string, slug = 'first'): Promise<{ collection: string, slug: string }> {
   expect(await saveEntry({ collection: name, slug, data: { title: 'One', draft: true } }, { create: true })).toMatchObject({ saved: true })
 
@@ -85,12 +90,12 @@ describe.each(['posts', 'notes'])('review in %s', (name) => {
 
     await submitEntry(ref, writer)
 
-    const approved = await approveEntry(ref, reviewer)
+    const approved = await approve(ref)
 
     expect(approved).toMatchObject({ saved: true, review: { status: 'approved', events: [{ verb: 'submit' }, { verb: 'approve', by: 'Rex' }] }, entry: { data: { draft: false } } })
     expect((await entryOf(ref))?.draft).toBe(false)
     expect((await notifications.list('writer-1')).map(note => note.title)).toEqual(['Rex approved One'])
-    expect(await approveEntry(ref, reviewer)).toMatchObject({ issues: [{ message: 'first is not in review' }] })
+    expect(await approve(ref)).toMatchObject({ issues: [{ message: 'first is not in review' }] })
   })
 
   test('a send-back needs a note, returns the draft to its writer who hears the note, and a new submission goes on', async () => {
@@ -146,7 +151,7 @@ describe('review', () => {
     const ref = await draft('notes')
 
     await submitEntry(ref, writer)
-    await approveEntry(ref, reviewer)
+    await approve(ref)
     expect((await revisionsOf(ref)).map(revision => revision.verb)).toEqual(['add', 'publish'])
     expect((await readReview(ref))?.events.map(event => event.verb)).toEqual(['submit', 'approve'])
   })
@@ -219,7 +224,7 @@ describe('review', () => {
 
       return real.save(change)
     } } })
-    expect(await approveEntry(ref, reviewer)).toMatchObject({ issues: [{ message: expect.stringContaining('could not be kept') }] })
+    expect(await approve(ref)).toMatchObject({ issues: [{ message: expect.stringContaining('could not be kept') }] })
     expect((await entryOf(ref))?.draft).toBe(false)
   })
 
@@ -228,10 +233,10 @@ describe('review', () => {
 
     await submitEntry(ref, writer)
     expect(await saveEntry({ ...ref, data: { title: 'Changed', draft: true } })).toMatchObject({ saved: true })
-    expect(await approveEntry(ref, reviewer)).toMatchObject({ issues: [{ message: 'first changed after it was sent for review: it needs to be sent again' }] })
+    expect(await approve(ref)).toMatchObject({ issues: [{ message: 'first changed after it was sent for review: it needs to be sent again' }] })
     expect((await entryOf(ref))?.draft).toBe(true)
     expect(await submitEntry(ref, writer)).toMatchObject({ saved: true })
-    expect(await approveEntry(ref, reviewer)).toMatchObject({ saved: true, entry: { data: { title: 'Changed', draft: false } } })
+    expect(await approve(ref)).toMatchObject({ saved: true, entry: { data: { title: 'Changed', draft: false } } })
   })
 
   test('an approval is of the version the reviewer opened', async () => {
@@ -241,6 +246,7 @@ describe('review', () => {
 
     const opened = (await entryOf(ref))?.version
 
+    expect(await approveEntry(ref, reviewer, undefined, undefined)).toMatchObject({ issues: [{ message: expect.stringContaining('changed since you opened it') }] })
     expect(await approveEntry(ref, reviewer, undefined, 'another-version')).toMatchObject({ issues: [{ message: 'first changed since you opened it: reload it to read what you approve' }] })
     expect((await entryOf(ref))?.draft).toBe(true)
     expect(await approveEntry(ref, reviewer, undefined, opened)).toMatchObject({ saved: true })

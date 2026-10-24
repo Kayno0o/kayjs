@@ -93,7 +93,7 @@ export async function submitEntry(ref: EntryRef, actor: Actor, author?: Identity
 }
 
 // Publishes an entry in review, or leaves it scheduled at the publish date it holds, and tells its writer. `seen` is the version the reviewer opened.
-export async function approveEntry(ref: EntryRef, actor: Actor, author?: Identity, seen?: string): Promise<ReviewOutcome> {
+export async function approveEntry(ref: EntryRef, actor: Actor, author: Identity | undefined, seen: string | undefined): Promise<ReviewOutcome> {
   const found = await target(ref)
 
   if ('issues' in found)
@@ -104,11 +104,11 @@ export async function approveEntry(ref: EntryRef, actor: Actor, author?: Identit
   if (review?.status !== 'review' || !entry.draft)
     return refused(ref, wording('cms.review.notInReview', '{slug} is not in review', { slug: ref.slug }))
 
-  // An approval is of the version the reviewer was asked to look at, and the one they opened.
-  if (review.version !== undefined && review.version !== entry.version)
+  // An approval is of the version the reviewer was asked to look at, and the one they opened: an entry that has a version is approved by naming it.
+  if (entry.version !== undefined && review.version !== entry.version)
     return refused(ref, wording('cms.review.changed', '{slug} changed after it was sent for review: it needs to be sent again', { slug: ref.slug }))
 
-  if (seen !== undefined && seen !== entry.version)
+  if (entry.version !== undefined && seen !== entry.version)
     return refused(ref, wording('cms.review.changedSince', '{slug} changed since you opened it: reload it to read what you approve', { slug: ref.slug }))
 
   const published = await publishEntry(ref, author, { reviewed: true, version: entry.version })

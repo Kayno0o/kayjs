@@ -123,7 +123,7 @@ async function noteActor(ctx: GuardContext, submitting: boolean): Promise<void> 
     log.error('the reviewers of a submission could not be listed', error)
   }
 
-  actors.set(ctx.request, { name: member?.name ?? '', id: member?.id, reviewers })
+  actors.set(ctx.request, { name: member?.name !== undefined && member.name !== '' ? member.name : wording('cms.review.someone', 'Someone'), id: member?.id, reviewers })
 }
 
 // Marks the edit cookie of a person the app's guard lets in who only reads. An edit link's holder, whom it turns away, reads on all the same, and the guard is asked again at each of their reads.
