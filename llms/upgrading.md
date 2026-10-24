@@ -6,7 +6,7 @@ What each minor release breaks, and what an app changes to move to it. kay and i
 
 ### A restricted-role Postgres app creates `kay_push_subscriptions` before listing `push()`
 
-- Nothing changes for an app that does not list `push()`. One that does, on a Postgres whose app role may not create tables, runs `createDataTables` once with a role that may, or creates the `kay_push_subscriptions` table itself, as it does for the other `kay_` tables.
+- Nothing changes for an app that does not list `push()`. One that does, on a Postgres whose app role may not create tables, has the owner create `kay_push_subscriptions` once, as it does for the other `kay_` tables ([Queues](queues.md)).
 
 ## 1.75.0
 
