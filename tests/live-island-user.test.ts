@@ -1,7 +1,7 @@
 import type { LiveRequest } from '../src/runtime/live-value'
 import { join } from 'node:path'
 import process from 'node:process'
-import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
+import { afterAll, beforeAll, describe, expect, it, spyOn } from 'bun:test'
 import { Elysia } from 'elysia'
 import { liveId } from '../src/build/live-ids'
 import { ISLAND_HEADER } from '../src/runtime/server-islands'
@@ -32,6 +32,7 @@ describe('a value of each user in a deferred island and on the error pages', () 
   let build: Awaited<ReturnType<typeof scratchBuild>>
   let app: Elysia
   let live: Values
+  const reported: string[] = []
 
   const as = (user: string | undefined, more: Record<string, string> = {}): Record<string, string> => ({ ...user === undefined ? {} : { 'x-user': user }, ...more })
   const visit = async (path: string, user?: string, more: Record<string, string> = {}) => app.handle(new Request(`http://localhost${path}`, { headers: { accept: 'text/html', ...as(user, more) } }))
@@ -42,7 +43,9 @@ describe('a value of each user in a deferred island and on the error pages', () 
     await pages({ root: ROOT, prebuilt: false })
     build = await scratchBuild({}, false, join(process.cwd(), ROOT))
     await build.prerender({})
-    app = new Elysia().onRequest(hooks).use(await build.serve({ security: false }))
+    app = new Elysia().onRequest(hooks).use(await build.serve({ security: false, onError: ({ error }) => {
+      reported.push(String(error))
+    } }))
     live = await import(join(process.cwd(), ROOT, 'src/live.ts')) as Values
     live.unread.set('alice', 3)
     live.unread.set('bob', 5)
@@ -115,9 +118,14 @@ describe('a value of each user in a deferred island and on the error pages', () 
     expect(html).toContain('Broke')
     expect(html).toContain('3<!--]--> unread')
     expect(pagesOf(html)[0]!.sig).toMatch(/\|alice$/)
+    // The page was rendered again for the viewer, and the error reported once.
+    await Bun.sleep(50)
+    expect(reported.filter(error => error.includes('a hook failed'))).toHaveLength(1)
   })
 
   it('renders a page through the error page when asking who is signed in fails, for the first request of the page and the next', async () => {
+    const warn = spyOn(console, 'warn').mockImplementation(() => undefined)
+
     for (let attempt = 0; attempt < 2; attempt++) {
       const response = await visit('/inbox', 'alice', { 'x-namer-fails': '1' })
       const html = await response.text()
@@ -128,6 +136,8 @@ describe('a value of each user in a deferred island and on the error pages', () 
       expect(html).not.toContain('alice')
     }
 
+    expect(warn.mock.calls.filter(call => String(call[0]).includes('asking who is signed in failed')).length).toBeGreaterThanOrEqual(2)
+    warn.mockRestore()
     expect(await (await visit('/inbox', 'alice')).text()).toContain('3<!--]--> unread')
   })
 })

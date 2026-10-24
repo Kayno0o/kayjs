@@ -28,6 +28,8 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('a value of 
   // What the server was asked for.
   const asked: string[] = []
   const cut = new Set<() => void>()
+  // How long the island's fetch takes, for a test to meet a second ask while one is in flight.
+  let slowIsland = 0
   const tabs: TestPage[] = []
 
   const open = async (as: string): Promise<TestPage> => {
@@ -66,6 +68,9 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('a value of 
         const headers = new Headers(request.headers)
 
         asked.push(`${request.method} ${url.pathname}${url.search}`)
+
+        if (slowIsland > 0 && url.searchParams.has('kay_island'))
+          await Bun.sleep(slowIsland)
 
         if (user === null)
           headers.delete('x-user')
@@ -120,6 +125,7 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('a value of 
       tab.close()
 
     session = undefined
+    slowIsland = 0
     asked.length = 0
     live.unread.set('alice', 3)
     live.unread.set('bob', 5)
@@ -154,6 +160,37 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('a value of 
     expect(alice.errors).toEqual([])
     expect(bob.errors).toEqual([])
   })
+
+  it('shows the own value of the new user when it equals the one the old user last had rendered', async () => {
+    const tab = await open('alice')
+
+    await tab.waitUntil(...shows(3))
+    await Bun.sleep(500)
+    live.unread.set('alice', 4)
+    await tab.waitUntil(...shows(4))
+    live.unread.set('bob', 3)
+    session = 'bob'
+    drop()
+    await tab.waitUntil(...shows(3))
+    expect(tab.errors).toEqual([])
+  })
+
+  it('fetches the island once for a renewal that comes while it is being fetched', async () => {
+    const tab = await open('alice')
+
+    await tab.waitUntil(...shows(3))
+    await Bun.sleep(500)
+
+    const loads = islandLoads().length
+
+    slowIsland = 3000
+    await tab.evaluate(() => dispatchEvent(new Event('kay-renew')))
+    await Bun.sleep(1000)
+    await tab.evaluate(() => dispatchEvent(new Event('kay-renew')))
+    await Bun.sleep(6000)
+    expect(islandLoads()).toHaveLength(loads + 1)
+    expect(tab.errors).toEqual([])
+  }, 30_000)
 
   it('shows the new user\'s value, and not the old one\'s, once another user signed in in the same tab', async () => {
     const tab = await open('alice')

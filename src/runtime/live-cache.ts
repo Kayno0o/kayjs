@@ -334,7 +334,8 @@ function askIsland(slot: HTMLElement): void {
 async function refetchIsland(slot: HTMLElement): Promise<void> {
   const hooks = navigation.hooks
 
-  if (!slot.isConnected)
+  // The fetch in progress renders with proofs made after the ask.
+  if (!slot.isConnected || fetchingIslands.has(slot))
     return
 
   if (hooks === undefined) {

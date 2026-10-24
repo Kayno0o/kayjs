@@ -6,6 +6,7 @@ import { AsyncLocalStorage } from 'node:async_hooks'
 import { broadcast, onClockHeard, onKeysInvalidated, onLiveRead } from '../runtime/cache'
 import { CACHE_LIVE_ID } from '../runtime/cache-live-id'
 import { checkLiveWrites, live, LIVE_ROUTE, liveSlot, ownLiveDeclared, PROOF_LIFETIME_MS, readViewerWith, slotValue, watchSlot } from '../runtime/live-value'
+import { kayLog } from '../runtime/log'
 import { PRESENCE_LIVE_ID } from '../runtime/presence'
 import { currentServerScope } from '../runtime/reactive'
 import { decodeServerValue, encodeValue, unsendable } from '../runtime/wire'
@@ -127,7 +128,9 @@ async function viewerOf(request: Request, forgiving: boolean): Promise<string | 
   try {
     return await userOf(request)
   }
-  catch {
+  catch (error) {
+    kayLog('warn', 'asking who is signed in failed, so the page renders for nobody', error)
+
     return undefined
   }
 }
