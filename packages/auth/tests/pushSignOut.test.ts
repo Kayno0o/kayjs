@@ -46,6 +46,22 @@ describe('signing out with push', () => {
     expect((await pushSubscriptions.list(ada.id)).map(each => each.endpoint)).toEqual(['https://8.8.8.8/push/other'])
   })
 
+  it('tells the browser to forget its local() mirrors, with a new value each time', async () => {
+    await authTest(site).signInAs({ email: 'edith@example.com', username: 'Edith' })
+
+    const first = (await site.fetch('/auth/sign-out', { method: 'POST' })).headers.getSetCookie().find(line => line.startsWith('kay_local_clear='))
+
+    expect(first).toBeDefined()
+    expect(first).toContain('Path=/')
+
+    await authTest(site).signInAs({ email: 'edith@example.com', username: 'Edith' })
+
+    const second = (await site.fetch('/auth/sign-out', { method: 'POST' })).headers.getSetCookie().find(line => line.startsWith('kay_local_clear='))
+
+    expect(second).toBeDefined()
+    expect(second!.slice(0, second!.indexOf(';'))).not.toBe(first!.slice(0, first!.indexOf(';')))
+  })
+
   it('leaves everything alone for a browser that never subscribed', async () => {
     const grace = await authTest(site).signInAs({ email: 'grace@example.com', username: 'Grace' })
 
