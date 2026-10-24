@@ -9,7 +9,7 @@ import { Elysia } from 'elysia'
 import { invalidate } from '../src/runtime/cache'
 import { setupStore } from '../src/server/app-store'
 import { notifications, notify } from '../src/server/notifications'
-import { pgHandle } from '../src/server/pg-data'
+import { createDataTables, pgHandle } from '../src/server/pg-data'
 import { pgPush } from '../src/server/pg-stores'
 import { checkedEndpoint, push, pushesSettled, pushSubscriptions, readSubscription, sendPush, setPushResolver, setVapidKeys, vapidKeys } from '../src/server/push'
 import { decryptPayload, encryptPayload, fromBase64Url, generateVapidKeys, toBase64Url, validVapidKeys, vapidAuthorization } from '../src/server/push-crypto'
@@ -270,7 +270,6 @@ describe('the endpoint a browser names', () => {
   })
 
   it('is dropped when its name resolves to a private address, and the connection is never made', async () => {
-
     const phone = await device('phone')
 
     setPushLoose(false)
@@ -673,6 +672,17 @@ function storeCases(name: string, make: () => Promise<PushStore>): void {
       expect((await made.list('ada')).map(each => each.endpoint)).toEqual(['https://a/4', 'https://a/3', 'https://a/2'])
     })
 
+    it('keeps the most and lists equal times in one order when many devices subscribe at once', async () => {
+      const made = await make()
+
+      await Promise.all(Array.from({ length: 14 }, async (_, index) => made.add('ada', record(`https://a/${index}`, 5), 10)))
+
+      const first = (await made.list('ada')).map(each => each.endpoint)
+
+      expect(first).toHaveLength(10)
+      expect((await made.list('ada')).map(each => each.endpoint)).toEqual(first)
+    })
+
     it('removes by endpoint, a person\'s own when named, and erases a person', async () => {
       const made = await make()
 
@@ -705,7 +715,7 @@ pgDescribe('Postgres', () => {
     const { sql } = await postgres()
 
     await sql.unsafe('DROP TABLE IF EXISTS kay_push_subscriptions')
-    await sql.unsafe('CREATE TABLE kay_push_subscriptions (endpoint text PRIMARY KEY, user_id text NOT NULL, p256dh text NOT NULL, auth text NOT NULL, at bigint NOT NULL)')
+    await createDataTables(sql)
 
     return pgPush(pgHandle(sql))
   })

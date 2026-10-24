@@ -275,12 +275,16 @@ export function pgPush(pg: PgHandle): PushStore {
     async add(user, subscription, most) {
       const db = await pg.db()
 
-      await query(db, 'INSERT INTO kay_push_subscriptions (endpoint, user_id, p256dh, auth, at) VALUES ($1, $2, $3, $4, $5::bigint) ON CONFLICT (endpoint) DO UPDATE SET user_id = EXCLUDED.user_id, p256dh = EXCLUDED.p256dh, auth = EXCLUDED.auth, at = EXCLUDED.at', [subscription.endpoint, user, subscription.p256dh, subscription.auth, subscription.at])
-      await query(db, 'DELETE FROM kay_push_subscriptions WHERE user_id = $1 AND endpoint NOT IN (SELECT endpoint FROM kay_push_subscriptions WHERE user_id = $1 ORDER BY at DESC LIMIT $2::integer)', [user, most])
+      // One transaction under a lock on the person, so two devices subscribing at once leave at most `most`, the newest.
+      await db.begin(async (tx) => {
+        await query(tx, 'SELECT pg_advisory_xact_lock(hashtextextended($1, 0))', [`kay_push_subscriptions\n${user}`])
+        await query(tx, 'INSERT INTO kay_push_subscriptions (endpoint, user_id, p256dh, auth, at) VALUES ($1, $2, $3, $4, $5::bigint) ON CONFLICT (endpoint) DO UPDATE SET user_id = EXCLUDED.user_id, p256dh = EXCLUDED.p256dh, auth = EXCLUDED.auth, at = EXCLUDED.at', [subscription.endpoint, user, subscription.p256dh, subscription.auth, subscription.at])
+        await query(tx, 'DELETE FROM kay_push_subscriptions WHERE user_id = $1 AND endpoint NOT IN (SELECT endpoint FROM kay_push_subscriptions WHERE user_id = $1 ORDER BY at DESC, endpoint DESC LIMIT $2::integer)', [user, most])
+      })
     },
     async list(user) {
       const db = await pg.db()
-      const rows = await query<{ endpoint: string, p256dh: string, auth: string, at: string }>(db, 'SELECT endpoint, p256dh, auth, at::text FROM kay_push_subscriptions WHERE user_id = $1 ORDER BY at DESC', [user])
+      const rows = await query<{ endpoint: string, p256dh: string, auth: string, at: string }>(db, 'SELECT endpoint, p256dh, auth, at::text FROM kay_push_subscriptions WHERE user_id = $1 ORDER BY at DESC, endpoint DESC', [user])
 
       return rows.map(row => ({ ...row, at: Number(row.at) }))
     },
