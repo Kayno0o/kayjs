@@ -91,6 +91,7 @@ const globex: Org = { id: 'o2', slug: 'globex', roles: [], members: [
   { user: { id: 'gus' }, roles: ['reviewer'] },
 ] }
 const orgs = [acme, globex]
+
 function organizations(roles: Record<string, ('publish' | 'review')[]>): void {
   configure({ guard: () => undefined, roles })
 }
