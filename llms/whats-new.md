@@ -8,6 +8,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 - `src/routes/_card.kay` lays out the share card `shareCard()` links with the app's own components, Tailwind classes and fonts, drawn by Chrome at build and on demand, and the fixed layout stays the default without it: [Lay out a share card yourself](images.md#lay-out-a-share-card-yourself).
 - kayjs-mail stops mailing an address that bounced or complained, learned from a Postmark, Mailgun, SendGrid or Resend webhook or a delivery report, drops it from the mailing lists, and `mailer({ inbound })` takes a reply as a function call ([Bounces, complaints and replies](../packages/mail/llms/bounces-and-replies.md)).
 - `push()` adds web push: `sendPush(userId, ...)` on the server, `webPush.subscribe()` and `installPrompt` in an island, and `notify()` also pushes to a person who opted in ([Notifications](notifications.md#push-to-a-persons-devices)).
+- `push()` adds web push: `sendPush(userId, ...)` on the server, `webPush.subscribe()` in an island, `installPrompt` (which needs no `push()`: a page with an island using it keeps the browser's install offer from the first moment), and `notify()` also pushes to a person who opted in ([Notifications](notifications.md#push-to-a-persons-devices)).
 - A page hook is given `fileSize(url)` and `htmlSize(html)`, the compressed sizes a browser downloads, read from the copies the compress stage keeps so that a hook measuring page weight compresses no file twice ([Page hooks](prerendering.md#page-hooks)).
 
 ## 1.75.0
