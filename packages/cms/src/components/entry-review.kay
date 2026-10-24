@@ -56,8 +56,11 @@ if draft && !waiting() && denied.publish !== undefined
     Refused(label={wording('cms.review.submit', 'Submit for review')} reason={reason()})
   else
     Button(label={wording('cms.review.submit', 'Submit for review')} disabled={busy} onClick={onSubmit})
-if waiting() && denied.review === undefined
-  if reason() !== undefined
+if waiting()
+  if denied.review !== undefined
+    Refused(label={wording('cms.review.approve', 'Approve')} reason={denied.review})
+    Refused(label={wording('cms.review.sendBack', 'Send back')} reason={denied.review})
+  else if reason() !== undefined
     Refused(label={wording('cms.review.approve', 'Approve')} reason={reason()})
     Refused(label={wording('cms.review.sendBack', 'Send back')} reason={reason()})
   else

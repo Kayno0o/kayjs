@@ -311,11 +311,12 @@ export async function submitSaved(ref: EntryRef): Promise<ReviewReply | undefine
 }
 
 // Approves an entry in review, which publishes it, and says how it went.
-export async function approveSaved(ref: EntryRef): Promise<ReviewReply | undefined> {
+export async function approveSaved(ref: EntryRef, version: string | undefined): Promise<ReviewReply | undefined> {
   const outcome = await attempt(async () => call(entriesApi, '/:collection/:slug/approve', {
     method: 'post',
     params: { collection: ref.collection, slug: ref.slug },
     query: localeOf(ref),
+    body: version === undefined ? {} : { version },
   }), wording('cms.review.approveFailure', 'Could not approve'))
 
   return replyOf(outcome, wording('cms.review.approvedToast', 'Approved'), wording('cms.review.notApproved', 'Not approved'))

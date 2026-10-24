@@ -5,7 +5,7 @@ import { editSessionAdmitted, READ_METHODS, underKayDev } from 'kay/library'
 import { editedEntry, editRequested } from 'kay/server'
 import { wording } from 'kay/words'
 import { forbidden, may, memberOf, refusalStatus, routePath } from '../access'
-import { authOf, organizationMembers } from '../auth-like'
+import { authOf, organizationMembers, siteRoleHolders } from '../auth-like'
 import { actors, authors, linkReaders, testAddresses } from '../authors'
 import { admitEditor } from '../editor-names'
 import { log } from '../log'
@@ -109,7 +109,7 @@ function actionOf(method: string, path: string): Action | undefined {
   return method === 'POST' && (UPLOAD.test(path) || MEDIA_RENAME.test(path)) ? 'upload' : undefined
 }
 
-// Finds who is behind a review request, and for a submission whom it is told to: the other holders of a reviewing organization role, which kayjs-auth lists for a member of the organization.
+// Finds who is behind a review request, and for a submission whom it is told to: the other holders of a reviewing site role, and of a reviewing organization role in the submitter's organizations.
 async function noteActor(ctx: GuardContext, submitting: boolean): Promise<void> {
   const member = await memberOf(ctx)
   const auth = authOf(ctx)
@@ -117,7 +117,7 @@ async function noteActor(ctx: GuardContext, submitting: boolean): Promise<void> 
   let reviewers: string[] = []
 
   try {
-    reviewers = submitting && auth ? await organizationMembers(auth, reviewing, member?.id) : []
+    reviewers = submitting && auth ? [...new Set([...await siteRoleHolders(auth, reviewing, member?.id), ...await organizationMembers(auth, reviewing, member?.id)])] : []
   }
   catch (error) {
     log.error('the reviewers of a submission could not be listed', error)

@@ -27,6 +27,8 @@ export interface Review {
   // Who submitted the entry, by name and, for a kayjs-auth user, id: the id is where the answer is notified and never leaves the server.
   by?: string | undefined
   byId?: string | undefined
+  // The version of the entry the reviewer is asked to look at, which an approval must still find.
+  version?: string | undefined
   events: ReviewEvent[]
 }
 
@@ -76,14 +78,14 @@ function parse(data: unknown): Review | undefined {
   if (typeof data !== 'object' || data === null)
     return undefined
 
-  const { status, by, byId, events } = data as Record<string, unknown>
+  const { status, by, byId, version, events } = data as Record<string, unknown>
 
   if (typeof status !== 'string' || !STATUSES.has(status) || !Array.isArray(events))
     return undefined
 
   const kept = events.filter((event): event is ReviewEvent => typeof event === 'object' && event !== null && typeof (event as ReviewEvent).at === 'number' && VERBS.has((event as ReviewEvent).verb))
 
-  return { status: status as ReviewStatus, ...typeof by === 'string' && { by }, ...typeof byId === 'string' && { byId }, events: kept }
+  return { status: status as ReviewStatus, ...typeof by === 'string' && { by }, ...typeof byId === 'string' && { byId }, ...typeof version === 'string' && { version }, events: kept }
 }
 
 // The hidden `review` collection beside a loaded collection's entries, written through its own loader; undefined for a loader that gives no `sibling`. It is kept whether or not `cms({ history })` is on.
@@ -118,8 +120,10 @@ export function reviewable(collection: Pick<CollectionInfo, 'kind' | 'name' | 'd
   return store?.save !== undefined && store.remove !== undefined
 }
 
-const directory = (collection: string) => join(repositoryRoot(), '.cms', 'review', encodeURIComponent(collection))
-const fileName = (place: string) => `${encodeURIComponent(place)}.json`
+// A name with no separator and no dot, so no collection or slug reaches outside `.cms/review`.
+const encoded = (name: string) => encodeURIComponent(name).replaceAll('.', '%2E')
+const directory = (collection: string) => join(repositoryRoot(), '.cms', 'review', encoded(collection))
+const fileName = (place: string) => `${encoded(place)}.json`
 
 // The version of a review file as its saver takes it, null when there is none.
 async function versionOf(absolute: string): Promise<string | null> {

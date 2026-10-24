@@ -90,6 +90,9 @@ const REQUIRES: unique symbol = Symbol.for('kayjs-auth.requires')
 export const SIGNED_IN_HINT = 'kay_user'
 // How long a user read stays good. A request is over long before; a websocket, which keeps its `Auth` for its life, reads its user again past it, so a sign-out, a revoked token or a ban reaches it.
 const USER_FRESH_MS = 30 * 1000
+// The newest users `userIdsHolding` reads, a page at a time.
+const USER_SCAN_MAX = 10_000
+const USER_SCAN_PAGE = 200
 // The close code of a socket whose user is gone: a policy violation.
 const SOCKET_USER_GONE = 1008
 // The sockets `socketUser` answered a user for, to close once that user is gone.
@@ -866,6 +869,29 @@ export class Auth<Scope extends string = string, Role extends string = string, O
     const record = await this.record()
 
     return record ? auditEntries(this.core, { ...options, userId: record.id }) : []
+  }
+
+  // The ids of the users holding `role`, one of the `roles` option or a role above it in its hierarchy, banned users left out, for server code that tells them something (a notification). Needs a signed-in user, and reads the 10,000 newest users at most.
+  async userIdsHolding(role: string): Promise<string[]> {
+    if (await this.record() === null)
+      return []
+
+    const { isGranted } = createRoleHierarchy<string[], string>(this.core.hierarchy ?? {}, roles => roles)
+    const found: string[] = []
+
+    for (let offset = 0; offset < USER_SCAN_MAX; offset += USER_SCAN_PAGE) {
+      const { users } = await this.core.store.users.list({ offset, limit: USER_SCAN_PAGE, total: false })
+
+      for (const user of users) {
+        if (!banned(user) && isGranted(role, user.roles))
+          found.push(user.id)
+      }
+
+      if (users.length < USER_SCAN_PAGE)
+        break
+    }
+
+    return found
   }
 
   // The users, newest first, a page of `limit` (50 by default) from `offset`; `search` matches part of an email or a username, or a whole id. For an admin only, as every method below.

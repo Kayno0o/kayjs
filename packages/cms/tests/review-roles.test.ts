@@ -1,5 +1,5 @@
 import type { GuardContext } from 'kay'
-import { describe, expect, mock, test } from 'bun:test'
+import { afterEach, describe, expect, mock, test } from 'bun:test'
 import * as server from 'kay/server'
 import { memberOf } from '../src/access'
 import { actors } from '../src/authors'
@@ -25,6 +25,12 @@ const { default: apiGuard } = await import('../src/api/_guard')
 
 interface Org { id: string, slug: string, roles: string[], members: { user: { id: string }, roles: string[] }[] }
 
+const siteUsers: { id: string, roles: string[] }[] = []
+
+afterEach(() => {
+  siteUsers.length = 0
+})
+
 // A kayjs-auth user who belongs to organizations, as `ctx.locals.auth` shows them.
 function authOf(id: string, siteRoles: string[], orgs: Org[]) {
   const mine = orgs.filter(org => org.members.some(member => member.user.id === id))
@@ -40,6 +46,7 @@ function authOf(id: string, siteRoles: string[], orgs: Org[]) {
 
       return org !== undefined && (role === undefined || heldIn(org).some(held => hierarchy[held]?.includes(role)))
     },
+    userIdsHolding: async (role: string) => siteUsers.filter(user => user.roles.some(held => hierarchy[held]?.includes(role))).map(user => user.id),
     listMembers: async (ref: string) => ({ ok: true as const, members: orgs.find(org => org.id === ref || org.slug === ref)!.members }),
   }
 }
@@ -84,7 +91,6 @@ const globex: Org = { id: 'o2', slug: 'globex', roles: [], members: [
   { user: { id: 'gus' }, roles: ['reviewer'] },
 ] }
 const orgs = [acme, globex]
-
 function organizations(roles: Record<string, ('publish' | 'review')[]>): void {
   configure({ guard: () => undefined, roles })
 }
@@ -169,13 +175,14 @@ describe('submitting, approving and sending back', () => {
     expect(actors.get(alone.request)!.reviewers).not.toContain('rex')
   })
 
-  test('a reviewing site role is told to nobody, as kayjs-auth lists no one for it', async () => {
+  test('a reviewing site role is told to the users holding it or a role above it, the submitter left out', async () => {
+    siteUsers.push({ id: 'sam', roles: ['reviewer'] }, { id: 'sue', roles: ['owner'] }, { id: 'wanda', roles: ['reviewer'] }, { id: 'tim', roles: ['writer'] })
     organizations({ reviewer: ['review'] })
 
     const ctx = ask(SUBMIT, authOf('wanda', [], orgs))
 
     await statusOf(ctx)
-    expect(actors.get(ctx.request)?.reviewers).toEqual([])
+    expect(actors.get(ctx.request)?.reviewers.sort()).toEqual(['sam', 'sue'])
   })
 })
 

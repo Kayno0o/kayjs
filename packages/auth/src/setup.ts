@@ -251,6 +251,7 @@ export function createCore<Data extends AuthSessionData, Role extends string, Pr
     signUp: options.signUp ?? true,
     defaultRoles: [...(options.defaultRoles ?? [])],
     roles: options.roles && new Set(Object.keys(options.roles)),
+    hierarchy: options.roles,
     onSignUp: hooked(options.onSignUp, (user, profile) => ({ user, profile })),
     onProviderProfile: hooked(options.profileFields, (user, profile) => ({ user, profile })),
     userData: options.user && userDataRules(options.user),

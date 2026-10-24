@@ -419,6 +419,8 @@ export default defineMessages({
       approve: 'Approuver',
       approveFailure: 'Approbation impossible',
       approved: '{name} a approuvé {title}',
+      changed: '{slug} a changé après sa soumission à relecture : il faut le soumettre de nouveau',
+      changedSince: '{slug} a changé depuis que vous l\'avez ouvert : rechargez-le pour lire ce que vous approuvez',
       approvedToast: 'Approuvé',
       failure: 'La relecture n\'a pas pu être enregistrée : le journal du serveur dit pourquoi',
       inReview: 'En relecture',

@@ -154,6 +154,8 @@ export interface Core {
   defaultRoles: string[]
   // The roles the app declares; any role goes without them.
   roles?: Set<string> | undefined
+  // The same roles with the ones each includes, for `userIdsHolding`.
+  hierarchy?: Record<string, string[]> | undefined
   // Whether a user meets the `admin` option; nobody does without it.
   admin?: ((user: User) => Promise<boolean>) | undefined
   // Whether a user meets a requirement, through the app's `authorize` when it has one, as `guard()` asks; for `requireUser({ require })`.

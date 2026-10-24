@@ -420,7 +420,7 @@ function storedState(entry: SourceEntry | undefined): { data: Record<string, unk
 }
 
 // Sets the collection's draft field to false, keeping the rest of the entry as saved.
-export async function publishEntry(ref: EntryRef, author?: Identity, { reviewed = false }: { reviewed?: boolean } = {}): Promise<SaveOutcome> {
+export async function publishEntry(ref: EntryRef, author?: Identity, { reviewed = false, version }: { reviewed?: boolean, version?: string | undefined } = {}): Promise<SaveOutcome> {
   const collection = await collectionNamed(ref.collection)
 
   if (collection.draftField === undefined)
@@ -434,7 +434,7 @@ export async function publishEntry(ref: EntryRef, author?: Identity, { reviewed 
   if (!existing.data)
     return refused(ref, wording('cms.store.parseFailure', '{slug}\'s file does not parse: {problem}', { slug: ref.slug, problem: existing.problem ?? '' }))
 
-  return saveEntry({ ...ref, data: { ...existing.data, [collection.draftField]: false }, body: existing.body }, { version: existing.version, verb: 'publish', author, bodyKept: true, reviewed })
+  return saveEntry({ ...ref, data: { ...existing.data, [collection.draftField]: false }, body: existing.body }, { version: version ?? existing.version, verb: 'publish', author, bodyKept: true, reviewed })
 }
 
 // Turns a published entry back into a draft, the way Publish turns a draft public.

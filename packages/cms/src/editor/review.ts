@@ -47,7 +47,7 @@ export function createReview(ref: EntryRef, initial: ReviewView | undefined, dra
     review,
     busy,
     submit: async () => step(async () => submitSaved(ref)),
-    approve: async () => step(async () => approveSaved(ref)),
+    approve: async () => step(async () => approveSaved(ref, drafts.version(ref))),
     sendBack: async note => step(async () => sendBackSaved(ref, note)),
   }
 }

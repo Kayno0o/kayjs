@@ -11,6 +11,7 @@ interface AuthLike {
   isGranted?: (role: string, user: MemberLike) => boolean
   listOrganizations?: () => Promise<MembershipLike[]>
   isMember?: (organization: string, role?: string) => Promise<boolean>
+  userIdsHolding?: (role: string) => Promise<string[]>
   listMembers?: (organization: string) => Promise<{ ok: true, members: { user: { id: unknown }, roles: readonly string[] }[] } | { ok: false }>
   signInUrl?: (back?: string) => string
   signOut?: () => Promise<void>
@@ -95,6 +96,23 @@ export async function heldInOrganizations(auth: AuthLike, keys: readonly string[
   }
 
   return held
+}
+
+// The ids of the users holding one of the site roles `keys` names, a role above it in kayjs-auth's hierarchy counting, themselves left out. A kayjs-auth without `userIdsHolding` lists no one.
+export async function siteRoleHolders(auth: AuthLike, keys: readonly string[], except: string | undefined): Promise<string[]> {
+  if (typeof auth.userIdsHolding !== 'function')
+    return []
+
+  const found = new Set<string>()
+
+  for (const key of keys.filter(key => !isOrganizationRole(key))) {
+    for (const id of await auth.userIdsHolding(key))
+      found.add(String(id))
+  }
+
+  found.delete(String(except))
+
+  return [...found]
 }
 
 // The ids of the people who hold a role of `keys` in an organization of the signed-in person, themselves left out: whom a submission is told to. A member counts when they hold the role itself, as kayjs-auth does not tell a role's hierarchy.

@@ -111,7 +111,9 @@ A writer whose roles lack `publish` sends a draft for review with Submit for rev
 
 Approving and sending back are checked on the server for kayjs-auth, `passwordGuard` and `member` roles alike. Every step is kept with who took it and when, in a log on the entry screen.
 
-The state is kept outside the entry, so no schema changes. A loaded collection keeps it in a hidden collection of its loader, a folder collection in a small file under `.cms/review` written through the `files` saver. The other holders of the `org:` reviewing role in the writer's organizations are told of a submission with `notify()`, and the writer of an approval or a send-back. The collection needs a draft flag.
+The state is kept outside the entry, so no schema changes. A loaded collection keeps it in a hidden collection of its loader, a folder collection in a small file under `.cms/review` written through the `files` saver. The users holding a reviewing role, a site role of kayjs-auth or an `org:` role in the writer's organizations, are told of a submission with `notify()`, and the writer of an approval or a send-back. A person of `passwordGuard` or `member` has no inbox, so none of them is told.
+
+An approval covers the version the reviewer opened: if the entry changed after its submission or after they loaded it, the approval is refused. A person without `review` sees Approve and Send back disabled, with the reason as a tooltip. The collection needs a draft flag.
 
 <ReadMore href="/llms/kayjs-cms-review">The routes, the storage, the notifications and what they cannot reach.</ReadMore>
 

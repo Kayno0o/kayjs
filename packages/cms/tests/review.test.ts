@@ -8,10 +8,10 @@ import { scratchDir } from 'kay/test'
 import { registerCollections, registerEditSite } from '../../../src/content/edit'
 import { contentPlace, setContentPlace } from '../../../src/content/load'
 import { sqliteLoader } from '../src/loaders/sqlite'
-import { readReview, reviewsOf } from '../src/review'
+import { readReview, reviewsOf, writeReview } from '../src/review'
 import { approveEntry, sendBackEntry, submitEntry } from '../src/reviewing'
 import { revisionsOf } from '../src/revisions'
-import { configure } from '../src/settings'
+import { configure, settings } from '../src/settings'
 import { deleteEntry, entryOf, findCollection, publishEntry, renameEntry, saveEntry } from '../src/store'
 
 const schema = s.Object({ title: s.String(), draft: s.Optional(s.Boolean()) })
@@ -221,5 +221,56 @@ describe('review', () => {
     } } })
     expect(await approveEntry(ref, reviewer)).toMatchObject({ issues: [{ message: expect.stringContaining('could not be kept') }] })
     expect((await entryOf(ref))?.draft).toBe(false)
+  })
+
+  test('an approval is of the version sent for review: a change after it is refused until it is sent again', async () => {
+    const ref = await draft('posts')
+
+    await submitEntry(ref, writer)
+    expect(await saveEntry({ ...ref, data: { title: 'Changed', draft: true } })).toMatchObject({ saved: true })
+    expect(await approveEntry(ref, reviewer)).toMatchObject({ issues: [{ message: 'first changed after it was sent for review: it needs to be sent again' }] })
+    expect((await entryOf(ref))?.draft).toBe(true)
+    expect(await submitEntry(ref, writer)).toMatchObject({ saved: true })
+    expect(await approveEntry(ref, reviewer)).toMatchObject({ saved: true, entry: { data: { title: 'Changed', draft: false } } })
+  })
+
+  test('an approval is of the version the reviewer opened', async () => {
+    const ref = await draft('notes')
+
+    await submitEntry(ref, writer)
+
+    const opened = (await entryOf(ref))?.version
+
+    expect(await approveEntry(ref, reviewer, undefined, 'another-version')).toMatchObject({ issues: [{ message: 'first changed since you opened it: reload it to read what you approve' }] })
+    expect((await entryOf(ref))?.draft).toBe(true)
+    expect(await approveEntry(ref, reviewer, undefined, opened)).toMatchObject({ saved: true })
+  })
+
+  test('a review file changed after it was read is a conflict that keeps the other write', async () => {
+    const ref = await draft('posts')
+    const real = settings().files
+    const file = join(contentPlace().root, '.cms/review/posts/first.json')
+
+    configure({ files: { ...real, save: async (change) => {
+      await mkdir(join(contentPlace().root, '.cms/review/posts'), { recursive: true })
+      await Bun.write(file, '{"status":"sent-back","events":[]}')
+
+      return real.save(change)
+    } } })
+    expect(await submitEntry(ref, writer)).toMatchObject({ issues: [{ message: expect.stringContaining('could not be kept') }] })
+    expect(await Bun.file(file).json()).toMatchObject({ status: 'sent-back' })
+  })
+
+  test('no slug or collection name reaches outside the review folder', async () => {
+    const root = join(contentPlace().root, '.cms', 'review')
+
+    for (const [collection, slug, locale] of [['posts', '..', undefined], ['posts', '../../x', undefined], ['posts', 'a/b', 'en'], ['..', 'x', undefined], ['posts', '%2e%2e', undefined], ['posts', '.', undefined]] as const)
+      await writeReview({ collection, slug, locale }, { status: 'review', events: [] })
+
+    const written = [...new Bun.Glob('**/*').scanSync({ cwd: contentPlace().root, dot: true, onlyFiles: true })].filter(path => path.endsWith('.json'))
+
+    expect(written).toHaveLength(6)
+    expect(written.every(path => join(contentPlace().root, path).startsWith(`${root}/`))).toBe(true)
+    expect([...(await reviewsOf('posts')).keys()].sort()).toEqual(['%2e%2e', '.', '..', '../../x', 'en/a/b'].sort())
   })
 })
