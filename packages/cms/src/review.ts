@@ -4,6 +4,7 @@ import type { CollectionInfo, EntryRef } from './kay/contract'
 import { mkdir, readdir } from 'node:fs/promises'
 import { join, relative } from 'node:path'
 import { repositoryRoot } from 'kay/content'
+import { wording } from 'kay/words'
 import { fileVersion } from './files'
 import { rowOf } from './hidden'
 import { collectionLoader } from './kay/content'
@@ -49,7 +50,7 @@ export function sentBy(review: Review, viewer: Viewer | undefined): boolean {
   if (review.byId !== undefined || viewer.id !== undefined)
     return review.byId === viewer.id
 
-  return viewer.name !== '' && review.by === viewer.name
+  return viewer.name !== '' && viewer.name !== wording('cms.review.someone', 'Someone') && review.by === viewer.name
 }
 
 // Whether `cms({ fourEyes })` keeps this person from approving the entry in review.

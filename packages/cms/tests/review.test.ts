@@ -171,8 +171,8 @@ describe('review with fourEyes', () => {
 
     const other = await draft('posts', 'second')
 
-    await submitEntry(other, { name: '', reviewers: [] })
-    expect(await approveEntry(other, { name: '', reviewers: [] }, undefined, (await entryOf(other))?.version)).toMatchObject({ saved: true })
+    await submitEntry(other, { name: 'Someone', reviewers: [] })
+    expect(await approveEntry(other, { name: 'Someone', reviewers: [] }, undefined, (await entryOf(other))?.version)).toMatchObject({ saved: true })
   })
 
   test('is off by default, and a send-back stays open to the submitter', async () => {
