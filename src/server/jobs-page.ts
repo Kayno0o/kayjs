@@ -46,7 +46,7 @@ function jobMarkup(queue: QueueView, job: JobView, action: (name: string) => str
   const run = job.workflow
   const send = run?.state === 'waiting' ? form('send', `Send ${escapeHtml(run.event ?? '')}`) : ''
   const remove = run || job.status !== 'running' ? form(run ? 'cancel' : 'delete', run ? 'Cancel' : 'Delete') : ''
-  const where = run === undefined ? '' : `<p>workflow run ${run.state}${run.event === undefined ? '' : ` for event <code>${escapeHtml(run.event)}</code>`}${run.until === undefined ? '' : ` until ${time(run.until)}`}, ${run.steps.length} steps done${run.steps.length === 0 ? '' : `: ${run.steps.map(step => `<code>${escapeHtml(step)}</code>`).join(' ')}`}</p>`
+  const where = run === undefined ? '' : `<p>workflow run ${run.state}${run.event === undefined ? '' : ` for event <code>${escapeHtml(run.event)}</code>`}${run.until === undefined ? '' : ` until ${time(run.until)}`}, ${run.done} steps done${run.steps.length === 0 ? '' : `${run.steps.length < run.done ? ', the last' : ''}: ${run.steps.map(step => `<code>${escapeHtml(step)}</code>`).join(' ')}`}</p>`
 
   return `<li><p><strong>${run?.state ?? job.status}</strong> <code>${escapeHtml(job.id)}</code> ${job.attempts} of ${queue.attempts} attempts${run === undefined ? `, due ${time(job.runAt)}` : ''}${job.key === undefined ? '' : ` key <code>${escapeHtml(job.key)}</code>`}${job.progress === undefined ? '' : ` progress ${escapeHtml(job.progress)}`}</p>${where}${job.error === undefined ? '' : `<pre>${escapeHtml(job.error)}</pre>`}<details><summary>Payload</summary><pre>${escapeHtml(job.payload)}</pre></details><div>${send}${retry}${remove}</div></li>`
 }

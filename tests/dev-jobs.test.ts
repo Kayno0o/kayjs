@@ -1,9 +1,9 @@
 import type { JobStore } from '../src/server'
 import type { JobView, QueueView } from '../src/server/job-admin'
 import { join } from 'node:path'
-import { describe, expect, it, setSystemTime, spyOn } from 'bun:test'
+import { afterEach, describe, expect, it, setSystemTime, spyOn } from 'bun:test'
 import { queue, workflow } from '../src/server'
-import { forgetQueue } from '../src/server/queue'
+import { forgetQueue, GiveUpError } from '../src/server/queue'
 import { cleanUpAfterFile, kinds } from './job-stores'
 import { scratchDir } from './scratch'
 import { pages } from './shared-pages'
@@ -259,6 +259,10 @@ describe('a queue on a store without revive or state', () => {
 })
 
 describe.each(kinds)('the Jobs tab\'s workflow runs on a $name store', ({ name, open }) => {
+  afterEach(() => {
+    setSystemTime()
+  })
+
   async function flowOf(label: string) {
     const queueName = `${name}-${label}`
     const flow = workflow<undefined, { paid: number }>(queueName, async ({ step }) => {
@@ -292,7 +296,6 @@ describe.each(kinds)('the Jobs tab\'s workflow runs on a $name store', ({ name, 
     expect((await act(site, 'send', queueName, waiting.id)).status).toBe(200)
     await flow.drain()
     expect(await flow.status(id)).toBeUndefined()
-    setSystemTime()
   })
 
   it('cancels a run, and refuses to send an event to one that does not wait or to a plain queue', async () => {
@@ -314,5 +317,64 @@ describe.each(kinds)('the Jobs tab\'s workflow runs on a $name store', ({ name, 
     expect((await act(site, 'cancel', `${name}-plain-wf`, plainId)).status).toBe(409)
     expect((await act(site, 'send', `${name}-plain-wf`, plainId)).status).toBe(409)
     expect((await act(site, 'send', 'nope', 'x')).status).toBe(404)
+  })
+
+  it('cancels the failed run of the row clicked, not a live run started under the same id', async () => {
+    const queueName = `${name}-twin`
+    const flow = workflow<boolean, Record<string, unknown>>(queueName, async ({ input, step }) => {
+      if (input)
+        throw new GiveUpError('boom')
+
+      await step.sleep('1h')
+    }, { store: await open(), attempts: 1 })
+    const site = await app()
+    const wf = `workflow:${queueName}`
+
+    await flow.start(true, { id: 'twin' })
+    await flow.drain()
+    await flow.start(false, { id: 'twin' })
+    await flow.drain()
+
+    const jobs = (await listed(site)).find(queued => queued.name === wf)!.jobs
+    const failed = jobs.find(job => job.status === 'failed')!
+
+    expect(jobs).toHaveLength(2)
+    expect((await act(site, 'cancel', wf, failed.id)).status).toBe(200)
+
+    const left = (await listed(site)).find(queued => queued.name === wf)!.jobs
+
+    expect(left.map(job => job.workflow?.state)).toEqual(['sleeping'])
+  })
+
+  it('lists the last steps of a long run, cut, with how many are kept', async () => {
+    const queueName = `${name}-long`
+    const flow = workflow<undefined, Record<string, unknown>>(queueName, async ({ step }) => {
+      for (let index = 0; index < 30; index++)
+        await step.run(`step ${index} ${'x'.repeat(300)}`, () => index)
+
+      await step.sleep('1h')
+    }, { store: await open() })
+    const site = await app()
+
+    await flow.start()
+    await flow.drain()
+
+    const [job] = (await listed(site)).find(queued => queued.name === `workflow:${queueName}`)!.jobs as [JobView]
+
+    expect(job.workflow!.done).toBe(31)
+    expect(job.workflow!.steps).toHaveLength(20)
+    expect(job.workflow!.steps.at(-1)).toBe('sleep')
+    expect(job.workflow!.steps.every(label => label.length <= 100)).toBe(true)
+  })
+
+  it('shows a malformed payload of a workflow-named queue as a plain job', async () => {
+    const queueName = `${name}-odd`
+    const odd = queue<{ memo: unknown[] }>(`workflow:${queueName}`, () => undefined, { store: await open() })
+
+    await odd.enqueue({ memo: [1, null] }, { delay: '1h' })
+
+    const [job] = (await listed(await app())).find(queued => queued.name === `workflow:${queueName}`)!.jobs as [JobView]
+
+    expect(job.workflow).toBeUndefined()
   })
 })

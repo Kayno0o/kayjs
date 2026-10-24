@@ -1,7 +1,7 @@
 import type { StoredJob, StoredJobState } from './queue'
 import type { RunView } from './workflow'
 import { queueAdmins } from './queue'
-import { runView, workflowAdminOf } from './workflow'
+import { runView, WORKFLOW_PREFIX, workflowAdminOf } from './workflow'
 
 const LIVE_LIMIT = 100
 const FAILED_LIMIT = 100
@@ -49,8 +49,6 @@ export const JOB_MESSAGES: Record<Exclude<JobAction, 'done'>, [number, string]> 
 }
 
 const cut = (text: string) => text.length > TEXT_CHARS ? `${text.slice(0, TEXT_CHARS)}...` : text
-
-const WORKFLOW_PREFIX = 'workflow:'
 
 function view(queue: string, job: StoredJob, status: StoredJobState['status']): JobView {
   const run = queue.startsWith(WORKFLOW_PREFIX) ? runView(status, job.payload, job.runAt) : undefined
@@ -149,7 +147,7 @@ async function runOf(queue: string, id: string) {
   if (state === undefined)
     return { fail: 'no-job' as const }
 
-  if (flow === undefined || state.key === undefined || !queue.startsWith(WORKFLOW_PREFIX))
+  if (flow === undefined || state.key === undefined)
     return { fail: 'not-workflow' as const }
 
   return { flow, state, key: state.key }
@@ -177,7 +175,9 @@ export async function cancelRun(queue: string, id: string): Promise<JobAction> {
   if ('fail' in found)
     return found.fail
 
-  return await found.flow.cancel(found.key) ? 'done' : 'no-job'
+  await found.flow.cancel(found.state.id)
+
+  return 'done'
 }
 
 export const jobActions = { retry: retryJob, delete: deleteJob, send: sendRunEvent, cancel: cancelRun } as const

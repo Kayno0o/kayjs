@@ -99,8 +99,16 @@ export interface RunView {
   event?: string
   // When a `sleeping` run or a `waiting` one with a timeout is due.
   until?: number
+  // How many steps are kept.
+  done: number
+  // The names of the last ones, at most STEP_NAMES, each cut.
   steps: string[]
 }
+
+const STEP_NAMES = 20
+const NAME_CHARS = 100
+
+export const WORKFLOW_PREFIX = 'workflow:'
 
 // What a queue job of `workflow:<name>` is, read from its stored payload; undefined when the payload is not a run's.
 export function runView(status: 'waiting' | 'running' | 'failed', payloadText: string, runAt: number): RunView | undefined {
@@ -113,22 +121,25 @@ export function runView(status: 'waiting' | 'running' | 'failed', payloadText: s
     return undefined
   }
 
-  if (!Array.isArray(payload?.memo))
+  if (!Array.isArray(payload?.memo) || !payload.memo.every(entry => typeof entry?.kind === 'string' && typeof entry.name === 'string') || (payload.waiting !== undefined && typeof payload.waiting.event !== 'string'))
     return undefined
 
-  const steps = payload.memo.map(entry => entry.kind === 'sleep' ? 'sleep' : `${entry.kind} ${entry.name}`)
+  const label = (entry: Entry) => entry.kind === 'sleep' ? 'sleep' : `${entry.kind} ${entry.name}`.slice(0, NAME_CHARS)
+  const steps = payload.memo.slice(-STEP_NAMES).map(label)
+  const done = payload.memo.length
   const until = runAt < NEVER ? { until: runAt } : {}
 
   if (status === 'waiting' && payload.waiting)
-    return { state: 'waiting', event: payload.waiting.event, ...until, steps }
+    return { state: 'waiting', event: payload.waiting.event, ...until, done, steps }
 
-  return { state: status === 'waiting' ? 'sleeping' : status, ...status === 'waiting' && until, steps }
+  return { state: status === 'waiting' ? 'sleeping' : status, ...status === 'waiting' && until, done, steps }
 }
 
 // What the dev tool and the jobs page act on a run with, by the name of its queue.
 export interface WorkflowAdmin {
   send: (id: string, event: string) => Promise<boolean>
-  cancel: (id: string) => Promise<boolean>
+  // Ends the run held by that job of the queue.
+  cancel: (jobId: string) => Promise<void>
 }
 
 const workflowAdmins = new Map<string, WorkflowAdmin>()
@@ -149,7 +160,7 @@ function needs(store: JobStore, name: string): { [Method in 'update' | 'release'
 // A flow of steps that survives restarts, sleeps without holding a process and waits for events: `start` it from an action, `app.use(flow)` in the server to run it, `send` it an event.
 // The function runs again from its top each time the run is taken, and each finished step gives its kept result back, so what lies between steps must give the same answer every time. The run is one job of the queue `workflow:<name>` kept under its id, and its results are kept in that job after each step.
 export function workflow<Input = undefined, Known extends Events = Events>(name: string, flow: (run: WorkflowRun<Input, Known>) => unknown, options: WorkflowOptions<Input> = {}): Workflow<Input, Known> {
-  const queueName = `workflow:${name}`
+  const queueName = `${WORKFLOW_PREFIX}${name}`
   const { onFailed, store: own, ...rest } = options
   const storeOf = () => own ?? defaultJobStore()
 
@@ -367,7 +378,7 @@ export function workflow<Input = undefined, Known extends Events = Events>(name:
     return true
   }
 
-  workflowAdmins.set(queueName, { send: flowSend, cancel: flowCancel })
+  workflowAdmins.set(queueName, { send: flowSend, cancel: async jobId => storeOf().complete(jobId) })
   onReload(() => {
     workflowAdmins.delete(queueName)
   })

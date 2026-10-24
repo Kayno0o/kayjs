@@ -93,7 +93,7 @@ export default function jobsTab(tool: DevTool, tab: DevTab): () => void {
     if (run) {
       const until = run.until === undefined ? '' : ` until ${new Date(run.until).toISOString()}`
 
-      row.append(tool.make('div', 'note', `${run.state}${run.event === undefined ? '' : ` for ${run.event}`}${until}, ${run.steps.length} steps done${run.steps.length === 0 ? '' : `: ${run.steps.join(', ')}`}`))
+      row.append(tool.make('div', 'note', `${run.state}${run.event === undefined ? '' : ` for ${run.event}`}${until}, ${run.done} steps done${run.steps.length === 0 ? '' : `${run.steps.length < run.done ? ', the last' : ''}: ${run.steps.join(', ')}`}`))
     }
 
     if (job.error !== undefined)

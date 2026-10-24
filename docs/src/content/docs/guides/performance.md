@@ -105,7 +105,7 @@ The tab and what it asks of the server exist under `kay dev` only. A production 
 
 ## Jobs
 
-The Jobs tab lists the queues of your app ([Queues](/guides/background-jobs/#queues)) and the jobs in each: running, waiting and failed. A job shows how many attempts it has used out of the queue's `attempts`, its payload, and for a failed job the error of its last run. The count on the tab is the number of failed jobs. A [workflow](/guides/background-jobs/#workflows) run shows its state and steps, with buttons to send the event it waits for or cancel it.
+The Jobs tab lists the queues of your app ([Queues](/guides/background-jobs/#queues)) and the jobs in each: running, waiting and failed. A job shows how many attempts it has used out of the queue's `attempts`, its payload, and for a failed job the error of its last run. The count on the tab is the number of failed jobs. A [workflow](/guides/background-jobs/#workflows) run shows its state and last steps, with Send for the event it waits for and Cancel in place of Delete.
 
 Retry puts a failed job back in its queue to run again from its first attempt. Delete removes a waiting or failed job. A job that is running is left to finish. Retry needs a store that can put a failed job back, which `sqliteJobs`, `memoryJobs` and `pgJobs` all can.
 
