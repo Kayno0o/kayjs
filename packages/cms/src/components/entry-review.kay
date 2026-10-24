@@ -63,6 +63,9 @@ if waiting()
   else if reason() !== undefined
     Refused(label={wording('cms.review.approve', 'Approve')} reason={reason()})
     Refused(label={wording('cms.review.sendBack', 'Send back')} reason={reason()})
+  else if review?.own
+    Refused(label={wording('cms.review.approve', 'Approve')} reason={wording('cms.review.ownApproval', 'You sent this entry for review: another person approves it')})
+    Button(label={wording('cms.review.sendBack', 'Send back')} disabled={busy} onClick={() => { asking = true }})
   else
     Button(label={wording('cms.review.approve', 'Approve')} tone="accent" disabled={busy} onClick={onApprove})
     Button(label={wording('cms.review.sendBack', 'Send back')} disabled={busy} onClick={() => { asking = true }})

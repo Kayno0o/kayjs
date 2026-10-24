@@ -437,6 +437,7 @@ export default defineMessages({
       notInReview: '{slug} n\'est pas en relecture',
       notSentBack: 'Non renvoyé',
       notSubmitted: 'Non soumis à relecture',
+      ownApproval: 'Vous avez soumis cette entrée à relecture : une autre personne l\'approuve',
       sendBack: 'Renvoyer',
       sendBackFailure: 'Renvoi impossible',
       sendBackTitle: 'Renvoyer à son auteur',

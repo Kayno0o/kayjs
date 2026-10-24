@@ -121,6 +121,11 @@ export async function denialsOf(request: Request): Promise<Denials> {
   return deniedTo(await members.get(request))
 }
 
+// Who the api guard read the person of for this request, the one it reads for an entry's read when `cms({ fourEyes })` is on.
+export async function memberOfRequest(request: Request): Promise<Member | undefined> {
+  return members.get(request)
+}
+
 function refusal(action: Action): string {
   return wording('cms.guard.forbidden', 'Your role may not do this: {action}', { action: ACTION_NAMES[action]() })
 }

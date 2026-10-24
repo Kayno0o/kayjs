@@ -200,11 +200,11 @@ export default guard(async (ctx) => {
   await admits(ctx)
   admitEditor(ctx)
 
-  if (settings().roles !== undefined) {
-    // Read now so the route that tells what the person may do has it; every other route reads it only when it needs it.
-    if (method === 'GET' && EDITOR_CAN.test(ownPath(ctx.url.pathname, root)))
-      await memberOf(ctx)
+  // Read now so the route that tells what the person may do has it, and the entry's read the review it may not approve; every other route reads it only when it needs it.
+  if (method === 'GET' && (EDITOR_CAN.test(ownPath(ctx.url.pathname, root)) || (settings().fourEyes && ENTRY.test(ownPath(ctx.url.pathname, root)))))
+    await memberOf(ctx)
 
+  if (settings().roles !== undefined) {
     const path = ownPath(routePath(ctx.url), root)
 
     // A request the guard cannot place below the cms's mount would skip every role check, so it is refused.

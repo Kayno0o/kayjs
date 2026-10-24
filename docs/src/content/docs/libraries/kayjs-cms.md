@@ -115,6 +115,8 @@ The state is kept outside the entry, so no schema changes. A loaded collection k
 
 An approval covers the version the reviewer opened: if the entry changed after its submission or after they loaded it, the approval is refused. A person without `review` sees Approve and Send back disabled, with the reason as a tooltip. The collection needs a draft flag.
 
+A reviewer may approve a draft they sent themselves. Set `fourEyes: true` in `cms()` to ask for another person: Approve is then disabled for the one who sent the draft, with the reason, and the server refuses it too.
+
 <ReadMore href="/llms/kayjs-cms-review">The routes, the storage, the notifications and what they cannot reach.</ReadMore>
 
 A guard of your own, neither kayjs-auth nor `passwordGuard`, holds no role until `member` says who it let in. It also runs on screens the guard does not cover, so it returns nothing for a visitor who is not signed in. When given, it replaces kayjs-auth's lookup and never falls back to it:

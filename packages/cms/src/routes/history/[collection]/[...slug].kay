@@ -5,13 +5,14 @@ import { wording } from 'kay/words'
 import EntryHeader from '../../../components/entry-header.kay'
 import EntryHistory from '../../../components/entry-history.kay'
 import EntryReviewLog from '../../../components/entry-review-log.kay'
+import { memberOf } from '../../../access'
 import { adminTitle, entryPath, entryTitle } from '../../../listing'
 import { historyScreen } from '../../../screens'
 
 export const page = { query: s.Object({ locale: s.Optional(s.String()) }) }
 
 const ref = { collection: ctx.params.collection, slug: ctx.params.slug, locale: ctx.query.locale }
-const { prefix, collection, entry, rows, review } = await historyScreen(ref) ?? ctx.notFound()
+const { prefix, collection, entry, rows, review } = await historyScreen(ref, await memberOf(ctx)) ?? ctx.notFound()
 const title = entryTitle(collection, entry)
 ---
 head

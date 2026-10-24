@@ -4,14 +4,14 @@ import { s } from 'kay'
 import { wording } from 'kay/words'
 import EntryEditor from '../../../components/entry-editor.kay'
 import EntryHeader from '../../../components/entry-header.kay'
-import { denials } from '../../../access'
+import { denials, memberOf } from '../../../access'
 import { adminTitle, collectionTitle, entryTitle } from '../../../listing'
 import { entryPresence } from '../../../presence'
 import { entryScreen, entryTranslations } from '../../../screens'
 
 export const page = { query: s.Object({ locale: s.Optional(s.String()), compare: s.Optional(s.String()) }) }
 
-const screen = await entryScreen({ collection: ctx.params.collection, slug: ctx.params.slug, locale: ctx.query.locale }) ?? ctx.notFound()
+const screen = await entryScreen({ collection: ctx.params.collection, slug: ctx.params.slug, locale: ctx.query.locale }, await memberOf(ctx)) ?? ctx.notFound()
 const { prefix, collection, review } = screen
 const entry = collection.problem === undefined ? screen.entry ?? ctx.notFound() : undefined
 const presence = entry ? await entryPresence(ctx, collection.name, entry) : undefined

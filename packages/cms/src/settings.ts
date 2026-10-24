@@ -82,6 +82,8 @@ export interface CmsOptions {
   // Who a save the guard let through is committed as, from the guard's context: `async ({ locals }) => ...` reading the signed-in user.
   author?: ((ctx: GuardContext) => Identity | undefined | Promise<Identity | undefined>) | undefined
   // Runs after each save, deletion and move an editor made went through, in the process that handled it: to purge a CDN, tell a webhook or rebuild what the app keeps beside its entries. A loaded collection's entries, the pages that read them and the sitemap are refreshed already, a folder entry's file shows with the next build or deploy; a throw is logged and never undoes the save.
+  // `true` refuses an approval by the person who sent the draft for review, so another person reads it: the Approve button is disabled with the reason, and the server refuses it. Off by default, a reviewer may approve what they sent.
+  fourEyes?: boolean | undefined
   onSave?: ((event: SaveEvent) => void | Promise<void>) | undefined
   // What a loaded collection keeps beside its entries, on by default for a loader with a `sibling` (SQLite and Postgres): the last `revisions` saves of each entry, 50 by default, which an editor lists, compares and restores, and the entries deleted, kept for `trash`, `'30d'` by default, `false` for none. `maxAge` is how old a revision or an activity event may get before it is dropped, `'365d'` by default, `false` for no limit. `false` turns it all off, and `collections: { name: { history: false } }` for one collection.
   history?: false | { revisions?: number | undefined, trash?: Duration | false | undefined, maxAge?: Duration | false | undefined } | undefined
@@ -108,6 +110,8 @@ export interface CmsSettings {
   author: CmsOptions['author']
   member: CmsOptions['member']
   onSave: CmsOptions['onSave']
+  // Whether the person who sent a draft for review may not approve it.
+  fourEyes: boolean
   // Whether editors' browsers get the hint cookie and the "Edit this page" link.
   pageLink: boolean
   // The actions each role may do, or undefined when every editor the guard admits may do all of them.
@@ -139,7 +143,7 @@ const LOGO = /^(?:\/(?![/\\])\S*|https:\/\/\S+)$/
 
 let current: CmsSettings | undefined
 
-export function configure({ prefix = '/admin', guard: own, role, files = workingTree(), uploads, pageSize = PAGE_SIZE, rawHtml = [], author, member, onSave, collections, pageLink, roles, history, newsletter }: CmsOptions): CmsSettings {
+export function configure({ prefix = '/admin', guard: own, role, files = workingTree(), uploads, pageSize = PAGE_SIZE, rawHtml = [], author, member, onSave, collections, pageLink, roles, history, newsletter, fourEyes = false }: CmsOptions): CmsSettings {
   if (!Number.isInteger(pageSize) || pageSize < 1)
     throw configError('`cms({ pageSize })`', pageSize, 'a positive whole number of entries')
 
@@ -154,7 +158,7 @@ export function configure({ prefix = '/admin', guard: own, role, files = working
   const guard = own ?? (role === undefined ? undefined : roleGuard(role))
   const tracked = trackPasswords(guard)
 
-  current = { prefix: prefix.replace(TRAILING_SLASHES, '') || '/', guard: tracked === undefined ? undefined : lazily(tracked), files, uploads: types, maxSize: uploadSize(maxSize), pageSize, rawHtml: new Set(rawHtml), author, member, onSave, pageLink: pageLink !== false, roles: asConfigError(() => checkRoles(roles, guard !== undefined)), layouts: asConfigError(() => checkLayouts(collections)), history: checkHistory(history), newsletter: checkNewsletter(newsletter) }
+  current = { prefix: prefix.replace(TRAILING_SLASHES, '') || '/', guard: tracked === undefined ? undefined : lazily(tracked), files, uploads: types, maxSize: uploadSize(maxSize), pageSize, rawHtml: new Set(rawHtml), author, member, onSave, fourEyes, pageLink: pageLink !== false, roles: asConfigError(() => checkRoles(roles, guard !== undefined)), layouts: asConfigError(() => checkLayouts(collections)), history: checkHistory(history), newsletter: checkNewsletter(newsletter) }
 
   return current
 }

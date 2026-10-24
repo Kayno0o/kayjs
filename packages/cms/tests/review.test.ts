@@ -146,6 +146,50 @@ describe.each(['posts', 'notes'])('review in %s', (name) => {
   })
 })
 
+describe('review with fourEyes', () => {
+  test('refuses an approval by the person who sent the draft, by id, and approves by another', async () => {
+    configure({ fourEyes: true })
+
+    const ref = await draft('posts')
+    const sent = await submitEntry(ref, writer)
+
+    expect(sent).toMatchObject({ review: { own: true } })
+    expect(await approveEntry(ref, { ...writer, reviewers: [] }, undefined, (await entryOf(ref))?.version)).toMatchObject({ issues: [{ message: 'You sent this entry for review: another person approves it' }] })
+    expect((await entryOf(ref))?.draft).toBe(true)
+    expect((await readReview(ref))?.status).toBe('review')
+    expect(await approve(ref)).toMatchObject({ saved: true, review: { status: 'approved' } })
+  })
+
+  test('matches a person with no id by name, and never one with no name', async () => {
+    configure({ fourEyes: true })
+
+    const ref = await draft('posts')
+
+    await submitEntry(ref, { name: 'Pat', reviewers: [] })
+    expect(await approveEntry(ref, { name: 'Pat', reviewers: [] }, undefined, (await entryOf(ref))?.version)).toMatchObject({ issues: [{}] })
+    expect(await approveEntry(ref, { name: 'Pia', reviewers: [] }, undefined, (await entryOf(ref))?.version)).toMatchObject({ saved: true })
+
+    const other = await draft('posts', 'second')
+
+    await submitEntry(other, { name: '', reviewers: [] })
+    expect(await approveEntry(other, { name: '', reviewers: [] }, undefined, (await entryOf(other))?.version)).toMatchObject({ saved: true })
+  })
+
+  test('is off by default, and a send-back stays open to the submitter', async () => {
+    const ref = await draft('posts')
+
+    expect(await submitEntry(ref, writer)).not.toHaveProperty('review.own')
+    expect(await approveEntry(ref, writer, undefined, (await entryOf(ref))?.version)).toMatchObject({ saved: true })
+
+    configure({ fourEyes: true })
+
+    const other = await draft('posts', 'second')
+
+    await submitEntry(other, writer)
+    expect(await sendBackEntry(other, 'redo', writer)).toMatchObject({ saved: true, review: { status: 'sent-back' } })
+  })
+})
+
 describe('review', () => {
   test('a loaded collection keeps its history entries apart from the review steps', async () => {
     const ref = await draft('notes')

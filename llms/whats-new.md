@@ -17,6 +17,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 - `live(0, { user: true })` is a value of each signed-in user, sent only to that user's own tabs, and a deferred server island reading a `cached(..., { live: true })` value or live collection is fetched again alone when it changes, with no request for the page ([Live values](live-values.md#a-value-that-is-one-users-own)).
 - A page hook is given `fileSize(url)` and `htmlSize(html)`, the compressed sizes a browser downloads, read from the copies the compress stage keeps so that a hook measuring page weight compresses no file twice ([Page hooks](prerendering.md#page-hooks)).
 - A server started with `kay start` renders a static component inside an island on a page that is not prerendered, `_404` and `_error` included, where it logged `KayHydrated is not a function` and answered 500 or lost the layout.
+- `cms({ fourEyes: true })` keeps the person who sent a draft for review from approving it ([Review](../packages/cms/llms/review.md)).
 
 ## 1.75.0
 

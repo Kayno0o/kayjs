@@ -3,7 +3,7 @@ import type { Change } from './changes'
 import type { Edit } from './history'
 import type { CollectionInfo, EntryRef, GivenLayout, ScreenCollection, SourceEntry, StoredEntry } from './kay/contract'
 import type { EntryRow, ListView } from './listing'
-import type { ReviewView } from './review'
+import type { ReviewView, Viewer } from './review'
 import type { EntryTranslations, PairedEntry, TranslationRow } from './translations'
 import { activityOf } from './activity'
 import { changesBetween } from './changes'
@@ -40,11 +40,11 @@ export interface ListScreen {
 }
 
 // What an entry's screen reads, for an app's page at that screen's path: undefined for a collection the site lacks. Reads only: the extension's guard covers a page at a screen's path, a page outside the prefix needs its own.
-export async function entryScreen(ref: EntryRef): Promise<EntryScreen | undefined> {
+export async function entryScreen(ref: EntryRef, viewer?: Viewer): Promise<EntryScreen | undefined> {
   const screen = await readEntry(ref)
   const review = screen?.entry && screen.collection.review ? await readReview(ref) : undefined
 
-  return screen && { prefix: settings().prefix, ...screen, ...review && { review: viewOf(review) } }
+  return screen && { prefix: settings().prefix, ...screen, ...review && { review: viewOf(review, viewer) } }
 }
 
 // What a new entry's screen reads: the collection alone.
@@ -229,7 +229,7 @@ export interface HistoryScreen {
 }
 
 // What an entry's history reads; undefined for a collection or an entry the site lacks, or a collection that keeps no history.
-export async function historyScreen(ref: EntryRef): Promise<HistoryScreen | undefined> {
+export async function historyScreen(ref: EntryRef, viewer?: Viewer): Promise<HistoryScreen | undefined> {
   const screen = await readEntry(ref)
 
   if (!screen?.entry?.data || screen.collection.history !== true)
@@ -247,7 +247,7 @@ export async function historyScreen(ref: EntryRef): Promise<HistoryScreen | unde
 
   const review = await readReview(ref)
 
-  return { prefix: settings().prefix, collection, entry, rows: rows.reverse(), ...review && { review: viewOf(review) } }
+  return { prefix: settings().prefix, collection, entry, rows: rows.reverse(), ...review && { review: viewOf(review, viewer) } }
 }
 
 // A trashed entry as the page shows it: the entry itself stays server side.

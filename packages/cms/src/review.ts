@@ -32,8 +32,30 @@ export interface Review {
   events: ReviewEvent[]
 }
 
-// What a screen is given of a review: the id of the person is left out.
-export type ReviewView = Omit<Review, 'byId'>
+// What a screen is given of a review: the id of the person is left out. `own` is set when the signed-in person sent the draft and `cms({ fourEyes })` keeps them from approving it.
+export type ReviewView = Omit<Review, 'byId'> & { own?: true }
+
+// Who is looking at a review or acting on it, as far as the guard knows them.
+export interface Viewer {
+  id?: string | undefined
+  name: string
+}
+
+// Whether a person is the one who sent a draft for review: by kayjs-auth id when both have one, else by name, which a person with none is never matched on.
+export function sentBy(review: Review, viewer: Viewer | undefined): boolean {
+  if (viewer === undefined)
+    return false
+
+  if (review.byId !== undefined || viewer.id !== undefined)
+    return review.byId === viewer.id
+
+  return viewer.name !== '' && review.by === viewer.name
+}
+
+// Whether `cms({ fourEyes })` keeps this person from approving the entry in review.
+export function mayNotApprove(review: Review, viewer: Viewer | undefined): boolean {
+  return settings().fourEyes && review.status === 'review' && sentBy(review, viewer)
+}
 
 // The events kept per entry, the oldest going first.
 const KEPT_EVENTS = 50
@@ -69,8 +91,8 @@ async function jsonOf(file: string): Promise<unknown> {
   }
 }
 
-export function viewOf(review: Review): ReviewView {
-  return { status: review.status, ...review.by !== undefined && { by: review.by }, events: review.events }
+export function viewOf(review: Review, viewer?: Viewer): ReviewView {
+  return { status: review.status, ...review.by !== undefined && { by: review.by }, events: review.events, ...mayNotApprove(review, viewer) && { own: true as const } }
 }
 
 // A stored value as a review, undefined for anything else.
