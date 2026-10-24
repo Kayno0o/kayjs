@@ -428,6 +428,33 @@ describe('a workflow\'s admin calls', () => {
   })
 })
 
+describe('a workflow\'s admin send', () => {
+  it('applies only while the run waits for that event, where send keeps the event for a later wait', async () => {
+    const name = named()
+    const got: unknown[] = []
+    const flow = workflow<undefined, { first: number, second: number }>(name, async ({ step }) => {
+      const first = await step.waitFor('first')
+
+      await step.run('first', () => void got.push(first))
+
+      const second = await step.waitFor('second')
+
+      await step.run('second', () => void got.push(second))
+    }, { store: memoryJobs() })
+    const admin = queueAdmins().find(queued => queued.name === `workflow:${name}`)!.workflow!
+    const id = await flow.start()
+
+    await flow.drain()
+    expect(await admin.send(id, 'second', 9)).toBe(false)
+    expect(await admin.send(id, 'first', 1)).toBe(true)
+    await flow.drain()
+    expect(await admin.send(id, 'first', 2)).toBe(false)
+    expect(await admin.send(id, 'second', 3)).toBe(true)
+    await flow.drain()
+    expect(got).toEqual([1, 3])
+  })
+})
+
 describe('a workflow needs a store with update', () => {
   it('throws config-invalid when its store has none', async () => {
     const store: JobStore = { ...memoryJobs(), update: undefined }

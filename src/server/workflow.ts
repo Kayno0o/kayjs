@@ -136,7 +136,8 @@ export function runView(status: 'waiting' | 'running' | 'failed', payloadText: s
 
 // What the dev tool and the jobs page act on a run with, by the name of its queue.
 export interface WorkflowAdmin {
-  send: (id: string, event: string) => Promise<boolean>
+  // Only applies while the run waits for that very event, else it resolves with false and keeps nothing.
+  send: (id: string, event: string, data?: unknown) => Promise<boolean>
   // Ends the run held by that job of the queue.
   cancel: (jobId: string) => Promise<void>
 }
@@ -327,13 +328,17 @@ export function workflow<Input = undefined, Known extends Events = Events>(name:
     return job && { job, payload: parse(job.payload) as Payload<Input> }
   }
 
-  const flowSend = async (id: string, event: string, data?: unknown) => {
+  const flowSend = async (id: string, event: string, data?: unknown, onlyWaiting = false) => {
     const store = storeOf()
     const { update } = needs(store, name)
     const run = await found(id)
 
     // A run a step is running, or a worker has just taken, is held: its event is dropped.
     if (run?.job.status !== 'waiting')
+      return false
+
+    // An event named by what a person read off a screen must not be kept for a later wait.
+    if (onlyWaiting && run.payload.waiting?.event !== event)
       return false
 
     const now = Date.now()
@@ -371,7 +376,7 @@ export function workflow<Input = undefined, Known extends Events = Events>(name:
     return true
   }
 
-  attachWorkflow(queueName, { send: flowSend, cancel: async jobId => storeOf().complete(jobId) })
+  attachWorkflow(queueName, { send: async (id, event, data) => flowSend(id, event, data, true), cancel: async jobId => storeOf().complete(jobId) })
 
   return Object.assign(queued as Elysia, {
     start: async (input?: Input, startOptions: StartOptions = {}) => {
