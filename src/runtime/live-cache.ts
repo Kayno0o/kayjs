@@ -1,3 +1,4 @@
+import type { FetchedIsland } from './fetch-island'
 import type { LivePage, LiveRequest, LiveUpdate } from './live-value'
 import { withBase } from './base'
 import { CACHE_LIVE_ID } from './cache-live-id'
@@ -11,6 +12,7 @@ import { decodeServerValue } from './wire'
 
 const ROUTE = '/_kay/live'
 const SCRIPT = 'script[data-kay-live]'
+const SERVER_ISLAND = 'slot[data-kay-server]'
 // The longest a tab waits before it loads the page again, so every tab showing a value does not ask for the page at the same moment.
 const JITTER_MS = 750
 const FIRST_RETRY_MS = 1000
@@ -30,6 +32,8 @@ interface Route {
 
 // The time the page shown read each key it follows.
 let rendered = new Map<string, number>()
+// The deferred server islands that read each followed key, with the time their render read it: the script an island's fetch carries sits inside its slot, and an invalidation fetches that island alone.
+let islands = new Map<string, Map<HTMLElement, number>>()
 // The resources following a route, by their owner.
 const routes = new Map<object, Route>()
 // The invalidations a resource waits to answer, by key: it asks its route once the tab is shown, after a short random wait.
@@ -46,6 +50,9 @@ const meanwhile = new Map<string, number>()
 // What was invalidated since the page was last loaded, by key, which a refresh held back by a swap in progress checks against the page then shown.
 const due = new Map<string, number>()
 let waiting = false
+// The islands waiting for their fetch, and those fetching, with what was invalidated meanwhile, which the island then shown is asked about.
+const waitingIslands = new Set<HTMLElement>()
+const fetchingIslands = new Map<HTMLElement, Map<string, number>>()
 
 function pagesOf(): LivePage[] {
   return [...document.querySelectorAll(SCRIPT)].map(script => decodeServerValue(script.textContent) as LivePage)
@@ -54,15 +61,24 @@ function pagesOf(): LivePage[] {
 // Follows the cached values the page shown read, and lets go of those it no longer does: called when a page is shown, as it may carry other keys than the last. The connection stays while the keys do, moves with them and closes with the last.
 export function followCaches(): void {
   const next = new Map<string, number>()
+  const inIslands = new Map<string, Map<HTMLElement, number>>()
 
-  for (const page of pagesOf()) {
-    for (const [id, key, at] of page.values) {
-      if (id === CACHE_LIVE_ID)
+  for (const script of document.querySelectorAll(SCRIPT)) {
+    const slot = script.closest<HTMLElement>(SERVER_ISLAND)
+
+    for (const [id, key, at] of (decodeServerValue(script.textContent) as LivePage).values) {
+      if (id !== CACHE_LIVE_ID)
+        continue
+
+      if (slot === null)
         next.set(key, at as number)
+      else
+        (inIslands.get(key) ?? inIslands.set(key, new Map()).get(key)!).set(slot, at as number)
     }
   }
 
   rendered = next
+  islands = inIslands
 
   if (next.size === 0) {
     clearTimeout(timer)
@@ -91,7 +107,7 @@ export function followRoute(owner: object, header: string | null, refetch: () =>
 
 // Moves the connection to the keys followed now, and closes it with the last.
 function follow(): void {
-  const keys = JSON.stringify([...new Set([...rendered.keys(), ...[...routes.values()].flatMap(route => [...route.reads.keys()])])].sort())
+  const keys = JSON.stringify([...new Set([...rendered.keys(), ...islands.keys(), ...[...routes.values()].flatMap(route => [...route.reads.keys()])])].sort())
 
   if (connection?.keys === keys)
     return
@@ -131,6 +147,9 @@ async function connect(keys: string): Promise<void> {
       // The resources ask their routes again for new proofs, and the page for its own.
       for (const route of routes.values())
         route.refetch()
+
+      for (const slot of new Set([...islands.values()].flatMap(readers => [...readers.keys()])))
+        askIsland(slot)
 
       if (rendered.size > 0)
         await load()
@@ -216,6 +235,18 @@ function changed(key: string, at: number): void {
       askRoute(owner, key, at)
   }
 
+  for (const [slot, read] of islands.get(key) ?? []) {
+    if (at < read)
+      continue
+
+    const during = fetchingIslands.get(slot)
+
+    if (during === undefined)
+      askIsland(slot)
+    else
+      during.set(key, at)
+  }
+
   const read = rendered.get(key)
 
   if (read === undefined || at < read)
@@ -243,7 +274,7 @@ function askRoute(owner: object, key: string, at: number): void {
 
   waitingRoutes.set(owner, new Map([[key, at]]))
 
-  const ask = () => {
+  soon(() => {
     const wanted = waitingRoutes.get(owner)
     const route = routes.get(owner)
 
@@ -252,19 +283,82 @@ function askRoute(owner: object, key: string, at: number): void {
     // Not if the resource is gone, or an answer since read what changed.
     if (wanted && route && [...wanted].some(([name, time]) => time >= (route.reads.get(name) ?? Infinity)))
       route.refetch()
-  }
+  })
+}
+
+// Runs after a short random wait, once the tab is shown.
+function soon(run: () => void): void {
   const shown = () => {
     if (document.hidden)
       return
 
     document.removeEventListener('visibilitychange', shown)
-    setTimeout(ask, Math.random() * JITTER_MS)
+    setTimeout(run, Math.random() * JITTER_MS)
   }
 
   if (document.hidden)
     document.addEventListener('visibilitychange', shown)
   else
-    setTimeout(ask, Math.random() * JITTER_MS)
+    setTimeout(run, Math.random() * JITTER_MS)
+}
+
+// A deferred server island fetches itself again, alone: one asked already absorbs the events meanwhile.
+function askIsland(slot: HTMLElement): void {
+  if (waitingIslands.has(slot))
+    return
+
+  waitingIslands.add(slot)
+  soon(() => {
+    waitingIslands.delete(slot)
+    void refetchIsland(slot)
+  })
+}
+
+// The island is replaced by what the server renders for this visitor now, the one it had ended first. An app swapping no pages has nothing to hydrate it again, so the page reloads, unless a change is waiting to be typed over.
+async function refetchIsland(slot: HTMLElement): Promise<void> {
+  const hooks = navigation.hooks
+
+  if (!slot.isConnected)
+    return
+
+  if (hooks === undefined) {
+    reloaded()
+
+    return
+  }
+
+  const during = new Map<string, number>()
+
+  fetchingIslands.set(slot, during)
+
+  try {
+    // A swap in progress is the visitor's click, which takes the island away or brings the page as it is now.
+    if (document.documentElement.hasAttribute('aria-busy'))
+      await idle()
+
+    if (!slot.isConnected)
+      return
+
+    const held = document.activeElement
+    const { fetchServerIsland } = await import('./fetch-island')
+
+    if (held instanceof HTMLElement && slot.contains(held))
+      (slot as FetchedIsland)._$f = held
+
+    await fetchServerIsland(slot, () => hooks.dispose(slot))
+    await hooks.hydrate(slot)
+  }
+  // A fetch that failed leaves the island as it was, shown until the next change.
+  catch {
+    during.clear()
+  }
+  finally {
+    fetchingIslands.delete(slot)
+  }
+
+  // What was invalidated while it was fetched is asked again only if the island now shown read the key before.
+  for (const [key, at] of during)
+    changed(key, at)
 }
 
 // A tab nobody looks at loads the page once it is shown again.

@@ -1,0 +1,7 @@
+---
+import Inbox from '../components/inbox.kay'
+import Online from '../components/online.kay'
+---
+h1 Mixed
+Inbox
+Online

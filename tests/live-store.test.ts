@@ -14,6 +14,8 @@ const declare = live as unknown as (initial: number, id: string, name: string) =
 // A value declared with a lifetime: the options come before the id and name the build adds.
 const declareTtl = live as unknown as (initial: number, id: string, name: string, options: { ttl: string }) => { (): number, set: (next: number) => void }
 const declareKeyedTtl = live as unknown as (initial: (key: string) => number, id: string, name: string, options: { ttl: string }) => { (key: string): number, set: (key: string, next: number) => void, delete: (key: string) => void }
+// A value of each user: the options come before the id and name the build adds.
+const declareOwn = live as unknown as (initial: number, id: string, name: string, options: { user: true }) => { (): number, set: (user: string, next: number) => void, delete: (user: string) => void }
 const dirs: string[] = []
 const VALUE = resolve('src/runtime/live-value.ts')
 const STORE = resolve('src/server/sqlite-live.ts')
@@ -97,6 +99,24 @@ process.exit(0)`)
     setLiveStore(undefined)
     memory.set(5)
     expect(store.entries()).toEqual([['test:memory', '', '[2]']])
+  })
+
+  it('keeps a value of each user under the user\'s id, and reads them back in a process starting', async () => {
+    const path = await storePath()
+    const store = sqliteLive(path)
+    const unread = declareOwn(0, 'test:unread', 'unread', { user: true })
+
+    setLiveStore(store)
+    unread.set('alice@example.com', 3)
+    unread.set('bob', 4)
+    unread.set('bob', 5)
+    unread.delete('bob')
+    expect(store.entries()).toEqual([['test:unread', 'alice@example.com', '[3]']])
+    setLiveStore(undefined)
+
+    const restarted = spawnProcess(path, 'live(0, \'test:unread\', \'unread\', { user: true })\nconsole.log(JSON.stringify([...liveSlot(\'test:unread\').values]))')
+
+    expect(JSON.parse(await output(restarted))).toEqual([['alice@example.com', 3]])
   })
 
   it('gives a value declared after the store attached what it holds', async () => {

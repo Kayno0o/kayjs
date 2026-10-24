@@ -1,0 +1,17 @@
+--- server
+import { cached } from 'kay/cache'
+import { db } from '../data'
+
+export const page = { prerender: true }
+
+const stock = await cached('stock', '1m', () => db.stock, { live: true })
+--- script
+import Stock from '../components/stock.kay'
+---
+head
+  title Shop
+h1 Shop
+input.note
+a.quiet(href="/quiet") Quiet
+a.page(href="/page") Page
+Stock(server="defer" count={stock})

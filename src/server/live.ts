@@ -5,16 +5,17 @@ import type { ServerScope } from '../runtime/reactive'
 import { AsyncLocalStorage } from 'node:async_hooks'
 import { broadcast, onClockHeard, onKeysInvalidated, onLiveRead } from '../runtime/cache'
 import { CACHE_LIVE_ID } from '../runtime/cache-live-id'
-import { checkLiveWrites, live, LIVE_ROUTE, liveSlot, PROOF_LIFETIME_MS, slotValue, watchSlot } from '../runtime/live-value'
+import { checkLiveWrites, live, LIVE_ROUTE, liveSlot, ownLiveDeclared, PROOF_LIFETIME_MS, readViewerWith, slotValue, watchSlot } from '../runtime/live-value'
 import { PRESENCE_LIVE_ID } from '../runtime/presence'
 import { currentServerScope } from '../runtime/reactive'
-import { encodeValue, unsendable } from '../runtime/wire'
+import { decodeServerValue, encodeValue, unsendable } from '../runtime/wire'
 import { isCrossSite } from './actions'
 import { liveLimits } from './config-limits'
 import { readCapped } from './errors'
 import { eventStream, StreamRefusedError } from './event-stream'
 import { presenceEntry } from './presence'
 import { clientAddress, overLimit } from './protection'
+import { userOf } from './request-user'
 import { signedText, signText } from './stamp'
 
 // What a proof is signed for, apart from every other thing kay signs.
@@ -58,6 +59,8 @@ interface CacheReads {
   // Whether a route's handler reads them, whose proof is a header; the key text read so far.
   route: boolean
   bytes: number
+  // Who is signed in, resolved before a render when a value of each user is declared.
+  user?: string | undefined
 }
 
 const cacheReads = new AsyncLocalStorage<CacheReads>()
@@ -69,8 +72,37 @@ const stamped = new Set<string>()
 const stamps = (live as (initial: (key: string) => number, id: string, name: string) => { set: (key: string, value: number) => void, delete: (key: string) => void })((): number => 0, CACHE_LIVE_ID, 'cache')
 
 // Runs the render of a request, loads included, so the cached values it reads with `live: true` are the page's to follow.
-export function inLiveReads<T>(run: () => T): T {
-  return cacheReads.run({ at: new Map(), sent: new Set(), route: false, bytes: 0 }, run)
+// With the request, and a value of each user declared, it first asks who is signed in: the render reads that value without waiting.
+export function inLiveReads<T>(run: () => T, request?: Request): T | Promise<T> {
+  const reads: CacheReads = { at: new Map(), sent: new Set(), route: false, bytes: 0 }
+
+  if (request === undefined || !ownLiveDeclared())
+    return cacheReads.run(reads, run)
+
+  return cacheReads.run(reads, async () => {
+    reads.user = await userOf(request)
+
+    return run()
+  })
+}
+
+readViewerWith(() => cacheReads.getStore()?.user)
+
+const LIVE_SCRIPT = /<script type="application\/json" data-kay-live[^>]*>([^<]*)<\/script>/g
+
+// The page without the scripts that follow cached values, for a page built once whose server islands follow them alone; undefined when a script holds a live value too, which its islands hydrate from.
+export function withoutCacheScripts(html: string): string | undefined {
+  for (const [, text] of html.matchAll(LIVE_SCRIPT)) {
+    if ((decodeServerValue(text!.replaceAll('\\u003c', '<')) as LivePage).values.some(([id]) => id !== CACHE_LIVE_ID))
+      return undefined
+  }
+
+  return html.replace(LIVE_SCRIPT, '')
+}
+
+// Runs the render of a deferred server island a browser fetched, and gives the script it follows: the cached values it read with `live: true` are the island's to follow, not the page's, which the prerendered file read none of.
+export async function withIslandReads<T>(run: () => Promise<T>): Promise<{ result: T, script: string }> {
+  return inLiveReads(async () => ({ result: await run(), script: liveScript() })) as Promise<{ result: T, script: string }>
 }
 
 // Runs a GET route's handler so the live keys it reads are the proof its answer carries, for a `resource()` to follow.
@@ -210,17 +242,40 @@ export function liveConnections(): number {
 }
 
 // The proof that a page read these keys of these values: whoever holds it is let watch exactly them, as whoever rendered the page was.
-function proofText(keys: [string, string][], at: number): string {
-  return `${at}\n${keys.map(key => JSON.stringify(key)).toSorted().join('\n')}`
+function proofText(keys: [string, string][], at: number, user?: string): string {
+  return `${at}\n${keys.map(key => JSON.stringify(key)).toSorted().join('\n')}${user === undefined ? '' : `\nuser ${JSON.stringify(user)}`}`
 }
 
-function proofOf(keys: [string, string][], at: number): string {
-  return signText(PROOF, proofText(keys, at))
+// A proof of a page that read a value of each user names that user in its signature, after the bar, and signs them: the browser hands the text back as it came, and a user put there by anyone else breaks it.
+const USER_BAR = '|'
+
+function proofOf(keys: [string, string][], at: number, user?: string): string {
+  const mac = signText(PROOF, proofText(keys, at, user))
+
+  return user === undefined ? mac : `${mac}${USER_BAR}${encodeURIComponent(user)}`
+}
+
+// The user a proof is bound to, or undefined for one bound to none.
+function boundUser(proof: LiveRequest['proofs'][number]): string | undefined {
+  const bar = proof.sig.indexOf(USER_BAR)
+
+  if (bar === -1)
+    return undefined
+
+  try {
+    return decodeURIComponent(proof.sig.slice(bar + 1))
+  }
+  catch {
+    return ''
+  }
 }
 
 // Whether the proof is signed, made by this server and not older than its lifetime.
 function proves(proof: LiveRequest['proofs'][number], now: number): boolean {
-  return proof.at <= now + SKEW_MS && now - proof.at <= PROOF_LIFETIME_MS && signedText(PROOF, proofText(proof.keys, proof.at), proof.sig)
+  const user = boundUser(proof)
+  const bar = proof.sig.indexOf(USER_BAR)
+
+  return proof.at <= now + SKEW_MS && now - proof.at <= PROOF_LIFETIME_MS && signedText(PROOF, proofText(proof.keys, proof.at, user), bar === -1 ? proof.sig : proof.sig.slice(0, bar))
 }
 
 // A value a browser cannot be sent is refused where it is written, not where a connection would later fail on it.
@@ -250,17 +305,17 @@ export function liveScript(scope: ServerScope | undefined = currentServerScope()
   for (const [key] of following)
     cache!.sent.add(key)
 
-  const page = cachePage(following, fresh)
+  const page = cachePage(following, fresh, fresh.some(read => read.own) ? cache?.user : undefined)
 
   return `${LIVE_MARK}${following.length > 0 ? CACHE_MARK : ''}>${encodeValue(page).replaceAll('<', '\\u003c')}</script>`
 }
 
 // The values a page or a route answer holds, with the proof of them.
-function cachePage(following: [string, number][], fresh: { id: string, key: string, value: unknown }[] = []): LivePage {
+function cachePage(following: [string, number][], fresh: { id: string, key: string, value: unknown }[] = [], user?: string): LivePage {
   const at = Date.now()
   const values: LivePage['values'] = [...fresh.map(read => [read.id, read.key, read.value] as LivePage['values'][number]), ...following.map(([key, read]) => [CACHE_LIVE_ID, key, read] as LivePage['values'][number])]
 
-  return { at, sig: proofOf(values.map(([id, key]) => [id, key]), at), values }
+  return { at, sig: proofOf(values.map(([id, key]) => [id, key]), at, user), values }
 }
 
 interface Watched {
@@ -398,7 +453,10 @@ export function serveLive(app: Elysia, config?: LiveConfig): void {
       return new Response(null, { status: 400 })
 
     const now = Date.now()
-    const valid = asked.proofs.filter(proof => proves(proof, now))
+    // A proof of a page rendered for a user holds for that user's own requests alone: sign-out, or another user in the same browser, makes it refused.
+    const bound = asked.proofs.some(proof => boundUser(proof) !== undefined)
+    const viewer = bound ? await userOf(request) : undefined
+    const valid = asked.proofs.filter(proof => proves(proof, now) && (boundUser(proof) === undefined || boundUser(proof) === viewer))
     // The newest proof naming each key: the one that lets a page watch it for the longest.
     const proven = new Map<string, number>()
 
@@ -428,6 +486,17 @@ export function serveLive(app: Elysia, config?: LiveConfig): void {
       // A room and member no page proves, or one whose proof is out of date: refused, so a tab does not join as a member its page never named.
       else if (id === PRESENCE_LIVE_ID) {
         stale = true
+      }
+      // A value of each user, of the user whose request this is, which a proof bound to them covers.
+      else if (slot?.own === true) {
+        if (provenAt === undefined || viewer === undefined || key !== '') {
+          stale = true
+
+          continue
+        }
+
+        oldest = Math.min(oldest, provenAt)
+        watched.push({ id, key, value: () => slotValue(slot, viewer), watch: listener => watchSlot(slot, viewer, listener) })
       }
       else if (slot !== undefined && provenAt !== undefined && (slot.keyed || key === '')) {
         oldest = Math.min(oldest, provenAt)

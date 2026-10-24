@@ -85,6 +85,25 @@ pgDescribe('pgData live values', () => {
     expect(Object.keys(data).sort()).toEqual(['cache', 'close', 'jobs', 'live', 'notifications', 'push', 'rates', 'rooms', 'sessions', 'vitals'])
   })
 
+  pgIt('keeps a value of each user under the user\'s id, however it is spelled', async () => {
+    await fresh()
+
+    const [first, second] = twoReplicas()
+
+    await first.entries()
+    await second.entries()
+
+    const onSecond = listen(second)
+    const users = ['alice@example.com', '8c0e2f0a-52f1-4c7b-9a43-3b1d0a6f5e11', 'o\'brien "the" 42|x']
+
+    for (const [index, user] of users.entries())
+      await first.set('app:unread', user, `[${index}]`)
+
+    await waitFor(() => onSecond.length >= users.length, 'the second replica to hear the sets')
+    expect(onSecond.map(([, key]) => key).toSorted()).toEqual(users.toSorted())
+    expect((await second.entries()).toSorted()).toEqual(users.map((user, index) => ['app:unread', user, `[${index}]`] as [string, string, string]).toSorted())
+  })
+
   pgIt('reaches the other replica, a set and a delete, and never the replica that made them', async () => {
     await fresh()
 

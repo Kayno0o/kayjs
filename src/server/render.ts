@@ -247,7 +247,7 @@ export async function renderPage(route: ServedRoute, context: RequestContext, pa
 
   rendering.guarded = options.guarded ?? route.guards.length > 0
 
-  const render = async () => inLiveReads(async () => withOutcome(rendering.outcome, async () => withEndedEntries(async () => renderRoute(route, rendering, client, withEditor(route, options)))))
+  const render = async () => inLiveReads(async () => withOutcome(rendering.outcome, async () => withEndedEntries(async () => renderRoute(route, rendering, client, withEditor(route, options)))), rendering.ctx.request)
   const { pathname, search } = rendering.ctx.url
 
   // The ids a page draws only have to differ from those of the page it is swapped for, so its route and URL give them: a page rendering the same bytes for every visitor is compressed once, not once per visit.

@@ -1,0 +1,4 @@
+---
+import { visitors } from '../live'
+---
+p.online {visitors()} online

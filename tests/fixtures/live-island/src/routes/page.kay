@@ -1,0 +1,11 @@
+--- server
+import { cached } from 'kay/cache'
+import { db } from '../data'
+
+const stock = await cached('stock', '1m', () => db.stock, { live: true })
+---
+head
+  title Page
+h1 Page
+p.whole {stock} in stock
+a.home(href="/") Home

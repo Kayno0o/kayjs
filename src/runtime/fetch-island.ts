@@ -10,9 +10,10 @@ export interface FetchedIsland extends HTMLElement {
 
 // A deferred server island rendered for this visitor in place of the inert copy standing in for it.
 // One a page swap held, showing the last render, gets its inert copy back when the fetch fails.
-export async function fetchServerIsland(element: FetchedIsland): Promise<void> {
+// `replacing` is given for an island already fetched, which a change of what it read fetches again: it runs just before the new content goes in, to end what the old one started, and a failed fetch leaves the island as it was.
+export async function fetchServerIsland(element: FetchedIsland, replacing?: () => void): Promise<void> {
   const url = new URL(location.href)
-  const held = element._$b
+  const held = replacing === undefined ? element._$b : undefined
   // Taken before any exit, so a fetch that fails or meets a skew leaves no node referenced.
   const focused = focusIn(element)
 
@@ -30,6 +31,7 @@ export async function fetchServerIsland(element: FetchedIsland): Promise<void> {
 
     const text = await response.text()
 
+    replacing?.()
     element._$b ??= element.innerHTML
     element.innerHTML = text
     element.removeAttribute('inert')

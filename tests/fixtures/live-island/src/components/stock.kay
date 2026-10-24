@@ -1,0 +1,8 @@
+---
+import { signal } from 'kay'
+
+const { count } = props<{ count: number }>()
+const clicks = signal(0)
+---
+p.stock {count} left
+button.clicks(onClick={() => clicks.set(value => value + 1)}) Clicked {clicks()}

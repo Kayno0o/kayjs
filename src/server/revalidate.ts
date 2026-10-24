@@ -1,6 +1,7 @@
 import type { ServedPage } from './render'
 import type { Revalidation } from './stale-pages'
 import { compressText, compressTextStrongest } from './compress'
+import { withoutCacheScripts } from './live'
 import { readsOf } from './page-reads'
 import { pageEtag, storedHeaders } from './prerendered'
 import { invalidationCount, markPageStale, revalidationOf } from './stale-pages'
@@ -60,7 +61,7 @@ async function rerender(page: ServedPage, render: () => Promise<Response>, reval
 
   try {
     // The body is read within the scope, as a streamed block reads what it needs while it is read.
-    const { result: { response, html }, reads, invalidated } = await readsOf(async () => {
+    const { result: { response, html: rendered }, reads, invalidated } = await readsOf(async () => {
       const rendered = await render()
 
       return { response: rendered, html: rendered.status >= 500 ? '' : await rendered.text() }
@@ -73,6 +74,8 @@ async function rerender(page: ServedPage, render: () => Promise<Response>, reval
       return
     }
 
+    // As when it was built, a page holding server islands follows no cached value: its islands do, through their own fetch.
+    const html = page.islands !== undefined && page.islands.length > 0 ? withoutCacheScripts(rendered) ?? rendered : rendered
     const encoded = await compressText(html)
 
     // All at once, so no request reads the new html with the old tag.

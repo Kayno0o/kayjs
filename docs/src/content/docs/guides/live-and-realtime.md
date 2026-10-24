@@ -55,6 +55,25 @@ p {room(id).users} in {id}
 
 A key you set stays until you delete it, or until its lifetime passes. Read a keyed value in the template, not only after the page rendered, as the server cannot know the key before.
 
+### A value for each user
+
+Give the declaration `{ user: true }` for a value that is one signed-in user's own, such as their unread count or their cart. You declare nothing else.
+
+```ts
+export const unread = live(0, { user: true })
+
+unread.set(user.id, n => n + 1)
+```
+
+```kay
+---
+import { unread } from '../live'
+---
+p {unread()} unread
+```
+
+`unread()` gives the value of whoever is signed in, and the starting value for nobody. The server sends a value only to the tabs of its own user. The page's proof names the user it was rendered for, signed, and the connection is refused unless its own request is that user's, so a proof copied to another browser, or kept after a sign-out, gets nothing and the tab loads the page again. The user is the id your sign-in library gives kay, which kayjs-auth does with the user's id.
+
 ### Forgetting a value
 
 A value stays in the store until you change it. Give the declaration a `ttl` to forget it that long after its last write:
@@ -115,6 +134,8 @@ You write no route, socket or island code. The server only tells each tab that `
 A tab you cannot see waits and loads the page when you come back. An `invalidate` made while the connection was down is not lost: the tab catches up when it reconnects. Processes sharing a `sqliteCache` follow each other's `invalidate`.
 
 Read the value in the page's server fence or a layout's. A page that follows a value is rendered for each request, so a static export of it fails. A value that only expires by its `ttl` is not pushed: call `invalidate` when it changes.
+
+A deferred server island follows a value on its own. When the island's fetch reads the value, an `invalidate` fetches just that island again and swaps it in, with no request for the page, so the rest of the page and its typed fields are not touched. The island starts afresh, so keep state it must hold outside it. A value read in a page's own render still loads the page again, and a plain island follows through `resource`.
 
 A collection follows when you add `live: true` to it. See [Showing edits in open tabs](/guides/content#showing-edits-in-open-tabs). A page that reads the collection then shows an edit in every open tab, a CMS save included.
 

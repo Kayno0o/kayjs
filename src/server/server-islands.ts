@@ -6,6 +6,7 @@ import type { RenderOptions, RequestContext, ServedPage } from './render'
 import { SERVER_ISLAND } from '../runtime/html'
 import { ISLAND_HEADER, ISLAND_PARAM } from '../runtime/server-islands'
 import { gzipParts, preferredEncoding, splicePartAsync, splicePartText } from './compress'
+import { withIslandReads } from './live'
 import { renderServerIslands, servePrerendered } from './render'
 import { savesLess } from './save-data'
 import { freshStamp, STAMP_HOLE } from './stamp'
@@ -141,15 +142,17 @@ export async function serveServerIslands(route: ServedRoute, page: ServedPage, p
   else if (all)
     mode = undefined
 
-  const rendered = await renderServerIslands(route, context, params, client, options, paths.get(route.file), mode)
+  const render = async () => renderServerIslands(route, context, params, client, options, paths.get(route.file), mode)
+  const { result: rendered, script } = fetched ? await withIslandReads(render) : { result: await render(), script: '' }
 
   if (rendered instanceof Response)
     return rendered
 
   paths.set(route.file, rendered.path)
 
+  // The island carries the proof of what it read, so the browser fetches it again alone when that changes.
   if (fetched)
-    return rendered.reply(rendered.html[Number(asked)] ?? '')
+    return rendered.reply((rendered.html[Number(asked)] ?? '') + script)
 
   // What the page's loads set this time wins over what the build stored.
   for (const [name, value] of page.headers) {

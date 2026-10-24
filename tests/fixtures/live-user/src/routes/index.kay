@@ -1,0 +1,5 @@
+---
+import Inbox from '../components/inbox.kay'
+---
+h1 Inbox
+Inbox

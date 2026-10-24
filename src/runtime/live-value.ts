@@ -23,6 +23,14 @@ export interface Live<T> {
   set: Setter<T>
 }
 
+// A value of each user, declared `live(initial, { user: true })`: read by calling it, which gives the signed-in visitor's own and `initial` for nobody; the server writes one user's with `set(user, next)`, `user` being the id the library that signs them in names (`userOf` of `kay/library`, which kayjs-auth does).
+export interface LiveOwn<T> {
+  (): T
+  set: (user: string, next: T | ((current: T) => T)) => void
+  // Puts a user's value back to `initial`, and frees what is kept for it.
+  delete: (user: string) => void
+}
+
 // A live value per key, `room(id)` reading one: what the declaration's function gives a key nothing was set for.
 export interface LiveByKey<K extends LiveKey, T> {
   (key: K): T
@@ -32,7 +40,7 @@ export interface LiveByKey<K extends LiveKey, T> {
 }
 
 // What both halves return for either shape; `live()` types the two apart for the app.
-type Handle = Live<unknown> & LiveByKey<LiveKey, unknown>
+type Handle = Live<unknown> & LiveByKey<LiveKey, unknown> & LiveOwn<unknown>
 
 // A row may end with the time in milliseconds it is forgotten at, for a value declared with a `ttl`.
 export type LiveEntry = [id: string, key: string, text: string] | [id: string, key: string, text: string, expiresAt: number]
@@ -43,6 +51,8 @@ type Entries = LiveEntry[]
 export interface LiveOptions<Ttl extends Duration = Duration> {
   // How long a value is kept after its last write, such as '7d': then every process and store forgets it, and it reads what the declaration gives again, as after a delete. A write of the value it holds renews it; a keyed value expires per key.
   ttl?: Ttl & PositiveDuration<Ttl>
+  // One value for each signed-in user, which only they are sent: see `LiveOwn`.
+  user?: boolean
 }
 
 // Where live values are kept beyond one process, `store.live` of kay.config.ts: `sqliteLive(path)` for the processes of a machine, `pgData(db).live` for replicas on Postgres. A value is its text, as `encodeValue` writes it.
@@ -105,6 +115,8 @@ interface ServerSlot {
   name: string | undefined
   initial: unknown
   keyed: boolean
+  // A value of each user, stored under the user's id and read with no key: a page proves it bound to the user it was rendered for.
+  own: boolean
   values: Map<string, unknown>
   listeners: Map<string, Set<() => void>>
   // The lifetime of a value in milliseconds after its last write, from the declaration's `ttl`.
@@ -284,6 +296,9 @@ interface ServerState {
   idle: LiveStore | undefined
   // The watchers of the app's values, held by connections.
   watchers: number
+  viewer: (() => string | undefined) | undefined
+  // Whether any value of each user was declared.
+  own: boolean
 }
 
 const STATE = Symbol.for('kay.live.state')
@@ -293,7 +308,7 @@ const UNDECLARED_ROWS = 10_000
 function state(): ServerState {
   const holder = globalThis as Record<symbol, ServerState | undefined>
 
-  return holder[STATE] ??= { store: undefined, subscribed: new WeakSet(), undeclared: new Map(), undeclaredRows: 0, undeclaredExpiry: new Map(), startup: new Set(), checkWrite: undefined, written: undefined, dating: new Set(), reading: undefined, idle: undefined, watchers: 0 }
+  return holder[STATE] ??= { store: undefined, subscribed: new WeakSet(), undeclared: new Map(), undeclaredRows: 0, undeclaredExpiry: new Map(), startup: new Set(), checkWrite: undefined, written: undefined, dating: new Set(), reading: undefined, idle: undefined, watchers: 0, viewer: undefined, own: false }
 }
 
 // Installed by the server: refuses a value a browser could not be sent where it is set.
@@ -312,12 +327,38 @@ function notify(slot: ServerSlot, key: string): void {
 
 const slotOfHandle = new WeakMap<object, ServerSlot>()
 
+// The signed-in user of the render in progress, which the server resolves before it renders when a value of each user is declared; installed by the server.
+export function readViewerWith(viewer: () => string | undefined): void {
+  state().viewer = viewer
+}
+
+// Whether a value of each user was declared, so the server asks who is signed in before it renders.
+export function ownLiveDeclared(): boolean {
+  return state().own
+}
+
+// The value of the user the render is for, noted for the page's proof with that user bound to it; what the declaration gives when nobody is signed in, which no page follows.
+function readOwn(slot: ServerSlot): unknown {
+  const user = state().viewer?.()
+
+  if (user === undefined)
+    return slot.initial
+
+  const value = slotValue(slot, user)
+
+  noteRead(slot, '', value, true)
+
+  return value
+}
+
 // An island's server render notes the live values it imports, so the page proves them though the render did not read them, as when a handler or a `--- client` fence reads one later. A keyed value is left out: its key is not known before it is read.
 export function noteLives(handles: readonly unknown[]): void {
   for (const handle of handles) {
     const slot = typeof handle === 'function' ? slotOfHandle.get(handle) : undefined
 
-    if (slot !== undefined && !slot.keyed)
+    if (slot?.own)
+      readOwn(slot)
+    else if (slot !== undefined && !slot.keyed)
       noteRead(slot, '', slotValue(slot, ''))
   }
 }
@@ -621,20 +662,24 @@ function datedTogether(id: string): void {
   kept.dating.add(id)
 }
 
-function serverLive(id: string, initial: unknown, name: string | undefined, ttl: number | undefined): Handle {
-  const keyed = typeof initial === 'function'
+function serverLive(id: string, initial: unknown, name: string | undefined, ttl: number | undefined, own: boolean): Handle {
+  const keyed = typeof initial === 'function' && !own
   const known = slots().get(id)
   // A dev reload evaluates the module again: the values and watchers stay, the declaration is the new one.
-  const slot: ServerSlot = known ?? { id, name, initial, keyed, values: new Map(), listeners: new Map(), ttl, expires: new Map(), ordered: true, latest: 0, timer: undefined }
+  const slot: ServerSlot = known ?? { id, name, initial, keyed, own, values: new Map(), listeners: new Map(), ttl, expires: new Map(), ordered: true, latest: 0, timer: undefined }
 
   if (known) {
     known.initial = initial
     known.keyed = keyed
+    known.own = own
     known.name = name
     known.ttl = ttl
   }
 
   slots().set(id, slot)
+
+  if (own)
+    state().own = true
 
   if (!known) {
     const kept = state()
@@ -713,30 +758,33 @@ function serverLive(id: string, initial: unknown, name: string | undefined, ttl:
       notify(slot, key)
   }
 
-  const handle = keyed ? (key: LiveKey) => read(keyText(key)) : () => read('')
+  const readOne = own ? () => readOwn(slot) : () => read('')
+  const handle = keyed ? (key: LiveKey) => read(keyText(key)) : readOne
 
   slotOfHandle.set(handle, slot)
 
-  return Object.assign(handle, keyed
+  const remove = (key: LiveKey) => {
+    if (!slot.values.has(keyText(key)))
+      return
+
+    if (shared(slot))
+      sendToStore(slot.id, keyText(key), (store): void | Promise<void> => store.delete(slot.id, keyText(key)))
+
+    slot.values.delete(keyText(key))
+    slot.expires.delete(keyText(key))
+    notify(slot, keyText(key))
+  }
+
+  return Object.assign(handle, keyed || own
     ? {
       set: (key: LiveKey, next: unknown) => write(keyText(key), next),
-      delete: (key: LiveKey) => {
-        if (!slot.values.has(keyText(key)))
-          return
-
-        if (shared(slot))
-          sendToStore(slot.id, keyText(key), (store): void | Promise<void> => store.delete(slot.id, keyText(key)))
-
-        slot.values.delete(keyText(key))
-        slot.expires.delete(keyText(key))
-        notify(slot, keyText(key))
-      },
+      delete: remove,
     }
     : { set: (next: unknown) => write('', next) }) as unknown as Handle
 }
 
 // A render of a page lists what it read, for its script and the proof of it.
-function noteRead(slot: ServerSlot, key: string, value: unknown): void {
+function noteRead(slot: ServerSlot, key: string, value: unknown, own = false): void {
   const scope: ServerScope | undefined = currentServerScope()
 
   if (scope === undefined)
@@ -746,7 +794,7 @@ function noteRead(slot: ServerSlot, key: string, value: unknown): void {
   const at = `${slot.id}\0${key}`
 
   if (!reads.has(at))
-    reads.set(at, { id: slot.id, key, value })
+    reads.set(at, { id: slot.id, key, value, ...own && { own: true as const } })
 }
 
 interface Entry {
@@ -1061,6 +1109,8 @@ function browserLive(id: string, initial: unknown): Handle {
 // Given a function of a key it is one value per key, `export const room = live((id: string) => ({ users: 0 }))`, read as `room(id)` and written as `room.set(id, ...)`.
 // The build gives each declaration its id, so it is written as `export const name = live(...)` at the top of a module.
 // `live(0, { ttl: '7d' })` forgets the value, in every store, that long after its last write.
+// `live(0, { user: true })` is one value for each signed-in user, sent only to that user's own pages: `unread()` reads the visitor's, `unread.set(userId, 3)` writes one user's.
+export function live<T, const Ttl extends Duration = Duration>(initial: PlainValue<T>, options: LiveOptions<Ttl> & { user: true }): LiveOwn<T>
 export function live<T, const Ttl extends Duration = Duration>(initial: PlainValue<T>, options?: LiveOptions<Ttl>): Live<T>
 export function live<K extends LiveKey, T, const Ttl extends Duration = Duration>(initial: (key: K) => PlainValue<T>, options?: LiveOptions<Ttl>): LiveByKey<K, T>
 // The build adds the id and the name after the value, before the options when there are some, so a browser reads the id second without looking for the options it has no use for.
@@ -1068,12 +1118,17 @@ export function live(initial: unknown, id?: unknown, name?: unknown, options?: u
   if (typeof id !== 'string')
     throw new TypeError('kay: live() is declared as `export const name = live(...)` at the top of a module in the project, where the build names it')
 
-  return typeof KAY_BROWSER === 'undefined' && typeof document === 'undefined' ? serverLive(id, initial, typeof name === 'string' ? name : undefined, ttlOf(id, name, options)) : browserLive(id, initial)
+  return typeof KAY_BROWSER === 'undefined' && typeof document === 'undefined' ? serverLive(id, initial, typeof name === 'string' ? name : undefined, ttlOf(id, name, options), declaredOptions(name, options)?.user === true) : browserLive(id, initial)
+}
+
+// The options of a declaration, which follow the id, or the name when there is one.
+function declaredOptions(name: unknown, options: unknown): LiveOptions | null | undefined {
+  return (typeof name === 'object' ? name : options) as LiveOptions | null | undefined
 }
 
 // The lifetime in milliseconds a declaration gives its value, from the options that follow the id, or the name when there is one.
 function ttlOf(id: string, name: unknown, options: unknown): number | undefined {
-  const declared = (typeof name === 'object' ? name : options) as LiveOptions | null | undefined
+  const declared = declaredOptions(name, options)
 
   return declared?.ttl === undefined ? undefined : durationSeconds(declared.ttl, `the ttl of live() ${typeof name === 'string' ? name : id}`) * 1000
 }

@@ -40,7 +40,7 @@ export interface ServerScope {
   // The path of the page being rendered, percent-encoded as requested.
   path: string
   // The live values the render read, by their id and key, which the page ships to its islands.
-  live?: Map<string, { id: string, key: string, value: unknown, sent?: boolean }>
+  live?: Map<string, { id: string, key: string, value: unknown, sent?: boolean, own?: true }>
 }
 
 const CLEAN = 0

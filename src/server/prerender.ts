@@ -22,7 +22,7 @@ import { dropOrphanCopies, keepClasses, missingClasses, PRERENDERED_DIR, readMan
 import { writeDictionary } from './dictionary'
 import { exportedEndpoints } from './endpoints'
 import { localeCopies, stateFor } from './i18n'
-import { LIVE_MARK } from './live'
+import { LIVE_MARK, withoutCacheScripts } from './live'
 import { pageFlags } from './page-flags'
 import { readsOf } from './page-reads'
 import { chainSetting, pageSetting } from './page-settings'
@@ -225,8 +225,14 @@ export async function prerenderPages(project: Project, client: ClientBuild, opti
         if (auto && (islands.length > 0 || stamps || readsSite || livesOn))
           return skip(unkeptBy(islands.length > 0, stamps, livesOn))
 
-        if (livesOn)
+        // A page holding a server island may read cached values with `live: true`: what the island's own request reads is what it follows, and the page, built once, follows nothing.
+        const unfollowed = livesOn && islands.length > 0 ? withoutCacheScripts(html) : undefined
+
+        if (livesOn && unfollowed === undefined)
           throw new KayError('export-server-render', 'kay: it reads a live value, which only a server holds and signs the connection to per request; drop `prerender` from `export const page`, or read the value in a component the page does not render at build time')
+
+        if (unfollowed !== undefined)
+          html = unfollowed
 
         if (options.exportAll && readsSite)
           throw new KayError('export-site-url', 'kay: it reads the site, through siteUrl() or siteOrigin(), which neither `site` in kay.config.ts nor SITE_URL sets')
