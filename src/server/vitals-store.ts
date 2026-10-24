@@ -1,5 +1,6 @@
 import { openSqlite } from '../runtime/sqlite.server'
 import { appStore } from './app-store'
+import { inMemory } from './memory-mark'
 import { onReload } from './reload'
 
 export type Vital = 'lcp' | 'cls' | 'inp'
@@ -73,7 +74,7 @@ const SEPARATOR = '\u0000'
 export function memoryVitals(): VitalsStore {
   const counts = new Map<string, number>()
 
-  return {
+  return inMemory({
     add(route, readings, day) {
       for (const [key] of counts) {
         if (Number(key.slice(0, key.indexOf(SEPARATOR))) >= day - WINDOW_DAYS)
@@ -109,7 +110,7 @@ export function memoryVitals(): VitalsStore {
 
       return [...summed.values()]
     },
-  }
+  })
 }
 
 // Counts kept in a SQLite file every process of the machine opening it shares, one row per day, route, metric and bucket.

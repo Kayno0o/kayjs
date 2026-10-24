@@ -1,5 +1,6 @@
 import { openSqlite } from '../runtime/sqlite.server'
 import { appStore } from './app-store'
+import { inMemory } from './memory-mark'
 import { onReload } from './reload'
 
 // One browser's push subscription: where the push service takes a message and the keys it is encrypted for.
@@ -29,7 +30,7 @@ export interface PushStore {
 export function memoryPush(): PushStore {
   const rows = new Map<string, PushSubscriptionRecord & { user: string }>()
 
-  return {
+  return inMemory({
     add(user, subscription, most) {
       rows.delete(subscription.endpoint)
       rows.set(subscription.endpoint, { ...subscription, user })
@@ -62,7 +63,7 @@ export function memoryPush(): PushStore {
 
       return count
     },
-  }
+  })
 }
 
 interface Row {

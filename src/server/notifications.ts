@@ -4,6 +4,7 @@ import { durationSeconds } from '../runtime/duration'
 import { kayLog } from '../runtime/log'
 import { openSqlite } from '../runtime/sqlite.server'
 import { appStore } from './app-store'
+import { inMemory } from './memory-mark'
 import { pushAlongside, pushSettings } from './push-settings'
 import { pushStore } from './push-store'
 import { onReload } from './reload'
@@ -113,7 +114,7 @@ export function memoryNotifications(): NotificationStore {
     return rows
   }
 
-  return {
+  return inMemory({
     add(user, note, most) {
       const rows = own(user, note.at)
 
@@ -158,7 +159,7 @@ export function memoryNotifications(): NotificationStore {
 
       return dropped
     },
-  }
+  })
 }
 
 interface Row {

@@ -3,6 +3,8 @@ import { rm } from 'node:fs/promises'
 import { availableParallelism, constants } from 'node:os'
 import { basename, join } from 'node:path'
 import process from 'node:process'
+import { kayLog } from '../runtime/log'
+import { isInMemory } from './memory-mark'
 import { START_PARENT, WORKER_COUNT, WORKER_INDEX } from './parent'
 
 // The server runs in a process group of its own, so each of these reaches it once, through the primary, whether a terminal sent it to the group or a supervisor to the primary alone.
@@ -73,6 +75,8 @@ export async function sharedStores(store: AppStore | undefined): Promise<AppStor
   if (workerCount() < 2)
     return store
 
+  warnOfMemoryStores(store)
+
   const { sqliteData } = await import('./sqlite-data')
   const { cache, live, rates, rooms, vitals, notifications, push } = sqliteData(SHARED_PATH)
 
@@ -110,6 +114,20 @@ export async function runAsPrimary(argv: string[], env: Record<string, string | 
   const count = platformWorkers(asked ?? 1, basename(process.execPath))
 
   return count < 2 ? undefined : superviseWorkers({ command: [process.execPath, ...argv.slice(2)], cwd: process.cwd(), env, count, name: basename(process.execPath) })
+}
+
+// The factories of the stores that keep their data in one process's memory, by the `store` key an app puts them under.
+const MEMORY_FACTORIES = { sessions: 'memoryStore', jobs: 'memoryJobs', rates: 'memoryRates', rooms: 'memoryRooms', vitals: 'memoryVitals', notifications: 'memoryNotifications', push: 'memoryPush' } as const
+
+// A store the app built in memory is kept, and splits per worker: said once, by the first worker.
+function warnOfMemoryStores(store: AppStore | undefined): void {
+  if (process.env[WORKER_INDEX] !== '0' || store === undefined)
+    return
+
+  for (const [kind, factory] of Object.entries(MEMORY_FACTORIES)) {
+    if (isInMemory(store[kind as keyof typeof MEMORY_FACTORIES]))
+      kayLog('warn', `store.${kind} is ${factory}(), which each of the ${workerCount()} workers keeps to itself: name sqliteData('data/app.sqlite') or a store of your own shared between processes for it in kay.config.ts`)
+  }
 }
 
 interface Supervised {

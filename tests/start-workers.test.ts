@@ -1,7 +1,10 @@
 import type { Subprocess } from 'bun'
 import { join } from 'node:path'
 import process from 'node:process'
-import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
+import { afterAll, beforeAll, describe, expect, it, spyOn } from 'bun:test'
+import { memoryStore } from '../src/server'
+import { sqliteRates } from '../src/server/protection'
+import { memoryRooms } from '../src/server/rooms'
 import { parseWorkers, requestedWorkers, sharedStores } from '../src/server/workers'
 import { alive } from './alive'
 import { freePort } from './free-port'
@@ -15,6 +18,7 @@ const SECRET = 'workers-test-secret-0123456789-abcdef'
 const SERVER = `import process from 'node:process'
 import { Elysia } from 'elysia'
 import { cached } from 'kay/cache'
+import { appStore } from 'kay/library'
 import { pages, rateLimit } from 'kay/server'
 
 const limit = rateLimit('workers-test', { max: 3, window: '1m' })
@@ -30,7 +34,11 @@ new Elysia().get('/who', who).get('/cached', async () => \`\${await cached('work
   visitors.set(count => count + 1)
 
   return \`\${visitors()}|\${process.env.KAY_WORKER}\`
-}).onStop(() => console.log(\`stopped \${process.env.KAY_WORKER}\`)).use(await pages())
+}).post('/join', () => {
+  appStore().rooms.add('workers-test-room', 'tab-1', '"ann"')
+
+  return process.env.KAY_WORKER
+}).get('/members', () => [appStore().rooms.members('workers-test-room').join(','), process.env.KAY_WORKER].join('|')).onStop(() => console.log(\`stopped \${process.env.KAY_WORKER}\`)).use(await pages())
 `
 
 // A live value, written by whichever worker answers.
@@ -167,6 +175,38 @@ describe('what workers share', () => {
     }
   })
 
+  it('warns once, by the first worker, of a store built in memory', async () => {
+    const warn = spyOn(console, 'warn').mockImplementation(() => undefined)
+    const before = { workers: process.env.KAY_WORKERS, worker: process.env.KAY_WORKER }
+
+    try {
+      process.env.KAY_WORKERS = '2'
+      process.env.KAY_WORKER = '1'
+      await sharedStores({ rooms: memoryRooms() })
+      expect(warn).not.toHaveBeenCalled()
+
+      process.env.KAY_WORKER = '0'
+      await sharedStores({ rooms: memoryRooms(), sessions: memoryStore(), rates: sqliteRates(':memory:') })
+
+      const said = warn.mock.calls.map(call => String(call[0]))
+
+      expect(said).toHaveLength(2)
+      expect(said[0]).toContain('store.sessions is memoryStore()')
+      expect(said[1]).toContain('store.rooms is memoryRooms()')
+      expect(said[1]).toContain('sqliteData')
+    }
+    finally {
+      warn.mockRestore()
+
+      for (const [name, value] of Object.entries({ KAY_WORKERS: before.workers, KAY_WORKER: before.worker })) {
+        if (value === undefined)
+          delete process.env[name]
+        else
+          process.env[name] = value
+      }
+    }
+  })
+
   it('lets two workers listen on one port, and a process that is none refuses', async () => {
     const script = `import { shareThePort } from ${JSON.stringify(join(import.meta.dir, '../src/server/workers.ts'))}
 shareThePort()
@@ -270,6 +310,17 @@ describe('kay start --workers', () => {
         statuses.push((await get(port, '/rate')).status)
 
       expect(statuses.filter(status => status === 200)).toHaveLength(3)
+
+      // A member who joined a room on one worker is listed by the other.
+      const joined = await (await fetch(`http://127.0.0.1:${port}/join`, { method: 'POST', headers: { connection: 'close' } })).text()
+      let members = ''
+
+      for (const limit = Date.now() + 10_000; members !== `"ann"|${joined === '0' ? '1' : '0'}`;) {
+        if (Date.now() > limit)
+          throw new Error(`worker ${joined} joined the room, the other listed ${members}`)
+
+        members = (await get(port, '/members')).text
+      }
 
       // A live value one worker wrote is read by the other, within the half second the store takes to tell it.
       const wrote = (await (await fetch(`http://127.0.0.1:${port}/api/count`, { method: 'POST', headers: { connection: 'close' } })).text())

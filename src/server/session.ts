@@ -11,6 +11,7 @@ import { openSqlite } from '../runtime/sqlite.server'
 import { appStore } from './app-store'
 import { nodeCrypto } from './builtins'
 import { requestCookies } from './cookies'
+import { inMemory } from './memory-mark'
 import { onReload } from './reload'
 import { overHttps } from './request-url'
 import { readPersonally } from './scope'
@@ -381,7 +382,7 @@ export function memoryStore(): DeletableSessionStore {
   const sessions = new Map<string, { text: string, expires: number }>()
   let writes = 0
 
-  return {
+  return inMemory({
     get(id) {
       const entry = sessions.get(id)
 
@@ -433,7 +434,7 @@ export function memoryStore(): DeletableSessionStore {
 
       return deleted
     },
-  }
+  })
 }
 
 // Sessions in a SQLite file, surviving restarts and shared by the processes on one machine; under `bun test` they stay in memory, so a test leaves no file and shares no session with another test file.

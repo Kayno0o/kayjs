@@ -15,6 +15,7 @@ import { NAVIGATE_HEADER, WORK_HEADER } from '../runtime/swap'
 import { appStore } from './app-store'
 import { nodeNet } from './builtins'
 import { checkRequestIdHeader } from './config-limits'
+import { inMemory } from './memory-mark'
 import { STORE_TIMEOUT_MS } from './pg-limit'
 import { TimeoutError } from './pg-poll'
 import { onReload } from './reload'
@@ -135,7 +136,7 @@ export function memoryRates(): { hit: (key: string, window: Duration, weight?: n
   // Ordered by when each window opened, so the oldest come first.
   const windows = new Map<string, RateWindow>()
 
-  return {
+  return inMemory({
     peek(key) {
       const window = windows.get(key)
 
@@ -158,7 +159,7 @@ export function memoryRates(): { hit: (key: string, window: Duration, weight?: n
 
       return { count: window.count, resetAt: window.resetAt }
     },
-  }
+  })
 }
 
 const RATES_KEY_BYTES = 32

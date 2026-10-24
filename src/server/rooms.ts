@@ -6,6 +6,7 @@ import { t } from 'elysia'
 import { optionMs } from '../runtime/duration'
 import { kayLog } from '../runtime/log'
 import { openSqlite } from '../runtime/sqlite.server'
+import { inMemory } from './memory-mark'
 import { onReload } from './reload'
 
 // What a room sends a connection through: Elysia's `ws`, read through its raw socket, the one object that stays the same from `open` to `close`.
@@ -296,7 +297,7 @@ export function memoryRooms(): RoomStore {
   const states = new Map<string, string>()
   const listeners = new Set<RoomListener>()
 
-  return {
+  return inMemory({
     add(room, connection, member) {
       byRoom.set(room, (byRoom.get(room) ?? new Map<string, string>()).set(connection, member))
     },
@@ -338,7 +339,7 @@ export function memoryRooms(): RoomStore {
     close() {
       listeners.clear()
     },
-  }
+  })
 }
 
 // Rooms kept in a SQLite file every process of the machine opening it shares: a message published in one reaches the members connected to the others as the file changes, and at worst within `poll`, `'250ms'` by default (`'25ms'` where the file cannot be watched, slowing to `'250ms'` after a second with no message); a bare number throws.

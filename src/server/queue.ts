@@ -13,6 +13,7 @@ import { openSqlite } from '../runtime/sqlite.server'
 import { appStore } from './app-store'
 import { MAX_TIMER_MS } from './config-limits'
 import { onDrain, stopGraceMs, STOPPED } from './drain'
+import { inMemory } from './memory-mark'
 import { onReload } from './reload'
 import { reportBackgroundError } from './report'
 
@@ -471,7 +472,7 @@ export function memoryJobs(): JobStore {
   // Whether a write about the job still comes from the run holding it: one that names no hold (a removal by id) always does.
   const holds = (job: StoredJob | undefined, until: number | undefined): job is StoredJob => job !== undefined && (until === undefined || job.heldUntil === until)
 
-  return {
+  return inMemory({
     add(job) {
       const holder = job.key === undefined ? undefined : waiting(job.queue).find(other => other.key === job.key)
 
@@ -604,7 +605,7 @@ export function memoryJobs(): JobStore {
 
       return true
     },
-  }
+  })
 }
 
 // What a queue or a locked schedule names no store of its own uses, opened on first use.
