@@ -6,7 +6,7 @@ description: A labelled list of radios to pick one option from, each with an opt
 
 `value` is the option picked to start with, or `null` for none, and a group whose parent passes another follows it. `onChange` gets the picked option's own value, a number for a number option. An option carries a `label`, an optional `description` under it that screen readers read after the label, and may be `disabled`. Inside a form, the group posts the picked option under `name`, with no JavaScript.
 
-When `value` is typed to allow `null`, an option may carry `value: null` for a "none" choice of its own. It is checked while the group holds `null`, tells `onChange` `null` when picked, and posts an empty string in a form.
+When `value` is typed to allow `null`, an option may carry `value: null` for a "none" choice of its own. It is checked while the group holds `null`, tells `onChange` `null` when picked, and posts an empty string in a form. `kay check` fails a null option on a `value` that cannot be `null`, and one beside an option of `""`, which would post the same empty string.
 
 Use [Segmented](/ui/segmented) for a compact row of options.
 

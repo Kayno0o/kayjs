@@ -3,6 +3,7 @@ import type { JSX } from 'kay'
 import type { IconProps } from 'kay/icons'
 import type { IconSlot } from './defaults'
 import { recipe, untrack } from 'kay'
+import type { NullOption } from './null-option'
 import { controlledRadios } from './controlled-radios'
 import Icon from './icon.kay'
 
@@ -19,7 +20,7 @@ const look = recipe({
 
 const { options, value, label, name, disabled = false, orientation = 'horizontal', onChange, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'role' | 'onChange'> & {
   // `icon` sits before the label; `disabled` keeps that option from being picked.
-  options: readonly { value: Value, label: string, icon?: IconSlot | IconProps | undefined, disabled?: boolean | undefined }[]
+  options: readonly { value: Value, label: string, icon?: IconSlot | IconProps | undefined, disabled?: boolean | undefined }[] & NullOption<Value, Held>
   // The option picked to start with, or `null` for none, such as while what shows matches no option; a group whose parent passes another follows it.
   value: Held
   // Names the group for screen readers.

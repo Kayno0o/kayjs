@@ -1,6 +1,7 @@
 --- <Value extends string | number | null, Held extends Value | null = Value>
 import type { JSX } from 'kay'
 import { recipe, uid, untrack } from 'kay'
+import type { NullOption } from './null-option'
 import { controlledRadios } from './controlled-radios'
 
 // 'kui-radio-group' stays as the component's name for an app's CSS; the group is named so a choice reads its busy state.
@@ -17,7 +18,7 @@ const look = recipe({
 
 const { options, value, label, name, disabled = false, onChange, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'role' | 'onChange'> & {
   // `description` is a quieter line under the label, which screen readers hear after it; `disabled` keeps that option from being picked.
-  options: readonly { value: Value, label: string, description?: string | undefined, disabled?: boolean | undefined }[]
+  options: readonly { value: Value, label: string, description?: string | undefined, disabled?: boolean | undefined }[] & NullOption<Value, Held>
   // The option picked to start with, or `null` for none; a group whose parent passes another follows it.
   value: Held
   // Names the group for screen readers; omit it and pass `aria-label` or `aria-labelledby` instead, such as inside a FormField that names it.
