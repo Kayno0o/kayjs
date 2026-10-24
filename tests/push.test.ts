@@ -619,8 +619,8 @@ describe('the worker handlers', () => {
 describe('the worker handlers on a rotated subscription', () => {
   type Listener = (event: unknown) => void
 
-  async function scope(extensions: Parameters<typeof pages>[0]['extensions'], fetching: (url: string, init?: RequestInit) => Promise<Response>) {
-    const app = await pages({ root: 'tests/fixtures/static', prebuilt: false, site: 'https://x.example', base: '/repo', extensions, offline: false })
+  async function scope(fetching: (url: string, init?: RequestInit) => Promise<Response>, offline = false) {
+    const app = await pages({ root: 'tests/fixtures/static', prebuilt: false, site: 'https://x.example', base: '/repo', extensions: [push()], offline })
     const script = await (await app.handle(new Request('http://localhost/sw.js'))).text()
     const listeners = new Map<string, Listener>()
     const subscribed: { applicationServerKey: Uint8Array, unsubscribed: boolean }[] = []
@@ -655,7 +655,7 @@ describe('the worker handlers on a rotated subscription', () => {
   it('subscribes again with the served key and sends it to the subscribe route under the base, with the session cookie', async () => {
     const calls: { url: string, init?: RequestInit | undefined }[] = []
     const keys = await generateVapidKeys()
-    const worker = await scope([push()], async (url, init) => {
+    const worker = await scope(async (url, init) => {
       calls.push({ url, init })
 
       return url.endsWith('/key') ? new Response(keys.publicKey) : new Response(null, { status: 204 })
@@ -670,16 +670,30 @@ describe('the worker handlers on a rotated subscription', () => {
     expect(worker.subscribed[0]!.unsubscribed).toBe(false)
   })
 
+  it('does the same from the offline worker', async () => {
+    const keys = await generateVapidKeys()
+    const calls: string[] = []
+    const worker = await scope(async (url) => {
+      calls.push(url)
+
+      return url.endsWith('/key') ? new Response(keys.publicKey) : new Response(null, { status: 204 })
+    }, true)
+
+    await worker.fire('pushsubscriptionchange')
+    expect(calls).toEqual(['https://x.example/repo/_kay/push/key', 'https://x.example/repo/_kay/push/subscribe'])
+    expect(worker.subscribed).toHaveLength(1)
+  })
+
   it('does not keep a subscription the server refused or could not be told of', async () => {
     const keys = await generateVapidKeys()
-    const refused = await scope([push()], async url => (url.endsWith('/key') ? new Response(keys.publicKey) : new Response(null, { status: 401 })))
-    const down = await scope([push()], async (url) => {
+    const refused = await scope(async url => (url.endsWith('/key') ? new Response(keys.publicKey) : new Response(null, { status: 401 })))
+    const down = await scope(async (url) => {
       if (url.endsWith('/key'))
         return new Response(keys.publicKey)
 
       throw new TypeError('offline')
     })
-    const none = await scope([push()], async () => new Response(null, { status: 500 }))
+    const none = await scope(async () => new Response(null, { status: 500 }))
 
     await refused.fire('pushsubscriptionchange')
     await down.fire('pushsubscriptionchange')
@@ -690,7 +704,7 @@ describe('the worker handlers on a rotated subscription', () => {
   })
 
   it('deletes the caches an earlier offline worker named when the push-only worker activates', async () => {
-    const worker = await scope([push()], async () => new Response(null))
+    const worker = await scope(async () => new Response(null))
 
     expect([...worker.caches.keys()]).toEqual(['kay-w1', 'kay-w5', 'other'])
     await worker.fire('activate')
