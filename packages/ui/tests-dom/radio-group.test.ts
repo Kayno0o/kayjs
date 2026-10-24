@@ -66,3 +66,20 @@ test('puts the previous option back when onChange resolves to false', async () =
 
   expect([told, checked()]).toEqual([[3], '1'])
 })
+
+test('an option with value null is checked while the group holds null, and picking it goes back to it', async () => {
+  const { root } = await open()
+  const away = () => [...root.querySelectorAll<HTMLInputElement>('input[name="away"]')]
+
+  expect(away().map(radio => radio.checked)).toEqual([true, false])
+
+  click(away()[1] ?? null)
+  await settle()
+
+  expect(away().map(radio => radio.checked)).toEqual([false, true])
+
+  click(away()[0] ?? null)
+  await settle()
+
+  expect(away().map(radio => radio.checked)).toEqual([true, false])
+})

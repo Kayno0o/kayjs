@@ -73,6 +73,23 @@ test('a reset puts the radios back on their start and tells onChange the number,
   expect(told.slice(2).sort()).toEqual([['held', 0], ['size', 10]])
 })
 
+test('an option with value null is checked while the group holds null, and picking it tells onChange null', async () => {
+  const { root, told, checked } = await open()
+  const radios = () => [...root.querySelectorAll<HTMLInputElement>('input[name="away"]')]
+
+  expect(radios().map(radio => radio.checked)).toEqual([true, false])
+
+  click(radios()[1] ?? null)
+  await settle()
+
+  expect([checked('away'), told]).toEqual(['evening', [['away', 'evening']]])
+
+  click(radios()[0] ?? null)
+  await settle()
+
+  expect([radios().map(radio => radio.checked), told.at(-1)]).toEqual([[true, false], ['away', null]])
+})
+
 test('a reset of a group that started with none tells onChange null', async () => {
   const { root, told, pick, checked } = await open()
 

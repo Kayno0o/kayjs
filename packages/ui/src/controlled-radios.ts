@@ -10,7 +10,7 @@ interface Options {
   // The class of its radios, which the group finds them by.
   input: string
   // What the parent holds, read each time.
-  options: () => readonly { value: string | number }[]
+  options: () => readonly { value: Held }[]
   value: () => Held
   name: () => string | undefined
   onChange: () => ((value: Held) => unknown) | undefined
@@ -20,7 +20,7 @@ interface Options {
 
 // What Segmented and RadioGroup share: real radios the parent controls, held busy while the `onChange` promise is pending, put back when it is refused, and sent back to their defaults by a form reset.
 // Held as string or number: a signal cannot take a type parameter that might be a function.
-export function controlledRadios({ control, input, options, value, name, onChange, appRef }: Options): { group: string, picked: () => Held, busy: () => boolean, ref: (element: HTMLElement) => void, pick: (next: string | number) => Promise<void> } {
+export function controlledRadios({ control, input, options, value, name, onChange, appRef }: Options): { group: string, picked: () => Held, busy: () => boolean, ref: (element: HTMLElement) => void, pick: (next: Held) => Promise<void> } {
   const group = name() ?? uid()
   const picked = signal<Held>(untrack(value))
   const busy = signal(false)
@@ -44,7 +44,7 @@ export function controlledRadios({ control, input, options, value, name, onChang
 
     // Radios follow the options in order, so the option is found by place, not by its text.
     for (const [index, radio] of all.entries())
-      radio.checked = wanted !== null && options()[index]?.value === wanted
+      radio.checked = options()[index]?.value === wanted
 
     if (focused && !focused.checked)
       all.find(radio => radio.checked)?.focus()
@@ -80,7 +80,7 @@ export function controlledRadios({ control, input, options, value, name, onChang
     resetting.idle()
   }
 
-  async function pick(next: string | number) {
+  async function pick(next: Held) {
     // A pick while a change is under way takes nothing: the radio checked by the click, a key or a label, is put back, on the start when a reset is waiting.
     if (busy()) {
       check(resetting.waiting() ? started() : picked())

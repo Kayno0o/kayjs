@@ -12,6 +12,8 @@ const size = signal<0 | 10 | 25>(10)
 const fixed = 10 as 0 | 10 | 25
 const none = null as 0 | 10 | 25 | null
 const mixed: readonly { value: 1 | '1', label: string }[] = [{ value: 1, label: 'Number' }, { value: '1', label: 'Text' }]
+const away = signal<'evening' | null>(null)
+const awayOptions = [{ value: null, label: 'Nothing' }, { value: 'evening', label: 'Evening' }] as const
 const held = signal<0 | 10 | 25 | null>(0)
 ---
 form#form
@@ -20,6 +22,7 @@ form#form
   Segmented(label="Fixed" name="fixed" options={sizes} value={fixed} onChange={(value: 0 | 10 | 25) => onChange('fixed', value)})
   Segmented(label="Sort" name="sort" options={sizes} value={none} onChange={(value: 0 | 10 | 25 | null) => onChange('sort', value)})
   Segmented(label="Mixed" name="mixed" options={mixed} value={1 as 1 | '1'} onChange={(value: 1 | '1') => onChange('mixed', value)})
+  Segmented(label="Away" name='away' options={awayOptions} value={away()} onChange={(value: 'evening' | null) => { away.set(value); return onChange('away', value) }})
   button#none(type="button" onClick={() => held.set(null)}) None
   button#reset(type="reset") Reset
   p#state {JSON.stringify({ size: size(), held: held() })}

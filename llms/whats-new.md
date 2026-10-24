@@ -4,6 +4,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 
 ## Unreleased
 
+- A Segmented or RadioGroup option can carry `value: null` for a "none" choice when `value` is typed nullable, checked while the group holds `null` and heard by `onChange` as `null` ([forms](../packages/ui/llms/tables-navigation-and-layout.md)).
 - `workflow()` writes a multi-step flow that survives restarts, sleeps for days and waits for events, with `step.run`, `step.sleep`, `step.waitFor`, one-call `start` and `send`, on the existing job stores ([Queues](queues.md)).
 - The Jobs tab and the jobs page show a `workflow()` run by its state and steps, and send the event it waits for or cancel it ([Queues](queues.md)).
 - `src/routes/_card.kay` lays out the share card `shareCard()` links with the app's own components, Tailwind classes and fonts, drawn by Chrome at build and on demand, and the fixed layout stays the default without it: [Lay out a share card yourself](images.md#lay-out-a-share-card-yourself).
