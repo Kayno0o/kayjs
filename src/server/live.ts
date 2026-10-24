@@ -23,8 +23,9 @@ const PROOF = 'live'
 
 // What a page carrying live values holds, which a prerendered file cannot: the values and their proof are per request.
 export const LIVE_MARK = '<script type="application/json" data-kay-live'
-const ISLAND_MARK = '<script type="application/json" data-kay-island'
-// Added to the script of a page that follows cached values, which the entry script looks for.
+const ISLAND_ATTR = ' data-kay-island'
+const ISLAND_MARK = `<script type="application/json"${ISLAND_ATTR}`
+// Added to the script of a page that follows cached values, or of a deferred island, which the entry script looks for.
 const CACHE_MARK = ' data-kay-cache'
 const MAX_REQUEST_BYTES = 64 * 1024
 // The keys one connection watches, and the length of a key.
@@ -81,7 +82,8 @@ const stamps = (live as (initial: (key: string) => number, id: string, name: str
 
 // Runs the render of a request, loads included, so the cached values it reads with `live: true` are the page's to follow.
 // Who is signed in is asked only for a render that reads a value of each user: the first render of a chain does not know it will, so it runs without, and `missed` is called when it read one, for the render to run again with the user resolved. A chain that read one is resolved before its renders from then on.
-export function inLiveReads<T>(run: () => T, request?: Request, chain?: string, missed?: () => void): T | Promise<T> {
+// A `forgiving` render (an error or 404 page) shows a failure of `userOf` as nobody being signed in, as the page cannot be answered with the failure it would report again.
+export function inLiveReads<T>(run: () => T, request?: Request, chain?: string, missed?: () => void, forgiving = false): T | Promise<T> {
   const reads: CacheReads = { at: new Map(), sent: new Set(), route: false, bytes: 0 }
 
   if (request === undefined || chain === undefined)
@@ -89,7 +91,7 @@ export function inLiveReads<T>(run: () => T, request?: Request, chain?: string, 
 
   if (readers.has(chain)) {
     return cacheReads.run(reads, async () => {
-      reads.user = await userOf(request)
+      reads.user = await viewerOf(request, forgiving)
 
       return run()
     })
@@ -109,13 +111,25 @@ export function inLiveReads<T>(run: () => T, request?: Request, chain?: string, 
 
     // A streamed block reads the user after this render settles, when it is too late to render again: the user is asked now, before the body is sent.
     if (reads.streams === true && reads.user === undefined && ownLiveDeclared()) {
-      reads.user = await userOf(request)
+      reads.user = await viewerOf(request, forgiving)
       readers.add(chain)
       reads.lazy = false
     }
 
     return result
   })
+}
+
+async function viewerOf(request: Request, forgiving: boolean): Promise<string | undefined> {
+  if (!forgiving)
+    return userOf(request)
+
+  try {
+    return await userOf(request)
+  }
+  catch {
+    return undefined
+  }
 }
 
 // Notes that the render in progress streams blocks after its head.
@@ -157,14 +171,14 @@ export function withoutCacheScripts(html: string): string | undefined {
   return html.replace(LIVE_SCRIPT, '')
 }
 
-// The script of an island's fetch, which a page renewing its proofs leaves alone.
-function islandScript(script: string): string {
-  return script.replace(LIVE_MARK, ISLAND_MARK)
-}
-
 // Runs the render of a deferred server island a browser fetched, and gives the script it follows: the cached values it read with `live: true` are the island's to follow, not the page's, which the prerendered file read none of.
-export async function withIslandReads<T>(run: () => Promise<T>, request: Request, chain: string): Promise<{ result: T, script: string }> {
-  return retryForViewer(async missed => inLiveReads(async () => ({ result: await run(), script: islandScript(liveScript()) }), request, chain, missed) as Promise<{ result: T, script: string }>)
+// `liveOf` gives the live values the render read, which its server scope held and which ended with it.
+export async function withIslandReads<T>(run: () => Promise<T>, request: Request, chain: string, liveOf: (result: T) => ServerScope['live']): Promise<{ result: T, script: string }> {
+  return retryForViewer(async missed => inLiveReads(async () => {
+    const result = await run()
+
+    return { result, script: liveScript(liveOf(result), true) }
+  }, request, chain, missed))
 }
 
 // Runs a GET route's handler so the live keys it reads are the proof its answer carries, for a `resource()` to follow.
@@ -353,8 +367,9 @@ function checkSendable(label: string, value: unknown): void {
 }
 
 // The script a page carries for the live values its render read since the last one, and the cached values it follows: their ids with the proof of them, and each value as it rendered, for the islands to hydrate with.
-export function liveScript(scope: ServerScope | undefined = currentServerScope()): string {
-  const fresh = [...scope?.live?.values() ?? []].filter(read => !read.sent)
+// An island's script is told from the page's by its attribute, so a page renewing its proofs leaves a cache-only one alone; it holds the live values of the island too, which hydrate it and follow through the same connection.
+export function liveScript(live: ServerScope['live'] = currentServerScope()?.live, island = false): string {
+  const fresh = [...live?.values() ?? []].filter(read => !read.sent)
   const cache = cacheReads.getStore()
   const following = cache === undefined ? [] : [...cache.at].filter(([key]) => !cache.sent.has(key))
 
@@ -368,8 +383,10 @@ export function liveScript(scope: ServerScope | undefined = currentServerScope()
     cache!.sent.add(key)
 
   const page = cachePage(following, fresh, fresh.some(read => read.own) ? cache?.user : undefined)
+  // An island's script holding live values is read by the connection of its module as a page's is, so it is marked as both.
+  const mark = island && fresh.length === 0 ? ISLAND_MARK : `${LIVE_MARK}${island ? ISLAND_ATTR : ''}`
 
-  return `${LIVE_MARK}${following.length > 0 ? CACHE_MARK : ''}>${encodeValue(page).replaceAll('<', '\\u003c')}</script>`
+  return `${mark}${following.length > 0 || island ? CACHE_MARK : ''}>${encodeValue(page).replaceAll('<', '\\u003c')}</script>`
 }
 
 // The values a page or a route answer holds, with the proof of them.

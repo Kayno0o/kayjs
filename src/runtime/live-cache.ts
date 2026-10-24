@@ -19,6 +19,8 @@ const FIRST_RETRY_MS = 1000
 const LAST_RETRY_MS = 30_000
 // A refused connection asks the page for a new proof once in this long: a refusal that stays is backed off, not rendered again.
 const REFUSAL_MS = 60_000
+// Fired by live-value.ts when it asks for new proofs.
+const RENEW_EVENT = 'kay-renew'
 
 // The longest a refresh waits for a swap in progress: one that never clears `aria-busy` (failed or aborted) would otherwise park every later invalidation.
 export const IDLE_MS = 20_000
@@ -34,6 +36,8 @@ interface Route {
 let rendered = new Map<string, number>()
 // The deferred server islands that read each followed key, with the time their render read it: the script an island's fetch carries sits inside its slot, and an invalidation fetches that island alone.
 let islands = new Map<string, Map<HTMLElement, number>>()
+// The deferred islands whose script holds live values: the connection their module opens takes the proof from the island, which cannot ask for a new one, so they are fetched again when the page renews its proofs.
+let holding = new Set<HTMLElement>()
 // The resources following a route, by their owner.
 const routes = new Map<object, Route>()
 // The invalidations a resource waits to answer, by key: it asks its route once the tab is shown, after a short random wait.
@@ -54,6 +58,12 @@ let waiting = false
 const waitingIslands = new Set<HTMLElement>()
 const fetchingIslands = new Map<HTMLElement, Map<string, number>>()
 
+// An app swapping no pages would reload the page for it, which a renewal is not worth.
+addEventListener(RENEW_EVENT, () => {
+  for (const slot of navigation.hooks === undefined ? [] : holding)
+    askIsland(slot)
+})
+
 function pagesOf(): LivePage[] {
   return [...document.querySelectorAll(SCRIPT)].map(script => decodeServerValue(script.textContent) as LivePage)
 }
@@ -62,11 +72,16 @@ function pagesOf(): LivePage[] {
 export function followCaches(): void {
   const next = new Map<string, number>()
   const inIslands = new Map<string, Map<HTMLElement, number>>()
+  const holders = new Set<HTMLElement>()
 
   for (const script of document.querySelectorAll(SCRIPT)) {
     const slot = script.closest<HTMLElement>(SERVER_ISLAND)
+    const page = decodeServerValue(script.textContent) as LivePage
 
-    for (const [id, key, at] of (decodeServerValue(script.textContent) as LivePage).values) {
+    if (slot !== null && page.values.some(([id]) => id !== CACHE_LIVE_ID))
+      holders.add(slot)
+
+    for (const [id, key, at] of page.values) {
       if (id !== CACHE_LIVE_ID)
         continue
 
@@ -79,6 +94,7 @@ export function followCaches(): void {
 
   rendered = next
   islands = inIslands
+  holding = holders
 
   if (next.size === 0) {
     clearTimeout(timer)

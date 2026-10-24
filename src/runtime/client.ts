@@ -163,7 +163,7 @@ async function whenHydrating(start: (when: typeof import('./hydrate-when')) => v
 async function fetchServerIsland(registry: IslandRegistry, element: HTMLElement): Promise<void> {
   const { fetchServerIsland: fetchIt } = await import('./fetch-island')
 
-  await fetchIt(element)
+  await fetchIt(element, disposeIslands)
   await hydrateIslands(registry, element)
 }
 

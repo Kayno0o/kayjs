@@ -103,6 +103,8 @@ const GONE_RETRY_MS = 5 * 60_000
 
 // How long the server takes a page's proof, and so how long a page may watch on it before asking for another.
 export const PROOF_LIFETIME_MS = 60 * 60_000
+// Fired on the window when the page asks for new proofs, for the deferred islands that hold live values to fetch themselves again.
+const RENEW_EVENT = 'kay-renew'
 
 // Another copy of this module, such as a workspace's second install or a dev reload, shares the one registry.
 const REGISTRY = Symbol.for('kay.live')
@@ -905,7 +907,10 @@ function watch(slot: BrowserSlot, key: string, entry: Entry): void {
   })
 }
 
-// Resolves after `ms`, or as soon as `signal` aborts.
+// Ends the pause in progress, as the keys the islands read changed.
+let wake: (() => void) | undefined
+
+// Resolves after `ms`, or as soon as `signal` aborts or the keys change.
 async function pause(ms: number, signal: AbortSignal): Promise<void> {
   await new Promise<void>((resolve) => {
     const timer = setTimeout(done, ms)
@@ -917,6 +922,7 @@ async function pause(ms: number, signal: AbortSignal): Promise<void> {
     }
 
     signal.addEventListener('abort', done)
+    wake = done
   })
 }
 
@@ -926,9 +932,12 @@ function settle(): void {
 }
 
 // Asks for the page again and takes its live scripts in place of the page's own, so a proof the server no longer takes, or is about to stop taking, is replaced by one it made now; `gone` when the page no longer holds any, as one the visitor may not see, `failed` when it could not be asked.
-async function renewProofs(signal: AbortSignal | null = null): Promise<'renewed' | 'gone' | 'failed'> {
+async function renewProofs(signal?: AbortSignal): Promise<'renewed' | 'gone' | 'failed'> {
+  // The deferred islands holding live values fetch themselves again, as their proofs are theirs.
+  dispatchEvent(new Event(RENEW_EVENT))
+
   try {
-    const response = await fetch(location.href, { headers: { accept: 'text/html' }, credentials: 'same-origin', cache: 'no-store', signal })
+    const response = await fetch(location.href, { headers: { accept: 'text/html' }, cache: 'no-store', signal })
 
     if (!response.ok)
       return 'failed'
@@ -938,11 +947,11 @@ async function renewProofs(signal: AbortSignal | null = null): Promise<'renewed'
     if (fresh.length === 0)
       return 'gone'
 
-    for (const old of document.querySelectorAll(LIVE_SCRIPT))
+    // The scripts inside a deferred island are the island's own, which its fetch renews.
+    for (const old of document.querySelectorAll(`${LIVE_SCRIPT}:not(slot *)`))
       old.remove()
 
-    for (const script of fresh)
-      document.head.append(document.importNode(script, true))
+    document.head.append(...fresh)
 
     return 'renewed'
   }
@@ -954,10 +963,6 @@ async function renewProofs(signal: AbortSignal | null = null): Promise<'renewed'
 // Gets the connection new proofs before the server stops taking the ones it opened with, counted on the browser's own clock as the server's may differ; a renewal that could not ask is tried again after a minute.
 function renewLater(delay = PROOF_LIFETIME_MS / 2): void {
   clearTimeout(renewing)
-  renewing = undefined
-
-  if (pagesOf().length === 0)
-    return
 
   const renew = async () => {
     renewing = undefined
@@ -974,8 +979,7 @@ function renewLater(delay = PROOF_LIFETIME_MS / 2): void {
     }
 
     if (renewed === 'renewed') {
-      current?.reader.close()
-      current = undefined
+      release()
       sync()
     }
   }
@@ -994,10 +998,12 @@ function release(): void {
 // Opens, moves or closes the one connection so it carries exactly the keys the islands read.
 function sync(): void {
   settling = undefined
+  wake?.()
 
   const keys = new Set(wanted.keys())
 
-  if (keys.size === 0) {
+  // Nothing is proven without a page script, as when an island's copy hydrates before the island is fetched: the connection opens once its script is in.
+  if (keys.size === 0 || pagesOf().length === 0) {
     release()
 
     return

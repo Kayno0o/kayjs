@@ -1,0 +1,9 @@
+--- server
+export const page = { prerender: true }
+--- script
+import Inbox from '../components/inbox.kay'
+---
+head
+  title Deferred
+h1 Deferred
+Inbox(server="defer")

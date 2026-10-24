@@ -74,7 +74,7 @@ p {unread()} unread
 
 `unread()` gives the value of whoever is signed in, and the starting value for nobody. The server sends a value only to the tabs of its own user. The page's proof names the user it was rendered for, signed, and the connection is refused unless its own request is that user's, so a proof copied to another browser, or kept after a sign-out, gets nothing and the tab takes the proofs of the page rendered for who is signed in now.
 
-A deferred server island shows the visitor's value without following it. The user is the id your sign-in library gives kay, which kayjs-auth does with the user's id.
+A deferred server island follows the visitor's value too, and so do the error and 404 pages. The user is the id your sign-in library gives kay, which kayjs-auth does with the user's id.
 
 ### Forgetting a value
 

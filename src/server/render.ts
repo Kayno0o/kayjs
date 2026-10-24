@@ -8,6 +8,7 @@ import type { HeadOptions, HeadTag, RenderedHead } from '../runtime/head'
 import type { ServerIslandMode } from '../runtime/html'
 import type { Locale } from '../runtime/i18n'
 import type { QueryRules } from '../runtime/query-param'
+import type { ServerScope } from '../runtime/reactive'
 import type { ClientBuild, PrerenderedPage } from './client'
 import type { BodyPieces, FixedText, StoredEncoding } from './compress'
 import type { DevRequest } from './dev'
@@ -32,6 +33,7 @@ import { DEFAULT_MAX_DENSITY, RESOLVED_META } from '../runtime/image'
 import { localeState } from '../runtime/locale-state'
 import { kayLog } from '../runtime/log'
 import { editing } from '../runtime/preview'
+import { currentServerScope } from '../runtime/reactive'
 import { BUILD_META } from '../runtime/swap'
 import { hasPageToken, withPageToken } from '../runtime/uid.server'
 import { encodeValue, unsendable } from '../runtime/wire'
@@ -623,6 +625,8 @@ export interface RenderedServerIslands {
   // The components a server island sits in, which the next request renders alone.
   path: Set<unknown>
   headers: Headers
+  // The live values the render read, whose server scopes ended with it.
+  live: NonNullable<ServerScope['live']>
   // Answers with what the page's loads set, cookies included, for this visitor alone.
   reply: (body: Written) => Response
 }
@@ -645,7 +649,18 @@ export async function renderServerIslands(route: ServedRoute, context: RequestCo
       const started = performance.now()
       const islands = newServerIslands(path === undefined, path, skip)
       const rules = queryRules(chainQuery(page.files, page.modules))
-      const inScope = <T>(run: () => T) => inServerScope(request, report, run, () => rendering.headers.append('vary', 'cookie'), rules)
+      const live: RenderedServerIslands['live'] = new Map()
+      const inScope = <T>(run: () => T) => inServerScope(request, report, () => {
+        try {
+          return run()
+        }
+        finally {
+          for (const [at, read] of currentServerScope()?.live ?? []) {
+            if (!live.has(at))
+              live.set(at, read)
+          }
+        }
+      }, () => rendering.headers.append('vary', 'cookie'), rules)
       const chunks = islandChunks(client)
       const { deferred } = inScope(() => withServerIslands(islands, () => renderStatic(viewOf(page.modules, page.data), undefined, chunks)))
       // What a block inside an island renders is the island's own, every component of it included.
@@ -672,7 +687,7 @@ export async function renderServerIslands(route: ServedRoute, context: RequestCo
       void Promise.allSettled(deferred.map(async block => block.value))
       timed(page, rendering, started, options)
 
-      return { html, path: islands.path, headers: rendering.headers, reply: (body) => {
+      return { html, path: islands.path, headers: rendering.headers, live, reply: (body) => {
         rendering.headers.set('cache-control', 'private, no-store')
 
         return respond(rendering, new Rebased(body))
@@ -708,9 +723,17 @@ async function settleBlocks(html: string, deferred: PendingBlock[], render: (vie
 
 // A URL no page serves, answered by the routes directory's own `_404.kay` or `_error.kay`.
 export async function renderUnmatched(special: SpecialPages, context: RequestContext, client: ClientBuild, options: RenderOptions = {}): Promise<Response> {
-  const rendering = createRendering(context, {}, options)
+  return renderForViewer('<404>', context, options, async rendering => renderFailure(new NotFound(), special, rendering, new Map(), client, options))
+}
 
-  return withOutcome(rendering.outcome, async () => renderFailure(new NotFound(), special, rendering, new Map(), client, options))
+// Renders a special page that no route chose, with the signed-in user known as a page's render does, so it shows and follows the visitor's own live values; a failure to tell who is signed in leaves it as for nobody.
+// A page built ahead has no visitor.
+async function renderForViewer(chain: string, context: RequestContext, options: RenderOptions, render: (rendering: Rendering) => Promise<Response>): Promise<Response> {
+  return retryForViewer(async (missed) => {
+    const rendering = createRendering(context, {}, options)
+
+    return inLiveReads(async () => withOutcome(rendering.outcome, async () => render(rendering)), options.prerendering ? undefined : context.request, chain, missed, true)
+  })
 }
 
 // The document `_card.kay` lays the share card out as, rendered bare for the browser that draws the card: no layout, no development tool, and no base, as the browser reaches it at the root of a server of its own.
@@ -731,9 +754,7 @@ export async function renderCardPage(page: SpecialPage, card: CardPageContext['c
 
 // An error thrown before any page was chosen, by a hook of the app or kay, answered by the routes directory's own `_error.kay` as a 500, in the default locale; `renderFailure` reports it.
 export async function renderUncaught(error: unknown, special: SpecialPages, context: RequestContext, client: ClientBuild, options: RenderOptions = {}): Promise<Response> {
-  const rendering = createRendering(context, {}, options)
-
-  return withOutcome(rendering.outcome, async () => renderFailure(error, special, rendering, new Map(), client, options))
+  return renderForViewer('<error>', context, options, async rendering => renderFailure(error, special, rendering, new Map(), client, options))
 }
 
 function createRendering(context: RequestContext, params: Record<string, unknown>, { prerendering = false, lang = DEFAULT_LANG, base = '', contexts }: RenderOptions, contextKeys?: readonly string[]): Rendering {
