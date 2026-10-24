@@ -1,0 +1,218 @@
+import type { TestPage } from '../src/test'
+import { afterAll, beforeEach, describe, expect, it } from 'bun:test'
+import { browserPath, testSite } from '../src/test'
+
+const path = browserPath()
+const ROOT = 'tests/fixtures/local-collection'
+
+const site = path === undefined ? undefined : await testSite({ root: ROOT, browser: { path } })
+
+const worker = path === undefined ? undefined : await testSite({ root: ROOT, browser: { path }, offline: true })
+
+afterAll(async () => {
+  await site?.close()
+  await worker?.close()
+})
+
+async function server(): Promise<{ saves: number, drops: number, rows: { id: string, title: string, rev: number }[] }> {
+  return (await site!.fetch('/api/notes/stats')).json() as Promise<Awaited<ReturnType<typeof server>>>
+}
+
+async function opened(url = '/'): Promise<TestPage> {
+  const page = await site!.open(url)
+
+  await page.waitUntil(() => document.querySelector('.status')?.textContent === 'synced')
+
+  return page
+}
+
+async function write(page: TestPage, button: string, title: string): Promise<void> {
+  await page.fill('input.title', title)
+  await page.click(button)
+}
+
+// What the browser holds in IndexedDB, read raw: the mirror's rows and the queue.
+async function stored(page: TestPage): Promise<{ rows: { k: string, row: { title: string }, gone: boolean }[], outbox: { id: string, op: string }[] }> {
+  return page.evaluate(async () => {
+    const db = await new Promise<IDBDatabase>((resolve, reject) => {
+      const open = indexedDB.open('kay-local')
+
+      open.onsuccess = () => resolve(open.result)
+      open.onerror = () => reject(open.error)
+    })
+    const all = async (name: string) => new Promise<unknown[]>((resolve) => {
+      const request = db.transaction(name).objectStore(name).getAll()
+
+      request.onsuccess = () => resolve(request.result)
+    })
+
+    return { rows: await all('rows') as never, outbox: await all('outbox') as never }
+  })
+}
+
+beforeEach(async () => {
+  await site?.fetch('/api/notes/reset', { method: 'POST' })
+  await worker?.fetch('/api/notes/reset', { method: 'POST' })
+})
+
+describe.skipIf(path === undefined)('a local() collection in the browser', () => {
+  it('applies a write at once offline, keeps it in IndexedDB and sends it once when the connection returns', async () => {
+    const page = await opened()
+
+    await page.offline()
+    await write(page, 'button.add', 'one')
+
+    await page.waitFor('li.note', { text: 'one 0' })
+
+    expect(await page.text('p.pending')).toBe('1')
+    expect((await stored(page)).rows.map(row => row.row.title)).toEqual(['one'])
+    expect((await stored(page)).outbox).toHaveLength(1)
+    expect((await server()).saves).toBe(0)
+
+    await page.online()
+    await page.waitUntil(() => document.querySelector('.pending')?.textContent === '0')
+
+    expect(await server()).toMatchObject({ saves: 1, rows: [{ id: 'a', title: 'one', rev: 1 }] })
+    // The row the action stored, its rev included, is the one now shown.
+    expect(await page.text('li.note')).toBe('one 1')
+    expect((await stored(page)).outbox).toEqual([])
+    expect(page.errors).toEqual([])
+  }, 60_000)
+
+  it('reaches the server once when the answer is lost and the write sent again', async () => {
+    const page = await opened()
+
+    await page.route('/_kay/action/*', async (request) => {
+      await request.fetch()
+      await request.abort()
+    })
+    await write(page, 'button.add', 'once')
+    await page.waitUntil(() => document.querySelector('.status')?.textContent === 'offline')
+
+    expect((await server()).saves).toBe(1)
+
+    await page.unroute()
+    await page.click('button.sync')
+    await page.waitUntil(() => document.querySelector('.pending')?.textContent === '0')
+
+    expect(await server()).toMatchObject({ saves: 1, rows: [{ id: 'a', title: 'once', rev: 1 }] })
+    expect(await page.text('li.note')).toBe('once 1')
+  }, 60_000)
+
+  it('rolls back a write the guard refuses and one the schema refuses, and shows each', async () => {
+    const page = await opened()
+
+    await page.evaluate(() => {
+      document.cookie = 'refuse=1; path=/'
+    })
+    await page.offline()
+    await write(page, 'button.add', 'denied')
+    await page.online()
+    await page.waitUntil(() => document.querySelector('.issue') !== null)
+
+    expect(await page.text('li.issue')).toBe('rejected a 403')
+    expect(await page.count('li.note')).toBe(0)
+    expect(await page.text('p.pending')).toBe('0')
+
+    await page.evaluate(() => {
+      document.cookie = 'refuse=; path=/; max-age=0'
+    })
+    await page.offline()
+    await write(page, 'button.add', 'x'.repeat(13))
+    await page.online()
+    await page.waitUntil(() => document.querySelectorAll('.issue').length === 2)
+
+    expect(await page.text('li.issue:nth-child(2)')).toMatch(/^rejected a 4\d\d$/)
+    expect(await page.count('li.note')).toBe(0)
+    expect((await server()).saves).toBe(0)
+  }, 60_000)
+
+  it('merges a conflicting write by default: the server\'s row with the fields this write changed', async () => {
+    const page = await opened()
+
+    await write(page, 'button.add', 'first')
+    await page.waitUntil(() => document.querySelector('li.note')?.textContent === 'first 1')
+    await page.offline()
+    await write(page, 'button.edit', 'mine')
+    await site!.fetch('/api/notes/other', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ id: 'a', title: 'theirs', rev: 5 }) })
+    await page.online()
+    await page.waitUntil(() => document.querySelector('li.note')?.textContent === 'mine 6')
+
+    expect(await server()).toMatchObject({ saves: 2, rows: [{ id: 'a', title: 'mine', rev: 6 }] })
+    expect(await page.text('li.issue')).toBe('conflict a ')
+  }, 60_000)
+
+  it('takes the app\'s rule over the default', async () => {
+    const page = await opened('/theirs')
+
+    await write(page, 'button.add', 'first')
+    await page.waitUntil(() => document.querySelector('li.note')?.textContent === 'first 1')
+    await page.offline()
+    await write(page, 'button.edit', 'mine')
+    await site!.fetch('/api/notes/other', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ id: 'a', title: 'theirs', rev: 5 }) })
+    await page.online()
+    await page.waitUntil(() => document.querySelector('.pending')?.textContent === '0' && document.querySelector('li.note')?.textContent === 'theirs 5')
+
+    expect(await server()).toMatchObject({ saves: 1, rows: [{ id: 'a', title: 'theirs', rev: 5 }] })
+    expect(await page.text('li.issue')).toBe('conflict a ')
+  }, 60_000)
+
+  it('shows one tab\'s write in another, here a frame of the same page', async () => {
+    const page = await opened()
+
+    await page.evaluate(async () => {
+      const frame = document.createElement('iframe')
+
+      frame.id = 'other'
+      frame.src = '/'
+      document.body.append(frame)
+      await new Promise(resolve => frame.addEventListener('load', resolve))
+    })
+    await page.waitUntil(() => (document.querySelector('#other') as HTMLIFrameElement).contentDocument?.querySelector('.status')?.textContent === 'synced')
+    await page.offline()
+    await write(page, 'button.add', 'shared')
+    await page.waitUntil(() => (document.querySelector('#other') as HTMLIFrameElement).contentDocument?.querySelector('li.note')?.textContent === 'shared 0')
+  }, 60_000)
+
+  it('forgets the mirror and the queue once the sign-out cookie changes', async () => {
+    const page = await opened()
+
+    await page.route('/_kay/action/*', async request => request.abort())
+    await write(page, 'button.add', 'left behind')
+    await page.waitUntil(() => document.querySelector('.status')?.textContent === 'offline')
+
+    expect((await stored(page)).outbox).toHaveLength(1)
+
+    await page.evaluate(() => {
+      document.cookie = 'kay_local_clear=signed-out; path=/'
+    })
+    await page.reload()
+    await page.waitUntil(() => document.querySelector('.status')?.textContent !== 'loading')
+
+    expect((await stored(page)).outbox).toEqual([])
+    expect(await page.count('li.note')).toBe(0)
+    expect((await server()).saves).toBe(0)
+  }, 60_000)
+
+  it('has the worker send a write queued with the page offline, and the page settles it from that answer', async () => {
+    const page = await worker!.open('/')
+
+    await page.waitUntil(() => document.querySelector('.status')?.textContent === 'synced')
+    await page.evaluate(async () => {
+      await navigator.serviceWorker.ready
+    })
+    await page.offline()
+    await write(page, 'button.add', 'by worker')
+    await page.waitUntil(() => document.querySelector('li.note')?.textContent === 'by worker 1' && document.querySelector('.pending')?.textContent === '0')
+
+    expect(await (await worker!.fetch('/api/notes/stats')).json()).toMatchObject({ saves: 1, rows: [{ id: 'a', title: 'by worker', rev: 1 }] })
+  }, 60_000)
+
+  it('loads no collection code on a page that has none', async () => {
+    const html = await (await site!.fetch('/plain')).text()
+    const scripts = [...html.matchAll(/(?:src|href)="([^"]+\.js)"/g)].map(match => match[1]!)
+
+    for (const script of scripts)
+      expect(await (await site!.fetch(script)).text()).not.toContain('kay-local')
+  })
+})

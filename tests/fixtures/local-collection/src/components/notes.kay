@@ -1,0 +1,28 @@
+---
+import { call, local } from 'kay'
+import { drop, save } from '../routes/index.kay'
+import notesApi from '../api/notes'
+
+const { theirs = false } = props<{ theirs?: boolean }>()
+const notes = local({
+  key: 'id',
+  read: async () => call(notesApi, '/'),
+  put: save,
+  remove: drop,
+  conflict: theirs ? () => undefined : undefined,
+})
+const text = signal('')
+---
+p.status {notes.status()}
+p.pending {notes.pending()}
+ul
+  for note of notes.rows()
+    li.note(data-id={note.id}) {note.title} {note.rev}
+ul
+  for issue of notes.issues()
+    li.issue {issue.kind} {issue.key} {issue.status ?? ''}
+input.title(bind:value={text} aria-label="Title")
+button.add(onClick={() => notes.put({ id: 'a', title: text(), rev: 0 })}) Add
+button.edit(onClick={() => notes.put({ id: 'a', title: text(), rev: notes.get('a')?.rev ?? 0 })}) Edit
+button.remove(onClick={() => notes.remove('a')}) Remove
+button.sync(onClick={() => notes.sync()}) Sync

@@ -26,6 +26,8 @@ export type { Answered, ApiAnswer, ApiCallOptions, CallMethod, CallPath, EventRe
 export { ApiError, apiUrl, call, dispatch, refusalMessage, resource, socket, stream } from './live'
 export type { Live, LiveByKey, LiveKey, LiveOptions } from './live-value'
 export { live } from './live-value'
+export type { Local, LocalConflict, LocalIssue, LocalOptions, LocalStatus } from './local'
+export { local } from './local'
 export type { Log } from './log'
 export { logFrom } from './log'
 export type { NavigateOptions, QueryChanges } from './navigate-api'

@@ -1,0 +1,30 @@
+--- server
+import { action, s } from 'kay'
+import { notes, stats } from '../lib/db'
+
+// A write based on an older rev than the server holds meets the newer row, which the island decides on.
+export const save = action(s.Object({ id: s.String({ maxLength: 40 }), title: s.String({ minLength: 1, maxLength: 12 }), rev: s.Number() }), ({ id, title, rev }, ctx) => {
+  const held = notes.get(id)
+
+  if (held !== undefined && held.rev !== rev)
+    return ctx.fail(409, held)
+
+  stats.saves++
+
+  const note = { id, title, rev: rev + 1 }
+
+  notes.set(id, note)
+
+  return note
+})
+
+export const drop = action(s.Object({ id: s.String({ maxLength: 40 }) }), ({ id }) => {
+  stats.drops++
+  notes.delete(id)
+})
+
+--- script
+import Notes from '../components/notes.kay'
+---
+h1 Notes
+Notes

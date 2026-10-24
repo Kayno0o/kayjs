@@ -251,6 +251,70 @@ function linkOf(link) {
 }
 `
 
+// What a worker adds for `local()` collections: when the browser fires background sync, sends the writes a page queued in IndexedDB, in order, recording each answer beside its write for the page to apply. It stops at the first answer that is not a success (a conflict or a refusal is the page's to settle), and fails the sync on a network error or a transient status so the browser tries again. A database no page created is left alone.
+const LOCAL_WORKER = `
+self.addEventListener('sync', (event) => {
+  if (event.tag === 'kay-local')
+    event.waitUntil(navigator.locks.request('kay-local', sendQueued))
+})
+
+function openLocal() {
+  return new Promise((resolve) => {
+    const request = indexedDB.open('kay-local')
+
+    request.onupgradeneeded = () => request.transaction.abort()
+    request.onerror = () => resolve(undefined)
+    request.onsuccess = () => resolve(request.result)
+  })
+}
+
+function settled(request) {
+  return new Promise((resolve, reject) => {
+    request.onsuccess = () => resolve(request.result)
+    request.onerror = () => reject(request.error)
+  })
+}
+
+async function sendQueued() {
+  const db = await openLocal()
+
+  if (!db)
+    return
+
+  try {
+    const queued = await settled(db.transaction('outbox').objectStore('outbox').getAll())
+    let answered = false
+
+    for (const entry of queued) {
+      if (entry.answer)
+        continue
+
+      const response = await fetch(entry.url, { method: 'POST', credentials: 'same-origin', redirect: 'manual', headers: { ...entry.headers, 'x-kay-write': entry.id }, body: entry.body })
+
+      if (response.type === 'opaqueredirect' || response.headers.has('x-kay-redirect') || response.status >= 500 || [401, 408, 425, 429].includes(response.status))
+        throw new Error('kay: a queued write was not answered')
+
+      entry.answer = { status: response.status, failure: response.headers.get('x-kay-failure'), body: await response.text() }
+
+      const tx = db.transaction('outbox', 'readwrite')
+
+      tx.objectStore('outbox').put(entry)
+      await new Promise(resolve => tx.oncomplete = resolve)
+      answered = true
+
+      if (!response.ok)
+        break
+    }
+
+    if (answered)
+      new BroadcastChannel('kay-local').postMessage('answered')
+  }
+  finally {
+    db.close()
+  }
+}
+`
+
 const UNREGISTER = `self.addEventListener('install', () => self.skipWaiting())
 self.addEventListener('activate', (event) => {
   event.waitUntil((async () => {
@@ -363,7 +427,7 @@ async function unusedSubsets(client: ClientBuild, pages: (string | undefined)[])
 
 // The worker of a site with `push()` and no `offline`: no fetch handler, so it keeps nothing and a stale page is never served, and it deletes the caches an earlier offline worker left on the device.
 function pushOnlyScript(base: string): string {
-  return `const KAY = ${JSON.stringify({ base })}\nself.addEventListener('install', () => self.skipWaiting())\nself.addEventListener('activate', event => event.waitUntil((async () => {\n  for (const name of await caches.keys()) {\n    if (name.startsWith('kay-'))\n      await caches.delete(name)\n  }\n\n  await self.clients.claim()\n})()))\n${PUSH_WORKER}`
+  return `const KAY = ${JSON.stringify({ base })}\nself.addEventListener('install', () => self.skipWaiting())\nself.addEventListener('activate', event => event.waitUntil((async () => {\n  for (const name of await caches.keys()) {\n    if (name.startsWith('kay-'))\n      await caches.delete(name)\n  }\n\n  await self.clients.claim()\n})()))\n${PUSH_WORKER}${LOCAL_WORKER}`
 }
 
 async function workerScript(options: ServiceWorkerOptions, offline: true | OfflineConfig): Promise<string> {
@@ -420,7 +484,7 @@ async function workerScript(options: ServiceWorkerOptions, offline: true | Offli
     ...options.push === true && { base },
   }
 
-  return `const KAY = ${JSON.stringify(settings)}\n${WORKER}${options.push === true ? PUSH_WORKER : ''}`
+  return `const KAY = ${JSON.stringify(settings)}\n${WORKER}${options.push === true ? PUSH_WORKER : ''}${LOCAL_WORKER}`
 }
 
 // The page a visitor offline gets for one that was not kept, in the site's default locale: the worker is one script for every visitor, so it cannot follow theirs.
