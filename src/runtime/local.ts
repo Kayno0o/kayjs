@@ -518,6 +518,9 @@ class Collection<Row extends object, Key extends keyof Row & string> {
   }
 
   private retry(): void {
+    if (this.ended)
+      return
+
     if (this.count[0]() === 0 || this.paused) {
       this.failures = 0
 
