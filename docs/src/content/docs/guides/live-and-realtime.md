@@ -341,7 +341,7 @@ import { webPush } from 'kay'
 button(onClick={async () => { await webPush.subscribe() }}) Notify me
 ```
 
-kay asks the browser's permission only from a click, keeps the device in your store, and drops it when the push service says it is gone. `sendPush(userId, { title, body, url })` from `kay/server` sends one without the inbox, and `notify(userId, { title, push: false })` keeps one out of the push. `installPrompt.available()` and `installPrompt.show()` from `kay` draw an "Install" button once the browser offers one.
+kay asks the browser's permission only from a click, keeps the device in your store, forgets it when kayjs-auth signs the person out of that browser, and drops it when the push service says it is gone. `sendPush(userId, { title, body, url })` from `kay/server` sends one without the inbox, and `notify(userId, { title, push: false })` keeps one out of the push. `installPrompt.available()` and `installPrompt.show()` from `kay` draw an "Install" button once the browser offers one.
 
 <ReadMore href="/llms/notifications">The keys, `sendPush` options, the store and the routes.</ReadMore>
 

@@ -31,7 +31,7 @@ import type { TwoFactorResult, TwoFactorSetup } from './twoFactor'
 import type { Level, PolicyContext, Predicate, Requirement } from './types'
 import { Elysia } from 'elysia'
 import { configError, nameUser, overHttps, READ_METHODS, requestOfContext, stoppers, underKayDev } from 'kay/library'
-import { clientAddress, crossSiteRefused, crossSiteResponse, rateKey, toolCall } from 'kay/server'
+import { clientAddress, crossSiteRefused, crossSiteResponse, forgetPushDevice, rateKey, toolCall } from 'kay/server'
 import { protectedResourceMetadata, rootIsFixed, rootUsable, siteRoot } from './authorize/metadata'
 import { serveOAuthServer } from './authorize/routes'
 import { bearerRequest, bearerToken } from './bearerHeader'
@@ -448,6 +448,10 @@ export class Auth<Scope extends string = string, Role extends string = string, O
   // Signs this session out without a word to `onAuthEvent`, the admin behind an impersonation too.
   private async leave(): Promise<void> {
     const signedIn = await this.session.get('auth')
+
+    // A device the person leaves stops getting their pushes.
+    if (signedIn)
+      await forgetPushDevice(this.request, signedIn.user)
 
     if (signedIn?.session !== undefined)
       await this.core.store.sessions.delete(signedIn.user, signedIn.session)

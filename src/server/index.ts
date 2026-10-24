@@ -49,7 +49,7 @@ export { editedEntry, editRequested, editSessionOf, enterPreview, exitPreview, p
 export type { ApiRateLimit, RateLimiter } from './protection'
 export { clientAddress, memoryRates, rateKey, rateLimit, requestId, sqliteRates } from './protection'
 export type { PushMessage, PushOptions, PushResult, PushSendOptions, PushStore, PushSubscriptionRecord } from './push'
-export { memoryPush, push, pushSubscriptions, sendPush, sqlitePush } from './push'
+export { forgetPushDevice, memoryPush, push, pushSubscriptions, sendPush, sqlitePush } from './push'
 export type { EnqueueOptions, FailedJob, JobContext, JobState, JobStore, Queue, QueueOptions, StoredJob, StoredJobState } from './queue'
 export { memoryJobs, queue, retryLater, sqliteJobs } from './queue'
 export type { AsyncRooms, AsyncRoomStore, CoalesceOptions, RoomConnection, RoomRecipients, Rooms, RoomsOptions, RoomStore, StoreRooms } from './rooms'

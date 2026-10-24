@@ -33,6 +33,7 @@ import { forgetStamps } from '../server/live'
 import { loaderRoot } from '../server/loader'
 import { memoryNotifications } from '../server/notifications'
 import { memoryRates } from '../server/protection'
+import { setPushLoose } from '../server/push-settings'
 import { drainQueues, memoryJobs } from '../server/queue'
 import { sendFrom } from '../server/rewrite'
 import { memoryRooms } from '../server/rooms'
@@ -319,6 +320,8 @@ export async function testSite(options: TestOptions = {}): Promise<TestSite> {
     throw new Error(`kay: this test process already serves ${serving}, and a process serves one project; test ${root} in a process of its own: \`bun test --parallel\` runs each file apart, or run its tests on their own as \`KAY_ROOT=${relative(process.cwd(), root) || '.'} bun test <its test files>\``)
 
   lazyNativePlugins()
+  // A site under test plays by `kay dev`'s rules for push: keys generated, a push service on loopback.
+  setPushLoose(true)
 
   const loaded = await withConfig(root, options)
   // A site setting none is served where the visits go, so pages reading siteUrl() or siteOrigin() render as in production; files go to memory, fresh for each site, rather than to the store kay.config.ts names, and so do the sessions, jobs, rate counts, presence rooms, vitals and notifications of its `store` (sessions only when it keeps them), its cached and live values staying in the process.

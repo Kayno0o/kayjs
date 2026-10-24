@@ -392,6 +392,40 @@ export async function readSubscription(body: unknown): Promise<PushSubscriptionR
   return { endpoint: checked, p256dh, auth, at: Date.now() }
 }
 
+const DEVICE_COOKIE = 'kay_push_device'
+const DEVICE_MAX_AGE = 31_536_000
+
+function deviceTag(endpoint: string): string {
+  return new Bun.CryptoHasher('sha256').update(endpoint).digest('base64url').slice(0, 22)
+}
+
+// The cookie that tells which of a person's subscriptions this browser holds, a hash of its endpoint: `forgetPushDevice` reads it at sign-out. It names no one and opens nothing.
+export function pushDeviceCookie(endpoint: string, secure: boolean): string {
+  return new Bun.Cookie(DEVICE_COOKIE, deviceTag(endpoint), { path: '/', sameSite: 'lax', httpOnly: true, secure, maxAge: DEVICE_MAX_AGE }).serialize()
+}
+
+// Takes the subscription of the browser that sent `request` away from `user`, for a sign-out: the person stops getting pushes on a device they left, while their other devices keep them. Does nothing without `push()` or without a subscription made in this browser, and never throws.
+export async function forgetPushDevice(request: Request, user: string): Promise<void> {
+  if (pushSettings() === undefined)
+    return
+
+  const tag = new Bun.CookieMap(request.headers.get('cookie') ?? '').get(DEVICE_COOKIE)
+
+  if (tag === null)
+    return
+
+  try {
+    for (const { endpoint } of await pushStore().list(user)) {
+      if (deviceTag(endpoint) === tag)
+        await pushStore().remove(endpoint, user)
+    }
+  }
+  catch (error) {
+    // A store that fails never keeps the person signed in.
+    kayLog('warn', `sign-out could not forget the push device of ${user}`, error)
+  }
+}
+
 // A person's push subscriptions, read and erased from the server: the function that erases a person on request ([Privacy](privacy.md)) calls `erase`.
 export const pushSubscriptions = {
   async list(user: string): Promise<{ endpoint: string, at: number }[]> {

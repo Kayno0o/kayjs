@@ -265,7 +265,11 @@ describe('the endpoint a browser names', () => {
     }
     finally {
       setPushLoose(true)
-      process.env.NODE_ENV = env
+
+      if (env === undefined)
+        delete process.env.NODE_ENV
+      else
+        process.env.NODE_ENV = env
     }
   })
 
