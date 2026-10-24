@@ -24,6 +24,9 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('a deferred 
       // What the server was asked for, by the path under the base and the query.
       const asked: string[] = []
       let failing = false
+      // The next connection of a tab is refused as a proof gone stale, and the open ones can be dropped.
+      let refuseOnce = false
+      const cut = new Set<() => void>()
 
       const path = (to: string) => `${root}${to}${site.trailingSlash === 'always' && to !== '/' ? '/' : ''}`
       const tabs: TestPage[] = []
@@ -62,7 +65,48 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('a deferred 
             if (failing && url.search.includes('kay_island='))
               return new Response(null, { status: 500 })
 
-            return app.handle(new Request(new URL(inner, url.origin), { method: request.method, headers: request.headers, body: request.method === 'GET' || request.method === 'HEAD' ? null : await request.arrayBuffer(), redirect: 'manual' }))
+            if (refuseOnce && request.method === 'POST' && inner.endsWith('/_kay/live')) {
+              refuseOnce = false
+
+              return new Response(null, { status: 403 })
+            }
+
+            const reply = await app.handle(new Request(new URL(inner, url.origin), { method: request.method, headers: request.headers, body: request.method === 'GET' || request.method === 'HEAD' ? null : await request.arrayBuffer(), redirect: 'manual' }))
+
+            if (!inner.endsWith('/_kay/live') || reply.body === null)
+              return reply
+
+            const reader = reply.body.getReader()
+            let stop = (): void => undefined
+
+            return new Response(new ReadableStream<Uint8Array>({
+              start(controller) {
+                stop = () => {
+                  try {
+                    controller.close()
+                  }
+                  catch {}
+
+                  void reader.cancel()
+                }
+                cut.add(stop)
+              },
+              async pull(controller) {
+                try {
+                  const { done, value } = await reader.read()
+
+                  if (done)
+                    controller.close()
+                  else
+                    controller.enqueue(value)
+                }
+                catch {}
+              },
+              async cancel() {
+                cut.delete(stop)
+                await reader.cancel()
+              },
+            }), { status: reply.status, headers: reply.headers })
           },
         })
         origin = server.url.origin
@@ -172,6 +216,29 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('a deferred 
         await page.waitFor('p.whole', { text: '41 in stock' })
         expect(pageLoads('/page')).toHaveLength(1)
         expect(islandLoads()).toEqual([])
+      })
+
+      it('follows again when the fetch of its island fails after a refused proof', async () => {
+        change(60)
+        const page = await open()
+
+        await page.waitUntil(...shows(60))
+        await Bun.sleep(500)
+        failing = true
+        refuseOnce = true
+        asked.length = 0
+
+        for (const stop of cut)
+          stop()
+
+        for (let waited = 0; islandLoads().length === 0 && waited < 8000; waited += 25)
+          await Bun.sleep(25)
+
+        failing = false
+        expect(islandLoads().length).toBeGreaterThan(0)
+        await Bun.sleep(1500)
+        change(61)
+        await page.waitUntil(...shows(61))
       })
 
       it('keeps the island as it was when its fetch fails, and fetches it again at the next change', async () => {

@@ -297,8 +297,6 @@ interface ServerState {
   // The watchers of the app's values, held by connections.
   watchers: number
   viewer: (() => string | undefined) | undefined
-  // Whether any value of each user was declared.
-  own: boolean
 }
 
 const STATE = Symbol.for('kay.live.state')
@@ -308,7 +306,7 @@ const UNDECLARED_ROWS = 10_000
 function state(): ServerState {
   const holder = globalThis as Record<symbol, ServerState | undefined>
 
-  return holder[STATE] ??= { store: undefined, subscribed: new WeakSet(), undeclared: new Map(), undeclaredRows: 0, undeclaredExpiry: new Map(), startup: new Set(), checkWrite: undefined, written: undefined, dating: new Set(), reading: undefined, idle: undefined, watchers: 0, viewer: undefined, own: false }
+  return holder[STATE] ??= { store: undefined, subscribed: new WeakSet(), undeclared: new Map(), undeclaredRows: 0, undeclaredExpiry: new Map(), startup: new Set(), checkWrite: undefined, written: undefined, dating: new Set(), reading: undefined, idle: undefined, watchers: 0, viewer: undefined }
 }
 
 // Installed by the server: refuses a value a browser could not be sent where it is set.
@@ -327,14 +325,9 @@ function notify(slot: ServerSlot, key: string): void {
 
 const slotOfHandle = new WeakMap<object, ServerSlot>()
 
-// The signed-in user of the render in progress, which the server resolves before it renders when a value of each user is declared; installed by the server.
+// The signed-in user of the render in progress, which the server resolves for a render that reads a value of each user; installed by the server.
 export function readViewerWith(viewer: () => string | undefined): void {
   state().viewer = viewer
-}
-
-// Whether a value of each user was declared, so the server asks who is signed in before it renders.
-export function ownLiveDeclared(): boolean {
-  return state().own
 }
 
 // The value of the user the render is for, noted for the page's proof with that user bound to it; what the declaration gives when nobody is signed in, which no page follows.
@@ -681,9 +674,6 @@ function serverLive(id: string, initial: unknown, name: string | undefined, ttl:
 
   slots().set(id, slot)
 
-  if (own)
-    state().own = true
-
   if (!known) {
     const kept = state()
     // The rows read at the start are older than the store: a late follow reads them again, so none of them is used and a key another process deleted since does not stay.
@@ -938,11 +928,8 @@ async function renewProofs(signal: AbortSignal | null = null): Promise<'renewed'
     if (fresh.length === 0)
       return 'gone'
 
-    // A server island's own script stays: the island is not part of the page asked for again.
-    for (const old of document.querySelectorAll(LIVE_SCRIPT)) {
-      if (!old.closest('slot[data-kay-server]'))
-        old.remove()
-    }
+    for (const old of document.querySelectorAll(LIVE_SCRIPT))
+      old.remove()
 
     for (const script of fresh)
       document.head.append(document.importNode(script, true))

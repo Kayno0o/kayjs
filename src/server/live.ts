@@ -5,7 +5,7 @@ import type { ServerScope } from '../runtime/reactive'
 import { AsyncLocalStorage } from 'node:async_hooks'
 import { broadcast, onClockHeard, onKeysInvalidated, onLiveRead } from '../runtime/cache'
 import { CACHE_LIVE_ID } from '../runtime/cache-live-id'
-import { checkLiveWrites, live, LIVE_ROUTE, liveSlot, ownLiveDeclared, PROOF_LIFETIME_MS, readViewerWith, slotValue, watchSlot } from '../runtime/live-value'
+import { checkLiveWrites, live, LIVE_ROUTE, liveSlot, PROOF_LIFETIME_MS, readViewerWith, slotValue, watchSlot } from '../runtime/live-value'
 import { PRESENCE_LIVE_ID } from '../runtime/presence'
 import { currentServerScope } from '../runtime/reactive'
 import { decodeServerValue, encodeValue, unsendable } from '../runtime/wire'
@@ -23,6 +23,7 @@ const PROOF = 'live'
 
 // What a page carrying live values holds, which a prerendered file cannot: the values and their proof are per request.
 export const LIVE_MARK = '<script type="application/json" data-kay-live'
+const ISLAND_MARK = '<script type="application/json" data-kay-island'
 // Added to the script of a page that follows cached values, which the entry script looks for.
 const CACHE_MARK = ' data-kay-cache'
 const MAX_REQUEST_BYTES = 64 * 1024
@@ -61,10 +62,14 @@ interface CacheReads {
   bytes: number
   // Who is signed in, resolved before a render when a value of each user is declared.
   user?: string | undefined
-  resolved?: boolean
+  // A render run before the user is known, and whether it read a value of each user meanwhile.
+  lazy?: boolean
+  missed?: boolean
 }
 
 const cacheReads = new AsyncLocalStorage<CacheReads>()
+// The chains of routes whose render read a value of each user, which are rendered with the user resolved.
+const readers = new Set<string>()
 // The reads of each API request in flight, for the hook that answers it.
 const routeReads = new WeakMap<Request, CacheReads>()
 // Least recently read or watched first.
@@ -73,33 +78,53 @@ const stamped = new Set<string>()
 const stamps = (live as (initial: (key: string) => number, id: string, name: string) => { set: (key: string, value: number) => void, delete: (key: string) => void })((): number => 0, CACHE_LIVE_ID, 'cache')
 
 // Runs the render of a request, loads included, so the cached values it reads with `live: true` are the page's to follow.
-// With the request, and a value of each user declared, it first asks who is signed in: the render reads that value without waiting.
-export function inLiveReads<T>(run: () => T, request?: Request): T | Promise<T> {
+// Who is signed in is asked only for a render that reads a value of each user: the first render of a chain does not know it will, so it runs without, and `missed` is called when it read one, for the render to run again with the user resolved. A chain that read one is resolved before its renders from then on.
+export function inLiveReads<T>(run: () => T, request?: Request, chain?: string, missed?: () => void): T | Promise<T> {
   const reads: CacheReads = { at: new Map(), sent: new Set(), route: false, bytes: 0 }
 
-  if (request === undefined || !ownLiveDeclared())
+  if (request === undefined || chain === undefined)
     return cacheReads.run(reads, run)
 
-  return cacheReads.run(reads, async () => {
-    reads.user = await userOf(request)
-    reads.resolved = true
+  if (readers.has(chain)) {
+    return cacheReads.run(reads, async () => {
+      reads.user = await userOf(request)
 
-    return run()
+      return run()
+    })
+  }
+
+  reads.lazy = true
+
+  return cacheReads.run(reads, async () => {
+    const result = await run()
+
+    if (reads.missed === true) {
+      readers.add(chain)
+      missed?.()
+    }
+
+    return result
   })
 }
 
-// Asks who is signed in once a render has imported its modules, for the first render of an app, which is the one that declares a value of each user.
-export async function resolveViewer(request: Request): Promise<void> {
-  const reads = cacheReads.getStore()
+// Runs a render and, when it read a value of each user before the user was known, once more with the user resolved: the first render of such a chain only.
+export async function retryForViewer<T>(attempt: (missed: () => void) => Promise<T>): Promise<T> {
+  let again = false
+  const result = await attempt(() => {
+    again = true
+  })
 
-  if (reads === undefined || reads.resolved === true || !ownLiveDeclared())
-    return
-
-  reads.resolved = true
-  reads.user = await userOf(request)
+  return again ? attempt(() => undefined) : result
 }
 
-readViewerWith(() => cacheReads.getStore()?.user)
+readViewerWith(() => {
+  const reads = cacheReads.getStore()
+
+  if (reads?.lazy === true && reads.user === undefined)
+    reads.missed = true
+
+  return reads?.user
+})
 
 const LIVE_SCRIPT = /<script type="application\/json" data-kay-live[^>]*>([^<]*)<\/script>/g
 
@@ -113,9 +138,14 @@ export function withoutCacheScripts(html: string): string | undefined {
   return html.replace(LIVE_SCRIPT, '')
 }
 
+// The script of an island's fetch, which a page renewing its proofs leaves alone.
+function islandScript(script: string): string {
+  return script.replace(LIVE_MARK, ISLAND_MARK)
+}
+
 // Runs the render of a deferred server island a browser fetched, and gives the script it follows: the cached values it read with `live: true` are the island's to follow, not the page's, which the prerendered file read none of.
-export async function withIslandReads<T>(run: () => Promise<T>, request: Request): Promise<{ result: T, script: string }> {
-  return inLiveReads(async () => ({ result: await run(), script: liveScript() }), request) as Promise<{ result: T, script: string }>
+export async function withIslandReads<T>(run: () => Promise<T>, request: Request, chain: string): Promise<{ result: T, script: string }> {
+  return retryForViewer(async missed => inLiveReads(async () => ({ result: await run(), script: islandScript(liveScript()) }), request, chain, missed) as Promise<{ result: T, script: string }>)
 }
 
 // Runs a GET route's handler so the live keys it reads are the proof its answer carries, for a `resource()` to follow.

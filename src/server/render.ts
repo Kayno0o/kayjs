@@ -51,7 +51,7 @@ import { runGuards } from './guards'
 import { historyScript } from './history'
 import { hydrationScript } from './hydration'
 import { DEFAULT_LANG, invalidKeys, messagesScript } from './i18n'
-import { followsCaches, inLiveReads, liveScript, resolveViewer } from './live'
+import { followsCaches, inLiveReads, liveScript, retryForViewer } from './live'
 import { newTabRule } from './new-tab'
 import { INSTALL_OFFER, registerScript } from './offline'
 import { errorPage } from './overlay'
@@ -243,12 +243,22 @@ const NOT_ASCII = /[^\x20-\x7E]/g
 
 // The params come resolved, each matcher's value in place of its text.
 export async function renderPage(route: ServedRoute, context: RequestContext, params: Record<string, unknown>, client: ClientBuild, options: RenderOptions = {}): Promise<Response> {
-  const rendering = createRendering(context, params, options, route.contextKeys)
-
-  rendering.guarded = options.guarded ?? route.guards.length > 0
-
-  const render = async () => inLiveReads(async () => withOutcome(rendering.outcome, async () => withEndedEntries(async () => renderRoute(route, rendering, client, withEditor(route, options)))), rendering.ctx.request)
+  let rendering = createRendering(context, params, options, route.contextKeys)
+  let rendered = false
   const { pathname, search } = rendering.ctx.url
+  // A render run again, for the user it read a value of, starts from a rendering of its own.
+  const attempt = async (missed: () => void): Promise<Response> => {
+    if (rendered)
+      rendering = createRendering(context, params, options, route.contextKeys)
+
+    rendered = true
+    rendering.guarded = options.guarded ?? route.guards.length > 0
+
+    const current = rendering
+
+    return inLiveReads(async () => withOutcome(current.outcome, async () => withEndedEntries(async () => renderRoute(route, current, client, withEditor(route, options)))), current.ctx.request, route.file, missed)
+  }
+  const render = async () => retryForViewer(attempt)
 
   // The ids a page draws only have to differ from those of the page it is swapped for, so its route and URL give them: a page rendering the same bytes for every visitor is compressed once, not once per visit.
   return hasPageToken() ? render() : withPageToken(pageToken(`${route.file}\n${pathname}${search}`), render)
@@ -428,8 +438,6 @@ async function loadChainAsync(route: ServedRoute, files: string[], rendering: Re
     const importsStarted = performance.now()
     const modules = await importAll(files, options)
     const imports = performance.now() - importsStarted
-
-    await resolveViewer(rendering.ctx.request)
 
     readRouteQuery(files, modules, rendering, options)
 

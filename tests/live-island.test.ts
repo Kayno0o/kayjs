@@ -45,7 +45,7 @@ describe('a deferred server island following a cached value', () => {
     const html = await island()
 
     expect(html).toContain('<p class="stock">')
-    expect(html).toContain('<script type="application/json" data-kay-live data-kay-cache>')
+    expect(html).toContain('<script type="application/json" data-kay-island data-kay-cache>')
     expect(pagesOf(html).flatMap(({ values }) => values.map(([id, key]) => [id, key]))).toEqual([[CACHE_LIVE_ID, 'stock']])
   })
 
@@ -74,7 +74,7 @@ describe('a deferred server island following a cached value', () => {
     const html = await island('/quiet')
 
     expect(html).toContain('<p class="stock">')
-    expect(html).not.toContain('data-kay-live')
+    expect(html).not.toContain('data-kay-island')
   })
 
   it('sends the island its key\'s invalidation time, then each invalidation, to the holder of its proof', async () => {

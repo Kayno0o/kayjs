@@ -1,4 +1,3 @@
-import type { FetchedIsland } from './fetch-island'
 import type { LivePage, LiveRequest, LiveUpdate } from './live-value'
 import { withBase } from './base'
 import { CACHE_LIVE_ID } from './cache-live-id'
@@ -11,7 +10,8 @@ import { decodeServerValue } from './wire'
 // A `resource()` reading a route the same way follows the keys the route's handler read, through the proof its answer carries.
 
 const ROUTE = '/_kay/live'
-const SCRIPT = 'script[data-kay-live]'
+// A deferred island's script is told from the page's by its attribute, so a page's renewal of its proofs leaves it alone.
+const SCRIPT = 'script[data-kay-live],script[data-kay-island]'
 const SERVER_ISLAND = 'slot[data-kay-server]'
 // The longest a tab waits before it loads the page again, so every tab showing a value does not ask for the page at the same moment.
 const JITTER_MS = 750
@@ -339,18 +339,16 @@ async function refetchIsland(slot: HTMLElement): Promise<void> {
     if (!slot.isConnected)
       return
 
-    const held = document.activeElement
-    const { fetchServerIsland } = await import('./fetch-island')
+    const { refetchServerIsland } = await import('./refetch-island')
+    const focus = await refetchServerIsland(slot, () => hooks.dispose(slot))
 
-    if (held instanceof HTMLElement && slot.contains(held))
-      (slot as FetchedIsland)._$f = held
-
-    await fetchServerIsland(slot, () => hooks.dispose(slot))
     await hooks.hydrate(slot)
+    focus()
   }
-  // A fetch that failed leaves the island as it was, shown until the next change.
+  // A fetch that failed leaves the island as it was, shown until the next change, and the connection a refused proof closed opens again.
   catch {
     during.clear()
+    follow()
   }
   finally {
     fetchingIslands.delete(slot)
