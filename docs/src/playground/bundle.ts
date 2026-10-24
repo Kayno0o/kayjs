@@ -6,7 +6,7 @@ const compress = promisify(brotliCompress)
 
 export interface Bundled {
   text: string
-  brotli: Buffer
+  brotli: Uint8Array<ArrayBuffer>
   etag: string
 }
 
@@ -59,7 +59,7 @@ export function bundled(file: string, minify: boolean): () => Promise<Bundled> {
 
     const text = await result.outputs[0]!.text()
 
-    return { text, brotli: await compress(text), etag: `"${Bun.hash(text).toString(36)}"` }
+    return { text, brotli: new Uint8Array(await compress(text)), etag: `"${Bun.hash(text).toString(36)}"` }
   }
 
   return async () => {
