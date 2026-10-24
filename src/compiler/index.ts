@@ -155,12 +155,17 @@ function liveImport(script: ScriptAnalysis, imported: ImportedSignals | undefine
   return liveBindings(script, imported)[0]?.local
 }
 
+// What the server fence declares for the template: its data and its exports, which the script reads as declared rather than as kay values to import.
+function serverNames(server: ServerAnalysis | undefined): string[] | undefined {
+  return server && [...server.data.map(data => data.name), ...server.exportNames]
+}
+
 // Whether a component renders as an island of its own, as compileKay decides it, without generating its code.
 export function rendersAsIsland(original: string, imported?: ImportedSignals): boolean {
   const { file } = parseExpanded(original)
   const source = file.source
   const server = analyzeServer(source, file.server)
-  const script = analyzeScript(source, file.script, server?.data.map(data => data.name), templateReads(file), file.module)
+  const script = analyzeScript(source, file.script, serverNames(server), templateReads(file), file.module)
 
   return file.client !== undefined || isInteractive(file, script) || (file.server === undefined && liveImport(script, imported) !== undefined)
 }
@@ -174,7 +179,7 @@ export function browserRole(original: string, filename: string, imported?: Impor
     return undefined
 
   const server = analyzeServer(source, file.server)
-  const script = analyzeScript(source, file.script, server?.data.map(data => data.name), templateReads(file), file.module, iconSetsOf(source, root))
+  const script = analyzeScript(source, file.script, serverNames(server), templateReads(file), file.module, iconSetsOf(source, root))
 
   if (file.client !== undefined || isInteractive(file, script) || liveImport(script, imported) !== undefined)
     return 'island'
@@ -192,7 +197,7 @@ export function promotedChecks(original: string, root?: string): Diagnostic[] {
   const { file } = parseExpanded(original)
   const source = file.source
   const server = analyzeServer(source, file.server)
-  const script = analyzeScript(source, file.script, server?.data.map(data => data.name), templateReads(file), file.module, iconSetsOf(source, root))
+  const script = analyzeScript(source, file.script, serverNames(server), templateReads(file), file.module, iconSetsOf(source, root))
   const site = promotionSite(file, script)
   const marker = islandMarker(source)
   const announced = site === undefined || marker !== undefined ? [] : [{ ...site.span, code: 'promoted-island', message: `This component renders as an island: ${site.cause}`, note: 'a function or a block with parameters cannot be sent to the browser as data, so the component hydrates itself', help: 'write `// kay-island` in it to say so, or pass the island what can be serialized', checkOnly: true }]
@@ -206,7 +211,7 @@ export function compileKay(original: string, filename: string, options: CompileO
   const { file, expansion, problems } = parseExpanded(original)
   const source = file.source
   const server = analyzeServer(source, file.server)
-  const script = analyzeScript(source, file.script, server?.data.map(data => data.name), templateReads(file), file.module, iconSetsOf(source, options.root))
+  const script = analyzeScript(source, file.script, serverNames(server), templateReads(file), file.module, iconSetsOf(source, options.root))
 
   if (file.style)
     scopeElements(file, scopeAttribute(islandId(filename, options.root)))

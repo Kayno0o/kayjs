@@ -62,3 +62,12 @@ describe('a fence declaring a name twice', () => {
     expect(walkScope(fence.ast, {})).toBe(false)
   })
 })
+
+// A server fence exporting an action under the name of a value of kay, which the template passes on.
+const EXPORTED = ['--- server', 'import { t } from \'elysia\'', 'import { action } from \'kay\'', '', 'export const local = action(t.Object({ name: t.String() }), ({ name }) => name)', '--- script', 'import Caller from \'../components/caller.kay\'', '---', 'Caller(run={local})', ''].join('\n')
+
+describe('a name a server fence exports', () => {
+  it('is the fence\'s own, not a value of kay the script imports beside it', () => {
+    expect(() => compileKay(EXPORTED, 'src/routes/exported.kay')).not.toThrow()
+  })
+})
