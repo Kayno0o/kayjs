@@ -6,7 +6,7 @@ import { editedEntry, editRequested } from 'kay/server'
 import { wording } from 'kay/words'
 import { forbidden, may, memberOf, refusalStatus, routePath } from '../access'
 import { authOf, organizationMembers } from '../auth-like'
-import { actors, authors, testAddresses } from '../authors'
+import { actors, authors, linkReaders, testAddresses } from '../authors'
 import { admitEditor } from '../editor-names'
 import { log } from '../log'
 import { leavesPublication, restrain } from '../publishing'
@@ -182,6 +182,9 @@ export default guard(async (ctx) => {
     if (READ_METHODS.has(method)) {
       if (mayRead(ctx, root)) {
         await admitReader(ctx, admits)
+
+        if (!editSessionAdmitted(ctx.request))
+          linkReaders.add(ctx.request)
 
         return
       }

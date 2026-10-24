@@ -1,9 +1,8 @@
 import type { StoredEntry } from '../kay/contract'
 import { s } from 'kay'
-import { editSessionAdmitted } from 'kay/library'
 import { api } from 'kay/server'
 import { wording } from 'kay/words'
-import { actors, authors } from '../authors'
+import { actors, authors, linkReaders } from '../authors'
 import { SINGLE_SLUG } from '../listing'
 import { withHold } from '../publishing'
 import { readReview, viewOf } from '../review'
@@ -34,7 +33,7 @@ export default api()
     }
 
     // The names and notes of a review are for the staff the guard admits, not for an edit link's holder.
-    const review = screen.entry && !editSessionAdmitted(request) ? await readReview({ collection: params.collection, slug: params.slug, locale: query.locale }) : undefined
+    const review = screen.entry && !linkReaders.has(request) ? await readReview({ collection: params.collection, slug: params.slug, locale: query.locale }) : undefined
 
     return screen.entry ? { collection: screen.collection, entry: screen.entry, review: review && viewOf(review) } : status(404, wording('cms.store.noEntry', 'No entry {slug} in {collection}', { slug: params.slug, collection: params.collection }))
   }, { query: locale })

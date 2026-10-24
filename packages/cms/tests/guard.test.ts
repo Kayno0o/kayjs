@@ -1,7 +1,7 @@
 import type { GuardContext } from 'kay'
 import { afterEach, beforeEach, describe, expect, mock, spyOn, test } from 'bun:test'
 import * as server from 'kay/server'
-import { authors } from '../src/authors'
+import { authors, linkReaders } from '../src/authors'
 import { configure, settings } from '../src/settings'
 
 // As kay's own, a refusal is no Error and carries its status.
@@ -138,6 +138,19 @@ describe('the API guard', () => {
 
     signedIn.request.headers.set('x-editor', '1')
     expect(await admitted(signedIn)).toBe(true)
+  })
+
+  test('marks an edit link\'s holder, whom the guard turns away, apart from a signed-in editor, so a review log is kept from them', async () => {
+    configure({ guard: ({ request, deny }) => request.headers.has('x-editor') ? undefined : deny(403, 'Editors only') })
+
+    const holder = context('GET', '/entries/posts/hello', true)
+    const editor = context('GET', '/entries/posts/hello', false)
+
+    editor.request.headers.set('x-editor', '1')
+    expect(await admitted(holder)).toBe(true)
+    expect(await admitted(editor)).toBe(true)
+    expect(linkReaders.has(holder.request)).toBe(true)
+    expect(linkReaders.has(editor.request)).toBe(false)
   })
 
   test('keeps who the app says the editor is, for the save to commit as', async () => {

@@ -185,7 +185,7 @@ describe('review', () => {
     expect(JSON.parse(saved[0]!.text!)).toMatchObject({ status: 'review', by: 'Wanda' })
   })
 
-  test('a folder review is written against the version of the file it read, so a stale one conflicts', async () => {
+  test('a folder review is written against the version of the file it read', async () => {
     const ref = await draft('posts')
     const bases: (string | null | undefined)[] = []
 

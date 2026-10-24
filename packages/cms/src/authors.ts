@@ -14,3 +14,6 @@ export interface Actor {
 }
 
 export const actors = new WeakMap<Request, Actor>()
+
+// The requests an edit link's holder made: read through the edit cookie alone, the app's guard having turned them away.
+export const linkReaders = new WeakSet<Request>()

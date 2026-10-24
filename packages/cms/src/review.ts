@@ -121,6 +121,16 @@ export function reviewable(collection: Pick<CollectionInfo, 'kind' | 'name' | 'd
 const directory = (collection: string) => join(repositoryRoot(), '.cms', 'review', encodeURIComponent(collection))
 const fileName = (place: string) => `${encodeURIComponent(place)}.json`
 
+// The version of a review file as its saver takes it, null when there is none.
+async function versionOf(absolute: string): Promise<string | null> {
+  try {
+    return fileVersion(await Bun.file(absolute).bytes())
+  }
+  catch {
+    return null
+  }
+}
+
 // A collection with no loader is a folder's.
 function isFolder(collection: string): boolean {
   return collectionLoader(collection) === undefined
@@ -193,8 +203,7 @@ export async function writeReview(ref: EntryRef, review: Review | undefined, { a
     if (kept === undefined && !await Bun.file(absolute).exists())
       return
 
-    const file = Bun.file(absolute)
-    const base = await file.exists() ? fileVersion(await file.bytes()) : null
+    const base = await versionOf(absolute)
 
     await mkdir(dir, { recursive: true })
     await settings().files.save({
