@@ -14,7 +14,8 @@ const LOADABLE = /\.(?:css|woff2?|ttf|otf|png|jpe?g|webp|avif|gif|svg)$/i
 const FRAME = '<style>html,body{margin:0}html{overflow:hidden}</style>'
 const HEAD = /<head(?:\s[^>]*)?>/
 // A card gets this long to load and be drawn, a template that never settles included; the fonts and images it loads get a part of it.
-const SHOT_MS = 30_000
+const DEFAULT_SHOT_MS = 30_000
+let shotMs = DEFAULT_SHOT_MS
 const SETTLE_MS = 5000
 const PAINT = `(async () => {
   const loading = [...document.images].filter(image => !image.complete).map(image => new Promise(resolve => {
@@ -23,6 +24,11 @@ const PAINT = `(async () => {
   }))
   await Promise.race([Promise.all([document.fonts.ready, ...loading]), new Promise(resolve => setTimeout(resolve, ${SETTLE_MS}))])
 })()`
+
+// Cuts the limit for a test, or restores it with no argument.
+export function setCardShotLimit(ms = DEFAULT_SHOT_MS): void {
+  shotMs = ms
+}
 
 // What a card drawn from `_card.kay` depends on that no setting names: the text of the template and of every `.kay` file it imports, however deep, and the stylesheet the build made of them.
 export function templateStamp(file: string, styles: string | undefined): string {
@@ -120,15 +126,24 @@ async function draw(clientDir: string, quality: number, render: (origin: string)
   const server = Bun.serve({ hostname: '127.0.0.1', port: 0, fetch: async request => answer(request, html, clientDir) })
   let timer: Timer | undefined
   let opened: { close: () => void } | undefined
+  let expired = false
+  const limit = shotMs
 
   try {
     const shot = (async () => {
       // Rendered once the port is known, for the page to name the image by the address the browser reaches it at.
       html = await render(`http://127.0.0.1:${server.port}`)
 
-      const page = await browse(`http://127.0.0.1:${server.port}/`, { width: CARD.width, height: CARD.height, javaScript: false, strict: false, lenient: true, timeout: `${SHOT_MS}ms` })
+      const page = await browse(`http://127.0.0.1:${server.port}/`, { width: CARD.width, height: CARD.height, javaScript: false, strict: false, lenient: true, timeout: `${limit}ms` })
 
       opened = page
+
+      // Opened after the timeout won: nothing waits for this shot any more, so its page closes at once.
+      if (expired) {
+        page.close()
+
+        throw new KayError('share-card-invalid', 'kay: src/routes/_card.kay was not drawn in time')
+      }
 
       // Closed by the shot itself, and below when it never ends, so the next card starts with no page of this one left open.
       try {
@@ -145,7 +160,10 @@ async function draw(clientDir: string, quality: number, render: (origin: string)
       }
     })()
     const timeout = new Promise<never>((_, reject) => {
-      timer = setTimeout(() => reject(new KayError('share-card-invalid', `kay: src/routes/_card.kay was not drawn within ${SHOT_MS / 1000} s, the browser stopped answering`)), SHOT_MS)
+      timer = setTimeout(() => {
+        expired = true
+        reject(new KayError('share-card-invalid', `kay: src/routes/_card.kay was not drawn within ${limit / 1000} s, the browser stopped answering`))
+      }, limit)
     })
 
     // A shot that lost the race is left to fail on its own, its page closed below.
