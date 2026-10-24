@@ -256,7 +256,10 @@ export async function inFlightWork<T>(work: () => Promise<T>): Promise<T> {
 }
 
 // The hold each run was claimed with, which `workflow` writes its checkpoints against.
-export const holds = new WeakMap<object, number>()
+export const claimHolds = new WeakMap<object, number>()
+
+// The runs whose handler gave the job back itself (a workflow that slept), which the queue then does not complete: a hold equal to the old one on a claim in the same millisecond would let the late complete delete the live job.
+export const handedBack = new WeakSet<object>()
 
 // Wakes the worker of the named queue in this process, for a job made due without an enqueue.
 export function wakeQueue(name: string): void {
@@ -815,7 +818,7 @@ export function queue<Payload, Progress = unknown>(name: string, handler: (paylo
     const context: JobContext<Progress> = { id: job.id, attempts: job.attempts, progress: reports.write }
 
     try {
-      holds.set(context, held)
+      claimHolds.set(context, held)
       await withinLostAfter(handler(parse(job.payload) as Payload, ended.signal, context), claimedAt, ended)
       await reports.settle()
       succeeded = true
@@ -868,7 +871,7 @@ export function queue<Payload, Progress = unknown>(name: string, handler: (paylo
     }
 
     // Outside the try above: a store that fails here ran the handler to its end, so the run is not a failed one, and retrying it would run the handler twice. Past a few tries the job stays claimed and is taken again once its hold lapses, counting an attempt.
-    if (succeeded) {
+    if (succeeded && !handedBack.has(context)) {
       for (let attempt = 1; ; attempt++) {
         try {
           await store().complete(job.id, held)

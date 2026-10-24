@@ -4,7 +4,7 @@ import type { JobContext, JobStore, QueueOptions } from './queue'
 import { parse, stringify } from 'devalue'
 import { KayError } from '../compiler/errors'
 import { durationSeconds } from '../runtime/duration'
-import { defaultJobStore, holds, queue, wakeQueue } from './queue'
+import { claimHolds, defaultJobStore, handedBack, queue, wakeQueue } from './queue'
 
 type Events = Record<string, unknown>
 
@@ -55,7 +55,7 @@ export interface WorkflowStatus {
 export type Workflow<Input, Known extends Events> = Elysia & {
   // Starts a run, which the server's workers carry out, surviving restarts; resolves with its id once stored.
   start: (...args: undefined extends Input ? [input?: Input, options?: StartOptions] : [input: Input, options?: StartOptions]) => Promise<string>
-  // Hands the event to the run if it is waiting for it, waking it now; resolves with whether it did. An event sent while the run is doing anything else, or after its wait timed out, is dropped.
+  // Hands the event to the run, waking it now when it waits for it, else keeping it for the wait that names it; resolves with whether the run took it. An event sent while a step runs, or once a worker took the run after its timeout, is dropped.
   send: <Event extends keyof Known & string>(id: string, event: Event, ...data: undefined extends Known[Event] ? [data?: Known[Event]] : [data: Known[Event]]) => Promise<boolean>
   // Where the run stands; undefined once it completed, was cancelled or never started.
   status: (id: string) => Promise<WorkflowStatus | undefined>
@@ -75,11 +75,14 @@ interface Payload<Input> {
   run: string
   input: Input
   memo: Entry[]
+  // Events sent before the run waited for them, taken in order by the waits that name them.
+  inbox?: { event: string, data: unknown }[] | undefined
   // Set while the run waits for an event, until its timeout.
   waiting?: { event: string, index: number } | undefined
 }
 
 const noop = () => undefined
+const RELEASE_TRIES = 3
 
 // A wait without timeout is due never: the last instant a Date holds.
 const NEVER = 8.64e15
@@ -102,8 +105,9 @@ export function workflow<Input = undefined, Known extends Events = Events>(name:
 
   const handler = async (payload: Payload<Input>, signal: AbortSignal, job: JobContext<unknown>) => {
     const { update, release } = needs(storeOf(), name)
-    const until = holds.get(job)!
+    const until = claimHolds.get(job)!
     const memo = [...payload.memo]
+    const inbox = [...payload.inbox ?? []]
     let at = 0
     let busy = false
     let halted = false
@@ -112,6 +116,7 @@ export function workflow<Input = undefined, Known extends Events = Events>(name:
     // Ends the claim without the code after the step running: the step's promise never settles, so a `try` around it catches nothing.
     const halt = async (): Promise<never> => {
       halted = true
+      handedBack.add(job)
       ended.resolve()
 
       return new Promise<never>(noop)
@@ -119,7 +124,7 @@ export function workflow<Input = undefined, Known extends Events = Events>(name:
 
     // A kept step starts the attempts again, as the store does for the stored count.
     const keep = async (waiting?: Payload<Input>['waiting'], runAt?: number) => {
-      const kept = await update(job.id, { payload: stringify({ ...payload, memo, waiting }), runAt }, { until })
+      const kept = await update(job.id, { payload: stringify({ ...payload, memo, inbox, waiting }), runAt }, { until })
 
       if (kept)
         job.attempts = 1
@@ -129,13 +134,30 @@ export function workflow<Input = undefined, Known extends Events = Events>(name:
 
     // A write refused means the run was cancelled or went to another process: nothing more of it is ours to do.
     const suspend = async (waiting?: Payload<Input>['waiting'], runAt?: number): Promise<never> => {
-      if (await keep(waiting, runAt))
-        await release(job.id, until)
+      if (await keep(waiting, runAt)) {
+        // A store that fails here would have the queue retry the run, moving its due time: ask again first.
+        for (let tries = 1; ; tries++) {
+          try {
+            await release(job.id, until)
+
+            break
+          }
+          catch (error) {
+            if (tries === RELEASE_TRIES)
+              throw error
+
+            await Bun.sleep(100 * tries)
+          }
+        }
+      }
 
       return halt()
     }
 
     const enter = (kind: Entry['kind'], label: string) => {
+      // A stop or a lost hold ended the claim: no side effect of the next step may run beside whoever takes the run.
+      signal.throwIfAborted()
+
       if (busy)
         throw new Error(`kay: workflow('${name}') ran two steps at once: await each step before starting the next`)
 
@@ -188,8 +210,7 @@ export function workflow<Input = undefined, Known extends Events = Events>(name:
         return suspend(undefined, Date.now() + ms)
       },
       async waitFor(event: string, waitOptions?: { timeout: Duration }): Promise<never> {
-        const label = event
-        const { slot, seen } = enter('wait', label)
+        const { slot, seen } = enter('wait', event)
         const reply = (result: WaitResult<unknown>) => (waitOptions === undefined ? result.data : result) as never
 
         if (seen)
@@ -199,7 +220,19 @@ export function workflow<Input = undefined, Known extends Events = Events>(name:
         if (payload.waiting?.index === slot && payload.waiting.event === event) {
           const value: WaitResult<unknown> = { timedOut: true }
 
-          memo.push({ kind: 'wait', name: label, value })
+          memo.push({ kind: 'wait', name: event, value })
+
+          return await keep() ? reply(value) : halt()
+        }
+
+        const early = inbox.findIndex(sent => sent.event === event)
+
+        // The event came before the run waited for it.
+        if (early !== -1) {
+          const [sent] = inbox.splice(early, 1)
+          const value: WaitResult<unknown> = { timedOut: false, data: sent!.data }
+
+          memo.push({ kind: 'wait', name: event, value })
 
           return await keep() ? reply(value) : halt()
         }
@@ -256,11 +289,17 @@ export function workflow<Input = undefined, Known extends Events = Events>(name:
       const { update } = needs(store, name)
       const run = await found(id)
 
-      if (run?.job.status !== 'waiting' || run.payload.waiting?.event !== event)
+      // A run a step is running, or a worker has just taken, is held: its event is dropped.
+      if (run?.job.status !== 'waiting')
         return false
 
-      const memo: Entry[] = [...run.payload.memo, { kind: 'wait', name: event, value: { timedOut: false, data } satisfies WaitResult<unknown> }]
       const now = Date.now()
+
+      // A run not waiting for it yet keeps the event for the wait that names it.
+      if (run.payload.waiting?.event !== event)
+        return update(run.job.id, { payload: stringify({ ...run.payload, inbox: [...run.payload.inbox ?? [], { event, data }] }) }, { payload: run.job.payload, now })
+
+      const memo: Entry[] = [...run.payload.memo, { kind: 'wait', name: event, value: { timedOut: false, data } satisfies WaitResult<unknown> }]
       const woken = await update(run.job.id, { payload: stringify({ ...run.payload, memo, waiting: undefined }), runAt: now }, { payload: run.job.payload, now })
 
       if (woken)
@@ -285,7 +324,12 @@ export function workflow<Input = undefined, Known extends Events = Events>(name:
     cancel: async (id: string) => {
       const run = await found(id)
 
-      return run !== undefined && await queued.remove(run.job.id) === 1
+      if (run === undefined)
+        return false
+
+      await storeOf().complete(run.job.id)
+
+      return true
     },
     drain: queued.drain,
   })

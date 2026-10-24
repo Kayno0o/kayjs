@@ -101,7 +101,7 @@ describe.each(kinds)('a workflow on a $name store', ({ open }) => {
     expect(seen.size).toBe(3)
   })
 
-  it('resumes in a new process after a stop, from the steps it kept', async () => {
+  it('retries a run that outlasts lostAfter from the steps it kept, in another process', async () => {
     const store = await open()
     const name = named()
     const calls: string[] = []
@@ -116,7 +116,7 @@ describe.each(kinds)('a workflow on a $name store', ({ open }) => {
     forgetQueue(first)
     expect(await first.status(id)).toMatchObject({ status: 'running', steps: 1 })
 
-    // The process that held it died: its hold lapses, on the store's clock, and another takes over.
+    // The run outlasted lostAfter, which gave it back to retry once its backoff passed.
     await Bun.sleep(400)
     later(MINUTE)
 
@@ -152,7 +152,7 @@ describe.each(kinds)('a workflow on a $name store', ({ open }) => {
     expect(await flow.status(id)).toBeUndefined()
   })
 
-  it('wakes a waiting run with an event and its data, and drops one meant for no wait', async () => {
+  it('wakes a waiting run with an event and its data', async () => {
     const store = await open()
     const got: unknown[] = []
     const flow = workflow<undefined, { paid: { amount: number }, other: undefined }>(named(), async ({ step }) => {
@@ -161,16 +161,64 @@ describe.each(kinds)('a workflow on a $name store', ({ open }) => {
     }, { store })
     const id = await flow.start()
 
-    expect(await flow.send(id, 'paid', { amount: 1 })).toBe(false)
     await flow.drain()
     expect(await flow.status(id)).toMatchObject({ status: 'waiting', event: 'paid' })
-    expect(await flow.send(id, 'other')).toBe(false)
     expect(await flow.send('nobody', 'paid', { amount: 1 })).toBe(false)
     expect(await flow.send(id, 'paid', { amount: 12 })).toBe(true)
-    expect(await flow.send(id, 'paid', { amount: 13 })).toBe(false)
     await flow.drain()
     expect(got).toEqual([{ amount: 12 }, 'done'])
     expect(await flow.status(id)).toBeUndefined()
+  })
+
+  it('keeps an event sent before the run waits for it, even one sent right after start', async () => {
+    const store = await open()
+    const got: unknown[] = []
+    const flow = workflow<undefined, { paid: number, other: string }>(named(), async ({ step }) => {
+      await step.sleep('1h')
+      await step.run('log', () => void got.push(['slept']))
+
+      const paid = await step.waitFor('paid')
+
+      await step.run('paid', () => void got.push(paid))
+    }, { store })
+    const id = await flow.start()
+
+    expect(await flow.send(id, 'paid', 5)).toBe(true)
+    expect(await flow.send(id, 'paid', 6)).toBe(true)
+    await flow.drain()
+    later(2 * 60 * MINUTE)
+    await flow.drain()
+    expect(got).toEqual([['slept'], 5])
+  })
+
+  it('wakes a run after a suspension even when the claims share a millisecond', async () => {
+    const store = await open()
+    const got: unknown[] = []
+    const flow = workflow<undefined, { go: number }>(named(), async ({ step }) => {
+      got.push(await step.waitFor('go'))
+      await step.run('after', () => void got.push('after'))
+    }, { store })
+    const id = await flow.start()
+
+    setSystemTime(new Date(Date.now()))
+    await flow.drain()
+    expect(await flow.send(id, 'go', 1)).toBe(true)
+    await flow.drain()
+    expect(got).toEqual([1, 'after'])
+    expect(await flow.status(id)).toBeUndefined()
+  })
+
+  it('starts no step once its run lost the hold', async () => {
+    const store = await open()
+    const calls: string[] = []
+    const flow = workflow<undefined>(named(), async ({ step }) => {
+      await step.run('slow', async () => Bun.sleep(450))
+      await step.run('next', () => void calls.push('next'))
+    }, { store, lostAfter: '300ms' })
+
+    await flow.start()
+    await flow.drain()
+    expect(calls).toEqual([])
   })
 
   it('times a wait out, and an event after that is dropped', async () => {
