@@ -1,7 +1,7 @@
 import type { GuardContext } from 'kay'
 import { afterEach, describe, expect, mock, test } from 'bun:test'
 import * as server from 'kay/server'
-import { memberOf } from '../src/access'
+import { memberOf, memberOfRequest } from '../src/access'
 import { actors } from '../src/authors'
 import { passwordGuard, SESSION_COOKIE } from '../src/password'
 import { configure } from '../src/settings'
@@ -64,6 +64,11 @@ function ask(path: string, auth: unknown, cookie?: string): GuardContext {
       throw new Denied(status, message)
     },
   } as unknown as GuardContext
+}
+
+// The same context as a GET, which is how an entry is read.
+function reading(from: GuardContext): GuardContext {
+  return { ...from, request: new Request(from.url, { method: 'GET' }) }
 }
 
 async function statusOf(ctx: GuardContext): Promise<number> {
@@ -184,6 +189,26 @@ describe('submitting, approving and sending back', () => {
 
     await statusOf(ctx)
     expect(actors.get(ctx.request)?.reviewers.sort()).toEqual(['sam', 'sue'])
+  })
+})
+
+describe('the four-eyes rule', () => {
+  test('has the guard read who looks at an entry, so its review can tell the person from the submitter', async () => {
+    const get = (fourEyes: boolean) => {
+      configure({ guard: () => undefined, fourEyes })
+
+      return reading(ask('/entries/posts/hello', authOf('wanda', [], orgs)))
+    }
+
+    const on = get(true)
+
+    await apiGuard(on)
+    expect(await memberOfRequest(on.request)).toMatchObject({ id: 'wanda' })
+
+    const off = get(false)
+
+    await apiGuard(off)
+    expect(await memberOfRequest(off.request)).toBeUndefined()
   })
 })
 
