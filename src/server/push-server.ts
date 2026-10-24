@@ -69,12 +69,13 @@ export async function pushServer(): Promise<AnyElysia> {
 
         if (typeof replaces !== 'string' || !held.some(endpoint => endpoint === replaces || endpoint === subscription.endpoint))
           return none(403)
-
-        if (replaces !== subscription.endpoint)
-          await pushStore().remove(replaces, user)
       }
 
       await pushStore().add(user, subscription, MOST_DEVICES)
+
+      // Added first, so a failing store never leaves the person with neither.
+      if (typeof replaces === 'string' && replaces !== subscription.endpoint)
+        await pushStore().remove(replaces, user)
 
       return new Response(null, { status: 204, headers: { 'cache-control': 'no-store', 'set-cookie': pushDeviceCookie(subscription.endpoint, overHttps(request)) } })
     }, { parse: 'none' })
