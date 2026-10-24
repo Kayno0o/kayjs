@@ -23,6 +23,7 @@ await Promise.all([
   Bun.write(join(clientDir, 'images/hero-640w.webp'), 'webp'),
   Bun.write(join(outputDir(scratch), 'favicon/icon-192.png'), 'png'),
   Bun.write(join(publicDir, 'post script.js'), 'console.log(1)'),
+  Bun.write(join(publicDir, 'big.css'), '.card { color: red; margin: 0 }\n'.repeat(200)),
   Bun.write(join(scratch, 'secret.txt'), 'outside'),
 ])
 
@@ -162,7 +163,7 @@ describe('page hooks', () => {
       expect(sizes[0]).toBe((await Bun.file(join(cache, (await readdir(cache)).find(name => name.endsWith('.br'))!)).bytes()).length)
     })
 
-    it('makes only the brotli copy for a file the build keeps no copies of, and keeps none for a page it measures', async () => {
+    it('sizes a public file and a page without the build\'s copies, keeping none', async () => {
       const cache = join(scratch, 'html-cache')
       const { fileSize, htmlSize } = await sizesOf({ clientDir, publicDir, base: '' })
 
@@ -171,6 +172,7 @@ describe('page hooks', () => {
       const kept = await sizesOf({ clientDir, publicDir, base: '' }, cachedCopies(cache))
 
       expect(await kept.htmlSize(`<p>${big}</p>`)).toBe(await htmlSize(`<p>${big}</p>`))
+      expect(await kept.fileSize('/big.css')).toBe(await fileSize('/_kay/big-3c4d.css'))
       expect(existsSync(cache)).toBe(false)
     })
 
