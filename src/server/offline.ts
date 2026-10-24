@@ -28,7 +28,7 @@ const BACKSLASH = /\\/g
 // A rule of the fonts' stylesheet naming its file and the range of characters it holds.
 const FACE_RANGE = /url\("([^"]+)"\)[^}]*?unicode-range:([^;}]+)/g
 // Bumped whenever the worker's own code changes, so every site installs it again.
-const WORKER_VERSION = 6
+const WORKER_VERSION = 7
 // Past this many pages kept by default, the boot says to list the ones worth it.
 const MANY_PAGES = 100
 
@@ -284,15 +284,31 @@ async function sendQueued() {
   try {
     const queued = await settled(db.transaction('outbox').objectStore('outbox').getAll())
     let answered = false
+    const jar = typeof cookieStore === 'undefined' ? null : await cookieStore.get('kay_local_clear')
+    const token = jar ? jar.value : ''
 
     for (const entry of queued) {
-      if (entry.answer)
+      // An answer a page has not applied yet: a success lets the next go, anything else is the page's to settle first.
+      if (entry.answer) {
+        if (entry.answer.status >= 300)
+          break
+
         continue
+      }
+
+      // Written before someone signed out here: never sent as the next person.
+      if (token !== '' && entry.cleared !== token) {
+        const gone = db.transaction('outbox', 'readwrite')
+
+        gone.objectStore('outbox').delete(entry.seq)
+        await new Promise(resolve => gone.oncomplete = resolve)
+        continue
+      }
 
       const response = await fetch(entry.url, { method: 'POST', credentials: 'same-origin', redirect: 'manual', headers: { ...entry.headers, 'x-kay-write': entry.id }, body: entry.body })
 
       if (response.type === 'opaqueredirect' || response.headers.has('x-kay-redirect') || response.status >= 500 || [401, 408, 425, 429].includes(response.status))
-        throw new Error('kay: a queued write was not answered')
+        throw new Error('a queued write was not answered')
 
       entry.answer = { status: response.status, failure: response.headers.get('x-kay-failure'), body: await response.text() }
 

@@ -109,10 +109,13 @@ export async function archive(scan: File) {
 - `kay_editor_session` (kayjs-cms `passwordGuard`): the password sign-in, `<role>.<expires>.<signature>`, `httpOnly`; necessary, `maxAge`, `'14d'` by default.
 - `ksteps_<name>` (kayjs-ui `stepDraft`): the values of a multi-step form between its steps, `httpOnly`, up to 3,800 encoded bytes, what a visitor typed in; necessary for the form they are filling in, `maxAge` (a duration), an hour by default, ended by `clear()`.
 - `kay_push_device` (`push()`): a hash naming the push subscription this browser made, `httpOnly`, set when it subscribes, so sign-out drops that device alone; necessary, a year.
+||||||| parent of a1f174b (fix(runtime): local() review: listeners released, sign-out reaches the worker, a failing write is rejected, privacy pages list it)
+- `kay_local_clear` (`local()`): a random value, readable by scripts, set only when the app calls `forgetLocalMirrors(request)` at sign-out; the next page using a collection empties the browser's mirror and queue when it changed; necessary, a year, names no one.
 - Each `persisted(name, ...)` signal keeps its value in a cookie of that name for a year, or its `maxAge`, or in `localStorage` with `{ storage: 'local' }`; what it holds is the app's choice, so a preference is necessary and anything else waits for consent.
 
 ### Browser storage
 
+- IndexedDB `kay-local` (`local()`): the rows of each collection as the person sees them, the writes not yet sent and the refusals to show; the app's data, so as personal as the rows are; necessary for the feature the app offers, until the rows are removed, `clear()` runs or the sign-out cookie changes.
 - `sessionStorage` `kay-reloaded`: the time of the last reload kay made for a page of an older build, so it never reloads twice within a minute; necessary, the tab's life, nothing personal.
 - `sessionStorage` `kay_editor-refused` (kayjs-cms): the sign-in value the editor check refused, so a signed-in visitor who is no editor costs one request per tab; necessary, the tab's life.
 - `localStorage` `kcms:draft:<entry>` (kayjs-cms): an editor's unsaved draft of an entry, whatever they typed; necessary for the editor who asked to keep it, a week, dropped once saved.
@@ -125,6 +128,7 @@ export async function archive(scan: File) {
 
 ### What the server keeps
 
+- **Write answers**: the first answer to a write carrying an `x-kay-write` id (`local()`), rows included, for a week in `store.cache` or in the process's memory.
 - A `live()` value is the app's own data, kept in `store.live` for every visitor (the app must not put a person in it), and a presence `member` is whatever the page's server fence gave, a name say, kept in `store.rooms` while the tab is open and about 10 seconds after a crash.
 - Request logs carry the method, the path without its query string, the status, the duration and the request id: no address, no user agent, no cookie.
 - `onError` gets `{ error, request }`, the request whole, or `undefined` for an error met outside one; an error tracker is sent its path and id, not `request.url`, whose query may hold an address or a token.

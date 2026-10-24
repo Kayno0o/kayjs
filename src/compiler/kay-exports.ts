@@ -29,6 +29,7 @@ export const KAY_VALUES: readonly string[] = [
   'linked',
   'listen',
   'live',
+  'local',
   'localPath',
   'logFrom',
   'markInvalid',

@@ -26,3 +26,4 @@ button.add(onClick={() => notes.put({ id: 'a', title: text(), rev: 0 })}) Add
 button.edit(onClick={() => notes.put({ id: 'a', title: text(), rev: notes.get('a')?.rev ?? 0 })}) Edit
 button.remove(onClick={() => notes.remove('a')}) Remove
 button.sync(onClick={() => notes.sync()}) Sync
+button.clear(onClick={() => notes.clear()}) Clear

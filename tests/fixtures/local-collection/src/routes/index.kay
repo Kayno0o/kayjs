@@ -22,7 +22,6 @@ export const drop = action(s.Object({ id: s.String({ maxLength: 40 }) }), ({ id 
   stats.drops++
   notes.delete(id)
 })
-
 --- script
 import Notes from '../components/notes.kay'
 ---

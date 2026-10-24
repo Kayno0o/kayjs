@@ -22,6 +22,7 @@ This page lists what each feature keeps, for a site's privacy notice and for the
 | `kay_editor` | kayjs-cms, for an editor | 90 days, slid forward each visit, ended at sign-out |
 | `kay_editor_who` | kayjs-cms, a digest naming the signed-in editor so drafts are kept per person | 90 days, ended at sign-out |
 | `kay_editor_session` | kayjs-cms `passwordGuard` | 14 days by default, or its `maxAge` |
+| `kay_local_clear` | `local()`, set by `forgetLocalMirrors(request)` at sign-out | a year, only a random value |
 | `ksteps_<name>` | kayjs-ui `stepDraft`, the values of a multi-step form | an hour by default, ended by `clear()` |
 | `kay_push_device` | `push()`, a hash naming the push subscription this browser made, so signing out stops its pushes alone | a year |
 | the name given to `persisted()` | a persisted signal | a year, or its `maxAge` |
@@ -44,6 +45,7 @@ Over https those three go out as `__Host-kay_flash`, `__Host-kay_locale` and `__
 | `localStorage` `kcms:rebuilding` | kayjs-cms, a save the site is still rebuilding for | until the rebuild ends |
 | `sessionStorage` under `remember` | kayjs-ai `Chat`, only when you name a key | the tab's life; the conversation's text, up to 200,000 characters |
 | `localStorage` under `listWidthKey` | kayjs-ui `SplitLayout`, only when you name a key | until the visitor clears it; the list's width |
+| IndexedDB `kay-local` | `local()`, the rows an island keeps offline and the writes not yet sent | until the rows are removed, `clear()` runs or the sign-out cookie changes |
 | Cache Storage `kay-w<version>` | the service worker, when `offline` is on | until `offline` is turned off or the worker's version changes |
 
 `kay-reloaded`, `kay_editor-refused`, `kcms:rebuilding` and the editor's draft are necessary for what the visitor or editor asked, so need no consent; the panel and list sizes are preferences they set.
@@ -60,6 +62,7 @@ The conversation of a `remember` chat is what the visitor wrote, so tell them.
 - **Jobs**: a waiting job's payload until it runs, a failed one's for 30 days from when its last attempt was due, or what the queue's `keepFailed` says (7 days for kayjs-mail, without the body).
 - **Mailing lists** (kayjs-mail): a subscriber's address, language, the date of their confirmation and the proof of it (the page of the form and which notice it showed), in `data/mail-list.sqlite`, until they unsubscribe or you call `mail.erase`; an address nobody confirmed is dropped after 7 days. A broadcast and who it was sent to (by a random id, not the address) are kept 30 days after it finished.
 - **Live values and presence**: a `live()` value is the app's own data, shared by every visitor, so keep no person in it. A presence member is whatever your page gave, a name say, kept while the tab is open and about 10 seconds after a crash.
+- **Write answers**: the first answer to a write that `local()` sent, rows included, for a week in `store.cache` or in memory.
 - **Rooms**: a message 30 seconds in `sqliteRooms`.
 - **Notifications**: the title, link and read state of each, 90 days by default or what `keep` says, the newest 200 per user. See [Notifications](/guides/live-and-realtime#notifications).
 - **Uploads**: until the app deletes them, without the metadata a camera writes in a JPEG, PNG, WebP, AVIF or HEIC.

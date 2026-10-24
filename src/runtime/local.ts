@@ -1,7 +1,7 @@
 import type { Action } from './action'
 import { encodeCall } from './action'
 import { withBase } from './base'
-import { createSignal } from './reactive'
+import { createSignal, getOwner, onCleanup } from './reactive'
 import { FAILURE_HEADER, PAGE_HEADER, REDIRECT_HEADER } from './swap'
 import { decodeServerValue } from './wire'
 
@@ -92,6 +92,9 @@ interface Entry {
   body: string
   row: object
   tries: number
+  // The sign-out token the write was made under: a write of someone who signed out since is never sent.
+  cleared: string
+  faults?: number | undefined
   answer?: Answer | undefined
 }
 
@@ -103,7 +106,9 @@ const CLEAR_COOKIE = 'kay_local_clear'
 const MOST_CONFLICTS = 3
 const RETRY_MS = [5000, 15_000, 60_000, 300_000]
 // A write answered with one of these may succeed later, so it stays queued.
-const TRANSIENT = new Set([401, 408, 425, 429])
+const TRANSIENT = new Set([408, 425, 429])
+// A write the server answers 5xx this many times is rejected, so one that always throws does not hold the queue forever.
+const MOST_FAULTS = 5
 
 function onServer(): boolean {
   return typeof KAY_BROWSER === 'undefined' && typeof indexedDB === 'undefined'
@@ -283,11 +288,25 @@ class Collection<Row extends object, Key extends keyof Row & string> {
   // Counts what changed the queue, so a read of the server that began before is not applied over it.
   private changes = 0
   private ready: Promise<void>
+  private token = ''
+  private disposers: (() => void)[] = []
+  private ended = false
 
   constructor(options: LocalOptions<Row, Key>) {
     this.options = options
     this.c = options.put.url
     this.ready = this.start()
+
+    if (getOwner())
+      onCleanup(() => this.dispose())
+  }
+
+  private dispose(): void {
+    this.ended = true
+    clearTimeout(this.timer)
+
+    for (const undo of this.disposers)
+      undo()
   }
 
   api(): Local<Row, Key> {
@@ -315,12 +334,13 @@ class Collection<Row extends object, Key extends keyof Row & string> {
       const version = this.options.version ?? 1
 
       // Someone signed out here since, so what they wrote goes with them; or the rows' shape changed, and the server's are read again.
-      if (meta !== undefined && meta.cleared !== token)
+      if (meta !== undefined && token !== '' && meta.cleared !== token)
         await this.wipe(tx, true)
       else if (meta !== undefined && meta.version !== version)
         await this.wipe(tx, false)
 
-      tx.objectStore('meta').put({ c, version, cleared: token })
+      this.token = token !== '' ? token : (meta?.cleared ?? '')
+      tx.objectStore('meta').put({ c, version, cleared: this.token })
       await finished(tx)
       await this.reload()
     }
@@ -330,13 +350,27 @@ class Collection<Row extends object, Key extends keyof Row & string> {
       return
     }
 
-    listeners.add(message => void quiet(async () => this.heard(message)))
-    channel ??= listen()
-    addEventListener('online', () => void this.sync())
-    addEventListener('offline', () => this.noticed(true))
-    document.addEventListener('visibilitychange', () => {
+    if (this.ended)
+      return
+
+    const heard = (message: string) => void quiet(async () => this.heard(message))
+    const online = () => void this.sync()
+    const offline = () => this.noticed(true)
+    const visible = () => {
       if (document.visibilityState === 'visible')
         void this.sync()
+    }
+
+    listeners.add(heard)
+    channel ??= listen()
+    addEventListener('online', online)
+    addEventListener('offline', offline)
+    document.addEventListener('visibilitychange', visible)
+    this.disposers.push(() => {
+      listeners.delete(heard)
+      removeEventListener('online', online)
+      removeEventListener('offline', offline)
+      document.removeEventListener('visibilitychange', visible)
     })
 
     void this.run(true)
@@ -354,11 +388,14 @@ class Collection<Row extends object, Key extends keyof Row & string> {
   }
 
   private async heard(message: string): Promise<void> {
+    // Settled elsewhere: a read of the server that began before is older than the queue.
+    this.changes++
+
     if (message === this.c) {
       await this.reload()
     }
     else if (message === 'answered') {
-      await this.sync(false)
+      await this.sync()
     }
   }
 
@@ -426,7 +463,7 @@ class Collection<Row extends object, Key extends keyof Row & string> {
 
     this.changes++
     rows.put({ c: this.c, k, row: op === 'put' ? row : (before?.row ?? row), base: before?.base, gone: op === 'remove' } satisfies RowRecord)
-    tx.objectStore('outbox').add({ c: this.c, id: crypto.randomUUID(), op, k, url: withBase(action.url), headers: sent, body, row, tries: 0 } satisfies Entry)
+    tx.objectStore('outbox').add({ c: this.c, id: crypto.randomUUID(), op, k, url: withBase(action.url), headers: sent, body, row, tries: 0, cleared: this.token } satisfies Entry)
     await finished(tx)
     await this.reload()
     announce(this.c)
@@ -464,7 +501,7 @@ class Collection<Row extends object, Key extends keyof Row & string> {
   }
 
   private async run(refresh: boolean): Promise<void> {
-    if (this.state[0]() === 'unavailable')
+    if (this.ended || this.state[0]() === 'unavailable')
       return
 
     clearTimeout(this.timer)
@@ -549,7 +586,13 @@ class Collection<Row extends object, Key extends keyof Row & string> {
       return undefined
     }
 
+    if (response.status >= 500 && (entry.faults ?? 0) + 1 >= MOST_FAULTS)
+      return { status: response.status, failure: null, body: await response.text() }
+
     if (response.status >= 500 || TRANSIENT.has(response.status)) {
+      if (response.status >= 500)
+        await this.record({ ...entry, faults: (entry.faults ?? 0) + 1 })
+
       this.noticed(true)
 
       return undefined

@@ -40,7 +40,14 @@ async function recall(key: string): Promise<Kept | undefined> {
   if (found !== undefined)
     return found.until > Date.now() ? found : (memory.delete(key), undefined)
 
-  const stored = await appStore()?.cache?.get(key)
+  let stored
+
+  try {
+    stored = await appStore()?.cache?.get(key)
+  }
+  catch {
+    return undefined
+  }
 
   if (stored === undefined || stored.freshUntil <= Date.now())
     return undefined
@@ -112,7 +119,22 @@ async function keep(key: string, response: Response): Promise<Kept | undefined> 
   if (response.status >= 500 || NOT_KEPT.has(response.status) || response.headers.get('content-type')?.startsWith('text/event-stream') === true)
     return undefined
 
-  const kept: Kept = { status: response.status, headers: [...response.headers].filter(([name]) => !SKIPPED_HEADERS.has(name)), body: await response.clone().text(), until: Date.now() + KEPT_MS }
+  const type = response.headers.get('content-type') ?? ''
+
+  // Only text is kept as text; a binary answer runs again.
+  if (type !== '' && !type.startsWith('text/') && !type.includes('json'))
+    return undefined
+
+  let body: string
+
+  try {
+    body = await response.clone().text()
+  }
+  catch {
+    return undefined
+  }
+
+  const kept: Kept = { status: response.status, headers: [...response.headers].filter(([name]) => !SKIPPED_HEADERS.has(name)), body, until: Date.now() + KEPT_MS }
 
   remember(key, kept)
 
