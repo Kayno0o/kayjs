@@ -8,23 +8,24 @@ import { outputDir } from '../build/assets'
 import { environmentWithoutDotenv, PAGES_ENTRY, serverSources } from '../dev/sources'
 import { ENTRY_RECORD, EXECUTABLE_RECORD, MANIFEST } from '../server/client'
 import { START_PARENT } from '../server/parent'
+import { FORWARDED, parseWorkers, platformWorkers, STOPS, superviseWorkers } from '../server/workers'
 import { count, isPort, projectRoot } from './command'
 import { USAGES } from './usages'
-
-// The server runs in a process group of its own, so each of these reaches it once, through `kay start`, whether a terminal sent it to the group or a supervisor to `kay start` alone: a second Ctrl-C stops it mid-drain, as it would run alone.
-// A kill of the group that `kay start` cannot pass on, SIGKILL, leaves the server to notice it is gone, through `START_PARENT`.
-const FORWARDED = ['SIGINT', 'SIGTERM', 'SIGHUP', 'SIGQUIT'] as const
-// The signals asking the server to stop: dying of one `kay start` passed on is a stop, not a failure.
-const STOPS = new Set<string>(['SIGINT', 'SIGTERM', 'SIGHUP'])
 
 // Serves the last build as the deployed server would: the executable `kay build --compile` made, else the server entry, in production.
 export const start: Command = {
   usage: USAGES.start,
-  options: { entry: { type: 'string' }, port: { type: 'string' }, quiet: { type: 'boolean' } },
+  options: { entry: { type: 'string' }, port: { type: 'string' }, workers: { type: 'string' }, quiet: { type: 'boolean' } },
   positionals: 1,
-  run: async ({ values: { entry: option, port, quiet }, positionals: [path] }, refuse) => {
+  run: async ({ values: { entry: option, port, workers, quiet }, positionals: [path] }, refuse) => {
     if (typeof port === 'string' && !isPort(port))
       return refuse(`--port takes a port number, not ${port}`)
+
+    const requested = typeof workers === 'string' ? workers : process.env.KAY_WORKERS
+    const asked = requested === undefined || requested === '' ? 1 : parseWorkers(requested)
+
+    if (asked === undefined)
+      return refuse(`--workers takes a number from 1 to 256, or auto, not ${requested}`)
 
     const root = projectRoot('start', path)
 
@@ -45,6 +46,11 @@ export const start: Command = {
 
     const command = typeof option === 'string' ? [process.execPath, resolve(option)] : await serverCommand(root, output, built.mtimeMs, quiet === true)
     const env = await environmentWithoutDotenv(root)
+    const serving = platformWorkers(asked, 'kay start')
+
+    if (serving > 1)
+      return superviseWorkers({ command, cwd: root, env: { ...env, NODE_ENV: 'production', ...typeof port === 'string' && { PORT: port } }, count: serving, name: 'kay start' })
+
     const forwarded = new Set<string>()
     let server: Bun.Subprocess | undefined
 

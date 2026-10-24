@@ -39,6 +39,7 @@ import { projectSource } from './source'
 import { setupStampSecret, warnOnStampKey } from './stamp'
 import { setupStorage } from './storage'
 import { setTracer } from './trace'
+import { sharedStores } from './workers'
 
 // What the config's refusals that need the scanned project read, handed to the check a server passes before any client build starts.
 export interface Scanned {
@@ -152,7 +153,7 @@ async function setupWith<Claimed>(project: Project, loadClient: () => Promise<Cl
     setupStorage(config.storage, join(imageCache, 'stored'), imageCache)
     setAppRoot(root)
     // An export serves nobody, so it keeps only the database url libraries read and none of the stores: a pgData store would otherwise poll, open its connection and create its tables while the build runs, and a build with no database reachable still ends.
-    setupStore(exporting && config.store ? { database: config.store.database } : config.store)
+    setupStore(await sharedStores(exporting && config.store ? { database: config.store.database } : config.store))
     await liveStoreReady()
     // A test's server restarts with its process and has no replica, so a key of the process is right there.
     warnOnStampKey(!mode.dev && process.env.NODE_ENV !== 'test')

@@ -177,6 +177,13 @@ Then `await welcomeMails.enqueue({ to: email })` in an action, or `enqueue(paylo
 - Requests still open after `shutdownTimeout`, 10 seconds by default, are closed and the process exits with 1.
 - `kay dev` restarts at once instead.
 
+### Several workers
+
+- `kay start --workers 4` (or `auto`, one per core) and `./server --workers 4` (or `KAY_WORKERS=4`) serve from that many Bun processes on the one port, through `reusePort`, with nothing to change in the app. One worker by default; elsewhere than Linux, where `reusePort` does not balance, the flag warns and runs one. kay.config.ts has no key for it.
+- The command running them (`kay start`, or the executable itself, before it loads the app) only supervises: it passes SIGINT, SIGTERM, SIGHUP and SIGQUIT to every worker, each draining as alone, and exits 0 when they all did. A worker that dies unasked is started again after 250 ms, doubling to 5 s while it keeps dying; five deaths in a row without living 10 s stop everything with exit 1. Workers watch it as a server watches `kay start`, and drain once it is gone.
+- What `store` in kay.config.ts leaves out and one process would keep in memory (`cache`, `live`, `rates`, `rooms`, `vitals`, `notifications`, `push`) is kept by kay in `data/workers.sqlite`, shared by the workers: a store you name is never replaced, sessions travel in their cookie and the queue keeps `data/jobs.sqlite`, as before. Like replicas, workers hear each other's live values and room changes within about half a second, and a read-modify-write is not atomic across them.
+- Every worker runs the queue, the schedules and the startup code, a job claimed and a schedule locked once through the store; an `onStart` hook or a module's top-level code runs once per worker. Each worker costs about a server's memory. Set `KAY_SECRET` as for replicas; `KAY_EPHEMERAL_SECRET=1` makes the primary share a made one with its workers.
+
 ### A deploy under open tabs
 
 - Every answer of a production server carries `x-kay-build`, a hash of the names of all the client chunks (the entry, the runtime and every island), which changes with any island's code. A page knows its own build from the `kay-build` meta it was rendered with; `kay dev` sends none.

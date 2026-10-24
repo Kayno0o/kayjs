@@ -101,7 +101,7 @@ export async function compileServer(project: Project, options: CompileOptions): 
   await Bun.write(generated, [
     `import { join } from 'node:path'`,
     `import process from 'node:process'`,
-    `import { buildingWithoutEnv, listenIdleApps, probeHealth, registerBundle } from 'kay/internal/server'`,
+    `import { buildingWithoutEnv, listenIdleApps, probeHealth, registerBundle, runAsPrimary } from 'kay/internal/server'`,
     // An embedded file, read only for `--licenses`, so the server keeps none of it in memory.
     `import notices from ${JSON.stringify(notices)} with { type: 'file' }`,
     '',
@@ -109,6 +109,12 @@ export async function compileServer(project: Project, options: CompileOptions): 
     '  process.stdout.write(await Bun.file(notices).text())',
     '  process.exit(0)',
     '}',
+    '',
+    // With `--workers` or `KAY_WORKERS` asking for several, this process only supervises them, before any module of the app loads.
+    'const primary = await runAsPrimary(process.argv, process.env)',
+    '',
+    'if (primary !== undefined)',
+    '  process.exit(primary)',
     '',
     // For code reading it off `node:process`, as kay does, which the build's `define` leaves alone.
     'Bun.env.NODE_ENV = \'production\'',

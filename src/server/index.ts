@@ -11,6 +11,7 @@ import { bootFailure } from './dev'
 import { recordBootFailure, trackDevErrors } from './dev-errors'
 import { START_PARENT } from './parent'
 import { projectSource } from './source'
+import { shareThePort } from './workers'
 
 export type { ExtensionApp, ExtensionProblem, KayConfig, KayExtension } from '../config'
 export { defineConfig } from '../config'
@@ -75,6 +76,8 @@ export { forgetLocalMirrors } from './writes'
 // Serves every `.kay` page under the routes directory, plus the island bundle when a page needs one.
 // In development a project that fails to boot serves its errors instead, and every page reloads when the server restarts.
 export async function pages(options: PagesOptions = {}) {
+  shareThePort()
+
   const problem = bunProblem()
 
   if (problem !== undefined)

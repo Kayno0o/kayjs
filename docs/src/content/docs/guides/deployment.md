@@ -164,6 +164,14 @@ On SIGTERM, SIGINT or SIGHUP the server stops taking connections, lets open requ
 
 A queue job whose handler ignores its signal is handed back after 3 seconds, or less with a short `shutdownTimeout`, and the rooms store lets go of this replica's members. The server then runs the `onStop` hooks and exits. Requests still open after `shutdownTimeout`, 10 seconds by default, are closed.
 
+## Several workers
+
+One Bun process uses one core. `kay start --workers 4` serves from four, all on the same port, and `--workers auto` takes one per core. The executable takes the same option: `./server --workers 4`, or `KAY_WORKERS=4` in its environment. The default is one worker. The option works on Linux, where the kernel shares connections between processes; elsewhere kay warns and runs one.
+
+You change nothing in the app. What would live in the memory of one process is kept in a SQLite file, `data/workers.sqlite`, that the workers share: cached values, live values, rate limits, presence rooms and the rest. A store you name in `kay.config.ts` is used as it is. Sessions travel in their cookie, and jobs keep `data/jobs.sqlite`. Every worker runs the queue and the schedules, and each job runs once.
+
+The process you start only supervises. A SIGTERM or Ctrl-C reaches every worker, and each one drains as a single server does. A worker that crashes is started again after a short wait, and if they keep dying at boot the whole group stops with exit code 1. Each worker takes about as much memory as one server, so count that before choosing the number. Set `KAY_SECRET` as you would for several replicas.
+
 ## Logs and tracing
 
 With `NODE_ENV=production`, the server's first line says where it listens, the kay version and how many pages the build prerendered. Every request is logged as one line, ending with the id its response carries as `X-Request-Id`.

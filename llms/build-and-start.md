@@ -66,11 +66,12 @@ kay build --static --outdir dist
   - `./server --licenses` prints the licence of every package it carries: the browser build's, and every package the project's `dependencies` install, theirs included.
 - `kay build [dir] --static [--outdir dist]`:
   - The same, then writes the whole site to `--outdir` for a host with no server; see [Static export](prerendering.md#static-export). It refuses `--compile` beside it (pick one), and `--outdir` without it.
-- `kay start [dir] [--entry <file>] [--port <port>]`:
+- `kay start [dir] [--entry <file>] [--port <port>] [--workers <n|auto>]`:
   - Serve the last `kay build` as the deployed server would, with `NODE_ENV=production`: the executable `--compile` wrote when that build made one (a later build without `--compile` drops it; one older than the build warns), else the server entry, else, in a project with none, kay's own server of its pages.
   - It refuses without a build in `.kay/client`, and warns when a file the server or its build reads changed since, naming the latest; env files are left for the server to read as Bun does under `NODE_ENV=production`, `.env.production` and `.env` both, so a value only `.env` holds reaches it, the shell's variables winning.
   - `--entry` runs another entry, relative to the current directory; `--port` sets `PORT`, over the shell's and the env files', 3000 otherwise.
   - Ctrl-C, `SIGTERM` and `SIGHUP` reach the server once, sent to the group or to `kay start` alone, which waits for it to drain, a second Ctrl-C stopping it at once; `SIGQUIT` is passed on and ends it at once (131).
   - The server runs in a process group of its own: Ctrl-Z suspends `kay start` alone, and once `kay start` is gone, as after a `SIGKILL` to the group, a kay server notices within a second and drains as on `SIGTERM`, or stops once booted when it was gone already;
   - It exits with the server's code, 0 when the server ended on a stop signal it passed on, 128 plus the signal's number when it died of another.
+  - `--workers <n|auto>` (or `KAY_WORKERS`) serves from n processes on the one port, `auto` one per core: see [Several workers](production.md#several-workers). The executable takes the same `--workers` or `KAY_WORKERS`.
   - The `start` script `kay new` writes runs it.
