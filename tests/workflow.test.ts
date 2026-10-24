@@ -1,7 +1,9 @@
 import type { JobStore } from '../src/server'
-import { afterEach, describe, expect, it, setSystemTime } from 'bun:test'
+import { afterEach, describe, expect, it, setSystemTime, spyOn } from 'bun:test'
+import { parse } from 'devalue'
 import { workflow as makeWorkflow, memoryJobs } from '../src/server'
 import { forgetQueue } from '../src/server/queue'
+import { INBOX_LIMIT } from '../src/server/workflow'
 import { cleanUpAfterFile, kinds } from './job-stores'
 
 cleanUpAfterFile()
@@ -221,6 +223,27 @@ describe.each(kinds)('a workflow on a $name store', ({ open }) => {
     expect(calls).toEqual([])
   })
 
+  it('keeps at most the last events no wait named, dropping the oldest and logging it', async () => {
+    const warn = spyOn(console, 'warn').mockImplementation(noop)
+    const store = await open()
+    const name = named()
+    const flow = workflow<undefined, { other: number, go: number }>(name, async ({ step }) => {
+      await step.waitFor('go')
+    }, { store })
+    const id = await flow.start()
+
+    for (let sent = 0; sent < INBOX_LIMIT + 3; sent++)
+      expect(await flow.send(id, 'other', sent)).toBe(true)
+
+    const [kept] = await store.jobs!(`workflow:${name}`)
+    const { inbox } = parse(kept!.payload) as { inbox: { data: number }[] }
+
+    expect(inbox).toHaveLength(INBOX_LIMIT)
+    expect(inbox[0]!.data).toBe(3)
+    expect(warn.mock.calls.flat().join(' ')).toContain('was dropped')
+    warn.mockRestore()
+  })
+
   it('times a wait out, and an event after that is dropped', async () => {
     const store = await open()
     const got: unknown[] = []
@@ -342,10 +365,10 @@ describe.each(kinds)('a workflow on a $name store', ({ open }) => {
     const failures: string[] = []
     const after = workflow<undefined>(name, async ({ step }) => {
       await step.run('renamed', () => undefined)
-    }, { store, attempts: 1, onFailed: ({ error }) => void failures.push((error as Error).message) })
+    }, { store, onFailed: ({ error }) => void failures.push((error as Error).message) })
 
     later(2 * MINUTE * 60)
-    await after.drain()
+    expect(await after.drain()).toBe(1)
     expect(failures[0]).toContain('changed under a run')
     expect(await after.status(id)).toMatchObject({ status: 'failed' })
   })

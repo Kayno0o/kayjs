@@ -4,7 +4,8 @@ import type { JobContext, JobStore, QueueOptions } from './queue'
 import { parse, stringify } from 'devalue'
 import { KayError } from '../compiler/errors'
 import { durationSeconds } from '../runtime/duration'
-import { claimHolds, defaultJobStore, handedBack, queue, wakeQueue } from './queue'
+import { kayLog } from '../runtime/log'
+import { claimHolds, defaultJobStore, GiveUp, handedBack, queue, wakeQueue } from './queue'
 
 type Events = Record<string, unknown>
 
@@ -83,6 +84,9 @@ interface Payload<Input> {
 
 const noop = () => undefined
 const RELEASE_TRIES = 3
+
+// Events kept for a wait that does not name them yet, per run: past it the oldest is dropped.
+export const INBOX_LIMIT = 50
 
 // A wait without timeout is due never: the last instant a Date holds.
 const NEVER = 8.64e15
@@ -165,7 +169,7 @@ export function workflow<Input = undefined, Known extends Events = Events>(name:
       const seen = memo[slot]
 
       if (seen && (seen.kind !== kind || seen.name !== label))
-        throw new Error(`kay: workflow('${name}') changed under a run: its step ${slot + 1} was ${seen.kind === 'run' ? `'${seen.name}'` : seen.kind}, now ${kind === 'run' ? `'${label}'` : kind}; finish or cancel the runs started before such a change`)
+        throw new GiveUp(`kay: workflow('${name}') changed under a run: its step ${slot + 1} was ${seen.kind === 'run' ? `'${seen.name}'` : seen.kind}, now ${kind === 'run' ? `'${label}'` : kind}; finish or cancel the runs started before such a change`)
 
       return { slot, seen }
     }
@@ -296,8 +300,17 @@ export function workflow<Input = undefined, Known extends Events = Events>(name:
       const now = Date.now()
 
       // A run not waiting for it yet keeps the event for the wait that names it.
-      if (run.payload.waiting?.event !== event)
-        return update(run.job.id, { payload: stringify({ ...run.payload, inbox: [...run.payload.inbox ?? [], { event, data }] }) }, { payload: run.job.payload, now })
+      if (run.payload.waiting?.event !== event) {
+        const inbox = [...run.payload.inbox ?? [], { event, data }]
+
+        if (inbox.length > INBOX_LIMIT) {
+          const [dropped] = inbox.splice(0, inbox.length - INBOX_LIMIT)
+
+          kayLog('warn', `workflow('${name}') run '${id}' kept more than ${INBOX_LIMIT} events no wait named: the oldest, '${dropped!.event}', was dropped`)
+        }
+
+        return update(run.job.id, { payload: stringify({ ...run.payload, inbox }) }, { payload: run.job.payload, now })
+      }
 
       const memo: Entry[] = [...run.payload.memo, { kind: 'wait', name: event, value: { timedOut: false, data } satisfies WaitResult<unknown> }]
       const woken = await update(run.job.id, { payload: stringify({ ...run.payload, memo, waiting: undefined }), runAt: now }, { payload: run.job.payload, now })

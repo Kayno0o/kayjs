@@ -276,11 +276,11 @@ await onboarding.send(userId, 'visited')
 
 The run is a job of the queue `workflow:onboarding` in the same store as your queues: memory, SQLite or Postgres, shared by every process. Its results are kept in that job after each step, so after a restart the run goes on at the first step with no result. A stop hands the run back at once. A process that died holds it until `lostAfter`, 10 minutes by default.
 
-The function runs again from its top each time the run is taken, and a finished step returns its kept result, so what lies between steps must give the same answer every time. Await each step before the next. Renaming or reordering steps under a run that is waiting fails that run with an error naming the step. Results go through devalue, as a queue's payload does.
+The function runs again from its top each time the run is taken, and a finished step returns its kept result, so what lies between steps must give the same answer every time. Await each step before the next. Renaming or reordering steps under a run that is waiting fails that run at once, with an error naming the step. Results go through devalue, as a queue's payload does.
 
 `step.sleep('3d')` and `step.waitFor` hold no process: the run waits in the store and the code after them runs in whichever process takes the run. `waitFor(event)` resolves with the event's data. With a `timeout` it resolves with `{ timedOut: false, data }` or `{ timedOut: true }`.
 
-`send(id, event, data)` resolves with whether the run took the event. A run that is not waiting for it yet keeps it for the wait that names it, so `start` followed by `send` works. An event sent while a step is running is dropped. `status(id)` tells whether a run is `running`, `sleeping`, `waiting` or `failed`, and `cancel(id)` ends it.
+`send(id, event, data)` resolves with whether the run took the event. A run that is not waiting for it yet keeps it for the wait that names it, so `start` followed by `send` works. It keeps 50 such events, dropping and logging the oldest. An event sent while a step is running is dropped. `status(id)` tells whether a run is `running`, `sleeping`, `waiting` or `failed`, and `cancel(id)` ends it.
 
 A step that throws is retried with the queue's `attempts` and `backoff`, and the steps done before it do not run again. A step finishing starts the count of attempts again. A stop ends the run before its next step starts, so the process taking over never runs a step beside the first.
 
