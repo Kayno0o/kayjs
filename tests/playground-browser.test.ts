@@ -215,6 +215,24 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the docs p
     expect(await page.count('.playground-error')).toBe(0)
   }, 60_000)
 
+  it('keeps a frame that answers while the page itself is busy past the limit', async () => {
+    await page.goto('/getting-started/playground')
+    await page.waitFor('.playground-result[aria-busy="false"]')
+    await page.fill('.playground-input textarea', '---\n---\np Steady\n')
+    await page.waitUntil(() => document.querySelector('.playground-frame')?.getAttribute('data-test-live') === 'Steady', { timeout: '15s' })
+    await page.evaluate(() => {
+      const end = Date.now() + 3600
+
+      while (Date.now() < end) {
+        // The page's main thread is busy while the frame is not.
+      }
+    })
+    await Bun.sleep(2500)
+    expect(await page.count('.playground-error')).toBe(0)
+    await page.fill('.playground-input textarea', '---\n---\np Still here\n')
+    await page.waitUntil(() => document.querySelector('.playground-frame')?.getAttribute('data-test-live') === 'Still here', { timeout: '15s' })
+  }, 60_000)
+
   it('resets a box whose code answers first and blocks later', async () => {
     await page.fill('.playground-input textarea', LATE)
     await page.waitUntil(() => document.querySelector('.playground-frame')?.getAttribute('data-test-live') === 'fine', { timeout: '15s' })

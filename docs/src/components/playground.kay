@@ -34,6 +34,7 @@ let sent = 0
 let monitor: ReturnType<typeof setInterval> | undefined
 let revive: ReturnType<typeof setTimeout> | undefined
 let lastHeard = 0
+let overdue = false
 
 // The frame runs the code: this page only reads text, so nothing a visitor types runs with the docs' origin. A frame that has not loaded drops the message and says it is ready when it has, which sends it again.
 function send() {
@@ -76,10 +77,18 @@ function watch() {
   if (!ready() || document.hidden || !frame?.contentWindow)
     return
 
+  // A page task that ran long may fire this timer before the queued replies are handled, so silence is judged on the second overdue tick in a row.
   if (performance.now() - lastHeard > RUN_LIMIT_MS) {
-    stuck()
+    if (overdue) {
+      stuck()
 
-    return
+      return
+    }
+
+    overdue = true
+  }
+  else {
+    overdue = false
   }
 
   frame.contentWindow.postMessage({ ping: true }, '*')
