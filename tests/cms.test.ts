@@ -851,9 +851,14 @@ describe('the collections a CMS edits', () => {
       noteEditedEntries(request, [{ collection: 'news', slug: 'shared' }])
       expect(JSON.parse(cache.get(key)!.text)).toContain('news\0shared')
 
-      // Another worker holds nothing in memory: the row the first wrote is its only source.
+      // A page of this editor another worker rendered is in the row, and this worker also holds a session of its own for the cookie.
       cache.set(key, JSON.stringify(['news\0elsewhere']), Date.now() + 60_000)
+      expect(editedEntry(new Request('http://localhost/', { headers: { cookie: edit } }), 'news', 'elsewhere')).toBe(true)
       expect(editedEntry(new Request('http://localhost/', { headers: { cookie: edit } }), 'news', 'shared')).toBe(true)
+
+      // Noting a page keeps what the other worker shared.
+      noteEditedEntries(request, [{ collection: 'news', slug: 'later' }])
+      expect((JSON.parse(cache.get(key)!.text) as string[]).toSorted()).toEqual(['news\0alone', 'news\0elsewhere', 'news\0later', 'news\0shared'].toSorted())
 
       const other = await previewCookie(previewUrl('/news', { edit: true }))
       const otherKey = `kay:edit-session:${other.slice('kay_preview='.length)}`

@@ -290,20 +290,40 @@ function sharedEditStore() {
   return workerCount() > 1 ? appStore()?.cache : undefined
 }
 
-function shareEditSession(cookie: string, session: EditSession): void {
-  const cache = sharedEditStore()
-
-  if (cache !== undefined)
-    void cache.set(EDIT_KEY + cookie, JSON.stringify([...session.entries]), session.until * 1000)
-}
-
-function sharedEditedEntry(cookie: string, key: string): boolean {
+// What the workers' shared row holds for an edit cookie: the entries the pages rendered by any of them read.
+function sharedEntries(cookie: string): string[] {
   const stored = sharedEditStore()?.get(EDIT_KEY + cookie)
 
   if (stored === undefined || stored instanceof Promise || stored.freshUntil <= Date.now())
-    return false
+    return []
 
-  return (JSON.parse(stored.text) as string[]).includes(key)
+  try {
+    return (JSON.parse(stored.text) as string[])
+  }
+  catch {
+    return []
+  }
+}
+
+// Written with the entries another worker already shared, so two workers rendering pages for one editor do not replace each other's.
+function shareEditSession(cookie: string, session: EditSession): void {
+  const cache = sharedEditStore()
+
+  if (cache === undefined)
+    return
+
+  const entries = new Set([...sharedEntries(cookie), ...session.entries])
+  const written = cache.set(EDIT_KEY + cookie, JSON.stringify([...entries]), session.until * 1000)
+
+  if (written instanceof Promise)
+    void settled(written)
+}
+
+async function settled(work: Promise<void>): Promise<void> {
+  try {
+    await work
+  }
+  catch {}
 }
 
 function entryKey(collection: string, slug: string): string {
@@ -315,10 +335,13 @@ export function editedEntry(request: Request, collection: string, slug: string):
   const cookie = editCookie(request)
   const session = cookie === undefined ? undefined : editSessions.get(cookie)
 
-  if (session !== undefined)
-    return session.until > Date.now() / 1000 && session.entries.has(entryKey(collection, slug))
+  const key = entryKey(collection, slug)
 
-  return cookie !== undefined && sharedEditedEntry(cookie, entryKey(collection, slug))
+  if (session !== undefined && session.until > Date.now() / 1000 && session.entries.has(key))
+    return true
+
+  // A page of the same editor may have been rendered by another worker.
+  return cookie !== undefined && sharedEntries(cookie).includes(key)
 }
 
 // The valid edit cookie of the request in edit mode, which names its edit session and is tied to no user: a CMS keeps what it learns of a person against it.
