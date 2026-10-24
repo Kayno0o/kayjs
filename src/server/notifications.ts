@@ -4,6 +4,8 @@ import { durationSeconds } from '../runtime/duration'
 import { kayLog } from '../runtime/log'
 import { openSqlite } from '../runtime/sqlite.server'
 import { appStore } from './app-store'
+import { pushAlongside } from './push-settings'
+import { pushStore } from './push-store'
 import { onReload } from './reload'
 
 // One notification of a person's inbox, newest first in a list.
@@ -53,6 +55,8 @@ export interface NotifyOptions {
   url?: string | undefined
   // How long it is kept, `'90d'` by default.
   keep?: Duration | undefined
+  // `false` keeps the notification in the inbox alone, without the push a person who opted in would get with `push()` listed.
+  push?: boolean | undefined
 }
 
 export const MAX_TITLE = 200
@@ -265,7 +269,7 @@ function changed(user: string): void {
 
 // Puts a notification in a person's inbox, which the `Bell` of kayjs-ui shows with its unread count and updates in every open tab. `user` is the id kayjs-auth, or whatever names the request's user, gives.
 // The store is the app's `store.notifications`, which `sqliteData` and `pgData` fill; with none it is this process's memory. A notification is dropped after `keep`, 90 days by default.
-export async function notify(user: string, { title, url, keep = DEFAULT_KEEP }: NotifyOptions): Promise<Notification> {
+export async function notify(user: string, { title, url, keep = DEFAULT_KEEP, push }: NotifyOptions): Promise<Notification> {
   const id = checkedUser(user)
   const text = typeof title === 'string' ? title.replaceAll('\0', '').trim() : ''
 
@@ -282,6 +286,9 @@ export async function notify(user: string, { title, url, keep = DEFAULT_KEEP }: 
 
   await notificationStore().add(id, note, MOST_PER_USER)
   changed(id)
+
+  if (push !== false)
+    pushAlongside(id, { title: text, url: link })
 
   return { id: note.id, title: note.title, ...link === undefined ? {} : { url: link }, at, read: false }
 }
@@ -328,9 +335,11 @@ export const notifications = {
 
     return count
   },
-  // Deletes every notification of a person, for the function that erases them on request: [Privacy](privacy.md).
+  // Deletes every notification of a person, and the devices they subscribed to push, for the function that erases them on request: [Privacy](privacy.md).
   async erase(user: string): Promise<number> {
     const count = await notificationStore().erase(checkedUser(user))
+
+    await pushStore().erase(user)
 
     changed(user)
 

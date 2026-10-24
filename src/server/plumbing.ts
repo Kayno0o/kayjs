@@ -8,6 +8,7 @@ import { ANALYTICS_PATH, ANALYTICS_SCRIPT_PATH, CUSTOM_COLLECT_PATH, CUSTOM_SCRI
 import { PUBLIC_ENV_PATH } from './env-state'
 import { ERROR_REPORTS } from './errors'
 import { PREVIEW_ROUTE } from './preview'
+import { PUSH_KEY_PATH, PUSH_SUBSCRIBE_PATH, PUSH_UNSUBSCRIBE_PATH } from './push-settings'
 import { CSP_REPORTS } from './violations'
 import { VITALS_PATH, VITALS_SCRIPT_PATH } from './vitals'
 
@@ -69,6 +70,9 @@ const KNOWN: Known[] = [
   { method: 'POST', path: CUSTOM_COLLECT_PATH, purpose: 'the custom tracker\'s data, passed on', docs: '/llms/analytics', when: mounted('POST', CUSTOM_COLLECT_PATH) },
   { method: 'GET', path: VITALS_SCRIPT_PATH, purpose: 'the Web Vitals beacon, served from the app', docs: '/llms/analytics', when: mounted('GET', VITALS_SCRIPT_PATH) },
   { method: 'POST', path: VITALS_PATH, purpose: 'the Web Vitals of a view, kept per route', docs: '/llms/analytics', when: mounted('POST', VITALS_PATH) },
+  { method: 'GET', path: PUSH_KEY_PATH, purpose: 'the public key a browser subscribes to push with', docs: '/llms/notifications', when: mounted('GET', PUSH_KEY_PATH) },
+  { method: 'POST', path: PUSH_SUBSCRIBE_PATH, purpose: 'a signed-in visitor opting in to push', docs: '/llms/notifications', when: mounted('POST', PUSH_SUBSCRIBE_PATH) },
+  { method: 'POST', path: PUSH_UNSUBSCRIBE_PATH, purpose: 'a signed-in visitor opting out of push', docs: '/llms/notifications', when: mounted('POST', PUSH_UNSUBSCRIBE_PATH) },
   { method: 'GET', path: NOTICES, purpose: 'the licences of the code the browser build bundles', docs: '/llms/build-and-start', when: (_, files) => files.includes(NOTICES) },
 ]
 

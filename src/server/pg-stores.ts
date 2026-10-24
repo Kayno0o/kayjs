@@ -1,6 +1,7 @@
 import type { RateStore } from '../runtime/action'
 import type { Notification, NotificationStore } from './notifications'
 import type { PgHandle } from './pg-data'
+import type { PushStore } from './push-store'
 import type { DeletableSessionStore, SessionData } from './session'
 import type { VitalCount, VitalReading, VitalsStore } from './vitals-store'
 import { parse, stringify } from 'devalue'
@@ -259,4 +260,35 @@ export function pgNotifications(pg: PgHandle): NotificationStore {
       return counted('DELETE FROM kay_notifications WHERE expires <= $1::bigint', [now])
     },
   }, 'the notifications store', { ready: pg.db, slow: ['prune'] })
+}
+
+// Push subscriptions in Postgres, one row each by endpoint, so replicas share them.
+export function pgPush(pg: PgHandle): PushStore {
+  const counted = async (text: string, values: (string | number)[]) => {
+    const db = await pg.db()
+    const [row] = await query<{ count: string }>(db, `WITH changed AS (${text} RETURNING 1) SELECT count(*)::text AS count FROM changed`, values)
+
+    return Number(row?.count ?? 0)
+  }
+
+  return limitedStore({
+    async add(user, subscription, most) {
+      const db = await pg.db()
+
+      await query(db, 'INSERT INTO kay_push_subscriptions (endpoint, user_id, p256dh, auth, at) VALUES ($1, $2, $3, $4, $5::bigint) ON CONFLICT (endpoint) DO UPDATE SET user_id = EXCLUDED.user_id, p256dh = EXCLUDED.p256dh, auth = EXCLUDED.auth, at = EXCLUDED.at', [subscription.endpoint, user, subscription.p256dh, subscription.auth, subscription.at])
+      await query(db, 'DELETE FROM kay_push_subscriptions WHERE user_id = $1 AND endpoint NOT IN (SELECT endpoint FROM kay_push_subscriptions WHERE user_id = $1 ORDER BY at DESC LIMIT $2::integer)', [user, most])
+    },
+    async list(user) {
+      const db = await pg.db()
+      const rows = await query<{ endpoint: string, p256dh: string, auth: string, at: string }>(db, 'SELECT endpoint, p256dh, auth, at::text FROM kay_push_subscriptions WHERE user_id = $1 ORDER BY at DESC', [user])
+
+      return rows.map(row => ({ ...row, at: Number(row.at) }))
+    },
+    async remove(endpoint, user) {
+      return await (user === undefined ? counted('DELETE FROM kay_push_subscriptions WHERE endpoint = $1', [endpoint]) : counted('DELETE FROM kay_push_subscriptions WHERE endpoint = $1 AND user_id = $2', [endpoint, user])) > 0
+    },
+    async erase(user) {
+      return counted('DELETE FROM kay_push_subscriptions WHERE user_id = $1', [user])
+    },
+  }, 'the push subscriptions store', { ready: pg.db })
 }

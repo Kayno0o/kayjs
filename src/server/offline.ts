@@ -183,6 +183,49 @@ async function page(request, url) {
 }
 `
 
+// What `push()` adds to the worker: draws the notification a push carries and, on a click, focuses the tab already on its link or opens one. A path of the site goes under the base the worker is served from.
+const PUSH_WORKER = `
+self.addEventListener('push', (event) => {
+  let data = {}
+
+  try {
+    data = event.data ? event.data.json() : {}
+  }
+  catch {}
+
+  event.waitUntil(self.registration.showNotification(typeof data.title === 'string' && data.title !== '' ? data.title : location.hostname, {
+    body: typeof data.body === 'string' ? data.body : undefined,
+    tag: typeof data.tag === 'string' ? data.tag : undefined,
+    icon: typeof data.icon === 'string' ? linkOf(data.icon) : undefined,
+    data: { url: typeof data.url === 'string' ? linkOf(data.url) : linkOf('/') },
+  }))
+})
+
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close()
+
+  event.waitUntil((async () => {
+    const target = event.notification.data && event.notification.data.url
+
+    if (typeof target !== 'string')
+      return
+
+    for (const client of await self.clients.matchAll({ type: 'window', includeUncontrolled: true })) {
+      if (client.url === target && 'focus' in client)
+        return client.focus()
+    }
+
+    await self.clients.openWindow(target)
+  })())
+})
+
+function linkOf(link) {
+  const url = new URL(link.startsWith('/') ? KAY.base + link : link, location.origin)
+
+  return url.protocol === 'https:' || url.protocol === 'http:' ? url.href : location.origin + KAY.base + '/'
+}
+`
+
 const UNREGISTER = `self.addEventListener('install', () => self.skipWaiting())
 self.addEventListener('activate', (event) => {
   event.waitUntil((async () => {
@@ -213,16 +256,21 @@ export interface ServiceWorkerOptions {
   locales?: I18n | undefined
   // The prerendered pages of routes no guard covers, which every visitor gets alike, by path.
   publicPages: string[]
+  // Set by `push()`: the worker also shows pushes and opens their link on a click, and is served even without `offline`, in development too.
+  push?: boolean | undefined
 }
 
 const registerScripts = new Map<string, string>()
 
-// What every page carries with `offline` on, registering the worker once the page has loaded.
-export function registerScript(base: string): string {
-  let script = registerScripts.get(base)
+const INSTALL_OFFER = `addEventListener("beforeinstallprompt",function(e){e.preventDefault();window.$kayInstall=e;dispatchEvent(new Event("kay:install"))});addEventListener("appinstalled",function(){window.$kayInstall=null;dispatchEvent(new Event("kay:install"))});`
+
+// What every page carries with `offline` or `push()` on: registers the worker once the page has loaded. With `install`, which `push()` sets, it also keeps the browser's install offer for `installPrompt` of kay, as it comes before an island hydrates (and holding it hides the browser's own prompt).
+export function registerScript(base: string, install = false): string {
+  const key = `${install ? '1' : '0'}${base}`
+  let script = registerScripts.get(key)
 
   if (script === undefined)
-    registerScripts.set(base, script = `<script>if("serviceWorker"in navigator)addEventListener("load",function(){navigator.serviceWorker.register(${JSON.stringify(`${base}${SERVICE_WORKER}`)})})</script>`)
+    registerScripts.set(key, script = `<script>${install ? INSTALL_OFFER : ''}if("serviceWorker"in navigator)addEventListener("load",function(){navigator.serviceWorker.register(${JSON.stringify(`${base}${SERVICE_WORKER}`)})})</script>`)
 
   return script
 }
@@ -232,10 +280,17 @@ export async function serveServiceWorker(app: Elysia, served: ServedPaths, optio
   if (!served.offer({ path: SERVICE_WORKER, owner: 'the service worker', kind: 'kay', exported: true }))
     return
 
-  const script = options.offline !== undefined ? await workerScript(options, options.offline) : UNREGISTER
+  const script = await scriptFor(options)
   const reply = fixedReply(script, { 'content-type': 'text/javascript; charset=utf-8', 'cache-control': 'no-cache' })
 
   app.get(SERVICE_WORKER, async ({ request }) => reply(request))
+}
+
+async function scriptFor(options: ServiceWorkerOptions): Promise<string> {
+  if (options.offline !== undefined)
+    return workerScript(options, options.offline)
+
+  return options.push === true ? pushOnlyScript(options.base) : UNREGISTER
 }
 
 // A font file of a face with several subsets is kept ahead only when a character of the pages kept falls in its `unicode-range`; the others are kept as a visit loads them.
@@ -279,6 +334,11 @@ async function unusedSubsets(client: ClientBuild, pages: (string | undefined)[])
   }
 
   return unused
+}
+
+// The worker of a site with `push()` and no `offline`: no fetch handler, so it keeps nothing and a stale page is never served.
+function pushOnlyScript(base: string): string {
+  return `const KAY = ${JSON.stringify({ base })}\nself.addEventListener('install', () => self.skipWaiting())\nself.addEventListener('activate', event => event.waitUntil(self.clients.claim()))\n${PUSH_WORKER}`
 }
 
 async function workerScript(options: ServiceWorkerOptions, offline: true | OfflineConfig): Promise<string> {
@@ -332,9 +392,10 @@ async function workerScript(options: ServiceWorkerOptions, offline: true | Offli
     network: [`${base}${ASSET_PREFIX}`, `${base}${apiPath}/`],
     api: `${base}${apiPath}`,
     offline: offlinePage(options),
+    ...options.push === true && { base },
   }
 
-  return `const KAY = ${JSON.stringify(settings)}\n${WORKER}`
+  return `const KAY = ${JSON.stringify(settings)}\n${WORKER}${options.push === true ? PUSH_WORKER : ''}`
 }
 
 // The page a visitor offline gets for one that was not kept, in the site's default locale: the worker is one script for every visitor, so it cannot follow theirs.

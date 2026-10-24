@@ -164,6 +164,8 @@ export interface RenderOptions {
   serverTiming?: boolean | undefined
   // Registers the service worker `offline` turns on.
   offline?: boolean | undefined
+  // Also keeps the browser's install offer, which `push()` turns on.
+  installOffer?: boolean | undefined
   // Whether pages load the whole stylesheet after paint, so no class lacks its rule.
   lateStyles?: boolean | undefined
   // `false` leaves a French page's spaces as they were typed.
@@ -1048,7 +1050,7 @@ function documentOf(files: string[], modules: PageModule[], data: Record<string,
   const islandData = (hasIslands || (checked !== '' && words.size > 0) ? messagesScript(words, true, hasIslands && lang !== state?.locale) : '') + (hasIslands ? outcomeScript(rendering.carried()) + queryScript(rules) : '') + liveText
   const opening = `${htmlOpen(lang, head.root)}<head>${headStart(head)}`
   const sheets = stylesheets(client, styled)
-  const closing = `${headHtml}${scripts}${islandData}${kayMetas(options, hasIslands)}${newTabRule(markup, hasIslands || streamed, options.sameTabLinks === true)}${shipsEntry && client.build !== undefined ? `<meta name="${BUILD_META}" content="${client.build}">` : ''}${speculationRules(options.prefetch, options.base, options.apiPath)}${rendering.guarded === true ? GUARDED_META : ''}${client.navigation === true && !shipsEntry ? historyScript : ''}${options.offline ? registerScript(options.base ?? '') : ''}${options.dev && options.devTools ? devScripts(client, styled, options.lateStyles === true) + (options.prerendering ? '' : requestBlock(files, rendering, options.base ?? '')) : ''}</head><body>${body}`
+  const closing = `${headHtml}${scripts}${islandData}${kayMetas(options, hasIslands)}${newTabRule(markup, hasIslands || streamed, options.sameTabLinks === true)}${shipsEntry && client.build !== undefined ? `<meta name="${BUILD_META}" content="${client.build}">` : ''}${speculationRules(options.prefetch, options.base, options.apiPath)}${rendering.guarded === true ? GUARDED_META : ''}${client.navigation === true && !shipsEntry ? historyScript : ''}${options.offline ? registerScript(options.base ?? '', options.installOffer === true) : ''}${options.dev && options.devTools ? devScripts(client, styled, options.lateStyles === true) + (options.prerendering ? '' : requestBlock(files, rendering, options.base ?? '')) : ''}</head><body>${body}`
   const written = opening + sheets + closing
   const start = marks === undefined ? written : placeFieldMarks(written, marks)
 

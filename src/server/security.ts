@@ -2,7 +2,7 @@ import type { Context } from 'elysia'
 import type { KayConfig, SecurityConfig } from '../config'
 import type { PageSecurity } from '../runtime'
 import type { Prefetch } from './speculation'
-import { offlineOf } from '../project'
+import { pushListed, registersWorker } from '../project'
 import { BUILD_HEADER } from '../runtime/swap'
 import { basePath } from './base'
 import { inlineScriptHashes, sourceHash } from './csp'
@@ -18,6 +18,7 @@ export interface SecurityOptions {
   site?: string | undefined
   base?: string | undefined
   offline?: KayConfig['offline'] | undefined
+  extensions?: KayConfig['extensions'] | undefined
   lateStyles?: KayConfig['lateStyles'] | undefined
   // The sources the islands need, added to kay's directives and the app's own: see ClientManifest.
   islands?: Record<string, string[]> | undefined
@@ -92,7 +93,7 @@ export function securityHeaders(options: SecurityOptions, pages: PageSecurity[] 
 
   const { csp, reports, reportOnly } = options.security ?? {}
   const base = basePath(options.base)
-  const hashes = [...inlineScriptHashes({ prefetch: options.prefetch, apiPath: options.apiPath, dev: options.dev, base, offline: offlineOf(options, { dev: options.dev === true }), lateStyles: options.lateStyles }), ...(options.scripts ?? []).map(sourceHash)]
+  const hashes = [...inlineScriptHashes({ prefetch: options.prefetch, apiPath: options.apiPath, dev: options.dev, base, offline: registersWorker(options, { dev: options.dev === true }), installOffer: pushListed(options), lateStyles: options.lateStyles }), ...(options.scripts ?? []).map(sourceHash)]
   const styles = [...new Set((options.styles ?? []).map(sourceHash))]
   const reportTo = reports === true ? `${base}${CSP_REPORTS}` : reports
 

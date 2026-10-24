@@ -25,6 +25,7 @@ export const KAY_VALUES: readonly string[] = [
   'followLog',
   'guard',
   'guardLeave',
+  'installPrompt',
   'linked',
   'listen',
   'live',
@@ -61,5 +62,6 @@ export const KAY_VALUES: readonly string[] = [
   'uid',
   'untrack',
   'watch',
+  'webPush',
   'withBase',
 ]

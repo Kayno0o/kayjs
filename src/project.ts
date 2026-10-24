@@ -120,7 +120,17 @@ export function offlineOf(config: Pick<KayConfig, 'offline'>, mode: Pick<Mode, '
   return config.offline !== undefined && config.offline !== false && !mode.dev
 }
 
-type RenderConfig = Pick<KayConfig, 'lang' | 'serverTiming' | 'prefetch' | 'saveData' | 'links' | 'onError' | 'base' | 'apiPath' | 'images' | 'offline' | 'lateStyles' | 'typography'>
+// Whether the config lists `push()`, whose worker handles pushes and is registered in every mode.
+export function pushListed(config: Pick<KayConfig, 'extensions'>): boolean {
+  return config.extensions?.some(extension => extension.name === 'kay/push') === true
+}
+
+// Whether pages register kay's service worker: `offlineOf`, or a site with `push()`.
+export function registersWorker(config: Pick<KayConfig, 'offline' | 'extensions'>, mode: Pick<Mode, 'dev'>): boolean {
+  return offlineOf(config, mode) || pushListed(config)
+}
+
+type RenderConfig = Pick<KayConfig, 'lang' | 'serverTiming' | 'prefetch' | 'saveData' | 'links' | 'onError' | 'base' | 'apiPath' | 'images' | 'offline' | 'extensions' | 'lateStyles' | 'typography'>
 
 // `images.widths` sorted, or undefined for the default ladder, which the islands need not be told.
 function customWidths(widths: number[] | undefined): number[] | undefined {
@@ -134,7 +144,7 @@ function customWidths(widths: number[] | undefined): number[] | undefined {
 
 // How every page renders, served or prerendered alike.
 export function renderOptionsOf(config: RenderConfig, mode: Pick<Mode, 'dev' | 'devRoutes'>, built: { head: SeoHead | undefined, maxDensity: number, editor?: string | undefined, contexts?: string[] | undefined, fontCss?: string | undefined, islandPreloads?: RenderOptions['islandPreloads'] }): RenderOptions {
-  return { lang: config.lang, dev: mode.dev, devTools: mode.devRoutes, serverTiming: config.serverTiming ?? mode.dev, prefetch: config.prefetch, saveData: config.saveData, sameTabLinks: config.links?.outside === 'same-tab', fontCss: config.saveData === false ? undefined : built.fontCss, islandPreloads: config.saveData === false ? undefined : built.islandPreloads, onError: config.onError, head: built.head, base: basePath(config.base), apiPath: config.apiPath, maxDensity: built.maxDensity, imageWidths: customWidths(config.images?.widths), resolvedImages: config.images?.resolve !== undefined, offline: offlineOf(config, mode), lateStyles: config.lateStyles, typography: config.typography, editor: built.editor, contexts: built.contexts }
+  return { lang: config.lang, dev: mode.dev, devTools: mode.devRoutes, serverTiming: config.serverTiming ?? mode.dev, prefetch: config.prefetch, saveData: config.saveData, sameTabLinks: config.links?.outside === 'same-tab', fontCss: config.saveData === false ? undefined : built.fontCss, islandPreloads: config.saveData === false ? undefined : built.islandPreloads, onError: config.onError, head: built.head, base: basePath(config.base), apiPath: config.apiPath, maxDensity: built.maxDensity, imageWidths: customWidths(config.images?.widths), resolvedImages: config.images?.resolve !== undefined, offline: registersWorker(config, mode), installOffer: pushListed(config), lateStyles: config.lateStyles, typography: config.typography, editor: built.editor, contexts: built.contexts }
 }
 
 // A project as every entry point takes it: where it is, its config, where it keeps each part and how it runs.

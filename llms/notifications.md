@@ -1,6 +1,6 @@
 # In-app notifications
 
-A signed-in user's inbox: `notify(userId, ...)` on the server stores a notification, and the Bell of kayjs-ui shows the unread count and the list, updated in every open tab. Not mail, push or a toast: those have their own pages.
+A signed-in user's inbox: `notify(userId, ...)` on the server stores a notification, and the Bell of kayjs-ui shows the unread count and the list, updated in every open tab. Not mail or a toast: those have their own pages. A person who opted in also gets it as a web push, below.
 
 ## Common tasks
 
@@ -64,6 +64,40 @@ await notifications.markAllRead(userId)
 await notifications.erase(userId)
 ```
 
+### Push to a person's devices
+
+`push()` in the extensions turns on web push: kay keeps the subscriptions in the app's store, signs and encrypts each push, and adds the `push` and `notificationclick` handlers to its service worker, which it serves and registers on every page with or without `offline`. A person who subscribed gets every `notify()` as a push too, with no second call; `push: false` in its options keeps one in the inbox alone:
+
+```ts
+// kay.config.ts
+import { defineConfig, push } from 'kay/server'
+
+export default defineConfig({ extensions: [push({ subject: 'mailto:ops@example.com' })] })
+```
+
+`kay push keys` prints `VAPID_PUBLIC_KEY` and `VAPID_PRIVATE_KEY` for the production environment (`kay env` lists them as required there); outside production a pair is generated once into `.kay/vapid.json`. `subject` is the contact push services reach you by, the https origin of `SITE_URL` when left out. List `push()` after the library that names the signed-in user (kayjs-auth), as the Bell needs.
+
+`sendPush` sends a push alone, whatever the inbox holds:
+
+```ts
+import { sendPush } from 'kay/server'
+
+const { sent, dropped, failed } = await sendPush(userId, { title: 'Order shipped', body: 'On its way', url: '/orders/12' }, { urgency: 'high', ttl: '1h' })
+```
+
+An island opts the visitor in from a click, and out again:
+
+```kay
+---
+import { webPush } from 'kay'
+---
+button(onClick={async () => { await webPush.subscribe() }}) Notify me
+```
+
+`webPush.state()` is a signal to draw it from: `'unsupported'`, `'denied'`, `'off'` or `'subscribed'`. `subscribe()` asks the permission only while the page has a user gesture, so call it from a click; it answers `'subscribed'`, `'denied'`, `'off'` (the prompt was dismissed), `'needs-gesture'` (nothing asked), `'unsupported'`, `'signed-out'` or `'failed'`. `unsubscribe()` answers whether a device went. iOS shows pushes only for a site added to the home screen.
+
+`installPrompt` from `kay` is the browser's offer to install the site: `installPrompt.available()` is a signal, true once the browser made the offer, and `await installPrompt.show()` (from a click) answers `'accepted'`, `'dismissed'` or `'unavailable'`. The offer comes before an island hydrates, so `push()` makes the script that registers the worker keep it (holding it hides Chrome Android's own install bar), and without `push()` it stays false. Safari never makes the offer.
+
 ## Reference
 
 - `notify(userId, { title, url?, keep? })` answers the stored `Notification` (`id`, `title`, `url?`, `at` in milliseconds, `read`). `userId` is 1 to 200 characters and `title` 1 to 200 after trimming, a `RangeError` otherwise. The title is text: the Bell writes it as text, never as HTML.
@@ -74,4 +108,7 @@ await notifications.erase(userId)
 - The Bell asks `GET /_kay/ui/inbox` and posts `POST /_kay/ui/inbox/read` (`{ id }`, or `{}` for all), served by `ui()` of kayjs-ui under `base`. Who is asking is read from the request through the user the auth library names (kayjs-auth does), never from a parameter, so one user never reaches another's notifications, and a request nobody is signed in for gets 401.
 - Live: the route reads the inbox as `cached(..., { live: true })` does, so every open tab updates within about a second of a `notify`, a read or an erase, in any process sharing a cache store; a hidden tab catches up when shown ([Following cached values](live-values.md#following-cached-values)). The inbox is cached in the process's memory only, never in the cache store.
 - `Bell` takes `label` (the `ui.bell.label` message, "Notifications") and `placement`. A page with a Bell is the signed-in visitor's own: `private, no-cache` and rendered per request, as one reading `ctx` is. Put the Bell in a layout or a page, not inside an island: it reads the visitor on the server.
-- Erasing a person: call `notifications.erase(userId)` with the rest of the function in [Privacy](privacy.md#erase-a-person-on-request).
+- Erasing a person: call `notifications.erase(userId)`, which also deletes their push subscriptions, with the rest of the function in [Privacy](privacy.md#erase-a-person-on-request).
+- Push: `sendPush(userId, { title, body?, url?, tag?, icon? }, { ttl?, urgency?, topic? })` answers `{ sent, dropped, failed }`. Title is 1 to 200 characters, body up to 500, tag 64; `url` and `icon` are kept as `notify` keeps a link, and a path goes under `base` in the worker. The payload is RFC 8291 aes128gcm with a VAPID (RFC 8292) JWT, on Web Crypto with no dependency. A push service answering 404 or 410 deletes that subscription; any other refusal counts as `failed` and keeps it. A person keeps their newest 10 devices. `pushSubscriptions.list(userId)` and `.erase(userId)` read and delete them.
+- Push store: `store.push` of kay.config.ts, a `PushStore` (`add`, `list`, `remove`, `erase`): `sqliteData` and `pgData` fill it (the `kay_push_subscriptions` table), memory otherwise.
+- Push routes: `GET /_kay/push/key`, `POST /_kay/push/subscribe` and `/unsubscribe`, whose user comes from the request (401 when nobody is signed in) and which refuse another site; a subscription's endpoint must be https at a public address in production.

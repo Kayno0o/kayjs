@@ -52,6 +52,8 @@ export const KAY_EXPORTS: Record<string, 'free' | 'request' | 'local'> = {
   elementSize: 'free',
   followLog: 'free',
   guardLeave: 'free',
+  webPush: 'free',
+  installPrompt: 'free',
   shortcut: 'free',
   navigate: 'free',
   refresh: 'free',

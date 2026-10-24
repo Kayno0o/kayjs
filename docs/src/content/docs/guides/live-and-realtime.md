@@ -330,6 +330,21 @@ A notification is deleted after 90 days. `keep: '7d'` in `notify` shortens or le
 
 The title is text, never HTML. The link is kept only when it is a path of your site or an http or https URL, so a `javascript:` link is dropped. `notifications` from `kay/server` lists, reads and erases a user's inbox from your own code, and `notifications.erase(userId)` belongs in the function that [erases a person](/guides/privacy#erasing-a-person).
 
+### Push
+
+Add `push()` to `extensions` and a person who opts in also gets each `notify` as a push on their phone or computer, with no second call. `kay push keys` prints the two `VAPID_*` variables for production. An island opts the visitor in from a click:
+
+```kay
+---
+import { webPush } from 'kay'
+---
+button(onClick={async () => { await webPush.subscribe() }}) Notify me
+```
+
+kay asks the browser's permission only from a click, keeps the device in your store, and drops it when the push service says it is gone. `sendPush(userId, { title, body, url })` from `kay/server` sends one without the inbox, and `notify(userId, { title, push: false })` keeps one out of the push. `installPrompt.available()` and `installPrompt.show()` from `kay` draw an "Install" button once the browser offers one.
+
+<ReadMore href="/llms/notifications">The keys, `sendPush` options, the store and the routes.</ReadMore>
+
 ## Rooms
 
 Rooms group a module's connections, such as a game's players or a document's editors. `rooms()` from `kay/server` keeps them.

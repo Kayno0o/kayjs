@@ -25,7 +25,7 @@ import { pageHooks } from '../config'
 import { clearEditSite, registerEditSite } from '../content/edit'
 import { clearContentMode } from '../content/load'
 import { refuseFeedsWithoutSite, serveFeeds } from '../content/server'
-import { cacheDir, offlineOf } from '../project'
+import { cacheDir, offlineOf, pushListed } from '../project'
 import { FILES_ROUTE, IMAGE_ROUTE } from '../runtime/image'
 import { localizedText } from '../runtime/localized'
 import { kayLog } from '../runtime/log'
@@ -660,7 +660,7 @@ export async function pagesApp(project: Project<PagesOptions>, loadClient: () =>
   const prerendered = await loadPrerendered(client, dictionaryUsed)
   const guarded = new Set(routes.filter(route => route.guards.length > 0).map(route => route.pattern))
 
-  await serveServiceWorker(app, served, { client, offline: offlineOf(options, mode) && options.offline !== false ? options.offline : undefined, base, apiPath: options.apiPath, trailingSlash: options.trailingSlash, lang: options.lang, typography: options.typography, locales, publicPages: [...client.pages].filter(([, page]) => !guarded.has(page.pattern) && page.islands === undefined && page.stamps === undefined).map(([path]) => path) })
+  await serveServiceWorker(app, served, { client, offline: offlineOf(options, mode) && options.offline !== false ? options.offline : undefined, base, apiPath: options.apiPath, trailingSlash: options.trailingSlash, lang: options.lang, typography: options.typography, locales, publicPages: [...client.pages].filter(([, page]) => !guarded.has(page.pattern) && page.islands === undefined && page.stamps === undefined).map(([path]) => path), push: pushListed(options) })
   // A server answering from a build does it in its own process; a static export is written once and `kay dev` shows every entry.
   const publishing = exported || mode.dev ? NOT_PUBLISHING : await watchPublishing(collections)
 
