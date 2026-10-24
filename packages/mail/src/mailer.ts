@@ -1,6 +1,8 @@
 import type { EnqueueOptions, FailedJob, KayExtension, QueueOptions } from 'kay/server'
-import type { ListOptions, ListRun, MailingList, Subscription } from './list'
+import type { EventSecrets, Found, Suppression, SuppressionReason } from './events'
+import type { ListOptions, ListRun, ListsHandle, MailingList, Subscription } from './list'
 import type { ListStore } from './list-store'
+import type { Reply } from './mime'
 import type { Relayed } from './outbox'
 import type { Relay } from './preview'
 import type { SmtpOverrides } from './smtp'
@@ -14,7 +16,9 @@ import { defineEnv, queue, renderLocale, renderToString } from 'kay/server'
 import parseAddresses from 'nodemailer/lib/addressparser'
 import { attempt, deliveryAddress, messageOf } from './delivery'
 import { defaultSender, parseMailUrl } from './env'
+import { mountEventRoutes, secretsOf } from './events'
 import { createLists, mountListRoutes } from './list'
+import { normalizeAddress } from './list-address'
 import { log } from './log'
 import { addressOf, outbox, PREVIEW_ROUTES } from './outbox'
 import { checkKey, checkOptions, greetingOf, rateFromText, smtp } from './smtp'
@@ -73,6 +77,10 @@ export interface MailerOptions {
   logSubjects?: boolean | undefined
   // Where the mailing lists live unless a list names its own `store` or `file`, such as `pgLists(db)` for a site on Postgres. It is also where a link of a list this process has not declared yet looks, and what `mail.erase` reaches, so declare it here rather than on each list.
   listStore?: ListStore | undefined
+  // The secrets of the routes where a provider reports bounces and complaints (`/_kay/mail/events/<provider>`) and a mail server hands over delivery reports and replies (`/_kay/mail/inbound`), `MAIL_EVENTS_<PROVIDER>` and `MAIL_INBOUND_SECRET` in the environment unless given here. A route without its secret answers 404.
+  events?: EventSecrets | undefined
+  // Called with each reply handed to `/_kay/mail/inbound` (anything but a delivery report, which suppresses its failed recipients instead). A reply carries the `Message-ID` of the mail it answers as `inReplyTo`.
+  inbound?: ((reply: Reply) => Promise<void> | void) | undefined
   // Lets a server lacking `MAIL_URL` or a sender boot anyway, each send then throwing `MailNotConfiguredError`, for a site whose mail can wait to be set up.
   optional?: boolean | undefined
 }
@@ -103,7 +111,13 @@ export type Mailer = Elysia & {
   remove: (match: string | { recipient: string } | ((mail: Mail) => boolean)) => Promise<number>
   // A mailing list of the site, `default` when unnamed, made on the first call and the same afterwards. It keeps its subscribers in kay's own store (`data/mail-list.sqlite`), mounts the confirmation and unsubscribe links, and sends through this mailer's queue.
   list: (name?: string, options?: ListOptions) => MailingList
-  // Erases a person: the address leaves every list and the mails queued for it are removed. Resolves with how many subscriptions and queued mails went.
+  // Stops mailing the address (a bounce unless `reason` says a complaint), as a provider's report does: later sends skip it, and it leaves every list. Resolves false for a string that is no address.
+  suppress: (address: string, reason?: SuppressionReason) => Promise<boolean>
+  // Mails the address again; whether it was suppressed.
+  unsuppress: (address: string) => Promise<boolean>
+  // Why the address is not mailed, undefined when it is.
+  suppression: (address: string) => Promise<Suppression | undefined>
+  // Erases a person: the address leaves every list, its suppression is lifted and the mails queued for it are removed. Resolves with how many subscriptions and queued mails went.
   erase: (address: string) => Promise<number>
   // What an address is on, for the export of a person's data: each list with its state and dates, pending rows included.
   subscriptions: (address: string) => Promise<Subscription[]>
@@ -202,6 +216,13 @@ function list(addresses: Address | Address[] | undefined): Address[] {
 // An optional field left empty, as a form's blank reply-to gives it, names no one rather than a broken address.
 function given(addresses: Address | Address[] | undefined): Address[] {
   return list(addresses).filter(address => addressOf(address).trim() !== '')
+}
+
+// The mail without the suppressed recipients, given by their normalised address.
+function without(mail: Mail, held: Map<string, unknown>): Mail {
+  const kept = (addresses: Address[]): Address[] => addresses.filter(address => !held.has(normalizeAddress(addressOf(address)) ?? ''))
+
+  return { ...mail, to: kept(mail.to), cc: kept(mail.cc), bcc: kept(mail.bcc) }
 }
 
 function recipientsOf(mail: Mail): string[] {
@@ -498,8 +519,21 @@ export function mailer(options: MailerOptions = {}): Mailer {
     return { to, error }
   }
 
+  // The lists are made with `deliver`, which asks them who is suppressed.
+  const suppressions: { lists?: ListsHandle } = {}
+
   // `signal` is the queue's, aborted when it gives up on the run.
-  const deliver = async (mail: Mail, signal?: AbortSignal): Promise<Delivery> => {
+  const deliver = async (given: Mail, signal?: AbortSignal): Promise<Delivery> => {
+    const held = await suppressions.lists!.suppressed(recipientsOf(given))
+    const mail = held.size === 0 ? given : without(given, held)
+
+    if (held.size > 0) {
+      log.warn(`${described(given)} skips ${whom([...held.keys()])}, whose address bounced or complained`)
+
+      if (recipientsOf(mail).length === 0)
+        return { accepted: [], rejected: [...held.keys()], response: 'suppressed' }
+    }
+
     if (transport === outbox) {
       const delivery = await outbox.keep(mail, await relayed(mail))
 
@@ -528,6 +562,9 @@ export function mailer(options: MailerOptions = {}): Mailer {
     render,
     deliver,
   }, { store: options.listStore })
+
+  suppressions.lists = lists
+
   const { name = 'mail', onFailed, ...queueOptions } = options.queue ?? {}
   const via = crypto.randomUUID()
   const redact = queueOptions.redact ?? withoutBody
@@ -561,6 +598,14 @@ export function mailer(options: MailerOptions = {}): Mailer {
   const plugin = new Elysia().use(jobs).use(listJobs)
 
   mountListRoutes(plugin, () => lists)
+  mountEventRoutes(plugin, () => ({
+    secrets: () => secretsOf(options.events),
+    suppress: async ({ email, reason }: Found, source: string) => {
+      await lists.suppress(email, reason, source)
+      log.info(`${source} reported a ${reason}: one address is no longer mailed`)
+    },
+    reply: options.inbound,
+  }))
   // A `kay dev` reload stops the app, so the sweep timers of this mailer end and the next one starts its own.
   plugin.onStop(() => lists.stopSweeping())
 
@@ -617,6 +662,9 @@ export function mailer(options: MailerOptions = {}): Mailer {
     render,
     list: (listName = 'default', listOptions?: ListOptions) => lists.list(listName, listOptions),
     subscriptions: async (address: string) => lists.subscriptions(address),
+    suppress: async (address: string, reason: SuppressionReason = 'bounce') => lists.suppress(address, reason, 'manual'),
+    unsuppress: async (address: string) => lists.lift(address),
+    suppression: async (address: string) => (await lists.suppressed([address])).values().next().value,
     erase: async (address: string) => await lists.erase(address) + await sending.remove({ recipient: address }),
     drain: async () => {
       const mails = await jobs.drain()

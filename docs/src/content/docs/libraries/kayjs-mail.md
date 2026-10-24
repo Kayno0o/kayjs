@@ -349,6 +349,33 @@ With `listStore` on the mailer, a link in a mail and `mail.erase` reach the stor
 
 To erase a person, call `mail.erase(address)`. It removes the address from every list and the mails still queued for it. `mail.subscriptions(address)` lists what the address is on, pending rows included, for a person asking for their data. With kayjs-auth, deleting an account and exporting its data call both for you, for a verified address.
 
+## Bounces and replies
+
+An address that bounces or reports your mail as spam should not be mailed again. Your mail provider tells kayjs-mail, and kayjs-mail stops.
+
+Point the provider's webhook at `https://your-site/_kay/mail/events/<provider>` and set one variable with its secret:
+
+- `postmark`: `MAIL_EVENTS_POSTMARK=user:password`, the Basic credentials of the URL, as Postmark signs nothing.
+- `mailgun`: `MAIL_EVENTS_MAILGUN`, the webhook signing key.
+- `sendgrid`: `MAIL_EVENTS_SENDGRID`, the public key of the Event Webhook.
+- `resend`: `MAIL_EVENTS_RESEND`, the `whsec_` secret.
+
+A provider with no secret has no route, and a post whose signature does not check is refused. Soft bounces are ignored.
+
+From then on a mail to that address is skipped and logged, from a form, the queue, a list or kayjs-auth, and the address leaves every mailing list. A skipped mail is not an error: the queue does not retry it. `mail.suppression(address)` says why an address is not mailed, `mail.unsuppress(address)` mails it again, and `mail.erase(address)` clears it with the rest of a person.
+
+Mail servers also answer a failed delivery with a report mail (a DSN). Pipe those, and the replies to your mails, to `POST /_kay/mail/inbound` with `Authorization: Bearer` and `MAIL_INBOUND_SECRET`. A report suppresses the recipients it names. Any other message goes to the function you give the mailer:
+
+```ts
+export const mail = mailer({
+  inbound: async (reply) => {
+    await saveReply(reply.inReplyTo, reply.from, reply.text)
+  },
+})
+```
+
+Providers that forward inbound mail as a form (SendGrid's raw option, Mailgun's `body-mime`) work too. [The details](/llms/kayjs-mail-bounces-and-replies) list the payloads understood, the limits and what is not covered yet.
+
 ## Previewing
 
 Under `kay dev`, `/_kay/mail` lists the mails sent, each with its html at desktop or phone width, its text and its size.
@@ -432,3 +459,4 @@ Topics of the kayjs-mail reference the sections above do not link:
 
 - [The contact form, testing, development and kayjs-auth](/llms/kayjs-mail-contact-form-and-testing)
 - [A mailing list](/llms/kayjs-mail-mailing-list)
+- [Bounces, complaints and replies](/llms/kayjs-mail-bounces-and-replies)

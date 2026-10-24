@@ -1,11 +1,16 @@
 import type { SQL } from 'bun'
 import type { PgJobsSource } from 'kay/library'
+import type { Suppression, SuppressionReason } from './events'
 import type { Broadcast, BroadcastProgress, DeliveryState, ListStore, Proof, Subscriber } from './list-store'
 import { connectionOf, privilegeRefused, relationsMissing } from 'kay/library'
 import { DELIVERY_TRIES } from './list-store'
 
 // The tables the Postgres store keeps its data in, for a pg-orm `ignoreTables` of an app that creates them with `createMailListTables`.
-export const mailListTables = ['kay_mail_subscribers', 'kay_mail_broadcasts', 'kay_mail_deliveries'] as const
+export const mailListTables = ['kay_mail_subscribers', 'kay_mail_broadcasts', 'kay_mail_deliveries', 'kay_mail_suppressions'] as const
+
+// The tables a store needs to open: the suppressions one is made when the first address is suppressed or looked up, so a database from before it keeps working under a role that creates nothing.
+const coreTables = mailListTables.slice(0, 3)
+const SUPPRESSIONS = 'CREATE TABLE IF NOT EXISTS kay_mail_suppressions (email text PRIMARY KEY, reason text NOT NULL, source text NOT NULL, at bigint NOT NULL)'
 
 // A confirmation nobody clicked is forgotten after this long; a finished broadcast and its deliveries are kept this long.
 const PENDING_KEPT_MS = 7 * 24 * 3_600_000
@@ -28,7 +33,7 @@ async function rows<Row>(db: SQL, text: string, params: unknown[] = []): Promise
   return db.unsafe<Row[]>(text, params)
 }
 
-// Creates the three tables and their indexes unless they exist, for an app whose role creates nothing: run it as the database's owner, in a boot script. `pgLists` creates them itself when its role may. Replicas running it together take turns.
+// Creates the tables and their indexes unless they exist, for an app whose role creates nothing: run it as the database's owner, in a boot script. `pgLists` creates them itself when its role may. Replicas running it together take turns.
 export async function createMailListTables(source: PgJobsSource): Promise<void> {
   const db = connectionOf(source)
 
@@ -45,6 +50,7 @@ export async function createMailListTables(source: PgJobsSource): Promise<void> 
       await tx`CREATE TABLE IF NOT EXISTS kay_mail_broadcasts (id text PRIMARY KEY, list text NOT NULL, created_at bigint NOT NULL, finished_at bigint, message text NOT NULL)`
       await tx`CREATE TABLE IF NOT EXISTS kay_mail_deliveries (broadcast text NOT NULL, subscriber text NOT NULL, state text NOT NULL, tries integer NOT NULL, at bigint NOT NULL, PRIMARY KEY (broadcast, subscriber))`
       await tx`CREATE INDEX IF NOT EXISTS kay_mail_deliveries_subscriber ON kay_mail_deliveries (subscriber)`
+      await tx.unsafe(SUPPRESSIONS)
     })
   }
   finally {
@@ -60,7 +66,7 @@ export function pgLists(source: PgJobsSource): ListStore & { close: () => Promis
   let ready: Promise<SQL> | undefined
 
   const create = async (): Promise<SQL> => {
-    if (!await relationsMissing(db, mailListTables))
+    if (!await relationsMissing(db, coreTables))
       return db
 
     try {
@@ -88,6 +94,39 @@ export function pgLists(source: PgJobsSource): ListStore & { close: () => Promis
 
       throw error
     }
+  }
+
+  // Made on first use, for a database that has the other three; a role that may not create it gets the same advice as for those.
+  let suppressionsReady: Promise<void> | undefined
+
+  const suppressions = async (): Promise<SQL> => {
+    const connection = await connected()
+
+    suppressionsReady ??= (async () => {
+      if (!await relationsMissing(connection, ['kay_mail_suppressions']))
+        return
+
+      try {
+        await connection.unsafe(SUPPRESSIONS)
+      }
+      catch (error) {
+        if (privilegeRefused(error))
+          throw new Error('kayjs-mail: pgLists needs its kay_mail_suppressions table, and its role may not create it: run `await createMailListTables(db)` from kayjs-mail as the database\'s owner', { cause: error })
+
+        throw error
+      }
+    })()
+
+    try {
+      await suppressionsReady
+    }
+    catch (error) {
+      suppressionsReady = undefined
+
+      throw error
+    }
+
+    return connection
   }
 
   const query = async <Row>(text: string, params: unknown[] = []): Promise<Row[]> => rows<Row>(await connected(), text, params)
@@ -193,6 +232,17 @@ export function pgLists(source: PgJobsSource): ListStore & { close: () => Promis
     },
     async release(broadcast, subscriber, now = Date.now()): Promise<void> {
       await query(`UPDATE kay_mail_deliveries SET state = CASE WHEN tries >= ${DELIVERY_TRIES} THEN 'failed' ELSE 'retry' END, at = $3::bigint WHERE broadcast = $1 AND subscriber = $2 AND state = 'sending'`, [broadcast, subscriber, now])
+    },
+    async suppress(email: string, reason: SuppressionReason, source: string, now = Date.now()): Promise<void> {
+      await rows(await suppressions(), 'INSERT INTO kay_mail_suppressions (email, reason, source, at) VALUES ($1, $2, $3, $4::bigint) ON CONFLICT DO NOTHING', [email, reason, source, now])
+    },
+    async suppressed(emails: string[]): Promise<Suppression[]> {
+      const found = await rows<{ email: string, reason: SuppressionReason, source: string, at: string }>(await suppressions(), 'SELECT email, reason, source, at FROM kay_mail_suppressions WHERE email = ANY($1::text[])', [emails])
+
+      return found.map(row => ({ ...row, at: Number(row.at) }))
+    },
+    async lift(email: string): Promise<boolean> {
+      return (await rows(await suppressions(), 'DELETE FROM kay_mail_suppressions WHERE email = $1 RETURNING email', [email])).length > 0
     },
     async progress(broadcast): Promise<BroadcastProgress> {
       const counts = new Map((await query<{ state: DeliveryState, total: string }>('SELECT state, COUNT(*) AS total FROM kay_mail_deliveries WHERE broadcast = $1 GROUP BY state', [broadcast.id])).map(row => [row.state, Number(row.total)]))

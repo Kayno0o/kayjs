@@ -1,4 +1,5 @@
 import type { Database } from 'bun:sqlite'
+import type { Suppression, SuppressionReason } from './events'
 import { openSqlite } from 'kay/library'
 
 // Where the production server keeps its mailing lists, next to the job store.
@@ -62,6 +63,13 @@ export interface ListStore {
   sent: (broadcast: string, subscriber: string, now?: number) => Maybe<unknown>
   release: (broadcast: string, subscriber: string, now?: number) => Maybe<unknown>
   progress: (broadcast: Broadcast) => Maybe<BroadcastProgress>
+  // Bounces and complaints, which a store of an app's own may leave out: the mailer then keeps them in the default file. The addresses are in `normalizeAddress` form.
+  // Remembers the address as one not to mail again, keeping the first reason and time it was given.
+  suppress?: ((email: string, reason: SuppressionReason, source: string, now?: number) => Maybe<void>) | undefined
+  // The addresses among these that are suppressed, with why.
+  suppressed?: ((emails: string[]) => Maybe<Suppression[]>) | undefined
+  // Mails the address again; whether it was suppressed.
+  lift?: ((email: string) => Maybe<boolean>) | undefined
 }
 
 export type DeliveryState = 'sending' | 'sent' | 'retry' | 'failed'
@@ -104,6 +112,7 @@ export function openLists(path: string) {
   db.run('CREATE TABLE IF NOT EXISTS kay_mail_deliveries (broadcast TEXT NOT NULL, subscriber TEXT NOT NULL, state TEXT NOT NULL, tries INTEGER NOT NULL, at INTEGER NOT NULL, PRIMARY KEY (broadcast, subscriber))')
   db.run('CREATE INDEX IF NOT EXISTS kay_mail_subscribers_pending ON kay_mail_subscribers (status, created_at)')
   db.run('CREATE INDEX IF NOT EXISTS kay_mail_deliveries_subscriber ON kay_mail_deliveries (subscriber)')
+  db.run('CREATE TABLE IF NOT EXISTS kay_mail_suppressions (email TEXT PRIMARY KEY, reason TEXT NOT NULL, source TEXT NOT NULL, at INTEGER NOT NULL)')
 
   const insertPending = db.query('INSERT OR IGNORE INTO kay_mail_subscribers (id, list, email, status, locale, created_at, source, wording) VALUES (?1, ?2, ?3, \'pending\', ?4, ?5, ?6, ?7)')
   const byEmail = db.query<SubscriberRow, [string, string]>('SELECT * FROM kay_mail_subscribers WHERE list = ?1 AND email = ?2')
@@ -118,6 +127,10 @@ export function openLists(path: string) {
   const sweepPending = db.query('DELETE FROM kay_mail_subscribers WHERE status = \'pending\' AND created_at < ?1')
   const confirmed = db.query<SubscriberRow, [string]>('SELECT * FROM kay_mail_subscribers WHERE list = ?1 AND status = \'confirmed\' ORDER BY confirmed_at, id')
   const count = db.query<{ total: number }, [string]>('SELECT COUNT(*) AS total FROM kay_mail_subscribers WHERE list = ?1 AND status = \'confirmed\'')
+
+  const insertSuppression = db.query('INSERT OR IGNORE INTO kay_mail_suppressions (email, reason, source, at) VALUES (?1, ?2, ?3, ?4)')
+  const deleteSuppression = db.query('DELETE FROM kay_mail_suppressions WHERE email = ?1')
+  const suppressionOf = db.query<Suppression, [string]>('SELECT email, reason, source, at FROM kay_mail_suppressions WHERE email = ?1')
 
   const insertBroadcast = db.query('INSERT INTO kay_mail_broadcasts (id, list, created_at, message) VALUES (?1, ?2, ?3, ?4)')
   const getBroadcast = db.query<BroadcastRow, [string]>('SELECT * FROM kay_mail_broadcasts WHERE id = ?1')
@@ -220,6 +233,11 @@ export function openLists(path: string) {
     claim: (broadcast: string, subscriber: string, now = Date.now()): boolean => claimRow.run(broadcast, subscriber, now).changes > 0,
     sent: (broadcast: string, subscriber: string, now = Date.now()) => settleRow.run(broadcast, subscriber, 'sent', now),
     release: (broadcast: string, subscriber: string, now = Date.now()) => releaseRow.run(broadcast, subscriber, now),
+    suppress(email: string, reason: SuppressionReason, source: string, now = Date.now()): void {
+      insertSuppression.run(email, reason, source, now)
+    },
+    suppressed: (emails: string[]): Suppression[] => emails.flatMap(email => suppressionOf.get(email) ?? []),
+    lift: (email: string): boolean => deleteSuppression.run(email).changes > 0,
     progress(broadcast: Broadcast): BroadcastProgress {
       const counts = new Map(states.all(broadcast.id).map(row => [row.state, row.total]))
 

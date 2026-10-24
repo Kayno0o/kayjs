@@ -1,5 +1,6 @@
 import type { Elysia, TSchema } from 'elysia'
 import type { ActionContext, ActionProtect, ActionProtection, Duration, Failure, JSX } from 'kay'
+import type { Suppression, SuppressionReason } from './events'
 import type { BroadcastProgress, ListStore, Subscriber } from './list-store'
 import type { Address, Mail, MailMessage } from './types'
 import { existsSync } from 'node:fs'
@@ -450,6 +451,65 @@ export function createLists(base: Omit<ListHost, 'enqueueMail' | 'enqueueRun' | 
     first = every = undefined
   }
 
+  // Every store this process knows, the default file when it exists too.
+  const known = (): ListStore[] => {
+    defaultFile()
+
+    return [...new Set([...files.values(), ...given])].filter(store => !store.closed)
+  }
+
+  // Where a suppression is written: the known stores that keep them, else the default file, opened for it.
+  const keepers = (): ListStore[] => {
+    const found = known().filter(store => store.suppress !== undefined)
+
+    return found.length > 0 ? found : [open(fallback.file ?? (process.env.NODE_ENV === 'test' ? ':memory:' : LIST_FILE))]
+  }
+
+  // The address stops being mailed, and leaves every list of the stores this process knows.
+  const suppress = async (address: string, reason: SuppressionReason, source: string): Promise<boolean> => {
+    const email = normalizeAddress(address)
+
+    if (email === undefined)
+      return false
+
+    for (const store of keepers())
+      await store.suppress!(email, reason, source)
+
+    for (const store of known())
+      await store.erase(email)
+
+    return true
+  }
+
+  // The suppressed among the addresses, by their normalised form; only stores already open or existing are asked, so a site with none makes no file.
+  const suppressed = async (addresses: string[]): Promise<Map<string, Suppression>> => {
+    const emails = [...new Set(addresses.flatMap(address => normalizeAddress(address) ?? []))]
+    const found = new Map<string, Suppression>()
+
+    if (emails.length === 0)
+      return found
+
+    for (const store of known()) {
+      for (const entry of await store.suppressed?.(emails) ?? [])
+        found.set(entry.email, entry)
+    }
+
+    return found
+  }
+
+  const lift = async (address: string): Promise<boolean> => {
+    const email = normalizeAddress(address)
+    let lifted = false
+
+    if (email === undefined)
+      return false
+
+    for (const store of known())
+      lifted = await store.lift?.(email) === true || lifted
+
+    return lifted
+  }
+
   // One process of the broadcast: mails a batch, then asks to run again after the pace until nobody is left.
   const run = async ({ list: name, broadcast: id }: ListRun, signal?: AbortSignal): Promise<void> => {
     const entry = entries.get(name)
@@ -515,6 +575,9 @@ export function createLists(base: Omit<ListHost, 'enqueueMail' | 'enqueueRun' | 
       return entry.list
     },
     run,
+    suppress,
+    suppressed,
+    lift,
     sweep,
     stopSweeping,
     connect(connected: Pick<ListHost, 'enqueueMail' | 'enqueueRun' | 'activate'>): void {
@@ -531,8 +594,10 @@ export function createLists(base: Omit<ListHost, 'enqueueMail' | 'enqueueRun' | 
 
       let total = 0
 
-      for (const lists of new Set([...files.values(), ...given]))
+      for (const lists of new Set([...files.values(), ...given])) {
         total += await lists.erase(email)
+        await lists.lift?.(email)
+      }
 
       return total
     },

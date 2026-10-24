@@ -53,6 +53,20 @@ for (const [kind, open, enabled] of stores) {
       return id
     }
 
+    it('keeps a suppression once, with the first reason, until it is lifted', async () => {
+      const store = open()
+      const { email } = names()
+      const address = email('gone')
+
+      expect(await store.suppressed!([address])).toEqual([])
+      await store.suppress!(address, 'bounce', 'postmark', 5000)
+      await store.suppress!(address, 'complaint', 'resend', 9000)
+      expect(await store.suppressed!([address, email('other')])).toEqual([{ email: address, reason: 'bounce', source: 'postmark', at: 5000 }])
+      expect(await store.lift!(address)).toBe(true)
+      expect(await store.lift!(address)).toBe(false)
+      expect(await store.suppressed!([address])).toEqual([])
+    })
+
     it('keeps one row per address of a list, pending until confirmed', async () => {
       const store = open()
       const { list, email } = names()
@@ -235,6 +249,25 @@ describe.skipIf(url === '')('a list on Postgres', () => {
       const [found] = await db.unsafe<{ present: boolean }[]>(`SELECT ${mailListTables.map(name => `to_regclass('${name}') IS NOT NULL`).join(' AND ')} AS present`)
 
       expect(found!.present).toBe(true)
+    }
+    finally {
+      await db.close()
+    }
+  })
+
+  it('opens a database from before the suppressions table, and makes that table on first use', async () => {
+    const db = new Bun.SQL(url)
+
+    try {
+      await pg!.count('anything')
+      await db.unsafe('DROP TABLE kay_mail_suppressions')
+
+      const old = pgLists(db)
+      const { email } = names()
+
+      expect(await old.count('anything')).toBe(0)
+      await old.suppress!(email('x'), 'bounce', 'dsn')
+      expect((await old.suppressed!([email('x')])).map(row => row.source)).toEqual(['dsn'])
     }
     finally {
       await db.close()
