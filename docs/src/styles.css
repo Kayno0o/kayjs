@@ -1301,6 +1301,11 @@ pre code {
   font-size: 0.75rem;
 }
 
+.playground-held {
+  margin: 0;
+  color: var(--muted);
+}
+
 .playground-frame {
   width: 100%;
   min-height: 20rem;

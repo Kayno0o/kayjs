@@ -1,5 +1,6 @@
 ---
 import type { Problem } from '../playground/compile'
+import Button from '@kaynooo/kayjs-ui/button.kay'
 import Textarea from '@kaynooo/kayjs-ui/textarea.kay'
 import { onCleanup, onMount, signal } from 'kay'
 import { loadCompiler } from '../playground/load'
@@ -15,6 +16,8 @@ const failure = signal('')
 // What the component shows in the frame, which the page cannot read itself.
 const live = signal('')
 const loading = signal(true)
+// Code that came from a link waits for a click on Run, as a link can carry anyone's code.
+const held = signal(false)
 
 let frame: HTMLIFrameElement | undefined
 let compiled: { server: string, dom: string } | undefined
@@ -24,7 +27,7 @@ let sent = 0
 
 // The frame runs the code: this page only reads text, so nothing a visitor types runs with the docs' origin. A frame that has not loaded drops the message and says it is ready when it has, which sends it again.
 function send() {
-  if (!frame?.contentWindow || !compiled)
+  if (held() || !frame?.contentWindow || !compiled)
     return
 
   sent++
@@ -54,7 +57,13 @@ function build() {
   send()
 }
 
+function run() {
+  held.set(false)
+  send()
+}
+
 function edit(value: string) {
+  held.set(false)
   source.set(value)
   clearTimeout(timer)
   timer = setTimeout(build, DEBOUNCE_MS)
@@ -83,8 +92,10 @@ onMount(async () => {
 
   const given = sourceOfHash(location.hash)
 
-  if (given !== undefined)
+  if (given !== undefined) {
     source.set(given)
+    held.set(true)
+  }
 
   try {
     compiler = await loadCompiler()
@@ -109,6 +120,9 @@ onCleanup(() => {
     Textarea(rows={14} spellcheck={false} value={source()} onInput={value => edit(value)})
   .playground-result
     span.playground-label Result
+    if held()
+      p.playground-held The code in this link has not run. Read it, then run it.
+      Button(label="Run" tone="accent" onClick={() => run()})
     iframe.playground-frame(ref={element => frame = element} title="The component running" sandbox="allow-scripts" data-live={live()} src="/playground/frame.html" loading="lazy")
   if problems().length > 0
     ul.playground-problems(role="alert")

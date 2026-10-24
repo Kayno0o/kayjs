@@ -12,7 +12,7 @@ Edit the component and the result updates as you type, with a compile error show
 
 ## What it runs
 
-The playground compiles one `.kay` component the way the build does, once for the server's HTML and once for the browser. The HTML from the server is shown under the editor, and the browser's version runs live in the box beside it. The box is sandboxed: it has no network and cannot reach this site's data.
+The playground compiles one `.kay` component the way the build does, once for the server's HTML and once for the browser. The HTML from the server is shown under the editor, and the browser's version runs live in the box beside it. Code that arrives in a link waits for a click on Run, as a link can carry anyone's code; code you type runs as you type. The box is sandboxed: it has no network and cannot reach this site's data.
 
 A component runs here when it imports only from `kay`. That leaves out:
 

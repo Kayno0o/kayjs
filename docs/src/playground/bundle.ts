@@ -7,6 +7,7 @@ const compress = promisify(brotliCompress)
 export interface Bundled {
   text: string
   brotli: Buffer
+  etag: string
 }
 
 // The server render keeps its locale and island ids in an AsyncLocalStorage, which a browser lacks: the playground renders synchronously, so a stack of one is the same storage.
@@ -58,7 +59,7 @@ export function bundled(file: string, minify: boolean): () => Promise<Bundled> {
 
     const text = await result.outputs[0]!.text()
 
-    return { text, brotli: await compress(text) }
+    return { text, brotli: await compress(text), etag: `"${Bun.hash(text).toString(36)}"` }
   }
 
   return async () => {
@@ -77,8 +78,12 @@ export function bundled(file: string, minify: boolean): () => Promise<Bundled> {
 
 // The body in the form the request accepts, brotli when it does.
 export function respond(request: Request, built: Bundled, headers: Record<string, string>): Response {
-  if (request.headers.get('accept-encoding')?.includes('br'))
-    return new Response(built.brotli, { headers: { ...headers, 'content-encoding': 'br', 'vary': 'accept-encoding' } })
+  // Revalidated on each visit, so an unchanged bundle costs a 304 and not the download.
+  if (request.headers.get('if-none-match') === built.etag)
+    return new Response(null, { status: 304, headers: { 'etag': built.etag, 'cache-control': headers['cache-control'] ?? 'no-cache' } })
 
-  return new Response(built.text, { headers: { ...headers, vary: 'accept-encoding' } })
+  if (request.headers.get('accept-encoding')?.includes('br'))
+    return new Response(built.brotli, { headers: { ...headers, 'etag': built.etag, 'content-encoding': 'br', 'vary': 'accept-encoding' } })
+
+  return new Response(built.text, { headers: { ...headers, etag: built.etag, vary: 'accept-encoding' } })
 }
