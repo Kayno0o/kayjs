@@ -115,6 +115,19 @@ async function withDatabase(run: (database: string, tables: () => Promise<string
 }
 
 describe('a build or a check with a pgData store', () => {
+  it('hands no store to a static export, whatever the time it takes', async () => {
+    const root = await project()
+    const marker = join(root, 'store-read')
+    const getters = ['sessions', 'cache', 'jobs', 'rates', 'rooms', 'vitals', 'live', 'notifications', 'push'].map(name => `get ${name}() { appendFileSync(${JSON.stringify(marker)}, '${name} '); return undefined }`)
+
+    await Bun.write(join(root, 'kay.config.ts'), `import { appendFileSync } from 'node:fs'\nimport { defineConfig } from 'kay/server'\n\nexport default defineConfig({ log: false, store: { ${getters.join(', ')} } })\n`)
+
+    const { code, text } = await kay(root, UNREACHABLE, 'build', '--static', '--no-check')
+
+    expect(code, text).toBe(0)
+    expect(await Bun.file(marker).exists() ? await Bun.file(marker).text() : '').toBe('')
+  }, 60_000)
+
   it('builds a static site without connecting when the database is unreachable', async () => {
     const root = await project()
     const { code, text } = await kay(root, UNREACHABLE, 'build', '--static', '--no-check')

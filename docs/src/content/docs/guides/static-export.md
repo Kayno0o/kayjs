@@ -28,6 +28,8 @@ The security headers a server would send are written as `_headers`, which Netlif
 
 <ReadMore href="/llms/prerendering#static-export">Images, redirects, locales and how the output directory is cleared.</ReadMore>
 
+The build never opens the `store` of your config. A `pgData` database is not connected to, and gets no tables, while you export.
+
 ## Pages that need a server
 
 A page cannot be exported when only a server can answer it. The build fails and names each one.

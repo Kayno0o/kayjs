@@ -151,8 +151,8 @@ async function setupWith<Claimed>(project: Project, loadClient: () => Promise<Cl
     setTracer(config.tracer)
     setupStorage(config.storage, join(imageCache, 'stored'), imageCache)
     setAppRoot(root)
-    // An export holds no live values, so it never reads the store that keeps them: a build with no database reachable still ends.
-    setupStore(exporting && config.store ? { ...config.store, live: undefined } : config.store)
+    // An export serves nobody, so it keeps only the database url libraries read and none of the stores: a pgData store would otherwise poll, open its connection and create its tables while the build runs, and a build with no database reachable still ends.
+    setupStore(exporting && config.store ? { database: config.store.database } : config.store)
     await liveStoreReady()
     // A test's server restarts with its process and has no replica, so a key of the process is right there.
     warnOnStampKey(!mode.dev && process.env.NODE_ENV !== 'test')
