@@ -10,7 +10,7 @@ import { setCardMaker, setRemoteImages, shareCard } from '../src/runtime/image'
 import { runInLocale } from '../src/runtime/locale-state'
 import { pages } from '../src/server'
 import { serveCards, setupCards } from '../src/server/card'
-import { answer, MAX_QUEUED, setCardShotLimit, shootCard, templateStamp } from '../src/server/card-template'
+import { answer, imageRoute, MAX_QUEUED, setCardShotLimit, shootCard, templateStamp } from '../src/server/card-template'
 import { decodePng } from '../src/server/crop'
 import * as browserModule from '../src/test/browser'
 import { browserPath } from '../src/test/browser'
@@ -248,6 +248,22 @@ describe('the share card template stamp', () => {
       await rm(dir, { recursive: true, force: true })
     }
   }, 60_000)
+
+  it.skipIf(!chrome)('makes one image route for the cards of a burst, and drops it once the browser closes', async () => {
+    const options = { clientDir: clientDir(FIXTURE), cacheDir: join(tmpdir(), 'kay-card-route-cache') }
+    const first = await imageRoute(options)
+
+    expect(await imageRoute(options)).toBe(first)
+    expect(await imageRoute({ ...options })).not.toBe(first)
+
+    // Drawn with the same options, the route the cards share is still the one made.
+    const shared = await imageRoute(options)
+
+    await shootCard(clientDir(FIXTURE), 80, async () => '<body style="margin:0">x</body>', options)
+    expect(await imageRoute(options)).toBe(shared)
+    await Bun.sleep(3300)
+    expect(await imageRoute(options)).not.toBe(shared)
+  }, 30_000)
 
   it('says where Chrome is needed when there is none', async () => {
     const before = process.env.BUN_CHROME_PATH

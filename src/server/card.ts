@@ -594,6 +594,8 @@ export function serveCards(app: Elysia, cards: Cards, options: ImageRouteOptions
 // The cards prerendered pages asked for, written beside the image variants for the route or a static host to serve as files; returns how many were drawn. A card an earlier build drew is copied from the cache, which keeps only this build's.
 export async function writeCards(clientDir: string, cacheDir?: string, remote?: RemoteImages, images?: Pick<ImageRouteOptions, 'aspects' | 'quality' | 'avif'>): Promise<number> {
   let drawn = 0
+  // One object for every card, so the image route is made once.
+  const served: ImageRouteOptions = { ...images, clientDir, cacheDir: join(current!.dir, CARD_IMAGES_DIR), remote }
 
   for (const [name, card] of requested) {
     const target = join(clientDir, VARIANTS_DIR, name)
@@ -612,7 +614,7 @@ export async function writeCards(clientDir: string, cacheDir?: string, remote?: 
     countCache('share cards', kept)
 
     if (!kept && current!.template) {
-      await writeTemplateCard(current!, cached ?? target, { title: card.title, image: card.image, name: card.name ?? current!.name, locale: card.locale }, { ...images, clientDir, cacheDir: join(current!.dir, CARD_IMAGES_DIR), remote })
+      await writeTemplateCard(current!, cached ?? target, { title: card.title, image: card.image, name: card.name ?? current!.name, locale: card.locale }, served)
       drawn++
     }
     else if (!kept) {

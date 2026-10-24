@@ -106,6 +106,8 @@ let waiting = 0
 export const MAX_QUEUED = 16
 let idle: Timer | undefined
 let browser: typeof import('../test/browser') | undefined
+// The image route of the cards being drawn, kept while the browser is, for the cards of a burst to share its caches.
+let routed: { options: ImageRouteOptions, handle: (request: Request) => Promise<Response> } | undefined
 
 // The JPEG of the page `render` gives, kay's render of `_card.kay` given the address it is served at, as Chrome draws it at the card's size, from a server of its own on a port nothing else knows that serves the page and the build's files. The browser is the one kay's tests and `kay screenshot` start, which closes once no page is left.
 export async function shootCard(clientDir: string, quality: number, render: (origin: string) => Promise<string>, images?: ImageRouteOptions | undefined): Promise<Uint8Array> {
@@ -125,21 +127,28 @@ export async function shootCard(clientDir: string, quality: number, render: (ori
     resolve()
 
     if (--waiting === 0) {
-      idle = setTimeout(() => browser?.releaseIdleBrowser(), IDLE_MS)
+      idle = setTimeout(() => {
+        routed = undefined
+        browser?.releaseIdleBrowser()
+      }, IDLE_MS)
       idle.unref()
     }
   }
 }
 
 // The image route over `options`, answering in this process: the images of `images.dirs` and `images.remote`, and the variants of an imported one, as the app's own route would.
-async function imageRoute(options: ImageRouteOptions): Promise<(request: Request) => Promise<Response>> {
+export async function imageRoute(options: ImageRouteOptions): Promise<(request: Request) => Promise<Response>> {
+  if (routed?.options === options)
+    return routed.handle
+
   const [{ Elysia }, { serveImages }] = await Promise.all([import('elysia'), import('./image')])
   const app = new Elysia()
 
   // No guard of `images.resolve` runs: a card shows what is public.
   serveImages(app, { ...options, resolve: undefined })
+  routed = { options, handle: async request => app.handle(request) }
 
-  return async request => app.handle(request)
+  return routed.handle
 }
 
 async function draw(clientDir: string, quality: number, render: (origin: string) => Promise<string>, images: ImageRouteOptions | undefined): Promise<Uint8Array> {
