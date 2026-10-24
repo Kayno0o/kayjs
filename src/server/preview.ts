@@ -290,9 +290,14 @@ function sharedEditStore() {
   return workerCount() > 1 ? appStore()?.cache : undefined
 }
 
+// The key of a cookie's row: the cookie is a bearer credential, so the store file holds a hash of it.
+function editKey(cookie: string): string {
+  return EDIT_KEY + new Bun.CryptoHasher('sha256').update(cookie).digest('hex')
+}
+
 // What the workers' shared row holds for an edit cookie: the entries the pages rendered by any of them read.
 function sharedEntries(cookie: string): string[] {
-  const stored = sharedEditStore()?.get(EDIT_KEY + cookie)
+  const stored = sharedEditStore()?.get(editKey(cookie))
 
   if (stored === undefined || stored instanceof Promise || stored.freshUntil <= Date.now())
     return []
@@ -313,7 +318,7 @@ function shareEditSession(cookie: string, session: EditSession): void {
     return
 
   const entries = new Set([...sharedEntries(cookie), ...session.entries])
-  const written = cache.set(EDIT_KEY + cookie, JSON.stringify([...entries]), session.until * 1000)
+  const written = cache.set(editKey(cookie), JSON.stringify([...entries]), session.until * 1000)
 
   if (written instanceof Promise)
     void settled(written)

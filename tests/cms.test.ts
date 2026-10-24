@@ -57,6 +57,11 @@ async function get(path: string, cookie?: string): Promise<{ status: number, htm
 }
 
 // The cookie a preview link sets, as the browser sends it back.
+// The key the shared cache holds an edit session under: a hash of the cookie.
+function editKeyOf(cookie: string): string {
+  return `kay:edit-session:${new Bun.CryptoHasher('sha256').update(cookie).digest('hex')}`
+}
+
 async function previewCookie(link: string): Promise<string> {
   const response = await app.handle(new Request(`http://localhost${link}`))
 
@@ -838,7 +843,7 @@ describe('the collections a CMS edits', () => {
     const dir = await mkdtemp(join(tmpdir(), 'kay-edit-share-'))
     const cache = sqliteCache(join(dir, 'cache.sqlite'))
     const request = new Request('http://localhost/', { headers: { cookie: edit } })
-    const key = `kay:edit-session:${edit.slice('kay_preview='.length)}`
+    const key = editKeyOf(edit.slice('kay_preview='.length))
     const before = { workers: process.env.KAY_WORKERS, worker: process.env.KAY_WORKER }
 
     try {
@@ -851,6 +856,9 @@ describe('the collections a CMS edits', () => {
       noteEditedEntries(request, [{ collection: 'news', slug: 'shared' }])
       expect(JSON.parse(cache.get(key)!.text)).toContain('news\0shared')
 
+      // The store file never holds the cookie itself.
+      expect(cache.keys().some(stored => stored.includes(edit.slice('kay_preview='.length)))).toBe(false)
+
       // A page of this editor another worker rendered is in the row, and this worker also holds a session of its own for the cookie.
       cache.set(key, JSON.stringify(['news\0elsewhere']), Date.now() + 60_000)
       expect(editedEntry(new Request('http://localhost/', { headers: { cookie: edit } }), 'news', 'elsewhere')).toBe(true)
@@ -861,7 +869,7 @@ describe('the collections a CMS edits', () => {
       expect((JSON.parse(cache.get(key)!.text) as string[]).toSorted()).toEqual(['news\0alone', 'news\0elsewhere', 'news\0later', 'news\0shared'].toSorted())
 
       const other = await previewCookie(previewUrl('/news', { edit: true }))
-      const otherKey = `kay:edit-session:${other.slice('kay_preview='.length)}`
+      const otherKey = editKeyOf(other.slice('kay_preview='.length))
 
       cache.set(otherKey, JSON.stringify(['news\0elsewhere']), Date.now() + 60_000)
       expect(editedEntry(new Request('http://localhost/', { headers: { cookie: other } }), 'news', 'elsewhere')).toBe(true)
