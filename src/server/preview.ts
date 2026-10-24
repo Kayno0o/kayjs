@@ -16,6 +16,7 @@ import { kayLog } from '../runtime/log'
 import { setPreviewScope } from '../runtime/preview'
 import { DRAFT_ROUTE } from '../runtime/swap'
 import { isCrossSite } from './actions'
+import { appStore } from './app-store'
 import { nodeCrypto } from './builtins'
 import { cookieName, prefixedNames } from './cookie-names'
 import { requestCookies } from './cookies'
@@ -23,6 +24,7 @@ import { overHttps, requestUrl } from './request-url'
 import { MIN_SECRET_LENGTH, sameText, warnLowEntropy } from './seal'
 import { appSecrets, noAppSecret, useStampSecret } from './stamp'
 import { markInternal, visitAs } from './visit'
+import { workerCount } from './workers'
 
 // Where a preview link enters preview mode, or `?exit` leaves it.
 export const PREVIEW_ROUTE = '/_kay/preview'
@@ -61,6 +63,8 @@ interface PreviewSettings {
 
 // Edit cookies kept at once, so the collections they read cannot grow without bound; the oldest goes first.
 const MAX_EDIT_SESSIONS = 1000
+// Where an edit session is kept in the workers' shared cache store.
+const EDIT_KEY = 'kay:edit-session:'
 
 interface EditSession {
   until: number
@@ -277,6 +281,29 @@ export function noteEditedEntries(request: Request, entries: Iterable<EntryRef>)
 
   for (const { collection, slug } of entries)
     session.entries.add(entryKey(collection, slug))
+
+  shareEditSession(cookie, session)
+}
+
+// With several workers a page and the API reading what it rendered meet different processes, so the session also goes to the cache store when that answers at once, which the workers share.
+function sharedEditStore() {
+  return workerCount() > 1 ? appStore()?.cache : undefined
+}
+
+function shareEditSession(cookie: string, session: EditSession): void {
+  const cache = sharedEditStore()
+
+  if (cache !== undefined)
+    void cache.set(EDIT_KEY + cookie, JSON.stringify([...session.entries]), session.until * 1000)
+}
+
+function sharedEditedEntry(cookie: string, key: string): boolean {
+  const stored = sharedEditStore()?.get(EDIT_KEY + cookie)
+
+  if (stored === undefined || stored instanceof Promise || stored.freshUntil <= Date.now())
+    return false
+
+  return (JSON.parse(stored.text) as string[]).includes(key)
 }
 
 function entryKey(collection: string, slug: string): string {
@@ -288,7 +315,10 @@ export function editedEntry(request: Request, collection: string, slug: string):
   const cookie = editCookie(request)
   const session = cookie === undefined ? undefined : editSessions.get(cookie)
 
-  return session !== undefined && session.until > Date.now() / 1000 && session.entries.has(entryKey(collection, slug))
+  if (session !== undefined)
+    return session.until > Date.now() / 1000 && session.entries.has(entryKey(collection, slug))
+
+  return cookie !== undefined && sharedEditedEntry(cookie, entryKey(collection, slug))
 }
 
 // The valid edit cookie of the request in edit mode, which names its edit session and is tied to no user: a CMS keeps what it learns of a person against it.

@@ -17,6 +17,7 @@ import { MarkdownError } from '../src/content/markdown'
 import * as validate from '../src/content/validate'
 import { ContentError } from '../src/content/validate'
 import { cached } from '../src/runtime/cache'
+import { sqliteCache } from '../src/runtime/cache.server'
 import { showDraft } from '../src/runtime/edit'
 import { editableEntry, editMarks, placeFieldMarks, unclickableFields, withFieldMarks } from '../src/runtime/fields'
 import { attribute, child, element, loop, spreadAttributes } from '../src/runtime/html'
@@ -27,6 +28,7 @@ import { editing, previewing } from '../src/runtime/preview'
 import { html as renderedHtml } from '../src/runtime/rendered'
 import { merge } from '../src/runtime/values'
 import { editedEntry, editRequested, enterPreview, previewUrl } from '../src/server'
+import { setupStore } from '../src/server/app-store'
 import { entryUrls } from '../src/server/entry-urls'
 import { inPreview, noteEditedEntries, noteProbedEntries, previewRequested, requestDrafts } from '../src/server/preview'
 import { extensionEditor } from '../src/server/routes'
@@ -827,6 +829,55 @@ describe('the collections a CMS edits', () => {
     expect(asked('probed')).toBe(false)
     expect(() => noteProbedEntries(new Request('http://localhost/', { headers: { 'x-kay-probe': 'nobody-holds-this' } }), [{ collection: 'news', slug: 'read' }])).not.toThrow()
     expect(() => noteProbedEntries(new Request('http://localhost/'), [{ collection: 'news', slug: 'read' }])).not.toThrow()
+  })
+
+  it('shares an edit session between workers through the cache store, and keeps it to the process otherwise', async () => {
+    setSystemTime(new Date(Date.now() + 20 * 60_000))
+
+    const edit = await previewCookie(previewUrl('/news', { edit: true }))
+    const dir = await mkdtemp(join(tmpdir(), 'kay-edit-share-'))
+    const cache = sqliteCache(join(dir, 'cache.sqlite'))
+    const request = new Request('http://localhost/', { headers: { cookie: edit } })
+    const key = `kay:edit-session:${edit.slice('kay_preview='.length)}`
+    const before = { workers: process.env.KAY_WORKERS, worker: process.env.KAY_WORKER }
+
+    try {
+      setupStore({ cache })
+      noteEditedEntries(request, [{ collection: 'news', slug: 'alone' }])
+      expect(cache.get(key)).toBeUndefined()
+
+      process.env.KAY_WORKERS = '2'
+      process.env.KAY_WORKER = '1'
+      noteEditedEntries(request, [{ collection: 'news', slug: 'shared' }])
+      expect(JSON.parse(cache.get(key)!.text)).toContain('news\0shared')
+
+      // Another worker holds nothing in memory: the row the first wrote is its only source.
+      cache.set(key, JSON.stringify(['news\0elsewhere']), Date.now() + 60_000)
+      expect(editedEntry(new Request('http://localhost/', { headers: { cookie: edit } }), 'news', 'shared')).toBe(true)
+
+      const other = await previewCookie(previewUrl('/news', { edit: true }))
+      const otherKey = `kay:edit-session:${other.slice('kay_preview='.length)}`
+
+      cache.set(otherKey, JSON.stringify(['news\0elsewhere']), Date.now() + 60_000)
+      expect(editedEntry(new Request('http://localhost/', { headers: { cookie: other } }), 'news', 'elsewhere')).toBe(true)
+      expect(editedEntry(new Request('http://localhost/', { headers: { cookie: other } }), 'news', 'unread')).toBe(false)
+
+      delete process.env.KAY_WORKERS
+      delete process.env.KAY_WORKER
+      expect(editedEntry(new Request('http://localhost/', { headers: { cookie: other } }), 'news', 'elsewhere')).toBe(false)
+    }
+    finally {
+      setupStore(undefined)
+
+      for (const [name, value] of Object.entries({ KAY_WORKERS: before.workers, KAY_WORKER: before.worker })) {
+        if (value === undefined)
+          delete process.env[name]
+        else
+          process.env[name] = value
+      }
+
+      await rm(dir, { recursive: true, force: true })
+    }
   })
 
   it('lists a collection in a sitemap setting as its entries\' page', async () => {
