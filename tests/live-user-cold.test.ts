@@ -2,15 +2,17 @@ import type { TestSite } from '../src/test'
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
 import { Elysia } from 'elysia'
 import { nameUser } from '../src/server/request-user'
+import { readPersonally } from '../src/server/scope'
 import { testSite } from '../src/test'
 import { pagesOf } from './live-helpers'
 
 let asked = 0
 
-// Counts how often kay asks who is signed in, as a session read would cost.
+// Counts how often kay asks who is signed in, which marks the response personal as a session read does.
 const signedIn = new Elysia().derive({ as: 'global' }, ({ request }) => {
   nameUser(request, () => {
     asked++
+    readPersonally(request)
 
     return request.headers.get('x-user') ?? undefined
   })
@@ -45,8 +47,16 @@ describe('who is signed in, asked for the pages that read a value of each user o
     expect(asked).toBe(2)
   })
 
+  it('marks personal the response of the page reading one only', async () => {
+    const reading = await site.visit('/', { headers: { 'x-user': 'alice' } })
+    const plain = await site.visit('/about', { headers: { 'x-user': 'alice' } })
+
+    expect(reading.headers.get('cache-control')).toContain('private')
+    expect(plain.headers.get('cache-control') ?? '').not.toContain('private')
+  })
+
   it('goes on never asking for the page reading none', async () => {
     await visit('/about')
-    expect(asked).toBe(2)
+    expect(asked).toBe(3)
   })
 })
