@@ -184,7 +184,7 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('a value of 
     await Bun.sleep(4000)
     live.unread.set('alice', 9)
     await Bun.sleep(1000)
-    expect(await unread(tab)).toBe('3 unread')
+    expect(await unread(tab)).toBe('0 unread')
     // The island was fetched again for nobody, and the connection it left was not opened again.
     expect(islandLoads()).toHaveLength(loads + 1)
 

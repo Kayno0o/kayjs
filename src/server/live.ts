@@ -391,6 +391,7 @@ export function liveScript(live: ServerScope['live'] = currentServerScope()?.liv
 
   const page = cachePage(following, fresh, fresh.some(read => read.own) ? cache?.user : undefined)
   // An island's script holding live values is read by the connection of its module as a page's is, so it is marked as both.
+  // An island always carries the cache mark, as its module follows the viewer's renewals through that chunk.
   const mark = island && fresh.length === 0 ? ISLAND_MARK : `${LIVE_MARK}${island ? ISLAND_ATTR : ''}`
 
   return `${mark}${following.length > 0 || island ? CACHE_MARK : ''}>${encodeValue(page).replaceAll('<', '\\u003c')}</script>`

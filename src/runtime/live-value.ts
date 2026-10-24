@@ -880,12 +880,12 @@ function watch(slot: BrowserSlot, key: string, entry: Entry): void {
   const at = JSON.stringify([slot.id, key])
 
   if (entry.watchers === 0) {
-    // A page rendered since may hold a fresher value than the last the connection delivered; the same render as before holds the one the connection has since moved past.
+    // A page rendered since holds a fresher value than the last the connection delivered, or none when the viewer is not the one it was rendered for; the same render as before holds the one the connection has since moved past.
     const rendered = renderedValue(slot.id, key)
 
-    if (rendered && !(entry.rendered && sameValue(entry.rendered.value, rendered.value))) {
+    if (!sameValue(entry.rendered?.value, rendered?.value)) {
       entry.rendered = rendered
-      whenHydrated(() => entry.write(rendered.value))
+      whenHydrated(() => entry.write(rendered ? rendered.value : initialOf(slot, key)))
     }
   }
 
@@ -909,6 +909,8 @@ function watch(slot: BrowserSlot, key: string, entry: Entry): void {
 
 // Ends the pause in progress, as the keys the islands read changed.
 let wake: (() => void) | undefined
+// Counts the syncs, for a renewal to tell that one ran while it asked.
+let syncs = 0
 
 // Resolves after `ms`, or as soon as `signal` aborts or the keys change.
 async function pause(ms: number, signal: AbortSignal): Promise<void> {
@@ -948,7 +950,7 @@ async function renewProofs(signal: AbortSignal | null = null): Promise<'renewed'
       return 'gone'
 
     // The scripts inside a deferred island are the island's own, which its fetch renews.
-    for (const old of document.querySelectorAll(`${LIVE_SCRIPT}:not(slot *)`))
+    for (const old of document.querySelectorAll(`${LIVE_SCRIPT}:not(slot[data-kay-server] *)`))
       old.remove()
 
     document.head.append(...fresh)
@@ -998,6 +1000,7 @@ function release(): void {
 // Opens, moves or closes the one connection so it carries exactly the keys the islands read.
 function sync(): void {
   settling = undefined
+  syncs++
   wake?.()
 
   const keys = new Set(wanted.keys())
@@ -1029,13 +1032,14 @@ function sync(): void {
       return response
 
     // Refused: the proof may be one a restart or its age made stale, so the page is asked for a new one before the backoff.
+    const before = syncs
     const renewed = await renewProofs(signal)
 
     if (renewed === 'renewed')
       return post(signal)
 
     // The page no longer holds any, as for a visitor who may not see it: the stale proof is tried again at a distance.
-    if (renewed === 'gone')
+    if (renewed === 'gone' && syncs === before)
       await pause(GONE_RETRY_MS, signal)
 
     return response

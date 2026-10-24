@@ -232,10 +232,8 @@ export async function prerenderPages(project: Project, client: ClientBuild, opti
         if (livesOn && unfollowed === undefined)
           throw new KayError('export-server-render', 'kay: it reads a live value, which only a server holds and signs the connection to per request; drop `prerender` from `export const page`, or read the value in a component the page does not render at build time')
 
-        if (unfollowed !== undefined) {
+        if (unfollowed !== undefined)
           html = unfollowed.html
-          kayLog('warn', `${copy.path} reads ${unfollowed.keys.map(key => `'${key}'`).join(', ')} with \`live: true\` in its own render, which the build runs once: what the page shows of it itself goes stale and only its server islands follow, so drop \`prerender\` from \`export const page\` if the page shows it`)
-        }
 
         if (options.exportAll && readsSite)
           throw new KayError('export-site-url', 'kay: it reads the site, through siteUrl() or siteOrigin(), which neither `site` in kay.config.ts nor SITE_URL sets')
@@ -248,6 +246,9 @@ export async function prerenderPages(project: Project, client: ClientBuild, opti
 
         if (islands.includes('defer') && client.entry === undefined)
           throw new KayError('export-server-render', `kay: it defers a server island, which kay's browser entry fetches, and with no island and \`navigation: false\` the build has none; mark it \`server\` to render it inline instead`)
+
+        if (unfollowed !== undefined)
+          kayLog('warn', `${copy.path} reads ${unfollowed.keys.slice(0, 5).map(key => `'${key}'`).join(', ')}${unfollowed.keys.length > 5 ? ' and more' : ''} with \`live: true\` in its own render, which the build runs once: what the page shows of it itself goes stale and only its server islands follow, so drop \`prerender\` from \`export const page\` if the page shows it`)
 
         const name = `${copy.key === '/' ? 'index' : copy.key.slice(1)}.html`
         const taken = reserved.get(name) ?? paths.get(name)
