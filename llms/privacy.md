@@ -109,7 +109,6 @@ export async function archive(scan: File) {
 - `kay_editor_session` (kayjs-cms `passwordGuard`): the password sign-in, `<role>.<expires>.<signature>`, `httpOnly`; necessary, `maxAge`, `'14d'` by default.
 - `ksteps_<name>` (kayjs-ui `stepDraft`): the values of a multi-step form between its steps, `httpOnly`, up to 3,800 encoded bytes, what a visitor typed in; necessary for the form they are filling in, `maxAge` (a duration), an hour by default, ended by `clear()`.
 - `kay_push_device` (`push()`): a hash naming the push subscription this browser made, `httpOnly`, set when it subscribes, so sign-out drops that device alone; necessary, a year.
-||||||| parent of a1f174b (fix(runtime): local() review: listeners released, sign-out reaches the worker, a failing write is rejected, privacy pages list it)
 - `kay_local_clear` (`local()`): a random value, readable by scripts, set only when the app calls `forgetLocalMirrors(request)` at sign-out; the next page using a collection empties the browser's mirror and queue when it changed; necessary, a year, names no one.
 - Each `persisted(name, ...)` signal keeps its value in a cookie of that name for a year, or its `maxAge`, or in `localStorage` with `{ storage: 'local' }`; what it holds is the app's choice, so a preference is necessary and anything else waits for consent.
 
