@@ -13,7 +13,7 @@ import { pgHandle } from '../src/server/pg-data'
 import { pgPush } from '../src/server/pg-stores'
 import { checkedEndpoint, push, pushesSettled, pushSubscriptions, readSubscription, sendPush, setPushResolver, setVapidKeys, vapidKeys } from '../src/server/push'
 import { decryptPayload, encryptPayload, fromBase64Url, generateVapidKeys, toBase64Url, validVapidKeys, vapidAuthorization } from '../src/server/push-crypto'
-import { setPushSettings } from '../src/server/push-settings'
+import { setPushLoose, setPushSettings } from '../src/server/push-settings'
 import { memoryPush, sqlitePush } from '../src/server/push-store'
 import { nameUser } from '../src/server/request-user'
 import { cleanUpAfterFile, pgDescribe, postgres } from './job-stores'
@@ -67,6 +67,7 @@ beforeAll(async () => {
     },
   })
   server = await generateVapidKeys()
+  setPushLoose(true)
 })
 
 afterAll(async () => {
@@ -225,13 +226,6 @@ describe('sendPush', () => {
   })
 })
 
-function restoreEnv(before: string | undefined): void {
-  if (before === undefined)
-    delete process.env.NODE_ENV
-  else
-    process.env.NODE_ENV = before
-}
-
 describe('the endpoint a browser names', () => {
   it('is https at a public address in production', async () => {
     expect(await checkedEndpoint('https://8.8.8.8/push/abc', true)).toBe('https://8.8.8.8/push/abc')
@@ -256,12 +250,30 @@ describe('the endpoint a browser names', () => {
     expect(await pushSubscriptions.list('ada')).toEqual([])
   })
 
+  it('is dropped without the dev switch even when it is a loopback address, whatever NODE_ENV says', async () => {
+    const phone = await device('phone')
+    const env = process.env.NODE_ENV
+
+    setPushLoose(false)
+    process.env.NODE_ENV = 'development'
+
+    try {
+      await subscribe('ada', phone)
+      expect(await sendPush('ada', { title: 'x' })).toEqual({ sent: 0, dropped: 1, failed: 0 })
+      expect(received).toHaveLength(0)
+      expect(await checkedEndpoint(phone.endpoint)).toBeUndefined()
+    }
+    finally {
+      setPushLoose(true)
+      process.env.NODE_ENV = env
+    }
+  })
+
   it('is dropped when its name resolves to a private address, and the connection is never made', async () => {
-    const before = process.env.NODE_ENV
 
     const phone = await device('phone')
 
-    process.env.NODE_ENV = 'production'
+    setPushLoose(false)
     setPushResolver(async () => [{ address: '10.0.0.7', family: 4 }])
 
     try {
@@ -270,16 +282,15 @@ describe('the endpoint a browser names', () => {
       expect(await pushSubscriptions.list('ada')).toEqual([])
     }
     finally {
-      restoreEnv(before)
+      setPushLoose(true)
       setPushResolver()
     }
   })
 
   it('is kept and failed when the lookup itself fails', async () => {
-    const before = process.env.NODE_ENV
     const phone = await device('phone')
 
-    process.env.NODE_ENV = 'production'
+    setPushLoose(false)
     setPushResolver(async () => {
       throw new Error('SERVFAIL')
     })
@@ -291,7 +302,7 @@ describe('the endpoint a browser names', () => {
       expect(await readSubscription({ endpoint: 'https://push.example.test/abc', keys: { p256dh: phone.keys.publicKey, auth: phone.auth } })).toBeUndefined()
     }
     finally {
-      restoreEnv(before)
+      setPushLoose(true)
       setPushResolver()
     }
   })
@@ -581,7 +592,7 @@ describe('the keys', () => {
 
   it('reads the pair of the environment, else generates one once outside production and stops a production server given none', async () => {
     const dir = await scratchDir('push-keys-')
-    const before = { cwd: process.cwd(), env: process.env.NODE_ENV, publicKey: process.env.VAPID_PUBLIC_KEY, privateKey: process.env.VAPID_PRIVATE_KEY }
+    const before = { cwd: process.cwd(), publicKey: process.env.VAPID_PUBLIC_KEY, privateKey: process.env.VAPID_PRIVATE_KEY }
 
     files.push(dir)
 
@@ -603,7 +614,7 @@ describe('the keys', () => {
       setVapidKeys(undefined)
       expect(await vapidKeys()).toEqual(server)
 
-      process.env.NODE_ENV = 'production'
+      setPushLoose(false)
       process.env.VAPID_PRIVATE_KEY = generated.privateKey
       setVapidKeys(undefined)
       await expect(vapidKeys()).rejects.toThrow('not a base64url P-256 key pair')
@@ -614,8 +625,9 @@ describe('the keys', () => {
     }
     finally {
       process.chdir(before.cwd)
+      setPushLoose(true)
 
-      for (const [name, value] of [['NODE_ENV', before.env], ['VAPID_PUBLIC_KEY', before.publicKey], ['VAPID_PRIVATE_KEY', before.privateKey]] as const) {
+      for (const [name, value] of [['VAPID_PUBLIC_KEY', before.publicKey], ['VAPID_PRIVATE_KEY', before.privateKey]] as const) {
         if (value === undefined)
           delete process.env[name]
         else

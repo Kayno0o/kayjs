@@ -1,3 +1,4 @@
+import { underKayDev } from '../build/assets'
 import { kayLog } from '../runtime/log'
 import { pushStore } from './push-store'
 
@@ -20,6 +21,18 @@ export function pushSettings(): PushSettings | undefined {
 
 export function setPushSettings(settings: PushSettings | undefined): void {
   current = settings
+}
+
+let looseForTest = false
+
+// For a test: plays the push service on loopback and generates VAPID keys as `kay dev` does.
+export function setPushLoose(loose: boolean): void {
+  looseForTest = loose
+}
+
+// Whether the server relaxes what production demands: loopback and private push endpoints, and VAPID keys generated into `.kay`. Only under `kay dev` (and tests); a deploy with any `NODE_ENV` is treated as production.
+export function pushLoose(): boolean {
+  return underKayDev() || looseForTest
 }
 
 const pending = new Set<Promise<void>>()

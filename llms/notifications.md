@@ -75,7 +75,7 @@ import { defineConfig, push } from 'kay/server'
 export default defineConfig({ extensions: [push({ subject: 'mailto:ops@example.com' })] })
 ```
 
-`kay push keys` prints `VAPID_PUBLIC_KEY` and `VAPID_PRIVATE_KEY` for the production environment (`kay env` lists them as required there); outside production a pair is generated once into `.kay/vapid.json`. `subject` is the contact push services reach you by, the https origin of `SITE_URL` when left out. List `push()` after the library that names the signed-in user (kayjs-auth), as the Bell needs.
+`kay push keys` prints `VAPID_PUBLIC_KEY` and `VAPID_PRIVATE_KEY` for the production environment (`kay env` lists them as required there); under `kay dev` alone a pair is generated once into `.kay/vapid.json`, and a push endpoint on loopback or a private address is accepted (any other server, whatever its `NODE_ENV`, refuses both). `subject` is the contact push services reach you by, the https origin of `SITE_URL` when left out. List `push()` after the library that names the signed-in user (kayjs-auth), as the Bell needs.
 
 `sendPush` sends a push alone, whatever the inbox holds:
 

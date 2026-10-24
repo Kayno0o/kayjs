@@ -14,7 +14,7 @@ import { ipVersion, isPublicAddress, pinnedLookup, PrivateAddressError, resolveH
 import { defineEnv } from './env'
 import { MAX_TITLE, safeNotificationUrl } from './notifications'
 import { encryptPayload, generateVapidKeys, MAX_PAYLOAD_BYTES, validVapidKeys, vapidAuthorization } from './push-crypto'
-import { pushSettings, setPushSettings } from './push-settings'
+import { pushLoose, pushSettings, setPushSettings } from './push-settings'
 import { pushStore } from './push-store'
 import { onReload } from './reload'
 
@@ -75,7 +75,7 @@ const PUSH_ENV = s.Object({
 })
 
 // Lets the site push to the devices of the people who opted in: `sendPush` sends, an island's `webPush.subscribe()` opts in, `notify()` pushes beside the inbox, and kay's service worker shows the notification and opens its link on a click.
-// The VAPID keys are read from `VAPID_PUBLIC_KEY` and `VAPID_PRIVATE_KEY` (`kay push keys` prints a pair); outside production a pair is generated once into `.kay/vapid.json`.
+// The VAPID keys are read from `VAPID_PUBLIC_KEY` and `VAPID_PRIVATE_KEY` (`kay push keys` prints a pair); under `kay dev` a pair is generated once into `.kay/vapid.json`.
 export function push(options: PushOptions = {}): KayExtension {
   const { subject } = options
 
@@ -99,7 +99,7 @@ onReload(() => {
   keys = undefined
 })
 
-// The VAPID pair: the environment's, else outside production one generated once into the git-ignored `.kay/vapid.json`. A production server without a valid pair stops.
+// The VAPID pair: the environment's, else under `kay dev` one generated once into the git-ignored `.kay/vapid.json`. Any other server without a valid pair stops.
 export async function vapidKeys(): Promise<VapidKeys> {
   keys ??= loadKeys()
 
@@ -125,7 +125,7 @@ async function loadKeys(): Promise<VapidKeys> {
   if (await validVapidKeys(pair))
     return pair
 
-  if (process.env.NODE_ENV === 'production')
+  if (!pushLoose())
     throw new KayError('config-invalid', 'kay: VAPID_PUBLIC_KEY and VAPID_PRIVATE_KEY are not a base64url P-256 key pair; `kay push keys` prints one')
 
   return devKeys()
@@ -165,7 +165,7 @@ function subjectOf(): string {
   if (site?.protocol === 'https:')
     return site.origin
 
-  if (process.env.NODE_ENV === 'production')
+  if (!pushLoose())
     kayLog('warn', 'push() has no subject and SITE_URL is not an https address: pass push({ subject: \'mailto:you@example.com\' }) so push services can reach you')
 
   return site?.origin ?? 'mailto:push@localhost'
@@ -178,7 +178,7 @@ export function setPushResolver(resolve: Resolver = resolveHost): void {
   resolver = resolve
 }
 
-// The endpoint when its shape can be a push service: https (outside production also an http(s) loopback one, which is how a test plays the push service), no credentials, and a literal address only when public. The browser chose it, so a name is resolved and checked by `checkedEndpoint` and again by the connection itself.
+// The endpoint when its shape can be a push service: https (under `kay dev` also an http(s) loopback one, which is how a test plays the push service), no credentials, and a literal address only when public. The browser chose it, so a name is resolved and checked by `checkedEndpoint` and again by the connection itself.
 function staticEndpoint(endpoint: unknown, production: boolean): { endpoint: string, host: string, name: boolean } | undefined {
   if (typeof endpoint !== 'string' || endpoint.length > MAX_ENDPOINT)
     return undefined
@@ -203,7 +203,7 @@ function staticEndpoint(endpoint: unknown, production: boolean): { endpoint: str
 }
 
 // `staticEndpoint` plus, for a name, a lookup that must answer public addresses only. A lookup that fails is a throw, not a refusal: the name may work later.
-export async function checkedEndpoint(endpoint: unknown, production = process.env.NODE_ENV === 'production'): Promise<string | undefined> {
+export async function checkedEndpoint(endpoint: unknown, production = !pushLoose()): Promise<string | undefined> {
   const found = staticEndpoint(endpoint, production)
 
   if (found === undefined)
@@ -282,7 +282,7 @@ async function post(endpoint: string, headers: Record<string, string>, body: Uin
 }
 
 async function deliver(subscription: PushSubscriptionRecord, payload: Uint8Array<ArrayBuffer>, headers: Record<string, string>, pair: VapidKeys, subject: string): Promise<Outcome> {
-  const production = process.env.NODE_ENV === 'production'
+  const production = !pushLoose()
   const found = staticEndpoint(subscription.endpoint, production)
 
   if (found === undefined) {
