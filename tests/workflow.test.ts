@@ -284,6 +284,8 @@ describe.each(kinds)('a workflow on a $name store', ({ open }) => {
 
     const [sent] = await Promise.all([flow.send(id, 'go', 1), flow.drain()])
 
+    // The drain may lose its claim to the event, which leaves the woken run for the next drain.
+    await flow.drain()
     expect(got).toHaveLength(1)
     expect(got[0]).toEqual(sent ? { timedOut: false, data: 1 } : { timedOut: true })
   })
