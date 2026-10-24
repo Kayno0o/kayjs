@@ -72,6 +72,7 @@ kayjs-auth's `auth_*` tables are no longer `renamedFrom` their old names. A data
 ### Props typed `Signal<T>` or `Memo<T>` are plain values
 
 A prop typed `Signal<T>` or `Memo<T>` is a plain value of that type now, no longer read by calling it or assigned: type a prop the child writes `Bindable<T>`, read and assign it as `open`, and bind it with `bind:open={open}`; a `Memo<T>` prop is a `T`, passed as `value={memo()}`. `kay check` reports a prop still typed `Signal<T>` or `Memo<T>` from `kay`.
+
 ## 1.73.0
 
 ### kayjs-cms: the editor panel is kayjs-ui's docked `SidePanel`
