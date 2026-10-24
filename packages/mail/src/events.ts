@@ -3,7 +3,9 @@ import type { Reply } from './mime'
 import { createHash, createHmac, createPublicKey, timingSafeEqual, verify } from 'node:crypto'
 import process from 'node:process'
 import { normalizeAddress } from './list-address'
-import { deliveryReport, parseMime, replyOf } from './mime'
+import { log } from './log'
+import { isOwnMessageId } from './message-id'
+import { addressesOf, deliveryReport, parseMime, replyOf } from './mime'
 
 // Where a provider posts what happened to a mail, and where a mail server hands the app a reply or a delivery report.
 export const EVENTS_PATH = '/_kay/mail/events'
@@ -53,7 +55,8 @@ const BODY_MAX = 1_048_576
 const INBOUND_MAX = 5_242_880
 const WINDOW_SECONDS = 300
 const SECRET_ENV: Record<keyof EventSecrets, string> = { postmark: 'MAIL_EVENTS_POSTMARK', mailgun: 'MAIL_EVENTS_MAILGUN', sendgrid: 'MAIL_EVENTS_SENDGRID', resend: 'MAIL_EVENTS_RESEND', inbound: 'MAIL_INBOUND_SECRET' }
-const PERMANENT = /^5\./
+// A bad destination address (5.1.x) or a disabled mailbox (5.2.1): not a full mailbox, a policy block or a reputation one, which say nothing of the address.
+const ADDRESS_GONE = /^5\.(?:1\.\d+|2\.1)$/
 const WHSEC = /^whsec_/
 const BASIC = /^basic\s+(\S+)$/i
 const BEARER = /^bearer\s+(\S+)$/i
@@ -136,11 +139,10 @@ function svixSigned(secret: string, request: Request, text: string): boolean {
 }
 
 const asArray = (value: unknown): unknown[] => Array.isArray(value) ? value : [value]
-const normalized = (value: unknown): string | undefined => normalizeAddress(value)
 
 function postmarkFound(body: unknown): Found[] {
   const { RecordType, Type, TypeCode, Email } = (body ?? {}) as Record<string, unknown>
-  const email = normalized(Email)
+  const email = normalizeAddress(Email)
 
   if (email === undefined)
     return []
@@ -153,7 +155,7 @@ function postmarkFound(body: unknown): Found[] {
 
 function mailgunFound(body: unknown): Found[] {
   const data = ((body ?? {}) as Record<string, unknown>)['event-data'] as Record<string, unknown> | undefined
-  const email = normalized(data?.recipient)
+  const email = normalizeAddress(data?.recipient)
 
   if (email === undefined)
     return []
@@ -168,16 +170,16 @@ function sendgridFound(body: unknown): Found[] {
   const found: Found[] = []
 
   for (const item of asArray(body)) {
-    const { email: address, event, type } = (item ?? {}) as Record<string, unknown>
-    const email = normalized(address)
+    const { email: address, event, type, reason } = (item ?? {}) as Record<string, unknown>
+    const email = normalizeAddress(address)
 
     if (email === undefined)
       continue
 
-    // A `blocked` bounce is the receiving server's temporary refusal; a dropped mail is one SendGrid itself refused for an address it knows dead or complaining.
-    if (event === 'spamreport')
+    // A `blocked` bounce is the receiving server's temporary refusal; SendGrid drops a mail for an address it knows dead or complaining, and for reasons that say nothing of the address.
+    if (event === 'spamreport' || (event === 'dropped' && reason === 'Spam Reporting Address'))
       found.push({ email, reason: 'complaint' })
-    else if (event === 'dropped' || (event === 'bounce' && type !== 'blocked'))
+    else if ((event === 'dropped' && reason === 'Bounced Address') || (event === 'bounce' && type !== 'blocked'))
       found.push({ email, reason: 'bounce' })
   }
 
@@ -197,7 +199,7 @@ function resendFound(body: unknown): Found[] {
   const reason = type === 'email.bounced' ? 'bounce' : 'complaint'
 
   return asArray(data?.to).flatMap((address) => {
-    const email = normalized(address)
+    const email = normalizeAddress(address)
 
     return email === undefined ? [] : [{ email, reason } satisfies Found]
   })
@@ -207,16 +209,26 @@ const FOUND: Record<Provider, (body: unknown) => Found[]> = { postmark: postmark
 
 const plain = (status: number, text = ''): Response => new Response(text, { status, headers: { 'content-type': 'text/plain; charset=utf-8', 'cache-control': 'no-store' } })
 
-// The body when it is no larger than `max`, else undefined.
+// The body when it is no larger than `max`, else undefined: read as it arrives, so a body without a length stops at the cap.
 async function bodyOf(request: Request, max: number): Promise<Uint8Array<ArrayBuffer> | undefined> {
-  const length = Number(request.headers.get('content-length') ?? 0)
-
-  if (length > max)
+  if (Number(request.headers.get('content-length') ?? 0) > max)
     return undefined
 
-  const bytes = new Uint8Array(await request.arrayBuffer())
+  const chunks: Uint8Array[] = []
+  let total = 0
 
-  return bytes.length > max ? undefined : bytes
+  if (request.body !== null) {
+    for await (const chunk of request.body as unknown as AsyncIterable<Uint8Array>) {
+      total += chunk.length
+
+      if (total > max)
+        return undefined
+
+      chunks.push(chunk)
+    }
+  }
+
+  return new Uint8Array(Buffer.concat(chunks))
 }
 
 function inboundAuthorised(secret: string, request: Request): boolean {
@@ -247,8 +259,9 @@ async function rawMessage(request: Request, bytes: Uint8Array<ArrayBuffer>): Pro
   const form = await new Response(bytes, { headers: { 'content-type': request.headers.get('content-type')! } }).formData()
   const field = form.get('email') ?? form.get('body-mime')
 
+  // `curl --data-binary` labels a raw message as a form.
   if (field === null)
-    return undefined
+    return type.startsWith('application/x-www-form-urlencoded') ? bytes : undefined
 
   return typeof field === 'string' ? new TextEncoder().encode(field) : new Uint8Array(await field.arrayBuffer())
 }
@@ -271,6 +284,10 @@ export function mountEventRoutes(plugin: Elysia, host: () => EventHost): void {
       // A provider without a secret has no route: nothing unsigned is ever taken.
       if (secret === undefined)
         return plain(404)
+
+      // Before the body is read: Postmark's check is the credentials alone.
+      if (provider === 'postmark' && !postmarkAuthorised(secret, request))
+        return plain(401)
 
       const raw = await bodyOf(request, BODY_MAX)
 
@@ -332,11 +349,20 @@ export function mountEventRoutes(plugin: Elysia, host: () => EventHost): void {
     const report = deliveryReport(root)
 
     if (report !== undefined) {
-      for (const entry of report) {
-        const email = normalized(entry.address)
+      // A report is believed only when it returns a mail this app sent (its keyed Message-ID) to the address it names: the secret proves the pipe, not whoever wrote the report.
+      const sent = isOwnMessageId(report.original['message-id'])
+      const addressed = new Set([...addressesOf(report.original.to), ...addressesOf(report.original.cc)].map(entry => entry.address))
 
-        if (email !== undefined && entry.action === 'failed' && PERMANENT.test(entry.status))
+      for (const entry of report.recipients) {
+        const email = normalizeAddress(entry.address)
+
+        if (email === undefined || entry.action !== 'failed' || !ADDRESS_GONE.test(entry.status))
+          continue
+
+        if (sent && addressed.has(email))
           await host().suppress({ email, reason: 'bounce' }, 'dsn')
+        else
+          log.warn('a delivery report was left unused: it returns no mail this app sent to that address')
       }
 
       return plain(200, 'ok')

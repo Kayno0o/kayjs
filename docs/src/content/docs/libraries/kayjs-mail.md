@@ -364,7 +364,7 @@ A provider with no secret has no route, and a post whose signature does not chec
 
 From then on a mail to that address is skipped and logged, from a form, the queue, a list or kayjs-auth, and the address leaves every mailing list. A skipped mail is not an error: the queue does not retry it. `mail.suppression(address)` says why an address is not mailed, `mail.unsuppress(address)` mails it again, and `mail.erase(address)` clears it with the rest of a person.
 
-Mail servers also answer a failed delivery with a report mail (a DSN). Pipe those, and the replies to your mails, to `POST /_kay/mail/inbound` with `Authorization: Bearer` and `MAIL_INBOUND_SECRET`. A report suppresses the recipients it names. Any other message goes to the function you give the mailer:
+Mail servers also answer a failed delivery with a report mail (a DSN). Pipe those, and the replies to your mails, to `POST /_kay/mail/inbound` with `Authorization: Bearer` and `MAIL_INBOUND_SECRET`. A report suppresses the recipients it names, but only when it returns a mail your app sent to that address, which needs `KAY_SECRET`. Any other message goes to the function you give the mailer:
 
 ```ts
 export const mail = mailer({

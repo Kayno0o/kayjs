@@ -1,8 +1,12 @@
 import type { Action } from 'kay'
+import type { ListStore } from '../src/list-store'
 import { createHmac, generateKeyPairSync, sign } from 'node:crypto'
+import { join } from 'node:path'
 import process from 'node:process'
 import { beforeAll, describe, expect, it } from 'bun:test'
-import { testSite } from 'kay/test'
+import { scratchDir, testSite } from 'kay/test'
+import { createLists } from '../src/list'
+import { openLists } from '../src/list-store'
 import { outbox } from '../src/outbox'
 
 const site = await testSite({ root: 'tests/fixture' })
@@ -94,14 +98,15 @@ describe('provider webhooks', () => {
   })
 
   it('sendgrid: a bounce, a drop and a spam report suppress, a blocked one does not, a wrong key or body does nothing', async () => {
-    const [bounced, dropped, reported, blocked, forged, tampered] = [fresh(), fresh(), fresh(), fresh(), fresh(), fresh()]
+    const [bounced, dropped, reported, blocked, forged, tampered, unrelated] = [fresh(), fresh(), fresh(), fresh(), fresh(), fresh(), fresh()]
 
-    expect((await sendgridPost([{ email: bounced, event: 'bounce', type: 'bounce', reason: '500 unknown recipient', status: '5.0.0' }, { email: dropped, event: 'dropped', reason: 'Bounced Address', status: '5.0.0' }, { email: reported, event: 'spamreport' }, { email: blocked, event: 'bounce', type: 'blocked' }])).status).toBe(200)
+    expect((await sendgridPost([{ email: bounced, event: 'bounce', type: 'bounce', reason: '500 unknown recipient', status: '5.0.0' }, { email: dropped, event: 'dropped', reason: 'Bounced Address', status: '5.0.0' }, { email: unrelated, event: 'dropped', reason: 'Invalid' }, { email: reported, event: 'spamreport' }, { email: blocked, event: 'bounce', type: 'blocked' }])).status).toBe(200)
 
     expect((await mail.suppression(bounced))?.reason).toBe('bounce')
     expect((await mail.suppression(dropped))?.reason).toBe('bounce')
     expect((await mail.suppression(reported))?.reason).toBe('complaint')
     expect(await mail.suppression(blocked)).toBeUndefined()
+    expect(await mail.suppression(unrelated)).toBeUndefined()
 
     const other = generateKeyPairSync('ec', { namedCurve: 'prime256v1' }).privateKey
 
@@ -160,7 +165,14 @@ describe('provider webhooks', () => {
   })
 })
 
-function dsn(address: string, { action = 'failed', status = '5.1.1' } = {}): string {
+// The Message-ID the app wrote on a mail it sent to the address.
+async function sentIdTo(address: string): Promise<string> {
+  await mail.send({ to: address, subject: 'Sent', text: 'x' })
+
+  return outbox.to(address).at(-1)!.headers['Message-ID']!
+}
+
+function dsn(address: string, { action = 'failed', status = '5.1.1', id = '<forged@fixture.test>', to = address } = {}): string {
   return [
     'From: MAILER-DAEMON@mx.example.org',
     'To: hello@fixture.test',
@@ -188,7 +200,8 @@ function dsn(address: string, { action = 'failed', status = '5.1.1' } = {}): str
     'Content-Type: message/rfc822',
     '',
     'From: hello@fixture.test',
-    `To: ${address}`,
+    `To: ${to}`,
+    `Message-ID: ${id}`,
     'Subject: Hello',
     '',
     'Hi',
@@ -202,16 +215,29 @@ const inboundAuth = { authorization: `Bearer ${INBOUND}` }
 const inbound = async (message: string, headers: Record<string, string> = inboundAuth) => post('/_kay/mail/inbound', message, { 'content-type': 'message/rfc822', ...headers })
 
 describe('delivery status notifications', () => {
-  it('suppresses the recipient of a permanent failure, not a delay or a temporary one', async () => {
-    const [dead, delayed, temporary] = [fresh(), fresh(), fresh()]
+  it('suppresses the recipient of a permanent address failure on a mail this app sent, not a delay, a temporary failure or a policy block', async () => {
+    const [dead, delayed, temporary, blocked, full] = [fresh(), fresh(), fresh(), fresh(), fresh()]
 
-    expect((await inbound(dsn(dead))).status).toBe(200)
-    expect((await inbound(dsn(delayed, { action: 'delayed', status: '4.4.1' }))).status).toBe(200)
-    expect((await inbound(dsn(temporary, { status: '4.2.2' }))).status).toBe(200)
+    expect((await inbound(dsn(dead, { id: await sentIdTo(dead) }))).status).toBe(200)
+    expect((await inbound(dsn(delayed, { action: 'delayed', status: '4.4.1', id: await sentIdTo(delayed) }))).status).toBe(200)
+    expect((await inbound(dsn(temporary, { status: '4.2.2', id: await sentIdTo(temporary) }))).status).toBe(200)
+    expect((await inbound(dsn(blocked, { status: '5.7.1', id: await sentIdTo(blocked) }))).status).toBe(200)
+    expect((await inbound(dsn(full, { status: '5.2.2', id: await sentIdTo(full) }))).status).toBe(200)
 
     expect((await mail.suppression(dead))?.source).toBe('dsn')
-    expect(await mail.suppression(delayed)).toBeUndefined()
-    expect(await mail.suppression(temporary)).toBeUndefined()
+
+    for (const address of [delayed, temporary, blocked, full])
+      expect(await mail.suppression(address)).toBeUndefined()
+  })
+
+  it('believes no report that returns a mail this app did not send, or one sent to someone else', async () => {
+    const [victim, attacker] = [fresh(), fresh()]
+    const own = await sentIdTo(attacker)
+
+    expect((await inbound(dsn(victim))).status).toBe(200)
+    expect((await inbound(dsn(victim, { id: own, to: attacker }))).status).toBe(200)
+    expect((await inbound(dsn(victim, { id: `<${crypto.randomUUID()}.AAAAAAAAAAAAAAAA@fixture.test>` }))).status).toBe(200)
+    expect(await mail.suppression(victim)).toBeUndefined()
   })
 
   it('is not handed to the reply function, and is refused without the secret', async () => {
@@ -341,6 +367,15 @@ describe('inbound replies', () => {
     expect(new TextDecoder().decode(reply.attachments[0]!.content)).toBe('%PDF-1.4')
   })
 
+  it('takes a raw message labelled as a form, as curl --data-binary sends it, and keeps 8bit UTF-8 whole', async () => {
+    const before = replies.length
+    const message = 'From: a@example.com\r\nTo: hello@fixture.test\r\nSubject: Prix\r\nContent-Type: text/plain; charset=utf-8\r\nContent-Transfer-Encoding: 8bit\r\n\r\nPrix: 5 € – l’été'
+
+    expect((await inbound(message, { ...inboundAuth, 'content-type': 'application/x-www-form-urlencoded' })).status).toBe(200)
+    expect(replies).toHaveLength(before + 1)
+    expect(replies.at(-1)!.text).toBe('Prix: 5 € – l’été')
+  })
+
   it('takes the raw message from the form of a provider\'s inbound parse', async () => {
     const form = new FormData()
     const before = replies.length
@@ -386,5 +421,24 @@ describe('inbound replies', () => {
     finally {
       process.env.MAIL_INBOUND_SECRET = saved
     }
+  })
+})
+
+describe('a store of the app\'s own', () => {
+  it('keeps its suppressions in the default file, which a restarted process reads again', async () => {
+    const file = join(await scratchDir('mail-custom-store'), 'lists.sqlite')
+    const own = openLists(':memory:')
+    // A store that implements none of the suppression methods, as one written before them.
+    const custom: ListStore = { ...own, suppress: undefined, suppressed: undefined, lift: undefined }
+    const host = { configured: () => true, render: async () => {
+      throw new Error('unused')
+    }, deliver: async () => undefined }
+    const address = fresh()
+
+    await createLists(host, { store: custom, file }).suppress(address, 'bounce', 'test')
+
+    const restarted = createLists(host, { store: custom, file })
+
+    expect([...(await restarted.suppressed([address])).keys()]).toEqual([address])
   })
 })

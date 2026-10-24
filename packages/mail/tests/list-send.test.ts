@@ -7,6 +7,7 @@ import { memoryJobs } from 'kay/server'
 import { scratchDir, testSite } from 'kay/test'
 import { openLists } from '../src/list-store'
 import { mailer } from '../src/mailer'
+import { isOwnMessageId } from '../src/message-id'
 import { outbox } from '../src/outbox'
 
 await testSite({ root: 'tests/fixture' })
@@ -78,6 +79,7 @@ describe('a broadcast', () => {
     expect(await list.status(id)).toMatchObject({ done: true, sent: 5, waiting: 0, failed: 0, unsure: 0 })
 
     const links = new Set<string>()
+    const ids = new Set<string>()
 
     for (const email of emails) {
       const [mail, ...others] = sentTo(email)
@@ -85,11 +87,13 @@ describe('a broadcast', () => {
       expect(others).toHaveLength(0)
       expect(mail!.to).toEqual([email])
       links.add(mail!.headers['List-Unsubscribe']!)
-      // A shared id would make the copies one message to a client, so each is left for the transport to give its own.
-      expect(mail!.headers['Message-ID']).toBeUndefined()
+      // A shared id would make the copies one message to a client, so each has its own.
+      ids.add(mail!.headers['Message-ID']!)
     }
 
     expect(links.size).toBe(5)
+    expect(ids.size).toBe(5)
+    expect([...ids].every(id => isOwnMessageId(id))).toBe(true)
   })
 
   it('resumes after a restart where it stopped, mailing nobody twice', async () => {

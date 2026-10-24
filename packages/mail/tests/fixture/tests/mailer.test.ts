@@ -107,7 +107,7 @@ describe('rendering', () => {
     const single = await mail.render({ to: 'ada@example.com', subject: 'News', text: 'Hi', unsubscribe: 'https://fixture.test/unsubscribe?u=1&t=<x>' })
     const both = await mail.render({ to: 'ada@example.com', subject: 'News', text: 'Hi', unsubscribe: { url: 'https://fixture.test/u', address: 'unsubscribe@fixture.test' } })
 
-    expect(single.headers).toEqual({ 'Message-ID': expect.stringMatching(/^<[\w-]+@fixture\.test>$/), 'List-Unsubscribe': '<https://fixture.test/unsubscribe?u=1&t=%3Cx%3E>', 'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click' })
+    expect(single.headers).toEqual({ 'Message-ID': expect.stringMatching(/^<[\w.-]+@fixture\.test>$/), 'List-Unsubscribe': '<https://fixture.test/unsubscribe?u=1&t=%3Cx%3E>', 'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click' })
     expect(both.headers['List-Unsubscribe']).toBe('<https://fixture.test/u>, <mailto:unsubscribe@fixture.test>')
     await expect(mail.render({ to: 'ada@example.com', subject: 'News', text: 'Hi', unsubscribe: 'http://fixture.test/u' })).rejects.toThrow('it takes an https URL')
   })
@@ -319,7 +319,7 @@ describe('the queue', () => {
     expect(sent[0]!.html).toContain('Welcome, Ada')
     // Every attempt goes out under the id of the first.
     expect(attempts).toHaveLength(2)
-    expect(attempts[0]).toMatch(/^<[\w-]+@example\.com>$/)
+    expect(attempts[0]).toMatch(/^<[\w.-]+@example\.com>$/)
     expect(attempts[1]).toBe(attempts[0])
   })
 

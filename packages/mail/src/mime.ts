@@ -14,6 +14,8 @@ const MAX_DEPTH = 8
 const MAX_PARTS = 200
 const WORD = /=\?([\w-]+)\?([bq])\?([^?]*)\?=/gi
 const WORD_GAP = /(\?=)\s+(?==\?)/g
+const SOFT_BREAK = /=\r?\n/g
+const WHITESPACE = /\s+/g
 const HEX_PAIR = /^[\da-f]{2}$/i
 const LINE_BREAKS = /\r?\n/
 const FOLDED = /^[ \t]/
@@ -24,7 +26,7 @@ const SPACES = /\s+/
 const BOUNDARY_SAFE = /[.*+?^${}()|[\]\\]/g
 
 function latin1(bytes: Uint8Array): string {
-  return new TextDecoder('latin1').decode(bytes)
+  return Buffer.from(bytes.buffer, bytes.byteOffset, bytes.byteLength).toString('latin1')
 }
 
 function bytesOf(text: string): Uint8Array {
@@ -46,7 +48,7 @@ function decode(bytes: Uint8Array, charset: string | undefined): string {
 }
 
 function quotedPrintable(text: string, header = false): Uint8Array {
-  const source = (header ? text.replaceAll('_', ' ') : text.replaceAll(/=\r?\n/g, ''))
+  const source = (header ? text.replaceAll('_', ' ') : text.replaceAll(SOFT_BREAK, ''))
   const out: number[] = []
 
   for (let index = 0; index < source.length; index++) {
@@ -123,7 +125,7 @@ function transferDecoded(raw: string, encoding: string | undefined): Uint8Array 
 
   try {
     if (kind === 'base64')
-      return Uint8Array.fromBase64(raw.replaceAll(/\s+/g, ''))
+      return Uint8Array.fromBase64(raw.replaceAll(WHITESPACE, ''))
   }
   catch {
     return new Uint8Array()
@@ -210,7 +212,7 @@ export interface Reply {
   attachments: Attachment[]
 }
 
-function addressesOf(value: string | undefined): { name: string, address: string }[] {
+export function addressesOf(value: string | undefined): { name: string, address: string }[] {
   if (value === undefined)
     return []
 
@@ -250,6 +252,12 @@ export function replyOf(root: Part): Reply {
   }
 }
 
+export interface Report {
+  recipients: Recipient[]
+  // The headers of the message the report returns, empty when it returns none.
+  original: Record<string, string>
+}
+
 export interface Recipient {
   address: string
   action: string
@@ -257,7 +265,7 @@ export interface Recipient {
 }
 
 // The recipients a delivery report (RFC 3464, `multipart/report; report-type=delivery-status`) names, with what happened to each; undefined for a message that is no such report.
-export function deliveryReport(root: Part): Recipient[] | undefined {
+export function deliveryReport(root: Part): Report | undefined {
   if (root.type !== 'multipart/report' || root.params['report-type']?.toLowerCase() !== 'delivery-status')
     return undefined
 
@@ -282,5 +290,7 @@ export function deliveryReport(root: Part): Recipient[] | undefined {
     found.push({ address, action: (fields.action ?? '').toLowerCase(), status: (fields.status ?? '').trim() })
   }
 
-  return found
+  const returned = root.parts.find(part => part.type === 'message/rfc822' || part.type === 'text/rfc822-headers')
+
+  return { recipients: found, original: returned === undefined ? {} : parseHeaders(split(latin1(returned.body))[0]) }
 }

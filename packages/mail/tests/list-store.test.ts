@@ -266,6 +266,9 @@ describe.skipIf(url === '')('a list on Postgres', () => {
       const { email } = names()
 
       expect(await old.count('anything')).toBe(0)
+      expect(await old.suppressed!([email('x')])).toEqual([])
+      expect(await old.lift!(email('x'))).toBe(false)
+      expect((await db.unsafe<{ found: string | null }[]>('SELECT to_regclass(\'kay_mail_suppressions\') AS found'))[0]!.found).toBeNull()
       await old.suppress!(email('x'), 'bounce', 'dsn')
       expect((await old.suppressed!([email('x')])).map(row => row.source)).toEqual(['dsn'])
     }

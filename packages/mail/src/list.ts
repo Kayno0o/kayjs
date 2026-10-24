@@ -14,8 +14,11 @@ import { normalizeAddress } from './list-address'
 import { LIST_FILE, openLists } from './list-store'
 import { checkToken, signToken } from './list-token'
 import { log } from './log'
+import { messageId } from './message-id'
 import { addressOf } from './outbox'
 import { htmlToText } from './text'
+
+const domainOf = (address: Address): string | undefined => addressOf(address).split('@').at(-1)
 
 // Where the confirmation and unsubscribe links go.
 export const LIST_PATH = '/_kay/mail/list'
@@ -191,7 +194,7 @@ function personalise(message: StoredMessage, subscriber: Subscriber, list: strin
     subject: message.subject,
     html: message.html === undefined ? undefined : withFooter(message.html, html),
     text: `${message.text}\n\n-- \n${text}\n`,
-    headers: { ...Object.fromEntries(Object.entries(message.headers).filter(([name]) => !name.toLowerCase().startsWith('list-unsubscribe') && name.toLowerCase() !== 'message-id')), 'List-Unsubscribe': `<${url}>`, 'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click' },
+    headers: { ...Object.fromEntries(Object.entries(message.headers).filter(([name]) => !name.toLowerCase().startsWith('list-unsubscribe') && name.toLowerCase() !== 'message-id')), 'Message-ID': messageId(domainOf(message.from) ?? 'localhost'), 'List-Unsubscribe': `<${url}>`, 'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click' },
     attachments: [],
   }
 }
@@ -224,15 +227,15 @@ export function createLists(base: Omit<ListHost, 'enqueueMail' | 'enqueueRun' | 
     return lists
   }
 
-  // The default file once it exists, whichever list this process declared: a link in a mail outlives the code that declared its list.
-  const defaultFile = (): ListStore | undefined => {
-    if (fallback.store !== undefined)
-      return fallback.store
-
+  // The default SQLite file once it exists, whichever list this process declared.
+  const defaultSqlite = (): ListStore | undefined => {
     const fallbackFile = fallback.file ?? (process.env.NODE_ENV === 'test' ? undefined : LIST_FILE)
 
     return fallbackFile !== undefined && (files.has(fallbackFile) || existsSync(fallbackFile)) ? open(fallbackFile) : undefined
   }
+
+  // The mailer's store, else the default file: a link in a mail outlives the code that declared its list.
+  const defaultFile = (): ListStore | undefined => fallback.store ?? defaultSqlite()
   const storeOf = (name: string): ListStore | undefined => entries.get(name)?.lists ?? defaultFile()
 
   const make = (name: string, options: ListOptions): Entry => {
@@ -455,6 +458,10 @@ export function createLists(base: Omit<ListHost, 'enqueueMail' | 'enqueueRun' | 
   const known = (): ListStore[] => {
     defaultFile()
 
+    // A store of the app's own may keep no suppressions, which are then in the default file.
+    if (fallback.store !== undefined && fallback.store.suppress === undefined)
+      defaultSqlite()
+
     return [...new Set([...files.values(), ...given])].filter(store => !store.closed)
   }
 
@@ -490,8 +497,14 @@ export function createLists(base: Omit<ListHost, 'enqueueMail' | 'enqueueRun' | 
       return found
 
     for (const store of known()) {
-      for (const entry of await store.suppressed?.(emails) ?? [])
-        found.set(entry.email, entry)
+      // A store that cannot answer must not stop the mail it was asked about.
+      try {
+        for (const entry of await store.suppressed?.(emails) ?? [])
+          found.set(entry.email, entry)
+      }
+      catch (error) {
+        log.warn(`the suppressions of a mailing list store could not be read, so its mails go out: ${error instanceof Error ? error.message : String(error)}`)
+      }
     }
 
     return found

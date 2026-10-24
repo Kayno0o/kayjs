@@ -129,6 +129,19 @@ export function pgLists(source: PgJobsSource): ListStore & { close: () => Promis
     return connection
   }
 
+  const readSuppressions = async <Row>(text: string, params: unknown[]): Promise<Row[]> => {
+    try {
+      return await rows<Row>(await connected(), text, params)
+    }
+    catch (error) {
+      // 42P01: the table does not exist.
+      if ((error as { code?: unknown }).code === '42P01')
+        return []
+
+      throw error
+    }
+  }
+
   const query = async <Row>(text: string, params: unknown[] = []): Promise<Row[]> => rows<Row>(await connected(), text, params)
 
   // The subscribers' ids whose rows the statement locks, so a claim of a delivery waits for the removal and finds the subscriber gone.
@@ -236,13 +249,14 @@ export function pgLists(source: PgJobsSource): ListStore & { close: () => Promis
     async suppress(email: string, reason: SuppressionReason, source: string, now = Date.now()): Promise<void> {
       await rows(await suppressions(), 'INSERT INTO kay_mail_suppressions (email, reason, source, at) VALUES ($1, $2, $3, $4::bigint) ON CONFLICT DO NOTHING', [email, reason, source, now])
     },
+    // A read makes no table: a database from before suppressions has none, and nobody is suppressed in it.
     async suppressed(emails: string[]): Promise<Suppression[]> {
-      const found = await rows<{ email: string, reason: SuppressionReason, source: string, at: string }>(await suppressions(), 'SELECT email, reason, source, at FROM kay_mail_suppressions WHERE email = ANY($1::text[])', [emails])
+      const found = await readSuppressions<{ email: string, reason: SuppressionReason, source: string, at: string }>('SELECT email, reason, source, at FROM kay_mail_suppressions WHERE email = ANY($1::text[])', [emails])
 
       return found.map(row => ({ ...row, at: Number(row.at) }))
     },
     async lift(email: string): Promise<boolean> {
-      return (await rows(await suppressions(), 'DELETE FROM kay_mail_suppressions WHERE email = $1 RETURNING email', [email])).length > 0
+      return (await readSuppressions('DELETE FROM kay_mail_suppressions WHERE email = $1 RETURNING email', [email])).length > 0
     },
     async progress(broadcast): Promise<BroadcastProgress> {
       const counts = new Map((await query<{ state: DeliveryState, total: string }>('SELECT state, COUNT(*) AS total FROM kay_mail_deliveries WHERE broadcast = $1 GROUP BY state', [broadcast.id])).map(row => [row.state, Number(row.total)]))

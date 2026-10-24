@@ -20,6 +20,7 @@ import { mountEventRoutes, secretsOf } from './events'
 import { createLists, mountListRoutes } from './list'
 import { normalizeAddress } from './list-address'
 import { log } from './log'
+import { messageId } from './message-id'
 import { addressOf, outbox, PREVIEW_ROUTES } from './outbox'
 import { checkKey, checkOptions, greetingOf, rateFromText, smtp } from './smtp'
 import { htmlToText } from './text'
@@ -479,7 +480,7 @@ export function mailer(options: MailerOptions = {}): Mailer {
       html,
       text: message.text ?? htmlToText(html!),
       // Made here, once, so every retry of a queued mail goes out under the id of the first attempt and a relay that took it twice can tell.
-      headers: { ...Object.keys(message.headers ?? {}).some(header => header.toLowerCase() === 'message-id') ? {} : { 'Message-ID': `<${crypto.randomUUID()}@${domainOf(from ?? sender()) ?? 'localhost'}>` }, ...unsubscribe, ...message.headers },
+      headers: { ...Object.keys(message.headers ?? {}).some(header => header.toLowerCase() === 'message-id') ? {} : { 'Message-ID': messageId(domainOf(from ?? sender()) ?? 'localhost') }, ...unsubscribe, ...message.headers },
       attachments: message.attachments ?? [],
     }
   }

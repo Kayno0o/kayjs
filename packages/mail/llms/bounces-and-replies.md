@@ -12,10 +12,11 @@ Point the provider's webhook at `https://<site>/_kay/mail/events/<provider>` and
 | --- | --- | --- | --- | --- |
 | Postmark | `/_kay/mail/events/postmark` | `MAIL_EVENTS_POSTMARK=user:password` | HTTP Basic credentials in the webhook URL (Postmark signs nothing) | a `Bounce` of `HardBounce`, `BadEmailAddress` or TypeCode 1, a `SpamComplaint` |
 | Mailgun | `/_kay/mail/events/mailgun` | `MAIL_EVENTS_MAILGUN` the webhook signing key | HMAC-SHA256 of timestamp and token, within 5 minutes | `failed` with `severity: permanent`, `complained` |
-| SendGrid | `/_kay/mail/events/sendgrid` | `MAIL_EVENTS_SENDGRID` the Event Webhook's public key (base64) | ECDSA over timestamp and raw body, within 5 minutes | `bounce` (not `blocked`), `dropped`, `spamreport` |
+| SendGrid | `/_kay/mail/events/sendgrid` | `MAIL_EVENTS_SENDGRID` the Event Webhook's public key (base64) | ECDSA over timestamp and raw body, within 5 minutes | `bounce` (not `blocked`), `dropped` for a bounced or spam-reporting address, `spamreport` |
 | Resend | `/_kay/mail/events/resend` | `MAIL_EVENTS_RESEND` the `whsec_` secret | Svix HMAC over id, timestamp and body, within 5 minutes | `email.bounced` (permanent), `email.complained` |
 
 - A soft or temporary bounce is ignored: the mail may still arrive.
+- A complaint blocks every mail to the address, a password reset or a sign-in code included: an address that reported a newsletter as spam has to be lifted with `mail.unsuppress` to get one.
 - `mailer({ events: { mailgun: key, ... } })` gives a secret in code instead; the environment is read when a request comes.
 - A forged or stale post answers 401 and changes nothing; a body over 1 MB, 413. Answers are plain text.
 
@@ -29,9 +30,9 @@ What a suppression does:
 
 ### Read delivery reports and replies
 
-`POST /_kay/mail/inbound` takes a raw message, from a mail server piping to `curl --data-binary @-` with `Authorization: Bearer $MAIL_INBOUND_SECRET`, or from a provider's inbound parse: a form field `email` (SendGrid, raw) or `body-mime` (Mailgun), authenticated by the secret as the password of the webhook URL's Basic credentials. Without `MAIL_INBOUND_SECRET` (or `events.inbound`) the route is 404; a message over 5 MB is refused with 413.
+`POST /_kay/mail/inbound` takes a raw message, from a mail server piping to `curl --data-binary @-` with `Authorization: Bearer $MAIL_INBOUND_SECRET` (a body labelled as a form is read as the raw message when it has no `email` field), or from a provider's inbound parse: a form field `email` (SendGrid, raw) or `body-mime` (Mailgun), authenticated by the secret as the password of the webhook URL's Basic credentials. Without `MAIL_INBOUND_SECRET` (or `events.inbound`) the route is 404; a message over 5 MB is refused with 413.
 
-- A delivery report (RFC 3464, `multipart/report; report-type=delivery-status`) suppresses each recipient with `Action: failed` and a `5.x.x` status. Point the bounce address (the envelope sender, `Return-Path`) at the same pipe.
+- A delivery report (RFC 3464, `multipart/report; report-type=delivery-status`) suppresses each recipient with `Action: failed` and a status of a bad address (`5.1.x`) or a disabled mailbox (`5.2.1`); a full mailbox or a policy block (`5.7.x`) says nothing of the address. Anyone can write to the bounce mailbox, so a report counts only when it returns a mail this app sent (the `Message-ID` kayjs-mail writes carries a tag keyed with the app secret, `KAY_SECRET`; without one no report is believed) to that very address in its `To` or `Cc`. Mails sent before this version, or with a `Message-ID` of your own, and `bcc` recipients are not matched. Point the bounce address (the envelope sender, `Return-Path`) at the same pipe.
 - Any other message goes to the mailer's one option, called with the decoded reply:
 
 ```ts
@@ -44,7 +45,7 @@ export const mail = mailer({
 ```
 
 - A `Reply` is `{ from, fromName, to, subject, date, messageId, inReplyTo, references, text, html, headers, attachments }`, headers read and bodies decoded (quoted-printable, base64, charsets), `attachments` being `{ filename, contentType, content }`. The `Message-ID` of every mail kayjs-mail sends is in its `headers` and the outbox, so a reply can be matched to it. Without `inbound` a reply is acknowledged and dropped.
-- The function runs for whoever holds the secret: treat the message as untrusted input, the sender's address included.
+- The function runs for whoever holds the secret: treat the message as untrusted input, the sender's address and the attachments' file names included (sanitise them before using one as a path).
 
 ## Reference
 
