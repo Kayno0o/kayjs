@@ -79,6 +79,9 @@ export async function answer(request: Request, html: string, clientDir: string):
 const IDLE_MS = 3000
 let tail: Promise<void> = Promise.resolve()
 let waiting = 0
+
+// How many cards the server draws or has waiting before it turns the next request away, each one being a tab of Chrome.
+export const MAX_QUEUED = 16
 let idle: Timer | undefined
 let browser: typeof import('../test/browser') | undefined
 

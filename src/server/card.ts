@@ -19,7 +19,7 @@ import { localeState } from '../runtime/locale-state'
 import { localizedText } from '../runtime/localized'
 import { nodeCrypto } from './builtins'
 import { drawCard, LOGO_SIZE } from './card-draw'
-import { shootCard, templateStamp } from './card-template'
+import { MAX_QUEUED, shootCard, templateStamp } from './card-template'
 import { coverImage } from './crop'
 import { readFace } from './face'
 import { builtAsset, DEFAULT_QUALITY, findSource, VARIANTS_DIR } from './image'
@@ -529,6 +529,10 @@ export function serveCards(app: Elysia, cards: Cards, options: ImageRouteOptions
 
     if (file !== built && !await Bun.file(file).exists()) {
       let writing = pending.get(file)
+
+      // A burst of titles nobody has drawn yet would queue a Chrome tab each: the server answers when it can, and the crawler asks again.
+      if (!writing && cards.template && pending.size >= MAX_QUEUED)
+        return new Response('Too many share cards are being drawn', { status: 503, headers: { ...TEXT, 'retry-after': '10' } })
 
       // Requests for a card being drawn wait for that one drawing.
       if (!writing) {

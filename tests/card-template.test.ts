@@ -4,11 +4,12 @@ import { join, resolve } from 'node:path'
 import process from 'node:process'
 import tailwind from 'bun-plugin-tailwind'
 import { describe, expect, it } from 'bun:test'
+import { Elysia } from 'elysia'
 import { clientDir } from '../src/build/assets'
 import { setCardMaker, shareCard } from '../src/runtime/image'
 import { pages } from '../src/server'
-import { setupCards } from '../src/server/card'
-import { answer, shootCard, templateStamp } from '../src/server/card-template'
+import { serveCards, setupCards } from '../src/server/card'
+import { answer, MAX_QUEUED, shootCard, templateStamp } from '../src/server/card-template'
 import { decodePng } from '../src/server/crop'
 import { browserPath } from '../src/test/browser'
 
@@ -109,14 +110,15 @@ describe('the share card template stamp', () => {
   })
 
   it('serves the page and the build\'s stylesheets, fonts and images, and nothing outside them', async () => {
-    const client = await mkdtemp(join(tmpdir(), 'kay-card-serve-'))
+    const scratch = await mkdtemp(join(tmpdir(), 'kay-card-serve-'))
+    const client = join(scratch, 'client')
     const get = async (path: string) => answer(new Request(`http://127.0.0.1${path}`), '<head><title>t</title></head><header>h</header>', client)
 
     try {
       await Bun.write(join(client, 'app.css'), 'a{}')
       await Bun.write(join(client, 'assets/font.woff2'), 'f')
       await Bun.write(join(client, 'entry.js'), 'x')
-      await Bun.write(join(client, '../secret.png'), 's')
+      await Bun.write(join(scratch, 'secret.png'), 's')
 
       expect(await (await get('/')).text()).toBe('<head><style>html,body{margin:0}html{overflow:hidden}</style><title>t</title></head><header>h</header>')
 
@@ -124,10 +126,40 @@ describe('the share card template stamp', () => {
         expect([path, (await get(path)).status]).toEqual([path, status])
     }
     finally {
-      await rm(client, { recursive: true, force: true })
-      await rm(join(client, '../secret.png'), { force: true })
+      await rm(scratch, { recursive: true, force: true })
     }
   })
+
+  it('turns a request away once the queue holds as many cards as it takes', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'kay-card-queue-'))
+    const gate = Promise.withResolvers<string>()
+
+    try {
+      const cards = await setupCards({ dir, clientDir: clientDir(FIXTURE), fonts: undefined, template: { file: CARD, styles: undefined } })
+      const server = new Elysia()
+
+      serveCards(server, cards, { clientDir: clientDir(FIXTURE), cacheDir: join(dir, 'cache') })
+      cards.template!.render = async () => gate.promise
+
+      const urls = Array.from({ length: MAX_QUEUED + 1 }, (_, index) => shareCard({ title: `Queued ${index}` }))
+      const asked = urls.slice(0, MAX_QUEUED).map(async url => server.handle(new Request(`http://localhost${url}`)))
+
+      // Each of the cards held its place while the first is drawn.
+      await Bun.sleep(200)
+
+      const turned = await server.handle(new Request(`http://localhost${urls.at(-1)!}`))
+
+      expect([turned.status, turned.headers.get('retry-after')]).toEqual([503, '10'])
+
+      // Those already waiting are not turned away: they fail with the render, not with a 503.
+      gate.reject(new Error('released'))
+      expect((await Promise.all(asked)).map(response => response.status)).toEqual(Array.from({ length: MAX_QUEUED }).fill(500))
+    }
+    finally {
+      setCardMaker(() => '')
+      await rm(dir, { recursive: true, force: true })
+    }
+  }, 60_000)
 
   it('says where Chrome is needed when there is none', async () => {
     const before = process.env.BUN_CHROME_PATH
