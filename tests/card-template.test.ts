@@ -1,9 +1,9 @@
-import { mkdtemp, rm } from 'node:fs/promises'
+import { mkdtemp, readdir, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import process from 'node:process'
 import tailwind from 'bun-plugin-tailwind'
-import { describe, expect, it } from 'bun:test'
+import { afterAll, describe, expect, it, spyOn } from 'bun:test'
 import { Elysia } from 'elysia'
 import { clientDir } from '../src/build/assets'
 import { setCardMaker, shareCard } from '../src/runtime/image'
@@ -11,7 +11,10 @@ import { pages } from '../src/server'
 import { serveCards, setupCards } from '../src/server/card'
 import { answer, MAX_QUEUED, shootCard, templateStamp } from '../src/server/card-template'
 import { decodePng } from '../src/server/crop'
+import * as browserModule from '../src/test/browser'
 import { browserPath } from '../src/test/browser'
+import { listeningPort } from './listening'
+import { fixtureCopy, scratchDir } from './scratch'
 
 const FIXTURE = resolve('tests/fixtures/card-template')
 const CLI = resolve('src/cli.ts')
@@ -234,4 +237,125 @@ describe.skipIf(!chrome)('a share card laid out in _card.kay', () => {
       await rm(outdir, { recursive: true, force: true })
     }
   }, 120_000)
+})
+
+// A `kay build --compile` of the fixture, run from a folder with none of its files.
+describe('a share card template in an executable', () => {
+  const SERVER = 'import process from \'node:process\'\nimport { Elysia } from \'elysia\'\nimport { pages } from \'kay/server\'\n\nconst app = new Elysia().use(await pages()).listen(Number(process.env.PORT ?? 0))\n\nconsole.log(`listening ${app.server?.port}`)\n'
+  let root = ''
+  let running: Bun.Subprocess<'ignore', 'pipe', 'pipe'> | undefined
+  let elsewhere = ''
+
+  afterAll(async () => {
+    running?.kill()
+    await running?.exited
+    await rm(root, { recursive: true, force: true })
+    await rm(elsewhere, { recursive: true, force: true })
+  })
+
+  it('serves the cards its build wrote, under the same names, and keeps the stamp it read', async () => {
+    root = resolve(await fixtureCopy('card-template'))
+    elsewhere = await scratchDir('card-executable-cwd-')
+    await Bun.write(join(root, 'src/server.ts'), SERVER)
+
+    const executable = join(root, 'bin')
+    const child = Bun.spawn([process.execPath, CLI, 'build', root, '--no-check', '--compile', executable], { stdout: 'pipe', stderr: 'pipe', env: { ...process.env, NODE_ENV: 'development' } })
+    const [errors, code] = await Promise.all([new Response(child.stderr).text(), child.exited])
+
+    expect({ code, errors }).toEqual({ code: 0, errors: '' })
+
+    const built = join(root, '.kay/client/dist/images')
+    const names = (await readdir(built)).filter(name => name.startsWith('card-')).toSorted()
+
+    expect(names).toHaveLength(2)
+
+    const wrote = await Promise.all(names.map(async name => Buffer.from(await Bun.file(join(built, name)).bytes()).toString('base64')))
+
+    expect((await Bun.file(join(root, '.kay/client/card-template.txt')).text()).length).toBeGreaterThan(0)
+
+    running = Bun.spawn([executable], { cwd: elsewhere, stdin: 'ignore', stdout: 'pipe', stderr: 'pipe', env: { ...process.env, NODE_ENV: 'production', PORT: '0', KAY_EPHEMERAL_SECRET: '1', BUN_CHROME_PATH: join(elsewhere, 'no-chrome-here') } })
+
+    const origin = `http://localhost:${await listeningPort(running, 'the executable')}`
+    const served: string[] = []
+
+    // With no Chrome to draw in, a card the executable serves is one its build wrote.
+    for (const page of ['/', '/plain']) {
+      const html = await (await fetch(`${origin}${page}`)).text()
+      const link = (/<meta property="og:image" content="https:\/\/cards\.example([^"]+)">/).exec(html)![1]!.replaceAll('&amp;', '&')
+      const card = await fetch(`${origin}${link}`)
+
+      expect([page, card.status, card.headers.get('content-type')]).toEqual([page, 200, 'image/jpeg'])
+      served.push(Buffer.from(await card.bytes()).toString('base64'))
+    }
+
+    expect(served.toSorted()).toEqual(wrote.toSorted())
+  }, 300_000)
+
+  it('refuses to start from a bundle that holds no record of the template', async () => {
+    const dir = await scratchDir('card-executable-stamp-')
+
+    try {
+      await expect(setupCards({ dir, clientDir: clientDir(FIXTURE), fonts: undefined, bundled: true, template: { file: CARD, styles: undefined } })).rejects.toMatchObject({ code: 'executable-incomplete' })
+    }
+    finally {
+      await rm(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('removes the stamp of an earlier build once the app has no _card.kay', async () => {
+    const dir = await scratchDir('card-executable-stale-')
+
+    try {
+      await setupCards({ dir, clientDir: clientDir(FIXTURE), fonts: undefined, collect: true, template: { file: CARD, styles: undefined } })
+      expect(await Bun.file(join(dir, 'card-template.txt')).exists()).toBe(true)
+
+      await setupCards({ dir, clientDir: clientDir(FIXTURE), fonts: undefined, collect: true })
+      expect(await Bun.file(join(dir, 'card-template.txt')).exists()).toBe(false)
+    }
+    finally {
+      await rm(dir, { recursive: true, force: true })
+    }
+  })
+})
+
+describe.skipIf(!chrome)('a share card that is not drawn in time', () => {
+  it('leaves no page of the browser open, and the next card waits for the stuck one to close', async () => {
+    const opened: { closed: boolean }[] = []
+    const order: string[] = []
+    const real = browserModule.browse
+    const spy = spyOn(browserModule, 'browse').mockImplementation(async (url, options) => {
+      const page = await real(url, options)
+      const record = { closed: false }
+
+      opened.push(record)
+
+      // A renderer that never answers the paint.
+      const view = { ...page.view, cdp: async (method: string, params?: Record<string, unknown>) => method === 'Runtime.evaluate' ? new Promise<never>(Function.prototype as () => void) : page.view.cdp(method, params) }
+
+      return { ...page, view, close: () => {
+        record.closed = true
+        order.push('closed')
+        page.close()
+      } } as typeof page
+    })
+
+    try {
+      const stuck = shootCard(clientDir(FIXTURE), 80, async () => '<p>stuck</p>')
+      const next = shootCard(clientDir(FIXTURE), 80, async () => {
+        order.push('next started')
+
+        return '<p>next</p>'
+      })
+
+      await expect(stuck).rejects.toThrow('was not drawn within 30 s')
+      expect(opened.map(page => page.closed)).toEqual([true])
+
+      await expect(next).rejects.toThrow('was not drawn within 30 s')
+      expect(order).toEqual(['closed', 'next started', 'closed'])
+      expect(opened.every(page => page.closed)).toBe(true)
+    }
+    finally {
+      spy.mockRestore()
+    }
+  }, 90_000)
 })

@@ -119,6 +119,7 @@ async function draw(clientDir: string, quality: number, render: (origin: string)
   let html = ''
   const server = Bun.serve({ hostname: '127.0.0.1', port: 0, fetch: async request => answer(request, html, clientDir) })
   let timer: Timer | undefined
+  let opened: { close: () => void } | undefined
 
   try {
     const shot = (async () => {
@@ -127,7 +128,9 @@ async function draw(clientDir: string, quality: number, render: (origin: string)
 
       const page = await browse(`http://127.0.0.1:${server.port}/`, { width: CARD.width, height: CARD.height, javaScript: false, strict: false, lenient: true, timeout: `${SHOT_MS}ms` })
 
-      // Closed by the shot itself, so a shot that lost the race to the timeout still frees its page when it ends.
+      opened = page
+
+      // Closed by the shot itself, and below when it never ends, so the next card starts with no page of this one left open.
       try {
       // The window is taller than the page's viewport by the browser's own bar.
         await page.view.cdp('Emulation.setDeviceMetricsOverride', { width: CARD.width, height: CARD.height, deviceScaleFactor: 1, mobile: false })
@@ -152,6 +155,7 @@ async function draw(clientDir: string, quality: number, render: (origin: string)
   }
   finally {
     clearTimeout(timer)
+    opened?.close()
     await server.stop(true)
   }
 }
