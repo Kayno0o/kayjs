@@ -72,7 +72,9 @@ import { unread } from '../live'
 p {unread()} unread
 ```
 
-`unread()` gives the value of whoever is signed in, and the starting value for nobody. The server sends a value only to the tabs of its own user. The page's proof names the user it was rendered for, signed, and the connection is refused unless its own request is that user's, so a proof copied to another browser, or kept after a sign-out, gets nothing and the tab loads the page again. The user is the id your sign-in library gives kay, which kayjs-auth does with the user's id.
+`unread()` gives the value of whoever is signed in, and the starting value for nobody. The server sends a value only to the tabs of its own user. The page's proof names the user it was rendered for, signed, and the connection is refused unless its own request is that user's, so a proof copied to another browser, or kept after a sign-out, gets nothing and the tab takes the proofs of the page rendered for who is signed in now.
+
+A deferred server island shows the visitor's value without following it. The user is the id your sign-in library gives kay, which kayjs-auth does with the user's id.
 
 ### Forgetting a value
 
@@ -91,7 +93,7 @@ A SQLite file or Postgres table made by an older version gains an `expires_at` c
 
 ### Limits
 
-A live value is the same for everyone who can render the page. There is no value per user. The server sends it only to a request holding the signed proof of a page that read it, so a guard on the page covers it.
+A live value is the same for everyone who can render the page, unless it is declared `{ user: true }` (see above). The server sends it only to a request holding the signed proof of a page that read it, so a guard on the page covers it.
 
 Whatever a page reads while it renders goes into its HTML. Read only what everyone who sees the page may see.
 

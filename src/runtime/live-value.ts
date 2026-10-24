@@ -663,6 +663,9 @@ function datedTogether(id: string): void {
 }
 
 function serverLive(id: string, initial: unknown, name: string | undefined, ttl: number | undefined, own: boolean): Handle {
+  if (own && typeof initial === 'function')
+    throw new TypeError(`kay: live(${id}) with \`user: true\` is one value for each user, so its starting value is not a function of a key`)
+
   const keyed = typeof initial === 'function' && !own
   const known = slots().get(id)
   // A dev reload evaluates the module again: the values and watchers stay, the declaration is the new one.
@@ -935,8 +938,11 @@ async function renewProofs(signal: AbortSignal | null = null): Promise<'renewed'
     if (fresh.length === 0)
       return 'gone'
 
-    for (const old of document.querySelectorAll(LIVE_SCRIPT))
-      old.remove()
+    // A server island's own script stays: the island is not part of the page asked for again.
+    for (const old of document.querySelectorAll(LIVE_SCRIPT)) {
+      if (!old.closest('slot[data-kay-server]'))
+        old.remove()
+    }
 
     for (const script of fresh)
       document.head.append(document.importNode(script, true))

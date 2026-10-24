@@ -61,6 +61,7 @@ interface CacheReads {
   bytes: number
   // Who is signed in, resolved before a render when a value of each user is declared.
   user?: string | undefined
+  resolved?: boolean
 }
 
 const cacheReads = new AsyncLocalStorage<CacheReads>()
@@ -81,9 +82,21 @@ export function inLiveReads<T>(run: () => T, request?: Request): T | Promise<T> 
 
   return cacheReads.run(reads, async () => {
     reads.user = await userOf(request)
+    reads.resolved = true
 
     return run()
   })
+}
+
+// Asks who is signed in once a render has imported its modules, for the first render of an app, which is the one that declares a value of each user.
+export async function resolveViewer(request: Request): Promise<void> {
+  const reads = cacheReads.getStore()
+
+  if (reads === undefined || reads.resolved === true || !ownLiveDeclared())
+    return
+
+  reads.resolved = true
+  reads.user = await userOf(request)
 }
 
 readViewerWith(() => cacheReads.getStore()?.user)
@@ -93,7 +106,7 @@ const LIVE_SCRIPT = /<script type="application\/json" data-kay-live[^>]*>([^<]*)
 // The page without the scripts that follow cached values, for a page built once whose server islands follow them alone; undefined when a script holds a live value too, which its islands hydrate from.
 export function withoutCacheScripts(html: string): string | undefined {
   for (const [, text] of html.matchAll(LIVE_SCRIPT)) {
-    if ((decodeServerValue(text!.replaceAll('\\u003c', '<')) as LivePage).values.some(([id]) => id !== CACHE_LIVE_ID))
+    if ((decodeServerValue(text!) as LivePage).values.some(([id]) => id !== CACHE_LIVE_ID))
       return undefined
   }
 
@@ -101,8 +114,8 @@ export function withoutCacheScripts(html: string): string | undefined {
 }
 
 // Runs the render of a deferred server island a browser fetched, and gives the script it follows: the cached values it read with `live: true` are the island's to follow, not the page's, which the prerendered file read none of.
-export async function withIslandReads<T>(run: () => Promise<T>): Promise<{ result: T, script: string }> {
-  return inLiveReads(async () => ({ result: await run(), script: liveScript() })) as Promise<{ result: T, script: string }>
+export async function withIslandReads<T>(run: () => Promise<T>, request: Request): Promise<{ result: T, script: string }> {
+  return inLiveReads(async () => ({ result: await run(), script: liveScript() }), request) as Promise<{ result: T, script: string }>
 }
 
 // Runs a GET route's handler so the live keys it reads are the proof its answer carries, for a `resource()` to follow.

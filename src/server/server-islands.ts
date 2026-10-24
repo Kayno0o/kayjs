@@ -143,7 +143,7 @@ export async function serveServerIslands(route: ServedRoute, page: ServedPage, p
     mode = undefined
 
   const render = async () => renderServerIslands(route, context, params, client, options, paths.get(route.file), mode)
-  const { result: rendered, script } = fetched ? await withIslandReads(render) : { result: await render(), script: '' }
+  const { result: rendered, script } = fetched ? await withIslandReads(render, context.request) : { result: await render(), script: '' }
 
   if (rendered instanceof Response)
     return rendered

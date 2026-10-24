@@ -51,7 +51,7 @@ import { runGuards } from './guards'
 import { historyScript } from './history'
 import { hydrationScript } from './hydration'
 import { DEFAULT_LANG, invalidKeys, messagesScript } from './i18n'
-import { followsCaches, inLiveReads, liveScript } from './live'
+import { followsCaches, inLiveReads, liveScript, resolveViewer } from './live'
 import { newTabRule } from './new-tab'
 import { INSTALL_OFFER, registerScript } from './offline'
 import { errorPage } from './overlay'
@@ -428,6 +428,8 @@ async function loadChainAsync(route: ServedRoute, files: string[], rendering: Re
     const importsStarted = performance.now()
     const modules = await importAll(files, options)
     const imports = performance.now() - importsStarted
+
+    await resolveViewer(rendering.ctx.request)
 
     readRouteQuery(files, modules, rendering, options)
 
