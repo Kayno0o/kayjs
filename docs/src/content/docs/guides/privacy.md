@@ -23,6 +23,7 @@ This page lists what each feature keeps, for a site's privacy notice and for the
 | `kay_editor_who` | kayjs-cms, a digest naming the signed-in editor so drafts are kept per person | 90 days, ended at sign-out |
 | `kay_editor_session` | kayjs-cms `passwordGuard` | 14 days by default, or its `maxAge` |
 | `ksteps_<name>` | kayjs-ui `stepDraft`, the values of a multi-step form | an hour by default, ended by `clear()` |
+| `kay_push_device` | `push()`, a hash naming the push subscription this browser made, so signing out stops its pushes alone | a year |
 | the name given to `persisted()` | a persisted signal | a year, or its `maxAge` |
 
 Every cookie above but the persisted one, including `kay_analytics`, which only remembers the visitor's answer, is necessary for what the visitor asked, so they need no consent. A persisted signal holds what the app puts in it. A theme or a language is necessary, and anything else waits for consent.

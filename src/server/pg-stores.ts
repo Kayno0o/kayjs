@@ -284,7 +284,7 @@ export function pgPush(pg: PgHandle): PushStore {
     },
     async list(user) {
       const db = await pg.db()
-      const rows = await query<{ endpoint: string, p256dh: string, auth: string, at: string }>(db, 'SELECT endpoint, p256dh, auth, at::text FROM kay_push_subscriptions WHERE user_id = $1 ORDER BY at DESC, endpoint DESC', [user])
+      const rows = await query<{ endpoint: string, p256dh: string, auth: string, at: string }>(db, 'SELECT endpoint, p256dh, auth, at::text FROM kay_push_subscriptions WHERE user_id = $1 ORDER BY kay_push_subscriptions.at DESC, endpoint DESC', [user])
 
       return rows.map(row => ({ ...row, at: Number(row.at) }))
     },
