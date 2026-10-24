@@ -8,6 +8,10 @@ What each minor release breaks, and what an app changes to move to it. kay and i
 
 - Nothing changes for an app that does not list `push()`. One that does, on a Postgres whose app role may not create tables, has the owner create `kay_push_subscriptions` once, as it does for the other `kay_` tables ([Queues](queues.md)).
 
+### A component generic in its option value casts the `options` it hands Segmented or RadioGroup
+
+- kayjs-ui type-checks a null option against the group's `value`, so a wrapper whose option value is a type parameter (`<V>` passing `options: { value: V }[]` through) fails `kay check` on `options` and casts what it passes. A wrapper with concrete option types changes nothing ([Segmented](../packages/ui/llms/tables-navigation-and-layout.md)).
+
 ## 1.75.0
 
 ### The forms deprecated in 1.72 are gone
