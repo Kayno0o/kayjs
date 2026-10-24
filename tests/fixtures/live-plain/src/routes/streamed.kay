@@ -1,0 +1,10 @@
+--- server
+const slow = new Promise<number>(resolve => setTimeout(() => resolve(1), 30))
+--- script
+import Visitors from '../components/visitors.kay'
+---
+h1 Streamed
+await slow
+  p Loading
+then _value
+  Visitors

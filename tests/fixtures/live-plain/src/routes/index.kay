@@ -1,0 +1,5 @@
+--- script
+import Visitors from '../components/visitors.kay'
+---
+h1 Plain
+Visitors
