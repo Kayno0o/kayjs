@@ -265,6 +265,24 @@ describe('the share card template stamp', () => {
     expect(await imageRoute(options)).not.toBe(shared)
   }, 30_000)
 
+  it.skipIf(!chrome)('waits for the images of the page, a big one and a lazy one included, to be decoded before it draws', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'kay-card-slow-'))
+
+    try {
+      // Kay writes every image lazy and decoded off the main thread, which a big image takes long to be.
+      await Bun.write(join(dir, 'assets/big.png'), await new Bun.Image(Bun.file(join(FIXTURE, 'src/hero.png'))).resize(4000, 2400).png().bytes())
+
+      for (const loading of ['lazy', 'eager']) {
+        const jpeg = await shootCard(dir, 80, async origin => `<body style="margin:0;background:#1e40af"><img loading="${loading}" decoding="async" src="${origin}/_kay/assets/big.png" style="display:block;width:400px;height:630px;object-fit:cover"></body>`)
+
+        expect([loading, green((await pixelsOf(jpeg))(160, 160))]).toEqual([loading, true])
+      }
+    }
+    finally {
+      await rm(dir, { recursive: true, force: true })
+    }
+  }, 120_000)
+
   it('says where Chrome is needed when there is none', async () => {
     const before = process.env.BUN_CHROME_PATH
 

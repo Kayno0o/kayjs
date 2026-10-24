@@ -20,12 +20,25 @@ const HEAD = /<head(?:\s[^>]*)?>/
 const DEFAULT_SHOT_MS = 30_000
 let shotMs = DEFAULT_SHOT_MS
 const SETTLE_MS = 5000
-const PAINT = `(async () => {
-  const loading = [...document.images].filter(image => !image.complete).map(image => new Promise(resolve => {
-    image.addEventListener('load', resolve)
-    image.addEventListener('error', resolve)
-  }))
-  await Promise.race([Promise.all([document.fonts.ready, ...loading]), new Promise(resolve => setTimeout(resolve, ${SETTLE_MS}))])
+const POLL_MS = 50
+// The page runs no script of its own and timers and frames do not run in it, so this only waits on the fonts and images, and sets a flag the card's shot polls: a lazy image would otherwise never start loading outside the first frame, and one decoded off the main thread may be loaded and still undrawn.
+const PAINT = `(() => {
+  window.__kayPainted = false
+  Promise.all([document.fonts.ready, ...[...document.images].map(async image => {
+    image.loading = 'eager'
+
+    if (!image.complete) {
+      await new Promise(resolve => {
+        image.addEventListener('load', resolve)
+        image.addEventListener('error', resolve)
+      })
+    }
+
+    try {
+      await image.decode()
+    }
+    catch {}
+  })]).then(() => { window.__kayPainted = true })
 })()`
 
 // Cuts the limit for a test, or restores it with no argument.
@@ -186,7 +199,17 @@ async function draw(clientDir: string, quality: number, render: (origin: string)
       try {
       // The window is taller than the page's viewport by the browser's own bar.
         await page.view.cdp('Emulation.setDeviceMetricsOverride', { width: CARD.width, height: CARD.height, deviceScaleFactor: 1, mobile: false })
-        await page.view.cdp('Runtime.evaluate', { expression: PAINT, awaitPromise: true })
+        await page.view.cdp('Runtime.evaluate', { expression: PAINT })
+
+        // The fonts and images get this long, as a host that never answers would hold the shot back to its limit.
+        for (let waited = 0; waited < SETTLE_MS; waited += POLL_MS) {
+          const { result } = await page.view.cdp<{ result: { value?: boolean } }>('Runtime.evaluate', { expression: 'window.__kayPainted', returnByValue: true })
+
+          if (result.value === true)
+            break
+
+          await Bun.sleep(POLL_MS)
+        }
 
         const { data } = await page.view.cdp<{ data: string }>('Page.captureScreenshot', { format: 'jpeg', quality, clip: { x: 0, y: 0, width: CARD.width, height: CARD.height, scale: 1 } })
 
