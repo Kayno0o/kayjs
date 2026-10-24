@@ -1,14 +1,13 @@
 import type { Command } from './command'
 import { existsSync, statSync } from 'node:fs'
 import { stat } from 'node:fs/promises'
-import { constants } from 'node:os'
 import { join, relative, resolve } from 'node:path'
 import process from 'node:process'
 import { outputDir } from '../build/assets'
 import { environmentWithoutDotenv, PAGES_ENTRY, serverSources } from '../dev/sources'
 import { ENTRY_RECORD, EXECUTABLE_RECORD, MANIFEST } from '../server/client'
 import { START_PARENT } from '../server/parent'
-import { FORWARDED, parseWorkers, platformWorkers, STOPS, superviseWorkers } from '../server/workers'
+import { exitCode, FORWARDED, MAX_WORKERS, parseWorkers, platformWorkers, superviseWorkers } from '../server/workers'
 import { count, isPort, projectRoot } from './command'
 import { USAGES } from './usages'
 
@@ -25,7 +24,7 @@ export const start: Command = {
     const asked = requested === undefined || requested === '' ? 1 : parseWorkers(requested)
 
     if (asked === undefined)
-      return refuse(`--workers takes a number from 1 to 256, or auto, not ${requested}`)
+      return refuse(`--workers takes a number from 1 to ${MAX_WORKERS}, or auto, not ${requested}`)
 
     const root = projectRoot('start', path)
 
@@ -51,6 +50,9 @@ export const start: Command = {
     if (serving > 1)
       return superviseWorkers({ command, cwd: root, env: { ...env, NODE_ENV: 'production', ...typeof port === 'string' && { PORT: port } }, count: serving, name: 'kay start' })
 
+    // A server that is not one of several must not take itself for one, as an executable would from `KAY_WORKERS`.
+    delete env.KAY_WORKERS
+
     const forwarded = new Set<string>()
     let server: Bun.Subprocess | undefined
 
@@ -72,16 +74,8 @@ export const start: Command = {
     }
 
     const code = await server.exited
-    const { signalCode } = server
 
-    if (signalCode === null)
-      return code
-
-    // As a shell reports a process a signal ended, one with no name coming as its number.
-    if (typeof signalCode === 'number')
-      return 128 + signalCode
-
-    return STOPS.has(signalCode) && forwarded.has(signalCode) ? 0 : 128 + constants.signals[signalCode]
+    return exitCode(code, server.signalCode, forwarded)
   },
 }
 

@@ -1,6 +1,7 @@
 import type { AppStore } from './app-store'
+import { rm } from 'node:fs/promises'
 import { availableParallelism, constants } from 'node:os'
-import { basename } from 'node:path'
+import { basename, join } from 'node:path'
 import process from 'node:process'
 import { START_PARENT, WORKER_COUNT, WORKER_INDEX } from './parent'
 
@@ -9,10 +10,9 @@ export const FORWARDED = ['SIGINT', 'SIGTERM', 'SIGHUP', 'SIGQUIT'] as const
 // The signals asking a server to stop: dying of one the primary passed on is a stop, not a failure.
 export const STOPS = new Set<string>(['SIGINT', 'SIGTERM', 'SIGHUP'])
 
-const MAX_WORKERS = 256
+export const MAX_WORKERS = 256
 const WHOLE_NUMBER = /^\d+$/
 const FIRST_BACKOFF_MS = 250
-const MAX_BACKOFF_MS = 5000
 // A worker living this long has booted: its next death starts the backoff over.
 const HEALTHY_MS = 10_000
 // Deaths in a row, none of them past HEALTHY_MS, after which the app is taken for one that cannot boot.
@@ -33,11 +33,12 @@ export function parseWorkers(value: string): number | undefined {
 
 // The count an executable run by hand asks for, by `--workers <n|auto>` over `KAY_WORKERS`; undefined when it asks none, and an invalid value throws.
 export function requestedWorkers(argv: string[], env: Record<string, string | undefined>): number | undefined {
-  const at = argv.indexOf('--workers')
-  const value = at === -1 ? env[WORKER_COUNT] : argv[at + 1]
+  const at = argv.findIndex(arg => arg === '--workers' || arg.startsWith('--workers='))
 
-  if (value === undefined || value === '')
+  if (at === -1 && (env[WORKER_COUNT] ?? '') === '')
     return undefined
+
+  const value = at === -1 ? env[WORKER_COUNT]! : flagValue(argv, at)
 
   const count = parseWorkers(value)
 
@@ -49,7 +50,7 @@ export function requestedWorkers(argv: string[], env: Record<string, string | un
 
 // Whether this process is one worker of several, which `kay start` or the executable's own primary made.
 export function workerCount(): number {
-  return Number(process.env[WORKER_COUNT]) || 1
+  return isWorker() ? Number(process.env[WORKER_COUNT]) || 1 : 1
 }
 
 export function isWorker(): boolean {
@@ -91,7 +92,8 @@ export function platformWorkers(asked: number, name: string): number {
 
 // What the executable's generated entry runs before it imports anything: with `--workers` or `KAY_WORKERS` asking for several, it is the primary, running itself as each worker, and returns the exit code; undefined for a process that serves.
 export async function runAsPrimary(argv: string[], env: Record<string, string | undefined>): Promise<number | undefined> {
-  if (env[WORKER_INDEX] !== undefined)
+  // `--health` and `--load` ask a process of their own, whatever the environment says.
+  if (env[WORKER_INDEX] !== undefined || argv.includes('--health') || argv.includes('--load'))
     return undefined
 
   let asked: number | undefined
@@ -120,7 +122,7 @@ interface Supervised {
   name: string
 }
 
-interface Worker {
+interface Slot {
   process: Bun.Subprocess | undefined
   startedAt: number
   deaths: number
@@ -130,8 +132,12 @@ interface Worker {
 export async function superviseWorkers({ command, cwd, env, count, name }: Supervised): Promise<number> {
   // A throwaway server asked for a key of its process; the workers would each make their own and refuse each other's stamps, so they share one made here.
   const shared = env.KAY_EPHEMERAL_SECRET === '1' && (env.KAY_SECRET === undefined || env.KAY_SECRET === '') ? { KAY_SECRET: crypto.randomUUID() + crypto.randomUUID() } : {}
+
+  // The file the workers share starts empty: what a run kept in memory on one process does not outlive it.
+  await Promise.all(['', '-wal', '-shm'].map(async suffix => rm(join(cwd, `${SHARED_PATH}${suffix}`), { force: true })))
+
   const forwarded = new Set<string>()
-  const workers: Worker[] = Array.from({ length: count }, () => ({ process: undefined, startedAt: 0, deaths: 0 }))
+  const workers: Slot[] = Array.from({ length: count }, () => ({ process: undefined, startedAt: 0, deaths: 0 }))
   const codes: number[] = []
   let stopping = false
   let failed = false
@@ -197,7 +203,7 @@ export async function superviseWorkers({ command, cwd, env, count, name }: Super
         return
       }
 
-      const wait = Math.min(MAX_BACKOFF_MS, FIRST_BACKOFF_MS * 2 ** (worker.deaths - 1))
+      const wait = FIRST_BACKOFF_MS * 2 ** (worker.deaths - 1)
 
       console.error(`${name}: worker ${index} ${signalCode === null ? `exited with ${code}` : `was killed by ${signalCode}`}; restarting in ${wait} ms`)
       await Promise.race([Bun.sleep(wait), woken])
@@ -210,7 +216,7 @@ export async function superviseWorkers({ command, cwd, env, count, name }: Super
 }
 
 // As a shell reports a process a signal ended, one with no name coming as its number.
-function exitCode(code: number | null, signalCode: NodeJS.Signals | number | null, forwarded: Set<string>): number {
+export function exitCode(code: number | null, signalCode: NodeJS.Signals | number | null, forwarded: Set<string>): number {
   if (signalCode === null)
     return code ?? 0
 
@@ -218,4 +224,11 @@ function exitCode(code: number | null, signalCode: NodeJS.Signals | number | nul
     return 128 + signalCode
 
   return STOPS.has(signalCode) && forwarded.has(signalCode) ? 0 : 128 + constants.signals[signalCode]
+}
+
+// The value of `--workers` at `at`: after an equals sign, else the next argument, empty when there is none.
+function flagValue(argv: string[], at: number): string {
+  const given = argv[at]!
+
+  return given.startsWith('--workers=') ? given.slice('--workers='.length) : argv[at + 1] ?? ''
 }

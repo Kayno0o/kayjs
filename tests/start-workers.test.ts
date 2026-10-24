@@ -82,6 +82,19 @@ async function workerZero(port: string): Promise<string | undefined> {
   }
 }
 
+// What the route answers once the server is up.
+async function answered(port: string, path: string): Promise<string> {
+  for (const limit = Date.now() + 15_000; ; await Bun.sleep(100)) {
+    try {
+      return (await get(port, path)).text
+    }
+    catch (error) {
+      if (Date.now() > limit)
+        throw error
+    }
+  }
+}
+
 function start(dir: string, port: string, ...args: string[]): Subprocess<'ignore', 'pipe', 'pipe'> {
   return Bun.spawn([process.execPath, cli, 'start', dir, '--port', port, ...args], { env: { ...process.env, KAY_SECRET: SECRET }, stdin: 'ignore', stdout: 'pipe', stderr: 'pipe' })
 }
@@ -111,7 +124,9 @@ describe('worker counts', () => {
     expect(requestedWorkers(['bun', 'server'], {})).toBeUndefined()
     expect(requestedWorkers(['bun', 'server'], { KAY_WORKERS: '4' })).toBe(4)
     expect(requestedWorkers(['bun', 'server', '--workers', '2'], { KAY_WORKERS: '4' })).toBe(2)
+    expect(requestedWorkers(['bun', 'server', '--workers=3'], {})).toBe(3)
     expect(() => requestedWorkers(['bun', 'server', '--workers', 'x'], {})).toThrow('--workers takes a number')
+    expect(() => requestedWorkers(['bun', 'server', '--workers'], {})).toThrow('--workers takes a number')
   })
 })
 
@@ -119,12 +134,15 @@ describe('what workers share', () => {
   it('keeps the stores the app leaves out in one SQLite file, and leaves its own', async () => {
     const own = { cache: { get: () => undefined, set: () => undefined } } as never
     const before = process.env.KAY_WORKERS
+    const worker = process.env.KAY_WORKER
 
     try {
       delete process.env.KAY_WORKERS
+      delete process.env.KAY_WORKER
       expect(await sharedStores(undefined)).toBeUndefined()
 
       process.env.KAY_WORKERS = '2'
+      process.env.KAY_WORKER = '0'
 
       const shared = await sharedStores({ cache: own })
 
@@ -141,6 +159,11 @@ describe('what workers share', () => {
         delete process.env.KAY_WORKERS
       else
         process.env.KAY_WORKERS = before
+
+      if (worker === undefined)
+        delete process.env.KAY_WORKER
+      else
+        process.env.KAY_WORKER = worker
     }
   })
 
@@ -196,6 +219,21 @@ describe('kay start --workers', () => {
 
     await rm(dir, { recursive: true, force: true })
   })
+
+  it('serves from one process with --workers 1, whatever KAY_WORKERS says', async () => {
+    const port = String(freePort())
+    const child = Bun.spawn([process.execPath, cli, 'start', dir, '--port', port, '--workers', '1'], { env: { ...process.env, KAY_SECRET: SECRET, KAY_WORKERS: '4' }, stdin: 'ignore', stdout: 'pipe', stderr: 'pipe' })
+
+    try {
+      const single = await answered(port, '/who')
+
+      expect(single.startsWith('undefined ')).toBe(true)
+      expect((await stop(child)).code).toBe(0)
+    }
+    finally {
+      child.kill('SIGKILL')
+    }
+  }, 30_000)
 
   it('refuses a bad count', async () => {
     const child = start(dir, String(freePort()), '--workers', 'many')
@@ -295,6 +333,11 @@ describe('kay start --workers', () => {
       const pids = await fromEveryWorker(port, '/who')
 
       expect(pids.size).toBe(WORKERS)
+
+      // The container's health probe is no primary, whatever KAY_WORKERS says.
+      const probe = Bun.spawn([executable, '--health'], { cwd: dir, env: { ...process.env, PORT: port, KAY_SECRET: SECRET, KAY_WORKERS: String(WORKERS) }, stdin: 'ignore', stdout: 'ignore', stderr: 'ignore' })
+
+      expect(await probe.exited).toBe(0)
 
       const stopped = await stop(child)
 
