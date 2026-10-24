@@ -217,3 +217,22 @@ describe('the production jobs page for a workflow run', () => {
     expect((await post(site, '/_kay/jobs/send', { queue: `workflow:${name}`, id: again.id })).status).toBe(404)
   })
 })
+
+describe('the production jobs page when the store fails', () => {
+  it('answers a post with 502 and the store\'s message, as the dev tool does', async () => {
+    const site = await app({ jobs: { guard: allow } })
+    const name = `page-down-${++counter}`
+    const store = { ...memoryJobs(), state: () => {
+      throw new Error('store down')
+    } }
+    const jobs = queue<{ n: number }>(name, () => undefined, { store })
+    const id = await jobs.enqueue({ n: 1 })
+
+    for (const act of ['retry', 'delete', 'send', 'cancel']) {
+      const response = await post(site, `/_kay/jobs/${act}`, { queue: name, id })
+
+      expect(response.status).toBe(502)
+      expect(await response.text()).toBe('store down')
+    }
+  })
+})

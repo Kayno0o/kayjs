@@ -99,7 +99,14 @@ export function serveJobsPage(app: Elysia, page: JobsPage, options: ActionOption
       if (typeof queue !== 'string' || typeof id !== 'string')
         return new Response('Bad Request', { status: 400, headers: HEADERS })
 
-      const done = await jobActions[act](queue, id)
+      let done: Awaited<ReturnType<(typeof jobActions)[typeof act]>>
+
+      try {
+        done = await jobActions[act](queue, id)
+      }
+      catch (error) {
+        return new Response(error instanceof Error ? error.message : String(error), { status: 502, headers: { 'content-type': 'text/plain; charset=utf-8', ...HEADERS } })
+      }
 
       if (done !== 'done') {
         const [status, message] = JOB_MESSAGES[done]

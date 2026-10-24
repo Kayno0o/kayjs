@@ -1,5 +1,5 @@
 import type { StoredJob, StoredJobState } from './queue'
-import type { RunView } from './workflow'
+import type { RunView, WorkflowAdmin } from './workflow'
 import { queueAdmins } from './queue'
 import { runView, WORKFLOW_PREFIX, workflowAdminOf } from './workflow'
 
@@ -137,27 +137,24 @@ export async function deleteJob(queue: string, id: string): Promise<JobAction> {
 }
 
 // The run of a workflow queue a click names, and what drives it.
-async function runOf(queue: string, id: string) {
+async function runOf(queue: string, id: string): Promise<{ fail: Exclude<JobAction, 'done'> } | { fail?: undefined, flow: WorkflowAdmin, state: StoredJobState, key: string }> {
   const { admin, state } = await stateOf(queue, id)
   const flow = workflowAdminOf(queue)
 
   if (admin === undefined)
-    return { fail: 'no-queue' as const }
+    return { fail: 'no-queue' }
 
   if (state === undefined)
-    return { fail: 'no-job' as const }
+    return { fail: 'no-job' }
 
-  if (flow === undefined || state.key === undefined)
-    return { fail: 'not-workflow' as const }
-
-  return { flow, state, key: state.key }
+  return flow === undefined || state.key === undefined ? { fail: 'not-workflow' } : { flow, state, key: state.key }
 }
 
 // Sends the event the run waits for, without data.
 export async function sendRunEvent(queue: string, id: string): Promise<JobAction> {
   const found = await runOf(queue, id)
 
-  if ('fail' in found)
+  if (found.fail !== undefined)
     return found.fail
 
   const run = runView(found.state.status, found.state.payload, found.state.runAt)
@@ -172,7 +169,7 @@ export async function sendRunEvent(queue: string, id: string): Promise<JobAction
 export async function cancelRun(queue: string, id: string): Promise<JobAction> {
   const found = await runOf(queue, id)
 
-  if ('fail' in found)
+  if (found.fail !== undefined)
     return found.fail
 
   await found.flow.cancel(found.state.id)
