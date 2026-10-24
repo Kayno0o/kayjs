@@ -560,7 +560,9 @@ class Collection<Row extends object, Key extends keyof Row & string> {
           break
 
         entry = { ...entry, answer }
-        await this.record(entry)
+
+        if (!await this.record(entry))
+          continue
       }
 
       if (!await this.apply(entry)) {
@@ -598,7 +600,7 @@ class Collection<Row extends object, Key extends keyof Row & string> {
 
     if (response.status >= 500 || TRANSIENT.has(response.status)) {
       if (response.status >= 500)
-        await this.record({ ...entry, faults: (entry.faults ?? 0) + 1 })
+        await this.countFault(entry)
 
       this.noticed(true)
 
@@ -608,11 +610,31 @@ class Collection<Row extends object, Key extends keyof Row & string> {
     return { status: response.status, failure: response.headers.get(FAILURE_HEADER), body: await response.text() }
   }
 
-  private async record(entry: Entry): Promise<void> {
+  // Writes the answer onto the entry as it is now; false, writing nothing, when a clear removed it meanwhile.
+  private async record(entry: Entry): Promise<boolean> {
     const db = await database()
     const tx = db.transaction('outbox', 'readwrite')
+    const store = tx.objectStore('outbox')
+    const current = await request(store.get(entry.seq!)) as Entry | undefined
 
-    tx.objectStore('outbox').put(entry)
+    if (current)
+      store.put({ ...current, answer: entry.answer })
+
+    await finished(tx)
+
+    return current !== undefined
+  }
+
+  // Counts a fault on the entry as it is now: one the worker counted meanwhile is kept, one removed (a clear) stays gone.
+  private async countFault(entry: Entry): Promise<void> {
+    const db = await database()
+    const tx = db.transaction('outbox', 'readwrite')
+    const store = tx.objectStore('outbox')
+    const current = await request(store.get(entry.seq!)) as Entry | undefined
+
+    if (current)
+      store.put({ ...current, faults: (current.faults ?? 0) + 1 })
+
     await finished(tx)
   }
 

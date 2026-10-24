@@ -71,6 +71,51 @@ async function workerSends(page: TestPage, script: string): Promise<boolean> {
   }, script)
 }
 
+// Runs the worker's sync code in the page with the page's fetch wrapped: `before` is the body of an async function of the call's number (from 1) that runs ahead of every fetch, and a throw from it is a failed fetch. Returns whether the worker settled and the messages heard on its channel.
+async function workerSendsWith(page: TestPage, script: string, before: string): Promise<{ settled: boolean, heard: string[] }> {
+  return page.evaluate(async (code, hook) => {
+    const heard: string[] = []
+    const channel = new BroadcastChannel('kay-local')
+    const real = window.fetch.bind(window)
+    let calls = 0
+    // eslint-disable-next-line no-new-func
+    const ahead = new Function('call', `return (async () => { ${hook} })()`) as (call: number) => Promise<void>
+    // eslint-disable-next-line no-new-func
+    const make = new Function('self', `${code.slice(code.indexOf('self.addEventListener(\'sync\''))}\nreturn sendQueued`) as (scope: object) => () => Promise<void>
+    let settled = true
+
+    channel.onmessage = event => heard.push(String(event.data))
+    window.fetch = (async (...args: Parameters<typeof fetch>) => {
+      await ahead(++calls)
+
+      return real(...args)
+    }) as typeof fetch
+
+    try {
+      await navigator.locks.request('kay-local', make({ addEventListener: () => undefined }))
+    }
+    catch {
+      settled = false
+    }
+    finally {
+      window.fetch = real
+    }
+
+    await new Promise(resolve => setTimeout(resolve, 300))
+    channel.close()
+
+    return { settled, heard }
+  }, script, before)
+}
+
+// What a clear does to the queue, done from the page while the worker's fetch is out.
+const CLEAR_OUTBOX = `
+  const db = await new Promise(resolve => { const open = indexedDB.open('kay-local'); open.onsuccess = () => resolve(open.result) })
+  const tx = db.transaction('outbox', 'readwrite')
+  tx.objectStore('outbox').clear()
+  await new Promise(resolve => { tx.oncomplete = resolve })
+`
+
 async function faults(page: TestPage): Promise<number | undefined> {
   return ((await stored(page)).outbox[0] as { faults?: number }).faults
 }
@@ -324,6 +369,61 @@ describe.skipIf(path === undefined)('a local() collection in the browser', () =>
 
     expect(await page.text('li.issue')).toBe('rejected a 500')
     expect(await page.text('p.pending')).toBe('0')
+  }, 60_000)
+
+  it('keeps an entry the page cleared during the worker fetch gone, answered or faulty', async () => {
+    const script = await (await worker!.fetch('/sw.js')).text()
+    const page = await opened()
+
+    await queuedFaulty(page, 'cleared fault')
+
+    expect((await workerSendsWith(page, script, CLEAR_OUTBOX)).settled).toBe(false)
+    expect((await stored(page)).outbox).toEqual([])
+
+    await page.evaluate(() => {
+      document.cookie = 'refuse=401; path=/'
+    })
+    await page.offline()
+    await write(page, 'button.add', 'cleared answer')
+    await page.online()
+    await page.waitUntil(() => document.querySelector('.status')?.textContent === 'signed-out')
+    await page.evaluate(() => {
+      document.cookie = 'refuse=; path=/; max-age=0'
+    })
+
+    const result = await workerSendsWith(page, script, CLEAR_OUTBOX)
+
+    expect(result.settled).toBe(true)
+    expect(result.heard).toEqual([])
+    expect((await stored(page)).outbox).toEqual([])
+  }, 60_000)
+
+  it('broadcasts the answers of the first two writes when the third throws', async () => {
+    const script = await (await worker!.fetch('/sw.js')).text()
+    const page = await opened()
+
+    await page.evaluate(() => {
+      document.cookie = 'refuse=401; path=/'
+    })
+    await page.offline()
+
+    await write(page, 'button.add', 'one')
+    await write(page, 'button.addb', 'two')
+    await page.click('button.remove')
+
+    await page.online()
+    await page.waitUntil(() => document.querySelector('.status')?.textContent === 'signed-out')
+    await page.evaluate(() => {
+      document.cookie = 'refuse=; path=/; max-age=0'
+    })
+
+    expect((await stored(page)).outbox).toHaveLength(3)
+
+    const result = await workerSendsWith(page, script, 'if (call === 3) throw new Error("network")')
+
+    expect(result.settled).toBe(false)
+    expect(result.heard).toContain('answered')
+    expect((await server()).saves).toBe(2)
   }, 60_000)
 
   it('aborts a read that takes over thirty seconds', async () => {

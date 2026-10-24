@@ -276,15 +276,37 @@ function settled(request) {
   })
 }
 
+// Merges fields into the entry as it is now, in one transaction: an entry the page removed during the fetch (a clear) stays gone. True when it was still queued.
+function amend(db, seq, fields) {
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction('outbox', 'readwrite')
+    const store = tx.objectStore('outbox')
+    let kept = false
+
+    store.get(seq).onsuccess = (event) => {
+      const current = event.target.result
+
+      if (current) {
+        kept = true
+        store.put({ ...current, ...fields })
+      }
+    }
+
+    tx.oncomplete = () => resolve(kept)
+    tx.onerror = tx.onabort = () => reject(tx.error)
+  })
+}
+
 async function sendQueued() {
   const db = await openLocal()
 
   if (!db)
     return
 
+  let answered = false
+
   try {
     const queued = await settled(db.transaction('outbox').objectStore('outbox').getAll())
-    let answered = false
     const jar = typeof cookieStore === 'undefined' ? null : await cookieStore.get('kay_local_clear')
     const token = jar ? jar.value : ''
 
@@ -313,32 +335,24 @@ async function sendQueued() {
 
       // A 5xx is counted on the write, as the page counts it: the fifth is its answer, so a write that always throws is rejected with no page open.
       if (response.status >= 500 && (entry.faults || 0) + 1 < ${MOST_FAULTS}) {
-        entry.faults = (entry.faults || 0) + 1
-
-        const faulted = db.transaction('outbox', 'readwrite')
-
-        faulted.objectStore('outbox').put(entry)
-        await new Promise(resolve => faulted.oncomplete = resolve)
+        await amend(db, entry.seq, { faults: (entry.faults || 0) + 1 })
         throw new Error('a queued write was not answered')
       }
 
-      entry.answer = { status: response.status, failure: response.headers.get('x-kay-failure'), body: await response.text() }
+      const answer = { status: response.status, failure: response.headers.get('x-kay-failure'), body: await response.text() }
 
-      const tx = db.transaction('outbox', 'readwrite')
-
-      tx.objectStore('outbox').put(entry)
-      await new Promise(resolve => tx.oncomplete = resolve)
-      answered = true
+      if (await amend(db, entry.seq, { answer }))
+        answered = true
 
       if (!response.ok)
         break
     }
-
-    if (answered)
-      new BroadcastChannel('kay-local').postMessage('answered')
   }
   finally {
     db.close()
+
+    if (answered)
+      new BroadcastChannel('kay-local').postMessage('answered')
   }
 }
 `
