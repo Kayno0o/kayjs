@@ -209,6 +209,16 @@ function installSignal(): () => boolean {
   const [read, write] = createSignal<boolean>(Boolean((globalThis as Installable).$kayInstall))
 
   addEventListener('kay:install', () => write(Boolean((globalThis as Installable).$kayInstall)))
+  // The page's own listener, for an app without `push()`: an offer made before this island hydrated is lost to it, one made after is held from here on.
+  addEventListener('beforeinstallprompt', (event) => {
+    event.preventDefault()
+    ;(globalThis as Installable).$kayInstall = event as InstallEvent
+    dispatchEvent(new Event('kay:install'))
+  })
+  addEventListener('appinstalled', () => {
+    ;(globalThis as Installable).$kayInstall = null
+    dispatchEvent(new Event('kay:install'))
+  })
   installable = read
 
   return read
@@ -216,7 +226,7 @@ function installSignal(): () => boolean {
 
 const readAvailable = markSignal((): boolean => (onServer() ? false : installSignal()()))
 
-// The browser's offer to install the site as an app, held from the first moment of the page (`beforeinstallprompt` fires before an island hydrates) by the script that registers kay's worker, which `push()` in kay.config.ts makes keep it.
+// The browser's offer to install the site as an app. An island using `installPrompt` holds it from its hydration on; `push()` in kay.config.ts also makes the page's worker script hold it from the first moment, for an offer the browser makes before any island hydrated.
 // `installPrompt.available()` is true while an offer is held: draw an "Install" button from it, and call `installPrompt.show()` from its click. Browsers that never make the offer, Safari's included, leave it false.
 export const installPrompt = {
   available: readAvailable,

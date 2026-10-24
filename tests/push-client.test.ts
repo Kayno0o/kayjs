@@ -199,6 +199,18 @@ describe('installPrompt', () => {
     expect(await module.installPrompt.show()).toBe('unavailable')
   })
 
+  it('holds an offer the browser makes after the island hydrated, with no early script', async () => {
+    const offer = Object.assign(new Event('beforeinstallprompt', { cancelable: true }), { prompt: async () => undefined, userChoice: Promise.resolve({ outcome: 'dismissed' as const }) })
+
+    Object.assign(window, { $kayInstall: undefined })
+    module.installPrompt.available()
+    window.dispatchEvent(offer)
+    expect(offer.defaultPrevented).toBe(true)
+    expect(module.installPrompt.available()).toBe(true)
+    expect(await module.installPrompt.show()).toBe('dismissed')
+    expect(module.installPrompt.available()).toBe(false)
+  })
+
   it('answers unavailable when the browser refuses to show it', async () => {
     Object.assign(window, { $kayInstall: Object.assign(new Event('beforeinstallprompt'), { prompt: async () => Promise.reject(new Error('no gesture')), userChoice: new Promise<never>(() => undefined) }) })
     expect(await module.installPrompt.show()).toBe('unavailable')
