@@ -6,6 +6,7 @@ import { normalizeAddress } from './list-address'
 import { log } from './log'
 import { isOwnMessageId } from './message-id'
 import { addressesOf, deliveryReport, parseMime, replyOf } from './mime'
+import { confirmSubscription, sesFound, snsSigned, topicsOf } from './sns'
 
 // Where a provider posts what happened to a mail, and where a mail server hands the app a reply or a delivery report.
 export const EVENTS_PATH = '/_kay/mail/events'
@@ -34,6 +35,8 @@ export interface EventSecrets {
   sendgrid?: string | undefined
   // The `whsec_` secret of the webhook.
   resend?: string | undefined
+  // The ARN of the SNS topic SES publishes to (several, comma separated): a message from any other topic is refused, as Amazon signs every topic's.
+  ses?: string | undefined
   // The secret the mail server presents to `/_kay/mail/inbound`, as `Authorization: Bearer`.
   inbound?: string | undefined
 }
@@ -54,7 +57,7 @@ export interface EventHost {
 const BODY_MAX = 1_048_576
 const INBOUND_MAX = 5_242_880
 const WINDOW_SECONDS = 300
-const SECRET_ENV: Record<keyof EventSecrets, string> = { postmark: 'MAIL_EVENTS_POSTMARK', mailgun: 'MAIL_EVENTS_MAILGUN', sendgrid: 'MAIL_EVENTS_SENDGRID', resend: 'MAIL_EVENTS_RESEND', inbound: 'MAIL_INBOUND_SECRET' }
+const SECRET_ENV: Record<keyof EventSecrets, string> = { postmark: 'MAIL_EVENTS_POSTMARK', mailgun: 'MAIL_EVENTS_MAILGUN', sendgrid: 'MAIL_EVENTS_SENDGRID', resend: 'MAIL_EVENTS_RESEND', ses: 'MAIL_EVENTS_SES', inbound: 'MAIL_INBOUND_SECRET' }
 // A bad destination address (5.1.x) or a disabled mailbox (5.2.1): not a full mailbox, a policy block or a reputation one, which say nothing of the address.
 const ADDRESS_GONE = /^5\.(?:1\.\d+|2\.1)$/
 const WHSEC = /^whsec_/
@@ -277,7 +280,59 @@ function isSigned(provider: Provider, secret: string, request: Request, body: un
   return provider === 'sendgrid' ? sendgridSigned(secret, request, raw) : svixSigned(secret, request, new TextDecoder().decode(raw))
 }
 
+// Amazon SNS posts its messages as text/plain JSON. The topic is the secret and the signature the proof: Amazon signs the messages of every topic, so the TopicArn is checked before anything is fetched.
+async function sesEvent(request: Request, host: EventHost): Promise<Response> {
+  const secret = host.secrets().ses
+
+  if (secret === undefined)
+    return plain(404)
+
+  const raw = await bodyOf(request, BODY_MAX)
+
+  if (raw === undefined)
+    return plain(413)
+
+  let message: Record<string, unknown> | undefined
+
+  try {
+    const parsed: unknown = JSON.parse(new TextDecoder().decode(raw))
+
+    message = typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed) ? parsed as Record<string, unknown> : undefined
+  }
+  catch {
+    message = undefined
+  }
+
+  if (message === undefined)
+    return plain(400)
+
+  if (typeof message.TopicArn !== 'string' || !topicsOf(secret).includes(message.TopicArn) || !await snsSigned(message))
+    return plain(401)
+
+  if (message.Type === 'SubscriptionConfirmation') {
+    // A failure answers 502, which SNS retries.
+    if (!await confirmSubscription(message.SubscribeURL)) {
+      log.warn('an SNS subscription could not be confirmed: its SubscribeURL did not answer')
+
+      return plain(502)
+    }
+
+    log.info('an SNS subscription to the SES topic was confirmed')
+
+    return plain(200, 'ok')
+  }
+
+  if (message.Type === 'Notification') {
+    for (const found of sesFound(message.Message))
+      await host.suppress(found, 'ses')
+  }
+
+  return plain(200, 'ok')
+}
+
 export function mountEventRoutes(plugin: Elysia, host: () => EventHost): void {
+  plugin.post(`${EVENTS_PATH}/ses`, async ({ request }) => sesEvent(request, host()), { parse: 'none' })
+
   for (const provider of PROVIDERS) {
     plugin.post(`${EVENTS_PATH}/${provider}`, async ({ request }) => {
       const secret = host().secrets()[provider]

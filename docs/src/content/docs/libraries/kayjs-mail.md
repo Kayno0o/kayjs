@@ -359,6 +359,7 @@ Point the provider's webhook at `https://your-site/_kay/mail/events/<provider>` 
 - `mailgun`: `MAIL_EVENTS_MAILGUN`, the webhook signing key.
 - `sendgrid`: `MAIL_EVENTS_SENDGRID`, the public key of the Event Webhook.
 - `resend`: `MAIL_EVENTS_RESEND`, the `whsec_` secret.
+- `ses`: Amazon SES, through an SNS topic. Subscribe the URL to the topic as HTTPS and set `MAIL_EVENTS_SES` to the topic's ARN, as Amazon signs every topic's messages and the ARN tells yours. kayjs-mail confirms the subscription itself and checks each message's signature.
 
 A provider with no secret has no route, and a post whose signature does not check is refused. Soft bounces are ignored.
 
