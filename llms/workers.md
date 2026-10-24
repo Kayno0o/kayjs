@@ -11,6 +11,8 @@ Serving from every core of a machine: `kay start --workers` and the executable. 
 - A worker that dies unasked is started again after 250 ms, doubling while it keeps dying; five deaths in a row without living 10 s stop everything with exit 1. Workers drain once the supervisor is gone.
 - Each worker costs a server's memory. Set `KAY_SECRET` as for replicas; `KAY_EPHEMERAL_SECRET=1` makes the supervisor share a made one with its workers.
 
+## Reference
+
 ### What the workers share
 
 - What `store` in kay.config.ts leaves out and one process would keep in memory (`cache`, `live`, `rates`, `rooms`, `vitals`, `notifications`, `push`) is kept by kay in `data/workers.sqlite`, emptied each time the command starts. A store you name is never replaced; sessions travel in their cookie and the queue keeps `data/jobs.sqlite`, as before.
