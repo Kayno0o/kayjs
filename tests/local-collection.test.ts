@@ -14,7 +14,7 @@ afterAll(async () => {
   await worker?.close()
 })
 
-async function server(): Promise<{ saves: number, drops: number, rows: { id: string, title: string, rev: number }[] }> {
+async function server(): Promise<{ saves: number, drops: number, order: string[], rows: { id: string, title: string, rev: number }[] }> {
   return (await site!.fetch('/api/notes/stats')).json() as Promise<Awaited<ReturnType<typeof server>>>
 }
 
@@ -250,6 +250,152 @@ describe.skipIf(path === undefined)('a local() collection in the browser', () =>
 
     expect(await stored(page)).toEqual({ rows: [], outbox: [] })
   }, 60_000)
+
+  it('sends several queued writes in the order they were made', async () => {
+    const page = await opened()
+
+    await page.offline()
+    await write(page, 'button.addb', 'second row')
+    await write(page, 'button.add', 'first row')
+    await page.online()
+    await page.waitUntil(() => document.querySelector('.pending')?.textContent === '0')
+
+    expect((await server()).order).toEqual(['b', 'a'])
+  }, 60_000)
+
+  it('sends a row a custom conflict rule returns, as a new write on the server\'s row', async () => {
+    const page = await opened('/both')
+
+    await write(page, 'button.add', 'first')
+    await page.waitUntil(() => document.querySelector('li.note')?.textContent === 'first 1')
+    await page.offline()
+    await write(page, 'button.edit', 'mine')
+    await site!.fetch('/api/notes/other', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ id: 'a', title: 'theirs', rev: 5 }) })
+    await page.online()
+    await page.waitUntil(() => document.querySelector('li.note')?.textContent === 'mine+theirs 6')
+
+    expect(await server()).toMatchObject({ saves: 2, rows: [{ id: 'a', title: 'mine+theirs', rev: 6 }] })
+    expect(await page.text('li.issue')).toBe('conflict a ')
+  }, 60_000)
+
+  it('keeps the server\'s row when a row made here meets one it never saw', async () => {
+    const page = await opened()
+
+    await page.offline()
+    await site!.fetch('/api/notes/other', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ id: 'a', title: 'theirs', rev: 5 }) })
+    await write(page, 'button.add', 'mine')
+    await page.online()
+    await page.waitUntil(() => document.querySelector('.pending')?.textContent === '0' && document.querySelector('li.note')?.textContent === 'theirs 5')
+
+    expect(await server()).toMatchObject({ saves: 0, rows: [{ id: 'a', title: 'theirs', rev: 5 }] })
+    expect(await page.text('li.issue')).toBe('conflict a ')
+  }, 60_000)
+
+  it('forgets the rows held, and keeps the queue, when the version changes', async () => {
+    const page = await opened()
+
+    await write(page, 'button.add', 'held')
+    await page.waitUntil(() => document.querySelector('li.note')?.textContent === 'held 1')
+    await page.route('/api/*', async request => request.abort())
+    await page.goto('/')
+    await page.waitUntil(() => document.querySelector('.status')?.textContent === 'offline')
+
+    // The same version keeps its rows when the server cannot be read.
+    expect(await page.text('li.note')).toBe('held 1')
+
+    await page.goto('/v2')
+    await page.waitUntil(() => document.querySelector('.status')?.textContent === 'offline')
+
+    expect(await page.count('li.note')).toBe(0)
+  }, 60_000)
+
+  it('pauses the queue on a 401 and sends it once the person signs in again', async () => {
+    const page = await opened()
+
+    await page.evaluate(() => {
+      document.cookie = 'refuse=401; path=/'
+    })
+    await page.offline()
+    await write(page, 'button.add', 'waiting')
+    await page.online()
+    await page.waitUntil(() => document.querySelector('.status')?.textContent === 'signed-out')
+
+    expect(await page.text('p.pending')).toBe('1')
+    expect((await server()).saves).toBe(0)
+
+    await page.evaluate(() => {
+      document.cookie = 'refuse=; path=/; max-age=0'
+    })
+    await page.click('button.sync')
+    await page.waitUntil(() => document.querySelector('.pending')?.textContent === '0')
+
+    expect(await server()).toMatchObject({ saves: 1, rows: [{ id: 'a', title: 'waiting', rev: 1 }] })
+  }, 60_000)
+
+  it('runs a write once when two tabs send the queue as the connection returns', async () => {
+    const page = await opened()
+
+    await page.evaluate(async () => {
+      const frame = document.createElement('iframe')
+
+      frame.id = 'other'
+      frame.src = '/'
+      document.body.append(frame)
+      await new Promise(resolve => frame.addEventListener('load', resolve))
+    })
+    await page.waitUntil(() => (document.querySelector('#other') as HTMLIFrameElement).contentDocument?.querySelector('.status')?.textContent === 'synced')
+    await page.offline()
+    await write(page, 'button.add', 'twice')
+    await page.online()
+    await page.waitUntil(() => document.querySelector('.pending')?.textContent === '0' && (document.querySelector('#other') as HTMLIFrameElement).contentDocument?.querySelector('.pending')?.textContent === '0')
+
+    expect(await server()).toMatchObject({ saves: 1, rows: [{ id: 'a', title: 'twice', rev: 1 }] })
+    expect(await page.count('li.issue')).toBe(0)
+    expect(await page.evaluate(() => (document.querySelector('#other') as HTMLIFrameElement).contentDocument!.querySelectorAll('li.issue').length)).toBe(0)
+  }, 60_000)
+
+  it('runs a write once when the page and the worker both send it', async () => {
+    const page = await worker!.open('/')
+
+    await page.waitUntil(() => document.querySelector('.status')?.textContent === 'synced')
+    await page.evaluate(async () => {
+      await navigator.serviceWorker.ready
+    })
+    await write(page, 'button.add', 'both ways')
+    await page.waitUntil(() => document.querySelector('.pending')?.textContent === '0')
+    await Bun.sleep(500)
+
+    expect(await (await worker!.fetch('/api/notes/stats')).json()).toMatchObject({ saves: 1, rows: [{ id: 'a', title: 'both ways', rev: 1 }] })
+    expect(await page.count('li.issue')).toBe(0)
+  }, 60_000)
+
+  it('reads the server again after a read failed with nothing queued', async () => {
+    const page = await opened()
+
+    await page.route('/api/*', async request => request.abort())
+    await page.click('button.sync')
+    await page.waitUntil(() => document.querySelector('.status')?.textContent === 'offline')
+    await page.unroute()
+    await page.waitUntil(() => document.querySelector('.status')?.textContent === 'synced', { timeout: '15s' })
+  }, 60_000)
+
+  it('keeps the latest fifty issues of a collection', async () => {
+    const page = await opened()
+
+    await page.evaluate(() => {
+      document.cookie = 'refuse=1; path=/'
+    })
+    await page.offline()
+    await page.fill('input.title', 'refused')
+
+    for (let each = 0; each < 55; each++)
+      await page.click('button.add')
+
+    await page.online()
+    await page.waitUntil(() => document.querySelector('.pending')?.textContent === '0', { timeout: '30s' })
+
+    expect(await page.count('li.issue')).toBe(50)
+  }, 90_000)
 
   it('loads the collection code on a page that has one and none on a page that has none', async () => {
     const holds = async (path: string) => {

@@ -1,34 +1,34 @@
 # kay
 
-> kay is a Bun web framework. A `.kay` file is one component: TypeScript fences, then a pug-like indented template. Pages render to plain HTML strings on the server, islands run on kay's own signals and DOM runtime, and an Elysia plugin serves it all with automatic islands. Everything is typed, templates included, and `kay check` reports errors at the `.kay` line and column.
+> kay is a Bun web framework. A `.kay` file is one component: TypeScript fences, then a pug-like indented template. Pages render to HTML on the server, islands run on kay's own signals and DOM runtime, and an Elysia plugin serves it all with automatic islands. Everything is typed, templates included, and `kay check` reports errors at the `.kay` line and column.
 
 ## Rules that are easy to get wrong
 
 - Every dynamic value sits in `{}`: `a(href={url})`, `p Hello {name}`. A static attribute value is a quoted string: `a(href="/about")`.
-- A signal or memo is read by calling it, `count()`, in the template as in the script; one the template names bare is an error, `uncalled-signal`, which `kay check --fix` calls. It is written by assigning it, in both: `count = 0`, `count += step` and `count++` compile to `.set`, and `count.set(c => c * 2)` still works; assigning works on any signal a `const`, an import, a `let`, a property (`box.count = 1`) or an array element holds. Props and server data are plain values: `{title}`, not `{title()}`; a child writing its parent's state types the prop `Bindable<T>`, assigns it, and the parent passes `bind:open={open}`.
-- A `for` matches its rows across renders by `item.id`, else by the item itself; rows of plain objects edited immutably keep their nodes with no key, and `key={post.slug}` names another key.
-- An `await` block streams any promise it is given, `await comments`, `await data.comments`, a prop or one a component makes; a rejection before it renders crashes nothing.
+- A signal or memo is read by calling it, `count()`, in the template as in the script; one the template names bare is an error, `uncalled-signal`, fixed by `kay check --fix`. It is written by assigning it, in both: `count = 0`, `count += step` and `count++` compile to `.set`, and `count.set(c => c * 2)` still works; assigning works on any signal, wherever it is held. Props and server data are plain values: `{title}`, not `{title()}`; a child writing its parent's state types the prop `Bindable<T>`, assigns it, and the parent passes `bind:open={open}`.
+- A `for` matches its rows across renders by `item.id`, else by the item itself; `key={post.slug}` names another key.
+- An `await` block streams any promise it is given, `await comments`, `await data.comments`, a prop or one a component makes.
 - Shared values are exported from a `--- module` fence.
 - A page has no props: its data comes from its `--- server` fence.
-- `window`, `document`, `localStorage` and the other globals only a browser has are read in `effect` or `onMount`, or in a component whose script fence is `--- client`; reading one while rendering throws on the server.
-- Every duration is a string with its unit, `'250ms'`, `'30s'`, `'5m'`, `'1.5h'`, `'30d'` or `'2w'` (type `Duration` from `kay`) everywhere; a bare number is a type error, `durationMs` gives one's milliseconds, and a session store's `set` takes its `maxAge` as one.
+- `window`, `document` and other browser-only globals are read in `effect` or `onMount`, or in a component whose script fence is `--- client`; reading one while rendering throws on the server.
+- Every duration is a string with its unit, `'250ms'`, `'30s'`, `'5m'`, `'1.5h'`, `'30d'` or `'2w'` (type `Duration` from `kay`); a bare number is a type error, `durationMs` gives one's milliseconds, and a session store's `set` takes its `maxAge` as one.
 - Indentation is spaces only, consistent within a block. Text after a tag needs one space: `p Hello`, never `p:Hello`.
-- Under `kay dev`, `.kay/dev/errors.json` lists the errors the server met (compile and type errors, requests that threw, islands' browser errors) at their `.kay` lines: read it rather than opening the browser.
+- Under `kay dev`, `.kay/dev/errors.json` lists the errors the server met (compile and type errors, throwing requests, islands' browser errors): read it rather than opening the browser.
 - Pug features that do not exist: `- code` lines, `#{}` and `!{}` interpolation, `+mixins`, `include`, `extends`, `block`, filters, `&attributes`, `case`, `each`, `while`, `unless`, `doctype`; a line starting with one is reported, with what kay writes instead.
 
 ## Libraries
 
 kay's own libraries are released with kay, and each ships its `llms.txt` and `llms/` in its package: open the one a task needs.
 
-- [kayjs-auth](packages/auth/llms.txt): sign-in with OAuth, passwords, magic links, two-factor and passkeys, bearer tokens, admin pages, organizations
+- [kayjs-auth](packages/auth/llms.txt): sign-in with OAuth, passwords, magic links, two-factor and passkeys, admin pages, organizations
 - [kayjs-ui](packages/ui/llms.txt): components styled by one theme: buttons, dialogs, toasts, tables, forms, charts, layouts
-- [kayjs-mail](packages/mail/llms.txt): mails written as `.kay` components, SMTP from the environment, an outbox in tests, sending through the queue
+- [kayjs-mail](packages/mail/llms.txt): mails written as `.kay` components, SMTP from the environment, sending through the queue
 - [kayjs-cms](packages/cms/llms.txt): content edited on the page it renders, collection screens, history, uploads
 - [kayjs-ai](packages/ai/llms.txt): `ask()` over Anthropic or an OpenAI-compatible server, streamed replies, tools, limits
 
 ## Docs
 
-To build a site, read [Build a site](llms/site.md) first. The topic files below cover what it leaves out. Each opens with its common tasks, one sentence and one example apiece, then the exact rules under Reference.
+To build a site, read [Build a site](llms/site.md) first. The topic files below cover what it leaves out.
 
 - [Build a site](llms/site.md): config, layout, a Markdown collection, the 404 page, islands, a form
 - [Recipes](llms/recipes.md): a database CRUD, a dashboard behind sign-in, a blog with tags and RSS

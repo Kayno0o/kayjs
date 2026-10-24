@@ -15,4 +15,5 @@ export default api()
     notes.clear()
     stats.saves = 0
     stats.drops = 0
+    stats.order = []
   })

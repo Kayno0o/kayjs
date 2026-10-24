@@ -4,4 +4,7 @@ import { guard } from 'kay'
 export default guard(({ cookies, deny }) => {
   if (cookies.get('refuse') === '1')
     deny(403, 'No entry')
+
+  if (cookies.get('refuse') === '401')
+    deny(401, 'Sign in')
 })

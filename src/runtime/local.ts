@@ -1,6 +1,7 @@
 import type { Action } from './action'
 import { encodeCall } from './action'
 import { withBase } from './base'
+import { RETRY_LATER } from './local-status'
 import { createSignal, getOwner, onCleanup } from './reactive'
 import { FAILURE_HEADER, PAGE_HEADER, REDIRECT_HEADER } from './swap'
 import { decodeServerValue } from './wire'
@@ -106,9 +107,13 @@ const CLEAR_COOKIE = 'kay_local_clear'
 const MOST_CONFLICTS = 3
 const RETRY_MS = [5000, 15_000, 60_000, 300_000]
 // A write answered with one of these may succeed later, so it stays queued.
-const TRANSIENT = new Set([408, 425, 429])
+const TRANSIENT = new Set<number>(RETRY_LATER)
 // A write the server answers 5xx this many times is rejected, so one that always throws does not hold the queue forever.
 const MOST_FAULTS = 5
+// The issues kept per collection: the oldest go first, so a page nobody dismisses on does not fill the browser.
+const MOST_ISSUES = 50
+// A request or a read of the server taking longer is given up as offline, as it holds the lock every tab and the worker send under.
+const MOST_WAIT_MS = 30_000
 
 function onServer(): boolean {
   return typeof KAY_BROWSER === 'undefined' && typeof indexedDB === 'undefined'
@@ -244,8 +249,9 @@ function merged<Row extends object>(base: Row | undefined, mine: Row | undefined
   if (mine === undefined)
     return undefined
 
+  // A row made here met a server row it never saw: the guard that answered 409 would refuse this write again, so the server's row stands and the issue shows the write.
   if (base === undefined)
-    return mine
+    return undefined
 
   const out = { ...theirs } as Record<string, unknown>
 
@@ -291,6 +297,8 @@ class Collection<Row extends object, Key extends keyof Row & string> {
   private token = ''
   private disposers: (() => void)[] = []
   private ended = false
+  // The last read of the server failed, so a retry is due though nothing is queued.
+  private unread = false
 
   constructor(options: LocalOptions<Row, Key>) {
     this.options = options
@@ -507,12 +515,12 @@ class Collection<Row extends object, Key extends keyof Row & string> {
     clearTimeout(this.timer)
     this.paused = false
 
-    await locked(async () => {
+    await quiet(async () => locked(async () => {
       await this.advance()
 
       if (refresh && !this.offline && !this.paused)
         await this.refresh()
-    })
+    }))
 
     this.retry()
   }
@@ -521,7 +529,7 @@ class Collection<Row extends object, Key extends keyof Row & string> {
     if (this.ended)
       return
 
-    if (this.count[0]() === 0 || this.paused) {
+    if ((this.count[0]() === 0 && !this.unread) || this.paused) {
       this.failures = 0
 
       return
@@ -572,7 +580,7 @@ class Collection<Row extends object, Key extends keyof Row & string> {
     let response: Response
 
     try {
-      response = await fetch(entry.url, { method: 'POST', credentials: 'same-origin', redirect: 'manual', headers: { ...entry.headers, 'x-kay-write': entry.id }, body: entry.body })
+      response = await fetch(entry.url, { method: 'POST', credentials: 'same-origin', redirect: 'manual', signal: AbortSignal.timeout(MOST_WAIT_MS), headers: { ...entry.headers, 'x-kay-write': entry.id }, body: entry.body })
     }
     catch {
       this.noticed(true)
@@ -666,6 +674,7 @@ class Collection<Row extends object, Key extends keyof Row & string> {
       rows.delete([this.c, entry.k])
 
     issues.add({ c: this.c, kind: 'rejected', key: entry.k, op: entry.op, status: answer.status, errors: failed.errors, data: failed.data, mine: entry.op === 'put' ? entry.row : undefined, at: Date.now() })
+    await this.trim(issues)
     await finished(tx)
 
     return true
@@ -693,9 +702,18 @@ class Collection<Row extends object, Key extends keyof Row & string> {
       tx.objectStore('outbox').put({ ...entry, id: crypto.randomUUID(), op: 'put', url: withBase(this.options.put.url), headers: { ...entry.headers, ...headers }, body: body as string, row: kept, tries: entry.tries + 1, answer: undefined })
     }
 
+    await this.trim(tx.objectStore('issues'))
     await finished(tx)
 
     return true
+  }
+
+  // Drops this collection's oldest issues beyond the most kept.
+  private async trim(issues: IDBObjectStore): Promise<void> {
+    const keys = await request(issues.index('c').getAllKeys(IDBKeyRange.only(this.c)))
+
+    for (const key of keys.slice(0, Math.max(0, keys.length - MOST_ISSUES)))
+      issues.delete(key)
   }
 
   // Takes the server's rows in, leaving any row with a write queued.
@@ -704,13 +722,16 @@ class Collection<Row extends object, Key extends keyof Row & string> {
     let server: readonly Row[]
 
     try {
-      server = await this.options.read()
+      server = await Promise.race([this.options.read(), new Promise<never>((_, reject) => setTimeout(reject, MOST_WAIT_MS, new Error('kay: the local() read took too long')))])
     }
     catch {
+      this.unread = true
       this.noticed(true)
 
       return
     }
+
+    this.unread = false
 
     // A write was made or settled while the server answered: its rows are older than the queue, and the next sync reads again.
     if (seen !== this.changes)

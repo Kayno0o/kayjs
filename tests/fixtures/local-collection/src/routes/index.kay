@@ -10,6 +10,7 @@ export const save = action(s.Object({ id: s.String({ maxLength: 40 }), title: s.
     return ctx.fail(409, held)
 
   stats.saves++
+  stats.order.push(id)
 
   const note = { id, title, rev: rev + 1 }
 

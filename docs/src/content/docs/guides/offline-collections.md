@@ -39,4 +39,4 @@ Say an action answers `ctx.fail(409, row)` with the row it holds when a write st
 
 ## Signing out
 
-The rows belong to the person who is signed in. When someone signs out, add the cookie `forgetLocalMirrors(request)` gives to the response. The next page that uses a collection empties the rows and the unsent writes, even offline.
+The rows belong to the person who is signed in. kayjs-auth does this on sign-out. For a sign-out of your own, add the cookie `forgetLocalMirrors(request)` gives to the response. The next page that uses a collection empties the rows and the unsent writes, even offline.

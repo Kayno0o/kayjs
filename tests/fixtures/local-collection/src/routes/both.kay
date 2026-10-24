@@ -1,0 +1,5 @@
+--- script
+import Notes from '../components/notes.kay'
+---
+h1 Both
+Notes(both)

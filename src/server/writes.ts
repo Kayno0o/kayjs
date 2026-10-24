@@ -1,3 +1,4 @@
+import { RETRY_LATER } from '../runtime/local-status'
 import { appStore } from './app-store'
 import { overHttps } from './request-url'
 import { userOf } from './request-user'
@@ -9,7 +10,7 @@ const KEPT_MS = 7 * 24 * 60 * 60 * 1000
 const MOST_KEPT = 5000
 const PREFIX = 'kay:write:'
 // Answers that depend on who asks or on the moment, which a retry may get differently: not kept, so the retry runs.
-const NOT_KEPT = new Set([401, 403, 408, 425, 429])
+const NOT_KEPT = new Set<number>([401, 403, ...RETRY_LATER])
 const SKIPPED_HEADERS = new Set(['set-cookie', 'date', 'content-length'])
 
 interface Kept {
