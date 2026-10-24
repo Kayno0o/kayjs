@@ -19,7 +19,7 @@ const HEAD = /<head(?:\s[^>]*)?>/
 // A card gets this long to load and be drawn, a template that never settles included; the fonts and images it loads get a part of it.
 const DEFAULT_SHOT_MS = 30_000
 let shotMs = DEFAULT_SHOT_MS
-const SETTLE_MS = 5000
+const SETTLE_MS = 15_000
 const POLL_MS = 50
 // The page runs no script of its own and timers and frames do not run in it, so this only waits on the fonts and images, and sets a flag the card's shot polls: a lazy image would otherwise never start loading outside the first frame, and one decoded off the main thread may be loaded and still undrawn.
 const PAINT = `(() => {
@@ -202,7 +202,7 @@ async function draw(clientDir: string, quality: number, render: (origin: string)
         await page.view.cdp('Runtime.evaluate', { expression: PAINT })
 
         // The fonts and images get this long, as a host that never answers would hold the shot back to its limit.
-        for (let waited = 0; waited < SETTLE_MS; waited += POLL_MS) {
+        for (const until = Date.now() + SETTLE_MS; Date.now() < until;) {
           const { result } = await page.view.cdp<{ result: { value?: boolean } }>('Runtime.evaluate', { expression: 'window.__kayPainted', returnByValue: true })
 
           if (result.value === true)
