@@ -152,6 +152,18 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the docs p
     await page.waitUntil(() => document.querySelector('.playground-frame')?.getAttribute('data-live') === 'Typed')
   }, 60_000)
 
+  it('resets a box whose code never finishes, and says so', async () => {
+    await page.goto('/getting-started/introduction')
+    await page.goto('/getting-started/playground')
+    await page.waitFor('.playground-frame')
+    await page.fill('.playground-input textarea', '---\nwhile (true) {}\n---\np loop\n')
+    await page.waitFor('.playground-error', { timeout: '15s' })
+    expect(await page.text('.playground-error')).toContain('did not finish')
+
+    // Whether the replacement frame runs depends on Chromium giving it a process of its own, so only the notice is held to.
+    expect(await page.evaluate(() => document.querySelectorAll('.playground-frame').length)).toBe(1)
+  }, 60_000)
+
   it('leaves the other pages\' policy without eval', async () => {
     const response = await fetch(`${origin}getting-started/introduction`)
 

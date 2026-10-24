@@ -8,6 +8,7 @@ import { encodeSource, sourceOfHash } from '../playground/runnable'
 import { SAMPLE } from '../playground/sample'
 
 const DEBOUNCE_MS = 150
+const RUN_LIMIT_MS = 3000
 
 const source = signal(SAMPLE)
 const problems = signal<Problem[]>([])
@@ -18,20 +19,38 @@ const live = signal('')
 const loading = signal(true)
 // Code that came from a link waits for a click on Run, as a link can carry anyone's code.
 const held = signal(false)
+// Turned off and on again to replace the frame.
+const framed = signal(true)
 
 let frame: HTMLIFrameElement | undefined
 let compiled: { server: string, dom: string } | undefined
 let compiler: Awaited<ReturnType<typeof loadCompiler>> | undefined
 let timer: ReturnType<typeof setTimeout> | undefined
 let sent = 0
+let ready = false
+let watchdog: ReturnType<typeof setTimeout> | undefined
 
 // The frame runs the code: this page only reads text, so nothing a visitor types runs with the docs' origin. A frame that has not loaded drops the message and says it is ready when it has, which sends it again.
 function send() {
-  if (held() || !frame?.contentWindow || !compiled)
+  if (held() || !ready || !frame?.contentWindow || !compiled)
     return
 
   sent++
+  clearTimeout(watchdog)
+  watchdog = setTimeout(stuck, RUN_LIMIT_MS)
   frame.contentWindow.postMessage({ id: sent, ...compiled }, '*')
+}
+
+// A frame that never answers is stuck in the code it was given: it is replaced, which ends that code, and the code is not sent again until the next edit.
+function stuck() {
+  if (!frame)
+    return
+
+  ready = false
+  compiled = undefined
+  failure.set(`The code did not finish in ${RUN_LIMIT_MS / 1000} seconds, so the box was reset. Edit the code to run it again, or reload the page if the box stays blank.`)
+  framed.set(false)
+  setTimeout(() => framed.set(true), 0)
 }
 
 function build() {
@@ -49,6 +68,7 @@ function build() {
   }
 
   problems.set(result.problems)
+  failure.set('')
 
   if (result.server === undefined || result.dom === undefined)
     return
@@ -74,6 +94,7 @@ function heard(event: MessageEvent<{ ready?: boolean, id?: number, html?: string
     return
 
   if (event.data.ready) {
+    ready = true
     send()
 
     return
@@ -81,6 +102,8 @@ function heard(event: MessageEvent<{ ready?: boolean, id?: number, html?: string
 
   if (event.data.id !== sent)
     return
+
+  clearTimeout(watchdog)
 
   markup.set(event.data.html ?? '')
   live.set(event.data.live ?? '')
@@ -112,6 +135,7 @@ onMount(async () => {
 onCleanup(() => {
   window.removeEventListener('message', heard)
   clearTimeout(timer)
+  clearTimeout(watchdog)
 })
 ---
 .playground
@@ -123,7 +147,8 @@ onCleanup(() => {
     if held()
       p.playground-held The code in this link has not run. Read it, then run it.
       Button(label="Run" tone="accent" onClick={() => run()})
-    iframe.playground-frame(ref={element => frame = element} title="The component running" sandbox="allow-scripts" data-live={live()} src="/playground/frame.html" loading="lazy")
+    if framed()
+      iframe.playground-frame(ref={element => frame = element} title="The component running" sandbox="allow-scripts" data-live={live()} src="/playground/frame.html" loading="lazy")
   if problems().length > 0
     ul.playground-problems(role="alert")
       for problem of problems() key={problem.report}
