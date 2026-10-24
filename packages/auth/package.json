@@ -81,7 +81,7 @@
     "reflect-metadata": "^0.2.2"
   },
   "devDependencies": {
-    "@kaynooo/eslint": "^7.1.0",
+    "@kaynooo/eslint": "^7.1.1",
     "@kaynooo/kayjs-mail": "workspace:~",
     "@kaynooo/kayjs-ui": "workspace:~",
     "@kaynooo/pg-orm": "^7.1.2",
