@@ -390,6 +390,119 @@ div(class={'relative h-[630px] w-[1200px] ' + background})
   }, 120_000)
 })
 
+// Whether a pixel is the fixture image's green, which the route's variants and Chrome's own draw a little apart.
+function green(pixel: number[]): boolean {
+  return pixel[1]! > 150 && pixel[0]! < 60 && pixel[2]! < 120
+}
+
+describe.skipIf(!chrome)('share cards of a template, in builds and on requests of other settings', () => {
+  const CONFIG = (settings: string) => `import tailwind from 'bun-plugin-tailwind'
+import { defineConfig } from 'kay/server'
+
+export default defineConfig({
+  site: 'https://cards.example',
+  seo: { name: 'Cards' },
+  plugins: [tailwind],
+${settings}
+})
+`
+  const staticBuild = async (root: string, outdir: string) => {
+    const child = Bun.spawn([process.execPath, CLI, 'build', root, '--no-check', '--static', '--outdir', outdir], { stdout: 'pipe', stderr: 'pipe' })
+    const [errors, code] = await Promise.all([new Response(child.stderr).text(), child.exited])
+
+    expect({ code, errors }).toMatchObject({ code: 0 })
+  }
+  const cardOf = async (outdir: string, page: string) => {
+    const html = await Bun.file(join(outdir, page)).text()
+    const file = (/<meta property="og:image" content="https:\/\/cards\.example(\/_kay\/images\/card-\w+\.jpg)">/).exec(html)?.[1]
+
+    expect([page, file === undefined]).toEqual([page, false])
+
+    return pixelsOf(await Bun.file(join(outdir, file!)).bytes())
+  }
+
+  it('shows an image the template cuts to an aspect images.aspects lists, in a build', async () => {
+    const root = await fixtureCopy('card-template')
+    const outdir = await scratchDir('card-aspect-')
+    const template = join(root, 'src/routes/_card.kay')
+
+    await Bun.write(join(root, 'kay.config.ts'), CONFIG('  images: { aspects: [\'2/1\'] },'))
+    await Bun.write(template, (await Bun.file(template).text()).replace('import hero from \'../hero.png\'', 'import hero from \'../hero.png\'\nimport { image as cut } from \'kay/image\'').replace('  div(class="absolute top-0 right-0', '  img({...cut(hero, { aspect: \'2/1\' })} class="absolute top-[200px] left-[700px] h-[100px] w-[200px] object-cover" alt="")\n  div(class="absolute top-0 right-0'))
+
+    try {
+      await staticBuild(root, outdir)
+      expect(green((await cardOf(outdir, 'index.html'))(800, 250))).toBe(true)
+    }
+    finally {
+      await rm(outdir, { recursive: true, force: true })
+    }
+  }, 120_000)
+
+  it('draws the card of a localized prerendered page in its locale, in a build', async () => {
+    const root = await fixtureCopy('card-template')
+    const outdir = await scratchDir('card-locale-')
+
+    await Bun.write(join(root, 'kay.config.ts'), CONFIG(`  i18n: { locales: ['en', 'fr'], defaultLocale: 'en', messages: ${JSON.stringify(resolve('tests/fixtures/i18n/src/messages'))} },`))
+    await Bun.write(join(root, 'src/routes/_card.kay'), '--- server\nimport \'../app.css\'\nimport { t } from \'kay/i18n\'\n\nconst { title } = ctx.card\nconst background = t(\'nav.home\') === \'Accueil\' ? \'bg-[#dc2626]\' : \'bg-[#1e40af]\'\n---\ndiv(class={\'relative h-[630px] w-[1200px] \' + background})\n  h1(class="m-0 text-6xl font-black text-white") {title}\n')
+
+    try {
+      await staticBuild(root, outdir)
+      expect(near((await cardOf(outdir, 'index.html'))(1150, 30), [30, 64, 175])).toBe(true)
+      expect(near((await cardOf(outdir, 'fr/index.html'))(1150, 30), [220, 38, 38])).toBe(true)
+    }
+    finally {
+      await rm(outdir, { recursive: true, force: true })
+    }
+  }, 120_000)
+
+  it('shows an image of images.remote on the card of a static export', async () => {
+    const root = await fixtureCopy('card-template')
+    const outdir = await scratchDir('card-remote-')
+    const host = Bun.serve({ hostname: '127.0.0.1', port: 0, fetch: () => new Response(Bun.file(join(FIXTURE, 'src/hero.png')), { headers: { 'content-type': 'image/png' } }) })
+    const origin = `http://127.0.0.1:${host.port}`
+
+    await Bun.write(join(root, 'kay.config.ts'), CONFIG(`  images: { remote: ['${origin}/photos/'] },`))
+    await Bun.write(join(root, 'src/routes/index.kay'), `---
+import { shareCard } from 'kay/image'
+---
+head
+  title Home
+  meta(property="og:image" content={shareCard({ title: 'Hello template', image: '${origin}/photos/hero.png' })})
+h1 Home
+`)
+
+    try {
+      await staticBuild(root, outdir)
+      expect(green((await cardOf(outdir, 'index.html'))(160, 160))).toBe(true)
+    }
+    finally {
+      await host.stop(true)
+      await rm(outdir, { recursive: true, force: true })
+    }
+  }, 120_000)
+
+  it('shows an image of images.dirs through the real template, on request', async () => {
+    const root = await fixtureCopy('card-template')
+    const uploads = await scratchDir('card-uploads-')
+
+    await Bun.write(join(uploads, 'photo.png'), Bun.file(join(FIXTURE, 'src/hero.png')))
+    await Bun.write(join(root, 'src/routes/uploaded.kay'), '---\nimport { shareCard } from \'kay/image\'\n---\nhead\n  title Uploaded\n  meta(property="og:image" content={shareCard({ title: \'Uploaded\', image: \'/uploads/photo.png\' })})\nh1 Uploaded\n')
+
+    try {
+      const app = await pages({ site: 'https://cards.example', seo: { name: 'Cards' }, plugins: [tailwind], root, prebuilt: false, images: { dirs: { '/uploads/': uploads } } })
+      const html = await (await app.handle(new Request('http://localhost/uploaded'))).text()
+      const link = (/<meta property="og:image" content="([^"]+)">/).exec(html)![1]!.replaceAll('&amp;', '&').slice('https://cards.example'.length)
+      const served = await app.handle(new Request(`http://localhost${link}`))
+
+      expect(served.status).toBe(200)
+      expect(green((await pixelsOf(await served.bytes()))(160, 160))).toBe(true)
+    }
+    finally {
+      await rm(uploads, { recursive: true, force: true })
+    }
+  }, 60_000)
+})
+
 // A `kay build --compile` of the fixture, run from a folder with none of its files; a worker of `bun test --parallel` builds into a folder of its own, which `outputDir` names.
 describe('a share card template in an executable', () => {
   const SERVER = 'import process from \'node:process\'\nimport { Elysia } from \'elysia\'\nimport { pages } from \'kay/server\'\n\nconst app = new Elysia().use(await pages()).listen(Number(process.env.PORT ?? 0))\n\nconsole.log(`listening ${app.server?.port}`)\n'
