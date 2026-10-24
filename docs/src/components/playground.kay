@@ -22,7 +22,7 @@ const loading = signal(true)
 const ready = signal(false)
 // Code that came from a link waits for a click on Run, as a link can carry anyone's code.
 const held = signal(false)
-// Turned off and on again to replace the frame, under a new address each time so the browser starts the replacement apart from the one that hung.
+// Turned off and on again to replace the frame, under a new address each time so the replacement is a fresh load.
 const framed = signal(true)
 const generation = signal(0)
 
@@ -46,8 +46,6 @@ function send() {
 
 // A frame that stops answering the page's pings is stuck in the code it was given, at once or later: it is replaced, which ends that code, and the code is not sent again until the next edit.
 function stuck() {
-  frame = undefined
-  ready.set(false)
   compiled = undefined
   markup.set('')
   shownInFrame.set('')
