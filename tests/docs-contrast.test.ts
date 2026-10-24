@@ -8,8 +8,8 @@ import { freePort } from './free-port'
 import { drainOutput, spawnSuiteServer, stopSuiteServer } from './listening'
 
 const CLI = resolve('src/cli.ts')
-// Home, a guide, a UI component's page with its demos and a Structure page: each layout the docs have; the chat panel is opened on the last.
-const PAGES = ['/', '/guides/api-routes', '/ui/button', '/ui/badge', '/ui/app-header', '/structure/app-css']
+// Home, a guide, a UI component's page with its demos, a Structure page and the playground: each layout the docs have, the playground's editor and result among them; the chat panel is opened on the last.
+const PAGES = ['/', '/guides/api-routes', '/ui/button', '/ui/badge', '/ui/app-header', '/getting-started/playground', '/structure/app-css']
 const SCHEMES = ['light', 'dark'] as const
 
 const path = browserPath()

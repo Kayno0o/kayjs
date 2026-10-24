@@ -560,6 +560,14 @@ a > code {
   background: var(--crust);
 }
 
+/* The link to the playground highlight.ts writes into the bar of a kay example it can run, beside the copy button. */
+.code-bar .code-playground {
+  margin-inline: auto 0.5rem;
+  color: var(--text);
+  font-family: var(--sans);
+  text-decoration: underline;
+}
+
 /* The copy button written by highlight.ts: CopyButton's padding and its label sized by the hidden other one. */
 .code-bar .kui-copy-btn {
   padding: 0.125rem 0.375rem;
@@ -1273,5 +1281,56 @@ pre code {
 }
 
 .html-converter-error {
+  color: var(--color-danger);
+}
+
+/* The playground: the editor and the running component side by side, one above the other on a phone. */
+.playground {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 22rem), 1fr));
+  gap: 1rem;
+  margin-block: 1rem;
+}
+
+.playground-input,
+.playground-result {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+
+.playground-frame {
+  width: 100%;
+  min-height: 20rem;
+  flex: 1;
+  border: 1px solid var(--edge);
+  border-radius: 0.5rem;
+  background: var(--base);
+}
+
+.playground-problems,
+.playground-error,
+.playground-markup {
+  grid-column: 1 / -1;
+  margin: 0;
+}
+
+.playground-problems {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0;
+  list-style: none;
+}
+
+.playground-problems pre {
+  margin: 0;
+  overflow-x: auto;
+  color: var(--color-danger);
+}
+
+.playground-error {
   color: var(--color-danger);
 }

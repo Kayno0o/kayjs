@@ -1,4 +1,5 @@
 import { relative, resolve, sep } from 'node:path'
+import { hash } from './host'
 
 const LEADING = /^(?:\s|\/\*[\s\S]*?\*\/)*/
 const AT_NAME = /^@([\w-]+)/
@@ -15,7 +16,7 @@ export function scopeAttribute(moduleId: string): string {
 }
 
 export function scopeHash(moduleId: string): string {
-  return Bun.hash(moduleId).toString(36)
+  return hash(moduleId)
 }
 
 // Where `open` at `from` closes, past strings, comments and nested brackets; the end of `css` when it never does.

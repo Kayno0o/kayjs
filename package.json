@@ -22,6 +22,9 @@
   "publishConfig": {
     "registry": "https://git.kaynooo.fr/api/packages/kaynooo/npm/"
   },
+  "browser": {
+    "./src/compiler/host.ts": "./src/compiler/host.browser.ts"
+  },
   "imports": {
     "#schema": {
       "types": "./types/runtime/schema.d.ts",

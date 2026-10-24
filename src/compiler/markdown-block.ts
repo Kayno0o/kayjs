@@ -4,6 +4,7 @@ import { extractComponents, MarkdownError } from '../content/markdown'
 import { MARKDOWN_OPTIONS } from '../runtime/markdown'
 import { labelTasks } from '../runtime/markdown-task'
 import { elementsIn } from './ast'
+import { markdownHtml, markdownEntity as parseEntity } from './host'
 import { parseKay } from './parser'
 import { Scanner } from './scanner'
 
@@ -383,7 +384,7 @@ function lowerLines(text: string, holes: Hole[], pad: string): string[] {
   const indent = Math.min(...lines.filter(line => line.trim() !== '').map(line => INDENT.exec(line)![0].length), Infinity)
   const dedented = lines.map(line => line.slice(Number.isFinite(indent) ? Math.min(indent, INDENT.exec(line)![0].length) : 0)).join('\n')
   const { text: marked, components } = extractComponents(dedented, 1)
-  const html = labelTasks(Bun.markdown.html(marked, MARKDOWN_OPTIONS)).replace(ENCODED_HOLE, (_, n: string) => `${OPEN}${n}${CLOSE}`)
+  const html = labelTasks(markdownHtml(marked, MARKDOWN_OPTIONS)).replace(ENCODED_HOLE, (_, n: string) => `${OPEN}${n}${CLOSE}`)
   const tree = parseHtml(html)
 
   return blockLines(tree, pad, false, new Context(holes, components))
@@ -508,10 +509,7 @@ function decode(text: string): string {
 
 // Markdown's parser knows the whole HTML5 table, so a raw-HTML entity outside the short one above is asked of it, and stays as written where there is no parser (the ESLint bundle) or no such entity.
 function markdownEntity(entity: string): string {
-  if (typeof Bun === 'undefined' || !('markdown' in Bun))
-    return entity
-
-  const decoded = PARAGRAPH.exec(Bun.markdown.html(entity))?.[1]
+  const decoded = PARAGRAPH.exec(parseEntity(entity) ?? '')?.[1]
 
   return decoded === undefined || decoded.startsWith('&amp;') ? entity : decoded
 }

@@ -3,6 +3,7 @@ import { mkdirSync, renameSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import kayGrammar from 'kay/kay.tmLanguage.json'
 import { createCssVariablesTheme, createHighlighter } from 'shiki'
+import { playgroundHref } from './playground/runnable'
 
 const kay: LanguageRegistration = { ...kayGrammar, name: 'kay', embeddedLangs: ['typescript'] }
 
@@ -95,6 +96,8 @@ export async function highlight(code: string, language: string | undefined): Pro
     return known
 
   const { highlighter, languages } = await (ready ??= load())
+  // Run by the playground check only for a kay example, imported then so loading the config alone pays nothing for the runtime.
+  const playable = language === 'kay' && (await import('./playground/check')).runs(code)
   const lang = language !== undefined && languages.has(language) ? language : 'text'
   // Inside the function: kay caches compiled pages by this function's source, so a change here recompiles them.
   const framed: ShikiTransformer = {
@@ -110,6 +113,7 @@ export async function highlight(code: string, language: string | undefined): Pro
             properties: { 'class': 'code-bar', 'data-search': 'false' },
             children: [
               { type: 'element', tagName: 'span', properties: {}, children: [{ type: 'text', value: lang === 'text' ? '' : lang }] },
+              ...playable ? [{ type: 'element' as const, tagName: 'a', properties: { href: playgroundHref(code), class: 'code-playground' }, children: [{ type: 'text' as const, value: 'Open in playground' }] }] : [],
               // CopyButton's markup without its island: the label is a `text` part, sized by the hidden other one in styles.css; components/code-copy.kay answers the click.
               { type: 'element', tagName: 'button', properties: { 'type': 'button', 'class': 'kui-btn kui-copy-btn', 'data-copy': '' }, children: [{ type: 'element', tagName: 'span', properties: { 'data-part': 'text', 'data-other': 'Copied!' }, children: [{ type: 'text', value: 'Copy' }] }] },
             ],

@@ -5,8 +5,8 @@ import type { Diagnostic, Span } from './ast'
 import type { Rewrite, SourceMap } from './mapping'
 import type { SignalKind } from './module-signals'
 import type { PropsBinding } from './script'
-import { createRequire } from 'node:module'
 import { parse } from '@babel/parser'
+import { loadTraverse } from './host'
 import { CURRENT, DEFAULTED, defaultName, HANDED, LOAD, PROBE, PROPS, VALUES, WRITABLE, WRITE_HELPERS } from './names'
 
 const LIVE_WRITES = new Set(['set', 'delete'])
@@ -35,16 +35,6 @@ const PLAIN_GENERICS = new Set(['Array', 'ReadonlyArray', 'Record', 'Partial', '
 const CHECKED_WRITE: Rewrite = { before: WRITABLE, after: ')' }
 
 export const POSITION_SUFFIX = / \(\d+:\d+\)$/
-const require = createRequire(import.meta.url)
-let loadedTraverse: typeof traverseModule | undefined
-
-// Loading it takes longer than most compiles, so a server whose `.kay` files all come from the compile cache never does; `kay dev` loads it ahead of time.
-export function loadTraverse(): typeof traverseModule {
-  loadedTraverse ??= (require('@babel/traverse') as { default: typeof traverseModule }).default
-
-  return loadedTraverse
-}
-
 // Walks the fence with Babel's scope, false when the scope refuses a name declared twice, as an import and a `const` an edit passes through. The half-built scope is dropped then: Babel marks a scope built before crawling it, so a later walk would read it as whole and not refuse the fence.
 export function walkScope(ast: t.Node, visitor: Parameters<typeof traverseModule>[1]): boolean {
   try {
@@ -1292,3 +1282,5 @@ function withShorthand(reference: NodePath, name: string, rewrite: Rewrite): Rew
 
   return rewrite
 }
+
+export { loadTraverse }

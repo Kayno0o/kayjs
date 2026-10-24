@@ -3,7 +3,7 @@ import type * as t from '@babel/types'
 import type { Diagnostic, Fix, KayFile, Span } from './ast'
 import { parse } from '@babel/parser'
 import { visitNodes } from './ast'
-import { browserGlobals } from './globals'
+import { browserGlobals } from './host'
 import { parameterNames } from './items'
 import { importedFromKay, walkScope } from './rewrite'
 
