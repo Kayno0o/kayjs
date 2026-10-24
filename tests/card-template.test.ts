@@ -139,10 +139,10 @@ describe('the share card template stamp', () => {
       const server = new Elysia()
 
       serveCards(server, cards, { clientDir: clientDir(FIXTURE), cacheDir: join(dir, 'cache') })
-      let started = false
+      const started = Promise.withResolvers<void>()
 
       cards.template!.render = async () => {
-        started = true
+        started.resolve()
 
         return gate.promise
       }
@@ -151,9 +151,7 @@ describe('the share card template stamp', () => {
       const asked = urls.slice(0, MAX_QUEUED).map(async url => server.handle(new Request(`http://localhost${url}`)))
 
       // Each of the cards held its place while the first is drawn.
-      while (!started)
-        await Bun.sleep(20)
-
+      await started.promise
       await Bun.sleep(200)
 
       const turned = await server.handle(new Request(`http://localhost${urls.at(-1)!}`))
