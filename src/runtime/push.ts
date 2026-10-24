@@ -62,6 +62,36 @@ async function worker(): Promise<ServiceWorkerRegistration | undefined> {
   }
 }
 
+const POSTED_KEY = 'kay-push-posted'
+
+// The endpoint the server last accepted from this browser, so a load can tell a subscription the browser rotated while no page or worker could tell the server.
+function posted(endpoint?: string | null): string | null {
+  try {
+    if (endpoint === undefined)
+      return localStorage.getItem(POSTED_KEY)
+
+    if (endpoint === null)
+      localStorage.removeItem(POSTED_KEY)
+    else
+      localStorage.setItem(POSTED_KEY, endpoint)
+  }
+  catch {}
+
+  return null
+}
+
+// Tells the server about the subscription the browser holds when it is not the one last posted; a refusal (signed out) is tried again on the next load.
+async function reconcile(subscription: PushSubscription): Promise<void> {
+  if (posted() === subscription.endpoint)
+    return
+
+  try {
+    if ((await post('subscribe', subscription.toJSON())).ok)
+      posted(subscription.endpoint)
+  }
+  catch {}
+}
+
 async function probe(write: (value: PushState) => void): Promise<void> {
   setState = write
 
@@ -74,8 +104,14 @@ async function probe(write: (value: PushState) => void): Promise<void> {
   try {
     const registration = await worker()
 
-    if (registration)
-      write(await registration.pushManager.getSubscription() === null ? 'off' : 'subscribed')
+    if (registration) {
+      const held = await registration.pushManager.getSubscription()
+
+      write(held === null ? 'off' : 'subscribed')
+
+      if (held !== null)
+        await reconcile(held)
+    }
   }
   catch {}
 }
@@ -160,6 +196,7 @@ export const webPush = {
         return sent.status === 401 ? 'signed-out' : 'failed'
       }
 
+      posted(subscription.endpoint)
       setState?.('subscribed')
 
       return 'subscribed'
@@ -180,6 +217,7 @@ export const webPush = {
 
       await post('unsubscribe', { endpoint: subscription.endpoint })
       await subscription.unsubscribe()
+      posted(null)
       setState?.('off')
 
       return true

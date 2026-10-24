@@ -11,6 +11,12 @@ interface FakeSubscription {
 type Push = typeof import('../src/runtime/push') & typeof import('../src/runtime/install-prompt')
 
 let module: Push
+
+// A fresh copy of the module is a page load, which probes the browser once.
+async function pageLoad(name: string): Promise<typeof import('../src/runtime/push').webPush> {
+  return ((await import(`../src/runtime/push?${name}`)) as typeof import('../src/runtime/push')).webPush
+}
+
 let permission: NotificationPermission = 'default'
 // What the visitor answers to the browser's prompt.
 let reply: NotificationPermission = 'granted'
@@ -162,6 +168,42 @@ describe('push.subscribe', () => {
     answer = 500
     expect(await module.webPush.subscribe()).toBe('failed')
     expect(subscription).toBeNull()
+  })
+})
+
+describe('a subscription the browser rotated', () => {
+  it('is posted once per endpoint when a page loads, and again after a refusal', async () => {
+    localStorage.clear()
+    subscription = fakeSubscription()
+    answer = 401
+
+    const loaded = { webPush: await pageLoad('load') }
+
+    expect(loaded.webPush.state()).toBe('unsupported')
+    await Bun.sleep(20)
+    expect(loaded.webPush.state()).toBe('subscribed')
+    expect(posts).toEqual([{ url: '/app/_kay/push/subscribe', body: { endpoint: 'https://push.example/abc', keys: { p256dh: 'p', auth: 'a' } } }])
+    expect(localStorage.getItem('kay-push-posted')).toBeNull()
+  })
+
+  it('is posted when the endpoint changed since the last accepted one, then not again on the next load', async () => {
+    localStorage.setItem('kay-push-posted', 'https://push.example/old')
+    subscription = fakeSubscription()
+    ;(await pageLoad('rotated')).state()
+    await Bun.sleep(20)
+    expect(posts).toHaveLength(1)
+    expect(localStorage.getItem('kay-push-posted')).toBe('https://push.example/abc')
+    ;(await pageLoad('reloaded')).state()
+    await Bun.sleep(20)
+    expect(posts).toHaveLength(1)
+  })
+
+  it('is not posted again once the server accepted that endpoint', async () => {
+    localStorage.setItem('kay-push-posted', 'https://push.example/abc')
+    subscription = fakeSubscription()
+    await module.webPush.subscribe()
+    expect(posts).toEqual([{ url: '/app/_kay/push/subscribe', body: { endpoint: 'https://push.example/abc', keys: { p256dh: 'p', auth: 'a' } } }])
+    expect(localStorage.getItem('kay-push-posted')).toBe('https://push.example/abc')
   })
 })
 

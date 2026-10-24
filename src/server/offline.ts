@@ -219,7 +219,7 @@ self.addEventListener('notificationclick', (event) => {
   })())
 })
 
-// A browser that rotated or expired the subscription tells the worker, which subscribes again with the key the server serves and sends it as the page would, the session cookie riding on the same-origin request; one the server refuses is dropped, as the page does.
+// A browser that rotated or expired the subscription tells the worker, which subscribes again with the key the server serves and sends it as the page would, the session cookie riding on the same-origin request; one the server refuses is dropped, as the page does, while a network error keeps it for the page to post on its next load.
 self.addEventListener('pushsubscriptionchange', (event) => {
   event.waitUntil((async () => {
     const root = location.origin + KAY.base + '/_kay/push'
@@ -237,9 +237,7 @@ self.addEventListener('pushsubscriptionchange', (event) => {
       if (!sent.ok)
         await subscription.unsubscribe()
     }
-    catch {
-      await subscription.unsubscribe()
-    }
+    catch {}
   })())
 })
 

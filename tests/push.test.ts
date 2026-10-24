@@ -684,7 +684,7 @@ describe('the worker handlers on a rotated subscription', () => {
     expect(worker.subscribed).toHaveLength(1)
   })
 
-  it('does not keep a subscription the server refused or could not be told of', async () => {
+  it('drops a subscription the server refused, and keeps one it could not reach', async () => {
     const keys = await generateVapidKeys()
     const refused = await scope(async url => (url.endsWith('/key') ? new Response(keys.publicKey) : new Response(null, { status: 401 })))
     const down = await scope(async (url) => {
@@ -699,7 +699,7 @@ describe('the worker handlers on a rotated subscription', () => {
     await down.fire('pushsubscriptionchange')
     await none.fire('pushsubscriptionchange')
     expect(refused.subscribed.map(held => held.unsubscribed)).toEqual([true])
-    expect(down.subscribed.map(held => held.unsubscribed)).toEqual([true])
+    expect(down.subscribed.map(held => held.unsubscribed)).toEqual([false])
     expect(none.subscribed).toEqual([])
   })
 
