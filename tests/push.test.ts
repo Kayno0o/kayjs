@@ -13,9 +13,10 @@ import { createDataTables, pgHandle } from '../src/server/pg-data'
 import { pgPush } from '../src/server/pg-stores'
 import { checkedEndpoint, push, pushesSettled, pushSubscriptions, readSubscription, sendPush, setPushResolver, setVapidKeys, vapidKeys } from '../src/server/push'
 import { decryptPayload, encryptPayload, fromBase64Url, generateVapidKeys, toBase64Url, validVapidKeys, vapidAuthorization } from '../src/server/push-crypto'
-import { setPushLoose, setPushSettings } from '../src/server/push-settings'
+import { pushLoose, setPushLoose, setPushSettings } from '../src/server/push-settings'
 import { memoryPush, sqlitePush } from '../src/server/push-store'
 import { nameUser } from '../src/server/request-user'
+import { testSite } from '../src/test'
 import { cleanUpAfterFile, pgDescribe, postgres } from './job-stores'
 import { scratchDir } from './scratch'
 import { pages } from './shared-pages'
@@ -444,6 +445,17 @@ describe('the routes a browser calls', () => {
     expect(await pushSubscriptions.list('ada')).toEqual([])
   })
 
+  it('ends the device cookie when the subscription is taken back', async () => {
+    const phone = await device('phone')
+
+    const sent = await post('subscribe', { endpoint: phone.endpoint, keys: { p256dh: phone.keys.publicKey, auth: phone.auth } })
+    const gone = await post('unsubscribe', { endpoint: phone.endpoint })
+
+    expect(sent.headers.get('set-cookie')).toContain('kay_push_device=')
+    expect(sent.headers.get('set-cookie')).not.toContain('Max-Age=0')
+    expect(gone.headers.get('set-cookie')).toMatch(/kay_push_device=;.*Max-Age=0/)
+  })
+
   it('moves a device to the user who subscribes with it last, and keeps at most ten per person', async () => {
     const shared = await device('shared')
     const body = { endpoint: shared.endpoint, keys: { p256dh: shared.keys.publicKey, auth: shared.auth } }
@@ -601,6 +613,101 @@ describe('the worker handlers', () => {
     await worker.fire('notificationclick', { notification: { close: () => closed.push(true), data: { url: 'https://x.example/repo/new' } } })
     expect(worker.opened).toEqual(['https://x.example/repo/new'])
     expect(closed).toHaveLength(2)
+  })
+})
+
+describe('the worker handlers on a rotated subscription', () => {
+  type Listener = (event: unknown) => void
+
+  async function scope(extensions: Parameters<typeof pages>[0]['extensions'], fetching: (url: string, init?: RequestInit) => Promise<Response>) {
+    const app = await pages({ root: 'tests/fixtures/static', prebuilt: false, site: 'https://x.example', base: '/repo', extensions, offline: false })
+    const script = await (await app.handle(new Request('http://localhost/sw.js'))).text()
+    const listeners = new Map<string, Listener>()
+    const subscribed: { applicationServerKey: Uint8Array, unsubscribed: boolean }[] = []
+    const caches = new Map([['kay-w1', 1], ['kay-w5', 1], ['other', 1]])
+    const self = {
+      addEventListener: (type: string, listener: Listener) => listeners.set(type, listener),
+      registration: { pushManager: { subscribe: async (options: { applicationServerKey: Uint8Array }) => {
+        const held = { applicationServerKey: options.applicationServerKey, unsubscribed: false }
+
+        subscribed.push(held)
+
+        return { toJSON: () => ({ endpoint: 'https://push.example/new' }), unsubscribe: async () => void (held.unsubscribed = true) }
+      } } },
+      clients: { claim: async () => undefined },
+      skipWaiting: () => undefined,
+    }
+
+    runInNewContext(script, { self, location: new URL('https://x.example/'), URL, fetch: fetching, atob, Uint8Array, caches: { keys: async () => [...caches.keys()], delete: async (name: string) => caches.delete(name) } })
+
+    return {
+      subscribed,
+      caches,
+      async fire(type: string) {
+        const waits: Promise<unknown>[] = []
+
+        listeners.get(type)?.({ waitUntil: (job: Promise<unknown>) => waits.push(job) })
+        await Promise.all(waits)
+      },
+    }
+  }
+
+  it('subscribes again with the served key and sends it to the subscribe route under the base, with the session cookie', async () => {
+    const calls: { url: string, init?: RequestInit | undefined }[] = []
+    const keys = await generateVapidKeys()
+    const worker = await scope([push()], async (url, init) => {
+      calls.push({ url, init })
+
+      return url.endsWith('/key') ? new Response(keys.publicKey) : new Response(null, { status: 204 })
+    })
+
+    await worker.fire('pushsubscriptionchange')
+    expect(calls.map(call => call.url)).toEqual(['https://x.example/repo/_kay/push/key', 'https://x.example/repo/_kay/push/subscribe'])
+    expect(calls.map(call => call.init?.credentials)).toEqual(['same-origin', 'same-origin'])
+    expect(calls[1]!.init?.method).toBe('POST')
+    expect(JSON.parse(calls[1]!.init?.body as string)).toEqual({ endpoint: 'https://push.example/new' })
+    expect([...worker.subscribed[0]!.applicationServerKey]).toEqual([...fromBase64Url(keys.publicKey)])
+    expect(worker.subscribed[0]!.unsubscribed).toBe(false)
+  })
+
+  it('does not keep a subscription the server refused or could not be told of', async () => {
+    const keys = await generateVapidKeys()
+    const refused = await scope([push()], async url => (url.endsWith('/key') ? new Response(keys.publicKey) : new Response(null, { status: 401 })))
+    const down = await scope([push()], async (url) => {
+      if (url.endsWith('/key'))
+        return new Response(keys.publicKey)
+
+      throw new TypeError('offline')
+    })
+    const none = await scope([push()], async () => new Response(null, { status: 500 }))
+
+    await refused.fire('pushsubscriptionchange')
+    await down.fire('pushsubscriptionchange')
+    await none.fire('pushsubscriptionchange')
+    expect(refused.subscribed.map(held => held.unsubscribed)).toEqual([true])
+    expect(down.subscribed.map(held => held.unsubscribed)).toEqual([true])
+    expect(none.subscribed).toEqual([])
+  })
+
+  it('deletes the caches an earlier offline worker named when the push-only worker activates', async () => {
+    const worker = await scope([push()], async () => new Response(null))
+
+    expect([...worker.caches.keys()]).toEqual(['kay-w1', 'kay-w5', 'other'])
+    await worker.fire('activate')
+    expect([...worker.caches.keys()]).toEqual(['other'])
+  })
+})
+
+describe('testSite and the push switch', () => {
+  it('puts the dev switch back when the last site closes', async () => {
+    setPushLoose(false)
+
+    const site = await testSite({ root: 'tests/fixtures/static' })
+
+    expect(pushLoose()).toBe(true)
+    await site.close()
+    expect(pushLoose()).toBe(false)
+    setPushLoose(true)
   })
 })
 

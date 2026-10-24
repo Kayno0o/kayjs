@@ -404,6 +404,11 @@ export function pushDeviceCookie(endpoint: string, secure: boolean): string {
   return new Bun.Cookie(DEVICE_COOKIE, deviceTag(endpoint), { path: '/', sameSite: 'lax', httpOnly: true, secure, maxAge: DEVICE_MAX_AGE }).serialize()
 }
 
+// Ends the cookie of `pushDeviceCookie`, once this browser's subscription is taken back.
+export function clearPushDeviceCookie(secure: boolean): string {
+  return new Bun.Cookie(DEVICE_COOKIE, '', { path: '/', sameSite: 'lax', httpOnly: true, secure, maxAge: 0 }).serialize()
+}
+
 // Takes the subscription of the browser that sent `request` away from `user`, for a sign-out: the person stops getting pushes on a device they left, while their other devices keep them. Does nothing without `push()` or without a subscription made in this browser, and never throws.
 export async function forgetPushDevice(request: Request, user: string): Promise<void> {
   if (pushSettings() === undefined)

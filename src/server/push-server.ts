@@ -2,7 +2,7 @@ import type { AnyElysia, Elysia } from 'elysia'
 import { isCrossSite } from './actions'
 import { readCapped } from './errors'
 import { clientAddress, overLimit } from './protection'
-import { MOST_DEVICES, pushDeviceCookie, readSubscription, vapidKeys } from './push'
+import { clearPushDeviceCookie, MOST_DEVICES, pushDeviceCookie, readSubscription, vapidKeys } from './push'
 import { PUSH_KEY_PATH, PUSH_SUBSCRIBE_PATH, PUSH_UNSUBSCRIBE_PATH } from './push-settings'
 import { pushStore } from './push-store'
 import { overHttps } from './request-url'
@@ -83,7 +83,7 @@ export async function pushServer(): Promise<AnyElysia> {
 
       await pushStore().remove(endpoint, user)
 
-      return none(204)
+      return new Response(null, { status: 204, headers: { 'cache-control': 'no-store', 'set-cookie': clearPushDeviceCookie(overHttps(request)) } })
     }, { parse: 'none' })
 
   return plugin as unknown as AnyElysia

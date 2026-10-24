@@ -28,7 +28,7 @@ const BACKSLASH = /\\/g
 // A rule of the fonts' stylesheet naming its file and the range of characters it holds.
 const FACE_RANGE = /url\("([^"]+)"\)[^}]*?unicode-range:([^;}]+)/g
 // Bumped whenever the worker's own code changes, so every site installs it again.
-const WORKER_VERSION = 5
+const WORKER_VERSION = 6
 // Past this many pages kept by default, the boot says to list the ones worth it.
 const MANY_PAGES = 100
 
@@ -219,6 +219,30 @@ self.addEventListener('notificationclick', (event) => {
   })())
 })
 
+// A browser that rotated or expired the subscription tells the worker, which subscribes again with the key the server serves and sends it as the page would, the session cookie riding on the same-origin request; one the server refuses is dropped, as the page does.
+self.addEventListener('pushsubscriptionchange', (event) => {
+  event.waitUntil((async () => {
+    const root = location.origin + KAY.base + '/_kay/push'
+    const key = await fetch(root + '/key', { credentials: 'same-origin' })
+
+    if (!key.ok)
+      return
+
+    const served = await key.text()
+    const subscription = await self.registration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: Uint8Array.from(atob(served.replaceAll('-', '+').replaceAll('_', '/')), (character) => character.codePointAt(0)) })
+
+    try {
+      const sent = await fetch(root + '/subscribe', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(subscription.toJSON()), credentials: 'same-origin' })
+
+      if (!sent.ok)
+        await subscription.unsubscribe()
+    }
+    catch {
+      await subscription.unsubscribe()
+    }
+  })())
+})
+
 function linkOf(link) {
   if (link.startsWith('//') || link.startsWith('/\\\\'))
     return location.origin + KAY.base + '/'
@@ -339,9 +363,9 @@ async function unusedSubsets(client: ClientBuild, pages: (string | undefined)[])
   return unused
 }
 
-// The worker of a site with `push()` and no `offline`: no fetch handler, so it keeps nothing and a stale page is never served.
+// The worker of a site with `push()` and no `offline`: no fetch handler, so it keeps nothing and a stale page is never served, and it deletes the caches an earlier offline worker left on the device.
 function pushOnlyScript(base: string): string {
-  return `const KAY = ${JSON.stringify({ base })}\nself.addEventListener('install', () => self.skipWaiting())\nself.addEventListener('activate', event => event.waitUntil(self.clients.claim()))\n${PUSH_WORKER}`
+  return `const KAY = ${JSON.stringify({ base })}\nself.addEventListener('install', () => self.skipWaiting())\nself.addEventListener('activate', event => event.waitUntil((async () => {\n  for (const name of await caches.keys()) {\n    if (name.startsWith('kay-'))\n      await caches.delete(name)\n  }\n\n  await self.clients.claim()\n})()))\n${PUSH_WORKER}`
 }
 
 async function workerScript(options: ServiceWorkerOptions, offline: true | OfflineConfig): Promise<string> {

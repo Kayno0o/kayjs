@@ -612,9 +612,11 @@ export async function testSite(options: TestOptions = {}): Promise<TestSite> {
         server = undefined
         await release()
 
-        // The last site gone, the next file of the process meets the invalidation times as a process just started would.
-        if (openSites() === 0)
+        // The last site gone, the next file of the process meets the invalidation times and the push switch as a process just started would.
+        if (openSites() === 0) {
           forgetStamps()
+          setPushLoose(false)
+        }
       },
       visit: async (path, init = {}) => follow(await send(path, { headers: init.headers }), path, init.headers),
       submit: async (action, fields, init = {}) => {
