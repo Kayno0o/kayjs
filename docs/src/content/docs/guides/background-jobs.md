@@ -282,6 +282,12 @@ The function runs again from its top each time the run is taken, and a finished 
 
 `send(id, event, data)` resolves with whether the run took the event. A run that is not waiting for it yet keeps it for the wait that names it, so `start` followed by `send` works. An event sent while a step is running is dropped. `status(id)` tells whether a run is `running`, `sleeping`, `waiting` or `failed`, and `cancel(id)` ends it.
 
-A step that throws is retried with the queue's `attempts` and `backoff`, and the steps done before it do not run again. A step finishing starts the count of attempts again. A stop ends the run before its next step starts, so the process taking over never runs a step beside the first. The options are those of a queue: `store`, `attempts`, `backoff`, `concurrency`, `lostAfter`, `idlePoll` and `keepFailed`, and `onFailed` gets `{ id, input, error }`. `lostAfter` bounds the time between two sleeps or waits. A custom job store needs `update`, `release` and `state`. The job holds the input and every kept result, so keep results small and free of secrets: a failed run keeps them for 30 days, and the jobs page shows them. In tests, `runJobs()` runs the due steps and `setSystemTime` moves a sleep or a timeout along.
+A step that throws is retried with the queue's `attempts` and `backoff`, and the steps done before it do not run again. A step finishing starts the count of attempts again. A stop ends the run before its next step starts, so the process taking over never runs a step beside the first.
+
+The options are those of a queue: `store`, `attempts`, `backoff`, `concurrency`, `lostAfter`, `idlePoll` and `keepFailed`, and `onFailed` gets `{ id, input, error }`. `lostAfter` bounds the time between two sleeps or waits. A custom job store needs `update`, `release` and `state`.
+
+The job holds the input and every kept result, so keep results small and free of secrets: a failed run keeps them for 30 days, and the jobs page shows them.
+
+In tests, `runJobs()` runs the due steps and `setSystemTime` moves a sleep or a timeout along.
 
 <ReadMore href="/llms/queues">The store contract of `update` and the details of runs are in the queues reference.</ReadMore>
