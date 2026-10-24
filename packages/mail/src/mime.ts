@@ -28,8 +28,9 @@ const FIRST_BREAK = /^\r?\n/
 const SPACES = /\s+/
 // Control and format characters (a right-to-left override spoofs an extension) and line or paragraph separators.
 const UNSAFE = /[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]/gu
-// A directory separator on any system, and the colon of a drive (`C:evil.txt`) or an NTFS stream.
-const PATH_SEPARATORS = /[/\\:]/
+const PATH_SEPARATORS = /[/\\]/
+// The colon of a drive (`C:evil.txt`) or an NTFS stream, kept as an underscore so `Re: report.pdf` stays readable.
+const COLON = /:/g
 const DOTS = /^\.*$/
 const ENCODER = new TextEncoder()
 const BOUNDARY_SAFE = /[.*+?^${}()|[\]\\]/g
@@ -333,7 +334,7 @@ export function addressesOf(value: string | undefined): { name: string, address:
 
 // A bare file name: encoded words decoded, any directory part, control character and name of dots alone dropped.
 function fileNameOf(raw: string): string {
-  const base = decodeWords(raw).replaceAll(UNSAFE, '').split(PATH_SEPARATORS).pop()!.trim()
+  const base = decodeWords(raw).replaceAll(UNSAFE, '').split(PATH_SEPARATORS).pop()!.replaceAll(COLON, '_').trim()
 
   return DOTS.test(base) ? 'attachment' : base
 }

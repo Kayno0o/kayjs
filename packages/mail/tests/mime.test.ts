@@ -68,7 +68,8 @@ describe('attachment names', () => {
 
   it('drops bidi overrides, drive prefixes and names of dots', () => {
     expect(name('attachment; filename*=utf-8\'\'%E2%80%AEgnp.exe')).toBe('gnp.exe')
-    expect(name('attachment; filename="C:evil.txt"')).toBe('evil.txt')
+    expect(name('attachment; filename="C:evil.txt"')).toBe('C_evil.txt')
+    expect(name('attachment; filename="Re: report.pdf"')).toBe('Re_ report.pdf')
     expect(name('attachment; filename="..."')).toBe('attachment')
   })
 
