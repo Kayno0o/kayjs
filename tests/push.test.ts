@@ -540,8 +540,10 @@ describe('the worker handlers', () => {
 
     await worker.fire('push', { data: { json: () => ({ url: '//evil.example/x' }) } })
     await worker.fire('push', { data: { json: () => ({ title: 'x', url: 'javascript:alert(1)' }) } })
+    await worker.fire('push', { data: { json: () => ({ title: 'x', url: '/\\evil.example/x' }) } })
     expect(worker.shown[0]).toMatchObject({ title: 'x.example', options: { data: { url: 'https://x.example/repo/' } } })
     expect(worker.shown[1]).toMatchObject({ options: { data: { url: 'https://x.example/repo/' } } })
+    expect(worker.shown[2]).toMatchObject({ options: { data: { url: 'https://x.example/repo/' } } })
   })
 
   it('still draws something for a payload that is not JSON', async () => {
