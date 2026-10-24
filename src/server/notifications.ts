@@ -4,7 +4,7 @@ import { durationSeconds } from '../runtime/duration'
 import { kayLog } from '../runtime/log'
 import { openSqlite } from '../runtime/sqlite.server'
 import { appStore } from './app-store'
-import { pushAlongside } from './push-settings'
+import { pushAlongside, pushSettings } from './push-settings'
 import { pushStore } from './push-store'
 import { onReload } from './reload'
 
@@ -339,7 +339,8 @@ export const notifications = {
   async erase(user: string): Promise<number> {
     const count = await notificationStore().erase(checkedUser(user))
 
-    await pushStore().erase(user)
+    if (pushSettings() !== undefined)
+      await pushStore().erase(user)
 
     changed(user)
 

@@ -1,4 +1,5 @@
 import { kayLog } from '../runtime/log'
+import { pushStore } from './push-store'
 
 export const PUSH_PATH = '/_kay/push'
 export const PUSH_KEY_PATH = `${PUSH_PATH}/key`
@@ -31,9 +32,8 @@ export function pushAlongside(user: string, message: { title: string, url?: stri
   const run = async (): Promise<void> => {
     try {
       const { sendPush } = await import('./push')
-      const store = await import('./push-store')
 
-      if ((await store.pushStore().list(user)).length > 0)
+      if ((await pushStore().list(user)).length > 0)
         await sendPush(user, message)
     }
     catch (error) {

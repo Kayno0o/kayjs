@@ -3,6 +3,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it } from 'bun:test'
 
 interface FakeSubscription {
   endpoint: string
+  options: { applicationServerKey: ArrayBuffer | null }
   toJSON: () => object
   unsubscribe: () => Promise<boolean>
 }
@@ -20,11 +21,13 @@ let created = 0
 let posts: { url: string, body: unknown }[] = []
 let answer = 204
 let keyRequests = 0
+const SERVED = 'BP4z9KsN6nGRTbVYI_c7VJSPQTBtkgcy27mlmlMoZIIgDll6e3vCYLocInmYWAmS6TlzAC8wEqKK6PBru3jl7A8'
 const realFetch = globalThis.fetch
 
 function fakeSubscription(): FakeSubscription {
   const made: FakeSubscription = {
     endpoint: 'https://push.example/abc',
+    options: { applicationServerKey: Uint8Array.fromBase64(SERVED, { alphabet: 'base64url' }).buffer },
     toJSON: () => ({ endpoint: made.endpoint, keys: { p256dh: 'p', auth: 'a' } }),
     unsubscribe: async () => {
       subscription = null
@@ -72,7 +75,7 @@ beforeAll(async () => {
     if (url.endsWith('/key')) {
       keyRequests++
 
-      return new Response('BP4z9KsN6nGRTbVYI_c7VJSPQTBtkgcy27mlmlMoZIIgDll6e3vCYLocInmYWAmS6TlzAC8wEqKK6PBru3jl7A8')
+      return new Response(SERVED)
     }
 
     posts.push({ url, body: JSON.parse(String(init?.body)) })
@@ -129,7 +132,15 @@ describe('push.subscribe', () => {
     expect(await module.webPush.subscribe()).toBe('subscribed')
     expect(requested).toBe(0)
     expect(created).toBe(0)
-    expect(keyRequests).toBe(0)
+  })
+
+  it('subscribes again when the subscription was made under another key', async () => {
+    permission = 'granted'
+    subscription = fakeSubscription()
+    subscription.options.applicationServerKey = new Uint8Array(65).fill(4).buffer
+    created = 0
+    expect(await module.webPush.subscribe()).toBe('subscribed')
+    expect(created).toBe(1)
   })
 
   it('leaves a dismissed prompt to ask again', async () => {

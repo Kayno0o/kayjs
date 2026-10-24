@@ -220,6 +220,9 @@ self.addEventListener('notificationclick', (event) => {
 })
 
 function linkOf(link) {
+  if (link.startsWith('//') || link.startsWith('/\\\\'))
+    return location.origin + KAY.base + '/'
+
   const url = new URL(link.startsWith('/') ? KAY.base + link : link, location.origin)
 
   return url.protocol === 'https:' || url.protocol === 'http:' ? url.href : location.origin + KAY.base + '/'

@@ -55,6 +55,10 @@ export async function validVapidKeys(keys: VapidKeys): Promise<boolean> {
     if (fromBase64Url(keys.publicKey).length !== 65 || fromBase64Url(keys.privateKey).length !== 32)
       return false
 
+    // Only the canonical spelling, so the key a browser is given is the one the pair signs with.
+    if (toBase64Url(fromBase64Url(keys.publicKey)) !== keys.publicKey || toBase64Url(fromBase64Url(keys.privateKey)) !== keys.privateKey)
+      return false
+
     const key = await crypto.subtle.importKey('jwk', privateJwk(keys.privateKey, keys.publicKey), { name: 'ECDSA', namedCurve: 'P-256' }, false, ['sign'])
     const signature = await crypto.subtle.sign({ name: 'ECDSA', hash: 'SHA-256' }, key, new Uint8Array(1))
     const verifier = await crypto.subtle.importKey('raw', fromBase64Url(keys.publicKey), { name: 'ECDSA', namedCurve: 'P-256' }, false, ['verify'])

@@ -46,14 +46,30 @@ function pushSignal(): () => PushState {
   return state
 }
 
+function sameKey(held: ArrayBuffer | null, served: string): boolean {
+  if (held === null)
+    return true
+
+  const wanted = keyBytes(served)
+  const bytes = new Uint8Array(held)
+
+  return bytes.length === wanted.length && bytes.every((byte, at) => byte === wanted[at])
+}
+
 let setState: ((value: PushState) => void) | undefined
 
 async function worker(): Promise<ServiceWorkerRegistration | undefined> {
+  let timer: number | undefined
   const none = new Promise<undefined>((done) => {
-    setTimeout(done, READY_TIMEOUT_MS)
+    timer = window.setTimeout(done, READY_TIMEOUT_MS)
   })
 
-  return Promise.race([navigator.serviceWorker.ready, none])
+  try {
+    return await Promise.race([navigator.serviceWorker.ready, none])
+  }
+  finally {
+    clearTimeout(timer)
+  }
 }
 
 async function probe(write: (value: PushState) => void): Promise<void> {
@@ -128,14 +144,21 @@ export const webPush = {
       let subscription = await registration.pushManager.getSubscription()
       const created = subscription === null
 
-      if (subscription === null) {
-        const key = await fetch(`${authority()}/key`, { credentials: 'same-origin' })
+      const key = await fetch(`${authority()}/key`, { credentials: 'same-origin' })
 
-        if (!key.ok)
-          return 'failed'
+      if (!key.ok)
+        return 'failed'
 
-        subscription = await registration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: keyBytes(await key.text()) })
+      const served = await key.text()
+
+      // A subscription made under another key (the app rotated its VAPID keys) would be refused by the push service, so it is made again.
+      if (subscription !== null && !sameKey(subscription.options.applicationServerKey, served)) {
+        await subscription.unsubscribe()
+        subscription = null
       }
+
+      if (subscription === null)
+        subscription = await registration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: keyBytes(served) })
 
       const sent = await post('subscribe', subscription.toJSON())
 

@@ -1,5 +1,6 @@
 import type { KayExtension } from '../config'
 import type { Duration } from '../runtime/duration'
+import type { Resolver } from './address'
 import type { VapidKeys } from './push-crypto'
 import type { PushSubscriptionRecord } from './push-store'
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
@@ -9,7 +10,7 @@ import { KayError } from '../compiler/errors'
 import { durationSeconds } from '../runtime/duration'
 import { kayLog } from '../runtime/log'
 import { s } from '../runtime/schema'
-import { ipVersion, isPublicAddress, resolveHost } from './address'
+import { ipVersion, isPublicAddress, pinnedLookup, PrivateAddressError, resolveHost } from './address'
 import { defineEnv } from './env'
 import { MAX_TITLE, safeNotificationUrl } from './notifications'
 import { encryptPayload, generateVapidKeys, MAX_PAYLOAD_BYTES, validVapidKeys, vapidAuthorization } from './push-crypto'
@@ -55,7 +56,7 @@ export interface PushResult {
   failed: number
 }
 
-export const MAX_BODY = 500
+const MAX_BODY = 500
 const MAX_TAG = 64
 
 export const MOST_DEVICES = 10
@@ -170,8 +171,15 @@ function subjectOf(): string {
   return site?.origin ?? 'mailto:push@localhost'
 }
 
-// The endpoint when it is somewhere a push service can be: https at a public address, or outside production an http(s) loopback one, which is how a test plays the push service. The browser chose it, so it must not lead the server into a private network.
-export async function checkedEndpoint(endpoint: unknown, production = process.env.NODE_ENV === 'production'): Promise<string | undefined> {
+let resolver: Resolver = resolveHost
+
+// Replaces the DNS lookup of push endpoints, which a test uses to name a host without a network.
+export function setPushResolver(resolve: Resolver = resolveHost): void {
+  resolver = resolve
+}
+
+// The endpoint when its shape can be a push service: https (outside production also an http(s) loopback one, which is how a test plays the push service), no credentials, and a literal address only when public. The browser chose it, so a name is resolved and checked by `checkedEndpoint` and again by the connection itself.
+function staticEndpoint(endpoint: unknown, production: boolean): { endpoint: string, host: string, name: boolean } | undefined {
   if (typeof endpoint !== 'string' || endpoint.length > MAX_ENDPOINT)
     return undefined
 
@@ -180,25 +188,35 @@ export async function checkedEndpoint(endpoint: unknown, production = process.en
   if (url === null || url.username !== '' || url.password !== '' || url.hash !== '')
     return undefined
 
+  const host = url.hostname.replace(/^\[|\]$/g, '')
+
   if (!production && LOOPBACK.has(url.hostname) && (url.protocol === 'http:' || url.protocol === 'https:'))
-    return endpoint
+    return { endpoint, host, name: false }
 
   if (url.protocol !== 'https:')
     return undefined
 
-  const host = url.hostname.replace(/^\[|\]$/g, '')
+  if (ipVersion(host) !== 0)
+    return isPublicAddress(host) ? { endpoint, host, name: false } : undefined
 
-  try {
-    if (ipVersion(host) !== 0)
-      return isPublicAddress(host) ? endpoint : undefined
+  return { endpoint, host, name: true }
+}
 
-    const answers = await resolveHost(host)
+// `staticEndpoint` plus, for a name, a lookup that must answer public addresses only. A lookup that fails is a throw, not a refusal: the name may work later.
+export async function checkedEndpoint(endpoint: unknown, production = process.env.NODE_ENV === 'production'): Promise<string | undefined> {
+  const found = staticEndpoint(endpoint, production)
 
-    return answers.length > 0 && answers.every(({ address }) => isPublicAddress(address)) ? endpoint : undefined
-  }
-  catch {
+  if (found === undefined)
     return undefined
+
+  if (found.name) {
+    const answers = await resolver(found.host)
+
+    if (answers.length === 0 || !answers.every(({ address }) => isPublicAddress(address)))
+      return undefined
   }
+
+  return found.endpoint
 }
 
 function text(value: unknown, most: number, what: string): string | undefined {
@@ -246,41 +264,60 @@ function payloadOf(message: PushMessage): Uint8Array<ArrayBuffer> {
 
 type Outcome = 'sent' | 'dropped' | 'failed'
 
-async function deliver(subscription: PushSubscriptionRecord, payload: Uint8Array<ArrayBuffer>, headers: Record<string, string>, pair: VapidKeys, subject: string): Promise<Outcome> {
-  const endpoint = await checkedEndpoint(subscription.endpoint)
+// One POST that connects to the address it resolved and checked itself, never one `fetch` would resolve again after the check. A redirect is not followed and answers its status.
+async function post(endpoint: string, headers: Record<string, string>, body: Uint8Array, production: boolean): Promise<number> {
+  const [{ request: httpRequest }, { request: httpsRequest }] = await Promise.all([import('node:http'), import('node:https')])
+  const url = new URL(endpoint)
+  const send = url.protocol === 'https:' ? httpsRequest : httpRequest
 
-  if (endpoint === undefined) {
+  return new Promise((done, fail) => {
+    const request = send(url, { method: 'POST', headers: { ...headers, 'content-length': String(body.byteLength) }, signal: AbortSignal.timeout(SEND_TIMEOUT_MS), lookup: pinnedLookup(resolver, !production) as never }, (incoming) => {
+      incoming.resume()
+      done(incoming.statusCode ?? 502)
+    })
+
+    request.on('error', fail)
+    request.end(body)
+  })
+}
+
+async function deliver(subscription: PushSubscriptionRecord, payload: Uint8Array<ArrayBuffer>, headers: Record<string, string>, pair: VapidKeys, subject: string): Promise<Outcome> {
+  const production = process.env.NODE_ENV === 'production'
+  const found = staticEndpoint(subscription.endpoint, production)
+
+  if (found === undefined) {
     await pushStore().remove(subscription.endpoint)
 
     return 'dropped'
   }
 
+  const { endpoint } = found
+
   try {
     const body = await encryptPayload(payload, subscription)
-    const response = await fetch(endpoint, {
-      method: 'POST',
-      headers: { ...headers, 'authorization': await vapidAuthorization(endpoint, subject, pair), 'content-encoding': 'aes128gcm', 'content-type': 'application/octet-stream' },
-      body,
-      redirect: 'manual',
-      signal: AbortSignal.timeout(SEND_TIMEOUT_MS),
-    })
+    const status = await post(endpoint, { ...headers, 'authorization': await vapidAuthorization(endpoint, subject, pair), 'content-encoding': 'aes128gcm', 'content-type': 'application/octet-stream' }, body, production)
 
-    await response.body?.cancel()
-
-    if (response.ok)
+    if (status >= 200 && status < 300)
       return 'sent'
 
-    if (response.status === 404 || response.status === 410) {
+    if (status === 404 || status === 410) {
       await pushStore().remove(subscription.endpoint)
 
       return 'dropped'
     }
 
-    kayLog('warn', `a push service (${new URL(endpoint).host}) answered ${response.status}`)
+    kayLog('warn', `a push service (${new URL(endpoint).host}) answered ${status}`)
 
     return 'failed'
   }
   catch (error) {
+    // Only an address that is not public ends a subscription; a lookup that failed may work on the next push.
+    if (error instanceof PrivateAddressError) {
+      await pushStore().remove(subscription.endpoint)
+
+      return 'dropped'
+    }
+
     kayLog('warn', `a push to ${new URL(endpoint).host} failed`, error)
 
     return 'failed'
@@ -328,13 +365,29 @@ export async function readSubscription(body: unknown): Promise<PushSubscriptionR
 
   const { endpoint, keys: sent } = body as { endpoint?: unknown, keys?: { p256dh?: unknown, auth?: unknown } | null }
   const { p256dh, auth } = sent ?? {}
-  const checked = await checkedEndpoint(endpoint)
+  let checked: string | undefined
+
+  try {
+    checked = await checkedEndpoint(endpoint)
+  }
+  catch {
+    return undefined
+  }
 
   if (checked === undefined || typeof p256dh !== 'string' || typeof auth !== 'string' || !BASE64URL.test(p256dh) || !BASE64URL.test(auth))
     return undefined
 
-  if (Buffer.from(p256dh, 'base64url').length !== 65 || Buffer.from(auth, 'base64url').length !== 16)
+  const point = Buffer.from(p256dh, 'base64url')
+
+  if (point.length !== 65 || point[0] !== 4 || Buffer.from(auth, 'base64url').length !== 16)
     return undefined
+
+  try {
+    await crypto.subtle.importKey('raw', point, { name: 'ECDH', namedCurve: 'P-256' }, false, [])
+  }
+  catch {
+    return undefined
+  }
 
   return { endpoint: checked, p256dh, auth, at: Date.now() }
 }

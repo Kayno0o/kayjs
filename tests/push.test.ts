@@ -3,6 +3,7 @@ import type { PushStore } from '../src/server/push-store'
 import { rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import process from 'node:process'
+import { runInNewContext } from 'node:vm'
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'bun:test'
 import { Elysia } from 'elysia'
 import { invalidate } from '../src/runtime/cache'
@@ -10,7 +11,7 @@ import { setupStore } from '../src/server/app-store'
 import { notifications, notify } from '../src/server/notifications'
 import { pgHandle } from '../src/server/pg-data'
 import { pgPush } from '../src/server/pg-stores'
-import { checkedEndpoint, push, pushesSettled, pushSubscriptions, readSubscription, sendPush, setVapidKeys, vapidKeys } from '../src/server/push'
+import { checkedEndpoint, push, pushesSettled, pushSubscriptions, readSubscription, sendPush, setPushResolver, setVapidKeys, vapidKeys } from '../src/server/push'
 import { decryptPayload, encryptPayload, fromBase64Url, generateVapidKeys, toBase64Url, validVapidKeys, vapidAuthorization } from '../src/server/push-crypto'
 import { setPushSettings } from '../src/server/push-settings'
 import { memoryPush, sqlitePush } from '../src/server/push-store'
@@ -135,6 +136,13 @@ describe('the VAPID authorization (RFC 8292)', () => {
     expect(await validVapidKeys(server)).toBe(true)
     expect(await validVapidKeys({ publicKey: server.publicKey, privateKey: (await generateVapidKeys()).privateKey })).toBe(false)
     expect(await validVapidKeys({ publicKey: 'x', privateKey: 'y' })).toBe(false)
+
+    // The last character of a 32-byte key holds spare bits; another spelling of the same bytes is not the key the browser is given.
+    const last = server.privateKey.at(-1)!
+    const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_'
+    const twin = alphabet[alphabet.indexOf(last) ^ 1]!
+
+    expect(await validVapidKeys({ publicKey: server.publicKey, privateKey: server.privateKey.slice(0, -1) + twin })).toBe(false)
   })
 })
 
@@ -217,6 +225,13 @@ describe('sendPush', () => {
   })
 })
 
+function restoreEnv(before: string | undefined): void {
+  if (before === undefined)
+    delete process.env.NODE_ENV
+  else
+    process.env.NODE_ENV = before
+}
+
 describe('the endpoint a browser names', () => {
   it('is https at a public address in production', async () => {
     expect(await checkedEndpoint('https://8.8.8.8/push/abc', true)).toBe('https://8.8.8.8/push/abc')
@@ -241,12 +256,72 @@ describe('the endpoint a browser names', () => {
     expect(await pushSubscriptions.list('ada')).toEqual([])
   })
 
+  it('is dropped when its name resolves to a private address, and the connection is never made', async () => {
+    const before = process.env.NODE_ENV
+
+    const phone = await device('phone')
+
+    process.env.NODE_ENV = 'production'
+    setPushResolver(async () => [{ address: '10.0.0.7', family: 4 }])
+
+    try {
+      await currentStore().add('ada', { endpoint: 'https://push.example.test/abc', p256dh: phone.keys.publicKey, auth: phone.auth, at: 1 }, 10)
+      expect(await sendPush('ada', { title: 'x' })).toEqual({ sent: 0, dropped: 1, failed: 0 })
+      expect(await pushSubscriptions.list('ada')).toEqual([])
+    }
+    finally {
+      restoreEnv(before)
+      setPushResolver()
+    }
+  })
+
+  it('is kept and failed when the lookup itself fails', async () => {
+    const before = process.env.NODE_ENV
+    const phone = await device('phone')
+
+    process.env.NODE_ENV = 'production'
+    setPushResolver(async () => {
+      throw new Error('SERVFAIL')
+    })
+
+    try {
+      await currentStore().add('ada', { endpoint: 'https://push.example.test/abc', p256dh: phone.keys.publicKey, auth: phone.auth, at: 1 }, 10)
+      expect(await sendPush('ada', { title: 'x' })).toEqual({ sent: 0, dropped: 0, failed: 1 })
+      expect(await pushSubscriptions.list('ada')).toHaveLength(1)
+      expect(await readSubscription({ endpoint: 'https://push.example.test/abc', keys: { p256dh: phone.keys.publicKey, auth: phone.auth } })).toBeUndefined()
+    }
+    finally {
+      restoreEnv(before)
+      setPushResolver()
+    }
+  })
+
+  it('is refused when a name resolves to a private address at subscribing', async () => {
+    setPushResolver(async () => [{ address: '169.254.169.254', family: 4 }])
+
+    try {
+      expect(await checkedEndpoint('https://push.example.test/abc', true)).toBeUndefined()
+    }
+    finally {
+      setPushResolver()
+    }
+
+    setPushResolver(async () => [{ address: '8.8.8.8', family: 4 }])
+
+    try {
+      expect(await checkedEndpoint('https://push.example.test/abc', true)).toBe('https://push.example.test/abc')
+    }
+    finally {
+      setPushResolver()
+    }
+  })
+
   it('is read with its keys of the sizes Web Push defines', async () => {
     const phone = await device('phone')
 
     expect(await readSubscription({ endpoint: phone.endpoint, keys: { p256dh: phone.keys.publicKey, auth: phone.auth } })).toMatchObject({ endpoint: phone.endpoint })
 
-    for (const body of [null, 'x', {}, { endpoint: phone.endpoint }, { endpoint: phone.endpoint, keys: { p256dh: 'AAAA', auth: phone.auth } }, { endpoint: phone.endpoint, keys: { p256dh: phone.keys.publicKey, auth: 'AAAA' } }, { endpoint: phone.endpoint, keys: { p256dh: 42, auth: phone.auth } }])
+    for (const body of [null, 'x', {}, { endpoint: phone.endpoint }, { endpoint: phone.endpoint, keys: { p256dh: 'AAAA', auth: phone.auth } }, { endpoint: phone.endpoint, keys: { p256dh: phone.keys.publicKey, auth: 'AAAA' } }, { endpoint: phone.endpoint, keys: { p256dh: 42, auth: phone.auth } }, { endpoint: phone.endpoint, keys: { p256dh: toBase64Url(new Uint8Array(65).fill(7)), auth: phone.auth } }])
       expect(await readSubscription(body)).toBeUndefined()
   })
 })
@@ -414,6 +489,82 @@ describe('the worker', () => {
 
     expect(worker).toContain('notificationclick')
     expect(worker).not.toContain('caches.open')
+  })
+})
+
+describe('the worker handlers', () => {
+  type Listener = (event: unknown) => void
+
+  async function run(base: string): Promise<{ shown: { title: string, options: Record<string, unknown> }[], opened: string[], focused: string[], fire: (type: string, event: object) => Promise<void> }> {
+    const app = await pages({ root: 'tests/fixtures/static', prebuilt: false, site: 'https://x.example', base, extensions: [push()] })
+    const script = await (await app.handle(new Request(`http://localhost/sw.js`))).text()
+    const listeners = new Map<string, Listener>()
+    const shown: { title: string, options: Record<string, unknown> }[] = []
+    const opened: string[] = []
+    const focused: string[] = []
+    const scope = {
+      addEventListener: (type: string, listener: Listener) => listeners.set(type, listener),
+      registration: { showNotification: async (title: string, options: Record<string, unknown>) => void shown.push({ title, options }) },
+      clients: {
+        matchAll: async () => [{ url: 'https://x.example/other', focus: async () => void focused.push('other') }, { url: `https://x.example${base}/inbox`, focus: async () => void focused.push('inbox') }],
+        openWindow: async (url: string) => void opened.push(url),
+        claim: async () => undefined,
+      },
+      skipWaiting: () => undefined,
+    }
+
+    runInNewContext(script, { self: scope, location: new URL('https://x.example/'), URL })
+
+    return {
+      shown,
+      opened,
+      focused,
+      async fire(type, event) {
+        const waits: Promise<unknown>[] = []
+
+        listeners.get(type)?.({ ...event, waitUntil: (job: Promise<unknown>) => waits.push(job) })
+        await Promise.all(waits)
+      },
+    }
+  }
+
+  it('draws the notification with its links under the base', async () => {
+    const worker = await run('/repo')
+
+    await worker.fire('push', { data: { json: () => ({ title: 'Hi', body: 'b', url: '/inbox', icon: '/i.png', tag: 't' }) } })
+    expect(worker.shown).toEqual([{ title: 'Hi', options: { body: 'b', tag: 't', icon: 'https://x.example/repo/i.png', data: { url: 'https://x.example/repo/inbox' } } }])
+  })
+
+  it('falls back to the host for a title, and to the base for a link that leaves the site', async () => {
+    const worker = await run('/repo')
+
+    await worker.fire('push', { data: { json: () => ({ url: '//evil.example/x' }) } })
+    await worker.fire('push', { data: { json: () => ({ title: 'x', url: 'javascript:alert(1)' }) } })
+    expect(worker.shown[0]).toMatchObject({ title: 'x.example', options: { data: { url: 'https://x.example/repo/' } } })
+    expect(worker.shown[1]).toMatchObject({ options: { data: { url: 'https://x.example/repo/' } } })
+  })
+
+  it('still draws something for a payload that is not JSON', async () => {
+    const worker = await run('')
+
+    await worker.fire('push', { data: { json: () => {
+      throw new SyntaxError('bad')
+    } } })
+    await worker.fire('push', {})
+    expect(worker.shown.map(({ title }) => title)).toEqual(['x.example', 'x.example'])
+  })
+
+  it('focuses the tab already on the page a click names, else opens it', async () => {
+    const worker = await run('/repo')
+    const closed: boolean[] = []
+
+    await worker.fire('notificationclick', { notification: { close: () => closed.push(true), data: { url: 'https://x.example/repo/inbox' } } })
+    expect(worker.focused).toEqual(['inbox'])
+    expect(worker.opened).toEqual([])
+
+    await worker.fire('notificationclick', { notification: { close: () => closed.push(true), data: { url: 'https://x.example/repo/new' } } })
+    expect(worker.opened).toEqual(['https://x.example/repo/new'])
+    expect(closed).toHaveLength(2)
   })
 })
 

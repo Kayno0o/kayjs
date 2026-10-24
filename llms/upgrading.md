@@ -2,6 +2,12 @@
 
 What each minor release breaks, and what an app changes to move to it. kay and its libraries share one version, so one section covers them all; a patch breaks nothing, and a minor missing here broke nothing.
 
+## 1.76.0
+
+### A restricted-role Postgres app creates `kay_push_subscriptions` before listing `push()`
+
+- Nothing changes for an app that does not list `push()`. One that does, on a Postgres whose app role may not create tables, runs `createDataTables` once with a role that may, or creates the `kay_push_subscriptions` table itself, as it does for the other `kay_` tables.
+
 ## 1.75.0
 
 ### The forms deprecated in 1.72 are gone
