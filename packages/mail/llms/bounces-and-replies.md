@@ -16,17 +16,17 @@ Point the provider's webhook at `https://<site>/_kay/mail/events/<provider>` and
 | Resend | `/_kay/mail/events/resend` | `MAIL_EVENTS_RESEND` the `whsec_` secret | Svix HMAC over id, timestamp and body, within 5 minutes | `email.bounced` (permanent), `email.complained` |
 
 - A soft or temporary bounce is ignored: the mail may still arrive.
-- A complaint blocks every mail to the address, a password reset or a sign-in code included: an address that reported a newsletter as spam has to be lifted with `mail.unsuppress` to get one.
+- A complaint blocks bulk mail only, a mail carrying `List-Unsubscribe` (a list's, or one sent with `unsubscribe`) or a list's confirmation; a password reset, a sign-in code or any other mail still reaches the address. A bounce blocks every mail. Nothing is declared on a message.
 - `mailer({ events: { mailgun: key, ... } })` gives a secret in code instead; the environment is read when a request comes.
 - A forged or stale post answers 401 and changes nothing; a body over 1 MB, 413. Answers are plain text.
 
 What a suppression does:
 
-- Later mails to the address are skipped and logged, whatever sends them (`send`, the queue, a list, kayjs-auth's mails): the mail resolves as `{ accepted: [], rejected: [address], response: 'suppressed' }` rather than throwing, so the queue neither retries it nor lists it in `failed()`. With other recipients left the mail goes to them alone. The log names the count and domains, the address itself under `logRecipients`.
+- Later mails to the address (every mail after a bounce, bulk mail after a complaint) are skipped and logged, whatever sends them (`send`, the queue, a list, kayjs-auth's mails): the mail resolves as `{ accepted: [], rejected: [address], response: 'suppressed' }` rather than throwing, so the queue neither retries it nor lists it in `failed()`. With other recipients left the mail goes to them alone. The log names the count and domains, the address itself under `logRecipients`.
 - The address leaves every mailing list at once, with its delivery rows, as an unsubscribe does, so a broadcast under way mails it no more.
 - It is kept in a `kay_mail_suppressions` table beside the lists' (SQLite or Postgres: `mailListTables` lists it; a database from before it gets the table on first use). The first reason and time stay.
 - `mail.suppress(address, reason = 'bounce')`, `mail.unsuppress(address)` and `mail.suppression(address)` (`{ email, reason, source, at }`) do by hand what a webhook does; `mail.erase(address)` lifts it with the rest of a person.
-- A subscriber who bounced and signs up again gets no confirmation mail (it is skipped like any other); `mail.unsuppress` once the address is fixed.
+- A subscriber who bounced or complained and signs up again gets no confirmation mail; `mail.unsuppress` once the address is fixed.
 
 ### Read delivery reports and replies
 

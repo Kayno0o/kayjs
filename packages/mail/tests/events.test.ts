@@ -306,6 +306,47 @@ describe('suppressed recipients', () => {
     expect(outbox.to(alive)).toHaveLength(1)
   })
 
+  it('a complaint stops list and bulk mail only, a bounce stops every mail', async () => {
+    const [complained, bounced, alive] = [fresh(), fresh(), fresh()]
+    const unsubscribe = 'https://fixture.test/unsubscribe'
+
+    await mail.suppress(complained, 'complaint')
+    await mail.suppress(bounced, 'bounce')
+    outbox.clear()
+
+    // A transactional mail (a reset link, a sign-in code) still reaches an address that reported a newsletter as spam.
+    await mail.send({ to: complained, subject: 'Reset', text: 'x' })
+    expect(outbox.to(complained)).toHaveLength(1)
+    await mail.enqueue({ to: complained, subject: 'Queued reset', text: 'x' })
+    await mail.drain()
+    expect(outbox.to(complained)).toHaveLength(2)
+
+    // A mail carrying a one-click unsubscribe is bulk mail.
+    const bulk = await mail.send({ to: complained, subject: 'News', text: 'x', unsubscribe })
+
+    expect(bulk).toMatchObject({ accepted: [], rejected: [complained], response: 'suppressed' })
+    await mail.send({ to: [complained, alive], subject: 'News 2', text: 'x', unsubscribe })
+    expect(outbox.to(complained)).toHaveLength(2)
+    expect(outbox.to(alive)).toHaveLength(1)
+
+    // A bounce stops both.
+    expect((await mail.send({ to: bounced, subject: 'Reset', text: 'x' })).response).toBe('suppressed')
+    expect((await mail.send({ to: bounced, subject: 'News', text: 'x', unsubscribe })).response).toBe('suppressed')
+    expect(outbox.to(bounced)).toHaveLength(0)
+  })
+
+  it('a complaint leaves the lists and gets no confirmation mail when it signs up again', async () => {
+    const email = fresh()
+    const { subscribe } = await import(`${import.meta.dir}/fixture/src/routes/subscribe.kay`) as { subscribe: Action<{ email: string }, unknown> }
+
+    await mail.suppress(email, 'complaint')
+    outbox.clear()
+    await site.call(subscribe, { email })
+    await Bun.sleep(50)
+    await mail.drain()
+    expect(outbox.to(email)).toHaveLength(0)
+  })
+
   it('are lifted by an erase', async () => {
     const email = fresh()
 

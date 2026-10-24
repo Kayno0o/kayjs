@@ -219,6 +219,16 @@ function given(addresses: Address | Address[] | undefined): Address[] {
   return list(addresses).filter(address => addressOf(address).trim() !== '')
 }
 
+// A mail carrying a `List-Unsubscribe` header, a list's or one with `unsubscribe`, is bulk mail.
+function isBulk(mail: Mail): boolean {
+  return Object.keys(mail.headers).some(name => name.toLowerCase() === 'list-unsubscribe')
+}
+
+// The suppressions that stop this mail: a bounce stops every mail, a complaint only bulk mail, so a password reset still reaches an address that reported a newsletter.
+function withheld(found: Map<string, Suppression>, mail: Mail): Map<string, Suppression> {
+  return isBulk(mail) ? found : new Map([...found].filter(([, entry]) => entry.reason === 'bounce'))
+}
+
 // The mail without the suppressed recipients, given by their normalised address.
 function without(mail: Mail, held: Map<string, unknown>): Mail {
   const kept = (addresses: Address[]): Address[] => addresses.filter(address => !held.has(normalizeAddress(addressOf(address)) ?? ''))
@@ -530,7 +540,7 @@ export function mailer(options: MailerOptions = {}): Mailer {
 
   // `signal` is the queue's, aborted when it gives up on the run.
   const deliver = async (given: Mail, signal?: AbortSignal): Promise<Delivery> => {
-    const held = await suppressions.lists!.suppressed(recipientsOf(given))
+    const held = withheld(await suppressions.lists!.suppressed(recipientsOf(given)), given)
     const mail = held.size === 0 ? given : without(given, held)
 
     if (held.size > 0) {

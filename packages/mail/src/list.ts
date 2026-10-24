@@ -238,6 +238,39 @@ export function createLists(base: Omit<ListHost, 'enqueueMail' | 'enqueueRun' | 
   const defaultFile = (): ListStore | undefined => fallback.store ?? defaultSqlite()
   const storeOf = (name: string): ListStore | undefined => entries.get(name)?.lists ?? defaultFile()
 
+  // Every store this process knows, the default file when it exists too.
+  const known = (): ListStore[] => {
+    defaultFile()
+
+    // A store of the app's own may keep no suppressions, which are then in the default file.
+    if (fallback.store !== undefined && fallback.store.suppress === undefined)
+      defaultSqlite()
+
+    return [...new Set([...files.values(), ...given])].filter(store => !store.closed)
+  }
+
+  // The suppressed among the addresses, by their normalised form; only stores already open or existing are asked, so a site with none makes no file.
+  const suppressed = async (addresses: string[]): Promise<Map<string, Suppression>> => {
+    const emails = [...new Set(addresses.flatMap(address => normalizeAddress(address) ?? []))]
+    const found = new Map<string, Suppression>()
+
+    if (emails.length === 0)
+      return found
+
+    for (const store of known()) {
+      // A store that cannot answer must not stop the mail it was asked about.
+      try {
+        for (const entry of await store.suppressed?.(emails) ?? [])
+          found.set(entry.email, entry)
+      }
+      catch (error) {
+        log.warn(`the suppressions of a mailing list store could not be read, so its mails go out: ${error instanceof Error ? error.message : String(error)}`)
+      }
+    }
+
+    return found
+  }
+
   const make = (name: string, options: ListOptions): Entry => {
     if (!NAME.test(name))
       throw configError(`mail.list(${JSON.stringify(name)}): a list's name is letters, digits, dashes and underscores, at most 40 characters`)
@@ -280,11 +313,15 @@ export function createLists(base: Omit<ListHost, 'enqueueMail' | 'enqueueRun' | 
       return { mail, from: mail.from, replyTo: mail.replyTo, subject: mail.subject, html: mail.html, text: mail.text, headers: mail.headers }
     }
 
-    const queueConfirmation = async (mail: Mail): Promise<void> => {
+    const queueConfirmation = async (mail: Mail, email: string): Promise<void> => {
       // After the answer's tick, as a queue's store may insert synchronously.
       await Bun.sleep(0)
 
       try {
+        // A confirmation is list mail: an address that complained or bounced gets none, as no list mail would reach it afterwards.
+        if ((await suppressed([email])).size > 0)
+          return
+
         await host.enqueueMail(mail)
       }
       catch (error) {
@@ -329,7 +366,7 @@ export function createLists(base: Omit<ListHost, 'enqueueMail' | 'enqueueRun' | 
             const mail = await host.render<ListConfirmProps>(confirmation)
 
             if (subscriber.status === 'pending')
-              trackDetached(queueConfirmation(mail))
+              trackDetached(queueConfirmation(mail, email))
           }
           catch (error) {
             log.error('the confirmation mail of a list could not be rendered', error)
@@ -454,17 +491,6 @@ export function createLists(base: Omit<ListHost, 'enqueueMail' | 'enqueueRun' | 
     first = every = undefined
   }
 
-  // Every store this process knows, the default file when it exists too.
-  const known = (): ListStore[] => {
-    defaultFile()
-
-    // A store of the app's own may keep no suppressions, which are then in the default file.
-    if (fallback.store !== undefined && fallback.store.suppress === undefined)
-      defaultSqlite()
-
-    return [...new Set([...files.values(), ...given])].filter(store => !store.closed)
-  }
-
   // Where a suppression is written: the known stores that keep them, else the default file, opened for it.
   const keepers = (): ListStore[] => {
     const found = known().filter(store => store.suppress !== undefined)
@@ -486,28 +512,6 @@ export function createLists(base: Omit<ListHost, 'enqueueMail' | 'enqueueRun' | 
       await store.erase(email)
 
     return true
-  }
-
-  // The suppressed among the addresses, by their normalised form; only stores already open or existing are asked, so a site with none makes no file.
-  const suppressed = async (addresses: string[]): Promise<Map<string, Suppression>> => {
-    const emails = [...new Set(addresses.flatMap(address => normalizeAddress(address) ?? []))]
-    const found = new Map<string, Suppression>()
-
-    if (emails.length === 0)
-      return found
-
-    for (const store of known()) {
-      // A store that cannot answer must not stop the mail it was asked about.
-      try {
-        for (const entry of await store.suppressed?.(emails) ?? [])
-          found.set(entry.email, entry)
-      }
-      catch (error) {
-        log.warn(`the suppressions of a mailing list store could not be read, so its mails go out: ${error instanceof Error ? error.message : String(error)}`)
-      }
-    }
-
-    return found
   }
 
   const lift = async (address: string): Promise<boolean> => {
