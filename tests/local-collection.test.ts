@@ -59,7 +59,9 @@ async function workerSends(page: TestPage, script: string): Promise<boolean> {
     const make = new Function('self', `${code.slice(code.indexOf('self.addEventListener(\'sync\''))}\nreturn sendQueued`) as (scope: object) => () => Promise<void>
 
     try {
-      await make({ addEventListener: noop })()
+      const send = make({ addEventListener: noop })
+
+      await navigator.locks.request('kay-local', send)
 
       return true
     }
