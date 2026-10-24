@@ -26,9 +26,9 @@ const KNOWN: Record<string, [name: string, calls: string[], why: string][]> = {
     ['reader', ['Object.assign'], 'adds the setters to the reader the module exports'],
     ['consent', ['markSignal'], 'adds the reader to the set of signals, which matters only once the export is read'],
   ],
+  'install-prompt.ts': [['readAvailable', ['markSignal'], 'adds the reader to the set of signals, which matters only once the export is read']],
   'push.ts': [
     ['readState', ['markSignal'], 'adds the reader to the set of signals, which matters only once the export is read'],
-    ['readAvailable', ['markSignal'], 'adds the reader to the set of signals, which matters only once the export is read'],
   ],
   'live.ts': [['call', ['Object.assign'], 'adds `track` to the function the module exports']],
   'markdown.client.ts': [['loaded', ['ownSignal'], 'the signal the loaded renderer is set on, read by the module\'s function']],

@@ -53,7 +53,7 @@ import { hydrationScript } from './hydration'
 import { DEFAULT_LANG, invalidKeys, messagesScript } from './i18n'
 import { followsCaches, inLiveReads, liveScript } from './live'
 import { newTabRule } from './new-tab'
-import { registerScript } from './offline'
+import { INSTALL_OFFER, registerScript } from './offline'
 import { errorPage } from './overlay'
 import { chainSetting, pageSetting } from './page-settings'
 import { pageToken } from './prerendered'
@@ -1048,9 +1048,11 @@ function documentOf(files: string[], modules: PageModule[], data: Record<string,
   // The browser's form check words a refusal as the server does, so a page with a checked form sends the `kay.invalid.*` messages too.
   const words = checked === '' ? islands.messages : new Set([...islands.messages, ...invalidKeys()])
   const islandData = (hasIslands || (checked !== '' && words.size > 0) ? messagesScript(words, true, hasIslands && lang !== state?.locale) : '') + (hasIslands ? outcomeScript(rendering.carried()) + queryScript(rules) : '') + liveText
+  // A page rendering an island that uses `installPrompt` keeps the browser's install offer from the first moment, unless the worker's registration script already does.
+  const keepsInstallOffer = client.installs?.some(id => islands.used.has(id)) === true && !(options.offline && options.installOffer)
   const opening = `${htmlOpen(lang, head.root)}<head>${headStart(head)}`
   const sheets = stylesheets(client, styled)
-  const closing = `${headHtml}${scripts}${islandData}${kayMetas(options, hasIslands)}${newTabRule(markup, hasIslands || streamed, options.sameTabLinks === true)}${shipsEntry && client.build !== undefined ? `<meta name="${BUILD_META}" content="${client.build}">` : ''}${speculationRules(options.prefetch, options.base, options.apiPath)}${rendering.guarded === true ? GUARDED_META : ''}${client.navigation === true && !shipsEntry ? historyScript : ''}${options.offline ? registerScript(options.base ?? '', options.installOffer === true) : ''}${options.dev && options.devTools ? devScripts(client, styled, options.lateStyles === true) + (options.prerendering ? '' : requestBlock(files, rendering, options.base ?? '')) : ''}</head><body>${body}`
+  const closing = `${headHtml}${scripts}${islandData}${kayMetas(options, hasIslands)}${newTabRule(markup, hasIslands || streamed, options.sameTabLinks === true)}${shipsEntry && client.build !== undefined ? `<meta name="${BUILD_META}" content="${client.build}">` : ''}${speculationRules(options.prefetch, options.base, options.apiPath)}${rendering.guarded === true ? GUARDED_META : ''}${client.navigation === true && !shipsEntry ? historyScript : ''}${options.offline ? registerScript(options.base ?? '', options.installOffer === true) : ''}${keepsInstallOffer ? `<script>${INSTALL_OFFER}</script>` : ''}${options.dev && options.devTools ? devScripts(client, styled, options.lateStyles === true) + (options.prerendering ? '' : requestBlock(files, rendering, options.base ?? '')) : ''}</head><body>${body}`
   const written = opening + sheets + closing
   const start = marks === undefined ? written : placeFieldMarks(written, marks)
 

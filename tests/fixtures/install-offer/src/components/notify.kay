@@ -1,0 +1,6 @@
+---
+async function join() {
+  await webPush.subscribe()
+}
+---
+button(onClick={join}) Notify me

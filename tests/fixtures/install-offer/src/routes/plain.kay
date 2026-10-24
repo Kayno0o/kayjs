@@ -1,0 +1,4 @@
+--- script
+import Counter from '../components/counter.kay'
+---
+Counter

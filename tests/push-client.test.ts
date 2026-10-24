@@ -8,7 +8,7 @@ interface FakeSubscription {
   unsubscribe: () => Promise<boolean>
 }
 
-type Push = typeof import('../src/runtime/push')
+type Push = typeof import('../src/runtime/push') & typeof import('../src/runtime/install-prompt')
 
 let module: Push
 let permission: NotificationPermission = 'default'
@@ -82,7 +82,7 @@ beforeAll(async () => {
 
     return new Response(null, { status: answer })
   }) as typeof fetch
-  module = await import('../src/runtime/push')
+  module = { ...await import('../src/runtime/push'), ...await import('../src/runtime/install-prompt') }
 })
 
 afterAll(async () => {
@@ -221,7 +221,8 @@ describe('on the server', () => {
   it('reads as unsupported and does nothing', async () => {
     await GlobalRegistrator.unregister()
 
-    const { webPush: push, installPrompt } = await import('../src/runtime/push')
+    const { webPush: push } = await import('../src/runtime/push')
+    const { installPrompt } = await import('../src/runtime/install-prompt')
 
     expect(push.state()).toBe('unsupported')
     expect(await push.subscribe()).toBe('unsupported')

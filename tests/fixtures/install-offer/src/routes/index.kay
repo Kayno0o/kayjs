@@ -1,0 +1,4 @@
+--- script
+import Install from '../components/install.kay'
+---
+Install

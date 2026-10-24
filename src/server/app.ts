@@ -64,7 +64,7 @@ import { mcpBodyLimit, receiveDispatched, serveMcp, serveToolCallsThrough } from
 import { METRICS_PATH, metricsOf, serveMetrics } from './metrics'
 import { newTabStyles } from './new-tab'
 import { countMissing, knowRedirects } from './not-found'
-import { serveServiceWorker } from './offline'
+import { INSTALL_OFFER, serveServiceWorker } from './offline'
 import { claimApi, openApiDocument, openApiSettings, serveOpenApi } from './openapi'
 import { withPageHeaders } from './page-headers'
 import { assetFiles, pageSizes } from './page-hook'
@@ -385,7 +385,7 @@ export async function pagesApp(project: Project<PagesOptions>, loadClient: () =>
   // The browser fetches the dictionary under `connect-src`, so it joins the policy as what an island needs does: the app's own sources, unless it removed the directive or set it to 'none'.
   const dictionaryUsed = compressing && !mode.dev && client.dictionary !== undefined
   const directives = dictionaryUsed ? { ...client.directives, 'connect-src': [...new Set([...client.directives?.['connect-src'] ?? [], '\'self\''])] } : client.directives
-  const securityOptions = { ...options, dev: mode.dev, islands: directives, scripts, styles: [...new Set([...styles, ...client.inlineStyles?.values() ?? [], ...inlinePageStyles(client), ...newTabStyles(locales.translations.values())].map(style => rebaseCss(style, base)))] }
+  const securityOptions = { ...options, dev: mode.dev, islands: directives, scripts: client.installs !== undefined && client.installs.length > 0 ? [...scripts, INSTALL_OFFER] : scripts, styles: [...new Set([...styles, ...client.inlineStyles?.values() ?? [], ...inlinePageStyles(client), ...newTabStyles(locales.translations.values())].map(style => rebaseCss(style, base)))] }
   const security = securityHeaders(securityOptions)
   // The paths of the build's files and the image route, whose responses carry the security headers themselves.
   const filePaths = new Set<string>([IMAGE_ROUTE])

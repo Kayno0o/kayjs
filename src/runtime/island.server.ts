@@ -22,6 +22,8 @@ let depth = 0
 let rendered: RenderedIslands | undefined
 
 export interface RenderedIslands {
+  // Every island the page holds, whenever it hydrates.
+  used: Set<string>
   eager: Set<string>
   // The eager ones that hydrate at once even for a visitor saving data: `load` and client-only.
   immediate: Set<string>
@@ -44,6 +46,7 @@ export function islandCheckpoint(): (() => void) | undefined {
     return undefined
 
   const { count, lazy } = islands
+  const used = islands.used.size
   const eager = islands.eager.size
   const immediate = islands.immediate.size
   const waiting = islands.waiting.size
@@ -52,6 +55,7 @@ export function islandCheckpoint(): (() => void) | undefined {
   return () => {
     islands.count = count
     islands.lazy = lazy
+    trim(islands.used, used)
     trim(islands.eager, eager)
     trim(islands.immediate, immediate)
     trim(islands.waiting, waiting)
@@ -70,7 +74,7 @@ function trim(set: Set<string>, size: number): void {
 
 // Runs a synchronous page render and lists the islands it rendered.
 export function collectIslands<T>(render: () => T, salt?: string, chunks?: Record<string, string>): { result: T, islands: RenderedIslands } {
-  const islands: RenderedIslands = { eager: new Set(), immediate: new Set(), waiting: new Set(), lazy: 0, count: 0, messages: new Set(), chunks }
+  const islands: RenderedIslands = { used: new Set(), eager: new Set(), immediate: new Set(), waiting: new Set(), lazy: 0, count: 0, messages: new Set(), chunks }
 
   rendered = islands
 
@@ -144,6 +148,7 @@ export function island<P extends object>(id: string, component: ((props: P) => J
 
     if (rendered) {
       rendered.count++
+      rendered.used.add(id)
 
       if (when === 'idle' || when === 'visible') {
         rendered.lazy++

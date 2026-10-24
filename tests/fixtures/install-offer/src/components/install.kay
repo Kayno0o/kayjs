@@ -1,0 +1,6 @@
+---
+async function install() {
+  await installPrompt.show()
+}
+---
+button(onClick={install} disabled={!installPrompt.available()}) Install

@@ -617,6 +617,8 @@ export function warnUnresolved(root: string, found: UnresolvedClass[], islands: 
   }
 }
 
+// The source of `installPrompt`, whose islands' pages carry the script keeping the install offer.
+const INSTALL_SOURCE = /(?:^|[/\\])runtime[/\\]install-prompt\.ts$/
 // The source of the code waiting for an island to be visible or idle, whose chunk the pages holding such an island preload.
 const HYDRATE_WHEN_SOURCE = /(?:^|[/\\])runtime[/\\]hydrate-when\.ts$/
 
@@ -654,6 +656,9 @@ export function islandManifest(root: string, outputs: Outputs, islands: Map<stri
       const id = idByFile.get(file)!
 
       manifest.islands[id] = chunks.map(assetUrl)
+
+      if (chunks.some(chunk => Object.keys(outputs[chunk]?.inputs ?? {}).some(input => INSTALL_SOURCE.test(input))))
+        (manifest.installs ??= []).push(id)
 
       // Inputs are named relative to the working directory, the root in development.
       if (hot) {

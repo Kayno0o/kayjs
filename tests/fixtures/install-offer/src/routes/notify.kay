@@ -1,0 +1,4 @@
+--- script
+import Notify from '../components/notify.kay'
+---
+Notify

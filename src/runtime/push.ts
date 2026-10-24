@@ -10,16 +10,6 @@ export type PushState = 'unsupported' | 'denied' | 'subscribed' | 'off'
 // What `webPush.subscribe()` ended with.
 export type PushSubscribeResult = PushState | 'needs-gesture' | 'signed-out' | 'failed'
 
-// What `installPrompt.show()` ended with.
-export type InstallOutcome = 'accepted' | 'dismissed' | 'unavailable'
-
-interface InstallEvent extends Event {
-  prompt: () => Promise<void>
-  userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }>
-}
-
-type Installable = typeof globalThis & { $kayInstall?: InstallEvent | null }
-
 const READY_TIMEOUT_MS = 10_000
 
 function onServer(): boolean {
@@ -196,62 +186,6 @@ export const webPush = {
     }
     catch {
       return false
-    }
-  },
-}
-
-let installable: (() => boolean) | undefined
-
-function installSignal(): () => boolean {
-  if (installable)
-    return installable
-
-  const [read, write] = createSignal<boolean>(Boolean((globalThis as Installable).$kayInstall))
-
-  addEventListener('kay:install', () => write(Boolean((globalThis as Installable).$kayInstall)))
-  // The page's own listener, for an app without `push()`: an offer made before this island hydrated is lost to it, one made after is held from here on.
-  addEventListener('beforeinstallprompt', (event) => {
-    event.preventDefault()
-    ;(globalThis as Installable).$kayInstall = event as InstallEvent
-    dispatchEvent(new Event('kay:install'))
-  })
-  addEventListener('appinstalled', () => {
-    ;(globalThis as Installable).$kayInstall = null
-    dispatchEvent(new Event('kay:install'))
-  })
-  installable = read
-
-  return read
-}
-
-const readAvailable = markSignal((): boolean => (onServer() ? false : installSignal()()))
-
-// The browser's offer to install the site as an app. An island using `installPrompt` holds it from its hydration on; `push()` in kay.config.ts also makes the page's worker script hold it from the first moment, for an offer the browser makes before any island hydrated.
-// `installPrompt.available()` is true while an offer is held: draw an "Install" button from it, and call `installPrompt.show()` from its click. Browsers that never make the offer, Safari's included, leave it false.
-export const installPrompt = {
-  available: readAvailable,
-  async show(): Promise<InstallOutcome> {
-    if (onServer())
-      return 'unavailable'
-
-    const event = (globalThis as Installable).$kayInstall
-
-    if (!event)
-      return 'unavailable'
-
-    try {
-      await event.prompt()
-
-      const { outcome } = await event.userChoice
-
-      // An offer is used once; the browser makes another when it sees fit.
-      ;(globalThis as Installable).$kayInstall = null
-      dispatchEvent(new Event('kay:install'))
-
-      return outcome
-    }
-    catch {
-      return 'unavailable'
     }
   },
 }
