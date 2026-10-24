@@ -526,13 +526,14 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('an island 
     }, name)
   }
 
+  // Sorted, as the two reports are separate requests that may arrive in either order.
   async function reportedTwice(): Promise<string[]> {
     const until = Date.now() + 5000
 
     while (reported.length < 2 && Date.now() < until)
       await Bun.sleep(50)
 
-    return reported
+    return reported.toSorted()
   }
 
   it('keeps it shown while a redirect to another origin loads, and hides it again when the page comes back from the cache', async () => {
