@@ -16,7 +16,6 @@ import * as browserModule from '../src/test/browser'
 import { browserPath } from '../src/test/browser'
 import { listeningPort } from './listening'
 import { fixtureCopy, scratchDir } from './scratch'
-import { fixtureCopy } from './scratch'
 
 const FIXTURE = resolve('tests/fixtures/card-template')
 const CLI = resolve('src/cli.ts')
