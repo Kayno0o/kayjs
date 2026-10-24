@@ -41,10 +41,10 @@ export function jobsPageOf(setting: JobsConfig | undefined): JobsPage | undefine
 const time = (at: number) => Number.isNaN(new Date(at).getTime()) ? String(at) : new Date(at).toISOString()
 
 function jobMarkup(queue: QueueView, job: JobView, action: (name: string) => string): string {
-  const form = (name: 'retry' | 'delete' | 'send' | 'cancel', label: string) => `<form method="post" action="${escapeHtml(action(name))}"><input type="hidden" name="queue" value="${escapeHtml(queue.name)}"><input type="hidden" name="id" value="${escapeHtml(job.id)}"><button>${label}</button></form>`
+  const form = (name: 'retry' | 'delete' | 'send' | 'cancel', label: string, field = '') => `<form method="post" action="${escapeHtml(action(name))}"><input type="hidden" name="queue" value="${escapeHtml(queue.name)}"><input type="hidden" name="id" value="${escapeHtml(job.id)}">${field}<button>${label}</button></form>`
   const retry = job.status === 'failed' && queue.canRetry ? form('retry', 'Retry') : ''
   const run = job.workflow
-  const send = run?.state === 'waiting' ? form('send', `Send ${escapeHtml(run.event ?? '')}`) : ''
+  const send = run?.state === 'waiting' ? form('send', `Send ${escapeHtml(run.event ?? '')}`, '<input name="data" placeholder="data, as JSON" aria-label="Data of the event, as JSON">') : ''
   const remove = run || job.status !== 'running' ? form(run ? 'cancel' : 'delete', run ? 'Cancel' : 'Delete') : ''
   const where = run === undefined ? '' : `<p>workflow run ${run.state}${run.event === undefined ? '' : ` for event <code>${escapeHtml(run.event)}</code>`}${run.until === undefined ? '' : ` until ${time(run.until)}`}, ${run.done} steps done${run.steps.length === 0 ? '' : `${run.steps.length < run.done ? ', the last' : ''}: ${run.steps.map(step => `<code>${escapeHtml(step)}</code>`).join(' ')}`}</p>`
 
@@ -95,6 +95,7 @@ export function serveJobsPage(app: Elysia, page: JobsPage, options: ActionOption
       const form = (typeof context.body === 'object' && context.body !== null ? context.body : {}) as Record<string, unknown>
       const queue = form.queue
       const id = form.id
+      const data = typeof form.data === 'string' ? form.data : undefined
 
       if (typeof queue !== 'string' || typeof id !== 'string')
         return new Response('Bad Request', { status: 400, headers: HEADERS })
@@ -102,7 +103,7 @@ export function serveJobsPage(app: Elysia, page: JobsPage, options: ActionOption
       let done: Awaited<ReturnType<(typeof jobActions)[typeof act]>>
 
       try {
-        done = await jobActions[act](queue, id)
+        done = await jobActions[act](queue, id, data)
       }
       catch (error) {
         return new Response(error instanceof Error ? error.message : String(error), { status: 502, headers: { 'content-type': 'text/plain; charset=utf-8', ...HEADERS } })

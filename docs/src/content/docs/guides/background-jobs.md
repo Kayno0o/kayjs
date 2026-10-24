@@ -87,7 +87,7 @@ A job that throws is retried after a growing wait. One that runs out of attempts
 
 Under `kay dev`, the dev tool's Jobs tab lists every queue's jobs and retries or deletes a failed one ([the dev tool](/guides/performance/#jobs)).
 
-A workflow run shows as its state, running, sleeping until a time, waiting for an event or failed, with its last steps, and buttons to send the event it waits for (without data) or cancel it.
+A workflow run shows as its state, running, sleeping until a time, waiting for an event or failed, with its last steps, and buttons to send the event it waits for, with its data typed as JSON, or cancel it.
 
 In production, `jobs: { guard }` in `kay.config.ts` serves that list at `/_kay/jobs`, behind the guard you give it: `jobs: { guard: ctx => ctx.locals.auth.requireAdmin() }` with kayjs-auth, or any guard. Without a guard the server does not start, and `jobs: { guard, path }` moves the page.
 

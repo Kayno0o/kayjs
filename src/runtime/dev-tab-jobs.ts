@@ -33,11 +33,11 @@ export default function jobsTab(tool: DevTool, tab: DevTab): () => void {
   let asked = 0
   let reread: (() => Promise<void>) | undefined
 
-  const act = async (action: keyof typeof DONE, queue: string, id: string, button: HTMLButtonElement) => {
+  const act = async (action: keyof typeof DONE, queue: string, id: string, button: HTMLButtonElement, data?: string) => {
     button.disabled = true
 
     try {
-      await ask(`/_kay/dev/jobs/${action}`, { method: 'POST', body: JSON.stringify({ queue, id }) })
+      await ask(`/_kay/dev/jobs/${action}`, { method: 'POST', body: JSON.stringify({ queue, id, ...data !== undefined && data !== '' && { data } }) })
       status.textContent = `${DONE[action]} ${queue}.`
     }
     catch (error) {
@@ -73,11 +73,15 @@ export default function jobsTab(tool: DevTool, tab: DevTab): () => void {
 
     if (run?.state === 'waiting') {
       const send = tool.make('button', 'tool', `Send ${run.event}`)
+      const data = tool.make('input', 'filter')
 
+      data.placeholder = 'data, as JSON'
+      data.setAttribute('aria-label', 'Data of the event, as JSON')
+      data.title = 'The event\'s data as JSON; empty sends none'
       send.type = 'button'
-      send.title = 'Send the event, without data, to the run'
-      send.onclick = async () => act('send', queue.name, job.id, send)
-      line.append(send)
+      send.title = 'Send the event to the run'
+      send.onclick = async () => act('send', queue.name, job.id, send, data.value.trim())
+      line.append(data, send)
     }
 
     if (job.status === 'failed')

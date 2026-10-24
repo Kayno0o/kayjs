@@ -30,8 +30,8 @@ async function listed(site: App): Promise<QueueView[]> {
   return (await (await site.handle(new Request('http://localhost/_kay/dev/jobs', { headers: HEADERS }))).json() as { queues: QueueView[] }).queues
 }
 
-async function act(site: App, action: 'retry' | 'delete' | 'send' | 'cancel', queueName: string, id: string, headers: Record<string, string> = HEADERS) {
-  return site.handle(new Request(`http://localhost/_kay/dev/jobs/${action}`, { method: 'POST', headers: { 'content-type': 'application/json', ...headers }, body: JSON.stringify({ queue: queueName, id }) }))
+async function act(site: App, action: 'retry' | 'delete' | 'send' | 'cancel', queueName: string, id: string, headers: Record<string, string> = HEADERS, data?: unknown) {
+  return site.handle(new Request(`http://localhost/_kay/dev/jobs/${action}`, { method: 'POST', headers: { 'content-type': 'application/json', ...headers }, body: JSON.stringify({ queue: queueName, id, ...data !== undefined && { data } }) }))
 }
 
 describe('the dev tool\'s jobs endpoints', () => {
@@ -317,6 +317,35 @@ describe.each(kinds)('the Jobs tab\'s workflow runs on a $name store', ({ name, 
     expect((await act(site, 'cancel', `${name}-plain-wf`, plainId)).status).toBe(409)
     expect((await act(site, 'send', `${name}-plain-wf`, plainId)).status).toBe(409)
     expect((await act(site, 'send', 'nope', 'x')).status).toBe(404)
+  })
+
+  it('sends the event with the data typed as JSON, none when empty, and refuses data that is not JSON', async () => {
+    const queueName = `${name}-data`
+    const got: unknown[] = []
+    const flow = workflow<undefined, { paid: { amount: number } | undefined }>(queueName, async ({ step }) => {
+      const paid = await step.waitFor('paid')
+
+      await step.run('log', () => void got.push(paid))
+    }, { store: await open() })
+    const site = await app()
+    const wf = `workflow:${queueName}`
+    const jobOf = async () => (await listed(site)).find(queued => queued.name === wf)!.jobs[0]!
+
+    await flow.start(undefined, { id: 'one' })
+    await flow.drain()
+
+    const { id } = await jobOf()
+
+    expect((await act(site, 'send', wf, id, HEADERS, '{"amount": ')).status).toBe(400)
+    expect((await act(site, 'send', wf, id, HEADERS, 'x'.repeat(10_001))).status).toBe(400)
+    expect((await jobOf()).workflow!.state).toBe('waiting')
+    expect((await act(site, 'send', wf, id, HEADERS, '{"amount": 12}')).status).toBe(200)
+    await flow.drain()
+    await flow.start(undefined, { id: 'two' })
+    await flow.drain()
+    expect((await act(site, 'send', wf, (await jobOf()).id, HEADERS, '  ')).status).toBe(200)
+    await flow.drain()
+    expect(got).toEqual([{ amount: 12 }, undefined])
   })
 
   it('cancels the failed run of the row clicked, not a live run started under the same id', async () => {

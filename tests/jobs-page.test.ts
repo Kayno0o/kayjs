@@ -197,10 +197,15 @@ describe('the production jobs page for a workflow run', () => {
     expect(html).toContain('workflow run waiting for event <code>paid</code>, 1 steps done: <code>run charge &lt;b&gt;</code>')
     expect(html).not.toContain('<script')
     expect(html).toContain('action="/_kay/jobs/send"')
+    expect(html).toContain('<input name="data"')
     expect(html).toContain('Cancel')
 
     const job = await runOf(name)
-    const sent = await post(site, '/_kay/jobs/send', { queue: `workflow:${name}`, id: job.id })
+    const refused = await post(site, '/_kay/jobs/send', { queue: `workflow:${name}`, id: job.id, data: '{' })
+
+    expect(refused.status).toBe(400)
+
+    const sent = await post(site, '/_kay/jobs/send', { queue: `workflow:${name}`, id: job.id, data: '7' })
 
     expect(sent.status).toBe(303)
     await flow.drain()

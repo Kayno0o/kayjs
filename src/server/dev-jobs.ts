@@ -30,7 +30,7 @@ export async function devJobAction(request: Request, act: JobActionName): Promis
   if (denied)
     return denied
 
-  let body: { queue?: unknown, id?: unknown }
+  let body: { queue?: unknown, id?: unknown, data?: unknown }
 
   try {
     body = await request.json() as typeof body
@@ -43,7 +43,7 @@ export async function devJobAction(request: Request, act: JobActionName): Promis
     return Response.json({ error: 'queue and id are texts' }, { status: 400 })
 
   try {
-    const done = await jobActions[act](body.queue, body.id)
+    const done = await jobActions[act](body.queue, body.id, typeof body.data === 'string' ? body.data : undefined)
 
     if (done === 'done')
       return Response.json({ done: true })

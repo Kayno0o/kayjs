@@ -6,6 +6,7 @@ import { runView, WORKFLOW_PREFIX } from './workflow'
 const LIVE_LIMIT = 100
 const FAILED_LIMIT = 100
 const TEXT_CHARS = 2000
+const DATA_CHARS = 10_000
 
 export interface JobView {
   id: string
@@ -36,7 +37,7 @@ export interface QueueView {
   truncated: boolean
 }
 
-export type JobAction = 'done' | 'no-queue' | 'no-job' | 'not-failed' | 'running' | 'unsupported' | 'not-workflow' | 'not-waiting'
+export type JobAction = 'done' | 'no-queue' | 'no-job' | 'not-failed' | 'running' | 'unsupported' | 'not-workflow' | 'not-waiting' | 'bad-data'
 
 export const JOB_MESSAGES: Record<Exclude<JobAction, 'done'>, [number, string]> = {
   'no-queue': [404, 'this server has no such queue'],
@@ -46,6 +47,7 @@ export const JOB_MESSAGES: Record<Exclude<JobAction, 'done'>, [number, string]> 
   'unsupported': [409, 'the queue\'s store cannot put a failed job back: it has no revive()'],
   'not-workflow': [409, 'only a workflow run can be sent an event or cancelled'],
   'not-waiting': [409, 'the run no longer waits for an event'],
+  'bad-data': [400, `the event's data is not JSON, or longer than ${DATA_CHARS} characters`],
 }
 
 const cut = (text: string) => text.length > TEXT_CHARS ? `${text.slice(0, TEXT_CHARS)}...` : text
@@ -150,8 +152,22 @@ async function runOf(queue: string, id: string): Promise<{ fail: Exclude<JobActi
   return flow === undefined || state.key === undefined ? { fail: 'not-workflow' } : { flow, state, key: state.key }
 }
 
-// Sends the event the run waits for, without data.
-export async function sendRunEvent(queue: string, id: string): Promise<JobAction> {
+// Sends the event the run waits for, with the data a person typed as JSON, none when it is empty.
+export async function sendRunEvent(queue: string, id: string, data?: string): Promise<JobAction> {
+  let given: unknown
+
+  if (data !== undefined && data.trim() !== '') {
+    try {
+      given = data.length > DATA_CHARS ? Symbol.for('too-long') : JSON.parse(data)
+    }
+    catch {
+      return 'bad-data'
+    }
+
+    if (typeof given === 'symbol')
+      return 'bad-data'
+  }
+
   const found = await runOf(queue, id)
 
   if (found.fail !== undefined)
@@ -162,7 +178,7 @@ export async function sendRunEvent(queue: string, id: string): Promise<JobAction
   if (run?.state !== 'waiting' || run.event === undefined)
     return 'not-waiting'
 
-  return await found.flow.send(found.key, run.event) ? 'done' : 'not-waiting'
+  return await found.flow.send(found.key, run.event, given) ? 'done' : 'not-waiting'
 }
 
 // Ends a run: a sleeping or waiting one at once, a running one at its next step.

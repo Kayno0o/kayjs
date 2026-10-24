@@ -102,6 +102,13 @@ describe('the Jobs tab', () => {
     ;[...panel.querySelectorAll<HTMLButtonElement>('button')].find(button => button.textContent === 'Send paid')!.click()
     await Bun.sleep(0)
     expect(calls.find(([call]) => call === 'POST /_kay/dev/jobs/send')![1]).toBe(JSON.stringify({ queue: 'workflow:order', id: 'a' }))
+
+    const field = panel.querySelector<HTMLInputElement>('input')!
+
+    field.value = ' {"amount": 3} '
+    ;[...panel.querySelectorAll<HTMLButtonElement>('button')].find(button => button.textContent === 'Send paid')!.click()
+    await Bun.sleep(0)
+    expect(calls.filter(([call]) => call === 'POST /_kay/dev/jobs/send').at(-1)![1]).toBe(JSON.stringify({ queue: 'workflow:order', id: 'a', data: '{"amount": 3}' }))
     expect(panel.querySelector('.note')!.textContent).toBe('Sent the event to workflow:order.')
     ;[...panel.querySelectorAll<HTMLButtonElement>('button')].find(button => button.textContent === 'Cancel')!.click()
     await Bun.sleep(0)
