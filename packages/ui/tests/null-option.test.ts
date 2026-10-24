@@ -1,54 +1,67 @@
-import { rm } from 'node:fs/promises'
+import { cp, symlink } from 'node:fs/promises'
 import { join } from 'node:path'
 import process from 'node:process'
-import { afterAll, expect, test } from 'bun:test'
+import { beforeAll, expect, test } from 'bun:test'
+import { scratchDir } from '../../../tests/scratch'
 
 const CLI = join(import.meta.dir, '../../../src/cli.ts')
 const FIXTURE = join(import.meta.dir, 'fixture')
 const withNull = '[{ value: null, label: \'None\' }, { value: \'a\', label: \'A\' }] as const'
 const withBoth = '[{ value: \'\', label: \'Empty\' }, { value: \'a\', label: \'A\' }, { value: null, label: \'None\' }] as const'
-const FILE = join(FIXTURE, 'src/components/null-option-scratch.kay')
+const PLAIN = 'label="x" options={options} value={held}'
 
-afterAll(async () => rm(FILE, { force: true }))
+// One scratch copy of the fixture holds a component per case, checked in one `kay check` run, so the shared fixture never meets a type error.
+const CASES = [
+  { name: 'ok', held: '\'a\' as \'a\' | null', options: withNull, props: `${PLAIN} onChange={(value: 'a' | null) => value}` },
+  { name: 'non-nullable', held: '\'a\' as \'a\'', options: withNull, props: PLAIN },
+  { name: 'empty-and-null', held: '\'\' as \'\' | \'a\' | null', options: withBoth, props: PLAIN },
+]
+const COMPONENTS = [{ name: 'Segmented', file: 'segmented' }, { name: 'RadioGroup', file: 'radio-group' }]
 
-async function check(component: string, held: string, options: string, groups: string) {
-  const file = component === 'Segmented' ? 'segmented' : 'radio-group'
+let output = ''
 
-  await Bun.write(FILE, `---
-import ${component} from '@kaynooo/kayjs-ui/${file}.kay'
+beforeAll(async () => {
+  const dir = await scratchDir('null-option-')
 
-const held = ${held}
-const options = ${options}
+  await cp(FIXTURE, dir, { recursive: true, filter: source => !(/\/(?:\.kay|node_modules)$/).test(source) })
+  await symlink(join(FIXTURE, 'node_modules'), join(dir, 'node_modules'))
+
+  for (const component of COMPONENTS) {
+    for (const item of CASES) {
+      await Bun.write(join(dir, `src/components/${item.name}-${component.file}.kay`), `---
+import ${component.name} from '@kaynooo/kayjs-ui/${component.file}.kay'
+
+const held = ${item.held}
+const options = ${item.options}
 ---
 div
-  ${component}(${groups})
+  ${component.name}(${item.props})
 `)
+    }
+  }
 
-  const run = Bun.spawn([process.execPath, CLI, 'check'], { cwd: FIXTURE, stdout: 'pipe', stderr: 'pipe' })
+  const run = Bun.spawn([process.execPath, CLI, 'check'], { cwd: dir, stdout: 'pipe', stderr: 'pipe' })
   const [out, err] = await Promise.all([new Response(run.stdout).text(), new Response(run.stderr).text()])
 
-  return { code: await run.exited, text: out + err }
+  output = out + err
+  await run.exited
+}, 300_000)
+
+// The errors of one component file, each opening with `error[` and naming the file.
+function errorsOf(file: string) {
+  return output.split(/(?=^error\[)/m).filter(block => block.includes(`${file}.kay`)).join('')
 }
 
-for (const component of ['Segmented', 'RadioGroup']) {
-  test(`a ${component} null option on a nullable value passes, with a typed onChange inferred`, async () => {
-    const { code, text } = await check(component, '\'a\' as \'a\' | null', withNull, `label="x" options={options} value={held} onChange={(value: 'a' | null) => value}`)
+for (const component of COMPONENTS) {
+  test(`a ${component.name} null option on a nullable value passes, with a typed onChange inferred`, () => {
+    expect(errorsOf(`ok-${component.file}`)).toBe('')
+  })
 
-    expect(text).not.toContain('null-option-scratch')
-    expect(code).toBe(0)
-  }, 120_000)
+  test(`a ${component.name} null option on a value that cannot be null fails kay check`, () => {
+    expect(errorsOf(`non-nullable-${component.file}`)).toContain('a null option needs a value typed to allow null')
+  })
 
-  test(`a ${component} null option on a value that cannot be null fails kay check`, async () => {
-    const { code, text } = await check(component, '\'a\' as \'a\'', withNull, 'label="x" options={options} value={held}')
-
-    expect(text).toContain('a null option needs a value typed to allow null')
-    expect(code).not.toBe(0)
-  }, 120_000)
-
-  test(`a ${component} with an option of "" and a null option fails kay check`, async () => {
-    const { code, text } = await check(component, '\'\' as \'\' | \'a\' | null', withBoth, 'label="x" options={options} value={held}')
-
-    expect(text).toContain('post the same empty string')
-    expect(code).not.toBe(0)
-  }, 120_000)
+  test(`a ${component.name} with an option of "" and a null option fails kay check`, () => {
+    expect(errorsOf(`empty-and-null-${component.file}`)).toContain('post the same empty string')
+  })
 }
