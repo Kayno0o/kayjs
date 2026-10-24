@@ -81,7 +81,7 @@ export interface PageSetup {
 
 // What serving pages and prerendering them both start from: the routes and their param matchers, the collections, the locales, the head and the render options.
 // It installs what every render reads outside its request too: the `.kay` loader, the site, the image config, the share cards, the content's place and mode and the locales, with the preview secret, the tracer and the file store when serving, as a build traces nothing, previews nothing and an export links its files itself.
-// `exporting` is a static export, which reads no live values. `refuse` is the check a server passes to refuse the config before the build starts, and what it claimed comes back as `claimed` for the server to go on from.
+// `exporting` is a static export, which opens no store of the config but its `database`. `refuse` is the check a server passes to refuse the config before the build starts, and what it claimed comes back as `claimed` for the server to go on from.
 export async function setupPages<Claimed = undefined>(project: Project, loadClient: () => ClientBuild | Promise<ClientBuild>, prerendering = false, redirectSpelling?: RenderOptions['redirectSpelling'], refuse?: (scanned: Scanned) => Claimed, exporting = false): Promise<PageSetup & { claimed: Claimed }> {
   let loading: Promise<ClientBuild> | undefined
 
