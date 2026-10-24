@@ -476,6 +476,26 @@ describe('the routes a browser calls', () => {
   })
 })
 
+describe('the routes under a base', () => {
+  it('answer at the router path a base proxy strips the base to', async () => {
+    const auth = new Elysia().onRequest(({ request }) => nameUser(request, () => 'ada'))
+    const site = await pages({ root: 'tests/fixtures/static', prebuilt: false, site: 'https://x.example', base: '/repo', extensions: [{ name: 'test/auth', server: auth }, push()] })
+    const phone = await device('phone')
+    const key = await site.handle(new Request('http://localhost/_kay/push/key'))
+    const sent = await site.handle(new Request('http://localhost/_kay/push/subscribe', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ endpoint: phone.endpoint, keys: { p256dh: phone.keys.publicKey, auth: phone.auth } }) }))
+
+    expect(key.status).toBe(200)
+    expect(await key.text()).toBe((await vapidKeys()).publicKey)
+    expect(sent.status).toBe(204)
+    expect((await pushSubscriptions.list('ada')).map(each => each.endpoint)).toEqual([phone.endpoint])
+
+    const gone = await site.handle(new Request('http://localhost/_kay/push/unsubscribe', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ endpoint: phone.endpoint }) }))
+
+    expect(gone.status).toBe(204)
+    expect(await pushSubscriptions.list('ada')).toEqual([])
+  })
+})
+
 describe('the worker', () => {
   it('has no push handlers without push()', async () => {
     const app = await pages({ root: 'tests/fixtures/static', prebuilt: false, site: 'https://x.example', offline: true })
