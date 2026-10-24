@@ -1,0 +1,5 @@
+---
+import Online from '../components/online.kay'
+---
+h1 Online
+Online

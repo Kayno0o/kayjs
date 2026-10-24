@@ -5,6 +5,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
 import { Elysia } from 'elysia'
 import { liveId } from '../src/build/live-ids'
 import { nameUser } from '../src/server/request-user'
+import { signedText, signText } from '../src/server/stamp'
 import { testSite } from '../src/test'
 import { Feed, JSON_POST, pagesOf, proofsOf } from './live-helpers'
 
@@ -13,6 +14,11 @@ const UNREAD = liveId('/app/src/live.ts', '/app', 'unread')
 const VISITORS = liveId('/app/src/live.ts', '/app', 'visitors')
 
 type Values = typeof import('./fixtures/live-user/src/live')
+
+// What a server before the user was bound signed and checked: the keys and the time, and the signature as it came.
+function oldText(keys: [string, string][], at: number): string {
+  return `${at}\n${keys.map(key => JSON.stringify(key)).toSorted().join('\n')}`
+}
 
 // Names the visitor from a header, as kayjs-auth names the signed-in user of a request.
 const signedIn = new Elysia().derive({ as: 'global' }, ({ request }) => {
@@ -138,5 +144,28 @@ describe('a live value of each user', () => {
     live.unread.delete('carol')
     expect(await feed.next()).toEqual([[UNREAD, '', 0]])
     await feed.close()
+  })
+
+  it('takes the proof of a server before users were bound, and a tab of one gets a proof it still checks for a page of nobody\'s value', async () => {
+    const at = Date.now()
+    const old = { keys: [[VISITORS, '']] as [string, string][], at, sig: signText('live', oldText([[VISITORS, '']], at)) }
+
+    for (const user of [undefined, 'alice'])
+      expect((await open([old], user, [[VISITORS, '']])).status).toBe(200)
+
+    // A page reading no value of a user is signed as the older server did, so an old check takes it.
+    const [fresh] = proofsOf(pagesOf(await visit('/online', 'alice')))
+
+    expect(fresh!.sig).not.toContain('|')
+    expect(signedText('live', oldText(fresh!.keys, fresh!.at), fresh!.sig)).toBe(true)
+  })
+
+  it('signs the proof of a user\'s page so that the check of a server before users were bound refuses it', async () => {
+    const [bound] = proofsOf(pagesOf(await visit('/', 'alice')))
+
+    expect(bound!.sig).toContain('|alice')
+    expect(signedText('live', oldText(bound!.keys, bound!.at), bound!.sig)).toBe(false)
+    // Nor does the user dropped from it make it one that either check takes.
+    expect(signedText('live', oldText(bound!.keys, bound!.at), bound!.sig.replace(/\|alice$/, ''))).toBe(false)
   })
 })
