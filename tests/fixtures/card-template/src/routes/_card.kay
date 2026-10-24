@@ -1,0 +1,12 @@
+--- server
+import '../app.css'
+import Brand from '../components/brand.kay'
+
+const { title, image, name } = ctx.card
+---
+div(class="relative h-[630px] w-[1200px] bg-[#1e40af]")
+  if image
+    img(src={image} class="absolute top-0 left-0 h-[630px] w-[400px] object-cover" alt="")
+  div(class="absolute top-0 right-0 flex h-[630px] w-[800px] flex-col justify-end gap-6 p-16")
+    h1(class="m-0 text-6xl font-black text-white") {title}
+    Brand(name={name ?? 'No name'})

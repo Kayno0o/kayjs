@@ -63,6 +63,8 @@ export interface GenerateOptions {
   paramTypes?: Record<string, string> | undefined
   // `_error.kay`, whose `ctx` carries the error it renders.
   errorPage?: boolean | undefined
+  // `_card.kay`, whose `ctx` carries the card it draws.
+  cardPage?: boolean | undefined
   // A special page (`_error.kay`, `_404.kay`), which declares no query and reads its route's.
   special?: boolean | undefined
   // The type of each `query` schema the layouts above this file declare, outermost first.
@@ -395,7 +397,7 @@ class ModuleShell {
     }
 
     if (server)
-      b.add(`import type { ${this.options.errorPage ? 'ErrorPageContext' : 'PageContext'} as KayPageContext, PageData as KayPageData${this.declaresQuery() !== undefined ? ', QueryOf as KayQueryOf' : ''}${this.settingType(PRERENDER) !== undefined ? ', PrerenderedContext as KayPrerenderedContext' : ''}${mode === 'check' && server.page ? ', PageSettings as KayPageSettings' : ''}${this.actionsTyped ? ', ActionFor as KayActionFor' : ''} } from 'kay'\n`)
+      b.add(`import type { ${this.pageContextType()} as KayPageContext, PageData as KayPageData${this.declaresQuery() !== undefined ? ', QueryOf as KayQueryOf' : ''}${this.settingType(PRERENDER) !== undefined ? ', PrerenderedContext as KayPrerenderedContext' : ''}${mode === 'check' && server.page ? ', PageSettings as KayPageSettings' : ''}${this.actionsTyped ? ', ActionFor as KayActionFor' : ''} } from 'kay'\n`)
 
     const kayHelpers: KayHelper[] = facts.actionForm ? ['formAction'] : []
     const actions = server?.exportNames.filter(name => !NOT_ACTIONS.has(name)) ?? []
@@ -679,6 +681,14 @@ class ModuleShell {
   }
 
   // What `ctx.query` is typed by: the schemas of the layouts above and this file's own, when there are any; a special page reads its route's.
+  // What `ctx` is typed as: the error page and the card page carry what they render.
+  private pageContextType(): string {
+    if (this.options.errorPage)
+      return 'ErrorPageContext'
+
+    return this.options.cardPage ? 'CardPageContext' : 'PageContext'
+  }
+
   private declaresQuery(): string | undefined {
     if (this.options.special)
       return undefined

@@ -19,6 +19,7 @@ import { localeState } from '../runtime/locale-state'
 import { localizedText } from '../runtime/localized'
 import { nodeCrypto } from './builtins'
 import { drawCard, LOGO_SIZE } from './card-draw'
+import { shootCard, templateStamp } from './card-template'
 import { coverImage } from './crop'
 import { readFace } from './face'
 import { builtAsset, DEFAULT_QUALITY, findSource, VARIANTS_DIR } from './image'
@@ -51,6 +52,13 @@ export interface CardSetup {
   prebuilt?: boolean | undefined
   // Keeps the cards pages ask for, for `kay build` to write: on while prerendering.
   collect?: boolean | undefined
+  // The app's `_card.kay`, which lays the cards out in place of kay's fixed layout, and the stylesheet the build made of it.
+  template?: { file: string, styles: string | undefined } | undefined
+}
+
+// What a card's `_card.kay` is drawn from, the render of its page, which the server sets once its render options exist.
+export interface CardTemplate {
+  render?: ((card: { title: string, image?: string | undefined, name?: string | undefined }) => Promise<string>) | undefined
 }
 
 // What one setup draws and signs cards with. The face is read on the first card drawn and the key made on the first card linked, so an app drawing none reads and writes nothing for them.
@@ -74,10 +82,13 @@ export interface Cards {
   logo?: Uint8Array | undefined
   quality: number
   collect: boolean
+  // Set when the app has a `_card.kay`, which draws every card in Chrome.
+  template?: CardTemplate | undefined
 }
 
 const KEY_FILE = 'card.key'
 const LOGO_FILE = 'card-logo.png'
+const TEMPLATE_FILE = 'card-template.txt'
 const SVG_DRAWING = /^card-svg-.+\.png$/
 const QUERY = /\?.*$/
 const COLOR = /^#(?:[\da-f]{3}|[\da-f]{6})$/i
@@ -128,6 +139,7 @@ export async function setupCards(setup: CardSetup): Promise<Cards> {
   const color = cardColor('color', setup.config?.color ?? '#ffffff')
   const quality = setup.quality ?? DEFAULT_QUALITY
   const logo = await cardLogo(setup)
+  const stamp = await cardTemplateStamp(setup)
   const keyFile = Bun.file(join(setup.dir, KEY_FILE))
   const cards: Cards = {
     font,
@@ -137,7 +149,7 @@ export async function setupCards(setup: CardSetup): Promise<Cards> {
     prebuilt: setup.prebuilt ?? false,
     clientDir: setup.clientDir,
     // The other locales' names are part of each card's spec, so a change to one renames its cards alone.
-    look: Bun.hash(JSON.stringify([DRAWING, font instanceof Error ? '' : font.path, background, color, localizedText(setup.name, setup.defaultLocale, setup.defaultLocale) ?? '', quality, ...logo === undefined ? [] : [Bun.hash(logo).toString(36)]])).toString(36),
+    look: Bun.hash(JSON.stringify([DRAWING, font instanceof Error ? '' : font.path, background, color, localizedText(setup.name, setup.defaultLocale, setup.defaultLocale) ?? '', quality, ...logo === undefined ? [] : [Bun.hash(logo).toString(36)], ...stamp === undefined ? [] : [stamp]])).toString(36),
     background,
     color,
     name: localizedText(setup.name, setup.defaultLocale, setup.defaultLocale),
@@ -146,6 +158,7 @@ export async function setupCards(setup: CardSetup): Promise<Cards> {
     logo,
     quality,
     collect: setup.collect ?? false,
+    template: stamp === undefined ? undefined : {},
   }
 
   if (cards.collect) {
@@ -242,6 +255,31 @@ async function cardSvg(cards: Cards, image: string): Promise<Uint8Array> {
   }
 
   return drawing
+}
+
+// What the app's `_card.kay` is made of, which renames its cards when it changes. A build keeps it beside the key, as an executable holds no source to read it from, and a server on that build reads it.
+async function cardTemplateStamp(setup: CardSetup): Promise<string | undefined> {
+  const built = join(setup.dir, TEMPLATE_FILE)
+
+  if (setup.template === undefined) {
+    if (setup.collect)
+      await rm(built, { force: true })
+
+    return undefined
+  }
+
+  if ((setup.bundled || setup.prebuilt) && !setup.collect && await Bun.file(built).exists())
+    return Bun.file(built).text()
+
+  if (setup.bundled)
+    throw new KayError('executable-incomplete', 'kay: this executable holds no record of src/routes/_card.kay; build it again with kay build --compile')
+
+  const stamp = templateStamp(setup.template.file, setup.template.styles)
+
+  if (setup.collect)
+    await Bun.write(built, stamp)
+
+  return stamp
 }
 
 // The logo drawn at the size a card shows it. A build keeps that drawing beside the key, as an executable carries no SVG drawer and reads it instead, as does a server on that build, and drops one the config no longer names.
@@ -381,7 +419,7 @@ function existingKey(cards: Cards): Uint8Array | undefined {
 }
 
 function cardUrl(cards: Cards, title: unknown, image: string | undefined): string {
-  if (cards.font instanceof Error)
+  if (cards.font instanceof Error && !cards.template)
     throw cards.font
 
   if (typeof title !== 'string')
@@ -391,6 +429,10 @@ function cardUrl(cards: Cards, title: unknown, image: string | undefined): strin
 
   if (text === '')
     throw new KayError('share-card-invalid', 'kay: shareCard() was given an empty title')
+
+  // The template's page loads the image from the build, which holds an imported one alone.
+  if (cards.template && image !== undefined && !image.startsWith(IMPORTED))
+    throw new KayError('share-card-invalid', `kay: shareCard() was given ${image}, which src/routes/_card.kay cannot show: its cards take an imported image`)
 
   const name = nameFor(cards)
   const spec = cardSpec(text, image, name)
@@ -452,7 +494,7 @@ export function serveCards(app: Elysia, cards: Cards, options: ImageRouteOptions
     const spec = cardSpec(title, src, siteName)
     const key = cards.key ??= existingKey(cards)
 
-    if (!key || cards.font instanceof Error || !signed(key, spec, url.searchParams.get('sig') ?? ''))
+    if (!key || (cards.font instanceof Error && !cards.template) || !signed(key, spec, url.searchParams.get('sig') ?? ''))
       return new Response('Not Found', { status: 404, headers: TEXT })
 
     const svg = isSvgCard(src)
@@ -492,7 +534,7 @@ export function serveCards(app: Elysia, cards: Cards, options: ImageRouteOptions
       if (!writing) {
         writing = (async () => {
           try {
-            await drawing(async () => writeCard(cards, file, title, siteName, svg ? { input: await cardSvg(cards, src) } : source && { input: Bun.file(source.path), maxPixels: source.immutable ? undefined : MAX_UPLOAD_PIXELS }))
+            await drawing(async () => cards.template ? writeTemplateCard(cards, file, { title, image: src, name: siteName ?? cards.name }) : writeCard(cards, file, title, siteName, svg ? { input: await cardSvg(cards, src) } : source && { input: Bun.file(source.path), maxPixels: source.immutable ? undefined : MAX_UPLOAD_PIXELS }))
           }
           finally {
             pending.delete(file)
@@ -532,8 +574,8 @@ export async function writeCards(clientDir: string, cacheDir?: string, remote?: 
   for (const [name, card] of requested) {
     const target = join(clientDir, VARIANTS_DIR, name)
 
-    // An executable draws no SVG, so the build keeps the drawing of each one a card is on, whether or not that card is drawn again.
-    if (isSvgCard(card.image))
+    // An executable draws no SVG, so the build keeps the drawing of each one a card is on, whether or not that card is drawn again; a template's page loads the SVG itself.
+    if (!current!.template && isSvgCard(card.image))
       await cardSvg(current!, card.image)
 
     const cached = cacheDir !== undefined && cacheDir !== '' ? join(cacheDir, name) : undefined
@@ -545,7 +587,11 @@ export async function writeCards(clientDir: string, cacheDir?: string, remote?: 
 
     countCache('share cards', kept)
 
-    if (!kept) {
+    if (!kept && current!.template) {
+      await writeTemplateCard(current!, cached ?? target, { title: card.title, image: card.image, name: card.name ?? current!.name })
+      drawn++
+    }
+    else if (!kept) {
       const svg = isSvgCard(card.image)
       const source = card.image === undefined || svg ? undefined : await findSource(card.image, { clientDir, cacheDir: '', remote })
 
@@ -570,6 +616,17 @@ export async function writeCards(clientDir: string, cacheDir?: string, remote?: 
   }
 
   return drawn
+}
+
+// The card the app's `_card.kay` lays out: its page rendered, then drawn by Chrome.
+async function writeTemplateCard(cards: Cards, target: string, content: { title: string, image?: string | undefined, name?: string | undefined }): Promise<void> {
+  if (!cards.template?.render)
+    throw new KayError('share-card-invalid', 'kay: src/routes/_card.kay was not ready to draw a card')
+
+  const { render } = cards.template
+
+  // The page names the image by the address the browser reaches the build's files at.
+  await writeAtomically(target, await shootCard(cards.clientDir, cards.quality, async origin => render({ ...content, image: content.image === undefined ? undefined : `${origin}${content.image}` })))
 }
 
 async function writeCard(cards: Cards, target: string, title: string, name: string | undefined, image?: { input: Blob | Uint8Array, maxPixels?: number | undefined }): Promise<void> {

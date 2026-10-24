@@ -898,6 +898,12 @@ async function claimBrowser(): Promise<{ dir: string, first: boolean }> {
   return { dir: browser.dir, first: true }
 }
 
+// Closes the browser now when no page is open, for a server that drew a card and runs no test, rather than leave Chrome idle for minutes.
+export function releaseIdleBrowser() {
+  if (browser && browser.pages === 0)
+    closeBrowser()
+}
+
 // A while after the last page closed, the browser goes with its profile, and the next page starts another.
 function releaseBrowser() {
   if (!browser || --browser.pages > 0)

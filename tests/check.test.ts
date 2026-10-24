@@ -1625,6 +1625,21 @@ describe.concurrent('kay check, edge cases', () => {
     }
   })
 
+  it('types the ctx.card of a _card.kay as the card it draws', async () => {
+    const card = (read: string) => `--- server\nconst { title, image } = ctx.card\nconst length: number = ${read}\n---\np {title} {image} {length}\n`
+    const root = await scratchProject({
+      'src/routes/_card.kay': card('ctx.card.title.length'),
+      'src/routes/other/_card.kay': card('ctx.card.titel.length'),
+    })
+
+    try {
+      expect((await check(root)).map(d => [relative(root, d.file), named(d)])).toEqual([['src/routes/other/_card.kay', expect.stringContaining('TS2551')]])
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
   it('narrows a loop\'s row and an if\'s alias in the branches of an if, in an island as in a static component', async () => {
     const template = 'ul\n  for item, index of items key={index}\n    if item === \'separator\'\n      li.sep\n    else if item.label === \'\'\n      li {item.label.length}\n    else\n      li {item.label}\n  for item of items key={item}\n    if item !== \'separator\'\n      li {item.label}\n  if items[0] as first\n    if typeof first === \'string\'\n      li {first.length}\n    else\n      li {first.label}\n'
     const script = '---\ntype Entry = \'separator\' | { label: string }\nconst { items } = props<{ items: Entry[] }>()\n'

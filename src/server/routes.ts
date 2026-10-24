@@ -125,6 +125,8 @@ export interface RouteMount {
 export interface SpecialPages {
   notFound?: SpecialPage | undefined
   error?: SpecialPage | undefined
+  // The routes directory's own `_card.kay`, which draws the share card in place of kay's fixed layout; only the fallback holds it, as no URL asks for it.
+  card?: SpecialPage | undefined
 }
 
 const DYNAMIC_SEGMENT = /^\[(\.\.\.)?([A-Z_$][\w$]*)(?:=([A-Z_$][\w$-]*))?\]$/i
@@ -139,6 +141,7 @@ const LAYOUT = '_layout.kay'
 const ACTIONS = '_actions.kay'
 const NOT_FOUND = '_404.kay'
 const ERROR = '_error.kay'
+const CARD = '_card.kay'
 const GUARD = '_guard.ts'
 // What Elysia reads as a parameter, a wildcard or breaks the code it generates on, in a static segment.
 const ROUTER_SYNTAX = /[:*']/
@@ -691,7 +694,11 @@ function withoutLayouts(special: SpecialPages): SpecialPages {
 export async function specialPagesOf(trees: RouteMount[], at: string, reads?: ContextReads): Promise<SpecialPages> {
   await openReaches(trees, reads, false)
 
-  return specialPagesIn(trees, at, new Map())
+  const special = specialPagesIn(trees, at, new Map())
+  const card = at === '' ? fileAt(trees, at, CARD) : undefined
+
+  // A card is drawn bare, outside every layout.
+  return card === undefined ? special : { ...special, card: { file: card, layouts: [] } }
 }
 
 function specialPagesIn(trees: RouteMount[], at: string, read: LayoutsRead): SpecialPages {

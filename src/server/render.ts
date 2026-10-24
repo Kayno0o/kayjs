@@ -1,5 +1,5 @@
 import type { KayConfig } from '../config'
-import type { ErrorPageContext, Locals, PageContext, PageError } from '../runtime'
+import type { CardPageContext, ErrorPageContext, Locals, PageContext, PageError } from '../runtime'
 import type { Action, Outcome } from '../runtime/action'
 import type { PendingBlock } from '../runtime/await.server'
 import type { EditorProps } from '../runtime/edit'
@@ -699,6 +699,22 @@ export async function renderUnmatched(special: SpecialPages, context: RequestCon
   const rendering = createRendering(context, {}, options)
 
   return withOutcome(rendering.outcome, async () => renderFailure(new NotFound(), special, rendering, new Map(), client, options))
+}
+
+// The document `_card.kay` lays the share card out as, rendered bare for the browser that draws the card: no layout, no development tool, and no base, as the browser reaches it at the root of a server of its own.
+export async function renderCardPage(page: SpecialPage, card: CardPageContext['card'], client: ClientBuild, options: RenderOptions = {}): Promise<string> {
+  const rendering = createRendering({ request: new Request('http://localhost/_kay/card') }, {}, { ...options, base: '', prerendering: false, dev: false, devTools: false })
+
+  ;(rendering.ctx as CardPageContext).card = card
+
+  return withOutcome(rendering.outcome, async () => {
+    const files = specialChains(page).alone
+    const modules = await importAll(files, options)
+    const loading = runLoads(files, modules, rendering.ctx, new Map())
+    const html = renderDocument(files, modules, loading instanceof Promise ? await loading : loading, client, rendering, options)
+
+    return respond(rendering, html).text()
+  })
 }
 
 // An error thrown before any page was chosen, by a hook of the app or kay, answered by the routes directory's own `_error.kay` as a 500, in the default locale; `renderFailure` reports it.

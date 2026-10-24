@@ -312,6 +312,11 @@ export interface ErrorPageContext<Params extends Record<string, unknown> = Recor
   error: PageError
 }
 
+// The context of `_card.kay`, which lays out the 1200x630 share card `shareCard()` links: `image` is the imported image it was given, its URL, which the card's browser loads from the build.
+export interface CardPageContext<Params extends Record<string, unknown> = Record<string, string>> extends PageContext<Params> {
+  card: { title: string, image?: string | undefined, name?: string | undefined }
+}
+
 // What a `_guard.ts` decides from: who is asking, and the params of the page asked for, each matcher's value in place of its text.
 // For an action, `url` and `params` are those of the page it was posted from; for an API route, its own as Elysia hands them to the handler.
 // `Own` names locals a guard knows beyond the app's, for a library's own guard to read what its plugin adds with no cast.

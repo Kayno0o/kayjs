@@ -1,0 +1,4 @@
+---
+const { name } = props<{ name: string }>()
+---
+p(class="m-0 text-3xl font-bold text-white") {name}

@@ -136,9 +136,32 @@ head
   meta(property="og:image" content={shareCard({ title: post.title })})
 ```
 
-`shareCard` needs a font listed in `fonts`.
+`shareCard` needs a font listed in `fonts`, unless a template lays the card out.
 
 Pass `image` to draw the title over a picture, which covers the card and fades into the background below the title. It can be an imported PNG, JPEG, WebP, GIF or AVIF, or an imported SVG such as a banner kept in the repo: the SVG is drawn to cover the card, cut in the middle if its shape differs, and `kay build` keeps that drawing for an executable. Turn any text in the SVG into paths, as kay draws it without fonts. An SVG from `images.dirs` or `images.remote` is refused.
+
+### Lay the card out yourself
+
+Without a template, every card has kay's layout. To lay it out yourself, write `src/routes/_card.kay`. It is a page like any other, with your components, your Tailwind classes and your fonts, but it draws one card: `ctx.card` holds the `title`, the `image` and the site `name` the page gave `shareCard()`.
+
+```kay
+--- server
+import '../app.css'
+import Logo from '../components/logo.kay'
+
+const { title, image, name } = ctx.card
+---
+div(class="relative h-[630px] w-[1200px] bg-slate-900 text-white")
+  if image
+    img(src={image} class="absolute inset-y-0 left-0 w-[400px] object-cover" alt="")
+  div(class="absolute inset-y-0 right-0 flex w-[800px] flex-col justify-end gap-6 p-16")
+    h1(class="text-6xl font-black") {title}
+    Logo
+```
+
+The card is 1200 by 630 pixels, with no layout around it, and the page links its stylesheet itself. The pages still call `shareCard({ title, image })` as before. `image` has to be an imported image, which the template loads from the build.
+
+Chrome or Chromium draws the card, so one has to be on the machine that builds the site, and on the server for the cards no prerendered page asks for. It starts only when a card is drawn, and closes when none is waiting. Cards are signed, cached and written at build like the others, and changing the template, a component it imports or its styles draws them again.
 
 To use a photo as the card, `shareImage(hero)` from `kay/image` is the URL of an imported image cut to the 1200x630 card, enlarged when smaller. It takes an image from `images.dirs` or `images.remote` too.
 

@@ -151,7 +151,7 @@ export const ERRORS = {
   },
   'share-card-invalid': {
     group: 'build',
-    summary: 'A share card drawn with no font, a logo that is missing, not square or not an image kay draws, a colour that is no #rrggbb, or an empty title.',
+    summary: 'A share card drawn with no font, a logo that is missing, not square or not an image kay draws, a colour that is no #rrggbb, an empty title, or a `_card.kay` with no Chrome to draw it or a card on an image it cannot show.',
     fix: { file: 'llms/images.md', heading: 'Draw a share card for a page' },
   },
   'image-invalid': {

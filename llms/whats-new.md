@@ -5,6 +5,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 ## Unreleased
 
 - `workflow()` writes a multi-step flow that survives restarts, sleeps for days and waits for events, with `step.run`, `step.sleep`, `step.waitFor`, one-call `start` and `send`, on the existing job stores ([Queues](queues.md)).
+- `src/routes/_card.kay` lays out the share card `shareCard()` links with the app's own components, Tailwind classes and fonts, drawn by Chrome at build and on demand, and the fixed layout stays the default without it: [Lay out a share card yourself](images.md#lay-out-a-share-card-yourself).
 - A page hook is given `fileSize(url)` and `htmlSize(html)`, the compressed sizes a browser downloads, read from the copies the compress stage keeps so that a hook measuring page weight compresses no file twice ([Page hooks](prerendering.md#page-hooks)).
 
 ## 1.75.0

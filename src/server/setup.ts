@@ -112,6 +112,8 @@ async function setupWith<Claimed>(project: Project, loadClient: () => Promise<Cl
   void Promise.allSettled([scanning])
 
   const routes = await source.routes(project, mounts)
+  // Beside the routes: no URL asks for the app's `_card.kay`, but its classes and fonts are built like a page's.
+  const cardPage = (await source.fallback(project, mounts)).card
 
   // A server's check claims the routes itself, once the locales are known.
   if (refuse)
@@ -190,13 +192,13 @@ async function setupWith<Claimed>(project: Project, loadClient: () => Promise<Cl
   const client = await loadingClient
 
   if (!mode.dev)
-    await chooseInlineStyles(client, base, config.inlineStyles, styleChains(routes), config.offline === undefined || config.offline === false, config.lateStyles === true)
+    await chooseInlineStyles(client, base, config.inlineStyles, [...styleChains(routes), ...cardPage === undefined ? [] : [[cardPage.file]]], config.offline === undefined || config.offline === false, config.lateStyles === true)
 
   // Cards are drawn in the fonts the head just wrote, rather than those a `fonts.json` held before.
   const headAndCards = async () => {
     const { fonts, ...head } = await configHead(root, config, client.dir, source.embedded, ownManifest)
 
-    return { ...head, fontCss: fonts?.css, cards: await setupCards({ dir: join(client.dir, '..'), clientDir: client.dir, fonts, config: config.images?.card, logo: logoFile, logoDrawn, name: config.seo?.name, defaultLocale: locales.settings.defaultLocale, quality: config.images?.quality, bundled: source.embedded, prebuilt: mode.prebuilt, collect: prerendering }) }
+    return { ...head, fontCss: fonts?.css, cards: await setupCards({ dir: join(client.dir, '..'), clientDir: client.dir, fonts, config: config.images?.card, logo: logoFile, logoDrawn, name: config.seo?.name, defaultLocale: locales.settings.defaultLocale, quality: config.images?.quality, bundled: source.embedded, prebuilt: mode.prebuilt, collect: prerendering, template: cardPage && { file: cardPage.file, styles: client.styles.get(cardPage.file) } }) }
   }
 
   const { head, scripts, styles, cards, fontCss } = await headAndCards()
@@ -209,5 +211,10 @@ async function setupWith<Claimed>(project: Project, loadClient: () => Promise<Cl
     followEntryFiles(i18n.settings, collections)
   }
 
-  return { source, client, mounts, routes, matchers, collections, i18n, locales, base, site, imageCache, scripts, styles, renderOptions: { ...renderOptionsOf(config, mode, { head, maxDensity, fontCss, islandPreloads: mode.dev ? undefined : islandOnlyChunks(client), editor: source.editor(root, config), contexts: extensionContexts(root, config.extensions) }), redirectSpelling }, cards, files, endpoints, appManifest: ownManifest, extensions, api, claimed }
+  const renderOptions: RenderOptions = { ...renderOptionsOf(config, mode, { head, maxDensity, fontCss, islandPreloads: mode.dev ? undefined : islandOnlyChunks(client), editor: source.editor(root, config), contexts: extensionContexts(root, config.extensions) }), redirectSpelling }
+
+  if (cards.template && cardPage)
+    cards.template.render = async card => (await import('./render')).renderCardPage(cardPage, card, client, renderOptions)
+
+  return { source, client, mounts, routes, matchers, collections, i18n, locales, base, site, imageCache, scripts, styles, renderOptions, cards, files, endpoints, appManifest: ownManifest, extensions, api, claimed }
 }

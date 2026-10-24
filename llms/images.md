@@ -52,6 +52,22 @@ head
   meta(property="og:image" content={shareCard({ title: post.title, image: post.cover })})
 ```
 
+### Lay out a share card yourself
+
+`src/routes/_card.kay` lays every card out in place of kay's fixed layout, with the app's components, Tailwind classes and fonts; `ctx.card` is `{ title, image, name }` (`CardPageContext`), and the pages keep calling `shareCard({ title, image })`:
+
+```kay
+--- server
+import '../app.css'
+
+const { title, image, name } = ctx.card
+---
+div(class="relative h-[630px] w-[1200px] bg-slate-900 text-white")
+  if image
+    img(src={image} class="absolute inset-y-0 left-0 w-[400px] object-cover" alt="")
+  h1(class="absolute right-16 bottom-24 w-[700px] text-6xl font-black") {title}
+```
+
 Resizing images uploaded at runtime and images from another host are in [Images uploaded at runtime and from other hosts](images-runtime-and-remote.md).
 
 ### Draw an icon
@@ -107,6 +123,10 @@ img(src={hero} sizes="(min-width: 60rem) 50vw, 100vw" alt="The workshop")
 - The face is read from its `.woff2`, `.woff` or `.ttf` file, TrueType outlines only, which every Fontsource face has.
 - A variable face draws at its default weight, a letter the face lacks draws as its missing-glyph box, and letters are kerned by the face's `GPOS` table but set one by one, with no ligatures or right-to-left text.
 - A page asking for a card fails when `fonts` lists none.
+- `_card.kay` is a bare page, no layout, so it imports its own stylesheet (`import '../app.css'`) and sets its own size, `w-[1200px] h-[630px]`; Chrome's margin and scrollbar are removed, and anything past 1200x630 is cut. It is found in the routes directory alone, not per directory, and compiles like `_404.kay`.
+- Chrome or Chromium draws it (`BUN_CHROME_PATH`, or one on the `PATH`), the one `kay screenshot` uses: `kay build` needs it for the cards prerendered pages ask for, the server for the others, an executable included, and none found fails with `share-card-invalid`, a 500 from the route. It starts when a card is drawn, one at a time, and closes once none waits; an app with no `_card.kay` never starts it.
+- `image` is an imported image only (an image of `images.dirs` or `images.remote` is refused with `share-card-invalid`), and reaches the template as an absolute URL the card's browser loads from the build, for an `img` or a `url()`; the build's stylesheets, fonts and images load, nothing else of it does, and scripts do not run.
+- `images.card` (`font`, `background`, `color`, `logo`) and `fonts` only serve the fixed layout; `images.quality` is the JPEG quality of both. The cards are signed, cached and written at build as the others are, and renamed when `_card.kay`, a `.kay` file it imports or its stylesheet changes; `kay build` keeps that record for an executable.
 - A card is served by `/_kay/card?title=...&sig=...`, drawn on its first request and kept with the variants.
 - The URL is signed with a key the build keeps beside the client build and never serves, so nobody can have the site draw a title of their own; whitespace runs read as one space and a title is cut at 200 characters before it is signed.
 - Each distinct title is one more card file, so a page titled by what visitors type, such as a search, draws one card per query.

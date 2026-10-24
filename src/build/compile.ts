@@ -218,7 +218,7 @@ export async function serverParts(project: Project) {
 function routeModules(routes: Route[], fallback: SpecialPages): Set<string> {
   const files = new Set<string>()
   const addSpecial = (special: SpecialPages) => {
-    for (const page of [special.notFound, special.error]) {
+    for (const page of [special.notFound, special.error, special.card]) {
       if (page) {
         for (const file of [...page.layouts, page.file])
           files.add(file)

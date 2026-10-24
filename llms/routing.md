@@ -154,6 +154,7 @@ Pages live in `src/routes/`:
 | `_actions.kay` | A server fence of actions and no template, served behind the guards of its directory and above, which pages and components import by path; see [Actions](actions.md#declaring-an-action). |
 | `_404.kay` | Rendered with status 404 for `ctx.notFound()` in its directory and below; the root one also answers URLs no page serves. |
 | `_error.kay` | Rendered with status 500 when a load or render throws, and for 404s with no `_404.kay`. |
+| `_card.kay` | Only in the routes directory: lays out the 1200x630 share card `shareCard()` links, reading `ctx.card`; see [Lay out a share card yourself](images.md#lay-out-a-share-card-yourself). |
 | `_guard.ts` | Runs before every page and every action in its directory and below; see [Guards](server.md#guards). |
 
 - Where two pages match a URL, the first segment telling them apart decides: static wins over a param, a param over a catch-all, so `/docs/intro` goes to `docs/[...path].kay` before `[section]/[page].kay`, and `/_kay/` stays kay's own files.
