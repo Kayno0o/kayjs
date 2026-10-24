@@ -684,7 +684,7 @@ describe('a live value with a lifetime', () => {
   it('is written to a store with the time it ends, and is not read back once past', async () => {
     const path = await storePath()
     const store = sqliteLive(path)
-    const mortal = declareTtl(0, 'test:ttl-sqlite', 'ttlSqlite', { ttl: '100ms' })
+    const mortal = declareTtl(0, 'test:ttl-sqlite', 'ttlSqlite', { ttl: '60s' })
     const forever = declare(0, 'test:ttl-none', 'ttlNone')
     const before = Date.now()
 
@@ -699,11 +699,18 @@ describe('a live value with a lifetime', () => {
     const held = rows.find(row => row[0] === 'test:ttl-sqlite')
 
     expect(held?.slice(0, 3)).toEqual(['test:ttl-sqlite', '', '[3]'])
-    expect(held?.[3]).toBeGreaterThanOrEqual(before + 100)
-    expect(held?.[3]).toBeLessThanOrEqual(Date.now() + 100)
-    await Bun.sleep(150)
-    expect((store.entries() as LiveEntry[]).map(row => row[0])).toEqual(['test:ttl-none'])
-    setLiveStore(undefined)
+    expect(held?.[3]).toBeGreaterThanOrEqual(before + 60_000)
+    expect(held?.[3]).toBeLessThanOrEqual(Date.now() + 60_000)
+    // The clock moves past the end rather than the test sleeping through a short one, which a loaded runner outlives before the first read.
+    setSystemTime(new Date(Date.now() + 61_000))
+
+    try {
+      expect((store.entries() as LiveEntry[]).map(row => row[0])).toEqual(['test:ttl-none'])
+    }
+    finally {
+      setSystemTime()
+      setLiveStore(undefined)
+    }
   })
 
   it('is dropped from the file by a write an hour after it expired', async () => {
