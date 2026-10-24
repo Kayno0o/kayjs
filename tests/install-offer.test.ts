@@ -49,6 +49,14 @@ describe('the install offer kept from the first moment', () => {
       expect(await (await plain.fetch(path)).text()).not.toContain(OFFER)
   })
 
+  it('is in the head of a page whose only installPrompt island sits in a streamed block', async () => {
+    const html = await (await plain.fetch('/streamed')).text()
+
+    expect(html).toContain('data-chunk')
+    expect(html.indexOf(OFFER)).toBeGreaterThan(-1)
+    expect(html.indexOf(OFFER)).toBeLessThan(html.indexOf('<body'))
+  })
+
   it('is written once when push() already keeps it in the registration script', async () => {
     const html = await (await pushing.fetch('/')).text()
 

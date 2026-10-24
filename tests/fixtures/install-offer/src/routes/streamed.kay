@@ -1,0 +1,9 @@
+--- server
+import { defer } from 'kay'
+import Install from '../components/install.kay'
+
+const rows = defer(Promise.resolve([1]))
+---
+p Shell
+await rows then list
+  Install
