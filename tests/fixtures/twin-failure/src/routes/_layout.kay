@@ -1,0 +1,7 @@
+---
+import Picker from '../components/picker.kay'
+---
+header
+  Picker(hydrate="idle")
+main
+  slot

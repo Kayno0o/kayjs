@@ -3,11 +3,12 @@ import type { ServerRecord } from '../server/server-record'
 import { existsSync, realpathSync } from 'node:fs'
 import { mkdir, rm } from 'node:fs/promises'
 import { dirname, join, relative, resolve, sep } from 'node:path'
+import { ISLAND_TWIN, withoutTwin } from '../compiler/twin'
 import { KAY_SOURCE, recordName, ROOT_TOKEN, SERVER_DIR, SERVER_RECORD, UP_TOKEN } from '../server/server-record'
 import { ASSET_FILE } from './assets'
 import { capturedLoads } from './captured-loads'
 import { serverParts } from './compile'
-import { KAY_FILE, SCRIPT_FILE, scriptLoader, transpilerFor } from './files'
+import { KAY_MODULE, SCRIPT_FILE, scriptLoader, transpilerFor } from './files'
 import { findKayLibraries, libraryOf, settingsReplacements } from './libraries'
 import { kay } from './plugin'
 import { splitEmbeddedMap } from './sourcemap'
@@ -16,9 +17,12 @@ const WASM_FILE = /\.wasm$/i
 const NODE_MODULES = `${sep}node_modules${sep}`
 const ICONS = '~icons/'
 
+// A static component's `?island` twin is resolved as its file, and keeps its suffix.
 function resolved(specifier: string, importer: string): string | undefined {
+  const twin = specifier.endsWith(ISLAND_TWIN)
+
   try {
-    return realpathSync(Bun.resolveSync(specifier, dirname(importer)))
+    return realpathSync(Bun.resolveSync(withoutTwin(specifier), dirname(importer))) + (twin ? ISLAND_TWIN : '')
   }
   catch {
     // A builtin, or a module that is not there.
@@ -66,7 +70,7 @@ export async function writeServerRecord(project: Project): Promise<void> {
   }
   // A module the record can hold: the project's own scripts, the kay libraries', and the components and assets anywhere.
   const inProject = (path: string) => path.startsWith(base + sep) && !path.slice(base.length).includes(NODE_MODULES)
-  const followed = (path: string) => ASSET_FILE.test(path) || KAY_FILE.test(path) || (SCRIPT_FILE.test(path) && (libraryOf(libraries, path) !== undefined || inProject(path)))
+  const followed = (path: string) => ASSET_FILE.test(path) || KAY_MODULE.test(path) || (SCRIPT_FILE.test(path) && (libraryOf(libraries, path) !== undefined || inProject(path)))
   let unsupported = false
 
   for (let path = queue.pop(); path !== undefined; path = queue.pop()) {
@@ -76,8 +80,8 @@ export async function writeServerRecord(project: Project): Promise<void> {
     seen.add(path)
 
     const load = loads.find(one => one.filter.test(path))
-    const loader = ASSET_FILE.test(path) ? undefined : scriptLoader(KAY_FILE.test(path) ? 'x.ts' : path)
-    let scanned = loader === undefined ? undefined : await Bun.file(path).text()
+    const loader = ASSET_FILE.test(path) ? undefined : scriptLoader(KAY_MODULE.test(path) ? 'x.ts' : path)
+    let scanned = loader === undefined ? undefined : await Bun.file(withoutTwin(path)).text()
     let scanLoader = loader ?? 'ts'
 
     if (load !== undefined) {
@@ -104,7 +108,7 @@ export async function writeServerRecord(project: Project): Promise<void> {
       }
 
       const name = relativeTo(path)
-      const hash = Bun.hash(await Bun.file(path).bytes()).toString(36)
+      const hash = Bun.hash(await Bun.file(withoutTwin(path)).bytes()).toString(36)
       const asLoader = 'contents' in result ? result.loader ?? 'ts' : 'js'
 
       recorded.add(path)

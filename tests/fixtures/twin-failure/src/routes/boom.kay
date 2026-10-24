@@ -1,0 +1,4 @@
+--- server
+throw new Error('boom')
+---
+p Never

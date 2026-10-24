@@ -1,0 +1,6 @@
+---
+import Glyph from './glyph.kay'
+const open = signal(false)
+---
+button.picker(onClick={() => open.set(!open())})
+  Glyph(label='Theme')

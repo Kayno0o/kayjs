@@ -21,6 +21,8 @@ const ANY_NAME = /./
 const JSX = /\.jsx$/
 
 export const KAY_FILE = /\.kay$/
+// A `.kay` file or its `?island` twin, which a server loads as a module of its own.
+export const KAY_MODULE = /\.kay(?:\?island)?$/
 export const CSS_FILE = /\.css$/
 export const SCRIPT_FILE = /\.[cm]?[jt]sx?$/
 export const TS_FILE = /\.ts$/

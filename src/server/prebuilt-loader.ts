@@ -4,8 +4,9 @@ import { readFileSync, realpathSync } from 'node:fs'
 import { join, resolve, sep } from 'node:path'
 import { plugin } from 'bun'
 import { ASSET_FILE } from '../build/assets'
-import { KAY_FILE, scriptLoader } from '../build/files'
+import { KAY_MODULE, scriptLoader } from '../build/files'
 import { registerEmbeddedMapFile } from '../build/sourcemap'
+import { withoutTwin } from '../compiler/twin'
 import { projectPaths } from '../project'
 import { readServerRecord, recordName, ROOT_TOKEN, SERVER_DIR, UP_TOKEN } from './server-record'
 
@@ -68,13 +69,13 @@ async function register(root: string, output: string): Promise<boolean> {
     const kept = Object.hasOwn(record.covered, name) ? record.covered[name] : undefined
 
     if (found === undefined) {
-      const text = kept === undefined ? undefined : await Bun.file(args.path).text()
+      const text = kept === undefined ? undefined : await Bun.file(withoutTwin(args.path)).text()
 
       return text !== undefined && Bun.hash(text).toString(36) === kept ? { contents: text, loader: scriptLoader(args.path) } : compiled(args)
     }
 
     // A wasm file's record is its import's shape, a path or an asset URL, which the file's bytes do not change: asking the loader for it again would lose whether the import wanted the path.
-    if (!WASM_FILE.test(args.path) && Bun.hash(await Bun.file(args.path).bytes()).toString(36) !== found.hash)
+    if (!WASM_FILE.test(args.path) && Bun.hash(await Bun.file(withoutTwin(args.path)).bytes()).toString(36) !== found.hash)
       return compiled(args)
 
     // Read when a stack first needs it, and named by the path the module has now.
@@ -91,7 +92,7 @@ async function register(root: string, output: string): Promise<boolean> {
     name: 'kay-prebuilt',
     setup(build) {
       onResolve = build.onResolve.bind(build)
-      build.onLoad({ filter: KAY_FILE }, answer)
+      build.onLoad({ filter: KAY_MODULE }, answer)
       build.onLoad({ filter: ASSET_FILE }, answer)
 
       if (replaced.length > 0)
