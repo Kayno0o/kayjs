@@ -311,6 +311,11 @@ function smtpEnv({ optional = false, listed = false }: { optional?: boolean, lis
     MAIL_DKIM_DOMAIN: s.Optional(s.String()),
     MAIL_FROM: s.Optional(s.String({ pattern: SENDER, ...listed ? { description: 'defaults to noreply@ the site\'s host' } : {} })),
     MAIL_TO: s.Optional(s.String({ pattern: RECIPIENTS })),
+    MAIL_EVENTS_POSTMARK: s.Optional(s.String({ pattern: '^[^:\\s]+:\\S+$', description: 'user:password, the Basic credentials of the Postmark webhook URL for bounces and complaints' })),
+    MAIL_EVENTS_MAILGUN: s.Optional(s.String({ description: 'the Mailgun webhook signing key, for bounces and complaints' })),
+    MAIL_EVENTS_SENDGRID: s.Optional(s.String({ description: 'the base64 public key of the SendGrid Event Webhook, for bounces and complaints' })),
+    MAIL_EVENTS_RESEND: s.Optional(s.String({ description: 'the whsec_ signing secret of the Resend webhook, for bounces and complaints' })),
+    MAIL_INBOUND_SECRET: s.Optional(s.String({ description: 'the bearer secret of /_kay/mail/inbound, where a mail server posts delivery reports and replies' })),
   })
 }
 

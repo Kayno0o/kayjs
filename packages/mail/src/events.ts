@@ -61,6 +61,7 @@ const WHSEC = /^whsec_/
 const BASIC = /^basic\s+(\S+)$/i
 const BEARER = /^bearer\s+(\S+)$/i
 
+// Read from the environment when a request comes, as `smtpEnv` declares the variables for `kay env` and the server's checks.
 export function secretsOf(given: EventSecrets | undefined): EventSecrets {
   const secrets: EventSecrets = {}
 
@@ -192,7 +193,7 @@ function resendFound(body: unknown): Found[] {
   if (type !== 'email.bounced' && type !== 'email.complained')
     return []
 
-  // A bounce Resend calls transient or undetermined may still be delivered later.
+  // Resend's bounce types are Permanent and Temporary; a temporary one may still be delivered later.
   if (type === 'email.bounced' && typeof data?.bounce?.type === 'string' && data.bounce.type.toLowerCase() !== 'permanent')
     return []
 

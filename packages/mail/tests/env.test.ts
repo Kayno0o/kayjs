@@ -6,7 +6,10 @@ describe('the mail extension\'s environment', () => {
   it('lists the mail variables with the server required in production only, so an app lists them without wiring', () => {
     const { env } = mail({ module: './src/mail' })
 
-    expect(Object.keys(env!.properties)).toEqual(['MAIL_URL', 'MAIL_INSECURE', 'MAIL_RATE_LIMIT', 'MAIL_DKIM_SELECTOR', 'MAIL_DKIM_PRIVATE_KEY', 'MAIL_DKIM_DOMAIN', 'MAIL_FROM', 'MAIL_TO'])
+    expect(Object.keys(env!.properties)).toEqual(['MAIL_URL', 'MAIL_INSECURE', 'MAIL_RATE_LIMIT', 'MAIL_DKIM_SELECTOR', 'MAIL_DKIM_PRIVATE_KEY', 'MAIL_DKIM_DOMAIN', 'MAIL_FROM', 'MAIL_TO', 'MAIL_EVENTS_POSTMARK', 'MAIL_EVENTS_MAILGUN', 'MAIL_EVENTS_SENDGRID', 'MAIL_EVENTS_RESEND', 'MAIL_INBOUND_SECRET'])
+    expect(env!.properties.MAIL_EVENTS_POSTMARK).toMatchObject({ description: expect.stringContaining('user:password'), pattern: '^[^:\\s]+:\\S+$' })
+    expect(env!.properties.MAIL_INBOUND_SECRET).toMatchObject({ description: expect.stringContaining('/_kay/mail/inbound') })
+    expect(env!.required ?? []).not.toContain('MAIL_INBOUND_SECRET')
     expect(env!.properties.MAIL_URL).toMatchObject({ requiredInProduction: true })
     expect(env!.properties.MAIL_FROM).not.toMatchObject({ requiredInProduction: true })
     expect(mail({ server: async () => ({}) as never }).env).toBeDefined()

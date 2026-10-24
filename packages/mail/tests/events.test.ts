@@ -125,9 +125,9 @@ describe('provider webhooks', () => {
   it('resend: a permanent bounce and a complaint suppress every recipient, a transient bounce and a forged post do not', async () => {
     const [first, second, complained, transient, forged] = [fresh(), fresh(), fresh(), fresh(), fresh()]
 
-    expect((await resendPost({ type: 'email.bounced', created_at: '2026-02-22T23:41:12.126Z', data: { email_id: 'x', to: [first, second], bounce: { type: 'Permanent', subType: 'General', message: 'no' } } })).status).toBe(200)
-    expect((await resendPost({ type: 'email.complained', data: { email_id: 'x', to: [complained] } })).status).toBe(200)
-    expect((await resendPost({ type: 'email.bounced', data: { to: [transient], bounce: { type: 'Transient' } } })).status).toBe(200)
+    expect((await resendPost({ type: 'email.bounced', created_at: '2026-11-22T23:41:12.126Z', data: { broadcast_id: '8b146471-e88e-4322-86af-016cd36fd216', created_at: '2026-11-22T23:41:11.894Z', email_id: '56761188-7520-42d8-8898-ff6fc54ce618', message_id: '<111-222-333@email.example.com>', from: 'Acme <onboarding@resend.dev>', to: [first, second], subject: 'Sending this example', template_id: '43f68331-0622-4e15-8202-246a0388854b', bounce: { message: 'The recipient\'s email address is on the suppression list because it has a recent history of producing hard bounces.', subType: 'Suppressed', type: 'Permanent' }, tags: { category: 'confirm_email' } } })).status).toBe(200)
+    expect((await resendPost({ type: 'email.complained', created_at: '2026-02-22T23:41:12.126Z', data: { broadcast_id: '8b146471-e88e-4322-86af-016cd36fd216', created_at: '2026-02-22T23:41:11.894Z', email_id: '56761188-7520-42d8-8898-ff6fc54ce618', message_id: '<111-222-333@email.example.com>', from: 'Acme <onboarding@resend.dev>', to: [complained], subject: 'Sending this example', template_id: '43f68331-0622-4e15-8202-246a0388854b', tags: { category: 'confirm_email' } } })).status).toBe(200)
+    expect((await resendPost({ type: 'email.bounced', data: { to: [transient], bounce: { type: 'Temporary', subType: 'MessageRejected', message: 'The mailbox is full.' } } })).status).toBe(200)
 
     expect((await mail.suppression(first))?.source).toBe('resend')
     expect((await mail.suppression(second))?.reason).toBe('bounce')
