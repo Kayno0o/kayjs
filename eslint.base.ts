@@ -14,6 +14,11 @@ export const kayRules: TypedFlatConfigItem[] = [{
     'ts/no-unsafe-argument': 'off',
   },
 }, {
+  // A `using` binding exists for its dispose at scope end, so it is never unused: the preset lacks `ignoreUsingDeclarations`, kaynooo/kayjs#2284.
+  rules: {
+    'unused-imports/no-unused-vars': ['error', { argsIgnorePattern: '^_', caughtErrors: 'none', ignoreUsingDeclarations: true }],
+  },
+}, {
   // A component declares its handlers and hooks in any order: a function body runs after the whole component, and TypeScript itself rejects a read of a const before its declaration.
   files: ['**/*.kay/*.tsx'],
   rules: {
