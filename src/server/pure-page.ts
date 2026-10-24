@@ -54,6 +54,8 @@ export const KAY_EXPORTS: Record<string, 'free' | 'request' | 'local'> = {
   guardLeave: 'free',
   webPush: 'free',
   installPrompt: 'free',
+  // An empty collection on the server, read from the browser's IndexedDB once hydrated.
+  local: 'free',
   shortcut: 'free',
   navigate: 'free',
   refresh: 'free',
