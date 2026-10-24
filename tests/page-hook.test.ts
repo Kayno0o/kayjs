@@ -39,7 +39,7 @@ async function sizesOf(dirs: Parameters<typeof assetFiles>[0], copiesOf?: Strong
     sizes = { fileSize, htmlSize }
 
     return html
-  }], '/', 'en', '', file, pageSizes(file, copiesOf))
+  }], '/', 'en', '', file, pageSizes(file, copiesOf && { copiesOf, dir: clientDir }))
 
   return sizes
 }

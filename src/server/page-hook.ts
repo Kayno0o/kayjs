@@ -41,15 +41,15 @@ export interface PageSizes {
 }
 
 // A file is measured once per version of it, however many pages link it, for as long as the sizes are kept.
-// `copiesOf` makes the copies of the files the compress stage will make the copies of, which a build backs with its cache so that the stage finds them; without it a file is measured with its brotli alone.
-export function pageSizes(file: RenderedPage['file'], copiesOf?: StrongestCopies): PageSizes {
+// `kept` makes the copies of the files under its directory, which the compress stage makes the copies of too and a build backs with its cache so that the stage finds them; any other file, and a server's, is measured with its brotli alone.
+export function pageSizes(file: RenderedPage['file'], kept?: { copiesOf: StrongestCopies, dir: string }): PageSizes {
   const files = new Map<string, Promise<number>>()
   const encoder = new TextEncoder()
 
   // A file that could not be read is tried again by the next page rather than failing every one that links it.
   async function sizeOfFile(path: string, key: string): Promise<number> {
     try {
-      return await servedSize(path, await Bun.file(path).bytes(), copiesOf)
+      return await servedSize(path, await Bun.file(path).bytes(), kept !== undefined && path.startsWith(kept.dir + sep) ? kept.copiesOf : undefined)
     }
     catch (error) {
       files.delete(key)
@@ -137,7 +137,7 @@ export async function hookPrerendered(root: string, hooks: PageHook[], dirs: Ass
     return
 
   const file = assetFiles(dirs)
-  const sizes = pageSizes(file, dirs.copiesOf)
+  const sizes = pageSizes(file, dirs.copiesOf && { copiesOf: dirs.copiesOf, dir: dirs.clientDir })
   const hooking = limiter(PAGES_AT_ONCE)
 
   await Promise.all(Object.entries(manifest.pages).map(async ([path, page]) => hooking(async () => {
