@@ -77,8 +77,8 @@ export interface StepDraft {
 export interface StepDraftOptions {
   // Whether the values kept for `step` pass that step's schema, an `additionalProperties: false` one so no key slips in: the cookie is the visitor's to edit, so a step failing it is not done.
   check: (step: string, values: Values) => boolean
-  // How long the draft lives, such as `'30m'`; an hour by default. A number of seconds works until 1.77.
-  maxAge?: Duration | number | undefined
+  // How long the draft lives, such as `'30m'`; an hour by default.
+  maxAge?: Duration | undefined
   // The path the cookie is sent to; the whole site by default, so a form living under one path narrows it.
   path?: string | undefined
   // The request being answered (`ctx.request`): the cookie is `secure` when it came over https, directly or through a proxy's `X-Forwarded-Proto`.
@@ -90,7 +90,7 @@ export interface StepDraftOptions {
 // The values of a multi-step form kept in a cookie of their own between posts, read and written from `ctx.cookies` in an action.
 export function stepDraft(cookies: StepCookies, name: string, { check, maxAge = '1h', path = '/', request, secure = request !== undefined && overHttps(request) }: StepDraftOptions): StepDraft {
   const cookie = `ksteps_${name}`
-  const seconds = typeof maxAge === 'number' ? maxAge : cookieSeconds(maxAge)
+  const seconds = cookieSeconds(maxAge)
 
   function read(): Record<string, Values> {
     try {

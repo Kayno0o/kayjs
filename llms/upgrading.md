@@ -2,6 +2,12 @@
 
 What each minor release breaks, and what an app changes to move to it. kay and its libraries share one version, so one section covers them all; a patch breaks nothing, and a minor missing here broke nothing.
 
+## 1.77.0
+
+### kayjs-ui: stepDraft's maxAge is a duration only
+
+- `stepDraft(..., { maxAge: 3600 })` is a type error now: write `maxAge: '1h'`. The deprecated `deprecated-step-draft-max-age` lint is gone with the number form, so run `kay check --fix` on 1.74 to 1.76 before moving.
+
 ## 1.76.0
 
 ### A restricted-role Postgres app creates `kay_push_subscriptions` before listing `push()`
@@ -66,10 +72,6 @@ kayjs-auth's `auth_*` tables are no longer `renamedFrom` their old names. A data
 ### Props typed `Signal<T>` or `Memo<T>` are plain values
 
 A prop typed `Signal<T>` or `Memo<T>` is a plain value of that type now, no longer read by calling it or assigned: type a prop the child writes `Bindable<T>`, read and assign it as `open`, and bind it with `bind:open={open}`; a `Memo<T>` prop is a `T`, passed as `value={memo()}`. `kay check` reports a prop still typed `Signal<T>` or `Memo<T>` from `kay`.
-### kayjs-ui: stepDraft's maxAge is a duration
-
-`stepDraft(ctx.cookies, name, { maxAge: 3600 })` is `maxAge: '1h'`, as every duration in kay is. A number of seconds works until 1.77, and `kay upgrade` (`deprecated-step-draft-max-age`) rewrites a numeric literal at the call.
-
 ## 1.73.0
 
 ### kayjs-cms: the editor panel is kayjs-ui's docked `SidePanel`

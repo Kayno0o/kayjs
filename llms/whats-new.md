@@ -2,6 +2,10 @@
 
 What each release of kay and its libraries adds, newest first, each feature with where it is documented. kay and its libraries share one version, so one section covers them all; what a release breaks is in [Upgrading](upgrading.md).
 
+## Unreleased
+
+- kayjs-ui `stepDraft`'s `maxAge` takes a duration only, and `deprecated-step-draft-max-age` is gone: [Upgrading](upgrading.md).
+
 ## 1.76.0
 
 - A Segmented or RadioGroup option can carry `value: null` for a "none" choice when `value` is typed nullable, checked while the group holds `null` and heard by `onChange` as `null`, and `kay check` fails one on a non-nullable `value` or beside an option of `""`, for literal or union option types ([Segmented](../packages/ui/llms/tables-navigation-and-layout.md)).

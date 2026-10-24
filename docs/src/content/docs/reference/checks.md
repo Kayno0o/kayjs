@@ -114,7 +114,6 @@ Each lint has a level. `deny` is an error, `warn` a warning, `allow` hides it. W
 | `broken-canonical` | warn | seo | A canonical link to a page that is a 404 or a redirect |
 | `one-way-hreflang` | warn | seo | Alternates that do not point back at each other |
 | `redirect-chain` | warn | seo | A redirect whose target redirects again |
-| `deprecated-step-draft-max-age` | warn | deprecated | A kayjs-ui `stepDraft` giving `maxAge` as a number of seconds, the form before 1.74 |
 
 ## Errors
 

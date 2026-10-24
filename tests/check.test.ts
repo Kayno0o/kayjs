@@ -3615,36 +3615,6 @@ describe.concurrent('kay check, unused code', () => {
     }
   })
 
-  it('reports a stepDraft maxAge in seconds and --fix writes the duration, through an alias, a subpath, a fence and a spread, leaving the rest alone', async () => {
-    const root = await scratchProject({
-      'src/actions.ts': 'import { stepDraft } from \'@kaynooo/kayjs-ui\'\nimport { stepDraft as draft } from \'@kaynooo/kayjs-ui/lib/steps\'\n\nconst check = () => true\nconst cookies = new Bun.CookieMap()\nconst shared = { check }\n\nexport const a = stepDraft(cookies, \'a\', { check, maxAge: 3600 })\nexport const b = draft(cookies, \'b\', { check, maxAge: 90 })\nexport const c = stepDraft(cookies, \'c\', { check, maxAge: 7 * 86_400 })\nexport const d = stepDraft(cookies, \'d\', { check, maxAge: \'30m\' })\nexport const e = stepDraft(cookies, \'e\', { ...shared, maxAge: 86_400 })\nexport const f = stepDraft(cookies, \'f\', { check, maxAge: 0 })\nexport const g = stepDraft(cookies, \'g\', { check, maxAge: 1.5 })\n',
-      'src/routes/index.kay': '--- server\nimport { stepDraft } from \'@kaynooo/kayjs-ui\'\n\nexport const h = stepDraft(new Bun.CookieMap(), \'h\', { check: () => true, maxAge: 7200 })\n---\np\n',
-      'src/local.ts': 'function stepDraft(a: unknown, b: unknown, c: unknown) { return [a, b, c] }\nexport const x = stepDraft(1, 2, { maxAge: 3600 })\n',
-    })
-
-    try {
-      const { output } = await runCheck(root)
-
-      expect(output.match(/deprecated-step-draft-max-age/g)).toHaveLength(6)
-      await runCheck(root, '--fix')
-
-      const actions = await Bun.file(join(root, 'src/actions.ts')).text()
-
-      expect(actions).toContain('maxAge: \'1h\' })')
-      expect(actions).toContain('maxAge: \'90s\' })')
-      expect(actions).toContain('maxAge: 7 * 86_400 })')
-      expect(actions).toContain('maxAge: \'30m\' })')
-      expect(actions).toContain('maxAge: \'1d\' })')
-      expect(actions).toContain('maxAge: 0 })')
-      expect(actions).toContain('maxAge: 1.5 })')
-      expect(await Bun.file(join(root, 'src/routes/index.kay')).text()).toContain('maxAge: \'2h\' })')
-      expect(await Bun.file(join(root, 'src/local.ts')).text()).toContain('maxAge: 3600')
-    }
-    finally {
-      await rm(root, { recursive: true, force: true })
-    }
-  })
-
   it('reports a form removed in 1.69 and 1.70 as a type error or an unknown option, never as a deprecation', async () => {
     const root = await scratchProject({
       'kay.config.ts': 'import { defineConfig } from \'kay/server\'\n\nexport default defineConfig({ bodyLimit: \'1mb\' })\n',

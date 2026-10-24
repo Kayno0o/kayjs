@@ -133,8 +133,7 @@ describe('stepDraft cookie flags', () => {
     expect(saved({ maxAge: '1500ms' })).toMatchObject({ maxAge: 2 })
   })
 
-  it('still takes a number of seconds until 1.77, and refuses a text that is no duration', () => {
-    expect(saved({ maxAge: 90 })).toMatchObject({ maxAge: 90 })
+  it('refuses a text that is no duration', () => {
     expect(() => saved({ maxAge: '30' })).toThrow('stepDraft maxAge')
     expect(() => saved({ maxAge: '0s' })).toThrow('stepDraft maxAge')
   })

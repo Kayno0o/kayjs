@@ -12,4 +12,3 @@ The lints of the `deprecated` group, each the old form a minor replaced, reporte
 
 | Lint | Default | Group | Reports |
 | --- | --- | --- | --- |
-| `deprecated-step-draft-max-age` | warn | deprecated | A kayjs-ui `stepDraft` giving `maxAge` as a number of seconds, since 1.74: it is a duration (`3600` is `'1h'`). Read until 1.77. `kay upgrade` rewrites a numeric literal. Found in `stepDraft(...)` calls with an object literal, in `.ts` files and `.kay` fences. |
