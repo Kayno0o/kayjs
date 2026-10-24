@@ -4,7 +4,7 @@ order: 8.5
 description: Run work on a schedule, keep a worker running with the server, and queue jobs that survive a restart.
 ---
 
-Three tools run work outside a request, each for its own kind of job.
+Four tools run work outside a request, each for its own kind of job.
 
 
 | The job | Use |
@@ -12,6 +12,7 @@ Three tools run work outside a request, each for its own kind of job.
 | runs at set times or every so often, such as purging expired carts | [`schedule`](#scheduled-jobs) |
 | runs as long as the server does, such as reading another service's queue | [`background`](#long-running-work) |
 | is started by a request and must run even after a restart, retried when it fails, such as a welcome mail | [`queue`](#queues) |
+| is a flow of steps that waits days or for an event, such as a mail, a three-day wait, then a reminder | [`workflow`](#workflows) |
 
 ## Scheduled jobs
 
@@ -247,3 +248,40 @@ export const welcomeMails = queue('welcome-mails', sendWelcome, { store: myStore
 ```
 
 <ReadMore href="/llms/queues">Concurrency, lost jobs and how shutdown waits for runs in progress are in the queues reference.</ReadMore>
+
+## Workflows
+
+A `workflow` is a flow of steps that survives restarts, sleeps for days without holding a process and waits for an event. `step.run` runs a step once and keeps its result, `step.sleep` lets the run go for a while, and `step.waitFor` waits for an event.
+
+```ts
+// src/jobs.ts
+import { workflow } from 'kay/server'
+
+export const onboarding = workflow<{ userId: string }, { visited: undefined }>('onboarding', async ({ input, step }) => {
+  await step.run('welcome', () => sendWelcome(input.userId))
+
+  const visit = await step.waitFor('visited', { timeout: '3d' })
+
+  if (visit.timedOut)
+    await step.run('reminder', () => sendReminder(input.userId))
+})
+```
+
+Use it like a queue: `.use(onboarding)` before `pages()` in `src/server.ts`, or `export { onboarding as default } from '../jobs'` in `src/plugins/jobs.ts`. An action starts a run with one call and sends it an event with another. The `id` names the run, so an app can use its own, a user's id say.
+
+```ts
+await onboarding.start({ userId }, { id: userId })
+await onboarding.send(userId, 'visited')
+```
+
+The run is a job of the queue `workflow:onboarding` in the same store as your queues: memory, SQLite or Postgres, shared by every process. Its results are kept in that job after each step, so after a restart the run goes on at the first step with no result. A stop hands the run back at once. A process that died holds it until `lostAfter`, 10 minutes by default.
+
+The function runs again from its top each time the run is taken, and a finished step returns its kept result, so what lies between steps must give the same answer every time. Await each step before the next. Renaming or reordering steps under a run that is waiting fails that run with an error naming the step. Results go through devalue, as a queue's payload does.
+
+`step.sleep('3d')` and `step.waitFor` hold no process: the run waits in the store and the code after them runs in whichever process takes the run. `waitFor(event)` resolves with the event's data. With a `timeout` it resolves with `{ timedOut: false, data }` or `{ timedOut: true }`.
+
+`send(id, event, data)` resolves with whether the run was waiting for that event. An event sent while the run is doing something else, or after its wait timed out, is dropped. `status(id)` tells whether a run is `running`, `sleeping`, `waiting` or `failed`, and `cancel(id)` ends it.
+
+A step that throws is retried with the queue's `attempts` and `backoff`, and the steps done before it do not run again. A step finishing starts the count of attempts again. The options are those of a queue: `store`, `attempts`, `backoff`, `concurrency`, `lostAfter`, `idlePoll` and `keepFailed`, and `onFailed` gets `{ id, input, error }`. `lostAfter` bounds the time between two sleeps or waits. A custom job store needs `update`, `release` and `state`.
+
+<ReadMore href="/llms/queues">The store contract of `update` and the details of runs are in the queues reference.</ReadMore>

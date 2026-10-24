@@ -255,6 +255,41 @@ describe.each(kinds)('job store contract, $name', ({ name, open }) => {
     })
   })
 
+  describe('update', () => {
+    it('rewrites the payload and due time only while the run holds the job, starting its attempts again', async () => {
+      const store = await open()
+      const added = job({ payload: 'a' })
+
+      await store.add(added)
+      expect(await store.update!(added.id, { payload: 'b' }, { until: 1 })).toBe(false)
+
+      const held = heldOf(await claimFor(store))
+      const runAt = clockNow() + LONG
+
+      expect(await store.update!(added.id, { payload: 'b', runAt }, { until: held + 1 })).toBe(false)
+      expect(await store.update!(added.id, { payload: 'b', runAt }, { until: held })).toBe(true)
+      await store.release!(added.id, held)
+      expect(await claimFor(store)).toBeUndefined()
+      expect((await store.jobs!('q'))[0]).toMatchObject({ payload: 'b', runAt, attempts: 0 })
+    })
+
+    it('rewrites an unheld job only from the payload it read, once', async () => {
+      const store = await open()
+      const added = job({ payload: 'a' })
+
+      await store.add(added)
+      expect(await store.update!(added.id, { payload: 'b' }, { payload: 'x', now: clockNow() })).toBe(false)
+
+      const held = heldOf(await claimFor(store))
+
+      expect(await store.update!(added.id, { payload: 'b' }, { payload: 'a', now: clockNow() })).toBe(false)
+      await store.release!(added.id, held)
+      expect(await store.update!(added.id, { payload: 'b', runAt: 7 }, { payload: 'a', now: clockNow() })).toBe(true)
+      expect(await store.update!(added.id, { payload: 'c' }, { payload: 'a', now: clockNow() })).toBe(false)
+      expect((await store.jobs!('q'))[0]).toMatchObject({ payload: 'b', runAt: 7 })
+    })
+  })
+
   describe('a run past its hold', () => {
     // The first run's hold ran out and another process took the job: nothing the first writes afterwards may touch it.
     async function taken() {

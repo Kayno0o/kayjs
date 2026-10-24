@@ -359,6 +359,14 @@ export function jobsAfter(source: PgJobsSource, before?: () => Promise<unknown>)
 
       await db`UPDATE kay_jobs SET progress = ${progress} WHERE id = ${id} AND held_until = ${until}::bigint`
     },
+    async update(id, change, guard) {
+      const db = await open()
+
+      if ('until' in guard)
+        return (await rowsOf<{ id: string }>(db`UPDATE kay_jobs SET payload = ${change.payload}, run_at = coalesce(${change.runAt ?? null}::bigint, run_at), attempts = 1 WHERE id = ${id} AND NOT failed AND held_until = ${guard.until}::bigint RETURNING id`)).length === 1
+
+      return (await rowsOf<{ id: string }>(db`UPDATE kay_jobs SET payload = ${change.payload}, run_at = coalesce(${change.runAt ?? null}::bigint, run_at) WHERE id = ${id} AND NOT failed AND payload = ${guard.payload} AND (held_until IS NULL OR held_until <= (floor(extract(epoch FROM statement_timestamp()) * 1000))::bigint) RETURNING id`)).length === 1
+    },
     async state(queue, ref) {
       const db = await open()
       const [row] = 'key' in ref

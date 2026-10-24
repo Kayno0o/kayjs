@@ -1,6 +1,6 @@
 # Queues
 
-A `queue` runs jobs in the background, each surviving a restart; `schedule` and `background` are in [Running in production](production.md#background-jobs).
+A `queue` runs jobs in the background, each surviving a restart, and a `workflow` is a multi-step flow that sleeps and waits for events across restarts; `schedule` and `background` are in [Running in production](production.md#background-jobs).
 
 ## Common tasks
 
@@ -32,7 +32,37 @@ export { welcomeMails as default } from '../jobs'
 await welcomeMails.enqueue({ to: email }, { delay: '1h', key: email })
 ```
 
+### Write a flow that sleeps and waits
+
+A `workflow` runs steps once each, keeps their results in the job store and survives restarts. `start` and `send` are one call each, and the `id` names the run. Used like a queue: `.use(onboarding)`, or `export { onboarding as default } from '../jobs'` in a plugin file.
+
+```ts
+// src/jobs.ts
+import { workflow } from 'kay/server'
+
+export const onboarding = workflow<{ userId: string }, { visited: undefined }>('onboarding', async ({ input, step }) => {
+  await step.run('welcome', () => sendWelcome(input.userId))
+
+  const visit = await step.waitFor('visited', { timeout: '3d' })
+
+  if (visit.timedOut)
+    await step.run('reminder', () => sendReminder(input.userId))
+})
+```
+
+```ts
+await onboarding.start({ userId }, { id: userId })
+await onboarding.send(userId, 'visited')
+```
+
 ## Reference
+
+- `workflow<Input, Events>(name, ({ id, input, step }) => ..., options)` is an Elysia plugin like `queue`, `options` those of a queue (`store`, `attempts`, `backoff`, `concurrency`, `lostAfter`, `idlePoll`, `keepFailed`) and `onFailed({ id, input, error })`. A run is one job of the queue `workflow:<name>`, kept under its id as its `key`, on the same stores as queues, its results in the job's payload after each step: no table of its own.
+- `start(input, { id?, delay? })` resolves with the run's id (random unless given): while a run with that `id` is live it starts nothing and resolves with the same id. `send(id, event, data?)` resolves with whether the run was waiting for that event, waking it at once in this process and within `idlePoll` in others; an event sent while the run does anything else, or after its wait timed out, is dropped. `status(id)` resolves with `{ status: 'running' | 'sleeping' | 'waiting' | 'failed', steps, event?, error? }`, undefined once the run completed. `cancel(id)` ends a run, a running one at its next step. `drain()` is a queue's.
+- The function runs again from its top each time a process takes the run, and a finished step returns its kept result: what lies between steps must be deterministic. A step is awaited before the next (two at once throw), a renamed or reordered step under a live run fails it naming the step, and a result devalue cannot keep throws.
+- `step.run(name, work)` runs `work(signal)` once and keeps its result. `step.sleep('3d')` and `step.waitFor(event, { timeout? })` write the run's state and give its hold back (the job is due at the wake time, never for a wait without timeout), so no process holds it and the code after them runs in whichever process takes the run; the step's promise never settles in the claim that suspended, so a `try` around it catches nothing. `waitFor(event)` resolves with the data, with `timeout` with `{ timedOut: false, data }` or `{ timedOut: true }`. `Events` types `waitFor` and `send`.
+- A step that throws, or a run that dies, uses the queue's retries: a stop hands the run back at once, a dead process holds it until `lostAfter`, and a retry replays from the first step with no kept result. A kept step starts the attempts count again, so a long flow does not spend its attempts across steps. `lostAfter` bounds the time between two sleeps or waits. `retryLater` works in a step.
+- A `JobStore` needs `update`, `release` and `state` for a workflow, as `memoryJobs`, `sqliteJobs` and `pgJobs` have (no schema change): `update(id, { payload, runAt? }, { until })` writes only while `until` is the job's hold and counts the run as started once, `update(id, change, { payload, now })` writes only while the job is not held and its payload is still that text, which is how an event wakes a run once against a timeout.
 
 - An action calls `await welcomeMails.enqueue({ to: email })`, or `enqueue(payload, { delay: '1h' })` to run it later.
 - `queue(name, handler, options)` is an Elysia plugin: the server using it runs the queue's jobs from start to stop, `concurrency` at a time, 1 by default, and waits on stop for the runs in progress.

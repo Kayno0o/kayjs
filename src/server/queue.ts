@@ -60,6 +60,8 @@ export interface JobStore {
   progress?: ((id: string, until: number, progress: string) => Maybe<void>) | undefined
   // The waiting or running job of the queue with that key or id, else its last failed one, `now` telling a held job from one whose hold ran out; undefined for a job that completed.
   state?: ((queue: string, ref: { key: string } | { id: string }, now: number) => Maybe<StoredJobState | undefined>) | undefined
+  // Rewrites a job in place: its payload, and when it is due when `runAt` is given. With `{ until }`, only while that hold is still the job's, and the run counts as having started once (a checkpoint of a run that goes on); with `{ payload, now }`, only while the job is not held and its payload is still that text (an event waking a waiting run). Resolves with whether it applied. `workflow` needs it.
+  update?: ((id: string, change: { payload: string, runAt?: number | undefined }, guard: { until: number } | { payload: string, now: number }) => Maybe<boolean>) | undefined
   // Keeps it as failed, out of the queue, with `payload` in place of the stored one when the queue redacts what it keeps; a store ignoring it keeps the payload whole. Only while the hold `until` is still the job's when it is given.
   // Resolves with `false` when the hold was another's and nothing was written, as `retry` does.
   fail: (id: string, error: string, payload?: string, until?: number) => Maybe<boolean | void>
@@ -198,6 +200,8 @@ export interface QueueAdmin {
   // Puts a failed job back to wait, due now, and wakes the queue; false when the store has no `revive` or the job cannot be revived.
   retry: (id: string) => Promise<boolean>
   remove: (id: string) => Promise<number>
+  // Wakes the worker looking for jobs, for a job another call made due now.
+  wake: () => void
 }
 
 // The queues this process made, by name: a queue made again under the same name (a reload) replaces the earlier one.
@@ -249,6 +253,14 @@ export async function inFlightWork<T>(work: () => Promise<T>): Promise<T> {
       idleWaiters.clear()
     }
   }
+}
+
+// The hold each run was claimed with, which `workflow` writes its checkpoints against.
+export const holds = new WeakMap<object, number>()
+
+// Wakes the worker of the named queue in this process, for a job made due without an enqueue.
+export function wakeQueue(name: string): void {
+  admins.get(name)?.wake()
 }
 
 // Set while a job runs, so a drain the job awaits does not wait for the run awaiting it.
@@ -308,6 +320,14 @@ export function sqliteJobs(path: string): JobStore {
     },
     progress(id, until, progress) {
       open(true)!.progress.run(progress, id, until)
+    },
+    update(id, change, guard) {
+      const { updateHeld, updateIdle } = open(true)!
+
+      if ('until' in guard)
+        return updateHeld.run(change.payload, change.runAt ?? null, id, guard.until).changes === 1
+
+      return updateIdle.run(change.payload, change.runAt ?? null, id, guard.payload, guard.now).changes === 1
     },
     state(queue, ref, now) {
       const statements = open(false)
@@ -407,6 +427,8 @@ function prepareJobs(db: Database) {
   const retry = db.query('UPDATE kay_jobs SET run_at = ?, held_until = NULL, error = ? WHERE id = ? AND (? IS NULL OR held_until = ?)')
   const release = db.query('UPDATE kay_jobs SET held_until = NULL, attempts = attempts - 1, run_at = coalesce(?, run_at) WHERE id = ? AND held_until = ?')
   const progress = db.query('UPDATE kay_jobs SET progress = ? WHERE id = ? AND held_until = ?')
+  const updateHeld = db.query('UPDATE kay_jobs SET payload = ?, run_at = coalesce(?, run_at), attempts = 1 WHERE id = ? AND failed = 0 AND held_until = ?')
+  const updateIdle = db.query('UPDATE kay_jobs SET payload = ?, run_at = coalesce(?, run_at) WHERE id = ? AND failed = 0 AND payload = ? AND (held_until IS NULL OR held_until <= ?)')
   // A live job comes before a failed one of the same key, the latest failed first.
   const byKey = db.query<StateRow, [string, string]>(`SELECT ${JOB_COLUMNS}, failed, held_until FROM kay_jobs WHERE queue = ? AND job_key = ? ORDER BY failed, run_at DESC LIMIT 1`)
   const byId = db.query<StateRow, [string, string]>(`SELECT ${JOB_COLUMNS}, failed, held_until FROM kay_jobs WHERE queue = ? AND id = ?`)
@@ -420,7 +442,7 @@ function prepareJobs(db: Database) {
   const lock = db.query('INSERT OR IGNORE INTO kay_locks (name, slot) VALUES (?, ?)')
   const pruneLocks = db.query('DELETE FROM kay_locks WHERE name = ? AND slot < ?')
 
-  return { insert, holder, claim, remove, retry, release, progress, byKey, byId, fail, purge, failed, revive, all, next, lock, pruneLocks }
+  return { insert, holder, claim, remove, retry, release, progress, updateHeld, updateIdle, byKey, byId, fail, purge, failed, revive, all, next, lock, pruneLocks }
 }
 
 // Jobs kept in this process's memory, gone with it: what tests run on.
@@ -485,6 +507,29 @@ export function memoryJobs(): JobStore {
 
       if (job?.heldUntil === until)
         job.progress = progress
+    },
+    update(id, change, guard) {
+      const job = jobs.get(id)
+
+      if (!job || job.failed)
+        return false
+
+      if ('until' in guard) {
+        if (job.heldUntil !== guard.until)
+          return false
+
+        job.attempts = 1
+      }
+      else if ((job.heldUntil ?? 0) > guard.now || job.payload !== guard.payload) {
+        return false
+      }
+
+      job.payload = change.payload
+
+      if (change.runAt !== undefined)
+        job.runAt = change.runAt
+
+      return true
     },
     state(queue, ref, now) {
       const matches = [...jobs.values()].filter(job => job.queue === queue && ('key' in ref ? job.key === ref.key : job.id === ref.id))
@@ -766,9 +811,12 @@ export function queue<Payload, Progress = unknown>(name: string, handler: (paylo
 
     const reports = progressWriter(job.id, held)
     let succeeded = false
+    // A handler may lower its own `attempts`: a workflow that kept a step starts its count again.
+    const context: JobContext<Progress> = { id: job.id, attempts: job.attempts, progress: reports.write }
 
     try {
-      await withinLostAfter(handler(parse(job.payload) as Payload, ended.signal, { id: job.id, attempts: job.attempts, progress: reports.write }), claimedAt, ended)
+      holds.set(context, held)
+      await withinLostAfter(handler(parse(job.payload) as Payload, ended.signal, context), claimedAt, ended)
       await reports.settle()
       succeeded = true
     }
@@ -797,21 +845,21 @@ export function queue<Payload, Progress = unknown>(name: string, handler: (paylo
       if (error instanceof RetryLater)
         kayLog('warn', `a job of queue('${name}') asked to run again later, but its store has no release(), so the run counts as failed`)
 
-      if (job.attempts < attempts) {
-        const wait = backoff * 2 ** (job.attempts - 1)
+      if (context.attempts < attempts) {
+        const wait = backoff * 2 ** (context.attempts - 1)
 
         // A run whose hold went to another process writes nothing and reports nothing: the job is that process's now.
         if (await store().retry(job.id, Date.now() + wait, message, held) !== false) {
           // The worker looking for jobs may sleep past the time this one is due.
           wakePoller()
-          kayLog('warn', `a job of queue('${name}') failed, attempt ${job.attempts} of ${attempts}, and runs again in ${Math.round(wait / 1000)} s: ${message}`)
+          kayLog('warn', `a job of queue('${name}') failed, attempt ${context.attempts} of ${attempts}, and runs again in ${Math.round(wait / 1000)} s: ${message}`)
         }
 
         return true
       }
 
       if (await store().fail(job.id, message, redacted(job), held) !== false) {
-        await reportBackgroundError(`a job of queue('${name}') failed ${job.attempts} times and is kept as failed`, error)
+        await reportBackgroundError(`a job of queue('${name}') failed ${context.attempts} times and is kept as failed`, error)
         await reportFailed(job, error)
       }
     }
@@ -1102,6 +1150,7 @@ export function queue<Payload, Progress = unknown>(name: string, handler: (paylo
       return revived
     },
     remove: async id => queued.remove(id),
+    wake: wakePoller,
   })
   // A queue renamed or removed while `kay dev` runs is gone from the tool once its module runs again.
   onReload(() => forgetQueue(queued))

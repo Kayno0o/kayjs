@@ -66,6 +66,8 @@ export { renderLocale, renderToString } from './string'
 export { CspViolationError } from './violations'
 export type { VerifyWorkOptions, WorkChallengeOptions } from './work-scope'
 export { verifyWork, workChallenge } from './work-scope'
+export type { StartOptions, WaitResult, Workflow, WorkflowOptions, WorkflowRun, WorkflowStatus, WorkflowStep } from './workflow'
+export { workflow } from './workflow'
 
 // Serves every `.kay` page under the routes directory, plus the island bundle when a page needs one.
 // In development a project that fails to boot serves its errors instead, and every page reloads when the server restarts.
