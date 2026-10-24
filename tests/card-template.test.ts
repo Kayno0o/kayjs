@@ -130,7 +130,7 @@ describe('the share card template stamp', () => {
     }
   })
 
-  it('turns a request away once the queue holds as many cards as it takes', async () => {
+  it.skipIf(!chrome)('turns a request away once the queue holds as many cards as it takes', async () => {
     const dir = await mkdtemp(join(tmpdir(), 'kay-card-queue-'))
     const gate = Promise.withResolvers<string>()
 
@@ -139,12 +139,21 @@ describe('the share card template stamp', () => {
       const server = new Elysia()
 
       serveCards(server, cards, { clientDir: clientDir(FIXTURE), cacheDir: join(dir, 'cache') })
-      cards.template!.render = async () => gate.promise
+      let started = false
+
+      cards.template!.render = async () => {
+        started = true
+
+        return gate.promise
+      }
 
       const urls = Array.from({ length: MAX_QUEUED + 1 }, (_, index) => shareCard({ title: `Queued ${index}` }))
       const asked = urls.slice(0, MAX_QUEUED).map(async url => server.handle(new Request(`http://localhost${url}`)))
 
       // Each of the cards held its place while the first is drawn.
+      while (!started)
+        await Bun.sleep(20)
+
       await Bun.sleep(200)
 
       const turned = await server.handle(new Request(`http://localhost${urls.at(-1)!}`))
