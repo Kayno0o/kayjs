@@ -1,7 +1,7 @@
 import type { Action } from './action'
 import { encodeCall } from './action'
 import { withBase } from './base'
-import { RETRY_LATER } from './local-status'
+import { MOST_WAIT_MS, RETRY_LATER } from './local-status'
 import { createSignal, getOwner, onCleanup } from './reactive'
 import { FAILURE_HEADER, PAGE_HEADER, REDIRECT_HEADER } from './swap'
 import { decodeServerValue } from './wire'
@@ -112,8 +112,6 @@ const TRANSIENT = new Set<number>(RETRY_LATER)
 const MOST_FAULTS = 5
 // The issues kept per collection: the oldest go first, so a page nobody dismisses on does not fill the browser.
 const MOST_ISSUES = 50
-// A request or a read of the server taking longer is given up as offline, as it holds the lock every tab and the worker send under.
-const MOST_WAIT_MS = 30_000
 
 function onServer(): boolean {
   return typeof KAY_BROWSER === 'undefined' && typeof indexedDB === 'undefined'
@@ -720,15 +718,21 @@ class Collection<Row extends object, Key extends keyof Row & string> {
   private async refresh(): Promise<void> {
     const seen = this.changes
     let server: readonly Row[]
+    let waiting: ReturnType<typeof setTimeout> | undefined
 
     try {
-      server = await Promise.race([this.options.read(), new Promise<never>((_, reject) => setTimeout(reject, MOST_WAIT_MS, new Error('kay: the local() read took too long')))])
+      server = await Promise.race([this.options.read(), new Promise<never>((_, reject) => {
+        waiting = setTimeout(reject, MOST_WAIT_MS, new Error('kay: the local() read took too long'))
+      })])
     }
     catch {
       this.unread = true
       this.noticed(true)
 
       return
+    }
+    finally {
+      clearTimeout(waiting)
     }
 
     this.unread = false
