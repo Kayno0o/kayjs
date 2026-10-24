@@ -5,7 +5,7 @@ import { parse, stringify } from 'devalue'
 import { KayError } from '../compiler/errors'
 import { durationSeconds } from '../runtime/duration'
 import { kayLog } from '../runtime/log'
-import { claimHolds, defaultJobStore, GiveUp, handedBack, queue, wakeQueue } from './queue'
+import { claimHolds, defaultJobStore, GiveUpError, handedBack, queue, wakeQueue } from './queue'
 
 type Events = Record<string, unknown>
 
@@ -169,7 +169,7 @@ export function workflow<Input = undefined, Known extends Events = Events>(name:
       const seen = memo[slot]
 
       if (seen && (seen.kind !== kind || seen.name !== label))
-        throw new GiveUp(`kay: workflow('${name}') changed under a run: its step ${slot + 1} was ${seen.kind === 'run' ? `'${seen.name}'` : seen.kind}, now ${kind === 'run' ? `'${label}'` : kind}; finish or cancel the runs started before such a change`)
+        throw new GiveUpError(`kay: workflow('${name}') changed under a run: its step ${slot + 1} was ${seen.kind === 'run' ? `'${seen.name}'` : seen.kind}, now ${kind === 'run' ? `'${label}'` : kind}; finish or cancel the runs started before such a change`)
 
       return { slot, seen }
     }

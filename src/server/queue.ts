@@ -172,7 +172,7 @@ const MAX_OUTAGE_MS = 60_000
 const DEFAULT_PATH = 'data/jobs.sqlite'
 
 // Thrown from a handler for a failure no retry can mend: the job is kept as failed at once, whatever attempts are left.
-export class GiveUp extends Error {}
+export class GiveUpError extends Error {}
 
 class RetryLater extends Error {
   readonly waitMs: number
@@ -851,7 +851,7 @@ export function queue<Payload, Progress = unknown>(name: string, handler: (paylo
       if (error instanceof RetryLater)
         kayLog('warn', `a job of queue('${name}') asked to run again later, but its store has no release(), so the run counts as failed`)
 
-      if (context.attempts < attempts && !(error instanceof GiveUp)) {
+      if (context.attempts < attempts && !(error instanceof GiveUpError)) {
         const wait = backoff * 2 ** (context.attempts - 1)
 
         // A run whose hold went to another process writes nothing and reports nothing: the job is that process's now.
