@@ -135,7 +135,7 @@ export function pgLists(source: PgJobsSource): ListStore & { close: () => Promis
     }
     catch (error) {
       // 42P01: the table does not exist.
-      if ((error as { code?: unknown }).code === '42P01')
+      if ((error as { errno?: unknown }).errno === '42P01')
         return []
 
       throw error
