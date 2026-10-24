@@ -40,21 +40,27 @@ function certificate(privateKey: KeyObject, publicKey: KeyObject, { expired = fa
 
 const rsa = () => generateKeyPairSync('rsa', { modulusLength: 2048 })
 const signer = rsa()
-let served = certificate(signer.privateKey, signer.publicKey)
+const CERT = '/SimpleNotificationService-f3ecfb7224c7233fe7bb5f59f96de52f.pem'
+// The certificate each path serves.
+const served = new Map([[CERT, certificate(signer.privateKey, signer.publicKey)]])
 const hits = { cert: 0, subscribe: 0 }
 const local = Bun.serve({
   port: 0,
   hostname: '127.0.0.1',
   fetch(request) {
-    const { pathname } = new URL(request.url)
+    const url = new URL(request.url)
+    const { pathname } = url
 
-    if (pathname === '/cert.pem') {
+    if (pathname === '/redirect.pem')
+      return new Response(null, { status: 302, headers: { location: new URL(CERT, request.url).href } })
+
+    if (served.has(pathname)) {
       hits.cert++
 
-      return new Response(served)
+      return new Response(served.get(pathname))
     }
 
-    if (pathname === '/subscribe') {
+    if (pathname === '/' && url.searchParams.get('Action') === 'ConfirmSubscription') {
       hits.subscribe++
 
       return new Response('<ConfirmSubscriptionResponse/>')
@@ -74,7 +80,7 @@ function canonical(message: Record<string, string>, fields: string[]): string {
 const NOTIFICATION = ['Message', 'MessageId', 'Subject', 'Timestamp', 'TopicArn', 'Type']
 const CONFIRMATION = ['Message', 'MessageId', 'SubscribeURL', 'Timestamp', 'Token', 'TopicArn', 'Type']
 
-function signed(fields: Record<string, string>, { version = '2', key = signer.privateKey, url = `${base}/cert.pem` } = {}): string {
+function signed(fields: Record<string, string>, { version = '2', key = signer.privateKey, url = `${base}${CERT}` } = {}): string {
   const names = (fields.Type === 'Notification' ? NOTIFICATION : CONFIRMATION).filter(name => fields[name] !== undefined)
   const signature = createSign(version === '1' ? 'RSA-SHA1' : 'RSA-SHA256').update(canonical(fields, names)).sign(key, 'base64')
 
@@ -173,19 +179,19 @@ describe('SES through SNS', () => {
     const confirmation = (SubscribeURL: string) => ({ Type: 'SubscriptionConfirmation', MessageId: crypto.randomUUID(), Token: '2336412f37', TopicArn: TOPIC, Message: 'You have chosen to subscribe to the topic.', SubscribeURL, Timestamp: '2012-04-26T20:45:04.751Z' })
     const before = hits.subscribe
 
-    expect((await post(signed(confirmation(`${base}/subscribe?Action=ConfirmSubscription`)))).status).toBe(200)
+    expect((await post(signed(confirmation(`${base}/?Action=ConfirmSubscription&Token=2336412f37`)))).status).toBe(200)
     expect(hits.subscribe).toBe(before + 1)
 
     expect((await post(signed(confirmation('https://evil.example.com/subscribe')))).status).toBe(502)
-    expect((await post(signed(confirmation(`${base}/missing`)))).status).toBe(502)
+    expect((await post(signed(confirmation(`${base}/?Action=Other`)))).status).toBe(502)
     expect(hits.subscribe).toBe(before + 1)
   })
 
   it('does not visit the SubscribeURL of an unsigned confirmation or one of another topic', async () => {
     const before = hits.subscribe
-    const body = { Type: 'SubscriptionConfirmation', MessageId: 'a', Token: 't', TopicArn: TOPIC, Message: 'm', SubscribeURL: `${base}/subscribe`, Timestamp: '2012-04-26T20:45:04.751Z' }
+    const body = { Type: 'SubscriptionConfirmation', MessageId: 'a', Token: 't', TopicArn: TOPIC, Message: 'm', SubscribeURL: `${base}/?Action=ConfirmSubscription`, Timestamp: '2012-04-26T20:45:04.751Z' }
 
-    expect((await post(JSON.stringify({ ...body, SignatureVersion: '2', Signature: 'AAAA', SigningCertURL: `${base}/cert.pem` }))).status).toBe(401)
+    expect((await post(JSON.stringify({ ...body, SignatureVersion: '2', Signature: 'AAAA', SigningCertURL: `${base}${CERT}` }))).status).toBe(401)
     expect((await post(signed({ ...body, TopicArn: OTHER_TOPIC }))).status).toBe(401)
     expect(hits.subscribe).toBe(before)
   })
@@ -193,17 +199,10 @@ describe('SES through SNS', () => {
   it('refuses a certificate that is expired, and answers 400 to what is no JSON object', async () => {
     const expired = rsa()
     const email = fresh()
-    const was = served
 
-    served = certificate(expired.privateKey, expired.publicKey, { expired: true })
-
-    try {
-      // A distinct URL, as the cache holds the good certificate under the first.
-      expect((await post(signed(notification(bounce([email])), { key: expired.privateKey, url: `${base}/cert.pem?expired` }))).status).toBe(401)
-    }
-    finally {
-      served = was
-    }
+    // A distinct path, as the cache holds the good certificate under the first.
+    served.set('/SimpleNotificationService-expired.pem', certificate(expired.privateKey, expired.publicKey, { expired: true }))
+    expect((await post(signed(notification(bounce([email])), { key: expired.privateKey, url: `${base}/SimpleNotificationService-expired.pem` }))).status).toBe(401)
 
     expect(await mail.suppression(email)).toBeUndefined()
     expect((await post('not json')).status).toBe(400)
@@ -213,12 +212,12 @@ describe('SES through SNS', () => {
   it('fetches a rotated certificate again when a cached one fails, but not within a minute', async () => {
     const rotated = rsa()
     const [early, late] = [fresh(), fresh()]
-    const was = served
-    const url = `${base}/cert.pem?rotation`
+    const url = `${base}/SimpleNotificationService-rotation.pem`
 
     // Cached first under the old key.
+    served.set('/SimpleNotificationService-rotation.pem', served.get(CERT)!)
     expect((await post(signed(notification(bounce([fresh()])), { url }))).status).toBe(200)
-    served = certificate(rotated.privateKey, rotated.publicKey)
+    served.set('/SimpleNotificationService-rotation.pem', certificate(rotated.privateKey, rotated.publicKey))
 
     try {
       expect((await post(signed(notification(bounce([early])), { key: rotated.privateKey, url }))).status).toBe(401)
@@ -227,11 +226,33 @@ describe('SES through SNS', () => {
     }
     finally {
       network.refetchAfter = 60_000
-      served = was
     }
 
     expect(await mail.suppression(early)).toBeUndefined()
     expect((await mail.suppression(late))?.reason).toBe('bounce')
+  })
+
+  it('refuses a certificate URL of the wrong shape, a redirect and an oversized file, and takes an UnsubscribeConfirmation as nothing', async () => {
+    const email = fresh()
+    const before = hits.cert
+
+    for (const url of [`${base}/cert.pem`, `${base}${CERT}?x=1`, `${base}/redirect.pem`])
+      expect((await post(signed(notification(bounce([email])), { url }))).status).toBe(401)
+
+    served.set('/SimpleNotificationService-huge.pem', 'A'.repeat(100_000))
+    expect((await post(signed(notification(bounce([email])), { url: `${base}/SimpleNotificationService-huge.pem` }))).status).toBe(401)
+    expect(hits.cert - before).toBe(1)
+    expect(await mail.suppression(email)).toBeUndefined()
+
+    const unsubscribed = { Type: 'UnsubscribeConfirmation', MessageId: 'u', Token: 't', TopicArn: TOPIC, Message: 'm', SubscribeURL: `${base}/?Action=ConfirmSubscription`, Timestamp: '2012-04-26T20:45:04.751Z' }
+    const visits = hits.subscribe
+
+    expect((await post(signed(unsubscribed))).status).toBe(200)
+    expect(hits.subscribe).toBe(visits)
+  })
+
+  it('refuses a body over 1 MB', async () => {
+    expect((await post('x'.repeat(1_048_577))).status).toBe(413)
   })
 
   it('has no route without its topic', async () => {
@@ -252,7 +273,7 @@ describe('SES through SNS', () => {
     network.trusted = production
 
     try {
-      expect((await post(signed(notification(bounce([email])), { url: `${base}/cert.pem?other` }))).status).toBe(401)
+      expect((await post(signed(notification(bounce([email])), { url: `${base}${CERT}` }))).status).toBe(401)
     }
     finally {
       network.trusted = url => url.startsWith(base)

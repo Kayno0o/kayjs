@@ -61,6 +61,21 @@ describe('attachment names', () => {
     expect(name('attachment; filename*=utf-8\'\'%00')).toBe('attachment')
   })
 
+  it('does not choke on a parameter named like an Object property', () => {
+    expect(name('attachment; constructor*=x; __proto__*=y; toString*0=z; filename=ok.pdf')).toBe('ok.pdf')
+    expect(namesOf('Content-Type: application/pdf; constructor*=x', 'Content-Disposition: attachment; __proto__*0*=utf-8\'\'y; filename="b.pdf"')).toEqual(['b.pdf'])
+  })
+
+  it('drops bidi overrides, drive prefixes and names of dots', () => {
+    expect(name('attachment; filename*=utf-8\'\'%E2%80%AEgnp.exe')).toBe('gnp.exe')
+    expect(name('attachment; filename="C:evil.txt"')).toBe('evil.txt')
+    expect(name('attachment; filename="..."')).toBe('attachment')
+  })
+
+  it('prefers the disposition filename to the type name', () => {
+    expect(namesOf('Content-Type: application/pdf; name="a.pdf"', 'Content-Disposition: attachment; filename="b.pdf"')).toEqual(['b.pdf'])
+  })
+
   it('survives a malformed extended value', () => {
     expect(name('attachment; filename*=nonsense')).toBe('nonsense')
     expect(name('attachment; filename*=bogus-charset\'\'a%ZZb.pdf')).toBe('a%ZZb.pdf')

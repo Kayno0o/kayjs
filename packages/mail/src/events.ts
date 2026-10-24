@@ -401,8 +401,16 @@ export function mountEventRoutes(plugin: Elysia, host: () => EventHost): void {
     if (message === undefined)
       return plain(400)
 
-    const root = parseMime(message)
-    const report = deliveryReport(root)
+    let root: ReturnType<typeof parseMime>
+    let report: ReturnType<typeof deliveryReport>
+
+    try {
+      root = parseMime(message)
+      report = deliveryReport(root)
+    }
+    catch {
+      return plain(400)
+    }
 
     if (report !== undefined) {
       // A report is believed only when it returns a mail this app sent (its keyed Message-ID) to the address it names: the secret proves the pipe, not whoever wrote the report.
@@ -424,7 +432,16 @@ export function mountEventRoutes(plugin: Elysia, host: () => EventHost): void {
       return plain(200, 'ok')
     }
 
-    await host().reply?.(replyOf(root))
+    let reply: ReturnType<typeof replyOf>
+
+    try {
+      reply = replyOf(root)
+    }
+    catch {
+      return plain(400)
+    }
+
+    await host().reply?.(reply)
 
     return plain(200, 'ok')
   }, { parse: 'none' })

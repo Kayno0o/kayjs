@@ -319,8 +319,11 @@ export function createLists(base: Omit<ListHost, 'enqueueMail' | 'enqueueRun' | 
 
       try {
         // A confirmation is list mail: an address that complained or bounced gets none, as no list mail would reach it afterwards.
-        if ((await suppressed([email])).size > 0)
+        if ((await suppressed([email])).size > 0) {
+          log.info('a list confirmation mail was skipped: its address bounced or complained')
+
           return
+        }
 
         await host.enqueueMail(mail)
       }

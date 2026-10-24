@@ -325,7 +325,7 @@ function smtpEnv({ optional = false, listed = false }: { optional?: boolean, lis
     MAIL_EVENTS_MAILGUN: s.Optional(s.String({ description: 'the Mailgun webhook signing key, for bounces and complaints' })),
     MAIL_EVENTS_SENDGRID: s.Optional(s.String({ description: 'the base64 public key of the SendGrid Event Webhook, for bounces and complaints' })),
     MAIL_EVENTS_RESEND: s.Optional(s.String({ description: 'the whsec_ signing secret of the Resend webhook, for bounces and complaints' })),
-    MAIL_EVENTS_SES: s.Optional(s.String({ pattern: '^arn:aws[\\w-]*:sns:\\S+$', description: 'the ARN of the SNS topic SES publishes bounces and complaints to (several, comma separated)' })),
+    MAIL_EVENTS_SES: s.Optional(s.String({ pattern: '^arn:aws:sns:[^\\s,]+(?:\\s*,\\s*arn:aws:sns:[^\\s,]+)*$', description: 'the ARN of the SNS topic SES publishes bounces and complaints to (several, comma separated)' })),
     MAIL_INBOUND_SECRET: s.Optional(s.String({ description: 'the bearer secret of /_kay/mail/inbound, where a mail server posts delivery reports and replies' })),
   })
 }

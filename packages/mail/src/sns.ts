@@ -11,7 +11,9 @@ const CERT_MAX = 16_384
 const CERT_TTL = 24 * 3_600_000
 const CERT_CACHE_MAX = 8
 const FETCH_TIMEOUT = 5000
-const TOPIC_ARN = /^arn:aws[\w-]*:sns:/
+const TOPIC_ARN = /^arn:aws:sns:/
+// The certificates SNS publishes are files of this name at the root, and a subscription is confirmed at the root with this action: nothing else of the host is fetched.
+const CERT_PATH = /^\/SimpleNotificationService-[\w-]+\.pem$/
 
 export function isSnsUrl(value: string): boolean {
   try {
@@ -31,6 +33,9 @@ export const network = {
   // A certificate that fails a check is fetched again once it is older than this, for a rotation, so a flood of bad posts cannot make a fetch each.
   refetchAfter: 60_000,
 }
+
+const certificateUrl = (value: string): boolean => network.trusted(value) && CERT_PATH.test(new URL(value).pathname) && new URL(value).search === ''
+const subscriptionUrl = (value: string): boolean => network.trusted(value) && new URL(value).pathname === '/' && new URL(value).searchParams.get('Action') === 'ConfirmSubscription'
 
 const NOTIFICATION = ['Message', 'MessageId', 'Subject', 'Timestamp', 'TopicArn', 'Type'] as const
 const CONFIRMATION = ['Message', 'MessageId', 'SubscribeURL', 'Timestamp', 'Token', 'TopicArn', 'Type'] as const
@@ -70,17 +75,58 @@ const ALGORITHMS: Record<string, string> = { 1: 'RSA-SHA1', 2: 'RSA-SHA256' }
 
 const certificates = new Map<string, { key: KeyObject, at: number }>()
 
+// The body as text when it is no larger than the cap, read as it arrives.
+async function boundedText(response: Response): Promise<string | undefined> {
+  if (!response.ok || response.body === null || Number(response.headers.get('content-length') ?? 0) > CERT_MAX)
+    return undefined
+
+  const chunks: Uint8Array[] = []
+  let total = 0
+
+  for await (const chunk of response.body as unknown as AsyncIterable<Uint8Array>) {
+    total += chunk.length
+
+    if (total > CERT_MAX)
+      return undefined
+
+    chunks.push(chunk)
+  }
+
+  return Buffer.concat(chunks).toString('utf8')
+}
+
+// Requests for one certificate share a fetch, so a burst of posts makes one.
+const fetching = new Map<string, Promise<{ key: KeyObject, fresh: boolean } | undefined>>()
+
 async function certificateKey(url: string, forceFresh: boolean): Promise<{ key: KeyObject, fresh: boolean } | undefined> {
   const cached = certificates.get(url)
 
   if (cached !== undefined && !forceFresh && Date.now() - cached.at < CERT_TTL)
-    return { key: cached.key, fresh: false }
+    return Promise.resolve({ key: cached.key, fresh: false })
 
+  let pending = fetching.get(url)
+
+  if (pending === undefined) {
+    pending = (async () => {
+      try {
+        return await fetchCertificate(url)
+      }
+      finally {
+        fetching.delete(url)
+      }
+    })()
+    fetching.set(url, pending)
+  }
+
+  return pending
+}
+
+async function fetchCertificate(url: string): Promise<{ key: KeyObject, fresh: boolean } | undefined> {
   try {
     const response = await network.fetch(url, { signal: AbortSignal.timeout(FETCH_TIMEOUT), redirect: 'error' })
-    const text = response.ok ? await response.text() : ''
+    const text = await boundedText(response)
 
-    if (text === '' || text.length > CERT_MAX)
+    if (text === undefined || text === '')
       return undefined
 
     const certificate = new X509Certificate(text)
@@ -121,7 +167,7 @@ export async function snsSigned(message: Record<string, unknown>): Promise<boole
   const text = stringToSign(message)
   const url = message.SigningCertURL
 
-  if (text === undefined || typeof url !== 'string' || !network.trusted(url))
+  if (text === undefined || typeof url !== 'string' || !certificateUrl(url))
     return false
 
   const first = await certificateKey(url, false)
@@ -145,7 +191,7 @@ export async function snsSigned(message: Record<string, unknown>): Promise<boole
 
 // Visiting the SubscribeURL confirms the subscription; it must be an SNS endpoint too.
 export async function confirmSubscription(subscribeUrl: unknown): Promise<boolean> {
-  if (typeof subscribeUrl !== 'string' || !network.trusted(subscribeUrl))
+  if (typeof subscribeUrl !== 'string' || !subscriptionUrl(subscribeUrl))
     return false
 
   try {

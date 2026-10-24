@@ -26,8 +26,12 @@ const EXTENDED = /^([^*]+)\*(?:(\d+)(\*)?)?$/
 const BLANK_LINE = /\r?\n\r?\n/
 const FIRST_BREAK = /^\r?\n/
 const SPACES = /\s+/
-const CONTROL = /\p{Cc}/gu
-const PATH_SEPARATORS = /[/\\]/
+// Control and format characters (a right-to-left override spoofs an extension) and line or paragraph separators.
+const UNSAFE = /[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]/gu
+// A directory separator on any system, and the colon of a drive (`C:evil.txt`) or an NTFS stream.
+const PATH_SEPARATORS = /[/\\:]/
+const DOTS = /^\.*$/
+const ENCODER = new TextEncoder()
 const BOUNDARY_SAFE = /[.*+?^${}()|[\]\\]/g
 
 function latin1(bytes: Uint8Array): string {
@@ -159,7 +163,7 @@ function percentDecoded(text: string, charset: string | undefined): string {
       index += 2
     }
     else {
-      for (const byte of new TextEncoder().encode(text[index]))
+      for (const byte of ENCODER.encode(text[index]))
         bytes.push(byte)
     }
   }
@@ -170,7 +174,8 @@ function percentDecoded(text: string, charset: string | undefined): string {
 // RFC 2231: `name*=charset'lang'%C3%A9` and the continuations `name*0`, `name*1*`, joined into `name`; an extended `name*` wins over a plain `name`.
 function resolveExtended(raw: Record<string, string>): Record<string, string> {
   const params: Record<string, string> = {}
-  const pieces: Record<string, { index: number, encoded: boolean, value: string }[]> = {}
+  // A Map: a header can name a parameter `constructor*` or `__proto__*`.
+  const pieces = new Map<string, { index: number, encoded: boolean, value: string }[]>()
 
   for (const [key, value] of Object.entries(raw)) {
     const match = EXTENDED.exec(key)
@@ -181,10 +186,13 @@ function resolveExtended(raw: Record<string, string>): Record<string, string> {
       continue
     }
 
-    (pieces[match[1]!] ??= []).push({ index: match[2] === undefined ? 0 : Number(match[2]), encoded: match[3] === '*' || match[2] === undefined, value })
+    const list = pieces.get(match[1]!) ?? []
+
+    list.push({ index: match[2] === undefined ? 0 : Number(match[2]), encoded: match[3] === '*' || match[2] === undefined, value })
+    pieces.set(match[1]!, list)
   }
 
-  for (const [name, list] of Object.entries(pieces)) {
+  for (const [name, list] of pieces) {
     let charset: string | undefined
     let joined = ''
 
@@ -323,11 +331,11 @@ export function addressesOf(value: string | undefined): { name: string, address:
   return parseAddresses(decodeWords(value), { flatten: true }).filter(entry => Boolean(entry.address)).map(entry => ({ name: entry.name, address: entry.address.toLowerCase() }))
 }
 
-// A bare file name: encoded words decoded, any directory part and control character dropped.
+// A bare file name: encoded words decoded, any directory part, control character and name of dots alone dropped.
 function fileNameOf(raw: string): string {
-  const base = decodeWords(raw).replaceAll(CONTROL, '').split(PATH_SEPARATORS).pop()!.trim()
+  const base = decodeWords(raw).replaceAll(UNSAFE, '').split(PATH_SEPARATORS).pop()!.trim()
 
-  return base === '' || base === '.' || base === '..' ? 'attachment' : base
+  return DOTS.test(base) ? 'attachment' : base
 }
 
 function filenameOf(part: Part): string | undefined {
