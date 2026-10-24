@@ -73,5 +73,5 @@ kay build --static --outdir dist
   - Ctrl-C, `SIGTERM` and `SIGHUP` reach the server once, sent to the group or to `kay start` alone, which waits for it to drain, a second Ctrl-C stopping it at once; `SIGQUIT` is passed on and ends it at once (131).
   - The server runs in a process group of its own: Ctrl-Z suspends `kay start` alone, and once `kay start` is gone, as after a `SIGKILL` to the group, a kay server notices within a second and drains as on `SIGTERM`, or stops once booted when it was gone already;
   - It exits with the server's code, 0 when the server ended on a stop signal it passed on, 128 plus the signal's number when it died of another.
-  - `--workers <n|auto>` (or `KAY_WORKERS`) serves from n processes on the one port, `auto` one per core: see [Several workers](production.md#several-workers). The executable takes the same `--workers` or `KAY_WORKERS`.
+  - `--workers <n|auto>` (or `KAY_WORKERS`) serves from n processes on the one port, `auto` one per core: see [Several workers](workers.md). The executable takes the same `--workers` or `KAY_WORKERS`.
   - The `start` script `kay new` writes runs it.

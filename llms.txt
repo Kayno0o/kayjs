@@ -88,6 +88,7 @@ To build a site, read [Build a site](llms/site.md) first. The topic files below 
 - [Check, inspect and tool commands](llms/check-and-tools.md): `check`, `render`, `routes`, `env`, `doctor`, `upgrade`, `fmt`
 - [Language server, screenshot and MCP](llms/editor-and-agent-commands.md): `kay lsp`, `screenshot`, `mcp`
 - [Running in production](llms/production.md): logs, tracing, health checks, shutdown, cron, jobs
+- [Several workers](llms/workers.md): `--workers`, what the processes share
 - [Queues](llms/queues.md): jobs and workflows that survive a restart
 - [Proxies and security headers](llms/proxy-and-security.md): headers, CSP, compression
 - [Upgrading](llms/upgrading.md): what each recent minor breaks, and what an app changes
