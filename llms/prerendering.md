@@ -161,7 +161,7 @@ export const pageWeight: KayExtension = {
 - It gives `undefined` for any other, such as another site's or one only the server answers, as the public environment.
 - An image route URL in a server build gives the WebP variant the build wrote, where a browser taking AVIF gets the AVIF one.
 - `fileSize(url)` gives the bytes a browser downloads for the file `file` finds, or `undefined` when it finds none: what `kay build` compresses the file to with brotli, or the file's own length when it is not compressed, under 256 bytes or saved little by the copy (a public file is sized the same way, though a server compresses it on the fly). `htmlSize(html)` gives the same for HTML in hand, as the build would write it: the page as returned, or a variant of it to measure.
-- The sizes come from the copies the compress stage writes, found again there, so a hook never compresses what kay does: a file is compressed once per version of it however many pages link it, and a rebuild reads the copies of what did not change. A hook measuring a page that holds its own size compresses the page once more for it, as the page changes with the number.
+- A build reads `fileSize` from the copies the compress stage writes, found again there: a file is compressed once per version of it however many pages link it, and a rebuild reads the copies of what did not change. `htmlSize` compresses with brotli alone and keeps nothing, as a page a hook measures is not always the one written, and a server rendering a page afresh does the same for files.
 
 #### Server islands
 

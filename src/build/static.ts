@@ -21,7 +21,7 @@ import { compressPaths } from '../server/compress'
 import { localeSettings } from '../server/i18n'
 import { limiter } from '../server/limit'
 import { routesWithSecurity } from '../server/page-headers'
-import { applyPageHooks, assetFiles } from '../server/page-hook'
+import { applyPageHooks, assetFiles, pageSizes } from '../server/page-hook'
 import { publicFiles, servedPublicly } from '../server/public'
 import { hostedStatus } from '../server/redirects'
 import { withoutSlash } from '../server/routes'
@@ -158,9 +158,9 @@ export async function exportStatic(project: Project, client: ClientBuild, outdir
 
   // Rendered here rather than prerendered, so it goes through the page hooks as it is written.
   if (missing.status === 404 && missing.headers.get('content-type')?.startsWith('text/html')) {
-    const files = assetFiles({ clientDir: client.dir, publicDir, base: basePath(config.base), aspects: config.images?.aspects, copiesOf: cachedCopies(cacheDir(root, 'compressed')) })
+    const files = assetFiles({ clientDir: client.dir, publicDir, base: basePath(config.base), aspects: config.images?.aspects })
 
-    await Bun.write(join(out, '404.html'), await applyPageHooks(pageHooks(config.extensions), '/404.html', pages.locale, await missing.text(), files))
+    await Bun.write(join(out, '404.html'), await applyPageHooks(pageHooks(config.extensions), '/404.html', pages.locale, await missing.text(), files, pageSizes(files, cachedCopies(cacheDir(root, 'compressed')))))
     written.push(join(out, '404.html'))
   }
 

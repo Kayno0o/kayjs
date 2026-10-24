@@ -67,7 +67,7 @@ import { countMissing, knowRedirects } from './not-found'
 import { serveServiceWorker } from './offline'
 import { claimApi, openApiDocument, openApiSettings, serveOpenApi } from './openapi'
 import { withPageHeaders } from './page-headers'
-import { assetFiles } from './page-hook'
+import { assetFiles, pageSizes } from './page-hook'
 import { loadPrerendered, pageResponder, servePageRoutes } from './page-routes'
 import { plumbing } from './plumbing'
 import { DRAFT_BODY_LIMIT, serveDrafts, servePreview } from './preview'
@@ -687,7 +687,8 @@ export async function pagesApp(project: Project<PagesOptions>, loadClient: () =>
   // After the hooks above, which a public file deleted since boot is answered through as a path nothing serves.
   await servePublic(app, served, publicServed, mode.dev ? undefined : publicCache, compressing && !mode.dev, pageFor)
 
-  const respond = withPageHeaders(withSavedData(pageResponder({ client, renderOptions, prerendered, writes, settings: i18n?.settings, transforms: pageHooks(options.extensions), pageFile: assetFiles({ clientDir: client.dir, publicDir: paths.public, base, aspects: options.images?.aspects }) }), renderOptions), securityOptions, security)
+  const pageFile = assetFiles({ clientDir: client.dir, publicDir: paths.public, base, aspects: options.images?.aspects })
+  const respond = withPageHeaders(withSavedData(pageResponder({ client, renderOptions, prerendered, writes, settings: i18n?.settings, transforms: pageHooks(options.extensions), pageFile, pageSizes: pageSizes(pageFile) }), renderOptions), securityOptions, security)
 
   const fallback = await source.fallback(project, mounts)
 

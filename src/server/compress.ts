@@ -80,12 +80,18 @@ export async function compressPaths(paths: string[], copiesOf: StrongestCopies =
   }))
 }
 
+// A copy saving less than this is not kept.
+const KEEP_BELOW = 0.9
+
 // The bytes a browser downloads for a file of the build: its brotli copy as `kay build` writes it, or the file itself when it is not compressed, is too small or the copy saves too little. `name` only tells the kind of file by its extension.
-export async function servedSize(name: string, bytes: Uint8Array<ArrayBuffer>, copiesOf: StrongestCopies = strongestCopies): Promise<number> {
+// Only the brotli is made, off the main thread, unless `copiesOf` is given for a file the compress stage will make the copies of, which then finds them again.
+export async function servedSize(name: string, bytes: Uint8Array<ArrayBuffer>, copiesOf?: StrongestCopies): Promise<number> {
   if (!COMPRESSIBLE.test(name) || bytes.length < MIN_SIZE)
     return bytes.length
 
-  return (await copiesOf(bytes)).br?.length ?? bytes.length
+  const br = copiesOf === undefined ? await strongestBrotli(bytes) : (await copiesOf(bytes)).br
+
+  return br !== undefined && br.length < bytes.length * KEEP_BELOW ? br.length : bytes.length
 }
 
 // The copies `kay build` writes, for text rendered while serving but off any request's path, as a stale page rendered again.
@@ -95,14 +101,19 @@ export async function compressTextStrongest(text: string): Promise<Partial<Recor
   return bytes.length < MIN_SIZE ? {} : strongestCopies(bytes)
 }
 
-export async function strongestCopies(bytes: Uint8Array<ArrayBuffer>): Promise<Partial<Record<StoredEncoding, Uint8Array<ArrayBuffer>>>> {
+async function strongestBrotli(bytes: Uint8Array<ArrayBuffer>): Promise<Uint8Array<ArrayBuffer>> {
   const { constants } = nodeZlib()
+
+  return compressBrotli(bytes, { [constants.BROTLI_PARAM_QUALITY]: constants.BROTLI_MAX_QUALITY, [constants.BROTLI_PARAM_SIZE_HINT]: bytes.length })
+}
+
+export async function strongestCopies(bytes: Uint8Array<ArrayBuffer>): Promise<Partial<Record<StoredEncoding, Uint8Array<ArrayBuffer>>>> {
   const copies: [StoredEncoding, Uint8Array<ArrayBuffer>][] = [
-    ['br', await compressBrotli(bytes, { [constants.BROTLI_PARAM_QUALITY]: constants.BROTLI_MAX_QUALITY, [constants.BROTLI_PARAM_SIZE_HINT]: bytes.length })],
+    ['br', await strongestBrotli(bytes)],
     ['gzip', Bun.gzipSync(bytes, { level: 9 })],
   ]
 
-  return Object.fromEntries(copies.filter(([, copy]) => copy.length < bytes.length * 0.9))
+  return Object.fromEntries(copies.filter(([, copy]) => copy.length < bytes.length * KEEP_BELOW))
 }
 
 // A brotli and a gzip copy of text rendered while serving, at levels quick enough for a request path; none below the size worth it, nor one saving little.

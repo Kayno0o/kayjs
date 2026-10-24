@@ -3,7 +3,7 @@ import { join, normalize, resolve, sep } from 'node:path'
 import { ASSET_PREFIX, outputDir } from '../build/assets'
 import { IMAGE_ROUTE } from '../runtime/image'
 import { PRERENDERED_DIR, readManifest, writeManifest } from './client'
-import { servedSize, strongestCopies } from './compress'
+import { servedSize } from './compress'
 import { FAVICON_DIR, FAVICON_PATHS } from './favicon'
 import { builtVariant } from './image'
 import { limiter } from './limit'
@@ -33,8 +33,6 @@ export interface AssetDirs {
   publicDir: string
   base: string
   aspects?: readonly string[] | undefined
-  // Makes the copies the sizes read, which a build backs with its cache so that the compress stage finds them; compressed afresh without.
-  copiesOf?: StrongestCopies | undefined
 }
 
 export interface PageSizes {
@@ -42,11 +40,9 @@ export interface PageSizes {
   htmlSize: RenderedPage['htmlSize']
 }
 
-// The sizes of the files each `file` function finds, kept for as long as it is.
-const sizesOf = new WeakMap<RenderedPage['file'], PageSizes>()
-
-// A file is compressed once per version of it, however many pages link it.
-export function pageSizes(file: RenderedPage['file'], copiesOf: StrongestCopies = strongestCopies): PageSizes {
+// A file is measured once per version of it, however many pages link it, for as long as the sizes are kept.
+// `copiesOf` makes the copies of the files the compress stage will make the copies of, which a build backs with its cache so that the stage finds them; without it a file is measured with its brotli alone.
+export function pageSizes(file: RenderedPage['file'], copiesOf?: StrongestCopies): PageSizes {
   const files = new Map<string, Promise<number>>()
   const encoder = new TextEncoder()
 
@@ -80,7 +76,7 @@ export function pageSizes(file: RenderedPage['file'], copiesOf: StrongestCopies 
       return size
     },
     async htmlSize(html) {
-      return servedSize('page.html', encoder.encode(html), copiesOf)
+      return servedSize('page.html', encoder.encode(html))
     },
   }
 }
@@ -114,8 +110,6 @@ export function assetFiles(dirs: AssetDirs): RenderedPage['file'] {
     return FAVICON_PATHS.includes(path) ? await fileWithin(favicons, path.slice(1)) ?? fileWithin(dirs.publicDir, path.slice(1)) : fileWithin(dirs.publicDir, path.slice(1))
   }
 
-  sizesOf.set(file, pageSizes(file, dirs.copiesOf))
-
   return file
 }
 
@@ -126,9 +120,8 @@ async function fileWithin(dir: string, encoded: string): Promise<string | undefi
   return path !== undefined && path.startsWith(dir + sep) && await Bun.file(path).exists() ? path : undefined
 }
 
-export async function applyPageHooks(hooks: PageHook[], path: string, locale: string, html: string, file: RenderedPage['file']): Promise<string> {
+export async function applyPageHooks(hooks: PageHook[], path: string, locale: string, html: string, file: RenderedPage['file'], sizes: PageSizes): Promise<string> {
   let result = html
-  const sizes = sizesOf.get(file) ?? pageSizes(file)
 
   for (const hook of hooks)
     result = await hook({ path, locale, html: result, file, ...sizes })
@@ -137,20 +130,21 @@ export async function applyPageHooks(hooks: PageHook[], path: string, locale: st
 }
 
 // Runs the hooks over every page `kay build` prerendered, several pages at once, once the files they link are written and before they are compressed.
-export async function hookPrerendered(root: string, hooks: PageHook[], dirs: AssetDirs, base = outputDir(root)): Promise<void> {
+export async function hookPrerendered(root: string, hooks: PageHook[], dirs: AssetDirs & { copiesOf?: StrongestCopies | undefined }, base = outputDir(root)): Promise<void> {
   const manifest = await readManifest(root, base)
 
   if (hooks.length === 0 || !manifest?.pages)
     return
 
   const file = assetFiles(dirs)
+  const sizes = pageSizes(file, dirs.copiesOf)
   const hooking = limiter(PAGES_AT_ONCE)
 
   await Promise.all(Object.entries(manifest.pages).map(async ([path, page]) => hooking(async () => {
     const name = join(base, PRERENDERED_DIR, page.file)
     // A manifest a build wrote before pages recorded their locale has none.
     const locale = (page as Partial<typeof page>).locale ?? ''
-    const html = await applyPageHooks(hooks, path, locale, await Bun.file(name).text(), file)
+    const html = await applyPageHooks(hooks, path, locale, await Bun.file(name).text(), file, sizes)
 
     await Bun.write(name, html)
     page.etag = pageEtag(html)
@@ -160,9 +154,9 @@ export async function hookPrerendered(root: string, hooks: PageHook[], dirs: Ass
 }
 
 // A page the server renders again in place of a prerendered one, through the same hooks.
-export async function hookedResponse(response: Response, hooks: PageHook[], path: string, locale: string, file: RenderedPage['file']): Promise<Response> {
+export async function hookedResponse(response: Response, hooks: PageHook[], path: string, locale: string, file: RenderedPage['file'], sizes: PageSizes): Promise<Response> {
   if (hooks.length === 0)
     return response
 
-  return new Response(await applyPageHooks(hooks, path, locale, await response.text(), file), { status: response.status, headers: response.headers })
+  return new Response(await applyPageHooks(hooks, path, locale, await response.text(), file, sizes), { status: response.status, headers: response.headers })
 }

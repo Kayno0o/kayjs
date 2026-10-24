@@ -9,6 +9,7 @@ import { readClient } from '../src/server/client'
 import { loadGuards } from '../src/server/guards'
 import { localeSettings } from '../src/server/i18n'
 import { countWrites } from '../src/server/kept-pages'
+import { pageSizes } from '../src/server/page-hook'
 import { pageResponder } from '../src/server/page-routes'
 import { routeMatch, routeTable } from '../src/server/route-table'
 import { routeOf, scanRoutes } from '../src/server/routes'
@@ -69,7 +70,7 @@ describe('pageResponder', () => {
     // Boots the site, which builds the browser bundle the responder reads.
     await pages({ routes: 'tests/fixtures/site/src/routes', prebuilt: false })
     const about = { ...(await scanRoutes(join(root, 'tests/fixtures/site/src/routes'))).find(route => route.pattern === '/about')!, guards: [] }
-    const respond = pageResponder({ client: (await readClient(root))!, renderOptions: {}, prerendered: new Map([['/about', built('/about')]]), settings: undefined, transforms: [], pageFile: async () => undefined, writes: { count: 0 } })
+    const respond = pageResponder({ client: (await readClient(root))!, renderOptions: {}, prerendered: new Map([['/about', built('/about')]]), settings: undefined, transforms: [], pageFile: async () => undefined, pageSizes: pageSizes(async () => undefined), writes: { count: 0 } })
     const visit = async (path: string, headers: Record<string, string> = {}) => {
       const response = await respond(about, {}, { request: new Request(`http://localhost${path}`, { headers }) }, new URL(`http://localhost${path}`))
 
@@ -102,7 +103,7 @@ describe('pageResponder', () => {
     })
     app.post('/saved', () => 'ok')
 
-    const respond = pageResponder({ client: (await readClient(root))!, renderOptions: {}, prerendered: new Map([['/about', copies]]), settings: undefined, transforms: [], pageFile: async () => undefined, writes })
+    const respond = pageResponder({ client: (await readClient(root))!, renderOptions: {}, prerendered: new Map([['/about', copies]]), settings: undefined, transforms: [], pageFile: async () => undefined, pageSizes: pageSizes(async () => undefined), writes })
     const visit = async () => (await respond(about, {}, { request: new Request('http://localhost/about') }, new URL('http://localhost/about'))).text()
     const post = async (path: string) => app.handle(new Request(`http://localhost${path}`, { method: 'POST' }))
 
@@ -133,7 +134,7 @@ describe('pageResponder', () => {
     const client = (await readClient(root))!
     const routes = await Promise.all((await scanRoutes(dir)).map(async route => loadGuards(route)))
     const { head } = await configHead(root, {}, client.dir)
-    const respond = pageResponder({ client, renderOptions: { base: '/b', head }, prerendered: new Map([['/vip', built('/vip')], ['/gone', built('/gone')]]), settings: undefined, transforms: [], pageFile: async () => undefined, writes: { count: 0 } })
+    const respond = pageResponder({ client, renderOptions: { base: '/b', head }, prerendered: new Map([['/vip', built('/vip')], ['/gone', built('/gone')]]), settings: undefined, transforms: [], pageFile: async () => undefined, pageSizes: pageSizes(async () => undefined), writes: { count: 0 } })
 
     for (const [path, status] of [['/vip', 403], ['/gone', 404]] as const) {
       const response = await respond(routes.find(route => route.pattern === path)!, {}, { request: new Request(`http://localhost${path}`) }, new URL(`http://localhost${path}`))

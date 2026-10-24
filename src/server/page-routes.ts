@@ -5,7 +5,7 @@ import type { ClientBuild } from './client'
 import type { ServedRoute } from './guards'
 import type { I18n } from './i18n'
 import type { Writes } from './kept-pages'
-import type { PageHook, RenderedPage } from './page-hook'
+import type { PageHook, PageSizes, RenderedPage } from './page-hook'
 import type { Matcher, RouterShape } from './params'
 import type { RenderOptions, RequestContext, ServedPage } from './render'
 import type { Candidate, RouteTable } from './route-table'
@@ -49,6 +49,7 @@ export interface ResponderOptions {
   // What the extensions' page hooks did to the prerendered pages, done again to each the server renders afresh.
   transforms: PageHook[]
   pageFile: RenderedPage['file']
+  pageSizes: PageSizes
   // Counts the requests that can write, which a kept page is checked after.
   writes: Writes
 }
@@ -101,9 +102,9 @@ async function forVisitor(render: () => Promise<Response>): Promise<Response> {
 }
 
 // How a page answers one request: rendered afresh, or the copy `kay build` rendered, revalidated, with its server islands filled in.
-export function pageResponder({ client, renderOptions, prerendered, settings, transforms, pageFile, writes }: ResponderOptions): PageResponder {
+export function pageResponder({ client, renderOptions, prerendered, settings, transforms, pageFile, pageSizes, writes }: ResponderOptions): PageResponder {
   // Rendered as `kay build` renders it: without the request, for whoever its guards let through; it starts within the request, so in its locale.
-  const prerender = async (route: ServedRoute, params: Record<string, unknown>, url: URL, key: string) => hookedResponse(await renderPage({ ...route, guards: [] }, { request: new Request(`http://localhost${url.pathname}`) }, params, client, { ...renderOptions, prerendering: true, guarded: route.guards.length > 0 }), transforms, key, localeState()?.locale ?? settings?.defaultLocale ?? '', pageFile)
+  const prerender = async (route: ServedRoute, params: Record<string, unknown>, url: URL, key: string) => hookedResponse(await renderPage({ ...route, guards: [] }, { request: new Request(`http://localhost${url.pathname}`) }, params, client, { ...renderOptions, prerendering: true, guarded: route.guards.length > 0 }), transforms, key, localeState()?.locale ?? settings?.defaultLocale ?? '', pageFile, pageSizes)
 
   return async (route, params, context, url) => {
     const render = async () => renderPage(route, context, params, client, renderOptions)

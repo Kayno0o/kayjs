@@ -1,5 +1,7 @@
 import type { PrerenderedPage } from '../src/server/client'
+import type { StrongestCopies } from '../src/server/compress'
 import type { RenderedPage } from '../src/server/page-hook'
+import { existsSync } from 'node:fs'
 import { mkdtemp, readdir, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -8,7 +10,7 @@ import { outputDir } from '../src/build/assets'
 import { cachedCopies } from '../src/build/compressed'
 import { PRERENDERED_DIR, readManifest, writeManifest } from '../src/server/client'
 import { strongestCopies } from '../src/server/compress'
-import { applyPageHooks, assetFiles, hookPrerendered } from '../src/server/page-hook'
+import { applyPageHooks, assetFiles, hookPrerendered, pageSizes } from '../src/server/page-hook'
 import { pageEtag } from '../src/server/prerendered'
 
 const scratch = await mkdtemp(join(tmpdir(), 'kay-page-hook-'))
@@ -29,14 +31,15 @@ afterAll(async () => {
 })
 
 // The sizes a hook is handed, through the hook that reads them.
-async function sizesOf(dirs: Parameters<typeof assetFiles>[0]) {
+async function sizesOf(dirs: Parameters<typeof assetFiles>[0], copiesOf?: StrongestCopies) {
   let sizes!: Pick<RenderedPage, 'fileSize' | 'htmlSize'>
+  const file = assetFiles(dirs)
 
   await applyPageHooks([({ fileSize, htmlSize, html }) => {
     sizes = { fileSize, htmlSize }
 
     return html
-  }], '/', 'en', '', assetFiles(dirs))
+  }], '/', 'en', '', file, pageSizes(file, copiesOf))
 
   return sizes
 }
@@ -63,7 +66,7 @@ describe('page hooks', () => {
     const html = await applyPageHooks([
       ({ html }) => html.replace('</body>', '<footer>one</footer></body>'),
       async ({ path, html }) => html.replace('one', `${path} two`),
-    ], '/about', 'en', '<body></body>', file)
+    ], '/about', 'en', '<body></body>', file, pageSizes(file))
 
     expect(html).toBe('<body><footer>/about two</footer></body>')
   })
@@ -125,11 +128,11 @@ describe('page hooks', () => {
 
     it('measures a file once however many pages link it, and a page as the build would compress it', async () => {
       const made: number[] = []
-      const { fileSize, htmlSize } = await sizesOf({ clientDir, publicDir, base: '', copiesOf: async (bytes) => {
+      const { fileSize, htmlSize } = await sizesOf({ clientDir, publicDir, base: '' }, async (bytes) => {
         made.push(bytes.length)
 
         return strongestCopies(bytes)
-      } })
+      })
       const sizes = await Promise.all([fileSize('/_kay/big-3c4d.css'), fileSize('/_kay/big-3c4d.css')])
 
       expect(sizes[0]).toBe(sizes[1])
@@ -140,11 +143,35 @@ describe('page hooks', () => {
 
     it('reads the copies a build keeps, so the compress stage finds them', async () => {
       const cache = join(scratch, 'compressed-cache')
-      const { fileSize } = await sizesOf({ clientDir, publicDir, base: '', copiesOf: cachedCopies(cache) })
+      const { fileSize } = await sizesOf({ clientDir, publicDir, base: '' }, cachedCopies(cache))
       const size = await fileSize('/_kay/big-3c4d.css')
       const kept = (await readdir(cache)).find(name => name.endsWith('.br'))!
 
       expect(size).toBe((await Bun.file(join(cache, kept)).bytes()).length)
+    })
+
+    it('measures two paths of one content at once, to the one entry the build keeps', async () => {
+      await Bun.write(join(clientDir, 'twin-5e6f.css'), big)
+
+      const cache = join(scratch, 'twin-cache')
+      const { fileSize } = await sizesOf({ clientDir, publicDir, base: '' }, cachedCopies(cache))
+      const sizes = await Promise.all([fileSize('/_kay/big-3c4d.css'), fileSize('/_kay/twin-5e6f.css')])
+
+      expect(sizes[0]).toBe(sizes[1])
+      expect((await readdir(cache)).map(name => name.split('.').pop()).sort()).toEqual(['br', 'done', 'gz'])
+      expect(sizes[0]).toBe((await Bun.file(join(cache, (await readdir(cache)).find(name => name.endsWith('.br'))!)).bytes()).length)
+    })
+
+    it('makes only the brotli copy for a file the build keeps no copies of, and keeps none for a page it measures', async () => {
+      const cache = join(scratch, 'html-cache')
+      const { fileSize, htmlSize } = await sizesOf({ clientDir, publicDir, base: '' })
+
+      expect(await fileSize('/_kay/big-3c4d.css')).toBe((await strongestCopies(new TextEncoder().encode(big)) as { br: Uint8Array }).br.length)
+
+      const kept = await sizesOf({ clientDir, publicDir, base: '' }, cachedCopies(cache))
+
+      expect(await kept.htmlSize(`<p>${big}</p>`)).toBe(await htmlSize(`<p>${big}</p>`))
+      expect(existsSync(cache)).toBe(false)
     })
 
     it('hands every hook the sizes, in a build and in a page rendered afresh', async () => {
@@ -155,8 +182,11 @@ describe('page hooks', () => {
         return '<p></p>'
       }
 
-      await applyPageHooks([hook], '/', 'en', '<p></p>', assetFiles({ clientDir, publicDir, base: '' }))
-      await applyPageHooks([hook], '/', 'en', '<p></p>', async () => join(clientDir, 'page-1a2b.css'))
+      const found = assetFiles({ clientDir, publicDir, base: '' })
+      const other = async () => join(clientDir, 'page-1a2b.css')
+
+      await applyPageHooks([hook], '/', 'en', '<p></p>', found, pageSizes(found))
+      await applyPageHooks([hook], '/', 'en', '<p></p>', other, pageSizes(other))
 
       expect(seen).toEqual([3, 3])
     })
