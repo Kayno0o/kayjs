@@ -8,7 +8,7 @@ import { clientDir } from '../src/build/assets'
 import { setCardMaker, shareCard } from '../src/runtime/image'
 import { pages } from '../src/server'
 import { setupCards } from '../src/server/card'
-import { shootCard, templateStamp } from '../src/server/card-template'
+import { answer, shootCard, templateStamp } from '../src/server/card-template'
 import { decodePng } from '../src/server/crop'
 import { browserPath } from '../src/test/browser'
 
@@ -105,6 +105,27 @@ describe('the share card template stamp', () => {
     finally {
       setCardMaker(() => '')
       await rm(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('serves the page and the build\'s stylesheets, fonts and images, and nothing outside them', async () => {
+    const client = await mkdtemp(join(tmpdir(), 'kay-card-serve-'))
+    const get = async (path: string) => answer(new Request(`http://127.0.0.1${path}`), '<head><title>t</title></head><header>h</header>', client)
+
+    try {
+      await Bun.write(join(client, 'app.css'), 'a{}')
+      await Bun.write(join(client, 'assets/font.woff2'), 'f')
+      await Bun.write(join(client, 'entry.js'), 'x')
+      await Bun.write(join(client, '../secret.png'), 's')
+
+      expect(await (await get('/')).text()).toBe('<head><style>html,body{margin:0}html{overflow:hidden}</style><title>t</title></head><header>h</header>')
+
+      for (const [path, status] of [['/_kay/app.css', 200], ['/_kay/assets/font.woff2', 200], ['/_kay/entry.js', 404], ['/_kay/missing.css', 404], ['/app.css', 404], ['/_kay/%2e%2e/secret.png', 404], ['/_kay/..%2fsecret.png', 404], ['/_kay/assets/%00.css', 404], ['/_kay/%', 404]] as const)
+        expect([path, (await get(path)).status]).toEqual([path, status])
+    }
+    finally {
+      await rm(client, { recursive: true, force: true })
+      await rm(join(client, '../secret.png'), { force: true })
     }
   })
 

@@ -161,7 +161,7 @@ div(class="relative h-[630px] w-[1200px] bg-slate-900 text-white")
 
 The card is 1200 by 630 pixels, with no layout around it, and the page links its stylesheet itself. The pages still call `shareCard({ title, image })` as before. `image` has to be an imported image, which the template loads from the build.
 
-Chrome or Chromium draws the card, so one has to be on the machine that builds the site, and on the server for the cards no prerendered page asks for. It starts only when a card is drawn, and closes when none is waiting. Cards are signed, cached and written at build like the others, and changing the template, a component it imports or its styles draws them again.
+Chrome or Chromium draws the card, so one has to be on the machine that builds the site, and on the server for the cards no prerendered page asks for. It starts only when a card is drawn, and closes when none is waiting. Cards are signed, cached and written at build like the others, and changing the template, a component it imports or its styles draws them again. A change to a `.ts` helper or to `fonts` does not, so touch the template too. An imported image the template shows itself, outside `ctx.card.image`, is not loaded: use a `url()` of the file instead. The template renders in the default locale.
 
 To use a photo as the card, `shareImage(hero)` from `kay/image` is the URL of an imported image cut to the 1200x630 card, enlarged when smaller. It takes an image from `images.dirs` or `images.remote` too.
 

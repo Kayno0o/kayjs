@@ -680,7 +680,6 @@ class ModuleShell {
     return this.options.output === 'html' || this.kind === 'twin' || this.kind === 'promotable twin' || this.fence !== undefined || this.options.route === true
   }
 
-  // What `ctx.query` is typed by: the schemas of the layouts above and this file's own, when there are any; a special page reads its route's.
   // What `ctx` is typed as: the error page and the card page carry what they render.
   private pageContextType(): string {
     if (this.options.errorPage)
@@ -689,6 +688,7 @@ class ModuleShell {
     return this.options.cardPage ? 'CardPageContext' : 'PageContext'
   }
 
+  // What `ctx.query` is typed by: the schemas of the layouts above and this file's own, when there are any; a special page reads its route's.
   private declaresQuery(): string | undefined {
     if (this.options.special)
       return undefined
