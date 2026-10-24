@@ -24,6 +24,8 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('a deferred 
       // What the server was asked for, by the path under the base and the query.
       const asked: string[] = []
       let failing = false
+      // How long the server takes to answer a fetch of an island, for a test to meet the page before its island is fetched.
+      let islandDelay = 0
       // The next connection of a tab is refused as a proof gone stale, and the open ones can be dropped.
       let refuseOnce = false
       // Holds the fetch of an island before it reaches the server, until released.
@@ -40,7 +42,8 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('a deferred 
         return page
       }
       const stock = async (page: TestPage) => page.text('slot[data-kay-server] p.stock')
-      const shows = (count: number) => [(expected: number) => document.querySelector('slot[data-kay-server] p.stock')?.textContent === `${expected} left`, { timeout: '8s' }, count] as const
+      // The inert copy standing in for an island shows its value too, so it is the fetched island that counts.
+      const shows = (count: number) => [(expected: number) => document.querySelector('slot[data-kay-server]:not([inert]) p.stock')?.textContent === `${expected} left`, { timeout: '8s' }, count] as const
       const change = (count: number) => {
         db.stock = count
         invalidate('stock')
@@ -63,6 +66,9 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('a deferred 
             const inner = `${url.pathname.slice(root.length) || '/'}${url.search}`
 
             asked.push(`${request.method} ${inner}`)
+
+            if (islandDelay > 0 && url.search.includes('kay_island='))
+              await Bun.sleep(islandDelay)
 
             if (failing && url.search.includes('kay_island='))
               return new Response(null, { status: 500 })
@@ -119,6 +125,8 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('a deferred 
       }, 120_000)
 
       afterEach(() => {
+        islandDelay = 0
+
         for (const tab of tabs.splice(0))
           tab.close()
       })
@@ -277,6 +285,8 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('a deferred 
 
       it('keeps the island as it was when its fetch fails, and fetches it again at the next change', async () => {
         change(50)
+        islandDelay = 1500
+
         const page = await open()
 
         await page.waitUntil(...shows(50))
