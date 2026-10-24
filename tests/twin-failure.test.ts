@@ -55,3 +55,48 @@ describe('the pages a production server renders inside a layout holding an islan
     }, 120_000)
   }
 })
+
+async function buildFixture(): Promise<{ root: string, options: string }> {
+  const root = resolve(await fixtureCopy('twin-failure'))
+  const options = JSON.stringify({ root, prebuilt: true, security: false, inlineStyles: false, site: 'https://site.example' })
+  const built = await run(`import { buildProject } from ${JSON.stringify(resolve('src/build/pipeline'))}\nconst options = ${options}\nconst built = await buildProject(options.root, { security: false, inlineStyles: false, site: options.site }, { check: false })\nif (built.failed) throw built.failed.error\n`)
+
+  expect(built.code).toBe(0)
+
+  return { root, options }
+}
+
+async function serve(options: string, paths: string[]): Promise<{ answers: Answer[], errors: string, loaded: number }> {
+  const served = await run(`const options = ${options}\nconst { pages } = await import(${JSON.stringify(resolve('src/server'))})\nconst app = await pages(options)\nconst answers = []\nfor (const path of ${JSON.stringify(paths)}) {\n  const response = await app.handle(new Request('http://localhost' + path))\n  answers.push({ method: 'GET', path, status: response.status, html: await response.text() })\n}\nconsole.log(JSON.stringify({ answers, loaded: Object.keys(require.cache).filter(key => key.includes('@babel/parser')).length }))\n`)
+
+  expect(served.code).toBe(0)
+
+  return { ...JSON.parse(served.output.split('\n').at(-1)!) as { answers: Answer[], loaded: number }, errors: served.errors }
+}
+
+describe('a twin on the prebuilt path', () => {
+  it('is compiled again when its source changed after the build, with nothing logged', async () => {
+    const { root, options } = await buildFixture()
+    const glyph = resolve(root, 'src/components/glyph.kay')
+
+    await Bun.write(glyph, (await Bun.file(glyph).text()).replace('span.glyph ', 'span.glyph.edited '))
+
+    const { answers, errors, loaded } = await serve(options, ['/dyn'])
+
+    expect(answers[0]!.status).toBe(200)
+    expect(answers[0]!.html).toContain('class="glyph edited"')
+    expect(errors).not.toMatch(/Error|kay:/)
+    // The edited twin went through the compiler, so the parser probe of the tests above does see a load.
+    expect(loaded).toBeGreaterThan(0)
+  }, 120_000)
+
+  it('shows the frames of a throwing render as the lines of its .kay file', async () => {
+    const { options } = await buildFixture()
+    const { answers, errors } = await serve(options, ['/crash'])
+
+    expect(answers[0]!.status).toBe(500)
+    expect(errors).toMatch(/twin crash/)
+    // The throw is on line 5 of crash.kay, where the module the loader returns has it elsewhere.
+    expect(errors).toMatch(/crash\.kay:5:/)
+  }, 120_000)
+})

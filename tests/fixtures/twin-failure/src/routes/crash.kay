@@ -1,0 +1,4 @@
+---
+import Shaker from '../components/shaker.kay'
+---
+Shaker(hydrate="idle")

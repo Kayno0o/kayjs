@@ -1,0 +1,6 @@
+---
+import Crash from './crash.kay'
+const open = signal(false)
+---
+button.shaker(onClick={() => open.set(!open())})
+  Crash(label="crash")

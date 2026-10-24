@@ -1,0 +1,7 @@
+---
+const { label } = props<{ label: string }>()
+
+if (label === 'crash')
+  throw new Error('twin crash')
+---
+span.crash {label}
