@@ -14,7 +14,7 @@ import { imageHeader } from '../server/image-format'
 import { ASSET_FILE, clientDir, RENDER_OUTPUT, writeAsset } from './assets'
 import { cacheIds } from './cache-ids'
 import { directImports } from './direct-imports'
-import { SCRIPT_FILE, scriptLoader } from './files'
+import { KAY_MODULE, SCRIPT_FILE, scriptLoader } from './files'
 import { expandGlobs } from './glob'
 import { iconModule, iconNames, installedIconSets } from './icons'
 import { settingsReplacements } from './libraries'
@@ -59,7 +59,6 @@ export interface KayPluginOptions {
 }
 
 // A static component imports its `?island` twin, the build of it that renders inside islands, as a module of its own.
-const KAY_FILE = /\.kay(?:\?island)?$/
 const TWIN_IMPORT = /\.kay\?island$/
 // Where the bundler keeps twins: unlike the runtime loader, it resolves no specifier holding a `?`.
 const TWIN_NAMESPACE = 'kay-island'
@@ -235,14 +234,14 @@ export function kayPlugin(options: KayPluginOptions, workers: string[]): BunPlug
         return { contents: map === undefined ? noted : `${noted}${embeddedMapTail(twin ? `${TWIN_NAMESPACE}:${file}` : options.mapName?.(file) ?? relative(process.cwd(), file), map)}`, loader: 'ts' as const }
       }
 
-      build.onLoad({ filter: KAY_FILE }, async ({ path }) => load(path))
+      build.onLoad({ filter: KAY_MODULE }, async ({ path }) => load(path))
 
       const iconSets = installedIconSets(root)
 
       // Only a bundle has a config; the runtime loader takes the specifier as it is.
       if (build.config !== undefined) {
         build.onResolve({ filter: TWIN_IMPORT }, ({ path, importer }) => ({ path: `${resolve(dirname(importer), withoutTwin(path))}${ISLAND_TWIN}`, namespace: TWIN_NAMESPACE }))
-        build.onLoad({ filter: KAY_FILE, namespace: TWIN_NAMESPACE }, async ({ path }) => load(path, true))
+        build.onLoad({ filter: KAY_MODULE, namespace: TWIN_NAMESPACE }, async ({ path }) => load(path, true))
         build.onResolve({ filter: ICON_SPECIFIER }, ({ path }) => ({ path, namespace: ICON_NAMESPACE }))
         build.onLoad({ filter: ANY, namespace: ICON_NAMESPACE }, ({ path }) => ({ contents: iconModule(iconSets, path), loader: 'js' }))
       }

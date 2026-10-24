@@ -1,0 +1,4 @@
+--- server
+const { url } = ctx
+---
+p.dyn {url.pathname}

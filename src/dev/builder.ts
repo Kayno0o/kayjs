@@ -10,7 +10,7 @@ import { dirname, join, relative, resolve, sep } from 'node:path'
 import process from 'node:process'
 import { clientDir, DEV_MAPS_DIR, outputDir } from '../build/assets'
 import { bothBundles, bundleIslands, bundleStyles, classTableOf, clearClientOutput, islandClassTableOf, readClientSources, writeClasses } from '../build/client'
-import { CSS_FILE, forgetSources, inWalkScope, keepSources, readSource, readSourcePaths, readText, writeAtomically } from '../build/files'
+import { CSS_FILE, forgetSources, inWalkScope, KAY_MODULE, keepSources, readSource, readSourcePaths, readText, writeAtomically } from '../build/files'
 import { fileWords, sourceWords } from '../build/libraries'
 import { classTokens, NAMING_FILE } from '../build/prune'
 import { referencesOf } from '../build/references'
@@ -66,8 +66,6 @@ interface Built {
   manifest: string
 }
 
-// A `.kay` module of a chunk, a static component's `?island` twin included.
-const KAY_INPUT = /\.kay(?:\?island)?$/
 const SCRIPT_OR_COMPONENT = /\.(?:kay|[cm]?[jt]sx?)$/
 // The files Tailwind reads classes from.
 const SCANNED_FILE = /\.(?:kay|[cm]?[jt]sx?|html|mdx?)$/
@@ -335,12 +333,12 @@ async function pointMapsAtKay(root: string, scripts: { maps: string[], inputs: C
 
 // What a chunk's map depends on besides the chunk's name, which holds its code's hash: the text of each `.kay` file in it. Undefined for a chunk with none, whose map has nothing to point.
 function kayKey(root: string, inputs: ChunkInputs[string] | undefined): string | undefined {
-  const files = Object.keys(inputs ?? {}).filter(input => KAY_INPUT.test(input)).sort()
+  const files = Object.keys(inputs ?? {}).filter(input => KAY_MODULE.test(input)).sort()
 
   if (files.length === 0)
     return undefined
 
-  return Bun.hash(files.map(file => `${file}\0${readSourceText(resolve(root, file.replace(KAY_INPUT, '.kay'))) ?? ''}`).join('\0')).toString(36)
+  return Bun.hash(files.map(file => `${file}\0${readSourceText(resolve(root, file.replace(KAY_MODULE, '.kay'))) ?? ''}`).join('\0')).toString(36)
 }
 
 async function signatureOf(file: string, text: string, signed: Map<string, { hash: number | bigint, signature: string | undefined }>): Promise<string | undefined> {

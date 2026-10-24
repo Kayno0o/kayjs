@@ -14,7 +14,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 - kayjs-auth: `auth.userIdsHolding(role)` lists the ids of the users holding a role or one above it, for server code that notifies them ([Admin and organizations](../packages/auth/llms/admin-and-organizations.md)).
 - A cms writer without `publish` sends a draft for review, and a reviewer holding the new `review` action approves it (publishing or scheduling it) or sends it back with a note, each kept in the entry's history and told through `notify()`; `roles` keys can name kayjs-auth organization roles as `org:<role>` ([Review](../packages/cms/llms/review.md)).
 - A page hook is given `fileSize(url)` and `htmlSize(html)`, the compressed sizes a browser downloads, read from the copies the compress stage keeps so that a hook measuring page weight compresses no file twice ([Page hooks](prerendering.md#page-hooks)).
-- A server started with `kay start` renders a static component inside an island on its `_404` and `_error` pages, where it logged `KayHydrated is not a function` and fell back to the page without its layout.
+- A server started with `kay start` renders a static component inside an island on a page that is not prerendered, `_404` and `_error` included, where it logged `KayHydrated is not a function` and answered 500 or lost the layout.
 
 ## 1.75.0
 
