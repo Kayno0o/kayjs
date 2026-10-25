@@ -39,18 +39,14 @@ async function heldByTheDead(): Promise<boolean> {
   }
 }
 
-// Tests of one parallel run each build the docs into `docs/.kay` and read or serve it: one at a time, as a build wipes the last one. Returns what releases the turn.
-export async function takeDocsBuild(keepsBuild = false): Promise<() => Promise<void>> {
+// Tests of one parallel run each build the docs into `docs/.kay` and read or serve it: one at a time, so a build never meets a reader of the same folder. Returns what releases the turn.
+export async function takeDocsBuild(): Promise<() => Promise<void>> {
   await mkdir(join(LOCK, '..'), { recursive: true })
 
   for (;;) {
     try {
       await mkdir(LOCK)
       await writeFile(HOLDER, String(process.pid))
-
-      // A build of its own replaces what the last one wrote, so the one a reader kept is no longer there.
-      if (!keepsBuild)
-        await rm(stampFile(), { force: true })
 
       return async () => rm(LOCK, { recursive: true, force: true })
     }
@@ -99,7 +95,7 @@ async function readStamp(): Promise<string> {
 
 // `takeDocsBuild` for a test reading the build `kay build docs --no-check` writes: it builds unless this run already built the same sources, which a file holding the turn since then has not touched.
 export async function takeDocsBuilt(): Promise<() => Promise<void>> {
-  const release = await takeDocsBuild(true)
+  const release = await takeDocsBuild()
 
   try {
     const stamp = await stampOfSources()
