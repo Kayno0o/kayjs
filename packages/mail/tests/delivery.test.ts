@@ -8,21 +8,25 @@ import { deliveryAddress } from '../src/delivery'
 import { mailer } from '../src/mailer'
 import { outbox } from '../src/outbox'
 import { logged } from './fixture/tests/logged'
+import { fixtureCopy } from './helpers/fixtureCopy'
 import { startSmtp } from './helpers/smtp'
 
-// As `kay dev` runs the server: NODE_ENV=development with its change code, in the fixture app's folder, where the switch is kept under `.kay`.
+// As `kay dev` runs the server: NODE_ENV=development with its change code, in a copy of the fixture app, where the switch is kept under `.kay`.
 const saved = process.env.NODE_ENV
 const root = process.cwd()
 const server = startSmtp()
 const closed = startSmtp()
-const SWITCH = join(root, 'tests/fixture/.kay/mail-delivery.json')
+let app = ''
+let switchFile = ''
 
 closed.stop()
 
-beforeAll(() => {
+beforeAll(async () => {
+  app = await fixtureCopy()
+  switchFile = join(app, '.kay/mail-delivery.json')
   process.env.NODE_ENV = 'development'
   process.env.KAY_DEV_CODE = '0'
-  process.chdir(`${root}/tests/fixture`)
+  process.chdir(app)
 })
 
 afterAll(() => {
@@ -42,7 +46,7 @@ beforeEach(() => {
 })
 
 afterEach(async () => {
-  await rm(SWITCH, { force: true })
+  await rm(switchFile, { force: true })
 
   for (const name of ['MAIL_URL', 'MAIL_INSECURE'])
     delete process.env[name]
@@ -138,7 +142,7 @@ describe('the "Send for real" switch', () => {
 
   it('stays on across a restart of the server, kept under .kay until turned off', async () => {
     await toggle(mailer({ from: 'dev@example.com', queue: { store: memoryJobs() } }), 'me@example.com')
-    expect(JSON.parse(await Bun.file(SWITCH).text())).toEqual({ to: 'me@example.com' })
+    expect(JSON.parse(await Bun.file(switchFile).text())).toEqual({ to: 'me@example.com' })
 
     const restarted = mailer({ from: 'dev@example.com', queue: { store: memoryJobs() } })
     const received = server.received.length
@@ -150,7 +154,7 @@ describe('the "Send for real" switch', () => {
     const off = await toggle(restarted, '')
 
     expect(await off.json()).toMatchObject({ on: false })
-    expect(existsSync(SWITCH)).toBe(false)
+    expect(existsSync(switchFile)).toBe(false)
     await restarted.send(mail('Once off'))
     expect(server.received).toHaveLength(received + 1)
   })
@@ -167,9 +171,9 @@ describe('the "Send for real" switch', () => {
 
     expect(refused.status).toBe(409)
     expect(await refused.text()).toContain('MAIL_URL')
-    expect(existsSync(SWITCH)).toBe(false)
+    expect(existsSync(switchFile)).toBe(false)
 
-    await Bun.write(SWITCH, JSON.stringify({ to: 'me@example.com' }))
+    await Bun.write(switchFile, JSON.stringify({ to: 'me@example.com' }))
 
     const received = server.received.length
 
@@ -184,7 +188,7 @@ describe('the "Send for real" switch', () => {
 
     const app = mailer({ from: 'dev@example.com', queue: { store: memoryJobs() } })
 
-    await Bun.write(SWITCH, JSON.stringify({ to: 'me@example.com' }))
+    await Bun.write(switchFile, JSON.stringify({ to: 'me@example.com' }))
 
     const lines = await logged(async () => {
       await app.send(mail('First'))
@@ -201,19 +205,19 @@ describe('the "Send for real" switch', () => {
     expect((await toggle(app, 'me@example.com', 'cross-site')).status).toBe(403)
     expect((await toggle(app, 'me@example.com', 'same-site')).status).toBe(403)
     expect((await request(app, '/_kay/mail/delivery', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ to: 'me@example.com' }) })).status).toBe(403)
-    expect(existsSync(SWITCH)).toBe(false)
+    expect(existsSync(switchFile)).toBe(false)
     expect((await toggle(app, 'not an address')).status).toBe(400)
     expect((await toggle(app, 'me@example.com, you@example.com')).status).toBe(400)
     expect((await toggle(app, 'Me <me@example.com>')).status).toBe(400)
-    expect(existsSync(SWITCH)).toBe(false)
+    expect(existsSync(switchFile)).toBe(false)
 
     await toggle(app, 'me@example.com')
     expect((await toggle(app, '', 'cross-site')).status).toBe(403)
-    expect(existsSync(SWITCH)).toBe(true)
+    expect(existsSync(switchFile)).toBe(true)
   })
 
   it('is read by the server kay dev runs alone, never under test, in production or outside kay dev', async () => {
-    await Bun.write(SWITCH, JSON.stringify({ to: 'me@example.com' }))
+    await Bun.write(switchFile, JSON.stringify({ to: 'me@example.com' }))
     expect(await deliveryAddress()).toBe('me@example.com')
 
     for (const env of ['test', 'production']) {
@@ -230,7 +234,7 @@ describe('the "Send for real" switch', () => {
     expect(outbox.last()!.relayed).toBeUndefined()
     expect(server.received.length).toBe(received)
     expect((await toggle(underTest, 'you@example.com')).status).toBe(409)
-    expect(JSON.parse(await Bun.file(SWITCH).text())).toEqual({ to: 'me@example.com' })
+    expect(JSON.parse(await Bun.file(switchFile).text())).toEqual({ to: 'me@example.com' })
 
     process.env.NODE_ENV = 'development'
     delete process.env.KAY_DEV_CODE
@@ -245,7 +249,7 @@ describe('the "Send for real" switch', () => {
 
   it('ignores a file edited into something that is no address', async () => {
     for (const content of ['{"to":"a@b.c, d@e.f"}', '{"to":5}', 'not json', '{}']) {
-      await Bun.write(SWITCH, content)
+      await Bun.write(switchFile, content)
       expect(await deliveryAddress()).toBeUndefined()
     }
   })

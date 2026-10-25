@@ -3,6 +3,7 @@ import { join } from 'node:path'
 import process from 'node:process'
 import { expect, test } from 'bun:test'
 import { scratchDir } from '../../../tests/scratch'
+import { appEnv, fixtureCopy } from './helpers/fixtureCopy'
 
 const CLI = join(import.meta.dir, '../../../src/cli.ts')
 const SERVER = '--- server\nimport { ask } from \'@kaynooo/kayjs-ai\'\n\nconst answer = ask(\'hi\')\n---\nawait answer\n  p Thinking\nthen text\n  p {text}\n'
@@ -37,8 +38,8 @@ test('a page asking in its server fence builds, and an island importing ask does
 
 // The send and stop buttons draw kayjs-ui's `send` and `stop` slots, so the island carries the icons of the app's settings: this marker is the send arrow's drawing.
 test('the Chat island draws its icons from kayjs-ui\'s settings', async () => {
-  const fixture = join(import.meta.dir, 'fixture')
-  const run = Bun.spawn([process.execPath, CLI, 'build', fixture, '--no-check', '--quiet'], { cwd: fixture, stdout: 'pipe', stderr: 'pipe' })
+  const fixture = await fixtureCopy()
+  const run = Bun.spawn([process.execPath, CLI, 'build', fixture, '--no-check', '--quiet'], { cwd: fixture, env: appEnv(fixture), stdout: 'pipe', stderr: 'pipe' })
   const output = await new Response(run.stdout).text() + await new Response(run.stderr).text()
 
   expect(await run.exited, output).toBe(0)
