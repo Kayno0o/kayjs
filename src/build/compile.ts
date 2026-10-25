@@ -10,6 +10,7 @@ import { PAGES_ENTRY } from '../dev/sources'
 import { projectApi } from '../server/api-modules'
 import { packageName } from '../server/app-identity'
 import { AVIF_WORKER_SOURCE } from '../server/avif'
+import { publicEnvFiles } from '../server/env-state'
 import { DEFAULT_LANG, extensionMessageFiles, messagesFile } from '../server/i18n'
 import { matcherFile } from '../server/params'
 import { refuseClashes } from '../server/route-table'
@@ -90,7 +91,7 @@ export async function compileServer(project: Project, options: CompileOptions): 
   if (basename(publicDir) === CLIENT_ASSETS)
     throw new KayError('executable-invalid', `kay: an executable embeds its public files and the client build side by side, so the public directory cannot be named ${CLIENT_ASSETS}`)
 
-  const { routes, fallback, api, plugins, endpoints, editor, extensionMessages, modules } = await serverParts(project)
+  const { routes, fallback, api, plugins, endpoints, editor, extensionMessages, modules, publicModules } = await serverParts(project)
   const configFile = join(root, CONFIG_FILE)
   const generated = join(paths.compile, 'entry.ts')
   const embedded = (dir: string) => `join(import.meta.dir, ${JSON.stringify(basename(dir))})`
@@ -146,6 +147,7 @@ export async function compileServer(project: Project, options: CompileOptions): 
     `  plugins: ${JSON.stringify(plugins)},`,
     `  extensionMessages: ${JSON.stringify(extensionMessages)},`,
     ...editor === undefined ? [] : [`  editor: ${JSON.stringify(editor)},`],
+    `  publicModules: ${JSON.stringify(publicModules)},`,
     `  modules: { ${modules.map((file, index) => `${JSON.stringify(file)}: module${index}`).join(', ')} },`,
     '  config,',
     `  clientDir: ${embedded(clientBase)},`,
@@ -215,9 +217,11 @@ export async function serverParts(project: Project) {
   const plugins = pluginFiles(root)
   const endpoints = await scanEndpoints(routesDir, mounts)
   const editor = extensionEditor(root, config.extensions)
-  const modules = [...new Set([...routeModules(routes, fallback), ...editor === undefined ? [] : [editor], ...extensionServerModules(root, serverExtensions(root, config.extensions, plugins)), ...extensionContexts(root, config.extensions), ...extensionAppFiles(root, config.extensions), ...existsSync(contentConfig) ? [contentConfig] : [], ...matcherFiles, ...messageFiles, ...[...api, ...endpoints].flatMap(module => [module.file, ...module.guards.map(guard => guard.file)])])]
+  // The modules declaring `s.Public` run at boot, and an executable cannot scan for them.
+  const publicModules = publicEnvFiles(root).filter(file => file.endsWith('.ts')).map(file => join(root, file))
+  const modules = [...new Set([...publicModules, ...routeModules(routes, fallback), ...editor === undefined ? [] : [editor], ...extensionServerModules(root, serverExtensions(root, config.extensions, plugins)), ...extensionContexts(root, config.extensions), ...extensionAppFiles(root, config.extensions), ...existsSync(contentConfig) ? [contentConfig] : [], ...matcherFiles, ...messageFiles, ...[...api, ...endpoints].flatMap(module => [module.file, ...module.guards.map(guard => guard.file)])])]
 
-  return { routes, fallback, api, plugins, endpoints, editor, extensionMessages, modules }
+  return { routes, fallback, api, plugins, endpoints, editor, extensionMessages, modules, publicModules }
 }
 
 // Every module a route renders or runs: its page, layouts, special pages and guards, its layouts' own included.

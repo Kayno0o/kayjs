@@ -36,6 +36,7 @@ import { apiPathOf, mcpPath, mcpRateLimit, RESOURCE_METADATA, sharedGuards } fro
 import { rebaseCss, rebaseRedirects } from './base'
 import { DEFAULT_BODY_LIMIT, limitBodies, mountLimits } from './body'
 import { serveBuildFiles } from './build-files'
+import { bundled } from './bundle'
 import { serveCards } from './card'
 import { compressResponse, fixedTexts } from './compress'
 import { checkRequestIdHeader, healthTimeoutMs, remoteLimits } from './config-limits'
@@ -331,6 +332,15 @@ export async function servePages(project: Project<PagesOptions>, loadClient: () 
 
 // The modules declaring an `s.Public` field run before any build starts, so a name meant for the server alone is refused first and the values are there before a page or the browser reads them. Returns their paths.
 async function loadPublicModules(root: string): Promise<string[]> {
+  const held = bundled()
+
+  // An executable holds the modules the build found, already run by its entry, with no `src` to scan.
+  if (held?.publicModules !== undefined) {
+    holdPublicEnv(held.publicModules)
+
+    return held.publicModules
+  }
+
   const files = publicEnvFiles(root)
   const inFence = files.find(file => file.endsWith('.kay'))
 

@@ -5,6 +5,7 @@ import process from 'node:process'
 import { t } from 'elysia'
 import { KayError } from '../compiler/errors'
 import { PUBLIC_ENV } from '../runtime/env'
+import { bundled } from './bundle'
 import { fixedReply } from './compress'
 import { devSecret } from './dev-secret'
 import { building, callerFile, PUBLIC_ENV_PATH, recordEnv } from './env-state'
@@ -211,6 +212,10 @@ function publicOf(schema: EnvSchema, values: Record<string, unknown>, owner: str
 }
 
 function declaredOf(files: readonly string[]): PublicDeclared[] {
+  // An executable runs one app, and the frames of its modules do not name the files they were built from, so every declaration is its own.
+  if (bundled() !== undefined)
+    return declaredPublic
+
   const own = new Set(files)
 
   return declaredPublic.filter(({ file }) => file === undefined || own.has(file))

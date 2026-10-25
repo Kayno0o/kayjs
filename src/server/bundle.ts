@@ -19,6 +19,8 @@ export interface Bundle {
   // The endpoint files under the routes directory, `llms.txt.ts` and the like.
   endpoints?: Endpoint[]
   modules: Record<string, unknown>
+  // The modules declaring an `s.Public` field, by the paths they are held under in `modules`: a server with no `src` beside it cannot scan for them.
+  publicModules?: string[]
   // The message catalogs the extensions gave each locale, found where the build ran: an extension names its own under the executable's.
   extensionMessages?: Record<string, string[]>
   // The editor an extension gives, by the path its module is held under.

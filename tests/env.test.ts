@@ -9,6 +9,7 @@ import { defineEnv } from '../src/server'
 import { publicEnvFiles } from '../src/server/env-state'
 import { overrideEnv } from '../src/test'
 import { kayInProject } from './check-helper'
+import { freePort } from './free-port'
 import { scratchDir } from './scratch'
 
 // Many cases spawn the CLI, which a loaded host runs slowly.
@@ -309,6 +310,85 @@ describe('a compiled server', () => {
     expect(set.stdout.trim()).toBe('real')
     expect(set.code).toBe(0)
   }, 90_000)
+
+  describe('with s.Public', () => {
+    const files = {
+      'tsconfig.json': JSON.stringify({ compilerOptions: { target: 'ESNext', jsx: 'preserve', jsxImportSource: 'kay', lib: ['ESNext', 'DOM'], rootDirs: ['.', '.kay/types'], module: 'Preserve', moduleResolution: 'bundler', strict: true, noEmit: true, skipLibCheck: true }, include: ['src', '.kay/types'] }),
+      'kay.config.ts': 'export default { favicon: false }\n',
+      'src/public-env.ts': 'import { s } from \'kay\'\nimport { defineEnv } from \'kay/server\'\n\nexport const env = defineEnv(s.Object({ SITE_NAME: s.Public(s.String({ default: \'built\' })) }))\n',
+      'src/routes/index.kay': '---\nimport { publicEnv } from \'kay\'\n---\np#name {publicEnv.SITE_NAME}\n',
+    }
+
+    const stops = new WeakMap<object, Promise<string>>()
+
+    async function stderrAfterExit(child: Bun.Subprocess<'ignore', 'pipe', 'pipe'>): Promise<string> {
+      await child.exited
+
+      return new Response(child.stderr).text()
+    }
+
+    // Stops the executable once and gives what it wrote to stderr.
+    async function stopped(child: Bun.Subprocess<'ignore', 'pipe', 'pipe'>): Promise<string> {
+      if (!stops.has(child)) {
+        child.kill()
+        stops.set(child, stderrAfterExit(child))
+      }
+
+      return stops.get(child)!
+    }
+
+    async function served(options: { from: 'source' | 'elsewhere' }) {
+      const root = await project(files)
+      const built = Bun.spawn([process.execPath, cli, 'build', root, '--compile', join(root, 'server'), '--no-check'], { stdout: 'pipe', stderr: 'pipe' })
+
+      expect(await built.exited, await new Response(built.stderr).text()).toBe(0)
+
+      // A runtime stage of a container image holds the executable alone.
+      const cwd = options.from === 'source' ? root : await scratchDir('env-run-')
+
+      dirs.push(cwd)
+
+      if (cwd !== root)
+        await Bun.write(join(cwd, 'server'), Bun.file(join(root, 'server')), { mode: 0o755 })
+
+      const port = freePort()
+      const child = Bun.spawn([join(cwd, 'server')], { cwd, env: { PATH: process.env.PATH!, PORT: String(port), HOST: '127.0.0.1', KAY_EPHEMERAL_SECRET: '1', SITE_NAME: 'booted' }, stdout: 'pipe', stderr: 'pipe' })
+
+      try {
+        for (const limit = Date.now() + 20_000; Date.now() < limit; await Bun.sleep(50)) {
+          try {
+            const page = await fetch(`http://127.0.0.1:${port}/`)
+            const module = await fetch(`http://127.0.0.1:${port}/_kay/env.js`)
+
+            return { page: { status: page.status, text: await page.text() }, module: { status: module.status, text: await module.text() }, stderr: await stopped(child) }
+          }
+          catch {}
+        }
+
+        throw new Error(`the executable never answered: ${await new Response(child.stderr).text()}`)
+      }
+      finally {
+        await stopped(child)
+      }
+    }
+
+    it('fills publicEnv and serves it with no src beside the executable', async () => {
+      const { page, module, stderr } = await served({ from: 'elsewhere' })
+
+      expect(page.status, stderr).toBe(200)
+      expect(page.text).toContain('<p id="name">booted</p>')
+      expect(module.status).toBe(200)
+      expect(module.text).toBe('export default {"SITE_NAME":"booted"}\n')
+    }, 90_000)
+
+    it('does the same run from its source folder, loading the module once', async () => {
+      const { page, module, stderr } = await served({ from: 'source' })
+
+      expect(page.status, stderr).toBe(200)
+      expect(page.text).toContain('<p id="name">booted</p>')
+      expect(module.text).toBe('export default {"SITE_NAME":"booted"}\n')
+    }, 90_000)
+  })
 })
 
 function readerEnv() {
