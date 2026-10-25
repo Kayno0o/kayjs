@@ -67,7 +67,7 @@ kayjs-cms answers on `/_kay/cms` alone: the `/api/cms` path of 1.70 and before i
 - kayjs-cms: `cms({ logo })` is gone, a type error: give `logo: { src, alt }` in the cms settings module. The `kcms_session` cookie is no longer read, so an editor signed in with the 1.69 cookie signs in again.
 - `paginate()`'s result drops `size`, the old name of `pageSize`.
 
-kayjs-auth's `auth_*` tables are no longer `renamedFrom` their old names. A database still on `auth_*` tables must take 1.71 to 1.73 first, apply the migration `db.sync()` or `bunx pg-orm generate` writes there, and only then move to 1.74: from 1.74 the generator no longer renames them, so it would create the `kay_*` tables beside the old ones, empty.
+kayjs-auth's `auth_*` tables are no longer `renamedFrom` their old names on 1.74 to 1.76: a database still on `auth_*` tables moves straight to 1.77 or later, whose tables rename them again for good, through the migration `db.sync()` or `bunx pg-orm generate` writes.
 
 ### Props typed `Signal<T>` or `Memo<T>` are plain values
 

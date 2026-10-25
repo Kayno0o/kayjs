@@ -4,6 +4,7 @@ import { defineTable } from '@kaynooo/pg-orm'
 import { durationSeconds } from 'kay/library'
 import { log } from './log'
 
+// Each table keeps the `renamedFrom` of its pre-1.71 `auth_*` name for good, unlike a deprecated form: an app jumping several minors at once still gets its users renamed rather than empty tables beside them, and a rename finding no old table does nothing.
 export const AuthUsers = defineTable('kay_users', t => ({
   id: t.text().primaryKey(),
   email: t.text().nullable().unique(),
@@ -26,7 +27,7 @@ export const AuthUsers = defineTable('kay_users', t => ({
   // The app's own data on the user, from the `user` option.
   data: t.jsonb<Record<string, unknown>>().notNull().default({}),
   created_at: t.timestamptz().notNull(),
-})).withIndexes([{ columns: ['created_at'] }, { columns: ['guest', 'created_at'] }])
+})).renamedFrom('auth_user').withIndexes([{ columns: ['created_at'] }, { columns: ['guest', 'created_at'] }])
 
 const userId = () => AuthUsers
 
@@ -39,7 +40,7 @@ export const AuthIdentities = defineTable('kay_identities', t => ({
   refresh_token: t.text().nullable(),
   token_expires_at: t.timestamptz().nullable(),
   created_at: t.timestamptz().notNull(),
-})).withIndexes([{ columns: ['provider', 'provider_id'], unique: true }, { columns: ['user_id'] }])
+})).renamedFrom('auth_identity').withIndexes([{ columns: ['provider', 'provider_id'], unique: true }, { columns: ['user_id'] }])
 
 export const AuthTokens = defineTable('kay_tokens', t => ({
   digest: t.text().primaryKey(),
@@ -48,13 +49,13 @@ export const AuthTokens = defineTable('kay_tokens', t => ({
   email: t.text().notNull(),
   redirect: t.text().nullable(),
   expires_at: t.timestamptz().notNull(),
-})).withIndexes([{ columns: ['user_id', 'type'] }, { columns: ['expires_at'] }])
+})).renamedFrom('auth_token').withIndexes([{ columns: ['user_id', 'type'] }, { columns: ['expires_at'] }])
 
 export const AuthRecoveryCodes = defineTable('kay_recovery_codes', t => ({
   id: t.serial().primaryKey(),
   user_id: t.text().notNull().references(userId, 'id', { onDelete: 'cascade' }),
   digest: t.text().notNull(),
-})).withIndexes([{ columns: ['user_id', 'digest'], unique: true }])
+})).renamedFrom('auth_recovery_code').withIndexes([{ columns: ['user_id', 'digest'], unique: true }])
 
 export const AuthBearerTokens = defineTable('kay_bearer_tokens', t => ({
   id: t.text().primaryKey(),
@@ -70,7 +71,7 @@ export const AuthBearerTokens = defineTable('kay_bearer_tokens', t => ({
   oauth_family: t.text().nullable(),
   // The resource (RFC 8707) the token is bound to; null for none, and for tokens stored before this column.
   oauth_resource: t.text().nullable(),
-})).withIndexes([{ columns: ['user_id'] }, { columns: ['expires_at'] }, { columns: ['user_id', 'oauth_client'] }, { columns: ['user_id', 'oauth_family'] }])
+})).renamedFrom('auth_bearer_token').withIndexes([{ columns: ['user_id'] }, { columns: ['expires_at'] }, { columns: ['user_id', 'oauth_client'] }, { columns: ['user_id', 'oauth_family'] }])
 
 export const AuthSessions = defineTable('kay_auth_sessions', t => ({
   id: t.text().primaryKey(),
@@ -81,7 +82,7 @@ export const AuthSessions = defineTable('kay_auth_sessions', t => ({
   created_at: t.timestamptz().notNull(),
   last_seen_at: t.timestamptz().notNull(),
   max_age: t.int4().nullable(),
-})).withIndexes([{ columns: ['user_id'] }, { columns: ['last_seen_at'] }, { columns: ['created_at'] }])
+})).renamedFrom('auth_session').withIndexes([{ columns: ['user_id'] }, { columns: ['last_seen_at'] }, { columns: ['created_at'] }])
 
 export const AuthPasskeys = defineTable('kay_passkeys', t => ({
   id: t.text().primaryKey(),
@@ -97,7 +98,7 @@ export const AuthPasskeys = defineTable('kay_passkeys', t => ({
   user_verified: t.bool().notNull().default(false),
   created_at: t.timestamptz().notNull(),
   last_used_at: t.timestamptz().nullable(),
-})).withIndexes([{ columns: ['user_id'] }])
+})).renamedFrom('auth_passkey').withIndexes([{ columns: ['user_id'] }])
 
 // No reference to the user: the log outlives them.
 export const AuthAudit = defineTable('kay_audits', t => ({
@@ -109,14 +110,14 @@ export const AuthAudit = defineTable('kay_audits', t => ({
   user_agent: t.text().notNull(),
   actor_id: t.text().nullable(),
   at: t.timestamptz().notNull(),
-})).withIndexes([{ columns: ['user_id', 'at'] }, { columns: ['at'] }, { columns: ['actor_id'] }])
+})).renamedFrom('auth_audit').withIndexes([{ columns: ['user_id', 'at'] }, { columns: ['at'] }, { columns: ['actor_id'] }])
 
 export const AuthOrganizations = defineTable('kay_organizations', t => ({
   id: t.text().primaryKey(),
   name: t.text().notNull(),
   slug: t.text().nullable().unique(),
   created_at: t.timestamptz().notNull(),
-}))
+})).renamedFrom('auth_organization')
 
 const organizationId = () => AuthOrganizations
 
@@ -126,7 +127,7 @@ export const AuthMembers = defineTable('kay_members', t => ({
   user_id: t.text().notNull().references(userId, 'id', { onDelete: 'cascade' }),
   roles: t.array(t.text()).notNull(),
   created_at: t.timestamptz().notNull(),
-})).withIndexes([{ columns: ['organization_id', 'user_id'], unique: true }, { columns: ['user_id'] }])
+})).renamedFrom('auth_member').withIndexes([{ columns: ['organization_id', 'user_id'], unique: true }, { columns: ['user_id'] }])
 
 export const AuthInvitations = defineTable('kay_invitations', t => ({
   id: t.text().primaryKey(),
@@ -136,14 +137,14 @@ export const AuthInvitations = defineTable('kay_invitations', t => ({
   invited_by: t.text().nullable().references(userId, 'id', { onDelete: 'set null' }),
   created_at: t.timestamptz().notNull(),
   expires_at: t.timestamptz().notNull(),
-})).withIndexes([{ columns: ['organization_id'] }, { columns: ['email'] }, { columns: ['expires_at'] }])
+})).renamedFrom('auth_invitation').withIndexes([{ columns: ['organization_id'] }, { columns: ['email'] }, { columns: ['expires_at'] }])
 
 export const AuthOAuthClients = defineTable('kay_oauth_clients', t => ({
   id: t.text().primaryKey(),
   name: t.text().notNull(),
   redirect_uris: t.array(t.text()).notNull(),
   created_at: t.timestamptz().notNull(),
-})).withIndexes([{ columns: ['created_at'] }])
+})).renamedFrom('auth_oauth_client').withIndexes([{ columns: ['created_at'] }])
 
 export const AuthOAuthGrants = defineTable('kay_oauth_grants', t => ({
   id: t.serial().primaryKey(),
@@ -153,7 +154,7 @@ export const AuthOAuthGrants = defineTable('kay_oauth_grants', t => ({
   scopes: t.array(t.text()).nullable(),
   created_at: t.timestamptz().notNull(),
   last_used_at: t.timestamptz().nullable(),
-})).withIndexes([{ columns: ['user_id', 'client_id'], unique: true }, { columns: ['client_id'] }])
+})).renamedFrom('auth_oauth_grant').withIndexes([{ columns: ['user_id', 'client_id'], unique: true }, { columns: ['client_id'] }])
 
 export const AuthOAuthCodes = defineTable('kay_oauth_codes', t => ({
   digest: t.text().primaryKey(),
@@ -168,7 +169,7 @@ export const AuthOAuthCodes = defineTable('kay_oauth_codes', t => ({
   created_at: t.timestamptz().notNull(),
   expires_at: t.timestamptz().notNull(),
   used_at: t.timestamptz().nullable(),
-})).withIndexes([{ columns: ['expires_at'] }, { columns: ['user_id'] }])
+})).renamedFrom('auth_oauth_code').withIndexes([{ columns: ['expires_at'] }, { columns: ['user_id'] }])
 
 export const AuthOAuthRefresh = defineTable('kay_oauth_refresh_tokens', t => ({
   digest: t.text().primaryKey(),
@@ -181,13 +182,13 @@ export const AuthOAuthRefresh = defineTable('kay_oauth_refresh_tokens', t => ({
   created_at: t.timestamptz().notNull(),
   expires_at: t.timestamptz().notNull(),
   used_at: t.timestamptz().nullable(),
-})).withIndexes([{ columns: ['user_id', 'family'] }, { columns: ['user_id', 'client_id'] }, { columns: ['expires_at'] }])
+})).renamedFrom('auth_oauth_refresh').withIndexes([{ columns: ['user_id', 'family'] }, { columns: ['user_id', 'client_id'] }, { columns: ['expires_at'] }])
 
 export const AuthAttempts = defineTable('kay_attempts', t => ({
   key: t.text().primaryKey(),
   count: t.int4().notNull(),
   reset_at: t.timestamptz().notNull(),
-})).withIndexes([{ columns: ['reset_at'] }])
+})).renamedFrom('auth_attempt').withIndexes([{ columns: ['reset_at'] }])
 
 // The tables to list in the app's `new Database({ tables })`, so `db.sync()` creates them.
 export const authTables = [AuthUsers, AuthIdentities, AuthTokens, AuthRecoveryCodes, AuthBearerTokens, AuthSessions, AuthPasskeys, AuthAudit, AuthOrganizations, AuthMembers, AuthInvitations, AuthAttempts, AuthOAuthClients, AuthOAuthGrants, AuthOAuthCodes, AuthOAuthRefresh] as const
