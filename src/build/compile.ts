@@ -10,7 +10,7 @@ import { PAGES_ENTRY } from '../dev/sources'
 import { projectApi } from '../server/api-modules'
 import { packageName } from '../server/app-identity'
 import { AVIF_WORKER_SOURCE } from '../server/avif'
-import { publicEnvFiles } from '../server/env-state'
+import { publicEnvFiles, publicEnvModules, publicInFenceMessage } from '../server/env-state'
 import { DEFAULT_LANG, extensionMessageFiles, messagesFile } from '../server/i18n'
 import { matcherFile } from '../server/params'
 import { refuseClashes } from '../server/route-table'
@@ -218,7 +218,12 @@ export async function serverParts(project: Project) {
   const endpoints = await scanEndpoints(routesDir, mounts)
   const editor = extensionEditor(root, config.extensions)
   // The modules declaring `s.Public` run at boot, and an executable cannot scan for them.
-  const publicModules = publicEnvFiles(root).filter(file => file.endsWith('.ts')).map(file => join(root, file))
+  const inFence = publicEnvFiles(root).find(file => file.endsWith('.kay'))
+
+  if (inFence !== undefined)
+    throw new KayError('config-invalid', publicInFenceMessage(inFence))
+
+  const publicModules = publicEnvModules(root).map(file => join(root, file))
   const modules = [...new Set([...publicModules, ...routeModules(routes, fallback), ...editor === undefined ? [] : [editor], ...extensionServerModules(root, serverExtensions(root, config.extensions, plugins)), ...extensionContexts(root, config.extensions), ...extensionAppFiles(root, config.extensions), ...existsSync(contentConfig) ? [contentConfig] : [], ...matcherFiles, ...messageFiles, ...[...api, ...endpoints].flatMap(module => [module.file, ...module.guards.map(guard => guard.file)])])]
 
   return { routes, fallback, api, plugins, endpoints, editor, extensionMessages, modules, publicModules }

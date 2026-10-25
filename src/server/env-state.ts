@@ -93,6 +93,16 @@ const TEST_FILE = /\.(?:test|spec)\.[cm]?[jt]sx?$/
 // What each file read last held, by its size and time, so a command asking for the files several times reads each one once.
 const scanned = new Map<string, { stamp: string, declares: boolean }>()
 
+// What a `.kay` file declaring `s.Public` is refused with: its fence cannot give the browser a value.
+export function publicInFenceMessage(file: string): string {
+  return `kay: ${file} declares an s.Public field, which a .kay file cannot give the browser: declare it in a .ts module under src`
+}
+
+// The `.ts` modules among those declaring `s.Public`, the only ones that can give the browser a value.
+export function publicEnvModules(root: string): string[] {
+  return publicEnvFiles(root).filter(file => file.endsWith('.ts'))
+}
+
 // The files under `src` declaring a field with `s.Public`, found by reading them as text so `kay build`, `kay check` and `kay routes` know the project sends the browser an environment without loading its modules.
 export function publicEnvFiles(root: string): string[] {
   return [...new Bun.Glob('src/**/*.{ts,kay}').scanSync({ cwd: root })].sort().filter((file) => {

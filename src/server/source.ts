@@ -100,13 +100,16 @@ const DISK: ProjectSource = {
 }
 
 function embeddedSource(bundle: Bundle): ProjectSource {
+  // The modules the build found declaring `s.Public` make the executable send the browser an environment.
+  const publicConfig = (bundle.publicModules?.length ?? 0) > 0 ? { ...bundle.config, publicEnv: true } : bundle.config
+
   return {
     embedded: true,
     mode: () => PRODUCTION,
     root: () => bundle.root,
     // The root, routes and public files it was built with win over the options.
     // eslint-disable-next-line ts/require-await -- the interface returns a promise
-    config: async (_, options) => ({ ...mergeConfig((bundle.publicModules?.length ?? 0) > 0 ? { ...bundle.config, publicEnv: true } : bundle.config, options), root: bundle.root, publicDir: bundle.publicDir }),
+    config: async (_, options) => ({ ...mergeConfig(publicConfig, options), root: bundle.root, publicDir: bundle.publicDir }),
     client: async () => {
       const client = await readClient(bundle.root, bundle.clientDir)
 

@@ -315,8 +315,10 @@ describe('a compiled server', () => {
     const files = {
       'tsconfig.json': JSON.stringify({ compilerOptions: { target: 'ESNext', jsx: 'preserve', jsxImportSource: 'kay', lib: ['ESNext', 'DOM'], rootDirs: ['.', '.kay/types'], module: 'Preserve', moduleResolution: 'bundler', strict: true, noEmit: true, skipLibCheck: true }, include: ['src', '.kay/types'] }),
       'kay.config.ts': 'export default { favicon: false }\n',
-      'src/public-env.ts': 'import { s } from \'kay\'\nimport { defineEnv } from \'kay/server\'\n\nexport const env = defineEnv(s.Object({ SITE_NAME: s.Public(s.String({ default: \'built\' })) }))\n',
-      'src/routes/index.kay': '---\nimport { publicEnv } from \'kay\'\n---\np#name {publicEnv.SITE_NAME}\n',
+      'src/public-env.ts': 'import { s } from \'kay\'\nimport { defineEnv } from \'kay/server\'\n\nexport const env = defineEnv(s.Object({ SITE_NAME: s.Public(s.String({ default: \'built\' })) }))\n\nconst counted = globalThis as { loads?: number }\n\ncounted.loads = (counted.loads ?? 0) + 1\n',
+      'src/routes/index.kay': '---\nimport { publicEnv } from \'kay\'\nimport Picker from \'../picker.kay\'\n---\np#name {publicEnv.SITE_NAME}\nPicker\n',
+      'src/server.ts': 'import { Elysia } from \'elysia\'\nimport { pages } from \'kay/server\'\n\nawait new Elysia().get(\'/loads\', () => String((globalThis as { loads?: number }).loads)).use(await pages()).listen({ port: Number(process.env.PORT), hostname: \'127.0.0.1\' })\n',
+      'src/picker.kay': '---\nimport { publicEnv } from \'kay\'\n\nlet count = 0\n---\nbutton#pick(onClick={() => count++}) {publicEnv.SITE_NAME} {count}\n',
     }
 
     const stops = new WeakMap<object, Promise<string>>()
@@ -359,13 +361,14 @@ describe('a compiled server', () => {
           try {
             const page = await fetch(`http://127.0.0.1:${port}/`)
             const module = await fetch(`http://127.0.0.1:${port}/_kay/env.js`)
+            const loads = await (await fetch(`http://127.0.0.1:${port}/loads`)).text()
 
-            return { page: { status: page.status, text: await page.text() }, module: { status: module.status, text: await module.text() }, stderr: await stopped(child) }
+            return { page: { status: page.status, text: await page.text() }, module: { status: module.status, text: await module.text() }, loads, stderr: await stopped(child) }
           }
           catch {}
         }
 
-        throw new Error(`the executable never answered: ${await new Response(child.stderr).text()}`)
+        throw new Error(`the executable never answered: ${await stopped(child)}`)
       }
       finally {
         await stopped(child)
@@ -373,19 +376,31 @@ describe('a compiled server', () => {
     }
 
     it('fills publicEnv and serves it with no src beside the executable', async () => {
-      const { page, module, stderr } = await served({ from: 'elsewhere' })
+      const { page, module, loads, stderr } = await served({ from: 'elsewhere' })
 
       expect(page.status, stderr).toBe(200)
       expect(page.text).toContain('<p id="name">booted</p>')
+      expect(loads).toBe('1')
+      expect(page.text).toMatch(/<button id="pick"><!--\[-->booted/)
+      expect(page.text).toContain('/_kay/env.js')
       expect(module.status).toBe(200)
       expect(module.text).toBe('export default {"SITE_NAME":"booted"}\n')
     }, 90_000)
 
+    it('refuses to compile a .kay file declaring s.Public, as the server on disk does', async () => {
+      const root = await project({ ...files, 'src/fence.kay': '---\nimport { s } from \'kay\'\nimport { defineEnv } from \'kay/server\'\n\ndefineEnv(s.Object({ A: s.Public(s.String({ default: \'a\' })) }))\n---\np x\n' })
+      const built = Bun.spawn([process.execPath, cli, 'build', root, '--compile', join(root, 'server'), '--no-check'], { stdout: 'pipe', stderr: 'pipe' })
+
+      expect(await built.exited).not.toBe(0)
+      expect(await new Response(built.stderr).text()).toContain('src/fence.kay declares an s.Public field')
+    }, 90_000)
+
     it('does the same run from its source folder, loading the module once', async () => {
-      const { page, module, stderr } = await served({ from: 'source' })
+      const { page, module, loads, stderr } = await served({ from: 'source' })
 
       expect(page.status, stderr).toBe(200)
       expect(page.text).toContain('<p id="name">booted</p>')
+      expect(loads).toBe('1')
       expect(module.text).toBe('export default {"SITE_NAME":"booted"}\n')
     }, 90_000)
   })

@@ -48,7 +48,7 @@ import { claimEndpoints } from './endpoint-claims'
 import { serveEndpoints } from './endpoints'
 import { entryUrls } from './entry-urls'
 import { holdPublicEnv, servePublicEnv } from './env'
-import { PUBLIC_ENV_PATH, publicEnvFiles } from './env-state'
+import { PUBLIC_ENV_PATH, publicEnvFiles, publicInFenceMessage } from './env-state'
 import { browserStackMapper, devStackMapper } from './error-maps'
 import { serveErrorReports } from './errors'
 import { FAVICON_DIR, faviconSource, MANIFEST, manifestJson, serveFavicons } from './favicon'
@@ -345,7 +345,7 @@ async function loadPublicModules(root: string): Promise<string[]> {
   const inFence = files.find(file => file.endsWith('.kay'))
 
   if (inFence !== undefined)
-    throw new KayError('config-invalid', `kay: ${inFence} declares an s.Public field, which a .kay file cannot give the browser: declare it in a .ts module under src`)
+    throw new KayError('config-invalid', publicInFenceMessage(inFence))
 
   const paths = files.map(file => join(root, file))
 

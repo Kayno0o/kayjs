@@ -11,7 +11,7 @@ import { componentName } from '../compiler'
 import { CONFIG_FILE, serverExtensions } from '../config'
 import { projectPaths } from '../project'
 import { apiPathOf, OPENAPI_PATH, openApiPaths, REFERENCE_PATH } from '../server/api-modules'
-import { publicEnvFiles } from '../server/env-state'
+import { publicEnvModules } from '../server/env-state'
 import { FAVICON_PATHS } from '../server/favicon'
 import { DEFAULT_LANG, extensionMessageFiles, localePattern, localePrefixes, messagesFile } from '../server/i18n'
 import { HEALTH_PATH } from '../server/lifecycle'
@@ -133,7 +133,7 @@ export async function environmentTypes(root: string, options: CheckOptions, serv
   const named = [...new Set(routes.map(route => route.catchAll === undefined ? route.pattern : route.pattern.replace(CATCH_ALL, `/*${route.catchAll}`)))]
 
   // The modules declaring a `s.Public` field, whose `defineEnv` results carry the type of what an island reads.
-  const publicModules = publicEnvFiles(root).filter(file => file.endsWith('.ts')).map(file => modulePath(join(root, file)))
+  const publicModules = publicEnvModules(root).map(file => modulePath(join(root, file)))
 
   return environment(reachable, [...publicPaths.map(file => file.url), ...kayPaths(options)], apiMounts, texts, config, app, content, servers, serverModules, [...endpointPaths, LOCALE_MANIFESTS], named, publicModules, contexts)
 }
