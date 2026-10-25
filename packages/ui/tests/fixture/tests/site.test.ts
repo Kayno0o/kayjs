@@ -3,6 +3,7 @@ import { readdir } from 'node:fs/promises'
 import { join } from 'node:path'
 import { describe, expect, test } from 'bun:test'
 import { testSite } from 'kay/test'
+import { testWorker } from '../../../../../src/build/assets'
 import { resolveClasses } from '../../../../../src/runtime/class-table'
 
 // The fixture is an app installing the library, linked back to the library by the repository root's scripts/link-fixture.ts.
@@ -235,9 +236,9 @@ describe('layout', () => {
   })
 })
 
-// The island bundle the test site built: what an island carries of a recipe and of the class table its merge reads.
+// The island bundle the test site built, in the folder of this test worker: what an island carries of a recipe and of the class table its merge reads.
 async function islandBundle() {
-  const dist = join(ROOT, '.kay/test-client/dist')
+  const dist = join(ROOT, `.kay/test-client${testWorker()}/dist`)
   const files = (await readdir(dist, { recursive: true })).filter(file => file.endsWith('.js'))
   const text = (await Promise.all(files.map(async file => Bun.file(join(dist, file)).text()))).join('\n')
   const table = (/Symbol\.for\("kay\.classTable"\)\] = (\{.*\});$/m).exec(text)?.[1]
