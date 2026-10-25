@@ -3,6 +3,7 @@ import { resolve } from 'node:path'
 import process from 'node:process'
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
 import { encodeSource } from '../docs/src/playground/runnable'
+import { SAMPLE } from '../docs/src/playground/sample'
 import { browse, browserPath } from '../src/test'
 import { takeDocsBuilt } from './docs-build'
 import { freePort } from './free-port'
@@ -10,7 +11,7 @@ import { drainOutput, spawnSuiteServer, stopSuiteServer } from './listening'
 
 const CLI = resolve('src/cli.ts')
 const path = browserPath()
-const COUNTER = '---\nimport { signal } from \'kay\'\n\nconst count = signal(0)\n---\nbutton(onClick={() => count.update(n => n + 1)}) Clicked {count()} times\n'
+const COUNTER = '---\nimport { signal } from \'kay\'\n\nconst count = signal(0)\n---\nbutton(onClick={() => count++}) Clicked {count()} times\n'
 
 async function reachable(url: string): Promise<boolean> {
   try {
@@ -99,6 +100,28 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the docs p
     await page.waitUntil(() => document.querySelector('.playground-frame')?.getAttribute('data-test-live') === 'Hello from the playground')
     expect(await page.count('.playground-problems')).toBe(0)
     expect((await page.a11y('.playground')).map(violation => `${violation.id} ${violation.nodes.map(node => node.target).join(' ')}`)).toEqual([])
+    expect(page.errors).toEqual([])
+  }, 60_000)
+
+  it('runs the sample on its own: a click in the frame counts, and the frame logs no error', async () => {
+    await page.goto('/getting-started/playground')
+    await page.waitUntil(() => document.querySelector('.playground-frame')?.getAttribute('data-test-live') === 'Clicked 0 times', { timeout: '15s' })
+    expect(await page.evaluate(() => (document.querySelector('.playground-input textarea') as HTMLTextAreaElement).value)).toBe(SAMPLE)
+
+    // The button is the first thing in the frame, under its 1rem padding, and a sandboxed frame is out of the page's reach: the click is the browser's own, at the button's place.
+    for (const count of [1, 2]) {
+      const { x, y } = await page.evaluate(() => {
+        const { left, top } = document.querySelector('.playground-frame')!.getBoundingClientRect()
+
+        return { x: left + 30, y: top + 30 }
+      })
+
+      for (const type of ['mousePressed', 'mouseReleased'])
+        await page.cdp('Input.dispatchMouseEvent', { type, x, y, button: 'left', clickCount: 1 })
+
+      await page.waitUntil((expected: string) => document.querySelector('.playground-frame')?.getAttribute('data-test-live') === expected, { timeout: '15s' }, `Clicked ${count} times`)
+    }
+
     expect(page.errors).toEqual([])
   }, 60_000)
 

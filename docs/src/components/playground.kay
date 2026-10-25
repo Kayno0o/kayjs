@@ -134,7 +134,7 @@ function edit(value: string) {
   timer = setTimeout(build, DEBOUNCE_MS)
 }
 
-function heard(event: MessageEvent<{ ready?: boolean, pong?: boolean, id?: number, html?: string, live?: string, error?: string }>) {
+function heard(event: MessageEvent<{ ready?: boolean, pong?: boolean, id?: number, html?: string, live?: string, shown?: string, error?: string }>) {
   if (event.source !== frame?.contentWindow)
     return
 
@@ -143,6 +143,12 @@ function heard(event: MessageEvent<{ ready?: boolean, pong?: boolean, id?: numbe
   if (event.data.ready) {
     ready.set(true)
     send()
+
+    return
+  }
+
+  if (event.data.shown !== undefined) {
+    shownInFrame.set(event.data.shown)
 
     return
   }

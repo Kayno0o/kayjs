@@ -1,12 +1,15 @@
+import { rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import { beforeAll, describe, expect, it } from 'bun:test'
 import { highlight } from '../docs/src/highlight'
 import { runs } from '../docs/src/playground/check'
 import { isRunnable, playgroundHref, sourceOfHash } from '../docs/src/playground/runnable'
 import { renderServer } from '../docs/src/playground/runtime'
+import { SAMPLE } from '../docs/src/playground/sample'
 import { stripTypes } from '../docs/src/playground/strip'
+import { check } from '../src/check'
 import { compileKay } from '../src/compiler'
-import { scratchDir } from './scratch'
+import { fixtureCopy, scratchDir } from './scratch'
 
 const root = join(import.meta.dir, '..')
 const pagesDir = join(root, 'docs/src/content/docs')
@@ -79,6 +82,20 @@ describe('the playground\'s compiler', () => {
     expect(sourceOfHash(playgroundHref(source).slice(playgroundHref(source).indexOf('#')))).toBe(source)
     expect(sourceOfHash('#other')).toBeUndefined()
   })
+})
+
+describe('the playground\'s sample', () => {
+  it('type-checks as a page of an app', async () => {
+    const root = await fixtureCopy('app')
+
+    try {
+      await Bun.write(join(root, 'src/routes/sample.kay'), SAMPLE)
+      expect((await check(root)).filter(diagnostic => diagnostic.file?.endsWith('sample.kay')).map(diagnostic => diagnostic.message)).toEqual([])
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  }, 120_000)
 })
 
 describe('the docs\' examples', () => {
