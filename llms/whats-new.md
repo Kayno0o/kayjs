@@ -2,6 +2,11 @@
 
 What each release of kay and its libraries adds, newest first, each feature with where it is documented. kay and its libraries share one version, so one section covers them all; what a release breaks is in [Upgrading](upgrading.md).
 
+## Unreleased
+
+- The `server` Dockerfile `kay new` writes runs on `debian:trixie-slim` (Debian 13) instead of bookworm, which only gets security fixes: [kay new](project-new-and-add.md).
+- kayjs-mail requires nodemailer 10.2.1 and up, past three addressparser advisories (GHSA-85x2-q946-cp5h, GHSA-8c8m-p3m8-cjg8, GHSA-m943-m63m-w62w): [kayjs-mail](../packages/mail/llms.txt).
+
 ## 1.77.1
 
 - A `kay build --compile` executable carries the modules declaring `s.Public`, so `publicEnv` and `/_kay/env.js` work where no `src` sits beside it, as in a container image holding the executable alone: [Environment](environment.md).

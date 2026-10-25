@@ -9,7 +9,7 @@ WORKDIR /kay/examples/noticeboard
 # The checkout's own command, which the install linked before the sources were copied in.
 RUN bun ../../src/cli.ts build --compile server
 
-FROM debian:bookworm-slim
+FROM debian:trixie-slim
 RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 COPY --from=build /kay/examples/noticeboard/server ./server

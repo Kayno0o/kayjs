@@ -77,7 +77,7 @@
     "tailwindcss": "^4.3.3"
   },
   "devDependencies": {
-    "@happy-dom/global-registrator": "^21.0.3",
+    "@happy-dom/global-registrator": "^21.0.4",
     "@kaynooo/eslint": "^7.1.1",
     "@kaynooo/kayjs-mail": "workspace:~",
     "@kaynooo/kayjs-ui": "workspace:~",

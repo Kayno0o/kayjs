@@ -18,7 +18,7 @@ export type Host = 'forgejo' | 'github'
 
 // Base images by tag and digest, so a build gets the bytes reviewed here whatever the tag moves to; `bun scripts/image-digests.ts` checks they still resolve and prints the refresh. The Bun build stage stays on `oven/bun:<version>`, which tracks the Bun that scaffolded the project.
 const POSTGRES_IMAGE = 'postgres:18-alpine@sha256:898c60cb390d1085bc97bdd6a1ae968757421df394b071848b52b1c09c89d6a5'
-const RUNTIME_IMAGE = 'debian:bookworm-slim@sha256:7ff6ba31527b9e336162fa061746c366c4b2032f4d2cff2078bea43f78efe3f8'
+const RUNTIME_IMAGE = 'debian:trixie-slim@sha256:62bd423aeee912639ca8ee681c2b762cb3e25137e0a92b20be455898a9f034ad'
 const NGINX_IMAGE = 'nginxinc/nginx-unprivileged:1.31-alpine@sha256:b5047b9b76845eac124358373c6852377c52e4b05834a47647e955dd91cb8f1e'
 
 // The runner label each host's jobs run on unless `kay new --runner` names another.

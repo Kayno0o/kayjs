@@ -824,7 +824,7 @@ describe('kay new', () => {
       expect(await Bun.file(join(dir, 'Dockerfile')).text()).toStartWith(`FROM oven/bun:${Bun.version} AS build\n`)
       expect(await Bun.file(join(dir, '.forgejo/workflows/test.yml')).text()).toContain(`bun-version: ${Bun.version}\n`)
       // Base images by digest, and the app container with no capability nor privilege gain.
-      expect(await Bun.file(join(dir, 'Dockerfile')).text()).toMatch(/^FROM debian:bookworm-slim@sha256:[0-9a-f]{64}$/m)
+      expect(await Bun.file(join(dir, 'Dockerfile')).text()).toMatch(/^FROM debian:trixie-slim@sha256:[0-9a-f]{64}$/m)
       expect(compose).toMatch(/image: postgres:18-alpine@sha256:[0-9a-f]{64}/)
       expect(await Bun.file(join(dir, 'compose.dev.yaml')).text()).toMatch(/\n {4}image: postgres:18-alpine@sha256:[0-9a-f]{64}\n/)
       expect(await Bun.file(join(dir, '.forgejo/workflows/test.yml')).text()).toMatch(/\n {8}image: postgres:18-alpine@sha256:[0-9a-f]{64}\n/)

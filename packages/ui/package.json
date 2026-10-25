@@ -73,7 +73,7 @@
     "@kaynooo/utils": "^2.30.1"
   },
   "devDependencies": {
-    "@happy-dom/global-registrator": "^21.0.3",
+    "@happy-dom/global-registrator": "^21.0.4",
     "@iconify-json/tabler": "^1.2.42",
     "@kaynooo/eslint": "^7.1.1",
     "@types/bun": "^1.4.4",
