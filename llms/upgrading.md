@@ -4,6 +4,10 @@ What each minor release breaks, and what an app changes to move to it. kay and i
 
 ## 1.77.0
 
+### kayjs-auth renames the `auth_*` tables again
+
+- A database still on the pre-1.71 `auth_*` tables moves straight here: the migration `db.sync()` or `bunx pg-orm generate` writes renames them with their rows and adds the columns since, where 1.74 to 1.76 created empty `kay_*` tables beside them.
+
 ### kayjs-ui: stepDraft's maxAge is a duration only
 
 - `stepDraft(..., { maxAge: 3600 })` is a type error now: write `maxAge: '1h'`. The deprecated `deprecated-step-draft-max-age` lint is gone with the number form, so run `kay check --fix` on 1.74 to 1.76 before moving.
