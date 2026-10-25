@@ -2,7 +2,7 @@
 
 What each release of kay and its libraries adds, newest first, each feature with where it is documented. kay and its libraries share one version, so one section covers them all; what a release breaks is in [Upgrading](upgrading.md).
 
-## Unreleased
+## 1.77.0
 
 - kayjs-auth's tables rename the pre-1.71 `auth_*` ones again, for good, so a database still on them moves straight to this version with its users: [Upgrading](upgrading.md).
 - kayjs-ui `stepDraft`'s `maxAge` takes a duration only, and `deprecated-step-draft-max-age` is gone: [Upgrading](upgrading.md).
