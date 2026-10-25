@@ -5,7 +5,17 @@ const root = document.getElementById('root')!
 let unmount: (() => void) | undefined
 
 // What the component shows after a click or a timer changed it, which the page cannot read from its sandbox: only the browser tests look at it.
-new MutationObserver(() => parent.postMessage({ shown: root.textContent ?? '' }, '*')).observe(root, { childList: true, characterData: true, subtree: true })
+let posted = ''
+
+new MutationObserver(() => {
+  const shown = root.textContent ?? ''
+
+  if (shown === posted)
+    return
+
+  posted = shown
+  parent.postMessage({ shown }, '*')
+}).observe(root, { childList: true, characterData: true, subtree: true })
 
 addEventListener('message', (event: MessageEvent<{ ping?: boolean, id: number, server: string, dom: string }>) => {
   if (event.source !== parent)

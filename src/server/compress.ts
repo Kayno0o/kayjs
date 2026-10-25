@@ -689,7 +689,9 @@ export function compressResponse(request: Request, response: Response, fixed?: F
   const { headers, status } = response
   const html = dictionary !== undefined && !BODILESS.has(status) && HTML_TYPE.test(headers.get('content-type') ?? '')
 
-  if (html && !forbidsFetch(headers.get('content-security-policy')))
+  const advertised = html && !forbidsFetch(headers.get('content-security-policy'))
+
+  if (advertised)
     advertise(headers, dictionary)
 
   const length = headers.get('content-length')
@@ -698,7 +700,7 @@ export function compressResponse(request: Request, response: Response, fixed?: F
   if (request.method === 'HEAD' || BODILESS.has(status) || headers.has('content-encoding') || NO_TRANSFORM.test(headers.get('cache-control') ?? '') || !COMPRESSIBLE_TYPE.test(headers.get('content-type') ?? '') || (size !== undefined && size < MIN_SIZE))
     return undefined
 
-  const encoding = html && dictionaryAsked(request, dictionary.ref) ? dictionary : preferredEncoding(request.headers.get('accept-encoding'), ON_THE_FLY, ON_THE_FLY_ORDER)
+  const encoding = advertised && dictionaryAsked(request, dictionary.ref) ? dictionary : preferredEncoding(request.headers.get('accept-encoding'), ON_THE_FLY, ON_THE_FLY_ORDER)
   const read = readBodies.get(response)
 
   // A streamed body is sent once: a route returning it again gets an error naming it, rather than an empty or broken reply.
@@ -735,13 +737,16 @@ function forbidsFetch(policy: string | null): boolean {
     const directives = new Map<string, string>()
 
     for (const directive of one.split(';')) {
-      const [name = '', ...sources] = directive.trim().split(CSP_SPACE)
+      const [name = '', ...sources] = directive.trim().split(CSP_SPACE).filter(word => word !== '')
 
       if (name !== '' && !directives.has(name.toLowerCase()))
         directives.set(name.toLowerCase(), sources.join(' ').toLowerCase())
     }
 
-    return (directives.get('connect-src') ?? directives.get('default-src')) === '\'none\''
+    const sources = directives.get('connect-src') ?? directives.get('default-src')
+
+    // An empty source list is the same as `'none'`.
+    return sources === '\'none\'' || sources === ''
   })
 }
 

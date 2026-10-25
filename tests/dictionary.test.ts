@@ -137,6 +137,7 @@ describe('dictionaries for compression', () => {
     ['default-src \'self\'', true],
     ['default-src \'self\'; connect-src \'none\'', false],
     ['default-src \'self\', default-src \'none\'', false],
+    ['connect-src; script-src \'self\'', false],
     ['connect-src https://api.example.com', true],
     ['script-src \'self\'', true],
   ])('names the dictionary under the policy %s: %p', async (policy, named) => {
@@ -147,6 +148,17 @@ describe('dictionaries for compression', () => {
     expect(reply.headers.get('link')).toBe(dictionary.link)
     expect(forbidding.headers.get('link')).toBe(named ? dictionary.link : null)
     expect(forbidding.headers.get('vary')?.includes('available-dictionary') ?? false).toBe(named)
+  })
+
+  it('answers a browser holding the dictionary with a policy forbidding its fetch in the usual encodings, as it named none', async () => {
+    const { dictionary, ref } = await served()
+    const send = async (policy: string) => (await compressResponse(asking(`:${ref.hash}:`), wholeResponse(pageHtml('Topic'), { headers: { 'content-type': 'text/html', 'content-security-policy': policy } }), undefined, undefined, dictionary))!
+    const forbidding = await send('default-src \'none\'')
+    const allowing = await send('default-src \'self\'')
+
+    expect(allowing.headers.get('content-encoding')).toBe('dcz')
+    expect(forbidding.headers.get('content-encoding')).not.toBe('dcz')
+    expect(forbidding.headers.get('vary')).not.toContain('available-dictionary')
   })
 
   it('names the dictionary on a page too small to compress, and on none of the bodiless answers', async () => {
