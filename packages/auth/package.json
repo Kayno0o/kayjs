@@ -61,7 +61,7 @@
     "lint": "$npm_execpath ../../scripts/lint-cache.ts && keslint --cache",
     "prelint:fix": "$npm_execpath run --cwd ../.. build:eslint",
     "lint:fix": "$npm_execpath ../../scripts/lint-cache.ts && keslint --fix --cache",
-    "test": "$npm_execpath test --isolate --timeout 20000"
+    "test": "$npm_execpath test --parallel=6 --timeout 20000 --path-ignore-patterns='**/{pgStore,lastOne,sharedDatabase}.test.ts' && $npm_execpath test --isolate --timeout 20000 pgStore.test lastOne.test sharedDatabase.test"
   },
   "peerDependencies": {
     "@kaynooo/kayjs-ui": "workspace:~",

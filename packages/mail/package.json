@@ -50,7 +50,7 @@
     "lint": "$npm_execpath ../../scripts/lint-cache.ts && keslint --cache",
     "prelint:fix": "$npm_execpath run --cwd ../.. build:eslint",
     "lint:fix": "$npm_execpath ../../scripts/lint-cache.ts && keslint --fix --cache",
-    "test": "$npm_execpath test --timeout 20000"
+    "test": "$npm_execpath test --parallel=6 --timeout 20000"
   },
   "peerDependencies": {
     "elysia": "^1.4.30",

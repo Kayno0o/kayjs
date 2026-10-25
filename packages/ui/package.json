@@ -51,8 +51,8 @@
     "lint": "$npm_execpath ../../scripts/lint-cache.ts && keslint --cache",
     "prelint:fix": "$npm_execpath run --cwd ../.. build:eslint",
     "lint:fix": "$npm_execpath ../../scripts/lint-cache.ts && keslint --fix --cache",
-    "test": "$npm_execpath test --timeout 20000 && $npm_execpath run test:dom",
-    "test:dom": "$npm_execpath --config=tests-dom/bunfig.toml test"
+    "test": "$npm_execpath test --parallel=6 --timeout 20000 && $npm_execpath run test:dom",
+    "test:dom": "$npm_execpath --config=tests-dom/bunfig.toml test --parallel=6"
   },
   "peerDependencies": {
     "@iconify-json/tabler": "^1.2.42",
