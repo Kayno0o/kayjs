@@ -4,11 +4,11 @@ import { join } from 'node:path'
 import process from 'node:process'
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'bun:test'
 import { memoryJobs } from 'kay/server'
+import { appCopy } from '../../../tests/scratch'
 import { deliveryAddress } from '../src/delivery'
 import { mailer } from '../src/mailer'
 import { outbox } from '../src/outbox'
 import { logged } from './fixture/tests/logged'
-import { fixtureCopy } from './helpers/fixtureCopy'
 import { startSmtp } from './helpers/smtp'
 
 // As `kay dev` runs the server: NODE_ENV=development with its change code, in a copy of the fixture app, where the switch is kept under `.kay`.
@@ -22,7 +22,7 @@ let switchFile = ''
 closed.stop()
 
 beforeAll(async () => {
-  app = await fixtureCopy()
+  app = await appCopy(join(import.meta.dir, 'fixture'), 'mail-fixture-')
   switchFile = join(app, '.kay/mail-delivery.json')
   process.env.NODE_ENV = 'development'
   process.env.KAY_DEV_CODE = '0'

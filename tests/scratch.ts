@@ -27,3 +27,12 @@ export async function fixtureCopy(name: string, stable = false): Promise<string>
 
   return relative(process.cwd(), dir)
 }
+
+// A copy of an app outside `tests/fixtures`, as a library's fixture is, for a test that builds or writes into it, its build output and installs left out: the copy resolves the packages from the checkout's node_modules. Its absolute path.
+export async function appCopy(app: string, prefix: string): Promise<string> {
+  const dir = await scratchDir(prefix)
+
+  await cp(app, dir, { recursive: true, filter: source => !source.endsWith('/.kay') && !source.endsWith('/node_modules') })
+
+  return dir
+}
