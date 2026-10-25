@@ -250,7 +250,8 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the docs p
 
   it('runs the sample on its own: a click in the frame counts, and the frame logs no error', async () => {
     await page.goto('/getting-started/playground')
-    await page.waitUntil(() => document.querySelector('.playground-frame')?.getAttribute('data-test-live') === 'Clicked 0 times', { timeout: '15s' })
+    // The frame loads the compiler and compiles before it shows anything, which takes far longer while the whole suite runs beside it: kaynooo/kayjs#2337.
+    await page.waitUntil(() => document.querySelector('.playground-frame')?.getAttribute('data-test-live') === 'Clicked 0 times', { timeout: '45s' })
     expect(await page.evaluate(() => (document.querySelector('.playground-input textarea') as HTMLTextAreaElement).value)).toBe(SAMPLE)
 
     // The button is the first thing in the frame, under its 1rem padding, and a sandboxed frame is out of the page's reach: the click is the browser's own, at the button's place.
@@ -268,7 +269,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the docs p
     }
 
     expect(page.errors).toEqual([])
-  }, 60_000)
+  }, 90_000)
 
   it('leaves the other pages\' policy without eval', async () => {
     const response = await fetch(`${origin}getting-started/introduction`)
