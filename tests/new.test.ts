@@ -674,7 +674,7 @@ describe('kay new', () => {
     }
   }, SCAFFOLD_MS)
 
-  it('scaffolds a static site that type-checks and exports to dist, with a Pages workflow and a container beside it', async () => {
+  it.concurrent('scaffolds a static site that type-checks and exports to dist, with a Pages workflow and a container beside it', async () => {
     const dir = join(await mkdtemp(join(tmpdir(), 'kay-new-')), 'my-site')
 
     try {
@@ -734,7 +734,7 @@ describe('kay new', () => {
     }
   }, SCAFFOLD_MS)
 
-  it('scaffolds an app on kayjs-auth with its users in a SQLite file, guarded pages and a websocket island, which runs its tests with Bun alone', async () => {
+  it.concurrent('scaffolds an app on kayjs-auth with its users in a SQLite file, guarded pages and a websocket island, which runs its tests with Bun alone', async () => {
     const dir = join(await mkdtemp(join(tmpdir(), 'kay-new-')), 'my-app')
 
     try {
@@ -785,7 +785,7 @@ describe('kay new', () => {
     }
   }, SCAFFOLD_MS)
 
-  it('scaffolds an app with kayjs-auth in Postgres behind the postgres feature, which checks and builds as it is and generates its first migration', async () => {
+  it.concurrent('scaffolds an app with kayjs-auth in Postgres behind the postgres feature, which checks and builds as it is and generates its first migration', async () => {
     const dir = join(await mkdtemp(join(tmpdir(), 'kay-new-')), 'my-app')
 
     try {
@@ -889,7 +889,7 @@ describe('kay new', () => {
     expect(pg['src/db/tables.ts']).toContain('...authTables')
   })
 
-  it('scaffolds a blank project of one bare page, which checks and builds as a static site', async () => {
+  it.concurrent('scaffolds a blank project of one bare page, which checks and builds as a static site', async () => {
     const dir = join(await mkdtemp(join(tmpdir(), 'kay-new-')), 'my-app')
 
     try {
