@@ -1,10 +1,16 @@
 import { mkdir, readFile, rm, stat, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import process from 'node:process'
-import { testWorker } from '../src/build/assets'
+import { KAY_DIR, RENDER_OUTPUT } from '../src/build/assets'
 
 const LOCK = join(import.meta.dir, '../docs/.kay/build.lock')
 const HOLDER = join(LOCK, 'pid')
+
+// The folder under `docs/.kay` the shared build writes: one for every worker of a run, so the first to need it builds and the others read it, where each worker's own `client-<id>` would be built again by each.
+export const DOCS_OUTPUT = 'client-shared'
+export const DOCS_BUILT = join(import.meta.dir, '../docs', KAY_DIR, DOCS_OUTPUT)
+// The environment of a process serving or building the shared build.
+export const DOCS_BUILT_ENV = { [RENDER_OUTPUT]: DOCS_OUTPUT }
 
 // A lock whose holder is no longer running belongs to a test that died; one still running keeps it however long its build takes.
 async function heldByTheDead(): Promise<boolean> {
@@ -63,7 +69,7 @@ const SOURCES = '{docs,src,packages}/**/*'
 const IGNORED = /(?:^|\/)(?:node_modules|\.kay|dist|\.git)\//
 
 function stampFile(): string {
-  return join(LOCK, '..', `built${testWorker()}.json`)
+  return join(LOCK, '..', 'built.json')
 }
 
 // What the build reads, by size and modification time, and the run asking: a build of these sources from this run is still the one on disk.
@@ -102,7 +108,7 @@ export async function takeDocsBuilt(): Promise<() => Promise<void>> {
     if (kept === stamp)
       return release
 
-    const child = Bun.spawn([process.execPath, CLI, 'build', 'docs', '--no-check'], { cwd: ROOT, stdout: 'ignore', stderr: 'pipe' })
+    const child = Bun.spawn([process.execPath, CLI, 'build', 'docs', '--no-check'], { cwd: ROOT, env: { ...process.env, ...DOCS_BUILT_ENV }, stdout: 'ignore', stderr: 'pipe' })
     const [errors, code] = await Promise.all([new Response(child.stderr).text(), child.exited])
 
     if (code !== 0)

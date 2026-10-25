@@ -5,7 +5,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
 import { encodeSource } from '../docs/src/playground/runnable'
 import { SAMPLE } from '../docs/src/playground/sample'
 import { browse, browserPath } from '../src/test'
-import { takeDocsBuilt } from './docs-build'
+import { DOCS_BUILT_ENV, takeDocsBuilt } from './docs-build'
 import { freePort } from './free-port'
 import { drainOutput, spawnSuiteServer, stopSuiteServer } from './listening'
 
@@ -70,7 +70,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the docs p
 
     const port = freePort()
 
-    server = spawnSuiteServer([process.execPath, CLI, 'start', 'docs', '--port', String(port)])
+    server = spawnSuiteServer([process.execPath, CLI, 'start', 'docs', '--port', String(port)], { env: { ...process.env, ...DOCS_BUILT_ENV } })
     drainOutput(server)
     origin = `http://localhost:${port}/`
 

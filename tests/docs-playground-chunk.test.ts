@@ -1,7 +1,6 @@
 import { join } from 'node:path'
 import { beforeAll, describe, expect, it } from 'bun:test'
-import { outputDir } from '../src/build/assets'
-import { takeDocsBuilt } from './docs-build'
+import { DOCS_BUILT, takeDocsBuilt } from './docs-build'
 
 const CHUNK_NAME = /[\w-]+\.js/g
 // A chunk reaching another, by a static import or a dynamic one.
@@ -11,8 +10,8 @@ const PLAYGROUND_PAGES = ['getting-started/playground.html', 'getting-started/pl
 const COMPILER_URL = '/playground/compiler.js'
 const COMPILER_MARK = 'does not run TypeScript enums'
 
-// A worker of `bun test --parallel` builds into `.kay/client-<id>`, which the spawned build inherits, so the folder comes from `outputDir`.
-const CLIENT = outputDir(join(import.meta.dir, '../docs'))
+// The build `takeDocsBuilt` shares between the workers of a run.
+const CLIENT = DOCS_BUILT
 const chunks = new Map<string, string>()
 const pages = new Map<string, string>()
 
