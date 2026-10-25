@@ -1,4 +1,3 @@
-import { appendFileSync } from 'node:fs'
 import { appendFile } from 'node:fs/promises'
 import os from 'node:os'
 import { dirname, join, resolve } from 'node:path'
@@ -29,37 +28,27 @@ const WORKERS = `--parallel=${Number(process.env.KAY_LAND_WORKERS) || 6}`
 const STEP_LIMIT_MS = Number(process.env.KAY_LAND_STEP_LIMIT_MS) || 30 * 60_000
 // How long the output of a step that ended may stay open, as a process it started outside its group can hold it.
 const DRAIN_MS = Number(process.env.KAY_LAND_DRAIN_MS) || 5000
-// The steps running, whose process groups go with a landing stopped by a signal or by a step beside them failing, each running beside others with the output it has not logged yet.
-const running = new Map<number, { label: string, output: () => string } | undefined>()
+// The step running, whose process group goes with a landing stopped by a signal.
+let running: number | undefined
 
 for (const signal of ['SIGINT', 'SIGTERM', 'SIGHUP'] as const) {
   process.on(signal, () => {
-    stopRunning()
+    killGroup(running)
     process.exit(128 + os.constants.signals[signal])
   })
 }
 
-function killGroup(pid: number) {
+function killGroup(pid: number | undefined) {
   try {
-    process.kill(-pid, 'SIGKILL')
+    if (pid !== undefined)
+      process.kill(-pid, 'SIGKILL')
   }
   catch {
     // Already gone.
   }
 }
 
-// Kills the steps running, logging what those running beside others printed up to then.
-function stopRunning() {
-  for (const [pid, beside] of running) {
-    killGroup(pid)
-
-    if (beside)
-      appendFileSync(LOG, `$ ${beside.label}, stopped\n${beside.output()}\n`)
-  }
-}
-
 function fail(message: string, code: number): never {
-  stopRunning()
   console.error(`land failed: ${message}`)
   process.exit(code)
 }
@@ -110,14 +99,11 @@ async function settledWithin(work: Promise<void>, ms: number) {
 }
 
 // Runs one step in a process group of its own, its output going to the log as it comes, and fails the landing on its failed tests and last lines, or on where it stood once it ran past STEP_LIMIT_MS.
-// A step running `beside` others prints its line and logs its output once it ends, so theirs do not interleave.
-async function step(label: string, argv: string[], cwd = '.', beside = false) {
+async function step(label: string, argv: string[], cwd = '.') {
   const started = performance.now()
 
-  if (!beside) {
-    process.stdout.write(`${label}: `)
-    await appendFile(LOG, `$ ${label}\n`)
-  }
+  process.stdout.write(`${label}: `)
+  await appendFile(LOG, `$ ${label}\n`)
 
   // Its stderr into its stdout, so one pipe keeps their lines in the order they were written, the shell's own included, which says why a command could not start.
   const child = Bun.spawn(['sh', '-c', 'exec 2>&1; exec "$@"', 'sh', ...argv], { cwd, stdin: 'ignore', stdout: 'pipe', stderr: 'inherit', detached: true })
@@ -135,9 +121,7 @@ async function step(label: string, argv: string[], cwd = '.', beside = false) {
         const text = decoder.decode(read.value, { stream: true })
 
         output += text
-
-        if (!beside)
-          await appendFile(LOG, text)
+        await appendFile(LOG, text)
       }
     }
     catch {
@@ -145,27 +129,26 @@ async function step(label: string, argv: string[], cwd = '.', beside = false) {
     }
   })()
 
-  running.set(child.pid, beside ? { label, output: () => output } : undefined)
+  running = child.pid
 
   const exitCode = await child.exited
 
-  running.delete(child.pid)
+  running = undefined
   clearTimeout(limit)
   await settledWithin(drained, DRAIN_MS)
   // A process left holding the pipe would otherwise keep the landing alive once it is done.
   await reader.cancel()
-  await appendFile(LOG, beside ? `$ ${label}\n${output}\n` : '\n')
+  await appendFile(LOG, '\n')
 
   const seconds = Math.round((performance.now() - started) / 1000)
-  const said = beside ? `${label}: ` : ''
 
   if (exitCode === 0 && !hung) {
-    console.log(`${said}ok, ${seconds} s`)
+    console.log(`ok, ${seconds} s`)
 
     return
   }
 
-  console.log(`${said}${hung ? `killed after ${seconds} s` : `exit ${exitCode}, ${seconds} s`}`)
+  console.log(hung ? `killed after ${seconds} s` : `exit ${exitCode}, ${seconds} s`)
   const lines = output.trimEnd().split('\n')
 
   const failures = failedTests(lines)
@@ -235,56 +218,48 @@ async function verify(): Promise<string> {
   const dependencies = manifests.length > 0 && (await Promise.all(manifests.map(async path => dependenciesOnly(path, await shown(base, path), await shown('HEAD', path))))).every(Boolean)
   const whole = changed.some(path => WHOLE_SUITE.test(path) && !(dependencies && MANIFEST.test(path)))
   const libraries = [...new Set(changed.map(path => PACKAGE.exec(path)?.[1]).filter(name => name !== undefined))]
-  const beside = libraries.length > 0
 
   if (!whole && changed.some(path => WHOLE_SUITE.test(path)))
     console.log('tests, the whole suite: left to CI, as only dependencies changed')
 
-  // kay's tests and the libraries' suites run side by side, the libraries one after another, so a landing takes the longer of the two rather than their sum.
-  await Promise.all([
-    (async () => {
-      if (whole) {
-        await step('tests, the whole suite', [BUN, 'run', 'test', WORKERS], '.', beside)
+  if (whole) {
+    await step('tests, the whole suite', [BUN, 'run', 'test', WORKERS])
+  }
+  else {
+    // `bun test --changed` reads a manifest change as reaching nearly every file, so one changing dependencies alone runs only the tests named below.
+    if (!dependencies || manifests.length < changed.length)
+      await step('tests the changes reach', [BUN, 'run', 'test', `--changed=${base}`, WORKERS])
 
-        return
+    const readers = new Set(changed.flatMap(readersOf))
+
+    if (dependencies)
+      readers.add('tests/packages.test.ts')
+
+    // A change under src/ also reaches the tests running kay in a subprocess or loading it by path, which the import graph does not show.
+    for (const test of await subprocessTests(process.cwd(), changed))
+      readers.add(test)
+
+    const fixtures = [...new Set(changed.map(path => FIXTURE.exec(path)?.[1]).filter(name => name !== undefined))]
+    // A fixture's name as a path segment or a quoted string, as in `fixtures/site`, `join(fixtures, 'site')` or `fixtureCopy('site')`.
+    const names = fixtures.map(name => new RegExp(`[/'"\`]${name}[/'"\`]`))
+
+    if (names.length > 0) {
+      for await (const test of new Glob('tests/*.test.ts').scan()) {
+        const text = await Bun.file(test).text()
+
+        if (names.some(name => name.test(text)))
+          readers.add(test)
       }
+    }
 
-      // `bun test --changed` reads a manifest change as reaching nearly every file, so one changing dependencies alone runs only the tests named below.
-      if (!dependencies || manifests.length < changed.length)
-        await step('tests the changes reach', [BUN, 'run', 'test', `--changed=${base}`, WORKERS], '.', beside)
+    if (readers.size > 0)
+      await step('tests reading the changed files', [BUN, 'run', 'test', ...readers, WORKERS])
+  }
 
-      const readers = new Set(changed.flatMap(readersOf))
-
-      if (dependencies)
-        readers.add('tests/packages.test.ts')
-
-      // A change under src/ also reaches the tests running kay in a subprocess or loading it by path, which the import graph does not show.
-      for (const test of await subprocessTests(process.cwd(), changed))
-        readers.add(test)
-
-      const fixtures = [...new Set(changed.map(path => FIXTURE.exec(path)?.[1]).filter(name => name !== undefined))]
-      // A fixture's name as a path segment or a quoted string, as in `fixtures/site`, `join(fixtures, 'site')` or `fixtureCopy('site')`.
-      const names = fixtures.map(name => new RegExp(`[/'"\`]${name}[/'"\`]`))
-
-      if (names.length > 0) {
-        for await (const test of new Glob('tests/*.test.ts').scan()) {
-          const text = await Bun.file(test).text()
-
-          if (names.some(name => name.test(text)))
-            readers.add(test)
-        }
-      }
-
-      if (readers.size > 0)
-        await step('tests reading the changed files', [BUN, 'run', 'test', ...readers, WORKERS], '.', beside)
-    })(),
-    (async () => {
-      for (const name of libraries) {
-        await step(`packages/${name} check`, [BUN, 'run', 'check'], `packages/${name}`, beside)
-        await step(`packages/${name} tests`, [BUN, 'run', 'test'], `packages/${name}`, beside)
-      }
-    })(),
-  ])
+  for (const name of libraries) {
+    await step(`packages/${name} check`, [BUN, 'run', 'check'], `packages/${name}`)
+    await step(`packages/${name} tests`, [BUN, 'run', 'test'], `packages/${name}`)
+  }
 
   return base
 }

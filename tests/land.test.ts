@@ -107,7 +107,7 @@ const LAND = join(ROOT, 'scripts/land.ts')
 const IDENTITY = { GIT_AUTHOR_NAME: 't', GIT_AUTHOR_EMAIL: 't@example.com', GIT_COMMITTER_NAME: 't', GIT_COMMITTER_EMAIL: 't@example.com' }
 
 // An origin, and for each name a clone on a branch with one commit of its own, whose lint step is `lint.ts`: it notes its run in LAND_TRACE, leaves a process of another group holding its output while LAND_LEAK is set, waits for LAND_GATE to exist and fails while LAND_FAIL is set.
-// Its test step, `test.ts`, notes its arguments in LAND_TRACE and waits for LAND_TEST_GATE to exist; `open.ts`, a library's test step, opens that gate, or fails without opening it while LAND_LIB_FAIL is set.
+// Its test step, `test.ts`, notes its arguments in LAND_TRACE; `lib.ts`, a library's test step, notes its run there too and fails while LAND_LIB_FAIL is set.
 async function landings(...names: string[]) {
   const dir = await scratchDir('land-')
   const origin = join(dir, 'origin.git')
@@ -124,8 +124,8 @@ async function landings(...names: string[]) {
   // The cap step, which fails with the command to run while LAND_CAP_FAIL is set, as a page outgrowing its room does.
   await Bun.write(join(seed, 'scripts/whats-new.ts'), 'if (process.env.LAND_CAP_FAIL) {\n  console.error(\'llms/whats-new.md outgrew the room: run `bun scripts/whats-new.ts --cap`\')\n  process.exit(1)\n}\n')
   await Bun.write(join(seed, 'lint.ts'), 'import { appendFileSync, existsSync } from \'node:fs\'\n\nappendFileSync(process.env.LAND_TRACE!, `${process.env.LAND_NAME}\\n`)\n\nif (process.env.LAND_LEAK)\n  Bun.spawn([\'setsid\', \'sleep\', \'30\'], { stdout: \'inherit\', stderr: \'inherit\' }).unref()\n\nwhile (process.env.LAND_GATE && !existsSync(process.env.LAND_GATE))\n  await Bun.sleep(20)\n\nif (process.env.LAND_FAIL)\n  process.exit(1)\n')
-  await Bun.write(join(seed, 'test.ts'), 'import { appendFileSync, existsSync } from \'node:fs\'\n\nappendFileSync(process.env.LAND_TRACE!, `test ${process.argv.slice(2).join(\' \')}\\n`)\n\nwhile (process.env.LAND_TEST_GATE && !existsSync(process.env.LAND_TEST_GATE))\n  await Bun.sleep(20)\n')
-  await Bun.write(join(seed, 'open.ts'), 'if (process.env.LAND_LIB_FAIL)\n  process.exit(1)\n\nawait Bun.write(process.env.LAND_TEST_GATE!, \'\')\n')
+  await Bun.write(join(seed, 'test.ts'), 'import { appendFileSync } from \'node:fs\'\n\nappendFileSync(process.env.LAND_TRACE!, `test ${process.argv.slice(2).join(\' \')}\\n`)\n')
+  await Bun.write(join(seed, 'lib.ts'), 'import { appendFileSync } from \'node:fs\'\n\nappendFileSync(process.env.LAND_TRACE!, \'lib\\n\')\n\nif (process.env.LAND_LIB_FAIL)\n  process.exit(1)\n')
   await $`${process.execPath} install --silent`.cwd(seed).quiet()
   await git(seed, 'add', '-A')
   await git(seed, 'commit', '-qm', 'base')
@@ -399,47 +399,38 @@ describe('landing a change to dependencies alone', () => {
 })
 
 describe('landing a change to a library', () => {
-  // A library whose test step opens the gate kay's tests wait at, so they pass only when both run at once.
   async function library(work: string) {
-    await Bun.write(join(work, 'packages/lib/package.json'), JSON.stringify({ name: 'lib', scripts: { check: 'true', test: 'bun ../../open.ts' } }))
+    await Bun.write(join(work, 'packages/lib/package.json'), JSON.stringify({ name: 'lib', scripts: { check: 'true', test: 'bun ../../lib.ts' } }))
     await git(work, 'add', '-A')
     await git(work, 'commit', '-qm', 'lib')
   }
 
-  it('runs kay\'s tests and the library\'s side by side, a line each', async () => {
+  // Each library's suite fills the workers on its own, so beside kay's tests it would double the processes and the memory a landing takes.
+  it('runs the library\'s suite once kay\'s tests are done, a line each', async () => {
     const { clones, dir, land, tree } = await landings('a')
 
     await library(clones.a!)
 
-    const { code, out } = await land('a', { LAND_TEST_GATE: join(dir, 'test-gate') }).done()
+    const { code, out } = await land('a').done()
+    const trace = (await Bun.file(join(dir, 'trace')).text()).split('\n').filter(line => line === 'lib' || line.startsWith('test '))
 
     expect(code).toBe(0)
     expect(out).toMatch(/^tests the changes reach: ok, \d+ s$/m)
     expect(out).toMatch(/^packages\/lib tests: ok, \d+ s$/m)
+    expect(trace.at(-1)).toBe('lib')
+    expect(trace.length).toBeGreaterThan(1)
     expect(await tree()).toContain('packages')
   }, 60_000)
 
-  it('stops kay\'s tests with what they started once the library\'s fail, exiting 4', async () => {
-    const { clones, dir, land, tree } = await landings('a')
-    const started = Date.now()
+  it('stops on the library\'s failing suite, exiting 4', async () => {
+    const { clones, land, tree } = await landings('a')
 
     await library(clones.a!)
 
-    const { code, out } = await land('a', { LAND_TEST_GATE: join(dir, 'test-gate'), LAND_LIB_FAIL: '1' }).done()
-    const cwds = readdirSync('/proc').flatMap((name) => {
-      try {
-        return [readlinkSync(`/proc/${name}/cwd`)]
-      }
-      catch {
-        return []
-      }
-    })
+    const { code, out } = await land('a', { LAND_LIB_FAIL: '1' }).done()
 
-    expect({ code, fast: Date.now() - started < 20_000 }).toEqual({ code: 4, fast: true })
+    expect(code).toBe(4)
     expect(out).toContain('packages/lib tests: exit 1')
-    // kay's tests, stopped beside it, keep what they printed.
-    expect(await Bun.file(join(clones.a!, '.git/land.log')).text()).toContain('$ tests the changes reach, stopped')
-    expect(cwds).not.toContain(clones.a)
     expect(await tree()).not.toContain('packages')
   }, 60_000)
 })
