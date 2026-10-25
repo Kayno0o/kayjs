@@ -4,6 +4,7 @@ import { join } from 'node:path'
 import process from 'node:process'
 import { $ } from 'bun'
 import { describe, expect, it } from 'bun:test'
+import { dependenciesOnly } from '../scripts/dependency-change'
 import { addedMarkers } from '../scripts/merge-markers'
 import { READERS, readersOf, SOURCE_CHANGE, SOURCE_FILE_READ, SOURCE_FILE_READERS, SOURCE_READERS, SOURCE_SCAN, sourcesRead, UI_THEME_USE, WHOLE_SUITE } from '../scripts/source-readers'
 import { subprocessTests } from '../scripts/subprocess-tests'
@@ -106,6 +107,7 @@ const LAND = join(ROOT, 'scripts/land.ts')
 const IDENTITY = { GIT_AUTHOR_NAME: 't', GIT_AUTHOR_EMAIL: 't@example.com', GIT_COMMITTER_NAME: 't', GIT_COMMITTER_EMAIL: 't@example.com' }
 
 // An origin, and for each name a clone on a branch with one commit of its own, whose lint step is `lint.ts`: it notes its run in LAND_TRACE, leaves a process of another group holding its output while LAND_LEAK is set, waits for LAND_GATE to exist and fails while LAND_FAIL is set.
+// Its test step, `test.ts`, notes its arguments in LAND_TRACE and waits for LAND_TEST_GATE to exist; `open.ts`, a library's test step, opens that gate, or fails without opening it while LAND_LIB_FAIL is set.
 async function landings(...names: string[]) {
   const dir = await scratchDir('land-')
   const origin = join(dir, 'origin.git')
@@ -115,13 +117,15 @@ async function landings(...names: string[]) {
 
   await $`git init -q --bare -b main ${origin}`
   await $`git clone -q ${origin} ${seed}`.quiet()
-  await Bun.write(join(seed, 'package.json'), JSON.stringify({ name: 'landing', scripts: { lint: 'bun lint.ts', check: 'true', test: 'true' } }))
+  await Bun.write(join(seed, 'package.json'), JSON.stringify({ name: 'landing', scripts: { lint: 'bun lint.ts', check: 'true', test: 'bun test.ts' }, peerDependencies: { 'left-pad': '^1.0.0' }, peerDependenciesMeta: { 'left-pad': { optional: true } } }, null, 2))
   await Bun.write(join(seed, 'shared.txt'), 'one\n')
   // The eager JS sizes step, which a landing runs whatever its change reaches: it fails with a growth message while LAND_SIZES_FAIL is set.
   await Bun.write(join(seed, 'scripts/sizes.ts'), 'if (process.env.LAND_SIZES_FAIL) {\n  console.error(\'Eager JS grew past 100 B: static +200 B. run `bun scripts/sizes.ts --update`\')\n  process.exit(1)\n}\n')
   // The cap step, which fails with the command to run while LAND_CAP_FAIL is set, as a page outgrowing its room does.
   await Bun.write(join(seed, 'scripts/whats-new.ts'), 'if (process.env.LAND_CAP_FAIL) {\n  console.error(\'llms/whats-new.md outgrew the room: run `bun scripts/whats-new.ts --cap`\')\n  process.exit(1)\n}\n')
   await Bun.write(join(seed, 'lint.ts'), 'import { appendFileSync, existsSync } from \'node:fs\'\n\nappendFileSync(process.env.LAND_TRACE!, `${process.env.LAND_NAME}\\n`)\n\nif (process.env.LAND_LEAK)\n  Bun.spawn([\'setsid\', \'sleep\', \'30\'], { stdout: \'inherit\', stderr: \'inherit\' }).unref()\n\nwhile (process.env.LAND_GATE && !existsSync(process.env.LAND_GATE))\n  await Bun.sleep(20)\n\nif (process.env.LAND_FAIL)\n  process.exit(1)\n')
+  await Bun.write(join(seed, 'test.ts'), 'import { appendFileSync, existsSync } from \'node:fs\'\n\nappendFileSync(process.env.LAND_TRACE!, `test ${process.argv.slice(2).join(\' \')}\\n`)\n\nwhile (process.env.LAND_TEST_GATE && !existsSync(process.env.LAND_TEST_GATE))\n  await Bun.sleep(20)\n')
+  await Bun.write(join(seed, 'open.ts'), 'if (process.env.LAND_LIB_FAIL)\n  process.exit(1)\n\nawait Bun.write(process.env.LAND_TEST_GATE!, \'\')\n')
   await $`${process.execPath} install --silent`.cwd(seed).quiet()
   await git(seed, 'add', '-A')
   await git(seed, 'commit', '-qm', 'base')
@@ -358,6 +362,103 @@ describe('landing', () => {
     await $`chmod +x ${join(origin, 'hooks/pre-receive')}`
     expect((await land('a').done()).code).toBe(5)
   }, 120_000)
+})
+
+describe('landing a change to dependencies alone', () => {
+  it('leaves the whole suite to CI and runs the test holding the manifests together', async () => {
+    const { clones, land, tree } = await landings('a')
+    const work = clones.a!
+
+    await git(work, 'reset', '-q', '--hard', 'origin/main')
+    await Bun.write(join(work, 'package.json'), (await Bun.file(join(work, 'package.json')).text()).replace('^1.0.0', '^1.1.0'))
+    await git(work, 'commit', '-qam', 'peer')
+
+    const { code, out } = await land('a').done()
+    const trace = await Bun.file(join(work, '..', 'trace')).text()
+
+    expect(code).toBe(0)
+    expect(out).toContain('tests, the whole suite: left to CI, as only dependencies changed')
+    expect(trace).toMatch(/^test .*tests\/packages\.test\.ts/m)
+    expect(trace).not.toContain('--changed')
+    expect(await tree()).toContain('package.json')
+  }, 60_000)
+
+  it('runs the whole suite for a manifest changing more than its dependencies', async () => {
+    const { clones, land } = await landings('a')
+    const work = clones.a!
+
+    await Bun.write(join(work, 'package.json'), (await Bun.file(join(work, 'package.json')).text()).replace('"landing"', '"landed"'))
+    await git(work, 'commit', '-qam', 'name')
+
+    const { code, out } = await land('a').done()
+
+    expect(code).toBe(0)
+    expect(out).toContain('tests, the whole suite: ok')
+    expect(out).not.toContain('left to CI')
+  }, 60_000)
+})
+
+describe('landing a change to a library', () => {
+  // A library whose test step opens the gate kay's tests wait at, so they pass only when both run at once.
+  async function library(work: string) {
+    await Bun.write(join(work, 'packages/lib/package.json'), JSON.stringify({ name: 'lib', scripts: { check: 'true', test: 'bun ../../open.ts' } }))
+    await git(work, 'add', '-A')
+    await git(work, 'commit', '-qm', 'lib')
+  }
+
+  it('runs kay\'s tests and the library\'s side by side, a line each', async () => {
+    const { clones, dir, land, tree } = await landings('a')
+
+    await library(clones.a!)
+
+    const { code, out } = await land('a', { LAND_TEST_GATE: join(dir, 'test-gate') }).done()
+
+    expect(code).toBe(0)
+    expect(out).toMatch(/^tests the changes reach: ok, \d+ s$/m)
+    expect(out).toMatch(/^packages\/lib tests: ok, \d+ s$/m)
+    expect(await tree()).toContain('packages')
+  }, 60_000)
+
+  it('stops kay\'s tests with what they started once the library\'s fail, exiting 4', async () => {
+    const { clones, dir, land, tree } = await landings('a')
+    const started = Date.now()
+
+    await library(clones.a!)
+
+    const { code, out } = await land('a', { LAND_TEST_GATE: join(dir, 'test-gate'), LAND_LIB_FAIL: '1' }).done()
+    const cwds = readdirSync('/proc').flatMap((name) => {
+      try {
+        return [readlinkSync(`/proc/${name}/cwd`)]
+      }
+      catch {
+        return []
+      }
+    })
+
+    expect({ code, fast: Date.now() - started < 20_000 }).toEqual({ code: 4, fast: true })
+    expect(out).toContain('packages/lib tests: exit 1')
+    expect(cwds).not.toContain(clones.a)
+    expect(await tree()).not.toContain('packages')
+  }, 60_000)
+})
+
+describe('a change to dependencies alone', () => {
+  const MANIFEST = JSON.stringify({ name: 'x', scripts: { test: 'bun test' }, dependencies: { a: '^1.0.0' } }, null, 2)
+
+  it('is a lockfile, or a manifest whose other fields stayed as they were', () => {
+    expect(dependenciesOnly('bun.lock', 'old', 'new')).toBe(true)
+    expect(dependenciesOnly('bench/apps/next/bun.lock', 'old', 'new')).toBe(true)
+    expect(dependenciesOnly('package.json', MANIFEST, MANIFEST.replace('^1.0.0', '^1.2.0'))).toBe(true)
+    expect(dependenciesOnly('packages/ui/package.json', MANIFEST, MANIFEST.replace('"dependencies"', '"devDependencies"'))).toBe(true)
+  })
+
+  it('is not a manifest changing another field, one added or removed, one that does not parse, or another file', () => {
+    expect(dependenciesOnly('package.json', MANIFEST, MANIFEST.replace('bun test', 'bun test --bail'))).toBe(false)
+    expect(dependenciesOnly('package.json', undefined, MANIFEST)).toBe(false)
+    expect(dependenciesOnly('package.json', MANIFEST, undefined)).toBe(false)
+    expect(dependenciesOnly('package.json', '{', MANIFEST)).toBe(false)
+    expect(dependenciesOnly('tsconfig.json', '{}', '{"a":1}')).toBe(false)
+  })
 })
 
 describe('tests running kay in a subprocess', () => {
