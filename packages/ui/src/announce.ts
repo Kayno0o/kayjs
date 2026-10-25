@@ -7,6 +7,8 @@ export function announce(message: string, from: Element | null = document.active
   if (!region) {
     region = host.appendChild(document.createElement('div'))
     region.setAttribute('data-kui-announce', '')
+    // A page swap keeps it, so words said just before one are still read.
+    region.setAttribute('data-kay-keep', '')
     region.setAttribute('aria-live', 'polite')
     region.style.cssText = 'position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)'
 

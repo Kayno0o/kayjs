@@ -46,6 +46,8 @@ const POLICIES: Record<Intent, Policy> = {
 
 const PERSISTENT = 'slot[data-persist]'
 const SERVER_ISLAND = 'slot[data-kay-server]'
+// What a script put in the body to outlive every page, a live region an announcer fills for one: the next body never holds it, so the morph would take it away.
+const LASTING = ':scope > [data-kay-keep]'
 // What the morph never keeps across pages: islands are kept by `persist` or a refresh alone, and a script or a template is put in afresh.
 const OPAQUE = `${ISLAND},slot[data-kay-server],script,template`
 // The tags OPAQUE can match, so the selector is only matched for them.
@@ -864,6 +866,15 @@ function swapBody(next: Document, policy: Policy): void {
       script.replaceWith(runnable(script, markup))
   }
 
+  const lasting = [...old.querySelectorAll(LASTING)]
+
+  if (lasting.length > 0) {
+    parking ??= document.documentElement.appendChild(document.createElement('div'))
+
+    for (const element of lasting)
+      place(parking, element, null)
+  }
+
   // The server writes `<body>` bare, so every attribute it holds is a script's.
   try {
     morphChildren(old, body)
@@ -876,6 +887,9 @@ function swapBody(next: Document, policy: Policy): void {
     }
   }
   finally {
+    for (const element of lasting)
+      place(old, element, null)
+
     parking?.remove()
   }
 

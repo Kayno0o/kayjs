@@ -1057,6 +1057,37 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('page swap i
     expect(await state()).toEqual({ themes: ['#123456'], images: ['/x.png', '/b.png'], added: 1, secondOnly: 0, mode: 'dark' })
   })
 
+  it('keeps through every swap the element a script put in <body> marked data-kay-keep, the same one, and drops the rest it added', async () => {
+    const state = async () => page.evaluate(() => ({
+      kept: [...document.querySelectorAll('body > [data-kay-keep]')].map(element => [element.textContent, element === (window as { kept?: Element }).kept]),
+      unmarked: document.querySelectorAll('.script-added').length,
+      nested: document.querySelectorAll('[data-kay-keep] [data-kay-keep], main [data-kay-keep]').length,
+    }))
+
+    await page.goto(origin)
+    // A live region an announcer added and filled, an overlay left unmarked, and a mark on an element of the page's own content.
+    await page.evaluate(() => {
+      const region = document.body.appendChild(document.createElement('div'))
+
+      ;(window as { kayAlive?: boolean }).kayAlive = true
+      region.setAttribute('data-kay-keep', '')
+      region.setAttribute('aria-live', 'polite')
+      region.textContent = 'Title updated'
+      ;(window as { kept?: Element }).kept = region
+      document.body.appendChild(document.createElement('div')).className = 'script-added'
+      document.querySelector('main')?.appendChild(document.createElement('p')).setAttribute('data-kay-keep', '')
+    })
+    await page.click('a.second')
+    await page.waitFor('h1', { text: 'Second' })
+    expect(await sameDocument()).toBe(true)
+    expect(await state()).toEqual({ kept: [['Title updated', true]], unmarked: 0, nested: 0 })
+    await page.click('a.home')
+    await page.waitFor('h1', { text: 'Home' })
+    await refreshed(page)
+    expect(await state()).toEqual({ kept: [['Title updated', true]], unmarked: 0, nested: 0 })
+    expect(page.errors).toEqual([])
+  })
+
   it('serializes each head element and script a fixed number of times per swap', async () => {
     await page.goto(origin)
     await page.evaluate(() => {
