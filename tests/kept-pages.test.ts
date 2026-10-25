@@ -47,8 +47,7 @@ async function built(root: string): Promise<string[]> {
 interface Asked {
   path: string
   method?: string
-  // `{ etagOf: n }` is the etag the n-th answer of the process came with, which a conditional request carries.
-  headers?: Record<string, string | { etagOf: number }>
+  headers?: Record<string, string>
   body?: string
   // Milliseconds before the request is sent, to land in the middle of another of its group.
   wait?: number
@@ -65,7 +64,7 @@ interface Answered {
 // The warnings it logged come with the answers.
 // `parent` is chained onto the app ahead of `pages()`, as hooks of a parent app are.
 async function servedWith(root: string, asked: (Asked | Asked[])[], options = '', parent = ''): Promise<{ answers: Answered[], warnings: string }> {
-  await Bun.write(join(root, 'serve.ts'), `import { Elysia } from 'elysia'\nimport { pages } from ${JSON.stringify(join(import.meta.dir, '../src/server'))}\n\nconst app = new Elysia()${parent}.use(await pages({ root: ${JSON.stringify(root)}, prebuilt: true, log: false, compress: false${options} }))\nconst answers = []\nconst ask = async ({ path, method, headers, body, wait }) => {\n  for (const [name, value] of Object.entries(headers ?? {}))\n    if (typeof value === 'object')\n      headers[name] = answers[value.etagOf].etag\n\n  if (wait)\n    await Bun.sleep(wait)\n\n  const response = await app.handle(new Request(\`http://localhost\${path}\`, { method, headers, body }))\n\n  return { status: response.status, etag: response.headers.get('etag'), cache: response.headers.get('cache-control'), text: await response.text() }\n}\n\nfor (const group of ${JSON.stringify(asked)}) {\n  if (Array.isArray(group))\n    answers.push(...await Promise.all(group.map(ask)))\n  else\n    answers.push(await ask(group))\n}\n\nconsole.log(JSON.stringify(answers))\nprocess.exit(0)\n`)
+  await Bun.write(join(root, 'serve.ts'), `import { Elysia } from 'elysia'\nimport { pages } from ${JSON.stringify(join(import.meta.dir, '../src/server'))}\n\nconst app = new Elysia()${parent}.use(await pages({ root: ${JSON.stringify(root)}, prebuilt: true, log: false, compress: false${options} }))\nconst answers = []\nconst ask = async ({ path, method, headers, body, wait }) => {\n  if (wait)\n    await Bun.sleep(wait)\n\n  const response = await app.handle(new Request(\`http://localhost\${path}\`, { method, headers, body }))\n\n  return { status: response.status, etag: response.headers.get('etag'), cache: response.headers.get('cache-control'), text: await response.text() }\n}\n\nfor (const group of ${JSON.stringify(asked)}) {\n  if (Array.isArray(group))\n    answers.push(...await Promise.all(group.map(ask)))\n  else\n    answers.push(await ask(group))\n}\n\nconsole.log(JSON.stringify(answers))\nprocess.exit(0)\n`)
 
   const child = Bun.spawn([process.execPath, join(root, 'serve.ts')], { cwd: root, stdout: 'pipe', stderr: 'pipe', env: { ...process.env, NODE_ENV: 'production' } })
   const [out, err, code] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited])
@@ -158,7 +157,8 @@ describe('a page that reads nothing from its request', () => {
     try {
       expect(await built(root)).toEqual(['/', '/private'])
 
-      const [home, revalidated, refused, allowed] = await served(root, [{ path: '/' }, { path: '/', headers: { 'if-none-match': { etagOf: 0 } } }, { path: '/private' }, { path: '/private', headers: { 'x-pass': '1' } }])
+      const [home] = await served(root, [{ path: '/' }])
+      const [revalidated, refused, allowed] = await served(root, [{ path: '/', headers: { 'if-none-match': home!.etag! } }, { path: '/private' }, { path: '/private', headers: { 'x-pass': '1' } }])
 
       expect(home!.status).toBe(200)
       expect(home!.cache).toBe('public, max-age=0, must-revalidate')
@@ -347,7 +347,8 @@ describe('a kept page after a request that can write', () => {
 
   it('answers HEAD and a conditional request from the page as it is now', async () => {
     const root = await guestbook()
-    const [, , , head, conditional, stable, stableHead] = await served(root, [read('/'), read('/about'), post('add.kay', 'save'), { path: '/', method: 'HEAD' }, { path: '/', headers: { 'if-none-match': { etagOf: 0 } } }, { path: '/about', headers: { 'if-none-match': { etagOf: 1 } } }, { path: '/about', method: 'HEAD' }])
+    const [old, stableOld] = await served(root, [read('/'), read('/about')])
+    const [, head, conditional, stable, stableHead] = await served(root, [post('add.kay', 'save'), { path: '/', method: 'HEAD' }, read('/', { 'if-none-match': old!.etag! }), read('/about', { 'if-none-match': stableOld!.etag! }), { path: '/about', method: 'HEAD' }])
 
     expect(head!.status).toBe(200)
     expect(head!.text).toBe('')
