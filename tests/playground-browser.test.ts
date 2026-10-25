@@ -103,28 +103,6 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the docs p
     expect(page.errors).toEqual([])
   }, 60_000)
 
-  it('runs the sample on its own: a click in the frame counts, and the frame logs no error', async () => {
-    await page.goto('/getting-started/playground')
-    await page.waitUntil(() => document.querySelector('.playground-frame')?.getAttribute('data-test-live') === 'Clicked 0 times', { timeout: '15s' })
-    expect(await page.evaluate(() => (document.querySelector('.playground-input textarea') as HTMLTextAreaElement).value)).toBe(SAMPLE)
-
-    // The button is the first thing in the frame, under its 1rem padding, and a sandboxed frame is out of the page's reach: the click is the browser's own, at the button's place.
-    for (const count of [1, 2]) {
-      const { x, y } = await page.evaluate(() => {
-        const { left, top } = document.querySelector('.playground-frame')!.getBoundingClientRect()
-
-        return { x: left + 30, y: top + 30 }
-      })
-
-      for (const type of ['mousePressed', 'mouseReleased'])
-        await page.cdp('Input.dispatchMouseEvent', { type, x, y, button: 'left', clickCount: 1 })
-
-      await page.waitUntil((expected: string) => document.querySelector('.playground-frame')?.getAttribute('data-test-live') === expected, { timeout: '15s' }, `Clicked ${count} times`)
-    }
-
-    expect(page.errors).toEqual([])
-  }, 60_000)
-
   it('shows a compile error at its line and keeps the last good result', async () => {
     await page.fill('.playground-input textarea', '---\n---\ndiv\n  p {1 +}\n')
     await page.waitFor('.playground-problems')
@@ -137,6 +115,9 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the docs p
     const policy = response.headers.get('content-security-policy') ?? ''
 
     expect(policy).toContain('default-src \'none\'')
+    // The docs name their dictionary, so the frame's silence is the policy's doing: a fetch its `default-src 'none'` would refuse.
+    expect((await fetch(`${origin}getting-started/introduction`)).headers.get('link')).toContain('rel="compression-dictionary"')
+    expect(response.headers.get('link')).toBeNull()
     expect(policy).toContain('\'unsafe-eval\'')
     expect((await (await fetch(origin)).text())).not.toContain('unsafe-eval')
     expect(await page.evaluate(() => document.querySelector('.playground-frame')?.getAttribute('sandbox'))).toBe('allow-scripts')
@@ -265,6 +246,28 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the docs p
 
     await page.fill('.playground-input textarea', '---\n---\np Back\n')
     await page.waitUntil(() => document.querySelector('.playground-frame')?.getAttribute('data-test-live') === 'Back', { timeout: '15s' })
+  }, 60_000)
+
+  it('runs the sample on its own: a click in the frame counts, and the frame logs no error', async () => {
+    await page.goto('/getting-started/playground')
+    await page.waitUntil(() => document.querySelector('.playground-frame')?.getAttribute('data-test-live') === 'Clicked 0 times', { timeout: '15s' })
+    expect(await page.evaluate(() => (document.querySelector('.playground-input textarea') as HTMLTextAreaElement).value)).toBe(SAMPLE)
+
+    // The button is the first thing in the frame, under its 1rem padding, and a sandboxed frame is out of the page's reach: the click is the browser's own, at the button's place.
+    for (const count of [1, 2]) {
+      const { x, y } = await page.evaluate(() => {
+        const { left, top } = document.querySelector('.playground-frame')!.getBoundingClientRect()
+
+        return { x: left + 30, y: top + 30 }
+      })
+
+      for (const type of ['mousePressed', 'mouseReleased'])
+        await page.cdp('Input.dispatchMouseEvent', { type, x, y, button: 'left', clickCount: 1 })
+
+      await page.waitUntil((expected: string) => document.querySelector('.playground-frame')?.getAttribute('data-test-live') === expected, { timeout: '15s' }, `Clicked ${count} times`)
+    }
+
+    expect(page.errors).toEqual([])
   }, 60_000)
 
   it('leaves the other pages\' policy without eval', async () => {

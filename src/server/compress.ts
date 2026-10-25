@@ -46,6 +46,7 @@ const VARY_DICTIONARY = /\bavailable-dictionary\b/i
 export const COMPRESSIBLE_TYPE = /^(?:text\/|application\/(?:json|javascript|xml|manifest\+json|ld\+json|rss\+xml|atom\+xml|wasm|(?:x-)?ndjson)|font\/(?:ttf|otf)|image\/svg\+xml)/i
 // Statuses with no body to compress, or a partial one.
 const BODILESS = new Set([101, 204, 205, 206, 304])
+const CSP_SPACE = /\s+/
 const NO_TRANSFORM = /\bno-transform\b/i
 const VARY_ENCODING = /\baccept-encoding\b/i
 
@@ -683,12 +684,12 @@ export function wholeResponse(body: string | Uint8Array<ArrayBuffer>, init?: Res
 // A body complete within a tick, as a rendered string is, is compressed in one go with a window cut to its size, and gets a length unless it waited on zlib's threads and goes out at 15 KB or more, compressed or not (`lateBody`); a streamed one is flushed chunk by chunk, so what the server sends early still reaches the browser early.
 // A response left alone is answered synchronously: Elysia sends an empty body for a `mapResponse` promise resolving to undefined.
 // A whole page holding `fixed` texts goes as gzip to a browser taking it, whatever weight it gives zstd or brotli: only the rest of it is compressed, where brotli would compress it all, as its streams cannot be joined.
-// A page of a build with a dictionary names it in a `Link` header, and goes out as the difference from it to a browser holding it, in place of the other encodings; a streamed one goes as it did.
+// A page of a build with a dictionary names it in a `Link` header, unless its own policy forbids fetching it, and goes out as the difference from it to a browser holding it, in place of the other encodings; a streamed one goes as it did.
 export function compressResponse(request: Request, response: Response, fixed?: FixedText[], report?: (error: Error) => void, dictionary?: ServedDictionary): Response | undefined | Promise<Response> {
   const { headers, status } = response
   const html = dictionary !== undefined && !BODILESS.has(status) && HTML_TYPE.test(headers.get('content-type') ?? '')
 
-  if (html)
+  if (html && !forbidsFetch(headers.get('content-security-policy')))
     advertise(headers, dictionary)
 
   const length = headers.get('content-length')
@@ -726,6 +727,22 @@ export function compressResponse(request: Request, response: Response, fixed?: F
   const pieces = splice ? wholePieces.get(response) : undefined
 
   return compressBody(response, wholeSizes.has(response) ? response : response.body, encoding, request.headers.get('accept-encoding'), splice, pieces)
+}
+
+// Whether a response's own policy refuses every fetch, `connect-src` or its fallback `default-src` being `'none'`: the browser could not load a dictionary the page named, and logs a violation for the attempt. Several policies on one header all apply, so one refusing is enough.
+function forbidsFetch(policy: string | null): boolean {
+  return (policy ?? '').split(',').some((one) => {
+    const directives = new Map<string, string>()
+
+    for (const directive of one.split(';')) {
+      const [name = '', ...sources] = directive.trim().split(CSP_SPACE)
+
+      if (name !== '' && !directives.has(name.toLowerCase()))
+        directives.set(name.toLowerCase(), sources.join(' ').toLowerCase())
+    }
+
+    return (directives.get('connect-src') ?? directives.get('default-src')) === '\'none\''
+  })
 }
 
 function advertise(headers: Headers, { link }: ServedDictionary): void {

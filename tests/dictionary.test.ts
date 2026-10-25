@@ -130,6 +130,25 @@ describe('dictionaries for compression', () => {
     expect(await streamed.arrayBuffer()).toBeInstanceOf(ArrayBuffer)
   })
 
+  it.each([
+    ['default-src \'none\'; script-src \'unsafe-inline\'', false],
+    ['script-src \'self\'; DEFAULT-SRC \'NONE\'', false],
+    ['default-src \'none\'; connect-src \'self\'', true],
+    ['default-src \'self\'', true],
+    ['default-src \'self\'; connect-src \'none\'', false],
+    ['default-src \'self\', default-src \'none\'', false],
+    ['connect-src https://api.example.com', true],
+    ['script-src \'self\'', true],
+  ])('names the dictionary under the policy %s: %p', async (policy, named) => {
+    const { dictionary } = await served()
+    const reply = await compress(asking(undefined), pageHtml('Topic'), dictionary, 'text/html')
+    const forbidding = (await compressResponse(asking(undefined), wholeResponse(pageHtml('Topic'), { headers: { 'content-type': 'text/html', 'content-security-policy': policy } }), undefined, undefined, dictionary))!
+
+    expect(reply.headers.get('link')).toBe(dictionary.link)
+    expect(forbidding.headers.get('link')).toBe(named ? dictionary.link : null)
+    expect(forbidding.headers.get('vary')?.includes('available-dictionary') ?? false).toBe(named)
+  })
+
   it('names the dictionary on a page too small to compress, and on none of the bodiless answers', async () => {
     const { dictionary, ref } = await served()
     const small = wholeResponse('<p>Hi</p>', { headers: { 'content-type': 'text/html' } })
