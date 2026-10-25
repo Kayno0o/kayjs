@@ -1,3 +1,4 @@
+import { appendFileSync } from 'node:fs'
 import { appendFile } from 'node:fs/promises'
 import os from 'node:os'
 import { dirname, join, resolve } from 'node:path'
@@ -28,14 +29,12 @@ const WORKERS = `--parallel=${Number(process.env.KAY_LAND_WORKERS) || 6}`
 const STEP_LIMIT_MS = Number(process.env.KAY_LAND_STEP_LIMIT_MS) || 30 * 60_000
 // How long the output of a step that ended may stay open, as a process it started outside its group can hold it.
 const DRAIN_MS = Number(process.env.KAY_LAND_DRAIN_MS) || 5000
-// The steps running, whose process groups go with a landing stopped by a signal or by a step beside them failing.
-const running = new Set<number>()
+// The steps running, whose process groups go with a landing stopped by a signal or by a step beside them failing, each running beside others with the output it has not logged yet.
+const running = new Map<number, { label: string, output: () => string } | undefined>()
 
 for (const signal of ['SIGINT', 'SIGTERM', 'SIGHUP'] as const) {
   process.on(signal, () => {
-    for (const pid of running)
-      killGroup(pid)
-
+    stopRunning()
     process.exit(128 + os.constants.signals[signal])
   })
 }
@@ -49,10 +48,18 @@ function killGroup(pid: number) {
   }
 }
 
-function fail(message: string, code: number): never {
-  for (const pid of running)
+// Kills the steps running, logging what those running beside others printed up to then.
+function stopRunning() {
+  for (const [pid, beside] of running) {
     killGroup(pid)
 
+    if (beside)
+      appendFileSync(LOG, `$ ${beside.label}, stopped\n${beside.output()}\n`)
+  }
+}
+
+function fail(message: string, code: number): never {
+  stopRunning()
   console.error(`land failed: ${message}`)
   process.exit(code)
 }
@@ -138,7 +145,7 @@ async function step(label: string, argv: string[], cwd = '.', beside = false) {
     }
   })()
 
-  running.add(child.pid)
+  running.set(child.pid, beside ? { label, output: () => output } : undefined)
 
   const exitCode = await child.exited
 

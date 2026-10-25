@@ -437,6 +437,8 @@ describe('landing a change to a library', () => {
 
     expect({ code, fast: Date.now() - started < 20_000 }).toEqual({ code: 4, fast: true })
     expect(out).toContain('packages/lib tests: exit 1')
+    // kay's tests, stopped beside it, keep what they printed.
+    expect(await Bun.file(join(clones.a!, '.git/land.log')).text()).toContain('$ tests the changes reach, stopped')
     expect(cwds).not.toContain(clones.a)
     expect(await tree()).not.toContain('packages')
   }, 60_000)
