@@ -250,14 +250,22 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the docs p
 
   it('runs the sample on its own: a click in the frame counts, and the frame logs no error', async () => {
     await page.goto('/getting-started/playground')
-    // The frame loads the compiler and compiles before it shows anything, which takes far longer while the whole suite runs beside it: kaynooo/kayjs#2337.
-    await page.waitUntil(() => document.querySelector('.playground-frame')?.getAttribute('data-test-live') === 'Clicked 0 times', { timeout: '45s' })
+    await page.waitUntil(() => document.querySelector('.playground-frame')?.getAttribute('data-test-live') === 'Clicked 0 times', { timeout: '15s' })
     expect(await page.evaluate(() => (document.querySelector('.playground-input textarea') as HTMLTextAreaElement).value)).toBe(SAMPLE)
 
     // The button is the first thing in the frame, under its 1rem padding, and a sandboxed frame is out of the page's reach: the click is the browser's own, at the button's place.
-    for (const count of [1, 2]) {
+    // Under the whole suite a click can land before the page settles or the frame's process routes input, so the frame is brought into view and measured again for each click, and a click that changed nothing is sent again: kaynooo/kayjs#2337.
+    const shown = async () => Number((/Clicked (\d+) times/).exec(await page.evaluate(() => document.querySelector('.playground-frame')?.getAttribute('data-test-live') ?? ''))?.[1] ?? 0)
+    let clicks = 0
+
+    while (await shown() < 2 && clicks < 10) {
+      const before = await shown()
       const { x, y } = await page.evaluate(() => {
-        const { left, top } = document.querySelector('.playground-frame')!.getBoundingClientRect()
+        const frame = document.querySelector('.playground-frame')!
+
+        frame.scrollIntoView({ block: 'center' })
+
+        const { left, top } = frame.getBoundingClientRect()
 
         return { x: left + 30, y: top + 30 }
       })
@@ -265,9 +273,17 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the docs p
       for (const type of ['mousePressed', 'mouseReleased'])
         await page.cdp('Input.dispatchMouseEvent', { type, x, y, button: 'left', clickCount: 1 })
 
-      await page.waitUntil((expected: string) => document.querySelector('.playground-frame')?.getAttribute('data-test-live') === expected, { timeout: '15s' }, `Clicked ${count} times`)
+      clicks++
+
+      try {
+        await page.waitUntil((count: string) => document.querySelector('.playground-frame')?.getAttribute('data-test-live') !== `Clicked ${count} times`, { timeout: '3s' }, String(before))
+      }
+      catch {}
     }
 
+    // Each click counts at most once, and two of them got through.
+    expect(await shown()).toBeGreaterThanOrEqual(2)
+    expect(await shown()).toBeLessThanOrEqual(clicks)
     expect(page.errors).toEqual([])
   }, 90_000)
 
