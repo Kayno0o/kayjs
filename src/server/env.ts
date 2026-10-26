@@ -10,27 +10,34 @@ import { fixedReply } from './compress'
 import { devSecret } from './dev-secret'
 import { building, callerFile, loading, PUBLIC_ENV_PATH, recordEnv } from './env-state'
 import { readFields } from './query'
+import { compiledCheck } from './schema-check'
 
 const OPTIONAL = Symbol.for('TypeBox.Optional')
 const LOAD_PLACEHOLDER_LENGTH = 32
-// Values tried, in order, for a string whose `format` or `pattern` refuses the plain placeholder: a URL, an email, an address, an id, a date and time, then short texts a pattern is likely to take.
-const LOAD_SAMPLES = [
-  'https://kay-load-placeholder.invalid/',
-  'kay-load-placeholder@example.invalid',
-  '127.0.0.1',
-  '::1',
-  '00000000-0000-4000-8000-000000000000',
-  '2000-01-01T00:00:00.000Z',
-  '2000-01-01',
-  '00:00:00',
-  'kay-load-placeholder',
-  'kay',
-  'a',
-  '0',
-  '1',
-  '0000000000000000000000000000000000000000000000000000000000000000',
-  'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
-]
+const LOAD_PREFIX = /^\^([\w:/.-]+)/
+
+// Values tried, in order, for a string the plain placeholder does not satisfy, each grown to `length` where it can: a URL, an email, addresses, an id, a date and time, the literal start of a pattern such as `^sk_`, then short texts a pattern is likely to take.
+function loadSamples(length: number, pattern: unknown): string[] {
+  const grow = (text: string, filler = 'a') => text.padEnd(length, filler)
+  const prefix = typeof pattern === 'string' ? LOAD_PREFIX.exec(pattern)?.[1] : undefined
+
+  return [
+    `https://kay-load-placeholder.invalid/${'a'.repeat(Math.max(0, length - 37))}`,
+    `${'a'.repeat(Math.max(0, length - 36))}kay-load-placeholder@example.invalid`,
+    '127.0.0.1',
+    '::1',
+    '00000000-0000-4000-8000-000000000000',
+    '2000-01-01T00:00:00.000Z',
+    '2000-01-01',
+    '00:00:00',
+    ...prefix === undefined ? [] : [grow(prefix, '0'), grow(prefix), prefix],
+    grow('kay-load-placeholder'),
+    grow('A', 'A'),
+    grow('a'),
+    grow('0', '0'),
+    grow('1', '0'),
+  ]
+}
 
 // A `s.Object` of the variables, each read on its own.
 export type EnvSchema = TSchema & { properties: Record<string, TSchema> }
@@ -97,9 +104,9 @@ export function defineEnv<Schema extends EnvSchema>(declared: Schema, source: Re
 }
 
 // What `--load` gives a variable the build lacks or refuses: a fixed string of 32 characters or its `minLength`, which a session secret's own check accepts and writes nothing to disk; `undefined` for a field of another type.
-// A field with an `enum` or `const` reads as its first value, and the string is replaced by the first sample the field's own rules accept, one for its `format` or a short text for its `pattern`, so a module validating it at load, as `new URL(env.X)` does, still loads.
+// A field with an `enum` or `const` reads as its first value, and one the plain string does not satisfy as the first of kay's samples it accepts (a URL, an email, a literal `pattern` start...), checked without decoding; a rule none of them meets leaves the plain string.
 function loadPlaceholder(name: string, field: TSchema | undefined): unknown {
-  const { minLength, type, enum: values, const: only } = (field ?? {}) as { minLength?: unknown, type?: unknown, enum?: unknown, const?: unknown }
+  const { minLength, type, enum: values, const: only, pattern } = (field ?? {}) as { minLength?: unknown, type?: unknown, enum?: unknown, const?: unknown, pattern?: unknown }
 
   if (type !== 'string')
     return undefined
@@ -110,11 +117,12 @@ function loadPlaceholder(name: string, field: TSchema | undefined): unknown {
   if (Array.isArray(values) && typeof values[0] === 'string')
     return values[0]
 
-  const plain = `kay-load-placeholder-${name}`.padEnd(Math.max(LOAD_PLACEHOLDER_LENGTH, typeof minLength === 'number' ? minLength : 0), '_')
-  const check = t.Object({ [name]: field as TSchema })
+  const length = Math.max(LOAD_PLACEHOLDER_LENGTH, typeof minLength === 'number' ? minLength : 0)
+  const plain = `kay-load-placeholder-${name}`.padEnd(length, '_')
+  const check = compiledCheck(field as TSchema)
 
-  for (const candidate of [plain, ...LOAD_SAMPLES]) {
-    if (!('refused' in readFields(check, { [name]: candidate }, false)))
+  for (const candidate of [plain, ...loadSamples(length, pattern)]) {
+    if (check.Check(candidate))
       return candidate
   }
 

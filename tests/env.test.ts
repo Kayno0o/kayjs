@@ -1,3 +1,4 @@
+import type { TSchema } from 'elysia'
 import { readFile, rm, stat } from 'node:fs/promises'
 import { join } from 'node:path'
 import process from 'node:process'
@@ -166,7 +167,7 @@ describe('the placeholder --load gives a string the build lacks', () => {
   const LOADING = Symbol.for('kay.loading')
   const BUILDING = Symbol.for('kay.building')
 
-  function loadedWith(names: Record<string, ReturnType<typeof s.String>>): Record<string, unknown> {
+  function loadedWith(names: Record<string, TSchema>): Record<string, unknown> {
     const global = globalThis as Record<symbol, unknown>
 
     global[BUILDING] = true
@@ -189,6 +190,13 @@ describe('the placeholder --load gives a string the build lacks', () => {
       ID: s.String({ pattern: '^[0-9]+$' }),
       MODE: s.String({ enum: ['b', 'a'] }),
       LONG: s.String({ minLength: 40 }),
+      LONG_URL: s.String({ format: 'uri', minLength: 60 }),
+      KEY: s.String({ pattern: '^sk_' }),
+      DB: s.String({ pattern: '^postgres://' }),
+      UPPER: s.String({ pattern: '^[A-Z]+$' }),
+      ONLY: s.String({ const: 'x' }),
+      SAMPLE_LESS: s.String({ pattern: '^zz-[0-9]{3}-q$' }),
+      DECODED: t.Transform(t.String()).Decode((value) => { throw new Error(`decoded ${value}`) }).Encode(value => value),
     })
 
     expect(env.PLAIN).toBe('kay-load-placeholder-PLAIN'.padEnd(32, '_'))
@@ -197,6 +205,14 @@ describe('the placeholder --load gives a string the build lacks', () => {
     expect(env.ID).toMatch(/^\d+$/)
     expect(env.MODE).toBe('b')
     expect((env.LONG as string).length).toBe(40)
+    expect(() => new URL(env.LONG_URL as string)).not.toThrow()
+    expect((env.LONG_URL as string).length).toBeGreaterThanOrEqual(60)
+    expect(env.KEY).toMatch(/^sk_/)
+    expect(env.DB).toMatch(/^postgres:\/\//)
+    expect(env.UPPER).toMatch(/^[A-Z]+$/)
+    expect(env.ONLY).toBe('x')
+    // A pattern none of the samples meets leaves the plain placeholder rather than failing the load.
+    expect(env.SAMPLE_LESS).toBe('kay-load-placeholder-SAMPLE_LESS'.padEnd(32, '_'))
   })
 })
 

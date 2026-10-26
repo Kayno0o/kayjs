@@ -60,7 +60,9 @@ A Dockerfile build stage has neither a database nor your secrets. There, use `--
 kay build --compile server --verify-load
 ```
 
-It runs `./server --load`, which loads every module the executable carries and stops before your server entry runs. A variable your `defineEnv` needs in production is not asked for: a module that reads it while loading, such as for `session({ secret })`, gets a placeholder (a fixed string of 32 characters, or the field's `minLength`, for a string, the first value of its `enum`, or a sample its `format` or `pattern` accepts, and `undefined` for other types). 
+It runs `./server --load`, which loads every module the executable carries and stops before your server entry runs. A variable your `defineEnv` needs in production is not asked for: a module that reads it while loading, such as for `session({ secret })`, gets a placeholder.
+
+A string reads as a fixed text of 32 characters, or the field's `minLength`. A string with an `enum` or `const` reads as that value, and one with a `format` or `pattern` the plain text refuses reads as the first of kay's samples it accepts (a URL, an email, the literal start of a pattern such as `sk_`), else the plain text. Any other type reads as `undefined`. 
 
 A module that cannot load fails the build with the executable's output, as `--verify` does. It cannot catch what your server entry does at startup, so keep `--verify` where the real environment is.
 
