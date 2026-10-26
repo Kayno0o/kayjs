@@ -131,7 +131,8 @@ effect(() => {
 
     if (list && (wanted?.key !== held?.key || wanted?.direction !== held?.direction))
       void list.sortBy(wanted)
-  })})
+  })
+})
 
 // The rows the filter keeps, all of them without one.
 const kept = memo(() => filter === undefined ? rows() : rowsMatching(rows(), filter, typed()))
