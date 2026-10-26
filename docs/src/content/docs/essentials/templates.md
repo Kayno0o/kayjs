@@ -21,6 +21,8 @@ section.todo-list
       li Nothing to do
 ```
 
+A `for` can take its item apart, as a `const` does: `for { id, title } of todos`, or `for [name, count] of Object.entries(totals)`. An index goes after it, `for [name, count], i of entries`.
+
 ## Elements
 
 A line is `tag.class#id(attributes) text`, every part optional. A line starting with `.` or `#` is a `div`.

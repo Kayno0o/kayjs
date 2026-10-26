@@ -120,7 +120,10 @@ export interface MatchNode extends Span {
 
 export interface ForNode extends Span {
   kind: 'for'
+  // A name, or an object or array pattern destructuring each row.
   item: Span
+  // Set on a loop whose item is a pattern, once codegen has given the row a name of its own and declared the pattern as a `const` of the block.
+  row?: string | undefined
   index?: Span | undefined
   each: Span
   // Without one, rows are matched by the item's `id`, else by the item itself.
@@ -173,6 +176,8 @@ export interface ConstNode extends Span {
   // A name, or an object or array pattern destructuring the value.
   pattern: Span
   value: Span
+  // The name of a loop's row, which a destructured `for` item reads in place of `value`.
+  row?: string | undefined
 }
 
 // `error title` inside a form posting to an action: the message a refused post gives that field, in a `p.error` the field's `aria-describedby` names; a bare `error` shows the form's own.
@@ -270,6 +275,29 @@ export function keyedByPosition(node: ForNode, source: string): node is ForNode 
   const index = node.index && source.slice(node.index.start, node.index.end)
 
   return index !== undefined && index !== '' && node.key !== undefined && source.slice(node.key.start, node.key.end).trim() === index
+}
+
+// The file with each loop whose item is a pattern (`for [key, value] of entries`, `for { id, name } of rows`) given a row name of its own, the pattern then declared by a `const` leading its block: the loop's row is an accessor in a browser, which a parameter pattern cannot destructure.
+export function nameDestructuredRows(file: KayFile): KayFile {
+  const isPattern = (node: Node): node is ForNode => node.kind === 'for' && /^[{[]/.test(file.source.slice(node.item.start, node.item.end))
+
+  if (!someNode(file.template, isPattern))
+    return file
+
+  const template = structuredClone(file.template)
+
+  visitNodes(template, (node) => {
+    if (!isPattern(node))
+      return
+
+    const row = `KayRow${node.item.start}`
+    const at = { start: node.item.start, end: node.item.start }
+
+    node.row = row
+    node.children.unshift({ kind: 'const', ...node.item, pattern: node.item, value: at, row })
+  })
+
+  return { ...file, template }
 }
 
 // Every element of a template, nested ones included, in source order.

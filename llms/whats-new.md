@@ -4,6 +4,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 
 ## Unreleased
 
+- A `for` destructures its item, `for { id, name } of rows` or `for [key, count] of entries`, in the server render, in islands and in `kay check`, where it was a `Malformed for` error: [Templates](templates.md#render-a-list).
 - kayjs-ui `Table` takes `sortParam`, keeping the sort a header click picks in the URL beside `filterParam`, so a reload and back and forward sort the same: [Tables](../packages/ui/llms/tables-navigation-and-layout.md).
 - `kay check` reports a root Dockerfile building `FROM oven/bun:<version>` from a Bun older than the one kay needs (`old-bun-image`), and `kay check --fix`, so `kay upgrade`, moves the tag to the oldest Bun kay runs on, so an image build no longer fails after an upgrade: [Lints](lints.md).
 - `kay check` and `kay upgrade` name an export `kay.config.ts` imports and a release removed (`mailExtension`, `authExtension`, `authPages`) with what replaced it, instead of stopping on Bun's bare `SyntaxError`: [upgrading](upgrading.md).

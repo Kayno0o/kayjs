@@ -30,6 +30,8 @@ const SLOT_NAME = /@[A-Z_$][\w$]*/iy
 const NAMED_SLOT = /slot[ \t]+([A-Z_$][\w$]*)/diy
 const SNIPPET_HELP = '`snippet feature(title: string, text: string)`, then its lines indented below it'
 const FOR_HEAD = /for[ \t]+([A-Z_$][\w$]*)(?:[ \t]*,[ \t]*([A-Z_$][\w$]*))?[ \t]+of[ \t]+/diy
+const FOR_PATTERN_HEAD = /for[ \t]+(?=[{[])/y
+const FOR_PATTERN_TAIL = /(?:[ \t]*,[ \t]*([A-Z_$][\w$]*))?[ \t]+of[ \t]+/diy
 const COMMENT_HEAD = /\/\//y
 // `| text`, or a line made of an expression, which is text as `| {expr}` is.
 const TEXT_HEAD = /\| ?|(?=\{)/y
@@ -786,26 +788,55 @@ class TemplateParser {
     previous.end = branch.end
   }
 
+  // The item of a `for` line, a name or a destructuring pattern, its optional index and where the list starts.
+  private forHead(start: number): { item: Span, index: Span | undefined, end: number } | undefined {
+    FOR_PATTERN_HEAD.lastIndex = start
+
+    if (FOR_PATTERN_HEAD.test(this.src)) {
+      const open = FOR_PATTERN_HEAD.lastIndex
+      const close = this.scan.balanced(open)
+
+      FOR_PATTERN_TAIL.lastIndex = close
+
+      const tail = FOR_PATTERN_TAIL.exec(this.src)
+
+      if (!tail)
+        return undefined
+
+      const indexIndices = tail.indices?.[1]
+
+      return { item: { start: open, end: close }, index: indexIndices && { start: indexIndices[0], end: indexIndices[1] }, end: close + tail[0].length }
+    }
+
+    FOR_HEAD.lastIndex = start
+
+    const head = FOR_HEAD.exec(this.src)
+    const itemIndices = head?.indices?.[1]
+
+    if (!head || !itemIndices)
+      return undefined
+
+    const indexIndices = head.indices?.[2]
+
+    return { item: { start: itemIndices[0], end: itemIndices[1] }, index: indexIndices && { start: indexIndices[0], end: indexIndices[1] }, end: start + head[0].length }
+  }
+
   private parseFor(indent: number): ForNode {
     const start = this.pos
 
-    FOR_HEAD.lastIndex = start
-    const head = FOR_HEAD.exec(this.src)
     const end = this.scan.lineEnd(start)
-    const itemIndices = head?.indices?.[1]
+    const head = this.forHead(start)
 
-    if (!head || !itemIndices) {
-      this.error(start, end, 'Malformed `for`', { help: '`for <item> of <list>`, or `for <item>, <index> of <list>`, then `key={<key>}` when rows are not matched by `item.id`' })
+    if (!head) {
+      this.error(start, end, 'Malformed `for`', { help: '`for <item> of <list>`, `for <item>, <index> of <list>` or a destructured item as in `for { id, name } of rows` and `for [key, value] of entries`, then `key={<key>}` when rows are not matched by `item.id`' })
       this.pos = end
 
       return { kind: 'for', start, end, item: { start, end: start }, each: { start, end: start }, children: this.parseBlock(indent) }
     }
 
-    const item = { start: itemIndices[0], end: itemIndices[1] }
-    const indexIndices = head.indices?.[2]
-    const index = indexIndices ? { start: indexIndices[0], end: indexIndices[1] } : undefined
+    const { item, index } = head
 
-    this.pos = start + head[0].length
+    this.pos = head.end
     const each = this.scanToLineEnd(true)
     let key: Span | undefined
 

@@ -200,6 +200,16 @@ describe('control flow', () => {
     expect(out).toBe('<ul><KayLoopFor each={todos} keyed={(todo) => (todo.id)}>{(todo, i) => <li data-i={i}>{todo.title}</li>}</KayLoopFor></ul>')
   })
 
+  it('destructures a loop\'s item through a name of the row\'s own, which a browser reads as the accessor it is and a page as the item', () => {
+    const source = 'for [key, value], i of entries key={key}\n  p {key}: {value}'
+
+    expect(compileKay(source, 'test.kay', { output: 'dom' }).tsx).toContain('([key, value]) => (key), (KayRow4, i) =>')
+    expect(compileKay(source, 'test.kay', { output: 'dom' }).tsx).toContain('const [key, value] = (KayRow4());')
+    expect(compileKay(source, 'test.kay', { output: 'html' }).tsx).toContain('const [key, value] = (KayRow4);')
+    expect(compileKay(source, 'test.kay', { output: 'html' }).tsx).toContain('(KayRow4, i) =>')
+    expect(compileKay('for { a, b } of rows\n  p {a}{b}', 'test.kay', { check: true }).tsx).toContain('{((KayRow4) => <>{(() => { const { a, b } = (KayRow4); return <p>{a}{b}</p> })()}</>)(KayRow(kayEach))}')
+  })
+
   it('matches rows by position when the key is the index', () => {
     expect(jsx('for row, i of rows key={i}\n  p {i}: {row}')).toBe('<><KayLoopFor each={rows} keyed={false}>{(row, i) => <p>{i}: {row}</p>}</KayLoopFor></>')
   })

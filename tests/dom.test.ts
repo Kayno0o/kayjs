@@ -607,6 +607,27 @@ describe('loops', () => {
     }
   })
 
+  const mountDestructured = site({
+    'main.kay': '---\nimport { signal } from \'kay\'\n\nconst rows = signal([{ id: 1, name: \'a\' }, { id: 2, name: \'b\' }])\nconst pairs = signal<[string, number][]>([[\'x\', 1]])\n---\nbutton(onClick={() => { rows.set([{ id: 1, name: \'A\' }, { id: 2, name: \'b\' }]); pairs.set([[\'x\', 1], [\'y\', 2]]) }}) Edit\nul.rows\n  for { id, name }, i of rows() key={id}\n    li {i}:{id}:{name}\nul.pairs\n  for [key, count] of pairs() key={key}\n    li {key}={count}\n',
+  })
+
+  it('destructures a loop\'s item, each name following its row as the list changes', async () => {
+    const { root, dispose } = await mountDestructured()
+    const texts = (selector: string) => [...root.querySelectorAll(selector)].map(item => item.textContent)
+
+    try {
+      expect(texts('.rows li')).toEqual(['0:1:a', '1:2:b'])
+      expect(texts('.pairs li')).toEqual(['x=1'])
+      root.querySelector('button')!.click()
+      await settle()
+      expect(texts('.rows li')).toEqual(['0:1:A', '1:2:b'])
+      expect(texts('.pairs li')).toEqual(['x=1', 'y=2'])
+    }
+    finally {
+      await dispose()
+    }
+  })
+
   const keyed = ([
     ['as the only content of their element', 'ul\n  for n, i of list() key={n}\n    li {n}:{i}\n'],
     ['between other children, several nodes a row', 'ul\n  li.first first\n  for n, i of list() key={n}\n    li {n}:{i}\n    | ,\n  li.last last\n'],

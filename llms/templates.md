@@ -33,6 +33,8 @@ ul
     li Nobody yet
 ```
 
+A destructured item reads like a `const` pattern: `for { id, name } of rows` and `for [key, count] of Object.entries(totals)`, with an index after it (`for [key, count], i of entries`) and a `key={...}` as usual.
+
 ### Pick a block by a value
 
 `match` renders the block of the first `when` listing a value equal to it, else the `else` block:

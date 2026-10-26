@@ -7,7 +7,7 @@ import type { PageSettingName } from './page-settings'
 import type { Sites } from './rewrite'
 import type { ImportBinding, PropsDeclaration, ScriptAnalysis, ServerAnalysis } from './script'
 import { actionUrl } from '../runtime/action'
-import { childBlocks, errorMessages, INTERACTIVE_ATTRIBUTE, isHead, someNode, templateFacts, uiHasVariants, visitNodes } from './ast'
+import { childBlocks, errorMessages, INTERACTIVE_ATTRIBUTE, isHead, nameDestructuredRows, someNode, templateFacts, uiHasVariants, visitNodes } from './ast'
 import { domHelperImport, DomTemplate } from './dom'
 import { mayHoldFunction } from './expression'
 import { htmlHelperImport, HtmlTemplate } from './html'
@@ -172,7 +172,7 @@ function bindableNames(source: string, props: PropsDeclaration | undefined): Map
 }
 
 export function generate(file: KayFile, script: ScriptAnalysis, server: ServerAnalysis | undefined, options: GenerateOptions): Generated {
-  return new ModuleShell(file, script, server, options).run()
+  return new ModuleShell(nameDestructuredRows(file), script, server, options).run()
 }
 
 // The module around a template, alike for every output mode: its imports, the server fence's `load`, the component's signature, props and script, and its export; the template renders through the writer of the mode.

@@ -6,7 +6,7 @@ import { DATA_SCRIPT, LEADING_NEWLINE } from '../runtime/head'
 import { mayLeaveSite } from '../runtime/outside'
 import { actionOf, FIELD_ELEMENTS, keyedByPosition, marksServerIsland, sectionOf, serverIslandOf, UNCHECKED_TYPES, UNREQUIRABLE_TYPES } from './ast'
 import { decodeEntities } from './expression'
-import { childItems, constDeclaration, errorParagraphArguments, isDeclaration, slotValue, soleDynamic } from './items'
+import { addRowItem, childItems, constDeclaration, errorParagraphArguments, isDeclaration, slotValue, soleDynamic } from './items'
 import { addStyleArguments, BEHAVIOUR, describedValue, END_MARKER, escapeStaticAttribute, escapeText, fromRoot, GROUP_HAS, groupValue, helperName, RAW_ELEMENTS, START_MARKER, TemplateWriter, VOID_ELEMENTS } from './markup'
 import { SUBJECT } from './names'
 
@@ -352,7 +352,8 @@ export class HtmlTemplate extends TemplateWriter {
     const { b } = this
 
     b.wrap(node, () => {
-      b.add(`${helperName('loop')}((`).addSource(node.each).add('), (').addSource(node.item)
+      b.add(`${helperName('loop')}((`).addSource(node.each).add('), (')
+      addRowItem(b, node)
 
       if (node.index)
         b.add(', ').addSource(node.index)

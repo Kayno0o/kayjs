@@ -259,6 +259,18 @@ describe('elements', () => {
     ])
   })
 
+  it('reads a destructured loop item, an index after it and a key', () => {
+    expect(outline(parse('for { id, name }, i of rows key={id}\n  p {name}'))).toEqual([{ for: '{ id, name }', index: 'i', of: 'rows', key: 'id', children: [{ tag: 'p', children: [['{name}']] }] }])
+    expect(outline(parse('for [a, [b]] of rows\n  p {a}'))).toMatchObject([{ for: '[a, [b]]', of: 'rows' }])
+  })
+
+  it('hints at the destructured form when a loop is malformed', () => {
+    const [found] = parse('for { a } rows\n  p x').diagnostics
+
+    expect(found?.message).toBe('Malformed `for`')
+    expect(found?.help).toContain('for { id, name } of rows')
+  })
+
   it('rejects text glued to a tag', () => {
     expect(parse('p.x=oops').diagnostics.length).toBeGreaterThan(0)
   })

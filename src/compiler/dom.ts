@@ -6,7 +6,7 @@ import type { PlannedAttribute } from './markup'
 import { mayLeaveSite } from '../runtime/outside'
 import { keyedByPosition, marksServerIsland, modifiersOf } from './ast'
 import { decodeEntities, isFunctionAt } from './expression'
-import { childItems, constDeclaration, errorParagraphArguments, isDeclaration, slotValue, soleDynamic } from './items'
+import { addRowItem, childItems, constDeclaration, errorParagraphArguments, isDeclaration, slotValue, soleDynamic } from './items'
 import { addBindWrite, addHandler, addStyleArguments, bindRead, END_MARKER, escapeStaticAttribute, escapeText, GROUP_HAS, groupValue, helperName, RAW_ELEMENTS, START_MARKER, TemplateWriter, VOID_ELEMENTS } from './markup'
 import { SUBJECT } from './names'
 import { bindEvent } from './validate'
@@ -245,7 +245,8 @@ export class DomTemplate extends TemplateWriter {
     else
       b.add(helperName('rowKey'))
 
-    b.add(', (').addSource(node.item)
+    b.add(', (')
+    addRowItem(b, node)
 
     if (node.index)
       b.add(', ').addSource(node.index)

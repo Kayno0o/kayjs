@@ -3,7 +3,7 @@ import type { CodeBuilder } from './mapping'
 import type { Sites } from './rewrite'
 import { actionOf, bindsOwnProp, FIELD_ATTRIBUTE, FIELD_ELEMENTS, handedParts, isSlot, keyedByPosition, partAttribute, serverIslandOf } from './ast'
 import { isFunctionAt, sentParts } from './expression'
-import { slotValue } from './items'
+import { addConstValue, addRowItem, slotValue } from './items'
 import { DYNAMIC_TAG } from './mapping'
 import { addBindWrite, bindRead, helperName } from './markup'
 import { PROPS } from './names'
@@ -146,7 +146,9 @@ export class JsxTemplate {
       // Code that runs reads it as a memo, as it does a row, unless the markup renders once.
       this.sites.consts.set(b.code.length, !this.options.staticLoops)
 
-      b.addSource(node.pattern).add(' = (').addSource(node.value).add(');')
+      b.addSource(node.pattern).add(' = (')
+      addConstValue(b, node)
+      b.add(');')
     })
     b.add(' return ')
     this.emitRoot(rest)
@@ -399,8 +401,10 @@ export class JsxTemplate {
       }
 
       b.add('>{(')
-      this.sites.rows.add(b.code.length)
-      b.addSource(node.item)
+      if (node.row === undefined)
+        this.sites.rows.add(b.code.length)
+
+      addRowItem(b, node)
 
       if (node.index) {
         b.add(', ')
@@ -466,10 +470,10 @@ export class JsxTemplate {
 
       b.add('((')
 
-      if (!staticLoop)
+      if (!staticLoop && node.row === undefined)
         this.sites.rows.add(b.code.length)
 
-      b.addSource(node.item)
+      addRowItem(b, node)
 
       if (node.index) {
         b.add(', ')
@@ -516,7 +520,7 @@ export class JsxTemplate {
 
     b.wrap(node, () => {
       b.add('{KayStaticFor(').addSource(node.each).add(', (')
-      b.addSource(node.item)
+      addRowItem(b, node)
 
       if (node.index)
         b.add(', ').addSource(node.index)

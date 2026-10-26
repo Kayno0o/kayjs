@@ -128,21 +128,35 @@ export function childItems(nodes: Node[]): Item[] {
   return items
 }
 
+// The value a `const` names: its expression, or the row of the loop whose destructured item it declares, which a browser's loop and an island's server render hand over as an accessor (the `memo` of a block that follows what it reads).
+export function addConstValue(b: CodeBuilder, node: ConstNode, memo?: string): void {
+  if (node.row === undefined)
+    b.addSource(node.value)
+  else
+    b.add(memo === undefined ? node.row : `${node.row}()`)
+}
+
 // A template `const` as a statement. `memo`, the helper's name in code that runs again as what it reads changes, makes each name a memo, read by calling it.
 export function constDeclaration(b: CodeBuilder, node: ConstNode, src: string, memo: string | undefined): void {
   const names = memo === undefined ? [] : parameterNames(src.slice(node.pattern.start, node.pattern.end))
 
   if (memo === undefined) {
-    b.add('const ').addSource(node.pattern).add(' = (').addSource(node.value).add('); ')
+    b.add('const ').addSource(node.pattern).add(' = (')
+    addConstValue(b, node, memo)
+    b.add('); ')
   }
   else if (names.length === 1 && src.slice(node.pattern.start, node.pattern.end) === names[0]) {
-    b.add('const ').addSource(node.pattern).add(` = ${memo}(() => (`).addSource(node.value).add(')); ')
+    b.add('const ').addSource(node.pattern).add(` = ${memo}(() => (`)
+    addConstValue(b, node, memo)
+    b.add(')); ')
   }
   else {
     // A destructured value is one memo, each name reading its part.
     const shared = `KayC${node.start}`
 
-    b.add(`const ${shared} = ${memo}(() => { const `).addSource(node.pattern).add(' = (').addSource(node.value).add(`); return [${names.join(', ')}] })`)
+    b.add(`const ${shared} = ${memo}(() => { const `).addSource(node.pattern).add(' = (')
+    addConstValue(b, node, memo)
+    b.add(`); return [${names.join(', ')}] })`)
 
     for (const [index, name] of names.entries())
       b.add(`, ${name} = () => ${shared}()[${index}]`)
@@ -180,4 +194,12 @@ export function soleDynamic(items: Item[]): boolean {
   const rendered = items.filter(item => !isDeclaration(item))
 
   return rendered.length === 1 && isDynamic(rendered[0]!)
+}
+
+// The parameter a loop's block takes for its row: the item as written, or the row's own name when the item is a pattern.
+export function addRowItem(b: CodeBuilder, node: ForNode): void {
+  if (node.row === undefined)
+    b.addSource(node.item)
+  else
+    b.add(node.row)
 }
