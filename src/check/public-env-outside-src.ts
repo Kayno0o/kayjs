@@ -10,7 +10,7 @@ const TS_SOURCE = /\.[cm]?ts$/
 const PUBLIC_FIELD_ALL = new RegExp(PUBLIC_FIELD.source, 'g')
 const SRC_PREFIX = /^src[\\/]/
 
-// An `s.Public(` in a `.ts` file outside `src`, which kay does not scan: the field types as a plain string in an island and the browser is not sent it.
+// An `s.Public` field in a `.ts` file outside `src`, which kay does not scan: the field types as a plain string in an island and the browser is not sent it.
 export async function publicEnvOutsideSrc(root: string, options: CheckOptions): Promise<CheckDiagnostic[]> {
   const found: CheckDiagnostic[] = []
 
