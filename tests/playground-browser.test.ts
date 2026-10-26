@@ -80,6 +80,9 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the docs p
     if (!await reachable(origin))
       throw new Error('kay start did not serve the docs')
 
+    // The docs bundle the compiler and the frame's runtime on their first request (`bundled`), seconds of CPU on a loaded runner, so the first test's waits would be spent on the server's build rather than on the playground.
+    await Promise.all(['playground/compiler.js', 'playground/frame.html'].map(async file => (await fetch(`${origin}${file}`)).arrayBuffer()))
+
     page = await browse(origin, { path, width: 1440, height: 900 })
   }, 300_000)
 
