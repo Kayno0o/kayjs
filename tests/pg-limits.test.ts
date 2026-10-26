@@ -83,7 +83,8 @@ describe('the Postgres job store when its session is killed', () => {
     const stuck = store.claim('q', Date.now(), Date.now() + 60_000)
     const outcome = Promise.allSettled([stuck])
 
-    await Bun.sleep(300)
+    // The claim is stuck on the lock once its statement shows as active.
+    await until(async () => Number((await admin.unsafe<{ count: string }[]>(`SELECT count(*) FROM pg_stat_activity WHERE datname = current_database() AND query LIKE 'UPDATE kay_jobs%' AND state = 'active' AND pid != pg_backend_pid()`))[0]!.count) > 0, 5000)
     await admin.unsafe(`SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = current_database() AND query LIKE 'UPDATE kay_jobs%' AND state = 'active' AND pid != pg_backend_pid()`)
 
     const [settled] = await outcome
@@ -147,7 +148,7 @@ describe('the rooms store with a throwing listener', () => {
       })
       store.subscribe((room, text) => void heard.push(`${room}:${text}`))
       store.publish('hall', 'hi', {})
-      await Bun.sleep(50)
+      await until(() => heard.length > 0, 5000)
     })
 
     expect(heard).toEqual(['hall:hi'])
