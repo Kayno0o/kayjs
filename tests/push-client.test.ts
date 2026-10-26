@@ -1,6 +1,6 @@
 import { GlobalRegistrator } from '@happy-dom/global-registrator'
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'bun:test'
-import { untilHolds } from './until-holds'
+import { untilHolds } from './helpers/until-holds'
 
 interface FakeSubscription {
   endpoint: string

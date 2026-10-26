@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test'
 import { endEventStreams, eventBody, eventStream } from '../src/server/event-stream'
-import { untilHolds } from './until-holds'
+import { untilHolds } from './helpers/until-holds'
 
 // A source blocked on a feed that never speaks, freed only by the signal it was handed.
 function quiet(seen: { signal?: AbortSignal, freed: boolean }) {

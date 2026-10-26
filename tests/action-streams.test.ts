@@ -6,7 +6,7 @@ import { t } from 'elysia'
 import { action, ActionRedirectError, encodeCall, SETTLED } from '../src/runtime/action'
 import { actionStream } from '../src/runtime/action-stream'
 import { browserPath, testSite } from '../src/test'
-import { untilHolds } from './until-holds'
+import { untilHolds } from './helpers/until-holds'
 
 const site = await testSite({ root: 'tests/fixtures/action-streams', browser: true, mcp: true })
 const mounted = await testSite({ root: 'tests/fixtures/action-streams', islands: false, base: '/blog', trailingSlash: 'always' })

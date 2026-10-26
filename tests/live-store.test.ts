@@ -8,7 +8,7 @@ import { afterAll, beforeEach, describe, expect, it, setSystemTime, spyOn } from
 import { live, liveSlot, liveStoreReady, setLiveStore, watchSlot } from '../src/runtime/live-value'
 import { setupStore } from '../src/server/app-store'
 import { sqliteLive } from '../src/server/sqlite-live'
-import { untilHolds } from './until-holds'
+import { untilHolds } from './helpers/until-holds'
 
 // The build gives a declaration its id and name; a test passes them itself.
 const declare = live as unknown as (initial: number, id: string, name: string) => { (): number, set: (next: number) => void }

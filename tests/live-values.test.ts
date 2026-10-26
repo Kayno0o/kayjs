@@ -10,9 +10,9 @@ import { compileKay } from '../src/compiler'
 import { PROOF_LIFETIME_MS } from '../src/runtime/live-value'
 import { MAX_CONNECTIONS } from '../src/server/config-limits'
 import { browserPath, testSite } from '../src/test'
+import { untilHolds } from './helpers/until-holds'
 import { Feed, JSON_POST, pagesOf, proofsOf } from './live-helpers'
 import { fixtureCopy } from './scratch'
-import { untilHolds } from './until-holds'
 
 const ROOT = 'tests/fixtures/live-values'
 // The id of a value of the fixture's src/live.ts, which depends on the path from the project alone.
