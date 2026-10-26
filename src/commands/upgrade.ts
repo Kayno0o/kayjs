@@ -3,7 +3,7 @@ import { existsSync } from 'node:fs'
 import { rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import process from 'node:process'
-import { minorAfter, minorOf, REMOVED_DEPRECATIONS, UPGRADE_FROM } from '../compiler/lints'
+import { DEPRECATION_MINORS, minorAfter, minorOf, UPGRADE_FROM } from '../compiler/lints'
 import { done, printFailure, projectRoot } from './command'
 import { USAGES } from './usages'
 
@@ -236,10 +236,13 @@ function steppingStones(from: string, to: string): string[] {
   const stones: string[] = []
   let behind = minorOf(from)!
 
-  for (const { removedIn, since } of [...REMOVED_DEPRECATIONS].sort((a, b) => (minorAfter(minorOf(a.removedIn)!, minorOf(b.removedIn)!) ? 1 : -1))) {
+  for (const { removedIn, since } of DEPRECATION_MINORS.toSorted((a, b) => (minorAfter(minorOf(a.removedIn ?? '')!, minorOf(b.removedIn ?? '')!) ? 1 : -1))) {
+    if (removedIn === undefined)
+      continue
+
     const removed = minorOf(removedIn)!
 
-    if (minorAfter(removed, toMinor) || !since.some(minor => minorAfter(minorOf(minor)!, behind)))
+    if (minorAfter(removed, toMinor) || !minorAfter(minorOf(since)!, behind))
       continue
 
     behind = [removed[0], removed[1] - 1]

@@ -638,15 +638,18 @@ export function isLint(code: string | undefined): code is LintName {
 // Set by `kay upgrade` for the checks it runs, to the version the app came from: a lint about a change of default speaks to an app crossing it, and only then.
 export const UPGRADE_FROM = 'KAY_UPGRADE_FROM'
 
-// The releases that dropped deprecated lints with the old forms they rewrote, and the minors those lints came in: a release newer than one of these no longer rewrites such a form, so `kay upgrade` installs the minor before it first, whose kay still does. Dropping a deprecated lint adds its release here, the test in `tests/upgrade.test.ts` only checking that no row names a minor whose lints are still declared.
-export const REMOVED_DEPRECATIONS: readonly { removedIn: string, since: readonly string[] }[] = [
-  { removedIn: '1.51', since: ['1.46'] },
-  { removedIn: '1.56', since: ['1.51', '1.52'] },
-  { removedIn: '1.60', since: ['1.55', '1.56'] },
-  { removedIn: '1.73', since: ['1.69'] },
-  { removedIn: '1.74', since: ['1.70', '1.71'] },
-  { removedIn: '1.75', since: ['1.72'] },
-  { removedIn: '1.77', since: ['1.74'] },
+// Every minor that shipped deprecated lints, and the release that dropped them with the old forms they rewrote, none while they are still declared: a release newer than `removedIn` no longer rewrites those forms, so `kay upgrade` installs the minor before it first, whose kay still does. `tests/upgrade.test.ts` fails for a lint whose minor is not listed and for a minor listed as live with no lint left, so dropping the last lint of a minor means writing its `removedIn` here.
+export const DEPRECATION_MINORS: readonly { since: string, removedIn?: string }[] = [
+  { since: '1.46', removedIn: '1.51' },
+  { since: '1.51', removedIn: '1.56' },
+  { since: '1.52', removedIn: '1.56' },
+  { since: '1.55', removedIn: '1.60' },
+  { since: '1.56', removedIn: '1.60' },
+  { since: '1.69', removedIn: '1.73' },
+  { since: '1.70', removedIn: '1.74' },
+  { since: '1.71', removedIn: '1.74' },
+  { since: '1.72', removedIn: '1.75' },
+  { since: '1.74', removedIn: '1.77' },
 ]
 
 // The minor, as `[major, minor]`, a version or a `1.46` names, or undefined for what is neither.

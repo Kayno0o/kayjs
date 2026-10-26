@@ -4,7 +4,7 @@ import { join } from 'node:path'
 import process from 'node:process'
 import { describe, expect, it, setDefaultTimeout, spyOn } from 'bun:test'
 import { registryDepsFor, upgradeProject } from '../src/commands/upgrade'
-import { LINTS, minorOf, REMOVED_DEPRECATIONS } from '../src/compiler/lints'
+import { DEPRECATION_MINORS, LINTS, minorOf } from '../src/compiler/lints'
 import { scratchDir } from './scratch'
 
 setDefaultTimeout(90_000)
@@ -481,21 +481,26 @@ describe('kay upgrade across removed deprecations', () => {
     }
   })
 
-  it('keeps the table of dropped deprecations ordered, and true to the lints still declared', async () => {
+  it('lists every minor with deprecated lints, as live or dropped, so a dropped lint cannot go without its release', async () => {
     const { version } = (await Bun.file(join(import.meta.dir, '../package.json')).json()) as { version: string }
     const current = minorOf(version)!
-    const ordered = REMOVED_DEPRECATIONS.map(entry => minorOf(entry.removedIn)!)
-    const live = Object.values(LINTS).flatMap(lint => ('since' in lint ? [lint.since as string] : []))
+    const live = new Set(Object.values(LINTS).flatMap(lint => ('since' in lint ? [lint.since as string] : [])))
+    const listed = new Set(DEPRECATION_MINORS.map(entry => entry.since))
 
-    expect(ordered.every((minor, index) => index === 0 || minor[0] > ordered[index - 1]![0] || minor[1] > ordered[index - 1]![1])).toBe(true)
+    expect(listed.size).toBe(DEPRECATION_MINORS.length)
+    expect([...live].filter(since => !listed.has(since))).toEqual([])
+    expect(DEPRECATION_MINORS.filter(entry => entry.removedIn === undefined && !live.has(entry.since)).map(entry => entry.since)).toEqual([])
+    expect(DEPRECATION_MINORS.filter(entry => entry.removedIn !== undefined && live.has(entry.since)).map(entry => entry.since)).toEqual([])
 
-    for (const entry of REMOVED_DEPRECATIONS) {
-      const removed = minorOf(entry.removedIn)!
+    for (const { since, removedIn } of DEPRECATION_MINORS) {
+      const minor = minorOf(since)!
 
-      // A release not reached yet is not in the table; one reached holds none of the lints it names.
-      expect(removed[0] < current[0] || removed[1] <= current[1]).toBe(true)
-      expect(live.filter(since => entry.since.includes(since))).toEqual([])
-      expect(entry.since.every(since => removed[1] - minorOf(since)![1] >= 1)).toBe(true)
+      if (removedIn !== undefined) {
+        const removed = minorOf(removedIn)!
+
+        expect(removed[0] === minor[0] ? removed[1] > minor[1] : removed[0] > minor[0]).toBe(true)
+        expect(removed[0] < current[0] || removed[1] <= current[1]).toBe(true)
+      }
     }
   })
 })
