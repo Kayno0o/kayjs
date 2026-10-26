@@ -650,23 +650,6 @@ describe('kay upgrade through the package manager', () => {
     }
   })
 
-  it('prints what the install says but the trace lines Bun adds to it', async () => {
-    const { bun, root } = await stub('echo \'[0.02ms] ".env"\' >&2\necho "bun install v1.4.4"\necho "installed kay@1.46.0" >&2\necho \'[0.00ms] done\'')
-    const out = spyOn(process.stdout, 'write').mockImplementation(() => true)
-    const err = spyOn(process.stderr, 'write').mockImplementation(() => true)
-
-    try {
-      expect(await registryDepsFor(bun).install(root, [])).toBe(true)
-      expect(out.mock.calls.map(call => String(call[0])).join('')).toBe('bun install v1.4.4\n')
-      expect(err.mock.calls.map(call => String(call[0])).join('')).toBe('installed kay@1.46.0\n')
-    }
-    finally {
-      out.mockRestore()
-      err.mockRestore()
-      await rm(root, { recursive: true, force: true })
-    }
-  })
-
   it('updates the npm `bun` an install left under the Bun the installed kay needs, and only then', async () => {
     const stale = await stub('exit 0')
     const fresh = await stub('exit 0')

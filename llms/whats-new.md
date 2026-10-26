@@ -8,7 +8,6 @@ What each release of kay and its libraries adds, newest first, each feature with
 - `session()` no longer warns in production that a cookie with no store cannot be revoked when kayjs-auth uses it, which keeps its own record of each session and refuses a cookie whose session it ended: [Sessions](server.md).
 - `kay check` reports an `s.Public` field in a `.ts` file outside `src` (`public-env-outside-src`), where kay does not find it and an island reads it as a string: [Environment](environment.md).
 - `kay upgrade` runs `bun update bun` itself when the install leaves an npm `bun` (the peer of `bun-plugin-tailwind`) older than the Bun kay needs, so kay runs right after it: [kay upgrade](check-and-tools.md).
-- `kay upgrade` leaves out the `[0.02ms] ".env"` trace lines Bun prints during its install, so its output is its own steps, the install's summary and what is left: [kay upgrade](check-and-tools.md).
 - `kay upgrade` says `nothing left to do by hand` only when its last check printed nothing, warnings such as `promoted-island` included, and exits 1 otherwise: [kay upgrade](check-and-tools.md).
 - A `for` destructures its item, `for { id, name } of rows` or `for [key, count] of entries`, in the server render, in islands and in `kay check`, where it was a `Malformed for` error: [Templates](templates.md#render-a-list).
 - kayjs-ui `Table` takes `sortParam`, keeping the sort a header click picks in the URL beside `filterParam`, so a reload and back and forward sort the same: [Tables](../packages/ui/llms/tables-navigation-and-layout.md).
