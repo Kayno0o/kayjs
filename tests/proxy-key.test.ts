@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import process from 'node:process'
 import { afterAll, describe, expect, it } from 'bun:test'
+import { logSink, setLogSink } from '../src/runtime/log'
 import { dropStore, NOT_FOUND_FILE } from '../src/server/not-found'
 import { eventually } from './helpers/eventually'
 import { pages } from './shared-pages'
@@ -175,6 +176,30 @@ describe('proxy.key', () => {
 
     expect(await status(test, '/')).not.toBe(403)
     expect(await status(dev, '/')).not.toBe(403)
+  })
+
+  it('warns that the key is unset outside production, except in a test run, which expects it unset', async () => {
+    const warned = async (NODE_ENV: string) => {
+      const kept = logSink()
+      const messages: string[] = []
+
+      setLogSink((_level, message) => {
+        messages.push(message)
+      })
+
+      try {
+        // The sink is read at boot, before the app's own `log` replaces it.
+        await served({ NODE_ENV }, { proxy: { key: HEADER } })
+
+        return messages.some(message => message.includes('proxy.key is set'))
+      }
+      finally {
+        setLogSink(kept)
+      }
+    }
+
+    expect(await warned('staging')).toBe(true)
+    expect(await warned('test')).toBe(false)
   })
 
   it('refuses a setting that names no header, or open without a key', async () => {

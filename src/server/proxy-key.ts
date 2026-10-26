@@ -43,7 +43,7 @@ function isOpen(path: string, open: readonly string[]): boolean {
 }
 
 // Refuses with 403 every request that does not carry the proxy's shared key in the header `proxy.key` names, so a process or a container reaching the port directly skips nothing the proxy does.
-// Off under `kay dev`, in a static export, and outside production while no key is given; a production server with `key` and no key to compare with does not boot.
+// Off under `kay dev`, in a static export, and outside production while no key is given (a warning says so, except in a test run); a production server with `key` and no key to compare with does not boot.
 export function requireProxyKey(app: Elysia, proxy: ProxyConfig | undefined, options: { dev: boolean, exported: boolean, base: string, health: string | undefined, metrics?: (() => string | undefined) | undefined, logRefused?: ((request: Request, status: number) => void) | undefined, security?: Record<string, string> | undefined }): void {
   const header = proxy?.key
 
@@ -54,7 +54,9 @@ export function requireProxyKey(app: Elysia, proxy: ProxyConfig | undefined, opt
 
   if (secret === undefined) {
     if (process.env.NODE_ENV !== 'production') {
-      kayLog('warn', `proxy.key is set but ${KEY_VARIABLE} and ${KEY_FILE_VARIABLE} are not, so requests are not checked for the ${header} header; a production server would not boot`)
+      // A test run expects the key unset, and warning there repeats in every test file of an app behind a proxy.
+      if (process.env.NODE_ENV !== 'test')
+        kayLog('warn', `proxy.key is set but ${KEY_VARIABLE} and ${KEY_FILE_VARIABLE} are not, so requests are not checked for the ${header} header; a production server would not boot`)
 
       return
     }
