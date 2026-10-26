@@ -173,7 +173,7 @@ export const env = defineEnv(s.Object({
 
 For a secret, use `s.Secret()`. It is a string of at least 32 characters that production must set. Under `kay dev` and `bun test` kay derives a value from the project path and a random seed kept in the git-ignored `.kay` folder, so sessions survive a restart and no placeholder is committed. Under any other `NODE_ENV`, or none, a missing secret stops the boot, as production does. If `kay dev` cannot write `.kay`, kay says so and asks you to set the variable.
 
-Under `bun test` the seed is only read, and kay uses one of the process when there is none, so a test run writes nothing to `.kay` for it and needs no variable.
+Under `bun test` the seed is only read, and kay uses one of the process when there is none, so a test run writes nothing to `.kay` for it and needs no variable. The seed goes into `KAY_DEV_SEED` in the environment, so a subprocess a test spawns with the environment it was given derives the same secret and reads its parent's cookies; one spawned with an environment of its own derives another.
 
 ```ts
 export const env = defineEnv(s.Object({

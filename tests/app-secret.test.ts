@@ -216,6 +216,22 @@ console.log(JSON.stringify(await read(build(), ${JSON.stringify(first.out)})))
     expect(test.out).toBe('1')
   })
 
+  it('gives a subprocess of a test the secret of its parent, though no seed file exists', async () => {
+    const folder = await scratchDir('app-secret-test-seed')
+    const script = `
+import { appSecrets } from '${ROOT}/src/server/stamp'
+const own = appSecrets()[0]
+const child = Bun.spawnSync([process.execPath, '-e', "import { appSecrets } from '${ROOT}/src/server/stamp'; process.stdout.write(appSecrets()[0])"], { env: process.env })
+console.log(JSON.stringify([own, child.stdout.toString()]))
+`
+    const { out } = await isolated(script, { NODE_ENV: 'test' }, folder)
+    const [own, child] = out as [string, string]
+
+    expect(own).toHaveLength(64)
+    expect(child).toBe(own)
+    expect(await Bun.file(join(folder, '.kay', 'dev-secret')).exists()).toBe(false)
+  })
+
   it('derives none outside development and test, so a script of no mode asks for the secret', async () => {
     const { out } = await isolated(`
 try {

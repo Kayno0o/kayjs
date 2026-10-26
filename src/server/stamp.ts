@@ -74,7 +74,7 @@ export function appSecrets(): string[] | undefined {
 
   const mode = process.env.NODE_ENV
 
-  return mode === 'development' || mode === 'test' ? [devSecret('KAY_SECRET')] : undefined
+  return mode === 'development' || mode === 'test' ? [devSecret('KAY_SECRET', mode)] : undefined
 }
 
 // A script or a job that signs before any server set the secret up takes the app's own (`KAY_SECRET`, or the checkout's in development and tests) instead of the key of its process, which no other process shares. Does nothing once a secret is set.

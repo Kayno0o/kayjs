@@ -150,7 +150,7 @@ function placeholdersFor(schema: EnvSchema, input: Record<string, string>, mode:
     if (secret === true && mode !== 'development' && mode !== 'test')
       continue
 
-    placeholders[name] = secret === true ? devSecret(name) : ''
+    placeholders[name] = secret === true ? devSecret(name, mode) : ''
   }
 
   return placeholders

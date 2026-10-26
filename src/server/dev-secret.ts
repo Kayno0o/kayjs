@@ -3,16 +3,17 @@ import { join } from 'node:path'
 import process from 'node:process'
 import { KayError } from '../compiler/errors'
 
-// Stable for a checkout and a name, so a session signed before a restart still reads (under `NODE_ENV=test` only while a seed file exists, else one of the process); a random seed kept in the git-ignored `.kay/` folder keeps the value from being computed by anyone who only knows the path.
-export function devSecret(name: string): string {
-  return new Bun.CryptoHasher('sha256').update(`kay dev secret\0${devSeed(name)}\0${process.cwd()}\0${name}`).digest('hex')
+// Stable for a checkout and a name, so a session signed before a restart still reads (in `test` mode only while a seed file exists, else one of the process, which its subprocesses inherit through `KAY_DEV_SEED`); a random seed kept in the git-ignored `.kay/` folder keeps the value from being computed by anyone who only knows the path.
+export function devSecret(name: string, mode: string | undefined): string {
+  return new Bun.CryptoHasher('sha256').update(`kay dev secret\0${devSeed(name, mode)}\0${process.cwd()}\0${name}`).digest('hex')
 }
 
 const SEED_LENGTH = 64
+const SEED_VARIABLE = 'KAY_DEV_SEED'
 let seed: string | undefined
 
 // Read once per process; a file that is missing, empty or cut short is written again.
-function devSeed(name: string): string {
+function devSeed(name: string, mode: string | undefined): string {
   if (seed !== undefined)
     return seed
 
@@ -32,9 +33,12 @@ function devSeed(name: string): string {
   if (seed.length >= SEED_LENGTH)
     return seed
 
-  // A test run needs no file: a seed of this process serves, so a checkout whose `.kay` is read-only (a bind mount, a read-only checkout) tests as any other.
-  if (process.env.NODE_ENV === 'test') {
-    seed = crypto.randomUUID() + crypto.randomUUID()
+  // A test run needs no file: a seed of this process serves, so a checkout whose `.kay` is read-only (a bind mount, a read-only checkout) tests as any other. It goes into the environment, so a subprocess the test spawns derives the same secret and reads the cookies of its parent.
+  if (mode === 'test') {
+    const inherited = process.env[SEED_VARIABLE] ?? ''
+
+    seed = inherited.length >= SEED_LENGTH ? inherited : crypto.randomUUID() + crypto.randomUUID()
+    process.env[SEED_VARIABLE] = seed
 
     return seed
   }
