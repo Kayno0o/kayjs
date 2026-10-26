@@ -6,6 +6,7 @@ import { dirname, join } from 'node:path'
 import process from 'node:process'
 import { afterAll, describe, expect, it } from 'bun:test'
 import { dropStore, NOT_FOUND_FILE } from '../src/server/not-found'
+import { eventually } from './helpers/eventually'
 import { pages } from './shared-pages'
 
 const PRODUCTION = 'tests/fixtures/production'
@@ -93,10 +94,9 @@ describe('proxy.key', () => {
     const id = refused.headers.get('x-request-id')
 
     expect(refused.status).toBe(403)
-    // Past the after-response hooks, which log the requests the request log saw.
-    await Bun.sleep(20)
     expect(id).toBeTruthy()
-    expect(lines).toEqual([expect.objectContaining({ type: 'request', method: 'GET', path: '/secret', status: 403, id })])
+    // Past the after-response hooks, which log the requests the request log saw.
+    await eventually(() => expect(lines).toEqual([expect.objectContaining({ type: 'request', method: 'GET', path: '/secret', status: 403, id })]))
     expect(JSON.stringify(lines)).not.toContain('wrong-guess')
     expect(JSON.stringify(lines)).not.toContain(KEY)
   })

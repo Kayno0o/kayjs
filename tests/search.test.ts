@@ -176,6 +176,7 @@ describe('search', () => {
         await Bun.sleep(5)
 
       // The first query's words answer last, and are dropped.
+      // Past the 40 ms the first query's word file takes to answer.
       await Bun.sleep(60)
       dispose()
 

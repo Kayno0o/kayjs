@@ -23,6 +23,7 @@ const early = [rejected(), rejected()] as const
 
 await import('./rejected')
 
+// Past the turn the rejections are noticed in, so the blocks meet them already rejected.
 await Bun.sleep(20)
 
 result.prop = await renderToString(await load<{ rows: Promise<string[]>, count: number }>('prop.kay'), { rows: early[0], count: 3 })
@@ -43,8 +44,10 @@ console.error = (...args: unknown[]) => void logged.push(args)
 void Promise.reject(new Error('lost'))
 const taken = Promise.reject(new Error('taken'))
 
+// Past the turn the unhandled rejections are noticed in, before one of them is taken.
 await Bun.sleep(20)
 await Promise.allSettled([taken])
+// Past the 300 ms grace, after which the rejection nobody took is logged.
 await Bun.sleep(700)
 console.error = log
 

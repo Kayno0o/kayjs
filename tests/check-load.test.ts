@@ -26,10 +26,13 @@ const diagnostics = await check(root)
 const page = root + '/src/routes/index.kay'
 const text = await Bun.file(page).text()
 
+// The editor's server publishes the page's problems once its checking ran, which is what loads the modules the test lists.
+const published = new Promise(resolve => client.onNotification('textDocument/publishDiagnostics', resolve))
+
 await client.request('initialize', { processId: process.pid, rootUri: pathToFileURL(root).href, capabilities: {} })
 client.notify('initialized', {})
 client.notify('textDocument/didOpen', { textDocument: { uri: pathToFileURL(page).href, languageId: 'kay', version: 1, text } })
-await Bun.sleep(1500)
+await Promise.race([published, Bun.sleep(30_000)])
 await client.request('textDocument/hover', { textDocument: { uri: pathToFileURL(page).href }, position: { line: 0, character: 1 } })
 
 const loaded = Object.keys(require.cache).filter(path => path.includes('/node_modules/elysia/') || path.includes('/node_modules/@sinclair/typebox/'))
