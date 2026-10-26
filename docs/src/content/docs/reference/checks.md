@@ -84,6 +84,7 @@ Each lint has a level. `deny` is an error, `warn` a warning, `allow` hides it. W
 | `literal-tag` | warn | code | An HTML tag written in template text, shown as written |
 | `over-budget` | warn | code | A page loading more JavaScript, CSS or weight than `budget` allows, or with a worse EcoIndex grade |
 | `uncaught-await` | warn | code | An `await` block with no `catch` and no `try` around it |
+| `removed-ui-token` | warn | code | A kayjs-ui theme token or utility under its old `kui-` name, such as `--color-kui-canvas` or `bg-kui-surface2`, which stopped working in 1.75: a utility builds nothing and a `var()` of it resolves to nothing. `kay check --fix` rewrites it to the app's own name where one stands for it, and the report says where to set the rest |
 | `unkept-page` | warn | code | A page saying `keep: true` that `kay build` does not keep |
 | `unguarded-route` | deny | security | With `requireGuards`, a route no guard covers that does not set `guards: false` |
 | `unguarded-tool` | warn | security | With `mcp`, a tool action with bot protection that no guard covers |

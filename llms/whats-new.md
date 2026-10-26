@@ -8,6 +8,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 - `kay check` reports a root Dockerfile building `FROM oven/bun:<version>` from a Bun older than the one kay needs (`old-bun-image`), and `kay check --fix`, so `kay upgrade`, moves the tag to the oldest Bun kay runs on, so an image build no longer fails after an upgrade: [Lints](lints.md).
 - `kay check` and `kay upgrade` name an export `kay.config.ts` imports and a release removed (`mailExtension`, `authExtension`, `authPages`) with what replaced it, instead of stopping on Bun's bare `SyntaxError`: [upgrading](upgrading.md).
 - `kay build --compile --verify-load` loads a module reading a `defineEnv` field at load, such as an app's `session({ secret })` or `createAuth({ secret })`, with no environment: the field reads as a placeholder there: [Production](production.md#check-the-executable-starts).
+- `kay check` reports a kayjs-ui theme token or utility still written under its removed `kui-` name (`bg-kui-surface2`, `var(--color-kui-muted)`) as `removed-ui-token`, in `.kay` classes, `@apply`, stylesheets and src/ui.ts, and `kay check --fix` rewrites it where a new name stands for it; the `--kui-border-*` knobs are reported for a hand fix instead of being mapped to `--border-width`: [Upgrading](upgrading.md), [checks](lints.md).
 
 ## 1.77.2
 

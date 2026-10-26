@@ -49,7 +49,7 @@ What each minor release breaks, and what an app changes to move to it. kay and i
 The names folded into a Tailwind step or a recipe have no pair: `--radius-kui-*` is `--radius-sm/md/lg`, `--kui-border-*` is `--border-width`, and the badge, notice, avatar, field and stamp knobs are set on the part in `src/ui.ts`, as are `--kui-badge-case`, `--kui-badge-font`, `--kui-badge-solid-text` and `--kui-field-focus-shadow`; `--color-kui-overlay1` is `--color-muted`, and `--color-kui-fill-hover`, `--color-kui-fill-danger` and the stamp colours are set on the part too.
 
 - A `ui.*` or `cms.*` message key still ending in `Label` (`ui.table.filterLabel`) no longer overrides the library's text: word it as the bare name (`ui.table.filter`), `Aria` where the bare name met a visible text (`cms.admin.searchLabel` is `cms.admin.searchAria`), and `cms.history.restoreLabel` is `cms.history.restoreButton`. The props `loadingLabel`, `backLabel` and the like keep their names.
-- `deprecated-ui-prop`, `deprecated-ui-callback`, `deprecated-ui-token` and `deprecated-message-key` are gone with the forms they reported, so run `kay check --fix` on 1.74 before moving.
+- `deprecated-ui-prop`, `deprecated-ui-callback`, `deprecated-ui-token` and `deprecated-message-key` are gone with the forms they reported, so run `kay check --fix` on 1.74 before moving. What an app still writes with an old `kui-` name is reported by `removed-ui-token` (a utility such as `bg-kui-surface2`, a `var(--color-kui-muted)`), and `kay check --fix` rewrites it where a new name stands for it.
 
 ## 1.74.0
 

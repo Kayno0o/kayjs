@@ -39,6 +39,7 @@ import { islandOnlyComponents } from './island-only'
 import { largePublicImages } from './large-images'
 import { mcpRoutes } from './mcp-routes'
 import { unreadOpenSettings } from './open-settings'
+import { removedUiTokens } from './removed-ui-tokens'
 import { compileShadow, layoutQueries, matcherSource, pageRoute, serializeShadowSettings, SHADOW_SETTINGS, shadowPath } from './shadow'
 import { untypedSockets } from './socket-routes'
 import { typingOptions } from './tsgo'
@@ -127,7 +128,7 @@ async function writeShadows(projectRoot: string, options: CheckOptions): Promise
 
   // A types-only write discards the problems, so none of their checks run.
   if (options.typesOnly !== true)
-    problems.push(...redirectChecks(root, options, served), ...await unguardedRoutes(options, served), ...await unreadOpenSettings(served), ...await unguardedTools(options, served), ...await mcpRoutes(options, served), ...await largePublicImages(options, root, served), ...await untypedSockets(options, served))
+    problems.push(...redirectChecks(root, options, served), ...await unguardedRoutes(options, served), ...await unreadOpenSettings(served), ...await unguardedTools(options, served), ...await mcpRoutes(options, served), ...await largePublicImages(options, root, served), ...await untypedSockets(options, served), ...await removedUiTokens(root, options))
 
   // A script rather than a module, which is what lets it declare a wildcard module.
   await tree.write('kay-assets.d.ts', ASSET_TYPES)

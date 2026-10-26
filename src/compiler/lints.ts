@@ -599,6 +599,14 @@ export const LINTS = {
     wrong: 'head\n  meta(name="robots" content="noindex")',
     right: '--- server\nexport const page = { noindex: true }\n---',
   },
+  'removed-ui-token': {
+    level: 'warn',
+    group: 'code',
+    site: true,
+    summary: 'A kayjs-ui theme token under its old prefixed name, removed in 1.75: kayjs-ui reads the app\'s own theme names (`--color-background`, `--color-muted`, `--radius-lg`, `--border-width`) and the old names no longer alias them, so `bg-kui-surface2` builds nothing, a `var(--color-kui-muted)` resolves to nothing and `--kui-density` set on an element changes nothing. Found in the project\'s stylesheets (declarations, `var()`, `--theme()` and `@apply`), its `.kay` files and src/ui.ts (utilities, `[--kui-x:...]`, `(--kui-x)` and style strings). The fix writes what the alias rendered: a reference or a utility is rewritten, a declaration only where the new name reads the old one and the same block does not set the new one, and what reads a name the app declares and keeps is reported only. A name that folded into a recipe, became private or has no name of its own (the `--kui-border-*` knobs, which `--border-width` replaced) is reported with where to set it instead.',
+    wrong: '@theme { --color-kui-canvas: #fff; }\n.card { color: var(--color-kui-muted); @apply bg-kui-surface2; }',
+    right: '@theme { --color-background: #fff; }\n.card { color: var(--color-muted); @apply bg-border; }',
+  },
 } as const satisfies Record<string, Lint>
 
 export type LintName = keyof typeof LINTS
