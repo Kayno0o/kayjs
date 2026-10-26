@@ -51,7 +51,7 @@ interface Turn extends Message {
   code?: CodeBlock[] | undefined
 }
 
-const { action, initial = [], label = wording('ai.chat.label', 'Chat'), placeholder = wording('ai.chat.placeholder', 'Write a message…'), sendLabel = wording('ai.chat.send', 'Send'), stopLabel = wording('ai.chat.stop', 'Stop'), retryLabel = wording('ai.chat.retry', 'Try again'), thinkingLabel = wording('ai.chat.thinking', 'Thinking…'), stoppedLabel = wording('ai.chat.stopped', 'Stopped'), errorMessage = wording('ai.chat.error', 'The reply failed.'), keep = 20, maxChars = POSTED_CHARACTERS, tableLabel = wording('ai.chat.table', 'Table'), toolDetails = true, greeting = wording('ai.chat.greeting', 'How can I help?'), disclosure = wording('ai.chat.disclosure', 'You are talking to an AI. Your messages are sent to its provider to answer.'), suggestions = [], toolLabels = {}, sendIcon, stopIcon, remember, links = 'apart', runningLabel = wording('ai.chat.running', 'Running'), doneLabel = wording('ai.chat.done', 'Done'), failedLabel = wording('ai.chat.failed', 'Failed'), argumentsLabel = wording('ai.chat.arguments', 'Arguments'), resultLabel = wording('ai.chat.result', 'Result'), approvalLabel = wording('ai.chat.approval', 'Needs your approval'), allowLabel = wording('ai.chat.allow', 'Allow'), denyLabel = wording('ai.chat.deny', 'Deny'), allowedLabel = wording('ai.chat.allowed', 'Allowed:'), deniedLabel = wording('ai.chat.denied', 'Denied:'), variant = 'bubble', tone = 'accent', size = 'md' } = props<{
+const { action, initial = [], label = wording('ai.chat.label', 'Chat'), placeholder = wording('ai.chat.placeholder', 'Write a message…'), sendLabel = wording('ai.chat.send', 'Send'), stopLabel = wording('ai.chat.stop', 'Stop'), retryLabel = wording('ai.chat.retry', 'Try again'), thinkingLabel = wording('ai.chat.thinking', 'Thinking…'), stoppedLabel = wording('ai.chat.stopped', 'Stopped'), errorMessage = wording('ai.chat.error', 'The reply failed.'), keep = 20, maxChars = POSTED_CHARACTERS, tableLabel = wording('ai.chat.table', 'Table'), toolDetails = true, greeting = wording('ai.chat.greeting', 'How can I help?'), disclosure = wording('ai.chat.disclosure', 'You are talking to an AI. Your messages are sent to its provider to answer.'), suggestions = [], toolLabels = {}, sendIcon, stopIcon, newButton = false, newLabel = wording('ai.chat.new', 'New conversation'), newIcon, remember, links = 'apart', runningLabel = wording('ai.chat.running', 'Running'), doneLabel = wording('ai.chat.done', 'Done'), failedLabel = wording('ai.chat.failed', 'Failed'), argumentsLabel = wording('ai.chat.arguments', 'Arguments'), resultLabel = wording('ai.chat.result', 'Result'), approvalLabel = wording('ai.chat.approval', 'Needs your approval'), allowLabel = wording('ai.chat.allow', 'Allow'), denyLabel = wording('ai.chat.deny', 'Deny'), allowedLabel = wording('ai.chat.allowed', 'Allowed:'), deniedLabel = wording('ai.chat.denied', 'Denied:'), variant = 'bubble', tone = 'accent', size = 'md' } = props<{
   // The page's streaming action, `action(schema, ({ messages }) => ask(messages))`, which may also `ctx.fail`; the chat posts the latest messages to it and reads the reply as it streams.
   // Returning `ask(messages, { tools }).progress()` instead streams the tool calls as well, which the chat shows before the text of their turn.
   action: Action<{ messages: Message[] }, AsyncIterable<string | Progress> | Failure<unknown>>
@@ -100,6 +100,10 @@ const { action, initial = [], label = wording('ai.chat.label', 'Chat'), placehol
   deniedLabel?: string | undefined
   // Shown when the call is refused or the stream breaks off.
   errorMessage?: string | undefined
+  // Shows a button beside the field, once the log holds a turn, which starts the conversation over as `ChatPanel`'s header button does: a reply under way stops, and the log, the field and the kept history are cleared. `newLabel` names it and `@newIcon` replaces its plus.
+  newButton?: boolean | undefined
+  newLabel?: string | undefined
+  newIcon?: Snippet
   // A name under which the conversation is kept in the tab's session storage, so a reload of the tab finds it again; the tool calls of the replies are not kept. Without it, a reload starts afresh.
   remember?: string | undefined
   // Where a link of a reply opens: `apart` in a new tab, so following it does not swap the page and drop a conversation that lives in it; `here` for a link of this site opens in place, for a chat that survives a swap (kept by `persist`, or by `remember`), while a link to another site still opens apart.
@@ -365,6 +369,12 @@ function sendFrom(event: Event) {
     void send(false, text.trim())
 }
 
+// The button beside the field resets, then puts the cursor back in the field.
+function startOver() {
+  reset()
+  queueMicrotask(() => field?.focus())
+}
+
 // Starts the conversation over: what is under way stops, and the log, the field and the kept history are cleared.
 function reset() {
   stop()
@@ -523,6 +533,10 @@ section(part="root" onKeyDown={escape} data-empty={history().length === 0 && !bu
   if disclosure !== ''
     p(part="disclosure") {disclosure}
   form(part="form" onSubmit={event => { event.preventDefault(); void send() }})
+    if newButton && history().length > 0
+      BareIconButton(part="new" variant="inline" label={newLabel} onClick={startOver})
+        slot newIcon
+          Icon(icon="plus")
     Textarea(part="field" writeFocused ref={element => { field = element }} value={draft()} onInput={draft.set} rows="1" aria-label={label} placeholder={placeholder} onKeyDown={keyDown})
     if busy()
       BareIconButton(part="send" variant="inline" label={stopLabel} onClick={stop})

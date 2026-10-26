@@ -582,6 +582,25 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the Chat i
       expect(page.errors).toEqual([])
     })
 
+    test('newButton shows once the log holds a turn, and clears the log, the field and the kept history', async () => {
+      const page = await site.open('/restartable')
+
+      expect(await page.evaluate(() => document.querySelector('.kai-chat-new') === null)).toBe(true)
+
+      fakeAi.reply(['Hi there'])
+      await page.fill('textarea', 'Hello')
+      await page.click('button[type="submit"]')
+      await page.waitFor('[data-pending]', { gone: true })
+      await page.waitFor('.kai-chat-turn[data-role="assistant"]', { text: 'Hi there' })
+      await page.fill('textarea', 'draft')
+      await page.click('.kai-chat-new')
+      await page.waitFor('.kai-chat-turn', { gone: true })
+
+      expect(await page.evaluate(() => ({ field: document.querySelector('textarea')!.value, button: document.querySelector('.kai-chat-new') === null, stored: sessionStorage.getItem('restartable'), focused: document.activeElement?.tagName }))).toMatchObject({ field: '', button: true, stored: '[]', focused: 'TEXTAREA' })
+      expect(await page.a11y('.kai-chat')).toEqual([])
+      expect(page.errors).toEqual([])
+    })
+
     test('a launcher given remember keeps the conversation over a reload under that key', async () => {
       const page = await site.open('/kept')
 
