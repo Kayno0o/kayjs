@@ -105,6 +105,16 @@ async function configuredEnvFiles(root: string): Promise<EnvFiles | undefined> {
   return env === false ? undefined : env ?? await defaultEnvFiles(root)
 }
 
+// The path of an extension's module relative to the root, none when it does not resolve, which the build reports.
+function resolvedUnder(root: string, path: string): string[] {
+  try {
+    return [relative(root, Bun.resolveSync(resolve(root, path), root))]
+  }
+  catch {
+    return []
+  }
+}
+
 export async function listEnv(root: string): Promise<{ variables: Listed[], unread: { file: string, error: string }[] }> {
   const config = await loadConfig(root)
   const declared = listingEnv()
@@ -117,7 +127,7 @@ export async function listEnv(root: string): Promise<{ variables: Listed[], unre
   await registerLoader(root, config.settings ?? {})
 
   // The module an extension with an env list builds its server from may build the library with options that change what it needs, as a mailer that is `optional`: it is read too, and one that does not load leaves the extension's list.
-  const built = new Set((config.extensions ?? []).flatMap(({ env, serverModule }) => env === undefined || serverModule === undefined ? [] : [relative(root, Bun.resolveSync(resolve(root, serverModule.path), root))]))
+  const built = new Set((config.extensions ?? []).flatMap(({ env, serverModule }) => env === undefined || serverModule === undefined ? [] : resolvedUnder(root, serverModule.path)))
 
   for (const file of files) {
     if (!built.has(file) && !DEFINE_ENV.test(await readFile(join(root, file), 'utf8')))

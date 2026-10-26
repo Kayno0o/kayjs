@@ -575,6 +575,10 @@ describe('kay env against compose and .env.example', () => {
 
     expect(await messages('{ optional: true }')).toEqual([])
     expect(await messages('{}')).toEqual([expect.stringContaining('MAIL_URL is required')])
+
+    const missing = await project({ 'kay.config.ts': 'import { mail } from \'@kaynooo/kayjs-mail\'\n\nexport default { favicon: false, extensions: [mail({ module: \'./src/gone.ts\' })] }\n', 'compose.yaml': 'services: {}\n' })
+
+    expect((await kay(['env', '--compose', 'compose.yaml', '--format', 'json'], missing, {}, false)).stdout).toContain('MAIL_URL')
   })
 
   it('names a file that is missing or not YAML, and an env_file that does not exist', async () => {
