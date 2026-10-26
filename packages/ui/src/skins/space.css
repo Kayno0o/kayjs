@@ -64,13 +64,13 @@
 
   /* A key, on a Button and a framed IconButton: a hairline on the canvas, lit in the accent while hovered. The tones, the ghost and inline forms and a pressed toggle keep their own. */
   :is(.kui-btn, .kui-icon-btn.kui-shell):where(:not(.kui-btn-accent, .kui-btn-success, .kui-btn-danger, .kui-shell-danger, [data-variant='ghost'], [data-variant='inline'], [aria-pressed='true'])) {
-    --_shell-line: var(--color-input);
-    --_shell-fill: transparent;
+    --shell-line: var(--color-input);
+    --shell-fill: transparent;
   }
 
   :is(.kui-btn, .kui-icon-btn.kui-shell):where(:not(.kui-btn-accent, .kui-btn-success, .kui-btn-danger, .kui-shell-danger, [data-variant='ghost'], [data-variant='inline'], [aria-pressed='true'])):hover {
-    --_shell-line: var(--color-accent);
-    --_shell-fill: transparent;
+    --shell-line: var(--color-accent);
+    --shell-fill: transparent;
     color: var(--color-accent);
   }
 

@@ -4,6 +4,10 @@ What each minor release breaks, and what an app changes to move to it. kay and i
 
 ## 1.78.0
 
+### A stylesheet setting a Button's shell variables renames them
+
+- `--_shell-line` and `--_shell-fill`, the private variables a stylesheet set to restyle a Button, a framed IconButton or a stat badge, are `--shell-line` and `--shell-fill`, now documented ([Setup](../packages/ui/llms/setup.md)). Set them as utilities on the part in `src/ui.ts`, such as `Button: { parts: { root: '[--shell-line:var(--color-accent)]' } }`. `kay check` cannot tell a private name written in a stylesheet from any other custom property, so no lint reports the old one.
+
 ### A form calling kayjs-auth itself carries the proof of work
 
 - Since 1.44, `createAuth` asks a proof of work for registering, resets and magic links, so an app's own form answers `{ ok: false, error: 'captcha' }` until it holds `input(type="hidden" name="captcha" data-kay-work={await auth.captchaChallenge('register')})` (`'reset'`, `'magic-link'` or `'sign-in'` for the others) and its action passes the field on as `{ captcha: input.captcha }`. `kay check` now reports a call with no `captcha` option (`missing-captcha`); `captcha: false` on `createAuth` turns the proof off ([Bots](../packages/auth/llms/hardening-and-testing.md)).

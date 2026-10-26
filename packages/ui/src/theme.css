@@ -140,21 +140,21 @@
 }
 
 @layer components {
-  /* A rectangle drawn as a fill on the element and a hairline in ::before, so the line adds nothing to the box. Variants only redeclare --_shell-line and --_shell-fill. */
+  /* A rectangle drawn as a fill on the element and a hairline in ::before, so the line adds nothing to the box. Variants only redeclare --shell-line and --shell-fill. */
   .kui-shell,
   .kui-btn,
   .kui-stat-badge {
-    --_shell-line: var(--color-border-strong);
-    --_shell-fill: var(--color-surface);
+    --shell-line: var(--color-border-strong);
+    --shell-fill: var(--color-surface);
     position: relative;
-    background-color: var(--_shell-fill);
+    background-color: var(--shell-fill);
   }
 
   :is(.kui-shell, .kui-btn, .kui-stat-badge)::before {
     content: '';
     position: absolute;
     inset: 0;
-    border: var(--border-width) solid var(--_shell-line);
+    border: var(--border-width) solid var(--shell-line);
     border-radius: inherit;
     pointer-events: none;
   }
@@ -167,20 +167,20 @@
   /* :where() keeps these at one class, so the variants below still win. */
   :where(button, a, [role='button'], summary).kui-shell:hover,
   .kui-btn:hover {
-    --_shell-line: var(--color-muted);
-    --_shell-fill: var(--color-surface-strong);
+    --shell-line: var(--color-muted);
+    --shell-fill: var(--color-surface-strong);
   }
 
   :where(button, a, [role='button'], summary).kui-shell:focus-visible,
   .kui-btn:focus-visible {
-    --_shell-line: var(--color-accent);
+    --shell-line: var(--color-accent);
     outline: 2px solid var(--color-accent);
     outline-offset: 2px;
   }
 
   .kui-shell-danger:hover {
-    --_shell-line: var(--color-danger);
-    --_shell-fill: color-mix(in oklab, var(--color-danger) 10%, transparent);
+    --shell-line: var(--color-danger);
+    --shell-fill: color-mix(in oklab, var(--color-danger) 10%, transparent);
   }
 
   .kui-btn,
@@ -207,8 +207,8 @@
   }
 
   .kui-btn {
-    --_shell-line: var(--color-input);
-    --_shell-fill: var(--color-background);
+    --shell-line: var(--color-input);
+    --shell-fill: var(--color-background);
     @apply inline-flex cursor-pointer items-center justify-center gap-[calc(var(--spacing)*1.25*var(--density))] border-0 px-3 py-1 text-xs whitespace-nowrap [font-weight:var(--font-weight-normal)] [letter-spacing:var(--tracking-label)] text-foreground [font-family:var(--font-label,inherit)] [text-transform:var(--label-case)] transition-[color,translate,box-shadow] duration-150;
   }
 
@@ -231,13 +231,13 @@
   }
 
   .kui-btn-accent {
-    --_shell-line: var(--color-accent);
-    --_shell-fill: var(--color-accent);
+    --shell-line: var(--color-accent);
+    --shell-fill: var(--color-accent);
     @apply text-accent-foreground;
 
     &:hover {
-      --_shell-line: var(--color-accent-hover);
-      --_shell-fill: var(--color-accent-hover);
+      --shell-line: var(--color-accent-hover);
+      --shell-fill: var(--color-accent-hover);
     }
   }
 
@@ -245,7 +245,7 @@
     @apply text-success;
 
     &:hover {
-      --_shell-line: var(--color-success);
+      --shell-line: var(--color-success);
     }
   }
 
@@ -253,21 +253,21 @@
     @apply text-danger;
 
     &:hover {
-      --_shell-line: var(--color-danger);
-      --_shell-fill: color-mix(in oklab, var(--color-danger) 10%, transparent);
+      --shell-line: var(--color-danger);
+      --shell-fill: color-mix(in oklab, var(--color-danger) 10%, transparent);
     }
   }
 
   /* The form of a button besides the framed one: no line or fill until hovered, `inline` also reading as a link. Declared after the tones, so a ghost accent is an accent text and no filled button. */
   .kui-btn:where([data-variant='ghost'], [data-variant='inline']),
   .kui-btn-accent:where([data-variant='ghost'], [data-variant='inline']) {
-    --_shell-line: transparent;
-    --_shell-fill: transparent;
+    --shell-line: transparent;
+    --shell-fill: transparent;
     box-shadow: none;
 
     &:hover {
-      --_shell-line: transparent;
-      --_shell-fill: var(--color-hover);
+      --shell-line: transparent;
+      --shell-fill: var(--color-hover);
     }
   }
 
@@ -310,7 +310,7 @@
 
   /* A toggle button that is on: the keyline in the accent, after the variants and tones so it shows on each, and over the hover line. A filled accent button shows no difference, its fill being the accent already. */
   .kui-btn[aria-pressed='true'] {
-    --_shell-line: var(--color-accent);
+    --shell-line: var(--color-accent);
   }
 
   /* A form field's own controls take this look with no class, all but the inputs a text box does not fit. */
@@ -1061,8 +1061,8 @@
   :where(button, a, [role='button']).kui-shell[aria-disabled='true'],
   .kui-btn:disabled,
   .kui-btn[aria-disabled='true'] {
-    --_shell-line: var(--color-border);
-    --_shell-fill: var(--color-background);
+    --shell-line: var(--color-border);
+    --shell-fill: var(--color-background);
     color: var(--color-muted);
     cursor: not-allowed;
     box-shadow: none;

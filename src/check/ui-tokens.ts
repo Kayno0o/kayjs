@@ -124,7 +124,8 @@ export const UI_TOKENS: Readonly<Record<string, UiToken>> = Object.fromEntries([
   ['--kui-badge-font', { kind: 'var', help: recipe('badge', 'root', 'font-sans') }],
   ['--kui-badge-solid-text', { kind: 'var', to: '--color-accent-foreground' }],
   ['--kui-field-focus-shadow', { kind: 'var', help: 'the focus ring of a field is drawn by its recipe now; restyle the field part in src/ui.ts' }],
-  ...['badge-tone', 'toast-tone', 'shell-line', 'shell-fill', 'control-line', 'dot-size', 'masonry-gap', 'masonry-lane', 'masonry-lanes', 'masonry-min', 'masonry-top', 'skeleton-width', 'skeleton-height', 'split-list-width', 'tree-level', 'tooltip-anchor', 'badge-color', 'notice-tone', 'notice-ground'].map((name): [string, UiToken] => [`--kui-${name}`, privateName(name)]),
+  ...['shell-line', 'shell-fill'].map((name): [string, UiToken] => [`--kui-${name}`, { kind: 'var', help: `\`--kui-${name}\` is now \`--${name}\`, the hairline or fill of a Button, a framed IconButton and a stat badge; set it on the part from src/ui.ts (\`Button: { parts: { root: '[--${name}:var(--color-accent)]' } }\`) or \`class\`` }]),
+  ...['badge-tone', 'toast-tone', 'control-line', 'dot-size', 'masonry-gap', 'masonry-lane', 'masonry-lanes', 'masonry-min', 'masonry-top', 'skeleton-width', 'skeleton-height', 'split-list-width', 'tree-level', 'tooltip-anchor', 'badge-color', 'notice-tone', 'notice-ground'].map((name): [string, UiToken] => [`--kui-${name}`, privateName(name)]),
 ] as [string, UiToken][])
 
 // The utility prefixes that read each namespace, as a pattern.

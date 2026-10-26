@@ -515,6 +515,16 @@ describe('theme.css', () => {
     expect(blockOf(press ?? '', '&:active')).toContain('translate: 0 var(--press-travel);')
   })
 
+  test('draws the hairline and fill of a Button, a framed IconButton and a stat badge from --shell-line and --shell-fill, which src/ui.ts sets as utilities', async () => {
+    const skin = await Bun.file(`${ROOT}src/skins/space.css`).text()
+
+    expect(theme + skin).not.toContain('--_shell-')
+    expect(blockOf(theme, '.kui-btn')).toContain('--shell-line: var(--color-input);')
+    expect(blockOf(theme, ':is(.kui-shell, .kui-btn, .kui-stat-badge)::before')).toContain('border: var(--border-width) solid var(--shell-line);')
+    expect(theme).toContain('background-color: var(--shell-fill);')
+    expect(skin).toContain('--shell-line: var(--color-input);')
+  })
+
   test('rounds buttons by --radius-md and cards and overlays by --radius-lg, Tailwind\'s own steps unless the app sets them', async () => {
     // The recipes are not scanned here, so a rule applies the step for the theme to emit it.
     const css = await built('@theme { --radius-md: 4px; --radius-lg: 1rem; } .recipe { @apply rounded-lg; }')

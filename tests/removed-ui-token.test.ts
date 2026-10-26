@@ -80,7 +80,7 @@ describe('removed-ui-token', () => {
       expect(found).toHaveLength(6)
       expect(found.every(problem => problem.code === 'removed-ui-token' && problem.severity === 'warning' && problem.fixes === undefined)).toBe(true)
       expect(found.find(problem => problem.message.startsWith('`--kui-badge-case`'))?.help).toContain('\'@kaynooo/kayjs-ui/badge.kay\': { parts: { root: \'normal-case\' } }')
-      expect(found.find(problem => problem.message.startsWith('`--kui-shell-line`'))?.help).toContain('`--_shell-line`')
+      expect(found.find(problem => problem.message.startsWith('`--kui-shell-line`'))?.help).toContain('`--shell-line`')
       expect(found.find(problem => problem.message.startsWith('`--kui-border-badge`'))?.help).toContain('`--border-width`')
     }
     finally {

@@ -76,6 +76,8 @@ Corners are Tailwind's own `--radius-sm` (badges, toggle thumbs), `--radius-md` 
 
 A few tokens shape boxes rather than colour them. A setting only one component reads is no token: restyle that component everywhere in `src/ui.ts`, or one instance with `class`. A brutalist skin sets `--shadow-raised` (under cards, rows, widgets and toasts), `--shadow-press` (under framed buttons) and `--press-travel` (how far a pressed button moves down). All three draw nothing by default.
 
+A button's hairline and fill are `--shell-line` and `--shell-fill`, shared by Button, a framed IconButton and a stat badge. Set them on the part in `src/ui.ts`, such as `Button: { parts: { root: '[--shell-line:var(--color-accent)] hover:[--shell-fill:transparent]' } }`, so your value wins over the theme's.
+
 ### Light or dark
 
 The theme is dark unless the visitor's system asks for light. `data-theme="light"` or `"dark"` on `html` wins over both. A site in one theme sets it in its root layout's `head` block.
