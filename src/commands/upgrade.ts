@@ -231,15 +231,14 @@ interface Phase {
 }
 
 // The versions an upgrade installs before the latest, oldest first: each is the minor before a release that dropped the lints rewriting forms the app may still hold, so that minor's kay rewrites them. A form is the app's to keep when its minor is not after the one the app is on, as in `crossed`.
-function steppingStones(from: string, to: string): string[] {
+export function steppingStones(from: string, to: string, table: typeof DEPRECATION_MINORS = DEPRECATION_MINORS): string[] {
   const toMinor = minorOf(to)!
   const stones: string[] = []
   let behind = minorOf(from)!
 
-  for (const { removedIn, since } of DEPRECATION_MINORS.toSorted((a, b) => (minorAfter(minorOf(a.removedIn ?? '')!, minorOf(b.removedIn ?? '')!) ? 1 : -1))) {
-    if (removedIn === undefined)
-      continue
+  const dropped = table.flatMap(({ since, removedIn }) => (removedIn === undefined ? [] : [{ since, removedIn }]))
 
+  for (const { removedIn, since } of dropped.toSorted((a, b) => minorOf(a.removedIn)![1] - minorOf(b.removedIn)![1])) {
     const removed = minorOf(removedIn)!
 
     if (minorAfter(removed, toMinor) || !minorAfter(minorOf(since)!, behind))

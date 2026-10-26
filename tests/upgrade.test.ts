@@ -3,7 +3,7 @@ import { chmod, mkdir, rm, symlink } from 'node:fs/promises'
 import { join } from 'node:path'
 import process from 'node:process'
 import { describe, expect, it, setDefaultTimeout, spyOn } from 'bun:test'
-import { registryDepsFor, upgradeProject } from '../src/commands/upgrade'
+import { registryDepsFor, steppingStones, upgradeProject } from '../src/commands/upgrade'
 import { DEPRECATION_MINORS, LINTS, minorOf } from '../src/compiler/lints'
 import { scratchDir } from './scratch'
 
@@ -466,6 +466,13 @@ describe('kay upgrade across removed deprecations', () => {
       log.mockRestore()
       await rm(root, { recursive: true, force: true })
     }
+  })
+
+  it('ignores a minor whose lints are still declared when it picks the stops', () => {
+    const table = [{ since: '1.80' }, { since: '1.70', removedIn: '1.74' }, { since: '1.69', removedIn: '1.73' }, { since: '1.81' }]
+
+    expect(steppingStones('1.68.0', '1.90.0', table)).toEqual(['1.72.0'])
+    expect(steppingStones('1.72.0', '1.90.0', table)).toEqual([])
   })
 
   it('stops at the minor before the release it moves to', async () => {
