@@ -660,7 +660,8 @@ describe.concurrent('kay dev', () => {
         await expect(dev(root, { refuseConfig: true })).rejects.toBeInstanceOf(ConfigRefusedError)
         expect(childrenRunning(real, 'builder.ts')).toHaveLength(0)
         expect(childrenRunning(real, 'preload.ts')).toHaveLength(0)
-        expect(written.filter(text => text.includes('config broke'))).toEqual([])
+        // The error names the config it came from: the tests beside this one break theirs the same way, and the spy hears what their builders print too.
+        expect(written.filter(text => text.includes('config broke') && (text.includes(root) || text.includes(real)))).toEqual([])
       }
       finally {
         stderr.mockRestore()
