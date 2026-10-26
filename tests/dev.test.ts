@@ -18,6 +18,7 @@ import { TypesProcess } from '../src/dev/types-process'
 import { bootFailure, hotSwap } from '../src/server/dev'
 import { editorCommand } from '../src/server/editor'
 import { freePort } from './free-port'
+import { eventually } from './helpers/eventually'
 
 // The parent's pid in /proc/<pid>/stat, after the command name and the state.
 const PARENT_PID = /\) \S+ (\d+)/
@@ -161,6 +162,7 @@ describe.concurrent('the dev watcher', () => {
     try {
       expect(await sees('src/server.ts', async (attempt) => {
         await rm(join(root, 'src'), { recursive: true, force: true })
+        // The watcher sees the removal before the directory is created again.
         await Bun.sleep(50)
         await mkdir(join(root, 'src'))
         await Bun.write(join(root, 'src/server.ts'), `${attempt}\n`)
@@ -168,6 +170,7 @@ describe.concurrent('the dev watcher', () => {
       expect(await sees('src/server.ts', async attempt => Bun.write(join(root, 'src/server.ts'), `edited ${attempt}\n`))).toBe(true)
       expect(await sees('lib/a.ts', async (attempt) => {
         await mkdir(join(root, 'lib'), { recursive: true })
+        // The watcher is on the new directory before the file is written in it.
         await Bun.sleep(50)
         await Bun.write(join(root, 'lib/a.ts'), String(attempt))
       })).toBe(true)
@@ -486,6 +489,7 @@ describe.concurrent('kay dev', () => {
       await until(() => existsSync(join(root, '.kay/types/kay-shadow.json')) && existsSync(shadow), 20_000)
       expect(count()).toBe(1)
       await Bun.write(join(root, 'src/other.ts'), 'export const other = 2\n')
+      // No types process may start for it, so the wait is a fixed span.
       await Bun.sleep(1500)
       await Bun.write(join(root, 'src/routes/index.kay'), 'p Second\n')
       await until(() => readFileSync(shadow, 'utf8').includes('Second'), 20_000)
@@ -507,12 +511,14 @@ describe.concurrent('kay dev', () => {
     await Bun.write(join(root, 'src/server.ts'), 'setInterval(() => undefined, 1000)\n')
     await Bun.write(join(root, 'kay.config.ts'), 'export default {}\n')
     const stop = await dev(root, { onRestart: child => children.push(child) })
+    // Written by the types process as it loads the config, so the stop comes while it is stuck there.
+    const typed = join(root, '.typed')
 
     try {
       // The restart this change makes writes the types again, from a config that never loads.
-      await Bun.write(join(root, 'kay.config.ts'), 'await new Promise(() => undefined)\n')
+      await Bun.write(join(root, 'kay.config.ts'), `import { writeFileSync } from 'node:fs'\n\nif (process.argv[1]?.endsWith('types.ts'))\n  writeFileSync(${JSON.stringify(typed)}, 'x')\n\nawait new Promise(() => undefined)\n`)
       await until(() => children.length === 2, 20_000)
-      await Bun.sleep(500)
+      await until(() => existsSync(typed), 20_000)
 
       const started = performance.now()
       const stopping = stop()
@@ -613,6 +619,7 @@ describe.concurrent('kay dev', () => {
 
       running.push(first)
 
+      // No builder may start, so the wait is a fixed span.
       await Bun.sleep(1500)
       expect(childrenRunning(real, 'builder.ts')).toHaveLength(0)
       await first()
@@ -689,6 +696,7 @@ describe.concurrent('kay dev', () => {
       stop = await dev(root, { refuseConfig: true, log: line => lines.push(line) })
 
       await until(() => lines.some(line => line.includes('process building the client exited')), 20_000)
+      // No second exit may be said, so the wait is a fixed span.
       await Bun.sleep(200)
       await stop()
       expect(childrenRunning(realpathSync(root), 'preload.ts')).toHaveLength(0)
@@ -936,6 +944,7 @@ describe.concurrent('kay dev', () => {
     // What kay dev printed, so a failure names the file each extra restart was for.
     const printed: string[] = []
     const stop = await dev(root, { onRestart: child => children.push(child), log: line => printed.push(line) })
+    // The pauses inside a save stand for a host stretching it, each shorter than the debounce.
     const saves = [
       async () => Bun.write(server, body(1)),
       // A temporary file renamed over the source.
@@ -966,11 +975,13 @@ describe.concurrent('kay dev', () => {
       await until(() => children.length === 1)
 
       for (const [index, save] of saves.entries()) {
+        // Past the debounce, so a save is not taken for a late event of the one before.
         await Bun.sleep(200)
         await save()
         await until(() => children.length === index + 2)
       }
 
+      // No restart may follow the last save, so the wait is a fixed span.
       await Bun.sleep(300)
       expect({ restarts: children.length, printed }).toEqual({ restarts: saves.length + 1, printed })
     }
@@ -991,6 +1002,7 @@ describe.concurrent('kay dev', () => {
 
     try {
       await until(() => restarts.length === 1)
+      // Past the debounce, so the move below is not taken for a late event of the start.
       await Bun.sleep(300)
 
       // Moved away and never written back: waited for, then restarted once.
@@ -999,12 +1011,13 @@ describe.concurrent('kay dev', () => {
       await rename(server, `${server}~`)
       await until(() => restarts.length === 2)
       expect(restarts[1]! - moved).toBeGreaterThanOrEqual(150)
+      // No second restart may follow, so the wait is a fixed span.
       await Bun.sleep(300)
       expect(restarts).toHaveLength(2)
 
       await Bun.write(server, body)
       await until(() => restarts.length === 3)
-      // Past the wait, so only the backup still beside it holds the next one.
+      // Past the wait, so only the backup still beside it holds the next one, which the fixed span lets pass.
       await Bun.sleep(400)
       expect(restarts).toHaveLength(3)
 
@@ -1031,6 +1044,7 @@ describe.concurrent('kay dev', () => {
     const stop = await dev(root, { onRestart: child => children.push(child) })
 
     try {
+      // The process may not exit for want of an entry, so the wait is a fixed span.
       await Bun.sleep(500)
       expect(children[0]!.exitCode).toBeNull()
 
@@ -1059,7 +1073,7 @@ describe.concurrent('kay dev', () => {
       await rm(seen, { force: true })
       await Bun.write(join(root, file), content)
       await until(() => children.length > count && filled(seen))
-      // A save can come as several events, each restarting once their debounce settles.
+      // A save can come as several events, each restarting once their debounce settles, so the wait is a fixed span past it.
       await Bun.sleep(200)
       await until(() => filled(seen))
 
@@ -1250,6 +1264,7 @@ describe.concurrent('kay dev', () => {
             expect(lines[1]).toBe(`kay dev: http://${network}:${port} on the network`)
           }
 
+          // No further line may follow, so the wait is a fixed span.
           await Bun.sleep(100)
           expect(lines).toHaveLength(host !== undefined && network !== undefined ? 2 : 1)
         }
@@ -1398,7 +1413,9 @@ describe.concurrent('kay dev', () => {
     let stop: (() => Promise<void>) | undefined
 
     await free.stop()
-    await Bun.write(join(root, 'src/server.ts'), `Bun.serve({ port: ${port}, fetch: () => new Response() })\nsetTimeout(() => process.stderr.write('app output\\n'), 300)\n`)
+    const output = join(root, '.output')
+
+    await Bun.write(join(root, 'src/server.ts'), `Bun.serve({ port: ${port}, fetch: () => new Response() })\nsetTimeout(() => {\n  process.stderr.write('app output\\n')\n  Bun.write(${JSON.stringify(output)}, '')\n}, 300)\n`)
     process.stdout.isTTY = true
 
     try {
@@ -1406,8 +1423,8 @@ describe.concurrent('kay dev', () => {
       await until(() => lines.length === 2)
       keys.write('r')
       await until(() => lines.length === 3)
-      // Past the app's own line.
-      await Bun.sleep(1000)
+      // Past the app's own line, which it writes a moment after its start.
+      await until(() => existsSync(output), 10_000)
       keys.write('r')
       await until(() => lines.length === 4)
       expect(lines[3]).not.toContain('(x')
@@ -1459,6 +1476,7 @@ describe.concurrent('kay dev', () => {
       // Ctrl+C, which a terminal in raw mode sends as a key rather than a signal.
       keys.write('\x03')
       await until(() => quit === 2)
+      // The escape sequence and the q must press no key, so the wait is a fixed span.
       await Bun.sleep(50)
       expect(quit).toBe(2)
 
@@ -1501,6 +1519,7 @@ describe.concurrent('kay dev', () => {
       await until(() => output.includes('ready in'), 20_000)
       void child.stdin.write('q')
       await child.stdin.flush()
+      // A q from a pipe, not a terminal, must not quit, so the wait is a fixed span.
       await Bun.sleep(300)
       expect(child.exitCode).toBeNull()
       expect(output).toMatch(/^kay dev: \S+ \(ready in \d+ ms\)\n$/)
@@ -1638,7 +1657,7 @@ describe.concurrent('kay dev', () => {
       // The debugger's connection ends with its server, and connecting again reaches the next.
       await first.closed
       expect(await (await session()).pid()).not.toBe(pid)
-      // A server let go of exits within milliseconds without a word. The new directory and its file are two events, which a slow host can spread over two restarts, the second one in place.
+      // A server let go of exits within milliseconds without a word. The new directory and its file are two events, which a slow host can spread over two restarts, the second one in place; nothing more may be said, so the wait is a fixed span.
       await Bun.sleep(500)
       expect(output.slice(3).filter(line => !line.includes('restarted in'))).toEqual([])
 
@@ -1723,6 +1742,7 @@ describe.concurrent('kay dev', () => {
       await new Promise(resolve => client.addEventListener('open', resolve))
       client.close()
       await until(() => messages.length === 1)
+      // The silent server must not be let go of before the proxy's delay, so the wait is a fixed span.
       await Bun.sleep(150)
       expect(closes).toEqual([])
       await until(() => closes.length === 1, 5000)
@@ -1765,9 +1785,11 @@ describe.concurrent('kay dev', () => {
       await new Promise(resolve => client.addEventListener('open', resolve))
       client.close()
       await until(() => messages.length === 1)
+      // The frame that is not JSON must not close the connection, so the wait is a fixed span.
       await Bun.sleep(150)
       expect(closes).toEqual([])
       await until(() => closes.length === 1, 5000)
+      // Nor may a second close follow.
       await Bun.sleep(100)
 
       expect(closes).toHaveLength(1)
@@ -2091,6 +2113,7 @@ describe.concurrent('kay dev', () => {
       // The config changing at any moment of the island's build.
       for (let step = 1; step <= 8; step++) {
         await Bun.write(join(root, 'src/counter.kay'), counter(step))
+        // A growing pause, so the config changes at a different moment of the build each time.
         await Bun.sleep(step * 20)
         await Bun.write(join(root, 'kay.config.ts'), `export default {}\n// ${step}\n`)
         await Bun.sleep(150)
@@ -2230,6 +2253,8 @@ describe.concurrent('kay dev', () => {
 
       await builder.stop()
       await build
+      await eventually(() => expect(running()).toEqual([]))
+      // None may start again, so the wait goes on for a fixed span.
       await Bun.sleep(300)
       expect(running()).toEqual([])
       expect(builder.gone()).toBe(true)
@@ -2334,6 +2359,7 @@ describe.concurrent('kay dev', () => {
       await stop()
     }
 
+    // No builder may start once stopped, so the wait is a fixed span.
     await Bun.sleep(500)
     expect(childrenRunning(realpathSync(root), 'builder.ts')).toEqual([])
     await rm(root, { recursive: true, force: true })
