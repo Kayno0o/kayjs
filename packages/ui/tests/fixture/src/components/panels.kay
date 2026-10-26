@@ -9,6 +9,7 @@ const { onClose, listWidthKey, onSettled } = props<{ onClose: () => void, listWi
 const open = signal(false)
 const beside = signal(false)
 const linked = signal(false)
+const launched = signal(false)
 const sidebarOpen = signal(true)
 const detailOpen = signal(true)
 const dockOpen = signal(true)
@@ -44,6 +45,10 @@ SplitLayout#split(sidebarOpen={sidebarOpen()} onSidebarOpenChange={() => sidebar
     button#edit Edit
 SidePanel#docked(open={dockOpen()} modal={false} dock={dockEdge()} size={dockSize()} onSizeChange={(size, settled) => { dockSize.set(size); if (settled) onSettled?.(size) }} title="Jupiter" launcher="Open Jupiter" launcherLayer={41} style="z-index: 77; opacity: 0.9" onOpenChange={shown => dockOpen.set(shown)})
   p#docked-body Fifth planet
+button#show-launched(onClick={() => launched.set(true)}) Show launched
+if launched()
+  SidePanel#launched(open={false} modal={false} dock="right" closeHref="/list" title="Saturn" launcher="Open Saturn" launcherHref="/saturn")
+    p Sixth planet
 button#open-docked(onClick={() => dockOpen.set(true)}) Open docked
 button#dock-bottom(onClick={() => dockEdge.set('bottom')}) Dock bottom
 SidePanel#late(open={true} modal={false} dock={lateEdge()} title="Saturn" onOpenChange={() => undefined})

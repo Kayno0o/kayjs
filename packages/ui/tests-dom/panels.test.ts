@@ -322,6 +322,19 @@ describe('SidePanel with a dock', () => {
     }
   })
 
+  test('a closeHref panel with a launcherHref and no onOpenChange leaves a launcher that is a link', async () => {
+    const root = await panels()
+
+    click(root.querySelector('#show-launched'))
+    await settle()
+
+    const link = root.querySelector<HTMLElement>('[data-part=launcher][aria-controls="launched"]')
+
+    expect(link?.getAttribute('aria-label')).toBe('Open Saturn')
+    expect(link?.tagName).toBe('A')
+    expect(link?.getAttribute('href')).toBe('/saturn')
+  })
+
   test('a panel whose dock arrives later docks then, and makes no room before', async () => {
     const root = await panels()
     const late = root.querySelector<HTMLDialogElement>('#late')!

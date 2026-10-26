@@ -20,7 +20,7 @@ const look = recipe({
   },
 })
 
-const { open, title, actions, footer, modal = true, closeHref, launcher, launcherLayer, onOpenChange, closeLabel = wording('ui.sidePanel.close', 'Close'), dock, size, onSizeChange, resizeLabel = wording('ui.sidePanel.resize', 'Resize'), style, ...rest } = props<Omit<JSX.IntrinsicElements['dialog'], 'open' | 'class' | 'title' | 'onClose' | 'closedby' | 'closedBy' | 'style'> & {
+const { open, title, actions, footer, modal = true, closeHref, launcher, launcherHref, launcherLayer, onOpenChange, closeLabel = wording('ui.sidePanel.close', 'Close'), dock, size, onSizeChange, resizeLabel = wording('ui.sidePanel.resize', 'Resize'), style, ...rest } = props<Omit<JSX.IntrinsicElements['dialog'], 'open' | 'class' | 'title' | 'onClose' | 'closedby' | 'closedBy' | 'style'> & {
   // Shows the panel along the edge, as a modal unless `modal` is false; the parent sets it back to false in `onOpenChange`.
   open: boolean
   title: string
@@ -44,10 +44,11 @@ const { open, title, actions, footer, modal = true, closeHref, launcher, launche
   onSizeChange?: ((size: number, settled: boolean) => unknown) | undefined
   resizeLabel?: string | undefined
 } & (
-  // Makes the close control a link to this URL, for a panel open on the server whose close needs no JavaScript; the link navigates and `onOpenChange(false)` is called as well, so its handler need not navigate. Without an `onOpenChange`, Escape follows it too, so a server page renders the panel with no island of its own.
-  | { closeHref: string, onOpenChange?: ((open: boolean) => unknown) | undefined }
-  // Called with `false` however the panel closes, a click outside and Escape included. Closed by either of those or its close button, its content is still there to read; closed by the parent, it is already gone.
-  | { closeHref?: undefined, onOpenChange: (open: boolean) => unknown }
+  // Makes the close control a link to this URL, for a panel open on the server whose close needs no JavaScript; the link navigates and `onOpenChange(false)` is called as well, so its handler need not navigate. Without an `onOpenChange`, Escape follows it too, so a server page renders the panel with no island of its own. Such a panel's `launcher` is a link to `launcherHref`, which the types ask for, as nothing else could open it.
+  | { closeHref: string, onOpenChange?: undefined, launcher?: undefined, launcherHref?: undefined }
+  | { closeHref: string, onOpenChange?: undefined, launcher: string, launcherHref: string }
+  // Called with `false` however the panel closes, a click outside and Escape included. Closed by either of those or its close button, its content is still there to read; closed by the parent, it is already gone. `launcherHref` makes the launcher a link instead, which the handler is not called for.
+  | { closeHref?: string | undefined, onOpenChange: (open: boolean) => unknown, launcherHref?: string | undefined }
 )>()
 
 // A docked panel keeps the page this much of the window beside it, and itself at least its minimum.
@@ -303,4 +304,4 @@ dialog(part="root" aria-label={title} {...rest} open={renderedOpen} data-modal={
       div(part="footer")
         | {footer}
 if docked() && !open && launcher
-  IconButton(part="launcher" icon="menu" label={launcher} variant="ghost" aria-controls={rest.id} style={launcherLayer === undefined ? undefined : `z-index: ${launcherLayer}`} ref={element => launching.set(element)} onClick={() => onOpenChange?.(true)})
+  IconButton(part="launcher" icon="menu" label={launcher} variant="ghost" aria-controls={rest.id} style={launcherLayer === undefined ? undefined : `z-index: ${launcherLayer}`} ref={element => launching.set(element)} href={launcherHref} onClick={() => onOpenChange?.(true)})
