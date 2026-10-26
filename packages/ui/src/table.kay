@@ -43,12 +43,14 @@ const look = recipe({
   },
 })
 
-const { columns: given, rows, rowKey, sort, serverSort = false, onSort, cell, empty, filter, filterLabel = wording('ui.table.filter', 'Filter'), filterPlaceholder, filterParam, sortParam, countLabel, noMatch, narrow = 'stack', selectable = false, selected, onSelect, bulk, selectAllLabel = wording('ui.table.selectAll', 'Select all'), selectedLabel, selectRowLabel, exportable = false, exportLabel = wording('ui.table.export', 'Export CSV'), exportName = 'table.csv', virtual = false, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'onSelect'> & {
+const { columns: given, rows, rowKey, sort, sortable = true, serverSort = false, onSort, cell, empty, filter, filterLabel = wording('ui.table.filter', 'Filter'), filterPlaceholder, filterParam, sortParam, countLabel, noMatch, narrow = 'stack', selectable = false, selected, onSelect, bulk, selectAllLabel = wording('ui.table.selectAll', 'Select all'), selectedLabel, selectRowLabel, exportable = false, exportLabel = wording('ui.table.export', 'Export CSV'), exportName = 'table.csv', virtual = false, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'onSelect'> & {
   columns: Column<Row>[]
   rows: Row[]
   rowKey: Key
   // The sort to start from; a table whose parent passes a new one follows it.
   sort?: SortState | undefined
+  // `false` leaves every header unsortable, `numeric` columns included, for rows the page holds only a part of, which a header click would sort alone.
+  sortable?: boolean | undefined
   // Rows already sorted by the data source: the table reflects the sort in its headers and never reorders them itself.
   serverSort?: boolean | undefined
   // Called with each sort a header click asks for, to fetch the rows sorted that way when `serverSort` is set.
@@ -96,7 +98,7 @@ const { columns: given, rows, rowKey, sort, serverSort = false, onSort, cell, em
   virtual?: boolean | undefined
 }>()
 
-const columns = memo(() => given.map(resolvedColumn))
+const columns = memo(() => given.map(column => resolvedColumn(column, sortable)))
 const keptKey = sortParam === undefined ? undefined : persisted(sortParam, '', { storage: 'query' })
 const keptDirection = sortParam === undefined ? undefined : persisted(sortParam === 'sort' ? 'direction' : `${sortParam}Direction`, '', { storage: 'query' })
 const restored = restoredSort(columns(), keptKey?.(), keptDirection?.())

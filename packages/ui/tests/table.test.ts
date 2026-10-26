@@ -64,6 +64,11 @@ test('cellText shows nothing for a missing value, and rowKeyOf reads a field or 
   expect(rowKeyOf(planets[0]!, planet => planet.name)).toBe('Mars')
 })
 
+test('a table that is not sortable drops every sortValue, numeric columns included', () => {
+  expect(resolvedColumn<Planet>({ key: 'moons', header: 'Moons', numeric: true }, false)).toStrictEqual({ key: 'moons', header: 'Moons', numeric: true, align: 'end', defaultDirection: 'desc' })
+  expect(resolvedColumn<Planet>({ key: 'name', header: 'Name', sortValue: true }, false).sortValue).toBeUndefined()
+})
+
 test('a numeric column aligns to the end and sorts by its own value, largest first, unless it says otherwise', () => {
   expect(resolvedColumn<Planet>({ key: 'moons', header: 'Moons', numeric: true })).toEqual({ key: 'moons', header: 'Moons', numeric: true, align: 'end', sortValue: true, defaultDirection: 'desc' })
   expect(resolvedColumn<Planet>({ key: 'moons', header: 'Moons', numeric: true, defaultDirection: 'asc' }).defaultDirection).toBe('asc')

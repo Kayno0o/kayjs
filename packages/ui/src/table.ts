@@ -19,9 +19,18 @@ export interface Column<Row> {
   cell?: boolean
 }
 
-// The column with what `numeric` stands for filled in where it says nothing itself.
-export function resolvedColumn<Row>(column: Column<Row>): Column<Row> {
-  return column.numeric ? { align: 'end', sortValue: true, defaultDirection: 'desc', ...column } : column
+// The column with what `numeric` stands for filled in where it says nothing itself, and no `sortValue` at all when the table is not `sortable`, `numeric` columns included.
+export function resolvedColumn<Row>(column: Column<Row>, sortable = true): Column<Row> {
+  const filled: Column<Row> = column.numeric ? { align: 'end', sortValue: true, defaultDirection: 'desc', ...column } : column
+
+  if (sortable)
+    return filled
+
+  const unsortable = { ...filled }
+
+  delete unsortable.sortValue
+
+  return unsortable
 }
 
 // Whether the `@cell` block draws the column: one marked `cell: true` puts the table in the older way, where only those are.

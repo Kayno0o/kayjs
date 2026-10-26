@@ -31,6 +31,7 @@ Table(columns={columns} rows={posts} rowKey="id" filter={['title', 'author']} fi
 - `numeric: true` marks a count or an amount: aligned to the end, its digits in columns, sorted by its own value and largest first, each overridable by `align`, `sortValue` and `defaultDirection`.
 - A column with `sortValue` sorts when its header is clicked. `true` sorts by the row's value at `key`; a function sorts by what it returns.
 - The first click sorts in `defaultDirection`, `desc` unless set, and the next click flips it. `sort` gives the sort to start from.
+- `sortable={false}` makes no header sortable, `numeric` columns included: for rows loaded page by page, which a header click would sort alone.
 - `serverSort` leaves the rows in the order they came. The headers show the sort, and `onSort(sort)` lets the page fetch the rows sorted that way, from a load or an action.
 - With `sortValue: true`, dates sort by time, booleans as 0 and 1, and a missing value sorts last in either direction.
 - `rowKey` is a field of the row or a function of it, and tells rows apart across a sort.

@@ -8,15 +8,15 @@ interface Planet {
   moons: number
 }
 
-const { rows, serverSort = false, onSort } = props<{ rows: Planet[], serverSort?: boolean, onSort?: (sort: SortState) => void }>()
+const { rows, serverSort = false, sortable, sort, numericMoons = false, onSort } = props<{ rows: Planet[], serverSort?: boolean, sortable?: boolean, sort?: SortState, numericMoons?: boolean, onSort?: (sort: SortState) => void }>()
 
 const columns: Column<Planet>[] = [
   { key: 'name', header: 'Name', sortValue: planet => planet.name, defaultDirection: 'asc', cell: true },
-  { key: 'moons', header: 'Moons', sortValue: true, align: 'end' },
+  numericMoons ? { key: 'moons', header: 'Moons', numeric: true } : { key: 'moons', header: 'Moons', sortValue: true, align: 'end' },
   { key: 'id', header: 'Id' },
 ]
 ---
-Table(columns={columns} rows={rows} rowKey={planet => planet.id} serverSort={serverSort} onSort={onSort})
+Table(columns={columns} rows={rows} rowKey={planet => planet.id} sortable={sortable} sort={sort} serverSort={serverSort} onSort={onSort})
   @cell(planet)
     strong {planet.name}
   @empty

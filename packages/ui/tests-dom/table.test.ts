@@ -65,6 +65,14 @@ describe('Table', () => {
     expect(header(mounted.root, 0).getAttribute('aria-sort')).toBe('ascending')
   })
 
+  test('has no sortable header at all with sortable false, numeric columns included', async () => {
+    mounted = await mountComponent(TableComponent, { rows: PLANETS, sortable: false, numericMoons: true, sort: { key: 'moons', direction: 'asc' } })
+
+    expect(mounted.root.querySelectorAll('th button')).toHaveLength(0)
+    expect(mounted.root.querySelector('th[aria-sort]')).toBeNull()
+    expect(names(mounted.root)).toEqual(['Mars', 'Earth', 'Venus'])
+  })
+
   test('shows its @empty block when there are no rows', async () => {
     mounted = await mountComponent(TableComponent, { rows: [] })
 
