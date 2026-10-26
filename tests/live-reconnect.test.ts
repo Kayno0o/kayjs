@@ -34,6 +34,8 @@ describe('a live value set just after a connection that followed a refusal', () 
   // The page the server renders for a visitor, fetched to renew the proofs.
   let renewed: string
   const posted: number[] = []
+  // The requests of the connections opened, which abort as each closes.
+  const signals: AbortSignal[] = []
   const shown = new Map<string, unknown>()
   const disposals: (() => void)[] = []
 
@@ -68,6 +70,7 @@ describe('a live value set just after a connection that followed a refusal', () 
       const answer = answers.shift() ?? 403
 
       posted.push(typeof answer === 'number' ? answer : 200)
+      signals.push(init.signal!)
 
       return typeof answer === 'number' ? new Response(null, { status: answer }) : new Response(answer.body, { headers: { 'content-type': 'text/event-stream' } })
     }) as typeof fetch
@@ -78,8 +81,9 @@ describe('a live value set just after a connection that followed a refusal', () 
     for (const dispose of disposals.splice(0))
       dispose()
 
-    // The connection closes a settling delay after the values are no longer read; a deliberate wait, as nothing else tells it closed.
-    await Bun.sleep(80)
+    // The connection closes a settling delay after the values are no longer read, which aborts its request.
+    await until(() => signals.every(signal => signal.aborted))
+    signals.length = 0
 
     posted.length = 0
     shown.clear()
@@ -102,6 +106,7 @@ describe('a live value set just after a connection that followed a refusal', () 
     // The snapshot and the update land together, before the value is read again.
     connection.send([['unread', 5]], [['unread', 7]])
     await until(() => shown.get('unread') === 7)
+    // Nothing is meant to change the value again, so a short window is all there is to wait out.
     await Bun.sleep(100)
     expect(shown.get('unread')).toBe(7)
   })
@@ -119,8 +124,25 @@ describe('a live value set just after a connection that followed a refusal', () 
     await until(() => posted.length === 2)
     connection.send([['unread', 5], ['visitors', 10], ['mentions', 2]], [['unread', 7], ['mentions', 4]], [['visitors', 11]])
     await until(() => shown.get('visitors') === 11)
+    // Nothing is meant to change the value again, so a short window is all there is to wait out.
     await Bun.sleep(100)
     expect([shown.get('unread'), shown.get('visitors'), shown.get('mentions')]).toEqual([7, 11, 4])
+  })
+
+  it('shows the update when the renewed page holds no value for the visitor', async () => {
+    const connection = new Connection()
+
+    page(['unread', 3], ['other', 1])
+    renewed = script(['other', 1])
+    answers = [403, connection]
+    follow('unread', 0)
+    await until(() => shown.get('unread') === 3)
+    await until(() => posted.length === 2)
+    connection.send([['unread', 5]], [['unread', 7]])
+    await until(() => shown.get('unread') === 7)
+    // Nothing is meant to change the value again, so a short window is all there is to wait out.
+    await Bun.sleep(100)
+    expect(shown.get('unread')).toBe(7)
   })
 
   it('shows a page rendered after the last value the connection delivered', async () => {
@@ -155,6 +177,7 @@ describe('a live value set just after a connection that followed a refusal', () 
     await until(() => posted.length === 2)
     second.send([['unread', 5]], [['unread', 7]])
     await until(() => shown.get('unread') === 7)
+    // Nothing is meant to change the value again, so a short window is all there is to wait out.
     await Bun.sleep(100)
     expect(shown.get('unread')).toBe(7)
   })

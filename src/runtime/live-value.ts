@@ -807,7 +807,7 @@ interface Entry {
   write: (value: unknown) => void
   // The value the page rendered it with, which an island claiming its markup reads whatever arrived since.
   rendered: { value: unknown } | undefined
-  // What the page held for it when the connection last delivered a value, which a later read of the page compares to: a page rendered before that delivery holds nothing the connection has not already moved past.
+  // What the page held for it when the connection last delivered a value, compared with the page read later: a page rendered before that delivery holds nothing the connection has not moved past. Wrapped, as a page holding nothing for it differs from no delivery.
   delivered: { rendered: { value: unknown } | undefined } | undefined
   // Read while an island claims its markup, so the value that arrived since shows once it is hydrated.
   hydrated: () => number
