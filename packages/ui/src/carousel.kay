@@ -1,6 +1,6 @@
 ---
 import type { Duration, JSX } from 'kay'
-import { durationMs, effect, listen, onCleanup, onMount, recipe, signal } from 'kay'
+import { durationMs, effect, every, onCleanup, recipe, signal } from 'kay'
 import IconButton from './icon-button.kay'
 import { startRef } from './form-reset'
 import { stepIndex } from './cycle'
@@ -44,17 +44,13 @@ const { slides, index = 0, onIndexChange, autoplay, ratio = '16 / 9', label = wo
 }>()
 
 const shown = signal(index)
-// Whether the pointer or the focus is on the carousel, or the tab is hidden or the carousel scrolled out of view, which holds the autoplay.
+// Whether the pointer or the focus is on the carousel, or the carousel scrolled out of view, which holds the autoplay, as `every` does for a hidden tab.
 const pointed = signal(false)
 const focused = signal(false)
-const hidden = signal(false)
 const offscreen = signal(false)
 const root = signal<HTMLElement>()
 // The visitor's own pause, which nothing but the button lifts.
 const paused = signal(false)
-
-onMount(() => hidden.set(document.hidden))
-listen(document, 'visibilitychange', () => hidden.set(document.hidden))
 
 const ref = startRef<HTMLElement>(element => root.set(element), rest.ref)
 
@@ -76,14 +72,8 @@ effect(() => {
 if (autoplay !== undefined)
   durationMs(autoplay)
 
-effect(() => {
-  if (!autoplay || paused() || pointed() || focused() || hidden() || offscreen() || matchMedia('(prefers-reduced-motion: reduce)').matches)
-    return
-
-  const timer = setInterval(step, durationMs(autoplay), 1)
-
-  onCleanup(() => clearInterval(timer))
-})
+if (autoplay)
+  every(autoplay, () => step(1), { while: () => !paused() && !pointed() && !focused() && !offscreen() && !matchMedia('(prefers-reduced-motion: reduce)').matches })
 
 const active = () => stepIndex(shown(), 0, slides.length)
 
