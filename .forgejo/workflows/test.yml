@@ -58,7 +58,7 @@ jobs:
     # A release's version commit, `v1.2.3`, pushed alone, is tested by the publish workflow its tag starts, on the same tree; no other commit title starts with a `v`. Code commits pushed along with it still get the steps only this workflow runs.
     if: needs.latest.outputs.current == 'true' && (github.event_name != 'push' || !startsWith(github.event.head_commit.message, 'v') || github.event.commits[1] != null)
     runs-on: alpine
-    # Well past the slowest run so far (about 10 minutes), so a hung run frees the queue behind it.
+    # Well past the slowest run since the libraries run in parallel (12m35s, run 2999; most take about 10 minutes), so a hung run frees the queue behind it.
     timeout-minutes: 15
 
     steps:
