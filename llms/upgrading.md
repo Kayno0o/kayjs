@@ -65,6 +65,8 @@ An action's `rateLimit`, `honeypot`, `minTime` and `proofOfWork` on the third ar
 
 kayjs-ui's `theme.css` has no rule left for the part classes its components stopped setting (`kui-card-head`, `kui-stat-value`, `kui-dialog-title` and the rest listed under 1.71.0 and 1.72.0), nor for the old rule of the roots of Card, Dialog, Menu, Popover, HoverCard, SidePanel, CommandPalette, Toaster, TooltipHost, Badge, Notice, Avatar, Widget, CardRow, Checkbox, RadioGroup, ChipGroup, CopyButton, EmptyState, FileDrop, Meter, Progress, Skeleton, PageHeader, PageSection, DateInput, DateRangeInput, Segmented, Slider, ColorInput, Combobox, MultiSelect, Rating, Toggle and FormField, whose recipes draw the look: markup of yours written by hand with one of those classes is no longer styled, so give it utilities or select `[data-part]` on the component. `deprecated-ui-class` is gone, and a stylesheet selecting a removed class matches nothing.
 
+The selectors a stylesheet moves to, inside the component's root: `.kui-table-row` is `[data-part='row']` (`.kui-table-cell` is `[data-part='cell']`), `.kui-checkbox-input` is `[data-part='input']`, `.kui-line-chart-legend` is `[data-part='legend']` and `.kui-site-nav-list` is `[data-part='list']`. The Table's narrow form is a container named `table` (`@container table`, which was `kui-table`), so a container query on the old name becomes `@container table (max-width: 30rem)`. The part names are the keys of each component's recipe in `packages/ui/src/`.
+
 kayjs-cms answers on `/_kay/cms` alone: the `/api/cms` path of 1.70 and before is no longer served, so point a webhook or a script at the new one.
 
 ### The 1.70 names that were read for three minors are gone
