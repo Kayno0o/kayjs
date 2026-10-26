@@ -356,6 +356,50 @@ function specificity(selector: string): [number, number] {
   return [classes, elements]
 }
 
+function resolveAgainst(part: string, parent: string): string {
+  if (parent === '')
+    return part
+
+  return part.includes('&') ? part.replaceAll('&', `:is(${parent})`) : `:is(${parent}) ${part}`
+}
+
+// Every style rule of a compiled stylesheet with its nesting resolved: a child rule's `&` becomes `:is(parent)` (the parent's own specificity) and a child without one a descendant of it, at-rules passing their parent through.
+function resolvedSelectors(css: string): string[] {
+  const out: string[] = []
+  const stack: string[] = []
+  let start = 0
+
+  for (let i = 0; i < css.length; i++) {
+    const char = css[i]
+
+    if (char === ';') {
+      start = i + 1
+    }
+    else if (char === '{') {
+      const prelude = css.slice(start, i).trim()
+      const parent = stack.findLast(entry => entry !== '') ?? ''
+
+      if (prelude.startsWith('@')) {
+        stack.push('')
+      }
+      else {
+        const resolved = splitTop(prelude).map(part => resolveAgainst(part, parent)).join(', ')
+
+        out.push(resolved)
+        stack.push(resolved)
+      }
+
+      start = i + 1
+    }
+    else if (char === '}') {
+      stack.pop()
+      start = i + 1
+    }
+  }
+
+  return out
+}
+
 describe('theme.css', () => {
   test('reads at 4.5:1 for text and 3:1 for field borders and focus, on every ground in both schemes', () => {
     expect(failing(TEXT, 4.5)).toEqual([])
@@ -729,10 +773,14 @@ describe('theme.css', () => {
     expect(css).toMatch(/\.starfield \{[^}]*background-color: var\(--color-background\)/)
     expect(css).toMatch(/\.starfield \{[^}]*background-attachment: fixed/)
 
-    // Every selector of the skin as compiled: one class at most, two for the key's hover as the theme's own.
-    const selectors = [...css.replaceAll(/\/\*[\s\S]*?\*\//g, '').matchAll(/([^{};]+)\{[^{}]*\}/g)].map(([, selector = '']) => selector.trim()).filter(selector => selector.includes('.kui-') || selector.includes('select'))
+    // Every selector of the skin as compiled, nested rules (option states, checkbox, picker) resolved against their parents: one class at most, two for the key's hover as the theme's own.
+    const selectors = resolvedSelectors(css.replaceAll(/\/\*[\s\S]*?\*\//g, '')).filter(selector => selector.includes('.kui-') || selector.includes('select'))
 
     expect(selectors.length).toBeGreaterThan(8)
+    expect(selectors.some(selector => selector.includes('option') && selector.includes(':checked'))).toBe(true)
+    expect(selectors.some(selector => selector.includes('checkbox') && selector.includes(':hover'))).toBe(true)
+    expect(selectors.some(selector => selector.includes('::picker'))).toBe(true)
+
     for (const selector of selectors) {
       for (const part of splitTop(selector)) {
         const [classes = 0] = specificity(part)
@@ -742,10 +790,10 @@ describe('theme.css', () => {
     }
 
     // A disabled button keeps the theme's look, which sits at two classes after the skin: the key rules never select it.
-    const keys = selectors.filter(selector => selector.includes('--shell') || selector.includes('.kui-btn-accent'))
+    const keys = selectors.filter(selector => selector.includes('.kui-btn') && selector.includes('.kui-btn-accent'))
 
     expect(keys.length).toBeGreaterThan(1)
-    for (const key of keys) expect(key, key).toContain('[aria-disabled=\'true\']')
+    for (const key of keys) expect(key, key).toMatch(/\[aria-disabled=["']?true["']?\]/)
     expect(css).toMatch(/:where\(:not\(:checked, :indeterminate, :disabled\)\)\s*\{\s*border-color: var\(--color-accent\)/)
     // A raw select in a FormField sits at the theme's own one class, so the skin's chevron padding wins by order.
     expect(css).toContain('.kui-form-field :where(select)')
