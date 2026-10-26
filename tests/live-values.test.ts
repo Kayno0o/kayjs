@@ -12,6 +12,7 @@ import { MAX_CONNECTIONS } from '../src/server/config-limits'
 import { browserPath, testSite } from '../src/test'
 import { Feed, JSON_POST, pagesOf, proofsOf } from './live-helpers'
 import { fixtureCopy } from './scratch'
+import { untilHolds } from './until-holds'
 
 const ROOT = 'tests/fixtures/live-values'
 // The id of a value of the fixture's src/live.ts, which depends on the path from the project alone.
@@ -159,7 +160,7 @@ describe('live values on the server', () => {
     await feed.next()
     expect(liveSlot(VISITORS)!.listeners.get('')?.size).toBe(1)
     await feed.close()
-    await tick()
+    await untilHolds(() => liveSlot(VISITORS)!.listeners.get('') === undefined)
     expect(liveSlot(VISITORS)!.listeners.get('')).toBeUndefined()
   })
 
@@ -313,9 +314,14 @@ describe('the connections of one client', () => {
       const first = feeds.shift()!
 
       await first.close()
-      await Bun.sleep(50)
 
-      const again = await connect()
+      // The server frees the slot once it sees the connection close, which a request in the meantime may still meet as full.
+      let again = await connect()
+
+      for (let tries = 0; again.status === 429 && tries < 500; tries++) {
+        await Bun.sleep(10)
+        again = await connect()
+      }
 
       expect(again.status).toBe(200)
       await again.body!.cancel()
@@ -378,8 +384,8 @@ describe('the connections of one client', () => {
         }
 
         expect((await connect()).status).toBe(429)
-        await Bun.sleep(500)
 
+        // Each connection ends on its own when its proof expires, which `next()` waits for.
         for (const feed of feeds)
           await expect(feed.next()).rejects.toThrow('the connection ended')
       }
@@ -408,6 +414,7 @@ describe('the connections of one client', () => {
         const feed = new Feed(await site.fetch('/_kay/live', { ...JSON_POST, body: JSON.stringify({ proofs: [...old, ...fresh], watch: [[VISITORS, '']] }) }))
 
         await feed.next()
+        // The oldest proof expires meanwhile, and the connection must outlast it: the wait is the point.
         await Bun.sleep(500)
         visitors.set(n => n + 1)
         expect((await feed.next()).map(([id]) => id)).toEqual([VISITORS])
@@ -578,8 +585,12 @@ describe.skipIf(chrome === undefined && (process.env.CI ?? '') === '')('live val
       Object.defineProperty(document, 'hidden', { configurable: true, get: () => true })
       document.dispatchEvent(new Event('visibilitychange'))
     })
-    await Bun.sleep(100)
+
+    const { liveSlot } = await import('../src/runtime/live-value')
+
+    await untilHolds(() => liveSlot(VISITORS)!.listeners.get('') === undefined)
     live.visitors.set(31)
+    // Nothing happens: a hidden tab shows nothing, which an update arriving late would show within this time.
     await Bun.sleep(300)
     expect(await page.text('p.online')).toBe('30 online')
     expect(connections).toHaveLength(1)
@@ -599,6 +610,7 @@ describe.skipIf(chrome === undefined && (process.env.CI ?? '') === '')('live val
 
     await using page = await site.open('/about')
 
+    // Nothing happens: a connection opened late would show within this time.
     await Bun.sleep(150)
     expect(connections).toEqual([])
     expect(await page.evaluate(() => document.querySelectorAll('script[type=module]').length)).toBe(0)
@@ -738,6 +750,7 @@ describe.skipIf(chrome === undefined && (process.env.CI ?? '') === '')('live val
       await using page = await site.open('/other')
 
       await page.waitUntil(() => document.querySelector('p.online')?.textContent === '50 online')
+      // Nothing happens: the retry backs off for longer than this wait, so a third request would show if it did not.
       await Bun.sleep(3000)
       expect(server.posts.length).toBe(2)
     }
@@ -758,6 +771,7 @@ describe.skipIf(chrome === undefined && (process.env.CI ?? '') === '')('live val
     await until(() => server.posts.length === 1)
     // The first request is still waiting for its refusal.
     await page.evaluate(() => Object.defineProperty(document, 'hidden', { configurable: true, get: () => true }))
+    // Nothing happens: a hidden tab does not retry, which a request sent late would show within this time.
     await Bun.sleep(3000)
     expect(server.posts.length).toBe(1)
     await page.evaluate(() => {

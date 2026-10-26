@@ -133,6 +133,7 @@ describe('a cached value a page follows', () => {
     const { html } = await site.visit('/')
     const [[, readAt]] = followed(pagesOf(html)) as [[string, number]]
 
+    // The invalidation is stamped by the clock, so it waits for a millisecond after the render's read.
     await Bun.sleep(5)
     invalidate('orders')
 
@@ -360,6 +361,7 @@ describe.skipIf(chrome === undefined && (process.env.CI ?? '') === '')('a cached
 
     await using page = await site.open('/plain')
 
+    // Nothing happens: a connection opened late would show within this time.
     await Bun.sleep(300)
     expect(connections).toEqual([])
     expect(await page.count('script[data-kay-cache]')).toBe(0)
@@ -376,6 +378,7 @@ describe.skipIf(chrome === undefined && (process.env.CI ?? '') === '')('a cached
       Object.defineProperty(document, 'hidden', { configurable: true, get: () => true })
     })
     change(5)
+    // Nothing happens: a hidden tab loads nothing, which a load arriving late would show within this time.
     await Bun.sleep(1200)
     expect(await page.text('p.orders')).toBe('4 orders')
     await page.evaluate(() => {
