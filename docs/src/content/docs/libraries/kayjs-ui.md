@@ -66,7 +66,18 @@ Labels, headings and table heads are uppercase unless `--label-case` is `none`, 
 
 The space skin is dark only: a near-black background, a starlight accent, red kept for errors, and no lines around boxes, where the fill tells them apart. Buttons become hairline keys that light in the accent on hover, checkboxes are drawn, selects are themed, and the `starfield` class paints tiled dots behind a page or a section. It uses Space Grotesk, which you serve with `fonts: [{ fontsource: '@fontsource-variable/space-grotesk' }]` in `kay.config.ts`.
 
-Add the one line to `src/app.css`, after the theme import (an app using `ui()` has the theme already):
+Besides its colours, the space skin sets these, so an override of yours knows what it changes:
+
+- The sans font, `--color-popover`, `--color-surface`, `--color-surface-strong`, `--color-border` and `--color-border-strong`.
+- `--border-width` to `0`, put back to `1px` on buttons, fields, chips, toggles, badges, notices, avatars, segmented controls, file drops and pagination steps.
+- `--label-case` to `none`, `--tracking-label` and `color-scheme: dark`.
+- A shadow under overlays, the key look of `.kui-btn` and framed `.kui-icon-btn`, the drawn checkboxes (outlined in the accent on hover) and the themed selects.
+
+Soft sets `--label-case`, `--tracking-label` and `--shadow-raised`; brutalist sets `--border-width`, the three radii, `--font-label` and the three shadow tokens.
+
+A skin's rules sit at one class of specificity or none, so a plain class of yours beats them. `starfield` paints its dots over `--color-background` and fixes them to the viewport; keep your own fuller sky by layering your gradients on the same element.
+
+Add the one line to `src/app.css`, after the theme import (an app using `ui()` has the theme already, so it goes after `@import 'tailwindcss'`):
 
 ```css
 @import '@kaynooo/kayjs-ui/skins/space.css';

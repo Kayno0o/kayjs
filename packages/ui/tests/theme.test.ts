@@ -636,10 +636,27 @@ describe('theme.css', () => {
 
     expect(skin).toMatch(/--color-popover: color-mix\(in oklab, var\(--color-background\), black/)
     expect(css).toContain('@media (forced-colors: active)')
-    expect(css).toMatch(/\.kui-icon-btn\.kui-shell/)
+    expect(css).toMatch(/\.kui-shell:where\(\.kui-icon-btn\)/)
     expect(css).toContain(':not([multiple], [size])')
     // The skin sets one colour scheme, so it never asks for light.
     expect(skin).not.toContain('light-dark(')
+  })
+
+  test('lets an app\'s plain class beat the space skin, and gives its starfield a ground and a fixed attachment and its checkbox a hover', async () => {
+    const skin = await Bun.file(`${ROOT}src/skins/space.css`).text()
+    const tailwind = Bun.resolveSync('tailwindcss/theme.css', ROOT)
+    const compiler = await compile(`@import 'tailwindcss/theme.css' layer(theme);\n${theme}\n${skin}\n@tailwind utilities;`, { base: ROOT, loadStylesheet: async (_, base) => ({ path: tailwind, base, content: await Bun.file(tailwind).text() }) })
+    const css = compiler.build(['starfield'])
+
+    expect(css).toMatch(/\.starfield \{[^}]*background-color: var\(--color-background\)/)
+    expect(css).toMatch(/\.starfield \{[^}]*background-attachment: fixed/)
+    expect(skin).toMatch(/&:hover:not\(:checked, :indeterminate, :disabled\) \{\s*border-color: var\(--color-accent\)/)
+
+    // No selector joins two classes outside :where(), which a plain class of the app would lose to.
+    const rules = skin.replace(/\/\*[\s\S]*?\*\//g, '').replace(/@theme \{[^}]*\}/, '')
+
+    expect(rules).not.toMatch(/\.kui-icon-btn\.kui-shell/)
+    expect(rules).not.toMatch(/:is\([^()]*(?:\.[\w-]+|\])\s+[.[][^()]*\)/)
   })
 
   test('keeps the space skin on the parts the recipes draw: the line they read, the combobox list and the multi-select checkbox', async () => {

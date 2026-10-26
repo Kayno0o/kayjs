@@ -1,6 +1,6 @@
 /*
  * A dark-only space skin: a near-black canvas, a starlight accent, Space Grotesk, few borders (fill tells the boxes apart), buttons as hairline keys that light in the accent, drawn checkboxes and themed selects, and a `starfield` background utility.
- * Import it after theme.css in the app's stylesheet: its tokens are the app's `@theme`, so an override of yours after it wins. It names the family `Space Grotesk`, which the app serves with `fonts: [{ fontsource: '@fontsource-variable/space-grotesk' }]` in kay.config.ts.
+ * Import it after theme.css in the app's stylesheet, or after `@import 'tailwindcss'` with `ui()`, which injects the theme before the app's CSS: its tokens are the app's `@theme`, so an override of yours after it wins. Its rules sit at one class of specificity or none, so a plain class of the app beats them. It names the family `Space Grotesk`, which the app serves with `fonts: [{ fontsource: '@fontsource-variable/space-grotesk' }]` in kay.config.ts.
  */
 @theme {
   --font-sans: 'Space Grotesk', ui-sans-serif, system-ui, sans-serif;
@@ -31,8 +31,10 @@
   color-scheme: dark;
 }
 
-/* Dots tiled at prime sizes, so the four layers never line up into a grid. */
+/* Dots tiled at prime sizes, so the four layers never line up into a grid, on the canvas colour and fixed to the viewport so they stay put while the page scrolls. */
 @utility starfield {
+  background-color: var(--color-background);
+  background-attachment: fixed;
   background-image:
     radial-gradient(1px 1px at 23px 41px, rgb(255 255 255 / 0.55), transparent),
     radial-gradient(1px 1px at 71px 17px, rgb(188 212 255 / 0.4), transparent),
@@ -43,39 +45,39 @@
 
 @layer components {
   /* The framed boxes have no line, so the controls that need one draw it again: buttons, fields, notices and avatars among them. */
-  :is(.kui-btn, .kui-shell, .kui-segmented, .kui-pagination [data-part='step'], .kui-toggle [data-part='track'], .kui-chip, .kui-file-drop, .kui-badge, .kui-notice, .kui-avatar, .kui-field-input, .kui-form-field :is(input, select, textarea)) {
+  :is(.kui-btn, .kui-shell, .kui-segmented, :where(.kui-pagination [data-part='step']), :where(.kui-toggle [data-part='track']), .kui-chip, .kui-file-drop, .kui-badge, .kui-notice, .kui-avatar, .kui-field-input, :where(.kui-form-field :is(input, select, textarea))) {
     --border-width: 1px;
   }
 
   /* A checked chip and a file drop being dragged over keep the accent line the theme gives them. */
-  :is(.kui-segmented, .kui-file-drop:not([data-dragging])) {
+  :is(.kui-segmented, .kui-file-drop:where(:not([data-dragging]))) {
     border-color: var(--color-input);
   }
 
   /* The same line for the recipes of Segmented, ChipGroup, FileDrop and Pagination, which read it from --_control-line. */
-  :is(.kui-segmented, .kui-pagination [data-part='step'], .kui-chip [data-part='input']:not(:checked) + [data-part='label'], .kui-file-drop:not([data-dragging])) {
+  :is(.kui-segmented, :where(.kui-pagination [data-part='step']), :where(.kui-chip [data-part='input']:not(:checked) + [data-part='label']), .kui-file-drop:where(:not([data-dragging]))) {
     --_control-line: var(--color-input);
   }
 
   /* Overlays lose their line to a shadow that lifts them off the page. */
-  :is(.kui-dialog, .kui-command-palette, .kui-popover, .kui-hover-card, .kui-toast, .kui-tooltip, .kui-combobox [data-part='list'], .kui-side-panel, .kui-line-chart [data-part='tooltip'], .kui-site-nav > [data-part='list']:popover-open) {
+  :is(.kui-dialog, .kui-command-palette, .kui-popover, .kui-hover-card, .kui-toast, .kui-tooltip, :where(.kui-combobox [data-part='list']), .kui-side-panel, :where(.kui-line-chart [data-part='tooltip']), :where(.kui-site-nav > [data-part='list']:popover-open)) {
     box-shadow: 0 1rem 3rem -0.75rem rgb(0 0 0 / 0.8);
   }
 
   /* A key, on a Button and a framed IconButton: a hairline on the canvas, lit in the accent while hovered. The tones, the ghost and inline forms and a pressed toggle keep their own. */
-  :is(.kui-btn, .kui-icon-btn.kui-shell):where(:not(.kui-btn-accent, .kui-btn-success, .kui-btn-danger, .kui-shell-danger, [data-variant='ghost'], [data-variant='inline'], [aria-pressed='true'])) {
+  :is(.kui-btn, .kui-shell:where(.kui-icon-btn)):where(:not(.kui-btn-accent, .kui-btn-success, .kui-btn-danger, .kui-shell-danger, [data-variant='ghost'], [data-variant='inline'], [aria-pressed='true'])) {
     --shell-line: var(--color-input);
     --shell-fill: transparent;
   }
 
-  :is(.kui-btn, .kui-icon-btn.kui-shell):where(:not(.kui-btn-accent, .kui-btn-success, .kui-btn-danger, .kui-shell-danger, [data-variant='ghost'], [data-variant='inline'], [aria-pressed='true'])):hover {
+  :is(.kui-btn, .kui-shell:where(.kui-icon-btn)):where(:not(.kui-btn-accent, .kui-btn-success, .kui-btn-danger, .kui-shell-danger, [data-variant='ghost'], [data-variant='inline'], [aria-pressed='true'])):hover {
     --shell-line: var(--color-accent);
     --shell-fill: transparent;
     color: var(--color-accent);
   }
 
   /* A themed select: its own chevron drawn as two gradients, and where the browser can style the select itself, its list too. */
-  :is(select.kui-field-input, .kui-form-field select):not([multiple], [size]) {
+  :is(select.kui-field-input, :where(.kui-form-field select)):where(:not([multiple], [size])) {
     appearance: none;
     padding-right: 1.75rem;
     background-image: linear-gradient(45deg, transparent 50%, var(--color-muted) 50%), linear-gradient(135deg, var(--color-muted) 50%, transparent 50%);
@@ -85,7 +87,7 @@
   }
 
   @supports (appearance: base-select) {
-    :is(select.kui-field-input, .kui-form-field select):not([multiple], [size]) {
+    :is(select.kui-field-input, :where(.kui-form-field select)):where(:not([multiple], [size])) {
       appearance: base-select;
       padding-right: calc(var(--spacing) * 2.25 * var(--density));
       background-image: none;
@@ -122,7 +124,7 @@
   }
 
   /* A drawn checkbox: a square in the field's line that fills with the accent and shows a tick once checked. */
-  :is(.kui-checkbox [data-part='input'], .kui-checkbox [data-part='boxInput'], .kui-multi-select [data-part='checkbox']) {
+  :where(.kui-checkbox [data-part='input'], .kui-checkbox [data-part='boxInput'], .kui-multi-select [data-part='checkbox']) {
     display: inline-grid;
     place-content: center;
     appearance: none;
@@ -139,6 +141,10 @@
       clip-path: polygon(14% 44%, 0 65%, 50% 100%, 100% 16%, 80% 0, 43% 62%);
       transform: scale(0);
       transition: transform 120ms;
+    }
+
+    &:hover:not(:checked, :indeterminate, :disabled) {
+      border-color: var(--color-accent);
     }
 
     &:checked,
@@ -158,12 +164,12 @@
   }
 
   @media (forced-colors: active) {
-    :is(.kui-checkbox [data-part='input'], .kui-checkbox [data-part='boxInput'], .kui-multi-select [data-part='checkbox'])::before {
+    :where(.kui-checkbox [data-part='input'], .kui-checkbox [data-part='boxInput'], .kui-multi-select [data-part='checkbox'])::before {
       background: HighlightText;
     }
 
-    :is(.kui-checkbox [data-part='input'], .kui-checkbox [data-part='boxInput'], .kui-multi-select [data-part='checkbox']):checked,
-    :is(.kui-checkbox [data-part='input'], .kui-checkbox [data-part='boxInput'], .kui-multi-select [data-part='checkbox']):indeterminate {
+    :where(.kui-checkbox [data-part='input'], .kui-checkbox [data-part='boxInput'], .kui-multi-select [data-part='checkbox']):checked,
+    :where(.kui-checkbox [data-part='input'], .kui-checkbox [data-part='boxInput'], .kui-multi-select [data-part='checkbox']):indeterminate {
       background: Highlight;
     }
   }
