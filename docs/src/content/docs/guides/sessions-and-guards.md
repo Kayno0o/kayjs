@@ -121,6 +121,20 @@ Development and tests derive one for the checkout, so a fresh clone runs with no
 
 `session()` reads it from the environment when it is called. Keep the secret in `KAY_SECRET`, or give `session({ secret })` yourself.
 
+### Signing your own links
+
+To sign a link or a value of your own, such as a picture link you send in a push or a mail, use `signed` from `kay/server`. It needs no key of your own, as it uses the app's secret.
+
+```ts
+import { signed } from 'kay/server'
+
+const url = `https://example.com/shot/${id}?sig=${signed.sign('shot', id, { maxAge: '7d' })}`
+
+signed.verify('shot', id, sig)
+```
+
+`maxAge` is how long the signature stays valid, an hour when left out. `verify` answers `true` or `false`, and never throws. The first argument names what you sign, so a signature for one use never passes for another. Rotating the secret keeps older signatures valid.
+
 ### Changing the secret
 
 Separate several secrets with commas in `KAY_SECRET`, or give `secret` a list, to rotate it. The first secret seals new cookies, and every one in the list opens old cookies.
