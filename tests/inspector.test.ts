@@ -4,6 +4,7 @@ import { Elysia } from 'elysia'
 import { compileKay } from '../src/compiler'
 import { startInspector } from '../src/runtime/dev-inspector'
 import { startDevTool } from '../src/runtime/dev-tool'
+import { eventually, turn } from './helpers/eventually'
 import { pages } from './shared-pages'
 
 const SOURCE = `---
@@ -92,18 +93,15 @@ describe('the inspector', () => {
 
       answer = false
       span.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, altKey: true }))
-      await Bun.sleep(0)
-      expect(host().textContent).toContain('src/routes/index.kay:4:3: no editor found, set KAY_EDITOR')
+      await eventually(() => expect(host().textContent).toContain('src/routes/index.kay:4:3: no editor found, set KAY_EDITOR'))
 
       answer = 'failed'
       span.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, altKey: true }))
-      await Bun.sleep(0)
-      expect(host().textContent).toContain('src/routes/index.kay:4:3: the editor failed to open it, see the kay dev terminal')
+      await eventually(() => expect(host().textContent).toContain('src/routes/index.kay:4:3: the editor failed to open it, see the kay dev terminal'))
 
       answer = 404
       span.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, altKey: true }))
-      await Bun.sleep(0)
-      expect(host().textContent).toContain('src/routes/index.kay:4:3: not a source file of this project')
+      await eventually(() => expect(host().textContent).toContain('src/routes/index.kay:4:3: not a source file of this project'))
     }
     finally {
       answer = true
@@ -165,26 +163,28 @@ describe('the inspector', () => {
       document.body.innerHTML = '<slot data-component="src/islands/counter.kay" data-props="{&quot;n&quot;:&quot;é&quot;}"><button>1</button></slot><slot data-component="src/islands/late.kay"></slot>'
       document.documentElement.removeAttribute('aria-busy')
       values.set(document.querySelector('slot')!, [1, { open: true }])
-      await Bun.sleep(0)
-      expect(badge()?.hidden).toBe(false)
-      expect(badge()?.textContent).toBe('2 islands')
+      await eventually(() => {
+        expect(badge()?.hidden).toBe(false)
+        expect(badge()?.textContent).toBe('2 islands')
+      })
 
       badge()!.click()
-      await Bun.sleep(0)
+
+      const panelText = 'src/islands/counter.kayprops 10 Bhydrated in 1.2 ms#11number#2{"open":true}objectsrc/islands/late.kaynot hydrated'
+
+      await eventually(() => expect(host().querySelector('#kay-dev-islands')?.textContent).toBe(panelText))
 
       const panel = host().querySelector('#kay-dev-islands')!
-
-      expect(panel.textContent).toBe('src/islands/counter.kayprops 10 Bhydrated in 1.2 ms#11number#2{"open":true}objectsrc/islands/late.kaynot hydrated')
 
       // Unchanged, the rows stay, and a click or a selection in them with them.
       const row = panel.firstChild
 
+      // Nothing may change over more than one refresh, so the wait is a fixed span longer than REFRESH_MS.
       await Bun.sleep(600)
       expect(panel.firstChild).toBe(row)
 
       values.set(document.querySelector('slot')!, [2, { open: false }])
-      await Bun.sleep(600)
-      expect(panel.textContent).toContain('#12number#2{"open":false}')
+      await eventually(() => expect(panel.textContent).toContain('#12number#2{"open":false}'))
 
       opened.length = 0
       panel.querySelector('button')!.click()
@@ -192,8 +192,9 @@ describe('the inspector', () => {
 
       // Closed, the values stop being read.
       badge()!.click()
-      await Bun.sleep(0)
+      await turn()
       values.set(document.querySelector('slot')!, [3, { open: false }])
+      // Nothing may change over more than one refresh, so the wait is a fixed span longer than REFRESH_MS.
       await Bun.sleep(600)
       expect(panel.textContent).toContain('#12number#2')
     }

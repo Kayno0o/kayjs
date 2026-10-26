@@ -4,6 +4,7 @@ import { join } from 'node:path'
 import process from 'node:process'
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
 import { alive } from './alive'
+import { eventually } from './helpers/eventually'
 import { spawnSuiteServer } from './listening'
 import { scratchDir } from './scratch'
 
@@ -141,8 +142,7 @@ p Late
         }
       }
 
-      for (let waited = 0; await served() === '' && waited < 60_000; waited += 100)
-        await Bun.sleep(100)
+      await eventually(async () => expect(await served()).not.toBe(''), 60_000)
 
       const server = Number(await served())
 
@@ -151,8 +151,7 @@ p Late
       expect(processesIn(own).length).toBeGreaterThan(1)
       process.kill(stopped.pid, 'SIGTERM')
 
-      for (let waited = 0; processesIn(own).length > 0 && waited < 10_000; waited += 100)
-        await Bun.sleep(100)
+      await eventually(() => expect(processesIn(own)).toEqual([]), 10_000)
 
       expect(processesIn(own)).toEqual([])
       expect(alive(server)).toBe(false)
@@ -181,14 +180,12 @@ export const slow: B[N4] = null as never
       void stopped.request('tools/call', { name: 'check', arguments: {} })
 
       // The checker itself, not a short `--showConfig` run that can end between two reads.
-      for (let waited = 0; processesIn(own, '--listFiles').length === 0 && waited < 60_000; waited += 20)
-        await Bun.sleep(20)
+      await eventually(() => expect(processesIn(own, '--listFiles').length).toBeGreaterThan(0), 60_000)
 
       expect(processesIn(own, '--listFiles').length).toBeGreaterThan(0)
       process.kill(stopped.pid, 'SIGTERM')
 
-      for (let waited = 0; processesIn(own).length > 0 && waited < 5000; waited += 20)
-        await Bun.sleep(20)
+      await eventually(() => expect(processesIn(own)).toEqual([]), 5000)
 
       expect(processesIn(own)).toEqual([])
     }
