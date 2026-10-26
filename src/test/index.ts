@@ -52,6 +52,7 @@ import { NativeFetch, NativeFormData, NativeHeaders, NativeRequest, NativeURL, N
 import { readPage, settledHtml, sitemapUrls } from './page'
 import { testRoot } from './root'
 import { closeAfterTests, openSites } from './sites'
+import { assertKayWritable } from './writable'
 
 export type { A11yViolation, BrowserOptions, ClickOptions, DialogHandler, FetchedResponse, FulfillOptions, PageDialog, PageRequest, PageResponse, PointerOptions, RouteHandler, RouteMatch, TestPage, WaitForOptions, WaitOptions } from './browser'
 export { browse, browserPath } from './browser'
@@ -329,6 +330,10 @@ export async function testSite(options: TestOptions = {}): Promise<TestSite> {
   const config = { ...loaded, site: loaded.site ?? ORIGIN, storage: options.storage ?? memoryFiles(), store: options.store === undefined && loaded.store !== undefined ? { ...loaded.store.sessions && { sessions: memoryStore() }, jobs: memoryJobs(), rates: memoryRates(), rooms: memoryRooms(), vitals: memoryVitals(), notifications: memoryNotifications() } : loaded.store }
   const project = resolveProject(root, config, { dev: config.dev === true, prebuilt: false, underKayDev: false, devRoutes: config.dev === true })
   const inBrowser = options.browser !== undefined && options.browser !== false
+
+  if (inBrowser || options.islands !== false)
+    assertKayWritable(root)
+
   const wanted = inBrowser || options.islands !== false ? await islandsChecked(root, inBrowser ? clientOptionsOf(config, PRODUCTION) : checkOnly(clientOptionsOf(config, PRODUCTION)), inBrowser) : undefined
   // Without a browser the pages render their islands' markup and load no script, so the build was only a check.
   const client: ClientBuild = inBrowser && wanted ? wanted : { entryImports: [], islands: {}, styles: new Map(), pages: new Map(), dir: clientDir(root) }

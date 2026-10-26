@@ -90,7 +90,7 @@ describe('s.Secret and a required-in-production string with no default', () => {
   })
 
   it('differs between project paths', async () => {
-    const run = async (cwd: string) => (await Bun.$`${process.execPath} -e ${`import { s } from ${JSON.stringify(join(import.meta.dir, '../src/runtime/schema'))}; import { defineEnv } from ${JSON.stringify(join(import.meta.dir, '../src/server'))}; console.log(defineEnv(s.Object({ A: s.Secret() }), { NODE_ENV: 'test' }).A)`}`.cwd(cwd).quiet().text()).trim()
+    const run = async (cwd: string) => (await Bun.$`${process.execPath} -e ${`import { s } from ${JSON.stringify(join(import.meta.dir, '../src/runtime/schema'))}; import { defineEnv } from ${JSON.stringify(join(import.meta.dir, '../src/server'))}; console.log(defineEnv(s.Object({ A: s.Secret() }), { NODE_ENV: 'development' }).A)`}`.cwd(cwd).env({ ...process.env, NODE_ENV: 'development' }).quiet().text()).trim()
     const a = await project({ 'a.txt': '' })
     const b = await project({ 'a.txt': '' })
 
@@ -99,7 +99,7 @@ describe('s.Secret and a required-in-production string with no default', () => {
   })
 
   it('mixes in a random seed kept in the checkout\'s .kay, so the same path elsewhere gives another value', async () => {
-    const run = async (cwd: string) => (await Bun.$`${process.execPath} -e ${`import { s } from ${JSON.stringify(join(import.meta.dir, '../src/runtime/schema'))}; import { defineEnv } from ${JSON.stringify(join(import.meta.dir, '../src/server'))}; console.log(defineEnv(s.Object({ A: s.Secret() }), { NODE_ENV: 'test' }).A)`}`.cwd(cwd).quiet().text()).trim()
+    const run = async (cwd: string) => (await Bun.$`${process.execPath} -e ${`import { s } from ${JSON.stringify(join(import.meta.dir, '../src/runtime/schema'))}; import { defineEnv } from ${JSON.stringify(join(import.meta.dir, '../src/server'))}; console.log(defineEnv(s.Object({ A: s.Secret() }), { NODE_ENV: 'development' }).A)`}`.cwd(cwd).env({ ...process.env, NODE_ENV: 'development' }).quiet().text()).trim()
     const root = await project({ 'a.txt': '' })
     const first = await run(root)
 
@@ -118,7 +118,7 @@ describe('s.Secret and a required-in-production string with no default', () => {
   })
 
   it('writes the seed again when its file is empty or cut short, and fails clearly when .kay cannot be written', async () => {
-    const run = async (cwd: string) => Bun.$`${process.execPath} -e ${`import { s } from ${JSON.stringify(join(import.meta.dir, '../src/runtime/schema'))}; import { defineEnv } from ${JSON.stringify(join(import.meta.dir, '../src/server'))}; try { console.log(defineEnv(s.Object({ A: s.Secret() }), { NODE_ENV: 'test' }).A) } catch (error) { console.log(error.message) }`}`.cwd(cwd).quiet().text()
+    const run = async (cwd: string) => Bun.$`${process.execPath} -e ${`import { s } from ${JSON.stringify(join(import.meta.dir, '../src/runtime/schema'))}; import { defineEnv } from ${JSON.stringify(join(import.meta.dir, '../src/server'))}; try { console.log(defineEnv(s.Object({ A: s.Secret() }), { NODE_ENV: 'development' }).A) } catch (error) { console.log(error.message) }`}`.cwd(cwd).env({ ...process.env, NODE_ENV: 'development' }).quiet().text()
     const root = await project({ '.kay/dev-secret': 'short' })
     const first = (await run(root)).trim()
 
@@ -129,6 +129,27 @@ describe('s.Secret and a required-in-production string with no default', () => {
     const blocked = await project({ '.kay': 'a file, not a folder' })
 
     expect(await run(blocked)).toContain('the development secret cannot be kept in')
+    expect(await run(blocked)).toContain('set A')
+  })
+
+  it('keeps a seed in memory under test, writing nothing to .kay and agreeing with a seed file that exists', async () => {
+    const run = async (cwd: string, mode: string) => (await Bun.$`${process.execPath} -e ${`import { s } from ${JSON.stringify(join(import.meta.dir, '../src/runtime/schema'))}; import { defineEnv } from ${JSON.stringify(join(import.meta.dir, '../src/server'))}; const env = s.Object({ A: s.Secret() }); console.log(defineEnv(env, { NODE_ENV: '${mode}' }).A + ' ' + defineEnv(env, { NODE_ENV: '${mode}' }).A)`}`.cwd(cwd).env({ ...process.env, NODE_ENV: mode }).quiet().text()).trim().split(' ')
+    const blocked = await project({ '.kay': 'a file, not a folder' })
+    const [first, again] = await run(blocked, 'test')
+
+    expect(first).toMatch(/^[0-9a-f]{64}$/)
+    expect(again).toBe(first)
+    expect(await Bun.file(join(blocked, '.kay')).text()).toBe('a file, not a folder')
+
+    const kept = await project({ 'a.txt': '' })
+    const [fromDevelopment] = await run(kept, 'development')
+
+    expect((await run(kept, 'test'))[0]).toBe(fromDevelopment)
+
+    const fresh = await project({ 'a.txt': '' })
+
+    await run(fresh, 'test')
+    expect(await Bun.file(join(fresh, '.kay/dev-secret')).exists()).toBe(false)
   })
 
   it('keeps 32 characters whatever minLength is given', () => {
