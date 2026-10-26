@@ -32,9 +32,9 @@ function folded(old: string, to: string): [string, UiToken] {
   return [`${COLOR}${old}`, { kind: 'color', to: `--color-${to}`, utility: to }]
 }
 
-// A border width the one `--border-width` replaced.
+// A border width the one `--border-width` replaced. It is a hand fix: the app's `--border-width` may differ from what the old knob held (a field kept 1px while the frames had none), so no name stands for it.
 function border(old: string): [string, UiToken] {
-  return [`--kui-border-${old}`, { kind: 'var', to: '--border-width', help: 'one `--border-width` draws every frame now, set once in your `@theme`; one component\'s frame is a `border-*` utility on its part in src/ui.ts' }]
+  return [`--kui-border-${old}`, { kind: 'var', help: 'one `--border-width` draws every frame now, so no name stands for this one; to keep a width apart from the others, set `--border-width` on the element, or `[border-width:1px]` on the part in src/ui.ts' }]
 }
 
 function renamed(old: string, to: string, kind: UiToken['kind'] = 'var', utility?: string): [string, UiToken] {

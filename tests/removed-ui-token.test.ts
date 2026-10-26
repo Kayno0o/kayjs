@@ -81,7 +81,7 @@ describe('removed-ui-token', () => {
       expect(found.every(problem => problem.code === 'removed-ui-token' && problem.severity === 'warning' && problem.fixes === undefined)).toBe(true)
       expect(found.find(problem => problem.message.startsWith('`--kui-badge-case`'))?.help).toContain('\'@kaynooo/kayjs-ui/badge.kay\': { parts: { root: \'normal-case\' } }')
       expect(found.find(problem => problem.message.startsWith('`--kui-shell-line`'))?.help).toContain('`--_shell-line`')
-      expect(found.find(problem => problem.message.startsWith('`--kui-border-badge`'))?.message).toContain('`--border-width`')
+      expect(found.find(problem => problem.message.startsWith('`--kui-border-badge`'))?.help).toContain('`--border-width`')
     }
     finally {
       await rm(root, { recursive: true, force: true })
@@ -175,6 +175,20 @@ describe('removed-ui-token', () => {
       expect(found.find(problem => problem.message.startsWith('`bg-kui-surface0`'))?.message).toContain('`bg-surface`')
       expect(found.find(problem => problem.message.startsWith('`bg-kui-surface`'))?.help).toContain('1.75.0')
       expect(await after('src/routes/index.kay')).toBe('div(class="border border-kui-border bg-kui-surface bg-surface") hi\n')
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
+  it('reports the field and notice border knobs for a hand fix, as the app\'s --border-width may differ', async () => {
+    const css = ':root { --border-width: 0px; --kui-border-input: 1px; }\n.a { border-width: var(--kui-border-input); border-color: var(--kui-border-notice); }\n'
+    const { root, found, after } = await fixed({ 'src/app.css': css })
+
+    try {
+      expect(await after('src/app.css')).toBe(css)
+      expect(found).toHaveLength(3)
+      expect(found.every(problem => problem.fixes === undefined && !problem.message.includes('is `--border-width`') && problem.help?.includes('[border-width:1px]'))).toBe(true)
     }
     finally {
       await rm(root, { recursive: true, force: true })
