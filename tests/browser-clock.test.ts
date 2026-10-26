@@ -63,6 +63,29 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('advancing 
     expect(await page.evaluate(() => (window as unknown as { order: string[] }).order)).toEqual(['a', 'b'])
   })
 
+  it('runs an interval a long task made late once, and its next tick an interval on, as Chromium does', async () => {
+    await using page = await site.open('/')
+
+    const ticks = await page.evaluate(async () => {
+      const at: number[] = []
+      const id = setInterval(() => at.push(performance.now()), 100)
+      const end = performance.now() + 450
+
+      while (performance.now() < end) {
+        // The page's main thread is busy past four ticks.
+      }
+
+      await new Promise(resolve => setTimeout(resolve, 80))
+      clearInterval(id)
+
+      return at
+    })
+
+    expect(ticks.length).toBeGreaterThanOrEqual(2)
+    // Caught up at once, the second tick would follow the first within a millisecond.
+    expect(ticks[1]! - ticks[0]!).toBeGreaterThan(40)
+  })
+
   it('pauses every() in a hidden tab and catches up as it shows', async () => {
     await using page = await site.open('/')
 

@@ -33,7 +33,10 @@ export function installClock(): void {
       timers.delete(id)
     }
     else {
-      timer.due = Math.max(timer.due + timer.every, now())
+      // As Chromium does, an interval a long task made late runs once, and its next tick keeps the cadence rather than following at once to catch up.
+      const at = now()
+
+      timer.due = at + timer.every - (Math.max(0, at - timer.due) % timer.every)
       arm(id, timer)
     }
 
