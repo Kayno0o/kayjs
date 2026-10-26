@@ -3,6 +3,7 @@ import type { Mounted } from 'kay/test'
 import { afterEach, describe, expect, test } from 'bun:test'
 import { mountComponent, settle } from 'kay/test'
 import FilteredTable from '../tests/fixture/src/components/filtered-table.kay'
+import ListedTable from '../tests/fixture/src/components/listed-table.kay'
 import SelectableFeed from '../tests/fixture/src/components/selectable-feed.kay'
 import SelectableTable from '../tests/fixture/src/components/selectable-table.kay'
 import TableComponent from '../tests/fixture/src/components/table.kay'
@@ -78,6 +79,43 @@ describe('Table', () => {
 
     expect(mounted.root.querySelector('[data-part="emptyCell"]')?.getAttribute('colspan')).toBe('3')
     expect(mounted.root.querySelector('[data-part="emptyCell"] .nothing')?.textContent).toBe('No planets')
+  })
+})
+
+describe('Table over an infinite list', () => {
+  const cells = (root: HTMLElement) => [...root.querySelectorAll('tbody tr')].map(row => row.querySelector('[data-part="cellBody"]')?.textContent)
+
+  test('sorts on the server: a header click reloads the list from offset 0 with the sort and keeps the rows until they land', async () => {
+    const asked: { offset: number, sort: SortState | undefined }[] = []
+    let answer: ((rows: { id: number, name: string, moons: number }[]) => void) | undefined
+    const onLoad = async (at: { offset: number, sort: SortState | undefined }) => new Promise<{ id: number, name: string, moons: number }[]>((resolve) => {
+      asked.push(at)
+      answer = resolve
+    })
+    const sorts: SortState[] = []
+
+    mounted = await mountComponent(ListedTable, { onLoad, onSort: (sort: SortState) => sorts.push(sort) })
+
+    const { root } = mounted
+
+    click(header(root, 1).querySelector('button'))
+    await settle()
+
+    expect(asked).toEqual([{ offset: 0, sort: { key: 'moons', direction: 'desc' } }])
+    expect(sorts).toEqual([{ key: 'moons', direction: 'desc' }])
+    expect(cells(root)).toEqual(['Io', 'Europa'])
+    expect(header(root, 1).getAttribute('aria-sort')).toBe('descending')
+
+    answer!([{ id: 2, name: 'Europa', moons: 1 }, { id: 1, name: 'Io', moons: 0 }])
+    await settle()
+
+    expect(cells(root)).toEqual(['Europa', 'Io'])
+  })
+
+  test('draws LoadMore after the rows', async () => {
+    mounted = await mountComponent(ListedTable, { onLoad: async () => [] })
+
+    expect(mounted.root.querySelector('.kui-load-more')).not.toBeNull()
   })
 })
 

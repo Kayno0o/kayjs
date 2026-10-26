@@ -1,10 +1,12 @@
 --- <Row, Key extends RowKey<Row>>
 import type { JSX, Snippet } from 'kay'
+import type { InfiniteList } from './infinite-list'
 import type { Column, RowFilter, RowKey, RowKeyValue, SortState } from './table'
 import { effect, memo, onCleanup, onMount, persisted, recipe, signal } from 'kay'
 import Button from './button.kay'
 import Checkbox from './checkbox.kay'
 import Icon from './icon.kay'
+import LoadMore from './load-more.kay'
 import { cellText, drawnByBlock, exportHref, nextSort, resolvedColumn, restoredSort, rowKeyOf, rowLabel, rowsMatching, sortedRows, toCsv } from './table'
 import { virtualRows } from './virtual'
 import { wording } from 'kay/words'
@@ -43,9 +45,12 @@ const look = recipe({
   },
 })
 
-const { columns: given, rows, rowKey, sort, sortable = true, serverSort = false, onSort, cell, empty, filter, filterLabel = wording('ui.table.filter', 'Filter'), filterPlaceholder, filterParam, sortParam, countLabel, noMatch, narrow = 'stack', selectable = false, selected, onSelect, bulk, selectAllLabel = wording('ui.table.selectAll', 'Select all'), selectedLabel, selectRowLabel, exportable = false, exportLabel = wording('ui.table.export', 'Export CSV'), exportName = 'table.csv', virtual = false, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'onSelect'> & {
+const { columns: given, rows: passed, list, rowKey, sort, sortable = true, serverSort = false, onSort, cell, empty, filter, filterLabel = wording('ui.table.filter', 'Filter'), filterPlaceholder, filterParam, sortParam, countLabel, noMatch, narrow = 'stack', selectable = false, selected, onSelect, bulk, selectAllLabel = wording('ui.table.selectAll', 'Select all'), selectedLabel, selectRowLabel, exportable = false, exportLabel = wording('ui.table.export', 'Export CSV'), exportName = 'table.csv', virtual = false, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'onSelect'> & {
   columns: Column<Row>[]
-  rows: Row[]
+  // The rows to draw. Left out when `list` holds them.
+  rows?: Row[] | undefined
+  // Rows loaded page by page, from `infiniteList`: the table draws its rows with `LoadMore` after them, and a header click sorts on the server, the list starting over from offset 0 with the sort passed to its `load` (and to `onSort` too). The columns to sort by carry a `sortValue`, which only marks them sortable here.
+  list?: InfiniteList<Row> | undefined
   rowKey: Key
   // The sort to start from; a table whose parent passes a new one follows it.
   sort?: SortState | undefined
@@ -98,6 +103,7 @@ const { columns: given, rows, rowKey, sort, sortable = true, serverSort = false,
   virtual?: boolean | undefined
 }>()
 
+const rows = () => list ? list.rows() : passed ?? []
 const columns = memo(() => given.map(column => resolvedColumn(column, sortable)))
 const keptKey = sortParam === undefined ? undefined : persisted(sortParam, '', { storage: 'query' })
 const keptDirection = sortParam === undefined ? undefined : persisted(sortParam === 'sort' ? 'direction' : `${sortParam}Direction`, '', { storage: 'query' })
@@ -117,14 +123,14 @@ effect(() => {
 })
 
 // The rows the filter keeps, all of them without one.
-const kept = memo(() => filter === undefined ? rows : rowsMatching(rows, filter, typed()))
+const kept = memo(() => filter === undefined ? rows() : rowsMatching(rows(), filter, typed()))
 const counted = countLabel ?? ((count: number) => wording('ui.table.rowCount', count === 1 ? '1 row' : '{count} rows', { count }))
 const none: RowKeyValue<Row, Key>[] = []
 const picked = signal(selected ?? none)
 
 effect(() => picked.set(selected ?? none))
 
-const keyed = memo(() => rows.map(row => rowKeyOf(row, rowKey)))
+const keyed = memo(() => rows().map(row => rowKeyOf(row, rowKey)))
 const chosen = memo(() => {
   const set = new Set(picked())
 
@@ -152,7 +158,7 @@ function commit(keys: RowKeyValue<Row, Key>[]) {
 
   const wanted = new Set(keys)
 
-  onSelect(keys, rows.filter(row => wanted.has(rowKeyOf(row, rowKey))))
+  onSelect(keys, rows().filter(row => wanted.has(rowKeyOf(row, rowKey))))
 }
 
 function pick(key: RowKeyValue<Row, Key>, on: boolean) {
@@ -166,7 +172,7 @@ function pickAll(on: boolean) {
   commit(on ? keyed().filter(key => chosenSet().has(key) || shownKeys.has(key)) : chosen().filter(key => !shownKeys.has(key)))
 }
 
-const shown = memo(() => serverSort ? kept() : sortedRows(kept(), columns(), current()))
+const shown = memo(() => serverSort || list ? kept() : sortedRows(kept(), columns(), current()))
 const sorting = (column: Column<Row>) => column.sortValue !== undefined && current()?.key === column.key
 
 const endpoint = memo(() => {
@@ -202,6 +208,7 @@ function toggle(column: Column<Row>) {
   current.set(next)
   keptKey?.set(next.key)
   keptDirection?.set(next.direction)
+  list?.sortBy(next)
   onSort?.(next)
 }
 
@@ -266,7 +273,7 @@ div({...rest} ref={element => box = element} data-narrow={narrow} data-virtual={
                 else
                   | {cellText(row, column)}
       else
-        if rows.length > 0 && noMatch
+        if rows().length > 0 && noMatch
           tr
             td(part="emptyCell" colspan={given.length + (selectable ? 1 : 0)})
               | {noMatch}
@@ -277,3 +284,5 @@ div({...rest} ref={element => box = element} data-narrow={narrow} data-virtual={
       if windowed && windowed.after() > 0
         tr(part="spacer" aria-hidden="true" style={`height: ${windowed.after()}px`})
           td(colspan={given.length + (selectable ? 1 : 0)} style="padding: 0; border: 0")
+  if list
+    LoadMore(list={list})

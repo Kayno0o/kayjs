@@ -1,4 +1,4 @@
-import type { InfinitePage } from '../src/infinite-list'
+import type { InfinitePage, PageAt } from '../src/infinite-list'
 import { describe, expect, test } from 'bun:test'
 import { infiniteList } from '../src/infinite-list'
 
@@ -10,8 +10,8 @@ const bans = (from: number, count: number): Ban[] => Array.from({ length: count 
 
 // A source answering from a queue, remembering where each call asked.
 function source(...answers: (Ban[] | undefined | Error)[]) {
-  const asked: { offset: number, last: Ban | undefined }[] = []
-  const load = async (at: { offset: number, last: Ban | undefined }): Promise<InfinitePage<Ban>> => {
+  const asked: PageAt<Ban>[] = []
+  const load = async (at: PageAt<Ban>): Promise<InfinitePage<Ban>> => {
     asked.push(at)
 
     const answer = answers.shift()
@@ -58,13 +58,13 @@ describe('infiniteList', () => {
 
     await list.more()
 
-    expect(asked).toEqual([{ offset: 3, last: { id: 3 } }])
+    expect(asked).toEqual([{ offset: 3, last: { id: 3 }, sort: undefined }])
     expect(list.rows().map(row => row.id)).toEqual([1, 2, 3, 4, 5, 6])
     expect(list.ended()).toBe(false)
 
     await list.more()
 
-    expect(asked.at(-1)).toEqual({ offset: 6, last: { id: 6 } })
+    expect(asked.at(-1)).toEqual({ offset: 6, last: { id: 6 }, sort: undefined })
     expect(list.rows()).toHaveLength(7)
     expect(list.ended()).toBe(true)
   })
@@ -161,5 +161,55 @@ describe('infiniteList', () => {
     expect(calls).toBe(1)
     expect(list.pending()).toBe(false)
     expect(list.rows()).toHaveLength(6)
+  })
+
+  test('sortBy starts over from offset 0 with the sort, the old rows staying until its first page lands', async () => {
+    const { asked, load } = source(bans(10, 3), bans(13, 1))
+    const list = infiniteList(bans(1, 3), { pageSize: 3, key: ban => ban.id, load })
+
+    await list.more()
+    expect(list.rows()).toHaveLength(6)
+
+    const sorting = list.sortBy({ key: 'id', direction: 'desc' })
+
+    expect(list.rows()).toHaveLength(6)
+    expect(list.pending()).toBe(true)
+    await sorting
+    expect(asked.at(-1)).toEqual({ offset: 0, last: undefined, sort: { key: 'id', direction: 'desc' } })
+    expect(list.rows().map(ban => ban.id)).toEqual([13])
+    expect(list.ended()).toBe(true)
+  })
+
+  test('sortBy revives an ended or failed list, and the first load gets the sort the list began with', async () => {
+    const { asked, load } = source(undefined, bans(1, 3))
+    const first = { key: 'id', direction: 'asc' as const }
+    const list = infiniteList(bans(1, 2), { pageSize: 3, sort: first, load })
+
+    expect(list.ended()).toBe(true)
+    await list.sortBy(undefined)
+    expect(list.failed()).toBe(true)
+    await list.sortBy(first)
+    expect(list.failed()).toBe(false)
+    expect(list.ended()).toBe(false)
+    expect(asked.map(at => at.sort)).toEqual([undefined, first])
+  })
+
+  test('a page asked for before sortBy is dropped when it lands', async () => {
+    const waiting: ((page: Ban[]) => void)[] = []
+    const load = async (): Promise<InfinitePage<Ban>> => new Promise((resolve) => {
+      waiting.push(resolve)
+    })
+    const list = infiniteList(bans(1, 3), { pageSize: 3, load })
+    const stale = list.more()
+    const fresh = list.sortBy({ key: 'id', direction: 'desc' })
+
+    waiting[0]!(bans(100, 3))
+    await stale
+    expect(list.rows().map(ban => ban.id)).toEqual([1, 2, 3])
+
+    waiting[1]!(bans(50, 2))
+    await fresh
+    expect(list.rows().map(ban => ban.id)).toEqual([50, 51])
+    expect(list.pending()).toBe(false)
   })
 })
