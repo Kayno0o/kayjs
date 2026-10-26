@@ -223,9 +223,11 @@ describe('the outbox helpers', () => {
     const waiting = outbox.waitFor('Ada@Example.com')
 
     await mail.send({ to: 'bob@example.com', subject: 'Not this one', text: 'Hi' })
-    setTimeout(() => void mail.send({ to: 'ada@example.com', subject: 'This one', text: 'Hi' }), 20)
+    // The wait is pending while the mail it waits for goes out.
+    const sending = mail.send({ to: 'ada@example.com', subject: 'This one', text: 'Hi' })
 
     expect((await waiting).subject).toBe('This one')
+    await sending
     expect((await outbox.waitFor('bob@example.com')).subject).toBe('Not this one')
     await expect(outbox.waitFor('carol@example.com', { timeout: '50ms' })).rejects.toThrow('no mail to carol@example.com reached the outbox within 50 ms')
   })
@@ -313,6 +315,7 @@ describe('the queue', () => {
     expect(await queued.drain()).toBe(1)
     expect(sent).toEqual([])
 
+    // The retry is due once the queue's 10 ms backoff has passed.
     await Bun.sleep(30)
     expect(await queued.drain()).toBe(1)
     expect(sent.map(each => each.subject)).toEqual(['Queued'])

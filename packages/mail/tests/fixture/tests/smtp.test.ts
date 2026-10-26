@@ -5,6 +5,7 @@ import { afterAll, describe, expect, it } from 'bun:test'
 import { Elysia } from 'elysia'
 import { memoryJobs } from 'kay/server'
 import { bodyText, startSmtp } from '../../helpers/smtp'
+import { untilHolds } from '../../until'
 import Welcome from '../src/mails/welcome.kay'
 import { logged } from './logged'
 
@@ -60,7 +61,7 @@ describe('smtp', () => {
   it('names a relay without STARTTLS in the boot log, with the setting that allows it, and says nothing of one that is allowed', async () => {
     const saved = { ...process.env }
     // The boot check ran once its connection to the stub closed.
-    const boot = async (insecure: string) => logged(async () => {
+    const boot = async (insecure: string) => logged(async (lines) => {
       const closed = server.connections.closed
 
       Object.assign(process.env, { NODE_ENV: 'production', MAIL_URL: `smtp://127.0.0.1:${server.port}`, MAIL_INSECURE: insecure, MAIL_FROM: 'site@env.test' })
@@ -69,11 +70,14 @@ describe('smtp', () => {
 
       app.listen(0)
 
-      for (const start = Date.now(); server.connections.closed === closed && Date.now() - start < 10_000;)
-        await Bun.sleep(20)
+      await untilHolds(() => server.connections.closed !== closed)
 
-      // The warning follows the connection's close by a tick.
-      await Bun.sleep(200)
+      // The warning follows the connection's close by a tick; an allowed relay logs nothing, so that case waits a moment to show it.
+      if (insecure === 'false')
+        await untilHolds(() => lines.length > 0)
+      else
+        await Bun.sleep(200)
+
       await app.stop()
     })
 
@@ -109,7 +113,8 @@ describe('smtp', () => {
       expect(own.received).toHaveLength(3)
       expect(own.connections).toEqual({ opened: 1, closed: 0 })
 
-      await Bun.sleep(1200)
+      // The connection closes once it has been idle for the transport's idle time.
+      await untilHolds(() => own.connections.closed === 1)
       expect(own.connections).toEqual({ opened: 1, closed: 1 })
     }
     finally {

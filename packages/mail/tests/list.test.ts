@@ -203,6 +203,7 @@ describe('the subscribe form', () => {
     const old = tokenOf(await confirmationOf(email), '/confirm')
 
     await mail.list().unsubscribe(email)
+    // Asks are stamped in milliseconds, so the second one needs a later millisecond than the link made from the first.
     await Bun.sleep(5)
     await site.call(subscribe, { email })
     await site.runJobs()
@@ -675,6 +676,7 @@ describe('the sweep of the lists', () => {
 
     lists.stopSweeping()
     store.ask('timed', 'third@example.com', 'third', 'en', old)
+    // Deliberate: past two sweep periods of 30 ms, a stopped sweep has not swept.
     await Bun.sleep(80)
     expect(store.confirm('timed', 'third')).toBe(true)
     store.close()
@@ -751,7 +753,7 @@ describe('the subscribe form\'s queue insert', () => {
       expect(rendered).toEqual([known, fresher])
       // Not even the insert has started when the answer is back.
       expect(queued).toEqual([])
-      await Bun.sleep(10)
+      await until(() => queued.length === 1)
       expect(queued).toEqual([fresher])
     }
     finally {

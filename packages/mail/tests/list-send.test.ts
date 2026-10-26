@@ -9,6 +9,7 @@ import { openLists } from '../src/list-store'
 import { mailer } from '../src/mailer'
 import { isOwnMessageId } from '../src/message-id'
 import { outbox } from '../src/outbox'
+import { untilHolds } from './until'
 
 await testSite({ root: 'tests/fixture' })
 
@@ -255,12 +256,14 @@ describe('the list queue', () => {
     app.listen(0)
 
     try {
+      // The queue has looked at its store, and the list queue, which no list asked for yet, has had time to start if it would.
+      await untilHolds(() => (looks.get('watched') ?? 0) > 0)
       await sleep(150)
       expect(looks.get('watched')).toBeGreaterThan(0)
       expect(looks.get('watched-list')).toBeUndefined()
 
       app.list('news', { file })
-      await sleep(150)
+      await untilHolds(() => (looks.get('watched-list') ?? 0) > 0)
       expect(looks.get('watched-list')).toBeGreaterThan(0)
     }
     finally {
@@ -276,7 +279,7 @@ describe('the list queue', () => {
     app.listen(0)
 
     try {
-      await sleep(150)
+      await untilHolds(() => (looks.get('early-list') ?? 0) > 0)
       expect(looks.get('early-list')).toBeGreaterThan(0)
     }
     finally {

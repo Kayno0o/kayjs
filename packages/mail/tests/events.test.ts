@@ -8,6 +8,8 @@ import { scratchDir, testSite } from 'kay/test'
 import { createLists } from '../src/list'
 import { openLists } from '../src/list-store'
 import { outbox } from '../src/outbox'
+import { logged } from './fixture/tests/logged'
+import { untilHolds } from './until'
 
 const site = await testSite({ root: 'tests/fixture' })
 const { mail, replies } = await import(`${import.meta.dir}/fixture/src/mail`) as typeof import('./fixture/src/mail')
@@ -341,8 +343,12 @@ describe('suppressed recipients', () => {
 
     await mail.suppress(email, 'complaint')
     outbox.clear()
-    await site.call(subscribe, { email })
-    await Bun.sleep(50)
+
+    // The confirmation is queued off the response path, and a skipped one says so.
+    await logged(async (lines) => {
+      await site.call(subscribe, { email })
+      await untilHolds(() => lines.some(([, line]) => line.includes('confirmation mail was skipped')))
+    })
     await mail.drain()
     expect(outbox.to(email)).toHaveLength(0)
   })

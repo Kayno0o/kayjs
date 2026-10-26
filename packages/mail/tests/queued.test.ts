@@ -7,6 +7,7 @@ import { openLists } from '../src/list-store'
 import { mailer } from '../src/mailer'
 import { smtp } from '../src/smtp'
 import { startSmtp } from './helpers/smtp'
+import { untilHolds } from './until'
 
 await testSite({ root: 'tests/fixture' })
 
@@ -123,6 +124,7 @@ describe('mailers sharing a queue', () => {
 
     second = undefined
     Bun.gc(true)
+    // Lets the collector's finalizers run, which is when a gone mailer would be forgotten.
     await Bun.sleep(10)
 
     expect(() => mailer({ from: 'c@example.com', queue: { ...queue, keepFailed: '30d' } })).toThrow(/keepFailed/)
@@ -196,8 +198,7 @@ describe('a queued delivery the queue aborts', () => {
       })()
 
       // The message is with the server once the end of its data is read.
-      for (let look = 0; look < 40 && server.received.length === 0; look++)
-        await Bun.sleep(50)
+      await untilHolds(() => server.received.length > 0, 2000)
 
       expect(server.received).toHaveLength(1)
       controller.abort()
@@ -228,8 +229,7 @@ describe('a queued delivery the queue aborts', () => {
       // The abort dropped the pool, so its connection closes as the server answers, well before the one second a pool left idle waits.
       server.release()
 
-      for (const start = performance.now(); performance.now() - start < 500 && server.connections.closed === 0;)
-        await Bun.sleep(25)
+      await untilHolds(() => server.connections.closed > 0, 500)
 
       expect(server.connections.closed).toBe(1)
     }

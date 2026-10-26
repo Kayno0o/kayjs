@@ -2,8 +2,8 @@ type Level = 'info' | 'warn' | 'error'
 
 const SINK = Symbol.for('kay.log')
 
-// The lines kayjs-mail logs through kay's log sink while `run` runs, as `[level, 'kayjs-mail: message: what was thrown']`.
-export async function logged(run: () => Promise<unknown>): Promise<[Level, string][]> {
+// The lines kayjs-mail logs through kay's log sink while `run` runs, as `[level, 'kayjs-mail: message: what was thrown']`; `run` is handed the same array, to wait on a line.
+export async function logged(run: (lines: [Level, string][]) => Promise<unknown>): Promise<[Level, string][]> {
   const lines: [Level, string][] = []
   const global = globalThis as { [SINK]?: unknown }
   const sink = global[SINK]
@@ -14,7 +14,7 @@ export async function logged(run: () => Promise<unknown>): Promise<[Level, strin
   }
 
   try {
-    await run()
+    await run(lines)
   }
   finally {
     global[SINK] = sink

@@ -347,6 +347,7 @@ describe.skipIf(url === '')('a list on Postgres', () => {
             settled = true
           }
         })()
+        // Deliberate: the claim must stay blocked on the row lock for as long as the erase holds it.
         await Bun.sleep(150)
         expect(settled).toBe(false)
         await tx.unsafe('DELETE FROM kay_mail_subscribers WHERE id = $1', [subscriber.id])
