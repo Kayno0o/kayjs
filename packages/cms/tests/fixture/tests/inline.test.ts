@@ -55,8 +55,8 @@ test('a click on the title types in place, the form follows, and Enter ends the 
 
   expect(await page.text(TITLE)).toBe('Hello inline')
   expect(await page.value(FORM_TITLE)).toBe('Hello inline')
-  // The focus stays on the title and a polite live region says the text was kept.
-  expect(await page.evaluate(selector => document.activeElement === document.querySelector(selector), TITLE)).toBe(true)
+  // The focus stays on the title and a polite live region says the text was kept. The save may render the draft once more after the status clears, so the focus is waited for rather than read once.
+  await page.waitUntil((selector: string) => document.activeElement === document.querySelector(selector), undefined, TITLE)
   await page.waitUntil(() => (document.querySelector('[data-kui-announce]')?.textContent ?? '').endsWith('updated'))
 }, 60_000)
 
