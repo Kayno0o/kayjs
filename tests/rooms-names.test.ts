@@ -190,8 +190,8 @@ pgDescribe('a room named by a visitor in Postgres', () => {
     for (let room = 0; room < 1500; room++)
       store.members(`made-up-${room}`)
 
-    await until(() => lengths.length > 0)
-    await Bun.sleep(50)
+    // Five polls of the 10 ms interval, enough to see the cap held across them.
+    await until(() => lengths.length >= 5)
     expect(Math.max(...lengths)).toBeLessThanOrEqual(1000)
     expect(lengths.at(-1)).toBeGreaterThanOrEqual(900)
     await store.close()
@@ -203,6 +203,7 @@ pgDescribe('a room named by a visitor in Postgres', () => {
       for (let message = 0; message < 1500; message++)
         store.publish('hall', 'hi', {})
 
+      // The queue logs as the writes overflow it, so no more line is expected: the wait lets a second one show.
       await Bun.sleep(20)
     })
 
