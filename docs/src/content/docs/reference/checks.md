@@ -95,6 +95,7 @@ Each lint has a level. `deny` is an error, `warn` a warning, `allow` hides it. W
 | `draft-entry` | warn | i18n | An entry marked `# draft`, which no one has checked yet |
 | `hidden-tool` | warn | code | With `mcp`, an API route that sets `hide` and `tool` |
 | `trusted-folder` | warn | code | A folder collection with `trusted`, which only a loader's collection reads |
+| `old-bun-image` | deny | code | A Dockerfile building from a Bun older than the one kay needs |
 | `untyped-socket` | warn | code | A `.ws()` route with a `body` and no `response`, so an island's `socket()` gets `unknown` messages |
 | `unsized-image` | warn | performance | An `img` with no `width` and `height`, unless its classes or `style` reserve the box, as `aspect-video w-full` |
 | `large-public-image` | warn | performance | An `img`, a CSS `url()` or `image-set()` string, a social card `meta`, `seo.image`, or a Markdown image, HTML `img` or frontmatter `image:` using a public image over 256 KiB, as a path or an address under `site` |

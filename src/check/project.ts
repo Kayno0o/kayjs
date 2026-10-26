@@ -20,6 +20,7 @@ import { EXTENSIONS_MARKER, FEEDS_MARKER, PROBLEMS_MARKER, ROUTES_MARKER, USES_M
 import { projectPaths } from '../project'
 import { bootProblems } from './boot'
 import { configLocator, readConfigSource } from './config-keys'
+import { dockerfileProblems } from './dockerfile'
 import { CONTENT_CHECK, contentPropsCheck } from './generated'
 import { browserModules } from './island-modules'
 import { FILES_MARKER, stampOf } from './loaded'
@@ -85,7 +86,7 @@ export function configProblems(root: string, options: CheckOptions, types: Shado
   const source = readConfigSource(root)
   const seo = [...configSeoLints(options, join(root, CONFIG_FILE), [...types.files.values()].map(file => file.source), options.exported === true, source), ...redirectChainLints(options, { configFile: join(root, CONFIG_FILE), configSource: source, exported: options.exported })]
 
-  return [...types.problems, ...lintConfigProblems(root, options.lints), ...seo.filter(diagnostic => options.launch === true || !isLaunchLint(diagnostic.code))]
+  return [...types.problems, ...lintConfigProblems(root, options.lints), ...dockerfileProblems(root, options.lints), ...seo.filter(diagnostic => options.launch === true || !isLaunchLint(diagnostic.code))]
 }
 
 // The collections, the messages, what the server refuses when it boots and the lints of the project's scripts, reported after the type errors.

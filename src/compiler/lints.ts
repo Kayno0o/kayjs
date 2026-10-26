@@ -422,6 +422,14 @@ export const LINTS = {
     wrong: 'export const posts = collection(\'src/content/posts\', { schema, trusted: true })',
     right: 'export const posts = collection(\'src/content/posts\', { schema })',
   },
+  'old-bun-image': {
+    level: 'deny',
+    group: 'code',
+    site: true,
+    summary: 'A root Dockerfile whose `FROM oven/bun:<version>` is older than the Bun kay needs (`engines.bun`), so the image fails to build once kay moves up, as `kay upgrade` does. `--fix` moves the tag to the oldest Bun kay runs on, dropping a digest pin that would keep the old image; a tag that is no full version, as `1` or `latest`, is left alone.',
+    wrong: 'FROM oven/bun:1.0.0 AS build',
+    right: 'FROM oven/bun:1.4.4 AS build',
+  },
   'untyped-socket': {
     level: 'warn',
     group: 'code',

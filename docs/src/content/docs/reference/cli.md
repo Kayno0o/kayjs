@@ -487,7 +487,7 @@ kay upgrade --dry-run
 
 It then runs the kay it installed. Each minor you skipped may have replaced a form with a new one, and each is a lint in the `deprecated` group with a fix. The oldest minor's fixes run first.
 
-A last `kay check --fix` applies any other quick fix and prints what is left for you to change by hand. An app already on the latest version is left alone. If the install fails, `package.json` goes back as it was.
+A last `kay check --fix` applies any other quick fix, such as moving a Dockerfile's `FROM oven/bun:<version>` up to the Bun the new kay needs, and prints what is left for you to change by hand. An app already on the latest version is left alone. If the install fails, `package.json` goes back as it was.
 
 `--dry-run` lists the packages it would move and changes nothing: no write, no install, no rewrite. `--quiet` leaves out the step lines, keeping the packages it would move and how it ended. The old forms it would then fix are known only to the new version, so they are not listed.
 

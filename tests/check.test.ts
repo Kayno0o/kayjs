@@ -3782,6 +3782,20 @@ describe.concurrent('kay check, unused code', () => {
     }
   })
 
+  it('reports a Dockerfile building from a Bun older than kay needs, and `--fix` moves it up', async () => {
+    const root = await scratchProject({ 'src/a.kay': 'p a\n', 'Dockerfile': 'FROM oven/bun:1.0.0 AS build\n' })
+
+    try {
+      expect((await check(root)).map(d => [basename(d.file), d.line, d.code, d.severity])).toEqual([['Dockerfile', 1, 'old-bun-image', 'error']])
+      expect(await applySafeFixes(root, await check(root))).toBe(1)
+      expect(await Bun.file(join(root, 'Dockerfile')).text()).toMatch(/^FROM oven\/bun:\d+\.\d+\.\d+ AS build\n$/)
+      expect(await check(root)).toEqual([])
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
   it('reports what a public site leaves out of kay.config.ts, and nothing on a site that is not public; what it lacks to go public only when asked, as kay build does, and a missing site only for a static export, as a server reads SITE_URL when it boots', async () => {
     const root = await scratchProject({ 'src/routes/index.kay': 'p a\n' })
     const seoLints = async (options: CheckOptions) => (await check(root, options)).map(d => [basename(d.file), d.code, d.severity])
