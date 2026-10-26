@@ -240,6 +240,7 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('page swap i
       fresh.responses.length = 0
       await act(fresh)
       await settled(fresh)
+      // Past the prefetch's hover delay, so a link the rules do not prefetch would have been fetched by now.
       await Bun.sleep(500)
 
       return { fetched: fresh.responses.filter(({ url }) => new URL(url).pathname === '/second').map(({ method }) => method), loaded: await chunkLoaded(fresh, 'prefetch') }

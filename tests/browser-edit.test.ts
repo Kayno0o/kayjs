@@ -2,6 +2,7 @@ import process from 'node:process'
 import { describe, expect, it } from 'bun:test'
 import { previewUrl } from '../src/server'
 import { browserPath, testSite } from '../src/test'
+import { untilHolds } from './helpers/until-holds'
 
 const path = browserPath()
 
@@ -53,10 +54,16 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('edit mode 
       await typed('x', 'Typxed', 4)
 
       // Leaving the page while a draft renders keeps the page gone to.
+      const drafted = () => editor.responses.filter(({ url }) => new URL(url).pathname === '/_kay/draft').length
+      const before = drafted()
+
       await editor.click('button.slow')
       await editor.click('a.away')
       await editor.waitFor('h1', { text: 'Next year' })
-      await Bun.sleep(800)
+      // The held draft answers after the page was left, and the frames after its answer have handled it.
+      await untilHolds(() => drafted() > before)
+      expect(drafted()).toBeGreaterThan(before)
+      await editor.evaluate(async () => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))))
 
       expect(await editor.text('h1')).toBe('Next year')
       expect(await editor.path()).toBe('/marks/roadmap')

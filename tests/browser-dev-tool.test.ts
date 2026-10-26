@@ -166,7 +166,8 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the dev to
       // A hover long enough prefetches the page, well before the click that swaps to it.
       await view.evaluate(() => document.querySelector('a[href="/next"]')!.dispatchEvent(new PointerEvent('pointerover', { bubbles: true })))
       await view.waitUntil(() => performance.getEntriesByType('resource').some(entry => entry.name.endsWith('/next')))
-      await view.evaluate(async () => new Promise(resolve => setTimeout(resolve, 100)))
+      // The frames after the response have stored it for the click.
+      await view.evaluate(async () => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))))
       await view.click('a[href="/next"]')
       await view.waitUntil(() => document.querySelector('kay-dev')!.shadowRoot!.querySelector('#kay-dev-network h3')?.textContent.startsWith('This page, /next') === true)
       await view.waitUntil(() => [...document.querySelector('kay-dev')!.shadowRoot!.querySelectorAll('#kay-dev-network .group')[0]?.querySelectorAll('.fetch .name') ?? []].some(name => name.textContent === '/next'))

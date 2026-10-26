@@ -231,6 +231,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the docs p
         // The page's main thread is busy while the frame is not.
       }
     })
+    // The frame's watchdog is not meant to fire for a frame that answers, so the window it would take is all there is to wait out.
     await Bun.sleep(2500)
     expect(await page.count('.playground-error')).toBe(0)
     await page.fill('.playground-input textarea', '---\n---\np Still here\n')

@@ -50,6 +50,7 @@ describe.skipIf(chrome === undefined && (process.env.CI ?? '') === '')('the Bell
     visitor.name = undefined
     await using page = await main.open('/')
 
+    // Nothing is meant to be drawn or requested, so a short window is all there is to wait out.
     await Bun.sleep(200)
     expect(await page.count('.kui-bell')).toBe(0)
     expect(await page.evaluate(() => performance.getEntriesByType('resource').filter(entry => entry.name.includes('/_kay/ui/inbox')).length)).toBe(0)
@@ -97,6 +98,7 @@ describe.skipIf(chrome === undefined && (process.env.CI ?? '') === '')('the Bell
     await using page = await main.open('/')
 
     await page.waitFor('.kui-bell button')
+    // Grace's notification is not meant to show up, so a short window is all there is to wait out.
     await Bun.sleep(300)
     expect(await page.evaluate(() => document.body.textContent?.includes('For Grace only'))).toBe(false)
     expect(await page.evaluate(() => document.querySelector('.kui-bell button')?.getAttribute('aria-label'))).toBe('Notifications')
@@ -127,6 +129,7 @@ describe.skipIf(chrome === undefined && (process.env.CI ?? '') === '')('the Bell
     const short = await notify('ada', { title: 'Short lived', keep: '2s' })
 
     await page.waitUntil(() => document.querySelector('.kui-bell button')?.getAttribute('aria-label') === 'Notifications, 1 unread')
+    // The server reads the clock for the time to live, so it is waited out.
     await Bun.sleep(Math.max(0, short.at + 2000 - Date.now()) + 200)
     invalidate(() => true)
     await page.waitUntil(() => document.querySelector('.kui-bell button')?.getAttribute('aria-label') === 'Notifications')

@@ -44,6 +44,11 @@ async function show(page: TestPage): Promise<void> {
   })
 }
 
+// Resolves once the page has painted its largest content, which the vitals beacon reads from the same buffered entries.
+async function painted(page: TestPage): Promise<void> {
+  await page.evaluate(async () => new Promise<void>(resolve => new PerformanceObserver(() => setTimeout(resolve)).observe({ type: 'largest-contentful-paint', buffered: true })))
+}
+
 async function reported(done: (routes: Awaited<ReturnType<typeof vitalsReport>>) => boolean): Promise<Awaited<ReturnType<typeof vitalsReport>>> {
   const until = Date.now() + 5000
   let routes = await vitalsReport()
@@ -75,6 +80,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('web vitals
     const page = await site.open('/')
 
     await page.waitFor('h1', { text: 'Home' })
+    // Nothing is meant to be sent at load, so a short window is all there is to wait out.
     await Bun.sleep(1000)
     expect(await vitalsReport()).toEqual([])
 
@@ -88,6 +94,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('web vitals
 
     await show(page)
     await hide(page)
+    // A second report is not meant to follow the second hide, so a short window is all there is to wait out.
     await Bun.sleep(300)
     expect((await vitalsReport())[0]!.cls!.views).toBe(1)
     expect(page.errors).toEqual([])
@@ -100,7 +107,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('web vitals
 
     await page.waitFor('h1', { text: 'Home' })
     // A loaded host can paint after the click, and LCP stops at input, so the click waits for the beacon to have read one.
-    await page.evaluate(async () => new Promise<void>(resolve => new PerformanceObserver(() => setTimeout(resolve)).observe({ type: 'largest-contentful-paint', buffered: true })))
+    await painted(page)
     await page.click('a.second')
     await page.waitFor('h1', { text: 'Second' })
 
@@ -130,7 +137,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('web vitals
     const page = await site.open('/')
 
     await page.waitFor('h1', { text: 'Home' })
-    await Bun.sleep(1000)
+    await painted(page)
     await hide(page)
     await reported(found => found.length > 0)
     await show(page)
@@ -210,7 +217,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('web vitals
     const page = await site.open('/')
 
     await page.waitFor('h1', { text: 'Home' })
-    await Bun.sleep(500)
+    await painted(page)
 
     const shifts = await page.evaluate(async () => {
       const seen: { at: number, value: number, input: boolean }[] = []
@@ -229,8 +236,10 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('web vitals
       }).observe({ type: 'layout-shift', buffered: true })
 
       await shift()
+      // A second apart is the gap that starts a window of its own.
       await new Promise(resolve => setTimeout(resolve, 1300))
       await shift()
+      // Less than a second after the last shift, this one joins its window.
       await new Promise(resolve => setTimeout(resolve, 100))
       await shift()
       await frames()
@@ -280,6 +289,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('web vitals
 
     await page.waitFor('h1', { text: 'Home' })
     await hide(page)
+    // Nothing is meant to be sent without the yes, so a short window is all there is to wait out.
     await Bun.sleep(400)
     expect(await vitalsReport()).toEqual([])
 
@@ -301,6 +311,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('web vitals
       document.cookie = 'kay_analytics=no; path=/'
     })
     await hide(page)
+    // Nothing is meant to be sent after an opt-out, so a short window is all there is to wait out.
     await Bun.sleep(400)
     expect(await vitalsReport()).toEqual([])
     page.close()

@@ -5,6 +5,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it } from 'bun:test'
 import { Elysia } from 'elysia'
 import { nameUser } from '../src/server/request-user'
 import { browse, browserPath } from '../src/test'
+import { untilHolds } from './helpers/until-holds'
 import { scratchBuild } from './prerendered'
 import { pages } from './shared-pages'
 
@@ -144,7 +145,7 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('a value of 
 
     await alice.waitUntil(...shows(3))
     await bob.waitUntil(...shows(5))
-    await Bun.sleep(500)
+    await untilHolds(() => cut.size === 2)
 
     const loads = islandLoads().length
 
@@ -165,7 +166,7 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('a value of 
     const tab = await open('alice')
 
     await tab.waitUntil(...shows(3))
-    await Bun.sleep(500)
+    await untilHolds(() => cut.size > 0)
     live.unread.set('alice', 4)
     await tab.waitUntil(...shows(4))
     live.unread.set('bob', 3)
@@ -179,15 +180,20 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('a value of 
     const tab = await open('alice')
 
     await tab.waitUntil(...shows(3))
-    await Bun.sleep(500)
+    await untilHolds(() => cut.size > 0)
 
     const loads = islandLoads().length
+    const fetches = async () => tab.evaluate(() => performance.getEntriesByType('resource').filter(entry => entry.name.includes('kay_island=')).length)
+    const fetched = await fetches()
 
     slowIsland = 3000
     await tab.evaluate(() => dispatchEvent(new Event('kay-renew')))
-    await Bun.sleep(1000)
+    await untilHolds(() => islandLoads().length > loads)
+    // The island is being fetched, the server holding its answer.
     await tab.evaluate(() => dispatchEvent(new Event('kay-renew')))
-    await Bun.sleep(6000)
+    await tab.waitUntil((count: number) => performance.getEntriesByType('resource').filter(entry => entry.name.includes('kay_island=')).length > count, { timeout: '15s' }, fetched)
+    // A second fetch, had the renewal queued one, would be asked as the first answered, so a short window is all there is to wait out.
+    await Bun.sleep(1000)
     expect(islandLoads()).toHaveLength(loads + 1)
     expect(tab.errors).toEqual([])
   }, 30_000)
@@ -196,11 +202,12 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('a value of 
     const tab = await open('alice')
 
     await tab.waitUntil(...shows(3))
-    await Bun.sleep(500)
+    await untilHolds(() => cut.size > 0)
     session = 'bob'
     drop()
     await tab.waitUntil(...shows(5))
     live.unread.set('alice', 9)
+    // The old user's value is not meant to reach the tab, so a short window is all there is to wait out.
     await Bun.sleep(500)
     expect(await unread(tab)).toBe('5 unread')
     live.unread.set('bob', 7)
@@ -212,14 +219,16 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('a value of 
     const tab = await open('alice')
 
     await tab.waitUntil(...shows(3))
-    await Bun.sleep(500)
+    await untilHolds(() => cut.size > 0)
 
     const loads = islandLoads().length
 
     session = null
     drop()
-    await Bun.sleep(4000)
+    await untilHolds(() => islandLoads().length > loads, 8000)
+    await tab.waitUntil(...shows(0))
     live.unread.set('alice', 9)
+    // Nothing is meant to reach the tab of nobody, so a short window is all there is to wait out.
     await Bun.sleep(1000)
     expect(await unread(tab)).toBe('0 unread')
     // The island was fetched again for nobody, and the connection it left was not opened again.
@@ -227,6 +236,7 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('a value of 
 
     const posts = asked.filter(url => url === 'POST /_kay/live').length
 
+    // No connection is meant to be opened again, so a short window is all there is to wait out.
     await Bun.sleep(2000)
     expect(asked.filter(url => url === 'POST /_kay/live')).toHaveLength(posts)
     expect(tab.errors).toEqual([])

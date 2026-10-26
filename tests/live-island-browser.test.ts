@@ -7,6 +7,7 @@ import { CACHE_LIVE_ID } from '../src/runtime/cache-live-id'
 import { liveSlot } from '../src/runtime/live-value'
 import { browse, browserPath } from '../src/test'
 import { db } from './fixtures/live-island/src/data'
+import { untilHolds } from './helpers/until-holds'
 import { scratchBuild } from './prerendered'
 import { pages } from './shared-pages'
 
@@ -33,6 +34,9 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('a deferred 
       // Holds the fetch of an island before it reaches the server, until released.
       let held: Promise<void> | undefined
       const cut = new Set<() => void>()
+      // How many live connections the server let through, and how many chunks of them reached the tabs.
+      let accepted = 0
+      let delivered = 0
 
       const path = (to: string) => `${root}${to}${site.trailingSlash === 'always' && to !== '/' ? '/' : ''}`
       const tabs: TestPage[] = []
@@ -95,6 +99,8 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('a deferred 
             if (!inner.endsWith('/_kay/live') || reply.body === null)
               return reply
 
+            accepted++
+
             const reader = reply.body.getReader()
             let stop = (): void => undefined
 
@@ -114,10 +120,13 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('a deferred 
                 try {
                   const { done, value } = await reader.read()
 
-                  if (done)
+                  if (done) {
                     controller.close()
-                  else
+                  }
+                  else {
                     controller.enqueue(value)
+                    delivered++
+                  }
                 }
                 catch {}
               },
@@ -195,6 +204,7 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('a deferred 
         asked.length = 0
         change(21)
         change(22)
+        // Nothing is meant to be fetched while the tab is hidden, so a short window is all there is to wait out.
         await Bun.sleep(1200)
         expect(await stock(page)).toBe('20 left')
         expect(islandLoads()).toEqual([])
@@ -215,8 +225,7 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('a deferred 
         await page.waitUntil(() => location.pathname.includes('quiet'))
         await page.waitUntil((selector: string) => document.querySelector(selector) !== null, { timeout: '20s' }, FETCHED)
 
-        for (let waited = 0; liveSlot(CACHE_LIVE_ID)!.listeners.get('stock') !== undefined && waited < 3000; waited += 25)
-          await Bun.sleep(25)
+        await untilHolds(() => liveSlot(CACHE_LIVE_ID)!.listeners.get('stock') === undefined, 3000)
 
         expect(liveSlot(CACHE_LIVE_ID)!.listeners.get('stock')).toBeUndefined()
         await page.click('a.home')
@@ -244,7 +253,10 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('a deferred 
         const page = await open()
 
         await page.waitUntil(...shows(60))
-        await Bun.sleep(500)
+        await untilHolds(() => cut.size > 0)
+
+        const before = accepted
+
         failing = true
         refuseOnce = true
         asked.length = 0
@@ -252,12 +264,12 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('a deferred 
         for (const stop of cut)
           stop()
 
-        for (let waited = 0; islandLoads().length === 0 && waited < 8000; waited += 25)
-          await Bun.sleep(25)
+        await untilHolds(() => islandLoads().length > 0, 8000)
 
         failing = false
         expect(islandLoads().length).toBeGreaterThan(0)
-        await Bun.sleep(1500)
+        // The tab follows again once its connection is let through after the failed fetch.
+        await untilHolds(() => accepted > before)
         change(61)
         await page.waitUntil(...shows(61))
       })
@@ -267,7 +279,7 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('a deferred 
         const page = await open()
 
         await page.waitUntil(...shows(70))
-        await Bun.sleep(500)
+        await untilHolds(() => cut.size > 0)
 
         let release = (): void => undefined
 
@@ -277,15 +289,17 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('a deferred 
         asked.length = 0
         change(71)
 
-        for (let waited = 0; islandLoads().length === 0 && waited < 4000; waited += 25)
-          await Bun.sleep(25)
+        await untilHolds(() => islandLoads().length > 0, 4000)
+
+        const heard = delivered
 
         // The change arrives while the island is fetched, and the server renders it afterwards: the render it sends already holds it.
         change(72)
-        await Bun.sleep(300)
+        await untilHolds(() => delivered > heard)
         held = undefined
         release()
         await page.waitUntil(...shows(72))
+        // No second fetch is meant to follow, so a short window is all there is to wait out.
         await Bun.sleep(1500)
         expect(islandLoads()).toHaveLength(1)
         expect(page.errors).toEqual([])
@@ -301,11 +315,13 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('a deferred 
         await page.waitUntil(...shows(50))
         failing = true
         asked.length = 0
+
+        const fetches = async () => page.evaluate(() => performance.getEntriesByType('resource').filter(entry => entry.name.includes('kay_island=')).length)
+        const fetched = await fetches()
+
         change(51)
         await page.waitUntil(() => true)
-
-        for (let waited = 0; islandLoads().length === 0 && waited < 4000; waited += 25)
-          await Bun.sleep(25)
+        await untilHolds(() => islandLoads().length > 0, 4000)
 
         failing = false
         expect(islandLoads()).toHaveLength(1)
@@ -313,11 +329,11 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('a deferred 
         await page.waitFor('slot[data-kay-server] button.clicks', { text: 'Clicked 1' })
 
         // The failure is answered after the delay: the island is checked once it is, and has kept what the click gave it.
-        for (let waited = 0; failed.length === 0 && waited < 8000; waited += 25)
-          await Bun.sleep(25)
-
+        await untilHolds(() => failed.length > 0, 8000)
         expect(failed).toHaveLength(1)
-        await Bun.sleep(300)
+        // The failed answer is in the page's resource timings once it arrived, and the frames after it have handled it.
+        await page.waitUntil((count: number) => performance.getEntriesByType('resource').filter(entry => entry.name.includes('kay_island=')).length > count, { timeout: '8s' }, fetched)
+        await page.evaluate(async () => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))))
         expect(await stock(page)).toBe('50 left')
         expect(await page.text('slot[data-kay-server] button.clicks')).toBe('Clicked 1')
         change(52)

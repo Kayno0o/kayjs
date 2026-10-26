@@ -109,14 +109,25 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('a field an
     try {
       const page = await site.open('/slow')
 
+      const { promise: sent, resolve: send } = Promise.withResolvers<void>()
+      const { promise: typed, resolve: answer } = Promise.withResolvers<void>()
+
+      // The answer to `el` is held once the server gave it until `ys` is typed, which is the key landing while the navigate is in flight, its own navigate still to come.
+      await page.route(url => url.pathname === '/slow' && url.searchParams.get('q') === 'el', async (request) => {
+        const held = await request.fetch()
+
+        send()
+        await typed
+        await request.fulfill({ ...held, body: held.text() })
+      })
       await page.click('.field')
       await page.type('el')
-      // The debounce sends `el` after 400ms and the server answers 600ms later: `ys` lands between the two, and its own navigate is still to come.
-      await Bun.sleep(800)
+      await sent
 
       expect(await page.text('p.searched')).toBe('')
 
       await page.type('ys')
+      answer()
       await page.waitUntil(() => document.querySelector('p.searched')!.textContent === 'el')
 
       expect(await page.evaluate(() => {
