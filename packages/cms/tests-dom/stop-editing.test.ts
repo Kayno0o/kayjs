@@ -47,10 +47,17 @@ async function typed(): Promise<ParentNode> {
   title.value = 'Mine'
   title.dispatchEvent(new Event('input', { bubbles: true }))
   await settle()
-  // The edit is kept in the browser after the render's pause, or as the page is left, which this does at once.
-  window.dispatchEvent(new Event('pagehide'))
+  // The edit is kept in the browser after the render's pause.
+  await until(() => keptTitle() === 'Mine')
 
   return mounted.root
+}
+
+// The title the browser keeps in the entry's draft, once the editor's debounced write has run.
+function keptTitle() {
+  const key = Object.keys(localStorage).find(name => name.startsWith('kcms:draft:'))
+
+  return key === undefined ? undefined : (JSON.parse(localStorage.getItem(key)!) as { entry: { data: { title?: string } } }).entry.data.title
 }
 
 // How many drafts the browser keeps, apart from the editor's dock.
@@ -241,7 +248,7 @@ test('asks before a leave only for the entries the page shows, not for edits lef
     title.value = value
     title.dispatchEvent(new Event('input', { bubbles: true }))
     await settle()
-    window.dispatchEvent(new Event('pagehide'))
+    await until(() => keptTitle() === value)
   }
   const unload = () => {
     const event = new Event('beforeunload', { cancelable: true })

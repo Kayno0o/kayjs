@@ -6,6 +6,9 @@ import { EDITOR_COOKIE } from '../src/page-link'
 import { until } from '../tests/until'
 import { entryLoaded } from './loaded'
 
+// Past the editor's 150 ms write pause, for the checks that expect nothing to be written.
+const DRAFT_PAUSE = 220
+
 let mounted: Mounted | undefined
 
 // happy-dom has no caret lookup, which the editor's click handler asks.
@@ -78,13 +81,20 @@ async function open(pages: Page[], entry: { collection: string, slug: string, lo
   await settle()
   await entryLoaded(mounted.root)
 
-  // The draft as the browser keeps it, written when the page is left rather than a pause after the last keystroke.
-  const draft = async (path: string) => {
-    window.dispatchEvent(new Event('pagehide'))
+  // The draft as the editor's debounced write keeps it: with `written`, waits until the field holds it, else for the pause to lapse with nothing to see.
+  const draft = async (path: string, written?: unknown) => {
+    const read = () => {
+      const kept = JSON.parse(localStorage.getItem(`kcms:draft:tester:${entry.collection}:${entry.slug}${entry.locale === undefined ? '' : `@${entry.locale}`}`) ?? 'null') as { entry: { data: unknown } } | null
 
-    const kept = JSON.parse(localStorage.getItem(`kcms:draft:tester:${entry.collection}:${entry.slug}${entry.locale === undefined ? '' : `@${entry.locale}`}`) ?? 'null') as { entry: { data: unknown } } | null
+      return path.split('.').reduce<unknown>((value, key) => (value as Record<string, unknown> | undefined)?.[key], kept?.entry.data)
+    }
 
-    return path.split('.').reduce<unknown>((value, key) => (value as Record<string, unknown> | undefined)?.[key], kept?.entry.data)
+    if (written === undefined)
+      await Bun.sleep(DRAFT_PAUSE)
+    else
+      await until(() => read() === written)
+
+    return read()
   }
   const root = mounted.root
   const type = async (element: HTMLElement, text: string) => {
@@ -117,7 +127,7 @@ test('a click on a text unlocks it for typing and the draft follows each keystro
 
   await type(title!, 'Welcome home')
 
-  expect(await draft('title')).toBe('Welcome home')
+  expect(await draft('title', 'Welcome home')).toBe('Welcome home')
   expect(root.querySelector<HTMLInputElement>('[data-kcms-path="title"] input')!.value).toBe('Welcome home')
 })
 
@@ -148,9 +158,9 @@ test('a text inside a block, and an item of a list of texts, are typed in place'
   await click(tag!)
   await type(tag!, 'deux')
 
-  expect(await draft('sections.0.heading')).toBe('Hi')
-  expect(await draft('tags.1')).toBe('deux')
-  expect(await draft('tags.0')).toBe('one')
+  expect(await draft('sections.0.heading', 'Hi')).toBe('Hi')
+  expect(await draft('tags.1', 'deux')).toBe('deux')
+  expect(await draft('tags.0', 'one')).toBe('one')
   // Taking the second text ends the first one's edit.
   expect(heading!.hasAttribute('contenteditable')).toBe(false)
 })
@@ -162,7 +172,7 @@ test('a localized entry keeps the edit to its own locale', async () => {
   await click(title!)
   await type(title!, 'Bienvenue')
 
-  expect(await draft('title')).toBe('Bienvenue')
+  expect(await draft('title', 'Bienvenue')).toBe('Bienvenue')
 })
 
 test('emptying an optional text unsets it, a required one stays empty', async () => {
@@ -176,7 +186,7 @@ test('emptying an optional text unsets it, a required one stays empty', async ()
   await type(title!, '')
 
   expect(await draft('subtitle')).toBeUndefined()
-  expect(await draft('title')).toBe('')
+  expect(await draft('title', '')).toBe('')
 })
 
 test('a field the form hides until its sibling is filled is still typed in on the page', async () => {
@@ -184,7 +194,7 @@ test('a field the form hides until its sibling is filled is still typed in on th
 
   await click(tagline!)
   await type(tagline!, 'Typed')
-  expect(await draft('tagline')).toBe('Typed')
+  expect(await draft('tagline', 'Typed')).toBe('Typed')
 })
 
 test('HTML typed or pasted stays text, and line breaks do not stay', async () => {
@@ -193,12 +203,12 @@ test('HTML typed or pasted stays text, and line breaks do not stay', async () =>
   await click(title!)
   await type(title!, '<img src=x onerror="alert(1)"> & <b>bold</b>')
 
-  expect(await draft('title')).toBe('<img src=x onerror="alert(1)"> & <b>bold</b>')
+  expect(await draft('title', '<img src=x onerror="alert(1)"> & <b>bold</b>')).toBe('<img src=x onerror="alert(1)"> & <b>bold</b>')
   expect(title!.children).toHaveLength(0)
 
   await type(title!, 'one\ntwo three')
 
-  expect(await draft('title')).toBe('one two three')
+  expect(await draft('title', 'one two three')).toBe('one two three')
 })
 
 test('Enter and Escape leave the text instead of breaking the line', async () => {
@@ -265,7 +275,7 @@ test('a text the page shows transformed by CSS is stored as typed, not as shown'
   title!.dispatchEvent(new Event('input', { bubbles: true }))
   await settle()
 
-  expect(await draft('title')).toBe('Welcome home')
+  expect(await draft('title', 'Welcome home')).toBe('Welcome home')
 })
 
 test('a line break the browser makes of a pasted line is a space in a one-line text', async () => {
@@ -276,5 +286,5 @@ test('a line break the browser makes of a pasted line is a space in a one-line t
   title!.dispatchEvent(new Event('input', { bubbles: true }))
   await settle()
 
-  expect(await draft('title')).toBe('one two three four')
+  expect(await draft('title', 'one two three four')).toBe('one two three four')
 })

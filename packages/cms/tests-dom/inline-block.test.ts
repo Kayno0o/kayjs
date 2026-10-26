@@ -6,6 +6,9 @@ import { EDITOR_COOKIE } from '../src/page-link'
 import { until } from '../tests/until'
 import { entryLoaded } from './loaded'
 
+// Past the editor's 150 ms write pause, for the checks that expect nothing to be written.
+const DRAFT_PAUSE = 220
+
 let mounted: Mounted | undefined
 
 Object.assign(document, { caretPositionFromPoint: () => null, elementsFromPoint: () => [] })
@@ -58,11 +61,16 @@ async function open(fields = '', data: Record<string, unknown> = DATA) {
     element.dispatchEvent(new Event('input', { bubbles: true }))
     await settle()
   }
-  // The draft as the browser keeps it, written when the page is left rather than a pause after the last keystroke.
-  const draft = async () => {
-    window.dispatchEvent(new Event('pagehide'))
+  // The draft as the editor's debounced write keeps it: with `written`, waits until it holds what the assertion reads, else for the pause to lapse with nothing to see.
+  const draft = async (written?: (entry: { body: string, data: Record<string, unknown> } | undefined) => boolean) => {
+    const read = () => (JSON.parse(localStorage.getItem('kcms:draft:tester:pages:home') ?? 'null') as { entry: { body: string, data: Record<string, unknown> } } | null)?.entry
 
-    return (JSON.parse(localStorage.getItem('kcms:draft:tester:pages:home') ?? 'null') as { entry: { body: string, data: Record<string, unknown> } } | null)?.entry
+    if (written === undefined)
+      await Bun.sleep(DRAFT_PAUSE)
+    else
+      await until(() => written(read()))
+
+    return read()
   }
   const blocks = [...page.querySelectorAll<HTMLElement>('[data-kay-body] > *')]
 
@@ -88,11 +96,11 @@ test('a paragraph of the body is typed as its Markdown source, and only its line
   expect(second!.getAttribute('aria-label')).toBe('Body')
 
   await type(second!, 'Second [one](https://x.test) here, and more.')
-  expect((await draft())?.body).toBe(BODY.replace('here.', 'here, and more.'))
+  expect((await draft(entry => entry?.body === BODY.replace('here.', 'here, and more.')))?.body).toBe(BODY.replace('here.', 'here, and more.'))
 
   // The block is kept in the draft as far as it goes: a longer one moves the end, not the lines after it.
   await type(second!, 'Second.')
-  expect((await draft())?.body).toBe(BODY.replace('Second [one](https://x.test) here.', 'Second.'))
+  expect((await draft(entry => entry?.body === BODY.replace('Second [one](https://x.test) here.', 'Second.')))?.body).toBe(BODY.replace('Second [one](https://x.test) here.', 'Second.'))
 })
 
 test('a heading and a list item are typed with their marker', async () => {
@@ -115,7 +123,7 @@ test('the second of two identical paragraphs edits its own lines', async () => {
   expect(second.textContent).toBe('Same.')
   await click(second)
   await type(second, 'Other.')
-  expect((await draft())?.body).toBe(BODY.replace('Same.\n\nSame.', 'Same.\n\nOther.'))
+  expect((await draft(entry => entry?.body === BODY.replace('Same.\n\nSame.', 'Same.\n\nOther.')))?.body).toBe(BODY.replace('Same.\n\nSame.', 'Same.\n\nOther.'))
 })
 
 test('Enter in a block is a line break, Ctrl+Enter keeps the text and Escape puts the page back', async () => {
@@ -130,7 +138,7 @@ test('Enter in a block is a line break, Ctrl+Enter keeps the text and Escape put
   expect(first!.getAttribute('contenteditable')).toBe('plaintext-only')
 
   await type(first!, 'First\nline two')
-  expect((await draft())?.body.startsWith('First\nline two\n\nSecond')).toBe(true)
+  expect((await draft(entry => entry?.body.startsWith('First\nline two\n\nSecond') === true))?.body.startsWith('First\nline two\n\nSecond')).toBe(true)
 
   const escape = key(first!, { key: 'Escape' })
 
@@ -161,7 +169,7 @@ test('HTML typed in a block stays text', async () => {
   await type(first!, '<img src=x onerror="alert(1)"> **hi**')
 
   expect(first!.children).toHaveLength(0)
-  expect((await draft())?.body.startsWith('<img src=x onerror="alert(1)"> **hi**\n\nSecond')).toBe(true)
+  expect((await draft(entry => entry?.body.startsWith('<img src=x onerror="alert(1)"> **hi**\n\nSecond') === true))?.body.startsWith('<img src=x onerror="alert(1)"> **hi**\n\nSecond')).toBe(true)
 })
 
 test('a block whose text the Markdown does not hold, or that holds an image, is left to the form', async () => {
@@ -188,7 +196,7 @@ test('a long text is typed in place with its line breaks, Enter taking a new lin
   expect(key(long, { key: 'Enter' }).defaultPrevented).toBe(false)
 
   await type(long, 'one\ntwo\r\nthree')
-  expect((await draft())?.data.long).toBe('one\ntwo\nthree')
+  expect((await draft(entry => entry?.data.long === 'one\ntwo\nthree'))?.data.long).toBe('one\ntwo\nthree')
 
   key(long, { key: 'Enter', metaKey: true })
   expect(long.hasAttribute('contenteditable')).toBe(false)
@@ -212,7 +220,7 @@ test('a Markdown field of the entry is typed block by block like the body', asyn
   expect(paragraph.getAttribute('aria-label')).toBe('Intro')
 
   await type(paragraph, 'Intro **text** more')
-  expect((await draft())?.data.intro).toBe('Intro **text** more')
+  expect((await draft(entry => entry?.data.intro === 'Intro **text** more'))?.data.intro).toBe('Intro **text** more')
 })
 
 // The page renders the block again as another tag once its marker changes, which the test does by hand as happy-dom runs no page.
@@ -246,7 +254,7 @@ test('typing a heading marker at the start of a paragraph goes on in the heading
   expect(heading.textContent).toBe('# Second [one](https://x.test) here.')
   expect(document.activeElement).toBe(heading)
   expect(document.getSelection()?.anchorOffset).toBe(2)
-  expect((await draft())?.body).toBe(BODY.replace('Second [one](https://x.test) here.', '# Second [one](https://x.test) here.'))
+  expect((await draft(entry => entry?.body === BODY.replace('Second [one](https://x.test) here.', '# Second [one](https://x.test) here.')))?.body).toBe(BODY.replace('Second [one](https://x.test) here.', '# Second [one](https://x.test) here.'))
 })
 
 test('deleting the marker of a heading goes on in the paragraph it becomes', async () => {
