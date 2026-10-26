@@ -26,6 +26,7 @@ export type { StepCookies, StepDraft, StepDraftOptions, StepItem } from './steps
 export { currentStep, stepDraft, stepHref } from './steps'
 export { toCsv } from './table'
 export type { Column, RowFilter, RowKey, RowKeyValue, SortDirection, SortState } from './table'
+export type { TimelineEntry } from './timeline'
 export * from './toast'
 export type { TreeId, TreeNode } from './tree'
 export type { Plate } from './zoom'

@@ -2,6 +2,10 @@
 
 What each release of kay and its libraries adds, newest first, each feature with where it is documented. kay and its libraries share one version, so one section covers them all; what a release breaks is in [Upgrading](upgrading.md).
 
+## Unreleased
+
+- kayjs-ui has a `Timeline`, a vertical list of time-stamped entries with an optional icon or muted tone, each pickable through a bindable `selected` key ([Page layout](../packages/ui/llms/page-layout-palette-and-trees.md)).
+
 ## 1.78.0
 
 - `site.submit(action, fields, { from: '/path' })` solves a `workChallenge` field of the form on that page, as `from: await site.visit(...)` does: [Testing](testing.md).

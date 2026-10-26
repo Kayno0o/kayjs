@@ -55,7 +55,7 @@ const tokens = new Set([...theme.matchAll(DEFINED_TOKEN)].map(([, token]) => tok
 const classes = new Set([...theme.matchAll(DEFINED_CLASS)].map(([, name = '']) => name))
 
 // Classes a component writes that no rule of the theme selects any more: rule-free names for an app's CSS and skins.
-const HOOKS = new Set(['kui-menu', 'kui-toaster', 'kui-tooltip', 'kui-card', 'kui-card-row', 'kui-widget', 'kui-notice', 'kui-avatar', 'kui-checkbox', 'kui-radio-group', 'kui-chip', 'kui-chip-group', 'kui-copy-btn', 'kui-empty-state', 'kui-file-drop', 'kui-meter', 'kui-progress', 'kui-skeleton', 'kui-page-header', 'kui-page-section', 'kui-date-input', 'kui-date-range-input', 'kui-segmented', 'kui-slider', 'kui-color-input', 'kui-combobox', 'kui-rating', 'kui-toggle', 'kui-contact-form', 'kui-contact-consent', 'kui-contact-privacy'])
+const HOOKS = new Set(['kui-menu', 'kui-toaster', 'kui-tooltip', 'kui-card', 'kui-card-row', 'kui-widget', 'kui-notice', 'kui-avatar', 'kui-checkbox', 'kui-radio-group', 'kui-chip', 'kui-chip-group', 'kui-copy-btn', 'kui-empty-state', 'kui-file-drop', 'kui-meter', 'kui-progress', 'kui-skeleton', 'kui-page-header', 'kui-page-section', 'kui-date-input', 'kui-date-range-input', 'kui-segmented', 'kui-slider', 'kui-color-input', 'kui-combobox', 'kui-rating', 'kui-toggle', 'kui-contact-form', 'kui-contact-consent', 'kui-contact-privacy', 'kui-timeline'])
 
 // The source of a component of the library.
 const sourceOf = (name: string): string => components.find(component => component.path === `src/${name}.kay`)!.source
@@ -64,7 +64,7 @@ const sourceOf = (name: string): string => components.find(component => componen
 const RECIPE_COMPONENTS = new Set(['src/card.kay', 'src/badge.kay', 'src/notice.kay', 'src/avatar.kay', 'src/stat.kay', 'src/page-header.kay', 'src/page-section.kay', 'src/empty-state.kay', 'src/card-row.kay', 'src/widget.kay', 'src/meter.kay', 'src/progress.kay', 'src/skeleton.kay', 'src/button.kay', 'src/form-field.kay', 'src/checkbox.kay', 'src/toggle.kay', 'src/text-input.kay', 'src/textarea.kay', 'src/select.kay', 'src/contact-form.kay', 'src/radio-group.kay', 'src/segmented.kay', 'src/rating.kay', 'src/slider.kay', 'src/color-input.kay', 'src/date-input.kay', 'src/date-range-input.kay', 'src/combobox.kay', 'src/multi-select.kay', 'src/chip-group.kay', 'src/file-drop.kay', 'src/copy-button.kay', 'src/confirm-delete.kay', 'src/dialog.kay', 'src/form-dialog.kay', 'src/menu.kay', 'src/popover.kay', 'src/hover-card.kay', 'src/side-panel.kay', 'src/command-palette.kay', 'src/toaster.kay', 'src/tooltip-host.kay', 'src/toolbar.kay'])
 
 // Tables and navigation (slice 5 of #1885).
-for (const path of ['table', 'tabs', 'tab-nav', 'breadcrumb', 'pagination', 'steps', 'site-nav', 'app-header'])
+for (const path of ['table', 'tabs', 'tab-nav', 'breadcrumb', 'pagination', 'steps', 'site-nav', 'app-header', 'timeline'])
   RECIPE_COMPONENTS.add(`src/${path}.kay`)
 
 // Charts and media (slice 6).

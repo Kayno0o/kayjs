@@ -1,0 +1,59 @@
+--- <Key extends string | number>
+import type { JSX } from 'kay'
+import type { TimelineEntry } from './timeline'
+import { effect, recipe, signal } from 'kay'
+import Icon from './icon.kay'
+
+// 'kui-timeline' stays as the component's name for an app's CSS. A picked entry is marked by aria-pressed, a toned one by data-tone on its item.
+const look = recipe({
+  parts: {
+    root: 'kui-timeline m-0 flex list-none flex-col gap-1 p-0',
+    item: 'group/entry text-sm data-[tone=muted]:text-muted',
+    entry: 'flex w-full items-baseline gap-3 rounded-md px-3 py-2 text-start [&:is(button)]:cursor-pointer [&:is(button)]:hover:bg-surface-strong [&:is(button)]:aria-pressed:bg-accent/15',
+    time: 'w-28 shrink-0 tabular-nums text-muted',
+    icon: 'size-4 shrink-0 self-center group-data-[tone=accent]/entry:text-accent group-data-[tone=success]/entry:text-success group-data-[tone=warning]/entry:text-warning group-data-[tone=danger]/entry:text-danger group-data-[tone=info]/entry:text-info',
+    text: 'min-w-0',
+  },
+})
+
+const { entries, selected, onSelect, label, ...rest } = props<Omit<JSX.IntrinsicElements['ol'], 'class' | 'children' | 'onSelect'> & {
+  // In the order they are shown, which is the time order: the timeline never sorts them.
+  entries: readonly TimelineEntry<Key>[]
+  // The key of the picked entry, if any; a new one from the parent is followed.
+  selected?: Key | undefined
+  // Makes the entries buttons, one picked at a time; with `selected` alone they stay buttons too. Gets the picked key, or undefined when the picked entry is pressed again, and the entry pressed.
+  // The shape `selected` takes first, so `onSelect={picked.set}` round-trips.
+  onSelect?: ((key: Key | undefined, entry: TimelineEntry<Key>) => unknown) | undefined
+  // Names the list for screen readers.
+  label: string
+}>()
+
+// Held as string or number: a signal cannot take a type parameter that might be a function.
+const picked = signal<string | number | undefined>(selected)
+
+effect(() => picked.set(selected))
+
+const selectable = () => onSelect !== undefined || selected !== undefined
+
+function pick(entry: TimelineEntry<Key>) {
+  const next = picked() === entry.key ? undefined : entry.key
+
+  picked.set(next)
+  onSelect?.(next, entry)
+}
+---
+ol(part="root" {...rest} aria-label={label})
+  for entry of entries key={entry.key}
+    li(part="item" data-tone={entry.tone})
+      if selectable() && entry.pickable !== false
+        button(part="entry" type="button" aria-pressed={picked() === entry.key} onClick={() => pick(entry)})
+          span(part="time") {entry.time}
+          if entry.icon
+            Icon(icon={entry.icon} part="icon")
+          span(part="text") {entry.text}
+      else
+        div(part="entry")
+          span(part="time") {entry.time}
+          if entry.icon
+            Icon(icon={entry.icon} part="icon")
+          span(part="text") {entry.text}

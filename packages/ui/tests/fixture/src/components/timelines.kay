@@ -1,0 +1,23 @@
+---
+import { signal } from 'kay'
+import Timeline from '@kaynooo/kayjs-ui/timeline.kay'
+
+// A selectable timeline bound to a key shown below it, a plain one, and a button standing for the parent picking an entry itself.
+const { onSelect } = props<{ onSelect: (key: string | undefined, text: string) => void }>()
+
+const picked = signal<string | undefined>('b')
+const entries = [
+  { key: 'a', time: '08:00', text: 'Home', icon: 'info' as const },
+  { key: 'b', time: '09:00', text: 'Walk' },
+  { key: 'c', time: '10:00', text: 'Gap', tone: 'muted' as const, pickable: false },
+]
+
+function select(key: string | undefined, entry: { text: string }) {
+  picked.set(key)
+  onSelect(key, entry.text)
+}
+---
+Timeline#bound(entries={entries} label="Day" selected={picked()} onSelect={select})
+p#value {picked() ?? 'none'}
+Timeline#plain(entries={entries} label="Plain")
+button#pick-a(type="button" onClick={() => picked.set('a')}) A
