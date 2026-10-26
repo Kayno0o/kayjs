@@ -17,6 +17,8 @@ const DECLARED_AFTER = /^['"`]?\s*:/
 const CSS_DECLARED_AFTER = /^\s*:/
 const SHORTHAND_BEFORE = /-\($/
 const SHORTHAND_AFTER = /^\s*\)/
+const WORD = /\w/
+const BLANK_LINE = /^[ \t\r]*\n?$/
 
 interface Scan {
   file: string
@@ -72,15 +74,18 @@ function blank(text: string): string {
   return text.replace(/[^\n]/g, ' ')
 }
 
-// A `.kay` file or src/ui.ts with its `//` and `/* */` comments blanked, quoted strings left alone so a URL in one is not a comment; a quote ends at its line, as prose in a template holds apostrophes, and only a backtick runs on.
+// A `.kay` file or src/ui.ts with its `//` and `/* */` comments blanked, quoted strings left alone so a URL in one is not a comment. Prose in a template holds apostrophes and stray backticks, so an apostrophe after a word character (`don't`) opens nothing, a quote ends at its line, and a backtick runs on to its twin or to the next blank line; the code of a `${ }` inside one is read like any other.
 function blankComments(source: string): string {
   let out = ''
   let index = 0
   let quote = ''
+  // An open template is 'template', an open `${` its brace depth.
+  const frames: ('template' | number)[] = []
 
   while (index < source.length) {
     const char = source[index]!
     const next = source[index + 1]
+    const frame = frames.at(-1)
 
     if (quote) {
       if (char === '\\' && next !== undefined && next !== '\n') {
@@ -90,11 +95,42 @@ function blankComments(source: string): string {
         continue
       }
 
-      if (char === quote || (char === '\n' && quote !== '`'))
+      if (char === quote || char === '\n')
         quote = ''
     }
-    else if (char === '"' || char === '\'' || char === '`') {
+    else if (frame === 'template') {
+      if (char === '\\' && next !== undefined) {
+        out += char + next
+        index += 2
+
+        continue
+      }
+
+      if (char === '`' || (char === '\n' && BLANK_LINE.test(source.slice(index + 1, source.indexOf('\n', index + 1) + 1 || source.length + 1)))) {
+        frames.pop()
+      }
+      else if (char === '$' && next === '{') {
+        frames.push(0)
+        out += '${'
+        index += 2
+
+        continue
+      }
+    }
+    else if (char === '"' || (char === '\'' && !WORD.test(source[index - 1] ?? ''))) {
       quote = char
+    }
+    else if (char === '`') {
+      frames.push('template')
+    }
+    else if (char === '{' && frame !== undefined) {
+      frames[frames.length - 1] = frame + 1
+    }
+    else if (char === '}' && frame !== undefined) {
+      if (frame === 0)
+        frames.pop()
+      else
+        frames[frames.length - 1] = frame - 1
     }
     else if (char === '/' && next === '*') {
       const close = source.indexOf('*/', index + 2)

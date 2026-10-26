@@ -47,6 +47,31 @@ describe('removed-ui-token', () => {
     }
   })
 
+  it('blanks a comment after a prose apostrophe, an unbalanced backtick and inside a template expression', async () => {
+    const root = await project({
+      'src/pages/index.kay': [
+        'p don\'t // bg-kui-canvas',
+        'p it`s prose',
+        '',
+        '// text-kui-text',
+        'p(class="bg-kui-surface0") real',
+        'const a = `x ${/* --color-kui-text */ 1} y ${[1].map(n => n // bg-kui-canvas',
+        ')} z`',
+        'p(class="bg-kui-surface1") kept',
+        '',
+      ].join('\n'),
+    })
+
+    try {
+      const found = await removedUiTokens(root, {})
+
+      expect(found.map(item => item.line)).toEqual([5, 8])
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
   it('renames declarations the new name reads, references and utilities, in css', async () => {
     const css = [
       '@theme {',
