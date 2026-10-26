@@ -437,7 +437,7 @@ An action takes that answer with `passkeyAssertion` for a sign-in, a second fact
 
 Registering, password resets and magic links ask for a proof of work by default, and a password sign-in from the third attempt. The browser hashes for some tens of milliseconds before the request goes through, with no third party and no cookie.
 
-The prebuilt pages carry it. Your own form carries `captchaChallenge` in a `data-kay-work` field, and your action passes its solution on as `captcha`.
+The prebuilt pages carry it. Your own form carries `captchaChallenge` in a `data-kay-work` field, and your action passes its solution on as `captcha`. `kay check` reports a call to `register`, `requestPasswordReset`, `requestMagicLink` or `signInWithPassword` with no `captcha` option (`missing-captcha`), since without the token it answers `{ ok: false, error: 'captcha' }` and the form fails with no message.
 
 ```kay
 --- server

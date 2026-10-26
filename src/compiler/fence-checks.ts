@@ -433,6 +433,55 @@ export function asyncReplies(fence: ParsedFence): Diagnostic[] {
   return diagnostics
 }
 
+// The kayjs-auth methods that ask a CAPTCHA by default, with the position of the options holding `captcha`.
+const CAPTCHA_CALLS = new Map([['register', 1], ['signInWithPassword', 1], ['requestPasswordReset', 1], ['requestMagicLink', 1]])
+const AUTH_NAME = /auth$/i
+const CAPTCHA_OFF = /\bcaptcha\s*:\s*false\b/
+
+// The last name of a receiver, `auth` for `ctx.locals.auth`.
+function receiverName(node: t.Node): string | undefined {
+  if (node.type === 'Identifier')
+    return node.name
+
+  return node.type === 'MemberExpression' && !node.computed && node.property.type === 'Identifier' ? node.property.name : undefined
+}
+
+// A call of kayjs-auth that asks a CAPTCHA by default, written with no `captcha` option: it answers `{ ok: false, error: 'captcha' }` until the form carries the challenge and the call passes the token on.
+export function missingCaptchas(fence: ParsedFence): Diagnostic[] {
+  if (!CAPTCHA_CALLS.keys().some(name => fence.code.includes(name)) || CAPTCHA_OFF.test(fence.code))
+    return []
+
+  const diagnostics: Diagnostic[] = []
+
+  eachNode(fence.ast.program, (node) => {
+    if (node.type !== 'CallExpression' || node.callee.type !== 'MemberExpression' || node.callee.computed || node.callee.property.type !== 'Identifier')
+      return
+
+    const name = node.callee.property.name
+    const at = CAPTCHA_CALLS.get(name)
+    const receiver = receiverName(node.callee.object)
+
+    if (at === undefined || receiver === undefined || !AUTH_NAME.test(receiver) || node.arguments.some(argument => argument.type === 'SpreadElement'))
+      return
+
+    const options = node.arguments[at]
+    const lacking = options?.type === 'ObjectExpression' && !options.properties.some(property => property.type === 'SpreadElement') && !options.properties.some(property => property.type === 'ObjectProperty' && ((property.key.type === 'Identifier' && !property.computed && property.key.name === 'captcha') || (property.key.type === 'StringLiteral' && property.key.value === 'captcha')))
+
+    if (options !== undefined && !lacking)
+      return
+
+    diagnostics.push({
+      ...fence.shift(node.callee.property),
+      code: 'missing-captcha',
+      message: `\`${name}\` is called with no \`captcha\`, which kayjs-auth asks of it by default`,
+      note: 'with the default proof of work, a call without the token answers `{ ok: false, error: \'captcha\' }`, and a form that does not post one fails with no message',
+      help: 'add `input(type="hidden" name="captcha" data-kay-work={await auth.captchaChallenge(action)})` to the form and pass `{ captcha: input.captcha }`, or set `captcha: false` on `createAuth`',
+    })
+  })
+
+  return diagnostics
+}
+
 // The values of a template that follow its first one with no text between: they extend the prefix, where later ones follow text the prefix already ended with.
 function adjacent(node: t.TemplateLiteral): t.Node[] {
   const found: t.Node[] = []
@@ -806,7 +855,7 @@ export function openRedirects(fence: ParsedFence): Diagnostic[] {
 // The checks a plain module takes, parsed only when one of them may find something.
 // A module the browser bundle reaches (`browser`) is checked for the names the browser's entries lack as well.
 export function moduleChecks(source: string, browser = false): Diagnostic[] {
-  if (!CSS_BINDING.test(source) && !(browser && source.includes('kay/cache')) && !(source.includes(AI_PACKAGE) && source.includes('async')) && !source.includes('redirect('))
+  if (!CSS_BINDING.test(source) && !(browser && source.includes('kay/cache')) && !(source.includes(AI_PACKAGE) && source.includes('async')) && !source.includes('redirect(') && !CAPTCHA_CALLS.keys().some(name => source.includes(name)))
     return []
 
   const whole = { start: 0, end: source.length }
@@ -825,5 +874,5 @@ export function moduleChecks(source: string, browser = false): Diagnostic[] {
 }
 
 function checksOf(module: ParsedFence, browser: boolean): Diagnostic[] {
-  return [...cssImportsWithoutText(module), ...asyncReplies(module), ...openRedirects(module), ...browser ? serverOnlyImports(module) : []]
+  return [...cssImportsWithoutText(module), ...asyncReplies(module), ...openRedirects(module), ...missingCaptchas(module), ...browser ? serverOnlyImports(module) : []]
 }

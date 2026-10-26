@@ -81,6 +81,7 @@ Each lint has a level. `deny` is an error, `warn` a warning, `allow` hides it. W
 | `css-import-without-text` | deny | code | A stylesheet imported for a value without `with { type: 'text' }` |
 | `external-redirect` | warn | security | A `redirect()` whose target is not written as a path of the site or wrapped in `localPath()`, and that the request can reach, which makes it an open redirect |
 | `async-reply` | warn | code | An `async` function returning kayjs-ai's `ask()`, which awaits the reply so nothing streams |
+| `missing-captcha` | warn | forms | A kayjs-auth call that asks a CAPTCHA by default (`register`, `requestPasswordReset`, `requestMagicLink`, `signInWithPassword`) written with no `captcha` option |
 | `literal-tag` | warn | code | An HTML tag written in template text, shown as written |
 | `over-budget` | warn | code | A page loading more JavaScript, CSS or weight than `budget` allows, or with a worse EcoIndex grade |
 | `uncaught-await` | warn | code | An `await` block with no `catch` and no `try` around it |

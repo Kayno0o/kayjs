@@ -286,6 +286,13 @@ export const LINTS = {
     wrong: '--- server\nimport { ask } from \'@kaynooo/kayjs-ai\'\nimport { action, s } from \'kay\'\n\nexport const reply = action(s.Object({ messages: s.Array(s.Any()) }), async ({ messages }) => ask(messages))\n---\np x',
     right: '--- server\nimport { ask } from \'@kaynooo/kayjs-ai\'\nimport { action, s } from \'kay\'\n\nexport const reply = action(s.Object({ messages: s.Array(s.Any()) }), ({ messages }) => ask(messages))\n---\np x',
   },
+  'missing-captcha': {
+    level: 'warn',
+    group: 'forms',
+    summary: 'A call to `register`, `requestPasswordReset`, `requestMagicLink` or `signInWithPassword` on an auth (a receiver named `auth`, or ending in `auth`) with no `captcha` option, while no `captcha: false` is written in the same file: kayjs-auth asks a proof of work by default, so such a call answers `{ ok: false, error: \'captcha\' }` until the form carries the challenge. Put `input(type="hidden" name="captcha" data-kay-work={await auth.captchaChallenge(\'register\')})` in the form (action `\'reset\'`, `\'magic-link\'` or `\'sign-in\'` for the others), read the field in the action and pass it as `{ captcha: input.captcha }`; an app with the captcha off elsewhere sets `lints: { \'missing-captcha\': \'allow\' }`. Found in `.kay` fences and `.ts` modules alike.',
+    wrong: '--- server\nexport const reset = action(s.Object({ email: s.String() }), ({ email }, ctx) => ctx.locals.auth.requestPasswordReset(email))\n---\np x',
+    right: '--- server\nexport const reset = action(s.Object({ email: s.String(), captcha: s.String() }), ({ email, captcha }, ctx) => ctx.locals.auth.requestPasswordReset(email, { captcha }))\n---\np x',
+  },
   'positional-key': {
     level: 'warn',
     group: 'islands',

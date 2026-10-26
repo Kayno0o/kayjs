@@ -145,6 +145,33 @@ describe('css-import-without-text', () => {
   })
 })
 
+describe('missing-captcha', () => {
+  const server = (body: string) => `--- server\nimport { action, s } from 'kay'\n\n${body}\n---\np x`
+  const found = (body: string) => lints(server(body)).filter(d => d.code === 'missing-captcha')
+
+  it('reports each of the four calls with no options, or options holding no captcha', () => {
+    expect(found('export const a = action(s.Object({ email: s.String() }), async ({ email }, ctx) => ctx.locals.auth.requestPasswordReset(email))')).toEqual([{ code: 'missing-captcha', severity: 'warning', at: 'requestPasswordReset' }])
+    expect(found('export const a = action(s.Object({ email: s.String() }), async ({ email }) => auth.requestMagicLink(email, { redirect: \'/\' }))')).toEqual([{ code: 'missing-captcha', severity: 'warning', at: 'requestMagicLink' }])
+    expect(found('export const a = action(s.Object({ email: s.String() }), async (input) => auth.register(input, { remember: true }))')).toEqual([{ code: 'missing-captcha', severity: 'warning', at: 'register' }])
+    expect(found('export const a = action(s.Object({ email: s.String() }), async (input) => auth.signInWithPassword(input))')).toEqual([{ code: 'missing-captcha', severity: 'warning', at: 'signInWithPassword' }])
+  })
+
+  it('leaves a call naming captcha, options it cannot read, a receiver that is no auth and an auth with captcha off', () => {
+    expect(found('export const a = (input: never) => auth.register(input, { captcha: input.captcha })')).toEqual([])
+    expect(found('export const a = (input: never, captcha: string) => auth.register(input, { captcha })')).toEqual([])
+    expect(found('export const a = (input: never, options: never) => auth.register(input, options)')).toEqual([])
+    expect(found('export const a = (input: never, options: never) => auth.register(input, { ...options })')).toEqual([])
+    expect(found('export const a = (input: never) => registry.register(input)')).toEqual([])
+    expect(found('export const a = (input: never) => auth.register(input)\nexport const auth = createAuth({ captcha: false })')).toEqual([])
+    expect(found('// kay-allow missing-captcha\nexport const a = (input: never) => auth.register(input)')).toEqual([])
+  })
+
+  it('is found in a plain module as in a fence', () => {
+    expect(moduleChecks('export const a = (email: string) => ctx.locals.auth.requestPasswordReset(email)').map(d => d.code)).toEqual(['missing-captcha'])
+    expect(moduleChecks('export const a = (email: string) => ctx.locals.auth.requestPasswordReset(email, { captcha: \'x\' })')).toEqual([])
+  })
+})
+
 describe('async-reply', () => {
   const server = (body: string, imports = 'import { ask } from \'@kaynooo/kayjs-ai\'') => `--- server\n${imports}\nimport { action, s } from 'kay'\n\n${body}\n---\np x`
   const reply = 'export const reply = action(s.Object({ messages: s.Array(s.Any()) }), async ({ messages }) => ask(messages))'
