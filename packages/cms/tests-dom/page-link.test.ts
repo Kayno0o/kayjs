@@ -1,4 +1,4 @@
-import { afterAll, afterEach, beforeEach, expect, mock, spyOn, test } from 'bun:test'
+import { afterAll, afterEach, beforeEach, expect, mock, setSystemTime, spyOn, test } from 'bun:test'
 import { settle } from 'kay/test'
 import { CHECK_PATH, HINT_COOKIE, PAGE_LINK_ATTRIBUTE, pageLink, pageLinkLoader, SIGNED_IN_COOKIE } from '../src/page-link'
 
@@ -69,6 +69,7 @@ afterEach(() => {
   document.cookie = `${SIGNED_IN_COOKIE}=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT`
   sessionStorage.clear()
   mock.restore()
+  setSystemTime()
 })
 
 afterAll(() => {
@@ -119,6 +120,9 @@ test('asks under /_kay whatever apiPath the page says', async () => {
 })
 
 test('shows nothing and drops the hint once the session is over, whether the guard denies or redirects', async () => {
+  // The clock stands still, so a hint dropped as expiring now would still be read within the same millisecond.
+  setSystemTime(Date.now())
+
   for (const status of [401, 403, 0]) {
     document.cookie = `${HINT_COOKIE}=1; path=/`
     answering(status)

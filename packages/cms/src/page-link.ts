@@ -43,7 +43,8 @@ export function pageLink(hint: string, attribute: string, endpoint: string, sign
 
       // Refused, or redirected to a sign-in: the session is over, so the hint goes.
       if (response.status === 0 || response.status === 401 || response.status === 403) {
-        document.cookie = `${hint}=; path=/; max-age=0`
+        // An expiry in the past drops the hint at once, where happy-dom keeps one with a max-age of 0 for the millisecond it was set in.
+        document.cookie = `${hint}=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT`
 
         if (signIn !== undefined)
           sessionStorage.setItem(refusedKey, signIn)
