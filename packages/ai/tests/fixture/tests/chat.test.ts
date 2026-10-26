@@ -601,6 +601,19 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the Chat i
       expect(page.errors).toEqual([])
     })
 
+    test('newButton stops a reply under way', async () => {
+      const page = await site.open('/restartable-slow')
+
+      await page.fill('textarea', 'Go')
+      await page.press('Enter')
+      await page.waitFor('[data-pending] .kai-chat-text', { text: 'Working' })
+      await page.click('.kai-chat-new')
+      await page.waitFor('.kai-chat-turn', { gone: true })
+
+      expect(await page.count('[data-pending]')).toBe(0)
+      expect(page.errors).toEqual([])
+    })
+
     test('a launcher given remember keeps the conversation over a reload under that key', async () => {
       const page = await site.open('/kept')
 
