@@ -147,15 +147,13 @@ describe('every websocket route', () => {
       expect((await talk(path, 'x'.repeat(1_100_000))).code).toBe(1009)
 
     const plain = new WebSocket(`ws://localhost:${port}/api/plain`)
-    const outcome: Outcome = { received: [], code: undefined, reason: undefined }
+    const closed = new Promise<number>(resolve => (plain.onclose = event => resolve(event.code)))
 
-    plain.onclose = (event) => {
-      outcome.code = event.code
-    }
     await new Promise<void>(resolve => (plain.onopen = () => resolve()))
     plain.send('x'.repeat(1_100_000))
-    await Bun.sleep(200)
-    expect(outcome.code).toBe(1009)
+
+    // The close event itself, bounded by the test's own timeout, as a fixed sleep races a loaded host.
+    expect(await closed).toBe(1009)
   })
 
   it('runs the route\x27s own beforeHandle hooks once', async () => {
