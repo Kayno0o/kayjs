@@ -6,6 +6,7 @@ import { collection, contentKey } from 'kay/content'
 import { onKeysInvalidated, refreshLocally, trackStore, untrackStore } from '../../../src/runtime/cache'
 import { pgLoader } from '../src/loaders/pg'
 import { watcher } from '../src/loaders/shared'
+import { until } from './until'
 
 const schema = s.Object({ title: s.String() })
 const EVERY = 20
@@ -45,6 +46,12 @@ function sharedStore(): { published: string[], hear: (message: string) => void }
   return { published, hear: message => hear(message) }
 }
 
+// Waits for the drops to reach `wanted`, then a few looks of the watcher more for it to drop no further, a deliberate wait for nothing to happen.
+async function dropsStopAt(seen: { count: () => number }, wanted: number): Promise<void> {
+  await until(() => seen.count() >= wanted)
+  await Bun.sleep(EVERY * 3)
+}
+
 afterEach(() => {
   for (const stop of stops.splice(0))
     stop()
@@ -60,7 +67,7 @@ describe('a loader\'s watcher', () => {
 
     await watching.start()
     signature = 'b'
-    await Bun.sleep(EVERY * 5)
+    await dropsStopAt(seen, 1)
     expect(seen.count()).toBe(1)
     expect(others.published).toEqual([])
   })
@@ -75,7 +82,7 @@ describe('a loader\'s watcher', () => {
     await watching.start()
     signature = 'b'
     others.hear(JSON.stringify({ keys: [contentKey(name)] }))
-    await Bun.sleep(EVERY * 5)
+    await dropsStopAt(seen, 1)
     expect(seen.count()).toBe(1)
   })
 
@@ -99,9 +106,8 @@ describe('a loader\'s watcher', () => {
 
     const before = first
 
-    await Bun.sleep(EVERY * 5)
+    await until(() => second > 2)
     expect(first).toBe(before)
-    expect(second).toBeGreaterThan(2)
   })
 
   test('starts again after a start that failed, and a second start does nothing', async () => {
@@ -118,6 +124,7 @@ describe('a loader\'s watcher', () => {
     })
 
     await expect(watching.start()).rejects.toThrow('database down')
+    // A deliberate wait for nothing to happen: a failed start schedules no look.
     await Bun.sleep(EVERY * 3)
     expect(calls).toBe(1)
     failing = false
@@ -125,11 +132,13 @@ describe('a loader\'s watcher', () => {
     await watching.start()
 
     const before = calls
+    const started = Date.now()
 
-    await Bun.sleep(EVERY * 5)
-    // One timer looks about five times in that time, two would look ten.
+    await until(() => calls - before > 1)
+    await Bun.sleep(EVERY * 3)
+    // One timer looks once an interval, two would look twice as often: the bound follows the time that really passed.
     expect(calls - before).toBeGreaterThan(1)
-    expect(calls - before).toBeLessThanOrEqual(7)
+    expect(calls - before).toBeLessThanOrEqual((Date.now() - started) / EVERY + 2)
   })
 
   test('keeps looking after the entries were refreshed without being dropped, as a publishAt date passing does', async () => {
@@ -141,7 +150,7 @@ describe('a loader\'s watcher', () => {
     await watching.start()
     signature = 'b'
     refreshLocally(contentKey(name))
-    await Bun.sleep(EVERY * 5)
+    await dropsStopAt(seen, 1)
     expect(seen.count()).toBe(1)
   })
 
@@ -162,10 +171,11 @@ describe('a loader\'s watcher', () => {
     })
 
     await watching.start()
-    await Bun.sleep(EVERY * 2)
+    await until(() => calls.length >= 2)
     expect(calls).toEqual(['forced', 'look'])
     await watching.settle()
     release('b')
+    // A deliberate wait for nothing to happen: the look that read before the save is dropped, not reported.
     await Bun.sleep(EVERY * 2)
     expect(seen.count()).toBe(0)
   })
@@ -201,11 +211,12 @@ describe('the postgres loader\'s watch', () => {
     await posts.all()
     await sql.unsafe('UPDATE frozen SET data = data')
     await sql.unsafe('VACUUM FREEZE frozen')
+    // A deliberate wait for nothing to happen: the watch looks several times in it and finds no change.
     await Bun.sleep(300)
     await posts.all()
     expect(reads).toBe(1)
     await sql.unsafe(`UPDATE frozen SET data = '{"title":"Edited"}'`)
-    await Bun.sleep(300)
+    await until(async () => (await posts.all())[0]?.data.title === 'Edited')
     expect((await posts.all()).map(post => post.data.title)).toEqual(['Edited'])
     expect(reads).toBe(2)
   })

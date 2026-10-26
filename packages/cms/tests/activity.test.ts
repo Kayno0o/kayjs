@@ -10,6 +10,7 @@ import { activityScreen } from '../src/screens'
 import { configure } from '../src/settings'
 import { deleteEntry, publishEntry, renameEntry, saveEntry } from '../src/store'
 import { trashOf } from '../src/trash'
+import { until } from './until'
 
 const schema = s.Object({ title: s.String(), draft: s.Optional(s.Boolean()) })
 let count = 0
@@ -162,7 +163,7 @@ describe('activity', () => {
     }
     // Two reads over the cap trim the same rows once.
     expect((await Promise.all([activityOf('notes'), activityOf('notes')])).map(events => events.length)).toEqual([500, 500])
-    await Bun.sleep(100)
+    await until(async () => await stored() === 500)
     expect(removals).toBe(5)
     expect(await stored()).toBe(500)
   })

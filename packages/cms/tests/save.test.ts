@@ -1,6 +1,7 @@
 import type { DraftEntry } from '../src/kay/contract'
 import { dirname, join } from 'node:path'
 import { afterEach, describe, expect, it, mock, spyOn } from 'bun:test'
+import { until } from './until'
 
 // kayjs-ui's toasts alone, as its entry also loads icons only kay's build resolves.
 const toastModule = join(dirname(Bun.resolveSync('@kaynooo/kayjs-ui/package.json', import.meta.dir)), 'src/toast.ts')
@@ -263,7 +264,7 @@ describe('an upload on its way', () => {
     const drafts = opened()
     const upload = uploadFile('posts', PNG())
 
-    await Bun.sleep(20)
+    await until(() => files.posts > 0)
     expect(uploading()).toBe(true)
     drafts.set(post, 'title', 'Edited')
     expect(await saveDraft(drafts, post)).toBe(false)
@@ -277,12 +278,12 @@ describe('an upload on its way', () => {
   })
 
   it('stops counting once it is cancelled, rejecting with the signal\'s reason', async () => {
-    slowFiles()
+    const files = slowFiles()
 
     const cancel = new AbortController()
     const upload = uploadFile('posts', PNG(), { signal: cancel.signal })
 
-    await Bun.sleep(20)
+    await until(() => files.posts > 0)
     expect(uploading()).toBe(true)
     cancel.abort()
     await expect(upload).rejects.toMatchObject({ name: 'AbortError' })

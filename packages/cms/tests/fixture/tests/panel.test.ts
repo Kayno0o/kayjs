@@ -171,6 +171,7 @@ test('an editor left collapsed never shows open while the page loads', async () 
   })
   await page.reload()
   await page.waitUntil(() => document.documentElement.classList.contains('kcms-dock-bottom'))
+  // A deliberate wait for nothing to happen: the panel would flash in the first frames after the reload.
   await Bun.sleep(300)
   expect(await page.evaluate(() => (window as unknown as { flashed?: boolean }).flashed)).toBeUndefined()
 })
@@ -345,6 +346,7 @@ test('a click already in the visible part leaves the page where it is, however t
   })
   await page.waitUntil(() => scrollY === 500)
   await page.evaluate(() => document.querySelector<HTMLElement>('h1')!.dispatchEvent(new MouseEvent('click', { bubbles: true, clientX: 10, clientY: 200 })))
+  // A deliberate wait for nothing to happen: the page would scroll in the frames after the click.
   await Bun.sleep(200)
   expect(await page.evaluate(() => scrollY)).toBe(500)
 })

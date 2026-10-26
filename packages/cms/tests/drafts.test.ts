@@ -3,6 +3,7 @@ import type { DraftEntry, DraftResult } from '../src/kay/contract'
 import { describe, expect, it } from 'bun:test'
 import { createDrafts } from '../src/drafts'
 import { BODY } from '../src/markers'
+import { until } from './until'
 
 const post: DraftEntry = { collection: 'posts', slug: 'hello', data: { title: 'Hello', tags: ['a'] }, body: '# Hello' }
 
@@ -22,7 +23,8 @@ function setup(answer: (entries: DraftEntry[]) => Promise<DraftResult> = async (
   return { drafts, calls }
 }
 
-const settled = async () => Bun.sleep(20)
+// Waits for the typed edits' render to end, which the debounce and the page's answer both decide.
+const settled = async (drafts: { pending: () => boolean }) => until(() => !drafts.pending())
 
 describe('opening an entry again', () => {
   it('shows the current copy and version of an entry with no edits', () => {
@@ -78,7 +80,7 @@ describe('createDrafts', () => {
     const { drafts, calls } = setup(undefined, '5ms')
 
     drafts.set(post, 'title', 'Hel')
-    await settled()
+    await settled(drafts)
     expect(calls).toHaveLength(1)
     expect(() => setup(undefined, 5 as never).drafts.set(post, 'title', 'Hel')).toThrow('takes its unit')
   })
@@ -89,7 +91,7 @@ describe('createDrafts', () => {
     drafts.set(post, 'title', 'Hel')
     drafts.set(post, 'title', 'Hello there')
     drafts.set(post, BODY, '# Hi')
-    await settled()
+    await settled(drafts)
 
     expect(calls).toEqual([[{ ...post, data: { title: 'Hello there', tags: ['a'] }, body: '# Hi' }]])
     expect(drafts.value(post, 'title')).toBe('Hello there')
@@ -102,7 +104,7 @@ describe('createDrafts', () => {
 
     drafts.set(post, 'tags.0', 'b')
     drafts.set(post, 'tags.0', 'a')
-    await settled()
+    await settled(drafts)
 
     expect(drafts.changed(post)).toBe(false)
     expect(calls).toEqual([[]])
@@ -113,7 +115,7 @@ describe('createDrafts', () => {
 
     drafts.set(post, 'title', 'Other')
     drafts.reset(post)
-    await settled()
+    await settled(drafts)
 
     expect(drafts.value(post, 'title')).toBe('Hello')
     expect(calls).toEqual([[]])
@@ -132,7 +134,7 @@ describe('createDrafts', () => {
     const { drafts } = setup(async () => ({ issues: [{ collection: 'posts', slug: 'hello', path: 'title', message: 'Too short' }, { collection: 'posts', slug: 'other', path: 'title', message: 'Elsewhere' }] }))
 
     drafts.set(post, 'title', '')
-    await settled()
+    await settled(drafts)
 
     expect(drafts.issues(post, 'title').map(issue => issue.message)).toEqual(['Too short'])
     expect(drafts.issues(post, 'tags')).toEqual([])
@@ -147,7 +149,7 @@ describe('createDrafts', () => {
     ] }))
 
     drafts.set(post, BODY, '<Chart />')
-    await settled()
+    await settled(drafts)
 
     expect(drafts.issues(post, BODY).map(issue => issue.message)).toEqual(['Unknown component Chart'])
     expect(drafts.issues(post, 'body').map(issue => issue.message)).toEqual(['Data field'])
@@ -163,14 +165,14 @@ describe('createDrafts', () => {
     }))
 
     drafts.set(post, 'title', 'A')
-    await settled()
+    await until(() => answers.length === 1)
     drafts.set(post, 'title', 'AB')
-    await settled()
+    await until(() => answers.length === 2)
 
     expect(drafts.rendering()).toBe(true)
     failures[0]?.(new DOMException('aborted', 'AbortError'))
     answers[1]?.({ issues: [{ collection: 'posts', slug: 'hello', path: 'title', message: 'Latest' }] })
-    await settled()
+    await settled(drafts)
 
     expect(drafts.rendering()).toBe(false)
     expect(drafts.failure()).toBeUndefined()
@@ -183,7 +185,7 @@ describe('createDrafts', () => {
     })
 
     drafts.set(post, 'title', 'X')
-    await settled()
+    await settled(drafts)
 
     expect(drafts.failure()).toBe('Server down')
   })
@@ -229,7 +231,7 @@ describe('saving', () => {
     drafts.set(post, 'title', 'Mine')
     drafts.refuse(post, { message: 'saved since', conflict: { version: 'f00d' } })
     drafts.set(post, 'title', 'Mine, typed on')
-    await settled()
+    await settled(drafts)
     expect(drafts.refusal(post)?.message).toBe('saved since')
 
     drafts.keepEdits(post)
@@ -286,13 +288,13 @@ describe('saving', () => {
 
     drafts.set(post, 'title', 'Hel')
     drafts.report([refusal])
-    await settled()
+    await settled(drafts)
 
     expect(calls).toHaveLength(1)
     expect(drafts.issues(post, '').map(issue => issue.message)).toEqual(['would run as the site'])
 
     drafts.set(post, 'title', 'Hell')
-    await settled()
+    await settled(drafts)
 
     expect(calls).toHaveLength(2)
     expect(drafts.issues(post, '')).toEqual([])
@@ -307,12 +309,12 @@ describe('the issues of a refused save', () => {
 
     drafts.report([issue('title', 'Title is required'), issue('tags', 'Tags is not valid'), issue('', 'Entry level')])
     drafts.set(post, 'title', 'Hel')
-    await settled()
+    await settled(drafts)
 
     expect(drafts.issues(post).map(found => found.message)).toEqual(['Tags is not valid'])
 
     drafts.set(post, 'tags', ['b'])
-    await settled()
+    await settled(drafts)
 
     expect(drafts.issues(post)).toEqual([])
   })
@@ -345,7 +347,7 @@ describe('the issues of a refused save', () => {
 
     drafts.report([issue('title', 'Stale'), issue('tags', 'Older')])
     drafts.set(post, 'title', 'Hel')
-    await settled()
+    await settled(drafts)
 
     expect(drafts.issues(post).map(found => found.message)).toEqual(['Fresh'])
   })
@@ -385,10 +387,10 @@ describe('the issues of a refused save', () => {
 
     expect(drafts.stale()).toEqual([])
     drafts.set(post, 'title', '')
-    await settled()
+    await settled(drafts)
     expect(drafts.stale().map(entry => entry.slug)).toEqual(['hello'])
     drafts.reset(post)
-    await settled()
+    await settled(drafts)
     expect(drafts.stale()).toEqual([])
   })
 
@@ -400,10 +402,9 @@ describe('the issues of a refused save', () => {
 
     expect(drafts.rendering()).toBe(false)
     drafts.set(post, 'title', 'A')
-    await settled()
-    expect(drafts.rendering()).toBe(true)
+    await until(() => drafts.rendering())
     answer({})
-    await settled()
+    await settled(drafts)
     expect(drafts.rendering()).toBe(false)
   })
 
@@ -411,12 +412,13 @@ describe('the issues of a refused save', () => {
     const { drafts, calls } = setup()
 
     drafts.reapply()
-    await settled()
+    // With no edits nothing is scheduled, so there is no render to wait for.
+    expect(drafts.pending()).toBe(false)
     expect(calls).toEqual([])
     drafts.set(post, 'title', 'Kept')
-    await settled()
+    await settled(drafts)
     drafts.reapply()
-    await settled()
+    await settled(drafts)
     expect(calls).toHaveLength(2)
     expect(calls[1]).toEqual([{ ...post, data: { title: 'Kept', tags: ['a'] } }])
   })

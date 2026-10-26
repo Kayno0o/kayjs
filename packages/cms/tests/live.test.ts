@@ -1,6 +1,7 @@
 import type { SavedState } from '../src/editor/live'
 import { describe, expect, test } from 'bun:test'
 import { savedHandler, whenLive } from '../src/editor/live'
+import { until } from './until'
 
 // A page answering the texts in turn, the last one for good.
 function pageSaying(...texts: string[]) {
@@ -12,6 +13,9 @@ function pageSaying(...texts: string[]) {
     return texts[Math.min(reads.length - 1, texts.length - 1)]!
   } }
 }
+
+// The watch under test runs on microtasks alone, so a turn of the event loop lets everything it will ever do happen.
+const settle = async () => new Promise(resolve => setTimeout(resolve, 0))
 
 const quick = { pause: async () => undefined, interval: 1000 }
 
@@ -72,8 +76,6 @@ describe('whenLive', () => {
 })
 
 describe('savedHandler', () => {
-  const settle = async () => Bun.sleep(5)
-
   test('records a save that waits for a rebuild, then turns it live when the page serves it', async () => {
     const states: unknown[] = []
     let finished = 0
@@ -81,7 +83,7 @@ describe('savedHandler', () => {
     const saved = savedHandler(() => '/talk', state => states.push(state), () => finished++, { ...quick, read: page.read })
 
     saved({ rebuilding: true })
-    await settle()
+    await until(() => finished === 1)
     expect(states).toEqual([expect.objectContaining({ rebuilding: true }), expect.objectContaining({ rebuilding: false, live: true })])
     expect(finished).toBe(1)
   })
@@ -92,7 +94,6 @@ describe('savedHandler', () => {
 
     savedHandler(() => '/talk', state => states.push(state), () => undefined, { ...quick, read: page.read })({ rebuilding: false })
     savedHandler(() => undefined, state => states.push(state), () => undefined, { ...quick, read: page.read })({ rebuilding: true })
-    await settle()
     expect(page.reads).toEqual([])
     expect(states).toHaveLength(2)
   })
@@ -125,7 +126,7 @@ describe('savedHandler stop', () => {
 
     handler({ rebuilding: true })
     handler.stop()
-    await Bun.sleep(10)
+    await settle()
 
     expect(finished).toBe(0)
     expect(states).toHaveLength(1)

@@ -383,8 +383,6 @@ test('the on-page editor shows each issue of a refused save beside its field and
   await page.waitUntil(() => document.querySelector('.kcms-editor .kcms-entry-actions button:last-child') !== null)
   await page.evaluate(() => [...document.querySelectorAll<HTMLButtonElement>('.kcms-editor .kcms-entry-actions button')].find(each => each.textContent?.trim() === 'Save')!.click())
   await page.waitUntil(() => document.querySelector('.kcms-editor')?.textContent?.includes('would run as the site') === true)
-  await Bun.sleep(200)
-
   await page.waitUntil(() => document.activeElement?.getAttribute('aria-invalid') === 'true')
 
   const count = async (selector: string) => page.evaluate((query: string) => [...document.querySelectorAll(`.kcms-editor ${query}`)].filter(node => node.textContent?.includes('would run as the site')).length, selector)
@@ -1278,6 +1276,7 @@ test('two tabs on one entry\'s screen name each other, and the one left is told 
   await using again = await built.open('/admin/collections/posts/notes/garden?as=Ann')
 
   await again.waitUntil(() => document.querySelector('.kcms-entry-presence')?.textContent?.trim() === 'Also open: Bob', SETTLED)
+  // A deliberate wait for nothing to change: the second tab would count within it.
   await Bun.sleep(300)
   expect(await ann.evaluate(text)).toBe('Also open: Bob')
   bob.close()

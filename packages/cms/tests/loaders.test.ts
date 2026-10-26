@@ -251,6 +251,7 @@ describe('a move meeting a writer of another connection', () => {
       // The move starts while the row is held, and cannot finish before this transaction does.
       move = moving()
 
+      // Nothing is to happen meanwhile, so this waits a fixed time and checks the move is still blocked.
       await Bun.sleep(300)
       expect(moved).toBe(false)
     })
@@ -273,8 +274,9 @@ const schema = s.Object({ title: s.String() })
 // Waits for the collection's titles to be what `wanted` lists, for a watcher's interval to pass.
 async function titlesBecome(posts: { all: () => Promise<{ data: { title: string } }[]> }, wanted: string[]) {
   let titles: string[] = []
+  const deadline = Date.now() + 15_000
 
-  for (let wait = 0; wait < 100; wait++) {
+  while (Date.now() < deadline) {
     titles = (await posts.all()).map(post => post.data.title).toSorted()
 
     if (titles.join() === wanted.join())
@@ -297,6 +299,7 @@ async function readsDuring(loader: ContentLoader, run: () => Promise<void>): Pro
 
   await posts.all()
   await run()
+  // A deliberate wait for nothing to happen: a drop of the cache would show as a read within this time.
   await Bun.sleep(250)
   await posts.all()
 

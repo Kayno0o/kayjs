@@ -1,5 +1,5 @@
 import type { GuardContext } from 'kay'
-import { describe, expect, test } from 'bun:test'
+import { describe, expect, setSystemTime, test } from 'bun:test'
 import { memoryRates } from 'kay/library'
 import { HOST_SESSION_COOKIE, passwordGuard, Passwords, SESSION_COOKIE, sessionCookieOf, signedInBy } from '../src/password'
 
@@ -78,8 +78,14 @@ describe('the password guard\'s sign-in cookie', () => {
     const cookie = short.issue('editor', false)
 
     expect(short.read(cookie.value)).toBe('editor')
-    await Bun.sleep(1100)
-    expect(short.read(cookie.value)).toBeUndefined()
+
+    try {
+      setSystemTime(new Date(Date.now() + 1100))
+      expect(short.read(cookie.value)).toBeUndefined()
+    }
+    finally {
+      setSystemTime()
+    }
 
     const changed = new Passwords({ editor: 'another' }, '1h')
 

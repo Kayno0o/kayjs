@@ -3,6 +3,7 @@ import { afterEach, describe, expect, spyOn, test } from 'bun:test'
 import { cms } from '../src/extension'
 import { workingTree } from '../src/files'
 import { settings } from '../src/settings'
+import { until } from './until'
 
 const environment = process.env.NODE_ENV
 const devCode = process.env.KAY_DEV_CODE
@@ -156,7 +157,8 @@ describe('cms() missing field kinds', () => {
       // The working directory is the package's, not the project: the root is the one the content config settled.
       setContentPlace(`${import.meta.dir}/fixture`, `${import.meta.dir}/fixture/src`)
       app.listen(0)
-      await Bun.sleep(50)
+      // The server logs every setup warning in one go once it listens.
+      await until(() => warned.mock.calls.length > 0)
 
       expect(warned.mock.calls.map(call => String(call[0]))).toEqual(['kayjs-cms: no editor for the mood kind that products uses: add src/cms/fields/mood.kay, until then it is edited as JSON'])
     }
@@ -242,7 +244,8 @@ describe('cms() check', () => {
 
       try {
         app.listen(0)
-        await Bun.sleep(50)
+        // The server logs every setup warning in one go once it listens.
+        await until(() => warned.mock.calls.length > 0)
 
         expect(warned.mock.calls.map(call => String(call[0]))).toEqual([`kayjs-cms: ${line}`])
       }

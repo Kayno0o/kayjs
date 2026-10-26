@@ -396,6 +396,7 @@ describe('startSweeping', () => {
     await deleteEntry(ref, ada)
     setSystemTime(new Date(Date.now() + 31 * DAY))
     startSweeping()
+    // A deliberate wait for nothing to happen: the first sweep is minutes away, so the trash stays as it is.
     await Bun.sleep(30)
 
     expect(await rowCount('trash')).toBe(1)

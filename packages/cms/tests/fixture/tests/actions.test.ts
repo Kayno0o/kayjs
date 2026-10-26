@@ -2,6 +2,7 @@ import type { ScreenCollection, StoredEntry } from '../../../src/kay/contract'
 import { dirname, join } from 'node:path'
 import { afterEach, describe, expect, mock, spyOn, test } from 'bun:test'
 import { testSite } from 'kay/test'
+import { until } from '../../until'
 
 await testSite({ root: join(import.meta.dir, '..') })
 
@@ -59,7 +60,7 @@ describe('Save', () => {
     const typed = createEntryForm({ prefix: '/admin', collection: talks })
 
     typed.drafts.set(typed.entry, 'title', 'Été à la ferme')
-    await Bun.sleep(5)
+    await until(() => typed.slug() === 'ete-a-la-ferme')
     expect(typed.slug()).toBe('ete-a-la-ferme')
     typed.typeSlug(' Notes / Œufs du Marché ')
     await typed.save()
@@ -128,12 +129,13 @@ describe('the save shortcut', () => {
 
   test('saves and keeps the browser from saving the page', async () => {
     const target = new EventTarget()
+    const listening = spyOn(target, 'addEventListener')
     let saved = 0
 
     saveShortcut(() => {
       saved++
     }, target)
-    await Bun.sleep(5)
+    await until(() => listening.mock.calls.length > 0)
 
     const event = Object.assign(new Event('keydown', { cancelable: true }), { key: 's', ctrlKey: true, metaKey: false, altKey: false, shiftKey: false })
 

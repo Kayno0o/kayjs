@@ -3,6 +3,7 @@ import { describe, expect, it, spyOn } from 'bun:test'
 import { browserKeeper, KEEP_FOR } from '../src/draft-storage'
 import { createDrafts } from '../src/drafts'
 import { BODY } from '../src/markers'
+import { until } from './until'
 
 const post: DraftEntry = { collection: 'posts', slug: 'hello', data: { title: 'Hello' }, body: '# Hello' }
 
@@ -277,6 +278,8 @@ describe('writing the kept draft', () => {
       drafts.set(post, 'title', title)
 
     expect(writes).not.toHaveBeenCalled()
+    await until(() => writes.mock.calls.length > 0)
+    // A deliberate wait for nothing more to happen: a second write would come within a few of the 10 ms pauses.
     await Bun.sleep(40)
     expect(writes).toHaveBeenCalledTimes(1)
     expect((JSON.parse(storage.getItem('kcms:draft:posts:hello')!) as { entry: DraftEntry }).entry.data.title).toBe('Hel')

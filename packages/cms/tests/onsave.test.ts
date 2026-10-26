@@ -3,6 +3,7 @@ import type { CollectionInfo } from '../src/kay/contract'
 import { afterEach, beforeEach, expect, mock, spyOn, test } from 'bun:test'
 import { log } from '../src/log'
 import { configure } from '../src/settings'
+import { until } from './until'
 
 const products: CollectionInfo = { name: 'products', kind: 'loaded', schema: { type: 'object', properties: { name: { type: 'string' } } }, components: [], localized: false }
 
@@ -63,13 +64,15 @@ test('logs a hook that fails after the limit, too', async () => {
   setSaveHookLimit(10)
 
   const failure = new Error('late failure')
+  const limitPassed = Promise.withResolvers<void>()
 
   configure({ onSave: async () => {
-    await Bun.sleep(60)
+    await limitPassed.promise
 
     throw failure
   } })
   await saveEntry(entry)
-  await Bun.sleep(100)
+  limitPassed.resolve()
+  await until(() => logged.mock.calls.length > 0)
   expect(logged).toHaveBeenCalledWith('onSave failed for products/mug', failure)
 })
