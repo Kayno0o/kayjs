@@ -159,7 +159,7 @@ describe('kay upgrade', () => {
         ['check', '--fix', '--since', '1.41'],
         ['check', '--fix', '--since', '1.44'],
         ['check', '--fix', '--since', '1.46'],
-        ['check', '--fix'],
+        ['check', '--fix', '--deny-warnings'],
       ])
     }
     finally {
@@ -175,7 +175,26 @@ describe('kay upgrade', () => {
     try {
       expect(await upgradeProject(root, deps, { quiet: true })).toBe(0)
       expect(log.mock.calls.map(call => String(call[0])).join('\n')).not.toMatch(/moved|rewriting|checking/)
-      expect(calls.kay.slice(1)).toEqual([['check', '--fix', '--since', '1.44', '--quiet'], ['check', '--fix', '--quiet']])
+      expect(calls.kay.slice(1)).toEqual([['check', '--fix', '--since', '1.44', '--quiet'], ['check', '--fix', '--deny-warnings', '--quiet']])
+    }
+    finally {
+      log.mockRestore()
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
+  it('does not say nothing is left while the last check still reports warnings', async () => {
+    const root = await project()
+    const { deps } = fakes({ '@kaynooo/kayjs': '1.46.0', '@kaynooo/kayjs-ui': '1.46.0' })
+    const kay = deps.kay
+    const log = spyOn(console, 'log').mockImplementation(() => undefined)
+
+    // Only a warning is left: the check exits 0 unless it is told warnings fail.
+    deps.kay = async (dir, args, capture, env) => (args[0] === 'check' && args.includes('--deny-warnings') ? { code: 1, stdout: '' } : kay(dir, args, capture, env))
+
+    try {
+      expect(await upgradeProject(root, deps)).toBe(1)
+      expect(log.mock.calls.map(call => String(call[0])).join('\n')).not.toContain('nothing left')
     }
     finally {
       log.mockRestore()
@@ -283,7 +302,7 @@ describe('kay upgrade across removed deprecations', () => {
         ['~1.76.0', 'npm:@kaynooo/kayjs@~1.76.0'],
         ['~1.77.2', 'npm:@kaynooo/kayjs@~1.77.2'],
       ])
-      expect(calls.kay.filter(args => args[0] === 'check')).toEqual([['check', '--fix', '--since', '1.71'], ['check', '--fix', '--since', '1.72'], ['check', '--fix', '--since', '1.74'], ['check', '--fix']])
+      expect(calls.kay.filter(args => args[0] === 'check')).toEqual([['check', '--fix', '--since', '1.71'], ['check', '--fix', '--since', '1.72'], ['check', '--fix', '--since', '1.74'], ['check', '--fix', '--deny-warnings']])
       expect(new Set(envs.map(env => env?.KAY_UPGRADE_FROM))).toEqual(new Set(['1.70.2']))
       expect(await Bun.file(join(root, 'package.json')).text()).toBe(appOn('1.77.2'))
     }
@@ -299,7 +318,7 @@ describe('kay upgrade across removed deprecations', () => {
     try {
       await quietly(async () => upgradeProject(root, deps))
       // Stone 1.73 holds 1.71; the latest 1.76 holds 1.74 and 1.75.
-      expect(calls.kay.filter(args => args[0] === 'check')).toEqual([['check', '--fix', '--since', '1.71'], ['check', '--fix', '--since', '1.74'], ['check', '--fix', '--since', '1.75'], ['check', '--fix']])
+      expect(calls.kay.filter(args => args[0] === 'check')).toEqual([['check', '--fix', '--since', '1.71'], ['check', '--fix', '--since', '1.74'], ['check', '--fix', '--since', '1.75'], ['check', '--fix', '--deny-warnings']])
     }
     finally {
       await rm(root, { recursive: true, force: true })

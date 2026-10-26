@@ -207,7 +207,7 @@ export async function upgradeProject(root: string, deps: UpgradeDeps, { dryRun =
 
   step('checking', 'what is left')
 
-  const left = await deps.kay(root, ['check', '--fix', ...quiet ? ['--quiet'] : []], false, { [UPGRADE_FROM]: from })
+  const left = await deps.kay(root, ['check', '--fix', '--deny-warnings', ...quiet ? ['--quiet'] : []], false, { [UPGRADE_FROM]: from })
 
   if (left.code === 0 && !leftOnTheWay)
     done('upgraded', `to kay ${latestKay}, nothing left to do by hand`)

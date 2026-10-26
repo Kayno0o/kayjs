@@ -108,4 +108,10 @@ kay and its libraries require Bun 1.4.4 or later (`bun upgrade`, then `bun updat
 
 In an island `markdownHtml` from `kay/markdown` returns the text as written on its first call and the formatted HTML after marked has loaded, which a template or an effect calling it picks up. Read it there; a click handler or the script calls `await markdownReady()` (from `kay/markdown`) before it, else it gets the text as written. An island hydrating keeps the server's formatted markup until then.
 
-Releases before 1.72 are in the notes of their releases, at https://git.kaynooo.fr/kaynooo/kayjs/releases.
+## 1.71.0
+
+### `kay check` warns of a static component promoted to an island
+
+- `promoted-island` names a call passing a component a function, or a block taking parameters, which turns it into an island that hydrates and sends its own props to the browser. `kay upgrade` cannot decide for you, so each is left as a warning: add `// kay-island` on a line of its own in the component when it is meant, or pass data a page can serialize instead of the function (`Table(columns=...)` and `Popover` blocks are the usual calls). `kay explain promoted-island` shows an example, see [Islands](islands.md).
+
+Releases before 1.71 are in the notes of their releases, at https://git.kaynooo.fr/kaynooo/kayjs/releases.
