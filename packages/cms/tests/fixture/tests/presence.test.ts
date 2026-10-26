@@ -1,11 +1,24 @@
 import { join } from 'node:path'
 import { afterAll, expect, test } from 'bun:test'
+import { memoryRooms } from 'kay/server'
 import { testSite } from 'kay/test'
 
 const ROOT = join(import.meta.dir, '..')
-const built = await testSite({ root: ROOT, browser: true })
+const rooms = memoryRooms()
+const built = await testSite({ root: ROOT, browser: true, store: { rooms } })
 // A tab that closed leaves its room after a grace and a heartbeat.
 const SETTLED = { timeout: '15s' } as const
+
+async function waitUntil(done: () => boolean): Promise<void> {
+  const until = Date.now() + 15_000
+
+  while (!done()) {
+    if (Date.now() > until)
+      throw new Error('the previous test\'s tabs never left the entry\'s room')
+
+    await Bun.sleep(50)
+  }
+}
 
 afterAll(async () => {
   await built.close()
@@ -41,6 +54,9 @@ test('the on-page editor and the list join an entry\'s room: the screen names it
 
 test('editors with no name still count each other when a list is open, and the list says the entry is being edited', async () => {
   const says = () => document.querySelector('.kcms-editor .kcms-entry-presence')?.textContent?.trim()
+
+  // The tabs the previous test closed are kept in the entry's room for a grace, and count as editors until then: a wait for "1 other editor" they satisfy would end when they leave, before the second editor has joined.
+  await waitUntil(() => rooms.members(`kay:presence:open:cms:posts:hello`).length === 0)
 
   await using list = await built.open('/admin/collections/posts?as=Bob')
   await using first = await built.open('/admin/page?path=/blog/hello')
