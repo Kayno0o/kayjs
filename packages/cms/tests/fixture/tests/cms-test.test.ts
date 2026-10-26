@@ -56,3 +56,46 @@ test('a collection that does not exist is an error, not an empty answer', async 
   await editor.signInAs()
   await expect(editor.save('nowhere', 'a', { title: 'A' })).rejects.toThrow('answered 404')
 })
+
+test('saves over an entry without naming its version, and refuses a stale one named', async () => {
+  const site = await siteWith('pw-editor')
+  const editor = cmsTest(site)
+
+  await editor.signInAs()
+  expect(await editor.save('posts', 'versioned', { title: 'One' }, { create: true })).toMatchObject({ saved: true, version: expect.any(String) })
+  expect(await editor.save('posts', 'versioned', { title: 'Two' })).toMatchObject({ saved: true })
+  expect(await editor.save('posts', 'versioned', { title: 'Three' }, { version: 'stale' })).toMatchObject({ issues: expect.any(Array) })
+  expect((await editor.entry('posts', 'versioned'))?.data).toMatchObject({ title: 'Two' })
+})
+
+test('deletes and renames an entry, naming its version itself', async () => {
+  const site = await siteWith('pw-editor')
+  const editor = cmsTest(site)
+
+  await editor.signInAs()
+  await editor.save('posts', 'old-name', { title: 'Old' }, { create: true })
+  expect(await editor.rename('posts', 'old-name', 'new-name')).toMatchObject({ saved: true, slug: 'new-name' })
+  expect(await editor.entry('posts', 'old-name')).toBeUndefined()
+  expect(await editor.delete('posts', 'new-name')).toMatchObject({ saved: true })
+  expect(await editor.entry('posts', 'new-name')).toBeUndefined()
+  expect(await editor.delete('posts', 'new-name', { version: 'stale' })).toMatchObject({ issues: expect.any(Array) })
+})
+
+test('a move in a collection with no order field is refused with its issues', async () => {
+  const site = await siteWith('pw-editor')
+  const editor = cmsTest(site)
+
+  await editor.signInAs()
+  expect(await editor.move('posts', 'hello', 'up')).toMatchObject({ issues: expect.any(Array) })
+})
+
+test('uploads a file and answers the path to keep', async () => {
+  const site = await siteWith('pw-editor')
+  const editor = cmsTest(site)
+
+  await editor.signInAs()
+
+  const upload = await editor.upload('posts', new File([await Bun.file(join(ROOT, 'src/outside.png')).arrayBuffer()], 'pic.png', { type: 'image/png' }))
+
+  expect(upload.path).toStartWith('/_kay/files/cms-media/')
+})

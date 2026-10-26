@@ -5,6 +5,7 @@ import type { SaveOutcome } from './store'
 import { apiUrl } from 'kay'
 import { configError } from 'kay/library'
 import entriesApi from './api/entries'
+import filesApi from './api/files'
 import { HINT_COOKIE } from './page-link'
 import { activePasswords, HOST_SESSION_COOKIE, SESSION_COOKIE, sessionCookiesOf } from './password'
 import { settings } from './settings'
@@ -70,8 +71,21 @@ export interface CmsSaveOptions {
   locale?: string | undefined
   // A new entry: the save refuses a slug that exists.
   create?: boolean | undefined
-  // The version of the entry read, which a save over someone else's is refused for.
+  // The version of the entry read, which a save over someone else's is refused for; read from the entry as it is now when left out, so a test names it only to try a stale one.
   version?: string | undefined
+}
+
+export interface CmsEntryOptions {
+  locale?: string | undefined
+  // The version of the entry read; read from the entry as it is now when left out.
+  version?: string | undefined
+}
+
+export interface CmsUpload {
+  // The path a page renders the file from, under `/_kay/files/cms-media/`.
+  path: string
+  width?: number | undefined
+  height?: number | undefined
 }
 
 export interface CmsTest {
@@ -79,10 +93,18 @@ export interface CmsTest {
   signInAs: (role?: string) => Promise<string>
   // Signs the site out of the cms, its other cookies kept.
   signOut: () => void
-  // Saves an entry as the signed-in editor does from the screen: the answer is `{ saved: true }`, or `{ issues }` for a refused entry, and a site not signed in throws.
+  // Saves an entry as the signed-in editor does from the screen: the answer is `{ saved: true, version }`, or `{ issues }` for a refused entry, and a site not signed in throws.
   save: (collection: string, slug: string, data: Record<string, unknown>, options?: CmsSaveOptions) => Promise<CmsSaveOutcome>
   // The entry as the editor opens it, with its `version`, or undefined when there is none.
   entry: (collection: string, slug: string, options?: Pick<EntryRef, 'locale'>) => Promise<StoredEntry | undefined>
+  // Deletes an entry as the editor does, naming the version of the entry as it is now; the answer is `{ saved: true }` or `{ issues }`.
+  delete: (collection: string, slug: string, options?: CmsEntryOptions) => Promise<CmsSaveOutcome>
+  // Renames an entry's slug, naming its version; the answer is `{ saved: true, slug }` or `{ issues }`.
+  rename: (collection: string, slug: string, to: string, options?: CmsEntryOptions) => Promise<CmsSaveOutcome & { slug?: string }>
+  // Moves an entry up or down in a collection that names an order field.
+  move: (collection: string, slug: string, direction: 'up' | 'down', options?: Pick<EntryRef, 'locale'>) => Promise<CmsSaveOutcome>
+  // Uploads a file as a field's drop zone does: the answer is the path to keep in the entry.
+  upload: (collection: string, file: File) => Promise<CmsUpload>
 }
 
 async function answered(response: Response, what: string, missing = false): Promise<unknown> {
@@ -99,20 +121,57 @@ async function answered(response: Response, what: string, missing = false): Prom
 // Saves go to the content the test site holds, never to the project's.
 export function cmsTest(site: Pick<TestSite, 'cookies' | 'fetch'>): CmsTest {
   const path = (collection: string, slug: string) => `${apiUrl(entriesApi)}/${encodeURIComponent(collection)}/${encodeURIComponent(slug)}`
+  const localeQuery = (locale: string | undefined) => locale === undefined ? '' : `?locale=${encodeURIComponent(locale)}`
+
+  async function entry(collection: string, slug: string, options: Pick<EntryRef, 'locale'> = {}) {
+    const found = await answered(await site.fetch(`${path(collection, slug)}${localeQuery(options.locale)}`), `reading ${collection}/${slug}`, true) as { entry?: StoredEntry } | undefined
+
+    return found?.entry
+  }
+
+  // The version the editor would send: the one named, else the entry's as it is now.
+  async function versionOf(collection: string, slug: string, { locale, version }: CmsEntryOptions) {
+    return version ?? (await entry(collection, slug, { locale }))?.version
+  }
+
+  const versioned = (locale: string | undefined, version: string | undefined) => new URLSearchParams({ ...locale !== undefined && { locale }, ...version !== undefined && { version } }).toString()
 
   return {
     signInAs: async role => cmsSignInAs(site, role),
     signOut: () => cmsSignOut(site),
     save: async (collection, slug, data, options = {}) => {
-      const response = await site.fetch(path(collection, slug), { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ data, ...options }) })
+      const version = options.create ? options.version : await versionOf(collection, slug, options)
+      const response = await site.fetch(path(collection, slug), { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ data, ...options, ...version !== undefined && { version } }) })
 
       return await answered(response, `saving ${collection}/${slug}`) as CmsSaveOutcome
     },
-    entry: async (collection, slug, options = {}) => {
-      const query = options.locale === undefined ? '' : `?locale=${encodeURIComponent(options.locale)}`
-      const found = await answered(await site.fetch(`${path(collection, slug)}${query}`), `reading ${collection}/${slug}`, true) as { entry?: StoredEntry } | undefined
+    entry,
+    delete: async (collection, slug, options = {}) => {
+      const query = versioned(options.locale, await versionOf(collection, slug, options))
+      const response = await site.fetch(`${path(collection, slug)}${query && `?${query}`}`, { method: 'DELETE' })
 
-      return found?.entry
+      return await answered(response, `deleting ${collection}/${slug}`) as CmsSaveOutcome
+    },
+    rename: async (collection, slug, to, options = {}) => {
+      const query = versioned(options.locale, await versionOf(collection, slug, options))
+      const response = await site.fetch(`${path(collection, slug)}/rename${query && `?${query}`}`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ slug: to }) })
+
+      return await answered(response, `renaming ${collection}/${slug}`) as CmsSaveOutcome & { slug?: string }
+    },
+    move: async (collection, slug, direction, options = {}) => {
+      const query = new URLSearchParams({ direction, ...options.locale !== undefined && { locale: options.locale } }).toString()
+      const response = await site.fetch(`${path(collection, slug)}/move?${query}`, { method: 'POST' })
+
+      return await answered(response, `moving ${collection}/${slug}`) as CmsSaveOutcome
+    },
+    upload: async (collection, file) => {
+      const body = new FormData()
+
+      body.set('file', file)
+
+      const response = await site.fetch(`${apiUrl(filesApi)}/${encodeURIComponent(collection)}`, { method: 'POST', body })
+
+      return await answered(response, `uploading ${file.name} to ${collection}`) as CmsUpload
     },
   }
 }

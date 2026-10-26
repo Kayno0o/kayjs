@@ -74,7 +74,7 @@ kayjs-auth's `await auth.signInAs(site, { email, username })` signs a test site 
 
 ### Test a library's part
 
-Each library has one helper, called at the top of a file, that clears itself before every test: `const mail = mailTest(site)` from `@kaynooo/kayjs-mail/test` (the site's mails, `waitFor` running its queues), `const model = aiTest()` from `@kaynooo/kayjs-ai/test` (`reply`, `fail`, `asked`), `const as = auth.test(site)` (`signInAs`, `signOut`, `sessionCookie`) and `const editor = cmsTest(site)` from `@kaynooo/kayjs-cms/test` (`signInAs`, `save`, `entry`); each library's llms.txt has the rest.
+Each library has one helper, called at the top of a file, that clears itself before every test: `const mail = mailTest(site)` from `@kaynooo/kayjs-mail/test` (the site's mails, `waitFor` running its queues), `const model = aiTest()` from `@kaynooo/kayjs-ai/test` (`reply`, `fail`, `asked`), `const as = auth.test(site)` (`signInAs`, `signOut`, `sessionCookie`) and `const editor = cmsTest(site)` from `@kaynooo/kayjs-cms/test` (`signInAs`, `save`, `entry`, `delete`, `rename`, `move`, `upload`); each library's llms.txt has the rest.
 
 ### Check a page's metadata
 
