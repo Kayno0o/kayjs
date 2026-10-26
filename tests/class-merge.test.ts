@@ -225,6 +225,7 @@ describe('kay dev with the class table', () => {
       await build([])
       const before = await stamps(clientDir(project))
 
+      // The edit has to be newer than the build's files by a file time's granularity.
       await Bun.sleep(20)
       await Bun.write(page, `${source}p ${added}\n`)
       await build(['src/routes/index.kay'])

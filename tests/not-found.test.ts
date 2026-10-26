@@ -9,6 +9,7 @@ import { clearMissing, dismissMissing } from '../src/server/library'
 import { answeredBy, countedPath, countMissing, flushStores, knowRedirects, missingPaths, missingStore, pageRequested, referrerHost, referrerOf, suggester, unansweredPaths } from '../src/server/not-found'
 import { withRedirect } from '../src/server/not-found-config'
 import { readRuntimeRedirects } from '../src/server/runtime-redirects'
+import { eventually } from './helpers/eventually'
 import { scratchDir } from './scratch'
 import { pages } from './shared-pages'
 
@@ -219,8 +220,7 @@ describe('missingStore', () => {
     flushStores()
     expect(reader.list().map(({ path, hits, referrers }) => ({ path, hits, referrers }))).toEqual([{ path: '/a', hits: 3, referrers: [{ host: 'x.example', hits: 2 }] }, { path: '/b', hits: 1, referrers: [] }])
     store.hit('/c', undefined, never)
-    await Bun.sleep(1200)
-    expect(reader.list().map(row => row.path)).toContain('/c')
+    await eventually(() => expect(reader.list().map(row => row.path)).toContain('/c'))
     store.hit('/d', undefined, never)
     store.close()
     expect(reader.list().map(row => row.path)).toContain('/d')
@@ -395,9 +395,7 @@ describe('countMissing', () => {
     await visit('/gone', { headers: { referer: 'http://localhost/news/item?q=private' } })
 
     await counted('/gone')
-    await Bun.sleep(20)
-
-    expect((await counted('/gone')).referrers).toContainEqual({ host: 'localhost', page: '/news/item', hits: 1 })
+    await eventually(async () => expect((await counted('/gone')).referrers).toContainEqual({ host: 'localhost', page: '/news/item', hits: 1 }))
     expect(JSON.stringify(missingPaths())).not.toContain('private')
   })
 })

@@ -40,6 +40,7 @@ describe.each(kinds)('job store contract, $name', ({ name, open }) => {
   // Lets `ms` go by for the store's clock.
   async function pass(ms: number): Promise<void> {
     if (name === 'postgres')
+      // Postgres stamps rows with its own clock, which only real time moves.
       await Bun.sleep(ms)
     else
       skew += ms

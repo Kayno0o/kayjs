@@ -128,6 +128,7 @@ describe('uid', () => {
   it('keeps a token to its own render while others run at the same time', async () => {
     const drawn = async (token: string | undefined, wait: number) => {
       const run = async () => {
+        // Staggered on purpose, so the renders overlap in a different order than they started.
         await Bun.sleep(wait)
 
         return pageIds(() => uid())

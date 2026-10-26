@@ -152,6 +152,7 @@ describe('an entry that does not listen', () => {
 
     try {
       expect(await until(async () => body(`http://127.0.0.1:${port}/mine`))).toBe('mine')
+      // Nothing happens: a second listen would have made the child exit by now.
       await Bun.sleep(300)
       expect(child.exitCode).toBeNull()
     }
@@ -169,6 +170,7 @@ describe('an entry that does not listen', () => {
 
     try {
       expect(await until(async () => body(`http://127.0.0.1:${second}/mine`))).toBe('mine')
+      // Nothing happens: a second listen would have opened the entry's own port by now.
       await Bun.sleep(300)
       await expect(fetch(`http://127.0.0.1:${port}/mine`)).rejects.toThrow()
     }
@@ -241,6 +243,7 @@ describe('an entry that does not listen', () => {
 
     try {
       expect(await until(async () => body(`http://127.0.0.1:${port}/mine`))).toBe('mine')
+      // Nothing happens: a second listen would have made the child exit by now.
       await Bun.sleep(300)
       expect(child.exitCode).toBeNull()
     }
@@ -255,6 +258,7 @@ describe('an entry that does not listen', () => {
 
     try {
       expect(await until(async () => body(`http://127.0.0.1:${port + 1}/mine`))).toBe('mine')
+      // Nothing happens: a second listen would have made the child exit by now.
       await Bun.sleep(300)
       expect(child.exitCode).toBeNull()
     }

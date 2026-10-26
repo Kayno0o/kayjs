@@ -303,6 +303,7 @@ describe('kay build', () => {
       expect((await build(['src/lab.kay'])).failed).toBe(false)
       expect(bundles()).toBe(first)
 
+      // The edit has to be newer than the last build by a file time's granularity.
       await Bun.sleep(20)
       await Bun.write(join(project, 'src/echo.ts'), 'postMessage(2)\n')
       await Bun.write(lab, `${await Bun.file(lab).text()}p again\n`)
@@ -1924,7 +1925,10 @@ const island = await app.handle(new Request('http://localhost/_kay/error', { met
 for (const path of ['library', 'plain', ''])
   await app.handle(new Request(\`http://localhost/\${path}\`))
 
-await Bun.sleep(20)
+// The after-response hooks log the requests, so the four errors the test reads are waited for.
+for (let tries = 0; tries < 500 && !['server', 'library', 'plain', 'twin'].every(name => logged.some(stack => stack.startsWith(\`Error: \${name} boom\`))); tries++)
+  await Bun.sleep(10)
+
 console.log(JSON.stringify({ status, island: island.status, logged, reported }))
 process.exit(0)
 `,
@@ -2551,6 +2555,7 @@ describe('the files a build writes', () => {
 
       const written = (await stat(file)).mtimeMs
 
+      // The second write has to come later by a file time's granularity, for an untouched mtime to mean no write.
       await Bun.sleep(10)
       await writeIfChanged(file, 'a')
       expect((await stat(file)).mtimeMs).toBe(written)

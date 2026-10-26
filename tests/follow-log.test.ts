@@ -128,6 +128,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('followLog 
         return original.call(this)
       }
       document.querySelector<HTMLElement>('ol.list')!.scrollTop = 21_000
+      // Two frames and a margin for the scroll listener to run, which has no event to wait for, then the count is read.
       await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(() => setTimeout(resolve, 50))))
       Element.prototype.getBoundingClientRect = original
 

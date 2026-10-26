@@ -116,6 +116,7 @@ describe('translations', () => {
       await translations('pages')
       await translations('pages')
       expect(counts.loads).toBe(1)
+      // The loader's 300 ms ttl has to pass for real.
       await Bun.sleep(400)
       await translations('pages')
       expect(counts.loads).toBe(2)

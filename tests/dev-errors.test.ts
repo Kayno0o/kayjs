@@ -192,6 +192,7 @@ describe('the errors kay dev lists for a reader without a browser', () => {
       const app = await pages({ root, dev: true, prebuilt: false })
 
       expect((await app.handle(new Request('http://localhost/outside'))).status).toBe(500)
+      // Nothing happens: a recorded error would have been written by now.
       await Bun.sleep(50)
       expect(listed(root)).toBeUndefined()
     }

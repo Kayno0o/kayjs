@@ -376,6 +376,7 @@ describe('a store answering with promises', () => {
     mod.trackStore(store)
     mod.invalidate('k')
     expect(await mod.cached('k', '600s', () => 'loaded', { store })).toBe('loaded')
+    // Nothing happens: a rejection left behind would surface within this time.
     await Bun.sleep(50)
   })
 })

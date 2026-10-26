@@ -39,6 +39,7 @@ import { setTracer, traced } from '../src/server/trace'
 import { parsingRoutes, routePaths } from './elysia'
 import { auth } from './fixtures/site/src/auth'
 import { resetTodos } from './fixtures/site/src/data'
+import { eventually } from './helpers/eventually'
 import { prerendered, refusedPrerender, scratchBuild } from './prerendered'
 import { scratchDir } from './scratch'
 import { pages } from './shared-pages'
@@ -458,8 +459,7 @@ describe('pages', () => {
       await hydrateFrom(html)
       expect(document.querySelector('slot button')).toBe(button)
       button.dispatchEvent(new Event('click', { bubbles: true }))
-      await new Promise(resolve => setTimeout(resolve, 0))
-      expect(button.textContent).toBe('Clicked 2')
+      await eventually(() => expect(button.textContent).toBe('Clicked 2'))
       expect(document.querySelector('article.card')).toBe(card)
     }
     finally {
@@ -617,8 +617,7 @@ describe('pages', () => {
       // A person types and submits in separate tasks.
       await new Promise(resolve => setTimeout(resolve, 0))
       document.querySelector('form.quick')!.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }))
-      await new Promise(resolve => setTimeout(resolve, 50))
-      expect(document.querySelector('p.saved')?.textContent).toStartWith('Saved as ')
+      await eventually(() => expect(document.querySelector('p.saved')?.textContent).toStartWith('Saved as '))
       // The call went through, so the page runs its loads again; it lands before the DOM goes away.
       await waitFor(() => requests.includes('GET /new') && !document.documentElement.hasAttribute('aria-busy'))
       expect(document.querySelector('p.saved')?.textContent).toStartWith('Saved as ')
@@ -1143,8 +1142,7 @@ describe('await blocks', () => {
       const button = document.querySelector('slot button')!
 
       button.dispatchEvent(new Event('click', { bubbles: true }))
-      await new Promise(resolve => setTimeout(resolve, 0))
-      expect(button.textContent).toBe('Clicked 3')
+      await eventually(() => expect(button.textContent).toBe('Clicked 3'))
     }
     finally {
       await GlobalRegistrator.unregister()
@@ -2065,8 +2063,7 @@ describe('tracing and timing in production', () => {
 
         expect(await (await traced.handle(new Request('http://localhost/api/echo', { method: 'POST', headers: { 'content-type': 'text/plain' }, body: 'hello' }))).text()).toBe('5')
         // Elysia runs the hook ending it once the response is out.
-        await new Promise(resolve => setTimeout(resolve, 10))
-        expect(ended).toEqual([{ name: 'POST /api/echo', parent: undefined, kind: 1, attributes: { 'http.request.method': 'POST', 'http.route': '/api/echo', 'url.path': '/api/echo', 'kay.request.id': expect.any(String), 'http.response.status_code': 200 } }])
+        await eventually(() => expect(ended).toEqual([{ name: 'POST /api/echo', parent: undefined, kind: 1, attributes: { 'http.request.method': 'POST', 'http.route': '/api/echo', 'url.path': '/api/echo', 'kay.request.id': expect.any(String), 'http.response.status_code': 200 } }]))
       }
     }
     finally {

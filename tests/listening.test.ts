@@ -105,6 +105,7 @@ it('starts a suite server that ignores SIGTERM and goes with stopSuiteServer', a
   const port = await listeningPort(server)
 
   server.kill()
+  // Nothing happens: a server that ignores SIGTERM would have gone by now.
   await Bun.sleep(200)
   expect(server.signalCode).toBeNull()
   expect(await (await fetch(`http://localhost:${port}/`)).text()).toBe('ok')

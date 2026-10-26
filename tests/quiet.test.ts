@@ -116,6 +116,7 @@ describe('--quiet', () => {
   it('start leaves out the warning that the build is older than the sources', async () => {
     const root = await project({ '.kay/client/manifest.json': '{}' })
 
+    // The build has to be older than the sources by a file time's granularity.
     await Bun.sleep(20)
     await Bun.write(join(root, 'kay.config.ts'), 'export default { favicon: false }\n')
     await Bun.write(join(root, 'server.ts'), 'console.log("up")\n')

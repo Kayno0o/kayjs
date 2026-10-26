@@ -353,6 +353,7 @@ describe('placeholder on a page', () => {
         await Bun.sleep(20)
 
       expect(image(remote, { width: 64, height: 48 }).style).toBe('background-color:#c86432')
+      // Nothing more is coming: the color of a resolved image is never put in a page, so there is no event to wait for.
       await Bun.sleep(100)
       // What `images.resolve` looks up may be private to the visitor, so its color is never put in a page.
       expect(image('/media/7', { width: 64, height: 48 }).style).toBeUndefined()

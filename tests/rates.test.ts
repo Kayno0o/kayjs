@@ -16,6 +16,7 @@ describe('a weighted hit', () => {
   it('opens an expired window afresh with the weight, in SQLite as in memory', async () => {
     for (const store of [memoryRates(), sqliteRates(join(await scratchDir('rates'), 'rates.sqlite'))]) {
       await store.hit('key', '1ms', 5)
+      // The 1 ms window really has to pass, which the store reads from the clock.
       await Bun.sleep(5)
       expect((await store.hit('key', '60000ms', 3)).count).toBe(3)
     }

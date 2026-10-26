@@ -134,6 +134,7 @@ describe('kay check', () => {
 
       const first = await stamps()
 
+      // The edit has to be newer than the shadows by a file time's granularity.
       await Bun.sleep(20)
       await Bun.write(join(root, 'src/a.kay'), 'p changed\n')
       await writeShadowTypes(root)
@@ -4310,6 +4311,7 @@ describe('kay check --watch, stopped by a signal', () => {
 
       for (const first of before) {
         void watch.stop(first)
+        // Nothing happens: the first signal is ignored, so what the check started is still alive after a moment.
         await Bun.sleep(200)
         expect(alive(started)).toBe(true)
       }
