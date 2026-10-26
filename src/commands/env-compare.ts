@@ -1,6 +1,7 @@
 import type { CheckDiagnostic } from '../check'
 import type { Listed } from './env'
 import { dirname, join, relative, resolve } from 'node:path'
+import { CONTENT_CONFIG } from '../project'
 
 // The files `kay env` compares the declared variables with: a compose file or several, and the example env file.
 export interface EnvFiles {
@@ -27,6 +28,12 @@ const TRAILING_COMMENT = /\s\/\/.*$/
 const DESTRUCTURED_ENV = /\b(?:const|let|var)\s*\{([^}]*)\}\s*=\s*(?:process\.env|Bun\.env)\b/
 const LEADING_NAME = /^\s*([a-z_]\w*)\s*(?:[:=,]|$)/i
 const LINE_BREAK = /\r?\n/
+// A line comment that keeps a file out of the raw read check, for a module that must read the environment itself.
+const RAW_ENV_MARK = /^\s*\/\/\s*kay-env:\s*raw\b/m
+const BUILD_COMMAND = /\bbun\s+build\b[^&|;]*/g
+const SOURCE_ARGUMENT = /(?<![\w./-])((?:\.\/)?src\/[^\s'"]+\.[cm]?[jt]sx?)(?![\w/])/g
+const RELATIVE_IMPORT = /\b(?:from|import)\s*(?:\(\s*)?['"](\.{1,2}\/[^'"]+)['"]/g
+const SOURCE_EXTENSIONS = ['', '.ts', '.tsx', '.js', '.jsx', '.mjs', '.mts', '/index.ts', '/index.js']
 
 // Read by kay or the runtime itself, never by a schema.
 export const IGNORED_READS = new Set(['NODE_ENV'])
@@ -138,13 +145,76 @@ export interface RawRead {
   length?: number
 }
 
-// The reads of `process.env.X`, `process.env['X']`, `Bun.env.X` and a one-line `const { X } = process.env` in the project's own sources, tests apart; a read on several lines, through a variable name or `import.meta.env` is not seen, and a trailing `//` comment is dropped.
+async function readText(file: string): Promise<string> {
+  try {
+    return await Bun.file(file).text()
+  }
+  catch {
+    return ''
+  }
+}
+
+async function readJson(file: string): Promise<unknown> {
+  try {
+    return JSON.parse(await readText(file))
+  }
+  catch {
+    return undefined
+  }
+}
+
+// The files that load before the server boots or run on their own, whose raw reads no schema of the app fits: the content config, and every module reached through relative imports from a file a `bun build` script of package.json names, such as a standalone binary's entry.
+async function standaloneFiles(root: string): Promise<Set<string>> {
+  const found = new Set<string>()
+  const queue = [resolve(root, CONTENT_CONFIG)]
+  const scripts = ((await readJson(join(root, 'package.json'))) as { scripts?: Record<string, unknown> } | undefined)?.scripts ?? {}
+
+  for (const script of Object.values(scripts)) {
+    for (const build of String(script).matchAll(BUILD_COMMAND)) {
+      for (const argument of build[0].matchAll(SOURCE_ARGUMENT))
+        queue.push(resolve(root, argument[1]!))
+    }
+  }
+
+  for (let file = queue.pop(); file !== undefined; file = queue.pop()) {
+    if (found.has(file))
+      continue
+
+    found.add(file)
+
+    const text = await readText(file)
+
+    for (const match of text.matchAll(RELATIVE_IMPORT)) {
+      const base = resolve(dirname(file), match[1]!)
+
+      for (const extension of SOURCE_EXTENSIONS) {
+        const candidate = Bun.file(base + extension)
+
+        if (await candidate.exists() && !(await candidate.stat()).isDirectory()) {
+          queue.push(base + extension)
+
+          break
+        }
+      }
+    }
+  }
+
+  return found
+}
+
+// The reads of `process.env.X`, `process.env['X']`, `Bun.env.X` and a one-line `const { X } = process.env` in the project's own sources, tests apart, and apart from the files `standaloneFiles` names and those carrying `// kay-env: raw`; a read on several lines, through a variable name or `import.meta.env` is not seen, and a trailing `//` comment is dropped.
 export async function rawReads(root: string): Promise<RawRead[]> {
   const found: RawRead[] = []
   const files = [...new Bun.Glob('src/**/*.{ts,tsx,js,jsx,mjs,mts,kay}').scanSync({ cwd: root })].sort().filter(file => !TEST_FILE.test(file) && !file.endsWith('.d.ts'))
+  const standalone = await standaloneFiles(root)
 
   for (const file of files) {
-    for (const [index, source] of (await Bun.file(join(root, file)).text()).split('\n').entries()) {
+    const text = await Bun.file(join(root, file)).text()
+
+    if (standalone.has(resolve(root, file)) || RAW_ENV_MARK.test(text))
+      continue
+
+    for (const [index, source] of text.split('\n').entries()) {
       if (COMMENT_LINE.test(source))
         continue
 
@@ -237,7 +307,7 @@ export async function compareEnv(root: string, variables: Listed[], files: EnvFi
 
   for (const { name, file, line } of complete ? await rawReads(root) : []) {
     if (!declared.has(name) && !IGNORED_READS.has(name))
-      problems.push(diagnostic('warning', file, line, `process.env.${name} is read with no schema declaring it: declare it with defineEnv so kay env lists it`))
+      problems.push(diagnostic('warning', file, line, `process.env.${name} is read with no schema declaring it: declare it with defineEnv so kay env lists it, or write // kay-env: raw in a file that must read the environment itself`))
   }
 
   return problems

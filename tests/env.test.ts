@@ -772,6 +772,25 @@ describe('kay check --fix on raw environment reads', () => {
     expect(await read(root, 'src/env.ts')).toContain('TWO: s.Optional(s.String()),')
   })
 
+  it('leaves a standalone entry and what it imports, a config-time module and a file marked raw, with no warning', async () => {
+    const root = await project({
+      ...config,
+      'package.json': '{ "scripts": { "collector": "bun build --compile src/collector/main.ts --outfile out/collector" } }\n',
+      'src/collector/main.ts': 'import { url } from \'./url\'\n\nexport const a = process.env.COLLECTOR_TOKEN ?? url\n',
+      'src/collector/url.ts': 'export const url = process.env.COLLECTOR_URL\n',
+      'src/content.config.ts': 'export const db = process.env.CONTENT_DB\n',
+      'src/marked.ts': '// kay-env: raw\nexport const b = process.env.MARKED\n',
+      'src/lib.ts': 'export const c = process.env.SERVER_ONLY\n',
+    })
+    const { stderr } = await kay(['check', '--fix'], root)
+
+    expect(stderr).not.toMatch(/COLLECTOR_|CONTENT_DB|MARKED/)
+    expect(await read(root, 'src/collector/main.ts')).toContain('process.env.COLLECTOR_TOKEN')
+    expect(await read(root, 'src/content.config.ts')).toBe('export const db = process.env.CONTENT_DB\n')
+    expect(await read(root, 'src/lib.ts')).toContain('env.SERVER_ONLY')
+    expect(await read(root, 'src/env.ts')).not.toMatch(/COLLECTOR_|CONTENT_DB|MARKED/)
+  })
+
   it('does nothing without --fix and where a schema in another shape exists', async () => {
     const root = await project({ ...config, 'src/lib.ts': 'export const a = process.env.FOO\n' })
 
