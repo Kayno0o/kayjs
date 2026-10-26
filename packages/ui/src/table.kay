@@ -2,7 +2,7 @@
 import type { JSX, Snippet } from 'kay'
 import type { InfiniteList } from './infinite-list'
 import type { Column, RowFilter, RowKey, RowKeyValue, SortState } from './table'
-import { effect, memo, onCleanup, onMount, persisted, recipe, signal } from 'kay'
+import { effect, memo, onCleanup, onMount, persisted, recipe, signal, untrack } from 'kay'
 import Button from './button.kay'
 import Checkbox from './checkbox.kay'
 import Icon from './icon.kay'
@@ -49,7 +49,7 @@ const { columns: given, rows: passed, list, rowKey, sort, sortable = true, serve
   columns: Column<Row>[]
   // The rows to draw. Left out when `list` holds them.
   rows?: Row[] | undefined
-  // Rows loaded page by page, from `infiniteList`: the table draws its rows with `LoadMore` after them, and a header click sorts on the server, the list starting over from offset 0 with the sort passed to its `load` (and to `onSort` too). The columns to sort by carry a `sortValue`, which only marks them sortable here.
+  // Rows loaded page by page, from `infiniteList`: the table draws its rows with `LoadMore` after them, and a header click sorts on the server, the list starting over from offset 0 with the sort passed to its `load` (and to `onSort` too). The columns to sort by carry a `sortValue` (`numeric` ones have it), which only marks them sortable here. The table's own sort, from `sort` or the URL, is sent to the list too. A sort restarts the list, so a selected row outside the first page leaves the selection.
   list?: InfiniteList<Row> | undefined
   rowKey: Key
   // The sort to start from; a table whose parent passes a new one follows it.
@@ -121,6 +121,17 @@ effect(() => {
 
   following = true
 })
+
+// A list follows the table's sort whatever set it: a header click, the URL's, or the parent's `sort`.
+effect(() => {
+  const wanted = current()
+
+  untrack(() => {
+    const held = list?.sort()
+
+    if (list && (wanted?.key !== held?.key || wanted?.direction !== held?.direction))
+      void list.sortBy(wanted)
+  })})
 
 // The rows the filter keeps, all of them without one.
 const kept = memo(() => filter === undefined ? rows() : rowsMatching(rows(), filter, typed()))
@@ -208,7 +219,6 @@ function toggle(column: Column<Row>) {
   current.set(next)
   keptKey?.set(next.key)
   keptDirection?.set(next.direction)
-  list?.sortBy(next)
   onSort?.(next)
 }
 

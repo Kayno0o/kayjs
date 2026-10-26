@@ -112,6 +112,20 @@ describe('Table over an infinite list', () => {
     expect(cells(root)).toEqual(['Europa', 'Io'])
   })
 
+  test('sends the sort it starts from to the list, which holds another', async () => {
+    const asked: (SortState | undefined)[] = []
+    const onLoad = async (at: { sort: SortState | undefined }) => {
+      asked.push(at.sort)
+
+      return []
+    }
+
+    mounted = await mountComponent(ListedTable, { onLoad, sort: { key: 'name', direction: 'desc' } })
+    await settle()
+
+    expect(asked).toEqual([{ key: 'name', direction: 'desc' }])
+  })
+
   test('draws LoadMore after the rows', async () => {
     mounted = await mountComponent(ListedTable, { onLoad: async () => [] })
 

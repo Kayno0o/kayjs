@@ -35,6 +35,8 @@ export interface InfiniteList<Row> {
   pending: () => boolean
   // Loads the next page; nothing while a page is on its way, the list is ended or a failure waits for `retry`.
   more: () => Promise<void>
+  // The sort the rows are in, or being loaded in.
+  sort: () => SortState | undefined
   // Starts the list over in that order: the rows go, and the first page comes from `load` at offset 0 with the sort. A page on its way for the old order is dropped when it lands.
   sortBy: (sort: SortState | undefined) => Promise<void>
   // Loads again the page that failed; nothing when no page failed.
@@ -126,5 +128,5 @@ export function infiniteList<Row>(first: Row[], options: InfiniteListOptions<Row
   const more = async () => failed() ? undefined : loadPage()
   const retry = async () => failed() ? loadPage() : undefined
 
-  return { rows, ended, failed, pending, more, retry, sortBy }
+  return { rows, ended, failed, pending, more, retry, sort: () => sort, sortBy }
 }

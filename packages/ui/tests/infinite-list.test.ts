@@ -212,4 +212,19 @@ describe('infiniteList', () => {
     expect(list.rows().map(ban => ban.id)).toEqual([50, 51])
     expect(list.pending()).toBe(false)
   })
+
+  test('a sortBy whose first page failed keeps the old rows, and retry reloads from offset 0 in the new order', async () => {
+    const { asked, load } = source(undefined, bans(1, 2))
+    const list = infiniteList(bans(5, 3), { pageSize: 3, key: ban => ban.id, load })
+    const by = { key: 'id', direction: 'asc' as const }
+
+    await list.sortBy(by)
+    expect(list.failed()).toBe(true)
+    expect(list.rows().map(ban => ban.id)).toEqual([5, 6, 7])
+    expect(list.sort()).toEqual(by)
+
+    await list.retry()
+    expect(asked.map(at => at.offset)).toEqual([0, 0])
+    expect(list.rows().map(ban => ban.id)).toEqual([1, 2])
+  })
 })
