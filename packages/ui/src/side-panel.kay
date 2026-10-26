@@ -47,7 +47,7 @@ const { open, title, actions, footer, modal = true, closeHref, launcher, launche
   // Makes the close control a link to this URL, for a panel open on the server whose close needs no JavaScript; the link navigates and `onOpenChange(false)` is called as well, so its handler need not navigate. Without an `onOpenChange`, Escape follows it too, so a server page renders the panel with no island of its own. Such a panel's `launcher` is a link to `launcherHref`, which the types ask for, as nothing else could open it.
   | { closeHref: string, onOpenChange?: undefined, launcher?: undefined, launcherHref?: undefined }
   | { closeHref: string, onOpenChange?: undefined, launcher: string, launcherHref: string }
-  // Called with `false` however the panel closes, a click outside and Escape included. Closed by either of those or its close button, its content is still there to read; closed by the parent, it is already gone. `launcherHref` makes the launcher a link instead, which the handler is not called for.
+  // Called with `false` however the panel closes, a click outside and Escape included. Closed by either of those or its close button, its content is still there to read; closed by the parent, it is already gone. `launcherHref` makes the launcher a link too: the link navigates and `onOpenChange(true)` is called as well.
   | { closeHref?: string | undefined, onOpenChange: (open: boolean) => unknown, launcherHref?: string | undefined }
 )>()
 
