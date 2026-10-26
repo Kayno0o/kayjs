@@ -812,6 +812,25 @@ describe('kay check --fix on raw environment reads', () => {
     expect(await read(root, 'src/env.ts')).not.toMatch(/COLLECTOR_|CONTENT_DB|MARKED/)
   })
 
+  it('follows a `.js` import, a `.kay` import, an entry outside src with --cwd, and a custom content path', async () => {
+    const root = await project({
+      ...config,
+      'kay.config.ts': 'export default { favicon: false, content: \'app/collections.ts\', env: { example: \'.env.example\' } }\n',
+      'package.json': '{ "scripts": { "a": "bun build --compile scripts/a.ts --outfile out/a.js", "b": "bun build --cwd tools --target bun b.ts --outdir dist" } }\n',
+      'scripts/a.ts': 'import { one } from \'../src/one.js\'\nimport two from \'../src/two.kay\'\n\nexport const a = [one, two]\n',
+      'src/one.ts': 'export const one = process.env.VIA_JS\n',
+      'src/two.kay': '---\nconst two = process.env.VIA_KAY\n---\np = two\n',
+      'tools/b.ts': 'export const b = process.env.VIA_CWD\n',
+      'app/collections.ts': 'export const db = process.env.VIA_CONTENT\n',
+      'src/lib.ts': 'export const c = process.env.SERVER_ONLY\n',
+    })
+    const { stderr } = await kay(['check', '--fix'], root)
+
+    expect(stderr).not.toMatch(/warning: process.env.VIA_/)
+    expect(await read(root, 'src/one.ts')).toContain('process.env.VIA_JS')
+    expect(await read(root, 'src/lib.ts')).toContain('env.SERVER_ONLY')
+  })
+
   it('does nothing without --fix and where a schema in another shape exists', async () => {
     const root = await project({ ...config, 'src/lib.ts': 'export const a = process.env.FOO\n' })
 

@@ -1,6 +1,7 @@
 import type { CheckDiagnostic } from '../check'
 import type { Listed } from './env'
 import { dirname, join, relative, resolve } from 'node:path'
+import { loadConfig } from '../config'
 import { CONTENT_CONFIG } from '../project'
 
 // The files `kay env` compares the declared variables with: a compose file or several, and the example env file.
@@ -27,11 +28,16 @@ const INTERPOLATED = /(?<!\$)\$\{?([a-z_]\w*)/gi
 const TRAILING_COMMENT = /\s\/\/.*$/
 const DESTRUCTURED_ENV = /\b(?:const|let|var)\s*\{([^}]*)\}\s*=\s*(?:process\.env|Bun\.env)\b/
 const LEADING_NAME = /^\s*([a-z_]\w*)\s*(?:[:=,]|$)/i
+const WORDS = /\s+/
+const QUOTES = /^['"]|['"]$/g
 const LINE_BREAK = /\r?\n/
 // A line comment that keeps a file out of the raw read check, for a module that must read the environment itself.
 const RAW_ENV_MARK = /^\s*\/\/\s*kay-env:\s*raw\b/m
 const BUILD_COMMAND = /\bbun\s+build\b[^&|;]*/g
-const SOURCE_ARGUMENT = /(?<![\w./-])((?:\.\/)?src\/[^\s'"]+\.[cm]?[jt]sx?)(?![\w/])/g
+const SOURCE_FILE = /\.(?:[cm]?[jt]sx?|kay)$/
+const BUILD_VALUE_FLAGS = new Set(['--outfile', '--outdir', '--cwd', '--root', '--tsconfig-override', '--define', '--external', '--loader', '--target', '--format', '--sourcemap', '--entry-naming', '--chunk-naming', '--asset-naming', '--public-path', '--banner', '--footer', '--conditions', '--env', '--packages', '--windows-icon', '--windows-title'])
+// A written `.js` extension, which TypeScript resolves to the `.ts` file beside it.
+const JS_EXTENSION = /\.([cm]?)jsx?$/
 const RELATIVE_IMPORT = /\b(?:from|import)\s*(?:\(\s*)?['"](\.{1,2}\/[^'"]+)['"]/g
 const SOURCE_EXTENSIONS = ['', '.ts', '.tsx', '.js', '.jsx', '.mjs', '.mts', '/index.ts', '/index.js']
 
@@ -163,16 +169,60 @@ async function readJson(file: string): Promise<unknown> {
   }
 }
 
-// The files that load before the server boots or run on their own, whose raw reads no schema of the app fits: the content config, and every module reached through relative imports from a file a `bun build` script of package.json names, such as a standalone binary's entry.
+// The source files a `bun build` command names, wherever they sit: its arguments that are not a flag or a flag's value, resolved against `--cwd` when it has one.
+function buildEntries(root: string, command: string): string[] {
+  const words = command.split(WORDS).map(word => word.replace(QUOTES, '')).slice(2)
+  const cwd = words.findIndex(word => word === '--cwd' || word.startsWith('--cwd='))
+  const base = cwd === -1 ? root : resolve(root, words[cwd]!.startsWith('--cwd=') ? words[cwd]!.slice(6) : words[cwd + 1] ?? '')
+  const entries: string[] = []
+
+  for (let at = 0; at < words.length; at++) {
+    const word = words[at]!
+
+    if (word.startsWith('-'))
+      at += BUILD_VALUE_FLAGS.has(word) ? 1 : 0
+    else if (SOURCE_FILE.test(word))
+      entries.push(resolve(base, word))
+  }
+
+  return entries
+}
+
+// The first existing file an import path names: as written, with an extension added, or a `.js` one read as the TypeScript file TypeScript resolves it to.
+async function resolveImport(base: string): Promise<string | undefined> {
+  const written = JS_EXTENSION.exec(base)
+  const stem = written === null ? undefined : base.slice(0, written.index)
+  const candidates = [...SOURCE_EXTENSIONS.map(extension => base + extension), ...stem === undefined ? [] : [`${stem}.${written![1]}ts`, `${stem}.${written![1]}tsx`, `${stem}.ts`, `${stem}.tsx`]]
+
+  for (const candidate of candidates) {
+    const file = Bun.file(candidate)
+
+    if (await file.exists() && !(await file.stat()).isDirectory())
+      return candidate
+  }
+
+  return undefined
+}
+
+// The content config the project names, `src/content.config.ts` by default, for the config may not load.
+async function contentConfig(root: string): Promise<string> {
+  try {
+    return resolve(root, (await loadConfig(root)).content ?? CONTENT_CONFIG)
+  }
+  catch {
+    return resolve(root, CONTENT_CONFIG)
+  }
+}
+
+// The files that load before the server boots or run on their own, whose raw reads no schema of the app fits: the content config, and every module reached through relative imports from a file a `bun build` script of package.json names, such as a standalone binary's entry, wherever it sits. A module the entry shares with the app is exempt for the whole app.
 async function standaloneFiles(root: string): Promise<Set<string>> {
   const found = new Set<string>()
-  const queue = [resolve(root, CONTENT_CONFIG)]
+  const queue = [await contentConfig(root)]
   const scripts = ((await readJson(join(root, 'package.json'))) as { scripts?: Record<string, unknown> } | undefined)?.scripts ?? {}
 
   for (const script of Object.values(scripts)) {
     for (const build of String(script).matchAll(BUILD_COMMAND)) {
-      for (const argument of build[0].matchAll(SOURCE_ARGUMENT))
-        queue.push(resolve(root, argument[1]!))
+      queue.push(...buildEntries(root, build[0]))
     }
   }
 
@@ -185,17 +235,10 @@ async function standaloneFiles(root: string): Promise<Set<string>> {
     const text = await readText(file)
 
     for (const match of text.matchAll(RELATIVE_IMPORT)) {
-      const base = resolve(dirname(file), match[1]!)
+      const imported = await resolveImport(resolve(dirname(file), match[1]!))
 
-      for (const extension of SOURCE_EXTENSIONS) {
-        const candidate = Bun.file(base + extension)
-
-        if (await candidate.exists() && !(await candidate.stat()).isDirectory()) {
-          queue.push(base + extension)
-
-          break
-        }
-      }
+      if (imported !== undefined)
+        queue.push(imported)
     }
   }
 
