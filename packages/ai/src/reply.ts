@@ -11,7 +11,7 @@ function snapshot(call: ToolCall): ToolCall {
 
 // A reply over what `open` yields once first read, with `signals` stopping it when any aborts.
 // The text is kept as it comes, so any number of readers (`await`, `for await`, `usage`) share one provider request.
-export function createReply(open: (signal: AbortSignal) => AsyncIterable<Piece>, signals: (AbortSignal | undefined)[], highlight = highlighting): Reply {
+export function createReply(open: (signal: AbortSignal) => AsyncIterable<Piece>, signals: (AbortSignal | undefined)[], highlight = highlighting, outlive = false): Reply {
   const controller = new AbortController()
   const deltas: string[] = []
   const waiters = new Set<() => void>()
@@ -171,10 +171,12 @@ export function createReply(open: (signal: AbortSignal) => AsyncIterable<Piece>,
           })
         }
       },
-      // A reader leaving early stops the provider, so a page left mid-reply bills no more.
+      // A reader leaving early stops the provider, so a page left mid-reply bills no more, unless the reply outlives its readers.
       return: async () => {
         closed = true
-        stop()
+
+        if (!outlive)
+          stop()
 
         return Promise.resolve({ done: true, value: undefined })
       },
@@ -257,7 +259,9 @@ export function createReply(open: (signal: AbortSignal) => AsyncIterable<Piece>,
       },
       return: async () => {
         closed = true
-        stop()
+
+        if (!outlive)
+          stop()
 
         return Promise.resolve({ done: true, value: undefined })
       },

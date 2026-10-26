@@ -1,0 +1,7 @@
+--- server
+import { staying } from './staying.kay'
+--- script
+import Chat from '@kaynooo/kayjs-ai/chat.kay'
+---
+h1 Staying assistant
+Chat(action={staying} remember="staying")

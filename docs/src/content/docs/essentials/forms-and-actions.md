@@ -336,6 +336,14 @@ controller.abort()
 
 The server may still have run a call that was already sent, so the page refreshes as after any other, unless `refresh: false`.
 
+### Sending headers
+
+Pass `headers` to send extra request headers with the call. The handler reads them from `ctx.request`, and the headers kay sets itself win.
+
+```ts
+search({ query }, { headers: { 'x-trace': id } })
+```
+
 ### Streaming an answer
 
 A handler can send its answer in parts, such as a model's reply as it is written. With [kayjs-ai](/libraries/kayjs-ai), return `ask(messages)` from the handler and it streams as it is. Otherwise make the handler an `async function*` and `yield` each value.

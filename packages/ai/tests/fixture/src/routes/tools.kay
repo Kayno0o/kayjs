@@ -1,7 +1,7 @@
 --- server
 import { ask } from '@kaynooo/kayjs-ai'
 import { action, s } from 'kay'
-import { done, hooks, testing } from '../testing'
+import { done, heard, hooks, testing } from '../testing'
 import { wipe } from './locked/_actions.kay'
 
 export const addNote = action(s.Object({ title: s.String({ minLength: 3, maxLength: 100, error: 'Too short' }) }), ({ title }) => {
@@ -41,6 +41,22 @@ export const converse = action(s.Object({ prompt: s.String({ maxLength: 200 }), 
 })
 
 export const watch = action(s.Object({ prompt: s.String({ maxLength: 200 }) }), ({ prompt }) => ask(prompt, { tools: [addNote, slow], confirm: false, provider: testing.provider }).progress())
+
+// A tool loop an app reads itself, as it would to speak the reply aloud, which `outlive` lets go on once the visitor left.
+export const staying = action(s.Object({ prompt: s.String({ maxLength: 200 }), outlive: s.Boolean() }), ({ prompt, outlive }) => {
+  const reply = ask(prompt, { tools: [addNote, slow], confirm: false, outlive, provider: testing.provider })
+
+  void (async () => {
+    let text = ''
+
+    for await (const snapshot of reply)
+      text = snapshot
+
+    heard.push(text)
+  })()
+
+  return reply.progress()
+})
 
 // A tool loop whose every call the visitor has not confirmed.
 export const unconfirmed = action(s.Object({ prompt: s.String({ maxLength: 200 }) }), ({ prompt }) => ask(prompt, { tools: [addNote], confirm: () => false, provider: testing.provider }).progress())

@@ -2,7 +2,7 @@ import { join } from 'node:path'
 import { fakeAi } from '@kaynooo/kayjs-ai'
 import { afterEach, beforeAll, describe, expect, test } from 'bun:test'
 import { browserPath, testSite } from 'kay/test'
-import { done, refusals } from '../src/testing'
+import { done, refusals, testing } from '../src/testing'
 
 const ROOT = join(import.meta.dir, '..')
 const path = browserPath()
@@ -12,7 +12,43 @@ let site: Awaited<ReturnType<typeof testSite>>
 afterEach(() => {
   fakeAi.clear()
   refusals.length = 0
+  testing.provider = undefined
 })
+
+// A model that says `Hel`, waits for the test to let it go on, then says `lo there`; an abort ends it where it stands.
+function held() {
+  const gate = Promise.withResolvers<void>()
+  const ended = Promise.withResolvers<void>()
+  const state = { asked: 0, aborted: false }
+
+  testing.provider = {
+    name: 'held',
+    model: 'm',
+    async* stream(_request, signal) {
+      state.asked++
+
+      try {
+        yield { text: 'Hel' }
+
+        await Promise.race([gate.promise, new Promise(resolve => signal.addEventListener('abort', resolve))])
+
+        if (signal.aborted) {
+          state.aborted = true
+
+          return
+        }
+
+        yield { text: 'lo there' }
+        yield { finish: 'stop' }
+      }
+      finally {
+        ended.resolve()
+      }
+    },
+  }
+
+  return { state, release: gate.resolve, ended: ended.promise }
+}
 
 // CI installs Chromium for these: there, a missing browser fails rather than skipping.
 describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the Chat island in a browser', () => {
@@ -510,6 +546,109 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the Chat i
     expect(await page.a11y('.kai-chat')).toEqual([])
     expect(await page.evaluate(() => document.querySelector('[role="log"]')?.getAttribute('aria-label'))).toBe('Assistant')
     expect(await page.evaluate(() => document.querySelector('.kai-chat')?.hasAttribute('aria-label'))).toBe(false)
+  })
+
+  describe('a reply that outlives the page', () => {
+    const turn = '.kai-chat-turn[data-role="assistant"]'
+    const stored = (page: Awaited<ReturnType<typeof site.open>>) => page.evaluate(() => ({ pending: sessionStorage.getItem('staying:reply'), turns: sessionStorage.getItem('staying') }))
+
+    async function send(page: Awaited<ReturnType<typeof site.open>>) {
+      await page.fill('textarea', 'Go')
+      await page.press('Enter')
+      await page.waitFor('[data-pending] .kai-chat-text', { text: 'Hel' })
+    }
+
+    test('finds the finished turn when the tab comes back after the reply ended on the server', async () => {
+      const model = held()
+      const page = await site.open('/staying-assistant')
+
+      await send(page)
+      await page.goto('/')
+      model.release()
+      await model.ended
+      await page.goto('/staying-assistant')
+      await page.waitFor(turn, { text: 'Hello there' })
+
+      expect(await page.count('.kai-chat-turn[data-role="user"]')).toBe(1)
+      expect(await page.count('.kai-chat-note')).toBe(0)
+      expect(await stored(page)).toMatchObject({ pending: null })
+
+      // A second reload finds the turn kept with the conversation, and asks nothing.
+      await page.reload()
+      await page.waitFor(turn, { text: 'Hello there' })
+
+      expect(await page.count('.kai-chat-turn')).toBe(2)
+      expect(model.state.asked).toBe(1)
+      expect(page.errors).toEqual([])
+    })
+
+    test('picks the stream back up when the reply is still under way, over two reloads', async () => {
+      const model = held()
+      const page = await site.open('/staying-assistant')
+
+      await send(page)
+      await page.reload()
+      await page.waitFor('[data-pending] .kai-chat-text', { text: 'Hel' })
+      await page.reload()
+      await page.waitFor('[data-pending] .kai-chat-text', { text: 'Hel' })
+      model.release()
+      await page.waitFor(turn, { text: 'Hello there' })
+      await page.waitFor('[data-pending]', { gone: true })
+
+      expect(await page.count('.kai-chat-turn')).toBe(2)
+      expect(model.state.asked).toBe(1)
+      expect(model.state.aborted).toBe(false)
+      expect(page.errors).toEqual([])
+    })
+
+    test('Stop on a resumed reply ends it on the server and no reload asks for it again', async () => {
+      const model = held()
+      const page = await site.open('/staying-assistant')
+
+      await send(page)
+      await page.reload()
+      await page.waitFor('[data-pending] .kai-chat-text', { text: 'Hel' })
+      await page.press('Escape')
+      await page.waitFor('[data-pending]', { gone: true })
+      await model.ended
+
+      expect(model.state.aborted).toBe(true)
+      expect(await page.text('.kai-chat-note')).toBe('Stopped')
+      expect(await stored(page)).toMatchObject({ pending: null })
+
+      await page.reload()
+
+      expect(await page.count('.kai-chat-turn')).toBe(2)
+      expect(await page.count('[data-pending]')).toBe(0)
+      expect(model.state.asked).toBe(1)
+    })
+
+    test('Stop on the page where the reply started ends it on the server too', async () => {
+      const model = held()
+      const page = await site.open('/staying-assistant')
+
+      await send(page)
+      await page.press('Escape')
+      await model.ended
+
+      expect(model.state.aborted).toBe(true)
+    })
+
+    test('returns the message to the field when the server kept nothing, without asking the model', async () => {
+      const model = held()
+      const page = await site.open('/staying-assistant')
+
+      await page.evaluate(() => {
+        sessionStorage.setItem('staying', JSON.stringify([{ role: 'user', content: 'Lost words' }]))
+        sessionStorage.setItem('staying:reply', 'deadbeef00000000')
+      })
+      await page.reload()
+      await page.waitUntil(() => (document.querySelector('textarea') as HTMLTextAreaElement | null)?.value === 'Lost words')
+
+      expect(await page.count('.kai-chat-turn')).toBe(0)
+      expect(await stored(page)).toMatchObject({ pending: null })
+      expect(model.state.asked).toBe(0)
+    })
   })
 
   describe('the launcher', () => {

@@ -60,7 +60,7 @@ catch
   p The reply was cut short
 ```
 
-The visitor leaving the page stops the request to the provider.
+The visitor leaving the page stops the request to the provider, unless the ask [outlives the visitor](#a-reply-that-outlives-the-visitor).
 
 ## Ask from an island
 
@@ -158,6 +158,10 @@ An inline `Chat` can show a New conversation button beside its field with `newBu
 
 To let a reload of the tab find the conversation again, give `remember` a name, and it is kept in the tab's session storage under it. Nothing is kept by default, because the next person to use the tab after a sign-out would read it. On a site with sign-in, make the name per visitor, such as `` `kai-chat-${user.id}` ``.
 
+If your `ask` has `outlive: true` (see [A reply that outlives the visitor](#a-reply-that-outlives-the-visitor)), `remember` also keeps a reply that was under way at the reload. The chat asks your action for it again: the finished turn appears, or the stream picks up and goes on. If the server kept nothing, no model is asked and the message goes back to the field.
+
+Stop, Escape and New conversation end that reply on the server too, with one more call to your action. That call and the resume go through your action like a send, so its guards and rate limit apply to them.
+
 ## The reply
 
 - `await reply` is the whole text.
@@ -173,6 +177,18 @@ A long answer cut by `maxTokens` still resolves as text, so check `finish` when 
 A provider that stalls fails the reply with an `AiError` of kind `timeout`. kay waits 30 seconds for the provider to start answering, and 60 seconds for the next piece of a reply that began. Change either per call with `timeout: { connect: '10s', idle: '20s' }`, a duration as elsewhere in kay.
 
 `ask` also takes `model`, `maxTokens` (4096 by default), `temperature` and a `signal`.
+
+### A reply that outlives the visitor
+
+A reload or a closed tab stops the reply, which suits a paid public chat. If your model runs locally, or your tools act on the world (a light switched, an answer read aloud on the server), let the reply finish instead:
+
+```ts
+ask(messages, { tools, outlive: true })
+```
+
+The request to the provider, the tool loop and every reader on the server go on after the visitor leaves, so the tools after the abort run and a `for await` of yours sees the whole text. `reply.stop()` and `signal` still stop it, and a reader leaving early no longer does. The budget and the rate limit count the reply like any other, once it ends.
+
+The reply is kept in the memory of the server process for half an hour, so a restart ends it and a second process does not find it.
 
 <ReadMore href="/llms/kayjs-ai-asking">Every variable, how the provider is picked, and the options of `ask`.</ReadMore>
 
@@ -260,7 +276,7 @@ To decide what counts as a yes yourself, pass `confirm`: `ask(messages, { tools,
 
 You decide what counts as a yes, such as the last message of the visitor saying so, a token your page issued after a button, or a read tool answering `true` at once. A `confirm` of yours replaces the Allow button for that ask.
 
-The visitor leaving stops the loop. A tool already running finishes, but nothing more is called.
+The visitor leaving stops the loop. A tool already running finishes, but nothing more is called. With [`outlive: true`](#a-reply-that-outlives-the-visitor) the loop runs to its end instead.
 
 `ask` with tools must run while kay answers a request, in a page, an action or a handler, because the tools run as that visitor. A background job has none.
 

@@ -66,7 +66,7 @@ const outcome = await site.call(assistant, { messages })
 `ask` requests the provider, runs the tools the model called one after another, sends their results back and requests again, until the model answers without a call or `maxSteps` requests were made (5 by default, a whole number of 1 or more). When the last request still calls tools, those calls are not run and `await reply.finish` is `steps`. A step the provider cut short (`length`, `filtered`) runs none of its calls, which may be half written, and the reply ends with that finish.
 
 - The text of the reply is the text of every step, a blank line between two steps' texts. `usage` is the sum of the steps.
-- The visitor leaving, `reply.stop()`, `options.signal` or a reader leaving early end the loop: a call already running finishes (an action cannot be cancelled) and its result is dropped, and no further call is run and no further request made.
+- The visitor leaving, `reply.stop()`, `options.signal` or a reader leaving early end the loop: a call already running finishes (an action cannot be cancelled) and its result is dropped, and no further call is run and no further request made. With `outlive: true` only `reply.stop()` and `options.signal` end it: the visitor leaving lets the loop run every call and request to the end, so a reload mid-reply loses no tool call's story ([a reply that outlives the visitor](asking.md#a-reply-that-outlives-the-visitor)).
 - A provider failing in any step fails the reply with its `AiError`.
 - A provider that reports no token count for a step leaves it out of the sum.
 - With `ai({ budget })` the tokens of every step count, and the reply holds `maxTokens` times `maxSteps` against the budget while it runs ([limits](limits.md)).

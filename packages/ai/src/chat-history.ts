@@ -75,3 +75,28 @@ export function stored(key: string, turns: readonly KeptTurn[]): void {
     catch {}
   }
 }
+
+// The reply a tab's last send started, kept beside its turns until the reply ends, so a reload mid-reply asks the server for it again.
+export function pendingReply(key: string): string | undefined {
+  try {
+    return sessionStorage.getItem(`${key}:reply`) ?? undefined
+  }
+  catch {
+    return undefined
+  }
+}
+
+export function keepPending(key: string, id: string | undefined): void {
+  try {
+    if (id === undefined)
+      sessionStorage.removeItem(`${key}:reply`)
+    else
+      sessionStorage.setItem(`${key}:reply`, id)
+  }
+  catch {}
+}
+
+// A random name for a reply: `crypto.randomUUID` needs a secure page, which a chat on a home network over http is not.
+export function newReplyId(): string {
+  return Array.from(crypto.getRandomValues(new Uint8Array(16)), byte => byte.toString(16).padStart(2, '0')).join('')
+}

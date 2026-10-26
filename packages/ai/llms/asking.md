@@ -86,7 +86,7 @@ The provider is `AI_BASE_URL` when set, else the one key set. Nothing is read at
 
 ### ask options
 
-- Options: `system`, `model`, `maxTokens` (4096 by default, as Anthropic requires one), `temperature`, `reasoning`, `cache`, `signal`, `timeout`, `key` (who the ask counts against, [limits](limits.md)), `tools`, `maxSteps` and `confirm` ([Actions as tools](tools.md)), `maxInputChars` (50,000, [limits](limits.md#the-size-of-the-input)), `schema` ([an object instead of text](#an-object-instead-of-text)) and `provider` to ask a provider built by hand.
+- Options: `system`, `model`, `maxTokens` (4096 by default, as Anthropic requires one), `temperature`, `reasoning`, `cache`, `signal`, `outlive` ([a reply that finishes after the visitor left](#a-reply-that-outlives-the-visitor)), `timeout`, `key` (who the ask counts against, [limits](limits.md)), `tools`, `maxSteps` and `confirm` ([Actions as tools](tools.md)), `maxInputChars` (50,000, [limits](limits.md#the-size-of-the-input)), `schema` ([an object instead of text](#an-object-instead-of-text)) and `provider` to ask a provider built by hand.
 - `reasoning` (`'none'`, `'low'`, `'medium'` or `'high'`) turns a reasoning model's thinking down, such as `'none'` for a one-sentence reply in about a second instead of ten: an OpenAI-compatible server (OpenAI, Ollama, Mistral) gets it as `reasoning_effort` only when you pass it, and one refusing the field with a 400 or 422 is asked again without it, remembered per process and base URL; Anthropic ignores it, as its thinking and effort settings differ per model and have no `none`.
 - `ask()` runs on the server, where the key lives: call it in a `--- server` fence, an action, a job or an API route. An island importing it fails `kay build`, which is how the key stays out of the browser. Reach it from an island through an action.
 - Messages are `user` and `assistant` only; the system prompt goes in `options.system`. A history a visitor posts can never carry a system prompt, and a `system` role throws.
@@ -101,6 +101,15 @@ The provider is `AI_BASE_URL` when set, else the one key set. Nothing is read at
 - `reply.deltas()` gives the JSON text in pieces; when a step wrote text and then called tools that text is dropped, which `reply.deltas({ onRestart })` announces by calling `onRestart` before the first piece of the answer, so a reader that clears what it kept ends with the JSON answered (a snapshot reader just sees the text start over). `usage`, `finish`, `calls` and `stop()` are the reply's own; `progress()` is not offered. `stop()` ends the request, and `await` then fails with a `schema` error as the cut text is no whole object.
 - `tools`, `maxSteps`, `confirm`, limits, the budget and `maxInputChars` work as without a schema; the schema counts for the tokens held against the budget. With tools, only the text of the step that answered is the object: a step that wrote text and then called tools drops it. The tools and the format go in one request; on the forced call, `kay_answer` is offered beside the tools.
 - An action returning the reply streams the snapshots to the island, whose `last()` is the object so far; an `async` handler returning it awaits it and answers the checked value, so it returns `.stream()` instead (`async-reply`). A plain form post or an MCP call gets the last snapshot.
+
+### A reply that outlives the visitor
+
+A reply is stopped when the request being answered aborts, as a reload or a closed tab does, which is right for a paid public chat. An app on a local model, or one whose tools act on the world (a light switched, a message sent, an answer read aloud by the server), wants it to finish: `ask(messages, { outlive: true })`.
+
+- The provider request, the tool loop and every server reader (the app's own `for await`) go on after the request aborts, so the tools after the abort run and the text is whole for a reader that kept going. `reply.stop()` and `options.signal` still stop it. A reader leaving early no longer does: it only stops reading, so a `break` out of a `for await` leaves the reply running.
+- The budget and the rate limit count the reply as any other: its tokens are counted once it ends, as the request is, and a reply refused by a limit is refused.
+- `Chat` with `remember` shows the finished turn after a reload with no app code, or picks the stream back up if the reply is still under way: [Chat](chat.md#a-reply-that-outlives-the-page). The reply is kept in this process's memory for half an hour (200 at most), so it does not survive a restart and a second server process does not find it.
+- Without `outlive` a reload mid-reply loses the reply, and a tool call already running finishes with its result dropped.
 
 ### Prompt caching
 
@@ -118,7 +127,7 @@ On by default, so a chat does not pay full price for its system prompt, tools an
 - `await reply.finish` is why it ended: `stop`, `length` (the `maxTokens` cap, the text returned as it is), `filtered` (the provider's filter or refusal) or `steps` (the tool loop ran out of `maxSteps` with the model still calling tools); undefined when it failed. Check it when a long answer matters.
 - `reply.stop()` aborts the provider request, what came staying the text of `await`. A stop is not an error: `await` resolves to the partial text.
 - A provider that stalls fails the reply with an `AiError` of kind `timeout`: after 30 s without an answer (`timeout.connect`), or 60 s without a chunk of the stream once it began (`timeout.idle`; `partial` holds what came). Both take a duration (`'10s'`, `'500ms'`), at most about 24 days; each step of a tool loop counts anew.
-- All readers share one request, which starts on the first read. The request being answered aborting, `options.signal` aborting or a reader leaving early stops it.
+- All readers share one request, which starts on the first read. The request being answered aborting, `options.signal` aborting or a reader leaving early stops it, unless the ask [outlives the visitor](#a-reply-that-outlives-the-visitor).
 
 - The reply is a thenable async iterable, not a Promise: `await ask(...)` is the full text, `for await` gives snapshots (the text so far), and an `await` block or a plain-arrow handler returning it streams; an `async` handler returns `ask(...).stream()` (lint `async-reply`).
 - Nothing is sent until the reply is first read, so an `await ask()` an island's server render skips bills nothing. A reader leaving early, the visitor leaving the page, or `options.signal` aborts the provider request.

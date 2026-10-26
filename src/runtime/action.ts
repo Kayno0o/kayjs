@@ -279,6 +279,8 @@ export interface CallOptions {
   optimistic?: (() => void) | undefined
   // Aborts the call: it rejects with the signal's reason, and the change `optimistic` showed goes back.
   signal?: AbortSignal | undefined
+  // Headers sent with the call, which the handler reads from `ctx.request`; the ones kay sets itself win.
+  headers?: Record<string, string> | undefined
 }
 
 // An action seen through the calls one island makes, so a row's button reads its own `pending()`.
@@ -747,7 +749,7 @@ function callable(url: () => string): { call: (input: never, options?: CallOptio
 
       const data = await post(url(), input, setProgress, options?.signal, () => {
         sent = true
-      }, left, caller)
+      }, left, caller, options?.headers)
 
       posted = true
 
@@ -892,9 +894,9 @@ function tracked(call: (input: never, options?: CallOptions) => Promise<unknown>
   )
 }
 
-async function post<Output>(url: string, input: unknown, onProgress: (sent: number) => void, signal: AbortSignal | undefined, onSent: () => void, left: () => boolean, caller: Caller): Promise<Output> {
+async function post<Output>(url: string, input: unknown, onProgress: (sent: number) => void, signal: AbortSignal | undefined, onSent: () => void, left: () => boolean, caller: Caller, extra?: Record<string, string>): Promise<Output> {
   const { headers, body } = encodeCall(input)
-  const sent: Record<string, string> = { ...headers }
+  const sent: Record<string, string> = { ...extra, ...headers }
 
   // A test or a script calling it has no page.
   if (typeof location !== 'undefined')

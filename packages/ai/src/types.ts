@@ -111,6 +111,8 @@ export interface AskOptions {
   cache?: boolean | '1h' | undefined
   // Stops the reply when it aborts, as the request being answered does on its own.
   signal?: AbortSignal | undefined
+  // Lets the reply finish on the server after the request being answered aborts, a visitor who reloaded or left: the provider request, the tool loop and every reader go on, and a `Chat` with `remember` shows the finished turn after the reload. Only `reply.stop()`, `signal` and the Chat's Stop end it, and a reader leaving early no longer does.
+  outlive?: boolean | undefined
   // How long to wait, as a duration: `connect` for the provider to start answering (`'30s'` by default), `idle` for the next chunk of a reply once it began (`'60s'` by default). A stall past either fails the reply with a `timeout` error. Each step of a tool loop counts them anew.
   timeout?: { connect?: Duration | undefined, idle?: Duration | undefined } | undefined
   // Who the limits and budget set in `ai()` count this ask for, in place of the signed-in user its `key` names or the address of the request being answered: a job or a test names one.

@@ -11,16 +11,17 @@ import { approvalMessage, withoutApproval } from '../src/approval-marker'
 import { forgetCounts } from '../src/limits'
 import { converse } from '../src/loop'
 import { createReply } from '../src/reply'
-import { done, hooks } from './fixture/src/testing'
+import { done, heard, hooks } from './fixture/src/testing'
 import { untilHolds } from './until'
 
 const ROOT = join(import.meta.dir, 'fixture')
 const site = await testSite({ root: ROOT })
-const { converse: conversing, watch, unconfirmed, approving, refusedTools, upload } = await import(join(import.meta.dir, 'fixture/src/routes/tools.kay')) as Tools
+const { converse: conversing, staying, watch, unconfirmed, approving, refusedTools, upload } = await import(join(import.meta.dir, 'fixture/src/routes/tools.kay')) as Tools
 
 afterAll(async () => site.close())
 beforeEach(() => {
   done.length = 0
+  heard.length = 0
   hooks.slowStarted = undefined
 })
 afterEach(() => fakeAi.clear())
@@ -330,6 +331,44 @@ describe('a visitor leaving mid-loop', () => {
 
     expect(done).toEqual(['slow'])
     expect(fakeAi.asked).toHaveLength(1)
+  })
+
+  // The visitor leaves while the first step's slow tool runs, and the model has a second step and a second tool call left.
+  async function leaveMidTool(outlive: boolean): Promise<void> {
+    const controller = new AbortController()
+
+    fakeAi.reply({ calls: [{ name: 'slow' }, { name: 'add_note', input: { title: 'Milk' } }] })
+    fakeAi.reply('All done')
+
+    const { headers, body } = encodeCall({ prompt: 'go', outlive })
+    const started = Promise.withResolvers<void>()
+
+    hooks.slowStarted = started.resolve
+
+    const answer = site.handle(new Request(`http://localhost${staying.url}`, { method: 'POST', headers: { ...headers, origin: 'http://localhost' }, body, signal: controller.signal }))
+
+    await started.promise
+    controller.abort()
+    await expect(answer).resolves.toBeDefined()
+    await untilHolds(() => heard.length > 0)
+    // The reader ended, and whatever was going to run after the abort had its time.
+    await Bun.sleep(100)
+  }
+
+  it('runs the tools after the visitor left and asks again when the ask outlives the request, a server reader seeing the whole text', async () => {
+    await leaveMidTool(true)
+
+    expect(done).toEqual(['slow', 'addNote:Milk'])
+    expect(fakeAi.asked).toHaveLength(2)
+    expect(heard).toEqual(['All done'])
+  })
+
+  it('still ends the loop when the visitor leaves and the ask does not outlive', async () => {
+    await leaveMidTool(false)
+
+    expect(done).toEqual(['slow'])
+    expect(fakeAi.asked).toHaveLength(1)
+    expect(heard).toEqual([''])
   })
 
   const request = new Request('http://localhost/')

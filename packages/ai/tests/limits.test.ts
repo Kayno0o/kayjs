@@ -402,6 +402,34 @@ describe('ai({ budget })', () => {
     expect(store.count()).toBe(10)
   })
 
+  it('counts a reply that finished after the request left once, as any other, and a stopped one for what came', async () => {
+    const store = tracking()
+
+    ai({ budget: { tokens: 1000, window: '1m', store } })
+
+    const finishing = Promise.withResolvers<void>()
+    const provider: Provider = { name: 's', model: 'm', async* stream(_, signal) {
+      yield { usage: { inputTokens: 7 } }
+      yield { text: usedBy(3) }
+      await Promise.race([finishing.promise, new Promise(resolve => signal.addEventListener('abort', resolve))])
+
+      if (signal.aborted)
+        return
+
+      yield { text: usedBy(2) }
+      yield { usage: { outputTokens: 5 } }
+    } }
+    const controller = new AbortController()
+    const { reply } = await answeringRequest(new Request('http://localhost/chat', { signal: controller.signal }), async () => ({ reply: ask('abcd', { provider, outlive: true }) }))
+    const reading = reply[Symbol.asyncIterator]()
+
+    await reading.next()
+    controller.abort()
+    finishing.resolve()
+    await reply
+    expect(store.count()).toBe(12)
+  })
+
   it('counts the input of a reply stopped before the provider said anything, which it may already be reading', async () => {
     const store = tracking()
 

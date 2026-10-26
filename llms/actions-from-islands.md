@@ -126,6 +126,7 @@ p {column()}
 - Two such calls over one signal failing out of order may leave the first one's value, so an island lets one move finish before the next, as `add.pending()` tells.
 - Once it went through, the refresh brings what the server kept, which a `linked` signal then takes.
 - `{ signal }` aborts a call: it rejects with the signal's reason, what `optimistic` showed goes back, and the action records no outcome.
+- `{ headers }` sends extra request headers with the call, which the handler reads from `ctx.request`; the ones kay sets itself win.
 - A call aborted once sent may still have run, so the page refreshes as after one that went through, unless `refresh: false`.
 - The call is typed, `ctx.fail` results excluded, and throws `ActionError` from `kay` with `status`, `errors` and `data` when it fails, its `message` being the string given to `ctx.fail`, else the form-wide message, the schema's field messages joined, or `data.message`, so `error.message` is what to show; it extends `ApiError`, so one `instanceof ApiError` catches a refused action and a refused `call()`.
 - `const save = add.track()` is a handle for one component, row or button: `save.pending()` reads, reactively, only the calls made through it, where `add.pending()` reads every call of the page.
