@@ -164,6 +164,7 @@ it('shows why a todo was refused', async () => {
 - A project setting no `site`, nor `SITE_URL`, is served as `http://localhost`, so a page reading `siteUrl()` or `siteOrigin()` renders as it does in production.
 - `site.submit(action, fields, { from })` posts a form without JavaScript, as multipart with any `File` among its fields, and follows it back to its page, or reads the page a refused post renders.
 - `from` may be a page `visit` or `submit` resolved with instead of a path: the post goes where its form posts, from the URL the browser shows it at.
+- A path as `from` is visited first, so a `workChallenge` field of the form on that page is solved as it is for a page: one extra GET per submit.
 - So `site.submit(add, fields, { from: refused })` posts again from the page a refused post answered, as a visitor fixing the form does.
 - A post to an action with `minTime` goes through as if its form had been open long enough, with a page or without, so a test of something else needs no waiting.
 - A page older than `maxAge` is still refused as expired.

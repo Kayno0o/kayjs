@@ -27,6 +27,13 @@ describe('workChallenge', () => {
     expect((await site.submit(contact, { message: 'hello', proof: solveWork(challenge)! }, { from: page })).html).toContain('<p class="error">wrong</p>')
   })
 
+  it('solves the field for a from given as a path, visiting the page as a Visit would be', async () => {
+    const site = await testSite({ root: 'tests/fixtures/navigation', security: false })
+    const { contact } = await import(SCOPED_PAGE) as { contact: Action<{ message: string, proof?: string }, number> }
+
+    expect((await site.submit(contact, { message: 'hello' }, { from: '/scoped' })).html).toContain('<p class="sent">Sent 5</p>')
+  })
+
   it('refuses as expired a challenge of another scope, an action\'s, an easier one, one past its maxAge or signed before the key changed', async () => {
     const solved = solveWork(workChallenge('contact', { difficulty: 50, maxAge: '1m' }))!
 

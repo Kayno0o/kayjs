@@ -633,8 +633,11 @@ export async function testSite(options: TestOptions = {}): Promise<TestSite> {
         if (stamp !== undefined && !(STAMP_FIELD in fields))
           form.set(STAMP_FIELD, stamp)
 
-        // Its `workChallenge` fields post their solution, as kay's script sends them.
-        for (const field of url === undefined ? [] : page?.find(`form[action^="${url.pathname}"] input[${WORK_SCRIPT}]`) ?? []) {
+        // Its `workChallenge` fields post their solution, as kay's script sends them. A `from` given as a path has no rendered page, so it is visited to read the challenge.
+        const worked = page ?? (typeof init.from === 'string' ? await follow(await send(init.from, { headers: init.headers }), init.from, init.headers) : undefined)
+        const workUrl = page ? url : worked && formUrl(worked, action)
+
+        for (const field of workUrl === undefined ? [] : worked?.find(`form[action^="${workUrl.pathname}"] input[${WORK_SCRIPT}]`) ?? []) {
           const { name, [WORK_SCRIPT]: challenge } = field.attributes
 
           if (name !== undefined && challenge !== undefined && !(name in fields))
