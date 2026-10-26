@@ -77,12 +77,14 @@ describe('testSite builds the islands', () => {
 
     const first = Bun.file(manifest()).lastModified
 
+    // The rebuild, if it came, would have to be newer than the first manifest by a file time's granularity.
     await Bun.sleep(20)
     await testSite({ root })
     await testSite({ root, browser: false })
 
     expect(Bun.file(manifest()).lastModified).toBe(first)
 
+    // The rebuild has to be newer than the first manifest by a file time's granularity.
     await Bun.sleep(20)
     await testSite({ root, base: '/app' })
 

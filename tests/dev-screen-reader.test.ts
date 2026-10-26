@@ -182,6 +182,7 @@ describe.skipIf(path === undefined)('the screen reader tab of the dev tool', () 
     })
 
     expect(await rows()).toBe(true)
+    // Nothing happens: the focus would have moved within this time.
     await page.evaluate(async () => new Promise(done => setTimeout(done, 700)))
     expect(await page.evaluate(() => document.querySelector('kay-dev')!.shadowRoot!.activeElement === (window as unknown as { row: Element }).row)).toBe(true)
   }, 60_000)

@@ -94,12 +94,14 @@ describe.concurrent('kay dev .env values', () => {
       await project.write('.env', 'A=two\n')
       await until(() => project.starts().at(-1)!.A === 'two')
       await until(() => project.configSaw('types.ts')?.A === 'two')
+      // Lets a restart the earlier writes could still cause come, so the counts below are final.
       await Bun.sleep(1000)
 
       const starts = project.starts().length
       const loads = project.configLoads()
 
       await project.write('.env', 'A=two\n')
+      // Nothing happens: a restart would have come within this time.
       await Bun.sleep(1500)
 
       expect(project.starts()).toHaveLength(starts)

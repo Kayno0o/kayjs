@@ -8,6 +8,7 @@ import { loadConfigWithin } from '../src/config'
 import { dynamic as dynamicHtml, element, leadingNewline, rawData } from '../src/runtime/html'
 import { safeUrl } from '../src/runtime/url'
 import { elementName, styleText } from '../src/runtime/values'
+import { turn } from './helpers/eventually'
 import { scratchDir } from './scratch'
 
 let reactive: typeof import('../src/runtime/reactive')
@@ -38,8 +39,8 @@ afterAll(async () => {
 })
 
 async function settle(): Promise<void> {
-  for (let turn = 0; turn < 10; turn++)
-    await Bun.sleep(0)
+  for (let round = 0; round < 10; round++)
+    await turn()
 }
 
 describe('a tag written in capitals', () => {

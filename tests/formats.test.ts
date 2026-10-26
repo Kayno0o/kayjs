@@ -6,6 +6,7 @@ import { outputDir } from '../src/build/assets'
 import { holdsRunning, loadExecutable, verifyExecutable } from '../src/build/verify'
 import { LINT_GROUPS, LINTS } from '../src/compiler/lints'
 import { freePort } from './free-port'
+import { eventually } from './helpers/eventually'
 import { scratchDir } from './scratch'
 
 const cli = join(import.meta.dir, '../src/cli.ts')
@@ -386,8 +387,7 @@ describe('kay build --format json', () => {
 
       verifying.kill('SIGINT')
       await verifying.exited
-      await Bun.sleep(200)
-      expect(await gone(child)).toBe(true)
+      await eventually(async () => expect(await gone(child)).toBe(true))
     }, 30_000)
 
     it('keeps the last bytes of the output, a cut character included', async () => {

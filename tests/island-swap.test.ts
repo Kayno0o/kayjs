@@ -38,6 +38,7 @@ async function labels(on: TestPage): Promise<string[]> {
 }
 
 async function settled(on: TestPage): Promise<void> {
+  // Two frames and a margin, the margin ending the wait when the tab draws none.
   await on.evaluate(async () => new Promise<void>((resolve) => {
     setTimeout(resolve, 100)
     requestAnimationFrame(() => requestAnimationFrame(() => setTimeout(resolve)))
