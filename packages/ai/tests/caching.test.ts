@@ -113,6 +113,37 @@ describe('OpenAI-compatible prompt caching', () => {
       expect(Object.keys(seen.body)).not.toContain('prompt_cache_key')
   })
 
+  it('sends reasoning_effort only when reasoning is given', async () => {
+    const server = serve(() => stream(openaiEvents('ok')).response)
+    const provided = openai({ baseUrl: `${server.url}/v1`, model: 'm' })
+
+    await ask('Hi', { provider: provided })
+    await ask('Hi', { provider: provided, reasoning: 'none' })
+    expect('reasoning_effort' in server.seen[0]!.body).toBe(false)
+    expect(server.seen[1]!.body.reasoning_effort).toBe('none')
+  })
+
+  it('asks again without reasoning_effort when a server refuses it, once per base URL', async () => {
+    const server = strict(['reasoning_effort'], openaiEvents('ok'))
+    const provided = openai({ baseUrl: `${server.url}/v1`, model: 'm' })
+
+    expect(await ask('Hi', { provider: provided, reasoning: 'low' })).toBe('ok')
+    expect(await ask('Again', { provider: provided, reasoning: 'low' })).toBe('ok')
+    expect(server.seen).toHaveLength(3)
+    expect('reasoning_effort' in server.seen[1]!.body).toBe(false)
+    expect('reasoning_effort' in server.seen[2]!.body).toBe(false)
+    expect(server.seen[2]!.body.prompt_cache_key).toBeDefined()
+    expect(server.seen[2]!.body.stream_options).toEqual({ include_usage: true })
+  })
+
+  it('leaves reasoning out of the Anthropic body', async () => {
+    const server = serve(() => stream(anthropicEvents('ok')).response)
+
+    await ask('Hi', { provider: anthropic({ baseUrl: server.url, apiKey: 'k', model: 'm' }), reasoning: 'none' })
+    expect(Object.keys(server.seen[0]!.body)).not.toContain('reasoning_effort')
+    expect(Object.keys(server.seen[0]!.body)).not.toContain('thinking')
+  })
+
   it('does not remember a refusal when the retry fails as well', async () => {
     const server = serve((_request, seen) => 'model' in seen.body && seen.body.model === 'bad' ? Response.json({ error: { message: 'unknown model' } }, { status: 400 }) : stream(openaiEvents('ok')).response)
     const provided = openai({ baseUrl: `${server.url}/v1`, model: 'm' })

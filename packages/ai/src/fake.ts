@@ -1,4 +1,4 @@
-import type { Finish, Piece, Provider, ProviderMessage, ProviderRequest, ToolSpec } from './types'
+import type { Finish, Piece, Provider, ProviderMessage, ProviderRequest, Reasoning, ToolSpec } from './types'
 import process from 'node:process'
 
 // What a fake reply was asked: the request a provider would have been sent.
@@ -10,6 +10,7 @@ export interface Asked {
   model: string
   maxTokens: number
   temperature: number | undefined
+  reasoning?: Reasoning | undefined
   // The JSON Schema of the object the ask wants, absent when it asked for text.
   schema?: object | undefined
 }

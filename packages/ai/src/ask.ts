@@ -124,7 +124,7 @@ function reply(prompt: string | Message[], options: AskOptions, answer: TSchema 
   const maxTokens = options.maxTokens ?? DEFAULT_MAX_TOKENS
   const described = answer === undefined ? undefined : answerSchema(answer)
   const schema = described?.plain
-  const request = { messages, system: options.system, model, maxTokens, temperature: options.temperature, cache: options.cache, timeouts: timeoutsOf(options.timeout), schema }
+  const request = { messages, system: options.system, model, maxTokens, temperature: options.temperature, reasoning: options.reasoning, cache: options.cache, timeouts: timeoutsOf(options.timeout), schema }
   const messageChars = messages.reduce((sum, message) => sum + message.content.length, 0)
   const maxInputChars = options.maxInputChars ?? DEFAULT_MAX_INPUT_CHARS
 

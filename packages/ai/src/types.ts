@@ -43,6 +43,9 @@ export interface ProviderMessage extends Message {
   results?: ToolOutcome[] | undefined
 }
 
+// How much a reasoning model thinks before it answers.
+export type Reasoning = 'none' | 'low' | 'medium' | 'high'
+
 // What a provider is asked for, the model and the limits already settled.
 export interface ProviderRequest {
   messages: ProviderMessage[]
@@ -51,6 +54,7 @@ export interface ProviderRequest {
   model: string
   maxTokens: number
   temperature: number | undefined
+  reasoning?: Reasoning | undefined
   // JSON Schema of the object the reply is: the provider asks the model for it its own way and streams the JSON as text, which `ask` reads and checks against the kay schema.
   schema?: object | undefined
   // Whether to ask the provider to cache the prompt: on when absent, `'1h'` for Anthropic's 1 hour lifetime.
@@ -101,6 +105,8 @@ export interface AskOptions {
   // 4096 by default, as Anthropic requires one.
   maxTokens?: number | undefined
   temperature?: number | undefined
+  // How much a reasoning model thinks before answering, `'none'` for a quick reply: sent as `reasoning_effort` to an OpenAI-compatible server, which is asked again without it if it refuses the field, and left out when not given. Anthropic ignores it.
+  reasoning?: Reasoning | undefined
   // Asks the provider to cache the prompt so the next turn and tool step read it at a fraction of the price: on by default, `false` turns it off and `'1h'` keeps an Anthropic cache for an hour instead of 5 minutes.
   cache?: boolean | '1h' | undefined
   // Stops the reply when it aborts, as the request being answered does on its own.

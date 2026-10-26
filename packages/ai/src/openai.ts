@@ -16,8 +16,8 @@ export interface OpenAiOptions {
 export const OPENAI_URL = 'https://api.openai.com/v1'
 const TRAILING_SLASHES = /\/+$/
 
-// The parameters a server may refuse, which the request is sent again without: `stream_options` to count tokens, `prompt_cache_key` to raise cache hits.
-type Optional = 'stream_options' | 'prompt_cache_key'
+// The parameters a server may refuse, which the request is sent again without: `stream_options` to count tokens, `prompt_cache_key` to raise cache hits, `reasoning_effort` to turn a model's thinking down.
+type Optional = 'stream_options' | 'prompt_cache_key' | 'reasoning_effort'
 
 // Those a server refused once, by API root, so only the first ask of a process pays the retry.
 const refused = new Map<string, Set<Optional>>()
@@ -146,10 +146,10 @@ export function openai({ baseUrl = OPENAI_URL, apiKey, model }: OpenAiOptions = 
       const calls = new Map<number, { index: number, id: string, name: string, arguments: string }>()
       const byIndex = new Map<number, number>()
 
-      // OpenAI and Ollama count tokens only when asked; Mistral refuses the parameter and sends usage unasked. Both optional parameters go first, and on a 400 or 422 the request goes again without the one the error names (else without both), the root remembered once that works.
+      // OpenAI and Ollama count tokens only when asked; Mistral refuses the parameter and sends usage unasked. The optional parameters go first, and on a 400 or 422 the request goes again without the one the error names (else without both), the root remembered once that works.
       const known = refused.get(root) ?? new Set<Optional>()
-      const optional = (['stream_options', 'prompt_cache_key'] as const).filter(name => !known.has(name) && (name === 'stream_options' || request.cache !== false))
-      const open = (sent: readonly Optional[]) => postEvents('openai', url, headers, { ...body, ...shapeOf(request, mode), ...sent.includes('stream_options') ? { stream_options: { include_usage: true } } : {}, ...sent.includes('prompt_cache_key') ? { prompt_cache_key: cacheKeyOf(request) } : {} }, request.timeouts, signal, apiKey)
+      const optional = (['stream_options', 'prompt_cache_key', 'reasoning_effort'] as const).filter(name => !known.has(name) && (name === 'stream_options' || (name === 'prompt_cache_key' ? request.cache !== false : request.reasoning !== undefined)))
+      const open = (sent: readonly Optional[]) => postEvents('openai', url, headers, { ...body, ...shapeOf(request, mode), ...sent.includes('stream_options') ? { stream_options: { include_usage: true } } : {}, ...sent.includes('prompt_cache_key') ? { prompt_cache_key: cacheKeyOf(request) } : {}, ...sent.includes('reasoning_effort') ? { reasoning_effort: request.reasoning } : {} }, request.timeouts, signal, apiKey)
       let sent: readonly Optional[] = optional
       let events = open(sent)
       let first: IteratorResult<ServerEvent>
