@@ -8,6 +8,8 @@ import { setLiveStore } from '../src/runtime/live-value'
 import { createDataTables, pages, pgData } from '../src/server'
 import { setupStore } from '../src/server/app-store'
 import { pgHandle } from '../src/server/pg-data'
+import { eventually } from './helpers/eventually'
+import { restoreClock, virtualClock } from './helpers/virtual-clock'
 import { pgDescribe, pgIt, url } from './job-stores'
 import { scratchDir } from './scratch'
 
@@ -36,6 +38,7 @@ afterAll(async () => {
 })
 
 afterEach(() => {
+  restoreClock()
   setupStore(undefined)
   setLiveStore(undefined)
 })
@@ -306,6 +309,8 @@ pgDescribe('closing a pgData store', () => {
   }
 
   pgIt('stops its polling', async () => {
+    const clock = virtualClock()
+
     await withDatabase(async (database) => {
       const sql = new SQL(database, { max: 2 })
       const { db, sent } = counted(sql)
@@ -319,13 +324,15 @@ pgDescribe('closing a pgData store', () => {
         const before = sent()
 
         // A poll is due every half second.
-        await Bun.sleep(1200)
-        expect(sent()).toBeGreaterThan(before)
+        await clock.advance(1200)
+        await eventually(() => expect(sent()).toBeGreaterThan(before))
         await store.close()
 
         const closed = sent()
 
-        await Bun.sleep(1200)
+        // The poll timers are the virtual clock's, so a poll left armed would fire here.
+        await clock.advance(1200)
+        expect(clock.pending()).toBe(0)
         expect(sent()).toBe(closed)
       }
       finally {
