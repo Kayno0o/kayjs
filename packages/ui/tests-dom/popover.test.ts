@@ -23,6 +23,25 @@ async function popovers(delays: { showDelay?: string, hideDelay?: string } = {})
 }
 
 describe('Popover', () => {
+  test('keeps its trigger element and its focus as it opens and closes', async () => {
+    const root = await popovers()
+    const trigger = root.querySelector<HTMLElement>('#trigger')!
+
+    trigger.focus()
+    click(root.querySelector('#show'))
+    await clock.settle()
+
+    expect(root.querySelector('#trigger')).toBe(trigger)
+    expect(trigger.getAttribute('aria-expanded')).toBe('true')
+
+    root.querySelector<HTMLElement>('#menu')!.hidePopover()
+    await clock.settle()
+
+    expect(root.querySelector('#trigger')).toBe(trigger)
+    expect(trigger.getAttribute('aria-expanded')).toBe('false')
+    expect(document.activeElement).toBe(trigger)
+  })
+
   test('pairs its trigger with its panel, anchored and placed', async () => {
     const root = await popovers()
     const trigger = root.querySelector('#trigger')!
@@ -90,7 +109,6 @@ describe('TooltipHost', () => {
     click(root.querySelector('#show'))
     await clock.settle()
 
-    // The Popover draws its trigger again as it opens, so the one under the pointer is a new element.
     const trigger = root.querySelector<HTMLElement>('#trigger')!
 
     expect(trigger.getAttribute('aria-expanded')).toBe('true')

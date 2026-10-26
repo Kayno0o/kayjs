@@ -43,6 +43,15 @@ effect(() => {
     panel.hidePopover()
 })
 
+// A getter, so the snippet's spread reads `shown` itself and updates `aria-expanded` in place instead of drawing the trigger again.
+const triggerProps: PopoverTriggerProps = {
+  'popovertarget': panelId,
+  get 'aria-expanded'() {
+    return shown() ? 'true' : 'false'
+  },
+  'style': `anchor-name: ${anchor}`,
+}
+
 function toggled(event: ToggleEvent) {
   const opened = event.newState === 'open'
   shown.set(opened)
@@ -52,6 +61,6 @@ function toggled(event: ToggleEvent) {
 if at
   span(part="anchor" aria-hidden="true" style={`position: fixed; left: ${at.x}px; top: ${at.y}px; width: 0; height: 0; pointer-events: none; anchor-name: ${anchor}`})
 else if trigger
-  | {trigger({ 'popovertarget': panelId, 'aria-expanded': shown() ? 'true' : 'false', 'style': `anchor-name: ${anchor}` })}
+  | {trigger(triggerProps)}
 div(part="root" {...rest} ref={element => panel = element} id={panelId} popover="auto" data-placement={placement} style={[`position-anchor: ${anchor}`, style].filter(Boolean).join('; ')} onToggle={toggled})
   slot
