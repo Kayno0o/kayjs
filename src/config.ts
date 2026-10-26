@@ -716,7 +716,7 @@ async function importConfig(root: string, fresh = false): Promise<KayConfig> {
 
   await readConfigLightly(file)
 
-  const { default: config } = await import(fresh ? `${file}?${Date.now()}` : file) as { default?: KayConfig }
+  const { default: config } = await importedConfig(file, fresh)
 
   if (typeof config !== 'object' || config === null)
     throw new KayError('config-default-export', `kay: ${CONFIG_FILE} must export its config by default: export default defineConfig({ ... })`)
@@ -724,6 +724,34 @@ async function importConfig(root: string, fresh = false): Promise<KayConfig> {
   checkedConfig(config)
 
   return config
+}
+
+const MODULE_DIRECTORY = /^.*\/node_modules\//
+const MODULE_ENTRY = /\/src\/index\.ts$/
+const REMOVED_EXPORT = /Export named '([^']+)' not found in module '([^']+)'/
+// What replaced the exports a config imported and a release removed, as llms/upgrading.md names them.
+const REPLACED_EXPORTS: Record<string, string> = {
+  authPages: 'auth({ module })',
+  authExtension: 'auth({ module })',
+  mailExtension: 'mail({ module })',
+}
+
+// The config's import, a missing export reported as the removal it is rather than as Bun's bare module error, so `kay check` and `kay upgrade` point at the note that renames it.
+async function importedConfig(file: string, fresh: boolean): Promise<{ default?: KayConfig }> {
+  try {
+    return await import(fresh ? `${file}?${Date.now()}` : file) as { default?: KayConfig }
+  }
+  catch (error) {
+    const removed = error instanceof SyntaxError ? REMOVED_EXPORT.exec(error.message) : null
+
+    if (removed === null)
+      throw error
+
+    const [, name = '', source = ''] = removed
+    const replacement = REPLACED_EXPORTS[name]
+
+    throw new KayError('config-invalid', `kay: ${CONFIG_FILE} imports \`${name}\` from ${JSON.stringify(source.replace(MODULE_DIRECTORY, '').replace(MODULE_ENTRY, ''))}, which no longer exports it${replacement === undefined ? '' : `: use ${replacement}`}; llms/upgrading.md lists what each release removed and what replaced it`)
+  }
 }
 
 // The keys `kay check` and `kay env` read in their own way, refused when they are not the shape they take.

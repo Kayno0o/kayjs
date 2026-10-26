@@ -38,3 +38,20 @@ test('a config naming the import in a string or a comment loads, and loads the s
 
   expect(loaded.site).toBe(`import { defineConfig } from 'kay/server'`)
 })
+
+test('a config importing an export a library removed names the export and the note that replaces it', async () => {
+  const dir = resolve(await scratchDir('config-removed-'))
+
+  await mkdir(join(dir, 'lib'), { recursive: true })
+  await Bun.write(join(dir, 'lib/index.ts'), 'export const mail = 1\n')
+  await Bun.write(join(dir, 'kay.config.ts'), `import { mailExtension } from './lib/index.ts'\nexport default { site: String(mailExtension) }\n`)
+  await Bun.write(join(dir, 'probe.ts'), `import { loadConfig } from ${JSON.stringify(CONFIG_MODULE)}\ntry { await loadConfig(${JSON.stringify(dir)}) } catch (error) { console.log(String(error instanceof Error ? error.message : error)) }\n`)
+
+  const child = Bun.spawn([process.execPath, join(dir, 'probe.ts')], { cwd: dir, stdout: 'pipe', stderr: 'pipe' })
+  const out = await new Response(child.stdout).text()
+
+  expect(out).toContain('imports `mailExtension` from')
+  expect(out).toContain('use mail({ module })')
+  expect(out).toContain('llms/upgrading.md')
+  expect(out).not.toContain('SyntaxError')
+})
