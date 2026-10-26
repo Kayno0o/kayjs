@@ -46,8 +46,9 @@ const POLICIES: Record<Intent, Policy> = {
 
 const PERSISTENT = 'slot[data-persist]'
 const SERVER_ISLAND = 'slot[data-kay-server]'
-// What a script put in the body to outlive every page, a live region an announcer fills for one: the next body never holds it, so the morph would take it away.
+// What a script put in the body to outlive every page, a live region an announcer fills for one: the next body never holds it, so the morph leaves it where it is, never moved, as a live region taken out and put back may go unread.
 const LASTING = ':scope > [data-kay-keep]'
+const NOTHING: ReadonlySet<Node> = new Set()
 // What the morph never keeps across pages: islands are kept by `persist` or a refresh alone, and a script or a template is put in afresh.
 const OPAQUE = `${ISLAND},slot[data-kay-server],script,template`
 // The tags OPAQUE can match, so the selector is only matched for them.
@@ -866,18 +867,9 @@ function swapBody(next: Document, policy: Policy): void {
       script.replaceWith(runnable(script, markup))
   }
 
-  const lasting = [...old.querySelectorAll(LASTING)]
-
-  if (lasting.length > 0) {
-    parking ??= document.documentElement.appendChild(document.createElement('div'))
-
-    for (const element of lasting)
-      place(parking, element, null)
-  }
-
   // The server writes `<body>` bare, so every attribute it holds is a script's.
   try {
-    morphChildren(old, body)
+    morphChildren(old, body, new Set(old.querySelectorAll(LASTING)))
 
     for (const [standIn, live] of standIns) {
       if (standIn.isConnected)
@@ -887,9 +879,6 @@ function swapBody(next: Document, policy: Policy): void {
     }
   }
   finally {
-    for (const element of lasting)
-      place(old, element, null)
-
     parking?.remove()
   }
 
@@ -1074,8 +1063,9 @@ function morph(live: Node, next: Node): void {
 }
 
 // Pairs the children in order: a live child alike the next one is morphed into it, one the next page dropped is removed, and the rest of the next page's children are moved in.
-function morphChildren(live: Element, next: Element): void {
-  let cursor = live.firstChild
+// `lasting` holds children of `live` the morph leaves where they are, matched against nothing.
+function morphChildren(live: Element, next: Element, lasting: ReadonlySet<Node> = NOTHING): void {
+  let cursor = past(live.firstChild, lasting)
   let incoming = next.firstChild
 
   while (incoming) {
@@ -1083,21 +1073,23 @@ function morphChildren(live: Element, next: Element): void {
 
     if (cursor && alike(cursor, incoming)) {
       morph(cursor, incoming)
-      cursor = cursor.nextSibling
+      cursor = past(cursor.nextSibling, lasting)
     }
     else {
-      const ahead = cursor && !later(following, cursor) ? later(cursor.nextSibling, incoming) : undefined
+      const ahead = cursor && !later(following, cursor) ? later(cursor.nextSibling, incoming, lasting) : undefined
 
       if (ahead) {
         while (cursor !== ahead) {
           const after: ChildNode | null = cursor!.nextSibling
 
-          cursor!.remove()
+          if (!lasting.has(cursor!))
+            cursor!.remove()
+
           cursor = after
         }
 
         morph(ahead, incoming)
-        cursor = ahead.nextSibling
+        cursor = past(ahead.nextSibling, lasting)
       }
       else {
         live.insertBefore(incoming, cursor)
@@ -1110,15 +1102,25 @@ function morphChildren(live: Element, next: Element): void {
   while (cursor) {
     const after: ChildNode | null = cursor.nextSibling
 
-    cursor.remove()
+    if (!lasting.has(cursor))
+      cursor.remove()
+
     cursor = after
   }
 }
 
+// The first of `node` and its next siblings the morph does not leave alone.
+function past(node: ChildNode | null, lasting: ReadonlySet<Node>): ChildNode | null {
+  while (node && lasting.has(node))
+    node = node.nextSibling
+
+  return node
+}
+
 // The first of a node's siblings from `from` on that is alike it.
-function later(from: ChildNode | null, node: Node): ChildNode | undefined {
+function later(from: ChildNode | null, node: Node, lasting: ReadonlySet<Node> = NOTHING): ChildNode | undefined {
   for (let sibling = from; sibling; sibling = sibling.nextSibling) {
-    if (alike(sibling, node))
+    if (!lasting.has(sibling) && alike(sibling, node))
       return sibling
   }
 

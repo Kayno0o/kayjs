@@ -1060,6 +1060,8 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('page swap i
   it('keeps through every swap the element a script put in <body> marked data-kay-keep, the same one, and drops the rest it added', async () => {
     const state = async () => page.evaluate(() => ({
       kept: [...document.querySelectorAll('body > [data-kay-keep]')].map(element => [element.textContent, element === (window as { kept?: Element }).kept]),
+      // Taken out and put back, with or without `moveBefore`, a live region may go unread.
+      moved: (window as { moved?: number }).moved,
       unmarked: document.querySelectorAll('.script-added').length,
       nested: document.querySelectorAll('[data-kay-keep] [data-kay-keep], main [data-kay-keep]').length,
     }))
@@ -1074,17 +1076,24 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('page swap i
       region.setAttribute('aria-live', 'polite')
       region.textContent = 'Title updated'
       ;(window as { kept?: Element }).kept = region
+      ;(window as { moved?: number }).moved = 0
+      new MutationObserver((records) => {
+        for (const record of records) {
+          if ([...record.removedNodes].includes(region))
+            (window as { moved?: number }).moved!++
+        }
+      }).observe(document.body, { childList: true })
       document.body.appendChild(document.createElement('div')).className = 'script-added'
       document.querySelector('main')?.appendChild(document.createElement('p')).setAttribute('data-kay-keep', '')
     })
     await page.click('a.second')
     await page.waitFor('h1', { text: 'Second' })
     expect(await sameDocument()).toBe(true)
-    expect(await state()).toEqual({ kept: [['Title updated', true]], unmarked: 0, nested: 0 })
+    expect(await state()).toEqual({ kept: [['Title updated', true]], moved: 0, unmarked: 0, nested: 0 })
     await page.click('a.home')
     await page.waitFor('h1', { text: 'Home' })
     await refreshed(page)
-    expect(await state()).toEqual({ kept: [['Title updated', true]], unmarked: 0, nested: 0 })
+    expect(await state()).toEqual({ kept: [['Title updated', true]], moved: 0, unmarked: 0, nested: 0 })
     expect(page.errors).toEqual([])
   })
 

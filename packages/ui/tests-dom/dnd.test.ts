@@ -114,6 +114,8 @@ describe('Sortable, from the keyboard', () => {
 
     expect(said()).toBe('Moved to 1 of 3')
     expect(document.querySelectorAll('[data-kui-announce]').length).toBe(1)
+    // A page swap leaves it where it is, so what it says just before one is still read.
+    expect(document.querySelector('body > [data-kui-announce]')?.hasAttribute('data-kay-keep')).toBe(true)
   })
 
   test('says it inside the open modal dialog holding the handle, where the rest of the page is inert', async () => {

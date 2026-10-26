@@ -275,7 +275,7 @@ A page the server has not fully sent after 10 seconds, for a link or `navigate()
 
 Each swap fires a `kay:navigate` event on `document`, with the page's address in `event.detail.url`, for a plain script to set itself up again. A full load fires none.
 
-What a script appends to `<body>` goes with the next swap, as the next page never renders it. Mark it `data-kay-keep` to keep it through every swap, the same element at the end of the body, such as a live region an announcer fills. Only a direct child of `<body>` is kept this way.
+What a script appends to `<body>` goes with the next swap, as the next page never renders it. Mark it `data-kay-keep` to keep it through every swap, the same element at the end of the body, such as a live region an announcer fills. The swap never moves it, so a live region is still read. Only a direct child of `<body>` is kept this way, and only one a script added: an element the server renders comes back with the next page.
 
 A link with `data-reload` loads its page fully. So does every link to a page setting `reload: true` in its `page`.
 
