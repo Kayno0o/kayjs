@@ -11,6 +11,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 - kayjs-auth's background prune of expired, erased and guest data is waited for by `site.runJobs()`, so a test of retention settings needs no sleep.
 - `signed.sign(use, value, { maxAge })` and `signed.verify(use, value, token)` from `kay/server` sign an app's own links and values with the app secret, expiring, so an app needs no key file of its own: [The app secret](environment.md#the-app-secret).
 - kayjs-ai `Chat` sends the text of a `kai-chat-send` event on its `.kai-chat` as the next message, so a voice button beside it can post a transcript without touching its field: [Chat](../packages/ai/llms/chat.md).
+- A browser test moves a page's clock with `page.advance('30s')`, running the `every()` and timer ticks due in that span, so a polling island is tested without waiting: [Browser tests](testing-browser.md).
 - An island passes a `Blob` to an `s.File()` or `s.Files()` field, a `MediaRecorder` recording as it is, and `kay check` accepts it where it asked for a `File`; the handler still gets a `File`: [Files](files.md#files-posted-to-an-action).
 - `session()` no longer warns in production that a cookie with no store cannot be revoked when kayjs-auth uses it, which keeps its own record of each session and refuses a cookie whose session it ended: [Sessions](server.md).
 - `kay check` reports an `s.Public` field in a `.ts` file outside `src` (`public-env-outside-src`), where kay does not find it and an island reads it as a string: [Environment](environment.md).

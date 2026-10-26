@@ -1,0 +1,11 @@
+---
+const polls = signal(0)
+const started = Date.now()
+const waited = signal(0)
+
+every('30s', () => polls.set(polls() + 1))
+every('1m', () => waited.set(Math.round((Date.now() - started) / 1000)))
+---
+h1 Polling
+p.polls {polls()}
+p.waited {waited()}

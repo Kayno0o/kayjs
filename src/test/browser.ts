@@ -10,6 +10,7 @@ import { afterAll } from 'bun:test'
 import { withUnreadable } from '../runtime/dev-a11y'
 import { optionMs } from '../runtime/duration'
 import { ISLAND } from '../runtime/markers'
+import { installClock } from './clock'
 import { createNetwork } from './network'
 
 export interface BrowserOptions {
@@ -150,6 +151,8 @@ export interface TestPage {
   // Cuts the page off the network, every request failing as with no connection, `navigator.onLine` false; `online()` restores it.
   offline: () => Promise<void>
   online: () => Promise<void>
+  // Moves the page's clock forward by a duration, as `bun test`'s fake timers do: every `setTimeout`, `setInterval`, `after()` and `every()` tick due in that span runs in order, and `Date.now()` and `performance.now()` read the time moved to. It resolves once the last tick ran, before what a tick started, such as a fetch, finished: follow it with `waitFor` or `waitUntil`. The clock otherwise runs in real time, and starts over with each document.
+  advance: (duration: Duration) => Promise<void>
   // Runs a function in every document the page loads from now on, before the document's own scripts, in each frame; its arguments cross as for `evaluate`.
   initScript: <Args extends unknown[]>(run: (...args: Args) => unknown, ...args: Args) => Promise<void>
   // Back and forward go through history, swapped pages included, resolving as `goto` does.
@@ -622,6 +625,9 @@ export async function browse(url: string, options: BrowserOptions = {}): Promise
     unroute: network.unroute,
     offline: async () => serial(async () => network.offline(true)),
     online: async () => serial(async () => network.offline(false)),
+    advance: async duration => serial(async () => {
+      await inView(`window.__kayAdvance(${optionMs(duration, 'advance')})`)
+    }),
     initScript: async (run, ...args) => serial(async () => {
       await cdp('Page.addScriptToEvaluateOnNewDocument', { source: script(run, args) })
     }),
@@ -824,6 +830,8 @@ export async function browse(url: string, options: BrowserOptions = {}): Promise
 
     if (options.javaScript === false)
       await cdp('Emulation.setScriptExecutionDisabled', { value: true })
+    else
+      await cdp('Page.addScriptToEvaluateOnNewDocument', { source: script(installClock, []) })
 
     view.addEventListener('Runtime.exceptionThrown', (event) => {
       const { exceptionDetails } = (event as MessageEvent<{ exceptionDetails: { text: string, exception?: { description?: string } } }>).data

@@ -403,6 +403,17 @@ await page.route('/', async (request) => {
 
 It cannot read an event stream, whose body never ends, so a route that fetches should not match one. A handler that throws is reported in `page.errors` and its request fails.
 
+`page.advance(duration)` moves the page's clock forward, as `bun test`'s fake timers do. Every `setTimeout`, `setInterval` and `every()` tick due in that span runs in order, and `Date.now()` and `performance.now()` read the time moved to, so a test of an island polling every 30 seconds does not wait 30.
+
+It resolves once the last tick ran, not when what a tick started, such as a fetch, finished: follow it with `waitFor`. A page nobody advances keeps real time, and the clock starts over with each document. `every()` still pauses in a hidden tab, so an advance runs nothing for it until the tab shows.
+
+```ts
+await using page = await site.open('/heartbeats')
+
+await page.advance('30s')
+await page.waitFor('.beat', { text: 'second read' })
+```
+
 `page.offline()` cuts the page off the network, so every request fails and `navigator.onLine` is false, and `page.online()` brings it back, for that page alone: other pages in the browser load as usual. A load or reload that fails because the host's own network changed is made again once. `page.initScript(fn, ...args)` runs a function in every document the page loads from then on, before the document's own scripts, to set up a stub or a flag the page reads as it starts.
 
 ```ts
