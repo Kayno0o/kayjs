@@ -118,8 +118,11 @@ describe.each(kinds)('a workflow on a $name store', ({ open }) => {
     forgetQueue(first)
     expect(await first.status(id)).toMatchObject({ status: 'running', steps: 1 })
 
-    // The run outlasted lostAfter, which gave it back to retry once its backoff passed.
-    await Bun.sleep(400)
+    // The run outlasted lostAfter, which gave it back to retry once its backoff passed: the clock moves on once the store holds the retry, as a claim meanwhile skips the row still being written, and a lapsed hold already reads as sleeping.
+    while ((await first.status(id))?.error === undefined)
+      await Bun.sleep(20)
+
+    expect(await first.status(id)).toMatchObject({ status: 'sleeping', steps: 1, error: 'it ran past lostAfter, 0 s' })
     later(MINUTE)
 
     const second = workflow<undefined>(name, async ({ step }) => {
