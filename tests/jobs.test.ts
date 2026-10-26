@@ -465,6 +465,8 @@ describe('schedule', () => {
       const world = await twoProcesses('production', (name, store, schedule) => [new Elysia().use(schedule('30s', () => runs.push(name), { boot: true, store }))])
 
       try {
+        await until(() => runs.length > 0)
+        // Nothing else runs: the other process answers the lock within this time.
         await Bun.sleep(20)
         expect(runs).toEqual(['first'])
       }
@@ -478,6 +480,8 @@ describe('schedule', () => {
       const world = await twoProcesses('production', (name, store, schedule) => [new Elysia().use(schedule('30s', () => runs.push(name), { boot: true, store }))])
 
       try {
+        await until(() => runs.length > 0)
+        // Nothing else runs: the other process answers the lock within this time.
         await Bun.sleep(20)
         expect(runs).toEqual(['first'])
       }
@@ -818,14 +822,14 @@ describe('schedule every so long', () => {
         stopped = true
       })()
 
-      // Real time for the server to stop and abort the run, then fake time for the grace after the lock.
+      // Real time for the server to stop and abort the run, as no event marks the abort reaching a run still waiting on its lock, then fake time for the grace after the lock.
       await Bun.sleep(50)
       jest.useFakeTimers()
       grant?.()
       await settle()
       jest.advanceTimersByTime(5000)
       jest.useRealTimers()
-      await Promise.race([stopping, Bun.sleep(1000)])
+      await stopping
       expect(stopped).toBe(true)
       await Promise.all(fired)
     }
@@ -929,7 +933,7 @@ describe('errors outside a request', () => {
       app.listen(0)
       await cron.fired[0]!.handler()
       await shutdown(app)
-      await Bun.sleep(5)
+      await until(() => caught.length >= 3)
 
       expect(caught.toSorted()).toEqual([['consumer failed', undefined], ['nightly failed', undefined], ['stop failed', undefined]])
       expect(logged.mock.calls.flat().join('\n')).toContain('Tracker down')
@@ -986,6 +990,7 @@ describe('queue', () => {
 
     try {
       await until(() => sent.length > 0)
+      // The job is not run a second time: this long covers several polls of the worker.
       await Bun.sleep(100)
       expect(sent).toEqual([{ to: 'ada@example.com', at: new Date(0) }])
     }
@@ -1002,6 +1007,7 @@ describe('queue', () => {
     const app = new Elysia().use(mail).listen(0)
 
     try {
+      // Nothing creates the file in this time: the worker polls well within it.
       await Bun.sleep(50)
       expect(await Bun.file(path).exists()).toBe(false)
       expect(errors).not.toHaveBeenCalled()
@@ -1018,14 +1024,28 @@ describe('queue', () => {
 
   it('wakes its worker for a job enqueued in the same process, and waits for the run in progress on stop', async () => {
     const steps: string[] = []
+    const store = memoryJobs()
+    const claim = store.claim.bind(store)
+    let polled = 0
+
+    // Counts the polls that found nothing, so the job is enqueued while the worker idles.
+    store.claim = async (...args) => {
+      const job = await claim(...args)
+
+      if (!job)
+        polled++
+
+      return job
+    }
+
     const work = queue('work', async (step: string) => {
       steps.push(`${step} started`)
       await Bun.sleep(30)
       steps.push(`${step} done`)
-    }, { store: memoryJobs() })
+    }, { store })
     const app = new Elysia().use(work).listen(0)
 
-    await Bun.sleep(20)
+    await until(() => polled > 0)
     await work.enqueue('a')
     await until(() => steps.length > 0, 200)
     await shutdown(app)
@@ -1176,7 +1196,7 @@ describe('queue', () => {
 
     await work.enqueue('a')
     await work.drain()
-    await Bun.sleep(20)
+    await until(() => log.length >= 2)
     expect(log).toEqual(['spawned drained', 'job done'])
     forgetQueue(work)
   })
@@ -1198,6 +1218,7 @@ describe('queue', () => {
 
     try {
       await until(() => ran.length >= 30)
+      // No job runs in both processes: this long covers further claims by either.
       await Bun.sleep(100)
       expect(ran.toSorted((a, b) => a - b)).toEqual(Array.from({ length: 30 }, (_, n) => n))
     }
@@ -1447,6 +1468,7 @@ describe('queue', () => {
     try {
       await outage.enqueue(1)
       await until(() => logged.mock.calls.length > 0)
+      // The workers retry meanwhile, and the single log line asserted below holds only if they stay quiet about it.
       await Bun.sleep(50)
       failing = false
       await until(() => ran.length > 0)
@@ -1548,11 +1570,12 @@ describe('queue', () => {
       const app = new Elysia().use(work).listen(0)
 
       try {
+        // The queue does not look at the store in this time, which an active one does within a poll.
         await Bun.sleep(50)
         expect(looks.count).toBe(0)
 
         work.activate()
-        await Bun.sleep(50)
+        await until(() => looks.count > 0)
         expect(looks.count).toBeGreaterThan(0)
       }
       finally {
@@ -1568,6 +1591,8 @@ describe('queue', () => {
 
       try {
         await work.enqueue('a')
+        await until(() => ran.length > 0)
+        // The job is not run a second time within this time.
         await Bun.sleep(100)
         expect(ran).toEqual(['a'])
       }
@@ -1585,7 +1610,7 @@ describe('queue', () => {
       const app = new Elysia().use(work).listen(0)
 
       try {
-        await Bun.sleep(50)
+        await until(() => looks.count > 0)
         expect(looks.count).toBeGreaterThan(0)
       }
       finally {
@@ -1665,7 +1690,7 @@ describe('queue', () => {
 
       const stopped = shutdown(app)
 
-      // The stop reaches the queue after the server has closed.
+      // The stop reaches the queue after the server has closed, which no event marks.
       await Bun.sleep(20)
       open?.()
       await stopped

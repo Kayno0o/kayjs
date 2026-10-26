@@ -342,6 +342,7 @@ describe.each(kinds)('a queue on a $name store', ({ open }) => {
       await jobs.enqueue(1, { key: 'k' })
       await jobs.drain()
       late!()
+      // Nothing is written by the dropped report in this time, which a write on the store would take.
       await Bun.sleep(20)
       expect(await jobs.job('k')).toBeUndefined()
 
@@ -349,6 +350,7 @@ describe.each(kinds)('a queue on a $name store', ({ open }) => {
 
       expect(await jobs.job({ id: next })).toEqual({ id: next, status: 'waiting', attempts: 0 })
       late!()
+      // Nothing is written by the dropped report in this time, which a write on the store would take.
       await Bun.sleep(20)
       expect(await jobs.job({ id: next })).toEqual({ id: next, status: 'waiting', attempts: 0 })
       await jobs.drain()
