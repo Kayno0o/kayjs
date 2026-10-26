@@ -88,7 +88,7 @@ expect((await cmsSignInWith(site, 'wrong')).status).toBe(401)
 
 Saves go to the content the test site holds, never to the project's `src/content`. `save`, `delete` and `rename` read the entry's version themselves, as the editor does, so a test names one only to try a stale one. `move(collection, slug, 'up')` and `upload(collection, file)` do the rest of the editor's calls; an upload answers the path to keep, under `/_kay/files/cms-media/`.
 
-`signInAs` works with `passwordGuard()` only. On kayjs-auth, sign the site in with `auth.test(site).signInAs(...)` and use the other methods of `cmsTest(site)` on that session. `cmsSignInAs(site, role)(site, role)` and `cmsSignOut(site)` do the sign-in alone.
+`signInAs` works with `passwordGuard()` only. On kayjs-auth, sign the site in with `auth.test(site).signInAs(...)` and use the other methods of `cmsTest(site)` on that session. `cmsSignInAs(site, role)` and `cmsSignOut(site)` do the sign-in alone.
 
 The admin header shows who is signed in, a username or an email with kayjs-auth and the role with `passwordGuard`, and a Sign out button.
 
