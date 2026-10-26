@@ -32,16 +32,18 @@ describe('the types a schema gives an island', () => {
   })
 })
 
-const upload = action(t.Object({ audio: t.File(), extra: t.Optional(t.Array(t.File())) }), input => input.audio.name)
+const upload = action(t.Object({ audio: t.File(), extra: t.Optional(t.Array(t.File())), note: t.Optional(t.File()), nested: t.Object({ clip: t.File(), when: t.Date() }), count: t.Number() }), input => input.audio.name)
 
 describe('the input of an action reading files', () => {
   it('takes a Blob where the handler reads a File', () => {
-    const blob: InputOf<typeof upload> = { audio: new Blob(['x']), extra: [new File(['y'], 'y.txt')] }
+    const blob: InputOf<typeof upload> = { audio: new Blob(['x']), extra: [new File(['y'], 'y.txt')], note: new Blob(['n']), nested: { clip: new Blob(['c']), when: new Date() }, count: 1 }
+    // @ts-expect-error a Blob is no number, no date
+    const other: InputOf<typeof upload> = { audio: new Blob(['x']), nested: { clip: new Blob(['c']), when: new Blob(['d']) }, count: new Blob(['1']) }
 
     // @ts-expect-error a string is no file
     const wrong: InputOf<typeof upload> = { audio: 'x' }
 
-    expect([blob, wrong, upload]).toHaveLength(3)
+    expect([blob, other, wrong, upload]).toHaveLength(4)
   })
 })
 
