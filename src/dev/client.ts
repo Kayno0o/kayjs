@@ -12,7 +12,7 @@ export interface ClientBuilder {
   gone: () => boolean
   // Whether a change to the file, relative to the root, changes what the process loaded as it started: the config and the project's modules it imports.
   loaded: (file: string) => boolean
-  // Ends the hold `quiet` put on the first process's error output: `show` writes what it printed meanwhile, otherwise it is dropped, and what it prints later goes straight through.
+  // Ends the hold `quiet` put on the first process's error output: `show` writes what it printed meanwhile and what it prints later goes straight through, otherwise the start is over and all of it is dropped, including what the host reads from the pipe only after.
   release: (show: boolean) => void
   stop: () => Promise<void>
 }
@@ -41,12 +41,16 @@ export function startClientBuilder(root: string, env: Record<string, string | un
   let current = spawn(quiet)
   let stopped = false
   let held: string | undefined = quiet ? '' : undefined
+  let dropped = false
 
   async function relay(stream: ReadableStream<Uint8Array>) {
     const decoder = new TextDecoder()
 
     for await (const chunk of stream) {
       const text = decoder.decode(chunk, { stream: true })
+
+      if (dropped)
+        continue
 
       if (held === undefined)
         process.stderr.write(text)
@@ -143,6 +147,7 @@ export function startClientBuilder(root: string, env: Record<string, string | un
         process.stderr.write(held)
 
       held = undefined
+      dropped = !show
     },
     stop: async () => {
       stopped = true

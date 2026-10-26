@@ -2170,6 +2170,36 @@ describe.concurrent('kay dev', () => {
     }
   }, 60_000)
 
+  it('drops the output of a quiet builder that crashed on the config when the start is refused, even if the host reads its pipe only after', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'kay-dev-'))
+    const marker = join(root, 'loading')
+    const written: string[] = []
+    const stderr = spyOn(process.stderr, 'write').mockImplementation((text: string) => {
+      written.push(String(text))
+
+      return true
+    })
+
+    await Bun.write(join(root, 'kay.config.ts'), `import { writeFileSync } from 'node:fs'\n\nwriteFileSync(${JSON.stringify(marker)}, 'x')\n\nthrow new Error('config broke')\n`)
+    const builder = startClientBuilder(root, process.env, 'inherit', true)
+
+    try {
+      // Blocks this thread while the process crashes, so its output waits in the pipe and the exit is unseen when the types settle, as under load.
+      for (let waited = 0; !existsSync(marker) && waited < 20_000; waited += 50)
+        Bun.sleepSync(50)
+
+      Bun.sleepSync(1000)
+      builder.release(false)
+      await Bun.sleep(300)
+      expect(written.filter(text => text.includes('config broke'))).toEqual([])
+    }
+    finally {
+      await builder.stop()
+      stderr.mockRestore()
+      await rm(root, { recursive: true, force: true })
+    }
+  }, 60_000)
+
   it.serial('keeps one process building the client for builds riding one that died, and none once stopped meanwhile', async () => {
     const scratch = join(import.meta.dir, '../node_modules/.cache')
 
