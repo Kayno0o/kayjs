@@ -26,7 +26,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 - The raw environment read check and `kay check --fix` leave a standalone binary's entry (a file a `bun build` script names, wherever it sits) with what it imports, the content config and a file with a `// kay-env: raw` line alone, so they no longer import the app's schema: [Environment](environment.md).
 - A test run (`NODE_ENV=test`, as `bun test` sets) no longer warns that `proxy.key` is set with no `KAY_PROXY_KEY`, so an app behind a proxy has no warning in every test file; `kay start` outside production still does: [proxy and security](proxy-and-security.md).
 - `kay upgrade` across a release that dropped deprecated lints installs the minor before that release first, so an app moving from 1.70 to the latest still gets the 1.71 and 1.72 forms rewritten instead of keeping them silently: [kay upgrade](check-and-tools.md).
-- `kay check` warns (`missing-captcha`) on a call to kayjs-auth's `register`, `requestPasswordReset`, `requestMagicLink` or `signInWithPassword` with no `captcha` option, which the default proof of work refuses: [Bots and breached passwords](../packages/auth/llms/hardening-and-testing.md).
+- `kay check` warns (`missing-captcha`) on a call to kayjs-auth's `register`, `requestPasswordReset`, `requestMagicLink` or `signInWithPassword` with no `captcha` option, which the default proof of work refuses (quiet project-wide, in the editor too, once a `createAuth` sets `captcha: false`): [Bots and breached passwords](../packages/auth/llms/hardening-and-testing.md).
 
 ## 1.77.2
 

@@ -466,7 +466,7 @@ form(action={register})
   button Create the account
 ```
 
-A proof of work costs a bot CPU rather than proving a human. A site bots target anyway sets Turnstile or hCaptcha as `captcha` instead; their tokens count only when the provider says they were made for your site's hostname, and for Turnstile the form they were shown on. `captcha: false` turns it off.
+A proof of work costs a bot CPU rather than proving a human. A site bots target anyway sets Turnstile or hCaptcha as `captcha` instead; their tokens count only when the provider says they were made for your site's hostname, and for Turnstile the form they were shown on. `captcha: false` turns it off, and silences `missing-captcha` across the project, in the editor too.
 
 Turnstile and hCaptcha send the visitor's address and browser to the provider: the widget runs in their browser and talks to Cloudflare or hCaptcha directly. Your server sends the provider only your secret and the token. Name them in the site's privacy notice. The proof of work calls nobody.
 

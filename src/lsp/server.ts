@@ -23,6 +23,7 @@ import { styleInfo, styleInfos, themeTokens } from '../build/ui-info'
 import { configCheckOptions, configProblems, contentChecks, generatedChecks, generatedProblem, projectProblems, stopProbes, writeShadowTypes } from '../check'
 import { diagnoseShadow, reportsTypeErrors, servedByTheApp, servedLocales } from '../check/diagnose'
 import { messageKeys } from '../check/messages'
+import { withoutMissingCaptcha } from '../check/project'
 import { compileShadow, generatedSpan, layoutQueries, shadowSource, sourceSpan } from '../check/shadow'
 import { programShadows, servedPathsOf } from '../check/shadow-types'
 import { elementsIn } from '../compiler/ast'
@@ -99,6 +100,7 @@ const KAY_FILE = /^file:.*\.kay$/
 const UI_DOCUMENT = /^file:.*\/src\/ui\.ts$/
 // The module of an import or a re-export in a component's text, fence or template.
 const IMPORT_SOURCE = /\b(?:from|import)\s*['"]([^'"]+)['"]/g
+const SCRIPT_FILE = /\.[cm]?[jt]s$/
 const EXTENSION = /\.\w+$/
 const IMPORT_DECLARATION = /^\s*import\s/
 const TRAILING_SEMICOLON = /;$/
@@ -299,7 +301,10 @@ export class KayLanguageServer {
       this.server.notify('workspace/didChangeWatchedFiles', { changes: others })
 
     // `kay.config.ts`, or a module it imported, changing makes every project read its config again.
-    if (changed.some(change => basename(change.path) === CONFIG_FILE || realPath(change.path) in require.cache)) {
+    // A module that holds `createAuth` may turn the CAPTCHA off, which `missing-captcha` reads project-wide.
+    const authChanged = await Promise.all(changed.filter(change => SCRIPT_FILE.test(change.path)).map(async change => change.type === DELETED || await createsAuth(change.path)))
+
+    if (changed.some(change => basename(change.path) === CONFIG_FILE || realPath(change.path) in require.cache) || authChanged.includes(true)) {
       for (const project of this.projects.values())
         project.configured = false
     }
@@ -481,7 +486,7 @@ export class KayLanguageServer {
 
     const config = await projectConfig(project.root)
 
-    project.options = { ...configCheckOptions(config), routes: (project.root === this.root ? this.routesSetting : undefined) ?? config.routes }
+    project.options = await withoutMissingCaptcha(project.root, { ...configCheckOptions(config), routes: (project.root === this.root ? this.routesSetting : undefined) ?? config.routes })
     project.routesDir = projectPaths(project.root, project.options).routes
     project.mounts = routeMounts(project.root, project.options.extensions)
     project.locales = servedLocales(project.options.i18n)
@@ -1494,6 +1499,16 @@ export class KayLanguageServer {
     this.tsgo?.process.kill()
     stopProbes()
     process.exit(0)
+  }
+}
+
+// Whether a module on disk holds `createAuth`, one that cannot be read holding none.
+async function createsAuth(path: string): Promise<boolean> {
+  try {
+    return (await Bun.file(path).text()).includes('createAuth')
+  }
+  catch {
+    return false
   }
 }
 

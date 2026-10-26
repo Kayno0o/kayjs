@@ -749,6 +749,24 @@ describe('kay lsp following the project on disk', () => {
     expect(messages(await editor.filesChanged('src/routes/sub/_guard.ts', [{ path: 'src/routes/sub/_guard.ts', type: 1 }, { path: 'src/routes/sub/index.kay', type: 1 }]))).toEqual([expect.stringMatching(/^It must export a guard by default: /)])
   })
 
+  it('drops missing-captcha once a module sets captcha: false on createAuth, and brings it back when it stops', async () => {
+    const route = 'src/routes/signup.kay'
+    const missing = (diagnostics: Diagnostic[]) => diagnostics.filter(diagnostic => diagnostic.code === 'missing-captcha').length
+
+    await Bun.write(join(dir, route), '---\nexport const join = action(s.Object({ email: s.String() }), async (input) => auth.signInWithPassword(input))\n---\nh1 Join\n')
+    expect(missing(await editor.open(route))).toBe(1)
+
+    await Bun.write(join(dir, 'src/auth.ts'), 'export const auth = createAuth({ captcha: false })\n')
+    expect(missing(await editor.filesChanged(route, [{ path: 'src/auth.ts', type: 1 }]))).toBe(0)
+
+    await Bun.write(join(dir, 'src/auth.ts'), 'export const auth = createAuth({})\n')
+    expect(missing(await editor.filesChanged(route, [{ path: 'src/auth.ts', type: 2 }]))).toBe(1)
+
+    await rm(join(dir, 'src/auth.ts'))
+    await rm(join(dir, route))
+    await editor.filesChanged(route, [{ path: 'src/auth.ts', type: 3 }, { path: route, type: 3 }])
+  })
+
   it('sees a component created or deleted on disk, on save or from the file watcher', async () => {
     expect(codes(await editor.open(page))).toEqual([2307, 2322])
 
