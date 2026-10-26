@@ -11,6 +11,7 @@ import { PUBLIC_ENV } from '../src/runtime/env'
 import { reportError } from '../src/runtime/reactive'
 import { ISLAND_PARAM } from '../src/runtime/server-islands'
 import { DEV_BOOT, liveReload, problemsBlock } from '../src/server/dev'
+import { eventually, turn } from './helpers/eventually'
 import { scratchDir } from './scratch'
 import { pages } from './shared-pages'
 
@@ -20,28 +21,6 @@ const PAGE = { page: 'src/routes/index.kay', layouts: [], params: {}, id: 'abc',
 const BOOT = (/<script>([\s\S]*)<\/script>/).exec(DEV_BOOT)![1]!
 
 const { error, warn } = console
-
-// One turn of the event loop, which runs every microtask the tool queued, as the render of a problem or the answer of a mocked clipboard is: a turn takes no time, so it paces nothing.
-const turn = async () => Bun.sleep(0)
-
-// Retries an assertion until it holds, for what the tool reaches through a fetch or a stream it reads, which takes more than one turn; the last failure is the one thrown.
-async function eventually(assertion: () => void | Promise<void>, timeout = 10_000): Promise<void> {
-  const end = Date.now() + timeout
-
-  for (;;) {
-    try {
-      await assertion()
-
-      return
-    }
-    catch (failure) {
-      if (Date.now() > end)
-        throw failure
-
-      await Bun.sleep(5)
-    }
-  }
-}
 
 // A PerformanceObserver the test reports entries to by type, installed on the window until the test removes it.
 function fakeObserver() {
