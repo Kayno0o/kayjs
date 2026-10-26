@@ -12,6 +12,7 @@ import { TimeoutError } from '../src/server/pg-poll'
 import { memoryRates, overLimit } from '../src/server/protection'
 import { memoryRooms, sqliteRooms } from '../src/server/rooms'
 import { verifyWork, workChallenge } from '../src/server/work-scope'
+import { eventually } from './helpers/eventually'
 import { scratchDir } from './scratch'
 
 afterEach(() => {
@@ -179,9 +180,9 @@ describe('sqliteCache', () => {
   })
 })
 
-// Elysia runs its afterResponse hooks once the event loop gets to them.
-async function settled(): Promise<void> {
-  await Bun.sleep(20)
+// Elysia runs its afterResponse hooks once the event loop gets to them, and a write still in flight counts half a step.
+async function settled(writes: { count: number }): Promise<void> {
+  await eventually(() => expect(Number.isInteger(writes.count)).toBe(true))
 }
 
 describe('a listener that throws', () => {
@@ -205,14 +206,11 @@ describe('a listener that throws', () => {
     other.close()
 
     try {
-      for (let wait = 0; heard.length === 0 && wait < 100; wait++)
-        await Bun.sleep(25)
+      await eventually(() => expect(heard).toEqual(['{"keys":[]}']))
     }
     finally {
       setLogSink(sink)
     }
-
-    expect(heard).toEqual(['{"keys":[]}'])
   })
 
   for (const [name, open] of [['memoryRooms', () => memoryRooms()], ['sqliteRooms', () => sqliteRooms(':memory:')]] as const) {
@@ -257,10 +255,10 @@ describe('countWrites', () => {
     const { writes, handle } = app()
 
     expect((await handle('/ok')).status).toBe(200)
-    await settled()
+    await settled(writes)
     expect(writes.count).toBe(1)
     expect((await handle('/broken')).status).toBe(500)
-    await settled()
+    await settled(writes)
     expect(writes.count).toBe(2)
   })
 
@@ -268,7 +266,7 @@ describe('countWrites', () => {
     const { writes, handle } = app()
 
     expect((await handle('/code')).status).toBe(200)
-    await settled()
+    await settled(writes)
     expect(writes.count).toBe(1)
   })
 
@@ -282,7 +280,7 @@ describe('countWrites', () => {
 
     expect(invalid.status).toBeGreaterThanOrEqual(400)
     expect(invalid.status).toBeLessThan(500)
-    await settled()
+    await settled(writes)
     expect(writes.count).toBe(0)
   })
 })
@@ -296,8 +294,7 @@ describe('sqliteRooms on a file that cannot be watched', () => {
       store.subscribe(() => undefined)
       store.add('lobby', 'c1', '')
       expect(started.mock.calls.map(call => call[1])).toContain(25)
-      await Bun.sleep(1500)
-      expect(started.mock.calls.map(call => call[1])).toContain(250)
+      await eventually(() => expect(started.mock.calls.map(call => call[1])).toContain(250))
     }
     finally {
       store.close()
