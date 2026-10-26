@@ -807,6 +807,8 @@ interface Entry {
   write: (value: unknown) => void
   // The value the page rendered it with, which an island claiming its markup reads whatever arrived since.
   rendered: { value: unknown } | undefined
+  // What the page held for it when the connection last delivered a value, which a later read of the page compares to: a page rendered before that delivery holds nothing the connection has not already moved past.
+  delivered: { rendered: { value: unknown } | undefined } | undefined
   // Read while an island claims its markup, so the value that arrived since shows once it is hydrated.
   hydrated: () => number
   bump: () => void
@@ -854,7 +856,7 @@ function entryOf(slot: BrowserSlot, key: string): Entry {
     const [read, write] = ownSignal<unknown>(rendered ? rendered.value : initialOf(slot, key))
     const [hydrated, bump] = ownSignal(0)
 
-    entry = { read, write, rendered, hydrated, bump: () => {
+    entry = { read, write, rendered, delivered: undefined, hydrated, bump: () => {
       entry!.bumping = false
       bump(untrack(hydrated) + 1)
     }, bumping: false, watchers: 0 }
@@ -880,13 +882,15 @@ function watch(slot: BrowserSlot, key: string, entry: Entry): void {
   const at = JSON.stringify([slot.id, key])
 
   if (entry.watchers === 0) {
-    // A page rendered since holds a fresher value than the last the connection delivered, or none when the viewer is not the one it was rendered for; the same render as before holds the one the connection has since moved past.
+    // A page rendered since holds a fresher value than the last the connection delivered, or none when the viewer is not the one it was rendered for; the same render as before, or one fetched before the delivery, holds the one the connection has since moved past.
     const rendered = renderedValue(slot.id, key)
+    const known = entry.delivered ? entry.delivered.rendered : entry.rendered
 
-    if (!sameValue(entry.rendered?.value, rendered?.value)) {
-      entry.rendered = rendered
+    entry.rendered = rendered
+    entry.delivered = undefined
+
+    if (!sameValue(known?.value, rendered?.value))
       whenHydrated(() => entry.write(rendered ? rendered.value : initialOf(slot, key)))
-    }
   }
 
   entry.watchers++
@@ -1074,8 +1078,10 @@ function apply(updates: LiveUpdate[]): void {
   for (const [id, key, value] of updates) {
     const entry = browserSlots.get(id)?.entries.get(key)
 
-    if (entry)
+    if (entry) {
+      entry.delivered = { rendered: renderedValue(id, key) }
       entry.write(value)
+    }
   }
 }
 

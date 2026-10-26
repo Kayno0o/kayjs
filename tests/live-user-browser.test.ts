@@ -181,8 +181,6 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('a live valu
     session = 'bob'
     drop()
     await untilHolds(() => accepted > letThrough)
-    // The tab shows the new user's own value before it is written again: an update right after the reconnect is lost otherwise, kaynooo/kayjs#2353.
-    await tab.waitUntil(...shows(5))
     live.unread.set('alice', 9)
     live.unread.set('bob', 7)
     await tab.waitUntil(...shows(7))
