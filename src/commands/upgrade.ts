@@ -404,9 +404,43 @@ function replaceSpec(source: string, dependency: KayDependency, spec: string): s
   return entry.test(inside) ? source.slice(0, span.start) + inside.replace(entry, (_whole, key: string) => `${key}${JSON.stringify(spec)}`) + source.slice(span.end) : undefined
 }
 
+// What Bun prints of its own env loading and timing, as `[0.02ms] ".env"` and `[0.00ms] done`, which says nothing to the reader.
+const AFTER_NEWLINE = /(?<=\n)/
+const BUN_TRACE = /^\[\d+(?:\.\d+)?ms\] /
+
 async function run(args: string[], root: string, capture: boolean, env: Record<string, string> = {}): Promise<{ code: number, stdout: string }> {
-  const child = Bun.spawn(args, { cwd: root, env: { ...process.env, ...env }, stdin: 'ignore', stdout: capture ? 'pipe' : 'inherit', stderr: 'inherit' })
-  const [stdout, code] = await Promise.all([capture ? new Response(child.stdout).text() : '', child.exited])
+  const child = Bun.spawn(args, { cwd: root, env: { ...process.env, ...env }, stdin: 'ignore', stdout: 'pipe', stderr: capture ? 'inherit' : 'pipe' })
+  const [stdout, , code] = await Promise.all([
+    capture ? new Response(child.stdout).text() : forward(child.stdout, process.stdout),
+    capture ? undefined : forward(child.stderr as ReadableStream<Uint8Array>, process.stderr),
+    child.exited,
+  ])
 
   return { code, stdout }
+}
+
+// Writes a child's output to `sink` line by line, without the lines Bun traces.
+async function forward(stream: ReadableStream<Uint8Array>, sink: NodeJS.WriteStream): Promise<string> {
+  const decoder = new TextDecoder()
+  let pending = ''
+
+  const flush = (text: string) => {
+    for (const line of text.split(AFTER_NEWLINE)) {
+      if (!BUN_TRACE.test(line))
+        sink.write(line)
+    }
+  }
+
+  for await (const chunk of stream) {
+    pending += decoder.decode(chunk, { stream: true })
+
+    const end = pending.lastIndexOf('\n') + 1
+
+    flush(pending.slice(0, end))
+    pending = pending.slice(end)
+  }
+
+  flush(pending + decoder.decode())
+
+  return ''
 }
