@@ -110,6 +110,7 @@ describe.concurrent('kay dev reloading', () => {
     try {
       for (let edit = 1; edit <= 6; edit++) {
         await project.write('src/routes/index.kay', `h1 Burst ${edit}\n`)
+        // The edits come closer together than the debounce, so each lands before the last one is taken in.
         await Bun.sleep(15)
       }
 
@@ -135,6 +136,7 @@ describe.concurrent('kay dev reloading', () => {
       await until(() => rebuilds() >= expected)
       await project.quiet()
       await Bun.write(join(project.root, path), content)
+      // No rebuild may follow the late second event, so the wait is a fixed span past the debounce.
       await Bun.sleep(300)
       expect(rebuilds()).toBe(expected)
     }
@@ -367,6 +369,8 @@ describe.concurrent('kay dev reloading', () => {
 
       await until(() => lines(counts).length >= 21)
       await Bun.write(ticks, '')
+      await until(() => lines(ticks).length > 0)
+      // An earlier run still ticking would show within this span, so the wait is a fixed span after the current run's first tick.
       await Bun.sleep(200)
 
       expect(project.children).toHaveLength(2)
@@ -443,6 +447,8 @@ describe.concurrent('kay dev reloading', () => {
       await until(async () => (await project.text('/api/one')).includes('"edit":1'))
       expect(await project.text('/api/one')).toContain('"previous":"closed"')
       await Bun.write(ticks, '')
+      await until(() => lines(ticks).includes('one1') && lines(ticks).includes('two0'))
+      // An earlier run still ticking would show within this span, so the wait is a fixed span after the current runs' first ticks.
       await Bun.sleep(200)
 
       const seen = new Set(lines(ticks))

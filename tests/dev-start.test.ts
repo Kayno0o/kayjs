@@ -86,6 +86,7 @@ it('leaves the server alone for an edit of package.json that resolves nothing, a
 
     // A script, the version, the description and the order of the fields leave everything as it is.
     await pkg({ version: '1.0.1', scripts: { dev: 'kay dev --open', test: 'bun test' }, description: 'edited' })
+    // No restart may follow, so the wait is a fixed span.
     await Bun.sleep(1500)
     expect(restarts()).toEqual([])
     expect(children).toHaveLength(1)
@@ -176,6 +177,7 @@ it('starts the server on the entry it knows when kay.config.ts changes, without 
     expect(existsSync(marker)).toBe(false)
     expect(children).toHaveLength(2)
     await until(() => existsSync(marker), 30_000)
+    // No second restart may follow the types, so the wait is a fixed span.
     await Bun.sleep(1000)
     expect(lines.filter(line => line.includes('restarted'))).toHaveLength(1)
     expect(children).toHaveLength(2)
@@ -219,6 +221,7 @@ it('leaves the client build of an earlier run as it is when nothing the build re
     // A start with nothing changed leaves the build as it is, and still serves it.
     const built = manifestTime(root)
 
+    // A rebuild must write a manifest with a later mtime than the one kept, which the clock's granularity could hide.
     await Bun.sleep(30)
     expect(await run()).toContain('LABEL_A')
     expect(manifestTime(root)).toBe(built)

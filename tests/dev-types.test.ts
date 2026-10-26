@@ -118,6 +118,7 @@ describe('the type check beside kay dev', () => {
 
       await Bun.write(join(root, '.env'), 'A=1\n')
       await until(() => events.slice(before).some(({ event }) => event === 'restart'))
+      // Nothing may clear the listed errors after the restart, so the wait is a fixed span.
       await Bun.sleep(1500)
       expect(listedTypeErrors(root)).toHaveLength(1)
     }
@@ -137,6 +138,7 @@ describe('the type check beside kay dev', () => {
 
     try {
       await until(() => listedTypeErrors(root).length === 0)
+      // Nothing may be listed afterwards, so the wait is a fixed span.
       await Bun.sleep(1500)
       expect(listedTypeErrors(root)).toEqual([])
     }
@@ -157,6 +159,7 @@ describe('the type check beside kay dev', () => {
 
       try {
         await until(() => events.some(({ event }) => event === 'ready'))
+        // No type check may report within this span, so the wait is a fixed span.
         await Bun.sleep(4000)
         expect(events.map(({ event }) => event)).not.toContain('types')
         expect(listedTypeErrors(root)).toEqual([])

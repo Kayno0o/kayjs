@@ -84,6 +84,7 @@ async function firstRun(options = OPTIONS, files = FILES) {
 async function buildsAgain(options = OPTIONS): Promise<boolean> {
   const before = manifest()
 
+  // A rebuild is told from none by a later mtime, which the clock's granularity could hide.
   await Bun.sleep(30)
 
   const outcome = await devBuilder(project, options)(null)
@@ -141,6 +142,7 @@ describe('the build an earlier kay dev left', () => {
     // A deleted import fails the build, which still builds.
     const before = manifest()
 
+    // A rebuild is told from none by a later mtime, which the clock's granularity could hide.
     await Bun.sleep(30)
     await devBuilder(project, OPTIONS)(null)
     expect(statSync(join(outputDir(project), 'manifest.json'), { throwIfNoEntry: false })?.mtimeMs !== before || existsSync(join(outputDir(project), BUILD_FAILURE))).toBe(true)
@@ -243,6 +245,7 @@ describe('the build an earlier kay dev left', () => {
 
   it('builds everything for the first edit after a start that skipped the build, and keeps the record true after it', async () => {
     await firstRun()
+    // A pace past the clock's granularity between the first build and the files the builds below write.
     await Bun.sleep(100)
 
     const started = devBuilder(project, OPTIONS)
