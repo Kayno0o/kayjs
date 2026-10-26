@@ -317,6 +317,7 @@ describe('a collection route read beyond the entries', () => {
       await Bun.sleep(10)
 
     expect(loads.count).toBe(1)
+    // Nothing happens: the failed read changes no entry file within this time.
     await Bun.sleep(20)
     expect(kept.entryFiles).toEqual(['/down/a.html'])
   })

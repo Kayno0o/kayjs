@@ -11,6 +11,7 @@ import { island, IslandPropsError } from '../src/runtime/island.server'
 import { trustHtml } from '../src/runtime/sanitize'
 import { decodeServerValue } from '../src/runtime/wire'
 import { HYDRATION_SCRIPT } from '../src/server/hydration'
+import { eventually } from './helpers/eventually'
 
 await plugin(kay())
 
@@ -89,8 +90,7 @@ describe('islands', () => {
     expect(document.querySelector('slot button')).toBe(button)
 
     button.dispatchEvent(new Event('click', { bubbles: true }))
-    await new Promise(resolve => setTimeout(resolve, 0))
-    expect(button.textContent).toBe('Count 3')
+    await eventually(() => expect(button.textContent).toBe('Count 3'))
 
     const [lazy] = observed
     const lazyIsland = document.querySelector('slot[data-hydrate="visible"]')!
@@ -99,20 +99,17 @@ describe('islands', () => {
     // The wrapper has no box, so what scrolls into view is its markup.
     expect(observed.map(({ target }) => target)).toEqual([...lazyIsland.children])
     lazy!.callback([{ isIntersecting: true, target: lazy!.target } as IntersectionObserverEntry], {} as IntersectionObserver)
-    await new Promise(resolve => setTimeout(resolve, 20))
-    expect(disconnected).toBe(1)
+    await eventually(() => expect(disconnected).toBe(1))
     expect(lazyIsland.querySelector('button')).toBe(lazyButton)
     lazyButton.dispatchEvent(new Event('click', { bubbles: true }))
-    await new Promise(resolve => setTimeout(resolve, 0))
-    expect(lazyButton.textContent).toBe('Count 6')
+    await eventually(() => expect(lazyButton.textContent).toBe('Count 6'))
 
     // happy-dom has no requestIdleCallback, so an idle island waits for the timer standing in for it.
     const idleButton = document.querySelector('slot[data-hydrate="idle"] button')!
 
-    await new Promise(resolve => setTimeout(resolve, 250))
+    // A click before the island hydrates is replayed once it has, so the count only moves after the idle timer ran.
     idleButton.dispatchEvent(new Event('click', { bubbles: true }))
-    await new Promise(resolve => setTimeout(resolve, 0))
-    expect(idleButton.textContent).toBe('Count 8')
+    await eventually(() => expect(idleButton.textContent).toBe('Count 8'))
   })
 
   it('renders an await block in an island pending on the server, then resolves it in the hydrated island', async () => {
@@ -120,13 +117,11 @@ describe('islands', () => {
     const section = document.querySelector('section.greeting')!
     const button = section.querySelector('button')!
 
-    await new Promise(resolve => setTimeout(resolve, 20))
+    await eventually(() => expect(section.querySelector('p.text')?.textContent).toBe('Hello Ada'))
     expect(document.querySelector('section.greeting')).toBe(section)
-    expect(section.querySelector('p.text')?.textContent).toBe('Hello Ada')
     expect(section.querySelector('p.wait')).toBeNull()
     button.dispatchEvent(new Event('click', { bubbles: true }))
-    await new Promise(resolve => setTimeout(resolve, 0))
-    expect(button.textContent).toBe('Clicked 1')
+    await eventually(() => expect(button.textContent).toBe('Clicked 1'))
   })
 
   it('replays a click made before its island hydrated, once it has, and only once', async () => {
@@ -141,10 +136,9 @@ describe('islands', () => {
     const { hydrateAgain } = await import(join(outdir, 'client.js')) as { hydrateAgain: () => Promise<void> }
 
     await hydrateAgain()
-    await new Promise(resolve => setTimeout(resolve, 0))
     expect(document.querySelector('slot button')).toBe(button)
-    expect(button.textContent).toBe('Count 3')
-    expect((globalThis as { _$K?: Event[] })._$K).toEqual([])
+    await eventually(() => expect(button.textContent).toBe('Count 3'))
+    await eventually(() => expect((globalThis as { _$K?: Event[] })._$K).toEqual([]))
   })
 
   it('drops the clicks made on an island that will never hydrate', async () => {
@@ -237,8 +231,7 @@ describe('islands', () => {
     const { hydrateAgain } = await import(join(outdir, 'client.js')) as { hydrateAgain: () => Promise<void> }
 
     await hydrateAgain()
-    await new Promise(resolve => setTimeout(resolve, 0))
-    expect(button.textContent).toBe('Counted 11')
+    await eventually(() => expect(button.textContent).toBe('Counted 11'))
   })
 
   it('keeps what was typed and ticked before its island hydrated, the bound signals taking it', async () => {
@@ -258,10 +251,9 @@ describe('islands', () => {
     const { hydrateAgain } = await import(join(outdir, 'client.js')) as { hydrateAgain: () => Promise<void> }
 
     await hydrateAgain()
-    await new Promise(resolve => setTimeout(resolve, 0))
+    await eventually(() => expect(document.querySelector('form.typed p')!.textContent).toBe('Ada yes'))
     expect(name.value).toBe('Ada')
     expect(agree.checked).toBe(true)
-    expect(document.querySelector('form.typed p')!.textContent).toBe('Ada yes')
   })
 
   it('renders an island afresh, logging an error, when its server markup is not what it builds', async () => {
@@ -278,8 +270,7 @@ describe('islands', () => {
 
       expect(document.querySelector('slot em')).toBeNull()
       button.dispatchEvent(new Event('click', { bubbles: true }))
-      await new Promise(resolve => setTimeout(resolve, 0))
-      expect(button.textContent).toBe('Count 3')
+      await eventually(() => expect(button.textContent).toBe('Count 3'))
     }
     finally {
       logged.mockRestore()
@@ -307,11 +298,10 @@ describe('islands', () => {
     const button = document.querySelector(selector)!
 
     button.dispatchEvent(new Event('click', { bubbles: true }))
-    await new Promise(resolve => setTimeout(resolve, 0))
+    await eventually(() => expect(button.textContent).toBe(expected))
     warn.mockRestore()
     error.mockRestore()
     expect(document.querySelector(selector)).toBe(button)
-    expect(button.textContent).toBe(expected)
     expect(issues).toEqual([])
   })
 
@@ -333,11 +323,10 @@ describe('islands', () => {
     const button = document.querySelector('button.tally')!
 
     button.dispatchEvent(new Event('click', { bubbles: true }))
-    await new Promise(resolve => setTimeout(resolve, 0))
+    await eventually(() => expect(button.textContent).toBe('Tally 1'))
     warn.mockRestore()
     error.mockRestore()
     expect(document.querySelector('button.tally')).toBe(button)
-    expect(button.textContent).toBe('Tally 1')
     expect([...document.querySelectorAll('slot li.badge')].map(item => item.textContent)).toEqual(['a', 'b', 'c'])
     expect(issues).toEqual([])
   })
@@ -359,11 +348,10 @@ describe('islands', () => {
     const first = document.querySelector('li.product')
 
     document.querySelector('button.rate')!.dispatchEvent(new Event('click', { bubbles: true }))
-    await new Promise(resolve => setTimeout(resolve, 0))
+    await eventually(() => expect(rows()).toEqual([['product low', '5.00', 'Tea: 5.001 left'], ['product', '18.00', 'Mug: 18.00']]))
     warn.mockRestore()
     error.mockRestore()
     expect(document.querySelector('li.product')).toBe(first)
-    expect(rows()).toEqual([['product low', '5.00', 'Tea: 5.001 left'], ['product', '18.00', 'Mug: 18.00']])
     expect(issues).toEqual([])
   })
 
@@ -401,11 +389,10 @@ describe('islands', () => {
 
     await hydrateAgain()
     document.querySelector('button.bump')!.dispatchEvent(new Event('click', { bubbles: true }))
-    await new Promise(resolve => setTimeout(resolve, 30))
+    await eventually(() => expect(document.querySelector('button.bump')!.textContent).toBe('Bumped 1'))
     warn.mockRestore()
     expect(document.querySelector('.good')).toBe(good)
     expect(good.innerHTML).toBe('<b>island-vouched-1</b>')
     expect(document.querySelector('.bad')!.innerHTML).toBe('')
-    expect(document.querySelector('button.bump')!.textContent).toBe('Bumped 1')
   })
 })

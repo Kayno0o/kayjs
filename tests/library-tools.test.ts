@@ -167,6 +167,7 @@ describe('the current request', () => {
 
   it('is none once the answer is made', async () => {
     await site.call(later)
+    // Nothing happens: the context is still recorded within this time if it ever is.
     await Bun.sleep(30)
     expect(await site.call(recorded)).toBeNull()
   })

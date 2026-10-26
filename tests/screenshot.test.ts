@@ -398,6 +398,7 @@ describe('the address of the dev server', () => {
 
     try {
       await Bun.write(devAddressFile(root, other.pid), JSON.stringify({ url: 'http://localhost:3001', pid: other.pid }))
+      // The second address has to be newer than the first by a file time's granularity.
       await Bun.sleep(20)
       writeDevAddress(root, 'http://localhost:3000')
 

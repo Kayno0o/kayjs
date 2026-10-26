@@ -29,6 +29,7 @@ describe('a server waiting for the client build of kay dev', () => {
     } })
 
     await asked.promise
+    // The CPU the wait takes is what is measured, so it has to last.
     await Bun.sleep(WAIT_MS)
     child.send({ client: 'none' })
 
@@ -52,6 +53,7 @@ process.exit(0)
 
     const child = Bun.spawn([process.execPath, 'waiter.ts'], { cwd: root, stdout: 'pipe', stderr: 'inherit', ipc: () => undefined })
 
+    // The CPU the wait takes is what is measured, so it has to last.
     await Bun.sleep(WAIT_MS)
     child.send('go')
 

@@ -5,6 +5,7 @@ import { plugin } from 'bun'
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
 import { kay } from '../src/build/plugin'
 import { child } from '../src/runtime/html'
+import { eventually, turn } from './helpers/eventually'
 import { scratchDir } from './scratch'
 
 await plugin(kay())
@@ -92,8 +93,6 @@ function sameNodes(claimed: Element[]): boolean {
   return now.length === claimed.length && now.every((node, index) => node === claimed[index])
 }
 
-const tick = async (ms = 0) => new Promise(resolve => setTimeout(resolve, ms))
-
 describe('snippets in an island', () => {
   it('hydrate the markup the server wrote, claiming its nodes, and then follow the signals', async () => {
     document.body.innerHTML = pageHtml
@@ -103,20 +102,18 @@ describe('snippets in an island', () => {
 
     expect(claimed).toHaveLength(13)
     await ready
-    await tick()
+    await turn()
     expect(sameNodes(claimed)).toBe(true)
 
     const bump = document.querySelector<HTMLButtonElement>('#bump')!
 
     bump.click()
-    await tick()
-    expect([...document.querySelectorAll('.badge')].map(badge => badge.textContent)).toEqual(['A 1', 'B 1'])
+    await eventually(() => expect([...document.querySelectorAll('.badge')].map(badge => badge.textContent)).toEqual(['A 1', 'B 1']))
     expect(document.querySelector('.note')!.textContent).toBe('x1')
     expect(sameNodes(claimed)).toBe(true)
 
     document.querySelector<HTMLButtonElement>('#grow')!.click()
-    await tick()
-    expect([...document.querySelectorAll('.tag')].map(tag => tag.textContent)).toEqual(['a', 'b', 'c'])
+    await eventually(() => expect([...document.querySelectorAll('.tag')].map(tag => tag.textContent)).toEqual(['a', 'b', 'c']))
     expect([...document.querySelectorAll('.row')].map(row => row.textContent)).toEqual(['0: a', '1: b', '2: c'])
     expect(claimed.every(node => node.isConnected)).toBe(true)
   })

@@ -7,6 +7,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
 import { kay } from '../src/build/plugin'
 import { child } from '../src/runtime/html'
 import { IslandPropsError } from '../src/runtime/island.server'
+import { eventually, turn } from './helpers/eventually'
 
 await plugin(kay())
 
@@ -33,8 +34,6 @@ afterAll(async () => {
   await rm(outdir, { recursive: true, force: true })
 })
 
-const tick = async (ms = 0) => new Promise(resolve => setTimeout(resolve, ms))
-
 function click(element: Element) {
   element.dispatchEvent(new Event('click', { bubbles: true }))
 }
@@ -58,27 +57,23 @@ describe('static slots', () => {
     const { ready } = await import(join(outdir, 'client.js')) as { ready: Promise<void> }
 
     await ready
-    await tick()
+    await turn()
     expect(panel!.querySelector('p.text')).toBe(text)
     expect(panel!.querySelector('a.more')).toBe(more)
 
     const count = panel!.querySelector('button.count')!
 
     click(count)
-    await tick()
-    expect(count.textContent).toBe('Count 2')
+    await eventually(() => expect(count.textContent).toBe('Count 2'))
 
     click(panel!.querySelector('button.toggle')!)
-    await tick()
-    expect(text.isConnected).toBe(false)
+    await eventually(() => expect(text.isConnected).toBe(false))
 
     click(panel!.querySelector('button.toggle')!)
-    await tick()
-    expect(panel!.querySelector('p.text')).toBe(text)
+    await eventually(() => expect(panel!.querySelector('p.text')).toBe(text))
     expect(panel!.querySelector('button.count')).toBe(count)
     click(count)
-    await tick()
-    expect(count.textContent).toBe('Count 3')
+    await eventually(() => expect(count.textContent).toBe('Count 3'))
   })
 
   it('builds a slot the island did not render from its markup once it shows it, hydrating an island in it', async () => {
@@ -86,18 +81,16 @@ describe('static slots', () => {
 
     expect(panel.querySelector('p.hidden')).toBeNull()
     click(panel.querySelector('button.toggle')!)
-    await tick(20)
-    expect(panel.querySelector('p.hidden')?.textContent).toBe('Hidden at first')
+    await eventually(() => expect(panel.querySelector('p.hidden')?.textContent).toBe('Hidden at first'))
 
     const count = panel.querySelector('button.count')!
 
     click(count)
-    await tick()
-    expect(count.textContent).toBe('Count 11')
+    await eventually(() => expect(count.textContent).toBe('Count 11'))
 
     click(panel.querySelector('button.toggle')!)
     click(panel.querySelector('button.toggle')!)
-    await tick()
+    await turn()
     expect(panel.querySelector('button.count')).toBe(count)
     expect(count.textContent).toBe('Count 11')
   })
@@ -119,25 +112,21 @@ describe('static slots', () => {
     const pick = document.querySelector('button.pick')!
 
     click(pick)
-    await tick()
-    expect(pick.textContent).toBe('Picked Tool: A')
+    await eventually(() => expect(pick.textContent).toBe('Picked Tool: A'))
 
     click(document.querySelector('ul.list')!)
-    await tick()
-    expect([...document.querySelectorAll('ul.list b')].map(item => item.textContent)).toEqual(['y', 'x'])
+    await eventually(() => expect([...document.querySelectorAll('ul.list b')].map(item => item.textContent)).toEqual(['y', 'x']))
 
     const dot = document.querySelector('button.dot')!
 
     click(dot)
-    await tick()
-    expect(dot.textContent).toBe('Dot 3')
+    await eventually(() => expect(dot.textContent).toBe('Dot 3'))
 
     const shelf = document.querySelectorAll('ul.list')[1]!
 
     expect([...shelf.querySelectorAll('i.snip')].map(item => item.textContent)).toEqual(['p', 'q'])
     click(shelf)
-    await tick()
-    expect([...shelf.querySelectorAll('i.snip')].map(item => item.textContent)).toEqual(['q', 'p'])
+    await eventually(() => expect([...shelf.querySelectorAll('i.snip')].map(item => item.textContent)).toEqual(['q', 'p']))
   })
 
   it('still refuses a layout passing an island a function, naming the fix', async () => {
