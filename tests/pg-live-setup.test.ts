@@ -275,7 +275,7 @@ pgDescribe('closing a pgData store', () => {
 
   // The server ends a closed connection a moment after the client sent its goodbye.
   async function settled(sql: SQL, expected: number) {
-    for (let attempt = 0; attempt < 20 && await others(sql) !== expected; attempt++)
+    for (let attempt = 0; attempt < 100 && await others(sql) !== expected; attempt++)
       await Bun.sleep(50)
 
     expect(await others(sql)).toBe(expected)

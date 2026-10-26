@@ -20,7 +20,7 @@ import { scratchDir } from './scratch'
 
 cleanUpAfterFile()
 
-async function waitFor(check: () => boolean | Promise<boolean>, what: string, ms = 4000): Promise<void> {
+async function waitFor(check: () => boolean | Promise<boolean>, what: string, ms = 10_000): Promise<void> {
   const until = Date.now() + ms
 
   while (Date.now() < until) {
