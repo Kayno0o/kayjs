@@ -8,6 +8,7 @@ import { afterAll, beforeEach, describe, expect, it, setSystemTime, spyOn } from
 import { live, liveSlot, liveStoreReady, setLiveStore, watchSlot } from '../src/runtime/live-value'
 import { setupStore } from '../src/server/app-store'
 import { sqliteLive } from '../src/server/sqlite-live'
+import { untilHolds } from './until-holds'
 
 // The build gives a declaration its id and name; a test passes them itself.
 const declare = live as unknown as (initial: number, id: string, name: string) => { (): number, set: (next: number) => void }
@@ -171,6 +172,7 @@ process.exit(0)`)
     expect(late()).toBe(3)
     expect(kept()).toBe(5)
     expect(written).toEqual(['test:late-kept=[5]'])
+    // Nothing happens: the refused write is swallowed, which a rejection escaping late would show within this time.
     await Bun.sleep(10)
     setupStore(undefined)
   })
@@ -390,7 +392,7 @@ describe('a live value with a lifetime', () => {
     expect(mortal()).toBe(5)
     await Bun.sleep(100)
     expectAliveBefore(endsAt, mortal, 5)
-    await Bun.sleep(400)
+    await untilHolds(() => heard.length > 1)
     expect(mortal()).toBe(0)
     expect(heard).toEqual([5, 0])
   })
@@ -399,6 +401,7 @@ describe('a live value with a lifetime', () => {
     const mortal = declareTtl(0, 'test:ttl-renewed', 'ttlRenewed', { ttl: '300ms' })
 
     mortal.set(5)
+    // The sleeps are the lifetime's own pace: the write renews the value part of the way through it.
     await Bun.sleep(200)
 
     const endsAt = Date.now() + 300
@@ -406,7 +409,7 @@ describe('a live value with a lifetime', () => {
     mortal.set(5)
     await Bun.sleep(200)
     expectAliveBefore(endsAt, mortal, 5)
-    await Bun.sleep(300)
+    await untilHolds(() => mortal() === 0)
     expect(mortal()).toBe(0)
   })
 
@@ -429,7 +432,7 @@ describe('a live value with a lifetime', () => {
     if (read >= aEnds && read < bEnds)
       expect([a, b]).toEqual([0, 2])
 
-    await Bun.sleep(250)
+    await untilHolds(() => room('a') === 0 && room('b') === 0)
     expect([room('a'), room('b')]).toEqual([0, 0])
   })
 
@@ -460,7 +463,7 @@ describe('a live value with a lifetime', () => {
     }
 
     expect(expires.size).toBe(20_000)
-    await Bun.sleep(5500)
+    await untilHolds(() => expires.size === 0, 15_000)
     expect(expires.size).toBe(0)
     expect(room('0') + room('19999')).toBe(0)
     // Each key is read once as it is dropped, and a pass stops at the first key still to come.
@@ -479,8 +482,14 @@ describe('a live value with a lifetime', () => {
 
     hear!('test:ttl-renewed-by-watcher', 'a', '[1]', ends)
     hear!('test:ttl-renewed-by-watcher', 'b', '[2]', ends)
-    watchSlot(liveSlot('test:ttl-renewed-by-watcher')!, 'a', () => room.set('b', 7))
-    await Bun.sleep(250)
+    // A read already answers for an ended key before the timer's pass tells its watchers, so the pass is waited for through its watcher.
+    let told = false
+
+    watchSlot(liveSlot('test:ttl-renewed-by-watcher')!, 'a', () => {
+      room.set('b', 7)
+      told = true
+    })
+    await untilHolds(() => told)
     expect([room('a'), room('b')]).toEqual([0, 7])
     setLiveStore(undefined)
   })
@@ -543,7 +552,7 @@ describe('a live value with a lifetime', () => {
 
     await Bun.sleep(150)
     expectAliveBefore(Math.min(...written.map(row => row[2] ?? 0)), () => [early(), late()], [5, 4])
-    await Bun.sleep(300)
+    await untilHolds(() => early() === 0 && late() === 0)
     expect([early(), late()]).toEqual([0, 0])
     setLiveStore(undefined)
   })
@@ -559,7 +568,7 @@ describe('a live value with a lifetime', () => {
 
     setLiveStore(store)
     declareTtl(0, 'test:ttl-kept', 'ttlKept', { ttl: '60s' })
-    await Bun.sleep(50)
+    await untilHolds(() => ((store.entries() as LiveEntry[]).find(entry => entry[0] === 'test:ttl-kept')?.[3] ?? 0) > Date.now() + 50_000)
     setLiveStore(undefined)
 
     const row = (sqliteLive(path).entries() as LiveEntry[]).find(entry => entry[0] === 'test:ttl-kept')
@@ -653,7 +662,7 @@ describe('a live value with a lifetime', () => {
     expect([keyed('a'), keyed('b')]).toEqual([1, 2])
     await Promise.resolve()
     expect(calls).toEqual([['test:ttl-all', 300]])
-    await Bun.sleep(400)
+    await untilHolds(() => keyed('a') === 0 && keyed('b') === 0)
     expect([keyed('a'), keyed('b')]).toEqual([0, 0])
     setLiveStore(undefined)
   })
@@ -670,6 +679,7 @@ describe('a live value with a lifetime', () => {
         const keyed = declareKeyedTtl(() => 0, 'test:ttl-all-refused', 'ttlAllRefused', { ttl: '60s' })
 
         expect(keyed('a')).toBe(1)
+        // Nothing happens: the refused end is logged and swallowed, which a rejection escaping late would show within this time.
         await Bun.sleep(10)
       }
     }
@@ -737,8 +747,8 @@ describe('a live value with a lifetime', () => {
     const path = await storePath()
     const store = sqliteLive(path)
 
-    await store.set('test:ttl-swept', '', '[1]', Date.now() + 10)
-    await Bun.sleep(30)
+    // Past its end already, as the row is meant to be by the time the write comes.
+    await store.set('test:ttl-swept', '', '[1]', Date.now() - 1)
 
     const count = () => new Database(path, { readonly: true }).query<{ n: number }, []>('SELECT count(*) AS n FROM kay_live').get()!.n
 
@@ -791,7 +801,7 @@ describe('a live value with a lifetime', () => {
 
     expect(late()).toBe(7)
     expect(gone()).toBe(0)
-    await Bun.sleep(1600)
+    await untilHolds(() => late() === 0)
     expect(late()).toBe(0)
     setLiveStore(undefined)
   })
@@ -807,7 +817,7 @@ describe('a live value with a lifetime', () => {
 
     hear!('test:ttl-subscribed', '', '[4]', Date.now() + 100)
     expect(heard()).toBe(4)
-    await Bun.sleep(250)
+    await untilHolds(() => heard() === 0)
     expect(heard()).toBe(0)
     hear!('test:ttl-subscribed', '', '[6]', Date.now() + 60_000)
     expect(heard()).toBe(6)
