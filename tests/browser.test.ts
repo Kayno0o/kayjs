@@ -80,7 +80,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('kay/test i
   })
 
   it('solves an action\'s proof-of-work in a worker under the default csp, for a form the swap posts and an island\'s call alike', async () => {
-    const costly = await site.open('/costly')
+    await using costly = await site.open('/costly')
 
     await costly.fill('input[name="title"]', 'form')
     await costly.click('form button')
@@ -92,7 +92,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('kay/test i
   })
 
   it('sends a form again with the fresh challenge it is refused with, after an island\'s call or a failed post spent the page\'s', async () => {
-    const costly = await site.open('/costly')
+    await using costly = await site.open('/costly')
 
     await costly.click('button.payer')
     await costly.waitFor('p.island-paid', { text: 'island' })
@@ -110,7 +110,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('kay/test i
   })
 
   it('posts the solution of a workChallenge field in its place, for the action to check', async () => {
-    const scoped = await site.open('/scoped')
+    await using scoped = await site.open('/scoped')
 
     await scoped.fill('input[name="message"]', 'hello')
     await scoped.click('form button')
@@ -135,7 +135,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('kay/test i
   it('fails a call once the page reports a problem kay hides in production, unless opened with strict: false', async () => {
     await expect(site.open('/mismatch')).rejects.toThrow('kay: the page reported a problem production would hide: island src/components/mismatch.kay did not match its server markup')
 
-    const lenient = await site.open('/mismatch', { strict: false })
+    await using lenient = await site.open('/mismatch', { strict: false })
 
     await lenient.click('button.mismatch')
     expect(await lenient.text('button.mismatch')).toBe('Clicked 1')
@@ -143,7 +143,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('kay/test i
   }, 30_000)
 
   it('hydrates an island passing a slot to a component whose for-else tests that slot with an if', async () => {
-    const page = await site.open('/empty-rows')
+    await using page = await site.open('/empty-rows')
 
     await page.click('button.empty-bump')
     expect(await page.text('button.empty-bump')).toBe('Bumped 1')
@@ -152,7 +152,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('kay/test i
   }, 30_000)
 
   it('hydrates an island whose component reads a slot in an attribute, a ternary and an if with an alias, as well as inserting it', async () => {
-    const page = await site.open('/slot-flag')
+    await using page = await site.open('/slot-flag')
 
     await page.click('button.flag-bump')
     expect(await page.text('button.flag-bump')).toBe('Bumped 1')
@@ -551,7 +551,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('kay/test i
 
   it('scrolls to what it clicks only once the page loaded, as the browser restores a reload\'s scroll position until then', async () => {
     // The scroll the click makes is lost to the restoring one, so the press lands on whatever the page then shows at the place measured.
-    const own = await site.open('/plain')
+    await using own = await site.open('/plain')
 
     await own.initScript(() => {
       const scrolls: string[] = (window as unknown as { scrolls: string[] }).scrolls = []
