@@ -81,7 +81,8 @@ onMount(() => {
 
       // A map mounted hidden has no size to fit into: it fits once the box gets one, and learns of later resizes.
       if (typeof ResizeObserver !== 'undefined') {
-        let sized = false
+        // A map that has a size at mount is fitted by the effects, so a later resize leaves the visitor's pan and zoom.
+        let sized = view.getSize().x > 0 && view.getSize().y > 0
 
         observer = new ResizeObserver(() => {
           view?.invalidateSize({ animate: false })
