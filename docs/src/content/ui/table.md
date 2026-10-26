@@ -8,7 +8,7 @@ description: A table of rows described by columns, with sortable headers and an 
 
 Give a column a `sortValue` to make its header sortable: `true` sorts by the row's own value at `key`, a function sorts by what it returns. `defaultDirection` sets the first click's direction, and `onSort` reports each sort. With `serverSort`, the table only reflects the sort in its headers and your data source orders the rows. `sortable={false}` removes every sortable header, `numeric` columns included, for rows loaded page by page that a click would sort alone.
 
-For rows loaded page by page, `list={list}` from `infiniteList` is better: the table sorts on the server instead, see [LoadMore](load-more.md).
+For rows loaded page by page, `list={list}` from `infiniteList` is better: the table sorts on the server instead, see [LoadMore](load-more.md). A table takes `rows` or `list`, one of the two, and `kay check` fails one with neither.
 
 `sortParam` keeps the sort in the page's URL: `sortParam="sort"` writes the column's key as `?sort=` and its direction as `?direction=`. A reload, a shared link or back and forward sort the same, the URL's sort wins over `sort` on load, and a click replaces the history entry. Any other name writes the direction as `<name>Direction`.
 
@@ -44,7 +44,7 @@ A `filter` adds a search box. `filterLabel` names it, `Filter` by default, and `
 
 <Demo name="table/export" />
 
-When the page holds only a part of the rows, give `exportable` an address: the button links it with the sort as `sort` and `direction` and the typed filter text under `filterParam` (`q` without one), and your endpoint answers with `toCsv(rows, columns)`, which the package exports.
+When the page holds only a part of the rows, give `exportable` an address: the button links it with the sort as `sort` and `direction` and the typed filter text under `filterParam` (`q` without one), and your endpoint answers with `toCsv(rows, columns)`, which the package exports. The same goes for a table over a `list`: the plain button exports the rows loaded so far.
 
 ## Many rows
 

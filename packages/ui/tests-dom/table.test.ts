@@ -15,7 +15,13 @@ let mounted: Mounted | undefined
 
 afterEach(() => {
   mounted?.unmount()
+  visit('about:blank')
 })
+
+// happy-dom keeps about:blank through history.replaceState, so the page's URL is set through its own handle.
+function visit(url: string) {
+  (window as unknown as { happyDOM: { setURL: (url: string) => void } }).happyDOM.setURL(url)
+}
 
 const names = (root: HTMLElement) => [...root.querySelectorAll('tbody tr')].map(row => row.querySelector('[data-part="cellBody"]')?.textContent)
 const header = (root: HTMLElement, index: number) => root.querySelectorAll('th')[index]!
@@ -134,14 +140,12 @@ describe('Table over an infinite list', () => {
       return []
     }
 
-    // happy-dom keeps about:blank through history.replaceState, so the page's URL is set through its own handle.
-    ;(window as unknown as { happyDOM: { setURL: (url: string) => void } }).happyDOM.setURL('http://localhost/?sort=moons&direction=asc')
+    visit('http://localhost/?sort=moons&direction=asc')
     mounted = await mountComponent(ListedTable, { onLoad, sortParam: 'sort' })
     await settle()
 
     expect(asked).toEqual([{ offset: 0, sort: { key: 'moons', direction: 'asc' } }])
     expect(header(mounted.root, 1).getAttribute('aria-sort')).toBe('ascending')
-    ;(window as unknown as { happyDOM: { setURL: (url: string) => void } }).happyDOM.setURL('about:blank')
   })
 
   test('a header click calls sortBy once: one load, one onSort', async () => {
@@ -172,11 +176,6 @@ describe('Table over an infinite list', () => {
 
 describe('Table with a filter', () => {
   const MOONS = [{ name: 'Phobos', planet: 'Mars', radius: 11 }, { name: 'Deimos', planet: 'Mars', radius: 6 }, { name: 'Io', planet: 'Jupiter', radius: 1822 }]
-
-  // happy-dom keeps about:blank through history.replaceState, so the page's URL is set through its own handle.
-  function visit(url: string) {
-    (window as unknown as { happyDOM: { setURL: (url: string) => void } }).happyDOM.setURL(url)
-  }
 
   function filter(root: HTMLElement, text: string) {
     const input = root.querySelector<HTMLInputElement>('[data-part="filterInput"]')!

@@ -10,6 +10,8 @@ description: The end of an infinite-scroll list that loads its pages by offset o
 
 A `Table` takes the list as `list={list}` in place of `rows`: it draws `list.rows()`, puts `LoadMore` after them, and sorts on the server. A header click calls `list.sortBy(sort)`, which starts the list over from offset 0: `load` receives the sort as `sort` beside `offset` and `last`, and the rows on screen stay until the first page in the new order lands.
 
+The list also starts over on mount when the table's sort, from `sort` or the URL, differs from the `sort` the list was made with, so give both the same one to keep the first page. A sort drops the picked rows that are not in the new first page, as a row leaving the table always does.
+
 Mark the columns to sort by with a `sortValue` (`numeric` columns have one).
 
 The table's `sort` and the URL's `sortParam` sort reach the list too, and a sort restarts it, so a selected row outside the first page leaves the selection. `infiniteList`'s `sort` option names the order the first page is already in.
