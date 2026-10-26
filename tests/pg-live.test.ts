@@ -1,10 +1,11 @@
+import type { SQL } from 'bun'
 import type { LiveStore } from '../src/runtime/live-value'
 import { afterEach, expect, setSystemTime } from 'bun:test'
 import { live, liveSlot, liveStoreReady, setLiveStore } from '../src/runtime/live-value'
 import { setupStore } from '../src/server/app-store'
 import { createDataTables, dataTables, pgData as openPgData, pgHandle as openPgHandle } from '../src/server/pg-data'
 import { pgLive } from '../src/server/pg-live'
-import { unescaped } from '../src/server/pg-sql'
+import { NOW, unescaped } from '../src/server/pg-sql'
 import { cleanUpAfterFile, pgDescribe, pgIt, postgres, replicas } from './job-stores'
 
 cleanUpAfterFile()
@@ -54,11 +55,40 @@ function pgHandle(...args: Parameters<typeof openPgHandle>): ReturnType<typeof o
   return handle
 }
 
+// How many times each store asked its handle for the database, which it only does when a poll starts.
+const reads = new WeakMap<LiveStore, () => number>()
+
+function countedStore(sql: SQL): LiveStore {
+  const handle = pgHandle(sql)
+  let count = 0
+  const store = pgLive({ ...handle, db: async () => {
+    count++
+
+    return handle.db()
+  } })
+
+  reads.set(store, () => count)
+
+  return store
+}
+
+// Waits for the store to start two more polls: the first may have begun before what the case did, and the second only starts once the first ended, so the case's change was read by then.
+async function polledTwice(store: LiveStore): Promise<void> {
+  const target = reads.get(store)!() + 2
+
+  await waitFor(() => reads.get(store)!() >= target, 'the replica to poll twice more', 15_000)
+}
+
+// Waits for a statement to be blocked on a row lock, which a write to a locked row is until the lock ends.
+async function lockWaited(sql: SQL): Promise<void> {
+  await waitFor(async () => Number((await sql.unsafe<{ count: string }[]>('SELECT count(*) FROM pg_stat_activity WHERE datname = current_database() AND wait_event_type = \'Lock\''))[0]!.count) > 0, 'a write to wait on the locked row')
+}
+
 // Two stores on separate connections, as two replicas have.
 function twoReplicas(): [LiveStore, LiveStore] {
   const [first, second] = replicas(2)
 
-  return [pgLive(pgHandle(first!)), pgLive(pgHandle(second!))]
+  return [countedStore(first!), countedStore(second!)]
 }
 
 type Heard = [id: string, key: string, text: string | undefined]
@@ -126,7 +156,9 @@ pgDescribe('pgData live values', () => {
     expect(await first.entries()).toEqual([])
     const count = onSecond.length
 
-    await Bun.sleep(700)
+    // Two reads on each side: neither hears anything more, and the first never hears its own set.
+    await polledTwice(first)
+    await polledTwice(second)
     expect(onSecond).toHaveLength(count)
     expect(onFirst).toHaveLength(1)
     first.stop?.()
@@ -168,7 +200,8 @@ pgDescribe('pgData live values', () => {
     await second.entries()
     await first.set('app:room', 'new', '[1]')
     await waitFor(() => heard.length >= 1, 'the second replica to hear the new set')
-    await Bun.sleep(300)
+    // The old rows are not heard however many reads follow.
+    await polledTwice(second)
     expect(heard.map(([, key]) => key)).toEqual(['new'])
     first.stop?.()
     second.stop?.()
@@ -193,7 +226,8 @@ pgDescribe('pgData live values', () => {
     await other.entries()
     await other.set('app:count', '', '[5]')
     await waitFor(() => heard.length >= 1, 'the restarted replica to hear the set')
-    await Bun.sleep(700)
+    // The set is not heard again by the reads after it.
+    await polledTwice(after)
     expect(heard).toEqual([['app:count', '', '[5]']])
     after.stop?.()
     other.stop?.()
@@ -264,6 +298,7 @@ pgDescribe('pgData live values', () => {
 
     second.stop?.()
     await first.set('app:stop', '', '[1]')
+    // Nothing happens: a stopped store polls no more, and a poll is due every half second.
     await Bun.sleep(900)
     expect(heard).toEqual([])
     first.stop?.()
@@ -324,13 +359,13 @@ pgDescribe('pgData live values', () => {
 
     const writing = mine.set('app:race', '', '[2]')
 
-    await Bun.sleep(100)
+    await lockWaited(sql)
     await sql.unsafe('INSERT INTO kay_live_events (origin, id, key, at) VALUES (\'another\', \'app:race\', \'\', 0)')
-    await Bun.sleep(1200)
+    await polledTwice(mine)
     release()
     await holding
     await writing
-    await Bun.sleep(1200)
+    await polledTwice(mine)
     expect(heard.slice(1).every(([, , text]) => text !== '[1]')).toBe(true)
     expect((await sql.unsafe<{ value: string }[]>('SELECT value FROM kay_live WHERE id = \'app:race\''))[0]?.value).toBe('[2]')
     mine.stop?.()
@@ -358,7 +393,7 @@ pgDescribe('pgData live values', () => {
     const [store] = twoReplicas()
 
     await store.set('app:ttl', 'a', '[1]', Date.now() + 60_000)
-    await store.set('app:ttl', 'b', '[2]', Date.now() + 100)
+    await store.set('app:ttl', 'b', '[2]', Date.now() + 500)
     await store.set('app:ttl', 'c', '[3]')
 
     const rows = await store.entries()
@@ -366,7 +401,7 @@ pgDescribe('pgData live values', () => {
     expect(rows.map(row => row.slice(0, 3))).toEqual(expect.arrayContaining([['app:ttl', 'a', '[1]'], ['app:ttl', 'b', '[2]'], ['app:ttl', 'c', '[3]']]))
     expect(rows.find(row => row[1] === 'a')?.[3]).toBeGreaterThan(Date.now())
     expect(rows.find(row => row[1] === 'c')).toEqual(['app:ttl', 'c', '[3]'])
-    await Bun.sleep(150)
+    await waitFor(async () => !(await store.entries()).some(row => row[1] === 'b'), 'b to end')
     expect((await store.entries()).map(row => row[1]).sort()).toEqual(['a', 'c'])
     expect((await sql.unsafe<{ n: string }[]>('SELECT count(*)::text AS n FROM kay_live'))[0]?.n).toBe('3')
     setSystemTime(new Date(Date.now() + 2 * 3_600_000))
@@ -515,7 +550,7 @@ pgDescribe('pgData live values', () => {
       await writing
     }
 
-    await Bun.sleep(100)
+    await lockWaited(sql)
     await other.endAll!('app:race', 60_000)
     await waitFor(() => heard.some(([key]) => key === 'J'), 'the end of J to be heard')
     await waitFor(() => heard.some(([key, text]) => key === 'K' && text === '[2]'), 'the new text of K')
@@ -531,7 +566,8 @@ pgDescribe('pgData live values', () => {
     const [store] = twoReplicas()
 
     await store.set('app:purge', 'old', '[1]', Date.now() + 50)
-    await Bun.sleep(100)
+    // The database's own clock decides when the row has ended.
+    await waitFor(async () => (await sql.unsafe<{ ended: boolean }[]>(`SELECT expires_at < ${NOW} AS ended FROM kay_live WHERE key = 'old'`))[0]?.ended === true, 'the row to end')
 
     const holder = await sql.reserve()
 
@@ -601,7 +637,7 @@ pgDescribe('pgData live values', () => {
     mortal.set(8)
     expect(mortal()).toBe(8)
     await waitFor(async () => (await sql.unsafe<{ expires_at: string }[]>('SELECT expires_at::text FROM kay_live WHERE id = \'test:pg-ttl\''))[0]?.expires_at !== undefined, 'the write to land')
-    await Bun.sleep(150)
+    await waitFor(() => mortal() === 0, 'the value to end')
     expect(mortal()).toBe(0)
 
     const reader = pgLive(pgHandle(sql))
