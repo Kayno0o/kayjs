@@ -331,11 +331,26 @@ export interface ServerAction<Schema extends TSchema, Output, Honeypot extends s
   readonly protection?: ResolvedProtection
 }
 
+// What a visitor can read of a refusal: the form-wide message (a string given to `ctx.fail`, a rate limit's), else the schema's field messages, else a `message` the handler's data carries; undefined when it says nothing readable.
+function refusalText(errors: Record<string, string>, data: unknown): string | undefined {
+  if (errors[''] !== undefined && errors[''] !== '')
+    return errors['']
+
+  const fields = Object.values(errors).filter(Boolean)
+
+  if (fields.length > 0)
+    return fields.join(', ')
+
+  const message = typeof data === 'object' && data !== null ? (data as { message?: unknown }).message : undefined
+
+  return typeof message === 'string' && message !== '' ? message : undefined
+}
+
 export class ActionError<Data = unknown> extends ApiError {
   override name = 'ActionError'
 
-  // `errors` holds a message per field the schema refused, `data` what the handler passed to `ctx.fail`, undefined when the call was refused before it ran.
-  constructor(status: number, readonly body: string, readonly errors: Record<string, string> = {}, readonly data?: Data, message = `Action failed with ${status}: ${body}`) {
+  // `errors` holds a message per field the schema refused, `data` what the handler passed to `ctx.fail`, undefined when the call was refused before it ran; `message` reads them, else the status and body.
+  constructor(status: number, readonly body: string, readonly errors: Record<string, string> = {}, readonly data?: Data, message = refusalText(errors, data) ?? `Action failed with ${status}: ${body}`) {
     super(status, message, body)
   }
 }

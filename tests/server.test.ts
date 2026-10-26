@@ -1608,6 +1608,7 @@ describe('failed actions', () => {
     expect(error).toBeInstanceOf(ActionError)
     expect(error).toMatchObject({ status: 409, errors: {}, data: { message: 'Already on the list' } })
     expect(add.refused(error) && error.data?.message).toBe('Already on the list')
+    expect((error as ActionError).message).toBe('Already on the list')
   })
 
   it('renders the page the post came from under the mount point it is served at', async () => {

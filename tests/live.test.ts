@@ -939,6 +939,19 @@ describe('call()', () => {
     expect(refusalMessage(new ApiError(503, 'HTTP 503'), 'Try again')).toBe('HTTP 503')
   })
 
+  it('words an ActionError with what a visitor can read, not the serialized body', () => {
+    const body = '[{"errors":1,"data":2},{"":2},"whisper answered 500"]'
+
+    expect(new ActionError(502, body, { '': 'whisper answered 500' }, 'whisper answered 500').message).toBe('whisper answered 500')
+    expect(new ActionError(422, '[...]', { title: 'Write a title', body: 'Too short' }).message).toBe('Write a title, Too short')
+    expect(new ActionError(429, '[...]', { '': 'Too many tries', 'title': 'Write a title' }).message).toBe('Too many tries')
+    expect(new ActionError(409, '[...]', {}, { message: 'Already on the list' }).message).toBe('Already on the list')
+    expect(new ActionError(422, '[...]', {}, { message: 7 }).message).toBe('Action failed with 422: [...]')
+    expect(new ActionError(422, '[...]', {}, { error: 'x' }).message).toBe('Action failed with 422: [...]')
+    expect(new ActionError(422, '[...]', { '': '' }, '').message).toBe('Action failed with 422: [...]')
+    expect(new ActionError(413, 'too large').message).toBe('Action failed with 413: too large')
+  })
+
   it('catches an ActionError as an ApiError, and shows its form-wide message or the fallback', () => {
     const refused = new ActionError(422, 'bad', { title: 'Too short' })
 

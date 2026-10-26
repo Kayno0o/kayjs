@@ -196,7 +196,8 @@ describe('kay/test', () => {
 
     expect(refused).toMatchObject({ status: 422, errors: {} })
     expect(reason).toBe('ada stays an admin')
-    expect(await site.refusal(add, { title: '' })).toMatchObject({ status: 422, errors: { title: 'Write a title' }, data: undefined })
+    expect(await site.refusal(add, { title: '' })).toMatchObject({ status: 422, errors: { title: 'Write a title' }, data: undefined, message: 'Write a title' })
+    expect(refused.message).toBe(`Action failed with 422: ${refused.body}`)
     // @ts-expect-error: the handler fails with `error` alone.
     expect(refused.data?.message).toBeUndefined()
     await expect(site.refusal(demote, { name: 'bob' }, { headers: { 'x-user': 'ada' } })).rejects.toThrow('went through, where a refusal was expected')
