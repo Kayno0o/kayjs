@@ -2170,7 +2170,7 @@ describe.concurrent('kay dev', () => {
     }
   }, 60_000)
 
-  it('drops the output of a quiet builder that crashed on the config when the start is refused, even if the host reads its pipe only after', async () => {
+  it.serial('drops the output of a quiet builder that crashed on the config when the start is refused, even if the host reads its pipe only after', async () => {
     const root = await mkdtemp(join(tmpdir(), 'kay-dev-'))
     const marker = join(root, 'loading')
     const written: string[] = []
@@ -2189,7 +2189,9 @@ describe.concurrent('kay dev', () => {
         Bun.sleepSync(50)
 
       Bun.sleepSync(1000)
+      expect(existsSync(marker)).toBe(true)
       builder.release(false)
+      await until(() => builder.gone(), 20_000)
       await Bun.sleep(300)
       expect(written.filter(text => text.includes('config broke'))).toEqual([])
     }

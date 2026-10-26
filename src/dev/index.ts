@@ -444,6 +444,11 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
 
     if (builderStale || builder?.gone() === true) {
       await builder?.stop()
+
+      // The start may have been refused while the old process stopped: a new one would print the config's error again.
+      if (stopping)
+        return undefined
+
       builder = startClientBuilder(root, env, json ? STDERR : 'inherit', !typesSettled)
       builderStale = false
       unbuilt = null
