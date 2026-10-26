@@ -5,7 +5,6 @@ What each release of kay and its libraries adds, newest first, each feature with
 ## Unreleased
 
 - kayjs-ui has a `Timeline`, a vertical list of time-stamped entries with an optional icon or muted tone, each pickable through a bindable `selected` key ([Page layout](../packages/ui/llms/page-layout-palette-and-trees.md)).
-- kayjs-ui's `Map` draws polylines and markers over raster tiles with Leaflet, loaded only on pages using it, fitted to what it draws, with a `highlight` path brought into view, OpenStreetMap's tiles by default and the skin's colours: [kayjs-ui](../packages/ui/llms/charts-drag-and-media.md).
 - kayjs-ui's `MapView` draws polylines and markers over raster tiles with Leaflet, loaded only on pages using it, fitted to what it draws, with a `highlight` path brought into view, OpenStreetMap's tiles by default and the skin's colours: [kayjs-ui](../packages/ui/llms/charts-drag-and-media.md).
 - kayjs-ai: `ask(messages, { outlive: true })` lets a reply finish on the server, tool loop and readers included, after the visitor reloaded or left, and a `Chat` with `remember` shows the finished turn after the reload or picks the stream back up, with no app code; an action call takes `{ headers }`: [Asking](../packages/ai/llms/asking.md#a-reply-that-outlives-the-visitor), [Chat](../packages/ai/llms/chat.md#a-reply-that-outlives-the-page).
 
