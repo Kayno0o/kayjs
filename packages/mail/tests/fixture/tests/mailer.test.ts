@@ -1,7 +1,7 @@
 import type { Mail, Transport } from '@kaynooo/kayjs-mail'
 import process from 'node:process'
 import { darkPalette, mailDefaults, mailer, MailNotConfiguredError, outbox } from '@kaynooo/kayjs-mail'
-import { afterEach, beforeEach, describe, expect, it } from 'bun:test'
+import { afterEach, beforeEach, describe, expect, it, setSystemTime } from 'bun:test'
 import { Elysia } from 'elysia'
 import { setSite } from 'kay/library'
 import { mail } from '../src/mail'
@@ -293,6 +293,10 @@ describe('the outbox helpers', () => {
 })
 
 describe('the queue', () => {
+  afterEach(() => {
+    setSystemTime()
+  })
+
   it('renders a mail when enqueued and sends it once drained, retrying a failure', async () => {
     const sent: Mail[] = []
     const attempts: (string | undefined)[] = []
@@ -310,13 +314,17 @@ describe('the queue', () => {
       },
     }
     const queued = mailer({ from: 'q@example.com', transport: flaky, queue: { name: 'flaky-mail', backoff: '10ms' } })
+    // The clock stands still, so the retry is not already due within the first drain on a slow host.
+    const start = Date.now()
+
+    setSystemTime(start)
 
     await queued.enqueue({ to: 'ada@example.com', subject: 'Queued', view: Welcome, props: { name: 'Ada', url: URL } })
     expect(await queued.drain()).toBe(1)
     expect(sent).toEqual([])
 
     // The retry is due once the queue's 10 ms backoff has passed.
-    await Bun.sleep(30)
+    setSystemTime(start + 10)
     expect(await queued.drain()).toBe(1)
     expect(sent.map(each => each.subject)).toEqual(['Queued'])
     expect(sent[0]!.html).toContain('Welcome, Ada')
