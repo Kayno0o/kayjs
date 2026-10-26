@@ -583,6 +583,7 @@ describe('stream() started from a handler', () => {
     })
     reader.start()
     await until(() => seen.includes(10))
+    // Nothing happens: a value of the first run delivered late would show within this time.
     await Bun.sleep(10)
     expect(seen).toEqual([1, 10])
   })
@@ -686,6 +687,7 @@ describe('resource()', () => {
     flush()
     await until(() => rooms.status() === 'ready')
     older.resolve(await site.fetch('/api/chat/rooms?prefix=g'))
+    // Nothing happens: the overtaken answer, applied late, would show within this time.
     await Bun.sleep(20)
 
     expect(rooms.value()?.map(room => room.name)).toEqual(['news'])
@@ -757,6 +759,7 @@ describe('resource()', () => {
     gates.get('b')?.resolve('B')
     await until(() => found.status() === 'ready')
     gates.get('a')?.resolve('A')
+    // Nothing happens: the overtaken answer, applied late, would show within this time.
     await Bun.sleep(10)
 
     expect(found.value()).toBe('B')
@@ -1007,16 +1010,20 @@ describe('call()', () => {
   it('rejects with the signal\'s reason when aborted while the answer is read', async () => {
     const controller = new AbortController()
 
+    const taken = Promise.withResolvers<void>()
+
     served.mockImplementationOnce((async () => new Response(new ReadableStream({
       start: (body) => {
         body.enqueue(new TextEncoder().encode('[1,'))
         controller.signal.addEventListener('abort', () => body.error(controller.signal.reason))
       },
+      // Asked for more only once the reader took the first chunk.
+      pull: () => taken.resolve(),
     }), { headers: { 'content-type': 'application/json' } })) as unknown as typeof fetch)
 
     const reading = call(notes, '/', { signal: controller.signal })
 
-    await Bun.sleep(5)
+    await taken.promise
     controller.abort(new Error('left'))
     await expect(reading).rejects.toThrow('left')
     await expect(reading).rejects.not.toBeInstanceOf(ApiError)
@@ -1187,6 +1194,7 @@ describe('rooms', () => {
       ada.send({ type: 'bump', room: 'game' })
 
     expect(await ada.next()).toEqual({ type: 'score', room: 'game', score: 5 })
+    // Nothing happens: a second snapshot of the burst would show within this time.
     await Bun.sleep(60)
     expect(ada.received).toHaveLength(2)
     ada.close()
@@ -1642,6 +1650,7 @@ describe('stream() over an async iterable', () => {
     flush()
     await until(() => reader.last() === 1)
     reader.close()
+    // Nothing happens: past the 20 ms the source waits, a second value would show.
     await Bun.sleep(40)
 
     expect(aborted?.aborted).toBe(true)
