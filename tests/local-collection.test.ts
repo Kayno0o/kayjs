@@ -1,6 +1,7 @@
 import type { TestPage } from '../src/test'
 import { afterAll, beforeEach, describe, expect, it } from 'bun:test'
 import { browserPath, testSite } from '../src/test'
+import { eventually } from './helpers/eventually'
 
 const path = browserPath()
 const ROOT = 'tests/fixtures/local-collection'
@@ -71,9 +72,9 @@ async function workerSends(page: TestPage, script: string): Promise<boolean> {
   }, script)
 }
 
-// Runs the worker's sync code in the page with the page's fetch wrapped: `before` is the body of an async function of the call's number (from 1) that runs ahead of every fetch, and a throw from it is a failed fetch. Returns whether the worker settled and the messages heard on its channel.
-async function workerSendsWith(page: TestPage, script: string, before: string): Promise<{ settled: boolean, heard: string[] }> {
-  return page.evaluate(async (code, hook) => {
+// Runs the worker's sync code in the page with the page's fetch wrapped: `before` is the body of an async function of the call's number (from 1) that runs ahead of every fetch, and a throw from it is a failed fetch. Returns whether the worker settled and the messages heard on its channel: the message `awaited` is waited for when the test expects it, else a quiet window shows that none comes.
+async function workerSendsWith(page: TestPage, script: string, before: string, awaited?: string): Promise<{ settled: boolean, heard: string[] }> {
+  return page.evaluate(async (code, hook, message) => {
     const heard: string[] = []
     const channel = new BroadcastChannel('kay-local')
     const real = window.fetch.bind(window)
@@ -101,11 +102,18 @@ async function workerSendsWith(page: TestPage, script: string, before: string): 
       window.fetch = real
     }
 
-    await new Promise(resolve => setTimeout(resolve, 300))
+    if (message === undefined) {
+      await new Promise(resolve => setTimeout(resolve, 300))
+    }
+    else {
+      for (let waited = 0; !heard.includes(message) && waited < 5000; waited += 10)
+        await new Promise(resolve => setTimeout(resolve, 10))
+    }
+
     channel.close()
 
     return { settled, heard }
-  }, script, before)
+  }, script, before, awaited)
 }
 
 // What a clear does to the queue, done from the page while the worker's fetch is out.
@@ -317,12 +325,21 @@ describe.skipIf(path === undefined)('a local() collection in the browser', () =>
   it('rejects a write the server keeps failing with a 5xx, after five tries, and goes on', async () => {
     const page = await opened()
 
-    await page.route('/_kay/action/*', async request => request.fulfill({ status: 500, body: 'broken' }))
+    let answered = 0
+
+    await page.route('/_kay/action/*', async (request) => {
+      answered++
+
+      return request.fulfill({ status: 500, body: 'broken' })
+    })
     await write(page, 'button.add', 'unlucky')
 
     for (let attempt = 0; attempt < 5; attempt++) {
+      const seen = answered
+
       await page.click('button.sync')
-      await Bun.sleep(150)
+      // The sync sends the write again, or the write is already rejected and there is nothing to send.
+      await eventually(async () => expect(answered > seen || await page.count('li.issue') > 0).toBe(true))
     }
 
     await page.waitUntil(() => document.querySelector('li.issue') !== null)
@@ -419,7 +436,7 @@ describe.skipIf(path === undefined)('a local() collection in the browser', () =>
 
     expect((await stored(page)).outbox).toHaveLength(3)
 
-    const result = await workerSendsWith(page, script, 'if (call === 3) throw new Error("network")')
+    const result = await workerSendsWith(page, script, 'if (call === 3) throw new Error("network")', 'answered')
 
     expect(result.settled).toBe(false)
     expect(result.heard).toContain('answered')
@@ -557,6 +574,7 @@ describe.skipIf(path === undefined)('a local() collection in the browser', () =>
     })
     await write(page, 'button.add', 'both ways')
     await page.waitUntil(() => document.querySelector('.pending')?.textContent === '0')
+    // Nothing happens: a second save by the other sender would show within this time.
     await Bun.sleep(500)
 
     expect(await (await worker!.fetch('/api/notes/stats')).json()).toMatchObject({ saves: 1, rows: [{ id: 'a', title: 'both ways', rev: 1 }] })

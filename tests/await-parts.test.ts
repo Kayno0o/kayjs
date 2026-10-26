@@ -8,6 +8,7 @@ import { html } from '../src/runtime/rendered'
 import { readSnapshots } from '../src/runtime/snapshots'
 import { renderToString } from '../src/server'
 import { PART_MS, streamDocument } from '../src/server/stream'
+import { eventually } from './helpers/eventually'
 import { scratchDir } from './scratch'
 import { pages } from './shared-pages'
 
@@ -185,8 +186,7 @@ describe('an await block given an async iterable', () => {
 
     expect(templatesOf(page, 'b')).toEqual([''])
     expect((reported as Error[]).map(error => error.message)).toEqual(['Bug'])
-    await Bun.sleep(20)
-    expect(returned).toBe(true)
+    await eventually(() => expect(returned).toBe(true))
   })
 
   it('stops an iterable that never ends once the browser goes away', async () => {
@@ -207,8 +207,7 @@ describe('an await block given an async iterable', () => {
     const { page } = await streamed([block(endless())], chunk => chunk.includes('data-kay-await'))
 
     expect(templatesOf(page, 'b')).toEqual(['<!--kay-await:b--><p>0</p><!--/kay-await:b-->'])
-    await Bun.sleep(20)
-    expect(returned).toBe(true)
+    await eventually(() => expect(returned).toBe(true))
   })
 })
 
@@ -240,10 +239,11 @@ describe('reading the parts of an async iterable', () => {
   }
 
   it('ends with nothing once stopped, even when the pending next() then rejects', async () => {
-    const { source } = aborting(['a'])
+    const { source, calls } = aborting(['a'])
     const reader = readSnapshots(source, 0, () => undefined)
 
-    await Bun.sleep(5)
+    // The second next() is the pending one that rejects.
+    await eventually(() => expect(calls.filter(call => call === 'next')).toHaveLength(2))
     reader.stop()
 
     expect(await reader.done).toBeUndefined()

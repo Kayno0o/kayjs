@@ -23,6 +23,7 @@ describe('writing the shadow tree again', () => {
       Bun.write(join(root, 'src/routes/blog/post.kay'), 'p Post\n'),
     ])
     await writeShadowTypes(root)
+    // The rewrite has to be newer than the shadows by a file time's granularity.
     await Bun.sleep(20)
 
     const types = join(root, '.kay/types')
