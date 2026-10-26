@@ -11,6 +11,7 @@ import { trustHtml } from '../src/runtime/sanitize'
 import { shortcut } from '../src/runtime/shortcut'
 import { liveReload } from '../src/server/dev'
 import { settle } from '../src/test'
+import { eventually } from './helpers/eventually'
 import { scratchDir } from './scratch'
 
 interface ClientModule {
@@ -2485,8 +2486,7 @@ describe('the live reload script', () => {
 
       expect(delays.at(-1)).toBe(10)
       expect(sources.filter(source => !source.closed)).toHaveLength(1)
-      await Bun.sleep(0)
-      expect(reload).toHaveBeenCalledTimes(1)
+      await eventually(() => expect(reload).toHaveBeenCalledTimes(1))
     }
     finally {
       reload.mockRestore()
@@ -2994,6 +2994,7 @@ describe('a form submitted in the browser', () => {
       const form = window.document.querySelector('form')
       listenSubmit(form, 'onSubmit', () => Promise.reject(new Error('refused')))
       form.requestSubmit()
+      // An unhandled rejection is reported once the turn that raised it is over.
       await Bun.sleep(20)
       console.log(JSON.stringify({ reasons, busy: [form, form.querySelector('button')].map(element => element.getAttribute('aria-busy')) }))
     `

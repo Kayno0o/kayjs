@@ -378,6 +378,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('a page tol
 
       await loadDroppedChunk(page)
 
+      // Nothing happens: a reload of the page would come within this time.
       await Bun.sleep(500)
       expect(await page.evaluate(() => (window as { kayMark?: string }).kayMark)).toBe('kept')
     }
@@ -497,6 +498,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('a tab open
     await page.evaluate(() => {
       scrollTo(0, document.body.scrollHeight)
     })
+    // Nothing happens: a reload of the page would come within this time.
     await Bun.sleep(1500)
 
     expect(await page.evaluate(() => (window as { kayOld?: boolean }).kayOld)).toBe(true)

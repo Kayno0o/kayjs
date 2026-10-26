@@ -12,6 +12,7 @@ import { setupStore } from '../src/server/app-store'
 import { pgCache } from '../src/server/pg-cache'
 import { pgHandle } from '../src/server/pg-data'
 import { feed } from './fixtures/production/src/news'
+import { eventually } from './helpers/eventually'
 import { cleanUpAfterFile, pgIt, postgres } from './job-stores'
 import { scratchBuild } from './prerendered'
 import { scratchDir } from './scratch'
@@ -47,8 +48,7 @@ describe('cached', () => {
     edition = 2
     setSystemTime(Date.now() + 61_000)
     expect(await cached('news', '60s', load)).toBe(1)
-    await Bun.sleep(0)
-    expect(await cached('news', '60s', load)).toBe(2)
+    await eventually(async () => expect(await cached('news', '60s', load)).toBe(2))
   })
 
   it('keeps nothing from a first load that throws, and the stale value through a refresh that throws', async () => {
@@ -69,8 +69,7 @@ describe('cached', () => {
       failing = true
       setSystemTime(Date.now() + 61_000)
       expect(await cached('feed', '60s', load)).toBe('up')
-      await Bun.sleep(0)
-      expect(logged).toHaveBeenCalledTimes(1)
+      await eventually(() => expect(logged).toHaveBeenCalledTimes(1))
       // A minute before the next attempt, whatever the ttl.
       expect(await cached('feed', '60s', load)).toBe('up')
       expect(logged).toHaveBeenCalledTimes(1)
@@ -172,6 +171,7 @@ describe('cached with a store', () => {
     expect(store.dependencies().size).toBe(0)
     store.delete('a')
     invalidate(key => key.startsWith('b'))
+    // Nothing happens: a write by the store would come within this time.
     await Bun.sleep(600)
     expect(existsSync(join(dir, 'data'))).toBe(false)
 
@@ -298,8 +298,7 @@ describe('cached with a store', () => {
       value = () => 1
       setSystemTime(Date.now() + 61_000)
       expect(await cached('feed', '60s', () => value, { store })).toBe('plain')
-      await Bun.sleep(0)
-      expect(logged.mock.calls[0]![0]).toContain('cannot keep its value in a store')
+      await eventually(() => expect(logged.mock.calls[0]![0]).toContain('cannot keep its value in a store'))
       expect(store.get('feed')!.text).toBe('["plain"]')
 
       const failing = { ...store, set: () => {
