@@ -28,7 +28,7 @@
 - `Map(label="Route" lines={[path]} markers={[{ at: [48.85, 2.35], label: "Start" }]} highlight={picked()})`, drawn by Leaflet, a peer the app installs to use it: `bun add leaflet @types/leaflet`. It loads once the island mounts, so a page without a map downloads none of it; the server renders the frame and the list screen readers read.
   - `lines` are paths of `[latitude, longitude]` points, `markers` are `{ at, label, popup }`: a `label` shows on hover and is listed for screen readers, a `popup` opens on a click as plain text. A point that is no place (`NaN`, past 90 or 180 degrees) is left out. The map fits what it draws, with `center` and `zoom` while there is nothing (the world by default).
   - `highlight` is a path drawn over the lines on a dark casing and brought into view (one point is a dot), such as the entry picked in a timeline; unset, the map fits everything again. It follows the value given, so `highlight={picked()}` from a signal moves it.
-  - `tiles` and `attribution` are OpenStreetMap's by default, `maxZoom` 19. kay's default `img-src` admits any https tile host, so the app sets no `security.csp`; one that narrows `img-src` lists its tile host.
+  - `tiles` and `attribution` are OpenStreetMap's by default, `maxZoom` 19, all read when the map mounts. kay's default `img-src` admits any https tile host, so the app sets no `security.csp`; one that narrows `img-src` lists its tile host.
   - The controls, tooltips, popups and attribution follow the skin in light and dark and the lines take `--color-accent`; `--map-height` sets the height (24rem). `label` names the region for screen readers. Parts: `root`, `canvas`, `surface`, `list` and `item`.
 
 ### Drag and drop: Sortable, Board, DropTargets

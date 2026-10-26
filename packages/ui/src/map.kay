@@ -41,6 +41,9 @@ let canvas: HTMLElement | undefined
 
 const names = () => markers.flatMap(marker => marker.label ? [marker.label] : [])
 
+// Leaflet writes a string into the page as HTML, so text goes in as an element holding it as text.
+const textNode = (leaflet: typeof import('leaflet'), text: string) => Object.assign(leaflet.DomUtil.create('div'), { textContent: text })
+
 // The map once Leaflet has loaded and drawn its tiles, which the effects below draw on.
 const drawing = signal<{ view: LeafletMap, base: LayerGroup, picked: LayerGroup, leaflet: typeof import('leaflet') } | null>(null)
 
@@ -64,17 +67,22 @@ onMount(() => {
     if (gone || !canvas)
       return
 
-    view = leaflet.map(canvas, { zoomSnap: 0.5, attributionControl: false })
-    view.addControl(leaflet.control.attribution({ prefix: false }))
-    leaflet.tileLayer(tiles, { maxZoom, attribution }).addTo(view)
+    try {
+      view = leaflet.map(canvas, { zoomSnap: 0.5, attributionControl: false })
+      view.addControl(leaflet.control.attribution({ prefix: false }))
+      leaflet.tileLayer(tiles, { maxZoom, attribution }).addTo(view)
 
-    // A map laid out while hidden or resized later learns its size from the box.
-    if (typeof ResizeObserver !== 'undefined') {
-      observer = new ResizeObserver(() => view?.invalidateSize())
-      observer.observe(canvas)
+      // A map laid out while hidden or resized later learns its size from the box.
+      if (typeof ResizeObserver !== 'undefined') {
+        observer = new ResizeObserver(() => view?.invalidateSize())
+        observer.observe(canvas)
+      }
+
+      drawing.set({ view, base: leaflet.layerGroup().addTo(view), picked: leaflet.layerGroup().addTo(view), leaflet })
     }
-
-    drawing.set({ view, base: leaflet.layerGroup().addTo(view), picked: leaflet.layerGroup().addTo(view), leaflet })
+    catch (error) {
+      console.error('kayjs-ui: Map could not draw', error)
+    }
   })()
 
   // Where the map fits: the highlight when there is one, else everything drawn, else the centre.
@@ -106,17 +114,13 @@ onMount(() => {
       leaflet.polyline(path, { weight: 3, className: 'kui-map-line' }).addTo(base)
 
     for (const marker of marks) {
-      const dot = leaflet.circleMarker(marker.at, { radius: 5, weight: 1, className: 'kui-map-marker', interactive: Boolean(marker.label ?? marker.popup) }).addTo(base)
+      const dot = leaflet.circleMarker(marker.at, { radius: 5, weight: 1, className: 'kui-map-marker', interactive: Boolean(marker.label || marker.popup) }).addTo(base)
 
       if (marker.label)
-        dot.bindTooltip(marker.label)
+        dot.bindTooltip(textNode(leaflet, marker.label))
 
-      if (marker.popup) {
-        const text = leaflet.DomUtil.create('div')
-
-        text.textContent = marker.popup
-        dot.bindPopup(text)
-      }
+      if (marker.popup)
+        dot.bindPopup(textNode(leaflet, marker.popup))
     }
 
     all = drawnPoints(paths, marks)

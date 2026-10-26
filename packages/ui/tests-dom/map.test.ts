@@ -20,6 +20,22 @@ async function drawn(props: Record<string, unknown> = {}) {
 }
 
 describe('Map', () => {
+  test('shows a label as text in its tooltip, never as markup', async () => {
+    mounted = await mountComponent(MapFixture, { hostile: true })
+
+    for (let tries = 0; tries < 400 && mounted.root.querySelector('#hostile .leaflet-overlay-pane path') === null; tries++)
+      await Bun.sleep(5)
+
+    const dot = mounted.root.querySelector('#hostile path.kui-map-marker')!
+
+    dot.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }))
+
+    const tip = mounted.root.querySelector('#hostile .leaflet-tooltip')
+
+    expect(tip?.textContent).toBe('<img src=x onerror=alert(1)>')
+    expect(tip?.querySelector('img')).toBeNull()
+  })
+
   test('names the region and lists the markers that have a label for screen readers', async () => {
     const root = await drawn()
     const region = root.querySelector('#map')!

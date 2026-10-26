@@ -3,8 +3,10 @@ import type { MapPoint } from '@kaynooo/kayjs-ui'
 import MapView from '@kaynooo/kayjs-ui/map.kay'
 
 // What the test sets: the path highlighted on the map.
-const { highlight } = props<{ highlight?: MapPoint[] | undefined }>()
+const { highlight, hostile = false } = props<{ highlight?: MapPoint[] | undefined, hostile?: boolean }>()
 ---
 MapView#map(label="Route" lines={[[[48.85, 2.35], [48.86, 2.37], [48.87, 2.4]], [[48.9, 2.3], [Number.NaN, 2.3]]]} markers={[{ at: [48.85, 2.35], label: 'Start', popup: '<b>Start</b>' }, { at: [48.87, 2.4] }]} highlight={highlight})
 MapView#empty(label="Nothing yet")
 MapView#custom(label="Custom" tiles="https://tiles.example/{z}/{x}/{y}.png" attribution="Example tiles" lines={[[[0, 0], [1, 1]]]})
+if hostile
+  MapView#hostile(label="Hostile" markers={[{ at: [1, 1], label: '<img src=x onerror=alert(1)>' }]})

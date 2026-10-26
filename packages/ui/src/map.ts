@@ -3,7 +3,7 @@ export type MapPoint = [number, number]
 
 export interface MapMarker {
   at: MapPoint
-  // Shown beside the marker on hover or focus, and read by screen readers in the map's list.
+  // Shown beside the marker on hover as text, and read by screen readers in the map's list.
   label?: string | undefined
   // Opens on a click, as plain text.
   popup?: string | undefined

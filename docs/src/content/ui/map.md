@@ -12,7 +12,7 @@ The map is drawn by Leaflet, which the app installs with `bun add leaflet @types
 
 ## Lines and markers
 
-`lines` is an array of paths, each an array of `[latitude, longitude]` points, and `markers` an array of `{ at, label, popup }`. The map fits what it draws, and shows the `center` at `zoom` while there is nothing yet. A marker with a `label` shows it on hover and lists it for screen readers, and a `popup` opens on a click as plain text. A point that is no place, such as a `NaN`, is left out.
+`lines` is an array of paths, each an array of `[latitude, longitude]` points, and `markers` an array of `{ at, label, popup }`. The map fits what it draws, and shows the `center` at `zoom` while there is nothing yet. A marker with a `label` shows it on hover, as text, and lists it for screen readers, and a `popup` opens on a click as plain text. A point that is no place, such as a `NaN`, is left out.
 
 ## Highlighting a path
 
@@ -22,7 +22,7 @@ The map is drawn by Leaflet, which the app installs with `bun add leaflet @types
 
 ## Tiles
 
-`tiles` is the tile layer's URL template and `attribution` the credit shown in the corner, OpenStreetMap's by default. Set the two together, and `maxZoom` to what the tiles reach.
+`tiles` is the tile layer's URL template and `attribution` the credit shown in the corner, OpenStreetMap's by default. Set the two together, and `maxZoom` to what the tiles reach. All three are read when the map mounts.
 
 ## Look and screen readers
 
