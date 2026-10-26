@@ -656,6 +656,9 @@ describe('theme.css', () => {
     const rules = skin.replace(/\/\*[\s\S]*?\*\//g, '').replace(/@theme \{[^}]*\}/, '')
 
     expect(rules).not.toMatch(/\.kui-icon-btn\.kui-shell/)
+    // A raw select in a FormField sits at the theme's own one class, so the skin's chevron padding wins by order.
+    expect(rules).toContain('.kui-form-field :where(select)')
+    expect(rules).not.toContain(':where(.kui-form-field select)')
     expect(rules).not.toMatch(/:is\([^()]*(?:\.[\w-]+|\])\s+[.[][^()]*\)/)
   })
 
