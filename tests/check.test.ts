@@ -2894,6 +2894,17 @@ describe('kay check, string fields an action leaves unbounded', () => {
     ])
   })
 
+  it('leaves a string whose enum, const or anchored pattern without an unbounded quantifier already bounds it alone', () => {
+    expect(fields('export const add = action(t.Object({ time: t.String({ pattern: \'^([01]?\\\\d|2[0-3]):[0-5]\\\\d$\' }), kind: t.String({ enum: [\'a\', \'b\'] }), fixed: t.String({ const: \'x\' }), code: t.String({ pattern: \'^[a-z]{2,8}$\' }), star: t.String({ pattern: \'^[*+]$\' }) }), () => 1)')).toEqual([])
+  })
+
+  it('still reports a pattern that leaves the length open', () => {
+    const open = ['^a*$', '^a+$', '^a{2,}$', '^(ab)+$', 'a$', '^a', '^a\\\\$', '^a|b$', '^[a-z]\\\\d*$']
+
+    for (const pattern of open)
+      expect(fields(`export const add = action(t.Object({ name: t.String({ pattern: '${pattern}' }) }), () => 1)`).map(found => found.message), pattern).toEqual(['The string field name has no maxLength'])
+  })
+
   it('leaves a handler of an action with no schema alone, whatever strings it builds', () => {
     expect(fields('export const run = action(() => t.String())\nexport const again = action(function () { return t.String() })')).toEqual([])
   })

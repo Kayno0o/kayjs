@@ -97,7 +97,56 @@ function maxLengthEdit(call: t.CallExpression, options: t.CallExpression['argume
   return { at: (options as t.ObjectExpression).properties[0]!.start!, text: `maxLength: ${SUGGESTED_MAX_LENGTH}, ` }
 }
 
-// A string field of an action's schema with no `maxLength` takes whatever a visitor posts into it, up to the request body limit. A secret, such as a password, is checked or hashed rather than kept or shown, so it needs none.
+const UNBOUNDED_QUANTIFIER = /^\{\d+,\}/
+
+// Whether a regular expression source matches only strings of a bounded length: anchored at both ends in every alternative, with no `*`, `+` or `{n,}` outside a character class.
+function isBoundedPattern(source: string): boolean {
+  if (!source.startsWith('^') || !source.endsWith('$') || source.endsWith('\\$'))
+    return false
+
+  let depth = 0
+
+  for (let index = 1; index < source.length - 1; index++) {
+    const char = source[index]!
+
+    if (char === '\\') {
+      index++
+    }
+    else if (char === '[') {
+      index++
+
+      while (index < source.length - 1 && source[index] !== ']')
+        index += source[index] === '\\' ? 2 : 1
+    }
+    else if (char === '*' || char === '+' || (char === '{' && UNBOUNDED_QUANTIFIER.test(source.slice(index)))) {
+      return false
+    }
+    else if (char === '(') {
+      depth++
+    }
+    else if (char === ')') {
+      depth--
+    }
+    // A top-level alternative may leave one side unanchored.
+    else if (char === '|' && depth === 0) {
+      return false
+    }
+  }
+
+  return true
+}
+
+// A property whose value already bounds the string: an `enum` or a `const`, or a `pattern` written as a literal that only matches strings of bounded length.
+function isBoundedByValue(property: t.ObjectProperty | t.ObjectMethod): boolean {
+  const key = propertyKey(property)
+
+  if (key === 'enum' || key === 'const')
+    return true
+
+  return key === 'pattern' && property.type === 'ObjectProperty' && property.value.type === 'StringLiteral' && isBoundedPattern(property.value.value)
+}
+
+// A string field of an action's schema with no `maxLength` takes whatever a visitor posts into it, up to the request body limit, unless its `enum`, `const` or anchored `pattern` already bounds it. A secret, such as a password, is checked or hashed rather than kept or shown, so it needs none.
 export function unboundedFields(server: ServerAnalysis | undefined): Diagnostic[] {
   const fence = server?.fence
 
@@ -114,7 +163,7 @@ export function unboundedFields(server: ServerAnalysis | undefined): Diagnostic[
       const options = call.arguments[0]
       const known = options === undefined || (options.type === 'ObjectExpression' && options.properties.every(property => property.type !== 'SpreadElement'))
 
-      if (!known || (options?.type === 'ObjectExpression' && options.properties.some(property => property.type !== 'SpreadElement' && propertyKey(property) === 'maxLength')) || (field !== undefined && isSecret(field)))
+      if (!known || (options?.type === 'ObjectExpression' && options.properties.some(property => property.type !== 'SpreadElement' && (propertyKey(property) === 'maxLength' || isBoundedByValue(property)))) || (field !== undefined && isSecret(field)))
         return
 
       const edit = maxLengthEdit(call, options)
