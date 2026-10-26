@@ -19,11 +19,11 @@ const look = recipe({
 
 const { lines = [], markers = [], highlight, tiles = OSM_TILES, attribution = OSM_ATTRIBUTION, maxZoom = 19, center = [20, 0], zoom = 2, label, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'role'> & {
   // Polylines, each an array of [latitude, longitude] points.
-  lines?: MapPoint[][] | undefined
+  lines?: readonly (readonly MapPoint[])[] | undefined
   // Round markers; a `label` shows on hover and is read by screen readers, a `popup` opens on a click and is read in the list too.
-  markers?: MapMarker[] | undefined
+  markers?: readonly MapMarker[] | undefined
   // A path drawn over the lines and brought into view, such as the entry picked in a timeline; one point draws a dot. Unset, the map fits what it draws again.
-  highlight?: MapPoint[] | undefined
+  highlight?: readonly MapPoint[] | undefined
   // The tile layer's URL template; OpenStreetMap's by default, whose attribution the map shows; `tiles`, `attribution` and `maxZoom` follow later changes. Its host needs `img-src`, which kay admits for any https host.
   tiles?: string | undefined
   // HTML shown in the corner for the tiles' source; set it with `tiles`, and the map follows a change to either.

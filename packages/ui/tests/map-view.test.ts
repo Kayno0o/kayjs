@@ -13,6 +13,8 @@ test('leaves out a point no map can place', () => {
   expect(validPoint([1, Number.POSITIVE_INFINITY])).toBe(false)
   expect(validPoint([91, 0])).toBe(false)
   expect(validPoint([0, -181])).toBe(false)
+  expect(validPoint([48.85])).toBe(false)
+  expect(validPoint([48.85, 2.35, 30])).toBe(false)
 })
 
 test('defaults to OpenStreetMap\'s tiles over https, which kay\'s default img-src admits, and credits it', () => {
