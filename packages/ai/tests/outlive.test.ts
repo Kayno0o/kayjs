@@ -22,7 +22,8 @@ function gated() {
       state.asked++
       yield { text: 'one ' }
 
-      await Promise.race([gate.promise, new Promise(resolve => signal.addEventListener('abort', resolve))])
+      if (!signal.aborted)
+        await Promise.race([gate.promise, new Promise(resolve => signal.addEventListener('abort', resolve))])
 
       if (signal.aborted) {
         state.aborted = true
@@ -171,6 +172,17 @@ describe('resuming a reply by the header a Chat sends', () => {
     expect(await (await answering({ provider: model.provider }, { 'x-kai-reply': `stop:${id}` })).reply).toBe('')
     expect(model.state.aborted).toBe(true)
     expect(await (await answering({ provider: model.provider }, { 'x-kai-reply': `resume:${id}` })).reply).toBe('one ')
+  })
+
+  it('ends a reply that is kept after the stop for its id came first', async () => {
+    const model = gated()
+
+    expect(await (await answering({ provider: model.provider }, { 'x-kai-reply': `stop:${id}` })).reply).toBe('')
+
+    const first = await answering({ provider: model.provider, outlive: true }, { 'x-kai-reply': `start:${id}` })
+
+    expect(await first.reply).toBe('one ')
+    expect(model.state.aborted).toBe(true)
   })
 
   it('answers nothing, and asks no provider, for an unknown id, a malformed one or an ask that did not outlive', async () => {

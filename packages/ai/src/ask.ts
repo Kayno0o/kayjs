@@ -5,7 +5,7 @@ import { actionTool, configError, currentRequest, durationSeconds, jsonSchemaOf 
 import { choose } from './config'
 import { recorded } from './dev-log'
 import { AiError } from './errors'
-import { keep, kept } from './kept'
+import { keep, kept, stopKept } from './kept'
 import { guarded } from './limits'
 import { converse } from './loop'
 import { outputSchema } from './output-schema'
@@ -129,15 +129,13 @@ function resumed(): Reply | undefined {
   if (call === undefined || call.op === 'start')
     return undefined
 
-  const found = kept(call.id)
-
   if (call.op === 'stop') {
-    found?.stop()
+    stopKept(call.id)
 
     return createReply(nothing, [])
   }
 
-  return found ?? createReply(nothing, [])
+  return kept(call.id) ?? createReply(nothing, [])
 }
 
 // A reply that outlives its request is kept under the id its Chat named, for the Chat to find after a reload.

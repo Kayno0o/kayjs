@@ -372,8 +372,8 @@ async function send(again = false, question?: string, resuming?: string) {
   }
 
   const mine = new AbortController()
-  // A reply of a Chat that remembers is named, so a reload finds it and a Stop ends it.
-  const id = remember === undefined ? undefined : resuming ?? newReplyId()
+  // A reply is named, so a Stop ends it on the server and, for a Chat that remembers, a reload finds it.
+  const id = resuming ?? newReplyId()
 
   if (remember !== undefined && id !== undefined)
     keepPending(remember, id)
@@ -393,7 +393,7 @@ async function send(again = false, question?: string, resuming?: string) {
 
   try {
     // A turn that only called tools has no text to post, which a provider refuses.
-    const stream = await call(mine.signal, id === undefined ? undefined : { [REPLY_HEADER]: `${resuming === undefined ? 'start' : 'resume'}:${id}` })
+    const stream = await call(mine.signal, { [REPLY_HEADER]: `${resuming === undefined ? 'start' : 'resume'}:${id}` })
 
     if (mine.signal.aborted) {
       stream.close()
@@ -491,17 +491,22 @@ async function endOnServer(id: string, messages: Message[]) {
     if (typeof answer === 'object' && answer !== null && 'close' in answer)
       (answer as ActionStream<unknown>).close()
   }
-  catch {}
+  catch (error) {
+    console.warn('the reply could not be ended on the server', error)
+  }
 }
 
 function stop() {
   const stream = streaming()
   const id = replying
 
-  if (id !== undefined && remember !== undefined && busy()) {
-    keepPending(remember, undefined)
+  if (id !== undefined && busy()) {
+    if (remember !== undefined)
+      keepPending(remember, undefined)
+
     replying = undefined
-    void endOnServer(id, posted(history(), keep, maxChars))
+    // Only the last message goes, which any size the action takes holds.
+    void endOnServer(id, posted(history(), keep, maxChars).slice(-1))
   }
 
   // Aborting a call whose answer arrived would break the body read; closing the stream is enough then.
