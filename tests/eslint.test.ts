@@ -706,6 +706,14 @@ p {a}
     expect(left).toEqual([])
   })
 
+  it('keeps a comment trailing the props declaration on its line, as after any other statement', async () => {
+    const source = '---\nconst { a } = props<{ a: string }>() // note\nconst b = a.trim() // note\nconst c = b // note\n---\nspan {c}\n'
+    const { messages, fixed } = await lint(source)
+
+    expect(messages).toEqual([])
+    expect(fixed).toBe(source)
+  })
+
   it('reports only the tab on a fence otherwise indented as a .ts file would be', async () => {
     const { messages } = await lint(`---
 import {

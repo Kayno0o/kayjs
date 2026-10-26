@@ -22,6 +22,8 @@ import { reactiveValue } from './script'
 import { shadowedBinds } from './template-reads'
 import { headTagProblem, sharedImports } from './validate'
 
+const HORIZONTAL_SPACE = /^[ \t]*/
+
 const WRITE_NAMES: Record<keyof typeof WRITE_HELPERS, KayHelper> = { to: 'writeTo', update: 'updateTo', back: 'writeBack', updateBack: 'updateBack' }
 
 const WORD = /[\p{ID_Start}$_][\p{ID_Continue}$\u200C\u200D]*/gu
@@ -868,7 +870,8 @@ class ModuleShell {
         propsDone = true
       }
 
-      this.b.addBody(span)
+      // What follows the props declaration on its line, a trailing comment, moves to the line of its own the declaration leaves: its space would indent that line one column too deep.
+      this.b.addBody(props && span.start === props.statement.end ? { start: span.start + HORIZONTAL_SPACE.exec(this.text(span))![0].length, end: span.end } : span)
     }
 
     if (!propsDone)
