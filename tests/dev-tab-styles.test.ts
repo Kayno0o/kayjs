@@ -3,6 +3,7 @@ import { GlobalRegistrator } from '@happy-dom/global-registrator'
 import { afterAll, afterEach, beforeAll, describe, expect, it, spyOn } from 'bun:test'
 import stylesTab from '../src/runtime/dev-tab-styles'
 import { startDevTool } from '../src/runtime/dev-tool'
+import { eventually, turn } from './helpers/eventually'
 
 beforeAll(() => {
   GlobalRegistrator.register()
@@ -41,10 +42,12 @@ describe('the Styles tab', () => {
     return { panel: tab.panel, calls, done: () => fetching.mockRestore() }
   }
 
-  const hover = async (target: Element) => {
-    target.dispatchEvent(new window.MouseEvent('mouseover', { bubbles: true, composed: true }))
-    await Bun.sleep(0)
-    await Bun.sleep(0)
+  const hover = (target: Element) => target.dispatchEvent(new window.MouseEvent('mouseover', { bubbles: true, composed: true }))
+
+  // Two turns for the read of a component and its drawing, for the tests that expect nothing to change after a hover.
+  const settle = async () => {
+    await turn()
+    await turn()
   }
 
   const page = () => {
@@ -56,13 +59,15 @@ describe('the Styles tab', () => {
 
     const { panel, calls, done } = open(url => url.includes('panel.kay') ? Response.json(view) : new Response(null, { status: 404 }))
 
-    await hover(document.getElementById('text')!)
-    expect(calls.map(call => call[0])).toEqual(['GET /_kay/dev/ui?file=src%2Froutes%2Findex.kay', 'GET /_kay/dev/ui?file=src%2Fcomponents%2Fpanel.kay'])
-    expect(panel.querySelector('.heading')!.textContent).toBe('Panel')
-    expect([...panel.querySelectorAll('.row .pill')].map(pill => pill.textContent)).toEqual(['root', 'body'])
-    expect(panel.querySelectorAll<HTMLTextAreaElement>('.row textarea')[1]!.value).toBe('p-9')
-    expect(panel.textContent).toContain('size:')
-    expect(panel.textContent).toContain('--border-width: 1px')
+    hover(document.getElementById('text')!)
+    await eventually(() => {
+      expect(calls.map(call => call[0])).toEqual(['GET /_kay/dev/ui?file=src%2Froutes%2Findex.kay', 'GET /_kay/dev/ui?file=src%2Fcomponents%2Fpanel.kay'])
+      expect(panel.querySelector('.heading')!.textContent).toBe('Panel')
+      expect([...panel.querySelectorAll('.row .pill')].map(pill => pill.textContent)).toEqual(['root', 'body'])
+      expect(panel.querySelectorAll<HTMLTextAreaElement>('.row textarea')[1]!.value).toBe('p-9')
+      expect(panel.textContent).toContain('size:')
+      expect(panel.textContent).toContain('--border-width: 1px')
+    })
     done()
   })
 
@@ -77,22 +82,21 @@ describe('the Styles tab', () => {
       return fail ? Response.json({ error: 'src/ui.ts has no default export' }, { status: 422 }) : Response.json({ key: 'Panel', created: false })
     })
 
-    await hover(document.getElementById('panel')!)
+    hover(document.getElementById('panel')!)
+    await eventually(() => expect(panel.querySelector('.row button')).not.toBeNull())
 
     const write = panel.querySelector<HTMLButtonElement>('.row button')!
 
     panel.querySelector<HTMLTextAreaElement>('.row textarea')!.value = 'p-4'
     write.click()
-    await Bun.sleep(0)
-    await Bun.sleep(0)
-    expect(calls.at(-1)).toEqual(['POST /_kay/dev/ui', JSON.stringify({ file: 'src/components/panel.kay', part: 'root', classes: 'p-4' })])
-    expect(panel.querySelector('.note')!.textContent).toBe('Wrote root of Panel to src/ui.ts.')
+    await eventually(() => {
+      expect(calls.at(-1)).toEqual(['POST /_kay/dev/ui', JSON.stringify({ file: 'src/components/panel.kay', part: 'root', classes: 'p-4' })])
+      expect(panel.querySelector('.note')!.textContent).toBe('Wrote root of Panel to src/ui.ts.')
+    })
 
     fail = true
     write.click()
-    await Bun.sleep(0)
-    await Bun.sleep(0)
-    expect(panel.querySelector('.note')!.textContent).toBe('Could not write src/ui.ts: src/ui.ts has no default export')
+    await eventually(() => expect(panel.querySelector('.note')!.textContent).toBe('Could not write src/ui.ts: src/ui.ts has no default export'))
     done()
   })
 
@@ -101,12 +105,14 @@ describe('the Styles tab', () => {
 
     const { panel, done } = open(() => Response.json(view))
 
-    await hover(document.getElementById('panel')!)
+    hover(document.getElementById('panel')!)
+    await eventually(() => expect(panel.querySelector('.row textarea')).not.toBeNull())
 
     const box = panel.querySelector<HTMLTextAreaElement>('.row textarea')!
 
     box.value = 'typed'
-    await hover(document.getElementById('panel')!)
+    hover(document.getElementById('panel')!)
+    await settle()
     expect(panel.querySelector<HTMLTextAreaElement>('.row textarea')).toBe(box)
     expect(box.value).toBe('typed')
     done()
@@ -117,21 +123,23 @@ describe('the Styles tab', () => {
 
     const { panel, done } = open(url => Response.json(url.includes('panel.kay') ? view : { ...view, name: 'Page' }))
 
-    await hover(document.getElementById('panel')!)
+    hover(document.getElementById('panel')!)
+    await eventually(() => expect(panel.querySelector('.row textarea')).not.toBeNull())
 
     const box = panel.querySelector<HTMLTextAreaElement>('.row textarea')!
 
     box.focus()
     box.value = 'typed'
     panel.hidden = false
-    await hover(document.getElementById('main')!)
+    hover(document.getElementById('main')!)
+    await settle()
     expect(panel.querySelector<HTMLTextAreaElement>('.row textarea')).toBe(box)
     expect(box.value).toBe('typed')
 
     box.blur()
     panel.hidden = false
-    await hover(document.getElementById('main')!)
-    expect(panel.querySelector<HTMLTextAreaElement>('.row textarea')).not.toBe(box)
+    hover(document.getElementById('main')!)
+    await eventually(() => expect(panel.querySelector<HTMLTextAreaElement>('.row textarea')).not.toBe(box))
     done()
   })
 
@@ -141,9 +149,11 @@ describe('the Styles tab', () => {
     const { panel, calls, done } = open(() => Response.json(view))
 
     panel.hidden = true
-    await hover(document.getElementById('panel')!)
+    hover(document.getElementById('panel')!)
+    await settle()
     panel.hidden = false
-    await hover(tool!.root.host)
+    hover(tool!.root.host)
+    await settle()
     expect(calls).toEqual([])
     done()
   })

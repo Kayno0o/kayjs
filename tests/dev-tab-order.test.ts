@@ -120,6 +120,7 @@ describe.skipIf(path === undefined)('the tab order overlay of the dev tool', () 
       document.body.append(Object.assign(document.createElement('div'), { style: 'height: 3000px' }))
     })
     await page.waitUntil(() => (window as unknown as { counts: { rects: Map<Element, number> } }).counts.rects.size >= 2)
+    // A quiet period: any further read of a rect after the change settled would be a redraw the one-read count must not have.
     await page.evaluate(async () => new Promise(done => setTimeout(done, 400)))
 
     const change = await page.evaluate(() => [...document.querySelectorAll('main > button')].map(button => (window as unknown as { counts: { rects: Map<Element, number> } }).counts.rects.get(button)))
