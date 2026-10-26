@@ -3,6 +3,7 @@ import type { NavigationHooks } from '../src/runtime/navigation'
 import { GlobalRegistrator } from '@happy-dom/global-registrator'
 import { afterAll, afterEach, beforeAll, describe, expect, it, spyOn } from 'bun:test'
 import { stringify } from 'devalue'
+import { turn } from './helpers/eventually'
 
 const MODULES = ['navigate-api', 'hydrate-when', 'focus', 'live-props'] as const
 
@@ -65,8 +66,8 @@ async function hydrated(): Promise<typeof import('../src/runtime/client')> {
 }
 
 async function settle(): Promise<void> {
-  for (let turn = 0; turn < 20; turn++)
-    await Bun.sleep(0)
+  for (let round = 0; round < 20; round++)
+    await turn()
 }
 
 describe('a page whose navigate-api chunk fails to load with the build unchanged', () => {

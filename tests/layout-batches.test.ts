@@ -16,6 +16,7 @@ const updated = async () => new Promise<void>(resolve => queueMicrotask(resolve)
 
 async function finished() {
   await twoFrames()
+  // The rows fade for 200 ms of real time.
   await new Promise(resolve => setTimeout(resolve, 210))
 }
 

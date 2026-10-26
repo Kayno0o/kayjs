@@ -27,6 +27,7 @@ import { sqliteRates } from '../src/server/protection'
 import { securityHeaders } from '../src/server/security'
 import { sqliteStoreAt } from '../src/server/session'
 import { CspViolationError } from '../src/server/violations'
+import { eventually } from './helpers/eventually'
 import { cleanUpAfterFile, url as databaseUrl, postgres } from './job-stores'
 import { prerendered, refusedPrerender } from './prerendered'
 import { fixtureCopy, scratchDir } from './scratch'
@@ -1574,11 +1575,14 @@ describe('lifecycle', () => {
 
       return { response }
     }
-    const waitFor = async (text: string) => {
-      for (const start = Date.now(); !output.includes(text) && Date.now() - start < 10_000;)
+    // `count` lines of `text`, for the jobs of two queues that each print one.
+    const waitFor = async (text: string, count = 1) => {
+      const printed = () => output.split(text).length - 1
+
+      for (const start = Date.now(); printed() < count && Date.now() - start < 10_000;)
         await Bun.sleep(10)
 
-      expect(output).toContain(text)
+      expect(printed()).toBeGreaterThanOrEqual(count)
     }
 
     return { server, url, slow, waitFor, output: async () => rest }
@@ -1738,8 +1742,7 @@ describe('lifecycle', () => {
 
         await stream.body!.getReader().read()
         expect(await (await fetch(`${url}/join`)).text()).toBe('joined')
-        await waitFor('job started\n')
-        await Bun.sleep(300)
+        await waitFor('job started\n', 2)
         server.kill('SIGTERM')
 
         const stopping = Date.now()
@@ -1766,8 +1769,7 @@ describe('lifecycle', () => {
 
         await stream.body!.getReader().read()
         expect(await (await fetch(`${web.url}/join`)).text()).toBe('joined')
-        await worker.waitFor('job started\n')
-        await Bun.sleep(300)
+        await worker.waitFor('job started\n', 2)
         web.server.kill('SIGTERM')
         worker.server.kill('SIGTERM')
         expect(await Promise.all([web.server.exited, worker.server.exited])).toEqual([0, 0])
@@ -1788,8 +1790,7 @@ describe('lifecycle', () => {
         const { server, url, waitFor, output } = await startServer({ ...kept.env, SHUTDOWN_TIMEOUT: '2' })
 
         expect(await (await fetch(`${url}/join`)).text()).toBe('joined')
-        await waitFor('job started\n')
-        await Bun.sleep(300)
+        await waitFor('job started\n', 2)
         server.kill('SIGTERM')
         expect(await server.exited).toBe(0)
         expect(await output()).not.toContain('requests still open')
@@ -1946,8 +1947,7 @@ describe('request logging', () => {
       expect(await idOf(behind, '/missing')).toMatch(/^[\w-]{22}$/)
 
       await behind.handle(new Request('http://localhost/_kay/error', { method: 'POST', headers: { ...passed, 'content-type': 'application/json' }, body: JSON.stringify({ name: 'Error', message: 'Broken island', url: '/contact', stack: '' }) }))
-      await Bun.sleep(10)
-      expect(ids).toEqual(['edge-42'])
+      await eventually(() => expect(ids).toEqual(['edge-42']))
       expect(logged).toHaveBeenCalledWith(expect.stringMatching(/^kay: POST \/_kay\/error, request edge-42\n/))
     }
     finally {

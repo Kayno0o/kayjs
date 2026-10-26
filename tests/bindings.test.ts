@@ -2,6 +2,7 @@ import { GlobalRegistrator } from '@happy-dom/global-registrator'
 import { afterAll, beforeAll, describe, expect, it, spyOn } from 'bun:test'
 import { stringify } from 'devalue'
 import { classText } from '../src/runtime/values'
+import { turn } from './helpers/eventually'
 
 let dom: typeof import('../src/runtime/dom')
 let reactive: typeof import('../src/runtime/reactive')
@@ -20,8 +21,8 @@ afterAll(async () => {
 })
 
 async function settle(): Promise<void> {
-  for (let turn = 0; turn < 10; turn++)
-    await Bun.sleep(0)
+  for (let round = 0; round < 10; round++)
+    await turn()
 }
 
 describe('classText', () => {

@@ -53,6 +53,7 @@ async function talk(path: string, ...messages: (string | ArrayBuffer)[]): Promis
     await Bun.sleep(10)
 
   // A close frame sent just after the last echo.
+  // Nothing happens: a close frame still coming would arrive within this time.
   await Bun.sleep(50)
   socket.close()
 
@@ -133,6 +134,7 @@ describe('the rate of a websocket\'s messages', () => {
       for (let count = 0; count < 800; count++)
         socket.send('x')
 
+      // The limit counts messages in a window of one second, which has to pass for real.
       await Bun.sleep(1100)
     }
 

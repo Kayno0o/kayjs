@@ -35,6 +35,7 @@ import { extensionEditor } from '../src/server/routes'
 import { cms, resetCms } from './fixtures/cms/src/cms'
 import { articles, news, pages as pagesCollection } from './fixtures/cms/src/content.config'
 import { partners } from './fixtures/cms/src/partners'
+import { eventually } from './helpers/eventually'
 import { scratchBuild } from './prerendered'
 import { scratchDir } from './scratch'
 import { pages } from './shared-pages'
@@ -188,8 +189,7 @@ describe('loaded collections', () => {
     setSystemTime(new Date(Date.now() + 2 * 60_000))
     // Stale, so this read still gets it and starts the refresh the next one sees.
     expect((await timed.get('a'))?.data.title).toBe('Load 3')
-    await Bun.sleep(0)
-    expect((await timed.get('a'))?.data.title).toBe('Load 4')
+    await eventually(async () => expect((await timed.get('a'))?.data.title).toBe('Load 4'))
   })
 })
 
@@ -1324,6 +1324,7 @@ describe('the collections a CMS edits', () => {
       const first = saveEntry('flaky', { slug: 'a', data: { title: 'A' } })
       const batch = saveEntries('flaky', [{ slug: 'b', data: { title: 'B' } }, { slug: 'c', data: { title: 'C' } }])
 
+      // Nothing happens: the batch waits behind the first save, which the gate holds.
       await Bun.sleep(20)
       expect(order).toEqual(['save a'])
       gate.resolve()

@@ -1,5 +1,6 @@
 import { join, resolve } from 'node:path'
 import { describe, expect, it } from 'bun:test'
+import { eventually } from './helpers/eventually'
 import { scratchDir } from './scratch'
 
 const CLI = join(import.meta.dir, '..', 'src', 'cli.ts')
@@ -195,8 +196,7 @@ describe('kay test', () => {
 
     child.kill(signal)
     await child.exited
-    await Bun.sleep(300)
-    expect(() => process.kill(pid, 0)).toThrow()
+    await eventually(() => expect(() => process.kill(pid, 0)).toThrow())
   }, 60_000)
 
   it('mounts a component with no DOM preload, loading happy-dom on the first mount only', async () => {
