@@ -25,6 +25,28 @@ async function fixed(files: Record<string, string>): Promise<{ root: string, fou
 }
 
 describe('removed-ui-token', () => {
+  it('leaves old names quoted in comments of .kay files and src/ui.ts alone', async () => {
+    const root = await project({
+      'src/pages/index.kay': [
+        '// --color-kui-text and bg-kui-canvas, the names 1.75 removed',
+        '/* var(--color-kui-muted) */',
+        'p(class="bg-kui-surface0") don\'t',
+        'a(href="https://example.com") // text-kui-text here',
+        '',
+      ].join('\n'),
+      'src/ui.ts': '// --color-kui-text\nexport default {} /* bg-kui-canvas */\n',
+    })
+
+    try {
+      const found = await removedUiTokens(root, {})
+
+      expect(found.map(item => [item.file.split('/').pop(), item.line])).toEqual([['index.kay', 3]])
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
   it('renames declarations the new name reads, references and utilities, in css', async () => {
     const css = [
       '@theme {',

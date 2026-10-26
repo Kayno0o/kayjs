@@ -53,7 +53,7 @@ export async function removedUiTokens(root: string, options: CheckOptions): Prom
 
     const css = CSS_FILE.test(file)
     // Comments are blanked, not cut, so a position still points into the file.
-    const code = css ? source.replace(COMMENT, comment => comment.replace(/[^\n]/g, ' ')) : source
+    const code = css ? source.replace(COMMENT, blank) : blankComments(source)
     const levelAt = lintLevels(source, options.lints)
 
     scanNames({ file, source, code, css, level: offset => levelAt('removed-ui-token', offset), found, kept, reports, renamed: new Set() })
@@ -66,6 +66,60 @@ export async function removedUiTokens(root: string, options: CheckOptions): Prom
   }
 
   return found
+}
+
+function blank(text: string): string {
+  return text.replace(/[^\n]/g, ' ')
+}
+
+// A `.kay` file or src/ui.ts with its `//` and `/* */` comments blanked, quoted strings left alone so a URL in one is not a comment; a quote ends at its line, as prose in a template holds apostrophes, and only a backtick runs on.
+function blankComments(source: string): string {
+  let out = ''
+  let index = 0
+  let quote = ''
+
+  while (index < source.length) {
+    const char = source[index]!
+    const next = source[index + 1]
+
+    if (quote) {
+      if (char === '\\' && next !== undefined && next !== '\n') {
+        out += char + next
+        index += 2
+
+        continue
+      }
+
+      if (char === quote || (char === '\n' && quote !== '`'))
+        quote = ''
+    }
+    else if (char === '"' || char === '\'' || char === '`') {
+      quote = char
+    }
+    else if (char === '/' && next === '*') {
+      const close = source.indexOf('*/', index + 2)
+      const end = close < 0 ? source.length : close + 2
+
+      out += blank(source.slice(index, end))
+      index = end
+
+      continue
+    }
+    else if (char === '/' && next === '/' && source[index - 1] !== ':') {
+      const newline = source.indexOf('\n', index)
+      const end = newline < 0 ? source.length : newline
+
+      out += blank(source.slice(index, end))
+      index = end
+
+      continue
+    }
+
+    out += char
+    index++
+  }
+
+  return out
 }
 
 function scanNames(scan: Scan): void {
