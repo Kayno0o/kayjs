@@ -219,6 +219,7 @@ describe('highlighting', () => {
       return upper(code, language)
     }))
     const iterator = reply.progress()[Symbol.asyncIterator]()
+    // A bound, so a stalled stream fails here instead of hanging the file.
     const first = await Promise.race([iterator.next(), (async () => {
       await Bun.sleep(500)
 

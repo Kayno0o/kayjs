@@ -330,6 +330,7 @@ describe('streaming a structured reply', () => {
           aborted = true
         })
         yield { text: '{"title":"a' }
+        // A provider that goes quiet, which only the reader leaving ends.
         await Bun.sleep(5000)
       },
     }
@@ -343,9 +344,18 @@ describe('streaming a structured reply', () => {
   })
 
   it('stops with stop(), the text received making the failing answer\'s partial', async () => {
-    const reply = ask('x', { schema: verdict, provider: typing(...pieces) })
+    const typed = typing(...pieces)
+    let stop = (): void => undefined
+    // Stops once the first piece has been read.
+    const stopping: Provider = { ...typed, async* stream(request, signal) {
+      for await (const piece of typed.stream(request, signal)) {
+        yield piece
+        stop()
+      }
+    } }
+    const reply = ask('x', { schema: verdict, provider: stopping })
 
-    setTimeout(() => reply.stop(), 6)
+    stop = () => reply.stop()
 
     const error = await failure(reply)
 

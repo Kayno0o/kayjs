@@ -1,7 +1,7 @@
 --- server
 import { ask } from '@kaynooo/kayjs-ai'
 import { action, s } from 'kay'
-import { done, testing } from '../testing'
+import { done, hooks, testing } from '../testing'
 import { wipe } from './locked/_actions.kay'
 
 export const addNote = action(s.Object({ title: s.String({ minLength: 3, maxLength: 100, error: 'Too short' }) }), ({ title }) => {
@@ -19,6 +19,7 @@ export const breaks = action(s.Object({}), () => {
 })
 
 export const slow = action(s.Object({}), async () => {
+  hooks.slowStarted?.()
   await Bun.sleep(150)
   done.push('slow')
 

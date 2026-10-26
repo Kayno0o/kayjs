@@ -283,6 +283,7 @@ describe('timeouts', () => {
         async start(controller) {
           for (const line of lines) {
             controller.enqueue(encoder.encode(line))
+            // A server sending a chunk every 40 ms, under the 150 ms idle timeout.
             await Bun.sleep(40)
           }
 
@@ -297,11 +298,17 @@ describe('timeouts', () => {
   })
 
   it('ends without an error when stopped while connecting', async () => {
-    const server = serve(async () => new Promise<Response>(() => undefined))
+    const requested = Promise.withResolvers<void>()
+    const server = serve(async () => {
+      requested.resolve()
+
+      return new Promise<Response>(() => undefined)
+    })
     const reply = ask('Hi', { provider: openai({ baseUrl: server.url, model: 'm' }), timeout: { connect: '5s' } })
     const text = (async () => reply)()
 
-    await Bun.sleep(20)
+    // The request reached the server, which never answers, so the reply is still connecting.
+    await requested.promise
     reply.stop()
     expect(await text).toBe('')
   })

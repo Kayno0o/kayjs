@@ -11,7 +11,8 @@ import { approvalMessage, withoutApproval } from '../src/approval-marker'
 import { forgetCounts } from '../src/limits'
 import { converse } from '../src/loop'
 import { createReply } from '../src/reply'
-import { done } from './fixture/src/testing'
+import { done, hooks } from './fixture/src/testing'
+import { untilHolds } from './until'
 
 const ROOT = join(import.meta.dir, 'fixture')
 const site = await testSite({ root: ROOT })
@@ -20,6 +21,7 @@ const { converse: conversing, watch, unconfirmed, approving, refusedTools, uploa
 afterAll(async () => site.close())
 beforeEach(() => {
   done.length = 0
+  hooks.slowStarted = undefined
 })
 afterEach(() => fakeAi.clear())
 
@@ -314,12 +316,17 @@ describe('a visitor leaving mid-loop', () => {
     fakeAi.reply('never')
 
     const { headers, body } = encodeCall({ prompt: 'go' })
+    const started = Promise.withResolvers<void>()
+
+    hooks.slowStarted = started.resolve
+
     const answer = site.handle(new Request(`http://localhost${conversing.url}`, { method: 'POST', headers: { ...headers, origin: 'http://localhost' }, body, signal: controller.signal }))
 
-    await Bun.sleep(60)
+    await started.promise
     controller.abort()
-    await Bun.sleep(250)
     await expect(answer).resolves.toBeDefined()
+    // The tool in flight still finishes, and the loop that has ended ran nothing after it.
+    await untilHolds(() => done.length > 0)
 
     expect(done).toEqual(['slow'])
     expect(fakeAi.asked).toHaveLength(1)
@@ -411,11 +418,9 @@ describe('a visitor leaving mid-loop', () => {
         break
     }
 
-    await Bun.sleep(20)
-
     // The call being answered finished, and no step followed it.
-    expect(fakeAi.asked).toHaveLength(1)
     expect(await reply.finish).toBeUndefined()
+    expect(fakeAi.asked).toHaveLength(1)
   })
 
   it('keeps an action that threw outside the reply: what call() throws is a failed result', async () => {

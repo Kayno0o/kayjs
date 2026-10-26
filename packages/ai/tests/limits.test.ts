@@ -3,7 +3,7 @@ import type { Piece, Provider } from '../src'
 import { existsSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { afterEach, beforeEach, describe, expect, it, spyOn } from 'bun:test'
+import { afterEach, beforeEach, describe, expect, it, setSystemTime, spyOn } from 'bun:test'
 import { nameUser } from 'kay/library'
 import { memoryRates, sqliteRates } from 'kay/server'
 import { setupStore } from '../../../src/server/app-store'
@@ -17,6 +17,7 @@ const REFUSED = Symbol.for('kay.refused')
 beforeEach(() => forgetCounts())
 
 afterEach(() => {
+  setSystemTime()
   ai()
   forgetCounts()
   storeTimeout(5000)
@@ -215,7 +216,8 @@ describe('ai({ rateLimit })', () => {
     ai({ rateLimit: { max: 1, window: '1s' } })
     await ask('a', { key: 'v' })
     expect((await failure(ask('b', { key: 'v' }))).kind).toBe('limited')
-    await Bun.sleep(1100)
+    // The window reads the clock, so it closes by moving the clock.
+    setSystemTime(Date.now() + 1100)
     await ask('c', { key: 'v' })
   })
 
@@ -405,14 +407,18 @@ describe('ai({ budget })', () => {
 
     ai({ budget: { tokens: 1000, window: '1m', store } })
 
+    const streaming = Promise.withResolvers<void>()
     const reply = ask('abcd'.repeat(25), { key: 'v', provider: { name: 's', model: 'm', async* stream(_, signal) {
-      await new Promise(resolve => signal.addEventListener('abort', resolve))
+      const aborted = new Promise(resolve => signal.addEventListener('abort', resolve))
+
+      streaming.resolve()
+      await aborted
       yield* []
     } } })
     const reading = reply[Symbol.asyncIterator]()
     const first = reading.next()
 
-    await Bun.sleep(10)
+    await streaming.promise
     reply.stop()
     await first
     expect(store.count()).toBe(25)
@@ -436,7 +442,7 @@ describe('ai({ budget })', () => {
     fakeAi.reply(usedBy(10))
     await ask('a', { key: 'v' })
     expect((await failure(ask('a', { key: 'v' }))).limit).toBe('budget')
-    await Bun.sleep(1100)
+    setSystemTime(Date.now() + 1100)
     await ask('a', { key: 'v' })
   })
 
@@ -447,7 +453,8 @@ describe('ai({ budget })', () => {
 
     const reply = ask('a', { key: 'v', provider: { name: 's', model: 'm', async* stream() {
       yield { text: 'start' }
-      await Bun.sleep(1100)
+      // The window rolls over while the reply streams.
+      setSystemTime(Date.now() + 1100)
       yield { usage: { inputTokens: 4, outputTokens: 6 } }
     } } })
 

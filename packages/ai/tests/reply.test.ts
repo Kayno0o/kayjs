@@ -40,6 +40,7 @@ describe('the reply of ask()', () => {
   it('asks nothing until it is read', async () => {
     const reply = ask('Hi')
 
+    // Deliberate: nothing is asked while nobody reads, however long it waits.
     await Bun.sleep(5)
     expect(fakeAi.asked).toEqual([])
     expect(await reply).toBe('Fake reply to: Hi')
@@ -142,6 +143,7 @@ describe('a reply whose text starts over', () => {
   async function* restarting(): AsyncGenerator<Piece> {
     yield { text: 'Let me ' }
     yield { text: 'check. ' }
+    // A stream that pauses before it starts over.
     await Bun.sleep(10)
     yield { restart: true }
     yield { text: '{"a"' }
