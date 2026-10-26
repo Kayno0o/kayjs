@@ -614,6 +614,14 @@ export const LINTS = {
     wrong: '@theme { --color-kui-canvas: #fff; }\n.card { color: var(--color-kui-muted); @apply bg-kui-surface2; }',
     right: '@theme { --color-background: #fff; }\n.card { color: var(--color-muted); @apply bg-border; }',
   },
+  'public-env-outside-src': {
+    level: 'warn',
+    group: 'code',
+    site: true,
+    summary: 'An `s.Public(...)` field in a `.ts` file outside `src/`, such as `common/env.ts`: kay reads the fields of the `defineEnv` results of the modules under `src` as text, so an island reads that field typed as a plain string, with no message, and the browser is not sent it. Declare the field in a `defineEnv` in a `.ts` module under `src`.',
+    wrong: '// common/env.ts\nexport const env = defineEnv({ MAP_KEY: s.Public(s.String()) })',
+    right: '// src/env.ts\nexport const env = defineEnv({ MAP_KEY: s.Public(s.String()) })',
+  },
 } as const satisfies Record<string, Lint>
 
 export type LintName = keyof typeof LINTS

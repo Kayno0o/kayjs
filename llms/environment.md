@@ -35,7 +35,7 @@ export const env = defineEnv(s.Object({
 }))
 ```
 
-A component reads it as `publicEnv` from `kay`, typed from the `s.Public` fields of the modules under `src`:
+A component reads it as `publicEnv` from `kay`, typed from the `s.Public` fields of the modules under `src` only (one outside it, such as `common/env.ts`, is not found: `kay check` reports it as `public-env-outside-src`):
 
 ```kay
 ---

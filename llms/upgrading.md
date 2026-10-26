@@ -70,7 +70,7 @@ kayjs-cms answers on `/_kay/cms` alone: the `/api/cms` path of 1.70 and before i
 ### The 1.70 names that were read for three minors are gone
 
 - kayjs-mail reads `MAIL_URL`, `MAIL_INSECURE`, `MAIL_DKIM_SELECTOR`, `MAIL_DKIM_PRIVATE_KEY`, `MAIL_DKIM_DOMAIN`, `MAIL_FROM` and `MAIL_RATE_LIMIT` alone: `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER` and `SMTP_PASS` (now the login and server of `MAIL_URL`, such as `smtp://user:pass@mail.example.com:465`), `SMTP_INSECURE`, `SMTP_DKIM_*`, `SMTP_FROM` and `SMTP_RATE_LIMIT` are no longer read, so rename them in the deploy's environment.
-- `publicEnv` in kay.config.ts is refused at boot: mark the fields `s.Public` in `defineEnv` instead. The `publicEnv` an island imports from `kay` stays; the `PublicEnvOf` type is gone.
+- `publicEnv` in kay.config.ts is refused at boot: mark the fields `s.Public` in `defineEnv` in a `.ts` module under `src` instead: kay finds public fields only there, so a schema in `common/` or another folder outside `src` types its fields as strings in islands (`kay check` reports it as `public-env-outside-src`). The `publicEnv` an island imports from `kay` stays; the `PublicEnvOf` type is gone.
 - The `ORIGIN` env is no longer read for the site's URL: set `SITE_URL`. `kay env` stops listing it.
 - `kay migrate astro --out` is `--outdir`, and `kay new --host` is `--forge`; the old flags are unknown options.
 - kayjs-ai: the `failed` field of a `ToolOutcome` (`results` of a `ProviderMessage`) is gone, read `ok`; a provider written against `failed` reads `!ok`.

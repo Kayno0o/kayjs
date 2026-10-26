@@ -100,8 +100,8 @@ export function building(): boolean {
 // The module the island entry imports the public variables from, served from the environment the server runs in, so an executable or a prerendered page reads today's values rather than those of the build.
 export const PUBLIC_ENV_PATH = '/_kay/env.js'
 
-const PUBLIC_FIELD = /\bs\.Public\s*\(/
-const TEST_FILE = /\.(?:test|spec)\.[cm]?[jt]sx?$/
+export const PUBLIC_FIELD = /\bs\.Public\s*\(/
+export const TEST_FILE = /\.(?:test|spec)\.[cm]?[jt]sx?$/
 // What each file read last held, by its size and time, so a command asking for the files several times reads each one once.
 const scanned = new Map<string, { stamp: string, declares: boolean }>()
 
