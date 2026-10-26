@@ -5,6 +5,7 @@ import { join } from 'node:path'
 import process from 'node:process'
 import { beforeAll, describe, expect, it } from 'bun:test'
 import { alive, kill } from './alive'
+import { eventually } from './helpers/eventually'
 import { fixtureCopy } from './scratch'
 
 const cli = join(import.meta.dir, '..', 'src', 'cli.ts')
@@ -18,8 +19,13 @@ async function render(...args: string[]): Promise<{ out: string, err: string, co
   return { out, err, code }
 }
 
-// Kills `kay render` alone once its server printed `pid N` and `ready`, then answers what the server printed until `printed` holds, its pid and kay render's.
-async function killedRender(dir: string, url: string, printed: (err: string) => boolean): Promise<{ err: string, pid: number, render: number }> {
+// What a `kay render` of this project leaves when it is killed: its build under `.kay` and the folder of its socket in the temporary directory.
+async function leftBy(dir: string, render: number): Promise<string[]> {
+  return [...(await readdir(join(dir, '.kay'))).filter(name => name === `render-${render}`), ...(await readdir(tmpdir())).filter(name => name.startsWith(`kay-render-${render}-`))]
+}
+
+// Kills `kay render` alone once its server printed `pid N` and `ready` and, with `leaving`, once it left that many leftovers, then answers what the server printed until `printed` holds, its pid and kay render's.
+async function killedRender(dir: string, url: string, printed: (err: string) => boolean, leaving = 0): Promise<{ err: string, pid: number, render: number }> {
   const child = Bun.spawn([process.execPath, cli, 'render', url, dir], { stdin: 'ignore', stdout: 'ignore', stderr: 'pipe' })
   const reader = child.stderr.getReader()
   const decoder = new TextDecoder()
@@ -35,6 +41,10 @@ async function killedRender(dir: string, url: string, printed: (err: string) => 
     err += decoder.decode(value)
 
     if (!killed && err.includes('ready')) {
+      // The build under `.kay` is written once the server is up, which a loaded host may do after it printed `ready`.
+      if (leaving > 0)
+        await eventually(async () => expect(await leftBy(dir, child.pid)).toHaveLength(leaving))
+
       child.kill('SIGKILL')
       killed = true
     }
@@ -267,12 +277,12 @@ p {user} via {via}
 
   it('removes what a SIGKILLed kay render left, as the next one starts', async () => {
     const dir = await project(undefined, announced(SERVER))
-    const { pid, render: killed } = await killedRender(dir, '/', () => true)
+    const { pid, render: killed } = await killedRender(dir, '/', () => true, 2)
 
     for (let tries = 0; alive(pid) && tries < 100; tries++)
       await Bun.sleep(50)
 
-    const left = async () => [...(await readdir(join(dir, '.kay'))).filter(name => name === `render-${killed}`), ...(await readdir(tmpdir())).filter(name => name.startsWith(`kay-render-${killed}-`))]
+    const left = async () => leftBy(dir, killed)
 
     expect(await left()).toHaveLength(2)
     expect((await render('/', dir)).code).toBe(0)
