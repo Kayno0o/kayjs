@@ -12,6 +12,7 @@ import { compileKay } from '../src/compiler'
 import { parseKay } from '../src/compiler/parser'
 import { analyzeScript } from '../src/compiler/script'
 import { child } from '../src/runtime/html'
+import { eventually } from './helpers/eventually'
 import { scratchDir } from './scratch'
 
 await plugin(kay())
@@ -85,16 +86,14 @@ describe('client-only islands', () => {
       await ready
       expect(document.querySelector('button.chart')!.textContent).toBe(`sales ratio ${window.devicePixelRatio} 0`)
       document.querySelector('button.chart')!.dispatchEvent(new Event('click', { bubbles: true }))
-      await new Promise(resolve => setTimeout(resolve, 0))
-      expect(document.querySelector('button.chart')!.textContent).toBe(`sales ratio ${window.devicePixelRatio} 1`)
+      await eventually(() => expect(document.querySelector('button.chart')!.textContent).toBe(`sales ratio ${window.devicePixelRatio} 1`))
 
       const section = document.querySelector('section')!
 
       expect(section.querySelector('button')).toBe(toggle)
       expect([...section.children].map(element => element.outerHTML)).toEqual([toggle.outerHTML, `<span class="width"><!--[-->${window.innerWidth}<!--]--><!--[-->px<!--]--></span>`, '<p class="after">after</p>'])
       toggle.dispatchEvent(new Event('click', { bubbles: true }))
-      await new Promise(resolve => setTimeout(resolve, 0))
-      expect(toggle.textContent).toBe('1')
+      await eventually(() => expect(toggle.textContent).toBe('1'))
 
       expect(document.querySelector(`slot[data-component="${ids.width}"]`)!.textContent).toBe(`${window.innerWidth}em`)
       expect(document.querySelector('b.plain')!.textContent).toBe('1')

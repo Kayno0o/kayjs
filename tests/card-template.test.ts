@@ -233,6 +233,7 @@ describe('the share card template stamp', () => {
 
       // Each of the cards held its place while the first is drawn.
       await started.promise
+      // No event marks the cards reaching the queue, which a request does through a few file reads, so they get this long.
       await Bun.sleep(200)
 
       const turned = await server.handle(new Request(`http://localhost${urls.at(-1)!}`))
@@ -261,6 +262,7 @@ describe('the share card template stamp', () => {
 
     await shootCard(clientDir(FIXTURE), 80, async () => '<body style="margin:0">x</body>', options)
     expect(await imageRoute(options)).toBe(shared)
+    // The browser closes IDLE_MS (3 s) after the last card, and the route made on it with it.
     await Bun.sleep(3300)
     expect(await imageRoute(options)).not.toBe(shared)
   }, 30_000)

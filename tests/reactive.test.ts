@@ -7,6 +7,7 @@ import { ActionError, ActionRedirectError, actionStub } from '../src/runtime/act
 import { navigation } from '../src/runtime/navigation'
 import { createSignal, hydrationEnded, hydrationStarted, ownSignal, recordSignals, renderEffect, renderOnServer, undoable, unrecorded, whenHydrated } from '../src/runtime/reactive'
 import { inServerScope } from '../src/server/scope'
+import { eventually, turn } from './helpers/eventually'
 
 describe('signals', () => {
   it('read the last value written, a function written being an updater', () => {
@@ -58,6 +59,7 @@ describe('server scopes', () => {
     const shared = createSignal('module')
     const report = () => undefined
     const request = async (value: string, before: number, after: number) => inServerScope(new Request('http://localhost/'), report, async () => {
+      // The requests are staggered on purpose, so they overlap in an order of their own.
       await Bun.sleep(before)
       shared[1](value)
       await Bun.sleep(after)
@@ -1005,10 +1007,9 @@ describe('optimistic changes', () => {
       const settled = Promise.allSettled([nested!, call])
 
       expect(a()).toBe(2)
-      await Bun.sleep(0)
+      await eventually(() => expect(failing.has('/_kay/action/test/inner')).toBe(true))
       failing.get('/_kay/action/test/inner')!()
-      await Bun.sleep(0)
-      expect(a()).toBe(1)
+      await eventually(() => expect(a()).toBe(1))
       failing.get('/_kay/action/test/outer')!()
       expect((await settled).map(result => result.status)).toEqual(['rejected', 'rejected'])
       expect(a()).toBe(0)
@@ -1038,10 +1039,9 @@ describe('optimistic changes', () => {
       const settled = Promise.allSettled([call, nested!])
 
       expect([inner.pending(), outer.pending()]).toEqual([true, true])
-      await Bun.sleep(0)
+      await eventually(() => expect(failing.has('/_kay/action/test/outer')).toBe(true))
       failing.get('/_kay/action/test/outer')!()
-      await Bun.sleep(0)
-      expect([a(), inner.pending(), outer.pending()]).toEqual([0, true, false])
+      await eventually(() => expect([a(), inner.pending(), outer.pending()]).toEqual([0, true, false]))
       failing.get('/_kay/action/test/inner')!()
       expect((await settled).map(result => result.status)).toEqual(['rejected', 'rejected'])
       expect([a(), inner.pending()]).toEqual([0, false])
@@ -1240,13 +1240,13 @@ describe('a tracked action call', () => {
         await saved.settled()
         settled.push('action')
       })()
-      await Bun.sleep(0)
+      // Nothing happens: both waits stay open while the first call is out.
+      await turn()
       expect(settled).toEqual([])
       releases[0]!(new Response(stringify('a')))
       await first
-      await Bun.sleep(0)
       // The handle holds only its own calls, the action every call of the page.
-      expect(settled).toEqual(['handle'])
+      await eventually(() => expect(settled).toEqual(['handle']))
       releases[1]!(fail(500, { errors: { '': 'Broke' } }))
       await expect(second).rejects.toBeInstanceOf(ActionError)
       await saved.settled()
@@ -1280,6 +1280,7 @@ describe('a tracked action call', () => {
       releases[0]!(new Response(stringify('a')))
       // A write started before the first one ended keeps the wait going.
       void swallow(saved({ id: 2 }))
+      // Nothing happens: the wait stays open while a write started before it ended is out.
       await Bun.sleep(5)
       expect(done).toBe(false)
       releases[1]!(new TypeError('offline'))

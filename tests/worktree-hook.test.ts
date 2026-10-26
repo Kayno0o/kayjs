@@ -52,6 +52,7 @@ test('a worktree waits for the git steps of another to finish', async () => {
 
   const created = $`${process.execPath} ${HOOK} create waits`.cwd(repo).quiet().nothrow()
 
+  // Nothing happens: the hook is held by the lock, so no worktree appears within this time.
   await Bun.sleep(500)
   expect(existsSync(join(repo, '.claude/worktrees/waits'))).toBe(false)
 

@@ -4,6 +4,7 @@ import { join } from 'node:path'
 import { afterEach, describe, expect, it, setSystemTime, spyOn } from 'bun:test'
 import { queue, workflow } from '../src/server'
 import { forgetQueue, GiveUpError } from '../src/server/queue'
+import { eventually } from './helpers/eventually'
 import { cleanUpAfterFile, kinds } from './job-stores'
 import { scratchDir } from './scratch'
 import { pages } from './shared-pages'
@@ -110,7 +111,7 @@ describe.each(kinds)('the Jobs tab\'s queues on a $name store', ({ name, open })
     const id = await jobs.enqueue({ n: 1 })
     const draining = jobs.drain()
 
-    await Bun.sleep(50)
+    await eventually(async () => expect(find(await listed(site), 'running').jobs[0]).toMatchObject({ id, status: 'running', attempts: 1 }))
 
     const [running] = find(await listed(site), 'running').jobs as [JobView]
 
@@ -127,6 +128,7 @@ describe.each(kinds)('the Jobs tab\'s queues on a $name store', ({ name, open })
     const site = await app()
     const id = await jobs.enqueue({ n: 7 })
 
+    // The first retry of a failed job waits one second of real time.
     await jobs.drain()
     await Bun.sleep(1100)
     await jobs.drain()
@@ -152,6 +154,7 @@ describe.each(kinds)('the Jobs tab\'s queues on a $name store', ({ name, open })
     const site = await app()
     const id = await jobs.enqueue({ n: 1 })
 
+    // The first retry of a failed job waits one second of real time.
     await jobs.drain()
     await Bun.sleep(1100)
     await jobs.drain()

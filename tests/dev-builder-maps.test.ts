@@ -101,6 +101,7 @@ it('never lets a rewrite of an earlier build land over the maps of the next one'
     await Bun.write(join(project, 'src/one.kay'), edited)
     expect((await build(['src/one.kay'])).failed).toBe(false)
     await pointedAt(project, { 'one.kay': edited, 'two.kay': ISLAND('two') })
+    // Nothing happens: a late pointing would rewrite the maps within this time.
     await Bun.sleep(300)
     expect((await kayTexts(project)).get('one.kay')).toBe(edited)
   }
