@@ -57,9 +57,9 @@ const DOCKS = { right: { min: 280, page: 352, step: 24, fallback: 384 }, bottom:
 const LAUNCHER_GAP = 16
 
 // A panel with a `closeHref` and no handler closes by going there: its link on a click, and Escape, which only closes the dialog, through `navigate`.
-const follows = closeHref !== undefined && onOpenChange === undefined
+const follows = () => closeHref !== undefined && onOpenChange === undefined
 function closed() {
-  if (follows && closeHref !== undefined)
+  if (follows() && closeHref !== undefined)
     navigate(closeHref)
   else
     onOpenChange?.(false)
@@ -296,7 +296,7 @@ dialog(part="root" aria-label={title} {...rest} open={renderedOpen} data-modal={
     header(part="head")
       h2(part="title") {title}
       | {actions}
-      IconButton(icon="close" label={closeLabel} variant="ghost" href={closeHref} onClick={() => follows || panel?.close()})
+      IconButton(icon="close" label={closeLabel} variant="ghost" href={closeHref} onClick={() => follows() || panel?.close()})
     div(part="body")
       slot
     if footer
