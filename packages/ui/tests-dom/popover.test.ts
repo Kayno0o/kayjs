@@ -83,6 +83,43 @@ describe('TooltipHost', () => {
     expect(button.style.getPropertyValue('anchor-name')).toBe('')
   })
 
+  test('shows no tooltip over the popover its element opened, as the pointer comes back onto that element', async () => {
+    const root = await popovers()
+    const tooltip = root.querySelector<HTMLElement>('.kui-tooltip')!
+
+    click(root.querySelector('#show'))
+    await clock.settle()
+
+    // The Popover draws its trigger again as it opens, so the one under the pointer is a new element.
+    const trigger = root.querySelector<HTMLElement>('#trigger')!
+
+    expect(trigger.getAttribute('aria-expanded')).toBe('true')
+
+    trigger.querySelector('svg')!.dispatchEvent(new Event('pointerover', { bubbles: true }))
+    await clock.elapse(100)
+    await clock.settle()
+
+    expect(tooltip.matches(':popover-open')).toBe(false)
+  })
+
+  test('hides the tooltip a tab showed once its element opens its popover', async () => {
+    const root = await popovers()
+    const tooltip = root.querySelector<HTMLElement>('.kui-tooltip')!
+
+    root.querySelector<HTMLElement>('#trigger')!.focus()
+    await clock.elapse(100)
+    await clock.settle()
+
+    expect(tooltip.textContent).toBe('Menu')
+    expect(tooltip.matches(':popover-open')).toBe(true)
+
+    click(root.querySelector('#show'))
+    await clock.settle()
+
+    expect(root.querySelector<HTMLElement>('#menu')!.matches(':popover-open')).toBe(true)
+    expect(tooltip.matches(':popover-open')).toBe(false)
+  })
+
   test('shows a data-hint under the pointer only, never as the focus lands on its element', async () => {
     const root = await popovers()
     const figure = root.querySelector<HTMLElement>('#figure')!
