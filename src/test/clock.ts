@@ -15,7 +15,8 @@ export function installClock(): void {
   interface Timer { due: number, every: number | undefined, run: () => void, handle: number }
   const timers = new Map<number, Timer>()
   let skipped = 0
-  let next = 1
+  // Far above the ids the real timers hand out, which a string handler keeps.
+  let next = 1_000_000_000
 
   const now = () => realNow() + skipped
   const fireRef: { current: (id: number) => void } = { current: () => undefined }
