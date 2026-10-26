@@ -1,5 +1,6 @@
 import { GlobalRegistrator } from '@happy-dom/global-registrator'
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'bun:test'
+import { untilHolds } from './until-holds'
 
 interface FakeSubscription {
   endpoint: string
@@ -190,10 +191,11 @@ describe('a subscription the browser rotated', () => {
     localStorage.setItem('kay-push-posted', 'https://push.example/old')
     subscription = fakeSubscription()
     ;(await pageLoad('rotated')).state()
-    await Bun.sleep(20)
+    await untilHolds(() => posts.length > 0 && localStorage.getItem('kay-push-posted') === 'https://push.example/abc')
     expect(posts).toEqual([{ url: '/app/_kay/push/subscribe', body }])
     expect(localStorage.getItem('kay-push-posted')).toBe('https://push.example/abc')
     ;(await pageLoad('reloaded')).state()
+    // Nothing happens: a post made late would show within this time.
     await Bun.sleep(20)
     expect(posts).toHaveLength(1)
   })
@@ -202,6 +204,7 @@ describe('a subscription the browser rotated', () => {
     localStorage.clear()
     subscription = fakeSubscription()
     ;(await pageLoad('unrecorded')).state()
+    // Nothing happens: a post made late would show within this time.
     await Bun.sleep(20)
     expect(posts).toEqual([])
   })
@@ -220,8 +223,9 @@ describe('a subscription the browser rotated', () => {
     subscription = fakeSubscription()
     answer = 401
     ;(await pageLoad('signed-out-1')).state()
-    await Bun.sleep(20)
+    await untilHolds(() => posts.length > 0 && sessionStorage.getItem('kay-push-refused') !== null)
     ;(await pageLoad('signed-out-2')).state()
+    // Nothing happens: a post made late would show within this time.
     await Bun.sleep(20)
     expect(posts).toHaveLength(1)
     expect(localStorage.getItem('kay-push-posted')).toBe('https://push.example/old')
@@ -235,9 +239,10 @@ describe('a subscription the browser rotated', () => {
     subscription = fakeSubscription()
     answer = 403
     ;(await pageLoad('other-user')).state()
-    await Bun.sleep(20)
+    await untilHolds(() => localStorage.getItem('kay-push-posted') === null)
     expect(localStorage.getItem('kay-push-posted')).toBeNull()
     ;(await pageLoad('other-user-again')).state()
+    // Nothing happens: a post made late would show within this time.
     await Bun.sleep(20)
     expect(posts).toHaveLength(1)
   })
@@ -247,8 +252,10 @@ describe('a subscription the browser rotated', () => {
     subscription = fakeSubscription()
     answer = 500
     ;(await pageLoad('failing-1')).state()
-    await Bun.sleep(20)
+    await untilHolds(() => posts.length > 0)
     ;(await pageLoad('failing-2')).state()
+    await untilHolds(() => posts.length > 1)
+    // Nothing more happens: a third post would show within this time.
     await Bun.sleep(20)
     expect(posts).toHaveLength(2)
     expect(localStorage.getItem('kay-push-posted')).toBe('https://push.example/old')
@@ -267,6 +274,7 @@ describe('a subscription the browser rotated', () => {
 
     try {
       ;(await pageLoad('blocked')).state()
+      // Nothing happens: a post made late would show within this time.
       await Bun.sleep(20)
       expect(posts).toEqual([])
       expect(await module.webPush.subscribe()).toBe('subscribed')
@@ -286,12 +294,12 @@ describe('a subscription the browser rotated', () => {
     const loaded = await pageLoad('unsubscribing')
 
     loaded.state()
-    await Bun.sleep(20)
+    await untilHolds(() => posts.length > 0)
     expect(posts).toHaveLength(1)
 
+    // The call counts itself before its first await, so the reconcile held by `release` is already stale.
     const done = loaded.unsubscribe()
 
-    await Bun.sleep(20)
     release.resolve()
     expect(await done).toBe(true)
     expect(localStorage.getItem('kay-push-posted')).toBeNull()
@@ -306,15 +314,16 @@ describe('a subscription the browser rotated', () => {
     const loaded = await pageLoad('racing')
 
     loaded.state()
-    await Bun.sleep(20)
+    await untilHolds(() => posts.length > 0)
     expect(posts).toHaveLength(1)
     subscription = null
 
+    // The call counts itself before its first await, so the reconcile held by `release` is already stale.
     const done = loaded.subscribe()
 
-    await Bun.sleep(20)
     release.resolve()
     expect(await done).toBe('subscribed')
+    // Nothing happens: the stale reconcile would record its endpoint once it finishes, within this time.
     await Bun.sleep(20)
     expect(localStorage.getItem('kay-push-posted')).toBe('https://push.example/abc')
   })
