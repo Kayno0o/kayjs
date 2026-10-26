@@ -524,6 +524,7 @@ describe.skipIf(chrome === undefined && (process.env.CI ?? '') === '')('presence
       Object.defineProperty(document, 'hidden', { configurable: true, get: () => true })
       document.dispatchEvent(new Event('visibilitychange'))
     })
+    // Nothing happens: a hidden tab that left would be gone once the grace has run out, three times over.
     await Bun.sleep(QUICK_GRACE_MS * 3)
     expect(await watching.text('p.names')).toBe('Ann')
   }, 30_000)
@@ -542,6 +543,7 @@ describe.skipIf(chrome === undefined && (process.env.CI ?? '') === '')('presence
     })
     await leaving.click('a.same')
     await leaving.waitUntil(() => location.search === '?as=Ann&n=2')
+    // Nothing happens: the member would drop out of the room once the grace has run out, if the swap had left it.
     await Bun.sleep(BROWSER_GRACE_MS + 400)
     expect(await watching.evaluate(() => (Reflect.get(window, 'seen') as string[]).filter(text => text !== 'Ann'))).toEqual([])
     expect(await watching.text('p.names')).toBe('Ann')
@@ -555,6 +557,7 @@ describe.skipIf(chrome === undefined && (process.env.CI ?? '') === '')('presence
   it('opens no connection for a page with no presence', async () => {
     await using page = await site.open('/plain')
 
+    // Nothing happens: a connection opened late would show within this time.
     await Bun.sleep(150)
     expect(await page.evaluate(() => performance.getEntriesByType('resource').filter(entry => entry.name.includes('/_kay/live')).length)).toBe(0)
   })

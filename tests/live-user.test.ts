@@ -27,6 +27,7 @@ const signedIn = new Elysia().derive({ as: 'global' }, ({ request }) => {
   return {}
 })
 
+// Nothing is expected to arrive within the wait, which is the check.
 async function quiet(feed: Feed): Promise<boolean> {
   const nothing = Symbol('nothing')
   const wait = async () => {

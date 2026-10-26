@@ -173,6 +173,7 @@ describe.skipIf(chrome === undefined && (process.env.CI ?? '') === '')('a collec
   it('opens no connection for a page reading a collection without live', async () => {
     await using page = await site.open('/quiet')
 
+    // Nothing happens: a connection opened late would show within this time.
     await Bun.sleep(300)
     expect(await page.evaluate(() => performance.getEntriesByType('resource').some(entry => entry.name.includes('/_kay/live')))).toBe(false)
   })

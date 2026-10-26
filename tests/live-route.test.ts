@@ -258,6 +258,7 @@ describe.skipIf(chrome === undefined && (process.env.CI ?? '') === '')('a resour
     await using page = await site.open('/resource-plain')
 
     await page.waitUntil(() => document.querySelector('p.answer')?.textContent?.endsWith('via ready') === true, { timeout: '5000ms' })
+    // Nothing happens: a connection or chunk requested late would show within this time.
     await Bun.sleep(300)
     expect(await page.evaluate(() => performance.getEntriesByType('resource').some(entry => entry.name.includes('live-cache') || entry.name.includes('/_kay/live')))).toBe(false)
   })

@@ -9,6 +9,7 @@ import { nameUser } from '../src/server/request-user'
 import { Feed, JSON_POST, pagesOf, proofsOf } from './live-helpers'
 import { scratchBuild } from './prerendered'
 import { pages } from './shared-pages'
+import { untilHolds } from './until-holds'
 
 const ROOT = 'tests/fixtures/live-island-user'
 const UNREAD = liveId('/app/src/live.ts', '/app', 'unread')
@@ -118,7 +119,8 @@ describe('a value of each user in a deferred island and on the error pages', () 
     expect(html).toContain('Broke')
     expect(html).toContain('3<!--]--> unread')
     expect(pagesOf(html)[0]!.sig).toMatch(/\|alice$/)
-    // The page was rendered again for the viewer, and the error reported once.
+    // The page was rendered again for the viewer, and the error reported once: waited for, then a short window for a second report to show.
+    await untilHolds(() => reported.some(error => error.includes('a hook failed')))
     await Bun.sleep(50)
     expect(reported.filter(error => error.includes('a hook failed'))).toHaveLength(1)
   })
