@@ -3,6 +3,7 @@ import { existsSync } from 'node:fs'
 import { rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import process from 'node:process'
+import { engines } from '../../package.json'
 import { DEPRECATION_MINORS, minorAfter, minorOf, UPGRADE_FROM } from '../compiler/lints'
 import { done, printFailure, projectRoot } from './command'
 import { USAGES } from './usages'
@@ -31,6 +32,7 @@ const SECTION_FLAGS: Record<string, string[]> = { devDependencies: ['--dev'], op
 const KAY_PACKAGE = '@kaynooo/kayjs'
 const SECTION_OPEN = /\s*:\s*\{/y
 const LOCKFILES = ['bun.lock', 'bun.lockb']
+const PRERELEASE = /[-+].*$/
 const SEMVER = /^\d+\.\d+\.\d+$/
 const REGEX_SPECIALS = /[.*+?^${}()|[\]\\]/g
 
@@ -59,6 +61,10 @@ export function registryDepsFor(bun: string): UpgradeDeps {
           return false
       }
 
+      // bun-plugin-tailwind's auto-installed `bun` peer stays at its old version in the lockfile and shadows the system Bun, which kay then refuses to run on.
+      if (await staleBun(root) && (await run([bun, 'update', 'bun'], root, false)).code !== 0)
+        console.error('kay upgrade: `bun update bun` failed; kay refuses to run on the old npm `bun` until it is updated')
+
       return true
     },
     kay: async (root, args, capture, env) => run([bun, join(root, 'node_modules/kay/src/cli.ts'), ...args], root, capture, env),
@@ -66,6 +72,26 @@ export function registryDepsFor(bun: string): UpgradeDeps {
 }
 
 const registryDeps = registryDepsFor(process.execPath)
+
+// Whether the project holds an npm `bun` older than the Bun the installed kay needs.
+async function staleBun(root: string): Promise<boolean> {
+  const installed = join(root, 'node_modules/bun/package.json')
+
+  if (!existsSync(installed))
+    return false
+
+  const { version } = (await Bun.file(installed).json()) as { version?: string }
+  let range = engines.bun
+
+  try {
+    range = ((await Bun.file(join(root, 'node_modules/kay/package.json')).json()) as { engines?: { bun?: string } }).engines?.bun ?? range
+  }
+  catch {
+    // No installed kay to read: the range of the kay running the upgrade stands.
+  }
+
+  return version !== undefined && !Bun.semver.satisfies(version.replace(PRERELEASE, ''), range)
+}
 
 // Moves kay and the kay libraries an app lists to their latest version, installs, then has that kay rewrite the old forms the minors crossed deprecated, one minor at a time, and report what is left to do by hand.
 export const upgrade: Command = {

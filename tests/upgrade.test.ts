@@ -667,6 +667,30 @@ describe('kay upgrade through the package manager', () => {
     }
   })
 
+  it('updates the npm `bun` an install left under the Bun the installed kay needs, and only then', async () => {
+    const stale = await stub('exit 0')
+    const fresh = await stub('exit 0')
+    const absent = await stub('exit 0')
+
+    try {
+      for (const [{ root }, version] of [[stale, '1.4.3'], [fresh, '1.4.4']] as const) {
+        await Bun.write(join(root, 'node_modules/bun/package.json'), JSON.stringify({ version }))
+      }
+
+      for (const { bun, root } of [stale, fresh, absent])
+        expect(await registryDepsFor(bun).install(root, [])).toBe(true)
+
+      expect(await stale.calls()).toEqual([['install'], ['update', 'bun']])
+      expect(await fresh.calls()).toEqual([['install']])
+      expect(await absent.calls()).toEqual([['install']])
+    }
+    finally {
+      await rm(stale.root, { recursive: true, force: true })
+      await rm(fresh.root, { recursive: true, force: true })
+      await rm(absent.root, { recursive: true, force: true })
+    }
+  })
+
   it('answers false when the install, or an add after it, fails', async () => {
     const failingInstall = await stub('[ "$1" = install ] && exit 1; exit 0')
     const failingAdd = await stub('[ "$1" = add ] && exit 1; exit 0')
