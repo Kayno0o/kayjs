@@ -119,6 +119,27 @@ describe('SidePanel with modal={false}', () => {
   })
 })
 
+describe('SidePanel with a closeHref and no onOpenChange', () => {
+  test('follows closeHref on Escape with no handler from the page', async () => {
+    const root = await panels()
+    const panel = root.querySelector<HTMLDialogElement>('#linked')!
+    const happy = window as unknown as { happyDOM: { setURL: (url: string) => void } }
+
+    happy.happyDOM.setURL('http://localhost/panels')
+    click(root.querySelector('#open-linked'))
+    await settle()
+
+    expect(panel.open).toBe(true)
+    expect(panel.querySelector('a.kui-icon-btn')?.getAttribute('href')).toBe('/list')
+
+    key(document.body, 'Escape')
+    await settle()
+
+    expect(panel.open).toBe(false)
+    await untilHolds(() => location.pathname === '/list')
+  })
+})
+
 describe('SidePanel with a dock', () => {
   const launcher = (root: Element) => root.querySelector<HTMLElement>('[data-part=launcher]')
 

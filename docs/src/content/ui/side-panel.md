@@ -37,3 +37,5 @@ The panel publishes its size on `html` as `--kui-dock-right` or `--kui-dock-bott
 `launcher` is the label of a button the closed panel leaves in the window's bottom right corner, off the dev tool's drawer, which opens it through `onOpenChange(true)`; `launcherLayer` sets its `z-index`, the one thing of it a parent sets, as the panel's `style` does not reach it. It names the panel it opens through `aria-controls`, the panel's `id`, and publishes its room as `--kay-panel-right`.
 
 `closeHref` makes the close button a link to that URL, so such a page closes it with no JavaScript too. With JavaScript the link navigates and `onOpenChange(false)` is called as well, so its handler need not navigate.
+
+With `closeHref`, `onOpenChange` is optional. Leave it out and a server page renders the panel with no island of its own: the link closes it, and Escape follows `closeHref` too.

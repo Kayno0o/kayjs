@@ -1,6 +1,6 @@
 ---
 import type { JSX, Snippet } from 'kay'
-import { effect, listen, onCleanup, recipe, signal } from 'kay'
+import { effect, listen, navigate, onCleanup, recipe, signal } from 'kay'
 import IconButton from './icon-button.kay'
 import { wording } from 'kay/words'
 
@@ -30,8 +30,6 @@ const { open, title, actions, footer, modal = true, closeHref, launcher, launche
   closeLabel?: string | undefined
   // `false` shows the panel beside the page instead of over it: the page under it stays interactive, a click outside leaves it open and only Escape or the close control closes it. It renders open on the server, so a page driven by the URL shows it with no JavaScript.
   modal?: boolean | undefined
-  // Makes the close control a link to this URL, for a panel open on the server whose close needs no JavaScript; the link navigates and `onOpenChange(false)` is called as well, so its handler need not navigate.
-  closeHref?: string | undefined
   // With `dock`, a closed panel leaves a button of this label in the window's bottom right corner that opens it through `onOpenChange(true)`, off the dev tool's drawer, and publishes the room it takes as `--kay-panel-right` for the dev tool's bar. Without it a closed panel leaves nothing.
   launcher?: string | undefined
   // Written after the component's own declarations, so it wins: a docked panel's `z-index` is set here. The launcher takes none of it, only `launcherLayer`.
@@ -45,15 +43,27 @@ const { open, title, actions, footer, modal = true, closeHref, launcher, launche
   // Called with the size the grip reached: `settled` is false while a drag is under way and true once it ends or a key moved it, so a parent keeps it then.
   onSizeChange?: ((size: number, settled: boolean) => unknown) | undefined
   resizeLabel?: string | undefined
+} & (
+  // Makes the close control a link to this URL, for a panel open on the server whose close needs no JavaScript; the link navigates and `onOpenChange(false)` is called as well, so its handler need not navigate. Without an `onOpenChange`, Escape follows it too, so a server page renders the panel with no island of its own.
+  | { closeHref: string, onOpenChange?: ((open: boolean) => unknown) | undefined }
   // Called with `false` however the panel closes, a click outside and Escape included. Closed by either of those or its close button, its content is still there to read; closed by the parent, it is already gone.
-  onOpenChange: (open: boolean) => unknown
-}>()
+  | { closeHref?: undefined, onOpenChange: (open: boolean) => unknown }
+)>()
 
 // A docked panel keeps the page this much of the window beside it, and itself at least its minimum.
 const DOCKS = { right: { min: 280, page: 352, step: 24, fallback: 384 }, bottom: { min: 160, page: 160, step: 24, fallback: 0 } }
 
 // The launcher's distance from the window's right edge, which what keeps off it counts too.
 const LAUNCHER_GAP = 16
+
+// A panel with a `closeHref` and no handler closes by going there: its link on a click, and Escape, which only closes the dialog, through `navigate`.
+const follows = closeHref !== undefined && onOpenChange === undefined
+function closed() {
+  if (follows && closeHref !== undefined)
+    navigate(closeHref)
+  else
+    onOpenChange?.(false)
+}
 
 const docked = () => !modal && dock !== undefined
 const room = signal({ width: 0, height: 0, right: 0, bottom: 0 })
@@ -278,7 +288,7 @@ listen(document, 'keydown', event => {
 })
 ---
 // Named by its title for screen readers. Every way of closing it ends in the dialog's `close` event, the close button included, so `onOpenChange` is the one place the parent learns of it.
-dialog(part="root" aria-label={title} {...rest} open={renderedOpen} data-modal={modal ? undefined : 'false'} data-dock={docked() ? dock : undefined} style={panelStyle()} ref={element => panel = element} closedby={modal ? 'any' : docked() ? 'none' : 'closerequest'} onClose={() => onOpenChange(false)})
+dialog(part="root" aria-label={title} {...rest} open={renderedOpen} data-modal={modal ? undefined : 'false'} data-dock={docked() ? dock : undefined} style={panelStyle()} ref={element => panel = element} closedby={modal ? 'any' : docked() ? 'none' : 'closerequest'} onClose={closed})
   if open
     if docked() && dock as edge
       div(part="grip" role="separator" tabindex="0" aria-label={resizeLabel} aria-orientation={edge === 'right' ? 'vertical' : 'horizontal'} aria-valuenow={shownSize()} aria-valuemin={limits(edge).min} aria-valuemax={Number.isFinite(limits(edge).max) ? limits(edge).max : undefined} data-dock={edge} onPointerDown={startResize} onKeyDown={resizeByKey})
@@ -286,11 +296,11 @@ dialog(part="root" aria-label={title} {...rest} open={renderedOpen} data-modal={
     header(part="head")
       h2(part="title") {title}
       | {actions}
-      IconButton(icon="close" label={closeLabel} variant="ghost" href={closeHref} onClick={() => panel?.close()})
+      IconButton(icon="close" label={closeLabel} variant="ghost" href={closeHref} onClick={() => follows || panel?.close()})
     div(part="body")
       slot
     if footer
       div(part="footer")
         | {footer}
 if docked() && !open && launcher
-  IconButton(part="launcher" icon="menu" label={launcher} variant="ghost" aria-controls={rest.id} style={launcherLayer === undefined ? undefined : `z-index: ${launcherLayer}`} ref={element => launching.set(element)} onClick={() => onOpenChange(true)})
+  IconButton(part="launcher" icon="menu" label={launcher} variant="ghost" aria-controls={rest.id} style={launcherLayer === undefined ? undefined : `z-index: ${launcherLayer}`} ref={element => launching.set(element)} onClick={() => onOpenChange?.(true)})

@@ -8,6 +8,7 @@ const { onClose, listWidthKey, onSettled } = props<{ onClose: () => void, listWi
 
 const open = signal(false)
 const beside = signal(false)
+const linked = signal(false)
 const sidebarOpen = signal(true)
 const detailOpen = signal(true)
 const dockOpen = signal(true)
@@ -19,6 +20,7 @@ button#open(onClick={() => open.set(true)}) Open
 button#open-beside(onClick={() => beside.set(true)}) Open beside
 button#open-sidebar(onClick={() => sidebarOpen.set(true)}) Sidebar
 button#toggle-detail(onClick={() => detailOpen.set(!detailOpen())}) Detail
+button#open-linked(onClick={() => linked.set(true)}) Open linked
 button#shut(onClick={() => open.set(false)}) Shut
 SidePanel#panel(open={open()} title="Mars" onOpenChange={() => { open.set(false); onClose() }})
   @actions
@@ -28,6 +30,8 @@ SidePanel#panel(open={open()} title="Mars" onOpenChange={() => { open.set(false)
   p#body Fourth planet
 SidePanel#beside(open={beside()} modal={false} closeHref="/list" title="Venus" onOpenChange={() => { beside.set(false); onClose() }})
   p#beside-body Second planet
+SidePanel#linked(open={linked()} modal={false} closeHref="/list" title="Earth")
+  p#linked-body Third planet
 SplitLayout#split(sidebarOpen={sidebarOpen()} onSidebarOpenChange={() => sidebarOpen.set(false)} sidebarTitle="Planets" resizableList listWidthKey={listWidthKey} detailOpen={detailOpen()})
   @sidebar
     nav Inner, outer

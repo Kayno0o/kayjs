@@ -17,6 +17,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 - `unbounded-string` stays quiet on a string field whose `enum`, `const` or anchored `pattern` with no `*`, `+` or `{n,}` already bounds its length: [Checks](checks.md).
 - An `api()` handler returning `null` answers the JSON `null`, which `response.json()` reads, where it answered an empty body: [API routes](api-routes.md).
 - kayjs-ai: an inline `Chat` shows a New conversation button with `newButton`, and `kai-chat-new` is documented as the way to clear one from outside: [Chat](../packages/ai/llms/chat.md).
+- kayjs-ui `SidePanel` takes no `onOpenChange` when it has a `closeHref`: Escape follows the link as its close button does, so a URL-driven panel in a server page needs no wrapper island and `persist` on a sibling island works: [Page layout](../packages/ui/llms/page-layout-palette-and-trees.md).
 - An island passes a `Blob` to an `s.File()` or `s.Files()` field, a `MediaRecorder` recording as it is, and `kay check` accepts it where it asked for a `File`; the handler still gets a `File`: [Files](files.md#files-posted-to-an-action).
 - `session()` no longer warns in production that a cookie with no store cannot be revoked when kayjs-auth uses it, which keeps its own record of each session and refuses a cookie whose session it ended: [Sessions](server.md).
 - `kay check` reports an `s.Public` field in a `.ts` file outside `src` (`public-env-outside-src`), where kay does not find it and an island reads it as a string: [Environment](environment.md).
