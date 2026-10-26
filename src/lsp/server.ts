@@ -100,7 +100,7 @@ const KAY_FILE = /^file:.*\.kay$/
 const UI_DOCUMENT = /^file:.*\/src\/ui\.ts$/
 // The module of an import or a re-export in a component's text, fence or template.
 const IMPORT_SOURCE = /\b(?:from|import)\s*['"]([^'"]+)['"]/g
-const SCRIPT_FILE = /\.[cm]?[jt]s$/
+const SCRIPT_FILE = /\.(?:[cm]?ts|tsx)$/
 const EXTENSION = /\.\w+$/
 const IMPORT_DECLARATION = /^\s*import\s/
 const TRAILING_SEMICOLON = /;$/

@@ -753,18 +753,26 @@ describe('kay lsp following the project on disk', () => {
     const route = 'src/routes/signup.kay'
     const missing = (diagnostics: Diagnostic[]) => diagnostics.filter(diagnostic => diagnostic.code === 'missing-captcha').length
 
-    await Bun.write(join(dir, route), '---\nexport const join = action(s.Object({ email: s.String() }), async (input) => auth.signInWithPassword(input))\n---\nh1 Join\n')
-    expect(missing(await editor.open(route))).toBe(1)
+    try {
+      await Bun.write(join(dir, route), '---\nexport const join = action(s.Object({ email: s.String() }), async (input) => auth.signInWithPassword(input))\n---\nh1 Join\n')
+      expect(missing(await editor.open(route))).toBe(1)
 
-    await Bun.write(join(dir, 'src/auth.ts'), 'export const auth = createAuth({ captcha: false })\n')
-    expect(missing(await editor.filesChanged(route, [{ path: 'src/auth.ts', type: 1 }]))).toBe(0)
+      await Bun.write(join(dir, 'src/auth.ts'), 'export const auth = createAuth({ captcha: false })\n')
+      expect(missing(await editor.filesChanged(route, [{ path: 'src/auth.ts', type: 1 }]))).toBe(0)
 
-    await Bun.write(join(dir, 'src/auth.ts'), 'export const auth = createAuth({})\n')
-    expect(missing(await editor.filesChanged(route, [{ path: 'src/auth.ts', type: 2 }]))).toBe(1)
+      await Bun.write(join(dir, 'src/auth.ts'), 'export const auth = createAuth({})\n')
+      expect(missing(await editor.filesChanged(route, [{ path: 'src/auth.ts', type: 2 }]))).toBe(1)
 
-    await rm(join(dir, 'src/auth.ts'))
-    await rm(join(dir, route))
-    await editor.filesChanged(route, [{ path: 'src/auth.ts', type: 3 }, { path: route, type: 3 }])
+      await Bun.write(join(dir, 'src/auth.ts'), 'export const auth = createAuth({ captcha: false })\n')
+      expect(missing(await editor.filesChanged(route, [{ path: 'src/auth.ts', type: 2 }]))).toBe(0)
+
+      await rm(join(dir, 'src/auth.ts'))
+      expect(missing(await editor.filesChanged(route, [{ path: 'src/auth.ts', type: 3 }]))).toBe(1)
+    }
+    finally {
+      await Promise.all([rm(join(dir, 'src/auth.ts'), { force: true }), rm(join(dir, route), { force: true })])
+      await editor.filesChanged(route, [{ path: 'src/auth.ts', type: 3 }, { path: route, type: 3 }])
+    }
   })
 
   it('sees a component created or deleted on disk, on save or from the file watcher', async () => {
