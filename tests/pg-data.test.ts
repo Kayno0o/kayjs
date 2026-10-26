@@ -14,6 +14,7 @@ import { createDataTables, dataTables, pgData as openPgData, pgHandle } from '..
 import { createMissingIndexes, indexStatement, pgJobs } from '../src/server/pg-jobs'
 import { pgRooms } from '../src/server/pg-rooms'
 import { pgRates, pgSessions, pgVitals } from '../src/server/pg-stores'
+import { turn } from './helpers/eventually'
 import { cleanUpAfterFile, pgDescribe, pgIt, postgres, replicas } from './job-stores'
 import { scratchDir } from './scratch'
 
@@ -49,11 +50,26 @@ async function fresh(): Promise<SQL> {
 }
 
 // Closes the stores and waits for their last writes, which would otherwise land on the next case's tables.
-async function closed(...stores: { close: () => void }[]): Promise<void> {
-  for (const store of stores)
-    store.close()
+async function closed(...stores: { close: () => unknown }[]): Promise<void> {
+  await Promise.all(stores.map(async store => store.close()))
+}
 
-  await Bun.sleep(100)
+// A handle counting how often a store asked it for the database, which a poller only does when a poll starts.
+function counting(handle: PgHandle): { handle: PgHandle, polls: () => number } {
+  let count = 0
+
+  return { handle: { ...handle, db: async () => {
+    count++
+
+    return handle.db()
+  } }, polls: () => count }
+}
+
+// Waits for two more polls: the first may have begun before what the case did, and the second only starts once the first ended, so the case's change was read by then.
+async function polledTwice(polls: () => number): Promise<void> {
+  const target = polls() + 2
+
+  await waitFor(() => polls() >= target, 'the replica to poll twice more', 15_000)
 }
 
 // Handles on separate connections, as replicas of an app have.
@@ -198,6 +214,7 @@ pgDescribe('pgData', () => {
       return 'done'
     }
     const timeout = async (): Promise<string> => {
+      // The deadline of the race: the second build answers at once unless it waits on the first, which is held.
       await Bun.sleep(3000)
 
       return 'waited on the first build'
@@ -253,6 +270,7 @@ pgDescribe('pgData', () => {
 
     try {
       await waitFor(building, 'the first build')
+      // Nothing happens: the adds stay held for as long as the first build runs, which is until the snapshot is released.
       await Bun.sleep(1500)
       expect(added).toBe(0)
     }
@@ -285,6 +303,7 @@ pgDescribe('pgData', () => {
     })()
 
     try {
+      // Nothing happens: the replica waits on the lock for as long as it is held.
       await Bun.sleep(1000)
       expect(done).toBe(false)
     }
@@ -476,7 +495,7 @@ pgDescribe('pgRates', () => {
     expect((await rates.peek!('ada'))?.count).toBe(7)
     expect((await rates.peek!('bob'))).toBeUndefined()
     expect((await rates.hit('ada', '300ms')).resetAt).toBe(first.resetAt)
-    await Bun.sleep(350)
+    await waitFor(async () => await rates.peek!('ada') === undefined, 'the window to close')
     expect(await rates.peek!('ada')).toBeUndefined()
     expect((await rates.hit('ada', '300ms')).count).toBe(1)
   })
@@ -616,8 +635,9 @@ pgDescribe('pgCache', () => {
     await fresh()
 
     const [first, second] = handles(2)
+    const counter = counting(second!)
     const sender = await boot('bus-a', first!)
-    const receiver = await boot('bus-b', second!)
+    const receiver = await boot('bus-b', counter.handle)
     const heard: string[] = []
 
     const probe = '{"keys":[]}'
@@ -634,15 +654,17 @@ pgDescribe('pgCache', () => {
     await sender.store.publish!('{"keys":["a"]}')
     await waitFor(() => heard.length === 1, 'the message')
     expect(heard).toEqual(['{"keys":["a"]}'])
-    await Bun.sleep(700)
+    // Nothing happens: the message is not heard again by the polls after it.
+    await polledTwice(counter.polls)
     expect(heard).toHaveLength(1)
   })
 
   pgIt('tells another process the invalidations in the order they were made when their ids gain a digit', async () => {
     const sql = await fresh()
     const [first, second] = handles(2)
+    const counter = counting(second!)
     const sender = await boot('bus-a', first!)
-    const receiver = await boot('bus-b', second!)
+    const receiver = await boot('bus-b', counter.handle)
     const heard: string[] = []
     let polling = false
 
@@ -661,7 +683,7 @@ pgDescribe('pgCache', () => {
       await sender.store.publish!(message)
 
     await waitFor(() => heard.length === messages.length, 'every message')
-    await Bun.sleep(150)
+    await polledTwice(counter.polls)
     expect(heard).toEqual(messages)
   })
 })
@@ -762,13 +784,16 @@ pgDescribe('pgRooms', () => {
 
   pgIt('delivers messages in the order they were published when their ids gain a digit', async () => {
     const sql = await fresh()
-    const [first, second] = handles(2).map(handle => pgRooms(handle, { poll: '20ms' }))
+    const [firstHandle, secondHandle] = handles(2)
+    const counter = counting(secondHandle!)
+    const first = pgRooms(firstHandle!, { poll: '20ms' })
+    const second = pgRooms(counter.handle, { poll: '20ms' })
     const heard: string[] = []
     let polling = false
 
-    second!.subscribe((_room, text) => text === 'probe' ? void (polling = true) : heard.push(text))
+    second.subscribe((_room, text) => text === 'probe' ? void (polling = true) : heard.push(text))
     await waitFor(() => {
-      first!.publish('lobby', 'probe', {})
+      first.publish('lobby', 'probe', {})
 
       return polling
     }, 'the other poller to run')
@@ -779,12 +804,12 @@ pgDescribe('pgRooms', () => {
     const texts = Array.from({ length: 30 }, (_, at) => `m${at}`)
 
     for (const text of texts)
-      first!.publish('lobby', text, {})
+      first.publish('lobby', text, {})
 
     await waitFor(() => heard.length === texts.length, 'every message')
-    await Bun.sleep(150)
+    await polledTwice(counter.polls)
     expect(heard).toEqual(texts)
-    await closed(first!, second!)
+    await closed(first, second)
   })
 
   pgIt('keeps a room state across replicas, two replicas updating one room at once losing nothing', async () => {
@@ -838,17 +863,19 @@ pgDescribe('pgRooms', () => {
     live.join(ada, 'lobby')
     await live.update('lobby', () => ({ count: 3 }))
 
+    const locked = Promise.withResolvers<void>()
     // Held for longer than the 5 s the leaving one waits for the lock.
     const holder = (async () => {
       const db = await other!.db()
 
       await db.begin(async (tx) => {
         await tx.unsafe('SELECT pg_advisory_xact_lock(hashtextextended($1, 0))', ['kay_room_state\nlobby'])
+        locked.resolve()
         await Bun.sleep(5_500)
       })
     })()
 
-    await Bun.sleep(300)
+    await locked.promise
     live.leave(ada)
     await holder
     await waitFor(async () => (await rows(sql, 'SELECT 1 FROM kay_room_state')).length === 0, 'the state to go', 8000)
@@ -868,7 +895,7 @@ pgDescribe('pgRooms', () => {
     live.leave(ada)
     // The store answers in the order asked: once this state is read, the one read for the first join is too, and its snapshot had its turn.
     await live.state('lobby')
-    await Bun.sleep(0)
+    await turn()
     expect(received).toEqual([])
     live.join(ada, 'lobby')
     await waitFor(() => received.length === 1, 'the snapshot')
@@ -879,6 +906,7 @@ pgDescribe('pgRooms', () => {
     send('lobby')
     send('lobby')
     await waitFor(() => received.length === 2, 'the coalesced snapshot')
+    // Nothing happens: the two calls coalesced into one snapshot, and a second would follow within the wait.
     await Bun.sleep(100)
     expect(received).toEqual(['snap0', 'now4'])
     store.close()
