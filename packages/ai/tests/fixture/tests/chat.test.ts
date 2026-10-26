@@ -250,6 +250,40 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the Chat i
     expect(await slow.count('.kai-chat-turn[data-role="user"]')).toBe(1)
   })
 
+  test('a kai-chat-send event sends its text as the next message, keeping the draft, and is ignored for blank text and while a reply is under way', async () => {
+    const send = (page: Awaited<ReturnType<typeof site.open>>, detail: unknown) => page.evaluate((detail) => {
+      document.querySelector('.kai-chat')!.dispatchEvent(new CustomEvent('kai-chat-send', { detail }))
+    }, detail)
+    const page = await site.open('/assistant')
+
+    await page.fill('textarea', 'Typing')
+    await send(page, '   ')
+    await send(page, 42)
+    expect(await page.count('.kai-chat-turn')).toBe(0)
+
+    await send(page, ' Spoken words ')
+    await page.waitFor('.kai-chat-turn[data-role="assistant"]')
+    await page.waitFor('[data-pending]', { gone: true })
+
+    expect(await page.text('.kai-chat-turn[data-role="user"]')).toBe('Spoken words')
+    expect(await page.value('textarea')).toBe('Typing')
+    expect(fakeAi.asked.length).toBe(1)
+
+    const slow = await site.open('/slow-assistant')
+
+    await slow.fill('textarea', 'Go')
+    await slow.press('Enter')
+    await slow.waitFor('[data-pending] .kai-chat-text', { text: 'Working' })
+    await slow.fill('textarea', 'Second')
+    await send(slow, 'Ignored')
+
+    expect(await slow.count('.kai-chat-turn[data-role="user"]')).toBe(1)
+    expect(await slow.value('textarea')).toBe('Second')
+
+    await slow.press('Escape')
+    await slow.waitFor('[data-pending]', { gone: true })
+  })
+
   test('Shift+Enter breaks the line and Enter sends the whole text', async () => {
     const page = await site.open('/assistant')
 

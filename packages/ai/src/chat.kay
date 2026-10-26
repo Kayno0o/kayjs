@@ -357,6 +357,14 @@ async function send(again = false, question?: string) {
   }
 }
 
+// Text from outside the field, such as a voice transcript, is sent as a suggestion is: the draft stays, and a reply under way or blank text ignores it.
+function sendFrom(event: Event) {
+  const text = (event as CustomEvent<unknown>).detail
+
+  if (typeof text === 'string' && text.trim() !== '')
+    void send(false, text.trim())
+}
+
 // Starts the conversation over: what is under way stops, and the log, the field and the kept history are cleared.
 function reset() {
   stop()
@@ -466,7 +474,7 @@ function scrolled() {
   lastTop = top
 }
 ---
-section(part="root" onKeyDown={escape} data-empty={history().length === 0 && !busy()} data-variant={variant} data-tone={tone} data-size={size} ref={element => element.addEventListener('kai-chat-new', reset)})
+section(part="root" onKeyDown={escape} data-empty={history().length === 0 && !busy()} data-variant={variant} data-tone={tone} data-size={size} ref={element => { element.addEventListener('kai-chat-new', reset); element.addEventListener('kai-chat-send', sendFrom) }})
   if history().length === 0 && !busy()
     div(part="empty")
       p(part="greeting") {greeting}
