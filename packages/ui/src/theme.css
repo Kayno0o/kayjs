@@ -621,7 +621,7 @@
   }
 
   /* Leaflet lays the map out; only the rules it needs from its own stylesheet are here, so the app imports none, and its controls, tooltips, popups and attribution take the skin's colours. */
-  .kui-map-canvas {
+  .kui-map-view-canvas {
     height: var(--map-height, 24rem);
     outline-offset: 1px;
     background: var(--color-surface);
@@ -683,28 +683,28 @@
     }
 
     /* The drawing takes the accent, which an SVG attribute Leaflet writes yields to. */
-    & :where(.kui-map-line) {
+    & :where(.kui-map-view-line) {
       stroke: var(--color-accent);
       stroke-opacity: 0.85;
     }
-    & :where(.kui-map-marker) {
+    & :where(.kui-map-view-marker) {
       stroke: var(--color-accent);
       fill: var(--color-accent);
       fill-opacity: 1;
     }
-    /* A dark casing under the accent, so the picked part stands out on light and dark tiles alike. */
-    & :where(.kui-map-casing) {
-      stroke: black;
+    /* A dark casing under the accent, so the picked part stands out on tiles that are light in either scheme; --map-casing sets its colour. */
+    & :where(.kui-map-view-casing) {
+      stroke: var(--map-casing, black);
       stroke-opacity: 0.5;
       fill: none;
     }
-    & :where(.kui-map-pick) {
+    & :where(.kui-map-view-pick) {
       stroke: var(--color-accent);
       fill: none;
       stroke-opacity: 1;
     }
-    & :where(.kui-map-pick-dot) {
-      stroke: black;
+    & :where(.kui-map-view-pick-dot) {
+      stroke: var(--map-casing, black);
       stroke-opacity: 0.6;
       fill: var(--color-accent);
       fill-opacity: 1;

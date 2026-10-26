@@ -38,7 +38,7 @@ async function box(page: { evaluate: <Args extends unknown[], Result>(run: (...a
 }
 
 inBrowser('chart and media recipes in the browser', () => {
-  test('Map lays Leaflet out inside its frame, draws the route in the accent and styles the controls and the attribution from the skin', async () => {
+  test('MapView lays Leaflet out inside its frame, draws the route in the accent and styles the controls and the attribution from the skin', async () => {
     const site = await shared()
 
     await using page = await site.open('/chart-media', { width: 1000 })
@@ -48,7 +48,7 @@ inBrowser('chart and media recipes in the browser', () => {
     expect(await box(page, '#map .leaflet-container')).toEqual(await box(page, '#map [data-part=canvas]'))
     expect(await looks(page, '#map .leaflet-map-pane', ['position'])).toEqual({ position: 'absolute' })
 
-    const line = await looks(page, '#map path.kui-map-line', ['stroke'])
+    const line = await looks(page, '#map path.kui-map-view-line', ['stroke'])
 
     expect(line.stroke).not.toBe('')
     expect(line.stroke).not.toBe('rgb(51, 136, 255)')

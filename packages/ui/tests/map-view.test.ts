@@ -1,5 +1,5 @@
 import { expect, test } from 'bun:test'
-import { drawnPoints, OSM_ATTRIBUTION, OSM_TILES, validPoint } from '../src/map'
+import { drawnPoints, OSM_ATTRIBUTION, OSM_TILES, validPoint } from '../src/map-view'
 
 test('draws every point of the lines and the markers, which the map fits into view', () => {
   expect(drawnPoints([[[1, 2], [3, 4]], [[5, 6]]], [{ at: [7, 8] }, { at: [9, 10], label: 'End' }])).toEqual([[1, 2], [3, 4], [5, 6], [7, 8], [9, 10]])

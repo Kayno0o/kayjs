@@ -23,13 +23,13 @@
   - `onSelect(point)` makes each dot a button, from an island; `emptyLabel` is what it reads with no points.
 - `ContributionGraph(days={days} color="var(--color-accent)" today={today} months)`: a grid of weeks, each day's cell shaded towards `color` by its `intensity` from 0 to 1, with `description` as hover text before the date, which screen readers read too, or how full the day was (`50% · 2026-09-01`) without one. The grid is a group named by `label`, one tab stop on today's cell: up and down step a day, left and right a week, Home and End reach the ends, and each focused cell shows its tooltip. `days` starts on a Monday: map the dates `gridDays(weeks)` from `@kaynooo/utils/date` lists to `{ day, intensity }`, typed `ContributionDay`; `today` marks its cell, and `months` names each month over the week it starts in. It is static.
 
-### Map
+### MapView
 
-- `Map(label="Route" lines={[path]} markers={[{ at: [48.85, 2.35], label: "Start" }]} highlight={picked()})`, drawn by Leaflet, a peer the app installs to use it: `bun add leaflet @types/leaflet`. It loads once the island mounts, so a page without a map downloads none of it; the server renders the frame and the list screen readers read.
-  - `lines` are paths of `[latitude, longitude]` points, `markers` are `{ at, label, popup }`: a `label` shows on hover and is listed for screen readers, a `popup` opens on a click as plain text. A point that is no place (`NaN`, past 90 or 180 degrees) is left out. The map fits what it draws, with `center` and `zoom` while there is nothing (the world by default).
+- `MapView(label="Route" lines={[path]} markers={[{ at: [48.85, 2.35], label: "Start" }]} highlight={picked()})`, drawn by Leaflet, a peer the app installs to use it: `bun add leaflet`. It loads once the island mounts, so a page without a map downloads none of it; the server renders the frame and the list screen readers read.
+  - `lines` are paths of `[latitude, longitude]` points, `markers` are `{ at, label, popup }`: a `label` shows on hover and is listed for screen readers, a `popup` opens on a click as plain text, and is read in the list too. A point that is no place (`NaN`, past 90 or 180 degrees) is left out. The map fits what it draws, with `center` and `zoom` while there is nothing (the world by default).
   - `highlight` is a path drawn over the lines on a dark casing and brought into view (one point is a dot), such as the entry picked in a timeline; unset, the map fits everything again. It follows the value given, so `highlight={picked()}` from a signal moves it.
-  - `tiles` and `attribution` are OpenStreetMap's by default, `maxZoom` 19, all read when the map mounts. kay's default `img-src` admits any https tile host, so the app sets no `security.csp`; one that narrows `img-src` lists its tile host.
-  - The controls, tooltips, popups and attribution follow the skin in light and dark and the lines take `--color-accent`; `--map-height` sets the height (24rem). `label` names the region for screen readers. Parts: `root`, `canvas`, `surface`, `list` and `item`.
+  - `tiles` and `attribution` are OpenStreetMap's by default, `maxZoom` 19, all followed when they change. kay's default `img-src` admits any https tile host, so the app sets no `security.csp`; one that narrows `img-src` lists its tile host.
+  - The controls, tooltips, popups and attribution follow the skin in light and dark and the lines take `--color-accent`; `--map-height` sets the height (24rem) and `--map-casing` the colour under a highlight (black). `label` names the region for screen readers. Parts: `root`, `canvas`, `surface`, `list` and `item`.
 
 ### Drag and drop: Sortable, Board, DropTargets
 

@@ -6,7 +6,7 @@ import { mountComponent } from 'kay/test'
 // What a component leaves to the browser to draw, which the server HTML cannot hold.
 const BROWSER_DRAWN: Record<string, string | undefined> = {
   'line-chart': '.kui-line-chart-plot',
-  'map': '.kui-map-canvas',
+  'map-view': '.kui-map-view-canvas',
   // The bar's buttons load in a chunk of their own once the editor is on the page, the server holding the empty bar they fill.
   'markdown-editor': '.kui-markdown-bar',
 }

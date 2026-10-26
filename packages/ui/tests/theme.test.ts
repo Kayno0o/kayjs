@@ -55,7 +55,7 @@ const tokens = new Set([...theme.matchAll(DEFINED_TOKEN)].map(([, token]) => tok
 const classes = new Set([...theme.matchAll(DEFINED_CLASS)].map(([, name = '']) => name))
 
 // Classes a component writes that no rule of the theme selects any more: rule-free names for an app's CSS and skins.
-const HOOKS = new Set(['kui-menu', 'kui-map', 'kui-toaster', 'kui-tooltip', 'kui-card', 'kui-card-row', 'kui-widget', 'kui-notice', 'kui-avatar', 'kui-checkbox', 'kui-radio-group', 'kui-chip', 'kui-chip-group', 'kui-copy-btn', 'kui-empty-state', 'kui-file-drop', 'kui-meter', 'kui-progress', 'kui-skeleton', 'kui-page-header', 'kui-page-section', 'kui-date-input', 'kui-date-range-input', 'kui-segmented', 'kui-slider', 'kui-color-input', 'kui-combobox', 'kui-rating', 'kui-toggle', 'kui-contact-form', 'kui-contact-consent', 'kui-contact-privacy', 'kui-timeline'])
+const HOOKS = new Set(['kui-menu', 'kui-map-view', 'kui-toaster', 'kui-tooltip', 'kui-card', 'kui-card-row', 'kui-widget', 'kui-notice', 'kui-avatar', 'kui-checkbox', 'kui-radio-group', 'kui-chip', 'kui-chip-group', 'kui-copy-btn', 'kui-empty-state', 'kui-file-drop', 'kui-meter', 'kui-progress', 'kui-skeleton', 'kui-page-header', 'kui-page-section', 'kui-date-input', 'kui-date-range-input', 'kui-segmented', 'kui-slider', 'kui-color-input', 'kui-combobox', 'kui-rating', 'kui-toggle', 'kui-contact-form', 'kui-contact-consent', 'kui-contact-privacy', 'kui-timeline'])
 
 // The source of a component of the library.
 const sourceOf = (name: string): string => components.find(component => component.path === `src/${name}.kay`)!.source
@@ -68,7 +68,7 @@ for (const path of ['table', 'tabs', 'tab-nav', 'breadcrumb', 'pagination', 'ste
   RECIPE_COMPONENTS.add(`src/${path}.kay`)
 
 // Charts and media (slice 6).
-for (const path of ['bar-list', 'bar-chart', 'scatter-chart', 'contribution-graph', 'line-chart', 'carousel', 'media-gallery', 'image-cropper', 'zoom-pane', 'masonry', 'qr-code', 'site-favicon', 'map'])
+for (const path of ['bar-list', 'bar-chart', 'scatter-chart', 'contribution-graph', 'line-chart', 'carousel', 'media-gallery', 'image-cropper', 'zoom-pane', 'masonry', 'qr-code', 'site-favicon', 'map-view'])
   RECIPE_COMPONENTS.add(`src/${path}.kay`)
 
 // Every class a component writes: the `.class` shorthand, plain `class` attributes, and the names a `class` expression holds.

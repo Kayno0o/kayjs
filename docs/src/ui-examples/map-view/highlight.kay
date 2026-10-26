@@ -1,5 +1,5 @@
 ---
-import MapView from '@kaynooo/kayjs-ui/map.kay'
+import MapView from '@kaynooo/kayjs-ui/map-view.kay'
 
 const legs = {
   Louvre: [[48.8606, 2.3376], [48.8530, 2.3499]],

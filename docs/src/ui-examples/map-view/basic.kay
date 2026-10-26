@@ -1,5 +1,5 @@
 ---
-import MapView from '@kaynooo/kayjs-ui/map.kay'
+import MapView from '@kaynooo/kayjs-ui/map-view.kay'
 
 const route = [[48.8584, 2.2945], [48.8606, 2.3376], [48.8530, 2.3499], [48.8462, 2.3372]]
 ---
