@@ -432,7 +432,10 @@ function watch(element: HTMLElement) {
     return
 
   const observer = new ResizeObserver(() => {
-    if (pinned)
+    // A hidden log is scrolled anew once shown, so a scroll then is not read against where it stood before.
+    if (element.clientHeight === 0)
+      lastTop = 0
+    else if (pinned)
       follow()
   })
 
