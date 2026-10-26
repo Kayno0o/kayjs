@@ -4110,6 +4110,8 @@ describe.concurrent('kay check, unused code', () => {
       await Bun.write(join(root, 'src/b.kay'), 'img(src="/b.png" width="1" height="1")\n')
       expect(await watch.report()).toMatchObject({ errors: 1 })
       await Bun.write(join(root, 'src/b.kay'), 'p b\n')
+      expect(await watch.report()).toMatchObject({ errors: 0 })
+      // A change of its own, as the write and the removal can come as two, each checked and reported: the config edit's report would then be the removal's.
       await rm(join(root, 'src/b.kay'))
       expect(await watch.report()).toMatchObject({ errors: 0 })
       await Bun.write(join(root, 'kay.config.ts'), `${config}// changed\n`)
