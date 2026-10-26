@@ -175,7 +175,7 @@ it('shows why a todo was refused', async () => {
 - `{ from: '/orgs/acme' }` names the page a call is made on, for an action reading its params.
 - `site.call` resolves with the action's result, throws `ActionError` when it fails and `ActionRedirectError` with `location` when it redirects, the path under the site's `base` when it has one.
 - A handler returning an async iterable gives every value once its stream ended, `[1, 2, 3]`, and throws when the stream failed.
-- `site.refusal(action, input)` makes the same call expecting it refused: it resolves with the `ActionError`, `data` typed from the handler, and fails the test when the call went through.
+- `site.refusal(action, input)` makes the same call expecting it refused: it resolves with the `ActionError`, `data` typed from the handler and `message` the `ctx.fail` text or the schema's messages, and fails the test when the call went through.
 - `await site.refusal(add, { title: '' })` reads `{ status: 422, errors: { title: 'Write a title' } }`.
 - `site.mcp.tools()` lists the tools of an app with `mcp: true`, each `{ name, description, inputSchema }`, and `site.mcp.call('add_note', { title: 'Milk' })` calls one as an agent does, through the cookies of the site so far and the `headers` given, `{ headers: { authorization: 'Bearer token' } }`: it resolves with `{ isError, text, data, status }`, `isError` set when the app refused the call, `data` the answer when it is an object, `status` 401 when a guard asks for a sign-in; a protocol error, such as an unknown tool, throws.
 

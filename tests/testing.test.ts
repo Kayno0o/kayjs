@@ -187,7 +187,8 @@ describe('kay/test', () => {
   })
 
   it('reads back a call expected to be refused, and fails one that went through', async () => {
-    const { promote, demote } = await import(join(import.meta.dir, 'fixtures/site/src/routes/admin/index.kay')) as {
+    const { promote, demote, refuseText } = await import(join(import.meta.dir, 'fixtures/site/src/routes/admin/index.kay')) as {
+      refuseText: ServerAction<Named, Failure<string>>
       promote: Action<{ name: string }, string>
       demote: ServerAction<Named, Failure<{ error: string }> | undefined>
     }
@@ -198,6 +199,7 @@ describe('kay/test', () => {
     expect(reason).toBe('ada stays an admin')
     expect(await site.refusal(add, { title: '' })).toMatchObject({ status: 422, errors: { title: 'Write a title' }, data: undefined, message: 'Write a title' })
     expect(refused.message).toBe(`Action failed with 422: ${refused.body}`)
+    expect(await site.refusal(refuseText, { name: 'ada' }, { headers: { 'x-user': 'ada' } })).toMatchObject({ status: 502, message: 'whisper answered 500' })
     // @ts-expect-error: the handler fails with `error` alone.
     expect(refused.data?.message).toBeUndefined()
     await expect(site.refusal(demote, { name: 'bob' }, { headers: { 'x-user': 'ada' } })).rejects.toThrow('went through, where a refusal was expected')
