@@ -134,6 +134,8 @@ const busy = () => waiting() || streaming() !== undefined
 let run: AbortController | undefined
 // The id the reply under way was sent under, for a Chat that remembers: what a reload resumes and a Stop ends.
 let replying: string | undefined
+// The reply under way said it outlives its request, so its Stop is told to the server.
+let outlives = false
 // The reply under way is one asked for again after a reload, so an empty one means the server kept nothing.
 let resumed = false
 let field: HTMLTextAreaElement | undefined
@@ -165,6 +167,9 @@ function show(value: string | Progress) {
 
     return
   }
+
+  if (value.outlives === true)
+    outlives = true
 
   partial.set(value.text)
   calls.set(value.calls)
@@ -380,6 +385,7 @@ async function send(again = false, question?: string, resuming?: string) {
 
   run = mine
   replying = id
+  outlives = false
   resumed = resuming !== undefined
   pinned = true
   failure.set(undefined)
@@ -500,7 +506,8 @@ function stop() {
   const stream = streaming()
   const id = replying
 
-  if (id !== undefined && busy()) {
+  // A reply that showed nothing yet is ended too, as it may outlive: only one that streamed without saying so is left alone.
+  if (id !== undefined && busy() && (outlives || (partial() === '' && calls().length === 0))) {
     if (remember !== undefined)
       keepPending(remember, undefined)
 

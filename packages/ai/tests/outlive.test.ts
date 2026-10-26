@@ -1,5 +1,6 @@
 import type { AskOptions, Provider } from '../src'
 import { afterEach, describe, expect, it } from 'bun:test'
+import { nameUser } from 'kay/library'
 import { answeringRequest } from '../../../src/server/log'
 import { ask, fakeAi } from '../src'
 import { forgetKept } from '../src/kept'
@@ -40,12 +41,23 @@ function gated() {
 }
 
 // An ask made while answering a request the test can abort, as an action's handler makes it.
-async function answering(options: AskOptions, headers: Record<string, string> = {}) {
+async function answering(options: AskOptions, headers: Record<string, string> = {}, where: { path?: string, visitor?: string } = {}) {
   const controller = new AbortController()
-  const request = new Request('http://localhost/chat', { headers, signal: controller.signal })
+  const request = new Request(`http://localhost${where.path ?? '/chat'}`, { headers, signal: controller.signal })
+
+  if (where.visitor !== undefined)
+    nameUser(request, () => where.visitor)
+
   const { reply } = await answeringRequest(request, async () => ({ reply: ask('x', options) }))
 
   return { reply, leave: () => controller.abort() }
+}
+
+// An action asking twice, as one that moderates a message before it answers does.
+async function answeringTwice(first: AskOptions, second: AskOptions, headers: Record<string, string>) {
+  const request = new Request('http://localhost/chat', { headers })
+
+  return answeringRequest(request, async () => ({ first: ask('a', first), second: ask('b', second) }))
 }
 
 async function readers(reply: AsyncIterable<string>): Promise<{ seen: string[], ended: Promise<void> }> {
@@ -211,5 +223,100 @@ describe('resuming a reply by the header a Chat sends', () => {
     model.release()
 
     expect(await reply).toBe('one two')
+  })
+
+  it('keeps the replies of two asks in one action apart, so a resume and a stop reach the right one', async () => {
+    const one = gated()
+    const two = gated()
+    const started = await answeringTwice({ provider: one.provider, outlive: true }, { provider: two.provider, outlive: true }, { 'x-kai-reply': `start:${id}` })
+
+    await Promise.all([readers(started.first), readers(started.second)])
+
+    const again = await answeringTwice({ provider: one.provider, outlive: true }, { provider: two.provider, outlive: true }, { 'x-kai-reply': `resume:${id}` })
+
+    one.release()
+    two.release()
+
+    expect(await again.first).toBe('one two')
+    expect(await again.second).toBe('one two')
+    expect(one.state.asked).toBe(1)
+    expect(two.state.asked).toBe(1)
+
+    const stopping = await answeringTwice({ provider: one.provider }, { provider: two.provider }, { 'x-kai-reply': `stop:${id}` })
+
+    expect([await stopping.first, await stopping.second]).toEqual(['', ''])
+  })
+
+  it('stops only the ask a stop is for, as each ask has its own key', async () => {
+    const one = gated()
+    const two = gated()
+    const started = await answeringTwice({ provider: one.provider, outlive: true }, { provider: two.provider, outlive: true }, { 'x-kai-reply': `start:${id}` })
+
+    await Promise.all([readers(started.first), readers(started.second)])
+    // Only the first ask of the stopping request is made, so only the first reply is stopped.
+    await (await answering({ provider: one.provider }, { 'x-kai-reply': `stop:${id}` })).reply
+    await untilHolds(() => one.state.aborted)
+    two.release()
+
+    expect(await started.second).toBe('one two')
+    expect(one.state.aborted).toBe(true)
+    expect(two.state.aborted).toBe(false)
+  })
+
+  it('gives the empty reply to an id replayed against another action or by another visitor, and does not let them stop it', async () => {
+    const model = gated()
+    const first = await answering({ provider: model.provider, outlive: true }, { 'x-kai-reply': `start:${id}` }, { path: '/_kay/action/a', visitor: 'ann' })
+
+    await readers(first.reply)
+    first.leave()
+
+    for (const where of [{ path: '/_kay/action/b', visitor: 'ann' }, { path: '/_kay/action/a', visitor: 'bob' }]) {
+      expect(await (await answering({ provider: model.provider }, { 'x-kai-reply': `resume:${id}` }, where)).reply).toBe('')
+      await (await answering({ provider: model.provider }, { 'x-kai-reply': `stop:${id}` }, where)).reply
+    }
+
+    await Bun.sleep(20)
+    expect(model.state.aborted).toBe(false)
+    model.release()
+
+    const own = await answering({ provider: model.provider }, { 'x-kai-reply': `resume:${id}` }, { path: '/_kay/action/a', visitor: 'ann' })
+
+    expect(await own.reply).toBe('one two')
+  })
+
+  it('stops by its owner only when the stop came first', async () => {
+    const model = gated()
+
+    await (await answering({ provider: model.provider }, { 'x-kai-reply': `stop:${id}` }, { visitor: 'bob' })).reply
+
+    const first = await answering({ provider: model.provider, outlive: true }, { 'x-kai-reply': `start:${id}` }, { visitor: 'ann' })
+
+    await readers(first.reply)
+    model.release()
+
+    expect(await first.reply).toBe('one two')
+  })
+
+  it('drops finished replies before any still under way when more than 200 are kept', async () => {
+    const running = gated()
+    const first = await answering({ provider: running.provider, outlive: true }, { 'x-kai-reply': `start:${id}` })
+
+    await readers(first.reply)
+
+    for (let index = 0; index < 205; index++) {
+      const done = await answering({ outlive: true }, { 'x-kai-reply': `start:done-${String(index).padStart(4, '0')}` })
+
+      await done.reply
+    }
+
+    const again = await answering({ provider: running.provider, outlive: true }, { 'x-kai-reply': `resume:${id}` })
+    const seen = await readers(again.reply)
+
+    running.release()
+    await seen.ended
+    expect(seen.seen.at(-1)).toBe('one two')
+    // The oldest finished ones went.
+    expect(await (await answering({}, { 'x-kai-reply': 'resume:done-0000' })).reply).toBe('')
+    expect(await (await answering({}, { 'x-kai-reply': 'resume:done-0204' })).reply).toBe('Fake reply to: x')
   })
 })

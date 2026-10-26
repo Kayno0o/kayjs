@@ -3,10 +3,19 @@ import type { Reply } from './types'
 const KEPT_MS = 30 * 60_000
 const MOST_KEPT = 200
 
+interface Entry {
+  reply: Reply
+  at: number
+  // Who asked and from which action, which a resume or a stop must match.
+  owner: Promise<string>
+  // The reply ended, so it is the first to go when the store is full.
+  ended: boolean
+}
+
 interface Slot {
-  replies: Map<string, { reply: Reply, at: number }>
-  // Ids a stop named before their reply was kept, as a stop may reach the server ahead of the call it ends.
-  stopped: Map<string, number>
+  replies: Map<string, Entry>
+  // Keys a stop named before their reply was kept, as a stop may reach the server ahead of the call it ends.
+  stopped: Map<string, { at: number, owner: Promise<string> }>
 }
 
 const SLOT = Symbol.for('kayjs-ai.kept')
@@ -21,60 +30,123 @@ function slot(): Slot {
 function sweep(now: number): void {
   const { replies, stopped } = slot()
 
-  for (const [id, { at }] of replies) {
+  for (const [key, { at }] of replies) {
     if (now - at > KEPT_MS)
-      replies.delete(id)
+      replies.delete(key)
   }
 
-  for (const [id, at] of stopped) {
+  for (const [key, { at }] of stopped) {
     if (now - at > KEPT_MS)
-      stopped.delete(id)
+      stopped.delete(key)
   }
 
-  // A Map iterates oldest first, so the overflow is the oldest.
-  for (const id of replies.keys()) {
-    if (replies.size <= MOST_KEPT)
-      break
+  // A Map iterates oldest first: the finished replies go before any still under way, oldest first.
+  for (const wanted of [true, false]) {
+    for (const [key, { ended }] of replies) {
+      if (replies.size <= MOST_KEPT)
+        return
 
-    replies.delete(id)
+      if (ended === wanted)
+        replies.delete(key)
+    }
   }
 }
 
-// Keeps a reply that outlives its request under the id its Chat named, so the Chat finds it after a reload: for half an hour, 200 at most, in this process's memory.
-export function keep(id: string, reply: Reply): void {
+// Keeps a reply that outlives its request under the key its Chat named, so the Chat finds it after a reload: for half an hour, 200 at most, in this process's memory.
+export function keep(key: string, reply: Reply, owner: Promise<string>): void {
   const now = Date.now()
   const { replies, stopped } = slot()
 
   sweep(now)
 
-  // A stop that came first ends the reply before it begins.
-  if (stopped.delete(id)) {
-    reply.stop()
+  const early = stopped.get(key)
+
+  // A stop that came first, from the same owner, ends the reply before it begins.
+  if (early) {
+    stopped.delete(key)
+
+    void (async () => {
+      if (await early.owner === await owner)
+        reply.stop()
+    })()
+  }
+
+  replies.delete(key)
+  replies.set(key, { reply, at: now, owner, ended: false })
+}
+
+export function markEnded(key: string): void {
+  const entry = slot().replies.get(key)
+
+  if (entry)
+    entry.ended = true
+}
+
+// Ends the reply kept under `key` if `owner` kept it, else the one about to be kept under it when the stop came first.
+export function stopKept(key: string, owner: Promise<string>): void {
+  sweep(Date.now())
+
+  const entry = slot().replies.get(key)
+
+  if (entry === undefined) {
+    slot().stopped.set(key, { at: Date.now(), owner })
 
     return
   }
 
-  replies.delete(id)
-  replies.set(id, { reply, at: now })
+  void (async () => {
+    if (await entry.owner === await owner)
+      entry.reply.stop()
+  })()
 }
 
-// Ends the reply kept under `id`, or the one about to be kept under it when the stop came first.
-export function stopKept(id: string | undefined): void {
-  if (id === undefined)
-    return
-
-  const found = kept(id)
-
-  if (found)
-    found.stop()
-  else
-    slot().stopped.set(id, Date.now())
-}
-
-export function kept(id: string | undefined): Reply | undefined {
+// The reply kept under `key` for `owner`, as a reply that answers like an empty one if the owner is not the one who kept it.
+export function keptFor(key: string, owner: Promise<string>, empty: Reply): Reply | undefined {
   sweep(Date.now())
 
-  return id === undefined ? undefined : slot().replies.get(id)?.reply
+  const entry = slot().replies.get(key)
+
+  if (entry === undefined)
+    return undefined
+
+  const target = (async (): Promise<{ reply: Reply }> => ({ reply: await entry.owner === await owner ? entry.reply : empty }))()
+  const ahead = <Value>(pick: (reply: Reply) => AsyncIterable<Value>): AsyncIterable<Value> => ({
+    [Symbol.asyncIterator]: () => {
+      let source: AsyncIterator<Value> | undefined
+
+      return {
+        async next() {
+          source ??= pick((await target).reply)[Symbol.asyncIterator]()
+
+          return source.next()
+        },
+        async return(value?: unknown) {
+          return await source?.return?.(value) ?? { done: true, value: undefined }
+        },
+      }
+    },
+  })
+
+  return {
+    // eslint-disable-next-line kaynooo/no-then -- the thenable's own `then`, passed through
+    then: async (onFulfilled, onRejected) => (await target).reply.then(onFulfilled, onRejected),
+    [Symbol.asyncIterator]: () => ahead(reply => reply)[Symbol.asyncIterator](),
+    stream: () => ahead(reply => reply.stream()),
+    deltas: options => ahead(reply => reply.deltas(options)),
+    progress: () => ahead(reply => reply.progress()),
+    get calls() {
+      return (async () => (await target).reply.calls)()
+    },
+    get usage() {
+      return (async () => (await target).reply.usage)()
+    },
+    get finish() {
+      return (async () => (await target).reply.finish)()
+    },
+    stop: () => void (async () => {
+      (await target).reply.stop()
+    })(),
+  }
 }
 
 export function forgetKept(): void {

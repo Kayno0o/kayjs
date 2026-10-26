@@ -218,6 +218,11 @@ async function visitorKey(keyOf: Settings['key'], { request, visitor: named }: A
   return request ? `address:${hashed(rateKey(clientAddress(request, undefined)))}` : undefined
 }
 
+// Who a request counts as, the same key the limits count it under: the signed-in user, else the address.
+export async function visitorOf(request: Request): Promise<string | undefined> {
+  return visitorKey(slot().settings.key, { request, visitor: undefined, chars: 0, maxTokens: 0 })
+}
+
 // A store shared by processes, a database say, then holds no address nor user id, only a digest keyed by the app's secret to count under.
 export function hashed(text: string): string {
   return keyedDigest('ai-visitor', text)

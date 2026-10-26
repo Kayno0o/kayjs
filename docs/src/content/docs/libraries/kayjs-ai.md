@@ -160,7 +160,7 @@ To let a reload of the tab find the conversation again, give `remember` a name, 
 
 If your `ask` has `outlive: true` (see [A reply that outlives the visitor](#a-reply-that-outlives-the-visitor)), `remember` also keeps a reply that was under way at the reload. The chat asks your action for it again: the finished turn appears, or the stream picks up and goes on. If the server kept nothing, no model is asked and the message goes back to the field.
 
-Stop, Escape and New conversation end that reply on the server too, with one more call to your action. That call and the resume go through your action like a send, so its guards and rate limit apply to them.
+Stop, Escape and New conversation end that reply on the server too, with one more call to your action. Return `ask(...).progress()` for that: its snapshots tell the chat the reply outlives, so a chat whose reply does not makes no extra call. The resume and stop go through your action like a send, so its guards and rate limit apply to them.
 
 ## The reply
 
@@ -188,7 +188,7 @@ ask(messages, { tools, outlive: true })
 
 The request to the provider, the tool loop and every reader on the server go on after the visitor leaves, so the tools after the abort run and a `for await` of yours sees the whole text. `reply.stop()` and `signal` still stop it, and a reader leaving early no longer does. The budget and the rate limit count the reply like any other, once it ends.
 
-The reply is kept in the memory of the server process for half an hour, so a restart ends it and a second process does not find it.
+The reply is kept in the memory of the server process for half an hour, so a restart loses it and a second process does not find it. It is kept for the action and the visitor that asked, so another action or another visitor cannot resume or stop it.
 
 <ReadMore href="/llms/kayjs-ai-asking">Every variable, how the provider is picked, and the options of `ask`.</ReadMore>
 

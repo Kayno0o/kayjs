@@ -108,7 +108,9 @@ A reply is stopped when the request being answered aborts, as a reload or a clos
 
 - The provider request, the tool loop and every server reader (the app's own `for await`) go on after the request aborts, so the tools after the abort run and the text is whole for a reader that kept going. `reply.stop()` and `options.signal` still stop it. A reader leaving early no longer does: it only stops reading, so a `break` out of a `for await` leaves the reply running.
 - The budget and the rate limit count the reply as any other: its tokens are counted once it ends, as the request is, and a reply refused by a limit is refused.
-- `Chat` with `remember` shows the finished turn after a reload with no app code, or picks the stream back up if the reply is still under way: [Chat](chat.md#a-reply-that-outlives-the-page). The reply is kept in this process's memory for half an hour (200 at most), so it does not survive a restart and a second server process does not find it.
+- `Chat` with `remember` shows the finished turn after a reload with no app code, or picks the stream back up if the reply is still under way: [Chat](chat.md#a-reply-that-outlives-the-page).
+- The reply is kept in this process's memory only, for half an hour and 200 at most (finished ones go first, oldest first), so a restart loses it and a second server process does not find it. It is kept for the action that asked and the visitor (the signed-in user, else the address, as the limits count them): an id replayed against another action or by another visitor gets an empty reply and cannot stop it. Two `ask()` calls in one action keep two replies, told apart by their order in the call.
+- A resume or a stop asks no provider and counts nothing in `ai({ budget, rateLimit })`; the action's own `protect.rateLimit` still counts the call, which kay runs before the handler.
 - Without `outlive` a reload mid-reply loses the reply, and a tool call already running finishes with its result dropped.
 
 ### Prompt caching

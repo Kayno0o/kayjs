@@ -634,6 +634,35 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the Chat i
       expect(model.state.aborted).toBe(true)
     })
 
+    test('settles a reply that ended while the page announced it was leaving and stayed', async () => {
+      const model = held()
+      const page = await site.open('/staying-assistant')
+
+      await send(page)
+      // A download or a refused leave: the event comes and the page stays.
+      await page.evaluate(() => window.dispatchEvent(new Event('beforeunload')))
+      model.release()
+      await page.waitFor(turn, { text: 'Hello there' })
+      await page.waitFor('[data-pending]', { gone: true })
+
+      expect(await page.count('[role="alert"]')).toBe(0)
+      expect(await page.evaluate(() => sessionStorage.getItem('staying:reply'))).toBeNull()
+    })
+
+    test('a Chat whose reply does not outlive its request calls the action once, Stop included', async () => {
+      const page = await site.open('/slow-assistant')
+      const calls = () => page.evaluate(() => performance.getEntriesByType('resource').filter(entry => entry.name.includes('/_kay/action/')).length)
+
+      await page.fill('textarea', 'Go')
+      await page.press('Enter')
+      await page.waitFor('[data-pending] .kai-chat-text', { text: 'Working' })
+      await page.press('Escape')
+      await page.waitFor('[data-pending]', { gone: true })
+      await Bun.sleep(300)
+
+      expect(await calls()).toBe(1)
+    })
+
     test('returns the message to the field when the server kept nothing, without asking the model', async () => {
       const model = held()
       const page = await site.open('/staying-assistant')

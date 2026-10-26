@@ -155,6 +155,8 @@ export interface Progress {
   calls: ToolCall[]
   // The code blocks of the text closed since the previous snapshot, highlighted with the app's own highlighter (`markdown.highlight` in `kay.config.ts`) and sanitized; absent when there are none or the app has no highlighter.
   code?: CodeBlock[] | undefined
+  // Set when the ask has `outlive`, which tells a chat its Stop must end the reply on the server too.
+  outlives?: true | undefined
 }
 
 // A finished code block: `markup` is how the chat renders it as Markdown, which `html` replaces.

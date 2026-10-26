@@ -430,6 +430,28 @@ describe('ai({ budget })', () => {
     expect(store.count()).toBe(12)
   })
 
+  it('counts neither a resume nor a stop of a reply that outlived its request, in the budget or the rate limit', async () => {
+    const store = tracking()
+
+    ai({ budget: { tokens: 1000, window: '1m', store }, rateLimit: { max: 1, window: '1m', store } })
+
+    const call = async (op: string) => answeringRequest(new Request('http://localhost/chat', { headers: { 'x-kai-reply': `${op}:abcdef12-3456` } }), async () => ({ reply: ask('abcd', { key: 'v', outlive: true }) }))
+    const started = (await call('start')).reply
+
+    expect(await started).toBe('Fake reply to: abcd')
+
+    const counted = store.count()
+    const hits = [...store.keys].length
+
+    expect(counted).toBeGreaterThan(0)
+    expect(await (await call('resume')).reply).toBe('Fake reply to: abcd')
+    expect(await (await call('resume')).reply).toBe('Fake reply to: abcd')
+    await (await call('stop')).reply
+    expect(store.count()).toBe(counted)
+    expect([...store.keys]).toHaveLength(hits)
+    expect(fakeAi.asked).toHaveLength(1)
+  })
+
   it('counts the input of a reply stopped before the provider said anything, which it may already be reading', async () => {
     const store = tracking()
 

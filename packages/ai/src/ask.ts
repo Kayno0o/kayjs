@@ -5,8 +5,8 @@ import { actionTool, configError, currentRequest, durationSeconds, jsonSchemaOf 
 import { choose } from './config'
 import { recorded } from './dev-log'
 import { AiError } from './errors'
-import { keep, kept, stopKept } from './kept'
-import { guarded } from './limits'
+import { keep, keptFor, markEnded, stopKept } from './kept'
+import { guarded, visitorOf } from './limits'
 import { converse } from './loop'
 import { outputSchema } from './output-schema'
 import { createReply } from './reply'
@@ -110,7 +110,8 @@ export function ask<const Schema extends TSchema>(prompt: string | Message[], op
 export function ask(prompt: string | Message[], options?: AskOptions): Reply
 export function ask(prompt: string | Message[], options: AskOptions | StructuredAskOptions = {}): Reply | ReplyOf<TSchema> {
   const schema = 'schema' in options ? options.schema : undefined
-  const text = resumed() ?? remembered(reply(prompt, options, schema), options)
+  const call = replyCall()
+  const text = resumed(call) ?? remembered(reply(prompt, options, schema, call), options, call)
 
   return schema === undefined ? text : structured(text, schema)
 }
@@ -122,33 +123,63 @@ function nothing(): AsyncIterable<never> {
   }
 }
 
-// The reply a Chat resumes or stops by the id it sent, or an empty one when none is kept: such a call never asks a provider.
-function resumed(): Reply | undefined {
-  const call = replyCallOf(currentRequest())
+const asks = new WeakMap<Request, number>()
 
+interface ReplyCall {
+  op: 'start' | 'resume' | 'stop'
+  // The id the Chat named and the place of this ask among the request's, so two asks of one action keep two replies.
+  key: string | undefined
+  // The action and the visitor the ask is for, which a resume or a stop must come from too.
+  owner: Promise<string>
+}
+
+// What the request being answered says of the reply this ask is for, or nothing for an ordinary call.
+function replyCall(): ReplyCall | undefined {
+  const request = currentRequest()
+  const call = replyCallOf(request)
+
+  if (request === undefined || call === undefined)
+    return undefined
+
+  const place = asks.get(request) ?? 0
+
+  asks.set(request, place + 1)
+
+  return { op: call.op, key: call.id === undefined ? undefined : `${call.id}.${place}`, owner: ownerOf(request) }
+}
+
+async function ownerOf(request: Request): Promise<string> {
+  return `${new URL(request.url).pathname}\n${await visitorOf(request) ?? ''}`
+}
+
+// The reply a Chat resumes or stops by the id it sent, or an empty one when none is kept for it: such a call never asks a provider, nor counts against a limit or the budget.
+function resumed(call: ReplyCall | undefined): Reply | undefined {
   if (call === undefined || call.op === 'start')
     return undefined
 
-  if (call.op === 'stop') {
-    stopKept(call.id)
+  const empty = createReply(nothing, [])
 
-    return createReply(nothing, [])
+  if (call.key === undefined)
+    return empty
+
+  if (call.op === 'stop') {
+    stopKept(call.key, call.owner)
+
+    return empty
   }
 
-  return kept(call.id) ?? createReply(nothing, [])
+  return keptFor(call.key, call.owner, empty) ?? empty
 }
 
 // A reply that outlives its request is kept under the id its Chat named, for the Chat to find after a reload.
-function remembered(made: Reply, options: AskOptions): Reply {
-  const call = replyCallOf(currentRequest())
-
-  if (options.outlive === true && call?.op === 'start' && call.id !== undefined)
-    keep(call.id, made)
+function remembered(made: Reply, options: AskOptions, call: ReplyCall | undefined): Reply {
+  if (options.outlive === true && call?.op === 'start' && call.key !== undefined)
+    keep(call.key, made, call.owner)
 
   return made
 }
 
-function reply(prompt: string | Message[], options: AskOptions, answer: TSchema | undefined): Reply {
+function reply(prompt: string | Message[], options: AskOptions, answer: TSchema | undefined, call: ReplyCall | undefined): Reply {
   const messages = messagesOf(prompt)
   const { provider, model: configured } = options.provider === undefined ? choose() : { provider: options.provider, model: options.provider.model }
   const model = options.model ?? configured ?? options.provider?.model
@@ -169,15 +200,17 @@ function reply(prompt: string | Message[], options: AskOptions, answer: TSchema 
 
   const asker = { request: answering, visitor: options.key, chars: messageChars + (options.system?.length ?? 0) + (described?.chars ?? 0), maxTokens }
   const outlive = options.outlive === true
+  const kept = call?.key
+  const ended = outlive && kept !== undefined ? () => markEnded(kept) : undefined
   // A reply that outlives its request is not stopped by it.
   const signals = [outlive ? undefined : answering?.signal, options.signal]
   const about = { provider: provider.name, model, prompt: messages.findLast(message => message.role === 'user')?.content ?? '', chars: asker.chars }
 
   if (messageChars > maxInputChars)
-    return createReply(() => tooLong(messageChars, maxInputChars), signals, undefined, outlive)
+    return createReply(() => tooLong(messageChars, maxInputChars), signals, undefined, outlive, ended)
 
   if (options.tools === undefined || options.tools.length === 0)
-    return createReply(signal => recorded(guarded(() => provider.stream(request, signal), asker, signal), about, signal), signals, undefined, outlive)
+    return createReply(signal => recorded(guarded(() => provider.stream(request, signal), asker, signal), about, signal), signals, undefined, outlive, ended)
 
   const maxSteps = options.maxSteps ?? DEFAULT_MAX_STEPS
 
@@ -190,5 +223,5 @@ function reply(prompt: string | Message[], options: AskOptions, answer: TSchema 
     throw configError('tools run as the visitor, so ask() with tools needs the request being answered; call it from a page, an action or a handler kay is answering')
 
   // Every step may use `maxTokens`, which is what the budget holds for the reply while it runs.
-  return createReply(signal => recorded(guarded(() => converse(provider, request, offered, maxSteps, answering, signal, options.confirm), { ...asker, maxTokens: maxTokens * maxSteps }, signal), about, signal), signals, undefined, outlive)
+  return createReply(signal => recorded(guarded(() => converse(provider, request, offered, maxSteps, answering, signal, options.confirm), { ...asker, maxTokens: maxTokens * maxSteps }, signal), about, signal), signals, undefined, outlive, ended)
 }

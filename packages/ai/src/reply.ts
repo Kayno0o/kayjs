@@ -11,7 +11,7 @@ function snapshot(call: ToolCall): ToolCall {
 
 // A reply over what `open` yields once first read, with `signals` stopping it when any aborts.
 // The text is kept as it comes, so any number of readers (`await`, `for await`, `usage`) share one provider request.
-export function createReply(open: (signal: AbortSignal) => AsyncIterable<Piece>, signals: (AbortSignal | undefined)[], highlight = highlighting, outlive = false): Reply {
+export function createReply(open: (signal: AbortSignal) => AsyncIterable<Piece>, signals: (AbortSignal | undefined)[], highlight = highlighting, outlive = false, onEnd?: () => void): Reply {
   const controller = new AbortController()
   const deltas: string[] = []
   const waiters = new Set<() => void>()
@@ -84,6 +84,7 @@ export function createReply(open: (signal: AbortSignal) => AsyncIterable<Piece>,
         signal?.removeEventListener('abort', stop)
 
       ended = true
+      onEnd?.()
       counted.resolve(failure === undefined && total.inputTokens !== undefined && total.outputTokens !== undefined ? { ...total, inputTokens: total.inputTokens, outputTokens: total.outputTokens } : undefined)
       ending.resolve(failure === undefined ? reason : undefined)
       notify()
@@ -223,7 +224,7 @@ export function createReply(open: (signal: AbortSignal) => AsyncIterable<Piece>,
 
             finished = []
 
-            return { done: false, value: { text: deltas.join(''), calls: calls.map(snapshot), code } }
+            return { done: false, value: { text: deltas.join(''), calls: calls.map(snapshot), code, ...outlive && { outlives: true } } }
           }
 
           if (seen < version) {
@@ -234,7 +235,7 @@ export function createReply(open: (signal: AbortSignal) => AsyncIterable<Piece>,
             else
               scan()
 
-            return { done: false, value: { text: deltas.join(''), calls: calls.map(snapshot) } }
+            return { done: false, value: { text: deltas.join(''), calls: calls.map(snapshot), ...outlive && { outlives: true } } }
           }
 
           if (stale && !working) {
