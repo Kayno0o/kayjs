@@ -124,7 +124,17 @@ Two defaults surprise apps. `Cross-Origin-Opener-Policy: same-origin` cuts a pag
 
 `Cross-Origin-Resource-Policy: same-site` stops another site from embedding your images and files. If you want that, send `'cross-origin-resource-policy': 'cross-origin'`.
 
-A site that needs a feature `Permissions-Policy` refuses, such as geolocation for a map, sends its own `'permissions-policy': 'geolocation=(self)'`. It replaces kay's.
+A site that needs a feature `Permissions-Policy` refuses, such as the microphone for a voice recorder, grants it in `security.permissions`. The rest of kay's policy stays.
+
+```ts
+export default defineConfig({
+  security: {
+    permissions: { microphone: 'self', geolocation: ['self', 'https://maps.example.com'] },
+  },
+})
+```
+
+`'self'` and `'*'` are keywords and any other source is an origin. A feature set to `false` is left out of the policy, so the browser's default applies. A `permissions-policy` in `headers` still replaces the whole header.
 
 ## Redirect only to your own pages
 

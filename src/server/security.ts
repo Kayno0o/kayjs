@@ -59,6 +59,16 @@ const FALLBACKS: Record<string, string[]> = {
 }
 const FETCH_DIRECTIVE = /-src(?:-elem|-attr)?$/
 
+// Features a site rarely uses, refused to it and to anything it embeds, so an injected script cannot ask for them.
+const FEATURES: Record<string, string[]> = {
+  'camera': [],
+  'microphone': [],
+  'geolocation': [],
+  'payment': [],
+  'usb': [],
+  'browsing-topics': [],
+}
+
 // A year, with neither `includeSubDomains` nor `preload`, which bind more than the site itself and which no later deploy takes back.
 const HSTS = 'max-age=31536000'
 
@@ -71,8 +81,6 @@ const HEADERS: Record<string, string> = {
   'cross-origin-opener-policy': 'same-origin',
   // A page of another site may link here, but not load what this one serves into itself, as Spectre-style reads would.
   'cross-origin-resource-policy': 'same-site',
-  // Features a site rarely uses, refused to it and to anything it embeds, so an injected script cannot ask for them.
-  'permissions-policy': 'camera=(), microphone=(), geolocation=(), payment=(), usb=(), browsing-topics=()',
   // No Flash or Acrobat cross-domain policy file is honoured.
   'x-permitted-cross-domain-policies': 'none',
 }
@@ -90,6 +98,8 @@ export function securityHeaders(options: SecurityOptions, pages: PageSecurity[] 
   // Browsers ignore it over http, so a proxy terminating TLS needs no special case; development stays free of it so localhost is not pinned to https.
   if (options.dev !== true && URL.parse(options.site ?? '')?.protocol === 'https:')
     headers['strict-transport-security'] = HSTS
+
+  headers['permissions-policy'] = permissionsPolicy(options.security?.permissions)
 
   const { csp, reports, reportOnly } = options.security ?? {}
   const base = basePath(options.base)
@@ -119,6 +129,27 @@ export function securityHeaders(options: SecurityOptions, pages: PageSecurity[] 
     headers['content-security-policy-report-only'] = serialized(policy([enforced ? csp ?? {} : {}, reportOnly], hashes, styles, reportTo, options.islands, added))
 
   return withHeaders(headers, [options.security?.headers ?? {}, ...pageHeaders])
+}
+
+// kay's features with the app's merged over them, one given `false` left out: `self` and `*` are keywords, any other source an origin that gets quoted.
+function permissionsPolicy(overrides: Record<string, string | string[] | false> | undefined): string {
+  const features = new Map(Object.entries(FEATURES))
+
+  for (const [name, allowed] of Object.entries(overrides ?? {})) {
+    if (allowed === false)
+      features.delete(name)
+    else
+      features.set(name, typeof allowed === 'string' ? [allowed] : allowed)
+  }
+
+  return [...features].map(([name, sources]) => `${name}=${featureSources(sources)}`).join(', ')
+}
+
+function featureSources(sources: string[]): string {
+  if (sources.length === 1 && sources[0] === '*')
+    return '*'
+
+  return `(${sources.map(source => source === 'self' || source === 'src' ? source : `"${source}"`).join(' ')})`
 }
 
 function withHeaders(headers: Record<string, string>, layers: Record<string, string | false>[]): Record<string, string> {

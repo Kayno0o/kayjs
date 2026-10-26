@@ -14,7 +14,7 @@ export default defineConfig({
 
 ### Allow another image host in the Content-Security-Policy
 
-`security.csp` merges directives over kay's, and `headers` adds a header such as `permissions-policy` or a longer HSTS:
+`security.csp` merges directives over kay's, `permissions` features over its `Permissions-Policy`, and `headers` adds a header such as a longer HSTS:
 
 ```ts
 import { defineConfig } from 'kay/server'
@@ -22,6 +22,7 @@ import { defineConfig } from 'kay/server'
 export default defineConfig({
   security: {
     csp: { 'img-src': ['\'self\'', 'https://images.example.com'] },
+    permissions: { microphone: 'self' },
     headers: { 'strict-transport-security': 'max-age=63072000; includeSubDomains' },
   },
 })
@@ -142,7 +143,7 @@ export default defineConfig({
 - `Strict-Transport-Security: max-age=31536000` (a year, no `includeSubDomains`, no `preload`) is sent on every response the app serves in production when `site` (or `SITE_URL`) is https, behind a `proxy` too, and never in development, for an http or unset `site`, or with `security: false`. `'strict-transport-security': false` in `headers` (or a page's `security.headers`) turns it off, and a value replaces it: `'max-age=63072000; includeSubDomains'`. A static export writes the security headers as `_headers` and `headers.nginx.conf` ([Static export](prerendering.md#static-export)), HSTS in the first only: the scaffold's `nginx.conf` sends it itself, always with one year, so a server in front of your own export sets it, in each `location` that has an `add_header` of its own too, as nginx drops the server-level ones there.
 - `Cross-Origin-Resource-Policy: same-site` keeps another site from loading the images, scripts and files the app serves, so an app whose files another site embeds sends `'cross-origin-resource-policy': 'cross-origin'`.
 - `Cross-Origin-Opener-Policy: same-origin` cuts a page off from a window of another site it opened, or that opened it, so a sign-in or payment popup that answers through `window.opener` needs `'cross-origin-opener-policy': 'same-origin-allow-popups'`.
-- A site using a feature `Permissions-Policy` refuses, such as geolocation for a map, sends its own, `'permissions-policy': 'geolocation=(self)'`, which replaces kay's.
+- A site using a feature `Permissions-Policy` refuses, such as the microphone, grants it with `security.permissions`, merged over kay's list: `{ microphone: 'self' }` sends `microphone=(self)`, `{ geolocation: ['self', 'https://maps.example.com'] }` an allowlist (`self` is a keyword, other sources are quoted origins), `{ camera: '*' }` every origin, and `false` leaves a feature out of the policy so the browser's default applies. A `permissions-policy` in `headers` replaces the whole header.
 - A header the app sets itself, in an Elysia `onRequest` or a handler, wins over kay's.
 - The build's files under `/_kay/` and the image route carry kay's headers in their own responses, which Elysia does not let a later hook override: change them there through `headers`.
 - A page, or a layout for every page under it, adds to them for its own responses with `security` in its `page`: `export const page = { security: { csp: { 'script-src': ['https://cdn.example.com'], 'worker-src': ['blob:'] }, headers: { 'cross-origin-embedder-policy': 'require-corp' } } }` isolates an emulator page and lets its CDN script in, the rest of the site keeping the strict policy.

@@ -240,6 +240,15 @@ describe('security headers', () => {
     expect(response.headers.has('cross-origin-opener-policy')).toBe(false)
   })
 
+  it('merges `security.permissions` over kay\'s Permissions-Policy, and a `permissions-policy` header still replaces it', async () => {
+    const policy = async (security: Record<string, unknown>) => (await (await pages({ root: SEO, prebuilt: false, security })).handle(new Request('http://localhost/about'))).headers.get('permissions-policy')
+
+    expect(await policy({ permissions: { microphone: 'self' } })).toBe('camera=(), microphone=(self), geolocation=(), payment=(), usb=(), browsing-topics=()')
+    expect(await policy({ permissions: { microphone: ['self', 'https://voice.example.com'], camera: '*' } })).toBe('camera=*, microphone=(self "https://voice.example.com"), geolocation=(), payment=(), usb=(), browsing-topics=()')
+    expect(await policy({ permissions: { usb: false, fullscreen: 'self' } })).toBe('camera=(), microphone=(), geolocation=(), payment=(), browsing-topics=(), fullscreen=(self)')
+    expect(await policy({ permissions: { microphone: 'self' }, headers: { 'permissions-policy': 'geolocation=(self)' } })).toBe('geolocation=(self)')
+  })
+
   it('sends what a page and its layouts set in `security` over the site\'s headers, and marks a page asking for full loads', async () => {
     const dir = await scratchDir('page-security-')
     const settings = (page: string) => `--- server\nexport const page = ${page}\n---\n`

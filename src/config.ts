@@ -251,6 +251,8 @@ export interface SecurityConfig {
   reportOnly?: Record<string, string[] | false> | undefined
   // Where browsers report what either policy blocks: `true` for kay's own route, which logs each violation and hands it to `onError` as a `CspViolationError`, or a collector's URL.
   reports?: true | string | undefined
+  // Features merged over kay's Permissions-Policy, which refuses camera, microphone, geolocation, payment, usb and browsing-topics: `{ microphone: 'self' }`, `{ geolocation: ['self', 'https://maps.example.com'] }` or `{ camera: '*' }`, one given `false` left out of the policy. A `permissions-policy` in `headers` still replaces the whole header.
+  permissions?: Record<string, string | string[] | false> | undefined
   // Headers merged over kay's, one given `false` not sent: `{ 'strict-transport-security': 'max-age=63072000; includeSubDomains' }`.
   headers?: Record<string, string | false> | undefined
   // Production answers 421 to a request whose `Host` is not the site's, one of the `i18n` locale hosts or listed here, against DNS rebinding: `true` allows those alone. Localhost and IP addresses always pass, as a health check reaches the server by them. Off by default, and under `kay dev`, which has `KAY_DEV_HOSTS`.
