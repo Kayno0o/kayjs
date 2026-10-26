@@ -75,7 +75,7 @@ describe('erasing a user takes their notifications and mailing list rows', () =>
     await notify(guest.id, { title: 'Hello guest' })
     setSystemTime(start + DAY_MS + PRUNE_EVERY_MS)
     await context.browser().json('/me')
-    await new Promise(resolve => setTimeout(resolve, 30))
+    await context.pruned()
     expect(await context.store.users.get(guest.id)).toBeUndefined()
     expect(await notifications.list(guest.id)).toEqual([])
 

@@ -2,6 +2,7 @@ import type { Duration } from 'kay'
 import { afterEach, describe, expect, setSystemTime, test } from 'bun:test'
 import { memoryAuthStore } from '../src/memoryStore'
 import { testApp } from './helpers/app'
+import { untilHolds } from './helpers/until'
 
 const PASSWORD = 'correct horse battery'
 const DAY_MS = 24 * 60 * 60 * 1000
@@ -40,12 +41,12 @@ describe('time options take a Duration', () => {
 
       return base.users.staleGuests!(createdBefore, limit)
     } } }
-    const { browser } = testApp({ store, guests: { maxAge: '0.4s' } })
+    const { browser, pruned } = testApp({ store, guests: { maxAge: '0.4s' } })
     const now = Date.now()
 
     setSystemTime(now)
     await browser().json('/me')
-    await new Promise(resolve => setTimeout(resolve, 30))
+    await pruned()
 
     expect(cutoffs.map(cutoff => now - cutoff.getTime())).toEqual([1000])
   })
@@ -62,7 +63,7 @@ describe('time options take a Duration', () => {
 
     setSystemTime(now)
     await browser().call('register', { email: 'ada@example.com', password: PASSWORD })
-    await new Promise(resolve => setTimeout(resolve, 30))
+    await untilHolds(() => cutoffs.length > 0)
 
     expect(cutoffs.length).toBeGreaterThan(0)
     expect(cutoffs.map(cutoff => now - cutoff.getTime())).toEqual(cutoffs.map(() => 1000))

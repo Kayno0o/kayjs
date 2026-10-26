@@ -159,6 +159,7 @@ describe('typing a secret', () => {
   })
 })
 
+// A bound for a wait that must end, so a hang fails the test instead of the file.
 async function hangs(ms: number): Promise<'hung'> {
   await Bun.sleep(ms)
 

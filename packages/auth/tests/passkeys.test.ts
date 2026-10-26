@@ -5,6 +5,7 @@ import { totpCode, totpStep } from '../src/totp'
 import { testApp, userRecord } from './helpers/app'
 import { authenticator } from './helpers/authenticator'
 import { mailbox } from './helpers/mail'
+import { untilHolds } from './helpers/until'
 
 const PASSWORD = 'correct horse battery'
 
@@ -228,7 +229,8 @@ describe('a passkey as second factor and as proof', () => {
       answers.push(await visitor.call('verifyTwoFactorPasskey', {} as never))
 
     expect(answers.at(-1)).toEqual({ ok: false, error: 'limited' })
-    await Bun.sleep(20)
+    // The notice is mailed off the response's path.
+    await untilHolds(() => box.mails.some(mail => mail.kind === 'sign-in-locked'))
     expect(box.mails.filter(mail => mail.kind === 'sign-in-locked').map(mail => mail.to)).toEqual(['ada@example.com'])
   })
 

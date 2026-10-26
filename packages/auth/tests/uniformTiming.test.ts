@@ -3,6 +3,7 @@ import * as utils from '@kaynooo/utils'
 import { afterEach, describe, expect, spyOn, test } from 'bun:test'
 import { SECRET, testApp } from './helpers/app'
 import { mailbox } from './helpers/mail'
+import { untilHolds } from './helpers/until'
 
 const PASSWORD = 'correct horse battery'
 const WRONG = 'wrong password!'
@@ -214,7 +215,8 @@ describe('registering under requireVerified', () => {
 
     expect(ran).toEqual([])
     slow.open()
-    await Bun.sleep(50)
+    // The notices run after the answers, once the gate opens.
+    await untilHolds(() => ran.length === 3)
 
     expect(ran.toSorted()).toEqual(['deleted:ada@example.com', 'signed-up:ada@example.com', 'signed-up:bob@example.com'])
     expect((await app.store.users.findByEmail('ada@example.com'))?.id).toBeDefined()
@@ -280,7 +282,8 @@ describe('a replaced unverified account whose erase fails', () => {
     const logged = spyOn(console, 'error').mockImplementation(() => undefined)
 
     await app.browser().call('register', { email: 'ada@example.com', password: PASSWORD })
-    await Bun.sleep(50)
+    // The failing hook runs after the answer and says so when it fails.
+    await untilHolds(() => logged.mock.calls.length > 0)
     logged.mockRestore()
     failing = false
 

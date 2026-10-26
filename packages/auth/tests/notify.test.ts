@@ -155,6 +155,7 @@ describe('a slow mailer', () => {
     failing = true
     sent.length = 0
 
+    // A bound: the answer must not wait on the mail that fails.
     const answer = await Promise.race([
       app.browser().json('/password', from('10.0.0.9', 'Firefox')),
       new Promise<'timeout'>(resolve => setTimeout(resolve, 1500, 'timeout')),

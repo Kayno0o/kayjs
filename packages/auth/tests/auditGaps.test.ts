@@ -7,6 +7,7 @@ import { discordProvider, githubProvider, oidcProvider } from '../src/oauth/prov
 import { base32Encode } from '../src/totp'
 import { SECRET, testApp, userRecord } from './helpers/app'
 import { mailbox } from './helpers/mail'
+import { untilHolds } from './helpers/until'
 
 const PASSWORD = 'correct horse battery'
 const LINKS = { 'verify-email': '/verify', 'reset-password': '/reset', 'magic-link': '/magic', 'change-email': '/confirm-email' }
@@ -100,7 +101,8 @@ describe('the second factor cap', () => {
       answers.push(await visitor.call('verifyTwoFactor', '000000'))
 
     expect(answers.at(-1)).toEqual({ ok: false, error: 'limited' })
-    await Bun.sleep(20)
+    // The notice is mailed off the response's path.
+    await untilHolds(() => box.mails.some(mail => mail.kind === 'sign-in-locked'))
     expect(box.mails.filter(mail => mail.kind === 'sign-in-locked')).toHaveLength(1)
     expect(box.mails.filter(mail => mail.kind === 'sign-in-locked')[0]!.to).toBe('ada@example.com')
   })

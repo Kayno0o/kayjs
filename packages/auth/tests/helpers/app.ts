@@ -85,6 +85,15 @@ export function testApp<const Scope extends string = never, OrgRole extends stri
 
       return (await method.apply(auth, body as unknown[])) ?? null
     })
+    // Answers once the prune a request started in the background has ended, which the state of the request holds as `core.pruned.running`.
+    .get('/pruned', async ({ auth }) => {
+      const state = Object.getOwnPropertySymbols(auth).find(symbol => symbol.description === 'kayjs-auth.state')!
+      const { core } = (auth as unknown as Record<symbol, { core: { pruned: { running: Promise<void> } } }>)[state]!
+
+      await core.pruned.running
+
+      return 'pruned'
+    })
     .post('/sign-out', async ({ auth }) => {
       await auth.signOut()
 
@@ -99,7 +108,12 @@ export function testApp<const Scope extends string = never, OrgRole extends stri
   const browserOn = (on: { handle: (request: Request) => Promise<Response> }) => browser<Auth<Scope, 'admin' | 'editor', OrgRole>>(on)
 
   // `browserOn` drives an app wrapping this one, such as one adding routes.
-  return { auth, app, store, browser: () => browserOn(app), browserOn }
+  // Resolves once the prune that a request started has ended.
+  const pruned = async () => {
+    await app.handle(new Request('http://localhost/pruned'))
+  }
+
+  return { auth, app, store, browser: () => browserOn(app), browserOn, pruned }
 }
 
 type Method<A, M extends keyof A> = A[M] extends (...args: infer Args) => infer Answer ? { args: Args, answer: Awaited<Answer> } : never

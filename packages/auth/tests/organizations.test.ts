@@ -434,6 +434,7 @@ describe('organizations', () => {
     expect((await store.members!.listByOrganization(org)).map(member => member.userId)).toEqual([grace.id, alan.id])
   })
 
+  // Each deletion's onDelete takes 30 ms, so the two deletions overlap.
   test('two owners whose deletions overlap, each having seen the other, still leave the organization an owner', async () => {
     const { ada, org, person, join, store } = await setup({}, { onDelete: async () => Bun.sleep(30) })
     const grace = await person('grace@example.com')
@@ -450,6 +451,7 @@ describe('organizations', () => {
     expect(left[0]!.roles).toContain('owner')
   })
 
+  // As above, a 30 ms onDelete keeps the two deletions overlapping.
   test('two owners alone deleting at once leave no organization behind', async () => {
     const { ada, org, person, join, store } = await setup({}, { onDelete: async () => Bun.sleep(30) })
     const grace = await person('grace@example.com')

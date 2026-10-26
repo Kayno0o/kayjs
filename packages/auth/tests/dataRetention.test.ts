@@ -35,7 +35,7 @@ describe('pruning accounts never verified', () => {
     const prune = async (age: number) => {
       setSystemTime(start + age)
       await app.browser().json('/me')
-      await new Promise(resolve => setTimeout(resolve, 30))
+      await app.pruned()
     }
 
     return { ...app, deleted, start, prune }

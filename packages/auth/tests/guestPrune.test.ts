@@ -31,11 +31,11 @@ async function setup(options: { store?: AuthStore, onDelete?: (user: User) => vo
   })
   const start = Date.now()
 
-  // Visiting `age` after the start runs the prune in the background; a memory store is done within a few ticks.
+  // Visiting `age` after the start runs the prune in the background, which `pruned` waits for.
   const prune = async (age: number) => {
     setSystemTime(start + age)
     await app.browser().json('/me')
-    await new Promise(resolve => setTimeout(resolve, 30))
+    await app.pruned()
   }
 
   return { ...app, deleted, heard, start, prune }
@@ -116,14 +116,14 @@ describe('pruning guests', () => {
 
   test('guests are deleted after 30 days without the option', async () => {
     const store = memoryAuthStore()
-    const { browser } = testApp({ store })
+    const { browser, pruned } = testApp({ store })
     const start = Date.now()
 
     await store.users.create(userRecord({ id: 'old', guest: true, createdAt: new Date(start - 31 * MAX_AGE_MS) }))
     await store.users.create(userRecord({ id: 'recent', guest: true, createdAt: new Date(start - 29 * MAX_AGE_MS) }))
     setSystemTime(start + PRUNE_EVERY_MS)
     await browser().json('/me')
-    await new Promise(resolve => setTimeout(resolve, 20))
+    await pruned()
 
     expect(await store.users.get('old')).toBeUndefined()
     expect(await store.users.get('recent')).toBeDefined()

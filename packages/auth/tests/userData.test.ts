@@ -7,6 +7,7 @@ import { createAuth } from '../src/auth'
 import { memoryAuthStore } from '../src/memoryStore'
 import { discordProvider, githubProvider } from '../src/oauth/providers'
 import { SECRET, testApp, userRecord } from './helpers/app'
+import { untilHolds } from './helpers/until'
 
 const realFetch = globalThis.fetch
 
@@ -294,7 +295,7 @@ describe('app data and provider ids on the user', () => {
 
     try {
       await signInWith(failing.browser(), 'discord', '1')
-      await Bun.sleep(20)
+      await untilHolds(async () => (await failing.store.audit!.list({ limit: 10 })).length > 0)
 
       expect((await failing.store.audit!.list({ limit: 10 })).length).toBeGreaterThan(0)
     }
