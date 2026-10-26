@@ -140,6 +140,33 @@ describe('Table with a filter', () => {
     visit('about:blank')
   })
 
+  test('keeps the sort a header click picks in the URL under sortParam, replacing the entry, and starts from it', async () => {
+    visit('http://localhost/?sort=name&direction=desc')
+    const before = history.length
+
+    mounted = await mountComponent(FilteredTable, { rows: MOONS, sortParam: 'sort' })
+
+    expect(names(mounted.root)).toEqual(['Phobos', 'Io', 'Deimos'])
+    expect(header(mounted.root, 0).getAttribute('aria-sort')).toBe('descending')
+
+    click(header(mounted.root, 0).querySelector('button'))
+    await settle()
+    // Both params go through the one throttled write, the second landing after its gap.
+    await new Promise(resolve => setTimeout(resolve, 300))
+
+    expect(location.search).toBe('?sort=name&direction=asc')
+    expect(history.length).toBe(before)
+    visit('about:blank')
+  })
+
+  test('ignores a sort in the URL naming no sortable column', async () => {
+    visit('http://localhost/?sort=planet&direction=desc')
+    mounted = await mountComponent(FilteredTable, { rows: MOONS, sortParam: 'sort' })
+
+    expect(mounted.root.querySelector('th[aria-sort]')).toBeNull()
+    visit('about:blank')
+  })
+
   test('shows its @empty block, not the no-match one, when there are no rows at all', async () => {
     mounted = await mountComponent(FilteredTable, { rows: [] })
 

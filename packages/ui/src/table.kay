@@ -5,7 +5,7 @@ import { effect, memo, onCleanup, onMount, persisted, recipe, signal } from 'kay
 import Button from './button.kay'
 import Checkbox from './checkbox.kay'
 import Icon from './icon.kay'
-import { cellText, drawnByBlock, exportHref, nextSort, resolvedColumn, rowKeyOf, rowLabel, rowsMatching, sortedRows, toCsv } from './table'
+import { cellText, drawnByBlock, exportHref, nextSort, resolvedColumn, restoredSort, rowKeyOf, rowLabel, rowsMatching, sortedRows, toCsv } from './table'
 import { virtualRows } from './virtual'
 import { wording } from 'kay/words'
 
@@ -43,7 +43,7 @@ const look = recipe({
   },
 })
 
-const { columns: given, rows, rowKey, sort, serverSort = false, onSort, cell, empty, filter, filterLabel = wording('ui.table.filter', 'Filter'), filterPlaceholder, filterParam, countLabel, noMatch, narrow = 'stack', selectable = false, selected, onSelect, bulk, selectAllLabel = wording('ui.table.selectAll', 'Select all'), selectedLabel, selectRowLabel, exportable = false, exportLabel = wording('ui.table.export', 'Export CSV'), exportName = 'table.csv', virtual = false, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'onSelect'> & {
+const { columns: given, rows, rowKey, sort, serverSort = false, onSort, cell, empty, filter, filterLabel = wording('ui.table.filter', 'Filter'), filterPlaceholder, filterParam, sortParam, countLabel, noMatch, narrow = 'stack', selectable = false, selected, onSelect, bulk, selectAllLabel = wording('ui.table.selectAll', 'Select all'), selectedLabel, selectRowLabel, exportable = false, exportLabel = wording('ui.table.export', 'Export CSV'), exportName = 'table.csv', virtual = false, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'onSelect'> & {
   columns: Column<Row>[]
   rows: Row[]
   rowKey: Key
@@ -64,6 +64,8 @@ const { columns: given, rows, rowKey, sort, serverSort = false, onSort, cell, em
   filterPlaceholder?: string | undefined
   // The query parameter keeping the typed text in the page's URL, so a reload or a shared link filters the same; without it the text stays on the page.
   filterParam?: string | undefined
+  // The query parameter keeping the sort a header click picks in the page's URL, the column's key under it and its direction under `direction` (`<name>Direction` for any name but `sort`), so a reload, a shared link or back and forward sort the same; a click replaces the history entry. The URL's sort wins over `sort` on load.
+  sortParam?: string | undefined
   // How many rows the filter keeps, as screen readers hear it.
   countLabel?: ((count: number) => string) | undefined
   // Shown in place of the rows when the filter hides every one; `empty` otherwise.
@@ -95,10 +97,22 @@ const { columns: given, rows, rowKey, sort, serverSort = false, onSort, cell, em
 }>()
 
 const columns = memo(() => given.map(resolvedColumn))
-const current = signal(sort)
+const keptKey = sortParam === undefined ? undefined : persisted(sortParam, '', { storage: 'query' })
+const keptDirection = sortParam === undefined ? undefined : persisted(sortParam === 'sort' ? 'direction' : `${sortParam}Direction`, '', { storage: 'query' })
+const restored = restoredSort(columns(), keptKey?.(), keptDirection?.())
+const current = signal(restored ?? sort)
+let following = restored === undefined
 const typed = filterParam === undefined ? signal('') : persisted(filterParam, '', { storage: 'query' })
 
-effect(() => current.set(sort))
+effect(() => {
+  const next = sort
+
+  // The URL's sort stands over the one the table starts from, until the parent passes a new one.
+  if (following)
+    current.set(next)
+
+  following = true
+})
 
 // The rows the filter keeps, all of them without one.
 const kept = memo(() => filter === undefined ? rows : rowsMatching(rows, filter, typed()))
@@ -184,6 +198,8 @@ function toggle(column: Column<Row>) {
   const next = nextSort(current(), column)
 
   current.set(next)
+  keptKey?.set(next.key)
+  keptDirection?.set(next.direction)
   onSort?.(next)
 }
 

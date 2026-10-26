@@ -8,6 +8,8 @@ description: A table of rows described by columns, with sortable headers and an 
 
 Give a column a `sortValue` to make its header sortable: `true` sorts by the row's own value at `key`, a function sorts by what it returns. `defaultDirection` sets the first click's direction, and `onSort` reports each sort. With `serverSort`, the table only reflects the sort in its headers and your data source orders the rows.
 
+`sortParam` keeps the sort in the page's URL: `sortParam="sort"` writes the column's key as `?sort=` and its direction as `?direction=`. A reload, a shared link or back and forward sort the same, the URL's sort wins over `sort` on load, and a click replaces the history entry. Any other name writes the direction as `<name>Direction`.
+
 ## Empty
 
 With a `@cell(row, column)` block, every column is drawn by it, except one marked `cell: false`, which shows its value as text. Once any column sets `cell: true`, the block draws only those columns. The `@empty` block is shown in place of the rows when there are none.

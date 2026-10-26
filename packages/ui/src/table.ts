@@ -122,6 +122,14 @@ export function nextSort<Row>(sort: SortState | undefined, column: Column<Row>):
     : { key: column.key, direction: column.defaultDirection ?? 'desc' }
 }
 
+// The sort a page's URL holds: a sortable column's key and a direction, nothing for any other text.
+export function restoredSort<Row>(columns: Column<Row>[], key: string | undefined, direction: string | undefined): SortState | undefined {
+  if (key === undefined || key === '' || (direction !== 'asc' && direction !== 'desc'))
+    return undefined
+
+  return columns.some(column => column.key === key && column.sortValue !== undefined) ? { key, direction } : undefined
+}
+
 const FORMULA_START = /^[=+\-@\t\r]/
 const CSV_QUOTED = /[",\r\n]/
 

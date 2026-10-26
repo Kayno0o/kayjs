@@ -2,6 +2,10 @@
 
 What each release of kay and its libraries adds, newest first, each feature with where it is documented. kay and its libraries share one version, so one section covers them all; what a release breaks is in [Upgrading](upgrading.md).
 
+## Unreleased
+
+- kayjs-ui `Table` takes `sortParam`, keeping the sort a header click picks in the URL beside `filterParam`, so a reload and back and forward sort the same: [Tables](../packages/ui/llms/tables-navigation-and-layout.md).
+
 ## 1.77.2
 
 - kayjs-ai `ask(..., { reasoning })` takes `'none'`, `'low'`, `'medium'` or `'high'` and sends it as `reasoning_effort` to an OpenAI-compatible server, so a reasoning model such as Ollama's answers a short question in about a second: [asking](../packages/ai/llms/asking.md#ask-options).
