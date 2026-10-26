@@ -261,7 +261,7 @@ export function createCore<Data extends AuthSessionData, Role extends string, Pr
     onExport: hooked(options.exportData, user => ({ user })),
     onAuthEvent: options.onAuthEvent,
     organizations: options.organizations && organizationsCore(options.organizations),
-    pruned: { at: 0, running: Promise.resolve() },
+    pruned: { at: 0 },
     audit: options.audit == null || options.audit === false ? undefined : { maxAge: auditMaxAge(options.audit), prunedAt: 0, ip: options.audit === true ? 'truncated' : options.audit.ip ?? 'truncated' },
     rememberMaxAge: wholeSeconds(options.remember?.maxAge ?? `${DEFAULT_REMEMBER_MAX_AGE}s`, 'remember.maxAge'),
   }

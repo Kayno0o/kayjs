@@ -2,7 +2,7 @@ import type { Auth, AuthOptions, AuthSessionData } from '../../src/auth'
 import type { SignInOptions } from '../../src/signInOptions'
 import type { AuthStore, UserRecord } from '../../src/store'
 import { Elysia } from 'elysia'
-import { userOf } from 'kay/library'
+import { drainQueues, userOf } from 'kay/library'
 import { session } from 'kay/server'
 import { cookieJar } from 'kay/test'
 import { createAuth } from '../../src/auth'
@@ -85,15 +85,6 @@ export function testApp<const Scope extends string = never, OrgRole extends stri
 
       return (await method.apply(auth, body as unknown[])) ?? null
     })
-    // Answers once the prune a request started in the background has ended, which the state of the request holds as `core.pruned.running`.
-    .get('/pruned', async ({ auth }) => {
-      const state = Object.getOwnPropertySymbols(auth).find(symbol => symbol.description === 'kayjs-auth.state')!
-      const { core } = (auth as unknown as Record<symbol, { core: { pruned: { running: Promise<void> } } }>)[state]!
-
-      await core.pruned.running
-
-      return 'pruned'
-    })
     .post('/sign-out', async ({ auth }) => {
       await auth.signOut()
 
@@ -108,9 +99,9 @@ export function testApp<const Scope extends string = never, OrgRole extends stri
   const browserOn = (on: { handle: (request: Request) => Promise<Response> }) => browser<Auth<Scope, 'admin' | 'editor', OrgRole>>(on)
 
   // `browserOn` drives an app wrapping this one, such as one adding routes.
-  // Resolves once the prune that a request started has ended.
+  // Resolves once the prune that a request started has ended, as `site.runJobs()` does for an app.
   const pruned = async () => {
-    await app.handle(new Request('http://localhost/pruned'))
+    await drainQueues()
   }
 
   return { auth, app, store, browser: () => browserOn(app), browserOn, pruned }

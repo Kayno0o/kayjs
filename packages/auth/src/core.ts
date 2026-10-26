@@ -176,8 +176,8 @@ export interface Core {
   organizations?: OrganizationsCore | undefined
   // Kept with the `audit` option: entries live `maxAge` seconds.
   audit?: { maxAge: number, prunedAt: number, ip: 'full' | 'truncated' } | undefined
-  // When the store last pruned what expired, and that run while it lasts.
-  pruned: { at: number, running: Promise<void> }
+  // When the store last pruned what expired.
+  pruned: { at: number }
 }
 
 // What a provider token refresh works on: the identity, and its tokens opened.
