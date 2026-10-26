@@ -21,6 +21,28 @@ const BOOT = (/<script>([\s\S]*)<\/script>/).exec(DEV_BOOT)![1]!
 
 const { error, warn } = console
 
+// One turn of the event loop, which runs every microtask the tool queued, as the render of a problem or the answer of a mocked clipboard is: a turn takes no time, so it paces nothing.
+const turn = async () => Bun.sleep(0)
+
+// Retries an assertion until it holds, for what the tool reaches through a fetch or a stream it reads, which takes more than one turn; the last failure is the one thrown.
+async function eventually(assertion: () => void | Promise<void>, timeout = 10_000): Promise<void> {
+  const end = Date.now() + timeout
+
+  for (;;) {
+    try {
+      await assertion()
+
+      return
+    }
+    catch (failure) {
+      if (Date.now() > end)
+        throw failure
+
+      await Bun.sleep(5)
+    }
+  }
+}
+
 // A PerformanceObserver the test reports entries to by type, installed on the window until the test removes it.
 function fakeObserver() {
   const observers: { type: string, callback: (list: { getEntries: () => unknown[] }) => void }[] = []
@@ -70,7 +92,7 @@ describe('the dev tool', () => {
 
     Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: async (text: string) => void (copied = text) } })
     button.click()
-    await Bun.sleep(0)
+    await turn()
 
     return copied
   }
@@ -106,7 +128,7 @@ describe('the dev tool', () => {
     tool = startDevTool()
     console.warn('[kay] the persisted signal note could not be kept')
     console.warn('[kay] the persisted signal note could not be kept')
-    await Bun.sleep(0)
+    await turn()
 
     expect(problems()).toEqual([['error', 'island a.kay did not match its server markup'], ['warn', 'the persisted signal note could not be kept'], ['error', check]])
     expect(groups()).toEqual(['Recovered by kay (2)', 'kay check (1)'])
@@ -121,7 +143,7 @@ describe('the dev tool', () => {
 
     document.head.innerHTML = problemsBlock(['warning[missing-title]: a page needs a title']) + problemsBlock([mistyped], 'kay-type-problems')
     tool = startDevTool()
-    await Bun.sleep(0)
+    await turn()
 
     expect(problems()).toEqual([['warn', 'warning[missing-title]: a page needs a title'], ['error', mistyped]])
 
@@ -145,27 +167,27 @@ describe('the dev tool', () => {
     console.warn('[kay] a note to dismiss')
     tool = startDevTool()
     console.error('[kay] island a.kay did not match its server markup')
-    await Bun.sleep(0)
+    await turn()
     ;[...shadow().querySelectorAll<HTMLElement>('.problem')].find(problem => problem.textContent?.includes('a note to dismiss'))!.querySelector<HTMLButtonElement>('button')!.click()
 
     copy().click()
-    await Bun.sleep(0)
+    await turn()
 
     expect(copied).toEqual([`kay dev problems on ${location.href}\n\n[Recovered by kay] error (2 times)\nisland a.kay did not match its server markup\n\n[kay check] error\nerror[missing-alt]: An \`img\` needs \`alt\`\n --> src/routes/index.kay:3:5`])
     expect(copy().textContent).toBe('Copied')
-    await Bun.sleep(1)
 
-    expect(shadow().querySelector('.copies')?.textContent).toBe('Copied')
+    // The live region says it from a timer of its own, once emptied.
+    await eventually(() => expect(shadow().querySelector('.copies')?.textContent).toBe('Copied'))
 
     // The tab as Markdown spaces a heading from its count and names no count a problem told once.
     shadow().querySelector<HTMLButtonElement>('.head .icon[aria-label="Copy this tab as Markdown"]')!.click()
-    await Bun.sleep(0)
+    await turn()
 
     expect(copied[1]).toBe(`# Problems, ${location.href}\n\n## Recovered by kay 1\n\n**Error**, 2 times\n\n\`\`\`text\nisland a.kay did not match its server markup\n\`\`\`\n\n## kay check 1\n\n**Error**\n\n\`\`\`text\nerror[missing-alt]: An \`img\` needs \`alt\`\n --> src/routes/index.kay:3:5\n\`\`\``)
 
     Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: async () => Promise.reject(new Error('denied')) } })
     copy().click()
-    await Bun.sleep(0)
+    await turn()
     expect(copy().textContent).toBe('Copy failed')
 
     for (const button of shadow().querySelectorAll<HTMLButtonElement>('.problem button'))
@@ -191,7 +213,7 @@ describe('the dev tool', () => {
         at('/fonts/inter.woff2', { initiatorType: 'css', startTime: 7, transferSize: 0 }),
         at('https://cdn.example/x.js', { initiatorType: 'script', startTime: 8, transferSize: 0, encodedBodySize: 0, decodedBodySize: 0, responseStatus: 0 }),
       ])
-      await Bun.sleep(0)
+      await turn()
 
       expect(groups()).toEqual([`This page, ${location.pathname}${location.search}3`])
       expect(rows()).toEqual([
@@ -217,13 +239,13 @@ describe('the dev tool', () => {
       const clock = spyOn(window.performance, 'now').mockReturnValue(start)
 
       document.documentElement.setAttribute('aria-busy', 'true')
-      await Bun.sleep(0)
+      await turn()
       clock.mockRestore()
 
       await copiedBy(shadow().querySelector<HTMLButtonElement>('#kay-dev-network .fetch .copy')!)
       spyOn(window, 'fetch').mockImplementation((async () => new Response('')) as unknown as typeof window.fetch)
       shadow().querySelector<HTMLButtonElement>('#kay-dev-tab-env')!.click()
-      await Bun.sleep(0)
+      await turn()
       shadow().querySelector<HTMLButtonElement>('#kay-dev-tab-network')!.click()
       observed.report('resource', [
         at('/next', { startTime: start, contentType: 'text/html; charset=utf-8' }),
@@ -234,7 +256,7 @@ describe('the dev tool', () => {
       ])
       ;(window as unknown as { happyDOM: { setURL: (url: string) => void } }).happyDOM.setURL('http://localhost/next')
       document.documentElement.removeAttribute('aria-busy')
-      await Bun.sleep(0)
+      await turn()
 
       expect(groups()).toEqual([`This page, ${location.pathname}${location.search}4`, `Before, /shop4`])
       expect(names().slice(0, 4)).toEqual(['/next', '/_kay/action/src/routes/next.kay/save', `/next?${ISLAND_PARAM}=1`, '/_kay/env.js'])
@@ -259,9 +281,9 @@ describe('the dev tool', () => {
 
       for (let swap = 0; swap < 5; swap++) {
         document.documentElement.setAttribute('aria-busy', 'true')
-        await Bun.sleep(0)
+        await turn()
         document.documentElement.removeAttribute('aria-busy')
-        await Bun.sleep(0)
+        await turn()
       }
 
       expect(groups()).toHaveLength(5)
@@ -291,12 +313,12 @@ describe('the dev tool', () => {
       const clock = spyOn(window.performance, 'now').mockReturnValue(start)
 
       document.documentElement.setAttribute('aria-busy', 'true')
-      await Bun.sleep(0)
+      await turn()
       clock.mockRestore()
       observed.report('resource', entries(start))
       ;(window as unknown as { happyDOM: { setURL: (url: string) => void } }).happyDOM.setURL(`http://localhost${to}`)
       document.documentElement.removeAttribute('aria-busy')
-      await Bun.sleep(0)
+      await turn()
     }
 
     try {
@@ -358,7 +380,12 @@ describe('the dev tool', () => {
         listeners.set(type, listener)
       }
     }
-    const answer = (async () => new Response('<html></html>', { headers: { 'content-type': 'text/html' } })) as unknown as typeof fetch
+    let loads = 0
+    const answer = (async () => {
+      loads++
+
+      return new Response('<html></html>', { headers: { 'content-type': 'text/html' } })
+    }) as unknown as typeof fetch
 
     globalThis.fetch = answer
     window.fetch = answer
@@ -372,7 +399,8 @@ describe('the dev tool', () => {
       for (let reload = 0; reload < 30; reload++)
         listeners.get('styles')!({ data: String(reload) })
 
-      await Bun.sleep(20)
+      // Every one of the 30 swaps loaded the page, so the notes were cut to their cap along the way.
+      await eventually(() => expect(loads).toBe(30))
 
       const notes = (window as unknown as { $kayReloads: [string, number][] }).$kayReloads
 
@@ -396,7 +424,7 @@ describe('the dev tool', () => {
   it('lists its tabs in a vertical rail that moves by Up and Down, and keeps the size it was given for the browser', async () => {
     tool = startDevTool()
     tool.tab({ id: 'other', label: 'Other' })
-    await Bun.sleep(0)
+    await turn()
 
     const rail = shadow().querySelector('[role=tablist]')!
     const icons = () => [...shadow().querySelectorAll<HTMLButtonElement>('.head .icon')].map(button => [button.getAttribute('aria-label'), button.title, button.textContent])
@@ -420,7 +448,7 @@ describe('the dev tool', () => {
     tool.stop()
 
     tool = startDevTool()
-    await Bun.sleep(0)
+    await turn()
 
     expect(shadow().querySelector('.ui.max')).not.toBeNull()
     shadow().querySelector<HTMLButtonElement>('.icon[aria-label="Restore the size"]')!.click()
@@ -430,7 +458,7 @@ describe('the dev tool', () => {
   it('opens on the bar or Alt+Shift+K, moves between tabs by arrow keys, closes on Escape from inside it, and keeps its tab for the browser tab and its dock for the browser', async () => {
     tool = startDevTool()
     tool.tab({ id: 'other', label: 'Other' })
-    await Bun.sleep(0)
+    await turn()
 
     // Styled by an adopted sheet and the sizes of its bars set through the CSSOM, which a policy without inline styles allows.
     expect(shadow().adoptedStyleSheets).toHaveLength(1)
@@ -465,7 +493,7 @@ describe('the dev tool', () => {
     sessionStorage.clear()
 
     tool = startDevTool()
-    await Bun.sleep(0)
+    await turn()
 
     expect(drawer().hidden).toBe(true)
     expect(shadow().querySelector('.ui.dock-right')).not.toBeNull()
@@ -478,7 +506,7 @@ describe('the dev tool', () => {
     for (const [corner, expected] of [['bottom-left', ['--kay-dev-bar-bottom-left']], ['bottom-right', ['--kay-dev-bar-bottom-right']], ['top-left', []], ['top-right', []]] as [string, string[]][]) {
       localStorage.setItem('kay-dev-layout', JSON.stringify({ dock: 'float', corner }))
       tool = startDevTool()
-      await Bun.sleep(0)
+      await turn()
       expect(published()).toEqual(expected)
       tool.stop()
       tool = undefined
@@ -490,7 +518,7 @@ describe('the dev tool', () => {
 
     try {
       tool = startDevTool()
-      await Bun.sleep(0)
+      await turn()
       expect([...document.adoptedStyleSheets].flatMap(sheet => [...sheet.cssRules].map(rule => rule.cssText)).join(' ')).toContain('--kay-dev-bar-bottom-left: 52px')
     }
     finally {
@@ -506,7 +534,7 @@ describe('the dev tool', () => {
 
     localStorage.setItem('kay-dev-layout', '{"dock":"sideways","corner":"middle","box":{"left":"x"},"bottom":"tall"}')
     tool = startDevTool()
-    await Bun.sleep(0)
+    await turn()
 
     // A floating drawer resizes from every edge and corner, the keyboard reaching its bottom right corner.
     expect(shadow().querySelector('.ui.floating')).not.toBeNull()
@@ -544,7 +572,7 @@ describe('the dev tool', () => {
     // A layout stored as no object at all.
     localStorage.setItem('kay-dev-layout', 'null')
     tool = startDevTool()
-    await Bun.sleep(0)
+    await turn()
     expect(shadow().querySelector('.ui.floating')).not.toBeNull()
   })
 
@@ -564,14 +592,13 @@ describe('the dev tool', () => {
 
     tool = startDevTool()
     push(Object.assign(new TypeError('count is undefined'), { stack }))
-    await Bun.sleep(20)
+    await eventually(() => expect(problems()).toEqual([['error', mapped]]))
 
     expect(posted).toEqual([{ stack }])
-    expect(problems()).toEqual([['error', mapped]])
     expect(await copiedBy(shadow().querySelector<HTMLButtonElement>('.actions button[title^="Copy"]')!)).toContain('/app/src/counter.kay:4:9')
 
     push(Object.assign(new TypeError('other'), { stack: 'TypeError: other\n    at f (http://localhost/_kay/counter-bbbbbbbb.js:2:2)' }))
-    await Bun.sleep(20)
+    await eventually(() => expect(posted).toHaveLength(2))
 
     expect(problems().at(-1)).toEqual(['error', 'TypeError: other\n    at f (http://localhost/_kay/counter-bbbbbbbb.js:2:2)'])
     answer.mockRestore()
@@ -581,7 +608,7 @@ describe('the dev tool', () => {
     document.head.innerHTML = problemsBlock(['warning[missing-title]: a page needs a title'])
     tool = startDevTool()
     console.warn('[kay] first')
-    await Bun.sleep(0)
+    await turn()
 
     dismissAll().click()
     expect(problems()).toEqual([])
@@ -589,30 +616,30 @@ describe('the dev tool', () => {
 
     console.warn('[kay] first')
     console.warn('[kay] second')
-    await Bun.sleep(0)
+    await turn()
     expect(problems()).toEqual([['warn', 'second']])
 
     tool.stop()
     document.head.innerHTML = problemsBlock(['warning[missing-title]: a page needs a title', 'warning[missing-alt]: an img needs alt'])
     tool = startDevTool()
     console.warn('[kay] on this page')
-    await Bun.sleep(0)
+    await turn()
     expect(problems()).toEqual([['warn', 'on this page'], ['warn', 'warning[missing-alt]: an img needs alt']])
 
     document.documentElement.setAttribute('aria-busy', 'true')
-    await Bun.sleep(0)
+    await turn()
     expect(problems()).toEqual([['warn', 'warning[missing-alt]: an img needs alt']])
 
     // Read again, a problem kay check still finds came no second time.
     document.documentElement.removeAttribute('aria-busy')
-    await Bun.sleep(0)
+    await turn()
     document.documentElement.setAttribute('aria-busy', 'true')
-    await Bun.sleep(0)
+    await turn()
     expect(shadow().querySelector<HTMLElement>('.problem > .pill')!.hidden).toBe(true)
 
     document.head.innerHTML = problemsBlock(['error[unread-prop]: a prop nothing reads'])
     document.documentElement.removeAttribute('aria-busy')
-    await Bun.sleep(0)
+    await turn()
     expect(problems()).toEqual([['error', 'error[unread-prop]: a prop nothing reads']])
   })
 
@@ -628,7 +655,7 @@ describe('the dev tool', () => {
     window.dispatchEvent(rejected)
     window.dispatchEvent(blocked)
     console.warn('[kay] a11y image-alt: Images must have alternative text\n  img.hero\nhttps://dequeuniversity.com/rules/axe/4.14/image-alt')
-    await Bun.sleep(0)
+    await turn()
 
     expect(groups()).toEqual(['Uncaught errors (2)', 'Blocked by the policy (1)', 'Accessibility (1)'])
     expect(problems()).toEqual([
@@ -658,7 +685,7 @@ describe('the dev tool', () => {
     globalThis.fetch = fetch
     window.dispatchEvent(rejected)
     window.dispatchEvent(new ErrorEvent('error', { message: 'ResizeObserver loop completed with undelivered notifications.', error: null }))
-    await Bun.sleep(0)
+    await turn()
 
     expect(problems()).toEqual([
       ['error', 'in island src/components/counter.kay: TypeError: no count\ncounted@http://localhost/_kay/client/a.js:1:2'],
@@ -670,7 +697,7 @@ describe('the dev tool', () => {
     document.body.innerHTML = '<img class="hero" src="/a.png"><img class="hero" src="/b.png">'
     tool = startDevTool()
     console.warn('[kay] a11y image-alt: Images must have alternative text\n  img.hero\n  #in >>> img\n  and 3 more\nhttps://dequeuniversity.com/rules/axe/4.14/image-alt')
-    await Bun.sleep(0)
+    await turn()
 
     const visible = () => [...shadow().querySelectorAll<HTMLElement>('.outline')].filter(outline => outline.hidden === false).length
 
@@ -686,7 +713,7 @@ describe('the dev tool', () => {
   it('finds the .kay files a problem names by kay\'s route names, with a line alone, and none inside a URL', async () => {
     tool = startDevTool()
     console.error('[kay] src/routes/todos/[id].kay:3:4, src/routes/(site)/[[page]].kay:12, src/routes/[...rest].kay and http://localhost:3000/src/x.kay')
-    await Bun.sleep(0)
+    await turn()
 
     expect([...shadow().querySelectorAll('.problem button.position')].map(position => position.textContent)).toEqual(['src/routes/todos/[id].kay:3:4', 'src/routes/(site)/[[page]].kay:12', 'src/routes/[...rest].kay'])
   })
@@ -694,7 +721,7 @@ describe('the dev tool', () => {
   it('finds the scripts and stylesheets a problem names by a folder or a line, but no word like Node.js, URL path or URL of kay\'s own', async () => {
     tool = startDevTool()
     console.error('[kay] at load (src/lib/db.ts:12:5), C:\\app\\src\\x.tsx:3, styles.css:4, src/app.css, Node.js, /_kay/entry-1.js:2:1, https://cdn.example/x.js:1:1, GET /assets/app.js 404, /home/me/app/src/y.ts:3:5 and lib.mjs')
-    await Bun.sleep(0)
+    await turn()
 
     expect([...shadow().querySelectorAll('.problem button.position')].map(position => position.textContent)).toEqual(['src/lib/db.ts:12:5', 'C:\\app\\src\\x.tsx:3', 'styles.css:4', 'src/app.css', '/home/me/app/src/y.ts:3:5'])
   })
@@ -705,7 +732,7 @@ describe('the dev tool', () => {
     tool = startDevTool()
     console.error('[kay] island src/components/card.kay did not match, see src/routes/index.kay:4:3.')
     console.error('[kay] line alone in src/routes/about.kay:7')
-    await Bun.sleep(0)
+    await turn()
 
     const positions = () => [...shadow().querySelectorAll<HTMLButtonElement>('.problem button.position')]
 
@@ -721,7 +748,7 @@ describe('the dev tool', () => {
     for (const position of positions())
       position.click()
 
-    await Bun.sleep(0)
+    await turn()
 
     expect(opened).toEqual(['src/components/card.kay:1:1', 'src/routes/index.kay:4:3', 'src/routes/about.kay:7:1'])
     expect(problems()[0]![1]).toBe('island src/components/card.kay did not match, see src/routes/index.kay:4:3 (no editor found, set KAY_EDITOR).')
@@ -744,7 +771,7 @@ describe('the dev tool', () => {
 
     open!.click()
     copy!.click()
-    await Bun.sleep(0)
+    await turn()
 
     expect(opened).toEqual(['src/stock.ts:4:11'])
     expect(open!.textContent).toBe('src/stock.ts:4:11 (no editor found, set KAY_EDITOR)')
@@ -845,12 +872,9 @@ describe('the dev tool', () => {
     document.head.append(block({ route: '/items/:id', page: 'src/routes/items/[id].kay', layouts: ['src/routes/_layout.kay'], params: { id: '7' }, id: 'abc', guards: [{ file: 'src/routes/_guard.ts', outcome: 'passed' }, { file: 'src/routes/items/_guard.ts', outcome: 'passed' }], prerender: 'listed', locale: 'fr', status: 200, loads: [{ file: 'src/routes/_layout.kay', ms: 1.5 }, { file: 'src/routes/items/[id].kay', ms: 42.4 }] }))
     tool = startDevTool()
     shadow().querySelector<HTMLButtonElement>('#kay-dev-tab-request')!.click()
-    await Bun.sleep(0)
-
-    await Bun.sleep(0)
+    await eventually(() => expect(line()).toEqual(['GET', `${location.pathname}${location.search}`, '200', '51 ms on the server']))
 
     expect(asked).toEqual(['/_kay/dev/request?id=abc'])
-    expect(line()).toEqual(['GET', `${location.pathname}${location.search}`, '200', '51 ms on the server'])
     expect(shadow().querySelector<HTMLElement>('#kay-dev-tab-request .count')!.hidden).toBe(true)
     expect(facts()).toEqual([
       'Route: /items/:id',
@@ -896,13 +920,13 @@ describe('the dev tool', () => {
 
     Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: async (text: string) => void copied.push(text) } })
     shadow().querySelector<HTMLButtonElement>('#kay-dev-request .headers .copy[aria-label="Copy the cache-control header"]')!.click()
-    await Bun.sleep(0)
+    await turn()
 
     expect(copied).toEqual(['no-store'])
     expect(shadow().querySelectorAll('#kay-dev-request .headers .copy[aria-label="Copied"]')).toHaveLength(1)
 
     shadow().querySelector<HTMLButtonElement>('.head .icon[aria-label="Copy this tab as Markdown"]')!.click()
-    await Bun.sleep(0)
+    await turn()
 
     expect(copied[1]).toBe(`# Request, ${location.href}\n\nGET ${location.pathname}${location.search} 200 51 ms on the server\n\n## Matched\n\n- Route: /items/:id\n- Params: id = "7"\n- Locale: fr\n- Rendered: on request here, prerendered by kay build for the paths its setting lists\n- Redirected: /members (307, by the guard src/routes/members/_guard.ts)\n\n## Files, outermost first\n\n- Guard src/routes/_guard.ts passed\n- Guard src/routes/items/_guard.ts passed\n- Layout src/routes/_layout.kay\n- Page src/routes/items/[id].kay\n\n## Time on the server\n\n- Guards: 0.8 ms\n- Importing modules: 2.0 ms\n- Loads, run at once: 43 ms\n- src/routes/_layout.kay: 1.5 ms\n- src/routes/items/[id].kay: 42 ms\n- Render, what a stream sends first: 3.1 ms\n- Whole request: 51 ms\n\n## Response headers\n\n- content-security-policy: default-src 'self'; script-src 'self' 'sha256-abc'; img-src *;\n- cache-control: no-store\n- x-request-id: abc\n- content-type: text/html\n- server-timing: guards;dur=0.8, import;dur=2.04, loads;dur=42.6, load-0;desc="src/routes/_layout.kay";dur=1.5, load-1;desc="src/routes/items/[id].kay";dur=42.4, render;dur=3.1`)
     expect(shadow().querySelector('.head .icon[aria-label="Copied"]')).not.toBeNull()
@@ -910,13 +934,11 @@ describe('the dev tool', () => {
     // The swap adds the next page's block, then drops this one's.
     recorded = undefined
     document.head.append(block({ page: 'src/routes/_404.kay', layouts: [], params: {}, id: 'def', guards: [{ file: 'src/routes/_guard.ts', outcome: 'denied with 403' }], locale: 'en', status: 404, error: 'Not Found', loads: [] }))
-    await Bun.sleep(0)
+    await turn()
     document.head.firstElementChild!.remove()
-    await Bun.sleep(0)
-    await Bun.sleep(0)
+    await eventually(() => expect(facts()).toEqual(['Route: none matched', 'Params: none', 'Locale: en', 'Rendered: not known, a guard refused the request', 'Response: not recorded by the server']))
 
     expect(line()).toEqual(['GET', `${location.pathname}${location.search}`, '404 Not Found'])
-    expect(facts()).toEqual(['Route: none matched', 'Params: none', 'Locale: en', 'Rendered: not known, a guard refused the request', 'Response: not recorded by the server'])
     expect(chain()).toEqual(['Guard src/routes/_guard.ts denied with 403', 'Page src/routes/_404.kay'])
     expect(timing()).toEqual([])
     expect(shadow().querySelector('#kay-dev-request .reqline .pill')?.textContent).toBe('404 Not Found')
@@ -932,7 +954,7 @@ describe('the dev tool', () => {
       return undefined
     })
     shadow().querySelector<HTMLButtonElement>('#kay-dev-request .chain li:last-child button.position')!.click()
-    await Bun.sleep(0)
+    await turn()
 
     expect(opened).toEqual(['src/routes/_404.kay:1:1'])
     fetching.mockRestore()
@@ -966,16 +988,16 @@ describe('the dev tool', () => {
 
     console.error('[kay] no locale has the message "nav.home"; production shows the key itself')
     console.error('[kay] no locale has the message "a\\"b"; production shows the key itself')
-    await Bun.sleep(0)
+    await turn()
     expect(panel()!.querySelectorAll('.missing li')).toHaveLength(2)
     expect(panel()!.textContent).toContain('a"b')
 
     document.head.replaceChildren(block({ ...PAGE, locale: 'fr', locales: [{ locale: 'en', href: '/docs/about' }, { locale: 'fr', href: '/docs/fr/a-propos' }] }))
-    await Bun.sleep(0)
+    await turn()
     expect(links()).toEqual(['en /docs/about', 'fr current'])
 
     document.documentElement.setAttribute('aria-busy', 'true')
-    await Bun.sleep(0)
+    await turn()
     expect(panel()!.querySelectorAll('.missing li')).toHaveLength(0)
     expect(count()).toBe('0')
   })
@@ -1009,10 +1031,9 @@ describe('the dev tool', () => {
     try {
       tool = startDevTool()
       shadow().querySelector<HTMLButtonElement>('#kay-dev-tab-routes')!.click()
-      await Bun.sleep(0)
+      await eventually(() => expect(sections()).toEqual(['Pages (3)', 'API (1)', 'Served by kay (3)', 'kay\'s plumbing (2)']))
 
       expect(fetched).toEqual(['/_kay/dev/routes'])
-      expect(sections()).toEqual(['Pages (3)', 'API (1)', 'Served by kay (3)', 'kay\'s plumbing (2)'])
       expect(rows()).toEqual(['GET | /broken |  | src/routes/broken.kay', 'GET | /items/:id |  | src/routes/items/[id].kay', 'GET | /fr/a-propos | fr | src/routes/about.kay', 'POST | /api/stock/:id |  | src/api/stock.ts', 'GET | /manifest.webmanifest |  | the web app manifest', 'GET | /_kay/image | docs | resized images, by width and crop', 'POST | /_kay/csp | docs | what the Content-Security-Policy blocked'])
       expect([...shadow().querySelectorAll<HTMLAnchorElement>('#kay-dev-routes a')].map(link => link.getAttribute('href'))).toEqual(['/broken', '/fr/a-propos', '/manifest.webmanifest', '/_kay/image', 'https://kayjs.kaynooo.fr/llms/images', 'https://kayjs.kaynooo.fr/llms/proxy-and-security'])
       expect([...shadow().querySelectorAll<HTMLAnchorElement>('#kay-dev-routes a[target=_blank]')].map(link => [link.getAttribute('aria-label'), link.rel])).toEqual([['Docs for /_kay/image', 'noopener noreferrer'], ['Docs for /_kay/csp', 'noopener noreferrer']])
@@ -1039,10 +1060,9 @@ describe('the dev tool', () => {
       // A restart may change the routes: the tab shown asks again.
       status = 500
       window.dispatchEvent(new CustomEvent('kay-dev-built', { detail: JSON.stringify({ changed: 'src/routes/x.kay', ms: 1 }) }))
-      await Bun.sleep(0)
+      await eventually(() => expect(shadow().querySelector('#kay-dev-routes .empty')?.textContent).toBe('Could not list the routes: the server answered 500'))
 
       expect(fetched).toHaveLength(2)
-      expect(shadow().querySelector('#kay-dev-routes .empty')?.textContent).toBe('Could not list the routes: the server answered 500')
     }
     finally {
       fetching.mockRestore()
@@ -1071,29 +1091,27 @@ describe('the dev tool', () => {
     try {
       tool = startDevTool()
       shadow().querySelector<HTMLButtonElement>('#kay-dev-tab-not-found')!.click()
-      await Bun.sleep(0)
-
-      expect(rows()).toEqual(['/old | 3 hits | from a.example | /new | Suggested target (slug): /new', '/other | 1 hit |  |  | No target suggested: name one to redirect.'])
+      await eventually(() => expect(rows()).toEqual(['/old | 3 hits | from a.example | /new | Suggested target (slug): /new', '/other | 1 hit |  |  | No target suggested: name one to redirect.']))
 
       const add = (index: number) => shadow().querySelectorAll<HTMLButtonElement>('#kay-dev-not-found .missing button.tool')[index]!
 
       refuse = '/other has no suggested target'
       add(1).click()
-      await Bun.sleep(0)
-      expect(shadow().querySelector('#kay-dev-not-found > .note')?.textContent).toBe('Could not add the redirect: /other has no suggested target')
+      await eventually(() => expect(shadow().querySelector('#kay-dev-not-found > .note')?.textContent).toBe('Could not add the redirect: /other has no suggested target'))
       expect(rows()).toHaveLength(2)
 
       refuse = undefined
       add(0).click()
-      await Bun.sleep(0)
+      await eventually(() => {
+        expect(shadow().querySelector('#kay-dev-not-found > .note')?.textContent).toContain('Added to kay.config.ts')
+        expect(rows()).toHaveLength(1)
+      })
+
       expect(calls.at(-1)).toEqual(['POST /_kay/dev/not-found', JSON.stringify({ path: '/old', to: '/new' })])
-      expect(shadow().querySelector('#kay-dev-not-found > .note')?.textContent).toContain('Added to kay.config.ts')
-      expect(rows()).toHaveLength(1)
 
       recorded = false
       window.dispatchEvent(new CustomEvent('kay-dev-built', { detail: JSON.stringify({ changed: 'kay.config.ts', ms: 1 }) }))
-      await Bun.sleep(0)
-      expect(shadow().querySelector('#kay-dev-not-found .empty')?.textContent).toContain('kay dev records none')
+      await eventually(() => expect(shadow().querySelector('#kay-dev-not-found .empty')?.textContent).toContain('kay dev records none'))
     }
     finally {
       fetching.mockRestore()
@@ -1130,14 +1148,14 @@ describe('the dev tool', () => {
 
     try {
       tool = startDevTool()
-      await Bun.sleep(0)
 
       // The count is there before the tab is opened, and opening it reads again.
+      await eventually(() => expect(shadow().querySelector<HTMLElement>('#kay-dev-tab-head .count')!.textContent).toBe('1'))
+
       expect(asked).toHaveLength(1)
-      expect(shadow().querySelector<HTMLElement>('#kay-dev-tab-head .count')!.textContent).toBe('1')
       asked.length = 0
       shadow().querySelector<HTMLButtonElement>('#kay-dev-tab-head')!.click()
-      await Bun.sleep(0)
+      await eventually(() => expect(text('.problem pre')).toEqual(['The description of `/` runs 200 characters\nhelp: shorten it']))
 
       expect(asked).toHaveLength(1)
       expect(asked[0]!.path).toBe('/')
@@ -1184,11 +1202,9 @@ describe('the dev tool', () => {
       // A swap brings the next page's head, with no origin to list it in.
       answer = { descriptionLength: 160, sitemap: 'none', problems: [] }
       document.head.innerHTML = '<title>About</title>'
-      await Bun.sleep(0)
-      await Bun.sleep(0)
+      await eventually(() => expect(text('.serp span:not(.cap)')).toEqual(['http://localhost:3000/', 'About', 'No description']))
 
       expect(asked).toHaveLength(2)
-      expect(text('.serp span:not(.cap)')).toEqual(['http://localhost:3000/', 'About', 'No description'])
       expect(panel().querySelector('.facts')!.textContent).toContain('Sitemapnone, the site has no origin')
       expect(panel().querySelector('img.card')).toBeNull()
       expect(panel().querySelector('.preview:not(.serp)')!.textContent).toContain('No og:image or twitter:image tag.')
@@ -1198,10 +1214,8 @@ describe('the dev tool', () => {
       // A server that fails leaves the head readable.
       fetching.mockImplementation((async () => new Response(null, { status: 500 })) as unknown as typeof window.fetch)
       document.head.innerHTML = '<title>Again</title><meta property="og:image" content="http://">'
-      await Bun.sleep(0)
-      await Bun.sleep(0)
+      await eventually(() => expect(panel().querySelector('.empty')?.textContent).toBe('Could not check the head: the server answered 500'))
 
-      expect(panel().querySelector('.empty')?.textContent).toBe('Could not check the head: the server answered 500')
       expect(text('.serp span:not(.cap)')[1]).toBe('Again')
       expect(panel().querySelector('.error')?.textContent).toBe('The social card image is not a valid URL: http://')
     }
@@ -1232,14 +1246,19 @@ describe('the dev tool', () => {
     try {
       tool = startDevTool()
       shadow().querySelector<HTMLButtonElement>('#kay-dev-tab-head')!.click()
-      await Bun.sleep(0)
+
+      // Both asks are held back until the swap has asked again.
+      await eventually(() => expect(fetching).toHaveBeenCalled())
+
+      const first = fetching.mock.calls.length
+
       document.head.innerHTML = '<title>About</title><meta name="description" content="Other"><meta property="og:title" content="About">'
-      await Bun.sleep(0)
+      await eventually(() => expect(fetching.mock.calls.length).toBeGreaterThan(first))
       release()
-      await Bun.sleep(0)
-      await Bun.sleep(0)
 
       // The swap asks again and the latest snapshot wins, never a mix of the two heads.
+      await eventually(() => expect(panel().textContent).toContain('Other'))
+
       expect(panel().textContent).toContain('About')
       expect(panel().textContent).toContain('Other')
       expect(panel().textContent).not.toContain('Home | Shop')
@@ -1287,7 +1306,7 @@ describe('the dev tool', () => {
       tool = startDevTool()
       asked.length = 0
       shadow().querySelector<HTMLButtonElement>('#kay-dev-tab-env')!.click()
-      await Bun.sleep(20)
+      await eventually(() => expect(rows()).toHaveLength(8))
 
       expect(asked).toEqual(['/_kay/env.js'])
       expect(rows()).toEqual([
@@ -1318,18 +1337,15 @@ describe('the dev tool', () => {
       await rm(join(dir, 'src/env.ts'))
       app = await pages({ root: dir, routes, dev: true })
       window.dispatchEvent(new CustomEvent('kay-dev-built', { detail: JSON.stringify({ changed: 'kay.config.ts', ms: 1 }) }))
-      await Bun.sleep(20)
+      await eventually(() => expect(shadow().querySelector('#kay-dev-env .empty')?.textContent).toContain('sends no public env'))
 
-      expect(shadow().querySelector('#kay-dev-env .empty')?.textContent).toContain('sends no public env')
       expect(shadow().querySelector<HTMLElement>('#kay-dev-tab-env .count')!.hidden).toBe(true)
 
       // Only a missing route means none: a failing server, or a page answering in its place, is told as a failure.
       for (const answer of [new Response(null, { status: 503 }), new Response('<p>Home</p>', { headers: { 'content-type': 'text/html' } })]) {
         fetching.mockImplementation((async () => answer.clone()) as unknown as typeof window.fetch)
         window.dispatchEvent(new CustomEvent('kay-dev-built', { detail: JSON.stringify({ changed: 'kay.config.ts', ms: 1 }) }))
-        await Bun.sleep(20)
-
-        expect(shadow().querySelector('#kay-dev-env .empty')?.textContent).toContain('Could not read the public env')
+        await eventually(() => expect(shadow().querySelector('#kay-dev-env .empty')?.textContent).toContain('Could not read the public env'))
       }
     }
     finally {
@@ -1403,12 +1419,9 @@ describe('the dev tool', () => {
       signals.length = 0
       observed.report('largest-contentful-paint', [{ startTime: 900, renderTime: 900, element: document.getElementById('hero')! }])
       shadow().querySelector<HTMLButtonElement>('#kay-dev-tab-images')!.click()
-      await Bun.sleep(20)
 
       // Only loaded images of kay's own routes are asked for: the app's handlers, an image not drawn yet and another host are not, and a request that hangs holds back none of the others.
-      expect(asked).toEqual(['HEAD http://localhost/_kay/image?src=%2F_kay%2Fassets%2Fhero.jpg&w=1280', 'HEAD http://localhost/_kay/images/logo-320-1x1.webp', 'HEAD http://localhost/_kay/images/100%.webp', 'HEAD http://localhost/_kay/images/gone.webp', 'HEAD http://localhost/_kay/images/hung.webp'])
-      expect(signals.every(signal => signal instanceof AbortSignal)).toBe(true)
-      expect(rows()).toEqual([
+      await eventually(() => expect(rows()).toEqual([
         '/_kay/image?src=%2F_kay%2Fassets%2Fhero.jpg&w=1280 (largest paint) | 1280w, resized on request - avif, 43.9 KB - 1280x1280 drawn 640x360 at 2x',
         '/photo.jpg | not resized by kay - format not looked up - 4000x4000 drawn 300x225 at 2x | served 59 times the pixels it is drawn with, give it a smaller width or `sizes`',
         '/_kay/images/logo-320-1x1.webp | 320w, cut 1x1, written by kay build - webp, 43.9 KB - 160x160 drawn 80x80 at 2x | no width and height, so the page shifts as it loads | lazy-loaded but in view, which delays it',
@@ -1418,28 +1431,27 @@ describe('the dev tool', () => {
         '/_kay/images/gone.webp | not resized by kay - the server answered 404 - 10x10 drawn 10x10 at 2x',
         '/_kay/images/hung.webp | not resized by kay - format... - 10x10 drawn 10x10 at 2x',
         '/_kay/images/unloaded.webp | not resized by kay - not loaded - not loaded, drawn 10x10 at 2x',
-      ])
+      ]))
+      expect(asked).toEqual(['HEAD http://localhost/_kay/image?src=%2F_kay%2Fassets%2Fhero.jpg&w=1280', 'HEAD http://localhost/_kay/images/logo-320-1x1.webp', 'HEAD http://localhost/_kay/images/100%.webp', 'HEAD http://localhost/_kay/images/gone.webp', 'HEAD http://localhost/_kay/images/hung.webp'])
+      expect(signals.every(signal => signal instanceof AbortSignal)).toBe(true)
       expect(shadow().querySelector('#kay-dev-tab-images .count')?.textContent).toBe('3')
 
       // The page changes under the open tab: an image added is listed, and the answers already read are not asked for again.
       document.body.insertAdjacentHTML('beforeend', '<img id="late" src="/late.png" width="10" height="10" alt="">')
-      await Bun.sleep(20)
-
-      expect(rows()).toHaveLength(10)
+      await eventually(() => expect(rows()).toHaveLength(10))
 
       // No answer is asked for again, the 404 and the request still pending included, until the next rebuild.
       missing = false
       document.body.insertAdjacentHTML('beforeend', '<img id="later" src="/later.png" width="10" height="10" alt="">')
-      await Bun.sleep(20)
+      await eventually(() => expect(rows()).toHaveLength(11))
 
       expect(asked).toHaveLength(5)
       expect(rows().at(-5)).toContain('the server answered 404')
 
       window.dispatchEvent(new CustomEvent('kay-dev-built', { detail: JSON.stringify({ changed: 'src/routes/x.kay', ms: 1 }) }))
-      await Bun.sleep(20)
+      await eventually(() => expect(rows().at(-5)).toContain('avif, 43.9 KB'))
 
       expect(asked.filter(request => request.includes('gone'))).toHaveLength(2)
-      expect(rows().at(-5)).toContain('avif, 43.9 KB')
 
       const visible = () => [...shadow().querySelectorAll<HTMLElement>('.outline')].filter(outline => outline.hidden === false).length
 
@@ -1492,9 +1504,7 @@ describe('the dev tool', () => {
     try {
       tool = startDevTool()
       shadow().querySelector<HTMLButtonElement>('#kay-dev-tab-images')!.click()
-      await Bun.sleep(20)
-
-      expect(flags()).toEqual([
+      await eventually(() => expect(flags()).toEqual([
         '/_kay/assets/logo.svg | no width and height, so the page shifts as it loads',
         '/logo.svg',
         '/large.svg',
@@ -1504,7 +1514,7 @@ describe('the dev tool', () => {
         '/logo.png?file=a.svg | served 88 times the pixels it is drawn with, give it a smaller width or `sizes`',
         '/mark?v=1#x',
         '/photo | served 88 times the pixels it is drawn with, give it a smaller width or `sizes`',
-      ])
+      ]))
 
       // Problems only keeps the rows with something wrong, the filter narrowing them further.
       shadow().querySelector<HTMLButtonElement>('#kay-dev-images .toolbar button')!.click()
@@ -1565,12 +1575,10 @@ describe('the dev tool', () => {
     try {
       tool = startDevTool()
       shadow().querySelector<HTMLButtonElement>('#kay-dev-tab-images')!.click()
-      await Bun.sleep(20)
-
-      expect(rows()).toEqual([
+      await eventually(() => expect(rows()).toEqual([
         '/logo.svg4 copies | not resized by kay - format not looked up - 150x150 drawn 16x16 at 1.2x | lazy-loaded but in view, which delays it',
         '/logo.svg | not resized by kay - format not looked up - 150x150 drawn 32x32 at 1.2x',
-      ])
+      ]))
       expect(shadow().querySelector('#kay-dev-images .image')!.getAttribute('aria-label')).toBe('/logo.svg, 4 copies')
 
       shadow().querySelector('#kay-dev-images .image')!.dispatchEvent(new PointerEvent('pointerenter'))
@@ -1612,16 +1620,18 @@ describe('the dev tool', () => {
       fetching.mockClear()
       observed.report('largest-contentful-paint', [])
       shadow().querySelector<HTMLButtonElement>('#kay-dev-tab-images')!.click()
-      await Bun.sleep(20)
+      const formats = () => [...shadow().querySelectorAll('#kay-dev-images .image .chips')].map(line => line.textContent)
 
-      const formats = [...shadow().querySelectorAll('#kay-dev-images .image .chips')].map(line => line.textContent)
+      // The four held slots take the first four, and the others are answered while they are held.
+      await eventually(() => {
+        expect(fetching).toHaveBeenCalledTimes(4)
+        expect(formats()[7]).toContain('not loaded')
+      })
 
-      expect(fetching).toHaveBeenCalledTimes(4)
-      expect(formats.slice(0, 4).every(text => text?.includes('format...'))).toBe(true)
-      expect(formats[4]).toContain('on another host')
-      expect(formats[5]).toContain('format not looked up')
-      expect(formats[6]).toContain('format unknown')
-      expect(formats[7]).toContain('not loaded')
+      expect(formats().slice(0, 4).every(text => text?.includes('format...'))).toBe(true)
+      expect(formats()[4]).toContain('on another host')
+      expect(formats()[5]).toContain('format not looked up')
+      expect(formats()[6]).toContain('format unknown')
     }
     finally {
       fetching.mockRestore()
@@ -1699,9 +1709,14 @@ describe('the dev tool', () => {
       observed.report('largest-contentful-paint', [{ startTime: 3000, renderTime: 3000, element: null }])
       observed.report('layout-shift', [{ startTime: 100, value: 0.04, hadRecentInput: false }, { startTime: 400, value: 0.08, hadRecentInput: false }, { startTime: 450, value: 0.5, hadRecentInput: true }, { startTime: 9000, value: 0.01, hadRecentInput: false }])
       shadow().querySelector<HTMLButtonElement>('#kay-dev-tab-performance')!.click()
-      await Bun.sleep(30)
 
-      expect(vitalTiles()).toEqual(['LCP: 3000ms needs work', 'CLS: 0.120 needs work', 'INP: no interaction yet'])
+      // The footprint is the last to come, after the weights are read through streams and the server asked twice.
+      await eventually(() => {
+        expect(vitalTiles()).toEqual(['LCP: 3000ms needs work', 'CLS: 0.120 needs work', 'INP: no interaction yet'])
+        expect(shadow().querySelector('#kay-dev-performance .facts')?.textContent).toContain('Requests11')
+        expect(fetched).toContain('/_kay/dev/sizes')
+      })
+
       expect(shadow().querySelector('#kay-dev-performance .vital .tick')?.textContent).toBe('2.5 s')
 
       // Interactions: the slowest of each, the worst taken; a later report moves the open tab.
@@ -1755,23 +1770,26 @@ describe('the dev tool', () => {
       expect(shadow().querySelector('#kay-dev-performance')!.textContent).toContain('Measured on the load of /.')
 
       // As Markdown: a bullet per vital with its rating, the weights with their files nested, the total last.
-      const markdown = await copiedBy()
+      // The weights are read through streams and the footprint through a fetch, which the copy waits for.
+      await eventually(async () => {
+        const markdown = await copiedBy()
 
-      expect(markdown).toContain('\n- LCP: 3000 ms, needs work\n- CLS: 0.120, needs work\n- INP: 240 ms, needs work\n')
-      expect(markdown).toContain('\n  - /_kay/counter-def45678.js ')
-      expect(markdown).toMatch(/\n- Total: \d+(\.\d)? (B|KB)\n/)
+        expect(markdown).toContain('\n- LCP: 3000 ms, needs work\n- CLS: 0.120, needs work\n- INP: 240 ms, needs work\n')
+        expect(markdown).toContain('\n  - /_kay/counter-def45678.js ')
+        expect(markdown).toMatch(/\n- Total: \d+(\.\d)? (B|KB)\n/)
 
-      expect(markdown).toContain('\n## Footprint of the page\n\n- EcoIndex: ')
-      expect(markdown).toContain('\n- Requests: 11\n')
+        expect(markdown).toContain('\n## Footprint of the page\n\n- EcoIndex: ')
+        expect(markdown).toContain('\n- Requests: 11\n')
+      })
 
       // A link swaps in another page without a load: the vitals say which load they belong to, and the footprint is measured again.
       footprintQuery = ''
       happyDOM.setURL('http://localhost/next')
       document.head.insertAdjacentHTML('beforeend', '<meta name="swapped">')
-      await Bun.sleep(30)
-
-      expect(shadow().querySelector('#kay-dev-performance')!.textContent).toContain('Measured on the load of /, not on this page')
-      expect(footprintQuery).toContain('requests=11')
+      await eventually(() => {
+        expect(shadow().querySelector('#kay-dev-performance')!.textContent).toContain('Measured on the load of /, not on this page')
+        expect(footprintQuery).toContain('requests=11')
+      })
     }
     finally {
       fetching.mockRestore()
