@@ -10,6 +10,7 @@ import { check } from '../src/check'
 import * as shadowModule from '../src/check/shadow'
 import { Connection } from '../src/lsp/rpc'
 import { DEPENDENTS_DELAY, DIAGNOSTICS_DELAY, KayLanguageServer } from '../src/lsp/server'
+import { eventually } from './helpers/eventually'
 import { spawnSuiteServer } from './listening'
 import { scratchDir } from './scratch'
 
@@ -825,6 +826,7 @@ describe('kay lsp for a client that supports diagnostic refreshes', () => {
     editor.connection.notify('textDocument/didSave', { textDocument: { uri } })
     await settled(editor)
     for (const version of [2, 3]) {
+      // Past the debounce, so each edit is a publish of its own.
       await Bun.sleep(DIAGNOSTICS_DELAY * 2)
       await editor.change(page, `--- server\nconst n: string = ${version}\n---\np {n}\n`, version)
       await settled(editor)
@@ -1047,8 +1049,13 @@ describe('kay lsp on a save', () => {
 
       await client.request('initialize', { processId: process.pid, rootUri: pathToFileURL(dir).href, capabilities: {} })
       client.notify('initialized', {})
+      const opened = new Promise<void>((resolve) => {
+        client.onNotification('textDocument/publishDiagnostics', () => resolve())
+      })
+
       client.notify('textDocument/didOpen', { textDocument: { uri, languageId: 'kay', version: 1, text: 'p x\n' } })
-      await Bun.sleep(300)
+      // The open is over when its first publish came, after the shadow tree was written.
+      await opened
       writes.mockClear()
 
       const tsgo = (server as unknown as { tsgo: { connection: Connection } }).tsgo.connection
@@ -1061,6 +1068,8 @@ describe('kay lsp on a save', () => {
       await Bun.write(join(dir, page), 'p changed\n')
       client.notify('textDocument/didSave', { textDocument: { uri } })
       client.notify('workspace/didChangeWatchedFiles', { changes: [{ uri, type: 2 }] })
+      await eventually(() => expect(told).toHaveLength(1))
+      // No second write may follow the save, so the wait goes on for a fixed span.
       await Bun.sleep(500)
       notify.mockRestore()
 
@@ -1100,8 +1109,13 @@ describe('kay lsp on a save', () => {
 
       await client.request('initialize', { processId: process.pid, rootUri: pathToFileURL(dir).href, capabilities: {} })
       client.notify('initialized', {})
+      const opened = new Promise<void>((resolve) => {
+        client.onNotification('textDocument/publishDiagnostics', () => resolve())
+      })
+
       client.notify('textDocument/didOpen', { textDocument: { uri, languageId: 'kay', version: 1, text: 'p x\n' } })
-      await Bun.sleep(300)
+      // The open is over when its first publish came, after the shadow tree was written.
+      await opened
 
       const tsgo = (server as unknown as { tsgo: { connection: Connection } }).tsgo.connection
       const told: string[][] = []
@@ -1109,9 +1123,13 @@ describe('kay lsp on a save', () => {
         if (method === 'workspace/didChangeWatchedFiles')
           told.push((params as { changes: { uri: string }[] }).changes.map(change => change.uri).filter(changed => changed.endsWith('.kay.tsx')))
       })
+      const passes = spyOn(server as unknown as { writeAfterSave: () => Promise<void> }, 'writeAfterSave')
       const save = async () => {
+        const before = passes.mock.calls.length
+
         client.notify('textDocument/didSave', { textDocument: { uri } })
-        await Bun.sleep(300)
+        await eventually(() => expect(passes.mock.calls.length).toBeGreaterThan(before))
+        await passes.mock.results[before]?.value
       }
 
       await Bun.write(join(dir, page), 'p y\n')
@@ -1122,6 +1140,7 @@ describe('kay lsp on a save', () => {
       notify.mockRestore()
 
       expect(told).toEqual([[shadow], [], [shadow]])
+      passes.mockRestore()
     }
     finally {
       const { tsgo } = server as unknown as { tsgo?: { process: { kill: () => void } } }
@@ -1154,8 +1173,13 @@ describe('kay lsp on a save', () => {
 
       await client.request('initialize', { processId: process.pid, rootUri: pathToFileURL(project).href, capabilities: {} })
       client.notify('initialized', {})
+      const opened = new Promise<void>((resolve) => {
+        client.onNotification('textDocument/publishDiagnostics', () => resolve())
+      })
+
       client.notify('textDocument/didOpen', { textDocument: { uri, languageId: 'kay', version: 1, text: source } })
-      await Bun.sleep(300)
+      // The open is over when its first publish came, after the shadow tree was written.
+      await opened
 
       const tsgo = (server as unknown as { tsgo: { connection: Connection } }).tsgo.connection
       const compiled: string[] = []
@@ -1178,6 +1202,7 @@ describe('kay lsp on a save', () => {
           await Bun.sleep(10)
 
         await writes.mock.results[before]?.value
+        // A second pass for the same save would start within this span.
         await Bun.sleep(50)
       }
 
@@ -1331,6 +1356,7 @@ describe('kay lsp with a slow tsgo', () => {
       await slow.start()
 
       for (let version = 2; version <= 5; version++) {
+        // Past the debounce, so each change is its own publish.
         await Bun.sleep(DIAGNOSTICS_DELAY + 50)
         slow.client.notify('textDocument/didChange', { textDocument: { uri: slow.uri, version }, contentChanges: [{ text: `p {${version}}\n` }] })
       }
