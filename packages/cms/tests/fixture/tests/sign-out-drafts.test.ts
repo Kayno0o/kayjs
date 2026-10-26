@@ -29,5 +29,7 @@ test('signing out forgets the drafts the browser kept, and a draft is kept under
   })
   await page.click('.kcms-admin-who button')
   await page.waitUntil(() => localStorage.length === 0, { timeout: '15s' })
+  // The browser clears the drafts on submit and the server's Set-Cookie arrives with the response, so the cookie goes after them.
+  await page.waitUntil(() => !document.cookie.includes('kay_editor_who'), { timeout: '15s' })
   expect(await page.evaluate(() => document.cookie.includes('kay_editor_who'))).toBe(false)
 }, 60_000)
