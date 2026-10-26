@@ -78,6 +78,8 @@ export const quiet = action(async function* (ctx) {
 })
 
 export const slow = action(async function* () {
+  seen.slowStarted++
+
   try {
     await Bun.sleep(50)
     yield 'late'

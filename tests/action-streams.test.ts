@@ -6,6 +6,7 @@ import { t } from 'elysia'
 import { action, ActionRedirectError, encodeCall, SETTLED } from '../src/runtime/action'
 import { actionStream } from '../src/runtime/action-stream'
 import { browserPath, testSite } from '../src/test'
+import { untilHolds } from './until-holds'
 
 const site = await testSite({ root: 'tests/fixtures/action-streams', browser: true, mcp: true })
 const mounted = await testSite({ root: 'tests/fixtures/action-streams', islands: false, base: '/blog', trailingSlash: 'always' })
@@ -35,7 +36,7 @@ const actions = await import(join(fixture, 'routes/index.kay')) as {
   libraryForbidden: Action<Record<never, never>, AsyncIterable<string>>
 }
 const { secret } = await import(join(fixture, 'routes/members/index.kay')) as { secret: Action<Record<never, never>, AsyncIterable<string>> }
-const { seen } = await import(join(fixture, 'seen.ts')) as { seen: { started: number, stopped: number, slowStopped: number, quietStopped: number, pages: { slow: number, await: number, slowServed: number }, slowGate: PromiseWithResolvers<void> } }
+const { seen } = await import(join(fixture, 'seen.ts')) as { seen: { started: number, stopped: number, slowStarted: number, slowStopped: number, quietStopped: number, pages: { slow: number, await: number, slowServed: number }, slowGate: PromiseWithResolvers<void> } }
 const path = browserPath()
 
 afterAll(async () => {
@@ -246,11 +247,12 @@ describe('an action returning an async iterable', () => {
 
   it('stops the iterable when the client goes away before its first value', async () => {
     const before = seen.slowStopped
+    const started = seen.slowStarted
     const leaving = new AbortController()
     const { headers, body } = encodeCall(undefined)
     const response = site.fetch(actions.slow.url, { method: 'POST', headers: { ...headers, origin: 'http://localhost' }, body, signal: leaving.signal })
 
-    await Bun.sleep(10)
+    await untilHolds(() => seen.slowStarted > started)
     leaving.abort()
 
     try {
@@ -263,10 +265,11 @@ describe('an action returning an async iterable', () => {
 
   it('stops the iterable a plain form post drains once the browser goes away', async () => {
     const before = seen.stopped
+    const started = seen.started
     const leaving = new AbortController()
     const response = site.fetch(actions.endless.url, { method: 'POST', headers: { origin: 'http://localhost' }, body: new FormData(), signal: leaving.signal })
 
-    await Bun.sleep(30)
+    await untilHolds(() => seen.started > started)
     leaving.abort()
 
     try {
@@ -341,7 +344,7 @@ describe('an action returning an async iterable', () => {
     using server = Bun.serve({ port: 0, fetch: async request => localized.handle(request) })
     const response = await fetch(new URL(actions.greets.url, server.url), { method: 'POST', headers: { ...headers, origin: server.url.origin, referer: new URL('/en/', server.url).href }, body })
 
-    // Over a server and read late, so the values after the first are pulled by its reads rather than where the answer was made.
+    // Over a server and read late, so the values after the first are pulled by its reads rather than where the answer was made: the delay is the point.
     await Bun.sleep(30)
 
     expect(await response.text()).toContain('data: ["Home"]')
@@ -436,6 +439,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('an island 
       await page.waitFor('p.status', { text: 'open' })
       await page.click('a.next')
       await page.waitFor('h1', { text: 'Kept next' })
+      // Nothing happens: the stream stays open, so a stop that came late would show within this time.
       await Bun.sleep(150)
 
       expect(seen.quietStopped).toBe(before)
@@ -460,6 +464,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('an island 
       await page.click('button.begin')
       await page.waitFor('p.status', { text: 'open' })
       await page.waitFor('button.begin', { gone: true })
+      // Nothing happens: the stream stays open, so a stop that came late would show within this time.
       await Bun.sleep(150)
 
       expect(seen.quietStopped).toBe(before)

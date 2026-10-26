@@ -3,6 +3,7 @@
 export const seen = {
   started: 0,
   stopped: 0,
+  slowStarted: 0,
   slowStopped: 0,
   quietStopped: 0,
   pages: { slow: 0, await: 0, slowServed: 0 },

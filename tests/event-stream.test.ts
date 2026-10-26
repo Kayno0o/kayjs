@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'bun:test'
 import { endEventStreams, eventBody, eventStream } from '../src/server/event-stream'
+import { untilHolds } from './until-holds'
 
 // A source blocked on a feed that never speaks, freed only by the signal it was handed.
 function quiet(seen: { signal?: AbortSignal, freed: boolean }) {
@@ -24,11 +25,11 @@ describe('an event stream whose source is a function of a signal', () => {
     const reader = eventBody(quiet(seen), () => undefined).getReader()
     const pending = reader.read()
 
-    await Bun.sleep(5)
+    await untilHolds(() => seen.signal !== undefined)
     expect(seen.signal?.aborted).toBe(false)
 
     await reader.cancel()
-    await Bun.sleep(5)
+    await untilHolds(() => seen.freed)
     expect(seen.signal?.aborted).toBe(true)
     expect(seen.freed).toBe(true)
     expect((await pending).done).toBe(true)
@@ -69,11 +70,13 @@ describe('endEventStreams', () => {
   it('ends every stream being read with no end or error event, freeing its source, and leaves one already finished alone', async () => {
     const seen: { signal?: AbortSignal, freed: boolean } = { freed: false }
     const first = eventBody(quiet(seen), () => undefined).getReader()
-    const second = eventBody(quiet({ freed: false }), () => undefined).getReader()
+    const secondSeen: { signal?: AbortSignal, freed: boolean } = { freed: false }
+    const second = eventBody(quiet(secondSeen), () => undefined).getReader()
     const done = new Response(eventBody(() => [1], () => undefined))
     const pending = [first.read(), second.read()]
 
-    await Bun.sleep(5)
+    await untilHolds(() => seen.signal !== undefined)
+    await untilHolds(() => secondSeen.signal !== undefined)
     endEventStreams()
     expect((await Promise.all(pending)).map(read => read.done)).toEqual([true, true])
     expect(seen.signal?.aborted).toBe(true)
@@ -82,10 +85,11 @@ describe('endEventStreams', () => {
   })
 
   it('has nothing to end once the streams are cancelled or ended', async () => {
-    const reader = eventBody(quiet({ freed: false }), () => undefined).getReader()
+    const seen: { signal?: AbortSignal, freed: boolean } = { freed: false }
+    const reader = eventBody(quiet(seen), () => undefined).getReader()
     const pending = reader.read()
 
-    await Bun.sleep(5)
+    await untilHolds(() => seen.signal !== undefined)
     await reader.cancel()
     await pending
     expect(() => endEventStreams()).not.toThrow()
