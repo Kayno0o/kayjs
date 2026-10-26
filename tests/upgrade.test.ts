@@ -4,7 +4,7 @@ import { join } from 'node:path'
 import process from 'node:process'
 import { describe, expect, it, setDefaultTimeout, spyOn } from 'bun:test'
 import { registryDepsFor, upgradeProject } from '../src/commands/upgrade'
-import { LINTS, minorOf } from '../src/compiler/lints'
+import { LINTS, minorOf, REMOVED_DEPRECATIONS } from '../src/compiler/lints'
 import { scratchDir } from './scratch'
 
 setDefaultTimeout(90_000)
@@ -249,6 +249,218 @@ describe('kay upgrade', () => {
     }
     finally {
       await rm(root, { recursive: true, force: true })
+    }
+  })
+})
+
+// An app with its kay and kayjs-ui ranges pinned at `from`.
+function appOn(from: string): string {
+  return `{
+  "dependencies": { "@kaynooo/kayjs-ui": "~${from}" },
+  "devDependencies": { "kay": "npm:@kaynooo/kayjs@~${from}" }
+}
+`
+}
+
+describe('kay upgrade across removed deprecations', () => {
+  it('installs the minor before each release that dropped a fix the app needs, rewriting there, then the latest', async () => {
+    const root = await project(appOn('1.70.2'))
+    const { deps, calls } = fakes({ '@kaynooo/kayjs': '1.77.2', '@kaynooo/kayjs-ui': '1.77.2' }, ['1.71', '1.72', '1.74'])
+    const envs: (Record<string, string> | undefined)[] = []
+    const kay = deps.kay
+
+    deps.kay = async (dir, args, capture, env) => {
+      if (args[0] === 'check')
+        envs.push(env)
+
+      return kay(dir, args, capture, env)
+    }
+
+    try {
+      expect(await quietly(async () => upgradeProject(root, deps))).toBe(0)
+      expect(calls.installs.map(changes => changes.map(change => change.spec))).toEqual([
+        ['~1.73.0', 'npm:@kaynooo/kayjs@~1.73.0'],
+        ['~1.76.0', 'npm:@kaynooo/kayjs@~1.76.0'],
+        ['~1.77.2', 'npm:@kaynooo/kayjs@~1.77.2'],
+      ])
+      expect(calls.kay.filter(args => args[0] === 'check')).toEqual([['check', '--fix', '--since', '1.71'], ['check', '--fix', '--since', '1.72'], ['check', '--fix', '--since', '1.74'], ['check', '--fix']])
+      expect(new Set(envs.map(env => env?.KAY_UPGRADE_FROM))).toEqual(new Set(['1.70.2']))
+      expect(await Bun.file(join(root, 'package.json')).text()).toBe(appOn('1.77.2'))
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
+  it('rewrites each phase with the deprecations of the kay installed then, none from before the app or past the phase', async () => {
+    const root = await project(appOn('1.70.2'))
+    const { deps, calls } = fakes({ '@kaynooo/kayjs': '1.76.0', '@kaynooo/kayjs-ui': '1.76.0' }, ['1.69', '1.71', '1.74', '1.75'])
+
+    try {
+      await quietly(async () => upgradeProject(root, deps))
+      // Stone 1.73 holds 1.71; the latest 1.76 holds 1.74 and 1.75.
+      expect(calls.kay.filter(args => args[0] === 'check')).toEqual([['check', '--fix', '--since', '1.71'], ['check', '--fix', '--since', '1.74'], ['check', '--fix', '--since', '1.75'], ['check', '--fix']])
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
+  it('takes one stop from 1.73, and none from an app past every form a release dropped', async () => {
+    const from173 = await project(appOn('1.73.0'))
+    const from175 = await project(appOn('1.75.0'))
+    const a = fakes({ '@kaynooo/kayjs': '1.77.0', '@kaynooo/kayjs-ui': '1.77.0' })
+    const b = fakes({ '@kaynooo/kayjs': '1.77.0', '@kaynooo/kayjs-ui': '1.77.0' })
+
+    try {
+      await quietly(async () => upgradeProject(from173, a.deps))
+      await quietly(async () => upgradeProject(from175, b.deps))
+      expect(a.calls.installs.map(changes => changes[0]!.spec)).toEqual(['~1.76.0', '~1.77.0'])
+      expect(b.calls.installs.map(changes => changes[0]!.spec)).toEqual(['~1.77.0'])
+    }
+    finally {
+      await rm(from173, { recursive: true, force: true })
+      await rm(from175, { recursive: true, force: true })
+    }
+  })
+
+  it('does not stop at a release newer than the one it moves to', async () => {
+    const root = await project(appOn('1.70.0'))
+    const { deps, calls } = fakes({ '@kaynooo/kayjs': '1.73.4', '@kaynooo/kayjs-ui': '1.73.4' })
+
+    try {
+      await quietly(async () => upgradeProject(root, deps))
+      expect(calls.installs.map(changes => changes[0]!.spec)).toEqual(['~1.73.4'])
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
+  it('moves a library behind the stop to it, and leaves one already past it', async () => {
+    const manifest = `{
+  "dependencies": { "@kaynooo/kayjs-ui": "~1.70.0", "@kaynooo/kayjs-mail": "~1.74.1" },
+  "devDependencies": { "kay": "npm:@kaynooo/kayjs@~1.70.0" }
+}
+`
+    const root = await project(manifest)
+    const { deps, calls } = fakes({ '@kaynooo/kayjs': '1.75.0', '@kaynooo/kayjs-ui': '1.75.0', '@kaynooo/kayjs-mail': '1.75.0' })
+
+    try {
+      await quietly(async () => upgradeProject(root, deps))
+      expect(calls.installs.map(changes => changes.map(change => `${change.name} ${change.spec.slice(change.spec.lastIndexOf('~'))}`))).toEqual([
+        ['@kaynooo/kayjs-ui ~1.73.0', 'kay ~1.73.0'],
+        ['@kaynooo/kayjs-ui ~1.75.0', '@kaynooo/kayjs-mail ~1.75.0', 'kay ~1.75.0'],
+      ])
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
+  it('lists every stop on --dry-run, touching nothing', async () => {
+    const root = await project(appOn('1.70.0'))
+    const { deps, calls } = fakes({ '@kaynooo/kayjs': '1.77.0', '@kaynooo/kayjs-ui': '1.77.0' })
+    const log = spyOn(console, 'log').mockImplementation(() => undefined)
+
+    try {
+      expect(await upgradeProject(root, deps, { dryRun: true })).toBe(0)
+
+      const printed = log.mock.calls.map(call => String(call[0])).join('\n')
+
+      expect(printed).toContain('~1.73.0')
+      expect(printed).toContain('~1.76.0')
+      expect(printed).toContain('~1.77.0')
+      expect(await Bun.file(join(root, 'package.json')).text()).toBe(appOn('1.70.0'))
+      expect(calls).toEqual({ installs: [], kay: [] })
+    }
+    finally {
+      log.mockRestore()
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
+  it('puts everything back when the first stop fails to install, and says so without claiming nothing is left', async () => {
+    const root = await project(appOn('1.70.0'), { 'bun.lock': 'old lock\n' })
+    const { deps, calls } = fakes({ '@kaynooo/kayjs': '1.77.0', '@kaynooo/kayjs-ui': '1.77.0' })
+    const log = spyOn(console, 'log').mockImplementation(() => undefined)
+    const error = spyOn(console, 'error').mockImplementation(() => undefined)
+
+    deps.install = async (dir, changes) => {
+      calls.installs.push(changes)
+      await Bun.write(join(dir, 'bun.lock'), 'new lock\n')
+
+      return false
+    }
+
+    try {
+      expect(await upgradeProject(root, deps)).toBe(1)
+      expect(await Bun.file(join(root, 'package.json')).text()).toBe(appOn('1.70.0'))
+      expect(await Bun.file(join(root, 'bun.lock')).text()).toBe('old lock\n')
+      expect(calls.installs).toHaveLength(1)
+      expect(calls.kay).toEqual([])
+      expect([...log.mock.calls, ...error.mock.calls].map(call => String(call[0])).join('\n')).not.toContain('nothing left')
+    }
+    finally {
+      log.mockRestore()
+      error.mockRestore()
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
+  it('stays at the last stop that installed when a later install fails, never saying nothing is left', async () => {
+    const root = await project(appOn('1.70.0'), { 'bun.lock': 'old lock\n' })
+    const { deps, calls } = fakes({ '@kaynooo/kayjs': '1.77.0', '@kaynooo/kayjs-ui': '1.77.0' }, ['1.71'])
+    const log = spyOn(console, 'log').mockImplementation(() => undefined)
+    const error = spyOn(console, 'error').mockImplementation(() => undefined)
+
+    deps.install = async (dir, changes) => {
+      calls.installs.push(changes)
+
+      if (calls.installs.length === 1) {
+        await Bun.write(join(dir, 'bun.lock'), 'stop lock\n')
+
+        return true
+      }
+
+      await Bun.write(join(dir, 'bun.lock'), 'broken lock\n')
+
+      return false
+    }
+
+    try {
+      expect(await upgradeProject(root, deps)).toBe(1)
+      expect(await Bun.file(join(root, 'package.json')).text()).toBe(appOn('1.73.0'))
+      expect(await Bun.file(join(root, 'bun.lock')).text()).toBe('stop lock\n')
+      expect(calls.kay.filter(args => args[0] === 'check')).toEqual([['check', '--fix', '--since', '1.71']])
+
+      const printed = [...log.mock.calls, ...error.mock.calls].map(call => String(call[0])).join('\n')
+
+      expect(printed).toContain('1.76.0')
+      expect(printed).not.toContain('nothing left')
+    }
+    finally {
+      log.mockRestore()
+      error.mockRestore()
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
+  it('keeps the table of dropped deprecations ordered, and true to the lints still declared', async () => {
+    const { version } = (await Bun.file(join(import.meta.dir, '../package.json')).json()) as { version: string }
+    const current = minorOf(version)!
+    const ordered = REMOVED_DEPRECATIONS.map(entry => minorOf(entry.removedIn)!)
+    const live = Object.values(LINTS).flatMap(lint => ('since' in lint ? [lint.since as string] : []))
+
+    expect(ordered.every((minor, index) => index === 0 || minor[0] > ordered[index - 1]![0] || minor[1] > ordered[index - 1]![1])).toBe(true)
+
+    for (const entry of REMOVED_DEPRECATIONS) {
+      const removed = minorOf(entry.removedIn)!
+
+      // A release not reached yet is not in the table; one reached holds none of the lints it names.
+      expect(removed[0] < current[0] || removed[1] <= current[1]).toBe(true)
+      expect(live.filter(since => entry.since.includes(since))).toEqual([])
+      expect(entry.since.every(since => removed[1] - minorOf(since)![1] >= 1)).toBe(true)
     }
   })
 })

@@ -3,7 +3,7 @@ import { existsSync } from 'node:fs'
 import { rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import process from 'node:process'
-import { minorAfter, minorOf, UPGRADE_FROM } from '../compiler/lints'
+import { minorAfter, minorOf, REMOVED_DEPRECATIONS, UPGRADE_FROM } from '../compiler/lints'
 import { done, printFailure, projectRoot } from './command'
 import { USAGES } from './usages'
 
@@ -50,7 +50,7 @@ export function registryDepsFor(bun: string): UpgradeDeps {
         const installed = join(root, 'node_modules', name, 'package.json')
         const wanted = spec.slice(spec.lastIndexOf('~') + 1)
 
-        if (existsSync(installed) && ((await Bun.file(installed).json()) as { version?: string }).version === wanted)
+        if (existsSync(installed) && Bun.semver.satisfies(((await Bun.file(installed).json()) as { version: string }).version, `~${wanted}`))
           continue
 
         const flag = SECTION_FLAGS[section] ?? []
@@ -95,12 +95,10 @@ export async function upgradeProject(root: string, deps: UpgradeDeps, { dryRun =
   }
 
   const original = await Bun.file(manifest).text()
-  const locks = await Promise.all(LOCKFILES.map(async name => ({ path: join(root, name), content: existsSync(join(root, name)) ? await Bun.file(join(root, name)).bytes() : undefined })))
-  let source = original
   let packageJson: Record<string, unknown>
 
   try {
-    packageJson = JSON.parse(source)
+    packageJson = JSON.parse(original)
   }
   catch (error) {
     printFailure('upgrade', `package.json does not parse: ${error instanceof Error ? error.message : String(error)}`, 'text')
@@ -126,7 +124,7 @@ export async function upgradeProject(root: string, deps: UpgradeDeps, { dryRun =
   }
 
   const from = kay.version
-  const changes: DependencyChange[] = []
+  const latest = new Map<KayDependency, string>()
 
   for (const dependency of found) {
     const target = dependency === kay ? latestKay : await deps.latest(dependency.registry, root)
@@ -137,59 +135,69 @@ export async function upgradeProject(root: string, deps: UpgradeDeps, { dryRun =
       return 1
     }
 
-    if (Bun.semver.order(target, dependency.version) !== 1)
-      continue
-
-    const spec = `${dependency.prefix}~${target}`
-
-    const replaced = replaceSpec(source, dependency, spec)
-
-    if (replaced === undefined) {
-      printFailure('upgrade', `package.json lists ${dependency.name} as ${JSON.stringify(dependency.spec)} in "${dependency.section}", but kay could not find that entry to move: edit it by hand, then run \`kay upgrade\` again`, 'text')
-
-      return 1
-    }
-
-    source = replaced
-    changes.push({ name: dependency.name, spec, section: dependency.section })
+    latest.set(dependency, target)
   }
 
-  if (changes.length === 0) {
+  const phases = planPhases(original, found, latest, steppingStones(from, latestKay))
+
+  if (typeof phases === 'string') {
+    printFailure('upgrade', `package.json lists ${phases}, but kay could not find that entry to move: edit it by hand, then run \`kay upgrade\` again`, 'text')
+
+    return 1
+  }
+
+  if (phases.every(phase => phase.changes.length === 0)) {
     done('upgraded', `nothing: kay ${from} is the latest, run \`kay check --fix\` for the rest`)
 
     return 0
   }
 
   if (dryRun) {
-    for (const { name, spec } of changes)
-      done('would move', `${name} to ${spec.slice(spec.lastIndexOf('~'))}`)
+    for (const { version, changes, stone } of phases) {
+      for (const { name, spec } of changes)
+        done('would move', `${name} to ${spec.slice(spec.lastIndexOf('~'))}${stone ? ` (kay ${version} still rewrites forms the next minors drop)` : ''}`)
+    }
 
     done('dry run', 'nothing written; run `kay upgrade` to install them and rewrite the old forms')
 
     return 0
   }
 
-  await Bun.write(manifest, source)
-  step('moved', changes.map(({ name, spec }) => `${name} to ${spec.slice(spec.lastIndexOf('~'))}`).join(', '))
+  // What the project holds after the last phase that landed, so a failing one puts back that state and not an older one.
+  let settled = { source: original, locks: await readLocks(root) }
+  let behind = from
 
-  if (!await deps.install(root, changes) || !existsSync(join(root, 'node_modules/kay/src/cli.ts'))) {
-    await Bun.write(manifest, original)
+  for (const phase of phases) {
+    if (phase.changes.length === 0)
+      continue
 
-    for (const { path, content } of locks) {
-      if (content !== undefined)
-        await Bun.write(path, content)
-      else
-        await rm(path, { force: true })
+    await Bun.write(manifest, phase.source)
+    step('moved', phase.changes.map(({ name, spec }) => `${name} to ${spec.slice(spec.lastIndexOf('~'))}`).join(', '))
+
+    if (!await deps.install(root, phase.changes) || !existsSync(join(root, 'node_modules/kay/src/cli.ts'))) {
+      await Bun.write(manifest, settled.source)
+
+      for (const { path, content } of settled.locks) {
+        if (content !== undefined)
+          await Bun.write(path, content)
+        else
+          await rm(path, { force: true })
+      }
+
+      printFailure('upgrade', behind === from
+        ? `the install of kay ${phase.version} failed or left no kay in node_modules, so package.json and the lockfile are back as they were and nothing was rewritten; node_modules may still hold what the install did, so run \`bun install\` once the install is fixed, then \`kay upgrade\` again`
+        : `the install of kay ${phase.version} failed or left no kay in node_modules, after the forms of the minors up to ${behind} were rewritten on the way; package.json and the lockfile are back at kay ${behind}, so run \`bun install\` once the install is fixed, then \`kay upgrade\` again`, 'text')
+
+      return 1
     }
 
-    printFailure('upgrade', 'the install failed or left no kay in node_modules, so package.json and the lockfile are back as they were and nothing was rewritten; node_modules may still hold what the install did, so run `bun install` once the install is fixed, then `kay upgrade` again', 'text')
+    for (const since of await crossed(root, behind, phase.version, deps)) {
+      step('rewriting', `what ${since} deprecated`)
+      await deps.kay(root, ['check', '--fix', '--since', since, ...quiet ? ['--quiet'] : []], false, { [UPGRADE_FROM]: from })
+    }
 
-    return 1
-  }
-
-  for (const since of await crossed(root, from, latestKay, deps)) {
-    step('rewriting', `what ${since} deprecated`)
-    await deps.kay(root, ['check', '--fix', '--since', since, ...quiet ? ['--quiet'] : []], false, { [UPGRADE_FROM]: from })
+    behind = phase.version
+    settled = { source: phase.source, locks: await readLocks(root) }
   }
 
   step('checking', 'what is left')
@@ -202,6 +210,71 @@ export async function upgradeProject(root: string, deps: UpgradeDeps, { dryRun =
     console.log(`upgraded to kay ${latestKay}, the problems above are left for you`)
 
   return left.code === 0 ? 0 : 1
+}
+
+async function readLocks(root: string): Promise<{ path: string, content: Uint8Array | undefined }[]> {
+  return Promise.all(LOCKFILES.map(async name => ({ path: join(root, name), content: existsSync(join(root, name)) ? await Bun.file(join(root, name)).bytes() : undefined })))
+}
+
+// One install of the upgrade: the ranges `source` holds once its `changes` are written, and the version of kay then installed.
+interface Phase {
+  version: string
+  source: string
+  changes: DependencyChange[]
+  // A minor passed through on the way, not the one the upgrade ends on.
+  stone: boolean
+}
+
+// The versions an upgrade installs before the latest, oldest first: each is the minor before a release that dropped the lints rewriting forms the app may still hold, so that minor's kay rewrites them. A form is the app's to keep when its minor is not after the one the app is on, as in `crossed`.
+function steppingStones(from: string, to: string): string[] {
+  const toMinor = minorOf(to)!
+  const stones: string[] = []
+  let behind = minorOf(from)!
+
+  for (const { removedIn, since } of [...REMOVED_DEPRECATIONS].sort((a, b) => (minorAfter(minorOf(a.removedIn)!, minorOf(b.removedIn)!) ? 1 : -1))) {
+    const removed = minorOf(removedIn)!
+
+    if (minorAfter(removed, toMinor) || !since.some(minor => minorAfter(minorOf(minor)!, behind)))
+      continue
+
+    behind = [removed[0], removed[1] - 1]
+    stones.push(`${behind[0]}.${behind[1]}.0`)
+  }
+
+  return stones
+}
+
+// The phases from the app's ranges to the latest ones, the ranges of each written over the text of the one before; the name of a dependency whose entry cannot be found in the text when one cannot.
+function planPhases(original: string, found: KayDependency[], latest: Map<KayDependency, string>, stones: string[]): Phase[] | string {
+  const state = found.map(dependency => ({ ...dependency }))
+  const phases: Phase[] = []
+  let source = original
+
+  for (const stone of [...stones, undefined]) {
+    const changes: DependencyChange[] = []
+
+    for (const [index, dependency] of state.entries()) {
+      const target = stone ?? latest.get(found[index]!)!
+
+      if (Bun.semver.order(target, dependency.version) !== 1)
+        continue
+
+      const spec = `${dependency.prefix}~${target}`
+      const replaced = replaceSpec(source, dependency, spec)
+
+      if (replaced === undefined)
+        return `${dependency.name} as ${JSON.stringify(dependency.spec)} in "${dependency.section}"`
+
+      source = replaced
+      dependency.spec = spec
+      dependency.version = target
+      changes.push({ name: dependency.name, spec, section: dependency.section })
+    }
+
+    phases.push({ version: stone ?? latest.get(found.find(dependency => dependency.registry === KAY_PACKAGE)!)!, source, changes, stone: stone !== undefined })
+  }
+
+  return phases
 }
 
 interface KayDependency extends DependencyChange {

@@ -14,6 +14,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 - An `ActionError`'s `message` reads what a visitor can show: the string given to `ctx.fail`, the form-wide message, the schema's field messages, or the handler data's `message`, rather than the serialized body it carried before (`Action failed with 502: [...]`), which only a refusal that says nothing readable still gives: [Actions from islands](actions-from-islands.md).
 - The raw environment read check and `kay check --fix` leave a standalone binary's entry (a file a `bun build` script names) with what it imports, `src/content.config.ts` and a file with a `// kay-env: raw` line alone, so they no longer import the app's schema: [Environment](environment.md).
 - A test run (`NODE_ENV=test`, as `bun test` sets) no longer warns that `proxy.key` is set with no `KAY_PROXY_KEY`, so an app behind a proxy has no warning in every test file; `kay start` outside production still does: [proxy and security](proxy-and-security.md).
+- `kay upgrade` across a release that dropped deprecated lints installs the minor before that release first, so an app moving from 1.70 to the latest still gets the 1.71 and 1.72 forms rewritten instead of keeping them silently: [kay upgrade](check-and-tools.md).
 
 ## 1.77.2
 
