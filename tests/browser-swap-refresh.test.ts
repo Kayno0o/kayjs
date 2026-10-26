@@ -308,6 +308,7 @@ describe.skipIf(chrome === undefined && (process.env.CI ?? '') === '')('a refres
     })
     await page.click('a.cross')
     await page.waitFor('h1', { text: 'Other' })
+    // No error is meant to come, so a short window is all there is to wait out.
     await page.evaluate(async () => new Promise(resolve => setTimeout(resolve, 200)))
 
     expect(page.errors).toEqual([])

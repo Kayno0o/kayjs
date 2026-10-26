@@ -61,7 +61,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('history af
     await view.waitFor('h1', { text: 'Home' })
     await view.forward()
     await view.waitFor('h1', { text: 'Still' })
-    // A reload would come once the traversal is over.
+    // A reload would come once the traversal is over, and nothing is meant to reload, so a short window is all there is to wait out.
     await Bun.sleep(300)
 
     expect(await view.evaluate(kept)).toBe(true)
@@ -73,6 +73,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('history af
     })
     await view.back()
     await view.forward()
+    // The app's own entry is left to the app, and no reload is meant to follow the traversal.
     await Bun.sleep(300)
 
     expect(await view.path()).toBe('/elsewhere')

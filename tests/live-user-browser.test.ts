@@ -5,6 +5,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it } from 'bun:test'
 import { Elysia } from 'elysia'
 import { nameUser } from '../src/server/request-user'
 import { browse, browserPath, testSite } from '../src/test'
+import { untilHolds } from './helpers/until-holds'
 
 const ROOT = 'tests/fixtures/live-user'
 const browserInstalled = browserPath() !== undefined
@@ -26,6 +27,9 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('a live valu
   // Who the front says is signed in, by the `as` query of the page the request comes from, until a test overrides it for everyone: a cookie or a session that changed.
   let session: string | null | undefined
   const cut = new Set<() => void>()
+  // How many connections the front answered, and how many of them it let through.
+  let connections = 0
+  let accepted = 0
   const tabs: TestPage[] = []
 
   const open = async (as: string): Promise<TestPage> => {
@@ -58,7 +62,15 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('a live valu
 
         const reply = await site.handle(new Request(request.url, { method: request.method, headers, body: request.method === 'GET' || request.method === 'HEAD' ? null : await request.arrayBuffer(), redirect: 'manual' }))
 
-        if (!new URL(request.url).pathname.endsWith('/_kay/live') || reply.body === null)
+        if (!new URL(request.url).pathname.endsWith('/_kay/live'))
+          return reply
+
+        connections++
+
+        if (reply.ok)
+          accepted++
+
+        if (reply.body === null)
           return reply
 
         // The connection of a tab, which a test can drop to make it connect again.
@@ -129,7 +141,7 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('a live valu
     await alice.waitUntil(...shows(3))
     await bob.waitUntil(...shows(5))
     // The connections are open once the values are followed.
-    await Bun.sleep(500)
+    await untilHolds(() => cut.size === 2)
     live.unread.set('alice', 4)
     await alice.waitUntil(...shows(4))
     expect(await unread(bob)).toBe('5 unread')
@@ -144,13 +156,16 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('a live valu
     const tab = await open('alice')
 
     await tab.waitUntil(...shows(3))
-    await Bun.sleep(500)
+    await untilHolds(() => cut.size === 1)
 
     // The visitor signed out: the tab connects again with a proof naming a user nobody is, and is refused.
+    const answered = connections
+
     session = null
     drop()
-    await Bun.sleep(3000)
+    await untilHolds(() => connections > answered)
     live.unread.set('alice', 9)
+    // Nothing is meant to arrive for the refused tab, so a short window is all there is to wait out.
     await Bun.sleep(1000)
     expect(await unread(tab)).toBe('3 unread')
     expect(tab.errors).toEqual([])
@@ -160,14 +175,19 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('a live valu
     const tab = await open('alice')
 
     await tab.waitUntil(...shows(3))
-    await Bun.sleep(500)
+    await untilHolds(() => cut.size === 1)
+    const letThrough = accepted
+
     session = 'bob'
     drop()
-    await Bun.sleep(3000)
+    await untilHolds(() => accepted > letThrough)
+    // The tab shows the new user's own value before it is written again: an update right after the reconnect is lost otherwise, kaynooo/kayjs#2353.
+    await tab.waitUntil(...shows(5))
     live.unread.set('alice', 9)
     live.unread.set('bob', 7)
     await tab.waitUntil(...shows(7))
     live.unread.set('alice', 10)
+    // The old user's value is not meant to reach the tab, so a short window is all there is to wait out.
     await Bun.sleep(500)
     expect(await unread(tab)).toBe('7 unread')
     expect(tab.errors).toEqual([])

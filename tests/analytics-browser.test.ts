@@ -6,6 +6,7 @@ import { analytics } from '../src/server/analytics'
 import { NOTICE_SCRIPT } from '../src/server/analytics-script'
 import { browserPath, testSite } from '../src/test'
 import { fakeProvider, received, restoreEnvironment, visits } from './analytics-browser-support'
+import { untilHolds } from './helpers/until-holds'
 
 const path = browserPath()
 
@@ -53,6 +54,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('analytics 
 
   it('asks first and counts nothing until the visitor agrees', async () => {
     await page.waitFor('section[aria-labelledby] button')
+    // Nothing is meant to be counted yet, so a short window is all there is to wait out.
     await Bun.sleep(200)
 
     expect(await page.text('#kay-analytics-notice')).toBe('Count?')
@@ -147,6 +149,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('analytics 
     await page.waitFor('section[aria-labelledby] button')
     await page.click('section[aria-labelledby] button:last-of-type')
     await page.back()
+    // No further visit is meant to be counted after the refusal, so a short window is all there is to wait out.
     await Bun.sleep(300)
 
     expect(received).toHaveLength(2)
@@ -180,6 +183,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('a custom p
 
   it('loads the tracker only after a yes, and reloads without it after a refusal', async () => {
     await opened.waitFor('section[aria-labelledby] button')
+    // Nothing is meant to load before a yes, so a short window is all there is to wait out.
     await Bun.sleep(200)
 
     expect(received).toEqual([])
@@ -201,6 +205,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('a custom p
     await opened.click('#settings')
     await opened.waitFor('section[aria-labelledby] button')
     await opened.click('section[aria-labelledby] button:last-of-type')
+    // The refusal reloads the page without the tracker, and no visit is meant to follow it, so a window is all there is to wait out.
     await Bun.sleep(500)
 
     expect(await opened.count('script[src$="/_kay/analytics/script.js"]')).toBe(0)
@@ -242,6 +247,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('a counter 
 
   it('counts nothing more when the visitor closes the line with OK', async () => {
     await opened.click('section[aria-labelledby] button:first-of-type')
+    // No further visit is meant to be counted after OK, so a short window is all there is to wait out.
     await Bun.sleep(300)
 
     expect(received).toHaveLength(1)
@@ -262,6 +268,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('a counter 
     expect(await opened.evaluate(() => document.cookie)).toContain('kay_analytics=no')
     await opened.click('a.second')
     await opened.waitFor('h1', { text: 'Second' })
+    // No visit is meant to be counted after the opt-out, so a short window is all there is to wait out.
     await Bun.sleep(300)
 
     expect(received).toHaveLength(1)
@@ -378,6 +385,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the notice
     await opened.waitFor('h1', { text: 'Second' })
     await opened.click('a.later')
     await visits(before + 2)
+    // No visit is meant to arrive for the excluded page, so a short window is all there is to wait out.
     await Bun.sleep(300)
 
     const urls = received.slice(before).map(visit => new URL(visit.body.url).pathname)
@@ -401,6 +409,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the notice
     await opened.evaluate(() => document.querySelector('meta[name=robots]')!.remove())
     await swap('/loud')
     await visits(before + 2)
+    // No visit is meant to arrive for the quiet pages, so a short window is all there is to wait out.
     await Bun.sleep(300)
 
     expect(received.slice(before).map(visit => new URL(visit.body.url).pathname)).toEqual(['/admin', '/loud'])
@@ -417,6 +426,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the notice
     await opened.evaluate(() => document.querySelector('meta[name=kay-guarded]')!.remove())
     await swap('/open')
     await visits(before + 1)
+    // No visit is meant to arrive for the guarded page, so a short window is all there is to wait out.
     await Bun.sleep(300)
 
     expect(received.slice(before).map(visit => new URL(visit.body.url).pathname)).toEqual(['/open'])
@@ -476,8 +486,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('a notice t
     // The failed fetch of the first ask has removed its script once the server saw the request and the page has no notice script left.
     const requested = () => failures <= 0
 
-    for (let tries = 0; tries < 100 && !requested(); tries++)
-      await Bun.sleep(25)
+    await untilHolds(requested, 2500)
 
     expect(requested()).toBe(true)
 
@@ -575,6 +584,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('fathom and
       const opened = await own.open('/')
 
       await opened.waitFor('section[aria-labelledby] button')
+      // Nothing is meant to load before a yes, so a short window is all there is to wait out.
       await Bun.sleep(200)
 
       expect(await opened.count(selector)).toBe(0)

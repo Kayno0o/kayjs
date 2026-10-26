@@ -7,6 +7,7 @@ import process from 'node:process'
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
 import { browserPath, testSite } from '../src/test'
 import { chromeTree, killAll, removeFetcherDirs } from '../src/test/browser'
+import { untilHolds } from './helpers/until-holds'
 import { scratchDir } from './scratch'
 
 const path = browserPath()
@@ -126,7 +127,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('kay/test i
     await page.evaluate(() => void setTimeout(() => {
       throw new Error('Thrown later')
     }))
-    await page.waitUntil(async () => new Promise(resolve => setTimeout(resolve, 50, true)))
+    await untilHolds(() => page.errors.some(error => error.startsWith('Error: Thrown later')))
 
     expect(page.errors.some(error => error.includes('Fragile broke'))).toBe(true)
     expect(page.errors.some(error => error.startsWith('Error: Thrown later'))).toBe(true)
@@ -205,6 +206,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('kay/test i
       const before = await plain.text('button.player')
 
       await plain.click('button.player')
+      // Nothing is meant to hydrate, so a short window is all there is to wait out.
       await Bun.sleep(200)
 
       expect(await plain.text('button.player')).toBe(before)
@@ -429,8 +431,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('kay/test i
     try {
       await warned.evaluate(() => console.warn('careful', { a: 1 }))
       // The console reaches the test a moment after the call.
-      for (let tries = 0; tries < 50 && warned.warnings.length === 0; tries++)
-        await Bun.sleep(20)
+      await untilHolds(() => warned.warnings.length > 0)
 
       expect(warned.warnings).toHaveLength(1)
 
@@ -905,7 +906,8 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('kay dev in
 
           return panel.childElementCount > 0 && ![...panel.querySelectorAll('.chip')].some(chip => chip.textContent === 'format...')
         })
-        await Bun.sleep(150)
+        // The panel is laid out over the frames that follow its content.
+        await shown.evaluate(async () => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))))
         wide.push(...await shown.evaluate((label: string) => {
           const panel = document.querySelector('kay-dev')!.shadowRoot!.querySelector<HTMLElement>('.panel:not([hidden])')!
           const edge = panel.getBoundingClientRect().right - Number.parseFloat(getComputedStyle(panel).paddingRight) + 1

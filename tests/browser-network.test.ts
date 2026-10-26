@@ -4,6 +4,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
 import { browse, browserPath } from '../src/test'
 import { retriedOnce } from '../src/test/browser'
 import { createNetwork } from '../src/test/network'
+import { eventually, turn } from './helpers/eventually'
 
 const path = browserPath()
 
@@ -345,12 +346,21 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the networ
   })
 
   it('lets a request go that the page cancels while it is paused, and reports nothing', async () => {
+    const finished = [Promise.withResolvers<void>(), Promise.withResolvers<void>()]
+
+    // Both handlers pause a request for a while, which is the slow work this test cancels.
     await page.route('/api/hello', async (request) => {
-      await Bun.sleep(200)
-      await request.fulfill({ body: 'late' })
+      try {
+        await Bun.sleep(200)
+        await request.fulfill({ body: 'late' })
+      }
+      finally {
+        finished[0]!.resolve()
+      }
     })
     await page.route('/api/missing', async () => {
       await Bun.sleep(200)
+      finished[1]!.resolve()
     })
 
     const cancelled = page.evaluate(() => {
@@ -367,7 +377,9 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the networ
 
     await cancelled
     await page.goto('/?away')
-    await Bun.sleep(400)
+    await Promise.all(finished.map(async ({ promise }) => promise))
+    // A page call queues behind the handlers' own, so by its answer they have reported anything they would.
+    await page.evaluate(() => true)
 
     expect(page.errors).toEqual([])
     await page.unroute()
@@ -387,9 +399,9 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the networ
 
       void swallow(fetch('/stream'))
     })
-    await Bun.sleep(300)
-
-    expect(page.errors.at(-1)).toContain('cannot read the event stream')
+    await eventually(() => {
+      expect(page.errors.at(-1)).toContain('cannot read the event stream')
+    })
     page.errors.length = 0
     await page.unroute()
   })
@@ -419,9 +431,20 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the networ
   it('does not hold its request when the page closes with it paused', async () => {
     const closing = await browse(`${origin}/`)
 
+    const { promise: held, resolve: hold } = Promise.withResolvers<void>()
+    const { promise: answered, resolve: answer } = Promise.withResolvers<void>()
+
     await closing.route('/hold', async (request) => {
-      await Bun.sleep(200)
-      await request.fulfill({ body: 'late' })
+      hold()
+
+      try {
+        // The slow work the page closes on.
+        await Bun.sleep(200)
+        await request.fulfill({ body: 'late' })
+      }
+      finally {
+        answer()
+      }
     })
     // Fails with the page, which is what this test is about.
     void (async () => {
@@ -430,9 +453,10 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the networ
       }
       catch {}
     })()
-    await Bun.sleep(50)
+    await held
     closing.close()
-    await Bun.sleep(300)
+    await answered
+    await turn()
 
     expect(closing.errors).toEqual([])
 
@@ -470,7 +494,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the networ
     await removing.unroute()
 
     expect(String(await handled)).toContain('the route was removed')
-    await Bun.sleep(100)
+    await turn()
     expect(removing.errors).toEqual([])
     removing.close()
   })
@@ -587,8 +611,9 @@ describe('the interception of a kay/test page', () => {
     expect(sent.find(({ method }) => method === 'Fetch.enable')?.params).toEqual({ patterns: [{ urlPattern: '*', requestStage: 'Request' }] })
 
     fire('Fetch.requestPaused', PAUSED)
-    await Bun.sleep(20)
-    expect(sent.filter(({ method }) => method === 'Fetch.continueRequest').map(({ params }) => params)).toEqual([{ requestId: 'r1' }])
+    await eventually(() => {
+      expect(sent.filter(({ method }) => method === 'Fetch.continueRequest').map(({ params }) => params)).toEqual([{ requestId: 'r1' }])
+    })
     network.close()
   })
 
@@ -602,30 +627,37 @@ describe('the interception of a kay/test page', () => {
       catch {}
     })
     fire('Fetch.requestPaused', PAUSED)
-    await Bun.sleep(20)
-    expect(sent.find(({ method }) => method === 'Fetch.continueRequest')?.params).toEqual({ requestId: 'r1', interceptResponse: true })
+    await eventually(() => {
+      expect(sent.find(({ method }) => method === 'Fetch.continueRequest')?.params).toEqual({ requestId: 'r1', interceptResponse: true })
+    })
     network.close()
   })
 
   it('swallows the error of a request no longer paused and reports any other', async () => {
+    const continued = (sent: { method: string }[]) => sent.some(({ method }) => method === 'Fetch.continueRequest')
     const gone = scripted(method => method === 'Fetch.continueRequest' ? new Error('Invalid InterceptionId.') : undefined)
 
     await gone.network.route('/api', async request => request.continue())
     gone.fire('Fetch.requestPaused', PAUSED)
-    await Bun.sleep(20)
+    await eventually(() => {
+      expect(continued(gone.sent)).toBe(true)
+    })
+    // The failed command is judged within the turns that follow it.
+    await turn()
     expect(gone.errors).toEqual([])
 
     const other = scripted(method => method === 'Fetch.continueRequest' ? new Error('Session with given id not found.') : undefined)
 
     await other.network.route('/api', async request => request.continue())
     other.fire('Fetch.requestPaused', PAUSED)
-    await Bun.sleep(20)
-    expect(other.errors.join('\n')).toContain('not found')
+    await eventually(() => {
+      expect(other.errors.join('\n')).toContain('not found')
+    })
   })
 
   it('does not report a handler that answers after the last route was removed', async () => {
     let enabled = true
-    const { network, errors, fire } = scripted((method) => {
+    const { network, errors, sent, fire } = scripted((method) => {
       if (method === 'Fetch.disable')
         enabled = false
 
@@ -640,7 +672,10 @@ describe('the interception of a kay/test page', () => {
     fire('Fetch.requestPaused', PAUSED)
     await network.unroute()
     resolve()
-    await Bun.sleep(20)
+    await eventually(() => {
+      expect(sent.some(({ method }) => method === 'Fetch.continueRequest')).toBe(true)
+    })
+    await turn()
     expect(errors).toEqual([])
     network.close()
   })

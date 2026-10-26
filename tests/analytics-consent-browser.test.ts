@@ -41,6 +41,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the consen
 
   it('shows no notice of kay\'s, counts nothing until the app answers, and reads the cookie kay writes', async () => {
     await opened.waitFor('p.state', { text: 'asking' })
+    // Nothing is meant to appear or be sent, so a short window is all there is to wait out.
     await Bun.sleep(200)
 
     expect(await opened.count('section[aria-labelledby]')).toBe(0)
