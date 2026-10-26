@@ -487,10 +487,10 @@ function sentAsIs(value: object): boolean {
 // A status that carries no body is left to Elysia, which answers it empty.
 const NULL_BODY = new Set([204, 205, 304])
 
-// A plain object or array is serialized here, once, rather than by Elysia: JSON has no bigint, which JSON.stringify throws on, so one holding a bigint is answered with each written as its digits, as a database's bigint ids usually are.
+// A plain object, an array or `null` is serialized here, once, rather than by Elysia: JSON has no bigint, which JSON.stringify throws on, so one holding a bigint is answered with each written as its digits, as a database's bigint ids usually are.
 // Anything the plain pass cannot settle, a cycle, a status given by name or a cookie Elysia's jar holds, is left to Elysia.
 function jsonReply(value: unknown, set: { status?: number | string, headers: Record<string, unknown>, cookie?: object }): Response | undefined {
-  if (typeof value !== 'object' || value === null || (Object.getPrototypeOf(value) !== Object.prototype && !Array.isArray(value)) || (set.status !== undefined && typeof set.status !== 'number') || NULL_BODY.has(set.status as number) || (set.cookie !== undefined && Object.keys(set.cookie).length > 0))
+  if (typeof value !== 'object' || (value !== null && Object.getPrototypeOf(value) !== Object.prototype && !Array.isArray(value)) || (set.status !== undefined && typeof set.status !== 'number') || NULL_BODY.has(set.status as number) || (set.cookie !== undefined && Object.keys(set.cookie).length > 0))
     return undefined
 
   const text = serialized(value)
@@ -519,7 +519,7 @@ function jsonReply(value: unknown, set: { status?: number | string, headers: Rec
 }
 
 // Plain first, the bigint-aware pass only for a value the plain one threw on; undefined for a cycle, which Elysia's own pass names.
-function serialized(value: object): string | undefined {
+function serialized(value: object | null): string | undefined {
   try {
     return JSON.stringify(value)
   }

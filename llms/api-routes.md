@@ -135,6 +135,7 @@ export default api()
 - Refused input or a thrown `status()` keeps Elysia's answer, unlogged.
 - A route answering a plain object or array holding a bigint, as a database's bigint ids are, gives JSON with each written as its digits, `{"id":"9007199254740993"}`, where `JSON.stringify` would throw.
 - `resource()` types such a field as a `string`.
+- A route answering `null` gives the JSON `null` with `content-type: application/json`, which `response.json()` reads, and `undefined` an empty body.
 - A route answers a plain object or array as JSON, and a string, a number, a `Date`, a `Response`, a `Blob`, bytes or a stream as Elysia does.
 - A class instance without its own `toString`, or a `Map`, such as an ORM row returned as is, answers 500 and is logged with the route and its class, as a throw is, where Elysia would send `[object Object]`.
 - A class instance without its own `toString`, or a `Map`, passed to `status()` answers 500 the same way.
