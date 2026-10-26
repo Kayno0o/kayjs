@@ -24,6 +24,8 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('a deferred 
       // What the server was asked for, by the path under the base and the query.
       const asked: string[] = []
       let failing = false
+      // How many fetches of an island were answered with a failure.
+      const failed: true[] = []
       // How long the server takes to answer a fetch of an island, for a test to meet the page before its island is fetched.
       let islandDelay = 0
       // The next connection of a tab is refused as a proof gone stale, and the open ones can be dropped.
@@ -67,11 +69,17 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('a deferred 
 
             asked.push(`${request.method} ${inner}`)
 
+            // Decided when the request arrives, as a test turns `failing` off right after, long before a delayed answer is sent.
+            const refused = failing && url.search.includes('kay_island=')
+
             if (islandDelay > 0 && url.search.includes('kay_island='))
               await Bun.sleep(islandDelay)
 
-            if (failing && url.search.includes('kay_island='))
+            if (refused) {
+              failed.push(true)
+
               return new Response(null, { status: 500 })
+            }
 
             if (url.search.includes('kay_island='))
               await held
@@ -286,6 +294,7 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('a deferred 
       it('keeps the island as it was when its fetch fails, and fetches it again at the next change', async () => {
         change(50)
         islandDelay = 1500
+        failed.length = 0
 
         const page = await open()
 
@@ -300,9 +309,17 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('a deferred 
 
         failing = false
         expect(islandLoads()).toHaveLength(1)
-        expect(await stock(page)).toBe('50 left')
         await page.click('slot[data-kay-server] button.clicks')
         await page.waitFor('slot[data-kay-server] button.clicks', { text: 'Clicked 1' })
+
+        // The failure is answered after the delay: the island is checked once it is, and has kept what the click gave it.
+        for (let waited = 0; failed.length === 0 && waited < 8000; waited += 25)
+          await Bun.sleep(25)
+
+        expect(failed).toHaveLength(1)
+        await Bun.sleep(300)
+        expect(await stock(page)).toBe('50 left')
+        expect(await page.text('slot[data-kay-server] button.clicks')).toBe('Clicked 1')
         change(52)
         await page.waitUntil(...shows(52))
       })
