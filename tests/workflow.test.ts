@@ -107,14 +107,20 @@ describe.each(kinds)('a workflow on a $name store', ({ open }) => {
     const store = await open()
     const name = named()
     const calls: string[] = []
+    const stuck = Promise.withResolvers<void>()
     const first = workflow<undefined>(name, async ({ step }) => {
       await step.run('one', () => void calls.push('one'))
-      await step.run('two', async () => new Promise<void>(noop))
+      await step.run('two', async () => {
+        stuck.resolve()
+
+        return new Promise<void>(noop)
+      })
     }, { store, lostAfter: '300ms' })
     const id = await first.start()
-    const stuck = first.drain()
+    const draining = first.drain()
 
-    await Bun.sleep(50)
+    // Step two starts once step one is kept, and never ends.
+    await stuck.promise
     forgetQueue(first)
     expect(await first.status(id)).toMatchObject({ status: 'running', steps: 1 })
 
@@ -132,7 +138,7 @@ describe.each(kinds)('a workflow on a $name store', ({ open }) => {
 
     expect(await second.drain()).toBe(1)
     expect(calls).toEqual(['one', 'two'])
-    void stuck
+    void draining
   })
 
   it('sleeps without a process and wakes when its time comes', async () => {
