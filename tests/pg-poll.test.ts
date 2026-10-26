@@ -1,6 +1,6 @@
 import type { SQL } from 'bun'
 import type { PgHandle } from '../src/server/pg-data'
-import { describe, expect, it } from 'bun:test'
+import { afterEach, describe, expect, it } from 'bun:test'
 import { logSink, setLogSink } from '../src/runtime/log'
 import { pgCache } from '../src/server/pg-cache'
 import { pgHandle } from '../src/server/pg-data'
@@ -8,9 +8,13 @@ import { rowsOf } from '../src/server/pg-jobs'
 import { pgLive } from '../src/server/pg-live'
 import { pollerOf, timeLimited } from '../src/server/pg-poll'
 import { pgRooms } from '../src/server/pg-rooms'
+import { eventually } from './helpers/eventually'
+import { restoreClock, virtualClock } from './helpers/virtual-clock'
 import { cleanUpAfterFile, pgIt, postgres } from './job-stores'
 
 cleanUpAfterFile()
+
+afterEach(restoreClock)
 
 // A handle counting how often it is asked for the database.
 // The statements still running that start with `statement`, once a cancel had up to two seconds to reach the server, which a loaded runner takes longer than a fixed pause.
@@ -39,13 +43,22 @@ function counted(inner: PgHandle): { handle: PgHandle, calls: () => number } {
 
 describe('the shared event poller', () => {
   it('reaches the database once a tick however many tasks are due, and tasks keep their own rhythm', async () => {
+    const clock = virtualClock()
     const counter = counted({ db: async () => ({}) as SQL })
     const runs = { fast: 0, same: 0, slow: 0 }
     const poller = pollerOf(counter.handle)
     const task = (every: number, key: keyof typeof runs) => ({ every, wanted: () => true, run: async () => void runs[key]++, failed: 'reading failed' })
     const removals = [poller.add(task(40, 'fast'), false), poller.add(task(40, 'same'), false), poller.add(task(160, 'slow'), false)]
 
-    await Bun.sleep(500)
+    // Each period is stepped and its runs awaited, as the poller arms its next timer once the runs of the tick end.
+    for (let step = 1; step <= 12; step++) {
+      await clock.advance(40)
+      await eventually(() => {
+        expect(runs.fast).toBe(step)
+        expect(runs.same).toBe(step)
+      })
+    }
+
     for (const remove of removals) {
       remove()
     }
@@ -56,7 +69,7 @@ describe('the shared event poller', () => {
 
     const stopped = counter.calls()
 
-    await Bun.sleep(120)
+    await clock.advance(120)
     expect(counter.calls()).toBe(stopped)
   })
 
@@ -90,11 +103,21 @@ describe('the shared event poller', () => {
   pgIt('cancels a statement that abandoned work starts after the limit', async () => {
     const { sql } = await postgres()
 
+    const ended = Promise.withResolvers<void>()
+
     await expect(timeLimited(async () => {
+      // The work runs past its limit on purpose, then starts a statement nobody waits for.
       await Bun.sleep(150)
-      await sql`SELECT pg_sleep(13)`
+
+      try {
+        await sql`SELECT pg_sleep(13)`
+      }
+      finally {
+        ended.resolve()
+      }
     }, 50, 'the read')).rejects.toThrow('the read took more than')
-    await Bun.sleep(400)
+    // The statement is over once it started and was cancelled.
+    await ended.promise
 
     expect(await activeAfterCancel(sql, 'SELECT pg_sleep(13)')).toBe(0)
   })
@@ -112,7 +135,6 @@ describe('the shared event poller', () => {
         }, 50)
       })
     }, 1000, 'the read')
-    await Bun.sleep(100)
 
     expect(((await later) as { seven: number }[])[0]?.seven).toBe(7)
   })
@@ -125,16 +147,25 @@ describe('the shared event poller', () => {
   })
 
   it('does not run a task again before its last run ended', async () => {
+    const clock = virtualClock()
     const counter = counted({ db: async () => ({}) as SQL })
+    const gate = Promise.withResolvers<void>()
     let started = 0
     const remove = pollerOf(counter.handle).add({ every: 20, wanted: () => true, run: async () => {
       started++
-      await Bun.sleep(150)
+      await gate.promise
     }, failed: 'reading failed' }, true)
 
-    await Bun.sleep(400)
+    // The first run is still going while twenty periods pass.
+    await clock.advance(400)
+    await eventually(() => expect(started).toBe(1))
+    expect(clock.pending()).toBe(0)
+    gate.resolve()
+    // The poller arms its next timer once the run ends.
+    await eventually(() => expect(clock.pending()).toBe(1))
+    await clock.advance(20)
+    await eventually(() => expect(started).toBe(2))
     remove()
-    expect(started).toBeLessThanOrEqual(4)
   })
 
   it('logs a streak of failed runs once, and a run skipped as busy does not end it', async () => {
@@ -189,6 +220,7 @@ describe('the shared event poller', () => {
 
       return 'dropped'
     })(), (async () => {
+      // The deadline of the race: a write queued behind the others would not settle at all.
       await Bun.sleep(1000)
 
       return 'queued'
@@ -212,6 +244,7 @@ describe('the shared event poller', () => {
 
     const before = counter.calls()
 
+    // The window the poll rhythm is measured over, on the real clock as the stores' backed off tasks and the database answer in their own time.
     await Bun.sleep(1100)
 
     // Rooms poll every 250ms, so four or five ticks; three separate timers would reach the database about twice that.
