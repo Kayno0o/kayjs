@@ -445,7 +445,7 @@ Use `s.File()` in the schema and `input(type="file" name="avatar")` in the form.
 
 A form that posts to an action is sent as `multipart/form-data` unless it sets its own `enctype`. An empty file input counts as no file, so `s.Optional(s.File())` works.
 
-An island passes a `File` or `Blob` anywhere in its input: `await upload({ avatar: input.files[0] })`.
+An island passes a `File` or `Blob` anywhere in its input: `await upload({ avatar: input.files[0] })`. A `Blob` fills a file field too, such as a `MediaRecorder` recording, and the handler still gets a `File`.
 
 `s.File({ type: 'image/png' })` checks the file's bytes, not its name or the type the browser declared. That holds for a top-level field only. A nested file is checked against the type it declares.
 

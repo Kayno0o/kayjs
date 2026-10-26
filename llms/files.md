@@ -180,7 +180,7 @@ if upload.progress() !== undefined
 - `s.File()` or `s.Files()` in the schema, `input(type="file" name="avatar")` in the form, and the handler gets a `File`, which `files.put` stores.
 - Forms posting to an action are sent as `multipart/form-data` unless they set `enctype`.
 - A file input left empty counts as no file, so `s.Optional(s.File())` works.
-- An island passes a `File` or `Blob` anywhere in its input, nested ones included: `await upload({ avatar: input.files[0] })`.
+- An island passes a `File` or `Blob` anywhere in its input, nested ones included, and a `Blob` types as a field's `File`: `await upload({ avatar: input.files[0] })`.
 - On a top-level field, `s.File({ type: 'image/png' })` checks the file's bytes, not its name or declared type.
 - A file it refuses fails like any field, under its name in `errors` with the schema's `error` option when set.
 - A nested file is checked against the type it declares only.

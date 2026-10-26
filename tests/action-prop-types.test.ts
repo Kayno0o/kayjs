@@ -32,6 +32,19 @@ describe('the types a schema gives an island', () => {
   })
 })
 
+const upload = action(t.Object({ audio: t.File(), extra: t.Optional(t.Array(t.File())) }), input => input.audio.name)
+
+describe('the input of an action reading files', () => {
+  it('takes a Blob where the handler reads a File', () => {
+    const blob: InputOf<typeof upload> = { audio: new Blob(['x']), extra: [new File(['y'], 'y.txt')] }
+
+    // @ts-expect-error a string is no file
+    const wrong: InputOf<typeof upload> = { audio: 'x' }
+
+    expect([blob, wrong, upload]).toHaveLength(3)
+  })
+})
+
 describe('an action prop typed with the success output', () => {
   it('takes an action whose handler can ctx.fail', () => {
     const prop: Action<{ dossier: string }, AsyncGenerator<string>> = summarise

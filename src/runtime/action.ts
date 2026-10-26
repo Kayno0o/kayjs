@@ -325,7 +325,10 @@ export interface Action<Input, Output, Honeypot extends string = never> {
   [HONEYPOT]?: (field: Honeypot) => void
 }
 
-export interface ServerAction<Schema extends TSchema, Output, Honeypot extends string = never> extends Action<Static<Schema>, Output, Honeypot> {
+// What a call may send for an input the handler reads: a `Blob` where it reads a `File`, since the server names every posted Blob.
+export type Sendable<Value> = Value extends File ? Blob : Value extends readonly unknown[] ? { [Key in keyof Value]: Sendable<Value[Key]> } : Value extends Record<string, unknown> ? { [Key in keyof Value]: Sendable<Value[Key]> } : Value
+
+export interface ServerAction<Schema extends TSchema, Output, Honeypot extends string = never> extends Action<Sendable<Static<Schema>>, Output, Honeypot> {
   readonly schema: Schema
   readonly handler: (input: Static<Schema>, ctx: ActionContext) => Output | Promise<Output>
   readonly protection?: ResolvedProtection
