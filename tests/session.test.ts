@@ -135,6 +135,38 @@ describe('sessions', () => {
     expect(warnings).toEqual([expect.stringContaining('a session kept in its kay_session cookie alone, with no store')])
   })
 
+  it('does not warn in production of a session no store keeps when a library ends sessions itself', async () => {
+    const SINK = Symbol.for('kay.log')
+    const global = globalThis as { [SINK]?: unknown }
+    const sink = global[SINK]
+    const warnings: unknown[] = []
+    const environment = process.env.NODE_ENV
+
+    global[SINK] = (level: string, message: string) => level === 'warn' && warnings.push(message)
+    process.env.NODE_ENV = 'production'
+
+    try {
+      const plugin = session({ secret: SECRET })
+
+      plugin.endsSessionsElsewhere()
+      await new Elysia().use(plugin).get('/plain', async ({ session }) => {
+        await session.set('count', 1)
+
+        return 'ok'
+      }).handle(new Request('http://localhost/plain'))
+    }
+    finally {
+      global[SINK] = sink
+
+      if (environment === undefined)
+        delete process.env.NODE_ENV
+      else
+        process.env.NODE_ENV = environment
+    }
+
+    expect(warnings).toEqual([])
+  })
+
   describe('in the app store', () => {
     // A memory store telling what it was given, so a test sees where the data went.
     function recording() {

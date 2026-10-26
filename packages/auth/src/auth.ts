@@ -128,6 +128,8 @@ export interface SessionPlugin<Data extends AuthSessionData> {
   '~Ephemeral': { derive: { readonly session: Session<Data> } }
   // A key for one purpose from each of the session's secrets, in their order.
   'deriveSecret'?: (purpose: string) => string[]
+  // Tells the plugin kayjs-auth ends sessions itself, so it does not warn that a cookie with no store cannot be revoked.
+  'endsSessionsElsewhere'?: () => void
 }
 
 export interface AuthOptions<Data extends AuthSessionData, Role extends string, Prefix extends string = '/auth', Scope extends string = never, OrgRole extends string = never, UserData extends object = Record<string, never>> {
@@ -1150,6 +1152,9 @@ readRequestWith(requestOfContext)
 // Auth for a kay app or a plain Elysia one, on the app's kay session.
 export function createAuth<Data extends AuthSessionData, Role extends string = string, Prefix extends string = '/auth', const Scope extends string = never, OrgRole extends string = never, UserData extends object = Record<string, never>>(options: AuthOptions<Data, Role, Prefix, Scope, OrgRole, UserData>) {
   const core = createCore(options)
+
+  options.sessions.endsSessionsElsewhere?.()
+
   const { hasRole, isGranted } = createRoleHierarchy<BareUser, Role>(options.roles ?? {} as RoleHierarchy<Role>, user => user.roles as Role[])
 
   // The sign-in page keeps the page the visitor asked for, so they come back to it once they sign in another way.

@@ -148,7 +148,7 @@ export function session<Data extends object = SessionData>(options: SessionOptio
   if (options.sameSite !== undefined && !SAME_SITE.has(options.sameSite))
     throw new KayError('config-invalid', `kay: the session sameSite is ${JSON.stringify(options.sameSite)}, which is none of 'lax', 'strict' and 'none'`)
 
-  const config = { name: options.cookie ?? 'kay_session', sameSite: options.sameSite ?? 'lax', maxAge: options.maxAge === undefined ? DEFAULT_MAX_AGE : wholeSeconds(options.maxAge, 'the session maxAge'), absoluteMaxAge: options.absoluteMaxAge === undefined ? DEFAULT_ABSOLUTE_MAX_AGE : wholeSeconds(options.absoluteMaxAge, 'the session absoluteMaxAge'), browserMaxAge: options.browserMaxAge === undefined ? DEFAULT_BROWSER_MAX_AGE : wholeSeconds(options.browserMaxAge, 'the session browserMaxAge'), domain, store: () => options.store ?? appStore()?.sessions, keys }
+  const config = { name: options.cookie ?? 'kay_session', sameSite: options.sameSite ?? 'lax', maxAge: options.maxAge === undefined ? DEFAULT_MAX_AGE : wholeSeconds(options.maxAge, 'the session maxAge'), absoluteMaxAge: options.absoluteMaxAge === undefined ? DEFAULT_ABSOLUTE_MAX_AGE : wholeSeconds(options.absoluteMaxAge, 'the session absoluteMaxAge'), browserMaxAge: options.browserMaxAge === undefined ? DEFAULT_BROWSER_MAX_AGE : wholeSeconds(options.browserMaxAge, 'the session browserMaxAge'), domain, store: () => options.store ?? appStore()?.sessions, keys, revokedElsewhere: false }
 
   const plugin = new Elysia({ name: 'kay/session', seed: config.name })
     .derive({ as: 'scoped' }, ({ request }) => ({ session: new RequestSession<Data>(request, config) }))
@@ -175,7 +175,12 @@ export function session<Data extends object = SessionData>(options: SessionOptio
   // A key for one `purpose`, such as `'kayjs-auth'`, derived from the secret with HKDF so it says nothing of the secret or of the cookie's key; a list of 43-character texts in the order of the secrets, one for a single secret.
   const deriveSecret = (purpose: string): string[] => secrets.map(secret => Buffer.from(nodeCrypto().hkdfSync('sha256', secret, '', `kay session ${purpose}`, 32)).toString('base64url'))
 
-  return Object.assign(plugin, { deriveSecret })
+  // A library keeping its own record of each session, kayjs-auth, tells the plugin it refuses a cookie whose session it ended, so the plugin has no revoking left to warn about.
+  const endsSessionsElsewhere = (): void => {
+    config.revokedElsewhere = true
+  }
+
+  return Object.assign(plugin, { deriveSecret, endsSessionsElsewhere })
 }
 
 interface SessionConfig {
@@ -188,6 +193,8 @@ interface SessionConfig {
   // The session's own store, else the app's `store.sessions`, read per request as a `session()` made while its module loads comes before the config.
   store: () => SessionStore | undefined
   keys: Buffer[]
+  // Whether a library refuses the cookie of a session it ended, as kayjs-auth does, so a missing store warns of nothing.
+  revokedElsewhere: boolean
 }
 
 class RequestSession<Data extends object> implements Session<Data> {
@@ -211,7 +218,7 @@ class RequestSession<Data extends object> implements Session<Data> {
     this.name = this.secure && config.domain === undefined && !config.name.startsWith('__') ? `__Host-${config.name}` : config.name
     this.store = config.store()
 
-    if (!this.store)
+    if (!this.store && !config.revokedElsewhere)
       warnNoStore(config.name)
   }
 
