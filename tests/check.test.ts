@@ -4261,6 +4261,23 @@ describe.concurrent('kay check, unused code', () => {
     }
   })
 
+  it('checks the rest of a --fix run against the config the fixes left', async () => {
+    // The config reads the Dockerfile, which the fix rewrites, and allows `missing-title` while it is old.
+    const config = 'import { readFileSync } from \'node:fs\'\n\nconst old = readFileSync(`${import.meta.dir}/Dockerfile`, \'utf8\').includes(\'oven/bun:1.0.0\')\n\nexport default { lints: { \'missing-title\': old ? \'allow\' : \'deny\' } }\n'
+    const root = await scratchProject({ 'kay.config.ts': config, 'Dockerfile': 'FROM oven/bun:1.0.0\n', 'src/card.kay': 'iframe(src="https://example.com")\n' })
+
+    try {
+      const { code, output } = await runCheck(root, '--fix')
+
+      expect(await Bun.file(join(root, 'Dockerfile')).text()).not.toContain('1.0.0')
+      expect(output).toStartWith('error[missing-title]')
+      expect(code).toBe(1)
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
   it('applies the safe fixes with --fix, then prints what is left', async () => {
     const root = await scratchProject({
       'src/card.kay': '---\nconst { title, subtitle } = props<{ title: string, subtitle?: string }>()\n---\np {title}\niframe(src="https://example.com")\n',

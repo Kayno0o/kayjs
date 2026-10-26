@@ -6,11 +6,11 @@ import type { Command, ProblemFormat } from './command'
 import { existsSync, realpathSync, statSync } from 'node:fs'
 import { isAbsolute, join, relative, resolve, sep } from 'node:path'
 import process from 'node:process'
-import { realPath } from '../build/files'
+import { KAY_FILE, realPath } from '../build/files'
 import { pruneCheckCache } from '../build/transform'
 import { applySafeFixes, check as checkTypes, configCheckOptions } from '../check'
 import { isLint, isLintGroup, LINT_GROUPS, LINTS, UPGRADE_FROM } from '../compiler/lints'
-import { CONFIG_FILE, loadConfigWithin } from '../config'
+import { CONFIG_FILE, loadConfig, loadConfigWithin } from '../config'
 import { watchProject } from '../dev/sources'
 import { cacheDir } from '../project'
 import { buildingWithoutEnv } from '../server/env-state'
@@ -315,8 +315,9 @@ function inScope(diagnostic: CheckDiagnostic, scope: string[]): boolean {
 
 // Prints what `kay check` finds in the project and answers how many it found and how many of those fail it: the errors, and the warnings too with `denyWarnings`.
 // With `fix`, applies the safe fixes first, then checks again and prints what is left; with `only`, prints that group's lints alone; with a `scope`, the problems in those files and directories alone, the project still checked as a whole.
-async function checkProject(root: string, config: KayConfig, tsconfig: string, entry: string | undefined, { denyWarnings, fix, dryRun, only, since, launch, format, scope, quiet, probes }: { denyWarnings: boolean, fix: boolean, dryRun: boolean, only: LintGroup | undefined, since: string | undefined, launch: boolean, format: ProblemFormat, scope: string[], quiet: boolean, probes: ProbeMemory | undefined }): Promise<{ failing: number, found: number }> {
-  const options = { ...configCheckOptions(config), tsconfig, entry: entry ?? config.entry, launch }
+async function checkProject(root: string, loaded: KayConfig, tsconfig: string, entry: string | undefined, { denyWarnings, fix, dryRun, only, since, launch, format, scope, quiet, probes }: { denyWarnings: boolean, fix: boolean, dryRun: boolean, only: LintGroup | undefined, since: string | undefined, launch: boolean, format: ProblemFormat, scope: string[], quiet: boolean, probes: ProbeMemory | undefined }): Promise<{ failing: number, found: number }> {
+  let config = loaded
+  let options = { ...configCheckOptions(config), tsconfig, entry: entry ?? config.entry, launch }
   let everything = await checkTypes(root, options, probes)
   const checkScope = async () => {
     everything = await checkTypes(root, options, probes)
@@ -331,7 +332,8 @@ async function checkProject(root: string, config: KayConfig, tsconfig: string, e
 
   // `since` narrows what is fixed and reported to the deprecations of one minor, which `kay upgrade` applies in order.
   const inMinor = (diagnostic: CheckDiagnostic) => isLint(diagnostic.code) && (LINTS[diagnostic.code] as Lint).since === since
-  const fixed = fix ? await applySafeFixes(root, since === undefined ? diagnostics : diagnostics.filter(inMinor), !dryRun) : 0
+  const fixing = since === undefined ? diagnostics : diagnostics.filter(inMinor)
+  const fixed = fix ? await applySafeFixes(root, fixing, !dryRun) : 0
 
   if (fixed > 0) {
     // JSON is the whole of stdout; quiet, what is left is all that is said.
@@ -340,8 +342,15 @@ async function checkProject(root: string, config: KayConfig, tsconfig: string, e
     else if (!quiet)
       done(dryRun ? 'would fix' : 'fixed', count(fixed, 'problem'))
 
-    if (!dryRun)
+    if (!dryRun) {
+      // A fix that wrote a file other than a template may have rewritten kay.config.ts or what it reads, so the check that follows types the locals and routes off the config as it is now.
+      if (fixing.some(diagnostic => !KAY_FILE.test(diagnostic.file) && diagnostic.fixes?.some(candidate => candidate.safe))) {
+        config = await loadConfig(root, true)
+        options = { ...configCheckOptions(config), tsconfig, entry: entry ?? config.entry, launch }
+      }
+
       diagnostics = await checkScope()
+    }
   }
 
   // The app's own checks run once, after the fixes.
