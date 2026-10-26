@@ -2,6 +2,7 @@ import type { Mounted } from 'kay/test'
 import { afterEach, expect, spyOn, test } from 'bun:test'
 import { mountComponent, settle } from 'kay/test'
 import Slider from '../tests/fixture/src/components/slider.kay'
+import { untilHolds } from '../tests/until'
 import { click } from './dom'
 
 let mounted: Mounted | undefined
@@ -74,7 +75,8 @@ test('posts under its name in a plain form and goes back to its start on a reset
   expect(new FormData(form).get('delay')).toBe('20')
 
   click(root.querySelector('#reset'))
-  await new Promise(resolve => setTimeout(resolve, 30))
+  // The slider follows the reset a task later, once the browser has put the defaults back.
+  await untilHolds(() => new FormData(form).get('delay') === '40' && shown() === '40 ms')
   await settle()
 
   expect([new FormData(form).get('delay'), shown()]).toEqual(['40', '40 ms'])
@@ -257,7 +259,7 @@ test('tells onChange of a form reset that moved the thumb', async () => {
   await drag('20')
   await release()
   click(root.querySelector('#reset'))
-  await new Promise(resolve => setTimeout(resolve, 30))
+  await untilHolds(() => input.value === '40' && change.length === 2)
   await settle()
 
   expect([input.value, change]).toEqual(['40', [20, 40]])

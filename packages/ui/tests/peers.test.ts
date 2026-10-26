@@ -2,6 +2,7 @@ import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { dirname, join, normalize } from 'node:path'
 import { expect, test } from 'bun:test'
+import { untilHolds } from './until'
 
 const ROOT = join(import.meta.dir, '..')
 // A static value import; a type import ships nothing, and a dynamic one is checked by building it below.
@@ -58,7 +59,8 @@ test('MediaGallery\'s player builds without hls.js installed, and says to instal
 
     console.error = (...args: unknown[]) => void errors.push(args.join(' '))
     playSource(video, '/live.m3u8')
-    await Bun.sleep(50)
+    // The player imports hls.js asynchronously, and falls back to the plain src once that fails.
+    await untilHolds(() => video.src === '/live.m3u8' && errors.length > 0)
 
     expect([video.src, errors]).toEqual(['/live.m3u8', [expect.stringContaining('bun add hls.js')]])
   }

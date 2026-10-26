@@ -92,7 +92,7 @@ describe('Sortable, from the keyboard', () => {
     const { moves, handles: [, middle] } = listOf()
 
     press(middle!, 'ArrowDown')
-    await Bun.sleep(0)
+    await settle()
     press(middle!, 'ArrowUp')
 
     expect(moves).toEqual([[1, 2], [1, 0]])
@@ -102,15 +102,17 @@ describe('Sortable, from the keyboard', () => {
   test('says where the item landed to a screen reader through one shared polite live region', async () => {
     const { handles: [, middle] } = listOf()
 
+    clock.start()
     press(middle!, 'ArrowDown')
-    await Bun.sleep(150)
+    // The region waits a moment before it takes its first words.
+    await clock.elapse(150)
 
     expect(said()).toBe('Moved to 3 of 3')
 
     press(middle!, 'ArrowUp')
-    await Bun.sleep(0)
+    await clock.settle()
     press(middle!, 'ArrowUp')
-    await Bun.sleep(0)
+    await clock.settle()
 
     expect(said()).toBe('Moved to 1 of 3')
     expect(document.querySelectorAll('[data-kui-announce]').length).toBe(1)
@@ -137,8 +139,9 @@ describe('Sortable, from the keyboard', () => {
     dialog.append(other)
     sortable.item(2)(other)
 
+    clock.start()
     press(handle, 'ArrowDown')
-    await Bun.sleep(150)
+    await clock.elapse(150)
 
     expect(dialog.querySelector(':scope > [data-kui-announce]')?.textContent).toBe('Moved to 2 of 2')
   })
@@ -162,8 +165,9 @@ describe('Sortable, from the keyboard', () => {
     })
 
     rows[1]!.row.remove()
+    clock.start()
     press(rows[0]!.handle, 'ArrowDown')
-    await Bun.sleep(150)
+    await clock.elapse(150)
 
     expect(said()).toBe('Moved to 2 of 2')
   })
@@ -176,9 +180,11 @@ describe('Sortable, from the keyboard', () => {
     const handle = document.createElement('button')
 
     dialog.append(handle)
+    clock.start()
     announce('First', handle)
     announce('Second', handle)
-    await Bun.sleep(150)
+    // Past the moment a fresh region waits, which the later words must outlast.
+    await clock.elapse(150)
 
     expect(dialog.querySelector('[data-kui-announce]')?.textContent).toBe('Second')
   })
@@ -187,12 +193,12 @@ describe('Sortable, from the keyboard', () => {
     const { handles: [first] } = listOf()
 
     press(first!, 'ArrowDown')
-    await Bun.sleep(0)
+    await settle()
 
     const before = said()
 
     press(first!, 'ArrowUp')
-    await Bun.sleep(0)
+    await settle()
 
     expect(said()).toBe(before)
   })
@@ -296,7 +302,7 @@ describe('Sortable, from the keyboard', () => {
     expect(moves).toEqual([[1, 2]])
 
     saving.resolve()
-    await Bun.sleep(0)
+    await settle()
     press(first!, 'ArrowDown')
 
     expect(moves).toEqual([[1, 2], [0, 1]])
@@ -307,7 +313,7 @@ describe('Sortable, from the keyboard', () => {
 
     middle!.focus()
     press(middle!, 'ArrowDown')
-    await Bun.sleep(0)
+    await settle()
 
     expect(document.activeElement === first).toBe(true)
   })
@@ -519,13 +525,14 @@ describe('Board, from the keyboard', () => {
   test('says where the card landed in its container, counting the card a move into another one adds', async () => {
     const { root } = await board()
 
+    clock.start()
     press(button(root, 'Plan'), 'ArrowRight')
-    await Bun.sleep(150)
+    await clock.elapse(150)
 
     expect(said()).toBe('Moved to 2 of 2')
 
     press(button(root, 'Ship'), 'ArrowUp')
-    await settle()
+    await clock.settle()
 
     expect(said()).toBe('Moved to 1 of 3')
   })

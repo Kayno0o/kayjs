@@ -2,6 +2,7 @@ import type { Mounted } from 'kay/test'
 import { afterEach, describe, expect, spyOn, test } from 'bun:test'
 import { mountComponent, settle } from 'kay/test'
 import Panels from '../tests/fixture/src/components/panels.kay'
+import { untilHolds } from '../tests/until'
 import { click } from './dom'
 
 let mounted: Mounted | undefined
@@ -453,13 +454,13 @@ describe('SplitLayout on a phone', () => {
       reopen.focus()
       click(reopen)
       await settle()
-      await Bun.sleep(0)
+      await untilHolds(() => document.activeElement === root.querySelector('.kui-split-layout-sidebar-head .kui-icon-btn'))
 
       expect(document.activeElement).toBe(root.querySelector('.kui-split-layout-sidebar-head .kui-icon-btn'))
 
       click(root.querySelector('.kui-split-layout-sidebar-head .kui-icon-btn'))
       await settle()
-      await Bun.sleep(0)
+      await untilHolds(() => document.activeElement === reopen)
 
       expect(document.activeElement).toBe(reopen)
     })
@@ -478,13 +479,13 @@ describe('SplitLayout on a phone', () => {
       toggle.focus()
       click(toggle)
       await settle()
-      await Bun.sleep(0)
+      await untilHolds(() => document.activeElement === root.querySelector('#edit'))
 
       expect(document.activeElement).toBe(root.querySelector('#edit'))
 
       click(toggle)
       await settle()
-      await Bun.sleep(0)
+      await untilHolds(() => document.activeElement === toggle)
 
       expect(document.activeElement).toBe(toggle)
     })
@@ -496,7 +497,7 @@ describe('SplitLayout on a phone', () => {
 
       click(root.querySelector('.kui-split-layout-sidebar-head .kui-icon-btn'))
       await settle()
-      await Bun.sleep(0)
+      await untilHolds(() => document.activeElement === root.querySelector('#mars'))
 
       expect(document.activeElement).toBe(root.querySelector('#mars'))
     })
@@ -509,7 +510,8 @@ describe('SplitLayout on a phone', () => {
     toggle.focus()
     click(toggle)
     await settle()
-    await Bun.sleep(0)
+    // Nothing is meant to move focus, which a turn after the click would have shown.
+    await settle()
 
     expect(document.activeElement).toBe(toggle)
   })

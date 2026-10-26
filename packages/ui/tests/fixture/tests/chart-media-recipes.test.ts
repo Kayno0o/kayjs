@@ -2,7 +2,7 @@ import { join } from 'node:path'
 import process from 'node:process'
 import { afterAll, describe, expect, test } from 'bun:test'
 import { browserPath, testSite } from 'kay/test'
-import { hoverable } from './hoverable'
+import { hoverable, hoverOver } from './hoverable'
 
 const ROOT = join(import.meta.dir, '..')
 const path = browserPath()
@@ -138,8 +138,7 @@ inBrowser('chart and media recipes in the browser', () => {
     expect(heavy!.height).toBe(heavy!.size)
     expect(Number.parseFloat(heavy!.radius)).toBeGreaterThan(heavy!.width)
     expect(heavy!.width).toBeGreaterThan(light!.width)
-    await page.hover('#scatter [data-part=dot]')
-    await Bun.sleep(400)
+    await hoverOver(page, '#scatter [data-part=dot]')
     expect((await read())[0]!.opacity).toBe('1')
     expect(page.errors).toEqual([])
   }, 120_000)

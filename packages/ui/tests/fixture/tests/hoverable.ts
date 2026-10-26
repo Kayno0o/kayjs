@@ -15,3 +15,19 @@ export async function hoverable(page: { evaluate: (run: () => void) => Promise<u
     }
   })
 }
+
+// Hovers an element and returns once the pointer is on it and the transitions the hover started have finished, so the colours read next are the settled ones.
+export async function hoverOver(page: { hover: (selector: string) => Promise<unknown>, waitUntil: (condition: (selector: string) => unknown, options: undefined, selector: string) => Promise<void>, evaluate: (run: () => Promise<void>) => Promise<unknown> }, selector: string) {
+  await page.hover(selector)
+  await page.waitUntil(target => document.querySelector(target)?.matches(':hover'), undefined, selector)
+  await page.evaluate(async () => {
+    for (const animation of document.getAnimations()) {
+      try {
+        await animation.finished
+      }
+      catch {
+        // A transition a newer hover cancelled has nothing left to wait for.
+      }
+    }
+  })
+}

@@ -2,13 +2,15 @@ import type { Mounted } from 'kay/test'
 import { afterEach, expect, test } from 'bun:test'
 import { mountComponent, settle } from 'kay/test'
 import Combobox from '../tests/fixture/src/components/combobox.kay'
-import { click } from './dom'
+import { click, clock } from './dom'
 
 let mounted: Mounted | undefined
 const changes: string[] = []
 const created: string[] = []
 
+// The load waits out a debounce after the last keystroke, so these tests run it on a fake clock.
 afterEach(() => {
+  clock.stop()
   mounted?.unmount()
   changes.length = 0
   created.length = 0
@@ -163,17 +165,18 @@ test('loads options as the visitor types after a pause, and drops an answer a ne
   })
   const { input, rows } = await combobox(load, undefined, false)
 
+  clock.start()
   type(input, 'm')
-  await Bun.sleep(260)
+  await clock.elapse(260)
   type(input, 'ma')
-  await Bun.sleep(260)
+  await clock.elapse(260)
 
   expect(asked).toEqual(['m', 'ma'])
 
   answers.get('ma')!([{ value: 'mars', label: 'Mars' }])
-  await settle()
+  await clock.settle()
   answers.get('m')!([{ value: 'moon', label: 'Moon' }])
-  await settle()
+  await clock.settle()
 
   expect(rows()).toEqual(['Mars'])
   expect(input.getAttribute('aria-busy')).toBeNull()
@@ -190,14 +193,15 @@ test('asks for nothing under minLength, says when the load failed and when nothi
     return []
   }, 2, false)
 
+  clock.start()
   type(input, 'a')
-  await Bun.sleep(260)
+  await clock.elapse(260)
 
   expect(asked).toEqual([])
 
   type(input, 'zz')
-  await Bun.sleep(260)
-  await settle()
+  await clock.elapse(260)
+  await clock.settle()
 
   expect(root.querySelector('[role="status"]')?.textContent).toBe('No match')
 
@@ -205,8 +209,8 @@ test('asks for nothing under minLength, says when the load failed and when nothi
 
   console.error = () => undefined
   type(input, 'boom')
-  await Bun.sleep(260)
-  await settle()
+  await clock.elapse(260)
+  await clock.settle()
   console.error = logged
 
   expect(root.querySelector('[role="status"]')?.textContent).toBe('Could not load the options')
@@ -267,18 +271,19 @@ test('drops the rows of an older text at once and offers no new option before th
   const answers = new Map<string, (rows: unknown[]) => void>()
   const { input, rows } = await combobox(async ({ q }: { q: string }) => new Promise<unknown[]>(resolve => answers.set(q, resolve)))
 
+  clock.start()
   type(input, 'par')
-  await Bun.sleep(260)
+  await clock.elapse(260)
 
   expect(rows()).toEqual([])
 
   answers.get('par')!([{ value: 'paris', label: 'Paris' }])
-  await settle()
+  await clock.settle()
 
   expect(rows()).toEqual(['Paris', 'Create "par"'])
 
   type(input, 'pari')
-  await settle()
+  await clock.settle()
 
   expect(rows()).toEqual([])
 })
@@ -309,15 +314,16 @@ test('Escape closes an open list that has no rows without taking the press from 
   let answer: (rows: unknown[]) => void = () => undefined
   const { input, rows } = await combobox(async () => new Promise<unknown[]>(resolve => answer = resolve))
 
+  clock.start()
   type(input, 'par')
-  await Bun.sleep(260)
+  await clock.elapse(260)
 
   expect(key(input, 'Escape').defaultPrevented).toBe(false)
   expect(input.getAttribute('aria-expanded')).toBe('false')
   expect(input.value).toBe('par')
 
   answer([{ value: 'paris', label: 'Paris' }])
-  await settle()
+  await clock.settle()
 
   expect([input.getAttribute('aria-expanded'), rows()]).toEqual(['false', ['Paris', 'Create "par"']])
 })
@@ -333,8 +339,9 @@ test('shows the label given for a remote value, and asks the loader for nothing 
   expect(input.value).toBe('Ada Lovelace')
   expect(root.querySelector<HTMLInputElement>('input[type="hidden"]')?.value).toBe('c-42')
 
+  clock.start()
   input.focus()
-  await Bun.sleep(260)
+  await clock.elapse(260)
 
   expect(asked).toEqual([])
 })
@@ -380,8 +387,9 @@ test('shows no raw id for a remote value without a label, posts it, and leaves t
   expect(input.value).toBe('')
   expect(root.querySelector<HTMLInputElement>('input[type="hidden"]')?.value).toBe('c-42')
 
+  clock.start()
   input.focus()
-  await Bun.sleep(260)
+  await clock.elapse(260)
 
   expect(asked).toEqual([])
   expect([input.getAttribute('aria-expanded'), root.querySelector('[role="status"]')?.textContent]).toEqual(['false', ''])

@@ -6,6 +6,7 @@ import { mountComponent, settle } from 'kay/test'
 import SaveFormControls from '../tests/fixture/src/components/save-form-controls.kay'
 import SaveFormSignals from '../tests/fixture/src/components/save-form-signals.kay'
 import SaveFormComponent from '../tests/fixture/src/components/save-form.kay'
+import { untilHolds } from '../tests/until'
 import { click } from './dom'
 
 let mounted: Mounted | undefined
@@ -442,7 +443,8 @@ describe('SaveForm and the pick of a Combobox and an IconPicker', () => {
     click(buttons(root)[0]!)
     await settle()
     await settle()
-    await Bun.sleep(20)
+    // Discard resets the form, which its controls follow a task later.
+    await untilHolds(() => planet.value === 'Earth' && root.querySelector<HTMLInputElement>('input[name="planet"][type="hidden"]')?.value === 'earth' && iconValue() === 'tabler:house')
     await settle()
 
     expect(planet.value).toBe('Earth')
@@ -594,7 +596,8 @@ describe('SaveForm driven by signals', () => {
     await settle()
     click(buttons(root)[0]!)
     await settle()
-    await new Promise(resolve => setTimeout(resolve, 20))
+    // Discard resets the form, which the title follows a task later.
+    await untilHolds(() => title().value === 'Grace' && root.querySelector('#name')!.textContent === 'Grace' && status(root) === 'No unsaved change.')
 
     expect(title().value).toBe('Grace')
     expect(root.querySelector('#name')!.textContent).toBe('Grace')

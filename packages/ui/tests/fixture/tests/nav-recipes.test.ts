@@ -2,7 +2,7 @@ import { join } from 'node:path'
 import process from 'node:process'
 import { afterAll, describe, expect, test } from 'bun:test'
 import { browserPath, testSite } from 'kay/test'
-import { hoverable } from './hoverable'
+import { hoverable, hoverOver } from './hoverable'
 
 const ROOT = join(import.meta.dir, '..')
 const path = browserPath()
@@ -92,8 +92,7 @@ inBrowser('navigation recipes in the browser', () => {
     // Hovering the link lights its text, and a span keeps the text colour it has.
     const before = await read('')
 
-    await page.hover('#paging a[data-part=step]')
-    await Bun.sleep(400)
+    await hoverOver(page, '#paging a[data-part=step]')
     const hovered = await page.evaluate(() => getComputedStyle(document.querySelector('#paging a[data-part=step]')!).color)
 
     expect(hovered).not.toBe(before.next.text)
@@ -125,12 +124,10 @@ inBrowser('navigation recipes in the browser', () => {
       const resting = await colour(selector)
       const rest = await colour(other[name as keyof typeof other])
 
-      await page.hover(selector)
-      await Bun.sleep(400)
+      await hoverOver(page, selector)
       expect(await colour(selector), name).toBe(resting)
       // The hover lights another link, so the test sees a hover that does recolour.
-      await page.hover(other[name as keyof typeof other])
-      await Bun.sleep(400)
+      await hoverOver(page, other[name as keyof typeof other])
       expect(await colour(other[name as keyof typeof other]), name).not.toBe(rest)
       expect(await colour(selector), name).toBe(resting)
     }

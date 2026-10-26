@@ -3,6 +3,7 @@ import type { DateRange } from '../src/date'
 import { afterEach, describe, expect, test } from 'bun:test'
 import { mountComponent, settle } from 'kay/test'
 import Dates from '../tests/fixture/src/components/dates.kay'
+import { untilHolds } from '../tests/until'
 
 let mounted: Mounted | undefined
 const seen: { date: string[], range: DateRange[], time: string[] } = { date: [], range: [], time: [] }
@@ -167,7 +168,8 @@ describe('DateInput', () => {
     input.dispatchEvent(new Event('change', { bubbles: true }))
     root.querySelector<HTMLButtonElement>('#reset')!.click()
     await settle()
-    await new Promise(done => setTimeout(done, 20))
+    // The form reset reaches the input a task later.
+    await untilHolds(() => seen.date.length === 2 && input.value === '2026-10-21')
 
     expect(seen.date).toEqual(['2026-12-01', '2026-10-21'])
     expect(input.value).toBe('2026-10-21')
