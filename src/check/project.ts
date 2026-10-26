@@ -13,7 +13,7 @@ import { fileURLToPath } from 'node:url'
 import { findKayFiles, findProjectFiles, inWalkScope, writeIfChanged } from '../build/files'
 import { missingContextModules } from '../build/manifests'
 import { browserRole, promotedChecks } from '../compiler'
-import { moduleChecks } from '../compiler/fence-checks'
+import { moduleChecks, turnsCaptchaOff } from '../compiler/fence-checks'
 import { isLaunchLint, isLint, isLintGroup, LEVELS, lintLevel, lintLevels } from '../compiler/lints'
 import { CONFIG_FILE } from '../config'
 import { EXTENSIONS_MARKER, FEEDS_MARKER, PROBLEMS_MARKER, ROUTES_MARKER, USES_MARKER } from '../content/claims'
@@ -114,6 +114,21 @@ export function lintConfigTypeError(root: string, lints: Record<string, string> 
     return false
 
   return Object.entries(lints).some(([name, level]) => !isLint(name) && !isLintGroup(name) ? diagnostic.message.includes(`'${name}'`) : !LEVELS.has(level) && diagnostic.message.includes(`"${level}"`))
+}
+
+// `missing-captcha` is moot in an app whose `createAuth` turns the CAPTCHA off, in whichever module it sits, unless the config sets the lint itself.
+export async function withoutMissingCaptcha(root: string, options: CheckOptions): Promise<CheckOptions> {
+  if (options.lints?.['missing-captcha'] !== undefined || options.lints?.forms !== undefined)
+    return options
+
+  const files = (await findProjectFiles(root, SCRIPT_MODULE, { project: true, ownKayOnly: true })).filter(file => !DECLARATION_FILE.test(file))
+
+  for (const file of files) {
+    if (turnsCaptchaOff(await Bun.file(file).text()))
+      return { ...options, lints: { ...options.lints, 'missing-captcha': 'allow' } }
+  }
+
+  return options
 }
 
 // The lints the compiler finds in fences, in the project's own scripts: a name imported from the entry point it left, a stylesheet imported for a value with no text attribute, and a name the browser's entry lacks imported by a module the browser bundle reaches, or by a component the build promotes to an island.

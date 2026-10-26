@@ -21,7 +21,7 @@ import { projectPaths } from '../project'
 import { diagnoseShadow, reportsTypeErrors, servedByTheApp, shownOutsideKay, unusedCodesOf } from './diagnose'
 import { unknownNameHelp } from './export-homes'
 import { CONTENT_CHECK, generatedProblem } from './generated'
-import { configProblems, contentChecks, lintConfigTypeError, projectProblems } from './project'
+import { configProblems, contentChecks, lintConfigTypeError, projectProblems, withoutMissingCaptcha } from './project'
 import { writeShadowTypes } from './shadow-types'
 import { parseTscOutput, resolvedConfig, tsgoCode, tsgoDiagnostic, typecheck } from './tsgo'
 
@@ -121,7 +121,8 @@ export async function check(root: string, options: CheckOptions = {}, probes?: P
   return inWalkScope(async () => runCheck(root, options, probes))
 }
 
-async function runCheck(root: string, options: CheckOptions, probes?: ProbeMemory): Promise<CheckDiagnostic[]> {
+async function runCheck(root: string, given: CheckOptions, probes?: ProbeMemory): Promise<CheckDiagnostic[]> {
+  const options = await withoutMissingCaptcha(root, given)
   const tsconfig = options.tsconfig ?? 'tsconfig.json'
   // The props entries give their components are typed with the rest, so the collections are read before the type check; their probe does not wait for the shadow tree, which leaves the file it writes alone.
   // The tsconfig includes the shadow tree, so its files are listed once the tree is written.

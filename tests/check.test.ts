@@ -4300,6 +4300,18 @@ describe.concurrent('kay check, s.Public fields', () => {
   })
 })
 
+describe('kay check, missing-captcha', () => {
+  const page = '--- server\nconst auth = { register: async (_input: unknown) => 1 }\n\nawait auth.register({})\n---\np x\n'
+  const found = async (files: Record<string, string>, options?: Parameters<typeof check>[1]) => (await check(await scratchProject({ 'src/routes/index.kay': page, ...files }), options)).filter(d => d.code === 'missing-captcha').length
+
+  it('is reported in a page, and quiet project-wide once any module creates an auth with captcha: false', async () => {
+    expect(await found({})).toBe(1)
+    expect(await found({ 'src/auth.ts': 'export const auth = createAuth({ captcha: false })\n' })).toBe(0)
+    expect(await found({ 'src/auth.ts': 'export const auth = createAuth({ captcha: proofOfWork() })\n' })).toBe(1)
+    expect(await found({ 'src/auth.ts': 'export const auth = createAuth({ captcha: false })\n' }, { lints: { 'missing-captcha': 'warn' } })).toBe(1)
+  })
+})
+
 // Alone, as a busy machine would stretch the moments they wait for a signal to land.
 describe('kay check --watch, stopped by a signal', () => {
   it.each([

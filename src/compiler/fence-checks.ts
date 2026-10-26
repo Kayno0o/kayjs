@@ -438,6 +438,11 @@ const CAPTCHA_CALLS = new Map([['register', 1], ['signInWithPassword', 1], ['req
 const AUTH_NAME = /auth$/i
 const CAPTCHA_OFF = /\bcaptcha\s*:\s*false\b/
 
+// Whether a module creates an auth with its CAPTCHA off, which makes `missing-captcha` moot across the project.
+export function turnsCaptchaOff(source: string): boolean {
+  return source.includes('createAuth') && CAPTCHA_OFF.test(source)
+}
+
 // The last name of a receiver, `auth` for `ctx.locals.auth`.
 function receiverName(node: t.Node): string | undefined {
   if (node.type === 'Identifier')
