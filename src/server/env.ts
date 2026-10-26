@@ -12,6 +12,7 @@ import { building, callerFile, loading, PUBLIC_ENV_PATH, recordEnv } from './env
 import { readFields } from './query'
 
 const OPTIONAL = Symbol.for('TypeBox.Optional')
+const LOAD_PLACEHOLDER_LENGTH = 32
 
 // A `s.Object` of the variables, each read on its own.
 export type EnvSchema = TSchema & { properties: Record<string, TSchema> }
@@ -77,14 +78,14 @@ export function defineEnv<Schema extends EnvSchema>(declared: Schema, source: Re
   return env as ReturnType<typeof defineEnv<Schema>>
 }
 
-// What `--load` gives a variable the build lacks: a derived value for a secret and `''` for any other string, so a module guarding or passing it at load runs; `undefined` for a field of another type.
+// What `--load` gives a variable the build lacks or refuses: a fixed string of 32 characters or its `minLength`, which a session secret's own check accepts and writes nothing to disk; `undefined` for a field of another type.
 function loadPlaceholder(name: string, field: TSchema | undefined): unknown {
-  const { secret, type } = (field ?? {}) as { secret?: unknown, type?: unknown }
+  const { minLength, type } = (field ?? {}) as { minLength?: unknown, type?: unknown }
 
   if (type !== 'string')
     return undefined
 
-  return secret === true ? devSecret(name) : ''
+  return `kay-load-placeholder-${name}`.padEnd(Math.max(LOAD_PLACEHOLDER_LENGTH, typeof minLength === 'number' ? minLength : 0), '_')
 }
 
 function without<Schema extends EnvSchema>(schema: Schema, placeholders: Record<string, string>): Schema {
