@@ -446,6 +446,41 @@ describe('kay upgrade across removed deprecations', () => {
     }
   })
 
+  it('fails, never saying nothing is left, when a stop leaves a form its rewrite could not fix', async () => {
+    const root = await project(appOn('1.70.0'))
+    const { deps } = fakes({ '@kaynooo/kayjs': '1.77.0', '@kaynooo/kayjs-ui': '1.77.0' }, ['1.71'])
+    const log = spyOn(console, 'log').mockImplementation(() => undefined)
+    const kay = deps.kay
+
+    deps.kay = async (dir, args, capture, env) => {
+      const answer = await kay(dir, args, capture, env)
+
+      return args.includes('--since') ? { ...answer, code: 1 } : answer
+    }
+
+    try {
+      expect(await upgradeProject(root, deps)).toBe(1)
+      expect(log.mock.calls.map(call => String(call[0])).join('\n')).not.toContain('nothing left')
+    }
+    finally {
+      log.mockRestore()
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
+  it('stops at the minor before the release it moves to', async () => {
+    const root = await project(appOn('1.68.0'))
+    const { deps, calls } = fakes({ '@kaynooo/kayjs': '1.73.4', '@kaynooo/kayjs-ui': '1.73.4' })
+
+    try {
+      await quietly(async () => upgradeProject(root, deps))
+      expect(calls.installs.map(changes => changes[0]!.spec)).toEqual(['~1.72.0', '~1.73.4'])
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
   it('keeps the table of dropped deprecations ordered, and true to the lints still declared', async () => {
     const { version } = (await Bun.file(join(import.meta.dir, '../package.json')).json()) as { version: string }
     const current = minorOf(version)!
@@ -564,7 +599,7 @@ describe('kay upgrade through the package manager', () => {
       const deps = registryDepsFor(bun)
 
       await Bun.write(join(root, 'node_modules/stale/package.json'), '{ "version": "1.40.1" }')
-      await Bun.write(join(root, 'node_modules/fresh/package.json'), '{ "version": "1.46.0" }')
+      await Bun.write(join(root, 'node_modules/fresh/package.json'), '{ "version": "1.46.3" }')
 
       expect(await deps.install(root, [
         { name: 'stale', spec: 'npm:@kaynooo/kayjs@~1.46.0', section: 'devDependencies' },

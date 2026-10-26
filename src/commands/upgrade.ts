@@ -166,6 +166,8 @@ export async function upgradeProject(root: string, deps: UpgradeDeps, { dryRun =
   // What the project holds after the last phase that landed, so a failing one puts back that state and not an older one.
   let settled = { source: original, locks: await readLocks(root) }
   let behind = from
+  // A stone's rewrite that leaves a form behind: the latest kay no longer knows its lint, so only this run can still report it.
+  let leftOnTheWay = false
 
   for (const phase of phases) {
     if (phase.changes.length === 0)
@@ -193,7 +195,10 @@ export async function upgradeProject(root: string, deps: UpgradeDeps, { dryRun =
 
     for (const since of await crossed(root, behind, phase.version, deps)) {
       step('rewriting', `what ${since} deprecated`)
-      await deps.kay(root, ['check', '--fix', '--since', since, ...quiet ? ['--quiet'] : []], false, { [UPGRADE_FROM]: from })
+      const rewritten = await deps.kay(root, ['check', '--fix', '--since', since, ...quiet ? ['--quiet'] : []], false, { [UPGRADE_FROM]: from })
+
+      if (phase.stone && rewritten.code !== 0)
+        leftOnTheWay = true
     }
 
     behind = phase.version
@@ -204,12 +209,12 @@ export async function upgradeProject(root: string, deps: UpgradeDeps, { dryRun =
 
   const left = await deps.kay(root, ['check', '--fix', ...quiet ? ['--quiet'] : []], false, { [UPGRADE_FROM]: from })
 
-  if (left.code === 0)
+  if (left.code === 0 && !leftOnTheWay)
     done('upgraded', `to kay ${latestKay}, nothing left to do by hand`)
   else
     console.log(`upgraded to kay ${latestKay}, the problems above are left for you`)
 
-  return left.code === 0 ? 0 : 1
+  return left.code === 0 && !leftOnTheWay ? 0 : 1
 }
 
 async function readLocks(root: string): Promise<{ path: string, content: Uint8Array | undefined }[]> {

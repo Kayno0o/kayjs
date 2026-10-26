@@ -638,7 +638,7 @@ export function isLint(code: string | undefined): code is LintName {
 // Set by `kay upgrade` for the checks it runs, to the version the app came from: a lint about a change of default speaks to an app crossing it, and only then.
 export const UPGRADE_FROM = 'KAY_UPGRADE_FROM'
 
-// The releases that dropped deprecated lints with the old forms they rewrote, and the minors those lints came in: a release newer than one of these no longer rewrites such a form, so `kay upgrade` installs the minor before it first, whose kay still does. Adding a release that drops a deprecation here is part of dropping it: `tests/upgrade.test.ts` holds the table to the lints still declared.
+// The releases that dropped deprecated lints with the old forms they rewrote, and the minors those lints came in: a release newer than one of these no longer rewrites such a form, so `kay upgrade` installs the minor before it first, whose kay still does. Dropping a deprecated lint adds its release here, the test in `tests/upgrade.test.ts` only checking that no row names a minor whose lints are still declared.
 export const REMOVED_DEPRECATIONS: readonly { removedIn: string, since: readonly string[] }[] = [
   { removedIn: '1.51', since: ['1.46'] },
   { removedIn: '1.56', since: ['1.51', '1.52'] },
