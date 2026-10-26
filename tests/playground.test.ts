@@ -126,7 +126,6 @@ describe('the playground\'s bundles', () => {
       expect(build).not.toHaveBeenCalled()
 
       app.listen(0)
-      await Bun.sleep(50)
 
       expect(build.mock.calls.map(([options]) => (options.entrypoints[0] ?? '').split('/').pop()).sort()).toEqual(['compile.ts', 'frame.ts'])
     }
