@@ -80,14 +80,15 @@ async function staleBun(root: string): Promise<boolean> {
   if (!existsSync(installed))
     return false
 
-  const { version } = (await Bun.file(installed).json()) as { version?: string }
+  let version: string | undefined
   let range = engines.bun
 
   try {
+    version = ((await Bun.file(installed).json()) as { version?: string }).version
     range = ((await Bun.file(join(root, 'node_modules/kay/package.json')).json()) as { engines?: { bun?: string } }).engines?.bun ?? range
   }
   catch {
-    // No installed kay to read: the range of the kay running the upgrade stands.
+    // An unreadable manifest: no stale `bun` is claimed, and the range of the kay running the upgrade stands.
   }
 
   return version !== undefined && !Bun.semver.satisfies(version.replace(PRERELEASE, ''), range)
