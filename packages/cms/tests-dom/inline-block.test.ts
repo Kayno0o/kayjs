@@ -3,12 +3,16 @@ import { afterEach, expect, mock, spyOn, test } from 'bun:test'
 import { mountComponent, settle } from 'kay/test'
 import Editor from '../src/editor/editor.kay'
 import { EDITOR_COOKIE } from '../src/page-link'
+import { until } from '../tests/until'
+import { entryLoaded } from './loaded'
 
 let mounted: Mounted | undefined
 
 Object.assign(document, { caretPositionFromPoint: () => null, elementsFromPoint: () => [] })
 
 afterEach(() => {
+  // Every editor bundle mounted so far keeps its own drafts, whose unwritten edits a later test's flush would write: this one's go first.
+  window.dispatchEvent(new Event('pagehide'))
   mounted?.unmount()
   mounted = undefined
   for (const element of document.querySelectorAll('[data-page]'))
@@ -36,9 +40,15 @@ async function open(fields = '', data: Record<string, unknown> = DATA) {
 
   mounted = await mountComponent(Editor, { entries: [{ collection: 'pages', slug: 'home' }], unclickable: [] })
   await settle()
-  await Bun.sleep(50)
+  await entryLoaded(mounted.root)
 
   const click = async (element: Element) => {
+    (element as HTMLElement).click()
+    await settle()
+    await until(() => element.getAttribute('contenteditable') === 'plaintext-only')
+  }
+  // A click that leaves the block to the form, so the wait for it is a deliberate wait for nothing to happen.
+  const clickQuietly = async (element: Element) => {
     (element as HTMLElement).click()
     await settle()
     await Bun.sleep(20)
@@ -48,14 +58,15 @@ async function open(fields = '', data: Record<string, unknown> = DATA) {
     element.dispatchEvent(new Event('input', { bubbles: true }))
     await settle()
   }
+  // The draft as the browser keeps it, written when the page is left rather than a pause after the last keystroke.
   const draft = async () => {
-    await Bun.sleep(220)
+    window.dispatchEvent(new Event('pagehide'))
 
     return (JSON.parse(localStorage.getItem('kcms:draft:tester:pages:home') ?? 'null') as { entry: { body: string, data: Record<string, unknown> } } | null)?.entry
   }
   const blocks = [...page.querySelectorAll<HTMLElement>('[data-kay-body] > *')]
 
-  return { page, root: mounted.root, blocks, click, type, draft }
+  return { page, root: mounted.root, blocks, click, clickQuietly, type, draft }
 }
 
 function key(element: Element, init: KeyboardEventInit) {
@@ -154,15 +165,15 @@ test('HTML typed in a block stays text', async () => {
 })
 
 test('a block whose text the Markdown does not hold, or that holds an image, is left to the form', async () => {
-  const { blocks, root, click } = await open()
+  const { blocks, root, clickQuietly } = await open()
   const [quoted, image] = [blocks[6]!, blocks[7]!]
 
-  await click(quoted)
+  await clickQuietly(quoted)
   expect(quoted.hasAttribute('contenteditable')).toBe(false)
   expect(document.activeElement?.tagName).toBe('TEXTAREA')
   expect(root.contains(document.activeElement)).toBe(true)
 
-  await click(image)
+  await clickQuietly(image)
   expect(image.hasAttribute('contenteditable')).toBe(false)
 })
 
@@ -184,10 +195,10 @@ test('a long text is typed in place with its line breaks, Enter taking a new lin
 })
 
 test('a long text the page shows otherwise than the value is left to the form', async () => {
-  const { page, click } = await open('<p data-kay-field="pages:home:long">Something else</p>')
+  const { page, clickQuietly } = await open('<p data-kay-field="pages:home:long">Something else</p>')
   const long = page.querySelector<HTMLElement>('[data-kay-field]')!
 
-  await click(long)
+  await clickQuietly(long)
 
   expect(long.hasAttribute('contenteditable')).toBe(false)
 })
@@ -218,7 +229,7 @@ async function typeAt(element: HTMLElement, text: string, caret: number): Promis
   element.textContent = text
   document.getSelection()?.collapse(element.firstChild, caret)
   element.dispatchEvent(new Event('input', { bubbles: true }))
-  await Bun.sleep(0)
+  await settle()
 }
 
 test('typing a heading marker at the start of a paragraph goes on in the heading it becomes, the caret kept', async () => {
@@ -229,7 +240,7 @@ test('typing a heading marker at the start of a paragraph goes on in the heading
 
   const heading = swapTag(second!, 'h1', 'Second <a href="https://x.test">one</a> here.')
 
-  await Bun.sleep(30)
+  await until(() => heading.getAttribute('contenteditable') === 'plaintext-only' && document.activeElement === heading && document.getSelection()?.anchorOffset === 2)
 
   expect(heading.getAttribute('contenteditable')).toBe('plaintext-only')
   expect(heading.textContent).toBe('# Second [one](https://x.test) here.')
@@ -246,7 +257,7 @@ test('deleting the marker of a heading goes on in the paragraph it becomes', asy
 
   const paragraph = swapTag(heading!, 'p', 'A heading')
 
-  await Bun.sleep(30)
+  await until(() => paragraph.getAttribute('contenteditable') === 'plaintext-only' && document.activeElement === paragraph && document.getSelection()?.anchorOffset === 0)
 
   expect(paragraph.getAttribute('contenteditable')).toBe('plaintext-only')
   expect(document.activeElement).toBe(paragraph)
@@ -261,7 +272,7 @@ test('Escape after a tag change puts the paragraph back as it was before the fir
 
   const heading = swapTag(second!, 'h1', 'Second <a href="https://x.test">one</a> here.')
 
-  await Bun.sleep(30)
+  await until(() => heading.getAttribute('contenteditable') === 'plaintext-only')
   expect(heading.getAttribute('contenteditable')).toBe('plaintext-only')
   key(heading, { key: 'Escape' })
   expect(heading.hasAttribute('contenteditable')).toBe(false)

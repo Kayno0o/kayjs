@@ -14,7 +14,7 @@ let asked: string[] = []
 Object.assign(document, { caretPositionFromPoint: () => null, elementsFromPoint: () => [] })
 
 afterEach(async () => {
-  await Bun.sleep(20)
+  await settle()
   mounted?.unmount()
   mounted = undefined
   for (const element of document.querySelectorAll('[data-page]'))
@@ -292,6 +292,7 @@ test('a click on a field the layout hides collapses nothing', async () => {
   expect(shown()).toEqual(['title', 'summary'])
   page('posts:hello:tags').click()
   await settle()
+  // A deliberate wait for nothing to happen: the click would collapse the form within it.
   await Bun.sleep(30)
 
   expect(shown()).toEqual(['title', 'summary'])
@@ -338,6 +339,7 @@ test('the form is not collapsed again by a reload of its entry', async () => {
   await until(() => shown().length === 1)
   button('Show all fields')!.click()
   await until(() => shown().length === 3)
+  // A deliberate wait for nothing to happen: a reload of the entry would collapse the form again within it.
   await Bun.sleep(50)
 
   expect(shown()).toEqual(['title', 'summary', 'tags'])
@@ -419,6 +421,8 @@ test('the registry forgets the saver of an entry when its form unmounts, so Save
   await type('Edited again')
   await press('hide')
   await press('all')
+  await until(() => root.querySelector('.kcms-entry') === null)
+  // A deliberate wait for nothing to happen: a second save would be sent within it.
   await Bun.sleep(50)
 
   expect(root.querySelector('.kcms-entry')).toBeNull()

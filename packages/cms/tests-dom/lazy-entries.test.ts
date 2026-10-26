@@ -3,6 +3,7 @@ import { afterEach, expect, mock, spyOn, test } from 'bun:test'
 import { mountComponent, settle } from 'kay/test'
 import Editor from '../src/editor/editor.kay'
 import { EDITOR_COOKIE } from '../src/page-link'
+import { until } from '../tests/until'
 
 const POSTS = { name: 'posts', title: 'Posts', kind: 'folder', localized: false, components: [], schema: { type: 'object', properties: { title: { type: 'string' }, summary: { type: 'string' } } } }
 const MENU = { name: 'menu', title: 'Menu', single: true, kind: 'file', localized: false, components: [], schema: { type: 'object', properties: { label: { type: 'string' } } } }
@@ -10,11 +11,13 @@ const HELLO = { collection: 'posts', slug: 'hello' }
 const NAV = { collection: 'menu', slug: 'index' }
 let mounted: Mounted | undefined
 let asked: string[] = []
+// How many reads of an entry were answered, for a test that waits for the answer to land.
+let answered = 0
 
 Object.assign(document, { caretPositionFromPoint: () => null, elementsFromPoint: () => [] })
 
 afterEach(async () => {
-  await Bun.sleep(20)
+  await settle()
   mounted?.unmount()
   mounted = undefined
   for (const element of document.querySelectorAll('[data-page]'))
@@ -28,6 +31,7 @@ afterEach(async () => {
 // `fail` answers an entry's read with an error, `hang` never answers it.
 function server(slow = 0, mode?: 'fail' | 'hang'): void {
   asked = []
+  answered = 0
   spyOn(globalThis, 'fetch').mockImplementation((async (request: string | URL | Request) => {
     const path = String(request)
 
@@ -40,6 +44,7 @@ function server(slow = 0, mode?: 'fail' | 'hang'): void {
       await new Promise(() => undefined)
 
     await Bun.sleep(slow)
+    answered++
 
     if (mode === 'fail')
       return Response.json({ message: 'down' }, { status: 500 })
@@ -48,19 +53,6 @@ function server(slow = 0, mode?: 'fail' | 'hang'): void {
       ? Response.json({ collection: MENU, entry: { slug: 'index', data: { label: 'Home' }, version: 'v1', url: '/' } })
       : Response.json({ collection: POSTS, entry: { slug: 'hello', data: { title: 'Hello world', summary: 'Short' }, version: 'v1', url: '/posts/hello' } })
   }) as unknown as typeof fetch)
-}
-
-async function until(done: () => boolean): Promise<void> {
-  const giveUp = Date.now() + 5000
-
-  while (Date.now() < giveUp) {
-    await settle()
-
-    if (done())
-      return
-  }
-
-  throw new Error('the page never reached the state the test waits for')
 }
 
 const reads = () => asked.filter(path => path.includes('/entries/'))
@@ -74,7 +66,7 @@ async function open(entries: object[], settleEvery?: number) {
   document.body.append(element)
   mounted = await mountComponent(Editor, { entries, unclickable: [], settleEvery })
   await settle()
-  await Bun.sleep(30)
+  await until(() => mounted!.root.querySelector('.kcms-entry, .kcms-entry-idle') !== null)
 
   return { root: mounted.root, element }
 }
@@ -164,7 +156,7 @@ test('a second click on a text of an entry still loading types in place too, the
   title.textContent = 'Hello world'
   document.body.append(title)
   title.click()
-  await Bun.sleep(30)
+  await until(() => reads().length === 1)
   title.click()
   await until(() => title.isContentEditable)
 
@@ -197,7 +189,8 @@ test('a click on a text of an entry whose read failed brings up the side form at
 
   clickAbove(title)
   await until(() => root.querySelector('.kcms-entry-failure') !== null)
-  await Bun.sleep(400)
+  // Bounded below the wait for an entry's read (about five seconds), as the form comes up at once and not when that wait ends.
+  await until(() => measured.mock.calls.length > 0, 3000)
 
   expect(measured).toHaveBeenCalled()
   expect(title.isContentEditable).toBe(false)
@@ -212,9 +205,9 @@ test('a click on a text of an entry that never loads falls back to the form once
   const measured = spyOn(title, 'getBoundingClientRect')
 
   clickAbove(title)
-  await Bun.sleep(100)
+  await settle()
   expect(measured).not.toHaveBeenCalled()
-  await Bun.sleep(600)
+  await until(() => measured.mock.calls.length > 0)
 
   expect(measured).toHaveBeenCalled()
   expect(title.isContentEditable).toBe(false)
@@ -243,9 +236,11 @@ test('closing the editor ends the wait of a click, which then edits nothing', as
   const measured = spyOn(title, 'getBoundingClientRect')
 
   clickAbove(title)
-  await Bun.sleep(30)
+  await until(() => reads().length === 1)
   root.querySelector<HTMLElement>('[aria-label="Hide the editor"]')!.click()
-  await Bun.sleep(700)
+  await until(() => answered === 1)
+  // A deliberate wait for nothing to happen: the click would measure the title within it once its entry had loaded.
+  await Bun.sleep(300)
 
   expect(measured).not.toHaveBeenCalled()
   expect(title.isContentEditable).toBe(false)

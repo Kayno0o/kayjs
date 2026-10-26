@@ -3,6 +3,7 @@ import type { ScreenCollection, StoredEntry } from '../src/kay/contract'
 import { afterEach, expect, mock, spyOn, test } from 'bun:test'
 import { mountComponent, settle } from 'kay/test'
 import EntryScreen from '../tests/fixture/src/components/entry-screen.kay'
+import { until } from '../tests/until'
 
 const SHOP: ScreenCollection = {
   name: 'shop',
@@ -49,12 +50,11 @@ async function open(data: Record<string, unknown> = {}, collection: ScreenCollec
   const save = async () => {
     const fetched = spyOn(globalThis, 'fetch').mockImplementation((async (url: RequestInfo | URL) => Response.json(String(url).includes('/entries/') ? { saved: true, version: 'v2' } : [])) as unknown as typeof fetch)
 
-    root.querySelector('form')!.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }))
+    const form = root.querySelector('form')!
 
-    for (let wait = 0; wait < 30; wait++) {
-      await Bun.sleep(10)
-      await settle()
-    }
+    form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }))
+    await until(() => fetched.mock.calls.some(([url]) => String(url).includes('/entries/')) && form.getAttribute('aria-busy') !== 'true')
+    await settle()
 
     const saved = fetched.mock.calls.find(([url]) => String(url).includes('/entries/'))
 
@@ -110,8 +110,7 @@ test('an icon field asks the server for the icons of its set and keeps the one p
 
   const { field } = await open({})
 
-  for (let wait = 0; wait < 20 && field('icon').querySelector('.kui-icon-grid-option') === null; wait++)
-    await Bun.sleep(10)
+  await until(() => field('icon').querySelector('.kui-icon-grid-option') !== null)
 
   expect(asked[0]).toContain('set=mini')
   field('icon').querySelector<HTMLButtonElement>('.kui-icon-grid-option')!.click()

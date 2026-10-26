@@ -234,6 +234,7 @@ test('a focus that fails leaves nothing editable behind', async () => {
     title.inert = true
     title.click()
   }, TITLE)
+  // A deliberate wait for nothing: an inert title must stay out of editing.
   await page.evaluate(() => new Promise(done => setTimeout(done, 200)))
 
   expect(await page.evaluate((selector: string) => [document.querySelector(selector)!.hasAttribute('contenteditable'), document.querySelector(selector)!.hasAttribute('data-kay-typing'), document.querySelector('.kcms-inline-issue') === null], TITLE)).toEqual([false, false, true])

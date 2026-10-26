@@ -3,6 +3,7 @@ import { afterEach, expect, mock, spyOn, test } from 'bun:test'
 import { mountComponent, settle } from 'kay/test'
 import { forgetPlace, notePlace, placeCaret } from '../src/editor/caret'
 import Editor from '../src/editor/editor.kay'
+import { entryLoaded } from './loaded'
 
 const POSTS = { name: 'posts', title: 'Posts', kind: 'folder', localized: false, components: [], body: {}, schema: { type: 'object', properties: { title: { type: 'string' }, summary: { type: 'string', maxLength: 500 } } } }
 const BODY = 'First **bold** paragraph.\n\nSecond [one](https://x.test) here.'
@@ -13,7 +14,7 @@ let caret: { node: Node, offset: number } | undefined
 Object.assign(document, { caretPositionFromPoint: () => caret ? { offsetNode: caret.node, offset: caret.offset } : null, elementsFromPoint: () => [] })
 
 afterEach(async () => {
-  await Bun.sleep(20)
+  await settle()
   mounted?.unmount()
   mounted = undefined
   caret = undefined
@@ -40,7 +41,7 @@ async function open() {
   document.body.append(page)
   mounted = await mountComponent(Editor, { entries: [{ collection: 'posts', slug: 'hello' }], unclickable: [] })
   await settle()
-  await Bun.sleep(50)
+  await entryLoaded(mounted.root)
 
   return { root: mounted.root, page }
 }

@@ -3,6 +3,7 @@ import type { ScreenCollection, StoredEntry } from '../src/kay/contract'
 import { afterEach, expect, mock, spyOn, test } from 'bun:test'
 import { mountComponent, settle } from 'kay/test'
 import EntryScreen from '../tests/fixture/src/components/entry-screen.kay'
+import { until } from '../tests/until'
 import ReferenceReads from './reference-reads.kay'
 
 const NOTES: ScreenCollection = {
@@ -122,13 +123,6 @@ async function open(held: string | undefined) {
 // The option marked selected, which a browser shows chosen.
 const chosen = (select: HTMLSelectElement) => [...select.options].find(option => option.hasAttribute('selected'))?.value
 
-async function pause(): Promise<void> {
-  for (let wait = 0; wait < 10; wait++) {
-    await Bun.sleep(5)
-    await settle()
-  }
-}
-
 test('the picker shows it is loading, then lists the entries with the held one selected', async () => {
   const { release } = server(() => ({ choices: [{ slug: 'hello', title: 'Hello' }, { slug: 'other', title: 'Other' }], complete: true }), true)
   const { field } = await open('hello')
@@ -137,7 +131,7 @@ test('the picker shows it is loading, then lists the entries with the held one s
   expect(select().querySelector('option[disabled]')?.textContent).toContain('Loading')
 
   release()
-  await pause()
+  await until(() => select().querySelector('option[disabled]') === null)
   expect([...select().options].map(option => option.value)).toEqual(['', 'hello', 'other'])
   expect(chosen(select())).toBe('hello')
 })
@@ -147,7 +141,7 @@ test('a collection that cannot be listed falls back to typing the slug', async (
 
   const { field } = await open('hello')
 
-  await pause()
+  await until(() => field().querySelector('input') !== null)
   expect(field().querySelector('select')).toBeNull()
   expect(field().querySelector<HTMLInputElement>('input')!.value).toBe('hello')
 })
@@ -157,7 +151,7 @@ test('a held value the collection lacks stays among the choices, so it shows rat
 
   const { field } = await open('gone')
 
-  await pause()
+  await until(() => [...field().querySelector('select')?.options ?? []].some(option => option.value === 'hello'))
 
   const select = field().querySelector('select')!
 

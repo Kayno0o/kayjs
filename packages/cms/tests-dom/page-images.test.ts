@@ -6,6 +6,7 @@ import { sameBar } from '../src/editor/image-bar'
 import { EDITOR_LAYER } from '../src/editor/layer'
 import { OWN } from '../src/editor/own'
 import { EDITOR_COOKIE } from '../src/page-link'
+import { until } from '../tests/until'
 
 const SCHEMA = {
   type: 'object',
@@ -30,11 +31,13 @@ let slow = 0
 let slowRead = 0
 let refusal = 415
 let asked: string[] = []
+// How many reads of an entry were answered, for a test that waits for the answer to land.
+let answered = 0
 
 Object.assign(document, { caretPositionFromPoint: () => null, elementsFromPoint: () => [] })
 
 afterEach(async () => {
-  await Bun.sleep(20)
+  await settle()
   mounted?.unmount()
   mounted = undefined
   for (const element of document.querySelectorAll('[data-page]'))
@@ -51,6 +54,7 @@ afterEach(async () => {
 function server(): void {
   document.cookie = `${EDITOR_COOKIE}=tester`
   uploads = 0
+  answered = 0
   asked = []
   spyOn(globalThis, 'fetch').mockImplementation((async (request: string | URL | Request, init?: RequestInit) => {
     const path = String(request)
@@ -74,6 +78,7 @@ function server(): void {
       return Response.json({})
 
     await Bun.sleep(slowRead)
+    answered++
 
     return Response.json({ collection: POSTS, entry: { slug: 'hello', data: { title: 'Hello', photo: '/old.png', photoWidth: 10, photoHeight: 10, gallery: [{ image: '/a.png' }, { image: '/b.png' }] }, version: 'v1', url: '/posts/hello' } })
   }) as unknown as typeof fetch)
@@ -84,19 +89,6 @@ function data(): Record<string, unknown> {
   const kept = localStorage.getItem('kcms:draft:tester:posts:hello')
 
   return kept === null ? {} : (JSON.parse(kept) as { entry: { data: Record<string, unknown> } }).entry.data
-}
-
-async function until(done: () => boolean): Promise<void> {
-  const giveUp = Date.now() + 5000
-
-  while (Date.now() < giveUp) {
-    await settle()
-
-    if (done())
-      return
-  }
-
-  throw new Error('the page never reached the state the test waits for')
 }
 
 async function open(entries: object[] = [HELLO]) {
@@ -112,7 +104,7 @@ async function open(entries: object[] = [HELLO]) {
   document.body.append(image, title)
   mounted = await mountComponent(Editor, { entries, unclickable: [] })
   await settle()
-  await Bun.sleep(30)
+  await until(() => mounted!.root.querySelector('.kcms-entry, .kcms-entry-idle') !== null)
 
   return { root: mounted.root, image, title }
 }
@@ -295,11 +287,13 @@ test('closing the editor ends the wait of an image dropped on an entry still a r
   const { root, image } = await open([OTHER, HELLO])
 
   drop(image, [file()])
-  await Bun.sleep(30)
+  await until(() => asked.some(path => path.includes('/entries/') && path.includes('/posts/hello')))
   root.querySelector<HTMLElement>('[aria-label="Hide the editor"]')!.click()
   await settle()
   root.querySelector<HTMLElement>('[data-part=launcher]')!.click()
-  await Bun.sleep(1200)
+  await until(() => answered > 0)
+  // A deliberate wait for nothing to happen: the dropped image would upload within it once its entry had loaded.
+  await Bun.sleep(300)
   expect(uploads).toBe(0)
   expect(data().photo).toBeUndefined()
 })
@@ -345,7 +339,7 @@ test('an image of a list item lands in its item, whose page bars cannot move it 
 
   await settle()
   drop(second!, [file()])
-  await Bun.sleep(30)
+  await until(() => uploads === 1)
   keyDown(second!, 'ArrowUp')
   keyDown(second!, 'Delete')
   await until(() => (data().gallery as { image: string }[] | undefined)?.[1]?.image === '/_kay/files/posts/new.png')
@@ -363,7 +357,6 @@ test('the side form\'s own list controls are held too while a list item\'s image
   await until(() => controls().length > 0)
   expect(controls().some(button => !button.disabled)).toBe(true)
   drop(second!, [file()])
-  await Bun.sleep(50)
   await until(() => controls().every(button => button.disabled))
   await until(() => (data().gallery as { image: string }[] | undefined)?.[1]?.image === '/_kay/files/posts/new.png')
   await until(() => controls().some(button => !button.disabled))

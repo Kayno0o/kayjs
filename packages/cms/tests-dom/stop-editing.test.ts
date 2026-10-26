@@ -3,6 +3,8 @@ import { afterEach, beforeEach, expect, mock, spyOn, test } from 'bun:test'
 import { mountComponent, settle } from 'kay/test'
 import Editor from '../src/editor/editor.kay'
 import { EDITOR_COOKIE } from '../src/page-link'
+import { until } from '../tests/until'
+import { entryLoaded } from './loaded'
 
 const ENTRY = { collection: 'posts', slug: 'hello' }
 let mounted: Mounted | undefined
@@ -16,6 +18,8 @@ beforeEach(() => {
 })
 
 afterEach(() => {
+  // Every editor bundle mounted so far keeps its own drafts, whose unwritten edits a later test's flush would write: this one's go first, under the cookie that lets them.
+  window.dispatchEvent(new Event('pagehide'))
   document.cookie = `${EDITOR_COOKIE}=; max-age=0`
   mounted?.unmount()
   mounted = undefined
@@ -36,15 +40,15 @@ const left = (fetched: ReturnType<typeof server>) => fetched.mock.calls.some(([u
 async function typed(): Promise<ParentNode> {
   mounted = await mountComponent(Editor, { entries: [ENTRY], unclickable: [] })
   await settle()
-  await Bun.sleep(50)
+  await entryLoaded(mounted.root)
 
   const title = mounted.root.querySelector<HTMLInputElement>('input')!
 
   title.value = 'Mine'
   title.dispatchEvent(new Event('input', { bubbles: true }))
   await settle()
-  // The edit is kept in the browser after the render's pause.
-  await Bun.sleep(200)
+  // The edit is kept in the browser after the render's pause, or as the page is left, which this does at once.
+  window.dispatchEvent(new Event('pagehide'))
 
   return mounted.root
 }
@@ -61,7 +65,7 @@ test('the page editor\'s Save is there from the start, disabled with nothing to 
   server()
   mounted = await mountComponent(Editor, { entries: [ENTRY], unclickable: [] })
   await settle()
-  await Bun.sleep(50)
+  await entryLoaded(mounted.root)
 
   const save = () => [...mounted!.root.querySelectorAll('button')].find(button => button.textContent?.trim() === 'Save')!
 
@@ -80,7 +84,7 @@ test('Stop editing with nothing unsaved leaves at once', async () => {
 
   mounted = await mountComponent(Editor, { entries: [ENTRY], unclickable: [] })
   await settle()
-  await Bun.sleep(50)
+  await entryLoaded(mounted.root)
   stop(mounted.root).click()
   await settle()
 
@@ -136,23 +140,22 @@ test('Drop them and stop leaves the edit mode', async () => {
   stop(root).click()
   await settle()
   confirmation(root)!.querySelectorAll<HTMLButtonElement>('button')[1]!.click()
-  await settle()
-  await Bun.sleep(50)
+  await until(() => left(fetched) && kept() === 0)
 
   expect(left(fetched)).toBe(true)
   expect(kept()).toBe(0)
 })
 
 test('a leave that fails keeps the edits', async () => {
-  server(new Response('no', { status: 500 }))
+  const fetched = server(new Response('no', { status: 500 }))
 
   const root = await typed()
 
   stop(root).click()
   await settle()
   confirmation(root)!.querySelectorAll<HTMLButtonElement>('button')[1]!.click()
+  await until(() => left(fetched))
   await settle()
-  await Bun.sleep(50)
 
   expect(root.querySelector<HTMLInputElement>('input')!.value).toBe('Mine')
   expect(kept()).toBe(1)
@@ -192,7 +195,7 @@ test('a reload brings the typed edits back, and Reset drops them for good', asyn
 
   mounted = await mountComponent(Editor, { entries: [ENTRY], unclickable: [] })
   await settle()
-  await Bun.sleep(50)
+  await entryLoaded(mounted.root)
 
   expect(mounted.root.querySelector<HTMLInputElement>('input')!.value).toBe('Mine')
   expect(mounted.root.textContent).toContain('Your unsaved changes from')
@@ -231,14 +234,14 @@ test('asks before a leave only for the entries the page shows, not for edits lef
     return shown
   }, unclickable: [] })
   await settle()
-  await Bun.sleep(50)
+  await entryLoaded(mounted.root)
 
   const title = mounted.root.querySelector<HTMLInputElement>('input')!
   const type = async (value: string) => {
     title.value = value
     title.dispatchEvent(new Event('input', { bubbles: true }))
     await settle()
-    await Bun.sleep(200)
+    window.dispatchEvent(new Event('pagehide'))
   }
   const unload = () => {
     const event = new Event('beforeunload', { cancelable: true })
@@ -265,8 +268,7 @@ test('names the fields of an entry the page does not let the editor click, and t
   for (const idle of mounted.root.querySelectorAll<HTMLButtonElement>('.kcms-entry-idle button'))
     idle.click()
 
-  await settle()
-  await Bun.sleep(50)
+  await until(() => mounted!.root.querySelectorAll('.kcms-entry-hint').length === 3)
 
   const hints = [...mounted.root.querySelectorAll('.kcms-entry-hint')].map(hint => hint.textContent)
 

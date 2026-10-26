@@ -3,6 +3,7 @@ import type { ScreenCollection, StoredEntry } from '../src/kay/contract'
 import { afterEach, expect, mock, spyOn, test } from 'bun:test'
 import { mountComponent, settle } from 'kay/test'
 import EntryScreen from '../tests/fixture/src/components/entry-screen.kay'
+import { submitted } from './submit'
 
 const PEOPLE: ScreenCollection = {
   name: 'people',
@@ -52,14 +53,7 @@ async function open(data: Record<string, unknown> = { note: 'x' }) {
     box(path).dispatchEvent(new Event('input', { bubbles: true }))
     await settle()
   }
-  const submit = async () => {
-    root.querySelector('form')!.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }))
-
-    for (let wait = 0; wait < 30; wait++) {
-      await Bun.sleep(10)
-      await settle()
-    }
-  }
+  const submit = async () => submitted(root.querySelector('form')!)
 
   return { root, field, box, type, submit }
 }

@@ -2,6 +2,7 @@ import type { Mounted } from 'kay/test'
 import { afterEach, expect, mock, spyOn, test } from 'bun:test'
 import { mountComponent, settle } from 'kay/test'
 import AddRedirect from '../src/components/add-redirect.kay'
+import { until } from '../tests/until'
 import WithToaster from './with-toaster.kay'
 
 type Added = [string, string, number]
@@ -120,8 +121,7 @@ test('the target box asks for the site\'s paths holding what is typed, and offer
   const { root } = await open({})
 
   await type(root, 'ab')
-  await Bun.sleep(250)
-  await settle()
+  await until(() => root.querySelector('datalist option') !== null)
   expect([...root.querySelectorAll('datalist option')].map(item => item.getAttribute('value'))).toEqual(['/about'])
   expect(asked).toContain('ab')
 })
@@ -141,9 +141,7 @@ test('the target box sends one request for several keystrokes typed within the p
     await type(root, text)
 
   // Each keystroke restarts the pause, so an earlier request would have been sent before the last one's.
-  for (let waited = 0; asked.length === 0 && waited < 3000; waited += 10)
-    await Bun.sleep(10)
-
+  await until(() => asked.length > 0)
   await settle()
   expect(asked).toEqual(['abo'])
 })

@@ -3,6 +3,7 @@ import type { ScreenCollection } from '../src/kay/contract'
 import type { EntryRow } from '../src/listing'
 import { afterEach, expect, mock, spyOn, test } from 'bun:test'
 import { mountComponent, settle } from 'kay/test'
+import { until } from '../tests/until'
 import WithToaster from './with-toaster.kay'
 
 const POSTS: ScreenCollection = {
@@ -72,13 +73,6 @@ async function openBar(rows: EntryRow[], actions = ['publish', 'unpublish', 'del
 
 const button = (root: ParentNode, label: string) => [...root.querySelectorAll('button')].find(item => item.textContent?.trim() === label)
 
-async function pause(): Promise<void> {
-  for (let wait = 0; wait < 15; wait++) {
-    await Bun.sleep(5)
-    await settle()
-  }
-}
-
 test('the bar offers only the actions the ticked rows fit, and a failed row says why in one toast', async () => {
   server(slug => slug === 'b' ? refusing('b changed since you opened it') : Response.json({ saved: true }))
 
@@ -87,7 +81,7 @@ test('the bar offers only the actions the ticked rows fit, and a failed row says
   expect(button(root, 'Publish')).toBeDefined()
   expect(button(root, 'Unpublish')).toBeDefined()
   button(root, 'Publish')!.click()
-  await pause()
+  await until(() => cleared.mock.calls.length > 0 && text().includes('1 entry could not be changed: b changed since you opened it'))
 
   expect(text()).toContain('1 entry published')
   expect(text()).toContain('1 entry could not be changed: b changed since you opened it')
@@ -100,7 +94,7 @@ test('a toast counts the failures and names the first reason when several fail',
   const { root } = await openBar([row('a'), row('b')])
 
   button(root, 'Publish')!.click()
-  await pause()
+  await until(() => text().includes('2 entries could not be changed, the first: nope'))
   expect(text()).toContain('2 entries could not be changed, the first: nope')
 })
 
@@ -110,7 +104,7 @@ test('a failure no answer explained is only counted', async () => {
   const { root } = await openBar([row('a')])
 
   button(root, 'Publish')!.click()
-  await pause()
+  await until(() => text().includes('1 entry could not be changed'))
   expect(text()).toContain('1 entry could not be changed')
   expect(text()).not.toContain('1 entry could not be changed:')
 })
@@ -120,10 +114,12 @@ test('a bulk delete names each row\'s version and runs the rows in turn', async 
   const { root } = await openBar([row('a'), row('b')])
 
   button(root, 'Delete')!.click()
-  await pause()
   // The confirmation, whose own button deletes.
-  ;[...document.querySelectorAll('button')].filter(item => item.textContent?.trim() === 'Delete').at(-1)!.click()
-  await pause()
+  const confirm = () => [...document.querySelectorAll('button')].filter(item => item.textContent?.trim() === 'Delete').at(-1)!
+
+  await until(() => confirm() !== button(root, 'Delete'))
+  confirm().click()
+  await until(() => text().includes('2 entries deleted'))
 
   const deletes = calls.filter(call => call.method === 'DELETE')
 
@@ -145,11 +141,11 @@ test('a duplicate refused says why, and one that failed says the refusal the ser
   const root = await openTable([row('a'), row('b')])
 
   root.querySelector<HTMLElement>('button[aria-label="Duplicate a"]')!.click()
-  await pause()
+  await until(() => text().includes('Not duplicated: posts holds one entry'))
   expect(text()).toContain('Not duplicated: posts holds one entry')
 
   root.querySelector<HTMLElement>('button[aria-label="Duplicate b"]')!.click()
-  await pause()
+  await until(() => text().includes('You may not duplicate here'))
   expect(text()).toContain('You may not duplicate here')
 })
 
@@ -161,7 +157,7 @@ test('a duplicate that went through is told', async () => {
   const root = await openTable([row('a')])
 
   root.querySelector<HTMLElement>('button[aria-label="Duplicate a"]')!.click()
-  await pause()
+  await until(() => text().includes('Duplicated'))
   expect(text()).toContain('Duplicated')
   expect(calls.map(call => [call.method, call.url.pathname.split('/').slice(-3).join('/')])).toContainEqual(['POST', 'posts/a/duplicate'])
 })
@@ -219,7 +215,7 @@ test('a row\'s Rename opens the dialog, turns off for a slug the collection hold
   const root = await openTable([row('a'), row('b')])
 
   root.querySelector<HTMLElement>('button[aria-label="Rename a"]')!.click()
-  await pause()
+  await until(() => document.querySelector('dialog')?.textContent.includes('Books: Engine') === true)
   expect(document.querySelector('dialog')!.textContent).toContain('Books: Engine')
   await typeSlug('b')
   expect(dialogRename().disabled).toBe(true)
@@ -227,7 +223,7 @@ test('a row\'s Rename opens the dialog, turns off for a slug the collection hold
   await typeSlug('new')
   expect(dialogRename().disabled).toBe(false)
   dialogRename().dispatchEvent(new MouseEvent('click', { bubbles: true }))
-  await pause()
+  await until(() => fetched.mock.calls.some(call => call[1]?.method === 'POST' && String(call[0]).includes('/rename')))
 
   const posts = fetched.mock.calls.filter(call => call[1]?.method === 'POST' && String(call[0]).includes('/rename'))
 
@@ -243,10 +239,10 @@ test('a row\'s Rename shows the refusal in the dialog, and a role without the re
   const root = await openTable([row('a')])
 
   root.querySelector<HTMLElement>('button[aria-label="Rename a"]')!.click()
-  await pause()
+  await until(() => document.querySelector('dialog input') !== null)
   await typeSlug('new')
   dialogRename().dispatchEvent(new MouseEvent('click', { bubbles: true }))
-  await pause()
+  await until(() => document.querySelector('dialog[open]')?.textContent.includes('The saver is down') === true)
   expect(document.querySelector('dialog[open]')!.textContent).toContain('The saver is down')
   mounted?.unmount()
 
@@ -265,9 +261,9 @@ test('a rename that left an entry unpointed tells which', async () => {
   const root = await openTable([row('a')])
 
   root.querySelector<HTMLElement>('button[aria-label="Rename a"]')!.click()
-  await pause()
+  await until(() => document.querySelector('dialog input') !== null)
   await typeSlug('new')
   dialogRename().dispatchEvent(new MouseEvent('click', { bubbles: true }))
-  await pause()
+  await until(() => text().includes('Renamed, but Books: Engine could not be pointed at the new slug'))
   expect(text()).toContain('Renamed, but Books: Engine could not be pointed at the new slug')
 })

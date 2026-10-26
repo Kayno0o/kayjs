@@ -2,6 +2,7 @@ import type { Mounted } from 'kay/test'
 import { afterEach, expect, mock, spyOn, test } from 'bun:test'
 import { mountComponent, settle } from 'kay/test'
 import EntryNewsletter from '../src/components/entry-newsletter.kay'
+import { until } from '../tests/until'
 
 let mounted: Mounted | undefined
 let dirty = false
@@ -26,14 +27,6 @@ async function open(denied: Record<string, string> = {}): Promise<void> {
 
   mounted = await mountComponent(EntryNewsletter, { form, denied })
   await settle()
-}
-
-// Settles until the condition holds, so a slow run waits longer instead of failing.
-async function until(condition: () => boolean): Promise<void> {
-  for (let wait = 0; wait < 2000 && !condition(); wait++) {
-    await settle()
-    await Bun.sleep(1)
-  }
 }
 
 const labelled = (label: string) => [...document.querySelectorAll('button')].find(item => item.textContent?.trim() === label)

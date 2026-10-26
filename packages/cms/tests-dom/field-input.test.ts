@@ -12,6 +12,7 @@ import ListField from '../tests/fixture/src/components/list-field.kay'
 import ListState from '../tests/fixture/src/components/list-state.kay'
 import ScheduledEntry from '../tests/fixture/src/components/scheduled-entry.kay'
 import ScheduledRows from '../tests/fixture/src/components/scheduled-rows.kay'
+import { until } from '../tests/until'
 
 const ENTRY = { collection: 'posts', slug: 'hello' }
 const TAGS: Field = { key: 'tags', label: 'Tags', hint: undefined, required: false, kind: 'list', numbered: true, item: { key: 0, label: 'Tag', hint: undefined, required: false, kind: 'text' } }
@@ -40,8 +41,7 @@ test('the buttons of a list item move it, reorder the saved value and say the it
 
   expect(drafts.value(ENTRY, 'tags')).toEqual(['b', 'a', 'c'])
   // The live region speaks after a short first-use delay.
-  for (let wait = 0; wait < 50 && (said() ?? '') === ''; wait++)
-    await Bun.sleep(20)
+  await until(() => (said() ?? '') !== '')
 
   expect(said()).toBe('Moved Item 1 to 2 of 3')
 })
@@ -176,8 +176,7 @@ test('a group item is named by its title in every button and in the move announc
 
   expect(root.querySelector('button[aria-label="Remove Ada"]')).not.toBeNull()
   await click('[data-kcms-move="down"]', 0)
-  for (let wait = 0; wait < 50 && (said() ?? '') === ''; wait++)
-    await Bun.sleep(20)
+  await until(() => (said() ?? '') !== '')
 
   expect(said()).toBe('Moved Ada to 2 of 2')
 })

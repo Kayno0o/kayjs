@@ -3,6 +3,8 @@ import { afterEach, expect, mock, spyOn, test } from 'bun:test'
 import { mountComponent, settle } from 'kay/test'
 import Editor from '../src/editor/editor.kay'
 import { EDITOR_COOKIE } from '../src/page-link'
+import { until } from '../tests/until'
+import { entryLoaded } from './loaded'
 
 let mounted: Mounted | undefined
 
@@ -10,6 +12,8 @@ let mounted: Mounted | undefined
 Object.assign(document, { caretPositionFromPoint: () => null, elementsFromPoint: () => [] })
 
 afterEach(() => {
+  // Every editor bundle mounted so far keeps its own drafts, whose unwritten edits a later test's flush would write: this one's go first.
+  window.dispatchEvent(new Event('pagehide'))
   mounted?.unmount()
   mounted = undefined
   for (const element of document.querySelectorAll('[data-page]'))
@@ -72,11 +76,11 @@ async function open(pages: Page[], entry: { collection: string, slug: string, lo
 
   mounted = await mountComponent(Editor, { entries: [entry], unclickable: [] })
   await settle()
-  await Bun.sleep(50)
+  await entryLoaded(mounted.root)
 
-  // The draft as the browser keeps it a moment after the last keystroke, which the editor's own drafts write.
+  // The draft as the browser keeps it, written when the page is left rather than a pause after the last keystroke.
   const draft = async (path: string) => {
-    await Bun.sleep(220)
+    window.dispatchEvent(new Event('pagehide'))
 
     const kept = JSON.parse(localStorage.getItem(`kcms:draft:tester:${entry.collection}:${entry.slug}${entry.locale === undefined ? '' : `@${entry.locale}`}`) ?? 'null') as { entry: { data: unknown } } | null
 
@@ -91,10 +95,16 @@ async function open(pages: Page[], entry: { collection: string, slug: string, lo
   const click = async (element: HTMLElement) => {
     element.click()
     await settle()
+    await until(() => element.getAttribute('contenteditable') === 'plaintext-only')
+  }
+  // A click that leaves the text locked, so the wait for it is a deliberate wait for nothing to happen.
+  const clickQuietly = async (element: HTMLElement) => {
+    element.click()
+    await settle()
     await Bun.sleep(20)
   }
 
-  return { elements, root, draft, type, click }
+  return { elements, root, draft, type, click, clickQuietly }
 }
 
 test('a click on a text unlocks it for typing and the draft follows each keystroke, the form field included', async () => {
@@ -205,26 +215,27 @@ test('Enter and Escape leave the text instead of breaking the line', async () =>
 })
 
 test('a button or a link is not made a text box by a click', async () => {
-  const { elements: [button], click } = await open([{ marker: 'pages:home:title', tag: 'button', text: 'Go' }])
+  const { elements: [button], clickQuietly } = await open([{ marker: 'pages:home:title', tag: 'button', text: 'Go' }])
 
-  await click(button!)
+  await clickQuietly(button!)
 
   expect(button!.hasAttribute('contenteditable')).toBe(false)
 })
 
 test('what is not a one-line text on its own element falls back to the form', async () => {
-  const { elements: [long, attribute, mixed], root, click } = await open([
+  const { elements: [long, attribute, mixed], root, clickQuietly } = await open([
     { marker: 'pages:home:long', text: 'A long text' },
     { marker: 'pages:home:title', tag: 'img', attribute: 'alt' },
     { marker: 'pages:home:subtitle', html: 'Sub <em>styled</em>' },
   ])
 
   for (const element of [long!, attribute!, mixed!]) {
-    await click(element)
+    await clickQuietly(element)
 
     expect(element.hasAttribute('contenteditable')).toBe(false)
   }
 
+  await until(() => document.activeElement === root.querySelector('[data-kcms-path="subtitle"] input'))
   expect(document.activeElement).toBe(root.querySelector('[data-kcms-path="subtitle"] input'))
 })
 

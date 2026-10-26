@@ -3,6 +3,7 @@ import type { ScreenCollection, StoredEntry } from '../src/kay/contract'
 import { afterEach, expect, mock, spyOn, test } from 'bun:test'
 import { mountComponent, settle } from 'kay/test'
 import EntryScreen from '../tests/fixture/src/components/entry-screen.kay'
+import { submitted, submittedQuietly } from './submit'
 
 const NOTES: ScreenCollection = {
   name: 'notes',
@@ -53,17 +54,11 @@ async function open(data: Record<string, unknown> = { title: 'hello', count: 3 }
     box(name).dispatchEvent(new Event('change', { bubbles: true }))
     await settle()
   }
-  const submit = async () => {
-    root.querySelector('form')!.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }))
-
-    for (let wait = 0; wait < 30; wait++) {
-      await Bun.sleep(10)
-      await settle()
-    }
-  }
+  const submit = async () => submitted(root.querySelector('form')!)
+  const submitQuietly = async () => submittedQuietly(root.querySelector('form')!)
   const issueOf = (name: string) => root.querySelector(`[data-kcms-path="${name}"] [data-part="issue"]`)?.textContent?.trim()
 
-  return { root, box, type, leave, submit, issueOf }
+  return { root, box, type, leave, submit, submitQuietly, issueOf }
 }
 
 test('the limits of a schema are attributes of its controls', async () => {
@@ -136,13 +131,13 @@ test('an edit answers its own field\'s issue only, in the field and in the summa
 })
 
 test('a JSON box that does not parse stops the save, says so by name and follows what is typed', async () => {
-  const { box, type, leave, submit, issueOf, root } = await open({ title: 'hello', count: 3, meta: { a: 1 } })
+  const { box, type, leave, submit, submitQuietly, issueOf, root } = await open({ title: 'hello', count: 3, meta: { a: 1 } })
   const fetched = server(undefined)
 
   await type('meta', '{ "a": ')
   await leave('meta')
   expect(issueOf('meta')).toBe('Meta is not valid JSON')
-  await submit()
+  await submitQuietly()
 
   expect(fetched).not.toHaveBeenCalled()
   expect(root.querySelector('.kcms-summary')?.textContent).toContain('Meta is not valid JSON')
@@ -157,7 +152,7 @@ test('a JSON box that does not parse stops the save, says so by name and follows
 })
 
 test('Reset puts a JSON box that does not parse back to the draft, and it blocks nothing any more', async () => {
-  const { box, type, leave, submit, issueOf, root } = await open({ title: 'hello', count: 3, meta: { a: 1 } })
+  const { box, type, leave, submitQuietly, issueOf, root } = await open({ title: 'hello', count: 3, meta: { a: 1 } })
   const fetched = server(undefined)
 
   await type('meta', '{ "a": ')
@@ -170,7 +165,7 @@ test('Reset puts a JSON box that does not parse back to the draft, and it blocks
 
   expect(box('meta').value).toContain('"a": 1')
   expect(issueOf('meta')).toBeUndefined()
-  await submit()
+  await submitQuietly()
   expect(fetched).not.toHaveBeenCalled()
 })
 
@@ -220,14 +215,8 @@ async function openIn(collection: ScreenCollection, stored: StoredEntry | undefi
   await settle()
 
   const root = mounted.root
-  const submit = async () => {
-    root.querySelector('form')!.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }))
-
-    for (let wait = 0; wait < 30; wait++) {
-      await Bun.sleep(10)
-      await settle()
-    }
-  }
+  const submit = async () => submitted(root.querySelector('form')!)
+  const submitQuietly = async () => submittedQuietly(root.querySelector('form')!)
 
   // The form saves only once something changed.
   const edit = async () => {
@@ -238,18 +227,18 @@ async function openIn(collection: ScreenCollection, stored: StoredEntry | undefi
     await settle()
   }
 
-  return { root, submit, edit }
+  return { root, submit, submitQuietly, edit }
 }
 
 test('removing a list item holding a JSON box that does not parse stops blocking Save', async () => {
-  const { root, submit } = await openIn(BOXES, entry({ items: [{ a: 1 }] }))
+  const { root, submit, submitQuietly } = await openIn(BOXES, entry({ items: [{ a: 1 }] }))
   const fetched = server(undefined)
   const area = root.querySelector<HTMLTextAreaElement>('[data-kcms-path="items.0"] textarea')!
 
   area.value = '{ "a": '
   area.dispatchEvent(new Event('input', { bubbles: true }))
   await settle()
-  await submit()
+  await submitQuietly()
   expect(fetched).not.toHaveBeenCalled()
 
   ;[...root.querySelectorAll<HTMLButtonElement>('button')].find(button => button.getAttribute('aria-label') === 'Remove Item 1')!.click()

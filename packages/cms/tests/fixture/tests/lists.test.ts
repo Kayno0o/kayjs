@@ -270,6 +270,7 @@ test('browsing the page shows no bar', async () => {
 
 const TITLE = '[data-kcms-path="title"] input'
 const FOLDS = '[data-kcms-path="columns"] [data-kcms-fold]'
+// Only for the checks that wait for nothing to happen.
 const pause = (ms: number) => new Promise(resolve => setTimeout(resolve, ms))
 const folds = (page: Page) => page.evaluate((selector: string) => [...document.querySelectorAll(selector)].map(button => button.getAttribute('aria-expanded')), FOLDS)
 
@@ -304,6 +305,7 @@ test('the bars stay while a field of the form is typed in', async () => {
   }, TITLE)
   await page.press('x')
   await page.waitUntil(() => document.querySelector('h1')!.textContent!.endsWith('x'))
+  // A deliberate wait for nothing: no render may drop a bar once the title shows the typed text.
   await pause(400)
   expect(await page.evaluate(() => (window as unknown as { seen: { least: number } }).seen.least)).toBe(1)
 }, 60_000)
@@ -314,6 +316,7 @@ test('an action is refused in the pause before the page renders what was typed',
   await showBar(page, 'ol.steps li:first-child')
   await typeThen(page, REMOVE)
   await page.waitUntil(() => document.querySelector('h1')!.textContent === 'Intro!')
+  // A deliberate wait for nothing: the page renders the typed text later than the refused action.
   await pause(300)
   expect(await texts(page, 'ol.steps li')).toEqual(['Open', 'Edit'])
   expect(await formSteps(page)).toEqual(['Open', 'Edit'])
@@ -630,6 +633,7 @@ test('the outlines are not drawn again for the bars', async () => {
   await page.reload()
   await page.waitUntil(() => document.querySelector('.kcms-marks')?.childElementCount)
   await showBar(page, 'ol.steps li:first-child')
+  // A deliberate wait for nothing: the page must keep the saved list.
   await pause(200)
 
   const drawn = await page.evaluate(async () => {
@@ -640,6 +644,7 @@ test('the outlines are not drawn again for the bars', async () => {
 
     watch.observe(document.querySelector('.kcms-marks')!, { childList: true })
     document.querySelector('.kcms-list-bar')!.setAttribute('data-moved', '')
+    // A deliberate window: nothing may be added to or removed from the marks while it runs.
     await new Promise(resolve => setTimeout(resolve, 300))
     watch.disconnect()
 
@@ -674,6 +679,7 @@ test('Alt and Shift keep their meaning in a text box inside an item', async () =
   const page = await open()
 
   await page.evaluate(() => document.querySelector<HTMLElement>('ul.limited li input')!.focus())
+  // A deliberate wait for nothing: the shortcut must not take an item out of the list.
   await page.press('Delete', ALT_SHIFT)
   await pause(500)
   expect(await page.evaluate(() => document.querySelectorAll('ul.limited li').length)).toBe(2)
@@ -692,6 +698,7 @@ test('an item taken out cannot be put back once its entry left the page', async 
   await page.waitUntil(() => document.querySelectorAll('ol.steps li').length === 2)
   expect(await page.evaluate(() => document.querySelector('.kcms-editor-undo') !== null)).toBe(true)
   await page.evaluate(() => document.querySelector<HTMLElement>('a.out')!.click())
+  // A deliberate wait for nothing: the notice must stay gone, with no later render bringing it back.
   await page.waitUntil(() => document.querySelector('a.out') === null)
   await pause(300)
   expect(await page.evaluate(() => document.querySelector('.kcms-editor-undo'))).toBeNull()

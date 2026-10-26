@@ -2,6 +2,8 @@ import type { Mounted } from 'kay/test'
 import { afterEach, expect, mock, spyOn, test } from 'bun:test'
 import { mountComponent, settle } from 'kay/test'
 import Editor from '../src/editor/editor.kay'
+import { until } from '../tests/until'
+import { entryLoaded } from './loaded'
 
 const ENTRY = { collection: 'pages', slug: 'home' }
 let mounted: Mounted | undefined
@@ -51,7 +53,7 @@ async function open() {
   document.body.append(page)
   mounted = await mountComponent(Editor, { entries: [ENTRY], unclickable: [] })
   await settle()
-  await Bun.sleep(50)
+  await entryLoaded(mounted.root)
 
   const root = mounted.root
   // The rows of a list, not those of the lists inside them.
@@ -77,7 +79,7 @@ test('a click on the page inside a folded block, in a nested list, unfolds both 
   expect([expanded(outer()), expanded(inner())]).toEqual(['false', 'false'])
 
   await press(page)
-  await Bun.sleep(20)
+  await until(() => expanded(outer()) === 'true' && expanded(inner()) === 'true' && document.activeElement === inner().querySelector('input'))
 
   expect([expanded(outer()), expanded(inner())]).toEqual(['true', 'true'])
   expect(document.activeElement).toBe(inner().querySelector('input'))
@@ -88,7 +90,7 @@ test('once a click unfolded a block, editing the list or folding the block again
 
   await press(fold(outer()))
   await press(page)
-  await Bun.sleep(20)
+  await until(() => expanded(outer()) === 'true')
   expect(expanded(outer())).toBe('true')
 
   const body = outer().querySelector<HTMLInputElement>('[data-kcms-path="sections.1.body"] input')!
@@ -97,10 +99,12 @@ test('once a click unfolded a block, editing the list or folding the block again
   body.value = 'Hello again'
   body.dispatchEvent(new Event('input', { bubbles: true }))
   await settle()
+  // A deliberate wait for nothing to happen: the list's edit would not take the focus back within it.
   await Bun.sleep(20)
   expect(document.activeElement).toBe(body)
 
   await press(fold(outer()))
+  // A deliberate wait for nothing to happen: the block would not unfold again within it.
   await Bun.sleep(20)
   expect(expanded(outer())).toBe('false')
 })

@@ -4,6 +4,7 @@ import { mountComponent, settle } from 'kay/test'
 import { browserKeeper } from '../src/draft-storage'
 import { createDrafts } from '../src/drafts'
 import Notices from '../tests/fixture/src/components/notices.kay'
+import { until } from '../tests/until'
 
 const ENTRY = { collection: 'posts', slug: 'hello' }
 const COLLECTION = { name: 'posts', title: 'Posts' }
@@ -67,8 +68,7 @@ test('a conflict names the fields both sides changed, and offers keeping mine or
 
   const root = await mountNotices(drafts)
 
-  for (let wait = 0; wait < 50 && !root.textContent?.includes('Both sides changed'); wait++)
-    await Bun.sleep(20)
+  await until(() => root.textContent?.includes('Both sides changed') === true)
 
   expect(root.textContent).toContain('Both sides changed: title.')
 
@@ -76,8 +76,7 @@ test('a conflict names the fields both sides changed, and offers keeping mine or
 
   expect(buttons.map(button => button.textContent?.trim())).toEqual(['Keep my edits', 'Take their version'])
   buttons[1]!.click()
-  for (let wait = 0; wait < 50 && drafts.refusal(ENTRY); wait++)
-    await Bun.sleep(20)
+  await until(() => drafts.refusal(ENTRY) === undefined)
 
   expect([drafts.value(ENTRY, 'title'), drafts.version(ENTRY), drafts.changed(ENTRY)]).toEqual(['Theirs', 'v2', false])
 })

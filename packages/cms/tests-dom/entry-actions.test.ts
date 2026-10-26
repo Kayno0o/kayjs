@@ -3,6 +3,7 @@ import type { ScreenCollection, StoredEntry } from '../src/kay/contract'
 import { afterEach, expect, mock, spyOn, test } from 'bun:test'
 import { mountComponent, settle } from 'kay/test'
 import EntryEditor from '../src/components/entry-editor.kay'
+import { until } from '../tests/until'
 import WithLeaveGuard from './with-leave-guard.kay'
 
 const POSTS: ScreenCollection = {
@@ -64,7 +65,8 @@ async function type(root: ParentNode, text: string): Promise<void> {
   await settle()
 }
 
-async function pause(): Promise<void> {
+// A deliberate wait for nothing to happen: the request or the notice a test expects not to come would have by now.
+async function quiet(): Promise<void> {
   for (let wait = 0; wait < 10; wait++) {
     await Bun.sleep(5)
     await settle()
@@ -92,7 +94,7 @@ test('Save waits for an edit, the state line says so, and a save locks the form 
   expect(button(root, 'Delete')!.disabled).toBe(true)
 
   release()
-  await pause()
+  await until(() => (state(root)).startsWith('Saved at ') && !root.querySelector('fieldset')!.disabled)
   expect(state(root)).toMatch(/^Saved at /)
   expect(state(root)).not.toContain('Not live')
   expect(root.querySelector('fieldset')!.disabled).toBe(false)
@@ -107,7 +109,7 @@ test('a save the site shows only once rebuilt says so, with a link to the public
 
   await type(root, 'Rebuilt')
   root.querySelector('form')!.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }))
-  await pause()
+  await until(() => (/Not live yet: the site shows it once it has rebuilt\./).test(state(root)))
   expect(state(root)).toMatch(/Not live yet: the site shows it once it has rebuilt\./)
 
   const link = root.querySelector<HTMLAnchorElement>('.kcms-save-state a')
@@ -141,7 +143,7 @@ test('a draft shows its badge and Publish, which saves the entry as public alone
   expect(buttons(root)).toContain('Publish')
   expect(buttons(root)).not.toContain('Unpublish')
   button(root, 'Publish')!.click()
-  await pause()
+  await until(() => !buttons(root).includes('Publish'))
   expect(sentData(fetched).data).toMatchObject({ title: 'Hello', draft: false })
   expect(buttons(root)).not.toContain('Publish')
   expect(root.querySelector('header')!.textContent).not.toContain('Draft')
@@ -153,7 +155,7 @@ test('a refused publish puts the field back, naming a conflict, and the entry st
   const root = await open(stored({ draft: true }))
 
   button(root, 'Publish')!.click()
-  await pause()
+  await until(() => root.querySelector('.kcms-refusal') !== null)
   expect(buttons(root)).toContain('Publish')
   expect(root.querySelector('header')!.textContent).toContain('Draft')
   expect(button(root, 'Save')!.disabled).toBe(true)
@@ -167,7 +169,7 @@ test('Publish and Unpublish wait for unsaved edits instead of saving them too', 
   await type(root, 'Edited')
   expect(button(root, 'Unpublish')).toBeDefined()
   button(root, 'Unpublish')!.click()
-  await pause()
+  await quiet()
   expect(fetched).not.toHaveBeenCalled()
 })
 
@@ -185,7 +187,7 @@ test('a scheduled entry shows its badge with Publish now and Clear schedule, eac
   expect(root.textContent).toContain('Scheduled for')
   expect(buttons(root)).toEqual(expect.arrayContaining(['Publish now', 'Clear schedule']))
   button(root, 'Clear schedule')!.click()
-  await pause()
+  await until(() => fetched.mock.calls.length > 0 && !root.textContent.includes('Scheduled for'))
   expect('publishAt' in sentData(fetched).data).toBe(false)
   expect(root.textContent).not.toContain('Scheduled for')
   expect(buttons(root)).not.toContain('Clear schedule')
@@ -196,7 +198,7 @@ test('a scheduled entry shows its badge with Publish now and Clear schedule, eac
   const again = await open(stored({ publishAt: FUTURE }))
 
   button(again, 'Publish now')!.click()
-  await pause()
+  await until(() => fetched.mock.calls.length > 0 && !again.textContent.includes('Scheduled for'))
   expect(Date.parse(String(sentData(fetched).data.publishAt))).toBeLessThanOrEqual(Date.now())
   expect(again.textContent).not.toContain('Scheduled for')
 })
@@ -220,7 +222,7 @@ test('a localized entry is published with its locale', async () => {
   const root = await open(stored({ draft: true }, { locale: 'fr' }), { ...POSTS, localized: true, locales: ['en', 'fr'] })
 
   button(root, 'Publish')!.click()
-  await pause()
+  await until(() => fetched.mock.calls.length > 0)
   expect(sentData(fetched).locale).toBe('fr')
 })
 
@@ -237,7 +239,7 @@ test('Ctrl+S in a field saves and leaves the caret in it once the save ends', as
   // A browser drops the focus of a field its fieldset disabled; happy-dom does not.
   title(root).blur()
   release()
-  await pause()
+  await until(() => !root.querySelector('fieldset')!.disabled && document.activeElement === title(root))
   expect(fetched).toHaveBeenCalledTimes(1)
   expect(root.querySelector('fieldset')!.disabled).toBe(false)
   expect(document.activeElement).toBe(title(root))
@@ -258,8 +260,7 @@ test('Delete with edits not saved, when leaving is declined, locks the form and 
   button(root, 'Delete')!.click()
   await settle()
   document.querySelector<HTMLButtonElement>('dialog[open] .kui-btn-danger')!.click()
-  await pause()
-  await pause()
+  await until(() => root.querySelector('.kcms-entry-failure') !== null)
   expect(ask).toHaveBeenCalledTimes(1)
   expect(root.querySelector('.kcms-entry-failure')!.textContent).toContain('This entry is deleted.')
   expect(root.querySelector('.kcms-entry-failure a')!.getAttribute('href')).toBe('/admin/collections/posts')
@@ -269,7 +270,7 @@ test('Delete with edits not saved, when leaving is declined, locks the form and 
   const sent = fetched.mock.calls.length
 
   document.dispatchEvent(new KeyboardEvent('keydown', { key: 's', ctrlKey: true, bubbles: true, cancelable: true }))
-  await pause()
+  await quiet()
   expect(fetched.mock.calls.filter(call => (call[1])?.method === 'DELETE')).toHaveLength(1)
   expect(fetched.mock.calls.length).toBe(sent)
 })
@@ -351,7 +352,7 @@ test('Create and add another creates the entry, then visits the new entry page',
   ;(window as unknown as { happyDOM: { setURL: (url: string) => void } }).happyDOM.setURL('http://localhost/admin/start')
   await type(root, 'Next one')
   ;(button(root, 'Create and add another') as HTMLButtonElement).click()
-  await pause()
+  await until(() => window.location.pathname === '/admin/new/posts')
 
   const posts = fetched.mock.calls.filter(call => (call[1])?.method === 'POST')
 
@@ -384,10 +385,9 @@ test('Create, when leaving is declined over edits not saved elsewhere, locks the
   ;(window as unknown as { happyDOM: { setURL: (url: string) => void } }).happyDOM.setURL('http://localhost/admin/start')
   await type(root, 'Next one')
   ;(button(root, 'Create') as HTMLButtonElement).click()
-  await pause()
+  await until(() => fetched.mock.calls.some(call => call[1]?.method === 'POST'))
   release()
-  await pause()
-  await pause()
+  await until(() => root.querySelector('.kcms-entry-failure') !== null)
   expect(ask).toHaveBeenCalledTimes(1)
   expect(root.querySelector('.kcms-entry-failure')!.textContent).toContain('This entry is created.')
   expect(root.querySelector('.kcms-entry-failure a')!.getAttribute('href')).toBe('/admin/collections/posts/next-one')
@@ -397,7 +397,7 @@ test('Create, when leaving is declined over edits not saved elsewhere, locks the
   const sent = fetched.mock.calls.length
 
   document.dispatchEvent(new KeyboardEvent('keydown', { key: 's', ctrlKey: true, bubbles: true, cancelable: true }))
-  await pause()
+  await quiet()
   expect(fetched.mock.calls.length).toBe(sent)
 })
 
@@ -417,7 +417,7 @@ test('Rename types a cleaned slug in a dialog, sends it with the version, and op
   await settle()
   expect(input.value).toBe('new-name-')
   ;[...document.querySelectorAll('dialog button')].find(each => each.textContent?.trim() === 'Rename')!.dispatchEvent(new MouseEvent('click', { bubbles: true }))
-  await pause()
+  await until(() => window.location.pathname === '/admin/collections/posts/new-name')
 
   const posts = fetched.mock.calls.filter(call => (call[1])?.method === 'POST')
 
@@ -449,8 +449,7 @@ test('Rename with edits typed meanwhile, when leaving is declined, locks the for
   await settle()
   await type(root, 'Hello again')
   release()
-  await pause()
-  await pause()
+  await until(() => root.querySelector('.kcms-entry-failure') !== null)
   expect(ask).toHaveBeenCalledTimes(1)
   expect(root.querySelector('.kcms-entry-failure')!.textContent).toContain('This entry is renamed.')
   expect(root.querySelector('.kcms-entry-failure a')!.getAttribute('href')).toBe('/admin/collections/posts/new-name')
@@ -460,7 +459,7 @@ test('Rename with edits typed meanwhile, when leaving is declined, locks the for
   const sent = fetched.mock.calls.length
 
   document.dispatchEvent(new KeyboardEvent('keydown', { key: 's', ctrlKey: true, bubbles: true, cancelable: true }))
-  await pause()
+  await quiet()
   expect(fetched.mock.calls.length).toBe(sent)
 })
 
@@ -492,7 +491,7 @@ test('a refused Rename keeps the dialog open and the page where it is', async ()
   input.dispatchEvent(new Event('input', { bubbles: true }))
   await settle()
   ;[...document.querySelectorAll('dialog button')].find(each => each.textContent?.trim() === 'Rename')!.dispatchEvent(new MouseEvent('click', { bubbles: true }))
-  await pause()
+  await quiet()
   expect(document.querySelector('dialog[open]')).not.toBeNull()
   expect(window.location.pathname).not.toContain('/other')
 })
@@ -528,7 +527,6 @@ async function typeSlug(text: string): Promise<void> {
 async function openRename(root: ParentNode): Promise<void> {
   button(root, 'Rename')!.click()
   await settle()
-  await pause()
 }
 
 test('the Rename dialog turns Rename off for a slug the collection holds, saying why', async () => {
@@ -537,12 +535,13 @@ test('the Rename dialog turns Rename off for a slug the collection holds, saying
 
   await openRename(root)
   await typeSlug('taken')
+  await until(() => dialogRename().disabled)
   expect(dialogRename().disabled).toBe(true)
   expect(dialogRename().closest('[data-tooltip]')?.getAttribute('data-tooltip')).toContain('already exists')
   expect(document.querySelector('dialog')!.textContent).toContain('already exists')
   dialogRename().dispatchEvent(new MouseEvent('click', { bubbles: true }))
   document.querySelector('dialog form')!.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }))
-  await pause()
+  await quiet()
   expect(fetched.mock.calls.filter(call => call[1]?.method === 'POST')).toHaveLength(0)
   await typeSlug('free')
   expect(dialogRename().disabled).toBe(false)
@@ -554,10 +553,11 @@ test('the Rename dialog lists the entries it points at the new slug, and stays o
 
   await openRename(root)
   await typeSlug('other')
+  await until(() => document.querySelector('dialog')!.textContent.includes('Books: Engine'))
   expect(dialogRename().disabled).toBe(false)
   expect(document.querySelector('dialog')!.textContent).toContain('Books: Engine')
   dialogRename().dispatchEvent(new MouseEvent('click', { bubbles: true }))
-  await pause()
+  await until(() => fetched.mock.calls.filter(call => call[1]?.method === 'POST').length === 1)
   expect(fetched.mock.calls.filter(call => call[1]?.method === 'POST')).toHaveLength(1)
 })
 
@@ -569,7 +569,7 @@ test('the Rename dialog shows a refusal of the server inside itself, and clears 
   await openRename(root)
   await typeSlug('other')
   dialogRename().dispatchEvent(new MouseEvent('click', { bubbles: true }))
-  await pause()
+  await until(() => document.querySelector('dialog[open]')?.textContent.includes('The saver is down') === true)
   expect(document.querySelector('dialog[open]')!.textContent).toContain('The saver is down')
   await typeSlug('another')
   expect(document.querySelector('dialog')!.textContent).not.toContain('The saver is down')
@@ -585,7 +585,7 @@ test('the Rename dialog cannot submit once the form turns dirty while it is open
   expect(dialogRename().disabled).toBe(true)
   expect(document.querySelector('dialog')!.textContent).toContain('Save or reset your edits first')
   document.querySelector('dialog form')!.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }))
-  await pause()
+  await quiet()
   expect(fetched.mock.calls.filter(call => call[1]?.method === 'POST')).toHaveLength(0)
 })
 
@@ -596,6 +596,7 @@ test('the Rename dialog hints that a slug with a new folder creates it', async (
 
   await openRename(root)
   await typeSlug('drafts/other')
+  await until(() => document.querySelector('dialog')!.textContent.includes('Creates the folder drafts'))
   expect(document.querySelector('dialog')!.textContent).toContain('Creates the folder drafts')
   expect(dialogRename().disabled).toBe(false)
 })

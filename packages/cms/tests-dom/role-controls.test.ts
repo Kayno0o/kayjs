@@ -7,6 +7,7 @@ import { createDrafts } from '../src/drafts'
 import EntryBodyProbe from '../tests/fixture/src/components/entry-body-probe.kay'
 import EntryFieldProbe from '../tests/fixture/src/components/entry-field-probe.kay'
 import ListField from '../tests/fixture/src/components/list-field.kay'
+import { until } from '../tests/until'
 
 const REFUSAL = 'Your role may not do this: publish or unpublish'
 const schema = { type: 'object', properties: { title: { type: 'string' }, draft: { type: 'boolean' }, publishAt: { type: 'string', format: 'date' }, endsAt: { type: 'string', format: 'date' } } }
@@ -85,9 +86,11 @@ async function withRole(denied: Record<string, string>, open: () => Promise<HTML
   Object.assign(globalThis, { XMLHttpRequest: CountingRequest })
 
   try {
+    const before = asked
     const root = await open()
 
-    await Bun.sleep(20)
+    // The question about the role is asked as the field opens, and answered a turn later.
+    await until(() => asked > before)
     await settle()
 
     return await dropped(root)

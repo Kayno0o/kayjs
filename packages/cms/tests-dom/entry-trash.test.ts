@@ -3,6 +3,7 @@ import type { ScreenCollection } from '../src/kay/contract'
 import type { TrashScreen } from '../src/screens'
 import { afterEach, expect, mock, spyOn, test } from 'bun:test'
 import { mountComponent, settle } from 'kay/test'
+import { until } from '../tests/until'
 import WithToaster from './with-toaster.kay'
 
 const NOTES: ScreenCollection = {
@@ -31,7 +32,8 @@ async function open(shown: TrashScreen['rows']): Promise<ParentNode> {
   return mounted.root
 }
 
-async function pause(): Promise<void> {
+// A deliberate wait for nothing to happen: the request a test expects not to come would have been sent by now.
+async function quiet(): Promise<void> {
   for (let wait = 0; wait < 10; wait++) {
     await Bun.sleep(5)
     await settle()
@@ -61,11 +63,11 @@ test('Restore asks first, then posts the entry\'s id to the trash API and says s
   await open(rows)
 
   labelled('Restore')[0]!.click()
-  await pause()
+  await quiet()
   expect(fetched).not.toHaveBeenCalled()
 
   confirmFirst()
-  await pause()
+  await until(() => fetched.mock.calls.length > 0 && document.body.textContent.includes('Restored'))
 
   const [url, init] = fetched.mock.calls[0]! as [string | URL | Request, RequestInit]
 
@@ -78,8 +80,8 @@ test('a refused restore toasts why', async () => {
   spyOn(globalThis, 'fetch').mockImplementation((async () => Response.json({ issues: [{ message: 'second already exists' }] })) as unknown as typeof fetch)
   await open(rows)
   labelled('Restore')[0]!.click()
-  await pause()
+  await until(() => document.querySelector('dialog[open]') !== null)
   confirmFirst()
-  await pause()
+  await until(() => document.body.textContent.includes('second already exists'))
   expect(document.body.textContent).toContain('second already exists')
 })
