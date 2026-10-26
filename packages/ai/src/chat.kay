@@ -128,6 +128,7 @@ let run: AbortController | undefined
 let field: HTMLTextAreaElement | undefined
 let log: HTMLElement | undefined
 let pinned = true
+let lastTop = 0
 const told = new Map<string, string>()
 const statuses = { running: runningLabel, done: doneLabel, failed: failedLabel }
 
@@ -271,7 +272,7 @@ effect(() => {
   waiting()
 
   if (pinned)
-    queueMicrotask(() => log?.scrollTo({ top: log.scrollHeight }))
+    queueMicrotask(follow)
 })
 
 // What the action took as too long, learned from its 413s, so the app states `maxInputChars` once: the oldest turns go first, the last stays.
@@ -432,15 +433,34 @@ function watch(element: HTMLElement) {
 
   const observer = new ResizeObserver(() => {
     if (pinned)
-      element.scrollTo({ top: element.scrollHeight })
+      follow()
   })
 
   observer.observe(element)
   onCleanup(() => observer.disconnect())
 }
 
+function follow() {
+  if (log === undefined)
+    return
+
+  log.scrollTo({ top: log.scrollHeight })
+  // Remembered here as scroll events coalesce, so a visitor scrolling up before the event is still seen as going up.
+  lastTop = log.scrollTop
+}
+
+// Only the visitor scrolling up leaves the end: the scroll event of our own scrollTo reaches the handler after the reply grew again, which would read as far from the end.
 function scrolled() {
-  pinned = log !== undefined && log.scrollHeight - log.scrollTop - log.clientHeight < PINNED_PX
+  if (log === undefined || log.clientHeight === 0)
+    return
+
+  const top = log.scrollTop
+  const atEnd = log.scrollHeight - top - log.clientHeight < PINNED_PX
+
+  if (top < lastTop || atEnd)
+    pinned = atEnd
+
+  lastTop = top
 }
 ---
 section(part="root" onKeyDown={escape} data-empty={history().length === 0 && !busy()} data-variant={variant} data-tone={tone} data-size={size} ref={element => element.addEventListener('kai-chat-new', reset)})

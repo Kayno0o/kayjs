@@ -605,6 +605,31 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the Chat i
       })
     })
 
+    test('a log that grows between a scroll and its event stays pinned to the end', async () => {
+      const page = await site.open('/slow-assistant')
+
+      await page.fill('textarea', 'Go')
+      await page.press('Enter')
+      await page.waitFor('[data-pending] .kai-chat-text', { text: 'Working' })
+      // The reply growing before the scroll event of the log following it is what a fast stream does; scrolling down by one pixel after the growth stands for that event.
+      await page.evaluate(async () => {
+        const log = document.querySelector('.kai-chat-log')!
+        const filler = document.createElement('div')
+
+        filler.style.cssText = 'flex: none; height: 600px'
+        log.append(filler)
+        log.scrollTop += 1
+        await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))
+      })
+      await page.press('Escape')
+      await page.waitFor('.kai-chat-note', { text: 'Stopped' })
+      await page.waitUntil(() => {
+        const log = document.querySelector('.kai-chat-log')!
+
+        return log.scrollHeight - log.scrollTop - log.clientHeight < 8
+      })
+    })
+
     test('a suggestion sends, New conversation clears the log and the kept history, and the panel enlarges', async () => {
       const page = await site.open('/launcher/one')
 
