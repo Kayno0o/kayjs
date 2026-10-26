@@ -23,7 +23,7 @@ export default defineConfig({ extensions: [ui()] })
 
 The `@kaynooo` scope must point at the Forgejo registry. A project made by `kay new` already has it in its `.npmrc`; for another, see [Installation](/getting-started/installation).
 
-kay and Tailwind v4 are peers, and the default icons are Tabler's. Two peers are optional: `bun add chartist` for `LineChart`, and `bun add hls.js` for an `.m3u8` video in a browser without native HLS. kayjs-ui is released with kay, at kay's own version, and peers on kay's minor. Install the one matching your kay and move them together.
+kay and Tailwind v4 are peers, and the default icons are Tabler's. Three peers are optional: `bun add chartist` for `LineChart`, `bun add leaflet @types/leaflet` for `Map`, and `bun add hls.js` for an `.m3u8` video in a browser without native HLS. kayjs-ui is released with kay, at kay's own version, and peers on kay's minor. Install the one matching your kay and move them together.
 
 An app on a `^0.x` range moves to kay's version by hand, as a caret on 0.x never reaches it.
 
@@ -151,7 +151,7 @@ export default defineUi({
 A variant or value the component lacks is added: `Button(tone="brand")` types and renders.
 
 - The components with parts: Button, Card, Dialog, Table, TextInput, Textarea, DateInput, DateRangeInput, TimeInput, Badge, Notice, Avatar, Stat, PageHeader, PageSection, EmptyState, CardRow, FormField, Checkbox, Toggle, Select, MultiSelect, RangeInput, Segmented, Rating, FileDrop, IconButton, CopyButton, Menu, Slider, ColorInput, Popover, HoverCard, TooltipHost, Toaster, SidePanel, Toolbar, CommandPalette, ConfirmDelete, FormDialog.
-- Also with parts: SaveForm, ContactForm, SubscribeForm, CollapsibleSection, Widget, Meter, BarList, ChipGroup, Tabs, TabNav, SiteNav, AppHeader, AppSwitcher, Pagination, SplitLayout, TreeView, Timeline, LoadMore, VirtualList, BarChart, LineChart, ScatterChart, ContributionGraph, Carousel, Masonry, MediaGallery, ImageCropper, ZoomPane, QrCode, SiteFavicon, Icon, IconPicker, MarkdownEditor and WhenVisible.
+- Also with parts: SaveForm, ContactForm, SubscribeForm, CollapsibleSection, Widget, Meter, BarList, ChipGroup, Tabs, TabNav, SiteNav, AppHeader, AppSwitcher, Pagination, SplitLayout, TreeView, Timeline, LoadMore, VirtualList, BarChart, LineChart, ScatterChart, Map, ContributionGraph, Carousel, Masonry, MediaGallery, ImageCropper, ZoomPane, QrCode, SiteFavicon, Icon, IconPicker, MarkdownEditor and WhenVisible.
 - Card, Badge and Notice (1.71) hold their look in a recipe, and so do Avatar, Stat, PageHeader, PageSection, EmptyState, CardRow, Widget, Meter, Progress and Skeleton (1.72), then Button, IconButton, FormField, Checkbox, Toggle, TextInput, Textarea and Select (1.72), and the charts and media components too (1.72). `theme.css` has no rule for their part classes since 1.74.
 - RadioGroup, Segmented, Rating, Slider, ColorInput, DateInput, DateRangeInput, Combobox, MultiSelect, ChipGroup, FileDrop, CopyButton and ConfirmDelete follow the same way (1.72), and so do the overlays: Dialog, FormDialog, Menu, BellInbox, Popover, HoverCard, SidePanel, CommandPalette, Toaster and TooltipHost. A Dialog `size` is a recipe variant, so a `max-w-*` in `src/ui.ts` or `class` replaces its width.
 - In those, the root keeps its `kui-` class (`kui-card`, `kui-badge`, `kui-stat-badge`) as a name for your CSS, and the other parts carry `data-part` alone (`.kui-card > [data-part='head']`, a child selector, as `head`, `title` and `body` are names other components use too).
@@ -174,7 +174,7 @@ A variant or value the component lacks is added: `Button(tone="brand")` types an
 - BarChart has `root` (the empty message too), `plot`, `grid`, `tick`, `columns`, `column`, `bar`, `axis`, `axisLabel`, `legend`, `legendItem` and `key`.
 - LineChart has `root`, `frame`, `plot`, `cursor`, `dot`, `band`, `overlay`, `tooltip`, `tooltipLabel`, `tooltipRow`, `tooltipName`, `tooltipValue`, `swatch`, `data`, `hint`, `legend`, `legendItem` and `key`; ScatterChart `root` (the empty message too), `axisLabel`, `plot`, `grid`, `tick`, `guide`, `corner` and `dot`; ContributionGraph `root`, `month` and `cell`.
 - Carousel has `root`, `viewport`, `slide`, `image`, `controls`, `step`, `dot` and `pause`; Masonry `root` and `tile`; MediaGallery `root` (the empty message too), `stage`, `frame`, `zoom`, `step`, `counter`, `caption`, `strip`, `thumb`, `thumbImage`, `play`, `lightbox`, `full` and `close`; ImageCropper `root`, `stage`, `image`, `crop`, `gridCols`, `gridRows` and `handle`.
-- ZoomPane has `root`, `plate` and `tools`; QrCode, SiteFavicon (`root`, `img`, `icon`), Icon and WhenVisible `root`; IconPicker `root`, `search`, `grid`, `item`, `option`, `empty`, `bar`, `selection`, `clear`, `error` and `more`; MarkdownEditor `wrap`, `grid`, `root` (the textarea), `bar` and `barFailed`.
+- Map has `root`, `canvas`, `surface`, `list` and `item`; ZoomPane has `root`, `plate` and `tools`; QrCode, SiteFavicon (`root`, `img`, `icon`), Icon and WhenVisible `root`; IconPicker `root`, `search`, `grid`, `item`, `option`, `empty`, `bar`, `selection`, `clear`, `error` and `more`; MarkdownEditor `wrap`, `grid`, `root` (the textarea), `bar` and `barFailed`.
 - Accordion `root`; Skeleton `root`, `block` and `label`; Progress `root` and `fill`; Breadcrumb `root`, `list`, `more`, `item`, `link` and `text`; RadioGroup `root`, `radio`, `choice`, `input`, `label` and `description`; MarkdownEditor's preview `root`, `failed` and `body`, its `previewClass` string landing on `body`.
 
 Every element of a component that an app could style carries `data-part` (hidden inputs, a chart's hidden data table and a few layout rows aside), so no class has to be known to restyle it.
@@ -258,7 +258,7 @@ Layout: [Card](/ui/card), [CardRow](/ui/card-row), [PageHeader](/ui/page-header)
 
 Navigation: [Tabs](/ui/tabs), [TabNav](/ui/tab-nav), [Breadcrumb](/ui/breadcrumb), [Segmented](/ui/segmented), [SiteNav](/ui/site-nav), [AppHeader](/ui/app-header), [AppSwitcher](/ui/app-switcher), [Pagination](/ui/pagination), [Steps](/ui/steps), [TreeView](/ui/tree-view), [Timeline](/ui/timeline).
 
-Data: [Table](/ui/table), [Stat](/ui/stat), [Meter](/ui/meter), [BarList](/ui/bar-list), [Badge](/ui/badge), [Avatar](/ui/avatar), [LineChart](/ui/line-chart), [BarChart](/ui/bar-chart), [ScatterChart](/ui/scatter-chart), [ContributionGraph](/ui/contribution-graph), [QrCode](/ui/qr-code), [SiteFavicon](/ui/site-favicon), [Icon](/ui/icon).
+Data: [Table](/ui/table), [Stat](/ui/stat), [Meter](/ui/meter), [BarList](/ui/bar-list), [Badge](/ui/badge), [Avatar](/ui/avatar), [LineChart](/ui/line-chart), [BarChart](/ui/bar-chart), [ScatterChart](/ui/scatter-chart), [Map](/ui/map), [ContributionGraph](/ui/contribution-graph), [QrCode](/ui/qr-code), [SiteFavicon](/ui/site-favicon), [Icon](/ui/icon).
 
 Media: [MediaGallery](/ui/media-gallery), [Carousel](/ui/carousel), [ZoomPane](/ui/zoom-pane), [WhenVisible](/ui/when-visible), [LoadMore](/ui/load-more), [VirtualList](/ui/virtual-list).
 

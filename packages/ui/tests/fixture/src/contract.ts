@@ -36,6 +36,7 @@ import Icon from '@kaynooo/kayjs-ui/icon.kay'
 import ImageCropper from '@kaynooo/kayjs-ui/image-cropper.kay'
 import LineChart from '@kaynooo/kayjs-ui/line-chart.kay'
 import LoadMore from '@kaynooo/kayjs-ui/load-more.kay'
+import MapView from '@kaynooo/kayjs-ui/map.kay'
 import MarkdownEditor from '@kaynooo/kayjs-ui/markdown-editor.kay'
 import Masonry from '@kaynooo/kayjs-ui/masonry.kay'
 import MediaGallery from '@kaynooo/kayjs-ui/media-gallery.kay'
@@ -140,6 +141,7 @@ export const COMPONENTS = {
   'line-chart': LineChart,
   'load-more': LoadMore,
   'markdown-editor': MarkdownEditor,
+  'map': MapView,
   'masonry': Masonry,
   'media-gallery': MediaGallery,
   'menu': Menu,
@@ -227,6 +229,7 @@ export const CASES: Record<string, Record<string, unknown>> = {
   'load-more': { list: { rows: () => [], ended: () => false, failed: () => false, pending: () => false, retry: noop, loadMore: noop } },
   'markdown-editor': { 'value': '# Hi', 'aria-label': 'Body' },
   'masonry': { items: [1, 2], key: (item: number) => item, tile: (item: number) => String(item) },
+  'map': { label: 'Route', lines: [[[48.85, 2.35], [48.86, 2.36]]] },
   'media-gallery': { items: media },
   'menu': { items: [{ label: 'Edit', onSelect: noop }], label: 'Actions', icon },
   'meter': { value: 3, max: 10, label: 'Disk' },

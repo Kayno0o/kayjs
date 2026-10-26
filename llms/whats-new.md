@@ -5,6 +5,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 ## Unreleased
 
 - kayjs-ui has a `Timeline`, a vertical list of time-stamped entries with an optional icon or muted tone, each pickable through a bindable `selected` key ([Page layout](../packages/ui/llms/page-layout-palette-and-trees.md)).
+- kayjs-ui's `Map` draws polylines and markers over raster tiles with Leaflet, loaded only on pages using it, fitted to what it draws, with a `highlight` path brought into view, OpenStreetMap's tiles by default and the skin's colours: [kayjs-ui](../packages/ui/llms/charts-drag-and-media.md).
 
 ## 1.78.0
 

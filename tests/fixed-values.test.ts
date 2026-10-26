@@ -271,6 +271,16 @@ describe('options that also take false', () => {
   })
 })
 
+describe('the default Content-Security-Policy', () => {
+  it('admits an image from any https host, such as a map\'s tile server, with no security.csp', () => {
+    const policy = securityHeaders({})!['content-security-policy']!
+    const images = policy.split('; ').find(directive => directive.startsWith('img-src '))!.split(' ')
+
+    expect(images).toContain('https:')
+    expect(images).not.toContain('http:')
+  })
+})
+
 describe('security.csp: false in a layout', () => {
   it('sends the pages under it no policy, and the pages beside it the site\'s', async () => {
     const root = await scratchDir('csp-false-')

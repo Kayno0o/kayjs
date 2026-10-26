@@ -1,0 +1,11 @@
+---
+import MapView from '@kaynooo/kayjs-ui/map.kay'
+
+const route = [[48.8584, 2.2945], [48.8606, 2.3376], [48.8530, 2.3499], [48.8462, 2.3372]]
+---
+.max-w-xl
+  MapView(
+    label="A walk through Paris, from the Eiffel Tower to the Luxembourg Garden"
+    lines={[route]}
+    markers={[{ at: route[0]!, label: 'Eiffel Tower' }, { at: route[3]!, label: 'Luxembourg Garden', popup: 'The end of the walk' }]}
+  )

@@ -7,7 +7,7 @@ import { untilHolds } from './until'
 const ROOT = join(import.meta.dir, '..')
 // A static value import; a type import ships nothing, and a dynamic one is checked by building it below.
 const STATIC_IMPORT = /^import (?!type )[^'\n]*'([^']+)'/gm
-const OPTIONAL = new Set(['chartist', 'hls.js'])
+const OPTIONAL = new Set(['chartist', 'hls.js', 'leaflet'])
 
 const sources = new Map<string, string>()
 
@@ -35,7 +35,7 @@ function peersOf(path: string, seen = new Set<string>()): string[] {
   })
 }
 
-test('no component imports an optional peer statically: chartist and hls.js load once a chart or a playlist is shown', () => {
+test('no component imports an optional peer statically: chartist, hls.js and leaflet load once a chart, a playlist or a map is shown', () => {
   const reaching = [...sources.keys()].filter(path => path.endsWith('.kay')).flatMap(path => [...new Set(peersOf(path))].map(peer => `${path} ${peer}`))
 
   expect(reaching).toEqual([])

@@ -369,10 +369,10 @@ describe('the naming conventions', () => {
 
       const bare = text.replaceAll(/\/\*[\s\S]*?\*\//g, '').replaceAll(/(["'])(?:(?!\1).)*\1|url\([^)]*\)/g, '')
 
-      // A stylesheet may restyle another library's classes (cms styles kui-form-field), ui's charts are drawn by chartist whose own `ct-` classes the theme styles, and `group` is Tailwind's.
+      // A stylesheet may restyle another library's classes (cms styles kui-form-field), ui's charts are drawn by chartist and its map by Leaflet, whose own `ct-` and `leaflet-` classes the theme styles, and `group` is Tailwind's.
       const foreign = new RegExp(`^k(?:${others})-`)
 
-      return [...bare.matchAll(/(?<![\w)\]-])\.([a-z][\w-]*)/g)].map(([, name]) => name!).filter(name => !foreign.test(name) && !(library === 'ui' && (name.startsWith('ct-') || name === 'group')))
+      return [...bare.matchAll(/(?<![\w)\]-])\.([a-z][\w-]*)/g)].map(([, name]) => name!).filter(name => !foreign.test(name) && !(library === 'ui' && (name.startsWith('ct-') || name.startsWith('leaflet-') || name === 'group')))
     }
 
     expect(drift(find, [])).toEqual([])

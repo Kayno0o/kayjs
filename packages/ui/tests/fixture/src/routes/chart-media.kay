@@ -4,6 +4,7 @@ import '../app.css'
 import ImageCropper from '@kaynooo/kayjs-ui/image-cropper.kay'
 import LineChart from '@kaynooo/kayjs-ui/line-chart.kay'
 import Masonry from '@kaynooo/kayjs-ui/masonry.kay'
+import MapView from '@kaynooo/kayjs-ui/map.kay'
 import MediaGallery from '@kaynooo/kayjs-ui/media-gallery.kay'
 import ScatterChart from '@kaynooo/kayjs-ui/scatter-chart.kay'
 import ZoomPane from '@kaynooo/kayjs-ui/zoom-pane.kay'
@@ -14,6 +15,8 @@ const tiles = [{ id: 1, height: 80 }, { id: 2, height: 120 }, { id: 3, height: 6
 ---
 //- The browser-drawn chart and media parts, for the browser test to read their computed styles.
 main
+  #map
+    MapView(label="Route" lines={[[[48.85, 2.35], [48.86, 2.4]]]} markers={[{ at: [48.85, 2.35], label: 'Start' }]} tiles="data:image/gif;base64,R0lGODlhAQABAAAAACw=#{z}{x}{y}")
   #line
     LineChart(label="Visits" labels={['a', 'b', 'c', 'd', 'e']} onRange={() => undefined} series={[{ name: 'Visits', values: [3, 5, 2, 6, 4] }, { name: 'Sales', values: [1, 2, 1, 3, 2], color: 'red' }]})
   #scatter

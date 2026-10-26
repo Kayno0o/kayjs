@@ -620,6 +620,211 @@
     }
   }
 
+  /* Leaflet lays the map out; only the rules it needs from its own stylesheet are here, so the app imports none, and its controls, tooltips, popups and attribution take the skin's colours. */
+  .kui-map-canvas {
+    height: var(--map-height, 24rem);
+    outline-offset: 1px;
+    background: var(--color-surface);
+    font: inherit;
+    line-height: 1.4;
+    color: var(--color-foreground);
+
+    & :where(.leaflet-pane, .leaflet-tile, .leaflet-marker-icon, .leaflet-tile-container, .leaflet-pane > svg, .leaflet-pane > canvas, .leaflet-zoom-box, .leaflet-layer) {
+      position: absolute;
+      left: 0;
+      top: 0;
+    }
+    & :where(.leaflet-tile, .leaflet-marker-icon) {
+      user-select: none;
+      -webkit-user-drag: none;
+    }
+    & :where(.leaflet-tile) {
+      visibility: hidden;
+      filter: inherit;
+    }
+    & :where(.leaflet-tile-loaded) {
+      visibility: inherit;
+    }
+    & :where(.leaflet-tile-pane img, .leaflet-tile, .leaflet-overlay-pane svg) {
+      max-width: none !important;
+      max-height: none !important;
+      padding: 0;
+    }
+    & :where(.leaflet-pane) { z-index: 400; }
+    & :where(.leaflet-tile-pane) { z-index: 200; }
+    & :where(.leaflet-overlay-pane) { z-index: 400; }
+    & :where(.leaflet-marker-pane) { z-index: 600; }
+    & :where(.leaflet-tooltip-pane) { z-index: 650; }
+    & :where(.leaflet-popup-pane) { z-index: 700; }
+    & :where(.leaflet-map-pane svg) { z-index: 200; }
+    & :where(.leaflet-map-pane canvas) { z-index: 100; }
+    & :where(.leaflet-touch-zoom) { touch-action: pan-x pan-y; }
+    & :where(.leaflet-touch-drag) { touch-action: pinch-zoom; }
+    & :where(.leaflet-touch-drag.leaflet-touch-zoom) { touch-action: none; }
+    & :where(.leaflet-zoom-animated) { transform-origin: 0 0; }
+    & :where(.leaflet-zoom-anim .leaflet-zoom-animated) { transition: transform 0.25s cubic-bezier(0, 0, 0.25, 1); }
+    & :where(.leaflet-zoom-anim .leaflet-tile, .leaflet-pan-anim .leaflet-tile) { transition: none; }
+    & :where(.leaflet-zoom-anim .leaflet-zoom-hide) { visibility: hidden; }
+    & :where(.leaflet-fade-anim .leaflet-popup) { opacity: 0; transition: opacity 0.2s linear; }
+    & :where(.leaflet-fade-anim .leaflet-map-pane .leaflet-popup) { opacity: 1; }
+    & :where(.leaflet-interactive) { cursor: pointer; }
+    & :where(.leaflet-grab) { cursor: grab; }
+    & :where(.leaflet-dragging .leaflet-grab, .leaflet-dragging .leaflet-grab .leaflet-interactive) { cursor: grabbing; }
+    & :where(.leaflet-popup-pane, .leaflet-control) { cursor: auto; }
+    & :where(.leaflet-marker-icon, .leaflet-tile-container, .leaflet-pane > svg path) { pointer-events: none; }
+    & :where(.leaflet-pane > svg path.leaflet-interactive, .leaflet-marker-icon.leaflet-interactive) { pointer-events: auto; }
+    & :where(.leaflet-zoom-box) {
+      width: 0;
+      height: 0;
+      box-sizing: border-box;
+      z-index: 800;
+      border: 2px dotted var(--color-accent);
+      background: color-mix(in oklab, var(--color-accent) 15%, transparent);
+    }
+
+    /* The drawing takes the accent, which an SVG attribute Leaflet writes yields to. */
+    & :where(.kui-map-line) {
+      stroke: var(--color-accent);
+      stroke-opacity: 0.85;
+    }
+    & :where(.kui-map-marker) {
+      stroke: var(--color-accent);
+      fill: var(--color-accent);
+      fill-opacity: 1;
+    }
+    /* A dark casing under the accent, so the picked part stands out on light and dark tiles alike. */
+    & :where(.kui-map-casing) {
+      stroke: black;
+      stroke-opacity: 0.5;
+      fill: none;
+    }
+    & :where(.kui-map-pick) {
+      stroke: var(--color-accent);
+      fill: none;
+      stroke-opacity: 1;
+    }
+    & :where(.kui-map-pick-dot) {
+      stroke: black;
+      stroke-opacity: 0.6;
+      fill: var(--color-accent);
+      fill-opacity: 1;
+    }
+
+    & :where(.leaflet-top, .leaflet-bottom) {
+      position: absolute;
+      z-index: 1000;
+      pointer-events: none;
+    }
+    & :where(.leaflet-top) { top: 0; }
+    & :where(.leaflet-bottom) { bottom: 0; }
+    & :where(.leaflet-left) { left: 0; }
+    & :where(.leaflet-right) { right: 0; }
+    & :where(.leaflet-control) {
+      position: relative;
+      z-index: 800;
+      float: left;
+      clear: both;
+      pointer-events: auto;
+    }
+    & :where(.leaflet-right .leaflet-control) { float: right; margin-right: 0.625rem; }
+    & :where(.leaflet-left .leaflet-control) { margin-left: 0.625rem; }
+    & :where(.leaflet-top .leaflet-control) { margin-top: 0.625rem; }
+    & :where(.leaflet-bottom .leaflet-control) { margin-bottom: 0.625rem; }
+
+    & :where(.leaflet-bar) {
+      border: var(--border-width) solid var(--color-border-strong);
+      border-radius: var(--radius-md);
+      overflow: hidden;
+    }
+    & :where(.leaflet-bar a) {
+      display: block;
+      width: 1.75rem;
+      height: 1.75rem;
+      line-height: 1.75rem;
+      text-align: center;
+      text-decoration: none;
+      font-weight: bold;
+      background: var(--color-popover);
+      color: var(--color-foreground);
+      border-bottom: var(--border-width) solid var(--color-border);
+    }
+    & :where(.leaflet-bar a:last-child) { border-bottom: none; }
+    & :where(.leaflet-bar a:hover, .leaflet-bar a:focus-visible) { background: var(--color-surface-strong); }
+    & :where(.leaflet-bar a.leaflet-disabled) {
+      cursor: default;
+      color: var(--color-muted);
+      background: var(--color-popover);
+    }
+
+    & :where(.leaflet-control-attribution) {
+      margin: 0;
+      padding: 0 0.375rem;
+      font-size: 0.6875rem;
+      background: color-mix(in oklab, var(--color-background) 80%, transparent);
+      color: var(--color-muted);
+    }
+    & :where(.leaflet-control-attribution a) {
+      color: var(--color-foreground);
+      text-decoration: none;
+    }
+    & :where(.leaflet-control-attribution a:hover, .leaflet-control-attribution a:focus-visible) { text-decoration: underline; }
+
+    & :where(.leaflet-tooltip) {
+      position: absolute;
+      padding: 0.125rem 0.5rem;
+      white-space: nowrap;
+      pointer-events: none;
+      font-size: 0.75rem;
+      background: var(--color-popover);
+      color: var(--color-foreground);
+      border: var(--border-width) solid var(--color-border-strong);
+      border-radius: var(--radius-sm);
+    }
+    & :where(.leaflet-tooltip::before) { content: none; }
+
+    & :where(.leaflet-popup) {
+      position: absolute;
+      text-align: center;
+      margin-bottom: 1.25rem;
+    }
+    & :where(.leaflet-popup-content-wrapper) {
+      padding: 0.25rem;
+      text-align: left;
+      background: var(--color-popover);
+      color: var(--color-foreground);
+      border: var(--border-width) solid var(--color-border-strong);
+      border-radius: var(--radius-md);
+    }
+    & :where(.leaflet-popup-content) { margin: 0.5rem 0.75rem; font-size: 0.8125rem; }
+    & :where(.leaflet-popup-tip-container) {
+      position: absolute;
+      left: 50%;
+      width: 2.5rem;
+      height: 1.25rem;
+      margin-left: -1.25rem;
+      overflow: hidden;
+      pointer-events: none;
+    }
+    & :where(.leaflet-popup-tip) {
+      width: 1.0625rem;
+      height: 1.0625rem;
+      margin: -0.55rem auto 0;
+      rotate: 45deg;
+      background: var(--color-popover);
+      border: var(--border-width) solid var(--color-border-strong);
+    }
+    & :where(.leaflet-popup-close-button) {
+      position: absolute;
+      top: 0;
+      right: 0;
+      width: 1.5rem;
+      height: 1.5rem;
+      text-align: center;
+      text-decoration: none;
+      color: var(--color-muted);
+    }
+  }
+
   /* Takes field-input's look beside its own class, so a text box and the editor stay one style. Grows with its text between about 12 lines and most of the screen, where browsers size a field by its content. */
   .kui-markdown-editor {
     @apply max-h-[70dvh] min-h-[12lh] w-full resize-y font-mono field-sizing-content;

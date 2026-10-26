@@ -59,6 +59,7 @@
     "chartist": "^1.5.0",
     "hls.js": "^1.7.0",
     "kay": "~1.78.0",
+    "leaflet": "^1.9.4",
     "tailwindcss": "^4.3.3"
   },
   "peerDependenciesMeta": {
@@ -66,6 +67,9 @@
       "optional": true
     },
     "hls.js": {
+      "optional": true
+    },
+    "leaflet": {
       "optional": true
     }
   },
@@ -77,9 +81,11 @@
     "@iconify-json/tabler": "^1.2.42",
     "@kaynooo/eslint": "^7.1.1",
     "@types/bun": "^1.4.4",
+    "@types/leaflet": "^1.9.22",
     "chartist": "^1.5.0",
     "elysia": "^1.4.30",
     "hls.js": "^1.7.0",
+    "leaflet": "^1.9.4",
     "tailwindcss": "^4.3.3",
     "typescript": "^6.0.3"
   }

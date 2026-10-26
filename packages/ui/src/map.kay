@@ -1,0 +1,162 @@
+---
+import type { JSX } from 'kay'
+import type { LayerGroup, Map as LeafletMap } from 'leaflet'
+import type { MapMarker, MapPoint } from './map'
+import { effect, onCleanup, onMount, recipe, signal } from 'kay'
+import { drawnPoints, OSM_ATTRIBUTION, OSM_TILES, validPoint } from './map'
+
+const look = recipe({
+  parts: {
+    root: 'kui-map relative z-0 isolate w-full overflow-hidden border-solid border-[length:var(--border-width)] border-border',
+    // Leaflet draws into it, and the rules it needs from its own stylesheet stay on this class in theme.css.
+    canvas: 'kui-map-canvas w-full',
+    // What screen readers read in place of the drawing.
+    // The box Leaflet takes over, which adds its own classes and style to it.
+    surface: 'size-full overflow-hidden',
+    list: 'sr-only',
+    item: 'block',
+  },
+})
+
+const { lines = [], markers = [], highlight, tiles = OSM_TILES, attribution = OSM_ATTRIBUTION, maxZoom = 19, center = [20, 0], zoom = 2, label, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'role'> & {
+  // Polylines, each an array of [latitude, longitude] points.
+  lines?: MapPoint[][] | undefined
+  // Round markers; a `label` shows on hover and is read by screen readers, a `popup` opens on a click.
+  markers?: MapMarker[] | undefined
+  // A path drawn over the lines and brought into view, such as the entry picked in a timeline; one point draws a dot. Unset, the map fits what it draws again.
+  highlight?: MapPoint[] | undefined
+  // The tile layer's URL template; OpenStreetMap's by default, whose attribution the map shows. Its host needs `img-src`, which kay admits for any https host.
+  tiles?: string | undefined
+  // HTML shown in the corner for the tiles' source; set it with `tiles`.
+  attribution?: string | undefined
+  maxZoom?: number | undefined
+  // Where the map looks while there is nothing to fit, and how close.
+  center?: MapPoint | undefined
+  zoom?: number | undefined
+  // Describes the map for screen readers.
+  label: string
+}>()
+
+let canvas: HTMLElement | undefined
+
+const names = () => markers.flatMap(marker => marker.label ? [marker.label] : [])
+
+// The map once Leaflet has loaded and drawn its tiles, which the effects below draw on.
+const drawing = signal<{ view: LeafletMap, base: LayerGroup, picked: LayerGroup, leaflet: typeof import('leaflet') } | null>(null)
+
+onMount(() => {
+  let gone = false
+  let view: LeafletMap | undefined
+  let observer: ResizeObserver | undefined
+
+  void (async () => {
+    let leaflet: typeof import('leaflet')
+
+    try {
+      leaflet = await import('leaflet')
+    }
+    catch (error) {
+      console.error('kayjs-ui: Map draws with Leaflet, which could not be loaded; install it with `bun add leaflet @types/leaflet`', error)
+
+      return
+    }
+
+    if (gone || !canvas)
+      return
+
+    view = leaflet.map(canvas, { zoomSnap: 0.5, attributionControl: false })
+    view.addControl(leaflet.control.attribution({ prefix: false }))
+    leaflet.tileLayer(tiles, { maxZoom, attribution }).addTo(view)
+
+    // A map laid out while hidden or resized later learns its size from the box.
+    if (typeof ResizeObserver !== 'undefined') {
+      observer = new ResizeObserver(() => view?.invalidateSize())
+      observer.observe(canvas)
+    }
+
+    drawing.set({ view, base: leaflet.layerGroup().addTo(view), picked: leaflet.layerGroup().addTo(view), leaflet })
+  })()
+
+  // Where the map fits: the highlight when there is one, else everything drawn, else the centre.
+  let all: MapPoint[] = []
+  let chosen: MapPoint[] = []
+
+  const fit = (map: LeafletMap, latLngBounds: typeof import('leaflet').latLngBounds) => {
+    if (chosen.length > 0)
+      map.fitBounds(latLngBounds(chosen), { padding: [48, 48], maxZoom: 16 })
+    else if (all.length > 0)
+      map.fitBounds(latLngBounds(all), { padding: [24, 24], maxZoom: 16 })
+    else
+      map.setView(center, zoom)
+  }
+
+  effect(() => {
+    const ready = drawing()
+
+    if (!ready)
+      return
+
+    const { view: map, base, leaflet } = ready
+    const paths = lines.map(path => path.filter(validPoint)).filter(path => path.length > 0)
+    const marks = markers.filter(marker => validPoint(marker.at))
+
+    base.clearLayers()
+
+    for (const path of paths)
+      leaflet.polyline(path, { weight: 3, className: 'kui-map-line' }).addTo(base)
+
+    for (const marker of marks) {
+      const dot = leaflet.circleMarker(marker.at, { radius: 5, weight: 1, className: 'kui-map-marker', interactive: Boolean(marker.label ?? marker.popup) }).addTo(base)
+
+      if (marker.label)
+        dot.bindTooltip(marker.label)
+
+      if (marker.popup) {
+        const text = leaflet.DomUtil.create('div')
+
+        text.textContent = marker.popup
+        dot.bindPopup(text)
+      }
+    }
+
+    all = drawnPoints(paths, marks)
+    fit(map, leaflet.latLngBounds)
+  })
+
+  effect(() => {
+    const ready = drawing()
+
+    if (!ready)
+      return
+
+    const { view: map, picked, leaflet } = ready
+    const path = highlight?.filter(validPoint) ?? []
+
+    picked.clearLayers()
+
+    if (path.length === 1) {
+      leaflet.circleMarker(path[0]!, { radius: 9, weight: 3, className: 'kui-map-pick-dot', interactive: false }).addTo(picked)
+    }
+    else if (path.length > 1) {
+      leaflet.polyline(path, { weight: 10, className: 'kui-map-casing', interactive: false }).addTo(picked)
+      leaflet.polyline(path, { weight: 6, className: 'kui-map-pick', interactive: false }).addTo(picked)
+    }
+
+    chosen = path
+    fit(map, leaflet.latLngBounds)
+  })
+
+  onCleanup(() => {
+    gone = true
+    observer?.disconnect()
+    view?.remove()
+  })
+})
+---
+div(part="root" {...rest} role="region" aria-label={label})
+  div(part="canvas")
+    div(part="surface" ref={el => canvas = el})
+  if names().length > 0
+    ul(part="list")
+      for name, at of names() key={at}
+        li(part="item") {name}
