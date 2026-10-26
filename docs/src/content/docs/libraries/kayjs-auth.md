@@ -808,6 +808,8 @@ The prebuilt pages' actions import as `@kaynooo/kayjs-auth/pages/<page>.kay`, su
 
 To send a signed-in request by hand, `await auth.sessionCookie(userId)` gives the `Cookie` header of a new session for that user. It mints the cookie the app reads from a plain request: `__Host-kay_session` in production when `site` in kay.config.ts is https, else `kay_session`. A request over https reads `__Host-kay_session` alone, so `{ secure: true }` asks for it, as for a site without `site` behind a proxy that says it was reached over https, and `{ secure: false }` asks for `kay_session`.
 
+The cookie works minted before the first `testSite()` too, so a helper can mint at import time.
+
 To sign a test site in as a member, `await auth.signInAs(site, { email: 'ada@example.com', username: 'Ada' })` makes the member when no user has that email or username, signs an existing one in as they are, and sets the session cookie on the site. It takes the fields of `createUser` (`password`, `roles`, `emailVerified` and `locale` too), and `data` for the fields of your `user` schema. It works on any store. Call it again to switch member, and `auth.signOut(site)` to sign out.
 
 `auth.test(site)` names the site once: `const as = auth.test(site)`, then `as.signInAs({ email })`, `as.signOut()` and `as.sessionCookie(userId)`. With `auth()` alone and no `src/auth.ts` module, `authTest(site)` from `@kaynooo/kayjs-auth/test` makes the same calls on the auth `testSite()` built.

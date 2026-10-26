@@ -114,6 +114,13 @@ const FILE_CHECK_MS = 5000
 const DELETE_PAGE = 500
 
 type SqliteSessionStore = DeletableSessionStore
+// Set by a test site: a test mints its cookies before its first site exists, so before the store the site brings, and a cookie holding its data must read as it did without a store.
+let acceptingCookieData = false
+
+export function acceptCookieData(): void {
+  acceptingCookieData = true
+}
+
 // Whether this process was told yet that a session without a store cannot be revoked.
 let warnedNoStore = false
 const sqliteStores = new Map<string, { store: SqliteSessionStore, reopen: () => void }>()
@@ -342,6 +349,12 @@ class RequestSession<Data extends object> implements Session<Data> {
 
     if (!this.store) {
       this.data = sealed.data ?? {}
+
+      return
+    }
+
+    if (sealed.id === undefined && sealed.data !== undefined && acceptingCookieData) {
+      this.data = sealed.data
 
       return
     }
