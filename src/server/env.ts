@@ -13,6 +13,24 @@ import { readFields } from './query'
 
 const OPTIONAL = Symbol.for('TypeBox.Optional')
 const LOAD_PLACEHOLDER_LENGTH = 32
+// Values tried, in order, for a string whose `format` or `pattern` refuses the plain placeholder: a URL, an email, an address, an id, a date and time, then short texts a pattern is likely to take.
+const LOAD_SAMPLES = [
+  'https://kay-load-placeholder.invalid/',
+  'kay-load-placeholder@example.invalid',
+  '127.0.0.1',
+  '::1',
+  '00000000-0000-4000-8000-000000000000',
+  '2000-01-01T00:00:00.000Z',
+  '2000-01-01',
+  '00:00:00',
+  'kay-load-placeholder',
+  'kay',
+  'a',
+  '0',
+  '1',
+  '0000000000000000000000000000000000000000000000000000000000000000',
+  'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+]
 
 // A `s.Object` of the variables, each read on its own.
 export type EnvSchema = TSchema & { properties: Record<string, TSchema> }
@@ -79,13 +97,28 @@ export function defineEnv<Schema extends EnvSchema>(declared: Schema, source: Re
 }
 
 // What `--load` gives a variable the build lacks or refuses: a fixed string of 32 characters or its `minLength`, which a session secret's own check accepts and writes nothing to disk; `undefined` for a field of another type.
+// A field with an `enum` or `const` reads as its first value, and the string is replaced by the first sample the field's own rules accept, one for its `format` or a short text for its `pattern`, so a module validating it at load, as `new URL(env.X)` does, still loads.
 function loadPlaceholder(name: string, field: TSchema | undefined): unknown {
-  const { minLength, type } = (field ?? {}) as { minLength?: unknown, type?: unknown }
+  const { minLength, type, enum: values, const: only } = (field ?? {}) as { minLength?: unknown, type?: unknown, enum?: unknown, const?: unknown }
 
   if (type !== 'string')
     return undefined
 
-  return `kay-load-placeholder-${name}`.padEnd(Math.max(LOAD_PLACEHOLDER_LENGTH, typeof minLength === 'number' ? minLength : 0), '_')
+  if (typeof only === 'string')
+    return only
+
+  if (Array.isArray(values) && typeof values[0] === 'string')
+    return values[0]
+
+  const plain = `kay-load-placeholder-${name}`.padEnd(Math.max(LOAD_PLACEHOLDER_LENGTH, typeof minLength === 'number' ? minLength : 0), '_')
+  const check = t.Object({ [name]: field as TSchema })
+
+  for (const candidate of [plain, ...LOAD_SAMPLES]) {
+    if (!('refused' in readFields(check, { [name]: candidate }, false)))
+      return candidate
+  }
+
+  return plain
 }
 
 function without<Schema extends EnvSchema>(schema: Schema, placeholders: Record<string, string>): Schema {

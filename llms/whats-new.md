@@ -5,6 +5,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 ## Unreleased
 
 - `site.submit(action, fields, { from: '/path' })` solves a `workChallenge` field of the form on that page, as `from: await site.visit(...)` does: [Testing](testing.md).
+- The placeholder `kay build --compile --verify-load` gives a string field reads as the field's first `enum` value, or a sample its `format` or `pattern` accepts, so a module validating it at load, as `new URL(env.X)` does, loads: [Production](production.md#check-the-executable-starts).
 - An island passes a `Blob` to an `s.File()` or `s.Files()` field, a `MediaRecorder` recording as it is, and `kay check` accepts it where it asked for a `File`; the handler still gets a `File`: [Files](files.md#files-posted-to-an-action).
 - `session()` no longer warns in production that a cookie with no store cannot be revoked when kayjs-auth uses it, which keeps its own record of each session and refuses a cookie whose session it ended: [Sessions](server.md).
 - `kay check` reports an `s.Public` field in a `.ts` file outside `src` (`public-env-outside-src`), where kay does not find it and an island reads it as a string: [Environment](environment.md).

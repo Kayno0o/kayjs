@@ -162,6 +162,44 @@ describe('s.Secret and a required-in-production string with no default', () => {
   })
 })
 
+describe('the placeholder --load gives a string the build lacks', () => {
+  const LOADING = Symbol.for('kay.loading')
+  const BUILDING = Symbol.for('kay.building')
+
+  function loadedWith(names: Record<string, ReturnType<typeof s.String>>): Record<string, unknown> {
+    const global = globalThis as Record<symbol, unknown>
+
+    global[BUILDING] = true
+    global[LOADING] = true
+
+    try {
+      return defineEnv(s.Object(names), { NODE_ENV: 'production' })
+    }
+    finally {
+      delete global[BUILDING]
+      delete global[LOADING]
+    }
+  }
+
+  it('is accepted by the field\'s format, pattern and enum, so a module validating it at load still loads', () => {
+    const env = loadedWith({
+      PLAIN: s.String(),
+      URL_VALUE: s.String({ format: 'uri' }),
+      MAIL: s.String({ format: 'email' }),
+      ID: s.String({ pattern: '^[0-9]+$' }),
+      MODE: s.String({ enum: ['b', 'a'] }),
+      LONG: s.String({ minLength: 40 }),
+    })
+
+    expect(env.PLAIN).toBe('kay-load-placeholder-PLAIN'.padEnd(32, '_'))
+    expect(() => new URL(env.URL_VALUE as string)).not.toThrow()
+    expect(env.MAIL).toContain('@')
+    expect(env.ID).toMatch(/^\d+$/)
+    expect(env.MODE).toBe('b')
+    expect((env.LONG as string).length).toBe(40)
+  })
+})
+
 describe('kay env', () => {
   const files = {
     'kay.config.ts': 'import { Elysia, t } from \'elysia\'\n\nconst lib = { name: \'lib\', env: t.Object({ LIB_KEY: t.String({ description: \'the library\\\'s key\', requiredInProduction: true }), LIB_MODE: t.String({ default: \'fast\' }) }) }\n\nexport default { favicon: false, extensions: [lib] }\n',
