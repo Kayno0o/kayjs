@@ -47,9 +47,9 @@ const look = recipe({
 
 const { columns: given, rows: passed, list, rowKey, sort, sortable = true, serverSort = false, onSort, cell, empty, filter, filterLabel = wording('ui.table.filter', 'Filter'), filterPlaceholder, filterParam, sortParam, countLabel, noMatch, narrow = 'stack', selectable = false, selected, onSelect, bulk, selectAllLabel = wording('ui.table.selectAll', 'Select all'), selectedLabel, selectRowLabel, exportable = false, exportLabel = wording('ui.table.export', 'Export CSV'), exportName = 'table.csv', virtual = false, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'onSelect'> & {
   columns: Column<Row>[]
-  // The rows to draw. Left out when `list` holds them.
+  // The rows to draw. Left out when `list` holds them: one of the two is required.
   rows?: Row[] | undefined
-  // Rows loaded page by page, from `infiniteList`: the table draws its rows with `LoadMore` after them, and a header click sorts on the server, the list starting over from offset 0 with the sort passed to its `load` (and to `onSort` too). The columns to sort by carry a `sortValue` (`numeric` ones have it), which only marks them sortable here. The table's own sort, from `sort` or the URL, is sent to the list too. A sort restarts the list, so a selected row outside the first page leaves the selection.
+  // Rows loaded page by page, from `infiniteList`: the table draws its rows with `LoadMore` after them, and a header click sorts on the server, the list starting over from offset 0 with the sort passed to its `load` (and to `onSort` too). The columns to sort by carry a `sortValue` (`numeric` ones have it), which only marks them sortable here. The table's own sort, from `sort` or the URL, is sent to the list too. A sort restarts the list, so a selected row outside the first page leaves the selection. The list loads again from offset 0 when the table's sort differs from the `sort` the list was made with, on mount included, so give `infiniteList` the same `sort` the table starts from to keep the first page. `exportable` as `true` exports the rows loaded so far; give it an endpoint to export them all.
   list?: InfiniteList<Row> | undefined
   rowKey: Key
   // The sort to start from; a table whose parent passes a new one follows it.
@@ -101,7 +101,7 @@ const { columns: given, rows: passed, list, rowKey, sort, sortable = true, serve
   exportName?: string | undefined
   // Draws only the rows in view, between room standing for the others, so a table of ten thousand rows and more stays as light as a short one. The table scrolls in a box of its own (`--table-height`, 70vh by default) with its headers kept on top. Decided once, when the table is made. The server draws the first screenful, so the rest shows once the page loads its script. Find-in-page sees the drawn rows alone, and a focused row that scrolls out of the window loses its focus. Name the scroll box with an `aria-label`.
   virtual?: boolean | undefined
-}>()
+} & ({ rows: Row[], list?: undefined } | { rows?: undefined, list: InfiniteList<Row> })>()
 
 const rows = () => list ? list.rows() : passed ?? []
 const columns = memo(() => given.map(column => resolvedColumn(column, sortable)))

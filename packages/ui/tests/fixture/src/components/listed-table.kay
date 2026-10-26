@@ -3,12 +3,13 @@ import type { SortState } from '@kaynooo/kayjs-ui'
 import { infiniteList } from '@kaynooo/kayjs-ui'
 import Table from '@kaynooo/kayjs-ui/table.kay'
 
-const { onLoad, onSort, sort } = props<{
+const { onLoad, onSort, sort, sortParam } = props<{
   onLoad: (at: { offset: number, sort: SortState | undefined }) => Promise<{ id: number, name: string, moons: number }[] | undefined>
   onSort?: (sort: SortState) => void
   sort?: SortState
+  sortParam?: string
 }>()
 
 const feed = infiniteList([{ id: 1, name: 'Io', moons: 0 }, { id: 2, name: 'Europa', moons: 1 }], { pageSize: 2, key: row => row.id, load: onLoad })
 ---
-Table(columns={[{ key: 'name', header: 'Name', sortValue: true, defaultDirection: 'asc' }, { key: 'moons', header: 'Moons', numeric: true }]} list={feed} rowKey="id" onSort={onSort} sort={sort})
+Table(columns={[{ key: 'name', header: 'Name', sortValue: true, defaultDirection: 'asc' }, { key: 'moons', header: 'Moons', numeric: true }]} list={feed} rowKey="id" onSort={onSort} sort={sort} sortParam={sortParam})

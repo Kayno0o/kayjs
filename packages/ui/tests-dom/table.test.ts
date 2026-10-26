@@ -126,6 +126,43 @@ describe('Table over an infinite list', () => {
     expect(asked).toEqual([{ key: 'name', direction: 'desc' }])
   })
 
+  test('sends the sort the URL restores to the list, once, from offset 0', async () => {
+    const asked: { offset: number, sort: SortState | undefined }[] = []
+    const onLoad = async (at: { offset: number, sort: SortState | undefined }) => {
+      asked.push(at)
+
+      return []
+    }
+
+    // happy-dom keeps about:blank through history.replaceState, so the page's URL is set through its own handle.
+    ;(window as unknown as { happyDOM: { setURL: (url: string) => void } }).happyDOM.setURL('http://localhost/?sort=moons&direction=asc')
+    mounted = await mountComponent(ListedTable, { onLoad, sortParam: 'sort' })
+    await settle()
+
+    expect(asked).toEqual([{ offset: 0, sort: { key: 'moons', direction: 'asc' } }])
+    expect(header(mounted.root, 1).getAttribute('aria-sort')).toBe('ascending')
+    ;(window as unknown as { happyDOM: { setURL: (url: string) => void } }).happyDOM.setURL('about:blank')
+  })
+
+  test('a header click calls sortBy once: one load, one onSort', async () => {
+    const asked: (SortState | undefined)[] = []
+    const sorts: SortState[] = []
+    const onLoad = async (at: { sort: SortState | undefined }) => {
+      asked.push(at.sort)
+
+      return []
+    }
+
+    mounted = await mountComponent(ListedTable, { onLoad, onSort: (sort: SortState) => sorts.push(sort) })
+    click(header(mounted.root, 0).querySelector('button'))
+    await settle()
+    click(header(mounted.root, 0).querySelector('button'))
+    await settle()
+
+    expect(asked).toEqual([{ key: 'name', direction: 'asc' }, { key: 'name', direction: 'desc' }])
+    expect(sorts).toEqual(asked as SortState[])
+  })
+
   test('draws LoadMore after the rows', async () => {
     mounted = await mountComponent(ListedTable, { onLoad: async () => [] })
 
