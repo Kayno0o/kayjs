@@ -10,6 +10,18 @@ export function buildingWithoutEnv(): void {
   (globalThis as { [BUILDING]?: boolean })[BUILDING] = true
 }
 
+const LOADING = Symbol.for('kay.loading')
+
+// An executable run as `--load` loads every module of the app without its environment, and no page is rendered: a variable missing or refused reads as a placeholder there rather than failing the module that reads it at load.
+export function loadingWithoutEnv(): void {
+  buildingWithoutEnv()
+  ;(globalThis as { [LOADING]?: boolean })[LOADING] = true
+}
+
+export function loading(): boolean {
+  return (globalThis as { [LOADING]?: boolean })[LOADING] === true
+}
+
 const LISTED = Symbol.for('kay.envListed')
 // The caller's file in a stack frame such as `at /app/src/env.ts:3:20` or `at env (file:///app/src/env.ts:3:20)`.
 const FRAME_FILE = /^at (?:.*? \()?(?:file:\/\/)?(\/[^():]+):\d+:\d+\)?$/

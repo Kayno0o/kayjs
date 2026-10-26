@@ -200,7 +200,8 @@ describe('kay build --format json', () => {
     // The entry asks for a secret and a database as an app's does, and leaves a marker where it runs: --verify-load must reach neither.
     const entry = 'import { writeFileSync } from \'node:fs\'\nimport { Elysia } from \'elysia\'\nimport { defineEnv, pages } from \'kay/server\'\nimport { s } from \'kay\'\n\nwriteFileSync(\'entry-ran\', \'yes\')\ndefineEnv(s.Object({ KAY_TEST_SECRET: s.String({ requiredInProduction: true }) }))\nnew Elysia().use(await pages()).listen(Number(process.env.PORT))\n'
     // An API module reading the same secret at the top of its module, which loads before the entry does.
-    const secret = 'import { s } from \'kay\'\nimport { api, defineEnv } from \'kay/server\'\n\ndefineEnv(s.Object({ KAY_TEST_SECRET: s.String({ requiredInProduction: true }) }))\n\nexport default api().get(\'/\', () => \'ok\')\n'
+    // It reads the value at load as `session({ secret })` does, and refuses one that is not a string as an app's own guard would.
+    const secret = 'import { s } from \'kay\'\nimport { api, defineEnv } from \'kay/server\'\n\nconst env = defineEnv(s.Object({ KAY_TEST_SECRET: s.String({ requiredInProduction: true }) }))\n\nif (typeof env.KAY_TEST_SECRET !== \'string\')\n  throw new Error(\'no secret\')\n\nexport default api().get(\'/\', () => \'ok\')\n'
     const files = { 'kay.config.ts': 'export default { favicon: false }\n', 'src/routes/index.kay': 'p Home\n', 'src/api/secret.ts': secret, 'src/server.ts': entry }
     const working = await project(files)
     const env = { ...process.env }

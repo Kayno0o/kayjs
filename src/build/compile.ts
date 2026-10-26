@@ -102,7 +102,7 @@ export async function compileServer(project: Project, options: CompileOptions): 
   await Bun.write(generated, [
     `import { join } from 'node:path'`,
     `import process from 'node:process'`,
-    `import { buildingWithoutEnv, listenIdleApps, probeHealth, registerBundle, runAsPrimary } from 'kay/internal/server'`,
+    `import { listenIdleApps, loadingWithoutEnv, probeHealth, registerBundle, runAsPrimary } from 'kay/internal/server'`,
     // An embedded file, read only for `--licenses`, so the server keeps none of it in memory.
     `import notices from ${JSON.stringify(notices)} with { type: 'file' }`,
     '',
@@ -120,11 +120,11 @@ export async function compileServer(project: Project, options: CompileOptions): 
     // For code reading it off `node:process`, as kay does, which the build's `define` leaves alone.
     'Bun.env.NODE_ENV = \'production\'',
     '',
-    // `--load` loads every module and stops before the server entry, which is where a database or a secret is asked for: a variable missing fails the code reading it, not the module declaring it, as under `kay build`.
+    // `--load` loads every module and stops before the server entry, which is where a database or a secret is asked for: a variable missing reads as a placeholder, as a module reading it at load, such as `session({ secret })`, needs one.
     'const loading = process.argv.includes(\'--load\')',
     '',
     'if (loading)',
-    '  buildingWithoutEnv()',
+    '  loadingWithoutEnv()',
     '',
     existsSync(configFile) ? `const { default: config } = await import(${JSON.stringify(configFile)})` : 'const config = {}',
     '',

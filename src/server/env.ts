@@ -8,7 +8,7 @@ import { PUBLIC_ENV } from '../runtime/env'
 import { bundled } from './bundle'
 import { fixedReply } from './compress'
 import { devSecret } from './dev-secret'
-import { building, callerFile, PUBLIC_ENV_PATH, recordEnv } from './env-state'
+import { building, callerFile, loading, PUBLIC_ENV_PATH, recordEnv } from './env-state'
 import { readFields } from './query'
 
 const OPTIONAL = Symbol.for('TypeBox.Optional')
@@ -58,6 +58,12 @@ export function defineEnv<Schema extends EnvSchema>(declared: Schema, source: Re
     if (name === '')
       continue
 
+    if (loading()) {
+      env[name] = loadPlaceholder(name, schema.properties[name])
+
+      continue
+    }
+
     Object.defineProperty(env, name, {
       enumerable: true,
       get: () => {
@@ -69,6 +75,16 @@ export function defineEnv<Schema extends EnvSchema>(declared: Schema, source: Re
   registerPublic(declared, env)
 
   return env as ReturnType<typeof defineEnv<Schema>>
+}
+
+// What `--load` gives a variable the build lacks: a derived value for a secret and `''` for any other string, so a module guarding or passing it at load runs; `undefined` for a field of another type.
+function loadPlaceholder(name: string, field: TSchema | undefined): unknown {
+  const { secret, type } = (field ?? {}) as { secret?: unknown, type?: unknown }
+
+  if (type !== 'string')
+    return undefined
+
+  return secret === true ? devSecret(name) : ''
 }
 
 function without<Schema extends EnvSchema>(schema: Schema, placeholders: Record<string, string>): Schema {
