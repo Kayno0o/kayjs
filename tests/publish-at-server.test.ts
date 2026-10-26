@@ -321,6 +321,7 @@ describe('a prerendered site with a scheduled entry', () => {
       try {
         app.listen(0)
         await app.stop()
+        // Nothing refreshes past the entry's date (700 ms ahead) once the server stopped.
         await Bun.sleep(900)
         expect(heard).toBe(0)
       }
@@ -343,6 +344,7 @@ describe('a prerendered site with a scheduled entry', () => {
 
       try {
         await until(app, '/talks', 'Soon0')
+        // No second refresh follows the one at the date.
         await Bun.sleep(300)
         expect(heard).toBe(1)
       }

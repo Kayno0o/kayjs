@@ -82,6 +82,7 @@ describe('the progress line', () => {
 
     try {
       line.update({ step: 'bundling' })
+      // The clock has to pass 0.1 s for a new step still on the old one's clock to read other than 0.0s.
       await Bun.sleep(150)
 
       const drawn = written.length
@@ -94,7 +95,9 @@ describe('the progress line', () => {
       expect(written.slice(drawn)).toHaveLength(1)
       expect(written.at(-1)).toEndWith(' 0/50 routes 0.0s')
 
-      await Bun.sleep(120)
+      // The count shows with the next frame of the spinner's timer.
+      for (const limit = Date.now() + 5000; !written.at(-1)!.includes(' 50/50 routes ') && Date.now() < limit;)
+        await Bun.sleep(10)
 
       expect(written.at(-1)).toContain(' 50/50 routes ')
     }

@@ -332,9 +332,14 @@ describe.each(kinds)('a workflow on a $name store', ({ open }) => {
     const store = await open()
     const ran: string[] = []
     const gate = Promise.withResolvers<void>()
+    const waiting = Promise.withResolvers<void>()
     const flow = workflow<string>(named(), async ({ input, step }) => {
       if (input === 'running') {
-        await step.run('wait', async () => gate.promise)
+        await step.run('wait', async () => {
+          waiting.resolve()
+
+          return gate.promise
+        })
         await step.run('never', () => void ran.push('never'))
       }
       else {
@@ -351,7 +356,7 @@ describe.each(kinds)('a workflow on a $name store', ({ open }) => {
     const running = await flow.start('running')
     const draining = flow.drain()
 
-    await Bun.sleep(50)
+    await waiting.promise
     expect(await flow.status(running)).toMatchObject({ status: 'running' })
     expect(await flow.cancel(running)).toBe(true)
     gate.resolve()
@@ -533,30 +538,35 @@ pgDescribe('two workflows on separate Postgres connections', () => {
   it('keeps a run held by one connection from the other until its hold lapses', async () => {
     const calls: string[] = []
     let hang = true
+    const stuck = Promise.withResolvers<void>()
     const { first, second } = await pair(async ({ step }) => {
       await step.run('one', () => void calls.push('one'))
       await step.run('two', async () => {
-        if (hang)
+        if (hang) {
+          stuck.resolve()
           await new Promise<void>(noop)
+        }
 
         calls.push('two')
       })
     }, { lostAfter: '1s' })
     const id = await first.start()
-    const stuck = first.drain()
+    const draining = first.drain()
 
-    await Bun.sleep(100)
+    await stuck.promise
     forgetQueue(first)
     expect(await second.status(id)).toMatchObject({ status: 'running', steps: 1 })
     expect(await second.drain()).toBe(0)
     expect(await second.send(id, 'go', 1)).toBe(false)
 
     // The first connection gives the run up at lostAfter, to retry once its backoff passes.
-    await Bun.sleep(1200)
+    while ((await second.status(id))?.error === undefined)
+      await Bun.sleep(20)
+
     hang = false
     later(MINUTE)
     expect(await second.drain()).toBe(1)
     expect(calls).toEqual(['one', 'two'])
-    void stuck
+    void draining
   })
 })
