@@ -144,8 +144,9 @@ jobs:
 
       # Every test file in this one checkout, the slowest first by .kay/timings.json (scripts/timings.ts builds it from tests/timings.json, with an early start for a file not measured yet), on half the host's 12 cores: a worker per core held the whole machine the runner shares.
       # Each file's duration here is written into this checkout's .kay/timings.json, which the step below prints, whole on one line for scripts/timings.ts to read back from the log, so a session's runs schedule by the last green run's measurement.
+      # A run stuck past its time is interrupted before the job limit, so bun prints the files still running, which the limit cuts off with the log.
       - name: Tests
-        run: bun run test --parallel=6 --update-timings
+        run: timeout -s INT -k 30 720 bun run test --parallel=6 --update-timings
 
       - name: Slowest test files
         if: ${{ !cancelled() }}
@@ -157,7 +158,8 @@ jobs:
         run: |
           for dir in packages/*/; do
             echo "$dir"
-            (cd "$dir" && bun run check && bun run test) || exit 1
+            # Each suite takes about a minute: one stuck for five is interrupted, and names its files still running.
+            (cd "$dir" && bun run check && timeout -s INT -k 30 300 bun run test) || exit 1
           done
         env:
           # kayjs-auth refuses to skip its pg store's tests for want of a database.
