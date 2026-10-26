@@ -1,7 +1,8 @@
 import { rm } from 'node:fs/promises'
 import { join } from 'node:path'
-import { beforeAll, describe, expect, it } from 'bun:test'
+import { beforeAll, describe, expect, it, spyOn } from 'bun:test'
 import { highlight } from '../docs/src/highlight'
+import { playgroundWarm } from '../docs/src/playground/bundles'
 import { runs } from '../docs/src/playground/check'
 import { isRunnable, playgroundHref, sourceOfHash } from '../docs/src/playground/runnable'
 import { renderServer } from '../docs/src/playground/runtime'
@@ -113,5 +114,25 @@ describe('the docs\' examples', () => {
     await highlight('---\nglobalThis.__playgroundRan = true\n---\np hi\n', 'kay')
 
     expect((globalThis as { __playgroundRan?: boolean }).__playgroundRan).toBeUndefined()
+  })
+})
+
+describe('the playground\'s bundles', () => {
+  it('are built as the server starts listening, not when the first visitor asks', async () => {
+    const build = spyOn(Bun, 'build').mockResolvedValue({ success: false, logs: [], outputs: [] })
+    const app = (await playgroundWarm.server())
+
+    try {
+      expect(build).not.toHaveBeenCalled()
+
+      app.listen(0)
+      await Bun.sleep(50)
+
+      expect(build.mock.calls.map(([options]) => (options.entrypoints[0] ?? '').split('/').pop()).sort()).toEqual(['compile.ts', 'frame.ts'])
+    }
+    finally {
+      await app.stop()
+      build.mockRestore()
+    }
   })
 })

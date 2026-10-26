@@ -49,7 +49,7 @@ const asyncHooks: Bun.BunPlugin = {
 // What a browser lacks of the Node a library written for both reads: Babel asks `process.env` and `process.emitWarning`, which would throw as its chunk evaluates, so they are defined away rather than shimmed.
 const DEFINED = { 'process.env': '{}', 'process.emitWarning': 'undefined' }
 
-// A playground file bundled for the browser when the first visitor asks for it, then kept: no docs page carries it, and kay's own client build would refuse Babel's reads of `process`.
+// A playground file bundled for the browser when first asked for (the server asks once it listens), then kept: no docs page carries it, and kay's own client build would refuse Babel's reads of `process`.
 export function bundled(file: string, minify: boolean): () => Promise<Bundled> {
   let kept: Promise<Bundled> | undefined
 
