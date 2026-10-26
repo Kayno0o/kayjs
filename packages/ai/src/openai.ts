@@ -146,7 +146,7 @@ export function openai({ baseUrl = OPENAI_URL, apiKey, model }: OpenAiOptions = 
       const calls = new Map<number, { index: number, id: string, name: string, arguments: string }>()
       const byIndex = new Map<number, number>()
 
-      // OpenAI and Ollama count tokens only when asked; Mistral refuses the parameter and sends usage unasked. The optional parameters go first, and on a 400 or 422 the request goes again without the one the error names (else without both), the root remembered once that works.
+      // OpenAI and Ollama count tokens only when asked; Mistral refuses the parameter and sends usage unasked. The optional parameters go first, and on a 400 or 422 the request goes again without the one the error names (else without them all), the root remembered once that works.
       const known = refused.get(root) ?? new Set<Optional>()
       const optional = (['stream_options', 'prompt_cache_key', 'reasoning_effort'] as const).filter(name => !known.has(name) && (name === 'stream_options' || (name === 'prompt_cache_key' ? request.cache !== false : request.reasoning !== undefined)))
       const open = (sent: readonly Optional[]) => postEvents('openai', url, headers, { ...body, ...shapeOf(request, mode), ...sent.includes('stream_options') ? { stream_options: { include_usage: true } } : {}, ...sent.includes('prompt_cache_key') ? { prompt_cache_key: cacheKeyOf(request) } : {}, ...sent.includes('reasoning_effort') ? { reasoning_effort: request.reasoning } : {} }, request.timeouts, signal, apiKey)
