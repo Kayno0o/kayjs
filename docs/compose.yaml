@@ -20,11 +20,13 @@ services:
     networks:
       - default
       - umami
-    # The chat's daily counts, kept over a restart.
+    # The chat's daily counts, kept over a restart in the checkout's gitignored docs/data/, which must exist and belong to the uid the daemon's userns-remap maps `bun` (1000) to.
     volumes:
-      - chat-data:/kay/docs/data
-volumes:
-  chat-data:
+      - type: bind
+        source: ./data
+        target: /kay/docs/data
+        bind:
+          create_host_path: false
 networks:
   umami:
     external: true
