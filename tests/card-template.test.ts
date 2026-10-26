@@ -605,15 +605,17 @@ describe.skipIf(!chrome)('a share card that is not drawn in time', () => {
   const real = browserModule.browse
   const opened: { closed: boolean }[] = []
   const order: string[] = []
+  const blank = Bun.serve({ port: 0, hostname: '127.0.0.1', fetch: () => new Response('<p>blank</p>', { headers: { 'content-type': 'text/html' } }) })
 
-  // The real browse, its page recorded, with the paint of a renderer that never answers when `hang` is set, and the answer of the open delayed by `delay`.
-  function watch(hang: boolean, delay = 0) {
+  // The real browse, its page recorded, with the paint of a renderer that never answers when `hang` is set, and the answer of the open held until `gate` settles.
+  function watch(hang: boolean, gate?: Promise<unknown>) {
     return spyOn(browserModule, 'browse').mockImplementation(async (url, options) => {
-      const page = await real(url, options)
+      // A held open goes to a page of its own: the card's server stops once the limit has passed, and a slow browser must not decide whether this page can still load from it.
+      const page = await real(gate === undefined ? url : blank.url.href, options)
       const record = { closed: false }
 
       opened.push(record)
-      await Bun.sleep(delay)
+      await gate
 
       const view = { ...page.view, cdp: async (method: string, params?: Record<string, unknown>) => hang && method === 'Runtime.evaluate' ? new Promise<never>(Function.prototype as () => void) : page.view.cdp(method, params) }
 
@@ -641,6 +643,10 @@ describe.skipIf(!chrome)('a share card that is not drawn in time', () => {
     mock.restore()
   })
 
+  afterAll(async () => {
+    await blank.stop(true)
+  })
+
   it('leaves no page of the browser open, and the next card waits for the stuck one to close', async () => {
     watch(true)
 
@@ -660,12 +666,19 @@ describe.skipIf(!chrome)('a share card that is not drawn in time', () => {
   }, 30_000)
 
   it('closes at once a page the browser opens after the limit has passed', async () => {
-    watch(true, LIMIT * 1.5)
+    const release = Promise.withResolvers<void>()
+
+    watch(true, release.promise)
 
     await expect(shootCard(clientDir(FIXTURE), 80, async () => '<p>slow</p>')).rejects.toThrow('was not drawn within')
 
-    // The page opened, but its answer came after the card was given up.
+    // The browser may take longer than the limit to open the page at all, so the page is waited for, then held open until the card has been given up.
+    for (let waited = 0; opened.length === 0 && waited < 20_000; waited += 50)
+      await Bun.sleep(50)
+
+    // The page opened, but its answer comes after the card was given up.
     expect(opened.map(page => page.closed)).toEqual([false])
+    release.resolve()
 
     for (let waited = 0; !opened[0]!.closed && waited < 5000; waited += 50)
       await Bun.sleep(50)
