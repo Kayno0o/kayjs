@@ -71,11 +71,16 @@ Besides its colours, the space skin sets these, so an override of yours knows wh
 - The sans font, `--color-popover`, `--color-surface`, `--color-surface-strong`, `--color-border` and `--color-border-strong`.
 - `--border-width` to `0`, put back to `1px` on buttons, fields, chips, toggles, badges, notices, avatars, segmented controls, file drops and pagination steps.
 - `--label-case` to `none`, `--tracking-label` and `color-scheme: dark`.
-- A shadow under overlays, the key look of `.kui-btn` and framed `.kui-icon-btn`, the drawn checkboxes (outlined in the accent on hover) and the themed selects.
+- The line of Segmented and FileDrop, and of pagination steps and unchecked chips, in `--color-input`.
+- A shadow under overlays, and drawn checkboxes that outline in the accent on hover.
+- Themed selects: a chevron, and where the browser allows it the open list and its options.
+- The key look of buttons and framed icon buttons: a hairline, lit in the accent on hover. Tone, ghost, inline, pressed and disabled buttons keep the theme's look, and a focused button shows the theme's focus line.
 
-Soft sets `--label-case`, `--tracking-label` and `--shadow-raised`; brutalist sets `--border-width`, the three radii, `--font-label` and the three shadow tokens.
+Soft sets `--label-case`, `--tracking-label` and `--shadow-raised`. Brutalist sets `--border-width`, the three radii, `--font-label` and the three shadow tokens.
 
-A skin's rules sit at one class of specificity or none, so a plain class of yours beats them. `starfield` paints its dots over `--color-background` and fixes them to the viewport; keep your own fuller sky by layering your gradients on the same element.
+A skin's rules sit at one class of specificity or none, so a rule of yours with one class in `@layer components` beats them. Unlayered CSS and the classes of `src/ui.ts` already did. The key's hover is the one exception, at two classes like the theme's own.
+
+`starfield` draws four dots over `--color-background`, fixed to the viewport, and `class="starfield bg-surface"` changes the ground. A `bg-[radial-gradient(...)]` utility replaces the dots instead of adding to them. For a fuller sky, write your own `background-image` that repeats the dots and adds your gradients, with its own `background-size`.
 
 Add the one line to `src/app.css`, after the theme import (an app using `ui()` has the theme already, so it goes after `@import 'tailwindcss'`):
 

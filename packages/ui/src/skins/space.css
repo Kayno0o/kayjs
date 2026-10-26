@@ -64,20 +64,20 @@
     box-shadow: 0 1rem 3rem -0.75rem rgb(0 0 0 / 0.8);
   }
 
-  /* A key, on a Button and a framed IconButton: a hairline on the canvas, lit in the accent while hovered. The tones, the ghost and inline forms and a pressed toggle keep their own. */
-  :is(.kui-btn, .kui-shell:where(.kui-icon-btn)):where(:not(.kui-btn-accent, .kui-btn-success, .kui-btn-danger, .kui-shell-danger, [data-variant='ghost'], [data-variant='inline'], [aria-pressed='true'])) {
+  /* A key, on a Button and a framed IconButton: a hairline on the canvas, lit in the accent while hovered. The tones, the ghost and inline forms, a pressed toggle and a disabled button keep their own look from the theme. */
+  :is(.kui-btn, .kui-shell:where(.kui-icon-btn)):where(:not(.kui-btn-accent, .kui-btn-success, .kui-btn-danger, .kui-shell-danger, [data-variant='ghost'], [data-variant='inline'], [aria-pressed='true'], :disabled, [aria-disabled='true'])) {
     --shell-line: var(--color-input);
     --shell-fill: transparent;
   }
 
-  :is(.kui-btn, .kui-shell:where(.kui-icon-btn)):where(:not(.kui-btn-accent, .kui-btn-success, .kui-btn-danger, .kui-shell-danger, [data-variant='ghost'], [data-variant='inline'], [aria-pressed='true'])):hover {
+  :is(.kui-btn, .kui-shell:where(.kui-icon-btn)):where(:not(.kui-btn-accent, .kui-btn-success, .kui-btn-danger, .kui-shell-danger, [data-variant='ghost'], [data-variant='inline'], [aria-pressed='true'], :disabled, [aria-disabled='true'])):hover {
     --shell-line: var(--color-accent);
     --shell-fill: transparent;
     color: var(--color-accent);
   }
 
   /* A themed select: its own chevron drawn as two gradients, and where the browser can style the select itself, its list too. */
-  :is(select.kui-field-input, .kui-form-field :where(select)):where(:not([multiple], [size])) {
+  :is(:where(select).kui-field-input, .kui-form-field :where(select)):where(:not([multiple], [size])) {
     appearance: none;
     padding-right: 1.75rem;
     background-image: linear-gradient(45deg, transparent 50%, var(--color-muted) 50%), linear-gradient(135deg, var(--color-muted) 50%, transparent 50%);
@@ -87,7 +87,7 @@
   }
 
   @supports (appearance: base-select) {
-    :is(select.kui-field-input, .kui-form-field :where(select)):where(:not([multiple], [size])) {
+    :is(:where(select).kui-field-input, .kui-form-field :where(select)):where(:not([multiple], [size])) {
       appearance: base-select;
       padding-right: calc(var(--spacing) * 2.25 * var(--density));
       background-image: none;
@@ -107,16 +107,15 @@
         color: var(--color-muted);
       }
 
-      & option {
+      & :where(option) {
         padding: 0.25rem calc(var(--spacing) * 2.25 * var(--density));
         border-radius: var(--radius-md);
 
-        &:hover,
-        &:focus-visible {
+        &:where(:hover, :focus-visible) {
           background: var(--color-surface-strong);
         }
 
-        &:checked {
+        &:where(:checked) {
           color: var(--color-accent);
         }
       }
@@ -143,7 +142,7 @@
       transition: transform 120ms;
     }
 
-    &:hover:not(:checked, :indeterminate, :disabled) {
+    &:hover:where(:not(:checked, :indeterminate, :disabled)) {
       border-color: var(--color-accent);
     }
 

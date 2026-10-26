@@ -278,6 +278,84 @@ async function built(skin: string, where: 'after' | 'before' = 'after', candidat
   return compiler.build(candidates)
 }
 
+// Splits a selector list at its top-level commas.
+function splitTop(selector: string): string[] {
+  const parts: string[] = []
+  let depth = 0
+  let start = 0
+
+  for (const [i, char] of [...selector].entries()) {
+    if (char === '(' || char === '[') {
+      depth++
+    }
+    else if (char === ')' || char === ']') {
+      depth--
+    }
+    else if (char === ',' && depth === 0) {
+      parts.push(selector.slice(start, i).trim())
+      start = i + 1
+    }
+  }
+
+  parts.push(selector.slice(start).trim())
+
+  return parts
+}
+
+const FUNCTIONAL = /:(where|is|not|has)\(/y
+const SIMPLE = /\.[\w-]+|\[[^\]]*\]|::?[\w-]+|#[\w-]+|[a-z][\w-]*|[^.[:#\w]+/gy
+
+// A selector's specificity as [classes, elements]: :where() counts nothing, :is(), :not() and :has() their most specific argument, a pseudo-element an element.
+function specificity(selector: string): [number, number] {
+  let classes = 0
+  let elements = 0
+  let i = 0
+
+  while (i < selector.length) {
+    FUNCTIONAL.lastIndex = i
+    const functional = FUNCTIONAL.exec(selector)
+
+    if (functional) {
+      let depth = 1
+      let end = i + functional[0].length
+
+      while (depth > 0 && end < selector.length) {
+        if (selector[end] === '(')
+          depth++
+        else if (selector[end] === ')')
+          depth--
+
+        end++
+      }
+
+      if (functional[1] !== 'where') {
+        const [c = 0, e = 0] = splitTop(selector.slice(i + functional[0].length, end - 1)).map(specificity).reduce<[number, number]>((best, one) => (one[0] > best[0] || (one[0] === best[0] && one[1] > best[1]) ? one : best), [0, 0])
+
+        classes += c
+        elements += e
+      }
+
+      i = end
+
+      continue
+    }
+
+    SIMPLE.lastIndex = i
+    const token = SIMPLE.exec(selector)?.[0] ?? selector[i] ?? ''
+
+    if (token.startsWith('::'))
+      elements++
+    else if (token.startsWith('.') || token.startsWith('[') || token.startsWith(':') || token.startsWith('#'))
+      classes++
+    else if ((/^[a-z]/).test(token))
+      elements++
+
+    i += token.length || 1
+  }
+
+  return [classes, elements]
+}
+
 describe('theme.css', () => {
   test('reads at 4.5:1 for text and 3:1 for field borders and focus, on every ground in both schemes', () => {
     expect(failing(TEXT, 4.5)).toEqual([])
@@ -645,21 +723,32 @@ describe('theme.css', () => {
   test('lets an app\'s plain class beat the space skin, and gives its starfield a ground and a fixed attachment and its checkbox a hover', async () => {
     const skin = await Bun.file(`${ROOT}src/skins/space.css`).text()
     const tailwind = Bun.resolveSync('tailwindcss/theme.css', ROOT)
-    const compiler = await compile(`@import 'tailwindcss/theme.css' layer(theme);\n${theme}\n${skin}\n@tailwind utilities;`, { base: ROOT, loadStylesheet: async (_, base) => ({ path: tailwind, base, content: await Bun.file(tailwind).text() }) })
+    const compiler = await compile(`@import 'tailwindcss/theme.css' layer(theme);\n${skin}\n@tailwind utilities;`, { base: ROOT, loadStylesheet: async (_, base) => ({ path: tailwind, base, content: await Bun.file(tailwind).text() }) })
     const css = compiler.build(['starfield'])
 
     expect(css).toMatch(/\.starfield \{[^}]*background-color: var\(--color-background\)/)
     expect(css).toMatch(/\.starfield \{[^}]*background-attachment: fixed/)
-    expect(skin).toMatch(/&:hover:not\(:checked, :indeterminate, :disabled\) \{\s*border-color: var\(--color-accent\)/)
 
-    // No selector joins two classes outside :where(), which a plain class of the app would lose to.
-    const rules = skin.replace(/\/\*[\s\S]*?\*\//g, '').replace(/@theme \{[^}]*\}/, '')
+    // Every selector of the skin as compiled: one class at most, two for the key's hover as the theme's own.
+    const selectors = [...css.replaceAll(/\/\*[\s\S]*?\*\//g, '').matchAll(/([^{};]+)\{[^{}]*\}/g)].map(([, selector = '']) => selector.trim()).filter(selector => selector.includes('.kui-') || selector.includes('select'))
 
-    expect(rules).not.toMatch(/\.kui-icon-btn\.kui-shell/)
+    expect(selectors.length).toBeGreaterThan(8)
+    for (const selector of selectors) {
+      for (const part of splitTop(selector)) {
+        const [classes = 0] = specificity(part)
+
+        expect(classes, part).toBeLessThanOrEqual((/\.kui-btn.*:hover$|\.kui-shell.*:hover$/).test(part) ? 2 : 1)
+      }
+    }
+
+    // A disabled button keeps the theme's look, which sits at two classes after the skin: the key rules never select it.
+    const keys = selectors.filter(selector => selector.includes('--shell') || selector.includes('.kui-btn-accent'))
+
+    expect(keys.length).toBeGreaterThan(1)
+    for (const key of keys) expect(key, key).toContain('[aria-disabled=\'true\']')
+    expect(css).toMatch(/:where\(:not\(:checked, :indeterminate, :disabled\)\)\s*\{\s*border-color: var\(--color-accent\)/)
     // A raw select in a FormField sits at the theme's own one class, so the skin's chevron padding wins by order.
-    expect(rules).toContain('.kui-form-field :where(select)')
-    expect(rules).not.toContain(':where(.kui-form-field select)')
-    expect(rules).not.toMatch(/:is\([^()]*(?:\.[\w-]+|\])\s+[.[][^()]*\)/)
+    expect(css).toContain('.kui-form-field :where(select)')
   })
 
   test('keeps the space skin on the parts the recipes draw: the line they read, the combobox list and the multi-select checkbox', async () => {
