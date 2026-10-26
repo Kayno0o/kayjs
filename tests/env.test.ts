@@ -560,6 +560,23 @@ describe('kay env against compose and .env.example', () => {
     expect((await run(root, ['--compose', 'compose.yaml'])).findings).toHaveLength(3)
   })
 
+  it('asks compose for MAIL_URL of a mailer that is not optional, and not of an optional one, whatever file builds it', async () => {
+    const mailer = async (options: string) => project({
+      'kay.config.ts': 'import { mail } from \'@kaynooo/kayjs-mail\'\n\nexport default { favicon: false, extensions: [mail({ module: \'./src/mail.ts\' })] }\n',
+      'src/mail.ts': `import { mailer } from '@kaynooo/kayjs-mail'\n\nexport const mail = mailer(${options})\n`,
+      'compose.yaml': 'services:\n  app:\n    environment:\n      SITE_URL: https://example.com\n',
+    })
+    // Spawned, as the mailer declares its variables only where it delivers over SMTP, which a test process does not.
+    const messages = async (options: string) => {
+      const { stdout } = await kay(['env', '--compose', 'compose.yaml', '--format', 'json'], await mailer(options), {}, false)
+
+      return (JSON.parse(stdout) as { findings: { message: string }[] }).findings.map(({ message }) => message)
+    }
+
+    expect(await messages('{ optional: true }')).toEqual([])
+    expect(await messages('{}')).toEqual([expect.stringContaining('MAIL_URL is required')])
+  })
+
   it('names a file that is missing or not YAML, and an env_file that does not exist', async () => {
     const root = await project({ ...files, 'bad.yaml': 'services: [\n', 'gone.yaml': 'services:\n  app:\n    env_file: nope.env\n' })
 

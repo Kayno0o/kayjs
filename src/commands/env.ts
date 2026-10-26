@@ -116,14 +116,20 @@ export async function listEnv(root: string): Promise<{ variables: Listed[], unre
 
   await registerLoader(root, config.settings ?? {})
 
+  // The module an extension with an env list builds its server from may build the library with options that change what it needs, as a mailer that is `optional`: it is read too, and one that does not load leaves the extension's list.
+  const built = new Set((config.extensions ?? []).flatMap(({ env, serverModule }) => env === undefined || serverModule === undefined ? [] : [relative(root, Bun.resolveSync(resolve(root, serverModule.path), root))]))
+
   for (const file of files) {
-    if (!DEFINE_ENV.test(await readFile(join(root, file), 'utf8')))
+    if (!built.has(file) && !DEFINE_ENV.test(await readFile(join(root, file), 'utf8')))
       continue
 
     try {
       await importApi(resolve(root, file))
     }
     catch (error) {
+      if (built.has(file))
+        continue
+
       unread.push({ file, error: error instanceof Error ? error.message : String(error) })
     }
   }
