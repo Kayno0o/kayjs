@@ -220,6 +220,14 @@ describe('control flow', () => {
     expect(compileKay('for [k] of [[1]]\n  for [k] of [[2]]\n    p {k}', 'test.kay', { output: 'html', hydratable: true }).diagnostics).toEqual([])
   })
 
+  it('emits a destructured loop\'s pattern once in the checked output, so a type error on it is reported once', () => {
+    const { tsx } = compileKay('for { a, b } of rows key={a}\n  p {a}{b}', 'test.kay', { check: true })
+
+    expect(tsx.split('{ a, b }')).toHaveLength(2)
+    expect(tsx).toContain('keyed={() => 0}')
+    expect(tsx).toContain('return (void (a), <p>')
+  })
+
   it('matches rows by position when the key is the index', () => {
     expect(jsx('for row, i of rows key={i}\n  p {i}: {row}')).toBe('<><KayLoopFor each={rows} keyed={false}>{(row, i) => <p>{i}: {row}</p>}</KayLoopFor></>')
   })

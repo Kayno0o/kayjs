@@ -825,10 +825,14 @@ class TemplateParser {
     const start = this.pos
 
     const end = this.scan.lineEnd(start)
+    const reported = this.diagnostics.length
     const head = this.forHead(start)
 
     if (!head) {
-      this.error(start, end, 'Malformed `for`', { help: '`for <item> of <list>`, `for <item>, <index> of <list>` or a destructured item as in `for { id, name } of rows` and `for [key, value] of entries`, then `key={<key>}` when rows are not matched by `item.id`' })
+      // An unclosed or unbalanced pattern is already reported by the scanner, which a second message on the same line would repeat.
+      if (this.diagnostics.length === reported)
+        this.error(start, end, 'Malformed `for`', { help: '`for <item> of <list>`, `for <item>, <index> of <list>` or a destructured item as in `for { id, name } of rows` and `for [key, value] of entries`, then `key={<key>}` when rows are not matched by `item.id`' })
+
       this.pos = end
 
       return { kind: 'for', start, end, item: { start, end: start }, each: { start, end: start }, children: this.parseBlock(indent) }

@@ -197,6 +197,18 @@ describe('kay grammar', () => {
     expect(lines[12]?.[0]).toBe('when: keyword.control.conditional.kay')
   })
 
+  it('reads a destructured loop item, an object or an array pattern, with an index after it', () => {
+    const [object, array] = tokenize(['for { id, name }, i of rows key={id}', 'for [k, [v]] of entries key={k}'].join('\n'))
+
+    expect(object).toContain('i: variable.other.readwrite.kay')
+    expect(object).toContain('of: keyword.control.loop.kay')
+    expect(object).toContain('rows: variable.other.ts')
+    expect(object).toContain('key: entity.other.attribute-name.kay')
+    expect(array).toContain('of: keyword.control.loop.kay')
+    expect(array).toContain('entries: variable.other.ts')
+    expect(scopesOf('for { id } of rows key={id}', 'id')).toContain('meta.embedded.expression.kay')
+  })
+
   it('reads a snippet line, its name and parameters, and leaves an element named snippets alone', () => {
     const lines = tokenize(['snippet feature(title: string)', '  h3 {title}', 'snippet rule', 'snippets x'].join('\n'))
 

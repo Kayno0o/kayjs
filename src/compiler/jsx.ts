@@ -472,7 +472,8 @@ export class JsxTemplate {
 
         if (positional)
           b.add('false')
-        else if (node.key)
+        // A destructured item is declared by the `const` leading the block, which also reads the key, so the pattern is written out once.
+        else if (node.key && node.row === undefined)
           b.add('(').addSource(node.item).add(') => (').addSource(node.key).add(')')
         else
           b.add('() => 0')
@@ -507,7 +508,7 @@ export class JsxTemplate {
       b.add(') => ')
 
       // A key the loop does not match rows by is still read, so the type check sees it, and hover and rename reach the key's name.
-      if (node.key && node.row !== undefined && (staticLoop || positional)) {
+      if (node.key && node.row !== undefined) {
         this.rowKey = node.key
         this.emitRoot(node.children)
       }

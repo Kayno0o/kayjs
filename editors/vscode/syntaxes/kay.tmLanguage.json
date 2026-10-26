@@ -275,7 +275,7 @@
       }
     },
     "for": {
-      "match": "^[ \\t]*(for)[ \\t]+([A-Za-z_$][\\w$]*)(?:[ \\t]*(,)[ \\t]*([A-Za-z_$][\\w$]*))?[ \\t]+(of)[ \\t]+(.*?)[ \\t]+(key)(=)(\\{.*\\})[ \\t]*$",
+      "match": "^[ \\t]*(for)[ \\t]+(?:([A-Za-z_$][\\w$]*)|(\\{.*?\\}|\\[.*?\\]))(?:[ \\t]*(,)[ \\t]*([A-Za-z_$][\\w$]*))?[ \\t]+(of)[ \\t]+(.*?)[ \\t]+(key)(=)(\\{.*\\})[ \\t]*$",
       "captures": {
         "1": {
           "name": "keyword.control.loop.kay"
@@ -284,15 +284,6 @@
           "name": "variable.other.readwrite.kay"
         },
         "3": {
-          "name": "punctuation.separator.comma.kay"
-        },
-        "4": {
-          "name": "variable.other.readwrite.kay"
-        },
-        "5": {
-          "name": "keyword.control.loop.kay"
-        },
-        "6": {
           "name": "meta.embedded.expression.kay",
           "patterns": [
             {
@@ -300,13 +291,30 @@
             }
           ]
         },
+        "4": {
+          "name": "punctuation.separator.comma.kay"
+        },
+        "5": {
+          "name": "variable.other.readwrite.kay"
+        },
+        "6": {
+          "name": "keyword.control.loop.kay"
+        },
         "7": {
-          "name": "entity.other.attribute-name.kay"
+          "name": "meta.embedded.expression.kay",
+          "patterns": [
+            {
+              "include": "source.ts"
+            }
+          ]
         },
         "8": {
-          "name": "punctuation.separator.key-value.kay"
+          "name": "entity.other.attribute-name.kay"
         },
         "9": {
+          "name": "punctuation.separator.key-value.kay"
+        },
+        "10": {
           "patterns": [
             {
               "include": "#expression"

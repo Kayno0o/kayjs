@@ -125,7 +125,7 @@ module.exports = grammar({
 
     for_line: $ => seq(
       'for',
-      $.identifier,
+      choice($.identifier, $.hole, seq('[', optional($.bracket_content), ']')),
       optional(seq(',', $.identifier)),
       'of',
       $.each_expression,

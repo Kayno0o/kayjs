@@ -95,6 +95,15 @@ describe.skipIf(treeSitter === null)('tree-sitter grammar', () => {
     expect(output).toMatch(TREE_ERROR)
   })
 
+  it('parses a loop whose item is a destructuring pattern, an index after it and a key', async () => {
+    const dir = await scratchDir('tree-sitter-')
+
+    await Bun.write(join(dir, 'pattern.kay'), 'for { id, name }, i of rows key={id}\n  p {name}\nfor [key, [value]] of entries\n  p {key}\n')
+    const { output } = await run([treeSitter!, 'parse', '--quiet', join(dir, 'pattern.kay')], { libdir: dir })
+
+    expect(output).not.toMatch(TREE_ERROR)
+  })
+
   it('keeps balancing brackets nested past the scanner stack', async () => {
     const dir = await scratchDir('tree-sitter-')
     const depth = 100

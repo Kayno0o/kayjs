@@ -271,6 +271,11 @@ describe('elements', () => {
     expect(found?.help).toContain('for { id, name } of rows')
   })
 
+  it('reports an unclosed destructured item once, not also as a malformed loop', () => {
+    expect(parse('for { a of rows\n  p x').diagnostics.map(found => found.message)).toEqual(['Unclosed `{`'])
+    expect(parse('for [a of rows\n  p x').diagnostics.map(found => found.message)).toEqual(['Unclosed `[`'])
+  })
+
   it('rejects text glued to a tag', () => {
     expect(parse('p.x=oops').diagnostics.length).toBeGreaterThan(0)
   })

@@ -422,6 +422,10 @@
           "named": true
         },
         {
+          "type": "bracket_content",
+          "named": true
+        },
+        {
           "type": "each_expression",
           "named": true
         },
