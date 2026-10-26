@@ -210,6 +210,16 @@ describe('control flow', () => {
     expect(compileKay('for { a, b } of rows\n  p {a}{b}', 'test.kay', { check: true }).tsx).toContain('{((KayRow4) => <>{(() => { const { a, b } = (KayRow4); return <p>{a}{b}</p> })()}</>)(KayRow(kayEach))}')
   })
 
+  it('reads a destructured loop\'s key where its names are in scope, and shadows like a plain item does', () => {
+    const page = '--- server\nconst name = 1\n---\np {name}\nfor [k] of Object.entries({}) key={k}\n  p {k}\nfor { name } of [{ name: 1 }]\n  p {name}'
+    const checked = compileKay(page, 'src/routes/index.kay', { check: true })
+
+    expect(checked.tsx).toContain('const [k] = (KayRow')
+    expect(checked.tsx).toContain('return (void (k), <p>')
+    expect(checked.diagnostics).toEqual([])
+    expect(compileKay('for [k] of [[1]]\n  for [k] of [[2]]\n    p {k}', 'test.kay', { output: 'html', hydratable: true }).diagnostics).toEqual([])
+  })
+
   it('matches rows by position when the key is the index', () => {
     expect(jsx('for row, i of rows key={i}\n  p {i}: {row}')).toBe('<><KayLoopFor each={rows} keyed={false}>{(row, i) => <p>{i}: {row}</p>}</KayLoopFor></>')
   })

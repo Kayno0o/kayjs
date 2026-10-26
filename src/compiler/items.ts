@@ -129,11 +129,11 @@ export function childItems(nodes: Node[]): Item[] {
 }
 
 // The value a `const` names: its expression, or the row of the loop whose destructured item it declares, which a browser's loop and an island's server render hand over as an accessor (the `memo` of a block that follows what it reads).
-export function addConstValue(b: CodeBuilder, node: ConstNode, memo?: string): void {
+export function addConstValue(b: CodeBuilder, node: ConstNode, accessor = false): void {
   if (node.row === undefined)
     b.addSource(node.value)
   else
-    b.add(memo === undefined ? node.row : `${node.row}()`)
+    b.add(accessor ? `${node.row}()` : node.row)
 }
 
 // A template `const` as a statement. `memo`, the helper's name in code that runs again as what it reads changes, makes each name a memo, read by calling it.
@@ -142,12 +142,12 @@ export function constDeclaration(b: CodeBuilder, node: ConstNode, src: string, m
 
   if (memo === undefined) {
     b.add('const ').addSource(node.pattern).add(' = (')
-    addConstValue(b, node, memo)
+    addConstValue(b, node, memo !== undefined)
     b.add('); ')
   }
   else if (names.length === 1 && src.slice(node.pattern.start, node.pattern.end) === names[0]) {
     b.add('const ').addSource(node.pattern).add(` = ${memo}(() => (`)
-    addConstValue(b, node, memo)
+    addConstValue(b, node, memo !== undefined)
     b.add(')); ')
   }
   else {
@@ -155,7 +155,7 @@ export function constDeclaration(b: CodeBuilder, node: ConstNode, src: string, m
     const shared = `KayC${node.start}`
 
     b.add(`const ${shared} = ${memo}(() => { const `).addSource(node.pattern).add(' = (')
-    addConstValue(b, node, memo)
+    addConstValue(b, node, memo !== undefined)
     b.add(`); return [${names.join(', ')}] })`)
 
     for (const [index, name] of names.entries())

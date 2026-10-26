@@ -43,6 +43,8 @@ const PLAIN_PARAMETER = /^[\p{ID_Start}$_][\p{ID_Continue}$\u200C\u200D]*$/u
 
 // A template as JSX: what the analysis pass reads for scope, and `kay check` type-checks.
 export class JsxTemplate {
+  private rowKey: Span | undefined
+
   constructor(private readonly b: CodeBuilder, private readonly src: string, private readonly facts: TemplateFacts, private readonly options: JsxOptions, private readonly sites: Sites) {}
 
   emitRoot(nodes: Node[]): void {
@@ -146,12 +148,29 @@ export class JsxTemplate {
       // Code that runs reads it as a memo, as it does a row, unless the markup renders once.
       this.sites.consts.set(b.code.length, !this.options.staticLoops)
 
+      if (node.row !== undefined)
+        this.sites.loopItems.add(b.code.length)
+
       b.addSource(node.pattern).add(' = (')
       addConstValue(b, node)
       b.add(');')
     })
     b.add(' return ')
-    this.emitRoot(rest)
+
+    // The key a loop does not match rows by, read where its destructured names are in scope.
+    const key = node.row === undefined ? undefined : this.rowKey
+
+    this.rowKey = undefined
+
+    if (key) {
+      b.add('(void (').addSource(key).add('), ')
+      this.emitRoot(rest)
+      b.add(')')
+    }
+    else {
+      this.emitRoot(rest)
+    }
+
     b.add(' })()}')
   }
 
@@ -401,6 +420,7 @@ export class JsxTemplate {
       }
 
       b.add('>{(')
+
       if (node.row === undefined)
         this.sites.rows.add(b.code.length)
 
@@ -487,7 +507,11 @@ export class JsxTemplate {
       b.add(') => ')
 
       // A key the loop does not match rows by is still read, so the type check sees it, and hover and rename reach the key's name.
-      if (node.key && (staticLoop || positional)) {
+      if (node.key && node.row !== undefined && (staticLoop || positional)) {
+        this.rowKey = node.key
+        this.emitRoot(node.children)
+      }
+      else if (node.key && (staticLoop || positional)) {
         b.add('(void (').addSource(node.key).add('), ')
         this.emitRoot(node.children)
         b.add(')')

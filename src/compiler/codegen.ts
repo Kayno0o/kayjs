@@ -180,7 +180,7 @@ export function generate(file: KayFile, script: ScriptAnalysis, server: ServerAn
 // The module around a template, alike for every output mode: its imports, the server fence's `load`, the component's signature, props and script, and its export; the template renders through the writer of the mode.
 class ModuleShell {
   private readonly b: CodeBuilder
-  private readonly sites: Sites = { rows: new Set(), consts: new Map(), snippets: new Set(), props: new Map() }
+  private readonly sites: Sites = { rows: new Set(), consts: new Map(), loopItems: new Set(), snippets: new Set(), props: new Map() }
   // Whether the island types a prop as an action, so the server lets it be passed one.
   private takesActions = false
   private readonly src: string

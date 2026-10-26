@@ -277,9 +277,11 @@ export function keyedByPosition(node: ForNode, source: string): node is ForNode 
   return index !== undefined && index !== '' && node.key !== undefined && source.slice(node.key.start, node.key.end).trim() === index
 }
 
+const PATTERN_ITEM = /^[{[]/
+
 // The file with each loop whose item is a pattern (`for [key, value] of entries`, `for { id, name } of rows`) given a row name of its own, the pattern then declared by a `const` leading its block: the loop's row is an accessor in a browser, which a parameter pattern cannot destructure.
 export function nameDestructuredRows(file: KayFile): KayFile {
-  const isPattern = (node: Node): node is ForNode => node.kind === 'for' && /^[{[]/.test(file.source.slice(node.item.start, node.item.end))
+  const isPattern = (node: Node): node is ForNode => node.kind === 'for' && PATTERN_ITEM.test(file.source.slice(node.item.start, node.item.end))
 
   if (!someNode(file.template, isPattern))
     return file
