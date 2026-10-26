@@ -77,6 +77,17 @@ export function appSecrets(): string[] | undefined {
   return mode === 'development' || mode === 'test' ? [devSecret('KAY_SECRET')] : undefined
 }
 
+// A script or a job that signs before any server set the secret up takes the app's own (`KAY_SECRET`, or the checkout's in development and tests) instead of the key of its process, which no other process shares. Does nothing once a secret is set.
+export function useScriptSecret(): void {
+  if (secret.from !== 'process')
+    return
+
+  const secrets = appSecrets()
+
+  if (secrets !== undefined)
+    useStampSecret(secrets, 'config')
+}
+
 // What an app without any secret is told: where one goes.
 export function noAppSecret(use: string): KayError {
   return new KayError('config-invalid', `kay: ${use} has no secret: set KAY_SECRET to at least ${MIN_SECRET_LENGTH} random characters; generate one with ${GENERATE_SECRET}`)

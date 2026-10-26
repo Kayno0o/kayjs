@@ -80,3 +80,34 @@ console.log(JSON.stringify([other, rotated, signed.verify('shot', 'abc', signed.
     expect(await isolated(script)).toEqual([false, true, true])
   })
 })
+
+describe('signed in a script and on odd input', () => {
+  it('reads KAY_SECRET when no server set a secret up', async () => {
+    const secret = 'first-secret-first-secret-first-secret'
+    const other = 'other-secret-other-secret-other-secret'
+    const run = async (script: string, key: string) => {
+      const proc = Bun.spawn([process.execPath, '-e', script], { cwd: process.cwd(), env: { ...process.env, KAY_SECRET: key }, stdout: 'pipe', stderr: 'pipe' })
+
+      return (await new Response(proc.stdout).text()).trim()
+    }
+    const sign = `import { signed } from './src/server/index'\nconsole.log(signed.sign('shot', 'abc'))`
+    const token = await run(sign, secret)
+    const verify = `import { signed } from './src/server/index'\nconsole.log(signed.verify('shot', 'abc', '${token}'))`
+
+    expect(await run(verify, secret)).toBe('true')
+    expect(await run(verify, other)).toBe('false')
+  })
+
+  it('keeps a use and a value holding NUL apart, and refuses odd input', async () => {
+    const script = `${HEAD}
+const token = signed.sign('a', 'b\\0c')
+let strings = false
+try { signed.sign(undefined, 'x') } catch { strings = true }
+let long = false
+try { signed.sign('a', 'b', { maxAge: '99999999w' }) } catch { long = true }
+console.log(JSON.stringify([signed.verify('a', 'b\\0c', token), signed.verify('a\\0b', 'c', token), strings, long, signed.verify('a', 'b', signed.sign('a', 'b', { maxAge: '1h' }))]))
+`
+
+    expect(await isolated(script)).toEqual([true, false, true, true, true])
+  })
+})

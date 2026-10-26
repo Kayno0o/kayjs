@@ -133,7 +133,7 @@ const url = `https://example.com/shot/${id}?sig=${signed.sign('shot', id, { maxA
 signed.verify('shot', id, sig)
 ```
 
-`maxAge` is how long the signature stays valid, an hour when left out. `verify` answers `true` or `false`, and never throws. The first argument names what you sign, so a signature for one use never passes for another. Rotating the secret keeps older signatures valid.
+`maxAge` is how long the signature stays valid, an hour when left out. `verify` answers `true` or `false`, and never throws. The first argument names what you sign, so a signature for one use never passes for another. Rotating the secret keeps older signatures valid while the old secret stays in the list. A script or a job signs with `KAY_SECRET` too, and a development checkout shares its own secret.
 
 ### Changing the secret
 
