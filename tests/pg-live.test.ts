@@ -565,9 +565,12 @@ pgDescribe('pgData live values', () => {
     const sql = await fresh()
     const [store] = twoReplicas()
 
-    await store.set('app:purge', 'old', '[1]', Date.now() + 50)
-    // The database's own clock decides when the row has ended.
-    await waitFor(async () => (await sql.unsafe<{ ended: boolean }[]>(`SELECT expires_at < ${NOW} AS ended FROM kay_live WHERE key = 'old'`))[0]?.ended === true, 'the row to end')
+    // Reading opens the store, which creates the tables.
+    await store.entries()
+
+    // Written straight to the table already ended: a set through the store would start its own purge, which a loaded runner can run after the row's 50 ms and drop it before it is locked.
+    await sql.unsafe(`INSERT INTO kay_live (id, key, value, expires_at) VALUES ('app:purge', 'old', '[1]', ${NOW} - 1000)`)
+    expect((await sql.unsafe<{ ended: boolean }[]>(`SELECT expires_at < ${NOW} AS ended FROM kay_live WHERE key = 'old'`))[0]?.ended, 'the row to be there and ended').toBe(true)
 
     const holder = await sql.reserve()
 
