@@ -16,7 +16,7 @@ export interface ScheduleOptions {
   // IANA time zone the schedule reads in, such as `Europe/Paris`; the system's by default.
   tz?: string | undefined
   // Runs each time once across every process sharing the job store, the first to reach it taking it: names the lock, unique per schedule.
-  // A production server (`NODE_ENV=production`) locks every schedule by default, under a name made of its schedule and its job's source; `false` runs it in every process.
+  // A production server (`NODE_ENV=production`) locks every schedule by default, under a name made of its schedule and its job's source; `false` runs it in every process, and `KAY_LOCK_SCHEDULES=false` makes that the default of an app running one process.
   lock?: string | false | undefined
   // Where the lock is taken: the queues' default store unless given.
   store?: JobStore | undefined
@@ -24,6 +24,8 @@ export interface ScheduleOptions {
   boot?: boolean | undefined
   // How long a run may take: past it, the run is logged as failed, its signal aborts and the schedule goes on without it. 10 minutes by default, `false` for no limit.
   timeout?: Duration | false | undefined
+  // `false` adds nothing: the schedule never runs, so a job needing an optional service is switched by its setting, `enabled: url !== undefined`, without a conditional plugin around it.
+  enabled?: boolean | undefined
 }
 
 type Job = (signal: AbortSignal) => unknown
@@ -84,13 +86,17 @@ export function schedule(first: Duration | string | Record<string, Jobs>, second
   const table = typeof first === 'object'
   const entries = table ? Object.entries(first) : [[first, second as Jobs] as const]
   const options = (table ? second : third) as ScheduleOptions | undefined ?? {}
+
+  if (options.enabled === false)
+    return new Elysia()
+
   const jobs = entries.flatMap(([when, listed]) => (Array.isArray(listed) ? listed as Job[] : [listed as Job]).map((job, place) => [when, job, place] as const))
   const plugins = jobs.map(([when, job, place]) => {
     if (typeof job !== 'function')
       throw new KayError('config-invalid', `kay: the job scheduled ${String(when)} is no function`)
 
     const own = jobs.length > 1 && typeof options.lock === 'string' ? { ...options, lock: `${options.lock}:${String(when)}:${place}` } : options
-    const auto = options.lock === undefined && process.env.NODE_ENV === 'production' ? autoLock(when, job) : undefined
+    const auto = options.lock === undefined && process.env.NODE_ENV === 'production' && process.env.KAY_LOCK_SCHEDULES !== 'false' ? autoLock(when, job) : undefined
 
     if (typeof when === 'number' || DURATION_TEXT.test(when))
       return scheduleEvery(when as Duration, job, table ? { ...own, tz: undefined } : own, auto)
@@ -287,9 +293,17 @@ function scheduledRun(label: string, slotMs: number, job: Job, options: Schedule
   })
 }
 
+export interface BackgroundOptions {
+  // `false` adds nothing: the work never starts, as `enabled` of a schedule.
+  enabled?: boolean | undefined
+}
+
 // Starts `work` with the server, for a queue consumer or anything else that runs the whole time; on stop, its signal aborts and the server waits for it to return.
 // Work that throws is logged; it is not started again.
-export function background(work: (signal: AbortSignal) => unknown) {
+export function background(work: (signal: AbortSignal) => unknown, options: BackgroundOptions = {}) {
+  if (options.enabled === false)
+    return new Elysia()
+
   let controller: AbortController | undefined
   let running: Promise<void> | undefined
 

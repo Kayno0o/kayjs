@@ -154,6 +154,18 @@ describe('schedule', () => {
     expect(typed(() => schedule('0 0 31 04 *', () => undefined))).toBe(true)
   })
 
+  it('refuses a job whose first parameter is not the AbortSignal it is called with', () => {
+    const typed = (_build: () => unknown) => true
+    const signed = (_signal: AbortSignal) => undefined
+    const optional = (_signal?: AbortSignal) => undefined
+
+    expect(typed(() => [schedule('@hourly', signed), schedule('@hourly', optional), schedule('@hourly', () => undefined), background(signed)])).toBe(true)
+    // @ts-expect-error -- called with the signal, which is no Date
+    expect(typed(() => schedule('@hourly', (_now?: Date) => undefined))).toBe(true)
+    // @ts-expect-error -- called with the signal, which is no Date
+    expect(typed(() => background((_now?: Date) => undefined))).toBe(true)
+  })
+
   it('types a table entry\'s list with a conditional spread anywhere in it', () => {
     const typed = (_build: () => unknown) => true
     const on = Math.random() > 2
@@ -438,6 +450,28 @@ describe('schedule', () => {
         expect(runs).toEqual(['first-report'])
       }
       finally {
+        await world.done()
+      }
+    })
+
+    it('runs in every process when KAY_LOCK_SCHEDULES=false makes that the default of a production server', async () => {
+      const runs: string[] = []
+      const before = process.env.KAY_LOCK_SCHEDULES
+
+      process.env.KAY_LOCK_SCHEDULES = 'false'
+
+      const world = await twoProcesses('production', (name, store, schedule) => [new Elysia().use(schedule('@hourly', () => runs.push(`${name}-report`), { store }))])
+
+      try {
+        await world.fire()
+        expect(runs.toSorted()).toEqual(['first-report', 'second-report'])
+      }
+      finally {
+        if (before === undefined)
+          delete process.env.KAY_LOCK_SCHEDULES
+        else
+          process.env.KAY_LOCK_SCHEDULES = before
+
         await world.done()
       }
     })
@@ -894,6 +928,21 @@ describe('schedule every so long', () => {
 })
 
 describe('background', () => {
+  it('adds nothing with enabled: false', async () => {
+    const steps: string[] = []
+    const cron = fakeCron()
+    const app = new Elysia().use(background(() => steps.push('started'), { enabled: false })).use(schedule('@hourly', () => steps.push('ran'), { enabled: false })).use(schedule({ '@daily': () => steps.push('ran') }, { enabled: false })).use(schedule('30s', () => steps.push('ran'), { enabled: false })).listen(0)
+
+    try {
+      expect(cron.fired).toEqual([])
+      expect(steps).toEqual([])
+    }
+    finally {
+      cron.restore()
+      await shutdown(app)
+    }
+  })
+
   it('runs from start to stop, its signal aborting on stop and the server waiting for it', async () => {
     const steps: string[] = []
     const app = new Elysia().use(background(async (signal) => {

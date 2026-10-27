@@ -5,6 +5,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 ## Unreleased
 
 - `sanitizeHtml` adds `noopener` to the `rel` of a link whose kept `target` is not `_self`, so a `target="_blank"` the options let through gives the page no `window.opener`: [Templates](templates-elements-slots-snippets.md).
+- `schedule` and `background` take `enabled: false` to add nothing, and `KAY_LOCK_SCHEDULES=false` stops a one-process production server locking every schedule: [Background jobs](production.md#background-jobs).
 - `waitUntil(condition, { timeout, what })` from `kay/test` polls a sync or async condition in a server test until it is truthy, and fails naming what it waited for and the last value seen: [Testing requests, jobs and sockets](testing-requests-jobs-sockets.md).
 - `cached(key, ttl, load, { stale: false })` waits for a fresh load past its ttl instead of giving the stale value, concurrent callers sharing it, and `{ fallback }` answers a value when the first load throws, logging the error and trying again a minute later at most; `cache()` takes both: [Caching](rendering.md#caching).
 - `s.UnionEnum(values)` no longer defaults to its first value: an optional enum field left out reads `undefined`, and a required one is refused instead of filled in, in an action, a page's `query`, `defineEnv` and content; pass `{ default }` for one: [Actions](actions.md).
