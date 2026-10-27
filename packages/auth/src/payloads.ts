@@ -1,4 +1,4 @@
-import type { AuthenticationResponseJSON, RegistrationResponseJSON } from '@simplewebauthn/server'
+import type { AuthenticationResponseJSON, RegistrationResponseJSON } from './webauthn'
 import { t } from 'elysia'
 
 // The parts of a browser's answer a ceremony reads, as `credential.toJSON()` writes them: a post that lacks one is refused here, and the signature and challenge are the ceremony's to check.

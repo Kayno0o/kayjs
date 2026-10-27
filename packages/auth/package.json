@@ -76,9 +76,7 @@
   },
   "dependencies": {
     "@kaynooo/utils": "^2.27.0",
-    "@simplewebauthn/server": "^14.0.3",
-    "jose": "^6.2.12",
-    "reflect-metadata": "^0.2.2"
+    "jose": "^6.2.12"
   },
   "devDependencies": {
     "@kaynooo/eslint": "^7.1.4",

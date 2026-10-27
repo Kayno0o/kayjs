@@ -1,6 +1,6 @@
-import type { AuthenticationResponseJSON } from '@simplewebauthn/server'
 import type { RequestState } from './state'
 import type { UserRecord } from './store'
+import type { AuthenticationResponseJSON } from './webauthn'
 import { comparePasswords } from '@kaynooo/utils'
 import { backOf, banned, withBack } from './core'
 import { spend } from './limits'

@@ -3,7 +3,7 @@ import { join } from 'node:path'
 import { expect, test } from 'bun:test'
 import { scratchDir } from 'kay/test'
 
-// Bun's bundler wraps what an `import()` reaches in lazy initialisers, which run a module's CommonJS imports after its ES ones: the polyfill tsyringe needs must still load first.
+// `kay build --compile` reaches passkeys through `import()`, which Bun's bundler wraps in lazy initialisers: they must load there as they do unbundled.
 test('passkeys load in a bundle reaching them through import()', async () => {
   const dir = await scratchDir('bundle-')
 

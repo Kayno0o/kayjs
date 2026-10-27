@@ -1,9 +1,9 @@
-import type { AuthenticationResponseJSON, PublicKeyCredentialCreationOptionsJSON, PublicKeyCredentialRequestOptionsJSON, RegistrationResponseJSON } from '@simplewebauthn/server'
 import type { Core } from './core'
 import type { Proof, ProofFailure } from './proof'
 import type { RequestState } from './state'
 import type { PasskeyRecord, UserRecord } from './store'
 import type { TwoFactorResult } from './twoFactor'
+import type { AuthenticationResponseJSON, PublicKeyCredentialCreationOptionsJSON, PublicKeyCredentialRequestOptionsJSON, RegistrationResponseJSON } from './webauthn'
 import { Buffer } from 'node:buffer'
 import { localPath } from 'kay'
 import { configError } from 'kay/library'
@@ -17,7 +17,7 @@ import { reprove } from './proof'
 import { endOtherSessions } from './sessions'
 import { plainName } from './text'
 import { hasWayIn, putBack } from './wayIn'
-import { generateAuthenticationOptions, generateRegistrationOptions, verifyAuthenticationResponse, verifyRegistrationResponse } from './webauthn'
+import { authenticationOptions, registrationOptions, verifyAuthentication, verifyRegistration } from './webauthn'
 
 const CHALLENGE_MAX_AGE_MS = 5 * 60 * 1000
 const NAME_MAX_LENGTH = 64
@@ -77,15 +77,12 @@ export async function passkeyRegistrationOptions(state: RequestState, proof: Pro
 
   const { record } = proved
 
-  const options = await generateRegistrationOptions({
+  const options = registrationOptions({
     rpName: relying.name,
-    rpID: relying.id,
+    rpId: relying.id,
     userName: record.email ?? record.username ?? record.id,
-    userID: Buffer.from(record.id),
-    attestationType: 'none',
-    excludeCredentials: (await state.core.store.passkeys.listByUser(record.id)).map(passkey => ({ id: passkey.id, transports: passkey.transports })),
-    // Kept on the authenticator, so it signs in without a name typed first. Signing in requires user verification, so a passkey made without it would count as a way in and never open.
-    authenticatorSelection: { residentKey: 'required', userVerification: 'required' },
+    userId: record.id,
+    exclude: (await state.core.store.passkeys.listByUser(record.id)).map(passkey => ({ id: passkey.id, transports: passkey.transports })),
   })
 
   await park(state, 'register', options.challenge, record.id)
@@ -107,32 +104,20 @@ export async function registerPasskey(state: RequestState, response: Registratio
   if (challenge === undefined)
     return { ok: false, error: 'expired' }
 
-  let verified: Awaited<ReturnType<typeof verifyRegistrationResponse>>
+  const credential = await verifyRegistration(response, { challenge, origins: relying.origins, rpId: relying.id, requireUserVerification: true })
 
-  try {
-    verified = await verifyRegistrationResponse({ response, expectedChallenge: challenge, expectedOrigin: relying.origins, expectedRPID: relying.id, requireUserVerification: true })
-  }
-  catch {
-    return { ok: false, error: 'invalid' }
-  }
-
-  if (!verified.verified)
-    return { ok: false, error: 'invalid' }
-
-  const { credential, credentialDeviceType, credentialBackedUp } = verified.registrationInfo
-
-  if (await core.store.passkeys.get(credential.id))
+  if (!credential || await core.store.passkeys.get(credential.id))
     return { ok: false, error: 'invalid' }
 
   const passkey: PasskeyRecord = {
     id: credential.id,
     userId: record.id,
     name: cleanName(name) ?? deviceName(state.userAgent),
-    publicKey: Buffer.from(credential.publicKey).toString('base64url'),
+    publicKey: credential.publicKey,
     counter: credential.counter,
-    transports: credential.transports ?? [],
-    multiDevice: credentialDeviceType === 'multiDevice',
-    backedUp: credentialBackedUp,
+    transports: credential.transports,
+    multiDevice: credential.multiDevice,
+    backedUp: credential.backedUp,
     userVerified: true,
     createdAt: new Date(),
     lastUsedAt: null,
@@ -207,7 +192,7 @@ export async function removePasskey(state: RequestState, id: string, proof: Proo
 
 // The options for `navigator.credentials.get` naming no account, so the browser offers every passkey it holds for the site, in its autofill too with `useBrowserAutofill`.
 export async function passkeySignInOptions(state: RequestState): Promise<PublicKeyCredentialRequestOptionsJSON> {
-  const options = await generateAuthenticationOptions({ rpID: relyingParty(state.core).id, userVerification: 'required' })
+  const options = authenticationOptions({ rpId: relyingParty(state.core).id, userVerification: 'required' })
 
   await park(state, 'sign-in', options.challenge, null)
 
@@ -323,9 +308,9 @@ async function userOptions(state: RequestState, record: UserRecord, purpose: 'se
   if (passkeys.length === 0)
     return { ok: false, error: 'none' }
 
-  const options = await generateAuthenticationOptions({
-    rpID: relyingParty(state.core).id,
-    allowCredentials: passkeys.map(passkey => ({ id: passkey.id, transports: passkey.transports })),
+  const options = authenticationOptions({
+    rpId: relyingParty(state.core).id,
+    allow: passkeys.map(passkey => ({ id: passkey.id, transports: passkey.transports })),
     userVerification: purpose === 'reprove' ? 'required' : relyingParty(state.core).userVerification,
   })
 
@@ -351,30 +336,17 @@ async function take(state: RequestState, purpose: PasskeyPurpose, user: string |
   return await state.core.store.attempts.hit(`passkey-challenge:${parked.challenge}`, `${CHALLENGE_MAX_AGE_MS}ms`) === 1 ? parked.challenge : undefined
 }
 
-// Whether `response` is `passkey` signing `challenge`; its counter and last use are recorded. simplewebauthn refuses a counter that did not move past the stored one, the sign of a cloned authenticator.
+// Whether `response` is `passkey` signing `challenge`; its counter and last use are recorded. A counter that did not move past the stored one, the sign of a cloned authenticator, is refused.
 async function check(core: Core, passkey: PasskeyRecord, response: AuthenticationResponseJSON, challenge: string, requireUserVerification: boolean): Promise<boolean> {
   const relying = relyingParty(core)
+  const asserted = await verifyAuthentication(response, { challenge, origins: relying.origins, rpId: relying.id, requireUserVerification }, passkey)
 
-  try {
-    const { verified, authenticationInfo } = await verifyAuthenticationResponse({
-      response,
-      expectedChallenge: challenge,
-      expectedOrigin: relying.origins,
-      expectedRPID: relying.id,
-      credential: { id: passkey.id, publicKey: Buffer.from(passkey.publicKey, 'base64url'), counter: passkey.counter, transports: passkey.transports },
-      requireUserVerification,
-    })
-
-    if (!verified)
-      return false
-
-    await core.store.passkeys.update(passkey.id, { counter: authenticationInfo.newCounter, backedUp: authenticationInfo.credentialBackedUp, ...authenticationInfo.userVerified && !passkey.userVerified && { userVerified: true }, lastUsedAt: new Date() })
-
-    return true
-  }
-  catch {
+  if (!asserted)
     return false
-  }
+
+  await core.store.passkeys.update(passkey.id, { counter: asserted.counter, backedUp: asserted.backedUp, ...asserted.userVerified && !passkey.userVerified && { userVerified: true }, lastUsedAt: new Date() })
+
+  return true
 }
 
 function cleanName(name: string | undefined): string | undefined {

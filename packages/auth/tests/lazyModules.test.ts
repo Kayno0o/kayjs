@@ -9,7 +9,7 @@ interface Loaded {
 // What each feature reads: its own modules, and the packages only it needs.
 const FEATURES = {
   password: { modules: ['password.ts'], packages: [] },
-  passkeys: { modules: ['passkeys.ts', 'webauthn.ts'], packages: ['@simplewebauthn/server'] },
+  passkeys: { modules: ['passkeys.ts', 'webauthn.ts', 'cbor.ts'], packages: [] },
   twoFactor: { modules: ['twoFactor.ts', 'totp.ts'], packages: [] },
   organizations: { modules: ['organizations.ts'], packages: [] },
   admin: { modules: ['admin.ts'], packages: [] },
@@ -75,10 +75,9 @@ describe('a feature an app does not use is not loaded', () => {
     })
   }
 
-  test('an app with no passkey and no OAuth loads neither simplewebauthn nor jose', async () => {
+  test('an app with no OAuth does not load jose', async () => {
     const result = await loaded('minimal')
 
-    expect(result.packages).not.toContain('@simplewebauthn/server')
     expect(result.packages).not.toContain('jose')
   })
 })

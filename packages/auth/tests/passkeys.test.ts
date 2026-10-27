@@ -1,6 +1,8 @@
 import type { AuthEventInfo } from '../src/events'
 import type { Proof } from '../src/proof'
+import type { Credential } from './helpers/authenticator'
 import { afterEach, describe, expect, setSystemTime, test } from 'bun:test'
+import { userHandle } from '../src/passkeys'
 import { totpCode, totpStep } from '../src/totp'
 import { testApp, userRecord } from './helpers/app'
 import { authenticator } from './helpers/authenticator'
@@ -205,6 +207,26 @@ describe('signing in with a passkey', () => {
     await app.store.passkeys.create({ ...passkey, userId: 'eve' })
 
     expect(await passkeySignIn(app.browser(), device)).toEqual({ ok: false, error: 'invalid' })
+  })
+
+  // Each key was stored by @simplewebauthn/server 14.0.3 as it registered the passkey, before kay verified passkeys itself.
+  test('a passkey registered under the previous verifier signs in, whatever its algorithm', async () => {
+    const vectors = await Bun.file(`${import.meta.dir}/helpers/webauthnVectors.json`).json() as { credentials: Record<string, Omit<Credential, 'keys'> & { privateKey: JsonWebKey, publicKey: string }> }
+    const app = await setup()
+
+    await registered(app)
+
+    const user = (await app.store.users.findByEmail('ada@example.com'))!
+
+    for (const name of ['ES256', 'RS256', 'EdDSA', 'ML-DSA-44', 'synced']) {
+      const stored = vectors.credentials[name]!
+      const device = authenticator()
+
+      await device.adopt({ ...stored, userHandle: userHandle(user.id), counter: 0 })
+      await app.store.passkeys.create({ id: stored.id, userId: user.id, name, publicKey: stored.publicKey, counter: 0, transports: ['internal'], multiDevice: false, backedUp: false, userVerified: true, createdAt: new Date(), lastUsedAt: null })
+
+      expect({ name, signedIn: await passkeySignIn(app.browser(), device) }).toMatchObject({ name, signedIn: { ok: true } })
+    }
   })
 })
 
