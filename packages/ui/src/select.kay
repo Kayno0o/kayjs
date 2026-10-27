@@ -51,13 +51,15 @@ function report(select: HTMLSelectElement) {
 const moving = signal(false)
 
 async function move(select: HTMLSelectElement) {
-  const kept = String(value)
   const choice = options.find(option => String(option.value) === select.value)
 
   heard(select.value)
 
   if (await changeAccepted('Select', () => paramChange(param, paramDefault, onChange)?.(choice === undefined ? '' as never : choice.value), moving.set))
     return
+
+  // What the app renders now, which it may have changed while the move was under way.
+  const kept = String(value)
 
   select.value = kept
   heard(kept)

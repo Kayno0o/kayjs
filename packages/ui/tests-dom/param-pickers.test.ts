@@ -72,3 +72,8 @@ test('an onChange answering false stops the move and puts the pick back', async 
   expect(await pick('?period=30d', async root => choose(root, '24h', 'refused-select'))).toBeUndefined()
   expect(mounted!.root.querySelector<HTMLSelectElement>('#refused-select')?.value).toBe('30d')
 })
+
+test('a refused Select move puts back the value the app renders now, not the one read when the pick arrived', async () => {
+  expect(await pick('?period=7d', async root => choose(root, '24h', 'stale'))).toBeUndefined()
+  expect(mounted!.root.querySelector<HTMLSelectElement>('#stale')?.value).toBe('30d')
+})

@@ -1,12 +1,16 @@
 --- client
 import Segmented from '@kaynooo/kayjs-ui/segmented.kay'
 import Select from '@kaynooo/kayjs-ui/select.kay'
+import { signal } from 'kay'
 
 const periods = ['24h', '7d', '30d'].map(value => ({ value, label: value }))
 const period = new URLSearchParams(location.search).get('period') ?? '7d'
+// The app moves the value it renders while a pick is refused.
+const shown = signal(period)
 ---
 Segmented#segmented(options={periods} value={period} param="period" paramDefault="7d" label="Period")
 Segmented#refused(options={periods} value={period} param="period" onChange={() => false} label="Refused")
 Select#refused-select(options={periods} value={period} param="period" onChange={() => false})
 Select#sizes(options={[{ value: 10, label: '10' }, { value: 25, label: '25' }]} value={25} param="size" paramDefault="25")
 Select#select(options={periods} value={period} param="period" paramDefault="7d" emptyOption="Any")
+Select#stale(options={periods} value={shown()} param="period" onChange={() => { shown = '30d'; return false }})
