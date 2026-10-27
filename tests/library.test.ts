@@ -166,6 +166,37 @@ describe('a linked kay library', () => {
   }, 120_000)
 })
 
+// Bun's isolated linker, the default of a workspace, keeps each package under `node_modules/.bun/` and links it into the app's `node_modules`, and the Tailwind plugin skips every file under `.bun/`.
+describe('a kay library in Bun\'s isolated store', () => {
+  let project: string
+
+  beforeAll(async () => {
+    project = await scratchDir('dom-')
+    projects.push(project)
+    await write(project, { ...PROJECT, 'kay.config.ts': 'import tailwind from \'bun-plugin-tailwind\'\n\nexport default { plugins: [tailwind] }\n', 'src/routes/framed.kay': '---\nimport Framed from \'kay-lib/framed.kay\'\n---\nFramed\n' })
+    await write(join(project, 'node_modules/.bun/kay-lib@1.0.0/node_modules/kay-lib'), {
+      ...LIBRARY,
+      'src/framed.kay': '---\nimport \'./framed.css\'\n---\np.framed Framed\n',
+      // As kayjs-ui's shell stylesheet starts.
+      'src/framed.css': '@import \'tailwindcss/theme.css\' layer(theme);\n@import \'tailwindcss/utilities.css\' layer(utilities) source(none);\n\n.framed {\n  @apply font-bold;\n}\n',
+    })
+    await symlink('.bun/kay-lib@1.0.0/node_modules/kay-lib', join(project, 'node_modules/kay-lib'))
+  })
+
+  it('has its stylesheets built by the app\'s Tailwind plugin', async () => {
+    const out = join(project, 'out')
+    const { code, output } = await run('build', project, '--static', '--outdir', out)
+
+    expect(output).not.toContain('error')
+    expect(code).toBe(0)
+
+    const css = (await Promise.all((await readdir(join(out, '_kay'))).filter(name => name.endsWith('.css')).map(async name => Bun.file(join(out, '_kay', name)).text()))).join('\n')
+
+    expect(css).toMatch(/\.framed\s*\{[^}]*font-weight:\s*var\(--font-weight-bold\)/)
+    expect(css).not.toContain('@apply')
+  }, 120_000)
+})
+
 // A workspace installs its packages once, in a `node_modules` above each app.
 describe('a kay library hoisted above the project', () => {
   let workspace: string

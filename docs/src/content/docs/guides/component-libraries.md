@@ -21,6 +21,8 @@ Ship the sources, not a build. List `kay` under `peerDependencies` and import fr
 
 The exports map gives each component a specifier: `import Button from 'my-ui/button.kay'`. Without it, a component is imported by its path in the package.
 
+A library installed, linked, hoisted to a workspace's root or kept in the store of Bun's isolated linker builds the same: the app's Tailwind plugin processes the library's stylesheets wherever the package lives, with no setting in the app.
+
 ## Texts in the app's languages
 
 Put the texts your components show in one folder of catalogs, one file per language, and name it in `package.json`:

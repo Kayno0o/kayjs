@@ -13,7 +13,7 @@ import { pruneCache, touchCacheFile } from './cache'
 import { collectionComponents, importedNames, rendersContent } from './collection-components'
 import { CSS_FILE, KAY_FILE, resolveFrom, SCRIPT_FILE, scriptLoader, transpilerFor } from './files'
 import { globbedFiles } from './glob'
-import { importsOf, libraryOf } from './libraries'
+import { importsOf, libraryOf, throughNodeModules } from './libraries'
 import { throughLinks } from './links'
 import { UI_FILE, uiEntryOf } from './ui'
 
@@ -27,6 +27,9 @@ const ANY = /.*/
 // What Tailwind resolves against the app's theme, which a stylesheet of its own reads through `@reference`.
 const THEME_USE = /@apply\b|@variant\b|@custom-variant\b|\btheme\(|--(?:spacing|alpha)\(/
 const SCOPED_FILE = /^[\da-z]+\.css$/
+// Where Bun's isolated linker, a workspace's default, keeps each package, linking it into the app's `node_modules`.
+const PACKAGE_STORE = /[\\/]node_modules[\\/]\.bun[\\/]/
+const MODULE_STYLESHEET = /[\\/]node_modules[\\/].*\.css$/
 // Whether this process wrote or kept a scoped stylesheet, which a full build leaves in place when it prunes.
 let scopedTouched = false
 const CSS_TEXT = 'kay-css-text'
@@ -99,7 +102,22 @@ export function styleImports(root: string, libraries: KayLibrary[] = [], loaded?
   const inProject = (path: string) => path.startsWith(project) && !path.includes(`${sep}node_modules${sep}`)
   // A kay library's components and modules are followed as the app's own are.
   const followed = (path: string) => CSS_FILE.test(path) || ((inProject(path) || libraryOf(libraries, path) !== undefined) && (KAY_FILE.test(path) || SCRIPT_FILE.test(path)))
-  const note = (importer: string, paths: string[]) => {
+  // The Tailwind plugin leaves every file under `node_modules/.bun/` to Bun's own CSS parser, so a stylesheet there reaches the bundler by the link the app reaches its package through, which `onResolve` keeps as Bun would resolve it to its real path.
+  const linkedStylesheets = new Set<string>()
+  const outsideStore = (path: string) => {
+    if (!CSS_FILE.test(path) || !PACKAGE_STORE.test(path))
+      return path
+
+    const library = libraryOf(libraries, path)
+    const linked = library === undefined ? throughLinks(root, path) : throughNodeModules(library, path)
+
+    linkedStylesheets.add(linked)
+
+    return linked
+  }
+  const note = (importer: string, found: string[]) => {
+    const paths = found.map(outsideStore)
+
     if (reached !== undefined)
       reached.edges.set(importer, [...reached.edges.get(importer) ?? [], ...paths])
 
@@ -210,6 +228,7 @@ export function styleImports(root: string, libraries: KayLibrary[] = [], loaded?
       })
       // Bun resolves a file through the listing of its directory a build of the same process still running took, which the class list written since may be missing from.
       build.onResolve({ filter: new RegExp(`^${RegExp.escape(classesFile)}$`) }, () => ({ path: classesFile }))
+      build.onResolve({ filter: MODULE_STYLESHEET }, ({ path }) => linkedStylesheets.has(path) ? { path } : undefined)
       // `url(/logo.png)` points at a public file the server serves as is.
       build.onResolve({ filter: ABSOLUTE_URL }, ({ path, importer }) => CSS_FILE.test(importer) ? { path, external: true } : undefined)
       // A font a stylesheet names is written as an asset and linked, where the bundler would inline it as a data URL in every page's stylesheet.
