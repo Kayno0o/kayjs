@@ -146,11 +146,15 @@ function namesIn(program: t.File): Set<string> {
 }
 
 const TS_MODULE = /\.[cm]?ts$/
+const JS_MODULE = /\.[cm]?js$/
 
 type Syntax = 'js' | 'ts' | 'tsx'
 
-// A project's own module is TypeScript, and TSX but for a plain `.ts`, where `<T>x` is a cast and not an element.
+// A project's own module is TypeScript, and TSX but for a plain `.ts`, where `<T>x` is a cast and not an element; a plain JavaScript one, a package's say, is read as such.
 function syntaxOf(file: string): Syntax {
+  if (JS_MODULE.test(file))
+    return 'js'
+
   return TS_MODULE.test(file) ? 'ts' : 'tsx'
 }
 

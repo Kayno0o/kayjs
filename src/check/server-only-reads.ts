@@ -60,13 +60,15 @@ export async function serverOnlyInIsland(root: string, { modules, seeds, origins
 
     const where = relative(project, module)
 
+    const text = await textOf(module)
+
     for (const origin of origins.get(module) ?? []) {
       const seed = await textOf(origin.seed)
       const at = importAt(seed, origin.specifier, KAY_FILE.test(origin.seed))
       const island = relative(project, realpathSync(origin.seed))
 
       for (const name of new Set(reads.map(read => read.name))) {
-        const line = positionAt(await textOf(module), reads.find(read => read.name === name)!.start).line
+        const line = positionAt(text, reads.find(read => read.name === name)!.start).line
 
         report(origin.seed, seed, at, `${island} reaches ${where} through its import of '${origin.specifier}', which ${readsOf(name)} at line ${line} as it loads, so the island dies as it loads`)
       }
