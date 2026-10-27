@@ -2,6 +2,9 @@ import type { Action } from '../src/runtime'
 import { join, resolve } from 'node:path'
 import { afterAll, describe, expect, it } from 'bun:test'
 import { Elysia } from 'elysia'
+import { encodeValue } from '../src/runtime/wire'
+import { FLASH_COOKIE, flashName } from '../src/server/flash'
+import { sealText } from '../src/server/stamp'
 import { testSite } from '../src/test'
 import { pages } from './shared-pages'
 
@@ -63,6 +66,31 @@ describe('the flash cookie against a request for another page', () => {
       expect(await back.text()).toContain('saved')
       expect(back.headers.getSetCookie().join()).toContain('kay_flash=;')
     }
+  })
+})
+
+describe('the flash cookie under locales and from an older kay', () => {
+  it('is left by a request for another page of the locale, and shown on the locale page it goes back to', async () => {
+    const app = new Elysia().use(await pages({ root: ROOT, prebuilt: false, security: false, i18n: { ...i18n, prefixDefault: true } }))
+    const post = await app.handle(new Request(`http://localhost${save.url}`, { method: 'POST', headers: { origin: 'http://localhost', referer: 'http://localhost/fr' }, body: new FormData() }))
+    const header = post.headers.getSetCookie().find(line => line.startsWith('kay_flash='))!
+    const cookie = header.slice(0, header.indexOf(';'))
+    const followed = { 'sec-fetch-site': 'same-origin', cookie }
+    const elsewhere = await app.handle(new Request('http://localhost/fr/other', { headers: followed }))
+
+    expect(elsewhere.status).toBe(200)
+    expect(elsewhere.headers.getSetCookie().join()).not.toContain('kay_flash')
+
+    const back = await app.handle(new Request('http://localhost/fr', { headers: followed }))
+
+    expect(await back.text()).toContain('saved')
+  })
+
+  it('shows a cookie without the page it goes back to on any page', async () => {
+    const value = sealText(FLASH_COOKIE, encodeValue({ action: save.url, succeeded: true, data: 'saved' }), flashName(false, ''))
+    const response = await sites.root.fetch('/', { headers: { cookie: `${flashName(false, '')}=${value}` } })
+
+    expect(await response.text()).toContain('saved')
   })
 })
 
