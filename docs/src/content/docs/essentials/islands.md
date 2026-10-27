@@ -277,7 +277,7 @@ To link to the current page with one param changed, use `withQuery`. It works in
 a(href={withQuery({ page: 2 })}) Next
 ```
 
-It keeps the other params, and your `base`, `trailingSlash` and locale prefix are added the way they are to any link.
+In an island it reads the address when the island renders. It keeps the other params, and your `base`, `trailingSlash` and locale prefix are added the way they are to any link.
 
 `navigate('/todos', { scroll: 'keep' })` goes to the page without scrolling to the top, and `{ transition: false }` swaps it without a view transition. A link does the same with `data-keep-scroll` and `data-no-transition`, which an element around several links can carry. The nearest `data-keep-scroll` to the link decides, so `data-keep-scroll="false"` on one link inside a keeping element scrolls to the top.
 

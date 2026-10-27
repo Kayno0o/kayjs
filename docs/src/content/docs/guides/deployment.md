@@ -130,7 +130,7 @@ The password goes into the URL as it is, so keep it to letters and digits. An ex
 
 A provider key such as kayjs-ai's `ANTHROPIC_API_KEY`, or the password in kayjs-mail's `MAIL_URL`, is a secret. Set it as an environment variable of the container, or in a `.env` next to the executable. Never put it in the image or the repository.
 
-A secret that compose or Swarm hands over as a file needs no code. Set `<NAME>_FILE` to its path, `API_KEY_FILE: /run/secrets/api_key` for `API_KEY`, and a string variable of `defineEnv` reads the file once as the server boots, without its trailing newline. Setting both the variable and the file, or naming a file that is missing or empty, stops the boot and says which.
+A secret that compose or Swarm hands over as a file needs no code. Set `<NAME>_FILE` to its path, `API_KEY_FILE: /run/secrets/api_key` for `API_KEY`, and a string variable of `defineEnv` reads the file once as the server boots, trimmed of surrounding whitespace. Setting both the variable and the file, or naming a file that is missing or empty, stops the boot and says which.
 
 `kay env` lists the variables each library reads, and which of them production requires. Name your compose file and `.env.example` in `kay.config.ts` as `env: { compose: 'compose.prod.yaml', example: '.env.example' }`, and `kay check` compares them with what the project declares ([kay env](/reference/cli#kay-env)).
 
