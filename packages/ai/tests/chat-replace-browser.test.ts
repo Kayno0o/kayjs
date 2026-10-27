@@ -618,3 +618,48 @@ it('keeps the reasoning open when the visitor opened it while the reply was writ
   expect(await page.evaluate(() => (document.querySelector('.kai-chat-reasoning') as HTMLDetailsElement).open)).toBe(true)
   expect(page.errors).toEqual([])
 }, 120_000)
+
+it('leaves the summaries of the calls of the hidden turn out of the tab order, then in it once the turn is written', async () => {
+  await using page = await site.open('/labelled-tools')
+
+  const gate = Promise.withResolvers<void>()
+  let requests = 0
+
+  testing.provider = {
+    name: 'gated',
+    model: 'm',
+    async* stream() {
+      requests++
+
+      if (requests === 1) {
+        yield { toolUse: { id: 'one', name: 'home_state', arguments: '{}' } }
+        yield { finish: 'stop' }
+
+        return
+      }
+
+      yield { text: 'Almost' }
+      await gate.promise
+      yield { text: ' done' }
+      yield { finish: 'stop' }
+    },
+  }
+
+  await page.fill('.kai-chat-form textarea', 'how is the home')
+  await page.click('.kai-chat-form .kai-chat-send')
+  await page.waitFor('.kai-chat-turn[data-pending] .kai-chat-calls-summary')
+
+  const pending = await page.evaluate(() => [...document.querySelectorAll('.kai-chat-turn[data-pending] .kai-chat-calls summary')].map(element => element.getAttribute('tabindex')))
+
+  gate.resolve()
+  await page.waitFor(LAST_REPLY, { text: 'Almost done' })
+  await page.waitFor('.kai-chat-turn[data-pending]', { gone: true })
+
+  const settled = await page.evaluate(() => [...document.querySelectorAll('.kai-chat-calls summary')].map(element => element.getAttribute('tabindex')))
+
+  expect(pending.length).toBeGreaterThan(0)
+  expect(pending.every(tabindex => tabindex === '-1')).toBe(true)
+  expect(settled.length).toBeGreaterThan(0)
+  expect(settled.every(tabindex => tabindex === null)).toBe(true)
+  expect(page.errors).toEqual([])
+}, 120_000)

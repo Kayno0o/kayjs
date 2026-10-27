@@ -30,12 +30,15 @@ export async function unknownToolLabels(root: string, options: CheckOptions): Pr
     return []
 
   const files = (await findProjectFiles(root, SOURCE_FILE, { project: true, ownKayOnly: true })).filter(file => !DECLARATION_FILE.test(file))
-  const texts = await Promise.all(files.map(async file => ({ file, source: await Bun.file(file).text() })))
-  const labelled = texts.flatMap(({ file, source }) => source.includes('toolLabels') && file.endsWith('.kay') ? labelsIn(file, source) : [])
+  const read = async (paths: string[]) => Promise.all(paths.map(async file => ({ file, source: await Bun.file(file).text() })))
+  const written = await read(files.filter(file => file.endsWith('.kay')))
+  const labelled = written.flatMap(({ file, source }) => source.includes('toolLabels') ? labelsIn(file, source) : [])
 
   if (labelled.length === 0)
     return []
 
+  // The other modules are read once a `toolLabels` is found, as only they say which tools exist.
+  const texts = [...written, ...await read(files.filter(file => !file.endsWith('.kay')))]
   const known = new Set<string>()
   const labelledFiles = new Map(labelled.map(item => [item.file, item.rest]))
 

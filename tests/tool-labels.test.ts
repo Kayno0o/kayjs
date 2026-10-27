@@ -1,6 +1,6 @@
 import { rm } from 'node:fs/promises'
 import { join } from 'node:path'
-import { expect, it } from 'bun:test'
+import { expect, it, spyOn } from 'bun:test'
 import { unknownToolLabels } from '../src/check/tool-labels'
 import { scratchDir } from './scratch'
 
@@ -36,4 +36,16 @@ it('reads only an object literal and honours the lint level', async () => {
   expect(await found({ 'src/routes/index.kay': page('labels') })).toEqual([])
   expect(await found({ 'src/routes/index.kay': page('{ nope: \'x\' }') }, { 'unknown-tool-label': 'allow' })).toEqual([])
   expect(await found({ 'src/routes/index.kay': page('{ nope: \'x\' }') })).toEqual([['index.kay', 6, 'nope']])
+})
+
+it('reads no module but the pages when none writes toolLabels', async () => {
+  const read = spyOn(Bun, 'file')
+
+  try {
+    expect(await found({ 'src/tools.ts': 'export const find = 1\n', 'src/routes/index.kay': '--- server\nconst x = 1\n---\ndiv(x)\n' })).toEqual([])
+    expect(read.mock.calls.map(([path]) => String(path)).filter(path => path.endsWith('.ts') && path.includes('tool-labels-'))).toEqual([])
+  }
+  finally {
+    read.mockRestore()
+  }
 })
