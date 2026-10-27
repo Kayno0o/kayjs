@@ -132,6 +132,8 @@ const admin = await testSite({
 })
 ```
 
+An app behind `proxy.key` is tested with `testSite({ proxyKey: 'secret' })`, which checks the key for that site only and sends it with every request, so nothing is written to `process.env`. A call's own header of the key's name wins, and `''` sends none, to see the refusal.
+
 A site made with `headers` sends them with every request. `site.as()` gives the same site more of them, and a string is a `Cookie` header, such as `auth.sessionCookie` returns.
 
 ```ts

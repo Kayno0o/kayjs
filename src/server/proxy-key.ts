@@ -1,5 +1,6 @@
 import type { Elysia } from 'elysia'
 import type { ProxyConfig } from '../config'
+import { AsyncLocalStorage } from 'node:async_hooks'
 import { readFileSync } from 'node:fs'
 import process from 'node:process'
 import { KayError } from '../compiler/errors'
@@ -13,8 +14,20 @@ import { isInternal } from './visit'
 const KEY_VARIABLE = 'KAY_PROXY_KEY'
 const KEY_FILE_VARIABLE = 'KAY_PROXY_KEY_FILE'
 
-// The key the proxy sends: `KAY_PROXY_KEY`, else the trimmed content of the file `KAY_PROXY_KEY_FILE` names; undefined when neither gives a non-empty one.
+const testKeys = new AsyncLocalStorage<string>()
+
+// Runs `boot` with `key` as the proxy key of the app it builds, whatever the environment says, so a test site checks one without writing `process.env`.
+export async function withProxyKey<T>(key: string, boot: () => Promise<T>): Promise<T> {
+  return testKeys.run(key, boot)
+}
+
+// The key the proxy sends: the one a test site was given, else `KAY_PROXY_KEY`, else the trimmed content of the file `KAY_PROXY_KEY_FILE` names; undefined when neither gives a non-empty one.
 function proxyKeyValue(): string | undefined {
+  const test = testKeys.getStore()
+
+  if (test !== undefined)
+    return test
+
   const given = process.env[KEY_VARIABLE]?.trim()
 
   if (given !== undefined && given !== '')

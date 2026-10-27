@@ -32,7 +32,8 @@ import { shutdown } from '../server/lifecycle'
 import { forgetStamps } from '../server/live'
 import { loaderRoot } from '../server/loader'
 import { memoryNotifications } from '../server/notifications'
-import { memoryRates } from '../server/protection'
+import { checkProxy, memoryRates } from '../server/protection'
+import { withProxyKey } from '../server/proxy-key'
 import { setPushLoose } from '../server/push-settings'
 import { drainQueues, memoryJobs } from '../server/queue'
 import { sendFrom } from '../server/rewrite'
@@ -78,6 +79,8 @@ export interface TestOptions extends PagesOptions {
   browser?: boolean | BrowserOptions | undefined
   // Builds the islands for the browser, unminified, into `.kay/test-client`, or `.kay/client` with `browser`, so one a browser cannot build, such as a server module reaching it, fails `testSite()` here and not only under `kay dev`; no browser needed. On unless `false`, built again only when the files under `src`, the routes or the API change.
   islands?: boolean | undefined
+  // The key the app's `proxy.key` header carries, turning the check on for this site alone, the environment left as it is: `fetch`, `visit`, `call`, `mcp` and `socket` send it by default, a call's own header of that name wins, and an empty one sends none.
+  proxyKey?: string | undefined
 }
 
 // The page, with its head and its elements read from `html`.
@@ -194,11 +197,15 @@ const BunWebSocket = NativeWebSocket as unknown as new (url: string, options: Bu
 const MAX_REDIRECTS = 10
 
 // The site's default headers, those a call gives winning by name in any case.
-function withDefaults(defaults: Record<string, string>, given: Record<string, string> | undefined): Headers {
+function withDefaults(defaults: Record<string, string>, given: Record<string, string> | undefined, keyHeader?: string): Headers {
   const headers = new NativeHeaders(defaults)
 
   for (const [name, value] of Object.entries(given ?? {}))
     headers.set(name, value)
+
+  // An empty proxy key header stands for a request that sends none.
+  if (keyHeader !== undefined && headers.get(keyHeader) === '')
+    headers.delete(keyHeader)
 
   return headers
 }
@@ -339,7 +346,13 @@ export async function testSite(options: TestOptions = {}): Promise<TestSite> {
   const client: ClientBuild = inBrowser && wanted ? wanted : { entryImports: [], islands: {}, styles: new Map(), pages: new Map(), dir: clientDir(root) }
   const browser = typeof options.browser === 'object' ? options.browser : {}
   const jar = cookieJar()
-  const pages = await buildingTestSite(jar.cookies, async () => servePages(project, () => client, true))
+  const keyHeader = options.proxyKey === undefined ? undefined : checkProxy(config.proxy)?.key
+
+  if (options.proxyKey !== undefined && keyHeader === undefined)
+    throw new Error('kay: testSite({ proxyKey }) needs the app to set `proxy.key` in kay.config.ts, the header the key travels in')
+
+  const boot = async (): Promise<Awaited<ReturnType<typeof servePages>>> => buildingTestSite(jar.cookies, async () => servePages(project, () => client, true))
+  const pages = await (options.proxyKey === undefined ? boot() : withProxyKey(options.proxyKey, boot))
   const locals = options.locals
   const before = [...options.use ?? [], ...locals ? [new Elysia().derive({ as: 'global' }, async ({ request }) => locals(request))] : []]
   const app = before.length === 0 ? pages : before.reduce<AnyElysia>((served, plugin) => served.use(plugin), new Elysia()).use(pages)
@@ -395,7 +408,7 @@ export async function testSite(options: TestOptions = {}): Promise<TestSite> {
     const send = async (path: string, init: Omit<RequestInit, 'headers'> & VisitInit): Promise<Response> => {
       const url = new NativeURL(path, ORIGIN)
       const routed = routerPath(url.pathname, base)
-      const request = new NativeRequest(new NativeURL(routed + url.search, ORIGIN), { ...init, headers: withDefaults(defaults, init.headers), redirect: 'manual' })
+      const request = new NativeRequest(new NativeURL(routed + url.search, ORIGIN), { ...init, headers: withDefaults(defaults, init.headers, keyHeader), redirect: 'manual' })
 
       sendFrom(request, address)
 
@@ -404,7 +417,7 @@ export async function testSite(options: TestOptions = {}): Promise<TestSite> {
 
     // What a socket's upgrade carries: the site's headers, the cookies so far and the call's own.
     const upgradeHeaders = (url: string, given: Record<string, string> | undefined): Record<string, string> => {
-      const headers = withDefaults(defaults, given)
+      const headers = withDefaults(defaults, given, keyHeader)
 
       const cookie = withKept(headers.get('cookie'), jar.header(joinBase(base, url)))
 
@@ -687,7 +700,7 @@ export async function testSite(options: TestOptions = {}): Promise<TestSite> {
     }
   }
 
-  const site = scoped(options.headers ?? {})
+  const site = scoped({ ...options.headers, ...keyHeader !== undefined && options.proxyKey !== undefined && { [keyHeader]: options.proxyKey } })
 
   forget = closeAfterTests(site.close)
 

@@ -161,6 +161,7 @@ it('shows why a todo was refused', async () => {
 ```
 
 - `site.visit(path)` GETs a page and follows redirects, stopping at one to another site.
+- `testSite({ proxyKey: 'secret' })` of an app setting `proxy.key` turns the key check on for that site alone, with no `KAY_PROXY_KEY` written to `process.env`: `fetch`, `visit`, `call`, `mcp` and `socket` send the key in the header `proxy.key` names, a call's own header of that name wins (`{ headers: { 'x-upstream-key': 'wrong' } }`), and `''` sends none, so `await site.fetch('/', { headers: { 'x-upstream-key': '' } })` reads the 403.
 - A project setting no `site`, nor `SITE_URL`, is served as `http://localhost`, so a page reading `siteUrl()` or `siteOrigin()` renders as it does in production.
 - `site.submit(action, fields, { from })` posts a form without JavaScript, as multipart with any `File` among its fields, and follows it back to its page, or reads the page a refused post renders.
 - `from` may be a page `visit` or `submit` resolved with instead of a path: the post goes where its form posts, from the URL the browser shows it at.
