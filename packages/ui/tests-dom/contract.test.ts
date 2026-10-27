@@ -157,8 +157,11 @@ const NAMED = 'button, a[href], input:not([type="hidden"]), select, textarea, [r
 // Bell reads the signed-in visitor from the request, which this fixture has none of: the root tests/inbox*.test.ts draw it.
 const NEEDS_A_VISITOR = new Set(['bell', 'bell-inbox'])
 
+// RelativeTime reads the request's locale, which this fixture has none of: tests/fixture/tests/site.test.ts and tests-dom/relative-time.test.ts draw it.
+const NEEDS_A_LOCALE = new Set(['relative-time'])
+
 test('every component the library exports has fixture props', () => {
-  const exported = readdirSync(join(import.meta.dir, '..', 'src')).filter(file => file.endsWith('.kay')).map(file => file.slice(0, -4)).filter(name => !NEEDS_A_VISITOR.has(name)).sort()
+  const exported = readdirSync(join(import.meta.dir, '..', 'src')).filter(file => file.endsWith('.kay')).map(file => file.slice(0, -4)).filter(name => !NEEDS_A_VISITOR.has(name) && !NEEDS_A_LOCALE.has(name)).sort()
 
   expect(Object.keys(CASES).sort()).toEqual(exported)
 })

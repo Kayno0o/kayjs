@@ -2,6 +2,12 @@
 
 What each minor release breaks, and what an app changes to move to it. kay and its libraries share one version, so one section covers them all; a patch breaks nothing, and a minor missing here broke nothing.
 
+## 1.80.0
+
+### A Button that is disabled with a `data-tooltip` is `aria-disabled`, not `disabled`
+
+- So its reason reaches the keyboard, the button no longer matches `:disabled`: a stylesheet or a test reading `button:disabled` or `toBeDisabled()` on it reads `[aria-disabled='true']` instead, and a locked `type="submit"` button turns `type="button"`. A hand `span(data-tooltip tabindex="0")` wrapped around such a button can go, or become kayjs-ui's `Tooltip`, which `kay check --fix` writes (`hand-tooltip`). No lint can recognise the old form, as `disabled` with a tooltip is valid markup.
+
 ## 1.78.0
 
 ### A stylesheet setting a Button's shell variables renames them

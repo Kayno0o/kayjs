@@ -12,4 +12,4 @@ The text keeps ticking in the browser, every second under a minute away, every m
 
 ## Wording
 
-`options` takes what `Intl.RelativeTimeFormat` does, such as `{ style: 'short' }` for `3 hr. ago`. `dateOptions` takes what `Intl.DateTimeFormat` does for the tooltip, `{ dateStyle: 'long', timeStyle: 'short' }` by default. The tooltip is in the reader's time zone once the page loads, unless `dateOptions` sets `timeZone`.
+`options` takes what `Intl.RelativeTimeFormat` does, such as `{ style: 'short' }` for `3 hr. ago`. `dateOptions` takes what `Intl.DateTimeFormat` does for the tooltip, `{ dateStyle: 'long', timeStyle: 'short' }` by default. The tooltip is written in the time zone of the machine formatting it, the server's for the page as served, so set `timeZone` to pin one.

@@ -6,12 +6,12 @@ import { recipe } from 'kay'
 const look = recipe({ parts: { root: 'kui-tooltip-target' } })
 
 const { text, placement, ...rest } = props<Omit<JSX.IntrinsicElements['span'], 'class' | 'tabindex'> & {
-  // What the tooltip says, shown by TooltipHost as the pointer or the keyboard lands on the element.
-  text: string
+  // What the tooltip says, shown by TooltipHost as the pointer or the keyboard lands on the element. Without one the span is plain text, no tab stop.
+  text?: string | undefined
   // Where it sits, as a CSS `position-area`: `top` by default, or `bottom`, `left`, `right`.
   placement?: string | undefined
 }>()
 ---
 // Text carrying a tooltip, which the keyboard reaches as the pointer does: a `span` with `data-tooltip` alone is not a tab stop.
-span(part="root" {...rest} tabindex="0" data-tooltip={text} data-tooltip-placement={placement})
+span(part="root" {...rest} tabindex={text ? '0' : undefined} data-tooltip={text || undefined} data-tooltip-placement={placement})
   slot

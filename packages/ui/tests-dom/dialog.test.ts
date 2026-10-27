@@ -204,7 +204,7 @@ describe('ConfirmDelete', () => {
     const root = await dialogs(async () => promise)
     const trigger = root.querySelector<HTMLButtonElement>('.kui-icon-btn[aria-label="Remove"]')!
     const armed = () => root.querySelector('[data-part=armed]')
-    const buttons = () => [...armed()?.querySelectorAll('button') ?? []].map(button => [button.textContent || button.getAttribute('aria-label'), button.disabled])
+    const buttons = () => [...armed()?.querySelectorAll('button') ?? []].map(button => [button.textContent || button.getAttribute('aria-label'), button.disabled || button.getAttribute('aria-disabled') === 'true'])
 
     expect(root.querySelectorAll('dialog')).toHaveLength(18)
 

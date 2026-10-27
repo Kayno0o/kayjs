@@ -11,6 +11,7 @@ const NAMING = ['aria-label', 'aria-labelledby', 'title']
 const HEADING = /^h([1-6])$/
 const UI_IMPORT = /^import\b[^\n]*['"]@kaynooo\/kayjs-ui\/[^'"\n]*['"];?[ \t]*$/gm
 const TOOLTIP_IMPORT = /^import\s+Tooltip\s+from\s+['"]@kaynooo\/kayjs-ui\/tooltip\.kay['"]/m
+const WHITESPACE_CHAR = /\s/
 const TOOLTIP_NAME = /\bTooltip\b/
 // What gives an element content a screen reader reads, besides text.
 const CONTENT_ATTRIBUTES = ['innerHTML', 'textContent', 'innerText']
@@ -267,7 +268,8 @@ export function accessibilityLints(file: KayFile): Diagnostic[] {
 
     const placement = attribute(element, 'data-tooltip-placement')
 
-    if (placement?.kind === 'boolean' || !file.script)
+    // A spread keeps its place among the attributes only on an element, so `{...rest}` after `tabindex` would win over a prop of the component.
+    if (placement?.kind === 'boolean' || !file.script || spread(element))
       return undefined
 
     const script = text(file.script)
@@ -291,12 +293,17 @@ export function accessibilityLints(file: KayFile): Diagnostic[] {
     const end = index.value.end + (source[index.value.end] === '"' || source[index.value.end] === '\'' ? 1 : 0)
     let start = index.name.start
 
-    while (start > 0 && (source[start - 1] === ' ' || source[start - 1] === '\n'))
+    while (start > 0 && WHITESPACE_CHAR.test(source[start - 1]!))
       start--
 
+    // Opening the list, it takes the whitespace after it instead.
     if (source[start - 1] === '(') {
-      start = index.name.start
-      edits.push({ start, end: end + (source[end] === ' ' ? 1 : 0), text: '' })
+      let after = end
+
+      while (WHITESPACE_CHAR.test(source[after] ?? ''))
+        after++
+
+      edits.push({ start: index.name.start, end: after, text: '' })
     }
     else {
       edits.push({ start, end, text: '' })

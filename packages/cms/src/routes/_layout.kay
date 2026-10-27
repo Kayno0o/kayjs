@@ -1,6 +1,7 @@
 --- server
 import Toaster from '@kaynooo/kayjs-ui/toaster.kay'
 import TooltipHost from '@kaynooo/kayjs-ui/tooltip-host.kay'
+import Tooltip from '@kaynooo/kayjs-ui/tooltip.kay'
 import SignOut from '../components/sign-out.kay'
 import { localize } from 'kay/i18n'
 import { wording } from 'kay/words'
@@ -37,7 +38,7 @@ const inContent = SCREENS_OF_CONTENT.test(ctx.url.pathname)
       a(href={screenPath(prefix)} aria-current={inContent ? 'true' : undefined}) {wording('cms.admin.content', 'Content')}
       if denied.redirects as reason
         // A disabled link, with the reason a keyboard reaches too.
-        span.kcms-admin-refused(data-tooltip={reason} tabindex="0" aria-disabled="true") {wording('cms.missing.title', 'Missing pages')}
+        Tooltip.kcms-admin-refused(text={reason} aria-disabled="true") {wording('cms.missing.title', 'Missing pages')}
       else
         a(href={screenPath(prefix, '/not-found')}) {wording('cms.missing.title', 'Missing pages')}
       a(href={screenPath(prefix, '/media')}) {wording('cms.admin.media', 'Media')}
