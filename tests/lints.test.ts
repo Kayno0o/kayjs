@@ -660,6 +660,19 @@ describe('signal-set-call on a signal kay exports', () => {
     ])
   })
 
+  it('assigns it as the fix', () => {
+    const source = page('consent.set(\'no\')')
+    const edits = found(source).flatMap(d => d.fixes![0]!.edits).sort((a, b) => b.start - a.start)
+
+    expect(edits.reduce((text, edit) => text.slice(0, edit.start) + edit.text + text.slice(edit.end), source)).toBe(page('consent = \'no\'').replace('consent.set(\'yes\')', 'consent = \'yes\''))
+  })
+
+  it('leaves a type import, a namespace import and a shadowing parameter', () => {
+    expect(found('---\nimport type { consent } from \'kay/analytics\'\nconsent.set(\'no\')\n---\np x\n')).toEqual([])
+    expect(found('---\nimport * as analytics from \'kay/analytics\'\nanalytics.consent.set(\'no\')\n---\np x\n')).toEqual([])
+    expect(found('---\nimport { consent } from \'kay/analytics\'\nfunction step(consent: { set: (value: string) => void }) {\n  consent.set(\'no\')\n}\n---\np {consent()}\n')).toEqual([])
+  })
+
   it('follows an alias and leaves another module and another name', () => {
     expect(found('---\nimport { consent as answer } from \'kay/analytics\'\nanswer.set(\'no\')\n---\np x\n').map(d => d.message)).toEqual(['`answer` is a signal, written by assigning it'])
     expect(found('---\nimport { consent } from \'./mine\'\nimport { analytics } from \'kay/analytics\'\nconsent.set(\'no\')\nanalytics.set(1)\n---\np x\n')).toEqual([])

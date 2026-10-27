@@ -18,7 +18,7 @@ import { testRoot } from './root'
 export interface Mounted<Props = Record<string, unknown>> extends Interactions {
   // The element the component rendered into, last in `document.body`.
   root: HTMLElement
-  // Gives the component new values for some of its props, as a parent re-rendering would, and settles once it followed them.
+  // Gives the component new values for some of its props, as a parent re-rendering would, and settles once it followed them; after `unmount()` it does nothing.
   setProps: (props: Partial<Props>) => Promise<void>
   // Disposes of the component, running its cleanups once, and removes the element.
   unmount: () => void
@@ -70,9 +70,9 @@ async function registerDom(): Promise<void> {
   }
 }
 
-// What `mountComponent(Component, props)` takes the props of: required unless the component takes none or all optional.
 type PropsOf<Component> = Component extends (props: infer Props) => unknown ? Props : never
 
+// What `mountComponent(Component, props)` takes the props of: required unless the component takes none or all optional.
 type MountArguments<Component> = Component extends (props: infer Props) => unknown ? (Record<never, never> extends Props ? [props?: Props] : [props: Props]) : never
 
 // The file each server component the loader built under `bun test` comes from.
@@ -122,6 +122,9 @@ export async function mountComponent(source: (props: never) => unknown, ...given
   await settle()
 
   return { root: element, ...interactions(element, settle), setProps: async (next) => {
+    if (!mounted)
+      return
+
     setProps(next)
     await settle()
   }, unmount: () => {

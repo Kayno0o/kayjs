@@ -27,6 +27,8 @@ const ASSIGNABILITY = 2322
 // `Type 'Element' is not assignable to type '((item: string) => Element) | undefined'`: the parameters are what is captured.
 const BLOCK_NAME = /^[\w$-]+/
 const PARAMETER_NAME = /(?:^|, )(\.\.\.)?([\w$]+)\??:/g
+const UNREADABLE = /args_\d|[{[(<]/
+const UNNAMED = /args_\d+: /g
 const BLOCK_TYPE = /^Type 'Element' is not assignable to type '\(?\((.*?)\) => Element\)?/
 const LEADING_NAME = /^[a-z_$][\w$]*/i
 const MEMBER_OF = /([a-z_$][\w$]*)\??\.$/i
@@ -82,6 +84,10 @@ function blockWithoutParameters(diagnostic: TsgoDiagnostic, source: string, span
 
   if (name === undefined || parameters === undefined)
     return undefined
+
+  // Unnamed tuple elements print as `args_0`, and nested types would break the names read off the text, so those only say what the block is called with.
+  if (UNREADABLE.test(parameters))
+    return `the component calls \`@${name}\` with parameters, (${parameters.replace(UNNAMED, '')}): write the block with them, as \`@${name}(...)\``
 
   return `the component calls \`@${name}\` with (${parameters}): write it with them, as \`@${name}(${[...parameters.matchAll(PARAMETER_NAME)].map(match => `${match[1] ?? ''}${match[2]}`).join(', ')})\``
 }

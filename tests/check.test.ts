@@ -937,6 +937,24 @@ describe.concurrent('kay check, edge cases', () => {
     }
   })
 
+  it('names the parameters of a block written without them by their types when the tuple is unnamed, and by name for several', async () => {
+    const list = (type: string) => `---\nimport type { Snippet } from "kay"\nconst { row } = props<{ row: Snippet<${type}> }>()\n---\np\n  | {row("a", 1)}\n`
+    const page = '---\nimport List from "../list.kay"\n---\nList\n  @row\n    b plain\n'
+    const helps = async (type: string) => {
+      const root = await scratchProject({ 'src/list.kay': list(type), 'src/routes/index.kay': page })
+
+      try {
+        return (await check(root)).map(d => d.help)
+      }
+      finally {
+        await rm(root, { recursive: true, force: true })
+      }
+    }
+
+    expect(await helps('[item: string, index: number]')).toEqual(['the component calls `@row` with (item: string, index: number): write it with them, as `@row(item, index)`'])
+    expect(await helps('[string, number]')).toEqual(['the component calls `@row` with parameters, (string, number): write the block with them, as `@row(...)`'])
+  })
+
   it('tells to call a signal it does not see made where its value goes', async () => {
     const root = await scratchProject({
       'src/accent.ts': 'import { signal } from \'kay\'\n\nconst made = signal(\'red\')\n\nexport { made as accent }\n',

@@ -252,8 +252,10 @@ class RewriteFinder {
         this.signalBinding(binding, name, kind)
     }
 
-    for (const binding of Object.values(path.scope.bindings))
-      this.reportKaySignalSet(binding)
+    if (this.input.check) {
+      for (const binding of Object.values(path.scope.bindings))
+        this.reportKaySignalSet(binding)
+    }
   }
 
   // A signal `kay` exports is written through `.set` as the ones a module declares are, though reads and writes of it are left to the types.
