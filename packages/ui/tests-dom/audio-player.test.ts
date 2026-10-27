@@ -181,6 +181,82 @@ test('the transcript follows the playback, marks the cue playing under its chapt
   expect([audio.currentTime, audio.paused]).toEqual([10, false])
 })
 
+// happy-dom lays nothing out: a folded box has no height, an open one shows two cues of a column where each is 50 high.
+function layOut(box: HTMLElement, buttons: HTMLElement[]) {
+  const details = box.closest('details')!
+
+  Object.defineProperty(box, 'clientHeight', { get: () => details.open ? 100 : 0, configurable: true })
+
+  for (const [index, button] of buttons.entries()) {
+    Object.defineProperty(button, 'offsetTop', { value: index * 50, configurable: true })
+    Object.defineProperty(button, 'offsetHeight', { value: 20, configurable: true })
+  }
+}
+
+test('opening the transcript brings the cue playing into view', async () => {
+  const { player, part, move } = await players()
+  const box = part('transcript')[0]!
+
+  layOut(box, part('cue'))
+  await move(95)
+  expect(box.scrollTop).toBe(0)
+
+  const details = player.querySelector('details')!
+
+  details.open = true
+  details.dispatchEvent(new Event('toggle'))
+  await settle()
+  expect(box.scrollTop).toBe(3 * 50 - 40)
+})
+
+test('a hand scroll is left alone until a cue changes after it', async () => {
+  const { part, move } = await players()
+  const box = part('transcript')[0]!
+
+  box.closest('details')!.open = true
+  layOut(box, part('cue'))
+  await move(15)
+  box.dispatchEvent(new Event('wheel', { bubbles: true }))
+  box.scrollTop = 0
+  await move(35)
+  expect(box.scrollTop).toBe(0)
+
+  const realNow = Date.now
+
+  Date.now = () => realNow() + 5000
+  try {
+    await move(100)
+    await move(5)
+    expect(box.scrollTop).toBe(0)
+    await move(95)
+    expect(box.scrollTop).toBe(3 * 50 - 40)
+  }
+  finally {
+    Date.now = realNow
+  }
+})
+
+test('the cues are one tab stop, the cue playing, and the arrows go between them', async () => {
+  const { part, move } = await players()
+  const cues = part('cue')
+
+  expect(cues.map(cue => cue.tabIndex)).toEqual([0, -1, -1, -1])
+  await move(35)
+  expect(cues.map(cue => cue.tabIndex)).toEqual([-1, -1, 0, -1])
+
+  const press = (cue: HTMLElement, key: string) => cue.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true }))
+
+  cues[2]!.focus()
+  press(cues[2]!, 'ArrowRight')
+  await settle()
+  expect([document.activeElement === cues[3], cues.map(cue => cue.tabIndex)]).toEqual([true, [-1, -1, -1, 0]])
+
+  press(cues[3]!, 'ArrowRight')
+  press(cues[3]!, 'Home')
+  await settle()
+  expect(document.activeElement === cues[0]).toBe(true)
+})
+
 test('the lock screen shows the chapter playing and skips between chapters', async () => {
   const { audio, move } = await players()
 

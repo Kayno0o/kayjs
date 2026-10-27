@@ -13,6 +13,7 @@ import { wording } from 'kay/words'
 // How far a position the parent passes may sit from the audio's own before the player seeks to it, and how long a position the player reported counts as the parent echoing it back, which never seeks: an echo arrives after the audio has moved on.
 const FOLLOW_SECONDS = 1
 const ECHO_MS = 1000
+const HAND_MS = 4000
 const WEB = /^https?:\/\//
 
 // 'kui-audio-player' stays as the component's name for an app's CSS. The chapter playing and the cue playing are marked by aria-current.
@@ -89,6 +90,9 @@ const current = memo(() => chapterAt(chapters, at()))
 const cueNow = memo(() => cueAt(cues, at()))
 const groups = memo(() => cuesByChapter(chapters, cues))
 let transcript: HTMLElement | undefined
+let handScrolled = 0
+// The cue the reader last focused, which holds the tab stop.
+const focused = signal<number>()
 let reported: number | undefined
 // The positions reported to the parent lately, with when.
 const told = new Map<number, number>()
@@ -140,18 +144,52 @@ effect(() => {
   reported = now
 })
 
-// The cue playing is kept in view inside the transcript, which scrolls on its own and never moves the page.
-effect(() => {
-  const cue = cueNow()
+// The cue playing is kept in view inside the transcript, which scrolls on its own and never moves the page. A folded transcript has no height to scroll, so opening it brings the cue in.
+function follow() {
   const box = transcript
-  const line = box?.querySelector<HTMLElement>(`[data-index="${cue}"]`)
+  const line = box?.querySelector<HTMLElement>(`[data-index="${cueNow()}"]`)
 
-  if (!box || !line)
+  if (!box || !line || box.clientHeight === 0)
     return
 
   if (line.offsetTop < box.scrollTop || line.offsetTop + line.offsetHeight > box.scrollTop + box.clientHeight)
     box.scrollTop = line.offsetTop - (box.clientHeight - line.offsetHeight) / 2
+}
+
+// A reader scrolling by hand is left alone for a while: the cue that changes after it brings the transcript back.
+effect(() => {
+  cueNow()
+
+  if (Date.now() - handScrolled >= HAND_MS)
+    follow()
 })
+
+function scrolledByHand() {
+  handScrolled = Date.now()
+}
+
+// One tab stop for all the cues, the cue playing until the reader moves to another, and the arrows go between them.
+const stop = () => focused() ?? Math.max(cueNow(), 0)
+
+function between(event: KeyboardEvent) {
+  const keys = ['ArrowLeft', 'ArrowUp', 'ArrowRight', 'ArrowDown', 'Home', 'End']
+
+  if (!keys.includes(event.key))
+    return
+
+  const buttons = [...(transcript?.querySelectorAll<HTMLElement>('[data-index]') ?? [])]
+  const from = buttons.indexOf(event.target as HTMLElement)
+
+  if (from === -1)
+    return
+
+  event.preventDefault()
+  scrolledByHand()
+
+  const to = event.key === 'Home' ? 0 : event.key === 'End' ? buttons.length - 1 : Math.min(Math.max(from + (event.key === 'ArrowLeft' || event.key === 'ArrowUp' ? -1 : 1), 0), buttons.length - 1)
+
+  buttons[to]?.focus()
+}
 
 // A play interrupted by a pause or a new source rejects with an AbortError, which is no failure.
 async function start(audio: HTMLAudioElement) {
@@ -295,12 +333,12 @@ div(part="root" {...rest})
             span(part="actions")
               | {actions(chapter, index)}
   if cues.length > 0
-    CollapsibleSection(title={transcriptLabel} open={false})
-      div(part="transcript" ref={element => transcript = element})
+    CollapsibleSection(title={transcriptLabel} open={false} onToggle={event => { if (event.currentTarget.open) follow() }})
+      div(part="transcript" ref={element => transcript = element} onWheel={scrolledByHand} onTouchMove={scrolledByHand} onPointerDown={event => { if (event.target === event.currentTarget) scrolledByHand() }} onKeyDown={between})
         for group of groups() key={group.chapter}
           div(part="group")
             if chapters[group.chapter]
               p(part="groupTitle") {chapters[group.chapter]!.title}
             p(part="cues")
               for cue, offset of group.cues key={offset}
-                button(part="cue" type="button" data-index={group.first + offset} aria-current={group.first + offset === cueNow() ? 'true' : undefined} onClick={() => void seek(cue.start, true)}) {`${cue.text} `}
+                button(part="cue" type="button" data-index={group.first + offset} tabindex={group.first + offset === stop() ? '0' : '-1'} onFocus={() => focused = group.first + offset} aria-current={group.first + offset === cueNow() ? 'true' : undefined} onClick={() => void seek(cue.start, true)}) {`${cue.text} `}
