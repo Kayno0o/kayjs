@@ -30,11 +30,16 @@ function status(call: ToolCall) {
 // The calls in one line, each tool once with its count: `Searched the docs x2, read_page`, ended by the status of what is not done.
 function summary() {
   const counts = new Map<string, number>()
+  const labelled = new Map<string, string>()
 
-  for (const call of calls)
+  for (const call of calls) {
     counts.set(call.name, (counts.get(call.name) ?? 0) + 1)
 
-  const line = [...counts].map(([name, count]) => `${labels[name] ?? name}${count > 1 ? ` x${count}` : ''}`).join(', ')
+    if (call.label !== undefined)
+      labelled.set(call.name, call.label)
+  }
+
+  const line = [...counts].map(([name, count]) => `${labels[name] ?? labelled.get(name) ?? name}${count > 1 ? ` x${count}` : ''}`).join(', ')
   const failed = calls.some(call => call.status === 'failed' && call.approval === undefined)
   const held = calls.some(call => call.approval !== undefined)
 

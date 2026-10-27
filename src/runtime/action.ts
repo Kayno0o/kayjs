@@ -147,6 +147,8 @@ export interface ActionTool {
   name?: string | undefined
   // What the agent reads of it to choose it.
   description?: string | undefined
+  // What a library showing the calls to a visitor calls it, `Read the home` for `home_state`: kayjs-ai's `Chat` names the call with it. An agent never reads it.
+  label?: string | undefined
   // The action only reads: an agent may run it without asking anyone. Left out, a library asking the visitor before it runs a model's tool call, as kayjs-ai's `Chat` does, asks for this one.
   readOnly?: boolean | undefined
 }

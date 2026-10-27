@@ -1,0 +1,7 @@
+--- server
+import { labelled } from './tools.kay'
+--- script
+import Chat from '@kaynooo/kayjs-ai/chat.kay'
+---
+h1 Labelled tools
+Chat(action={labelled} label="Assistant")

@@ -530,6 +530,8 @@ export interface LibraryTool {
   inputSchema: object
   // Whether the action set `tool: { readOnly: true }`; a tool built by hand that leaves it out is taken to write.
   readOnly?: boolean | undefined
+  // The `label` of the action's `tool`, the words a library shows a visitor for a call to it.
+  label?: string | undefined
   // Runs the action as the visitor `request` came from, the one being answered unless given, through the whole app: its guards, validation and rate limits apply as on a form post, while the honeypot, minimum time and proof of work, which only a person filling in a form passes, are skipped.
   // A request a browser sent from another site is refused, as `/mcp` refuses it, since it carries the visitor's cookies whatever its method.
   // A call made once the answer is sent, from a reply streaming on, passes the request it captured while it was answered.
@@ -580,6 +582,7 @@ function toolFor(action: ServerAction<TSchema, unknown, string>, url: string): L
     description: tool.description,
     inputSchema: tool.inputSchema,
     readOnly: settings.readOnly === true,
+    ...typeof settings.label === 'string' && settings.label !== '' && { label: settings.label },
     call: async (args, request = currentRequest()) => {
       const app = ((request && answeringApps.get(request)) ?? fallbackApp)?.deref()
 

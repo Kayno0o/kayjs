@@ -17,6 +17,8 @@ interface OfferedBase {
   name: string
   description: string
   inputSchema: object
+  // The words a chat shows for a call to it.
+  label?: string | undefined
 }
 
 // An action, run as the visitor, or a function tool, run with no visitor: its input already checked, it answers the text the model reads.
@@ -265,7 +267,8 @@ export async function* converse(provider: Provider, base: ProviderRequest, offer
     const sent = new Map<string, Record<string, unknown>>()
 
     for (const [index, use] of uses.entries()) {
-      const call: ToolCall = { id: use.id, name: use.name, input: {}, status: 'running' }
+      const label = tools.get(use.name)?.label
+      const call: ToolCall = { id: use.id, name: use.name, ...label !== undefined && { label }, input: {}, status: 'running' }
       const parsed = parseInput(use.arguments)
 
       if ('input' in parsed) {

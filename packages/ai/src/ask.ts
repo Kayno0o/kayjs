@@ -134,7 +134,7 @@ function offer(actions: readonly (ToolAction | FunctionTool)[]): Offered[] {
     if (!tool)
       throw configError(`tools[${index}] cannot be a tool: an action taking a file, one of a page with params or one with \`tool: false\` is none; a function tool is made with tool()`)
 
-    offered.push({ name: tool.name, description: tool.description, inputSchema: tool.inputSchema, tool })
+    offered.push({ name: tool.name, description: tool.description, inputSchema: tool.inputSchema, ...tool.label !== undefined && { label: tool.label }, tool })
   }
 
   return offered

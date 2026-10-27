@@ -100,7 +100,7 @@ A page, with or without a `server` fence, hands the action straight to `Chat`. T
 - Stop, or Escape anywhere in the chat, ends the reply. The words that came stay, marked as stopped. Stopped before the first word, the message goes back to the field.
 - A screen reader hears each finished turn once, not word by word, and each tool call as it starts and ends.
 - An empty chat says `greeting` and offers the `suggestions` you give it, a few questions that send on a click.
-- The visitor's messages are bubbles at the right; answers take the full width. The tools a reply used fold into one muted line, such as `Searched the docs x2, Read a page`, which opens to the list; `toolLabels` words each tool, `{ search_docs: 'Searched the docs' }`, and a tool without one shows its name.
+- The visitor's messages are bubbles at the right; answers take the full width. The tools a reply used fold into one muted line, such as `Searched the docs x2, Read a page`, which opens to the list; an action words its own calls with `tool: { label: 'Searched the docs' }`, `toolLabels` words a tool by its name instead, `{ search_docs: 'Searched the docs' }`, and a tool without either shows its name.
 - Send and Stop are round icon buttons, `@sendIcon` and `@stopIcon` replacing the arrow and the square, which are kayjs-ui icon slots (`send`, `stop`, `chat`, `expand`, `collapse`) an app restyles through `settings.icons`.
 - A table wider than the chat scrolls sideways inside it, and the keyboard can scroll it.
 - A message the action's schema refuses (422) goes back to the field, also when it was a retry, and the refusal's message shows.
@@ -345,7 +345,7 @@ An action that changes something does not run on the model's word (a function to
 
 The row shows the tool and its arguments, so the visitor sees what they allow. Allow sends the visitor's next message with a signed ticket for that exact call, which lets it run once: it expires after 10 minutes, is spent when used, and is read only from the visitor's last message, so text a tool returned cannot allow anything. Set `KAY_SECRET` so every process of the app can read a ticket.
 
-A tool that only reads says so, `tool: { description: 'Looks a note up', readOnly: true }`, and runs at once. Pass `confirm: false` to run every tool without asking, for an app that asks elsewhere.
+A tool names its calls for the chat with `tool: { label: 'Read the home' }`, which the model never sees. A tool that only reads says so, `tool: { description: 'Looks a note up', readOnly: true }`, and runs at once. Pass `confirm: false` to run every tool without asking, for an app that asks elsewhere.
 
 The arguments travel in the message, so leave room for them in the `content` your schema allows.
 

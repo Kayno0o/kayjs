@@ -628,6 +628,14 @@ export const LINTS = {
     wrong: '@theme { --color-kui-canvas: #fff; }\n.card { color: var(--color-kui-muted); @apply bg-kui-surface2; }',
     right: '@theme { --color-background: #fff; }\n.card { color: var(--color-muted); @apply bg-border; }',
   },
+  'unknown-tool-label': {
+    level: 'warn',
+    group: 'code',
+    site: true,
+    summary: 'A key of a `toolLabels={{ ... }}` object literal on kayjs-ai\'s `Chat` that names no tool of the project: a tool is named by its export in snake case (`homeState` is `home_state`), by `tool: { name }` or by the `name` of a `tool()`, so a key matching none of them, nor any string the project\'s modules write, is a tool that was renamed or never was, and its calls show the raw name. `tool: { label }` on the action names its calls with no key to keep in step. Only `.kay` files with an object literal are read.',
+    wrong: '--- server\nimport { assistant } from \'./_actions.kay\'\n--- script\nimport Chat from \'@kaynooo/kayjs-ai/chat.kay\'\n---\nChat(action={assistant} toolLabels={{ home_stat: \'Read the home\' }})',
+    right: '--- server\nimport { assistant } from \'./_actions.kay\'\n--- script\nimport Chat from \'@kaynooo/kayjs-ai/chat.kay\'\n---\nChat(action={assistant})',
+  },
   // Its examples escape the call's parenthesis, as kay finds public fields by their text under an app's src, and kay's own tests build this repo as an app.
   'public-env-outside-src': {
     level: 'warn',

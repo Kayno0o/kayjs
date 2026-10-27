@@ -15,7 +15,7 @@ export function tool<const Schema extends TSchema>(options: FunctionToolOptions<
   if (typeof options !== 'object' || options === null || typeof options.name !== 'string' || !NAME.test(options.name) || typeof options.description !== 'string' || options.description === '' || typeof options.run !== 'function' || typeof options.input !== 'object' || options.input === null)
     throw configError('tool takes { name, description, input, run }: a name of letters, digits, _ and - up to 64 characters, a description, a schema s.Object({ ... }) and the function to run')
 
-  const made = Object.freeze({ name: options.name, description: options.description, input: options.input, run: options.run }) as unknown as FunctionTool
+  const made = Object.freeze({ name: options.name, description: options.description, input: options.input, run: options.run, ...typeof options.label === 'string' && options.label !== '' && { label: options.label } }) as unknown as FunctionTool
 
   built.add(made)
 
@@ -55,5 +55,5 @@ export function plainTool(tool: FunctionTool): Offered {
     }
   }
 
-  return { name: tool.name, description: tool.description, inputSchema: plain, plain: run }
+  return { name: tool.name, description: tool.description, inputSchema: plain, ...tool.label !== undefined && { label: tool.label }, plain: run }
 }

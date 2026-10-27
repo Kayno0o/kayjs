@@ -574,3 +574,15 @@ it('gives the reasoning of a finished reply a height cap and a place in the tab 
   expect(finished).toEqual({ tabindex: '0', scrolls: true, overflow: 'auto' })
   expect(page.errors).toEqual([])
 }, 120_000)
+
+it('names a call with the label of its action\'s tool', async () => {
+  await using page = await site.open('/labelled-tools')
+
+  fakeAi.reply({ text: 'Checking', calls: [{ name: 'home_state' }] })
+  fakeAi.reply('Done')
+  await send(page, 'how is the home', 'Done')
+  await page.waitFor('.kai-chat-turn[data-pending]', { gone: true })
+
+  expect(await page.evaluate(() => document.querySelector('.kai-chat-calls-summary')?.textContent)).toBe('Read the home')
+  expect(page.errors).toEqual([])
+}, 120_000)

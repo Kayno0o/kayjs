@@ -142,6 +142,8 @@ export interface FunctionToolOptions<Schema extends TSchema = TSchema> {
   name: string
   // What the model reads to decide when to call it.
   description: string
+  // The words a chat shows for a call to it, such as `Searched the docs`, in place of its name.
+  label?: string | undefined
   // The object the model gives, a kay schema (`s.Object({ ... })`): a call it refuses is answered to the model, `run` never sees it.
   input: Schema
   // What the call does, with the input checked and typed by the schema: its result goes back to the model, as the text it is or as JSON. A throw tells the model the tool could not run, and goes to the app's log.
@@ -155,6 +157,7 @@ export interface FunctionTool {
   readonly [functionTool]: true
   readonly name: string
   readonly description: string
+  readonly label?: string | undefined
   readonly input: TSchema
   readonly run: (input: never, context: FunctionToolContext) => unknown
 }
@@ -219,6 +222,8 @@ export interface StructuredAskOptions<Schema extends TSchema = TSchema> extends 
 export interface ToolCall {
   id: string
   name: string
+  // The words for the call, from the `label` of the action's `tool` or of a function tool, which a chat shows in place of the name unless its `toolLabels` names the tool.
+  label?: string | undefined
   // The arguments the model gave, `{}` when it gave none that parse as an object.
   input: Record<string, unknown>
   status: 'running' | 'done' | 'failed'

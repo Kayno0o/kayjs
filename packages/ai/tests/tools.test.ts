@@ -50,6 +50,16 @@ describe('actions as tools', () => {
     expect(outcome.finish).toBe('stop')
   })
 
+  it('carries the label of an action\'s tool on its call, and nothing to the model', async () => {
+    fakeAi.reply({ calls: [{ name: 'home_state' }, { name: 'add_note', input: { title: 'Milk' } }] })
+    fakeAi.reply('done')
+
+    const outcome = await conversation('go', { offer: ['homeState', 'addNote'] })
+
+    expect(outcome.calls).toEqual([{ id: 'fake_1', name: 'home_state', label: 'Read the home', input: {}, status: 'done', result: 'lit' }, { id: 'fake_2', name: 'add_note', input: { title: 'Milk' }, status: 'done', result: expect.stringContaining('Milk') }])
+    expect(fakeAi.asked[0]!.tools).toEqual([expect.not.objectContaining({ label: expect.anything() }), expect.not.objectContaining({ label: expect.anything() })])
+  })
+
   it('sums the cache reads and writes of the steps', async () => {
     fakeAi.reply({ calls: [{ name: 'add_note', input: { title: 'Milk' } }], cache: { read: 100, written: 40 } })
     fakeAi.reply({ text: 'done', cache: { read: 140 } })

@@ -27,6 +27,20 @@ const lookUp = tool({
 })
 
 describe('function tools outside a request', () => {
+  it('shows the label of a function tool on its call', async () => {
+    fakeAi.reply({ calls: [{ name: 'look_up', input: { title: 'Moon' } }] })
+    fakeAi.reply('ok')
+
+    const labelled = tool({ name: 'look_up', label: 'Looked an article up', description: 'Looks an article up', input: s.Object({ title: s.String() }), run: () => 'found' })
+    const calls: string[] = []
+
+    for await (const step of ask('go', { tools: [labelled] }).progress())
+      calls.push(...step.calls.map(call => call.label ?? 'none'))
+
+    expect(calls.at(-1)).toBe('Looked an article up')
+    expect(fakeAi.asked[0]!.tools![0]).not.toHaveProperty('label')
+  })
+
   it('lets a scheduled ask call a plain function, its result going back to the model as JSON', async () => {
     found.length = 0
     fakeAi.reply({ text: 'Looking. ', calls: [{ name: 'look_up', input: { title: 'Moon' } }] })
