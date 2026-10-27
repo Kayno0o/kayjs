@@ -26,7 +26,7 @@ export interface AnalyticsConsent {
   policy?: AnalyticsText | undefined
   // How long the visitor's answer, a refusal as much as a yes, is remembered: 180 days by default and 13 months at most, the CNIL's ceiling.
   maxAge?: Duration | undefined
-  // `false` shows no notice and opens none from `data-analytics-consent`: the app asks in its own UI and answers with `consent.set('yes')` from `kay/analytics`, while the server still forwards nothing without the yes.
+  // `false` shows no notice and opens none from `data-analytics-consent`: the app asks in its own UI and answers with `consent = 'yes'` from `kay/analytics`, while the server still forwards nothing without the yes.
   notice?: boolean | undefined
 }
 

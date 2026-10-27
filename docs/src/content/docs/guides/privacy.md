@@ -157,7 +157,7 @@ Google Analytics, Fathom, Cloudflare, `custom` and Umami Cloud (an Umami without
 
 Kay shows a notice until the visitor chooses. Nothing is counted before a yes, and the server checks that on every visit rather than trusting the page. The answer is kept in the `kay_analytics` cookie for 180 days, for your `base` path. A refusal is kept as long as a yes.
 
-The cookie is the only record of the answer, and it lives in the visitor's browser: kay keeps no list of who agreed or when. A site that must prove a visitor's consent (GDPR art. 7(1)) records it itself, for example by posting `consent()` to an action from the handler that calls `consent.set`, with the date, the wording shown and no more of the visitor than the proof needs.
+The cookie is the only record of the answer, and it lives in the visitor's browser: kay keeps no list of who agreed or when. A site that must prove a visitor's consent (GDPR art. 7(1)) records it itself, for example by posting `consent()` to an action from the handler that assigns `consent`, with the date, the wording shown and no more of the visitor than the proof needs.
 
 `consent: { maxAge }` sets another time, a string such as `'180d'`, up to 13 months, the longest the CNIL accepts.
 
@@ -241,7 +241,7 @@ Whichever tool you use, your privacy notice names it, what it is for and how lon
 
 ### Asking in your own banner
 
-If your site already has a cookie banner or a settings page, ask there. Pass `consent: { notice: false }` so kay shows no notice of its own, and use `consent` from `kay/analytics` in an island. `consent()` is the visitor's answer, `'yes'`, `'no'` or `''` while they have not chosen. `consent.set('yes')`, `'no'` or `''` records a new one; an empty answer asks again.
+If your site already has a cookie banner or a settings page, ask there. Pass `consent: { notice: false }` so kay shows no notice of its own, and use `consent` from `kay/analytics` in an island. `consent()` is the visitor's answer, `'yes'`, `'no'` or `''` while they have not chosen. `consent = 'yes'`, `'no'` or `''` records a new one; an empty answer asks again.
 
 ```ts
 analytics({ provider: 'ga4', measurementId: 'G-ABC123XYZ', apiSecret: 'secret', consent: { notice: false } })
@@ -264,7 +264,7 @@ else
 
 A page that calls `consent()` is rendered for each visitor, so read it in the island that needs it rather than in a layout every page shares, which a CDN could no longer cache.
 
-It is the same cookie kay's notice writes, so the two never disagree, and the server still sends nothing without a yes. A page is rendered with the answer already in the request, so the banner does not flash for a visitor who answered. The answer is shared by every island and survives page swaps. `consent.set` works in the browser only, in a handler or an effect; on the server `consent()` only reads.
+It is the same cookie kay's notice writes, so the two never disagree, and the server still sends nothing without a yes. A page is rendered with the answer already in the request, so the banner does not flash for a visitor who answered. The answer is shared by every island and survives page swaps. Assigning `consent` works in the browser only, in a handler or an effect; on the server `consent()` only reads.
 
 ### Who may post a visit
 
@@ -288,7 +288,7 @@ That is all the app writes. kay adds a script of about 700 bytes to every page, 
 
 The numbers are on `/vitals`, or the `prefix` you pick, for whoever your `guard` lets in. Each route shows its three values against the good limits: 2.5 s, 0.1 and 200 ms. Without a `guard` the page answers 403, and the numbers are still collected.
 
-The report holds no cookie, address or title. The server keeps only a count per day, route, metric and bucket, so the store never grows with the traffic. With nothing else set, the numbers are counted at once, with no notice, as they hold nothing about the visitor. When `analytics({ consent })` asks first, `vitals()` asks too. Set `consent: true` to ask on its own, then your own banner must set the `kay_analytics=yes` cookie with `consent.set('yes')`.
+The report holds no cookie, address or title. The server keeps only a count per day, route, metric and bucket, so the store never grows with the traffic. With nothing else set, the numbers are counted at once, with no notice, as they hold nothing about the visitor. When `analytics({ consent })` asks first, `vitals()` asks too. Set `consent: true` to ask on its own, then your own banner must set the `kay_analytics=yes` cookie with `consent = 'yes'`.
 
 Reports are checked like visits: a post from another site, a large or malformed body and more than 300 a minute from one address are refused. The screen needs a server, so a static export refuses `vitals()`.
 
