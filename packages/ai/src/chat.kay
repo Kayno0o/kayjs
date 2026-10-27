@@ -7,7 +7,7 @@ import Icon from '@kaynooo/kayjs-ui/icon.kay'
 import Notice from '@kaynooo/kayjs-ui/notice.kay'
 import Textarea from '@kaynooo/kayjs-ui/textarea.kay'
 import { acceptsFile } from '@kaynooo/kayjs-ui/lib/accept'
-import { isHeldMarkdown, markdownHtml } from 'kay/markdown'
+import { isHeldMarkdown, markdownHtml, markdownReady } from 'kay/markdown'
 import { wording } from 'kay/words'
 import { approvalMessage, ticketsIn, withoutApproval } from './approval-marker'
 import { MARK, MARKED, withoutMarker } from './marker'
@@ -544,6 +544,9 @@ async function send(again = false, question?: string, resuming?: string) {
 
   if (busy() || (!again && text === '' && sent.length === 0))
     return
+
+  // A history the server drew never loads the renderer: fetched now, it arrives while the model writes its first words.
+  void markdownReady()
 
   if (!again) {
     replacing = undefined

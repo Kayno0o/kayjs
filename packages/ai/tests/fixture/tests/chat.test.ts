@@ -102,6 +102,23 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the Chat i
     expect(await loaded()).toBe(true)
   })
 
+  test('a history the server drew stays formatted with no markdown renderer, which loads once the visitor sends', async () => {
+    const page = await site.open('/citing-initial')
+    const loaded = () => page.evaluate(() => performance.getEntriesByType('resource').some(entry => entry.name.includes('markdown-render')))
+
+    await Bun.sleep(300)
+
+    expect(await page.text('.kai-chat-turn[data-role="assistant"] h1')).toBe('Title')
+    expect(await loaded()).toBe(false)
+
+    await page.fill('textarea', 'none:Now **bold**.')
+    await page.press('Enter')
+    await page.waitFor('.kai-chat-turn[data-role="assistant"] strong', { text: 'bold' })
+
+    expect(await loaded()).toBe(true)
+    expect(page.errors).toEqual([])
+  })
+
   test('a reply that fails shows an alert and Try again asks for it once more without a second copy of the message', async () => {
     const page = await site.open('/assistant')
 
