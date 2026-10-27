@@ -118,7 +118,7 @@ export function authenticationOptions(options: { rpId: string, allow?: { id: str
   }
 }
 
-// The passkey `response` makes, when it answers `expected`; undefined for any answer that does not. The attestation is not read: kay asks for none and trusts no attestation root, and every sign-in proves the key itself. It is still decoded, so one holding a CBOR tag or float refuses the registration.
+// The passkey `response` makes, when it answers `expected`; undefined for any answer that does not. The attestation is decoded, so one holding a CBOR tag or float is refused, but never checked: kay asks for none and trusts no attestation root, and every sign-in proves the key itself.
 export async function verifyRegistration(response: RegistrationResponseJSON, expected: Expected): Promise<RegisteredCredential | undefined> {
   try {
     if (!credentialHolds(response) || !clientDataHolds(response.response.clientDataJSON, 'webauthn.create', expected))

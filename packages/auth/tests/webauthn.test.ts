@@ -119,6 +119,33 @@ describe('extensions', () => {
       expect(await verifyRegistration(await device.create(request, answer), expected)).toBeUndefined()
   })
 
+  test('a registration whose attestation statement holds a CBOR tag, or whose extensions hold a float, is refused', async () => {
+    const device = authenticator()
+    const request = registrationOptions({ rpName: 'Site', rpId: 'site.test', userName: 'ada', userId: 'u', exclude: [] })
+    const expected = { ...EXPECTED, challenge: request.challenge }
+    const answer = await device.create(request)
+    const attestation = decodeCbor(Buffer.from(answer.response.attestationObject, 'base64url'))[0] as Map<string, Encodable>
+    // The attestation object written by hand, its statement `{ "x": value }` with `value` as raw CBOR.
+    const withStatement = (value: number[]) => Buffer.concat([
+      Buffer.from([0xA3]),
+      encodeCbor('fmt'),
+      encodeCbor('none'),
+      encodeCbor('attStmt'),
+      Buffer.from([0xA1]),
+      encodeCbor('x'),
+      Buffer.from(value),
+      encodeCbor('authData'),
+      encodeCbor(attestation.get('authData')!),
+    ]).toString('base64url')
+    // `{ "x": value }` as raw CBOR after the key, with ED set.
+    const withExtensions = async (value: number[]) => device.create(request, { flags: ATTESTED_EXTENDED, after: new Uint8Array([0xA1, 0x61, 0x78, ...value]) })
+
+    expect(await verifyRegistration({ ...answer, response: { ...answer.response, attestationObject: withStatement([0x01]) } }, expected)).toBeDefined()
+    expect(await verifyRegistration({ ...answer, response: { ...answer.response, attestationObject: withStatement([0xC2, 0x41, 0x01]) } }, expected)).toBeUndefined()
+    expect(await verifyRegistration(await withExtensions([0x01]), expected)).toBeDefined()
+    expect(await verifyRegistration(await withExtensions([0xF9, 0x3C, 0x00]), expected)).toBeUndefined()
+  })
+
   test('an assertion carrying extensions is read past them, and one claiming a new credential it does not carry is refused', async () => {
     const { device, stored } = await es256Passkey()
 

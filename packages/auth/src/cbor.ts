@@ -6,7 +6,7 @@ const MAX_DEPTH = 16
 const SIMPLE = new Map<number, CborValue>([[20, false], [21, true], [22, null], [23, undefined]])
 const UTF8 = new TextDecoder('utf-8', { fatal: true })
 
-// The CBOR item starting at `offset` in `bytes`, and the offset it ends at. Throws on what no WebAuthn structure holds: indefinite lengths, tags, floats, a map key that repeats or is neither an integer nor text. The whole attestation object goes through it, so a statement or an extension holding a tag or a float is refused too.
+// The CBOR item starting at `offset` in `bytes`, and the offset it ends at. Throws on what no WebAuthn structure holds anywhere in the attestation object, its statement and extensions included: indefinite lengths, tags, floats, a map key that repeats or is neither an integer nor text.
 export function decodeCbor(bytes: Uint8Array, offset = 0): [CborValue, number] {
   return item(bytes, offset, 0)
 }
