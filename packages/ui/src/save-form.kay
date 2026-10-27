@@ -148,7 +148,7 @@ async function submit(event: SubmitEvent) {
   if (busy() || !form || !(dirty ?? snapshot() !== baseline))
     return
 
-  if (!action && !onSave || saveDisabled)
+  if ((!action && !onSave) || saveDisabled)
     return
 
   const sure = confirmed
@@ -231,7 +231,7 @@ form(part="root" ref={element => form = element} onSubmit={submit} onInput={chec
       if cancelHref !== undefined
         Button(label={cancelLabel} href={cancelHref})
       Button(label={discardLabel} aria-disabled={!isDirty() || busy() || undefined} onClick={discard})
-      Button(label={saveLabel} type="submit" tone="accent" busy={busy()} aria-disabled={!isDirty() || busy() || !!saveDisabled || undefined} data-tooltip={typeof saveDisabled === 'string' ? saveDisabled : undefined})
+      Button(label={saveLabel} type="submit" tone="accent" busy={busy()} aria-disabled={!isDirty() || busy() || Boolean(saveDisabled) || undefined} data-tooltip={typeof saveDisabled === 'string' ? saveDisabled : undefined})
   if confirm !== undefined
     Dialog(open={asking()} title={confirmLabel ?? saveLabel} size="sm" onOpenChange={() => asking = false})
       @footer
