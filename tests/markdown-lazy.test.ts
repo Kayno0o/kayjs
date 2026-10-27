@@ -1,7 +1,7 @@
 import { GlobalRegistrator } from '@happy-dom/global-registrator'
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
 import { fresh, hydrate, property } from '../src/runtime/dom'
-import { createSignal, flush, renderEffect, root } from '../src/runtime/reactive'
+import { createSignal, flush, memo, renderEffect, root } from '../src/runtime/reactive'
 
 // Each test gets its own copy of the shell, whose renderer has not loaded yet.
 async function shell(name: string): Promise<typeof import('../src/runtime/markdown.client')> {
@@ -54,6 +54,51 @@ describe('markdownHtml in an island', () => {
 
     await settled(() => element.innerHTML.startsWith('<h1'))
     expect(element.innerHTML).toBe('<h1>Other</h1>\n')
+  })
+
+  it('keeps the server\'s markup when a hydrated effect writes the same held text again, until the renderer has loaded', async () => {
+    const { markdownHtml } = await shell('rerun')
+    const container = document.createElement('div')
+    const [flag, setFlag] = createSignal(1)
+
+    container.innerHTML = '<div><h1>Title</h1></div>'
+
+    const element = container.firstElementChild!
+
+    root(() => hydrate(() => renderEffect(() => {
+      flag()
+      property(element, 'innerHTML', markdownHtml('# Title'))
+    }), container))
+    flush()
+    setFlag(2)
+    flush()
+    expect(element.innerHTML).toBe('<h1>Title</h1>')
+
+    await settled(() => element.innerHTML.endsWith('\n'))
+    expect(element.innerHTML).toBe('<h1>Title</h1>\n')
+  })
+
+  it('keeps the server\'s markup for a held text a memo cached, and loads the renderer when it is written again', async () => {
+    const { markdownHtml } = await shell('cached')
+    const container = document.createElement('div')
+    const [flag, setFlag] = createSignal(1)
+
+    container.innerHTML = '<div><h1>Title</h1></div>'
+
+    const element = container.firstElementChild!
+
+    root(() => hydrate(() => {
+      const html = memo(() => markdownHtml('# Title'))
+
+      renderEffect(() => property(element, 'innerHTML', flag() > 0 ? html() : ''))
+    }, container))
+    flush()
+    setFlag(2)
+    flush()
+    expect(element.innerHTML).toBe('<h1>Title</h1>')
+
+    await settled(() => element.innerHTML.endsWith('\n'))
+    expect(element.innerHTML).toBe('<h1>Title</h1>\n')
   })
 
   it('forgets a hold no write took when the island ends, so a later island draws its markup', async () => {

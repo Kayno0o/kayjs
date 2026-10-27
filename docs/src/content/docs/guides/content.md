@@ -426,7 +426,9 @@ The server renders it with Bun.markdown and the island with marked, and both wri
 
 An island about to stream Markdown starts the load early with `void markdownReady()`, as kayjs-ai's Chat does when the visitor sends.
 
-While an island hydrates, the text as written stands in for markup the server drew formatted, and the island leaves that markup in place: marked loads once the text changes, so a page whose Markdown never changes never fetches it. A component that changes what `markdownHtml` returned before writing it, such as linking words in it, returns it as it is when `isHeldMarkdown(html)`, from `kay/markdown` too, is true; on the server it is always false.
+While an island hydrates, the text as written stands in for markup the server drew formatted, and the island leaves that markup in place, even where the same text is written again after hydration: marked loads once the text changes or is written again, so a page whose Markdown never changes never fetches it.
+
+A component that changes what `markdownHtml` returned before writing it, such as linking words in it, returns it as it is when `isHeldMarkdown(html)`, from `kay/markdown` too, is true; on the server it is always false.
 
 It is sync, so it can run again on every chunk of a stream. Headings come out plain, with no id or anchor.
 

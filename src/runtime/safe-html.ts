@@ -8,21 +8,6 @@ let young = new Set<string>()
 let old = new Set<string>()
 let size = 0
 
-// The stand-ins of markup an island hydrating cannot draw yet, such as Markdown whose renderer is loading, which stands in as text: `property` leaves the server's own markup in place instead of writing one of them to a claimed element. Tied to the value rather than a flag, so no other write consumes or skips it.
-const held = new Set<string>()
-
-export function holdServerMarkup(standIn: string): void {
-  held.add(standIn)
-}
-
-export function isHeldMarkup(value: unknown): boolean {
-  return typeof value === 'string' && held.has(value)
-}
-
-export function clearHeldMarkup(): void {
-  held.clear()
-}
-
 export function vouch(markup: string, always = false): SafeHtml {
   if (always) {
     forever.add(markup)

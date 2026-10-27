@@ -7,8 +7,7 @@ import { frenchText, frenchTree } from './french'
 import { ISLAND, PART_END, PART_START } from './markers'
 import { place } from './move'
 import { browserKeepsSameTab, leavesSite } from './outside'
-import { activeOwner, hydrationEnded, hydrationStarted, isHydrating, memo, onCleanup, renderEffect, root, runWithOwner, scope, unrecorded, untrack } from './reactive'
-import { clearHeldMarkup, isHeldMarkup } from './safe-html'
+import { activeOwner, hydrationEnded, hydrationStarted, memo, onCleanup, renderEffect, root, runWithOwner, scope, unrecorded, untrack } from './reactive'
 import { freshPrefix, withIds } from './uid'
 import { safeUrl } from './url'
 import { attributeValue, classText, eachChild, styleText } from './values'
@@ -110,10 +109,6 @@ export function hydrate<T>(render: () => T, container: Node): T {
   finally {
     claim = previous
     hydrationEnded()
-
-    // An island nested in another's render leaves the outer one's stand-ins.
-    if (!isHydrating())
-      clearHeldMarkup()
   }
 }
 
@@ -813,10 +808,16 @@ export function outside<T>(element: Element, href: T, ownRel = false): T {
   return href
 }
 
+let keepsMarkup: ((element: Element, value: unknown) => boolean) | undefined
+
+// Installed by the Markdown shell once an island holds markup it cannot draw yet, such as Markdown whose renderer is still loading: whether a write of `innerHTML` leaves what the server wrote.
+export function keepServerMarkup(keeps: (element: Element, value: unknown) => boolean): void {
+  keepsMarkup = keeps
+}
+
 // A property where the element has one, such as an input's `value`; an attribute otherwise.
 export function property(element: Element, name: string, value: unknown, written = false): void {
-  // Markup the island cannot draw yet, such as Markdown whose renderer is still loading, leaves what the server wrote.
-  if (claim && name === 'innerHTML' && isHeldMarkup(value))
+  if (name === 'innerHTML' && keepsMarkup?.(element, value))
     return
 
   // The server wrote this value, and what the person typed, ticked or opened since stays for the replayed event to read.
