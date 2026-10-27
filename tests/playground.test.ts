@@ -1,11 +1,12 @@
 import { rm } from 'node:fs/promises'
 import { join } from 'node:path'
+import { GlobalRegistrator } from '@happy-dom/global-registrator'
 import { beforeAll, describe, expect, it, spyOn } from 'bun:test'
 import { highlight } from '../docs/src/highlight'
 import { playgroundWarm } from '../docs/src/playground/bundles'
 import { runs } from '../docs/src/playground/check'
 import { isRunnable, playgroundHref, sourceOfHash } from '../docs/src/playground/runnable'
-import { renderServer } from '../docs/src/playground/runtime'
+import { mount, renderServer } from '../docs/src/playground/runtime'
 import { SAMPLE } from '../docs/src/playground/sample'
 import { stripTypes } from '../docs/src/playground/strip'
 import { check } from '../src/check'
@@ -75,6 +76,22 @@ describe('the playground\'s compiler', () => {
     expect(problems.length).toBeGreaterThan(0)
     expect(problems.map(problem => problem.line)).toContain(7)
     expect(problems[0]!.report).toContain('playground.kay')
+  })
+
+  it('mounts a component writing a link, whose browser code imports kay/i18n-links', async () => {
+    const { dom } = browserCompile('---\nimport { signal } from \'kay\'\n\nconst to = signal(\'/about\')\n---\na(href={to()}) About\n')
+
+    GlobalRegistrator.register()
+
+    try {
+      const unmount = mount(dom!, document.body)
+
+      expect(document.body.querySelector('a')!.getAttribute('href')).toBe('/about')
+      unmount()
+    }
+    finally {
+      await GlobalRegistrator.unregister()
+    }
   })
 
   it('holds a source in a link\'s fragment and reads it back', () => {

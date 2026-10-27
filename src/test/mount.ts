@@ -167,7 +167,7 @@ async function bundle(root: string, file: string): Promise<string> {
 
     const loaded = await loadConfig(root)
     const trees = apiTrees(root, loaded)
-    const config = { entrypoints: [join(work, 'entry.ts')], target: 'browser', metafile: true, define: { KAY_FRENCH: writesFrench(loaded) ? 'true' : 'undefined' }, plugins: [apiStubs(trees), kay({ root, settings: loaded.settings, api: trees }), sharedMarks], throw: false } satisfies Bun.BuildConfig
+    const config = { entrypoints: [join(work, 'entry.ts')], target: 'browser', metafile: true, define: { KAY_FRENCH: writesFrench(loaded) ? 'true' : 'undefined', KAY_I18N: loaded.i18n === undefined ? 'undefined' : 'true' }, plugins: [apiStubs(trees), kay({ root, settings: loaded.settings, api: trees }), sharedMarks], throw: false } satisfies Bun.BuildConfig
     const build = await Bun.build({ ...config, outdir: join(work, 'out') })
 
     if (!build.success) {

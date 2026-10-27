@@ -85,7 +85,7 @@ export function playTransitions(given: Transitions): void {
   transitions = given
 }
 
-// Gives a link an island writes its copy in the page's locale, set by kay/i18n, so a page of an app without locales ships none of its code.
+// Gives a link an island writes its copy in the page's locale, set by kay/i18n-links, so a page of an app without locales ships none of its code.
 let localizeHref = (href: string) => href
 
 export function localizeLinks(given: (href: string) => string): void {

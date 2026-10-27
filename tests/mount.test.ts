@@ -293,6 +293,48 @@ describe('mount', () => {
     }
   })
 
+  it('writes a link in the page\'s locale as a build for the browser does, on a site with locales only', async () => {
+    const saved = process.env.KAY_ROOT
+    const settings = { locales: ['fr', 'en'], defaultLocale: 'fr', prefixDefault: false, pages: ['/about'] }
+    const payload = document.createElement('script')
+    const shown = async (config: string) => {
+      const project = await scratchDir('mount-links-')
+
+      try {
+        await Promise.all([Bun.write(join(project, 'kay.config.ts'), `export default ${config}\n`), Bun.write(join(project, 'src/link.kay'), '---\nimport { signal } from \'kay\'\n\nconst label = signal(\'About\')\n---\na(href="/about") {label()}\n')])
+        process.env.KAY_ROOT = project
+
+        const { root, unmount } = await mountComponent(await imported(join(project, 'src/link.kay')))
+        const href = root.querySelector('a')!.getAttribute('href')
+
+        unmount()
+
+        return href
+      }
+      finally {
+        await rm(project, { recursive: true, force: true })
+      }
+    }
+
+    payload.type = 'application/json'
+    payload.dataset.kayI18n = ''
+    payload.textContent = JSON.stringify({ locale: 'en', settings, messages: {} })
+    document.head.append(payload)
+
+    try {
+      expect(await shown('{ i18n: { locales: [\'fr\', \'en\'], defaultLocale: \'fr\' } }')).toBe('/en/about')
+      expect(await shown('{}')).toBe('/about')
+    }
+    finally {
+      payload.remove()
+
+      if (saved === undefined)
+        delete process.env.KAY_ROOT
+      else
+        process.env.KAY_ROOT = saved
+    }
+  })
+
   it('names the island and the imports down to the server module a browser build cannot take', async () => {
     const dir = await scratchDir('mount-')
     const file = join(dir, 'paired.kay')

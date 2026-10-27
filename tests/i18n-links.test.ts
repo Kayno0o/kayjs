@@ -6,7 +6,7 @@ import process from 'node:process'
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
 import { eagerJs, scriptUrls } from '../scripts/eager-js'
 import { browserPath, testSite } from '../src/test'
-import { fixtureCopy } from './scratch'
+import { fixtureCopy, scratchDir } from './scratch'
 
 const chrome = browserPath()
 
@@ -56,5 +56,25 @@ describe('an island of an app with locales', () => {
     expect(eager.filter(code => code.includes('setErrorReporter((error'))).toHaveLength(1)
     expect(eager.filter(code => code.includes('"unhandledrejection"'))).toHaveLength(1)
     expect(eager.filter(code => code.includes('unsaved changes'))).toEqual([])
+  })
+})
+
+describe('the code localizing links', () => {
+  it('builds to nothing for a site without locales, which defines no KAY_I18N', async () => {
+    const dir = await scratchDir('i18n-links-')
+    // Imported for its side effect alone, as a compiled island writing a link imports it.
+    const entry = join(dir, 'island.ts')
+
+    try {
+      await Bun.write(entry, `import ${JSON.stringify(join(import.meta.dir, '../src/runtime/i18n-links.ts'))}\n`)
+
+      const bundled = async (define: string) => (await Bun.build({ entrypoints: [entry], target: 'browser', define: { KAY_BROWSER: 'true', KAY_I18N: define } })).outputs[0]!.text()
+
+      expect(await bundled('true')).toContain('function localizedLink(')
+      expect(await bundled('undefined')).not.toContain('localizedLink')
+    }
+    finally {
+      await rm(dir, { recursive: true, force: true })
+    }
   })
 })
