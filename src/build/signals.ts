@@ -1,7 +1,6 @@
 import type { ImportedSignals, Reexported, SignalKind } from '../compiler/module-signals'
 import { AsyncLocalStorage } from 'node:async_hooks'
 import { readFileSync, statSync } from 'node:fs'
-import { fnvHash } from '../compiler/fnv-hash'
 import { importedModules, jsonKinds, moduleKinds } from '../compiler/module-signals'
 import { parseKay } from '../compiler/parser'
 import { resolveFrom, SCRIPT_FILE, scriptLoader, transpilerFor } from './files'
@@ -60,9 +59,9 @@ export async function inSignalsScope<T>(run: () => Promise<T>): Promise<T> {
 
 function readImportedSignals(file: string, source: string): ImportedSignals {
   const found: ImportedSignals = {}
-  // Under Node, where ESLint runs the processor, Babel reads the imports Bun's transpiler would.
+  // Under Node, where ESLint runs the processor, Babel reads the imports Bun's transpiler would, and the source is its own key.
   const node = typeof Bun === 'undefined'
-  const hash = node ? fnvHash(source) : Bun.hash(source)
+  const hash = node ? source : Bun.hash(source)
   const known = imports.get(file)
   let specifiers: string[]
 

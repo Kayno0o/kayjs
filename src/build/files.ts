@@ -182,7 +182,8 @@ const RESOLVED_EXTENSIONS = ['.tsx', '.jsx', '.mts', '.ts', '.mjs', '.js', '.cts
 const INDEX_FILES = RESOLVED_EXTENSIONS.map(added => `index${added}`)
 const COMPILED_FROM: Record<string, string[]> = { '.js': ['.ts', '.tsx', '.mts'], '.jsx': ['.ts', '.tsx', '.mts'], '.mjs': ['.mts'], '.cjs': ['.cts'] }
 
-function resolvePath(path: string, folderOnly = false): string | undefined {
+// `folders` holds the ones whose `main` is being followed, so two naming each other end.
+function resolvePath(path: string, folderOnly = false, folders = new Set<string>()): string | undefined {
   if (!folderOnly) {
     const extension = extname(path)
     const candidates = [path, ...(COMPILED_FROM[extension] ?? []).map(twin => path.slice(0, -extension.length) + twin), ...RESOLVED_EXTENSIONS.map(added => path + added)]
@@ -192,12 +193,13 @@ function resolvePath(path: string, folderOnly = false): string | undefined {
       return file
   }
 
-  if (statSync(path, { throwIfNoEntry: false })?.isDirectory() !== true)
+  if (folders.has(path) || statSync(path, { throwIfNoEntry: false })?.isDirectory() !== true)
     return undefined
 
+  folders.add(path)
+
   const { main } = readJson<{ main?: unknown }>(join(path, PACKAGE)) ?? {}
-  const target = typeof main === 'string' ? resolve(path, main) : path
-  const entry = target === path ? undefined : resolvePath(target)
+  const entry = typeof main === 'string' ? resolvePath(resolve(path, main), false, folders) : undefined
 
   return entry ?? INDEX_FILES.map(index => join(path, index)).find(isFile)
 }

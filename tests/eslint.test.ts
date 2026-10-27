@@ -914,6 +914,37 @@ describe('kay/eslint without Bun', () => {
       expect(underNode).toBe(processor.preprocess(text, path)[0]!.text)
     }
   })
+
+  it('resolves a module and reads the imports of a script as Bun does', async () => {
+    const dir = await scratchDir('eslint-node-resolve-')
+    const files = ['a.ts', 'a.tsx', 'a.js', 'b.ts', 'c.mts', 'd.json', 'e.kay', 'f.cts', 'only.ts', 'folder/index.tsx', 'folder/index.ts', 'main/lib.ts', 'main/index.ts', 'looped/index.ts', 'both.ts', 'both/index.ts']
+
+    await Promise.all(files.map(async file => Bun.write(join(dir, file), '')))
+    await Bun.write(join(dir, 'main/package.json'), JSON.stringify({ main: './lib.js' }))
+    await Bun.write(join(dir, 'looped/package.json'), JSON.stringify({ main: '.' }))
+
+    const out = await scratchDir('eslint-node-modules-')
+    const built = await Bun.build({ entrypoints: ['src/build/files.ts', 'src/compiler/module-signals.ts'].map(file => join(import.meta.dir, '..', file)), target: 'node', packages: 'external', outdir: out, banner: 'const Bun = undefined;' })
+
+    expect(built.success).toBe(true)
+
+    const [{ resolveSync }, { importedModules }] = await Promise.all([import(join(out, 'build', 'files.js')), import(join(out, 'compiler', 'module-signals.js'))]) as [typeof import('../src/build/files'), typeof import('../src/compiler/module-signals')]
+    const resolved = (resolve: (specifier: string, from: string) => string) => (specifier: string) => {
+      try {
+        return resolve(specifier, dir)
+      }
+      catch {
+        return undefined
+      }
+    }
+
+    for (const specifier of ['./a', './a.js', './a.ts', './b.js', './b.jsx', './c', './c.mjs', './d', './e', './e.kay', './f.cjs', './only.js', './folder', './folder/', './main', './looped', './both', './both/', './missing', '@iconify-json/tabler/icons.json', 'node:fs'])
+      expect(resolved(resolveSync)(specifier)).toBe(resolved(Bun.resolveSync)(specifier))
+
+    const script = 'import type { A } from \'./type\'\nimport { type B } from \'./inline-type\'\nimport { C } from \'./unused\'\nimport \'./side\'\nexport * from \'./star\'\nexport { E } from \'./reexport\'\nexport type { F } from \'./type-reexport\'\n'
+
+    expect(importedModules(script)).toEqual(new Bun.Transpiler({ loader: 'ts' }).scanImports(script).map(entry => entry.path))
+  })
 })
 
 describe('testRules', () => {
