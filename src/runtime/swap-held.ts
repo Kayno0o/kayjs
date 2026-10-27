@@ -1,6 +1,7 @@
 import type { FetchedIsland } from './fetch-island'
 import { ISLAND } from './markers'
 
+// Its own copy of `./swap-kept`'s: this chunk imports nothing from the swap's modules, which would split them out of the `page-swap` chunk.
 const SERVER_ISLAND = 'slot[data-kay-server]'
 
 // A deferred server island already fetched shows its render while the next page's copy of it is fetched, rather than the inert copy standing in for it: a post back to the same page keeps the island on screen, and the scroll with it. It stays inert until the fetch answers, and one the next page renders another copy of is replaced by it at once.
