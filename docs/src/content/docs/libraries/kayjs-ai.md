@@ -385,7 +385,7 @@ The same goes for the model's thinking: when the action returns `reply.progress(
 
 Code in an answer is coloured the way the rest of your Markdown is. Once a code block is finished, the server highlights it with the `markdown.highlight` function from your `kay.config.ts`, the one your content pages use, and the chat swaps the plain block for the coloured one. The browser loads no highlighter. A block still being written stays plain, and so does code when your app has no highlighter. This works when the action returns `.progress()`.
 
-You can also read `reply.progress()` yourself. It gives the text so far and every tool call, again with each change, plus the code blocks that were highlighted since the last snapshot. Each call is `{ id, name, input, status, result }`, its status `running`, then `done` or `failed`. `await reply.calls` gives the final list, each finished call with its `ms`, how long the action ran.
+You can also read `reply.progress()` yourself. It gives the text so far and every tool call, again with each change, plus the code blocks that were highlighted since the last snapshot. Each call is `{ id, name, input, status, result }`, its status `running`, then `done` or `failed`. `await reply.calls` gives the final list, each finished call with its `ms`, how long it took.
 
 To see where a slow answer spends its time, read `await reply.steps`. It has one entry per request made to the model, one for each round of a tool loop: `{ ms, firstTokenMs, usage, finish, calls }`. `ms` is how long the model took to answer and `firstTokenMs` how long until it first spoke. The tools it called are not counted in `ms`, they have their own on `calls`. A failed reply lists the requests that ended before it.
 
@@ -509,11 +509,15 @@ Scripts go to the asks in the order they are read. An action that asks several t
 model.reply({ data: { words: ['Kay'] } }, asked => asked.system?.includes('pronunciation') === true)
 ```
 
-Passes read before it, and the conditional ones, no longer shift it. Asks it does not accept keep the default reply, or the scripts you gave without a condition, in order. `model.fail(error, when)` takes the same condition.
+A podcast action that groups, writes, revises the length only when the script misses it, then fixes the pronunciation is tested on the last pass alone. Passes read before it, and the conditional ones, no longer shift it. Asks it does not accept keep the default reply, or the scripts you gave without a condition, in order. `model.fail(error, when)` takes the same condition.
 
 `model.reply({ calls: [{ name: 'add_note', input: { title: 'Milk' } }] })` makes the model call a tool, and the next script answers once the results are back.
 
-A call takes an `id` to give it one of your own, `fake_1`, `fake_2` and so on by default. `finish` says why a step ended: `stop` by default, `length` for a reply cut by the token cap, as in `fakeAi.reply({ text: 'Half an ans', finish: 'length' })`. An ask given its own `provider` is answered by the fake too, so a job sent to another model is tested like the rest: `model.last()?.provider` and `model.last()?.model` say which one it was for. A test of a provider itself sets `KAYJS_AI_REAL_PROVIDERS=1` to send to it. `model.fail(error)` makes the next ask fail. `fakeAi` is exported too. With nothing scripted, the fake answers `Fake reply to:` followed by your last message. In development the fake answers too, until a provider is configured.
+A call takes an `id` to give it one of your own, `fake_1`, `fake_2` and so on by default. `finish` says why a step ended: `stop` by default, `length` for a reply cut by the token cap, as in `fakeAi.reply({ text: 'Half an ans', finish: 'length' })`. 
+
+An ask given its own `provider` is answered by the fake too, so a job sent to another model is tested like the rest: `model.last()?.provider` and `model.last()?.model` say which one it was for. A test of a provider itself sets `KAYJS_AI_REAL_PROVIDERS=1` to send to it.
+
+`model.fail(error)` makes the next ask fail. `fakeAi` is exported too. With nothing scripted, the fake answers `Fake reply to:` followed by your last message. In development the fake answers too, until a provider is configured.
 
 <ReadMore href="/llms/kayjs-ai-testing-and-errors">Scripting the fake, every error kind, and building a provider by hand.</ReadMore>
 

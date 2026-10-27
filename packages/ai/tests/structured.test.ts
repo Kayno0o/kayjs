@@ -469,7 +469,7 @@ describe('structured replies with tools', () => {
     const result = await site.call(outcome, { prompt: 'go' })
 
     expect(result.value).toEqual(answer)
-    expect(result.calls).toEqual([{ id: 'fake_1', name: 'add_note', input: { title: 'Milk' }, status: 'done', result: expect.stringContaining('Milk') }])
+    expect(result.calls).toEqual([{ id: 'fake_1', name: 'add_note', input: { title: 'Milk' }, status: 'done', ms: expect.any(Number), result: expect.stringContaining('Milk') }])
     expect(result.finish).toBe('stop')
     expect(result.usage!.outputTokens).toBeGreaterThan(0)
   })

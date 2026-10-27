@@ -231,7 +231,7 @@ export interface ToolCall {
   approval?: string | undefined
   // What the model was told of the outcome, the action's answer or why the call failed; absent while running.
   result?: string | undefined
-  // How long the action ran, in milliseconds; absent while running.
+  // How long the call took in milliseconds, from the model's request to its result (a `confirm` the app awaits counts); absent while running.
   ms?: number | undefined
 }
 
@@ -241,7 +241,7 @@ export interface Step {
   ms: number
   // The wait until the first piece of text, reasoning or tool call came; undefined when the model said nothing.
   firstTokenMs: number | undefined
-  // The tokens of this request, undefined when the provider gave none.
+  // The tokens of this request, undefined when the provider gave none (a tool loop estimates them from the characters, as its budget does).
   usage: Usage | undefined
   // Why the model stopped, undefined when the provider said nothing.
   finish: Finish | undefined

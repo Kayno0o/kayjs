@@ -26,7 +26,8 @@ describe('reply.steps', () => {
     expect(steps).toHaveLength(1)
     expect(steps[0]).toMatchObject({ finish: 'stop', calls: [], usage: await reply.usage })
     expect(steps[0]?.ms).toBeGreaterThanOrEqual(0)
-    expect(steps[0]?.firstTokenMs).toBeLessThanOrEqual(steps[0]?.ms ?? 0)
+    expect(steps[0]?.firstTokenMs).toBeDefined()
+    expect(steps[0]?.firstTokenMs).toBeLessThanOrEqual(steps[0]!.ms)
   })
 
   it('lists a request per round of a tool loop, each with the calls it made and how long they ran', async () => {
