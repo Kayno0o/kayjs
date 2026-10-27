@@ -422,7 +422,9 @@ Text set through `innerHTML`, from `markdownHtml`, `renderMarkdown` or `sanitize
 
 A link leaving your site opens in a new tab with `rel="nofollow ugc noopener"`, the server and the island alike, unless you set `links: { outside: 'same-tab' }`.
 
-The server renders it with Bun.markdown and the island with marked, and both write the same HTML. Only the islands importing it load marked, about 15 KB gzipped, and only when they first render Markdown the server did not draw: until it arrives the island shows the text as written, then the formatted one. Call it in a template or an effect, which runs again once marked has loaded; in a click handler, `await markdownReady()` from `kay/markdown` first. An island about to stream Markdown starts the load early with `void markdownReady()`, as kayjs-ai's Chat does when the visitor sends.
+The server renders it with Bun.markdown and the island with marked, and both write the same HTML. Only the islands importing it load marked, about 15 KB gzipped, and only when they first render Markdown the server did not draw: until it arrives the island shows the text as written, then the formatted one. Call it in a template or an effect, which runs again once marked has loaded; in a click handler, `await markdownReady()` from `kay/markdown` first.
+
+An island about to stream Markdown starts the load early with `void markdownReady()`, as kayjs-ai's Chat does when the visitor sends.
 
 While an island hydrates, the text as written stands in for markup the server drew formatted, and the island leaves that markup in place: marked loads once the text changes, so a page whose Markdown never changes never fetches it. A component that changes what `markdownHtml` returned before writing it, such as linking words in it, returns it as it is when `isHeldMarkdown(html)`, from `kay/markdown` too, is true; on the server it is always false.
 
