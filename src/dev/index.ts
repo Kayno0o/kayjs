@@ -54,6 +54,17 @@ export interface DevOptions {
 // kay.config.ts does not load; the process that found out has printed why.
 export class ConfigRefusedError extends Error {}
 
+// What the process writing or checking the types answers the session with.
+export type TypesWorker = Pick<TypesProcess, 'configuredEntry' | 'problems' | 'loadedModules' | 'loaded' | 'write' | 'close'>
+
+// The processes and the watcher the session drives, which a test replaces to drive its races without spawning any.
+export interface DevPorts {
+  spawnServer: (root: string, entry: string, env: Record<string, string | undefined>, stdout: 'inherit' | number, ipc: (message: unknown, server: Subprocess) => void) => Subprocess<'pipe'>
+  typesProcess: (root: string, entry: string | undefined, env: Record<string, string | undefined>, idleMs?: number) => TypesWorker
+  startClientBuilder: (root: string, env: Record<string, string | undefined>, stdout: 'inherit' | number, quiet: boolean) => ClientBuilder
+  watchProject: (root: string, onChange: (file: string) => void, options: { rootNaming: boolean, onScratch: () => void }) => () => void
+}
+
 // Long enough to gather the few events one save makes, which come within a millisecond.
 const DEBOUNCE_MS = 10
 // How long a source an editor's save left missing is waited for, as saving by renaming it away and writing it anew leaves it, on a machine busy enough to stretch the save.
@@ -105,11 +116,18 @@ const STDERR = 2
 // eslint-disable-next-line no-control-regex -- escape sequences are what it strips
 const ANSI_STYLE = /\x1B\[[\d;]*m/g
 
+const PORTS: DevPorts = {
+  spawnServer: (root, entry, env, stdout, ipc) => Bun.spawn([process.execPath, '--preload', PRELOAD, entry], { cwd: root, env, stdin: 'pipe', stdout, stderr: 'inherit', ipc }),
+  typesProcess: (root, entry, env, idleMs) => new TypesProcess(root, entry, env, idleMs),
+  startClientBuilder,
+  watchProject,
+}
+
 // Runs the server entry in development and keeps its process through the changes to templates, islands and API modules: the process imports the modules they reached again and runs the entry once more, whose server takes over the one listening.
 // A change to anything else, such as the config, the environment or code kay does not load itself, starts a new process.
 // The client is built beside it, by a process kept from one change to the next, which a stylesheet edit alone needs no restart for.
 // Resolves once watching, with a function stopping the watchers and the server.
-export async function dev(projectRoot: string, options: DevOptions = {}): Promise<() => Promise<void>> {
+export async function dev(projectRoot: string, options: DevOptions = {}, ports: DevPorts = PORTS): Promise<() => Promise<void>> {
   const root = resolve(projectRoot)
   // Where the client build of `kay dev` and what it keeps of the config are written.
   const devDir = join(root, KAY_DIR, `dev${testWorker()}`)
@@ -150,7 +168,7 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
   const editedWhileWriting: string[] = []
   const env = await environmentWithoutDotenv(root)
   // The process writing them is kept between writes; only a change to something but `.kay` sources boots a new one, as the config or a module it imports may be what changed.
-  const typesProcess = new TypesProcess(root, options.entry, env)
+  const typesProcess = ports.typesProcess(root, options.entry, env)
   let typesFresh = true
   let startedTypes = false
   // Writes the first tree, which waits for the first server to listen so the page comes first; the editors need it, the page does not.
@@ -299,7 +317,7 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
   }
   // The type check runs in a process of its own beside the server, once the tree it types is written: a reload never waits for it, and its errors reach the open pages, errors.json and the terminal when it ends.
   const typeChecking = options.types !== false && options.config === undefined && existsSync(join(root, 'tsconfig.json'))
-  const checkProcess = new TypesProcess(root, options.entry, env, CHECK_IDLE_MS)
+  const checkProcess = ports.typesProcess(root, options.entry, env, CHECK_IDLE_MS)
   let checkFresh = true
   let checkTimer: Timer | undefined
   let checking: Promise<void> | undefined
@@ -449,7 +467,7 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
       if (stopping)
         return undefined
 
-      builder = startClientBuilder(root, env, json ? STDERR : 'inherit', !typesSettled)
+      builder = ports.startClientBuilder(root, env, json ? STDERR : 'inherit', !typesSettled)
       builderStale = false
       unbuilt = null
     }
@@ -587,7 +605,7 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
 
     runningEntry = entryToRun()
 
-    const server = Bun.spawn([process.execPath, '--preload', PRELOAD, runningEntry], { cwd: root, env: { ...env, NODE_ENV: 'development', ...options.port === undefined ? {} : { PORT: String(options.port) }, KAY_DEV_HOST: options.host ?? 'localhost', ...collapses ? { KAY_DEV_REPORTS_OUTPUT: '1' } : {}, ...socket === undefined ? {} : { BUN_INSPECT: `ws+unix://${socket}` } }, stdin: 'pipe', stdout: json ? STDERR : 'inherit', stderr: 'inherit', ipc: (message, server) => received(server, message) })
+    const server = ports.spawnServer(root, runningEntry, { ...env, NODE_ENV: 'development', ...options.port === undefined ? {} : { PORT: String(options.port) }, KAY_DEV_HOST: options.host ?? 'localhost', ...collapses ? { KAY_DEV_REPORTS_OUTPUT: '1' } : {}, ...socket === undefined ? {} : { BUN_INSPECT: `ws+unix://${socket}` } }, json ? STDERR : 'inherit', (message, server) => received(server, message))
 
     if (socket !== undefined) {
       sockets.set(server, socket)
@@ -821,7 +839,7 @@ export async function dev(projectRoot: string, options: DevOptions = {}): Promis
   }
   let packageScan: Promise<void> | undefined
   let packageScanAgain = false
-  const stopWatching = watchProject(root, (file) => {
+  const stopWatching = ports.watchProject(root, (file) => {
     if (taken.has(file) && contentHash(join(root, file)) === taken.get(file))
       return
 
@@ -1138,7 +1156,7 @@ async function reloadConfig(root: string, last: KayConfig): Promise<KayConfig> {
 // Keeps editors and `tsgo` in step with the `.kay` sources; the type errors are the check beside the server's.
 // Without a `config` it is written by a process of its own from kay.config.ts as it is now, which keeps the checker out of this one and reads again every module the config imports.
 // Whether, asked to `refuse`, the process found kay.config.ts does not load.
-async function regenerateTypes(root: string, { entry, config }: DevOptions, refuse: boolean, types: TypesProcess, fresh: boolean): Promise<boolean> {
+async function regenerateTypes(root: string, { entry, config }: DevOptions, refuse: boolean, types: TypesWorker, fresh: boolean): Promise<boolean> {
   try {
     if (config === undefined)
       return await types.write(fresh, refuse ? REFUSE : '') === CONFIG_REFUSED
