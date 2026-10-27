@@ -198,7 +198,7 @@ describe('Table over an infinite list', () => {
       await clock.elapse(300)
 
       expect(asked).toEqual([{ offset: 0, sort: undefined, filter: { text: 'eur', fields: {} } }])
-      expect(mounted.root.querySelector('[data-part="count"]')?.textContent).toBe('')
+      expect(mounted.root.querySelector('[data-part="count"]')?.textContent).toBe('0 rows')
       expect(mounted.root.querySelector('.no-match')).not.toBeNull()
     })
 

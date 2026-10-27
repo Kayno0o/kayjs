@@ -42,7 +42,7 @@ export function drawnByBlock<Row>(column: Column<Row>, columns: Column<Row>[]): 
 export interface FilterField {
   key: string
   label: string
-  // The choices of a select, the empty value being no filter; left out, the field is a text box.
+  // The choices of a select, a blank option for no filter is added, so none worth `''` is listed; left out, the field is a text box.
   options?: readonly { value: string, label: string }[] | undefined
 }
 

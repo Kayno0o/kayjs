@@ -12,9 +12,9 @@ import { cellText, drawnByBlock, exportHref, nextSort, resolvedColumn, restoredS
 import { virtualRows } from './virtual'
 import { wording } from 'kay/words'
 
-// 'kui-table-wrap' stays as the component's name for an app's CSS. The narrow form is a container named `table`, which its parts read with `@max-[30rem]/table:`; the name carries no `kui-` prefix so no old rule keeps its class alive.
-const DEBOUNCE_MS = 250
+const DEBOUNCE_MS = 200
 
+// 'kui-table-wrap' stays as the component's name for an app's CSS. The narrow form is a container named `table`, which its parts read with `@max-[30rem]/table:`; the name carries no `kui-` prefix so no old rule keeps its class alive.
 const look = recipe({
   parts: {
     root: 'kui-table-wrap group/table w-full overflow-x-auto border-solid border-[length:var(--border-width)] border-border bg-surface data-[narrow=stack]:@container/table data-virtual:overflow-y-auto data-virtual:max-h-[var(--table-height,70vh)] data-virtual:[overflow-anchor:none] data-virtual:focus-visible:outline-2 data-virtual:focus-visible:-outline-offset-2 data-virtual:focus-visible:outline-accent',
@@ -137,14 +137,14 @@ effect(() => {
 let started = false
 
 effect(() => {
+  if (!list)
+    return
+
   const wanted = current()
   const filtered = asked()
   const now = !started
 
   started = true
-
-  if (!list)
-    return
 
   const [sortChanged, filterChanged] = untrack(() => {
     const held = list.sort()
@@ -276,10 +276,10 @@ div({...rest} ref={element => box = element} data-narrow={narrow} data-virtual={
         label(part="field")
           span.kui-label-text(part="filterLabel") {field.label}
           if field.options
-            Select(value={fieldValues[index]!()} options={field.options} emptyOption=" " onChange={fieldValues[index]!.set})
+            Select(value={fieldValues[index]!()} options={field.options} emptyOption onChange={fieldValues[index]!.set})
           else
             input.kui-field-input(part="filterInput" type="search" value={fieldValues[index]!()} autocomplete="off" onInput={event => fieldValues[index]!.set(event.currentTarget.value)})
-    p(part="count" role="status") {typed() && !list ? counted(kept().length) : ''}
+    p(part="count" role="status") {list ? (filtering() && !list.pending() ? counted(rows().length) : '') : (typed() ? counted(kept().length) : '')}
   if selectable || exportable
     div(part="selection")
       if selectable
