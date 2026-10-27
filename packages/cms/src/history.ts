@@ -69,9 +69,11 @@ async function logged(dirs: string[]): Promise<Map<string, Edit> | undefined> {
 // The walk for the folders at the commit checked out, started once per commit; one that failed is started again by the next list.
 async function walk(dirs: string[]): Promise<Map<string, Edit> | undefined> {
   const read = ++reads
+  const { signal } = stopping
   const answered = (await git(['rev-parse', 'HEAD']))?.trim()
 
-  if (answered === undefined)
+  // A stop between the answer and this line starts no walk the stop would miss.
+  if (answered === undefined || signal.aborted)
     return undefined
 
   if (read > newest.read)
