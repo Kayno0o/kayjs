@@ -349,13 +349,13 @@ The page clicks and types as a user does.
 | `type(text)`, `press(key)` | Type or press a key in the focused element |
 | `text(selector)`, `value(selector)`, `count(selector)` | Read the page at once |
 | `waitFor(selector, { text, gone })` | Waits for an element, or for none |
-| `waitUntil(fn)` | Waits until a function run in the page returns something truthy |
+| `waitUntil(fn, { timeout, what })` | Waits until a function run in the page returns something truthy, and names `what` when it times out |
 | `evaluate(fn, ...args)` | Runs a function in the page |
 | `goto`, `back`, `forward`, `reload`, `path()` | Navigate and read where the page is |
 | `upload(selector, files)` | Puts files, given by path, in a file input, as the picker does |
 | `onDialog(handler)` | Answers the page's `alert`, `confirm`, `prompt` and `beforeunload` dialogs |
 
-The waits give up after 5 seconds, or after `timeout` in their options, and fail naming what they waited for. `evaluate` and `waitUntil` send only the source of the function, so it sees no variable of the test, only its arguments.
+The waits give up after 5 seconds, or after `timeout` in their options, and fail naming what they waited for, with the stack of the test's own call. `evaluate` and `waitUntil` send only the source of the function, so it sees no variable of the test, only its arguments.
 
 `page.view` is the `Bun.WebView` behind the page, for what the helpers leave out, such as `screenshot()` or `cdp()`.
 

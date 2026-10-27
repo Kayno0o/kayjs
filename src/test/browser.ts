@@ -58,6 +58,11 @@ export interface WaitOptions {
   timeout?: Duration | undefined
 }
 
+export interface WaitUntilOptions extends WaitOptions {
+  // Named in the failure when the wait times out, in place of `the condition to hold`.
+  what?: string | undefined
+}
+
 // Where in an element a pointer aims: CSS pixels from its top-left corner, for a point of a canvas the element's middle is not.
 export interface PointerOptions extends WaitOptions {
   at?: { x: number, y: number } | undefined
@@ -139,7 +144,7 @@ export interface TestPage {
   // Checks the page as it stands, or only the elements `selector` matches, with axe-core: what it breaks, none when it passes.
   a11y: (selector?: string) => Promise<A11yViolation[]>
   // Waits for a function run in the page, as `evaluate` runs it, to return something truthy.
-  waitUntil: <Args extends unknown[]>(condition: (...args: Args) => unknown, options?: WaitOptions, ...args: Args) => Promise<void>
+  waitUntil: <Args extends unknown[]>(condition: (...args: Args) => unknown, options?: WaitUntilOptions, ...args: Args) => Promise<void>
   // Every response the page received so far, redirects included, with its status and its request and response headers as the wire carried them, lowercased. A test empties the list with `responses.length = 0`.
   responses: PageResponse[]
   // Resolves with the first response whose URL matches, already received or not, once its body arrived (`complete: false` resolves on its headers, for one that never ends): a string with `*` for any characters, matched against the path on the page's site when it starts with `/`, else against the whole URL, a RegExp on the URL, or a function of the `URL`.
@@ -454,6 +459,19 @@ export async function browse(url: string, options: BrowserOptions = {}): Promise
     }
   }
 
+  // Runs a wait, and gives a timeout the stack of the call the test made, which the polling's own stack does not reach.
+  const atCaller = async (site: Error, run: () => Promise<void>) => {
+    try {
+      await run()
+    }
+    catch (error) {
+      if (error instanceof Error && error.message.startsWith(UNSETTLED) && site.stack !== undefined)
+        error.stack = `${error.name}: ${error.message}\n${site.stack.split('\n').slice(2).join('\n')}`
+
+      throw error
+    }
+  }
+
   // Waits for the page to settle, naming the files it failed to load when it does not.
   const settle = async (expression: string, wanted: string) => {
     try {
@@ -747,11 +765,11 @@ export async function browse(url: string, options: BrowserOptions = {}): Promise
     value: async selector => serial(async () => inView<string | null>(script((css: string) => document.querySelector<HTMLInputElement>(css)?.value ?? null, [selector]))),
     count: async selector => serial(async () => inView<number>(script((css: string) => document.querySelectorAll(css).length, [selector]))),
     evaluate: async (run, ...args) => serial(async () => inView(script(run, args))),
-    waitFor: async (selector, wait = {}) => serial(async () => {
+    waitFor: async (selector, wait = {}) => atCaller(new Error('the call'), async () => serial(async () => {
       const found = script((css: string, text?: string) => [...document.querySelectorAll(css)].some(element => text === undefined || element.textContent?.includes(text)), [selector, wait.text])
 
       await poll(wait.gone ? `!${found}` : found, `${selector}${wait.text === undefined ? '' : ` with text "${wait.text}"`}${wait.gone ? ' to be gone' : ''}`, waitMs(wait.timeout))
-    }),
+    })),
     a11y: async selector => serial(async () => {
       // Injected again after each navigation, which drops it; through DevTools, which the page's CSP does not hold back.
       if (!await inView<boolean>('!!window.axe')) {
@@ -782,7 +800,7 @@ export async function browse(url: string, options: BrowserOptions = {}): Promise
 
       return violations
     }),
-    waitUntil: async (condition, wait = {}, ...args) => serial(async () => poll(script(condition, args), 'the condition to hold', waitMs(wait.timeout))),
+    waitUntil: async (condition, wait = {}, ...args) => atCaller(new Error('the call'), async () => serial(async () => poll(script(condition, args), wait.what ?? 'the condition to hold', waitMs(wait.timeout)))),
     back: async () => serial(async () => traverse('history.back()')),
     forward: async () => serial(async () => traverse('history.forward()')),
     reload: async () => serial(async () => {

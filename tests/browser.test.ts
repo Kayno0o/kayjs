@@ -496,6 +496,21 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('kay/test i
     // A condition that keeps throwing is named as never held, as one calling a helper of the test does.
     await expect(page.waitUntil(() => elsewhere(), { timeout: '100ms' })).rejects.toThrow(/waiting for the condition to hold, last throwing .*elsewhere is not defined/)
     await expect(page.waitUntil(() => false, { timeout: '100ms' })).rejects.toThrow(/to hold$/)
+
+    // `what` names the wait, and the error's stack starts at the test's call, not in browser.ts.
+    let stalled = new Error('not thrown')
+
+    try {
+      await page.waitUntil(() => false, { timeout: '100ms', what: 'the title to change' })
+    }
+    catch (error) {
+      stalled = error as Error
+    }
+
+    expect(stalled.message).toBe('kay: timed out after 100ms waiting for the title to change')
+    expect(stalled.stack).toContain('tests/browser.test.ts')
+    expect(stalled.stack).not.toContain('src/test/browser.ts')
+
     // Thrown once, as by a page swap in flight, then only false: the error is over.
     await expect(page.waitUntil(() => {
       const counted = window as unknown as { polls?: number }

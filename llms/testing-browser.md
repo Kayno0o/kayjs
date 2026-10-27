@@ -43,7 +43,7 @@ expect(await page.path()).toBe('/account')
 - `click(selector, { modifiers })` holds keys such as `['Alt']` for the click; `hover(selector)`, once the page finished loading too, scrolls the element to the middle and moves the pointer onto it, where it stays; both take `at: { x, y }`, CSS pixels from the element's top-left corner, to aim at a point such as a spot of a canvas (scrolled into view, a real trusted pointer).
 - `fill(selector, text)` replaces a field's text as typing does; `type(text)` and `press(key)` go to the focused element.
 - `text`, `value` and `count` read the page at once, `text` and `value` null when nothing matches.
-- `waitFor(selector, { text, gone })` and `waitUntil(fn)` poll until they hold, 5 seconds at most unless `timeout` gives other milliseconds, and fail naming what they waited for.
+- `waitFor(selector, { text, gone })` and `waitUntil(fn, { what })` poll until they hold, 5 seconds at most unless `timeout` gives other milliseconds, and fail naming what they waited for (`what` names a `waitUntil`, as in a server test) with the stack of the test's own call.
 - A wait whose function keeps throwing names the last error when it times out.
 - `evaluate(fn, ...args)` runs a function in the page, its arguments and result crossing as JSON.
 - Only the source of that function crosses, so it sees no variable or helper of the test, only its arguments, and `waitUntil` runs its function the same way.
