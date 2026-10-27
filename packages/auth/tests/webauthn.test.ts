@@ -129,7 +129,7 @@ describe('extensions', () => {
   })
 })
 
-describe('a ceremony in a frame of another site', () => {
+describe('a ceremony in a frame of another origin', () => {
   const ALGORITHMS: Algorithm[] = ['ES256', 'RS256', 'EdDSA', 'ML-DSA-44']
   const SAME_SITE = [{ crossOrigin: false }, { crossOrigin: undefined }]
   const CROSS_SITE = [{ crossOrigin: true }, { crossOrigin: 'true' }, { crossOrigin: 1 }, { crossOrigin: null }, { crossOrigin: undefined, topOrigin: 'https://other.test' }, { topOrigin: 'https://other.test' }, { topOrigin: '' }, { topOrigin: null }, { crossOrigin: true, topOrigin: 'https://other.test' }]

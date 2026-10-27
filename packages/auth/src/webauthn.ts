@@ -193,7 +193,7 @@ function credentialHolds(response: RegistrationResponseJSON | AuthenticationResp
   return typeof response.id === 'string' && response.id !== '' && response.id === response.rawId && response.type === 'public-key'
 }
 
-// The client data the browser wrote is of the ceremony's `type`, carries the parked challenge and comes from one of the site's origins, in no frame of another site: kay serves its pages with `frame-ancestors 'self'`, so a ceremony that says `crossOrigin` or names a `topOrigin` is refused.
+// The client data the browser wrote is of the ceremony's `type`, carries the parked challenge and comes from one of the site's origins, in no frame of another origin: kay serves its pages with `frame-ancestors 'self'`, so a ceremony that says `crossOrigin` or names a `topOrigin` is refused.
 function clientDataHolds(encoded: string, type: string, expected: Expected): boolean {
   const clientData: unknown = JSON.parse(UTF8.decode(fromBase64url(encoded)))
 
