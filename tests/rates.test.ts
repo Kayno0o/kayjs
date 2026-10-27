@@ -1,7 +1,9 @@
 import type { RateStore } from 'kay'
 import { join } from 'node:path'
 import { describe, expect, it } from 'bun:test'
-import { memoryRates, rateLimit, sqliteRates } from 'kay/server'
+import { clientAddress, memoryRates, rateLimit, sqliteRates } from 'kay/server'
+import { knownAddress } from '../src/server/protection'
+import { sendFrom } from '../src/server/rewrite'
 import { scratchDir } from './scratch'
 
 describe('a weighted hit', () => {
@@ -52,5 +54,45 @@ describe('a weighted hit', () => {
 
     for (const weight of [0, -1, 1.5, Number.NaN])
       await expect(limit.hit('a', undefined, weight)).rejects.toThrow('weight')
+  })
+})
+
+describe('a refund', () => {
+  it('takes one attempt off the window it names, in memory and in SQLite, never below zero', async () => {
+    for (const store of [memoryRates(), sqliteRates(join(await scratchDir('rates'), 'rates.sqlite'))]) {
+      const { resetAt } = await store.hit('key', '60000ms', 3)
+
+      await store.refund('key', resetAt)
+      expect((await store.peek('key'))!.count).toBe(2)
+      await store.refund('key', resetAt)
+      await store.refund('key', resetAt)
+      await store.refund('key', resetAt)
+      expect((await store.peek('key'))!.count).toBe(0)
+      // A key with no window opens none.
+      await store.refund('other', resetAt)
+      expect(await store.peek('other')).toBeUndefined()
+    }
+  })
+
+  it('leaves a window that is not the one it names, as one reopened since is another', async () => {
+    for (const store of [memoryRates(), sqliteRates(join(await scratchDir('rates'), 'rates.sqlite'))]) {
+      const old = await store.hit('key', '1ms')
+
+      await Bun.sleep(5)
+      expect((await store.hit('key', '60000ms')).count).toBe(1)
+      await store.refund('key', old.resetAt)
+      expect((await store.peek('key'))!.count).toBe(1)
+    }
+  })
+})
+
+describe('the address of a request', () => {
+  it('is unknown for a request with no socket, which clientAddress counts as one client', () => {
+    const request = new Request('http://localhost/')
+
+    expect(knownAddress(request, null)).toBeUndefined()
+    expect(clientAddress(request, null)).toBe('unknown')
+    sendFrom(request, '203.0.113.7')
+    expect(knownAddress(request, null)).toBe('203.0.113.7')
   })
 })

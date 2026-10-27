@@ -78,6 +78,8 @@ export interface RateStore {
   hit: (key: string, window: Duration, weight?: number) => RateWindow | Promise<RateWindow>
   // The window open under `key` without counting an attempt, undefined when none is: what a limit counting only the posts that went through reads before the handler runs.
   peek?: (key: string) => RateWindow | undefined | Promise<RateWindow | undefined>
+  // Takes back one attempt `hit` counted under `key` in the window closing at `resetAt`, never below zero, and does nothing once that window is gone: how kay lets a call that started no work, such as kayjs-ai's resume of a reply it keeps, not spend the limit. A store without it simply keeps the attempt counted.
+  refund?: (key: string, resetAt: number) => void | Promise<void>
 }
 
 export interface RateWindow {

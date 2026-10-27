@@ -500,6 +500,25 @@ pgDescribe('pgRates', () => {
     expect((await rates.hit('ada', '300ms')).count).toBe(1)
   })
 
+  pgIt('takes one attempt back from the window it names, from any replica, never below zero', async () => {
+    await fresh()
+
+    const [first, second] = handles(2).map(handle => pgRates(handle))
+    const { resetAt } = await first!.hit('ada', '60s', 2)
+
+    await second!.refund!('ada', resetAt)
+    expect((await first!.peek!('ada'))?.count).toBe(1)
+    await second!.refund!('ada', resetAt)
+    await second!.refund!('ada', resetAt)
+    expect((await first!.peek!('ada'))?.count).toBe(0)
+    // A window that is not the one named is left alone.
+    await first!.hit('ada', '60s')
+    await second!.refund!('ada', resetAt - 1000)
+    expect((await first!.peek!('ada'))?.count).toBe(1)
+    await second!.refund!('bob', resetAt)
+    expect(await first!.peek!('bob')).toBeUndefined()
+  })
+
   pgIt('shares the counts between replicas, and stores no key in the clear', async () => {
     const sql = await fresh()
     const [first, second] = handles(2).map(handle => pgRates(handle))

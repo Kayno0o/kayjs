@@ -88,7 +88,8 @@ export function markEnded(key: string): void {
 }
 
 // Ends the reply kept under `key` if `owner` kept it, else the one about to be kept under it when the stop came first.
-export function stopKept(key: string, owner: Promise<string | undefined>): void {
+// `owned` is called once the reply found is the owner's.
+export function stopKept(key: string, owner: Promise<string | undefined>, owned?: () => Promise<void>): void {
   sweep(Date.now())
 
   const entry = slot().replies.get(key)
@@ -100,13 +101,16 @@ export function stopKept(key: string, owner: Promise<string | undefined>): void 
   }
 
   void (async () => {
-    if (same(await entry.owner, await owner))
+    if (same(await entry.owner, await owner)) {
       entry.reply.stop()
+      await owned?.()
+    }
   })()
 }
 
 // The reply kept under `key` for `owner`, as a reply that answers like an empty one if the owner is not the one who kept it.
-export function keptFor(key: string, owner: Promise<string | undefined>, empty: Reply): Reply | undefined {
+// `owned` is called once, as soon as the reply found is the owner's, whether it is read or not.
+export function keptFor(key: string, owner: Promise<string | undefined>, empty: Reply, owned?: () => Promise<void>): Reply | undefined {
   sweep(Date.now())
 
   const entry = slot().replies.get(key)
@@ -114,7 +118,14 @@ export function keptFor(key: string, owner: Promise<string | undefined>, empty: 
   if (entry === undefined)
     return undefined
 
-  const target = (async (): Promise<{ reply: Reply }> => ({ reply: same(await entry.owner, await owner) ? entry.reply : empty }))()
+  const target = (async (): Promise<{ reply: Reply }> => {
+    if (!same(await entry.owner, await owner))
+      return { reply: empty }
+
+    await owned?.()
+
+    return { reply: entry.reply }
+  })()
   const ahead = <Value>(pick: (reply: Reply) => AsyncIterable<Value>): AsyncIterable<Value> => ({
     [Symbol.asyncIterator]: () => {
       let source: AsyncIterator<Value> | undefined

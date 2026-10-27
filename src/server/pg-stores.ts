@@ -155,6 +155,12 @@ export function pgRates(pg: PgHandle): RateStore {
 
       return row ? { count: row.count, resetAt: Number(row.reset_at) } : undefined
     },
+    async refund(key, resetAt) {
+      const hash = await hashed(key)
+      const db = await pg.db()
+
+      await query(db, 'UPDATE kay_rates SET count = GREATEST(count - 1, 0) WHERE key = $1 AND reset_at = $2::bigint', [hash, resetAt])
+    },
   }, 'the rates store', { ready: pg.db })
 }
 

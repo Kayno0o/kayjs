@@ -202,6 +202,8 @@ const store: RateStore = {
 
 `peek(key)` is optional. It reads the open window without counting, which a limit set to `count: 'succeeded'` needs.
 
+`refund(key, resetAt)` is optional too. It takes one attempt back off the window that closes at `resetAt`, never below zero, and does nothing once that window is gone. kay calls it for a call that started no work, such as kayjs-ai's resume of a reply the server kept, and a store without it simply keeps the attempt counted.
+
 <ReadMore href="/llms/rate-limits">Several limits at once and the exact counting rules.</ReadMore>
 
 ## Rate limit a guard or an API route

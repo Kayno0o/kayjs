@@ -3,7 +3,7 @@ import type { AiLimit } from './errors'
 import type { Piece, Usage } from './types'
 import process from 'node:process'
 import { logFrom } from 'kay'
-import { appStore, configError, durationSeconds, keyedDigest, userOf } from 'kay/library'
+import { appStore, configError, durationSeconds, keyedDigest, knownAddress, userOf } from 'kay/library'
 import { clientAddress, memoryRates, rateKey } from 'kay/server'
 import { AiError } from './errors'
 
@@ -203,7 +203,8 @@ async function bounded<T>(read: () => T | Promise<T>): Promise<T> {
   }
 }
 
-async function visitorKey(keyOf: Settings['key'], { request, visitor: named }: Asker): Promise<string | undefined> {
+// With `strict`, a request with no address of its own has no key, where the limits count all of them as one client.
+async function visitorKey(keyOf: Settings['key'], { request, visitor: named }: Asker, strict = false): Promise<string | undefined> {
   let user = named
 
   if ((user === undefined || user === '') && request) {
@@ -215,14 +216,15 @@ async function visitorKey(keyOf: Settings['key'], { request, visitor: named }: A
   if (typeof user === 'string' && user !== '')
     return `user:${hashed(user)}`
 
-  return request ? `address:${hashed(rateKey(clientAddress(request, undefined)))}` : undefined
+  if (!request || (strict && knownAddress(request, undefined) === undefined))
+    return undefined
+
+  return `address:${hashed(rateKey(clientAddress(request, undefined)))}`
 }
 
 // Who a request counts as, the same key the limits count it under: the signed-in user, else the address; undefined for one with neither (no socket, as under `app.handle()`), which no one can tell apart from the next.
 export async function visitorOf(request: Request): Promise<string | undefined> {
-  const key = await visitorKey(slot().settings.key, { request, visitor: undefined, chars: 0, maxTokens: 0 })
-
-  return key === `address:${hashed(rateKey('unknown'))}` ? undefined : key
+  return visitorKey(slot().settings.key, { request, visitor: undefined, chars: 0, maxTokens: 0 }, true)
 }
 
 // A store shared by processes, a database say, then holds no address nor user id, only a digest keyed by the app's secret to count under.

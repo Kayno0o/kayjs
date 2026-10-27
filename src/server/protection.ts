@@ -132,7 +132,7 @@ function windowText(rateLimit: { window: Duration }): `${number}ms` {
 }
 
 // Fixed windows per key in this process: enough to slow a script hammering a form, which is what a contact or login form needs.
-export function memoryRates(): { hit: (key: string, window: Duration, weight?: number) => RateWindow, peek: (key: string) => RateWindow | undefined } {
+export function memoryRates(): SyncRates {
   // Ordered by when each window opened, so the oldest come first.
   const windows = new Map<string, RateWindow>()
 
@@ -158,6 +158,12 @@ export function memoryRates(): { hit: (key: string, window: Duration, weight?: n
       window.count += weight
 
       return { count: window.count, resetAt: window.resetAt }
+    },
+    refund(key, resetAt) {
+      const window = windows.get(key)
+
+      if (window && window.resetAt === resetAt && window.count > 0)
+        window.count -= 1
     },
   })
 }
@@ -231,11 +237,12 @@ export function sqliteRates(path: string): SyncRates {
   return {
     hit: (key, window, weight) => (opened ??= openRates(path)).hit(key, window, weight),
     peek: key => (opened ??= openRates(path)).peek(key),
+    refund: (key, resetAt) => (opened ??= openRates(path)).refund(key, resetAt),
   }
 }
 
 // Answered at once, as a store reading SQLite needs no promise.
-export interface SyncRates { hit: (key: string, window: Duration, weight?: number) => RateWindow, peek: (key: string) => RateWindow | undefined }
+export interface SyncRates { hit: (key: string, window: Duration, weight?: number) => RateWindow, peek: (key: string) => RateWindow | undefined, refund: (key: string, resetAt: number) => void }
 type OpenRates = SyncRates & { close: () => void }
 
 function openRates(path: string): OpenRates {
@@ -254,6 +261,7 @@ function openRates(path: string): OpenRates {
   // The row's old values are what both cases read: a closed window opens afresh, an open one counts the weight more.
   const hit = db.query<{ count: number, reset_at: number }, [string, number, number, number]>('INSERT INTO kay_rates (key, count, reset_at) VALUES (?1, ?4, ?2 + ?3) ON CONFLICT (key) DO UPDATE SET count = CASE WHEN reset_at <= ?2 THEN ?4 ELSE count + ?4 END, reset_at = CASE WHEN reset_at <= ?2 THEN ?2 + ?3 ELSE reset_at END RETURNING count, reset_at')
   const peek = db.query<{ count: number, reset_at: number }, [string, number]>('SELECT count, reset_at FROM kay_rates WHERE key = ? AND reset_at > ?')
+  const refund = db.query('UPDATE kay_rates SET count = MAX(count - 1, 0) WHERE key = ? AND reset_at = ?')
   const sweep = db.query('DELETE FROM kay_rates WHERE reset_at <= ?')
   let swept = 0
 
@@ -275,6 +283,9 @@ function openRates(path: string): OpenRates {
       const row = peek.get(hashed(key), Date.now())
 
       return row ? { count: row.count, resetAt: row.reset_at } : undefined
+    },
+    refund(key, resetAt) {
+      refund.run(hashed(key), resetAt)
     },
   }
 }
@@ -391,6 +402,10 @@ export interface RefusalInput {
   keyContext?: (() => Omit<RateKeyContext, 'client'>) | undefined
 }
 
+type RefundableStore = RateStore & { refund: NonNullable<RateStore['refund']> }
+// The attempts the refusal check counted for a request, which `refundRateLimit` can take back once.
+const hitsCounted = new WeakMap<Request, { store: RefundableStore, key: string, resetAt: number }[]>()
+
 export async function protectionRefusal(action: ServerAction<TSchema, unknown>, request: Request, { body, form, server, plain = form, keyContext }: RefusalInput): Promise<ProtectionRefusal | typeof PRETEND | undefined> {
   const { honeypot, messages } = action.protection ?? {}
   const field = honeypotField(action.protection)
@@ -459,7 +474,23 @@ export async function protectionRefusal(action: ServerAction<TSchema, unknown>, 
 
     const key = await actionKey(name, limit, request, client, keyContext)
     // A limit on the posts that went through only reads its count here; the handler's success adds to it.
-    const own = limit.count === 'succeeded' ? reached(await store.peek!(key), limit.max) : waitFor(await store.hit(key, windowText(limit)), limit.max)
+    let own: number | undefined
+
+    if (limit.count === 'succeeded') {
+      own = reached(await store.peek!(key), limit.max)
+    }
+    else {
+      const window = await store.hit(key, windowText(limit))
+
+      own = waitFor(window, limit.max)
+
+      if (store.refund) {
+        const counted = hitsCounted.get(request) ?? []
+
+        counted.push({ store: store as RefundableStore, key, resetAt: window.resetAt })
+        hitsCounted.set(request, counted)
+      }
+    }
 
     if (own !== undefined && (wait === undefined || own > wait))
       wait = own
@@ -484,6 +515,25 @@ export async function countSucceeded(action: ServerAction<TSchema, unknown>, req
 
   for (const { name, limit } of limits)
     await (limit.store ?? sharedRates(name)).hit(await actionKey(name, limit, request, client, undefined), windowText(limit))
+}
+
+// Takes back the attempts the action's `rateLimit` counted for this request, once, for a call that started no work: kayjs-ai's resume of a reply it keeps. A limit counting only the posts that went through is left alone, and so is a store with no `refund`; the request being the one the action answers, any other request has nothing counted.
+export async function refundRateLimit(request: Request | undefined): Promise<void> {
+  const counted = request && hitsCounted.get(request)
+
+  if (!counted)
+    return
+
+  hitsCounted.delete(request)
+
+  for (const { store, key, resetAt } of counted) {
+    try {
+      await store.refund(key, resetAt)
+    }
+    catch (error) {
+      kayLog('warn', 'a rate limit store could not take back an attempt, which stays counted', error)
+    }
+  }
 }
 
 // The most characters of a custom key kept as it is, a longer one is hashed: a store keeps a key whole.
@@ -704,6 +754,11 @@ export function trustProxy(app: Elysia, setting: ProxyConfig | number | boolean 
 // The socket's address, unless it is a proxy on this machine or network the app's `proxy` setting trusts: then the client's address as that proxy passed it on.
 // `proxy` stands in for the app's setting, for a plain Elysia app that `pages()` does not serve.
 export function clientAddress(request: Request, server: Server<unknown> | null | undefined, setting?: ProxyConfig | number | boolean): string {
+  return knownAddress(request, server, setting) ?? 'unknown'
+}
+
+// `clientAddress`, or undefined for a request with no socket address and none a trusted proxy forwarded, which `clientAddress` counts as the one client `unknown`.
+export function knownAddress(request: Request, server: Server<unknown> | null | undefined, setting?: ProxyConfig | number | boolean): string | undefined {
   const proxy = proxyOf(setting)
   const address = rewrittenAddress(request) ?? (server ?? servers.get(request))?.requestIP(request)?.address
   const trusted = proxy ?? proxies.get(request)
@@ -723,7 +778,7 @@ export function clientAddress(request: Request, server: Server<unknown> | null |
   if (trusted && !fromProxy && request.headers.has(trusted.header ?? 'x-forwarded-for'))
     warnUntrusted(trusted, address)
 
-  return address ?? 'unknown'
+  return address
 }
 
 // Each proxy appends the address it was reached from to `X-Forwarded-For`, so the client is `hops` entries from the end; with fewer, the request skipped an outer proxy and the first entry is who reached the inner one.

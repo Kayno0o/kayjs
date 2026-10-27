@@ -160,7 +160,7 @@ To let a reload of the tab find the conversation again, give `remember` a name, 
 
 If your `ask` has `outlive: true` (see [A reply that outlives the visitor](#a-reply-that-outlives-the-visitor)), `remember` also keeps a reply that was under way at the reload. The chat asks your action for it again: the finished turn appears, or the stream picks up and goes on. If the server kept nothing, no model is asked and the message goes back to the field.
 
-Stop, Escape and New conversation end that reply on the server too, with one more call to your action. Return `ask(...).progress()` for that: its snapshots tell the chat the reply outlives, so a chat whose reply does not makes no extra call. The resume and stop go through your action like a send, so its guards and rate limit apply to them.
+Stop, Escape and New conversation end that reply on the server too, with one more call to your action. Return `ask(...).progress()` for that: its snapshots tell the chat the reply outlives, so a chat whose reply does not makes no extra call. The resume and stop go through your action like a send, so its guards and rate limit apply to them. A resume or stop that finds your visitor's reply gives its attempt back, so reloading the page does not use up the limit.
 
 ## The reply
 
