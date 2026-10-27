@@ -32,6 +32,8 @@ const PLAIN_CLASSES = /^(?:Array|Map|Set|WeakMap|WeakSet|Date|URL|URLSearchParam
 const PLAIN_TYPES = new Set(['TSNumberKeyword', 'TSStringKeyword', 'TSBooleanKeyword', 'TSBigIntKeyword', 'TSSymbolKeyword', 'TSNullKeyword', 'TSUndefinedKeyword', 'TSLiteralType', 'TSTemplateLiteralType'])
 // The generic types that hold only what their arguments are.
 const PLAIN_GENERICS = new Set(['Array', 'ReadonlyArray', 'Record', 'Partial', 'Readonly', 'Map', 'Set', 'ReadonlyMap', 'ReadonlySet'])
+// The signals the modules of `kay` export.
+const KAY_SIGNAL_EXPORTS = new Map([['kay/analytics', new Set(['consent'])]])
 const CHECKED_WRITE: Rewrite = { before: WRITABLE, after: ')' }
 
 export const POSITION_SUFFIX = / \(\d+:\d+\)$/
@@ -249,6 +251,23 @@ class RewriteFinder {
       if (binding?.kind === 'module')
         this.signalBinding(binding, name, kind)
     }
+
+    for (const binding of Object.values(path.scope.bindings))
+      this.reportKaySignalSet(binding)
+  }
+
+  // A signal `kay` exports is written through `.set` as the ones a module declares are, though reads and writes of it are left to the types.
+  private reportKaySignalSet(binding: Binding) {
+    const specifier = binding.path.node
+
+    if (binding.kind !== 'module' || specifier.type !== 'ImportSpecifier' || specifier.importKind === 'type' || specifier.imported.type !== 'Identifier' || binding.path.parent.type !== 'ImportDeclaration')
+      return
+
+    if (!KAY_SIGNAL_EXPORTS.get(binding.path.parent.source.value)?.has(specifier.imported.name))
+      return
+
+    for (const reference of valueReferences(binding))
+      this.reportSetCall(reference, binding.identifier.name)
   }
 
   // A tag is a JSX identifier, so a component rendering itself by its name is no read of it, and neither is a type of that name.

@@ -647,6 +647,25 @@ describe('signal-set-call', () => {
   })
 })
 
+describe('signal-set-call on a signal kay exports', () => {
+  const found = (source: string) => compileKay(source, 'list.kay', { check: true }).diagnostics.filter(d => d.code === 'signal-set-call')
+  const page = (body: string) => `---\nimport { consent } from 'kay/analytics'\n${body}\n---\nbutton(onClick={() => consent.set('yes')}) Accept\n`
+
+  it('reports consent written through .set, its fix assigning it', () => {
+    const source = page('function decline() {\n  consent.set(\'no\')\n}')
+
+    expect(found(source).toSorted((a, b) => a.start - b.start).map(d => [source.slice(d.start, d.end), d.message])).toEqual([
+      ['consent.set(\'no\')', '`consent` is a signal, written by assigning it'],
+      ['consent.set(\'yes\')', '`consent` is a signal, written by assigning it'],
+    ])
+  })
+
+  it('follows an alias and leaves another module and another name', () => {
+    expect(found('---\nimport { consent as answer } from \'kay/analytics\'\nanswer.set(\'no\')\n---\np x\n').map(d => d.message)).toEqual(['`answer` is a signal, written by assigning it'])
+    expect(found('---\nimport { consent } from \'./mine\'\nimport { analytics } from \'kay/analytics\'\nconsent.set(\'no\')\nanalytics.set(1)\n---\np x\n')).toEqual([])
+  })
+})
+
 describe('uncaught-await', () => {
   it('reports an await block with no catch block and no try around it, one-line or not', () => {
     expect(lints('await comments\n  p Loading\nthen list\n  p {list.length}\n')).toEqual([{ code: 'uncaught-await', severity: 'warning', at: 'await comments' }])
