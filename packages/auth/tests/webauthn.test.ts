@@ -102,6 +102,33 @@ describe('signatures', () => {
   })
 })
 
+describe('extensions', () => {
+  const EXTENSIONS = new Map<string, Encodable>([['hmac-secret', true], ['credProtect', 2]])
+  // UP, UV and ED, with AT for a registration.
+  const ATTESTED_EXTENDED = 0x01 | 0x04 | 0x40 | 0x80
+
+  test('a registration carrying extensions after its key is read past them, and nothing may follow them', async () => {
+    const device = authenticator()
+    const request = registrationOptions({ rpName: 'Site', rpId: 'site.test', userName: 'ada', userId: 'u', exclude: [] })
+    const expected = { ...EXPECTED, challenge: request.challenge }
+
+    expect(await verifyRegistration(await device.create(request, { extensions: EXTENSIONS }), expected)).toBeDefined()
+    expect(await verifyRegistration(await device.create(request, { flags: ATTESTED_EXTENDED, extensions: new Map() }), expected)).toBeDefined()
+
+    for (const answer of [{ extensions: EXTENSIONS, after: new Uint8Array([0]) }, { extensions: 7 }, { extensions: new Uint8Array(2) }, { extensions: [EXTENSIONS] }, { flags: ATTESTED_EXTENDED }, { flags: 0x01 | 0x04 | 0x40, extensions: EXTENSIONS }])
+      expect(await verifyRegistration(await device.create(request, answer), expected)).toBeUndefined()
+  })
+
+  test('an assertion carrying extensions is read past them, and one claiming a new credential it does not carry is refused', async () => {
+    const { device, stored } = await es256Passkey()
+
+    expect(await verifyAuthentication(await device.get({ challenge: 'challenge' }, { extensions: EXTENSIONS }), EXPECTED, stored)).toBeDefined()
+
+    for (const answer of [{ extensions: EXTENSIONS, after: new Uint8Array([0]) }, { extensions: 7 }, { flags: 0x01 | 0x04 | 0x80 }, { flags: 0x01 | 0x04, extensions: EXTENSIONS }, { flags: 0x01 | 0x04 | 0x40 }])
+      expect(await verifyAuthentication(await device.get({ challenge: 'challenge' }, answer), EXPECTED, stored)).toBeUndefined()
+  })
+})
+
 describe('hostile answers are refused, never thrown', () => {
   test('a registration missing parts, or with parts of the wrong type', async () => {
     const [{ response, expected }] = vectors.registrations as [Vectors['registrations'][number]]

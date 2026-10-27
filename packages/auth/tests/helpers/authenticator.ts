@@ -9,6 +9,7 @@ const USER_VERIFIED = 0x04
 const BACKUP_ELIGIBLE = 0x08
 const BACKED_UP = 0x10
 const ATTESTED = 0x40
+const EXTENSIONS = 0x80
 
 export type Algorithm = 'ES256' | 'RS256' | 'EdDSA' | 'ML-DSA-44'
 
@@ -46,12 +47,14 @@ export interface Credential {
   counter: number
 }
 
-// How one answer departs from an honest one: another challenge or rpId, user verification left out, its flags byte replaced, or fields of its client data overridden.
+// How one answer departs from an honest one: another challenge or rpId, user verification left out, its flags byte replaced, extensions after its authenticator data (setting ED) and bytes after those, or fields of its client data overridden.
 export interface Answer {
   userVerified?: boolean
   challenge?: string
   rpId?: string
   flags?: number
+  extensions?: Encodable
+  after?: Uint8Array
   clientData?: Record<string, unknown>
 }
 
@@ -83,12 +86,13 @@ export function authenticator(options: AuthenticatorOptions = {}) {
       const rawId = Buffer.from(id, 'base64url')
       const authData = Buffer.concat([
         await rpIdHash(answer.rpId ?? credentialRpId),
-        Buffer.from([answer.flags ?? (flags(answer.userVerified ?? true, options.synced) | ATTESTED)]),
+        Buffer.from([answer.flags ?? (flags(answer, options.synced) | ATTESTED)]),
         counterBytes(0),
         Buffer.alloc(16),
         Buffer.from([rawId.length >> 8, rawId.length & 0xFF]),
         rawId,
         encodeCbor(cose),
+        ...tail(answer),
       ])
       const clientDataJSON = clientData({ type: 'webauthn.create', challenge: answer.challenge ?? request.challenge, origin, ...answer.clientData })
       const statement = options.format === 'packed'
@@ -117,7 +121,7 @@ export function authenticator(options: AuthenticatorOptions = {}) {
 
       held.counter = counter ?? (counting ? held.counter + 1 : 0)
 
-      const authData = Buffer.concat([await rpIdHash(answer.rpId ?? held.rpId), Buffer.from([answer.flags ?? flags(answer.userVerified ?? true, options.synced)]), counterBytes(held.counter)])
+      const authData = Buffer.concat([await rpIdHash(answer.rpId ?? held.rpId), Buffer.from([answer.flags ?? flags(answer, options.synced)]), counterBytes(held.counter), ...tail(answer)])
       const clientDataJSON = clientData({ type: 'webauthn.get', challenge: answer.challenge ?? request.challenge, origin, ...answer.clientData })
 
       return {
@@ -156,8 +160,13 @@ function bytes(base64url: string | undefined): Buffer {
   return Buffer.from(base64url!, 'base64url')
 }
 
-function flags(userVerified: boolean, synced = false): number {
-  return USER_PRESENT | (userVerified ? USER_VERIFIED : 0) | (synced ? BACKUP_ELIGIBLE | BACKED_UP : 0)
+function flags(answer: Answer, synced = false): number {
+  return USER_PRESENT | ((answer.userVerified ?? true) ? USER_VERIFIED : 0) | (synced ? BACKUP_ELIGIBLE | BACKED_UP : 0) | (answer.extensions === undefined ? 0 : EXTENSIONS)
+}
+
+// The extensions an answer carries, then the bytes it adds after them.
+function tail(answer: Answer): Uint8Array[] {
+  return [...answer.extensions === undefined ? [] : [encodeCbor(answer.extensions)], ...answer.after ? [answer.after] : []]
 }
 
 async function rpIdHash(rpId: string): Promise<Buffer> {
