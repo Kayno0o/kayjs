@@ -57,6 +57,7 @@ ui: { sidePanel: { close: 'Fermer' } }
 - `ui.pagination.*`: `label` (`Pagination`), `next` (`Next`), `previous` (`Previous`)
 - `ui.rangeInput.*`: `from` (`{label} from`), `to` (`{label} to`)
 - `ui.rating.*`: `label` (`{value} out of {max}`)
+- `ui.rowsField.*`: `add` (`Add row`), `added` (`Row {n} added`), `remove` (`Remove row {n}`), `removed` (`Row {n} removed`)
 - `ui.saveForm.*`: `cancel` (`Cancel`), `clean` (`No unsaved change.`), `dirty` (`Unsaved changes.`), `discard` (`Discard`), `failure` (`Could not save.`), `save` (`Save`), `saving` (`Saving…`)
 - `ui.scatterChart.*`: `empty` (`No data yet.`)
 - `ui.select.*`: `loading` (`Loading…`)

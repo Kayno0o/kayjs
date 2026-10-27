@@ -1,0 +1,18 @@
+---
+import { signal } from 'kay'
+import RowsField from '@kaynooo/kayjs-ui/rows-field.kay'
+import SaveForm from '@kaynooo/kayjs-ui/save-form.kay'
+
+// A signal editor writing the rows back, a plain form posting them under a name, and a SaveForm around the same field; `save` stands in for the action.
+const { save } = props<{ save: (form: FormData) => Promise<void> }>()
+
+const headers = signal([{ name: 'X-Frame-Options', value: 'DENY' }, { name: 'Cache-Control', value: 'no-store' }])
+const columns = [{ key: 'name', label: 'Header' }, { key: 'value', label: 'Value', placeholder: 'Value of the header' }]
+const action = Object.assign(async (form: FormData) => save(form), { pending: signal(false), url: '/_kay/action/form/rows' })
+---
+RowsField#editor(rows={headers()} columns={columns} label="Response headers" addLabel="Add header" max={3} min={1} removeLabel={index => `Remove header ${index + 1}`} onChange={headers.set})
+p#out {JSON.stringify(headers())}
+form#plain
+  RowsField#posted(rows={[{ name: 'A', value: '1' }]} columns={columns} name="header" label="Posted headers")
+SaveForm(action={action} saved="Saved.")
+  RowsField#saved(rows={[{ name: 'A', value: '1' }]} columns={columns} name="saved" label="Saved headers")

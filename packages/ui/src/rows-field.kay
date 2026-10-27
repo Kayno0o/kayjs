@@ -1,0 +1,129 @@
+--- <Row extends Record<string, string>>
+import type { JSX } from 'kay'
+import { announce } from './announce'
+import { defaultKept, onFormReset } from './form-reset'
+import { effect, flush, recipe, signal, untrack } from 'kay'
+import { wording } from 'kay/words'
+import Button from './button.kay'
+import IconButton from './icon-button.kay'
+import TextInput from './text-input.kay'
+
+// 'kui-rows-field' stays as the name of the field for an app's CSS; the columns are a grid sized by `--_columns`, so the headings, every row and the remove buttons line up.
+const look = recipe({
+  parts: {
+    root: 'kui-rows-field flex flex-col gap-2',
+    head: 'grid grid-cols-[repeat(var(--_columns),minmax(0,1fr))_2rem] gap-2 px-px text-xs text-muted',
+    heading: 'truncate',
+    row: 'grid grid-cols-[repeat(var(--_columns),minmax(0,1fr))_2rem] items-center gap-2',
+    input: 'min-w-0',
+    remove: '',
+    add: 'self-start',
+  },
+})
+
+const NONE: never[] = []
+
+const { rows = NONE, columns, label, name, onChange, min = 0, max, addLabel = wording('ui.rowsField.add', 'Add row'), removeLabel, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'role' | 'onChange'> & {
+  // The rows to start with, and the ones to show whenever the parent passes others: a field in a form posting to an action needs nothing else, and an editor keeping them in a signal writes them back in `onChange`.
+  rows?: readonly Row[] | undefined
+  // One text box per column of a row: `key` is the property of the row it edits, `label` names it for screen readers and heads its column, `placeholder` defaults to the label.
+  columns: readonly { key: keyof Row & string, label: string, placeholder?: string | undefined, type?: 'text' | 'email' | 'url' | 'tel' | 'search' | undefined, name?: string | undefined }[]
+  // Names the field for screen readers.
+  label: string
+  // Inside a form, each column posts under `<name>_<key>` (or its own `name`), once per row in the order shown, so a blank cell keeps its place: an action reads them as `s.Array(s.String())` fields of one length.
+  name?: string | undefined
+  // Gets the new rows after every edit, an added row and a removed one. Called without a wait: it can store the rows, not refuse a change.
+  onChange?: ((rows: Row[]) => unknown) | undefined
+  // The fewest rows: Remove stops there. The most: Add stops there.
+  min?: number | undefined
+  max?: number | undefined
+  addLabel?: string | undefined
+  // Names the button removing the row at `index` (from 0), such as `Remove header 2`.
+  removeLabel?: ((index: number) => string) | undefined
+}>()
+
+let root: HTMLElement | undefined
+let nextId = 0
+const current = signal<readonly Row[]>(rows)
+// One id per row, so a row removed from the middle leaves the boxes of the others as they are.
+const ids = signal<number[]>(untrack(() => rows.map(() => nextId++)))
+
+// What the form goes back to on a reset: the rows it started with, or the ones last saved by a SaveForm.
+const initial = defaultKept(() => root, () => current(), untrack(() => rows))
+
+// The parent passed other rows, which have the last word; their ids are kept while their count is.
+effect(() => {
+  const next = rows
+
+  if (untrack(current) === next)
+    return
+
+  current = next
+
+  if (untrack(ids).length !== next.length)
+    ids = next.map(() => nextId++)
+})
+
+const entries = () => current().map((row, index) => ({ row, index, id: ids()[index] ?? index }))
+const full = () => max !== undefined && current().length >= max
+const removeName = (index: number) => removeLabel?.(index) ?? wording('ui.rowsField.remove', 'Remove row {n}', { n: index + 1 })
+const boxes = () => [...root?.querySelectorAll<HTMLElement>('[data-part=row]') ?? []]
+
+function commit(next: readonly Row[]) {
+  current = next
+  onChange?.([...next])
+}
+
+function edit(index: number, key: string, text: string) {
+  commit(current().map((row, at) => at === index ? { ...row, [key]: text } : row))
+}
+
+function add() {
+  if (full())
+    return
+
+  ids = [...ids(), nextId++]
+  commit([...current(), Object.fromEntries(columns.map(column => [column.key, ''])) as Row])
+  flush()
+  boxes().at(-1)?.querySelector('input')?.focus()
+  announce(wording('ui.rowsField.added', 'Row {n} added', { n: current().length }))
+}
+
+function drop(index: number) {
+  if (current().length <= min)
+    return
+
+  ids = ids().filter((_, at) => at !== index)
+  commit(current().filter((_, at) => at !== index))
+  flush()
+
+  // Focus goes to the row that took its place, else the one before it, else the Add button.
+  const rowsLeft = boxes()
+
+  ;(rowsLeft[index] ?? rowsLeft.at(-1))?.querySelector('input')?.focus()
+
+  if (rowsLeft.length === 0)
+    root?.querySelector<HTMLElement>('[data-part=add]')?.focus()
+
+  announce(wording('ui.rowsField.removed', 'Row {n} removed', { n: index + 1 }))
+}
+
+// A reset puts the boxes back on their defaults, but not the rows added or removed since: those come back as they started.
+onFormReset(() => root, () => {
+  const start = initial()
+
+  ids = start.map(() => nextId++)
+  commit(start)
+})
+---
+div(part="root" {...rest} ref={element => root = element} role="group" aria-label={label} style={`--_columns:${columns.length}`})
+  if current().length > 0
+    div(part="head" aria-hidden="true")
+      for column of columns key={column.key}
+        span(part="heading") {column.label}
+  for entry of entries() key={entry.id}
+    div(part="row")
+      for column of columns key={column.key}
+        TextInput(part="input" type={column.type} name={column.name ?? (name === undefined ? undefined : `${name}_${column.key}`)} aria-label={`${column.label} ${entry.index + 1}`} placeholder={column.placeholder ?? column.label} value={entry.row[column.key] ?? ''} onInput={text => edit(entry.index, column.key, text)})
+      IconButton(part="remove" icon="close" variant="ghost" size="sm" label={removeName(entry.index)} disabled={current().length <= min} onClick={() => drop(entry.index)})
+  Button(part="add" icon="plus" variant="ghost" size="sm" label={addLabel} disabled={full()} onClick={add})

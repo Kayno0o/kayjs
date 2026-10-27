@@ -124,6 +124,7 @@ export default defineMessages({
     pagination: { label: 'Pagination', next: 'Suivant', previous: 'Précédent' },
     rangeInput: { from: '{label} de', to: '{label} à' },
     rating: { label: '{value} sur {max}' },
+    rowsField: { add: 'Ajouter une ligne', added: 'Ligne {n} ajoutée', remove: 'Supprimer la ligne {n}', removed: 'Ligne {n} supprimée' },
     saveForm: {
       cancel: 'Annuler',
       clean: 'Aucune modification non enregistrée.',

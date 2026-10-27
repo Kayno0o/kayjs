@@ -55,6 +55,7 @@ import QrCode from '@kaynooo/kayjs-ui/qr-code.kay'
 import RadioGroup from '@kaynooo/kayjs-ui/radio-group.kay'
 import RangeInput from '@kaynooo/kayjs-ui/range-input.kay'
 import Rating from '@kaynooo/kayjs-ui/rating.kay'
+import RowsField from '@kaynooo/kayjs-ui/rows-field.kay'
 import SaveForm from '@kaynooo/kayjs-ui/save-form.kay'
 import ScatterChart from '@kaynooo/kayjs-ui/scatter-chart.kay'
 import Segmented from '@kaynooo/kayjs-ui/segmented.kay'
@@ -164,6 +165,7 @@ export const COMPONENTS = {
   'radio-group': RadioGroup,
   'range-input': RangeInput,
   'rating': Rating,
+  'rows-field': RowsField,
   'save-form': SaveForm,
   'scatter-chart': ScatterChart,
   'segmented': Segmented,
@@ -256,6 +258,7 @@ export const CASES: Record<string, Record<string, unknown>> = {
   'radio-group': { label: 'Planet', options, value: 'mars' },
   'range-input': { label: 'Hours', min: 0, max: 24 },
   'rating': { value: 4.5 },
+  'rows-field': { label: 'Headers', columns: [{ key: 'name', label: 'Header' }], rows: [{ name: 'A' }] },
   'save-form': { action, failure: 'Failed' },
   'scatter-chart': { points: [{ key: 'a', label: 'Hades', x: 1, y: 2 }], label: 'Games' },
   'segmented': { label: 'Range', options, value: 'mars', orientation: 'vertical' },
