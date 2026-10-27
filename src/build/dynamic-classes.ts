@@ -1,8 +1,9 @@
 import type { Expression, Node, ObjectExpression } from '@babel/types'
+import type { ClassIndex, FunctionNode } from './class-sources'
 import { existsSync, statSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
-import { parseExpression } from '@babel/parser'
 import { patternNames } from '../compiler/pattern-names'
+import { classIndex, nodeKey, rootOf, unwrapped } from './class-sources'
 import { readSource, SCRIPT_FILE } from './files'
 
 // A place where a source sets a class from a value the build cannot read: no page carries the rule of a class it ends up naming, unless the app lists it with `@source inline`.
@@ -21,100 +22,14 @@ export interface RuntimeClass {
 export type JudgeResult = 'covered' | 'uncovered' | 'none'
 export type Judge = (parts: string[]) => JudgeResult
 
-// A setter of the class attribute in a script, and its argument list or right-hand side.
-const SETTER = /\bclassList\s*\.\s*(?:add|toggle|replace)\s*\(|\.className\s*\+?=(?!=)|\bsetAttribute\s*\(\s*(["'])class\1\s*,|\bclass\s*=\s*\{/g
-const MANY_ARGUMENTS = 8
 const WHITESPACE = /\s+/g
-// A line starting like this goes on with the expression of the line before.
-const CONTINUED = /\s*(?:[?:.+]|&&|\|\|)/y
-// A destructured prop, `a`, `b: c`, `d = 1` or `...rest`: its name and the one it is renamed to.
-const PROP_NAME = /^\s*(?:\.\.\.)?(\w+)(?:\s*:\s*(\w+))?/
 // A function joining class names, whose result is made of its arguments.
 const JOINERS = new Set(['cn', 'cx', 'clsx', 'classNames', 'classnames', 'twMerge', 'twJoin'])
 // An element's own class, read back to be set again.
 const CLASS_READS = new Set(['className', 'classList'])
-const PROPS = /\b(?:const|let)\s*\{([^}]*)\}\s*=\s*props\b/g
+const SETTER_WORD = /\bclass|setAttribute/
 const EXPRESSION_LIMIT = 80
 const RESOLVE_DEPTH = 3
-const QUOTES = new Set(['"', '\'', '`'])
-const CLOSERS: Record<string, string> = { '(': ')', '[': ']', '{': '}' }
-
-// The end of the expression starting at `from`: the first top-level `,`, `)`, `;`, `}` or newline, quotes, templates and brackets skipped over.
-function expressionEnd(text: string, from: number, stopAtNewline: boolean): number {
-  const stack: string[] = []
-
-  for (let at = from; at < text.length; at++) {
-    const char = text[at]!
-
-    if (QUOTES.has(char)) {
-      at = stringEnd(text, at)
-
-      continue
-    }
-
-    if (CLOSERS[char] !== undefined) {
-      stack.push(CLOSERS[char])
-
-      continue
-    }
-
-    if (stack.length > 0) {
-      if (char === stack.at(-1))
-        stack.pop()
-
-      continue
-    }
-
-    if (char === ',' || char === ')' || char === ';' || char === '}' || char === ']')
-      return at
-
-    if (stopAtNewline && char === '\n') {
-      CONTINUED.lastIndex = at + 1
-
-      if (!CONTINUED.test(text))
-        return at
-    }
-  }
-
-  return text.length
-}
-
-// The index of the quote closing the string or template that opens at `from`, `${}` of a template skipped over.
-function stringEnd(text: string, from: number): number {
-  const quote = text[from]!
-
-  for (let at = from + 1; at < text.length; at++) {
-    const char = text[at]!
-
-    if (char === '\\') {
-      at++
-
-      continue
-    }
-
-    if (quote === '`' && char === '$' && text[at + 1] === '{') {
-      let depth = 1
-
-      for (at += 2; at < text.length && depth > 0; at++) {
-        if (QUOTES.has(text[at]!))
-          at = stringEnd(text, at)
-        else if (text[at] === '{')
-          depth++
-        else if (text[at] === '}')
-          depth--
-      }
-
-      at--
-
-      continue
-    }
-
-    if (char === quote)
-      return at
-  }
-
-  return text.length
-}
 
 interface Verdict {
   // The literal parts of the value, in order.
@@ -135,8 +50,6 @@ interface Scope {
   receiver?: string | undefined
 }
 
-type FunctionNode = Extract<Expression, { type: 'FunctionExpression' | 'ArrowFunctionExpression' }>
-
 // What reading a source shares with the modules it takes values from: the files read, and their scopes.
 interface Reads {
   modules: Set<string>
@@ -144,110 +57,12 @@ interface Reads {
 }
 
 const EXTENSION = /\.\w+$/
-const ASYNC_BEFORE = /\basync\s*$/
-const TRAILING_DOT = /\??\.$/
-
-const SPAN_KEYS = new Set(['start', 'end', 'loc', 'range', 'extra', 'optional', 'leadingComments', 'trailingComments', 'innerComments', 'comments', 'errors', 'tokens'])
-const OPTIONAL_TYPE = /^Optional\B/
-
-// What a node reads as, written the same whatever the spacing, the quotes and `?.`: the receiver of `el.className = el.className + x` is told by it from another element, whatever it is made of, a call, an index or a cast.
-function nodeKey(node: Node): string {
-  return JSON.stringify(node, (key, value: unknown) => {
-    if (SPAN_KEYS.has(key))
-      return undefined
-
-    return key === 'type' && typeof value === 'string' ? value.replace(OPTIONAL_TYPE, '') : value
-  })
-}
-
-const NAME_END = /[\w$]+$/
-const DOT_END = /(?:\?\.|\.)\s*$/
-const RECEIVER_LIMIT = 2000
-
-// The chain written right before `end` of the text, whatever its length: names, dots, and the brackets and parentheses between them.
-function receiverBefore(text: string, end: number): string | undefined {
-  const floor = Math.max(0, end - RECEIVER_LIMIT)
-  let at = end
-
-  for (;;) {
-    const start = at
-
-    while (at > floor && (text[at - 1] === ')' || text[at - 1] === ']')) {
-      const opened = openerBefore(text, at - 1, floor)
-
-      if (opened === undefined)
-        return undefined
-
-      at = opened
-    }
-
-    const name = NAME_END.exec(text.slice(floor, at))
-
-    if (name !== null)
-      at -= name[0].length
-
-    if (at === start)
-      break
-
-    const dot = DOT_END.exec(text.slice(floor, at))
-
-    if (dot === null)
-      break
-
-    at -= dot[0].length
-  }
-
-  if (at === end)
-    return undefined
-
-  try {
-    return nodeKey(parseExpression(text.slice(at, end), { plugins: ['typescript'] }))
-  }
-  catch {
-    return undefined
-  }
-}
-
-// The index of the bracket opening the one that closes at `close`.
-function openerBefore(text: string, close: number, floor: number): number | undefined {
-  let depth = 0
-
-  for (let at = close; at >= floor; at--) {
-    const char = text[at]!
-
-    if (char === ')' || char === ']')
-      depth++
-    else if ((char === '(' || char === '[') && --depth === 0)
-      return at
-  }
-
-  return undefined
-}
 
 const CLOSED: Verdict = { parts: [], open: false }
 const OPEN: Verdict = { parts: [], open: true }
 
 function merged(verdicts: Verdict[]): Verdict {
   return { parts: verdicts.flatMap(verdict => verdict.parts), open: verdicts.some(verdict => verdict.open) }
-}
-
-// The identifier a member chain starts from, `props.class` -> `props`.
-function rootOf(node: Expression): string | undefined {
-  let current = node
-
-  while (current.type === 'MemberExpression' || current.type === 'OptionalMemberExpression')
-    current = current.object
-
-  return current.type === 'Identifier' ? current.name : undefined
-}
-
-function unwrapped(node: Expression): Expression {
-  let current = node
-
-  while (current.type === 'ParenthesizedExpression' || current.type === 'TSAsExpression' || current.type === 'TSSatisfiesExpression' || current.type === 'TSNonNullExpression' || current.type === 'TSTypeAssertion')
-    current = current.expression
-
-  return current
 }
 
 // Every value of an object literal, those of the objects nested in it included, each judged as an expression: a spread or a method is open.
@@ -430,29 +245,20 @@ function verdictOf(node: Expression, scope: Scope, depth = 0): Verdict {
   return OPEN
 }
 
-// Each place a source sets a class: how, on which line, the expression written and the scope it is judged in.
-function* setters(text: string, file: string | undefined, reads: Reads): Generator<{ line: number, how: string, source: string, scope: Scope }> {
-  const whole = scopeOf(text, file, reads, true)
+// Each value a source sets a class to: how, on which line, the expression and the scope it is judged in.
+function* setters(text: string, file: string | undefined, reads: Reads): Generator<{ line: number, how: string, node: Expression, text: string, scope: Scope }> {
+  // Every setter writes one of these words, so a source holding none is not parsed.
+  if (!SETTER_WORD.test(text))
+    return
 
-  for (const match of text.matchAll(SETTER)) {
-    const how = setterName(match[0])
-    const before = text.slice(0, match.index).replace(TRAILING_DOT, '')
-    const scope: Scope = { ...whole, receiver: receiverBefore(before, before.length) }
-    let from = match.index + match[0].length
+  const index = classIndex(text, file)
+  const whole = scopeOf(index, file, reads, true)
 
-    for (let index = 0; index < classArguments(how); index++) {
-      const end = expressionEnd(text, from, how === 'className =')
-      const source = text.slice(from, end).trim()
-      const last = text[end] !== ','
+  for (const { line, how, values, receiver } of index.setters) {
+    const scope: Scope = { ...whole, receiver }
 
-      from = end + 1
-
-      if (source !== '')
-        yield { line: text.slice(0, match.index).split('\n').length, how, source, scope }
-
-      if (last)
-        break
-    }
+    for (const value of values)
+      yield { line, how, node: value.node, text: value.text, scope }
   }
 }
 
@@ -462,11 +268,11 @@ function* setters(text: string, file: string | undefined, reads: Reads): Generat
 export function runtimeClasses(text: string, judge: Judge, file?: string): RuntimeClass[] {
   const found: RuntimeClass[] = []
 
-  for (const { line, how, source, scope } of setters(text, file, { modules: new Set(), scopes: new Map() })) {
-    const reported = reportedClass(source, scope, judge)
+  for (const { line, how, node, text: written, scope } of setters(text, file, { modules: new Set(), scopes: new Map() })) {
+    const reported = reportedClass(node, scope, judge)
 
     if (reported !== undefined)
-      found.push({ line, how, part: reported, expression: shortened(source) })
+      found.push({ line, how, part: reported, expression: shortened(written) })
   }
 
   return found
@@ -476,8 +282,8 @@ export function runtimeClasses(text: string, judge: Judge, file?: string): Runti
 export function classModules(text: string, file: string): string[] {
   const reads: Reads = { modules: new Set(), scopes: new Map() }
 
-  for (const { source, scope } of setters(text, file, reads))
-    reportedClass(source, scope, () => 'none')
+  for (const { node, scope } of setters(text, file, reads))
+    reportedClass(node, scope, () => 'none')
 
   return [...reads.modules]
 }
@@ -488,61 +294,23 @@ function shortened(source: string): string {
   return flat.length > EXPRESSION_LIMIT ? `${flat.slice(0, EXPRESSION_LIMIT)}...` : flat
 }
 
-// The names a `const { a, b: c } = props<...>()` of the source takes, and every value a `const`, `let` or assignment gives a name, wherever in the file it sits, so a name declared twice or reassigned is judged by all its values.
-// `file` lets a name imported from a relative module be read there; `component` tells a source whose props are in `props` from a plain module.
-function scopeOf(text: string, file: string | undefined, reads: Reads, component: boolean): Scope {
-  const props = new Set<string>(component ? ['props'] : [])
-
-  for (const match of component ? text.matchAll(PROPS) : []) {
-    for (const entry of match[1]!.split(',')) {
-      const name = PROP_NAME.exec(entry)
-
-      if (name !== null)
-        props.add(name[2] ?? name[1]!)
-    }
-  }
-
-  let masked: { code: string, scripts: string } | undefined
-  const masks = () => {
-    if (masked === undefined) {
-      const code = codeOf(text, file?.endsWith('.kay') === true)
-
-      masked = { code, scripts: scriptsOf(code) }
-    }
-
-    return masked
-  }
-  const initialized = new Map<string, Expression[] | undefined>()
-  const declared = new Map<string, FunctionNode[] | undefined>()
+// The scope of a source's index: `file` lets a name imported from a relative module be read there; `component` tells a source whose props are in `props` from a plain module.
+function scopeOf(index: ClassIndex, file: string | undefined, reads: Reads, component: boolean): Scope {
   const imports = new Map<string, { scope: Scope, name: string } | undefined>()
 
-  const scope: Scope = {
-    props,
-    initializers(name) {
-      if (!initialized.has(name))
-        initialized.set(name, initializersOf(text, masks(), name))
-
-      return initialized.get(name)
-    },
-    functions(name) {
-      if (!declared.has(name))
-        declared.set(name, functionsOf(text, name, scope.initializers(name), masks().scripts))
-
-      return declared.get(name)
-    },
+  return {
+    props: new Set(component ? ['props', ...index.props] : []),
+    initializers: name => initializersOf(index, name),
+    functions: name => functionsOf(index, name),
     imported(name) {
       if (!imports.has(name))
-        imports.set(name, file === undefined ? undefined : importedFrom(text, file, name, reads, masks().scripts))
+        imports.set(name, file === undefined ? undefined : importedFrom(index, file, name, reads))
 
       return imports.get(name)
     },
   }
-
-  return scope
 }
 
-const IMPORT = /\bimport\s+(?!type\b)(?:[\w$]+\s*,\s*)?\{([^}]*)\}\s*from\s*(["'])([^"'\n]+)\2/g
-const IMPORTED_NAME = /^\s*([\w$]+)(?:\s+as\s+([\w$]+))?\s*$/
 const MODULE_ENDINGS = ['', '.ts', '.tsx', '.mts', '.js', '.mjs', '/index.ts', '/index.js']
 const JS_ENDING = /\.(?:js|mjs)$/
 
@@ -557,75 +325,43 @@ export function moduleFile(from: string, specifier: string): string | undefined 
   return candidates.find(path => existsSync(path) && statSync(path).isFile())
 }
 
-// The scope of the module `import { a as name } from './x'` brings `name` from, with the name it exports, undefined for anything the source declares itself or a module that is no relative script.
-function importedFrom(text: string, file: string, name: string, reads: Reads, scripts: string): { scope: Scope, name: string } | undefined {
-  if (shadowed(text, name, scripts))
+// The scope of the module `import { a as name } from './x'` brings `name` from, with the name it exports, undefined for anything the source binds otherwise or a module that is no relative script.
+function importedFrom(index: ClassIndex, file: string, name: string, reads: Reads): { scope: Scope, name: string } | undefined {
+  const imported = index.imports.get(name)
+
+  if (imported === undefined || index.shadowed.has(name) || !imported.specifier.startsWith('.') || (EXTENSION.test(imported.specifier) && !SCRIPT_FILE.test(imported.specifier)))
     return undefined
 
-  for (const [, names, , specifier] of text.matchAll(IMPORT)) {
-    if (!specifier!.startsWith('.') || (EXTENSION.test(specifier!) && !SCRIPT_FILE.test(specifier!)))
-      continue
+  const path = moduleFile(file, imported.specifier)
 
-    for (const entry of names!.split(',')) {
-      const parts = IMPORTED_NAME.exec(entry)
+  if (path === undefined)
+    return undefined
 
-      if (parts === null || (parts[2] ?? parts[1]) !== name)
-        continue
+  let scope = reads.scopes.get(path)
 
-      const path = moduleFile(file, specifier!)
-
-      if (path === undefined)
-        return undefined
-
-      let scope = reads.scopes.get(path)
-
-      if (scope === undefined) {
-        scope = scopeOf(readSource(path).text, path, reads, false)
-        reads.scopes.set(path, scope)
-      }
-
-      reads.modules.add(path)
-
-      return { scope, name: parts[1]! }
-    }
+  if (scope === undefined) {
+    scope = scopeOf(classIndex(readSource(path).text, path), path, reads, false)
+    reads.scopes.set(path, scope)
   }
 
-  return undefined
+  reads.modules.add(path)
+
+  return { scope, name: imported.imported }
+}
+
+// Every value a `const`, `let`, `var` or assignment gives `name`, undefined when nothing declares it or it is also bound in a way no value tells.
+function initializersOf(index: ClassIndex, name: string): Expression[] | undefined {
+  return index.declared.has(name) && !index.shadowed.has(name) ? index.values.get(name) : undefined
 }
 
 // The functions `function name() {}`, `const name = () => ...` and `const name = function () {}` make `name`, undefined when it is anything else too or nothing declares it.
-function functionsOf(text: string, name: string, initial: Expression[] | undefined, scripts: string): FunctionNode[] | undefined {
-  const escaped = RegExp.escape(name)
-  const found: FunctionNode[] = []
-
-  if (shadowed(text, name, scripts))
+function functionsOf(index: ClassIndex, name: string): FunctionNode[] | undefined {
+  if (index.shadowed.has(name) || index.async.has(name))
     return undefined
 
-  for (const match of text.matchAll(new RegExp(`(?<![\\w$.])function\\s*\\*?\\s*${escaped}\\s*\\(`, 'g'))) {
-    if (ASYNC_BEFORE.test(text.slice(Math.max(0, match.index - 12), match.index)))
-      return undefined
+  const found = [...index.functions.get(name) ?? []]
 
-    const close = expressionEnd(text, match.index + match[0].length, false)
-    const open = text.indexOf('{', close)
-    const end = open === -1 ? -1 : expressionEnd(text, open + 1, false)
-
-    if (end === text.length || end === -1)
-      return undefined
-
-    try {
-      const declaration = parseExpression(text.slice(match.index, end + 1), { plugins: ['typescript'] })
-
-      if (declaration.type !== 'FunctionExpression')
-        return undefined
-
-      found.push(declaration)
-    }
-    catch {
-      return undefined
-    }
-  }
-
-  for (const value of initial?.map(unwrapped) ?? []) {
+  for (const value of initializersOf(index, name)?.map(unwrapped) ?? []) {
     if (value.type !== 'ArrowFunctionExpression' && value.type !== 'FunctionExpression')
       return undefined
 
@@ -635,298 +371,8 @@ function functionsOf(text: string, name: string, initial: Expression[] | undefin
   return found.length === 0 ? undefined : found
 }
 
-const CONTROL_KEYWORDS = new Set(['if', 'while', 'switch', 'with', 'for', 'return', 'typeof', 'void', 'delete', 'await', 'yield', 'new', 'in', 'of', 'else', 'do', 'throw', 'case'])
-const CASE_END = /\bcase$/
-const TRAILING_WORD = /[\w$]+$/
-const BODY_OR_ARROW = /^\s*(?::[^{;=]+)?(?:\{|=>)/
-const OPENING = '([{'
-const CLOSING = ')]}'
-
-// The index of the `(` enclosing `at`, looking out through braces and brackets, or undefined at the top of the text.
-function enclosingParen(code: string, at: number): number | undefined {
-  let depth = 0
-
-  for (let i = at - 1; i >= 0; i--) {
-    if (CLOSING.includes(code[i]!)) {
-      depth++
-    }
-    else if (OPENING.includes(code[i]!)) {
-      if (depth > 0)
-        depth--
-      else if (code[i] === '(')
-        return i
-    }
-  }
-
-  return undefined
-}
-
-// The index after the `)` closing the `(` at `open`.
-function closeOf(code: string, open: number): number {
-  let depth = 0
-
-  for (let i = open; i < code.length; i++) {
-    if (OPENING.includes(code[i]!))
-      depth++
-    else if (CLOSING.includes(code[i]!) && --depth === 0)
-      return i + 1
-  }
-
-  return code.length
-}
-
-// Whether `name` is written in the parameters of a method, a function, an arrow or a `catch`: a parenthesis followed by a body or `=>`, after something that is no keyword taking a condition.
-function inParameters(code: string, name: string): boolean {
-  for (const match of code.matchAll(new RegExp(`(?<![\\w$.])${RegExp.escape(name)}(?![\\w$])`, 'g'))) {
-    const open = enclosingParen(code, match.index)
-
-    if (open === undefined)
-      continue
-
-    const word = TRAILING_WORD.exec(code.slice(0, open).trimEnd())?.[0]
-
-    // After a `?` or a `case`, the `:` following the parenthesis is a ternary's or a label's, not a return type.
-    const before = code.slice(0, open - (word?.length ?? 0)).trimEnd()
-
-    if ((word === undefined || !CONTROL_KEYWORDS.has(word)) && !before.endsWith('?') && !CASE_END.test(before) && BODY_OR_ARROW.test(code.slice(closeOf(code, open))))
-      return true
-  }
-
-  return false
-}
-
-// Whether `name` is also a parameter, a loop's variable, a destructuring target or a record some line writes into, whose values no initializer tells.
-// `scripts` is the text with its strings and comments blanked and a `.kay` template left empty, where a parameter list of a method or an arrow is looked for: a template's `p(class={x}) {text}` is no method.
-function shadowed(text: string, name: string, scripts: string): boolean {
-  const escaped = RegExp.escape(name)
-
-  return inParameters(scripts, name) || new RegExp(`\\b(?:const|let|var)\\s+${escaped}\\s+(?:of|in)\\b|\\bfor\\s*\\(\\s*${escaped}\\s+(?:of|in)\\b|\\bfunction\\b[^(]*\\([^)]*(?<![\\w$.])${escaped}\\b|(?<![\\w$.])${escaped}\\s*=>|\\([^()]*(?<![\\w$.])${escaped}\\b[^()]*\\)\\s*(?::[^=>{;]+)?=>|\\[[^\\]]*(?<![\\w$.])${escaped}\\b[^\\]]*\\]\\s*=(?![=>])|\\{[^{}]*(?<![\\w$.])${escaped}\\b[^{}]*\\}\\s*=(?![=>])|(?<![\\w$.])${escaped}\\s*(?:\\[[^\\]]*\\]|\\.[\\w$]+)\\s*=(?![=>])`).test(text)
-}
-
-const WHITESPACE_CHAR = /\s/
-const REGEX_AFTER = /[(,=:[!&|?{};*%<>~^]$/
-const KEYWORD_BEFORE_REGEX = /\b(?:return|typeof|case|void|delete|throw|in|of)$/
-
-// A fence line as the compiler reads it: `---` alone, or followed by a label or type parameters.
-const NOT_NEWLINE = /[^\n]/g
-const FENCE = /^---(?:[ \t]*$|[ \t]*[a-z<].*$)/gm
-
-// `codeOf` of a source: the scripts of a `.kay` file are masked and its template, after the last fence, is left as it is, where a quote or a backtick of the markup's text is no string. Any other file has no fence, whatever a line of its strings holds.
-function codeOf(text: string, kay: boolean): string {
-  const fences = kay ? [...text.matchAll(FENCE)] : []
-
-  if (fences.length === 0)
-    return maskScript(text)
-
-  let out = ''
-  let from = 0
-
-  for (const fence of fences) {
-    out += maskScript(text.slice(from, fence.index)) + fence[0]
-    from = fence.index + fence[0].length
-  }
-
-  return out + text.slice(from)
-}
-
-// The masked text of a `.kay` file with its template, after the last fence, emptied; any other text as it is.
-function scriptsOf(code: string): string {
-  const last = [...code.matchAll(FENCE)].at(-1)
-
-  if (last === undefined)
-    return code
-
-  const end = last.index + last[0].length
-
-  return code.slice(0, end) + code.slice(end).replace(NOT_NEWLINE, ' ')
-}
-
-// The text with the inside of every comment, string, template text and regular expression blanked, newlines kept, so a name read in it is read in code and every index is the text's own.
-function maskScript(text: string): string {
-  const out = text.split('')
-  // The `${` of the templates being read, for a `}` to tell its end.
-  const templates: number[] = []
-  let depth = 0
-  let at = 0
-
-  const blank = (from: number, to: number) => {
-    for (let index = from; index < to; index++) {
-      if (out[index] !== '\n')
-        out[index] = ' '
-    }
-  }
-
-  // Blanks the text of the template that opens at `from - 1` up to its `${` or closing backtick, and returns where code resumes.
-  const template = (from: number): number => {
-    for (let index = from; index < text.length; index++) {
-      if (text[index] === '\\') {
-        index++
-
-        continue
-      }
-
-      if (text[index] === '`') {
-        blank(from, index)
-
-        return index + 1
-      }
-
-      if (text[index] === '$' && text[index + 1] === '{') {
-        blank(from, index)
-        templates.push(depth)
-        depth++
-
-        return index + 2
-      }
-    }
-
-    // A backtick never closed is no template: it is left as it is.
-    return from
-  }
-
-  while (at < text.length) {
-    const char = text[at]!
-
-    if (char === '/' && text[at + 1] === '/') {
-      const end = text.indexOf('\n', at)
-
-      blank(at, end === -1 ? text.length : end)
-      at = end === -1 ? text.length : end
-    }
-    else if (char === '/' && text[at + 1] === '*') {
-      const end = text.indexOf('*/', at + 2)
-
-      if (end !== -1)
-        blank(at, end + 2)
-
-      at = end === -1 ? at + 2 : end + 2
-    }
-    else if (char === '"' || char === '\'') {
-      let end = at + 1
-
-      while (end < text.length && text[end] !== char && text[end] !== '\n')
-        end += text[end] === '\\' ? 2 : 1
-
-      blank(at + 1, Math.min(end, text.length))
-      at = end + 1
-    }
-    else if (char === '`') {
-      at = template(at + 1)
-    }
-    else if (char === '/') {
-      let last = at
-
-      while (last > 0 && WHITESPACE_CHAR.test(text[last - 1]!))
-        last--
-
-      const before = text.slice(Math.max(0, last - 8), last)
-
-      if (last === 0 || REGEX_AFTER.test(before) || KEYWORD_BEFORE_REGEX.test(before)) {
-        let end = at + 1
-        let inClass = false
-
-        while (end < text.length && text[end] !== '\n' && (inClass || text[end] !== '/')) {
-          if (text[end] === '\\')
-            end++
-          else if (text[end] === '[')
-            inClass = true
-          else if (text[end] === ']')
-            inClass = false
-
-          end++
-        }
-
-        if (text[end] === '/') {
-          blank(at + 1, end)
-          at = end + 1
-
-          continue
-        }
-      }
-
-      at++
-    }
-    else {
-      if (char === '{') {
-        depth++
-      }
-      else if (char === '}') {
-        depth--
-
-        if (templates.at(-1) === depth) {
-          templates.pop()
-          at = template(at + 1)
-
-          continue
-        }
-      }
-
-      at++
-    }
-  }
-
-  return out.join('')
-}
-
-// Every value a `const`, `let`, `var` or assignment gives `name`, undefined when it is also a parameter, a loop's variable, a destructuring target or a record some line writes into, whose values no initializer tells.
-// `code` is `text` with the comments and the strings blanked, where the declarations and assignments are looked for.
-function initializersOf(text: string, { code, scripts }: { code: string, scripts: string }, name: string): Expression[] | undefined {
-  const escaped = RegExp.escape(name)
-  const declared = new RegExp(`\\b(?:const|let|var)\\s+${escaped}\\b`)
-
-  if (!declared.test(code) || shadowed(text, name, scripts))
-    return undefined
-
-  const initialized = new RegExp(`\\b(?:const|let|var)\\s+${escaped}\\b\\s*(?::[^=\\n]+)?=(?![=>])\\s*`, 'g')
-  const assigned = new RegExp(`(?<![\\w$.])${escaped}\\s*(?:\\+|\\|\\||\\?\\?|&&)?=(?![=>])\\s*`, 'g')
-  const starts = new Set<number>()
-
-  for (const match of [...code.matchAll(initialized), ...code.matchAll(assigned)])
-    starts.add(match.index + match[0].length)
-
-  const found: Expression[] = []
-
-  for (const from of starts) {
-    try {
-      found.push(parseExpression(text.slice(from, expressionEnd(text, from, true)), { plugins: ['typescript'] }))
-    }
-    catch {
-      return undefined
-    }
-  }
-
-  return found.length === 0 ? undefined : found
-}
-
-// `classList.toggle` takes a class and a flag, `replace` two classes, `add` any number.
-function classArguments(how: string): number {
-  if (how === 'classList.add')
-    return MANY_ARGUMENTS
-
-  return how === 'classList.replace' ? 2 : 1
-}
-
-function setterName(opening: string): string {
-  if (opening.startsWith('classList'))
-    return opening.slice(0, opening.indexOf('(')).replaceAll(WHITESPACE, '')
-
-  if (opening.startsWith('.className'))
-    return 'className ='
-
-  return opening.startsWith('setAttribute') ? 'setAttribute(\'class\')' : 'class attribute'
-}
-
 // The literal parts around what is open when the value is one to report, else undefined.
-function reportedClass(source: string, scope: Scope, judge: Judge): string | undefined {
-  let node: Expression
-
-  try {
-    node = parseExpression(source.startsWith('...') ? source.slice(3) : source, { plugins: ['typescript'] })
-  }
-  catch {
-    return undefined
-  }
-
+function reportedClass(node: Expression, scope: Scope, judge: Judge): string | undefined {
   const verdict = verdictOf(node, scope)
   const parts = verdict.parts.filter(part => part !== '')
 

@@ -118,7 +118,7 @@ describe('which classes a page gets from the components it renders', () => {
   })
 
   it('takes the literal a parent passes as a prop, whichever side writes it', async () => {
-    expect(await reaching('Card(tone="btn-primary")\n', { 'card.kay': 'const { tone } = props<{ tone: string }>()\n---\np(class={tone}) a\n' })).toEqual(['btn-primary'])
+    expect(await reaching('Card(tone="btn-primary")\n', { 'card.kay': '---\nconst { tone } = props<{ tone: string }>()\n---\np(class={tone}) a\n' })).toEqual(['btn-primary'])
   })
 
   it('takes every branch of a ternary and every literal of a list a map walks', async () => {
@@ -235,17 +235,17 @@ describe('which classes are set from a value the build cannot read', () => {
     expect(await unresolved('const previous = el.className\nel.classList.add(\'mt-1\')\nel.className = previous\n')).toEqual([])
     expect(await unresolved('el.setAttribute(\'class\', el.getAttribute(\'class\'))\n')).toEqual([])
     expect(await unresolved('el.classList.add(cn(\'mt-1\', on && \'p-1\'))\n')).toEqual([])
-    expect(await unresolved('const { tone } = props<{ tone: string }>()\n---\np(class={cn(\'mt-1\', tone)}) a\n', '', 'page.kay')).toEqual([])
+    expect(await unresolved('---\nconst { tone } = props<{ tone: string }>()\n---\np(class={cn(\'mt-1\', tone)}) a\n', '', 'page.kay')).toEqual([])
     expect(await unresolved('el.classList.add(cn(\'mt-1\', shade(on)))\n')).toEqual(['1 classList.add mt-1'])
   })
 
   it('reads a member of a const object holding only literals as one of its values', async () => {
-    expect(await unresolved('const GLASS: Record<string, string> = { red: \'mt-1\', white: \'p-1\' }\n---\np(class={[\'mb-1\', GLASS[tone]]}) a\n', '', 'page.kay')).toEqual([])
-    expect(await unresolved('const GLASS = { red: \'mt-1\', white: \'p-1\' } as const\n---\np(class={GLASS[tone]}) a\n', '', 'page.kay')).toEqual([])
-    expect(await unresolved('const GLASS = { red: \'mt-1\' } satisfies Tones\n---\np(class={GLASS.red}) a\n', '', 'page.kay')).toEqual([])
-    expect(await unresolved('const GLASS = {\n  red: { bg: \'mt-1\' },\n  white: { bg: \'p-1\' },\n}\n---\np(class={GLASS[tone].bg}) a\n', '', 'page.kay')).toEqual([])
-    expect(await unresolved('const GLASS = { red: \'mt-1\', white: pick() }\n---\np(class={GLASS[tone]}) a\n', '', 'page.kay')).toEqual(['3 class attribute mt-1'])
-    expect(await unresolved('const GLASS = { red: \'mt-1\', ...others }\n---\np(class={GLASS[tone]}) a\n', '', 'page.kay')).toEqual(['3 class attribute mt-1'])
+    expect(await unresolved('---\nconst GLASS: Record<string, string> = { red: \'mt-1\', white: \'p-1\' }\n---\np(class={[\'mb-1\', GLASS[tone]]}) a\n', '', 'page.kay')).toEqual([])
+    expect(await unresolved('---\nconst GLASS = { red: \'mt-1\', white: \'p-1\' } as const\n---\np(class={GLASS[tone]}) a\n', '', 'page.kay')).toEqual([])
+    expect(await unresolved('---\nconst GLASS = { red: \'mt-1\' } satisfies Tones\n---\np(class={GLASS.red}) a\n', '', 'page.kay')).toEqual([])
+    expect(await unresolved('---\nconst GLASS = {\n  red: { bg: \'mt-1\' },\n  white: { bg: \'p-1\' },\n}\n---\np(class={GLASS[tone].bg}) a\n', '', 'page.kay')).toEqual([])
+    expect(await unresolved('---\nconst GLASS = { red: \'mt-1\', white: pick() }\n---\np(class={GLASS[tone]}) a\n', '', 'page.kay')).toEqual(['4 class attribute mt-1'])
+    expect(await unresolved('---\nconst GLASS = { red: \'mt-1\', ...others }\n---\np(class={GLASS[tone]}) a\n', '', 'page.kay')).toEqual(['4 class attribute mt-1'])
   })
 
   // Several files of an app: the entry is the first, `edges` the imports the stylesheet build followed.
@@ -263,7 +263,7 @@ describe('which classes are set from a value the build cannot read', () => {
   }
 
   it('reads a record beside a prop, and a const record imported from a module, typed or not', async () => {
-    expect(await unresolved('const { variant = \'primary\', class: className } = props<{ variant?: \'primary\' | \'outline\', class?: string }>()\n\nconst variants = { primary: \'btn-primary\', outline: \'mt-1\' }\n---\na(class={[variants[variant], className]}) a\n', '', 'page.kay')).toEqual([])
+    expect(await unresolved('---\nconst { variant = \'primary\', class: className } = props<{ variant?: \'primary\' | \'outline\', class?: string }>()\n\nconst variants = { primary: \'btn-primary\', outline: \'mt-1\' }\n---\na(class={[variants[variant], className]}) a\n', '', 'page.kay')).toEqual([])
     const page = '---\nimport { BG } from \'./data\'\n---\np(class={BG[info.swatch]}) a\n'
 
     expect(await unresolvedIn({ 'page.kay': page, 'data.ts': 'export const BG: Record<Swatch, string> = { a: \'mt-1\', b: \'p-1\' }\n' })).toEqual([])
@@ -284,8 +284,8 @@ describe('which classes are set from a value the build cannot read', () => {
   })
 
   it('reads a function whose every return is a literal, a ternary or a template of literals', async () => {
-    const island = (body: string) => `function position(i: number) {\n${body}\n}\n---\np(class={position(i)}) a\n`
-    const arrow = 'const position = (i: number) => i === 0 ? \'mt-1\' : \'p-1\'\n---\np(class={position(i)}) a\n'
+    const island = (body: string) => `---\nfunction position(i: number) {\n${body}\n}\n---\np(class={position(i)}) a\n`
+    const arrow = '---\nconst position = (i: number) => i === 0 ? \'mt-1\' : \'p-1\'\n---\np(class={position(i)}) a\n'
 
     expect(await unresolved(island('  if (i === current())\n    return \'mt-1\'\n\n  return i > current() ? \'p-1\' : \'-mt-1\''), '', 'page.kay')).toEqual([])
     expect(await unresolved(island('  return `mt-1 ${i > 1 ? \'p-1\' : \'\'}`'), '', 'page.kay')).toEqual([])
@@ -295,18 +295,18 @@ describe('which classes are set from a value the build cannot read', () => {
   })
 
   it('reads undefined, null and false as no class in a ternary, a logical and a return', async () => {
-    const attribute = (value: string) => `---\np(.shorthand class={${value}}) a\n`
+    const attribute = (value: string) => `---\n---\np(.shorthand class={${value}}) a\n`
 
     expect(await unresolved(attribute('cond ? undefined : \'mt-1\''), '', 'page.kay')).toEqual([])
     expect(await unresolved(attribute('cond ? \'mt-1\' : null'), '', 'page.kay')).toEqual([])
     expect(await unresolved(attribute('cond && \'mt-1\''), '', 'page.kay')).toEqual([])
     expect(await unresolved(attribute('cond ? false : \'mt-1\''), '', 'page.kay')).toEqual([])
     expect(await unresolved('el.className = on ? undefined : \'mt-1\'\n')).toEqual([])
-    expect(await unresolved(attribute('cond ? undefined : tone'), '', 'page.kay')).toEqual(['2 class attribute '])
+    expect(await unresolved(attribute('cond ? undefined : tone'), '', 'page.kay')).toEqual(['3 class attribute '])
   })
 
   it('reads a function returning literals or undefined, annotated or not', async () => {
-    const page = (fn: string) => `${fn}\n---\np(class={tone(u)}) a\n`
+    const page = (fn: string) => `---\n${fn}\n---\np(class={tone(u)}) a\n`
 
     expect(await unresolved(page('function tone(u: number): string | undefined {\n  if (u < 1)\n    return \'mt-1\'\n\n  if (u < 2)\n    return \'p-1\'\n\n  return undefined\n}'), '', 'page.kay')).toEqual([])
     expect(await unresolved(page('function tone(u: number) {\n  if (u < 1)\n    return \'mt-1\'\n\n  return undefined\n}'), '', 'page.kay')).toEqual([])
@@ -321,21 +321,21 @@ describe('which classes are set from a value the build cannot read', () => {
   })
 
   it('still warns of a function returning a parameter, a call or a value of the runtime', async () => {
-    const island = (body: string) => `function position(i: number) {\n${body}\n}\n---\np(class={position(i)}) a\n`
+    const island = (body: string) => `---\nfunction position(i: number) {\n${body}\n}\n---\np(class={position(i)}) a\n`
 
-    expect(await unresolved(island('  return i > 1 ? \'mt-1\' : i'), '', 'page.kay')).toEqual(['5 class attribute mt-1'])
-    expect(await unresolved(island('  return shade(i)'), '', 'page.kay')).toEqual(['5 class attribute '])
+    expect(await unresolved(island('  return i > 1 ? \'mt-1\' : i'), '', 'page.kay')).toEqual(['6 class attribute mt-1'])
+    expect(await unresolved(island('  return shade(i)'), '', 'page.kay')).toEqual(['6 class attribute '])
     expect(await unresolved(island('  if (i)\n    return \'mt-1\''), '', 'page.kay')).toEqual([])
-    expect(await unresolved(island('  return `tone-${i}`'), '', 'page.kay')).toEqual(['5 class attribute tone-${}'])
+    expect(await unresolved(island('  return `tone-${i}`'), '', 'page.kay')).toEqual(['6 class attribute tone-${}'])
     expect(await unresolved('function position() {\n  return position()\n}\nel.className = position()\n')).toEqual(['4 className = '])
     expect(await unresolved('el.className = position(i)\n')).toEqual(['1 className = '])
   })
 
   it('judges a parameter by its caller even when a prop has its name, and an import beside an unrelated local name', async () => {
-    const props = 'const { tone } = props<{ tone: string }>()\n'
+    const props = '---\nconst { tone } = props<{ tone: string }>()\n'
 
-    expect(await unresolved(`${props}function f(tone: string) {\n  return tone\n}\n---\np(class={f(x)}) a\n`, '', 'page.kay')).toEqual(['6 class attribute '])
-    expect(await unresolved(`${props}const f = ({ tone }: Tone) => tone\n---\np(class={f(x)}) a\n`, '', 'page.kay')).toEqual(['4 class attribute '])
+    expect(await unresolved(`${props}function f(tone: string) {\n  return tone\n}\n---\np(class={f(x)}) a\n`, '', 'page.kay')).toEqual(['7 class attribute '])
+    expect(await unresolved(`${props}const f = ({ tone }: Tone) => tone\n---\np(class={f(x)}) a\n`, '', 'page.kay')).toEqual(['5 class attribute '])
     expect(await unresolvedIn({ 'page.kay': '---\nimport { BG } from \'./d\'\nfunction other() {\n  const BG = { a: \'mt-1\' }\n}\n---\np(class={BG[k]}) a\n', 'd.ts': 'export const BG = { a: dyn() }\n' })).toEqual(['page.kay:7 class attribute mt-1'])
   })
 
@@ -376,7 +376,7 @@ describe('which classes are set from a value the build cannot read', () => {
       expect(await unresolved(`let tone = 'mt-1'\n${bound}\n`)).toEqual(['2 classList.add '])
 
     expect(await unresolved('let tone = \'mt-1\'\nok ? f(tone) : { a: 1 }\nswitch (k) { case f(tone): { break } }\nel.classList.add(tone)\n')).toEqual([])
-    expect(await unresolved('const color = \'mt-1\'\n---\np(class={color}) {text}\ndiv(class={`p-1 ${color}`}) {body}\n', '', 'page.kay')).toEqual([])
+    expect(await unresolved('---\nconst color = \'mt-1\'\n---\np(class={color}) {text}\ndiv(class={`p-1 ${color}`}) {body}\n', '', 'page.kay')).toEqual([])
     expect(await unresolved('class A { m(tone) { el.classList.add(tone) } }\n', '', 'island.ts')).toEqual(['1 classList.add '])
     expect(await unresolvedIn({ 'island.ts': 'import { tone } from \'./m\'\nclass A { m(tone) { el.classList.add(tone) } }\ntry {} catch (tone) { el.classList.add(tone) }\n', 'm.ts': 'export const tone = \'mt-1\'\n' })).toEqual(['island.ts:2 classList.add ', 'island.ts:3 classList.add '])
 
@@ -385,7 +385,7 @@ describe('which classes are set from a value the build cannot read', () => {
 
   it('reads a fence line only in a .kay file, and only as the compiler does', async () => {
     expect(await unresolved('let tone = \'mt-1\'\nconst s = `\n---\n`\nconst t = \'tone = dyn()\'\nel.classList.add(tone)\n')).toEqual([])
-    expect(await unresolved('let tone = \'mt-1\'\nel.classList.add(tone)\n--- server\nconst t = 1\n---\np press the ` key\nbutton(onclick={() => tone = dyn()}) a\n', '', 'page.kay')).toEqual(['2 classList.add mt-1'])
+    expect(await unresolved('---\nlet tone = \'mt-1\'\nel.classList.add(tone)\n--- server\nconst t = 1\n---\np press the ` key\nbutton(onclick={() => tone = dyn()}) a\n', '', 'page.kay')).toEqual(['3 classList.add mt-1'])
   })
 
   it('ignores an assignment written in a string, a template or a comment', async () => {
@@ -394,10 +394,21 @@ describe('which classes are set from a value the build cannot read', () => {
     expect(await unresolved('const tone = \'mt-1\'\nconst note = `a ${tone = dyn()} b`\nel.classList.add(tone)\n')).toEqual(['3 classList.add mt-1'])
   })
 
+  it('reads setters as code, never in a comment or a string, whatever the lines and parentheses of their arguments', async () => {
+    expect(await unresolved('// el.classList.add(tone)\nconst s = \'el.className = tone\'\nconst t = `el.setAttribute(\'class\', tone)`\n')).toEqual([])
+    expect(await unresolved('el.classList.add(\n  on ? \'mt-1\' : (\n    \'p-1\'\n  ),\n  tone,\n)\n')).toEqual(['1 classList.add '])
+    expect(await unresolved('el\n  .classList\n  .toggle((tone), on)\n')).toEqual(['2 classList.toggle '])
+  })
+
+  it('reads a template line binding a name, and an attribute named like a value, as the compiler does', async () => {
+    expect(await unresolved('---\nconst tone = \'mt-1\'\n---\nfor tone of tones\n  p(class={tone}) a\n', '', 'page.kay')).toEqual(['5 class attribute '])
+    expect(await unresolved('---\nconst { vote } = props<{ vote: { a: string, b: string } }>()\n---\nconst position = vote.a\np(class={`position-${position}`}) a\nBadge(position={vote.b})\n', '', 'page.kay')).toEqual([])
+  })
+
   it('never blanks a real assignment because of a quote, a backtick or a slash it misreads', async () => {
-    expect(await unresolved('let tone = \'mt-1\'\nel.classList.add(tone)\n---\np press the ` key\nbutton(onclick={() => tone = dyn()}) a\n', '', 'page.kay')).toEqual(['2 classList.add mt-1'])
-    expect(await unresolved('let tone = \'mt-1\'\nel.classList.add(tone)\ntone = dyn()\n---\np src/*.css\n', '', 'page.kay')).toEqual(['2 classList.add mt-1'])
-    expect(await unresolved('let tone = \'mt-1\'\nconst s = 1 `\ntone = dyn()\nel.classList.add(tone)\n')).toEqual(['4 classList.add mt-1'])
+    expect(await unresolved('---\nlet tone = \'mt-1\'\nel.classList.add(tone)\n---\np press the ` key\nbutton(onclick={() => tone = dyn()}) a\n', '', 'page.kay')).toEqual(['3 classList.add mt-1'])
+    expect(await unresolved('---\nlet tone = \'mt-1\'\nel.classList.add(tone)\ntone = dyn()\n---\np src/*.css\n', '', 'page.kay')).toEqual(['3 classList.add mt-1'])
+    expect(await unresolved('let tone = \'mt-1\'\nconst s = 1 // `\ntone = dyn()\nel.classList.add(tone)\n')).toEqual(['4 classList.add mt-1'])
     expect(await unresolved('let tone = \'mt-1\'\nlet i = 0\ni++ / 2; tone = dyn(); i / 3\nel.classList.add(tone)\n')).toEqual(['4 classList.add mt-1'])
   })
 
@@ -410,9 +421,9 @@ describe('which classes are set from a value the build cannot read', () => {
   })
 
   it('leaves an async function, a generator, a namespace or default import, a method and an import cycle open', async () => {
-    expect(await unresolved('async function f() {\n  return \'mt-1\'\n}\n---\np(class={f()}) a\n', '', 'page.kay')).toEqual(['5 class attribute '])
-    expect(await unresolved('function* f() {\n  return \'mt-1\'\n}\n---\np(class={f()}) a\n', '', 'page.kay')).toEqual(['5 class attribute '])
-    expect(await unresolvedIn({ 'page.kay': 'import * as d from \'./d\'\nimport BG from \'./d\'\n---\np(class={d.BG[k]}) a\np(class={BG[k]}) b\n', 'd.ts': 'export const BG = { a: \'mt-1\' }\nexport default BG\n' })).toEqual(['page.kay:4 class attribute ', 'page.kay:5 class attribute '])
+    expect(await unresolved('---\nasync function f() {\n  return \'mt-1\'\n}\n---\np(class={f()}) a\n', '', 'page.kay')).toEqual(['6 class attribute '])
+    expect(await unresolved('---\nfunction* f() {\n  return \'mt-1\'\n}\n---\np(class={f()}) a\n', '', 'page.kay')).toEqual(['6 class attribute '])
+    expect(await unresolvedIn({ 'page.kay': '---\nimport * as d from \'./d\'\nimport BG from \'./d\'\n---\np(class={d.BG[k]}) a\np(class={BG[k]}) b\n', 'd.ts': 'export const BG = { a: \'mt-1\' }\nexport default BG\n' })).toEqual(['page.kay:5 class attribute ', 'page.kay:6 class attribute '])
     expect(await unresolvedIn({ 'page.kay': '---\nimport { A } from \'./a\'\n---\np(class={A[k]}) a\n', 'a.ts': 'import { B } from \'./b\'\nexport const A = { x: B.y }\n', 'b.ts': 'import { A } from \'./a\'\nexport const B = { y: A.x }\n' })).toEqual(['page.kay:4 class attribute '])
     expect(await unresolvedIn({ 'page.kay': '---\nimport { f } from \'./d\'\n---\np(class={f(1)}) a\n', 'd.ts': 'export function f(i: number) {\n  return i ? f(i - 1) : \'mt-1\'\n}\n' })).toEqual(['page.kay:4 class attribute mt-1${}mt-1${}mt-1'])
   })
@@ -450,15 +461,15 @@ describe('which classes are set from a value the build cannot read', () => {
 
   it('judges a class attribute by what its value is made of', async () => {
     // A prop is named by the component using this one, a `btn-` fragment completes, a class written out is read as it is.
-    expect(await unresolved('const { tone } = props<{ tone: string }>()\n---\np(class={tone}) a\np(class={`card ${props.class}`}) b\np(class={`btn-${kind}`}) c\np(class={on ? \'p-1\' : \'mt-1\'}) d\n', '', 'page.kay')).toEqual([])
-    expect(await unresolved('const tone = on ? \'p-1\' : \'mt-1\'\n---\np(class={tone}) a\n', '', 'page.kay')).toEqual([])
-    expect(await unresolved('const { shade: tone } = props<{ shade: string }>()\n---\np(class={tone}) a\n', '', 'page.kay')).toEqual([])
+    expect(await unresolved('---\nconst { tone } = props<{ tone: string }>()\n---\np(class={tone}) a\np(class={`card ${props.class}`}) b\np(class={`btn-${kind}`}) c\np(class={on ? \'p-1\' : \'mt-1\'}) d\n', '', 'page.kay')).toEqual([])
+    expect(await unresolved('---\nconst tone = on ? \'p-1\' : \'mt-1\'\n---\np(class={tone}) a\n', '', 'page.kay')).toEqual([])
+    expect(await unresolved('---\nconst { shade: tone } = props<{ shade: string }>()\n---\np(class={tone}) a\n', '', 'page.kay')).toEqual([])
   })
 
   it('finds a class attribute a server builds from a value, a bare one included', async () => {
     expect(await unresolved('p(class={tone}) a\n', '', 'page.kay')).toEqual(['1 class attribute '])
-    expect(await unresolved('const tone = [\'ring\', 4].join(\'-\')\n---\np(class={tone}) a\n', '', 'page.kay')).toEqual(['3 class attribute '])
-    expect(await unresolved('const type = kinds[0]\n---\naside(class={`callout ${type}`}) a\n', '', 'page.kay')).toEqual(['3 class attribute callout ${}'])
+    expect(await unresolved('---\nconst tone = [\'ring\', 4].join(\'-\')\n---\np(class={tone}) a\n', '', 'page.kay')).toEqual(['4 class attribute '])
+    expect(await unresolved('---\nconst type = kinds[0]\n---\naside(class={`callout ${type}`}) a\n', '', 'page.kay')).toEqual(['4 class attribute callout ${}'])
     expect(await unresolved('p(class={`tone-${kind}`}) c\n', '', 'page.kay')).toEqual(['1 class attribute tone-${}'])
     expect(await unresolved('p(class={tone}) a\n', '@source inline("btn-primary");', 'page.kay')).toEqual([])
   })
@@ -509,7 +520,7 @@ describe('which classes a page keeps when its data holds them', () => {
     }
   }
 
-  const child = 'const { items } = props<{ items: { color: string }[] }>()\n---\nfor item of items\n  span(class={item.color}) a\n'
+  const child = '---\nconst { items } = props<{ items: { color: string }[] }>()\n---\nfor item of items\n  span(class={item.color}) a\n'
   const rows = '--- server\nconst rows = [{ color: \'mt-1\' }, { color: \'p-1\' }]\n---\nChild(items={rows})\n'
 
   it('keeps the rules of classes a parent writes as literals for a child to set, with no warning', async () => {

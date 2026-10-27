@@ -9,7 +9,7 @@ const WORD = /[\w$]+/g
 const FIRST_NAME = /^\s*([\w$]+)/
 
 // The spans of a node that declare names for its children, which its expressions do not read.
-function binders(node: Node): Span[] {
+export function binders(node: Node): Span[] {
   switch (node.kind) {
     case 'for':
       return node.index ? [node.item, node.index] : [node.item]
