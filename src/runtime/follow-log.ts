@@ -10,6 +10,11 @@ export interface FollowLogOptions {
   items?: string | undefined
 }
 
+export interface FollowLog {
+  // Scrolls to the bottom and follows again, as a chat does when the reader sends a message from higher up; nothing before the island mounted.
+  toBottom: () => void
+}
+
 interface Anchor {
   item: Element
   offset: number
@@ -34,10 +39,13 @@ function firstBelow(items: ArrayLike<Element>, top: number): Element | undefined
   return items[low]
 }
 
-// Keeps a scrolling container at its bottom while the reader is there and the first item showing in place while the reader is above it, whatever changes inside: an item appended, one prepended, a line growing as it streams. The container is the element that scrolls, or a function returning it once the island mounted, as `() => list` for a `ref`'s variable. It starts at its bottom, and does nothing on the server.
-export function followLog(container: Element | (() => Element | null | undefined), options: FollowLogOptions = {}): void {
+// Keeps a scrolling container at its bottom while the reader is there and the first item showing in place while the reader is above it, whatever changes inside: an item appended, one prepended, a line growing as it streams. The container is the element that scrolls, or a function returning it once the island mounted, as `() => list` for a `ref`'s variable. It starts at its bottom, and does nothing on the server. Its `toBottom()` takes the reader back to the bottom and follows again.
+export function followLog(container: Element | (() => Element | null | undefined), options: FollowLogOptions = {}): FollowLog {
+  let bottom: (() => void) | undefined
+  const log: FollowLog = { toBottom: () => bottom?.() }
+
   if (typeof KAY_BROWSER === 'undefined' && typeof document === 'undefined')
-    return
+    return log
 
   onMount(() => {
     const element = typeof container === 'function' ? container() : container
@@ -118,15 +126,22 @@ export function followLog(container: Element | (() => Element | null | undefined
     for (const item of Array.from(items()))
       watch(item)
 
-    scrollTo(element.scrollHeight)
-    measure()
+    bottom = () => {
+      scrollTo(element.scrollHeight)
+      measure()
+    }
+
+    bottom()
     element.addEventListener('scroll', scrolled, { passive: true })
     changes.observe(element, { childList: true, subtree: true, characterData: true })
     resizes.observe(element)
     onCleanup(() => {
+      bottom = undefined
       element.removeEventListener('scroll', scrolled)
       changes.disconnect()
       resizes.disconnect()
     })
   })
+
+  return log
 }

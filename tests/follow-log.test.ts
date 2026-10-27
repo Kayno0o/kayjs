@@ -75,6 +75,28 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('followLog 
     expect(page.errors).toEqual([])
   }, 30_000)
 
+  it('takes a reader away from the bottom back to it with toBottom, and follows the append that comes with it', async () => {
+    const page = await open()
+
+    await page.evaluate(() => {
+      document.querySelector<HTMLElement>('ol.list')!.scrollTop = 200
+    })
+    await page.waitUntil(() => document.querySelector<HTMLElement>('ol.list')!.scrollTop === 200)
+    await page.click('button.send')
+    await page.waitFor('ol.list li:last-child', { text: '41' })
+    await page.waitUntil(() => {
+      const list = document.querySelector<HTMLElement>('ol.list')!
+
+      return list.scrollHeight - list.scrollTop - list.clientHeight === 0
+    })
+
+    await page.click('button.append')
+    await page.waitFor('ol.list li:last-child', { text: '42' })
+
+    expect((await page.evaluate(reading)).away).toBe(0)
+    expect(page.errors).toEqual([])
+  }, 30_000)
+
   it('keeps the first line showing in place when earlier lines are prepended mid-list', async () => {
     const page = await open()
 

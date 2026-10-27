@@ -1,7 +1,7 @@
 ---
 import type { Action, ActionStream, Failure, SanitizeOptions, Snippet } from 'kay'
 import type { ChatMessage, ChatTurn, CodeBlock, Message, Progress, Source, ToolCall } from './types'
-import { ActionError, effect, onCleanup, onMount, recipe, sanitizeHtml, signal, trustHtml, untrack } from 'kay'
+import { ActionError, effect, followLog, onCleanup, onMount, recipe, sanitizeHtml, signal, trustHtml, untrack } from 'kay'
 import BareIconButton from '@kaynooo/kayjs-ui/bare-icon-button.kay'
 import Icon from '@kaynooo/kayjs-ui/icon.kay'
 import Notice from '@kaynooo/kayjs-ui/notice.kay'
@@ -200,9 +200,8 @@ let outlives = false
 let resumed = false
 let field: HTMLTextAreaElement | undefined
 let log: HTMLElement | undefined
-let observer: ResizeObserver | undefined
-let pinned = true
-let lastTop = 0
+// Keeps the newest text in view unless the visitor scrolled up to read, a finished turn formatted late and a panel reopened included.
+const following = followLog(() => log, { threshold: PINNED_PX })
 const told = new Map<string, string>()
 const statuses = { running: runningLabel, done: doneLabel, failed: failedLabel }
 
@@ -507,17 +506,6 @@ effect(() => {
     editProblem = undefined
 })
 
-// Keeps the newest text in view unless the visitor scrolled up to read.
-effect(() => {
-  history()
-  partial()
-  calls()
-  waiting()
-
-  if (pinned)
-    queueMicrotask(follow)
-})
-
 // What the action took as too long, learned from its 413s, so the app states `maxInputChars` once: the oldest turns go first, the last stays.
 let learned = Infinity
 const MAX_RETRIES = 5
@@ -573,7 +561,7 @@ async function send(again = false, question?: string, resuming?: string) {
   replying = id
   outlives = false
   resumed = resuming !== undefined
-  pinned = true
+  following.toBottom()
   failure = undefined
   takenBack = false
   partial = ''
@@ -884,58 +872,6 @@ function keyDown(event: KeyboardEvent) {
   }
 }
 
-// A log shown again, such as in a panel reopened, is scrolled to the end when the visitor was at it, as it has no scroll position while hidden. Its turns are watched too, as one can grow with no signal the following effect reads, such as a finished reply formatted once the Markdown renderer arrives.
-function watch(element: HTMLElement) {
-  log = element
-
-  if (typeof ResizeObserver === 'undefined')
-    return
-
-  observer = new ResizeObserver(() => {
-    // A hidden log is scrolled anew once shown, so a scroll then is not read against where it stood before.
-    if (element.clientHeight === 0)
-      lastTop = 0
-    else if (pinned)
-      follow()
-  })
-
-  observer.observe(element)
-
-  // The turns drawn before the log's own ref ran.
-  for (const turn of element.children)
-    observer.observe(turn)
-
-  onCleanup(() => observer?.disconnect())
-}
-
-function watchTurn(turn: HTMLElement) {
-  observer?.observe(turn)
-
-  return () => observer?.unobserve(turn)
-}
-
-function follow() {
-  if (log === undefined)
-    return
-
-  log.scrollTo({ top: log.scrollHeight })
-  // Remembered here as scroll events coalesce, so a visitor scrolling up before the event is still seen as going up.
-  lastTop = log.scrollTop
-}
-
-// Only the visitor scrolling up leaves the end: the scroll event of our own scrollTo reaches the handler after the reply grew again, which would read as far from the end.
-function scrolled() {
-  if (log === undefined || log.clientHeight === 0)
-    return
-
-  const top = log.scrollTop
-  const atEnd = log.scrollHeight - top - log.clientHeight < PINNED_PX
-
-  if (top < lastTop || atEnd)
-    pinned = atEnd
-
-  lastTop = top
-}
 ---
 section(part="root" onKeyDown={escape} data-empty={history().length === 0 && !busy()} data-fill={fill ? '' : undefined} data-variant={variant} data-tone={tone} data-size={size} ref={element => { element.addEventListener('kai-chat-new', reset); element.addEventListener('kai-chat-send', sendFrom) }})
   if history().length === 0 && !busy()
@@ -947,9 +883,9 @@ section(part="root" onKeyDown={escape} data-empty={history().length === 0 && !bu
             li
               button(part="suggestion" type="button" onClick={() => ask(question)}) {question}
   // The log is the turns so far; the reply streaming in is hidden from screen readers until it is whole, so the finished turn is announced once, not word by word. The status line says the thinking label, then each tool call as it starts and ends.
-  div(part="log" role="log" aria-label={label} tabindex="0" ref={watch} onScroll={scrolled})
+  div(part="log" role="log" aria-label={label} tabindex="0" ref={element => log = element})
     for turn of history() key={turn.id}
-      article(part="turn" data-role={turn.role} data-editing={editing() === turn.id ? '' : undefined} ref={watchTurn})
+      article(part="turn" data-role={turn.role} data-editing={editing() === turn.id ? '' : undefined})
         if turn.role === 'user'
           if editing() === turn.id
             Textarea(part="editField" writeFocused ref={element => { queueMicrotask(() => element.focus()) }} value={editDraft()} onInput={value => { editDraft = value; editProblem = undefined }} rows="1" aria-label={editLabel} onKeyDown={event => editKey(event, turn.id)})
@@ -995,7 +931,7 @@ section(part="root" onKeyDown={escape} data-empty={history().length === 0 && !bu
                 slot regenerateIcon
                   Icon(icon="refresh")
     if busy()
-      article(part="turn" data-role="assistant" data-pending="" aria-hidden="true" ref={watchTurn})
+      article(part="turn" data-role="assistant" data-pending="" aria-hidden="true")
         if reasoning && thought() !== ''
           details(part="reasoning" open={thoughtOpen()} onToggle={event => { thoughtOpen = event.currentTarget.open }})
             summary(tabindex="-1") {reasoningLabel}

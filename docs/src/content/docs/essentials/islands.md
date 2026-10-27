@@ -415,6 +415,8 @@ ol(ref={element => list = element} style="height: 20rem; overflow-y: auto")
 
 The list starts at its bottom. When an item is added, a line grows or the list is resized, the list scrolls down if the reader was at the bottom. If the reader scrolled up, the first item they can see stays where it is, even when items are added above it. It does nothing on the server.
 
+`followLog` returns `{ toBottom }`. Call `toBottom()` when the reader sends a message from higher up, and the list takes them back to its bottom and follows again. A list hidden and then shown again, as in a panel the reader reopens, shows its bottom.
+
 <ReadMore href="/llms/navigation#follow-a-log">The `threshold` and `items` options.</ReadMore>
 
 ## Reading an element's size

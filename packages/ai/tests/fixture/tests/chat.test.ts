@@ -620,6 +620,27 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the Chat i
     expect(await away.evaluate(() => document.querySelector('[role="log"]')!.scrollTop)).toBeLessThan(48)
   })
 
+  test('a visitor who scrolled up and sends is taken back to the end, to see their message and the reply', async () => {
+    const page = await site.open('/lengthy')
+    const atEnd = () => {
+      const log = document.querySelector<HTMLElement>('[role="log"]')!
+
+      return log.scrollHeight > log.clientHeight && log.scrollHeight - log.scrollTop - log.clientHeight < 2
+    }
+
+    await page.fill('textarea', 'Go')
+    await page.press('Enter')
+    await page.waitFor('.kai-chat-turn[data-role="assistant"]', { text: 'The end' })
+    await page.evaluate(async () => {
+      document.querySelector('[role="log"]')!.scrollTo({ top: 0 })
+      await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))
+    })
+    await page.fill('textarea', 'Again')
+    await page.press('Enter')
+    await page.waitFor('[data-pending] .kai-chat-text', { text: 'Line 60' })
+    await page.waitUntil(atEnd)
+  })
+
   test('a stream that breaks mid-reply keeps the words that came and shows the error', async () => {
     const page = await site.open('/flaky')
 
