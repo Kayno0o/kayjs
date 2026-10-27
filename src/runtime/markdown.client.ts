@@ -41,7 +41,7 @@ function keeps(element: Marked, value: unknown): boolean {
   if (!claiming() && kept.has(html))
     load()
 
-  const keep = claiming() ? held.has(html) : element._$m === html
+  const keep = typeof value === 'string' && (claiming() ? held.has(html) : element._$m === html)
 
   element._$m = keep ? html : undefined
 

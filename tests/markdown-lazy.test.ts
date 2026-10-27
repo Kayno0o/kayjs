@@ -101,6 +101,34 @@ describe('markdownHtml in an island', () => {
     expect(element.innerHTML).toBe('<h1>Title</h1>\n')
   })
 
+  it('draws any other write after hydration once an island held markdown, an emptying one included', async () => {
+    const { markdownHtml } = await shell('other-writes')
+    const container = document.createElement('div')
+    const other = document.createElement('div')
+    const [value, setValue] = createSignal<string | undefined>('<p># Title</p>\n')
+
+    container.innerHTML = '<div><h1>Title</h1></div>'
+    other.innerHTML = '<p>old</p>'
+
+    const element = container.firstElementChild!
+
+    root(() => hydrate(() => renderEffect(() => property(element, 'innerHTML', markdownHtml('# Title'))), container))
+    flush()
+    root(() => renderEffect(() => property(other, 'innerHTML', value())))
+    flush()
+    expect(other.innerHTML).toBe('<p># Title</p>\n')
+
+    setValue(undefined)
+    flush()
+    expect(other.innerHTML).toBe('')
+
+    property(element, 'innerHTML', '<p>new</p>')
+    expect(element.innerHTML).toBe('<p>new</p>')
+
+    property(element, 'innerHTML', '<p># Title</p>\n')
+    expect(element.innerHTML).toBe('<p># Title</p>\n')
+  })
+
   it('forgets a hold no write took when the island ends, so a later island draws its markup', async () => {
     const { markdownHtml } = await shell('forgotten')
     const first = document.createElement('div')
