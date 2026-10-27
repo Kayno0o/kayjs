@@ -4582,6 +4582,33 @@ describe.concurrent('kay check, s.Public fields', () => {
   })
 })
 
+describe('kay check, deprecated-auth-attempts', () => {
+  it('reports the attempts counter of a kayjs-auth store, and --fix drops a memory one with the import it leaves unread', async () => {
+    const shared = 'import type { AuthStore } from \'@kaynooo/kayjs-auth\'\nimport { memoryAuthStore, sealTotpSecret } from \'@kaynooo/kayjs-auth\'\n\nconst base = memoryAuthStore()\n\nexport const store: AuthStore = {\n  ...base,\n  users: base.users,\n  identities: base.identities,\n  tokens: base.tokens,\n  attempts: memoryAuthStore().attempts,\n  // Expired rows go.\n  async prune() {},\n}\nexport const seal = sealTotpSecret\n'
+    const alone = 'import { memoryAuthStore } from \'@kaynooo/kayjs-auth\'\n\nexport const store = { users: {}, identities: {}, tokens: {}, attempts: memoryAuthStore().attempts }\n'
+    const own = 'import type { AuthStore } from \'@kaynooo/kayjs-auth\'\n\ndeclare const counter: NonNullable<AuthStore[\'attempts\']>\n\nexport const store = { users: {}, identities: {}, tokens: {}, attempts: counter }\nexport const other = { attempts: counter }\n'
+    const root = await scratchProject({
+      'src/shared.ts': shared,
+      'src/alone.ts': alone,
+      'src/own.ts': own,
+      'src/unrelated.ts': 'const counter = { hit: () => 1 }\n\nexport const store = { users: {}, identities: {}, tokens: {}, attempts: counter }\n',
+    })
+
+    try {
+      const { output } = await runCheck(root)
+
+      expect(output.match(/deprecated-auth-attempts/g)).toHaveLength(3)
+      await runCheck(root, '--fix')
+      expect(await Bun.file(join(root, 'src/shared.ts')).text()).toBe(shared.replace('  attempts: memoryAuthStore().attempts,\n', ''))
+      expect(await Bun.file(join(root, 'src/alone.ts')).text()).toBe('\nexport const store = { users: {}, identities: {}, tokens: {} }\n')
+      expect(await Bun.file(join(root, 'src/own.ts')).text()).toBe(own)
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+})
+
 describe('kay check, missing-captcha', () => {
   const page = '--- server\nconst auth = { register: async (_input: unknown) => 1 }\n\nawait auth.register({})\n---\np x\n'
   const found = async (files: Record<string, string>, options?: Parameters<typeof check>[1]) => (await check(await scratchProject({ 'src/routes/index.kay': page, ...files }), options)).filter(d => d.code === 'missing-captcha').length

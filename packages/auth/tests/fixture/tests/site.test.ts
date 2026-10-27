@@ -346,7 +346,7 @@ describe('the prebuilt pages', () => {
   })
 
   test('the new-password form reads no attempts from the store, as it shows no captcha, where the request form does', async () => {
-    const count = spyOn(store.attempts, 'count')
+    const count = spyOn(store.rates!, 'peek')
 
     try {
       const visitor = await browser()

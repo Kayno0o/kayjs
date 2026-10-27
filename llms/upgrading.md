@@ -4,6 +4,11 @@ What each minor release breaks, and what an app changes to move to it. kay and i
 
 ## 1.81.0
 
+### kayjs-auth: a store counts attempts in `rates`, and `DEFAULT_LIMITS` windows are durations
+
+- `attempts` left the `AuthStore` contract. A store of the app's own drops it, attempts then counting in the app's `store.rates` from kay.config.ts, else in memory, or gives `rates`, a kay `RateStore` with `peek` and `reset` over its own database. The old counter is still read until 1.84, and `kay upgrade` (`deprecated-auth-attempts`) drops `attempts: memoryAuthStore().attempts`. `pgStore` keeps its `kay_attempts` table, so its counts survive; a counter the app drops starts its open windows over, a day at most.
+- `DEFAULT_LIMITS` and the `Limit` type write a window as a duration, `{ max: 40, window: '15m' }`, where they held seconds (`900`): code reading one as a number gets a type error from `kay check`, and reads it with `durationSeconds`. A `rateLimit` option already took durations and is unchanged.
+
 ### `s.UnionEnum` and `s.UnionKeys` no longer default to their first value
 
 - An enum field left out used to read as its first value. An optional one now reads `undefined`; a required one is refused: an action answers 422, a page's `query` schema answers 400 on a visit without the parameter, a `defineEnv` variable left unset stops the boot, and a content field left out fails the build. An app relying on the fill writes `s.UnionEnum(['a', 'b'], { default: 'a' })`, which also keeps the old error body of an `api` route. No lint can recognise it, as the old form is valid and only its result changed.

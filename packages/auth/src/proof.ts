@@ -73,7 +73,7 @@ export async function reprove(state: RequestState, proof: Proof, options: { seco
   if (proof.passkey === undefined && record.passwordHash === null && !twoFactor)
     return await provedLately(state) ? { ok: true, record } : { ok: false, error: 'stale' }
 
-  if (await spend(state.core.store, `reprove:${record.id}`, state.core.limits.reprove))
+  if (await spend(state.core.rates, `reprove:${record.id}`, state.core.limits.reprove))
     return { ok: false, error: 'limited' }
 
   let proved: boolean
@@ -88,7 +88,7 @@ export async function reprove(state: RequestState, proof: Proof, options: { seco
   if (!proved)
     return { ok: false, error: 'proof' }
 
-  await state.core.store.attempts.reset(`reprove:${record.id}`)
+  await state.core.rates.reset(`reprove:${record.id}`)
 
   const signedIn = await state.session.get('auth')
 

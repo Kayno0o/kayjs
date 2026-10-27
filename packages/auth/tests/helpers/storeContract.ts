@@ -429,8 +429,8 @@ export function storeContract(name: string, fresh: () => Promise<AuthStore>) {
       for (const [id, version] of [['ended', 0], ['current', 1]] as const)
         await store.sessions.create({ id, userId: 'u2', version, userAgent: 'ua', ip: '127.0.0.1', createdAt: at(-1), lastSeenAt: at(-1), maxAge: null })
 
-      await store.attempts.hit('short', '60s')
-      await store.attempts.hit('long', '604800s')
+      await store.rates!.hit('short', '60s')
+      await store.rates!.hit('long', '604800s')
 
       setSystemTime(at(0))
       await store.prune!({ now: at(0), bearerExpiredBefore: at(-30), sessionMaxAge: '2592000s', sessionAbsoluteMaxAge: '31536000s' })
@@ -442,7 +442,7 @@ export function storeContract(name: string, fresh: () => Promise<AuthStore>) {
       expect((await store.bearerTokens.listByUser('u1')).map(token => token.id).sort()).toEqual(['just-expired', 'live', 'never'])
       expect((await store.sessions.listByUser('u1')).map(session => session.id)).toEqual(['live'])
       expect((await store.sessions.listByUser('u2')).map(session => session.id)).toEqual(['current'])
-      expect(await store.attempts.count('long')).toBe(1)
+      expect((await store.rates!.peek('long'))!.count).toBe(1)
     })
 
     test('staleGuests lists guests created before an instant that hold no session, oldest first, up to a limit', async () => {
@@ -675,20 +675,27 @@ export function storeContract(name: string, fresh: () => Promise<AuthStore>) {
       })
     })
 
-    test('attempts count within their window, start over after it, and reset', async () => {
-      expect(await store.attempts.count('k')).toBe(0)
-      expect(await store.attempts.hit('k', '60s')).toBe(1)
-      expect(await Promise.all([store.attempts.hit('k', '60s'), store.attempts.hit('k', '60s')])).toEqual(expect.arrayContaining([2, 3]))
-      expect(await store.attempts.count('k')).toBe(3)
+    test('rates count within their window, start over after it, weigh a hit, and reset', async () => {
+      const rates = store.rates!
+      const opened = await rates.hit('k', '60s')
+
+      expect(await rates.peek('k')).toEqual(opened)
+      expect(opened.count).toBe(1)
+      expect(Math.abs(opened.resetAt - (Date.now() + 60_000))).toBeLessThan(2000)
+      expect((await Promise.all([rates.hit('k', '60s'), rates.hit('k', '60s')])).map(window => window.count)).toEqual(expect.arrayContaining([2, 3]))
+      expect((await rates.hit('k', '60s', 2)).count).toBe(5)
+      expect((await rates.peek('k'))!.resetAt).toBe(opened.resetAt)
 
       setSystemTime(Date.now() + 61_000)
 
-      expect(await store.attempts.count('k')).toBe(0)
-      expect(await store.attempts.hit('k', '60s')).toBe(1)
+      expect(await rates.peek('k')).toBeUndefined()
+      expect((await rates.hit('k', '60s')).count).toBe(1)
 
-      await store.attempts.reset('k')
+      await rates.hit('other', '60s')
+      await rates.reset('k')
 
-      expect(await store.attempts.count('k')).toBe(0)
+      expect(await rates.peek('k')).toBeUndefined()
+      expect((await rates.peek('other'))!.count).toBe(1)
     })
   })
 }

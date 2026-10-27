@@ -1,4 +1,5 @@
 import type { Duration } from 'kay'
+import type { AuthRates, LegacyAttempts } from './rates'
 // An account as kayjs-auth stores it. The app sees a `User`, which leaves the secrets out.
 export interface UserRecord {
   id: string
@@ -382,13 +383,10 @@ export interface AuthStore {
     consume: (userId: string, digest: string) => MaybePromise<boolean>
     count: (userId: string) => MaybePromise<number>
   }
-  // Attempt counts, shared by every process the store is: a window starts with its first attempt.
-  attempts: {
-    count: (key: string) => MaybePromise<number>
-    // Counts one more attempt against `key`, in a window of `window`, such as `'15m'`, when none is open; the count once raised.
-    hit: (key: string, window: Duration) => MaybePromise<number>
-    reset: (key: string) => MaybePromise<void>
-  }
+  // Where the store counts attempts, shared by every process it is, as `memoryAuthStore` and `pgStore` do: kay's `RateStore` with `peek` and `reset`. Without it they count in the app's `store.rates`, else this process's memory.
+  rates?: AuthRates | undefined
+  // The counter before 1.81, still read while the store gives no `rates`: `deprecated-auth-attempts`.
+  attempts?: LegacyAttempts | undefined
   // Deletes what outlived its use: expired links and codes and invitations, bearer tokens expired long ago, sessions past their lifetime unseen or the session plugin's `absoluteMaxAge` old, and attempt windows that ended. kayjs-auth calls it at most once an hour; a store without it keeps those rows until the app deletes them.
   prune?: (limits: PruneLimits) => MaybePromise<void>
 }

@@ -34,12 +34,13 @@ describe('guessing at an account', () => {
   test('the attempts table holds a digest of the client, never its address', async () => {
     const app = await account({})
     const keys: string[] = []
-    const hit = app.store.attempts.hit.bind(app.store.attempts)
+    const rates = app.store.rates!
+    const hit = rates.hit.bind(rates)
 
-    app.store.attempts.hit = async (key, window) => {
+    rates.hit = async (key, window, weight) => {
       keys.push(key)
 
-      return hit(key, window)
+      return hit(key, window, weight)
     }
     await attempt(app, '10.0.0.77', WRONG)
 
@@ -153,12 +154,12 @@ describe('guessing at an account', () => {
 
       // The ceiling's window ends.
       for (const key of ['sign-in-failures', 'sign-in-ceiling'])
-        await app.store.attempts.reset(`${key}:id:${app.user.id}`)
+        await app.store.rates!.reset(`${key}:id:${app.user.id}`)
     }
 
     expect(app.notices()).toHaveLength(1)
 
-    await app.store.attempts.reset(`sign-in-locked-mail:${app.user.id}`)
+    await app.store.rates!.reset(`sign-in-locked-mail:${app.user.id}`)
 
     for (let i = 1; i <= 4; i++)
       await attempt(app, `10.0.6.${i}`, WRONG)

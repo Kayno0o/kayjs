@@ -107,7 +107,7 @@ export async function createOrganization(state: RequestState, input: { name: str
   if (config.create && !(await config.create(publicUser(record))))
     return { ok: false, error: 'forbidden' }
 
-  if (await spend(state.core.store, `organization:${record.id}`, state.core.limits.organization))
+  if (await spend(state.core.rates, `organization:${record.id}`, state.core.limits.organization))
     return { ok: false, error: 'limited' }
 
   const name = input.name.trim()
@@ -347,7 +347,7 @@ export async function invite(state: RequestState, ref: string, email: string, ro
     return { ok: false, error: 'member' }
 
   // Each mail goes to an inbox someone else owns, so neither a manager nor many managers together may flood it.
-  if (await spend(core.store, `invite:${found.record.id}`, core.limits.invite) || await spend(core.store, typedKey(core, 'invite-address', address), core.limits.inviteAddress))
+  if (await spend(core.rates, `invite:${found.record.id}`, core.limits.invite) || await spend(core.rates, typedKey(core, 'invite-address', address), core.limits.inviteAddress))
     return { ok: false, error: 'limited' }
 
   for (const earlier of await store.invitations.listByOrganization(found.organization.id)) {

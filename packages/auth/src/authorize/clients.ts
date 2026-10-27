@@ -226,7 +226,7 @@ export async function resolveClient(core: Core, clientId: string, address: strin
     return known.client
 
   // Each read of a document is a request this server makes for whoever asked, so it is counted against them.
-  if (!server || await spend(core.store, `oauth-document:${address}`, core.limits.oauthDocument))
+  if (!server || await spend(core.rates, `oauth-document:${address}`, core.limits.oauthDocument))
     return undefined
 
   try {

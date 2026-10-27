@@ -121,6 +121,7 @@ Each lint has a level. `deny` is an error, `warn` a warning, `allow` hides it. W
 | `broken-canonical` | warn | seo | A canonical link to a page that is a 404 or a redirect |
 | `one-way-hreflang` | warn | seo | Alternates that do not point back at each other |
 | `redirect-chain` | warn | seo | A redirect whose target redirects again |
+| `deprecated-auth-attempts` | warn | deprecated | An `attempts` counter in a kayjs-auth store of the app's own, the contract before 1.81: the store counts in `rates`, or attempts count in the app's `store.rates`; the old counter works until 1.84 |
 
 ## Errors
 

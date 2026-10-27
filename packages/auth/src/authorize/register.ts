@@ -10,7 +10,7 @@ import { validRedirectUris } from './uris'
 export async function registerClient(core: Core, address: string, document: unknown): Promise<TokenReply> {
   const all = core.limits.oauthRegisterAll
 
-  if (await spend(core.store, `oauth-register:${address}`, core.limits.oauthRegister) || (all !== undefined && await spend(core.store, 'oauth-register:all', all)))
+  if (await spend(core.rates, `oauth-register:${address}`, core.limits.oauthRegister) || (all !== undefined && await spend(core.rates, 'oauth-register:all', all)))
     return refused('invalid_client_metadata', 'Too many registrations', 429)
 
   if (typeof document !== 'object' || document === null || Array.isArray(document))

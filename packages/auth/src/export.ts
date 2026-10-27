@@ -62,7 +62,7 @@ export async function exportData(state: RequestState): Promise<{ ok: true, data:
   if (!await provedLately(state))
     return { ok: false, error: 'stale' }
 
-  if (await spend(core.store, `export:${record.id}`, core.limits.export))
+  if (await spend(core.rates, `export:${record.id}`, core.limits.export))
     return { ok: false, error: 'limited' }
 
   const user = await linkedUser(core, record)

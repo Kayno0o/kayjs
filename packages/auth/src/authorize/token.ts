@@ -204,7 +204,7 @@ async function rotate(core: Core, form: URLSearchParams, root: string): Promise<
 
 // The token endpoint: the authorization code grant with PKCE, and refresh tokens that rotate, a token used twice ending its family.
 export async function tokenEndpoint(core: Core, address: string, form: URLSearchParams, root: string): Promise<TokenReply> {
-  if (await spend(core.store, `oauth-token:${address}`, core.limits.oauthToken))
+  if (await spend(core.rates, `oauth-token:${address}`, core.limits.oauthToken))
     return refused('invalid_request', 'Too many requests', 429)
 
   const type = form.get('grant_type')

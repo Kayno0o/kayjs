@@ -767,9 +767,9 @@ The new tables are created by `db.sync()` if you use Postgres or SQLite.
 
 ## Limits
 
-Attempts are counted in the store, so every process shares them. They are counted per client address and per account, the address kept as a keyed digest. Creating organizations is limited too, to 10 a day for each account: past that, `createOrganization` answers `limited`.
+Attempts are counted where every process shares them: in the store (`memoryAuthStore` and `pgStore` keep them), else in the app's `store.rates` from `kay.config.ts`, else in the process's memory. They are counted per client address and per account, the address kept as a keyed digest. Creating organizations is limited too, to 10 a day for each account: past that, `createOrganization` answers `limited`.
 
-`rateLimit` overrides any of `DEFAULT_LIMITS`, each `{ max, window }` with `window` a string such as `'1h'`.
+`rateLimit` overrides any of `DEFAULT_LIMITS`, each `{ max, window }` with `window` a string such as `'1h'`, as the defaults are written.
 
 ```ts
 createAuth({
@@ -789,6 +789,8 @@ Behind a proxy, kay reads the client address through `proxy` in `kay.config.ts`.
 `memoryAuthStore()` is for tests and trying things out. `pgStore(db)` keeps users in Postgres, or in a SQLite file when the `Database` opens a `sqlite://` URL.
 
 Any object with the `AuthStore` methods is a store. Each method is sync or async.
+
+A store of your own counts attempts in the app's `store.rates`, or in memory without one. To count them in its own database, give it `rates`, a kay `RateStore` with `peek` and `reset`.
 
 One verb does one thing in every group: `create` adds a row, `delete` removes one, `upsert` creates or replaces, `consume` deletes a row and answers it, or whether it had it, once only.
 

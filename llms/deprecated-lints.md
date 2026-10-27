@@ -12,3 +12,4 @@ The lints of the `deprecated` group, each the old form a minor replaced, reporte
 
 | Lint | Default | Group | Reports |
 | --- | --- | --- | --- |
+| `deprecated-auth-attempts` | warn | deprecated | An `attempts` counter in a kayjs-auth store the app writes, since 1.81: a store counts in `rates`, a kay `RateStore` with `peek` and `reset`, or leaves counting to the app's `store.rates`, else memory. Read until 1.84. `kay upgrade` drops `attempts: memoryAuthStore().attempts` and the import it leaves unread; another counter is reported with no fix. Found in object literals holding `users`, `identities` and `tokens`, in `.ts` files and `.kay` fences importing from the library. |

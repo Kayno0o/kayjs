@@ -33,6 +33,7 @@ export type { Passkey, PasskeyOptionsResult, PasskeySignInResult, RegisterPasske
 export type { CreateUserInput, CreateUserResult, PasswordSignInInput, PasswordSignInResult, RegisterErrors, RegisterInput, RegisterResult } from './password'
 export { passkeyAssertion, passkeyAttestation } from './payloads'
 export type { Proof, ProofFailure } from './proof'
+export type { AuthRates } from './rates'
 export * from './roles'
 export * from './rules'
 export type { UserSession } from './sessions'

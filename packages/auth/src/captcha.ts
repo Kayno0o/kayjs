@@ -3,7 +3,7 @@ import type { DEFAULT_LIMITS } from './limits'
 import type { RequestState } from './state'
 import { configError } from 'kay/library'
 import { verifyWork, workChallenge } from 'kay/server'
-import { spend } from './limits'
+import { counted, spend } from './limits'
 import { log } from './log'
 
 const TURNSTILE_URL = 'https://challenges.cloudflare.com/turnstile/v0/siteverify'
@@ -110,7 +110,7 @@ async function pastThreshold(state: RequestState, action: CaptchaAction): Promis
   if (rule === undefined || rule === false)
     return undefined
 
-  const count = await state.core.store.attempts.count(`${COUNTED[action].key}:${state.client}`)
+  const count = await counted(state.core.rates, `${COUNTED[action].key}:${state.client}`)
   const threshold = rule === 'always' ? 0 : rule
 
   return count >= threshold ? count - threshold : undefined
@@ -148,7 +148,7 @@ export async function admit(state: RequestState, action: CaptchaAction, token: s
   const past = await pastThreshold(state, action)
   const { key, limit } = COUNTED[action]
 
-  if (await spend(core.store, `${key}:${state.client}`, core.limits[limit]))
+  if (await spend(core.rates, `${key}:${state.client}`, core.limits[limit]))
     return 'limited'
 
   if (past === undefined)

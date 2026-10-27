@@ -1,9 +1,10 @@
+import type { Duration } from 'kay'
 import type { RequestState } from './state'
 import type { UserRecord } from './store'
 import { comparePasswords, hashPassword } from '@kaynooo/utils'
 import { afterResponse } from './events'
 import { randomToken } from './keys'
-import { spend } from './limits'
+import { counted, spend } from './limits'
 import { notify } from './notify'
 
 // The counts one password guess is held to: a hard stop for this client on this account, and a looser ceiling for the account from every client together.
@@ -12,16 +13,14 @@ export interface Guess {
   keys: string[]
   // The wrong guesses of every client on the account, which a right password does not give back.
   failures: string
-  window: number
+  window: Duration
 }
-
-const DAY = 24 * 60 * 60
 
 // Counts a guess at an account's password before the password is checked, so a burst of parallel guesses cannot all pass a count that only a failure would raise; `forgive` takes it back once the password proves right.
 // The hard stop is per client, so someone failing at an email cannot keep its holder out from another address. Without a record the count is kept against what was typed, so a missing account runs out the same way.
 export async function startGuess(state: RequestState, record: UserRecord | undefined, typed: string): Promise<Guess | 'limited'> {
   const { core, client } = state
-  const { attempts } = core.store
+  const { rates } = core
   const { max, window } = core.limits.signInAccountAll
   const account = record ? record.id : core.keys.fingerprint(typed.toLowerCase())
   // A record's id and a digest never share a prefix with the other, whatever the app's ids look like.
@@ -30,11 +29,11 @@ export async function startGuess(state: RequestState, record: UserRecord | undef
   const pending = `sign-in-ceiling:${kind}:${account}`
   const failures = `sign-in-failures:${kind}:${account}`
 
-  if (await attempts.hit(hard, `${core.limits.signInAccount.window}s`) > core.limits.signInAccount.max)
+  if (await spend(rates, hard, core.limits.signInAccount))
     return 'limited'
 
   // `pending` is every guess since the last right password, so a burst in parallel stops at the ceiling; `failures` is what the ceiling is spent on.
-  if (await attempts.hit(pending, `${window}s`) > max || await attempts.count(failures) >= max) {
+  if (await spend(rates, pending, { max, window }) || await counted(rates, failures) >= max) {
     if (record)
       await mailLockout(state, record)
 
@@ -46,18 +45,18 @@ export async function startGuess(state: RequestState, record: UserRecord | undef
 
 // Counts a wrong password against the account's ceiling, which no right password gives back.
 export async function failGuess(state: RequestState, guess: Guess): Promise<void> {
-  await state.core.store.attempts.hit(guess.failures, `${guess.window}s`)
+  await state.core.rates.hit(guess.failures, guess.window)
 }
 
 // A right password costs this client and the burst in flight nothing: the guesses they hold are forgotten, but not the failures of other clients, so signing in does not hand an attacker a fresh ceiling.
 export async function forgive(state: RequestState, guess: Guess): Promise<void> {
   for (const key of guess.keys)
-    await state.core.store.attempts.reset(key)
+    await state.core.rates.reset(key)
 }
 
 // Mails the holder that signing in is paused, at most once a day however often the lockout comes back, so guessing cannot flood their inbox.
 export async function mailLockout(state: RequestState, record: UserRecord): Promise<void> {
-  if (await state.core.store.attempts.hit(`sign-in-locked-mail:${record.id}`, `${DAY}s`) === 1)
+  if ((await state.core.rates.hit(`sign-in-locked-mail:${record.id}`, '1d')).count === 1)
     await afterResponse('reporting a sign-in lockout', async () => notify(state, record, 'sign-in-locked'))
 }
 
@@ -77,12 +76,12 @@ export async function passwordMatches(record: UserRecord | undefined, password: 
 // Counts one sign-in guess at the second factor, per client and per account, and says whether it is past the cap.
 // Only the first guess past the account's cap mails the holder, and at most once a day, as for passwords.
 export async function secondFactorLimited(state: RequestState, record: UserRecord): Promise<boolean> {
-  const { store, limits } = state.core
+  const { rates, limits } = state.core
 
-  if (await spend(store, `two-factor:${state.client}`, limits.twoFactor))
+  if (await spend(rates, `two-factor:${state.client}`, limits.twoFactor))
     return true
 
-  const guesses = await store.attempts.hit(`two-factor:${record.id}`, `${limits.twoFactorAccount.window}s`)
+  const guesses = (await rates.hit(`two-factor:${record.id}`, limits.twoFactorAccount.window)).count
 
   if (guesses <= limits.twoFactorAccount.max)
     return false

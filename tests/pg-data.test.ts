@@ -519,6 +519,19 @@ pgDescribe('pgRates', () => {
     expect(await first!.peek!('bob')).toBeUndefined()
   })
 
+  pgIt('forgets the window of one key from any replica', async () => {
+    await fresh()
+
+    const [first, second] = handles(2).map(handle => pgRates(handle))
+
+    await first!.hit('ada', '60s', 2)
+    await first!.hit('bob', '60s')
+    await second!.reset!('ada')
+    expect(await first!.peek!('ada')).toBeUndefined()
+    expect((await first!.peek!('bob'))?.count).toBe(1)
+    expect((await first!.hit('ada', '60s')).count).toBe(1)
+  })
+
   pgIt('shares the counts between replicas, and stores no key in the clear', async () => {
     const sql = await fresh()
     const [first, second] = handles(2).map(handle => pgRates(handle))

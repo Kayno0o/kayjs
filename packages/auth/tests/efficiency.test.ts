@@ -100,7 +100,7 @@ describe('pruning what expired', () => {
     await store.sessions.create(session('idle', now - 100 * 24 * HOUR_MS))
     await store.sessions.create(session('old', now - HOUR_MS, now - 1000 * 24 * HOUR_MS))
     await store.sessions.create(session('fresh', now - HOUR_MS))
-    await store.attempts.hit('closed', '1s')
+    await store.rates!.hit('closed', '1s')
 
     const { browser } = testApp({ store, sessions: sessionPlugin({ secret: SECRET, absoluteMaxAge: '365d' }), remember: { maxAge: '30d' } })
 
@@ -110,7 +110,7 @@ describe('pruning what expired', () => {
     expect(await store.tokens.consume('gone', 'verify-email')).toBeUndefined()
     expect(await store.tokens.consume('kept', 'verify-email')).toBeDefined()
     expect((await store.sessions.listByUser('u1')).map(found => found.id)).toEqual(['fresh'])
-    expect(await store.attempts.count('closed')).toBe(0)
+    expect(await store.rates!.peek('closed')).toBeUndefined()
   })
 })
 
@@ -339,7 +339,7 @@ describe('attempt keys', () => {
     for (let attempt = 0; attempt < 4; attempt++)
       answers.push(await browser().call('requestPasswordReset', attempt % 2 === 0 ? 'Ada@Example.com' : 'ada@example.com'))
 
-    const keys = log.calls.filter(call => call.name === 'attempts.hit').map(call => call.args[0] as string)
+    const keys = log.calls.filter(call => call.name === 'rates.hit').map(call => call.args[0] as string)
 
     expect(keys.some(key => key.startsWith('forgot:'))).toBe(true)
     expect(keys.filter(key => key.includes('ada') || key.includes('@'))).toEqual([])
@@ -353,7 +353,7 @@ describe('attempt keys', () => {
 
     await browser().post('/password', { identifier: 'nobody@example.com', password: PASSWORD })
 
-    const keys = log.calls.filter(call => call.name === 'attempts.hit').map(call => call.args[0] as string)
+    const keys = log.calls.filter(call => call.name === 'rates.hit').map(call => call.args[0] as string)
 
     expect(keys.some(key => key.startsWith('sign-in-account:'))).toBe(true)
     expect(keys.filter(key => key.includes('nobody'))).toEqual([])

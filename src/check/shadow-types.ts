@@ -31,6 +31,7 @@ import { htmlFallbacks, publicFiles } from '../server/public'
 import { redirectProblems } from '../server/redirects'
 import { extensionEditor, patternShapes, routeMounts, scanEndpoints, scanRoutes, servedPaths } from '../server/routes'
 import { readRuntimeRedirects } from '../server/runtime-redirects'
+import { authAttempts } from './auth-attempts'
 import { ownFile } from './diagnose'
 import { ASSET_TYPES, environmentTypes, kayPaths, packageTypes } from './env-types'
 import { CONTENT_CHECK, EXPORTS_CHECK, exportsCheck, SETTINGS_CHECK, settingsCheck } from './generated'
@@ -130,7 +131,7 @@ async function writeShadows(projectRoot: string, options: CheckOptions): Promise
 
   // A types-only write discards the problems, so none of their checks run.
   if (options.typesOnly !== true)
-    problems.push(...redirectChecks(root, options, served), ...await unguardedRoutes(options, served), ...await unreadOpenSettings(served), ...await unguardedTools(options, served), ...await mcpRoutes(options, served), ...await largePublicImages(options, root, served), ...await untypedSockets(options, served), ...await removedUiTokens(root, options), ...await unknownToolLabels(root, options), ...await publicEnvOutsideSrc(root, options))
+    problems.push(...redirectChecks(root, options, served), ...await unguardedRoutes(options, served), ...await unreadOpenSettings(served), ...await unguardedTools(options, served), ...await mcpRoutes(options, served), ...await largePublicImages(options, root, served), ...await untypedSockets(options, served), ...await removedUiTokens(root, options), ...await unknownToolLabels(root, options), ...await publicEnvOutsideSrc(root, options), ...await authAttempts(root, options))
 
   // A script rather than a module, which is what lets it declare a wildcard module.
   await tree.write('kay-assets.d.ts', ASSET_TYPES)

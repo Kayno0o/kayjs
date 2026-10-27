@@ -181,7 +181,7 @@ export async function requestPasswordReset(state: RequestState, email: string, c
 // Sets the password the link was sent for and ends every other session the user held.
 export async function resetPassword(state: RequestState, token: string, password: string): Promise<ResetPasswordResult> {
   // Counted before the breached-password service is asked, so forged links cannot make the server call it without end.
-  if (await spend(state.core.store, `link:${state.client}`, state.core.limits.link))
+  if (await spend(state.core.rates, `link:${state.client}`, state.core.limits.link))
     return { ok: false, error: 'limited' }
 
   const problem = await newPasswordProblem(state.core, password)
@@ -301,7 +301,7 @@ export async function warnHolder(state: RequestState, holder: UserRecord): Promi
 
   await bindCode(state, 'verify-email', email)
 
-  if (await spend(core.store, `account-exists:${holder.id}`, core.limits.resendAccount))
+  if (await spend(core.rates, `account-exists:${holder.id}`, core.limits.resendAccount))
     return
 
   const { locale, templates } = writing(mail, [holder.locale, ...state.languages])
@@ -367,14 +367,14 @@ async function spendCode(state: RequestState, type: CodeType, code: string) {
   if (!pending || pending.type !== type || pending.expires < Date.now())
     return { ok: false, error: 'expired' } as const
 
-  if (await spend(core.store, `email-code:${state.client}`, core.limits.emailCode) || await spend(core.store, typedKey(core, 'email-code', pending.email), core.limits.emailCodeAccount))
+  if (await spend(core.rates, `email-code:${state.client}`, core.limits.emailCode) || await spend(core.rates, typedKey(core, 'email-code', pending.email), core.limits.emailCodeAccount))
     return { ok: false, error: 'limited' } as const
 
   const spent = await core.store.tokens.consume(codeDigest(state.core, pending.nonce, code.replace(NOT_DIGITS, '')), type)
   const record = spent && await core.store.users.get(spent.userId)
 
   if (!spent || !record || record.email !== spent.email) {
-    if (await core.store.attempts.hit(`email-code-miss:${pending.nonce}`, `${core.email!.maxAge[type]}s`) < CODE_MISSES)
+    if ((await core.rates.hit(`email-code-miss:${pending.nonce}`, `${core.email!.maxAge[type]}s`)).count < CODE_MISSES)
       return { ok: false, error: 'invalid' } as const
 
     // Only this session's pending code is dropped: the holder's live code may be one another session asked for, and it is unreachable from here anyway, since its digest binds that session's nonce.
@@ -409,7 +409,7 @@ async function mailByAddress(state: RequestState, email: string, type: 'reset-pa
   if (refused)
     return { ok: false, error: refused }
 
-  if (await spend(core.store, typedKey(core, limit, address), core.limits[`${limit}Account`]))
+  if (await spend(core.rates, typedKey(core, limit, address), core.limits[`${limit}Account`]))
     return { ok: false, error: 'limited' }
 
   // Parked whether or not an account has the address, so this session looks the same either way.
@@ -452,7 +452,7 @@ async function mailFor(state: RequestState, record: UserRecord, type: LinkType, 
 async function spendResend(state: RequestState, id: string, limit: 'resend' | 'emailChange'): Promise<{ ok: false, error: 'limited' } | undefined> {
   const { core } = state
 
-  if (await spend(core.store, `${limit}:${state.client}`, core.limits[limit]) || await spend(core.store, `${limit}:${id}`, core.limits[`${limit}Account`]))
+  if (await spend(core.rates, `${limit}:${state.client}`, core.limits[limit]) || await spend(core.rates, `${limit}:${id}`, core.limits[`${limit}Account`]))
     return { ok: false, error: 'limited' }
 
   return undefined
@@ -500,7 +500,7 @@ async function issue(state: RequestState, record: UserRecord, type: LinkType, em
 async function spendLink(state: RequestState, token: string, type: LinkType, counted = false) {
   const { store, limits } = state.core
 
-  if (!counted && await spend(store, `link:${state.client}`, limits.link))
+  if (!counted && await spend(state.core.rates, `link:${state.client}`, limits.link))
     return { ok: false, error: 'limited' } as const
 
   const spent = await store.tokens.consume(digest(type === 'magic-link' ? unmarked(token) : token), type)

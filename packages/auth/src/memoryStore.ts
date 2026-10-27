@@ -1,7 +1,7 @@
 import type { AuditRecord, AuthStore, BearerTokenRecord, IdentityRecord, InvitationRecord, MemberRecord, OAuthClientRecord, OAuthCodeRecord, OAuthGrantRecord, OAuthRefreshRecord, OrganizationRecord, PasskeyRecord, PruneLimits, SessionRecord, TokenRecord, UserRecord } from './store'
 import { durationSeconds } from 'kay/library'
+import { memoryAuthRates } from './rates'
 
-const SWEEP_EVERY = 1000
 // A client that registered itself and was never approved by anyone is dropped after this long.
 const UNUSED_CLIENT_MS = 24 * 60 * 60 * 1000
 
@@ -22,8 +22,7 @@ export function memoryAuthStore(): AuthStore {
   const oauthCodes = new Map<string, OAuthCodeRecord>()
   const oauthRefresh = new Map<string, OAuthRefreshRecord>()
   let audit: AuditRecord[] = []
-  const attempts = new Map<string, { count: number, resetAt: number }>()
-  let hits = 0
+  const rates = memoryAuthRates()
   const identityKey = (provider: string, providerId: string) => `${provider}\n${providerId}`
   const memberKey = (organizationId: string, userId: string) => `${organizationId}\n${userId}`
   const grantKey = (userId: string, clientId: string) => `${userId}\n${clientId}`
@@ -486,33 +485,7 @@ export function memoryAuthStore(): AuthStore {
       listByEmail: email => oldestFirst([...invitations.values()].filter(invitation => invitation.email === email)).map(invitation => copyInvitation(invitation)!),
       delete: id => invitations.delete(id),
     },
-    attempts: {
-      count(key) {
-        const entry = attempts.get(key)
-
-        return entry && entry.resetAt > Date.now() ? entry.count : 0
-      },
-      hit(key, window) {
-        const now = Date.now()
-        const entry = attempts.get(key)
-        const next = entry && entry.resetAt > now ? { ...entry, count: entry.count + 1 } : { count: 1, resetAt: now + durationSeconds(window, 'an attempts window') * 1000 }
-
-        // Swept every so many hits, so memory follows the clients that keep trying.
-        if (++hits % SWEEP_EVERY === 0) {
-          for (const [other, open] of attempts) {
-            if (open.resetAt <= now)
-              attempts.delete(other)
-          }
-        }
-
-        attempts.set(key, next)
-
-        return next.count
-      },
-      reset(key) {
-        attempts.delete(key)
-      },
-    },
+    rates,
     prune({ now, bearerExpiredBefore, sessionMaxAge, sessionAbsoluteMaxAge }: PruneLimits) {
       const at = now.getTime()
 
@@ -531,10 +504,7 @@ export function memoryAuthStore(): AuthStore {
           bearerTokens.delete(key)
       }
 
-      for (const [key, open] of attempts) {
-        if (open.resetAt <= at)
-          attempts.delete(key)
-      }
+      rates.sweep(at)
 
       for (const map of [oauthCodes, oauthRefresh]) {
         for (const [key, record] of map) {

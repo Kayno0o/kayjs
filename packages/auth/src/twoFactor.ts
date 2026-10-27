@@ -47,7 +47,7 @@ export async function verifyTwoFactor(state: RequestState, code: string, signIn:
     return { ok: false, error: 'invalid' }
   }
 
-  await store.attempts.reset(`two-factor:${record.id}`)
+  await state.core.rates.reset(`two-factor:${record.id}`)
   await state.session.unset('authChallenge')
   await signIn(record, challenge.method ?? 'unknown')
 
@@ -88,7 +88,7 @@ export async function enableTwoFactor(state: RequestState, code: string): Promis
     return { ok: false, error: 'not-set-up' }
 
   // Counted like a sign-in code: a session alone may not guess the pending secret's codes at will.
-  if (await spend(state.core.store, `two-factor:${state.client}`, state.core.limits.twoFactor) || await spend(state.core.store, `enable-two-factor:${record.id}`, state.core.limits.twoFactorAccount))
+  if (await spend(state.core.rates, `two-factor:${state.client}`, state.core.limits.twoFactor) || await spend(state.core.rates, `enable-two-factor:${record.id}`, state.core.limits.twoFactorAccount))
     return { ok: false, error: 'limited' }
 
   const step = await verifyTotp(secret, code)
@@ -96,7 +96,7 @@ export async function enableTwoFactor(state: RequestState, code: string): Promis
   if (step === undefined)
     return { ok: false, error: 'invalid' }
 
-  await state.core.store.attempts.reset(`enable-two-factor:${record.id}`)
+  await state.core.rates.reset(`enable-two-factor:${record.id}`)
 
   const updated = await endOtherSessions(state, record, { totpEnabledAt: new Date(), totpLastStep: step })
 

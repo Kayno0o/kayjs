@@ -86,6 +86,21 @@ describe('a refund', () => {
   })
 })
 
+describe('a reset', () => {
+  it('forgets the window of its key alone, in memory and in SQLite, the next hit opening a fresh one', async () => {
+    for (const store of [memoryRates(), sqliteRates(join(await scratchDir('rates'), 'rates.sqlite'))]) {
+      await store.hit('key', '60000ms', 3)
+      await store.hit('other', '60000ms')
+      await store.reset('key')
+      expect(await store.peek('key')).toBeUndefined()
+      expect((await store.peek('other'))!.count).toBe(1)
+      expect((await store.hit('key', '60000ms')).count).toBe(1)
+      await store.reset('none')
+      expect(await store.peek('none')).toBeUndefined()
+    }
+  })
+})
+
 describe('the address of a request', () => {
   it('is unknown for a request with no socket, which clientAddress counts as one client', () => {
     const request = new Request('http://localhost/')

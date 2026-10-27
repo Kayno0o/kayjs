@@ -203,7 +203,7 @@ export async function passkeySignInOptions(state: RequestState): Promise<PublicK
 export async function signInWithPasskey(state: RequestState, response: AuthenticationResponseJSON, redirect: string | undefined, signIn: (record: UserRecord, method: string) => Promise<void>): Promise<PasskeySignInResult> {
   const { core } = state
 
-  if (await spend(core.store, `passkey:${state.client}`, core.limits.signIn))
+  if (await spend(core.rates, `passkey:${state.client}`, core.limits.signIn))
     return { ok: false, error: 'limited' }
 
   const challenge = await take(state, 'sign-in', null)
@@ -265,7 +265,7 @@ export async function verifyTwoFactorPasskey(state: RequestState, response: Auth
     return { ok: false, error: 'invalid' }
   }
 
-  await store.attempts.reset(`two-factor:${record.id}`)
+  await state.core.rates.reset(`two-factor:${record.id}`)
   await state.session.unset('authChallenge')
   await signIn(record, pending.method ?? 'unknown')
 
@@ -333,7 +333,7 @@ async function take(state: RequestState, purpose: PasskeyPurpose, user: string |
   if (!parked || parked.purpose !== purpose || parked.user !== user || parked.expires < Date.now())
     return undefined
 
-  return await state.core.store.attempts.hit(`passkey-challenge:${parked.challenge}`, `${CHALLENGE_MAX_AGE_MS}ms`) === 1 ? parked.challenge : undefined
+  return (await state.core.rates.hit(`passkey-challenge:${parked.challenge}`, `${CHALLENGE_MAX_AGE_MS}ms`)).count === 1 ? parked.challenge : undefined
 }
 
 // Whether `response` is `passkey` signing `challenge`; its counter and last use are recorded. A counter that did not move past the stored one, the sign of a cloned authenticator, is refused.

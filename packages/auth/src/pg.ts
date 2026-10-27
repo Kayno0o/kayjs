@@ -465,24 +465,24 @@ export function pgStore(db: Database): AuthStore {
       consume: async (userId, digest) => await recoveryCodes.write.deleteOne({ user_id: userId, digest }) !== null,
       count: async userId => recoveryCodes.read.count({ user_id: userId }),
     },
-    attempts: {
-      async count(key) {
+    rates: {
+      async peek(key) {
         const row = await attempts.read.findById(key)
 
-        return row && row.reset_at.getTime() > Date.now() ? row.count : 0
+        return row && row.reset_at.getTime() > Date.now() ? { count: row.count, resetAt: row.reset_at.getTime() } : undefined
       },
-      async hit(key, window) {
+      async hit(key, window, weight = 1) {
         const now = new Date()
 
         // One statement, so two attempts at once both count: a window still open is raised, an ended one starts over.
-        const [row] = await db.raw<{ count: number }>`
-          INSERT INTO "kay_attempts" ("key", "count", "reset_at") VALUES (${key}, 1, ${new Date(now.getTime() + durationSeconds(window, 'an attempts window') * 1000)})
+        const [row] = await db.raw<{ count: number, reset_at: Date | string | number }>`
+          INSERT INTO "kay_attempts" ("key", "count", "reset_at") VALUES (${key}, ${weight}, ${new Date(now.getTime() + durationSeconds(window, 'an attempts window') * 1000)})
           ON CONFLICT ("key") DO UPDATE SET
-            "count" = CASE WHEN "kay_attempts"."reset_at" > ${now} THEN "kay_attempts"."count" + 1 ELSE 1 END,
+            "count" = CASE WHEN "kay_attempts"."reset_at" > ${now} THEN "kay_attempts"."count" + ${weight} ELSE ${weight} END,
             "reset_at" = CASE WHEN "kay_attempts"."reset_at" > ${now} THEN "kay_attempts"."reset_at" ELSE EXCLUDED."reset_at" END
-          RETURNING "count"`
+          RETURNING "count", "reset_at"`
 
-        return row!.count
+        return { count: Number(row!.count), resetAt: new Date(row!.reset_at).getTime() }
       },
       async reset(key) {
         await attempts.write.deleteMany({ key })

@@ -162,6 +162,9 @@ export function memoryRates(): SyncRates {
       if (window && window.resetAt === resetAt && window.count > 0)
         window.count -= 1
     },
+    reset(key) {
+      windows.delete(key)
+    },
   })
 }
 
@@ -235,11 +238,12 @@ export function sqliteRates(path: string): SyncRates {
     hit: (key, window, weight) => (opened ??= openRates(path)).hit(key, window, weight),
     peek: key => (opened ??= openRates(path)).peek(key),
     refund: (key, resetAt) => (opened ??= openRates(path)).refund(key, resetAt),
+    reset: key => (opened ??= openRates(path)).reset(key),
   }
 }
 
 // Answered at once, as a store reading SQLite needs no promise.
-export interface SyncRates { hit: (key: string, window: Duration, weight?: number) => RateWindow, peek: (key: string) => RateWindow | undefined, refund: (key: string, resetAt: number) => void }
+export interface SyncRates { hit: (key: string, window: Duration, weight?: number) => RateWindow, peek: (key: string) => RateWindow | undefined, refund: (key: string, resetAt: number) => void, reset: (key: string) => void }
 type OpenRates = SyncRates & { close: () => void }
 
 function openRates(path: string): OpenRates {
@@ -259,6 +263,7 @@ function openRates(path: string): OpenRates {
   const hit = db.query<{ count: number, reset_at: number }, [string, number, number, number]>('INSERT INTO kay_rates (key, count, reset_at) VALUES (?1, ?4, ?2 + ?3) ON CONFLICT (key) DO UPDATE SET count = CASE WHEN reset_at <= ?2 THEN ?4 ELSE count + ?4 END, reset_at = CASE WHEN reset_at <= ?2 THEN ?2 + ?3 ELSE reset_at END RETURNING count, reset_at')
   const peek = db.query<{ count: number, reset_at: number }, [string, number]>('SELECT count, reset_at FROM kay_rates WHERE key = ? AND reset_at > ?')
   const refund = db.query('UPDATE kay_rates SET count = MAX(count - 1, 0) WHERE key = ? AND reset_at = ?')
+  const reset = db.query('DELETE FROM kay_rates WHERE key = ?')
   const sweep = db.query('DELETE FROM kay_rates WHERE reset_at <= ?')
   let swept = 0
 
@@ -283,6 +288,9 @@ function openRates(path: string): OpenRates {
     },
     refund(key, resetAt) {
       refund.run(hashed(key), resetAt)
+    },
+    reset(key) {
+      reset.run(hashed(key))
     },
   }
 }

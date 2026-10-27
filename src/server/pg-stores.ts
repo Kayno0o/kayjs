@@ -161,6 +161,12 @@ export function pgRates(pg: PgHandle): RateStore {
 
       await query(db, 'UPDATE kay_rates SET count = GREATEST(count - 1, 0) WHERE key = $1 AND reset_at = $2::bigint', [hash, resetAt])
     },
+    async reset(key) {
+      const hash = await hashed(key)
+      const db = await pg.db()
+
+      await query(db, 'DELETE FROM kay_rates WHERE key = $1', [hash])
+    },
   }, 'the rates store', { ready: pg.db })
 }
 

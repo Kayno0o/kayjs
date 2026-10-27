@@ -204,6 +204,8 @@ const store: RateStore = {
 
 `refund(key, resetAt)` is optional too. It takes one attempt back off the window that closes at `resetAt`, never below zero, and does nothing once that window is gone. kay calls it for a call that started no work, such as kayjs-ai's resume of a reply the server kept, and a store without it simply keeps the attempt counted.
 
+`reset(key)` is optional as well. It forgets the window under `key`, so the next hit opens a fresh one. kayjs-auth calls it to clear a count once a sign-in succeeds, and counts in its own memory when the app's store has no `peek` or `reset`.
+
 <ReadMore href="/llms/rate-limits">Several limits at once and the exact counting rules.</ReadMore>
 
 ## Rate limit a guard or an API route
