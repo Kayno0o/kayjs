@@ -13,6 +13,8 @@ const locals = (request: Request) => ({ key: request.headers.get('authorization'
 // No `mcp`: a library calls actions as tools in-process whether or not the app serves the endpoint.
 const site = await testSite({ root: 'tests/fixtures/library-tools', islands: false, locals })
 const mounted = await testSite({ root: 'tests/fixtures/library-tools', islands: false, base: '/shop', trailingSlash: 'always', locals })
+// A library's call is the visitor's own, so an endpoint guarded by `mcp.key` asks it nothing and the visitor's Authorization still reaches the action.
+const keyed = await testSite({ root: 'tests/fixtures/library-tools', islands: false, locals, mcp: { key: true } })
 const localized = await testSite({ root: 'tests/fixtures/library-tools', islands: false, i18n: { locales: ['fr', 'en'], defaultLocale: 'fr', messages: resolve('tests/fixtures/i18n/src/messages') } })
 
 // Imported once a site loads `.kay` modules.
@@ -20,7 +22,7 @@ const { current, later, names, recorded, run, shape, unregistered } = await impo
 const { addNote } = await import(join(import.meta.dir, 'fixtures/library-tools/src/routes/targets/_actions.kay')) as { addNote: Parameters<typeof actionTool>[0] }
 
 afterAll(async () => {
-  await Promise.all([site.close(), mounted.close(), localized.close()])
+  await Promise.all([site.close(), mounted.close(), keyed.close(), localized.close()])
 })
 
 async function call(name: string, args: Record<string, unknown> = {}, target = site, headers: Record<string, string> = {}): Promise<ToolResult> {
@@ -130,6 +132,11 @@ describe('an action as a tool', () => {
     const result = await localized.call(run, { name: 'language', args: {} }, { from: '/en/', headers: { 'accept-language': 'fr' } })
 
     expect(result.structuredContent).toEqual({ locale: 'en' })
+  })
+
+  it('runs without the MCP key and keeps the visitor\'s Authorization', async () => {
+    expect((await call('wipe', { confirm: true }, keyed, { authorization: 'Bearer open' })).structuredContent).toEqual({ by: 'open' })
+    expect((await call('wipe', { confirm: true }, keyed)).isError).toBe(true)
   })
 
   it('keeps two visitors calling at once apart', async () => {

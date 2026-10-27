@@ -1,6 +1,6 @@
 import type { McpConfig } from './api-modules'
 import { createHash, randomBytes, timingSafeEqual } from 'node:crypto'
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { linkSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import process from 'node:process'
 import { KayError } from '../compiler/errors'
@@ -11,6 +11,7 @@ const KEY_FILE_VARIABLE = 'KAY_MCP_KEY_FILE'
 
 // Shorter keys are guessable, whatever compares them.
 export const MCP_KEY_MIN = 16
+const VISIBLE = /^[\x21-\x7E]+$/
 const BEARER = /^bearer +(\S+)$/i
 
 // What `mcp.key` asks for: `true` reads the environment, a string is the key, `{ file }` reads the environment and else that file, made on first use.
@@ -57,6 +58,10 @@ function checked(key: string, source: string): string {
   if (key.length < MCP_KEY_MIN)
     throw new KayError('config-invalid', `kay: the MCP key from ${source} must be at least ${MCP_KEY_MIN} characters`)
 
+  // A bearer token is one run of visible ASCII, so any other key could never be sent.
+  if (!VISIBLE.test(key))
+    throw new KayError('config-invalid', `kay: the MCP key from ${source} must be visible ASCII characters with no space`)
+
   return key
 }
 
@@ -99,12 +104,19 @@ function readOrMake(path: string): string {
 
   mkdirSync(dirname(path), { recursive: true, mode: 0o700 })
 
+  // Written whole under another name and linked in, so a process reading meanwhile never meets an empty file, nor does a crash leave one.
+  const pending = `${path}.${process.pid}.${randomBytes(4).toString('hex')}`
+
   try {
-    writeFileSync(path, randomBytes(32).toString('base64url'), { mode: 0o600, flag: 'wx' })
+    writeFileSync(pending, randomBytes(32).toString('base64url'), { mode: 0o600, flag: 'wx' })
+    linkSync(pending, path)
   }
   catch (error) {
     if (!isCode(error, 'EEXIST'))
       throw error
+  }
+  finally {
+    rmSync(pending, { force: true })
   }
 
   return readFileSync(path, 'utf8').trim()

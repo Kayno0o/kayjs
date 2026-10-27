@@ -163,6 +163,8 @@ With `{ file }`, kay makes a random key in that file the first time the server s
 
 A production server with `key: true` and no key does not start. Elsewhere it refuses every request and logs a warning that names the variables. Behind `proxy.key`, the endpoint needs no entry in `proxy.open`, because the bearer is its credential. The tool a call runs does not receive the key as its `Authorization`.
 
+The key is the only way in: with `mcp.key` set, an OAuth token from kayjs-auth is refused at the endpoint. Prefer a generated key, which `{ file }` makes, over a short one you choose, because a caller on your own network can retry as often as the rate limit lets it.
+
 ### Routes as tools
 
 An API route is a tool only when you say so, with `tool` in its `detail`. The route stays in the OpenAPI document either way, so an internal route, such as a check for your proxy, never reaches an agent by accident.

@@ -1,5 +1,5 @@
 import { existsSync, statSync } from 'node:fs'
-import { chmod, readFile, rm, writeFile } from 'node:fs/promises'
+import { chmod, readdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import process from 'node:process'
 import { afterAll, describe, expect, it } from 'bun:test'
@@ -274,6 +274,25 @@ describe('where the key comes from', () => {
       await expect(served({ KAY_MCP_KEY_FILE: locked }, { mcp: { key: true } })).rejects.toThrow('cannot be read')
   })
 
+  it('refuses a key no bearer token could carry', async () => {
+    for (const key of ['my secret key 12345', 'clé-secrète-0123456789', 'tab\tseparated-key-1234'])
+      await expect(served({}, { mcp: { key } })).rejects.toThrow('visible ASCII')
+
+    await expect(served({ KAY_MCP_KEY: 'has a space in it 123' }, { mcp: { key: true } })).rejects.toThrow('visible ASCII')
+  })
+
+  it('never lets a second boot meet a half-made key file', async () => {
+    const dir = await scratchDir('mcp-key-')
+    const file = join(dir, 'mcp-key')
+    const apps = await Promise.all([1, 2, 3, 4].map(async () => served({}, { mcp: { key: { file } } })))
+    const made = (await readFile(file, 'utf8')).trim()
+
+    for (const app of apps)
+      expect((await post(app, message('ping'), bearer(made))).status).toBe(200)
+
+    expect((await readdir(dir)).sort()).toEqual(['mcp-key'])
+  })
+
   it('refuses a setting that is none of the three', async () => {
     for (const key of [5, null, {}, { file: '' }, { file: 3 }, []])
       await expect(served({}, { mcp: { key: key as never } })).rejects.toThrow('mcp.key is')
@@ -352,11 +371,19 @@ describe('behind proxy.key', () => {
     expect((await post(plain, message('ping'), bearer(KEY))).status).toBe(403)
   })
 
+  it('opens a POST alone, no other method on the path', async () => {
+    const app = await served(production, { proxy, mcp: { key: true } })
+
+    for (const method of ['GET', 'DELETE', 'PUT', 'PATCH', 'OPTIONS', 'HEAD'])
+      expect((await app.handle(new Request('http://localhost/mcp', { method, headers: bearer(KEY) }))).status).toBe(403)
+  })
+
   it('opens the endpoint where mcp.path puts it', async () => {
     const app = await served(production, { proxy, mcp: { key: true, path: '/tools' } })
 
     expect((await post(app, message('ping'), bearer(KEY), '/tools')).status).toBe(200)
-    expect((await post(app, message('ping'), bearer(KEY), '/tools/')).status).not.toBe(403)
+    expect((await post(app, message('ping'), bearer(KEY), '/tools/')).status).toBe(200)
+    await refused(await post(app, message('ping'), {}, '/tools/'))
     expect((await post(app, message('ping'), bearer(KEY), '/mcp')).status).toBe(403)
     await refused(await post(app, message('ping'), {}, '/tools'))
   })
@@ -367,6 +394,11 @@ describe('behind proxy.key', () => {
     // The server hands the app the path without the base, and the check reads either.
     for (const path of ['/mcp', '/mcp/', '/shop/mcp', '/shop/mcp/'])
       expect((await post(app, message('ping'), bearer(KEY), path)).status).not.toBe(403)
+
+    // The slash variant answers as the endpoint does, or is no route at all, never a page past the key.
+    const slashed = await post(app, message('ping'), {}, '/mcp/')
+
+    expect([401, 404]).toContain(slashed.status)
 
     expect((await post(app, message('ping'), bearer(KEY))).status).toBe(200)
     await refused(await post(app, message('ping'), {}))
