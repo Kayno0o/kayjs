@@ -14,7 +14,7 @@ The previous button restarts the chapter once it is more than 3 seconds in, and 
 
 ## Transcript
 
-A cue has a `start`, an `end` and a `text`. The cues fill a folded transcript, grouped under the chapter they start in. The cue playing is marked and kept in view, and clicking a cue seeks there and plays.
+A cue has a `start`, an `end` and a `text`. The cues fill a folded transcript, grouped under the chapter they start in. The cue playing is marked and kept in view, and clicking a cue seeks there and plays. The cues are one tab stop and the arrows move between them, the left and right ones following the reading direction.
 
 ## Lock screen and headset
 

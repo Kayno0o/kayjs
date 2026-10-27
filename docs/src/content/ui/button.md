@@ -19,7 +19,7 @@ description: A button or a link styled as one, with an optional icon and a busy 
 
 ## Disabled with a reason
 
-A button that is `disabled` and carries a `data-tooltip` renders `aria-disabled` instead of `disabled`. It stays reachable by the keyboard, so [TooltipHost](/ui/tooltip-host) can show why it is off, and its press does nothing: a submit button no longer submits.
+A button that is `disabled` and carries a `data-tooltip` renders `aria-disabled` instead of `disabled`. It stays reachable by the keyboard, so [TooltipHost](/ui/tooltip-host) can show why it is off, and its press does nothing: a submit button no longer submits, and a `popovertarget` or `command` on it opens nothing.
 
 ## Busy
 

@@ -149,13 +149,13 @@ describe('ZoomPane', () => {
     const pane = root.querySelector('#zoom')!
     const fit = () => pane.querySelector<HTMLButtonElement>('[aria-label="Fit"]')!
 
-    expect(fit().disabled).toBe(true)
+    expect(fit().getAttribute('aria-disabled')).toBe('true')
 
     press(pane, '+')
     await settle()
 
     expect(pane.querySelector<HTMLElement>('.kui-zoom-plate')?.style.getPropertyValue('--zoom-scale')).toBe('1.15')
-    expect(fit().disabled).toBe(false)
+    expect(fit().hasAttribute('aria-disabled')).toBe(false)
 
     press(pane, '0')
     await settle()

@@ -84,10 +84,12 @@ inBrowser('AudioPlayer in the browser', () => {
     await jump(1)
     await page.press('Enter')
     await reached(1)
-    await jump(2)
-    await page.press(' ')
+    // Next onto the last chapter disables the button pressed, which keeps the focus.
+    await page.evaluate(() => document.querySelector<HTMLElement>('#player [data-side=next]')!.focus())
+    await page.press('Enter')
     await reached(2)
-    // Next went disabled under the keyboard: it keeps the focus and ignores a press.
+    expect(await page.evaluate(() => document.activeElement === document.querySelector('#player [data-side=next]'))).toBe(true)
+    // A locked next ignores a press.
     const next = () => page.evaluate(() => {
       const button = document.querySelector<HTMLButtonElement>('#player [data-side=next]')!
 

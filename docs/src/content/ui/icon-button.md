@@ -30,6 +30,10 @@ description: A button showing only an icon, named by a label that doubles as its
 
 `icon` also takes a snippet, `@icon` under the IconButton, for a drawing no icon set has. IconButton still ships the default icon set, so an island drawing only its own `svg` imports `@kaynooo/kayjs-ui/bare-icon-button.kay` instead: the same button and props with the drawing nested inside it, and no icon lookup.
 
+## Disabled
+
+A `disabled` IconButton renders `aria-disabled` instead, and stays reachable by the keyboard with its label as the tooltip. Its press does nothing, and neither does a `popovertarget` or `command` on it. `BareIconButton` does the same.
+
 ## Type
 
 `type` is `button` by default, so an IconButton in a form does not submit it. Set `type="submit"` or `"reset"` for the form's own buttons.
