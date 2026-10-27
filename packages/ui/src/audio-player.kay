@@ -1,7 +1,7 @@
 ---
 import type { JSX, Snippet } from 'kay'
 import type { AudioChapter, AudioCue } from './audio'
-import { effect, memo, onCleanup, recipe, signal } from 'kay'
+import { effect, memo, onCleanup, onMount, recipe, signal } from 'kay'
 import { chapterAt, clock, cueAt, cuesByChapter, lockScreen, previousStart } from './audio'
 import CollapsibleSection from './collapsible-section.kay'
 import IconButton from './icon-button.kay'
@@ -26,14 +26,14 @@ const look = recipe({
     play: '',
     time: 'text-xs tabular-nums text-muted',
     seek: 'relative flex min-w-0 flex-1 basis-56 items-center',
-    track: rangeTrack,
+    track: `relative ${rangeTrack}`,
     marks: 'pointer-events-none absolute inset-0 m-0 list-none p-0',
-    mark: 'absolute top-1/2 h-3 w-0.5 -translate-y-1/2 bg-muted',
+    mark: 'absolute top-1/2 -ms-px h-3 w-0.5 -translate-y-1/2 bg-muted',
     now: 'm-0 text-sm text-foreground',
     chapters: 'm-0 flex list-none flex-col gap-1 p-0 text-sm',
     chapter: 'flex items-center gap-2',
     jump: 'flex min-w-0 flex-1 cursor-pointer items-baseline gap-3 rounded-md px-2 py-1.5 text-start text-muted hover:bg-surface-strong hover:text-foreground aria-[current=true]:bg-accent/15 aria-[current=true]:text-foreground',
-    start: 'w-16 shrink-0 text-xs tabular-nums',
+    start: 'min-w-16 shrink-0 text-xs tabular-nums',
     title: 'min-w-0',
     actions: 'flex shrink-0 items-center gap-1',
     transcript: 'relative flex max-h-96 flex-col gap-3 overflow-y-auto text-sm',
@@ -100,7 +100,8 @@ let lastTold: number | undefined
 // What tells this player's lock screen claim from another player's.
 const token = {}
 
-const percent = (seconds: number) => `${seconds / length() * 100}%`
+// Where the thumb's centre sits for a position: its travel is inset by half its 1rem width on each side, and the start flips in RTL.
+const placed = (seconds: number) => `inset-inline-start: calc(0.5rem + (100% - 1rem) * ${seconds / length()})`
 const marked = () => length() > 0 ? chapters.map((chapter, index) => ({ chapter, index })).filter(({ chapter }) => chapter.start > 0 && chapter.start < length()) : []
 
 function echoed(seconds: number) {
@@ -269,6 +270,14 @@ function measure(audio: HTMLAudioElement) {
   length = Number.isFinite(audio.duration) ? audio.duration : 0
 }
 
+// Read once mounted, as an audio already loaded would otherwise hydrate on a length its server markup did not draw.
+onMount(() => {
+  const audio = player()
+
+  if (audio)
+    measure(audio)
+})
+
 // A new source stops the audio without a pause event and starts the position over.
 function emptied(audio: HTMLAudioElement) {
   playing = false
@@ -304,20 +313,21 @@ onCleanup(() => {
 ---
 div(part="root" {...rest})
   // Without `controls`, so the element draws nothing and the bar below is the player.
-  audio(part="audio" ref={(element) => { player = element; measure(element) }} src={src} preload={preload} onTimeUpdate={event => report(event.currentTarget.currentTime)} onDurationChange={event => measure(event.currentTarget)} onLoadedMetadata={event => measure(event.currentTarget)} onPlay={() => { playing = true; claim() }} onPause={() => playing = false} onEnded={() => playing = false} onEmptied={event => emptied(event.currentTarget)})
+  audio(part="audio" ref={element => player = element} src={src} preload={preload} onTimeUpdate={event => report(event.currentTarget.currentTime)} onDurationChange={event => measure(event.currentTarget)} onLoadedMetadata={event => measure(event.currentTarget)} onPlay={() => { playing = true; claim() }} onPause={() => playing = false} onEnded={() => playing = false} onEmptied={event => emptied(event.currentTarget)})
   div(part="bar")
     if chapters.length > 1
       IconButton(icon="chevron" label={previousLabel} variant="ghost" part="step" data-side="previous" onClick={previous})
     IconButton(icon={playing() ? 'pause' : 'play'} label={playing() ? pauseLabel : playLabel} tone="accent" part="play" onClick={toggle})
     if chapters.length > 1
-      IconButton(icon="chevron" label={nextLabel} variant="ghost" part="step" data-side="next" onClick={next})
+      IconButton(icon="chevron" label={nextLabel} variant="ghost" part="step" data-side="next" disabled={current() >= chapters.length - 1} onClick={next})
     span(part="time") {clock(at())} / {clock(length())}
     div(part="seek")
-      input(part="track" type="range" min="0" max={length()} step="1" value={at()} disabled={length() === 0} aria-label={seekLabel} aria-valuetext={`${clock(at())} / ${clock(length())}`} onInput={scrub})
+      // Before the slider, so its thumb paints over the marks.
       if marked().length > 0
         ol(part="marks" aria-hidden="true")
           for entry of marked() key={entry.index}
-            li(part="mark" style={`left: ${percent(entry.chapter.start)}`})
+            li(part="mark" style={placed(entry.chapter.start)})
+      input(part="track" type="range" min="0" max={length()} step="1" value={at()} disabled={length() === 0} aria-label={seekLabel} aria-valuetext={`${clock(at())} / ${clock(length())}`} onInput={scrub})
   if chapters[current()]
     p(part="now") {chapters[current()]!.title}
   if chapters.length > 0

@@ -1,0 +1,23 @@
+---
+import AudioPlayer from '@kaynooo/kayjs-ui/audio-player.kay'
+import '../app.css'
+
+// `/episode.wav` is 30 seconds of silence; `#long` has no source and a chapter past the hour.
+const chapters = [
+  { title: 'Intro', start: 0 },
+  { title: 'News', start: 10, url: 'https://example.com/news' },
+  { title: 'Outro', start: 20 },
+]
+const long = [
+  { title: 'Start', start: 0 },
+  { title: 'Late', start: 3661 },
+]
+const cues = [
+  { start: 0, end: 10, text: 'Hello.' },
+  { start: 10, end: 20, text: 'The news.' },
+  { start: 20, end: 30, text: 'Bye.' },
+]
+---
+main
+  AudioPlayer#player(src="/episode.wav" title="Episode" chapters={chapters} cues={cues})
+  AudioPlayer#long(src="/none.wav" chapters={long})

@@ -126,7 +126,7 @@ test('chapters are listed with their start and marked on the timeline, the one p
   const { part, current, move } = await players()
 
   expect(part('chapter').map(item => item.querySelector('[data-part="jump"]')!.textContent)).toEqual(['0:00Intro', '0:30News', '1:30Outro'])
-  expect(part('mark').map(mark => mark.getAttribute('style'))).toEqual(['left: 25%', 'left: 75%'])
+  expect(part('mark').map(mark => mark.getAttribute('style'))).toEqual(['inset-inline-start: calc(0.5rem + (100% - 1rem) * 0.25)', 'inset-inline-start: calc(0.5rem + (100% - 1rem) * 0.75)'])
   expect(part('actions').map(actions => actions.textContent)).toEqual(['Like Intro 0', 'Like News 1', 'Like Outro 2'])
   expect(part('chapter')[1]!.querySelector('a')!.getAttribute('href')).toBe('https://example.com/news')
   expect(part('chapter')[1]!.querySelector('a')!.getAttribute('aria-label')).toBe('Open News')
@@ -224,6 +224,7 @@ test('a hand scroll is left alone until a cue changes after it', async () => {
   const realNow = Date.now
 
   Date.now = () => realNow() + 5000
+
   try {
     await move(100)
     await move(5)
