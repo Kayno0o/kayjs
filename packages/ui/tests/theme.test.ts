@@ -481,6 +481,20 @@ describe('theme.css', () => {
     expect(colour('accent', 0, undefined, tokens)).toEqual(colour('accent', 0))
   })
 
+  test('styles running text under kui-prose from the tokens, a wide table or code block scrolling inside it', async () => {
+    const css = await built('', 'after', ['kui-prose'])
+    const block = css.slice(css.indexOf('.kui-prose {'))
+    const rule = (selector: string) => block.slice(block.indexOf(`${selector} {`), block.indexOf('}', block.indexOf(`${selector} {`)))
+
+    for (const element of ['h1', 'ul', 'ol', 'dt', 'dd', 'a', 'blockquote', 'code', 'pre', 'table', 'th', 'td', 'img'])
+      expect(block, element).toMatch(new RegExp(`:where\\([^)]*\\b${element}\\b[^)]*\\) \\{`))
+
+    expect(rule(':where(table)')).toContain('overflow-x: auto')
+    expect(rule(':where(pre)')).toContain('overflow-x: auto')
+    expect(rule(':where(a)')).toContain('var(--color-accent)')
+    expect(rule(':where(th, td)')).toContain('var(--color-border)')
+  })
+
   test('lets a token the skin sets beat what derives it, in the compiled CSS wherever the skin sits', async () => {
     for (const where of ['after', 'before'] as const) {
       const css = await built('@theme { --color-background: #fff; --color-surface: red; }', where)

@@ -48,4 +48,4 @@ div(part="root" role="region" aria-label={wording('ui.markdownEditor.preview', '
   if failed()
     p(part="failed") {wording('ui.markdownEditor.previewFailure', 'The preview could not be shown')}
   else
-    div(part="body" innerHTML={trusted ? trustHtml(rendered() ?? '') : sanitizeHtml(rendered() ?? '', KEPT)})
+    div.kui-prose(part="body" innerHTML={trusted ? trustHtml(rendered() ?? '') : sanitizeHtml(rendered() ?? '', KEPT)})

@@ -418,6 +418,8 @@ textarea(aria-label="Note" value={text()} onInput={e => text = e.currentTarget.v
 div(innerHTML={markdownHtml(text())})
 ```
 
+Text set through `innerHTML`, from `markdownHtml`, `renderMarkdown` or `sanitizeHtml`, shows unstyled under Tailwind's preflight. With kayjs-ui, give its element the `kui-prose` class: headings, lists, links, quotes, code and tables take the theme's look, and a wide table or code block scrolls inside it.
+
 A link leaving your site opens in a new tab with `rel="nofollow ugc noopener"`, the server and the island alike, unless you set `links: { outside: 'same-tab' }`.
 
 The server renders it with Bun.markdown and the island with marked, and both write the same HTML. Only the islands importing it load marked, about 15 KB gzipped, and only when they first render Markdown: until it arrives the island shows the text as written, then the formatted one. Call it in a template or an effect, which runs again once marked has loaded; in a click handler, `await markdownReady()` from `kay/markdown` first.

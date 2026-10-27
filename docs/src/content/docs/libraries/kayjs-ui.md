@@ -121,6 +121,16 @@ Toaster
 TooltipHost
 ```
 
+### Rendered Markdown and HTML
+
+Text you did not template, such as the result of `markdownHtml`, `renderMarkdown` or `sanitizeHtml` set through `innerHTML`, shows unstyled under Tailwind's preflight. Give the element that holds it the `kui-prose` class:
+
+```kay
+div.kui-prose(innerHTML={markdownHtml(text())})
+```
+
+It styles headings, paragraphs, lists, links, quotes, code, tables and images from the theme's tokens, so a skin restyles it. A table or code block wider than the page scrolls inside it. Its rules are light, so a rule of your own wins. The MarkdownEditor preview and the replies of a kayjs-ai Chat use it already.
+
 ## Using a component
 
 Import each component by its `.kay` path. Types, `toast`, `attempt`, `messageOf`, `editing` and `infiniteList` come from the package itself.

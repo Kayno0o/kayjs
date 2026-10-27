@@ -20,6 +20,8 @@ A list keeps only the buttons it names, in its order: `toolbar={['bold', 'italic
 
 <Demo name="markdown-editor/preview" />
 
+The preview takes the `kui-prose` class, which styles headings, lists, code and tables from the theme. `previewClass` adds the classes your pages style rendered Markdown with.
+
 The editor ships no Markdown parser: the function asks your server, so the preview is made by the same code as your pages.
 
 ```ts

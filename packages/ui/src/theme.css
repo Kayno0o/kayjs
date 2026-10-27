@@ -884,50 +884,120 @@
     @apply text-danger;
   }
 
-  /* Just enough to read the text's structure; the page's own styles are not the admin's. */
-  .kui-markdown-preview-body {
+  /* Running text the app did not template, such as rendered Markdown or sanitized HTML set through innerHTML: headings, paragraphs, lists, links, quotes, code, tables and images drawn from the theme's tokens, so each skin restyles it. A wide table or code block scrolls inside it. Every rule weighs one class, so a rule of the app's wins. */
+  .kui-prose {
+    @apply min-w-0 text-foreground;
+    overflow-wrap: anywhere;
+
     :where(h1, h2, h3, h4, h5, h6) {
-      @apply mt-3 mb-1 font-semibold first:mt-0;
+      @apply mt-6 mb-2 font-semibold leading-tight;
     }
 
     :where(h1) {
-      @apply text-xl;
+      @apply text-2xl;
     }
 
     :where(h2) {
+      @apply text-xl;
+    }
+
+    :where(h3) {
       @apply text-lg;
     }
 
-    :where(p, ul, ol, blockquote, pre, table) {
-      @apply my-2;
+    :where(h4, h5, h6) {
+      @apply text-base;
+    }
+
+    :where(p, ul, ol, dl, blockquote, pre, table, figure, hr) {
+      @apply mx-0 my-3;
     }
 
     :where(ul) {
-      @apply list-disc pl-5;
+      @apply list-disc pl-6;
     }
 
     :where(ol) {
-      @apply list-decimal pl-5;
+      @apply list-decimal pl-6;
+    }
+
+    :where(li) {
+      @apply my-1;
+    }
+
+    :where(li > ul, li > ol) {
+      @apply my-1;
+    }
+
+    li::marker {
+      @apply text-muted;
+    }
+
+    :where(dt) {
+      @apply mt-3 font-semibold;
+    }
+
+    :where(dd) {
+      @apply m-0 pl-6;
     }
 
     :where(a) {
-      @apply text-accent underline;
+      @apply text-accent underline underline-offset-2;
     }
 
-    :where(img) {
-      @apply h-auto max-w-full;
+    :where(a:hover) {
+      @apply text-accent-hover;
+    }
+
+    :where(strong, b, th) {
+      @apply font-semibold;
     }
 
     :where(blockquote) {
-      @apply border-0 border-l-2 border-solid border-border pl-3 text-muted;
+      @apply border-0 border-l-[length:var(--border-width)] border-solid border-border-strong pl-4 text-muted;
     }
 
-    :where(code, pre) {
-      @apply bg-surface font-mono text-xs;
+    :where(hr) {
+      @apply border-0 border-t-[length:var(--border-width)] border-solid border-border;
+    }
+
+    :where(code, kbd, samp) {
+      @apply rounded-sm bg-surface-strong px-1 py-0.5 font-mono text-[0.875em];
     }
 
     :where(pre) {
-      @apply overflow-x-auto p-2;
+      @apply max-w-full overflow-x-auto border-solid border-[length:var(--border-width)] border-border bg-popover p-3 text-[0.8125rem] leading-normal;
+      overflow-wrap: normal;
+    }
+
+    :where(pre code) {
+      @apply rounded-none bg-transparent p-0 text-inherit;
+    }
+
+    :where(img, video) {
+      @apply h-auto max-w-full;
+    }
+
+    /* A table is its own scrolling box and needs no wrapper; its cells keep their words whole. */
+    :where(table) {
+      @apply block max-w-full overflow-x-auto border-collapse text-sm;
+      overflow-wrap: normal;
+    }
+
+    :where(th, td) {
+      @apply border-solid border-[length:var(--border-width)] border-border px-3 py-1.5 text-left align-top;
+    }
+
+    :where(th) {
+      @apply bg-surface;
+    }
+
+    > :where(:first-child) {
+      @apply mt-0;
+    }
+
+    > :where(:last-child) {
+      @apply mb-0;
     }
   }
 
