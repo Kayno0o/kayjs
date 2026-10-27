@@ -8,6 +8,10 @@ What each minor release breaks, and what an app changes to move to it. kay and i
 
 - An enum field left out used to read as its first value. An optional one now reads `undefined`; a required one is refused: an action answers 422, a page's `query` schema answers 400 on a visit without the parameter, a `defineEnv` variable left unset stops the boot, and a content field left out fails the build. An app relying on the fill writes `s.UnionEnum(['a', 'b'], { default: 'a' })`, which also keeps the old error body of an `api` route. No lint can recognise it, as the old form is valid and only its result changed.
 
+### kayjs-auth: a `forwardAuth` session cookie is no longer `__Host-` prefixed
+
+- An app with `forwardAuth` and a `session()` naming no `domain` now shares its session cookie under the `forwardAuth` domains, named `kay_session` (or your `cookie`) instead of `__Host-kay_session`, so every signed-in visitor is signed out once and signs in again. The old `__Host-` cookie cannot be shared across hosts, and `auth({ cookie })` only renames the new one, so nothing keeps the old sessions.
+
 ## 1.80.0
 
 ### A Button that is disabled with a `data-tooltip` is `aria-disabled`, not `disabled`
