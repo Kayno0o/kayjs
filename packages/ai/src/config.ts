@@ -40,6 +40,14 @@ function implied(base: string | undefined, anthropicKey: string | undefined, ope
   return openaiKey === undefined ? 'none' : 'openai'
 }
 
+// The provider an ask given its own is sent to: under `bun test` the fake, answering under that provider's name and model so the code path building it is tested, unless `KAYJS_AI_REAL_PROVIDERS=1` is set, which a library's tests of a provider itself set.
+export function given(provider: Provider): Provider {
+  if (process.env.NODE_ENV !== 'test' || process.env.KAYJS_AI_REAL_PROVIDERS === '1' || provider === fakeAi)
+    return provider
+
+  return fakeAi.standIn(provider)
+}
+
 // The provider the environment names, and the model it asks for. Under `bun test` always the fake, a key left in a test environment never billed; in development the fake until a provider is configured.
 export function choose(): Chosen {
   if (process.env.NODE_ENV === 'test')

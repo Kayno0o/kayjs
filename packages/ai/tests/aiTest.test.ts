@@ -1,5 +1,7 @@
-import { describe, expect, it } from 'bun:test'
+import process from 'node:process'
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test'
 import { ask } from '../src/ask'
+import { openai } from '../src/openai'
 import { aiTest } from '../src/test'
 
 const model = aiTest()
@@ -61,6 +63,48 @@ describe('aiTest', () => {
       model.clear()
 
       expect(await pass('a')).toBe('Fake reply to: x')
+    })
+  })
+
+  describe('an ask given its own provider', () => {
+    const real = process.env.KAYJS_AI_REAL_PROVIDERS
+
+    // The package's tests send to the providers they build; these ones want the fake.
+    beforeEach(() => {
+      delete process.env.KAYJS_AI_REAL_PROVIDERS
+    })
+
+    afterEach(() => {
+      if (real === undefined)
+        delete process.env.KAYJS_AI_REAL_PROVIDERS
+      else
+        process.env.KAYJS_AI_REAL_PROVIDERS = real
+    })
+
+    it('is answered by the fake, scripts included, recording the provider and the model', async () => {
+      model.reply('from mistral')
+
+      const provider = openai({ baseUrl: 'http://127.0.0.1:1/v1', apiKey: 'k', model: 'mistral-small' })
+
+      expect(await ask('Hi', { provider })).toBe('from mistral')
+      expect(model.last()).toMatchObject({ provider: 'openai', model: 'mistral-small' })
+    })
+
+    it('records the fake for an ask without one', async () => {
+      await ask('Hi')
+
+      expect(model.last()?.provider).toBe('fake')
+    })
+
+    it('goes to the provider when KAYJS_AI_REAL_PROVIDERS is 1', async () => {
+      process.env.KAYJS_AI_REAL_PROVIDERS = '1'
+
+      const provider = { name: 'own', model: 'm', async* stream() {
+        yield { text: 'real' }
+      } }
+
+      expect(await ask('Hi', { provider })).toBe('real')
+      expect(model.asked).toHaveLength(0)
     })
   })
 })

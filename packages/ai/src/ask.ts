@@ -4,7 +4,7 @@ import type { Replaces } from './resume'
 import type { AskOptions, FunctionTool, Message, Piece, Provider, ProviderMessage, ProviderRequest, Reply, ReplyOf, StructuredAskOptions, Timeouts, ToolAction } from './types'
 import { actionTool, configError, currentRequest, durationSeconds, jsonSchemaOf, refundRateLimit } from 'kay/library'
 import { attachmentsOf, checkAccepted, DEFAULT_MAX_ATTACHMENT_BYTES, estimatedChars, mediaChars, readAttachments } from './attachments'
-import { choose } from './config'
+import { choose, given } from './config'
 import { recorded } from './dev-log'
 import { AiError } from './errors'
 import { extraBody } from './extra'
@@ -266,7 +266,7 @@ function remembered(made: Reply, options: AskOptions, call: ReplyCall | undefine
 
 function reply(prompt: string | Message[], options: AskOptions, answer: TSchema | undefined, call: ReplyCall | undefined): Reply {
   const messages = messagesOf(prompt)
-  const { provider, model: configured } = options.provider === undefined ? choose() : { provider: options.provider, model: options.provider.model }
+  const { provider, model: configured } = options.provider === undefined ? choose() : { provider: given(options.provider), model: options.provider.model }
   const model = options.model ?? configured ?? options.provider?.model
 
   if (model === undefined)

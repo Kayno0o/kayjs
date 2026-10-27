@@ -4,6 +4,8 @@ import { mediaChars } from './attachments'
 
 // What a fake reply was asked: the request a provider would have been sent.
 export interface Asked {
+  // The name of the provider the ask was for: `fake`, or the one given to `ask({ provider })`, which the fake answers in its place under `bun test`.
+  provider: string
   messages: ProviderMessage[]
   // The tools the model was offered, absent when it was offered none.
   tools?: ToolSpec[] | undefined
@@ -46,6 +48,8 @@ export interface Fake extends Provider {
   // Every ask the fake answered, oldest first.
   readonly asked: readonly Asked[]
   last: () => Asked | undefined
+  // A provider that answers as the fake does, under the name and model of `provider`: what `ask({ provider })` is given under `bun test`.
+  standIn: (provider: Provider) => Provider
   // The next ask read is answered with this (scripts go to asks in the order they are read, not made): a text, split into words, the pieces as they should come, or `{ text?, calls?, cache? }` to call tools or report cache reads and writes (a tool loop reads one script per step); a function reads what was asked. Scripts are used in order, then the default reply returns.
   // With `when`, the script is for the first ask `when` accepts, whatever asks were read before it, and the asks it does not accept never use it; the scripts without one keep going to the asks in order.
   reply: (script: Script, when?: When) => void
@@ -164,60 +168,65 @@ function createFake(): Fake {
   const asked: Asked[] = []
   const scripts: Entry[] = []
 
-  return {
+  const fake: Fake = {
     name: 'fake',
     model: 'fake',
     asked,
     last: () => asked.at(-1),
+    standIn: provider => ({ name: provider.name, model: provider.model, accepts: provider.accepts, stream: (request, signal) => answer(request, signal, provider.name) }),
     reply: (script, when) => void scripts.push({ script, when }),
     fail: (error, when) => void scripts.push({ script: error, when }),
     clear: () => {
       asked.length = 0
       scripts.length = 0
     },
-    async* stream(request: ProviderRequest, signal): AsyncGenerator<Piece> {
-      const question: Asked = { ...request, messages: structuredClone(request.messages), tools: request.tools === undefined ? undefined : structuredClone(request.tools), schema: request.schema === undefined ? undefined : structuredClone(request.schema) }
-
-      asked.push(question)
-
-      const script = take(scripts, question) ?? (request.schema === undefined ? `Fake reply to: ${request.messages.findLast(message => message.role === 'user')?.content ?? ''}` : { data: sampleOf(request.schema) })
-
-      if (script instanceof Error)
-        throw script
-
-      const chosen = typeof script === 'function' ? script(question) : script
-      const calls = typeof chosen === 'object' && !Array.isArray(chosen) ? chosen.calls ?? [] : []
-      const cache = typeof chosen === 'object' && !Array.isArray(chosen) ? chosen.cache : undefined
-      const said = saidBy(chosen)
-      const parts = typeof said === 'string' ? pieces(said) : said
-      const pace = process.env.NODE_ENV === 'development' ? DEV_PACE_MS : 0
-      const input = request.messages.reduce((sum, message) => sum + tokens(message.content) + Math.ceil(mediaChars(message) / CHARS_PER_TOKEN) + (message.results ?? []).reduce((all, result) => all + tokens(result.content), 0), 0) + tokens(request.system ?? '')
-
-      const thoughts = typeof chosen === 'object' && !Array.isArray(chosen) ? chosen.reasoning ?? [] : []
-
-      yield { usage: { inputTokens: input, ...cache?.read === undefined ? {} : { cacheReadTokens: cache.read }, ...cache?.written === undefined ? {} : { cacheWriteTokens: cache.written } } }
-
-      for (const reasoning of typeof thoughts === 'string' ? pieces(thoughts) : thoughts) {
-        await pause(pace, signal)
-        signal.throwIfAborted()
-
-        yield { reasoning }
-      }
-
-      for (const text of parts) {
-        await pause(pace, signal)
-        signal.throwIfAborted()
-
-        yield { text }
-      }
-
-      for (const [index, { name, input, id }] of calls.entries())
-        yield { toolUse: { id: id ?? `fake_${index + 1}`, name, arguments: typeof input === 'string' ? input : JSON.stringify(input ?? {}) } }
-
-      yield { usage: { outputTokens: tokens(parts.join('')) } }
-      yield { finish: typeof chosen === 'object' && !Array.isArray(chosen) ? chosen.finish ?? 'stop' : 'stop' }
-    },
+    stream: (request, signal) => answer(request, signal, 'fake'),
   }
+
+  async function* answer(request: ProviderRequest, signal: AbortSignal, provider: string): AsyncGenerator<Piece> {
+    const question: Asked = { ...request, provider, messages: structuredClone(request.messages), tools: request.tools === undefined ? undefined : structuredClone(request.tools), schema: request.schema === undefined ? undefined : structuredClone(request.schema) }
+
+    asked.push(question)
+
+    const script = take(scripts, question) ?? (request.schema === undefined ? `Fake reply to: ${request.messages.findLast(message => message.role === 'user')?.content ?? ''}` : { data: sampleOf(request.schema) })
+
+    if (script instanceof Error)
+      throw script
+
+    const chosen = typeof script === 'function' ? script(question) : script
+    const calls = typeof chosen === 'object' && !Array.isArray(chosen) ? chosen.calls ?? [] : []
+    const cache = typeof chosen === 'object' && !Array.isArray(chosen) ? chosen.cache : undefined
+    const said = saidBy(chosen)
+    const parts = typeof said === 'string' ? pieces(said) : said
+    const pace = process.env.NODE_ENV === 'development' ? DEV_PACE_MS : 0
+    const input = request.messages.reduce((sum, message) => sum + tokens(message.content) + Math.ceil(mediaChars(message) / CHARS_PER_TOKEN) + (message.results ?? []).reduce((all, result) => all + tokens(result.content), 0), 0) + tokens(request.system ?? '')
+
+    const thoughts = typeof chosen === 'object' && !Array.isArray(chosen) ? chosen.reasoning ?? [] : []
+
+    yield { usage: { inputTokens: input, ...cache?.read === undefined ? {} : { cacheReadTokens: cache.read }, ...cache?.written === undefined ? {} : { cacheWriteTokens: cache.written } } }
+
+    for (const reasoning of typeof thoughts === 'string' ? pieces(thoughts) : thoughts) {
+      await pause(pace, signal)
+      signal.throwIfAborted()
+
+      yield { reasoning }
+    }
+
+    for (const text of parts) {
+      await pause(pace, signal)
+      signal.throwIfAborted()
+
+      yield { text }
+    }
+
+    for (const [index, { name, input, id }] of calls.entries())
+      yield { toolUse: { id: id ?? `fake_${index + 1}`, name, arguments: typeof input === 'string' ? input : JSON.stringify(input ?? {}) } }
+
+    yield { usage: { outputTokens: tokens(parts.join('')) } }
+    yield { finish: typeof chosen === 'object' && !Array.isArray(chosen) ? chosen.finish ?? 'stop' : 'stop' }
+  }
+
+  return fake
 }
 
 // Answers `ask` in development and under `bun test` instead of a provider, and a test scripts it and reads what was asked, as it reads kayjs-mail's `outbox`.

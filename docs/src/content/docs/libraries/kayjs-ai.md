@@ -511,7 +511,7 @@ Passes read before it, and the conditional ones, no longer shift it. Asks it doe
 
 `model.reply({ calls: [{ name: 'add_note', input: { title: 'Milk' } }] })` makes the model call a tool, and the next script answers once the results are back.
 
-A call takes an `id` to give it one of your own, `fake_1`, `fake_2` and so on by default. `finish` says why a step ended: `stop` by default, `length` for a reply cut by the token cap, as in `fakeAi.reply({ text: 'Half an ans', finish: 'length' })`. `model.fail(error)` makes the next ask fail. `fakeAi` is exported too. With nothing scripted, the fake answers `Fake reply to:` followed by your last message. In development the fake answers too, until a provider is configured.
+A call takes an `id` to give it one of your own, `fake_1`, `fake_2` and so on by default. `finish` says why a step ended: `stop` by default, `length` for a reply cut by the token cap, as in `fakeAi.reply({ text: 'Half an ans', finish: 'length' })`. An ask given its own `provider` is answered by the fake too, so a job sent to another model is tested like the rest: `model.last()?.provider` and `model.last()?.model` say which one it was for. A test of a provider itself sets `KAYJS_AI_REAL_PROVIDERS=1` to send to it. `model.fail(error)` makes the next ask fail. `fakeAi` is exported too. With nothing scripted, the fake answers `Fake reply to:` followed by your last message. In development the fake answers too, until a provider is configured.
 
 <ReadMore href="/llms/kayjs-ai-testing-and-errors">Scripting the fake, every error kind, and building a provider by hand.</ReadMore>
 

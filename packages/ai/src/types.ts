@@ -208,7 +208,7 @@ export interface AskOptions {
   maxInputChars?: number | undefined
   // The most bytes one attachment may hold, 10 MB (10,485,760) by default; a larger one fails the reply with a `too-long` error before the provider is called.
   maxAttachmentBytes?: number | undefined
-  // Asks this provider instead of the one the environment names, such as `openai({ baseUrl })`.
+  // Asks this provider instead of the one the environment names, such as `openai({ baseUrl })`; under `bun test` the fake answers in its place.
   provider?: Provider | undefined
 }
 
