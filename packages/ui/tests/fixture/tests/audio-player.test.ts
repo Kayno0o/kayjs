@@ -47,6 +47,27 @@ inBrowser('AudioPlayer in the browser', () => {
     expect(page.errors).toEqual([])
   }, 120_000)
 
+  test('the transcript listens to the wheel and touch passively, so it never holds the scroll up', async () => {
+    await using page = await open()
+    await page.initScript(() => {
+      const added: string[] = []
+      const original = EventTarget.prototype.addEventListener
+
+      EventTarget.prototype.addEventListener = function (type: string, listener: unknown, options?: boolean | AddEventListenerOptions) {
+        if ((type === 'wheel' || type === 'touchmove') && (this as Element).getAttribute?.('data-part') === 'transcript')
+          added.push(`${type}:${typeof options === 'object' && options.passive === true ? 'passive' : 'blocking'}`);
+
+        (window as unknown as { __added: string[] }).__added = added
+
+        return original.call(this, type, listener as EventListener, options)
+      } as typeof original
+    })
+    await page.reload()
+    await page.waitUntil(() => document.querySelector<HTMLInputElement>('#player [data-part=track]')?.max === '30')
+    expect(await page.evaluate(() => (window as unknown as { __added: string[] }).__added)).toEqual(['wheel:passive', 'touchmove:passive'])
+    expect(page.errors).toEqual([])
+  }, 120_000)
+
   test('Tab reaches every control with the cues as one stop, and the slider and the chapter buttons answer the keys', async () => {
     await using page = await open()
     const focused = () => page.evaluate(() => {

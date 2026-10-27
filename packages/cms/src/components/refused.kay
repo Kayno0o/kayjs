@@ -4,11 +4,11 @@ import Button from '@kaynooo/kayjs-ui/button.kay'
 import IconButton from '@kaynooo/kayjs-ui/icon-button.kay'
 import Tooltip from '@kaynooo/kayjs-ui/tooltip.kay'
 
-// A control the signed-in person's role may not use: disabled, with `reason` as its tooltip. A disabled button gets no hover or focus, so the tooltip sits on a Tooltip wrapper a keyboard reaches. With `icon` it is an icon button, which names itself by `label` and the reason.
+// A control the signed-in person's role may not use: disabled, with `reason` as its tooltip. A disabled Button gets no hover or focus, so its tooltip sits on a Tooltip wrapper a keyboard reaches. With `icon` it is an icon button, which keeps its tab stop and shows `label` and the reason as its own tooltip, so it needs no wrapper.
 const { label, reason, icon, tone, variant, size } = props<{ label: string, reason: string | undefined, icon?: IconSlot | undefined, tone?: 'neutral' | 'accent' | 'danger' | undefined, variant?: 'solid' | 'ghost' | 'inline' | undefined, size?: 'xs' | 'sm' | 'md' | 'lg' | undefined }>()
 ---
-Tooltip.kcms-refused(text={reason})
-  if icon
-    IconButton(icon={icon} label={`${label}: ${reason}`} variant={variant} size={size} disabled)
-  else
+if icon
+  IconButton(icon={icon} label={`${label}: ${reason}`} variant={variant} size={size} disabled)
+else
+  Tooltip.kcms-refused(text={reason})
     Button(label={label} tone={tone} variant={variant} size={size} disabled)

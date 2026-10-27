@@ -181,12 +181,15 @@ test('a row of the list disables its publish and delete for a role that may not,
   const actions = mounted.root.querySelector('.kcms-row-actions')!
   const refused = [...actions.querySelectorAll('.kcms-refused')]
 
-  expect(refused.map(each => each.getAttribute('data-tooltip'))).toEqual(['Your role may not publish', 'Your role may not delete'])
+  const remove = actions.querySelector<HTMLButtonElement>('button[aria-disabled=true]')!
+
+  expect(refused.map(each => each.getAttribute('data-tooltip'))).toEqual(['Your role may not publish'])
   expect(refused.every((each) => {
     const button = each.querySelector('button')!
 
     return button.disabled || button.getAttribute('aria-disabled') === 'true'
   })).toBe(true)
+  expect(remove.getAttribute('data-tooltip')).toContain('Your role may not delete')
 })
 
 // The API of a row's Rename dialog: the slugs the collection holds, the entries naming `a`, and the answer to the rename.
