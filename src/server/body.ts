@@ -69,7 +69,7 @@ export function limitBodies(app: Elysia, size: ByteSize, actionSizes: Map<string
   const prefixes = [...mounts].sort(([a], [b]) => b.length - a.length)
 
   // The bytes and the answer each come from the longest path covering the request that sets them, so a limit at `/auth` still holds under a path that only carries a cors grant.
-  const mounted = (path: string): { bytes: number | undefined, refuse: BodyLimit['refuse'] } | undefined => {
+  const mounted = (path: string): { bytes: number | undefined, files?: undefined, refuse: BodyLimit['refuse'] } | undefined => {
     const covering = prefixes.filter(([mount]) => path === mount || path.startsWith(`${mount}/`)).map(([, limit]) => limit)
 
     return covering.length === 0 ? undefined : { bytes: covering.find(limit => limit.bytes !== undefined)?.bytes, refuse: covering.find(limit => limit.refuse !== undefined)?.refuse ?? refusePlainly }
@@ -83,7 +83,7 @@ export function limitBodies(app: Elysia, size: ByteSize, actionSizes: Map<string
     const path = withoutSlash(requestUrl(request).pathname)
     const own = matchers.find(route => (route.method === request.method || route.method === 'ALL') && route.matcher.test(path))
     const limit = own?.limit ?? actions.get(path) ?? mounted(path)
-    const allowed = limit?.bytes ?? Math.max(bytes, (limit && 'files' in limit ? limit.files : undefined) ?? 0)
+    const allowed = limit?.bytes ?? Math.max(bytes, limit?.files ?? 0)
 
     return await exceeds(request, allowed) ? (limit ?? { refuse: refusePlainly }).refuse(request, allowed, server) : undefined
   })
