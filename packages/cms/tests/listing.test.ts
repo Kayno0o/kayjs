@@ -293,6 +293,20 @@ describe('sort', () => {
     expect(await view({ ...shop, kind: 'loaded' }, 'modified', 'asc')).toEqual(['a', 'b', 'c', 'd'])
   })
 
+  it('reads the edits once for a page sorted by them, with the collection\'s folder and waiting for them, even when git gave none', async () => {
+    const files = stock.map(entry => ({ ...entry, path: `content/shop/${entry.slug}.md` }))
+    const asked: unknown[] = []
+    const edits = async (_paths: string[], options?: unknown) => {
+      asked.push(options)
+
+      return new Map()
+    }
+
+    await pageRows({ ...shop, dir: 'content/shop' }, '', 1, async () => files, none, 50, { sort: 'modified', direction: 'asc', edits })
+
+    expect(asked).toEqual([{ dir: 'content/shop', sorting: true }])
+  })
+
   it('names the last edit on the rows of a plain page too', async () => {
     const files = stock.map(entry => ({ ...entry, path: `content/shop/${entry.slug}.md` }))
     const page = await pageRows(shop, '', 1, async () => files, none, 50, { edits: async () => new Map([['content/shop/d.md', { at: 5, author: 'Ada' }]]) })

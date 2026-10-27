@@ -16,8 +16,8 @@ export interface Edit {
   author?: string | undefined
 }
 
-// Reads the last edit of each file, by path relative to the repository, in one `git log`; `sorting` waits longer for the dates, which the order of the list needs.
-export type EditReader = (paths: string[], sorting?: boolean) => Promise<Map<string, Edit>>
+// Reads the last edit of each file, by path relative to the repository, in one `git log` over `dir`, the collection's folder, when they all sit in it, so every page of a collection shares one walk whatever subfolders its entries sit in; `sorting` waits longer for the dates, which the order of the list needs.
+export type EditReader = (paths: string[], options?: { dir?: string | undefined, sorting?: boolean | undefined }) => Promise<Map<string, Edit>>
 
 const LEADING_NEWLINE = /^\n/u
 const MARK = '\u0001'
@@ -100,7 +100,7 @@ async function soon<T>(answer: Promise<T>, ms: number): Promise<T | undefined> {
 
   try {
     return await Promise.race([answer, new Promise<undefined>((resolve) => {
-      timer = setTimeout(() => resolve(undefined), ms)
+      timer = setTimeout(resolve, ms, undefined)
     })])
   }
   finally {
@@ -109,11 +109,11 @@ async function soon<T>(answer: Promise<T>, ms: number): Promise<T | undefined> {
 }
 
 // A file's last commit gives its time and author; a file git has no commit for, or a project outside git, gives none, and so does every file while git takes longer than a list waits, unless the list is sorted by them, which waits longer.
-export const readEdits: EditReader = async (paths, sorting = false) => {
+export const readEdits: EditReader = async (paths, { dir, sorting = false } = {}) => {
   if (paths.length === 0)
     return new Map()
 
-  const edits = walk([...new Set(paths.map(path => dirname(path)))].sort())
+  const edits = walk(dir !== undefined && paths.every(path => path.startsWith(`${dir}/`)) ? [dir] : [...new Set(paths.map(path => dirname(path)))].sort())
   const all = await soon(edits, sorting ? GIT_LIMIT_MS : EDITS_WAIT_MS)
   const found = new Map<string, Edit>()
 

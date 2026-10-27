@@ -264,10 +264,11 @@ export async function pageRows(collection: ScreenCollection, search: string, pag
     if (readEdits === undefined || collection.kind !== 'folder')
       return undefined
 
-    return readEdits(found.flatMap(entry => entry.path === undefined ? [] : [entry.path]), sorting)
+    return readEdits(found.flatMap(entry => entry.path === undefined ? [] : [entry.path]), { dir: collection.dir, sorting })
   }
 
-  const stamped = async (found: SourceEntry[]) => sort === 'modified' || sort === 'author' ? editsOf(found, true) : undefined
+  const byEdit = sort === 'modified' || sort === 'author'
+  const stamped = async (found: SourceEntry[]) => byEdit ? editsOf(found, true) : undefined
 
   const versioned = async (found: Omit<RowsPage, 'total'>, total: number): Promise<RowsPage> => {
     const listed = await marked(found)
@@ -285,8 +286,8 @@ export async function pageRows(collection: ScreenCollection, search: string, pag
     if (collection.kind !== 'folder')
       return { ...listed, total }
 
-    // Rows a sort by edit ordered already carry theirs.
-    const last = listed.rows.every(row => row.modifiedAt !== undefined) ? undefined : await editsOf(listed.rows.flatMap(row => seen.get(key(row.slug, row.locale)) ?? []))
+    // Rows a sort by edit ordered already carry theirs, or have none.
+    const last = byEdit || listed.rows.every(row => row.modifiedAt !== undefined) ? undefined : await editsOf(listed.rows.flatMap(row => seen.get(key(row.slug, row.locale)) ?? []))
 
     const rows = await Promise.all(listed.rows.map(async (row) => {
       const path = seen.get(key(row.slug, row.locale))?.path

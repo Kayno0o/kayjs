@@ -41,7 +41,7 @@ async function commit(file: string, author: string): Promise<void> {
 
 beforeAll(async () => {
   dir = await mkdtemp(join(tmpdir(), 'kcms-history-'))
-  await mkdir(join(dir, 'content'), { recursive: true })
+  await mkdir(join(dir, 'content/notes'), { recursive: true })
   await git('init', '-q')
   await commit('content/a.md', 'Ada')
   await commit('content/b é.md', 'Grace')
@@ -80,18 +80,28 @@ it('walks the history once per commit, however many lists read it', async () => 
   expect(walks()).toBe(1)
 })
 
+it('walks the collection\'s folder once, whatever subfolders a page\'s entries sit in', async () => {
+  await commit('content/notes/g.md', 'Linus')
+  walks()
+
+  expect((await readEdits(['content/notes/g.md'], { dir: 'content' })).get('content/notes/g.md')).toMatchObject({ author: 'Linus' })
+  expect((await readEdits(['content/a.md', 'content/notes/g.md'], { dir: 'content' })).get('content/a.md')).toMatchObject({ author: 'Grace' })
+  expect((await readEdits(['content/a.md'], { dir: 'content' })).get('content/a.md')).toMatchObject({ author: 'Grace' })
+  expect(walks()).toBe(1)
+})
+
 it('gives a list no dates rather than wait on a slow git, and the next list the dates that walk found', async () => {
   await commit('content/e.md', 'Grace')
   walks()
-  delay = 2
+  delay = 3
 
   try {
     const started = performance.now()
 
     expect((await readEdits(['content/e.md'])).has('content/e.md')).toBe(false)
-    expect(performance.now() - started).toBeLessThan(1800)
-
-    await Bun.sleep(2500)
+    expect(performance.now() - started).toBeLessThan(2500)
+    // A sorted list waits for the same walk rather than start another.
+    expect((await readEdits(['content/e.md'], { sorting: true })).get('content/e.md')).toMatchObject({ author: 'Grace' })
   }
   finally {
     delay = 0
@@ -106,7 +116,7 @@ it('waits for a slow git when the list is sorted by the dates', async () => {
   delay = 1.5
 
   try {
-    expect((await readEdits(['content/f.md'], true)).get('content/f.md')).toMatchObject({ author: 'Linus' })
+    expect((await readEdits(['content/f.md'], { sorting: true })).get('content/f.md')).toMatchObject({ author: 'Linus' })
   }
   finally {
     delay = 0
