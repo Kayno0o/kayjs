@@ -1,7 +1,7 @@
 import type { Provider } from '@kaynooo/kayjs-ai'
 
-// What the tests reach from the fixture's actions: the provider they ask, and what the tools did.
-export const testing: { provider: Provider | undefined } = { provider: undefined }
+// What the tests reach from the fixture's actions: the provider they ask, what the `echoing` reply waits for before its first word, and what the tools did.
+export const testing: { provider: Provider | undefined, echoAfter?: Promise<void> | undefined } = { provider: undefined }
 export const done: string[] = []
 // What the app's own reader of the `staying` action's reply ended with, one entry per reply.
 export const heard: string[] = []

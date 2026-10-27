@@ -14,6 +14,7 @@ afterEach(() => {
   fakeAi.clear()
   refusals.length = 0
   testing.provider = undefined
+  testing.echoAfter = undefined
 })
 
 // A model that says `Hel`, waits for the test to let it go on, then says `lo there`; an abort ends it where it stands.
@@ -102,20 +103,37 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the Chat i
     expect(await loaded()).toBe(true)
   })
 
-  test('a history the server drew stays formatted with no markdown renderer, which loads once the visitor sends', async () => {
+  test('a history the server drew stays formatted with no markdown renderer, which loads once the visitor sends, before the first word of the reply', async () => {
     const page = await site.open('/citing-initial')
     const loaded = () => page.evaluate(() => performance.getEntriesByType('resource').some(entry => entry.name.includes('markdown-render')))
+    const words = Promise.withResolvers<void>()
 
     await Bun.sleep(300)
 
     expect(await page.text('.kai-chat-turn[data-role="assistant"] h1')).toBe('Title')
     expect(await loaded()).toBe(false)
 
+    // Any text as written the reply shows, caught however briefly it shows.
+    await page.evaluate(() => {
+      const seen: string[] = []
+
+      Object.assign(window, { asWritten: seen })
+      new MutationObserver(() => {
+        for (const text of document.querySelectorAll('.kai-chat-turn[data-role="assistant"] .kai-chat-text')) {
+          if (text.textContent.includes('**'))
+            seen.push(text.textContent)
+        }
+      }).observe(document.body, { subtree: true, childList: true, characterData: true })
+    })
+    testing.echoAfter = words.promise
     await page.fill('textarea', 'none:Now **bold**.')
     await page.press('Enter')
+    await page.waitUntil(() => performance.getEntriesByType('resource').some(entry => entry.name.includes('markdown-render')), { what: 'the Markdown renderer, asked for as the visitor sends' })
+    await markdownDrawn(page)
+    words.resolve()
     await page.waitFor('.kai-chat-turn[data-role="assistant"] strong', { text: 'bold' })
 
-    expect(await loaded()).toBe(true)
+    expect(await page.evaluate(() => (window as unknown as { asWritten: string[] }).asWritten)).toEqual([])
     expect(page.errors).toEqual([])
   })
 

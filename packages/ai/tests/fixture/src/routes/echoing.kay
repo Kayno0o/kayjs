@@ -1,6 +1,7 @@
 --- server
 import type { Progress } from '@kaynooo/kayjs-ai'
 import { s } from 'kay'
+import { testing } from '../testing'
 
 const sources = [{ n: 1, title: 'Tides', href: 'https://example.com/tides' }, { n: 2, title: 'Moon', href: '/moon' }]
 
@@ -8,6 +9,7 @@ const sources = [{ n: 1, title: 'Tides', href: 'https://example.com/tides' }, { 
 async function* echo(text: string): AsyncGenerator<Progress> {
   const bare = text.startsWith('none:')
 
+  await testing.echoAfter
   yield { text: bare ? text.slice(5) : text, calls: [], ...!bare && { sources } }
 }
 
