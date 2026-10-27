@@ -187,7 +187,7 @@ export function session<Data extends object = SessionData>(options: SessionOptio
     config.revokedElsewhere = true
   }
 
-  // A library that spreads the session over sibling hosts, kayjs-auth's `forwardAuth`, names their domains: the cookie takes the one the visited host is on, unless `domain` was given. A host on none keeps the cookie to itself.
+  // A library that spreads the session over sibling hosts, kayjs-auth's `forwardAuth`, names their domains: the cookie takes the one the visited host is on, unless `domain` was given. A host on none keeps the cookie to itself, under the same name.
   const sharesUnder = (domains: string[]): void => {
     config.shared = domains
   }
@@ -195,11 +195,11 @@ export function session<Data extends object = SessionData>(options: SessionOptio
   return Object.assign(plugin, { deriveSecret, endsSessionsElsewhere, sharesUnder })
 }
 
-// The listed domain a host is, or is a subdomain of; the host as the request URL names it, so a Host header cannot widen it.
+// The listed domain a host is, or is a subdomain of, the longest when several are.
 function sharedDomain(domains: string[] | undefined, request: Request): string | undefined {
   const { hostname } = requestUrl(request)
 
-  return domains?.find(domain => hostname === domain || hostname.endsWith(`.${domain}`))
+  return domains?.filter(domain => hostname === domain || hostname.endsWith(`.${domain}`)).sort((a, b) => b.length - a.length)[0]
 }
 
 interface SessionConfig {
@@ -230,7 +230,7 @@ class RequestSession<Data extends object> implements Session<Data> {
   private retired: string | undefined
   private oldKey = false
   private readonly secure: boolean
-  // `__Host-` keeps the cookie to this host over https, so no other host of the site can set it; a Domain rules the prefix out.
+  // `__Host-` keeps the cookie to this host over https, so no other host of the site can set it; a Domain rules the prefix out, and so does a session shared under domains, whose name must not depend on the Host a proxy passes on.
   private readonly name: string
   private readonly domain: string | undefined
   private readonly store: SessionStore | undefined
@@ -238,7 +238,7 @@ class RequestSession<Data extends object> implements Session<Data> {
   constructor(private readonly request: Request, private readonly config: SessionConfig) {
     this.secure = overHttps(request)
     this.domain = config.domain ?? sharedDomain(config.shared, request)
-    this.name = this.secure && this.domain === undefined && !config.name.startsWith('__') ? `__Host-${config.name}` : config.name
+    this.name = this.secure && this.domain === undefined && config.shared === undefined && !config.name.startsWith('__') ? `__Host-${config.name}` : config.name
     this.store = config.store()
 
     if (!this.store && !config.revokedElsewhere)

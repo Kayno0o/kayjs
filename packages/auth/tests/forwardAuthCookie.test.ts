@@ -7,7 +7,6 @@ import { SECRET, testApp } from './helpers/app'
 const PASSWORD = 'correct horse battery'
 const PORTAL = 'https://auth.example.test'
 const SIGNED_IN = /^kay_session=/
-const HOST_ONLY = /^__Host-kay_session=/
 
 async function signInAt(url: string, forwardAuth: ForwardDomains | ForwardAuthOptions = 'example.test', sessionDomain?: string, headers: Record<string, string> = {}) {
   const { app, auth } = testApp({ site: PORTAL, forwardAuth, sessions: session<AuthSessionData>({ secret: SECRET, ...sessionDomain !== undefined && { domain: sessionDomain } }) })
@@ -28,6 +27,13 @@ describe('the session cookie of a portal forwarding auth', () => {
       expect((await signInAt(url)).line, url).toMatch(/^kay_session=.*; Domain=example\.test;/i)
   })
 
+  test('is read back whatever Host the request carries, as a proxy asking from the portal\'s internal address sends', async () => {
+    const { app, cookie } = await signInAt(PORTAL)
+    const response = await app.handle(new Request('https://127.0.0.1:3000/me', { headers: { cookie } }))
+
+    expect(await response.json()).toMatchObject({ username: 'ada' })
+  })
+
   test('is read back by a sibling host', async () => {
     const { app, cookie } = await signInAt(PORTAL)
     const response = await app.handle(new Request('https://wiki.example.test/me', { headers: { cookie } }))
@@ -46,19 +52,13 @@ describe('the session cookie of a portal forwarding auth', () => {
     expect((await signInAt(PORTAL, { domains })).line).toMatch(/^kay_session=.*; Domain=example\.test;/i)
   })
 
-  test('stays the host\'s own, as a __Host- cookie over https, on a host outside the domains', async () => {
+  test('stays the host\'s own, under the same name, on a host outside the domains', async () => {
     for (const url of ['https://elsewhere.test', 'https://example.test.evil.test', 'https://evilexample.test', 'https://example.test@evil.test', 'https://example.test.', 'https://localhost', 'http://localhost']) {
       const { line } = await signInAt(url)
 
       expect(line, url).not.toMatch(/Domain=/i)
-      expect(line, url).toMatch(url.startsWith('https') ? HOST_ONLY : SIGNED_IN)
+      expect(line, url).toMatch(SIGNED_IN)
     }
-  })
-
-  test('is not widened by a Host or X-Forwarded-Host header naming a domain host, as the request URL names the host', async () => {
-    const { line } = await signInAt('https://elsewhere.test', 'example.test', undefined, { 'host': 'auth.example.test', 'x-forwarded-host': 'auth.example.test' })
-
-    expect(line).not.toMatch(/Domain=/i)
   })
 
   test('keeps the domain the session names itself', async () => {

@@ -1,4 +1,5 @@
 import { afterEach, expect, it } from 'bun:test'
+import { discordProvider } from '../src/oauth/providers'
 import { buildOwn } from '../src/own'
 import { authTest } from '../src/test'
 
@@ -35,6 +36,19 @@ it('enrols a member in two-factor through the auth() built with no module', asyn
   expect(await enrolment.code()).toMatch(/^\d{6}$/)
   expect(enrolment.recoveryCodes).toHaveLength(10)
   await expect(authTest(site).enrollTotp(user.id)).rejects.toThrow('already')
+})
+
+it('stubs an OAuth provider through the auth() built with no module', async () => {
+  const site = { cookies: new Bun.CookieMap() }
+
+  await buildOwn({ site: 'https://site.test', oauth: { discord: { provider: discordProvider(), clientId: 'id', clientSecret: 'secret' } } }, { root: process.cwd(), extensions: [], modules: {}, testCookies: site.cookies })
+
+  const restore = authTest(site).oauth.stub('discord', { id: '1', email: 'ada@example.com' })
+
+  await expect(authTest(site).oauth.signIn('discord')).rejects.toThrow('needs a site with a fetch')
+  expect(() => authTest(site).oauth.stub('github', { id: '1' })).toThrow('no provider')
+  restore()
+  await expect(authTest(site).oauth.signIn('discord')).rejects.toThrow('no stub')
 })
 
 it('signs each site in through its own auth, whichever was built last', async () => {
