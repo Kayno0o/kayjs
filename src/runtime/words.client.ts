@@ -85,14 +85,6 @@ export function pageLocale(): string {
   return locale || document.documentElement.lang || 'en'
 }
 
-// The site's `timeZone`, or none, for the formats a library draws itself.
-export function pageTimeZone(): string | undefined {
-  if (locale === '')
-    load()
-
-  return zone
-}
-
 // The message at `key` when the page brought it, else `english`; see the server's.
 export function wording(key: string, english: string, params: Record<string, MessageValue> = {}): string {
   if (!messages.has(key))

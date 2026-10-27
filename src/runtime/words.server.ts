@@ -1,5 +1,5 @@
 import type { MessageValue } from './i18n'
-import { formatDate, lookup, timeZone } from './i18n'
+import { formatDate, lookup } from './i18n'
 import { insideIsland, noteMessage } from './island.server'
 import { localeState } from './locale-state'
 import { sizeText as sizeIn } from './size-text'
@@ -35,11 +35,6 @@ export function wording(key: string, english: string, params: Record<string, Mes
 // The request's locale, `en` outside one: for the formats a library draws itself, such as a chart's dates.
 export function pageLocale(): string {
   return localeState()?.locale ?? 'en'
-}
-
-// The site's `timeZone`, or none, for the formats a library draws itself.
-export function pageTimeZone(): string | undefined {
-  return timeZone()
 }
 
 // `1 MB`, `512 KB`, `200 bytes` as the page's locale writes a size (`1 Mo`, `200 octets`), for a text that names a file's weight or a limit.

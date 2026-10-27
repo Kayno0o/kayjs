@@ -98,7 +98,7 @@ export default defineConfig({
 
 - `minify` is on for `kay build` unless set to `false`, and off for `kay dev` and a server bundling at boot unless set to `true`.
 - `lang`, the `<html lang>` of every page when `i18n` is not set, defaults to `en`.
-- `timeZone: 'Europe/Paris'` is the zone `formatDate`, kayjs-ui's charts and message dates write in, on the server and in islands alike, instead of the server's and the visitor's ([Locales](locales.md)).
+- `timeZone: 'Europe/Paris'` is the zone `formatDate` and message dates write in, on the server and in islands alike, instead of the server's and the visitor's ([Locales](locales.md)).
 - `typography: false` leaves a French page's spaces before `: ; ! ?` and inside `« »` as typed instead of making them non-breaking ([Locales](locales.md#french-typography)).
 - `links: { outside: 'same-tab' }` keeps a link to another origin in the same tab, where it opens in a new one by default ([Navigation](navigation.md#navigation)).
 

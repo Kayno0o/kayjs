@@ -110,7 +110,7 @@ export interface KayConfig {
   requestIdHeader?: string | undefined
   // The locales pages are served in, each under its prefix or on its own domain, with messages in `src/messages/<locale>.ts`.
   i18n?: I18nConfig | undefined
-  // The IANA time zone dates are written in, `Europe/Paris`: `formatDate`, a chart's day and time labels and the dates of kay's own screens, on the server and in the islands alike, unless a call names its own `timeZone`. The server's and the visitor's zone by default.
+  // The IANA time zone dates are written in, `Europe/Paris`: `formatDate` and the dates of kay's own screens, on the server and in the islands alike, unless a call names its own `timeZone`. The server's and the visitor's zone by default.
   timeZone?: string | undefined
   // Where the site is mounted when not at its host's root, `/docs`: the links, assets, forms and redirects pages render, the sitemap and the feeds carry it, links stay written without it, and a proxy in front of the server takes it off requests.
   base?: string | undefined

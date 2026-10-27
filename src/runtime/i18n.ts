@@ -282,12 +282,13 @@ export function formatBytes(page: string, bytes: number, given?: NumberFormatOpt
   let size = Math.abs(bytes)
   let unit = 0
 
-  while (size >= 1024 && unit < BYTE_UNITS.length - 1) {
+  // Compared as rounded, so 1048575 bytes read `1 MB` and not `1,024 kB`.
+  while (Math.round(size * 10) / 10 >= 1024 && unit < BYTE_UNITS.length - 1) {
     size /= 1024
     unit++
   }
 
-  return formatNumber(page, Math.sign(bytes) * size, { style: 'unit', unit: BYTE_UNITS[unit], unitDisplay: 'short', maximumFractionDigits: unit === 0 ? 0 : 1, ...given })
+  return formatNumber(page, Math.sign(bytes) * size, { style: 'unit', unit: BYTE_UNITS[unit], unitDisplay: 'short', ...given?.maximumFractionDigits === undefined && given?.minimumFractionDigits === undefined && { maximumFractionDigits: unit === 0 ? 0 : 1 }, ...given })
 }
 
 // Each unit of a duration with its length in milliseconds.
@@ -296,7 +297,7 @@ const DURATION_UNITS: readonly [string, number][] = [['day', 86_400_000], ['hour
 // A length of time in milliseconds in its largest unit and the one below, `2 hr 5 min`, the lower one left out when it is zero.
 export function formatDuration(page: string, milliseconds: number, given?: DurationFormatOptions): string {
   const [locale, options] = withLocale(page, given)
-  const total = Math.round(Math.max(0, milliseconds) / 1000) * 1000
+  const total = Number.isFinite(milliseconds) ? Math.round(Math.max(0, milliseconds) / 1000) * 1000 : 0
   const reached = DURATION_UNITS.findIndex(([, length]) => total >= length)
   const first = reached === -1 ? DURATION_UNITS.length - 1 : reached
   const parts: string[] = []
