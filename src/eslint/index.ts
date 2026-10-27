@@ -58,6 +58,12 @@ interface Linted {
   module: Set<number>
 }
 
+// What an app's test files need beyond the rules of `@kaynooo/eslint`, which its `kay` preset appends and kay's own config reuses: bun-types types the matchers of `expect(promise).rejects` as returning void, though they must be awaited.
+export const testRules = [{
+  files: ['**/tests/**/*.ts', '**/tests-dom/**/*.ts', '**/*.test.ts'],
+  rules: { 'ts/await-thenable': 'off' as const },
+}]
+
 // Lint runs each file through preprocess then postprocess before the next, so this only ever holds the one being linted.
 const compiled = new Map<string, Linted>()
 

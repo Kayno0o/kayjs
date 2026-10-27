@@ -6,7 +6,7 @@ import { describe, expect, it } from 'bun:test'
 import { writeShadowTypes } from '../src/check'
 import { readShadowSettings, serializeShadowSettings, SHADOW_SETTINGS } from '../src/check/shadow'
 import { positionAt } from '../src/compiler/mapping'
-import { processor, shadowParser } from '../src/eslint'
+import { processor, shadowParser, testRules } from '../src/eslint'
 import { projectPaths } from '../src/project'
 import { scratchDir } from './scratch'
 
@@ -858,5 +858,18 @@ describe('kay/eslint over a line a fix breaks in a fence', () => {
     const broken = NESTED.replace('} catch (e) {', '}\n  catch (e) {')
 
     expect(await fixed(broken)).toBe(broken)
+  })
+})
+
+describe('testRules', () => {
+  it('turns await-thenable off in an app\'s test files, wherever they live', async () => {
+    const { ESLint } = await import('eslint')
+    const tsPlugin = { rules: { 'await-thenable': { create: () => ({}) } } }
+    const eslint = new ESLint({ cwd: join(import.meta.dir, 'fixtures', 'lint'), overrideConfigFile: true, overrideConfig: [{ files: ['**/*.ts'], plugins: { ts: tsPlugin }, rules: { 'ts/await-thenable': 'error' } }, ...testRules] })
+
+    for (const file of ['tests/a.ts', 'src/todos.test.ts', 'tests-dom/a.ts'])
+      expect(((await eslint.calculateConfigForFile(join(import.meta.dir, 'fixtures', 'lint', file))) as { rules: Record<string, unknown[]> }).rules['ts/await-thenable']?.[0]).toBe(0)
+
+    expect(((await eslint.calculateConfigForFile(join(import.meta.dir, 'fixtures', 'lint', 'src', 'a.ts'))) as { rules: Record<string, unknown[]> }).rules['ts/await-thenable']?.[0]).toBe(2)
   })
 })
