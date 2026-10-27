@@ -16,7 +16,7 @@ const JOBS_FLAG = /^--jobs=(\d+)$/
 
 export interface LibraryRun {
   jobs?: number
-  // A test run stuck past it is interrupted, so bun names its files still running, then killed after the grace.
+  // A check or test run stuck past it is interrupted, so bun names its files still running, then killed after the grace.
   limitMs?: number
   graceMs?: number
   write?: (text: string) => void
@@ -41,17 +41,13 @@ export async function libraryFolders(root: string): Promise<string[]> {
 }
 
 // One package script of the library, its output appended to `fd`.
-async function script(folder: string, name: string, fd: number, limitMs?: number, graceMs = 0): Promise<Outcome> {
+async function script(folder: string, name: string, fd: number, limitMs: number, graceMs: number): Promise<Outcome> {
   const child = Bun.spawn([process.execPath, 'run', name], { cwd: folder, stdin: 'ignore', stdout: fd, stderr: fd })
-  const timers: Timer[] = []
   let interrupted = false
-
-  if (limitMs !== undefined) {
-    timers.push(setTimeout(() => {
-      interrupted = true
-      child.kill('SIGINT')
-    }, limitMs), setTimeout(() => child.kill('SIGKILL'), limitMs + graceMs))
-  }
+  const timers = [setTimeout(() => {
+    interrupted = true
+    child.kill('SIGINT')
+  }, limitMs), setTimeout(() => child.kill('SIGKILL'), limitMs + graceMs)]
 
   const code = await child.exited
 
@@ -68,19 +64,24 @@ async function script(folder: string, name: string, fd: number, limitMs?: number
 async function library(folder: string, log: string, options: LibraryRun): Promise<{ passed: boolean, summary: string }> {
   const fd = openSync(log, 'w')
   const started = performance.now()
-  const seconds = () => Math.round((performance.now() - started) / 1000)
+  const limitMs = options.limitMs ?? LIMIT_MS
 
   try {
-    if (await script(folder, 'check', fd) !== 'passed')
-      return { passed: false, summary: `check failed after ${seconds()} s` }
+    for (const name of ['check', 'test']) {
+      const outcome = await script(folder, name, fd, limitMs, options.graceMs ?? GRACE_MS)
 
-    const limitMs = options.limitMs ?? LIMIT_MS
-    const tested = await script(folder, 'test', fd, limitMs, options.graceMs ?? GRACE_MS)
+      if (outcome === 'interrupted')
+        return { passed: false, summary: `${name} interrupted after ${limitMs / 1000} s` }
 
-    if (tested === 'interrupted')
-      return { passed: false, summary: `test interrupted after ${limitMs / 1000} s` }
+      if (outcome === 'failed')
+        return { passed: false, summary: `${name} failed after ${Math.round((performance.now() - started) / 1000)} s` }
+    }
 
-    return { passed: tested === 'passed', summary: `test ${tested} after ${seconds()} s` }
+    return { passed: true, summary: `passed in ${Math.round((performance.now() - started) / 1000)} s` }
+  }
+  catch (error) {
+    // A library that could not run fails alone, so the others still end before their logs are removed.
+    return { passed: false, summary: `could not run: ${error instanceof Error ? error.message : String(error)}` }
   }
   finally {
     closeSync(fd)

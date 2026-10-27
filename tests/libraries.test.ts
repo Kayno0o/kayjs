@@ -41,7 +41,7 @@ describe('scripts/libraries.ts', () => {
 
     expect(results).toEqual([{ folder: failing, passed: false }, { folder: passing, passed: true }])
     expect(written).toHaveLength(2)
-    expect(written[0]).toMatch(/passing\/\n.*check ok\n.*test ok\n.*passing: test passed after \d+ s\n$/s)
+    expect(written[0]).toMatch(/passing\/\n.*check ok\n.*test ok\n.*passing: passed in \d+ s\n$/s)
     expect(written[1]).toMatch(/failing\/\n.*check out\ncheck err\n.*test out\ntest err\n.*failing: test failed after \d+ s\n$/s)
   })
 
@@ -59,11 +59,11 @@ describe('scripts/libraries.ts', () => {
   it('interrupts a test running past its limit, keeping what it printed', async () => {
     const root = await scratchDir('libraries-')
     const folder = await fakeLibrary(root, 'stuck', 'if (step === \'test\') {\n  process.on(\'SIGINT\', () => {\n    console.log(\'interrupted\')\n    process.exit(130)\n  })\n  console.log(\'started\')\n  setInterval(() => {}, 1000)\n}')
-    const { results, written } = await run([folder], { limitMs: 2000, graceMs: 2000 })
+    const { results, written } = await run([folder], { limitMs: 6000, graceMs: 2000 })
 
     expect(results).toEqual([{ folder, passed: false }])
     expect(written[0]).toContain('started')
-    expect(written[0]).toMatch(/stuck: test interrupted after 2 s\n$/)
+    expect(written[0]).toMatch(/stuck: test interrupted after 6 s\n$/)
   })
 
   it('runs as many libraries side by side as it has jobs', async () => {
