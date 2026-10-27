@@ -885,8 +885,23 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('page swap i
       await own.waitFor('form[aria-busy="true"]')
       // Naming its page, as a `Referer` the app's `referrer-policy` cuts would not.
       expect((await posted).requestHeaders['x-kay-page']).toBe(await own.path())
+
       // On a loaded CI host the post and the swap showing its answer can outlast the default wait.
-      await own.waitFor('p.done', { text: 'Added abcd', timeout: '20000ms' })
+      try {
+        await own.waitFor('p.done', { text: 'Added abcd', timeout: '20000ms' })
+      }
+      catch (error) {
+        // Names what the page held when the answer never showed, so a failure on a loaded CI host says why: the flash cookie carrying the answer is dropped by the first page response it rides, so the responses show which request took it.
+        const seen = await own.evaluate(() => ({
+          path: location.pathname + location.search,
+          busy: document.documentElement.getAttribute('aria-busy'),
+          formBusy: document.querySelector('form')?.getAttribute('aria-busy') ?? null,
+          alive: (window as { kayAlive?: boolean }).kayAlive === true,
+          main: document.body.textContent.slice(0, 400),
+        }))
+
+        throw new Error(`${error instanceof Error ? error.message : String(error)}\npage: ${JSON.stringify(seen)}\nerrors: ${JSON.stringify(own.errors)}\nresponses: ${JSON.stringify(own.responses.map(({ method, url, status, type, complete, requestHeaders, responseHeaders }) => `${method} ${url} ${status} ${type}${complete ? '' : ' incomplete'}${requestHeaders.cookie?.includes('kay_flash') === true ? ' sent-flash' : ''}${responseHeaders['set-cookie'] !== undefined ? ' set-cookie' : ''}`))}`, { cause: error })
+      }
 
       expect(await own.count('form[aria-busy]')).toBe(0)
       expect(await sameDocument(own)).toBe(true)
