@@ -7,7 +7,8 @@ import { memo, recipe } from 'kay'
 const look = recipe({
   parts: {
     root: 'kui-sparkline flex h-[var(--spark-height,1.5rem)] w-full items-end gap-px',
-    bar: 'min-h-px min-w-0 flex-1 rounded-t-[1px] bg-accent data-[tone=muted]:bg-muted data-[tone=accent]:bg-accent data-[tone=success]:bg-success data-[tone=warning]:bg-warning data-[tone=danger]:bg-danger data-[tone=info]:bg-info',
+    item: 'flex h-full min-w-0 flex-1 items-end',
+    bar: 'min-h-px w-full rounded-t-[1px] bg-accent data-[tone=muted]:bg-muted data-[tone=accent]:bg-accent data-[tone=success]:bg-success data-[tone=warning]:bg-warning data-[tone=danger]:bg-danger data-[tone=info]:bg-info',
   },
 })
 
@@ -24,11 +25,13 @@ const { values, tone = 'accent', tones, hints, label, ...rest } = props<Omit<JSX
   label: string
 }>()
 
-const largest = memo(() => Math.max(0, ...values.map(value => value ?? 0)))
+const finite = (value: number | null): value is number => value !== null && Number.isFinite(value)
+const largest = memo(() => Math.max(0, ...values.filter(finite)))
 
-// Each bar's height against the largest value.
-const percent = (value: number | null) => largest() > 0 && value !== null ? Math.max(0, value) / largest() * 100 : 0
+// Each bar's height against the largest value; a reading that is not a finite number leaves a hairline.
+const percent = (value: number | null) => largest() > 0 && finite(value) ? Math.max(0, value) / largest() * 100 : 0
 ---
 div(part="root" {...rest} role="img" aria-label={label})
   for value, at of values key={at}
-    span(part="bar" aria-hidden="true" data-tone={tones?.[at] ?? tone} data-hint={hints?.[at]} style={`height: ${percent(value)}%`})
+    span(part="item" aria-hidden="true" data-hint={hints?.[at]})
+      span(part="bar" data-tone={tones?.[at] ?? tone} style={`height: ${percent(value)}%`})

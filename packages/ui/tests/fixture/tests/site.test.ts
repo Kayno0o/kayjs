@@ -163,10 +163,11 @@ test('DescriptionList is a dl of label and value pairs, the block drawing the it
 test('Sparkline scales its bars against the largest and tones them, and StatusStrip draws one cell per entry, each saying the whole in one label', async () => {
   const spark = await one('/sparkline', '#spark')
   const bars = await find('/sparkline', '#spark [data-part=bar]')
+  const hinted = await find('/sparkline', '#spark [data-part=item]')
   const strip = await find('/sparkline', '#strip [data-part=cell]')
 
   expect([attr(spark, 'role'), attr(spark, 'aria-label')]).toEqual(['img', 'Visits per hour, 7 in all'])
-  expect(bars.map(bar => [attr(bar, 'style'), attr(bar, 'data-tone'), attr(bar, 'data-hint')])).toEqual([['height: 50%', 'success', 'two'], ['height: 100%', 'success', 'four'], ['height: 0%', 'danger', null], ['height: 0%', 'success', null], ['height: 25%', 'success', null]])
+  expect(bars.map((bar, at) => [attr(bar, 'style'), attr(bar, 'data-tone'), attr(hinted[at]!, 'data-hint')])).toEqual([['height: 50%', 'success', 'two'], ['height: 100%', 'success', 'four'], ['height: 0%', 'danger', null], ['height: 0%', 'success', null], ['height: 25%', 'success', null]])
   expect((await find('/sparkline', '#flat [data-part=bar]')).map(bar => attr(bar, 'style'))).toEqual(['height: 0%', 'height: 0%'])
   expect(attr(await one('/sparkline', '#strip'), 'aria-label')).toBe('Up 3 of 4 checks')
   expect(strip.map(cell => [attr(cell, 'data-tone'), attr(cell, 'aria-hidden'), attr(cell, 'data-hint')])).toEqual([['success', 'true', 'ok'], ['danger', 'true', null], [null, 'true', null], ['warning', 'true', null]])
