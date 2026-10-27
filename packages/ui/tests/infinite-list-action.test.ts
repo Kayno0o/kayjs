@@ -95,4 +95,11 @@ describe('infiniteList over an action', () => {
     expect(list.failed()).toBe(false)
     expect(list.rows()).toHaveLength(6)
   })
+
+  test('an action answering more than its rows needs rows to read them, which the types ask for', () => {
+    const paged = fake()
+
+    // @ts-expect-error listBans answers `{ rows, total }`, so its list needs `rows`
+    expect(() => infiniteList(bans(1, 3), { pageSize: 3, action: paged.action as unknown as typeof listBans, failure: 'Could not load.' })).not.toThrow()
+  })
 })

@@ -14,7 +14,9 @@ The list also starts over on mount when the table's sort, from `sort` or the URL
 
 A `filter` search box filters on the server too. The typed text reaches `load` as `filter.text` once typing pauses, and the list starts over from offset 0 as it does for a sort. The rows already loaded are not matched again, so `load` has to narrow its pages itself. `filter` or `filterParam` shows the box, and `filterParam` keeps the text in the URL.
 
-`fields` adds more inputs beside the box: `fields={[{ key: 'origin', label: 'Origin', options }, { key: 'tag', label: 'Tag' }]}`. A field with `options` is a select, one without is a text box. The value reaches `load` as `filter.fields.origin` (empty fields are left out) and stays in the URL under `key`. A sort and a filter changed together load one page.
+`fields` adds more inputs beside the box: `fields={[{ key: 'origin', label: 'Origin', options }, { key: 'tag', label: 'Tag' }]}`. A field with `options` is a select, one without is a text box. The value reaches `load` as `filter.fields.origin` (empty fields are left out) and stays in the URL under `key`. A key the table already writes in the URL, such as `sort`, `direction` or the search's own, throws as the table is made.
+
+A sort and a filter changed together load one page, and a sort clicked while typed text waits for its pause loads at once, the text with it.
 
 `list.filterBy({ text, fields })` does the same from code. The list begins with the `filter` option's value, and loads again on mount when the URL holds another.
 

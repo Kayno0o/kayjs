@@ -281,4 +281,48 @@ describe('infiniteList', () => {
     expect(loose.patch(1, {})).toBe(false)
     expect(keyed.rows()).toEqual(bans(1, 3))
   })
+
+  test('a more in the tick a restart waits loads its first page once, in the new order', async () => {
+    const { asked, load } = source(bans(20, 3))
+    const sort = { key: 'id', direction: 'desc' as const }
+    const list = infiniteList(bans(1, 3), { pageSize: 3, load })
+
+    await Promise.all([list.sortBy(sort), list.more()])
+
+    expect(asked).toEqual([{ offset: 0, last: undefined, sort, filter: NONE }])
+    expect(list.rows().map(ban => ban.id)).toEqual([20, 21, 22])
+  })
+
+  test('patch moving a row to a new key lets a later page show the old key and drops one bringing the new', async () => {
+    const { load } = source([{ id: 1 }, { id: 9 }, { id: 4 }])
+    const list = infiniteList(bans(1, 3), { pageSize: 3, key: ban => ban.id, load })
+
+    expect(list.patch(1, row => ({ ...row, id: 9 }))).toBe(true)
+
+    await list.more()
+
+    expect(list.rows().map(ban => ban.id)).toEqual([9, 2, 3, 1, 4])
+  })
+
+  test('patch keeps the other rows of a later page as they were and the prototype of a merged row', async () => {
+    class Planet {
+      constructor(readonly id: number, readonly seen = false) {}
+
+      get label() {
+        return `planet ${this.id}`
+      }
+    }
+
+    const { load } = source(bans(4, 3))
+    const list = infiniteList([new Planet(1), new Planet(2), new Planet(3)], { pageSize: 3, key: planet => planet.id, load: async at => (await load(at))?.map(ban => new Planet(ban.id)) })
+
+    await list.more()
+
+    const before = list.rows()
+
+    expect(list.patch(5, { seen: true })).toBe(true)
+    expect(list.rows()[4]).toBeInstanceOf(Planet)
+    expect([list.rows()[4]?.seen, list.rows()[4]?.label]).toEqual([true, 'planet 5'])
+    expect(list.rows().filter((_, at) => at !== 4).every((row, at) => row === before.filter((_, index) => index !== 4)[at])).toBe(true)
+  })
 })

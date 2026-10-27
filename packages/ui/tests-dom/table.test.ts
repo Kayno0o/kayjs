@@ -226,6 +226,48 @@ describe('Table over an infinite list', () => {
       expect(window.location.search).toContain('tag=x')
     })
 
+    test('a sort clicked while typed text waits for its pause loads at once, with the text', async () => {
+      mounted = await mountComponent(ListedTable, { onLoad, searchable: true })
+      await settle()
+      clock.start()
+
+      const input = mounted.root.querySelector<HTMLInputElement>('[data-part="filterInput"]')!
+
+      input.value = 'eur'
+      input.dispatchEvent(new Event('input', { bubbles: true }))
+      await clock.elapse(50)
+      click(header(mounted.root, 0).querySelector('button'))
+      await clock.elapse(0)
+
+      expect(asked).toEqual([{ offset: 0, sort: { key: 'name', direction: 'asc' }, filter: { text: 'eur', fields: {} } }])
+
+      await clock.elapse(400)
+
+      expect(asked).toHaveLength(1)
+    })
+
+    test('text typed back to what the list holds before the pause loads nothing', async () => {
+      mounted = await mountComponent(ListedTable, { onLoad, searchable: true })
+      await settle()
+      clock.start()
+
+      const input = mounted.root.querySelector<HTMLInputElement>('[data-part="filterInput"]')!
+
+      input.value = 'e'
+      input.dispatchEvent(new Event('input', { bubbles: true }))
+      await clock.elapse(100)
+      input.value = ''
+      input.dispatchEvent(new Event('input', { bubbles: true }))
+      await clock.elapse(400)
+
+      expect(asked).toEqual([])
+    })
+
+    test('a field keyed by a name the table writes in the query is refused', async () => {
+      for (const key of ['q', 'sort', 'direction', 'order', 'orderDirection'])
+        await expect(mountComponent(ListedTable, { onLoad, searchable: true, sortParam: 'order', fields: [{ key, label: 'Clash' }] })).rejects.toThrow(`a Table field cannot be keyed ${key}`)
+    })
+
     test('a filterParam alone shows the search box of a table over a list', async () => {
       mounted = await mountComponent(ListedTable, { onLoad, filterParam: 'q' })
 

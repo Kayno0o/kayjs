@@ -210,7 +210,7 @@ export function infiniteList<Row, Target extends Action<never, unknown> = never>
     failed.set(false)
     pending.set(true)
 
-    // Waits a tick, so a sort and a filter asked for one after the other load a single first page.
+    // Waits a tick, so a sort and a filter asked for one after the other load a single first page; a `more` in that tick loads that page itself.
     await Promise.resolve()
 
     if (mine === order)
@@ -229,9 +229,17 @@ export function infiniteList<Row, Target extends Action<never, unknown> = never>
     if (index === -1)
       return false
 
-    const changed = (row: Row): Row => typeof change === 'function' ? change(row) : { ...row, ...change }
+    const before = untrack(rows)[index]!
+    // A merge keeps the row's prototype, so a row made by a class stays one.
+    const after = typeof change === 'function' ? change(before) : Object.assign(Object.create(Object.getPrototypeOf(before) as object | null) as object, before, change) as Row
 
-    rows.set(current => current.map((row, at) => at === index ? changed(row) : row))
+    // A change of key moves the row's place in the keys shown, so a page bringing the old key adds it and one bringing the new key does not.
+    if (!Object.is(key(after), id)) {
+      shown.delete(id)
+      shown.add(key(after))
+    }
+
+    rows.set(current => current.map((row, at) => at === index ? after : row))
 
     return true
   }

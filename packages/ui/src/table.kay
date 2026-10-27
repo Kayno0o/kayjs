@@ -112,12 +112,21 @@ const { columns: given, rows: passed, list, rowKey, sort, sortable = true, serve
 const rows = () => list ? list.rows() : passed ?? []
 const columns = memo(() => given.map(column => resolvedColumn(column, sortable)))
 const keptKey = sortParam === undefined ? undefined : persisted(sortParam, '', { storage: 'query' })
-const keptDirection = sortParam === undefined ? undefined : persisted(sortParam === 'sort' ? 'direction' : `${sortParam}Direction`, '', { storage: 'query' })
+const directionParam = sortParam === undefined ? undefined : sortParam === 'sort' ? 'direction' : `${sortParam}Direction`
+const keptDirection = directionParam === undefined ? undefined : persisted(directionParam, '', { storage: 'query' })
 const restored = restoredSort(columns(), keptKey?.(), keptDirection?.())
 const current = signal(restored ?? sort)
 let following = restored === undefined
 const typed = filterParam === undefined ? signal('') : persisted(filterParam, '', { storage: 'query' })
 const extra = fields ?? []
+// The query names the table writes itself, which a field's own would overwrite: the sort's, the search's, and those of the export address.
+const taken = new Set(['sort', 'direction', filterParam ?? 'q', sortParam, directionParam])
+
+for (const field of extra) {
+  if (taken.has(field.key))
+    throw new Error(`kayjs-ui: a Table field cannot be keyed ${field.key}, a name the table's sort, search or export address already writes in the query`)
+}
+
 const fieldValues = extra.map(field => persisted(field.key, '', { storage: 'query' }))
 const fieldsNow = () => Object.fromEntries(extra.flatMap((field, index) => fieldValues[index]!() === '' ? [] : [[field.key, fieldValues[index]!()]]))
 const asked = () => ({ text: typed(), fields: fieldsNow() })
@@ -160,7 +169,8 @@ effect(() => {
 
   const run = () => void list.restart({ ...sortChanged && { sort: wanted }, ...filterChanged && { filter: filtered } })
 
-  if (now || !filterChanged) {
+  // A sort runs at once, taking a filter still waiting for its pause along.
+  if (now || sortChanged) {
     run()
 
     return

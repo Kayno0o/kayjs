@@ -1,6 +1,6 @@
 import type { Column } from '../src/table'
 import { describe, expect, test } from 'bun:test'
-import { cellText, csvField, drawnByBlock, exportHref, nextSort, resolvedColumn, rowKeyOf, rowLabel, rowsMatching, sortedRows, toCsv } from '../src/table'
+import { cellText, csvField, drawnByBlock, exportHref, nextSort, resolvedColumn, rowKeyOf, rowLabel, rowsMatching, sameFields, sortedRows, toCsv } from '../src/table'
 
 interface Planet { id: number, name: string, moons: number | null }
 
@@ -134,5 +134,19 @@ describe('exportHref', () => {
     expect(exportHref('/planets.csv?team=a#top', undefined, 'q', '  ')).toBe('/planets.csv?team=a#top')
     expect(exportHref('/p.csv?next=/a?b', undefined, 'q', 'x')).toBe('/p.csv?next=%2Fa%3Fb&q=x')
     expect(exportHref('/planets.csv?q=old', undefined, 'q', 'new')).toBe('/planets.csv?q=new')
+  })
+
+  test('adds the extra fields under their own names, over a value the address held', () => {
+    expect(exportHref('/planets.csv?origin=old', undefined, 'q', '', { origin: 'b', tag: 'x y' })).toBe('/planets.csv?origin=b&tag=x+y')
+  })
+})
+
+describe('sameFields', () => {
+  test('holds for the same names and values in any order, and not for one more, one fewer or one changed', () => {
+    expect(sameFields({}, {})).toBe(true)
+    expect(sameFields({ a: '1', b: '2' }, { b: '2', a: '1' })).toBe(true)
+    expect(sameFields({ a: '1' }, { a: '1', b: '2' })).toBe(false)
+    expect(sameFields({ a: '1', b: '2' }, { a: '1' })).toBe(false)
+    expect(sameFields({ a: '1' }, { a: '2' })).toBe(false)
   })
 })
