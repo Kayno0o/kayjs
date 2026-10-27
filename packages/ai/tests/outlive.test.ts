@@ -1,8 +1,7 @@
 import type { AskOptions, Provider } from '../src'
 import { afterEach, describe, expect, it } from 'bun:test'
-import { memoryRates, nameUser } from 'kay/library'
+import { nameUser } from 'kay/library'
 import { answeringRequest } from '../../../src/server/log'
-import { countSucceeded, protectionRefusal } from '../../../src/server/protection'
 import { sendFrom } from '../../../src/server/rewrite'
 import { ai, ask, fakeAi } from '../src'
 import { forgetKept } from '../src/kept'
@@ -384,55 +383,5 @@ describe('resuming a reply by the header a Chat sends', () => {
     model.release()
 
     expect(await (await answering({ provider: model.provider }, { 'x-kai-reply': `resume:${id}` }, { address: null, visitor: 'ann' })).reply).toBe('one two')
-  })
-
-  describe('against the rateLimit of the action', () => {
-    // The same limit the action declares, so the check and the count after the handler agree.
-    const action = () => ({ url: '/chat', protection: { rateLimit: { max: 1, window: '1m', store: memoryRates() } } }) as unknown as Parameters<typeof protectionRefusal>[0]
-    const input = { body: {}, form: false, server: null, plain: false } as const
-
-    // One post through the action as the server runs it: the refusal check, the handler, the count after it.
-    async function post(limited: ReturnType<typeof action>, header: string | undefined, handler: () => Promise<unknown>) {
-      const request = new Request('http://localhost/chat', { headers: header === undefined ? {} : { 'x-kai-reply': header } })
-
-      sendFrom(request, '203.0.113.1')
-
-      const refusal = await protectionRefusal(limited, request, input)
-
-      if (refusal !== undefined)
-        return refusal
-
-      await answeringRequest(request, handler)
-      await countSucceeded(limited, request, null)
-
-      return undefined
-    }
-
-    it('does not count a resume or a stop answered from what is kept', async () => {
-      const limited = action()
-      const asking = async () => ask('x', { provider: gated().provider })
-
-      for (const header of [`resume:${id}`, `stop:${id}`, `resume:${id}`])
-        expect(await post(limited, header, asking)).toBeUndefined()
-
-      // None counted, so the first ordinary post is the one the limit allows.
-      expect(await post(limited, undefined, async () => 'ok')).toBeUndefined()
-      expect(await post(limited, undefined, async () => 'ok')).toMatchObject({ status: 429 })
-    })
-
-    it('counts a call that carries the header but did not resume anything, so the header lifts no limit', async () => {
-      const limited = action()
-
-      expect(await post(limited, `resume:${id}`, async () => 'ok')).toBeUndefined()
-      expect(await post(limited, `resume:${id}`, async () => 'ok')).toMatchObject({ status: 429 })
-      expect(await post(limited, undefined, async () => 'ok')).toMatchObject({ status: 429 })
-    })
-
-    it('still refuses a resume once the visitor is over the limit with ordinary posts', async () => {
-      const limited = action()
-
-      expect(await post(limited, undefined, async () => 'ok')).toBeUndefined()
-      expect(await post(limited, `resume:${id}`, async () => ask('x', { provider: gated().provider }))).toMatchObject({ status: 429 })
-    })
   })
 })

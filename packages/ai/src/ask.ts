@@ -1,7 +1,7 @@
 import type { TSchema } from 'kay/library'
 import type { Offered } from './loop'
 import type { AskOptions, Message, Reply, ReplyOf, StructuredAskOptions, Timeouts, ToolAction } from './types'
-import { actionTool, configError, currentRequest, durationSeconds, exemptFromLimits, jsonSchemaOf } from 'kay/library'
+import { actionTool, configError, currentRequest, durationSeconds, jsonSchemaOf } from 'kay/library'
 import { choose } from './config'
 import { recorded } from './dev-log'
 import { AiError } from './errors'
@@ -140,10 +140,6 @@ function replyCall(): ReplyCall | undefined {
 
   if (request === undefined || call === undefined)
     return undefined
-
-  // Answered from what is kept, so the action's own `rateLimit` does not count it.
-  if (call.op !== 'start')
-    exemptFromLimits(request)
 
   const place = asks.get(request) ?? 0
 
