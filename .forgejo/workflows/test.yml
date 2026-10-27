@@ -58,7 +58,7 @@ jobs:
     # A release's version commit, `v1.2.3`, pushed alone, is tested by the publish workflow its tag starts, on the same tree; no other commit title starts with a `v`. Code commits pushed along with it still get the steps only this workflow runs.
     if: needs.latest.outputs.current == 'true' && (github.event_name != 'push' || !startsWith(github.event.head_commit.message, 'v') || github.event.commits[1] != null)
     runs-on: alpine
-    # Well past the slowest run since the libraries run in parallel (12m35s, run 2999; most take about 10 minutes), so a hung run frees the queue behind it.
+    # Past the slowest runs (about 14m45s, runs 3549 and 3556, with the libraries still one at a time), so a hung run frees the queue behind it.
     timeout-minutes: 15
 
     steps:
@@ -154,13 +154,9 @@ jobs:
           jq -r '.files | to_entries | sort_by(-.value) | .[:40][] | "\(.value / 1000 | floor)s \(.key)"' .kay/timings.json
           echo "KAY_TIMINGS $(jq -c . .kay/timings.json)"
 
+      # Three libraries at a time, as one suite alone keeps under two of the six cores busy; each one's output is printed whole once it ends, a failed one's last, and a suite stuck for five minutes is interrupted, naming its files still running.
       - name: Check and test the libraries
-        run: |
-          for dir in packages/*/; do
-            echo "$dir"
-            # Each suite takes about a minute: one stuck for five is interrupted, and names its files still running.
-            (cd "$dir" && bun run check && timeout -s INT -k 30 300 bun run test) || exit 1
-          done
+        run: bun scripts/libraries.ts
         env:
           # kayjs-auth refuses to skip its pg store's tests for want of a database.
           KAYJS_AUTH_REQUIRE_DATABASE: '1'
