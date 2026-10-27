@@ -10,3 +10,8 @@ export async function markdownReady(): Promise<void> {
 export function markdownHtml(markdown: string): SafeHtml {
   return sanitizedMarkdown(Bun.markdown.html(markdown, MARKDOWN_OPTIONS))
 }
+
+// The server writes the formatted markup itself, so nothing it renders is held back; see the island's.
+export function isHeldMarkdown(_html: string): boolean {
+  return false
+}

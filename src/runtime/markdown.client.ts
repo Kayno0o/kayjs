@@ -1,6 +1,6 @@
 import type { SafeHtml } from './checks'
 import { isHydrating, ownSignal } from './reactive'
-import { holdServerMarkup, vouch } from './safe-html'
+import { holdServerMarkup, isHeldMarkup, vouch } from './safe-html'
 
 const ESCAPED = /[&<>"]/g
 const ESCAPES: Record<string, string> = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }
@@ -52,4 +52,9 @@ export async function markdownReady(): Promise<void> {
     void load()
 
   await loading
+}
+
+// Whether `html` is the text as written that `markdownHtml` gave while an island hydrates and the renderer loads, which the island leaves the server's formatted markup under: a component that changes what `markdownHtml` returned before writing it returns this one as it is, or its change is written over that markup.
+export function isHeldMarkdown(html: string): boolean {
+  return isHeldMarkup(html)
 }

@@ -1,11 +1,9 @@
 ---
 import type { Source } from './types'
-import { recipe } from 'kay'
+import { recipe, uid } from 'kay'
+import { opensApart, REL_APART, REL_HERE } from './chat-sources'
 
 const look = recipe({ parts: { root: 'kai-chat-sources', label: 'kai-chat-sources-label', list: 'kai-chat-sources-list', item: 'kai-chat-source', link: 'kai-chat-source-link' } })
-
-// A path of this site or an anchor in the page: `//host` is another site.
-const LOCAL_HREF = /^(?:\/(?![/\\])|#)/
 
 const { sources, label, here } = props<{
   sources: Source[]
@@ -14,11 +12,12 @@ const { sources, label, here } = props<{
   here: boolean
 }>()
 
-const apart = (href: string) => !(here && LOCAL_HREF.test(href))
+const labelId = uid()
 ---
 div(part="root")
-  small(part="label") {label}
-  ol(part="list")
+  small(part="label" id={labelId}) {label}
+  ol(part="list" aria-labelledby={labelId})
     for source of sources key={source.n}
+      const apart = opensApart(source.href, here)
       li(part="item" value={source.n})
-        a(part="link" href={source.href} target={apart(source.href) ? '_blank' : undefined} rel={apart(source.href) ? 'nofollow ugc noopener' : 'nofollow ugc'} data-new-tab={apart(source.href) ? '' : undefined}) {source.title}
+        a(part="link" href={source.href} target={apart ? '_blank' : undefined} rel={apart ? REL_APART : REL_HERE} data-new-tab={apart ? '' : undefined}) {source.title}

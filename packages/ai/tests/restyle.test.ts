@@ -58,6 +58,10 @@ describe('restyling the chat from src/ui.ts', () => {
     'kai-chat-log max-h-96',
     'kai-chat-calls-summary font-bold',
     'kai-chat-call-name tracking-wide',
+    'kai-chat-sources-label uppercase',
+    'kai-chat-sources-list list-decimal',
+    'kai-chat-source py-1',
+    'kai-chat-source-link underline',
     'kai-launcher-panel shadow-2xl',
     'kui-icon-btn kai-launcher-button size-16',
   ])('draws class="%s"', (classes) => {

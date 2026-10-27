@@ -1,6 +1,6 @@
 import { afterEach, expect, test } from 'bun:test'
 import { ai, ask, fakeAi } from '../src'
-import { linkSources, usableSources } from '../src/chat-sources'
+import { linkSources, opensApart, sameSources, usableSources } from '../src/chat-sources'
 
 afterEach(() => {
   ai()
@@ -42,4 +42,21 @@ test('progress carries the sources of the ask beside the text, and none without 
 
   for await (const snapshot of ask('q').progress())
     expect(snapshot).not.toHaveProperty('sources')
+})
+
+test('a citation is one to four digits without a leading zero: [01] and [12345] stay text, even for a source with that number', () => {
+  const many = [{ n: 1, title: 'a', href: '/a' }, { n: 12345, title: 'b', href: '/b' }, { n: 9999, title: 'c', href: '/c' }]
+
+  expect(linkSources('<p>[01] [12345] [0] [9999]</p>', many)).toEqual({ html: '<p>[01] [12345] [0] <a href="/c">[9999]</a></p>', cited: [many[2]!] })
+})
+
+test('a link opens apart unless it is a path or an anchor of this site and the chat keeps them in place', () => {
+  expect([['/moon', true], ['#top', true], ['//evil.example', true], ['/\\evil.example', true], ['https://example.com', true], ['/moon', false]].map(([href, here]) => opensApart(href as string, here as boolean))).toEqual([false, false, true, true, true, true])
+})
+
+test('two lists are the same sources when every number, title and address matches in order', () => {
+  expect(sameSources(sources, [...sources])).toBe(true)
+  expect(sameSources(sources, sources.slice(0, 1))).toBe(false)
+  expect(sameSources(sources, [sources[0]!, { ...sources[1]!, href: '/other' }])).toBe(false)
+  expect(sameSources([], [])).toBe(true)
 })

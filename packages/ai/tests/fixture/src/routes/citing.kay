@@ -1,0 +1,7 @@
+--- server
+import { reply } from './echoing.kay'
+--- script
+import Chat from '@kaynooo/kayjs-ai/chat.kay'
+---
+h1 Citing
+Chat(action={reply} label="Assistant" regenerate editable newButton)

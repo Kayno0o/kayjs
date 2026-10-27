@@ -161,6 +161,7 @@ Every element is a part that keeps its `kai-` class and takes utilities from `sr
 
 - `chat.kay`: `root`, `empty`, `greeting`, `suggestions`, `suggestion`, `log`, `turn`, `text`, `thinking`, `note`, `status`, `disclosure`, `form`, `field`, `send` and `retry` (the Try again button, shown only after a failed reply).
 - `chat-calls.kay` (the tool calls): `root`, `summary`, `list`, `call`, `name`, `status`, `title` and `code`.
+- `chat-sources.kay` (the sources listed under a reply): `root`, `label`, `list`, `item` and `link`.
 - `chat-panel.kay` (the launcher's panel): `root`, `panel`, `head`, `title`, `actions`, `action`, `expand`, `body`, `button` and `glyph`.
 - A table of a reply is built from the reply's markup and keeps `.kai-chat-table`.
 

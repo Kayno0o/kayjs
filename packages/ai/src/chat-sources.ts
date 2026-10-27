@@ -2,11 +2,27 @@ import type { Source } from './types'
 
 const TAG = /<[^>]*>|[^<]+/g
 const CODE_OR_LINK = /^<(\/?)(?:code|pre|a)[\s/>]/i
-const CITATION = /\[(\d{1,4})\]/g
+// A number of one to four digits with no leading zero: `[01]` and `[12345]` stay text.
+const CITATION = /\[([1-9]\d{0,3})\]/g
 const ATTRIBUTE_UNSAFE = /[&"<]/g
 const ENTITIES: Record<string, string> = { '&': '&amp;', '"': '&quot;', '<': '&lt;' }
 // A source leads to a page or a file: no `javascript:` and the like, which a hostile page could have named.
 const SAFE_HREF = /^(?:https?:\/\/|mailto:|\/(?![/\\])|#)[^\s"'<>`\\]*$/i
+
+// A path of this site or an anchor in the page: `//host` and `/\host` are another site.
+const LOCAL_HREF = /^(?:\/(?![/\\])|#)/
+
+// The `rel` of a link that opens in a new tab, and of one that stays in the page.
+export const REL_APART = 'nofollow ugc noopener'
+export const REL_HERE = 'nofollow ugc'
+
+// Whether a link of a reply or of the sources list opens in a new tab: all do, except a link of this site when the chat's `links` is `here`.
+export const opensApart = (href: string, here: boolean) => !(here && LOCAL_HREF.test(href))
+
+// Whether two lists name the same sources, so a stream's next snapshot repeating them leaves the chat's own list alone.
+export function sameSources(a: readonly Source[], b: readonly Source[]): boolean {
+  return a.length === b.length && a.every((source, index) => source.n === b[index]!.n && source.title === b[index]!.title && source.href === b[index]!.href)
+}
 
 export const attribute = (text: string) => text.replace(ATTRIBUTE_UNSAFE, char => ENTITIES[char]!)
 

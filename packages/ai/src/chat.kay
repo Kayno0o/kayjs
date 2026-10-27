@@ -7,12 +7,12 @@ import FileDrop from '@kaynooo/kayjs-ui/file-drop.kay'
 import Icon from '@kaynooo/kayjs-ui/icon.kay'
 import Notice from '@kaynooo/kayjs-ui/notice.kay'
 import Textarea from '@kaynooo/kayjs-ui/textarea.kay'
-import { markdownHtml } from 'kay/markdown'
+import { isHeldMarkdown, markdownHtml } from 'kay/markdown'
 import { wording } from 'kay/words'
 import { approvalMessage, ticketsIn, withoutApproval } from './approval-marker'
 import { MARK, MARKED, withoutMarker } from './marker'
 import { REPLACES_HEADER, REPLY_HEADER } from './resume'
-import { attribute, linkSources, usableSources } from './chat-sources'
+import { attribute, linkSources, opensApart, REL_APART, sameSources, usableSources } from './chat-sources'
 import { filesOf, keepPending, newReplyId, pendingReply, posted, POSTED_CHARACTERS, restored, shrunk, stored } from './chat-history'
 import Calls from './chat-calls.kay'
 import Sources from './chat-sources.kay'
@@ -40,8 +40,6 @@ const PINNED_PX = 48
 const LEAVING_MS = 2000
 // The opening tag `sanitizeHtml` writes for a link, which `linksOpenApart` rewrites: the two change together. The href is captured to tell a link of this site from another.
 const SANITIZED_LINK = /<a href="([^"]*)" rel="nofollow ugc">/g
-// A path of this site, or an anchor in the page: `//host` is another site.
-const LOCAL_HREF = /^(?:\/(?!\/)|#)/
 
 // The images and documents a model reads.
 const ATTACHABLE = 'image/png,image/jpeg,image/gif,image/webp,application/pdf'
@@ -233,8 +231,13 @@ function show(value: string | Progress) {
   calls = value.calls
   announce(value.calls)
 
-  if (value.sources)
-    found = usableSources(value.sources)
+  if (value.sources) {
+    const next = usableSources(value.sources)
+
+    // Every snapshot of a stream repeats the list, which would redraw the reply for nothing.
+    if (!sameSources(next, found()))
+      found = next
+  }
 
   if (value.code)
     code = [...code(), ...value.code]
@@ -242,13 +245,21 @@ function show(value: string | Progress) {
 
 // A link of a reply opens in a new tab, as the conversation lives in this page and a page swap would drop it, unless `links` is `here` and the link leads to this site.
 function linksOpenApart(html: string): string {
-  return html.replaceAll(SANITIZED_LINK, (tag, href: string) => links === 'here' && LOCAL_HREF.test(href) ? tag : tag.replace('rel="nofollow ugc"', 'target="_blank" rel="nofollow ugc noopener" data-new-tab'))
+  return html.replaceAll(SANITIZED_LINK, (tag, href: string) => opensApart(href, links === 'here') ? tag.replace('rel="nofollow ugc"', `target="_blank" rel="${REL_APART}" data-new-tab`) : tag)
 }
 
 // A table is wrapped, once sanitized, in a box that scrolls sideways and takes the keyboard's focus, except in the turn being written, which is hidden from screen readers. Several tables of one reply are numbered, so no two groups share a name.
 // A code block the server highlighted (already sanitized there) takes the place of the plain one, which a marker holds through the sanitizing.
-function markdown(text: string, blocks: CodeBlock[] | undefined, sources: readonly Source[] = [], scrollable = true) {
-  let source = linkSources(markdownHtml(withoutMarker(text)) as string, sources).html
+// The reply is parsed once, for its HTML and for the sources it cites outside code, in the order it first does.
+function render(text: string, blocks: CodeBlock[] | undefined, sources: readonly Source[] = [], scrollable = true) {
+  const parsed = markdownHtml(withoutMarker(text))
+  const linked = linkSources(parsed, sources)
+
+  // Markdown whose renderer is still loading, in an island hydrating, is left as the server drew it: written over, it would flash as plain text. The sources it cites come from that text, as the server's list does but for a citation in code.
+  if (isHeldMarkdown(parsed))
+    return { html: parsed, cited: linked.cited }
+
+  let source = linked.html
 
   // Each block takes the first plain one of its markup left, in the order they were written, so two blocks of one code in two languages each get theirs.
   for (const [index, block] of (blocks ?? []).entries())
@@ -262,20 +273,15 @@ function markdown(text: string, blocks: CodeBlock[] | undefined, sources: readon
   const tables = html.split('<table>').length - 1
 
   if (tables === 0)
-    return trustHtml(html)
+    return { html: trustHtml(html), cited: linked.cited }
 
   let count = 0
 
-  return trustHtml(html.replaceAll('<table>', () => {
+  return { html: trustHtml(html.replaceAll('<table>', () => {
     count++
 
     return `<div class="kai-chat-table"${scrollable ? ` tabindex="0" role="group" aria-label="${attribute(tables === 1 ? tableLabel : `${tableLabel} ${count}`)}"` : ''}><table>`
-  }).replaceAll('</table>', '</table></div>'))
-}
-
-// The sources the text cites outside code, in the order it first does.
-function citedIn(text: string, sources: readonly Source[] | undefined): Source[] {
-  return sources === undefined || sources.length === 0 ? [] : linkSources(markdownHtml(withoutMarker(text)) as string, sources).cited
+  }).replaceAll('</table>', '</table></div>')), cited: linked.cited }
 }
 
 const sameFile = (a: File, b: File) => a.name === b.name && a.size === b.size && a.lastModified === b.lastModified
@@ -902,9 +908,10 @@ section(part="root" onKeyDown={escape} data-empty={history().length === 0 && !bu
               button(part="allow" type="button" data-variant="solid" data-size="sm" onClick={() => decide(call, true)}) {allowLabel}
               button(part="deny" type="button" data-variant="ghost" data-size="sm" onClick={() => decide(call, false)}) {denyLabel}
           if turn.content !== ''
-            div(part="text" innerHTML={markdown(turn.content, turn.code, turn.sources)})
-            if citedIn(turn.content, turn.sources).length > 0
-              Sources(sources={citedIn(turn.content, turn.sources)} label={sourcesLabel} here={links === 'here'})
+            const view = render(turn.content, turn.code, turn.sources)
+            div(part="text" innerHTML={view.html})
+            if view.cited.length > 0
+              Sources(sources={view.cited} label={sourcesLabel} here={links === 'here'})
           if turn.stopped
             small(part="note") {stoppedLabel}
           if canRegenerate(turn)
@@ -921,9 +928,10 @@ section(part="root" onKeyDown={escape} data-empty={history().length === 0 && !bu
         if calls().length > 0
           Calls(calls={calls()} labels={toolLabels} details={toolDetails} runningLabel={runningLabel} doneLabel={doneLabel} failedLabel={failedLabel} argumentsLabel={argumentsLabel} resultLabel={resultLabel} approvalLabel={approvalLabel})
         if partial() !== ''
-          div(part="text" innerHTML={markdown(partial(), code(), found(), false)})
-          if citedIn(partial(), found()).length > 0
-            Sources(sources={citedIn(partial(), found())} label={sourcesLabel} here={links === 'here'})
+          const view = render(partial(), code(), found(), false)
+          div(part="text" innerHTML={view.html})
+          if view.cited.length > 0
+            Sources(sources={view.cited} label={sourcesLabel} here={links === 'here'})
         else if calls().length === 0
           p(part="thinking") {thinkingLabel}
   div(part="status" role="status" aria-atomic="false")

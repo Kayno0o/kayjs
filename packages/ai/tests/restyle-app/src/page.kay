@@ -3,6 +3,7 @@ import type { Action, Failure } from 'kay'
 import type { Message, Progress } from '@kaynooo/kayjs-ai'
 import Chat from '@kaynooo/kayjs-ai/chat.kay'
 import Calls from '@kaynooo/kayjs-ai/chat-calls.kay'
+import Sources from '@kaynooo/kayjs-ai/chat-sources.kay'
 import Launcher from '@kaynooo/kayjs-ai/chat-launcher.kay'
 import Panel from '@kaynooo/kayjs-ai/chat-panel.kay'
 
@@ -20,5 +21,6 @@ Chat(action={reply} label="Own icons")
     b.own-stop own
 Launcher(action={reply} variant="plain" tone="neutral" size="lg" class="mb-2")
 Calls(calls={calls} labels={{}} details={true} runningLabel="Running" doneLabel="Done" failedLabel="Failed" argumentsLabel="Arguments" resultLabel="Result")
+Sources(sources={[{ n: 1, title: 'Tides', href: '/tides' }]} label="Sources" here={true})
 Panel(label="Ask" icon={() => undefined} closeIcon={() => undefined} newIcon={() => undefined} expandIcon={() => undefined} collapseIcon={() => undefined})
   p body

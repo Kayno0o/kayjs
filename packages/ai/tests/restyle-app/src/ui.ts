@@ -7,5 +7,6 @@ export default defineUi({
     variants: { tone: { neutral: { root: 'opacity-90' } } },
   },
   '@kaynooo/kayjs-ai/chat-calls.kay': { parts: { summary: 'font-bold', name: 'tracking-wide' } },
+  '@kaynooo/kayjs-ai/chat-sources.kay': { parts: { label: 'uppercase', list: 'list-decimal', item: 'py-1', link: 'underline' } },
   '@kaynooo/kayjs-ai/chat-panel.kay': { parts: { panel: 'shadow-2xl', button: 'size-16' } },
 })

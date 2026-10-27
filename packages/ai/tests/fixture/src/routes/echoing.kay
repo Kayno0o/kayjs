@@ -1,0 +1,16 @@
+--- server
+import type { Progress } from '@kaynooo/kayjs-ai'
+import { s } from 'kay'
+
+const sources = [{ n: 1, title: 'Tides', href: 'https://example.com/tides' }, { n: 2, title: 'Moon', href: '/moon' }]
+
+// Answers with the visitor's message as Markdown and the two sources above, or with no source when it starts with `none:`, so a test writes the reply it wants cited.
+async function* echo(text: string): AsyncGenerator<Progress> {
+  const bare = text.startsWith('none:')
+
+  yield { text: bare ? text.slice(5) : text, calls: [], ...!bare && { sources } }
+}
+
+export const reply = action(s.Object({ messages: s.Array(s.Object({ role: s.UnionEnum(['user', 'assistant']), content: s.String({ maxLength: 4000 }) }), { minItems: 1, maxItems: 50 }) }), ({ messages }) => echo(messages.at(-1)!.content))
+---
+p Echoing

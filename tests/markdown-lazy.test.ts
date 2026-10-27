@@ -82,6 +82,27 @@ describe('markdownHtml in an island', () => {
     expect(element.innerHTML).toBe('<p># a</p>\n')
   })
 
+  it('tells the stand-in of a hydrating island from the formatted markup and from any other text', async () => {
+    const { markdownHtml, isHeldMarkdown } = await shell('held')
+    const container = document.createElement('div')
+
+    container.innerHTML = '<div><h1>Title</h1></div>'
+
+    const held: boolean[] = []
+
+    root(() => hydrate(() => {
+      const html = markdownHtml('# Title')
+
+      held.push(isHeldMarkdown(html), isHeldMarkdown(html.replace('#', '$')))
+    }, container))
+    flush()
+    expect(held).toEqual([true, false])
+    expect(isHeldMarkdown(markdownHtml('# Title'))).toBe(false)
+
+    await settled(() => markdownHtml('# Title').startsWith('<h1'))
+    expect(isHeldMarkdown(markdownHtml('# Title'))).toBe(false)
+  })
+
   it('keeps the server\'s markup of every markdown of an island', async () => {
     const { markdownHtml } = await shell('two')
     const container = document.createElement('div')
