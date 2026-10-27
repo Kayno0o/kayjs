@@ -11,7 +11,7 @@ import { extraBody } from './extra'
 import { isFunctionTool, plainTool } from './function-tool'
 import { keep, keptFor, markEnded, stopKept } from './kept'
 import { guarded, visitorOf } from './limits'
-import { converse } from './loop'
+import { converse, single } from './loop'
 import { outputSchema } from './output-schema'
 import { createReply } from './reply'
 import { replacesOf, replyCallOf } from './resume'
@@ -309,7 +309,7 @@ function reply(prompt: string | Message[], options: AskOptions, answer: TSchema 
     return createReply(() => tooLong(messageChars, maxInputChars), signals, undefined, outlive, ended, { sources: options.sources })
 
   if (options.tools === undefined || options.tools.length === 0)
-    return createReply(signal => recorded(guarded(() => via(signal, request => provider.stream(request, signal)), asker, signal), about, signal), signals, undefined, outlive, ended, { sources: options.sources })
+    return createReply(signal => recorded(guarded(() => via(signal, request => single(provider.stream(request, signal))), asker, signal), about, signal), signals, undefined, outlive, ended, { sources: options.sources })
 
   const maxSteps = options.maxSteps ?? DEFAULT_MAX_STEPS
 

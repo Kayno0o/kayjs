@@ -113,10 +113,10 @@ export interface Timeouts {
 // A reply that still wanted tools when `maxSteps` ran out ends as `steps`.
 export type Finish = 'stop' | 'length' | 'filtered' | 'steps'
 
-// `toolUse` is a provider's finished tool call, which the loop answers and the reply never shows; `tool` is a call as the reply shows it, sent again as its status changes.
+// `toolUse` is a provider's finished tool call, which the loop answers and the reply never shows; `tool` is a call as the reply shows it, sent again as its status changes; `step` is a request to the model that ended, which `reply.steps` lists.
 // `restart` drops the text so far: the tool loop sends it for a `schema` reply when a step that wrote some went on to call tools, as only the text of the last step is the object.
 // `reasoning` is a part of the model's thinking as it streams, never mixed into `text`; `thinking` is a finished block of it, which the loop sends back with the calls and the reply never shows.
-export type Piece = { text: string } | { reasoning: string } | { thinking: Thinking } | { usage: Partial<Usage> } | { finish: Finish } | { toolUse: ToolUse } | { tool: ToolCall } | { restart: true }
+export type Piece = { text: string } | { reasoning: string } | { thinking: Thinking } | { usage: Partial<Usage> } | { finish: Finish } | { toolUse: ToolUse } | { tool: ToolCall } | { step: Step } | { restart: true }
 
 export interface Provider {
   readonly name: string
@@ -231,6 +231,22 @@ export interface ToolCall {
   approval?: string | undefined
   // What the model was told of the outcome, the action's answer or why the call failed; absent while running.
   result?: string | undefined
+  // How long the action ran, in milliseconds; absent while running.
+  ms?: number | undefined
+}
+
+// One request to the model, as `await reply.steps` lists them: a reply without tools makes one, a tool loop one per round.
+export interface Step {
+  // How long the request took, from sent to the end of the model's answer, the tools it called not counted.
+  ms: number
+  // The wait until the first piece of text, reasoning or tool call came; undefined when the model said nothing.
+  firstTokenMs: number | undefined
+  // The tokens of this request, undefined when the provider gave none.
+  usage: Usage | undefined
+  // Why the model stopped, undefined when the provider said nothing.
+  finish: Finish | undefined
+  // The tool calls the model made in this request, run, with their `ms`.
+  calls: ToolCall[]
 }
 
 // The reply so far, for a chat to show: the text of all steps and every call, each as last seen, and the code blocks that were finished since the previous snapshot.
@@ -273,6 +289,8 @@ export interface Reply extends PromiseLike<string>, AsyncIterable<string> {
   progress: () => AsyncIterable<Progress>
   // The tool calls once the reply ended, in the order they were made; never rejects, and reading it starts the reply.
   readonly calls: Promise<ToolCall[]>
+  // One entry per request made to the model, in order, with how long it took, how long until it first spoke, its tokens, why it stopped and the tool calls it made (each with its `ms`): a tool loop makes one per round. The requests that ended when the reply failed or was stopped; never rejects, and reading it starts the reply.
+  readonly steps: Promise<Step[]>
   // True for the reply a Chat's resume or stop call gets, which is the kept reply of an `outlive` ask or an empty one, so an action reading the reply on the server does it on the start alone: `if (!answer.resumed) void speak(answer)`.
   readonly resumed: boolean
   // Aborts the provider request; what was received stays the text of `await`.
@@ -298,6 +316,8 @@ export interface StructuredReply<Value, Snapshot = DeepPartial<Value>> extends P
   readonly usage: Promise<Usage | undefined>
   readonly finish: Promise<Finish | undefined>
   readonly calls: Promise<ToolCall[]>
+  // The requests made to the model, as on `Reply`.
+  readonly steps: Promise<Step[]>
   // True for the reply a Chat's resume or stop call gets, as on `Reply`.
   readonly resumed: boolean
   stop: () => void

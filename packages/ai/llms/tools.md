@@ -34,6 +34,8 @@ ask(messages, { tools: [findSlot, bookSlot], confirm: ({ name }) => name === 'fi
 
 ### Showing the calls
 
+A finished call has `ms`, how long its action ran, and `await reply.steps` tells how long each request to the model took beside them ([asking](asking.md)).
+
 `reply.progress()` streams the text and the calls of the reply:
 
 ```ts

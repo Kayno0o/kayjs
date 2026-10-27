@@ -385,7 +385,9 @@ The same goes for the model's thinking: when the action returns `reply.progress(
 
 Code in an answer is coloured the way the rest of your Markdown is. Once a code block is finished, the server highlights it with the `markdown.highlight` function from your `kay.config.ts`, the one your content pages use, and the chat swaps the plain block for the coloured one. The browser loads no highlighter. A block still being written stays plain, and so does code when your app has no highlighter. This works when the action returns `.progress()`.
 
-You can also read `reply.progress()` yourself. It gives the text so far and every tool call, again with each change, plus the code blocks that were highlighted since the last snapshot. Each call is `{ id, name, input, status, result }`, its status `running`, then `done` or `failed`. `await reply.calls` gives the final list.
+You can also read `reply.progress()` yourself. It gives the text so far and every tool call, again with each change, plus the code blocks that were highlighted since the last snapshot. Each call is `{ id, name, input, status, result }`, its status `running`, then `done` or `failed`. `await reply.calls` gives the final list, each finished call with its `ms`, how long the action ran.
+
+To see where a slow answer spends its time, read `await reply.steps`. It has one entry per request made to the model, one for each round of a tool loop: `{ ms, firstTokenMs, usage, finish, calls }`. `ms` is how long the model took to answer and `firstTokenMs` how long until it first spoke. The tools it called are not counted in `ms`, they have their own on `calls`. A failed reply lists the requests that ended before it.
 
 <ReadMore href="/llms/kayjs-ai-tools">What the model is told for each kind of failure, the limits, and how to test it.</ReadMore>
 

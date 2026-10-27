@@ -171,6 +171,9 @@ export function keptFor(key: string, owner: Promise<string | undefined>, empty: 
     get calls() {
       return (async () => (await target).reply.calls)()
     },
+    get steps() {
+      return (async () => (await target).reply.steps)()
+    },
     get usage() {
       return (async () => (await target).reply.usage)()
     },

@@ -1,5 +1,5 @@
 import type { LibraryTool } from 'kay/library'
-import type { Confirm, Piece, Provider, ProviderMessage, ProviderRequest, Thinking, ToolCall, ToolOutcome, ToolUse, Usage } from './types'
+import type { Confirm, Finish, Piece, Provider, ProviderMessage, ProviderRequest, Step, Thinking, ToolCall, ToolOutcome, ToolUse, Usage } from './types'
 import { logFrom } from 'kay'
 import { spend, ticketAllows, ticketFor } from './approval'
 import { ticketsIn } from './approval-marker'
@@ -150,6 +150,40 @@ async function run(tools: Map<string, Offered>, use: ToolUse, input: Record<stri
   }
 }
 
+function stepOf(began: number, ended: number, first: number | undefined, used: Partial<Usage>, finish: Finish | undefined, calls: ToolCall[]): Step {
+  const { inputTokens, outputTokens } = used
+
+  return {
+    ms: Math.round(ended - began),
+    firstTokenMs: first === undefined ? undefined : Math.round(first - began),
+    usage: inputTokens === undefined || outputTokens === undefined ? undefined : { ...used, inputTokens, outputTokens },
+    finish,
+    calls,
+  }
+}
+
+// Passes the pieces of one request through and ends them with the `step` it made, for a reply that asks the model once.
+export async function* single(pieces: AsyncIterable<Piece>): AsyncGenerator<Piece> {
+  const began = performance.now()
+  const used: Partial<Usage> = {}
+  let first: number | undefined
+  let finish: Finish | undefined
+
+  for await (const piece of pieces) {
+    if (first === undefined && ('text' in piece || 'reasoning' in piece || 'toolUse' in piece))
+      first = performance.now()
+
+    if ('usage' in piece)
+      Object.assign(used, piece.usage)
+    else if ('finish' in piece)
+      finish = piece.finish
+
+    yield piece
+  }
+
+  yield { step: stepOf(began, performance.now(), first, used, finish, []) }
+}
+
 const USAGE_FIELDS = ['inputTokens', 'outputTokens', 'cacheReadTokens', 'cacheWriteTokens'] as const
 
 // Asks the provider, answers the tools the model calls as the visitor, and asks again with their results until the model answers in text or `maxSteps` requests were made.
@@ -188,8 +222,13 @@ export async function* converse(provider: Provider, base: ProviderRequest, offer
     const used: Partial<Usage> = {}
     let text = ''
     let finish: Piece | undefined
+    const began = performance.now()
+    let first: number | undefined
 
     for await (const piece of provider.stream({ ...base, messages, tools: specs }, signal)) {
+      if (first === undefined && ('text' in piece || 'reasoning' in piece || 'toolUse' in piece))
+        first = performance.now()
+
       if ('text' in piece) {
         yield { text: !spoke || text !== '' ? piece.text : `\n\n${piece.text}` }
 
@@ -222,6 +261,8 @@ export async function* converse(provider: Provider, base: ProviderRequest, offer
       }
     }
 
+    const requested = performance.now()
+
     // A provider that reports no counts is estimated for each step, as every step sends the whole conversation again.
     if (used.inputTokens === undefined && used.outputTokens === undefined) {
       const received = text.length + uses.reduce((sum, use) => sum + use.name.length + use.arguments.length, 0)
@@ -229,6 +270,8 @@ export async function* converse(provider: Provider, base: ProviderRequest, offer
       used.inputTokens = Math.ceil(charsSent(messages, base.system) / CHARS_PER_TOKEN)
       used.outputTokens = Math.ceil(received / CHARS_PER_TOKEN)
     }
+
+    const stepped = (calls: ToolCall[]): Step => stepOf(began, requested, first, used, finish !== undefined && 'finish' in finish ? finish.finish : undefined, calls)
 
     for (const field of USAGE_FIELDS) {
       if (used[field] !== undefined)
@@ -244,6 +287,8 @@ export async function* converse(provider: Provider, base: ProviderRequest, offer
     const cut = finish !== undefined && 'finish' in finish && (finish.finish === 'length' || finish.finish === 'filtered')
 
     if (uses.length === 0 || cut) {
+      yield { step: stepped([]) }
+
       if (finish)
         yield finish
 
@@ -258,6 +303,7 @@ export async function* converse(provider: Provider, base: ProviderRequest, offer
     }
 
     if (step === maxSteps) {
+      yield { step: stepped([]) }
       yield { finish: 'steps' }
 
       return
@@ -265,6 +311,7 @@ export async function* converse(provider: Provider, base: ProviderRequest, offer
 
     const results: ToolOutcome[] = []
     const sent = new Map<string, Record<string, unknown>>()
+    const made: ToolCall[] = []
 
     for (const [index, use] of uses.entries()) {
       const label = tools.get(use.name)?.label
@@ -279,6 +326,7 @@ export async function* converse(provider: Provider, base: ProviderRequest, offer
       yield { tool: call }
 
       let ran: Ran
+      const ranFrom = performance.now()
 
       if (index >= MAX_CALLS_PER_STEP)
         ran = failed('Too many tool calls in one step')
@@ -293,8 +341,14 @@ export async function* converse(provider: Provider, base: ProviderRequest, offer
 
       results.push({ id: use.id, content: ran.result, ok: ran.status !== 'failed' })
 
-      yield { tool: { ...call, ...ran } }
+      const done: ToolCall = { ...call, ...ran, ms: Math.round(performance.now() - ranFrom) }
+
+      made.push(done)
+
+      yield { tool: done }
     }
+
+    yield { step: stepped(made) }
 
     // What goes back is the arguments as an object, so a provider that parses them never meets the text a model garbled.
     messages.push({ role: 'assistant', content: text, ...thinking.length > 0 && { thinking }, calls: uses.map(use => ({ ...use, arguments: JSON.stringify(sent.get(use.id) ?? {}) })) }, { role: 'user', content: '', results })

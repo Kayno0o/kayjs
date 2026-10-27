@@ -111,6 +111,9 @@ export function structured<Value>(base: Reply, schema: TSchema): StructuredReply
     get calls() {
       return base.calls
     },
+    get steps() {
+      return base.steps
+    },
     resumed: base.resumed,
     stop: base.stop,
   }

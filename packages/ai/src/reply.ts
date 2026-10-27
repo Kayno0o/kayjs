@@ -1,4 +1,4 @@
-import type { CodeBlock, DeltasOptions, Finish, Piece, Progress, Reply, Source, ToolCall, Usage } from './types'
+import type { CodeBlock, DeltasOptions, Finish, Piece, Progress, Reply, Source, Step, ToolCall, Usage } from './types'
 import { logFrom } from 'kay'
 import { AiError } from './errors'
 import { highlighting } from './highlight'
@@ -21,6 +21,7 @@ export function createReply(open: (signal: AbortSignal) => AsyncIterable<Piece>,
   const ending = Promise.withResolvers<Finish | undefined>()
   const total: Partial<Usage> = {}
   const calls: ToolCall[] = []
+  const steps: Step[] = []
   // Counts each change to the text, to a call or to the reasoning, which `progress()` reads from.
   let version = 0
   // Counts each change to the text alone, which is what its code blocks are scanned for.
@@ -75,6 +76,9 @@ export function createReply(open: (signal: AbortSignal) => AsyncIterable<Piece>,
         }
         else if ('finish' in piece) {
           reason = piece.finish
+        }
+        else if ('step' in piece) {
+          steps.push(piece.step)
         }
 
         notify()
@@ -307,6 +311,15 @@ export function createReply(open: (signal: AbortSignal) => AsyncIterable<Piece>,
         await ending.promise
 
         return calls.map(snapshot)
+      })()
+    },
+    get steps() {
+      start()
+
+      return (async () => {
+        await ending.promise
+
+        return steps.map(step => ({ ...step, calls: step.calls.map(snapshot) }))
       })()
     },
     get usage() {

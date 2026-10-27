@@ -45,7 +45,7 @@ describe('actions as tools', () => {
     expect(fakeAi.asked[0]!.tools!.map(tool => tool.name)).toContain('add_note')
     expect(fakeAi.asked[0]!.tools!.find(tool => tool.name === 'add_note')).toMatchObject({ description: 'Add note', inputSchema: { type: 'object', required: ['title'] } })
     expect(done).toEqual(['addNote:Milk'])
-    expect(outcome.calls).toEqual([{ id: 'fake_1', name: 'add_note', input: { title: 'Milk' }, status: 'done', result: expect.stringContaining('Milk') }])
+    expect(outcome.calls).toEqual([{ id: 'fake_1', name: 'add_note', input: { title: 'Milk' }, status: 'done', ms: expect.any(Number), result: expect.stringContaining('Milk') }])
     expect(outcome.text).toStartWith('Adding. \n\nAdded: ')
     expect(outcome.finish).toBe('stop')
   })
@@ -56,7 +56,7 @@ describe('actions as tools', () => {
 
     const outcome = await conversation('go', { offer: ['homeState', 'addNote'] })
 
-    expect(outcome.calls).toEqual([{ id: 'fake_1', name: 'home_state', label: 'Read the home', input: {}, status: 'done', result: 'lit' }, { id: 'fake_2', name: 'add_note', input: { title: 'Milk' }, status: 'done', result: expect.stringContaining('Milk') }])
+    expect(outcome.calls).toEqual([{ id: 'fake_1', name: 'home_state', label: 'Read the home', input: {}, status: 'done', ms: expect.any(Number), result: 'lit' }, { id: 'fake_2', name: 'add_note', input: { title: 'Milk' }, status: 'done', ms: expect.any(Number), result: expect.stringContaining('Milk') }])
     expect(fakeAi.asked[0]!.tools).toEqual([expect.not.objectContaining({ label: expect.anything() }), expect.not.objectContaining({ label: expect.anything() })])
   })
 
