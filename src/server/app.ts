@@ -366,7 +366,7 @@ export async function pagesApp(project: Project<PagesOptions>, loadClient: () =>
 
   // Before anything is built, so a production server without the key it asks for stops at once; a static export serves no endpoint.
   const keySetting = exported ? undefined : mcpKeySetting(options.mcp)
-  const mcpKey = keySetting === undefined ? undefined : { value: resolveMcpKey(keySetting, { root, production: !mode.dev && process.env.NODE_ENV === 'production' }) }
+  const mcpKey = keySetting === undefined ? undefined : resolveMcpKey(keySetting, { root, production: !mode.dev && process.env.NODE_ENV === 'production' }) ?? false
 
   const publicModules = options.publicEnv ? await loadPublicModules(root) : []
   const setup = await setupPages(project, loadClient, false, location => spell(location), scanned => refuseScanned(project, scanned), exported)

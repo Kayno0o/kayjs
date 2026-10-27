@@ -95,7 +95,7 @@ function isCode(error: unknown, code: string): boolean {
 // The key in `path`, made on first use; one another process wrote first wins.
 function readOrMake(path: string): string {
   try {
-    return readFileSync(path, 'utf8').trim()
+    return readWhole(path)
   }
   catch (error) {
     if (!isCode(error, 'ENOENT'))
@@ -104,12 +104,23 @@ function readOrMake(path: string): string {
 
   mkdirSync(dirname(path), { recursive: true, mode: 0o700 })
 
+  const key = Buffer.from(crypto.getRandomValues(new Uint8Array(32))).toString('base64url')
   // Written whole under another name and linked in, so a process reading meanwhile never meets an empty file, nor does a crash leave one.
   const pending = `${path}.${process.pid}.${crypto.randomUUID()}`
 
   try {
-    writeFileSync(pending, Buffer.from(crypto.getRandomValues(new Uint8Array(32))).toString('base64url'), { mode: 0o600, flag: 'wx' })
-    linkSync(pending, path)
+    writeFileSync(pending, key, { mode: 0o600, flag: 'wx' })
+
+    try {
+      linkSync(pending, path)
+    }
+    catch (error) {
+      // A filesystem without hard links refuses with something else than EEXIST: the file is then created exclusively in place, which a reader may meet empty for an instant, so `readWhole` waits for the key.
+      if (isCode(error, 'EEXIST'))
+        throw error
+
+      writeFileSync(path, key, { mode: 0o600, flag: 'wx' })
+    }
   }
   catch (error) {
     if (!isCode(error, 'EEXIST'))
@@ -119,7 +130,21 @@ function readOrMake(path: string): string {
     rmSync(pending, { force: true })
   }
 
-  return readFileSync(path, 'utf8').trim()
+  return readWhole(path)
+}
+
+// Reads the key file, waiting up to a second for a file another process is still writing.
+function readWhole(path: string): string {
+  for (let tries = 0; tries < 50; tries++) {
+    const text = readFileSync(path, 'utf8').trim()
+
+    if (text !== '')
+      return text
+
+    Bun.sleepSync(20)
+  }
+
+  return ''
 }
 
 const digest = (text: string): Buffer => new Bun.CryptoHasher('sha256').update(text).digest()

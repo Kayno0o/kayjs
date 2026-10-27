@@ -1,8 +1,9 @@
+import * as fs from 'node:fs'
 import { existsSync, statSync } from 'node:fs'
 import { chmod, readdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import process from 'node:process'
-import { afterAll, describe, expect, it } from 'bun:test'
+import { afterAll, describe, expect, it, spyOn } from 'bun:test'
 import { dropStore, NOT_FOUND_FILE } from '../src/server/not-found'
 import { testSite } from '../src/test'
 import { scratchDir } from './scratch'
@@ -238,6 +239,28 @@ describe('where the key comes from', () => {
 
     expect((await post(second, message('ping'), bearer(made))).status).toBe(200)
     expect((await readFile(file, 'utf8')).trim()).toBe(made)
+  })
+
+  it('makes the key in place on a filesystem without hard links, leaving no other file', async () => {
+    const dir = await scratchDir('mcp-key-')
+    const file = join(dir, 'mcp-key')
+    const refusing = spyOn(fs, 'linkSync').mockImplementation(() => {
+      throw Object.assign(new Error('operation not permitted'), { code: 'EPERM' })
+    })
+
+    try {
+      const app = await served({}, { mcp: { key: { file } } })
+      const made = (await readFile(file, 'utf8')).trim()
+
+      expect(refusing).toHaveBeenCalled()
+      expect(made.length).toBeGreaterThanOrEqual(32)
+      expect(statSync(file).mode & 0o777).toBe(0o600)
+      expect((await post(app, message('ping'), bearer(made))).status).toBe(200)
+      expect((await readdir(dir)).sort()).toEqual(['mcp-key'])
+    }
+    finally {
+      refusing.mockRestore()
+    }
   })
 
   it('lets the environment win over { file }, and makes no file then', async () => {

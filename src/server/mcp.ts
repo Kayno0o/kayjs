@@ -310,8 +310,8 @@ export interface McpOptions {
   path: string
   // The requests a client may send it a minute, or undefined for no limit.
   perMinute: number | undefined
-  // Set with `mcp.key`: the bearer token every request must carry, or undefined while no key was given, which refuses them all.
-  key?: { value: string | undefined } | undefined
+  // Set with `mcp.key`: the bearer token every request must carry, or `false` while no key was given, which refuses them all; undefined leaves the endpoint open.
+  key?: string | false | undefined
 }
 
 // A tool call the endpoint dispatched: which tool it calls, the address of the client that asked for it and the URL of the MCP request it came in, which a token bound to the endpoint is checked against.
@@ -481,7 +481,7 @@ export function serveMcp(app: Elysia, document: Schema, options: McpOptions): vo
       return new Response('Too many requests', { status: 429, headers: { 'retry-after': String(wait) } })
 
     // Before the body is read or any message answered, so a client without the key learns nothing of the tools.
-    if (options.key !== undefined && (options.key.value === undefined || !bearsMcpKey(request, options.key.value)))
+    if (options.key !== undefined && (options.key === false || !bearsMcpKey(request, options.key)))
       return new Response(JSON.stringify({ jsonrpc: '2.0', id: null, error: { code: REFUSED, message: 'Send the MCP key as a bearer token' } }), { status: 401, headers: { ...ANSWER, 'www-authenticate': 'Bearer realm="mcp"' } })
 
     const text = await request.text()

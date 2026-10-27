@@ -294,6 +294,42 @@ describe('kay build --format json', () => {
       }
     })
 
+    it('stands in a throwaway KAY_MCP_KEY the build lacks, and keeps the one it has or a key file', async () => {
+      const reporting = await executable('#!/usr/bin/env bun\nimport { writeFileSync } from \'node:fs\'\nif (process.argv[2] === \'--health\') process.exit(0)\nwriteFileSync(import.meta.path + \'.key\', String(process.env.KAY_MCP_KEY))\nBun.serve({ hostname: \'127.0.0.1\', port: Number(process.env.PORT), fetch: () => new Response(\'ok\') })\n')
+      const names = ['KAY_MCP_KEY', 'KAY_MCP_KEY_FILE']
+      const before = names.map(name => process.env[name])
+      const reported = async () => Bun.file(`${reporting.file}.key`).text()
+
+      try {
+        for (const name of names)
+          delete process.env[name]
+
+        await verifyExecutable(reporting.file, reporting.root, false)
+
+        // Long enough and visible ASCII, as `mcp.key` demands of any key.
+        expect(await reported()).toMatch(/^[\x21-\x7E]{16,}$/)
+
+        process.env.KAY_MCP_KEY = 'the-build-key-0123456789'
+        await verifyExecutable(reporting.file, reporting.root, false)
+        expect(await reported()).toBe('the-build-key-0123456789')
+
+        delete process.env.KAY_MCP_KEY
+        process.env.KAY_MCP_KEY_FILE = join(reporting.root, 'mcp-key')
+        await verifyExecutable(reporting.file, reporting.root, false)
+        expect(await reported()).toBe('undefined')
+      }
+      finally {
+        for (const [index, name] of names.entries()) {
+          const kept = before[index]
+
+          if (kept === undefined)
+            delete process.env[name]
+          else
+            process.env[name] = kept
+        }
+      }
+    }, 30_000)
+
     it('takes any answer when the health route is off, and fails on a refusal when it is not', async () => {
       const refusing = await executable(serving(404))
 
