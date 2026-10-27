@@ -2,6 +2,7 @@ import type { Persisted, Stored } from './persist'
 import { navigation, pageKey } from './navigation'
 import { pageData } from './page-data'
 import { keep } from './persist'
+import { addressChanged } from './with-query'
 
 // What the server sends of one param of the page's `query` schema, enough to read its text as the schema does without the schema itself.
 export interface ParamRule {
@@ -160,6 +161,7 @@ function flush(): void {
 
   try {
     history.replaceState(history.state, '', url)
+    addressChanged()
     pending.clear()
     retrying = false
   }

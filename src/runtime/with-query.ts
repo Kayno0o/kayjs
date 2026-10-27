@@ -1,10 +1,15 @@
 import type { QueryChanges } from './navigate-api'
 import { withoutBase } from './base'
+import { mergeQuery } from './navigate-api'
+import { ownDep } from './reactive'
 
 // Defined by the browser build, which never renders on the server: tested where it is read, so the bundler drops the server's code.
 declare const KAY_BROWSER: true | undefined
 
 const LEADING_SLASHES = /^[/\\]+/
+
+// Read by a link built in the browser, written when the address changes under it.
+let address: ReturnType<typeof ownDep> | undefined
 
 let serverUrl: (() => URL | undefined) | undefined
 
@@ -13,18 +18,14 @@ export function setCurrentUrl(read: () => URL | undefined): void {
   serverUrl = read
 }
 
-// Sets each param of `changes` on `params`, a null, undefined or empty one dropped and the others kept: the rule of `navigate({ query })` and of `withQuery`.
-export function mergeQuery(params: URLSearchParams, changes: QueryChanges): void {
-  for (const [name, value] of Object.entries(changes)) {
-    if (value == null || value === '')
-      params.delete(name)
-    else
-      params.set(name, String(value))
-  }
+// Tells the links built by `withQuery` in the browser that the address changed, a swap or a query written in place.
+export function addressChanged(): void {
+  address?.write()
 }
 
 // The path of the current page with `changes` merged into its query, to link to it with one filter or sort changed: `a(href={withQuery({ page: 2, filter: null })})`.
 // A null, undefined or empty value drops the param, the others keep their place and the hash is left out; the path is the site's own, under the mount point and in the locale of the page as any link of it is.
+// In an island it follows the address: the link is built again after each `navigate({ query })`, swap and traversal.
 // A page rendered once at build time has no request to read the query of, so it throws there.
 export function withQuery(changes: QueryChanges): string {
   const params = new URLSearchParams()
@@ -42,6 +43,7 @@ export function withQuery(changes: QueryChanges): string {
       params.append(name, value)
   }
   else {
+    (address ??= ownDep(() => undefined)).read()
     path = withoutBase(location.pathname)
 
     for (const [name, value] of new URLSearchParams(location.search))

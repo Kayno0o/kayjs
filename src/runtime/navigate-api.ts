@@ -2,7 +2,6 @@ import type { CheckedHref } from './checks'
 import { withBase } from './base'
 import { follow } from './navigate'
 import { leave, loadAgain, mayLeave, navigation, prefetched, swappable } from './navigation'
-import { mergeQuery } from './with-query'
 
 // Defined by the browser build, which never renders on the server: tested where it is read, so the bundler drops the server's code.
 declare const KAY_BROWSER: true | undefined
@@ -18,6 +17,16 @@ export interface NavigateOptions {
 
 // Query params to set on the current page, a null, undefined or empty one dropped.
 export type QueryChanges = Readonly<Record<string, string | number | null | undefined>>
+
+// Sets each param of `changes` on `params`, a null, undefined or empty one dropped and the others kept: the rule of `navigate({ query })` and of `withQuery`.
+export function mergeQuery(params: URLSearchParams, changes: QueryChanges): void {
+  for (const [name, value] of Object.entries(changes)) {
+    if (value == null || value === '')
+      params.delete(name)
+    else
+      params.set(name, String(value))
+  }
+}
 
 // The current page with `query` merged into its own, keeping the scroll and the focus as `refresh()` does: a filter or a sort picked in place.
 // Both forms resolve to `false` when a leave guard was declined, so the page stayed, and `true` otherwise.

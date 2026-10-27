@@ -1715,6 +1715,30 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('page swap i
     expect(problem()).toEqual([])
   })
 
+  it('keeps the links an island built with withQuery on the address after navigate({ query }), a swap and Back', async () => {
+    const problem = problems(page)
+    const hrefs = async () => page.evaluate(() => [...document.querySelectorAll('a.next, a.clear')].map(link => link.getAttribute('href')))
+
+    await page.goto('/query?color=red')
+    await page.evaluate(() => {
+      (window as { kayAlive?: boolean }).kayAlive = true
+    })
+
+    expect(await hrefs()).toEqual(['/query?color=red&page=2', '/query?color=red'])
+
+    await page.click('button.sorted')
+    await page.waitFor('p.sorted', { text: 'Sorted name' })
+
+    expect(await sameDocument()).toBe(true)
+    expect(await hrefs()).toEqual(['/query?color=red&sort=name&page=2', '/query?color=red'])
+
+    await page.back()
+    await page.waitFor('p.sorted', { text: 'Sorted none' })
+
+    expect(await hrefs()).toEqual(['/query?color=red&page=2', '/query?color=red'])
+    expect(problem()).toEqual([])
+  })
+
   it('keeps a query param typed by the page\'s schema, the server rendering it and its default leaving the URL plain', async () => {
     const problem = problems(page)
     const html = await fetchText(page, '/paged?page=3&tags=a')

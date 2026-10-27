@@ -8,6 +8,7 @@ import { forgetPageData } from './page-data'
 import { ROOT_ATTRIBUTES } from './root'
 import { NAVIGATE_HEADER, RELOAD_HEADER } from './swap'
 import { decodeServerValue } from './wire'
+import { addressChanged } from './with-query'
 
 declare const KAY_BROWSER: true | undefined
 
@@ -421,6 +422,7 @@ export async function show(page: FetchedPage, hash: string, swap: Swap, isCurren
 
     forgetPageData()
     writeHistory(policy, target)
+    addressChanged()
 
     if (pageKey(target) !== navigation.shown)
       navigation.page++

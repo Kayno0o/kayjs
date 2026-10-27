@@ -1,4 +1,5 @@
 --- server
+import Linker from '../components/linker.kay'
 import Search from '../components/search.kay'
 
 const sorted = ctx.url.searchParams.get('sort') ?? 'none'
@@ -9,4 +10,5 @@ h1 Query
 div(style="height: 1200px")
 p.sorted Sorted {sorted}
 Search
+Linker(persist)
 div(style="height: 1200px")
