@@ -2,6 +2,8 @@ import type { Reply } from './types'
 
 const KEPT_MS = 30 * 60_000
 const MOST_KEPT = 200
+// How many resumes and stops of one kept reply give their attempt of the action's rateLimit back; the rest stay counted, so one kept reply cannot replay the action's code for free.
+const MOST_REFUNDS = 3
 
 interface Entry {
   reply: Reply
@@ -10,6 +12,8 @@ interface Entry {
   owner: Promise<string | undefined>
   // The reply ended, so it is the first to go when the store is full.
   ended: boolean
+  // The refunds given for this reply so far.
+  refunds: number
 }
 
 interface Slot {
@@ -77,7 +81,7 @@ export function keep(key: string, reply: Reply, owner: Promise<string | undefine
   }
 
   replies.delete(key)
-  replies.set(key, { reply, at: now, owner, ended: false })
+  replies.set(key, { reply, at: now, owner, ended: false, refunds: 0 })
 }
 
 export function markEnded(key: string): void {
@@ -88,7 +92,17 @@ export function markEnded(key: string): void {
 }
 
 // Ends the reply kept under `key` if `owner` kept it, else the one about to be kept under it when the stop came first.
-// `owned` is called once the reply found is the owner's.
+// The refund is given, with no await between the check and the count, so parallel resumes cannot exceed the cap.
+function mayRefund(entry: Entry): boolean {
+  if (entry.refunds >= MOST_REFUNDS)
+    return false
+
+  entry.refunds++
+
+  return true
+}
+
+// `owned` is called once the reply found is the owner's, unless the reply already gave its refunds.
 export function stopKept(key: string, owner: Promise<string | undefined>, owned?: () => Promise<void>): void {
   sweep(Date.now())
 
@@ -103,13 +117,15 @@ export function stopKept(key: string, owner: Promise<string | undefined>, owned?
   void (async () => {
     if (same(await entry.owner, await owner)) {
       entry.reply.stop()
-      await owned?.()
+
+      if (mayRefund(entry))
+        await owned?.()
     }
   })()
 }
 
 // The reply kept under `key` for `owner`, as a reply that answers like an empty one if the owner is not the one who kept it.
-// `owned` is called once, as soon as the reply found is the owner's, whether it is read or not.
+// `owned` is called once, as soon as the reply found is the owner's and has refunds left, whether it is read or not, and is not waited for.
 export function keptFor(key: string, owner: Promise<string | undefined>, empty: Reply, owned?: () => Promise<void>): Reply | undefined {
   sweep(Date.now())
 
@@ -123,7 +139,8 @@ export function keptFor(key: string, owner: Promise<string | undefined>, empty: 
       return { reply: empty }
 
     // Not waited for: a store failing to take the attempt back must not delay the reply, and the refund logs its own errors.
-    void owned?.()
+    if (mayRefund(entry))
+      void owned?.()
 
     return { reply: entry.reply }
   })()

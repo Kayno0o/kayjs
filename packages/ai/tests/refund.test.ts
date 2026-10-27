@@ -75,7 +75,7 @@ describe('a resume or stop against the action\'s rateLimit', () => {
 
     await started(action)
 
-    for (let reload = 0; reload < 5; reload++) {
+    for (let reload = 0; reload < 3; reload++) {
       expect((await call(action, `resume:${id}`, asking({ provider: slow, outlive: true }))).refused).toBeUndefined()
       // The start counted once, and each resume gives its own back.
       await counts(store, KEY, 1)
@@ -91,10 +91,38 @@ describe('a resume or stop against the action\'s rateLimit', () => {
 
     await started(action)
 
-    for (let stops = 0; stops < 4; stops++) {
+    for (let stops = 0; stops < 3; stops++) {
       expect((await call(action, `stop:${id}`, asking({ provider: slow }))).refused).toBeUndefined()
       await counts(store, KEY, 1)
     }
+  })
+
+  it('gives back at most three attempts per kept reply, resumes and stops together, then counts the rest', async () => {
+    const store = memoryRates()
+    const action = actionOf({ max: 50, window: '1m', store })
+
+    await started(action)
+
+    for (const header of [`resume:${id}`, `stop:${id}`, `resume:${id}`]) {
+      await call(action, header, asking({ provider: slow, outlive: true }))
+      await counts(store, KEY, 1)
+    }
+
+    for (const [index, header] of [`resume:${id}`, `stop:${id}`, `resume:${id}`].entries()) {
+      await call(action, header, asking({ provider: slow, outlive: true }))
+      await counts(store, KEY, 2 + index)
+    }
+  })
+
+  it('gives back no more than the cap to resumes made together', async () => {
+    const store = memoryRates()
+    const action = actionOf({ max: 50, window: '1m', store })
+
+    await started(action)
+    await Promise.all(Array.from({ length: 10 }, async () => call(action, `resume:${id}`, asking({ provider: slow, outlive: true }))))
+    await counts(store, KEY, 1 + 10 - 3)
+    await Bun.sleep(20)
+    expect(store.peek(KEY)?.count).toBe(8)
   })
 
   it('leaves an ordinary ask and a start counted', async () => {
@@ -177,7 +205,10 @@ describe('a resume or stop against the action\'s rateLimit', () => {
 
     // The check runs before the handler, so the burst meets the limit as it always did.
     expect(refused).toBeGreaterThan(0)
-    await counts(store, KEY, 1 + refused)
+    const passed = results.length - refused
+
+    // Only the first refunds of the reply are given back, so a burst cannot replay the action for free.
+    await counts(store, KEY, 1 + refused + Math.max(0, passed - 3))
   })
 
   it('keeps a store with no refund counting, and throws nothing', async () => {
