@@ -1,5 +1,8 @@
+import type { Action, CallOptions, InputOf } from 'kay'
 import type { SortState } from './table'
+import type { AttemptOptions } from './toast'
 import { signal, untrack } from 'kay'
+import { attempt } from './toast'
 
 // What a source resolves to: the rows of the next page, or `undefined` for a page that failed, such as the result of an `attempt` that toasted. A throw fails the page too.
 export type InfinitePage<Row> = Row[] | undefined
@@ -14,15 +17,40 @@ export interface PageAt<Row> {
   sort: SortState | undefined
 }
 
-export interface InfiniteListOptions<Row> {
+interface InfiniteListBase<Row> {
   // The rows a full page holds: a page of fewer ends the list.
   pageSize: number
-  // Tells a row from another, so one already shown is dropped when the list shifts between two pages.
+  // Tells a row from another, so one already shown is dropped when the list shifts between two pages, and `patch` finds the row to change.
   key?: ((row: Row) => unknown) | undefined
   // The sort the first page is already in, which the first `load` receives.
   sort?: SortState | undefined
-  load: (at: PageAt<Row>) => Promise<InfinitePage<Row>> | InfinitePage<Row>
 }
+
+// A source of any kind: the function `load` runs for each page.
+export interface LoadSource<Row> {
+  load: (at: PageAt<Row>) => Promise<InfinitePage<Row>> | InfinitePage<Row>
+  action?: undefined
+}
+
+// What an action answers, once it went through.
+type Answered<Target extends Action<never, unknown>> = Awaited<ReturnType<Target>>
+
+// The part of an action source that reads the rows out of its answer: left out when the answer is the rows.
+type RowsOf<Row, Target extends Action<never, unknown>> = [Answered<Target>] extends [Row[]]
+  ? { rows?: ((answer: Answered<Target>) => Row[]) | undefined }
+  : { rows: (answer: Answered<Target>) => Row[] }
+
+// An action as the source: each page calls it with `{ refresh: false }` through `attempt`, so a failure toasts `failure` and fails the page.
+export type ActionSource<Row, Target extends Action<never, unknown>> = {
+  action: Target
+  // The fields of the call besides the paging: with an object, `offset` and `limit` (the page size) are added, so an action declaring both reads them from `pageFields`. A function gets where the page starts and answers the whole input, for a cursor or a sort; `undefined` loads nothing and resolves an empty page, such as a cursor with no row to continue after.
+  input?: Partial<InputOf<Target>> | ((at: PageAt<Row>) => Partial<InputOf<Target>> | undefined) | undefined
+  // What `attempt` toasts when the call fails.
+  failure: string | AttemptOptions
+  load?: undefined
+} & RowsOf<Row, Target>
+
+export type InfiniteListOptions<Row, Target extends Action<never, unknown> = never> = InfiniteListBase<Row> & (LoadSource<Row> | ActionSource<Row, Target>)
 
 export interface InfiniteList<Row> {
   // The rows loaded so far, the first page first.
@@ -48,9 +76,31 @@ export interface InfiniteList<Row> {
 // What `patch` applies to a row: the fields to merge over it, or a function of the row returning the row.
 export type RowChange<Row> = Partial<Row> | ((row: Row) => Row)
 
+// The page loader of an action source.
+function loadFromAction<Row, Target extends Action<never, unknown>>(source: ActionSource<Row, Target>, size: number): (at: PageAt<Row>) => Promise<InfinitePage<Row>> {
+  const call = source.action as unknown as (input: object, options: CallOptions) => Promise<unknown>
+  const { input } = source
+  const rowsOf = source.rows as ((answer: unknown) => Row[]) | undefined
+
+  return async (at) => {
+    const given = typeof input === 'function' ? input(at) : { ...input, offset: at.offset, limit: size }
+
+    if (given === undefined)
+      return []
+
+    const answer = await attempt(async () => call(given, { refresh: false }), source.failure)
+
+    if (answer === undefined)
+      return undefined
+
+    return rowsOf === undefined ? answer as Row[] : rowsOf(answer)
+  }
+}
+
 // The rows of a list that loads its next page as it scrolls, with `LoadMore` after the list drawing the sentinel and the failed state. The first page comes from the server; a page shorter than `pageSize` ends the list, one call runs at a time and a failed page loads no other until `retry`.
-export function infiniteList<Row>(first: Row[], options: InfiniteListOptions<Row>): InfiniteList<Row> {
-  const { key, load, pageSize: size } = options
+export function infiniteList<Row, Target extends Action<never, unknown> = never>(first: Row[], options: InfiniteListOptions<Row, Target>): InfiniteList<Row> {
+  const { key, pageSize: size } = options
+  const load = options.load === undefined ? loadFromAction(options, size) : options.load
   let sort = options.sort
   const rows = signal(first)
   const ended = signal(first.length < size)

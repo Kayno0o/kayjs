@@ -20,6 +20,14 @@ The table's `sort` and the URL's `sortParam` sort reach the list too, and a sort
 
 `list.patch(id, change)` updates one loaded row, the one `key` reads as `id`, with the fields to merge over it or a function of the row returning it. An action that toggles a row and answers it as the server now holds it feeds the list with `list.patch(row.id, answer)`, and the other rows stay as they are. It answers whether a row matched, and an `undefined` change, such as a failed `attempt`'s, does nothing.
 
+## Over an action
+
+An action loading the pages replaces `load`: `infiniteList(first, { pageSize, key, action: listPeople, input: { team }, failure: 'Could not load people.' })`. Each page calls it with `{ refresh: false }` through `attempt`, so a failed call toasts `failure` and fails the page. `input` holds the call's other fields; `offset` and `limit` are added from the page.
+
+For a cursor or a sort, `input` can be a function of where the page starts, such as `at => at.last && { before: at.last.id }`. It answers the whole call, and `undefined` loads an empty page, which is what a list with no row to continue after should do. When the answer is not an array of rows, `rows: answer => answer.items` reads them out.
+
+On the server, `pageFields()` gives the action its `offset` and `limit` fields with their bounds named once, and `pageOf(rows, input)` cuts a list held whole to a page and answers `{ rows, total }`. The action and the page that renders the first rows both call it, so neither slices by hand.
+
 ## A failed page
 
 A `load` that throws, or resolves `undefined` as an `attempt` does once it toasted, stops the list on an alert with a "Try again" button. No other page loads on scroll until it is pressed, and it asks for the same page again.
