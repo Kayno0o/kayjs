@@ -125,6 +125,7 @@ export default defineMessages({
     rangeInput: { from: '{label} de', to: '{label} à' },
     rating: { label: '{value} sur {max}' },
     saveForm: {
+      cancel: 'Annuler',
       clean: 'Aucune modification non enregistrée.',
       dirty: 'Modifications non enregistrées.',
       discard: 'Abandonner',

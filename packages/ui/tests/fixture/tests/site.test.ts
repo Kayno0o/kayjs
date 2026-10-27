@@ -156,7 +156,7 @@ test('DescriptionList is a dl of label and value pairs, the block drawing the it
 
   expect(plain.tag).toBe('dl')
   expect((await find('/description-list', '#plain dt')).map(term => term.text)).toEqual(['Host', 'Requests', 'State'])
-  expect((await find('/description-list', '#plain dd')).map(detail => detail.text)).toEqual(['relay.example.com', '0', ''])
+  expect((await find('/description-list', '#plain dd')).map(detail => detail.text)).toEqual(['relay.example.com', '0', '-'])
   expect(rich.map(detail => detail.text)).toEqual(['relay.example.com', '0', 'Healthy'])
 })
 
@@ -384,7 +384,7 @@ describe('the display components whose recipe holds their look, under Tailwind',
 
     const stat = await classes('#stat')
 
-    expect(stat).toEqual(expect.arrayContaining(['kui-stat-badge', 'flex', 'flex-col', 'px-9']))
+    expect(stat).toEqual(expect.arrayContaining(['kui-stat-badge', 'grid', 'px-9']))
     expect(stat).not.toEqual(expect.arrayContaining(['px-[calc(var(--spacing)*2.25*var(--density))]']))
     expect(stat).not.toContain('inline-flex')
     expect(await classes('#stat [data-part=value]')).toEqual(expect.arrayContaining(['text-2xl/none', 'text-danger']))
@@ -625,7 +625,7 @@ describe('data', () => {
     const linked = await one('/data', '#linked')
     const text = async (selector: string) => (await find('/data', selector)).map(item => item.text)
 
-    expect([linked.tag, attr(linked, 'href'), linked.text]).toEqual(['a', '/errors', '12+12%vs previouserrors'])
+    expect([linked.tag, attr(linked, 'href'), linked.text]).toEqual(['a', '/errors', '12errors+12%vs previous'])
     expect(await text('#plain')).toEqual(['1moon'])
     expect((await find('/data', '#plain [data-part=figure]'))).toEqual([])
     expect(await attributes('/data', '#linked [data-part=delta]', ['data-tone'])).toEqual([{ 'data-tone': 'danger' }])
