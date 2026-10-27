@@ -1,5 +1,6 @@
 import type { Finish, Piece, Provider, ProviderMessage } from './types'
 import { AiError } from './errors'
+import { extraBody } from './extra'
 import { json, postEvents } from './http'
 import { outputSchema } from './output-schema'
 import { MAX_ARGUMENTS, MAX_NAME_LENGTH, MAX_STREAMED_CALLS } from './tool-limits'
@@ -9,6 +10,8 @@ export interface AnthropicOptions {
   // The API root, `https://api.anthropic.com` by default, for a proxy.
   baseUrl?: string | undefined
   model?: string | undefined
+  // Fields added to the body of every request of this provider, such as `{ top_k: 40 }`; an ask's own `body` wins, and what kayjs-ai settles itself wins over both.
+  body?: Record<string, unknown> | undefined
 }
 
 export const ANTHROPIC_URL = 'https://api.anthropic.com'
@@ -85,7 +88,8 @@ function inputOf(raw: string): Record<string, unknown> {
 }
 
 // Anthropic's Messages API.
-export function anthropic({ apiKey, baseUrl = ANTHROPIC_URL, model }: AnthropicOptions): Provider {
+export function anthropic({ apiKey, baseUrl = ANTHROPIC_URL, model, body: fields }: AnthropicOptions): Provider {
+  const extra = extraBody(fields, 'anthropic({ body })')
   const root = baseUrl.replace(TRAILING_SLASHES, '')
 
   return {
@@ -93,6 +97,8 @@ export function anthropic({ apiKey, baseUrl = ANTHROPIC_URL, model }: AnthropicO
     model,
     async* stream(request, signal) {
       const body = {
+        ...extra,
+        ...request.body,
         model: request.model,
         max_tokens: request.maxTokens,
         messages: request.messages.map(turnOf),

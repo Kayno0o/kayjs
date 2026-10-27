@@ -178,6 +178,18 @@ A provider that stalls fails the reply with an `AiError` of kind `timeout`. kay 
 
 `ask` also takes `model`, `maxTokens` (4096 by default), `temperature` and a `signal`.
 
+### Fields kayjs-ai does not model
+
+A provider takes more fields than kayjs-ai knows. Pass them as `body` and they are added to the request as they are:
+
+```ts
+await ask(messages, { body: { top_p: 0.9, seed: 7, stop: ['END'] } })
+```
+
+To set them once for every ask of a provider, give the provider a `body`: `openai({ baseUrl, body: { provider: { order: ['anthropic'] } } })`, or the same on `anthropic()`. The ask's own `body` wins, field by field.
+
+The fields kayjs-ai settles itself win over `body`: the model, the messages, `stream`, the tools, the token limit, the schema's output format, and `temperature`, `reasoning` and `cache` when you set them. A server that refuses a field fails the reply with its own message, so the name of the field is in the error.
+
 ### A reply that outlives the visitor
 
 A reload or a closed tab stops the reply, which suits a paid public chat. If your model runs locally, or your tools act on the world (a light switched, an answer read aloud on the server), let the reply finish instead:

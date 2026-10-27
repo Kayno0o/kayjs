@@ -86,11 +86,17 @@ The provider is `AI_BASE_URL` when set, else the one key set. Nothing is read at
 
 ### ask options
 
-- Options: `system`, `model`, `maxTokens` (4096 by default, as Anthropic requires one), `temperature`, `reasoning`, `cache`, `signal`, `outlive` ([a reply that finishes after the visitor left](#a-reply-that-outlives-the-visitor)), `timeout`, `key` (who the ask counts against, [limits](limits.md)), `tools`, `maxSteps` and `confirm` ([Actions as tools](tools.md)), `maxInputChars` (50,000, [limits](limits.md#the-size-of-the-input)), `schema` ([an object instead of text](#an-object-instead-of-text)) and `provider` to ask a provider built by hand.
+- Options: `system`, `model`, `maxTokens` (4096 by default, as Anthropic requires one), `temperature`, `reasoning`, `cache`, `body` ([fields kayjs-ai does not model](#fields-kayjs-ai-does-not-model)), `signal`, `outlive` ([a reply that finishes after the visitor left](#a-reply-that-outlives-the-visitor)), `timeout`, `key` (who the ask counts against, [limits](limits.md)), `tools`, `maxSteps` and `confirm` ([Actions as tools](tools.md)), `maxInputChars` (50,000, [limits](limits.md#the-size-of-the-input)), `schema` ([an object instead of text](#an-object-instead-of-text)) and `provider` to ask a provider built by hand.
 - `reasoning` (`'none'`, `'low'`, `'medium'` or `'high'`) turns a reasoning model's thinking down, such as `'none'` for a one-sentence reply in about a second instead of ten: an OpenAI-compatible server (OpenAI, Ollama, Mistral) gets it as `reasoning_effort` only when you pass it, and one refusing the field with a 400 or 422 is asked again without it, remembered per process and base URL; Anthropic ignores it, as its thinking and effort settings differ per model and have no `none`.
 - `ask()` runs on the server, where the key lives: call it in a `--- server` fence, an action, a job or an API route. An island importing it fails `kay build`, which is how the key stays out of the browser. Reach it from an island through an action.
 - Messages are `user` and `assistant` only; the system prompt goes in `options.system`. A history a visitor posts can never carry a system prompt, and a `system` role throws.
 - No model id is built in: set `AI_MODEL` (required in production) or pass `{ model }`.
+
+### Fields kayjs-ai does not model
+
+- `ask(..., { body: { top_p: 0.9, seed: 7, stop: ['END'] } })` adds those fields to the provider's request body as they are, so a parameter a provider takes (`top_p`, `seed`, `presence_penalty`, Mistral's `safe_prompt`, Anthropic's `top_k` or `metadata.user_id`, OpenRouter's `provider` routing) needs no kayjs-ai release. `openai({ baseUrl, body })` and `anthropic({ apiKey, body })` set fields once for every ask of that provider; the ask's own `body` wins field by field, top level only.
+- What kayjs-ai settles wins over both, so a stray field cannot break the reply: `model`, `messages`, `stream`, `tools`, the token limit, the schema's output format, and `temperature`, `reasoning` and `cache` when the ask gives them (a body `temperature` is sent when `temperature` is not).
+- A server refusing a field fails the reply with its own message (`invalid`, with the server's words). Only the parameters kayjs-ai adds itself are dropped and retried; a field from `body` is never.
 
 ### Structured answers
 

@@ -1,6 +1,7 @@
 import type { ServerEvent } from './http'
 import type { Finish, Piece, Provider, ProviderMessage, ProviderRequest } from './types'
 import { AiError } from './errors'
+import { extraBody } from './extra'
 import { json, postEvents } from './http'
 import { allRequired, outputSchema } from './output-schema'
 import { MAX_ARGUMENTS, MAX_NAME_LENGTH, MAX_STREAMED_CALLS } from './tool-limits'
@@ -11,6 +12,8 @@ export interface OpenAiOptions {
   // Sent as a bearer token; a local server wanting none leaves it out.
   apiKey?: string | undefined
   model?: string | undefined
+  // Fields added to the body of every request of this provider, such as `{ top_p: 0.9 }` or OpenRouter's `provider`; an ask's own `body` wins, and what kayjs-ai settles itself wins over both.
+  body?: Record<string, unknown> | undefined
 }
 
 export const OPENAI_URL = 'https://api.openai.com/v1'
@@ -114,7 +117,8 @@ function shapeOf(request: ProviderRequest, mode: 'format' | 'tool' | undefined):
 }
 
 // An OpenAI chat completions server: OpenAI itself, Ollama, and the many that speak its API.
-export function openai({ baseUrl = OPENAI_URL, apiKey, model }: OpenAiOptions = {}): Provider {
+export function openai({ baseUrl = OPENAI_URL, apiKey, model, body: fields }: OpenAiOptions = {}): Provider {
+  const extra = extraBody(fields, 'openai({ body })')
   const root = baseUrl.replace(TRAILING_SLASHES, '')
   const official = root === OPENAI_URL
 
@@ -124,6 +128,8 @@ export function openai({ baseUrl = OPENAI_URL, apiKey, model }: OpenAiOptions = 
     async* stream(request, signal) {
       const messages = [...request.system === undefined ? [] : [{ role: 'system', content: request.system }], ...request.messages.flatMap(turnsOf)]
       const body = {
+        ...extra,
+        ...request.body,
         model: request.model,
         messages,
         stream: true,

@@ -59,6 +59,8 @@ export interface ProviderRequest {
   schema?: object | undefined
   // Whether to ask the provider to cache the prompt: on when absent, `'1h'` for Anthropic's 1 hour lifetime.
   cache?: boolean | '1h' | undefined
+  // Fields to add to the provider's request body as they are: the provider's own `body` with the ask's over it. A field the provider settles itself wins over them.
+  body?: Record<string, unknown> | undefined
   // How long a provider may take to answer, and to send the next chunk once it did.
   timeouts: Timeouts
 }
@@ -134,6 +136,8 @@ export interface AskOptions {
   reasoning?: Reasoning | undefined
   // Asks the provider to cache the prompt so the next turn and tool step read it at a fraction of the price: on by default, `false` turns it off and `'1h'` keeps an Anthropic cache for an hour instead of 5 minutes.
   cache?: boolean | '1h' | undefined
+  // Fields to add to the provider's request body as they are, such as `{ top_p: 0.9, seed: 7 }`, so a parameter kayjs-ai does not model needs no release. They are added to what the provider was built with in `body`, this ask's winning field by field (top level only), and a field kayjs-ai settles itself (`model`, `messages`, `stream`, `tools`, the token limit, the schema's output format, and `temperature`, `reasoning` and `cache` when given) wins over them. A server refusing a field fails the reply with its own message.
+  body?: Record<string, unknown> | undefined
   // Stops the reply when it aborts, as the request being answered does on its own.
   signal?: AbortSignal | undefined
   // Lets the reply finish on the server after the request being answered aborts, a visitor who reloaded or left: the provider request, the tool loop and every reader go on, and a `Chat` with `remember` shows the finished turn after the reload. Only `reply.stop()`, `signal` and the Chat's Stop end it, and a reader leaving early no longer does.
