@@ -35,7 +35,7 @@ function userOf(account: Extract<OAuthStub, { id: string }>): OAuthUser {
   return { providerId: id, username: username ?? (email !== undefined && at > 0 ? email.slice(0, at) : id), displayName, avatar: avatar ?? null, email: email ?? null }
 }
 
-// A request to the plugin as the site's browser sends it: the cookies so far go along, and the ones the response sets are kept, redirects not followed.
+// A request to the plugin as the site's browser sends it: the cookies so far go along, and the ones the response sets are kept, redirects not followed. A cookie's `Path`, `Domain` and `Secure` are ignored, as the plugin's routes are the only ones asked and every one of its cookies is for them; a test reaching the whole app passes the site's own `fetch`.
 async function throughPlugin(plugin: Elysia, cookies: Bun.CookieMap, path: string): Promise<Response> {
   const cookie = [...cookies].map(([name, value]) => `${name}=${value}`).join('; ')
   const response = await new ElysiaApp().use(plugin).handle(new Request(`http://localhost${path}`, { headers: cookie === '' ? {} : { cookie } }))

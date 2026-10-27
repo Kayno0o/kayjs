@@ -145,7 +145,7 @@ it('lists the repos Forgejo gives, and says so when it is down', async () => {
 
 ### Read the log
 
-`site.logs` holds what the server logged since the test began, in order, as the `log` option's function would get it: `{ type: 'message', level, from, message, request?, error? }` for kay's messages and a `logFrom('reply')` line of the app's, and `{ type: 'request', ... }` when `log` logs requests. It is emptied before each test of a site made at the top of a file or a describe, so `expect(site.logs).toContainEqual(expect.objectContaining({ from: 'reply', message }))` needs no spy on `console`.
+`site.logs` holds what the server logged since the test began, in order, as the `log` option's function would get it: `{ type: 'message', level, from, message, request?, error? }` for kay's messages and a `logFrom('reply')` line of the app's, and `{ type: 'request', ... }` when `log` logs requests, which lands once the response is sent, so `await waitUntil(() => site.logs.some(entry => entry.type === 'request'))` before reading it. It is emptied before each test of a site made at the top of a file or a describe, so `expect(site.logs).toContainEqual(expect.objectContaining({ from: 'reply', message }))` needs no spy on `console`.
 
 ### Reset or seed content
 

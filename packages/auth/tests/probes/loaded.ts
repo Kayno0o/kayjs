@@ -104,6 +104,13 @@ const scenarios: Record<string, () => Promise<void>> = {
 
     await visitor.fetch(`/auth/nope/callback?code=code-1&state=${state}`)
   },
+  // A test stubbing the provider, which loads the test helper and nothing of the flow until the callback runs.
+  async oauthStub() {
+    const app = testApp({ site: SITE, oauth: { discord: { provider: discordProvider(), clientId: 'id', clientSecret: 'secret' } } })
+    const as = app.auth.test({ cookies: new Bun.CookieMap() })
+
+    await as.oauth.stub('discord', { id: '80351110224678912', email: 'ada@example.com', username: 'ada' })
+  },
   async oauthServer() {
     const visitor = testApp({ site: SITE, pages: auth({ plugin: false }), scopes: ['posts:read'] }).browser()
 
