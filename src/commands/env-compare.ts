@@ -93,7 +93,15 @@ async function composeAssignments(file: string, text: string, problem: (message:
       interpolated.add(match[1]!)
   }
 
-  const services = (document as { services?: Record<string, unknown> } | null)?.services
+  const { services, secrets, configs } = (document ?? {}) as { services?: Record<string, unknown>, secrets?: Record<string, unknown>, configs?: Record<string, unknown> }
+
+  // A secret or a config compose reads from its own environment, `secrets: { token: { environment: TOKEN } }`, uses that variable as `${TOKEN}` does.
+  for (const entry of [...Object.values(secrets ?? {}), ...Object.values(configs ?? {})]) {
+    const source = (entry as { environment?: unknown } | null)?.environment
+
+    if (typeof source === 'string')
+      interpolated.add(source)
+  }
 
   for (const service of Object.values(services ?? {})) {
     const { environment, env_file: envFile } = (service ?? {}) as { environment?: unknown, env_file?: unknown }

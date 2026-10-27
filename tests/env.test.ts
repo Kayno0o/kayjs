@@ -628,6 +628,15 @@ describe('kay env against compose and .env.example', () => {
     ])
   })
 
+  it('counts a top-level secret or config compose reads from its environment as a use of that variable in .env.example', async () => {
+    const compose = `${files['compose.yaml']}secrets:\n  hf_token:\n    environment: HF_TOKEN\nconfigs:\n  banner:\n    environment: BANNER\n`
+    const root = await project({ ...files, 'compose.yaml': compose, '.env.example': 'HF_TOKEN=\nBANNER=\nSTRAY=\nSESSION_SECRET=\n' })
+
+    expect((await run(root, ['--compose', 'compose.yaml', '--example', '.env.example'])).findings!.map(({ message }) => message)).toEqual([
+      'STRAY is in .env.example and no schema declares it, no compose service sets it and none interpolates it',
+    ])
+  })
+
   it('skips the half it was not given, and with no compose file given, no variable is judged missing from it', async () => {
     const root = await project({ ...files, 'compose.yaml': 'services: {}\n' })
 
