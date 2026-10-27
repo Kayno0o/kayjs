@@ -95,6 +95,8 @@ type Body = Written | Pieced | Bun.BunFile
 // The editor's module by its file, imported before a page in edit mode renders, which does not wait.
 const editors = new Map<string, EditorModule>()
 
+const HTML_HEADERS = { 'content-type': 'text/html; charset=utf-8' }
+
 // HTML under the mount point already, as `kay build` rendered it or a server island's was rebased, which goes out as it is.
 class Rebased {
   constructor(readonly body: Body) {}
@@ -556,14 +558,14 @@ function storedEncodings(encoded: ServedPage['encoded']): { names: StoredEncodin
 // What `kay build` rendered, behind the page's guards, revalidated by its ETag.
 // `spliced` gives the page with what changes per request filled in, as its stamps, gzipped when the browser takes it.
 export async function servePrerendered(route: ServedRoute, page: ServedPage, params: Record<string, unknown>, context: RequestContext, client: ClientBuild, options: RenderOptions = {}, spliced?: () => Promise<{ body: Written, gzip: boolean }>): Promise<Response> {
-  const rendering = createRendering(context, params, options, route.contextKeys)
-  const refusing = refused(route, rendering, client, withEditor(route, options))
+  const rendering = readsRequest(route, context.request, options) ? createRendering(context, params, options, route.contextKeys) : undefined
+  const refusing = rendering && refused(route, rendering, client, withEditor(route, options))
   const refusal = refusing === undefined ? undefined : await refusing
 
   if (refusal)
     return refusal
 
-  const { headers } = rendering
+  const headers = rendering?.headers ?? new Headers(HTML_HEADERS)
 
   headers.set('cache-control', 'public, max-age=0, must-revalidate')
   for (const [name, value] of page.headers)
@@ -578,9 +580,7 @@ export async function servePrerendered(route: ServedRoute, page: ServedPage, par
     if (gzip)
       headers.set('content-encoding', 'gzip')
 
-    rendering.status = page.status
-
-    return respond(rendering, new Rebased(body))
+    return answerPrerendered(rendering, headers, page.status, body)
   }
 
   const { names: encodings, available } = storedEncodings(page.encoded)
@@ -605,19 +605,30 @@ export async function servePrerendered(route: ServedRoute, page: ServedPage, par
 
   if (matchesEtag(context.request.headers.get('if-none-match'), etag)) {
     headers.delete('content-type')
-    rendering.status = 304
 
-    return respond(rendering, new Rebased(''))
+    return answerPrerendered(rendering, headers, 304, '')
   }
 
-  rendering.status = page.status
-
   if (!encoding)
-    return respond(rendering, new Rebased(page.html))
+    return answerPrerendered(rendering, headers, page.status, page.html)
 
   headers.set('content-encoding', encoding)
 
-  return respond(rendering, new Rebased(encoding === 'dcz' ? page.dcz! : page.encoded[encoding]!))
+  return answerPrerendered(rendering, headers, page.status, encoding === 'dcz' ? page.dcz! : page.encoded[encoding]!)
+}
+
+// Whether a prerendered hit reads the request past its headers: a guard or the dev tool runs, a context is loaded, or a flash cookie is there to clear. Most hits do none of it, and answer with no rendering context.
+function readsRequest(route: ServedRoute, request: Request, options: RenderOptions): boolean {
+  return route.guards.length > 0 || options.dev === true || (options.contexts !== undefined && options.contexts.length > 0) || hasFlash(request, options.base ?? '')
+}
+
+function answerPrerendered(rendering: Rendering | undefined, headers: Headers, status: number, body: Body): Response {
+  if (!rendering)
+    return bodyResponse(body, { status, headers })
+
+  rendering.status = status
+
+  return respond(rendering, new Rebased(body))
 }
 
 export interface RenderedServerIslands {
@@ -782,7 +793,7 @@ function createRendering(context: RequestContext, params: Record<string, unknown
 
     return readOnce()
   }
-  const headers = new Headers({ 'content-type': 'text/html; charset=utf-8' })
+  const headers = new Headers(HTML_HEADERS)
   const url = new URL(request.url)
 
   withoutShareToken(url)
@@ -864,10 +875,15 @@ function respond(rendering: Rendering, output: Body | Rebased): Response {
 
   const unwrapped = output instanceof Rebased ? output.body : output
   const body = unwrapped instanceof Pieced ? unwrapped.text : unwrapped
-  const init = { status: rendering.status, headers: rendering.headers }
-  const response = body instanceof ReadableStream || body instanceof Blob ? new Response(body, init) : wholeResponse(body, init, unwrapped instanceof Pieced ? unwrapped.pieces : undefined)
+  const response = bodyResponse(unwrapped, { status: rendering.status, headers: rendering.headers })
 
   return !(output instanceof Rebased) && rendering.base !== '' && (typeof body === 'string' || body instanceof ReadableStream) ? rebaseHtml(response, rendering.base, typeof body === 'string') : response
+}
+
+function bodyResponse(output: Body, init: ResponseInit): Response {
+  const body = output instanceof Pieced ? output.text : output
+
+  return body instanceof ReadableStream || body instanceof Blob ? new Response(body, init) : wholeResponse(body, init, output instanceof Pieced ? output.pieces : undefined)
 }
 
 // A page whose render read the session or a cookie is for that visitor alone: no CDN may keep it, unless the page set its own caching.

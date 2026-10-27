@@ -143,11 +143,15 @@ describe('dictionaries for compression', () => {
   ])('names the dictionary under the policy %s: %p', async (policy, named) => {
     const { dictionary } = await served()
     const reply = await compress(asking(undefined), pageHtml('Topic'), dictionary, 'text/html')
-    const forbidding = (await compressResponse(asking(undefined), wholeResponse(pageHtml('Topic'), { headers: { 'content-type': 'text/html', 'content-security-policy': policy } }), undefined, undefined, dictionary))!
+    const send = async () => (await compressResponse(asking(undefined), wholeResponse(pageHtml('Topic'), { headers: { 'content-type': 'text/html', 'content-security-policy': policy } }), undefined, undefined, dictionary))!
 
     expect(reply.headers.get('link')).toBe(dictionary.link)
-    expect(forbidding.headers.get('link')).toBe(named ? dictionary.link : null)
-    expect(forbidding.headers.get('vary')?.includes('available-dictionary') ?? false).toBe(named)
+
+    // The second page under the same policy gets the verdict kept from the first.
+    for (const forbidding of [await send(), await send()]) {
+      expect(forbidding.headers.get('link')).toBe(named ? dictionary.link : null)
+      expect(forbidding.headers.get('vary')?.includes('available-dictionary') ?? false).toBe(named)
+    }
   })
 
   it('answers a browser holding the dictionary with a policy forbidding its fetch in the usual encodings, as it named none', async () => {
