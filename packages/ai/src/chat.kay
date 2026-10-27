@@ -1,6 +1,6 @@
 ---
 import type { Action, ActionStream, Failure, SanitizeOptions, Snippet } from 'kay'
-import type { ChatMessage, CodeBlock, Message, Progress, ToolCall } from './types'
+import type { ChatMessage, CodeBlock, Message, Progress, Source, ToolCall } from './types'
 import { ActionError, effect, onCleanup, onMount, recipe, sanitizeHtml, signal, trustHtml, untrack } from 'kay'
 import BareIconButton from '@kaynooo/kayjs-ui/bare-icon-button.kay'
 import FileDrop from '@kaynooo/kayjs-ui/file-drop.kay'
@@ -12,8 +12,10 @@ import { wording } from 'kay/words'
 import { approvalMessage, ticketsIn, withoutApproval } from './approval-marker'
 import { MARK, MARKED, withoutMarker } from './marker'
 import { REPLACES_HEADER, REPLY_HEADER } from './resume'
+import { attribute, linkSources, usableSources } from './chat-sources'
 import { filesOf, keepPending, newReplyId, pendingReply, posted, POSTED_CHARACTERS, restored, shrunk, stored } from './chat-history'
 import Calls from './chat-calls.kay'
+import Sources from './chat-sources.kay'
 import './chat.css'
 
 // The chat's own classes are its parts, so an app restyles them from src/ui.ts or a `class` object. The table of a reply is built as a string and keeps its class.
@@ -36,17 +38,13 @@ const REPLY: SanitizeOptions = { tags: ['table', 'thead', 'tbody', 'tr', 'th', '
 const PINNED_PX = 48
 // How long a page that announced it was leaving is waited on before it is taken to have stayed.
 const LEAVING_MS = 2000
-const ATTRIBUTE_UNSAFE = /[&"<]/g
 // The opening tag `sanitizeHtml` writes for a link, which `linksOpenApart` rewrites: the two change together. The href is captured to tell a link of this site from another.
 const SANITIZED_LINK = /<a href="([^"]*)" rel="nofollow ugc">/g
 // A path of this site, or an anchor in the page: `//host` is another site.
 const LOCAL_HREF = /^(?:\/(?!\/)|#)/
-const ENTITIES: Record<string, string> = { '&': '&amp;', '"': '&quot;', '<': '&lt;' }
 
 // The images and documents a model reads.
 const ATTACHABLE = 'image/png,image/jpeg,image/gif,image/webp,application/pdf'
-
-const attribute = (text: string) => text.replace(ATTRIBUTE_UNSAFE, char => ENTITIES[char]!)
 
 interface Turn extends Message {
   id: number
@@ -58,14 +56,16 @@ interface Turn extends Message {
   code?: CodeBlock[] | undefined
   // What the model thought before answering, when the action streams `reply.progress()` and the provider sends it.
   reasoning?: string | undefined
+  // The documents the reply cites as `[n]`, linked in its text and listed under it.
+  sources?: Source[] | undefined
 }
 
-const { action, initial = [], label = wording('ai.chat.label', 'Chat'), placeholder = wording('ai.chat.placeholder', 'Write a message…'), sendLabel = wording('ai.chat.send', 'Send'), stopLabel = wording('ai.chat.stop', 'Stop'), retryLabel = wording('ai.chat.retry', 'Try again'), thinkingLabel = wording('ai.chat.thinking', 'Thinking…'), reasoning = true, reasoningLabel = wording('ai.chat.reasoning', 'Reasoning'), stoppedLabel = wording('ai.chat.stopped', 'Stopped'), errorMessage = wording('ai.chat.error', 'The reply failed.'), keep = 20, maxChars = POSTED_CHARACTERS, tableLabel = wording('ai.chat.table', 'Table'), toolDetails = true, greeting = wording('ai.chat.greeting', 'How can I help?'), disclosure = wording('ai.chat.disclosure', 'You are talking to an AI. Your messages are sent to its provider to answer.'), suggestions = [], toolLabels = {}, sendIcon, stopIcon, newButton = false, newLabel = wording('ai.chat.new', 'New conversation'), newIcon, remember, links = 'apart', runningLabel = wording('ai.chat.running', 'Running'), doneLabel = wording('ai.chat.done', 'Done'), failedLabel = wording('ai.chat.failed', 'Failed'), argumentsLabel = wording('ai.chat.arguments', 'Arguments'), resultLabel = wording('ai.chat.result', 'Result'), approvalLabel = wording('ai.chat.approval', 'Needs your approval'), allowLabel = wording('ai.chat.allow', 'Allow'), denyLabel = wording('ai.chat.deny', 'Deny'), allowedLabel = wording('ai.chat.allowed', 'Allowed:'), deniedLabel = wording('ai.chat.denied', 'Denied:'), attach = false, accept = ATTACHABLE, maxFiles = 4, maxFileSize = 5 * 1024 * 1024, attachLabel = wording('ai.chat.attach', 'Attach a file'), removeLabel = wording('ai.chat.remove', 'Remove'), attachRefusedLabel = wording('ai.chat.attachRefused', 'Only images and PDFs can be attached.'), attachTooBigLabel = wording('ai.chat.attachTooBig', 'That file is too big to attach.'), attachFullLabel = wording('ai.chat.attachFull', 'No more files can be attached.'), attachIcon, regenerate = false, editable = false, regenerateLabel = wording('ai.chat.regenerate', 'Regenerate the reply'), editLabel = wording('ai.chat.edit', 'Edit the message'), saveLabel = wording('ai.chat.save', 'Save and send'), cancelLabel = wording('ai.chat.cancel', 'Cancel'), regenerateIcon, editIcon, fill = false, variant = 'bubble', tone = 'accent', size = 'md' } = props<{
+const { action, initial = [], label = wording('ai.chat.label', 'Chat'), placeholder = wording('ai.chat.placeholder', 'Write a message…'), sendLabel = wording('ai.chat.send', 'Send'), stopLabel = wording('ai.chat.stop', 'Stop'), retryLabel = wording('ai.chat.retry', 'Try again'), thinkingLabel = wording('ai.chat.thinking', 'Thinking…'), sourcesLabel = wording('ai.chat.sources', 'Sources'), reasoning = true, reasoningLabel = wording('ai.chat.reasoning', 'Reasoning'), stoppedLabel = wording('ai.chat.stopped', 'Stopped'), errorMessage = wording('ai.chat.error', 'The reply failed.'), keep = 20, maxChars = POSTED_CHARACTERS, tableLabel = wording('ai.chat.table', 'Table'), toolDetails = true, greeting = wording('ai.chat.greeting', 'How can I help?'), disclosure = wording('ai.chat.disclosure', 'You are talking to an AI. Your messages are sent to its provider to answer.'), suggestions = [], toolLabels = {}, sendIcon, stopIcon, newButton = false, newLabel = wording('ai.chat.new', 'New conversation'), newIcon, remember, links = 'apart', runningLabel = wording('ai.chat.running', 'Running'), doneLabel = wording('ai.chat.done', 'Done'), failedLabel = wording('ai.chat.failed', 'Failed'), argumentsLabel = wording('ai.chat.arguments', 'Arguments'), resultLabel = wording('ai.chat.result', 'Result'), approvalLabel = wording('ai.chat.approval', 'Needs your approval'), allowLabel = wording('ai.chat.allow', 'Allow'), denyLabel = wording('ai.chat.deny', 'Deny'), allowedLabel = wording('ai.chat.allowed', 'Allowed:'), deniedLabel = wording('ai.chat.denied', 'Denied:'), attach = false, accept = ATTACHABLE, maxFiles = 4, maxFileSize = 5 * 1024 * 1024, attachLabel = wording('ai.chat.attach', 'Attach a file'), removeLabel = wording('ai.chat.remove', 'Remove'), attachRefusedLabel = wording('ai.chat.attachRefused', 'Only images and PDFs can be attached.'), attachTooBigLabel = wording('ai.chat.attachTooBig', 'That file is too big to attach.'), attachFullLabel = wording('ai.chat.attachFull', 'No more files can be attached.'), attachIcon, regenerate = false, editable = false, regenerateLabel = wording('ai.chat.regenerate', 'Regenerate the reply'), editLabel = wording('ai.chat.edit', 'Edit the message'), saveLabel = wording('ai.chat.save', 'Save and send'), cancelLabel = wording('ai.chat.cancel', 'Cancel'), regenerateIcon, editIcon, fill = false, variant = 'bubble', tone = 'accent', size = 'md' } = props<{
   // The page's streaming action, `action(schema, ({ messages }) => ask(messages))`, which may also `ctx.fail`; the chat posts the latest messages to it and reads the reply as it streams.
   // Returning `ask(messages, { tools }).progress()` instead streams the tool calls as well, which the chat shows before the text of their turn.
   action: Action<{ messages: ChatMessage[] }, AsyncIterable<string | Progress> | Failure<unknown>>
   // The messages shown to start with.
-  initial?: Pick<Message, 'content' | 'role'>[] | undefined
+  initial?: Pick<Message, 'content' | 'role' | 'sources'>[] | undefined
   // Names the message list and the field for screen readers.
   label?: string | undefined
   placeholder?: string | undefined
@@ -74,6 +74,8 @@ const { action, initial = [], label = wording('ai.chat.label', 'Chat'), placehol
   retryLabel?: string | undefined
   // Said, and read out, while the first words of a reply are awaited.
   thinkingLabel?: string | undefined
+  // The title of the list of cited sources under a reply.
+  sourcesLabel?: string | undefined
   // Marks a reply cut short by Stop.
   stoppedLabel?: string | undefined
   // How many of the latest messages each send posts, so the history never outgrows the action's `maxItems`; the history posted opens on a user message, so an assistant one at its start is left out.
@@ -152,7 +154,7 @@ const { action, initial = [], label = wording('ai.chat.label', 'Chat'), placehol
 }>()
 
 let nextId = 0
-const history = signal<Turn[]>(untrack(() => initial).map(message => ({ ...message, id: nextId++ })))
+const history = signal<Turn[]>(untrack(() => initial).map(({ sources, ...message }) => ({ ...message, ...sources && { sources: usableSources(sources) }, id: nextId++ })))
 const draft = signal('')
 // The files chosen for the next message, and why one was left out.
 const attached = signal<File[]>([])
@@ -168,6 +170,8 @@ const thought = signal('')
 const calls = signal<ToolCall[]>([])
 // The code blocks of the reply being written that the server highlighted so far.
 const code = signal<CodeBlock[]>([])
+// The documents the reply being written cites, as last seen.
+const found = signal<Source[]>([])
 // What the status line said of the calls, one line each and added to it, since a line replaced before the screen reader reads it is lost.
 const spoken = signal<{ id: number, text: string }[]>([])
 const failure = signal<string | undefined>(undefined)
@@ -226,6 +230,9 @@ function show(value: string | Progress) {
   calls = value.calls
   announce(value.calls)
 
+  if (value.sources)
+    found = usableSources(value.sources)
+
   if (value.code)
     code = [...code(), ...value.code]
 }
@@ -237,8 +244,8 @@ function linksOpenApart(html: string): string {
 
 // A table is wrapped, once sanitized, in a box that scrolls sideways and takes the keyboard's focus, except in the turn being written, which is hidden from screen readers. Several tables of one reply are numbered, so no two groups share a name.
 // A code block the server highlighted (already sanitized there) takes the place of the plain one, which a marker holds through the sanitizing.
-function markdown(text: string, blocks: CodeBlock[] | undefined, scrollable = true) {
-  let source = markdownHtml(withoutMarker(text)) as string
+function markdown(text: string, blocks: CodeBlock[] | undefined, sources: readonly Source[] = [], scrollable = true) {
+  let source = linkSources(markdownHtml(withoutMarker(text)) as string, sources).html
 
   // Each block takes the first plain one of its markup left, in the order they were written, so two blocks of one code in two languages each get theirs.
   for (const [index, block] of (blocks ?? []).entries())
@@ -261,6 +268,11 @@ function markdown(text: string, blocks: CodeBlock[] | undefined, scrollable = tr
 
     return `<div class="kai-chat-table"${scrollable ? ` tabindex="0" role="group" aria-label="${attribute(tables === 1 ? tableLabel : `${tableLabel} ${count}`)}"` : ''}><table>`
   }).replaceAll('</table>', '</table></div>'))
+}
+
+// The sources the text cites outside code, in the order it first does.
+function citedIn(text: string, sources: readonly Source[] | undefined): Source[] {
+  return sources === undefined || sources.length === 0 ? [] : linkSources(markdownHtml(withoutMarker(text)) as string, sources).cited
 }
 
 const sameFile = (a: File, b: File) => a.name === b.name && a.size === b.size && a.lastModified === b.lastModified
@@ -349,12 +361,14 @@ function finish(state: string) {
   const thinking = thought()
   const made = calls()
   const highlighted = code()
+  const cites = found()
 
   streaming = undefined
   partial = ''
   thought = ''
   calls = []
   code = []
+  found = []
 
   // A page swap closes the stream too, leaving the reply to be asked for again when the chat returns.
   if (state !== 'closed' && remember !== undefined) {
@@ -367,7 +381,7 @@ function finish(state: string) {
 
   if (text !== '' || made.length > 0) {
     undone = undefined
-    history = [...history(), { id: nextId++, role: 'assistant', content: text, calls: made, code: highlighted, reasoning: thinking, stopped: state === 'closed' }]
+    history = [...history(), { id: nextId++, role: 'assistant', content: text, calls: made, code: highlighted, reasoning: thinking, ...cites.length > 0 && { sources: cites }, stopped: state === 'closed' }]
   }
 
   if (state === 'failed')
@@ -522,6 +536,7 @@ async function send(again = false, question?: string, resuming?: string) {
   thought = ''
   calls = []
   code = []
+  found = []
   told.clear()
   spoken = []
   waiting = true
@@ -596,6 +611,7 @@ function reset() {
   thought = ''
   calls = []
   code = []
+  found = []
   spoken = []
   told.clear()
 }
@@ -826,7 +842,9 @@ section(part="root" onKeyDown={escape} data-empty={history().length === 0 && !bu
               button(part="allow" type="button" data-variant="solid" data-size="sm" onClick={() => decide(call, true)}) {allowLabel}
               button(part="deny" type="button" data-variant="ghost" data-size="sm" onClick={() => decide(call, false)}) {denyLabel}
           if turn.content !== ''
-            div(part="text" innerHTML={markdown(turn.content, turn.code)})
+            div(part="text" innerHTML={markdown(turn.content, turn.code, turn.sources)})
+            if citedIn(turn.content, turn.sources).length > 0
+              Sources(sources={citedIn(turn.content, turn.sources)} label={sourcesLabel} here={links === 'here'})
           if turn.stopped
             small(part="note") {stoppedLabel}
           if canRegenerate(turn)
@@ -843,7 +861,9 @@ section(part="root" onKeyDown={escape} data-empty={history().length === 0 && !bu
         if calls().length > 0
           Calls(calls={calls()} labels={toolLabels} details={toolDetails} runningLabel={runningLabel} doneLabel={doneLabel} failedLabel={failedLabel} argumentsLabel={argumentsLabel} resultLabel={resultLabel} approvalLabel={approvalLabel})
         if partial() !== ''
-          div(part="text" innerHTML={markdown(partial(), code(), false)})
+          div(part="text" innerHTML={markdown(partial(), code(), found(), false)})
+          if citedIn(partial(), found()).length > 0
+            Sources(sources={citedIn(partial(), found())} label={sourcesLabel} here={links === 'here'})
         else if calls().length === 0
           p(part="thinking") {thinkingLabel}
   div(part="status" role="status" aria-atomic="false")

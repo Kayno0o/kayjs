@@ -1,4 +1,5 @@
 import type { ChatMessage, Message } from './types'
+import { usableSources } from './chat-sources'
 
 // The most characters a send posts unless the chat is told otherwise, under the 50,000 `ask` takes by default.
 export const POSTED_CHARACTERS = 40_000
@@ -39,7 +40,7 @@ export function shrunk(sent: readonly Pick<Message, 'attachments' | 'content'>[]
   return Math.floor(sent.reduce((sum, turn) => sum + cost(turn), 0) / 2)
 }
 
-// What a stopped or finished conversation keeps in session storage: the text of each turn, not the tool calls, whose arguments and results may be large.
+// What a stopped or finished conversation keeps in session storage: the text of each turn and the sources it cites, not the tool calls, whose arguments and results may be large.
 const KEPT_CHARACTERS = 200_000
 
 interface KeptTurn extends Message {
@@ -58,9 +59,10 @@ export function restored(key: string): KeptTurn[] {
       if (typeof turn !== 'object' || turn === null)
         return []
 
-      const { role, content, stopped } = turn as Record<string, unknown>
+      const { role, content, stopped, sources } = turn as Record<string, unknown>
+      const cited = role === 'assistant' ? usableSources(sources) : []
 
-      return (role === 'user' || role === 'assistant') && typeof content === 'string' && content !== '' ? [{ role, content, ...stopped === true && { stopped } }] : []
+      return (role === 'user' || role === 'assistant') && typeof content === 'string' && content !== '' ? [{ role, content, ...stopped === true && { stopped }, ...cited.length > 0 && { sources: cited } }] : []
     })
   }
   catch {
@@ -71,7 +73,7 @@ export function restored(key: string): KeptTurn[] {
 // Keeps the latest turns with text that fit; storage that is full or unavailable keeps nothing, and the chat goes on.
 export function stored(key: string, turns: readonly KeptTurn[]): void {
   try {
-    let kept = turns.filter(({ content }) => content !== '').map(({ role, content, stopped }) => ({ role, content, ...stopped === true && { stopped } }))
+    let kept = turns.filter(({ content }) => content !== '').map(({ role, content, stopped, sources }) => ({ role, content, ...stopped === true && { stopped }, ...sources !== undefined && sources.length > 0 && { sources } }))
     let text = JSON.stringify(kept)
 
     while (text.length > KEPT_CHARACTERS && kept.length > 0) {

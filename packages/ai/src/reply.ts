@@ -1,4 +1,4 @@
-import type { CodeBlock, DeltasOptions, Finish, Piece, Progress, Reply, ToolCall, Usage } from './types'
+import type { CodeBlock, DeltasOptions, Finish, Piece, Progress, Reply, Source, ToolCall, Usage } from './types'
 import { logFrom } from 'kay'
 import { AiError } from './errors'
 import { highlighting } from './highlight'
@@ -11,7 +11,7 @@ function snapshot(call: ToolCall): ToolCall {
 
 // A reply over what `open` yields once first read, with `signals` stopping it when any aborts.
 // The text is kept as it comes, so any number of readers (`await`, `for await`, `usage`) share one provider request.
-export function createReply(open: (signal: AbortSignal) => AsyncIterable<Piece>, signals: (AbortSignal | undefined)[], highlight = highlighting, outlive = false, onEnd?: () => void, resumed = false): Reply {
+export function createReply(open: (signal: AbortSignal) => AsyncIterable<Piece>, signals: (AbortSignal | undefined)[], highlight = highlighting, outlive = false, onEnd?: () => void, { resumed = false, sources = [] }: { resumed?: boolean | undefined, sources?: readonly Source[] | undefined } = {}): Reply {
   const controller = new AbortController()
   const deltas: string[] = []
   const thoughts: string[] = []
@@ -229,7 +229,7 @@ export function createReply(open: (signal: AbortSignal) => AsyncIterable<Piece>,
 
             finished = []
 
-            return { done: false, value: { text: deltas.join(''), calls: calls.map(snapshot), code, ...thoughts.length > 0 && { reasoning: thoughts.join('') }, ...outlive && { outlives: true } } }
+            return { done: false, value: { text: deltas.join(''), calls: calls.map(snapshot), code, ...thoughts.length > 0 && { reasoning: thoughts.join('') }, ...outlive && { outlives: true }, ...sources.length > 0 && { sources: sources.map(source => ({ ...source })) } } }
           }
 
           if (seen < version) {
@@ -240,7 +240,7 @@ export function createReply(open: (signal: AbortSignal) => AsyncIterable<Piece>,
             else
               scan()
 
-            return { done: false, value: { text: deltas.join(''), calls: calls.map(snapshot), ...thoughts.length > 0 && { reasoning: thoughts.join('') }, ...outlive && { outlives: true } } }
+            return { done: false, value: { text: deltas.join(''), calls: calls.map(snapshot), ...thoughts.length > 0 && { reasoning: thoughts.join('') }, ...outlive && { outlives: true }, ...sources.length > 0 && { sources: sources.map(source => ({ ...source })) } } }
           }
 
           if (stale && !working) {

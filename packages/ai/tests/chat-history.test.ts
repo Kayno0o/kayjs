@@ -121,3 +121,15 @@ test('shrunk lowers the cap half of what a refused send held, so repeated refusa
   expect(posted(sent, 20, shrunk(sent)).map(({ content }) => content[0])).toEqual(['c'])
   expect(posted([user(''), assistant('')], 20, shrunk([user(''), assistant('')]))).toEqual([])
 })
+
+test('a conversation kept comes back with the sources of its assistant turns, and drops the unsafe ones', () => {
+  memoryStorage()
+
+  const sources = [{ n: 1, title: 'Tides', href: 'https://example.com/a' }]
+
+  stored('k', [{ role: 'user', content: 'q' }, { role: 'assistant', content: 'a [1]', sources }])
+  expect(restored('k')).toEqual([{ role: 'user', content: 'q' }, { role: 'assistant', content: 'a [1]', sources }])
+
+  stored('k', [{ role: 'assistant', content: 'a [1]', sources: [{ n: 1, title: 'x', href: 'javascript:alert(1)' }] }])
+  expect(restored('k')).toEqual([{ role: 'assistant', content: 'a [1]' }])
+})

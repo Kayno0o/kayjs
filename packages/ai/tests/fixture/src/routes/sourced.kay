@@ -1,0 +1,7 @@
+--- server
+import { sourced } from './tools.kay'
+--- script
+import Chat from '@kaynooo/kayjs-ai/chat.kay'
+---
+h1 Sourced
+Chat(action={sourced} label="Sourced" remember="sourced-chat")

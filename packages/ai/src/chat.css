@@ -392,6 +392,23 @@
     white-space: pre-wrap;
   }
 
+  /* The documents a reply cites, in a muted list under its text. */
+  .kai-chat-sources {
+    margin-top: 0.5rem;
+    font-size: 0.75rem;
+    color: var(--color-muted);
+  }
+
+  .kai-chat-sources-list {
+    margin: 0.25rem 0 0;
+    padding-inline-start: 1.5rem;
+  }
+
+  .kai-chat-source-link {
+    color: inherit;
+    text-decoration: underline;
+  }
+
   .kai-chat-approval {
     display: flex;
     flex-wrap: wrap;

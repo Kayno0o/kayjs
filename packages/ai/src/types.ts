@@ -22,10 +22,19 @@ export interface Media {
   name?: string | undefined
 }
 
+// A document a reply cites as `[n]`: a `Chat` links each `[n]` outside code to `href` and lists the cited ones, by `title`, under the turn.
+export interface Source {
+  n: number
+  title: string
+  href: string
+}
+
 export interface Message {
   // `system` is not a role here: the prompt that frames the reply goes in `options.system`, so a history posted by a visitor cannot carry one.
   role: 'user' | 'assistant'
   content: string
+  // What an assistant message cites, for a `Chat`'s `initial` to show again; `ask` leaves it out of the request.
+  sources?: readonly Source[] | undefined
   // Images and PDFs shown to the model beside the text, on a user message; they count toward `maxInputChars` as `ask` estimates and each is under `maxAttachmentBytes`.
   attachments?: readonly Attachment[] | undefined
 }
@@ -175,6 +184,8 @@ export interface AskOptions {
   signal?: AbortSignal | undefined
   // Lets the reply finish on the server after the request being answered aborts, a visitor who reloaded or left: the provider request, the tool loop and every reader go on, and a `Chat` with `remember` shows the finished turn after the reload. Only `reply.stop()`, `signal` and the Chat's Stop end it, and a reader leaving early no longer does.
   outlive?: boolean | undefined
+  // The documents the model was given, numbered as it cites them (`[1]`): `reply.progress()` carries them beside the text, and a `Chat` links each `[n]` to its source and lists the cited ones under the turn.
+  sources?: readonly Source[] | undefined
   // How long to wait, as a duration: `connect` for the provider to start answering (`'30s'` by default), `idle` for the next chunk of a reply once it began (`'60s'` by default). A stall past either fails the reply with a `timeout` error. Each step of a tool loop counts them anew.
   timeout?: { connect?: Duration | undefined, idle?: Duration | undefined } | undefined
   // Who the limits and budget set in `ai()` count this ask for, in place of the signed-in user its `key` names or the address of the request being answered: a job or a test names one.
@@ -224,6 +235,8 @@ export interface Progress {
   reasoning?: string | undefined
   // Set when the ask has `outlive`, which tells a chat its Stop must end the reply on the server too.
   outlives?: true | undefined
+  // The documents the text cites as `[n]`, from `ask({ sources })`; absent when there are none.
+  sources?: Source[] | undefined
 }
 
 // A finished code block: `markup` is how the chat renders it as Markdown, which `html` replaces.

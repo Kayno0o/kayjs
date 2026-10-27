@@ -21,6 +21,7 @@
     "./chat.kay": "./src/chat.kay",
     "./chat-launcher.kay": "./src/chat-launcher.kay",
     "./chat-calls.kay": "./src/chat-calls.kay",
+    "./chat-sources.kay": "./src/chat-sources.kay",
     "./chat-panel.kay": "./src/chat-panel.kay",
     "./test": "./src/test.ts",
     ".": {

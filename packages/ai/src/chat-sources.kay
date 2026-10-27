@@ -1,0 +1,24 @@
+---
+import type { Source } from './types'
+import { recipe } from 'kay'
+
+const look = recipe({ parts: { root: 'kai-chat-sources', label: 'kai-chat-sources-label', list: 'kai-chat-sources-list', item: 'kai-chat-source', link: 'kai-chat-source-link' } })
+
+// A path of this site or an anchor in the page: `//host` is another site.
+const LOCAL_HREF = /^(?:\/(?!\/)|#)/
+
+const { sources, label, here } = props<{
+  sources: Source[]
+  label: string
+  // A source of this site opens in place instead of a new tab.
+  here: boolean
+}>()
+
+const apart = (href: string) => !(here && LOCAL_HREF.test(href))
+---
+div(part="root")
+  small(part="label") {label}
+  ol(part="list")
+    for source of sources key={source.n}
+      li(part="item" value={source.n})
+        a(part="link" href={source.href} target={apart(source.href) ? '_blank' : undefined} rel={apart(source.href) ? 'nofollow ugc noopener' : 'nofollow ugc'} data-new-tab={apart(source.href) ? '' : undefined}) {source.title}

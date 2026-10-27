@@ -40,6 +40,7 @@ export default defineMessages({
       table: 'Tableau',
       thinking: 'Réflexion…',
       reasoning: 'Raisonnement',
+      sources: 'Sources',
     },
   },
 })

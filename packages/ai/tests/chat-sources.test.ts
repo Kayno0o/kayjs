@@ -1,0 +1,45 @@
+import { afterEach, expect, test } from 'bun:test'
+import { ai, ask, fakeAi } from '../src'
+import { linkSources, usableSources } from '../src/chat-sources'
+
+afterEach(() => {
+  ai()
+  fakeAi.clear()
+})
+
+const sources = [{ n: 1, title: 'Tides', href: 'https://example.com/a?x=1&y="2"' }, { n: 2, title: 'Moon', href: '/moon' }]
+
+test('each [n] outside code and links becomes a link to its source, and the cited sources come in the order cited', () => {
+  const { html, cited } = linkSources('<p>See [2] and [1], [1] again, [3] unknown, <code>[1]</code> <a href="/x">[2]</a></p><pre><code>[2]</code></pre><p>[2][1]</p>', sources)
+
+  expect(html).toContain('<p>See <a href="/moon">[2]</a> and <a href="https://example.com/a?x=1&amp;y=&quot;2&quot;">[1]</a>, ')
+  expect(html).toContain('[3] unknown, <code>[1]</code> <a href="/x">[2]</a></p><pre><code>[2]</code></pre>')
+  expect(html).toEndWith('<p><a href="/moon">[2]</a><a href="https://example.com/a?x=1&amp;y=&quot;2&quot;">[1]</a></p>')
+  expect(cited.map(source => source.n)).toEqual([2, 1])
+})
+
+test('a reply with no sources is left as it is', () => {
+  expect(linkSources('<p>[1]</p>', [])).toEqual({ html: '<p>[1]</p>', cited: [] })
+})
+
+test('only well-formed sources with a safe href are used, one per number', () => {
+  expect(usableSources([{ n: 1, title: 'a', href: 'javascript:alert(1)' }, { n: 2, title: 'b', href: '//evil.example' }, { n: 3, title: 'c', href: 'https://x.example' }, { n: 3, title: 'dup', href: '/d' }, { n: 1.5, title: 'e', href: '/e' }, { title: 'f', href: '/f' }, null, 'x'])).toEqual([{ n: 3, title: 'c', href: 'https://x.example' }])
+  expect(usableSources(undefined)).toEqual([])
+})
+
+test('progress carries the sources of the ask beside the text, and none without them', async () => {
+  fakeAi.reply('See [1].')
+
+  const withSources: unknown[] = []
+
+  for await (const snapshot of ask('q', { sources }).progress())
+    withSources.push(snapshot)
+
+  expect(withSources.length).toBeGreaterThan(0)
+  expect(withSources.every(snapshot => JSON.stringify((snapshot as { sources: unknown }).sources) === JSON.stringify(sources))).toBe(true)
+
+  fakeAi.reply('See [1].')
+
+  for await (const snapshot of ask('q').progress())
+    expect(snapshot).not.toHaveProperty('sources')
+})

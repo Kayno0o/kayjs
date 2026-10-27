@@ -274,7 +274,7 @@ function resumed(call: ReplyCall | undefined): Reply | undefined {
   if (call === undefined || call.op === 'start')
     return undefined
 
-  const empty = createReply(nothing, [], undefined, false, undefined, true)
+  const empty = createReply(nothing, [], undefined, false, undefined, { resumed: true })
 
   if (call.key === undefined)
     return empty
@@ -338,10 +338,10 @@ function reply(prompt: string | Message[], options: AskOptions, answer: TSchema 
   const about = { provider: provider.name, model, prompt: messages.findLast(message => message.role === 'user')?.content ?? '', chars: asker.chars }
 
   if (messageChars > maxInputChars)
-    return createReply(() => tooLong(messageChars, maxInputChars), signals, undefined, outlive, ended)
+    return createReply(() => tooLong(messageChars, maxInputChars), signals, undefined, outlive, ended, { sources: options.sources })
 
   if (options.tools === undefined || options.tools.length === 0)
-    return createReply(signal => recorded(guarded(() => via(signal, request => provider.stream(request, signal)), asker, signal), about, signal), signals, undefined, outlive, ended)
+    return createReply(signal => recorded(guarded(() => via(signal, request => provider.stream(request, signal)), asker, signal), about, signal), signals, undefined, outlive, ended, { sources: options.sources })
 
   const maxSteps = options.maxSteps ?? DEFAULT_MAX_STEPS
 
@@ -355,5 +355,5 @@ function reply(prompt: string | Message[], options: AskOptions, answer: TSchema 
 
   looping.maxTokens = maxTokens * maxSteps
 
-  return createReply(signal => recorded(guarded(() => via(signal, request => converse(provider, request, offered, maxSteps, answering, signal, options.confirm)), looping, signal), about, signal), signals, undefined, outlive, ended)
+  return createReply(signal => recorded(guarded(() => via(signal, request => converse(provider, request, offered, maxSteps, answering, signal, options.confirm)), looping, signal), about, signal), signals, undefined, outlive, ended, { sources: options.sources })
 }

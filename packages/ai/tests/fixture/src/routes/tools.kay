@@ -82,6 +82,8 @@ export const approving = action(s.Object({ messages: s.Array(s.Object({ role: s.
 // The chat's action when the model has tools: the stream carries the calls too.
 export const helper = action(s.Object({ messages: s.Array(s.Object({ role: s.UnionEnum(['user', 'assistant']), content: s.String({ maxLength: 4000 }) }), { minItems: 1, maxItems: 50 }) }), ({ messages }) => ask(messages, { tools: [addNote, breaks], confirm: false, provider: testing.provider }).progress())
 
+export const sourced = action(s.Object({ messages: s.Array(s.Object({ role: s.UnionEnum(['user', 'assistant']), content: s.String({ maxLength: 4000 }) }), { minItems: 1, maxItems: 50 }) }), ({ messages }) => ask(messages, { sources: [{ n: 1, title: 'Tides', href: 'https://example.com/tides?a=1&b=2' }, { n: 2, title: 'Moon', href: '/moon' }, { n: 3, title: 'Never cited', href: 'https://example.com/3' }, { n: 4, title: 'Hostile', href: 'javascript:alert(1)' }] }).progress())
+
 export const refusedTools = action(s.Object({ which: s.UnionEnum(['vetoed', 'upload']) }), ({ which }) => {
   ask('x', { tools: [which === 'vetoed' ? vetoed : upload] })
 

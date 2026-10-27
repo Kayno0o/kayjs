@@ -145,6 +145,8 @@ Its parts - `root`, `empty`, `greeting`, `suggestions`, `suggestion`, `log`, `tu
 - The visitor's message is a tinted bubble at the right, an answer the full width of the log with no frame, and the first token is awaited behind three pulsing dots. Code in answers is `0.75rem`.
 - Markup: `.kai-chat` holds `.kai-chat-log` (turns `.kai-chat-turn[data-role]`, the pending one `[data-pending]`, text in `.kai-chat-text`) and `.kai-chat-form`; override them in the app's CSS.
 
+Citations of a reply (`[1]` linked, the cited sources listed under the turn) are in [Chat sources](chat-sources.md).
+
 ### A reply that outlives the page
 
 With `ask(messages, { outlive: true })` in the action, a `Chat` given `remember` loses nothing to a reload or a closed tab, with no code in the app.

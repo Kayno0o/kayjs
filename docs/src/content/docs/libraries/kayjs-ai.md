@@ -107,6 +107,14 @@ A page, with or without a `server` fence, hands the action straight to `Chat`. T
 - A link in a reply opens in a new tab, so following it never loses the conversation; `links="here"` opens a link to your own site in place, which `ChatLauncher` sets.
 - Images in a reply are not shown. A model that read a hostile page could point an image at a link carrying your visitor's conversation.
 
+A reply grounded in documents cites them as `[1]`, `[2]`. Give `ask` the documents and the chat links each number outside code to its document and lists the cited ones under the turn, in a new tab for an outside link:
+
+```ts
+ask(messages, { sources: documents.map((doc, index) => ({ n: index + 1, title: doc.title, href: doc.url })) }).progress()
+```
+
+A source is `{ n, title, href }`, and its `href` is an `http(s)` address, a path of your site, an anchor or `mailto:`; any other is ignored. Return `.progress()`, as the sources travel with it. A number the model cites that no source has stays as text. The sources stay with the turn over `remember`, and `initial` takes a `sources` list on an assistant message. The list's title is the `sourcesLabel` prop.
+
 Every text is looked up in the app's catalogs under an `ai.chat.<name>` key first (`ai.chat.send`, `ai.chat.greeting`, `ai.chat.open`, `ai.chat.running` and so on), and kayjs-ai ships the French of each, so a site on `lang: 'fr'` needs no setup; a key the app words in its own `src/messages/<locale>.ts` replaces it.
 
 Every label is also a prop, which replaces the message: `placeholder`, `sendLabel`, `stopLabel`, `retryLabel`, `thinkingLabel`, `stoppedLabel`, `tableLabel` (a reply with several tables numbers them), `greeting` and `errorMessage`.
@@ -122,6 +130,8 @@ The chat posts its last 20 messages with each one; the `keep` prop changes that,
 Each send also posts at most 40,000 characters, dropping the oldest messages first. If your `ask` sets a lower `maxInputChars`, you need to tell the chat nothing: when the action refuses a conversation with a 413, the chat posts half as much (the oldest messages go first) and asks again, up to five times, and it remembers the lower size for the next sends. Each of those refusals counts against the action's rate limit. `maxChars` sets the size from the start.
 
 <ReadMore href="/llms/kayjs-ai-chat">The props, the markup and the rules for passing the action.</ReadMore>
+
+<ReadMore href="/llms/kayjs-ai-chat-sources">How citations are linked and listed, and what a source may be.</ReadMore>
 
 ### A chat button on every page
 

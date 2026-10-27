@@ -212,6 +212,27 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the Chat i
     expect(page.errors).toEqual([])
   })
 
+  test('a reply citing [n] links each outside code to its source and lists the cited ones in a new tab, and a reload keeps them', async () => {
+    const page = await site.open('/sourced')
+
+    fakeAi.reply('Tides follow the moon [1][2], see `[1]` and [3x] and [4].')
+    await page.fill('textarea', 'Why tides?')
+    await page.press('Enter')
+    await page.waitFor('[data-pending]', { gone: true })
+
+    const turn = '.kai-chat-turn[data-role="assistant"]'
+
+    expect(await page.count(`${turn} .kai-chat-text a`)).toBe(2)
+    expect(await page.evaluate(() => [...document.querySelectorAll('.kai-chat-turn[data-role="assistant"] .kai-chat-text a')].map(link => `${link.textContent} ${link.getAttribute('href')} ${link.getAttribute('target')}`))).toEqual(['[1] https://example.com/tides?a=1&b=2 _blank', '[2] /moon _blank'])
+    expect(await page.evaluate(() => [...document.querySelectorAll('.kai-chat-source-link')].map(link => `${link.textContent} ${link.getAttribute('target')}`))).toEqual(['Tides _blank', 'Moon _blank'])
+
+    await page.reload()
+    await page.waitFor(`${turn} .kai-chat-source-link`, { text: 'Moon' })
+
+    expect(await page.count('.kai-chat-source-link')).toBe(2)
+    expect(page.errors).toEqual([])
+  })
+
   test('a write waits for Allow, which posts the ticket for that call and runs it, and Deny posts a refusal', async () => {
     done.length = 0
 
