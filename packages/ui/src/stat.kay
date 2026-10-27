@@ -4,14 +4,20 @@ import type { JSX } from 'kay'
 import type { IconProps } from 'kay/icons'
 import type { IconSlot } from './defaults'
 import Icon from './icon.kay'
+import { deltaIcon } from './stat'
+import type { StatDelta } from './stat'
 
 const look = recipe({
   // 'kui-stat-badge' keeps the hairline and the fill of the shell it shares with buttons; the figure alone takes the tone, so the label keeps its text colour. A tile fills its grid cell, the figure large above its label.
   parts: {
-    root: 'kui-stat-badge inline-flex items-center gap-[calc(var(--spacing)*1.25*var(--density))] rounded-lg px-2.25 py-0.75 text-xs',
+    root: 'kui-stat-badge inline-flex items-center gap-[calc(var(--spacing)*1.25*var(--density))] rounded-lg px-2.25 py-0.75 text-xs [&:is(a)]:no-underline',
     icon: 'size-4 shrink-0',
     value: 'font-semibold text-foreground',
     label: 'text-muted',
+    figure: 'flex items-baseline gap-2',
+    delta: 'inline-flex items-center gap-1 font-normal text-muted data-[tone=success]:text-success data-[tone=warning]:text-warning data-[tone=danger]:text-danger data-[tone=info]:text-info',
+    deltaIcon: 'size-3.5 shrink-0',
+    deltaLabel: 'text-muted',
   },
   variants: {
     // `inline` is the pill, figure and label side by side; `tile` is a framed box with the figure above its label, to stack in a grid.
@@ -36,16 +42,49 @@ const look = recipe({
   defaults: { variant: 'inline', tone: 'neutral' },
 })
 
-const { value, label, icon, variant = 'inline', tone = 'neutral', ...rest } = props<Omit<JSX.IntrinsicElements['span'], 'class' | 'children'> & {
+const { value, label, icon, href, delta, variant = 'inline', tone = 'neutral', ...rest } = props<Omit<JSX.IntrinsicElements['span'], 'class' | 'children'> & {
   value: number | string
   label?: string | undefined
   icon?: IconSlot | IconProps | undefined
+  // Makes the whole stat a link, to the list it counts.
+  href?: string | undefined
+  // How the figure moved since the period before, beside the figure with an arrow, so colour is not the only signal.
+  delta?: StatDelta | undefined
 }>()
+
+// The link takes the span's own props, typed for a span: its `ref` would not fit an anchor to the type check.
+const handedOn = rest as Record<string, never>
 ---
 // A figure and what it counts, read together: "12 moons".
-span({...rest} data-variant={variant === 'tile' ? 'tile' : undefined} data-tone={tone === 'neutral' ? undefined : tone})
-  if icon
-    Icon(icon={icon} part="icon")
-  span(part="value") {value}
-  if label
-    span(part="label") {label}
+if href !== undefined
+  a(part="root" {...handedOn} href={href} data-variant={variant === 'tile' ? 'tile' : undefined} data-tone={tone === 'neutral' ? undefined : tone})
+    if icon
+      Icon(icon={icon} part="icon")
+    if delta
+      span(part="figure")
+        span(part="value") {value}
+        span(part="delta" data-tone={delta.tone === 'neutral' ? undefined : delta.tone})
+          Icon(icon={deltaIcon(delta)} part="deltaIcon")
+          span {delta.value}
+          if delta.label
+            span(part="deltaLabel") {delta.label}
+    else
+      span(part="value") {value}
+    if label
+      span(part="label") {label}
+else
+  span(part="root" {...rest} data-variant={variant === 'tile' ? 'tile' : undefined} data-tone={tone === 'neutral' ? undefined : tone})
+    if icon
+      Icon(icon={icon} part="icon")
+    if delta
+      span(part="figure")
+        span(part="value") {value}
+        span(part="delta" data-tone={delta.tone === 'neutral' ? undefined : delta.tone})
+          Icon(icon={deltaIcon(delta)} part="deltaIcon")
+          span {delta.value}
+          if delta.label
+            span(part="deltaLabel") {delta.label}
+    else
+      span(part="value") {value}
+    if label
+      span(part="label") {label}

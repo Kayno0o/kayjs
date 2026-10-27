@@ -80,6 +80,29 @@ inBrowser('in the browser', () => {
     expect(page.errors).toEqual([])
   }, 120_000)
 
+  test('a Stat link is a plain framed tile with its change on the figure\'s line, and takes the shell\'s hover', async () => {
+    const site = await shared()
+
+    await using page = await site.open('/data', { width: 400 })
+    const measure = () => page.evaluate(() => {
+      const tile = document.querySelector<HTMLElement>('#linked')!
+      const value = tile.querySelector('[data-part=value]')!.getBoundingClientRect()
+      const delta = tile.querySelector('[data-part=delta]')!.getBoundingClientRect()
+      const label = tile.querySelector('[data-part=label]')!.getBoundingClientRect()
+
+      return { underline: getComputedStyle(tile).textDecorationLine, beside: delta.left >= value.right && Math.abs(delta.bottom - value.bottom) < 8, labelBelow: label.top >= value.bottom, fill: getComputedStyle(tile).backgroundColor, overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth }
+    })
+    const before = await measure()
+
+    await page.hover('#linked')
+
+    const after = await measure()
+
+    expect({ underline: before.underline, beside: before.beside, labelBelow: before.labelBelow, overflow: before.overflow }).toEqual({ underline: 'none', beside: true, labelBelow: true, overflow: 0 })
+    expect(after.fill).not.toBe(before.fill)
+    expect(page.errors).toEqual([])
+  }, 120_000)
+
   test('Table draws a line between the stacked cards whatever the row borders are, and none in the wide table', async () => {
     const site = await shared()
 

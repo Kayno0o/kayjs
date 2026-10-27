@@ -621,6 +621,20 @@ describe('data', () => {
     expect((await find('/data', '#no-media p')).map(found => found.text)).toEqual(['No photos'])
   })
 
+  test('Stat becomes a link as a whole, and shows its change with an arrow by the figure', async () => {
+    const linked = await one('/data', '#linked')
+    const text = async (selector: string) => (await find('/data', selector)).map(item => item.text)
+
+    expect([linked.tag, attr(linked, 'href'), linked.text]).toEqual(['a', '/errors', '12+12%vs previouserrors'])
+    expect(await text('#plain')).toEqual(['1moon'])
+    expect((await find('/data', '#plain [data-part=figure]'))).toEqual([])
+    expect(await attributes('/data', '#linked [data-part=delta]', ['data-tone'])).toEqual([{ 'data-tone': 'danger' }])
+    expect(await attributes('/data', '#falling [data-part=delta]', ['data-tone'])).toEqual([{ 'data-tone': 'success' }])
+    expect([(await find('/data', '#linked [data-part=deltaIcon]')).length, (await one('/data', '#linked [data-part=deltaIcon]')).html]).toEqual([1, expect.stringContaining('<path')])
+    expect((await one('/data', '#linked [data-part=deltaIcon]')).html).not.toBe((await one('/data', '#falling [data-part=deltaIcon]')).html)
+    expect((await one('/data', '#steady [data-part=deltaIcon]')).html).not.toBe((await one('/data', '#falling [data-part=deltaIcon]')).html)
+  })
+
   test('BarList makes the label of a row with an href a link, and leaves the others as text', async () => {
     expect((await find('/data', '#bar-links a')).map(found => [found.text, attr(found, 'href'), attr(found, 'data-part')])).toEqual([['Mars', '/planets/mars', 'label']])
     expect((await find('/data', '#bar-links span[data-part=label]')).map(found => found.text)).toEqual(['Venus'])

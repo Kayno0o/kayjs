@@ -166,12 +166,14 @@
 
   /* :where() keeps these at one class, so the variants below still win. */
   :where(button, a, [role='button'], summary).kui-shell:hover,
+  :where(a).kui-stat-badge:hover,
   .kui-btn:hover {
     --shell-line: var(--color-muted);
     --shell-fill: var(--color-surface-strong);
   }
 
   :where(button, a, [role='button'], summary).kui-shell:focus-visible,
+  :where(a).kui-stat-badge:focus-visible,
   .kui-btn:focus-visible {
     --shell-line: var(--color-accent);
     outline: 2px solid var(--color-accent);

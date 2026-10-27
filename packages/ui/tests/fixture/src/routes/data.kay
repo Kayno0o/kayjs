@@ -8,6 +8,7 @@ import Rating from '@kaynooo/kayjs-ui/rating.kay'
 import SiteFavicon from '@kaynooo/kayjs-ui/site-favicon.kay'
 import Skeleton from '@kaynooo/kayjs-ui/skeleton.kay'
 import Stat from '@kaynooo/kayjs-ui/stat.kay'
+import '../app.css'
 ---
 main
   article#stat
@@ -28,6 +29,11 @@ main
     Meter(value={3} max={4} label="Quota")
   article#bars
     BarList(rows={[{ key: 'mars', label: 'Mars', value: 2 }, { key: 'earth', label: 'Earth', value: 1, display: 'one' }, { key: 'venus', label: 'Venus', value: 0 }]})
+  article#stat-link
+    Stat#linked(value={12} label="errors" href="/errors" variant="tile" delta={{ value: '+12%', label: 'vs previous', tone: 'danger' }})
+    Stat#falling(value={3} label="open" delta={{ value: '-2', tone: 'success' }})
+    Stat#steady(value={3} label="closed" delta={{ value: '0%' }})
+    Stat#plain(value={1} label="moon")
   article#bar-links
     BarList(rows={[{ key: 'mars', label: 'Mars', value: 2, href: '/planets/mars' }, { key: 'venus', label: 'Venus', value: 1 }]})
   article#no-bars-label
