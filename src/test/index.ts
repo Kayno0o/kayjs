@@ -66,6 +66,8 @@ export type { EnvOverride, EnvRestore } from './override-env'
 export { overrideEnv } from './override-env'
 export type { Found, PageReading } from './page'
 export { scratchDir } from './scratch'
+export type { FakeService, ServiceAnswer, ServiceHandler, ServiceRequest, ServiceRoutes } from './service'
+export { fakeService } from './service'
 export { solveWork }
 
 export interface TestOptions extends PagesOptions {

@@ -114,6 +114,35 @@ expect(await site.api(notes, '/:id', { method: 'patch', params: { id: 9 }, body:
 
 Running the jobs an action enqueued and testing a websocket route are in [Testing requests, jobs, sockets and sessions](testing-requests-jobs-sockets.md).
 
+### Test an app calling an outside API
+
+- `fakeService(routes)` from `kay/test` stands in for a service the app calls (Forgejo, Frigate, a weather API): a real server on a free loopback port, so the app's own `fetch`, headers, timeouts and aborts run for real.
+- `routes` maps `path` or `METHOD path` to a value (JSON, a string as text, `undefined` as 204), a `Response`, or a function of the request returning one; a bare function answers every request, and an unmatched one answers 404.
+- `service.url` is its origin with no trailing slash, so one line points the app at it, `overrideEnv(env, { FORGEJO_URL: forgejo.url })`.
+- `service.requests` holds what it received since the test began, each `{ method, path, query, headers, text, json() }`.
+- `service.fail(503)` answers every request that status and `service.stall()` holds them unanswered, both until the test ends, to test the app's failure and timeout paths.
+- The requests clear and the failure ends before each test, and the server stops after the file's tests; one made inside a test is stopped with `await using` or `service.stop()`.
+
+```ts
+import { afterAll, expect, it } from 'bun:test'
+import { fakeService, overrideEnv, testSite } from 'kay/test'
+import { env } from '../src/env'
+
+const forgejo = fakeService({ 'GET /api/v1/repos': ({ query }) => [{ name: 'kay', page: query.get('page') }] })
+const restore = overrideEnv(env, { FORGEJO_URL: forgejo.url })
+const site = await testSite()
+
+afterAll(restore.restore)
+
+it('lists the repos Forgejo gives, and says so when it is down', async () => {
+  expect((await site.visit('/repos')).text('li')).toContain('kay')
+
+  forgejo.fail(503)
+  expect((await site.visit('/repos')).text('.error')).toContain('unavailable')
+  expect(forgejo.requests.at(-1)?.path).toBe('/api/v1/repos')
+})
+```
+
 ### Reset or seed content
 
 A test never writes into the project's `src/content`: a folder collection moves to a copy under `.kay/scratch` as its first save, delete or CMS screen reaches it, and the site reads it from there. `site.content.reset()` puts everything back (folders read from the project, loaders on their own source), `site.content.reset({ posts: [{ slug: 'a', data: { title: 'A' }, body: '...' }] })` or `site.content.seed('posts', entries)` makes a collection hold exactly those entries (`locale` for a localized one), and `site.content.write('posts', 'broken.json', text)` writes a raw file in the copy, for an entry that does not parse. A loaded collection's seed lives in memory: its loader's `load`, `get` and `count` read it, and `save` and `remove` (where declared) change it, never the source. A file written straight into `src/content` is read only until the copy is made.

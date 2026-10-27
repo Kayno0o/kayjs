@@ -214,6 +214,21 @@ On a French site, the component writes the same non-breaking spaces before `: ; 
 
 A component that calls a route of an API module, your own, can be mounted too. The call goes out as a `fetch`, so stub `fetch` in the test to answer it.
 
+## An outside API
+
+An app that calls another service is tested against a stand-in. `fakeService(routes)` starts a small real server on a free port and gives its `url`, which you hand to the app through `overrideEnv`. Because the server is real, the app's own `fetch`, headers and timeouts run as they do in production.
+
+```ts
+const forgejo = fakeService({ 'GET /api/v1/repos': () => [{ name: 'kay' }] })
+const restore = overrideEnv(env, { FORGEJO_URL: forgejo.url })
+
+afterAll(restore.restore)
+```
+
+A route is a path, or `METHOD path`, and its answer is a value sent as JSON, a string sent as text, a `Response`, or a function of the request that returns one. A request nothing matches answers 404. `forgejo.requests` lists what the app sent since the test began, with each `method`, `path`, `query`, `headers`, `text` and `json()`.
+
+To test a failure, call `forgejo.fail(503)` and every request answers that status, or `forgejo.stall()` and none is answered, so the app's timeout is what ends the call. Both end with the test, and the requests clear before the next one. The server stops after the file's tests. A fake made inside a test is stopped with `await using` or `forgejo.stop()`.
+
 ## The environment of the tests
 
 `kay/test/preload` drops every variable only your `.env` sets, so a test never reaches the mail server or database you use in development. The shell's and the CI's variables and `.env.test` stay.
