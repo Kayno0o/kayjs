@@ -13,11 +13,11 @@ const entries = [
 ]
 
 function select(key: string | undefined, entry: { text: string }) {
-  picked.set(key)
+  picked = key
   onSelect(key, entry.text)
 }
 ---
 Timeline#bound(entries={entries} label="Day" selected={picked()} onSelect={select})
 p#value {picked() ?? 'none'}
 Timeline#plain(entries={entries} label="Plain")
-button#pick-a(type="button" onClick={() => picked.set('a')}) A
+button#pick-a(type="button" onClick={() => picked = 'a'}) A

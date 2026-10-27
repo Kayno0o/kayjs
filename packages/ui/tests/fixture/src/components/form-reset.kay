@@ -47,7 +47,7 @@ form#form
   Checkbox#free(label="Free" onChange={free.set})
   ChipGroup(label="Decks" name="decks" options={options} value={decks()} onChange={decks.set})
   Segmented(label="Size" name="size" options={sizes} value={size()} onChange={size.set})
-  Segmented(label="Sort" name="sort" options={sizes} value={sort()} onChange={(value: 's' | 'm' | 'l' | null) => sort.set(value)})
+  Segmented(label="Sort" name="sort" options={sizes} value={sort()} onChange={(value: 's' | 'm' | 'l' | null) => sort = value})
   TextInput#formname(name="form" value={formName()} onInput={formName.set})
   Select#level(name="level" options={levels} value={level()} onChange={level.set})
   MultiSelect(label="Tags" name="tags" options={choices} value={tags()} onChange={tags.set})
@@ -58,6 +58,6 @@ form#form
   DateRangeInput#stay(label="Stay" value={stay()} onChange={stay.set})
   IconPicker#named(name="icon" value={icon()} search={search} onChange={icon.set})
   IconPicker#bare(value={bare()} search={search} onChange={bare.set})
-  Select#fixed(options={levels} value="b" onChange={heard.set} ref={() => refd.set(true)})
+  Select#fixed(options={levels} value="b" onChange={heard.set} ref={() => refd = true})
   button#reset(type="reset") Reset
 p#state {JSON.stringify({ agree: agree(), power: power(), free: free(), decks: decks(), size: size(), sort: sort(), level: level(), tags: tags(), title: title(), bio: bio(), notes: notes(), range: range(), stay: stay(), icon: icon(), bare: bare(), heard: heard(), refd: refd(), form: formName() })}

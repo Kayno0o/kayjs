@@ -20,7 +20,7 @@ const pending = signal(false)
 
 // What a page's action is to an island: a call that answers or throws ActionError, its `pending()` and its `url`.
 const rename = Object.assign(async (form: FormData) => {
-  pending.set(true)
+  pending = true
 
   try {
     const answer = await save({ name: String(form.get('name')) })
@@ -31,7 +31,7 @@ const rename = Object.assign(async (form: FormData) => {
     return answer
   }
   finally {
-    pending.set(false)
+    pending = false
   }
 }, { pending, url: '/_kay/action/form/rename' }) as unknown as Action<{ name: string }, string | Failure<Refusal>>
 
@@ -39,9 +39,9 @@ function said(refusal: Refusal) {
   return refusal.field ? { [refusal.field]: refusal.error } : refusal.error
 }
 ---
-button#open(onClick={() => open.set(true)}) Open
-button#hide(onClick={() => open.set(false)}) Hide
-FormDialog(open={open()} title="Rename" action={rename} submitLabel="Rename" failure="Could not rename" refused={plain ? undefined : said} onSaved={onSaved} onOpenChange={() => open.set(false)})
+button#open(onClick={() => open = true}) Open
+button#hide(onClick={() => open = false}) Hide
+FormDialog(open={open()} title="Rename" action={rename} submitLabel="Rename" failure="Could not rename" refused={plain ? undefined : said} onSaved={onSaved} onOpenChange={() => open = false})
   FormField(label="Name" name="name" hint="As the profile shows it")
     input#name(name="name" value="Ada" aria-describedby="name-note")
   p#name-note Public

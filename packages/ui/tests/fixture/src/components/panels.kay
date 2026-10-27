@@ -17,23 +17,23 @@ const dockEdge = signal<'right' | 'bottom'>('right')
 const dockSize = signal<number | undefined>(undefined)
 const lateEdge = signal<'right' | 'bottom' | undefined>(undefined)
 ---
-button#open(onClick={() => open.set(true)}) Open
-button#open-beside(onClick={() => beside.set(true)}) Open beside
-button#open-sidebar(onClick={() => sidebarOpen.set(true)}) Sidebar
-button#toggle-detail(onClick={() => detailOpen.set(!detailOpen())}) Detail
-button#open-linked(onClick={() => linked.set(true)}) Open linked
-button#shut(onClick={() => open.set(false)}) Shut
-SidePanel#panel(open={open()} title="Mars" onOpenChange={() => { open.set(false); onClose() }})
+button#open(onClick={() => open = true}) Open
+button#open-beside(onClick={() => beside = true}) Open beside
+button#open-sidebar(onClick={() => sidebarOpen = true}) Sidebar
+button#toggle-detail(onClick={() => detailOpen = !detailOpen()}) Detail
+button#open-linked(onClick={() => linked = true}) Open linked
+button#shut(onClick={() => open = false}) Shut
+SidePanel#panel(open={open()} title="Mars" onOpenChange={() => { open = false; onClose() }})
   @actions
     button#next Next
   @footer
     button#save Save
   p#body Fourth planet
-SidePanel#beside(open={beside()} modal={false} closeHref="/list" title="Venus" onOpenChange={() => { beside.set(false); onClose() }})
+SidePanel#beside(open={beside()} modal={false} closeHref="/list" title="Venus" onOpenChange={() => { beside = false; onClose() }})
   p#beside-body Second planet
 SidePanel#linked(open={linked()} modal={false} closeHref="/list" title="Earth")
   p#linked-body Third planet
-SplitLayout#split(sidebarOpen={sidebarOpen()} onSidebarOpenChange={() => sidebarOpen.set(false)} sidebarTitle="Planets" resizableList listWidthKey={listWidthKey} detailOpen={detailOpen()})
+SplitLayout#split(sidebarOpen={sidebarOpen()} onSidebarOpenChange={() => sidebarOpen = false} sidebarTitle="Planets" resizableList listWidthKey={listWidthKey} detailOpen={detailOpen()})
   @sidebar
     nav Inner, outer
   @list
@@ -43,14 +43,14 @@ SplitLayout#split(sidebarOpen={sidebarOpen()} onSidebarOpenChange={() => sidebar
   @detail
     p#detail Mars
     button#edit Edit
-SidePanel#docked(open={dockOpen()} modal={false} dock={dockEdge()} size={dockSize()} onSizeChange={(size, settled) => { dockSize.set(size); if (settled) onSettled?.(size) }} title="Jupiter" launcher="Open Jupiter" launcherLayer={41} style="z-index: 77; opacity: 0.9" onOpenChange={shown => dockOpen.set(shown)})
+SidePanel#docked(open={dockOpen()} modal={false} dock={dockEdge()} size={dockSize()} onSizeChange={(size, settled) => { dockSize = size; if (settled) onSettled?.(size) }} title="Jupiter" launcher="Open Jupiter" launcherLayer={41} style="z-index: 77; opacity: 0.9" onOpenChange={shown => dockOpen = shown})
   p#docked-body Fifth planet
-button#show-launched(onClick={() => launched.set(true)}) Show launched
+button#show-launched(onClick={() => launched = true}) Show launched
 if launched()
   SidePanel#launched(open={false} modal={false} dock="right" closeHref="/list" title="Saturn" launcher="Open Saturn" launcherHref="/saturn")
     p Sixth planet
-button#open-docked(onClick={() => dockOpen.set(true)}) Open docked
-button#dock-bottom(onClick={() => dockEdge.set('bottom')}) Dock bottom
+button#open-docked(onClick={() => dockOpen = true}) Open docked
+button#dock-bottom(onClick={() => dockEdge = 'bottom'}) Dock bottom
 SidePanel#late(open={true} modal={false} dock={lateEdge()} title="Saturn" onOpenChange={() => undefined})
   p Sixth planet
-button#late-dock(onClick={() => lateEdge.set('bottom')}) Dock late
+button#late-dock(onClick={() => lateEdge = 'bottom'}) Dock late

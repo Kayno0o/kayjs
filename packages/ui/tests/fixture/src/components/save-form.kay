@@ -12,7 +12,7 @@ const pending = signal(false)
 const extra = signal(false)
 
 const rename = Object.assign(async (form: FormData) => {
-  pending.set(true)
+  pending = true
 
   try {
     const answer = await save({ name: String(form.get('name')) })
@@ -23,11 +23,11 @@ const rename = Object.assign(async (form: FormData) => {
     return answer
   }
   finally {
-    pending.set(false)
+    pending = false
   }
 }, { pending, url: '/_kay/action/form/rename' }) as unknown as Action<{ name: string }, string | Failure<never>>
 ---
-button#more(onClick={() => extra.set(true)}) More
+button#more(onClick={() => extra = true}) More
 SaveForm(action={rename} failure="Could not save" saved="Saved." onSaved={onSaved} onDiscard={onDiscard} shortcut={shortcut})
   FormField(label="Name" name="name")
     input#name(name="name" value="Ada")

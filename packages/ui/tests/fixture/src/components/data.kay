@@ -16,4 +16,4 @@ SiteFavicon#favicon(src={src} name="kaynooo.fr")
 CopyButton#copy(text="https://kaynooo.fr" html={'<b>kaynooo.fr</b>'} label="Copy link" copiedFor={copiedFor})
 Toaster
 Avatar#avatar(src={picture()} name="Ada")
-button#swap(onClick={() => picture.set('/grace.png')}) Swap
+button#swap(onClick={() => picture = '/grace.png'}) Swap

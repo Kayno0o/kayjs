@@ -18,7 +18,7 @@ function level(next: number) {
 }
 
 function pickKind(next: 'post' | 'page' | '') {
-  kind.set(next)
+  kind = next
   onPicked?.(next)
 }
 // Kept as the names it reads, one per line, as a roster would.
@@ -26,21 +26,21 @@ const roster = signal('Ada\nGrace')
 // A message being written, which a send clears while the box is focused.
 const draft = signal('')
 ---
-TextInput#name(value={name()} onInput={value => name.set(value)} onChange={onCommit} onBlur={event => onLeave?.(event.currentTarget.id)})
+TextInput#name(value={name()} onInput={value => name = value} onChange={onCommit} onBlur={event => onLeave?.(event.currentTarget.id)})
 p#echo {name()}
 TextInput#amount(type="number" value={amount()} onInput={amount.set} onChange={next => onPicked?.(next)})
 p#figure {amount() === null ? 'none' : `${typeof amount()} ${amount()}`}
-button#reset(onClick={() => amount.set(null)}) Reset
-button#clear(onClick={() => name.set('')}) Clear
+button#reset(onClick={() => amount = null}) Reset
+button#clear(onClick={() => name = ''}) Clear
 Select#planet(value="mars" busy options={[{ value: 'mars', label: 'Mars' }, { value: 'earth', label: 'Earth' }]} onChange={onPlanet})
 Select#level(value={1} options={LEVELS} onChange={level})
 Select#kind(value={kind()} options={KINDS} emptyOption="Any" onChange={pickKind})
 TextInput#plain(name="email" aria-label="Email")
-Textarea#roster(aria-label="Roster" onBlur={event => onLeave?.(event.currentTarget.id)} value={roster()} onInput={value => roster.set(value.split('\n').map(line => line.trim()).filter(Boolean).join('\n'))})
+Textarea#roster(aria-label="Roster" onBlur={event => onLeave?.(event.currentTarget.id)} value={roster()} onInput={value => roster = value.split('\n').map(line => line.trim()).filter(Boolean).join('\n')})
 p#names {roster()}
 Textarea#draft(aria-label="Draft" value={draft()} onInput={draft.set})
-button#send(onClick={() => draft.set('')}) Send
-button#restore(onClick={() => draft.set('Back')}) Restore
+button#send(onClick={() => draft = ''}) Send
+button#restore(onClick={() => draft = 'Back'}) Restore
 Textarea#live(aria-label="Live" writeFocused value={draft()} onInput={draft.set})
 form#filters(method="get" onSubmit={event => { event.preventDefault(); onFilter?.(String(new FormData(event.currentTarget).get('period'))) }})
   FormField(label="Period" size="sm")

@@ -24,4 +24,4 @@ else
 input#title(aria-label="Title")
 Toaster
 if late
-  button#enable-toolbar(type="button" onClick={() => enabled.set(true)}) Enable
+  button#enable-toolbar(type="button" onClick={() => enabled = true}) Enable

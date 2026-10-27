@@ -8,8 +8,8 @@ import Toggle from '@kaynooo/kayjs-ui/toggle.kay'
 const issue = signal<string>()
 const tabs = [{ value: 'profile', label: 'Profile' }, { value: 'access', label: 'Access' }] as const
 ---
-button#refuse(type="button" onClick={() => issue.set('Pick at least one')}) Refuse
-button#clear(type="button" onClick={() => issue.set(undefined)}) Clear
+button#refuse(type="button" onClick={() => issue = 'Pick at least one'}) Refuse
+button#clear(type="button" onClick={() => issue = undefined}) Clear
 Tabs#tabs(tabs={tabs} value="profile" label="Settings")
   @panel(tab)
     if tab === 'access'

@@ -19,13 +19,13 @@ async function onSave() {
     throw new ActionError(422, '', accepted.errors)
 
   if (accepted !== false)
-    saved.set(name())
+    saved = name()
 
   return accepted
 }
 ---
-SaveForm(dirty={changed()} onSave={onSave} saved="Saved." status={status} onDiscard={() => { name.set(saved()); onDiscard() }})
-  button#edit(type="button" onClick={() => name.set('Grace')}) Edit
+SaveForm(dirty={changed()} onSave={onSave} saved="Saved." status={status} onDiscard={() => { name = saved(); onDiscard() }})
+  button#edit(type="button" onClick={() => name = 'Grace'}) Edit
   FormField(label="Title" name="title")
     TextInput#title(name="title" value={name()} onInput={name.set})
   p#name {name()}

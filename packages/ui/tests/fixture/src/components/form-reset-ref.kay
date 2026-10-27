@@ -39,5 +39,5 @@ form
   Slider(label="Level" value={1} class={hint()} ref={element => note('slider', element)})
   ColorInput(label="Colour" value="#112233" class={hint()} ref={element => note('colour', element)})
   input#plain({...{ placeholder: hint() }} ref={plain() === 'first' ? first : second})
-  button#swap(type="button" onClick={() => plain.set('second')}) Swap
-  button#change(type="button" onClick={() => hint.set('b')}) Change
+  button#swap(type="button" onClick={() => plain = 'second'}) Swap
+  button#change(type="button" onClick={() => hint = 'b'}) Change

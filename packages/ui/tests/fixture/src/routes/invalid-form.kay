@@ -30,8 +30,8 @@ main
   form#grouped(action={claim})
     FormField(label="Handle again" group issue={issue()})
       input(name="handle")
-  button#bump(type="button" onClick={() => bumped.set(1)}) {bumped()}
+  button#bump(type="button" onClick={() => bumped = 1}) {bumped()}
   button#accept(type="button" onClick={() => void send('abcd')}) Accept
   button#refuse(type="button" onClick={() => void send('ab')}) Refuse
-  button#show(type="button" onClick={() => issue.set('Taken already')}) Show
-  button#hide(type="button" onClick={() => issue.set(undefined)}) Hide
+  button#show(type="button" onClick={() => issue = 'Taken already'}) Show
+  button#hide(type="button" onClick={() => issue = undefined}) Hide

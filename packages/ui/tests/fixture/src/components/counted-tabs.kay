@@ -7,4 +7,4 @@ const tabs = memo(() => ['mars', 'venus'].map(value => ({ value, label: `${value
 ---
 Tabs(tabs={tabs()} value="venus" label="Planets")
   @panel(planet)
-    input(name={planet} onInput={event => typed.set({ ...typed(), [planet]: event.currentTarget.value })})
+    input(name={planet} onInput={event => typed = { ...typed(), [planet]: event.currentTarget.value }})

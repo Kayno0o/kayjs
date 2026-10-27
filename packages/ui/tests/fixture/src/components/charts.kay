@@ -19,7 +19,7 @@ function zoom(from: number, to: number) {
   const [start] = shown()
 
   onRange(from, to)
-  shown.set([start + from, start + to + 1])
+  shown = [start + from, start + to + 1]
 }
 ---
 LineChart#line(label="Visits" labels={DAYS.slice(...shown())} series={[{ name: 'Visits', values: VISITS.slice(...shown()) }, { name: 'Sales', values: SALES.slice(...shown()), color: 'red' }]} formatValue={value => `${value} v`} onRange={zoom})

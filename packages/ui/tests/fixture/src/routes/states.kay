@@ -13,10 +13,10 @@ head
 main.flex.flex-col.items-start.gap-4.p-8
   h1 States
   Combobox(label="Planet" name="planet" options={planets} value="mars")
-  FileDrop#live(aria-label="Live" onFiles={() => dropped.set([...dropped(), 'live'])})
+  FileDrop#live(aria-label="Live" onFiles={() => dropped = [...dropped(), 'live']})
     @content(_zone)
       | Drop here
-  FileDrop#locked(aria-label="Locked" disabled onFiles={() => dropped.set([...dropped(), 'locked'])})
+  FileDrop#locked(aria-label="Locked" disabled onFiles={() => dropped = [...dropped(), 'locked']})
     @content(_zone)
       | Drop here
   p#dropped {dropped().join(',')}

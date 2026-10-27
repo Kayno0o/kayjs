@@ -4,9 +4,9 @@ import SplitLayout from '@kaynooo/kayjs-ui/split-layout.kay'
 
 const sidebarOpen = signal(false)
 ---
-button#open-sidebar(type="button" onClick={() => sidebarOpen.set(true)}) Menu
+button#open-sidebar(type="button" onClick={() => sidebarOpen = true}) Menu
 .h-96
-  SplitLayout#split(sidebarOpen={sidebarOpen()} onSidebarOpenChange={open => sidebarOpen.set(open)} sidebarTitle="Planets")
+  SplitLayout#split(sidebarOpen={sidebarOpen()} onSidebarOpenChange={open => sidebarOpen = open} sidebarTitle="Planets")
     @sidebar
       nav
         a#sidebar-link(href="#inner") Inner

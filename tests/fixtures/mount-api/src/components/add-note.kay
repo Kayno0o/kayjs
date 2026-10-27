@@ -4,5 +4,5 @@ import notes from '../api/notes'
 
 const added = signal('')
 ---
-button(onClick={async () => added.set(JSON.stringify(await call(notes, '/', { method: 'post', body: { title: 'Milk' } })))}) Add
+button(onClick={async () => added = JSON.stringify(await call(notes, '/', { method: 'post', body: { title: 'Milk' } }))}) Add
 p.added {added()}

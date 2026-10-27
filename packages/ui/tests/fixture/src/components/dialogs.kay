@@ -25,10 +25,10 @@ async function archive() {
   throw new ActionError(409, '', {}, { error: 'Still referenced' })
 }
 ---
-button#open(onClick={() => open.set(true)}) Open
-Dialog#dialog(open={open()} title="Rename" dirty={dirty} onOpenChange={() => { open.set(false); onClose() }})
+button#open(onClick={() => open = true}) Open
+Dialog#dialog(open={open()} title="Rename" dirty={dirty} onOpenChange={() => { open = false; onClose() }})
   @footer
-    button#cancel.kui-btn(onClick={() => open.set(false)}) Cancel
+    button#cancel.kui-btn(onClick={() => open = false}) Cancel
   input#name(name="name")
 ConfirmDelete(message="Delete this?" failure="Could not delete" onConfirm={removeByApi})
 ConfirmDelete(message="Archive this?" failure="Could not archive" onConfirm={archive} label="Archive" refused={(data: { error?: string }) => data.error})
@@ -48,11 +48,11 @@ ConfirmDelete(message="Tone?" failure="Could not" onConfirm={onDelete} tone="neu
 ConfirmDelete(message="Tone?" failure="Could not" onConfirm={onDelete} trigger="button" variant="ghost" class="n-button")
 ConfirmDelete(message="Release it?" failure="Could not release" onConfirm={removeByApi} label="Release" refused={(data: { reason: string }) => data.reason.toUpperCase()} class="release")
 p#states {states().join(',')}
-ConfirmDelete(message="Watch it?" failure="Could not" onConfirm={onDelete} onOpenChange={open => states.set([...states(), open ? 'open' : 'closed'])} label="Watched" class="watched")
-ConfirmDelete(message="Watch it inline?" failure="Could not" onConfirm={onDelete} ask="inline" onOpenChange={open => states.set([...states(), open ? 'inline-open' : 'inline-closed'])} label="Watched inline" class="watched-inline")
+ConfirmDelete(message="Watch it?" failure="Could not" onConfirm={onDelete} onOpenChange={open => states = [...states(), open ? 'open' : 'closed']} label="Watched" class="watched")
+ConfirmDelete(message="Watch it inline?" failure="Could not" onConfirm={onDelete} ask="inline" onOpenChange={open => states = [...states(), open ? 'inline-open' : 'inline-closed']} label="Watched inline" class="watched-inline")
 Toaster
-button#open-bare(onClick={() => bareOpen.set(true)}) Open bare
-Dialog#bare(open={bareOpen()} title="Bare" onOpenChange={() => bareOpen.set(false)})
+button#open-bare(onClick={() => bareOpen = true}) Open bare
+Dialog#bare(open={bareOpen()} title="Bare" onOpenChange={() => bareOpen = false})
   input#bare-name(name="bare")
-button#busy(onClick={() => busy.set(!busy())}) Busy
+button#busy(onClick={() => busy = !busy()}) Busy
 ConfirmDelete(message="Hold it?" failure="Could not" onConfirm={onDelete} disabled={busy()} trigger="button" class="held")

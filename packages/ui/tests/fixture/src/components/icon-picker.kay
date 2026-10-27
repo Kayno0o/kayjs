@@ -10,4 +10,4 @@ const chosen = signal(value)
 ---
 form#form
   IconPicker#picker(search={search} value={chosen()} name="icon" onChange={onChange})
-  button#choose(type="button" onClick={() => chosen.set('tabler:shape-3')}) Choose
+  button#choose(type="button" onClick={() => chosen = 'tabler:shape-3'}) Choose

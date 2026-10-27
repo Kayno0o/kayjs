@@ -5,7 +5,7 @@ import Notice from '@kaynooo/kayjs-ui/notice.kay'
 
 const open = signal(false)
 ---
-button(onClick={() => open.set(!open())}) Toggle
+button(onClick={() => open = !open()}) Toggle
 if open()
   Card#island-card(class="border-danger" title="Moons")
     Badge(tone="success" label="New")

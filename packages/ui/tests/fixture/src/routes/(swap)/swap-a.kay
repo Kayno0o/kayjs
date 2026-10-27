@@ -5,4 +5,4 @@ const count = signal(0)
 ---
 h1#title Page a
 // An island, so the page ships kay's script and a link to the other one swaps in place.
-button#count(type="button" onClick={() => count.set(count() + 1)}) {count()}
+button#count(type="button" onClick={() => count = count() + 1}) {count()}

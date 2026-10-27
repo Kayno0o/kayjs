@@ -6,5 +6,5 @@ import FormDialog from '@kaynooo/kayjs-ui/form-dialog.kay'
 const { action } = props<{ action: Action<{ name: string }, string> }>()
 const open = signal(true)
 ---
-FormDialog#dialog(open={open()} title="Rename" action={action} submitLabel="Rename" failure="Could not rename" onOpenChange={() => open.set(false)})
+FormDialog#dialog(open={open()} title="Rename" action={action} submitLabel="Rename" failure="Could not rename" onOpenChange={() => open = false})
   input(name="name" value="Ada")

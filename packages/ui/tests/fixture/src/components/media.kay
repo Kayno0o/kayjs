@@ -11,7 +11,7 @@ const { onIndexChange, onCrop, onMore, onTiles } = props<{ onIndexChange: (index
 
 const tiles = signal(['a', 'b', 'c'])
 
-onTiles?.(next => tiles.set(next))
+onTiles?.(next => tiles = next)
 
 const items: MediaItem[] = [
   { key: 1, kind: 'image', thumb: '/a-thumb.png', preview: '/a.png', full: '/a-full.png', title: 'Mars' },

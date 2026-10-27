@@ -7,7 +7,7 @@ import { toast } from '@kaynooo/kayjs-ui'
 const app = signal(true)
 ---
 button#saved(onClick={() => toast.success('Saved')}) Save
-button#unmount(onClick={() => app.set(false)}) Unmount
+button#unmount(onClick={() => app = false}) Unmount
 button#tip(data-tooltip="Copy") Copy
 if app()
   Toaster

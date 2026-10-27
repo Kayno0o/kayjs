@@ -17,12 +17,12 @@ const awayOptions = [{ value: null, label: 'Nothing' }, { value: 'evening', labe
 const held = signal<0 | 10 | 25 | null>(0)
 ---
 form#form
-  Segmented(label="Size" name="size" options={sizes} value={size()} onChange={(value: 0 | 10 | 25) => { size.set(value); return onChange('size', value) }})
-  Segmented(label="Held" name="held" options={sizes} value={held()} onChange={(value: 0 | 10 | 25 | null) => { held.set(value); return onChange('held', value) }})
+  Segmented(label="Size" name="size" options={sizes} value={size()} onChange={(value: 0 | 10 | 25) => { size = value; return onChange('size', value) }})
+  Segmented(label="Held" name="held" options={sizes} value={held()} onChange={(value: 0 | 10 | 25 | null) => { held = value; return onChange('held', value) }})
   Segmented(label="Fixed" name="fixed" options={sizes} value={fixed} onChange={(value: 0 | 10 | 25) => onChange('fixed', value)})
   Segmented(label="Sort" name="sort" options={sizes} value={none} onChange={(value: 0 | 10 | 25 | null) => onChange('sort', value)})
   Segmented(label="Mixed" name="mixed" options={mixed} value={1 as 1 | '1'} onChange={(value: 1 | '1') => onChange('mixed', value)})
-  Segmented(label="Away" name='away' options={awayOptions} value={away()} onChange={(value: 'evening' | null) => { away.set(value); return onChange('away', value) }})
-  button#none(type="button" onClick={() => held.set(null)}) None
+  Segmented(label="Away" name='away' options={awayOptions} value={away()} onChange={(value: 'evening' | null) => { away = value; return onChange('away', value) }})
+  button#none(type="button" onClick={() => held = null}) None
   button#reset(type="reset") Reset
   p#state {JSON.stringify({ size: size(), held: held() })}

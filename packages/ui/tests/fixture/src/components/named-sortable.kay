@@ -11,4 +11,4 @@ ul
   li(ref={sortable.item(1)})
     span.grip(tabindex="0" ref={sortable.handle(1)})
     | {title()}
-    button.rename(type="button" onClick={() => title.set('Bread')}) Delete
+    button.rename(type="button" onClick={() => title = 'Bread'}) Delete
