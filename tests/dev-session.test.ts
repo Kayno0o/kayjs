@@ -12,6 +12,14 @@ import { CONFIG_REFUSED } from '../src/dev/refuse'
 import { eventually, turn } from './helpers/eventually'
 import { scratchDir } from './scratch'
 
+// What the session asks a running server to reload, `changed` as the JSON list the page swap reads.
+interface Reload {
+  code: number
+  startedAt: number
+  changed: string
+  files: string[] | null
+}
+
 // The model of kay dev's session: every process it drives and its watcher are fakes the test answers when it chooses, so each race the fix log names is played in the order it needs.
 
 class FakeServer {
@@ -21,6 +29,8 @@ class FakeServer {
   signalCode: NodeJS.Signals | null = null
   // A reload asked while it is set waits for it before the server answers.
   reloadHeld: PromiseWithResolvers<void> | undefined
+  // A reload asked while it is set is answered with this reason to start a new process.
+  reloadRefused: string | undefined
   // A kill while it is set ends the process only once it settles.
   exitHeld: PromiseWithResolvers<void> | undefined
   private ended: (code: number) => void
@@ -43,8 +53,8 @@ class FakeServer {
     this.ended = resolve
   }
 
-  get reloads(): Record<string, unknown>[] {
-    return this.sent.filter(message => 'reload' in message)
+  get reloads(): Reload[] {
+    return this.sent.filter(message => 'reload' in message).map(message => message.reload as Reload)
   }
 
   say(message: object) {
@@ -80,8 +90,10 @@ class FakeServer {
   }
 
   private async answerReload() {
+    const refused = this.reloadRefused
+
     await this.reloadHeld?.promise
-    this.say({ reloaded: true })
+    this.say(refused === undefined ? { reloaded: true } : { restart: refused })
   }
 }
 
@@ -356,7 +368,44 @@ describe('kay dev\'s session', () => {
       await turn()
       expect(server.reloads).toHaveLength(2)
       expect(dev.servers).toHaveLength(1)
-      expect((server.reloads[1]!.reload as { files: string[] }).files).toEqual(['src/b.kay', 'src/a.kay'])
+      expect(server.reloads[1]!.files).toEqual(['src/b.kay', 'src/a.kay'])
+      // A page on the first reload's code swaps in what changed since, a's second edit included.
+      expect(server.reloads[1]!.startedAt).toBe(server.reloads[0]!.code)
+      expect(JSON.parse(server.reloads[1]!.changed)).toEqual(['src/b.kay', 'src/a.kay'])
+      await dev.stop()
+    })
+
+    it('names a file edited again during the reload carrying it to the process a change after it starts, and drops it once a reload carried it alone', async () => {
+      const dev = await session({ 'src/a.kay': 'p a', 'src/b.kay': 'p b' })
+      const first = dev.running()
+      const held = Promise.withResolvers<void>()
+
+      first.reloadHeld = held
+      await dev.edit('src/a.kay')
+      await eventually(() => expect(first.reloads).toHaveLength(1))
+      await dev.edit('src/b.kay')
+      await dev.edit('src/a.kay')
+      await Bun.sleep(SETTLED_MS)
+      // The next reload needs a new process, whose start line carries the files changed since the first reload's count.
+      first.reloadHeld = undefined
+      first.reloadRefused = 'the entry changed'
+      held.resolve()
+      await eventually(() => expect(dev.running().id).toBe(2))
+
+      const [, code, , startedAt, changed] = dev.running().started!.trim().split(' ')
+
+      expect(Number(startedAt)).toBe(first.reloads[0]!.code)
+      expect(JSON.parse(changed!)).toEqual(['src/b.kay', 'src/a.kay'])
+
+      // Each later reload names only what changed since the one before.
+      const second = dev.running()
+
+      await eventually(() => expect(dev.lines.filter(line => line.includes('restarted in'))).toHaveLength(1))
+      await dev.edit('src/a.kay')
+      await eventually(() => expect(reloadedLines(dev)).toHaveLength(2))
+      await dev.edit('src/b.kay')
+      await eventually(() => expect(reloadedLines(dev)).toHaveLength(3))
+      expect(second.reloads.map(reload => [reload.startedAt, JSON.parse(reload.changed) as string[]])).toEqual([[Number(code), ['src/a.kay']], [second.reloads[0]!.code, ['src/b.kay']]])
       await dev.stop()
     })
 
@@ -719,7 +768,7 @@ describe('kay dev\'s session', () => {
       await turn()
       expect(dev.scans.asked).toHaveLength(2)
       expect(server.reloads).toHaveLength(1)
-      expect((server.reloads[0]!.reload as { files: string[] }).files).toEqual(['package.json'])
+      expect(server.reloads[0]!.files).toEqual(['package.json'])
       expect(dev.servers).toHaveLength(1)
       await dev.stop()
     })
@@ -741,7 +790,7 @@ describe('kay dev\'s session', () => {
       await eventually(() => expect(reloadedLines(dev)).toHaveLength(1))
       await turn()
       expect(server.reloads).toHaveLength(1)
-      expect((server.reloads[0]!.reload as { files: string[] }).files).toEqual(['src/a.kay'])
+      expect(server.reloads[0]!.files).toEqual(['src/a.kay'])
       expect(dev.servers).toHaveLength(1)
       await dev.stop()
     })

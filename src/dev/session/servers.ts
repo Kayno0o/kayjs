@@ -42,7 +42,7 @@ export interface ServerSetup {
 // What a reload carries, taken as it is sent: an edit arriving meanwhile belongs to the next one.
 export interface Sent {
   code: number
-  files: Set<string>
+  files: string[]
 }
 
 // A running server's report that it listens.
@@ -81,9 +81,9 @@ export class ServerSupervisor {
   // Counts every change but a stylesheet's: an open page whose server comes back with the same count only needs its stylesheets again.
   // It starts from the clock, so a page left open across two `kay dev` runs never takes the new run's count for its own.
   private codeVersion: number
-  // The count the last server started with, and the files changed since: a page on that count may swap in what changed.
+  // The count the last server started with, and the files changed since, each with the count of its last change, in the order they last changed: a page on that count may swap in what changed.
   private startedAt: number
-  private changedFiles = new Set<string>()
+  private changedFiles = new Map<string, number>()
   // The port the first server asked for and the one it moved to, busy, which every next server takes first.
   private moved: string | undefined
   // The port the running server's pages are on, the one origin besides debug.bun.sh a page may reach the debugger from.
@@ -107,7 +107,8 @@ export class ServerSupervisor {
       return
 
     this.codeVersion++
-    this.changedFiles.add(file)
+    this.changedFiles.delete(file)
+    this.changedFiles.set(file, this.codeVersion)
   }
 
   // A change for no file: open pages load the page again.
@@ -141,9 +142,9 @@ export class ServerSupervisor {
     this.listening = false
     this.reloads = 0
     this.waiting = undefined
-    void started.stdin.write(`start ${this.codeVersion} ${this.moved ?? '-'} ${this.startedAt} ${JSON.stringify(this.changedFiles.size > MAX_CHANGED_FILES ? null : [...this.changedFiles])}\n`)
+    void started.stdin.write(`start ${this.codeVersion} ${this.moved ?? '-'} ${this.startedAt} ${JSON.stringify(this.changedFiles.size > MAX_CHANGED_FILES ? null : [...this.changedFiles.keys()])}\n`)
     this.startedAt = this.codeVersion
-    this.changedFiles = new Set()
+    this.changedFiles = new Map()
     void started.stdin.flush()
     this.setup.options.onRestart?.(started)
     void this.reportExit(started)
@@ -155,7 +156,7 @@ export class ServerSupervisor {
   }
 
   sent(): Sent {
-    return { code: this.codeVersion, files: new Set(this.changedFiles) }
+    return { code: this.codeVersion, files: [...this.changedFiles.keys()] }
   }
 
   // Asks the running process to import the modules the change reached again; answers 'reloaded', or why it needs a new process, or 'exited'. The entry waits for the client `building`, so the clock starts once it settled.
@@ -167,7 +168,7 @@ export class ServerSupervisor {
     let answered = false
 
     try {
-      server.send({ reload: { code: this.codeVersion, startedAt: this.startedAt, changed: JSON.stringify(sent.files.size > MAX_CHANGED_FILES ? null : [...sent.files]), files: files.length > MAX_CHANGED_FILES ? null : files } })
+      server.send({ reload: { code: this.codeVersion, startedAt: this.startedAt, changed: JSON.stringify(sent.files.length > MAX_CHANGED_FILES ? null : sent.files), files: files.length > MAX_CHANGED_FILES ? null : files } })
     }
     catch {
       this.reloadAnswer?.('exited')
@@ -194,13 +195,15 @@ export class ServerSupervisor {
     }
   }
 
-  // The running process took the reload in.
+  // The running process took the reload in: a file changed again since it was sent stays for the next one, as the page on this count has not seen that change.
   reloaded(sent: Sent) {
     this.startedAt = sent.code
     this.reloads++
 
-    for (const file of sent.files)
-      this.changedFiles.delete(file)
+    for (const [file, changedAt] of this.changedFiles) {
+      if (changedAt <= sent.code)
+        this.changedFiles.delete(file)
+    }
   }
 
   // A new process loads kay while the one before ends, and starts once it has.
