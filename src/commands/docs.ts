@@ -158,5 +158,5 @@ function missingLabel(files: DocFile[], label: string): string {
 
   return files.some(file => file.label.startsWith(`${name}/`))
     ? `\`${path}\` names no file of \`${name}\`; \`kay docs\` lists them`
-    : `\`${name}\` is no package installed here with docs; \`kay docs\` lists the files of those that are`
+    : `\`${name}\` is no package installed here with docs (a label is \`<package>/<file>.md#<heading>\`); \`kay docs\` lists the files of those that are`
 }

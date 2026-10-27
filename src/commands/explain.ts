@@ -76,8 +76,14 @@ function errorDocument(group: ErrorGroup | undefined) {
 }
 
 // Where `kay docs` documents a name that is no lint, as a component or a function taken for one.
+// A docs file that cannot be read leaves the failure as it was.
 function docsHint(name: string): string {
-  const [best] = searchDocs(docFiles(process.cwd()), name)
+  try {
+    const [best] = searchDocs(docFiles(process.cwd()), name)
 
-  return best?.named !== true ? '' : `, and \`kay docs ${name}\` prints ${best.section.label}`
+    return best?.named !== true ? '' : `, and \`kay docs ${name}\` prints ${best.section.label}`
+  }
+  catch {
+    return ''
+  }
 }

@@ -28,6 +28,10 @@ beforeAll(async () => {
   await Bun.write(join(library, 'src/imported.kay'), '---\nimport type { Shared, Extra } from \'./shared\'\n\nconst { name } = props<Shared & Extra>()\n---\np {name}\n')
   await Bun.write(join(library, 'src/shared.ts'), 'export interface Shared {\n  name: string\n}\n\nexport type Extra = { loud?: boolean }\n')
   await Bun.write(join(library, 'src/inner/special.kay'), '---\nconst { on } = props<{ on: boolean }>()\n---\np {on}\n')
+  await Bun.write(join(library, 'llms/themes.md'), '# Themes\n\n## Dark theme\n\nThe dark mode follows the scheme.\n')
+  await Bun.write(join(library, 'src/tricky.kay'), '---\n// props<Nope>() in a comment\n/* it\'s a { comment */\nconst label = \'myprops<x>\'\nexport const { a } = props<{ /* don\'t ( */ a: string }>()\n---\np {a}\n')
+  await Bun.write(join(library, 'src/inline-type.kay'), '---\nimport { type Shared } from \'./shared\'\n\nconst { name } = props<Shared>()\n---\np {name}\n')
+  await Bun.write(join(library, 'src/passed-on.kay'), '---\nexport type { Extra } from \'./shared\'\n\nconst { loud } = props<Extra>()\n---\np {loud}\n')
   // A library installed nearer than the checkout's, which wins its name.
   await Bun.write(join(root, 'node_modules/@kaynooo/kayjs-ui/llms.txt'), '# kayjs-ui nearer\n\nThe nearest copy.\n')
   await Bun.write(join(root, 'node_modules/@kaynooo/kayjs-bare/package.json'), '{}')
@@ -94,6 +98,10 @@ describe('a search', () => {
     expect(searchDocs(docFiles(checkout), 'ctx.fail')[0]!.section.file.label).toBe('kay/actions.md')
   })
 
+  it('searches a hyphenated word no section holds whole as its parts', () => {
+    expect(searchDocs(docFiles(root).filter(file => file.label.startsWith('kayjs-fake/')), 'dark-mode')[0]!.section.label).toBe('kayjs-fake/themes.md#dark-theme')
+  })
+
   it('finds a heading repeated in two files in both', () => {
     const labels = searchDocs(docFiles(root), 'spin widget').map(match => match.section.label)
 
@@ -117,6 +125,34 @@ describe('a search', () => {
   })
 })
 
+describe('a broken install', () => {
+  let broken: string
+
+  beforeAll(async () => {
+    broken = await scratchDir('docs-broken-')
+    await Bun.write(join(broken, 'node_modules/@kaynooo/kayjs-broken/llms.txt'), '# kayjs-broken\n')
+    // A directory where a docs file should be, which reading throws on.
+    await mkdir(join(broken, 'node_modules/@kaynooo/kayjs-broken/llms/topic.md'), { recursive: true })
+    await Bun.write(join(broken, 'node_modules/@kaynooo/kayjs-badjson/llms.txt'), '# kayjs-badjson\n')
+    await Bun.write(join(broken, 'node_modules/@kaynooo/kayjs-badjson/package.json'), '{')
+  })
+
+  afterAll(async () => {
+    await rm(broken, { recursive: true, force: true })
+  })
+
+  it('leaves kay explain\'s failure as it was when the docs cannot be read', async () => {
+    const child = Bun.spawn([process.execPath, cli, 'explain', 'FormDialog'], { cwd: broken, stdout: 'pipe', stderr: 'pipe' })
+
+    expect(await new Response(child.stderr).text()).toBe('kay explain: `FormDialog` is no lint, error or group; `kay explain` lists them\n')
+    expect(await child.exited).toBe(1)
+  })
+
+  it('skips a library whose package.json does not parse', () => {
+    expect(componentProps(broken, 'FormDialog').map(component => component.specifier)).toEqual(['@kaynooo/kayjs-ui/form-dialog.kay'])
+  })
+})
+
 describe('a component\'s props', () => {
   it('reads the statement taking them from the installed source, by the name an app imports, its case and hyphens aside', () => {
     const [card] = componentProps(root, 'FancyCard')
@@ -128,6 +164,15 @@ describe('a component\'s props', () => {
   it('adds the types it names that the file or a module it imports declares', () => {
     expect(componentProps(root, 'Gizmo')[0]!.props).toBe('const { size } = props<GizmoProps>()\n\ninterface GizmoProps {\n  size: number\n}')
     expect(componentProps(root, 'Imported')[0]!.props).toBe('const { name } = props<Shared & Extra>()\n\nexport interface Shared {\n  name: string\n}\n\nexport type Extra = { loud?: boolean }')
+  })
+
+  it('reads past comments, a name ending in props and an exported statement', () => {
+    expect(componentProps(root, 'tricky')[0]!.props).toBe('export const { a } = props<{ /* don\'t ( */ a: string }>()')
+  })
+
+  it('finds a type imported inline or passed on by an export', () => {
+    expect(componentProps(root, 'InlineType')[0]!.props).toBe('const { name } = props<Shared>()\n\nexport interface Shared {\n  name: string\n}')
+    expect(componentProps(root, 'PassedOn')[0]!.props).toBe('const { loud } = props<Extra>()\n\nexport type Extra = { loud?: boolean }')
   })
 
   it('names a component exported by its own path, and one taking no props', () => {
@@ -174,7 +219,11 @@ describe('kay docs', () => {
 
   it('fails on a label naming a file its package lacks or a package not installed', async () => {
     expect(await kay(['kayjs-fake/nope.md'], root)).toMatchObject({ code: 1, stderr: 'kay docs: `kayjs-fake/nope.md` names no file of `kayjs-fake`; `kay docs` lists them\n' })
-    expect(await kay(['kayjs-cms-not-here/setup.md#use'], root)).toMatchObject({ code: 1, stderr: 'kay docs: `kayjs-cms-not-here` is no package installed here with docs; `kay docs` lists the files of those that are\n' })
+    expect(await kay(['kayjs-cms-not-here/setup.md#use'], root)).toMatchObject({ code: 1, stderr: 'kay docs: `kayjs-cms-not-here` is no package installed here with docs (a label is `<package>/<file>.md#<heading>`); `kay docs` lists the files of those that are\n' })
+  })
+
+  it('names the label syntax for a path that is no package', async () => {
+    expect(await kay(['src/foo.txt'], root)).toMatchObject({ code: 1, stderr: 'kay docs: `src` is no package installed here with docs (a label is `<package>/<file>.md#<heading>`); `kay docs` lists the files of those that are\n' })
   })
 
   it('answers the list, a file\'s headings and a section in JSON, and reads words after `--`', async () => {

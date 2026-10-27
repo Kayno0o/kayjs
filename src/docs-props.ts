@@ -7,6 +7,8 @@ const NAME = /^[A-Z][\w-]*$/i
 const HYPHEN = /-/g
 const KEBAB_PART = /(?:^|-)([a-z\d])/g
 const TYPE_NAME = /^\w+$/
+// The call taking the props: not `myprops<`, not on a comment line.
+const PROPS_CALL = /^(?!\s*(?:\/\/|\/\*|\*)).*?(?<![\w$.])props</m
 // What joins the type names a component may take its props as, `AsButton | AsLink`.
 const TYPE_JOIN = /[|&]/
 const RELATIVE = /^\.\.?\//
@@ -40,10 +42,20 @@ export function componentProps(root: string, query: string): ComponentProps[] {
   }))
 }
 
+// A manifest that does not parse exports nothing, rather than failing the search.
+function readManifest(path: string): { exports?: Record<string, unknown> } {
+  try {
+    return JSON.parse(readFileSync(path, 'utf8')) as { exports?: Record<string, unknown> }
+  }
+  catch {
+    return {}
+  }
+}
+
 // Each `.kay` file a package exports, by the specifier an app imports it with.
 function components(name: string, dir: string): [string, string][] {
   const manifestPath = join(dir, 'package.json')
-  const manifest = existsSync(manifestPath) ? JSON.parse(readFileSync(manifestPath, 'utf8')) as { exports?: Record<string, unknown> } : {}
+  const manifest = existsSync(manifestPath) ? readManifest(manifestPath) : {}
   const found: [string, string][] = []
 
   for (const [key, value] of Object.entries(manifest.exports ?? {})) {
@@ -69,14 +81,15 @@ function components(name: string, dir: string): [string, string][] {
 
 function propsOf(path: string): { line: number, props: string } {
   const source = readFileSync(path, 'utf8')
-  const call = source.indexOf('props<')
+  const found = PROPS_CALL.exec(source)
+  const call = found === null ? -1 : found.index + found[0].length - 'props<'.length
 
   if (call === -1)
     return { line: 1, props: '' }
 
   const open = call + 'props'.length
   const close = closing(source, open)
-  const start = source.lastIndexOf('\nconst ', call) + 1
+  const start = Math.max(source.lastIndexOf('\nconst ', call), source.lastIndexOf('\nexport const ', call)) + 1
   const statement = source.slice(start, source.startsWith('()', close + 1) ? close + 3 : close + 1)
   const type = source.slice(open + 1, close).trim()
   const names = type.split(TYPE_JOIN).map(name => name.trim())
@@ -98,10 +111,10 @@ function closing(source: string, open: number): number {
       if (index === -1)
         return source.length
     }
-    else if (char === '/' && source[index + 1] === '/') {
-      index = source.indexOf('\n', index)
+    else if (char === '/' && (source[index + 1] === '/' || source[index + 1] === '*')) {
+      index = source[index + 1] === '/' ? source.indexOf('\n', index) : source.indexOf('*/', index + 2) + 1
 
-      if (index === -1)
+      if (index <= 0)
         return source.length
     }
     else if (char === '<' || char === '{' || char === '(' || char === '[') {
@@ -137,7 +150,7 @@ function declaration(file: string, name: string): string | undefined {
 
 // The declaration of a type the component imports from a relative module of its package.
 function importedDeclaration(source: string, name: string, path: string): string | undefined {
-  const from = new RegExp(`import type \\{[^}]*\\b${name}\\b[^}]*\\} from '([^']+)'`).exec(source)?.[1]
+  const from = new RegExp(`(?:import|export) (?:type )?\\{[^}]*\\b${name}\\b[^}]*\\} from '([^']+)'`).exec(source)?.[1]
 
   if (from === undefined || !RELATIVE.test(from))
     return undefined

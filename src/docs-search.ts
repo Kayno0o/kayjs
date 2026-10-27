@@ -222,17 +222,19 @@ export function looksLikeLabel(argument: string): boolean {
 
 // The sections the words match, the best first.
 export function searchDocs(files: DocFile[], query: string): DocMatch[] {
-  const words = wordsOf(query, false)
+  const index = files.filter(file => file.searched).flatMap(file => file.sections.filter(searchable).map(indexed))
+  const holds = (term: string) => (one: Indexed) => one.counts.has(term) || one.heading.has(term) || one.names.has(term)
+  // A hyphenated word no section holds whole is searched as its parts, so that `dark-mode` finds "dark mode".
+  const words = wordsOf(query, false).flatMap(word => word.includes('-') && !index.some(holds(word)) ? word.split('-').filter(part => part !== '').map(stem) : [word])
   const terms = [...new Set(words.filter(word => !STOP_WORDS.has(word)))]
   const wanted = terms.length > 0 ? terms : [...new Set(words)]
 
   if (wanted.length === 0)
     return []
 
-  const index = files.filter(file => file.searched).flatMap(file => file.sections.filter(searchable).map(indexed))
   const average = index.reduce((sum, one) => sum + one.length, 0) / Math.max(index.length, 1)
   const idf = new Map(wanted.map((term) => {
-    const holding = index.filter(one => one.counts.has(term) || one.heading.has(term) || one.names.has(term)).length
+    const holding = index.filter(holds(term)).length
 
     return [term, Math.log(1 + (index.length - holding + 0.5) / (holding + 0.5))]
   }))
