@@ -17,6 +17,7 @@ const look = recipe({
     figure: 'flex items-baseline gap-2',
     delta: 'inline-flex items-center gap-1 font-normal text-muted data-[tone=success]:text-success data-[tone=warning]:text-warning data-[tone=danger]:text-danger data-[tone=info]:text-info',
     deltaIcon: 'size-3.5 shrink-0',
+    deltaValue: '',
     deltaLabel: 'text-muted',
   },
   variants: {
@@ -65,7 +66,7 @@ if href !== undefined
         span(part="value") {value}
         span(part="delta" data-tone={delta.tone === 'neutral' ? undefined : delta.tone})
           Icon(icon={deltaIcon(delta)} part="deltaIcon")
-          span {delta.value}
+          span(part="deltaValue") {delta.value}
           if delta.label
             span(part="deltaLabel") {delta.label}
     else
@@ -81,7 +82,7 @@ else
         span(part="value") {value}
         span(part="delta" data-tone={delta.tone === 'neutral' ? undefined : delta.tone})
           Icon(icon={deltaIcon(delta)} part="deltaIcon")
-          span {delta.value}
+          span(part="deltaValue") {delta.value}
           if delta.label
             span(part="deltaLabel") {delta.label}
     else

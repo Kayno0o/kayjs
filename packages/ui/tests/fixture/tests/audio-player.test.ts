@@ -53,7 +53,7 @@ inBrowser('AudioPlayer in the browser', () => {
       const added: string[] = []
       const original = EventTarget.prototype.addEventListener
 
-      EventTarget.prototype.addEventListener = function (type: string, listener: unknown, options?: boolean | AddEventListenerOptions) {
+      EventTarget.prototype.addEventListener = function (this: EventTarget, type: string, listener: unknown, options?: boolean | AddEventListenerOptions) {
         if ((type === 'wheel' || type === 'touchmove') && (this as Element).getAttribute?.('data-part') === 'transcript')
           added.push(`${type}:${typeof options === 'object' && options.passive === true ? 'passive' : 'blocking'}`);
 
