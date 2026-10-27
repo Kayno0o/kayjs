@@ -55,9 +55,19 @@ test('a click on the title types in place, the form follows, and Enter ends the 
 
   expect(await page.text(TITLE)).toBe('Hello inline')
   expect(await page.value(FORM_TITLE)).toBe('Hello inline')
-  // The focus stays on the title and a polite live region says the text was kept. The save may render the draft once more after the status clears, so the focus is waited for rather than read once.
-  await page.waitUntil((selector: string) => document.activeElement === document.querySelector(selector), undefined, TITLE)
-  await page.waitUntil(() => (document.querySelector('[data-kui-announce]')?.textContent ?? '').endsWith('updated'))
+  // The focus stays on the title and a polite live region says the text was kept.
+  await page.waitUntil((selector: string) => document.activeElement === document.querySelector(selector), { what: 'the focus on the title' }, TITLE)
+  await page.waitUntil(() => (document.querySelector('[data-kui-announce]')?.textContent ?? '').endsWith('updated'), { what: 'the title announced as updated' })
+
+  // A render of the draft landing once the edit ended, as the last keystroke's can, keeps the focus on the title, whose tab stop the page's markup lacks. The form's field changed by script renders one for certain.
+  await page.evaluate((selector: string) => {
+    const input = document.querySelector(selector) as HTMLInputElement
+
+    input.value = 'Hello again'
+    input.dispatchEvent(new Event('input', { bubbles: true }))
+  }, FORM_TITLE)
+  await page.waitUntil((selector: string) => document.querySelector(selector)!.textContent === 'Hello again', { what: 'the title rendered from the form' }, TITLE)
+  await page.waitUntil((selector: string) => document.activeElement === document.querySelector(selector), { what: 'the focus on the title after the render' }, TITLE)
 }, 60_000)
 
 test('text with a line break and HTML lands as one line of text', async () => {

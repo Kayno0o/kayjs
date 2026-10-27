@@ -66,8 +66,11 @@ function morph(live: Node, next: Node): void {
       live.setAttribute(name, value)
   }
 
+  // The focused element keeps the tab stop a script gave it, as a CMS editor or the swap's own focus on a heading does: without it the browser takes the focus away to the body.
+  const focused = live === document.activeElement
+
   for (const name of live.getAttributeNames()) {
-    if (!other.hasAttribute(name))
+    if (!other.hasAttribute(name) && !(focused && name === 'tabindex'))
       live.removeAttribute(name)
   }
 

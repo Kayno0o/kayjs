@@ -82,6 +82,7 @@ form(ref={element => form = element} onSubmit={event => event.preventDefault()})
 - The props the next page gives a kept island reach it as a component inside an island gets new props: what reads them in the template or an effect shows the new values, while a value the script computed from them once keeps the old one.
 - The element focused inside an island a swap keeps, marked `persist` or unchanged on a refresh, stays focused, a text field, `textarea` or `contenteditable` with its caret and selection, so a field whose every key shows a draft or refreshes the page keeps taking the keys.
 - A text field or `textarea` the swap replaces on a query `navigate()`, a refresh or a redirect, such as a field of an island hydrated afresh for its new `value` prop, gets the focus back with the caret and selection of the old one (kept within the new text, at its end when the caret was at the end), so a search as you type keeps taking the keys; on a query `navigate()` or a refresh, keys typed in it while the page was fetched are kept, and its `input` event fires again so the island asks for them.
+- The focused element a swap keeps holds on to the `tabindex` a script gave it when the next page's markup has none, as the browser would otherwise move the focus to the body: a heading the swap focused, or a kayjs-cms title whose inline edit just ended, stays focused through a refresh or a draft's render.
 - A swap to a new page still moves the focus to its heading.
 
 ### Forms posting in place

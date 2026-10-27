@@ -44,4 +44,21 @@ describe('a page swap over an element being typed in', () => {
     expect(document.querySelector('h1')!.textContent).toBe('Saved text')
     expect(document.querySelector('h1')!.hasAttribute('contenteditable')).toBe(false)
   })
+
+  // A browser takes the focus away from an element that stops being focusable, as a CMS editor's title would once its edit ended.
+  it('keeps the tab stop a script gave the focused element, and takes it from any other', async () => {
+    document.body.innerHTML = '<h1 tabindex="0" role="button">Title</h1><p tabindex="0">Old</p>'
+
+    const heading = document.querySelector('h1')!
+
+    heading.focus()
+    await refresh('<!doctype html><html><head><title>t</title></head><body><h1>New title</h1><p>New</p></body></html>')
+
+    expect(document.querySelector('h1')).toBe(heading)
+    expect(document.activeElement).toBe(heading)
+    expect(heading.textContent).toBe('New title')
+    expect(heading.getAttribute('tabindex')).toBe('0')
+    expect(heading.hasAttribute('role')).toBe(false)
+    expect(document.querySelector('p')!.hasAttribute('tabindex')).toBe(false)
+  })
 })
