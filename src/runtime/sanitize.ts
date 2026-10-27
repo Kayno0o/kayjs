@@ -1,5 +1,7 @@
 import type { SafeHtml } from './checks'
+import { browserKeepsSameTab, browserOrigin, leavesSite, NEW_TAB_ATTRIBUTE } from './outside'
 import { isVouched, vouch } from './safe-html'
+import { configuredSite, keepsSameTab } from './site'
 import { URL_ATTRIBUTES } from './url-attributes'
 
 export interface SanitizeOptions {
@@ -10,6 +12,9 @@ export interface SanitizeOptions {
   attributes?: Record<string, string[]> | undefined
   // Keeps a relative URL, `./a.png` or `page?x=1`, which carries no scheme and so no script, beside the web, mail and site URLs.
   relativeUrls?: boolean | undefined
+  // The address the markup was fetched from, `article.url`: every kept URL, such as an `href`, a `src` or each of a `srcset`'s, is resolved against it as a browser would, a relative or `//host` one included, and dropped when it does not resolve to an http(s) or `mailto:` URL.
+  // A `base` that is not an absolute http(s) URL drops every relative URL, and replaces `relativeUrls`.
+  base?: string | undefined
 }
 
 // What `sanitizeHtml` keeps, written back without attributes but a link's `href`: formatted text, such as a comment or rendered Markdown, and nothing that loads, runs, styles or covers the page.
@@ -27,6 +32,13 @@ const DESCRIPTOR = /\s+\S+$/
 const ATTRIBUTE = /([a-z][\w:-]*)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'=<>`]+))/gi
 const LINK_ATTRIBUTES = ['href']
 
+// How the URLs of one call are rewritten: `base` is a URL to resolve against, `null` for a `base` that is none, which keeps only the absolute URLs, and `undefined` for no `base`. `leaves` tells a link opening in a new tab, `undefined` for markup that is not opened apart.
+interface Rewrite {
+  relative?: boolean | undefined
+  base?: URL | null | undefined
+  leaves?: ((href: string) => boolean) | undefined
+}
+
 interface Allowed {
   tags: ReadonlySet<string>
   attributes: Record<string, readonly string[]>
@@ -43,6 +55,10 @@ const TAG = /<(\/?)([a-z][a-z\d]*)(\s[^<>]*|\/)?>/gi
 const SAFE_URL = /^(?:https?:\/\/|mailto:|\/(?![/\\])|#)[^\s"'<>`\\&]*$/i
 const AMPERSAND = /&amp;/g
 // No scheme before the first slash, query or fragment, no `//` host and no character a browser strips or an attribute ends on.
+// A `//host` path, which only a `base` gives a scheme.
+const PROTOCOL_RELATIVE = /^\/\/(?![/\\])[^\s"'<>`\\&]+$/
+const ABSOLUTE_URL = /^(?:https?:\/\/|mailto:)/i
+const RESOLVED = new Set(['http:', 'https:', 'mailto:'])
 const RELATIVE_URL = /^(?![^/?#]*:)(?!\/\/)[^\0-\x20\x7F"'<>`\\&]+$/
 const TEXT = /&(?!#\d{1,7};|#x[\da-f]{1,6};|[a-z][a-z\d]{1,31};)|</gi
 
@@ -50,18 +66,54 @@ function text(markup: string): string {
   return markup.replace(TEXT, char => char === '<' ? '&lt;' : '&amp;')
 }
 
-function isSafeUrl(value: string, relative?: boolean): boolean {
+function isSafeUrl(value: string, relative?: boolean, protocolRelative?: boolean): boolean {
   const plain = value.replace(AMPERSAND, '')
 
-  return SAFE_URL.test(plain) || (relative === true && RELATIVE_URL.test(plain))
+  return SAFE_URL.test(plain) || (relative === true && RELATIVE_URL.test(plain)) || (protocolRelative === true && PROTOCOL_RELATIVE.test(plain))
 }
 
-// Whether an attribute's value is fine to write back: a URL safe, and every URL of a `srcset`. `data` is a URL on an `object` only, a tag never kept, so on any other it is a plain value.
-function safeValue(attribute: string, value: string, relative?: boolean): boolean {
-  if (attribute === 'srcset')
-    return value.trim().split(SRCSET_CANDIDATE).every(candidate => isSafeUrl(candidate.replace(DESCRIPTOR, ''), relative))
+// A URL as the browser reads it against `base`, written back with its ampersands escaped; nothing when it is unsafe, or does not resolve to a web or mail URL.
+function resolvedUrl(value: string, base: URL | null): string | undefined {
+  if (!isSafeUrl(value, true, base !== null))
+    return undefined
 
-  return attribute === 'data' || !isUrlAttribute(attribute) || isSafeUrl(value, relative)
+  if (base === null)
+    return ABSOLUTE_URL.test(value) ? value : undefined
+
+  try {
+    const url = new URL(value.replace(AMPERSAND, '&'), base)
+
+    return RESOLVED.has(url.protocol) ? url.href.replaceAll('&', '&amp;') : undefined
+  }
+  catch {
+    return undefined
+  }
+}
+
+function kept(url: string, { relative, base }: Rewrite): string | undefined {
+  if (base !== undefined)
+    return resolvedUrl(url, base)
+
+  return isSafeUrl(url, relative) ? url : undefined
+}
+
+// What an attribute is written back as, nothing when it is not fine to write: a URL safe, and every URL of a `srcset`. `data` is a URL on an `object` only, a tag never kept, so on any other it is a plain value.
+function keptValue(attribute: string, value: string, rewrite: Rewrite): string | undefined {
+  if (attribute === 'srcset') {
+    const candidates = value.trim().split(SRCSET_CANDIDATE).map((candidate) => {
+      const url = candidate.replace(DESCRIPTOR, '')
+      const found = kept(url, rewrite)
+
+      return found === undefined ? undefined : found + candidate.slice(url.length)
+    })
+
+    if (candidates.includes(undefined))
+      return undefined
+
+    return rewrite.base === undefined ? value : candidates.join(', ')
+  }
+
+  return attribute === 'data' || !isUrlAttribute(attribute) ? value : kept(value, rewrite)
 }
 
 // Whether an attribute of a user's markup holds a URL, its name lowercased: a function rather than a set, so a build reaching `trustHtml` alone leaves it out.
@@ -69,24 +121,35 @@ export function isUrlAttribute(name: string): boolean {
   return URL_ATTRIBUTES.includes(name) || MARKUP_ONLY_URL.test(name)
 }
 
-// The opening tag with the attributes kept for it, a URL only when safe, and a link marked as the user's.
-function openingTag(tag: string, attributes: string | undefined, kept: readonly string[] | undefined, relative?: boolean): string {
+// The opening tag with the attributes kept for it, a URL only when safe, and a link marked as the user's, opening in a new tab when it leaves the site and writes no `target` of its own.
+function openingTag(tag: string, attributes: string | undefined, allowedNames: readonly string[] | undefined, rewrite: Rewrite): string {
   const written = new Map<string, string>()
 
-  if (attributes !== undefined && kept !== undefined) {
+  if (attributes !== undefined && allowedNames !== undefined) {
     for (const [, name, double, single, bare] of attributes.matchAll(ATTRIBUTE)) {
       const attribute = name!.toLowerCase()
       const value = double ?? single ?? bare ?? ''
 
-      if (kept.includes(attribute) && !written.has(attribute) && safeValue(attribute, value, relative))
-        written.set(attribute, text(value).replaceAll('"', '&quot;'))
+      const fit = allowedNames.includes(attribute) && !written.has(attribute) ? keptValue(attribute, value, rewrite) : undefined
+
+      if (fit !== undefined)
+        written.set(attribute, text(fit).replaceAll('"', '&quot;'))
     }
   }
 
-  if (tag === 'a' && written.has('href'))
-    written.set('rel', 'nofollow ugc')
+  let apart = false
 
-  return `<${tag}${[...written].map(([name, value]) => ` ${name}="${value}"`).join('')}>`
+  if (tag === 'a' && written.has('href')) {
+    apart = !written.has('target') && rewrite.leaves?.(written.get('href')!.replace(AMPERSAND, '&')) === true
+    written.delete('rel')
+
+    if (apart)
+      written.set('target', '_blank')
+
+    written.set('rel', apart ? 'nofollow ugc noopener' : 'nofollow ugc')
+  }
+
+  return `<${tag}${[...written].map(([name, value]) => ` ${name}="${value}"`).join('')}${apart ? ` ${NEW_TAB_ATTRIBUTE}` : ''}>`
 }
 
 // The tags and attributes kept, the defaults with what the options add; read once per options object.
@@ -168,9 +231,41 @@ function withoutDropped(markup: string): string {
   return result + markup.slice(last)
 }
 
-// Markup from a user, made fit for `innerHTML`: the elements above are kept and balanced, other tags dropped with their text kept, and the result is the same on the server and in an island.
+// The `base` option as a URL, `null` for one that is not a string or not an absolute URL, `undefined` for none.
+function baseOf(options: SanitizeOptions | undefined): URL | null | undefined {
+  if (options?.base === undefined)
+    return undefined
+
+  try {
+    const base = typeof options.base === 'string' ? new URL(options.base) : undefined
+
+    return base?.protocol === 'http:' || base?.protocol === 'https:' ? base : null
+  }
+  catch {
+    return null
+  }
+}
+
+// Whether a link goes to another origin than the site, read from the server's site or the island's page the first time a link asks.
+function leavingSite(): (href: string) => boolean {
+  let site: { origin: string | undefined, sameTab: boolean } | undefined
+
+  return (href) => {
+    site ??= { origin: configuredSite()?.origin ?? browserOrigin(), sameTab: keepsSameTab() || browserKeepsSameTab() }
+
+    return !site.sameTab && leavesSite(href, site.origin)
+  }
+}
+
+// Markup from a user, made fit for `innerHTML`: the elements above are kept and balanced, other tags dropped with their text kept, a link leaving the site opening in a new tab, and the result is the same on the server and in an island.
 export function sanitizeHtml(markup: string, options?: SanitizeOptions): SafeHtml {
+  return sanitizeMarkup(markup, options, true)
+}
+
+// `sanitizeHtml`, its links leaving the site opening in a new tab or not: a content body gets that from the page rendering it.
+export function sanitizeMarkup(markup: string, options: SanitizeOptions | undefined, opensApart: boolean): SafeHtml {
   const { tags, attributes: keptAttributes, relative } = allowed(options)
+  const rewrite: Rewrite = { relative, base: baseOf(options), leaves: opensApart ? leavingSite() : undefined }
   const source = withoutDropped(markup)
   const open: string[] = []
   let result = ''
@@ -188,13 +283,13 @@ export function sanitizeHtml(markup: string, options?: SanitizeOptions): SafeHtm
 
     if (VOID.has(tag)) {
       if (closing === '')
-        result += openingTag(tag, attributes, keptAttributes[tag], relative)
+        result += openingTag(tag, attributes, keptAttributes[tag], rewrite)
 
       continue
     }
 
     if (closing === '') {
-      result += openingTag(tag, attributes, keptAttributes[tag], relative)
+      result += openingTag(tag, attributes, keptAttributes[tag], rewrite)
       open.push(tag)
 
       continue

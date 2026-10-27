@@ -8,7 +8,7 @@ import { collectionNamed, UnknownCollectionError } from '../store'
 // Where bodyHtml stands a component, which the preview shows as the content it wraps; the sanitizer does not read a tag name with a hyphen, and a heading's anchor points nowhere in the screens.
 const COMPONENT_TAGS = /<kay-component\b[^>]*>|<\/kay-component>/g
 const HEADING_ANCHOR = /<a href="#[^"]*"[^>]*>(.*?)<\/a>/gs
-const LINK = /<a /g
+const LINK = /<a (?![^>]*data-new-tab)/g
 
 // The most a preview request may send: an entry's text is far smaller, and the route renders and sanitizes all of it.
 const MAX_MARKDOWN = '1mb'

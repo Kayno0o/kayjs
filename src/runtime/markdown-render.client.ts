@@ -2,7 +2,6 @@ import type { RendererObject, Token, TokenizerObject, Tokens } from 'marked'
 import type { SafeHtml } from './checks'
 import { Marked, Tokenizer } from 'marked'
 import { sanitizedMarkdown } from './markdown'
-import { browserKeepsSameTab, browserOrigin, leavesSite } from './outside'
 import { vouch } from './safe-html'
 
 const ESCAPED = /[&<>"]/g
@@ -160,10 +159,7 @@ export function markdownHtml(markdown: string): SafeHtml {
     return asWritten(markdown)
 
   try {
-    const origin = browserOrigin()
-    const sameTab = browserKeepsSameTab()
-
-    return sanitizedMarkdown(marked.parse(markdown) as string, href => !sameTab && leavesSite(href, origin))
+    return sanitizedMarkdown(marked.parse(markdown) as string)
   }
   // Thousands of nested quotes overflow marked's stack.
   catch {

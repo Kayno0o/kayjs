@@ -137,7 +137,7 @@ export function countWords(html: string): number {
 function sanitizedComponents(html: string): string {
   const held = html.replace(PRIVATE_CHARS, char => `&#${char.codePointAt(0)};`).replace(PLACEHOLDER_TAG, (_, selfClosing: string | undefined, opening: string | undefined) => heldPlaceholder(selfClosing, opening))
 
-  return withoutInnerRel(sanitizedMarkdown(held, () => false, LOADED).replace(CODE_CLASS, '<code>').replace(HEADING_ID, '<$1').replace(HELD_PLACEHOLDER, (_, selfClosing: string | undefined, opening: string | undefined) => restoredPlaceholder(selfClosing, opening)))
+  return withoutInnerRel(sanitizedMarkdown(held, LOADED, false).replace(CODE_CLASS, '<code>').replace(HEADING_ID, '<$1').replace(HELD_PLACEHOLDER, (_, selfClosing: string | undefined, opening: string | undefined) => restoredPlaceholder(selfClosing, opening)))
 }
 
 // The sanitizer marks every link as a user's; a link to the site or to a heading is the entry's own, so only one leaving the site keeps its `rel`.
@@ -161,7 +161,7 @@ function restoredPlaceholder(selfClosing: string | undefined, opening: string | 
 
 // An HTML body a loader gave, as a user's markup goes through the sanitizer.
 export function sanitizedHtml(html: string): string {
-  return withoutInnerRel(sanitizedMarkdown(html, () => false, LOADED_HTML))
+  return withoutInnerRel(sanitizedMarkdown(html, LOADED_HTML, false))
 }
 
 // The HTML an entry's Markdown body puts on the page, each component standing as a `<kay-component>` element around what it wraps, so a CMS can check what an editor wrote before saving it; throws a MarkdownError for components kay cannot read.

@@ -8,7 +8,6 @@ import { renderMarkdown } from '../src/content'
 import { sanitizedMarkdown } from '../src/runtime/markdown'
 import { markdownHtml as islandMarkdown } from '../src/runtime/markdown-render.client'
 import { markdownHtml } from '../src/runtime/markdown.server'
-import { leavesSite } from '../src/runtime/outside'
 
 // GFM as a user writes it, with the edges where marked and Bun.markdown part by default.
 const CORPUS = [
@@ -91,7 +90,7 @@ describe('markdownHtml', () => {
 
       // A task list's labels are written after the sanitizer, so only the unlabelled form round trips.
       if (!html.includes('<h') && !html.includes('task-list-item'))
-        expect(markdownHtml(markdown)).toBe(sanitizedMarkdown(html, href => leavesSite(href, undefined)))
+        expect(markdownHtml(markdown)).toBe(sanitizedMarkdown(html))
     }
 
     for (const render of [markdownHtml, islandMarkdown])
