@@ -17,7 +17,7 @@ import { directImports } from './direct-imports'
 import { KAY_MODULE, SCRIPT_FILE, scriptLoader } from './files'
 import { expandGlobs } from './glob'
 import { iconModule, iconNames, installedIconSets } from './icons'
-import { linkedPeers, settingsReplacements } from './libraries'
+import { linkedKayCopies, settingsReplacements } from './libraries'
 import { liveIds } from './live-ids'
 import { embeddedMapTail } from './sourcemap'
 import { embeddedMapCached, transformKayCached } from './transform'
@@ -259,9 +259,9 @@ export function kayPlugin(options: KayPluginOptions, workers: string[]): BunPlug
           build.onLoad({ filter: new RegExp(`^${RegExp.escape(path)}$`) }, () => ({ contents: `export * from ${JSON.stringify(replacement)}\nexport { default } from ${JSON.stringify(replacement)}\n`, loader: 'ts' }))
       }
 
-      // A linked library's own copy of kay, or of another of its peers, loads as the app's: each of its modules re-exports the app's module at the same place, so the library and the app share one kay.
-      for (const { from, to } of linkedPeers(root)) {
-        build.onLoad({ filter: new RegExp(`^${RegExp.escape(from + sep)}.*\\.(?:[cm]?[jt]sx?)$`) }, async ({ path }) => {
+      // A linked library's own copy of kay loads as the app's: each of its modules re-exports the app's module at the same place, so the library and the app share one kay. A module the app's copy lacks, as another version may, stays the library's.
+      for (const { from, to } of linkedKayCopies(root)) {
+        build.onLoad({ filter: new RegExp(`^${RegExp.escape(from + sep)}(?!(?:.*[\\\\/])?node_modules[\\\\/]).*\\.[cm]?[jt]sx?$`) }, async ({ path }) => {
           const target = join(to, relative(from, path))
 
           if (!existsSync(target))

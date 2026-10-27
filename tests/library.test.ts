@@ -2,7 +2,7 @@ import { mkdir, readdir, readlink, rm, symlink } from 'node:fs/promises'
 import { join, relative, resolve } from 'node:path'
 import process from 'node:process'
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
-import { findKayLibraries, kayLibrariesOf } from '../src/build/libraries'
+import { findKayLibraries, kayLibrariesOf, linkedKayCopies } from '../src/build/libraries'
 import { outOfStore, throughLinks } from '../src/build/links'
 import { projectPaths } from '../src/project'
 import { testSite } from '../src/test'
@@ -529,7 +529,7 @@ describe('kay libraries', () => {
 
 // A library developed in its own folder installs kay there too: linked into an app, its modules resolve `kay` from that folder unless the app's copy takes its place.
 describe('a linked library bringing its own kay', () => {
-  it('serves its api() module from the app, kay\'s own copy in the library standing for the app\'s', async () => {
+  it('serves its api() module from the app, kay\'s own copy in the library standing for the app\'s, a module only that copy has staying its own', async () => {
     const app = await scratchDir('dom-')
     const library = await scratchDir('dom-')
 
@@ -542,10 +542,12 @@ describe('a linked library bringing its own kay', () => {
     })
     await write(library, {
       'package.json': JSON.stringify({ name: 'kay-lib', version: '1.0.0', type: 'module', peerDependencies: { kay: '*' }, devDependencies: { kay: '*' }, exports: { './api': './src/api.ts' } }),
-      'src/api.ts': 'import { api } from \'kay/server\'\n\nexport default api().get(\'/\', () => ({ from: \'lib\' }))\n',
+      'src/api.ts': 'import { api } from \'kay/server\'\nimport dataTab from \'kay/dev-tab-data\'\nimport only from \'kay/only-here\'\n\nexport default api().get(\'/\', () => ({ from: \'lib\', tab: dataTab.name, only }))\n',
       // The library's own copy, which answers no Elysia instance the app's server would take.
-      'node_modules/kay/package.json': JSON.stringify({ name: '@kaynooo/kayjs', type: 'module', exports: { './server': './src/server/index.ts' } }),
+      'node_modules/kay/package.json': JSON.stringify({ name: '@kaynooo/kayjs', type: 'module', exports: { './server': './src/server/index.ts', './dev-tab-data': './src/runtime/dev-tab-data.ts', './only-here': './src/only-here.ts' } }),
       'node_modules/kay/src/server/index.ts': 'export function api() {\n  return { get: () => ({ copy: true }) }\n}\n',
+      'node_modules/kay/src/runtime/dev-tab-data.ts': 'export default function copy() {}\n',
+      'node_modules/kay/src/only-here.ts': 'export default \'copy\'\n',
     })
     await mkdir(join(app, 'node_modules'), { recursive: true })
     await symlink(library, join(app, 'node_modules/kay-lib'))
@@ -553,10 +555,34 @@ describe('a linked library bringing its own kay', () => {
     const site = await testSite({ root: app })
 
     try {
-      expect(await (await site.fetch('/api/lib')).json()).toEqual({ from: 'lib' })
+      expect(await (await site.fetch('/api/lib')).json()).toEqual({ from: 'lib', tab: 'dataTab', only: 'copy' })
     }
     finally {
       await site.close()
     }
+  })
+
+  it('leaves alone a library\'s copy that is the app\'s, or holds the app, as a kay checkout holds its examples', async () => {
+    const checkout = await scratchDir('dom-')
+    const app = join(checkout, 'examples/app')
+    const shared = await scratchDir('dom-')
+    const holding = await scratchDir('dom-')
+
+    projects.push(checkout, shared, holding)
+    await write(checkout, {
+      'package.json': JSON.stringify({ name: '@kaynooo/kayjs', type: 'module' }),
+      'examples/app/package.json': JSON.stringify({ name: 'app', private: true, dependencies: { 'shared-lib': '1.0.0', 'holding-lib': '1.0.0' } }),
+      'examples/app/node_modules/kay/package.json': JSON.stringify({ name: '@kaynooo/kayjs' }),
+    })
+    await write(shared, { 'package.json': JSON.stringify({ name: 'shared-lib', peerDependencies: { kay: '*' } }) })
+    await write(holding, { 'package.json': JSON.stringify({ name: 'holding-lib', peerDependencies: { kay: '*' } }) })
+    await mkdir(join(shared, 'node_modules'), { recursive: true })
+    await mkdir(join(holding, 'node_modules'), { recursive: true })
+    await symlink(join(app, 'node_modules/kay'), join(shared, 'node_modules/kay'))
+    await symlink(checkout, join(holding, 'node_modules/kay'))
+    await symlink(shared, join(app, 'node_modules/shared-lib'))
+    await symlink(holding, join(app, 'node_modules/holding-lib'))
+
+    expect(linkedKayCopies(app)).toEqual([])
   })
 })
