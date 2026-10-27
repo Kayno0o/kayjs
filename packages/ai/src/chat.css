@@ -498,23 +498,36 @@
     min-height: 0;
   }
 
-  .kai-launcher-body .kai-chat {
+  /* In the panel, whose height is fixed, and in a chat given `fill`: the form stays at the bottom while the greeting, or the log, fills what is above it. */
+  .kai-launcher-body .kai-chat,
+  .kai-chat[data-fill] {
     flex: 1;
   }
 
-  .kai-launcher-body .kai-chat-log {
+  .kai-chat[data-fill] {
+    height: 100%;
+  }
+
+  .kai-launcher-body .kai-chat-log,
+  .kai-chat[data-fill] .kai-chat-log {
     flex: 1;
     min-height: 0;
     max-height: none;
   }
 
-  /* The panel's height is fixed, so the form stays at the bottom while the greeting, or the log, fills what is above it. */
-  .kai-launcher-body .kai-chat-form {
+  .kai-launcher-body .kai-chat-form,
+  .kai-chat[data-fill] .kai-chat-form {
     margin-top: auto;
   }
 
-  .kai-launcher-body .kai-chat-empty {
+  .kai-launcher-body .kai-chat-empty,
+  .kai-chat[data-fill] .kai-chat-empty {
     overflow-y: auto;
+  }
+
+  .kai-chat[data-fill] .kai-chat-empty {
+    flex: 1;
+    justify-content: flex-end;
   }
 
   .kai-launcher-note {
