@@ -1,24 +1,25 @@
 import type { Subprocess } from 'bun'
 import type { Readable } from 'node:stream'
 import type { KayConfig } from '../config'
-import type { BuildOutcome } from './builder'
-import type { ClientBuilder } from './client'
 import type { TypeProblem } from './refuse'
+import type { DevPorts, Phase } from './session/ports'
+import type { RestartBatch } from './session/queue'
 import { existsSync, readFileSync, statSync } from 'node:fs'
-import { rm } from 'node:fs/promises'
-import { networkInterfaces } from 'node:os'
-import { join, resolve, sep } from 'node:path'
+import { join, resolve } from 'node:path'
 import process from 'node:process'
-import { ASSET_EXTENSIONS, KAY_DIR, testWorker } from '../build/assets'
-import { CONFIG_FILE, loadConfig } from '../config'
-import { projectPaths, savedPublicDir } from '../project'
-import { removeDevAddress, writeDevAddress } from './address'
+import { KAY_DIR, testWorker } from '../build/assets'
+import { CONFIG_FILE } from '../config'
+import { projectPaths } from '../project'
+import { removeDevAddress } from './address'
 import { startClientBuilder } from './client'
 import { readConfigRecord, writeConfigRecord } from './config-record'
 import { mentionsPackage } from './fingerprint'
-import { inspectorProxy } from './inspector'
-import { CHECK, CHECK_SKIPPED, CONFIG_REFUSED, LOAD, REFUSE } from './refuse'
-import { environmentWithoutDotenv, PAGES_ENTRY, stylesOnly, watchProject } from './sources'
+import { ClientController } from './session/client'
+import { ChangeQueue } from './session/queue'
+import { describe, networkAddress, openBrowser, Reporter } from './session/report'
+import { MAX_CHANGED_FILES, ServerSupervisor, tell } from './session/servers'
+import { TypesController } from './session/types'
+import { environmentWithoutDotenv, stylesOnly, watchProject } from './sources'
 import { TypesProcess } from './types-process'
 
 export interface DevOptions {
@@ -54,67 +55,17 @@ export interface DevOptions {
 // kay.config.ts does not load; the process that found out has printed why.
 export class ConfigRefusedError extends Error {}
 
-// What the process writing or checking the types answers the session with.
-export type TypesWorker = Pick<TypesProcess, 'configuredEntry' | 'problems' | 'loadedModules' | 'loaded' | 'write' | 'close'>
+export type { DevPorts, TypesWorker } from './session/ports'
 
-// The processes and the watcher the session drives, which a test replaces to drive its races without spawning any.
-export interface DevPorts {
-  spawnServer: (root: string, entry: string, env: Record<string, string | undefined>, stdout: 'inherit' | number, ipc: (message: unknown, server: Subprocess) => void) => Subprocess<'pipe'>
-  typesProcess: (root: string, entry: string | undefined, env: Record<string, string | undefined>, idleMs?: number) => TypesWorker
-  startClientBuilder: (root: string, env: Record<string, string | undefined>, stdout: 'inherit' | number, quiet: boolean) => ClientBuilder
-  watchProject: (root: string, onChange: (file: string) => void, options: { rootNaming: boolean, onScratch: () => void }) => () => void
-}
-
-// Long enough to gather the few events one save makes, which come within a millisecond.
-const DEBOUNCE_MS = 10
-// How long a source an editor's save left missing is waited for, as saving by renaming it away and writing it anew leaves it, on a machine busy enough to stretch the save.
-const GONE_WAIT_MS = 200
 const PRELOAD = join(import.meta.dir, 'preload.ts')
-// How long a server gets to reload its modules before the change starts a new process: an entry stuck on top-level work, or a process that stopped answering.
-const RELOAD_TIMEOUT_MS = 5000
-// A process creeps by about 70 KB per reload, so it is replaced before that adds up.
-const MAX_RELOADS = 200
-// How long stopping waits for the types being written before it kills the process writing them.
-const TYPES_GRACE_MS = 2000
-// How long the first tree waits for the first server to listen before it is written anyway, as for a server that never does.
-const FIRST_TREE_WAIT_MS = 3000
-// How long the type check waits for the last change before it starts, so a burst of saves is checked once.
-const CHECK_DEBOUNCE_MS = 300
-// How long the process checking waits for the next edit before it exits: longer than the tree writer's, as a boot costs it the config and the collections it read.
-const CHECK_IDLE_MS = 120_000
-// The type errors the pages and the server carry, as `errors.json` does.
-const MAX_SENT_ERRORS = 50
-// The type errors the terminal lists before it counts the rest.
-const MAX_TYPE_LINES = 10
-const LINE_BREAK = /\r?\n/
-
 // The root files Bun reads as a process starts.
 const STARTUP_FILE = /^(?:\.env.*|package\.json|bunfig\.toml|tsconfig\.json)$/
 const PACKAGE_FILE = 'package.json'
 // The fields of package.json that no module resolves with or loads differently for: an edit of only these changes nothing a process or the client build reads.
 const INERT_PACKAGE_FIELDS = new Set(['scripts', 'version', 'description', 'keywords', 'author', 'contributors', 'license', 'homepage', 'repository', 'bugs', 'funding', 'private', 'files', 'engines', 'packageManager', 'publishConfig'])
-// The code files, which the process writing the types keeps running through an edit it did not load.
-const CODE_FILE = /\.[cm]?[jt]sx?$/
-// The files no type reads the contents of: a stylesheet, a markdown entry of a collection, an image, a font or any media an import takes the URL of.
-const TYPE_FREE = new RegExp(`\\.(?:css|mdx?|${ASSET_EXTENSIONS.join('|')})$`, 'i')
-// The backups Vim, Emacs and JetBrains IDEs move a source to while they write it anew.
-const SAVE_BACKUPS = ['~', '___jb_old___', '___jb_tmp___']
-// Past this, as after a checkout, the files changed are not passed on, and open pages reload.
-const MAX_CHANGED_FILES = 200
-// The address of a server listening on the root path, as kay's do, reads better without its slash.
-const ROOT_PATH = /(?<=\/\/[^/]+)\/$/
-const STOP_SIGNALS = new Set<Subprocess['signalCode']>(['SIGINT', 'SIGTERM', 'SIGHUP'])
-const WS_SCHEME = /^ws:\/\//
-// A server listening on every address is reached on this machine as localhost.
-const ANY_ADDRESS = /(?<=\/\/)(?:0\.0\.0\.0|\[::\])(?=:)/
 const CLEAR_SCREEN = '\x1B[2J\x1B[3J\x1B[H'
 const CTRL_C = '\x03'
 const ESCAPE = '\x1B'
-// The interfaces of containers, bridges and VPNs, whose address a phone on the network does not reach.
-const VIRTUAL_INTERFACE = /^(?:docker|br-|bridge|veth|virbr|vmnet|vboxnet|tun|utun|tap|wg|tailscale|zt|lxc|lxd|cni|flannel)/
-const STDERR = 2
-// eslint-disable-next-line no-control-regex -- escape sequences are what it strips
-const ANSI_STYLE = /\x1B\[[\d;]*m/g
 
 const PORTS: DevPorts = {
   spawnServer: (root, entry, env, stdout, ipc) => Bun.spawn([process.execPath, '--preload', PRELOAD, entry], { cwd: root, env, stdin: 'pipe', stdout, stderr: 'inherit', ipc }),
@@ -126,298 +77,65 @@ const PORTS: DevPorts = {
 // Runs the server entry in development and keeps its process through the changes to templates, islands and API modules: the process imports the modules they reached again and runs the entry once more, whose server takes over the one listening.
 // A change to anything else, such as the config, the environment or code kay does not load itself, starts a new process.
 // The client is built beside it, by a process kept from one change to the next, which a stylesheet edit alone needs no restart for.
+// The session drives a controller each for the servers, the types, the client build and the reports, from one queue of changes and one phase.
 // Resolves once watching, with a function stopping the watchers and the server.
 export async function dev(projectRoot: string, options: DevOptions = {}, ports: DevPorts = PORTS): Promise<() => Promise<void>> {
+  const clock = Date.now()
   const root = resolve(projectRoot)
   // Where the client build of `kay dev` and what it keeps of the config are written.
   const devDir = join(root, KAY_DIR, `dev${testWorker()}`)
-  let child: Subprocess<'pipe'> | undefined
-  // Spawned ahead of its start line, which it loads kay while it waits for: the first server when the config is to be checked first.
-  let waiting: Subprocess<'pipe'> | undefined
-  let waitingEntry: string | undefined
-  // The entry the running process was started with, which a new entry ends.
-  let runningEntry: string | undefined
-  // Answers a reload with how it ended: reloaded, why it needs a new process, or that the process exited meanwhile.
-  let reloadAnswer: ((answer: string) => void) | undefined
-  let timer: Timer | undefined
-  let changed = false
-  // Bun reads these as a process starts, so changing one needs a process started after it.
-  let startupChanged = false
-  let restarting: Promise<void> | undefined
-  let stopping = false
-  // Counts every change but a stylesheet's: an open page whose server comes back with the same count only needs its stylesheets again.
-  // It starts from the clock, so a page left open across two `kay dev` runs never takes the new run's count for its own.
-  let codeVersion = Date.now()
-  // The count the last server started with, and the files changed since: a page on that count may swap in what changed.
-  let startedAt = codeVersion
-  let changedFiles = new Set<string>()
-  // Whether the running process has a server listening, so its first run of the entry is over and it can reload.
-  let listening = false
-  // The reloads the running process took, which bound its memory: Bun keeps some of every module it loaded again, so the process is replaced after MAX_RELOADS.
-  let reloads = 0
-  // Every file changed since the last restart began, stylesheets included.
-  let touched = new Set<string>()
-  // The content each file had when a restart took it in, so a late second event of the same save, its content unchanged, restarts nothing.
-  const taken = new Map<string, number | bigint>()
-  // The config the types are written from, read again once kay.config.ts changes.
-  let typesConfig = options.config
-  // The types are written beside the restarts, one run at a time and one more once it ends when changes came meanwhile.
-  let typesWriting: Promise<void> | undefined
-  let typesAgain = false
-  // The code files edited while a write ran, whose module the process may have loaded by then.
-  const editedWhileWriting: string[] = []
+  let phase: Phase = 'starting'
+  const currentPhase = () => phase
   const env = await environmentWithoutDotenv(root)
-  // The process writing them is kept between writes; only a change to something but `.kay` sources boots a new one, as the config or a module it imports may be what changed.
-  const typesProcess = ports.typesProcess(root, options.entry, env)
-  let typesFresh = true
-  let startedTypes = false
-  // Writes the first tree, which waits for the first server to listen so the page comes first; the editors need it, the page does not.
-  let writeFirstTree: (() => void) | undefined
-  let treeTimer: Timer | undefined
-  // The shadow tree and the declarations read the project's sources, config and the names of its public files, so an edit of the contents of a stylesheet, a markdown entry or a media file leaves them as they are.
-  const typesRead = (files: string[]) => {
-    if (files.length === 0 || files.some(file => !TYPE_FREE.test(file)))
-      return true
+  const reporter = new Reporter(options.log, options.format, options.quiet)
+  // Settled once the first types write, which tells a config that does not load, is over.
+  const verified = Promise.withResolvers<void>()
+  const types = new TypesController(root, options, env, ports, reporter, currentPhase, tellTypeErrors)
+  const servers = new ServerSupervisor(root, options, env, ports, reporter, currentPhase, verified.promise, { entry: () => types.entry(), received, exited: serverExited }, clock)
+  const client = new ClientController(root, env, ports, reporter, currentPhase)
 
-    const publicDir = savedPublicDir(root) + sep
-
-    return files.some(file => join(root, file).startsWith(publicDir))
-  }
-  let configRefused = false
-  // Set once the type check is defined, below the helpers it says its errors with.
-  let typesWritten: (() => void) | undefined
-  // A write of the tree started since the check began, which makes its answer old.
-  let checkStale = false
-  const writeTypes = async () => {
-    checkStale = true
-    // Any write of the tree is the first one, so none is left waiting for a server.
-    writeFirstTree = undefined
-    clearTimeout(treeTimer)
-    typesAgain = true
-    typesWriting ??= (async () => {
-      while (typesAgain) {
-        typesAgain = false
-        const fresh = typesFresh
-
-        typesFresh = false
-        configRefused ||= await regenerateTypes(root, { ...options, config: typesConfig }, options.refuseConfig === true && !startedTypes, typesProcess, fresh)
-        startedTypes = true
-
-        if (editedWhileWriting.splice(0).some(file => typesProcess.loaded(file))) {
-          typesFresh = true
-          typesAgain = true
-        }
-      }
-
-      typesWritten?.()
-      typesWriting = undefined
-    })()
-
-    return typesWriting
-  }
-  // What the last restart came from and when it began, for its report, `r` pressed when nothing changed.
-  let restartedFor: string[] = []
-  let restartAsked = false
-  // `r` was pressed since the last restart began, which restarts even when only stylesheets changed.
-  let forced = false
-  // The file a forced restart is for, when it is not the user's key: the config naming another entry than the server runs.
-  let forcedFor: string | undefined
-  let restartedAt = performance.now()
-  let address: string | undefined
-  // The port the first server asked for and the one it moved to, busy, which every next server takes first.
-  let moved: string | undefined
-  // Started once a server asks for the client, and again once a file it loaded changes or it is gone.
-  let builder: ClientBuilder | undefined
-  let builderStale = true
-  // One build at a time, so a restart never starts a second process while the last build still waits on the first.
-  let lastBuild: Promise<unknown> = Promise.resolve()
-  // Said once until a build succeeds again, as the process's own error already shows.
-  let builderExitSaid = false
-  // A server asked for the client, so the next ones will: each restart starts building it at once.
-  let wantsClient = false
-  // `pages()` was given other options than kay.config.ts holds, so the servers bundle their own until the config changes.
-  let ownClient = false
-  // The build the running server reads, and the files changed since the last one began, null for all of them.
-  let building: Promise<BuildOutcome | undefined> | undefined
-  let unbuilt: Set<string> | null = null
-  // The server swapping in the stylesheets of a stylesheet edit, once it said it reads the build.
-  let follower: Subprocess | undefined
-  const print = options.log ?? console.log
-  // The last rebuild line, kept to be rewritten when the next is the same; anything printed after it, by kay dev or the app, ends it.
-  let repeatable: { key: string, count: number, rows: number } | undefined
-  const log = (line: string) => {
-    repeatable = undefined
-    print(line)
-  }
-  // The inspector socket of each server process.
-  const sockets = new Map<Subprocess, string>()
-  // The port the running server's pages are on, the one origin besides debug.bun.sh a page may reach the debugger from.
-  let pagePort: number | undefined
-  const inspector = options.inspect === undefined ? undefined : inspectorProxy(options.inspect, () => child && sockets.get(child), () => pagePort)
-  // Bun leaves its socket behind as it exits.
-  const forgetSocket = async (server: Subprocess, socket: string) => {
-    await server.exited
-    sockets.delete(server)
-    await rm(socket, { force: true })
-  }
-  const json = options.format === 'json'
-  // One event, as a line of text, or as a JSON object of its fields under `json`.
-  const say = (event: string, fields: object, line: string) => log(json ? JSON.stringify({ event, time: new Date().toISOString(), ...fields }) : line)
-  const color = options.log === undefined && !json && process.stdout.isTTY && process.env.NO_COLOR === undefined
-  const dim = (text: string) => color ? `\x1B[2m${text}\x1B[22m` : text
-  const collapses = options.log === undefined && !json && process.stdout.isTTY
-  // A rebuild line the one before said already is rewritten with a count, on a terminal only: elsewhere every line stays.
-  const sayRebuild = (event: string, fields: object, key: string, line: string) => {
-    if (!collapses) {
-      say(event, fields, line)
-
-      return
-    }
-
-    const count = repeatable?.key === key ? repeatable.count + 1 : 1
-    const shown = count > 1 ? `${line} (x${count})` : line
-
-    if (repeatable !== undefined && count > 1)
-      process.stdout.write(`\x1B[${repeatable.rows}A\x1B[J`)
-
-    print(shown)
-    repeatable = { key, count, rows: Math.max(1, Math.ceil(shown.replace(ANSI_STYLE, '').length / (process.stdout.columns || 80))) }
-  }
-  const stamp = () => dim(new Date().toLocaleTimeString('en-GB'))
-  // The errors the last check ended with, and them as JSON (`undefined` before the first check) to tell a changed set from the same one.
-  let typeProblems: TypeProblem[] = []
-  let typeKey: string | undefined
-  // Whether the server is told the type errors on listening: once a check ended, or skipped, so it never waits on one that will not come.
-  let typeSettled = false
-  // A check that ended with another set of type errors than the one before is told to the server and said in the terminal.
-  const publishTypeErrors = (problems: TypeProblem[]) => {
-    const key = JSON.stringify(problems)
-
-    if (key === typeKey)
-      return
-
-    typeKey = key
-    typeSettled = true
-    typeProblems = problems
-
-    if (child !== undefined)
-      tell(child, { typeErrors: problems.slice(0, MAX_SENT_ERRORS) })
-
-    if (problems.length === 0) {
-      if (options.quiet !== true)
-        say('types', { errors: [] }, `${stamp()} types: no errors`)
-
-      return
-    }
-
-    const lines = problems.slice(0, MAX_TYPE_LINES).map(({ file, line, column, code, message }) => `  ${file}:${line}:${column}${code === undefined ? '' : ` ${code}`} ${message.split(LINE_BREAK)[0]}`)
-    const more = problems.length - lines.length
-
-    say('types', { errors: problems.map(({ report: _report, ...problem }) => problem) }, [`${stamp()} types: ${problems.length} type error${problems.length === 1 ? '' : 's'}`, ...lines, ...more > 0 ? [`  and ${more} more`] : []].join('\n'))
-  }
-  // The type check runs in a process of its own beside the server, once the tree it types is written: a reload never waits for it, and its errors reach the open pages, errors.json and the terminal when it ends.
-  const typeChecking = options.types !== false && options.config === undefined && existsSync(join(root, 'tsconfig.json'))
-  const checkProcess = ports.typesProcess(root, options.entry, env, CHECK_IDLE_MS)
-  let checkFresh = true
-  let checkTimer: Timer | undefined
-  let checking: Promise<void> | undefined
-  let checkAgain = false
-  const scheduleCheck = () => {
-    if (!typeChecking || stopping || configRefused)
-      return
-
-    clearTimeout(checkTimer)
-    checkTimer = setTimeout(() => {
-      checkAgain = true
-      checking ??= (async () => {
-        try {
-          while (checkAgain) {
-            checkAgain = false
-            await typesWriting
-            checkStale = false
-
-            const fresh = checkFresh
-
-            checkFresh = false
-
-            const code = await checkProcess.write(fresh, '', CHECK)
-
-            if (stopping)
-              break
-
-            // A change came meanwhile, whose check follows and says what holds.
-            if (!checkStale && !checkAgain) {
-              if (code !== CHECK_SKIPPED) {
-                publishTypeErrors(checkProcess.problems)
-              }
-              // A first check skipped leaves nothing to show: the errors a previous run listed are stale.
-              else if (!typeSettled) {
-                typeSettled = true
-
-                if (child !== undefined)
-                  tell(child, { typeErrors: [] })
-              }
-            }
-          }
-        }
-        catch (error) {
-          console.error(error)
-        }
-        finally {
-          checking = undefined
-        }
-      })()
-    }, CHECK_DEBOUNCE_MS)
-    checkTimer.unref()
+  function tellTypeErrors(problems: TypeProblem[]) {
+    servers.tellTypeErrors(problems)
   }
 
-  typesWritten = scheduleCheck
+  // The running server exited on its own: nothing serves until the next change, and the first tree waits for it no more.
+  function serverExited(code: number) {
+    types.writeFirstTree()
+    servers.answer('exited')
+    reporter.exit(code)
+  }
+
   // A restart or a reload is over, its report the terminal's and the open pages'; `reloaded` says the running process took the change in, where a restart is a new one.
-  const restarted = (server: Subprocess, url: string | undefined, reloaded = false) => {
-    const ms = Math.round(performance.now() - restartedAt)
-    const changed = restartAsked ? 'r pressed' : describe(restartedFor)
-    const moved = url !== undefined && url !== address
-    const verb = reloaded ? 'reloaded' : 'restarted'
+  function restarted(server: Subprocess, url: string | undefined, reloaded = false) {
+    const ms = Math.round(performance.now() - servers.restartedAt)
+    const changed = servers.restartAsked ? 'r pressed' : describe(servers.restartedFor)
 
-    // Quiet, a restart is said only when it moved the address.
-    if (options.quiet !== true || moved)
-      sayRebuild('restart', { changed: restartedFor, ms, ...reloaded && { reloaded }, ...url !== undefined && { url } }, `${changed}: ${verb}${moved ? `, now on ${url}` : ''}`, `${stamp()} ${changed}: ${verb} in ${ms} ms${moved ? `, now on ${url}` : ''}`)
-
+    reporter.restarted(servers.restartedFor, changed, ms, url, url !== undefined && url !== servers.address, reloaded)
     tell(server, { built: { changed, ms, ...reloaded && { reloaded } } })
   }
-  // A server reports its address over IPC from the preload; only the one running counts, and only the first time it listens.
-  const listened = (server: Subprocess, message: unknown) => {
-    if (server !== child || typeof message !== 'object' || message === null || !('listening' in message) || typeof message.listening !== 'string')
+
+  // Only the running server's report counts, and only the first time it listens.
+  function listened(server: Subprocess, message: unknown) {
+    const heard = servers.heard(server, message)
+
+    if (heard === undefined)
       return
 
-    const url = message.listening.replace(ROOT_PATH, '').replace(ANY_ADDRESS, 'localhost')
-    const ms = Math.round(performance.now() - restartedAt)
-    const took = `${ms} ms`
-    const { asked, port } = message as Partial<Record<'asked' | 'port', number>>
+    const { url, ms, inUse, anyAddress } = heard
 
-    moved = asked !== undefined && port !== undefined && asked !== port ? `${asked}:${port}` : undefined
-    pagePort = port
+    if (servers.address === undefined) {
+      types.writeFirstTree()
 
-    if (address === undefined) {
-      writeFirstTree?.()
+      const network = anyAddress ? networkAddress() : undefined
 
-      const network = ANY_ADDRESS.test(message.listening) ? networkAddress() : undefined
-      const reached = network === undefined ? undefined : url.replace('//localhost', `//${network}`)
-
-      say('ready', { url, ms, ...moved !== undefined && { inUse: asked }, ...reached !== undefined && { network: reached } }, `kay dev: ${url} (ready in ${took}${moved === undefined ? '' : `, ${asked} was in use`})`)
-
-      if (reached !== undefined && !json)
-        log(`kay dev: ${reached} on the network`)
-
-      if (inspector !== undefined)
-        say('debugger', { url: inspector.url }, `kay dev: debugger on ${inspector.url}, https://debug.bun.sh/#${inspector.url.replace(WS_SCHEME, '')}`)
+      reporter.ready(url, ms, inUse, network === undefined ? undefined : url.replace('//localhost', `//${network}`), servers.inspector?.url)
 
       if (options.open === true)
-        openBrowser(url, command => say('no-browser', { command }, `kay dev: no browser to open ${url} with: ${command} is not installed`))
+        openBrowser(url, command => reporter.noBrowser(url, command))
 
       if (options.keys !== undefined) {
-        if (options.quiet !== true)
-          log(`kay dev: ${dim('press o to open it in the browser, r to restart, c to clear the screen, q to quit')}`)
+        if (!reporter.quiet)
+          reporter.keys()
 
         readKeys(options.keys)
       }
@@ -426,155 +144,58 @@ export async function dev(projectRoot: string, options: DevOptions = {}, ports: 
       restarted(server, url)
     }
 
-    address = url
-    writeDevAddress(root, url)
+    servers.listenedOn(url)
   }
 
-  // Settled once the first types write, which tells a config that does not load, is over.
-  const verified = Promise.withResolvers<void>()
-  // A server killed for a restart or by `kay dev` stopping exits as expected, as does one the terminal interrupted along with `kay dev`; one exiting on its own leaves nothing serving until the next change.
-  const reportExit = async (server: Subprocess) => {
-    const code = await server.exited
-
-    // A server dying with a config that does not load is the refusal's to report, once the first types say so.
-    await verified.promise
-
-    if (server === child && !stopping && !STOP_SIGNALS.has(server.signalCode)) {
-      writeFirstTree?.()
-      reloadAnswer?.('exited')
-      say('exit', { code }, `${stamp()} the server exited with code ${code}, waiting for a change`)
-    }
-  }
-
-  // Set once the first types settled, which say a config that does not load: until then a builder started ahead of them stays quiet about its own exit.
-  let typesSettled = false
-  // The builder exited before the types settled, so its notice waits for them.
-  let builderExitHeld = false
-  const sayBuilderExit = () => {
-    if (!builderExitSaid)
-      say('builder-exit', {}, `${stamp()} the process building the client exited; each change starts it again, the servers building their own until one build succeeds`)
-
-    builderExitSaid = true
-  }
-  const buildClientNow = async (): Promise<BuildOutcome | undefined> => {
-    if (ownClient || stopping)
-      return undefined
-
-    if (builderStale || builder?.gone() === true) {
-      await builder?.stop()
-
-      // The start may have been refused while the old process stopped: a new one would print the config's error again.
-      if (stopping)
-        return undefined
-
-      builder = ports.startClientBuilder(root, env, json ? STDERR : 'inherit', !typesSettled)
-      builderStale = false
-      unbuilt = null
-    }
-
-    const files = unbuilt === null || unbuilt.size > MAX_CHANGED_FILES ? null : [...unbuilt]
-    const current = builder
-
-    unbuilt = new Set()
-
-    const outcome = await current?.build(files)
-
-    if (outcome) {
-      builderExitSaid = false
-
-      return outcome
-    }
-
-    // Gone on its own while building, as when the config failed to load: the next build starts it again.
-    if (current !== undefined && current === builder && !stopping && !ownClient) {
-      if (typesSettled)
-        sayBuilderExit()
-      else
-        builderExitHeld = true
-    }
-
-    return undefined
-  }
-  const buildClient = async (): Promise<BuildOutcome | undefined> => {
-    const previous = lastBuild
-    const build = (async () => {
-      try {
-        await previous
-      }
-      catch {}
-
-      return buildClientNow()
-    })()
-
-    lastBuild = build
-
-    return build
-  }
-  const answerClient = async (server: Subprocess) => {
-    const outcome = await (building ??= buildClient())
-
-    let state: 'none' | 'failed' | 'built' = 'none'
-
-    if (outcome !== undefined)
-      state = outcome.failed ? 'failed' : 'built'
-
-    try {
-      server.send({ client: state })
-    }
-    // Killed for a restart meanwhile.
-    catch {}
-  }
-  const received = (server: Subprocess, message: unknown) => {
+  function received(server: Subprocess, message: unknown) {
     if (typeof message !== 'object' || message === null)
       return
 
-    if ('wantsClient' in message) {
-      wantsClient = true
-      void answerClient(server)
-    }
+    if ('wantsClient' in message)
+      client.asked(server)
 
-    if ('ownClient' in message) {
-      ownClient = true
-      void builder?.stop()
-      builder = undefined
-    }
+    if ('ownClient' in message)
+      client.ownAsked()
 
     if ('output' in message)
-      repeatable = undefined
+      reporter.endRepeat()
 
     if ('followsStyles' in message)
-      follower = server
+      client.follows(server)
 
-    if (server === child && 'listening' in message) {
-      listening = true
+    if (server === servers.child && 'listening' in message) {
+      servers.listening = true
 
-      // A new process starts without the errors the last check found; with no check running it clears those a previous run left in `errors.json`.
-      if (!typeChecking || typeSettled || configRefused)
-        tell(server, { typeErrors: typeProblems.slice(0, MAX_SENT_ERRORS) })
+      const told = types.toldOnListen()
+
+      if (told !== undefined)
+        tell(server, { typeErrors: told })
     }
 
-    if (server === child && 'reloaded' in message)
-      reloadAnswer?.('reloaded')
+    if (server === servers.child && 'reloaded' in message)
+      servers.answer('reloaded')
 
-    if (server === child && 'restart' in message && typeof message.restart === 'string')
-      reloadAnswer?.(message.restart)
+    if (server === servers.child && 'restart' in message && typeof message.restart === 'string')
+      servers.answer(message.restart)
 
     // The server logged it already; only `json` repeats it, as an event.
-    if ('devError' in message && json && typeof message.devError === 'object')
-      say('error', message.devError ?? {}, '')
+    if ('devError' in message && reporter.json && typeof message.devError === 'object')
+      reporter.say('error', message.devError ?? {}, '')
 
     listened(server, message)
   }
+
   // A running server that reads the build takes the stylesheets of an edit to stylesheets alone; false when it needs a restart instead, as when the build failed.
   const swapStylesheets = async (files: string[]) => {
-    if (files.length === 0 || !files.every(stylesOnly) || child === undefined || follower !== child || builder === undefined || builderStale)
+    const server = servers.child
+
+    if (files.length === 0 || !files.every(stylesOnly) || server === undefined || !client.swappable(server))
       return false
 
-    const server = child
     const started = performance.now()
-    const outcome = await (building = buildClient())
+    const outcome = await client.buildStyles()
 
-    if (!outcome || outcome.failed || server !== child)
+    if (!outcome || outcome.failed || server !== servers.child)
       return false
 
     // A root Markdown file naming no pruned class leaves the stylesheets as they are.
@@ -586,225 +207,58 @@ export async function dev(projectRoot: string, options: DevOptions = {}, ports: 
     const ms = Math.round(performance.now() - started)
 
     tell(server, { styles: outcome.styles, built: { changed, ms, styles: true } })
-
-    if (options.quiet !== true)
-      sayRebuild('styles', { changed: named, ms }, `${changed}: stylesheets swapped`, `${stamp()} ${changed}: stylesheets swapped in ${ms} ms`)
+    reporter.styles(named, changed, ms)
 
     return true
   }
-  // Chosen again for each process, so a `src/server.ts` written or deleted while running takes over at the next restart.
-  // The config's `entry` comes from the process writing the types, which loads the config; `--entry` wins.
-  const entryToRun = () => {
-    const entry = projectPaths(root, { ...typesConfig, entry: options.entry ?? typesConfig?.entry }).entry
-    const file = options.entry === undefined ? typesProcess.configuredEntry ?? entry : entry
-
-    return options.entry === undefined && !existsSync(file) ? PAGES_ENTRY : file
-  }
-  const spawn = () => {
-    const socket = inspector?.socketFor()
-
-    runningEntry = entryToRun()
-
-    const server = ports.spawnServer(root, runningEntry, { ...env, NODE_ENV: 'development', ...options.port === undefined ? {} : { PORT: String(options.port) }, KAY_DEV_HOST: options.host ?? 'localhost', ...collapses ? { KAY_DEV_REPORTS_OUTPUT: '1' } : {}, ...socket === undefined ? {} : { BUN_INSPECT: `ws+unix://${socket}` } }, json ? STDERR : 'inherit', (message, server) => received(server, message))
-
-    if (socket !== undefined) {
-      sockets.set(server, socket)
-      void forgetSocket(server, socket)
-    }
-
-    return server
-  }
-
-  const spawnWaiting = () => {
-    waiting?.kill()
-    waiting = spawn()
-    waitingEntry = runningEntry
-    startupChanged = false
-  }
-
-  // A new process, taking the one spawned ahead of its start line when it is still right for it.
-  let booted = false
-  const start = () => {
-    booted = true
-
-    if (startupChanged || waiting === undefined || waiting.exitCode !== null || waitingEntry !== entryToRun())
-      spawnWaiting()
-
-    const started = waiting!
-
-    child = started
-    listening = false
-    reloads = 0
-    waiting = undefined
-    void started.stdin.write(`start ${codeVersion} ${moved ?? '-'} ${startedAt} ${JSON.stringify(changedFiles.size > MAX_CHANGED_FILES ? null : [...changedFiles])}\n`)
-    startedAt = codeVersion
-    changedFiles = new Set()
-    void started.stdin.flush()
-    options.onRestart?.(started)
-    void reportExit(started)
-  }
-  // Whether the running process can take the change in: it is up, the environment and the entry are the ones it started with, and no key asked for a new one.
-  const reloadable = (files: string[], asked: boolean) => !asked && !startupChanged && listening && reloads < MAX_RELOADS && child !== undefined && child.exitCode === null && runningEntry === entryToRun() && !files.includes(CONFIG_FILE)
-  // Asks the running process to import the modules the change reached again; answers 'reloaded', or why it needs a new process, or 'exited'.
-  const reload = async (server: Subprocess<'pipe'>, files: string[], sent: string): Promise<string> => {
-    const answer = new Promise<string>((resolve) => {
-      reloadAnswer = resolve
-    })
-    let timeout: ReturnType<typeof setTimeout> | undefined
-    let answered = false
-
-    try {
-      server.send({ reload: { code: codeVersion, startedAt, changed: sent, files: files.length > MAX_CHANGED_FILES ? null : files } })
-    }
-    catch {
-      reloadAnswer?.('exited')
-    }
-
-    // The entry waits for the client build, so the clock starts once it settled.
-    const armed = (async () => {
-      try {
-        await building
-      }
-      catch {}
-
-      if (!answered)
-        timeout = setTimeout(() => reloadAnswer?.('the server did not answer in time'), RELOAD_TIMEOUT_MS)
-    })()
-
-    try {
-      return await answer
-    }
-    finally {
-      answered = true
-      void armed
-      clearTimeout(timeout)
-      reloadAnswer = undefined
-    }
-  }
   // The server never reads the generated types, only the editor and `kay check` do, so it starts before they are rewritten.
   // The client builds while the last server stops and the next one boots, which waits for it only once it asks.
-  const restart = async () => {
-    const files = [...touched]
-
-    const asked = forced
-    const askedFor = forcedFor
-
-    touched = new Set()
-    forced = false
-    forcedFor = undefined
-
-    for (const file of files) {
-      const hash = contentHash(join(root, file))
-
-      if (hash === undefined)
-        taken.delete(file)
-      else
-        taken.set(file, hash)
-    }
-
+  const restart = async ({ files, asked, askedFor }: RestartBatch) => {
     if (!asked && await swapStylesheets(files))
       return
 
-    restartedAt = performance.now()
-    restartedFor = askedFor !== undefined && files.length === 0 ? [askedFor] : changedFilesNamed(root, files)
-    restartAsked = asked && files.length === 0 && askedFor === undefined
-    building = wantsClient ? buildClient() : undefined
+    servers.began(askedFor !== undefined && files.length === 0 ? [askedFor] : changedFilesNamed(root, files), asked && files.length === 0 && askedFor === undefined)
+    client.rebuild()
 
     // The entry is the config's, which the types read: the new process starts on the one known, and another process follows once the types tell the config now names another.
     const configEdited = files.includes(CONFIG_FILE)
 
-    // A check needs a new process as the tree writer does, for a change to the config or to something the process loaded.
-    if (configEdited || (typesRead(files) && (files.length === 0 || files.some(file => !file.endsWith('.kay') && (!CODE_FILE.test(file) || checkProcess.loaded(file))))))
-      checkFresh = true
+    types.checkFor(files, configEdited)
 
     let entryWrite: Promise<void> | undefined
 
     if (configEdited) {
-      if (typesConfig !== undefined)
-        typesConfig = await reloadConfig(root, typesConfig)
-
-      typesFresh = true
-      entryWrite = writeTypes()
+      await types.readConfig()
+      entryWrite = types.writeFresh()
     }
 
-    const previous = child
-    const server = reloadable(files, asked) ? previous : undefined
-    // What the reload carries, taken as it is sent: an edit arriving meanwhile belongs to the next one.
-    const sentCode = codeVersion
-    const sentFiles = new Set(changedFiles)
-    const answer = server === undefined ? undefined : await reload(server, files, JSON.stringify(sentFiles.size > MAX_CHANGED_FILES ? null : [...sentFiles]))
+    const previous = servers.child
+    const server = servers.reloadable(files, asked) ? previous : undefined
+    const sent = servers.sent()
+    const answer = server === undefined ? undefined : await servers.reload(server, files, sent, client.building)
 
     if (answer === 'reloaded') {
-      startedAt = sentCode
-      reloads++
-
-      for (const file of sentFiles)
-        changedFiles.delete(file)
-
+      servers.reloaded(sent)
       restarted(server!, undefined, true)
     }
-    // The server exited on its own while it reloaded, which `reportExit` says: nothing runs until the next change.
+    // The server exited on its own while it reloaded, which the exit report says: nothing runs until the next change.
     else if (answer !== 'exited') {
-      // A new process loads kay while the one before ends, and starts once it has.
-      spawnWaiting()
-      child = undefined
-      previous?.kill()
-      await previous?.exited
-      start()
+      await servers.replace(previous)
     }
 
     if (entryWrite !== undefined) {
       void (async () => {
         await entryWrite
 
-        if (!stopping && child !== undefined && entryToRun() !== runningEntry)
+        if (phase !== 'stopping' && servers.child !== undefined && types.entry() !== servers.runningEntry)
           restartNow(CONFIG_FILE)
       })()
     }
 
-    if (!configEdited && typesRead(files)) {
-      // A code file the process did not load is read from disk by the write, so only the others need a new process.
-      typesFresh ||= files.length === 0 || files.some(file => !file.endsWith('.kay') && (!CODE_FILE.test(file) || typesProcess.loaded(file)))
-
-      // A write in flight may load a module this edit touched, which its answer reports: checked once it ends.
-      if (typesWriting !== undefined)
-        editedWhileWriting.push(...files.filter(file => CODE_FILE.test(file)))
-
-      void writeTypes()
-    }
+    if (!configEdited && types.read(files))
+      types.followEdit(files)
   }
-  // Changes landing during a restart trigger one more, never two restarts at once.
-  const drain = async () => {
-    while (changed) {
-      changed = false
-      await restart()
-    }
-
-    restarting = undefined
-  }
-  let scratchWritten = -Infinity
-  let waitingSince: number | undefined
-  let waited = false
-  // A deleted source restarts at once, while one a save left missing a moment, its backup beside it or the editor's scratch files just written, is waited for.
-  const settle = () => {
-    const now = performance.now()
-    const saving = (file: string) => !existsSync(join(root, file)) && (now - scratchWritten < GONE_WAIT_MS || SAVE_BACKUPS.some(suffix => existsSync(join(root, file + suffix))))
-
-    waitingSince ??= now
-    const wait = now - waitingSince < GONE_WAIT_MS && [...touched].some(saving)
-
-    // A file seen back on disk has its event still to come, which one more tick gathers instead of restarting again for it.
-    if (wait || waited) {
-      waited = wait
-      timer = setTimeout(settle, DEBOUNCE_MS)
-
-      return
-    }
-
-    waitingSince = undefined
-    changed = true
-    restarting ??= drain()
-  }
+  const queue = new ChangeQueue(root, restart)
   // What package.json says of the modules a process resolves, as of the last edit seen: an edit of its scripts or version leaves it as it is.
   let packageSeen = packageSignature(join(root, PACKAGE_FILE))
   const packageResolves = () => {
@@ -817,30 +271,17 @@ export async function dev(projectRoot: string, options: DevOptions = {}, ports: 
   }
   // `inert` is an edit of package.json that changes nothing a process resolves, which still counts when a module imports the file for its version or scripts.
   const changedFile = (file: string, inert: boolean) => {
-    startupChanged ||= !inert && STARTUP_FILE.test(file)
+    const startup = !inert && STARTUP_FILE.test(file)
 
-    // The process building the client resolves modules the way Bun cached package.json for it, so an edit of what package.json resolves with starts a new one, as it does for the process writing the types.
-    if ((!inert && STARTUP_FILE.test(file)) || file === CONFIG_FILE || builder?.loaded(file) === true) {
-      builderStale = true
-      ownClient = false
-    }
-
-    unbuilt?.add(file)
-
-    if (!stylesOnly(file)) {
-      codeVersion++
-      changedFiles.add(file)
-    }
-
-    touched.add(file)
-
-    clearTimeout(timer)
-    timer = setTimeout(settle, DEBOUNCE_MS)
+    servers.startupChanged ||= startup
+    client.changed(file, startup)
+    servers.changed(file)
+    queue.changed(file)
   }
   let packageScan: Promise<void> | undefined
   let packageScanAgain = false
   const stopWatching = ports.watchProject(root, (file) => {
-    if (taken.has(file) && contentHash(join(root, file)) === taken.get(file))
+    if (queue.tookIn(file))
       return
 
     if (file !== PACKAGE_FILE || packageResolves()) {
@@ -868,9 +309,7 @@ export async function dev(projectRoot: string, options: DevOptions = {}, ports: 
     })
   }, {
     rootNaming: true,
-    onScratch: () => {
-      scratchWritten = performance.now()
-    },
+    onScratch: () => queue.scratch(),
   })
 
   // A terminal in raw mode hands over each key as it is pressed, Ctrl+C included, which no longer interrupts; an escape sequence, as Alt+key or an arrow sends, is none of them.
@@ -881,14 +320,16 @@ export async function dev(projectRoot: string, options: DevOptions = {}, ports: 
       return
 
     for (const key of keys) {
-      if (key === 'o' && address !== undefined) {
-        openBrowser(address, command => log(`kay dev: no browser to open ${address} with: ${command} is not installed`))
+      if (key === 'o' && servers.address !== undefined) {
+        const address = servers.address
+
+        openBrowser(address, command => reporter.log(`kay dev: no browser to open ${address} with: ${command} is not installed`))
       }
       else if (key === 'r') {
         restartNow()
       }
       else if (key === 'c') {
-        repeatable = undefined
+        reporter.endRepeat()
         process.stdout.write(CLEAR_SCREEN)
       }
       else if (key === 'q' || key === CTRL_C) {
@@ -909,20 +350,14 @@ export async function dev(projectRoot: string, options: DevOptions = {}, ports: 
     keys.on('data', onKey)
   }
 
-  // As a change does, but for no file: open pages load the page again. A change still waiting on the debounce goes with it, its timer cleared so it does not restart again for nothing.
+  // As a change does, but for no file: open pages load the page again.
   function restartNow(file?: string) {
-    forcedFor = file
-    clearTimeout(timer)
-    waitingSince = undefined
-    waited = false
-    forced = true
-    codeVersion++
-    changed = true
-    restarting ??= drain()
+    servers.bump()
+    queue.ask(file)
   }
 
   const stop = async () => {
-    stopping = true
+    phase = 'stopping'
 
     if (options.keys !== undefined) {
       options.keys.off('data', onKey)
@@ -931,121 +366,76 @@ export async function dev(projectRoot: string, options: DevOptions = {}, ports: 
       process.off('exit', restoreTerminal)
     }
 
-    clearTimeout(timer)
-    clearTimeout(treeTimer)
+    queue.close()
+    types.cancelFirstTree()
     stopWatching()
     removeDevAddress(root)
-    await restarting
-    typesAgain = false
-    child?.kill()
-    waiting?.kill()
-
-    // A types process stuck importing the config is killed rather than waited for.
-    if (typesWriting !== undefined) {
-      const grace = setTimeout(() => typesProcess.close(), TYPES_GRACE_MS)
-
-      try {
-        await typesWriting
-      }
-      finally {
-        clearTimeout(grace)
-      }
-    }
-
-    clearTimeout(checkTimer)
-    checkAgain = false
-    checkProcess.close()
-    typesProcess.close()
-    await Promise.all([checking, child?.exited, waiting?.exited, builder?.stop()])
-    await inspector?.stop()
+    await queue.idle
+    types.cancelReruns()
+    servers.kill()
+    await types.settle()
+    types.close()
+    await Promise.all([types.checking, ...servers.exits(), client.stop()])
+    await servers.inspector?.stop()
   }
 
-  // A project with pages, or one an earlier run left a client build of, starts its builder beside the first types and server instead of once the server asks, and keeps it quiet until the types settle.
-  // A server that never asks, as one with no pages, starts none.
-  if (building === undefined && (existsSync(join(devDir, 'manifest.json')) || existsSync(projectPaths(root).routes))) {
-    wantsClient = true
-
-    const early = buildClient()
-
-    building = early
-    // A failure shows where a server awaits it.
-    void (async () => {
-      try {
-        await early
-      }
-      catch {}
-    })()
-  }
+  // A project with pages, or one an earlier run left a client build of, starts its builder beside the first types and server instead of once the server asks; a server that never asks, as one with no pages, starts none.
+  if (client.building === undefined && (existsSync(join(devDir, 'manifest.json')) || existsSync(projectPaths(root).routes)))
+    client.startEarly()
 
   // A config that loaded, with every file it read as it is now, has told the entry already: the first server need not wait for the types to read it again.
   // Should the config not load after all, as one reading an environment variable would, the first types say so and the start ends, though the server's own failure may print before the types' error.
   const recorded = options.config === undefined && options.entry === undefined ? await readConfigRecord(devDir, root) : undefined
 
   if (recorded !== undefined)
-    typesProcess.configuredEntry = recorded
+    types.process.configuredEntry = recorded
 
   // Asked to refuse a config that does not load, the first server waits for the first types: its own boot failure would print the same error again. The process it will run in loads kay meanwhile.
   // The same holds while the config is still to be read for its `entry`, which the types do.
   if (recorded === undefined && (options.refuseConfig === true || (options.config === undefined && options.entry === undefined)))
-    spawnWaiting()
+    servers.spawnWaiting()
   else
-    start()
-
-  // Given no config, the process writing the types reads it first, which is all the first server waits for.
-  const deferred = options.config === undefined
+    servers.start()
 
   try {
-    if (deferred) {
+    if (options.config === undefined) {
       const loadedAt = Date.now()
 
-      configRefused = await typesProcess.write(false, options.refuseConfig === true ? REFUSE : '', LOAD) === CONFIG_REFUSED
-      typesFresh = false
-      startedTypes = true
+      await types.load()
 
-      if (!configRefused) {
-        const modules = typesProcess.loadedModules()
+      if (!types.refused) {
+        const modules = types.process.loadedModules()
 
-        if (typesProcess.configuredEntry !== undefined && modules !== undefined)
-          void writeConfigRecord(devDir, root, typesProcess.configuredEntry, modules, loadedAt)
+        if (types.process.configuredEntry !== undefined && modules !== undefined)
+          void writeConfigRecord(devDir, root, types.process.configuredEntry, modules, loadedAt)
 
         // The first server started on the entry the last run's config named.
-        if (booted && child !== undefined && entryToRun() !== runningEntry)
+        if (servers.booted && servers.child !== undefined && types.entry() !== servers.runningEntry)
           restartNow(CONFIG_FILE)
       }
 
-      writeFirstTree = () => {
-        writeFirstTree = undefined
-        clearTimeout(treeTimer)
-
-        if (!stopping)
-          void writeTypes()
-      }
-      treeTimer = setTimeout(() => writeFirstTree?.(), FIRST_TREE_WAIT_MS)
-      treeTimer.unref()
+      types.armFirstTree()
 
       // A server started ahead of the answer may be listening already.
-      if (address !== undefined)
-        writeFirstTree()
+      if (servers.address !== undefined)
+        types.writeFirstTree()
     }
     else {
-      await writeTypes()
+      await types.write()
     }
   }
   finally {
-    typesSettled = true
-    // A config that does not load is the types' to report, once; any other crash of the builder shows its error and the notice.
-    builder?.release(!configRefused)
+    if (phase === 'starting')
+      phase = 'running'
 
-    if (builderExitHeld && !configRefused && !stopping)
-      sayBuilderExit()
-
+    client.settled(types.refused)
     verified.resolve()
   }
 
-  if (!booted && !configRefused && !stopping)
-    start()
+  if (!servers.booted && !types.refused)
+    servers.start()
 
-  if (configRefused) {
+  if (types.refused) {
     await stop()
 
     throw new ConfigRefusedError()
@@ -1075,16 +465,6 @@ function packageSignature(path: string): string {
   }
 }
 
-// The hash of a file's content, or none for a file that is missing or a directory.
-function contentHash(path: string): number | bigint | undefined {
-  try {
-    return Bun.hash(readFileSync(path))
-  }
-  catch {
-    return undefined
-  }
-}
-
 // The files a change left in place, which leaves out the directories holding them and an editor's temporary files; a deletion names what is gone.
 function changedFilesNamed(root: string, files: string[]): string[] {
   if (files.length > MAX_CHANGED_FILES)
@@ -1095,81 +475,5 @@ function changedFilesNamed(root: string, files: string[]): string[] {
   return kept.length > 0 ? kept : files.filter(file => !files.some(other => other.startsWith(`${file}/`)))
 }
 
-// The system's browser, or the command `BROWSER` names.
-function browserCommand(): string[] {
-  if (process.env.BROWSER !== undefined && process.env.BROWSER !== '')
-    return [process.env.BROWSER]
-
-  if (process.platform === 'darwin')
-    return ['open']
-
-  return process.platform === 'win32' ? ['cmd', '/c', 'start', '""'] : ['xdg-open']
-}
-
-// `missing` hears of a machine without a browser.
-function openBrowser(url: string, missing: (command: string) => void): void {
-  const command = browserCommand()
-
-  try {
-    Bun.spawn([...command, url], { stdio: ['ignore', 'ignore', 'ignore'] }).unref()
-  }
-  catch {
-    missing(command[0]!)
-  }
-}
-
-// The address of this machine others on its network reach it by: the first of an interface no container, bridge or VPN made, else the first.
-export function networkAddress(interfaces: ReturnType<typeof networkInterfaces> = networkInterfaces()): string | undefined {
-  const external = Object.entries(interfaces).flatMap(([name, entries]) => (entries ?? []).filter(entry => entry.family === 'IPv4' && !entry.internal).map(entry => ({ name, address: entry.address })))
-
-  return (external.find(entry => !VIRTUAL_INTERFACE.test(entry.name)) ?? external[0])?.address
-}
-
-// A server killed for a restart meanwhile takes no message.
-function tell(server: Subprocess, message: object): void {
-  try {
-    server.send(message)
-  }
-  catch {}
-}
-
-// The files a restart came from, as its report names them.
-function describe(files: string[]): string {
-  const [first] = files
-
-  if (first === undefined)
-    return 'a change'
-
-  return files.length === 1 ? first : `${first} and ${files.length - 1} more`
-}
-
-// A config that fails to load, halfway through an edit say, leaves the last one in place; the server reports why.
-async function reloadConfig(root: string, last: KayConfig): Promise<KayConfig> {
-  try {
-    return await loadConfig(root, true)
-  }
-  catch {
-    return last
-  }
-}
-
-// Keeps editors and `tsgo` in step with the `.kay` sources; the type errors are the check beside the server's.
-// Without a `config` it is written by a process of its own from kay.config.ts as it is now, which keeps the checker out of this one and reads again every module the config imports.
-// Whether, asked to `refuse`, the process found kay.config.ts does not load.
-async function regenerateTypes(root: string, { entry, config }: DevOptions, refuse: boolean, types: TypesWorker, fresh: boolean): Promise<boolean> {
-  try {
-    if (config === undefined)
-      return await types.write(fresh, refuse ? REFUSE : '') === CONFIG_REFUSED
-
-    const { configCheckOptions, writeShadowTypes } = await import('../check')
-
-    await writeShadowTypes(root, { ...configCheckOptions(config), entry: entry ?? config.entry, typesOnly: true })
-  }
-  catch (error) {
-    console.error(error)
-  }
-
-  return false
-}
-
+export { networkAddress } from './session/report'
 export { environmentWithoutDotenv, PAGES_ENTRY, serverSources, watchProject } from './sources'
