@@ -1,0 +1,7 @@
+---
+import TabNav from '@kaynooo/kayjs-ui/tab-nav.kay'
+
+const tabs = ['findings', 'hosts', 'ports'].map(value => ({ value, label: value }))
+---
+TabNav#first(tabs={tabs} param="tab" label="Plain")
+TabNav#defaulted(tabs={tabs} param="tab" paramDefault="hosts" label="Defaulted")

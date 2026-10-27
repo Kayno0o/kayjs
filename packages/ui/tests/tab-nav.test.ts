@@ -19,17 +19,38 @@ describe('keptHref', () => {
   })
 })
 
+const links = (...hrefs: string[]) => hrefs.map(href => ({ href }))
+
 describe('currentTab', () => {
   test('matches a string current as written', () => {
-    expect(currentTab(['/settings', '/settings/keys'], '/settings')).toBe('/settings')
-    expect(currentTab(['/settings'], '/settings?tab=1')).toBeUndefined()
+    expect(currentTab(links('/settings', '/settings/keys'), '/settings')).toBe('/settings')
+    expect(currentTab(links('/settings'), '/settings?tab=1')).toBeUndefined()
   })
 
   test('matches a URL by its path and the params the link sets, the link setting the most winning', () => {
     const current = new URL('https://example.com/traffic?period=7d&view=table')
 
-    expect(currentTab(['/traffic', '/traffic/sites'], current)).toBe('/traffic')
-    expect(currentTab(['/traffic', '/traffic?view=table', '/traffic?view=chart'], current)).toBe('/traffic?view=table')
-    expect(currentTab(['/traffic?view=chart', '/traffic/sites'], current)).toBeUndefined()
+    expect(currentTab(links('/traffic', '/traffic/sites'), current)).toBe('/traffic')
+    expect(currentTab(links('/traffic', '/traffic?view=table', '/traffic?view=chart'), current)).toBe('/traffic?view=table')
+    expect(currentTab(links('/traffic?view=chart', '/traffic/sites'), current)).toBeUndefined()
+  })
+
+  test('marks a link current on the pages under its path with prefix, or under the paths in also, the exact page winning', () => {
+    const tabs = [{ href: '/traffic', prefix: true }, { href: '/traffic/errors', prefix: true }, { href: '/logs', also: ['/logs/archive/'] }, { href: '/other' }]
+    const at = (path: string) => currentTab(tabs, new URL(path, 'https://example.com'))
+
+    expect(at('/traffic')).toBe('/traffic')
+    expect(at('/traffic/requests/12?period=7d')).toBe('/traffic')
+    expect(at('/traffic/errors/4')).toBe('/traffic/errors')
+    expect(at('/traffic/errors')).toBe('/traffic/errors')
+    expect(at('/trafficking')).toBeUndefined()
+    expect(at('/logs/archive')).toBe('/logs')
+    expect(at('/logs/archive/2024/1')).toBe('/logs')
+    expect(at('/logs/live')).toBeUndefined()
+    expect(at('/other/deep')).toBeUndefined()
+  })
+
+  test('keeps a string current exact whatever a link\'s prefix says', () => {
+    expect(currentTab([{ href: '/traffic', prefix: true }], '/traffic/requests/12')).toBeUndefined()
   })
 })
