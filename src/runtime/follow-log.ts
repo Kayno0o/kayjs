@@ -50,7 +50,8 @@ export function followLog(container: Element | (() => Element | null | undefined
   onMount(() => {
     const element = typeof container === 'function' ? container() : container
 
-    if (!element)
+    // A DOM simulator without ResizeObserver mounts the island with nothing followed, as `elementSize` does.
+    if (!element || typeof ResizeObserver === 'undefined')
       return
 
     const threshold = options.threshold ?? DEFAULT_THRESHOLD

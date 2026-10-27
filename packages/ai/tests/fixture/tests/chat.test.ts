@@ -980,6 +980,30 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the Chat i
       })
     })
 
+    test('a panel reopened shows the latest turn to a visitor who had scrolled up before closing it', async () => {
+      const page = await site.open('/launcher/one', { height: 500 })
+
+      await page.click('.kai-launcher-button')
+      await page.waitUntil(chatHydrated)
+      fakeAi.reply(Array.from({ length: 60 }, (_, line) => `Line ${line}\n\n`))
+      await page.fill('textarea', 'Long')
+      await page.press('Enter')
+      await replied(page)
+      await page.waitFor('.kai-chat-text', { text: 'Line 59' })
+      await page.evaluate(async () => {
+        document.querySelector('.kai-chat-log')!.scrollTo({ top: 0 })
+        await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))
+      })
+      await page.click('.kai-launcher-button')
+      await page.waitFor(closed)
+      await page.click('.kai-launcher-button')
+      await page.waitUntil(() => {
+        const log = document.querySelector('.kai-chat-log')!
+
+        return log.scrollHeight > log.clientHeight && log.scrollHeight - log.scrollTop - log.clientHeight < 8
+      })
+    })
+
     // A slow network brings the renderer after the reply: the turn shows its text as written, then grows once formatted, with no new word to follow.
     test('a log at its end follows a finished reply that the Markdown renderer formats after it ended', async () => {
       const page = await site.open('/launcher/one', { height: 500 })

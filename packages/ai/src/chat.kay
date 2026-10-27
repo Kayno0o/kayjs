@@ -871,7 +871,6 @@ function keyDown(event: KeyboardEvent) {
     void send()
   }
 }
-
 ---
 section(part="root" onKeyDown={escape} data-empty={history().length === 0 && !busy()} data-fill={fill ? '' : undefined} data-variant={variant} data-tone={tone} data-size={size} ref={element => { element.addEventListener('kai-chat-new', reset); element.addEventListener('kai-chat-send', sendFrom) }})
   if history().length === 0 && !busy()
