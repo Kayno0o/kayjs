@@ -1,22 +1,26 @@
 --- <Row, Key extends RowKey<Row>>
 import type { JSX, Snippet } from 'kay'
 import type { InfiniteList } from './infinite-list'
-import type { Column, RowFilter, RowKey, RowKeyValue, SortState } from './table'
+import type { Column, FilterField, RowFilter, RowKey, RowKeyValue, SortState } from './table'
 import { effect, memo, onCleanup, onMount, persisted, recipe, signal, untrack } from 'kay'
 import Button from './button.kay'
 import Checkbox from './checkbox.kay'
 import Icon from './icon.kay'
 import LoadMore from './load-more.kay'
-import { cellText, drawnByBlock, exportHref, nextSort, resolvedColumn, restoredSort, rowKeyOf, rowLabel, rowsMatching, sortedRows, toCsv } from './table'
+import Select from './select.kay'
+import { cellText, drawnByBlock, exportHref, nextSort, resolvedColumn, restoredSort, rowKeyOf, rowLabel, rowsMatching, sameFields, sortedRows, toCsv } from './table'
 import { virtualRows } from './virtual'
 import { wording } from 'kay/words'
 
 // 'kui-table-wrap' stays as the component's name for an app's CSS. The narrow form is a container named `table`, which its parts read with `@max-[30rem]/table:`; the name carries no `kui-` prefix so no old rule keeps its class alive.
+const DEBOUNCE_MS = 250
+
 const look = recipe({
   parts: {
     root: 'kui-table-wrap group/table w-full overflow-x-auto border-solid border-[length:var(--border-width)] border-border bg-surface data-[narrow=stack]:@container/table data-virtual:overflow-y-auto data-virtual:max-h-[var(--table-height,70vh)] data-virtual:[overflow-anchor:none] data-virtual:focus-visible:outline-2 data-virtual:focus-visible:-outline-offset-2 data-virtual:focus-visible:outline-accent',
     // Sticky, so the filter and the selection bar stay in view while a wide table scrolls under them.
-    filter: 'sticky left-0 flex items-center gap-2 border-solid border-b-[length:var(--border-width)] border-border px-3 py-2',
+    filter: 'sticky left-0 flex flex-wrap items-center gap-x-4 gap-y-2 border-solid border-b-[length:var(--border-width)] border-border px-3 py-2',
+    field: 'flex items-center gap-2',
     filterInput: 'w-56 max-w-full',
     count: 'sr-only',
     selection: 'sticky left-0 flex flex-wrap items-center gap-3 border-solid border-b-[length:var(--border-width)] border-border px-3 py-2 text-sm [&_.kui-checkbox]:min-h-6 [&_.kui-checkbox]:min-w-6',
@@ -45,7 +49,7 @@ const look = recipe({
   },
 })
 
-const { columns: given, rows: passed, list, rowKey, sort, sortable = true, serverSort = false, onSort, cell, empty, filter, filterLabel = wording('ui.table.filter', 'Filter'), filterPlaceholder, filterParam, sortParam, countLabel, noMatch, narrow = 'stack', selectable = false, selected, onSelect, bulk, selectAllLabel = wording('ui.table.selectAll', 'Select all'), selectedLabel, selectRowLabel, exportable = false, exportLabel = wording('ui.table.export', 'Export CSV'), exportName = 'table.csv', virtual = false, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'onSelect'> & {
+const { columns: given, rows: passed, list, rowKey, sort, sortable = true, serverSort = false, onSort, cell, empty, filter, fields, filterLabel = wording('ui.table.filter', 'Filter'), filterPlaceholder, filterParam, sortParam, countLabel, noMatch, narrow = 'stack', selectable = false, selected, onSelect, bulk, selectAllLabel = wording('ui.table.selectAll', 'Select all'), selectedLabel, selectRowLabel, exportable = false, exportLabel = wording('ui.table.export', 'Export CSV'), exportName = 'table.csv', virtual = false, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'onSelect'> & {
   columns: Column<Row>[]
   // The rows to draw. Left out when `list` holds them: one of the two is required.
   rows?: Row[] | undefined
@@ -64,8 +68,10 @@ const { columns: given, rows: passed, list, rowKey, sort, sortable = true, serve
   cell?: Snippet<[row: Row, column: Column<Row>]> | undefined
   // Shown in place of the rows when there are none.
   empty?: Snippet
-  // A search box above the rows, keeping those where a value it reads holds the typed text: the row's fields named, or what a function of the row returns.
+  // A search box above the rows, keeping those where a value it reads holds the typed text: the row's fields named, or what a function of the row returns. For a table over a `list` the rows are the server's to filter: the text goes to the list's `load` as `filter.text` (the list starting over from offset 0 after a pause in typing, as it does for a sort) and `filter` only has to be there to show the box.
   filter?: RowFilter<Row> | undefined
+  // Extra fields beside the search box of a table over a `list`, each a text box or, with `options`, a select, whose value goes to the list's `load` as `filter.fields[key]` and to the page's URL under `key`, so a reload or a shared link filters the same. The list starts over from offset 0 when one changes. Decided once, when the table is made.
+  fields?: readonly FilterField[] | undefined
   // Names the search box.
   filterLabel?: string | undefined
   filterPlaceholder?: string | undefined
@@ -111,6 +117,11 @@ const restored = restoredSort(columns(), keptKey?.(), keptDirection?.())
 const current = signal(restored ?? sort)
 let following = restored === undefined
 const typed = filterParam === undefined ? signal('') : persisted(filterParam, '', { storage: 'query' })
+const extra = fields ?? []
+const fieldValues = extra.map(field => persisted(field.key, '', { storage: 'query' }))
+const fieldsNow = () => Object.fromEntries(extra.flatMap((field, index) => fieldValues[index]!() === '' ? [] : [[field.key, fieldValues[index]!()]]))
+const asked = () => ({ text: typed(), fields: fieldsNow() })
+const filtering = () => typed() !== '' || extra.some((_, index) => fieldValues[index]!() !== '')
 
 effect(() => {
   const next = sort
@@ -122,20 +133,44 @@ effect(() => {
   following = true
 })
 
-// A list follows the table's sort whatever set it: a header click, the URL's, or the parent's `sort`.
+// A list follows the table's sort and filter whatever set them: a header click, the URL's, the parent's `sort`, a typed text or a field. The first run loads at once, a text waits for a pause in typing, and one load serves a sort and a filter changed together.
+let started = false
+
 effect(() => {
   const wanted = current()
+  const filtered = asked()
+  const now = !started
 
-  untrack(() => {
-    const held = list?.sort()
+  started = true
 
-    if (list && (wanted?.key !== held?.key || wanted?.direction !== held?.direction))
-      void list.sortBy(wanted)
+  if (!list)
+    return
+
+  const [sortChanged, filterChanged] = untrack(() => {
+    const held = list.sort()
+    const filter = list.filter()
+
+    return [wanted?.key !== held?.key || wanted?.direction !== held?.direction, filtered.text !== filter.text || !sameFields(filtered.fields, filter.fields)]
   })
+
+  if (!sortChanged && !filterChanged)
+    return
+
+  const run = () => void list.restart({ ...sortChanged && { sort: wanted }, ...filterChanged && { filter: filtered } })
+
+  if (now || !filterChanged) {
+    run()
+
+    return
+  }
+
+  const timer = setTimeout(run, DEBOUNCE_MS)
+
+  onCleanup(() => clearTimeout(timer))
 })
 
 // The rows the filter keeps, all of them without one.
-const kept = memo(() => filter === undefined ? rows() : rowsMatching(rows(), filter, typed()))
+const kept = memo(() => filter === undefined || list ? rows() : rowsMatching(rows(), filter, typed()))
 const counted = countLabel ?? ((count: number) => wording('ui.table.rowCount', count === 1 ? '1 row' : '{count} rows', { count }))
 const none: RowKeyValue<Row, Key>[] = []
 const picked = signal(selected ?? none)
@@ -231,11 +266,20 @@ function ariaSort(column: Column<Row>): 'ascending' | 'descending' | undefined {
 }
 ---
 div({...rest} ref={element => box = element} data-narrow={narrow} data-virtual={virtual ? '' : undefined} tabindex={virtual ? '0' : undefined})
-  if filter
-    label(part="filter")
-      span.kui-label-text(part="filterLabel") {filterLabel}
-      input.kui-field-input(part="filterInput" type="search" value={typed()} placeholder={filterPlaceholder} autocomplete="off" onInput={event => typed.set(event.currentTarget.value)})
-    p(part="count" role="status") {typed() ? counted(kept().length) : ''}
+  if filter || extra.length > 0
+    div(part="filter")
+      if filter
+        label(part="field")
+          span.kui-label-text(part="filterLabel") {filterLabel}
+          input.kui-field-input(part="filterInput" type="search" value={typed()} placeholder={filterPlaceholder} autocomplete="off" onInput={event => typed.set(event.currentTarget.value)})
+      for field, index of extra key={field.key}
+        label(part="field")
+          span.kui-label-text(part="filterLabel") {field.label}
+          if field.options
+            Select(value={fieldValues[index]!()} options={field.options} emptyOption=" " onChange={fieldValues[index]!.set})
+          else
+            input.kui-field-input(part="filterInput" type="search" value={fieldValues[index]!()} autocomplete="off" onInput={event => fieldValues[index]!.set(event.currentTarget.value)})
+    p(part="count" role="status") {typed() && !list ? counted(kept().length) : ''}
   if selectable || exportable
     div(part="selection")
       if selectable
@@ -246,7 +290,7 @@ div({...rest} ref={element => box = element} data-narrow={narrow} data-virtual={
             | {bulk(chosen(), () => commit([]))}
       if exportable
         if endpoint() as address
-          Button(href={exportHref(address, current(), filterParam ?? 'q', typed())} download={exportName} label={exportLabel} variant="ghost" size="sm")
+          Button(href={exportHref(address, current(), filterParam ?? 'q', typed(), fieldsNow())} download={exportName} label={exportLabel} variant="ghost" size="sm")
         else
           Button(label={exportLabel} variant="ghost" size="sm" onClick={download})
   table(part="table" aria-rowcount={virtual ? shown().length + 1 : undefined})
@@ -284,7 +328,7 @@ div({...rest} ref={element => box = element} data-narrow={narrow} data-virtual={
                 else
                   | {cellText(row, column)}
       else
-        if rows().length > 0 && noMatch
+        if (list ? filtering() : rows().length > 0) && noMatch
           tr
             td(part="emptyCell" colspan={given.length + (selectable ? 1 : 0)})
               | {noMatch}

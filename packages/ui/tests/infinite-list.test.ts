@@ -6,6 +6,8 @@ interface Ban {
   id: number
 }
 
+const NONE = { text: '', fields: {} }
+
 const bans = (from: number, count: number): Ban[] => Array.from({ length: count }, (_, index) => ({ id: from + index }))
 
 // A source answering from a queue, remembering where each call asked.
@@ -58,13 +60,13 @@ describe('infiniteList', () => {
 
     await list.more()
 
-    expect(asked).toEqual([{ offset: 3, last: { id: 3 }, sort: undefined }])
+    expect(asked).toEqual([{ offset: 3, last: { id: 3 }, sort: undefined, filter: NONE }])
     expect(list.rows().map(row => row.id)).toEqual([1, 2, 3, 4, 5, 6])
     expect(list.ended()).toBe(false)
 
     await list.more()
 
-    expect(asked.at(-1)).toEqual({ offset: 6, last: { id: 6 }, sort: undefined })
+    expect(asked.at(-1)).toEqual({ offset: 6, last: { id: 6 }, sort: undefined, filter: NONE })
     expect(list.rows()).toHaveLength(7)
     expect(list.ended()).toBe(true)
   })
@@ -175,7 +177,7 @@ describe('infiniteList', () => {
     expect(list.rows()).toHaveLength(6)
     expect(list.pending()).toBe(true)
     await sorting
-    expect(asked.at(-1)).toEqual({ offset: 0, last: undefined, sort: { key: 'id', direction: 'desc' } })
+    expect(asked.at(-1)).toEqual({ offset: 0, last: undefined, sort: { key: 'id', direction: 'desc' }, filter: NONE })
     expect(list.rows().map(ban => ban.id)).toEqual([13])
     expect(list.ended()).toBe(true)
   })
@@ -226,6 +228,31 @@ describe('infiniteList', () => {
     await list.retry()
     expect(asked.map(at => at.offset)).toEqual([0, 0])
     expect(list.rows().map(ban => ban.id)).toEqual([1, 2])
+  })
+
+  test('filterBy starts over from offset 0 with the filter, keeping the sort and leaving out what it does not name', async () => {
+    const { asked, load } = source(bans(20, 1), bans(30, 1))
+    const sort = { key: 'id', direction: 'asc' as const }
+    const list = infiniteList(bans(1, 3), { pageSize: 3, key: ban => ban.id, sort, filter: { fields: { origin: 'a' } }, load })
+
+    await list.filterBy({ text: 'x', fields: { origin: 'b' } })
+    expect(asked.at(-1)).toEqual({ offset: 0, last: undefined, sort, filter: { text: 'x', fields: { origin: 'b' } } })
+    expect(list.rows().map(ban => ban.id)).toEqual([20])
+    expect(list.filter()).toEqual({ text: 'x', fields: { origin: 'b' } })
+
+    await list.filterBy({ text: 'y' })
+    expect(asked.at(-1)?.filter).toEqual({ text: 'y', fields: {} })
+  })
+
+  test('restart changes the sort and the filter together with a single load', async () => {
+    const { asked, load } = source(bans(20, 1), bans(30, 1))
+    const sort = { key: 'id', direction: 'desc' as const }
+    const list = infiniteList(bans(1, 3), { pageSize: 3, load })
+
+    await Promise.all([list.sortBy(sort), list.filterBy({ text: 'x' }), list.restart({ sort, filter: { text: 'x' } })])
+
+    expect(asked).toEqual([{ offset: 0, last: undefined, sort, filter: { text: 'x', fields: {} } }])
+    expect(list.rows().map(ban => ban.id)).toEqual([20])
   })
 
   test('patch changes one loaded row by its key and leaves the others as they are', async () => {

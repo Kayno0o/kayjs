@@ -34,7 +34,7 @@ The `@bulk(keys, clear)` block draws the page's bulk actions beside the count wh
 
 ## Filtering
 
-A `filter` adds a search box. `filterLabel` names it, `Filter` by default, and `filterPlaceholder` fills it. `filterParam` keeps the typed text in the page's URL under that query parameter, so a reload or a shared link filters the same. Without it the text stays on the page.
+A `filter` adds a search box. On a table over a `list` it filters on the server instead, see [LoadMore](load-more.md). `filterLabel` names it, `Filter` by default, and `filterPlaceholder` fills it. `filterParam` keeps the typed text in the page's URL under that query parameter, so a reload or a shared link filters the same. Without it the text stays on the page.
 
 `countLabel(count)` words how many rows the filter keeps, as screen readers hear it. `noMatch` is shown in place of the rows when the filter hides every one, and `empty` otherwise.
 

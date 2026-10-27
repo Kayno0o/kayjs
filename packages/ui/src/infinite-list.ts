@@ -7,6 +7,12 @@ import { attempt } from './toast'
 // What a source resolves to: the rows of the next page, or `undefined` for a page that failed, such as the result of an `attempt` that toasted. A throw fails the page too.
 export type InfinitePage<Row> = Row[] | undefined
 
+// What a Table's search box and extra fields ask the server for: the typed text, `''` for none, and the fields the table was given by their `key`, only those that are not empty.
+export interface ListFilter {
+  text: string
+  fields: Record<string, string>
+}
+
 // Where the next page starts, for a source paging by offset or by cursor.
 export interface PageAt<Row> {
   // How many rows were fetched so far, duplicates included, which is what an offset source skips.
@@ -15,6 +21,8 @@ export interface PageAt<Row> {
   last: Row | undefined
   // The sort `sortBy` last asked for, `undefined` until one was; a source orders its pages by it.
   sort: SortState | undefined
+  // The filter `filterBy` last asked for, nothing until one was; a source narrows its pages by it.
+  filter: ListFilter
 }
 
 interface InfiniteListBase<Row> {
@@ -24,6 +32,8 @@ interface InfiniteListBase<Row> {
   key?: ((row: Row) => unknown) | undefined
   // The sort the first page is already in, which the first `load` receives.
   sort?: SortState | undefined
+  // The filter the first page is already in, which the first `load` receives.
+  filter?: Partial<ListFilter> | undefined
 }
 
 // A source of any kind: the function `load` runs for each page.
@@ -67,6 +77,12 @@ export interface InfiniteList<Row> {
   sort: () => SortState | undefined
   // Starts the list over in that order: the rows go, and the first page comes from `load` at offset 0 with the sort. A page on its way for the old order is dropped when it lands.
   sortBy: (sort: SortState | undefined) => Promise<void>
+  // The filter the rows are narrowed by, or being loaded with.
+  filter: () => ListFilter
+  // Starts the list over with that filter, as `sortBy` does with a sort; a field or the text left out is empty.
+  filterBy: (filter: Partial<ListFilter>) => Promise<void>
+  // Starts the list over once with a new sort, a new filter or both, which a table asking for the two at a time needs to load a single first page.
+  restart: (change: { sort?: SortState | undefined, filter?: Partial<ListFilter> }) => Promise<void>
   // Loads again the page that failed; nothing when no page failed.
   retry: () => Promise<void>
   // Changes the loaded row `key` reads as `id`, from the fields to merge over it or a function returning the row; `undefined` changes nothing, so the answer of an `attempt` that failed passes as is. Answers whether a loaded row matched, which needs the `key` option.
@@ -75,6 +91,8 @@ export interface InfiniteList<Row> {
 
 // What `patch` applies to a row: the fields to merge over it, or a function of the row returning the row.
 export type RowChange<Row> = Partial<Row> | ((row: Row) => Row)
+
+const filterOf = (given: Partial<ListFilter> | undefined): ListFilter => ({ text: given?.text ?? '', fields: given?.fields ?? {} })
 
 // The page loader of an action source.
 function loadFromAction<Row, Target extends Action<never, unknown>>(source: ActionSource<Row, Target>, size: number): (at: PageAt<Row>) => Promise<InfinitePage<Row>> {
@@ -102,6 +120,7 @@ export function infiniteList<Row, Target extends Action<never, unknown> = never>
   const { key, pageSize: size } = options
   const load = options.load === undefined ? loadFromAction(options, size) : options.load
   let sort = options.sort
+  let filter = filterOf(options.filter)
   const rows = signal(first)
   const ended = signal(first.length < size)
   const failed = signal(false)
@@ -125,7 +144,7 @@ export function infiniteList<Row, Target extends Action<never, unknown> = never>
     const mine = order
 
     try {
-      const page = await load({ offset: fetched, last: lastFetched, sort })
+      const page = await load({ offset: fetched, last: lastFetched, sort, filter })
 
       if (mine !== order)
         return
@@ -167,18 +186,34 @@ export function infiniteList<Row, Target extends Action<never, unknown> = never>
     }
   }
 
-  async function sortBy(next: SortState | undefined): Promise<void> {
+  async function restart(change: { sort?: SortState | undefined, filter?: Partial<ListFilter> }): Promise<void> {
     order += 1
-    sort = next
+
+    const mine = order
+
+    if ('sort' in change)
+      sort = change.sort
+
+    if (change.filter !== undefined)
+      filter = filterOf(change.filter)
+
     running = false
     replacing = true
     fetched = 0
     lastFetched = undefined
     ended.set(false)
     failed.set(false)
+    pending.set(true)
 
-    return loadPage()
+    // Waits a tick, so a sort and a filter asked for one after the other load a single first page.
+    await Promise.resolve()
+
+    if (mine === order)
+      return loadPage()
   }
+
+  const sortBy = async (next: SortState | undefined) => restart({ sort: next })
+  const filterBy = async (next: Partial<ListFilter>) => restart({ filter: next })
 
   function patch(id: unknown, change: RowChange<Row> | undefined): boolean {
     if (key === undefined || change === undefined)
@@ -199,5 +234,5 @@ export function infiniteList<Row, Target extends Action<never, unknown> = never>
   const more = async () => failed() ? undefined : loadPage()
   const retry = async () => failed() ? loadPage() : undefined
 
-  return { rows, ended, failed, pending, more, retry, sort: () => sort, sortBy, patch }
+  return { rows, ended, failed, pending, more, retry, sort: () => sort, sortBy, filter: () => filter, filterBy, restart, patch }
 }

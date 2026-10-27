@@ -38,6 +38,14 @@ export function drawnByBlock<Row>(column: Column<Row>, columns: Column<Row>[]): 
   return column.cell ?? !columns.some(other => other.cell === true)
 }
 
+// An extra field beside the search box of a Table over a list, whose value goes to the list's `load` under `key` and to the page's URL under the same name. Choices make it a select.
+export interface FilterField {
+  key: string
+  label: string
+  // The choices of a select, the empty value being no filter; left out, the field is a text box.
+  options?: readonly { value: string, label: string }[] | undefined
+}
+
 // What a filter box reads off a row: the row's fields named, or what a function of it returns.
 export type RowFilter<Row> = readonly (keyof Row & string)[] | ((row: Row) => (string | number | null | undefined)[])
 
@@ -165,8 +173,15 @@ export function toCsv<Row>(rows: Row[], columns: Column<Row>[]): string {
   return `\uFEFF${lines.map(line => line.join(',')).join('\r\n')}\r\n`
 }
 
-// The address of a table's CSV endpoint for what is on screen: the sort as `sort` and `direction`, and the typed filter text under `param`, in the query the address already has.
-export function exportHref(href: string, sort: SortState | undefined, param: string, text: string): string {
+// Whether two filter fields hold the same values.
+export function sameFields(a: Record<string, string>, b: Record<string, string>): boolean {
+  const keys = Object.keys(a)
+
+  return keys.length === Object.keys(b).length && keys.every(key => a[key] === b[key])
+}
+
+// The address of a table's CSV endpoint for what is on screen: the sort as `sort` and `direction`, the typed filter text under `param` and the extra fields under their own names, in the query the address already has.
+export function exportHref(href: string, sort: SortState | undefined, param: string, text: string, fields: Record<string, string> = {}): string {
   const hash = href.indexOf('#')
   const bare = hash === -1 ? href : href.slice(0, hash)
   const mark = bare.indexOf('?')
@@ -181,6 +196,9 @@ export function exportHref(href: string, sort: SortState | undefined, param: str
 
   if (text.trim() !== '')
     params.set(param, text)
+
+  for (const [name, value] of Object.entries(fields))
+    params.set(name, value)
 
   const search = params.toString()
 

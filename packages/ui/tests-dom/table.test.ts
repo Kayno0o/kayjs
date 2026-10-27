@@ -1,4 +1,4 @@
-import type { SortState } from '@kaynooo/kayjs-ui'
+import type { ListFilter, SortState } from '@kaynooo/kayjs-ui'
 import type { Mounted } from 'kay/test'
 import { afterEach, describe, expect, test } from 'bun:test'
 import { mountComponent, settle } from 'kay/test'
@@ -7,7 +7,7 @@ import ListedTable from '../tests/fixture/src/components/listed-table.kay'
 import SelectableFeed from '../tests/fixture/src/components/selectable-feed.kay'
 import SelectableTable from '../tests/fixture/src/components/selectable-table.kay'
 import TableComponent from '../tests/fixture/src/components/table.kay'
-import { click } from './dom'
+import { click, clock } from './dom'
 
 const PLANETS = [{ id: 1, name: 'Mars', moons: 2 }, { id: 2, name: 'Earth', moons: 1 }, { id: 3, name: 'Venus', moons: 0 }]
 
@@ -92,9 +92,9 @@ describe('Table over an infinite list', () => {
   const cells = (root: HTMLElement) => [...root.querySelectorAll('tbody tr')].map(row => row.querySelector('[data-part="cellBody"]')?.textContent)
 
   test('sorts on the server: a header click reloads the list from offset 0 with the sort and keeps the rows until they land', async () => {
-    const asked: { offset: number, sort: SortState | undefined }[] = []
+    const asked: { offset: number, sort: SortState | undefined, filter: ListFilter }[] = []
     let answer: ((rows: { id: number, name: string, moons: number }[]) => void) | undefined
-    const onLoad = async (at: { offset: number, sort: SortState | undefined }) => new Promise<{ id: number, name: string, moons: number }[]>((resolve) => {
+    const onLoad = async (at: { offset: number, sort: SortState | undefined, filter: ListFilter }) => new Promise<{ id: number, name: string, moons: number }[]>((resolve) => {
       asked.push(at)
       answer = resolve
     })
@@ -107,7 +107,7 @@ describe('Table over an infinite list', () => {
     click(header(root, 1).querySelector('button'))
     await settle()
 
-    expect(asked).toEqual([{ offset: 0, sort: { key: 'moons', direction: 'desc' } }])
+    expect(asked).toEqual([{ offset: 0, sort: { key: 'moons', direction: 'desc' }, filter: { text: '', fields: {} } }])
     expect(sorts).toEqual([{ key: 'moons', direction: 'desc' }])
     expect(cells(root)).toEqual(['Io', 'Europa'])
     expect(header(root, 1).getAttribute('aria-sort')).toBe('descending')
@@ -133,8 +133,8 @@ describe('Table over an infinite list', () => {
   })
 
   test('sends the sort the URL restores to the list, once, from offset 0', async () => {
-    const asked: { offset: number, sort: SortState | undefined }[] = []
-    const onLoad = async (at: { offset: number, sort: SortState | undefined }) => {
+    const asked: { offset: number, sort: SortState | undefined, filter: ListFilter }[] = []
+    const onLoad = async (at: { offset: number, sort: SortState | undefined, filter: ListFilter }) => {
       asked.push(at)
 
       return []
@@ -144,7 +144,7 @@ describe('Table over an infinite list', () => {
     mounted = await mountComponent(ListedTable, { onLoad, sortParam: 'sort' })
     await settle()
 
-    expect(asked).toEqual([{ offset: 0, sort: { key: 'moons', direction: 'asc' } }])
+    expect(asked).toEqual([{ offset: 0, sort: { key: 'moons', direction: 'asc' }, filter: { text: '', fields: {} } }])
     expect(header(mounted.root, 1).getAttribute('aria-sort')).toBe('ascending')
   })
 
@@ -165,6 +165,73 @@ describe('Table over an infinite list', () => {
 
     expect(asked).toEqual([{ key: 'name', direction: 'asc' }, { key: 'name', direction: 'desc' }])
     expect(sorts).toEqual(asked as SortState[])
+  })
+
+  describe('filtering on the server', () => {
+    const FIELDS = [{ key: 'origin', label: 'Origin', options: [{ value: 'a', label: 'A' }, { value: 'b', label: 'B' }] }, { key: 'tag', label: 'Tag' }]
+    const asked: { offset: number, sort: SortState | undefined, filter: ListFilter }[] = []
+    const onLoad = async (at: { offset: number, sort: SortState | undefined, filter: ListFilter }) => {
+      asked.push(at)
+
+      return []
+    }
+
+    afterEach(() => {
+      clock.stop()
+      asked.length = 0
+    })
+
+    test('the typed text reaches the list after a pause in typing, from offset 0, and the loaded rows are not filtered again', async () => {
+      mounted = await mountComponent(ListedTable, { onLoad, searchable: true })
+      await settle()
+      clock.start()
+
+      const input = mounted.root.querySelector<HTMLInputElement>('[data-part="filterInput"]')!
+
+      input.value = 'eur'
+      input.dispatchEvent(new Event('input', { bubbles: true }))
+      await clock.elapse(100)
+
+      expect(asked).toEqual([])
+      expect(cells(mounted.root)).toEqual(['Io', 'Europa'])
+
+      await clock.elapse(300)
+
+      expect(asked).toEqual([{ offset: 0, sort: undefined, filter: { text: 'eur', fields: {} } }])
+      expect(mounted.root.querySelector('[data-part="count"]')?.textContent).toBe('')
+      expect(mounted.root.querySelector('.no-match')).not.toBeNull()
+    })
+
+    test('extra fields join the text, one load for a change of several, and keep the URL', async () => {
+      visit('http://localhost/?q=io&origin=b&sort=moons&direction=asc')
+      mounted = await mountComponent(ListedTable, { onLoad, searchable: true, filterParam: 'q', sortParam: 'sort', fields: FIELDS })
+      await settle()
+
+      expect(asked).toEqual([{ offset: 0, sort: { key: 'moons', direction: 'asc' }, filter: { text: 'io', fields: { origin: 'b' } } }])
+
+      clock.start()
+
+      const select = mounted.root.querySelector<HTMLSelectElement>('select')!
+      const tag = mounted.root.querySelectorAll<HTMLInputElement>('input[type="search"]')[1]!
+
+      select.value = 'a'
+      select.dispatchEvent(new Event('change', { bubbles: true }))
+      tag.value = 'x'
+      tag.dispatchEvent(new Event('input', { bubbles: true }))
+      await clock.elapse(400)
+
+      expect(asked).toHaveLength(2)
+      expect(asked[1]).toEqual({ offset: 0, sort: { key: 'moons', direction: 'asc' }, filter: { text: 'io', fields: { origin: 'a', tag: 'x' } } })
+      expect(window.location.search).toContain('origin=a')
+      expect(window.location.search).toContain('tag=x')
+    })
+
+    test('a table whose filter equals the one its list began with loads nothing on mount', async () => {
+      mounted = await mountComponent(ListedTable, { onLoad, searchable: true, filterParam: 'q', fields: FIELDS })
+      await settle()
+
+      expect(asked).toEqual([])
+    })
   })
 
   test('draws LoadMore after the rows', async () => {

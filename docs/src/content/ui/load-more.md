@@ -12,6 +12,12 @@ A `Table` takes the list as `list={list}` in place of `rows`: it draws `list.row
 
 The list also starts over on mount when the table's sort, from `sort` or the URL, differs from the `sort` the list was made with, so give both the same one to keep the first page. A sort drops the picked rows that are not in the new first page, as a row leaving the table always does.
 
+A `filter` search box filters on the server too. The typed text reaches `load` as `filter.text` once typing pauses, and the list starts over from offset 0 as it does for a sort. The rows already loaded are not matched again, so `load` has to narrow its pages itself. Any value of `filter` shows the box, since a list does not read it. `filterParam` keeps the text in the URL.
+
+`fields` adds more inputs beside the box: `fields={[{ key: 'origin', label: 'Origin', options }, { key: 'tag', label: 'Tag' }]}`. A field with `options` is a select, one without is a text box. The value reaches `load` as `filter.fields.origin` (empty fields are left out) and stays in the URL under `key`. A sort and a filter changed together load one page.
+
+`list.filterBy({ text, fields })` does the same from code. The list begins with the `filter` option's value, and loads again on mount when the URL holds another.
+
 Mark the columns to sort by with a `sortValue` (`numeric` columns have one).
 
 The table's `sort` and the URL's `sortParam` sort reach the list too, and a sort restarts it, so a selected row outside the first page leaves the selection. `infiniteList`'s `sort` option names the order the first page is already in.
