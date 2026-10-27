@@ -4,8 +4,9 @@ const TAG = /<[^>]*>|[^<]+/g
 const CODE_OR_LINK = /^<(\/?)(?:code|pre|a)[\s/>]/i
 // A number of one to four digits with no leading zero: `[01]` and `[12345]` stay text.
 const CITATION = /\[([1-9]\d{0,3})\]/g
-const ATTRIBUTE_UNSAFE = /[&"<]/g
-const ENTITIES: Record<string, string> = { '&': '&amp;', '"': '&quot;', '<': '&lt;' }
+// Escaped as `markdownHtml` escapes the text it shows as written, so the reply as written reads the same.
+const ATTRIBUTE_UNSAFE = /[&"<>]/g
+const ENTITIES: Record<string, string> = { '&': '&amp;', '"': '&quot;', '<': '&lt;', '>': '&gt;' }
 // A source leads to a page or a file: no `javascript:` and the like, which a hostile page could have named.
 const SAFE_HREF = /^(?:https?:\/\/|mailto:|\/(?![/\\])|#)[^\s"'<>`\\]*$/i
 

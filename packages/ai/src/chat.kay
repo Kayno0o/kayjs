@@ -266,7 +266,7 @@ function render(text: string, blocks: CodeBlock[] | undefined, sources: readonly
     return { html: parsed, cited: citedAsWritten(plain, sources) }
 
   // Until the renderer arrives the reply shows as written, its code not set apart, so its citations are read from the text with its code set aside.
-  const linked = markdownLoaded() ? linkSources(parsed, sources) : linkAsWritten(plain, sources)
+  const linked = markdownLoaded() || sources.length === 0 ? linkSources(parsed, sources) : linkAsWritten(plain, sources)
   let source = linked.html
 
   // Each block takes the first plain one of its markup left, in the order they were written, so two blocks of one code in two languages each get theirs.
