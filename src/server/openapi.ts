@@ -12,6 +12,7 @@ import { API_PREFIX, KAY_PREFIX, openApiPaths } from './api-modules'
 import { sharedContext } from './render'
 import { apiRoutePath } from './routes'
 import { markPrivate } from './scope'
+import { snakeCase } from './snake-case'
 import { toolSettings } from './tool-settings'
 
 export interface OpenApiConfig {
@@ -137,7 +138,6 @@ export function claimApi(served: ServedPaths, modules: MountedApi[], config: Ope
 
 const TOOL_NAME = /\W+/g
 const EDGE_UNDERSCORES = /^_+|_+$/g
-const WORD_BREAK = /([a-z\d])([A-Z])/g
 // The most characters an MCP client takes in a tool's name.
 const MAX_NAME = 64
 
@@ -168,11 +168,6 @@ function operationName(id: string, taken: Set<string>): string {
   taken.add(candidate)
 
   return candidate
-}
-
-// An export's name as a tool is named: `addNote` is `add_note`.
-export function snakeCase(name: string): string {
-  return name.replace(WORD_BREAK, '$1_$2').toLowerCase()
 }
 
 // A path below `apiRoot`, or below `/_kay` for the API modules of an extension served there; any other path as it is.

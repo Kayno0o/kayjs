@@ -6,7 +6,7 @@ import { elementsIn } from '../compiler/ast'
 import { lintLevel, lintLevels } from '../compiler/lints'
 import { positionAt } from '../compiler/mapping'
 import { parseKay } from '../compiler/parser'
-import { snakeCase } from '../server/openapi'
+import { snakeCase } from '../server/snake-case'
 
 const SOURCE_FILE = /\.(?:kay|[cm]?ts|tsx)$/
 const DECLARATION_FILE = /\.d\.[cm]?ts$/
