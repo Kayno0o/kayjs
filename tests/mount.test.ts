@@ -349,6 +349,24 @@ describe('mount', () => {
     }
   })
 
+  it('hands the component new props with setProps, which it follows as it follows a parent, a prop it was given none of included', async () => {
+    const { root, setProps, unmount } = await mountComponent(await imported('tests/fixtures/mount/follows.kay'), { label: 'one' })
+
+    const shown = () => [root.querySelector('.label')!.textContent.trim(), root.querySelector('.shout')!.textContent]
+
+    expect(shown()).toEqual(['one', 'ONE'])
+
+    await setProps({ label: 'two' })
+    expect(shown()).toEqual(['two', 'TWO'])
+
+    await setProps({ mark: '!' })
+    expect(shown()).toEqual(['two !', 'TWO'])
+
+    await setProps({ mark: undefined })
+    expect(shown()).toEqual(['two', 'TWO'])
+    unmount()
+  })
+
   it('unmounts twice without harm', async () => {
     const dir = await scratchDir('mount-')
     const file = join(dir, 'fixed.kay')

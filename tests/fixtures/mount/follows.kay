@@ -1,0 +1,8 @@
+---
+import { memo } from 'kay'
+
+const { label, mark } = props<{ label: string, mark?: string }>()
+const shout = memo(() => label.toUpperCase())
+---
+p.label {label} {mark}
+p.shout {shout()}

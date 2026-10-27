@@ -204,6 +204,15 @@ await press('Enter')
 await click('button.more')
 ```
 
+`setProps` gives the component new values for some of its props, as a parent that re-rendered would, and settles once the component followed them. A prop the component was mounted without can be given too.
+
+```ts
+const { root, setProps } = await mountComponent(Greeting, { name: 'Ada' })
+
+await setProps({ name: 'Grace' })
+expect(root.textContent).toContain('Grace')
+```
+
 A test that reads `document` before its first mount imports `kay/test/dom`, which registers the DOM at once. Put the import last, where the kay lint preset sorts a side-effect import: every import runs before a test body, so the order changes nothing there. An earlier import that captures `setTimeout` as it loads is the exception, and needs it first.
 
 ```ts

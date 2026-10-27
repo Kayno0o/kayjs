@@ -227,8 +227,9 @@ Requests, jobs, sockets and sessions are in [Testing requests, jobs, sockets and
 
 ### Mounting a component
 
-- `mountComponent(Component, props)` from `kay/test` renders one component built for the browser, as an island renders, into `document`, and resolves with `{ root, unmount }` once its effects ran: for what handlers and effects do, such as a dialog opening on a click.
+- `mountComponent(Component, props)` from `kay/test` renders one component built for the browser, as an island renders, into `document`, and resolves with `{ root, unmount, setProps }` once its effects ran: for what handlers and effects do, such as a dialog opening on a click.
 - `Component` is the one the test imports, whose props are typed; the browser build is made from its file.
+- `await setProps({ tiles })` gives the mounted component new values for some of its props, as a parent that re-rendered would (the others keep theirs, a prop it was mounted without can be given), then settles: for a component that follows a prop.
 - The mount also has `type(selector, text)`, `click(selector)` and `press(key)`, firing what a browser fires, then settling: `type` focuses an input or textarea and puts the text in it with an `input` event (a `select` takes the option whose value or label is the text, with `input` and `change`), `click` sends the pointer events and the click to the element and focuses it, a disabled one doing nothing, and `press` sends `keydown` and `keyup` to the focused element, Enter committing a text field with its `change` and submitting its form, Enter or Space (`press(' ')`) clicking a button. A text field's `change` also comes when another gesture leaves it. They work on kayjs-ui's TextInput, Select and Segmented.
 - On a French site (a `lang` or locale of `fr`) it writes the non-breaking spaces an island does, once `document.documentElement.lang` is `fr`; the other client defines (`KAY_BROWSER`, `KAY_STATIC_EXPORT`) are left out.
 - Props may be functions, and the component runs on a kay of its own, so a signal of the test reaches it through a callback rather than as a prop.

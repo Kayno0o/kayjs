@@ -15,15 +15,17 @@ import { interactions } from './interact'
 import { lazyNativePlugins } from './lazy-plugins'
 import { testRoot } from './root'
 
-export interface Mounted extends Interactions {
+export interface Mounted<Props = Record<string, unknown>> extends Interactions {
   // The element the component rendered into, last in `document.body`.
   root: HTMLElement
+  // Gives the component new values for some of its props, as a parent re-rendering would, and settles once it followed them.
+  setProps: (props: Partial<Props>) => Promise<void>
   // Disposes of the component, running its cleanups once, and removes the element.
   unmount: () => void
 }
 
 interface MountModule {
-  mount: (element: HTMLElement, props: Record<string, unknown>) => () => void
+  mount: (element: HTMLElement, props: Record<string, unknown>) => { dispose: () => void, setProps: (props: Record<string, unknown>) => void }
 }
 
 const SAFE_HTML_MODULE = /(?:^|[/\\])safe-html(?:\.ts)?$/
@@ -69,6 +71,8 @@ async function registerDom(): Promise<void> {
 }
 
 // What `mountComponent(Component, props)` takes the props of: required unless the component takes none or all optional.
+type PropsOf<Component> = Component extends (props: infer Props) => unknown ? Props : never
+
 type MountArguments<Component> = Component extends (props: infer Props) => unknown ? (Record<never, never> extends Props ? [props?: Props] : [props: Props]) : never
 
 // The file each server component the loader built under `bun test` comes from.
@@ -76,7 +80,7 @@ const componentFiles = (): WeakMap<object, string> | undefined => (globalThis as
 
 // Renders a component compiled for the browser, as an island renders, into the document a DOM such as happy-dom's registered: for testing what its handlers and effects do.
 // The component is the one a test imports, `import Toggle from '../src/components/toggle.kay'`, from which the browser build is made.
-export async function mountComponent<Component extends (props: never) => unknown>(component: Component, ...props: MountArguments<Component>): Promise<Mounted>
+export async function mountComponent<Component extends (props: never) => unknown>(component: Component, ...props: MountArguments<Component>): Promise<Mounted<PropsOf<Component>>>
 export async function mountComponent(source: (props: never) => unknown, ...given: unknown[]): Promise<Mounted> {
   if (typeof document === 'undefined')
     await registerDom()
@@ -112,12 +116,15 @@ export async function mountComponent(source: (props: never) => unknown, ...given
 
   document.body.append(element)
 
-  const dispose = module.mount(element, props)
+  const { dispose, setProps } = module.mount(element, props)
   let mounted = true
 
   await settle()
 
-  return { root: element, ...interactions(element, settle), unmount: () => {
+  return { root: element, ...interactions(element, settle), setProps: async (next) => {
+    setProps(next)
+    await settle()
+  }, unmount: () => {
     if (!mounted)
       return
 
@@ -209,11 +216,21 @@ async function fileVersion(path: string): Promise<string> {
 }
 
 function entry(file: string): string {
-  return `import { render } from 'kay/dom'
+  return `import { signal } from 'kay'
+import { render } from 'kay/dom'
 import Component from ${JSON.stringify(file)}
 
+// The props are read through a signal, so the component follows what setProps hands it as it follows a parent's.
 export function mount(element, props) {
-  return render(() => Component(props), element)
+  const given = signal(props)
+  const live = new Proxy({}, {
+    get: (_, key) => given()[key],
+    has: (_, key) => key in given(),
+    ownKeys: () => Reflect.ownKeys(given()),
+    getOwnPropertyDescriptor: (_, key) => key in given() ? { value: given()[key], enumerable: true, configurable: true, writable: true } : undefined,
+  })
+
+  return { dispose: render(() => Component(live), element), setProps: next => given.set({ ...given(), ...next }) }
 }
 `
 }
