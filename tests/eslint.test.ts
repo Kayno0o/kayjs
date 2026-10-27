@@ -865,14 +865,20 @@ describe('kay/eslint without Bun', () => {
   const STYLED = '---\nconst { n } = props<{ n: number }>()\nconst odd = n == 1\n---\n--- style\n.rendered :global(h1) { font-size: 1.5rem; }\n.rendered p { margin: 0 }\n---\n.rendered\n  p {odd || n == 2}\n'
   const tsParser = import('@typescript-eslint/parser')
 
+  let bundle: Promise<typeof processor> | undefined
+
   // The processor with the options of the `build:eslint` script, `Bun` shadowed by undefined, as keslint runs it under Node.
   async function nodeProcessor(): Promise<typeof processor> {
-    const dir = await scratchDir('eslint-node-')
-    const built = await Bun.build({ entrypoints: [join(import.meta.dir, '..', 'src/eslint/index.ts')], target: 'node', packages: 'external', outdir: dir, naming: 'eslint.js', banner: 'const Bun = undefined;' })
+    bundle ??= (async () => {
+      const dir = await scratchDir('eslint-node-')
+      const built = await Bun.build({ entrypoints: [join(import.meta.dir, '..', 'src/eslint/index.ts')], target: 'node', packages: 'external', outdir: dir, naming: 'eslint.js', banner: 'const Bun = undefined;' })
 
-    expect(built.success).toBe(true)
+      expect(built.success).toBe(true)
 
-    return ((await import(join(dir, 'eslint.js'))) as { processor: typeof processor }).processor
+      return ((await import(join(dir, 'eslint.js'))) as { processor: typeof processor }).processor
+    })()
+
+    return bundle
   }
 
   it('lints a component and a page with a style fence, their script and template rules reported', async () => {
@@ -890,6 +896,22 @@ describe('kay/eslint without Bun', () => {
         { ruleId: 'eqeqeq', line: 3, column: 15 },
         { ruleId: 'eqeqeq', line: 10, column: 15 },
       ])
+    }
+  })
+
+  it('shadows a signal imported from a module and an icon of an installed set as under Bun', async () => {
+    const bundled = await nodeProcessor()
+    const components: [string, string, string][] = [
+      ['navigation/src/components/probe.kay', '---\nimport { added } from \'../shared\'\nimport { theme } from \'../shared.js\'\n---\np {added} {theme}\n', '__values.theme'],
+      ['icons/src/components/probe.kay', '---\nimport home from \'~icons/tabler/home\'\nimport Child from \'./child.kay\'\n---\nChild(icon={home})\n', 'KayProp(Child)((home))'],
+    ]
+
+    for (const [file, text, kept] of components) {
+      const path = join(import.meta.dir, 'fixtures', file)
+      const underNode = bundled.preprocess(text, path)[0]!.text
+
+      expect(underNode).toContain(kept)
+      expect(underNode).toBe(processor.preprocess(text, path)[0]!.text)
     }
   })
 })

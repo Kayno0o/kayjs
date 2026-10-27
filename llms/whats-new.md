@@ -4,6 +4,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 
 ## Unreleased
 
+- `kay lint` reads a signal a component imports from another module, and an icon of an installed `~icons/` set, as `kay check` does, where under Node it read the signal as a plain value and the icon as a component, so a template showing an imported signal lints as it type-checks: [Lint with ESLint](checks.md#lint-the-script-fences-and-template-expressions-with-eslint).
 - `kay lint` lints a component or page with a `--- style` fence, which failed with `Bun is not defined` as ESLint runs under Node, so scoped styles no longer have to move out of components to lint clean: [Lint with ESLint](checks.md#lint-the-script-fences-and-template-expressions-with-eslint).
 - `kay build` and `kay dev` build an app in a workspace on Bun's isolated linker, its default: the Tailwind plugin skips every file under `node_modules/.bun/`, so kay hands it a library's stylesheet kept there, such as kayjs-ui's shell, by the link the app reaches the package through, and `linker = "hoisted"` in `bunfig.toml` is no longer needed: [Component libraries](component-libraries.md).
 - `kay build` and `kay dev` build an app in a workspace on Bun's isolated linker, its default: the Tailwind plugin skips every file under `node_modules/.bun/`, so kay hands it a stylesheet kept there, such as kayjs-ui's shell, by the link the app reaches its package through, and `linker = "hoisted"` in `bunfig.toml` is no longer needed: [Component libraries](component-libraries.md).

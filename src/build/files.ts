@@ -2,7 +2,8 @@ import type { Dirent } from 'node:fs'
 import { AsyncLocalStorage } from 'node:async_hooks'
 import { readFileSync, realpathSync, statSync } from 'node:fs'
 import { mkdir, readdir, readFile, rename, rm } from 'node:fs/promises'
-import { basename, dirname, join } from 'node:path'
+import { createRequire } from 'node:module'
+import { basename, dirname, extname, isAbsolute, join, resolve } from 'node:path'
 import { KAY_DIR } from './assets'
 
 // Never source at any depth: dependencies, kay's own output and version control.
@@ -156,7 +157,58 @@ export function realPath(path: string): string {
 // What `specifier` resolves to from the folder of `file`, or nothing when it does not resolve.
 export function resolveFrom(specifier: string, file: string): string | undefined {
   try {
-    return Bun.resolveSync(specifier, dirname(file))
+    return resolveSync(specifier, dirname(file))
+  }
+  catch {
+    return undefined
+  }
+}
+
+// `Bun.resolveSync`, or under Node, where ESLint runs the processor, the same resolution of a path and a package's own through Node's, throwing when nothing is found. A tsconfig `paths` alias only resolves under Bun.
+export function resolveSync(specifier: string, dir: string): string {
+  if (typeof Bun !== 'undefined')
+    return Bun.resolveSync(specifier, dir)
+
+  const found = specifier.startsWith('.') || isAbsolute(specifier) ? resolvePath(resolve(dir, specifier), specifier.endsWith('/')) : createRequire(join(dir, PACKAGE)).resolve(specifier)
+
+  if (found === undefined)
+    throw new Error(`Cannot find module '${specifier}' from '${dir}'`)
+
+  return found
+}
+
+// The order Bun tries extensions in, and the TypeScript it reads for an import naming the JavaScript compiled from it.
+const RESOLVED_EXTENSIONS = ['.tsx', '.jsx', '.mts', '.ts', '.mjs', '.js', '.cts', '.cjs', '.json']
+const INDEX_FILES = RESOLVED_EXTENSIONS.map(added => `index${added}`)
+const COMPILED_FROM: Record<string, string[]> = { '.js': ['.ts', '.tsx', '.mts'], '.jsx': ['.ts', '.tsx', '.mts'], '.mjs': ['.mts'], '.cjs': ['.cts'] }
+
+function resolvePath(path: string, folderOnly = false): string | undefined {
+  if (!folderOnly) {
+    const extension = extname(path)
+    const candidates = [path, ...(COMPILED_FROM[extension] ?? []).map(twin => path.slice(0, -extension.length) + twin), ...RESOLVED_EXTENSIONS.map(added => path + added)]
+    const file = candidates.find(isFile)
+
+    if (file !== undefined)
+      return file
+  }
+
+  if (statSync(path, { throwIfNoEntry: false })?.isDirectory() !== true)
+    return undefined
+
+  const { main } = readJson<{ main?: unknown }>(join(path, PACKAGE)) ?? {}
+  const target = typeof main === 'string' ? resolve(path, main) : path
+  const entry = target === path ? undefined : resolvePath(target)
+
+  return entry ?? INDEX_FILES.map(index => join(path, index)).find(isFile)
+}
+
+function isFile(path: string): boolean {
+  return statSync(path, { throwIfNoEntry: false })?.isFile() === true
+}
+
+function readJson<T>(path: string): T | undefined {
+  try {
+    return JSON.parse(readFileSync(path, 'utf8')) as T
   }
   catch {
     return undefined

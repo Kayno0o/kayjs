@@ -32,6 +32,25 @@ function parseModule(source: string, jsx: boolean): t.File | undefined {
   }
 }
 
+// The modules a script imports or re-exports from, as Bun's `scanImports` lists them, for a lint under Node where its transpiler is missing: a type-only import is left out, and so is a dynamic import or a `require`, which no template reads a name of.
+export function importedModules(source: string): string[] {
+  const modules: string[] = []
+
+  for (const statement of parseModule(source, false)?.program.body ?? []) {
+    if (statement.type === 'ImportDeclaration' && statement.importKind !== 'type' && !allTypes(statement.specifiers))
+      modules.push(statement.source.value)
+    else if ((statement.type === 'ExportAllDeclaration' || (statement.type === 'ExportNamedDeclaration' && !allTypes(statement.specifiers))) && statement.source && statement.exportKind !== 'type')
+      modules.push(statement.source.value)
+  }
+
+  return modules
+}
+
+// `import { type A, type B }`, which Bun drops as it would `import type`.
+function allTypes(specifiers: t.Node[]): boolean {
+  return specifiers.length > 0 && specifiers.every(specifier => (specifier.type === 'ImportSpecifier' && specifier.importKind === 'type') || (specifier.type === 'ExportSpecifier' && specifier.exportKind === 'type'))
+}
+
 // What a component importing a module reads of it: its signals and memos, and the names it exports as literal data. The module is parsed once, and only when it exports something.
 export function moduleKinds(source: string, jsx = false, reexported?: Reexported): Record<string, SignalKind | 'data'> {
   const ast = source.includes('export') ? parseModule(source, jsx) : undefined

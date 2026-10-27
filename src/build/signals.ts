@@ -1,7 +1,8 @@
 import type { ImportedSignals, Reexported, SignalKind } from '../compiler/module-signals'
 import { AsyncLocalStorage } from 'node:async_hooks'
 import { readFileSync, statSync } from 'node:fs'
-import { jsonKinds, moduleKinds } from '../compiler/module-signals'
+import { fnvHash } from '../compiler/fnv-hash'
+import { importedModules, jsonKinds, moduleKinds } from '../compiler/module-signals'
 import { parseKay } from '../compiler/parser'
 import { resolveFrom, SCRIPT_FILE, scriptLoader, transpilerFor } from './files'
 import { fences } from './libraries'
@@ -21,7 +22,7 @@ const scope = new AsyncLocalStorage<Memo>()
 // Bun calls a plugin back from outside the scope's async context, so while one scope is the only one open its memo answers there too; with two open, a callback without a context looks again.
 const open = new Set<Memo>()
 // What each component imports, read again only once its text changes.
-const imports = new Map<string, { hash: number | bigint, specifiers: string[] }>()
+const imports = new Map<string, { hash: number | bigint | string, specifiers: string[] }>()
 
 // The signals and memos the modules a component imports export, and the names they export as literal data, which its template reads and writes as its own; part of every cache key of its compile, so editing such a module compiles the component again.
 // A package is left out, its code too large to scan on every compile, unless a relative import reaches into it, as a library's own components do.
@@ -59,17 +60,14 @@ export async function inSignalsScope<T>(run: () => Promise<T>): Promise<T> {
 
 function readImportedSignals(file: string, source: string): ImportedSignals {
   const found: ImportedSignals = {}
-  let hash: number | bigint
+  // Under Node, where ESLint runs the processor, Babel reads the imports Bun's transpiler would.
+  const node = typeof Bun === 'undefined'
+  const hash = node ? fnvHash(source) : Bun.hash(source)
+  const known = imports.get(file)
   let specifiers: string[]
 
   try {
-    // Under Node, where the ESLint processor runs this, there is no transpiler: nothing is hashed or scanned.
-    const transpiler = transpilerFor('ts')
-
-    hash = Bun.hash(source)
-    const known = imports.get(file)
-
-    specifiers = known?.hash === hash ? known.specifiers : [...new Set(transpiler.scanImports(fences(source)).map(entry => entry.path))]
+    specifiers = known?.hash === hash ? known.specifiers : [...new Set(node ? importedModules(fences(source)) : transpilerFor('ts').scanImports(fences(source)).map(entry => entry.path))]
   }
   catch {
     return found

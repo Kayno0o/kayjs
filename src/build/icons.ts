@@ -4,6 +4,7 @@ import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { KayError } from '../compiler/errors'
 import * as iconSet from '../runtime/icons'
+import { resolveSync } from './files'
 
 // `import home from '~icons/tabler/home'`: an icon of a set the project installs as `@iconify-json/<prefix>`.
 export const ICON_IMPORT = /^~icons\/([a-z0-9-]+)\/([a-z0-9-]+)$/
@@ -25,7 +26,7 @@ export function installedIconSets(root: string): Map<string, string> {
       continue
 
     try {
-      found.set(name.slice(ICONIFY_PACKAGE.length), Bun.resolveSync(`${name}/icons.json`, root))
+      found.set(name.slice(ICONIFY_PACKAGE.length), resolveSync(`${name}/icons.json`, root))
     }
     catch {
       // Listed but not installed yet: its icons are reported missing until `bun install` runs.
