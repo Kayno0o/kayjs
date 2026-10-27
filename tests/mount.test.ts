@@ -405,8 +405,9 @@ describe('mount', () => {
     expect(lines).toEqual(['down Escape'])
 
     await expect(click('.nothing')).rejects.toThrow('kay: click(".nothing") matches nothing')
-    await expect(type('.go', 'x')).rejects.toThrow('needs an input, textarea or select')
+    await expect(type('.go', 'x')).rejects.toThrow('needs a text input, textarea or select')
     await expect(type('.pick', 'Gamma')).rejects.toThrow('has no option')
+    await expect(type('.red', 'x')).rejects.toThrow('needs a text input')
     unmount()
   })
 })

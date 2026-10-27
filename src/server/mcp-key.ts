@@ -105,7 +105,7 @@ function readOrMake(path: string): string {
   mkdirSync(dirname(path), { recursive: true, mode: 0o700 })
 
   const key = Buffer.from(crypto.getRandomValues(new Uint8Array(32))).toString('base64url')
-  // Written whole under another name and linked in, so a process reading meanwhile never meets an empty file, nor does a crash leave one.
+  // Written whole under another name and linked in, so a process reading meanwhile never meets an empty file, nor does a crash leave one; the fallback below removes what it failed to write.
   const pending = `${path}.${process.pid}.${crypto.randomUUID()}`
 
   try {
@@ -119,7 +119,16 @@ function readOrMake(path: string): string {
       if (isCode(error, 'EEXIST'))
         throw error
 
-      writeFileSync(path, key, { mode: 0o600, flag: 'wx' })
+      try {
+        writeFileSync(path, key, { mode: 0o600, flag: 'wx' })
+      }
+      catch (written) {
+        // A write that failed halfway must not leave the empty file behind, which no later boot could use.
+        if (!isCode(written, 'EEXIST'))
+          rmSync(path, { force: true })
+
+        throw written
+      }
     }
   }
   catch (error) {

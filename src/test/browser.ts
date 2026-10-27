@@ -1,6 +1,7 @@
 import type { AxeResults } from '../runtime/dev-a11y'
 import type { Duration } from '../runtime/duration'
 import type { Network, PageResponse } from './network'
+import type { WaitUntilOptions } from './wait'
 import { existsSync, mkdtempSync, readdirSync, readFileSync, readlinkSync, realpathSync, rmdirSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { basename, dirname, join, resolve as resolvePath } from 'node:path'
@@ -56,11 +57,6 @@ export function cookiePairs(cookies: BrowserOptions['cookies']): { name: string,
 
 export interface WaitOptions {
   timeout?: Duration | undefined
-}
-
-export interface WaitUntilOptions extends WaitOptions {
-  // Named in the failure when the wait times out, in place of `the condition to hold`.
-  what?: string | undefined
 }
 
 // Where in an element a pointer aims: CSS pixels from its top-left corner, for a point of a canvas the element's middle is not.

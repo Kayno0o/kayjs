@@ -11,6 +11,9 @@ export interface Interactions {
 
 type Field = HTMLInputElement | HTMLTextAreaElement
 
+// The input types a user types text into.
+const TEXTUAL = new Set(['text', 'search', 'email', 'url', 'tel', 'password', 'number'])
+
 // The fields typed into whose `change` a browser has not fired yet.
 const uncommitted = new WeakSet<Element>()
 
@@ -39,14 +42,17 @@ export function interactions(root: HTMLElement, settle: () => Promise<void>): In
         element.dispatchEvent(new Event('input', { bubbles: true }))
         element.dispatchEvent(new Event('change', { bubbles: true }))
       }
-      else if (element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement) {
+      else if ((element instanceof HTMLInputElement && TEXTUAL.has(element.type)) || element instanceof HTMLTextAreaElement) {
+        if (element.disabled || element.readOnly)
+          throw new Error(`kay: type(${JSON.stringify(selector)}) found a field that is disabled or read-only`)
+
         focused(element)
         write(element, text)
         uncommitted.add(element)
         element.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'insertText', data: text }))
       }
       else {
-        throw new TypeError(`kay: type(${JSON.stringify(selector)}) needs an input, textarea or select, not a ${element.localName}`)
+        throw new TypeError(`kay: type(${JSON.stringify(selector)}) needs a text input, textarea or select, not a ${element.localName}`)
       }
 
       await settle()
@@ -56,7 +62,7 @@ export function interactions(root: HTMLElement, settle: () => Promise<void>): In
       const target = element.closest<HTMLElement>('button, input, select, textarea, a[href], [tabindex]') ?? element
 
       // Disabled controls swallow every pointer event, as in a browser.
-      if (!('disabled' in element && element.disabled === true)) {
+      if (!element.closest(':disabled')) {
         for (const type of ['pointerdown', 'mousedown'])
           element.dispatchEvent(new MouseEvent(type, { bubbles: true, cancelable: true, composed: true, button: 0 }))
 
