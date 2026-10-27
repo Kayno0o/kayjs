@@ -44,9 +44,10 @@ describe('sanitizeHtml in an island', () => {
   it('adds noopener to a kept target that opens a new context', () => {
     const options = { attributes: { a: ['target'] } }
 
-    for (const target of ['_blank', '_BLANK', 'popup', ' _blank'])
+    for (const target of ['_blank', '_BLANK', 'popup', ' _blank', '_top', '_parent', '', '_s&#101;lf'])
       expect(clean(`<a href="https://other.example/" target="${target}">x</a>`, options)).toBe(`<a href="https://other.example/" target="${target}" rel="nofollow ugc noopener">x</a>`)
 
+    expect(clean('<a href="https://other.example/" target="_SELF">x</a>', options)).toBe('<a href="https://other.example/" target="_SELF" rel="nofollow ugc">x</a>')
     expect(clean('<a href="https://other.example/" target="_self">x</a>', options)).toBe('<a href="https://other.example/" target="_self" rel="nofollow ugc">x</a>')
   })
 })

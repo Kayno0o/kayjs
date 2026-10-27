@@ -291,7 +291,7 @@ To render a string as markup, pass it through one of two helpers first. `sanitiz
 
 Call `trustHtml` where the markup is used, not once for a constant kept for hours.
 
-A link that `sanitizeHtml` keeps and that leaves your site opens in a new tab, as a template's does, with `target="_blank"`, `rel="nofollow ugc noopener"` and `data-new-tab`. `links: { outside: 'same-tab' }` in `kay.config.ts` turns that off, and a link that keeps a `target` of its own is left alone.
+A link that `sanitizeHtml` keeps and that leaves your site opens in a new tab, as a template's does, with `target="_blank"`, `rel="nofollow ugc noopener"` and `data-new-tab`. `links: { outside: 'same-tab' }` in `kay.config.ts` turns that off, and a link that keeps a `target` of its own is not marked, and gets `noopener` in its `rel` unless the target is `_self`.
 
 For markup fetched from elsewhere, such as a feed's body, pass the address it came from: `sanitizeHtml(body, { base: article.url })`. Every kept link and picture, `srcset` included, is resolved against it as a browser would, so a relative or `//host` URL points at the origin it came from.
 
