@@ -79,6 +79,106 @@ describe('cached', () => {
     }
   })
 
+  it('waits for a fresh load past the ttl with stale: false, concurrent callers sharing it', async () => {
+    let edition = 1
+    let loads = 0
+    const load = async () => {
+      loads++
+      await Bun.sleep(5)
+
+      return edition
+    }
+
+    expect(await cached('live', '30s', load, { stale: false })).toBe(1)
+    expect(await cached('live', '30s', load, { stale: false })).toBe(1)
+    expect(loads).toBe(1)
+    edition = 2
+    setSystemTime(Date.now() + 31_000)
+    expect(await Promise.all([cached('live', '30s', load, { stale: false }), cached('live', '30s', load, { stale: false })])).toEqual([2, 2])
+    expect(loads).toBe(2)
+    expect(await cached('live', '30s', load, { stale: false })).toBe(2)
+    expect(loads).toBe(2)
+  })
+
+  it('throws a failed stale: false load to every caller waiting for it, and loads again on the next call', async () => {
+    let failing = false
+    let loads = 0
+    const load = async () => {
+      loads++
+      await Bun.sleep(5)
+
+      if (failing)
+        throw new Error('down')
+
+      return loads
+    }
+
+    expect(await cached('strict', '30s', load, { stale: false })).toBe(1)
+    failing = true
+    setSystemTime(Date.now() + 31_000)
+
+    const results = await Promise.allSettled([cached('strict', '30s', load, { stale: false }), cached('strict', '30s', load, { stale: false })])
+
+    expect(results.map(result => result.status)).toEqual(['rejected', 'rejected'])
+    expect(loads).toBe(2)
+    failing = false
+    expect(await cached('strict', '30s', load, { stale: false })).toBe(3)
+  })
+
+  it('answers the fallback when a first load throws, storing nothing and trying again after a minute', async () => {
+    const logged = spyOn(console, 'error').mockImplementation(() => undefined)
+    let failing = true
+    let loads = 0
+    const load = async (): Promise<string[]> => {
+      loads++
+
+      if (failing)
+        throw new Error('down')
+
+      return ['repo']
+    }
+
+    try {
+      expect(await Promise.all([cached('repos', '1h', load, { fallback: [] }), cached('repos', '1h', load, { fallback: [] })])).toEqual([[], []])
+      expect(loads).toBe(1)
+      expect(logged).toHaveBeenCalledTimes(1)
+      expect(await cached('repos', '1h', load, { fallback: [] })).toEqual([])
+      expect(loads).toBe(1)
+      // Without a fallback the error still throws.
+      await expect(cached('repos', '1h', load)).rejects.toThrow('down')
+      expect(loads).toBe(2)
+
+      failing = false
+      setSystemTime(Date.now() + 61_000)
+      expect(await cached('repos', '1h', load, { fallback: [] })).toEqual(['repo'])
+      expect(loads).toBe(3)
+    }
+    finally {
+      logged.mockRestore()
+    }
+  })
+
+  it('tries a failed first load again at once once its key is invalidated', async () => {
+    const logged = spyOn(console, 'error').mockImplementation(() => undefined)
+    let failing = true
+    const load = () => {
+      if (failing)
+        throw new Error('down')
+
+      return 'up'
+    }
+
+    try {
+      expect(await cached('again', '1h', load, { fallback: 'none' })).toBe('none')
+      failing = false
+      invalidate('again')
+      expect(await cached('again', '1h', load, { fallback: 'none' })).toBe('up')
+    }
+    finally {
+      logged.mockRestore()
+    }
+  })
+
   it('drops a key, or the keys a function matches, a load already running for one never landing', async () => {
     let value = 'old'
     const load = async () => value

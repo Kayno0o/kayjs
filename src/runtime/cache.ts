@@ -40,11 +40,15 @@ export interface StoredValue {
 // `at` is a clock reading of the sending process, carried by a message naming no page: older processes read it as pages marked stale, none.
 export type Invalidation = { keys: string[], prefixes?: string[] } | { pages: string[], at?: number }
 
-export interface CacheOptions {
+export interface CacheOptions<T = unknown> {
   // Keeps the value across restarts, and for every process sharing the store; the value must survive devalue, as session data does. The app's `store.cache` in kay.config.ts by default, `false` for this process's memory alone.
   store?: CacheStore | false | undefined
   // Every open page that read the value follows it: once an `invalidate` drops the key, or a key it was built from, the page shows what the loads give now. Needs the key read while a page renders, in its server fence or a layout's; a static export of such a page fails.
   live?: boolean | undefined
+  // `false` for a value that must never be older than its ttl, such as a live feed: past the ttl the next call waits for a fresh load, which concurrent callers share, instead of getting the stale value while it refreshes. A load that throws throws to those callers, and the next call loads again.
+  stale?: boolean | undefined
+  // What a call gives when the first load throws, with the error logged, instead of throwing: a page that lists an outside service's data renders without it. It is not stored, and the load is tried again after a minute at most (the ttl when shorter), so a service that is down is not called on every request. `invalidate` of the key tries it at once.
+  fallback?: T | undefined
 }
 
 interface Entry {
@@ -62,6 +66,8 @@ interface Entry {
 type Tracker = <T>(load: () => Promise<T>) => Promise<{ result: T, reads: string[], invalidated?: boolean }>
 
 const entries = new Map<string, Entry>()
+// When each key whose first load failed, with a `fallback` given, may be loaded again.
+const failures = new Map<string, number>()
 // Every store a call named, which `invalidate` empties too.
 const stores = new Set<CacheStore>()
 // The drops of stored rows still running in the background, which a read of a store waits for so it never meets a row an `invalidate` already dropped.
@@ -104,18 +110,18 @@ const DELETE_BATCH = 50
 // After a background refresh that failed, the longest a stale value is kept before the next call tries again.
 const RETRY_MS = 60_000
 
-// The value `load` gives for `key`, kept for `ttl`, a string such as '5m', for every request in this process. Concurrent misses share one load; past `ttl`, the next call still gets the stale value and refreshes it in the background.
-// A first load that throws throws to its callers and keeps nothing; a refresh that throws is logged and keeps the stale value.
-export async function cached<T, const Ttl extends Duration = Duration>(key: string, ttl: Ttl & PositiveDuration<Ttl>, load: () => T | Promise<T>, options: CacheOptions = {}): Promise<T> {
+// The value `load` gives for `key`, kept for `ttl`, a string such as '5m', for every request in this process. Concurrent misses share one load; past `ttl`, the next call still gets the stale value and refreshes it in the background, unless `stale: false` makes it wait for a fresh one.
+// A first load that throws throws to its callers and keeps nothing, unless a `fallback` is given; a refresh that throws is logged and keeps the stale value.
+export async function cached<T, const Ttl extends Duration = Duration>(key: string, ttl: Ttl & PositiveDuration<Ttl>, load: () => T | Promise<T>, options: CacheOptions<T> = {}): Promise<T> {
   return cachedFor(key, ttl, load, options, renderingForVisitor())
 }
 
 // `cached` for what every visitor gets, such as a collection's published entries, which a visitor shown one entry's draft by a share link reads as well.
-export async function cachedPublished<T, const Ttl extends Duration = Duration>(key: string, ttl: Ttl & PositiveDuration<Ttl>, load: () => T | Promise<T>, options: CacheOptions = {}): Promise<T> {
+export async function cachedPublished<T, const Ttl extends Duration = Duration>(key: string, ttl: Ttl & PositiveDuration<Ttl>, load: () => T | Promise<T>, options: CacheOptions<T> = {}): Promise<T> {
   return cachedFor(key, ttl, load, options, previewing())
 }
 
-export interface CacheFunctionOptions<Ttl extends Duration = Duration> extends CacheOptions {
+export interface CacheFunctionOptions<Ttl extends Duration = Duration, T = unknown> extends CacheOptions<T> {
   ttl: Ttl & PositiveDuration<Ttl>
   // Groups to drop together: `invalidate()` of any tag drops every value that names it, and the pages that read them.
   tags?: CacheTag[] | undefined
@@ -170,9 +176,9 @@ function callSite(kind: string, caller: (...args: never[]) => unknown): string {
 
 // A cached function, its key taken from the module and the place that calls `cache`, so no string is typed twice: call it where it is declared, once, at the top of a module.
 // `await posts()` gives the value as `cached` does, `posts.invalidate()` drops it, and a function taking arguments keeps a value for each.
-export function cache<A extends unknown[], T, const Ttl extends Duration = Duration>(load: (...args: A) => T | Promise<T>, options: CacheFunctionOptions<Ttl>): CachedFunction<A, T>
+export function cache<A extends unknown[], T, const Ttl extends Duration = Duration>(load: (...args: A) => T | Promise<T>, options: CacheFunctionOptions<Ttl, T>): CachedFunction<A, T>
 // The build adds the module's id as a third argument, which the type keeps from apps.
-export function cache<A extends unknown[], T>(load: (...args: A) => T | Promise<T>, options: CacheFunctionOptions, id?: string): CachedFunction<A, T> {
+export function cache<A extends unknown[], T>(load: (...args: A) => T | Promise<T>, options: CacheFunctionOptions<Duration, T>, id?: string): CachedFunction<A, T> {
   const site = id === undefined ? callSite('cache', cache) : `cache:${id}`
   const { ttl, tags = [], ...rest } = options
 
@@ -226,7 +232,7 @@ export function cacheTag(id?: string): CacheTag {
   return tag
 }
 
-async function cachedFor<T, const Ttl extends Duration = Duration>(key: string, ttl: Ttl & PositiveDuration<Ttl>, load: () => T | Promise<T>, options: CacheOptions, bypass: boolean, tagKeys: string[] = []): Promise<T> {
+async function cachedFor<T, const Ttl extends Duration = Duration>(key: string, ttl: Ttl & PositiveDuration<Ttl>, load: () => T | Promise<T>, options: CacheOptions<T>, bypass: boolean, tagKeys: string[] = []): Promise<T> {
   const seconds = durationSeconds(ttl, `cached('${key}')'s ttl`)
 
   noteRead(key)
@@ -286,7 +292,19 @@ async function cachedFor<T, const Ttl extends Duration = Duration>(key: string, 
 
   cacheReads[entry ? 'hit' : 'miss']++
 
+  const fallback = 'fallback' in options
+
   if (!entry) {
+    const until = fallback ? failures.get(key) : undefined
+
+    // A first load failed a moment ago: the fallback again, without asking the service on every call.
+    if (until !== undefined) {
+      if (Date.now() < until)
+        return options.fallback as T
+
+      failures.delete(key)
+    }
+
     const pending: Entry = { value: undefined, freshUntil: 0, loaded: false, ...tagKeys.length > 0 ? { deps: tagKeys } : {} }
 
     entries.set(key, pending)
@@ -294,19 +312,47 @@ async function cachedFor<T, const Ttl extends Duration = Duration>(key: string, 
 
     pending.loading = firstLoad(key, seconds, pending, load, store, tagKeys, options.store === undefined)
 
-    return waited<T>(key, pending)
+    return fallback ? withFallback<T>(key, seconds, options.fallback as T, waited<T>(key, pending)) : waited<T>(key, pending)
   }
 
   if (!entry.loaded)
-    return waited<T>(key, entry)
+    return fallback ? withFallback<T>(key, seconds, options.fallback as T, waited<T>(key, entry)) : waited<T>(key, entry)
 
   for (const dep of entry.deps ?? [])
     noteRead(dep)
 
-  if (Date.now() >= entry.freshUntil && !entry.loading)
-    void refresh(key, seconds, entry, load, store, tagKeys, options.store === undefined)
+  if (Date.now() >= entry.freshUntil) {
+    if (options.stale === false) {
+      // Past the ttl every caller waits for the one load, and a failure throws to all of them.
+      if (!entry.loading)
+        void refresh(key, seconds, entry, load, store, tagKeys, options.store === undefined, true)
+
+      return (await (entry.loading as Promise<{ result: T }>)).result
+    }
+
+    if (!entry.loading)
+      void refresh(key, seconds, entry, load, store, tagKeys, options.store === undefined)
+  }
 
   return entry.value as T
+}
+
+// The first load's value, or the fallback when it throws, which is logged and remembered for a short while.
+async function withFallback<T>(key: string, seconds: number, fallback: T, loading: Promise<T>): Promise<T> {
+  try {
+    return await loading
+  }
+  catch (error) {
+    if (!failures.has(key)) {
+      if (failures.size >= MAX_ENTRIES)
+        failures.clear()
+
+      failures.set(key, Date.now() + Math.min(seconds * 1000, RETRY_MS))
+      kayLog('error', `loading cached('${key}') failed; answering its fallback`, error)
+    }
+
+    return fallback
+  }
 }
 
 // The first load's value, once the render waiting for it has noted what that load read.
@@ -427,6 +473,11 @@ export function refreshLocally(key: string): void {
 // Drops the entries and stored rows `named` matches, and those built from a read `built` matches, then tells the key listeners; `dropped` gathers the keys, which `invalidate` sends on.
 function dropAndTell(named: (key: string) => boolean, built: (key: string) => boolean, dropped: Set<string>): void {
   invalidations++
+
+  for (const name of failures.keys()) {
+    if (named(name) || built(name))
+      failures.delete(name)
+  }
 
   for (const name of dropEntries(named, built))
     dropped.add(name)
@@ -641,7 +692,7 @@ async function firstLoad<T>(key: string, ttl: number, pending: Entry, load: () =
   }
 }
 
-async function refresh(key: string, ttl: number, entry: Entry, load: () => unknown, store: CacheStore | undefined, tagKeys: string[], inherited: boolean): Promise<void> {
+async function refresh(key: string, ttl: number, entry: Entry, load: () => unknown, store: CacheStore | undefined, tagKeys: string[], inherited: boolean, strict = false): Promise<void> {
   const loading = trackedLoad(load)
 
   entry.loading = loading
@@ -655,6 +706,10 @@ async function refresh(key: string, ttl: number, entry: Entry, load: () => unkno
       keep(key, { value, freshUntil: Date.now() + ttl * 1000, loaded: true, ...reads.length > 0 ? { deps: reads } : {} }, store, inherited)
   }
   catch (error) {
+    // A strict refresh threw to the calls waiting for it, and the next one loads again.
+    if (strict)
+      return
+
     entry.freshUntil = Date.now() + Math.min(ttl * 1000, RETRY_MS)
     kayLog('error', `refreshing cached('${key}') failed; keeping the stale value`, error)
   }

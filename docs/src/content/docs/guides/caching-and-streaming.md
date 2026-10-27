@@ -31,6 +31,10 @@ const posts = await cached('posts', '5m', listPosts)
 
 Concurrent calls share one load. Past the `ttl`, the next call still gets the stale value and refreshes it in the background, so no request waits on a refresh.
 
+A live feed that must never be older than its `ttl` passes `{ stale: false }`: past the `ttl` the next call waits for a fresh load, which concurrent calls share. A load that throws throws to all of them, and the next call loads again.
+
+A first load that throws throws to its callers and keeps nothing. Pass `{ fallback: [] }` to give that value instead: the error is logged, the fallback is not stored, and the load is tried again a minute later at most, so a page listing an outside service's data renders without it and the service is not called on every request.
+
 Drop keys from the action that changed their data. A prerendered page that read a dropped key is rendered again on its next request, and so is a cached value built from it.
 
 ```ts
