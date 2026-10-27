@@ -73,7 +73,8 @@ const PORTS: DevPorts = {
   typesProcess: (root, entry, env, idleMs) => new TypesProcess(root, entry, env, idleMs),
   startClientBuilder,
   watchProject,
-  mentionsPackage,
+  // Called through its module's binding, which tests/dev-start.test.ts spies on.
+  mentionsPackage: async root => mentionsPackage(root),
 }
 
 // Runs the server entry in development and keeps its process through the changes to templates, islands and API modules: the process imports the modules they reached again and runs the entry once more, whose server takes over the one listening.
