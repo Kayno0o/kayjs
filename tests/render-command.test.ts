@@ -1,32 +1,38 @@
 import { existsSync } from 'node:fs'
-import { mkdir, readdir, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, readdir, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import process from 'node:process'
-import { beforeAll, describe, expect, it } from 'bun:test'
+import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
 import { alive, kill } from './alive'
 import { eventually } from './helpers/eventually'
 import { fixtureCopy } from './scratch'
 
 const cli = join(import.meta.dir, '..', 'src', 'cli.ts')
 const SURVEY = '/_kay/action/src/routes/survey.kay'
+// The temporary directory every kay render of this file puts its socket in: any kay render starting sweeps the dead renders' socket folders from its own, so one in another test file, sharing the host's, would remove a killed render's before the sweep test reads it.
+// Made in the host's rather than under the checkout's `.kay/scratch`, as a Unix socket's path is capped at 108 bytes.
+const TMP = await mkdtemp(join(tmpdir(), 'kay-test-render-'))
+const ENV = { ...process.env, TMPDIR: TMP }
+
+afterAll(async () => rm(TMP, { recursive: true, force: true }))
 
 // What `kay render` printed, each stream apart, and how it exited.
 async function render(...args: string[]): Promise<{ out: string, err: string, code: number }> {
-  const child = Bun.spawn([process.execPath, cli, 'render', ...args], { stdin: 'ignore', stdout: 'pipe', stderr: 'pipe' })
+  const child = Bun.spawn([process.execPath, cli, 'render', ...args], { env: ENV, stdin: 'ignore', stdout: 'pipe', stderr: 'pipe' })
   const [out, err, code] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited])
 
   return { out, err, code }
 }
 
-// What a `kay render` of this project leaves when it is killed: its build under `.kay` and the folder of its socket in the temporary directory.
+// What a `kay render` of this project leaves when it is killed: its build under `.kay` and the folder of its socket in `TMP`.
 async function leftBy(dir: string, render: number): Promise<string[]> {
-  return [...(await readdir(join(dir, '.kay'))).filter(name => name === `render-${render}`), ...(await readdir(tmpdir())).filter(name => name.startsWith(`kay-render-${render}-`))]
+  return [...(await readdir(join(dir, '.kay'))).filter(name => name === `render-${render}`), ...(await readdir(TMP)).filter(name => name.startsWith(`kay-render-${render}-`))]
 }
 
 // Kills `kay render` alone once its server printed `pid N` and `ready` and, with `leaving`, once it left that many leftovers, then answers what the server printed until `printed` holds, its pid and kay render's.
 async function killedRender(dir: string, url: string, printed: (err: string) => boolean, leaving = 0): Promise<{ err: string, pid: number, render: number }> {
-  const child = Bun.spawn([process.execPath, cli, 'render', url, dir], { stdin: 'ignore', stdout: 'ignore', stderr: 'pipe' })
+  const child = Bun.spawn([process.execPath, cli, 'render', url, dir], { env: ENV, stdin: 'ignore', stdout: 'ignore', stderr: 'pipe' })
   const reader = child.stderr.getReader()
   const decoder = new TextDecoder()
   let err = ''
