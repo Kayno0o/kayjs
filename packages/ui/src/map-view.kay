@@ -165,10 +165,10 @@ onMount(() => {
     if (!ready)
       return
 
-    const own = darkTiles !== undefined && dark()
+    const night = darkTiles !== undefined && dark() ? darkTiles : undefined
 
     tileLayer?.remove()
-    tileLayer = ready.leaflet.tileLayer(own ? darkTiles : tiles, { maxZoom, attribution: own ? darkAttribution ?? attribution : attribution }).addTo(ready.view)
+    tileLayer = ready.leaflet.tileLayer(night ?? tiles, { maxZoom, attribution: night === undefined ? attribution : darkAttribution ?? attribution }).addTo(ready.view)
   })
 
   // The markers with a label or a popup, one tab stop in all: the arrows and Home and End walk them in the order of `markers`, as a scatter chart's dots.
