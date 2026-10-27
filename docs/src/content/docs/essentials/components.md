@@ -150,6 +150,8 @@ List(items={['Milk', 'Eggs']})
     li {i + 1}. {item}
 ```
 
+A block written without its parameters, `@row`, is markup and not a function, so `kay check` reports it and names the parameters to write.
+
 ## Signals
 
 `signal(value)` holds state. Read it by calling it, `{count()}`. Write it by assigning it, `count++`, or with `.set`. Both work in the template and in the script.

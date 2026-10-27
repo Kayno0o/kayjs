@@ -921,6 +921,22 @@ describe.concurrent('kay check, edge cases', () => {
     }
   })
 
+  it('names the parameter a block taking one was written without', async () => {
+    const root = await scratchProject({
+      'src/list.kay': '---\nimport type { Snippet } from "kay"\nconst { value } = props<{ value?: Snippet<[item: string]> }>()\n---\np\n  | {value?.("a")}\n',
+      'src/routes/index.kay': '---\nimport List from "../list.kay"\n---\nList\n  @value\n    b plain\n',
+    })
+
+    try {
+      expect((await check(root)).map(d => [d.line, d.code, d.help])).toEqual([
+        [5, 'TS2322', 'the component calls `@value` with (item: string): write it with them, as `@value(item)`'],
+      ])
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
   it('tells to call a signal it does not see made where its value goes', async () => {
     const root = await scratchProject({
       'src/accent.ts': 'import { signal } from \'kay\'\n\nconst made = signal(\'red\')\n\nexport { made as accent }\n',

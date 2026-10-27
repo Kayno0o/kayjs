@@ -23,6 +23,11 @@ const UNUSED_PARAMETER_CODES = new Set([6133, 6198, 6205])
 // A condition that is always true, a function standing in for its value.
 const ALWAYS_DEFINED = 2774
 const MISSING_PROPERTY = 2339
+const ASSIGNABILITY = 2322
+// `Type 'Element' is not assignable to type '((item: string) => Element) | undefined'`: the parameters are what is captured.
+const BLOCK_NAME = /^[\w$-]+/
+const PARAMETER_NAME = /(?:^|, )(\.\.\.)?([\w$]+)\??:/g
+const BLOCK_TYPE = /^Type 'Element' is not assignable to type '\(?\((.*?)\) => Element\)?/
 const LEADING_NAME = /^[a-z_$][\w$]*/i
 const MEMBER_OF = /([a-z_$][\w$]*)\??\.$/i
 // The error `CheckedHref` gives a site-relative path nothing serves.
@@ -67,6 +72,20 @@ function propBefore(source: string, span: Span | undefined): string | undefined 
   return span === undefined ? undefined : PROP_BEFORE.exec(source.slice(Math.max(0, span.start - 80), span.start))?.[1]
 }
 
+// A block with no parameters is markup, so one a component calls with values is a type error on `Element`: the help names the parameters its prop is typed with.
+function blockWithoutParameters(diagnostic: TsgoDiagnostic, source: string, span: Span | undefined): string | undefined {
+  if (diagnostic.code !== ASSIGNABILITY || span === undefined)
+    return undefined
+
+  const name = source[span.start - 1] === '@' ? BLOCK_NAME.exec(source.slice(span.start))?.[0] : undefined
+  const parameters = BLOCK_TYPE.exec(diagnostic.message)?.[1]
+
+  if (name === undefined || parameters === undefined)
+    return undefined
+
+  return `the component calls \`@${name}\` with (${parameters}): write it with them, as \`@${name}(${[...parameters.matchAll(PARAMETER_NAME)].map(match => `${match[1] ?? ''}${match[2]}`).join(', ')})\``
+}
+
 // A diagnostic in a .kay file's shadow TSX, read at the levels its source gives the lints.
 export function diagnoseShadow(shadow: ShadowFile, diagnostic: TsgoDiagnostic, levelAt: (lint: LintName, offset: number) => LintLevel): Diagnosed | undefined {
   const span = sourceSpan(shadow, diagnostic.start, diagnostic.end, 'loose')
@@ -93,6 +112,11 @@ export function diagnoseShadow(shadow: ShadowFile, diagnostic: TsgoDiagnostic, l
 
   if (unreadSignal(diagnostic))
     return { message: diagnostic.message, help: signalHelp(diagnostic, signalName(diagnostic, shadow.source, offset)), span }
+
+  const blockHelp = blockWithoutParameters(diagnostic, shadow.source, span)
+
+  if (blockHelp !== undefined)
+    return { message: diagnostic.message, help: blockHelp, span }
 
   const help = unknownNameHelp(diagnostic.message)
 
