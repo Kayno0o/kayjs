@@ -202,7 +202,7 @@ describe('browser-only globals read while rendering', () => {
   })
 
   it('leaves the target of `listen` alone, which the compiler hands over as a function the server never calls', () => {
-    const source = '---\nimport { listen, signal } from \'kay\'\n\nconst key = signal(\'\')\nlisten(window, \'keydown\', event => key.set(event.key))\nlisten(window.visualViewport!, \'resize\', () => key.set(\'\'))\n---\np {key()}\n'
+    const source = '---\nimport { listen, signal } from \'kay\'\n\nconst key = signal(\'\')\nlisten(window, \'keydown\', event => key = event.key)\nlisten(window.visualViewport!, \'resize\', () => key = \'\')\n---\np {key()}\n'
     const compiled = (output: 'dom' | 'html') => compileKay(source, join(process.cwd(), 'widget.kay'), { output, hydratable: true }).tsx
 
     expect(reads(source)).toEqual([])
@@ -279,7 +279,7 @@ describe('values an island renders differently on the server and in the browser'
 
   it('leaves alone what both sides compute alike, what runs in the browser only, and a static component', () => {
     const alike = island('const at = new Date(0)\nconst price = (2).toLocaleString(\'fr\')\nconst day = at.toLocaleDateString(\'fr\', { timeZone: \'UTC\' })\nconst time = new Intl.DateTimeFormat(\'fr\', { timeZone: \'Europe/Paris\' })\nconst options = { timeZone: \'UTC\' }\nconst hour = at.toLocaleTimeString(\'fr\', options)\nconst Date = { now: () => 1 }', '{price} {day} {time.format(at)} {hour} {Date.now()} {count()}')
-    const later = '---\nimport { effect, signal } from \'kay\'\n\nconst count = signal(0)\neffect(() => count.set(Date.now()))\n---\nbutton(onClick={() => count.set(Math.random())}) {count()}\n'
+    const later = '---\nimport { effect, signal } from \'kay\'\n\nconst count = signal(0)\neffect(() => count = Date.now())\n---\nbutton(onClick={() => count = Math.random()}) {count()}\n'
 
     expect(reads(alike)).toEqual([])
     expect(reads(later)).toEqual([])

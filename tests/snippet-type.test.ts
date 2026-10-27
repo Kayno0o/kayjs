@@ -99,7 +99,7 @@ describe('Snippet', () => {
   })
 
   it('sends an island a Snippet with no parameters as its static slot, and refuses one with parameters from a layout or a server page', async () => {
-    const island = '---\nimport type { Snippet } from \'kay\'\nimport { signal } from \'kay\'\n\nconst { icon, row } = props<{ icon?: Snippet, row?: Snippet<[name: string]> }>()\nconst count = signal(0)\n---\nbutton(onClick={() => count.set(count() + 1)})\n  slot icon\n  slot row(\'x\')\n'
+    const island = '---\nimport type { Snippet } from \'kay\'\nimport { signal } from \'kay\'\n\nconst { icon, row } = props<{ icon?: Snippet, row?: Snippet<[name: string]> }>()\nconst count = signal(0)\n---\nbutton(onClick={() => count = count() + 1})\n  slot icon\n  slot row(\'x\')\n'
 
     expect(await problems({
       'src/routes/index.kay': '---\nimport Toggle from \'../toggle.kay\'\n---\nToggle\n  @icon\n    b x\n',
@@ -112,7 +112,7 @@ describe('Snippet', () => {
   })
 
   it('refuses a block with parameters from a layout, and allows it from a static component the island promotes', async () => {
-    const island = '---\nimport type { Snippet } from \'kay\'\nimport { signal } from \'kay\'\n\nconst { row } = props<{ row: Snippet<[name: string]> }>()\nconst count = signal(0)\n---\nbutton(onClick={() => count.set(count() + 1)})\n  slot row(\'x\')\n'
+    const island = '---\nimport type { Snippet } from \'kay\'\nimport { signal } from \'kay\'\n\nconst { row } = props<{ row: Snippet<[name: string]> }>()\nconst count = signal(0)\n---\nbutton(onClick={() => count = count() + 1})\n  slot row(\'x\')\n'
 
     expect(await problems({
       'src/routes/_layout.kay': '---\nimport Toggle from \'../toggle.kay\'\n---\nToggle\n  @row(name)\n    b {name}\nslot\n',
