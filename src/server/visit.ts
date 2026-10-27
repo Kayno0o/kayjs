@@ -26,7 +26,12 @@ const received = new WeakSet<Request>()
 
 // Reads the mark and drops it from the request, so no handler of the app reads the token; `isInternal` still tells afterwards.
 export function receiveInternal(request: Request): void {
-  if (request.headers.get(INTERNAL) === INTERNAL_TOKEN)
+  const mark = request.headers.get(INTERNAL)
+
+  if (mark === null)
+    return
+
+  if (mark === INTERNAL_TOKEN)
     received.add(request)
 
   request.headers.delete(INTERNAL)

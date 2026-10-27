@@ -12,6 +12,9 @@ export interface Writes {
   readonly count: number
 }
 
+// The count of a server keeping no page, which nothing reads.
+export const NO_WRITES: Writes = { count: 0 }
+
 // What kay answers itself without changing what a page renders, taken from the list of its own endpoints: the beats, reports and drafts the browser posts.
 const KAY_ROUTES = ownPostPaths()
 const SLASH = 47

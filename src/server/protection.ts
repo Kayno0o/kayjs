@@ -4,6 +4,7 @@ import type { BlockList } from 'node:net'
 import type { ProxyConfig } from '../config'
 import type { ActionRateLimit, RateKey, RateKeyContext, RateLimit, RateStore, RateWindow, ServerAction } from '../runtime/action'
 import type { Duration } from '../runtime/duration'
+import type { RequestRecord } from './request-record'
 import { linkSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
 import process from 'node:process'
 import { KayError } from '../compiler/errors'
@@ -19,6 +20,7 @@ import { inMemory } from './memory-mark'
 import { STORE_TIMEOUT_MS } from './pg-limit'
 import { TimeoutError } from './pg-poll'
 import { onReload } from './reload'
+import { recordOf, requestRecord } from './request-record'
 import { rewrittenAddress } from './rewrite'
 import { sharedKey, stampTime } from './stamp'
 import { kayWord } from './words'
@@ -53,10 +55,6 @@ const BRACKETED_PORT = /^\[([^\]]+)\](:\d{1,5})?$/
 const V4_PORT = /^([\d.]+):\d{1,5}$/
 // Loopback, private, shared (CGNAT, Tailscale) and link-local ranges, IPv4 ones mapped into IPv6 included: where a proxy in front of the server connects from.
 const LOOPBACK_OR_PRIVATE = /^(?:(?:::ffff:)?(?:127\.|10\.|192\.168\.|172\.(?:1[6-9]|2\d|3[01])\.|100\.(?:6[4-9]|[7-9]\d|1[01]\d|12[0-7])\.|169\.254\.)|::1$|f[cd]|fe[89ab])/i
-// The proxy settings of the app each request reached, set as it arrives; `null` for an app setting none.
-const proxies = new WeakMap<Request, ProxyConfig | null>()
-// The server each request came through, for `clientAddress` called where only the request is at hand, as in a guard.
-const servers = new WeakMap<Request, Server<unknown>>()
 
 interface ActionLimit {
   name: string
@@ -73,7 +71,6 @@ const warnedUntrusted = new Set<string>()
 // Each list of `trusted` ranges, read once.
 const trustedRanges = new Map<string, BlockList>()
 const RANGE = /^([^/]+)\/(\d{1,3})$/
-const requestIds = new WeakMap<Request, string>()
 
 // The header a request's id comes in from a trusted proxy and goes out on, every context holding it; `requestIdHeader` in kay.config.ts renames it.
 // It is one name per process, as the helpers that put it on a response see no app: an app that sets none leaves a name another one set, and two apps naming different ones is refused.
@@ -704,7 +701,7 @@ function proxyOf(setting: ProxyConfig | number | boolean | undefined): ProxyConf
 
 // The server that received `request`, once the app read it.
 export function requestServer(request: Request): Server<unknown> | undefined {
-  return servers.get(request)
+  return recordOf(request)?.server
 }
 
 // Refuses a `proxy` setting that names no proxy, so the boot can before any build starts.
@@ -744,10 +741,12 @@ export function trustProxy(app: Elysia, setting: ProxyConfig | number | boolean 
   const proxy = checkProxy(setting)
 
   app.onRequest(({ request, server }) => {
-    proxies.set(request, proxy ?? null)
+    const record = requestRecord(request)
+
+    record.proxy = proxy
 
     if (server)
-      servers.set(request, server)
+      record.server = server
   })
 }
 
@@ -760,8 +759,9 @@ export function clientAddress(request: Request, server: Server<unknown> | null |
 // `clientAddress`, or undefined for a request with no socket address and none a trusted proxy forwarded, which `clientAddress` counts as the one client `unknown`.
 export function knownAddress(request: Request, server: Server<unknown> | null | undefined, setting?: ProxyConfig | number | boolean): string | undefined {
   const proxy = proxyOf(setting)
-  const address = rewrittenAddress(request) ?? (server ?? servers.get(request))?.requestIP(request)?.address
-  const trusted = proxy ?? proxies.get(request)
+  const record = recordOf(request)
+  const address = rewrittenAddress(request) ?? (server ?? record?.server)?.requestIP(request)?.address
+  const trusted = proxy ?? record?.proxy
   // Under `app.handle()`, as in a test, there is no socket: the request came from whatever the test says.
   const fromProxy = address === undefined || fromTrusted(address, trusted)
 
@@ -816,30 +816,25 @@ function addressOf(value: string | null | undefined): string | undefined {
 
 // The id of a request, on its log lines and its `X-Request-Id` header: the one a proxy the app's `proxy` setting trusts passed on, else one made for it, time-ordered.
 export function requestId(request: Request): string {
-  let id = requestIds.get(request)
+  const record = requestRecord(request)
 
-  if (id === undefined) {
-    id = passedId(request) ?? Bun.randomUUIDv7('base64url')
-    requestIds.set(request, id)
-  }
-
-  return id
+  return record.id ??= passedId(request, record) ?? Bun.randomUUIDv7('base64url')
 }
 
 // The id a request kay rewrote had before, as the request served in its place is another.
 export function keepRequestId(request: Request, id: string): void {
-  requestIds.set(request, id)
+  requestRecord(request).id = id
 }
 
-function passedId(request: Request): string | undefined {
+function passedId(request: Request, { proxy, server }: RequestRecord): string | undefined {
   const id = request.headers.get(idHeader)
 
-  if (id === null || !proxies.get(request) || !PASSED_ID.test(id))
+  if (id === null || !proxy || !PASSED_ID.test(id))
     return undefined
 
-  const address = rewrittenAddress(request) ?? servers.get(request)?.requestIP(request)?.address
+  const address = rewrittenAddress(request) ?? server?.requestIP(request)?.address
 
-  return address === undefined || fromTrusted(address, proxies.get(request) ?? undefined) ? id : undefined
+  return address === undefined || fromTrusted(address, proxy) ? id : undefined
 }
 
 // Whether `address` is this machine or a private network.

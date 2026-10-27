@@ -29,6 +29,10 @@ export function setTracer(given: Tracer | undefined): void {
   tracer = given
 }
 
+export function tracing(): boolean {
+  return tracer !== undefined
+}
+
 // `ctx.redirect()`, `ctx.notFound()` and `ctx.deny()` end the work as the app meant to, so their span is no failure.
 export function failed(span: Span, error: unknown): void {
   if (error instanceof Redirect || error instanceof NotFound || error instanceof Denied)

@@ -18,6 +18,7 @@ import { answeredAsPage, currentRequest } from './log'
 import { bearsMcpKey } from './mcp-key'
 import { actionOperation, guardRefusal, toolName } from './openapi'
 import { clientAddress, keepRequestId, markAgentCall, overLimit, requestId, requestServer, wasChallenged } from './protection'
+import { recordOf, requestRecord } from './request-record'
 import { requestUrl } from './request-url'
 import { sendFrom } from './rewrite'
 import { toolSettings } from './tool-settings'
@@ -336,18 +337,16 @@ export function toolCall(request: Request): ToolCall | undefined {
   return request.headers.get(AGENT) === TOKEN && tool !== null ? { tool, client: request.headers.get(CLIENT) ?? '', from: request.headers.get(FROM) ?? request.url } : undefined
 }
 
-// What serves an action a library calls as a tool when no server does, as under `app.handle()`: the app that received the request, so several apps built in one process each run their own calls; held weakly, so an app nothing reaches any more goes.
-const answeringApps = new WeakMap<Request, WeakRef<Elysia>>()
-
 // The app `pages()` built last answers a request no app recorded, such as one a hook of another plugin rebuilt.
 let fallbackApp: WeakRef<Elysia> | undefined
 
+// The app that received a request serves the actions a library calls as tools when no server does, as under `app.handle()`, so several apps built in one process each run their own calls.
 export function serveToolCallsThrough(app: Elysia): void {
   const held = new WeakRef(app)
 
   fallbackApp = held
   app.onRequest(({ request }) => {
-    answeringApps.set(request, held)
+    requestRecord(request).app = held
   })
 }
 
@@ -584,7 +583,7 @@ function toolFor(action: ServerAction<TSchema, unknown, string>, url: string): L
     readOnly: settings.readOnly === true,
     ...typeof settings.label === 'string' && settings.label !== '' && { label: settings.label },
     call: async (args, request = currentRequest()) => {
-      const app = ((request && answeringApps.get(request)) ?? fallbackApp)?.deref()
+      const app = ((request && recordOf(request)?.app) ?? fallbackApp)?.deref()
 
       if (!request || !app)
         throw new Error(`kay: the ${tool.name} tool was called outside a request kay answers; pass the request it was asked for`)

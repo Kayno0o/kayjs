@@ -39,7 +39,8 @@ export function serveHealth(app: Elysia, lifecycle: Lifecycle, holds: () => bool
   let checked: { at: number, healthy: Promise<boolean> } | undefined
 
   const asked = (request: Request): boolean => {
-    if (request.method !== 'GET' && request.method !== 'HEAD')
+    // A pathname that is the path is written in the URL as it is, so any other request, an asset's say, is told apart with no parse.
+    if ((request.method !== 'GET' && request.method !== 'HEAD') || !request.url.includes(path))
       return false
 
     const requested = requestUrl(request).pathname

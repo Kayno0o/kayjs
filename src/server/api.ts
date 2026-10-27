@@ -34,7 +34,7 @@ import { requestUrl } from './request-url'
 import { apiRoutePath, withoutSlash } from './routes'
 import { VARY_COOKIE, wasReadPersonally } from './scope'
 import { carriedNames, carryContext } from './security'
-import { answered, failed, SERVER_SPAN, startSpan } from './trace'
+import { answered, failed, SERVER_SPAN, startSpan, tracing } from './trace'
 import { socketLimits } from './ws-limits'
 
 // What a body Elysia streams, awaits or asks for its response has: a generator, a thenable, an object with `toResponse()`.
@@ -65,17 +65,19 @@ export async function serveApi(app: Elysia, modules: ApiModule[], options: Actio
   // The app's `cors`, the rule of every module that sets none.
   const appCors = options.cors === undefined ? undefined : corsRule(options.cors)
 
-  // Global: a group's own afterResponse hook never runs once the app holds a global one, as the request log does.
-  app.onAfterResponse({ as: 'global' }, ({ request, set, responseValue }) => {
-    const span = spans.get(request)
+  // Global: a group's own afterResponse hook never runs once the app holds a global one, as the request log does; with no module no span starts.
+  if (modules.length > 0) {
+    app.onAfterResponse({ as: 'global' }, ({ request, set, responseValue }) => {
+      const span = spans.get(request)
 
-    if (!span)
-      return
+      if (!span)
+        return
 
-    spans.delete(request)
-    answered(span, statusOf(responseValue, set))
-    span.end()
-  })
+      spans.delete(request)
+      answered(span, statusOf(responseValue, set))
+      span.end()
+    })
+  }
 
   for (const module of modules) {
     const instance = (await importModule<{ default?: unknown }>(module.file)).default
@@ -134,31 +136,42 @@ export async function serveApi(app: Elysia, modules: ApiModule[], options: Actio
       if (cors)
         group.options('/', ({ request }) => preflight(cors, methods, request)).options('/*', ({ request }) => preflight(cors, methods, request))
 
-      const mounting = group
+      const guarded = group
         // A span from the guards to the response, which the handler's own spans do not nest under: the handler runs in Elysia's call, not in one kay makes.
         .onBeforeHandle(({ request, route: mounted }) => {
           owners.set(request, instance)
           // What `apiUrl(request, path)` in a handler reads to name the route of the module it runs in.
           Object.defineProperty(request, API_MOUNT, { value: module.mount, configurable: true })
-          // `/api/echo` rather than the `/api/echo/` a module's `/` route is mounted at.
-          const route = mounted.length > 1 ? mounted.replace(TRAILING_SLASH, '') : mounted
-          const span = startSpan(`${request.method} ${route}`, { kind: SERVER_SPAN, attributes: { 'http.request.method': request.method, 'http.route': route, 'url.path': requestUrl(request).pathname, 'kay.request.id': requestId(request) } })
 
-          if (span)
-            spans.set(request, span)
+          // Without a tracer, its name and attributes are never built.
+          if (tracing()) {
+            // `/api/echo` rather than the `/api/echo/` a module's `/` route is mounted at.
+            const route = mounted.length > 1 ? mounted.replace(TRAILING_SLASH, '') : mounted
+            const span = startSpan(`${request.method} ${route}`, { kind: SERVER_SPAN, attributes: { 'http.request.method': request.method, 'http.route': route, 'url.path': requestUrl(request).pathname, 'kay.request.id': requestId(request) } })
+
+            if (span)
+              spans.set(request, span)
+          }
         })
-        // A route of the module's own answering OPTIONS, `.all()` included, leaves a browser's preflight to kay.
-        .onBeforeHandle(({ request }) => cors && request.method === 'OPTIONS' && request.headers.has('access-control-request-method') ? preflight(cors, methods, request) : undefined)
-        // The guards are kay's call, so what they log carries the request; the handler runs in Elysia's.
-        // With no guard and no cors rule nothing runs in the request's scope, so only the cross-site check is left.
-        .onBeforeHandle(async (context) => {
-          if (guards.length === 0 && !cors)
-            return crossSiteRefused(context.request) ? crossSiteResponse(context.request, 'request') : undefined
 
+      // A route of the module's own answering OPTIONS, `.all()` included, leaves a browser's preflight to kay.
+      if (cors)
+        guarded.onBeforeHandle(({ request }) => request.method === 'OPTIONS' && request.headers.has('access-control-request-method') ? preflight(cors, methods, request) : undefined)
+
+      // The guards are kay's call, so what they log carries the request; the handler runs in Elysia's.
+      // With no guard and no cors rule nothing runs in the request's scope, so only the cross-site check is left.
+      if (guards.length === 0 && !cors) {
+        guarded.onBeforeHandle(({ request }) => crossSiteRefused(request) ? crossSiteResponse(request, 'request') : undefined)
+      }
+      else {
+        guarded.onBeforeHandle(async (context) => {
           return answeringRequest(context.request, async () => inApiLocale(context.request, options, async () => admit(guards, sharedContext(context.request, () => ({ ...context })), options, cors)))
         })
-        // After the guards, so a caller they refuse costs no allowance and a `key` reads what they set up.
-        .onBeforeHandle(async (context) => {
+      }
+
+      // After the guards, so a caller they refuse costs no allowance and a `key` reads what they set up; a module with no limit of its own or of a route has nothing to count.
+      if (moduleLimits.length > 0 || routeRates.size > 0) {
+        guarded.onBeforeHandle(async (context) => {
           const route = withoutSlash(context.route)
           const limits = [...moduleLimits, ...routeRates.get(`${context.request.method} ${route}`) ?? routeRates.get(`${context.request.method === 'HEAD' ? 'GET' : 'ALL'} ${route}`) ?? routeRates.get(`ALL ${route}`) ?? []]
 
@@ -177,6 +190,9 @@ export async function serveApi(app: Elysia, modules: ApiModule[], options: Actio
 
           return wait === undefined ? undefined : tooManyRequests(wait)
         })
+      }
+
+      const mounting = guarded
         // Elysia runs the `mapResponse` of every module registered before the one matched, so only the matched module's, which knows its cors rule, acts.
         .mapResponse(({ request, responseValue, set }) => {
           const owner = owners.get(request)

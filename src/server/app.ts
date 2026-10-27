@@ -57,7 +57,7 @@ import { refuseUnknownHosts } from './host-allowlist'
 import { refuseLocaleClashes } from './i18n'
 import { avifQuality, serveImages, webpQuality } from './image'
 import { jobsPageOf, serveJobsPage } from './jobs-page'
-import { countWrites } from './kept-pages'
+import { countWrites, NO_WRITES } from './kept-pages'
 import { HEALTH_PATH, serveHealth, stopOnSignal } from './lifecycle'
 import { liveConnections, serveLive } from './live'
 import { announceStart, logRequests, pathOf, requestRefusalLogger, useLogger } from './log'
@@ -395,7 +395,8 @@ export async function pagesApp(project: Project<PagesOptions>, loadClient: () =>
     asksConsent: options.extensions?.some(extension => extension.asksConsent === true) ?? false,
   })
 
-  const writes = countWrites(app, [mcpAt].filter(path => path !== undefined))
+  // Only a kept page reads the count, so a build keeping none registers no hook for it.
+  const writes = [...client.pages.values()].some(page => page.kept === true) ? countWrites(app, [mcpAt].filter(path => path !== undefined)) : NO_WRITES
   // Hashed as they go out, under the mount point.
   const compressing = options.compress ?? process.env.NODE_ENV === 'production'
   // The browser fetches the dictionary under `connect-src`, so it joins the policy as what an island needs does: the app's own sources, unless it removed the directive or set it to 'none'.
