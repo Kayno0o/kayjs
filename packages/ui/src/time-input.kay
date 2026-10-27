@@ -1,6 +1,6 @@
 ---
 import type { JSX } from 'kay'
-import { recipe } from 'kay'
+import { effect, recipe } from 'kay'
 import TextInput from './text-input.kay'
 
 const look = recipe({ parts: { root: 'kui-time-input' } })
@@ -8,8 +8,36 @@ const look = recipe({ parts: { root: 'kui-time-input' } })
 const { value, onChange, ...rest } = props<Omit<JSX.IntrinsicElements['input'], 'value' | 'type' | 'class' | 'children' | 'onInput' | 'onChange'> & {
   // The time as `HH:MM`, or `HH:MM:SS` with a `step` under a minute, and `''` for none. Without it, the box starts empty and keeps what is typed, for a form posting it by its `name`.
   value?: string | undefined
-  // Called with the new time, or `''` once emptied, as soon as the box holds a whole time.
+  // Called with the new time, or `''` once emptied, as soon as the box holds a whole time. With `required` it never hears `''`: the box goes back to the last time when it is left empty.
   onChange?: ((value: string) => unknown) | undefined
 }>()
+
+// The last whole time the box held, which a required box goes back to once left empty.
+let last = ''
+
+// A time the parent sets counts as the last one too.
+effect(() => {
+  if (value)
+    last = value
+})
+
+function heard(next: string) {
+  if (next !== '')
+    last = next
+  else if (rest.required)
+    return
+
+  onChange?.(next)
+}
+
+// Cleared digit by digit, the box reads empty on the way to a new time, so it is only put back once left.
+function left(event: FocusEvent & { currentTarget: HTMLInputElement }) {
+  const box = event.currentTarget
+
+  if (rest.required && box.value === '' && last !== '')
+    box.value = last
+
+  rest.onBlur?.(event as never)
+}
 ---
-TextInput(part="root" {...rest} type="time" value={value} onInput={onChange})
+TextInput(part="root" {...rest} type="time" value={value} onInput={heard} onBlur={left})

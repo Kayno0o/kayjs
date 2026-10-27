@@ -13,6 +13,7 @@ form
   DateInput#plain(aria-label="Plain" name="plain")
   DateRangeInput#range(label="Stay" fromName="from" toName="to" firstDay={firstDay} onChange={onRange})
   TimeInput#time(aria-label="Start" name="start" value="09:30" onChange={onTime})
+  TimeInput#required-time(aria-label="Wake" name="wake" value="07:00" required onChange={onTime})
   FormField(label="Held")
     DateInput#held(name="held" value="2026-10-21")
   DateInput#locked(aria-label="Locked" value="2026-10-21" readonly)

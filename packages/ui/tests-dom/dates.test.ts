@@ -299,4 +299,38 @@ describe('TimeInput', () => {
 
     expect(seen.time).toEqual(['17:45'])
   })
+
+  test('with required, never tells an empty time and goes back to the last one once left', async () => {
+    const root = await dates()
+    const input = root.querySelector<HTMLInputElement>('#required-time')!
+    const type = (value: string) => {
+      input.value = value
+      input.dispatchEvent(new Event('input', { bubbles: true }))
+    }
+
+    type('08:15')
+    type('')
+    expect(seen.time).toEqual(['08:15'])
+
+    input.dispatchEvent(new FocusEvent('blur'))
+    expect(input.value).toBe('08:15')
+
+    type('')
+    type('09:45')
+    input.dispatchEvent(new FocusEvent('blur'))
+    expect(input.value).toBe('09:45')
+    expect(seen.time).toEqual(['08:15', '09:45'])
+  })
+
+  test('without required, tells an empty time', async () => {
+    const root = await dates()
+    const input = root.querySelector<HTMLInputElement>('#time')!
+
+    input.value = ''
+    input.dispatchEvent(new Event('input', { bubbles: true }))
+    input.dispatchEvent(new FocusEvent('blur'))
+
+    expect(seen.time).toEqual([''])
+    expect(input.value).toBe('')
+  })
 })

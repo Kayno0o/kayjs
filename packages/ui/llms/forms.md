@@ -24,7 +24,7 @@
   - Keyboard: the calendar opens on the chosen day (else today); the arrows move by day and week, Home and End to the ends of the week, PageUp and PageDown by month and with Shift by year, Enter or Space picks, Escape closes with focus back on the button. It is a labelled dialog holding a `grid` of day buttons named in full (`Wednesday 21 October 2026`), the month announced as it changes.
   - Other props are the input's own (`name`, `required`, `disabled`, `id`); `openLabel`, `previousLabel`, `nextLabel` and `todayLabel` replace the `ui.dateInput.*` messages.
 - `DateRangeInput(label="Stay" fromName="from" toName="to" value={stay()} onChange={stay.set})`: two DateInputs for a `DateRange` (`[from, to]` of `YYYY-MM-DD` or `null`, open when empty), named `{label} from` and `{label} to` or by `fromLabel` and `toLabel`. `onChange` runs when a date is set and only when the range changed; a reversed pair is put back in order in both boxes. `dateRangeFrom(from, to)` reads the two posted strings the same way on the server.
-- `TimeInput(aria-label="Start" name="start" value="09:30" step={900} onChange={start.set})`: a native `input type="time"` holding `HH:MM` (`HH:MM:SS` under a minute's `step`), the same plain field without `value`.
+- `TimeInput(aria-label="Start" name="start" value="09:30" step={900} onChange={start.set})`: a native `input type="time"` holding `HH:MM` (`HH:MM:SS` under a minute's `step`), the same plain field without `value`. With `required`, `onChange` never hears `''`: the box goes back to the last time once left empty.
 
 ### RangeInput, Slider, MultiSelect, Combobox, FileDrop, Menu, IconPicker
 
