@@ -86,7 +86,9 @@ export interface InfiniteList<Row> {
   // Loads again the page that failed; nothing when no page failed.
   retry: () => Promise<void>
   // Changes the loaded row `key` reads as `id`, from the fields to merge over it or a function returning the row; `undefined` changes nothing, so the answer of an `attempt` that failed passes as is. Answers whether a loaded row matched, which needs the `key` option.
-  patch: (id: unknown, change: RowChange<Row> | undefined) => boolean
+  // A method, so a list of one row type still passes where `InfiniteList<unknown>` is expected, as `LoadMore` takes it.
+  // eslint-disable-next-line ts/method-signature-style
+  patch(id: unknown, change: RowChange<Row> | undefined): boolean
 }
 
 // What `patch` applies to a row: the fields to merge over it, or a function of the row returning the row.
