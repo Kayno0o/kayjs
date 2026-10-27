@@ -701,7 +701,7 @@ function cancelEdit(id: number) {
 }
 
 const START_CHARS = 40
-const GRAPHEMES = new Intl.Segmenter(undefined, { granularity: 'grapheme' })
+const GRAPHEMES = new Intl.Segmenter('en', { granularity: 'grapheme' })
 
 // The edit button names its message by its first words, so a screen reader and the tooltip tell the buttons apart.
 function editName(turn: Turn): string {
