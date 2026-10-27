@@ -1605,6 +1605,11 @@ describe('lifecycle', () => {
     expect(health.status).toBe(200)
     expect(await health.text()).toBe('ok')
     expect(health.headers.get('cache-control')).toBe('no-store')
+
+    // The hook tells the path apart in the URL as written, which the request hands over normalized.
+    for (const spelling of ['/_kay/./health', '/_kay/%2e/health', '/_kay\\health', '/up/../_kay/health/'])
+      expect(await (await app.handle(new Request(`http://localhost${spelling}`))).text()).toBe('ok')
+
     expect((await unhealthy.handle(new Request('http://localhost/up'))).status).toBe(503)
     expect((await (await pages({ root: PRODUCTION, prebuilt: false, health: false })).handle(new Request('http://localhost/_kay/health'))).status).toBe(404)
   })
