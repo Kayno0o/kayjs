@@ -1,10 +1,10 @@
 import type { McpConfig } from './api-modules'
-import { createHash, randomBytes, timingSafeEqual } from 'node:crypto'
 import { linkSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import process from 'node:process'
 import { KayError } from '../compiler/errors'
 import { kayLog } from '../runtime/log'
+import { nodeCrypto } from './builtins'
 
 const KEY_VARIABLE = 'KAY_MCP_KEY'
 const KEY_FILE_VARIABLE = 'KAY_MCP_KEY_FILE'
@@ -105,10 +105,10 @@ function readOrMake(path: string): string {
   mkdirSync(dirname(path), { recursive: true, mode: 0o700 })
 
   // Written whole under another name and linked in, so a process reading meanwhile never meets an empty file, nor does a crash leave one.
-  const pending = `${path}.${process.pid}.${randomBytes(4).toString('hex')}`
+  const pending = `${path}.${process.pid}.${crypto.randomUUID()}`
 
   try {
-    writeFileSync(pending, randomBytes(32).toString('base64url'), { mode: 0o600, flag: 'wx' })
+    writeFileSync(pending, Buffer.from(crypto.getRandomValues(new Uint8Array(32))).toString('base64url'), { mode: 0o600, flag: 'wx' })
     linkSync(pending, path)
   }
   catch (error) {
@@ -122,11 +122,11 @@ function readOrMake(path: string): string {
   return readFileSync(path, 'utf8').trim()
 }
 
-const digest = (text: string): Buffer => createHash('sha256').update(text).digest()
+const digest = (text: string): Buffer => new Bun.CryptoHasher('sha256').update(text).digest()
 
 // Whether `request` carries `key` as its one bearer token: the scheme is read in any case, and both sides are hashed first so neither the content nor the length of the key shows in the time taken.
 export function bearsMcpKey(request: Request, key: string): boolean {
   const token = BEARER.exec(request.headers.get('authorization') ?? '')?.[1]
 
-  return token !== undefined && timingSafeEqual(digest(token), digest(key))
+  return token !== undefined && nodeCrypto().timingSafeEqual(digest(token), digest(key))
 }
