@@ -47,6 +47,8 @@ expect((await site.visit('/auth/account')).url).toBe('/auth/sign-in?redirect=%2F
 
 `await as.enrollTotp(user.id)` turns two-factor on for a member as the app would, so a password sign-in asks for a code: it answers `{ secret, code(offset?), recoveryCodes }`, the code of the current step and the recovery codes usable at the next sign-in. It throws for a missing member or one who has two-factor already, so a test never writes the user row's `totpEnabledAt`.
 
+`as.oauth.stub('discord', { id, email, username?, displayName?, avatar? })` makes a configured provider answer with that account, with no request to it and no `fetch` spy, until the function it returns is called; `{ error: 'access_denied' | 'invalid_grant' | 'server_error' }` simulates a refused consent, a rejected code or a provider down. `await as.oauth.signIn('discord', { redirect? })` leaves for the provider and comes back through the site (a `testSite()`, which has `fetch`), answering the callback's response: a redirect to where the sign-in goes, or to the sign-in page with `?error=cancelled|oauth|unavailable`. It throws without a stub. A provider found by OpenID discovery is not asked for its endpoints.
+
 An app with a `src/auth.ts` module calls the same on its `auth` with the site first: `await auth.signInAs(site, { email })`, `auth.signOut(site)`, `await auth.sessionCookie(userId)`, `await auth.enrollTotp(userId)`; `auth.test(site)` names the site once, as `authTest` does.
 
 ## Reference

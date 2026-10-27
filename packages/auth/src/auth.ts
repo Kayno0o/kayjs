@@ -16,6 +16,7 @@ import type { ForwardAuthOptions, ForwardDomains } from './forwardAuth'
 import type { ScopeRequirement } from './gate'
 import type { LimitsOption } from './limits'
 import type { LinkProviderResult, OAuthFailure } from './oauth/flow'
+import type { OAuthSite, OAuthTest } from './oauthTest'
 import type { AcceptResult, CreateOrganizationResult, Invitation, InviteResult, Member, MemberResult, Membership, OrganizationFailure, OrganizationsOptions, UpdateOrganizationResult } from './organizations'
 import type { AuthFeatures, AuthPagesConfig, ProfileFieldView, ProfileProblem } from './pages'
 import type { Passkey, PasskeyOptionsResult, PasskeySignInResult, RegisterPasskeyResult } from './passkeys'
@@ -43,6 +44,7 @@ import { createGate, scopeAllows } from './gate'
 import { acceptedLocales, validLocale } from './locale'
 import { noteSignIn, notify } from './notify'
 import { safeRedirect } from './oauth/redirect'
+import { oauthTest } from './oauthTest'
 import { AUTH_OF, CHECK_USER, featuresOf, PAGES_OF } from './pages'
 import { challenged, completeSignIn, provedLately, reprove } from './proof'
 import { pruneWhenDue } from './prune'
@@ -1386,6 +1388,11 @@ export function createAuth<Data extends AuthSessionData, Role extends string = s
       return (await load.twoFactor()).enrollTotp(core, userId)
     },
 
+    // The provider calls of a test site: `oauth.stub(provider, { id, email })` makes the provider answer with that account with no request leaving the test (or `{ error: 'access_denied' | 'invalid_grant' | 'server_error' }` a refused consent, a rejected code or a provider down), and `await oauth.signIn(provider)` leaves for it and comes back through the site, answering the callback's response.
+    oauth(site: OAuthSite): OAuthTest {
+      return oauthTest(core, site)
+    },
+
     // Signs a test site out, however it was signed in, by dropping its session cookie: the site is anonymous again, its other cookies kept.
     signOut(site: { cookies: Bun.CookieMap }): void {
       dropSession(site.cookies)
@@ -1476,11 +1483,12 @@ export function createAuth<Data extends AuthSessionData, Role extends string = s
 
   return Object.assign(instance, {
     // The test calls on one test site, so a test names the site once: `const as = auth.test(site)`, then `await as.signInAs({ email })` and `as.signOut()`.
-    test: (site: { cookies: Bun.CookieMap }) => ({
+    test: (site: OAuthSite) => ({
       signInAs: async (who: Parameters<typeof instance.signInAs>[1]) => instance.signInAs(site, who),
       signOut: () => instance.signOut(site),
       sessionCookie: async (userId: string, cookieOptions?: { secure?: boolean }) => instance.sessionCookie(userId, cookieOptions),
       enrollTotp: async (userId: string) => instance.enrollTotp(userId),
+      oauth: instance.oauth(site),
     }),
   })
 }
