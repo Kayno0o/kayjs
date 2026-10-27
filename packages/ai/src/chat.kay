@@ -58,7 +58,7 @@ interface Turn extends Message {
   reasoning?: string | undefined
 }
 
-const { action, initial = [], label = wording('ai.chat.label', 'Chat'), placeholder = wording('ai.chat.placeholder', 'Write a message…'), sendLabel = wording('ai.chat.send', 'Send'), stopLabel = wording('ai.chat.stop', 'Stop'), retryLabel = wording('ai.chat.retry', 'Try again'), thinkingLabel = wording('ai.chat.thinking', 'Thinking…'), sourcesLabel = wording('ai.chat.sources', 'Sources'), reasoning = true, reasoningLabel = wording('ai.chat.reasoning', 'Reasoning'), stoppedLabel = wording('ai.chat.stopped', 'Stopped'), errorMessage = wording('ai.chat.error', 'The reply failed.'), keep = 20, maxChars = POSTED_CHARACTERS, tableLabel = wording('ai.chat.table', 'Table'), toolDetails = true, greeting = wording('ai.chat.greeting', 'How can I help?'), disclosure = wording('ai.chat.disclosure', 'You are talking to an AI. Your messages are sent to its provider to answer.'), suggestions = [], toolLabels = {}, sendIcon, stopIcon, newButton = false, newLabel = wording('ai.chat.new', 'New conversation'), newIcon, remember, links = 'apart', runningLabel = wording('ai.chat.running', 'Running'), doneLabel = wording('ai.chat.done', 'Done'), failedLabel = wording('ai.chat.failed', 'Failed'), argumentsLabel = wording('ai.chat.arguments', 'Arguments'), resultLabel = wording('ai.chat.result', 'Result'), approvalLabel = wording('ai.chat.approval', 'Needs your approval'), allowLabel = wording('ai.chat.allow', 'Allow'), denyLabel = wording('ai.chat.deny', 'Deny'), allowedLabel = wording('ai.chat.allowed', 'Allowed:'), deniedLabel = wording('ai.chat.denied', 'Denied:'), attach = false, accept = ATTACHABLE, maxFiles = 4, maxFileSize = 5 * 1024 * 1024, attachLabel = wording('ai.chat.attach', 'Attach a file'), removeLabel = wording('ai.chat.remove', 'Remove'), attachRefusedLabel = wording('ai.chat.attachRefused', 'Only images and PDFs can be attached.'), attachTooBigLabel = wording('ai.chat.attachTooBig', 'That file is too big to attach.'), attachFullLabel = wording('ai.chat.attachFull', 'No more files can be attached.'), attachIcon, regenerate = false, editable = false, regenerateLabel = wording('ai.chat.regenerate', 'Regenerate the reply'), editLabel = wording('ai.chat.edit', 'Edit the message'), saveLabel = wording('ai.chat.save', 'Save and send'), cancelLabel = wording('ai.chat.cancel', 'Cancel'), regenerateIcon, editIcon, fill = false, variant = 'bubble', tone = 'accent', size = 'md' } = props<{
+const { action, initial = [], label = wording('ai.chat.label', 'Chat'), placeholder = wording('ai.chat.placeholder', 'Write a message…'), sendLabel = wording('ai.chat.send', 'Send'), stopLabel = wording('ai.chat.stop', 'Stop'), retryLabel = wording('ai.chat.retry', 'Try again'), thinkingLabel = wording('ai.chat.thinking', 'Thinking…'), sourcesLabel = wording('ai.chat.sources', 'Sources'), reasoning = true, reasoningLabel = wording('ai.chat.reasoning', 'Reasoning'), stoppedLabel = wording('ai.chat.stopped', 'Stopped'), errorMessage = wording('ai.chat.error', 'The reply failed.'), keep = 20, maxChars = POSTED_CHARACTERS, tableLabel = wording('ai.chat.table', 'Table'), toolDetails = true, greeting = wording('ai.chat.greeting', 'How can I help?'), disclosure = wording('ai.chat.disclosure', 'You are talking to an AI. Your messages are sent to its provider to answer.'), suggestions = [], toolLabels = {}, sendIcon, stopIcon, newButton = false, newLabel = wording('ai.chat.new', 'New conversation'), newIcon, remember, links = 'apart', runningLabel = wording('ai.chat.running', 'Running'), doneLabel = wording('ai.chat.done', 'Done'), failedLabel = wording('ai.chat.failed', 'Failed'), argumentsLabel = wording('ai.chat.arguments', 'Arguments'), resultLabel = wording('ai.chat.result', 'Result'), approvalLabel = wording('ai.chat.approval', 'Needs your approval'), allowLabel = wording('ai.chat.allow', 'Allow'), denyLabel = wording('ai.chat.deny', 'Deny'), allowedLabel = wording('ai.chat.allowed', 'Allowed:'), deniedLabel = wording('ai.chat.denied', 'Denied:'), attach = false, accept = ATTACHABLE, maxFiles = 4, maxFileSize = 5 * 1024 * 1024, attachLabel = wording('ai.chat.attach', 'Attach a file'), removeLabel = wording('ai.chat.remove', 'Remove'), attachRefusedLabel = wording('ai.chat.attachRefused', 'Only images and PDFs can be attached.'), attachTooBigLabel = wording('ai.chat.attachTooBig', 'That file is too big to attach.'), attachFullLabel = wording('ai.chat.attachFull', 'No more files can be attached.'), attachIcon, regenerate = false, editable = false, regenerateLabel = wording('ai.chat.regenerate', 'Regenerate the reply'), editLabel = wording('ai.chat.edit', 'Edit the message'), saveLabel = wording('ai.chat.save', 'Save and send'), cancelLabel = wording('ai.chat.cancel', 'Cancel'), editEmptyLabel = wording('ai.chat.editEmpty', 'Write a message to send.'), regenerateIcon, editIcon, fill = false, variant = 'bubble', tone = 'accent', size = 'md' } = props<{
   // The page's streaming action, `action(schema, ({ messages }) => ask(messages))`, which may also `ctx.fail`; the chat posts the latest messages to it and reads the reply as it streams.
   // Returning `ask(messages, { tools }).progress()` instead streams the tool calls as well, which the chat shows before the text of their turn.
   action: Action<{ messages: ChatMessage[] }, AsyncIterable<string | Progress> | Failure<unknown>>
@@ -139,11 +139,12 @@ const { action, initial = [], label = wording('ai.chat.label', 'Chat'), placehol
   regenerate?: boolean | undefined
   // Shows a button on each message of the visitor, which turns it into a field to change and send again: that message and every turn after it leave the log and the history, and the action reads `replaces()` to drop them from what it stored. Its files stay.
   editable?: boolean | undefined
-  // The buttons' names and tooltips, and the two buttons of the field an edit opens.
+  // The buttons' names and tooltips, and the two buttons of the field an edit opens. Each message's edit button adds the start of the message to `editLabel`, `Edit the message: Hello`, so no two share a name. `editEmptyLabel` is said when Save finds no text and no file.
   regenerateLabel?: string | undefined
   editLabel?: string | undefined
   saveLabel?: string | undefined
   cancelLabel?: string | undefined
+  editEmptyLabel?: string | undefined
   // What the regenerate and edit buttons draw, in place of a circular arrow and a pencil.
   regenerateIcon?: Snippet
   editIcon?: Snippet
@@ -178,6 +179,10 @@ const takenBack = signal(false)
 // The message being edited, and what the field holds.
 const editing = signal<number | undefined>(undefined)
 const editDraft = signal('')
+// Why Save sent nothing, shown in the field's turn until the visitor types.
+const editProblem = signal<string | undefined>(undefined)
+// The message whose edit just closed, whose edit button takes the focus back once it is drawn.
+let refocus: number | undefined
 const busy = () => waiting() || streaming() !== undefined
 // What the post under way replaces (`regenerate:2`), kept for Try again, which posts the same request; a fresh send, a message taken back or a reset forgets it.
 let replacing: string | undefined
@@ -502,8 +507,6 @@ async function send(again = false, question?: string, resuming?: string) {
   if (busy() || (!again && text === '' && sent.length === 0))
     return
 
-  editing = undefined
-
   if (!again) {
     replacing = undefined
     undone = undefined
@@ -649,6 +652,35 @@ function regenerateReply() {
 function startEdit(turn: Turn) {
   editing = turn.id
   editDraft = withoutApproval(turn.content)
+  editProblem = undefined
+}
+
+// Closes the edit and puts the focus back on the message's edit button, which is drawn again by then.
+function cancelEdit(id: number) {
+  refocus = id
+  editing = undefined
+  editProblem = undefined
+}
+
+const START_CHARS = 40
+
+// The edit button names its message by its first words, so a screen reader and the tooltip tell the buttons apart.
+function editName(turn: Turn): string {
+  const words = withoutApproval(turn.content).replaceAll(/\s+/g, ' ').trim()
+
+  if (words === '')
+    return editLabel
+
+  return `${editLabel}: ${words.length > START_CHARS ? `${words.slice(0, START_CHARS).trimEnd()}…` : words}`
+}
+
+// Takes the focus when this message's edit just closed.
+function takeFocus(element: HTMLElement, turn: Turn) {
+  if (refocus !== turn.id)
+    return
+
+  refocus = undefined
+  queueMicrotask(() => element.focus())
 }
 
 // The edited message and every turn after it leave the history, and the post ends on the new message: its files stay, and it replaces all those turns on a server that keeps the conversation.
@@ -658,21 +690,34 @@ function saveEdit() {
   const edited = turns[index]
   const text = editDraft().trim()
 
-  if (busy() || edited === undefined)
+  if (busy())
     return
+
+  if (edited === undefined) {
+    editing = undefined
+
+    return
+  }
 
   const files = filesOf(edited)
 
-  if (text === '' && files.length === 0)
-    return
+  if (text === '' && files.length === 0) {
+    editProblem = editEmptyLabel
 
+    return
+  }
+
+  editing = undefined
+  editProblem = undefined
+  // The edit field is gone, and the edit button too while the reply is under way.
+  field?.focus()
   replacing = `edit:${turns.length - index}`
   undone = turns
   history = [...turns.slice(0, index), { id: nextId++, role: 'user', content: text, ...files.length > 0 && { attachments: files } }]
   void send(true)
 }
 
-function editKey(event: KeyboardEvent) {
+function editKey(event: KeyboardEvent, id: number) {
   if (event.isComposing)
     return
 
@@ -681,8 +726,22 @@ function editKey(event: KeyboardEvent) {
     saveEdit()
   }
   else if (event.key === 'Escape') {
-    event.preventDefault()
-    editing = undefined
+    cancelEdit(id)
+    leaveEscape(event)
+  }
+}
+
+// An Escape that closed an edit does only that: not the reply being stopped, nor a panel around the chat closing.
+function leaveEscape(event: KeyboardEvent) {
+  event.preventDefault()
+  event.stopPropagation()
+}
+
+// Escape on the Save or Cancel button cancels the edit as it does in the field.
+function actionsKey(event: KeyboardEvent, id: number) {
+  if (event.key === 'Escape' && !event.isComposing) {
+    cancelEdit(id)
+    leaveEscape(event)
   }
 }
 
@@ -812,7 +871,7 @@ section(part="root" onKeyDown={escape} data-empty={history().length === 0 && !bu
       article(part="turn" data-role={turn.role} data-editing={editing() === turn.id ? '' : undefined})
         if turn.role === 'user'
           if editing() === turn.id
-            Textarea(part="editField" writeFocused ref={element => { queueMicrotask(() => element.focus()) }} value={editDraft()} onInput={editDraft.set} rows="1" aria-label={editLabel} onKeyDown={editKey})
+            Textarea(part="editField" writeFocused ref={element => { queueMicrotask(() => element.focus()) }} value={editDraft()} onInput={value => { editDraft = value; editProblem = undefined }} rows="1" aria-label={editLabel} onKeyDown={event => editKey(event, turn.id)})
           else if turn.content !== ''
             p(part="text") {withoutApproval(turn.content)}
           if filesOf(turn).length > 0
@@ -820,12 +879,14 @@ section(part="root" onKeyDown={escape} data-empty={history().length === 0 && !bu
               for file of filesOf(turn) key={fileKey(file)}
                 li(part="file") {file.name}
           if editing() === turn.id
-            div(part="actions")
-              button(part="save" type="button" data-variant="solid" data-size="sm" onClick={saveEdit}) {saveLabel}
-              button(part="cancel" type="button" data-variant="ghost" data-size="sm" onClick={() => { editing = undefined }}) {cancelLabel}
+            if editProblem()
+              Notice(tone="danger") {editProblem()}
+            div(part="actions" onKeyDown={event => actionsKey(event, turn.id)})
+              button(part="save" type="button" data-variant="solid" data-size="sm" disabled={busy()} onClick={saveEdit}) {saveLabel}
+              button(part="cancel" type="button" data-variant="ghost" data-size="sm" onClick={() => cancelEdit(turn.id)}) {cancelLabel}
           else if canEdit(turn)
             div(part="actions")
-              BareIconButton(part="edit" variant="inline" size="xs" label={editLabel} onClick={() => startEdit(turn)})
+              BareIconButton(part="edit" variant="inline" size="xs" label={editName(turn)} ref={element => takeFocus(element, turn)} onClick={() => startEdit(turn)})
                 slot editIcon
                   Icon(icon="edit")
         else
