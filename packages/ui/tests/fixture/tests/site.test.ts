@@ -126,6 +126,20 @@ test('a disabled Button with a tooltip renders aria-disabled and stays a tab sto
   expect(await read('plain-disabled')).toEqual({ 'type': 'button', 'disabled': '', 'aria-disabled': null, 'data-tooltip': null })
 })
 
+test('a disabled IconButton renders aria-disabled and stays a tab stop, dropping its popover target', async () => {
+  const names = ['type', 'disabled', 'aria-disabled', 'popovertarget', 'data-tooltip']
+
+  const read = async (id: string) => {
+    const found = await one('/buttons', `#${id}`)
+
+    return Object.fromEntries(names.map(name => [name, attr(found, name)]))
+  }
+
+  expect(await read('locked-icon')).toEqual({ 'type': 'button', 'disabled': null, 'aria-disabled': 'true', 'popovertarget': null, 'data-tooltip': 'Delete' })
+  expect(await read('locked-popover')).toMatchObject({ 'disabled': null, 'aria-disabled': 'true', 'popovertarget': null })
+  expect(await read('live-icon')).toEqual({ 'type': 'button', 'disabled': null, 'aria-disabled': null, 'popovertarget': 'locked-panel', 'data-tooltip': 'Delete' })
+})
+
 test('RelativeTime is a time element worded relative to now, a tab stop carrying the full date, and nothing for a date it cannot read', async () => {
   const plain = await one('/relative-time', '#plain')
   const short = await one('/relative-time', '#short')

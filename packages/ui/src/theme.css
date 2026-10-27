@@ -350,7 +350,7 @@
   }
 
   .kui-icon-btn {
-    @apply inline-flex shrink-0 items-center justify-center p-0 transition disabled:pointer-events-none disabled:opacity-40;
+    @apply inline-flex shrink-0 items-center justify-center p-0 transition disabled:pointer-events-none disabled:opacity-40 aria-disabled:opacity-40;
 
     &:where([data-size='xs']) {
       @apply size-5;

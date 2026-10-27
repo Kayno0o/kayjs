@@ -1,6 +1,7 @@
 ---
 import type { JSX } from 'kay'
 import { recipe } from 'kay'
+import { lockedButton } from './button-props'
 
 const look = recipe({ parts: { root: 'kui-icon-btn' } })
 
@@ -19,6 +20,9 @@ const { label, href, size = 'md', variant = 'solid', tone = 'neutral', type = 'b
 // What the link is given besides its own props, typed for a button: its `ref` would not fit an anchor to the type check.
 const handedOn = rest as Record<string, never>
 
+// A disabled icon button always carries its label as a tooltip, so it is written `aria-disabled` and stays a tab stop, as a disabled Button with a tooltip does.
+const typed = () => (rest.disabled ? 'button' : type)
+
 // Only the solid form is framed by the shell's hairline.
 const framed = () => variant === 'solid'
 ---
@@ -26,5 +30,5 @@ if href !== undefined
   a(part="root" {...handedOn} href={href} aria-label={label} data-tooltip={label} data-size={size} data-variant={variant} data-tone={tone} class={{ 'kui-shell': framed(), 'kui-shell-danger': framed() && tone === 'danger' }})
     slot
 else
-  button(part="root" {...rest} type={type} aria-label={label} data-tooltip={label} data-size={size} data-variant={variant} data-tone={tone} class={{ 'kui-shell': framed(), 'kui-shell-danger': framed() && tone === 'danger' }})
+  button(part="root" {...(rest.disabled ? lockedButton(rest) : rest)} type={typed()} aria-label={label} data-tooltip={label} data-size={size} data-variant={variant} data-tone={tone} class={{ 'kui-shell': framed(), 'kui-shell-danger': framed() && tone === 'danger' }})
     slot

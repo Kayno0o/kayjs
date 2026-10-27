@@ -49,13 +49,26 @@ export function lockedWithTooltip(attributes: TagAttributes) {
   return Boolean(disabled) && tooltip !== undefined
 }
 
+// What a locked button gives up besides `disabled`: its press and the popover or dialog it would open by itself, since only a disabled button leaves those alone.
+const pressAttributes = new Set(['onClick', 'popovertarget', 'popovertargetaction', 'commandfor', 'command'])
+
+// A button written `aria-disabled` in place of `disabled`: still a tab stop, but plain and deaf to its press, a popover and a command.
+export function lockedButton<T extends object>(attributes: T) {
+  const kept = Object.fromEntries(Object.entries(attributes).filter(([name]) => !pressAttributes.has(name) && name !== 'disabled'))
+
+  return { ...kept, 'type': 'button', 'aria-disabled': 'true' } as T & { 'type': 'button', 'aria-disabled': 'true' }
+}
+
 export function buttonOf(attributes: TagAttributes) {
   if (attributes.href !== undefined)
     return undefined
 
   const { type = 'button', expanded, pressed, disabled, ...others } = attributes
-  const locked = lockedWithTooltip(attributes)
+  const aria = { 'aria-expanded': expanded === undefined ? undefined : String(expanded), 'aria-pressed': pressed === undefined ? undefined : String(pressed) }
 
   // A locked submit or reset button turns plain, as nothing may submit or reset the form it sits in.
-  return { ...others, 'type': locked ? 'button' : type, 'disabled': locked ? undefined : disabled, 'aria-disabled': locked ? 'true' : others['aria-disabled'], 'aria-expanded': expanded === undefined ? undefined : String(expanded), 'aria-pressed': pressed === undefined ? undefined : String(pressed) }
+  if (lockedWithTooltip(attributes))
+    return { ...lockedButton(others), ...aria, disabled: undefined }
+
+  return { ...others, type, disabled, ...aria }
 }

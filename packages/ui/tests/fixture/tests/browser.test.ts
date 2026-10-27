@@ -1137,6 +1137,25 @@ inBrowser('a Select with submit on a served page', () => {
   }, 120_000)
 })
 
+inBrowser('a locked button on a served page', () => {
+  test('a disabled IconButton takes focus and its press opens no popover, while an enabled one opens it', async () => {
+    const site = await shared()
+
+    await using page = await site.open('/buttons')
+    const open = async () => page.evaluate(() => document.querySelector('#locked-panel')!.matches(':popover-open'))
+
+    for (const id of ['#locked-icon', '#locked-popover']) {
+      await page.click(id)
+      expect(await open()).toBe(false)
+      expect(await page.evaluate(((selector: string) => document.activeElement === document.querySelector(selector)) as never, id)).toBe(true)
+    }
+
+    await page.click('#live-icon')
+    expect(await open()).toBe(true)
+    expect(page.errors).toEqual([])
+  }, 120_000)
+})
+
 inBrowser('a CopyButton on a served page', () => {
   test('CopyButton keeps its width through the copy, in every size and variant, and reads only the label showing', async () => {
     const site = await shared()

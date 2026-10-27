@@ -33,4 +33,8 @@ main
     Button#locked(label="Publish" disabled data-tooltip="Needs a title")
     Button#locked-submit(label="Publish" type="submit" disabled data-tooltip="Needs a title")
     Button#plain-disabled(label="Publish" disabled)
+    Button#locked-popover(label="Open" disabled data-tooltip="Needs a title" popovertarget="locked-panel")
+    IconButton#locked-icon(icon="delete" label="Delete" type="submit" disabled popovertarget="locked-panel")
+    IconButton#live-icon(icon="delete" label="Delete" variant="ghost" popovertarget="locked-panel")
+    div#locked-panel(popover) Panel
     Tooltip#tip(text="Published on Monday" placement="bottom") Published
