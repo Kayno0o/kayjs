@@ -304,6 +304,8 @@ A module reading `env.MEDIA_DIR` when it runs sees the new value, but one that c
 
 The value is not checked against the schema, so a string given to a number field stays a string. Undo overrides in reverse order, as `using` does. Tests running at the same time share one `env`, and `publicEnv` is read apart, so an override never reaches it.
 
+`waitUntil(() => condition, { timeout, what })` from `kay/test` waits for something nothing else in a test waits for, such as a title a reply writes after its stream ends. It polls the function, sync or async, until it returns something truthy and resolves with that value. After 5 seconds, or the `timeout` you give, it fails naming `what` and the last value it saw. It needs real timers, as fake ones freeze its polling.
+
 `solveWork(challenge)` solves a proof-of-work challenge as kay's script does. `scratchDir(prefix)` makes a fresh directory under `.kay/scratch`, which no build or check reads.
 
 ## Islands that fail the browser build

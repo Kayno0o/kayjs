@@ -14,6 +14,16 @@ expect(await site.runJobs()).toBe(1)
 
 A mail an action enqueues is waited for by kayjs-mail's `outbox`, which runs the site's queues until it is there: `await outbox.waitFor(address, { site })` resolves with the newest mail to that address, and `outbox.token(mail, '/auth/verify-email')` reads the token of its link ([kayjs-mail](../packages/mail/llms/contact-form-and-testing.md#testing)).
 
+### Wait for a state nothing else waits for
+
+`waitUntil(condition, { timeout, what })` from `kay/test` polls a sync or async function until it returns something truthy and resolves with that value, as for a title written after a stream ended or state fed by a websocket. It fails after 5 seconds (or `timeout`, such as `'2s'`) naming `what` and the last value seen, and needs real timers, as fake ones freeze it:
+
+```ts
+import { waitUntil } from 'kay/test'
+
+const session = await waitUntil(() => findSession(id)?.title, { what: 'the session title' })
+```
+
 ### Test a websocket route
 
 `site.socket(module, path, options)` opens the route as an island does, and `next()` resolves with the oldest message not read yet:

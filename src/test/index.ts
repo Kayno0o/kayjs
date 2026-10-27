@@ -69,6 +69,8 @@ export type { Found, PageReading } from './page'
 export { scratchDir } from './scratch'
 export type { FakeService, ServiceAnswer, ServiceHandler, ServiceRequest, ServiceRoutes } from './service'
 export { fakeService } from './service'
+export type { WaitUntilOptions } from './wait'
+export { waitUntil } from './wait'
 export { solveWork }
 
 export interface TestOptions extends PagesOptions {
