@@ -1,15 +1,13 @@
 import type { JSX } from 'kay'
+import type { AuthLinkKind, AuthMailData, AuthMailKind, AuthNoticeKind } from 'kay/library/auth-mails'
 import type { MailMessage } from './types'
+import { AUTH_LINK_KINDS, AUTH_NOTICE_KINDS } from 'kay/library/auth-mails'
 import { renderToString } from 'kay/server'
 import { decode } from './text'
 
-// kayjs-auth's kinds of mail: a link to follow or a code to type, then news of a change to the account.
-export type AuthLinkKind = 'verify-email' | 'reset-password' | 'magic-link' | 'change-email' | 'invitation' | 'account-exists'
-export type AuthNoticeKind = 'new-sign-in' | 'sign-in-locked' | 'password-changed' | 'email-changed' | 'two-factor-enabled' | 'two-factor-disabled' | 'recovery-code-used' | 'recovery-codes-regenerated' | 'provider-linked' | 'provider-unlinked' | 'passkey-added' | 'passkey-removed' | 'token-created' | 'signed-out-everywhere' | 'account-deleted' | 'organization-handed-over'
-export type AuthKind = AuthLinkKind | AuthNoticeKind
-
-export const AUTH_LINK_KINDS: readonly AuthLinkKind[] = ['verify-email', 'reset-password', 'magic-link', 'change-email', 'invitation', 'account-exists']
-export const AUTH_NOTICE_KINDS: readonly AuthNoticeKind[] = ['new-sign-in', 'sign-in-locked', 'password-changed', 'email-changed', 'two-factor-enabled', 'two-factor-disabled', 'recovery-code-used', 'recovery-codes-regenerated', 'provider-linked', 'provider-unlinked', 'passkey-added', 'passkey-removed', 'token-created', 'signed-out-everywhere', 'account-deleted', 'organization-handed-over']
+// kayjs-auth's kinds of mail, from the list kay keeps for both libraries: a link to follow or a code to type, then news of a change to the account.
+export type { AuthLinkKind, AuthNoticeKind }
+export type AuthKind = AuthMailKind
 
 export const LINK_KINDS: ReadonlySet<string> = new Set<AuthLinkKind>(AUTH_LINK_KINDS)
 const NOTICE_KINDS: ReadonlySet<string> = new Set<AuthNoticeKind>(AUTH_NOTICE_KINDS)
@@ -22,22 +20,13 @@ export function isNoticeKind(kind: string): kind is AuthNoticeKind {
   return NOTICE_KINDS.has(kind)
 }
 
-// A mail kayjs-auth hands its mailer, typed by its shape so neither package depends on the other.
-export interface AuthMail {
+// A mail kayjs-auth hands its mailer, with the data of kay's list for both libraries, so neither depends on the other: `name` is the site's, `to` the address written to, and `subject`, `text` and `html` kayjs-auth's own rendering, sent for a kind this list lacks.
+export interface AuthMail extends Omit<AuthMailData, 'email'> {
   to: string
   kind: string
-  // The site's name.
-  name: string
-  locale: string
   subject: string
   text: string
   html: string
-  url?: string | undefined
-  code?: string | undefined
-  // How many seconds its link and its code work, for the ones it carries.
-  maxAge?: { link?: number, code?: number } | undefined
-  // The organization an invitation is to, or the provider, passkey, token or new address an event is about.
-  detail?: string | undefined
 }
 
 export type AuthView = (props: { mail: AuthMail }) => JSX.Element

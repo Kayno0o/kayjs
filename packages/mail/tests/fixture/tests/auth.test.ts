@@ -1,7 +1,7 @@
 import type { AuthMail } from '@kaynooo/kayjs-mail'
 import { authMailer, mailer, outbox } from '@kaynooo/kayjs-mail'
 import { beforeEach, describe, expect, it } from 'bun:test'
-import { AUTH_LINK_KINDS, AUTH_NOTICE_KINDS } from '../../../src/auth'
+import { AUTH_LINK_KINDS, AUTH_MAIL_WORDING, AUTH_NOTICE_KINDS } from 'kay/library/auth-mails'
 import { authSample } from '../../../src/auth-samples'
 
 const URL = 'https://site.test/verify?token=a&b'
@@ -86,14 +86,25 @@ describe('authMailer', () => {
     expect(html).toContain('If this was not you, reset your password and check your account at once.</p>')
   })
 
-  it('writes every kind in English and French, each line filled', async () => {
-    for (const locale of ['en', 'fr']) {
+  it('writes every kind of the shared list in each language it words, through the view of its shape, each line filled', async () => {
+    for (const [locale, words] of Object.entries(AUTH_MAIL_WORDING)) {
       for (const kind of [...AUTH_LINK_KINDS, ...AUTH_NOTICE_KINDS]) {
-        const { subject, text } = await authMailer(mail.render).send({ ...authSample(kind), locale })
+        const sample = authSample(kind)
+        const { subject, text, html } = await authMailer(mail.render).send({ ...sample, locale })
 
         expect(`${locale} ${kind}: ${subject}`).not.toMatch(/mail\.auth|[{}]|: $/)
         expect(`${locale} ${kind}: ${text}`).not.toMatch(/mail\.auth|[{}]/)
+        expect(subject).toBe(words[kind].subject.replace('{site}', sample.name).replace('{detail}', sample.detail ?? ''))
+        expect(html).toContain(`<h1`)
       }
+    }
+  })
+
+  it('ships a catalog for each language the shared list words beyond English, holding that wording', async () => {
+    for (const [locale, words] of Object.entries(AUTH_MAIL_WORDING).filter(([locale]) => locale !== 'en')) {
+      const catalog = await import(`../../../src/messages/${locale}.ts`) as { default: { mail: { auth: unknown } } }
+
+      expect(catalog.default.mail.auth).toEqual(words)
     }
   })
 

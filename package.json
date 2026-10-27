@@ -185,6 +185,10 @@
       "types": "./types/server/library.d.ts",
       "default": "./src/server/library.ts"
     },
+    "./library/auth-mails": {
+      "types": "./types/server/auth-mails.d.ts",
+      "default": "./src/server/auth-mails.ts"
+    },
     "./test": {
       "types": "./types/test/index.d.ts",
       "default": "./src/test/index.ts"

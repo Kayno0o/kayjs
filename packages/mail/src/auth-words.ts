@@ -1,8 +1,8 @@
 import type { AuthMail } from './auth'
 import { configError, durationWords } from 'kay/library'
+import { AUTH_MAIL_ENGLISH as en } from 'kay/library/auth-mails'
 import { wording } from 'kay/words'
 import { isLinkKind, isNoticeKind } from './auth'
-import { ENGLISH } from './auth-english'
 
 export interface AuthWords {
   subject: string
@@ -26,23 +26,23 @@ export function authWords(mail: AuthMail): AuthWords {
   if (!isLinkKind(kind) && !isNoticeKind(kind))
     throw configError(`${kind} is no kind of mail kayjs-auth sends`)
 
-  const english = ENGLISH[kind]!
-  const of = (line: 'subject' | 'lead' | 'ending'): string => wording(`mail.auth.${kind}.${line}`, english[line], { site: mail.name, email: mail.to, detail: mail.detail ?? '', what: mail.url === undefined ? wording('mail.auth.code', 'code') : wording('mail.auth.link', 'link') })
+  const english = en[kind]
+  const of = (line: 'subject' | 'lead' | 'ending'): string => wording(`mail.auth.${kind}.${line}`, english[line], { site: mail.name, email: mail.to, detail: mail.detail ?? '', what: mail.url === undefined ? wording('mail.auth.code', en.code) : wording('mail.auth.link', en.link) })
   // How long a link works, left unsaid when its `lasts` is empty; the figure kayjs-auth was set to when it sends one, the default wording otherwise.
   const maxAge = mail.maxAge
-  const link = maxAge?.link === undefined ? undefined : durationWords(maxAge.link, mail.locale) + (kind === 'magic-link' ? wording('mail.auth.once', ', once') : '')
-  const lasts = isLinkKind(kind) && mail.url !== undefined ? link ?? wording(`mail.auth.${kind}.lasts`, english.lasts ?? '') : ''
-  const duration = maxAge?.code === undefined ? wording('mail.auth.codeLasts', '10 minutes') : durationWords(maxAge.code, mail.locale)
-  const code = wording('mail.auth.codeWorks', 'The code works for {duration}, typed where you asked for it.', { duration })
-  const ending = [lasts === '' ? undefined : wording('mail.auth.linkWorks', 'The link works for {duration}.', { duration: lasts }), mail.code === undefined ? undefined : code, of('ending')]
+  const link = maxAge?.link === undefined ? undefined : durationWords(maxAge.link, mail.locale) + (kind === 'magic-link' ? wording('mail.auth.once', en.once) : '')
+  const lasts = isLinkKind(kind) && mail.url !== undefined ? link ?? wording(`mail.auth.${kind}.lasts`, en[kind].lasts) : ''
+  const duration = maxAge?.code === undefined ? wording('mail.auth.codeLasts', en.codeLasts) : durationWords(maxAge.code, mail.locale)
+  const code = wording('mail.auth.codeWorks', en.codeWorks, { duration })
+  const ending = [lasts === '' ? undefined : wording('mail.auth.linkWorks', en.linkWorks, { duration: lasts }), mail.code === undefined ? undefined : code, of('ending')]
 
   return {
     subject: of('subject'),
     lead: of('lead'),
-    button: isLinkKind(kind) ? wording(`mail.auth.${kind}.button`, english.button ?? '') : '',
-    orPaste: wording('mail.auth.orPaste', 'Or paste this into your browser:'),
-    codeLead: mail.url === undefined ? wording('mail.auth.yourCode', 'Your code:') : wording('mail.auth.orTypeCode', 'Or type this code where you asked for it:'),
-    review: wording('mail.auth.review', 'See where your account is signed in, and end what you do not know:'),
+    button: isLinkKind(kind) ? wording(`mail.auth.${kind}.button`, en[kind].button) : '',
+    orPaste: wording('mail.auth.orPaste', en.orPaste),
+    codeLead: mail.url === undefined ? wording('mail.auth.yourCode', en.yourCode) : wording('mail.auth.orTypeCode', en.orTypeCode),
+    review: wording('mail.auth.review', en.review),
     ending: ending.filter(line => line !== undefined).join(' '),
   }
 }
