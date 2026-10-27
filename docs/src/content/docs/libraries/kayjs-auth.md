@@ -670,7 +670,9 @@ createAuth({
 })
 ```
 
-The session cookie takes the domain of the host it is set on, among the ones `forwardAuth` names, so the guarded sites receive it. A host on none of them keeps a cookie of its own, and a `domain` given to `session()` wins. With `auth()` in kay.config.ts, `auth({ cookie: 'login', forwardAuth: 'example.com' })` is all it takes. `forwardAuth` names the domains a sign-in may return to: the domain and its subdomains, over `https` only. A list takes several, and `{ domains, requireTwoFactor: true }` also asks for two-factor.
+The session cookie takes the domain of the host it is set on, among the ones `forwardAuth` names, so the guarded sites receive it.
+
+A host on none of them keeps a cookie of its own, and a `domain` given to `session()` wins. With `auth()` in kay.config.ts, `auth({ cookie: 'login', forwardAuth: 'example.com' })` is all it takes. `forwardAuth` names the domains a sign-in may return to: the domain and its subdomains, over `https` only. A list takes several, and `{ domains, requireTwoFactor: true }` also asks for two-factor.
 
 Name your own domain: kay has no list of public suffixes, so `co.uk` or `github.io` are accepted and would open every site under them. A user without two-factor is sent to the account security page, passkey holders included, as a session does not record how it signed in.
 
@@ -816,7 +818,9 @@ To sign a test site in as a member, `await auth.signInAs(site, { email: 'ada@exa
 
 To test two-factor, `await auth.enrollTotp(user.id)` (or `as.enrollTotp(user.id)`) turns it on for a member as the app would once they confirm a code, with no session or mail. It gives `{ secret, code(offset?), recoveryCodes }`: `await enrolment.code()` is the code of the current step, and each recovery code signs in once. It throws for a missing member or one who has two-factor already.
 
-To test a sign-in through a provider, `as.oauth.stub('discord', { id: '80351', email: 'ada@example.com' })` makes the provider answer with that account, so no request leaves the test and no `fetch` needs spying. `await as.oauth.signIn('discord')` leaves for the provider and comes back through the site, and answers the callback's response. Give `{ error: 'access_denied' }` to simulate a refused consent, `'invalid_grant'` for a code the provider rejects and `'server_error'` for a provider that is down. The function `stub` returns puts the real provider back.
+To test a sign-in through a provider, `as.oauth.stub('discord', { id: '80351', email: 'ada@example.com' })` makes the provider answer with that account, so no request leaves the test and no `fetch` needs spying.
+
+`await as.oauth.signIn('discord')` leaves for the provider and comes back through the site, and answers the callback's response. Give `{ error: 'access_denied' }` to simulate a refused consent, `'invalid_grant'` for a code the provider rejects and `'server_error'` for a provider that is down. The function `stub` returns puts the real provider back.
 
 ```ts
 const as = authTest(site)
