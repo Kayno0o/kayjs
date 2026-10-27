@@ -187,7 +187,8 @@ function openingTag(tag: string, attributes: string | undefined, allowedNames: r
     if (apart)
       written.set('target', '_blank')
 
-    written.set('rel', apart ? 'nofollow ugc noopener' : 'nofollow ugc')
+    // A kept target other than `_self` may open a new context, a named one included, which then gets no `window.opener`.
+    written.set('rel', apart || (written.has('target') && written.get('target')!.toLowerCase() !== '_self') ? 'nofollow ugc noopener' : 'nofollow ugc')
   }
 
   return `<${tag}${[...written].map(([name, value]) => ` ${name}="${value}"`).join('')}${apart ? ` ${NEW_TAB_ATTRIBUTE}` : ''}>`

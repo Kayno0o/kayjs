@@ -132,8 +132,8 @@ describe('sanitizeHtml outside links', () => {
     const options = { attributes: { a: ['target', 'rel'] } }
 
     expect(clean('<a href="https://other.example/" target="_self" rel="opener">x</a>', options)).toBe('<a href="https://other.example/" target="_self" rel="nofollow ugc">x</a>')
-    expect(clean('<a target="_blank" rel="external" href="https://other.example/">x</a>', options)).toBe('<a target="_blank" href="https://other.example/" rel="nofollow ugc">x</a>')
-    expect(clean('<a href="/a" rel="opener" target="x">x</a>', options)).toBe('<a href="/a" target="x" rel="nofollow ugc">x</a>')
+    expect(clean('<a target="_blank" rel="external" href="https://other.example/">x</a>', options)).toBe('<a target="_blank" href="https://other.example/" rel="nofollow ugc noopener">x</a>')
+    expect(clean('<a href="/a" rel="opener" target="x">x</a>', options)).toBe('<a href="/a" target="x" rel="nofollow ugc noopener">x</a>')
     // Not kept by the options, a target or rel is dropped and the link marked.
     expect(clean('<a href="https://other.example/" target="_self" rel="opener">x</a>')).toBe(`<a href="https://other.example/"${OUT}>x</a>`)
   })
