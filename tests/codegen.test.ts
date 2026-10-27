@@ -1299,6 +1299,7 @@ describe('module signals', () => {
     expect(moduleSignals('export const a = signal(1)\n')).toEqual({})
     expect(moduleData('export const a = { x: \'1\', y: [1, -2, true, null, { z: `t` }] } as const\nexport const b = \'s\'\nexport const c = { ...a }\nexport const d = { get x() { return 1 } }\nexport const e = { m() {} }\nexport const f = { [k]: 1 }\nexport const g = { x }\nexport const h = `a${b}`\nexport const i = [1, , 2]\nexport const j = { f: () => 1 }\nexport const k = fn()\nexport let l = \'x\'\nconst m = \'x\'\nexport { m }\n')).toEqual(['a', 'b', 'm'])
     expect(moduleData('const a = { x: 1 }\nconst f = () => 1\nconst o = { f }\nexport { a as b, f, o }\nexport default a\nexport type { a as c }\n')).toEqual(['b', 'default'])
+    expect(moduleData('export * from \'./x\'\nexport const L = { f: () => 1 }\nconst M = { f: () => 1 }\nexport { M }\nexport function N() {}\n', false, () => ({ L: 'data', M: 'data', N: 'data', O: 'data' }))).toEqual(['O'])
     expect(moduleData('export default { a: 1 }\n')).toEqual(['default'])
     expect(moduleData('export default { a: () => 1 }\n')).toEqual([])
     expect(moduleData('export { a, b as c, default as d } from \'./x\'\nexport * from \'./y\'\nexport * as ns from \'./y\'\n', false, specifier => specifier === './x' ? { a: 'data', b: 'data', default: 'data' } : { z: 'data', default: 'data', f: 'signal' })).toEqual(['a', 'c', 'd', 'z'])

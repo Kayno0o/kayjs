@@ -9,8 +9,9 @@ import { fences } from './libraries'
 type ImportedKinds = Record<string, SignalKind | 'data'>
 const KAY_FILE = /\.kay$/
 const JSON_FILE = /\.json$/
-// A key of the modules a read depended on that marks a re-export cycle cut short.
+// A key of the modules a read depended on that marks a re-export cycle cut short, or a re-export that resolves to nothing: such a read is not remembered, so a module in a cycle is parsed again on each call.
 const CUT = '<cycle>'
+const MISSING = 'missing'
 const KAY_MODULE = /^kay(?:\/|$)/
 const scanned = new Map<string, { stamp: string, signals: ImportedKinds, deps: Map<string, string> }>()
 
@@ -105,15 +106,18 @@ function signalsOf(path: string, walk = new Set<string>(), deps = new Map<string
   try {
     const stats = statSync(path, { throwIfNoEntry: false })
 
-    if (!stats)
+    if (!stats) {
+      deps.set(path, MISSING)
+
       return {}
+    }
 
     const stamp = `${stats.mtimeMs}-${stats.size}`
     const known = scanned.get(path)
 
     deps.set(path, stamp)
 
-    if (known?.stamp === stamp && [...known.deps].every(([dep, depStamp]) => stampOf(dep) === depStamp)) {
+    if (known?.stamp === stamp && [...known.deps].every(([dep, depStamp]) => dep === path || (stampOf(dep) ?? MISSING) === depStamp)) {
       for (const [dep, depStamp] of known.deps)
         deps.set(dep, depStamp)
 
@@ -133,11 +137,22 @@ function signalsOf(path: string, walk = new Set<string>(), deps = new Map<string
     const reexported: Reexported = (specifier) => {
       const target = resolveFrom(specifier, path)
 
-      return target === undefined || !(SCRIPT_FILE.test(target) || KAY_FILE.test(target) || JSON_FILE.test(target)) ? {} : signalsOf(target, walk, own)
-    }
-    const signals = kindsOf(path, text, reexported)
+      if (target === undefined) {
+        own.set(CUT, '')
 
-    walk.delete(path)
+        return {}
+      }
+
+      return SCRIPT_FILE.test(target) || KAY_FILE.test(target) || JSON_FILE.test(target) ? signalsOf(target, walk, own) : {}
+    }
+    let signals: ImportedKinds
+
+    try {
+      signals = kindsOf(path, text, reexported)
+    }
+    finally {
+      walk.delete(path)
+    }
 
     for (const [dep, depStamp] of own)
       deps.set(dep, depStamp)

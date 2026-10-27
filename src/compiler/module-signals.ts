@@ -122,6 +122,37 @@ function exportedName(node: t.Identifier | t.StringLiteral): string {
   return node.type === 'Identifier' ? node.name : node.value
 }
 
+// The names a module exports itself, which win over the same name in an `export *`.
+function ownExports(ast: t.File): Set<string> {
+  const own = new Set<string>()
+
+  for (const statement of ast.program.body) {
+    if (statement.type === 'ExportDefaultDeclaration') {
+      own.add('default')
+    }
+    else if (statement.type === 'ExportNamedDeclaration') {
+      const declaration = statement.declaration
+
+      if (declaration?.type === 'VariableDeclaration') {
+        for (const { id } of declaration.declarations) {
+          if (id.type === 'Identifier')
+            own.add(id.name)
+          else
+            own.add('')
+        }
+      }
+      else if (declaration && 'id' in declaration && declaration.id?.type === 'Identifier') {
+        own.add(declaration.id.name)
+      }
+
+      for (const specifier of statement.specifiers)
+        own.add(specifier.exported.type === 'Identifier' ? specifier.exported.name : specifier.exported.value)
+    }
+  }
+
+  return own
+}
+
 function dataIn(ast: t.File, reexported?: Reexported): string[] {
   const found = new Set<string>()
   const local = new Set<string>()
@@ -151,8 +182,10 @@ function dataIn(ast: t.File, reexported?: Reexported): string[] {
         found.add('default')
     }
     else if (statement.type === 'ExportAllDeclaration' && statement.exportKind !== 'type') {
+      const own = ownExports(ast)
+
       for (const [name, kind] of Object.entries(reexported?.(statement.source.value) ?? {})) {
-        if (kind === 'data' && name !== 'default')
+        if (kind === 'data' && name !== 'default' && !own.has(name))
           found.add(name)
       }
     }

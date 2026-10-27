@@ -1466,6 +1466,12 @@ describe('what a build keeps in memory', () => {
       expect(importedSignals(file, source)).toEqual({ './barrel': { LABELS: 'data' }, './loop-a': { LOOP: 'data' }, './copy.json': { default: 'data', a: 'data' } })
       await Bun.write(join(dir, 'labels.ts'), 'export const LABELS = { a: () => \'A\' }\n')
       expect(importedSignals(file, source)['./barrel']).toBeUndefined()
+      // A module a re-export names before it exists is read again once it does.
+      await Bun.write(join(dir, 'barrel.ts'), 'export * from \'./labels\'\nexport * from \'./later\'\n')
+      await Bun.write(join(dir, 'labels.ts'), 'export const LABELS = { a: \'A\' }\n')
+      expect(importedSignals(file, source)['./barrel']).toEqual({ LABELS: 'data' })
+      await Bun.write(join(dir, 'later.ts'), 'export const LATER = { a: \'A\' }\n')
+      expect(importedSignals(file, source)['./barrel']).toEqual({ LABELS: 'data', LATER: 'data' })
     }
     finally {
       await rm(dir, { recursive: true, force: true })
