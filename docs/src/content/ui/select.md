@@ -20,6 +20,16 @@ When the options come from a request, set `busy` to show a disabled row in their
 
 <Demo name="select/loading" />
 
+## Holding a query param
+
+`param="period"` makes the select hold a query param of the page. A pick goes to the current page with the param set to the option and every other param kept. The empty option and `paramDefault`, the value the page shows while the param is left out, leave the param out. Pass `value` as the page read it.
+
+```kay
+Select(value={period} options={PERIODS} param="period" paramDefault="7d" aria-label="Period")
+```
+
+The select takes `param` as its name. Inside a GET form with a button it works without JavaScript, and alone it needs JavaScript.
+
 ## Submitting on pick
 
 Set `submit` on a Select inside a form to submit that form once an option is picked, after `onChange`. A GET filter form then needs no ref to itself.

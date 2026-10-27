@@ -1,0 +1,9 @@
+---
+import Segmented from '@kaynooo/kayjs-ui/segmented.kay'
+import Select from '@kaynooo/kayjs-ui/select.kay'
+
+const periods = ['24h', '7d', '30d'].map(value => ({ value, label: value }))
+const period = new URLSearchParams(location.search).get('period') ?? '7d'
+---
+Segmented#segmented(options={periods} value={period} param="period" paramDefault="7d" label="Period")
+Select#select(options={periods} value={period} param="period" paramDefault="7d" emptyOption="Any")

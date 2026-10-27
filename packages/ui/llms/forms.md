@@ -11,6 +11,7 @@
 - `Textarea(value={notes()} onInput={notes.set})`: the multi-line TextInput, taking the same props, `rows` among the rest, and working as a plain field without `value` and `onInput`. While focused it keeps the text as typed, and takes the parent's reading of it, such as without a blank line, once left. `writeFocused` lets any write land while focused, such as a chat clearing its draft after a send, the caret going to the end.
 - `Select(value={kind()} options={[{ value: 'post', label: 'Post' }]} onChange={kind.set} emptyOption="Any")`:
   - `value` and `onChange` take the type of the options' values, so a union stays a union and a number option hands back a number: `const kind = signal<'post' | 'page'>('post')` passes `kind.set` with no cast.
+  - `param="period"` (with `paramDefault`) holds a query param of the page with no island of the app's, as on Segmented: a pick runs `navigate({ query })`, keeping the other params and leaving the param out for `paramDefault` or the empty option, your `onChange` running first. The select takes `param` as its name, so a GET form around it with a button works without JavaScript; alone it needs JavaScript.
   - `emptyOption` adds a first option worth `''`, labelled by the string, or blank with `true`; `value` and `onChange` then take `''` too, so hold a `signal<Kind | ''>`.
   - An option is `{ value, label, disabled? }`; `disabled` keeps it from being picked. A native option draws no icon, unlike the other groups' options.
   - `busy` shows a disabled row saying `loadingLabel` while the options are on their way.

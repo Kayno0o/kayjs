@@ -5,6 +5,7 @@ import type { IconSlot } from './defaults'
 import { recipe, untrack } from 'kay'
 import type { NullOption } from './null-option'
 import { controlledRadios } from './controlled-radios'
+import { paramChange } from './param-change'
 import Icon from './icon.kay'
 
 // 'kui-segmented' stays as the component's name for an app's CSS and the skins; the border colour reads --_control-line, which a skin sets.
@@ -18,7 +19,7 @@ const look = recipe({
   },
 })
 
-const { options, value, label, name, disabled = false, orientation = 'horizontal', onChange, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'role' | 'onChange'> & {
+const { options, value, label, name, param, paramDefault, disabled = false, orientation = 'horizontal', onChange, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'role' | 'onChange'> & {
   // `icon` sits before the label; `disabled` keeps that option from being picked.
   options: readonly { value: Value, label: string, icon?: IconSlot | IconProps | undefined, disabled?: boolean | undefined }[] & NullOption<Value, Held>
   // The option picked to start with, or `null` for none, such as while what shows matches no option; a group whose parent passes another follows it.
@@ -29,6 +30,10 @@ const { options, value, label, name, disabled = false, orientation = 'horizontal
   disabled?: boolean | undefined
   // The radios' name, which the group submits under inside a form; one unique on the page is drawn when none is given.
   name?: string | undefined
+  // Holds a query param of the page instead of, or besides, `onChange`: a pick goes to the current page with `param` set to the option and every other param kept, the group busy until the page shows it. Give `value` the param as the page read it. The radios take its name, so a GET form around the group sends it without JavaScript.
+  param?: string | undefined
+  // The value the page shows while `param` is left out: picking it leaves the param out.
+  paramDefault?: string | number | undefined
   // `vertical` stacks the options in a column; the arrow keys keep moving between the radios, up and down as well as left and right.
   orientation?: 'horizontal' | 'vertical' | undefined
   // A promise holds the group busy until it settles, and puts the previous option back when it resolves to false, rejects or throws (logged): a refused change never shows as made.
@@ -42,8 +47,8 @@ const { group, picked, busy, ref, pick } = controlledRadios({
   input: '[data-part=input]',
   options: () => options,
   value: () => value,
-  name: () => name,
-  onChange: () => onChange as ((value: string | number | null) => unknown) | undefined,
+  name: () => name ?? param,
+  onChange: () => paramChange(param, paramDefault, onChange as ((value: string | number | null) => unknown) | undefined),
   appRef: rest.ref,
 })
 ---

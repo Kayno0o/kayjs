@@ -36,6 +36,16 @@ While the group is busy, a pick takes nothing: the radio is put back, and keyboa
 
 <Demo name="segmented/busy" />
 
+## Holding a query param
+
+`param="period"` makes the group hold a query param of the page. A pick goes to the current page with the param set to the option and every other param kept, and the group stays busy until the page shows it. `paramDefault` is the value the page shows while the param is left out, so picking it leaves the param out. Pass `value` as the page read it.
+
+```kay
+Segmented(options={PERIODS} value={period} param="period" paramDefault="7d" label="Period")
+```
+
+An `onChange` of your own still runs first, and a `false` from it stops the move. The radios take `param` as their name, so inside a GET form with a button the group works without JavaScript. Alone, it needs JavaScript.
+
 ## Label
 
 `label` is required. It names the group for screen readers.
