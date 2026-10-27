@@ -121,7 +121,7 @@ describe('page hooks', () => {
     it('gives the brotli size of a compressible file, the file\'s own for a small one or one that is not compressed, and nothing for a URL no file serves', async () => {
       const { fileSize } = await sizesOf({ clientDir, publicDir, base: '' })
 
-      expect(await fileSize('/_kay/big-3c4d.css')).toBe((await strongestCopies(new TextEncoder().encode(big)) as { br: Uint8Array }).br.length)
+      expect(await fileSize('/_kay/big-3c4d.css')).toBe((await strongestCopies(new TextEncoder().encode(big), 'big.css') as { br: Uint8Array }).br.length)
       expect(await fileSize('/_kay/page-1a2b.css')).toBe(3)
       expect(await fileSize('/_kay/images/hero-640w.webp')).toBe(4)
       expect(await fileSize('https://cdn.example/a.css')).toBeUndefined()
@@ -129,10 +129,10 @@ describe('page hooks', () => {
 
     it('measures a file once however many pages link it, and a page as the build would compress it', async () => {
       const made: number[] = []
-      const { fileSize, htmlSize } = await sizesOf({ clientDir, publicDir, base: '' }, async (bytes) => {
+      const { fileSize, htmlSize } = await sizesOf({ clientDir, publicDir, base: '' }, async (bytes, name) => {
         made.push(bytes.length)
 
-        return strongestCopies(bytes)
+        return strongestCopies(bytes, name)
       })
       const sizes = await Promise.all([fileSize('/_kay/big-3c4d.css'), fileSize('/_kay/big-3c4d.css')])
 
@@ -167,7 +167,7 @@ describe('page hooks', () => {
       const cache = join(scratch, 'html-cache')
       const { fileSize, htmlSize } = await sizesOf({ clientDir, publicDir, base: '' })
 
-      expect(await fileSize('/_kay/big-3c4d.css')).toBe((await strongestCopies(new TextEncoder().encode(big)) as { br: Uint8Array }).br.length)
+      expect(await fileSize('/_kay/big-3c4d.css')).toBe((await strongestCopies(new TextEncoder().encode(big), 'big.css') as { br: Uint8Array }).br.length)
 
       const kept = await sizesOf({ clientDir, publicDir, base: '' }, cachedCopies(cache))
 

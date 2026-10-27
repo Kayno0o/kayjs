@@ -28,6 +28,9 @@ const HTML_TYPE = /^text\/html/i
 // Text the build writes, and the fonts with no compression of their own; images, woff fonts and media come compressed already.
 const COMPRESSIBLE = /\.(?:js|mjs|css|html|svg|json|txt|xml|map|wasm|ttf|otf)$/i
 const ENCODED_COPY = /\.(?:br|gz)$/
+const HTML_FILE = /\.html$/i
+const PAGE_BROTLI_QUALITY = 10
+const MAX_BROTLI_QUALITY = 11
 
 // Below this a response fits in a packet or two anyway.
 export const MIN_SIZE = 256
@@ -71,7 +74,8 @@ export async function compressFiles(dir: string, copiesOf: StrongestCopies = str
   await compressPaths(await filesUnder(dir), copiesOf)
 }
 
-export type StrongestCopies = (bytes: Uint8Array<ArrayBuffer>) => Promise<Partial<Record<StoredEncoding, Uint8Array<ArrayBuffer>>>>
+// `name` only tells the kind of file by its extension, which picks the brotli level.
+export type StrongestCopies = (bytes: Uint8Array<ArrayBuffer>, name: string) => Promise<Partial<Record<StoredEncoding, Uint8Array<ArrayBuffer>>>>
 
 // The same for the files listed, those not worth compressing left out; `copiesOf` makes the copies of one file's bytes, which a build backs with a cache.
 export async function compressPaths(paths: string[], copiesOf: StrongestCopies = strongestCopies): Promise<void> {
@@ -81,7 +85,7 @@ export async function compressPaths(paths: string[], copiesOf: StrongestCopies =
     if (bytes.length < MIN_SIZE)
       return
 
-    await Promise.all(Object.entries(await copiesOf(bytes)).map(async ([encoding, copy]) => Bun.write(encodedPath(path, encoding as StoredEncoding), copy)))
+    await Promise.all(Object.entries(await copiesOf(bytes, path)).map(async ([encoding, copy]) => Bun.write(encodedPath(path, encoding as StoredEncoding), copy)))
   }))
 }
 
@@ -94,7 +98,7 @@ export async function servedSize(name: string, bytes: Uint8Array<ArrayBuffer>, c
   if (!COMPRESSIBLE.test(name) || bytes.length < MIN_SIZE)
     return bytes.length
 
-  const br = copiesOf === undefined ? await strongestBrotli(bytes) : (await copiesOf(bytes)).br
+  const br = copiesOf === undefined ? await strongestBrotli(bytes, buildBrotliLevel(name)) : (await copiesOf(bytes, name)).br
 
   return br !== undefined && br.length < bytes.length * KEEP_BELOW ? br.length : bytes.length
 }
@@ -103,18 +107,23 @@ export async function servedSize(name: string, bytes: Uint8Array<ArrayBuffer>, c
 export async function compressTextStrongest(text: string): Promise<Partial<Record<StoredEncoding, Uint8Array<ArrayBuffer>>>> {
   const bytes = new TextEncoder().encode(text)
 
-  return bytes.length < MIN_SIZE ? {} : strongestCopies(bytes)
+  return bytes.length < MIN_SIZE ? {} : strongestCopies(bytes, 'page.html')
 }
 
-async function strongestBrotli(bytes: Uint8Array<ArrayBuffer>): Promise<Uint8Array<ArrayBuffer>> {
+// The brotli level of a build's copy of a file: brotli's strongest for scripts, stylesheets and the rest, which a build compresses again only when their content changes; one below for a page, which every build compresses again once any script changed, as it names the build: about a third of the CPU for 2 to 3% more bytes.
+export function buildBrotliLevel(name: string): number {
+  return HTML_FILE.test(name) ? PAGE_BROTLI_QUALITY : MAX_BROTLI_QUALITY
+}
+
+async function strongestBrotli(bytes: Uint8Array<ArrayBuffer>, level: number): Promise<Uint8Array<ArrayBuffer>> {
   const { constants } = nodeZlib()
 
-  return compressBrotli(bytes, { [constants.BROTLI_PARAM_QUALITY]: constants.BROTLI_MAX_QUALITY, [constants.BROTLI_PARAM_SIZE_HINT]: bytes.length })
+  return compressBrotli(bytes, { [constants.BROTLI_PARAM_QUALITY]: level, [constants.BROTLI_PARAM_SIZE_HINT]: bytes.length })
 }
 
-export async function strongestCopies(bytes: Uint8Array<ArrayBuffer>): Promise<Partial<Record<StoredEncoding, Uint8Array<ArrayBuffer>>>> {
+export async function strongestCopies(bytes: Uint8Array<ArrayBuffer>, name: string): Promise<Partial<Record<StoredEncoding, Uint8Array<ArrayBuffer>>>> {
   const copies: [StoredEncoding, Uint8Array<ArrayBuffer>][] = [
-    ['br', await strongestBrotli(bytes)],
+    ['br', await strongestBrotli(bytes, buildBrotliLevel(name))],
     ['gzip', Bun.gzipSync(bytes, { level: 9 })],
   ]
 

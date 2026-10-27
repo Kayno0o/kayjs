@@ -3,6 +3,7 @@ import type { DictionaryRef } from '../src/server/dictionary'
 import { readdir, rm, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { zstdDecompressSync } from 'node:zlib'
+import { brotliCompressSync, constants } from 'node:zlib'
 import { describe, expect, it } from 'bun:test'
 import { cacheCounts, resetCacheCounts } from '../src/build/cache'
 import { cachedCopies, cachedDictionaryCopies, pruneCopies, pruneDictionaryCopies } from '../src/build/compressed'
@@ -101,6 +102,24 @@ describe('cached compressed copies', () => {
 
     expect(counted('compressed copies')).toEqual({ cached: 1, made: 2 })
     expect(Bun.gunzipSync(await Bun.file(join(dir, 'app.js.gz')).bytes())).toEqual(new TextEncoder().encode(text('second')))
+  })
+
+  it('compresses a page at brotli 10 and a script at 11, each to an entry of its own', async () => {
+    const root = await scratchDir('copies-levels-')
+    const dir = join(root, 'client')
+    const cache = join(root, 'cache')
+    const text = '<p>kay pages</p> '.repeat(400)
+    const bytes = new TextEncoder().encode(text)
+    const brotli = (quality: number) => new Uint8Array(brotliCompressSync(bytes, { params: { [constants.BROTLI_PARAM_QUALITY]: quality, [constants.BROTLI_PARAM_SIZE_HINT]: bytes.length } }))
+
+    await Bun.write(join(dir, 'page.html'), text)
+    await Bun.write(join(dir, 'app.js'), text)
+    resetCacheCounts()
+    await compressFiles(dir, cachedCopies(cache))
+
+    expect(counted('compressed copies')).toEqual({ cached: 0, made: 2 })
+    expect(await Bun.file(join(dir, 'page.html.br')).bytes()).toEqual(brotli(10))
+    expect(await Bun.file(join(dir, 'app.js.br')).bytes()).toEqual(brotli(11))
   })
 
   it('makes an entry again when one of its copies is gone', async () => {

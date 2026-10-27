@@ -1,12 +1,12 @@
 import type { StoredEncoding, StrongestCopies } from '../server/compress'
 import type { DictionaryCopies } from '../server/dictionary'
 import { join } from 'node:path'
-import { strongestCopies } from '../server/compress'
+import { buildBrotliLevel, strongestCopies } from '../server/compress'
 import { BUILD_COPY_KEY, buildDictionaryCopy, DCZ_SUFFIX } from '../server/dictionary'
 import { countCache, pruneCache, touchCacheFile } from './cache'
 import { writeAtomically } from './files'
 
-// Bumped when the levels or the rule keeping a copy change, so older entries are never read as the new ones.
+// Bumped when the gzip level or the rule keeping a copy change, so older entries are never read as the new ones; the brotli level is in the key itself.
 const COPIES_VERSION = 1
 const SUFFIXES: Record<StoredEncoding, string> = { br: 'br', gzip: 'gz' }
 const ENTRY_FILE = /^[\da-f]{64}\.(?:br|gz|done)(?:\..+\.tmp)?$/
@@ -15,8 +15,9 @@ const DICTIONARY_ENTRY_FILE = /^[\da-f]{64}\.dcz(?:\..+\.tmp)?$/
 // The copies `kay build` writes, kept under the cache by the SHA-256 of the file's content, so a file unchanged since an earlier build is not compressed again.
 // An entry holds the copies worth writing and a marker naming them, written last, so an entry cut short or missing a copy is made again; a file whose copies do not shrink it keeps the marker alone and is not compressed again either.
 export function cachedCopies(dir: string): StrongestCopies {
-  return async (bytes) => {
-    const name = new Bun.CryptoHasher('sha256').update(`${COPIES_VERSION}:`).update(bytes).digest('hex')
+  return async (bytes, file) => {
+    const level = buildBrotliLevel(file)
+    const name = new Bun.CryptoHasher('sha256').update(`${COPIES_VERSION}:br${level}:`).update(bytes).digest('hex')
     const marker = join(dir, `${name}.done`)
 
     touchCacheFile(marker)
@@ -42,7 +43,7 @@ export function cachedCopies(dir: string): StrongestCopies {
 
     countCache('compressed copies', false)
 
-    const made = await strongestCopies(bytes)
+    const made = await strongestCopies(bytes, file)
 
     try {
       await Promise.all(Object.entries(made).map(async ([encoding, copy]) => writeAtomically(join(dir, `${name}.${SUFFIXES[encoding as StoredEncoding]}`), copy)))
