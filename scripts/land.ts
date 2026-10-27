@@ -4,6 +4,7 @@ import { dirname, join, resolve } from 'node:path'
 import process from 'node:process'
 import { $, Glob } from 'bun'
 import { dependenciesOnly } from './dependency-change'
+import { librariesToTest, libraryDependencies } from './library-dependents'
 import { addedMarkers } from './merge-markers'
 import { readersOf, WHOLE_SUITE } from './source-readers'
 import { subprocessTests } from './subprocess-tests'
@@ -20,7 +21,6 @@ const LOG = join((await $`git rev-parse --absolute-git-dir`.text()).trim(), 'lan
 const TAIL = 30
 const SUMMARY = 8
 const FIXTURE = /^tests\/fixtures\/([^/]+)\//
-const PACKAGE = /^packages\/([^/]+)\//
 const MANIFEST = /(?:^|\/)(?:package\.json|bun\.lock)$/
 // Half the host's cores, as CI runs them, so a landing leaves the machine to the rest; fewer with KAY_LAND_WORKERS, for a session short of memory beside other test runs.
 const WORKERS = `--parallel=${Number(process.env.KAY_LAND_WORKERS) || 6}`
@@ -217,7 +217,7 @@ async function verify(): Promise<string> {
   // A change to the dependencies alone leaves the whole suite to CI, which runs it on every push: the steps above, the suites of the libraries it touches and the test holding the manifests together still run here.
   const dependencies = manifests.length > 0 && (await Promise.all(manifests.map(async path => dependenciesOnly(path, await shown(base, path), await shown('HEAD', path))))).every(Boolean)
   const whole = changed.some(path => WHOLE_SUITE.test(path) && !(dependencies && MANIFEST.test(path)))
-  const libraries = [...new Set(changed.map(path => PACKAGE.exec(path)?.[1]).filter(name => name !== undefined))]
+  const libraries = librariesToTest(changed, await libraryDependencies(process.cwd()))
 
   if (!whole && changed.some(path => WHOLE_SUITE.test(path)))
     console.log('tests, the whole suite: left to CI, as only dependencies changed')

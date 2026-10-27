@@ -5,6 +5,7 @@ import process from 'node:process'
 import { $ } from 'bun'
 import { describe, expect, it } from 'bun:test'
 import { dependenciesOnly } from '../scripts/dependency-change'
+import { librariesToTest, libraryDependencies } from '../scripts/library-dependents'
 import { addedMarkers } from '../scripts/merge-markers'
 import { READERS, readersOf, SOURCE_CHANGE, SOURCE_FILE_READ, SOURCE_FILE_READERS, SOURCE_READERS, SOURCE_SCAN, sourcesRead, UI_THEME_USE, WHOLE_SUITE } from '../scripts/source-readers'
 import { subprocessTests } from '../scripts/subprocess-tests'
@@ -433,6 +434,34 @@ describe('landing a change to a library', () => {
     expect(out).toContain('packages/lib tests: exit 1')
     expect(await tree()).not.toContain('packages')
   }, 60_000)
+})
+
+describe('the libraries a landing tests', () => {
+  const DEPENDENCIES = new Map([['ui', new Set<string>()], ['cms', new Set(['ui', 'mail'])], ['ai', new Set(['ui'])], ['mail', new Set<string>()]])
+
+  it('reads which library names which in its manifest', async () => {
+    const found = await libraryDependencies(ROOT)
+
+    expect([...found.get('cms') ?? []]).toContain('ui')
+    expect([...found.get('ai') ?? []]).toContain('ui')
+    expect([...found.get('ui') ?? []]).not.toContain('ui')
+  })
+
+  it('adds the dependents of a library whose source changed', () => {
+    expect(librariesToTest(['packages/ui/src/button.kay'], DEPENDENCIES).toSorted()).toEqual(['ai', 'cms', 'ui'])
+    expect(librariesToTest(['packages/mail/src/send.ts'], DEPENDENCIES).toSorted()).toEqual(['cms', 'mail'])
+  })
+
+  it('leaves the dependents out for a change to tests or docs alone', () => {
+    expect(librariesToTest(['packages/ui/tests/button.test.ts', 'packages/ui/llms.txt'], DEPENDENCIES)).toEqual(['ui'])
+    expect(librariesToTest(['src/server/env.ts'], DEPENDENCIES)).toEqual([])
+  })
+
+  it('follows a dependent\'s own dependents', () => {
+    const chain = new Map([['a', new Set<string>()], ['b', new Set(['a'])], ['c', new Set(['b'])]])
+
+    expect(librariesToTest(['packages/a/src/x.ts'], chain).toSorted()).toEqual(['a', 'b', 'c'])
+  })
 })
 
 describe('a change to dependencies alone', () => {
