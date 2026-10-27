@@ -23,11 +23,12 @@ const look = recipe({
 
 const NONE: never[] = []
 
-const { rows = NONE, columns, label, name, onChange, min = 0, max, addLabel = wording('ui.rowsField.add', 'Add row'), removeLabel, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'role' | 'onChange'> & {
+const { rows = NONE, style, columns, label, name, onChange, min = 0, max, addLabel = wording('ui.rowsField.add', 'Add row'), removeLabel, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'role' | 'onChange' | 'style'> & {
+  style?: string | undefined
   // The rows to start with, and the ones to show whenever the parent passes others: a field in a form posting to an action needs nothing else, and an editor keeping them in a signal writes them back in `onChange`.
   rows?: readonly Row[] | undefined
-  // One text box per column of a row: `key` is the property of the row it edits, `label` names it for screen readers and heads its column, `placeholder` defaults to the label.
-  columns: readonly { key: keyof Row & string, label: string, placeholder?: string | undefined, type?: 'text' | 'email' | 'url' | 'tel' | 'search' | undefined, name?: string | undefined }[]
+  // One text box per column of a row: `key` is the property of the row it edits (a plain string, so a `columns` array declared apart from the call needs no `as const`), `label` names it for screen readers and heads its column, `placeholder` defaults to the label.
+  columns: readonly { key: string, label: string, placeholder?: string | undefined, type?: 'text' | 'email' | 'url' | 'tel' | 'search' | undefined, name?: string | undefined }[]
   // Names the field for screen readers.
   label: string
   // Inside a form, each column posts under `<name>_<key>` (or its own `name`), once per row in the order shown, so a blank cell keeps its place: an action reads them as `s.Array(s.String())` fields of one length.
@@ -116,7 +117,7 @@ onFormReset(() => root, () => {
   commit(start)
 })
 ---
-div(part="root" {...rest} ref={element => root = element} role="group" aria-label={label} style={`--_columns:${columns.length}`})
+div(part="root" {...rest} ref={element => root = element} role="group" aria-label={label} style={[`--_columns:${columns.length}`, style].filter(Boolean).join('; ')})
   if current().length > 0
     div(part="head" aria-hidden="true")
       for column of columns key={column.key}

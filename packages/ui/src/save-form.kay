@@ -74,6 +74,8 @@ async function loadConfirm() {
   catch (error) {
     console.error('kayjs-ui: a SaveForm\'s confirmation could not be loaded', error)
     confirmFailed = true
+    asking = false
+    toast.error(failure)
   }
 }
 
@@ -175,11 +177,14 @@ async function submit(event: SubmitEvent) {
     return
 
   if (confirm !== undefined && !sure) {
-    // The question could not be loaded, and a save that needs it must not go through unasked.
-    if (confirmFailed())
-      toast.error(failure)
-    else
+    // The question could not be loaded, and a save that needs it must not go through unasked: this press tries the load again.
+    if (confirmFailed()) {
+      confirmFailed = false
+      void loadConfirm()
+    }
+    else {
       asking = true
+    }
 
     return
   }

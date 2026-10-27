@@ -1,11 +1,11 @@
 import type { Mounted } from 'kay/test'
-import { afterEach, expect, spyOn, test } from 'bun:test'
+import { afterAll, afterEach, expect, spyOn, test } from 'bun:test'
 import { mountComponent, settle } from 'kay/test'
 import ParamPickers from '../tests/fixture/src/components/param-pickers.kay'
 import ParamTabs from '../tests/fixture/src/components/param-tabs.kay'
 import { click } from './dom'
 
-// The site is mounted under /docs and the page is its French one: every address a param control builds or goes to keeps both.
+// The site is mounted under /docs and the page is its French one. `navigate({ query })` and `withQuery` start from the address the browser is at, so these tests pin that both the base and the locale of the page survive a pick.
 const meta = document.createElement('meta')
 
 meta.name = 'kay-base'
@@ -13,6 +13,8 @@ meta.content = '/docs'
 document.head.append(meta)
 
 let mounted: Mounted | undefined
+
+afterAll(() => meta.remove())
 
 afterEach(() => {
   mounted?.unmount()

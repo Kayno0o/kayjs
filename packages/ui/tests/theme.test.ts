@@ -681,6 +681,15 @@ describe('theme.css', () => {
     expect(blockOf(theme, ':is(.kui-shell, .kui-btn, .kui-stat-badge)::before')).toContain('border-radius: inherit;')
   })
 
+  test('a Stat tile keeps its grid placement without the recipe, and a control in a wrapping box keeps its words whole', () => {
+    expect(blockOf(theme, '.kui-stat-badge:where([data-variant=\'tile\']) > :where([data-part=\'icon\'], [data-part=\'label\'])')).toContain('@apply col-span-full;')
+
+    for (const [part, order] of [['value', 1], ['delta', 2], ['label', 3]])
+      expect(blockOf(theme, `.kui-stat-badge > :where([data-part='${part}'])`)).toContain(`@apply order-${order};`)
+
+    expect(blockOf(theme, ':is(.kui-card, .kui-notice, .kui-page-header, .kui-app-header) :where(button, input, select, summary, .kui-btn, .kui-shell)')).toContain('overflow-wrap: normal;')
+  })
+
   test('steps the radius of what sits inside a box by --radius-sm and -md, and a round avatar by rounded-full', async () => {
     const css = await built('@theme { --radius-sm: 2px; --radius-md: 6px; }')
 
