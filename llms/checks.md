@@ -26,7 +26,7 @@ export default defineConfig({ strict: true, kay: true })
 kay lint --cache
 ```
 
-`kay/eslint` also exports `testRules`, which the `kay` preset applies to the app's test files (`tests/`, `tests-dom/` and `*.test.ts`): `ts/await-thenable` is off there, as bun-types types the matchers of `await expect(promise).rejects` as void, so a test keeps its `await` with no override of its own (needs `@kaynooo/eslint` 7.1.2 or later).
+`kay/eslint` also exports `testRules`, which the `kay` preset applies to the app's test files (`tests/`, `tests-dom/` and `*.test.ts`): `ts/await-thenable` is off there, as bun-types types the matchers of `await expect(promise).rejects` as void, so a test keeps its `await` with no override of its own (needs `@kaynooo/eslint` 7.1.4 or later).
 
 ## Reference
 
