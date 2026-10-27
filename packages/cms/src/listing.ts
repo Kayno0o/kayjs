@@ -259,15 +259,15 @@ export async function pageRows(collection: ScreenCollection, search: string, pag
     }) }
   }
 
-  // The last edit of each entry's file, read for the entries a sort by edit has to order or the page shown alone.
-  const editsOf = async (found: SourceEntry[]): Promise<Map<string, Edit> | undefined> => {
+  // The last edit of each entry's file, read for the entries a sort by edit has to order, which waits for every date, or the page shown alone.
+  const editsOf = async (found: SourceEntry[], sorting = false): Promise<Map<string, Edit> | undefined> => {
     if (readEdits === undefined || collection.kind !== 'folder')
       return undefined
 
-    return readEdits(found.flatMap(entry => entry.path === undefined ? [] : [entry.path]))
+    return readEdits(found.flatMap(entry => entry.path === undefined ? [] : [entry.path]), sorting)
   }
 
-  const stamped = async (found: SourceEntry[]) => sort === 'modified' || sort === 'author' ? editsOf(found) : undefined
+  const stamped = async (found: SourceEntry[]) => sort === 'modified' || sort === 'author' ? editsOf(found, true) : undefined
 
   const versioned = async (found: Omit<RowsPage, 'total'>, total: number): Promise<RowsPage> => {
     const listed = await marked(found)

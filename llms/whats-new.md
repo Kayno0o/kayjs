@@ -4,6 +4,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 
 ## Unreleased
 
+- kayjs-cms: a collection's list walks the git history for its Last modified and Author columns once per commit rather than on every view, and waits a second at most for it unless sorted by them, so a slow git no longer holds the page: [Screens](../packages/cms/llms/screens.md).
 - kayjs-ui: `MapView` markers with a label or a popup are one tab stop the arrows walk, Enter opening the popup, the tiles darken while the map's scheme is dark (`darkTiles` swaps in a dark set, `--map-tiles-dark` sets the filter), and a change to `lines` or `markers` keeps the view once the visitor moved it: [MapView](../packages/ui/llms/charts-drag-and-media.md#mapview).
 - `memoryJobs()` lists failed jobs oldest first, as `sqliteJobs` and `pgJobs` do, so a queue's `failed()` reads the same under `bun test` as in production: [Queues](queues.md#reference).
 - kayjs-ai: `await reply.steps` lists the model requests a reply made, each `{ ms, firstTokenMs, usage, finish, calls }`, and a finished `ToolCall` has `ms`, so a slow tool loop shows whether the model or a tool took the time: [Asking](../packages/ai/llms/asking.md).
