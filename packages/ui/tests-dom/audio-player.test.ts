@@ -223,3 +223,48 @@ test('a position the parent passes is followed', async () => {
   await settle()
   expect(audio.currentTime).toBe(45)
 })
+
+test('a chapter link to another site opens in a new tab, so the audio keeps playing', async () => {
+  const { part } = await players()
+  const link = part('chapter')[1]!.querySelector('a')!
+
+  expect([link.getAttribute('target'), link.getAttribute('rel')]).toEqual(['_blank', 'noopener noreferrer'])
+})
+
+test('a play interrupted by a pause is no failure, and a new source puts the button back to play', async () => {
+  const { audio, part } = await players()
+
+  Object.defineProperty(audio, 'play', { value: async () => {
+    throw new DOMException('interrupted', 'AbortError')
+  }, configurable: true })
+  click(part('play')[0]!)
+  await settle()
+  expect(part('play')[0]!.getAttribute('aria-label')).toBe('Play')
+
+  Object.defineProperty(audio, 'play', { value: async () => audio.dispatchEvent(new Event('play')), configurable: true })
+  click(part('play')[0]!)
+  await settle()
+  expect(part('play')[0]!.getAttribute('aria-label')).toBe('Pause')
+
+  audio.dispatchEvent(new Event('emptied'))
+  await settle()
+  expect([part('play')[0]!.getAttribute('aria-label'), part('time')[0]!.textContent]).toEqual(['Play', '0:00 / 2:00'])
+})
+
+test('leaving the page lifts the lock screen handlers and metadata, and a player without chapters sets no skip', async () => {
+  const { root, audio } = await players()
+  const plain = root.querySelector<HTMLAudioElement>('#plain audio')!
+
+  fake(plain)
+  await plain.play()
+  await settle()
+  expect([handlers.previoustrack, handlers.nexttrack]).toEqual([null, null])
+
+  await audio.play()
+  await settle()
+  expect(typeof handlers.nexttrack).toBe('function')
+
+  mounted?.unmount()
+  mounted = undefined
+  expect([handlers.previoustrack, handlers.nexttrack, handlers.seekto, metadata]).toEqual([null, null, null, null])
+})

@@ -8,7 +8,7 @@ description: An audio player with chapters, a transcript that follows the voice,
 
 ## Chapters
 
-A chapter has a `title`, a `start` in seconds and optionally a `url`. Pass them in time order, as the player never sorts them. They show as a list of buttons that seek and play, as marks on the timeline, and the previous and next buttons step between them. The chapter playing is marked, and a chapter with a `url` gets a link beside it.
+A chapter has a `title`, a `start` in seconds and optionally a `url`. Pass them in time order, as the player never sorts them. They show as a list of buttons that seek and play, as marks on the timeline, and the previous and next buttons step between them. The chapter playing is marked, and a chapter with a `url` gets a link beside it, in a new tab for another site so the audio keeps playing.
 
 The previous button restarts the chapter once it is more than 3 seconds in, and goes to the one before otherwise, as a music player's back button does.
 
@@ -28,7 +28,7 @@ Once the audio has played, the lock screen and the headset buttons show the chap
 
 ## Reading the position
 
-`onPositionChange` gets the seconds played, and `onChapterChange` the index of the chapter now playing, or -1 before the first. `position` goes the other way: a player whose parent passes a position more than a second away from its own seeks to it, so `position={at()} onPositionChange={at.set}` keeps both in step.
+`onPositionChange` gets the seconds played, and `onChapterChange` the index of the chapter now playing, or -1 before the first. `position` goes the other way: a player whose parent passes a position more than a second away from its own seeks to it, so `position={at()} onPositionChange={at.set}` keeps both in step. The parent must echo the position as it is reported: a value that comes back late is more than a second behind and seeks the audio backwards.
 
 ## Labels
 

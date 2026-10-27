@@ -69,3 +69,6 @@ export function clock(seconds: number): string {
 
   return hours > 0 ? `${hours}:${String(minutes).padStart(2, '0')}:${rest}` : `${minutes}:${rest}`
 }
+
+// The player whose lock screen controls are set, so a player leaving the page lifts only its own.
+export const lockScreen: { owner: object | undefined } = { owner: undefined }
