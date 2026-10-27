@@ -126,3 +126,68 @@ it('resumes a regenerated reply after a reload without saying it replaces anythi
 
   expect(await log(page)).toEqual(['u:hold', 'a:fresh roles=u last=hold files=0'])
 }, 120_000)
+
+it('regenerates the last reply, then edits the first message: no dropped turn is left in the log or posted, and each post says what it replaces', async () => {
+  await using page = await site.open('/replaceable')
+
+  await send(page, 'one', 'fresh roles=u last=one files=0')
+  await send(page, 'two', 'fresh roles=uau last=two files=0')
+  await page.click(REGENERATE)
+  await page.waitFor('.kai-chat-turn[data-role=assistant]:last-of-type .kai-chat-text', { text: 'regenerate:2 roles=uau last=two files=0' })
+  await page.click(`.kai-chat-turn[data-role=user] ${EDIT}`)
+  await page.fill('.kai-chat-turn[data-editing] textarea', 'uno')
+  await page.press('Enter')
+  await page.waitFor('.kai-chat-turn[data-role=assistant]:last-of-type .kai-chat-text', { text: 'edit:4 roles=u last=uno files=0' })
+
+  expect(await log(page)).toEqual(['u:uno', 'a:edit:4 roles=u last=uno files=0'])
+}, 120_000)
+
+it('puts the history back, the edited text in the field, when an edit is stopped before the first word', async () => {
+  await using page = await site.open('/replaceable')
+
+  await send(page, 'one', 'fresh roles=u last=one files=0')
+  await send(page, 'two', 'fresh roles=uau last=two files=0')
+
+  const before = await log(page)
+
+  await page.click(`.kai-chat-turn[data-role=user] ${EDIT}`)
+  await page.fill('.kai-chat-turn[data-editing] textarea', 'silent')
+  await page.click('.kai-chat-save')
+  await page.waitFor('.kai-chat-turn[data-pending]')
+  await page.click('.kai-chat-form .kai-chat-send')
+  await page.waitFor('.kai-chat-turn[data-pending]', { gone: true })
+
+  expect(await log(page)).toEqual(before)
+  expect(await page.value('.kai-chat-form textarea')).toBe('silent')
+}, 120_000)
+
+it('puts the reply back when a regenerate is stopped before the first word', async () => {
+  await using page = await site.open('/replaceable')
+
+  await send(page, 'silent', 'fresh roles=u last=silent files=0')
+
+  const before = await log(page)
+
+  await page.click(REGENERATE)
+  await page.waitFor('.kai-chat-turn[data-pending]')
+  await page.click('.kai-chat-form .kai-chat-send')
+  await page.waitFor('.kai-chat-turn[data-pending]', { gone: true })
+
+  expect(await log(page)).toEqual(before)
+  expect(await page.value('.kai-chat-form textarea')).toBe('')
+}, 120_000)
+
+it('posts the same request again from Try again after a failed regenerate, and Escape cancels an edit', async () => {
+  await using page = await site.open('/replaceable')
+
+  await send(page, 'fail', 'fresh roles=u last=fail files=0')
+  await page.click(REGENERATE)
+  await page.waitFor('.kui-notice button')
+  await page.click('.kui-notice button')
+  await page.waitFor('.kai-chat-turn[data-role=assistant]:last-of-type .kai-chat-text', { text: 'regenerate:2 roles=u last=fail files=0' })
+  await page.click(`.kai-chat-turn[data-role=user] ${EDIT}`)
+  await page.press('Escape')
+  await page.waitFor('.kai-chat-turn[data-editing]', { gone: true })
+
+  expect(await log(page)).toEqual(['u:fail', 'a:regenerate:2 roles=u last=fail files=0'])
+}, 120_000)

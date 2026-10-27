@@ -179,6 +179,8 @@ const editDraft = signal('')
 const busy = () => waiting() || streaming() !== undefined
 // What the post under way replaces (`regenerate:2`), kept for Try again, which posts the same request; a fresh send, a message taken back or a reset forgets it.
 let replacing: string | undefined
+// The history as it stood before a regenerate or an edit cut it, put back when that post is stopped or refused before any word, since nothing replaced the turns it dropped.
+let undone: Turn[] | undefined
 let run: AbortController | undefined
 // The id the reply under way was sent under, for a Chat that remembers: what a reload resumes and a Stop ends.
 let replying: string | undefined
@@ -316,9 +318,24 @@ function takeBack() {
   if (last?.role !== 'user')
     return
 
-  history = history().slice(0, -1)
+  const edited = replacing?.startsWith('edit')
+  const restore = undone
+
+  undone = undefined
   replacing = undefined
   takenBack = true
+
+  // A regenerate or an edit puts the history back as it was; an edit's text returns to the field, its files staying with the turn they came from, and a regenerate has no message to return.
+  if (restore !== undefined) {
+    history = restore
+
+    if (edited)
+      draft = draft() === '' ? last.content : `${last.content}\n${draft()}`
+
+    return
+  }
+
+  history = history().slice(0, -1)
   draft = draft() === '' ? last.content : `${last.content}\n${draft()}`
   attached = [...filesOf(last), ...attached()]
 }
@@ -348,8 +365,10 @@ function finish(state: string) {
   if (state === 'done' && resumed && text === '' && made.length === 0)
     takeBack()
 
-  if (text !== '' || made.length > 0)
+  if (text !== '' || made.length > 0) {
+    undone = undefined
     history = [...history(), { id: nextId++, role: 'assistant', content: text, calls: made, code: highlighted, reasoning: thinking, stopped: state === 'closed' }]
+  }
 
   if (state === 'failed')
     failure = errorMessage
@@ -474,6 +493,7 @@ async function send(again = false, question?: string, resuming?: string) {
 
   if (!again) {
     replacing = undefined
+    undone = undefined
     history = [...history(), { id: nextId++, role: 'user', content: text, ...sent.length > 0 && { attachments: sent } }]
 
     // A suggestion leaves what the visitor was typing.
@@ -565,6 +585,7 @@ function reset() {
   stop()
   history = []
   replacing = undefined
+  undone = undefined
   editing = undefined
   draft = ''
   attached = []
@@ -605,6 +626,7 @@ function regenerateReply() {
     return
 
   replacing = 'regenerate:2'
+  undone = history()
   history = history().slice(0, -1)
   void send(true)
 }
@@ -630,6 +652,7 @@ function saveEdit() {
     return
 
   replacing = `edit:${turns.length - index}`
+  undone = turns
   history = [...turns.slice(0, index), { id: nextId++, role: 'user', content: text, ...files.length > 0 && { attachments: files } }]
   void send(true)
 }

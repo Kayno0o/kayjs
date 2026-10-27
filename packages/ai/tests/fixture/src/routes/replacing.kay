@@ -2,19 +2,31 @@
 import { replaces } from '@kaynooo/kayjs-ai'
 import { s } from 'kay'
 
-// Says what a Chat with regenerate and editable posted: what the post replaces, the roles of the history and its last message, how many files it holds. A regenerated "hold" never ends, for a test that reloads mid-reply.
-async function* say(text: string, hold: boolean) {
+// Says what a Chat with regenerate and editable posted: what the post replaces, the roles of the history and its last message, how many files it holds. A regenerated or edited "hold" never ends, "silent" says nothing for a while, and "fail" fails once, for tests that stop, reload or retry.
+async function* say(text: string, mode: string | undefined) {
+  if (mode === 'silent')
+    await Bun.sleep(5000)
+
   yield text
 
-  if (hold)
+  if (mode === 'hold')
     await Bun.sleep(5000)
 }
+
+let failed = false
 
 export const reply = action(s.Object({ messages: s.Array(s.Object({ role: s.UnionEnum(['user', 'assistant']), content: s.String({ maxLength: 4000 }), attachments: s.Optional(s.Array(s.File({ type: 'image/png' }), { maxItems: 4 })) }), { minItems: 1, maxItems: 50 }) }), ({ messages }) => {
   const replacing = replaces()
   const last = messages.at(-1)!
 
-  return say(`${replacing ? `${replacing.kind}:${replacing.turns}` : 'fresh'} roles=${messages.map(message => message.role[0]).join('')} last=${last.content} files=${messages.reduce((sum, message) => sum + (message.attachments?.length ?? 0), 0)}`, replacing?.kind === 'regenerate' && last.content === 'hold')
+  if (replacing && last.content === 'fail' && !failed) {
+    failed = true
+    throw new Error('failed once')
+  }
+
+  const mode = replacing && (last.content === 'hold' || last.content === 'silent') ? last.content : undefined
+
+  return say(`${replacing ? `${replacing.kind}:${replacing.turns}` : 'fresh'} roles=${messages.map(message => message.role[0]).join('')} last=${last.content} files=${messages.reduce((sum, message) => sum + (message.attachments?.length ?? 0), 0)}`, mode)
 }, { maxSize: '2mb' })
 ---
 p Replacing
