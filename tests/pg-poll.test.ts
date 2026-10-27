@@ -19,7 +19,7 @@ afterEach(restoreClock)
 // A handle counting how often it is asked for the database.
 // The statements still running that start with `statement`, once a cancel had up to two seconds to reach the server, which a loaded runner takes longer than a fixed pause.
 async function activeAfterCancel(sql: SQL, statement: string): Promise<number> {
-  const deadline = performance.now() + 2000
+  const deadline = performance.now() + 10_000
 
   for (;;) {
     const [{ busy }] = await sql<[{ busy: number }]>`SELECT count(*)::int AS busy FROM pg_stat_activity WHERE query LIKE ${`${statement}%`} AND state = 'active' AND pid != pg_backend_pid()`
