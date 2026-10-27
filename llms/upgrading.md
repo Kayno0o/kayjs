@@ -6,7 +6,7 @@ What each minor release breaks, and what an app changes to move to it. kay and i
 
 ### `s.UnionEnum` and `s.UnionKeys` no longer default to their first value
 
-- An optional enum field left out used to read as the first value and a required one was filled in instead of refused with a 422. Both now keep what the visitor sent: an action relying on the fill writes `s.UnionEnum(['a', 'b'], { default: 'a' })`. No lint can recognise it, as the old form is valid and only its result changed.
+- An enum field left out used to read as its first value. An optional one now reads `undefined`; a required one is refused: an action answers 422, a page's `query` schema answers 400 on a visit without the parameter, a `defineEnv` variable left unset stops the boot, and a content field left out fails the build. An app relying on the fill writes `s.UnionEnum(['a', 'b'], { default: 'a' })`, which also keeps the old error body of an `api` route. No lint can recognise it, as the old form is valid and only its result changed.
 
 ### A Button that is disabled with a `data-tooltip` is `aria-disabled`, not `disabled`
 

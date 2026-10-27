@@ -6,6 +6,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
 import { t as elysiaSchema } from 'elysia'
 import { TypeCompiler } from 'elysia/type-system'
 import { s } from 'kay'
+import { readFields } from '../src/server/query'
 import { scratchDir } from './scratch'
 
 let dir: string
@@ -106,7 +107,8 @@ describe('s from kay', () => {
     expect(check.Check({})).toBe(false)
     expect(check.Check({ level: 'low' })).toBe(true)
     expect(check.Check({ level: 'other' })).toBe(false)
-    expect(s.UnionKeys({ a: 1 }).default).toBeUndefined()
+    expect(readFields(shape, {})).toEqual({ refused: new Map([['level', expect.any(String)]]) })
+    expect(readFields(shape, { level: 'low' })).toEqual({ value: { level: 'low' } })
     expect('default' in s.UnionKeys({ a: 1 })).toBe(false)
   })
 })
