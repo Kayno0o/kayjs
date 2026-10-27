@@ -50,6 +50,7 @@ In production the server serves what `kay build` wrote and bundles nothing at bo
 | `kay render <url> [dir] [--method <method>] [--body <text>] [--header <name: value>] [--cookie <name=value>] [-i] [--entry <file>]` | print what the server answers for one URL, as `kay dev` serves it, without starting it on a port |
 | `kay routes [dir]` | list every route the project serves, and the file serving it |
 | `kay explain [lint\|error\|group]` | list the lints and the errors, or a group's, or explain one: a lint with an example it reports and the same written right, an error with where its fix is written |
+| `kay docs [words]` | print the section of kay's or an installed library's docs that words or a name match, or the one a label names |
 | `kay fmt [paths...] [--check]` | format `.kay` files |
 | `kay types [dir]` | write the types the editor's ESLint reads for `.kay` files, without checking |
 | `kay lint [keslint arguments]...` | write the types the lint of `.kay` files reads, then run the project's `keslint` on the arguments, with no `kay check` needed first |

@@ -883,7 +883,7 @@ export function agentsFile(scripts: Record<string, string>, seo: boolean): strin
 
   return blocks(
     '# __NAME__',
-    'Built with kay, a Bun web framework: a `.kay` file is one component, TypeScript fences then a pug-like template. Read kay\'s docs for the installed version before writing kay code; the topic files they link are in `node_modules/kay/llms/`:',
+    'Built with kay, a Bun web framework: a `.kay` file is one component, TypeScript fences then a pug-like template. Read kay\'s docs for the installed version before writing kay code; the topic files they link are in `node_modules/kay/llms/`, and `bunx kay docs <words>` prints the section of them or of an installed library\'s that matches:',
     '@node_modules/kay/llms.txt',
     seo && 'Every page title ends with `seo.name` from `kay.config.ts`, which `kay new` filled in from the folder name: set it to the site\'s real name.',
     `Before calling a change done, run ${new Intl.ListFormat('en').format(checks)}.`,

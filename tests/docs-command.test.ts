@@ -1,14 +1,16 @@
+import type { ErrorName } from '../src/compiler/errors'
 import { mkdir, rm, symlink } from 'node:fs/promises'
 import { join } from 'node:path'
 import process from 'node:process'
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
+import { ERRORS, explainError } from '../src/compiler/errors'
 import { docFiles, excerpt, findLabel, searchDocs } from '../src/docs-search'
 import { scratchDir } from './scratch'
 
 const cli = join(import.meta.dir, '../src/cli.ts')
 const checkout = join(import.meta.dir, '..')
 // A reference section past the length a search prints whole, one item of it naming the word searched.
-const longReference = `## Reference\n\n${Array.from({ length: 60 }, (_, index) => `- Item ${index} says something about the widget at length, ${'padding words '.repeat(6)}`).join('\n')}\n- The quokka option turns the widget around.\n`
+const longReference = `## Reference\n\n${Array.from({ length: 60 }, (_, index) => `- Item ${index} says something about the widget at length, ${'padding words '.repeat(6)}`).join('\n')}\n- The quokka option turns the widget around.\n\n\`\`\`ts\nquokka()\n\`\`\`\n`
 let root: string
 
 beforeAll(async () => {
@@ -17,7 +19,9 @@ beforeAll(async () => {
 
   await Bun.write(join(library, 'llms.txt'), '# kayjs-fake\n\n> A fake library.\n\n## Topics\n\n- [Widgets](llms/widgets.md): the widget\n- [Gadgets](llms/gadgets.md): the gadget\n')
   await Bun.write(join(library, 'llms/widgets.md'), `# Widgets\n\n## Common tasks\n\n### Spin a widget\n\nA Widget spins.\n\n\`\`\`sh\n# not a heading\n\`\`\`\n\n### Spin a widget\n\nThe same heading twice.\n\n${longReference}`)
-  await Bun.write(join(library, 'llms/gadgets.md'), '# Gadgets\n\n## Spin a widget\n\nA gadget spins a widget too.\n')
+  await Bun.write(join(library, 'llms/gadgets.md'), '# Gadgets\n\n## Spin a widget\n\nA gadget spins a widget too.\n\n## Object shapes\n\nAn object of s fields, the object kind.\n\n## Validate a post\n\nThe handler checks the post with `s.Object({ name })` first.\n')
+  // A library installed nearer than the checkout's, which wins its name.
+  await Bun.write(join(root, 'node_modules/@kaynooo/kayjs-ui/llms.txt'), '# kayjs-ui nearer\n\nThe nearest copy.\n')
   await Bun.write(join(root, 'node_modules/@kaynooo/kayjs-bare/package.json'), '{}')
   await mkdir(join(root, 'node_modules/@kaynooo'), { recursive: true })
   await symlink(library, join(root, 'node_modules/@kaynooo/kayjs-fake'))
@@ -40,9 +44,15 @@ describe('the llms files', () => {
 
     expect(labels).toContain('kay/llms.txt')
     expect(labels).toContain('kay/actions.md')
-    expect(labels).toContain('kayjs-ui/forms-and-steps.md')
+    expect(labels).toContain('kayjs-ai/asking.md')
     expect(labels).toContain('kayjs-fake/widgets.md')
     expect(labels.some(label => label.startsWith('kayjs-bare/'))).toBe(false)
+  })
+
+  it('takes a library from the nearest node_modules holding it', () => {
+    const ui = docFiles(root).filter(file => file.label.startsWith('kayjs-ui/'))
+
+    expect(ui.map(file => [file.label, file.path])).toEqual([['kayjs-ui/llms.txt', join(root, 'node_modules/@kaynooo/kayjs-ui/llms.txt')]])
   })
 
   it('splits a file on its headings, none read inside a code fence, a repeated heading numbered as GitHub anchors it', () => {
@@ -71,6 +81,11 @@ describe('a search', () => {
     expect(searchDocs(files, 'ask')[0]!.section.label).toBe('kayjs-ai/asking.md#ask')
   })
 
+  it('finds a dotted name as one word, not by its parts', () => {
+    expect(searchDocs(docFiles(root).filter(file => file.label.startsWith('kayjs-fake/')), 's.Object')[0]!.section.label).toBe('kayjs-fake/gadgets.md#validate-a-post')
+    expect(searchDocs(docFiles(checkout), 'ctx.fail')[0]!.section.file.label).toBe('kay/actions.md')
+  })
+
   it('finds a heading repeated in two files in both', () => {
     const labels = searchDocs(docFiles(root), 'spin widget').map(match => match.section.label)
 
@@ -82,7 +97,7 @@ describe('a search', () => {
     const [match] = searchDocs(docFiles(root), 'quokka')
 
     expect(match!.section.label).toBe('kayjs-fake/widgets.md#reference')
-    expect(excerpt(match!).text).toBe('## Reference\n\n- The quokka option turns the widget around.')
+    expect(excerpt(match!).text).toBe('## Reference\n\n- The quokka option turns the widget around.\n\n```ts\nquokka()\n```')
     expect(excerpt(match!).omitted).toBe(60)
   })
 
@@ -119,11 +134,33 @@ describe('kay docs', () => {
     expect(stdout).not.toContain('## Reference')
   })
 
+  it('fails on a label naming a file its package lacks or a package not installed', async () => {
+    expect(await kay(['kayjs-fake/nope.md'], root)).toMatchObject({ code: 1, stderr: 'kay docs: `kayjs-fake/nope.md` names no file of `kayjs-fake`; `kay docs` lists them\n' })
+    expect(await kay(['kayjs-cms-not-here/setup.md#use'], root)).toMatchObject({ code: 1, stderr: 'kay docs: `kayjs-cms-not-here` is no package installed here with docs; `kay docs` lists the files of those that are\n' })
+  })
+
+  it('answers the list, a file\'s headings and a section in JSON, and reads words after `--`', async () => {
+    const list = JSON.parse((await kay(['--format', 'json'], root)).stdout) as { files: { label: string, title: string, path: string }[] }
+    const outline = JSON.parse((await kay(['kayjs-fake/gadgets', '--format', 'json'], root)).stdout) as { files: { headings: { label: string, level: number }[] }[] }
+    const section = JSON.parse((await kay(['--format', 'json', '--', 'kayjs-fake/gadgets#object-shapes'], root)).stdout) as { sections: unknown[], others: unknown[] }
+
+    expect(list.files).toContainEqual({ label: 'kayjs-fake/gadgets.md', title: 'Gadgets', path: 'node_modules/@kaynooo/kayjs-fake/llms/gadgets.md' })
+    expect(outline.files[0]!.headings.map(heading => [heading.label, heading.level])).toEqual([['kayjs-fake/gadgets.md#gadgets', 1], ['kayjs-fake/gadgets.md#spin-a-widget', 2], ['kayjs-fake/gadgets.md#object-shapes', 2], ['kayjs-fake/gadgets.md#validate-a-post', 2]])
+    expect(section).toEqual({ sections: [{ label: 'kayjs-fake/gadgets.md#object-shapes', path: 'node_modules/@kaynooo/kayjs-fake/llms/gadgets.md', line: 7, heading: 'Object shapes', text: '## Object shapes\n\nAn object of s fields, the object kind.' }], others: [] })
+  })
+
   it('explains a lint, the sections naming it after', async () => {
     const { stdout } = await kay(['missing-alt'])
 
     expect(stdout).toStartWith('kay explain missing-alt\n\nmissing-alt: deny by default, in a11y')
     expect(stdout).toContain('\nAlso:\n')
+  })
+
+  it('explains an error code', async () => {
+    const [code] = Object.keys(ERRORS)
+    const { stdout } = await kay([code!])
+
+    expect(stdout).toStartWith(`kay explain ${code}\n\n${explainError(code as ErrorName)}`)
   })
 
   it('answers a search in JSON, and fails on words nothing matches or a heading a file lacks', async () => {

@@ -78,7 +78,7 @@ const NO_CACHE = { ttlMs: 0, cacheScope: 'private' }
 // The longest line read, a request being far shorter; a longer one is refused instead of growing the buffer.
 const MAX_LINE = 4 * 1024 * 1024
 
-const INSTRUCTIONS = 'kay is a Bun web framework whose components are `.kay` files. Run `check` after editing a `.kay` file, `routes` to see what the app serves, `render` to see what a URL answers, `dev_errors` for what `kay dev` met, and `explain` for a lint or error code a report names. Read the `kay://llms.txt` resource first, it links the guide to each part of the framework.'
+const INSTRUCTIONS = 'kay is a Bun web framework whose components are `.kay` files. Run `check` after editing a `.kay` file, `routes` to see what the app serves, `render` to see what a URL answers, `dev_errors` for what `kay dev` met, `explain` for a lint or error code a report names, and `docs` to find the section of the docs on a topic or a name. Read the `kay://llms.txt` resource first, it links the guide to each part of the framework.'
 
 // The id of a message that is no valid request, when it is one a reply can carry.
 function readableId(message: unknown): string | number | null {

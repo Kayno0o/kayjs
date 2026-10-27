@@ -9,10 +9,13 @@ const FENCE = /^\s*(`{3,}|~{3,})/
 const HEADING = /^(#{1,6}) (.+)$/
 const LINK_LINE = /^\s*[-*]\s+\[[^\]]*\]\([^)]*\)/
 const BLOCK_START = /^(?:[-*+]|\d+\.)\s|^#{1,6}\s|^\|/
-const TABLE_ROW = /^\|([^|]+)\|/
+// A table row whose first cell is one code span, as a lint's or an option's row is, rather than a case in words.
+const TABLE_NAME = /^\|\s*`([^`|]+)`\s*\|/
 const WORD = /[\w$@][\w$@.-]*[\w$]|[\w$]/g
 const CAMEL_PART = /[A-Z]?[a-z\d]+|[A-Z]+(?![a-z])/g
-const CODE_SPAN = /`([^`]+)`/g
+const LEAD_CODE = /^`([^`]+)`/
+const WHITESPACE = /\s/
+const LABEL_FILE = /\.(?:md|txt)$/
 const NOT_SLUG = /[^\w\- ]/g
 const SPACE = / /g
 const MD_SUFFIX = /\.md$/
@@ -34,7 +37,6 @@ const BM25_B = 0.75
 export interface DocFile {
   // `kay/actions.md`, `kayjs-ui/llms.txt`
   label: string
-  package: string
   path: string
   title: string
   searched: boolean
@@ -111,7 +113,7 @@ function parseFile(name: string, file: string, path: string): DocFile | undefine
     return undefined
 
   const lines = readFileSync(path, 'utf8').split('\n')
-  const doc: DocFile = { label: `${name}/${file}`, package: name, path, title: file, searched: !UNSEARCHED.test(file), sections: [] }
+  const doc: DocFile = { label: `${name}/${file}`, path, title: file, searched: !UNSEARCHED.test(file), sections: [] }
   const heads = headings(lines)
   const slugs = new Map<string, number>()
 
@@ -212,9 +214,14 @@ export function isLabel(files: DocFile[], argument: string): boolean {
   return argument.includes('/') && findLabel(files, labelPath(argument)) !== undefined
 }
 
+// Whether an argument can only be meant as a label, naming a `.md` or `.txt` file or a heading, so that one naming nothing fails rather than being searched.
+export function looksLikeLabel(argument: string): boolean {
+  return !WHITESPACE.test(argument) && argument.includes('/') && (argument.includes('#') || LABEL_FILE.test(labelPath(argument)))
+}
+
 // The sections the words match, the best first.
 export function searchDocs(files: DocFile[], query: string): DocMatch[] {
-  const words = wordsOf(query)
+  const words = wordsOf(query, false)
   const terms = [...new Set(words.filter(word => !STOP_WORDS.has(word)))]
   const wanted = terms.length > 0 ? terms : [...new Set(words)]
 
@@ -284,27 +291,28 @@ function indexed(section: DocSection): Indexed {
 function lead(block: string): string[] {
   const end = block.indexOf('\n')
   const first = end === -1 ? block : block.slice(0, end)
-  const cell = TABLE_ROW.exec(first)?.[1]
+  const cell = TABLE_NAME.exec(first)?.[1]
 
   if (cell !== undefined)
     return wordsOf(cell)
 
-  const text = first.replace(LEAD_MARKER, '')
-  const code = text.startsWith('`') ? CODE_SPAN.exec(text)?.[1] : undefined
+  if (first.startsWith('|'))
+    return []
 
-  CODE_SPAN.lastIndex = 0
+  const text = first.replace(LEAD_MARKER, '')
+  const code = LEAD_CODE.exec(text)?.[1]
 
   return code === undefined ? wordsOf(text).slice(0, 3).filter(word => !STOP_WORDS.has(word)) : wordsOf(code).slice(0, 2)
 }
 
-// Lowercased words, a camel-cased name also as its parts and a plural as its singular, so that `form dialogs` finds `FormDialog`.
-function wordsOf(text: string): string[] {
+// Lowercased words, a plural as its singular, and in the docs a camel-cased or dotted name also as its parts, so that `form dialogs` finds `FormDialog` while `s.Object` searched finds only itself.
+function wordsOf(text: string, parts = true): string[] {
   const words: string[] = []
 
   for (const [raw] of text.matchAll(WORD)) {
-    const parts = raw.match(CAMEL_PART) ?? []
+    const split = parts ? raw.match(CAMEL_PART) ?? [] : []
 
-    words.push(stem(raw.toLowerCase()), ...parts.length > 1 ? parts.map(part => stem(part.toLowerCase())) : [])
+    words.push(stem(raw.toLowerCase()), ...split.length > 1 ? split.map(part => stem(part.toLowerCase())) : [])
   }
 
   return words
@@ -336,7 +344,7 @@ function blocks(text: string): string[] {
     if (found.length === 0 || (!inFence && marker === undefined && (blank || BLOCK_START.test(line))))
       found.push([line])
     else
-      found.at(-1)!.push(line)
+      found.at(-1)!.push(...blank ? ['', line] : [line])
 
     blank = false
   }

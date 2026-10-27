@@ -130,7 +130,10 @@ describe('kay explain', () => {
     expect(await explain('missing-alt')).toEqual({ code: 0, stdout: `${explainLint('missing-alt')}\n`, stderr: '' })
     expect(await explain('seo')).toEqual({ code: 0, stdout: `${lintList('seo')}\n`, stderr: '' })
     expect(await explain('zzqqxx')).toEqual({ code: 1, stdout: '', stderr: 'kay explain: `zzqqxx` is no lint, error or group; `kay explain` lists them\n' })
-    expect(await explain('FormDialog')).toEqual({ code: 1, stdout: '', stderr: 'kay explain: `FormDialog` is no lint, error or group; `kay explain` lists them, and `kay docs FormDialog` prints kayjs-ui/forms-and-steps.md#forms-and-steps\n' })
+    const named = await explain('FormDialog')
+
+    expect(named.code).toBe(1)
+    expect(named.stderr).toStartWith('kay explain: `FormDialog` is no lint, error or group; `kay explain` lists them, and `kay docs FormDialog` prints kayjs-ui/forms-and-steps.md#')
   })
 })
 

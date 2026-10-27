@@ -4,7 +4,7 @@ import { relative } from 'node:path'
 import process from 'node:process'
 import { explainError, isErrorCode } from '../compiler/errors'
 import { explainLint, isLint } from '../compiler/lints'
-import { docFiles, excerpt, findLabel, isLabel, labelPath, searchDocs } from '../docs-search'
+import { docFiles, excerpt, findLabel, isLabel, labelPath, looksLikeLabel, searchDocs } from '../docs-search'
 import { formatOption, printDocument, printFailure } from './command'
 import { USAGES } from './usages'
 
@@ -45,12 +45,11 @@ export const docs: Command = {
       return 0
     }
 
-    if (positionals.length === 1 && isLabel(files, first)) {
+    if (positionals.length === 1 && (isLabel(files, first) || looksLikeLabel(first))) {
       const found = findLabel(files, first)
-      const path = labelPath(first)
 
       if (found === undefined) {
-        printFailure('docs', `\`${first}\` names no heading of \`${path}\`; \`kay docs ${path}\` lists them`, format)
+        printFailure('docs', missingLabel(files, first), format)
 
         return 1
       }
@@ -121,4 +120,19 @@ function printOutline(file: DocFile, format: ProblemFormat, root: string) {
 
 function where(section: DocSection, root: string) {
   return { label: section.label, path: relative(root, section.file.path), line: section.line }
+}
+
+// Why a label names nothing: a heading its file lacks, a file its package lacks, or a package not installed.
+function missingLabel(files: DocFile[], label: string): string {
+  const path = labelPath(label)
+
+  if (findLabel(files, path) !== undefined)
+    return `\`${label}\` names no heading of \`${path}\`; \`kay docs ${path}\` lists them`
+
+  const bare = path.replace('@kaynooo/', '')
+  const name = bare.slice(0, bare.indexOf('/'))
+
+  return files.some(file => file.label.startsWith(`${name}/`))
+    ? `\`${path}\` names no file of \`${name}\`; \`kay docs\` lists them`
+    : `\`${name}\` is no package installed here with docs; \`kay docs\` lists the files of those that are`
 }
