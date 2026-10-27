@@ -610,6 +610,7 @@ function reset() {
   replacing = undefined
   undone = undefined
   editing = undefined
+  refocus = undefined
   draft = ''
   attached = []
   attachProblem = undefined
@@ -659,13 +660,19 @@ function startEdit(turn: Turn) {
   editing = turn.id
   editDraft = withoutApproval(turn.content)
   editProblem = undefined
+  refocus = undefined
 }
 
 // Closes the edit and puts the focus back on the message's edit button, which is drawn again by then.
 function cancelEdit(id: number) {
-  refocus = id
   editing = undefined
   editProblem = undefined
+
+  // While a reply is under way no message has an edit button, so the field takes the focus, as after a Save.
+  if (busy())
+    field?.focus()
+  else
+    refocus = id
 }
 
 const START_CHARS = 40

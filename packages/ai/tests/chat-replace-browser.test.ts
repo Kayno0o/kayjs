@@ -313,3 +313,21 @@ it('draws the icons a ChatLauncher is given for the regenerate and edit buttons'
   expect(await page.text(`${EDIT} .mine-edit`)).toBe('E')
   expect(await page.text(`${REGENERATE} .mine-regenerate`)).toBe('R')
 }, 120_000)
+
+it('puts the focus in the field, and nowhere later, when an edit is cancelled while a reply is under way', async () => {
+  await using page = await site.open('/replaceable')
+
+  await send(page, 'silent', 'fresh roles=u last=silent files=0')
+  await page.click(EDIT)
+  await page.click(REGENERATE)
+  await page.waitFor('.kai-chat-turn[data-pending]')
+  await page.click('.kai-chat-cancel')
+  await page.waitFor('.kai-chat-turn[data-editing]', { gone: true })
+
+  expect(await focused(page)).toContain('textarea')
+
+  await page.click('.kai-chat-form .kai-chat-send')
+  await page.waitFor('.kai-chat-turn[data-pending]', { gone: true })
+
+  expect(await focused(page)).toContain('textarea')
+}, 120_000)
