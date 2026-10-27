@@ -48,6 +48,24 @@ describe('the flash cookie', () => {
   })
 })
 
+describe('the flash cookie against a request for another page', () => {
+  it('is left for the page it goes back to, whatever fetched another page meanwhile', async () => {
+    for (const [site, path, other] of [[sites.root, '/', '/other'], [sites.mounted, '/blog', '/blog/other']] as const) {
+      const header = (await posted(site, path))[0]!
+      const cookie = header.slice(0, header.indexOf(';'))
+      const elsewhere = await site.fetch(other, { headers: { cookie } })
+
+      expect(elsewhere.status).toBe(200)
+      expect(elsewhere.headers.getSetCookie().join()).not.toContain('kay_flash')
+
+      const back = await site.fetch(path, { headers: { cookie } })
+
+      expect(await back.text()).toContain('saved')
+      expect(back.headers.getSetCookie().join()).toContain('kay_flash=;')
+    }
+  })
+})
+
 describe('the locale cookie', () => {
   const get = async (served: Elysia, path: string, headers: Record<string, string>) => served.handle(new Request(`http://localhost${path}`, { headers }))
   const followed = { 'sec-fetch-site': 'same-origin' }

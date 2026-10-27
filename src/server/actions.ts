@@ -822,7 +822,7 @@ async function countGoneThrough(action: ServerAction<TSchema, unknown>, request:
 // A call gets the result; a plain form post goes back to the page it came from, which reads the result through `succeeded()`.
 function succeeded(action: ServerAction<TSchema, unknown>, request: Request, jar: CookieJar, headers: Headers, result: unknown, status: number, base = ''): Response {
   if (!isCall(request))
-    writeSuccess(jar.cookies, { action: action.url, succeeded: true, data: result }, overHttps(request), base)
+    writeSuccess(jar.cookies, { action: action.url, succeeded: true, data: result, page: new URL(backTo(request, base), 'http://kay').pathname }, overHttps(request), base)
 
   jar.writeTo(headers)
 

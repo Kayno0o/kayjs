@@ -37,7 +37,7 @@ import { currentServerScope } from '../runtime/reactive'
 import { BUILD_META } from '../runtime/swap'
 import { hasPageToken, withPageToken } from '../runtime/uid.server'
 import { encodeValue, unsendable } from '../runtime/wire'
-import { rebaseHtml } from './base'
+import { rebaseHtml, routerPath } from './base'
 import { importModule, onForgetModules } from './bundle'
 import { INLINE_LIMIT, islandChunks } from './client'
 import { preferredEncoding, STYLE_TAG, wholeResponse } from './compress'
@@ -47,7 +47,7 @@ import { A11Y_SCRIPT, DEV_BOOT, devToolScripts, errorPageScripts, liveReload, pr
 import { noteRedirect } from './dev-notes'
 import { dictionaryAsked } from './dictionary'
 import { entryHeadOf } from './entry-head'
-import { FLASH_COOKIE, flashName, flashPath, handedOverFlash, readFlash } from './flash'
+import { FLASH_COOKIE, flashForOther, flashName, flashPath, handedOverFlash, readFlash } from './flash'
 import { formsScript } from './forms'
 import { runGuards } from './guards'
 import { historyScript } from './history'
@@ -770,7 +770,11 @@ function createRendering(context: RequestContext, params: Record<string, unknown
 
     return jar.cookies
   }
-  const readOnce = () => flash ??= handedOverFlash(request) ?? (hasFlash(request, base) ? readFlash(personalCookies(), flashName(overHttps(request), base)) ?? null : null)
+  // The cookie's flash, whichever page this is: the page it goes back to reads it, and no other takes it.
+  let cookieFlash: SuccessFlash | null | undefined
+  const fromCookie = () => cookieFlash ??= hasFlash(request, base) ? readFlash(personalCookies(), flashName(overHttps(request), base)) ?? null : null
+  const foreign = () => flashForOther(fromCookie(), routerPath(new URL(request.url).pathname, base))
+  const readOnce = () => flash ??= handedOverFlash(request) ?? (foreign() ? null : fromCookie())
   // A page asking how a form post went depends on the visitor's cookie, carried or not, so it is theirs either way.
   const asked = () => {
     readPersonally(request)
@@ -794,7 +798,7 @@ function createRendering(context: RequestContext, params: Record<string, unknown
     outcome: asked,
     carried: readOnce,
     writeCookies: () => {
-      if (hasFlash(request, base)) {
+      if (hasFlash(request, base) && !foreign()) {
         const name = flashName(overHttps(request), base)
 
         jar.cookies.delete({ name, path: flashPath(base) })

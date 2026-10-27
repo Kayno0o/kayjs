@@ -21,6 +21,8 @@ export interface SuccessFlash {
   action: string
   succeeded: true
   data: unknown
+  // The page it goes back to, as a path under `base` without its query: a page request for another path leaves the cookie alone, so a prefetch or another tab racing the swap's own request never takes it.
+  page?: string
 }
 
 // Under the 4 KB browsers keep per cookie, the other cookies of the response included.
@@ -87,6 +89,15 @@ export function flashName(secure: boolean, base: string): string {
 // The flash goes with the pages of the site, so under a `base` its cookie is that path's alone: another app on the host never meets it, nor deletes it.
 export function flashPath(base: string): string {
   return base || '/'
+}
+
+// Whether a page at `path` (under `base`) is not the one the flash goes back to; one that names no page is for any.
+export function flashForOther(flash: Flash | SuccessFlash | null | undefined, path: string): boolean {
+  return flash !== null && flash !== undefined && 'page' in flash && flash.page !== undefined && trimSlash(flash.page) !== trimSlash(path)
+}
+
+function trimSlash(path: string): string {
+  return path.length > 1 && path.endsWith('/') ? path.slice(0, -1) : path
 }
 
 // Its shape is checked before a page reads it all the same; one that does not open, forged or sealed before a restart changed the secret, reads as none.
