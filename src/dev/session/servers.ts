@@ -20,8 +20,18 @@ const STOP_SIGNALS = new Set<Subprocess['signalCode']>(['SIGINT', 'SIGTERM', 'SI
 // A server listening on every address is reached on this machine as localhost.
 const ANY_ADDRESS = /(?<=\/\/)(?:0\.0\.0\.0|\[::\])(?=:)/
 
-// What the session hears of its servers.
-export interface ServerHooks {
+// What the supervisor is built with, and what the session hears of its servers.
+export interface ServerSetup {
+  root: string
+  options: Pick<DevOptions, 'port' | 'host' | 'inspect' | 'onRestart'>
+  env: Record<string, string | undefined>
+  ports: DevPorts
+  reporter: Reporter
+  phase: () => Phase
+  // Settled once the first types write, which tells a config that does not load, is over.
+  verified: Promise<void>
+  // When the session began, which the count of changes starts from.
+  clock: number
   // The entry a new process runs, the config's as the types last read it.
   entry: () => string
   received: (server: Subprocess, message: unknown) => void
@@ -81,7 +91,9 @@ export class ServerSupervisor {
   // The inspector socket of each server process.
   private sockets = new Map<Subprocess, string>()
 
-  constructor(private root: string, private options: Pick<DevOptions, 'port' | 'host' | 'inspect' | 'onRestart'>, private env: Record<string, string | undefined>, private ports: DevPorts, private reporter: Reporter, private phase: () => Phase, private verified: Promise<void>, private hooks: ServerHooks, clock: number) {
+  constructor(private setup: ServerSetup) {
+    const { clock, options } = setup
+
     this.codeVersion = clock
     this.startedAt = clock
     this.inspector = options.inspect === undefined ? undefined : inspectorProxy(options.inspect, () => this.child && this.sockets.get(this.child), () => this.pagePort)
@@ -99,7 +111,7 @@ export class ServerSupervisor {
   }
 
   // A change for no file: open pages load the page again.
-  bump() {
+  outdatePages() {
     this.codeVersion++
   }
 
@@ -120,7 +132,7 @@ export class ServerSupervisor {
   start() {
     this.booted = true
 
-    if (this.startupChanged || this.waiting === undefined || this.waiting.exitCode !== null || this.waitingEntry !== this.hooks.entry())
+    if (this.startupChanged || this.waiting === undefined || this.waiting.exitCode !== null || this.waitingEntry !== this.setup.entry())
       this.spawnWaiting()
 
     const started = this.waiting!
@@ -133,13 +145,13 @@ export class ServerSupervisor {
     this.startedAt = this.codeVersion
     this.changedFiles = new Set()
     void started.stdin.flush()
-    this.options.onRestart?.(started)
+    this.setup.options.onRestart?.(started)
     void this.reportExit(started)
   }
 
   // Whether the running process can take the change in: it is up, the environment and the entry are the ones it started with, and no key asked for a new one.
   reloadable(files: string[], asked: boolean): boolean {
-    return !asked && !this.startupChanged && this.listening && this.reloads < MAX_RELOADS && this.child !== undefined && this.child.exitCode === null && this.runningEntry === this.hooks.entry() && !files.includes(CONFIG_FILE)
+    return !asked && !this.startupChanged && this.listening && this.reloads < MAX_RELOADS && this.child !== undefined && this.child.exitCode === null && this.runningEntry === this.setup.entry() && !files.includes(CONFIG_FILE)
   }
 
   sent(): Sent {
@@ -205,8 +217,9 @@ export class ServerSupervisor {
     this.listening = true
   }
 
-  answer(answer: string) {
-    this.reloadAnswer?.(answer)
+  // The reload in flight ended: `reloaded`, why it needs a new process, or `exited`.
+  endReload(how: string) {
+    this.reloadAnswer?.(how)
   }
 
   // A server reports its address over IPC from the preload; only the one running counts.
@@ -226,7 +239,7 @@ export class ServerSupervisor {
 
   listenedOn(url: string) {
     this.address = url
-    writeDevAddress(this.root, url)
+    writeDevAddress(this.setup.root, url)
   }
 
   tellTypeErrors(problems: unknown[]) {
@@ -244,11 +257,12 @@ export class ServerSupervisor {
   }
 
   private spawn() {
+    const { root, options, env, ports, reporter } = this.setup
     const socket = this.inspector?.socketFor()
 
-    this.runningEntry = this.hooks.entry()
+    this.runningEntry = this.setup.entry()
 
-    const server = this.ports.spawnServer(this.root, this.runningEntry, { ...this.env, NODE_ENV: 'development', ...this.options.port === undefined ? {} : { PORT: String(this.options.port) }, KAY_DEV_HOST: this.options.host ?? 'localhost', ...this.reporter.collapses ? { KAY_DEV_REPORTS_OUTPUT: '1' } : {}, ...socket === undefined ? {} : { BUN_INSPECT: `ws+unix://${socket}` } }, this.reporter.output, (message, server) => this.hooks.received(server, message))
+    const server = ports.spawnServer(root, this.runningEntry, { ...env, NODE_ENV: 'development', ...options.port === undefined ? {} : { PORT: String(options.port) }, KAY_DEV_HOST: options.host ?? 'localhost', ...reporter.collapses ? { KAY_DEV_REPORTS_OUTPUT: '1' } : {}, ...socket === undefined ? {} : { BUN_INSPECT: `ws+unix://${socket}` } }, reporter.output, (message, server) => this.setup.received(server, message))
 
     if (socket !== undefined) {
       this.sockets.set(server, socket)
@@ -270,9 +284,9 @@ export class ServerSupervisor {
     const code = await server.exited
 
     // A server dying with a config that does not load is the refusal's to report, once the first types say so.
-    await this.verified
+    await this.setup.verified
 
-    if (server === this.child && this.phase() !== 'stopping' && !STOP_SIGNALS.has(server.signalCode))
-      this.hooks.exited(code)
+    if (server === this.child && this.setup.phase() !== 'stopping' && !STOP_SIGNALS.has(server.signalCode))
+      this.setup.exited(code)
   }
 }

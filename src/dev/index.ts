@@ -92,7 +92,7 @@ export async function dev(projectRoot: string, options: DevOptions = {}, ports: 
   // Settled once the first types write, which tells a config that does not load, is over.
   const verified = Promise.withResolvers<void>()
   const types = new TypesController(root, options, env, ports, reporter, currentPhase, tellTypeErrors)
-  const servers = new ServerSupervisor(root, options, env, ports, reporter, currentPhase, verified.promise, { entry: () => types.entry(), received, exited: serverExited }, clock)
+  const servers = new ServerSupervisor({ root, options, env, ports, reporter, phase: currentPhase, verified: verified.promise, clock, entry: () => types.entry(), received, exited: serverExited })
   const client = new ClientController(root, env, ports, reporter, currentPhase)
 
   function tellTypeErrors(problems: TypeProblem[]) {
@@ -102,7 +102,7 @@ export async function dev(projectRoot: string, options: DevOptions = {}, ports: 
   // The running server exited on its own: nothing serves until the next change, and the first tree waits for it no more.
   function serverExited(code: number) {
     types.writeFirstTree()
-    servers.answer('exited')
+    servers.endReload('exited')
     reporter.exit(code)
   }
 
@@ -174,10 +174,10 @@ export async function dev(projectRoot: string, options: DevOptions = {}, ports: 
     }
 
     if (server === servers.child && 'reloaded' in message)
-      servers.answer('reloaded')
+      servers.endReload('reloaded')
 
     if (server === servers.child && 'restart' in message && typeof message.restart === 'string')
-      servers.answer(message.restart)
+      servers.endReload(message.restart)
 
     // The server logged it already; only `json` repeats it, as an event.
     if ('devError' in message && reporter.json && typeof message.devError === 'object')
@@ -352,7 +352,7 @@ export async function dev(projectRoot: string, options: DevOptions = {}, ports: 
 
   // As a change does, but for no file: open pages load the page again.
   function restartNow(file?: string) {
-    servers.bump()
+    servers.outdatePages()
     queue.ask(file)
   }
 
