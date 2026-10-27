@@ -131,15 +131,17 @@ export async function verifyRegistration(response: RegistrationResponseJSON, exp
       return undefined
 
     const data = parseAuthData(authData)
+    const id = data.credential && Buffer.from(data.credential.id).toString('base64url')
 
-    if (!data.credential || !(await flagsHold(data, expected)))
+    // Sign-in finds the passkey by the id the browser sends, so one stored under another id than the answer named could never be found again.
+    if (!data.credential || id !== response.id || !(await flagsHold(data, expected)))
       return undefined
 
     // A key of an algorithm not offered, or that Web Crypto cannot import, could never sign in, so it throws here rather than being stored.
     await importCoseKey(data.credential.publicKey)
 
     return {
-      id: Buffer.from(data.credential.id).toString('base64url'),
+      id,
       publicKey: Buffer.from(data.credential.publicKey).toString('base64url'),
       counter: data.counter,
       transports: response.response.transports ?? [],

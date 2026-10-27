@@ -163,6 +163,33 @@ describe('a ceremony in a frame of another site', () => {
   }
 })
 
+describe('the credential id a registration names', () => {
+  for (const algorithm of ['ES256', 'RS256', 'EdDSA', 'ML-DSA-44'] satisfies Algorithm[]) {
+    for (const format of ['none', 'packed'] as const) {
+      test(`a ${algorithm} registration attested as ${format} is stored under its own id, and refused under any other`, async () => {
+        const device = authenticator({ algorithm, format })
+        const request = registrationOptions({ rpName: 'Site', rpId: 'site.test', userName: 'ada', userId: 'u', exclude: [] })
+        const expected = { ...EXPECTED, challenge: request.challenge }
+        const answer = await device.create(request)
+        const raw = Buffer.from(answer.id, 'base64url')
+
+        expect(await verifyRegistration(answer, expected)).toMatchObject({ id: answer.id })
+
+        const others = [
+          Buffer.from(crypto.getRandomValues(new Uint8Array(16))).toString('base64url'),
+          raw.subarray(0, 15).toString('base64url'),
+          Buffer.concat([raw, Buffer.from([0])]).toString('base64url'),
+          raw.toString('base64'),
+          `${answer.id}==`,
+        ]
+
+        for (const id of others)
+          expect(await verifyRegistration({ ...answer, id, rawId: id }, expected)).toBeUndefined()
+      })
+    }
+  }
+})
+
 describe('hostile answers are refused, never thrown', () => {
   test('a registration missing parts, or with parts of the wrong type', async () => {
     const [{ response, expected }] = vectors.registrations as [Vectors['registrations'][number]]
@@ -173,8 +200,10 @@ describe('hostile answers are refused, never thrown', () => {
     const withId = (id: Uint8Array, key = authData.subarray(71)) => withAuthData(Buffer.concat([authData.subarray(0, 53), Buffer.from([id.length >> 8, id.length & 0xFF]), id, key]))
     const unoffered = encodeCbor(new Map<number | string, Encodable>([[1, 2], [3, -35], [-1, 2], [-2, new Uint8Array(48)], [-3, new Uint8Array(48)]]))
 
-    for (const attestationObject of [withAuthData(authData), withId(new Uint8Array(1023))])
-      expect(await verifyRegistration({ ...response, response: { ...response.response, attestationObject } }, expected)).toBeDefined()
+    const longest = Buffer.alloc(1023).toString('base64url')
+
+    expect(await verifyRegistration({ ...response, response: { ...response.response, attestationObject: withAuthData(authData) } }, expected)).toBeDefined()
+    expect(await verifyRegistration({ ...response, id: longest, rawId: longest, response: { ...response.response, attestationObject: withId(new Uint8Array(1023)) } }, expected)).toMatchObject({ id: longest })
 
     const broken: unknown[] = [
       { ...response, response: { ...response.response, attestationObject: withAuthData(Buffer.concat([authData, Buffer.from([0])])) } },
