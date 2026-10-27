@@ -1,0 +1,128 @@
+import { join } from 'node:path'
+import { afterAll, expect, it } from 'bun:test'
+import { testSite } from 'kay/test'
+import { scratchDir } from '../../../tests/scratch'
+
+const site = await testSite({ root: join(import.meta.dir, 'fixture'), browser: true })
+
+afterAll(async () => site.close())
+
+type Page = Awaited<ReturnType<typeof site.open>>
+
+const PNG = new Uint8Array([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0, 0, 0, 13, 0x49, 0x48, 0x44, 0x52])
+const REGENERATE = 'button[aria-label="Regenerate the reply"]'
+const EDIT = 'button[aria-label="Edit the message"]'
+
+// The log as a visitor reads it: one entry per turn, `u:` or `a:` then its text.
+const log = async (page: Page) => page.evaluate(() => [...document.querySelectorAll('.kai-chat-turn')].map(turn => `${turn.getAttribute('data-role')![0]}:${turn.querySelector('.kai-chat-text')?.textContent?.trim() ?? ''}`))
+
+async function send(page: Page, text: string, answer: string) {
+  await page.fill('.kai-chat-form textarea', text)
+  await page.click('.kai-chat-form .kai-chat-send')
+  await page.waitFor('.kai-chat-turn[data-role=assistant]:last-of-type .kai-chat-text', { text: answer })
+}
+
+it('asks again for the last reply: the old one leaves the log, and the action reads that it replaces the reply and the message posted again', async () => {
+  await using page = await site.open('/replaceable')
+
+  await send(page, 'one', 'fresh roles=u last=one files=0')
+  await send(page, 'two', 'fresh roles=uau last=two files=0')
+
+  expect(await page.count(REGENERATE)).toBe(1)
+
+  await page.click(REGENERATE)
+  await page.waitFor('.kai-chat-turn[data-role=assistant]:last-of-type .kai-chat-text', { text: 'regenerate:2 roles=uau last=two files=0' })
+
+  expect(await log(page)).toEqual(['u:one', 'a:fresh roles=u last=one files=0', 'u:two', 'a:regenerate:2 roles=uau last=two files=0'])
+  expect(await page.count(REGENERATE)).toBe(1)
+  expect(page.errors).toEqual([])
+}, 120_000)
+
+it('resends an edited message with every later turn gone, the action reading how many it replaces, and a later send is fresh again', async () => {
+  await using page = await site.open('/replaceable')
+
+  await send(page, 'one', 'fresh roles=u last=one files=0')
+  await send(page, 'two', 'fresh roles=uau last=two files=0')
+  await page.click(`.kai-chat-turn[data-role=user] ${EDIT}`)
+  await page.fill('.kai-chat-turn[data-editing] textarea', 'uno')
+  await page.click('.kai-chat-save')
+  await page.waitFor('.kai-chat-turn[data-role=assistant]:last-of-type .kai-chat-text', { text: 'edit:4 roles=u last=uno files=0' })
+
+  expect(await log(page)).toEqual(['u:uno', 'a:edit:4 roles=u last=uno files=0'])
+
+  await page.click(REGENERATE)
+  await page.waitFor('.kai-chat-turn[data-role=assistant]:last-of-type .kai-chat-text', { text: 'regenerate:2 roles=u last=uno files=0' })
+  await send(page, 'next', 'fresh roles=uau last=next files=0')
+
+  expect(await log(page)).toEqual(['u:uno', 'a:regenerate:2 roles=u last=uno files=0', 'u:next', 'a:fresh roles=uau last=next files=0'])
+  expect(page.errors).toEqual([])
+}, 120_000)
+
+it('edits a message in the middle and cancels an edit, leaving the log as it was', async () => {
+  await using page = await site.open('/replaceable')
+
+  await send(page, 'one', 'fresh roles=u last=one files=0')
+  await send(page, 'two', 'fresh roles=uau last=two files=0')
+
+  const before = await log(page)
+
+  await page.click(`.kai-chat-turn[data-role=user] ${EDIT}`)
+  await page.click('.kai-chat-cancel')
+  await page.waitFor('.kai-chat-turn[data-editing]', { gone: true })
+
+  expect(await log(page)).toEqual(before)
+
+  await page.evaluate(() => {
+    document.querySelectorAll<HTMLButtonElement>('.kai-chat-turn[data-role=user] button[aria-label="Edit the message"]')[1]!.click()
+  })
+  await page.fill('.kai-chat-turn[data-editing] textarea', 'deux')
+  await page.click('.kai-chat-save')
+  await page.waitFor('.kai-chat-turn[data-role=assistant]:last-of-type .kai-chat-text', { text: 'edit:2 roles=uau last=deux files=0' })
+
+  expect(await log(page)).toEqual(['u:one', 'a:fresh roles=u last=one files=0', 'u:deux', 'a:edit:2 roles=uau last=deux files=0'])
+}, 120_000)
+
+it('keeps the files of an edited message, and of a message asked again', async () => {
+  const dir = await scratchDir('ai-replace-')
+  const shot = join(dir, 'shot.png')
+
+  await Bun.write(shot, PNG)
+
+  await using page = await site.open('/replaceable')
+
+  await page.upload('input[type=file]', [shot])
+  await page.waitFor('.kai-chat-files .kai-chat-file', { text: 'shot.png' })
+  await send(page, 'pic', 'fresh roles=u last=pic files=1')
+  await page.click(REGENERATE)
+  await page.waitFor('.kai-chat-turn[data-role=assistant]:last-of-type .kai-chat-text', { text: 'regenerate:2 roles=u last=pic files=1' })
+  await page.click(`.kai-chat-turn[data-role=user] ${EDIT}`)
+
+  expect(await page.text('.kai-chat-turn[data-editing] .kai-chat-file')).toBe('shot.png')
+
+  await page.fill('.kai-chat-turn[data-editing] textarea', 'pic2')
+  await page.click('.kai-chat-save')
+  await page.waitFor('.kai-chat-turn[data-role=assistant]:last-of-type .kai-chat-text', { text: 'edit:2 roles=u last=pic2 files=1' })
+
+  expect(await page.text('.kai-chat-turn[data-role=user] .kai-chat-file')).toBe('shot.png')
+}, 120_000)
+
+it('offers neither button unless asked for', async () => {
+  await using page = await site.open('/replaceless')
+
+  await send(page, 'one', 'fresh roles=u last=one files=0')
+
+  expect(await page.count(REGENERATE)).toBe(0)
+  expect(await page.count(EDIT)).toBe(0)
+}, 120_000)
+
+it('resumes a regenerated reply after a reload without saying it replaces anything again', async () => {
+  await using page = await site.open('/replaceable-kept')
+
+  await send(page, 'hold', 'fresh roles=u last=hold files=0')
+  await page.click(REGENERATE)
+  await page.waitFor('.kai-chat-turn[data-role=assistant]:last-of-type .kai-chat-text', { text: 'regenerate:2 roles=u last=hold files=0' })
+  await page.reload()
+  await page.waitFor('.kai-chat-turn[data-role=assistant]:last-of-type .kai-chat-text', { text: 'fresh roles=u last=hold files=0' })
+
+  expect(await log(page)).toEqual(['u:hold', 'a:fresh roles=u last=hold files=0'])
+}, 120_000)

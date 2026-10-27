@@ -46,6 +46,32 @@ Chat(action={reply} attach)
 - The files ride on the history: each send posts those of the `keep` latest messages again, so the model sees them in a follow-up, and a 413 shrinks the history counting each file as `ask` prices an image. The files live in the page: `remember` keeps the text of a turn, so after a reload the model no longer sees them.
 - Stop's call to the server posts the last message without its files.
 
+### Regenerating and editing
+
+`regenerate` adds a button under the last reply that asks again for it, and `editable` one on each message of the visitor that turns it into a field to change and send again. Both are off by default.
+
+```kay
+Chat(action={reply} regenerate editable)
+```
+
+- A regenerated reply leaves the log and the history, reasoning, tool calls and code with it, and the history is posted again ending on the message before it. An edited message and every turn after it leave, and the history is posted ending on the new message. A message keeps the files it had while the page holds them; a restored one has none. Enter saves an edit, Escape cancels it.
+- Neither is offered for a reply that waits for the visitor's allowance, nor for an answer to a held tool call, whose approval is spent. Nothing is offered while a reply is under way; a kept reply that resumes after a reload ends before the buttons come.
+- A server that keeps the conversation tells these posts from a fresh send with `replaces()` (`@kaynooo/kayjs-ai`), read from the `x-kai-replaces` header, which no schema has to take: `{ kind: 'regenerate' | 'edit', turns }`, or `undefined` for a fresh send. `turns` counts the trailing turns the chat showed that the post supersedes, its last message included (a regenerate is `2`: the reply and the message posted again; an edit of the third of five turns is `3`). One rule serves both: drop that many stored turns, append the last posted message, answer. A chat that is posted the whole history needs nothing.
+
+```ts
+export const reply = action(schema, async ({ messages }) => {
+  const dropped = replaces()?.turns ?? 0
+
+  await conversation.dropLast(dropped)
+  await conversation.add(messages.at(-1)!)
+
+  return ask(await conversation.messages())
+})
+```
+
+- Try again after a failed regenerate or edit posts the same request with the same header, as a fresh send's retry posts its message again; a Stop before the first word returns the message to the field and forgets it. A resume after a reload carries none, the server having dropped the turns by then.
+- Words: `ai.chat.regenerate` (`Regenerate the reply`), `edit` (`Edit the message`), `save` (`Save and send`) and `cancel`, props `regenerateLabel`, `editLabel`, `saveLabel` and `cancelLabel`; `@regenerateIcon` and `@editIcon` replace the circular arrow and the pencil (kayjs-ui's `refresh` and `edit` slots; `ChatLauncher` takes the two props but not the blocks, so it restyles them through those slots).
+
 ### Floating chat
 
 `ChatLauncher` (`@kaynooo/kayjs-ai/chat-launcher.kay`) is the chat as a button at the bottom right of every page that opens it in a panel. Put it once in the root layout, a `--- server` fence passing the action as for `Chat`, and it needs no other wiring:
@@ -105,7 +131,7 @@ ChatLauncher(action={reply} label="Ask the docs")
 
 ### Restyle
 
-Its parts - `root`, `empty`, `greeting`, `suggestions`, `suggestion`, `log`, `turn`, `text`, `thinking`, `reasoning`, `reasoningText`, `note`, `status`, `disclosure`, `form`, `field`, `send` and `retry` (the Try again button, shown only after a failed reply) - keep their `kai-` classes and take utilities from `src/ui.ts` or a `class` object: `defineUi({ '@kaynooo/kayjs-ai/chat.kay': { parts: { send: 'size-12', turn: 'text-base' } } })`, `Chat(class={{ log: 'max-h-96' }})`. A `class` string restyles the root. The tool calls are `@kaynooo/kayjs-ai/chat-calls.kay` (`root`, `summary`, `list`, `call`, `name`, `status`, `title`, `code`) and the launcher's panel `@kaynooo/kayjs-ai/chat-panel.kay` (`root`, `panel`, `head`, `title`, `actions`, `action`, `expand`, `body`, `button`, `glyph`). A table of a reply is built from the reply's markup and keeps `.kai-chat-table`.
+Its parts - `root`, `empty`, `greeting`, `suggestions`, `suggestion`, `log`, `turn`, `text`, `thinking`, `reasoning`, `reasoningText`, `note`, `status`, `disclosure`, `form`, `field`, `send`, `retry`, `actions`, `regenerate`, `edit`, `editField`, `save` and `cancel` (the Try again button, shown only after a failed reply) - keep their `kai-` classes and take utilities from `src/ui.ts` or a `class` object: `defineUi({ '@kaynooo/kayjs-ai/chat.kay': { parts: { send: 'size-12', turn: 'text-base' } } })`, `Chat(class={{ log: 'max-h-96' }})`. A `class` string restyles the root. The tool calls are `@kaynooo/kayjs-ai/chat-calls.kay` (`root`, `summary`, `list`, `call`, `name`, `status`, `title`, `code`) and the launcher's panel `@kaynooo/kayjs-ai/chat-panel.kay` (`root`, `panel`, `head`, `title`, `actions`, `action`, `expand`, `body`, `button`, `glyph`). A table of a reply is built from the reply's markup and keeps `.kai-chat-table`.
 
 ### Behaviour
 

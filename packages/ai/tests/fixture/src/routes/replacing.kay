@@ -1,0 +1,20 @@
+--- server
+import { replaces } from '@kaynooo/kayjs-ai'
+import { s } from 'kay'
+
+// Says what a Chat with regenerate and editable posted: what the post replaces, the roles of the history and its last message, how many files it holds. A regenerated "hold" never ends, for a test that reloads mid-reply.
+async function* say(text: string, hold: boolean) {
+  yield text
+
+  if (hold)
+    await Bun.sleep(5000)
+}
+
+export const reply = action(s.Object({ messages: s.Array(s.Object({ role: s.UnionEnum(['user', 'assistant']), content: s.String({ maxLength: 4000 }), attachments: s.Optional(s.Array(s.File({ type: 'image/png' }), { maxItems: 4 })) }), { minItems: 1, maxItems: 50 }) }), ({ messages }) => {
+  const replacing = replaces()
+  const last = messages.at(-1)!
+
+  return say(`${replacing ? `${replacing.kind}:${replacing.turns}` : 'fresh'} roles=${messages.map(message => message.role[0]).join('')} last=${last.content} files=${messages.reduce((sum, message) => sum + (message.attachments?.length ?? 0), 0)}`, replacing?.kind === 'regenerate' && last.content === 'hold')
+}, { maxSize: '2mb' })
+---
+p Replacing

@@ -23,3 +23,22 @@ export function replyCallOf(request: Request | undefined): ReplyCall | undefined
 
   return !OPERATIONS.has(op) ? undefined : { op: op as ReplyCall['op'], id: ID.test(id) ? id : undefined }
 }
+
+// The header a Chat sends when its post replaces turns of the conversation: `regenerate:<n>` or `edit:<n>`, `n` the trailing turns it supersedes, the last posted message among them.
+export const REPLACES_HEADER = 'x-kai-replaces'
+
+export interface Replaces {
+  // `regenerate` asks again for the last reply, `edit` resends a changed message.
+  kind: 'regenerate' | 'edit'
+  // How many of the conversation's last turns the post supersedes, the posted last message included: drop that many stored turns, append the last posted message, answer.
+  turns: number
+}
+
+const REPLACES = /^(regenerate|edit):([1-9]\d{0,5})$/
+
+// What the request says it replaces, or nothing for a fresh send.
+export function replacesOf(request: Request | undefined): Replaces | undefined {
+  const match = REPLACES.exec(request?.headers.get(REPLACES_HEADER) ?? '')
+
+  return match ? { kind: match[1] as Replaces['kind'], turns: Number(match[2]) } : undefined
+}

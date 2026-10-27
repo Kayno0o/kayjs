@@ -1,5 +1,6 @@
 import type { TSchema } from 'kay/library'
 import type { Offered, Ran } from './loop'
+import type { Replaces } from './resume'
 import type { AskOptions, FunctionTool, Message, Piece, Provider, ProviderMessage, ProviderRequest, Reply, ReplyOf, StructuredAskOptions, Timeouts, ToolAction } from './types'
 import { logFrom } from 'kay'
 import { actionTool, checkAnswer, configError, currentRequest, durationSeconds, jsonSchemaOf, refundRateLimit } from 'kay/library'
@@ -14,7 +15,7 @@ import { guarded, visitorOf } from './limits'
 import { clip, converse, MAX_RESULT } from './loop'
 import { outputSchema } from './output-schema'
 import { createReply } from './reply'
-import { replyCallOf } from './resume'
+import { replacesOf, replyCallOf } from './resume'
 import { structured } from './structured'
 
 const DEFAULT_MAX_TOKENS = 4096
@@ -193,6 +194,11 @@ function answerSchema(schema: unknown): { plain: object, chars: number } {
   answers.set(schema as object, answer)
 
   return answer
+}
+
+// What the post being answered replaces when it comes from a Chat with `regenerate` or `editable`, or nothing for a fresh send: drop that many stored turns, append the last posted message, answer.
+export function replaces(request: Request | undefined = currentRequest()): Replaces | undefined {
+  return replacesOf(request)
 }
 
 // Asks the model and gives the reply back at once: `await ask(...)` is its text, `for await` its snapshots, and the request to the provider goes out when it is first read.

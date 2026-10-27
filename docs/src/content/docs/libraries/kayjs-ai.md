@@ -154,6 +154,8 @@ Every element is a part that keeps its `kai-` class and takes utilities from `sr
 
 A site restyles the panel with custom properties, all optional: `--kai-chat-accent`, `--kai-chat-bubble`, `--kai-chat-radius`, `--kai-chat-shadow`, `--kai-chat-width`, `--kai-chat-width-large`, `--kai-chat-height` and `--kai-chat-height-large`. The other props are `Chat`'s. The button has a `data-tooltip`, which shows when the layout renders kayjs-ui's `TooltipHost`.
 
+A chat can let the visitor ask again for the last reply with `regenerate`, and change a message they sent and send it again with `editable`. The reply, or the edited message and everything after it, leave the log. An action that keeps the conversation reads `replaces()` to tell these from a fresh send and to drop that many stored turns before it answers.
+
 A chat that is the main content of a page, such as a page of its own for the assistant, takes the height of its container with `fill`: give the container a height (a flex column, a grid row, `h-dvh`) and the log scrolls inside it while the form stays at the bottom. Without `fill` the log stops growing at `32rem`.
 
 An inline `Chat` can show a New conversation button beside its field with `newButton`. It appears once the conversation has a turn, stops a reply under way and clears the log, the field and what `remember` kept. `newLabel` names it and `@newIcon` replaces its plus. To start over from your own control instead, dispatch a `kai-chat-new` event on the `.kai-chat` element.
