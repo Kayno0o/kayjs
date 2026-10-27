@@ -149,6 +149,20 @@ Actions that set `tool` are listed too, as `POST` operations.
 
 Set `mcp: true` in kay.config.ts to let an AI agent use your app. Kay serves an MCP endpoint at `/mcp`, or at the path of `mcp: { path: '/tools' }`, and an agent pointed at it can list and call your tools. You write no MCP server. A client may send the endpoint 120 requests a minute; `mcp: { rateLimit: 60 }` changes that and `false` removes it. With a `store.rates`, replicas count together.
 
+### Guarding the endpoint with a key
+
+An agent on your own machine can hold a static key instead of signing in. Set `mcp: { key: true }` and every request to the endpoint must send `Authorization: Bearer <key>`. Kay reads the key from `KAY_MCP_KEY`, or from the file `KAY_MCP_KEY_FILE` names, such as a container secret. A request without it, or with another, is refused with 401 before anything is read, and the tools it would have listed stay unseen.
+
+```ts
+export default defineConfig({
+  mcp: { key: { file: 'data/mcp-key' } },
+})
+```
+
+With `{ file }`, kay makes a random key in that file the first time the server starts, readable by its owner alone, and the environment still wins when it is set. A string is the key itself, for one your own code reads from somewhere else. A key is at least 16 characters and is read when the server starts, so a new key takes a restart.
+
+A production server with `key: true` and no key does not start. Elsewhere it refuses every request and logs a warning that names the variables. Behind `proxy.key`, the endpoint needs no entry in `proxy.open`, because the bearer is its credential. The tool a call runs does not receive the key as its `Authorization`.
+
 ### Routes as tools
 
 An API route is a tool only when you say so, with `tool` in its `detail`. The route stays in the OpenAPI document either way, so an internal route, such as a check for your proxy, never reaches an agent by accident.
@@ -203,7 +217,7 @@ An agent fills in no form, so `honeypot`, `minTime` and `proofOfWork` do not app
 
 ### Telling a tool call apart
 
-A tool call reaches your app as a request, with the caller's `Authorization` header. A front guard that only lets a local agent's key through can tell the two apart with `toolCall` from `kay/server`.
+A tool call reaches your app as a request, with the caller's `Authorization` header (unless the endpoint has an `mcp.key`, which is not passed on, and which makes this guard unnecessary). A front guard that only lets a local agent's key through can tell the two apart with `toolCall` from `kay/server`.
 
 ```ts
 import { guard } from 'kay'

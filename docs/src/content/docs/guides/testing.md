@@ -61,6 +61,8 @@ it('shows why a book was refused', async () => {
 
 With `mcp: true`, `site.mcp.tools()` lists the tools an agent sees. `site.mcp.call('add_note', { title: 'Milk' })` calls one and resolves with `{ isError, text, data, status }`.
 
+For an endpoint with `mcp: { key }`, `testSite({ mcpKey: 'a-test-key-0123456789' })` sets the key and `site.mcp` sends it as the bearer; a call that gives its own `authorization` header sends that one instead, such as a wrong key to see the refusal. A site whose config sets `mcp.key` and gives no `mcpKey` is given a generated one.
+
 `isError` is true when the app refused the call, and `status` is 401 when a guard asks for a sign-in. Pass `{ headers: { authorization: 'Bearer token' } }` as the third argument to call as a signed-in agent. The cookies set so far go with a call.
 
 ### Action protections

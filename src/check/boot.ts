@@ -17,6 +17,7 @@ import { claimEndpoints } from '../server/endpoint-claims'
 import { PUBLIC_ENV_PATH } from '../server/env-state'
 import { faviconSource, svgFaviconProblems } from '../server/favicon'
 import { localeSettings, refuseLocaleClashes } from '../server/i18n'
+import { mcpKeySetting } from '../server/mcp-key'
 import { pageFlags } from '../server/page-flags'
 import { claimPublic, publicFiles } from '../server/public'
 import { claimRedirects, readRedirects } from '../server/redirects'
@@ -119,6 +120,7 @@ export async function bootProblems(root: string, options: CheckOptions, feeds: C
 
   refused(config, () => {
     mcpAt = mcpPath(options.mcp)
+    mcpKeySetting(options.mcp)
   })
 
   if (mcpAt !== undefined) {

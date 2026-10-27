@@ -332,6 +332,10 @@ export async function compareEnv(root: string, variables: Listed[], files: EnvFi
     // The proxy key is kay's own variable, but a server with `proxy.key` refuses to boot in production without it, given directly or as a file.
     if (variables.some(({ name }) => name === 'KAY_PROXY_KEY') && !set.has('KAY_PROXY_KEY') && !set.has('KAY_PROXY_KEY_FILE'))
       problems.push(diagnostic('error', composes[0]!, 1, `KAY_PROXY_KEY is required in production (proxy.key in kay.config.ts) and no service of ${composeNames} sets it or KAY_PROXY_KEY_FILE`))
+
+    // The same for the MCP key; the listing leaves it optional for `{ file }`, which makes its own.
+    if (variables.some(({ name, required }) => name === 'KAY_MCP_KEY' && required !== false) && !set.has('KAY_MCP_KEY') && !set.has('KAY_MCP_KEY_FILE'))
+      problems.push(diagnostic('error', composes[0]!, 1, `KAY_MCP_KEY is required in production (mcp.key in kay.config.ts) and no service of ${composeNames} sets it or KAY_MCP_KEY_FILE`))
   }
 
   if (examplePath !== undefined) {

@@ -56,8 +56,9 @@ function isOpen(path: string, open: readonly string[]): boolean {
 }
 
 // Refuses with 403 every request that does not carry the proxy's shared key in the header `proxy.key` names, so a process or a container reaching the port directly skips nothing the proxy does.
+// The `endpoint` is the MCP endpoint while `mcp.key` guards it, whose bearer is its own credential and so skips the check.
 // Off under `kay dev`, in a static export, and outside production while no key is given (a warning says so, except in a test run); a production server with `key` and no key to compare with does not boot.
-export function requireProxyKey(app: Elysia, proxy: ProxyConfig | undefined, options: { dev: boolean, exported: boolean, base: string, health: string | undefined, metrics?: (() => string | undefined) | undefined, logRefused?: ((request: Request, status: number) => void) | undefined, security?: Record<string, string> | undefined }): void {
+export function requireProxyKey(app: Elysia, proxy: ProxyConfig | undefined, options: { dev: boolean, exported: boolean, base: string, health: string | undefined, metrics?: (() => string | undefined) | undefined, endpoint?: string | undefined, logRefused?: ((request: Request, status: number) => void) | undefined, security?: Record<string, string> | undefined }): void {
   const header = proxy?.key
 
   if (header === undefined || options.dev || options.exported)
@@ -84,7 +85,7 @@ export function requireProxyKey(app: Elysia, proxy: ProxyConfig | undefined, opt
     const metrics = options.metrics?.()
 
     // The metrics route answers by its own rule, so a collector on the private network needs no key.
-    if (isInternal(request) || isOpen(path, open) || (metrics !== undefined && (path === metrics || path === `${metrics}/`)))
+    if (isInternal(request) || isOpen(path, open) || (metrics !== undefined && (path === metrics || path === `${metrics}/`)) || (options.endpoint !== undefined && (path === options.endpoint || path === `${options.endpoint}/`)))
       return
 
     const given = request.headers.get(header)

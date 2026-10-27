@@ -36,6 +36,12 @@ const PROXY_KEY_VARIABLES: EnvVariable[] = [
   { name: 'KAY_PROXY_KEY_FILE', type: 'string', required: false, description: 'the path of a file holding the proxy key, read when `KAY_PROXY_KEY` is unset' },
 ]
 
+// What `mcp.key` reads: `true` makes a production server refuse to boot without the key, given directly or as the file that holds it, while `{ file }` makes one on first use.
+const MCP_KEY_VARIABLES: EnvVariable[] = [
+  { name: 'KAY_MCP_KEY', type: 'string', required: 'production', secret: true, description: 'the key an MCP client sends as a bearer token to the endpoint (at least 16 characters), or set `KAY_MCP_KEY_FILE` instead' },
+  { name: 'KAY_MCP_KEY_FILE', type: 'string', required: false, description: 'the path of a file holding the MCP key, read when `KAY_MCP_KEY` is unset' },
+]
+
 // What `metrics` reads: with it set, only a scrape carrying it as a bearer token is answered.
 const METRICS_VARIABLES: EnvVariable[] = [
   { name: 'KAY_METRICS_TOKEN', type: 'string', required: false, secret: true, description: 'the bearer token a scrape must send to `metrics`; unset, only a request from this machine or a private network that no proxy forwarded is answered' },
@@ -152,9 +158,20 @@ export async function listEnv(root: string): Promise<{ variables: Listed[], unre
     ...KAY_VARIABLES.map(variable => ({ ...variable, source: 'kay' })),
     ...config.metrics !== undefined && config.metrics !== false ? METRICS_VARIABLES.map(variable => ({ ...variable, source: 'kay' })) : [],
     ...typeof config.proxy === 'object' && config.proxy.key !== undefined ? PROXY_KEY_VARIABLES.map(variable => ({ ...variable, source: 'kay' })) : [],
+    ...mcpKeyVariables(config.mcp).map(variable => ({ ...variable, source: 'kay' })),
   ]
 
   return { variables, unread }
+}
+
+// The variables the MCP key reads: none for a key given as a string, none required for `{ file }`, which makes the key itself.
+function mcpKeyVariables(mcp: unknown): EnvVariable[] {
+  const key = typeof mcp === 'object' && mcp !== null ? (mcp as { key?: unknown }).key : undefined
+
+  if (key === undefined || key === false || typeof key === 'string')
+    return []
+
+  return key === true ? MCP_KEY_VARIABLES : MCP_KEY_VARIABLES.map(variable => ({ ...variable, required: false }))
 }
 
 function described(schema: EnvSchemaRecord, source: string): Listed[] {

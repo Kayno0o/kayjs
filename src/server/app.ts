@@ -62,6 +62,7 @@ import { HEALTH_PATH, serveHealth, stopOnSignal } from './lifecycle'
 import { liveConnections, serveLive } from './live'
 import { announceStart, logRequests, pathOf, requestRefusalLogger, useLogger } from './log'
 import { mcpBodyLimit, receiveDispatched, serveMcp, serveToolCallsThrough } from './mcp'
+import { mcpKeySetting, resolveMcpKey } from './mcp-key'
 import { METRICS_PATH, metricsOf, serveMetrics } from './metrics'
 import { newTabStyles } from './new-tab'
 import { countMissing, knowRedirects } from './not-found'
@@ -363,6 +364,10 @@ export async function pagesApp(project: Project<PagesOptions>, loadClient: () =>
 
   refuseOptions(options)
 
+  // Before anything is built, so a production server without the key it asks for stops at once; a static export serves no endpoint.
+  const keySetting = exported ? undefined : mcpKeySetting(options.mcp)
+  const mcpKey = keySetting === undefined ? undefined : { value: resolveMcpKey(keySetting, { root, production: !mode.dev && process.env.NODE_ENV === 'production' }) }
+
   const publicModules = options.publicEnv ? await loadPublicModules(root) : []
   const setup = await setupPages(project, loadClient, false, location => spell(location), scanned => refuseScanned(project, scanned), exported)
   const { served, table, publicServed, redirects, mcpAt } = setup.claimed
@@ -414,7 +419,7 @@ export async function pagesApp(project: Project<PagesOptions>, loadClient: () =>
   app.onRequest(({ request }) => {
     receiveInternal(request)
   })
-  requireProxyKey(app, checkProxy(options.proxy), { dev: mode.dev, exported, base, health: options.health === false ? undefined : options.health?.path ?? HEALTH_PATH, metrics: () => metrics && served.holds(metrics) ? metrics.path : undefined, logRefused: requestRefusalLogger(log), security })
+  requireProxyKey(app, checkProxy(options.proxy), { dev: mode.dev, exported, base, health: options.health === false ? undefined : options.health?.path ?? HEALTH_PATH, endpoint: mcpKey === undefined ? undefined : mcpAt, metrics: () => metrics && served.holds(metrics) ? metrics.path : undefined, logRefused: requestRefusalLogger(log), security })
   refuseForeignHosts(app, site, security)
 
   if (typeof options.security === 'object' && options.security.hosts !== undefined && !mode.dev && !exported)
@@ -612,7 +617,7 @@ export async function pagesApp(project: Project<PagesOptions>, loadClient: () =>
     serveOpenApi(app, document, openapi, await covering(false), actionOptions, apiAt)
 
   if (mcpAt !== undefined && document)
-    serveMcp(app, document, { title: (document.info as { title: string }).title, version: (document.info as { version: string }).version, base, guards: await covering(true), actions: actionOptions, metadataPaths, path: mcpAt, perMinute: mcpRateLimit(options.mcp) })
+    serveMcp(app, document, { title: (document.info as { title: string }).title, version: (document.info as { version: string }).version, base, guards: await covering(true), actions: actionOptions, metadataPaths, path: mcpAt, perMinute: mcpRateLimit(options.mcp), key: mcpKey })
 
   const mapStack = mode.dev ? devStackMapper(client.dir) : browserStackMapper(join(client.dir, '..', MAPS_DIR))
 

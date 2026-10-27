@@ -15,6 +15,7 @@ import { decodeServerValue, encodeValue } from '../runtime/wire'
 import { boundToPage, isCrossSite, postedFrom, unadmittedCrossSite } from './actions'
 import { RESOURCE_METADATA } from './api-modules'
 import { answeredAsPage, currentRequest } from './log'
+import { bearsMcpKey } from './mcp-key'
 import { actionOperation, guardRefusal, toolName } from './openapi'
 import { clientAddress, keepRequestId, markAgentCall, overLimit, requestId, requestServer, wasChallenged } from './protection'
 import { requestUrl } from './request-url'
@@ -35,6 +36,8 @@ interface CallContext {
   page?: string | undefined
   // Set when a guard refused the call for want of a sign-in, which the endpoint answers 401.
   challenged: boolean
+  // Set when the request's bearer token was the endpoint's key, which belongs to the endpoint and goes no further.
+  keyed?: boolean | undefined
 }
 
 interface AppTool extends Omit<Tool, 'run'> {
@@ -191,7 +194,7 @@ async function dispatch(context: CallContext, url: string, init: RequestInit, ac
   const headers = new Headers(init.headers)
 
   for (const name of FORWARDED) {
-    const value = request.headers.get(name)
+    const value = name === 'authorization' && context.keyed ? null : request.headers.get(name)
 
     if (value !== null)
       headers.set(name, value)
@@ -307,6 +310,8 @@ export interface McpOptions {
   path: string
   // The requests a client may send it a minute, or undefined for no limit.
   perMinute: number | undefined
+  // Set with `mcp.key`: the bearer token every request must carry, or undefined while no key was given, which refuses them all.
+  key?: { value: string | undefined } | undefined
 }
 
 // A tool call the endpoint dispatched: which tool it calls, the address of the client that asked for it and the URL of the MCP request it came in, which a token bound to the endpoint is checked against.
@@ -475,6 +480,10 @@ export function serveMcp(app: Elysia, document: Schema, options: McpOptions): vo
     if (wait !== undefined)
       return new Response('Too many requests', { status: 429, headers: { 'retry-after': String(wait) } })
 
+    // Before the body is read or any message answered, so a client without the key learns nothing of the tools.
+    if (options.key !== undefined && (options.key.value === undefined || !bearsMcpKey(request, options.key.value)))
+      return new Response(JSON.stringify({ jsonrpc: '2.0', id: null, error: { code: REFUSED, message: 'Send the MCP key as a bearer token' } }), { status: 401, headers: { ...ANSWER, 'www-authenticate': 'Bearer realm="mcp"' } })
+
     const text = await request.text()
     const message = parseJson(text)
     const guarded = guardedMessage(message, known)
@@ -487,7 +496,7 @@ export function serveMcp(app: Elysia, document: Schema, options: McpOptions): vo
         return declined(refusal, guarded.id, request, options.base, guarded.call, originOf(served))
     }
 
-    const context: CallContext = { request, server, fallback: async visit => app.handle(visit), challenged: false }
+    const context: CallContext = { request, server, fallback: async visit => app.handle(visit), challenged: false, keyed: options.key !== undefined }
     // A text that is no JSON goes to the server as it is, which words the parse error.
     const reply = await calls.run(context, async () => message === undefined ? mcp.answer(text) : mcp.answerMessage(message))
 

@@ -320,6 +320,8 @@ export default defineConfig({
 
 The key itself is not in the config. Kay reads it from `KAY_PROXY_KEY`, or from the file `KAY_PROXY_KEY_FILE` names, such as a container secret. A request without the header, or with another value, is refused with 403, logged like any request with its request id. A production server with `key` and no key to compare with does not start. Nothing is checked under `kay dev`, and outside production with no key a warning says so, except in a test run, and `kay build --verify` uses a key of its own.
 
+An MCP endpoint guarded by `mcp: { key }` needs no `open` entry: its bearer is its credential, and the check lets its path through.
+
 The health route stays open, since the container asks it without the key. `open` lists other paths that need none, such as `open: ['/api/push']`, each with what is under it.
 
 <ReadMore href="/llms/proxy-and-security#behind-a-proxy">How `hops` reads `X-Forwarded-For`, the warnings kay logs and `clientAddress` in a plain Elysia app.</ReadMore>

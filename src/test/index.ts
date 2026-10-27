@@ -31,6 +31,7 @@ import { basePath, routerPath } from '../server/base'
 import { shutdown } from '../server/lifecycle'
 import { forgetStamps } from '../server/live'
 import { loaderRoot } from '../server/loader'
+import { mcpKeySetting } from '../server/mcp-key'
 import { memoryNotifications } from '../server/notifications'
 import { checkProxy, memoryRates } from '../server/protection'
 import { withProxyKey } from '../server/proxy-key'
@@ -77,6 +78,8 @@ export interface TestOptions extends PagesOptions {
   use?: AnyElysia[] | undefined
   // What the app's Elysia `derive` would add for a request, such as the signed-in user, read by pages, guards and actions as `ctx.locals`.
   locals?: ((request: Request) => Record<string, unknown> | Promise<Record<string, unknown>>) | undefined
+  // The key the site's MCP endpoint asks for as a bearer token, which `mcp: { key }` in the config otherwise reads from the environment: `site.mcp` sends it unless a call or the site's headers give an `authorization`. A site whose config sets `mcp.key` and gets none here is given a generated one, so its tests need nothing.
+  mcpKey?: string | undefined
   // Loads pages in a headless Chrome with `open()`, served from the islands built for the browser.
   browser?: boolean | BrowserOptions | undefined
   // Builds the islands for the browser, unminified, into `.kay/test-client`, or `.kay/client` with `browser`, so one a browser cannot build, such as a server module reaching it, fails `testSite()` here and not only under `kay dev`; no browser needed. On unless `false`, built again only when the files under `src`, the routes or the API change.
@@ -336,7 +339,8 @@ export async function testSite(options: TestOptions = {}): Promise<TestSite> {
 
   const loaded = await withConfig(root, options)
   // A site setting none is served where the visits go, so pages reading siteUrl() or siteOrigin() render as in production; files go to memory, fresh for each site, rather than to the store kay.config.ts names, and so do the sessions, jobs, rate counts, presence rooms, vitals and notifications of its `store` (sessions only when it keeps them), its cached and live values staying in the process.
-  const config = { ...loaded, site: loaded.site ?? ORIGIN, storage: options.storage ?? memoryFiles(), store: options.store === undefined && loaded.store !== undefined ? { ...loaded.store.sessions && { sessions: memoryStore() }, jobs: memoryJobs(), rates: memoryRates(), rooms: memoryRooms(), vitals: memoryVitals(), notifications: memoryNotifications() } : loaded.store }
+  const mcpKey = options.mcpKey ?? (mcpKeySetting(loaded.mcp) === undefined ? undefined : crypto.randomUUID())
+  const config = { ...loaded, ...mcpKey !== undefined && loaded.mcp !== undefined && loaded.mcp !== false && { mcp: { ...loaded.mcp === true ? {} : loaded.mcp, key: mcpKey } }, site: loaded.site ?? ORIGIN, storage: options.storage ?? memoryFiles(), store: options.store === undefined && loaded.store !== undefined ? { ...loaded.store.sessions && { sessions: memoryStore() }, jobs: memoryJobs(), rates: memoryRates(), rooms: memoryRooms(), vitals: memoryVitals(), notifications: memoryNotifications() } : loaded.store }
   const project = resolveProject(root, config, { dev: config.dev === true, prebuilt: false, underKayDev: false, devRoutes: config.dev === true })
   const inBrowser = options.browser !== undefined && options.browser !== false
   const proxyKey = options.proxyKey?.trim()
@@ -503,7 +507,8 @@ export async function testSite(options: TestOptions = {}): Promise<TestSite> {
     let rpcId = 0
 
     const rpc = async (method: string, params: object, init: VisitInit = {}): Promise<{ status: number, result: RpcResult }> => {
-      const response = await send(mcpPath(config.mcp) ?? MCP_PATH, { method: 'POST', headers: { 'content-type': 'application/json', 'accept': 'application/json, text/event-stream', ...init.headers }, body: JSON.stringify({ jsonrpc: '2.0', id: ++rpcId, method, params }) })
+      const bearer = mcpKey === undefined || new NativeHeaders(defaults).has('authorization') ? {} : { authorization: `Bearer ${mcpKey}` }
+      const response = await send(mcpPath(config.mcp) ?? MCP_PATH, { method: 'POST', headers: { 'content-type': 'application/json', 'accept': 'application/json, text/event-stream', ...bearer, ...init.headers }, body: JSON.stringify({ jsonrpc: '2.0', id: ++rpcId, method, params }) })
       const reply = await withNatives(async () => response.json() as Promise<unknown>) as { result?: RpcResult, error?: { message: string } }
 
       if (reply.error)
