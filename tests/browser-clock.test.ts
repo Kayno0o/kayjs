@@ -82,8 +82,8 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('advancing 
     })
 
     expect(ticks.length).toBeGreaterThanOrEqual(2)
-    // Caught up at once, the second tick would follow the first within a millisecond.
-    expect(ticks[1]! - ticks[0]!).toBeGreaterThan(40)
+    // Caught up at once, the second tick would follow the first within a millisecond; kept on its cadence, it comes at the next 100 ms mark, about 50 ms on, less what a loaded runner takes to run the late one.
+    expect(ticks[1]! - ticks[0]!).toBeGreaterThan(15)
   })
 
   it('pauses every() in a hidden tab and catches up as it shows', async () => {
