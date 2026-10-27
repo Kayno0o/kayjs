@@ -1,7 +1,10 @@
 --- server
+import type { ChatTurn } from '@kaynooo/kayjs-ai'
 import { reply } from './chat.kay'
+
+const earlier: ChatTurn[] = [{ role: 'assistant', content: 'Welcome, ask me anything' }, { role: 'user', content: 'Earlier question' }, { role: 'assistant', content: 'Earlier answer' }]
 --- script
 import Chat from '@kaynooo/kayjs-ai/chat.kay'
 ---
 h1 Greeter
-Chat(action={reply} label="Greeter" keep={2} initial={[{ role: 'assistant', content: 'Welcome, ask me anything' }, { role: 'user', content: 'Earlier question' }, { role: 'assistant', content: 'Earlier answer' }]})
+Chat(action={reply} label="Greeter" keep={2} initial={earlier})

@@ -39,6 +39,9 @@ export interface Message {
   attachments?: readonly Attachment[] | undefined
 }
 
+// A message a `Chat` shows to start with, through `initial`: an island prop carries no `Blob`, so it has no attachments.
+export type ChatTurn = Pick<Message, 'role' | 'content' | 'sources'>
+
 export interface Usage {
   // The input read at full price: what the provider did not take from its cache, nor write to it.
   inputTokens: number

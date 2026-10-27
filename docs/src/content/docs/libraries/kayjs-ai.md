@@ -125,7 +125,7 @@ The status of a tool call and the two parts it opens to are labels too: `running
 
 The line under the chat has its own prop, `disclosure`, [explained below](#personal-data-and-the-ai-notice).
 
-The action may also `ctx.fail`. A refusal from the action, such as a rate limit's message, shows instead of `errorMessage`. `initial` gives messages to start with.
+The action may also `ctx.fail`. A refusal from the action, such as a rate limit's message, shows instead of `errorMessage`. `initial` gives messages to start with, each a `ChatTurn` (`{ role, content, sources? }`, a type `@kaynooo/kayjs-ai` exports): a message carrying attachments cannot be passed, as an island prop holds no file.
 
 The chat posts its last 20 messages with each one; the `keep` prop changes that, and what is posted always opens on one of the visitor's, so an assistant greeting in `initial` is never the first message. Keep `maxItems` in the action's schema at least as high as `keep`, bound `content`, and add a rate limit.
 
