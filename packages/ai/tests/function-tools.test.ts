@@ -1,7 +1,11 @@
-import { afterEach, describe, expect, it } from 'bun:test'
+import type { Tools } from './helpers/tools'
+import { join } from 'node:path'
+import { afterAll, afterEach, beforeEach, describe, expect, it } from 'bun:test'
 import { s } from 'kay'
+import { testSite } from 'kay/test'
 import { ai, ask, fakeAi, tool } from '../src'
 import { forgetCounts } from '../src/limits'
+import { done } from './fixture/src/testing'
 
 afterEach(() => {
   ai()
@@ -94,11 +98,13 @@ describe('function tools outside a request', () => {
 
   it('counts a job against the key it names and the total, with no visitor', async () => {
     ai({ rateLimit: { max: 1, window: '1m' } })
-    fakeAi.reply('one')
-    fakeAi.reply('two')
     fakeAi.reply({ calls: [{ name: 'look_up', input: { title: 'Sun' } }] })
+    fakeAi.reply('one')
 
     await ask('go', { tools: [lookUp], key: 'job' })
+
+    expect(fakeAi.asked).toHaveLength(2)
+
     let refused: unknown
 
     try {
@@ -116,5 +122,53 @@ describe('function tools outside a request', () => {
     expect(() => tool({ name: 'ok', description: '', input: s.Object({}), run: () => '' })).toThrow('tool takes')
     expect(() => ask('x', { tools: [lookUp, tool({ name: 'look_up', description: 'x', input: s.Object({}), run: () => '' })] })).toThrow('tools[1]')
     expect(() => ask('x', { tools: [tool({ name: 'bad', description: 'x', input: s.String(), run: () => '' })] })).toThrow('object schema')
+  })
+
+  it('cuts a result past 20,000 characters and hands run the reply\'s signal', async () => {
+    const signals: AbortSignal[] = []
+    const long = tool({ name: 'long', description: 'Long', input: s.Object({}), run: (_input, { signal }) => {
+      signals.push(signal)
+
+      return 'x'.repeat(30_000)
+    } })
+
+    fakeAi.reply({ calls: [{ name: 'long' }] })
+    fakeAi.reply('done')
+    await ask('go', { tools: [long] })
+
+    const content = fakeAi.last()!.messages.at(-1)!.results![0]!.content
+
+    expect(content).toHaveLength(20_000 + '... (cut)'.length)
+    expect(signals[0]!.aborted).toBe(false)
+  })
+})
+
+describe('function tools in a request', () => {
+  const site = testSite({ root: join(import.meta.dir, 'fixture') })
+
+  afterAll(async () => (await site).close())
+  beforeEach(() => {
+    done.length = 0
+  })
+
+  it('runs unasked beside an action that confirm holds', async () => {
+    const { mixed } = await import(join(import.meta.dir, 'fixture/src/routes/tools.kay')) as Tools
+
+    fakeAi.reply({ calls: [{ name: 'add_note', input: { title: 'Milk' } }, { name: 'stamp' }] })
+    fakeAi.reply('ok')
+
+    const steps = await (await site).call(mixed, { prompt: 'go' })
+
+    expect(steps.at(-1)!.calls).toMatchObject([{ name: 'add_note', status: 'failed' }, { name: 'stamp', status: 'done', result: 'stamped' }])
+    expect(done).toEqual(['stamp'])
+  })
+
+  it('numbers an action named as a function tool, whatever their order', async () => {
+    const { mixed } = await import(join(import.meta.dir, 'fixture/src/routes/tools.kay')) as Tools
+
+    fakeAi.reply('ok')
+    await (await site).call(mixed, { prompt: 'go', twin: true })
+
+    expect(fakeAi.asked[0]!.tools!.map(spec => spec.name)).toEqual(['add_note', 'add_note_2'])
   })
 })

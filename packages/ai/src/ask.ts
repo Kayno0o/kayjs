@@ -9,7 +9,7 @@ import { AiError } from './errors'
 import { isFunctionTool } from './function-tool'
 import { keep, keptFor, markEnded, stopKept } from './kept'
 import { guarded, visitorOf } from './limits'
-import { converse } from './loop'
+import { clip, converse, MAX_RESULT } from './loop'
 import { outputSchema } from './output-schema'
 import { createReply } from './reply'
 import { replyCallOf } from './resume'
@@ -59,23 +59,25 @@ function tooLong(chars: number, max: number): AsyncIterable<never> {
 }
 
 const log = logFrom('kayjs-ai')
-const MAX_RESULT = 20_000
 
 // A function tool as the loop runs it: the input checked against its schema, the result as the text the model reads.
 function plainTool(tool: FunctionTool): Offered {
-  const { plain } = answerSchema(tool.input, `tool ${tool.name}'s input`)
+  const plain = jsonSchemaOf(tool.input) as { type?: unknown }
+
+  if (plain.type !== 'object')
+    throw configError(`tool ${tool.name}'s input is an object schema, s.Object({ ... })`)
 
   const run = async (input: Record<string, unknown>, signal: AbortSignal): Promise<Ran> => {
-    const checked = checkAnswer(tool.input, input)
-
-    if (!('value' in checked))
-      return { status: 'failed', result: `The arguments do not fit the tool: ${checked.issues.map(({ path, message }) => `${path === '' ? 'the arguments' : path} (${message})`).join(', ')}` }
-
     try {
+      const checked = checkAnswer(tool.input, input)
+
+      if (!('value' in checked))
+        return { status: 'failed', result: `The arguments do not fit the tool: ${checked.issues.map(({ path, message }) => `${path === '' ? 'the arguments' : path} (${message})`).join(', ')}` }
+
       const value = await tool.run(checked.value as never, { signal })
       const text = typeof value === 'string' ? value : JSON.stringify(value) ?? ''
 
-      return { status: 'done', result: text.length > MAX_RESULT ? `${text.slice(0, MAX_RESULT)}... (cut)` : text }
+      return { status: 'done', result: clip(text, MAX_RESULT) }
     }
     catch (error) {
       log.error(`the ${tool.name} tool could not run`, error)
@@ -89,20 +91,30 @@ function plainTool(tool: FunctionTool): Offered {
 
 function offer(actions: readonly (ToolAction | FunctionTool)[]): Offered[] {
   const taken = new Set<string>()
-  const seen = new Set<unknown>()
+  const named = new Set<unknown>()
   const offered: Offered[] = []
 
+  // A function tool keeps the name it was given, so an action of the same name is the one numbered.
   for (const [index, action] of actions.entries()) {
-    if (seen.has(action))
+    if (!isFunctionTool(action) || named.has(action))
       continue
 
-    seen.add(action)
+    if (taken.has(action.name))
+      throw configError(`tools[${index}] is named ${action.name}, as another function tool of this ask is`)
+
+    taken.add(action.name)
+    named.add(action)
+  }
+
+  const done = new Set<unknown>()
+
+  for (const [index, action] of actions.entries()) {
+    if (done.has(action))
+      continue
+
+    done.add(action)
 
     if (isFunctionTool(action)) {
-      if (taken.has(action.name))
-        throw configError(`tools[${index}] is named ${action.name}, as another tool of this ask is`)
-
-      taken.add(action.name)
       offered.push(plainTool(action))
 
       continue
@@ -111,7 +123,7 @@ function offer(actions: readonly (ToolAction | FunctionTool)[]): Offered[] {
     const tool = actionTool(action as Parameters<typeof actionTool>[0], taken)
 
     if (!tool)
-      throw configError(`tools[${index}] cannot be a tool: an action taking a file, one of a page with params or one with \`tool: false\` is none`)
+      throw configError(`tools[${index}] cannot be a tool: an action taking a file, one of a page with params or one with \`tool: false\` is none; a function tool is made with tool()`)
 
     offered.push({ name: tool.name, description: tool.description, inputSchema: tool.inputSchema, tool })
   }
@@ -122,7 +134,7 @@ function offer(actions: readonly (ToolAction | FunctionTool)[]): Offered[] {
 const answers = new WeakMap<object, { plain: object, chars: number }>()
 
 // The JSON Schema a provider is asked for, from a kay schema that must describe an object, and its length.
-function answerSchema(schema: unknown, what = 'schema'): { plain: object, chars: number } {
+function answerSchema(schema: unknown): { plain: object, chars: number } {
   const known = typeof schema === 'object' && schema !== null ? answers.get(schema) : undefined
 
   if (known)
@@ -131,7 +143,7 @@ function answerSchema(schema: unknown, what = 'schema'): { plain: object, chars:
   const plain = typeof schema === 'object' && schema !== null ? jsonSchemaOf(schema) as { type?: unknown } : undefined
 
   if (plain?.type !== 'object')
-    throw configError(`${what} is an object schema, s.Object({ ... })`)
+    throw configError('schema is an object schema, s.Object({ ... })')
 
   // Refuses a shape no provider can be held to before anything is sent.
   outputSchema(plain)

@@ -20,6 +20,7 @@ export interface Tools {
   upload: ToolAction
   watch: Action<{ prompt: string }, Step[]>
   staying: Action<{ prompt: string, outlive: boolean }, Step[]>
+  mixed: Action<{ prompt: string, twin?: boolean }, Step[]>
   unconfirmed: Action<{ prompt: string }, Step[]>
   approving: Action<{ messages: { role: 'user' | 'assistant', content: string }[] }, Step[]>
 }

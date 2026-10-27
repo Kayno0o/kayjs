@@ -6,7 +6,8 @@ import { ticketsIn } from './approval-marker'
 import { MAX_ARGUMENTS, MAX_CALLS_PER_STEP, MAX_STREAMED_CALLS } from './tool-limits'
 
 const log = logFrom('kayjs-ai')
-const MAX_RESULT = 20_000
+
+export const MAX_RESULT = 20_000
 const MAX_NAME = 64
 const CHARS_PER_TOKEN = 4
 
@@ -47,7 +48,7 @@ function charsSent(messages: ProviderMessage[], system: string | undefined): num
   return chars
 }
 
-function clip(text: string, max: number): string {
+export function clip(text: string, max: number): string {
   return text.length > max ? `${text.slice(0, max)}... (cut)` : text
 }
 

@@ -1,5 +1,5 @@
 --- server
-import { ask } from '@kaynooo/kayjs-ai'
+import { ask, tool } from '@kaynooo/kayjs-ai'
 import { action, s } from 'kay'
 import { done, heard, hooks, testing } from '../testing'
 import { wipe } from './locked/_actions.kay'
@@ -57,6 +57,16 @@ export const staying = action(s.Object({ prompt: s.String({ maxLength: 200 }), o
 
   return reply.progress()
 })
+
+const stamp = tool({ name: 'stamp', description: 'Stamps something', input: s.Object({}), run: () => {
+  done.push('stamp')
+
+  return 'stamped'
+} })
+const addNoteTwin = tool({ name: 'add_note', description: 'A function tool named as an action', input: s.Object({}), run: () => 'twin' })
+
+// An action and a function tool in one ask, whose confirm refuses every action.
+export const mixed = action(s.Object({ prompt: s.String({ maxLength: 200 }), twin: s.Optional(s.Boolean()) }), ({ prompt, twin }) => ask(prompt, { tools: twin === true ? [addNoteTwin, addNote] : [addNote, stamp], confirm: () => false, provider: testing.provider }).progress())
 
 // A tool loop whose every call the visitor has not confirmed.
 export const unconfirmed = action(s.Object({ prompt: s.String({ maxLength: 200 }) }), ({ prompt }) => ask(prompt, { tools: [addNote], confirm: () => false, provider: testing.provider }).progress())

@@ -264,7 +264,7 @@ A call that goes wrong is not an exception. The model is told what failed, such 
 
 A model can be talked into things by the text it reads, a visitor's message say. Offer only actions whose worst call you can accept from that visitor, and keep destructive ones out of `tools`.
 
-A tool that changes something does not run on the model's word. The model is told it needs the visitor's approval, and `Chat` shows Allow and Deny under the call.
+An action that changes something does not run on the model's word (a function tool, below, does). The model is told it needs the visitor's approval, and `Chat` shows Allow and Deny under the call.
 
 The row shows the tool and its arguments, so the visitor sees what they allow. Allow sends the visitor's next message with a signed ticket for that exact call, which lets it run once: it expires after 10 minutes, is spent when used, and is read only from the visitor's last message, so text a tool returned cannot allow anything. Set `KAY_SECRET` so every process of the app can read a ticket.
 
@@ -296,7 +296,7 @@ const findArticle = tool({
 await ask('Write this morning\'s episode', { tools: [findArticle], key: 'podcast' })
 ```
 
-A function tool runs with your app's own rights, never a visitor's, in a request or out of one. Because you wrote it and passed it, it is not held for an Allow and `confirm` is not asked about it. `maxSteps` and `signal` work as for actions, and with no visitor the `budget` and `rateLimit` count the `key` you pass, else only the total.
+A function tool runs with your app's own rights, never a visitor's, in a request or out of one. Because you wrote it and passed it, it is not held for an Allow and `confirm` is not asked about it, even in a visitor's chat, where the model picks its arguments from text a visitor or a fetched page wrote. Make it safe for any input, or check inside `run`. `maxSteps` and `signal` work as for actions, and with no visitor the `budget` and `rateLimit` count the `key` you pass, else only the total.
 
 To show the calls in a chat, return `reply.progress()` from the chat's action instead of the reply: `ask(messages, { tools: [addNote] }).progress()`.
 
