@@ -138,7 +138,7 @@ export interface AskOptions {
   // 4096 by default, as Anthropic requires one.
   maxTokens?: number | undefined
   temperature?: number | undefined
-  // How much a reasoning model thinks before answering, `'none'` for a quick reply: sent as `reasoning_effort` to an OpenAI-compatible server, which is asked again without it if it refuses the field, and left out when not given. Anthropic gets extended thinking sized from it (`'none'` turns it off, the others set a budget of a quarter, a half or three quarters of `maxTokens`, at least 1,024 tokens) and `temperature` is then left out, as it refuses one; a `maxTokens` under 1,536 leaves thinking off.
+  // How much a reasoning model thinks before answering, `'none'` for a quick reply: sent as `reasoning_effort` to an OpenAI-compatible server, which is asked again without it if it refuses the field, and left out when not given. Anthropic gets adaptive thinking at that effort, its text summarized so it streams (`'none'` asks the lowest effort with thinking disabled, which a model refusing it is asked again without), and `temperature` is then left out while it thinks; a `thinking` in `body` replaces all of it.
   reasoning?: Reasoning | undefined
   // Asks the provider to cache the prompt so the next turn and tool step read it at a fraction of the price: on by default, `false` turns it off and `'1h'` keeps an Anthropic cache for an hour instead of 5 minutes.
   cache?: boolean | '1h' | undefined

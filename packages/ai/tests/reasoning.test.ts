@@ -35,7 +35,7 @@ function bodyOf(server: ReturnType<typeof provider>): Record<string, unknown> {
 const BASE: ProviderRequest = { messages: [{ role: 'user', content: 'Hi' }], system: undefined, model: 'm', maxTokens: 50, temperature: undefined, timeouts: { connect: '5000s', idle: '5000s' } }
 
 describe('reasoning on Anthropic', () => {
-  async function sent(options: { reasoning?: 'none' | 'low' | 'medium' | 'high', maxTokens?: number, temperature?: number, body?: Record<string, unknown> }) {
+  async function sent(options: { reasoning?: 'none' | 'low' | 'medium' | 'high', temperature?: number, body?: Record<string, unknown> }) {
     const server = serve(() => stream(anthropicEvents('ok')).response)
 
     await ask('Hi', { provider: anthropic({ baseUrl: server.url, apiKey: 'k', model: 'm' }), ...options })
@@ -47,28 +47,58 @@ describe('reasoning on Anthropic', () => {
     expect('thinking' in await sent({})).toBe(false)
   })
 
-  it('turns thinking off for none, keeping the temperature', async () => {
-    expect(await sent({ reasoning: 'none', temperature: 0.2 })).toMatchObject({ thinking: { type: 'disabled' }, temperature: 0.2 })
+  it('asks adaptive thinking with summarized text at the effort of each level, and leaves the temperature out', async () => {
+    for (const level of ['low', 'medium', 'high'] as const) {
+      const body = await sent({ reasoning: level, temperature: 0.2 })
+
+      expect(body.thinking).toEqual({ type: 'adaptive', display: 'summarized' })
+      expect(body.output_config).toEqual({ effort: level })
+      expect('temperature' in body).toBe(false)
+    }
   })
 
-  it('sizes the budget from maxTokens for each level and drops the temperature it refuses', async () => {
-    const low = await sent({ reasoning: 'low', maxTokens: 8000, temperature: 0.2 })
-
-    expect(low.thinking).toEqual({ type: 'enabled', budget_tokens: 2000 })
-    expect('temperature' in low).toBe(false)
-    expect((await sent({ reasoning: 'medium', maxTokens: 8000 })).thinking).toEqual({ type: 'enabled', budget_tokens: 4000 })
-    expect((await sent({ reasoning: 'high', maxTokens: 8000 })).thinking).toEqual({ type: 'enabled', budget_tokens: 6000 })
+  it('asks none as the lowest effort with thinking disabled, keeping the temperature', async () => {
+    expect(await sent({ reasoning: 'none', temperature: 0.2 })).toMatchObject({ thinking: { type: 'disabled' }, output_config: { effort: 'low' }, temperature: 0.2 })
   })
 
-  it('keeps the budget at the minimum of 1024 and under maxTokens, else leaves thinking off', async () => {
-    expect((await sent({ reasoning: 'low', maxTokens: 2000 })).thinking).toEqual({ type: 'enabled', budget_tokens: 1024 })
-    expect((await sent({ reasoning: 'low', maxTokens: 1536 })).thinking).toEqual({ type: 'enabled', budget_tokens: 1024 })
-    expect('thinking' in await sent({ reasoning: 'low', maxTokens: 1535 })).toBe(false)
-    expect('thinking' in await sent({ reasoning: 'high', maxTokens: 1024 })).toBe(false)
+  it('asks again without disabled when the model refuses it, once per model', async () => {
+    const server = serve((_request, seen) => 'thinking' in seen.body ? Response.json({ error: { message: 'thinking.type disabled is not supported' } }, { status: 400 }) : stream(anthropicEvents('ok')).response)
+    const provided = anthropic({ baseUrl: server.url, apiKey: 'k', model: 'strict' })
+
+    expect(await ask('Hi', { provider: provided, reasoning: 'none' })).toBe('ok')
+    expect(await ask('Again', { provider: provided, reasoning: 'none' })).toBe('ok')
+    expect(server.seen).toHaveLength(3)
+    expect('thinking' in server.seen[1]!.body).toBe(false)
+    expect(server.seen[1]!.body.output_config).toEqual({ effort: 'low' })
+    expect('thinking' in server.seen[2]!.body).toBe(false)
   })
 
-  it('lets reasoning win over a thinking field of the body', async () => {
-    expect((await sent({ reasoning: 'none', body: { thinking: { type: 'enabled', budget_tokens: 2000 } } })).thinking).toEqual({ type: 'disabled' })
+  it('keeps the effort beside the schema\'s format', async () => {
+    const server = serve(() => stream(anthropicEvents('{}')).response)
+    const request: ProviderRequest = { ...BASE, reasoning: 'medium', schema: { type: 'object', properties: {}, required: [] } }
+
+    await collect(anthropic({ baseUrl: server.url, apiKey: 'k' }).stream(request, new AbortController().signal))
+    expect(bodyOf(server).output_config).toMatchObject({ effort: 'medium', format: { type: 'json_schema' } })
+  })
+
+  it('sends a thinking of the body as it is, with no effort, for a model that wants a budget', async () => {
+    const body = await sent({ reasoning: 'high', body: { thinking: { type: 'enabled', budget_tokens: 2000 } } })
+
+    expect(body.thinking).toEqual({ type: 'enabled', budget_tokens: 2000 })
+    expect('output_config' in body).toBe(false)
+  })
+
+  it('keeps an omitted thinking block, empty but signed, to send back', async () => {
+    const server = serve(() => stream([
+      ['content_block_start', { type: 'content_block_start', index: 0, content_block: { type: 'thinking', thinking: '', signature: '' } }],
+      ['content_block_delta', { type: 'content_block_delta', index: 0, delta: { type: 'signature_delta', signature: 'sig-omitted' } }],
+      ['content_block_stop', { type: 'content_block_stop', index: 0 }],
+      ['message_stop', { type: 'message_stop' }],
+    ]).response)
+    const pieces = await collect(anthropic({ baseUrl: server.url, apiKey: 'k' }).stream(BASE, new AbortController().signal))
+
+    expect(pieces.filter(piece => 'thinking' in piece)).toEqual([{ thinking: { text: '', signature: 'sig-omitted' } }])
+    expect(pieces.filter(piece => 'reasoning' in piece)).toEqual([])
   })
 
   it('streams the thinking as reasoning pieces, never as text, with the finished blocks', async () => {

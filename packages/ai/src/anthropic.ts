@@ -19,23 +19,20 @@ const VERSION = '2023-06-01'
 const TRAILING_SLASHES = /\/+$/
 
 const FINISHES: Record<string, Finish> = { max_tokens: 'length', refusal: 'filtered' }
-// The share of `maxTokens` each level lets the model think with, and the least Anthropic accepts as a budget.
-const THINKING_SHARE = { low: 0.25, medium: 0.5, high: 0.75 }
-const MIN_THINKING = 1024
-// The tokens the answer keeps beside the thinking budget.
-const ANSWER_ROOM = 512
 
-// Extended thinking for the level asked: `none` turns it off, the others give a budget with `ANSWER_ROOM` tokens left for the answer, and a `maxTokens` too small for that leaves thinking alone.
-function thinkingOf({ reasoning, maxTokens }: ProviderRequest): { type: 'disabled' } | { type: 'enabled', budget_tokens: number } | undefined {
+// The models that refused `thinking: { type: 'disabled' }`, by API root and model, which are asked for `none` with the lowest effort alone from then on.
+const noDisabled = new Set<string>()
+
+// What `reasoning` sets: adaptive thinking at the effort asked, its text summarized so it streams (the models since 4.7 omit it otherwise), and for `none` the lowest effort with thinking disabled where the model takes it.
+// A `thinking` of the body replaces all of it, for a model that still wants a budget.
+function reasoningOf({ reasoning }: ProviderRequest, disable: boolean): { thinking?: { type: string, display?: string }, effort?: string } {
   if (reasoning === undefined)
-    return undefined
+    return {}
 
   if (reasoning === 'none')
-    return { type: 'disabled' }
+    return disable ? { thinking: { type: 'disabled' }, effort: 'low' } : { effort: 'low' }
 
-  const budget = Math.max(MIN_THINKING, Math.floor(maxTokens * THINKING_SHARE[reasoning]))
-
-  return budget + ANSWER_ROOM <= maxTokens ? { type: 'enabled', budget_tokens: budget } : undefined
+  return { thinking: { type: 'adaptive', display: 'summarized' }, effort: reasoning }
 }
 
 function count(value: unknown): number | undefined {
@@ -115,31 +112,65 @@ export function anthropic({ apiKey, baseUrl = ANTHROPIC_URL, model, body: fields
     name: 'anthropic',
     model,
     async* stream(request, signal) {
-      const thinking = thinkingOf(request)
-      const body = {
-        ...extra,
-        ...request.body,
-        model: request.model,
-        max_tokens: request.maxTokens,
-        messages: request.messages.map(turnOf),
-        stream: true,
-        // Automatic caching: the API puts the breakpoint on the last cacheable block, so later turns and tool steps read the prefix; a prompt under the model's minimum is simply not cached.
-        ...request.cache === false ? {} : { cache_control: request.cache === '1h' ? { type: 'ephemeral', ttl: '1h' } : { type: 'ephemeral' } },
-        ...request.system === undefined ? {} : { system: request.system },
-        ...request.tools === undefined || request.tools.length === 0 ? {} : { tools: request.tools.map(({ name, description, inputSchema }) => ({ name, description, input_schema: inputSchema })) },
-        // Anthropic refuses a temperature other than 1 while the model thinks.
-        ...request.temperature === undefined || thinking?.type === 'enabled' ? {} : { temperature: request.temperature },
-        ...thinking === undefined ? {} : { thinking },
-        // The model answers the JSON of the schema as its text, whatever the tools.
-        ...request.schema === undefined ? {} : { output_config: { format: { type: 'json_schema', schema: outputSchema(request.schema) } } },
+      const key = `${root}\0${request.model}`
+      const own = { ...extra, ...request.body }
+      const build = (disable: boolean) => {
+        const { thinking, effort } = 'thinking' in own ? {} as ReturnType<typeof reasoningOf> : reasoningOf(request, disable)
+        const config = { ...typeof own.output_config === 'object' && own.output_config !== null ? own.output_config : {}, ...effort === undefined ? {} : { effort }, ...request.schema === undefined ? {} : { format: { type: 'json_schema', schema: outputSchema(request.schema) } } }
+
+        return {
+          ...own,
+          model: request.model,
+          max_tokens: request.maxTokens,
+          messages: request.messages.map(turnOf),
+          stream: true,
+          // Automatic caching: the API puts the breakpoint on the last cacheable block, so later turns and tool steps read the prefix; a prompt under the model's minimum is simply not cached.
+          ...request.cache === false ? {} : { cache_control: request.cache === '1h' ? { type: 'ephemeral', ttl: '1h' } : { type: 'ephemeral' } },
+          ...request.system === undefined ? {} : { system: request.system },
+          ...request.tools === undefined || request.tools.length === 0 ? {} : { tools: request.tools.map(({ name, description, inputSchema }) => ({ name, description, input_schema: inputSchema })) },
+          // Anthropic refuses a temperature other than 1 while the model thinks, so the app's one is left out then.
+          ...request.temperature === undefined || thinking?.type === 'adaptive' ? {} : { temperature: request.temperature },
+          ...thinking === undefined ? {} : { thinking },
+          // The model answers the JSON of the schema as its text, whatever the tools.
+          ...Object.keys(config).length === 0 ? {} : { output_config: config },
+        }
       }
+      const open = (disable: boolean) => postEvents('anthropic', `${root}/v1/messages`, { 'x-api-key': apiKey, 'anthropic-version': VERSION }, build(disable), request.timeouts, signal, apiKey)
 
       // Tool calls arrive as a block opened with the name, then the arguments in pieces.
       const calls = new Map<number, { id: string, name: string, arguments: string }>()
       // Thinking arrives as a block too: its text in pieces, then the signature that goes back with it.
       const thoughts = new Map<number, { text: string, signature: string } | { redacted: string }>()
 
-      for await (const { data } of postEvents('anthropic', `${root}/v1/messages`, { 'x-api-key': apiKey, 'anthropic-version': VERSION }, body, request.timeouts, signal, apiKey)) {
+      // Some models refuse `disabled`: the request goes again without it, and the model is remembered once that works.
+      let disable = request.reasoning === 'none' && !noDisabled.has(key) && !('thinking' in own)
+      let events = open(disable)
+      let first: IteratorResult<{ data: string }>
+
+      for (;;) {
+        try {
+          first = await events.next()
+
+          break
+        }
+        catch (error) {
+          if (!disable || !(error instanceof AiError) || (error.status !== 400 && error.status !== 422))
+            throw error
+
+          disable = false
+          noDisabled.add(key)
+          events = open(false)
+        }
+      }
+
+      const received = (async function* () {
+        if (!first.done)
+          yield first.value
+
+        yield* events
+      })()
+
+      for await (const { data } of received) {
         const event = json('anthropic', data)
 
         switch (event.type) {
