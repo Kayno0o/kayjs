@@ -17,5 +17,5 @@ const build = () => schema
 
 // The browser's `s`: a module shared with the server may build its schemas as it loads, and they cost nothing here, as carrying Elysia into every island would weigh about 190 KB.
 export const s = /* @__PURE__ */ new Proxy({}, {
-  get: (_, name) => typeof name === 'symbol' ? undefined : build,
+  get: (_, name) => typeof name === 'symbol' || name === 'then' ? undefined : build,
 }) as typeof server

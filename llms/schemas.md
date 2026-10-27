@@ -43,7 +43,7 @@ const { initial } = props<{ initial: Choice }>()
 ### Schemas
 
 - `s` from `kay` is Elysia's schema builder under a name that leaves `t` to translations, there to save an import in server fences and server modules, `defineEnv` and API modules included.
-- The browser has no Elysia, which reads `Bun`: there `s.Object(...)` and the rest build an inert stand-in, so a module shared by the server and an island may build its schemas as it loads, with nothing of the validator in the island's chunk.
+- The browser has no Elysia, which reads `Bun`: there `s.Object(...)` and the rest build an inert stand-in, so a module shared by the server and an island may build its schemas as it loads, with no validator in the island's chunk, only the calls and their literals.
 - The stand-in only passes into another builder: reading a key of one, or validating with it, throws in the browser. An island reads the type, `Static<typeof schema>`, and the server validates.
 - An island reads a schema's type, not its value: `import type { Choice } from '../schemas'`, or `import type { choice } from '../schemas'` for `Static<typeof choice>`, is erased from the browser build; a plain `import { choice }` works too, keeping the inert stand-in and the schema's literal in the chunk.
 - `Static<typeof schema>` and `InputOf<typeof action>` are types from `kay` and cost the browser nothing.
