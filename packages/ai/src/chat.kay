@@ -335,10 +335,15 @@ function picked(event: Event) {
 }
 
 function dropped(event: DragEvent) {
-  if (!attach || event.defaultPrevented || busy() || !event.dataTransfer?.types.includes('Files'))
+  if (!attach || event.defaultPrevented || !event.dataTransfer?.types.includes('Files'))
     return
 
+  // The dragover was cancelled, so the drop is too, or the browser would open the file; a reply under way takes none.
   event.preventDefault()
+
+  if (busy())
+    return
+
   take([...event.dataTransfer.files])
 }
 
@@ -696,6 +701,7 @@ function cancelEdit(id: number) {
 }
 
 const START_CHARS = 40
+const GRAPHEMES = new Intl.Segmenter(undefined, { granularity: 'grapheme' })
 
 // The edit button names its message by its first words, so a screen reader and the tooltip tell the buttons apart.
 function editName(turn: Turn): string {
@@ -711,7 +717,7 @@ function editName(turn: Turn): string {
 function startOf(words: string): string {
   let start = ''
 
-  for (const { segment } of new Intl.Segmenter(undefined, { granularity: 'grapheme' }).segment(words)) {
+  for (const { segment } of GRAPHEMES.segment(words)) {
     if (start.length + segment.length > START_CHARS)
       break
 

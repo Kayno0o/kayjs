@@ -29,6 +29,11 @@ test('the sources of a text still to be rendered leave out those cited only in a
   expect(numbers('a ` lone tick [1]')).toEqual([1])
   expect(numbers('1 < 2 and [1] > 0')).toEqual([1])
   expect(numbers('[01] [12345]')).toEqual([])
+  expect(numbers('- ```\n  [1]\n  ```\n[2]')).toEqual([2])
+  expect(numbers('> ```\n> [1]\n> ```\n\n[2]')).toEqual([2])
+  expect(numbers('\\`[1]\\` [2]')).toEqual([1, 2])
+  expect(numbers('`a\n\nb [1]` [2]')).toEqual([1, 2])
+  expect(numbers('```a`b\n[1]\n[2]')).toEqual([1, 2])
 })
 
 test('a reply with no sources is left as it is', () => {

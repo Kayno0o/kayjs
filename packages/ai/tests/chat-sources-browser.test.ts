@@ -97,7 +97,7 @@ it('hydrates an initial turn that cites only inside code with no list at any mom
   expect(page.errors).toEqual([])
 }, 120_000)
 
-it('lists a source cited in a list or a table,and links none in code, in a link, or written [01] or with five digits', async () => {
+it('lists a source cited in a list or a table, and links none in code, in a link, or written [01] or with five digits', async () => {
   await using page = await site.open('/citing')
 
   await send(page, '- see [2]\n\n| a | b |\n|---|---|\n| [1] | x |', 'see')

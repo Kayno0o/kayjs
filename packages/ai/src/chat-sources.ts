@@ -50,7 +50,9 @@ export function usableSources(sources: unknown): Source[] {
   return usable
 }
 
-const FENCE_LINE = /^ {0,3}(`{3,}|~{3,})/
+// A fence line, alone or inside a quote or a list item: the fence, then what follows it.
+const FENCE_LINE = /^[ \t>]*(?:(?:[-*+]|\d+[.)])[ \t]+)?[ \t]{0,3}(`{3}|~{3})(.*)$/
+const PARAGRAPH_BREAK = /\n[ \t]*\n/
 
 // The end of the run of `char` starting at `from`.
 function runEnd(text: string, from: number, char: string): number {
@@ -68,15 +70,20 @@ function outsideFences(markdown: string): string {
   let fence: string | undefined
 
   for (const line of markdown.split('\n')) {
-    const marker = FENCE_LINE.exec(line)?.[1]
+    const found = FENCE_LINE.exec(line)
+    const rest = found?.[2] ?? ''
+    const extra = found === null ? 0 : runEnd(rest, 0, found[1]![0]!)
+    const marker = found === null ? undefined : found[1]! + rest.slice(0, extra)
+    const info = rest.slice(extra)
 
     if (fence === undefined) {
-      if (marker === undefined)
+      // A backtick fence takes no backtick in its info string.
+      if (marker === undefined || (marker[0] === '`' && info.includes('`')))
         kept.push(line)
       else
         fence = marker
     }
-    else if (marker !== undefined && marker[0] === fence[0] && marker.length >= fence.length && line.trim().replaceAll(fence[0]!, '') === '') {
+    else if (marker !== undefined && marker[0] === fence[0] && marker.length >= fence.length && info.trim() === '') {
       fence = undefined
     }
   }
@@ -110,9 +117,12 @@ function outsideSpans(text: string): string {
   return result + text.slice(at)
 }
 
-// The sources a reply cites outside code, read from its markdown as written, for a turn whose renderer is still loading: it answers as the formatted reply would for fences and spans, so the list does not change when the renderer arrives.
+// The sources a reply cites outside code, read from its markdown as written, for a turn whose renderer is still loading: it sets aside fences and spans as the formatted reply does, so the list rarely changes when the renderer arrives (a citation in link text or an indented block still counts).
 export function citedAsWritten(markdown: string, sources: readonly Source[]): Source[] {
-  return linkSources(attribute(outsideSpans(outsideFences(markdown))), sources).cited
+  // A span ends with its paragraph, and an escaped backtick opens none.
+  const text = outsideFences(markdown).split(PARAGRAPH_BREAK).map(paragraph => outsideSpans(paragraph.replaceAll('\\`', ''))).join('\n\n')
+
+  return linkSources(attribute(text), sources).cited
 }
 
 // The reply's HTML with each `[n]` outside code and links turned into a link to its source, and the sources cited, in the order they were first cited.
