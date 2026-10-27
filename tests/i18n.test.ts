@@ -807,6 +807,7 @@ describe('in the browser', () => {
       expect(localize('/en')).toBe('/en')
       expect(alternate('fr')).toBe('/a-propos')
       expect(formatNumber(1234)).toBe('1,234')
+      expect(formatNumber(1234.5, { locale: 'fr' })).toBe(new Intl.NumberFormat('fr').format(1234.5))
       expect(locales()).toEqual(['fr', 'en'])
       expect(nameOf('fr')).toBe('Français')
 

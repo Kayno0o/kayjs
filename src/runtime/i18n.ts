@@ -102,8 +102,28 @@ const RELATIVE_UNITS: readonly [Intl.RelativeTimeFormatUnit, number][] = [['year
 export type Direction = 'ltr' | 'rtl'
 
 // What `formatRelativeTime` takes besides `Intl`'s options: the moment the time is relative to, now by default.
-export interface RelativeTimeOptions extends Intl.RelativeTimeFormatOptions {
+export interface RelativeTimeOptions extends Intl.RelativeTimeFormatOptions, LocaleOption {
   now?: Date | number | undefined
+}
+
+// Every format helper takes `locale` among its options, which wins over the page's or the request's: a mail written for a user in their own language.
+export interface LocaleOption {
+  locale?: string | undefined
+}
+
+export type NumberFormatOptions = Intl.NumberFormatOptions & LocaleOption
+export type DateFormatOptions = Intl.DateTimeFormatOptions & LocaleOption
+export type RelativeFormatOptions = Intl.RelativeTimeFormatOptions & LocaleOption
+export type ListFormatOptions = Intl.ListFormatOptions & LocaleOption
+
+// The options without `locale`, and the locale they name else `fallback`.
+function withLocale<Options extends LocaleOption>(fallback: string, options: Options | undefined): [string, Omit<Options, 'locale'> | undefined] {
+  if (options?.locale === undefined)
+    return [fallback, options]
+
+  const { locale, ...rest } = options
+
+  return [locale, rest]
 }
 
 // The message files' default export: it keeps the literal text, so `t` knows each message's placeholders.
@@ -227,18 +247,23 @@ function formatValue(locale: string, value: MessageValue): string {
   return value instanceof Date ? formatDate(locale, value) : value
 }
 
-export function formatNumber(locale: string, value: number, options?: Intl.NumberFormatOptions): string {
+export function formatNumber(page: string, value: number, given?: NumberFormatOptions): string {
+  const [locale, options] = withLocale(page, given)
+
   return cached(numberFormats, `${locale}\n${options === undefined ? '' : JSON.stringify(options)}`, () => new Intl.NumberFormat(locale, options)).format(value)
 }
 
 // A date as the locale writes it, `medium` by default: `4 oct. 2026`.
-export function formatDate(locale: string, value: Date | number, options: Intl.DateTimeFormatOptions = { dateStyle: 'medium' }): string {
+export function formatDate(page: string, value: Date | number, given: DateFormatOptions = { dateStyle: 'medium' }): string {
+  const [locale, named] = withLocale(page, given)
+  const options = named && Object.keys(named).length === 0 ? { dateStyle: 'medium' } as const : named!
+
   return cached(dateFormats, `${locale}\n${JSON.stringify(options)}`, () => new Intl.DateTimeFormat(locale, options)).format(value)
 }
 
 // A date relative to now in the largest unit it reaches, `3 days ago`, or a value in the unit given; `numeric: 'auto'` by default, so a day back reads `yesterday`.
-export function formatRelativeTime(locale: string, value: Date | number, unitOrOptions?: Intl.RelativeTimeFormatUnit | RelativeTimeOptions, options?: Intl.RelativeTimeFormatOptions): string {
-  const { now, ...format } = typeof unitOrOptions === 'object' ? unitOrOptions : { ...options, now: undefined }
+export function formatRelativeTime(page: string, value: Date | number, unitOrOptions?: Intl.RelativeTimeFormatUnit | RelativeTimeOptions, given?: RelativeFormatOptions): string {
+  const { locale = page, now, ...format } = typeof unitOrOptions === 'object' ? unitOrOptions : { ...given, now: undefined }
   const formatter = cached(relativeFormats, `${locale}\n${JSON.stringify(format)}`, () => new Intl.RelativeTimeFormat(locale, { numeric: 'auto', ...format }))
 
   if (typeof unitOrOptions === 'string')
@@ -252,7 +277,9 @@ export function formatRelativeTime(locale: string, value: Date | number, unitOrO
 }
 
 // Items joined as the locale writes a list, `a, b and c`.
-export function formatList(locale: string, items: Iterable<string>, options?: Intl.ListFormatOptions): string {
+export function formatList(page: string, items: Iterable<string>, given?: ListFormatOptions): string {
+  const [locale, options] = withLocale(page, given)
+
   return cached(listFormats, `${locale}\n${options === undefined ? '' : JSON.stringify(options)}`, () => new Intl.ListFormat(locale, options)).format(items)
 }
 

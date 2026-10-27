@@ -1,4 +1,4 @@
-import type { Direction, Locale, LocaleSettings, Localize, Message, MessageValue, RelativeTimeOptions, RichText, Translate } from './i18n'
+import type { DateFormatOptions, Direction, ListFormatOptions, Locale, LocaleSettings, Localize, Message, MessageValue, NumberFormatOptions, RelativeFormatOptions, RelativeTimeOptions, RichText, Translate } from './i18n'
 import { withBase, withoutBase } from './base'
 import { fragment, insert, localizeLinks, markers } from './dom'
 import { formatDate as formatDateIn, formatList as formatListIn, formatNumber as formatNumberIn, formatRelativeTime as formatRelativeTimeIn, leadsWithLocale, localeName as localeNameIn, localePath, localizedLink, richMessage, splitLocale, textDirection, translate, untranslatedPath } from './i18n'
@@ -114,23 +114,23 @@ export function localeName(target: Locale): string {
   return localeNameIn(target)
 }
 
-export function formatNumber(value: number, options?: Intl.NumberFormatOptions): string {
+export function formatNumber(value: number, options?: NumberFormatOptions): string {
   return formatNumberIn(translations().locale, value, options)
 }
 
-export function formatDate(value: Date | number, options?: Intl.DateTimeFormatOptions): string {
+export function formatDate(value: Date | number, options?: DateFormatOptions): string {
   return formatDateIn(translations().locale, value, options)
 }
 
 export function formatRelativeTime(value: Date | number, options?: RelativeTimeOptions): string
-export function formatRelativeTime(value: number, unit: Intl.RelativeTimeFormatUnit, options?: Intl.RelativeTimeFormatOptions): string
-export function formatRelativeTime(value: Date | number, unitOrOptions?: Intl.RelativeTimeFormatUnit | RelativeTimeOptions, options?: Intl.RelativeTimeFormatOptions): string {
+export function formatRelativeTime(value: number, unit: Intl.RelativeTimeFormatUnit, options?: RelativeFormatOptions): string
+export function formatRelativeTime(value: Date | number, unitOrOptions?: Intl.RelativeTimeFormatUnit | RelativeTimeOptions, options?: RelativeFormatOptions): string {
   return formatRelativeTimeIn(translations().locale, value, unitOrOptions, options)
 }
 
 // A date relative to now, formatted as `formatRelativeTime` does, that goes on ticking while the island lives and the tab shows: every second under a minute away, every minute under an hour, every hour past that.
 // It renders first as relative to the page's render time, as the server did, so hydrating changes nothing.
-export function relativeTime(value: () => Date | number, options?: Intl.RelativeTimeFormatOptions): () => string {
+export function relativeTime(value: () => Date | number, options?: RelativeFormatOptions): () => string {
   load()
 
   const [now, setNow] = createSignal(renderedAt ?? Date.now())
@@ -188,7 +188,7 @@ function tickPace(seconds: number): number {
   return seconds < 3600 ? 60_000 : 3_600_000
 }
 
-export function formatList(items: Iterable<string>, options?: Intl.ListFormatOptions): string {
+export function formatList(items: Iterable<string>, options?: ListFormatOptions): string {
   return formatListIn(translations().locale, items, options)
 }
 

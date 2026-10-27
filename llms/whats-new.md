@@ -4,7 +4,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 
 ## Unreleased
 
-- `formatNumber`, `formatDate`, `formatRelativeTime`, `formatList` and `direction` from `kay/i18n` work outside a request, in the site's default locale, so a job, an alert or a push formats like its pages: [Format a number, a date or a list](locales.md#format-a-number-a-date-or-a-list).
+- `formatNumber`, `formatDate`, `formatRelativeTime`, `formatList` and `direction` from `kay/i18n` work outside a request, in the site's default locale, so a job, an alert or a push formats like its pages, and each takes a `locale` option (`formatDate(date, { locale: user.locale })`) that wins over the page's, in the browser too: [Format a number, a date or a list](locales.md#format-a-number-a-date-or-a-list).
 - A module an island imports may build schemas with `s` as it loads: in the browser `s` builds an inert stand-in with no validator, so a type and its schema live in one module shared with the server, and `server-only-in-island` no longer refuses `s`, only `process` and `Bun` reads: [Schemas](schemas.md#schemas).
 - kayjs-ai: `ask` outside a request takes `tool({ name, description, input, run })` functions as `tools`, run with the app's own rights and never held for approval, so a scheduled job's model can call things: [Function tools](../packages/ai/llms/tools.md#function-tools).
 - kayjs-ui has an `AudioPlayer`: chapters on a timeline and in a list, a timed transcript following the playback, lock screen controls skipping between chapters, an `@actions` slot per chapter and a readable position ([Charts, drag and drop and media](../packages/ui/llms/charts-drag-and-media.md)).

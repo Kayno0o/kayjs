@@ -1,4 +1,4 @@
-import type { Direction, Locale, Localize, MessageValue, RelativeTimeOptions, RichText, Translate } from './i18n'
+import type { DateFormatOptions, Direction, ListFormatOptions, Locale, Localize, MessageValue, NumberFormatOptions, RelativeFormatOptions, RelativeTimeOptions, RichText, Translate } from './i18n'
 import type { JSX } from './jsx'
 import type { LocaleState } from './locale-state'
 import { formatDate as formatDateIn, formatList as formatListIn, formatNumber as formatNumberIn, formatRelativeTime as formatRelativeTimeIn, leadsWithLocale, localeName as localeNameIn, localePath, richMessage, textDirection, translate } from './i18n'
@@ -81,22 +81,22 @@ function formatLocale(): string {
   return localeState()?.locale ?? siteDefaultLocale()
 }
 
-export function formatNumber(value: number, options?: Intl.NumberFormatOptions): string {
+export function formatNumber(value: number, options?: NumberFormatOptions): string {
   return formatNumberIn(formatLocale(), value, options)
 }
 
-export function formatDate(value: Date | number, options?: Intl.DateTimeFormatOptions): string {
+export function formatDate(value: Date | number, options?: DateFormatOptions): string {
   return formatDateIn(formatLocale(), value, options)
 }
 
 export function formatRelativeTime(value: Date | number, options?: RelativeTimeOptions): string
-export function formatRelativeTime(value: number, unit: Intl.RelativeTimeFormatUnit, options?: Intl.RelativeTimeFormatOptions): string
-export function formatRelativeTime(value: Date | number, unitOrOptions?: Intl.RelativeTimeFormatUnit | RelativeTimeOptions, options?: Intl.RelativeTimeFormatOptions): string {
+export function formatRelativeTime(value: number, unit: Intl.RelativeTimeFormatUnit, options?: RelativeFormatOptions): string
+export function formatRelativeTime(value: Date | number, unitOrOptions?: Intl.RelativeTimeFormatUnit | RelativeTimeOptions, options?: RelativeFormatOptions): string {
   return formatRelativeTimeIn(formatLocale(), value, unitOrOptions, options)
 }
 
 // A date relative to the page's render time, formatted as `formatRelativeTime` does; in the browser it goes on ticking, see the browser's.
-export function relativeTime(value: () => Date | number, options?: Intl.RelativeTimeFormatOptions): () => string {
+export function relativeTime(value: () => Date | number, options?: RelativeFormatOptions): () => string {
   const state = current('relativeTime()')
 
   state.now ??= Date.now()
@@ -106,7 +106,7 @@ export function relativeTime(value: () => Date | number, options?: Intl.Relative
   return () => formatRelativeTimeIn(locale, value(), { ...options, now })
 }
 
-export function formatList(items: Iterable<string>, options?: Intl.ListFormatOptions): string {
+export function formatList(items: Iterable<string>, options?: ListFormatOptions): string {
   return formatListIn(formatLocale(), items, options)
 }
 

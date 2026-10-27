@@ -32,4 +32,22 @@ describe('the formatters outside a request', () => {
 
     expect(runInLocale({ locale: 'en', messages: new Map(), settings: { locales: ['en', 'fr'], defaultLocale: 'fr', prefixDefault: false }, path: '/' }, () => formatNumber(1234.5))).toBe('1,234.5')
   })
+
+  it('take a locale of their own first, outside a request and in one', () => {
+    const request = { locale: 'en', messages: new Map(), settings: { locales: ['en', 'fr'], defaultLocale: 'en', prefixDefault: false }, path: '/' }
+    const date = Date.UTC(2024, 0, 5, 12)
+    const all = () => [
+      formatNumber(1234.5, { locale: 'fr' }),
+      formatDate(date, { locale: 'fr', dateStyle: 'long', timeZone: 'UTC' }),
+      formatDate(date, { locale: 'fr' }),
+      formatList(['Ada', 'Grace'], { locale: 'fr' }),
+      formatRelativeTime(2, 'week', { locale: 'fr' }),
+      formatRelativeTime(date + 7 * 86_400_000, { locale: 'fr', now: date }),
+    ]
+    const french = [new Intl.NumberFormat('fr').format(1234.5), '5 janvier 2024', '5 janv. 2024', 'Ada et Grace', 'dans 2 semaines', 'la semaine prochaine']
+
+    expect(all()).toEqual(french)
+    expect(runInLocale(request, all)).toEqual(french)
+    expect(formatNumber(1234.5, { locale: 'de' })).toBe('1.234,5')
+  })
 })
