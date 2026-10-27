@@ -10,6 +10,8 @@ const LEADING_SLASHES = /^[/\\]+/
 
 // Read by a link built in the browser, written when the address changes under it.
 let address: ReturnType<typeof ownDep> | undefined
+// The path and query the links were last built from, so a refresh that leaves the address alone rebuilds none.
+let built = ''
 
 let serverUrl: (() => URL | undefined) | undefined
 
@@ -20,7 +22,8 @@ export function setCurrentUrl(read: () => URL | undefined): void {
 
 // Tells the links built by `withQuery` in the browser that the address changed, a swap or a query written in place.
 export function addressChanged(): void {
-  address?.write()
+  if (built !== location.pathname + location.search)
+    address?.write()
 }
 
 // The path of the current page with `changes` merged into its query, to link to it with one filter or sort changed: `a(href={withQuery({ page: 2, filter: null })})`.
@@ -44,6 +47,7 @@ export function withQuery(changes: QueryChanges): string {
   }
   else {
     (address ??= ownDep(() => undefined)).read()
+    built = location.pathname + location.search
     path = withoutBase(location.pathname)
 
     for (const [name, value] of new URLSearchParams(location.search))

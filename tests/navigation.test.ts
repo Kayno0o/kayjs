@@ -1736,6 +1736,12 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('page swap i
     await page.waitFor('p.sorted', { text: 'Sorted none' })
 
     expect(await hrefs()).toEqual(['/query?color=red&page=2', '/query?color=red'])
+
+    // A query the island writes in place with `persisted` moves it too.
+    await page.fill('input.search', 'typed')
+    await page.waitUntil(() => location.search === '?color=red&q=typed')
+
+    expect(await hrefs()).toEqual(['/query?color=red&q=typed&page=2', '/query?color=red&q=typed'])
     expect(problem()).toEqual([])
   })
 
