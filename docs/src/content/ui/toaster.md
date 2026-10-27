@@ -26,7 +26,9 @@ Call `toast` once what the user started has finished, with the outcome as its ty
 
 `attempt` toasts a failed call. To show its message where it happens instead, in a notice or beside a field, `messageOf(error, fallback)` reads the words the route answered with, or an action's refusal, when they read as a message, and gives `fallback` for a network failure, a 5xx or any other error.
 
-To keep what a refusal carries instead of its words, such as the output of a command, give `attempt` an `onRefused`: `attempt(run, { failure, onRefused: data => output = data.output })`. It gets the data an action's handler passed to `ctx.fail`, or the JSON a route answered with, and nothing is toasted. `onRefused` is awaited, and one that throws or rejects is logged and toasts `failure`. A failure that is no refusal, such as a network error or a 5xx answer, still toasts `failure`, and `attempt` resolves to `undefined` either way.
+To keep what a refusal carries instead of its words, such as the output of a command, give `attempt` an `onRefused`: `attempt(run, { failure, onRefused: data => output = data.output })`. It gets the data an action's handler passed to `ctx.fail`, or the JSON a route answered with, and nothing is toasted.
+
+`onRefused` is awaited, and one that throws or rejects is logged and toasts `failure`. A failure that is no refusal, such as a network error or a 5xx answer, still toasts `failure`, and `attempt` resolves to `undefined` either way.
 
 ## Dismiss label and hotkey
 
