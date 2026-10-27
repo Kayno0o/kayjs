@@ -1320,6 +1320,10 @@ describe('module signals', () => {
     expect(moduleData('export { a, b as c, default as d } from \'./x\'\nexport * from \'./y\'\nexport * as ns from \'./y\'\n', false, specifier => specifier === './x' ? { a: 'data', b: 'data', default: 'data' } : { z: 'data', default: 'data', f: 'signal' })).toEqual(['a', 'c', 'd', 'z'])
     expect(moduleKinds('import { signal } from \'kay\'\nexport const a = signal(1)\nexport const b = { x: \'y\' }\n')).toEqual({ a: 'signal', b: 'data' })
     expect(moduleKinds('const a = 1\n')).toEqual({})
+    const icons = 'import Home from \'~icons/tabler/home\'\nimport Brand from \'~icons/brands/github\'\nimport other from \'./other\'\nexport const a = { Home, list: [Home] }\nexport const b = { Brand }\nexport const c = { other }\nexport default Home\n'
+
+    expect(moduleKinds(icons)).toEqual({ a: 'data', b: 'data', default: 'data' })
+    expect(moduleKinds(icons, false, undefined, new Set(['tabler']))).toEqual({ a: 'data', default: 'data' })
   })
 
   it('reads a name a destructured export or two stars give as not data', () => {

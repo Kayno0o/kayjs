@@ -141,7 +141,7 @@ export function browserRole(original: string, filename: string, imported?: Impor
   const { file } = parseExpanded(original)
   const source = file.source
   const server = analyzeServer(source, file.server)
-  const script = analyzeScript(source, file.script, serverNames(server), templateReads(file), file.module, iconSetsOf(source, root))
+  const script = analyzeScript(source, file.script, serverNames(server), templateReads(file), file.module, iconSetsOf(source, root), imported)
   const routeFile = file.server !== undefined || ROUTE_FILES.has(basename(filename))
 
   if (file.client !== undefined || isInteractive(file, script) || (!routeFile && liveImport(script, imported) !== undefined))
@@ -160,7 +160,7 @@ export function promotedChecks(original: string, root?: string, imported?: Impor
   const { file } = parseExpanded(original)
   const source = file.source
   const server = analyzeServer(source, file.server)
-  const script = analyzeScript(source, file.script, serverNames(server), templateReads(file), file.module, iconSetsOf(source, root))
+  const script = analyzeScript(source, file.script, serverNames(server), templateReads(file), file.module, iconSetsOf(source, root), imported)
   const site = promotionSite(file, script, imported)
   const marker = islandMarker(source)
   const announced = site === undefined || marker !== undefined ? [] : [{ ...site.span, code: 'promoted-island', message: `This component renders as an island: ${site.cause}`, note: 'a function or a block with parameters cannot be sent to the browser as data, so the component hydrates itself', help: 'write `// kay-island` in it to say so, or pass the island what can be serialized', checkOnly: true }]
@@ -174,7 +174,7 @@ export function compileKay(original: string, filename: string, options: CompileO
   const { file, expansion, problems } = parseExpanded(original)
   const source = file.source
   const server = analyzeServer(source, file.server)
-  const script = analyzeScript(source, file.script, serverNames(server), templateReads(file), file.module, iconSetsOf(source, options.root))
+  const script = analyzeScript(source, file.script, serverNames(server), templateReads(file), file.module, iconSetsOf(source, options.root), options.importedSignals)
 
   if (file.style)
     scopeElements(file, scopeAttribute(islandId(filename, options.root)))

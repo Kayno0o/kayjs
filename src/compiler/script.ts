@@ -2,6 +2,7 @@ import type { ParseResult } from '@babel/parser'
 import type { NodePath } from '@babel/traverse'
 import type * as t from '@babel/types'
 import type { Diagnostic, Span } from './ast'
+import type { ImportedSignals } from './module-signals'
 import type { PageSettingName } from './page-settings'
 import { parse } from '@babel/parser'
 import { eachNode } from './each-node'
@@ -109,18 +110,19 @@ export interface ParsedFence {
 // `serverNames` are the names the `--- server` fence hands the script, which a type may take the type of, and `templateReads` the values of `kay` the template reads, which the compiler imports like the script's own.
 // `module` is the `--- module` fence, whose code stays at module level beside the script's imports and types.
 // `iconSets` are the prefixes of the icon sets the project installs: an icon of one is data, and one of a set that is not is left to the app's own resolution, which may make it a component. Unset, every `~icons/` import is data.
-export function analyzeScript(source: string, script: Span | undefined, serverNames: string[] = [], templateReads: readonly string[] = [], module?: Span, iconSets?: ReadonlySet<string>): ScriptAnalysis {
-  const analysis = analyzeComponentScript(source, script, serverNames, templateReads, iconSets)
+// `imported` tells which imported names their module exports as data, which a value built from them may hold without being a function.
+export function analyzeScript(source: string, script: Span | undefined, serverNames: string[] = [], templateReads: readonly string[] = [], module?: Span, iconSets?: ReadonlySet<string>, imported?: ImportedSignals): ScriptAnalysis {
+  const analysis = analyzeComponentScript(source, script, serverNames, templateReads, iconSets, imported)
 
-  return module === undefined ? analysis : withModule(analysis, analyzeModule(source, module, iconSets))
+  return module === undefined ? analysis : withModule(analysis, analyzeModule(source, module, iconSets, imported))
 }
 
 const ICON_SET = /^~icons\/([a-z0-9-]+)\//
 
-// What the imports hold that a static component passing it is promoted for: every value import, bar an icon of an installed set.
-function importedFunctions(analysis: ScriptAnalysis, scope: FunctionScope, iconSets: ReadonlySet<string> | undefined): void {
+// What the imports hold that a static component passing it is promoted for: every value import, bar an icon of an installed set and a name its module exports as data.
+function importedFunctions(analysis: ScriptAnalysis, scope: FunctionScope, iconSets: ReadonlySet<string> | undefined, imported: ImportedSignals | undefined): void {
   for (const binding of analysis.imports) {
-    if (binding.typeOnly)
+    if (binding.typeOnly || imported?.[binding.source]?.[binding.imported] === 'data')
       continue
 
     const set = ICON_SET.exec(binding.source)?.[1]
@@ -136,7 +138,7 @@ function importedFunctions(analysis: ScriptAnalysis, scope: FunctionScope, iconS
 }
 
 // The `--- module` fence as module-level code: every statement is hoisted, the exports among them are the file's own.
-function analyzeModule(source: string, module: Span, iconSets: ReadonlySet<string> | undefined): ScriptAnalysis {
+function analyzeModule(source: string, module: Span, iconSets: ReadonlySet<string> | undefined, imported: ImportedSignals | undefined): ScriptAnalysis {
   const analysis: ScriptAnalysis = { hoisted: [], imports: [], specifiers: [], body: [], broken: [], brokenModule: [], reactive: false, implicit: [], functions: [], plain: [], diagnostics: [] }
   const scope: FunctionScope = { functions: new Set(), data: new Set() }
   const split = splitFence(source, module, [], analysis)
@@ -144,7 +146,7 @@ function analyzeModule(source: string, module: Span, iconSets: ReadonlySet<strin
   if (!split)
     return analysis
 
-  importedFunctions(analysis, scope, iconSets)
+  importedFunctions(analysis, scope, iconSets, imported)
 
   analysis.reactive = analysis.implicit.some(name => !STATIC_EXPORTS.has(name)) || analysis.imports.some(importsReactiveValue)
 
@@ -179,7 +181,7 @@ function withModule(script: ScriptAnalysis, module: ScriptAnalysis): ScriptAnaly
   }
 }
 
-function analyzeComponentScript(source: string, script: Span | undefined, serverNames: string[], templateReads: readonly string[], iconSets: ReadonlySet<string> | undefined): ScriptAnalysis {
+function analyzeComponentScript(source: string, script: Span | undefined, serverNames: string[], templateReads: readonly string[], iconSets: ReadonlySet<string> | undefined, imported: ImportedSignals | undefined): ScriptAnalysis {
   const analysis: ScriptAnalysis = { hoisted: [], imports: [], specifiers: [], body: [], broken: [], brokenModule: [], reactive: false, implicit: [], functions: [], plain: [], diagnostics: [] }
   const scope: FunctionScope = { functions: new Set(), data: new Set() }
 
@@ -197,7 +199,7 @@ function analyzeComponentScript(source: string, script: Span | undefined, server
 
   const { ast, shift } = split
 
-  importedFunctions(analysis, scope, iconSets)
+  importedFunctions(analysis, scope, iconSets, imported)
 
   analysis.reactive = analysis.implicit.some(name => !STATIC_EXPORTS.has(name)) || analysis.imports.some(importsReactiveValue)
 

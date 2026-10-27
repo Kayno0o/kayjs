@@ -1,10 +1,12 @@
 import type { ImportedSignals, Reexported, SignalKind } from '../compiler/module-signals'
 import { AsyncLocalStorage } from 'node:async_hooks'
 import { readFileSync, statSync } from 'node:fs'
+import { dirname, join } from 'node:path'
+import { iconSetsOf } from '../compiler/host'
 import { importedModules, jsonKinds, moduleKinds } from '../compiler/module-signals'
 import { parseKay } from '../compiler/parser'
 import { resolveFrom, SCRIPT_FILE, scriptLoader, transpilerFor } from './files'
-import { fences } from './libraries'
+import { fences, packageRoot } from './libraries'
 
 type ImportedKinds = Record<string, SignalKind | 'data'>
 const KAY_FILE = /\.kay$/
@@ -145,7 +147,7 @@ function signalsOf(path: string, walk = new Set<string>(), deps = new Map<string
     let signals: ImportedKinds
 
     try {
-      signals = kindsOf(path, text, reexported)
+      signals = kindsOf(path, text, reexported, iconSetsFor(path, text, own))
     }
     finally {
       walk.delete(path)
@@ -164,15 +166,28 @@ function signalsOf(path: string, walk = new Set<string>(), deps = new Map<string
   }
 }
 
-function kindsOf(path: string, text: string, reexported: Reexported): ImportedKinds {
+// The icon sets the project holding a module that imports icons installs, its package.json and installed sets joining `deps`, so installing a set reads the module again.
+function iconSetsFor(path: string, text: string, deps: Map<string, string>): ReadonlySet<string> | undefined {
+  if (JSON_FILE.test(path) || !text.includes('~icons/'))
+    return undefined
+
+  const root = packageRoot(dirname(path))
+
+  for (const dep of [join(root, 'package.json'), join(root, 'node_modules/@iconify-json')])
+    deps.set(dep, stampOf(dep) ?? MISSING)
+
+  return iconSetsOf(text, root)
+}
+
+function kindsOf(path: string, text: string, reexported: Reexported, iconSets: ReadonlySet<string> | undefined): ImportedKinds {
   if (JSON_FILE.test(path))
     return jsonKinds(text)
 
   // A component's signals are the ones its `--- module` fence exports.
   if (KAY_FILE.test(path))
-    return kayModuleSignals(text, reexported)
+    return kayModuleSignals(text, reexported, iconSets)
 
-  return moduleKinds(text, scriptLoader(path) === 'tsx' || scriptLoader(path) === 'jsx', reexported)
+  return moduleKinds(text, scriptLoader(path) === 'tsx' || scriptLoader(path) === 'jsx', reexported, iconSets)
 }
 
 function stampOf(path: string): string | undefined {
@@ -181,7 +196,7 @@ function stampOf(path: string): string | undefined {
   return stats && `${stats.mtimeMs}-${stats.size}`
 }
 
-function kayModuleSignals(text: string, reexported: Reexported): ImportedKinds {
+function kayModuleSignals(text: string, reexported: Reexported, iconSets: ReadonlySet<string> | undefined): ImportedKinds {
   const { module } = parseKay(text)
 
   if (!module)
@@ -189,5 +204,5 @@ function kayModuleSignals(text: string, reexported: Reexported): ImportedKinds {
 
   const fence = text.slice(module.start, module.end)
 
-  return moduleKinds(fence, false, reexported)
+  return moduleKinds(fence, false, reexported, iconSets)
 }

@@ -5,7 +5,7 @@ import { parse } from '@babel/parser'
 export type SignalKind = 'signal' | 'memo' | 'live'
 
 // The signals and memos of each module a component imports, by the specifier it imports them with.
-// A name a module exports as a literal of strings and numbers is `data`: no function, so a component passing one to an island is not promoted for it.
+// A name a module exports as a literal of strings, numbers and icons is `data`: no function, so a component passing one to an island is not promoted for it.
 export type ImportedSignals = Record<string, Record<string, SignalKind | 'data'>>
 
 // The signal kind of an imported name, which `data` is not.
@@ -52,10 +52,11 @@ function allTypes(specifiers: t.Node[]): boolean {
 }
 
 // What a component importing a module reads of it: its signals and memos, and the names it exports as literal data. The module is parsed once, and only when it exports something.
-export function moduleKinds(source: string, jsx = false, reexported?: Reexported): Record<string, SignalKind | 'data'> {
+// `iconSets` are the icon sets the project installs, whose `~icons/` imports a literal may hold as data, as a component's own imports are; unset, every `~icons/` import is.
+export function moduleKinds(source: string, jsx = false, reexported?: Reexported, iconSets?: ReadonlySet<string>): Record<string, SignalKind | 'data'> {
   const ast = source.includes('export') ? parseModule(source, jsx) : undefined
 
-  return ast ? { ...Object.fromEntries(dataIn(ast, reexported).map(name => [name, 'data' as const])), ...NAMES_KAY.test(source) ? signalsIn(ast) : {} } : {}
+  return ast ? { ...Object.fromEntries(dataIn(ast, reexported, iconSets).map(name => [name, 'data' as const])), ...NAMES_KAY.test(source) ? signalsIn(ast) : {} } : {}
 }
 
 function signalsIn(ast: t.File): Record<string, SignalKind> {
@@ -94,27 +95,55 @@ function signalsIn(ast: t.File): Record<string, SignalKind> {
 
 const SCALARS = new Set(['StringLiteral', 'NumericLiteral', 'BooleanLiteral', 'NullLiteral', 'BigIntLiteral'])
 
-// Whether an expression is plain data, a literal string, number, boolean or null, or an array or object of them, `as const` and `satisfies` aside: nothing in it can be a function. A literal another module mutates afterwards is still read as data.
-function isDataLiteral(node: t.Node): boolean {
+const ICON_SET = /^~icons\/([a-z0-9-]+)\//
+const NO_ICONS: ReadonlySet<string> = new Set()
+
+// Whether an expression is plain data, a literal string, number, boolean or null, an icon in `icons`, or an array or object of them, `as const` and `satisfies` aside: nothing in it can be a function. A literal another module mutates afterwards is still read as data.
+function isDataLiteral(node: t.Node, icons = NO_ICONS): boolean {
   if (SCALARS.has(node.type))
     return true
+
+  if (node.type === 'Identifier')
+    return icons.has(node.name)
 
   if (node.type === 'TemplateLiteral')
     return node.expressions.length === 0
 
   if (node.type === 'TSAsExpression' || node.type === 'TSSatisfiesExpression' || node.type === 'TSNonNullExpression')
-    return isDataLiteral(node.expression)
+    return isDataLiteral(node.expression, icons)
 
   if (node.type === 'UnaryExpression')
     return (node.operator === '-' || node.operator === '+') && node.argument.type === 'NumericLiteral'
 
   if (node.type === 'ArrayExpression')
-    return node.elements.every(element => element !== null && isDataLiteral(element))
+    return node.elements.every(element => element !== null && isDataLiteral(element, icons))
 
-  return node.type === 'ObjectExpression' && node.properties.every(property => property.type === 'ObjectProperty' && !property.shorthand && (!property.computed || property.key.type === 'StringLiteral' || property.key.type === 'NumericLiteral') && isDataLiteral(property.value))
+  return node.type === 'ObjectExpression' && node.properties.every(property => property.type === 'ObjectProperty' && (!property.computed || property.key.type === 'StringLiteral' || property.key.type === 'NumericLiteral') && isDataLiteral(property.value, icons))
 }
 
-// The names a module exports as data, whose values are all strings, numbers, booleans or null: what a component reading one passes an island as data, not as a function.
+// The names a module's default imports of `~icons/` bind, for the sets in `iconSets` or, unset, all of them.
+function iconsIn(ast: t.File, iconSets: ReadonlySet<string> | undefined): ReadonlySet<string> {
+  const icons = new Set<string>()
+
+  for (const statement of ast.program.body) {
+    if (statement.type !== 'ImportDeclaration' || statement.importKind === 'type')
+      continue
+
+    const set = ICON_SET.exec(statement.source.value)?.[1]
+
+    if (set === undefined || (iconSets !== undefined && !iconSets.has(set)))
+      continue
+
+    for (const specifier of statement.specifiers) {
+      if (specifier.type === 'ImportDefaultSpecifier')
+        icons.add(specifier.local.name)
+    }
+  }
+
+  return icons
+}
+
+// The names a module exports as data, whose values are all strings, numbers, booleans, null or `~icons/` imports: what a component reading one passes an island as data, not as a function.
 // That is `export const name = <literal>`, a `const` exported by `export { name }`, an `export default` of a literal or of such a `const`, and what `export { name } from` and `export * from` take from a module `reexported` reads.
 export function moduleData(source: string, jsx = false, reexported?: Reexported): string[] {
   const ast = source.includes('export') ? parseModule(source, jsx) : undefined
@@ -192,7 +221,8 @@ function ownExports(ast: t.File): Set<string> {
   return own
 }
 
-function dataIn(ast: t.File, reexported?: Reexported): string[] {
+function dataIn(ast: t.File, reexported?: Reexported, iconSets?: ReadonlySet<string>): string[] {
+  const icons = iconsIn(ast, iconSets)
   const found = new Set<string>()
   const local = new Set<string>()
   const stars = new Map<t.ExportAllDeclaration, Record<string, SignalKind | 'data'>>()
@@ -219,7 +249,7 @@ function dataIn(ast: t.File, reexported?: Reexported): string[] {
       continue
 
     for (const { id, init } of declaration.declarations) {
-      if (id.type !== 'Identifier' || !init || !isDataLiteral(init))
+      if (id.type !== 'Identifier' || !init || !isDataLiteral(init, icons))
         continue
 
       local.add(id.name)
@@ -233,7 +263,7 @@ function dataIn(ast: t.File, reexported?: Reexported): string[] {
     if (statement.type === 'ExportDefaultDeclaration') {
       const value = statement.declaration
 
-      if (value.type === 'Identifier' ? local.has(value.name) : isDataLiteral(value))
+      if (value.type === 'Identifier' ? local.has(value.name) || icons.has(value.name) : isDataLiteral(value, icons))
         found.add('default')
     }
     else if (statement.type === 'ExportAllDeclaration' && statement.exportKind !== 'type') {

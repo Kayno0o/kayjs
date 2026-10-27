@@ -813,6 +813,9 @@ describe.concurrent('kay check, edge cases', () => {
       defaulted: ['import DEFAULTED from \'../forms\'\nimport CONSTANT from \'../constant\'\nconst { kind } = props<{ kind: \'a\' }>()', 'Child(format={[DEFAULTED[kind], CONSTANT[kind]]})'],
       json: ['import copy from \'../copy.json\'\nimport { title } from \'../copy.json\'\nconst { kind } = props<{ kind: \'a\' }>()', 'Child(format={[copy[kind], title]})'],
       fenced: ['import { TAGS } from \'./tags.kay\'\nconst { kind } = props<{ kind: \'a\' }>()', 'Child(format={TAGS[kind]})'],
+      iconMap: ['import ICON, { APP_ICONS, LISTED_ICONS } from \'../app-icons\'\nconst { kind } = props<{ kind: \'a\' | \'b\' }>()', 'Child(format={[APP_ICONS[kind], LISTED_ICONS[0], ICON]})'],
+      iconTiles: ['import { APP_ICONS } from \'../app-icons\'\nimport { APPS } from \'../apps\'\nconst tiles = APPS.map(app => ({ ...app, icon: APP_ICONS[app.id] }))', 'Child(format={tiles})'],
+      fencedIcons: ['import { FENCED_ICONS } from \'./icons.kay\'', 'Child(format={FENCED_ICONS.Home})'],
       ordered: ['const ids = [3, 1].map(id => id + 1)\nconst sorted = ids.filter(id => id > 1).slice(0, 1)', 'Child(format={sorted})'],
     }
     const functions: Record<string, [script: string, call: string]> = {
@@ -840,6 +843,7 @@ describe.concurrent('kay check, edge cases', () => {
       inline: ['', 'Child(format={Math.max})'],
       bound: ['', 'Child(format={Math.max.bind(null, 1)})'],
       uninstalled: ['import Brand from \'~icons/not-installed/brand-github\'', 'Child(format={Brand})'],
+      uninstalledMap: ['import { BRANDS } from \'../brand-icons\'', 'Child(format={BRANDS.a})'],
     }
     const all = { ...data, ...functions }
     const component = ([script, call]: [string, string]) => `---\nimport Child from './island.kay'\n${script}\n---\n${call}\n`
@@ -857,6 +861,10 @@ describe.concurrent('kay check, edge cases', () => {
       'src/loop-b.ts': 'export * from \'./loop-a\'\n',
       'src/copy.json': '{ "a": "A", "title": "T" }',
       'src/handlers.ts': 'export const handlers = [() => 1]\n',
+      'src/app-icons.ts': 'import Home from \'~icons/tabler/home\'\nimport Mail from \'~icons/tabler/mail\'\n\nexport const APP_ICONS: Record<\'a\' | \'b\', typeof Home> = { a: Home, b: Mail }\nexport const LISTED_ICONS = [Home, Mail] as const\nexport default Home\n',
+      'src/apps.ts': 'export const APPS = [{ id: \'a\', name: \'A\' }, { id: \'b\', name: \'B\' }] as const\n',
+      'src/brand-icons.ts': 'import Brand from \'~icons/not-installed/brand-github\'\n\nexport const BRANDS = { a: Brand }\n',
+      'src/components/icons.kay': '--- module\nimport Home from \'~icons/tabler/home\'\n\nexport const FENCED_ICONS = { Home }\n---\np icons\n',
       'src/components/tags.kay': '--- module\nexport const TAGS = { a: \'x\' }\n---\np tags\n',
       'src/components/runs.kay': '--- module\nexport const RUNS = { a: () => 1 }\n---\np runs\n',
       'src/labels.ts': 'export const LABELS: Record<\'a\' | \'b\', string> = { a: \'A\', b: `B` }\nexport const SIZES = { small: 1, nested: [true, null, { deep: \'x\' }] } as const\nexport const ACTIONS = { a: () => 1, b: () => 2 }\nconst make = () => \'x\'\nexport const BUILT = { a: make(), b: \'b\' }\n',
