@@ -1,7 +1,7 @@
 ---
 import type { JSX } from 'kay'
 import type { LeafletApi, LeafletGroup, LeafletLayer, LeafletView, MapMarker, MapPoint } from './map-view'
-import { effect, onCleanup, onMount, recipe, reducedMotion, signal } from 'kay'
+import { effect, onCleanup, onMount, recipe, reducedMotion, signal, untrack } from 'kay'
 import { drawnPoints, OSM_ATTRIBUTION, OSM_TILES, validPoint } from './map-view'
 
 const look = recipe({
@@ -73,7 +73,7 @@ onMount(() => {
       return
 
     try {
-      const calm = still()
+      const calm = untrack(still)
 
       view = leaflet.map(canvas, { zoomSnap: 0.5, attributionControl: false, zoomAnimation: !calm, fadeAnimation: !calm, markerZoomAnimation: !calm })
       view.addControl(leaflet.control.attribution({ prefix: false }))
@@ -113,7 +113,7 @@ onMount(() => {
 
   const fit = (map: LeafletView) => {
     const leaflet = drawing()?.leaflet
-    const animate = !still()
+    const animate = !untrack(still)
 
     if (!leaflet)
       return

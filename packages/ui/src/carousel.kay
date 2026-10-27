@@ -72,10 +72,11 @@ effect(() => {
 if (autoplay !== undefined)
   durationMs(autoplay)
 
-const still = reducedMotion()
+if (autoplay) {
+  const still = reducedMotion()
 
-if (autoplay)
   every(autoplay, () => step(1), { while: () => !paused() && !pointed() && !focused() && !offscreen() && !still() })
+}
 
 const active = () => stepIndex(shown(), 0, slides.length)
 
