@@ -769,6 +769,8 @@ The new tables are created by `db.sync()` if you use Postgres or SQLite.
 
 Attempts are counted where every process shares them: in the store (`memoryAuthStore` and `pgStore` keep them), else in the app's `store.rates` from `kay.config.ts`, else in the process's memory. They are counted per client address and per account, the address kept as a keyed digest. Creating organizations is limited too, to 10 a day for each account: past that, `createOrganization` answers `limited`.
 
+Give the app `sqliteRates` or `pgRates` as `store.rates` rather than `memoryRates`, which drops open windows past 10,000, so a flood of typed addresses could lift a lockout.
+
 `rateLimit` overrides any of `DEFAULT_LIMITS`, each `{ max, window }` with `window` a string such as `'1h'`, as the defaults are written.
 
 ```ts

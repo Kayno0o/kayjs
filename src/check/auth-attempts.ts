@@ -12,6 +12,9 @@ const SOURCE_FILE = /(?:(?<!\.d)\.tsx?|\.kay)$/
 const AUTH_PACKAGE = '@kaynooo/kayjs-auth'
 // Members every AuthStore has, which tell a store from any object holding an `attempts`.
 const STORE_KEYS = ['users', 'identities', 'tokens']
+// What follows a property to the end of its line: its comma and a comment.
+const LINE_REST = /^[ \t]*(?:,[ \t]*)?(?:\/\/[^\n]*)?\r?\n/
+const NEWLINE = /^\r?\n/
 
 interface Edit { start: number, end: number, text: string }
 
@@ -32,7 +35,7 @@ export async function authAttempts(root: string, options: CheckOptions): Promise
       continue
 
     const parsed = file.endsWith('.kay') ? parseKay(source) : undefined
-    const spans = parsed ? [parsed.script, parsed.server].filter(span => span !== undefined) : [{ start: 0, end: source.length }]
+    const spans = parsed ? [parsed.script, parsed.server, parsed.module].filter(span => span !== undefined) : [{ start: 0, end: source.length }]
 
     for (const { start: base, end } of spans) {
       const text = source.slice(base, end)
@@ -62,7 +65,7 @@ export async function authAttempts(root: string, options: CheckOptions): Promise
 
         const property = node.properties[index] as t.ObjectProperty
         const memory = memoryCounter(property.value, locals, namespaces)
-        const edits = memory === undefined ? undefined : [removal(node.properties, index), ...unreadImport(ast, text, memory)].map(edit => ({ ...edit, start: base + edit.start, end: base + edit.end }))
+        const edits = memory === undefined ? undefined : [removal(text, node.properties, index), ...unreadImport(ast, text, memory)].map(edit => ({ ...edit, start: base + edit.start, end: base + edit.end }))
 
         found.push({
           file,
@@ -94,10 +97,17 @@ function memoryCounter(value: t.Node, locals: Set<string>, namespaces: Set<strin
   return callee.type === 'MemberExpression' && !callee.computed && callee.object.type === 'Identifier' && namespaces.has(callee.object.name) && callee.property.type === 'Identifier' && callee.property.name === 'memoryAuthStore' ? '' : undefined
 }
 
-// The property with its comma, up to the next member or the comments above it, so what follows keeps its place.
-function removal(properties: t.ObjectExpression['properties'], index: number): Edit {
+// A property on lines of its own goes with those lines: the comments above it, its comma and a comment ending its line.
+// One sharing its line goes with its comma, up to the next member or the comments above it, so what follows keeps its place.
+function removal(text: string, properties: t.ObjectExpression['properties'], index: number): Edit {
   const property = properties[index]!
   const next = properties[index + 1]
+  const onOwnLine = (at: number) => text.slice(text.lastIndexOf('\n', at - 1) + 1, at).trim() === ''
+  const start = property.leadingComments?.find(comment => onOwnLine(comment.start!))?.start ?? property.start!
+  const rest = LINE_REST.exec(text.slice(property.end!))
+
+  if (onOwnLine(start) && rest)
+    return { start: text.lastIndexOf('\n', start - 1) + 1, end: property.end! + rest[0].length, text: '' }
 
   if (next)
     return { start: property.start!, end: next.leadingComments?.[0]?.start ?? next.start!, text: '' }
@@ -138,7 +148,7 @@ function unreadImport(ast: t.File, text: string, local: string): Edit[] {
       continue
 
     if (statement.specifiers.length === 1)
-      return [{ start: statement.start!, end: statement.end! + (text[statement.end!] === '\n' ? 1 : 0), text: '' }]
+      return [{ start: statement.start!, end: statement.end! + (NEWLINE.exec(text.slice(statement.end!))?.[0].length ?? 0), text: '' }]
 
     const specifier = statement.specifiers[index]!
     const next = statement.specifiers[index + 1]

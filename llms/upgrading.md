@@ -6,7 +6,7 @@ What each minor release breaks, and what an app changes to move to it. kay and i
 
 ### kayjs-auth: a store counts attempts in `rates`, and `DEFAULT_LIMITS` windows are durations
 
-- `attempts` left the `AuthStore` contract. A store of the app's own drops it, attempts then counting in the app's `store.rates` from kay.config.ts, else in memory, or gives `rates`, a kay `RateStore` with `peek` and `reset` over its own database. The old counter is still read until 1.84, and `kay upgrade` (`deprecated-auth-attempts`) drops `attempts: memoryAuthStore().attempts`. `pgStore` keeps its `kay_attempts` table, so its counts survive; a counter the app drops starts its open windows over, a day at most.
+- `attempts` left the `AuthStore` contract. A store of the app's own drops it, attempts then counting in the app's `store.rates` from kay.config.ts, else in memory, or gives `rates`, a kay `RateStore` with `peek` and `reset` over its own database. The old counter is still read, in place of `rates`, until 1.84, and `kay upgrade` (`deprecated-auth-attempts`) drops `attempts: memoryAuthStore().attempts`. `pgStore` keeps its `kay_attempts` table, so its counts survive; a counter the app drops starts its open windows over, a day at most.
 - `DEFAULT_LIMITS` and the `Limit` type write a window as a duration, `{ max: 40, window: '15m' }`, where they held seconds (`900`): code reading one as a number gets a type error from `kay check`, and reads it with `durationSeconds`. A `rateLimit` option already took durations and is unchanged.
 
 ### `s.UnionEnum` and `s.UnionKeys` no longer default to their first value

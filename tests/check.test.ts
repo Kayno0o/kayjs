@@ -4587,9 +4587,14 @@ describe('kay check, deprecated-auth-attempts', () => {
     const shared = 'import type { AuthStore } from \'@kaynooo/kayjs-auth\'\nimport { memoryAuthStore, sealTotpSecret } from \'@kaynooo/kayjs-auth\'\n\nconst base = memoryAuthStore()\n\nexport const store: AuthStore = {\n  ...base,\n  users: base.users,\n  identities: base.identities,\n  tokens: base.tokens,\n  attempts: memoryAuthStore().attempts,\n  // Expired rows go.\n  async prune() {},\n}\nexport const seal = sealTotpSecret\n'
     const alone = 'import { memoryAuthStore } from \'@kaynooo/kayjs-auth\'\n\nexport const store = { users: {}, identities: {}, tokens: {}, attempts: memoryAuthStore().attempts }\n'
     const own = 'import type { AuthStore } from \'@kaynooo/kayjs-auth\'\n\ndeclare const counter: NonNullable<AuthStore[\'attempts\']>\n\nexport const store = { users: {}, identities: {}, tokens: {}, attempts: counter }\nexport const other = { attempts: counter }\n'
+    const commented = 'import { memoryAuthStore } from \'@kaynooo/kayjs-auth\'\n\nconst base = memoryAuthStore()\n\nexport const store = {\n  ...base,\n  users: base.users,\n  identities: base.identities,\n  tokens: base.tokens, // the links\n  // Counted in memory.\n  attempts: memoryAuthStore().attempts, // for now\n  async prune() {},\n}\n'
+    const fenced = '--- module\nimport * as auth from \'@kaynooo/kayjs-auth\'\n\nexport const store = {\n  users: {},\n  identities: {},\n  tokens: {},\n  attempts: auth.memoryAuthStore().attempts,\n}\n---\np x\n'
     const root = await scratchProject({
       'src/shared.ts': shared,
       'src/alone.ts': alone,
+      'src/crlf.ts': alone.replaceAll('\n', '\r\n'),
+      'src/commented.ts': commented,
+      'src/components/store.kay': fenced,
       'src/own.ts': own,
       'src/unrelated.ts': 'const counter = { hit: () => 1 }\n\nexport const store = { users: {}, identities: {}, tokens: {}, attempts: counter }\n',
     })
@@ -4597,10 +4602,13 @@ describe('kay check, deprecated-auth-attempts', () => {
     try {
       const { output } = await runCheck(root)
 
-      expect(output.match(/deprecated-auth-attempts/g)).toHaveLength(3)
+      expect(output.match(/deprecated-auth-attempts/g)).toHaveLength(6)
       await runCheck(root, '--fix')
       expect(await Bun.file(join(root, 'src/shared.ts')).text()).toBe(shared.replace('  attempts: memoryAuthStore().attempts,\n', ''))
       expect(await Bun.file(join(root, 'src/alone.ts')).text()).toBe('\nexport const store = { users: {}, identities: {}, tokens: {} }\n')
+      expect(await Bun.file(join(root, 'src/crlf.ts')).text()).toBe('\r\nexport const store = { users: {}, identities: {}, tokens: {} }\r\n')
+      expect(await Bun.file(join(root, 'src/commented.ts')).text()).toBe(commented.replace('  // Counted in memory.\n  attempts: memoryAuthStore().attempts, // for now\n', ''))
+      expect(await Bun.file(join(root, 'src/components/store.kay')).text()).toBe(fenced.replace('  attempts: auth.memoryAuthStore().attempts,\n', ''))
       expect(await Bun.file(join(root, 'src/own.ts')).text()).toBe(own)
     }
     finally {

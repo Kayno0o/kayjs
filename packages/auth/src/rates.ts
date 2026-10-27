@@ -79,10 +79,11 @@ function counts(store: RateStore): store is AuthRates {
   return typeof store.peek === 'function' && typeof store.reset === 'function'
 }
 
-// The store's own `rates`, else its pre-1.81 `attempts`, else the app's `store.rates` from kay.config.ts when it can peek and reset, else this auth's memory.
+// The store's pre-1.81 `attempts`, else its own `rates`, else the app's `store.rates` from kay.config.ts when it can peek and reset, else this auth's memory.
+// `attempts` comes first: the built-in stores give `rates` and no `attempts`, so a store holding both spread one and gave the counter shared by its processes.
 // The app's store is read on each count, as kay sets it up after `createAuth` may have run.
 export function authRates(store: AuthStore): AuthRates {
-  const own = store.rates ?? (store.attempts && legacyRates(store.attempts))
+  const own = store.attempts ? legacyRates(store.attempts) : store.rates
 
   if (own)
     return own

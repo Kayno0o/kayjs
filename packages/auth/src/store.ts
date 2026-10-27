@@ -385,7 +385,7 @@ export interface AuthStore {
   }
   // Where the store counts attempts, shared by every process it is, as `memoryAuthStore` and `pgStore` do: kay's `RateStore` with `peek` and `reset`. Without it they count in the app's `store.rates`, else this process's memory.
   rates?: AuthRates | undefined
-  // The counter before 1.81, still read while the store gives no `rates`: `deprecated-auth-attempts`.
+  // The counter before 1.81, still read in place of `rates`: `deprecated-auth-attempts`.
   attempts?: LegacyAttempts | undefined
   // Deletes what outlived its use: expired links and codes and invitations, bearer tokens expired long ago, sessions past their lifetime unseen or the session plugin's `absoluteMaxAge` old, and attempt windows that ended. kayjs-auth calls it at most once an hour; a store without it keeps those rows until the app deletes them.
   prune?: (limits: PruneLimits) => MaybePromise<void>

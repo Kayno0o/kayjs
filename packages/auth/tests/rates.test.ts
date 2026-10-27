@@ -83,11 +83,11 @@ describe('where attempts are counted', () => {
     expect(hit).not.toHaveBeenCalled()
   })
 
-  test('a store giving the attempts counter of before 1.81 is still counted and cleared through it', async () => {
+  test('a store giving the attempts counter of before 1.81 is still counted and cleared through it, over the rates of the store it spreads', async () => {
     const memory = memoryAuthRates()
     const calls: string[] = []
     const store: AuthStore = {
-      ...withoutRates(),
+      ...memoryAuthStore(),
       attempts: {
         count: async (key) => {
           calls.push('count')
