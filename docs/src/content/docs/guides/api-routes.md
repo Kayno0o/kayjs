@@ -32,6 +32,21 @@ A handler names the route of its own module with `apiUrl(request, path)`, as a r
 
 A route at the path of a page, a public file, an endpoint or a redirect stops the server at boot. A single file a static export should write, such as `llms.txt`, is an [endpoint file](/essentials/routing#endpoint-files) in `src/routes/` instead.
 
+## HTTP Basic
+
+A device that only speaks Basic auth, such as a tracker, can post to a route behind `basicAuth`. Make it the `_guard.ts` of the directory:
+
+```ts
+// src/api/track/_guard.ts
+import { basicAuth } from 'kay/server'
+
+export default basicAuth({ user: process.env.TRACKER_USER, password: process.env.TRACKER_PASSWORD, realm: 'tracker' })
+```
+
+A request without the right credentials gets a 401 and a `WWW-Authenticate` header, so a browser asks for them. While the user or the password is unset, every request is refused, so a missing environment variable never opens the route. The password is compared in constant time.
+
+Basic sends the password with every request. Serve it over https, and add a `rateLimit` to the guard against guessing.
+
 ## Errors
 
 A handler that throws is logged with its stack and handed to `onError`, like a page's error. The answer is 500 with `Internal Server Error` in production and the message in development.

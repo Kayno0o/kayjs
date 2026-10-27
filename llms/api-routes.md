@@ -43,6 +43,19 @@ export default api({ guards: false })
   .post('/', ({ body }) => record(body))
 ```
 
+### Guard a route with HTTP Basic
+
+A device that only speaks Basic auth, a tracker say, posts to a directory whose `_guard.ts` is `basicAuth`:
+
+```ts
+// src/api/track/_guard.ts
+import { basicAuth } from 'kay/server'
+
+export default basicAuth({ user: process.env.TRACKER_USER, password: process.env.TRACKER_PASSWORD, realm: 'tracker' })
+```
+
+It answers 401 with `WWW-Authenticate: Basic realm="tracker", charset="UTF-8"` to a request without the right credentials: [Guards](server.md#basic-auth).
+
 ### Let another site's pages call a module
 
 `cors` names the origins, `https://*.example.org` standing for any subdomain:

@@ -140,6 +140,15 @@ export default guard(({ locals, redirect, deny }) => {
 
 A library's own guard names the locals it reads with `guard<{ auth: Auth }>(...)`, so its `ctx.locals` has them whatever the app registers. It is an assertion about the plugin the app mounts, not checked at runtime.
 
+### Basic auth
+
+- `basicAuth({ user, password, realm })` from `kay/server` is a guard as a `_guard.ts` default export, in `src/api/` or `src/routes/`: `export default basicAuth({ user: process.env.TRACKER_USER, password: process.env.TRACKER_PASSWORD })`.
+- A request without the right `Authorization: Basic` header answers 401 with `WWW-Authenticate: Basic realm="<realm>", charset="UTF-8"`, `realm` being `Restricted` unless given (printable ASCII, quoted for you).
+- While `user` or `password` is `undefined` or empty, every request is refused (and one warning logged), so a missing environment variable never opens the route.
+- The header is read as RFC 7617 has it: the scheme in any case, base64 of UTF-8, the first colon ending the user, so a password may hold colons and a user may not (refused at boot). A malformed header is a refusal, never an error.
+- Credentials are compared as SHA-256 digests with `timingSafeEqual`, both always, so a wrong user and a wrong password take as long.
+- Basic sends the password with every request: serve it over https and pair it with `rateLimit` ([Rate limits](rate-limits.md#limit-attempts-in-a-guard-or-an-api-route)) against guessing.
+
 A guard limits how often a client gets through with `rateLimit(name, { max, window })`: [Rate limits](rate-limits.md#limit-attempts-in-a-guard-or-an-api-route).
 
 ### Leave a page open under a guard
