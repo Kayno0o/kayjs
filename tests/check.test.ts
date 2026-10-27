@@ -631,6 +631,17 @@ describe.concurrent('kay check, edge cases', () => {
       })).toEqual([])
     })
 
+    it('reads typed and TSX modules, and passes a class field initializer', async () => {
+      const diagnostics = await found({
+        'src/components/counter.kay': '---\nimport { signal } from \'kay\'\nimport { SHAPE } from \'../lib/typed\'\nimport { VIEW } from \'../lib/view\'\nimport { KEY } from \'../lib/key\'\n\nconst count = signal(0)\n---\nbutton(onClick={() => count++}) {count()}\n',
+        'src/lib/typed.ts': 'import { s } from \'kay\'\n\nexport type Shape = unknown\nexport const SHAPE: Shape = s.Object({ name: s.String() }) as Shape\n',
+        'src/lib/view.tsx': 'import { s } from \'kay\'\n\nexport const VIEW = <b>{String(s.Object({}))}</b>\n',
+        'src/lib/key.ts': 'export class Key { x = process.env.Y }\nexport const KEY: string = \'k\'\n',
+      })
+
+      expect(diagnostics.map(d => d.at)).toEqual(['src/components/counter.kay:3', 'src/components/counter.kay:4'])
+    })
+
     it('reports a process or Bun read as a module an island reaches loads, and passes NODE_ENV and a typeof guard', async () => {
       const diagnostics = await found({
         'src/components/counter.kay': island('import { A } from \'../lib/a\'\nimport { B } from \'../lib/b\'\nimport { C } from \'../lib/c\'\nimport { D } from \'../lib/d\''),

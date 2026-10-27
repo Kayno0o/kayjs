@@ -6,6 +6,7 @@ import { relative } from 'node:path'
 import { KAY_FILE } from '../build/files'
 import { loadTimeReads } from '../build/server-only'
 import { positionAt } from '../compiler/mapping'
+import { parseKay } from '../compiler/parser'
 
 const REGEX_SPECIAL = /[.*+?^${}()|[\]\\]/g
 const HELP = 'keep the schemas, and what reads `process` or `Bun`, in a module only the server imports, and what the island needs of them, a length or a list of choices, in another'
@@ -16,6 +17,22 @@ function readsOf(name: string): string {
 
 // The build's refusal of an island whose chunk reads the server, found from the sources: an island, or a module one imports, building a schema with `s` or reading `process` or `Bun` as it loads.
 // Reported at the island's own import of the module, as the build names the island, and at the read itself when the island's own script holds it.
+// Where the island's own script, or the file itself, imports the specifier: its server fence may import the same module and comes first.
+function importAt(source: string, specifier: string, fenced: boolean): number {
+  const file = fenced ? parseKay(source) : undefined
+  const spans = file ? [file.script, file.module].filter(span => span !== undefined) : [{ start: 0, end: source.length }]
+  const quoted = new RegExp(`['"]${specifier.replace(REGEX_SPECIAL, '\\$&')}['"]`)
+
+  for (const { start, end } of spans) {
+    const found = source.slice(start, end).search(quoted)
+
+    if (found >= 0)
+      return start + found
+  }
+
+  return 0
+}
+
 export async function serverOnlyInIsland(root: string, { modules, seeds, origins }: BrowserModules): Promise<CheckDiagnostic[]> {
   const project = realpathSync(root)
   const diagnostics: CheckDiagnostic[] = []
@@ -35,8 +52,6 @@ export async function serverOnlyInIsland(root: string, { modules, seeds, origins
       report(seed, source, start, `this island ${readsOf(name)}: its first use would throw as the island loads`)
   }
 
-  const shown = new Set<string>()
-
   for (const module of [...modules].sort()) {
     const origin = origins.get(module)
 
@@ -49,21 +64,14 @@ export async function serverOnlyInIsland(root: string, { modules, seeds, origins
       continue
 
     const seed = await textOf(origin.seed)
-    const at = seed.search(new RegExp(`['"]${origin.specifier.replace(REGEX_SPECIAL, '\\$&')}['"]`))
+    const at = importAt(seed, origin.specifier, KAY_FILE.test(origin.seed))
     const where = relative(project, module)
     const island = relative(project, realpathSync(origin.seed))
 
     for (const name of new Set(reads.map(read => read.name))) {
-      const key = `${origin.seed}\0${at}\0${module}\0${name}`
-
-      if (shown.has(key))
-        continue
-
-      shown.add(key)
-
       const line = positionAt(await textOf(module), reads.find(read => read.name === name)!.start).line
 
-      report(origin.seed, seed, Math.max(at, 0), `${island} imports ${where}, which ${readsOf(name)} at line ${line} as it loads, so the island dies as it loads`)
+      report(origin.seed, seed, at, `${island} reaches ${where} through its import of '${origin.specifier}', which ${readsOf(name)} at line ${line} as it loads, so the island dies as it loads`)
     }
   }
 

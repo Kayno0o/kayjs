@@ -107,7 +107,8 @@ export function loadTimeReads(source: string, fenced: boolean): LoadTimeRead[] {
     if (!MENTIONED.test(text) && !text.includes('kay'))
       continue
 
-    const program = parsed(text, fenced)
+    // A project's own module is TypeScript, or TSX, whichever side it runs on.
+    const program = parsed(text, true)
 
     if (program === undefined)
       continue
@@ -116,7 +117,7 @@ export function loadTimeReads(source: string, fenced: boolean): LoadTimeRead[] {
       Identifier(path: NodePath<t.Identifier>) {
         const { name } = path.node
 
-        if (!path.isReferencedIdentifier() || path.getFunctionParent() !== null || path.findParent(parent => parent.isTSType()) !== null)
+        if (!path.isReferencedIdentifier() || path.getFunctionParent() !== null || path.findParent(parent => parent.isTSType() || ((parent.isClassProperty() || parent.isClassPrivateProperty()) && !parent.node.static)) !== null)
           return
 
         if (SERVER_ONLY.has(name)) {
