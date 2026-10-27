@@ -388,6 +388,22 @@ describe('DateTimeInput', () => {
     expect(field(root).max).toBe('2026-10-22T07:00')
   })
 
+  test('takes a Date as a bound, a bare date as its midnight, and hands disabled to the posting field', async () => {
+    process.env.TZ = 'Europe/Paris'
+    const root = await dates({ momentMin: new Date('2026-10-21T00:00:00Z'), momentMax: '2026-10-30', momentDisabled: true })
+
+    expect(field(root).min).toBe('2026-10-21T02:00')
+    expect(field(root).max).toBe('2026-10-30T00:00')
+    expect(posted(root).disabled).toBe(true)
+  })
+
+  test('posts an untouched instant as the same moment even on the repeated hour of a clock change', async () => {
+    process.env.TZ = 'Europe/Paris'
+    const root = await dates({ momentValue: '2026-10-25T01:30:00Z' })
+
+    expect(posted(root).value).toBe('2026-10-25T02:30:00+01:00')
+  })
+
   test('tells an empty box as an empty instant, and a reset puts the first back', async () => {
     process.env.TZ = 'Europe/Paris'
     const root = await dates()

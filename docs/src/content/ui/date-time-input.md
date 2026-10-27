@@ -10,4 +10,4 @@ The field is a native `input type="datetime-local"`, which carries no zone, so a
 
 `value` is any ISO instant, with an offset or `Z`, and the box shows it on the visitor's clock. `min` and `max` are instants too, as text or a `Date`, and bound the box on that clock. Without `value` the field keeps what is typed, for a form posting it by its `name`.
 
-The server cannot know the visitor's zone, so it draws the box empty. Without JavaScript the box posts the local text it holds, with no offset, which `s.Date()` refuses.
+The server cannot know the visitor's zone, so it draws the box empty, with no `min` or `max`. Without JavaScript the box posts the local text it holds, with no offset, which `s.Date()` refuses.

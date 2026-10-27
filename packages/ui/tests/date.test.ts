@@ -104,6 +104,24 @@ describe('date and time on the visitor\'s clock', () => {
     expect(zonedInstant('2026-12-01T09:30')).toBe('2026-12-01T09:30:00-03:30')
   })
 
+  test('keeps the moment of an instant across a clock change, and reads a typed time as the first of two', () => {
+    process.env.TZ = 'Europe/Paris'
+    // 02:30 happens twice on 2026-10-25: at 00:30Z and at 01:30Z.
+    expect(zonedInstant('2026-10-25T01:30:00Z')).toBe('2026-10-25T02:30:00+01:00')
+    expect(zonedInstant('2026-10-25T00:30:00Z')).toBe('2026-10-25T02:30:00+02:00')
+    expect(zonedInstant('2026-10-25T02:30')).toBe('2026-10-25T02:30:00+02:00')
+    // 02:30 does not exist on 2026-03-29, and the clock reads 03:30.
+    expect(zonedInstant('2026-03-29T02:30')).toBe('2026-03-29T03:30:00+02:00')
+    expect(zonedInstant('2026-10-21T07:30:00.500Z')).toBe('2026-10-21T09:30:00.500+02:00')
+    expect(Date.parse(zonedInstant('2026-10-25T01:30:00Z'))).toBe(Date.parse('2026-10-25T01:30:00Z'))
+  })
+
+  test('reads a bare date as midnight on the visitor\'s clock', () => {
+    process.env.TZ = 'Europe/Paris'
+    expect(localDateTime('2026-10-21')).toBe('2026-10-21T00:00')
+    expect(zonedInstant('2026-10-21')).toBe('2026-10-21T00:00:00+02:00')
+  })
+
   test('reads text that is no date as none', () => {
     expect(localDateTime('')).toBe('')
     expect(localDateTime(undefined)).toBe('')

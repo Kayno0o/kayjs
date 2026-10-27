@@ -7,13 +7,13 @@ import TimeInput from '@kaynooo/kayjs-ui/time-input.kay'
 import type { DateRange } from '@kaynooo/kayjs-ui'
 
 // What the test reads back: each change as it happened.
-const { onDate, onRange, onTime, onMoment, min, max, firstDay, momentMin, momentMax } = props<{ onDate: (value: string) => void, onRange: (value: DateRange) => void, onTime: (value: string) => void, onMoment: (value: string) => void, momentMin?: string | undefined, momentMax?: string | undefined, min?: string | undefined, max?: string | undefined, firstDay?: 0 | 1 | 2 | 3 | 4 | 5 | 6 | undefined }>()
+const { onDate, onRange, onTime, onMoment, min, max, firstDay, momentMin, momentMax, momentDisabled, momentValue } = props<{ onDate: (value: string) => void, onRange: (value: DateRange) => void, onTime: (value: string) => void, onMoment: (value: string) => void, momentMin?: string | Date | undefined, momentMax?: string | Date | undefined, momentDisabled?: boolean | undefined, momentValue?: string | undefined, min?: string | undefined, max?: string | undefined, firstDay?: 0 | 1 | 2 | 3 | 4 | 5 | 6 | undefined }>()
 ---
 form
   DateInput#date(aria-label="Day" name="day" value="2026-10-21" min={min} max={max} firstDay={firstDay} onChange={onDate})
   DateInput#plain(aria-label="Plain" name="plain")
   DateRangeInput#range(label="Stay" fromName="from" toName="to" firstDay={firstDay} onChange={onRange})
-  DateTimeInput#moment(aria-label="Moment" name="moment" value="2026-10-21T07:30:00Z" min={momentMin} max={momentMax} onChange={onMoment})
+  DateTimeInput#moment(aria-label="Moment" name="moment" value={momentValue ?? '2026-10-21T07:30:00Z'} disabled={momentDisabled} min={momentMin} max={momentMax} onChange={onMoment})
   TimeInput#time(aria-label="Start" name="start" value="09:30" onChange={onTime})
   TimeInput#required-time(aria-label="Wake" name="wake" value="07:00" required onChange={onTime})
   FormField(label="Held")

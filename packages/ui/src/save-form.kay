@@ -155,6 +155,13 @@ guardLeave(() => isDirty() && !busy())
 // A control added or removed changes what the form holds without an input event.
 onMount(() => {
   baseline = snapshot()
+  // The controls inside mount after the form does, and one that settles its fields as it runs (a DateTimeInput writing the visitor's clock) has done so by the next microtask: that is what a clean form holds, unless it changed since.
+  queueMicrotask(() => {
+    if (dirty === undefined) {
+      baseline = snapshot()
+      check()
+    }
+  })
 
   const observer = new MutationObserver(checkSoon)
 

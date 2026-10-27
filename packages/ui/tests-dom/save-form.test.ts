@@ -4,6 +4,7 @@ import { afterEach, describe, expect, test } from 'bun:test'
 import { trustHtml } from 'kay'
 import { mountComponent, settle } from 'kay/test'
 import SaveFormControls from '../tests/fixture/src/components/save-form-controls.kay'
+import SaveFormMoment from '../tests/fixture/src/components/save-form-moment.kay'
 import SaveFormSignals from '../tests/fixture/src/components/save-form-signals.kay'
 import SaveFormComponent from '../tests/fixture/src/components/save-form.kay'
 import { untilHolds } from '../tests/until'
@@ -728,5 +729,33 @@ describe('SaveForm driven by signals', () => {
 
     expect(discarded).toBe(1)
     expect(status(root)).toBe('No unsaved change.')
+  })
+})
+
+describe('SaveForm holding a DateTimeInput', () => {
+  const zone = process.env.TZ
+
+  afterEach(() => {
+    if (zone === undefined)
+      delete process.env.TZ
+    else
+      process.env.TZ = zone
+  })
+
+  test('starts clean though the control moves its name to a hidden field once it runs, and is dirty once the moment changes', async () => {
+    process.env.TZ = 'Europe/Paris'
+    mounted = await mountComponent(SaveFormMoment, { value: '2026-10-21T07:30:00Z' })
+    await settle()
+    await Bun.sleep(30)
+    await settle()
+
+    expect(status(mounted.root)).toBe('No unsaved change.')
+
+    expect(mounted.root.querySelector('form')!.hasAttribute('data-dirty')).toBe(false)
+
+    type(mounted.root, '2026-10-22T10:00', '#moment')
+    await settle()
+
+    expect(status(mounted.root)).toBe('Unsaved changes.')
   })
 })

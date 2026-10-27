@@ -172,9 +172,19 @@ export function dateRangeFrom(from: string, to: string): DateRange {
 
 const pad = (figure: number, width = 2) => String(figure).padStart(width, '0')
 
-// The instant as the visitor's wall clock reads it, `YYYY-MM-DDTHH:MM` (with `:SS` when the seconds are not zero), what a `datetime-local` box holds; `''` for text that is no date. A text with no zone is already on that clock.
+const DATE_ONLY = /^\d{4}-\d{2}-\d{2}$/
+
+// A text with no zone is on the visitor's clock, a bare date at its midnight, where `Date` would read it as UTC.
+function parsed(text: Date | string | null | undefined): Date {
+  if (text instanceof Date)
+    return text
+
+  return new Date(text !== undefined && text !== null && DATE_ONLY.test(text) ? `${text}T00:00` : text ?? '')
+}
+
+// The instant as the visitor's wall clock reads it, `YYYY-MM-DDTHH:MM` (with `:SS` when the seconds are not zero), what a `datetime-local` box holds; `''` for text that is no date.
 export function localDateTime(instant: Date | string | null | undefined): string {
-  const date = instant instanceof Date ? instant : new Date(instant ?? '')
+  const date = parsed(instant)
 
   if (Number.isNaN(date.getTime()))
     return ''
@@ -184,17 +194,18 @@ export function localDateTime(instant: Date | string | null | undefined): string
   return date.getSeconds() === 0 ? minutes : `${minutes}:${pad(date.getSeconds())}`
 }
 
-// What a `datetime-local` box holds, read on the visitor's clock and written as the instant it names with that clock's offset at the time, `2026-10-21T09:30:00+02:00`, which `s.Date()` reads right; `''` for text that is no date.
-export function zonedInstant(local: string): string {
-  const date = new Date(local)
+// The instant a text names, written with the visitor's offset at that time, `2026-10-21T09:30:00+02:00`, which `s.Date()` reads right; `''` for text that is no date. A box's text has no zone, so it is read on the visitor's clock, and the first of the two times a clock change repeats; an instant keeps its own moment.
+export function zonedInstant(text: string): string {
+  const date = parsed(text)
 
-  if (local === '' || Number.isNaN(date.getTime()))
+  if (text === '' || Number.isNaN(date.getTime()))
     return ''
 
   const west = date.getTimezoneOffset()
   const offset = `${west <= 0 ? '+' : '-'}${pad(Math.floor(Math.abs(west) / 60))}:${pad(Math.abs(west) % 60)}`
+  const millis = date.getMilliseconds() === 0 ? '' : `.${pad(date.getMilliseconds(), 3)}`
 
-  return `${localDateTime(date).padEnd(19, ':00')}${offset}`
+  return `${localDateTime(date).padEnd(19, ':00')}${millis}${offset}`
 }
 
 // Whether two ISO texts name the same instant, however their offsets are written; two empty ones do.

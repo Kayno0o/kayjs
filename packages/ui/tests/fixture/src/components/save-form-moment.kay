@@ -1,0 +1,9 @@
+---
+import DateTimeInput from '@kaynooo/kayjs-ui/date-time-input.kay'
+import SaveForm from '@kaynooo/kayjs-ui/save-form.kay'
+
+// A moment the form starts with, which the control only writes on the visitor's clock once the island runs.
+const { value } = props<{ value: string }>()
+---
+SaveForm(onSave={async () => undefined})
+  DateTimeInput#moment(aria-label="Moment" name="moment" value={value})
