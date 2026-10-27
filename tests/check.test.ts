@@ -642,6 +642,13 @@ describe.concurrent('kay check, edge cases', () => {
       expect(diagnostics.map(d => d.at)).toEqual(['src/components/counter.kay:3', 'src/components/counter.kay:4'])
     })
 
+    it('passes an island importing an API module that builds s schemas, which the build swaps for where its routes are served', async () => {
+      expect(await found({
+        'src/components/counter.kay': island('import online from \'../api/online\''),
+        'src/api/online.ts': 'import { s } from \'kay\'\n\nexport const SHAPE = s.Object({ name: s.String() })\n\nexport default { get: () => SHAPE }\n',
+      })).toEqual([])
+    })
+
     it('reports a process or Bun read as a module an island reaches loads, and passes NODE_ENV and a typeof guard', async () => {
       const diagnostics = await found({
         'src/components/counter.kay': island('import { A } from \'../lib/a\'\nimport { B } from \'../lib/b\'\nimport { C } from \'../lib/c\'\nimport { D } from \'../lib/d\''),

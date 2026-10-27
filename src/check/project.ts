@@ -19,6 +19,7 @@ import { isLaunchLint, isLint, isLintGroup, LEVELS, lintLevel, lintLevels } from
 import { CONFIG_FILE } from '../config'
 import { EXTENSIONS_MARKER, FEEDS_MARKER, PROBLEMS_MARKER, ROUTES_MARKER, USES_MARKER } from '../content/claims'
 import { projectPaths } from '../project'
+import { apiTrees } from '../server/api-modules'
 import { bootProblems } from './boot'
 import { configLocator, readConfigSource } from './config-keys'
 import { dockerfileProblems } from './dockerfile'
@@ -141,7 +142,7 @@ async function moduleLints(root: string, options: CheckOptions): Promise<CheckDi
   // Following the imports of every component is worth it only when some module or component names the entry, or one passes an island a function.
   const componentTexts = new Map(await Promise.all((await findKayFiles(root, { project: true, ownKayOnly: true })).map(async file => [file, await Bun.file(file).text()] as const)))
   const named = [...texts.values(), ...componentTexts.values()].some(text => text.includes('kay/cache') || mentionsServerOnly(text)) || [...componentTexts].some(([file, text]) => browserRole(text, file, undefined, root) === 'promotable')
-  const browser = named ? await browserModules(root, projectPaths(root, options).routes, options.extensions, componentTexts) : undefined
+  const browser = named ? await browserModules(root, projectPaths(root, options).routes, options.extensions, componentTexts, apiTrees(root, options)) : undefined
   const inBrowser = browser?.modules ?? new Set<string>()
   const promoted = browser?.promoted ?? new Set<string>()
   const report = (file: string, source: string, diagnostics: ReturnType<typeof moduleChecks>) => {

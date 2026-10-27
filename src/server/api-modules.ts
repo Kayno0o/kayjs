@@ -190,11 +190,22 @@ function guardsAt(trees: RouteMount[], at: string): ApiGuard[] {
   }).reverse()
 }
 
+// A tree reached through a link, a library linked into the app, is matched by its real path too, which Bun hands for a module imported from the real side.
+function reachedTrees(trees: RouteMount[]): { dir: string, prefix: string, apiPath: string }[] {
+  return trees.flatMap(tree => [...new Set([tree.dir, existsSync(tree.dir) ? realpathSync(tree.dir) : tree.dir])].map(dir => ({ dir, prefix: tree.prefix, apiPath: tree.apiPath ?? API_PREFIX })))
+}
+
+// Whether the browser build swaps a file for the stub of its route, as `apiStubs` does for every `.ts` file under a tree.
+export function isApiStubbed(trees: RouteMount[]): (file: string) => boolean {
+  const dirs = reachedTrees(trees).map(({ dir }) => dir + sep)
+
+  return file => file.endsWith('.ts') && dirs.some(dir => file.startsWith(dir))
+}
+
 // In the browser build an island imports a module of one of the API `trees` for its routes' types only: it gets where they are served, and none of the server code.
 // A library module the app replaced gives the app's mount, which is the same path, so a library island importing it still builds.
 export function apiStubs(trees: RouteMount[]): BunPlugin {
-  // A tree reached through a link, a library linked into the app, is matched by its real path too, which Bun hands for a module imported from the real side.
-  const reached = trees.flatMap(tree => [...new Set([tree.dir, existsSync(tree.dir) ? realpathSync(tree.dir) : tree.dir])].map(dir => ({ dir, prefix: tree.prefix, apiPath: tree.apiPath ?? API_PREFIX })))
+  const reached = reachedTrees(trees)
 
   return {
     name: 'kay-api',

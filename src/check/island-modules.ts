@@ -1,4 +1,5 @@
 import type { KayExtension } from '../config'
+import type { RouteMount } from '../server/routes'
 import { realpathSync } from 'node:fs'
 import { sep } from 'node:path'
 import { resolveFrom, transpilerFor } from '../build/files'
@@ -7,6 +8,7 @@ import { buildFiles, promotedFiles } from '../build/promotion'
 import { importedSignals } from '../build/signals'
 import { browserRole } from '../compiler'
 import { parseKay } from '../compiler/parser'
+import { isApiStubbed } from '../server/api-modules'
 import { islandOnlyComponents } from './island-only'
 
 const SCRIPT_MODULE = /\.(?:[cm]?ts|tsx)$/
@@ -41,7 +43,7 @@ export interface BrowserModules {
 // The project's own TypeScript modules the browser bundle reaches: those the script of an island, of a component only islands render and of a static one the build promotes to an island imports, and those they import in turn; and the promoted components themselves, as `findKayFiles` lists them.
 // A static component that passes a function is promoted only when its imports reach an island, the project's own, a library's or a mounted one, as the build decides, and a module the server alone imports is left out, as the browser never loads it.
 // `own` holds the text of the project's own components.
-export async function browserModules(root: string, routesDir: string, extensions: KayExtension[] | undefined, own: Map<string, string>): Promise<BrowserModules> {
+export async function browserModules(root: string, routesDir: string, extensions: KayExtension[] | undefined, own: Map<string, string>, api: RouteMount[] = []): Promise<BrowserModules> {
   const built = await buildFiles(root, extensions)
   const sources = new Map(own)
 
@@ -56,7 +58,9 @@ export async function browserModules(root: string, routesDir: string, extensions
   const project = realpathSync(root) + sep
   const islands = built.files.filter((file, index) => roles[index] === 'island' && own.has(file))
   const seeds = [...new Set([...islands, ...promoted, ...islandOnly])]
-  const inside = (file: string) => file.startsWith(project) && !file.includes(`${sep}node_modules${sep}`)
+  // The build gives an island a module of an API tree as where its routes are served, none of its code, so the walk stops there.
+  const stubbed = isApiStubbed(api)
+  const inside = (file: string) => !stubbed(file) && file.startsWith(project) && !file.includes(`${sep}node_modules${sep}`)
   const reached = new Set<string>()
   const origins = new Map<string, { seed: string, specifier: string }>()
   const modulesOf = (file: string, specifiers: string[]) => specifiers.filter(specifier => !OUTSIDE.test(specifier)).flatMap((specifier) => {
