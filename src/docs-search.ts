@@ -79,10 +79,11 @@ interface Indexed {
 
 // kay's llms files then each installed library's, the first found walking up from `root` winning a name.
 export function docFiles(root: string): DocFile[] {
-  return [...packageFiles('kay', KAY_ROOT), ...libraries(root).flatMap(([name, dir]) => packageFiles(name, dir))]
+  return [...packageFiles('kay', KAY_ROOT), ...installedLibraries(root).flatMap(([name, dir]) => packageFiles(name, dir))]
 }
 
-function libraries(root: string): [string, string][] {
+// The `@kaynooo/kayjs-*` packages with docs, each by name and directory.
+export function installedLibraries(root: string): [string, string][] {
   const found = new Map<string, string>()
 
   for (let dir = root; ; dir = join(dir, '..')) {

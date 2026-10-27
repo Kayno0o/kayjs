@@ -4,6 +4,7 @@ import { join } from 'node:path'
 import process from 'node:process'
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
 import { ERRORS, explainError } from '../src/compiler/errors'
+import { componentProps } from '../src/docs-props'
 import { docFiles, excerpt, findLabel, searchDocs } from '../src/docs-search'
 import { scratchDir } from './scratch'
 
@@ -20,6 +21,13 @@ beforeAll(async () => {
   await Bun.write(join(library, 'llms.txt'), '# kayjs-fake\n\n> A fake library.\n\n## Topics\n\n- [Widgets](llms/widgets.md): the widget\n- [Gadgets](llms/gadgets.md): the gadget\n')
   await Bun.write(join(library, 'llms/widgets.md'), `# Widgets\n\n## Common tasks\n\n### Spin a widget\n\nA Widget spins.\n\n\`\`\`sh\n# not a heading\n\`\`\`\n\n### Spin a widget\n\nThe same heading twice.\n\n${longReference}`)
   await Bun.write(join(library, 'llms/gadgets.md'), '# Gadgets\n\n## Spin a widget\n\nA gadget spins a widget too.\n\n## Object shapes\n\nAn object of s fields, the object kind.\n\n## Validate a post\n\nThe handler checks the post with `s.Object({ name })` first.\n')
+  await Bun.write(join(library, 'package.json'), JSON.stringify({ name: '@kaynooo/kayjs-fake', exports: { './*.kay': './src/*.kay', './special.kay': './src/inner/special.kay', './lib/*': './src/*.ts' } }))
+  await Bun.write(join(library, 'src/fancy-card.kay'), '---\nconst { title, onPick, tone = \'muted\' } = props<{\n  // What the card says on top.\n  title: string\n  onPick?: (value: string) => void\n  tone?: \'muted\' | \'loud\'\n}>()\n---\np {title}\n')
+  await Bun.write(join(library, 'src/zorblet.kay'), 'p Zorblet\n')
+  await Bun.write(join(library, 'src/gizmo.kay'), '---\ninterface GizmoProps {\n  size: number\n}\n\nconst { size } = props<GizmoProps>()\n---\np {size}\n')
+  await Bun.write(join(library, 'src/imported.kay'), '---\nimport type { Shared, Extra } from \'./shared\'\n\nconst { name } = props<Shared & Extra>()\n---\np {name}\n')
+  await Bun.write(join(library, 'src/shared.ts'), 'export interface Shared {\n  name: string\n}\n\nexport type Extra = { loud?: boolean }\n')
+  await Bun.write(join(library, 'src/inner/special.kay'), '---\nconst { on } = props<{ on: boolean }>()\n---\np {on}\n')
   // A library installed nearer than the checkout's, which wins its name.
   await Bun.write(join(root, 'node_modules/@kaynooo/kayjs-ui/llms.txt'), '# kayjs-ui nearer\n\nThe nearest copy.\n')
   await Bun.write(join(root, 'node_modules/@kaynooo/kayjs-bare/package.json'), '{}')
@@ -109,7 +117,37 @@ describe('a search', () => {
   })
 })
 
+describe('a component\'s props', () => {
+  it('reads the statement taking them from the installed source, by the name an app imports, its case and hyphens aside', () => {
+    const [card] = componentProps(root, 'FancyCard')
+
+    expect(card).toEqual({ name: 'FancyCard', specifier: '@kaynooo/kayjs-fake/fancy-card.kay', path: join(root, 'node_modules/@kaynooo/kayjs-fake/src/fancy-card.kay'), line: 2, props: 'const { title, onPick, tone = \'muted\' } = props<{\n  // What the card says on top.\n  title: string\n  onPick?: (value: string) => void\n  tone?: \'muted\' | \'loud\'\n}>()' })
+    expect(componentProps(root, 'fancy-card').map(component => component.name)).toEqual(['FancyCard'])
+  })
+
+  it('adds the types it names that the file or a module it imports declares', () => {
+    expect(componentProps(root, 'Gizmo')[0]!.props).toBe('const { size } = props<GizmoProps>()\n\ninterface GizmoProps {\n  size: number\n}')
+    expect(componentProps(root, 'Imported')[0]!.props).toBe('const { name } = props<Shared & Extra>()\n\nexport interface Shared {\n  name: string\n}\n\nexport type Extra = { loud?: boolean }')
+  })
+
+  it('names a component exported by its own path, and one taking no props', () => {
+    expect(componentProps(root, 'special')[0]).toMatchObject({ specifier: '@kaynooo/kayjs-fake/special.kay', props: 'const { on } = props<{ on: boolean }>()' })
+    expect(componentProps(root, 'Zorblet')[0]).toMatchObject({ specifier: '@kaynooo/kayjs-fake/zorblet.kay', props: '' })
+    expect(componentProps(root, 'shared')).toEqual([])
+    expect(componentProps(root, 'two words')).toEqual([])
+  })
+})
+
 describe('kay docs', () => {
+  it('prints a component\'s props after its section, or alone when no section names it', async () => {
+    const gizmo = await kay(['Gizmo'], root)
+    const json = JSON.parse((await kay(['FancyCard', '--format', 'json'], root)).stdout) as { sections: unknown[], components: { name: string, import: string, path: string, line: number }[] }
+
+    expect(gizmo).toMatchObject({ code: 0, stdout: 'Gizmo\'s props, `import Gizmo from \'@kaynooo/kayjs-fake/gizmo.kay\'` (node_modules/@kaynooo/kayjs-fake/src/gizmo.kay:6):\n\n```ts\nconst { size } = props<GizmoProps>()\n\ninterface GizmoProps {\n  size: number\n}\n```\n' })
+    expect(json.components).toEqual([expect.objectContaining({ name: 'FancyCard', import: '@kaynooo/kayjs-fake/fancy-card.kay', path: 'node_modules/@kaynooo/kayjs-fake/src/fancy-card.kay', line: 2 })])
+    expect((await kay(['Zorblet'], root)).stdout).toBe('Zorblet takes no props, `import Zorblet from \'@kaynooo/kayjs-fake/zorblet.kay\'` (node_modules/@kaynooo/kayjs-fake/src/zorblet.kay:1)\n')
+  })
+
   it('lists the files, then prints a file\'s headings', async () => {
     const list = await kay([], root)
     const outline = await kay(['kayjs-fake/widgets'], root)

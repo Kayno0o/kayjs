@@ -664,6 +664,8 @@ kay docs kay/actions.md#forms         # one section, whole
 
 `kay explain` of a component or function names the section `kay docs` would print.
 
+The name of a component an installed library exports also prints its props, read from its installed source, with the line that imports it.
+
 A long section prints only the parts that match, and says how many it left out. Release notes are never searched, though a label prints them.
 
 ## kay migrate

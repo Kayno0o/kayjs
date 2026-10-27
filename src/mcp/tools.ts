@@ -101,7 +101,7 @@ function tools(root: string): Tool[] {
     {
       name: 'docs',
       title: 'Find a topic in the docs',
-      description: 'Finds a topic in the llms docs of kay and of every kayjs-* library the project installed, at their installed versions. Given words or a name (a component, a function, a lint, an error code), returns the section they match best, whole or its matching blocks when long, and the labels of the next matches; given a label such as `kayjs-ui/forms.md#reference`, that section whole; given a file label, its headings; given nothing, the files.',
+      description: 'Finds a topic in the llms docs of kay and of every kayjs-* library the project installed, at their installed versions. Given words or a name (a component, a function, a lint, an error code), returns the section they match best, whole or its matching blocks when long, the props of a component from its installed source, and the labels of the next matches; given a label such as `kayjs-ui/forms.md#reference`, that section whole; given a file label, its headings; given nothing, the files.',
       inputSchema: { type: 'object', properties: { query: { type: 'string', description: 'Words such as `form dialog errors`, a name such as `FormDialog`, or a label from an earlier answer.' } }, additionalProperties: false },
       annotations: READ_ONLY,
       run: async (args) => {

@@ -1,9 +1,11 @@
+import type { ComponentProps } from '../docs-props'
 import type { DocFile, DocMatch, DocSection } from '../docs-search'
 import type { Command, ProblemFormat } from './command'
 import { relative } from 'node:path'
 import process from 'node:process'
 import { explainError, isErrorCode } from '../compiler/errors'
 import { explainLint, isLint } from '../compiler/lints'
+import { componentPlace, componentProps } from '../docs-props'
 import { docFiles, excerpt, findLabel, isLabel, labelPath, looksLikeLabel, searchDocs } from '../docs-search'
 import { formatOption, printDocument, printFailure } from './command'
 import { USAGES } from './usages'
@@ -73,42 +75,64 @@ export const docs: Command = {
     }
 
     const [best, ...rest] = matches
+    const components = positionals.length === 1 ? componentProps(root, first) : []
 
-    if (best === undefined) {
+    if (best === undefined && components.length === 0) {
       printFailure('docs', `nothing matches \`${query}\`; \`kay docs\` lists the files`, format)
 
       return 1
     }
 
+    if (best === undefined) {
+      printShown(undefined, [], format, root, components)
+
+      return 0
+    }
+
     const { section } = best
     const { text, omitted } = excerpt(best)
 
-    printShown({ label: section.label, heading: section.heading, text, section, omitted, children: text === section.own ? section.children : [] }, rest.slice(0, OTHERS), format, root)
+    printShown({ label: section.label, heading: section.heading, text, section, omitted, children: text === section.own ? section.children : [] }, rest.slice(0, OTHERS), format, root, components)
 
     return 0
   },
 }
 
-function printShown(shown: Shown, others: DocMatch[], format: ProblemFormat, root: string) {
-  const { label, heading, text, section, omitted = 0, children = [] } = shown
-
+// The section, then the props of the components the word names, then the other matches.
+function printShown(shown: Shown | undefined, others: DocMatch[], format: ProblemFormat, root: string, components: ComponentProps[] = []) {
   if (format === 'json') {
     printDocument({
-      sections: [{ ...section === undefined ? { label } : where(section, root), heading, text, ...omitted > 0 && { omitted }, ...children.length > 0 && { children } }],
+      sections: shown === undefined ? [] : [shownDocument(shown, root)],
+      ...components.length > 0 && { components: components.map(component => ({ name: component.name, import: component.specifier, path: relative(root, component.path), line: component.line, props: component.props })) },
       others: others.map(match => ({ ...where(match.section, root), heading: match.section.heading })),
     })
 
     return
   }
 
-  console.log([
+  const lines = shown === undefined ? [] : shownLines(shown, root)
+
+  for (const component of components) {
+    const place = `\`import ${component.name} from '${component.specifier}'\` (${componentPlace(component, root)})`
+
+    lines.push(...lines.length > 0 ? [''] : [], ...component.props === '' ? [`${component.name} takes no props, ${place}`] : [`${component.name}'s props, ${place}:`, '', '```ts', component.props, '```'])
+  }
+
+  console.log([...lines, ...others.length > 0 ? ['', 'Also:', ...others.map(match => `  ${match.section.label}  ${match.section.heading}`)] : []].join('\n'))
+}
+
+function shownDocument({ label, heading, text, section, omitted = 0, children = [] }: Shown, root: string) {
+  return { ...section === undefined ? { label } : where(section, root), heading, text, ...omitted > 0 && { omitted }, ...children.length > 0 && { children } }
+}
+
+function shownLines({ label, text, section, omitted = 0, children = [] }: Shown, root: string): string[] {
+  return [
     section === undefined ? label : `${label} (${relative(root, section.file.path)}:${section.line})`,
     '',
     text,
     ...omitted > 0 ? ['', `(${omitted} more blocks left out: \`kay docs ${label}\` prints the section whole)`] : [],
     ...children.length > 0 ? ['', 'Under it:', ...children.map(child => `  ${child}`)] : [],
-    ...others.length > 0 ? ['', 'Also:', ...others.map(match => `  ${match.section.label}  ${match.section.heading}`)] : [],
-  ].join('\n'))
+  ]
 }
 
 function printOutline(file: DocFile, format: ProblemFormat, root: string) {
