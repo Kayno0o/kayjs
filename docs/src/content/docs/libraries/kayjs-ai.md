@@ -155,6 +155,8 @@ The panel has a fixed height, so it does not grow or shrink as the conversation 
 
 Its header has a New conversation button, which clears the log and the kept history, and an Enlarge button for code-heavy answers (hidden on a phone). `openLabel` names the button and `closeLabel` its close button, `newLabel`, `expandLabel` and `collapseLabel` name the two others, `@icon`, `@closeIcon`, `@newIcon`, `@expandIcon` and `@collapseIcon` replace the icons, and `@note` adds a line under the chat. The button turns into a close icon while the panel is open.
 
+<ReadMore href="/llms/kayjs-ai-chat-launcher">What the launcher takes of `Chat`, how its panel opens, closes and keeps the conversation, and its sizes.</ReadMore>
+
 Every element is a part that keeps its `kai-` class and takes utilities from `src/ui.ts` or a `class` object, `defineUi({ '@kaynooo/kayjs-ai/chat.kay': { parts: { send: 'size-12' } } })` or `Chat(class={{ log: 'max-h-96' }})`; a `class` string restyles the root.
 
 - `chat.kay`: `root`, `empty`, `greeting`, `suggestions`, `suggestion`, `log`, `turn`, `text`, `thinking`, `note`, `status`, `disclosure`, `form`, `field`, `send` and `retry` (the Try again button, shown only after a failed reply).
