@@ -16,7 +16,6 @@ const ECHO_MS = 1000
 // How long a hand scroll or a key between cues holds the transcript where the reader left it: a cue changing inside it does not recentre, the first one after it does.
 const HAND_MS = 4000
 const CUE_KEYS = new Set(['ArrowLeft', 'ArrowUp', 'ArrowRight', 'ArrowDown', 'Home', 'End'])
-const BACKWARD = new Set(['ArrowLeft', 'ArrowUp'])
 const WEB = /^https?:\/\//
 
 // 'kui-audio-player' stays as the component's name for an app's CSS. The chapter playing and the cue playing are marked by aria-current.
@@ -172,6 +171,14 @@ function scrolledByHand() {
   handScrolled = Date.now()
 }
 
+// Wheel and touch listeners are passive, which a handler bound by `onWheel` is not, so the transcript scrolls without waiting on this one.
+function watch(element: HTMLElement | null) {
+  transcript = element ?? undefined
+
+  element?.addEventListener('wheel', scrolledByHand, { passive: true })
+  element?.addEventListener('touchmove', scrolledByHand, { passive: true })
+}
+
 // One tab stop for all the cues, the cue playing until the reader moves to another, and the arrows go between them.
 const stop = () => {
   const held = focused()
@@ -183,6 +190,8 @@ function between(event: KeyboardEvent) {
   if (!CUE_KEYS.has(event.key) || event.altKey || event.ctrlKey || event.metaKey)
     return
 
+  // The horizontal arrows follow the reading direction, so in RTL ArrowRight goes back.
+  const backward = event.key === 'ArrowUp' || event.key === (getComputedStyle(event.currentTarget as HTMLElement).direction === 'rtl' ? 'ArrowRight' : 'ArrowLeft')
   const buttons = [...(transcript?.querySelectorAll<HTMLElement>('[data-index]') ?? [])]
   const from = buttons.indexOf(event.target as HTMLElement)
 
@@ -192,7 +201,7 @@ function between(event: KeyboardEvent) {
   event.preventDefault()
   scrolledByHand()
 
-  const to = event.key === 'Home' ? 0 : event.key === 'End' ? buttons.length - 1 : Math.min(Math.max(from + (BACKWARD.has(event.key) ? -1 : 1), 0), buttons.length - 1)
+  const to = event.key === 'Home' ? 0 : event.key === 'End' ? buttons.length - 1 : Math.min(Math.max(from + (backward ? -1 : 1), 0), buttons.length - 1)
 
   buttons[to]?.focus()
 }
@@ -350,7 +359,7 @@ div(part="root" {...rest})
               | {actions(chapter, index)}
   if cues.length > 0
     CollapsibleSection(title={transcriptLabel} open={false} onToggle={event => { if (event.currentTarget.open) follow() }})
-      div(part="transcript" ref={element => transcript = element} onWheel={scrolledByHand} onTouchMove={scrolledByHand} onPointerDown={event => { if (event.target === event.currentTarget) scrolledByHand() }} onKeyDown={between})
+      div(part="transcript" ref={watch} onPointerDown={event => { if (event.target === event.currentTarget) scrolledByHand() }} onKeyDown={between})
         for group of groups() key={group.chapter}
           div(part="group")
             if chapters[group.chapter]

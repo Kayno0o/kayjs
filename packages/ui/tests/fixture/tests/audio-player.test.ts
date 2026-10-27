@@ -32,7 +32,7 @@ inBrowser('AudioPlayer in the browser', () => {
     return page
   }
 
-  test('at 400px the bar wraps and nothing overflows sideways, a chapter past the hour included', async () => {
+  test('at 400px the bar wraps and nothing overflows sideways, a chapter of ten thousand hours included', async () => {
     await using page = await open()
     const found = await page.evaluate(() => {
       const root = document.documentElement
@@ -43,7 +43,7 @@ inBrowser('AudioPlayer in the browser', () => {
       return { page: root.scrollWidth - root.clientWidth, wide, start: start.textContent, startFits: start.scrollWidth <= start.clientWidth, titleBeside: row.querySelector<HTMLElement>('[data-part=title]')!.getBoundingClientRect().left >= start.getBoundingClientRect().right }
     })
 
-    expect(found).toEqual({ page: 0, wide: [], start: '1:01:01', startFits: true, titleBeside: true })
+    expect(found).toEqual({ page: 0, wide: [], start: '10001:01:01', startFits: true, titleBeside: true })
     expect(page.errors).toEqual([])
   }, 120_000)
 
@@ -87,11 +87,38 @@ inBrowser('AudioPlayer in the browser', () => {
     await jump(2)
     await page.press(' ')
     await reached(2)
-    expect(await page.evaluate(() => document.querySelector<HTMLButtonElement>('#player [data-side=next]')!.disabled)).toBe(true)
+    // Next went disabled under the keyboard: it keeps the focus and ignores a press.
+    const next = () => page.evaluate(() => {
+      const button = document.querySelector<HTMLButtonElement>('#player [data-side=next]')!
+
+      return { disabled: button.getAttribute('aria-disabled'), focused: document.activeElement === button }
+    })
+
+    await page.evaluate(() => document.querySelector<HTMLElement>('#player [data-side=next]')!.focus())
+    expect(await next()).toEqual({ disabled: 'true', focused: true })
+    await page.press('Enter')
+    expect(await page.evaluate(() => document.querySelector<HTMLInputElement>('#player [data-part=track]')!.value)).toBe('20')
     expect(page.errors).toEqual([])
   }, 120_000)
 
   for (const dir of ['ltr', 'rtl'] as const) {
+    test(`the cue arrows follow the reading direction, ${dir}`, async () => {
+      await using page = await open(dir === 'rtl' ? dir : undefined)
+      const focused = () => page.evaluate(() => document.activeElement!.getAttribute('data-index'))
+
+      await page.evaluate(() => {
+        document.querySelector('#player details')!.setAttribute('open', '')
+        document.querySelector<HTMLElement>('#player [data-part=cue][data-index="1"]')!.focus()
+      })
+      await page.press('ArrowRight')
+      expect(await focused()).toBe(dir === 'rtl' ? '0' : '2')
+      await page.press('ArrowLeft')
+      expect(await focused()).toBe('1')
+      await page.press('ArrowDown')
+      expect(await focused()).toBe('2')
+      expect(page.errors).toEqual([])
+    }, 120_000)
+
     test(`the chapter marks sit on the thumb's travel and under it, ${dir === 'rtl' ? 'mirrored' : 'from the start'}`, async () => {
       await using page = await open(dir === 'rtl' ? dir : undefined)
       const found = await page.evaluate((length: number) => {

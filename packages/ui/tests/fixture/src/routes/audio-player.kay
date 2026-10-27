@@ -10,7 +10,7 @@ const chapters = [
 ]
 const long = [
   { title: 'Start', start: 0 },
-  { title: 'Late', start: 3661 },
+  { title: 'Late', start: 36_003_661 },
 ]
 const cues = [
   { start: 0, end: 10, text: 'Hello.' },
