@@ -45,6 +45,24 @@ inBrowser('in the browser', () => {
     expect(page.errors).toEqual([])
   }, 120_000)
 
+  test('Table draws a line between the stacked cards whatever the row borders are, and none in the wide table', async () => {
+    const site = await shared()
+
+    await using page = await site.open('/stacked')
+    // What an app dropping the row borders sets.
+    await page.evaluate(() => {
+      const style = document.createElement('style')
+
+      style.textContent = '[data-part=row] { border-bottom-width: 0 }'
+      document.head.append(style)
+    })
+    const lines = (selector: string) => page.evaluate((within: string) => [...document.querySelectorAll(`${within} [data-part="row"]`)].map(row => getComputedStyle(row).borderTopWidth), selector)
+
+    expect(await lines('#narrow')).toEqual(['0px', '1px'])
+    expect(await lines('#wide')).toEqual(['0px', '0px'])
+    expect(page.errors).toEqual([])
+  }, 120_000)
+
   test('Table with no rows hydrates on the markup the server rendered, an @empty slot alone or beside selectable and @bulk', async () => {
     const site = await shared()
 

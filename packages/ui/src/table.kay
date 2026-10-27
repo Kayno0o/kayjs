@@ -23,7 +23,7 @@ const look = recipe({
     selected: 'm-0',
     bulk: 'flex flex-wrap items-center gap-2',
     table: 'w-full border-collapse text-sm @max-[30rem]/table:block',
-    // Below 30rem of width the rows of a stacked table become cards and its headers one row of sort buttons, the only part of the head that stays.
+    // Below 30rem of width the rows of a stacked table become cards and its headers one row of sort buttons, the only part of the head that stays. Each card draws its own top line instead of the row's bottom border, so an app dropping the row borders of the wide table still sees the cards apart.
     head: '@max-[30rem]/table:has-[[data-part=sortButton]]:block @max-[30rem]/table:group-data-virtual/table:sticky @max-[30rem]/table:group-data-virtual/table:top-0 @max-[30rem]/table:group-data-virtual/table:z-1 @max-[30rem]/table:group-data-virtual/table:bg-surface @max-[30rem]/table:not-has-[[data-part=sortButton]]:hidden',
     headRow: '@max-[30rem]/table:flex @max-[30rem]/table:flex-wrap @max-[30rem]/table:gap-2 @max-[30rem]/table:border-solid @max-[30rem]/table:border-b-[length:var(--border-width)] @max-[30rem]/table:border-border @max-[30rem]/table:px-3 @max-[30rem]/table:py-2',
     body: '@max-[30rem]/table:block',
@@ -32,7 +32,7 @@ const look = recipe({
     selectText: 'sr-only',
     sortButton: 'group/sort inline-flex cursor-pointer items-center gap-1 border-0 bg-transparent p-0 text-inherit [font-family:var(--font-label,inherit)] [text-transform:var(--label-case)] @max-[30rem]/table:min-h-8 @max-[30rem]/table:border-solid @max-[30rem]/table:border-[length:var(--border-width)] @max-[30rem]/table:border-border @max-[30rem]/table:px-2 @max-[30rem]/table:py-0.5',
     sortIcon: 'size-3.5 group-data-[direction=asc]/sort:rotate-180',
-    row: 'border-b border-border hover:bg-hover aria-selected:bg-hover @max-[30rem]/table:grid @max-[30rem]/table:grid-cols-[fit-content(40%)_minmax(0,1fr)] @max-[30rem]/table:gap-x-4 @max-[30rem]/table:px-3 @max-[30rem]/table:py-2',
+    row: 'border-b border-border @max-[30rem]/table:border-b-0 @max-[30rem]/table:not-first:border-t hover:bg-hover aria-selected:bg-hover @max-[30rem]/table:grid @max-[30rem]/table:grid-cols-[fit-content(40%)_minmax(0,1fr)] @max-[30rem]/table:gap-x-4 @max-[30rem]/table:px-3 @max-[30rem]/table:py-2',
     cell: 'px-3 py-1.5 text-foreground data-[numeric]:tabular-nums data-[align=center]:text-center data-[align=end]:text-right @max-[30rem]/table:col-span-full @max-[30rem]/table:grid @max-[30rem]/table:grid-cols-subgrid @max-[30rem]/table:items-baseline @max-[30rem]/table:px-0 @max-[30rem]/table:py-1 @max-[30rem]/table:data-[align]:text-left',
     // The box is 1rem, so its label grows to the 1.5rem a finger needs.
     selectCell: 'px-3 py-1.5 text-foreground data-[numeric]:tabular-nums data-[align=center]:text-center data-[align=end]:text-right @max-[30rem]/table:col-span-full @max-[30rem]/table:grid @max-[30rem]/table:grid-cols-subgrid @max-[30rem]/table:items-baseline @max-[30rem]/table:px-0 @max-[30rem]/table:py-1 @max-[30rem]/table:data-[align]:text-left w-0 @max-[30rem]/table:w-auto [&_.kui-checkbox]:min-h-6 [&_.kui-checkbox]:min-w-6 [&_.kui-checkbox]:justify-center',
