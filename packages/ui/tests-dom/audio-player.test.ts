@@ -224,6 +224,20 @@ test('a position the parent passes is followed', async () => {
   expect(audio.currentTime).toBe(45)
 })
 
+test('a late echo of a position the player reported does not seek back, and a seek reports once', async () => {
+  const { root, audio, part, move } = await players()
+
+  click(part('jump')[2]!)
+  await settle()
+  await move(90)
+  expect(positions).toEqual([90])
+
+  await move(100)
+  click(root.querySelector('#late'))
+  await settle()
+  expect([audio.currentTime, positions]).toEqual([100, [90, 100]])
+})
+
 test('a chapter link to another site opens in a new tab, so the audio keeps playing', async () => {
   const { part } = await players()
   const link = part('chapter')[1]!.querySelector('a')!

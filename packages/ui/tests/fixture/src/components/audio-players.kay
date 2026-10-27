@@ -2,7 +2,7 @@
 import { signal } from 'kay'
 import AudioPlayer from '@kaynooo/kayjs-ui/audio-player.kay'
 
-// The test reads back each position and chapter the player reports; `#jump` passes it another position, as a parent would.
+// The test reads back each position and chapter the player reports; `#jump` passes it another position, as a parent would, and `#late` passes back one it reported a while ago.
 const { onPosition, onChapter } = props<{ onPosition: (seconds: number) => void, onChapter: (index: number) => void }>()
 
 const seconds = signal(0)
@@ -23,3 +23,4 @@ AudioPlayer#player(src="/episode.mp3" title="Episode" artist="Show" chapters={ch
     button.act(type="button") {`Like ${chapter.title} ${index}`}
 AudioPlayer#plain(src="/plain.mp3")
 button#jump(type="button" onClick={() => seconds = 45}) Jump
+button#late(type="button" onClick={() => seconds = 90}) Late

@@ -2,16 +2,17 @@
 import type { JSX, Snippet } from 'kay'
 import type { AudioChapter, AudioCue } from './audio'
 import { effect, memo, onCleanup, recipe, signal } from 'kay'
-import ExternalLink from '~icons/tabler/external-link'
 import { chapterAt, clock, cueAt, cuesByChapter, lockScreen, previousStart } from './audio'
 import CollapsibleSection from './collapsible-section.kay'
 import IconButton from './icon-button.kay'
 import { OUTSIDE } from './outside'
+import { rangeTrack } from './range-track'
 import { attempt } from './toast'
 import { wording } from 'kay/words'
 
-// How far a position the parent passes may sit from the audio's own before the player seeks to it, which keeps the parent echoing `onPositionChange` back from seeking.
+// How far a position the parent passes may sit from the audio's own before the player seeks to it, and how long a position the player reported counts as the parent echoing it back, which never seeks: an echo arrives after the audio has moved on.
 const FOLLOW_SECONDS = 1
+const ECHO_MS = 1000
 const WEB = /^https?:\/\//
 
 // 'kui-audio-player' stays as the component's name for an app's CSS. The chapter playing and the cue playing are marked by aria-current.
@@ -24,7 +25,7 @@ const look = recipe({
     play: '',
     time: 'text-xs tabular-nums text-muted',
     seek: 'relative flex min-w-0 flex-1 basis-56 items-center',
-    track: 'h-4 w-full cursor-pointer appearance-none bg-transparent [&::-webkit-slider-runnable-track]:h-1 [&::-webkit-slider-runnable-track]:bg-input [&::-moz-range-track]:h-1 [&::-moz-range-track]:bg-input [&::-webkit-slider-thumb]:size-4 [&::-webkit-slider-thumb]:-mt-1.5 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-sm [&::-webkit-slider-thumb]:border-0 [&::-webkit-slider-thumb]:bg-accent [&::-moz-range-thumb]:size-4 [&::-moz-range-thumb]:rounded-sm [&::-moz-range-thumb]:border-0 [&::-moz-range-thumb]:bg-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-default disabled:opacity-50',
+    track: rangeTrack,
     marks: 'pointer-events-none absolute inset-0 m-0 list-none p-0',
     mark: 'absolute top-1/2 h-3 w-0.5 -translate-y-1/2 bg-muted',
     now: 'm-0 text-sm text-foreground',
@@ -89,16 +90,44 @@ const cueNow = memo(() => cueAt(cues, at()))
 const groups = memo(() => cuesByChapter(chapters, cues))
 let transcript: HTMLElement | undefined
 let reported: number | undefined
+// The positions reported to the parent lately, with when.
+const told = new Map<number, number>()
+let lastTold: number | undefined
 // What tells this player's lock screen claim from another player's.
 const token = {}
 
 const percent = (seconds: number) => `${seconds / length() * 100}%`
 const marked = () => length() > 0 ? chapters.map((chapter, index) => ({ chapter, index })).filter(({ chapter }) => chapter.start > 0 && chapter.start < length()) : []
 
+function echoed(seconds: number) {
+  const when = told.get(seconds)
+
+  return when !== undefined && Date.now() - when < ECHO_MS
+}
+
+// Tells the parent the position once: a seek reports it, and the `timeupdate` it fires finds it told.
+function report(seconds: number) {
+  at = seconds
+
+  if (seconds === lastTold)
+    return
+
+  const now = Date.now()
+
+  for (const [value, when] of told) {
+    if (now - when >= ECHO_MS)
+      told.delete(value)
+  }
+
+  lastTold = seconds
+  told.set(seconds, now)
+  onPositionChange?.(seconds)
+}
+
 effect(() => {
   const audio = player()
 
-  if (audio && position !== undefined && Math.abs(position - audio.currentTime) > FOLLOW_SECONDS)
+  if (audio && position !== undefined && Math.abs(position - audio.currentTime) > FOLLOW_SECONDS && !echoed(position))
     audio.currentTime = position
 })
 
@@ -144,8 +173,7 @@ async function seek(seconds: number, play: boolean) {
     return
 
   audio.currentTime = seconds
-  at = seconds
-  onPositionChange?.(seconds)
+  report(seconds)
 
   if (play && audio.paused)
     await start(audio)
@@ -199,45 +227,16 @@ function claim() {
   })
 }
 
-function listen(audio: HTMLAudioElement) {
-  const follow = () => {
-    at = audio.currentTime
-    onPositionChange?.(audio.currentTime)
-  }
-  const measure = () => {
-    length = Number.isFinite(audio.duration) ? audio.duration : 0
-  }
-  // A new source stops the audio without a pause event and starts the position over.
-  const emptied = () => {
-    playing = false
-    at = 0
-    measure()
-  }
-  const started = () => {
-    playing = true
-    claim()
-  }
-  const stopped = () => {
-    playing = false
-  }
+function measure(audio: HTMLAudioElement) {
+  length = Number.isFinite(audio.duration) ? audio.duration : 0
+}
 
-  audio.addEventListener('timeupdate', follow)
-  audio.addEventListener('durationchange', measure)
-  audio.addEventListener('loadedmetadata', measure)
-  audio.addEventListener('play', started)
-  audio.addEventListener('pause', stopped)
-  audio.addEventListener('ended', stopped)
-  audio.addEventListener('emptied', emptied)
-  measure()
-  onCleanup(() => {
-    audio.removeEventListener('timeupdate', follow)
-    audio.removeEventListener('durationchange', measure)
-    audio.removeEventListener('loadedmetadata', measure)
-    audio.removeEventListener('play', started)
-    audio.removeEventListener('pause', stopped)
-    audio.removeEventListener('ended', stopped)
-    audio.removeEventListener('emptied', emptied)
-  })
+// A new source stops the audio without a pause event and starts the position over.
+function emptied(audio: HTMLAudioElement) {
+  playing = false
+  at = 0
+  lastTold = undefined
+  measure(audio)
 }
 
 effect(() => {
@@ -267,7 +266,7 @@ onCleanup(() => {
 ---
 div(part="root" {...rest})
   // Without `controls`, so the element draws nothing and the bar below is the player.
-  audio(part="audio" ref={(element) => { player = element; listen(element) }} src={src} preload={preload})
+  audio(part="audio" ref={(element) => { player = element; measure(element) }} src={src} preload={preload} onTimeUpdate={event => report(event.currentTarget.currentTime)} onDurationChange={event => measure(event.currentTarget)} onLoadedMetadata={event => measure(event.currentTarget)} onPlay={() => { playing = true; claim() }} onPause={() => playing = false} onEnded={() => playing = false} onEmptied={event => emptied(event.currentTarget)})
   div(part="bar")
     if chapters.length > 1
       IconButton(icon="chevron" label={previousLabel} variant="ghost" part="step" data-side="previous" onClick={previous})
@@ -291,7 +290,7 @@ div(part="root" {...rest})
             span(part="start") {clock(chapter.start)}
             span(part="title") {chapter.title}
           if chapter.url
-            IconButton(href={chapter.url} {...WEB.test(chapter.url) ? OUTSIDE : {}} icon={ExternalLink} label={linkLabel.replaceAll('{title}', chapter.title)} variant="ghost" size="sm")
+            IconButton(href={chapter.url} {...WEB.test(chapter.url) ? OUTSIDE : {}} icon="external" label={linkLabel.replaceAll('{title}', chapter.title)} variant="ghost" size="sm")
           if actions
             span(part="actions")
               | {actions(chapter, index)}
