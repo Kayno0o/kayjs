@@ -143,6 +143,10 @@ it('lists the repos Forgejo gives, and says so when it is down', async () => {
 })
 ```
 
+### Read the log
+
+`site.logs` holds what the server logged since the test began, in order, as the `log` option's function would get it: `{ type: 'message', level, from, message, request?, error? }` for kay's messages and a `logFrom('reply')` line of the app's, and `{ type: 'request', ... }` when `log` logs requests. It is emptied before each test of a site made at the top of a file or a describe, so `expect(site.logs).toContainEqual(expect.objectContaining({ from: 'reply', message }))` needs no spy on `console`.
+
 ### Reset or seed content
 
 A test never writes into the project's `src/content`: a folder collection moves to a copy under `.kay/scratch` as its first save, delete or CMS screen reaches it, and the site reads it from there. `site.content.reset()` puts everything back (folders read from the project, loaders on their own source), `site.content.reset({ posts: [{ slug: 'a', data: { title: 'A' }, body: '...' }] })` or `site.content.seed('posts', entries)` makes a collection hold exactly those entries (`locale` for a localized one), and `site.content.write('posts', 'broken.json', text)` writes a raw file in the copy, for an entry that does not parse. A loaded collection's seed lives in memory: its loader's `load`, `get` and `count` read it, and `save` and `remove` (where declared) change it, never the source. A file written straight into `src/content` is read only until the copy is made.

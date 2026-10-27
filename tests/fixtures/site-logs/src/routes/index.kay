@@ -1,0 +1,7 @@
+--- server
+const reply = logFrom('reply')
+
+reply.info('answered 12 tokens')
+reply.warn('slow')
+---
+h1 Logs

@@ -307,6 +307,18 @@ await site.content.reset({
 
 A loaded collection's seed is kept in memory. Its `load`, `get` and `count` read it, and its `save` and `remove`, where it has them, change it. Your database or API is never touched.
 
+## Reading the log
+
+`site.logs` lists what the server logged since the test began, in order: the messages kay and libraries wrote, those your code writes with `logFrom`, and the request lines when your `log` option logs them. It is emptied before each test of a site made at the top of a file.
+
+```ts
+await site.visit('/reply')
+
+expect(site.logs).toContainEqual(expect.objectContaining({ level: 'info', from: 'reply', message: 'answered 12 tokens' }))
+```
+
+A message entry also has the `request` it was logged under and the `error` it carried.
+
 ## Several projects
 
 One test process serves one project. When test files call `testSite({ root })` on different folders, run them with `bun test --parallel`, which gives each file a process of its own.

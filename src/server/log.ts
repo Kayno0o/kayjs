@@ -72,8 +72,29 @@ export function pathOf(url: string): string {
   return url.slice(start, query === -1 ? undefined : query)
 }
 
-// Writes an entry as the `log` option says: a line of text, a JSON object, or a call to the app's function.
+// Listeners every entry reaches before it is written, which `kay/test` reads a site's log through.
+const taps = new Set<(entry: LogEntry) => void>()
+
+// Hears every entry written until the returned function is called.
+export function tapLogs(tap: (entry: LogEntry) => void): () => void {
+  taps.add(tap)
+
+  return () => void taps.delete(tap)
+}
+
 function writerFor(logger: Logger): Write {
+  const out = outputFor(logger)
+
+  return (entry) => {
+    for (const tap of taps)
+      tap(entry)
+
+    out(entry)
+  }
+}
+
+// Writes an entry as the `log` option says: a line of text, a JSON object, or a call to the app's function.
+function outputFor(logger: Logger): Write {
   if (typeof logger === 'function')
     return logger
 

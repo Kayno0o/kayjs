@@ -5,6 +5,7 @@ import type { Duration } from '../runtime/duration'
 import type { ApiAnswer, ApiRequest, CallMethod, CallPath, EventReader, NodeAt, Optional, SocketOf, SocketOptions, SocketPath, StreamMethod, StreamOf, StreamOptions, StreamPath, StreamStatus } from '../runtime/live'
 import type { PagesOptions } from '../server/app'
 import type { ClientBuild } from '../server/client'
+import type { LogEntry } from '../server/log'
 import type { BrowserOptions, TestPage } from './browser'
 import type { TestContent } from './content'
 import type { PageReading } from './page'
@@ -31,6 +32,7 @@ import { basePath, routerPath } from '../server/base'
 import { shutdown } from '../server/lifecycle'
 import { forgetStamps } from '../server/live'
 import { loaderRoot } from '../server/loader'
+import { tapLogs } from '../server/log'
 import { mcpKeySetting } from '../server/mcp-key'
 import { memoryNotifications } from '../server/notifications'
 import { checkProxy, memoryRates } from '../server/protection'
@@ -158,6 +160,8 @@ export interface TestSite {
   // Runs every job the queues hold whose time has come, those the jobs enqueue included, until none is left; resolves with how many ran.
   runJobs: () => Promise<number>
   cookies: Bun.CookieMap
+  // What the server logged since the test began, in order: the messages kay and libraries wrote, a `logFrom('reply').info(...)` of the app's included (`{ type: 'message', level, from, message, request?, error? }`), and the request lines when the app's `log` option logs them. Emptied before each test of a site made at the top of a file or a describe.
+  logs: readonly LogEntry[]
   // The site's content, which a test works on apart from the project's: a folder collection moves to a copy as the first save or delete reaches it, so a CMS's save never reaches the real `src/content`.
   content: TestContent
   handle: (request: Request) => Promise<Response>
@@ -381,9 +385,13 @@ export async function testSite(options: TestOptions = {}): Promise<TestSite> {
   let address = nextClient()
 
   // A site made at the top of a file or a describe posts as a new client in each test, so no test meets the rate limits another one's posts counted; one made inside a test, or outside bun test, keeps one.
+  const logs: LogEntry[] = []
+  const untap = tapLogs(entry => void logs.push(entry))
+
   try {
     beforeEach(() => {
       address = nextClient()
+      logs.length = 0
     })
     afterAll(release)
   }
@@ -522,6 +530,7 @@ export async function testSite(options: TestOptions = {}): Promise<TestSite> {
 
     return {
       cookies: jar.cookies,
+      logs,
       handle,
       mcp: {
         tools: async init => (await rpc('tools/list', {}, init)).result.tools ?? [],
@@ -636,6 +645,7 @@ export async function testSite(options: TestOptions = {}): Promise<TestSite> {
       },
       close: async () => {
         forget()
+        untap()
 
         for (const page of opened)
           page.close()
