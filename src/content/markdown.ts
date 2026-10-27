@@ -91,8 +91,8 @@ const WHITESPACE = /\s*/y
 const RAW_TEXT = new Set(['script', 'style', 'textarea', 'title'])
 // Line breaks in the text before an offset, for the line a problem sits on.
 const LINE_BREAK = /\n/g
-// Words as the reader counts them, a CJK text's too, which has no spaces to split on.
-const WORDS = new Intl.Segmenter('und', { granularity: 'word' })
+// Words as the reader counts them, a CJK text's too, which has no spaces to split on: built on the first count, as making the first segmenter loads ICU's word rules (about 1 ms and 200 KB), which a server compiling no Markdown never needs.
+let words: Intl.Segmenter | undefined
 
 export class MarkdownError extends Error {
   readonly code = 'markdown-invalid'
@@ -124,12 +124,14 @@ export async function compileMarkdown(body: string, bodyLine: number, highlight?
 // The words an entry's reader sees in Markdown's HTML: tags and entities set aside, code included.
 // A component's own output is not in it, as it only exists once the page renders, so only the Markdown inside a component's tags counts.
 export function countWords(html: string): number {
-  let words = 0
+  let count = 0
 
-  for (const { isWordLike } of WORDS.segment(decode(html.replace(TAGS, ' '))))
-    words += isWordLike ? 1 : 0
+  words ??= new Intl.Segmenter('und', { granularity: 'word' })
 
-  return words
+  for (const { isWordLike } of words.segment(decode(html.replace(TAGS, ' '))))
+    count += isWordLike ? 1 : 0
+
+  return count
 }
 
 // Markdown's HTML through the sanitizer a user's Markdown goes through, the component placeholders and the heading anchors kept: raw tags, handlers and unsafe links are gone.
