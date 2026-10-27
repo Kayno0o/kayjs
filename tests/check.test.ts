@@ -279,7 +279,7 @@ async function cliCheck(root: string, ...flags: string[]): Promise<{ code: numbe
 }
 
 // `kay check --watch` with JSON reports, the next of them at each `report()`, one document per line.
-function watchChecks(root: string, ...flags: string[]): { report: () => Promise<{ errors: number }>, stop: (signal?: NodeJS.Signals) => Promise<number> } {
+function watchChecks(root: string, ...flags: string[]): { report: () => Promise<{ errors: number }>, reportWith: (errors: number) => Promise<{ errors: number }>, stop: (signal?: NodeJS.Signals) => Promise<number> } {
   const child = Bun.spawn([process.execPath, join(import.meta.dir, '../src/cli.ts'), 'check', root, '--watch', '--format', 'json', ...flags], { stdout: 'pipe', stderr: 'pipe' })
   const reader = child.stdout.getReader()
   let output = ''
@@ -287,22 +287,33 @@ function watchChecks(root: string, ...flags: string[]): { report: () => Promise<
   // Its stderr is never read, and a full pipe would stop the watcher.
   drainOutput({ stdout: undefined, stderr: child.stderr })
 
+  const report = async () => {
+    while (!output.includes('\n')) {
+      const { value, done } = await reader.read()
+
+      if (done)
+        throw new Error('kay check --watch exited')
+
+      output += new TextDecoder().decode(value)
+    }
+
+    const line = output.slice(0, output.indexOf('\n'))
+
+    output = output.slice(line.length + 1)
+
+    return JSON.parse(line) as { errors: number }
+  }
+
   return {
-    report: async () => {
-      while (!output.includes('\n')) {
-        const { value, done } = await reader.read()
+    report,
+    // The next report with that many errors, past those a write the watcher sees as two events repeats on a loaded host.
+    reportWith: async (errors: number) => {
+      for (;;) {
+        const found = await report()
 
-        if (done)
-          throw new Error('kay check --watch exited')
-
-        output += new TextDecoder().decode(value)
+        if (found.errors === errors)
+          return found
       }
-
-      const line = output.slice(0, output.indexOf('\n'))
-
-      output = output.slice(line.length + 1)
-
-      return JSON.parse(line) as { errors: number }
     },
     stop: async (signal = 'SIGTERM') => {
       child.kill(signal)
@@ -4125,27 +4136,27 @@ describe.concurrent('kay check, unused code', () => {
     const watch = watchChecks(root)
 
     try {
-      expect(await watch.report()).toMatchObject({ errors: 0 })
+      expect(await watch.reportWith(0)).toMatchObject({ errors: 0 })
       expect(await loads()).toBe(1)
       await Bun.write(join(root, 'src/a.kay'), 'img(src="/a.png" width="1" height="1")\n')
-      expect(await watch.report()).toMatchObject({ errors: 1, problems: [{ code: 'missing-alt' }] })
+      expect(await watch.reportWith(1)).toMatchObject({ errors: 1, problems: [{ code: 'missing-alt' }] })
       await Bun.write(join(root, 'src/a.kay'), 'p a\n')
-      expect(await watch.report()).toMatchObject({ errors: 0 })
+      expect(await watch.reportWith(0)).toMatchObject({ errors: 0 })
       // The watch read the config once for its own checks, the two edits sharing it.
       expect(await loads()).toBe(2)
       await Bun.write(join(root, 'src/b.kay'), 'img(src="/b.png" width="1" height="1")\n')
-      expect(await watch.report()).toMatchObject({ errors: 1 })
+      expect(await watch.reportWith(1)).toMatchObject({ errors: 1 })
       await Bun.write(join(root, 'src/b.kay'), 'p b\n')
-      expect(await watch.report()).toMatchObject({ errors: 0 })
+      expect(await watch.reportWith(0)).toMatchObject({ errors: 0 })
       // A change of its own, as the write and the removal can come as two, each checked and reported: the config edit's report would then be the removal's.
       await rm(join(root, 'src/b.kay'))
-      expect(await watch.report()).toMatchObject({ errors: 0 })
+      expect(await watch.reportWith(0)).toMatchObject({ errors: 0 })
       await Bun.write(join(root, 'kay.config.ts'), `${config}// changed\n`)
-      expect(await watch.report()).toMatchObject({ errors: 0 })
+      expect(await watch.reportWith(0)).toMatchObject({ errors: 0 })
       expect(await loads()).toBe(3)
       // The config it read is stale now, so a later .kay edit is a check of its own too.
       await Bun.write(join(root, 'src/a.kay'), 'img(src="/a.png" width="1" height="1")\n')
-      expect(await watch.report()).toMatchObject({ errors: 1 })
+      expect(await watch.reportWith(1)).toMatchObject({ errors: 1 })
       expect(await loads()).toBe(4)
     }
     finally {
