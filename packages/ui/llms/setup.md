@@ -63,7 +63,7 @@ Toaster
 TooltipHost
 ```
 
-The extension puts both islands on every page, so each page loads the hydration code, as the layout above does, and since the Toaster holds state `kay build` does not keep a page prerendered under it, as with the two in your own layout.
+The extension puts both islands on every page, so each page loads the hydration code, and since the Toaster holds state `kay build` does not keep a page prerendered under it.
 
 ### Settings
 
@@ -85,7 +85,7 @@ const settings: UiSettings = { ...uiDefaults, icons: { ...uiDefaults.icons, clos
 export default settings
 ```
 
-`kay check` checks this module against `UiSettings`. The server, the browser, `kay build` and `bun test` all render with it.
+`kay check` checks this module against `UiSettings`; the server, the browser, `kay build` and `bun test` all render with it.
 
 ### Restyle a component
 
