@@ -283,7 +283,9 @@ In an island it follows the address, so the link changes with each `navigate({ q
 
 `navigate('/todos', { scroll: 'keep' })` goes to the page without scrolling to the top, and `{ transition: false }` swaps it without a view transition. A link does the same with `data-keep-scroll` and `data-no-transition`, which an element around several links can carry. The nearest `data-keep-scroll` to the link decides, so `data-keep-scroll="false"` on one link inside a keeping element scrolls to the top.
 
-A page the server has not fully sent after 10 seconds, for a link or `navigate()`, is loaded by the browser instead, which shows its own progress or error. A view transition that has not finished after 3 seconds is skipped and the page is shown. A link you click during a transition skips it and is followed. The code a swap loads for a streamed page, or to keep a deferred server island already fetched on screen, is waited for 4.5 seconds at most once the page arrived: past that the streamed page is loaded by the browser, and the island shows its inert copy until fetched again.
+A page the server has not fully sent after 10 seconds, for a link or `navigate()`, is loaded by the browser instead, which shows its own progress or error. A view transition that has not finished after 3 seconds is skipped and the page is shown. A link you click during a transition skips it and is followed.
+
+The code a swap loads for a streamed page, or to keep a deferred server island already fetched on screen, is waited for 4.5 seconds at most once the page arrived: past that the streamed page is loaded by the browser, and the island shows its inert copy until fetched again.
 
 Each swap fires a `kay:navigate` event on `document`, with the page's address in `event.detail.url`, for a plain script to set itself up again. A full load fires none.
 
