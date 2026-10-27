@@ -44,7 +44,6 @@ import { createGate, scopeAllows } from './gate'
 import { acceptedLocales, validLocale } from './locale'
 import { noteSignIn, notify } from './notify'
 import { safeRedirect } from './oauth/redirect'
-import { oauthTest } from './oauthTest'
 import { AUTH_OF, CHECK_USER, featuresOf, PAGES_OF } from './pages'
 import { challenged, completeSignIn, provedLately, reprove } from './proof'
 import { pruneWhenDue } from './prune'
@@ -1388,9 +1387,14 @@ export function createAuth<Data extends AuthSessionData, Role extends string = s
       return (await load.twoFactor()).enrollTotp(core, userId)
     },
 
-    // The provider calls of a test site: `oauth.stub(provider, { id, email })` makes the provider answer with that account with no request leaving the test (or `{ error: 'access_denied' | 'invalid_grant' | 'server_error' }` a refused consent, a rejected code or a provider down), and `await oauth.signIn(provider)` leaves for it and comes back through the site, answering the callback's response.
+    // The provider calls of a test site: `await oauth.stub(provider, { id, email })` makes the provider answer with that account with no request leaving the test (or `{ error: 'access_denied' | 'invalid_grant' | 'server_error' }` a refused consent, a rejected code or a provider down), and `await oauth.signIn(provider)` leaves for it and comes back through the site, answering the callback's response.
     oauth(site: OAuthSite): OAuthTest {
-      return oauthTest(core, site)
+      const made = async () => (await import('./oauthTest')).oauthTest(core, plugin as unknown as Elysia, site)
+
+      return {
+        stub: async (provider, outcome) => (await made()).stub(provider, outcome),
+        signIn: async (provider, options) => (await made()).signIn(provider, options),
+      }
     },
 
     // Signs a test site out, however it was signed in, by dropping its session cookie: the site is anonymous again, its other cookies kept.

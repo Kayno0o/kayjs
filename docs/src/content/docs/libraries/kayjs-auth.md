@@ -818,14 +818,14 @@ To sign a test site in as a member, `await auth.signInAs(site, { email: 'ada@exa
 
 To test two-factor, `await auth.enrollTotp(user.id)` (or `as.enrollTotp(user.id)`) turns it on for a member as the app would once they confirm a code, with no session or mail. It gives `{ secret, code(offset?), recoveryCodes }`: `await enrolment.code()` is the code of the current step, and each recovery code signs in once. It throws for a missing member or one who has two-factor already.
 
-To test a sign-in through a provider, `as.oauth.stub('discord', { id: '80351', email: 'ada@example.com' })` makes the provider answer with that account, so no request leaves the test and no `fetch` needs spying.
+To test a sign-in through a provider, `await as.oauth.stub('discord', { id: '80351', email: 'ada@example.com' })` makes the provider answer with that account, so no request leaves the test and no `fetch` needs spying.
 
-`await as.oauth.signIn('discord')` leaves for the provider and comes back through the site, and answers the callback's response. Give `{ error: 'access_denied' }` to simulate a refused consent, `'invalid_grant'` for a code the provider rejects and `'server_error'` for a provider that is down. The function `stub` returns puts the real provider back.
+`await as.oauth.signIn('discord')` leaves for the provider and comes back through the site, and answers the callback's response. A site with only its `cookies` works too, the sign-in then going through the auth plugin. Give `{ error: 'access_denied' }` to simulate a refused consent, `'invalid_grant'` for a code the provider rejects and `'server_error'` for a provider that is down. The function `stub` returns puts the real provider back.
 
 ```ts
 const as = authTest(site)
 
-as.oauth.stub('discord', { id: '80351', email: 'ada@example.com' })
+await as.oauth.stub('discord', { id: '80351', email: 'ada@example.com' })
 
 const response = await as.oauth.signIn('discord')
 

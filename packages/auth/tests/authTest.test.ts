@@ -43,10 +43,15 @@ it('stubs an OAuth provider through the auth() built with no module', async () =
 
   await buildOwn({ site: 'https://site.test', oauth: { discord: { provider: discordProvider(), clientId: 'id', clientSecret: 'secret' } } }, { root: process.cwd(), extensions: [], modules: {}, testCookies: site.cookies })
 
-  const restore = authTest(site).oauth.stub('discord', { id: '1', email: 'ada@example.com' })
+  const restore = await authTest(site).oauth.stub('discord', { id: '1', email: 'ada@example.com' })
 
-  await expect(authTest(site).oauth.signIn('discord')).rejects.toThrow('needs a site with a fetch')
-  expect(() => authTest(site).oauth.stub('github', { id: '1' })).toThrow('no provider')
+  await expect(authTest(site).oauth.stub('github', { id: '1' })).rejects.toThrow('no provider')
+
+  // The site has only its cookies, so the sign-in is driven through the plugin and the session lands in them.
+  const answer = await authTest(site).oauth.signIn('discord')
+
+  expect(answer.headers.get('location')).toBe('/')
+  expect([...site.cookies].some(([name]) => name.endsWith('kay_session'))).toBe(true)
   restore()
   await expect(authTest(site).oauth.signIn('discord')).rejects.toThrow('no stub')
 })

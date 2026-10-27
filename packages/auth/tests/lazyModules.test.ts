@@ -14,6 +14,7 @@ const FEATURES = {
   organizations: { modules: ['organizations.ts'], packages: [] },
   admin: { modules: ['admin.ts'], packages: [] },
   oauth: { modules: ['oauth/flow.ts'], packages: [] },
+  oauthTest: { modules: ['oauthTest.ts'], packages: [] },
   oauthServer: { modules: ['authorize/clients.ts', 'authorize/grants.ts', 'authorize/register.ts', 'authorize/request.ts', 'authorize/token.ts'], packages: [] },
   forwardAuth: { modules: ['forwardRoutes.ts'], packages: [] },
   bearer: { modules: ['bearer.ts'], packages: [] },

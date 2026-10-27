@@ -52,7 +52,7 @@ describe('stubbing an OAuth provider in a test', () => {
     const outside = blockFetch()
     const { as, store, site } = setup()
 
-    as.oauth.stub('discord', { id: '80351110224678912', email: 'ada@example.com', username: 'ada' })
+    await as.oauth.stub('discord', { id: '80351110224678912', email: 'ada@example.com', username: 'ada' })
 
     const response = await as.oauth.signIn('discord')
 
@@ -72,16 +72,16 @@ describe('stubbing an OAuth provider in a test', () => {
 
     await store.identities.create({ provider: 'discord', providerId: 'd1', userId: made.user.id, accessToken: null, refreshToken: null, tokenExpiresAt: null, createdAt: new Date() })
     await as.enrollTotp(made.user.id)
-    as.oauth.stub('discord', { id: 'd1' })
+    await as.oauth.stub('discord', { id: 'd1' })
 
     expect((await as.oauth.signIn('discord')).headers.get('location')).toContain('/two-factor')
   })
 
   test('reads each provider\'s stub apart, and a stub given up leaves the provider as it was', async () => {
     const { as, store } = setup()
-    const restore = as.oauth.stub('discord', { id: 'd1', email: 'ada@example.com' })
+    const restore = await as.oauth.stub('discord', { id: 'd1', email: 'ada@example.com' })
 
-    as.oauth.stub('google', { id: 'g1', email: 'grace@example.com' })
+    await as.oauth.stub('google', { id: 'g1', email: 'grace@example.com' })
     await as.oauth.signIn('google')
     expect(await store.identities.find('google', 'g1')).toBeDefined()
     expect(await store.identities.find('discord', 'g1')).toBeUndefined()
@@ -93,13 +93,13 @@ describe('stubbing an OAuth provider in a test', () => {
   test('simulates a refused consent, a provider rejecting the code and a provider down', async () => {
     const { as, store } = setup()
 
-    as.oauth.stub('discord', { error: 'access_denied' })
+    await as.oauth.stub('discord', { error: 'access_denied' })
     expect((await as.oauth.signIn('discord')).headers.get('location')).toContain('error=cancelled')
 
-    as.oauth.stub('discord', { error: 'invalid_grant' })
+    await as.oauth.stub('discord', { error: 'invalid_grant' })
     expect((await as.oauth.signIn('discord')).headers.get('location')).toContain('error=oauth')
 
-    as.oauth.stub('discord', { error: 'server_error' })
+    await as.oauth.stub('discord', { error: 'server_error' })
     expect((await as.oauth.signIn('discord')).headers.get('location')).toContain('error=unavailable')
     expect(await store.users.findByEmail('ada@example.com')).toBeUndefined()
   })
@@ -107,8 +107,8 @@ describe('stubbing an OAuth provider in a test', () => {
   test('refuses a provider the app has not configured, a missing stub and a bad profile', async () => {
     const { as } = setup()
 
-    expect(() => as.oauth.stub('github', { id: '1' })).toThrow('no provider')
-    expect(() => as.oauth.stub('discord', { id: '' })).toThrow('id')
+    await expect(as.oauth.stub('github', { id: '1' })).rejects.toThrow('no provider')
+    await expect(as.oauth.stub('discord', { id: '' })).rejects.toThrow('id')
     await expect(as.oauth.signIn('discord')).rejects.toThrow('no stub')
   })
 
@@ -116,7 +116,7 @@ describe('stubbing an OAuth provider in a test', () => {
     const outside = blockFetch()
     const { as, store } = setup()
 
-    as.oauth.stub('google', { id: 'g1', email: 'grace@example.com' })
+    await as.oauth.stub('google', { id: 'g1', email: 'grace@example.com' })
     await as.oauth.signIn('google')
 
     expect(outside).not.toHaveBeenCalled()

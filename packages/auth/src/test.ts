@@ -14,7 +14,7 @@ export interface AuthTest {
   sessionCookie: (userId: string, options?: { secure?: boolean }) => Promise<string>
   // Turns two-factor on for that member as the app would, so a password sign-in asks for a code: the authenticator's `secret`, `code(offset?)` for the current step and the `recoveryCodes`, all usable at the next sign-in. Throws for a missing member or one who has it already.
   enrollTotp: (userId: string) => Promise<TotpEnrolment>
-  // Signs in through an OAuth provider with no request to it: `oauth.stub('discord', { id, email })` makes it answer with that account (or `{ error }` for a refused consent, a rejected code or a provider down), and `await oauth.signIn('discord')` leaves for it and comes back through the site, answering the callback's response.
+  // Signs in through an OAuth provider with no request to it: `await oauth.stub('discord', { id, email })` makes it answer with that account (or `{ error }` for a refused consent, a rejected code or a provider down), and `await oauth.signIn('discord')` leaves for it and comes back through the site, answering the callback's response.
   oauth: OAuthTest
 }
 
@@ -39,7 +39,7 @@ export function authTest(site: OAuthSite): AuthTest {
     sessionCookie: async (userId, options) => made().sessionCookie(userId, options),
     enrollTotp: async userId => made().enrollTotp(userId),
     oauth: {
-      stub: (provider, outcome) => made().oauth.stub(provider, outcome),
+      stub: async (provider, outcome) => made().oauth.stub(provider, outcome),
       signIn: async (provider, options) => made().oauth.signIn(provider, options),
     },
   }
