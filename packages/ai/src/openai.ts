@@ -66,6 +66,13 @@ function textOf(content: unknown): string {
   return content.map(part => typeof part === 'object' && part !== null && (part as { type?: unknown }).type === 'text' && typeof (part as { text?: unknown }).text === 'string' ? (part as { text: string }).text : '').join('')
 }
 
+// The model's thinking in a delta: `reasoning_content` on DeepSeek, Ollama and Mistral's compatible servers, `reasoning` on OpenRouter.
+function reasoningOf(delta: { reasoning_content?: unknown, reasoning?: unknown } | undefined): string {
+  const thought = delta?.reasoning_content ?? delta?.reasoning
+
+  return typeof thought === 'string' ? thought : ''
+}
+
 function usageOf(value: unknown): Piece[] {
   if (typeof value !== 'object' || value === null)
     return []
@@ -212,9 +219,13 @@ export function openai({ baseUrl = OPENAI_URL, apiKey, model, body: fields }: Op
         if (failure !== undefined && failure !== null)
           throw failureOf(failure)
 
-        const choice = (chunk.choices as { delta?: { content?: unknown, tool_calls?: unknown }, finish_reason?: unknown }[] | undefined)?.[0]
+        const choice = (chunk.choices as { delta?: { content?: unknown, tool_calls?: unknown, reasoning_content?: unknown, reasoning?: unknown }, finish_reason?: unknown }[] | undefined)?.[0]
         let answered = ''
         const text = textOf(choice?.delta?.content)
+        const thought = reasoningOf(choice?.delta)
+
+        if (thought !== '')
+          yield { reasoning: thought }
 
         if (Array.isArray(choice?.delta?.tool_calls)) {
           for (const piece of choice.delta.tool_calls as { index?: unknown, id?: unknown, function?: { name?: unknown, arguments?: unknown } }[]) {

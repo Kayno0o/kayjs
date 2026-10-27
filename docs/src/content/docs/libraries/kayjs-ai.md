@@ -178,6 +178,12 @@ A provider that stalls fails the reply with an `AiError` of kind `timeout`. kay 
 
 `ask` also takes `model`, `maxTokens` (4096 by default), `temperature` and a `signal`.
 
+### Thinking
+
+`reasoning: 'none' | 'low' | 'medium' | 'high'` sets how much a reasoning model thinks. An OpenAI-compatible server gets it as `reasoning_effort`. Anthropic gets extended thinking: `'none'` turns it off, and the other levels give the model a budget of a quarter, a half or three quarters of `maxTokens`, at least 1,024 tokens. Raise `maxTokens` to let a model think, as a `maxTokens` of 1,024 or less leaves thinking off. Anthropic refuses a `temperature` while the model thinks, so kayjs-ai leaves it out then.
+
+What the model thinks streams as its own kind of piece, so `await reply` still gives the answer alone. `reply.progress()` carries it as `reasoning`, and a tool loop sends Anthropic's thinking blocks back with the calls as its API requires.
+
 ### Fields kayjs-ai does not model
 
 A provider takes more fields than kayjs-ai knows. Pass them as `body` and they are added to the request as they are:
@@ -313,6 +319,8 @@ A function tool runs with your app's own rights, never a visitor's, in a request
 To show the calls in a chat, return `reply.progress()` from the chat's action instead of the reply: `ask(messages, { tools: [addNote] }).progress()`.
 
 The chat then lists each call before the text of its turn, with its status and, when opened, its arguments and result. Set `toolDetails={false}` on `Chat` to show names and statuses only.
+
+The same goes for the model's thinking: when the action returns `reply.progress()` and the provider streams it, the chat folds it above the text under `Reasoning`. Set `reasoning={false}` on `Chat` to hide it.
 
 Code in an answer is coloured the way the rest of your Markdown is. Once a code block is finished, the server highlights it with the `markdown.highlight` function from your `kay.config.ts`, the one your content pages use, and the chat swaps the plain block for the coloured one. The browser loads no highlighter. A block still being written stays plain, and so does code when your app has no highlighter. This works when the action returns `.progress()`.
 

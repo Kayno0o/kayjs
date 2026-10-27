@@ -326,6 +326,22 @@
     color: var(--color-danger);
   }
 
+  /* The model's thinking folds into one muted line, as the calls do, and opens to its text. */
+  .kai-chat-reasoning {
+    margin: 0 0 0.5rem;
+    font-size: 0.75rem;
+    color: var(--color-muted);
+  }
+
+  .kai-chat-reasoning summary {
+    cursor: pointer;
+  }
+
+  .kai-chat-reasoning-text {
+    margin: 0.375rem 0 0;
+    white-space: pre-wrap;
+  }
+
   .kai-chat-approval {
     display: flex;
     flex-wrap: wrap;

@@ -37,8 +37,13 @@ export interface ToolOutcome {
   ok: boolean
 }
 
+// A finished block of the model's thinking: the text with the signature that proves it, or the encrypted block Anthropic sends in its place (`redacted`).
+export type Thinking = { text: string, signature: string } | { redacted: string }
+
 // A message as a provider is sent it: the assistant's turn that called tools carries `calls`, and the turn answering them, from the user's side, `results`.
 export interface ProviderMessage extends Message {
+  // The thinking that came before the calls, which Anthropic requires back unchanged in the turn that called tools.
+  thinking?: Thinking[] | undefined
   calls?: ToolUse[] | undefined
   results?: ToolOutcome[] | undefined
 }
@@ -77,7 +82,8 @@ export type Finish = 'stop' | 'length' | 'filtered' | 'steps'
 
 // `toolUse` is a provider's finished tool call, which the loop answers and the reply never shows; `tool` is a call as the reply shows it, sent again as its status changes.
 // `restart` drops the text so far: the tool loop sends it for a `schema` reply when a step that wrote some went on to call tools, as only the text of the last step is the object.
-export type Piece = { text: string } | { usage: Partial<Usage> } | { finish: Finish } | { toolUse: ToolUse } | { tool: ToolCall } | { restart: true }
+// `reasoning` is a part of the model's thinking as it streams, never mixed into `text`; `thinking` is a finished block of it, which the loop sends back with the calls and the reply never shows.
+export type Piece = { text: string } | { reasoning: string } | { thinking: Thinking } | { usage: Partial<Usage> } | { finish: Finish } | { toolUse: ToolUse } | { tool: ToolCall } | { restart: true }
 
 export interface Provider {
   readonly name: string
@@ -132,11 +138,11 @@ export interface AskOptions {
   // 4096 by default, as Anthropic requires one.
   maxTokens?: number | undefined
   temperature?: number | undefined
-  // How much a reasoning model thinks before answering, `'none'` for a quick reply: sent as `reasoning_effort` to an OpenAI-compatible server, which is asked again without it if it refuses the field, and left out when not given. Anthropic ignores it.
+  // How much a reasoning model thinks before answering, `'none'` for a quick reply: sent as `reasoning_effort` to an OpenAI-compatible server, which is asked again without it if it refuses the field, and left out when not given. Anthropic gets extended thinking sized from it (`'none'` turns it off, the others set a budget of a quarter, a half or three quarters of `maxTokens`, at least 1,024 tokens) and `temperature` is then left out, as it refuses one; a `maxTokens` of 1,024 or less leaves thinking off.
   reasoning?: Reasoning | undefined
   // Asks the provider to cache the prompt so the next turn and tool step read it at a fraction of the price: on by default, `false` turns it off and `'1h'` keeps an Anthropic cache for an hour instead of 5 minutes.
   cache?: boolean | '1h' | undefined
-  // Fields to add to the provider's request body as they are, such as `{ top_p: 0.9, seed: 7 }`, so a parameter kayjs-ai does not model needs no release. They are added to what the provider was built with in `body`, this ask's winning field by field (top level only), and a field kayjs-ai settles itself (`model`, `messages`, `stream`, `tools`, the token limit, the schema's output format, and `temperature`, `reasoning` and `cache` when given) wins over them. A server refusing a field fails the reply with its own message.
+  // Fields to add to the provider's request body as they are, such as `{ top_p: 0.9, seed: 7 }`, so a parameter kayjs-ai does not model needs no release. They are added to what the provider was built with in `body`, this ask's winning field by field (top level only), and a field kayjs-ai settles itself (`model`, `messages`, `stream`, the token limit, and when it sets them `tools`, the schema's output format, `temperature`, `reasoning` and `cache`) wins over them. A server refusing a field fails the reply with its own message.
   body?: Record<string, unknown> | undefined
   // Stops the reply when it aborts, as the request being answered does on its own.
   signal?: AbortSignal | undefined
@@ -185,6 +191,8 @@ export interface Progress {
   calls: ToolCall[]
   // The code blocks of the text closed since the previous snapshot, highlighted with the app's own highlighter (`markdown.highlight` in `kay.config.ts`) and sanitized; absent when there are none or the app has no highlighter.
   code?: CodeBlock[] | undefined
+  // What the model has thought so far, when the provider streams it (Anthropic's thinking, an OpenAI-compatible server's `reasoning_content`); absent when it did not. The text of `await` never holds it.
+  reasoning?: string | undefined
   // Set when the ask has `outlive`, which tells a chat its Stop must end the reply on the server too.
   outlives?: true | undefined
 }

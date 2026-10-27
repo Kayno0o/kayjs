@@ -30,6 +30,7 @@ export default defineMessages({
       stopped: 'Arrêtée',
       table: 'Tableau',
       thinking: 'Réflexion…',
+      reasoning: 'Raisonnement',
     },
   },
 })

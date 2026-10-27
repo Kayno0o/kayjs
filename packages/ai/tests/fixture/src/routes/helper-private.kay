@@ -1,0 +1,7 @@
+--- server
+import { helper } from './tools.kay'
+--- script
+import Chat from '@kaynooo/kayjs-ai/chat.kay'
+---
+h1 Private helper
+Chat(action={helper} label="Helper" reasoning={false})

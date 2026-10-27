@@ -1,5 +1,5 @@
 import type { LibraryTool } from 'kay/library'
-import type { Confirm, Piece, Provider, ProviderMessage, ProviderRequest, ToolCall, ToolOutcome, ToolUse, Usage } from './types'
+import type { Confirm, Piece, Provider, ProviderMessage, ProviderRequest, Thinking, ToolCall, ToolOutcome, ToolUse, Usage } from './types'
 import { logFrom } from 'kay'
 import { spend, ticketAllows, ticketFor } from './approval'
 import { ticketsIn } from './approval-marker'
@@ -154,6 +154,7 @@ export async function* converse(provider: Provider, base: ProviderRequest, offer
   const tickets = allowed(base.messages)
   const total: Partial<Usage> = {}
   let spoke = false
+  let thought = false
   // A call is told apart by its id for the whole loop, so one a model reuses or leaves out gets a new one, which is the id it is answered under.
   const ids = new Set<string>()
   let issued = 0
@@ -174,6 +175,8 @@ export async function* converse(provider: Provider, base: ProviderRequest, offer
       return
 
     const uses: ToolUse[] = []
+    const thinking: Thinking[] = []
+    let reasoned = false
     const used: Partial<Usage> = {}
     let text = ''
     let finish: Piece | undefined
@@ -184,6 +187,15 @@ export async function* converse(provider: Provider, base: ProviderRequest, offer
 
         text += piece.text
         spoke = true
+      }
+      else if ('reasoning' in piece) {
+        yield { reasoning: !thought || reasoned ? piece.reasoning : `\n\n${piece.reasoning}` }
+
+        reasoned = true
+        thought = true
+      }
+      else if ('thinking' in piece) {
+        thinking.push(piece.thinking)
       }
       else if ('toolUse' in piece) {
         if (uses.length < MAX_STREAMED_CALLS)
@@ -271,6 +283,6 @@ export async function* converse(provider: Provider, base: ProviderRequest, offer
     }
 
     // What goes back is the arguments as an object, so a provider that parses them never meets the text a model garbled.
-    messages.push({ role: 'assistant', content: text, calls: uses.map(use => ({ ...use, arguments: JSON.stringify(sent.get(use.id) ?? {}) })) }, { role: 'user', content: '', results })
+    messages.push({ role: 'assistant', content: text, ...thinking.length > 0 && { thinking }, calls: uses.map(use => ({ ...use, arguments: JSON.stringify(sent.get(use.id) ?? {}) })) }, { role: 'user', content: '', results })
   }
 }

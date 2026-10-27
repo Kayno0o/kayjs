@@ -163,6 +163,36 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the Chat i
     expect(page.errors).toEqual([])
   })
 
+  test('the model\'s thinking folds above the reply and opens to its text, and reasoning={false} hides it', async () => {
+    const page = await site.open('/helper')
+
+    fakeAi.reply({ reasoning: 'First <b>think</b>. Then answer.', text: 'The answer' })
+    await page.fill('textarea', 'Why')
+    await page.press('Enter')
+    await page.waitFor('[data-pending]', { gone: true })
+    await page.waitFor('.kai-chat-turn[data-role="assistant"] .kai-chat-text', { text: 'The answer' })
+
+    const turn = '.kai-chat-turn[data-role="assistant"]'
+
+    expect(await page.text(`${turn} .kai-chat-reasoning summary`)).toBe('Reasoning')
+    expect(await page.text(`${turn} .kai-chat-reasoning-text`)).toBe('First <b>think</b>. Then answer.')
+    expect(await page.count(`${turn} .kai-chat-reasoning-text b`)).toBe(0)
+    expect((await page.text(`${turn} .kai-chat-text`))?.trim()).toBe('The answer')
+    expect(await page.evaluate(() => document.querySelector('.kai-chat-reasoning')?.hasAttribute('open'))).toBe(false)
+    expect(await page.evaluate(() => document.querySelector('.kai-chat-reasoning')?.nextElementSibling?.classList.contains('kai-chat-text'))).toBe(true)
+
+    const hidden = await site.open('/helper-private')
+
+    fakeAi.reply({ reasoning: 'Private thoughts', text: 'Plain answer' })
+    await hidden.fill('textarea', 'Why')
+    await hidden.press('Enter')
+    await hidden.waitFor('[data-pending]', { gone: true })
+    await hidden.waitFor('.kai-chat-turn[data-role="assistant"] .kai-chat-text', { text: 'Plain answer' })
+
+    expect(await hidden.count('.kai-chat-reasoning')).toBe(0)
+    expect(page.errors).toEqual([])
+  })
+
   test('a finished code block is swapped for the highlighted one, while the reply streams and in the finished turn, and a block left open stays plain', async () => {
     const page = await site.open('/helper')
 

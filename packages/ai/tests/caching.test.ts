@@ -136,14 +136,6 @@ describe('OpenAI-compatible prompt caching', () => {
     expect(server.seen[2]!.body.stream_options).toEqual({ include_usage: true })
   })
 
-  it('leaves reasoning out of the Anthropic body', async () => {
-    const server = serve(() => stream(anthropicEvents('ok')).response)
-
-    await ask('Hi', { provider: anthropic({ baseUrl: server.url, apiKey: 'k', model: 'm' }), reasoning: 'none' })
-    expect(Object.keys(server.seen[0]!.body)).not.toContain('reasoning_effort')
-    expect(Object.keys(server.seen[0]!.body)).not.toContain('thinking')
-  })
-
   it('does not remember a refusal when the retry fails as well', async () => {
     const server = serve((_request, seen) => 'model' in seen.body && seen.body.model === 'bad' ? Response.json({ error: { message: 'unknown model' } }, { status: 400 }) : stream(openaiEvents('ok')).response)
     const provided = openai({ baseUrl: `${server.url}/v1`, model: 'm' })

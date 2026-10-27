@@ -14,6 +14,7 @@ function snapshot(call: ToolCall): ToolCall {
 export function createReply(open: (signal: AbortSignal) => AsyncIterable<Piece>, signals: (AbortSignal | undefined)[], highlight = highlighting, outlive = false, onEnd?: () => void): Reply {
   const controller = new AbortController()
   const deltas: string[] = []
+  const thoughts: string[] = []
   const waiters = new Set<() => void>()
   const counted = Promise.withResolvers<Usage | undefined>()
   const ending = Promise.withResolvers<Finish | undefined>()
@@ -43,6 +44,10 @@ export function createReply(open: (signal: AbortSignal) => AsyncIterable<Piece>,
       for await (const piece of open(controller.signal)) {
         if ('text' in piece) {
           deltas.push(piece.text)
+          version++
+        }
+        else if ('reasoning' in piece) {
+          thoughts.push(piece.reasoning)
           version++
         }
         else if ('restart' in piece) {
@@ -224,7 +229,7 @@ export function createReply(open: (signal: AbortSignal) => AsyncIterable<Piece>,
 
             finished = []
 
-            return { done: false, value: { text: deltas.join(''), calls: calls.map(snapshot), code, ...outlive && { outlives: true } } }
+            return { done: false, value: { text: deltas.join(''), calls: calls.map(snapshot), code, ...thoughts.length > 0 && { reasoning: thoughts.join('') }, ...outlive && { outlives: true } } }
           }
 
           if (seen < version) {
@@ -235,7 +240,7 @@ export function createReply(open: (signal: AbortSignal) => AsyncIterable<Piece>,
             else
               scan()
 
-            return { done: false, value: { text: deltas.join(''), calls: calls.map(snapshot), ...outlive && { outlives: true } } }
+            return { done: false, value: { text: deltas.join(''), calls: calls.map(snapshot), ...thoughts.length > 0 && { reasoning: thoughts.join('') }, ...outlive && { outlives: true } } }
           }
 
           if (stale && !working) {

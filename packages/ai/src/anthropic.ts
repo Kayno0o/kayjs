@@ -1,4 +1,4 @@
-import type { Finish, Piece, Provider, ProviderMessage } from './types'
+import type { Finish, Piece, Provider, ProviderMessage, ProviderRequest, Thinking } from './types'
 import { AiError } from './errors'
 import { extraBody } from './extra'
 import { json, postEvents } from './http'
@@ -19,6 +19,22 @@ const VERSION = '2023-06-01'
 const TRAILING_SLASHES = /\/+$/
 
 const FINISHES: Record<string, Finish> = { max_tokens: 'length', refusal: 'filtered' }
+// The share of `maxTokens` each level lets the model think with, and the least Anthropic accepts as a budget.
+const THINKING_SHARE = { low: 0.25, medium: 0.5, high: 0.75 }
+const MIN_THINKING = 1024
+
+// Extended thinking for the level asked: `none` turns it off, the others give a budget the answer still has room beside, and a `maxTokens` too small for the minimum budget leaves thinking alone.
+function thinkingOf({ reasoning, maxTokens }: ProviderRequest): { type: 'disabled' } | { type: 'enabled', budget_tokens: number } | undefined {
+  if (reasoning === undefined)
+    return undefined
+
+  if (reasoning === 'none')
+    return { type: 'disabled' }
+
+  const budget = Math.max(MIN_THINKING, Math.floor(maxTokens * THINKING_SHARE[reasoning]))
+
+  return budget < maxTokens ? { type: 'enabled', budget_tokens: budget } : undefined
+}
 
 function count(value: unknown): number | undefined {
   return typeof value === 'number' ? value : undefined
@@ -69,6 +85,7 @@ function turnOf(message: ProviderMessage): { role: string, content: unknown } {
   return {
     role: 'assistant',
     content: [
+      ...(message.thinking ?? []).map(block => 'redacted' in block ? { type: 'redacted_thinking', data: block.redacted } : { type: 'thinking', thinking: block.text, signature: block.signature }),
       ...message.content.trim() === '' ? [] : [{ type: 'text', text: message.content }],
       ...(message.calls ?? []).map(({ id, name, arguments: raw }) => ({ type: 'tool_use', id, name, input: inputOf(raw) })),
     ],
@@ -96,6 +113,7 @@ export function anthropic({ apiKey, baseUrl = ANTHROPIC_URL, model, body: fields
     name: 'anthropic',
     model,
     async* stream(request, signal) {
+      const thinking = thinkingOf(request)
       const body = {
         ...extra,
         ...request.body,
@@ -107,13 +125,17 @@ export function anthropic({ apiKey, baseUrl = ANTHROPIC_URL, model, body: fields
         ...request.cache === false ? {} : { cache_control: request.cache === '1h' ? { type: 'ephemeral', ttl: '1h' } : { type: 'ephemeral' } },
         ...request.system === undefined ? {} : { system: request.system },
         ...request.tools === undefined || request.tools.length === 0 ? {} : { tools: request.tools.map(({ name, description, inputSchema }) => ({ name, description, input_schema: inputSchema })) },
-        ...request.temperature === undefined ? {} : { temperature: request.temperature },
+        // Anthropic refuses a temperature other than 1 while the model thinks.
+        ...request.temperature === undefined || thinking?.type === 'enabled' ? {} : { temperature: request.temperature },
+        ...thinking === undefined ? {} : { thinking },
         // The model answers the JSON of the schema as its text, whatever the tools.
         ...request.schema === undefined ? {} : { output_config: { format: { type: 'json_schema', schema: outputSchema(request.schema) } } },
       }
 
       // Tool calls arrive as a block opened with the name, then the arguments in pieces.
       const calls = new Map<number, { id: string, name: string, arguments: string }>()
+      // Thinking arrives as a block too: its text in pieces, then the signature that goes back with it.
+      const thoughts = new Map<number, { text: string, signature: string } | { redacted: string }>()
 
       for await (const { data } of postEvents('anthropic', `${root}/v1/messages`, { 'x-api-key': apiKey, 'anthropic-version': VERSION }, body, request.timeouts, signal, apiKey)) {
         const event = json('anthropic', data)
@@ -124,7 +146,13 @@ export function anthropic({ apiKey, baseUrl = ANTHROPIC_URL, model, body: fields
 
             break
           case 'content_block_start': {
-            const block = event.content_block as { type?: unknown, id?: unknown, name?: unknown } | undefined
+            const block = event.content_block as { type?: unknown, id?: unknown, name?: unknown, data?: unknown } | undefined
+
+            if (typeof event.index === 'number' && block?.type === 'thinking')
+              thoughts.set(event.index, { text: '', signature: '' })
+
+            if (typeof event.index === 'number' && block?.type === 'redacted_thinking' && typeof block.data === 'string')
+              thoughts.set(event.index, { redacted: block.data })
 
             if (block?.type === 'tool_use' && typeof event.index === 'number' && calls.size < MAX_STREAMED_CALLS)
               calls.set(event.index, { id: typeof block.id === 'string' ? block.id : '', name: typeof block.name === 'string' ? block.name.slice(0, MAX_NAME_LENGTH + 1) : '', arguments: '' })
@@ -132,7 +160,17 @@ export function anthropic({ apiKey, baseUrl = ANTHROPIC_URL, model, body: fields
             break
           }
           case 'content_block_delta': {
-            const delta = event.delta as { type?: unknown, text?: unknown, partial_json?: unknown } | undefined
+            const delta = event.delta as { type?: unknown, text?: unknown, partial_json?: unknown, thinking?: unknown, signature?: unknown } | undefined
+            const thought = typeof event.index === 'number' ? thoughts.get(event.index) : undefined
+
+            if (delta?.type === 'thinking_delta' && typeof delta.thinking === 'string' && delta.thinking !== '' && thought && 'text' in thought) {
+              thought.text += delta.thinking
+
+              yield { reasoning: delta.thinking }
+            }
+
+            if (delta?.type === 'signature_delta' && typeof delta.signature === 'string' && thought && 'signature' in thought)
+              thought.signature += delta.signature
 
             if (delta?.type === 'text_delta' && typeof delta.text === 'string' && delta.text !== '')
               yield { text: delta.text }
@@ -149,6 +187,13 @@ export function anthropic({ apiKey, baseUrl = ANTHROPIC_URL, model, body: fields
           }
           case 'content_block_stop': {
             const call = typeof event.index === 'number' ? calls.get(event.index) : undefined
+            const thought = typeof event.index === 'number' ? thoughts.get(event.index) : undefined
+
+            if (thought) {
+              thoughts.delete(event.index as number)
+
+              yield { thinking: thought satisfies Thinking }
+            }
 
             if (call) {
               calls.delete(event.index as number)

@@ -17,6 +17,8 @@ export interface Asked {
 
 // A step of the model that calls tools, after the text it says first: a string `input` is sent as the arguments as they are, to see what a model garbling its JSON does.
 export interface Calls {
+  // What the model thinks before it answers, streamed as reasoning pieces ahead of the text and kept out of it.
+  reasoning?: string | string[] | undefined
   text?: string | string[] | undefined
   // The object answering an ask with a `schema`, sent as its JSON text in pieces; any value, so a test can script one the schema refuses.
   data?: unknown
@@ -173,7 +175,16 @@ function createFake(): Fake {
       const pace = process.env.NODE_ENV === 'development' ? DEV_PACE_MS : 0
       const input = request.messages.reduce((sum, message) => sum + tokens(message.content) + (message.results ?? []).reduce((all, result) => all + tokens(result.content), 0), 0) + tokens(request.system ?? '')
 
+      const thoughts = typeof chosen === 'object' && !Array.isArray(chosen) ? chosen.reasoning ?? [] : []
+
       yield { usage: { inputTokens: input, ...cache?.read === undefined ? {} : { cacheReadTokens: cache.read }, ...cache?.written === undefined ? {} : { cacheWriteTokens: cache.written } } }
+
+      for (const reasoning of typeof thoughts === 'string' ? pieces(thoughts) : thoughts) {
+        await pause(pace, signal)
+        signal.throwIfAborted()
+
+        yield { reasoning }
+      }
 
       for (const text of parts) {
         await pause(pace, signal)

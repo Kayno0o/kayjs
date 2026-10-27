@@ -249,4 +249,29 @@ describe('Anthropic tool use', () => {
     expect(outcome.usage).toEqual({ inputTokens: 34, outputTokens: 35 })
     expect(server.seen[1]!.body.messages).toMatchObject([{ role: 'user' }, { role: 'assistant', content: [{ type: 'tool_use', id: 'toolu_1' }] }, { role: 'user', content: [{ type: 'tool_result', tool_use_id: 'toolu_1' }] }])
   })
+
+  it('sends the thinking of a step back, signed, with its tool_use in the next request', async () => {
+    const server = serve((_request, seen) => {
+      const first = (seen.body.messages as { role: string }[]).length === 1
+
+      return stream(first
+        ? anthropicToolEvents([
+          ['content_block_start', { type: 'content_block_start', index: 0, content_block: { type: 'thinking', thinking: '', signature: '' } }],
+          ['content_block_delta', { type: 'content_block_delta', index: 0, delta: { type: 'thinking_delta', thinking: 'Need a note' } }],
+          ['content_block_delta', { type: 'content_block_delta', index: 0, delta: { type: 'signature_delta', signature: 'sig' } }],
+          ['content_block_stop', { type: 'content_block_stop', index: 0 }],
+          ['content_block_start', { type: 'content_block_start', index: 1, content_block: { type: 'tool_use', id: 'toolu_1', name: 'add_note', input: {} } }],
+          ['content_block_delta', { type: 'content_block_delta', index: 1, delta: { type: 'input_json_delta', partial_json: '{"title":"Milk"}' } }],
+          ['content_block_stop', { type: 'content_block_stop', index: 1 }],
+        ])
+        : anthropicEvents('Added')).response
+    })
+
+    testing.provider = anthropic({ apiKey: 'k', baseUrl: server.url, model: 'm' })
+
+    const outcome = await site.call(converse, { prompt: 'Add milk' })
+
+    expect(outcome.text).toBe('Added')
+    expect((server.seen[1]!.body.messages as { content: unknown }[])[1]!.content).toMatchObject([{ type: 'thinking', thinking: 'Need a note', signature: 'sig' }, { type: 'tool_use', id: 'toolu_1' }])
+  })
 })
