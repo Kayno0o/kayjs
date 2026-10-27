@@ -7,6 +7,12 @@ export const POSTED_CHARACTERS = 40_000
 // What a file counts toward that cap, as `ask` prices an image.
 const FILE_CHARACTERS = 4000
 
+// The bytes of files an ask takes together, as `readAttachments` bounds them: a send never posts more.
+const POSTED_FILE_BYTES = 24 * 1024 * 1024
+
+// The bytes of files of earlier messages a send posts again, so a long conversation of screenshots does not upload them all at every send; the last message's files are always posted.
+export const HISTORY_FILE_BYTES = 8 * 1024 * 1024
+
 const cost = ({ content, attachments }: Pick<Message, 'attachments' | 'content'>) => content.length + (attachments?.length ?? 0) * FILE_CHARACTERS
 
 // The files a turn was sent with: those the visitor attached in this page, which a restored turn no longer has.
@@ -14,14 +20,37 @@ export function filesOf(turn: Pick<Message, 'attachments'>): File[] {
   return (turn.attachments ?? []).filter(attachment => attachment instanceof File)
 }
 
-// What a send posts: the latest `keep` messages that have text or files, from the first user message on, since a provider refuses a history opening on the assistant. The last message is the visitor's, so one is always posted.
-export function posted(turns: readonly Message[], keep: number, maxChars = POSTED_CHARACTERS): ChatMessage[] {
-  const said = turns.flatMap(({ role, content, attachments }) => {
+const bytesOf = (files: readonly File[]) => files.reduce((sum, file) => sum + file.size, 0)
+
+function said(turns: readonly Message[]): ChatMessage[] {
+  return turns.flatMap(({ role, content, attachments }) => {
     const sent = filesOf({ attachments })
 
     return content === '' && sent.length === 0 ? [] : [{ role, content, ...sent.length > 0 && { attachments: sent } }]
   })
-  let latest = said.slice(-Math.max(1, keep))
+}
+
+// The files of the messages before the last, newest first, while they fit `budget` bytes: a message whose files do not fit loses them all, and one left with no text goes too. The last message keeps its files whatever they weigh.
+function withinBudget(turns: ChatMessage[], budget: number): ChatMessage[] {
+  const last = turns.at(-1)
+  let room = Math.max(0, Math.min(budget, POSTED_FILE_BYTES - bytesOf(last?.attachments ?? [])))
+  const kept = turns.slice(0, -1).reduceRight<ChatMessage[]>((result, { attachments, ...turn }) => {
+    const bytes = bytesOf(attachments ?? [])
+
+    if (attachments === undefined || bytes > room)
+      return turn.content === '' ? result : [turn, ...result]
+
+    room -= bytes
+
+    return [{ ...turn, attachments }, ...result]
+  }, [])
+
+  return last === undefined ? kept : [...kept, last]
+}
+
+// What a send posts: the latest `keep` messages that have text or files, from the first user message on, since a provider refuses a history opening on the assistant. The last message is the visitor's, so one is always posted. The files of the messages before it are posted again only up to `fileBytes` together, the newest first.
+export function posted(turns: readonly Message[], keep: number, maxChars = POSTED_CHARACTERS, fileBytes = HISTORY_FILE_BYTES): ChatMessage[] {
+  let latest = withinBudget(said(turns).slice(-Math.max(1, keep)), fileBytes)
   let size = latest.reduce((sum, turn) => sum + cost(turn), 0)
 
   // Long answers must not push the history past what `ask` takes (`maxInputChars`): the oldest turns go first, the last message stays.

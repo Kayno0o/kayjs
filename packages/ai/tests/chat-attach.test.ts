@@ -43,3 +43,37 @@ it('keeps only the files this page holds, not what a stored turn or a hostile li
   expect(filesOf({ attachments: [photo('a.png'), new Blob(['x']), PNG] })).toHaveLength(1)
   expect(filesOf({})).toEqual([])
 })
+
+const weighing = (name: string, bytes: number) => new File([new Uint8Array(bytes)], name, { type: 'image/png' })
+const names = (turns: ReturnType<typeof posted>) => turns.map(turn => turn.attachments?.map(file => file.name) ?? turn.content)
+
+it('posts the files of earlier messages again only up to a byte budget, the newest first, and always those of the last message', () => {
+  const turns = [
+    { role: 'user' as const, content: 'one', attachments: [weighing('old.png', 3000)] },
+    { role: 'assistant' as const, content: 'a' },
+    { role: 'user' as const, content: 'two', attachments: [weighing('mid.png', 3000)] },
+    { role: 'assistant' as const, content: 'b' },
+    { role: 'user' as const, content: 'three', attachments: [weighing('new.png', 9000)] },
+  ]
+
+  expect(names(posted(turns, 20, 40_000, 20_000))).toEqual([['old.png'], 'a', ['mid.png'], 'b', ['new.png']])
+  expect(names(posted(turns, 20, 40_000, 4000))).toEqual(['one', 'a', ['mid.png'], 'b', ['new.png']])
+  expect(names(posted(turns, 20, 40_000, 0))).toEqual(['one', 'a', 'two', 'b', ['new.png']])
+})
+
+it('leaves out an earlier message of files alone once its files are over the budget, and the default budget is 8 MB', () => {
+  const turns = [
+    { role: 'user' as const, content: '', attachments: [weighing('big.png', 6 * 1024 * 1024)] },
+    { role: 'assistant' as const, content: 'seen' },
+    { role: 'user' as const, content: '', attachments: [weighing('bigger.png', 5 * 1024 * 1024), weighing('more.png', 5 * 1024 * 1024)] },
+    { role: 'assistant' as const, content: 'seen too' },
+    { role: 'user' as const, content: 'and?' },
+  ]
+
+  // The newer 10 MB message is over the 8 MB budget and goes whole, taking its empty text with it; the 6 MB one fits.
+  expect(names(posted(turns, 20))).toEqual([['big.png'], 'seen', 'seen too', 'and?'])
+})
+
+it('posts a message of files alone with an empty content, the files being the message', () => {
+  expect(posted([{ role: 'user', content: '', attachments: [photo('a.png')] }], 20)).toEqual([{ role: 'user', content: '', attachments: [expect.any(File)] }])
+})

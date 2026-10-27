@@ -3,10 +3,10 @@ import type { Action, ActionStream, Failure, SanitizeOptions, Snippet } from 'ka
 import type { ChatMessage, CodeBlock, Message, Progress, Source, ToolCall } from './types'
 import { ActionError, effect, onCleanup, onMount, recipe, sanitizeHtml, signal, trustHtml, untrack } from 'kay'
 import BareIconButton from '@kaynooo/kayjs-ui/bare-icon-button.kay'
-import FileDrop from '@kaynooo/kayjs-ui/file-drop.kay'
 import Icon from '@kaynooo/kayjs-ui/icon.kay'
 import Notice from '@kaynooo/kayjs-ui/notice.kay'
 import Textarea from '@kaynooo/kayjs-ui/textarea.kay'
+import { acceptsFile } from '@kaynooo/kayjs-ui/lib/accept'
 import { isHeldMarkdown, markdownHtml } from 'kay/markdown'
 import { wording } from 'kay/words'
 import { approvalMessage, ticketsIn, withoutApproval } from './approval-marker'
@@ -300,7 +300,9 @@ function attachFiles(chosen: File[]) {
     attachProblem = attachFullLabel
 }
 
-const acceptable = (file: File) => accept.split(',').some(type => type.trim() === file.type)
+const acceptable = (file: File) => acceptsFile(accept, file)
+// The picker the attach button opens, a plain input: a FileDrop component here would ship in every chat's island, attach or not.
+let picker: HTMLInputElement | undefined
 
 // Files pasted into the field (a screenshot) or dropped on the form: only the kinds `accept` names are taken, the rest of the clipboard stays text.
 function pasted(event: ClipboardEvent) {
@@ -313,19 +315,29 @@ function pasted(event: ClipboardEvent) {
   attachFiles(given)
 }
 
-// A drop on the attach button is the FileDrop's, which handled it and cancelled the event, so the form leaves it.
+// The files of the picker or of a drop on the form: the kinds `accept` names are taken, and any other says so.
+function take(given: File[]) {
+  attachFiles(given.filter(acceptable))
+
+  if (given.some(file => !acceptable(file)))
+    attachProblem = attachRefusedLabel
+}
+
+function picked(event: Event) {
+  const input = event.currentTarget as HTMLInputElement
+  const given = [...input.files ?? []]
+
+  // Cleared, so choosing the same file again still counts.
+  input.value = ''
+  take(given)
+}
+
 function dropped(event: DragEvent) {
   if (!attach || event.defaultPrevented || busy() || !event.dataTransfer?.types.includes('Files'))
     return
 
   event.preventDefault()
-
-  const given = [...event.dataTransfer.files]
-
-  attachFiles(given.filter(acceptable))
-
-  if (given.some(file => !acceptable(file)))
-    attachProblem = attachRefusedLabel
+  take([...event.dataTransfer.files])
 }
 
 function unattach(file: File) {
@@ -969,11 +981,10 @@ section(part="root" onKeyDown={escape} data-empty={history().length === 0 && !bu
         slot newIcon
           Icon(icon="plus")
     if attach
-      FileDrop(class={{ root: 'contents' }} accept={accept} multiple disabled={busy()} onFiles={attachFiles} onReject={() => { attachProblem = attachRefusedLabel }})
-        @content(zone)
-          BareIconButton(part="attach" variant="inline" label={attachLabel} onClick={zone.open})
-            slot attachIcon
-              Icon(icon="plus")
+      input(type="file" hidden tabindex="-1" aria-hidden="true" accept={accept} multiple disabled={busy()} ref={element => { picker = element }} onChange={picked})
+      BareIconButton(part="attach" variant="inline" label={attachLabel} onClick={() => picker?.click()})
+        slot attachIcon
+          Icon(icon="plus")
     Textarea(part="field" writeFocused ref={element => { field = element }} value={draft()} onInput={draft.set} rows="1" onPaste={pasted} aria-label={label} placeholder={placeholder} onKeyDown={keyDown})
     if busy()
       BareIconButton(part="send" variant="inline" label={stopLabel} onClick={stop})

@@ -38,6 +38,23 @@ it('attaches a file in the chat, shows it as a chip, posts it with the message a
   expect(page.errors).toEqual([])
 }, 120_000)
 
+it('ships no file drop component to a chat without attach', async () => {
+  await using page = await site.open('/quiet')
+
+  await page.waitFor('.kai-chat-form textarea')
+
+  const shipped = await page.evaluate(async () => {
+    const scripts = performance.getEntriesByType('resource').filter(entry => entry.name.endsWith('.js')).map(entry => entry.name)
+    const texts = await Promise.all(scripts.map(async url => (await fetch(url)).text()))
+
+    return { count: scripts.length, dropped: texts.some(text => text.includes('kui-file-drop')) }
+  })
+
+  expect(shipped.count).toBeGreaterThan(0)
+  expect(shipped.dropped).toBe(false)
+  expect(await page.count('input[type=file]')).toBe(0)
+}, 120_000)
+
 it('leaves out a file of a type the chat does not accept and says so', async () => {
   const dir = await scratchDir('ai-attach-')
   const note = join(dir, 'note.txt')

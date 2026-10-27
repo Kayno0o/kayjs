@@ -303,7 +303,7 @@ Anthropic takes both kinds. An OpenAI-compatible server takes images, and PDFs t
 
 Files count toward `maxInputChars` and the token budget as a price in characters: 4,000 for an image, and 4,000 for each 250 KB of a PDF. Raise `maxInputChars` when your app reads scans.
 
-To let visitors attach files in a chat, add `attach` to `Chat` and have the action's schema take `attachments` on a message. The chat adds an attach button, takes dropped and pasted files, and checks the type and size before it sends anything. In a test, the fake records the files in `asked`.
+To let visitors attach files in a chat, add `attach` to `Chat` and have the action's schema take `attachments` on a message. The chat adds an attach button, takes dropped and pasted files, and checks the type and size before it sends anything. Each send posts the files of earlier messages again, up to 8 MB, the newest first. In a test, the fake records the files in `asked`.
 
 <ReadMore href="/llms/kayjs-ai-attachments">What is accepted, what each provider gets, and how the limits count.</ReadMore>
 
