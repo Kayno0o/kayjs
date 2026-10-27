@@ -134,7 +134,7 @@ kay fmt --check
   - `--dry-run` lists the packages it would move and writes, installs and rewrites nothing.
   - A last `kay check --fix` also moves a root Dockerfile's `oven/bun:<version>` to the Bun the new kay needs (`old-bun-image`). An app already on the latest is left as it is, a registry older than the app's range never moves it back, and a failed install puts `package.json` back as it was. A deprecated form is one `deprecated` lint with its `since` minor and a safe fix; a minor's breaking changes carry one when `kay check` can see the old form, see [Checks](checks.md).
 - `kay explain [lint|error|group] [--format text|json]`:
-  - List the lints with their groups and default levels and the errors with theirs, or a group's, or print one: a lint with an example it reports and the same written right, an error with where its fix is written.
+  - List the lints with their groups and default levels and the errors with theirs, or a group's, or print one: a lint with an example it reports and the same written right, an error with where its fix is written; a name that is none names the `kay docs` section documenting it.
 - `kay fmt [paths...] [--check | --dry-run] [--format text|json] [--quiet]`:
   - Format `.kay` files; `--check` lists unformatted files and fails, `--dry-run` lists them and succeeds (not both).
 - `kay fmt --from-html [file] [--format text|json]`:

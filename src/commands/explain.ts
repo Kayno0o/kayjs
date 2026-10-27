@@ -1,8 +1,10 @@
 import type { ErrorCode, ErrorGroup } from '../compiler/errors'
 import type { Lint, LintGroup } from '../compiler/lints'
 import type { Command } from './command'
+import process from 'node:process'
 import { ERROR_GROUPS, errorList, ERRORS, explainError, isErrorCode, isErrorGroup } from '../compiler/errors'
 import { explainLint, isLint, isLintGroup, LINT_GROUPS, lintList, LINTS } from '../compiler/lints'
+import { docFiles, searchDocs } from '../docs-search'
 import { formatOption, printDocument, printFailure } from './command'
 import { USAGES } from './usages'
 
@@ -38,7 +40,7 @@ export const explain: Command = {
     }
 
     if (!isLint(name)) {
-      printFailure('explain', `\`${name}\` is no lint, error or group; \`kay explain\` lists them`, format)
+      printFailure('explain', `\`${name}\` is no lint, error or group; \`kay explain\` lists them${docsHint(name)}`, format)
 
       return 1
     }
@@ -71,4 +73,11 @@ function errorDocument(group: ErrorGroup | undefined) {
     errorGroups: group === undefined ? ERROR_GROUPS : { [group]: ERROR_GROUPS[group] },
     errors: errors.map(([name, error]) => ({ name, group: error.group, summary: error.summary, fix: error.fix })),
   }
+}
+
+// Where `kay docs` documents a name that is no lint, as a component or a function taken for one.
+function docsHint(name: string): string {
+  const [best] = searchDocs(docFiles(process.cwd()), name)
+
+  return best?.named !== true ? '' : `, and \`kay docs ${name}\` prints ${best.section.label}`
 }

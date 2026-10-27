@@ -126,10 +126,11 @@ describe('kay explain', () => {
     expect(explainLint('missing-site')).toEndWith('or with its group\'s, `lints: { seo: \'deny\' }`.')
   })
 
-  it('prints them from the command line, refusing a name that is no lint or group', async () => {
+  it('prints them from the command line, refusing a name that is no lint or group and pointing at the docs that name it', async () => {
     expect(await explain('missing-alt')).toEqual({ code: 0, stdout: `${explainLint('missing-alt')}\n`, stderr: '' })
     expect(await explain('seo')).toEqual({ code: 0, stdout: `${lintList('seo')}\n`, stderr: '' })
-    expect(await explain('missing-alts')).toEqual({ code: 1, stdout: '', stderr: 'kay explain: `missing-alts` is no lint, error or group; `kay explain` lists them\n' })
+    expect(await explain('zzqqxx')).toEqual({ code: 1, stdout: '', stderr: 'kay explain: `zzqqxx` is no lint, error or group; `kay explain` lists them\n' })
+    expect(await explain('FormDialog')).toEqual({ code: 1, stdout: '', stderr: 'kay explain: `FormDialog` is no lint, error or group; `kay explain` lists them, and `kay docs FormDialog` prints kayjs-ui/forms-and-steps.md#forms-and-steps\n' })
   })
 })
 

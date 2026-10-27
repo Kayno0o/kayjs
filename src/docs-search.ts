@@ -62,6 +62,8 @@ export interface DocMatch {
   score: number
   // The words searched, stop words left out.
   terms: string[]
+  // Every word is in its heading or a name it documents.
+  named: boolean
 }
 
 interface Indexed {
@@ -231,6 +233,7 @@ export function searchDocs(files: DocFile[], query: string): DocMatch[] {
   for (const one of index) {
     let score = 0
     let matched = 0
+    let named = 0
 
     for (const term of wanted) {
       const weight = idf.get(term)!
@@ -240,11 +243,14 @@ export function searchDocs(files: DocFile[], query: string): DocMatch[] {
       if (found > 0)
         matched++
 
+      if (one.names.has(term) || one.heading.has(term))
+        named++
+
       score += weight * found
     }
 
     if (score > 0)
-      matches.push({ section: one.section, score: score * (matched / wanted.length) ** 2, terms: wanted })
+      matches.push({ section: one.section, score: score * (matched / wanted.length) ** 2, terms: wanted, named: named === wanted.length })
   }
 
   return matches.sort((a, b) => b.score - a.score || a.section.own.length - b.section.own.length)

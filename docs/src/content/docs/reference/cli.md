@@ -660,7 +660,7 @@ kay docs kayjs-ui/forms-and-steps.md  # a file's headings
 kay docs kay/actions.md#forms         # one section, whole
 ```
 
-`kay docs` searches the docs written for agents: kay's `llms/` folder and the one each installed kayjs library ships, at the versions the app installed. It prints the section that matches best, with its file and line, then the labels of the next matches. A label prints that section whole. A component, function, lint or error code works as the search: a lint or an error code prints what `kay explain` says of it.
+`kay docs` searches the docs written for agents: kay's `llms/` folder and the one each installed kayjs library ships, at the versions the app installed. It prints the section that matches best, with its file and line, then the labels of the next matches. A label prints that section whole. A component, function, lint or error code works as the search: a lint or an error code prints what `kay explain` says of it, and `kay explain` of a component or function names the section `kay docs` would print.
 
 A long section prints only the parts that match, and says how many it left out. Release notes are never searched, though a label prints them.
 
