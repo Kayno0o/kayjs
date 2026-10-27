@@ -31,6 +31,21 @@ describe('BarList', () => {
   })
 })
 
+describe('BarList with links', () => {
+  test('a row with an href is a link its onSelect never hears, beside a button row that is heard', async () => {
+    const root = await data()
+    const link = root.querySelector<HTMLAnchorElement>('#linked a[data-part="label"]')!
+    const buttons = root.querySelectorAll<HTMLButtonElement>('#linked button[data-part="row"]')
+
+    expect([link.textContent, link.getAttribute('href'), buttons.length]).toEqual(['Mars', '/planets/mars', 1])
+    expect(root.querySelector('#linked a')!.closest('button')).toBeNull()
+
+    click(buttons[0]!)
+
+    expect(selected).toEqual(['earth'])
+  })
+})
+
 describe('SiteFavicon', () => {
   test('falls back to the globe once the image fails to load', async () => {
     const root = await data()

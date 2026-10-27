@@ -5,6 +5,8 @@ export interface BarListRow {
   value: number
   // What the row reads on its right, the value as it is when omitted.
   display?: string
+  // Makes the label a link to it, which a row's `onSelect` then leaves alone.
+  href?: string
 }
 
 // One dot of a `ScatterChart`.

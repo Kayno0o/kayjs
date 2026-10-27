@@ -28,6 +28,8 @@ main
     Meter(value={3} max={4} label="Quota")
   article#bars
     BarList(rows={[{ key: 'mars', label: 'Mars', value: 2 }, { key: 'earth', label: 'Earth', value: 1, display: 'one' }, { key: 'venus', label: 'Venus', value: 0 }]})
+  article#bar-links
+    BarList(rows={[{ key: 'mars', label: 'Mars', value: 2, href: '/planets/mars' }, { key: 'venus', label: 'Venus', value: 1 }]})
   article#no-bars-label
     BarList(rows={[]} emptyLabel="No visits")
   article#no-bars-default

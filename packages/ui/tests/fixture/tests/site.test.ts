@@ -608,6 +608,11 @@ describe('data', () => {
     expect((await find('/data', '#no-media p')).map(found => found.text)).toEqual(['No photos'])
   })
 
+  test('BarList makes the label of a row with an href a link, and leaves the others as text', async () => {
+    expect((await find('/data', '#bar-links a')).map(found => [found.text, attr(found, 'href'), attr(found, 'data-part')])).toEqual([['Mars', '/planets/mars', 'label']])
+    expect((await find('/data', '#bar-links span[data-part=label]')).map(found => found.text)).toEqual(['Venus'])
+  })
+
   test('SiteFavicon shows the site\'s icon, or the globe in a colour of the site\'s own', async () => {
     expect(await attributes('/data', '#favicon img', ['src', 'alt'])).toEqual([{ src: '/favicon.png', alt: '' }])
     expect((await one('/data', '#no-favicon svg')).attributes.style).toMatch(/^color: #[0-9A-F]{6}$/)

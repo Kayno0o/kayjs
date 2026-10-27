@@ -9,7 +9,7 @@ const look = recipe({
     root: 'kui-bar-list flex flex-col gap-2',
     // Label and value on one line, the bar spanning both under them, so a long label never squeezes the bar.
     row: 'grid w-full grid-cols-[minmax(0,1fr)_auto] items-baseline gap-x-3 gap-y-1 text-left text-sm data-interactive:cursor-pointer data-interactive:hover:text-accent',
-    label: 'truncate text-foreground',
+    label: 'truncate text-foreground [&:is(a)]:hover:text-accent [&:is(a)]:hover:underline',
     value: 'text-xs text-muted tabular-nums',
     track: 'col-span-2 block h-1.5 overflow-hidden bg-surface-strong',
     fill: 'block h-full bg-accent',
@@ -18,7 +18,7 @@ const look = recipe({
 
 const { rows, onSelect, emptyLabel, ...rest } = props<Omit<JSX.IntrinsicElements['ul'], 'class' | 'children' | 'onSelect'> & {
   rows: Row[]
-  // Makes every row a button handing back the row it was pressed on.
+  // Makes every row without an `href` a button handing back the row it was pressed on.
   onSelect?: ((row: Row) => unknown) | undefined
   // What the list reads with no rows.
   emptyLabel?: string | undefined
@@ -38,7 +38,7 @@ else
   ul(part="root" {...rest})
     for row of rows key={row.key}
       li(part="item")
-        if onSelect
+        if onSelect && !row.href
           button(part="row" type="button" data-interactive onClick={() => onSelect?.(row)})
             span(part="label") {row.label}
             span(part="value") {row.display ?? row.value}
@@ -46,7 +46,10 @@ else
               span(part="fill" style={`width: ${percent(row)}%`})
         else
           div(part="row")
-            span(part="label") {row.label}
+            if row.href
+              a(part="label" href={row.href}) {row.label}
+            else
+              span(part="label") {row.label}
             span(part="value") {row.display ?? row.value}
             span(part="track")
               span(part="fill" style={`width: ${percent(row)}%`})

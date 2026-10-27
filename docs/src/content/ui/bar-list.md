@@ -12,6 +12,12 @@ With `onSelect`, every row becomes a button handing back the row it was pressed 
 
 <Demo name="bar-list/select" />
 
+## Links
+
+A row with an `href` draws its label as a link, so middle-click and a new tab work. A row that has an `href` is not a button, even when the list takes `onSelect`, so the two mix in one list.
+
+<Demo name="bar-list/links" />
+
 ## Empty
 
 With no rows, the list reads `emptyLabel` instead.

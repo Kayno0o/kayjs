@@ -11,6 +11,7 @@ const { onSelect, src, copiedFor } = props<{ onSelect: (key: string) => void, sr
 
 const picture = signal('/ada.png')
 ---
+BarList#linked(rows={[{ key: 'mars', label: 'Mars', value: 2, href: '/planets/mars' }, { key: 'earth', label: 'Earth', value: 1 }]} onSelect={row => onSelect(row.key)})
 BarList#bars(rows={[{ key: 'mars', label: 'Mars', value: 2 }, { key: 'earth', label: 'Earth', value: 1 }]} onSelect={row => onSelect(row.key)})
 SiteFavicon#favicon(src={src} name="kaynooo.fr")
 CopyButton#copy(text="https://kaynooo.fr" html={'<b>kaynooo.fr</b>'} label="Copy link" copiedFor={copiedFor})
