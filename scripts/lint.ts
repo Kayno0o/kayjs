@@ -22,7 +22,7 @@ for (const [index, slice] of passes.entries()) {
   })
 
   // A pass the system killed, out of memory most often, has no exit code and printed nothing to tell it from a lint error.
-  if (child.signalCode !== null)
+  if (child.signalCode !== undefined)
     console.error(`lint: pass ${index + 1} of ${passes.length} (${slice?.join(' ') ?? 'the other files'}) was killed by ${child.signalCode}`)
 
   status = Math.max(status, child.exitCode ?? 1)
