@@ -53,6 +53,8 @@ export function usableSources(sources: unknown): Source[] {
 // A fence line, alone or inside a quote or a list item: the fence, then what follows it.
 const FENCE_LINE = /^[ \t>]*(?:(?:[-*+]|\d+[.)])[ \t]+)?[ \t]{0,3}(`{3}|~{3})(.*)$/
 const PARAGRAPH_BREAK = /\n[ \t]*\n/
+// The tags `markCode` sets around code, the only ones in its escaped text.
+const MARKED_CODE = /<\/?code>/g
 
 // The end of the run of `char` starting at `from`.
 function runEnd(text: string, from: number, char: string): number {
@@ -64,9 +66,38 @@ function runEnd(text: string, from: number, char: string): number {
   return end
 }
 
-// The lines outside fenced blocks, a block ending at a line of its own fence character at least as long, or at the end of the text.
-function outsideFences(markdown: string): string {
-  const kept: string[] = []
+const code = (text: string) => `<code>${attribute(text)}</code>`
+
+// The text as written, escaped, with its inline code spans in `<code>`: a run of backticks up to the next run of the same length, an unclosed run staying text, and an escaped backtick opening none.
+function markSpans(paragraph: string): string {
+  const seen = paragraph.replaceAll('\\`', '  ')
+  let result = ''
+  let at = 0
+
+  while (at < seen.length) {
+    const open = seen.indexOf('`', at)
+
+    if (open === -1)
+      break
+
+    const end = runEnd(seen, open, '`')
+    let close = -1
+
+    for (let next = seen.indexOf('`', end); next !== -1 && close === -1; next = seen.indexOf('`', runEnd(seen, next, '`'))) {
+      if (runEnd(seen, next, '`') - next === end - open)
+        close = runEnd(seen, next, '`')
+    }
+
+    result += close === -1 ? attribute(paragraph.slice(at, end)) : attribute(paragraph.slice(at, open)) + code(paragraph.slice(open, close))
+    at = close === -1 ? end : close
+  }
+
+  return result + attribute(paragraph.slice(at))
+}
+
+// The text as written, escaped, with its fenced blocks and code spans in `<code>`, so `linkSources` passes over them as over the formatted reply's code: a block runs from its fence line to a line of its own fence character at least as long, or to the end of the text, and a span ends with its paragraph.
+function markCode(markdown: string): string {
+  const blocks: { code: boolean, lines: string[] }[] = []
   let fence: string | undefined
 
   for (const line of markdown.split('\n')) {
@@ -75,55 +106,34 @@ function outsideFences(markdown: string): string {
     const extra = found === null ? 0 : runEnd(rest, 0, found[1]![0]!)
     const marker = found === null ? undefined : found[1]! + rest.slice(0, extra)
     const info = rest.slice(extra)
+    // A backtick fence takes no backtick in its info string.
+    const opens = fence === undefined && marker !== undefined && !(marker[0] === '`' && info.includes('`'))
+    const inCode = fence !== undefined || opens
+    const last = blocks.at(-1)
 
-    if (fence === undefined) {
-      // A backtick fence takes no backtick in its info string.
-      if (marker === undefined || (marker[0] === '`' && info.includes('`')))
-        kept.push(line)
-      else
-        fence = marker
-    }
-    else if (marker !== undefined && marker[0] === fence[0] && marker.length >= fence.length && info.trim() === '') {
+    if (last?.code === inCode)
+      last.lines.push(line)
+    else
+      blocks.push({ code: inCode, lines: [line] })
+
+    if (opens)
+      fence = marker
+    else if (fence !== undefined && marker !== undefined && marker[0] === fence[0] && marker.length >= fence.length && info.trim() === '')
       fence = undefined
-    }
   }
 
-  return kept.join('\n')
+  return blocks.map(block => block.code ? code(block.lines.join('\n')) : block.lines.join('\n').split(PARAGRAPH_BREAK).map(markSpans).join('\n\n')).join('\n')
 }
 
-// The text without its inline code spans: a run of backticks up to the next run of the same length, an unclosed run staying text.
-function outsideSpans(text: string): string {
-  let result = ''
-  let at = 0
+// The reply as `markdownHtml` writes it until its renderer arrives, its text as written, with each `[n]` outside code linked and the sources cited, as `linkSources` gives them for the formatted reply: fences and spans are set aside as formatting would, so the links and the list rarely change once it is formatted (a citation in link text or an indented block still counts).
+export function linkAsWritten(markdown: string, sources: readonly Source[]): { html: string, cited: Source[] } {
+  const linked = linkSources(markCode(markdown), sources)
 
-  while (at < text.length) {
-    const open = text.indexOf('`', at)
-
-    if (open === -1)
-      break
-
-    const end = runEnd(text, open, '`')
-    let close = -1
-
-    for (let next = text.indexOf('`', end); next !== -1 && close === -1; next = text.indexOf('`', runEnd(text, next, '`'))) {
-      if (runEnd(text, next, '`') - next === end - open)
-        close = runEnd(text, next, '`')
-    }
-
-    result += text.slice(at, close === -1 ? end : open)
-    at = close === -1 ? end : close
-  }
-
-  return result + text.slice(at)
+  return { html: `<p>${linked.html.replace(MARKED_CODE, '')}</p>\n`, cited: linked.cited }
 }
 
-// The sources a reply cites outside code, read from its markdown as written, for a turn whose renderer is still loading: it sets aside fences and spans as the formatted reply does, so the list rarely changes when the renderer arrives (a citation in link text or an indented block still counts).
-export function citedAsWritten(markdown: string, sources: readonly Source[]): Source[] {
-  // A span ends with its paragraph, and an escaped backtick opens none.
-  const text = outsideFences(markdown).split(PARAGRAPH_BREAK).map(paragraph => outsideSpans(paragraph.replaceAll('\\`', ''))).join('\n\n')
-
-  return linkSources(attribute(text), sources).cited
-}
+// The sources a reply cites outside code, read from its markdown as written, for a turn whose renderer is still loading.
+export const citedAsWritten = (markdown: string, sources: readonly Source[]) => linkAsWritten(markdown, sources).cited
 
 // The reply's HTML with each `[n]` outside code and links turned into a link to its source, and the sources cited, in the order they were first cited.
 export function linkSources(html: string, sources: readonly Source[]): { html: string, cited: Source[] } {

@@ -15,3 +15,8 @@ export function markdownHtml(markdown: string): SafeHtml {
 export function isHeldMarkdown(_html: string): boolean {
   return false
 }
+
+// The server formats Markdown at once; see the island's.
+export function markdownLoaded(): boolean {
+  return true
+}

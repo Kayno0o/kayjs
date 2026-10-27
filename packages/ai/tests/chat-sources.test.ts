@@ -1,6 +1,6 @@
 import { afterEach, expect, test } from 'bun:test'
 import { ai, ask, fakeAi } from '../src'
-import { citedAsWritten, linkSources, opensApart, sameSources, usableSources } from '../src/chat-sources'
+import { citedAsWritten, linkAsWritten, linkSources, opensApart, sameSources, usableSources } from '../src/chat-sources'
 
 afterEach(() => {
   ai()
@@ -34,6 +34,13 @@ test('the sources of a text still to be rendered leave out those cited only in a
   expect(numbers('\\`[1]\\` [2]')).toEqual([1, 2])
   expect(numbers('`a\n\nb [1]` [2]')).toEqual([1, 2])
   expect(numbers('```a`b\n[1]\n[2]')).toEqual([1, 2])
+})
+
+test('a reply as written links each [n] outside its code spans and fences, escaped as the stand-in of the Markdown renderer', () => {
+  expect(linkAsWritten('Tides [1][2], see `[1]` and [3x] & <b>[4]</b>', sources)).toEqual({ html: '<p>Tides <a href="https://example.com/a?x=1&amp;y=&quot;2&quot;">[1]</a><a href="/moon">[2]</a>, see `[1]` and [3x] &amp; &lt;b>[4]&lt;/b></p>\n', cited: sources })
+  expect(linkAsWritten('Only `[1]` and\n\n```\n[2]\n```', sources)).toEqual({ html: '<p>Only `[1]` and\n\n```\n[2]\n```</p>\n', cited: [] })
+  expect(linkAsWritten('`<code>[1]</code>` [2]', sources).html).toBe('<p>`&lt;code>[1]&lt;/code>` <a href="/moon">[2]</a></p>\n')
+  expect(linkAsWritten('[1]', []).html).toBe('<p>[1]</p>\n')
 })
 
 test('a reply with no sources is left as it is', () => {

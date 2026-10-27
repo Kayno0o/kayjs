@@ -7,12 +7,12 @@ import Icon from '@kaynooo/kayjs-ui/icon.kay'
 import Notice from '@kaynooo/kayjs-ui/notice.kay'
 import Textarea from '@kaynooo/kayjs-ui/textarea.kay'
 import { acceptsFile } from '@kaynooo/kayjs-ui/lib/accept'
-import { isHeldMarkdown, markdownHtml, markdownReady } from 'kay/markdown'
+import { isHeldMarkdown, markdownHtml, markdownLoaded, markdownReady } from 'kay/markdown'
 import { wording } from 'kay/words'
 import { approvalMessage, ticketsIn, withoutApproval } from './approval-marker'
 import { MARK, MARKED, withoutMarker } from './marker'
 import { REPLACES_HEADER, REPLY_HEADER } from './resume'
-import { attribute, citedAsWritten, linkSources, opensApart, REL_APART, sameSources, usableSources } from './chat-sources'
+import { attribute, citedAsWritten, linkAsWritten, linkSources, opensApart, REL_APART, sameSources, usableSources } from './chat-sources'
 import { filesOf, keepPending, newReplyId, pendingReply, posted, POSTED_CHARACTERS, restored, shrunk, stored } from './chat-history'
 import Calls from './chat-calls.kay'
 import Sources from './chat-sources.kay'
@@ -265,7 +265,8 @@ function render(text: string, blocks: CodeBlock[] | undefined, sources: readonly
   if (isHeldMarkdown(parsed))
     return { html: parsed, cited: citedAsWritten(plain, sources) }
 
-  const linked = linkSources(parsed, sources)
+  // Until the renderer arrives the reply shows as written, its code not set apart, so its citations are read from the text with its code set aside.
+  const linked = markdownLoaded() ? linkSources(parsed, sources) : linkAsWritten(plain, sources)
   let source = linked.html
 
   // Each block takes the first plain one of its markup left, in the order they were written, so two blocks of one code in two languages each get theirs.

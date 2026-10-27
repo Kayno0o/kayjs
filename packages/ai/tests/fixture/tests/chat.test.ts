@@ -253,6 +253,36 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the Chat i
     expect(page.errors).toEqual([])
   })
 
+  test('a reply drawn before the Markdown renderer arrives links and lists no citation in its code, as once formatted', async () => {
+    const page = await site.open('/sourced')
+    const renderer = Promise.withResolvers<void>()
+    // Each assistant turn's linked citations, then its listed sources.
+    const shown = async () => page.evaluate(() => [...document.querySelectorAll('.kai-chat-turn[data-role="assistant"]')].map(turn => [[...turn.querySelectorAll('.kai-chat-text a')].map(link => link.textContent).join(' '), [...turn.querySelectorAll('.kai-chat-source-link')].map(link => link.textContent).join(' ')]))
+
+    await page.route(url => url.pathname.includes('markdown-render'), async (request) => {
+      await renderer.promise
+      await request.continue()
+    })
+    fakeAi.reply('Only `[2]` and\n\n```\n[1]\n```')
+    await page.fill('textarea', 'In code?')
+    await page.press('Enter')
+    await page.waitFor('[data-pending]', { gone: true })
+    fakeAi.reply('Tides follow the moon [1][2], see `[1]` and [3x] and [4].')
+    await page.fill('textarea', 'Why tides?')
+    await page.press('Enter')
+    await page.waitFor('[data-pending]', { gone: true })
+
+    expect(await page.count('.kai-chat-text code')).toBe(0)
+    expect(await shown()).toEqual([['', ''], ['[1] [2]', 'Tides Moon']])
+
+    renderer.resolve()
+    await markdownDrawn(page)
+    await page.waitFor('.kai-chat-text code')
+
+    expect(await shown()).toEqual([['', ''], ['[1] [2]', 'Tides Moon']])
+    expect(page.errors).toEqual([])
+  })
+
   test('a write waits for Allow, which posts the ticket for that call and runs it, and Deny posts a refusal', async () => {
     done.length = 0
 

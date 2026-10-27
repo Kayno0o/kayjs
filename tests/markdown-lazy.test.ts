@@ -182,6 +182,23 @@ describe('markdownHtml in an island', () => {
     expect(isHeldMarkdown(markdownHtml('# Title'))).toBe(false)
   })
 
+  it('tells whether the renderer has arrived, an effect reading it running again once it has, without loading it', async () => {
+    const { markdownHtml, markdownLoaded } = await shell('loaded')
+    const seen: boolean[] = []
+
+    root(() => renderEffect(() => {
+      seen.push(markdownLoaded())
+    }))
+    flush()
+    await Bun.sleep(50)
+    expect(seen).toEqual([false])
+
+    markdownHtml('**a**')
+    await settled(() => seen.length === 2)
+    expect(seen).toEqual([false, true])
+    expect(String(markdownHtml('**a**'))).toBe('<p><strong>a</strong></p>\n')
+  })
+
   it('keeps the server\'s markup of every markdown of an island', async () => {
     const { markdownHtml } = await shell('two')
     const container = document.createElement('div')

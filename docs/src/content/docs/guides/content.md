@@ -430,6 +430,8 @@ While an island hydrates, the text as written stands in for markup the server dr
 
 A component that changes what `markdownHtml` returned before writing it, such as linking words in it, returns it as it is when `isHeldMarkdown(html)`, from `kay/markdown` too, is true; on the server it is always false.
 
+Until marked arrives, the text as written shows no code apart. A component linking words in the HTML reads them from the Markdown itself while `markdownLoaded()`, from `kay/markdown`, is false: read in a template or an effect, it runs again once marked has loaded, and it loads nothing. On the server it is always true.
+
 It is sync, so it can run again on every chunk of a stream. Headings come out plain, with no id or anchor.
 
 <ReadMore href="/llms/content-markdown-to-caching#rendering-markdown">The few cases where the island and the server differ, and how the island stays fast on hostile input, are in the full content reference.</ReadMore>

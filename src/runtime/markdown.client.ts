@@ -89,3 +89,8 @@ export async function markdownReady(): Promise<void> {
 export function isHeldMarkdown(html: string): boolean {
   return held.has(html)
 }
+
+// Whether the renderer has arrived, so `markdownHtml` formats rather than giving the text as written: a component that links words in what it returned reads them from the Markdown itself until then, with its code set aside, as the stand-in shows no code apart. A template or effect reading it runs again once it has, and it never loads the renderer.
+export function markdownLoaded(): boolean {
+  return loaded[0]() !== undefined
+}
