@@ -3,6 +3,7 @@ import type { Confirm, Piece, Provider, ProviderMessage, ProviderRequest, Thinki
 import { logFrom } from 'kay'
 import { spend, ticketAllows, ticketFor } from './approval'
 import { ticketsIn } from './approval-marker'
+import { mediaChars } from './attachments'
 import { MAX_ARGUMENTS, MAX_CALLS_PER_STEP, MAX_STREAMED_CALLS } from './tool-limits'
 
 const log = logFrom('kayjs-ai')
@@ -36,7 +37,7 @@ function charsSent(messages: ProviderMessage[], system: string | undefined): num
   let chars = system?.length ?? 0
 
   for (const message of messages) {
-    chars += message.content.length
+    chars += message.content.length + mediaChars(message)
 
     for (const call of message.calls ?? [])
       chars += call.name.length + call.arguments.length

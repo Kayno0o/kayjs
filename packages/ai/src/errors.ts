@@ -17,10 +17,12 @@ export type AiErrorKind
     | 'protocol'
   // The visitor or the chat is over a limit or budget set in `ai()`: `retryAfter` is the seconds until its window closes, `limit` which one.
     | 'limited'
-  // The messages are longer than the `maxInputChars` of `ask`: nothing was sent to the provider.
+  // The messages, with their attachments counted, are longer than the `maxInputChars` of `ask`, or an attachment is over `maxAttachmentBytes`: nothing was sent to the provider.
     | 'too-long'
   // The model's answer does not fit the `schema` of `ask`: it is no JSON object, was cut by `maxTokens` or refused, or breaks the schema. `fields` names the fields it refuses and `partial` holds the text.
     | 'schema'
+  // An attachment is none of the kinds a model is shown (a PNG, JPEG, GIF or WebP image, a PDF), or the provider does not take its kind: nothing was sent.
+    | 'unsupported'
 
 // Which limit refused an ask: `asks` is `limit`, `budget` the visitor's tokens, `total` the tokens of all visitors.
 export type AiLimit = 'asks' | 'budget' | 'total'
@@ -67,6 +69,10 @@ export class AiError extends Error {
     this.partial = partial
     this.limit = limit
     this.fields = fields
+
+    if (kind === 'unsupported') {
+      Object.defineProperty(this, REFUSED, { value: { status: 415, retryAfter: undefined, message: 'That file cannot be read here; send a PNG, JPEG, GIF or WebP image or a PDF' } })
+    }
 
     if (kind === 'too-long') {
       Object.defineProperty(this, REFUSED, { value: { status: 413, retryAfter: undefined, message: 'That conversation is too long; shorten it or start a new one' } })

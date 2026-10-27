@@ -40,6 +40,9 @@ export const converse = action(s.Object({ prompt: s.String({ maxLength: 200 }), 
   return { text: await reply, calls: await reply.calls, finish: await reply.finish, usage: await reply.usage }
 })
 
+// A posted file shown to a model that calls tools, as an app's scan reader would.
+export const looks = action(s.Object({ photo: s.File({ type: 'image/png' }) }), async ({ photo }) => await ask([{ role: 'user', content: 'look', attachments: [photo] }], { tools: [addNote], confirm: false, provider: testing.provider }), { maxSize: '1mb' })
+
 export const watch = action(s.Object({ prompt: s.String({ maxLength: 200 }) }), ({ prompt }) => ask(prompt, { tools: [addNote, slow], confirm: false, provider: testing.provider }).progress())
 
 // A tool loop an app reads itself, as it would to speak the reply aloud, which `outlive` lets go on once the visitor left.

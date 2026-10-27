@@ -14,9 +14,14 @@ export interface OpenAiOptions {
   model?: string | undefined
   // Fields added to the body of every request of this provider, such as `{ top_p: 0.9 }` or OpenRouter's `provider`; an ask's own `body` wins, and what kayjs-ai settles itself wins over both.
   body?: Record<string, unknown> | undefined
+  // How a PDF is sent: `file` is OpenAI's part (the default for OpenAI itself), `document_url` Mistral's (the default at `api.mistral.ai`), `false` takes none. Any other server takes images only unless this says how it takes PDFs, such as `file` for a proxy that forwards them.
+  pdf?: Documents | undefined
 }
 
+type Documents = 'file' | 'document_url' | false
+
 export const OPENAI_URL = 'https://api.openai.com/v1'
+const MISTRAL_HOST = 'api.mistral.ai'
 const TRAILING_SLASHES = /\/+$/
 
 // The parameters a server may refuse, which the request is sent again without: `stream_options` to count tokens, `prompt_cache_key` to raise cache hits, `reasoning_effort` to turn a model's thinking down.
@@ -93,10 +98,28 @@ function cacheKeyOf(request: ProviderRequest): string {
   return `kay-${hasher.digest('hex').slice(0, 32)}`
 }
 
+// The parts of a user message holding files: each as a data URL, a PDF as the `file` part OpenAI takes or the `document_url` Mistral does.
+function partsOf(message: ProviderMessage, documents: Documents): object[] {
+  return [
+    ...(message.attachments ?? []).map((media) => {
+      const url = `data:${media.type};base64,${Buffer.from(media.data).toString('base64')}`
+
+      if (media.kind === 'image')
+        return { type: 'image_url', image_url: { url } }
+
+      return documents === 'document_url' ? { type: 'document_url', document_url: url } : { type: 'file', file: { filename: media.name ?? 'document.pdf', file_data: url } }
+    }),
+    ...message.content === '' ? [] : [{ type: 'text', text: message.content }],
+  ]
+}
+
 // A turn as the API takes it: the calls an assistant made ride on its message, and each result is a message of its own.
-function turnsOf(message: ProviderMessage): object[] {
+function turnsOf(message: ProviderMessage, documents: Documents): object[] {
   if (message.results !== undefined)
     return message.results.map(({ id, content }) => ({ role: 'tool', tool_call_id: id, content }))
+
+  if (message.attachments !== undefined && message.attachments.length > 0)
+    return [{ role: message.role, content: partsOf(message, documents) }]
 
   if (message.calls === undefined)
     return [{ role: message.role, content: message.content }]
@@ -123,17 +146,27 @@ function shapeOf(request: ProviderRequest, mode: 'format' | 'tool' | undefined):
   return { tools: [...(request.tools ?? []).map(({ name, description, inputSchema }) => ({ type: 'function', function: { name, description, parameters: inputSchema } })), answer], tool_choice: 'required' }
 }
 
+// How the server at `root` takes a PDF: the two that do are known by their address.
+function documentsAt(root: string): Documents {
+  if (root === OPENAI_URL)
+    return 'file'
+
+  return URL.canParse(root) && new URL(root).hostname === MISTRAL_HOST ? 'document_url' : false
+}
+
 // An OpenAI chat completions server: OpenAI itself, Ollama, and the many that speak its API.
-export function openai({ baseUrl = OPENAI_URL, apiKey, model, body: fields }: OpenAiOptions = {}): Provider {
+export function openai({ baseUrl = OPENAI_URL, apiKey, model, body: fields, pdf }: OpenAiOptions = {}): Provider {
   const extra = extraBody(fields, 'openai({ body })')
   const root = baseUrl.replace(TRAILING_SLASHES, '')
   const official = root === OPENAI_URL
+  const documents: Documents = pdf ?? documentsAt(root)
 
   return {
     name: 'openai',
     model,
+    accepts: documents === false ? ['image'] : ['image', 'pdf'],
     async* stream(request, signal) {
-      const messages = [...request.system === undefined ? [] : [{ role: 'system', content: request.system }], ...request.messages.flatMap(turnsOf)]
+      const messages = [...request.system === undefined ? [] : [{ role: 'system', content: request.system }], ...request.messages.flatMap(message => turnsOf(message, documents))]
       const body = {
         ...extra,
         ...request.body,

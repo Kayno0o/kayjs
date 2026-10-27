@@ -34,7 +34,7 @@ export default defineConfig({
 
 ### The size of the input
 
-`ask(messages, { maxInputChars })` caps the characters of the messages together at 50,000 by default (the system prompt is not counted; `Infinity` lifts it). A conversation past it fails the reply with an `AiError` of kind `too-long`, before the provider is called and with nothing counted; an action letting it out answers 413 with `That conversation is too long; shorten it or start a new one`. A chat posts at most `keep` messages, but the action's schema still bounds `content` and `maxItems`.
+`ask(messages, { maxInputChars })` caps the characters of the messages together at 50,000 by default (the system prompt is not counted; `Infinity` lifts it). An image or a PDF counts as a price in characters ([Images and PDFs](attachments.md#limits)). A conversation past it fails the reply with an `AiError` of kind `too-long`, before the provider is called and with nothing counted; an action letting it out answers 413 with `That conversation is too long; shorten it or start a new one`. A chat posts at most `keep` messages, but the action's schema still bounds `content` and `maxItems`.
 
 ### When it counts
 

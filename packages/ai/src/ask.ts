@@ -1,8 +1,9 @@
 import type { TSchema } from 'kay/library'
 import type { Offered, Ran } from './loop'
-import type { AskOptions, FunctionTool, Message, Reply, ReplyOf, StructuredAskOptions, Timeouts, ToolAction } from './types'
+import type { AskOptions, FunctionTool, Message, Piece, Provider, ProviderMessage, ProviderRequest, Reply, ReplyOf, StructuredAskOptions, Timeouts, ToolAction } from './types'
 import { logFrom } from 'kay'
 import { actionTool, checkAnswer, configError, currentRequest, durationSeconds, jsonSchemaOf, refundRateLimit } from 'kay/library'
+import { attachmentsOf, checkAccepted, DEFAULT_MAX_ATTACHMENT_BYTES, estimatedChars, mediaChars, readAttachments } from './attachments'
 import { choose } from './config'
 import { recorded } from './dev-log'
 import { AiError } from './errors'
@@ -34,7 +35,12 @@ function messagesOf(prompt: string | Message[]): Message[] {
     if (typeof message !== 'object' || message === null || !ROLES.has(message.role) || typeof message.content !== 'string')
       throw configError('a message is { role: \'user\' | \'assistant\', content: string }; the system prompt goes in options.system')
 
-    return { role: message.role, content: message.content }
+    const attachments = attachmentsOf(message.attachments)
+
+    if (attachments.length > 0 && message.role !== 'user')
+      throw configError('only a user message holds attachments')
+
+    return { role: message.role, content: message.content, ...attachments.length > 0 && { attachments } }
   })
 }
 
@@ -56,6 +62,27 @@ function tooLong(chars: number, max: number): AsyncIterable<never> {
     [Symbol.asyncIterator]: () => ({
       next: async () => Promise.reject(new AiError('too-long', `the messages hold ${chars} characters, past the ${max} that maxInputChars allows`)),
     }),
+  }
+}
+
+type Via = (make: (request: ProviderRequest) => AsyncIterable<Piece>) => AsyncIterable<Piece>
+
+// Runs a stream over a request whose attachments are read once it is first read, so `ask` itself stays synchronous; they are read at most once however many steps a tool loop takes.
+function reading(request: ProviderRequest, messages: readonly Message[], maxBytes: number, maxChars: number, provider: Provider): Via {
+  let ready: Promise<ProviderMessage[]> | undefined
+
+  return async function* (make) {
+    ready ??= readAttachments(messages, maxBytes)
+
+    const read = await ready
+    const chars = read.reduce((sum, message) => sum + message.content.length + mediaChars(message), 0)
+
+    if (chars > maxChars)
+      throw new AiError('too-long', `the messages hold ${chars} characters, past the ${maxChars} that maxInputChars allows`)
+
+    checkAccepted(read, provider.accepts, provider.name)
+
+    yield* make({ ...request, messages: read })
   }
 }
 
@@ -255,12 +282,20 @@ function reply(prompt: string | Message[], options: AskOptions, answer: TSchema 
   const maxTokens = options.maxTokens ?? DEFAULT_MAX_TOKENS
   const described = answer === undefined ? undefined : answerSchema(answer)
   const schema = described?.plain
-  const request = { messages, system: options.system, model, maxTokens, temperature: options.temperature, reasoning: options.reasoning, cache: options.cache, body: extraBody(options.body, 'ask({ body })'), timeouts: timeoutsOf(options.timeout), schema }
-  const messageChars = messages.reduce((sum, message) => sum + message.content.length, 0)
+  const attached = messages.some(message => message.attachments !== undefined)
+  // Without attachments the messages are a provider's as they are; with them the request is completed once they are read.
+  const request: ProviderRequest = { messages: attached ? [] : messages as ProviderMessage[], system: options.system, model, maxTokens, temperature: options.temperature, reasoning: options.reasoning, cache: options.cache, body: extraBody(options.body, 'ask({ body })'), timeouts: timeoutsOf(options.timeout), schema }
+  const messageChars = messages.reduce((sum, message) => sum + message.content.length + estimatedChars(message), 0)
   const maxInputChars = options.maxInputChars ?? DEFAULT_MAX_INPUT_CHARS
+  const maxAttachmentBytes = options.maxAttachmentBytes ?? DEFAULT_MAX_ATTACHMENT_BYTES
 
   if (typeof maxInputChars !== 'number' || !(maxInputChars >= 1))
     throw configError('maxInputChars is a number of characters of 1 or more')
+
+  if (typeof maxAttachmentBytes !== 'number' || !(maxAttachmentBytes >= 1))
+    throw configError('maxAttachmentBytes is a number of bytes of 1 or more')
+
+  const via: Via = attached ? reading(request, messages, maxAttachmentBytes, maxInputChars, provider) : make => make(request)
 
   const asker = { request: answering, visitor: options.key, chars: messageChars + (options.system?.length ?? 0) + (described?.chars ?? 0), maxTokens }
   const outlive = options.outlive === true
@@ -274,7 +309,7 @@ function reply(prompt: string | Message[], options: AskOptions, answer: TSchema 
     return createReply(() => tooLong(messageChars, maxInputChars), signals, undefined, outlive, ended)
 
   if (options.tools === undefined || options.tools.length === 0)
-    return createReply(signal => recorded(guarded(() => provider.stream(request, signal), asker, signal), about, signal), signals, undefined, outlive, ended)
+    return createReply(signal => recorded(guarded(() => via(read => provider.stream(read, signal)), asker, signal), about, signal), signals, undefined, outlive, ended)
 
   const maxSteps = options.maxSteps ?? DEFAULT_MAX_STEPS
 
@@ -287,5 +322,5 @@ function reply(prompt: string | Message[], options: AskOptions, answer: TSchema 
     throw configError('an action runs as the visitor, so ask() with one needs the request being answered; call it from a page, an action or a handler kay is answering, or offer tool({ ... }) functions, which run with no visitor')
 
   // Every step may use `maxTokens`, which is what the budget holds for the reply while it runs.
-  return createReply(signal => recorded(guarded(() => converse(provider, request, offered, maxSteps, answering, signal, options.confirm), { ...asker, maxTokens: maxTokens * maxSteps }, signal), about, signal), signals, undefined, outlive, ended)
+  return createReply(signal => recorded(guarded(() => via(read => converse(provider, read, offered, maxSteps, answering, signal, options.confirm)), { ...asker, maxTokens: maxTokens * maxSteps }, signal), about, signal), signals, undefined, outlive, ended)
 }

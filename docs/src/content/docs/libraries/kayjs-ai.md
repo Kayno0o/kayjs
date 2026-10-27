@@ -252,6 +252,33 @@ An action returning the reply streams those snapshots to an island, whose `last(
 
 In a test, `fakeAi.reply({ data: { title: 'Alien', score: 5, tags: [] } })` answers an object. With nothing scripted, the fake builds one that fits your schema, so `kay dev` needs no key.
 
+## Show the model an image or a PDF
+
+A user message can hold `attachments` beside its text. An attachment is a `File` or `Blob` (an `s.File()` field gives you one), bytes, or a file kay stored, as `{ file: key }`.
+
+```kay
+--- server
+import { ask } from '@kaynooo/kayjs-ai'
+import { s } from 'kay'
+
+const bill = s.Object({ supplier: s.String(), total: s.Number() })
+
+export const read = action(s.Object({ scan: s.File({ type: 'application/pdf' }) }), async ({ scan }) => {
+  return await ask([{ role: 'user', content: 'Read this bill', attachments: [scan] }], { schema: bill })
+}, { maxSize: '6mb' })
+---
+```
+
+kay reads what each file is from its bytes, never from its name. PNG, JPEG, GIF and WebP images work, and so do PDFs. Anything else fails with an `AiError` of kind `unsupported` before the provider is called, and an action that lets it out answers 415. A file over `maxAttachmentBytes` (10 MB by default) fails with `too-long`.
+
+Anthropic takes both kinds. An OpenAI-compatible server takes images, and PDFs too at OpenAI and Mistral. Any other server fails a PDF with `unsupported`. If your proxy does take PDFs, `openai({ pdf: 'file' })` says how.
+
+Files count toward `maxInputChars` and the token budget as a price in characters: 4,000 for an image, and 4,000 for each 250 KB of a PDF. Raise `maxInputChars` when your app reads scans.
+
+To let visitors attach files in a chat, add `attach` to `Chat` and have the action's schema take `attachments` on a message. The chat adds an attach button, takes dropped and pasted files, and checks the type and size before it sends anything. In a test, the fake records the files in `asked`.
+
+<ReadMore href="/llms/kayjs-ai-attachments">What is accepted, what each provider gets, and how the limits count.</ReadMore>
+
 ## Prompt caching
 
 Providers bill a repeated prompt at a fraction of the price when they cached it. kayjs-ai asks for that on every `ask`, so a chat does not pay full price for its system prompt, tools and earlier messages on each turn and each tool step. You set nothing. A prompt shorter than the provider's minimum is simply not cached.
@@ -424,7 +451,7 @@ A run that stops half way leaves whole files. Run it again to translate what is 
 
 ## Errors
 
-A failure throws an `AiError` with a `kind`: `auth`, `rate-limited`, `unavailable`, `invalid`, `network`, `timeout`, `cut`, `protocol`, `limited`, `too-long` or `schema`. A rate limit has `retryAfter` in seconds. A reply cut halfway has `partial`, the text that came. A `schema` error has `fields` too. Nothing is retried for you.
+A failure throws an `AiError` with a `kind`: `auth`, `rate-limited`, `unavailable`, `invalid`, `network`, `timeout`, `cut`, `protocol`, `limited`, `too-long`, `schema` or `unsupported`. A rate limit has `retryAfter` in seconds. A reply cut halfway has `partial`, the text that came. A `schema` error has `fields` too. Nothing is retried for you.
 
 ## Test it
 

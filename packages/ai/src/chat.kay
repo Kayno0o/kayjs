@@ -1,8 +1,9 @@
 ---
 import type { Action, ActionStream, Failure, SanitizeOptions, Snippet } from 'kay'
-import type { CodeBlock, Message, Progress, ToolCall } from './types'
+import type { ChatMessage, CodeBlock, Message, Progress, ToolCall } from './types'
 import { ActionError, effect, onCleanup, onMount, recipe, sanitizeHtml, signal, trustHtml, untrack } from 'kay'
 import BareIconButton from '@kaynooo/kayjs-ui/bare-icon-button.kay'
+import FileDrop from '@kaynooo/kayjs-ui/file-drop.kay'
 import Icon from '@kaynooo/kayjs-ui/icon.kay'
 import Notice from '@kaynooo/kayjs-ui/notice.kay'
 import Textarea from '@kaynooo/kayjs-ui/textarea.kay'
@@ -11,13 +12,13 @@ import { wording } from 'kay/words'
 import { approvalMessage, withoutApproval } from './approval-marker'
 import { MARK, MARKED, withoutMarker } from './marker'
 import { REPLY_HEADER } from './resume'
-import { keepPending, newReplyId, pendingReply, posted, POSTED_CHARACTERS, restored, shrunk, stored } from './chat-history'
+import { filesOf, keepPending, newReplyId, pendingReply, posted, POSTED_CHARACTERS, restored, shrunk, stored } from './chat-history'
 import Calls from './chat-calls.kay'
 import './chat.css'
 
 // The chat's own classes are its parts, so an app restyles them from src/ui.ts or a `class` object. The table of a reply is built as a string and keeps its class.
 const look = recipe({
-  parts: { root: 'kai-chat', empty: 'kai-chat-empty', greeting: 'kai-chat-greeting', suggestions: 'kai-chat-suggestions', suggestion: 'kai-chat-suggestion', log: 'kai-chat-log', turn: 'kai-chat-turn', text: 'kai-chat-text', thinking: 'kai-chat-text kai-chat-thinking', reasoning: 'kai-chat-reasoning', reasoningText: 'kai-chat-reasoning-text', note: 'kai-chat-note', status: 'kai-chat-status', disclosure: 'kai-chat-disclosure', form: 'kai-chat-form', field: 'min-h-10 max-h-40 rounded-[1.25rem] px-3.5 leading-normal focus-visible:[outline:2px_solid_var(--kai-chat-accent,var(--color-accent))] focus-visible:outline-offset-2', send: 'kai-chat-send', new: 'kai-chat-new', retry: 'kui-btn', approval: 'kai-chat-approval', approvalText: 'kai-chat-approval-text', allow: 'kui-btn', deny: 'kui-btn' },
+  parts: { root: 'kai-chat', empty: 'kai-chat-empty', greeting: 'kai-chat-greeting', suggestions: 'kai-chat-suggestions', suggestion: 'kai-chat-suggestion', log: 'kai-chat-log', turn: 'kai-chat-turn', text: 'kai-chat-text', thinking: 'kai-chat-text kai-chat-thinking', reasoning: 'kai-chat-reasoning', reasoningText: 'kai-chat-reasoning-text', note: 'kai-chat-note', status: 'kai-chat-status', disclosure: 'kai-chat-disclosure', form: 'kai-chat-form', field: 'min-h-10 max-h-40 rounded-[1.25rem] px-3.5 leading-normal focus-visible:[outline:2px_solid_var(--kai-chat-accent,var(--color-accent))] focus-visible:outline-offset-2', send: 'kai-chat-send', new: 'kai-chat-new', retry: 'kui-btn', approval: 'kai-chat-approval', approvalText: 'kai-chat-approval-text', allow: 'kui-btn', deny: 'kui-btn', attach: 'kai-chat-attach', files: 'kai-chat-files', file: 'kai-chat-file', remove: 'kai-chat-file-remove' },
   variants: {
     // The form: `bubble` frames the visitor's messages, `plain` draws them as bare text.
     variant: { bubble: '', plain: '' },
@@ -42,6 +43,9 @@ const SANITIZED_LINK = /<a href="([^"]*)" rel="nofollow ugc">/g
 const LOCAL_HREF = /^(?:\/(?!\/)|#)/
 const ENTITIES: Record<string, string> = { '&': '&amp;', '"': '&quot;', '<': '&lt;' }
 
+// The images and documents a model reads.
+const ATTACHABLE = 'image/png,image/jpeg,image/gif,image/webp,application/pdf'
+
 const attribute = (text: string) => text.replace(ATTRIBUTE_UNSAFE, char => ENTITIES[char]!)
 
 interface Turn extends Message {
@@ -56,12 +60,12 @@ interface Turn extends Message {
   reasoning?: string | undefined
 }
 
-const { action, initial = [], label = wording('ai.chat.label', 'Chat'), placeholder = wording('ai.chat.placeholder', 'Write a message…'), sendLabel = wording('ai.chat.send', 'Send'), stopLabel = wording('ai.chat.stop', 'Stop'), retryLabel = wording('ai.chat.retry', 'Try again'), thinkingLabel = wording('ai.chat.thinking', 'Thinking…'), reasoning = true, reasoningLabel = wording('ai.chat.reasoning', 'Reasoning'), stoppedLabel = wording('ai.chat.stopped', 'Stopped'), errorMessage = wording('ai.chat.error', 'The reply failed.'), keep = 20, maxChars = POSTED_CHARACTERS, tableLabel = wording('ai.chat.table', 'Table'), toolDetails = true, greeting = wording('ai.chat.greeting', 'How can I help?'), disclosure = wording('ai.chat.disclosure', 'You are talking to an AI. Your messages are sent to its provider to answer.'), suggestions = [], toolLabels = {}, sendIcon, stopIcon, newButton = false, newLabel = wording('ai.chat.new', 'New conversation'), newIcon, remember, links = 'apart', runningLabel = wording('ai.chat.running', 'Running'), doneLabel = wording('ai.chat.done', 'Done'), failedLabel = wording('ai.chat.failed', 'Failed'), argumentsLabel = wording('ai.chat.arguments', 'Arguments'), resultLabel = wording('ai.chat.result', 'Result'), approvalLabel = wording('ai.chat.approval', 'Needs your approval'), allowLabel = wording('ai.chat.allow', 'Allow'), denyLabel = wording('ai.chat.deny', 'Deny'), allowedLabel = wording('ai.chat.allowed', 'Allowed:'), deniedLabel = wording('ai.chat.denied', 'Denied:'), variant = 'bubble', tone = 'accent', size = 'md' } = props<{
+const { action, initial = [], label = wording('ai.chat.label', 'Chat'), placeholder = wording('ai.chat.placeholder', 'Write a message…'), sendLabel = wording('ai.chat.send', 'Send'), stopLabel = wording('ai.chat.stop', 'Stop'), retryLabel = wording('ai.chat.retry', 'Try again'), thinkingLabel = wording('ai.chat.thinking', 'Thinking…'), reasoning = true, reasoningLabel = wording('ai.chat.reasoning', 'Reasoning'), stoppedLabel = wording('ai.chat.stopped', 'Stopped'), errorMessage = wording('ai.chat.error', 'The reply failed.'), keep = 20, maxChars = POSTED_CHARACTERS, tableLabel = wording('ai.chat.table', 'Table'), toolDetails = true, greeting = wording('ai.chat.greeting', 'How can I help?'), disclosure = wording('ai.chat.disclosure', 'You are talking to an AI. Your messages are sent to its provider to answer.'), suggestions = [], toolLabels = {}, sendIcon, stopIcon, newButton = false, newLabel = wording('ai.chat.new', 'New conversation'), newIcon, remember, links = 'apart', runningLabel = wording('ai.chat.running', 'Running'), doneLabel = wording('ai.chat.done', 'Done'), failedLabel = wording('ai.chat.failed', 'Failed'), argumentsLabel = wording('ai.chat.arguments', 'Arguments'), resultLabel = wording('ai.chat.result', 'Result'), approvalLabel = wording('ai.chat.approval', 'Needs your approval'), allowLabel = wording('ai.chat.allow', 'Allow'), denyLabel = wording('ai.chat.deny', 'Deny'), allowedLabel = wording('ai.chat.allowed', 'Allowed:'), deniedLabel = wording('ai.chat.denied', 'Denied:'), attach = false, accept = ATTACHABLE, maxFiles = 4, maxFileSize = 5 * 1024 * 1024, attachLabel = wording('ai.chat.attach', 'Attach a file'), removeLabel = wording('ai.chat.remove', 'Remove'), attachRefusedLabel = wording('ai.chat.attachRefused', 'Only images and PDFs can be attached.'), attachTooBigLabel = wording('ai.chat.attachTooBig', 'That file is too big to attach.'), attachFullLabel = wording('ai.chat.attachFull', 'No more files can be attached.'), attachIcon, variant = 'bubble', tone = 'accent', size = 'md' } = props<{
   // The page's streaming action, `action(schema, ({ messages }) => ask(messages))`, which may also `ctx.fail`; the chat posts the latest messages to it and reads the reply as it streams.
   // Returning `ask(messages, { tools }).progress()` instead streams the tool calls as well, which the chat shows before the text of their turn.
-  action: Action<{ messages: Message[] }, AsyncIterable<string | Progress> | Failure<unknown>>
+  action: Action<{ messages: ChatMessage[] }, AsyncIterable<string | Progress> | Failure<unknown>>
   // The messages shown to start with.
-  initial?: Message[] | undefined
+  initial?: Pick<Message, 'content' | 'role'>[] | undefined
   // Names the message list and the field for screen readers.
   label?: string | undefined
   placeholder?: string | undefined
@@ -116,11 +120,29 @@ const { action, initial = [], label = wording('ai.chat.label', 'Chat'), placehol
   remember?: string | undefined
   // Where a link of a reply opens: `apart` in a new tab, so following it does not swap the page and drop a conversation that lives in it; `here` for a link of this site opens in place, for a chat that survives a swap (kept by `persist`, or by `remember`), while a link to another site still opens apart.
   links?: 'apart' | 'here' | undefined
+  // Lets the visitor attach images and PDFs to a message, by a button beside the field, by dropping on it or by pasting, and posts them with the history as `attachments` of each message, which the action's schema must take: `attachments: s.Optional(s.Array(s.File({ type: 'image/png' })))` per type, and a `maxSize` on the action. Off by default.
+  attach?: boolean | undefined
+  // The types the picker takes, as an `accept` attribute: images and PDFs a model reads by default.
+  accept?: string | undefined
+  // The most files one message holds (4) and the most bytes of each (5 MB).
+  maxFiles?: number | undefined
+  maxFileSize?: number | undefined
+  // The attach button's name and tooltip, the name of each file's remove button, and what a refused file says: a type that is not accepted, a file past `maxFileSize` and a message already holding `maxFiles`.
+  attachLabel?: string | undefined
+  removeLabel?: string | undefined
+  attachRefusedLabel?: string | undefined
+  attachTooBigLabel?: string | undefined
+  attachFullLabel?: string | undefined
+  // What the attach button draws, in place of a plus.
+  attachIcon?: Snippet
 }>()
 
 let nextId = 0
 const history = signal<Turn[]>(untrack(() => initial).map(message => ({ ...message, id: nextId++ })))
 const draft = signal('')
+// The files chosen for the next message, and why one was left out.
+const attached = signal<File[]>([])
+const attachProblem = signal<string | undefined>(undefined)
 // The call is out and no word of the reply is there yet.
 const waiting = signal(false)
 const streaming = signal<ActionStream<string | Progress> | undefined>(undefined)
@@ -220,6 +242,27 @@ function markdown(text: string, blocks: CodeBlock[] | undefined, scrollable = tr
   }).replaceAll('</table>', '</table></div>'))
 }
 
+const sameFile = (a: File, b: File) => a.name === b.name && a.size === b.size && a.lastModified === b.lastModified
+const fileKey = (file: File) => `${file.name}\n${file.size}\n${file.lastModified}`
+
+// Files the picker, a drop or a paste gave, that fit the message: a file past `maxFileSize` or beyond `maxFiles` is left out and says so, and one already attached is not added twice.
+function attachFiles(chosen: File[]) {
+  const sized = chosen.filter(file => file.size <= maxFileSize && !attached().some(known => sameFile(known, file)))
+  const taken = sized.slice(0, Math.max(0, maxFiles - attached().length))
+
+  attached = [...attached(), ...taken]
+
+  if (sized.length < chosen.length && chosen.some(file => file.size > maxFileSize))
+    attachProblem = attachTooBigLabel
+  else if (taken.length < sized.length)
+    attachProblem = attachFullLabel
+}
+
+function unattach(file: File) {
+  attached = attached().filter(known => known !== file)
+  attachProblem = undefined
+}
+
 // A message the schema refuses would fail every later send, and one stopped before any word came has no answer, so a next send would post two user turns: it leaves the history and goes back to the field, ahead of what the visitor typed since.
 function takeBack() {
   const last = history().at(-1)
@@ -230,6 +273,7 @@ function takeBack() {
   history = history().slice(0, -1)
   takenBack = true
   draft = draft() === '' ? last.content : `${last.content}\n${draft()}`
+  attached = [...filesOf(last), ...attached()]
 }
 
 // The reply ended on its own, was stopped or broke off: what arrived joins the history.
@@ -374,16 +418,20 @@ async function call(abort: AbortSignal, headers?: Record<string, string>): Promi
 
 async function send(again = false, question?: string, resuming?: string) {
   const text = question ?? draft().trim()
+  const sent = question === undefined ? attached() : []
 
-  if (busy() || (!again && text === ''))
+  if (busy() || (!again && text === '' && sent.length === 0))
     return
 
   if (!again) {
-    history = [...history(), { id: nextId++, role: 'user', content: text }]
+    history = [...history(), { id: nextId++, role: 'user', content: text, ...sent.length > 0 && { attachments: sent } }]
 
     // A suggestion leaves what the visitor was typing.
-    if (question === undefined)
+    if (question === undefined) {
       draft = ''
+      attached = []
+      attachProblem = undefined
+    }
   }
 
   const mine = new AbortController()
@@ -466,6 +514,8 @@ function reset() {
   stop()
   history = []
   draft = ''
+  attached = []
+  attachProblem = undefined
   failure = undefined
   takenBack = false
   partial = ''
@@ -502,7 +552,7 @@ function ask(question: string) {
 }
 
 // Tells the server to end a reply that outlives its request, which closing the stream does not.
-async function endOnServer(id: string, messages: Message[]) {
+async function endOnServer(id: string, messages: ChatMessage[]) {
   try {
     const answer = await action({ messages }, { refresh: false, headers: { [REPLY_HEADER]: `stop:${id}` } })
 
@@ -524,8 +574,8 @@ function stop() {
       keepPending(remember, undefined)
 
     replying = undefined
-    // Only the last message goes, which any size the action takes holds.
-    void endOnServer(id, posted(history(), keep, maxChars).slice(-1))
+    // Only the last message goes, without its files, which any size the action takes holds.
+    void endOnServer(id, posted(history(), keep, maxChars).slice(-1).map(({ role, content }) => ({ role, content })))
   }
 
   // Aborting a call whose answer arrived would break the body read; closing the stream is enough then.
@@ -609,7 +659,12 @@ section(part="root" onKeyDown={escape} data-empty={history().length === 0 && !bu
     for turn of history() key={turn.id}
       article(part="turn" data-role={turn.role})
         if turn.role === 'user'
-          p(part="text") {withoutApproval(turn.content)}
+          if turn.content !== ''
+            p(part="text") {withoutApproval(turn.content)}
+          if filesOf(turn).length > 0
+            ul(part="files")
+              for file of filesOf(turn) key={fileKey(file)}
+                li(part="file") {file.name}
         else
           if reasoning && turn.reasoning
             details(part="reasoning")
@@ -651,11 +706,26 @@ section(part="root" onKeyDown={escape} data-empty={history().length === 0 && !bu
         button(part="retry" type="button" data-variant="solid" data-size="md" onClick={() => { void send(true) }}) {retryLabel}
   if disclosure !== ''
     p(part="disclosure") {disclosure}
+  if attachProblem()
+    Notice(tone="danger") {attachProblem()}
+  if attached().length > 0
+    ul(part="files")
+      for file of attached() key={fileKey(file)}
+        li(part="file")
+          | {file.name}
+          BareIconButton(part="remove" variant="inline" size="xs" label={`${removeLabel} ${file.name}`} onClick={() => unattach(file)})
+            Icon(icon="close")
   form(part="form" onSubmit={event => { event.preventDefault(); void send() }})
     if newButton && history().length > 0
       BareIconButton(part="new" variant="inline" label={newLabel} onClick={startOver})
         slot newIcon
           Icon(icon="plus")
+    if attach
+      FileDrop(class={{ root: 'contents' }} accept={accept} multiple paste disabled={busy()} onFiles={attachFiles} onReject={() => { attachProblem = attachRefusedLabel }})
+        @content(zone)
+          BareIconButton(part="attach" variant="inline" label={attachLabel} onClick={zone.open})
+            slot attachIcon
+              Icon(icon="plus")
     Textarea(part="field" writeFocused ref={element => { field = element }} value={draft()} onInput={draft.set} rows="1" aria-label={label} placeholder={placeholder} onKeyDown={keyDown})
     if busy()
       BareIconButton(part="send" variant="inline" label={stopLabel} onClick={stop})

@@ -1,5 +1,6 @@
 import type { Finish, Piece, Provider, ProviderMessage, ProviderRequest, Reasoning, ToolSpec } from './types'
 import process from 'node:process'
+import { mediaChars } from './attachments'
 
 // What a fake reply was asked: the request a provider would have been sent.
 export interface Asked {
@@ -173,7 +174,7 @@ function createFake(): Fake {
       const said = saidBy(chosen)
       const parts = typeof said === 'string' ? pieces(said) : said
       const pace = process.env.NODE_ENV === 'development' ? DEV_PACE_MS : 0
-      const input = request.messages.reduce((sum, message) => sum + tokens(message.content) + (message.results ?? []).reduce((all, result) => all + tokens(result.content), 0), 0) + tokens(request.system ?? '')
+      const input = request.messages.reduce((sum, message) => sum + tokens(message.content) + Math.ceil(mediaChars(message) / CHARS_PER_TOKEN) + (message.results ?? []).reduce((all, result) => all + tokens(result.content), 0), 0) + tokens(request.system ?? '')
 
       const thoughts = typeof chosen === 'object' && !Array.isArray(chosen) ? chosen.reasoning ?? [] : []
 

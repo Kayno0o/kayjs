@@ -1,0 +1,7 @@
+--- server
+import { reply } from './attaching.kay'
+--- script
+import Chat from '@kaynooo/kayjs-ai/chat.kay'
+---
+h1 Attacher
+Chat(action={reply} label="Assistant" attach)

@@ -21,6 +21,31 @@ import { reply } from '../routes/reply.kay'
 Chat(action={reply} label="Assistant")
 ```
 
+### Attaching files
+
+`attach` lets the visitor send images and PDFs the model reads ([Images and PDFs](attachments.md)). The action's schema takes them as `attachments` on a message, and `ask(messages)` shows them to the model with nothing else to wire:
+
+```kay
+--- server
+import { ask } from '@kaynooo/kayjs-ai'
+import { s } from 'kay'
+
+const file = s.File({ type: 'image/png' })
+
+export const reply = action(s.Object({ messages: s.Array(s.Object({ role: s.UnionEnum(['user', 'assistant']), content: s.String({ maxLength: 4000 }), attachments: s.Optional(s.Array(file, { maxItems: 4 })) }), { minItems: 1, maxItems: 40 }) }), ({ messages }) => ask(messages), { maxSize: '20mb' })
+---
+```
+
+```kay
+Chat(action={reply} attach)
+```
+
+- A button beside the field (its `attach` part, a plus, named `attachLabel`), dropping on it and pasting a file anywhere on the page outside a text field attach files, which show as chips with a remove button above the field and then in the visitor's turn. A message may hold files alone.
+- `accept` (images and PDFs), `maxFiles` (4 a message) and `maxFileSize` (5 MB each, in bytes) are the upload's checks, made before anything is sent; a file left out says why in a notice: `attachRefusedLabel`, `attachTooBigLabel` or `attachFullLabel`. Words: `ai.chat.attach`, `remove`, `attachRefused`, `attachTooBig` and `attachFull`; `@attachIcon` replaces the plus.
+- The action still checks: `s.File({ type })` reads the bytes of a top-level field only, so for a file nested in `messages` `ask` reads them again and answers 415 for a file that is no image or PDF (`unsupported`), 413 past its `maxAttachmentBytes`. Take `maxSize` for `maxFiles` files of `maxFileSize` on the action.
+- The files ride on the history: each send posts those of the `keep` latest messages again, so the model sees them in a follow-up, and a 413 shrinks the history counting each file as `ask` prices an image. The files live in the page: `remember` keeps the text of a turn, so after a reload the model no longer sees them.
+- Stop's call to the server posts the last message without its files.
+
 ### Floating chat
 
 `ChatLauncher` (`@kaynooo/kayjs-ai/chat-launcher.kay`) is the chat as a button at the bottom right of every page that opens it in a panel. Put it once in the root layout, a `--- server` fence passing the action as for `Chat`, and it needs no other wiring:
@@ -61,8 +86,8 @@ ChatLauncher(action={reply} label="Ask the docs")
 
 ### Props
 
-- `action`: the streaming action, typed `Action<{ messages: Message[] }, AsyncIterable<string | Progress> | Failure<unknown>>`, so `kay check` refuses one whose schema wants more or whose handler answers anything but a stream.
-- `keep`: how many of the latest messages each send posts (20), so a long chat stays under the schema's `maxItems`. The history posted opens on a user message, so an assistant one at its start, such as a greeting in `initial`, is left out; turns without text are not counted.
+- `action`: the streaming action, typed `Action<{ messages: ChatMessage[] }, AsyncIterable<string | Progress> | Failure<unknown>>`, so `kay check` refuses one whose schema wants more or whose handler answers anything but a stream.
+- `keep`: how many of the latest messages each send posts (20), so a long chat stays under the schema's `maxItems`. The history posted opens on a user message, so an assistant one at its start, such as a greeting in `initial`, is left out; turns with neither text nor files are not counted.
 - `maxChars`: the most characters each send posts (40,000), the oldest messages leaving first and the last staying; the chat lowers it by itself: a 413 from the action (`ask`'s `too-long` past its `maxInputChars`) makes it post half as much, oldest messages first, and ask again (5 times at most) until the action takes it or only the last message is left, remembering the size for the next sends. Each refusal counts against the action's rate limit, so set `maxChars` to the action's `maxInputChars` to avoid the first one.
 - `initial`: `Message[]` shown to start with and sent with the first message.
 - `label`: names the message list and the field for screen readers (`Chat`).

@@ -1,10 +1,32 @@
 import type { Action, Duration, Static } from 'kay'
 import type { TSchema } from 'kay/library'
 
+// A file the model is shown: bytes or a `Blob` (a `File` from an `s.File()` field is one), or a file kay stored (`{ file: key }`, never a key a visitor chose). What it is comes from its bytes, not its name or declared type: a PNG, JPEG, GIF or WebP image, or a PDF.
+export type Attachment = Blob | Uint8Array | ArrayBuffer | { file: string }
+
+// A message as `Chat` posts it to its action: the files a visitor attached are `File`s, which a schema takes as `attachments: s.Optional(s.Array(s.File({ ... })))`.
+export interface ChatMessage {
+  role: 'user' | 'assistant'
+  content: string
+  attachments?: File[]
+}
+
+// An attachment as a provider is sent it: read, its kind found from its bytes.
+export interface Media {
+  kind: 'image' | 'pdf'
+  // `image/png`, `image/jpeg`, `image/gif`, `image/webp` or `application/pdf`.
+  type: string
+  data: Uint8Array
+  // The file's name when it had one.
+  name?: string | undefined
+}
+
 export interface Message {
   // `system` is not a role here: the prompt that frames the reply goes in `options.system`, so a history posted by a visitor cannot carry one.
   role: 'user' | 'assistant'
   content: string
+  // Images and PDFs shown to the model beside the text, on a user message; they count toward `maxInputChars` as `ask` estimates and each is under `maxAttachmentBytes`.
+  attachments?: readonly Attachment[] | undefined
 }
 
 export interface Usage {
@@ -41,9 +63,10 @@ export interface ToolOutcome {
 export type Thinking = { text: string, signature: string } | { redacted: string }
 
 // A message as a provider is sent it: the assistant's turn that called tools carries `calls`, and the turn answering them, from the user's side, `results`.
-export interface ProviderMessage extends Message {
+export interface ProviderMessage extends Omit<Message, 'attachments'> {
   // The thinking that came before the calls, which Anthropic requires back unchanged in the turn that called tools.
   thinking?: Thinking[] | undefined
+  attachments?: Media[] | undefined
   calls?: ToolUse[] | undefined
   results?: ToolOutcome[] | undefined
 }
@@ -89,6 +112,8 @@ export interface Provider {
   readonly name: string
   // The model used when neither `ask` nor `AI_MODEL` names one.
   readonly model?: string | undefined
+  // The kinds of attachment it takes, both when absent; an ask holding another kind fails with an `unsupported` error before the provider is called.
+  readonly accepts?: readonly Media['kind'][] | undefined
   // Starts the request when first read, and stops it, the body cancelled, when `signal` aborts or the iterator returns.
   stream: (request: ProviderRequest, signal: AbortSignal) => AsyncIterable<Piece>
 }
@@ -163,6 +188,8 @@ export interface AskOptions {
   confirm?: Confirm | false | undefined
   // The most characters the messages may hold together, 50,000 by default (the system prompt is not counted); a conversation past it fails the reply with a `too-long` error, 413 in an action, before the provider is called. `Infinity` lifts it.
   maxInputChars?: number | undefined
+  // The most bytes one attachment may hold, 10 MB (10,485,760) by default; a larger one fails the reply with a `too-long` error before the provider is called.
+  maxAttachmentBytes?: number | undefined
   // Asks this provider instead of the one the environment names, such as `openai({ baseUrl })`.
   provider?: Provider | undefined
 }

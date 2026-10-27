@@ -18,6 +18,7 @@ export interface Tools {
   converse: ToolAction & Action<{ prompt: string, maxSteps?: number, offer?: string[] }, Outcome>
   refusedTools: Action<{ which: 'vetoed' | 'upload' }, string>
   upload: ToolAction
+  looks: Action<{ photo: File }, string>
   watch: Action<{ prompt: string }, Step[]>
   staying: Action<{ prompt: string, outlive: boolean }, Step[]>
   mixed: Action<{ prompt: string, twin?: boolean }, Step[]>

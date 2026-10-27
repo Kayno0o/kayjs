@@ -16,7 +16,7 @@ import { untilHolds } from './until'
 
 const ROOT = join(import.meta.dir, 'fixture')
 const site = await testSite({ root: ROOT })
-const { converse: conversing, staying, watch, unconfirmed, approving, refusedTools, upload } = await import(join(import.meta.dir, 'fixture/src/routes/tools.kay')) as Tools
+const { converse: conversing, staying, watch, unconfirmed, approving, refusedTools, upload, looks } = await import(join(import.meta.dir, 'fixture/src/routes/tools.kay')) as Tools
 
 afterAll(async () => site.close())
 beforeEach(() => {
@@ -90,6 +90,16 @@ describe('actions as tools', () => {
 
     expect(fakeAi.asked).toEqual([])
     expect(() => ask('x', { tools: [conversing, conversing, upload] })).toThrow('tools[2]')
+  })
+
+  it('shows a posted file to the model at every step of the loop', async () => {
+    const png = new File([new Uint8Array([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0, 0, 0, 13, 0x49, 0x48, 0x44, 0x52])], 'scan.png', { type: 'image/png' })
+
+    fakeAi.reply({ calls: [{ name: 'add_note', input: { title: 'Milk' } }] })
+    fakeAi.reply('Noted')
+
+    expect(await site.call(looks, { photo: png })).toBe('Noted')
+    expect(fakeAi.asked.map(asked => asked.messages[0]!.attachments?.map(media => media.name))).toEqual([['scan.png'], ['scan.png']])
   })
 
   it('throws outside a request, where there is no visitor to run as', () => {

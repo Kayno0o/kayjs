@@ -100,6 +100,17 @@ function failureOf(event: Record<string, unknown>): AiError {
 
 // A turn as the API takes it: plain text, or blocks when it called tools or answers them.
 function turnOf(message: ProviderMessage): { role: string, content: unknown } {
+  // Files go before the text, as the API advises.
+  if (message.attachments !== undefined && message.attachments.length > 0) {
+    return {
+      role: message.role,
+      content: [
+        ...message.attachments.map(media => ({ type: media.kind === 'pdf' ? 'document' : 'image', source: { type: 'base64', media_type: media.type, data: Buffer.from(media.data).toString('base64') } })),
+        ...message.content.trim() === '' ? [] : [{ type: 'text', text: message.content }],
+      ],
+    }
+  }
+
   if (message.calls === undefined && message.results === undefined)
     return { role: message.role, content: message.content }
 
@@ -136,6 +147,7 @@ export function anthropic({ apiKey, baseUrl = ANTHROPIC_URL, model, body: fields
   return {
     name: 'anthropic',
     model,
+    accepts: ['image', 'pdf'],
     async* stream(request, signal) {
       const key = `${root}\0${request.model}`
       const own = { ...extra, ...request.body }
