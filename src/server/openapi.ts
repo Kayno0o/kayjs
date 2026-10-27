@@ -171,7 +171,7 @@ function operationName(id: string, taken: Set<string>): string {
 }
 
 // An export's name as a tool is named: `addNote` is `add_note`.
-function snakeCase(name: string): string {
+export function snakeCase(name: string): string {
   return name.replace(WORD_BREAK, '$1_$2').toLowerCase()
 }
 

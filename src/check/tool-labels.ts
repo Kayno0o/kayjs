@@ -3,15 +3,15 @@ import type { CheckDiagnostic, CheckOptions } from '.'
 import { parseExpression } from '@babel/parser'
 import { findProjectFiles } from '../build/files'
 import { elementsIn } from '../compiler/ast'
-import { lintLevels } from '../compiler/lints'
+import { lintLevel, lintLevels } from '../compiler/lints'
 import { positionAt } from '../compiler/mapping'
 import { parseKay } from '../compiler/parser'
+import { snakeCase } from '../server/openapi'
 
 const SOURCE_FILE = /\.(?:kay|[cm]?ts|tsx)$/
 const DECLARATION_FILE = /\.d\.[cm]?ts$/
 const EXPORTED = /\bexport\s+(?:const|let|var|function|async\s+function)\s+([A-Za-z_$][\w$]*)/g
 const QUOTED = /(['"`])([A-Z][\w-]*)\1/gi
-const WORD_BREAK = /([a-z\d])([A-Z])/g
 // A name a second tool of the same name got: `add_note_2`.
 const NUMBERED = /^(.+)_\d+$/
 
@@ -26,6 +26,9 @@ interface Labelled {
 // A key of a Chat's `toolLabels` that names no tool of the project: an action is a tool named by its export (`homeState` is `home_state`) or by its `tool.name`, and a function tool by its `name`, so a key matching none of them, nor any string the project writes, is a tool that was renamed or never was.
 // Only a `toolLabels` written as an object literal is read, and only what the project's own modules write is searched.
 export async function unknownToolLabels(root: string, options: CheckOptions): Promise<CheckDiagnostic[]> {
+  if (lintLevel('unknown-tool-label', options.lints) === 'allow')
+    return []
+
   const files = (await findProjectFiles(root, SOURCE_FILE, { project: true, ownKayOnly: true })).filter(file => !DECLARATION_FILE.test(file))
   const texts = await Promise.all(files.map(async file => ({ file, source: await Bun.file(file).text() })))
   const labelled = texts.flatMap(({ file, source }) => source.includes('toolLabels') && file.endsWith('.kay') ? labelsIn(file, source) : [])
@@ -40,7 +43,7 @@ export async function unknownToolLabels(root: string, options: CheckOptions): Pr
     const text = labelledFiles.get(file) ?? source
 
     for (const [, name] of text.matchAll(EXPORTED))
-      known.add(name!.replace(WORD_BREAK, '$1_$2').toLowerCase())
+      known.add(snakeCase(name!))
 
     for (const [, , name] of text.matchAll(QUOTED))
       known.add(name!)

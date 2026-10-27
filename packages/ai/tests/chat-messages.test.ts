@@ -1,9 +1,11 @@
+import type { Static } from 'kay'
+import type { TSchema } from 'kay/library'
 import { expect, test } from 'bun:test'
 import { s } from 'kay'
 import { checkAnswer } from 'kay/library'
 import { chatMessages, lastChatMessage } from '../src'
 
-const accepts = (schema: ReturnType<typeof chatMessages>, value: unknown) => 'value' in checkAnswer(s.Object({ messages: schema }), { messages: value })
+const accepts = (schema: TSchema, value: unknown) => 'value' in checkAnswer(s.Object({ messages: schema }), { messages: value })
 const png = () => new File([new Uint8Array([0x89, 0x50, 0x4E, 0x47])], 'a.png', { type: 'image/png' })
 
 test('accepts the history Chat posts, a role and a text per message, and refuses what is out of bounds', () => {
@@ -35,4 +37,12 @@ test('with attachments, a message may carry files of the types asked, up to the 
 
 test('lastChatMessage gives the message just sent', () => {
   expect(lastChatMessage([{ role: 'user', content: 'a' }, { role: 'assistant', content: 'b' }, { role: 'user', content: 'c' }])).toEqual({ role: 'user', content: 'c' })
+})
+
+test('types the files of a message when attachments is set', () => {
+  const schema = chatMessages({ attachments: true })
+  const read = (messages: Static<typeof schema>) => messages[0]?.attachments
+
+  expect(read([{ role: 'user', content: 'a' }])).toBeUndefined()
+  expect(accepts(schema, [{ role: 'user', content: 'a' }])).toBe(true)
 })
