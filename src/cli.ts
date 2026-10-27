@@ -24,6 +24,7 @@ const COMMANDS: Record<keyof typeof USAGES, () => Promise<Command>> = {
   'env': async () => (await import('./commands/env')).env,
   'doctor': async () => (await import('./commands/doctor')).doctor,
   'explain': async () => (await import('./commands/explain')).explain,
+  'docs': async () => (await import('./commands/docs')).docs,
   'types': async () => (await import('./commands/types')).types,
   'fmt': async () => (await import('./commands/fmt')).fmt,
   'lint': async () => (await import('./commands/lint')).lint,

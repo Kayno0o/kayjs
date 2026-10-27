@@ -4,6 +4,8 @@
 
 ## Topics
 
+`bunx kay docs <words>` prints the section of these files or kay's that matches.
+
 The rest is split by topic, each file read whole with one command:
 
 - [Setup, environment, writing and sending mails](llms/writing-and-sending.md): the setup, the environment variables, writing a mail and sending it

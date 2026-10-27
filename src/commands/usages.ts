@@ -16,6 +16,7 @@ export const USAGES = {
   'env': 'env [dir] [--compose <file>]... [--example <file>] [--write] [--format text|json]',
   'doctor': 'doctor [dir] [--port <port>] [--format text|json]',
   'explain': 'explain [lint|error|group] [--format text|json]',
+  'docs': 'docs [words...|<package>/<file>[#<heading>]] [--format text|json]',
   'types': 'types [dir] [--format text|json] [--quiet]',
   'fmt': 'fmt [paths...] [--check | --dry-run] [--format text|json] [--quiet] | fmt --stdin [path] | fmt --from-html [file] [--format text|json]',
   'lint': 'lint [keslint arguments]...',

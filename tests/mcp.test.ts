@@ -349,7 +349,7 @@ describe.concurrent('kay mcp', () => {
     const { result } = await agent.request('tools/list')
     const tools = result?.tools as { name: string, inputSchema: { type: string }, annotations: object }[]
 
-    expect(tools.map(tool => tool.name)).toEqual(['check', 'routes', 'explain', 'render', 'screenshot', 'doctor', 'dev_errors'])
+    expect(tools.map(tool => tool.name)).toEqual(['check', 'routes', 'explain', 'docs', 'render', 'screenshot', 'doctor', 'dev_errors'])
     expect(tools.every(tool => tool.inputSchema.type === 'object' && 'readOnlyHint' in tool.annotations)).toBe(true)
   })
 
@@ -449,6 +449,18 @@ describe.concurrent('kay mcp', () => {
     expect(lint).toMatchObject({ name: 'missing-alt' })
     expect(code).toMatchObject({ name: all.errors[0]!.name })
     expect((await agent.request('tools/call', { name: 'explain', arguments: { name: 'not-a-lint' } })).result?.isError).toBe(true)
+  })
+
+  it('finds a topic in the docs, and prints the section a label names', async () => {
+    const found = (await agent.request('tools/call', { name: 'docs', arguments: { query: 'FormDialog' } })).result?.structuredContent as { sections: { label: string, text: string }[], others: { label: string }[] }
+
+    expect(found.sections[0]!.label).toStartWith('kayjs-ui/forms-and-steps.md#')
+    expect(found.sections[0]!.text).toContain('FormDialog')
+
+    const named = (await agent.request('tools/call', { name: 'docs', arguments: { query: found.others[0]!.label } })).result?.structuredContent as { sections: { label: string }[] }
+
+    expect(named.sections[0]!.label).toBe(found.others[0]!.label)
+    expect((await agent.request('tools/call', { name: 'docs', arguments: { query: 'zzqqxx' } })).result?.isError).toBe(true)
   })
 
   it('reads the dev server\'s errors from the file it writes, an empty list when it has not run', async () => {

@@ -35,6 +35,7 @@ This needs Bun to know the registry first, see [Installation](/getting-started/i
 | `kay i18n missing [locale] [dir]` | List what each locale lacks against the default one |
 | `kay i18n accept <locale> [dir]` | Accept a locale's draft messages |
 | `kay explain [lint\|error\|group]` | List the lints and the errors, or a group's, or explain one |
+| `kay docs [words]` | Print the section of kay's or an installed library's docs that matches |
 | `kay fmt [paths]` | Format `.kay` files, or with `--stdin` a source on stdin, or with `--from-html` turn HTML into a template |
 | `kay lint [args]` | Run ESLint with the types it reads for `.kay` files |
 | `kay test [args]` | Run `bun test` with each file isolated and kay's preload loaded |
@@ -651,6 +652,18 @@ To know Tailwind's order, `kay fmt` loads the app's `tailwindcss` and runs the p
 
 `kay explain` and `kay fmt` take `--format json` too, see [Output for tools](#output-for-tools).
 
+## kay docs
+
+```sh
+kay docs form dialog errors          # the section that matches best
+kay docs kayjs-ui/forms-and-steps.md  # a file's headings
+kay docs kay/actions.md#forms         # one section, whole
+```
+
+`kay docs` searches the docs written for agents: kay's `llms/` folder and the one each installed kayjs library ships, at the versions the app installed. It prints the section that matches best, with its file and line, then the labels of the next matches. A label prints that section whole. A component, function, lint or error code works as the search: a lint or an error code prints what `kay explain` says of it.
+
+A long section prints only the parts that match, and says how many it left out. Release notes are never searched, though a label prints them.
+
 ## kay migrate
 
 ```sh
@@ -699,6 +712,7 @@ Another client takes the same command in its MCP config, such as `.mcp.json` at 
 | `check` | `kay check --format json`. `paths` narrows the report, `only` picks a group, `denyWarnings` counts warnings as failures |
 | `routes` | `kay routes --format json` |
 | `explain` | The lints and error codes, or with `name` one lint, error code or group |
+| `docs` | `kay docs --format json` on `query` |
 | `render` | `kay render` on `url`, with `method`, `body`, `headers` and `cookies` |
 | `screenshot` | `kay screenshot` on `path`, with `width`, `height`, `scheme`, `fullPage` and `cookies` (as `name=value`). Answers the document, then an image per shot; `diff: true` adds the diff image against the shot before |
 | `doctor` | `kay doctor --format json`. `port` is the port to check |
@@ -732,7 +746,7 @@ Colour only goes to a terminal, and not under `NO_COLOR` or `TERM=dumb`. `FORCE_
 
 ## Output for tools
 
-`kay add`, `kay generate`, `kay new`, `kay types`, `kay build`, `kay routes`, `kay env`, `kay doctor`, `kay i18n missing`, `kay explain`, `kay fmt`, `kay migrate`, `kay not-found`, `kay screenshot` and `kay a11y` take `--format json`, as `kay check` does. Stdout then holds one JSON document on one line, and what the app's own code prints goes to stderr. The exit code is the one the text output gives.
+`kay add`, `kay generate`, `kay new`, `kay types`, `kay build`, `kay routes`, `kay env`, `kay doctor`, `kay i18n missing`, `kay explain`, `kay docs`, `kay fmt`, `kay migrate`, `kay not-found`, `kay screenshot` and `kay a11y` take `--format json`, as `kay check` does. Stdout then holds one JSON document on one line, and what the app's own code prints goes to stderr. The exit code is the one the text output gives.
 
 | Command | Document |
 | --- | --- |
@@ -743,6 +757,7 @@ Colour only goes to a terminal, and not under `NO_COLOR` or `TERM=dumb`. `FORCE_
 | `kay doctor` | `{ checks }`, each with its `name`, `ok`, `message` and `fix` |
 | `kay env` | `{ variables, unread }` (and `findings` when it compares files), each variable with its `name`, `source`, `type`, `required` and `default` |
 | `kay explain` | `{ groups, lints, errorGroups, errors }`, or for one lint its `summary` and its `wrong` and `right` examples |
+| `kay docs` | `{ sections, others }`, each with its `label`, `path`, `line` and `heading`, and the section's `text` |
 | `kay fmt` | `{ errors, warnings, problems, written, changed }` |
 | `kay migrate astro` | `{ dryRun, written, kept, copied, notes }` |
 | `kay migrate content` | `{ rewritten, failed, dryRun }` |

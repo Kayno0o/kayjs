@@ -4,6 +4,8 @@
 
 ## Topics
 
+`bunx kay docs <words>` prints the section of these files or kay's that matches.
+
 Each topic is one file, read whole with one command:
 
 - [Environment, ask() and its reply](llms/asking.md): the variables, picking a provider, `ask()`'s options, an object instead of text (`schema`), the reply, `await` blocks and streaming actions

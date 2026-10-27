@@ -68,7 +68,7 @@ Another client takes the same command in its MCP config, such as `.mcp.json` at 
 { "mcpServers": { "kay": { "command": "bunx", "args": ["kay", "mcp"] } } }
 ```
 
-The tools are `check` (`paths`, `only`, `denyWarnings`), `routes`, `explain` (a lint or an error code, `name`), `render` (`url`, `method`, `body`, `headers`, `cookies`), `screenshot` (`path`, `width`, `height`, `scheme`, `fullPage`, `cookies`, `diff`) and `dev_errors` and `doctor` (`port`); the resources are `kay://llms.txt` and one `kay://llms/<file>.md` per guide, each listing its sections. See [Commands](project.md#commands).
+The tools are `check` (`paths`, `only`, `denyWarnings`), `routes`, `explain` (a lint or an error code, `name`), `docs` (a topic, `query`), `render` (`url`, `method`, `body`, `headers`, `cookies`), `screenshot` (`path`, `width`, `height`, `scheme`, `fullPage`, `cookies`, `diff`) and `dev_errors` and `doctor` (`port`); the resources are `kay://llms.txt` and one `kay://llms/<file>.md` per guide, each listing its sections. See [Commands](project.md#commands).
 
 ### Format the templates
 
@@ -147,7 +147,7 @@ kay fmt --check
   - Run `bun test` in the project with `--isolate` and `kay/test/preload`, so it needs no `bunfig.toml` and no flag, and report a failure at its `.kay` line; the arguments are `bun test`'s and its exit code is the answer (see [Testing](testing.md)).
 - `kay types [dir] [--format text|json] [--quiet]`:
   - Write `.kay/types`, which the language server, `kay lint` and the editor's ESLint read, without checking anything; the editor's ESLint runs it through `bun` the first time it meets a component whose types are missing.
-- `kay lsp`, `kay screenshot` and `kay mcp` are in [Language server, screenshot and MCP commands](editor-and-agent-commands.md).
+- `kay lsp`, `kay screenshot`, `kay mcp` and `kay docs` are in [Language server, screenshot and MCP commands](editor-and-agent-commands.md).
 
 - `kay fmt --stdin [path]` reads a source on stdin and prints it formatted on stdout, for an editor's formatter (conform.nvim, Helix, Zed): `path` names the file it is for, which may not exist and decides the Tailwind order; a source that does not compile prints its problems on stderr, nothing on stdout, and exits 1; `--check`, `--from-html`, `--format json` and several paths are refused.
 - `kay fmt` refuses a path that is missing or is neither a directory nor a `.kay` file.

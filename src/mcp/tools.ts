@@ -99,6 +99,18 @@ function tools(root: string): Tool[] {
       },
     },
     {
+      name: 'docs',
+      title: 'Find a topic in the docs',
+      description: 'Finds a topic in the llms docs of kay and of every kayjs-* library the project installed, at their installed versions. Given words or a name (a component, a function, a lint, an error code), returns the section they match best, whole or its matching blocks when long, and the labels of the next matches; given a label such as `kayjs-ui/forms.md#reference`, that section whole; given a file label, its headings; given nothing, the files.',
+      inputSchema: { type: 'object', properties: { query: { type: 'string', description: 'Words such as `form dialog errors`, a name such as `FormDialog`, or a label from an earlier answer.' } }, additionalProperties: false },
+      annotations: READ_ONLY,
+      run: async (args) => {
+        const query = optionalString(args.query, 'query')
+
+        return document(['docs', '--format', 'json', ...query === undefined ? [] : ['--', query]])
+      },
+    },
+    {
       name: 'render',
       title: 'Render a URL',
       description: 'Answers one request as the app\'s server would under `kay dev`, without starting it on a port, and returns the body, then the status line, the headers and what the server logged. A status of 400 or above is an error result that still carries the body. Boots the whole app: a POST runs its action against the app\'s database.',

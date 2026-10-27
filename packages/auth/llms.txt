@@ -4,6 +4,8 @@
 
 ## Topics
 
+`bunx kay docs <words>` prints the section of these files or kay's that matches.
+
 The rest is split by topic, each file read whole with one command:
 
 - [Setup, pages and the signed-in user](llms/setup.md): `auth()`, the prebuilt pages and the signed-in user

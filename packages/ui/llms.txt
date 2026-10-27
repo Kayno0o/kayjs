@@ -4,6 +4,8 @@
 
 ## Topics
 
+`bunx kay docs <words>` prints the section of these files or kay's that matches.
+
 The rest by topic, each file read whole with one command:
 
 - [Setup, settings and testing](llms/setup.md): installing the theme and components, the settings that map icons, testing an app that uses it

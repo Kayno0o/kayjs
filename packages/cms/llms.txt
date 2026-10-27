@@ -4,6 +4,8 @@
 
 ## Topics
 
+`bunx kay docs <words>` prints the section of these files or kay's that matches.
+
 - [Setup and saving files](llms/setup.md): `kay add cms`, `forgejo()`, `workingTree()`, a saver of your own, and how a save names the version it was made from so editors never overwrite each other
 - [Options of cms()](llms/options.md): `prefix`, `role`, `guard`, `files` and the `CMS_*` variables, `uploads` and their checks, `pageSize`, `collections`, `rawHtml`, `author`, `onSave`, sign-in and roles
 - [The editor on the page](llms/editor.md): edit mode, the markers kay writes, the panel, unsaved drafts, the entries API and the dev tool tab
