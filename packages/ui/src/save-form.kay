@@ -1,6 +1,6 @@
 --- <Output>
 import type { Action, Answer, FailureData, Success } from 'kay'
-import { effect, guardLeave, onCleanup, onMount, recipe, shortcut, signal, untrack } from 'kay'
+import { effect, guardLeave, onCleanup, onMount, recipe, shortcut, signal } from 'kay'
 import Button from './button.kay'
 import { callAction, formIssues } from './forms'
 import { holdDefaults, onFormReset } from './form-reset'
@@ -52,7 +52,8 @@ const saving = signal(false)
 const asking = signal(false)
 // The dialog of `confirm`, a chunk of its own fetched once there is a question to ask, held in a list of at most one component.
 const confirmView = signal<(typeof import('./internal/save-confirm.kay'))['default'][]>([])
-const confirmFailed = signal(false)
+// The fetch of that chunk, under way or done; unset again when it failed.
+let confirmLoad: Promise<void> | undefined
 // Set by the dialog's confirm, so the submit it asks for goes through without asking again.
 let confirmed = false
 let form: HTMLFormElement | undefined
@@ -61,10 +62,10 @@ let baseline = ''
 
 formIssues.provide(issues)
 
-// Follows `confirm`, which a parent may set after mount; a chunk that failed is not tried again.
+// Follows `confirm`, which a parent may set after mount.
 effect(() => {
-  if (confirm !== undefined && untrack(confirmView).length === 0 && !untrack(confirmFailed))
-    void loadConfirm()
+  if (confirm !== undefined)
+    confirmLoad ??= loadConfirm()
 })
 
 async function loadConfirm() {
@@ -73,9 +74,13 @@ async function loadConfirm() {
   }
   catch (error) {
     console.error('kayjs-ui: a SaveForm\'s confirmation could not be loaded', error)
-    confirmFailed = true
-    asking = false
-    toast.error(failure)
+    confirmLoad = undefined
+
+    // A preload fails quietly: only a Save waiting on the question says it cannot be asked.
+    if (asking()) {
+      asking = false
+      toast.error(failure)
+    }
   }
 }
 
@@ -184,14 +189,9 @@ async function submit(event: SubmitEvent) {
     return
 
   if (confirm !== undefined && !sure) {
-    // The question could not be loaded, and a save that needs it must not go through unasked: this press tries the load again.
-    if (confirmFailed()) {
-      confirmFailed = false
-      void loadConfirm()
-    }
-    else {
-      asking = true
-    }
+    // The dialog opens once its chunk is there, fetched again by this press when it failed, as a save that needs the question must not go through unasked. Awaiting it keeps the form and its Save busy meanwhile.
+    asking = true
+    await (confirmLoad ??= loadConfirm())
 
     return
   }
@@ -250,6 +250,8 @@ function discard() {
 
   form?.reset()
   issues = {}
+  // A question still being fetched is not asked of the changes discarded.
+  asking = false
   onDiscard?.()
   check()
 }

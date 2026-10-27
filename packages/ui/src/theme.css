@@ -1202,8 +1202,8 @@
     @apply order-3;
   }
 
-  /* Card, Notice, PageHeader and AppHeader break a long word anywhere, which a control inside would inherit and split its own label by. */
-  :is(.kui-card, .kui-notice, .kui-page-header, .kui-app-header) :where(button, input, select, summary, .kui-btn, .kui-shell) {
+  /* Card, Notice, PageHeader, AppHeader, the values of a DescriptionList, the names of an AppSwitcher and a stacked Table break a long word anywhere, which a control inside would inherit and split its own label by. */
+  :is(.kui-card, .kui-notice, .kui-page-header, .kui-app-header, .kui-description-list, .kui-app-switcher, .kui-table-wrap) :where(button, input, select, summary, .kui-btn, .kui-shell) {
     overflow-wrap: normal;
   }
 

@@ -2,6 +2,7 @@ import { join } from 'node:path'
 import process from 'node:process'
 import { afterAll, describe, expect, test } from 'bun:test'
 import { browserPath, testSite } from 'kay/test'
+import { untilHolds } from '../../until'
 
 const ROOT = join(import.meta.dir, '..')
 const path = browserPath()
@@ -1129,6 +1130,76 @@ inBrowser('a SaveForm passed an action by a page with a server fence', () => {
     await page.click('button[type="submit"]')
     await page.waitFor('.kui-toast [data-part=message]', { text: 'Two letters at least' })
     expect(page.errors).toEqual([])
+  }, 120_000)
+})
+
+inBrowser('a SaveForm whose question is slow or fails to load', () => {
+  const question = (url: URL) => url.pathname.includes('/save-confirm-')
+  const toasts = async (page: { evaluate: <T>(run: () => T) => Promise<T> }) => page.evaluate(() => [...document.querySelectorAll('.kui-toast [data-part=message]')].map(message => message.textContent))
+
+  test('a Save pressed while the question loads spins, and opens it once loaded without a second press', async () => {
+    const site = await shared()
+
+    await using page = await site.open('/')
+    const { promise: release, resolve } = Promise.withResolvers<void>()
+    let asked = 0
+
+    await page.route(question, async (request) => {
+      asked++
+      await release
+      await request.continue()
+    })
+
+    try {
+      await page.goto('/save-form-confirm')
+      await untilHolds(() => asked > 0)
+      await page.fill('#name', 'Grace')
+      await page.click('button[type="submit"]')
+      await page.waitFor('button[type="submit"][aria-busy="true"]')
+
+      expect(await page.evaluate(() => document.querySelector('dialog[open]'))).toBeNull()
+
+      resolve()
+      await page.waitFor('dialog[open]', { text: 'Apply this change?' })
+      await page.click('dialog[open] .kui-btn-accent')
+      await page.waitFor('.kui-toast [data-part=message]', { text: 'Saved.' })
+
+      expect([asked, page.errors]).toEqual([1, []])
+    }
+    finally {
+      resolve()
+      await page.unroute()
+    }
+  }, 120_000)
+
+  test('a question that fails to preload toasts nothing at load, only when Save is pressed', async () => {
+    const site = await shared()
+
+    await using page = await site.open('/')
+    let aborted = 0
+
+    await page.route(question, async (request) => {
+      aborted++
+      await request.abort('internetdisconnected')
+    })
+
+    try {
+      await page.goto('/save-form-confirm')
+      await untilHolds(() => aborted > 0)
+      await page.waitUntil(() => document.querySelector('#name') !== null)
+      await Bun.sleep(300)
+
+      expect(await toasts(page)).toEqual([])
+
+      await page.fill('#name', 'Grace')
+      await page.click('button[type="submit"]')
+      await page.waitFor('.kui-toast [data-part=message]', { text: 'Could not save' })
+
+      expect(await page.evaluate(() => [document.querySelector('dialog[open]'), document.querySelector('.kui-save-bar-status')?.textContent, document.querySelector('button[type="submit"]')?.getAttribute('aria-busy')])).toEqual([null, 'Unsaved changes.', null])
+    }
+    finally {
+      await page.unroute()
+    }
   }, 120_000)
 })
 

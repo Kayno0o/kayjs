@@ -2,6 +2,7 @@ import type { Mounted } from 'kay/test'
 import { afterEach, describe, expect, test } from 'bun:test'
 import { mountComponent, settle } from 'kay/test'
 import RowsFields from '../tests/fixture/src/components/rows-fields.kay'
+import { untilHolds } from '../tests/until'
 import { click } from './dom'
 
 let mounted: Mounted | undefined
@@ -125,5 +126,51 @@ describe('RowsField in a form', () => {
 
     expect(posted).toEqual([[['saved_name', 'A'], ['saved_value', '1'], ['saved_name', ''], ['saved_value', '']]])
     expect(status.textContent).toBe('No unsaved change.')
+  })
+
+  test('Discard after a save goes back to the rows saved, not the ones first drawn', async () => {
+    const root = await open()
+    const discard = root.querySelector<HTMLButtonElement>('.kui-save-bar-actions button')!
+
+    click(root.querySelector('#saved [data-part=add]'))
+    await settle()
+    type(inputs(rowsOf(root, 'saved')[1]!)[0]!, 'B')
+    await settle()
+    root.querySelector<HTMLFormElement>('form[data-part=root]')!.requestSubmit()
+    await settle()
+
+    click(rowsOf(root, 'saved')[0]!.querySelector('button'))
+    click(root.querySelector('#saved [data-part=add]'))
+    await settle()
+    expect(rowsOf(root, 'saved').map(row => inputs(row)[0]!.value)).toEqual(['B', ''])
+
+    click(discard)
+    await settle()
+    await settle()
+
+    expect([rowsOf(root, 'saved').map(row => inputs(row).map(input => input.value)), root.querySelector('.kui-save-bar-status')!.textContent]).toEqual([[['A', '1'], ['B', '']], 'No unsaved change.'])
+  })
+})
+
+describe('RowsField words', () => {
+  // What the page's shared live region says now, whose first words wait for it to have been there.
+  const said = () => document.querySelector('[data-kui-announce]')?.textContent.trim() ?? ''
+
+  test('names a remove button Remove row n when no removeLabel is given', async () => {
+    const root = await open()
+
+    expect(rowsOf(root, 'posted')[0]!.querySelector('button')?.getAttribute('aria-label')).toBe('Remove row 1')
+  })
+
+  test('says a row was added, and which one was removed', async () => {
+    const root = await open()
+
+    click(root.querySelector('#posted [data-part=add]'))
+    await untilHolds(() => said() === 'Row 2 added')
+    expect(said()).toBe('Row 2 added')
+
+    click(rowsOf(root, 'posted')[0]!.querySelector('button'))
+    await settle()
+    expect(said()).toBe('Row 1 removed')
   })
 })

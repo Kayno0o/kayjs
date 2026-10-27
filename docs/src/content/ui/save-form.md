@@ -57,7 +57,7 @@ A Checkbox, Toggle, ChipGroup or Segmented still waiting on the promise of its `
 
 `cancelHref` adds a Cancel link before Discard, for a new item whose editor has nothing to go back to but the page it came from. Leaving with unsaved changes asks, as for any link.
 
-`confirm` is a question asked in a dialog before saving, Ctrl+S included, for a save with a consequence. Save runs once it is confirmed. `confirmLabel` words the dialog's button, `saveLabel` by default, and `cancelLabel` the other one.
+`confirm` is a question asked in a dialog before saving, Ctrl+S included, for a save with a consequence. Save runs once it is confirmed. `confirmLabel` words the dialog's button, `saveLabel` by default, and `cancelLabel` the other one. The dialog is a chunk fetched as the form mounts: a Save pressed before it is there stays busy until it opens, and one that cannot fetch it toasts `failure` and saves nothing.
 
 `saveDisabled` keeps Save and the shortcut off while the page says the draft cannot be saved. Give it the reason as a string and it shows as Save's tooltip, which the keyboard reaches too.
 

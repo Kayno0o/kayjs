@@ -1,0 +1,12 @@
+--- server
+import { t } from 'elysia'
+import { action } from 'kay'
+
+export const draft = action(t.Object({ name: t.String() }), ({ name }) => name)
+--- script
+import SaveForm from '@kaynooo/kayjs-ui/save-form.kay'
+import Toaster from '@kaynooo/kayjs-ui/toaster.kay'
+---
+Toaster
+SaveForm(action={draft} failure="Could not save" saved="Saved." confirm="Apply this change?")
+  input#name(name="name" value="Ada")

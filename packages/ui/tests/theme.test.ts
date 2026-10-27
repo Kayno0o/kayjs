@@ -64,7 +64,7 @@ const sourceOf = (name: string): string => components.find(component => componen
 const RECIPE_COMPONENTS = new Set(['src/card.kay', 'src/badge.kay', 'src/notice.kay', 'src/avatar.kay', 'src/stat.kay', 'src/page-header.kay', 'src/page-section.kay', 'src/empty-state.kay', 'src/card-row.kay', 'src/widget.kay', 'src/meter.kay', 'src/progress.kay', 'src/skeleton.kay', 'src/button.kay', 'src/form-field.kay', 'src/checkbox.kay', 'src/toggle.kay', 'src/text-input.kay', 'src/textarea.kay', 'src/select.kay', 'src/contact-form.kay', 'src/radio-group.kay', 'src/segmented.kay', 'src/rating.kay', 'src/slider.kay', 'src/color-input.kay', 'src/date-input.kay', 'src/date-range-input.kay', 'src/combobox.kay', 'src/multi-select.kay', 'src/chip-group.kay', 'src/file-drop.kay', 'src/copy-button.kay', 'src/confirm-delete.kay', 'src/dialog.kay', 'src/form-dialog.kay', 'src/menu.kay', 'src/popover.kay', 'src/hover-card.kay', 'src/side-panel.kay', 'src/command-palette.kay', 'src/toaster.kay', 'src/tooltip-host.kay', 'src/tooltip.kay', 'src/relative-time.kay', 'src/sparkline.kay', 'src/status-strip.kay', 'src/description-list.kay', 'src/toolbar.kay'])
 
 // Tables and navigation (slice 5 of #1885).
-for (const path of ['table', 'tabs', 'tab-nav', 'breadcrumb', 'pagination', 'steps', 'site-nav', 'app-header', 'timeline'])
+for (const path of ['table', 'tabs', 'tab-nav', 'breadcrumb', 'pagination', 'steps', 'site-nav', 'app-header', 'app-switcher', 'timeline'])
   RECIPE_COMPONENTS.add(`src/${path}.kay`)
 
 // Charts and media (slice 6).
@@ -687,7 +687,7 @@ describe('theme.css', () => {
     for (const [part, order] of [['value', 1], ['delta', 2], ['label', 3]])
       expect(blockOf(theme, `.kui-stat-badge > :where([data-part='${part}'])`)).toContain(`@apply order-${order};`)
 
-    expect(blockOf(theme, ':is(.kui-card, .kui-notice, .kui-page-header, .kui-app-header) :where(button, input, select, summary, .kui-btn, .kui-shell)')).toContain('overflow-wrap: normal;')
+    expect(blockOf(theme, ':is(.kui-card, .kui-notice, .kui-page-header, .kui-app-header, .kui-description-list, .kui-app-switcher, .kui-table-wrap) :where(button, input, select, summary, .kui-btn, .kui-shell)')).toContain('overflow-wrap: normal;')
   })
 
   test('steps the radius of what sits inside a box by --radius-sm and -md, and a round avatar by rounded-full', async () => {
