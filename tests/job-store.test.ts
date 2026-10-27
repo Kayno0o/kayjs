@@ -382,6 +382,117 @@ describe.each(kinds)('job store contract, $name', ({ name, open }) => {
       expect(await store.failed('q')).toMatchObject([{ id: failedOne.id }])
     })
   })
+
+  describe('claim', () => {
+    it('takes the due job of the queue that waited longest, never a failed one, one not due or one of another queue', async () => {
+      const store = await open()
+      const later = job({ runAt: 20 })
+      const first = job({ runAt: 10 })
+      const failedOne = job({ runAt: 1 })
+
+      await store.add(failedOne)
+      await store.fail(failedOne.id, 'boom')
+      await store.add(job({ queue: 'other', runAt: 0 }))
+      await store.add(job({ runAt: clockNow() + LONG }))
+      await store.add(later)
+      await store.add(first)
+      expect((await claimFor(store))?.id).toBe(first.id)
+      expect((await claimFor(store))?.id).toBe(later.id)
+      expect(await claimFor(store)).toBeUndefined()
+    })
+  })
+
+  describe('a job that completed', () => {
+    it('takes no retry, failure, release or progress', async () => {
+      const store = await open()
+      const added = job()
+
+      await store.add(added)
+
+      const held = heldOf(await claimFor(store))
+
+      await store.complete(added.id, held)
+      expect(await store.retry(added.id, 0, 'late', held)).toBe(false)
+      expect(await store.fail(added.id, 'late', undefined, held)).toBe(false)
+      await store.release!(added.id, held)
+      await store.progress!(added.id, held, '[1]')
+      expect(await store.jobs!('q')).toEqual([])
+      expect(await store.state!('q', { id: added.id }, clockNow())).toBeUndefined()
+    })
+  })
+
+  describe('failed', () => {
+    it('lists the failed jobs of the queue oldest first', async () => {
+      const store = await open()
+
+      for (const runAt of [30, 10, 20]) {
+        const added = job({ runAt })
+
+        await store.add(added)
+        await store.fail(added.id, 'boom')
+      }
+
+      await store.add(job({ runAt: 5 }))
+      expect((await store.failed('q')).map(found => found.runAt)).toEqual([10, 20, 30])
+      expect((await store.failed('q', 2)).map(found => found.runAt)).toEqual([10, 20])
+    })
+  })
+
+  describe('purge', () => {
+    it('drops the failed jobs of the queue due before the time given and counts them, leaving live, later and other queues\' ones', async () => {
+      const store = await open()
+      const old = job({ runAt: 1 })
+      const recent = job({ runAt: 5000 })
+      const live = job({ runAt: 1 })
+      const otherOld = job({ queue: 'other', runAt: 1 })
+
+      for (const added of [old, recent, live, otherOld])
+        await store.add(added)
+
+      for (const failing of [old, recent, otherOld])
+        await store.fail(failing.id, 'boom')
+
+      expect(await store.purge!('q', 100)).toBe(1)
+      expect(await store.failed('q')).toMatchObject([{ id: recent.id }])
+      expect(await store.jobs!('q', { failed: false })).toMatchObject([{ id: live.id }])
+      expect(await store.failed('other')).toMatchObject([{ id: otherOld.id }])
+      expect(await store.purge!('q', 100)).toBe(0)
+    })
+  })
+
+  describe('nextRunAt', () => {
+    it('is when the next live job of the queue may run, a held one counting from the end of its hold', async () => {
+      const store = await open()
+
+      expect(await store.nextRunAt('q')).toBeUndefined()
+
+      const soon = clockNow() + LONG
+      const due = job({ runAt: 5 })
+
+      await store.add(job({ runAt: soon }))
+      await store.add(job({ queue: 'other', runAt: 1 }))
+      expect(await store.nextRunAt('q')).toBe(soon)
+      await store.add(due)
+      expect(await store.nextRunAt('q')).toBe(5)
+
+      const held = heldOf(await claimFor(store))
+
+      expect(await store.nextRunAt('q')).toBe(Math.min(held, soon))
+      await store.fail(due.id, 'boom', undefined, held)
+      expect(await store.nextRunAt('q')).toBe(soon)
+    })
+  })
+
+  describe('lock', () => {
+    it('is won once per name and slot, by the first caller', async () => {
+      const store = await open()
+
+      expect(await store.lock('digest', 7)).toBe(true)
+      expect(await store.lock('digest', 7)).toBe(false)
+      expect(await store.lock('digest', 8)).toBe(true)
+      expect(await store.lock('other', 7)).toBe(true)
+    })
+  })
 })
 
 describe('a sqlite file made before keys and progress', () => {

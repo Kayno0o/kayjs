@@ -574,7 +574,7 @@ export function memoryJobs(): JobStore {
       return purged.length
     },
     failed(queue, limit) {
-      return [...jobs.values()].filter(job => job.queue === queue && job.failed).slice(0, limit).map(stored)
+      return [...jobs.values()].filter(job => job.queue === queue && job.failed).sort((a, b) => a.runAt - b.runAt).slice(0, limit).map(stored)
     },
     jobs(queue, options) {
       return [...jobs.values()].filter(job => job.queue === queue && (options?.failed === undefined || (job.failed === true) === options.failed)).slice(0, options?.limit).map(stored)
