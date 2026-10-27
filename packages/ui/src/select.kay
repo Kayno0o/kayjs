@@ -1,7 +1,8 @@
 --- <Value extends string | number, Empty extends string | boolean | undefined = undefined>
 import type { JSX } from 'kay'
-import { recipe, untrack } from 'kay'
+import { recipe, signal, untrack } from 'kay'
 import { controlledValue } from './controlled-value'
+import { changeAccepted } from './change'
 import { paramChange } from './param-change'
 import { startRef } from './form-reset'
 import { wording } from 'kay/words'
@@ -43,7 +44,23 @@ function report(select: HTMLSelectElement) {
   const choice = options.find(option => String(option.value) === select.value)
 
   // No option matches only the empty one, which the type allows exactly when there is one.
-  void paramChange(param, paramDefault, onChange)?.(choice === undefined ? '' as never : choice.value)
+  onChange?.(choice === undefined ? '' as never : choice.value)
+}
+
+// Holding a query param: a pick goes through the move, the select busy meanwhile and put back where the page is when the move is refused, as Segmented is.
+const moving = signal(false)
+
+async function move(select: HTMLSelectElement) {
+  const kept = String(value)
+  const choice = options.find(option => String(option.value) === select.value)
+
+  heard(select.value)
+
+  if (await changeAccepted('Select', () => paramChange(param, paramDefault, onChange)?.(choice === undefined ? '' as never : choice.value), moving.set))
+    return
+
+  select.value = kept
+  heard(kept)
 }
 
 // The keys that open the list: what is picked in it then arrives as one change, so it submits at once.
@@ -59,7 +76,11 @@ function submitNow(select: HTMLSelectElement) {
 }
 
 function picked(select: HTMLSelectElement) {
-  report(select)
+  // With `submit` the form's own submit carries the param.
+  if (param === undefined || submit)
+    report(select)
+  else
+    void move(select)
 
   if (!submit)
     return
@@ -94,7 +115,7 @@ function left(event: FocusEvent & { currentTarget: HTMLSelectElement }) {
 const ref = startRef<HTMLSelectElement>(element => box = element, rest.ref)
 ---
 // Each option says whether it is selected, so the right one stays chosen when the options arrive after the value.
-select(aria-busy={busy ? 'true' : undefined} {...rest} name={name ?? param} ref={ref} onChange={event => picked(event.currentTarget)} onKeyDown={submit ? pressed : onKeyDown} onPointerDown={submit ? grabbed : onPointerDown} onBlur={submit ? left : onBlur})
+select(aria-busy={busy || moving() ? 'true' : undefined} {...rest} name={name ?? param} ref={ref} onChange={event => picked(event.currentTarget)} onKeyDown={submit ? pressed : onKeyDown} onPointerDown={submit ? grabbed : onPointerDown} onBlur={submit ? left : onBlur})
   if emptyOption !== undefined && emptyOption !== false
     option(value="") {typeof emptyOption === 'string' ? emptyOption : ''}
   if busy

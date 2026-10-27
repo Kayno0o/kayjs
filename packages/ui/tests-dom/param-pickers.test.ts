@@ -29,10 +29,10 @@ async function pick(search: string, act: (root: Element) => void | Promise<void>
   }
 }
 
-const radio = (root: Element, value: string) => click(root.querySelector(`#segmented input[value="${value}"]`))
+const radio = (root: Element, value: string, id = 'segmented') => click(root.querySelector(`#${id} input[value="${value}"]`))
 
-async function choose(root: Element, value: string) {
-  const select = root.querySelector<HTMLSelectElement>('#select')!
+async function choose(root: Element, value: string, id = 'select') {
+  const select = root.querySelector<HTMLSelectElement>(`#${id}`)!
 
   select.value = value
   select.dispatchEvent(new Event('change', { bubbles: true }))
@@ -58,4 +58,17 @@ test('both take the param as their name, for a GET form around them', async () =
 
   expect(mounted!.root.querySelector('#select')?.getAttribute('name')).toBe('period')
   expect(mounted!.root.querySelector('#segmented input')?.getAttribute('name')).toBe('period')
+})
+
+test('a number option equal to a text paramDefault leaves the param out', async () => {
+  expect(await pick('?size=10', async root => choose(root, '25', 'sizes'))).toBe('/traffic')
+  expect(await pick('', async root => choose(root, '10', 'sizes'))).toBe('/traffic?size=10')
+})
+
+test('an onChange answering false stops the move and puts the pick back', async () => {
+  expect(await pick('?period=30d', root => radio(root, '24h', 'refused'))).toBeUndefined()
+  expect(mounted!.root.querySelector<HTMLInputElement>('#refused input:checked')?.value).toBe('30d')
+
+  expect(await pick('?period=30d', async root => choose(root, '24h', 'refused-select'))).toBeUndefined()
+  expect(mounted!.root.querySelector<HTMLSelectElement>('#refused-select')?.value).toBe('30d')
 })

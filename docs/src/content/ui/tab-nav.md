@@ -20,7 +20,7 @@ When the tabs are the values of one query param, give `tabs` and `param` instead
 TabNav(tabs={[{ value: 'findings', label: 'Findings' }, { value: 'hosts', label: 'Hosts' }]} param="tab" label="Host")
 ```
 
-The first tab is current while the param is left out. When the page shows another by default, pass it as `paramDefault`: its tab is current without the param and its link leaves the param out. These links follow the address of the request, so the page must be rendered per request, not once at build time.
+The first tab is current while the param is left out. When the page shows another by default, pass it as `paramDefault`: its tab is current without the param and its link leaves the param out. `keep` is not needed here, as every other param is kept. These links follow the address of the request, so the page must be rendered per request, not once at build time.
 
 ## Sub-pages
 

@@ -1216,3 +1216,10 @@ test('a page swap with a toast on screen hydrates the next toaster without a mis
     await built.close()
   }
 }, 60_000)
+
+test('TabNav of a query param renders on the server with the other params kept and the named tab current', async () => {
+  const links = await attributes('/tab-nav-param?tab=hosts&period=7d', '#tabs a', ['href', 'aria-current'])
+
+  expect(links).toEqual([{ 'href': '/tab-nav-param?tab=findings&period=7d', 'aria-current': null }, { 'href': '/tab-nav-param?tab=hosts&period=7d', 'aria-current': 'page' }, { 'href': '/tab-nav-param?tab=ports&period=7d', 'aria-current': null }])
+  expect((await attributes('/tab-nav-param', '#tabs a', ['aria-current'])).map(link => link['aria-current'])).toEqual(['page', null, null])
+})

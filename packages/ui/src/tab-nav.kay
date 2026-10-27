@@ -13,20 +13,30 @@ const look = recipe({
 })
 
 const { links, current, keep = [], tabs, param, paramDefault, label, ...rest } = props<Omit<JSX.IntrinsicElements['nav'], 'class' | 'children'> & {
-  // Each tab is a page of its own. `prefix` keeps a link current on the pages under its path, `also` on the pages under the listed paths, such as a detail page of the tab.
-  links?: readonly ({ href: string, label: string } & Omit<TabLink, 'href'>)[] | undefined
-  // The `href` of the page on screen, which the link to it marks as current; or its URL, `ctx.url`, matched by its path and the params a link sets. Needed with `links`.
-  current?: string | URL | undefined
-  // The params of `current` each link carries on, such as a period or a filter the tabs share, unless the link sets its own.
-  keep?: readonly string[] | undefined
-  // The tabs of one query param instead of `links`: each links to the current page with `param` set to its value and every other param kept, and the one the address names is current, with no `current` to hand over.
-  tabs?: readonly { value: string | number, label: string }[] | undefined
-  param?: string | undefined
-  // The value the page shows while `param` is left out: its tab is current then, and its link leaves the param out. Without it the first tab is the one shown, and its link sets the param like any other.
-  paramDefault?: string | number | undefined
   // Names the navigation for screen readers.
   label: string
-}>()
+} & (
+  {
+    // Each tab is a page of its own. `prefix` keeps a link current on the pages under its path, `also` on the pages under the listed paths, such as a detail page of the tab; both need a URL `current`.
+    links: readonly ({ href: string, label: string } & Omit<TabLink, 'href'>)[]
+    // The `href` of the page on screen, which the link to it marks as current; or its URL, `ctx.url`, matched by its path and the params a link sets.
+    current: string | URL
+    // The params of `current` each link carries on, such as a period or a filter the tabs share, unless the link sets its own.
+    keep?: readonly string[] | undefined
+    tabs?: undefined
+    param?: undefined
+    paramDefault?: undefined
+  } | {
+    // The tabs of one query param instead of `links`: each links to the current page with `param` set to its value and every other param kept, and the one the address names is current, with no `current` to hand over.
+    tabs: readonly { value: string | number, label: string }[]
+    param: string
+    // The value the page shows while `param` is left out: its tab is current then, and its link leaves the param out. Without it the first tab is the one shown, and its link sets the param like any other.
+    paramDefault?: string | number | undefined
+    links?: undefined
+    current?: undefined
+    keep?: undefined
+  }
+)>()
 
 let nav: HTMLElement | undefined
 
@@ -39,10 +49,11 @@ const items = () => {
   }
 
   const here = withQuery({})
-  const pick = (value: string | number) => withQuery({ [param]: value === paramDefault ? null : value })
+  const name = param
+  const pick = (value: string | number) => withQuery({ [name]: paramDefault !== undefined && String(value) === String(paramDefault) ? null : value })
   const shown = tabs.find(tab => pick(tab.value) === here)?.value ?? paramDefault ?? tabs[0]?.value
 
-  return tabs.map(tab => ({ key: String(tab.value), to: pick(tab.value), label: tab.label, on: tab.value === shown, scrolls: false }))
+  return tabs.map(tab => ({ key: String(tab.value), to: pick(tab.value), label: tab.label, on: String(tab.value) === String(shown), scrolls: false }))
 }
 
 // A tab bar wider than a phone scrolls, so the current tab is centred in it rather than left off screen. Only the bar scrolls: `scrollIntoView` would also move the page to it.

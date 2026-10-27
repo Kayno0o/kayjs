@@ -10,6 +10,6 @@ export function paramChange<Value extends string | number | null>(param: string 
     if (onChange && await onChange(value) === false)
       return false
 
-    return navigate({ query: { [param]: value === paramDefault ? null : value } })
+    return navigate({ query: { [param]: paramDefault !== undefined && String(value) === String(paramDefault) ? null : value } })
   }
 }
