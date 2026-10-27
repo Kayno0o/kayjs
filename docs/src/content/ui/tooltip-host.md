@@ -14,6 +14,10 @@ This page already renders the `TooltipHost`.
 
 </Callout>
 
+## Text that carries a tooltip
+
+A `span` with `data-tooltip` is not a tab stop, so the keyboard never shows its tooltip. Wrap the text in [Tooltip](/ui/tooltip) instead of adding `tabindex="0"` by hand.
+
 ## Hints on read-only text
 
 `data-hint` is a tooltip for the pointer alone, for the explanation of a figure the keyboard has no stop on, such as a stat. It shows on hover, never on focus, and `unreachable-tooltip` leaves it alone. It must only add to what the element already says, as neither the keyboard nor a screen reader brings it up.

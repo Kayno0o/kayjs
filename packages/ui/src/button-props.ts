@@ -42,11 +42,20 @@ export function linkOf(attributes: TagAttributes) {
   return attributes.href === undefined ? undefined : attributes
 }
 
+// A disabled button carrying a tooltip, whose reason the keyboard must reach: it is written `aria-disabled` and ignores the press rather than taking `disabled`, which drops it from the tab order.
+export function lockedWithTooltip(attributes: TagAttributes) {
+  const { disabled, 'data-tooltip': tooltip } = attributes as Record<string, unknown>
+
+  return Boolean(disabled) && tooltip !== undefined
+}
+
 export function buttonOf(attributes: TagAttributes) {
   if (attributes.href !== undefined)
     return undefined
 
-  const { type = 'button', expanded, pressed, ...others } = attributes
+  const { type = 'button', expanded, pressed, disabled, ...others } = attributes
+  const locked = lockedWithTooltip(attributes)
 
-  return { ...others, 'type': type, 'aria-expanded': expanded === undefined ? undefined : String(expanded), 'aria-pressed': pressed === undefined ? undefined : String(pressed) }
+  // A locked submit or reset button turns plain, as nothing may submit or reset the form it sits in.
+  return { ...others, 'type': locked ? 'button' : type, 'disabled': locked ? undefined : disabled, 'aria-disabled': locked ? 'true' : others['aria-disabled'], 'aria-expanded': expanded === undefined ? undefined : String(expanded), 'aria-pressed': pressed === undefined ? undefined : String(pressed) }
 }

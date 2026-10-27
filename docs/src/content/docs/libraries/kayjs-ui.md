@@ -246,7 +246,7 @@ Your own key wins over the French kayjs-ui ships, and a prop you pass to one com
 
 Actions: [Button](/ui/button), [IconButton](/ui/icon-button), [BareIconButton](/ui/bare-icon-button), [ConfirmDelete](/ui/confirm-delete), [CopyButton](/ui/copy-button), [Menu](/ui/menu), [Toggle](/ui/toggle).
 
-Overlays: [Dialog](/ui/dialog), [FormDialog](/ui/form-dialog), [SidePanel](/ui/side-panel), [Popover](/ui/popover), [HoverCard](/ui/hover-card), [TooltipHost](/ui/tooltip-host), [Toaster](/ui/toaster), [CommandPalette](/ui/command-palette).
+Overlays: [Dialog](/ui/dialog), [FormDialog](/ui/form-dialog), [SidePanel](/ui/side-panel), [Popover](/ui/popover), [HoverCard](/ui/hover-card), [TooltipHost](/ui/tooltip-host), [Tooltip](/ui/tooltip), [Toaster](/ui/toaster), [CommandPalette](/ui/command-palette).
 
 Forms: [FormField](/ui/form-field), [SaveForm](/ui/save-form), [ContactForm](/ui/contact-form), [SubscribeForm](/ui/subscribe-form), [TextInput](/ui/text-input), [Checkbox](/ui/checkbox), [ChipGroup](/ui/chip-group), [RadioGroup](/ui/radio-group), [Select](/ui/select), [MultiSelect](/ui/multi-select), [Combobox](/ui/combobox), [Textarea](/ui/textarea)
 

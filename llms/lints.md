@@ -108,6 +108,7 @@ kay check --only seo
 | `unannounced-click` | warn | a11y | An `onClick` on an element whose `role` names no widget, such as `presentation` or `region`; a `dialog` role or `aria-modal` (not `"false"`) is left alone. |
 | `dangling-aria` | warn | a11y | An `aria-labelledby` or `aria-describedby` listing an id nothing in the template has. |
 | `unreachable-tooltip` | warn | a11y | A `data-tooltip` on an element the keyboard never reaches and no `aria-label` (ignored on a role-less `span` or `div`), `aria-labelledby` or `aria-describedby` speaks for, and whose content is not just the tooltip's own text; `data-hint` is the pointer-only form. |
+| `hand-tooltip` | warn | a11y | A `span` with `data-tooltip` and `tabindex="0"` written by hand in a file importing kayjs-ui, which its `Tooltip` renders. `kay check --fix` writes `Tooltip(text=...)` and its import. |
 | `uncontrolled-autoplay` | warn | a11y | A `video` or `audio` with `autoplay` and no `controls`. |
 | `meta-refresh` | warn | a11y | A `meta(http-equiv="refresh")` reloading or leaving the page after a delay. |
 | `ungrouped-radios` | warn | a11y | Radios sharing a `name` outside a `fieldset` or a `role="radiogroup"`. |

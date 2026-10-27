@@ -9,6 +9,9 @@ const UNLABELLED_TYPES = new Set(['hidden', 'submit', 'reset', 'button', 'image'
 // What names an element besides its content.
 const NAMING = ['aria-label', 'aria-labelledby', 'title']
 const HEADING = /^h([1-6])$/
+const UI_IMPORT = /^import\b[^\n]*['"]@kaynooo\/kayjs-ui\/[^'"\n]*['"];?[ \t]*$/gm
+const TOOLTIP_IMPORT = /^import\s+Tooltip\s+from\s+['"]@kaynooo\/kayjs-ui\/tooltip\.kay['"]/m
+const TOOLTIP_NAME = /\bTooltip\b/
 // What gives an element content a screen reader reads, besides text.
 const CONTENT_ATTRIBUTES = ['innerHTML', 'textContent', 'innerText']
 // Elements the keyboard reaches unless disabled, besides a link with an `href` and an input that is not hidden.
@@ -254,6 +257,56 @@ export function accessibilityLints(file: KayFile): Diagnostic[] {
 
     return tooltip.kind === 'static' && part!.kind === 'chunk' && part!.text.trim() === tooltip.text.trim()
   }
+  // The edits writing a hand-made tooltip target as kayjs-ui's `Tooltip`, with the import it needs, or nothing when the file does not use the library or names something else `Tooltip`.
+  const tooltipEdits = (element: ElementNode): { start: number, end: number, text: string }[] | undefined => {
+    const tooltip = attribute(element, 'data-tooltip')
+    const index = attribute(element, 'tabindex')
+
+    if (element.name !== 'span' || element.component || !tooltip || tooltip.kind === 'boolean' || index?.kind !== 'static' || index.text.trim() !== '0' || has(element, 'text') || has(element, 'placement'))
+      return undefined
+
+    const placement = attribute(element, 'data-tooltip-placement')
+
+    if (placement?.kind === 'boolean' || !file.script)
+      return undefined
+
+    const script = text(file.script)
+    const imports = [...script.matchAll(UI_IMPORT)]
+    const last = imports.at(-1)
+
+    if (!last)
+      return undefined
+
+    const imported = TOOLTIP_IMPORT.test(script)
+
+    if (!imported && TOOLTIP_NAME.test(script))
+      return undefined
+
+    const edits = [{ ...element.tag, text: 'Tooltip' }, { ...tooltip.name, text: 'text' }]
+
+    if (placement)
+      edits.push({ ...placement.name, text: 'placement' })
+
+    // The attribute with the space before it, or after it when it opens the list.
+    const end = index.value.end + (source[index.value.end] === '"' || source[index.value.end] === '\'' ? 1 : 0)
+    let start = index.name.start
+
+    while (start > 0 && (source[start - 1] === ' ' || source[start - 1] === '\n'))
+      start--
+
+    if (source[start - 1] === '(') {
+      start = index.name.start
+      edits.push({ start, end: end + (source[end] === ' ' ? 1 : 0), text: '' })
+    }
+    else {
+      edits.push({ start, end, text: '' })
+    }
+
+    if (!imported)
+      edits.push({ start: file.script.start + last.index + last[0].length, end: file.script.start + last.index + last[0].length, text: '\nimport Tooltip from \'@kaynooo/kayjs-ui/tooltip.kay\'' })
+
+    return edits
+  }
   const interactive = (element: ElementNode) => (element.name === 'a' && has(element, 'href'))
     || (element.name === 'input' && staticValue(element, 'type')?.toLowerCase() !== 'hidden')
     || INTERACTIVE.has(element.name)
@@ -426,10 +479,15 @@ export function accessibilityLints(file: KayFile): Diagnostic[] {
       const generic = isUnnameable(element)
       const base = 'a tooltip shows as the pointer or the focus lands on its element, and the keyboard never lands on this one'
       const note = generic && has(element, 'aria-label') ? `${base}, and a screen reader ignores an \`aria-label\` on a role-less element` : base
-      const help = `put it on a \`button\` or a link, give the element \`tabindex="0"\`, say the same in ${generic ? '' : '`aria-label` or '}visible text, or write \`data-hint\` for text only the pointer adds, which kayjs-ui's \`TooltipHost\` shows`
+      const help = `put it on a \`button\` or a link, give the element \`tabindex="0"\` (kayjs-ui's \`Tooltip\` does for text), say the same in ${generic ? '' : '`aria-label` or '}visible text, or write \`data-hint\` for text only the pointer adds, which kayjs-ui's \`TooltipHost\` shows`
 
       lint(attribute(element, 'data-tooltip')!.name, 'unreachable-tooltip', `This \`${element.name}\`'s tooltip shows only under the pointer`, { note, help })
     }
+
+    const handTooltip = tooltipEdits(element)
+
+    if (handTooltip)
+      lint(attribute(element, 'tabindex')!.name, 'hand-tooltip', 'This `span` is a tooltip target written by hand', { note: 'kayjs-ui\'s `Tooltip` renders the same `span` with `data-tooltip` and `tabindex="0"`', help: '`Tooltip(text="...")`, which `kay check --fix` writes', fixes: [{ title: 'Write `Tooltip`', edits: handTooltip, safe: true }] })
 
     if ((element.name === 'video' || element.name === 'audio') && has(element, 'autoplay') && !has(element, 'controls'))
       lint(attribute(element, 'autoplay')!.name, 'uncontrolled-autoplay', `This \`${element.name}\` plays by itself with no controls`, { note: 'a visitor who did not start it has no way to pause or stop it', help: 'add `controls`, or a pause button of its own beside it' })

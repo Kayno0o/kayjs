@@ -4377,6 +4377,20 @@ describe.concurrent('kay check, unused code', () => {
     }
   })
 
+  it('writes an import two fixes of one file both insert once', async () => {
+    const root = await scratchProject({ 'src/a.kay': 'p a\np b\n' })
+    const file = join(root, 'src/a.kay')
+    const fix = (start: number) => ({ title: 'Write `Tip`', edits: [{ start, end: start + 1, text: 'Q' }, { start: 0, end: 0, text: 'import Tip\n' }], safe: true })
+
+    try {
+      expect(await applySafeFixes(root, [{ file, line: 1, column: 3, message: 'm', fixes: [fix(2)] }, { file, line: 2, column: 3, message: 'm', fixes: [fix(6)] }])).toBe(2)
+      expect(await Bun.file(file).text()).toBe('import Tip\np Q\np Q\n')
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
   it('checks the rest of a --fix run against the config the fixes left', async () => {
     // The config reads the Dockerfile, which the fix rewrites, and allows `missing-title` while it is old.
     const config = 'import { readFileSync } from \'node:fs\'\n\nconst old = readFileSync(`${import.meta.dir}/Dockerfile`, \'utf8\').includes(\'oven/bun:1.0.0\')\n\nexport default { lints: { \'missing-title\': old ? \'allow\' : \'deny\' } }\n'

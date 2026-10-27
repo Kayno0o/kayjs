@@ -187,6 +187,13 @@ export const LINTS = {
     wrong: 'span(data-tooltip="Published on Monday") Published',
     right: 'span(tabindex="0" data-tooltip="Published on Monday") Published',
   },
+  'hand-tooltip': {
+    level: 'warn',
+    group: 'a11y',
+    summary: 'A `span` carrying `data-tooltip` and `tabindex="0"` by hand, in a file importing kayjs-ui, whose `Tooltip` renders the same tab stop: `Tooltip(text="Published on Monday") Published`. The `data-tooltip-placement` becomes `placement`. `kay check --fix` writes it, and the import with it; a span with another `text` or `placement` attribute, or in a file naming something else `Tooltip`, is left alone.',
+    wrong: '---\nimport TooltipHost from \'@kaynooo/kayjs-ui/tooltip-host.kay\'\n---\nspan(data-tooltip="Published on Monday" tabindex="0") Published\nTooltipHost',
+    right: '---\nimport Tooltip from \'@kaynooo/kayjs-ui/tooltip.kay\'\nimport TooltipHost from \'@kaynooo/kayjs-ui/tooltip-host.kay\'\n---\nTooltip(text="Published on Monday") Published\nTooltipHost',
+  },
   'uncontrolled-autoplay': {
     level: 'warn',
     group: 'a11y',

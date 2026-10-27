@@ -5,6 +5,7 @@ import CopyButton from '@kaynooo/kayjs-ui/copy-button.kay'
 import Icon from '@kaynooo/kayjs-ui/icon.kay'
 import Notice from '@kaynooo/kayjs-ui/notice.kay'
 import Toaster from '@kaynooo/kayjs-ui/toaster.kay'
+import Tooltip from '@kaynooo/kayjs-ui/tooltip.kay'
 import home from '~icons/tabler/home'
 ---
 main
@@ -28,3 +29,8 @@ main
     Notice#notice-default(label="Saved")
   #toasts
     Toaster
+  #locks
+    Button#locked(label="Publish" disabled data-tooltip="Needs a title")
+    Button#locked-submit(label="Publish" type="submit" disabled data-tooltip="Needs a title")
+    Button#plain-disabled(label="Publish" disabled)
+    Tooltip#tip(text="Published on Monday" placement="bottom") Published

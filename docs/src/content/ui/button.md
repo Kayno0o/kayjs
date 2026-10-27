@@ -17,6 +17,10 @@ description: A button or a link styled as one, with an optional icon and a busy 
 
 <Demo name="button/icon" />
 
+## Disabled with a reason
+
+A button that is `disabled` and carries a `data-tooltip` renders `aria-disabled` instead of `disabled`. It stays reachable by the keyboard, so [TooltipHost](/ui/tooltip-host) can show why it is off, and its press does nothing: a submit button no longer submits.
+
 ## Busy
 
 Return a promise from `onClick` and the button swaps its icon for a spinner, marks itself `aria-busy` and disables itself until the promise settles. Only that button is held, however many share an action. A submit button shows the spinner and ignores clicks the same way, but is not disabled, so it still submits its form, while its `onClick` or its form's `onSubmit` returns a promise.

@@ -112,6 +112,26 @@ test('Button is a button that submits nothing unless asked, a link with an href,
   expect((await find('/buttons', '#busy svg')).map(icon => icon.attributes.class)).toEqual(['kui-icon animate-spin motion-reduce:animate-none'])
 })
 
+test('a disabled Button with a tooltip renders aria-disabled and stays a tab stop, a plain disabled one keeps disabled', async () => {
+  const names = ['type', 'disabled', 'aria-disabled', 'data-tooltip']
+
+  const read = async (id: string) => {
+    const found = await one('/buttons', `#${id}`)
+
+    return Object.fromEntries(names.map(name => [name, attr(found, name)]))
+  }
+
+  expect(await read('locked')).toEqual({ 'type': 'button', 'disabled': null, 'aria-disabled': 'true', 'data-tooltip': 'Needs a title' })
+  expect(await read('locked-submit')).toEqual({ 'type': 'button', 'disabled': null, 'aria-disabled': 'true', 'data-tooltip': 'Needs a title' })
+  expect(await read('plain-disabled')).toEqual({ 'type': 'button', 'disabled': '', 'aria-disabled': null, 'data-tooltip': null })
+})
+
+test('Tooltip is a tab stop carrying its text for TooltipHost', async () => {
+  const found = await one('/buttons', '#tip')
+
+  expect([found.tag, found.text, attr(found, 'tabindex'), attr(found, 'data-tooltip'), attr(found, 'data-tooltip-placement')]).toEqual(['span', 'Published', '0', 'Published on Monday', 'bottom'])
+})
+
 test('IconButton names its action for screen readers and as its tooltip', async () => {
   const { attributes: found } = await one('/buttons', '#delete')
 

@@ -196,3 +196,22 @@ test('an IconButton draws the snippet it is handed in place of an icon of the se
   expect(button.querySelectorAll('svg')).toHaveLength(1)
   expect(button.getAttribute('aria-label')).toBe('Send')
 })
+
+test('a disabled Button with a tooltip stays focusable as aria-disabled and ignores its press and its submit', async () => {
+  const save = later()
+  const submitted: unknown[] = []
+
+  mounted = await mountComponent(Buttons, { onSave: save.run, onSubmit: (event: SubmitEvent) => submitted.push(event) })
+
+  const root = mounted.root
+  const locked = root.querySelector<HTMLButtonElement>('#lockedClick')!
+  const send = root.querySelector<HTMLButtonElement>('#lockedSend')!
+
+  expect([locked.disabled, locked.getAttribute('aria-disabled'), send.disabled, send.getAttribute('aria-disabled'), send.type]).toEqual([false, 'true', false, 'true', 'button'])
+
+  click(locked)
+  click(send)
+  await settle()
+
+  expect([save.settles.length, submitted.length, locked.getAttribute('aria-busy')]).toEqual([0, 0, null])
+})

@@ -78,6 +78,7 @@ import Toaster from '@kaynooo/kayjs-ui/toaster.kay'
 import Toggle from '@kaynooo/kayjs-ui/toggle.kay'
 import Toolbar from '@kaynooo/kayjs-ui/toolbar.kay'
 import TooltipHost from '@kaynooo/kayjs-ui/tooltip-host.kay'
+import Tooltip from '@kaynooo/kayjs-ui/tooltip.kay'
 import TreeView from '@kaynooo/kayjs-ui/tree-view.kay'
 import VirtualList from '@kaynooo/kayjs-ui/virtual-list.kay'
 import WhenVisible from '@kaynooo/kayjs-ui/when-visible.kay'
@@ -182,6 +183,7 @@ export const COMPONENTS = {
   'timeline': Timeline,
   'toggle': Toggle,
   'toolbar': Toolbar,
+  'tooltip': Tooltip,
   'tooltip-host': TooltipHost,
   'tree-view': TreeView,
   'virtual-list': VirtualList,
@@ -270,6 +272,7 @@ export const CASES: Record<string, Record<string, unknown>> = {
   'timeline': { entries: [{ key: 'a', time: '08:00', text: 'Home', icon }, { key: 'b', time: '09:00', text: 'Gap', tone: 'muted' }], label: 'Day', selected: 'a', onSelect: noop },
   'toggle': { label: 'Digest' },
   'toolbar': { label: 'Actions', caption: 'Mars', children: 'Move' },
+  'tooltip': { text: 'Published on Monday', children: 'Published' },
   'tooltip-host': {},
   'tree-view': { nodes: tree, label: 'Planets', selected: 'phobos' },
   'virtual-list': { items: [1, 2, 3], item: (row: number) => String(row), label: 'Numbers' },

@@ -691,7 +691,7 @@ describe('literal-tag', () => {
 })
 
 describe('a11y lints', () => {
-  const A11Y = new Set(['unknown-aria', 'unknown-role', 'missing-state', 'hidden-focusable', 'positive-tabindex', 'autofocus', 'link-as-button', 'nested-control', 'duplicate-id', 'dangling-label', 'missing-captions', 'redundant-alt', 'invalid-autocomplete', 'dangling-aria', 'unannounced-click', 'unreachable-tooltip', 'meta-refresh', 'ungrouped-radios', 'section-not-a-link', 'table-without-header', 'fieldset-without-legend', 'mouse-only-event', 'missing-autocomplete'])
+  const A11Y = new Set(['unknown-aria', 'unknown-role', 'missing-state', 'hidden-focusable', 'positive-tabindex', 'autofocus', 'link-as-button', 'nested-control', 'duplicate-id', 'dangling-label', 'missing-captions', 'redundant-alt', 'invalid-autocomplete', 'dangling-aria', 'unannounced-click', 'unreachable-tooltip', 'hand-tooltip', 'meta-refresh', 'ungrouped-radios', 'section-not-a-link', 'table-without-header', 'fieldset-without-legend', 'mouse-only-event', 'missing-autocomplete'])
   const a11y = (source: string) => lints(source).filter(d => A11Y.has(d.code ?? '')).map(d => `${d.code} ${d.at}`)
   // One lint alone, for those the other examples here would trip.
   const only = (code: string, source: string) => lints(source).filter(d => d.code === code).map(d => `${d.code} ${d.at}`)
@@ -819,6 +819,18 @@ describe('a11y lints', () => {
     expect(a11y('span(data-hint="Per second") 12\nbutton(data-hint="Tip") b\n')).toEqual([])
     expect(a11y('span(data-tooltip={a} tabindex={a ? \'0\' : undefined}) a\nspan(data-tooltip={a} tabindex="-1") b\n')).toEqual(['unreachable-tooltip data-tooltip'])
     expect(a11y('span(data-tooltip={v}) {v}\nspan(data-tooltip={v}) {w}\nspan(data-tooltip="Same") Same\nspan(data-tooltip={v}) Is {v}\n')).toEqual(['unreachable-tooltip data-tooltip', 'unreachable-tooltip data-tooltip'])
+  })
+
+  it('writes a hand-made tooltip target as kayjs-ui\'s Tooltip, with its import, only in a file using the library', () => {
+    const head = '---\nimport Button from \'@kaynooo/kayjs-ui/button.kay\'\n---\n'
+    const imported = '---\nimport Button from \'@kaynooo/kayjs-ui/button.kay\'\nimport Tooltip from \'@kaynooo/kayjs-ui/tooltip.kay\'\n---\n'
+
+    expect(only('hand-tooltip', `${head}span(data-tooltip="A" tabindex="0") a\nspan.x(tabindex="0" data-tooltip={b} data-tooltip-placement="bottom") b\nspan(data-tooltip="C") c\nspan(data-tooltip="D" tabindex="-1") d\ndiv(data-tooltip="E" tabindex="0") e\nspan(data-tooltip="F" tabindex="0" text="g") f\n`)).toEqual(['hand-tooltip tabindex', 'hand-tooltip tabindex'])
+    expect(fixed(`${head}span(data-tooltip="A" tabindex="0") a\n`)).toEqual([`${imported}Tooltip(text="A") a\n`])
+    expect(fixed(`${imported}span.x(tabindex="0" data-tooltip={b} data-tooltip-placement="bottom") b\n`)).toEqual([`${imported}Tooltip.x(text={b} placement="bottom") b\n`])
+    expect(fixed(`${head}span(\n  class="q"\n  data-tooltip="C"\n  tabindex="0"\n) c\n`)).toEqual([`${imported}Tooltip(\n  class="q"\n  text="C"\n) c\n`])
+    expect(only('hand-tooltip', 'span(data-tooltip="A" tabindex="0") a\n')).toEqual([])
+    expect(only('hand-tooltip', '---\nimport Button from \'@kaynooo/kayjs-ui/button.kay\'\nimport Tooltip from \'./mine.kay\'\n---\nspan(data-tooltip="A" tabindex="0") a\n')).toEqual([])
   })
 
   it('reports media playing by itself with no controls, and a meta refresh with a delay', () => {

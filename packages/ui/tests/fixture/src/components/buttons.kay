@@ -17,3 +17,6 @@ form#form(onSubmit={event => { event.preventDefault(); return onSubmit(event) }}
   Button#quietSubmit(label="Quiet send" type="submit" spinner={false})
   Button#plain(label="Plain" type="button")
   Button#sendAsync(label="Send async" type="submit" onClick={onSave})
+Button#lockedClick(label="Locked" disabled data-tooltip="Needs a title" onClick={onSave})
+form#lockedForm(onSubmit={event => { event.preventDefault(); return onSubmit(event) }})
+  Button#lockedSend(label="Locked send" type="submit" disabled data-tooltip="Needs a title")

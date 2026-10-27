@@ -1,0 +1,5 @@
+---
+import Tooltip from '@kaynooo/kayjs-ui/tooltip.kay'
+---
+p.pt-10
+  Tooltip(text="Published on Monday at 9:00" placement="bottom") Published 3 days ago

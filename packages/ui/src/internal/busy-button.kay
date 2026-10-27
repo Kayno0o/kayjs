@@ -1,7 +1,7 @@
 ---
 import type { ButtonProps, TagAttributes } from '../button-props'
 import { recipe, signal } from 'kay'
-import { buttonOf, linkOf } from '../button-props'
+import { buttonOf, linkOf, lockedWithTooltip } from '../button-props'
 import { isPromiseLike } from '../change'
 import Icon from '../icon.kay'
 
@@ -16,6 +16,12 @@ const pending = signal(false)
 const spinning = () => busy ?? pending()
 
 async function press(event: MouseEvent) {
+  if (lockedWithTooltip(attributes)) {
+    event.preventDefault()
+
+    return
+  }
+
   if (busy === undefined && pending()) {
     event.preventDefault()
 

@@ -14,11 +14,14 @@ export async function applySafeFixes(root: string, diagnostics: CheckDiagnostic[
   for (const [file, found] of byFile) {
     const taken: Fix['edits'] = []
 
+    // Two fixes may insert the same text at the same place, such as the import both need, which is then written once; a replacement of the same span is still one fix taken twice.
+    const same = (edit: Fix['edits'][number], other: Fix['edits'][number]) => edit.start === edit.end && edit.start === other.start && edit.end === other.end && edit.text === other.text
+
     for (const { fix } of found) {
-      if (fix.edits.some(edit => taken.some(other => edit.start < other.end && other.start < edit.end)))
+      if (fix.edits.some(edit => taken.some(other => !same(edit, other) && edit.start < other.end && other.start < edit.end)))
         continue
 
-      taken.push(...fix.edits)
+      taken.push(...fix.edits.filter(edit => !taken.some(other => same(edit, other))))
       fixed++
     }
 
