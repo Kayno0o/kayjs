@@ -8,6 +8,7 @@ import process from 'node:process'
 import { KayError } from '../compiler/errors'
 import { PROBLEMS_MARKER } from '../content/claims'
 import { flattenMessages, isPlural, MESSAGE_TAG } from '../runtime/i18n'
+import { AUTH_MAIL_ENGLISH } from '../server/auth-mails'
 import { buildingWithoutEnv } from '../server/env-state'
 import { extensionMessageFiles, messagesFile } from '../server/i18n'
 import { draftMessages } from '../server/message-drafts'
@@ -227,9 +228,18 @@ async function libraryPlaceholders(root: string, key: string): Promise<Set<strin
   if (key in INVALID_PARAMS)
     return new Set(INVALID_PARAMS[key as InvalidWord])
 
-  const english = key in KAY_ENGLISH ? KAY_ENGLISH[key as keyof typeof KAY_ENGLISH] : await libraryEnglish(root, key)
+  const english = key in KAY_ENGLISH ? KAY_ENGLISH[key as keyof typeof KAY_ENGLISH] : authMailEnglish(key) ?? await libraryEnglish(root, key)
 
   return english === undefined ? undefined : placeholders(english)
+}
+
+const AUTH_MAIL_KEY = 'mail.auth.'
+
+// kayjs-mail words the lines every auth mail shares through kay's list rather than a literal in its source; a kind's own lines are keyed at run time, so they stay uncompared.
+function authMailEnglish(key: string): string | undefined {
+  const line: unknown = key.startsWith(AUTH_MAIL_KEY) ? (AUTH_MAIL_ENGLISH as Record<string, unknown>)[key.slice(AUTH_MAIL_KEY.length)] : undefined
+
+  return typeof line === 'string' ? line : undefined
 }
 
 async function libraryEnglish(root: string, key: string): Promise<string | undefined> {

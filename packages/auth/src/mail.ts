@@ -58,15 +58,15 @@ export type Templates = Record<MailKind, (data: MailData) => MailContent>
 
 const PLACEHOLDER = /\{(\w+)\}/g
 
-// A line of the shared wording with its placeholders filled.
-function filled(line: string, words: AuthMailWording, data: MailData): string {
+// Fills the placeholders of a mail's lines of the shared wording.
+function filler(words: AuthMailWording, data: MailData): (line: string) => string {
   const values: Record<string, string> = { site: data.name, email: data.email, detail: data.detail ?? '', what: data.url === undefined ? words.code : words.link }
 
-  return line.replace(PLACEHOLDER, (placeholder, name: string) => Object.hasOwn(values, name) ? values[name]! : placeholder)
+  return line => line.replace(PLACEHOLDER, (placeholder, name: string) => Object.hasOwn(values, name) ? values[name]! : placeholder)
 }
 
-// Both parts always: a mail with text only trips spam filters, and one with HTML only is unreadable where HTML is refused. Inline styles only, since mail clients drop stylesheets.
-// The plain shell of every link mail for a mailer other than kayjs-mail's `authMailer`, whose views render them themed. A mail may carry a link, a code to type, or both.
+// The two plain shells, link and notice, of kayjs-auth's own mails, for a mailer other than kayjs-mail's `authMailer`, whose views render them themed. Both parts always: a mail with text only trips spam filters, and one with HTML only is unreadable where HTML is refused. Inline styles only, since mail clients drop stylesheets.
+// A link mail may carry a link, a code to type, or both.
 function linkMail(words: AuthMailWording, data: MailData, subject: string, lead: string, button: string, ending: string): MailContent {
   const url = data.url === undefined ? undefined : escape(data.url)
   const codeLead = data.url === undefined ? words.yourCode : words.orTypeCode
@@ -102,7 +102,7 @@ function lasting(words: AuthMailWording, data: MailData, once: boolean): string 
   return [linkWorks, codeWorks].filter(part => part !== undefined).join(' ')
 }
 
-// The plain shell of every notice for a mailer other than `authMailer`. With a `url`, a link to where the user reviews what happened, such as the list of where they are signed in.
+// With a `url`, a link to where the user reviews what happened, such as the list of where they are signed in.
 function noticeMail(words: AuthMailWording, data: MailData, subject: string, lead: string, ending: string): MailContent {
   return {
     subject,
@@ -117,21 +117,26 @@ function noticeMail(words: AuthMailWording, data: MailData, subject: string, lea
   }
 }
 
-// A link mail says how long it works before its ending, unless its `lasts` is empty, as for an invitation.
+// A link mail says how long it works before its ending, unless its `lasts` is empty, as for an invitation; the figure is the one kayjs-auth sends, `lasts` itself being the fallback text of kayjs-mail's views.
 function linkTemplate(words: AuthMailWording, kind: AuthLinkKind): Templates[MailKind] {
   const lines = words[kind]
 
   return (data) => {
-    const ending = filled(lines.ending, words, data)
+    const fill = filler(words, data)
+    const ending = fill(lines.ending)
 
-    return linkMail(words, data, filled(lines.subject, words, data), filled(lines.lead, words, data), lines.button, lines.lasts === '' ? ending : `${lasting(words, data, kind === 'magic-link')} ${ending}`)
+    return linkMail(words, data, fill(lines.subject), fill(lines.lead), lines.button, lines.lasts === '' ? ending : `${lasting(words, data, kind === 'magic-link')} ${ending}`)
   }
 }
 
 function noticeTemplate(words: AuthMailWording, kind: AuthNoticeKind): Templates[MailKind] {
   const lines = words[kind]
 
-  return data => noticeMail(words, data, filled(lines.subject, words, data), filled(lines.lead, words, data), filled(lines.ending, words, data))
+  return (data) => {
+    const fill = filler(words, data)
+
+    return noticeMail(words, data, fill(lines.subject), fill(lines.lead), fill(lines.ending))
+  }
 }
 
 function templatesIn(words: AuthMailWording): Templates {

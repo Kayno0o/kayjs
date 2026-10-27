@@ -139,7 +139,7 @@ describe('kay check on the catalogs', () => {
   ui: { table: { selected: { one: 'une', other: '{count} choisies' }, filter: 'Filtre {x}', selectAll: 'Tout' } },
   cms: { table: { deleteMessage: 'Supprimer {title} ?' } },
   auth: { scopes: { read: 'Lire' }, other: 'Autre' },
-  mail: { contact: { sent: 'Envoyé' } },
+  mail: { contact: { sent: 'Envoyé' }, auth: { linkWorks: 'Le lien est valable', review: 'Voyez {x}' } },
   ai: { chat: { disclosure: 'Vous parlez à une IA {x}' }, other: 'Autre' },
 }`)
 
@@ -152,6 +152,8 @@ describe('kay check on the catalogs', () => {
       'gives kay.invalid.tooLong without {max}, which its English has',
       'gives ui.table.filter a {x}, which its English has not, so nothing fills it',
       'gives ai.chat.disclosure a {x}, which its English has not, so nothing fills it',
+      'gives mail.auth.linkWorks without {duration}, which its English has',
+      'gives mail.auth.review a {x}, which its English has not, so nothing fills it',
     ].toSorted())
   })
 

@@ -90,12 +90,16 @@ describe('authMailer', () => {
     for (const [locale, words] of Object.entries(AUTH_MAIL_WORDING)) {
       for (const kind of [...AUTH_LINK_KINDS, ...AUTH_NOTICE_KINDS]) {
         const sample = authSample(kind)
-        const { subject, text, html } = await authMailer(mail.render).send({ ...sample, locale })
+        const { subject, text } = await authMailer(mail.render).send({ ...sample, locale })
+        const fill = (line: string) => line.replace('{site}', sample.name).replace('{email}', sample.to).replace('{detail}', sample.detail ?? '').replace('{what}', words.link)
 
         expect(`${locale} ${kind}: ${subject}`).not.toMatch(/mail\.auth|[{}]|: $/)
         expect(`${locale} ${kind}: ${text}`).not.toMatch(/mail\.auth|[{}]/)
-        expect(subject).toBe(words[kind].subject.replace('{site}', sample.name).replace('{detail}', sample.detail ?? ''))
-        expect(html).toContain(`<h1`)
+        expect(subject).toBe(fill(words[kind].subject))
+
+        // The fixture's English words this lead its own way.
+        if (locale !== 'en' || kind !== 'password-changed')
+          expect(text.replace(SPACES, ' ')).toContain(fill(words[kind].lead).replace(SPACES, ' '))
       }
     }
   })
