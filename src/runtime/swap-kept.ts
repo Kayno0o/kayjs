@@ -37,6 +37,16 @@ async function loadHeld(): Promise<Held | undefined> {
   }
 }
 
+// A chunk whose request never answered is waited for once: the swaps after it, a refresh waiting behind that one among them, go on without it until it arrives.
+export function heldLate(): void {
+  const pending = heldChunk
+
+  heldChunk = Promise.resolve(undefined)
+  void (async () => {
+    heldChunk = Promise.resolve(await pending)
+  })()
+}
+
 // The next page's body morphed into this one: what it renders again stays the same element, so a layout's sidebar keeps its scroll, and the islands that live on are moved over before anything is taken away, so a playing video or an open socket never notices.
 export function swapBody(next: Document, policy: Policy, held: Held | undefined): void {
   const body = document.adoptNode(next.body)

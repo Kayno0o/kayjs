@@ -225,6 +225,22 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('a deferred 
           await watchIslands(fresh)
           // Long enough for the refresh to start waiting behind the swap before the swap gives up.
           await shorten(fresh, [CHUNK_TIMEOUT_MS], 1000)
+          // Counts the waits for the chunk that ran out, ahead of the shortening: the refresh does not wait for it again.
+          await fresh.evaluate((bound: number) => {
+            const original = window.setTimeout.bind(window)
+            const counted = window as { kayChunkWaits?: number }
+
+            counted.kayChunkWaits = 0
+            window.setTimeout = ((handler: TimerHandler, delay?: number, ...rest: unknown[]) => {
+              if (delay !== bound || typeof handler !== 'function')
+                return original(handler, delay, ...rest)
+
+              return original((...args: unknown[]) => {
+                counted.kayChunkWaits!++
+                ;(handler as (...given: unknown[]) => void)(...args)
+              }, delay, ...rest)
+            }) as typeof window.setTimeout
+          }, CHUNK_TIMEOUT_MS)
           fresh.responses.length = 0
 
           const swapped = fresh.waitForResponse(isPage)
@@ -242,6 +258,7 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('a deferred 
           await fresh.waitUntil((selector: string) => document.querySelectorAll(selector).length === 1 && !document.documentElement.hasAttribute('aria-busy'), {}, FETCHED)
 
           expect((await states(fresh)).some(slots => slots.some(slot => slot.inert && !slot.form))).toBe(true)
+          expect(await fresh.evaluate(() => (window as { kayChunkWaits?: number }).kayChunkWaits)).toBe(1)
           expect(await fresh.evaluate(() => (window as { kayAlive?: boolean }).kayAlive)).toBe(true)
           expect(await labels(fresh)).toEqual(['one'])
         }

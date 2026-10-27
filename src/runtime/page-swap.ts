@@ -6,7 +6,7 @@ import { HTML, ownOrigin, PAGE_TIMEOUT_MS, pageFor } from './swap-fetch'
 import { bounded, CHUNK_TIMEOUT_MS, inFlight, LATE, policyOf } from './swap-flight'
 import { moveFocus } from './swap-focus'
 import { mergeHead, swapRoot } from './swap-head'
-import { holding, swapBody } from './swap-kept'
+import { heldLate, holding, swapBody } from './swap-kept'
 import { transitioned, viewTransitions } from './swap-transition'
 import { addressChanged } from './with-query'
 
@@ -197,6 +197,10 @@ export async function show(page: FetchedPage, hash: string, swap: Swap, isCurren
 
   // A chunk that never answers is given up on as one that failed: the next page's copy of the island shows, inert until fetched.
   const kept = holds && await bounded(holds, CHUNK_TIMEOUT_MS)
+
+  if (kept === LATE)
+    heldLate()
+
   const held = kept === LATE ? undefined : kept
 
   // Another navigation started meanwhile and shows its own page; the head it merges drops what this one added.
