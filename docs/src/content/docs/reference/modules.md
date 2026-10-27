@@ -112,7 +112,7 @@ Types include `BrowserError` and `CspViolationError`, the browser errors and CSP
 | `kay/library` | What a library's extension, commands and dev routes use: `KayCommand`, `underKayDev`, `missingTranslations`, `writeDraftMessages`, `escapeHtml` and more. See [Component libraries](/guides/component-libraries#extensions) |
 | `kay/image` | `image`, `shareImage`, `shareCard` |
 | `kay/icons` | `iconProps`, `iconNames`, for icons known only at runtime |
-| `kay/test` | `testSite`, `mountComponent`, `browse`, `browserPath`, `settle`, `readPersisted`, `writePersisted`, `persistedCookie`, `cookieJar`, `overrideEnv`, `solveWork`, `scratchDir`. See [Testing](/guides/testing) |
+| `kay/test` | `testSite`, `mountComponent`, `browse`, `browserPath`, `settle`, `readPersisted`, `writePersisted`, `persistedCookie`, `cookieJar`, `overrideEnv`, `fakeService`, `solveWork`, `scratchDir`. See [Testing](/guides/testing) |
 | `kay/test/preload` | The preload `kay test` loads, and a project's `bunfig.toml` lists for a plain `bun test`; it also closes the test sites and copies a database per file from a `pg-orm.config.ts`. See [Testing](/guides/testing#a-database-for-each-test-file) |
 | `kay/test/dom` | Registers happy-dom's DOM, popover API included, which `mountComponent` loads on its first mount. See [Testing](/guides/testing#one-component) |
 | `kay/bun` | `kay`, the Bun plugin compiling `.kay` files for a page kay does not serve. See [Islands](/essentials/islands#a-page-kay-does-not-serve) |

@@ -81,7 +81,7 @@ export interface TestOptions extends PagesOptions {
   browser?: boolean | BrowserOptions | undefined
   // Builds the islands for the browser, unminified, into `.kay/test-client`, or `.kay/client` with `browser`, so one a browser cannot build, such as a server module reaching it, fails `testSite()` here and not only under `kay dev`; no browser needed. On unless `false`, built again only when the files under `src`, the routes or the API change.
   islands?: boolean | undefined
-  // The key the app's `proxy.key` header carries, turning the check on for this site alone, the environment left as it is: `fetch`, `visit`, `call`, `mcp` and `socket` send it by default, a call's own header of that name wins, and an empty one sends none.
+  // The key the app's `proxy.key` header carries, turning the check on for this site alone, the environment left as it is: `fetch`, `visit`, `call`, `mcp` and `socket` send it by default, a call's own header of that name wins, and an empty one sends none; not with `dev: true` or `browser`, which skip the check or send no key.
   proxyKey?: string | undefined
 }
 
@@ -339,6 +339,22 @@ export async function testSite(options: TestOptions = {}): Promise<TestSite> {
   const config = { ...loaded, site: loaded.site ?? ORIGIN, storage: options.storage ?? memoryFiles(), store: options.store === undefined && loaded.store !== undefined ? { ...loaded.store.sessions && { sessions: memoryStore() }, jobs: memoryJobs(), rates: memoryRates(), rooms: memoryRooms(), vitals: memoryVitals(), notifications: memoryNotifications() } : loaded.store }
   const project = resolveProject(root, config, { dev: config.dev === true, prebuilt: false, underKayDev: false, devRoutes: config.dev === true })
   const inBrowser = options.browser !== undefined && options.browser !== false
+  const proxyKey = options.proxyKey?.trim()
+  const keyHeader = proxyKey === undefined ? undefined : checkProxy(config.proxy)?.key
+
+  if (proxyKey !== undefined) {
+    if (proxyKey === '')
+      throw new Error('kay: testSite({ proxyKey }) needs a non-empty key; send no key from a call with an empty header of the name `proxy.key` gives')
+
+    if (keyHeader === undefined)
+      throw new Error('kay: testSite({ proxyKey }) needs the app to set `proxy.key` in kay.config.ts, the header the key travels in')
+
+    if (config.dev === true)
+      throw new Error('kay: testSite({ proxyKey }) checks nothing with `dev: true`, as `kay dev` does not check the key')
+
+    if (inBrowser)
+      throw new Error('kay: testSite({ proxyKey }) does not reach `open()`, whose browser sends no proxy key header; test the key check without `browser`')
+  }
 
   if (inBrowser || options.islands !== false)
     assertKayWritable(root)
@@ -348,13 +364,8 @@ export async function testSite(options: TestOptions = {}): Promise<TestSite> {
   const client: ClientBuild = inBrowser && wanted ? wanted : { entryImports: [], islands: {}, styles: new Map(), pages: new Map(), dir: clientDir(root) }
   const browser = typeof options.browser === 'object' ? options.browser : {}
   const jar = cookieJar()
-  const keyHeader = options.proxyKey === undefined ? undefined : checkProxy(config.proxy)?.key
-
-  if (options.proxyKey !== undefined && keyHeader === undefined)
-    throw new Error('kay: testSite({ proxyKey }) needs the app to set `proxy.key` in kay.config.ts, the header the key travels in')
-
   const boot = async (): Promise<Awaited<ReturnType<typeof servePages>>> => buildingTestSite(jar.cookies, async () => servePages(project, () => client, true))
-  const pages = await (options.proxyKey === undefined ? boot() : withProxyKey(options.proxyKey, boot))
+  const pages = await (proxyKey === undefined ? boot() : withProxyKey(proxyKey, boot))
   const locals = options.locals
   const before = [...options.use ?? [], ...locals ? [new Elysia().derive({ as: 'global' }, async ({ request }) => locals(request))] : []]
   const app = before.length === 0 ? pages : before.reduce<AnyElysia>((served, plugin) => served.use(plugin), new Elysia()).use(pages)
@@ -702,7 +713,7 @@ export async function testSite(options: TestOptions = {}): Promise<TestSite> {
     }
   }
 
-  const site = scoped({ ...options.headers, ...keyHeader !== undefined && options.proxyKey !== undefined && { [keyHeader]: options.proxyKey } })
+  const site = scoped({ ...options.headers, ...keyHeader !== undefined && proxyKey !== undefined && { [keyHeader]: proxyKey } })
 
   forget = closeAfterTests(site.close)
 

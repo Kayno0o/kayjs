@@ -225,7 +225,7 @@ const restore = overrideEnv(env, { FORGEJO_URL: forgejo.url })
 afterAll(restore.restore)
 ```
 
-A route is a path, or `METHOD path`, and its answer is a value sent as JSON, a string sent as text, a `Response`, or a function of the request that returns one. A request nothing matches answers 404. `forgejo.requests` lists what the app sent since the test began, with each `method`, `path`, `query`, `headers`, `text` and `json()`.
+A route is a path, or `METHOD path`, and its answer is a value sent as JSON, a string sent as text, a `Response`, or a function of the request that returns one. A request nothing matches answers 404. `forgejo.requests` lists what the app sent since the test began, with each `method`, `path`, `query`, `headers`, `text`, `bytes` and `json()`. A route function that throws answers 500 and the error lands in `forgejo.errors`.
 
 To test a failure, call `forgejo.fail(503)` and every request answers that status, or `forgejo.stall()` and none is answered, so the app's timeout is what ends the call. Both end with the test, and the requests clear before the next one. The server stops after the file's tests. A fake made inside a test is stopped with `await using` or `forgejo.stop()`.
 

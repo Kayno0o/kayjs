@@ -12,6 +12,8 @@ export interface ServiceRequest {
   query: URLSearchParams
   headers: Headers
   text: string
+  // The body as it came, for an upload that is no text.
+  bytes: Uint8Array
   // The body parsed as JSON, throwing when it is not.
   json: () => unknown
 }
@@ -26,6 +28,8 @@ export interface FakeService {
   url: string
   // Every request received since the test began, in order, the unmatched ones included.
   requests: ServiceRequest[]
+  // What a route function threw since the test began, each of which answered 500.
+  errors: unknown[]
   // Answers every request with this status and body until the test ends.
   fail: (status: number, body?: string) => void
   // Holds every request without answering until the test ends, or the client gives up.
@@ -35,11 +39,12 @@ export interface FakeService {
   [Symbol.asyncDispose]: () => Promise<void>
 }
 
+const METHOD_KEY = /^([a-z]+) (?=\/)/i
 const STALL_RELEASED = 'the fake service ended the test with this request unanswered'
 
 function answerOf(value: ServiceAnswer): Response {
   if (value instanceof Response)
-    return value
+    return value.clone()
 
   if (value === undefined)
     return new Response(null, { status: 204 })
@@ -54,13 +59,17 @@ function handlerOf(routes: ServiceRoutes): ServiceHandler {
   if (typeof routes === 'function')
     return routes
 
-  const table = new Map(Object.entries(routes))
+  // The method of a key is read in upper case, as a request's is.
+  const table = new Map(Object.entries(routes).map(([key, route]) => [key.replace(METHOD_KEY, (_, method: string) => `${method.toUpperCase()} `), route]))
 
   return (request) => {
-    const route = table.has(`${request.method} ${request.path}`) ? table.get(`${request.method} ${request.path}`) : table.get(request.path)
+    const key = `${request.method} ${request.path}`
+    const found = table.has(key) ? key : request.path
 
-    if (route === undefined && !table.has(request.path))
+    if (!table.has(found))
       return new Response('Not found', { status: 404 })
+
+    const route = table.get(found)
 
     return typeof route === 'function' ? (route as ServiceHandler)(request) : route
   }
@@ -72,6 +81,7 @@ export function fakeService(routes: ServiceRoutes): FakeService {
   const handle = handlerOf(routes)
   const held = new Set<() => void>()
   let requests: ServiceRequest[] = []
+  let errors: unknown[] = []
   let failing: { status: number, body: string } | undefined
   let stalled = false
 
@@ -82,6 +92,7 @@ export function fakeService(routes: ServiceRoutes): FakeService {
 
   const reset = (): void => {
     requests = []
+    errors = []
     failing = undefined
     stalled = false
     release()
@@ -91,31 +102,38 @@ export function fakeService(routes: ServiceRoutes): FakeService {
     port: 0,
     hostname: '127.0.0.1',
     async fetch(incoming) {
-      return withNatives(async () => {
-        const url = new NativeURL(incoming.url)
-        const text = await incoming.text()
-        const request: ServiceRequest = { method: incoming.method, path: url.pathname, query: url.searchParams, headers: incoming.headers, text, json: () => JSON.parse(text) as unknown }
+      const bytes = new Uint8Array(await incoming.arrayBuffer())
+      const text = new TextDecoder().decode(bytes)
+      const url = new NativeURL(incoming.url)
+      const request: ServiceRequest = { method: incoming.method, path: url.pathname, query: url.searchParams, headers: incoming.headers, text, bytes, json: () => JSON.parse(text) as unknown }
 
-        requests.push(request)
+      requests.push(request)
 
-        if (stalled) {
-          await new Promise<void>((resolve) => {
-            const free = (): void => {
-              held.delete(free)
-              resolve()
-            }
+      if (stalled) {
+        await new Promise<void>((resolve) => {
+          const free = (): void => {
+            held.delete(free)
+            incoming.signal.removeEventListener('abort', free)
+            resolve()
+          }
 
-            held.add(free)
-            incoming.signal.addEventListener('abort', free, { once: true })
-          })
+          held.add(free)
+          incoming.signal.addEventListener('abort', free, { once: true })
+        })
 
-          return new Response(STALL_RELEASED, { status: 503 })
-        }
+        return new Response(STALL_RELEASED, { status: 503 })
+      }
 
-        return failing ? new Response(failing.body, { status: failing.status }) : answerOf(await handle(request))
-      })
+      return withNatives(async () => (failing ? new Response(failing.body, { status: failing.status }) : answerOf(await handle(request))))
+    },
+    error(error) {
+      errors.push(error)
+
+      return new Response('The fake service\'s route threw', { status: 500 })
     },
   })
+
+  server.unref()
 
   const stop = async (): Promise<void> => {
     stalled = false
@@ -128,6 +146,9 @@ export function fakeService(routes: ServiceRoutes): FakeService {
     get requests() {
       return requests
     },
+    get errors() {
+      return errors
+    },
     fail(status, body = '') {
       failing = { status, body }
     },
@@ -138,10 +159,14 @@ export function fakeService(routes: ServiceRoutes): FakeService {
     [Symbol.asyncDispose]: stop,
   }
 
-  // Hooks cannot be registered from inside a test, where the fake is left to `stop()`.
+  // Hooks cannot be registered from inside a test, where the fake is left to `stop()`, and the server does not keep the process alive.
+  try {
+    afterAll(stop)
+  }
+  catch {}
+
   try {
     beforeEach(reset)
-    afterAll(stop)
   }
   catch {}
 

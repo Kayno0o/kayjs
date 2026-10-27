@@ -119,7 +119,7 @@ Running the jobs an action enqueued and testing a websocket route are in [Testin
 - `fakeService(routes)` from `kay/test` stands in for a service the app calls (Forgejo, Frigate, a weather API): a real server on a free loopback port, so the app's own `fetch`, headers, timeouts and aborts run for real.
 - `routes` maps `path` or `METHOD path` to a value (JSON, a string as text, `undefined` as 204), a `Response`, or a function of the request returning one; a bare function answers every request, and an unmatched one answers 404.
 - `service.url` is its origin with no trailing slash, so one line points the app at it, `overrideEnv(env, { FORGEJO_URL: forgejo.url })`.
-- `service.requests` holds what it received since the test began, each `{ method, path, query, headers, text, json() }`.
+- `service.requests` holds what it received since the test began, each `{ method, path, query, headers, text, bytes, json() }`, and `service.errors` what a route function threw, each answered 500.
 - `service.fail(503)` answers every request that status and `service.stall()` holds them unanswered, both until the test ends, to test the app's failure and timeout paths.
 - The requests clear and the failure ends before each test, and the server stops after the file's tests; one made inside a test is stopped with `await using` or `service.stop()`.
 
@@ -190,7 +190,7 @@ it('shows why a todo was refused', async () => {
 ```
 
 - `site.visit(path)` GETs a page and follows redirects, stopping at one to another site.
-- `testSite({ proxyKey: 'secret' })` of an app setting `proxy.key` turns the key check on for that site alone, with no `KAY_PROXY_KEY` written to `process.env`: `fetch`, `visit`, `call`, `mcp` and `socket` send the key in the header `proxy.key` names, a call's own header of that name wins (`{ headers: { 'x-upstream-key': 'wrong' } }`), and `''` sends none, so `await site.fetch('/', { headers: { 'x-upstream-key': '' } })` reads the 403.
+- `testSite({ proxyKey: 'secret' })` of an app setting `proxy.key` turns the key check on for that site alone, with no `KAY_PROXY_KEY` written to `process.env`: `fetch`, `visit`, `call`, `mcp` and `socket` send the key in the header `proxy.key` names, a call's own header of that name wins (`{ headers: { 'x-upstream-key': 'wrong' } }`), and `''` sends none, so `await site.fetch('/', { headers: { 'x-upstream-key': '' } })` reads the 403. The key is trimmed, must not be blank, and the option throws with `dev: true` (which checks nothing) or `browser` (whose `open()` sends no key).
 - A project setting no `site`, nor `SITE_URL`, is served as `http://localhost`, so a page reading `siteUrl()` or `siteOrigin()` renders as it does in production.
 - `site.submit(action, fields, { from })` posts a form without JavaScript, as multipart with any `File` among its fields, and follows it back to its page, or reads the page a refused post renders.
 - `from` may be a page `visit` or `submit` resolved with instead of a path: the post goes where its form posts, from the URL the browser shows it at.
