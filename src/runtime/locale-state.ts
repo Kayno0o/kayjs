@@ -25,3 +25,14 @@ export function runInLocale<T>(state: LocaleState, run: () => T): T {
 export function localeState(): LocaleState | undefined {
   return store.getStore()
 }
+
+let siteLocale = 'en'
+
+// The site's default locale, installed once its locales are known, which the formatters use where no request runs, as a job or an alert does.
+export function setSiteLocale(locale: string): void {
+  siteLocale = locale
+}
+
+export function siteDefaultLocale(): string {
+  return siteLocale
+}

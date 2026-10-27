@@ -11,7 +11,7 @@ import { entryPath } from '../content/entry-route'
 import { contentKey } from '../content/key'
 import { onKeysInvalidated } from '../runtime/cache'
 import { FILE_EXTENSION, flattenMessages, localePath, matchLinksWith, pathSegment, splitLocale, translatedPath } from '../runtime/i18n'
-import { localeState } from '../runtime/locale-state'
+import { localeState, setSiteLocale } from '../runtime/locale-state'
 import { kayLog } from '../runtime/log'
 import { acceptedLocales, LOCALE_TAG, matchLocale } from './accept-language'
 import { routerPath } from './base'
@@ -338,6 +338,7 @@ const projects = new Map<string, Promise<I18n>>()
 
 export function serveLocales(root: string, i18n: I18n): void {
   projects.set(resolve(root), Promise.resolve(i18n))
+  setSiteLocale(i18n.settings.defaultLocale)
 }
 
 // The state `renderToString` runs in outside a request, or for another locale than the request's, in the site's default locale unless given one; its page is the root.
