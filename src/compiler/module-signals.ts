@@ -96,10 +96,16 @@ function signalsIn(ast: t.File): Record<string, SignalKind> {
 const SCALARS = new Set(['StringLiteral', 'NumericLiteral', 'BooleanLiteral', 'NullLiteral', 'BigIntLiteral'])
 
 const ICON_SET = /^~icons\/([a-z0-9-]+)\//
-const NO_ICONS: ReadonlySet<string> = new Set()
+
+// The set an `~icons/` specifier names, and whether it is one `iconSets` holds, every set being one when it is unset; undefined for any other specifier.
+export function iconImport(specifier: string, iconSets: ReadonlySet<string> | undefined): { installed: boolean } | undefined {
+  const set = ICON_SET.exec(specifier)?.[1]
+
+  return set === undefined ? undefined : { installed: iconSets === undefined || iconSets.has(set) }
+}
 
 // Whether an expression is plain data, a literal string, number, boolean or null, an icon in `icons`, or an array or object of them, `as const` and `satisfies` aside: nothing in it can be a function. A literal another module mutates afterwards is still read as data.
-function isDataLiteral(node: t.Node, icons = NO_ICONS): boolean {
+function isDataLiteral(node: t.Node, icons: ReadonlySet<string>): boolean {
   if (SCALARS.has(node.type))
     return true
 
@@ -129,9 +135,7 @@ function iconsIn(ast: t.File, iconSets: ReadonlySet<string> | undefined): Readon
     if (statement.type !== 'ImportDeclaration' || statement.importKind === 'type')
       continue
 
-    const set = ICON_SET.exec(statement.source.value)?.[1]
-
-    if (set === undefined || (iconSets !== undefined && !iconSets.has(set)))
+    if (iconImport(statement.source.value, iconSets)?.installed !== true)
       continue
 
     for (const specifier of statement.specifiers) {

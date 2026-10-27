@@ -1478,6 +1478,23 @@ describe('what a build keeps in memory', () => {
     }
   })
 
+  it('reads an object of icons a module exports as data while their set is installed, again once the project\'s package.json changes', async () => {
+    const dir = resolve(await scratchDir('kay-icons-'))
+    const file = join(dir, 'tiles.kay')
+    const source = '---\nimport { ICONS } from \'./icons\'\n---\np {String(ICONS.a)}\n'
+
+    try {
+      await Bun.write(join(dir, 'package.json'), JSON.stringify({ name: 'app', private: true }))
+      await Bun.write(join(dir, 'icons.ts'), 'import Home from \'~icons/tabler/home\'\n\nexport const ICONS = { a: Home }\n')
+      expect(importedSignals(file, source)).toEqual({})
+      await Bun.write(join(dir, 'package.json'), JSON.stringify({ name: 'app', private: true, devDependencies: { '@iconify-json/tabler': '*' } }))
+      expect(importedSignals(file, source)).toEqual({ './icons': { ICONS: 'data' } })
+    }
+    finally {
+      await rm(dir, { recursive: true, force: true })
+    }
+  })
+
   it('looks up the signals a component imports once inside a scope, and from the disk again in the next', async () => {
     const dir = resolve(await scratchDir('kay-scope-'))
     const file = join(dir, 'count.kay')
@@ -1703,6 +1720,20 @@ describe('what a build keeps in memory', () => {
     expect(await promoted()).toEqual(['src/wrap.kay'])
 
     await Bun.write(join(root, 'src/link.ts'), 'export {}\n')
+    expect(await promoted()).toEqual([])
+  })
+
+  it('promotes no component for tiles built from icons another module exports, as kay check reads them', async () => {
+    const root = await scratchProject({
+      'package.json': JSON.stringify({ name: 'app', private: true, devDependencies: { '@iconify-json/tabler': '*' } }),
+      'src/app-icons.ts': 'import Home from \'~icons/tabler/home\'\n\nexport const APP_ICONS = { a: Home }\n',
+      'src/apps.ts': 'export const APPS = [{ id: \'a\', name: \'A\' }] as const\n',
+      'src/clicks.kay': '---\nconst { tiles } = props<{ tiles: unknown }>()\n---\nbutton(type="button" onClick={() => {}}) {String(tiles)}\n',
+      'src/tiles.kay': '---\nimport Clicks from \'./clicks.kay\'\nimport { APP_ICONS } from \'./app-icons\'\nimport { APPS } from \'./apps\'\n\nconst tiles = APPS.map(app => ({ ...app, icon: APP_ICONS[app.id] }))\n---\nClicks(tiles={tiles})\n',
+      'src/routes/index.kay': '---\nimport Tiles from \'../tiles.kay\'\n---\nTiles\n',
+    })
+    const promoted = async () => (await buildClient(root, { minify: true, report: 'sizes' })).report!.islands.filter(island => island.promoted).map(island => island.file)
+
     expect(await promoted()).toEqual([])
   })
 

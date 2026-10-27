@@ -8,6 +8,7 @@ import { parse } from '@babel/parser'
 import { eachNode } from './each-node'
 import { isGlobalFunctionMember, SENDABLE_CLASSES } from './expression'
 import { KAY_VALUES } from './kay-exports'
+import { iconImport } from './module-signals'
 import { PAGE, PAGE_SETTINGS, unreadSettingReport } from './page-settings'
 import { POSITION_SUFFIX, walkScope } from './rewrite'
 
@@ -117,22 +118,20 @@ export function analyzeScript(source: string, script: Span | undefined, serverNa
   return module === undefined ? analysis : withModule(analysis, analyzeModule(source, module, iconSets, imported))
 }
 
-const ICON_SET = /^~icons\/([a-z0-9-]+)\//
-
 // What the imports hold that a static component passing it is promoted for: every value import, bar an icon of an installed set and a name its module exports as data.
 function importedFunctions(analysis: ScriptAnalysis, scope: FunctionScope, iconSets: ReadonlySet<string> | undefined, imported: ImportedSignals | undefined): void {
   for (const binding of analysis.imports) {
     if (binding.typeOnly || imported?.[binding.source]?.[binding.imported] === 'data')
       continue
 
-    const set = ICON_SET.exec(binding.source)?.[1]
+    const icon = iconImport(binding.source, iconSets)
 
-    if (set !== undefined && (iconSets === undefined || iconSets.has(set)))
+    if (icon?.installed === true)
       continue
 
     scope.functions.add(binding.local)
 
-    if (set !== undefined)
+    if (icon !== undefined)
       analysis.functions.push(binding.local)
   }
 }
