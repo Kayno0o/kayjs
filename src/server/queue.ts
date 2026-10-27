@@ -554,6 +554,7 @@ export function defaultJobStore(): JobStore {
 // A queue of jobs the server runs in the background, each surviving a restart: `enqueue` from an action, `app.use(queue)` in the server to run them.
 // A run that throws is retried later, waiting `backoff` then twice as long each time, until `attempts` runs failed: it is then kept as failed, logged and handed to `onFailed`.
 export function queue<Payload, Progress = unknown>(name: string, handler: (payload: Payload, signal: AbortSignal, job: JobContext<Progress>) => unknown, options: QueueOptions<Payload> = {}): Queue<Payload, Progress> {
+  // Wrapped, so an app's handler never gets the run's hold as a fourth argument.
   return jobQueue<Payload, Progress>(name, (payload, signal, job) => handler(payload, signal, job), options).queued
 }
 
