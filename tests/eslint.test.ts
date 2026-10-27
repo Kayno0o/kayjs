@@ -861,6 +861,39 @@ describe('kay/eslint over a line a fix breaks in a fence', () => {
   })
 })
 
+describe('kay/eslint without Bun', () => {
+  const STYLED = '---\nconst { n } = props<{ n: number }>()\nconst odd = n == 1\n---\n--- style\n.rendered :global(h1) { font-size: 1.5rem; }\n.rendered p { margin: 0 }\n---\n.rendered\n  p {odd || n == 2}\n'
+  const tsParser = import('@typescript-eslint/parser')
+
+  // The processor as `prepack` bundles it, with `Bun` shadowed by undefined, as keslint runs it under Node.
+  async function nodeProcessor(): Promise<typeof processor> {
+    const dir = await scratchDir('eslint-node-')
+    const built = await Bun.build({ entrypoints: [join(import.meta.dir, '..', 'src/eslint/index.ts')], target: 'node', packages: 'external', outdir: dir, naming: 'eslint.js', banner: 'const Bun = undefined;' })
+
+    expect(built.success).toBe(true)
+
+    return ((await import(join(dir, 'eslint.js'))) as { processor: typeof processor }).processor
+  }
+
+  it('lints a component and a page with a style fence, their script and template rules reported', async () => {
+    const [bundled, { default: parser }, { ESLint }] = await Promise.all([nodeProcessor(), tsParser, import('eslint')])
+    const overrideConfig = [
+      { files: ['**/*.kay'], processor: bundled },
+      { files: ['**/*.kay/*.tsx'], languageOptions: { parser }, rules: { eqeqeq: 'error' } },
+    ] as never
+    const eslint = new ESLint({ cwd: join(import.meta.dir, 'fixtures', 'lint'), overrideConfigFile: true, overrideConfig })
+
+    for (const filePath of [FILE, join(import.meta.dir, 'fixtures', 'lint', 'src', 'routes', 'index.kay')]) {
+      const { messages } = (await eslint.lintText(STYLED, { filePath }))[0]!
+
+      expect(messages.map(({ ruleId, line, column }) => ({ ruleId, line, column }))).toEqual([
+        { ruleId: 'eqeqeq', line: 3, column: 15 },
+        { ruleId: 'eqeqeq', line: 10, column: 15 },
+      ])
+    }
+  })
+})
+
 describe('testRules', () => {
   it('turns await-thenable off in an app\'s test files, wherever they live', async () => {
     const { ESLint } = await import('eslint')

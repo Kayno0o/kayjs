@@ -5,6 +5,7 @@ import { createRequire } from 'node:module'
 import { join } from 'node:path'
 import process from 'node:process'
 import { installedIconSets } from '../build/icons'
+import { fnvHash } from './fnv-hash'
 
 export { browserGlobals } from './globals'
 
@@ -22,8 +23,9 @@ export function cwd(): string {
   return process.cwd()
 }
 
+// ESLint runs the processor under Node, where a scoped style's attribute only has to differ from another module's.
 export function hash(text: string): string {
-  return Bun.hash(text).toString(36)
+  return typeof Bun === 'undefined' ? fnvHash(text) : Bun.hash(text).toString(36)
 }
 
 export function markdownHtml(text: string, options: { autolinks: boolean }): string {

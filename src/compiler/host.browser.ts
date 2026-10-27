@@ -10,15 +10,8 @@ export function browserGlobals(): ReadonlySet<string> {
   return new Set()
 }
 
-// FNV-1a over the UTF-16 units, 64 bits: a scoped style's attribute only has to differ from another module's, so it need not match Bun.hash.
-export function hash(text: string): string {
-  let state = 0xCBF29CE484222325n
-
-  for (let i = 0; i < text.length; i++)
-    state = BigInt.asUintN(64, (state ^ BigInt(text.charCodeAt(i))) * 0x100000001B3n)
-
-  return state.toString(36)
-}
+// A scoped style's attribute only has to differ from another module's, so it need not match Bun.hash.
+export { fnvHash as hash } from './fnv-hash'
 
 export function cwd(): string {
   return '/'
