@@ -28,7 +28,11 @@ When the options come from a request, set `busy` to show a disabled row in their
 Select(value={period} options={PERIODS} param="period" paramDefault="7d" aria-label="Period")
 ```
 
-An `onChange` of your own runs first, and a `false` from it, a failure, or a page that stays because a leave guard declined puts the select back on the option the page shows. It is busy while the move is under way. `emptyOption` and `paramDefault` are alternatives: both leave the param out, so the page shows its default for "Any" too. The select takes `param` as its name. Inside a GET form with a button it works without JavaScript, and alone it needs JavaScript. That form posts an empty `period=` for the empty option, which the page should read as absent.
+An `onChange` of your own runs first, and a `false` from it, a failure, or a page that stays because a leave guard declined puts the select back on the option the page shows. It is busy while the move is under way.
+
+`emptyOption` and `paramDefault` are alternatives: both leave the param out, so the page shows its default for "Any" too.
+
+The select takes `param` as its name. Inside a GET form with a button it works without JavaScript, and alone it needs JavaScript. That form posts an empty `period=` for the empty option, which the page should read as absent.
 
 ## Submitting on pick
 
