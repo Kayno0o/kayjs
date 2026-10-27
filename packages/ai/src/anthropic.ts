@@ -99,12 +99,18 @@ function failureOf(event: Record<string, unknown>): AiError {
 }
 
 // A turn as the API takes it: plain text, or blocks when it called tools or answers them.
+// The message's thinking, which goes first in its content.
+function thinkingBlocks(message: ProviderMessage): unknown[] {
+  return (message.thinking ?? []).map(block => 'redacted' in block ? { type: 'redacted_thinking', data: block.redacted } : { type: 'thinking', thinking: block.text, signature: block.signature })
+}
+
 function turnOf(message: ProviderMessage): { role: string, content: unknown } {
   // Files go before the text, as the API advises.
   if (message.attachments !== undefined && message.attachments.length > 0) {
     return {
       role: message.role,
       content: [
+        ...thinkingBlocks(message),
         ...message.attachments.map(media => ({ type: media.kind === 'pdf' ? 'document' : 'image', source: { type: 'base64', media_type: media.type, data: Buffer.from(media.data).toString('base64') } })),
         ...message.content.trim() === '' ? [] : [{ type: 'text', text: message.content }],
       ],
@@ -120,7 +126,7 @@ function turnOf(message: ProviderMessage): { role: string, content: unknown } {
   return {
     role: 'assistant',
     content: [
-      ...(message.thinking ?? []).map(block => 'redacted' in block ? { type: 'redacted_thinking', data: block.redacted } : { type: 'thinking', thinking: block.text, signature: block.signature }),
+      ...thinkingBlocks(message),
       ...message.content.trim() === '' ? [] : [{ type: 'text', text: message.content }],
       ...(message.calls ?? []).map(({ id, name, arguments: raw }) => ({ type: 'tool_use', id, name, input: inputOf(raw) })),
     ],

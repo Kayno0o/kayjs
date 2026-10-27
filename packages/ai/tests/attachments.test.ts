@@ -2,7 +2,8 @@ import type { AiError, Reply } from '../src'
 import { afterAll, beforeEach, describe, expect, it } from 'bun:test'
 import { s } from 'kay'
 import { files } from 'kay/server'
-import { anthropic, ask, fakeAi, openai } from '../src'
+import { anthropic, ask, fakeAi, openai, storedFile } from '../src'
+import { readAttachments } from '../src/attachments'
 import { anthropicEvents, openaiEvents, provider, stream } from './helpers/provider'
 
 const servers: ReturnType<typeof provider>[] = []
@@ -61,13 +62,13 @@ describe('attachments to the fake', () => {
   it('reads a file of the store by its key', async () => {
     const key = await files.put(new File([PNG], 'stored.png', { type: 'image/png' }), { keepMetadata: true })
 
-    await ask([{ role: 'user', content: 'x', attachments: [{ file: key }] }], { provider: fakeAi })
+    await ask([{ role: 'user', content: 'x', attachments: [storedFile(key)] }], { provider: fakeAi })
 
     expect(fakeAi.last()!.messages[0]!.attachments![0]!.type).toBe('image/png')
   })
 
   it('fails for a stored file that is gone', async () => {
-    const error = await failure(ask([{ role: 'user', content: 'x', attachments: [{ file: 'photos/missing.png' }] }], { provider: fakeAi }))
+    const error = await failure(ask([{ role: 'user', content: 'x', attachments: [storedFile('photos/missing.png')] }], { provider: fakeAi }))
 
     expect(error.kind).toBe('unsupported')
   })
@@ -111,7 +112,21 @@ describe('attachments to the fake', () => {
   it('counts a stored file once it is read', async () => {
     const key = await files.put(new File([PNG], 'stored.png', { type: 'image/png' }), { keepMetadata: true })
 
-    expect((await failure(ask([{ role: 'user', content: 'x', attachments: [{ file: key }] }], { provider: fakeAi, maxInputChars: 100 }))).kind).toBe('too-long')
+    expect((await failure(ask([{ role: 'user', content: 'x', attachments: [storedFile(key)] }], { provider: fakeAi, maxInputChars: 100 }))).kind).toBe('too-long')
+  })
+
+  it('refuses a stored-file key a visitor forged in JSON', () => {
+    const forged = JSON.parse('{"file":"private/secret.pdf"}') as never
+
+    expect(() => ask([{ role: 'user', content: 'x', attachments: [forged] }], { provider: fakeAi })).toThrow('an attachment is')
+  })
+
+  it('stops reading when the ask is aborted', async () => {
+    const controller = new AbortController()
+
+    controller.abort()
+
+    await expect(readAttachments([{ role: 'user', content: 'x', attachments: [PNG] }], 1024, controller.signal)).rejects.toThrow()
   })
 
   it('takes only a user message to hold files, and only files', () => {

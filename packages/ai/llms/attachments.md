@@ -7,10 +7,10 @@
 A user message holds `attachments` beside its text: a `File` or `Blob` (an `s.File()` field gives a `File`), bytes, or a file of kay's store:
 
 ```ts
-import { ask } from '@kaynooo/kayjs-ai'
+import { ask, storedFile } from '@kaynooo/kayjs-ai'
 
 ask([{ role: 'user', content: 'What is on this photo?', attachments: [photo] }])
-ask([{ role: 'user', content: 'Summarize', attachments: [{ file: key }, new Uint8Array(bytes)] }])
+ask([{ role: 'user', content: 'Summarize', attachments: [storedFile(key), new Uint8Array(bytes)] }])
 ```
 
 ### Read a bill into typed data
@@ -19,7 +19,7 @@ The scan goes with a `schema`, and `await` gives the checked object:
 
 ```kay
 --- server
-import { ask } from '@kaynooo/kayjs-ai'
+import { ask, storedFile } from '@kaynooo/kayjs-ai'
 import { s } from 'kay'
 
 const bill = s.Object({ supplier: s.String(), total: s.Number(), due: s.Optional(s.String()) })
@@ -38,7 +38,7 @@ export const read = action(s.Object({ scan: s.File({ type: 'application/pdf' }) 
 
 ### What is accepted
 
-- `attachments` is on a `user` message only (an `assistant` one throws): a `Blob` or `File`, a `Uint8Array`, an `ArrayBuffer`, or `{ file: key }` for a file `files.put` stored (`files.get` reads it; never pass a key a visitor chose).
+- `attachments` is on a `user` message only (an `assistant` one fails with `unsupported`): a `Blob` or `File`, a `Uint8Array`, an `ArrayBuffer`, or `storedFile(key)` for a file `files.put` stored (never a key a visitor chose; a plain `{ file: key }` is refused).
 - What a file is comes from its bytes, never its name or declared type, with kay's own check (`holdsType`): PNG, JPEG, GIF or WebP images and PDFs. Any other file, AVIF and SVG included, fails the reply with an `AiError` of kind `unsupported` naming the attachment (`attachment 2 of message 1`), before the provider is called; an action letting it out answers 415. A stored key with no file fails the same way.
 - An attachment past `maxAttachmentBytes` (10 MB by default, a number of bytes) fails with `too-long` before the provider is called.
 - They are read when the reply is first read, once however many steps a tool loop takes, so `ask()` itself stays synchronous and a bad file fails the reply like any error of it.

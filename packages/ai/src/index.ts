@@ -1,6 +1,7 @@
 export { anthropic } from './anthropic'
 export type { AnthropicOptions } from './anthropic'
 export { ask } from './ask'
+export { storedFile } from './attachments'
 export { AiError } from './errors'
 export type { AiErrorKind, AiLimit } from './errors'
 export { ai } from './extension'

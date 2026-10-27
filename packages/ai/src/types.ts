@@ -1,8 +1,9 @@
 import type { Action, Duration, Static } from 'kay'
 import type { TSchema } from 'kay/library'
+import type { StoredFile } from './attachments'
 
-// A file the model is shown: bytes or a `Blob` (a `File` from an `s.File()` field is one), or a file kay stored (`{ file: key }`, never a key a visitor chose). What it is comes from its bytes, not its name or declared type: a PNG, JPEG, GIF or WebP image, or a PDF.
-export type Attachment = Blob | Uint8Array | ArrayBuffer | { file: string }
+// A file the model is shown: bytes or a `Blob` (a `File` from an `s.File()` field is one), or a file kay stored (`storedFile(key)`, never a key a visitor chose). What it is comes from its bytes, not its name or declared type: a PNG, JPEG, GIF or WebP image, or a PDF.
+export type Attachment = Blob | Uint8Array | ArrayBuffer | StoredFile
 
 // A message as `Chat` posts it to its action: the files a visitor attached are `File`s, which a schema takes as `attachments: s.Optional(s.Array(s.File({ ... })))`.
 export interface ChatMessage {

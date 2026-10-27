@@ -254,7 +254,7 @@ In a test, `fakeAi.reply({ data: { title: 'Alien', score: 5, tags: [] } })` answ
 
 ## Show the model an image or a PDF
 
-A user message can hold `attachments` beside its text. An attachment is a `File` or `Blob` (an `s.File()` field gives you one), bytes, or a file kay stored, as `{ file: key }`.
+A user message can hold `attachments` beside its text. An attachment is a `File` or `Blob` (an `s.File()` field gives you one), bytes, or a file kay stored, as `storedFile(key)`.
 
 ```kay
 --- server

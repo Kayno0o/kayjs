@@ -258,6 +258,33 @@ function attachFiles(chosen: File[]) {
     attachProblem = attachFullLabel
 }
 
+const acceptable = (file: File) => accept.split(',').some(type => type.trim() === file.type)
+
+// Files pasted into the field (a screenshot) or dropped on the form: only the kinds `accept` names are taken, the rest of the clipboard stays text.
+function pasted(event: ClipboardEvent) {
+  const given = [...event.clipboardData?.files ?? []].filter(acceptable)
+
+  if (!attach || busy() || given.length === 0)
+    return
+
+  event.preventDefault()
+  attachFiles(given)
+}
+
+function dropped(event: DragEvent) {
+  if (!attach || busy() || !event.dataTransfer?.types.includes('Files'))
+    return
+
+  event.preventDefault()
+
+  const given = [...event.dataTransfer.files]
+
+  attachFiles(given.filter(acceptable))
+
+  if (given.some(file => !acceptable(file)))
+    attachProblem = attachRefusedLabel
+}
+
 function unattach(file: File) {
   attached = attached().filter(known => known !== file)
   attachProblem = undefined
@@ -715,18 +742,18 @@ section(part="root" onKeyDown={escape} data-empty={history().length === 0 && !bu
           | {file.name}
           BareIconButton(part="remove" variant="inline" size="xs" label={`${removeLabel} ${file.name}`} onClick={() => unattach(file)})
             Icon(icon="close")
-  form(part="form" onSubmit={event => { event.preventDefault(); void send() }})
+  form(part="form" onSubmit={event => { event.preventDefault(); void send() }} onDragOver={event => { if (attach) event.preventDefault() }} onDrop={dropped})
     if newButton && history().length > 0
       BareIconButton(part="new" variant="inline" label={newLabel} onClick={startOver})
         slot newIcon
           Icon(icon="plus")
     if attach
-      FileDrop(class={{ root: 'contents' }} accept={accept} multiple paste disabled={busy()} onFiles={attachFiles} onReject={() => { attachProblem = attachRefusedLabel }})
+      FileDrop(class={{ root: 'contents' }} accept={accept} multiple disabled={busy()} onFiles={attachFiles} onReject={() => { attachProblem = attachRefusedLabel }})
         @content(zone)
           BareIconButton(part="attach" variant="inline" label={attachLabel} onClick={zone.open})
             slot attachIcon
               Icon(icon="plus")
-    Textarea(part="field" writeFocused ref={element => { field = element }} value={draft()} onInput={draft.set} rows="1" aria-label={label} placeholder={placeholder} onKeyDown={keyDown})
+    Textarea(part="field" writeFocused ref={element => { field = element }} value={draft()} onInput={draft.set} rows="1" onPaste={pasted} aria-label={label} placeholder={placeholder} onKeyDown={keyDown})
     if busy()
       BareIconButton(part="send" variant="inline" label={stopLabel} onClick={stop})
         slot stopIcon
