@@ -73,6 +73,7 @@ const PORTS: DevPorts = {
   typesProcess: (root, entry, env, idleMs) => new TypesProcess(root, entry, env, idleMs),
   startClientBuilder,
   watchProject,
+  mentionsPackage,
 }
 
 // Runs the server entry in development and keeps its process through the changes to templates, islands and API modules: the process imports the modules they reached again and runs the entry once more, whose server takes over the one listening.
@@ -301,7 +302,7 @@ export async function dev(projectRoot: string, options: DevOptions = {}, ports: 
       do {
         packageScanAgain = false
 
-        if (await mentionsPackage(root))
+        if (await ports.mentionsPackage(root))
           changedFile(file, true)
       } while (packageScanAgain)
     })().finally(() => {

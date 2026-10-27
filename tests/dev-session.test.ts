@@ -3,11 +3,12 @@ import type { DevPorts, TypesWorker } from '../src/dev'
 import type { BuildOutcome } from '../src/dev/builder'
 import type { ClientBuilder } from '../src/dev/client'
 import type { TypeProblem } from '../src/dev/refuse'
-import { mkdir } from 'node:fs/promises'
+import { mkdir, rename, rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import { PassThrough } from 'node:stream'
 import { describe, expect, it } from 'bun:test'
-import { dev } from '../src/dev'
+import { ConfigRefusedError, dev } from '../src/dev'
+import { CONFIG_REFUSED } from '../src/dev/refuse'
 import { eventually, turn } from './helpers/eventually'
 import { scratchDir } from './scratch'
 
@@ -206,7 +207,23 @@ class FakeBuilder implements ClientBuilder {
   }
 }
 
-interface Session {
+// The scans of the sources for a mention of package.json, each answered when the test chooses.
+class FakeScan {
+  readonly asked: PromiseWithResolvers<boolean>[] = []
+
+  constructor(private trace: string[]) {}
+
+  async scan(): Promise<boolean> {
+    const deferred = Promise.withResolvers<boolean>()
+
+    this.trace.push(`scan ${this.asked.length + 1}`)
+    this.asked.push(deferred)
+
+    return deferred.promise
+  }
+}
+
+interface Fakes {
   root: string
   trace: string[]
   lines: string[]
@@ -214,32 +231,37 @@ interface Session {
   builders: FakeBuilder[]
   types: FakeTypes
   check: FakeTypes
+  scans: FakeScan
   keys: PassThrough
+  ports: DevPorts
+  // Holds the first build of the next builder started.
+  builderHeld: boolean
+  // Reports the file changed, as the watcher would.
+  event: (file: string) => void
+}
+
+interface Session extends Omit<Fakes, 'ports' | 'builderHeld'> {
   // Writes the file and reports it changed, as the watcher would.
   edit: (file: string, content?: string) => Promise<void>
-  // Reports the file changed again without writing it, as the late second event of one save does.
-  event: (file: string) => void
   // The server the session runs, the last one started.
   running: () => FakeServer
   stop: () => Promise<void>
 }
 
-// A project of `files` under a session of fakes; `prepare` holds what the start should meet held, before it runs.
-async function session(files: Record<string, string>, prepare?: (fakes: Pick<Session, 'types' | 'check' | 'builders'> & { builderHeld: boolean }) => void): Promise<Session> {
+// A project of `files` and the fakes a session of it drives, none started yet.
+async function project(files: Record<string, string>): Promise<Fakes> {
   const root = await scratchDir('dev-session-')
   const trace: string[] = []
-  const lines: string[] = []
   const servers: FakeServer[] = []
   const builders: FakeBuilder[] = []
   const types = new FakeTypes(trace, 'types')
   const check = new FakeTypes(trace, 'check')
-  const keys = new PassThrough()
-  const fakes = { types, check, builders, builderHeld: false }
+  const scans = new FakeScan(trace)
   let onChange: ((file: string) => void) | undefined
 
   await Promise.all(Object.entries(files).map(async ([path, content]) => path.endsWith('/') ? mkdir(join(root, path), { recursive: true }) : Bun.write(join(root, path), content)))
-  prepare?.(fakes)
 
+  const fakes: Omit<Fakes, 'ports'> = { root, trace, lines: [], servers, builders, types, check, scans, keys: new PassThrough(), builderHeld: false, event: file => onChange?.(file) }
   let typesMade = 0
   const ports: DevPorts = {
     spawnServer: (_root, entry, _env, _stdout, ipc) => {
@@ -271,32 +293,38 @@ async function session(files: Record<string, string>, prepare?: (fakes: Pick<Ses
         onChange = undefined
       }
     },
+    mentionsPackage: async () => scans.scan(),
   }
-  const stop = await dev(root, { log: line => lines.push(line), keys }, ports)
+
+  return Object.assign(fakes, { ports })
+}
+
+// A session of fakes over a project of `files`, once its first server is ready; `prepare` holds what the start should meet held, before it runs.
+async function session(files: Record<string, string>, prepare?: (fakes: Fakes) => void): Promise<Session> {
+  const fakes = await project(files)
+  const { root, lines, servers } = fakes
+
+  prepare?.(fakes)
+
+  const stop = await dev(root, { log: line => lines.push(line), keys: fakes.keys }, fakes.ports)
 
   await eventually(() => expect(lines.some(line => line.includes('ready in'))).toBe(true))
 
   return {
-    root,
-    trace,
-    lines,
-    servers,
-    builders,
-    types,
-    check,
-    keys,
+    ...fakes,
     edit: async (file, content = `${file} ${Math.random()}`) => {
       await Bun.write(join(root, file), content)
-      onChange?.(file)
+      fakes.event(file)
     },
-    event: file => onChange?.(file),
     running: () => servers.findLast(server => server.started !== undefined)!,
     stop,
   }
 }
 
-// Longer than the debounce of a change and a few turns, so a restart it would start has started.
+// Longer than the debounce of a change and a few turns, so a restart it would start has started: for "nothing happens" where no fake answers first.
 const SETTLED_MS = 60
+const reloadedLines = (dev: Session) => dev.lines.filter(line => line.includes('reloaded in'))
+const writesAnswered = (dev: Session) => dev.trace.filter(entry => entry === 'types write answered')
 
 describe('kay dev\'s session', () => {
   it('starts one server, then writes the first tree once it listens', async () => {
@@ -324,12 +352,11 @@ describe('kay dev\'s session', () => {
       expect(server.reloads).toHaveLength(1)
       server.reloadHeld = undefined
       held.resolve()
-      await eventually(() => expect(server.reloads).toHaveLength(2))
-      await Bun.sleep(SETTLED_MS)
+      await eventually(() => expect(reloadedLines(dev)).toHaveLength(2))
+      await turn()
       expect(server.reloads).toHaveLength(2)
       expect(dev.servers).toHaveLength(1)
       expect((server.reloads[1]!.reload as { files: string[] }).files).toEqual(['src/b.kay', 'src/a.kay'])
-      await eventually(() => expect(dev.lines.filter(line => line.includes('reloaded in'))).toHaveLength(2))
       await dev.stop()
     })
 
@@ -353,8 +380,8 @@ describe('kay dev\'s session', () => {
 
       await dev.edit('src/a.kay')
       dev.keys.write('r')
-      await eventually(() => expect(dev.running()).not.toBe(first))
-      await Bun.sleep(SETTLED_MS)
+      await eventually(() => expect(dev.lines.filter(line => line.includes('src/a.kay: restarted in'))).toHaveLength(1))
+      await turn()
       expect(dev.servers.filter(server => server.started !== undefined)).toHaveLength(2)
       expect(first.reloads).toHaveLength(0)
       expect(dev.running().reloads).toHaveLength(0)
@@ -396,16 +423,16 @@ describe('kay dev\'s session', () => {
 
       await eventually(() => expect(dev.types.writes).toHaveLength(2))
       await dev.edit('src/helper.ts')
-      await eventually(() => expect(dev.running().reloads).toHaveLength(1))
-      await Bun.sleep(SETTLED_MS)
+      await eventually(() => expect(reloadedLines(dev)).toHaveLength(1))
+      await turn()
       expect(dev.types.writes).toHaveLength(2)
       // The write in flight answers that it loaded the module the edit changed.
       dev.types.loadedFiles.add('src/helper.ts')
       held!.resolve(0)
-      await eventually(() => expect(dev.types.writes).toHaveLength(3))
-      expect(dev.types.writes[2]).toEqual({ command: 'write', fresh: true })
-      await Bun.sleep(SETTLED_MS)
+      await eventually(() => expect(writesAnswered(dev)).toHaveLength(2))
+      await turn()
       expect(dev.types.writes).toHaveLength(3)
+      expect(dev.types.writes[2]).toEqual({ command: 'write', fresh: true })
       await dev.stop()
     })
 
@@ -419,10 +446,10 @@ describe('kay dev\'s session', () => {
       await dev.edit('src/helper.ts')
       await eventually(() => expect(dev.running().reloads).toHaveLength(1))
       held!.resolve(0)
-      await eventually(() => expect(dev.types.writes).toHaveLength(3))
-      expect(dev.types.writes[2]).toEqual({ command: 'write', fresh: false })
-      await Bun.sleep(SETTLED_MS)
+      await eventually(() => expect(writesAnswered(dev)).toHaveLength(2))
+      await turn()
       expect(dev.types.writes).toHaveLength(3)
+      expect(dev.types.writes[2]).toEqual({ command: 'write', fresh: false })
       await dev.stop()
     })
 
@@ -438,8 +465,8 @@ describe('kay dev\'s session', () => {
       await dev.edit('src/b.kay')
       await eventually(() => expect(dev.running().reloads).toHaveLength(2))
       held!.resolve(0)
-      await eventually(() => expect(dev.types.writes).toHaveLength(3))
-      await Bun.sleep(SETTLED_MS)
+      await eventually(() => expect(writesAnswered(dev)).toHaveLength(2))
+      await turn()
       expect(dev.types.writes).toHaveLength(3)
       await dev.stop()
     })
@@ -524,7 +551,7 @@ describe('kay dev\'s session', () => {
         stopped = true
       })()
 
-      await Bun.sleep(SETTLED_MS)
+      await turn()
       expect(stopped).toBe(false)
       expect(server.signalCode).toBe(null)
       held.resolve()
@@ -610,6 +637,113 @@ describe('kay dev\'s session', () => {
       server.say({ wantsClient: true })
       await stopping
       expect(dev.builders).toHaveLength(0)
+    })
+  })
+  describe('the start', () => {
+    it('ends with ConfigRefusedError for a config that does not load, killing the waiting server and starting no other builder', async () => {
+      const fakes = await project({ 'kay.config.ts': 'export default {', 'src/routes/index.kay': 'p hi' })
+
+      fakes.types.hold('load').resolve(CONFIG_REFUSED)
+      await expect(dev(fakes.root, { log: line => fakes.lines.push(line), refuseConfig: true }, fakes.ports)).rejects.toBeInstanceOf(ConfigRefusedError)
+      expect(fakes.servers).toHaveLength(1)
+      expect(fakes.servers[0]!.started).toBeUndefined()
+      expect(fakes.servers[0]!.signalCode).toBe('SIGTERM')
+      // The project has pages, so its builder started beside the types; it is stopped, and none follows it.
+      expect(fakes.builders).toHaveLength(1)
+      expect(fakes.builders[0]!.stopped).toBe(true)
+      expect(fakes.types.closed).toBe(true)
+      expect(fakes.lines.some(line => line.includes('building the client exited'))).toBe(false)
+    })
+  })
+
+  describe('a config edit', () => {
+    const files = { 'kay.config.ts': 'export default {}', 'src/a.kay': 'p a', 'src/other.ts': 'export {}' }
+
+    // Edits the config, its types write held, and answers once the new process started that the config now names src/other.ts.
+    async function namesAnotherEntry(dev: Session): Promise<PromiseWithResolvers<number>> {
+      await eventually(() => expect(dev.types.writes).toHaveLength(2))
+
+      const held = dev.types.hold()
+
+      await dev.edit('kay.config.ts')
+      await eventually(() => expect(dev.running().id).toBe(2))
+      expect(dev.types.writes).toHaveLength(3)
+      dev.types.configuredEntry = join(dev.root, 'src/other.ts')
+
+      return held
+    }
+
+    it('starts one more process once its types write names another entry', async () => {
+      const dev = await session(files)
+      const held = await namesAnotherEntry(dev)
+
+      held.resolve(0)
+      await eventually(() => expect(dev.running().id).toBe(3))
+      expect(dev.running().entry).toBe(join(dev.root, 'src/other.ts'))
+      await eventually(() => expect(dev.lines.filter(line => line.includes('kay.config.ts: restarted in'))).toHaveLength(2))
+      await turn()
+      expect(dev.servers).toHaveLength(3)
+      await dev.stop()
+    })
+
+    it('starts none when that write ends once stopping', async () => {
+      const dev = await session(files)
+      const held = await namesAnotherEntry(dev)
+      const stopping = dev.stop()
+
+      await turn()
+      held.resolve(0)
+      await stopping
+      await turn()
+      expect(dev.servers).toHaveLength(2)
+    })
+  })
+
+  describe('a package.json edit', () => {
+    const manifest = (version: string) => JSON.stringify({ name: 'app', version, dependencies: {} })
+
+    it('scans once for a burst of edits no module resolves with, and once more for those during the scan', async () => {
+      const dev = await session({ 'package.json': manifest('1.0.0'), 'src/a.kay': 'p a' })
+      const server = dev.running()
+
+      await dev.edit('package.json', manifest('1.0.1'))
+      expect(dev.scans.asked).toHaveLength(1)
+      await dev.edit('package.json', manifest('1.0.2'))
+      await dev.edit('package.json', manifest('1.0.3'))
+      expect(dev.scans.asked).toHaveLength(1)
+      dev.scans.asked[0]!.resolve(false)
+      await eventually(() => expect(dev.scans.asked).toHaveLength(2))
+      // The scan after the burst finds a source naming package.json, which a reload takes in.
+      dev.scans.asked[1]!.resolve(true)
+      await eventually(() => expect(reloadedLines(dev)).toHaveLength(1))
+      await turn()
+      expect(dev.scans.asked).toHaveLength(2)
+      expect(server.reloads).toHaveLength(1)
+      expect((server.reloads[0]!.reload as { files: string[] }).files).toEqual(['package.json'])
+      expect(dev.servers).toHaveLength(1)
+      await dev.stop()
+    })
+  })
+
+  describe('a save that leaves its source missing a moment', () => {
+    it('waits for the source to come back, its backup beside it, and reloads once', async () => {
+      const dev = await session({ 'src/a.kay': 'p a' })
+      const server = dev.running()
+      const source = join(dev.root, 'src/a.kay')
+
+      await rename(source, `${source}~`)
+      dev.event('src/a.kay')
+      // Past the debounce, well within the wait for the save to end.
+      await Bun.sleep(30)
+      expect(server.reloads).toHaveLength(0)
+      await dev.edit('src/a.kay', 'p saved')
+      await rm(`${source}~`)
+      await eventually(() => expect(reloadedLines(dev)).toHaveLength(1))
+      await turn()
+      expect(server.reloads).toHaveLength(1)
+      expect((server.reloads[0]!.reload as { files: string[] }).files).toEqual(['src/a.kay'])
+      expect(dev.servers).toHaveLength(1)
+      await dev.stop()
     })
   })
 })
