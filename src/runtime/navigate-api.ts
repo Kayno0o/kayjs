@@ -2,6 +2,7 @@ import type { CheckedHref } from './checks'
 import { withBase } from './base'
 import { follow } from './navigate'
 import { leave, loadAgain, mayLeave, navigation, prefetched, swappable } from './navigation'
+import { mergeQuery } from './with-query'
 
 // Defined by the browser build, which never renders on the server: tested where it is read, so the bundler drops the server's code.
 declare const KAY_BROWSER: true | undefined
@@ -38,12 +39,7 @@ export async function navigate(to: string | { query: QueryChanges }, options: Na
     throw new TypeError('kay: navigate() refuses javascript:')
 
   if (typeof to !== 'string') {
-    for (const [name, value] of Object.entries(to.query)) {
-      if (value == null || value === '')
-        url.searchParams.delete(name)
-      else
-        url.searchParams.set(name, String(value))
-    }
+    mergeQuery(url.searchParams, to.query)
   }
 
   if (!await mayLeave(url))

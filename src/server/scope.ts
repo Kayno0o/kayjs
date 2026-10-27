@@ -6,6 +6,7 @@ import { setRequestOutcome } from '../runtime/action'
 import { setEndedEntryNote } from '../runtime/ended-entry'
 import { readParam } from '../runtime/query-param'
 import { setServerScope } from '../runtime/reactive'
+import { setCurrentUrl } from '../runtime/with-query'
 import { requestCookies } from './cookies'
 import { requestUrl } from './request-url'
 
@@ -15,6 +16,16 @@ const personal = new WeakSet<Request>()
 const store = new AsyncLocalStorage<ServerScope>()
 
 setServerScope(() => store.getStore())
+
+// The page a load answers, which runs before the render's scope is made.
+const loadUrls = new AsyncLocalStorage<URL>()
+
+setCurrentUrl(() => loadUrls.getStore() ?? (store.getStore()?.request === undefined ? undefined : requestUrl(store.getStore()!.request!)))
+
+// Runs a page's or a layout's load, which reads the page it answers through `withQuery`.
+export function inLoad<T>(url: URL, run: () => T): T {
+  return loadUrls.run(url, run)
+}
 
 // Renders for `request`: a module's signals keep what this render writes to itself, persisted signals read its cookies and query, `queryParam` its query by the page's `rules`, and a `try` block reports what it caught.
 // `cookieRead` runs once a persisted signal read a cookie, the page then depending on it.

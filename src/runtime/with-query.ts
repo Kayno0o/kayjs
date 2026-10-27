@@ -1,0 +1,57 @@
+import type { QueryChanges } from './navigate-api'
+import { withoutBase } from './base'
+
+// Defined by the browser build, which never renders on the server: tested where it is read, so the bundler drops the server's code.
+declare const KAY_BROWSER: true | undefined
+
+const LEADING_SLASHES = /^[/\\]+/
+
+let serverUrl: (() => URL | undefined) | undefined
+
+// Given by the server, which knows the page a load or a render answers.
+export function setCurrentUrl(read: () => URL | undefined): void {
+  serverUrl = read
+}
+
+// Sets each param of `changes` on `params`, a null, undefined or empty one dropped and the others kept: the rule of `navigate({ query })` and of `withQuery`.
+export function mergeQuery(params: URLSearchParams, changes: QueryChanges): void {
+  for (const [name, value] of Object.entries(changes)) {
+    if (value == null || value === '')
+      params.delete(name)
+    else
+      params.set(name, String(value))
+  }
+}
+
+// The path of the current page with `changes` merged into its query, to link to it with one filter or sort changed: `a(href={withQuery({ page: 2, filter: null })})`.
+// A null, undefined or empty value drops the param, the others keep their place and the hash is left out; the path is the site's own, under the mount point and in the locale of the page as any link of it is.
+// A page rendered once at build time has no request to read the query of, so it throws there.
+export function withQuery(changes: QueryChanges): string {
+  const params = new URLSearchParams()
+  let path: string
+
+  if (typeof KAY_BROWSER === 'undefined' && typeof document === 'undefined') {
+    const url = serverUrl?.()
+
+    if (url === undefined)
+      throw new Error('kay: withQuery() reads the query of the request being rendered, and a page rendered once at build time has none; render the page per request, or build the link in an island')
+
+    path = url.pathname
+
+    for (const [name, value] of url.searchParams)
+      params.append(name, value)
+  }
+  else {
+    path = withoutBase(location.pathname)
+
+    for (const [name, value] of new URLSearchParams(location.search))
+      params.append(name, value)
+  }
+
+  mergeQuery(params, changes)
+
+  // A request path starting with two slashes would read as another host once it is a link's.
+  const text = params.toString()
+
+  return `${path.replace(LEADING_SLASHES, '/')}${text === '' ? '' : `?${text}`}`
+}

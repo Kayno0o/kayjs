@@ -271,6 +271,14 @@ button(onClick={() => navigate('/todos')}) Todos
 
 `navigate({ query: { sort: 'name', page: null } })` changes the current page's query in place. The scroll and the focus stay, and a null or empty value drops its param. A text field the swap replaces, such as a search box whose island gets the new value, keeps its caret and selection, and the keys typed meanwhile, so a search as you type keeps taking the keys.
 
+To link to the current page with one param changed, use `withQuery`. It works in a server fence, a template and an island, and follows the same rules as `navigate({ query })`.
+
+```kay
+a(href={withQuery({ page: 2 })}) Next
+```
+
+It keeps the other params, and your `base`, `trailingSlash` and locale prefix are added the way they are to any link.
+
 `navigate('/todos', { scroll: 'keep' })` goes to the page without scrolling to the top, and `{ transition: false }` swaps it without a view transition. A link does the same with `data-keep-scroll` and `data-no-transition`, which an element around several links can carry. The nearest `data-keep-scroll` to the link decides, so `data-keep-scroll="false"` on one link inside a keeping element scrolls to the top.
 
 A page the server has not fully sent after 10 seconds, for a link or `navigate()`, is loaded by the browser instead, which shows its own progress or error. A view transition that has not finished after 3 seconds is skipped and the page is shown. A link you click during a transition skips it and is followed.

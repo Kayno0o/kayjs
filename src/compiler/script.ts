@@ -18,7 +18,7 @@ const FIRST_TOKEN = /^[\w$]*/
 // A `guards` or `layouts` written as the server reads it, with nothing between the key and the literal.
 const LITERAL_SETTING = /^(?:[\w$]+|'[^']*'|"[^"]*")\s*:\s*(?:true|false)$/
 // What `kay` exports that reads nothing reactive: a script using only these stays a static component.
-const STATIC_EXPORTS = new Set(['uid', 'describeField', 'sanitizeHtml', 'trustHtml', 'defer', 'route', 'localPath', 'withBase', 's', 'durationMs', 'refusalMessage', 'recipe', 'ctx'])
+const STATIC_EXPORTS = new Set(['uid', 'describeField', 'sanitizeHtml', 'trustHtml', 'defer', 'route', 'localPath', 'withBase', 'withQuery', 's', 'durationMs', 'refusalMessage', 'recipe', 'ctx'])
 // What `kay/i18n` exports that makes a component an island; the rest of it reads the locale alike on both sides.
 const REACTIVE_I18N = new Set(['relativeTime'])
 const BINDABLE_TYPE = 'Bindable'

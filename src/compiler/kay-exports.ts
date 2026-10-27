@@ -65,4 +65,5 @@ export const KAY_VALUES: readonly string[] = [
   'watch',
   'webPush',
   'withBase',
+  'withQuery',
 ]

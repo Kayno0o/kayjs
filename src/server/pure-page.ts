@@ -45,6 +45,7 @@ export const KAY_EXPORTS: Record<string, 'free' | 'request' | 'local'> = {
   sanitizeHtml: 'free',
   trustHtml: 'free',
   withBase: 'free',
+  withQuery: 'request',
   localPath: 'free',
   route: 'free',
   markInvalid: 'free',

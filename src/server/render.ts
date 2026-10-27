@@ -69,7 +69,7 @@ import { overHttps } from './request-url'
 import { askedPath } from './rewrite'
 import { CONTEXT_LAYOUT, guardUrl, routeChain } from './routes'
 import { savesLess } from './save-data'
-import { askedForEndedEntry, inServerScope, markPrivate, readPersonally, wasReadPersonally, withEndedEntries, withOutcome } from './scope'
+import { askedForEndedEntry, inLoad, inServerScope, markPrivate, readPersonally, wasReadPersonally, withEndedEntries, withOutcome } from './scope'
 import { Denied, NotFound, Redirect, stoppers } from './signals'
 import { speculationRules } from './speculation'
 import { formChecks, renderBlock, renderStatic, settle, streamDocument } from './stream'
@@ -515,7 +515,7 @@ async function runLoad(file: string, module: PageModule, ctx: PageContext<Record
     return {}
 
   const load = module.load
-  const run = async () => traced(() => `kay.load ${projectPath(file)}`, {}, async () => await load(ctx) ?? {})
+  const run = async () => traced(() => `kay.load ${projectPath(file)}`, {}, async () => inLoad(ctx.url, async () => await load(ctx) ?? {}))
 
   if (!timings)
     return run()
