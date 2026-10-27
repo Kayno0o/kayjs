@@ -22,8 +22,10 @@ const FINISHES: Record<string, Finish> = { max_tokens: 'length', refusal: 'filte
 // The share of `maxTokens` each level lets the model think with, and the least Anthropic accepts as a budget.
 const THINKING_SHARE = { low: 0.25, medium: 0.5, high: 0.75 }
 const MIN_THINKING = 1024
+// The tokens the answer keeps beside the thinking budget.
+const ANSWER_ROOM = 512
 
-// Extended thinking for the level asked: `none` turns it off, the others give a budget the answer still has room beside, and a `maxTokens` too small for the minimum budget leaves thinking alone.
+// Extended thinking for the level asked: `none` turns it off, the others give a budget with `ANSWER_ROOM` tokens left for the answer, and a `maxTokens` too small for that leaves thinking alone.
 function thinkingOf({ reasoning, maxTokens }: ProviderRequest): { type: 'disabled' } | { type: 'enabled', budget_tokens: number } | undefined {
   if (reasoning === undefined)
     return undefined
@@ -33,7 +35,7 @@ function thinkingOf({ reasoning, maxTokens }: ProviderRequest): { type: 'disable
 
   const budget = Math.max(MIN_THINKING, Math.floor(maxTokens * THINKING_SHARE[reasoning]))
 
-  return budget < maxTokens ? { type: 'enabled', budget_tokens: budget } : undefined
+  return budget + ANSWER_ROOM <= maxTokens ? { type: 'enabled', budget_tokens: budget } : undefined
 }
 
 function count(value: unknown): number | undefined {
@@ -148,10 +150,10 @@ export function anthropic({ apiKey, baseUrl = ANTHROPIC_URL, model, body: fields
           case 'content_block_start': {
             const block = event.content_block as { type?: unknown, id?: unknown, name?: unknown, data?: unknown } | undefined
 
-            if (typeof event.index === 'number' && block?.type === 'thinking')
+            if (typeof event.index === 'number' && block?.type === 'thinking' && thoughts.size < MAX_STREAMED_CALLS)
               thoughts.set(event.index, { text: '', signature: '' })
 
-            if (typeof event.index === 'number' && block?.type === 'redacted_thinking' && typeof block.data === 'string')
+            if (typeof event.index === 'number' && block?.type === 'redacted_thinking' && typeof block.data === 'string' && thoughts.size < MAX_STREAMED_CALLS)
               thoughts.set(event.index, { redacted: block.data })
 
             if (block?.type === 'tool_use' && typeof event.index === 'number' && calls.size < MAX_STREAMED_CALLS)
@@ -192,7 +194,9 @@ export function anthropic({ apiKey, baseUrl = ANTHROPIC_URL, model, body: fields
             if (thought) {
               thoughts.delete(event.index as number)
 
-              yield { thinking: thought satisfies Thinking }
+              // A block without its signature would be refused when sent back, so it is not kept.
+              if ('redacted' in thought || thought.signature !== '')
+                yield { thinking: thought satisfies Thinking }
             }
 
             if (call) {

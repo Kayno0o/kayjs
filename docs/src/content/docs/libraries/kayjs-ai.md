@@ -180,7 +180,9 @@ A provider that stalls fails the reply with an `AiError` of kind `timeout`. kay 
 
 ### Thinking
 
-`reasoning: 'none' | 'low' | 'medium' | 'high'` sets how much a reasoning model thinks. An OpenAI-compatible server gets it as `reasoning_effort`. Anthropic gets extended thinking: `'none'` turns it off, and the other levels give the model a budget of a quarter, a half or three quarters of `maxTokens`, at least 1,024 tokens. Raise `maxTokens` to let a model think, as a `maxTokens` of 1,024 or less leaves thinking off. Anthropic refuses a `temperature` while the model thinks, so kayjs-ai leaves it out then.
+`reasoning: 'none' | 'low' | 'medium' | 'high'` sets how much a reasoning model thinks. An OpenAI-compatible server gets it as `reasoning_effort`. Anthropic gets extended thinking: `'none'` turns it off, and the other levels give the model a budget of a quarter, a half or three quarters of `maxTokens`, at least 1,024 tokens.
+
+Raise `maxTokens` to let a model think: a `maxTokens` under 1,536 leaves thinking off, as the answer keeps 512 tokens beside the smallest budget. A model that wants another thinking setting takes it from `body: { thinking }`, without `reasoning`. Anthropic refuses a `temperature` while the model thinks, so kayjs-ai leaves it out then.
 
 What the model thinks streams as its own kind of piece, so `await reply` still gives the answer alone. `reply.progress()` carries it as `reasoning`, and a tool loop sends Anthropic's thinking blocks back with the calls as its API requires.
 

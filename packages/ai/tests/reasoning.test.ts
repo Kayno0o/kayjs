@@ -1,7 +1,8 @@
-import type { Piece, ProviderRequest } from '../src'
+import type { Piece, Provider, ProviderRequest } from '../src'
 import type { Event } from './helpers/provider'
 import { afterAll, describe, expect, it } from 'bun:test'
 import { anthropic, ask, openai } from '../src'
+import { converse } from '../src/loop'
 import { anthropicEvents, openaiEvents, provider, stream } from './helpers/provider'
 
 const servers: ReturnType<typeof provider>[] = []
@@ -61,7 +62,8 @@ describe('reasoning on Anthropic', () => {
 
   it('keeps the budget at the minimum of 1024 and under maxTokens, else leaves thinking off', async () => {
     expect((await sent({ reasoning: 'low', maxTokens: 2000 })).thinking).toEqual({ type: 'enabled', budget_tokens: 1024 })
-    expect((await sent({ reasoning: 'high', maxTokens: 1500 })).thinking).toEqual({ type: 'enabled', budget_tokens: 1125 })
+    expect((await sent({ reasoning: 'low', maxTokens: 1536 })).thinking).toEqual({ type: 'enabled', budget_tokens: 1024 })
+    expect('thinking' in await sent({ reasoning: 'low', maxTokens: 1535 })).toBe(false)
     expect('thinking' in await sent({ reasoning: 'high', maxTokens: 1024 })).toBe(false)
   })
 
@@ -92,6 +94,18 @@ describe('reasoning on Anthropic', () => {
     expect(pieces.filter(piece => 'text' in piece)).toEqual([{ text: 'Answer' }])
   })
 
+  it('drops a thinking block that came without a signature', async () => {
+    const server = serve(() => stream([
+      ['content_block_start', { type: 'content_block_start', index: 0, content_block: { type: 'thinking', thinking: '', signature: '' } }],
+      ['content_block_delta', { type: 'content_block_delta', index: 0, delta: { type: 'thinking_delta', thinking: 'hm' } }],
+      ['content_block_stop', { type: 'content_block_stop', index: 0 }],
+      ['message_stop', { type: 'message_stop' }],
+    ]).response)
+    const pieces = await collect(anthropic({ baseUrl: server.url, apiKey: 'k' }).stream(BASE, new AbortController().signal))
+
+    expect(pieces.filter(piece => 'thinking' in piece)).toEqual([])
+  })
+
   it('sends the thinking blocks back before the tool calls of the turn', async () => {
     const server = serve(() => stream(anthropicEvents('ok')).response)
     const request: ProviderRequest = {
@@ -105,6 +119,35 @@ describe('reasoning on Anthropic', () => {
 
     await collect(anthropic({ baseUrl: server.url, apiKey: 'k' }).stream(request, new AbortController().signal))
     expect((bodyOf(server).messages as { content: unknown }[])[1]!.content).toEqual([{ type: 'thinking', thinking: 'hmm', signature: 's' }, { type: 'redacted_thinking', data: 'enc' }, { type: 'tool_use', id: 'c1', name: 'add_note', input: {} }])
+  })
+})
+
+describe('reasoning across the steps of a tool loop', () => {
+  it('joins the thinking of each step after a blank line, keeps the text apart and sends the blocks back', async () => {
+    const seen: ProviderRequest[] = []
+    const provided: Provider = {
+      name: 'steps',
+      model: 'm',
+      async* stream(request) {
+        const first = request.messages.length === 1
+
+        seen.push(structuredClone(request))
+
+        yield { reasoning: first ? 'a' : 'b' }
+        yield { thinking: first ? { text: 'a', signature: 's' } : { redacted: 'enc' } }
+        yield { text: first ? 'one' : 'two' }
+
+        if (first)
+          yield { toolUse: { id: 'x', name: 'unknown', arguments: '{}' } }
+
+        yield { finish: 'stop' }
+      },
+    }
+    const pieces = await collect(converse(provided, BASE, [], 3, new Request('http://localhost/'), new AbortController().signal))
+
+    expect(pieces.filter(piece => 'reasoning' in piece)).toEqual([{ reasoning: 'a' }, { reasoning: '\n\nb' }])
+    expect(pieces.filter(piece => 'thinking' in piece)).toEqual([])
+    expect(seen[1]!.messages[1]!.thinking).toEqual([{ text: 'a', signature: 's' }])
   })
 })
 

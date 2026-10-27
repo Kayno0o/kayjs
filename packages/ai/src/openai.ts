@@ -66,7 +66,7 @@ function textOf(content: unknown): string {
   return content.map(part => typeof part === 'object' && part !== null && (part as { type?: unknown }).type === 'text' && typeof (part as { text?: unknown }).text === 'string' ? (part as { text: string }).text : '').join('')
 }
 
-// The model's thinking in a delta: `reasoning_content` on DeepSeek, Ollama and Mistral's compatible servers, `reasoning` on OpenRouter.
+// The model's thinking in a delta: `reasoning_content` on DeepSeek and Ollama, `reasoning` on OpenRouter.
 function reasoningOf(delta: { reasoning_content?: unknown, reasoning?: unknown } | undefined): string {
   const thought = delta?.reasoning_content ?? delta?.reasoning
 
