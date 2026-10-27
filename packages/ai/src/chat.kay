@@ -302,8 +302,9 @@ function pasted(event: ClipboardEvent) {
   attachFiles(given)
 }
 
+// A drop on the attach button is the FileDrop's, which handled it and cancelled the event, so the form leaves it.
 function dropped(event: DragEvent) {
-  if (!attach || busy() || !event.dataTransfer?.types.includes('Files'))
+  if (!attach || event.defaultPrevented || busy() || !event.dataTransfer?.types.includes('Files'))
     return
 
   event.preventDefault()

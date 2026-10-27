@@ -51,3 +51,21 @@ it('leaves out a file of a type the chat does not accept and says so', async () 
 
   expect(await page.count('.kai-chat-files')).toBe(0)
 }, 120_000)
+
+it('takes a file dropped on the attach button once, and says why for one it leaves out', async () => {
+  await using page = await site.open('/attacher')
+
+  await page.evaluate(() => {
+    const files = new DataTransfer()
+
+    files.items.add(new File(['x'], 'a.png', { type: 'image/png' }))
+    files.items.add(new File(['x'], 'note.txt', { type: 'text/plain' }))
+    document.querySelector('.kai-chat-form button[aria-label="Attach a file"]')!.dispatchEvent(new DragEvent('drop', { bubbles: true, cancelable: true, dataTransfer: files }))
+  })
+  await page.waitFor('.kai-chat-files .kai-chat-file', { text: 'a.png' })
+  await page.waitFor('.kui-notice', { text: 'Only images and PDFs can be attached.' })
+
+  expect(await page.count('.kai-chat-files .kai-chat-file')).toBe(1)
+  expect(await page.count('.kui-notice')).toBe(1)
+  expect(page.errors).toEqual([])
+}, 120_000)

@@ -129,6 +129,43 @@ describe('attachments to the fake', () => {
     await expect(readAttachments([{ role: 'user', content: 'x', attachments: [PNG] }], 1024, controller.signal)).rejects.toThrow()
   })
 
+  it('refuses files past the 24 MiB an ask takes together, though each is under maxAttachmentBytes', async () => {
+    const MiB = 1024 * 1024
+    const image = (mebibytes: number) => {
+      const bytes = new Uint8Array(mebibytes * MiB)
+
+      bytes.set(PNG)
+
+      return bytes
+    }
+    const signal = new AbortController().signal
+    const message = (...sizes: number[]) => [{ role: 'user' as const, content: 'x', attachments: sizes.map(image) }]
+
+    expect((await readAttachments(message(8, 8, 8), 10 * MiB, signal))[0]!.attachments).toHaveLength(3)
+
+    const error = await failure(readAttachments(message(8, 8, 8, 1), 10 * MiB, signal))
+
+    expect(error.kind).toBe('too-long')
+    expect(error.message).toContain('together')
+  })
+
+  it('stops an ask aborted while its files are read, before the provider is called', async () => {
+    const controller = new AbortController()
+    const slow = new File([PNG], 'slow.png', { type: 'image/png' })
+
+    slow.bytes = async () => {
+      controller.abort()
+
+      return PNG
+    }
+
+    const reply = ask([{ role: 'user', content: 'x', attachments: [slow, PNG] }], { provider: fakeAi, signal: controller.signal })
+
+    // A reply stopped on purpose ends with what it has.
+    expect(await reply).toBe('')
+    expect(fakeAi.asked).toHaveLength(0)
+  })
+
   it('takes only a user message to hold files, and only files', () => {
     expect(() => ask([{ role: 'user', content: 'x' }, { role: 'assistant', content: 'y', attachments: [PNG] }], { provider: fakeAi })).toThrow('only a user message')
     expect(() => ask([{ role: 'user', content: 'x', attachments: ['/etc/passwd' as never] }], { provider: fakeAi })).toThrow('an attachment is')

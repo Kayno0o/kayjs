@@ -5,11 +5,11 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, setSystemTime, spyOn } from 'bun:test'
 import { nameUser } from 'kay/library'
-import { memoryRates, sqliteRates } from 'kay/server'
+import { files, memoryRates, sqliteRates } from 'kay/server'
 import { setupStore } from '../../../src/server/app-store'
 import { answeringRequest } from '../../../src/server/log'
 import { sendFrom } from '../../../src/server/rewrite'
-import { ai, AiError, ask, fakeAi } from '../src'
+import { ai, AiError, ask, fakeAi, storedFile } from '../src'
 import { forgetCounts, storeTimeout } from '../src/limits'
 
 const REFUSED = Symbol.for('kay.refused')
@@ -373,6 +373,20 @@ describe('ai({ budget })', () => {
     await failure(ask('abcd'.repeat(5), { key: 'v', provider: saying([{ text: usedBy(6) }], new AiError('cut', 'cut')) }))
     // 5 tokens of prompt, 6 of reply.
     expect(store.count()).toBe(11)
+  })
+
+  it('counts the files of a reply that reports no usage by what they hold once read, not by the guess made before', async () => {
+    const store = tracking()
+    const pages = new Uint8Array(600 * 1024)
+
+    pages.set(new TextEncoder().encode('%PDF-1.4\n'))
+
+    const key = await files.put(new File([pages], 'stored.pdf', { type: 'application/pdf' }), { keepMetadata: true })
+
+    ai({ budget: { tokens: 100_000, window: '1m', store } })
+    // A stored file is guessed an image before it is read, 4000 characters; its 600 KB are three PDF pages of 4000 each: 12,000 characters and 'abcd' make 3001 tokens, the 'ok' reply one.
+    await ask([{ role: 'user', content: 'abcd', attachments: [storedFile(key)] }], { key: 'v', provider: saying([{ text: 'ok' }, { finish: 'stop' }]) })
+    expect(store.count()).toBe(3001 + 1)
   })
 
   it('counts nothing for a reply that failed before any text and any usage', async () => {
