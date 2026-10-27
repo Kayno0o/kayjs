@@ -6,9 +6,13 @@ const items = [
   { label: 'Host', value: 'relay.example.com' },
   { label: 'Requests', value: 1284 },
   { label: 'State' },
+  { label: 'Backups' },
 ]
 ---
 .max-w-md
   DescriptionList(items={items})
-    @value
-      Badge(label="Healthy" tone="success")
+    @value(item)
+      if item.label === 'State'
+        Badge(label="Healthy" tone="success")
+      else
+        Badge(label="Paused" tone="warning")
