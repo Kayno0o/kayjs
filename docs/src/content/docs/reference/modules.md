@@ -103,7 +103,7 @@ Types include `BrowserError` and `CspViolationError`, the browser errors and CSP
 | `kay/compiler` | `compileKay`, which compiles one `.kay` source, `formatDiagnostic`, which prints a problem it found, and the `Diagnostic`, `CompileOptions` and `CompileResult` types. See [Compiling a component](/llms/check-and-tools#compile-a-component-from-a-tool) |
 | `kay/markdown` | `markdownHtml`, sanitized Markdown on the server and in an island. See [Content](/guides/content#markdown-in-an-island) |
 | `kay/seo` | `siteUrl`, `siteOrigin`, `jsonLd`, `breadcrumbList`. See [Head and SEO](/essentials/head-and-seo) |
-| `kay/i18n` | `t`, `locale`, `locales`, `localeName`, `localize`, `alternate`, `formatNumber`, `formatDate`, `formatRelativeTime`, `relativeTime`, `formatList`, `direction`, `defineMessages`. See [Internationalization](/guides/i18n) |
+| `kay/i18n` | `t`, `locale`, `locales`, `localeName`, `localize`, `alternate`, `formatNumber`, `formatDate`, `formatRelativeTime`, `relativeTime`, `formatList`, `formatBytes`, `formatDuration`, `timeZone`, `direction`, `defineMessages`. See [Internationalization](/guides/i18n) |
 | `kay/words` | `wording`, `pageLocale`, `sizeText`: the lookup a library words its default texts through. See [Internationalization](/guides/i18n) |
 | `kay/params` | The route matchers `integer`, `uuid` and `slug` |
 | `kay/pg-orm` | `jobTables`, with `KayJobs` and `KayLocks`: the job queue's tables as pg-orm definitions, for the app's `new Database({ tables })`. Needs `@kaynooo/pg-orm`. See [Background jobs](/guides/background-jobs#postgres) |

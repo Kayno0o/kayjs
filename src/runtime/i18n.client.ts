@@ -1,7 +1,7 @@
-import type { DateFormatOptions, Direction, ListFormatOptions, Locale, LocaleSettings, Localize, Message, MessageValue, NumberFormatOptions, RelativeFormatOptions, RelativeTimeOptions, RichText, Translate } from './i18n'
+import type { DateFormatOptions, Direction, DurationFormatOptions, ListFormatOptions, Locale, LocaleSettings, Localize, Message, MessageValue, NumberFormatOptions, RelativeFormatOptions, RelativeTimeOptions, RichText, Translate } from './i18n'
 import { withBase, withoutBase } from './base'
 import { fragment, insert, localizeLinks, markers } from './dom'
-import { formatDate as formatDateIn, formatList as formatListIn, formatNumber as formatNumberIn, formatRelativeTime as formatRelativeTimeIn, leadsWithLocale, localeName as localeNameIn, localePath, localizedLink, richMessage, splitLocale, textDirection, translate, untranslatedPath } from './i18n'
+import { formatBytes as formatBytesIn, formatDate as formatDateIn, formatDuration as formatDurationIn, formatList as formatListIn, formatNumber as formatNumberIn, formatRelativeTime as formatRelativeTimeIn, leadsWithLocale, localeName as localeNameIn, localePath, localizedLink, richMessage, setTimeZone, timeZone as siteTimeZone, splitLocale, textDirection, translate, untranslatedPath } from './i18n'
 import { pageData } from './page-data'
 import { createSignal, effect, memo, onCleanup } from './reactive'
 import { tabVisible } from './visibility'
@@ -16,6 +16,8 @@ interface Payload {
   messages: Record<string, Message>
   // When the server rendered the page, for `relativeTime`.
   now?: number
+  // The site's `timeZone`, which the dates an island writes use as the server's do.
+  timeZone?: string
 }
 
 const PAYLOAD = 'script[data-kay-i18n]'
@@ -39,6 +41,9 @@ function load(): void {
     settings ??= payload.settings
     pageLocale ||= payload.locale ?? ''
     renderedAt ??= payload.now
+
+    if (payload.timeZone !== undefined)
+      setTimeZone(payload.timeZone)
 
     for (const [key, message] of Object.entries(payload.messages))
       messages.set(key, message)
@@ -116,6 +121,22 @@ export function localeName(target: Locale): string {
 
 export function formatNumber(value: number, options?: NumberFormatOptions): string {
   return formatNumberIn(translations().locale, value, options)
+}
+
+// The time zone the site writes its dates in, as `timeZone` in kay.config.ts names it, or none.
+export function timeZone(): string | undefined {
+  if (!settled)
+    load()
+
+  return siteTimeZone()
+}
+
+export function formatBytes(bytes: number, options?: NumberFormatOptions): string {
+  return formatBytesIn(translations().locale, bytes, options)
+}
+
+export function formatDuration(milliseconds: number, options?: DurationFormatOptions): string {
+  return formatDurationIn(translations().locale, milliseconds, options)
 }
 
 export function formatDate(value: Date | number, options?: DateFormatOptions): string {

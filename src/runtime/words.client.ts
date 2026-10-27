@@ -4,6 +4,7 @@ import { sizeText as sizeIn } from './size-text'
 // What the server writes for a page's islands and checked forms: the locale and the messages they use. Kept small, as every island of a library reaches it, and free of `pageData`, which a lazy chunk reading it would keep in the eager entry; `kay/i18n` reads the same scripts for `t`.
 interface Payload {
   locale?: string
+  timeZone?: string
   messages: Record<string, string | Plural>
 }
 
@@ -12,6 +13,7 @@ const PLACEHOLDER = /\{(\w+)\}/g
 let read = new WeakSet<Element>()
 const messages = new Map<string, string | Plural>()
 let locale = ''
+let zone: string | undefined
 // Whether the page was searched for scripts since the last microtask: a render looks up many texts, and one search serves them all.
 let searched = false
 
@@ -20,6 +22,7 @@ export function resetWords(): void {
   read = new WeakSet()
   messages.clear()
   locale = ''
+  zone = undefined
   searched = false
 }
 
@@ -55,6 +58,7 @@ function load(): void {
 
     read.add(script)
     locale ||= payload.locale ?? ''
+    zone ??= payload.timeZone
 
     for (const [key, message] of Object.entries(payload.messages))
       messages.set(key, message)
@@ -69,7 +73,7 @@ function plainEnglish(english: string, params: Record<string, MessageValue>): st
 
     const value = params[name]!
 
-    return value instanceof Date ? new Intl.DateTimeFormat(pageLocale(), { dateStyle: 'medium' }).format(value) : String(value)
+    return value instanceof Date ? new Intl.DateTimeFormat(pageLocale(), { dateStyle: 'medium', timeZone: zone }).format(value) : String(value)
   })
 }
 
@@ -79,6 +83,14 @@ export function pageLocale(): string {
     load()
 
   return locale || document.documentElement.lang || 'en'
+}
+
+// The site's `timeZone`, or none, for the formats a library draws itself.
+export function pageTimeZone(): string | undefined {
+  if (locale === '')
+    load()
+
+  return zone
 }
 
 // The message at `key` when the page brought it, else `english`; see the server's.
@@ -104,7 +116,7 @@ export function wording(key: string, english: string, params: Record<string, Mes
       return placeholder
 
     if (value instanceof Date)
-      return new Intl.DateTimeFormat(here, { dateStyle: 'medium' }).format(value)
+      return new Intl.DateTimeFormat(here, { dateStyle: 'medium', timeZone: zone }).format(value)
 
     return typeof value === 'number' ? new Intl.NumberFormat(here).format(value) : String(value)
   })

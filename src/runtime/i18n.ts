@@ -77,6 +77,17 @@ export type RichText = [Messages] extends [never]
   : <Key extends KeysOf<Messages>>(props: { key: Key } & Params<At<Messages, Key>> & Record<TagsOf<At<Messages, Key>>, Block>) => JSX.Element
 export type Localize = <const Href extends string>(href: Href & CheckedHref<Href>, locale?: Locale) => string
 
+// The site's `timeZone`, which a date is written in unless the call names another; the server installs it and the page carries it to the browser.
+let siteZone: string | undefined
+
+export function setTimeZone(zone: string | undefined): void {
+  siteZone = zone
+}
+
+export function timeZone(): string | undefined {
+  return siteZone
+}
+
 const PLACEHOLDER = /\{(\w+)\}/g
 
 // A tag of a message, `<about>our story</about>`, which `T` renders through the block of its name; tags do not nest.
@@ -113,6 +124,7 @@ export interface LocaleOption {
 
 export type NumberFormatOptions = Intl.NumberFormatOptions & LocaleOption
 export type DateFormatOptions = Intl.DateTimeFormatOptions & LocaleOption
+export type DurationFormatOptions = Pick<Intl.NumberFormatOptions, 'unitDisplay'> & LocaleOption
 export type RelativeFormatOptions = Intl.RelativeTimeFormatOptions & LocaleOption
 export type ListFormatOptions = Intl.ListFormatOptions & LocaleOption
 
@@ -256,9 +268,50 @@ export function formatNumber(page: string, value: number, given?: NumberFormatOp
 // A date as the locale writes it, `medium` by default: `4 oct. 2026`.
 export function formatDate(page: string, value: Date | number, given: DateFormatOptions = { dateStyle: 'medium' }): string {
   const [locale, named] = withLocale(page, given)
-  const options = named !== given && Object.keys(named!).length === 0 ? { dateStyle: 'medium' } as const : named!
+  const base: Intl.DateTimeFormatOptions = named !== given && Object.keys(named!).length === 0 ? { dateStyle: 'medium' } : named!
+  const options = siteZone === undefined || base.timeZone !== undefined ? base : { ...base, timeZone: siteZone }
 
   return cached(dateFormats, `${locale}\n${JSON.stringify(options)}`, () => new Intl.DateTimeFormat(locale, options)).format(value)
+}
+
+// Each unit of a byte count, a count taking the largest one it reaches.
+const BYTE_UNITS = ['byte', 'kilobyte', 'megabyte', 'gigabyte', 'terabyte'] as const
+
+// A size in bytes in the largest unit that keeps it under 1024, `1.5 MB` or `1,5 Mo`, one decimal at most; the other number options are `Intl`'s.
+export function formatBytes(page: string, bytes: number, given?: NumberFormatOptions): string {
+  let size = Math.abs(bytes)
+  let unit = 0
+
+  while (size >= 1024 && unit < BYTE_UNITS.length - 1) {
+    size /= 1024
+    unit++
+  }
+
+  return formatNumber(page, Math.sign(bytes) * size, { style: 'unit', unit: BYTE_UNITS[unit], unitDisplay: 'short', maximumFractionDigits: unit === 0 ? 0 : 1, ...given })
+}
+
+// Each unit of a duration with its length in milliseconds.
+const DURATION_UNITS: readonly [string, number][] = [['day', 86_400_000], ['hour', 3_600_000], ['minute', 60_000], ['second', 1000]]
+
+// A length of time in milliseconds in its largest unit and the one below, `2 hr 5 min`, the lower one left out when it is zero.
+export function formatDuration(page: string, milliseconds: number, given?: DurationFormatOptions): string {
+  const [locale, options] = withLocale(page, given)
+  const total = Math.round(Math.max(0, milliseconds) / 1000) * 1000
+  const reached = DURATION_UNITS.findIndex(([, length]) => total >= length)
+  const first = reached === -1 ? DURATION_UNITS.length - 1 : reached
+  const parts: string[] = []
+  let rest = total
+
+  for (const [unit, length] of DURATION_UNITS.slice(first, first + 2)) {
+    const count = Math.floor(rest / length)
+
+    rest -= count * length
+
+    if (count > 0 || parts.length === 0)
+      parts.push(formatNumber(locale, count, { style: 'unit', unit, unitDisplay: options?.unitDisplay ?? 'short' }))
+  }
+
+  return parts.join(' ')
 }
 
 // A date relative to now in the largest unit it reaches, `3 days ago`, or a value in the unit given; `numeric: 'auto'` by default, so a day back reads `yesterday`.

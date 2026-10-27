@@ -1,4 +1,4 @@
-import { pageLocale } from 'kay/words'
+import { pageLocale, pageTimeZone } from 'kay/words'
 
 const ENGLISH = /^en(?:-|$)/
 
@@ -11,28 +11,28 @@ function dateLocale(): string {
 
 // `5 Jan` in the page's locale.
 export function dayMonth(date: Date): string {
-  return date.toLocaleDateString(dateLocale(), { day: 'numeric', month: 'short' })
+  return date.toLocaleDateString(dateLocale(), { day: 'numeric', month: 'short', timeZone: pageTimeZone() })
 }
 
 // `Jan` in the page's locale.
 export function monthShort(date: Date): string {
-  return date.toLocaleDateString(dateLocale(), { month: 'short' })
+  return date.toLocaleDateString(dateLocale(), { month: 'short', timeZone: pageTimeZone() })
 }
 
 // `16:12` in the page's locale, with seconds when asked.
 export function timeOfDay(date: Date, seconds: boolean): string {
-  return date.toLocaleTimeString(dateLocale(), { hour: '2-digit', minute: '2-digit', ...seconds ? { second: '2-digit' } : {} })
+  return date.toLocaleTimeString(dateLocale(), { hour: '2-digit', minute: '2-digit', timeZone: pageTimeZone(), ...seconds ? { second: '2-digit' } : {} })
 }
 
 // `21 Oct 2026` in the page's locale, followed by the time of day when asked.
 export function fullDate(date: Date, time: false | 'minutes' | 'seconds'): string {
-  const day = date.toLocaleDateString(dateLocale(), { day: 'numeric', month: 'short', year: 'numeric' })
+  const day = date.toLocaleDateString(dateLocale(), { day: 'numeric', month: 'short', year: 'numeric', timeZone: pageTimeZone() })
 
   if (time === false)
     return day
 
-  // The server cannot know the viewer's timezone, so what it renders names its own until the island writes the viewer's local time.
-  const zone = typeof window === 'undefined' ? ` ${date.toLocaleTimeString(dateLocale(), { timeZoneName: 'short' }).split(' ').at(-1)}` : ''
+  // The server cannot know the viewer's timezone, so what it renders names its own until the island writes the viewer's local time; a site `timeZone` is the same in both.
+  const zone = typeof window === 'undefined' && pageTimeZone() === undefined ? ` ${date.toLocaleTimeString(dateLocale(), { timeZoneName: 'short' }).split(' ').at(-1)}` : ''
 
   return `${day}, ${timeOfDay(date, time === 'seconds')}${zone}`
 }

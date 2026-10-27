@@ -10,7 +10,7 @@ import { KayError } from '../compiler/errors'
 import { entryPath } from '../content/entry-route'
 import { contentKey } from '../content/key'
 import { onKeysInvalidated } from '../runtime/cache'
-import { FILE_EXTENSION, flattenMessages, localePath, matchLinksWith, pathSegment, splitLocale, translatedPath } from '../runtime/i18n'
+import { FILE_EXTENSION, flattenMessages, localePath, matchLinksWith, pathSegment, splitLocale, timeZone, translatedPath } from '../runtime/i18n'
 import { localeState, setSiteLocale } from '../runtime/locale-state'
 import { kayLog } from '../runtime/log'
 import { acceptedLocales, LOCALE_TAG, matchLocale } from './accept-language'
@@ -491,8 +491,10 @@ export function messagesScript(keys: Set<string>, first: boolean, pinned = false
   const now = state?.now !== undefined && !state.nowWritten ? state.now : undefined
 
   // A page of its own `html lang` pins the locale, which the browser would otherwise read from `<html>`.
+  const zone = timeZone()
+
   // Without `i18n`, the browser builds links as they are written: a page sends its locale only for the messages its islands read.
-  if (!state || (keys.size === 0 && (!first || state.implicit) && now === undefined && !pinned))
+  if (!state || (keys.size === 0 && (!first || (state.implicit && zone === undefined)) && now === undefined && !pinned))
     return ''
 
   if (now !== undefined)
@@ -503,7 +505,7 @@ export function messagesScript(keys: Set<string>, first: boolean, pinned = false
 
     return message === undefined ? [] : [[key, message]]
   }))
-  const parts = [...first ? [`"locale":${escaped(state.locale)}`, ...state.implicit ? [] : [`"settings":${settingsJson(state.settings)}`]] : [], `"messages":${escaped(messages)}`, ...now !== undefined ? [`"now":${escaped(now)}`] : []]
+  const parts = [...first ? [`"locale":${escaped(state.locale)}`, ...state.implicit ? [] : [`"settings":${settingsJson(state.settings)}`], ...zone === undefined ? [] : [`"timeZone":${escaped(zone)}`]] : [], `"messages":${escaped(messages)}`, ...now !== undefined ? [`"now":${escaped(now)}`] : []]
 
   return `<script type="application/json" data-kay-i18n>{${parts.join(',')}}</script>`
 }

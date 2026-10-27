@@ -15,6 +15,7 @@ import { extensionContexts, extensionServers, serverExtensions } from '../config
 import { setContentMode, setMarkdownDefaults } from '../content/load'
 import { projectCollections } from '../content/server'
 import { renderOptionsOf } from '../project'
+import { setTimeZone } from '../runtime/i18n'
 import { liveStoreReady } from '../runtime/live-value'
 import { runInLocale } from '../runtime/locale-state'
 import { setSite } from '../runtime/site'
@@ -132,6 +133,7 @@ async function setupWith<Claimed>(project: Project, loadClient: () => Promise<Cl
   const locales = i18n ?? await implicitI18n(root, config.lang, config.extensions)
 
   serveLocales(root, locales)
+  setTimeZone(config.timeZone)
   const base = basePath(config.base)
   const maxDensity = await applyImageConfig(config.images, config.security === false || allowsStyleAttributes(config.security?.csp, config.security?.reportOnly))
   const site = siteWithBase(config.site, config.base)

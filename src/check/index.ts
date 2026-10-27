@@ -60,6 +60,7 @@ export interface CheckOptions {
   health?: HealthConfig | false | undefined
   live?: LiveConfig | undefined
   requestIdHeader?: string | undefined
+  timeZone?: string | undefined
   budget?: BudgetConfig | undefined
   // The config's locales: links may carry their prefixes, `t()` reads the default locale's messages, and every other locale's must match them.
   i18n?: I18nConfig | undefined
@@ -111,9 +112,9 @@ function helped({ message, help }: CheckDiagnostic): Pick<CheckDiagnostic, 'help
 }
 
 export function configCheckOptions(config: KayConfig): CheckOptions {
-  const { entry, routes, publicDir, api, apiPath, content, redirects, i18n, lang, settings, base, site, shutdownTimeout, health, live, requestIdHeader, budget, lints, extensions, seo, favicon, manifest, images, publicEnv, requireGuards, mcp, openapi } = config
+  const { entry, routes, publicDir, api, apiPath, content, redirects, i18n, lang, settings, base, site, shutdownTimeout, health, live, requestIdHeader, timeZone, budget, lints, extensions, seo, favicon, manifest, images, publicEnv, requireGuards, mcp, openapi } = config
 
-  return { entry, routes, publicDir, api, apiPath, content, redirects, i18n, lang, settings, base, site, shutdownTimeout, health, live, requestIdHeader, budget, lints, extensions, seo, favicon, manifest, images, publicEnv, requireGuards, mcp, openapi }
+  return { entry, routes, publicDir, api, apiPath, content, redirects, i18n, lang, settings, base, site, shutdownTimeout, health, live, requestIdHeader, timeZone, budget, lints, extensions, seo, favicon, manifest, images, publicEnv, requireGuards, mcp, openapi }
 }
 
 // Type-checks a project, .kay components included, and reports every error at the line and column the user wrote.

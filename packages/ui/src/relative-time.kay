@@ -11,7 +11,7 @@ const { date, options, dateOptions = { dateStyle: 'long', timeStyle: 'short' }, 
   date: Date | number | string
   // How the relative text is worded, as `Intl.RelativeTimeFormat` takes them: `{ style: 'short' }` for `3 hr. ago`.
   options?: Intl.RelativeTimeFormatOptions | undefined
-  // How the full date in the tooltip is written, as `Intl.DateTimeFormat` takes them; the time zone is that of the machine formatting it, the server's, unless `timeZone` is set.
+  // How the full date in the tooltip is written, as `Intl.DateTimeFormat` takes them; the time zone is the site's `timeZone`, else that of the machine formatting it, the server's, unless `timeZone` is set here.
   dateOptions?: Intl.DateTimeFormatOptions | undefined
 }>()
 

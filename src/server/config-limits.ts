@@ -44,6 +44,19 @@ export function liveLimits(config: LiveConfig | undefined): { connections: numbe
   return { connections, perMinute }
 }
 
+// Refuses a `timeZone` the engine does not know.
+export function checkTimeZone(zone: string | undefined): void {
+  if (zone === undefined)
+    return
+
+  try {
+    new Intl.DateTimeFormat('en', { timeZone: zone }).format(0)
+  }
+  catch {
+    throw new KayError('config-invalid', `kay: timeZone is ${JSON.stringify(zone)}; it names an IANA time zone, such as Europe/Paris`)
+  }
+}
+
 const HEADER_NAME = /^[\w!#$%&'*+.^`|~-]+$/
 // Headers the id would overwrite or echo something else through.
 const RESERVED_HEADERS = new Set(['authorization', 'content-length', 'content-type', 'cookie', 'host', 'location', 'set-cookie'])

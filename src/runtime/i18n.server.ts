@@ -1,14 +1,14 @@
-import type { DateFormatOptions, Direction, ListFormatOptions, Locale, Localize, MessageValue, NumberFormatOptions, RelativeFormatOptions, RelativeTimeOptions, RichText, Translate } from './i18n'
+import type { DateFormatOptions, Direction, DurationFormatOptions, ListFormatOptions, Locale, Localize, MessageValue, NumberFormatOptions, RelativeFormatOptions, RelativeTimeOptions, RichText, Translate } from './i18n'
 import type { JSX } from './jsx'
 import type { LocaleState } from './locale-state'
-import { formatDate as formatDateIn, formatList as formatListIn, formatNumber as formatNumberIn, formatRelativeTime as formatRelativeTimeIn, leadsWithLocale, localeName as localeNameIn, localePath, richMessage, textDirection, translate } from './i18n'
+import { formatBytes as formatBytesIn, formatDate as formatDateIn, formatDuration as formatDurationIn, formatList as formatListIn, formatNumber as formatNumberIn, formatRelativeTime as formatRelativeTimeIn, leadsWithLocale, localeName as localeNameIn, localePath, richMessage, textDirection, translate } from './i18n'
 import { insideIsland, noteMessage } from './island.server'
 import { localeState, siteDefaultLocale } from './locale-state'
 import { PART_END, PART_START } from './markers'
 import { html } from './rendered'
 
 export type { Direction, Locale, LocaleSettings, MergeMessages, Message, MessageKey, MessageTree, MessageValue, Plural, PluralCategory, RelativeTimeOptions, RichText } from './i18n'
-export { defineMessages } from './i18n'
+export { defineMessages, timeZone } from './i18n'
 
 function current(name: string): LocaleState {
   const state = localeState()
@@ -83,6 +83,14 @@ function formatLocale(): string {
 
 export function formatNumber(value: number, options?: NumberFormatOptions): string {
   return formatNumberIn(formatLocale(), value, options)
+}
+
+export function formatBytes(bytes: number, options?: NumberFormatOptions): string {
+  return formatBytesIn(formatLocale(), bytes, options)
+}
+
+export function formatDuration(milliseconds: number, options?: DurationFormatOptions): string {
+  return formatDurationIn(formatLocale(), milliseconds, options)
 }
 
 export function formatDate(value: Date | number, options?: DateFormatOptions): string {

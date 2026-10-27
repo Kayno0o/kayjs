@@ -7,7 +7,7 @@ import { clientDir } from '../src/build/assets'
 import { resolveProject } from '../src/project'
 import { action } from '../src/runtime/action'
 import { checkForm } from '../src/runtime/validate'
-import { resetWords } from '../src/runtime/words.client'
+import { pageTimeZone, resetWords } from '../src/runtime/words.client'
 import { servePages } from '../src/server/app'
 import { formsScript } from '../src/server/forms'
 import { INVALID_PARAMS } from '../src/server/words'
@@ -326,6 +326,14 @@ describe('the browser\'s form check in the page\'s locale', () => {
     await Promise.resolve()
     append(document.body, JSON.stringify({ messages: { 'kay.invalid.tooLong': 'Au plus {max} caractères' } }))
     expect(check(fields, schema).long).toBe('Au plus 2 caractères')
+  })
+
+  it('reads the site time zone the page brought, none when it brought none', () => {
+    expect(pageTimeZone()).toBeUndefined()
+
+    resetWords()
+    append(document.body, JSON.stringify({ locale: 'en', timeZone: 'Asia/Tokyo', messages: {} }))
+    expect(pageTimeZone()).toBe('Asia/Tokyo')
   })
 
   it('finds the rules of a form in the script a streamed block brought, past the shell\'s', () => {
