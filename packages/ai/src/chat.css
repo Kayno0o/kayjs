@@ -159,6 +159,7 @@
     margin-top: 0.75rem;
     margin-bottom: 0.25rem;
     font-size: 1em;
+    line-height: inherit;
   }
 
   /* A table wider than the log scrolls inside it; its cells keep their words whole, since breaking them anywhere would squeeze it to fit. */

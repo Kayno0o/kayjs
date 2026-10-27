@@ -301,6 +301,7 @@ describe('MarkdownEditor preview', () => {
     await until(() => state.root.querySelector('.kui-markdown-preview-body')?.innerHTML === '<p>one</p>')
 
     expect(state.root.querySelector('.kui-markdown-preview-body')?.className).toContain('prose lg:prose-lg')
+    expect(state.root.querySelector('.kui-markdown-preview-body')?.classList.contains('kui-prose')).toBe(true)
   })
 
   test('sanitizes the preview: an onerror payload and a javascript link come out inert', async () => {
