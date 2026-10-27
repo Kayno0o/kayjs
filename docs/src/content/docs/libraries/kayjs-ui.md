@@ -160,7 +160,7 @@ export default defineUi({
 
 A variant or value the component lacks is added: `Button(tone="brand")` types and renders.
 
-- The components with parts: Button, Card, Dialog, Table, TextInput, Textarea, DateInput, DateRangeInput, TimeInput, Badge, Notice, Avatar, Stat, PageHeader, PageSection, EmptyState, CardRow, FormField, Checkbox, Toggle, Select, MultiSelect, RangeInput, Segmented, Rating, FileDrop, IconButton, CopyButton, Menu, Slider, ColorInput, Popover, HoverCard, TooltipHost, Toaster, SidePanel, Toolbar, CommandPalette, ConfirmDelete, FormDialog.
+- The components with parts: Button, Card, Dialog, Table, TextInput, Textarea, DateInput, DateRangeInput, DateTimeInput, TimeInput, Badge, Notice, Avatar, Stat, PageHeader, PageSection, EmptyState, CardRow, FormField, Checkbox, Toggle, Select, MultiSelect, RangeInput, Segmented, Rating, FileDrop, IconButton, CopyButton, Menu, Slider, ColorInput, Popover, HoverCard, TooltipHost, Toaster, SidePanel, Toolbar, CommandPalette, ConfirmDelete, FormDialog.
 - Also with parts: SaveForm, RowsField, ContactForm, SubscribeForm, CollapsibleSection, Widget, Meter, BarList, ChipGroup, Tabs, TabNav, SiteNav, AppHeader, AppSwitcher, Pagination, SplitLayout, TreeView, Timeline, DescriptionList, LoadMore, VirtualList, BarChart, LineChart, ScatterChart, MapView, ContributionGraph, Sparkline, StatusStrip, Carousel, AudioPlayer, Masonry, MediaGallery, ImageCropper, ZoomPane, QrCode, SiteFavicon, Icon, IconPicker, MarkdownEditor and WhenVisible.
 - Card, Badge and Notice (1.71) hold their look in a recipe, and so do Avatar, Stat, PageHeader, PageSection, EmptyState, CardRow, Widget, Meter, Progress and Skeleton (1.72), then Button, IconButton, FormField, Checkbox, Toggle, TextInput, Textarea and Select (1.72), and the charts and media components too (1.72). `theme.css` has no rule for their part classes since 1.74.
 - RadioGroup, Segmented, Rating, Slider, ColorInput, DateInput, DateRangeInput, Combobox, MultiSelect, ChipGroup, FileDrop, CopyButton and ConfirmDelete follow the same way (1.72), and so do the overlays: Dialog, FormDialog, Menu, BellInbox, Popover, HoverCard, SidePanel, CommandPalette, Toaster and TooltipHost. A Dialog `size` is a recipe variant, so a `max-w-*` in `src/ui.ts` or `class` replaces its width.
@@ -168,7 +168,7 @@ A variant or value the component lacks is added: `Button(tone="brand")` types an
 - A recipe holds the look as utilities, so `src/ui.ts` or `class` replaces the one it sets, such as `p-6` for the padding it sets, instead of overriding a rule. A rule of yours selecting a removed part class matches nothing. A utility of `src/ui.ts` or of `class` wins over a theme rule on the same property.
 - A part is named after what its `kui-` class draws: Card has `root`, `head`, `title` and `body`, Dialog `root`, `title`, `body` and `footer`, Button `root` and `spinner`.
 - Table has `root` (the wrapper), `table`, `head`, `headRow`, `headCell`, `body`, `row`, `cell`, `cellBody`, `cellLabel`, `sortButton`, `sortIcon`, `filter`, `field`, `filterLabel`, `filterInput`, `count`, `selection`, `selected`, `bulk`, `selectHead`, `selectCell`, `selectText`, `spacer` and `emptyCell`.
-- DateInput has `root`, `input`, `trigger`, `panel`, `head`, `title`, `step`, `stepIcon`, `grid`, `weekday`, `weekdayRow`, `week`, `cell`, `day` and `today`, DateRangeInput `root` and `separator`, TimeInput `root`.
+- DateInput has `root`, `input`, `trigger`, `panel`, `head`, `title`, `step`, `stepIcon`, `grid`, `weekday`, `weekdayRow`, `week`, `cell`, `day` and `today`, DateRangeInput `root` and `separator`, DateTimeInput `root` and `input`, TimeInput `root`.
 - The variants are the props that already exist, and `src/ui.ts` can add more: `tone` (Button, Badge, Notice, CopyButton), `variant` and `size` (Button). `kay check` reports a part that does not exist.
 - A Button with an `onClick` hands its root and spinner classes to its busy button, so `button.kay` reaches both.
 - FormField has `root`, `label`, `head`, `text`, `required`, `action`, `hint`, `issues` and `issue`; Checkbox `root`, `input`, `label` and `hint`; Toggle `root`, `input`, `track` and `label`; Select `root`; Slider `root`, `label`, `input` and `value`; ColorInput `root`, `input`, `label` and `value`.
@@ -263,7 +263,7 @@ Forms: [FormField](/ui/form-field), [SaveForm](/ui/save-form), [ContactForm](/ui
 
 More inputs: [RangeInput](/ui/range-input), [Slider](/ui/slider), [ColorInput](/ui/color-input), [FileDrop](/ui/file-drop), [IconPicker](/ui/icon-picker), [MarkdownEditor](/ui/markdown-editor), [ImageCropper](/ui/image-cropper), [Rating](/ui/rating).
 
-Dates and times: [DateInput](/ui/date-input), [DateRangeInput](/ui/date-range-input), [TimeInput](/ui/time-input).
+Dates and times: [DateInput](/ui/date-input), [DateRangeInput](/ui/date-range-input), [DateTimeInput](/ui/date-time-input), [TimeInput](/ui/time-input).
 
 Layout: [Card](/ui/card), [CardRow](/ui/card-row), [PageHeader](/ui/page-header), [PageSection](/ui/page-section), [CollapsibleSection](/ui/collapsible-section), [Widget](/ui/widget), [SplitLayout](/ui/split-layout), [EmptyState](/ui/empty-state), [Notice](/ui/notice), [Toolbar](/ui/toolbar), [Masonry](/ui/masonry).
 

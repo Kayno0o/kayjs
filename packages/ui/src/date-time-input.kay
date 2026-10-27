@@ -1,0 +1,62 @@
+---
+import type { JSX } from 'kay'
+import { effect, onMount, recipe, signal, untrack } from 'kay'
+import { localDateTime, sameInstant, zonedInstant } from './date'
+import { startRef } from './form-reset'
+import TextInput from './text-input.kay'
+
+const look = recipe({ parts: { root: 'kui-date-time-input inline-flex min-w-0 items-center', input: 'min-w-0 flex-1 tabular-nums' } })
+
+const { value, min, max, name, form, disabled, onChange, ...rest } = props<Omit<JSX.IntrinsicElements['input'], 'value' | 'type' | 'name' | 'form' | 'disabled' | 'class' | 'children' | 'min' | 'max' | 'onInput' | 'onChange'> & {
+  // The instant as ISO text, with its offset or `Z` (`2026-10-21T07:30:00Z`), or `''` for none. Without it, the box starts empty and keeps what is typed, for a form posting it by its `name`.
+  value?: string | undefined
+  // The earliest and latest instant allowed, as ISO text or a `Date`; the box takes and shows them on the visitor's clock.
+  min?: string | Date | undefined
+  max?: string | Date | undefined
+  // Posted as the instant with the visitor's offset (`2026-10-21T09:30:00+02:00`), which `s.Date()` reads right, or `''` for none.
+  name?: string | undefined
+  form?: string | undefined
+  disabled?: boolean | undefined
+  // Called with the new instant in that form, or `''` once emptied, however it was set: typed or reset by a form.
+  onChange?: ((value: string) => unknown) | undefined
+}>()
+
+// The visitor's zone is only known once the island runs, so the server renders the empty box carrying the name, and the hidden field posting the instant takes the name over.
+const zoned = signal(false)
+const start = untrack(() => value ?? '')
+const current = signal(start)
+let box: HTMLInputElement | undefined
+
+onMount(() => zoned = true)
+
+effect(() => {
+  if (value !== undefined)
+    current = value
+})
+
+// The value a reset goes back to, on the visitor's clock.
+effect(() => {
+  if (zoned() && box)
+    box.defaultValue = localDateTime(start)
+})
+
+const ref = startRef<HTMLInputElement>(element => box = element, rest.ref)
+
+function heard(text: string) {
+  const next = zonedInstant(text)
+
+  if (sameInstant(next, current()))
+    return
+
+  current = next
+  onChange?.(next)
+}
+
+// A controlled box shows what its parent holds once the zone is known.
+const shown = () => zoned() && value !== undefined ? localDateTime(current()) : undefined
+const bound = (limit: string | Date | undefined) => localDateTime(limit) || undefined
+---
+div(part="root")
+  TextInput({...rest} part="input" type="datetime-local" ref={ref} name={zoned() ? undefined : name} form={form} disabled={disabled} min={bound(min)} max={bound(max)} value={shown()} onInput={heard} onChange={heard})
+  if zoned() && name
+    input(type="hidden" name={name} form={form} disabled={disabled} value={zonedInstant(localDateTime(current()))})

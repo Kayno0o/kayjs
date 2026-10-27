@@ -6,13 +6,14 @@ import Dates from '../tests/fixture/src/components/dates.kay'
 import { untilHolds } from '../tests/until'
 
 let mounted: Mounted | undefined
-const seen: { date: string[], range: DateRange[], time: string[] } = { date: [], range: [], time: [] }
+const seen: { date: string[], range: DateRange[], time: string[], moment: string[] } = { date: [], range: [], time: [], moment: [] }
 
 afterEach(() => {
   mounted?.unmount()
   seen.date = []
   seen.range = []
   seen.time = []
+  seen.moment = []
 })
 
 async function dates(props: Record<string, unknown> = {}) {
@@ -20,6 +21,7 @@ async function dates(props: Record<string, unknown> = {}) {
     onDate: (value: string) => seen.date.push(value),
     onRange: (value: DateRange) => seen.range.push(value),
     onTime: (value: string) => seen.time.push(value),
+    onMoment: (value: string) => seen.moment.push(value),
     firstDay: 1,
     ...props,
   })
@@ -332,5 +334,73 @@ describe('TimeInput', () => {
 
     expect(seen.time).toEqual([''])
     expect(input.value).toBe('')
+  })
+})
+
+describe('DateTimeInput', () => {
+  const zone = process.env.TZ
+
+  afterEach(() => {
+    if (zone === undefined)
+      delete process.env.TZ
+    else
+      process.env.TZ = zone
+  })
+
+  const field = (root: HTMLElement) => root.querySelector<HTMLInputElement>('#moment')!
+  const posted = (root: HTMLElement) => root.querySelector<HTMLInputElement>('input[type=hidden][name=moment]')!
+
+  function type(input: HTMLInputElement, value: string) {
+    input.value = value
+    input.dispatchEvent(new Event('input', { bubbles: true }))
+  }
+
+  test('shows the instant on the visitor\'s clock and posts it with that clock\'s offset', async () => {
+    process.env.TZ = 'Europe/Paris'
+    const root = await dates()
+
+    expect(field(root).type).toBe('datetime-local')
+    expect(field(root).value).toBe('2026-10-21T09:30')
+    expect(field(root).name).toBe('')
+    expect(posted(root).value).toBe('2026-10-21T09:30:00+02:00')
+
+    type(field(root), '2026-12-01T18:45')
+    await settle()
+
+    expect(seen.moment).toEqual(['2026-12-01T18:45:00+01:00'])
+    expect(posted(root).value).toBe('2026-12-01T18:45:00+01:00')
+  })
+
+  test('posts the same instant from another zone', async () => {
+    process.env.TZ = 'America/New_York'
+    const root = await dates()
+
+    expect(field(root).value).toBe('2026-10-21T03:30')
+    expect(posted(root).value).toBe('2026-10-21T03:30:00-04:00')
+    expect(Date.parse(posted(root).value)).toBe(Date.parse('2026-10-21T07:30:00Z'))
+  })
+
+  test('takes min and max as instants and hands them to the box on the visitor\'s clock', async () => {
+    process.env.TZ = 'Europe/Paris'
+    const root = await dates({ momentMin: '2026-10-21T00:00:00Z', momentMax: '2026-10-22T10:00:00+05:00' })
+
+    expect(field(root).min).toBe('2026-10-21T02:00')
+    expect(field(root).max).toBe('2026-10-22T07:00')
+  })
+
+  test('tells an empty box as an empty instant, and a reset puts the first back', async () => {
+    process.env.TZ = 'Europe/Paris'
+    const root = await dates()
+
+    type(field(root), '')
+    await settle()
+    expect(seen.moment).toEqual([''])
+    expect(posted(root).value).toBe('')
+
+    root.querySelector<HTMLButtonElement>('#reset')!.click()
+    await untilHolds(() => seen.moment.length === 2 && field(root).value === '2026-10-21T09:30')
+
+    expect(seen.moment).toEqual(['', '2026-10-21T09:30:00+02:00'])
+    expect(posted(root).value).toBe('2026-10-21T09:30:00+02:00')
   })
 })

@@ -1,5 +1,5 @@
-import { describe, expect, test } from 'bun:test'
-import { addDays, addMonths, clampDate, dateRangeFrom, dayName, firstDayOf, isDate, monthTitle, monthWeeks, weekdays, weekEdge } from '../src/date'
+import { afterEach, describe, expect, test } from 'bun:test'
+import { addDays, addMonths, clampDate, dateRangeFrom, dayName, firstDayOf, isDate, localDateTime, monthTitle, monthWeeks, sameInstant, weekdays, weekEdge, zonedInstant } from '../src/date'
 
 describe('dates', () => {
   test('reads only real calendar dates', () => {
@@ -77,5 +77,44 @@ describe('dates', () => {
     expect(dateRangeFrom('2026-10-20', '2026-10-10')).toEqual(['2026-10-10', '2026-10-20'])
     expect(dateRangeFrom('', '2026-10-10')).toEqual([null, '2026-10-10'])
     expect(dateRangeFrom('2026-13-01', '')).toEqual([null, null])
+  })
+})
+
+describe('date and time on the visitor\'s clock', () => {
+  const zone = process.env.TZ
+
+  afterEach(() => {
+    if (zone === undefined)
+      delete process.env.TZ
+    else
+      process.env.TZ = zone
+  })
+
+  test('writes an instant on the clock of the zone, with its offset at that time', () => {
+    process.env.TZ = 'Europe/Paris'
+    expect(localDateTime('2026-10-21T07:30:00Z')).toBe('2026-10-21T09:30')
+    expect(localDateTime('2026-12-01T07:30:15Z')).toBe('2026-12-01T08:30:15')
+    expect(zonedInstant('2026-10-21T09:30')).toBe('2026-10-21T09:30:00+02:00')
+    expect(zonedInstant('2026-12-01T08:30:15')).toBe('2026-12-01T08:30:15+01:00')
+
+    process.env.TZ = 'Asia/Kolkata'
+    expect(zonedInstant('2026-10-21T09:30')).toBe('2026-10-21T09:30:00+05:30')
+
+    process.env.TZ = 'America/St_Johns'
+    expect(zonedInstant('2026-12-01T09:30')).toBe('2026-12-01T09:30:00-03:30')
+  })
+
+  test('reads text that is no date as none', () => {
+    expect(localDateTime('')).toBe('')
+    expect(localDateTime(undefined)).toBe('')
+    expect(localDateTime('soon')).toBe('')
+    expect(zonedInstant('')).toBe('')
+    expect(zonedInstant('2026-13-45T99:99')).toBe('')
+  })
+
+  test('compares instants whatever their offsets', () => {
+    expect(sameInstant('2026-10-21T07:30:00Z', '2026-10-21T09:30:00+02:00')).toBe(true)
+    expect(sameInstant('', '')).toBe(true)
+    expect(sameInstant('', '2026-10-21T07:30:00Z')).toBe(false)
   })
 })

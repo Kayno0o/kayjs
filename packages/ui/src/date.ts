@@ -169,3 +169,35 @@ export function dateRangeFrom(from: string, to: string): DateRange {
 
   return start !== null && end !== null && start > end ? [end, start] : [start, end]
 }
+
+const pad = (figure: number, width = 2) => String(figure).padStart(width, '0')
+
+// The instant as the visitor's wall clock reads it, `YYYY-MM-DDTHH:MM` (with `:SS` when the seconds are not zero), what a `datetime-local` box holds; `''` for text that is no date. A text with no zone is already on that clock.
+export function localDateTime(instant: Date | string | null | undefined): string {
+  const date = instant instanceof Date ? instant : new Date(instant ?? '')
+
+  if (Number.isNaN(date.getTime()))
+    return ''
+
+  const minutes = `${pad(date.getFullYear(), 4)}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`
+
+  return date.getSeconds() === 0 ? minutes : `${minutes}:${pad(date.getSeconds())}`
+}
+
+// What a `datetime-local` box holds, read on the visitor's clock and written as the instant it names with that clock's offset at the time, `2026-10-21T09:30:00+02:00`, which `s.Date()` reads right; `''` for text that is no date.
+export function zonedInstant(local: string): string {
+  const date = new Date(local)
+
+  if (local === '' || Number.isNaN(date.getTime()))
+    return ''
+
+  const west = date.getTimezoneOffset()
+  const offset = `${west <= 0 ? '+' : '-'}${pad(Math.floor(Math.abs(west) / 60))}:${pad(Math.abs(west) % 60)}`
+
+  return `${localDateTime(date).padEnd(19, ':00')}${offset}`
+}
+
+// Whether two ISO texts name the same instant, however their offsets are written; two empty ones do.
+export function sameInstant(a: string, b: string): boolean {
+  return a === b || (a !== '' && b !== '' && Date.parse(a) === Date.parse(b))
+}

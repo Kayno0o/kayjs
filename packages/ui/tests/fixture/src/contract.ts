@@ -25,6 +25,7 @@ import ContributionGraph from '@kaynooo/kayjs-ui/contribution-graph.kay'
 import CopyButton from '@kaynooo/kayjs-ui/copy-button.kay'
 import DateInput from '@kaynooo/kayjs-ui/date-input.kay'
 import DateRangeInput from '@kaynooo/kayjs-ui/date-range-input.kay'
+import DateTimeInput from '@kaynooo/kayjs-ui/date-time-input.kay'
 import DescriptionList from '@kaynooo/kayjs-ui/description-list.kay'
 import Dialog from '@kaynooo/kayjs-ui/dialog.kay'
 import EmptyState from '@kaynooo/kayjs-ui/empty-state.kay'
@@ -135,6 +136,7 @@ export const COMPONENTS = {
   'copy-button': CopyButton,
   'date-input': DateInput,
   'date-range-input': DateRangeInput,
+  'date-time-input': DateTimeInput,
   'description-list': DescriptionList,
   'dialog': Dialog,
   'empty-state': EmptyState,
@@ -228,6 +230,7 @@ export const CASES: Record<string, Record<string, unknown>> = {
   'copy-button': { text: 'x', label: 'Copy link' },
   'date-input': { 'aria-label': 'Day', 'value': '2026-10-21' },
   'date-range-input': { label: 'Stay', value: ['2026-10-21', null] },
+  'date-time-input': { 'aria-label': 'Moment', 'value': '2026-10-21T07:30:00Z' },
   'description-list': { items: [{ label: 'Status', value: 'Healthy' }] },
   'dialog': { open: false, title: 'Rename', onOpenChange: noop, children: 'Body', size: 'full', bare: true },
   'empty-state': { title: 'No moons', description: 'Add one' },

@@ -1,0 +1,8 @@
+---
+import DateTimeInput from '@kaynooo/kayjs-ui/date-time-input.kay'
+
+const start = signal('2026-10-21T07:30:00Z')
+---
+.flex.flex-col.items-start.gap-2
+  DateTimeInput(aria-label="Starts at" name="startsAt" value={start()} onChange={start.set})
+  p.text-muted Starts at {start() || 'no moment'}.
