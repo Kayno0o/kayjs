@@ -203,6 +203,8 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the Chat i
 
     const turn = '.kai-chat-turn[data-role="assistant"] .kai-chat-text'
 
+    // The highlighted blocks can land after the reply stops pending, as the highlighter loads on first use.
+    await page.waitUntil((selector: string) => document.querySelectorAll(selector).length === 2, {}, `${turn} pre.hl`)
     expect(await page.count(`${turn} pre.hl`)).toBe(2)
     expect(await page.text(`${turn} pre.hl .tok`)).toContain('const a = 1 < 2')
     expect(await page.evaluate(() => document.querySelector('pre.hl .tok')?.getAttribute('style'))).toBe('color:#c00')
