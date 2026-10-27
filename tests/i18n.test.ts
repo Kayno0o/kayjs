@@ -794,7 +794,8 @@ describe('in the browser', () => {
     GlobalRegistrator.register({ url: 'http://localhost/en/about-us' })
 
     try {
-      const { alternate, formatNumber, localeName: nameOf, locales, localize, localizedHref, t } = await import('../src/runtime/i18n.client')
+      const { alternate, formatNumber, localeName: nameOf, locales, localize, t } = await import('../src/runtime/i18n.client')
+      const { localizedHref } = await import('../src/runtime/i18n-links')
       const payload = { locale: 'en', settings: localeSettings({ ...i18n, paths: { '/about': { fr: '/a-propos', en: '/about-us' } } }), messages: { 'counter.label': 'Counter' } }
 
       document.head.innerHTML = `<script type="application/json" data-kay-i18n>${JSON.stringify(payload)}</script>`

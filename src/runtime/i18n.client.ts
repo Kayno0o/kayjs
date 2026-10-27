@@ -1,7 +1,8 @@
 import type { DateFormatOptions, Direction, DurationFormatOptions, ListFormatOptions, Locale, LocaleSettings, Localize, Message, MessageValue, NumberFormatOptions, RelativeFormatOptions, RelativeTimeOptions, RichText, Translate } from './i18n'
 import { withBase, withoutBase } from './base'
-import { fragment, insert, localizeLinks, markers } from './dom'
-import { formatBytes as formatBytesIn, formatDate as formatDateIn, formatDuration as formatDurationIn, formatList as formatListIn, formatNumber as formatNumberIn, formatRelativeTime as formatRelativeTimeIn, leadsWithLocale, localeName as localeNameIn, localePath, localizedLink, richMessage, setTimeZone, timeZone as siteTimeZone, splitLocale, textDirection, translate, untranslatedPath } from './i18n'
+import { fragment, insert, markers } from './dom'
+import { formatBytes as formatBytesIn, formatDate as formatDateIn, formatDuration as formatDurationIn, formatList as formatListIn, formatNumber as formatNumberIn, formatRelativeTime as formatRelativeTimeIn, leadsWithLocale, localeName as localeNameIn, localePath, richMessage, setTimeZone, timeZone as siteTimeZone, splitLocale, textDirection, translate, untranslatedPath } from './i18n'
+import { noteLinkPayload } from './i18n-links'
 import { pageData } from './page-data'
 import { createSignal, effect, memo, onCleanup } from './reactive'
 import { tabVisible } from './visibility'
@@ -41,6 +42,7 @@ function load(): void {
     settings ??= payload.settings
     pageLocale ||= payload.locale ?? ''
     renderedAt ??= payload.now
+    noteLinkPayload(payload)
 
     if (payload.timeZone !== undefined)
       setTimeZone(payload.timeZone)
@@ -75,16 +77,6 @@ export const T = ((props: { key: string }) => fragment((parent) => {
     return richMessage(translations(), props.key, props)
   })
 })) as RichText
-
-// A link an island sets, in the page's locale as the server writes it; see `localizedLink`.
-export function localizedHref(href: string): string {
-  if (!settings && !settled)
-    load()
-
-  return settings ? localizedLink(settings, href, pageLocale, location.host) : href
-}
-
-localizeLinks(localizedHref)
 
 export function locale(): Locale {
   // eslint-disable-next-line ts/no-unnecessary-type-assertion -- Locale is a string in kay itself and an app's own locales once its Register names them

@@ -44,6 +44,8 @@ export class DomTemplate extends TemplateWriter {
   private constBlocks = 0
   // The names the `try` blocks being written give their `catch`, which an `await` without a `catch` inside falls back to: the runtime hands the function, or one rendering nothing, to the content of the `try`.
   private readonly catches: string[] = []
+  // Whether the code may write a link's `href`, which an app with locales localizes through `kay/i18n-links`: only a module doing so imports it.
+  private writesLinks = false
 
   // `errors`: what a refused form's fields are described by.
   // `located`, in development: the source position each element carries for `kay dev`'s inspector.
@@ -67,7 +69,7 @@ export class DomTemplate extends TemplateWriter {
 
   // The module-level templates the code clones, declared after the components that use them.
   declarations(): string {
-    return this.templates.map((html, index) => `const KayT${index} = KayTemplate(${JSON.stringify(html)})\n`).join('')
+    return `${this.templates.map((html, index) => `const KayT${index} = KayTemplate(${JSON.stringify(html)})\n`).join('')}${this.writesLinks ? 'import \'kay/i18n-links\'\n' : ''}`
   }
 
   private fragment(nodes: Node[]): void {
@@ -400,6 +402,7 @@ export class DomTemplate extends TemplateWriter {
     let selected: Span | undefined
 
     if (spreads) {
+      this.writesLinks ||= name === 'a'
       own.push(variable => this.spreadBinding(element, variable(node), children.length === 0))
     }
     else {
@@ -450,6 +453,7 @@ export class DomTemplate extends TemplateWriter {
 
             break
           case 'rooted':
+            this.notesLink(element, attribute.name)
             own.push(variable => b.add(`KayAttribute(${variable(node)}, ${JSON.stringify(attribute.name)}, ${JSON.stringify(attribute.text)}${this.writtenLink(element, attribute.name) ? ', true' : ''});`))
 
             if (attribute.name === 'href' && this.leavingLink(element) && mayLeaveSite(attribute.text))
@@ -482,6 +486,7 @@ export class DomTemplate extends TemplateWriter {
 
             break
           case 'value':
+            this.notesLink(element, attribute.name)
             own.push((variable) => {
               b.add(`KayEffect(() => KayProperty(${variable(node)}, ${JSON.stringify(attribute.name)}, `)
 
@@ -712,6 +717,9 @@ export class DomTemplate extends TemplateWriter {
   private component(element: ElementNode): void {
     const { b } = this
     const dynamic = b.isDynamicTag(element.tag)
+
+    // A tag read at runtime may name a link.
+    this.writesLinks ||= dynamic
     // A tag read at runtime may name a form, whose `submit` handler, written or spread, is held as a written form's is.
     const holds = dynamic && element.attributes.some(attribute => attribute.kind === 'spread' || this.source(attribute.name).toLowerCase() === 'onsubmit')
 
@@ -736,6 +744,10 @@ export class DomTemplate extends TemplateWriter {
   // A link that may leave the site, and so opens in a new tab unless it sets its own `target`.
   private leavingLink(element: ElementNode): boolean {
     return element.name === 'a' && !this.named(element, 'target')
+  }
+
+  private notesLink(element: ElementNode, attribute: string): void {
+    this.writesLinks ||= element.name === 'a' && attribute === 'href' && !this.writtenLink(element, attribute)
   }
 
   // A link's href kept as written, the link carrying `hreflang`, where any other goes to the page's locale's copy.

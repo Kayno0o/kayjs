@@ -16,7 +16,7 @@
   "sideEffects": [
     "./src/{a11y,build,check,commands,compiler,content,dev,eslint,format,lsp,mcp,migrate,server,test}/**",
     "./src/*.ts",
-    "./src/runtime/{client,i18n.client,live-cache,work-worker}.ts",
+    "./src/runtime/{client,i18n.client,i18n-links,live-cache,work-worker}.ts",
     "./{tests,bench,examples,.kay,node_modules/.cache}/**"
   ],
   "publishConfig": {
@@ -130,6 +130,10 @@
     "./dom-image": {
       "types": "./types/runtime/dom-image.d.ts",
       "default": "./src/runtime/dom-image.ts"
+    },
+    "./i18n-links": {
+      "types": "./types/runtime/i18n-links.d.ts",
+      "default": "./src/runtime/i18n-links.ts"
     },
     "./arrival": {
       "types": "./types/runtime/arrival.d.ts",

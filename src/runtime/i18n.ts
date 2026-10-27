@@ -93,16 +93,17 @@ const PLACEHOLDER = /\{(\w+)\}/g
 // A tag of a message, `<about>our story</about>`, which `T` renders through the block of its name; tags do not nest.
 export const MESSAGE_TAG = /<(\w[\w-]*)>(.*?)<\/\1>/gs
 
-const PLURAL_CATEGORIES: ReadonlySet<string> = new Set<PluralCategory>(['zero', 'one', 'two', 'few', 'many', 'other'])
-const numberFormats = new Map<string, Intl.NumberFormat>()
-const dateFormats = new Map<string, Intl.DateTimeFormat>()
-const pluralRules = new Map<string, Intl.PluralRules>()
-const relativeFormats = new Map<string, Intl.RelativeTimeFormat>()
-const listFormats = new Map<string, Intl.ListFormat>()
-const directions = new Map<string, Direction>()
-const localeNames = new Map<string, string>()
+// Marked pure, as all of these, so a bundle using none of what reads them drops them.
+const PLURAL_CATEGORIES: ReadonlySet<string> = /* @__PURE__ */ new Set<PluralCategory>(['zero', 'one', 'two', 'few', 'many', 'other'])
+const numberFormats = /* @__PURE__ */ new Map<string, Intl.NumberFormat>()
+const dateFormats = /* @__PURE__ */ new Map<string, Intl.DateTimeFormat>()
+const pluralRules = /* @__PURE__ */ new Map<string, Intl.PluralRules>()
+const relativeFormats = /* @__PURE__ */ new Map<string, Intl.RelativeTimeFormat>()
+const listFormats = /* @__PURE__ */ new Map<string, Intl.ListFormat>()
+const directions = /* @__PURE__ */ new Map<string, Direction>()
+const localeNames = /* @__PURE__ */ new Map<string, string>()
 // Scripts written right to left: Arabic, Hebrew, Thaana, Syriac, N'Ko, Adlam, Hanifi Rohingya, Mandaic and Samaritan.
-const RTL_SCRIPTS: ReadonlySet<string> = new Set(['Arab', 'Hebr', 'Thaa', 'Syrc', 'Nkoo', 'Adlm', 'Rohg', 'Mand', 'Samr'])
+const RTL_SCRIPTS: ReadonlySet<string> = /* @__PURE__ */ new Set(['Arab', 'Hebr', 'Thaa', 'Syrc', 'Nkoo', 'Adlm', 'Rohg', 'Mand', 'Samr'])
 // Where a link's path ends and its query or fragment starts.
 const PATH_END = /[?#]/
 const SEGMENT_END = /[/?#]/

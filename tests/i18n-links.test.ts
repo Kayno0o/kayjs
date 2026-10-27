@@ -19,6 +19,10 @@ describe('an island of an app with locales', () => {
     copy = await fixtureCopy('i18n', true)
     await Bun.write(join(copy, 'src/components/counter.kay'), '---\nimport { signal } from \'kay\'\n\nconst shown = signal(false)\n---\ndiv\n  button(type="button" onClick={() => shown.set(true)}) Show\n  if shown()\n    a.revealed(href="/about") About\n')
 
+    // An island writing no link, whose page ships none of the code localizing one.
+    await Bun.write(join(copy, 'src/components/clicks.kay'), '---\nimport { signal } from \'kay\'\n\nconst count = signal(0)\n---\nbutton(type="button" onClick={() => count.set(value => value + 1)}) Clicked {count()}\n')
+    await Bun.write(join(copy, 'src/routes/clicks.kay'), '---\nimport Clicks from \'../components/clicks.kay\'\n---\nh1 Clicks\nClicks\n')
+
     const i18n: I18nConfig = { locales: ['fr', 'en'], defaultLocale: 'fr', messages: 'src/messages' }
 
     // The French spacing of an island's text has its own budget, in tests/typography-islands.test.ts.
@@ -37,6 +41,13 @@ describe('an island of an app with locales', () => {
     expect(await page.evaluate(() => document.querySelector('a.revealed')?.getAttribute('href'))).toBe('/en/about')
     expect(page.errors).toEqual([])
   }, 60_000)
+
+  it('ships the code localizing links only to a page whose islands write one', async () => {
+    const eager = async (path: string) => [...(await eagerJs(scriptUrls(await (await site.fetch(path)).text()), async url => (await site.fetch(url)).text())).values()].map(({ code }) => code).join('\n')
+
+    expect(await eager('/en')).toContain('function localizedLink(')
+    expect(await eager('/en/clicks')).not.toContain('function localizedLink(')
+  })
 
   it('ships the error reporter of a server page, and no leave question while no island guards the page', async () => {
     const eager = [...(await eagerJs(scriptUrls(await (await site.fetch('/en')).text()), async url => (await site.fetch(url)).text())).values()].map(({ code }) => code)

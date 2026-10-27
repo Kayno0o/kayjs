@@ -80,6 +80,20 @@ describe('translations', () => {
     expect(tsx('---\nimport { t } from \'./words\'\n---\np {t(\'x\')}')).not.toContain('kay/i18n')
     expect(tsx('---\nconst t = (key: string) => key\n---\np {t(\'x\')}')).not.toContain('kay/i18n')
   })
+
+  it('has the browser code of a component writing a link\'s href import kay/i18n-links, and that of one writing none leave it out', () => {
+    const dom = (template: string) => compileKay(`---\nconst { href, attrs, items } = props<{ href: string, attrs: Record<string, string>, items: unknown[] }>()\n---\n${template}`, 'test.kay', { output: 'dom' }).tsx
+    const links = 'import \'kay/i18n-links\''
+
+    expect(dom('a(href="/about") About')).toContain(links)
+    expect(dom('a(href={href}) About')).toContain(links)
+    expect(dom('a({...attrs}) About')).toContain(links)
+    expect(dom('for Item of items key={Item}\n  Item(href="/about")')).toContain(links)
+    expect(dom('a(href="/fr" hreflang="fr") Français')).not.toContain(links)
+    expect(dom('a(href="https://example.com") Elsewhere')).not.toContain(links)
+    expect(dom('img(src="/logo.png" alt="")\ndiv({...attrs})')).not.toContain(links)
+    expect(compileKay('a(href="/about") About', 'test.kay').tsx).not.toContain(links)
+  })
 })
 
 describe('values of kay without an import', () => {

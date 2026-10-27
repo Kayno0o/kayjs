@@ -242,7 +242,7 @@ export default defineMessages({
 - `direction()` is `rtl` or `ltr`, for the request's locale or the one given.
 - `locale()` names it, as do `ctx.locale` in pages, guards, endpoints and actions, and `t()`, `wording()` and `locale()` in API handlers and their `onError`, the locale of the page the call came from, the site's `lang` (English by default) without `i18n`.
 - A link written as the default locale names a page, `a(href="/about")`, goes to the page's locale's copy as it renders: `/en/about` on an English page, translated by `paths`, on the locale's host with `domains`.
-- So do links to a localized collection's feed, the links of Markdown entries, and those an island renders in the browser, so converting a site needs no change to its links.
+- So do links to a localized collection's feed, the links of Markdown entries, and those an island renders in the browser, so converting a site needs no change to its links; a page whose islands write no link and read nothing of `kay/i18n` loads none of that code.
 - A link carrying `hreflang` stays as written, as a language switcher's must: `a(href={alternate('fr')} hreflang="fr")`.
 - So does one already under a locale's prefix, one to a file a param would take (`/blog/cover.png`), and one to no page, such as an API route or a public file.
 - `localize('/about')` is that path in the request's locale, or in the one given as second argument, checked like any link, for a path that is no `a`'s href: a redirect, a `fetch`, a URL to share. A path already under a locale's prefix, such as a guard's `?redirect=/en/account`, stays as it is.

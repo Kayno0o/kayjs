@@ -23,8 +23,8 @@ const DEFAULT_IMPORT = /^[\w$]+\s*(?:,|$)/
 const NAMED = /\{([^}]*)\}/
 const ALIAS = /\s+as\s+/
 const KAY_SPECIFIER = /^kay(?:\/|$)/
-// Entries of the runtime that bundle a package, or that few pages use, which stay in the chunks of the islands importing them rather than weigh on every page: the `for`, `await` and `try` blocks and the spread, which most islands do without.
-const OWN_CHUNK = new Set(['kay/markdown', 'kay/internal/title', 'kay/dom-loop', 'kay/dom-await', 'kay/dom-try', 'kay/dom-spread'])
+// Entries of the runtime that bundle a package, or that few pages use, which stay in the chunks of the islands importing them rather than weigh on every page: the `for`, `await` and `try` blocks, the spread and the localizing of the links an island writes, which most islands do without.
+const OWN_CHUNK = new Set(['kay/markdown', 'kay/internal/title', 'kay/dom-loop', 'kay/dom-await', 'kay/dom-try', 'kay/dom-spread', 'kay/i18n-links'])
 const RELATIVE = /^\.\.?\//
 const EXTENSIONS = ['.ts', '.tsx', '/index.ts']
 const ALL = '*'
