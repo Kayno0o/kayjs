@@ -37,6 +37,24 @@ function typedKept(live: Element, other: Element): boolean {
   return false
 }
 
+// The focused elements keeping a tab stop the next page's markup lacks, each until its blur.
+const heldTabStops = new WeakMap<Element, AbortController>()
+
+// Keeps the tab stop a script gave the focused element, as a CMS editor or the swap's own focus on a heading does, until the focus leaves it: without it the browser would move the focus to the body.
+function holdTabStop(element: Element): void {
+  if (heldTabStops.has(element))
+    return
+
+  const held = new AbortController()
+
+  heldTabStops.set(element, held)
+  held.signal.addEventListener('abort', () => heldTabStops.delete(element))
+  element.addEventListener('blur', () => {
+    held.abort()
+    element.removeAttribute('tabindex')
+  }, { once: true, signal: held.signal })
+}
+
 // Makes the live node read as the next one, keeping it and each child of it the next page renders again.
 function morph(live: Node, next: Node): void {
   if (!(live instanceof Element)) {
@@ -66,11 +84,16 @@ function morph(live: Node, next: Node): void {
       live.setAttribute(name, value)
   }
 
-  // The focused element keeps the tab stop a script gave it, as a CMS editor or the swap's own focus on a heading does: without it the browser takes the focus away to the body.
-  const focused = live === document.activeElement
+  if (other.hasAttribute('tabindex'))
+    heldTabStops.get(live)?.abort()
 
   for (const name of live.getAttributeNames()) {
-    if (!other.hasAttribute(name) && !(focused && name === 'tabindex'))
+    if (other.hasAttribute(name))
+      continue
+
+    if (name === 'tabindex' && live === document.activeElement)
+      holdTabStop(live)
+    else
       live.removeAttribute(name)
   }
 

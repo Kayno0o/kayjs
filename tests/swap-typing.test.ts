@@ -60,5 +60,21 @@ describe('a page swap over an element being typed in', () => {
     expect(heading.getAttribute('tabindex')).toBe('0')
     expect(heading.hasAttribute('role')).toBe(false)
     expect(document.querySelector('p')!.hasAttribute('tabindex')).toBe(false)
+
+    heading.blur()
+    expect(heading.hasAttribute('tabindex')).toBe(false)
+  })
+
+  it('leaves the tab stop the next page gives the focused element once it is blurred', async () => {
+    document.body.innerHTML = '<h1 tabindex="0">Title</h1>'
+
+    const heading = document.querySelector('h1')!
+
+    heading.focus()
+    await refresh('<!doctype html><html><head><title>t</title></head><body><h1>Title</h1></body></html>')
+    await refresh('<!doctype html><html><head><title>t</title></head><body><h1 tabindex="-1">Title</h1></body></html>')
+    heading.blur()
+
+    expect(heading.getAttribute('tabindex')).toBe('-1')
   })
 })

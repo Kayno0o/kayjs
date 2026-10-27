@@ -260,7 +260,7 @@ An island marked `persist` lives on from page to page. `Player(persist)` in a la
 
 Each swap moves focus to the new page's `autofocus` field, else its `h1`, else its `main`. It also announces the title to screen readers.
 
-A refresh keeps the focus where it was. An element a script made focusable with `tabindex` keeps that tab stop while it holds the focus, though the page's markup has none, so the focus does not fall to the body.
+A focused element the swap keeps stays focused. When a script made it focusable with `tabindex`, it keeps that tab stop until the focus leaves it, though the next page's markup has none, so the focus does not fall to the body.
 
 Go to a page from code with `navigate`.
 
