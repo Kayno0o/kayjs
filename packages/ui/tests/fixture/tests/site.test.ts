@@ -150,6 +150,16 @@ test('RelativeTime is a time element worded relative to now, a tab stop carrying
   expect(await find('/relative-time', '#bad')).toEqual([])
 })
 
+test('DescriptionList is a dl of label and value pairs, the block drawing the items that have no value', async () => {
+  const plain = await one('/description-list', '#plain')
+  const rich = await find('/description-list', '#rich dd')
+
+  expect(plain.tag).toBe('dl')
+  expect((await find('/description-list', '#plain dt')).map(term => term.text)).toEqual(['Host', 'Requests', 'State'])
+  expect((await find('/description-list', '#plain dd')).map(detail => detail.text)).toEqual(['relay.example.com', '0', ''])
+  expect(rich.map(detail => detail.text)).toEqual(['relay.example.com', '0', 'Healthy'])
+})
+
 test('Tooltip is a tab stop carrying its text for TooltipHost', async () => {
   const found = await one('/buttons', '#tip')
 

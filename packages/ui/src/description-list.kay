@@ -1,0 +1,30 @@
+--- <Item extends DescriptionItem>
+import type { JSX, Snippet } from 'kay'
+import type { DescriptionItem } from './description-list'
+import { recipe } from 'kay'
+
+// 'kui-description-list' stays as the component's name for an app's CSS. The list is a container named `dl` that its items read: narrower than 24rem, its own width and not the screen's, each label sits above its value.
+const look = recipe({
+  parts: {
+    root: 'kui-description-list @container/dl m-0 grid grid-cols-[max-content_minmax(0,1fr)] gap-x-4 gap-y-2 text-sm',
+    item: 'col-span-full grid grid-cols-subgrid @max-[24rem]/dl:grid-cols-1 @max-[24rem]/dl:gap-y-0.5',
+    term: 'm-0 text-muted',
+    detail: 'm-0 min-w-0 text-foreground [overflow-wrap:anywhere]',
+  },
+})
+
+const { items, value, ...rest } = props<Omit<JSX.IntrinsicElements['dl'], 'class' | 'children'> & {
+  items: readonly Item[]
+  // Draws the value of an item that has none, as the rich value a text cannot be: a badge, a link, a copy button.
+  value?: Snippet<[item: Item]> | undefined
+}>()
+---
+dl(part="root" {...rest})
+  for item of items key={item.key ?? item.label}
+    div(part="item")
+      dt(part="term") {item.label}
+      dd(part="detail")
+        if item.value === undefined && value
+          | {value(item)}
+        else
+          | {item.value}

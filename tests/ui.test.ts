@@ -413,7 +413,7 @@ describe('a variant or value src/ui.ts adds', () => {
 })
 
 describe('the src/ui.ts examples of the docs', () => {
-  const FILES = ['llms/styles-and-assets.md', 'packages/ui/llms/setup.md', 'docs/src/content/docs/essentials/styling-and-assets.md', 'docs/src/content/docs/libraries/kayjs-ui.md']
+  const FILES = ['llms/styles-and-assets.md', 'packages/ui/llms/restyle.md', 'docs/src/content/docs/essentials/styling-and-assets.md', 'docs/src/content/docs/libraries/kayjs-ui.md']
   const BLOCK = /```ts\n([^`]*defineUi\([^`]*)```/g
 
   it('pass kay check against kayjs-ui and an app with a Panel component', async () => {

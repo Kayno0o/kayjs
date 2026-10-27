@@ -45,6 +45,22 @@ inBrowser('in the browser', () => {
     expect(page.errors).toEqual([])
   }, 120_000)
 
+  test('DescriptionList puts every value beside its label, and each label above its value in a narrow box', async () => {
+    const site = await shared()
+
+    await using page = await site.open('/description-list', { width: 800 })
+    // Whether the first value starts right of its label, and under it, and where the values of the two rows start.
+    const layout = (selector: string) => page.evaluate((within: string) => {
+      const [first, second] = [...document.querySelectorAll(`${within} [data-part="item"]`)].map(item => ({ term: item.querySelector('dt')!.getBoundingClientRect(), detail: item.querySelector('dd')!.getBoundingClientRect() }))
+
+      return { beside: first!.detail.left >= first!.term.right, under: first!.detail.top >= first!.term.bottom, aligned: first!.detail.left === second!.detail.left }
+    }, selector)
+
+    expect(await layout('#plain')).toEqual({ beside: true, under: false, aligned: true })
+    expect(await layout('#narrow')).toEqual({ beside: false, under: true, aligned: true })
+    expect(page.errors).toEqual([])
+  }, 120_000)
+
   test('Table draws a line between the stacked cards whatever the row borders are, and none in the wide table', async () => {
     const site = await shared()
 

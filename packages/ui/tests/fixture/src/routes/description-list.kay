@@ -1,0 +1,18 @@
+---
+import Badge from '@kaynooo/kayjs-ui/badge.kay'
+import DescriptionList from '@kaynooo/kayjs-ui/description-list.kay'
+import '../app.css'
+
+const items = [
+  { label: 'Host', value: 'relay.example.com' },
+  { label: 'Requests', value: 0 },
+  { key: 'state', label: 'State' },
+]
+---
+main
+  DescriptionList#plain(items={items})
+  DescriptionList#rich(items={items})
+    @value(item)
+      Badge(label={item.label === 'State' ? 'Healthy' : ''} tone="success")
+  .w-48
+    DescriptionList#narrow(items={items})

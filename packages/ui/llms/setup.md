@@ -89,45 +89,7 @@ export default settings
 
 ### Restyle a component
 
-A component with parts takes its `class` as a string for the root or an object of parts, `Card(class={{ head: 'p-6' }})`. `src/ui.ts` restyles every instance of one, keyed by its name, with its import path as the fallback ([Restyle a component from src/ui.ts](../../../llms/styles-and-assets.md#restyle-a-component-from-srcuits)):
-
-```ts
-import { defineUi } from 'kay'
-
-export default defineUi({
-  Card: { parts: { root: 'rounded-xl', head: 'p-6' } },
-  Button: { variants: { tone: { danger: { root: 'bg-red-600' }, brand: { root: 'bg-brand' } } } },
-})
-```
-
-A variant or value the component lacks is added: `Button(tone="brand")` types and renders.
-
-- The components with parts: Button, Card, Dialog, Table, TextInput, Textarea, DateInput, DateRangeInput, TimeInput, Badge, Notice, Avatar, Stat, PageHeader, PageSection, EmptyState, CardRow, FormField, Checkbox, Toggle, Select, MultiSelect, RangeInput, Segmented, Rating, FileDrop, IconButton, CopyButton, Menu, Slider, ColorInput, Popover, HoverCard, TooltipHost, Toaster, SidePanel, Toolbar, CommandPalette, ConfirmDelete, FormDialog.
-- Also with parts: SaveForm, ContactForm, SubscribeForm, CollapsibleSection, Widget, Meter, BarList, ChipGroup, Tabs, TabNav, SiteNav, AppHeader, AppSwitcher, Pagination, SplitLayout, TreeView, Timeline, LoadMore, VirtualList, BarChart, LineChart, ScatterChart, MapView, ContributionGraph, Carousel, AudioPlayer, Masonry, MediaGallery, ImageCropper, ZoomPane, QrCode, SiteFavicon, Icon, IconPicker, MarkdownEditor and WhenVisible.
-- Card, Badge and Notice (1.71), then Avatar, Stat, PageHeader, PageSection, EmptyState, CardRow, Widget, Meter, Progress and Skeleton, then Button, IconButton, FormField, Checkbox, Toggle, TextInput, Textarea and Select, then RadioGroup, Segmented, Rating, Slider, ColorInput, DateInput, DateRangeInput, Combobox, MultiSelect, ChipGroup, FileDrop, CopyButton and ConfirmDelete, then Dialog, FormDialog, Menu, BellInbox, Popover, HoverCard, SidePanel, CommandPalette, Toaster and TooltipHost, then BarList, BarChart, LineChart, ScatterChart, ContributionGraph, Carousel, MediaGallery, ImageCropper, ZoomPane, Masonry, QrCode and SiteFavicon (all 1.72) hold their look in a recipe, and `theme.css` has no rule for their part classes since 1.74: their root keeps its `kui-` class (`kui-card`, `kui-badge`, `kui-stat-badge`) as a name for your CSS, their other parts carry `data-part` alone (`.kui-card > [data-part='head']`, a child selector, as `head`, `title` and `body` are names other components use too), and `src/ui.ts` or `class` replaces the base utility it sets (`p-6` for `p-kui-card`) instead of overriding a rule. A rule of yours selecting a removed part class matches nothing. A utility of `src/ui.ts` or of `class` wins over a theme rule on the same property.
-- A part is named after what its `kui-` class draws: Card has `root`, `head`, `title` and `body`; Dialog `root`, `title`, `body` and `footer`; Table `root` (the wrapper), `table`, `head`, `headRow`, `headCell`, `body`, `row`, `cell`, `cellBody`, `cellLabel`, `sortButton`, `sortIcon`, `filter`, `filterLabel`, `filterInput`, `count`, `selection`, `selected`, `bulk`, `selectHead`, `selectCell`, `selectText`, `spacer` and `emptyCell`; Button `root` and `spinner`; DateInput `root`, `input`, `trigger`, `panel`, `head`, `title`, `step`, `stepIcon`, `grid`, `weekday`, `weekdayRow`, `week`, `cell`, `day` and `today`, DateRangeInput `root` and `separator`. The variants are the props that already exist, and `src/ui.ts` can add more: `tone` (Button, Badge, Notice, CopyButton), `variant` and `size` (Button). `kay check` reports a part that does not exist.
-- A Button with an `onClick` hands its root and spinner classes to its busy button, so `button.kay` reaches both.
-- FormField has `root`, `label`, `head`, `text`, `required`, `action`, `hint`, `issues` and `issue`; Checkbox `root`, `input`, `label` and `hint`; Toggle `root`, `input`, `track` and `label`; Select `root`; Slider `root`, `label`, `input` and `value`; ColorInput `root`, `input`, `label` and `value`.
-- RangeInput has `root`, `box`, `separator` and `unit`; Segmented `root`, `option`, `input`, `label` and `icon`; Rating `root`, `stars` and `fill`; FileDrop `root` and `input`; IconButton and BareIconButton `root`; CopyButton `root`, `text` and `live`, with `tone` as its variant.
-- MultiSelect has `root`, `panel`, `trigger`, `summary`, `chevron`, `search`, `bar`, `action`, `options`, `option`, `checkbox`, `icon`, `label` and `empty`.
-- Menu has `menu` (the popover), `list`, `separator` and `item`; its `root` is the trigger, where a `class` string has always gone.
-- Popover has `root` (the panel), HoverCard `root` and TooltipHost `root`; Toaster `root`, `live`, `toast`, `icon`, `message` and `dismiss`; SidePanel `root`, `head`, `title`, `body` and `footer`; CollapsibleSection `root`, `summary`, `title`, `meta`, `chevron` and `body`; Widget `root`, `head` and `title`.
-- Meter has `root` and `fill` (its `fillClass` still works); BarList `root`, `item`, `row`, `label`, `value`, `track` and `fill`, `root` being the empty message too; ChipGroup `root`, `chip`, `input`, `label` and `icon`; SaveForm `root`, `grid`, `bar`, `status` and `actions`.
-- CommandPalette has `root`, `search`, `input`, `list`, `section`, `heading`, `option`, `text`, `label`, `snippet`, `more`, `group`, `empty` and `count`; FormDialog `root` (the Dialog), `footer`, `actions` and `form`; ContactForm `root`, `consent`, `link`, `privacy`, `issues` and `issue`; SubscribeForm `root`, `notice` and `link`.
-- ConfirmDelete has `root` (the trigger, where `class` has always gone), `armed` and `message`.
-- Tabs has `root`, `list`, `tab`, `icon` and `panel`; TabNav `root` and `link`; SiteNav `root`, `toggle`, `menuIcon`, `closeIcon`, `list`, `item`, `link` and `icon`; AppHeader `root`, `brand`, `nav` (its SiteNav) and `end`; AppSwitcher `root` (the trigger), `menu`, `grid`, `tile`, `icon`, `initial` and `name`; Pagination `root`, `step`, `gap` and `page`; Timeline `root`, `item`, `entry`, `time`, `icon` and `text`.
-- SplitLayout has `root`, `sidebar`, `sidebarHead`, `sidebarTitle`, `sidebarBody`, `list`, `listHead`, `resizer`, `detail` and `detailHead`; TreeView `root`, `item`, `toggle`, `icon` and `label`; LoadMore `root`, `failed`, `message`, `loading`, `text` and `announced`; VirtualList `root`, `content` and `item`.
-- BarChart has `root` (the empty message too), `plot`, `grid`, `tick`, `columns`, `column`, `bar`, `axis`, `axisLabel`, `legend`, `legendItem` and `key`.
-- LineChart has `root`, `frame`, `plot`, `cursor`, `dot`, `band`, `overlay`, `tooltip`, `tooltipLabel`, `tooltipRow`, `tooltipName`, `tooltipValue`, `swatch`, `data`, `hint`, `legend`, `legendItem` and `key`; MapView `root`, `canvas`, `surface`, `list` and `item`; ScatterChart `root` (the empty message too), `axisLabel`, `plot`, `grid`, `tick`, `guide`, `corner` and `dot`; ContributionGraph `root`, `month` and `cell`.
-- Carousel has `root`, `viewport`, `slide`, `image`, `controls`, `step`, `dot` and `pause`; Masonry `root` and `tile`; MediaGallery `root` (the empty message too), `stage`, `frame`, `zoom`, `step`, `counter`, `caption`, `strip`, `thumb`, `thumbImage`, `play`, `lightbox`, `full` and `close`; ImageCropper `root`, `stage`, `image`, `crop`, `gridCols`, `gridRows` and `handle`.
-- ZoomPane has `root`, `plate` and `tools`; QrCode, SiteFavicon (`root`, `img`, `icon`), Icon and WhenVisible `root`; IconPicker `root`, `search`, `grid`, `item`, `option`, `empty`, `bar`, `selection`, `clear`, `error` and `more`; MarkdownEditor `wrap`, `grid`, `root` (the textarea), `bar` and `barFailed`.
-- Accordion `root`; Skeleton `root`, `block` and `label`; Progress `root` and `fill`; Breadcrumb `root`, `list`, `more`, `item`, `link` and `text`; RadioGroup `root`, `radio`, `choice`, `input`, `label` and `description`; MarkdownEditor's preview `root`, `failed` and `body`, its `previewClass` string landing on `body`.
-
-#### The contract every component keeps
-
-- Every element a component draws that an app could style carries `data-part`, the name its `class` object and `src/ui.ts` take; only hidden inputs, the `slot`, `option`, `datalist`, `script` and `<track>` tags, a FormField's own controls, a chart's visually hidden table, a date grid's `thead` and `tbody`, a Table's spacer and empty rows and a Toaster's message spans go without.
-- A state is the ARIA attribute where ARIA has one (`aria-expanded`, `aria-checked`, `aria-selected`, `aria-current`, `aria-pressed`, `aria-busy`, `aria-disabled` or `disabled`), else a named `data-*` attribute (`data-placement`, `data-dragging`, `data-direction`, `data-step`), and never a `data-state` that repeats an ARIA one. Style both from `src/ui.ts` with Tailwind's `aria-selected:` and `data-dragging:` variants.
-- `tests/contract-parts.test.ts` fails for a component with an unmarked element or a state outside this rule.
+See [Restyle a component](restyle.md): `class` as a string or an object of parts, `src/ui.ts`, the recipes and the contract every component keeps.
 
 ### Copy a component into the app
 

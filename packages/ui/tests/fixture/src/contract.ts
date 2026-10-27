@@ -25,6 +25,7 @@ import ContributionGraph from '@kaynooo/kayjs-ui/contribution-graph.kay'
 import CopyButton from '@kaynooo/kayjs-ui/copy-button.kay'
 import DateInput from '@kaynooo/kayjs-ui/date-input.kay'
 import DateRangeInput from '@kaynooo/kayjs-ui/date-range-input.kay'
+import DescriptionList from '@kaynooo/kayjs-ui/description-list.kay'
 import Dialog from '@kaynooo/kayjs-ui/dialog.kay'
 import EmptyState from '@kaynooo/kayjs-ui/empty-state.kay'
 import FileDrop from '@kaynooo/kayjs-ui/file-drop.kay'
@@ -131,6 +132,7 @@ export const COMPONENTS = {
   'copy-button': CopyButton,
   'date-input': DateInput,
   'date-range-input': DateRangeInput,
+  'description-list': DescriptionList,
   'dialog': Dialog,
   'empty-state': EmptyState,
   'file-drop': FileDrop,
@@ -220,6 +222,7 @@ export const CASES: Record<string, Record<string, unknown>> = {
   'copy-button': { text: 'x', label: 'Copy link' },
   'date-input': { 'aria-label': 'Day', 'value': '2026-10-21' },
   'date-range-input': { label: 'Stay', value: ['2026-10-21', null] },
+  'description-list': { items: [{ label: 'Status', value: 'Healthy' }] },
   'dialog': { open: false, title: 'Rename', onOpenChange: noop, children: 'Body', size: 'full', bare: true },
   'empty-state': { title: 'No moons', description: 'Add one' },
   'file-drop': { 'aria-label': 'Photos', 'onFiles': noop, 'content': () => 'Drop files' },

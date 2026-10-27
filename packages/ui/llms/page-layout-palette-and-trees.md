@@ -83,6 +83,18 @@ Timeline(entries={[{ key: 'home', time: '08:00 - 09:10', text: 'At home', icon: 
 - Entries in time order, as given (the timeline never sorts): a `TimelineEntry` (from the package) has a `key`, a `time` (the time or range as the app words it), a `text`, an optional `icon` and `tone`, and `pickable`. `tone="muted"` greys a gap; `accent`, `success`, `warning`, `danger` and `info` colour the icon. `label` names the list for screen readers.
 - With `onSelect` or `selected` every entry is a button marked `aria-pressed`, one picked at a time, reachable with Tab; pressing the picked one again clears it. `selected` is the bindable key, a new one from the parent is followed, and `onSelect(key, entry)` gets the key as `selected` takes it (`undefined` when cleared), so `onSelect={picked.set}` round-trips. `pickable: false` keeps an entry plain text. Hover, picked and muted looks follow the theme and every skin; the parts are `root`, `item`, `entry`, `time`, `icon` and `text` ([Setup](setup.md)).
 
+### DescriptionList
+
+```kay
+DescriptionList(items={[{ label: 'Host', value: 'relay.example.com' }, { label: 'State' }]})
+  @value(item)
+    Badge(label="Healthy" tone="success")
+```
+
+- A `dl` of label and value pairs: `items` are `DescriptionItem`s (from the package), a `label`, a `value` (text or a number) and an optional `key` (the label by default). The labels share one column, so the values line up.
+- An item with no `value` is drawn by the `@value(item)` block, for a badge, a link or a copy button; one with a `value` shows it as text. Using the block makes the list an island.
+- Narrower than 24rem, its own width and not the screen's, each label sits above its value. Parts: `root`, `item`, `term` and `detail`.
+
 ## Reference
 
 - The words of these components, their props and the tokens they read are listed in their sections above; a component taking a function or a block with parameters renders as an island, as [Tables, navigation and layout](tables-navigation-and-layout.md) says under Reference.

@@ -1,0 +1,14 @@
+---
+import Badge from '@kaynooo/kayjs-ui/badge.kay'
+import DescriptionList from '@kaynooo/kayjs-ui/description-list.kay'
+
+const items = [
+  { label: 'Host', value: 'relay.example.com' },
+  { label: 'Requests', value: 1284 },
+  { label: 'State' },
+]
+---
+.max-w-md
+  DescriptionList(items={items})
+    @value
+      Badge(label="Healthy" tone="success")

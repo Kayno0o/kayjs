@@ -161,7 +161,7 @@ export default defineUi({
 A variant or value the component lacks is added: `Button(tone="brand")` types and renders.
 
 - The components with parts: Button, Card, Dialog, Table, TextInput, Textarea, DateInput, DateRangeInput, TimeInput, Badge, Notice, Avatar, Stat, PageHeader, PageSection, EmptyState, CardRow, FormField, Checkbox, Toggle, Select, MultiSelect, RangeInput, Segmented, Rating, FileDrop, IconButton, CopyButton, Menu, Slider, ColorInput, Popover, HoverCard, TooltipHost, Toaster, SidePanel, Toolbar, CommandPalette, ConfirmDelete, FormDialog.
-- Also with parts: SaveForm, ContactForm, SubscribeForm, CollapsibleSection, Widget, Meter, BarList, ChipGroup, Tabs, TabNav, SiteNav, AppHeader, AppSwitcher, Pagination, SplitLayout, TreeView, Timeline, LoadMore, VirtualList, BarChart, LineChart, ScatterChart, MapView, ContributionGraph, Carousel, AudioPlayer, Masonry, MediaGallery, ImageCropper, ZoomPane, QrCode, SiteFavicon, Icon, IconPicker, MarkdownEditor and WhenVisible.
+- Also with parts: SaveForm, ContactForm, SubscribeForm, CollapsibleSection, Widget, Meter, BarList, ChipGroup, Tabs, TabNav, SiteNav, AppHeader, AppSwitcher, Pagination, SplitLayout, TreeView, Timeline, DescriptionList, LoadMore, VirtualList, BarChart, LineChart, ScatterChart, MapView, ContributionGraph, Carousel, AudioPlayer, Masonry, MediaGallery, ImageCropper, ZoomPane, QrCode, SiteFavicon, Icon, IconPicker, MarkdownEditor and WhenVisible.
 - Card, Badge and Notice (1.71) hold their look in a recipe, and so do Avatar, Stat, PageHeader, PageSection, EmptyState, CardRow, Widget, Meter, Progress and Skeleton (1.72), then Button, IconButton, FormField, Checkbox, Toggle, TextInput, Textarea and Select (1.72), and the charts and media components too (1.72). `theme.css` has no rule for their part classes since 1.74.
 - RadioGroup, Segmented, Rating, Slider, ColorInput, DateInput, DateRangeInput, Combobox, MultiSelect, ChipGroup, FileDrop, CopyButton and ConfirmDelete follow the same way (1.72), and so do the overlays: Dialog, FormDialog, Menu, BellInbox, Popover, HoverCard, SidePanel, CommandPalette, Toaster and TooltipHost. A Dialog `size` is a recipe variant, so a `max-w-*` in `src/ui.ts` or `class` replaces its width.
 - In those, the root keeps its `kui-` class (`kui-card`, `kui-badge`, `kui-stat-badge`) as a name for your CSS, and the other parts carry `data-part` alone (`.kui-card > [data-part='head']`, a child selector, as `head`, `title` and `body` are names other components use too).
@@ -179,7 +179,7 @@ A variant or value the component lacks is added: `Button(tone="brand")` types an
 - Meter has `root` and `fill` (its `fillClass` still works); BarList `root`, `item`, `row`, `label`, `value`, `track` and `fill`, `root` being the empty message too; ChipGroup `root`, `chip`, `input`, `label` and `icon`; SaveForm `root`, `grid`, `bar`, `status` and `actions`.
 - CommandPalette has `root`, `search`, `input`, `list`, `section`, `heading`, `option`, `text`, `label`, `snippet`, `more`, `group`, `empty` and `count`; FormDialog `root` (the Dialog), `footer`, `actions` and `form`; ContactForm `root`, `consent`, `link`, `privacy`, `issues` and `issue`; SubscribeForm `root`, `notice` and `link`.
 - ConfirmDelete has `root` (the trigger, where `class` has always gone), `armed` and `message`.
-- Tabs has `root`, `list`, `tab`, `icon` and `panel`; TabNav `root` and `link`; SiteNav `root`, `toggle`, `menuIcon`, `closeIcon`, `list`, `item`, `link` and `icon`; AppHeader `root`, `brand`, `nav` (its SiteNav) and `end`; AppSwitcher `root` (the trigger), `menu`, `grid`, `tile`, `icon`, `initial` and `name`; Pagination `root`, `step`, `gap` and `page`; Timeline `root`, `item`, `entry`, `time`, `icon` and `text`.
+- Tabs has `root`, `list`, `tab`, `icon` and `panel`; TabNav `root` and `link`; SiteNav `root`, `toggle`, `menuIcon`, `closeIcon`, `list`, `item`, `link` and `icon`; AppHeader `root`, `brand`, `nav` (its SiteNav) and `end`; AppSwitcher `root` (the trigger), `menu`, `grid`, `tile`, `icon`, `initial` and `name`; Pagination `root`, `step`, `gap` and `page`; Timeline `root`, `item`, `entry`, `time`, `icon` and `text`; DescriptionList `root`, `item`, `term` and `detail`.
 - SplitLayout has `root`, `sidebar`, `sidebarHead`, `sidebarTitle`, `sidebarBody`, `list`, `listHead`, `resizer`, `detail` and `detailHead`; TreeView `root`, `item`, `toggle`, `icon` and `label`; LoadMore `root`, `failed`, `message`, `loading`, `text` and `announced`; VirtualList `root`, `content` and `item`.
 - BarChart has `root` (the empty message too), `plot`, `grid`, `tick`, `columns`, `column`, `bar`, `axis`, `axisLabel`, `legend`, `legendItem` and `key`.
 - LineChart has `root`, `frame`, `plot`, `cursor`, `dot`, `band`, `overlay`, `tooltip`, `tooltipLabel`, `tooltipRow`, `tooltipName`, `tooltipValue`, `swatch`, `data`, `hint`, `legend`, `legendItem` and `key`; ScatterChart `root` (the empty message too), `axisLabel`, `plot`, `grid`, `tick`, `guide`, `corner` and `dot`; ContributionGraph `root`, `month` and `cell`.
@@ -268,7 +268,7 @@ Layout: [Card](/ui/card), [CardRow](/ui/card-row), [PageHeader](/ui/page-header)
 
 Navigation: [Tabs](/ui/tabs), [TabNav](/ui/tab-nav), [Breadcrumb](/ui/breadcrumb), [Segmented](/ui/segmented), [SiteNav](/ui/site-nav), [AppHeader](/ui/app-header), [AppSwitcher](/ui/app-switcher), [Pagination](/ui/pagination), [Steps](/ui/steps), [TreeView](/ui/tree-view), [Timeline](/ui/timeline).
 
-Data: [Table](/ui/table), [Stat](/ui/stat), [Meter](/ui/meter), [BarList](/ui/bar-list), [Badge](/ui/badge), [RelativeTime](/ui/relative-time), [Avatar](/ui/avatar), [LineChart](/ui/line-chart), [BarChart](/ui/bar-chart), [ScatterChart](/ui/scatter-chart), [MapView](/ui/map-view), [ContributionGraph](/ui/contribution-graph), [QrCode](/ui/qr-code), [SiteFavicon](/ui/site-favicon), [Icon](/ui/icon).
+Data: [Table](/ui/table), [Stat](/ui/stat), [Meter](/ui/meter), [BarList](/ui/bar-list), [Badge](/ui/badge), [DescriptionList](/ui/description-list), [RelativeTime](/ui/relative-time), [Avatar](/ui/avatar), [LineChart](/ui/line-chart), [BarChart](/ui/bar-chart), [ScatterChart](/ui/scatter-chart), [MapView](/ui/map-view), [ContributionGraph](/ui/contribution-graph), [QrCode](/ui/qr-code), [SiteFavicon](/ui/site-favicon), [Icon](/ui/icon).
 
 Media: [MediaGallery](/ui/media-gallery), [Carousel](/ui/carousel), [ZoomPane](/ui/zoom-pane), [WhenVisible](/ui/when-visible), [LoadMore](/ui/load-more), [VirtualList](/ui/virtual-list).
 
@@ -281,6 +281,7 @@ Drag and drop (`Sortable`, `Board`, `DropTargets`) comes from `@kaynooo/kayjs-ui
 Topics of the kayjs-ui reference the sections above do not link:
 
 - [Setup, settings and testing](/llms/kayjs-ui-setup)
+- [Restyle a component](/llms/kayjs-ui-restyle)
 - [Icons, buttons, toasts, dialogs, cards, popovers and stats](/llms/kayjs-ui-basics)
 - [Inputs, selects, editors and forms](/llms/kayjs-ui-forms)
 - [Forms, FormDialog and Steps](/llms/kayjs-ui-forms-and-steps)
