@@ -6,7 +6,7 @@ import { HTML, ownOrigin, PAGE_TIMEOUT_MS, pageFor } from './swap-fetch'
 import { bounded, inFlight, LATE, policyOf } from './swap-flight'
 import { moveFocus } from './swap-focus'
 import { mergeHead, swapRoot } from './swap-head'
-import { swapBody } from './swap-kept'
+import { holding, swapBody } from './swap-kept'
 import { transitioned, viewTransitions } from './swap-transition'
 import { addressChanged } from './with-query'
 
@@ -16,7 +16,7 @@ export { TRANSITION_TIMEOUT_MS } from './swap-transition'
 // The page swap itself, which `./navigate` loads once a visitor is about to follow a link, and `./forms` once a form is posted.
 // The body's content becomes the next page's, morphed so what renders again stays the same element, islands kept only by `persist` or a refresh.
 // Everything else follows one rule: what the server served changes as the next page serves it, what a script changed or added since stays the script's. The served state is `served` for `<html>`, read from the server's meta, each head element's own `_$s` for the head, and none for `<body>`, which the server writes bare.
-// Its parts: the fetch in `./swap-fetch`, `<html>` and the head in `./swap-head`, the body's islands and what they keep in `./swap-kept`, the morph in `./swap-morph`, the focus in `./swap-focus`, view transitions in `./swap-transition`, and the policy and what the swaps under way share in `./swap-flight`.
+// Its parts: the fetch in `./swap-fetch`, `<html>` and the head in `./swap-head`, the body's islands and what they keep in `./swap-kept` (a deferred server island's render in the lazy `./swap-held`), the morph in `./swap-morph`, the focus in `./swap-focus`, view transitions in `./swap-transition`, and the policy and what the swaps under way share in `./swap-flight`.
 
 const ENTRY_SCRIPT = 'script[type="module"][src]:not([src*="/_kay/dev/"])'
 const STREAMED_TEMPLATE = 'template[data-kay-await]'
@@ -76,6 +76,7 @@ async function swapTo(url: URL, swap: Swap): Promise<void> {
     inFlight.fetch?.controller.abort()
 
   inFlight.fetch = { controller, key }
+  void holding()
 
   // Another page only: the same one with another query, or a form sending it back to itself, is not left.
   if (url.pathname !== location.pathname)
@@ -187,8 +188,11 @@ export async function show(page: FetchedPage, hash: string, swap: Swap, isCurren
 
   const root = swapRoot(next)
   const head = mergeHead(next)
+  const holds = holding()
 
   await head.loaded
+
+  const held = holds && await holds
 
   // Another navigation started meanwhile and shows its own page; the head it merges drops what this one added.
   if (!isCurrent())
@@ -211,7 +215,7 @@ export async function show(page: FetchedPage, hash: string, swap: Swap, isCurren
     inFlight.typing = process.env.NODE_ENV !== 'production' && navigation.typed === true
 
     try {
-      swapBody(next, policy)
+      swapBody(next, policy, held)
     }
     finally {
       inFlight.typing = false

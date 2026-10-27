@@ -114,7 +114,7 @@ describe('the blocks an island compiles to', () => {
 })
 
 describe('the page swap', () => {
-  it('keeps the code for streamed pages and refused forms in chunks of their own, loaded by the swaps needing them', async () => {
+  it('keeps the code for streamed pages, refused forms and held server islands in chunks of their own, loaded by the swaps needing them', async () => {
     const root = resolve(await fixtureCopy('runtime-chunks'))
 
     dirs.push(root)
@@ -124,7 +124,11 @@ describe('the page swap', () => {
     const swap = texts.find(({ text }) => text.includes('startViewTransition'))!
     const streamed = texts.filter(({ text }) => text.includes('kay-await:'))
     const refusal = texts.filter(({ text }) => text.includes('aria-describedby') && text.includes('preventScroll'))
+    const held = texts.filter(({ text }) => text.includes('_$f') && text.includes('dataset.chunk'))
 
+    expect(held).toHaveLength(1)
+    expect(held.map(({ chunk }) => chunk)).not.toContain(swap.chunk)
+    expect(swap.text).toContain('swap-held')
     expect(swap.text).not.toContain('kay-await:')
     expect(streamed.map(({ chunk }) => chunk)).not.toContain(swap.chunk)
     expect(streamed).toHaveLength(1)

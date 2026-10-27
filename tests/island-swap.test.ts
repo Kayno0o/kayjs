@@ -189,6 +189,26 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('a deferred 
         expect(await page.evaluate(() => [...document.querySelectorAll('slot[data-kay-server]')].map(slot => [slot.hasAttribute('inert'), slot.querySelector('form[action]') !== null]))).toEqual([[false, true], [true, false]])
       })
 
+      // A tab of its own, as a chunk the page loaded once stays loaded.
+      it('swaps in the inert copies, then fetches them, when the code holding a fetched island cannot load', async () => {
+        const fresh = await browse(`${origin}${path('/deferred')}`, VIEWPORT)
+
+        try {
+          await fresh.route(/\/swap-held-[^/]*\.js$/, async request => request.abort())
+          await fresh.waitUntil((selector: string) => document.querySelectorAll(selector).length === 2, {}, FETCHED)
+          await watchIslands(fresh)
+          await fresh.click('a.self')
+          await fresh.waitUntil(() => (window as { log?: Snapshot[][] }).log!.some(slots => slots.some(slot => slot.inert && !slot.form)))
+          await fresh.waitUntil((selector: string) => document.querySelectorAll(selector).length === 2, {}, FETCHED)
+
+          expect(await fresh.evaluate(() => (window as { kayAlive?: boolean }).kayAlive)).toBe(true)
+          expect(await labels(fresh)).toEqual(['one', 'two'])
+        }
+        finally {
+          fresh.close()
+        }
+      })
+
       it('fetches again an island whose first fetch failed, the next page\'s copy standing in its place', async () => {
         const failing = /kay_island=0/
         let refused = false

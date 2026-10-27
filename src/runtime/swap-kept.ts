@@ -1,4 +1,3 @@
-import type { FetchedIsland } from './fetch-island'
 import type { Policy } from './swap-flight'
 import { ISLAND } from './markers'
 import { moves, place } from './move'
@@ -19,8 +18,27 @@ interface KeptIsland extends HTMLElement {
   _$h?: string
 }
 
+type Held = typeof import('./swap-held')
+
+let heldChunk: Promise<Held | undefined> | undefined
+
+// The code keeping a deferred server island's render through a swap, which only a page holding one loads, from the moment its swap starts.
+export function holding(): Promise<Held | undefined> | undefined {
+  return document.querySelector(SERVER_ISLAND) ? heldChunk ??= loadHeld() : undefined
+}
+
+// A chunk a deploy replaced fails to load: the next page's copy of the island then shows, inert until fetched, as on a page loaded afresh.
+async function loadHeld(): Promise<Held | undefined> {
+  try {
+    return await import('./swap-held')
+  }
+  catch {
+    return undefined
+  }
+}
+
 // The next page's body morphed into this one: what it renders again stays the same element, so a layout's sidebar keeps its scroll, and the islands that live on are moved over before anything is taken away, so a playing video or an open socket never notices.
-export function swapBody(next: Document, policy: Policy): void {
+export function swapBody(next: Document, policy: Policy, held: Held | undefined): void {
   const body = document.adoptNode(next.body)
   const old = document.body
   const focused = heldFocus()
@@ -104,7 +122,7 @@ export function swapBody(next: Document, policy: Policy): void {
   // A browser without popovers throws on the selector. One open in an island kept closes too, as it did when moving the island hid it.
   const opened = 'popover' in HTMLElement.prototype ? [old, ...kept].flatMap(root => [...root.querySelectorAll(':popover-open')]) : []
 
-  holdFetched(old, body)
+  held?.holdFetched(old, body)
 
   // What ran already, the hydration script for one, runs once.
   const ran = new Set([...document.scripts].map(scriptMarkup))
@@ -193,40 +211,4 @@ function heldFocus(): { element: HTMLElement, restore: () => void } | undefined 
 // Whether an offset is still inside a node, which an island's render may have shortened.
 function fits(node: Node, offset: number): boolean {
   return offset <= (node instanceof CharacterData ? node.length : node.childNodes.length)
-}
-
-// A deferred server island already fetched shows its render while the next page's copy of it is fetched, rather than the inert copy standing in for it: a post back to the same page keeps the island on screen, and the scroll with it. It stays inert until the fetch answers, and one the next page renders another copy of is replaced by it at once.
-function holdFetched(old: Element, body: Element): void {
-  const fetched = new Map<string | undefined, FetchedIsland>()
-  const active = document.activeElement
-
-  for (const live of old.querySelectorAll<FetchedIsland>(SERVER_ISLAND)) {
-    if (live._$b !== undefined && !live.hasAttribute('inert'))
-      fetched.set(live.dataset.kayServer, live)
-  }
-
-  for (const placeholder of fetched.size === 0 ? [] : body.querySelectorAll<FetchedIsland>(SERVER_ISLAND)) {
-    const live = fetched.get(placeholder.dataset.kayServer)
-    const markup = placeholder.innerHTML
-
-    if (live === undefined || live._$b !== markup)
-      continue
-
-    const focused = active instanceof HTMLElement && live.contains(active) ? active : undefined
-
-    placeholder.replaceChildren(...live.childNodes)
-    placeholder._$b = markup
-
-    // The morph may keep the live element rather than the placeholder, so both carry it.
-    if (focused) {
-      live._$f = focused
-      placeholder._$f = focused
-    }
-
-    // An island of the held render still waiting to hydrate never does: the next render replaces it.
-    for (const island of placeholder.querySelectorAll<HTMLElement>(ISLAND)) {
-      delete island.dataset.component
-      delete island.dataset.chunk
-    }
-  }
 }

@@ -181,7 +181,7 @@ async function hydrateIsland(registry: IslandRegistry, element: HTMLElement): Pr
   if (!load) {
     takeEvents(element)
 
-    // An island `holdFetched` (swap-kept.ts) dropped from a held render has neither, and ends quietly.
+    // An island `holdFetched` (swap-held.ts) dropped from a held render has neither, and ends quietly.
     if (id !== '' || file !== '')
       console.error(`[kay] no client chunk for island ${id}`)
 
