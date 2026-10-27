@@ -2,7 +2,7 @@
 import { t } from 'elysia'
 import { action } from 'kay'
 
-export const draft = action(t.Object({ name: t.String() }), ({ name }) => name)
+export const draft = action(t.Object({ name: t.String({ maxLength: 100 }) }), ({ name }) => name)
 --- script
 import SaveForm from '@kaynooo/kayjs-ui/save-form.kay'
 import Toaster from '@kaynooo/kayjs-ui/toaster.kay'
