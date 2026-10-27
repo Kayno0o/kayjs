@@ -122,7 +122,8 @@ export function keptFor(key: string, owner: Promise<string | undefined>, empty: 
     if (!same(await entry.owner, await owner))
       return { reply: empty }
 
-    await owned?.()
+    // Not waited for: a store failing to take the attempt back must not delay the reply, and the refund logs its own errors.
+    void owned?.()
 
     return { reply: entry.reply }
   })()
