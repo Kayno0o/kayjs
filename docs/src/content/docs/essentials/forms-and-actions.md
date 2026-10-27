@@ -102,7 +102,7 @@ An action in it can read the params of every page below it.
 
 ## One schema for the server and the browser
 
-A schema is built with `s`, which only the server has. An island cannot import one, but it can import the type read off it, which leaves the module out of its bundle. Write the schema once in a `.ts` module, with its type beside it.
+A schema is built with `s`, and validates on the server. An island may import the module holding it, where `s` builds an inert stand-in that weighs nothing, and reads the type off it, which is the one type both sides use. Write the schema once in a `.ts` module, with its type beside it.
 
 ```ts
 // src/schemas.ts

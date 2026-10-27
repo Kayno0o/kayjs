@@ -109,16 +109,6 @@ describe('kay build', () => {
       message: 'src/counter.kay -> src/tokens.ts -> orm -> readline',
     },
     {
-      name: 'an island building a schema with kay\'s t, naming the module taking it from kay',
-      files: {
-        // A schema module shared by an action and an island's own check.
-        'src/schemas.ts': 'import { s } from \'kay\'\n\nexport const title = s.String({ minLength: 1 })\nexport const longest = 200\n',
-        'src/counter.kay': counter('import { longest, title } from \'./schemas\'\n', '{longest} {String(title)} {n()}'),
-      },
-      options: { minify: true },
-      message: 'an island imports src/schemas.ts, which takes it from \'kay\'',
-    },
-    {
       name: 'a server-only global read in the island\'s own fence, minifying as the build does',
       files: { 'src/counter.kay': counter('', '{own} {n()}', 'const own = process.env.OWN\n') },
       options: { minify: true },
@@ -176,6 +166,26 @@ describe('kay build', () => {
 
     expect(Object.keys((await buildClient(root)).islands)).toEqual(['src/counter.kay'])
     expect(Object.keys((await buildClient(join(root, 'examples/chat'))).islands)).toEqual(['src/live.kay'])
+  })
+
+  it.each([{ minify: true }, { hot: true }])('builds an island importing a module that builds schemas with kay\'s s, shared with the page\'s action: %p', async (options) => {
+    const root = await scratchProject({
+      'src/schemas.ts': 'import type { Static } from \'kay\'\nimport { s } from \'kay\'\n\nexport const title = s.String({ minLength: 1 })\nexport type Title = Static<typeof title>\nexport const longest = 200\n',
+      'src/counter.kay': counter('import { longest } from \'./schemas\'\nimport type { Title } from \'./schemas\'\n', '{longest} {n()}', 'const label: Title = \'x\'\n'),
+      'src/routes/index.kay': '--- server\nimport { s } from \'kay\'\nimport { title } from \'../schemas\'\n\nexport const add = action(s.Object({ title }), () => 1)\n---\n---\nimport Counter from \'../counter.kay\'\n---\nCounter\n',
+    })
+
+    expect(Object.keys((await buildClient(root, options)).islands)).toEqual(['src/counter.kay'])
+  })
+
+  it('still refuses a process read in a module building schemas an island imports', async () => {
+    const root = await scratchProject({
+      'src/schemas.ts': 'import { s } from \'kay\'\n\nexport const title = s.String()\nexport const longest = Number(process.env.LONGEST)\n',
+      'src/counter.kay': counter('import { longest } from \'./schemas\'\n', '{longest} {n()}'),
+      'src/routes/index.kay': ISLAND_PAGE,
+    })
+
+    await expect(buildClient(root, { minify: true })).rejects.toThrow(/`process` in counter-[a-z0-9]+\.js, read by src\/schemas\.ts/)
   })
 
   it('builds an island whose modules take t from kay as a type, the page building its schema in its server fence', async () => {

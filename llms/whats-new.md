@@ -4,6 +4,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 
 ## Unreleased
 
+- A module an island imports may build schemas with `s` as it loads: in the browser `s` builds an inert stand-in with no validator, so a type and its schema live in one module shared with the server, and `server-only-in-island` no longer refuses `s`, only `process` and `Bun` reads: [Schemas](schemas.md#schemas).
 - `kay check` reports `signal-set-call`, a signal written `count.set(value)` where assigning it, `count = value`, does the same, and `--fix` assigns it: [Signals](components.md#signals).
 
 ## 1.79.0

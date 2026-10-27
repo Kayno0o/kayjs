@@ -46,22 +46,30 @@ describe('s from kay', () => {
     expect(bundle).not.toContain('smash')
   })
 
-  it('leaves Elysia out of an island, and throws saying why when one calls it', async () => {
+  it('lets an island load a module that builds schemas, with no Elysia and no validator in its chunk', async () => {
+    const shared = 'import type { Static } from \'kay\'\nimport { s } from \'kay\'\n\nexport const SHAPE = s.Object({ pick: s.Union([s.Literal(\'smash\'), s.Literal(\'pass\')]), key: s.Secret(), pub: s.Public(s.String()), topic: s.UnionKeys({ a: 1 }) })\nexport type Shape = Static<typeof SHAPE>\nexport const label = \'ok\'\n'
+
+    await Bun.write(join(dir, 'built.ts'), shared)
+
     const plain = await browserBundle('import { signal } from \'kay\'\n\nexport const count = signal(1)\n')
-    const calling = await browserBundle('import { s } from \'kay\'\n\nexport const schema = () => s.String()\n')
-    const secret = await browserBundle('import { s } from \'kay\'\n\nexport const schema = () => s.Secret()\n')
+    const building = await browserBundle('import { label } from \'./built\'\n\nexport const read = () => label\n')
 
-    expect(secret).toContain('builds a schema on the server')
-    expect(plain).not.toContain('elysia')
-    expect(plain.length).toBeLessThan(20_000)
-    expect(calling.length).toBeLessThan(20_000)
+    expect(building).not.toContain('elysia')
+    expect(building).not.toContain('typebox')
+    expect(building.length).toBeLessThan(20_000)
+    expect(building.length - plain.length).toBeLessThan(2_000)
 
-    const { schema } = await import(`data:text/javascript;base64,${Buffer.from(calling).toString('base64')}`) as { schema: () => unknown }
-    const { schema: secretSchema } = await import(`data:text/javascript;base64,${Buffer.from(secret).toString('base64')}`) as { schema: () => unknown }
+    const { read } = await import(`data:text/javascript;base64,${Buffer.from(building).toString('base64')}`) as { read: () => string }
 
-    expect(secretSchema).toThrow('s.Secret() builds a schema on the server')
+    expect(read()).toBe('ok')
+  })
 
-    expect(schema).toThrow('kay: s.String() builds a schema on the server, and kay\'s `s` is not in the browser; keep schemas in a module only the server imports')
+  it('throws saying why when an island reads or validates with a schema it built', async () => {
+    const bundle = await browserBundle('import { s } from \'kay\'\n\nconst SHAPE = s.Object({ name: s.String() })\n\nexport const inert = () => [typeof (SHAPE as unknown as { then?: unknown }).then, JSON.stringify(SHAPE)]\nexport const read = () => (SHAPE as unknown as { properties: unknown }).properties\n')
+    const { inert, read } = await import(`data:text/javascript;base64,${Buffer.from(bundle).toString('base64')}`) as { inert: () => unknown[], read: () => unknown }
+
+    expect(inert()).toEqual(['undefined', '{}'])
+    expect(read).toThrow('a schema is inert in the browser')
   })
 
   it('builds an enum over a record\'s keys, typed as their union', () => {

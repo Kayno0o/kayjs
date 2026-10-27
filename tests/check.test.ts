@@ -589,53 +589,34 @@ describe.concurrent('kay check, edge cases', () => {
       }
     }
 
-    it('reports an island importing a module that builds s schemas, at the island\'s import line and naming the module', async () => {
-      const diagnostics = await found({
+    it('passes an island importing a module that builds s schemas, through another module, aliased, and in its own script', async () => {
+      expect(await found({
         'src/components/counter.kay': island('import { SHAPE } from \'../lib/schemas\''),
         'src/lib/schemas.ts': 'import { s } from \'kay\'\n\nexport const SHAPE = s.Object({ name: s.String() })\n',
-      })
-
-      expect(diagnostics.map(d => d.at)).toEqual(['src/components/counter.kay:3'])
-      expect(diagnostics[0]!.message).toContain('src/lib/schemas.ts')
-      expect(diagnostics[0]!.message).toContain('src/components/counter.kay')
-    })
-
-    it('follows a module an island reaches through another, and an aliased s', async () => {
-      const diagnostics = await found({
+      })).toEqual([])
+      expect(await found({
         'src/components/counter.kay': island('import { total } from \'../lib/total\''),
         'src/lib/total.ts': 'export { total } from \'./deep\'\n',
         'src/lib/deep.ts': 'import { s as schema } from \'kay\'\n\nconst SHAPE = schema.Object({})\n\nexport const total = SHAPE.type\n',
+      })).toEqual([])
+      expect(await found({ 'src/components/counter.kay': island('import { s } from \'kay\'', 'const SHAPE = s.Object({})\n') })).toEqual([])
+    })
+
+    it('still reports a process read next to a schema the island reaches, at the import line', async () => {
+      const diagnostics = await found({
+        'src/components/counter.kay': island('import { SHAPE } from \'../lib/schemas\''),
+        'src/lib/schemas.ts': 'import { s } from \'kay\'\n\nexport const SHAPE = s.Object({ name: s.String() })\nexport const KEY = process.env.SECRET\n',
       })
 
       expect(diagnostics.map(d => d.at)).toEqual(['src/components/counter.kay:3'])
-      expect(diagnostics[0]!.message).toContain('src/lib/deep.ts')
-    })
-
-    it('reports an s built in the island\'s own script, at the read', async () => {
-      expect((await found({ 'src/components/counter.kay': island('import { s } from \'kay\'', 'const SHAPE = s.Object({})\n') })).map(d => d.at)).toEqual(['src/components/counter.kay:6'])
-    })
-
-    it('passes a type-only s, an s no module scope builds, and a module only the server imports', async () => {
-      expect(await found({
-        'src/components/counter.kay': island('import { LABEL } from \'../lib/labels\''),
-        'src/lib/labels.ts': 'import type { s } from \'kay\'\n\nexport const LABEL = \'a\'\nexport type Shape = typeof s\n',
-      })).toEqual([])
-      expect(await found({
-        'src/components/counter.kay': island('import { LABEL } from \'../lib/labels\''),
-        'src/lib/labels.ts': 'import { s } from \'kay\'\n\nexport const LABEL = \'a\'\nexport const shape = () => s.Object({})\n',
-      })).toEqual([])
-      expect(await found({
-        'src/components/counter.kay': island('import { LABEL } from \'../lib/labels\''),
-        'src/lib/labels.ts': 'export const LABEL = \'a\'\n',
-        'src/lib/server.ts': 'import { s } from \'kay\'\n\nexport const SHAPE = s.Object({})\n',
-      })).toEqual([])
+      expect(diagnostics[0]!.message).toContain('process')
     })
 
     it('reads typed and TSX modules, and passes a class field initializer', async () => {
       const diagnostics = await found({
         'src/components/counter.kay': '---\nimport { signal } from \'kay\'\nimport { SHAPE } from \'../lib/typed\'\nimport { VIEW } from \'../lib/view\'\nimport { KEY } from \'../lib/key\'\n\nconst count = signal(0)\n---\nbutton(onClick={() => count++}) {count()}\n',
-        'src/lib/typed.ts': 'import { s } from \'kay\'\n\nexport type Shape = unknown\nexport const SHAPE: Shape = s.Object({ name: s.String() }) as Shape\n',
-        'src/lib/view.tsx': 'import { s } from \'kay\'\n\nexport const VIEW = <b>{String(s.Object({}))}</b>\n',
+        'src/lib/typed.ts': 'export type Shape = unknown\nexport const SHAPE: Shape = process.env.A as Shape\n',
+        'src/lib/view.tsx': 'export const VIEW = <b>{String(Bun.env.A)}</b>\n',
         'src/lib/key.ts': 'export class Key { x = process.env.Y }\nexport const KEY: string = \'k\'\n',
       })
 

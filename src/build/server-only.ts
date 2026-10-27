@@ -18,11 +18,6 @@ const SERVER_ONLY = new Set(['process', 'Bun'])
 const MENTIONED = /\b(?:process|Bun)\b/
 // The one read the client build replaces with a literal, so it reaches no chunk.
 const DEFINED = 'NODE_ENV'
-// Part of the message of the browser's stand-in for kay's `s`, which survives minifying: a chunk holding it builds a schema where Elysia is not.
-const BROWSER_T = 'builds a schema on the server, and kay'
-const KAY_IMPORT = /import\s*\{([^}]*)\}\s*from\s*['"]kay['"]/g
-// `s`, as imported or aliased.
-const SCHEMA_SPECIFIER = /^s(?:\s+as\s+\w+)?$/
 // Bun's refusal of a builtin in a browser build, which names the module importing it and not the island that reached it.
 const BUILTIN_REFUSAL = /^Browser build cannot import (?:Node\.js|Bun) builtin/
 const PACKAGE_PATH = /node_modules\/((?:@[^/]+\/)?[^/]+)/
@@ -81,19 +76,18 @@ function readsIn(code: string, fenced: boolean): Set<string> {
   return program === undefined ? new Set() : namesIn(program)
 }
 
-// Whether a source is worth following the browser's imports for: it names a server-only global or imports `s`.
+// Whether a source is worth following the browser's imports for: it names a server-only global.
 export function mentionsServerOnly(source: string): boolean {
-  return MENTIONED.test(source) || importsKaySchema(source)
+  return MENTIONED.test(source)
 }
 
 export interface LoadTimeRead {
-  // `s` for kay's schema builder, else the global.
   name: string
   // Where in the source it is read.
   start: number
 }
 
-// What a module reads of the server as it loads, which no tree-shaking drops: the server-only globals `refuseServerOnlyReads` finds, and kay's `s` called or read at module scope, which the browser's stand-in throws on.
+// What a module reads of the server as it loads, which no tree-shaking drops: the server-only globals `refuseServerOnlyReads` finds.
 // `fenced` reads a `.kay` file's script and module fences, the ones the browser runs.
 // A read inside a function is left out: whether it runs depends on what the importer calls, which only the build's own bundle knows.
 export function loadTimeReads(source: string, fenced: boolean): LoadTimeRead[] {
@@ -104,7 +98,7 @@ export function loadTimeReads(source: string, fenced: boolean): LoadTimeRead[] {
   for (const { start, end } of spans) {
     const text = source.slice(start, end)
 
-    if (!MENTIONED.test(text) && !text.includes('kay'))
+    if (!MENTIONED.test(text))
       continue
 
     // A project's own module is TypeScript, or TSX, whichever side it runs on.
@@ -120,19 +114,8 @@ export function loadTimeReads(source: string, fenced: boolean): LoadTimeRead[] {
         if (!path.isReferencedIdentifier() || path.getFunctionParent() !== null || path.findParent(parent => parent.isTSType() || ((parent.isClassProperty() || parent.isClassPrivateProperty()) && !parent.node.static)) !== null)
           return
 
-        if (SERVER_ONLY.has(name)) {
-          if (!path.scope.hasBinding(name, { noGlobals: true }) && !defined(path) && !guarded(path, name))
-            found.push({ name, start: start + path.node.start! })
-
-          return
-        }
-
-        const binding = path.scope.getBinding(name)
-        const specifier = binding?.path.node
-        const declaration = binding?.path.parentPath?.node
-
-        if (specifier?.type === 'ImportSpecifier' && specifier.importKind !== 'type' && specifier.imported.type === 'Identifier' && specifier.imported.name === 's' && declaration?.type === 'ImportDeclaration' && declaration.source.value === 'kay' && declaration.importKind !== 'type')
-          found.push({ name: 's', start: start + path.node.start! })
+        if (SERVER_ONLY.has(name) && !path.scope.hasBinding(name, { noGlobals: true }) && !defined(path) && !guarded(path, name))
+          found.push({ name, start: start + path.node.start! })
       },
     })
   }
@@ -306,7 +289,6 @@ function asksTypeof(node: t.Node, name: string): boolean {
 // With `cacheDir`, a chunk scanned by the build before, its content unchanged, is not parsed again.
 export async function refuseServerOnlyReads(root: string, dir: string, outputs: Record<string, Output>, cacheDir?: string): Promise<void> {
   const problems: string[] = []
-  const schemaBuilders = new Set<string>()
   const slot = cacheDir === undefined ? undefined : { file: join(cacheDir, SCANS_FILE), key: scanKey() }
   const cached = (slot && await readCacheEntry<Scans>(slot)) ?? {}
   const scans: Scans = {}
@@ -317,7 +299,6 @@ export async function refuseServerOnlyReads(root: string, dir: string, outputs: 
 
     return source === undefined ? undefined : [path.startsWith(root + sep) ? relative(root, path) : input, source] as const
   }))).filter(entry => entry !== undefined))
-  let buildsSchemas = false
 
   await Promise.all(Object.entries(outputs).map(async ([file, meta]) => {
     if (!file.endsWith('.js'))
@@ -335,8 +316,6 @@ export async function refuseServerOnlyReads(root: string, dir: string, outputs: 
     if (names === undefined)
       return unchecked('could not be parsed')
 
-    buildsSchemas ||= code.includes(BROWSER_T)
-
     if (names.size === 0)
       return
 
@@ -347,29 +326,8 @@ export async function refuseServerOnlyReads(root: string, dir: string, outputs: 
   if (slot)
     await writeCacheEntry(slot, scans)
 
-  // The browser's `s` sits with the runtime, and the modules taking it in any chunk.
-  if (buildsSchemas) {
-    for (const meta of Object.values(outputs)) {
-      for (const [module, source] of await modulesOf(meta)) {
-        if (importsKaySchema(KAY_FILE.test(module) ? scriptFence(source) : source))
-          schemaBuilders.add(module)
-      }
-    }
-
-    if (schemaBuilders.size === 0)
-      schemaBuilders.add('a module kay could not pin down')
-  }
-
-  const refusals: string[] = []
-
   if (problems.length > 0)
-    refusals.push(`a browser has no \`process\` or \`Bun\`, and these chunks a page loads read one, so every island in them dies as the chunk evaluates: ${problems.sort().join('; ')}. Keep the module reading it out of what an island imports, directly or through the page's script fence, and pass what it holds as a prop; ask \`typeof\` first where the module runs on both sides.`)
-
-  if (schemaBuilders.size > 0)
-    refusals.push(`kay's \`s\` builds schemas on the server only, and an island imports ${[...schemaBuilders].sort().join(', ')}, which take${schemaBuilders.size === 1 ? 's' : ''} it from 'kay': its first \`s.Object(...)\` would throw as the island loads, and Elysia's own \`t\` reads \`Bun\`. Keep the schemas in a module only the server imports, and what an island needs of them, a length or a list of choices, in another.`)
-
-  if (refusals.length > 0)
-    throw new KayError('server-only-in-island', `kay: ${refusals.join(' And ')}`)
+    throw new KayError('server-only-in-island', `kay: a browser has no \`process\` or \`Bun\`, and these chunks a page loads read one, so every island in them dies as the chunk evaluates: ${problems.sort().join('; ')}. Keep the module reading it out of what an island imports, directly or through the page's script fence, and pass what it holds as a prop; ask \`typeof\` first where the module runs on both sides.`)
 }
 
 function knownNames(known: string[] | null): Set<string> | undefined {
@@ -395,23 +353,6 @@ function scanKey(): string {
   scannerKey ??= Bun.hash([import.meta.path, ...SCANNER_PACKAGES.map(manifest => Bun.resolveSync(manifest, import.meta.dir))].map(file => readFileSync(file, 'utf8')).join('\0')).toString(36)
 
   return scannerKey
-}
-
-// Whether a module imports `s` itself from 'kay', not as a type.
-function importsKaySchema(source: string): boolean {
-  for (const [, specifiers] of source.matchAll(KAY_IMPORT)) {
-    if (specifiers!.split(',').some(specifier => SCHEMA_SPECIFIER.test(specifier.trim())))
-      return true
-  }
-
-  return false
-}
-
-// The component script of a `.kay` file: its server fence never reaches the browser.
-function scriptFence(source: string): string {
-  const { script, module } = parseKay(source)
-
-  return [script, module].map(span => span ? source.slice(span.start, span.end) : '').join('\n')
 }
 
 // A module of the chunk kay cannot read, a virtual one for instance, tells nothing about where the read came from.

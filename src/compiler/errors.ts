@@ -81,7 +81,7 @@ export const ERRORS = {
   },
   'server-only-in-island': {
     group: 'build',
-    summary: 'A chunk a page loads reading `process` or `Bun`, or an island importing the server\'s `s` schema builder, so the island dies as it loads; `kay check` reports it too.',
+    summary: 'A chunk a page loads reading `process` or `Bun`, so the island dies as it loads; `kay check` reports it too.',
     fix: { file: 'llms/browser-only.md', heading: 'Browser globals on the server' },
   },
   'inert-editor': {
