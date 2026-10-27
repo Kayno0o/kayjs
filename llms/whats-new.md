@@ -4,6 +4,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 
 ## Unreleased
 
+- A component mounted by `mountComponent` has `type(selector, text)`, `click(selector)` and `press(key)` firing the events a browser would, then settling, so a test no longer dispatches input events by hand: [Mounting a component](testing.md#mounting-a-component).
 - A browser test's `page.waitUntil(fn, { what })` names the wait in its timeout error, and a timed-out `waitFor` or `waitUntil` carries the stack of the test's own call: [Browser tests](testing-browser.md).
 - `sanitizeHtml` adds `noopener` to the `rel` of a link whose kept `target` is not `_self`, so a `target="_blank"` the options let through gives the page no `window.opener`: [Templates](templates-elements-slots-snippets.md).
 - `schedule` and `background` take `enabled: false` to add nothing, and `KAY_LOCK_SCHEDULES=false` stops a one-process production server locking every schedule: [Background jobs](production.md#background-jobs).

@@ -366,6 +366,49 @@ describe('mount', () => {
       await rm(dir, { recursive: true, force: true })
     }
   })
+
+  it('types, clicks and presses as a browser does, committing a text field when it is left or Enter is pressed', async () => {
+    const lines: string[] = []
+    const { root, type, click, press, unmount } = await mountComponent(await imported('tests/fixtures/mount/fields.kay'), { log: (line: string) => lines.push(line) })
+
+    await type('.name', 'Ada')
+    expect(root.querySelector<HTMLInputElement>('.name')!.value).toBe('Ada')
+    expect(document.activeElement).toBe(root.querySelector('.name'))
+    expect(lines).toEqual(['input Ada'])
+
+    // Enter commits, then submits the form.
+    await press('Enter')
+    expect(lines).toEqual(['input Ada', 'change Ada', 'submit'])
+    lines.length = 0
+
+    // Leaving the field by a click commits it before the click lands.
+    await type('.name', 'Bo')
+    await click('.go')
+    expect(lines).toEqual(['input Bo', 'change Bo', 'go'])
+    lines.length = 0
+
+    // A select commits at once, by value or by label.
+    await type('.pick', 'Beta')
+    expect(lines).toEqual(['pick b'])
+    lines.length = 0
+
+    await click('.blue')
+    expect(root.querySelector<HTMLInputElement>('.blue')!.checked).toBe(true)
+    expect(lines).toEqual(['blue'])
+    lines.length = 0
+
+    await click('.locked')
+    expect(lines).toEqual([])
+
+    await click('.keys')
+    await press('Escape')
+    expect(lines).toEqual(['down Escape'])
+
+    await expect(click('.nothing')).rejects.toThrow('kay: click(".nothing") matches nothing')
+    await expect(type('.go', 'x')).rejects.toThrow('needs an input, textarea or select')
+    await expect(type('.pick', 'Gamma')).rejects.toThrow('has no option')
+    unmount()
+  })
 })
 
 // Until the island's `focusInvalid()` answered, which may load the reveal first.

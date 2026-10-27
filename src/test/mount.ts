@@ -1,3 +1,4 @@
+import type { Interactions } from './interact'
 import { mkdir, mkdtemp, rm, stat } from 'node:fs/promises'
 import { dirname, join, resolve } from 'node:path'
 import process from 'node:process'
@@ -10,10 +11,11 @@ import { COOKIE_NAME } from '../runtime/persist'
 import { sendValue } from '../runtime/send'
 import { decodeValue } from '../runtime/wire'
 import { apiStubs, apiTrees } from '../server/api-modules'
+import { interactions } from './interact'
 import { lazyNativePlugins } from './lazy-plugins'
 import { testRoot } from './root'
 
-export interface Mounted {
+export interface Mounted extends Interactions {
   // The element the component rendered into, last in `document.body`.
   root: HTMLElement
   // Disposes of the component, running its cleanups once, and removes the element.
@@ -115,7 +117,7 @@ export async function mountComponent(source: (props: never) => unknown, ...given
 
   await settle()
 
-  return { root: element, unmount: () => {
+  return { root: element, ...interactions(element, settle), unmount: () => {
     if (!mounted)
       return
 

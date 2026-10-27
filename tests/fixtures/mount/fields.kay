@@ -1,0 +1,15 @@
+---
+const { log } = props<{ log: (line: string) => void }>()
+---
+form(onSubmit={event => { event.preventDefault(); log('submit') }})
+  input.name(onInput={event => log(`input ${event.currentTarget.value}`)} onChange={event => log(`change ${event.currentTarget.value}`)})
+  select.pick(onChange={event => log(`pick ${event.currentTarget.value}`)})
+    option(value="a") Alpha
+    option(value="b") Beta
+  label
+    input.red(type="radio" name="colour" value="red" onChange={() => log('red')})
+  label
+    input.blue(type="radio" name="colour" value="blue" onChange={() => log('blue')})
+  button.go(type="button" onClick={() => log('go')}) Go
+  button.locked(type="button" disabled onClick={() => log('locked')}) Locked
+  button.keys(type="button" onKeyDown={event => log(`down ${event.key}`)}) Keys

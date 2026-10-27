@@ -1,0 +1,14 @@
+---
+import Segmented from '@kaynooo/kayjs-ui/segmented.kay'
+import Select from '@kaynooo/kayjs-ui/select.kay'
+import TextInput from '@kaynooo/kayjs-ui/text-input.kay'
+
+// The fields a test drives with the helpers of a mounted component: `onTold` hears every event the fields report.
+const { onTold } = props<{ onTold: (line: string) => void }>()
+
+const LEVELS = [{ value: 'low', label: 'Low' }, { value: 'high', label: 'High' }]
+const SIZES = [{ value: 'small', label: 'Small' }, { value: 'large', label: 'Large' }]
+---
+TextInput#name(value="" onInput={value => onTold(`input ${value}`)} onChange={value => onTold(`change ${value}`)})
+Select#level(value="low" options={LEVELS} onChange={value => onTold(`level ${value}`)})
+Segmented(label="Size" name="size" options={SIZES} value="small" onChange={value => onTold(`size ${value}`)})
