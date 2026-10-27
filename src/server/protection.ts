@@ -391,6 +391,25 @@ export interface RefusalInput {
   keyContext?: (() => Omit<RateKeyContext, 'client'>) | undefined
 }
 
+// A call kayjs-ai's Chat sends to resume or stop a reply kept for it asks no provider, so the action's limits do not count it unless its handler then did something else: they only check it, and count it after the handler unless the library vouched for it.
+const REPLY_HEADER = 'x-kai-reply'
+const exemptRequests = new WeakSet<Request>()
+
+// For a library that answered a resume or a stop from what it kept: the action's `rateLimit` does not count this request.
+export function exemptFromLimits(request: Request): void {
+  exemptRequests.add(request)
+}
+
+// Whether a limit is only checked before the handler and counted after it: a limit on the posts that went through, or any limit for a resume or a stop, whose store can read a count.
+function countsAfter(request: Request, limit: ActionRateLimit, store: { peek?: unknown }): boolean {
+  if (limit.count === 'succeeded')
+    return true
+
+  const header = request.headers.get(REPLY_HEADER)
+
+  return store.peek !== undefined && header !== null && (header.startsWith('resume:') || header.startsWith('stop:'))
+}
+
 export async function protectionRefusal(action: ServerAction<TSchema, unknown>, request: Request, { body, form, server, plain = form, keyContext }: RefusalInput): Promise<ProtectionRefusal | typeof PRETEND | undefined> {
   const { honeypot, messages } = action.protection ?? {}
   const field = honeypotField(action.protection)
@@ -459,7 +478,7 @@ export async function protectionRefusal(action: ServerAction<TSchema, unknown>, 
 
     const key = await actionKey(name, limit, request, client, keyContext)
     // A limit on the posts that went through only reads its count here; the handler's success adds to it.
-    const own = limit.count === 'succeeded' ? reached(await store.peek!(key), limit.max) : waitFor(await store.hit(key, windowText(limit)), limit.max)
+    const own = countsAfter(request, limit, store) ? reached(await store.peek!(key), limit.max) : waitFor(await store.hit(key, windowText(limit)), limit.max)
 
     if (own !== undefined && (wait === undefined || own > wait))
       wait = own
@@ -475,7 +494,7 @@ export async function protectionRefusal(action: ServerAction<TSchema, unknown>, 
 
 // Counts a post whose handler went through against the action's limits on those, under the keys the refusal check counted it by.
 export async function countSucceeded(action: ServerAction<TSchema, unknown>, request: Request, server: Server<unknown> | null | undefined): Promise<void> {
-  const limits = actionLimits(action).filter(({ limit }) => limit.count === 'succeeded')
+  const limits = exemptRequests.has(request) ? [] : actionLimits(action).filter(({ name, limit }) => countsAfter(request, limit, limit.store ?? sharedRates(name)))
 
   if (limits.length === 0)
     return

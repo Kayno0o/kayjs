@@ -435,7 +435,7 @@ describe('ai({ budget })', () => {
 
     ai({ budget: { tokens: 1000, window: '1m', store }, rateLimit: { max: 1, window: '1m', store } })
 
-    const call = async (op: string) => answeringRequest(new Request('http://localhost/chat', { headers: { 'x-kai-reply': `${op}:abcdef12-3456` } }), async () => ({ reply: ask('abcd', { key: 'v', outlive: true }) }))
+    const call = async (op: string) => answeringRequest(rewrittenRequest('203.0.113.1', { 'x-kai-reply': `${op}:abcdef12-3456` }), async () => ({ reply: ask('abcd', { key: 'v', outlive: true }) }))
     const started = (await call('start')).reply
 
     expect(await started).toBe('Fake reply to: abcd')

@@ -1,12 +1,15 @@
 import type { AskOptions, Provider } from '../src'
 import { afterEach, describe, expect, it } from 'bun:test'
-import { nameUser } from 'kay/library'
+import { memoryRates, nameUser } from 'kay/library'
 import { answeringRequest } from '../../../src/server/log'
-import { ask, fakeAi } from '../src'
+import { countSucceeded, protectionRefusal } from '../../../src/server/protection'
+import { sendFrom } from '../../../src/server/rewrite'
+import { ai, ask, fakeAi } from '../src'
 import { forgetKept } from '../src/kept'
 import { untilHolds } from './until'
 
 afterEach(() => {
+  ai()
   fakeAi.clear()
   forgetKept()
 })
@@ -41,9 +44,13 @@ function gated() {
 }
 
 // An ask made while answering a request the test can abort, as an action's handler makes it.
-async function answering(options: AskOptions, headers: Record<string, string> = {}, where: { path?: string, visitor?: string } = {}) {
+async function answering(options: AskOptions, headers: Record<string, string> = {}, where: { path?: string, visitor?: string, address?: string | null } = {}) {
   const controller = new AbortController()
   const request = new Request(`http://localhost${where.path ?? '/chat'}`, { headers, signal: controller.signal })
+
+  // The address a socket gives; a request with neither it nor a user is told apart from no other.
+  if (where.address !== null)
+    sendFrom(request, where.address ?? '203.0.113.1')
 
   if (where.visitor !== undefined)
     nameUser(request, () => where.visitor)
@@ -56,6 +63,8 @@ async function answering(options: AskOptions, headers: Record<string, string> = 
 // An action asking twice, as one that moderates a message before it answers does.
 async function answeringTwice(first: AskOptions, second: AskOptions, headers: Record<string, string>) {
   const request = new Request('http://localhost/chat', { headers })
+
+  sendFrom(request, '203.0.113.1')
 
   return answeringRequest(request, async () => ({ first: ask('a', first), second: ask('b', second) }))
 }
@@ -318,5 +327,112 @@ describe('resuming a reply by the header a Chat sends', () => {
     // The oldest finished ones went.
     expect(await (await answering({}, { 'x-kai-reply': 'resume:done-0000' })).reply).toBe('')
     expect(await (await answering({}, { 'x-kai-reply': 'resume:done-0204' })).reply).toBe('Fake reply to: x')
+  })
+
+  it('computes no owner for an ordinary ask, so a failing key hook gives no unhandled rejection', async () => {
+    const seen: unknown[] = []
+    const listener = (reason: unknown) => void seen.push(reason)
+
+    process.on('unhandledRejection', listener)
+    ai({ key: async () => Promise.reject(new Error('key hook failed')) })
+
+    try {
+      const model = gated()
+      const { reply } = await answering({ provider: model.provider }, { 'x-kai-reply': `start:${id}` })
+
+      model.release()
+      expect(await reply).toBe('one two')
+
+      // An ask that outlives, and a resume of it, need the owner: a failing hook keeps and finds nothing, still without a rejection.
+      const kept = gated()
+      const started = await answering({ provider: kept.provider, outlive: true }, { 'x-kai-reply': `start:${id}` })
+
+      kept.release()
+      expect(await started.reply).toBe('one two')
+      expect(await (await answering({ provider: kept.provider }, { 'x-kai-reply': `resume:${id}` })).reply).toBe('')
+      await Bun.sleep(20)
+      expect(seen).toEqual([])
+    }
+    finally {
+      process.off('unhandledRejection', listener)
+    }
+  })
+
+  it('keeps no reply for a visitor with neither a user nor an address', async () => {
+    const model = gated()
+    const first = await answering({ provider: model.provider, outlive: true }, { 'x-kai-reply': `start:${id}` }, { address: null })
+
+    await readers(first.reply)
+    first.leave()
+
+    // Another such visitor, and the same one, find nothing; a visitor with an address does not find it either.
+    for (const address of [null, '203.0.113.1']) {
+      expect(await (await answering({ provider: model.provider }, { 'x-kai-reply': `resume:${id}` }, { address })).reply).toBe('')
+      await (await answering({ provider: model.provider }, { 'x-kai-reply': `stop:${id}` }, { address })).reply
+    }
+
+    await Bun.sleep(20)
+    expect(model.state.aborted).toBe(false)
+  })
+
+  it('keeps no reply for a user the visitor hook does not name nor an address, and still serves a named one', async () => {
+    const model = gated()
+    const first = await answering({ provider: model.provider, outlive: true }, { 'x-kai-reply': `start:${id}` }, { address: null, visitor: 'ann' })
+
+    await readers(first.reply)
+    first.leave()
+    model.release()
+
+    expect(await (await answering({ provider: model.provider }, { 'x-kai-reply': `resume:${id}` }, { address: null, visitor: 'ann' })).reply).toBe('one two')
+  })
+
+  describe('against the rateLimit of the action', () => {
+    // The same limit the action declares, so the check and the count after the handler agree.
+    const action = () => ({ url: '/chat', protection: { rateLimit: { max: 1, window: '1m', store: memoryRates() } } }) as unknown as Parameters<typeof protectionRefusal>[0]
+    const input = { body: {}, form: false, server: null, plain: false } as const
+
+    // One post through the action as the server runs it: the refusal check, the handler, the count after it.
+    async function post(limited: ReturnType<typeof action>, header: string | undefined, handler: () => Promise<unknown>) {
+      const request = new Request('http://localhost/chat', { headers: header === undefined ? {} : { 'x-kai-reply': header } })
+
+      sendFrom(request, '203.0.113.1')
+
+      const refusal = await protectionRefusal(limited, request, input)
+
+      if (refusal !== undefined)
+        return refusal
+
+      await answeringRequest(request, handler)
+      await countSucceeded(limited, request, null)
+
+      return undefined
+    }
+
+    it('does not count a resume or a stop answered from what is kept', async () => {
+      const limited = action()
+      const asking = async () => ask('x', { provider: gated().provider })
+
+      for (const header of [`resume:${id}`, `stop:${id}`, `resume:${id}`])
+        expect(await post(limited, header, asking)).toBeUndefined()
+
+      // None counted, so the first ordinary post is the one the limit allows.
+      expect(await post(limited, undefined, async () => 'ok')).toBeUndefined()
+      expect(await post(limited, undefined, async () => 'ok')).toMatchObject({ status: 429 })
+    })
+
+    it('counts a call that carries the header but did not resume anything, so the header lifts no limit', async () => {
+      const limited = action()
+
+      expect(await post(limited, `resume:${id}`, async () => 'ok')).toBeUndefined()
+      expect(await post(limited, `resume:${id}`, async () => 'ok')).toMatchObject({ status: 429 })
+      expect(await post(limited, undefined, async () => 'ok')).toMatchObject({ status: 429 })
+    })
+
+    it('still refuses a resume once the visitor is over the limit with ordinary posts', async () => {
+      const limited = action()
+
+      expect(await post(limited, undefined, async () => 'ok')).toBeUndefined()
+      expect(await post(limited, `resume:${id}`, async () => ask('x', { provider: gated().provider }))).toMatchObject({ status: 429 })
+    })
   })
 })

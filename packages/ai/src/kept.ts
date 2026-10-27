@@ -7,7 +7,7 @@ interface Entry {
   reply: Reply
   at: number
   // Who asked and from which action, which a resume or a stop must match.
-  owner: Promise<string>
+  owner: Promise<string | undefined>
   // The reply ended, so it is the first to go when the store is full.
   ended: boolean
 }
@@ -15,7 +15,12 @@ interface Entry {
 interface Slot {
   replies: Map<string, Entry>
   // Keys a stop named before their reply was kept, as a stop may reach the server ahead of the call it ends.
-  stopped: Map<string, { at: number, owner: Promise<string> }>
+  stopped: Map<string, { at: number, owner: Promise<string | undefined> }>
+}
+
+// A kept reply answers its owner only: a visitor no one can tell apart (no user, no address) owns nothing, so it never matches.
+function same(kept: string | undefined, asked: string | undefined): boolean {
+  return kept !== undefined && kept === asked
 }
 
 const SLOT = Symbol.for('kayjs-ai.kept')
@@ -53,7 +58,7 @@ function sweep(now: number): void {
 }
 
 // Keeps a reply that outlives its request under the key its Chat named, so the Chat finds it after a reload: for half an hour, 200 at most, in this process's memory.
-export function keep(key: string, reply: Reply, owner: Promise<string>): void {
+export function keep(key: string, reply: Reply, owner: Promise<string | undefined>): void {
   const now = Date.now()
   const { replies, stopped } = slot()
 
@@ -66,7 +71,7 @@ export function keep(key: string, reply: Reply, owner: Promise<string>): void {
     stopped.delete(key)
 
     void (async () => {
-      if (await early.owner === await owner)
+      if (same(await early.owner, await owner))
         reply.stop()
     })()
   }
@@ -83,7 +88,7 @@ export function markEnded(key: string): void {
 }
 
 // Ends the reply kept under `key` if `owner` kept it, else the one about to be kept under it when the stop came first.
-export function stopKept(key: string, owner: Promise<string>): void {
+export function stopKept(key: string, owner: Promise<string | undefined>): void {
   sweep(Date.now())
 
   const entry = slot().replies.get(key)
@@ -95,13 +100,13 @@ export function stopKept(key: string, owner: Promise<string>): void {
   }
 
   void (async () => {
-    if (await entry.owner === await owner)
+    if (same(await entry.owner, await owner))
       entry.reply.stop()
   })()
 }
 
 // The reply kept under `key` for `owner`, as a reply that answers like an empty one if the owner is not the one who kept it.
-export function keptFor(key: string, owner: Promise<string>, empty: Reply): Reply | undefined {
+export function keptFor(key: string, owner: Promise<string | undefined>, empty: Reply): Reply | undefined {
   sweep(Date.now())
 
   const entry = slot().replies.get(key)
@@ -109,7 +114,7 @@ export function keptFor(key: string, owner: Promise<string>, empty: Reply): Repl
   if (entry === undefined)
     return undefined
 
-  const target = (async (): Promise<{ reply: Reply }> => ({ reply: await entry.owner === await owner ? entry.reply : empty }))()
+  const target = (async (): Promise<{ reply: Reply }> => ({ reply: same(await entry.owner, await owner) ? entry.reply : empty }))()
   const ahead = <Value>(pick: (reply: Reply) => AsyncIterable<Value>): AsyncIterable<Value> => ({
     [Symbol.asyncIterator]: () => {
       let source: AsyncIterator<Value> | undefined

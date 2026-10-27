@@ -1,7 +1,7 @@
 import type { TSchema } from 'kay/library'
 import type { Offered } from './loop'
 import type { AskOptions, Message, Reply, ReplyOf, StructuredAskOptions, Timeouts, ToolAction } from './types'
-import { actionTool, configError, currentRequest, durationSeconds, jsonSchemaOf } from 'kay/library'
+import { actionTool, configError, currentRequest, durationSeconds, exemptFromLimits, jsonSchemaOf } from 'kay/library'
 import { choose } from './config'
 import { recorded } from './dev-log'
 import { AiError } from './errors'
@@ -129,8 +129,8 @@ interface ReplyCall {
   op: 'start' | 'resume' | 'stop'
   // The id the Chat named and the place of this ask among the request's, so two asks of one action keep two replies.
   key: string | undefined
-  // The action and the visitor the ask is for, which a resume or a stop must come from too.
-  owner: Promise<string>
+  // The action and the visitor the ask is for, which a resume or a stop must come from too: asked only when a reply is kept, resumed or stopped, so an ordinary ask never runs the `key` hook for it.
+  owner: () => Promise<string | undefined>
 }
 
 // What the request being answered says of the reply this ask is for, or nothing for an ordinary call.
@@ -141,15 +141,27 @@ function replyCall(): ReplyCall | undefined {
   if (request === undefined || call === undefined)
     return undefined
 
+  // Answered from what is kept, so the action's own `rateLimit` does not count it.
+  if (call.op !== 'start')
+    exemptFromLimits(request)
+
   const place = asks.get(request) ?? 0
 
   asks.set(request, place + 1)
 
-  return { op: call.op, key: call.id === undefined ? undefined : `${call.id}.${place}`, owner: ownerOf(request) }
+  return { op: call.op, key: call.id === undefined ? undefined : `${call.id}.${place}`, owner: async () => ownerOf(request) }
 }
 
-async function ownerOf(request: Request): Promise<string> {
-  return `${new URL(request.url).pathname}\n${await visitorOf(request) ?? ''}`
+// Undefined for a visitor no one can tell apart from the next, or when the `key` hook fails: such a visitor keeps no reply and resumes none.
+async function ownerOf(request: Request): Promise<string | undefined> {
+  try {
+    const visitor = await visitorOf(request)
+
+    return visitor === undefined ? undefined : `${new URL(request.url).pathname}\n${visitor}`
+  }
+  catch {
+    return undefined
+  }
 }
 
 // The reply a Chat resumes or stops by the id it sent, or an empty one when none is kept for it: such a call never asks a provider, nor counts against a limit or the budget.
@@ -163,18 +175,18 @@ function resumed(call: ReplyCall | undefined): Reply | undefined {
     return empty
 
   if (call.op === 'stop') {
-    stopKept(call.key, call.owner)
+    stopKept(call.key, call.owner())
 
     return empty
   }
 
-  return keptFor(call.key, call.owner, empty) ?? empty
+  return keptFor(call.key, call.owner(), empty) ?? empty
 }
 
 // A reply that outlives its request is kept under the id its Chat named, for the Chat to find after a reload.
 function remembered(made: Reply, options: AskOptions, call: ReplyCall | undefined): Reply {
   if (options.outlive === true && call?.op === 'start' && call.key !== undefined)
-    keep(call.key, made, call.owner)
+    keep(call.key, made, call.owner())
 
   return made
 }
