@@ -1,5 +1,8 @@
-import { existsSync, readdirSync, realpathSync, statSync } from 'node:fs'
-import { join, relative, sep } from 'node:path'
+import { existsSync, lstatSync, readdirSync, realpathSync, statSync } from 'node:fs'
+import { dirname, join, relative, sep } from 'node:path'
+
+// The package directory, its name and the file's path in it.
+const STORE_FILE = /^(.*[\\/]node_modules[\\/]\.bun[\\/][^\\/]+[\\/]node_modules[\\/]((?:@[^\\/]+[\\/])?[^\\/]+))[\\/](.+)$/
 
 // Kept apart from the library scan, which brings the compiler's parser: the server resolves extension directories through it.
 
@@ -23,6 +26,26 @@ export function throughLinks(root: string, file: string): string {
   const found = links.reduce<[string, string] | undefined>((best, link) => file.startsWith(link[0] + sep) && link[0].length > (best?.[0].length ?? -1) ? link : best, undefined)
 
   return found ? join(found[1], relative(found[0], file)) : file
+}
+
+// A file Bun's isolated linker keeps in its store, `node_modules/.bun/<id>/node_modules/<name>/...`, as the project reaches it through the link to its package in the `node_modules` of the project or of a directory above, as a workspace's store links it; the file as it is when nothing there links the package.
+export function outOfStore(root: string, file: string): string {
+  const [, dir, name, rest] = STORE_FILE.exec(file) ?? []
+
+  if (dir === undefined || name === undefined || rest === undefined)
+    return file
+
+  const real = realpathSync(dir)
+
+  for (let at = root; ; at = dirname(at)) {
+    const link = join(at, 'node_modules', name)
+
+    if (lstatSync(link, { throwIfNoEntry: false })?.isSymbolicLink() === true && existsSync(link) && realpathSync(link) === real)
+      return join(link, rest)
+
+    if (at === dirname(at))
+      return file
+  }
 }
 
 function readLinks(root: string) {

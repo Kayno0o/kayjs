@@ -13,8 +13,8 @@ import { pruneCache, touchCacheFile } from './cache'
 import { collectionComponents, importedNames, rendersContent } from './collection-components'
 import { CSS_FILE, KAY_FILE, resolveFrom, SCRIPT_FILE, scriptLoader, transpilerFor } from './files'
 import { globbedFiles } from './glob'
-import { importsOf, libraryOf, throughNodeModules } from './libraries'
-import { throughLinks } from './links'
+import { importsOf, libraryOf } from './libraries'
+import { outOfStore, throughLinks } from './links'
 import { UI_FILE, uiEntryOf } from './ui'
 
 const ABSOLUTE_URL = /^\//
@@ -102,21 +102,21 @@ export function styleImports(root: string, libraries: KayLibrary[] = [], loaded?
   const inProject = (path: string) => path.startsWith(project) && !path.includes(`${sep}node_modules${sep}`)
   // A kay library's components and modules are followed as the app's own are.
   const followed = (path: string) => CSS_FILE.test(path) || ((inProject(path) || libraryOf(libraries, path) !== undefined) && (KAY_FILE.test(path) || SCRIPT_FILE.test(path)))
-  // The Tailwind plugin leaves every file under `node_modules/.bun/` to Bun's own CSS parser, so a stylesheet there reaches the bundler by the link the app reaches its package through, which `onResolve` keeps as Bun would resolve it to its real path.
+  // The Tailwind plugin leaves every file under `node_modules/.bun/` to Bun's own CSS parser, so a stylesheet there reaches the bundler by the link the app reaches its package through.
+  // Bun resolves an absolute path to its real one, so `onResolve` answers each of these links with the link itself.
   const linkedStylesheets = new Set<string>()
-  const outsideStore = (path: string) => {
+  const linkedOutOfStore = (path: string) => {
     if (!CSS_FILE.test(path) || !PACKAGE_STORE.test(path))
       return path
 
-    const library = libraryOf(libraries, path)
-    const linked = library === undefined ? throughLinks(root, path) : throughNodeModules(library, path)
+    const linked = outOfStore(root, path)
 
     linkedStylesheets.add(linked)
 
     return linked
   }
   const note = (importer: string, found: string[]) => {
-    const paths = found.map(outsideStore)
+    const paths = found.map(linkedOutOfStore)
 
     if (reached !== undefined)
       reached.edges.set(importer, [...reached.edges.get(importer) ?? [], ...paths])
