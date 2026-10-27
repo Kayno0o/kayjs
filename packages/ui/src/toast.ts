@@ -145,12 +145,13 @@ export async function attempt<T, Data = unknown>(run: () => Promise<T>, failure:
     return (value === undefined ? true : value) as Attempted<T>
   }
   catch (error) {
-    const data = options.onRefused === undefined ? undefined : refusalData<Data>(error)
+    const { onRefused } = options
+    const data = onRefused === undefined ? undefined : refusalData<Data>(error)
 
-    if (data === undefined)
+    if (onRefused === undefined || data === undefined)
       toast.error(refusalOf(error, options.refused) ?? options.failure)
     else
-      options.onRefused?.(data.value)
+      onRefused(data.value)
 
     return undefined
   }

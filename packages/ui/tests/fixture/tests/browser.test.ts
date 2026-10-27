@@ -73,10 +73,10 @@ inBrowser('in the browser', () => {
       for (let more = 0; more < 164; more++)
         strip.append(strip.firstElementChild!.cloneNode(true))
 
-      return { bottoms: new Set(bars.map(bar => bar.bottom)).size, tall: bars[1]!.height > bars[4]!.height, distinct: new Set(colors).size, overflow: strip.scrollWidth - strip.clientWidth, page: document.documentElement.scrollWidth - document.documentElement.clientWidth, cell: strip.firstElementChild!.getBoundingClientRect().width > 0 }
+      return { bottoms: new Set(bars.map(bar => bar.bottom)).size, tall: bars[1]!.height > bars[4]!.height, distinct: new Set(colors).size, overflow: strip.scrollWidth - strip.clientWidth, page: document.documentElement.scrollWidth - document.documentElement.clientWidth, cell: strip.firstElementChild!.getBoundingClientRect().width > 0, gap: strip.children[2]!.getBoundingClientRect().height < strip.children[0]!.getBoundingClientRect().height / 4 }
     })
 
-    expect(found).toEqual({ bottoms: 1, tall: true, distinct: 4, overflow: 0, page: 0, cell: true })
+    expect(found).toEqual({ bottoms: 1, tall: true, distinct: 4, overflow: 0, page: 0, cell: true, gap: true })
     expect(page.errors).toEqual([])
   }, 120_000)
 
