@@ -417,7 +417,7 @@ describe('kay lsp', () => {
     const open = await editor.connection.request<Location[]>('textDocument/references', { textDocument: { uri: editor.uri('site/src/routes/index.kay') }, position: { line: 13, character: 7 }, context: { includeDeclaration: true } })
 
     expect(spots(add.filter(location => location.uri === editor.uri('site/src/routes/index.kay')).map(location => location.range))).toEqual([[5, 13, 16], [14, 16, 19], [24, 19, 22]])
-    expect(spots(add.filter(location => location.uri === editor.uri('site/src/components/quick-add.kay')).map(location => location.range))).toEqual([[2, 9, 12], [9, 18, 21]])
+    expect(spots(add.filter(location => location.uri === editor.uri('site/src/components/quick-add.kay')).map(location => location.range))).toEqual([[2, 9, 12], [9, 16, 19]])
     expect(spots(open.map(location => location.range))).toEqual([[13, 6, 10], [20, 5, 9], [31, 15, 19]])
     expect(spots((await editor.request<DocumentHighlight[]>('textDocument/documentHighlight', 'site/src/routes/index.kay', 20, 6)).map(highlight => highlight.range))).toEqual([[13, 6, 10], [20, 5, 9], [31, 15, 19]])
   })
@@ -490,7 +490,7 @@ describe('kay lsp', () => {
       'for todo, i of todos key={i}',
       '  p {todo.id}',
       'for post of posts()',
-      '  button(onClick={() => posts.set([])}) {post.slug}',
+      '  button(onClick={() => posts = []}) {post.slug}',
       'if open',
       '  span on',
       '',
@@ -639,7 +639,7 @@ describe('kay lsp imports', () => {
   })
 
   it('reports a browser-only global read while rendering next to the type errors, fixed with an effect or `--- client`', async () => {
-    const source = '---\nimport { signal } from \'kay\'\n\nconst count = signal(0)\nlocalStorage.clear()\n---\np {count().missing}\nbutton(onClick={() => count.set(1)}) +\n'
+    const source = '---\nimport { signal } from \'kay\'\n\nconst count = signal(0)\nlocalStorage.clear()\n---\np {count().missing}\nbutton(onClick={() => count = 1}) +\n'
     const diagnostics = await editor.change(page, source, 6)
     const line = { start: { line: 4, character: 0 }, end: { line: 4, character: 12 } }
     const actions = await editor.connection.request<CodeAction[]>('textDocument/codeAction', { textDocument: { uri: editor.uri(page) }, range: line, context: { diagnostics } })
@@ -652,7 +652,7 @@ describe('kay lsp imports', () => {
   })
 
   it('reports unused imports, declarations, props and server values as errors, a prop with its fix', async () => {
-    const source = '---\nimport { effect, signal } from \'kay\'\n\nconst { title, subtitle } = props<{ title: string, subtitle?: string }>()\nconst count = signal(0)\nconst idle = 1\n---\np {title} {count()}\nbutton(onClick={() => count.set(1)}) +\n'
+    const source = '---\nimport { effect, signal } from \'kay\'\n\nconst { title, subtitle } = props<{ title: string, subtitle?: string }>()\nconst count = signal(0)\nconst idle = 1\n---\np {title} {count()}\nbutton(onClick={() => count = 1}) +\n'
     const diagnostics = await editor.change(page, source, 7)
 
     const actions = await editor.connection.request<CodeAction[]>('textDocument/codeAction', { textDocument: { uri: editor.uri(page) }, range: diagnostics[0]!.range, context: { diagnostics } })
@@ -801,7 +801,7 @@ describe('kay lsp following the project on disk', () => {
       Bun.write(join(dir, 'src/components/controls.ts'), 'export interface Controls {\n  pick: (value: string) => void\n}\n'),
       Bun.write(join(dir, 'src/components/panel.kay'), '---\nimport type { Controls } from \'./controls\'\n\nconst { controls } = props<{ controls: Controls }>()\n---\nbutton(type="button" onClick={() => controls.pick("a")}) a\n'),
       Bun.write(join(dir, wrapper), '---\nimport type { Controls } from \'./controls\'\nimport Panel from \'./panel.kay\'\n\nconst { controls } = props<{ controls: Controls }>()\n---\nPanel(controls={controls})\n'),
-      Bun.write(join(dir, 'src/components/board.kay'), '---\nimport { signal } from \'kay\'\nimport Wrapper from \'./wrapper.kay\'\n\nconst picked = signal(\'none\')\n---\np {picked()}\nWrapper(controls={{ pick: value => picked.set(value) }})\n'),
+      Bun.write(join(dir, 'src/components/board.kay'), '---\nimport { signal } from \'kay\'\nimport Wrapper from \'./wrapper.kay\'\n\nconst picked = signal(\'none\')\n---\np {picked()}\nWrapper(controls={{ pick: value => picked = value }})\n'),
       Bun.write(join(dir, 'src/routes/board.kay'), '---\nimport Board from \'../components/board.kay\'\n---\nBoard\n'),
     ])
     // Opened before the server hears of the files, it compiles as a static component would, until they reach it.

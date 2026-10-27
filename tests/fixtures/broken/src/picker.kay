@@ -6,4 +6,4 @@ const chosen = signal<number>()
 ---
 ul.picker(role="listbox")
   for item of items key={item.id}
-    li(role="option" aria-selected={chosen() === item.id ? 'true' : 'false'} class={{ chosen: chosen() === item.id }} onClick={() => chosen.set(item.id)}) {String(item[field])}
+    li(role="option" aria-selected={chosen() === item.id ? 'true' : 'false'} class={{ chosen: chosen() === item.id }} onClick={() => chosen = item.id}) {String(item[field])}

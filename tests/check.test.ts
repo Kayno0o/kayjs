@@ -367,7 +367,7 @@ describe.concurrent('kay check, edge cases', () => {
   })
 
   it('types a signal the template reads by calling it as its value', async () => {
-    const root = await scratchProject({ 'src/routes/index.kay': '---\nimport { signal } from \'kay\'\n\nconst count = signal(0)\n---\nbutton(onClick={() => count.set(count() + 1)}) {count().toFixed(1)} {count().nope}\n' })
+    const root = await scratchProject({ 'src/routes/index.kay': '---\nimport { signal } from \'kay\'\n\nconst count = signal(0)\n---\nbutton(onClick={() => count = count() + 1}) {count().toFixed(1)} {count().nope}\n' })
 
     try {
       expect((await check(root)).map(d => [d.line, d.code, d.message])).toEqual([[6, 'TS2339', 'Property \'nope\' does not exist on type \'number\'.']])
@@ -410,7 +410,7 @@ describe.concurrent('kay check, edge cases', () => {
       'p {sent() !== undefined && sent().toFixed(1)}',
       'p {total() === undefined ? \'x\' : total() * 2}',
       'p {doubled() !== undefined && doubled() + 1}',
-      'button(onClick={() => sent.set(1)}) {sent() * 2}',
+      'button(onClick={() => sent = 1}) {sent() * 2}',
       'p {sent().toFixed(1)} {sent()?.toFixed(1)}',
       'button(onClick={() => { if (sent() !== undefined) (sent() * 2) }}) Log',
       'p {sent() !== undefined && [1, 2].map(i => sent() * i)}',
@@ -419,7 +419,7 @@ describe.concurrent('kay check, edge cases', () => {
     const root = await scratchProject({ 'src/components/meter.kay': meter })
 
     try {
-      expect((await check(root, {})).map(d => [d.line, d.column, d.code, d.message])).toEqual([[12, 38, 'TS2532', 'Object is possibly \'undefined\'.'], [13, 4, 'TS2532', 'Object is possibly \'undefined\'.'], [14, 52, 'TS2532', 'Object is possibly \'undefined\'.'], [15, 44, 'TS2532', 'Object is possibly \'undefined\'.']])
+      expect((await check(root, {})).map(d => [d.line, d.column, d.code, d.message])).toEqual([[12, 35, 'TS2532', 'Object is possibly \'undefined\'.'], [13, 4, 'TS2532', 'Object is possibly \'undefined\'.'], [14, 52, 'TS2532', 'Object is possibly \'undefined\'.'], [15, 44, 'TS2532', 'Object is possibly \'undefined\'.']])
     }
     finally {
       await rm(root, { recursive: true, force: true })
@@ -443,7 +443,7 @@ describe.concurrent('kay check, edge cases', () => {
   it('lets a page hand an island the entries and schemas a CMS reads, as they come', async () => {
     const root = await scratchProject({
       'src/routes/index.kay': '--- server\nimport { collections, entries } from \'kay/content\'\nimport Editor from \'../editor.kay\'\n\nconst [info] = await collections()\nconst listed = await entries(\'notes\')\n---\nEditor(schema={info!.schema} entries={listed})\n',
-      'src/editor.kay': '---\nimport type { JsonSchema, SourceEntry } from \'kay/content\'\nimport { signal } from \'kay\'\n\nconst { schema, entries } = props<{ schema: JsonSchema, entries: SourceEntry[] }>()\nconst open = signal(0)\n---\nbutton(onClick={() => open.set(open() + 1)}) {Object.keys(schema.properties ?? {}).join()} {entries.map(entry => String(entry.data?.title)).join()}\n',
+      'src/editor.kay': '---\nimport type { JsonSchema, SourceEntry } from \'kay/content\'\nimport { signal } from \'kay\'\n\nconst { schema, entries } = props<{ schema: JsonSchema, entries: SourceEntry[] }>()\nconst open = signal(0)\n---\nbutton(onClick={() => open = open() + 1}) {Object.keys(schema.properties ?? {}).join()} {entries.map(entry => String(entry.data?.title)).join()}\n',
     })
 
     try {
@@ -1406,7 +1406,7 @@ describe.concurrent('kay check, edge cases', () => {
       'p(style:color={{ a: 1 }}) z',
       'form(onSubmit|preventDefault={event => event.target}) w',
       'form(onSubmit|preventDefault={event => event.nope}) v',
-      'button(onClick={() => size.set(2)}) b',
+      'button(onClick={() => size = 2}) b',
       '',
     ].join('\n')
     const root = await scratchProject({ 'src/routes/index.kay': page })
@@ -2238,7 +2238,7 @@ describe.concurrent('kay check, edge cases', () => {
     const root = await scratchProject({
       'src/table.ts': 'export interface Column<Row> { key: string, sortValue?: ((row: Row) => string | number) | true }\nexport type RowFilter<Row> = readonly (keyof Row & string)[] | ((row: Row) => string[])\nexport type RowKey<Row> = (keyof Row & string) | ((row: Row) => string | number)\n',
       'src/components/table.kay': '--- <Row>\nimport type { Column, RowFilter, RowKey } from \'../table\'\n\nconst { columns, rows, rowKey, filter } = props<{ columns: Column<Row>[], rows: Row[], rowKey: RowKey<Row>, filter?: RowFilter<Row> | undefined }>()\n---\np {columns.length} {rows.length} {String(rowKey)} {String(filter)}\n',
-      'src/components/pick.kay': '--- <Item extends { id: number }>\nimport { signal } from \'kay\'\n\nconst { items, rows } = props<{ items: Item[], rows: Item[] }>()\nconst chosen = signal(0)\n---\nbutton(onClick={() => chosen.set(items.length + rows.length)}) {chosen()}\n',
+      'src/components/pick.kay': '--- <Item extends { id: number }>\nimport { signal } from \'kay\'\n\nconst { items, rows } = props<{ items: Item[], rows: Item[] }>()\nconst chosen = signal(0)\n---\nbutton(onClick={() => chosen = items.length + rows.length}) {chosen()}\n',
       // A page with a server fence sends an island its props serialized, where a component renders as an island itself.
       'src/routes/index.kay': `--- server${use.slice(3)}`,
       'src/components/user.kay': use.replaceAll('../components/', './'),
@@ -2264,7 +2264,7 @@ describe.concurrent('kay check, edge cases', () => {
     const root = await scratchProject({
       'src/table.ts': 'export interface Column<Row> { key: string, sortValue?: ((row: Row) => string | number) | true }\n',
       'src/columns.ts': 'import type { Column } from \'./table\'\n\nexport const fromModule: Column<{ id: number, name: string }>[] = [{ key: \'name\', sortValue: row => row.name }]\n',
-      'src/components/grid.kay': '--- <Row>\nimport { signal } from \'kay\'\nimport type { Column } from \'../table\'\n\nconst { columns, rows, virtual = false } = props<{ columns: Column<Row>[], rows: Row[], virtual?: boolean }>()\nconst chosen = signal(0)\n---\nbutton(onClick={() => chosen.set(columns.length + rows.length + (virtual ? 1 : 0))}) {chosen()}\n',
+      'src/components/grid.kay': '--- <Row>\nimport { signal } from \'kay\'\nimport type { Column } from \'../table\'\n\nconst { columns, rows, virtual = false } = props<{ columns: Column<Row>[], rows: Row[], virtual?: boolean }>()\nconst chosen = signal(0)\n---\nbutton(onClick={() => chosen = columns.length + rows.length + (virtual ? 1 : 0)}) {chosen()}\n',
       'src/routes/index.kay': `--- server${page.slice(3)}`,
       // A static component imports no value that may be a function, which would have the build promote it and leave it unchecked.
       'src/components/panel.kay': page.replaceAll('../components/', './').replace('import { fromModule } from \'../columns\'\n', '').replace(/Grid\(columns=\{fromModule\}[^\n]*\n/g, ''),
@@ -2291,7 +2291,7 @@ describe.concurrent('kay check, edge cases', () => {
     const page = '---\nimport Grid from \'../components/grid.kay\'\nimport { fromModule } from \'../columns\'\n\nconst empty: { key: string, sortValue?: (() => number) | true }[] = []\nconst written: { key: string, sortValue?: (() => number) | true }[] = [{ key: \'name\', sortValue: true }]\nconst fine: { key: string, sortValue?: (() => number) | true }[] = [{ key: \'name\', sortValue: true }]\n---\nGrid(columns={empty})\nGrid(columns={fine})\nfor written of [fromModule]\n  Grid(columns={written})\n'
     const root = await scratchProject({
       'src/columns.ts': 'export const fromModule: { key: string, sortValue?: (() => number) | true }[] = [{ key: \'name\', sortValue: () => 1 }]\n',
-      'src/components/grid.kay': '--- \nimport { signal } from \'kay\'\n\nconst { columns } = props<{ columns: { key: string, sortValue?: (() => number) | true }[] }>()\nconst chosen = signal(0)\n---\nbutton(onClick={() => chosen.set(columns.length)}) {chosen()}\n',
+      'src/components/grid.kay': '--- \nimport { signal } from \'kay\'\n\nconst { columns } = props<{ columns: { key: string, sortValue?: (() => number) | true }[] }>()\nconst chosen = signal(0)\n---\nbutton(onClick={() => chosen = columns.length}) {chosen()}\n',
       'src/routes/index.kay': `--- server${page.slice(3)}`,
     })
 
@@ -2426,7 +2426,7 @@ describe.concurrent('kay check, edge cases', () => {
       'src/components/controls.ts': 'export interface Controls {\n  pick: (value: string) => void\n}\n',
       'src/components/panel.kay': '---\nimport type { Controls } from \'./controls\'\n\nconst { controls, label } = props<{ controls: Controls, label: string }>()\n---\nbutton(type="button" onClick={() => controls.pick(label)}) {label}\n',
       'src/components/wrapper.kay': '---\nimport type { Controls } from \'./controls\'\nimport Panel from \'./panel.kay\'\n\nconst { controls } = props<{ controls: Controls }>()\n---\nPanel(controls={controls} label="a")\nPanel(controls={controls} label="b")\n',
-      'src/components/board.kay': '---\nimport { signal } from \'kay\'\nimport Wrapper from \'./wrapper.kay\'\n\nconst picked = signal(\'none\')\n---\np {picked()}\nWrapper(controls={{ pick: value => picked.set(value) }})\n',
+      'src/components/board.kay': '---\nimport { signal } from \'kay\'\nimport Wrapper from \'./wrapper.kay\'\n\nconst picked = signal(\'none\')\n---\np {picked()}\nWrapper(controls={{ pick: value => picked = value }})\n',
       'src/routes/index.kay': '---\nimport Board from \'../components/board.kay\'\n---\nBoard\n',
     }
     const islandOnly = await scratchProject(files)
@@ -3461,7 +3461,7 @@ describe.concurrent('kay check, unused code', () => {
       '    p R',
       '  else',
       '    p S',
-      'button(onClick={() => picked.set(\'v\')}) Go',
+      'button(onClick={() => picked = \'v\'}) Go',
       '',
     ].join('\n')
     const root = await scratchProject({ 'src/routes/index.kay': page, 'src/levels.ts': 'export enum Level { Low, High, Max }\n' })
@@ -3699,7 +3699,7 @@ describe.concurrent('kay check, unused code', () => {
   })
 
   it('does not warn of an island\'s for over objects with no id and no key, which the runtime matches through edits', async () => {
-    const list = '---\nconst posts = signal([{ slug: \'a\', title: \'A\' }])\nconst todos = signal([{ id: 1, title: \'T\' }])\nconst tags = signal([\'x\'])\n---\nul\n  for post of posts()\n    li {post.title}\n  for post of posts()\n    li {post.slug}\n  for todo of todos()\n    li {todo.title}\n  for tag of tags()\n    li {tag}\n  for post of posts() key={post.slug}\n    li {post.title}\nbutton(onClick={() => { posts.set([]); todos.set([]); tags.set([]) }}) Clear\n'
+    const list = '---\nconst posts = signal([{ slug: \'a\', title: \'A\' }])\nconst todos = signal([{ id: 1, title: \'T\' }])\nconst tags = signal([\'x\'])\n---\nul\n  for post of posts()\n    li {post.title}\n  for post of posts()\n    li {post.slug}\n  for todo of todos()\n    li {todo.title}\n  for tag of tags()\n    li {tag}\n  for post of posts() key={post.slug}\n    li {post.title}\nbutton(onClick={() => { posts = []; todos = []; tags = [] }}) Clear\n'
     const root = await scratchProject({
       'src/components/list.kay': list,
       // A page renders once, so its rows are never matched again.
@@ -3797,7 +3797,7 @@ describe.concurrent('kay check, unused code', () => {
   })
 
   describe('secret-prop', () => {
-    const island = '---\nimport { signal } from \'kay\'\n\nconst { data } = props<{ data: unknown }>()\nconst open = signal(0)\n---\nbutton(onClick={() => open.set(open() + 1)}) {JSON.stringify(data)} {open()}\n'
+    const island = '---\nimport { signal } from \'kay\'\n\nconst { data } = props<{ data: unknown }>()\nconst open = signal(0)\n---\nbutton(onClick={() => open = open() + 1}) {JSON.stringify(data)} {open()}\n'
     const types = [
       'export interface Row { id: number, email: string, emailVerified: boolean }',
       'export interface Account { name: string, session?: { token: string } | null }',

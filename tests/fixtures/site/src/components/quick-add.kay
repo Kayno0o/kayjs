@@ -7,7 +7,7 @@ const saved = signal<number>()
 
 async function submit(event: SubmitEvent) {
   event.preventDefault()
-  saved.set(await add({ title: title() }))
+  saved = await add({ title: title() })
 }
 ---
 form.quick(onSubmit={submit})
