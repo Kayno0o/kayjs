@@ -57,7 +57,47 @@ it('hydrates an initial turn with sources as the server drew it: formatted from 
   expect(page.errors).toEqual([])
 }, 120_000)
 
-it('lists a source cited in a list or a table, and links none in code, in a link, or written [01] or with five digits', async () => {
+it('hydrates an initial turn that cites only inside code with no list at any moment, as the server drew it', async () => {
+  await using plain = await site.open('/citing-initial-code', { javaScript: false })
+
+  expect(await plain.count('.kai-chat-sources')).toBe(0)
+
+  await using page = await site.open('/citing-initial-code')
+
+  await page.initScript(() => {
+    const seen = new Set<string>()
+    const record = () => {
+      const turn = document.querySelector('.kai-chat-turn')
+
+      if (turn)
+        seen.add(turn.innerHTML)
+    }
+
+    Object.assign(window, { seen })
+    new MutationObserver(record).observe(document, { subtree: true, childList: true, characterData: true, attributes: true })
+    document.addEventListener('DOMContentLoaded', record)
+  })
+  await page.reload()
+  // The island is hydrated once it, or an element around the chat, carries its state; the renderer arrives a moment after.
+  await page.waitUntil(() => {
+    for (let element = document.querySelector('.kai-chat'); element; element = element.parentElement) {
+      if ('_$k' in element)
+        return true
+    }
+
+    return false
+  })
+  await Bun.sleep(500)
+
+  const states = await page.evaluate(() => [...(window as unknown as { seen: Set<string> }).seen])
+
+  expect(states.length).toBeGreaterThan(0)
+  expect(states.some(state => state.includes('kai-chat-source'))).toBe(false)
+  expect(await page.count('.kai-chat-sources')).toBe(0)
+  expect(page.errors).toEqual([])
+}, 120_000)
+
+it('lists a source cited in a list or a table,and links none in code, in a link, or written [01] or with five digits', async () => {
   await using page = await site.open('/citing')
 
   await send(page, '- see [2]\n\n| a | b |\n|---|---|\n| [1] | x |', 'see')

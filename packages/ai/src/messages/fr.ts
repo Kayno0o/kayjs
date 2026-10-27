@@ -20,6 +20,7 @@ export default defineMessages({
       disclosure: 'Vous discutez avec une IA. Vos messages sont envoyés à son fournisseur pour y répondre.',
       done: 'Terminé',
       edit: 'Modifier le message',
+      editBusy: 'Attendez la fin de la réponse.',
       editEmpty: 'Écrivez un message à envoyer.',
       error: 'La réponse a échoué.',
       expand: 'Agrandir le chat',

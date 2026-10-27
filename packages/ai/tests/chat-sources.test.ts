@@ -1,6 +1,6 @@
 import { afterEach, expect, test } from 'bun:test'
 import { ai, ask, fakeAi } from '../src'
-import { linkSources, opensApart, sameSources, usableSources } from '../src/chat-sources'
+import { citedAsWritten, linkSources, opensApart, sameSources, usableSources } from '../src/chat-sources'
 
 afterEach(() => {
   ai()
@@ -16,6 +16,19 @@ test('each [n] outside code and links becomes a link to its source, and the cite
   expect(html).toContain('[3] unknown, <code>[1]</code> <a href="/x">[2]</a></p><pre><code>[2]</code></pre>')
   expect(html).toEndWith('<p><a href="/moon">[2]</a><a href="https://example.com/a?x=1&amp;y=&quot;2&quot;">[1]</a></p>')
   expect(cited.map(source => source.n)).toEqual([2, 1])
+})
+
+test('the sources of a text still to be rendered leave out those cited only in a code span or a fence, as its rendered list does', () => {
+  const numbers = (markdown: string) => citedAsWritten(markdown, sources).map(source => source.n)
+
+  expect(numbers('See [2] and `[1]`.')).toEqual([2])
+  expect(numbers('Only ``a [1] ` b`` here.')).toEqual([])
+  expect(numbers('Fenced:\n\n```ts\n[1]\n```\n\nthen [2]')).toEqual([2])
+  expect(numbers('~~~\n[1]\n[2]\n~~~')).toEqual([])
+  expect(numbers('```\n[1] in a fence never closed')).toEqual([])
+  expect(numbers('a ` lone tick [1]')).toEqual([1])
+  expect(numbers('1 < 2 and [1] > 0')).toEqual([1])
+  expect(numbers('[01] [12345]')).toEqual([])
 })
 
 test('a reply with no sources is left as it is', () => {

@@ -50,6 +50,71 @@ export function usableSources(sources: unknown): Source[] {
   return usable
 }
 
+const FENCE_LINE = /^ {0,3}(`{3,}|~{3,})/
+
+// The end of the run of `char` starting at `from`.
+function runEnd(text: string, from: number, char: string): number {
+  let end = from
+
+  while (text[end] === char)
+    end++
+
+  return end
+}
+
+// The lines outside fenced blocks, a block ending at a line of its own fence character at least as long, or at the end of the text.
+function outsideFences(markdown: string): string {
+  const kept: string[] = []
+  let fence: string | undefined
+
+  for (const line of markdown.split('\n')) {
+    const marker = FENCE_LINE.exec(line)?.[1]
+
+    if (fence === undefined) {
+      if (marker === undefined)
+        kept.push(line)
+      else
+        fence = marker
+    }
+    else if (marker !== undefined && marker[0] === fence[0] && marker.length >= fence.length && line.trim().replaceAll(fence[0]!, '') === '') {
+      fence = undefined
+    }
+  }
+
+  return kept.join('\n')
+}
+
+// The text without its inline code spans: a run of backticks up to the next run of the same length, an unclosed run staying text.
+function outsideSpans(text: string): string {
+  let result = ''
+  let at = 0
+
+  while (at < text.length) {
+    const open = text.indexOf('`', at)
+
+    if (open === -1)
+      break
+
+    const end = runEnd(text, open, '`')
+    let close = -1
+
+    for (let next = text.indexOf('`', end); next !== -1 && close === -1; next = text.indexOf('`', runEnd(text, next, '`'))) {
+      if (runEnd(text, next, '`') - next === end - open)
+        close = runEnd(text, next, '`')
+    }
+
+    result += text.slice(at, close === -1 ? end : open)
+    at = close === -1 ? end : close
+  }
+
+  return result + text.slice(at)
+}
+
+// The sources a reply cites outside code, read from its markdown as written, for a turn whose renderer is still loading: it answers as the formatted reply would for fences and spans, so the list does not change when the renderer arrives.
+export function citedAsWritten(markdown: string, sources: readonly Source[]): Source[] {
+  return linkSources(attribute(outsideSpans(outsideFences(markdown))), sources).cited
+}
+
 // The reply's HTML with each `[n]` outside code and links turned into a link to its source, and the sources cited, in the order they were first cited.
 export function linkSources(html: string, sources: readonly Source[]): { html: string, cited: Source[] } {
   if (sources.length === 0)

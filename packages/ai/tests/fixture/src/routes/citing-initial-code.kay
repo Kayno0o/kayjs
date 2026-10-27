@@ -1,0 +1,7 @@
+--- server
+import { reply } from './echoing.kay'
+--- script
+import Chat from '@kaynooo/kayjs-ai/chat.kay'
+---
+h1 Citing initial in code
+Chat(action={reply} label="Assistant" initial={[{ role: 'assistant', content: '# Title\n\nOnly `[1]` here, and\n\n```\n[2]\n```\n\nnothing else.', sources: [{ n: 1, title: 'Tides', href: 'https://example.com/tides' }, { n: 2, title: 'Moon', href: '/moon' }] }]})

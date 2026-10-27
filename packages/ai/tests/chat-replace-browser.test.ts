@@ -412,6 +412,86 @@ it('offers no regenerate while an approval waits or right after its answer, and 
   expect(page.errors).toEqual([])
 }, 120_000)
 
+it('keeps an open edit through an Allow and a Deny, and saves it after', async () => {
+  await using page = await site.open('/replaceable-approving')
+
+  fakeAi.reply({ calls: [{ name: 'add_note', input: { title: 'Milk' } }] })
+  fakeAi.reply('May I add it?')
+  await page.fill('.kai-chat-form textarea', 'Add milk')
+  await page.click('.kai-chat-form .kai-chat-send')
+  await page.waitFor('.kai-chat-approval')
+  await page.waitFor('.kai-chat-turn[data-pending]', { gone: true })
+  await page.click(`.kai-chat-turn[data-role=user] ${EDIT}`)
+  await page.fill('.kai-chat-turn[data-editing] textarea', 'Add bread')
+
+  fakeAi.reply({ calls: [{ name: 'add_note', input: { title: 'Milk' } }] })
+  fakeAi.reply('Added')
+  await page.click('.kai-chat-approval button:first-of-type')
+  await page.waitFor(LAST_REPLY, { text: 'Added' })
+  await page.waitFor('.kai-chat-turn[data-pending]', { gone: true })
+
+  expect(await page.value('.kai-chat-turn[data-editing] textarea')).toBe('Add bread')
+
+  fakeAi.reply({ calls: [{ name: 'add_note', input: { title: 'Bread' } }] })
+  fakeAi.reply('May I add bread?')
+  await page.fill('.kai-chat-form textarea', 'And bread')
+  await page.click('.kai-chat-form .kai-chat-send')
+  await page.waitFor('.kai-chat-approval')
+  await page.waitFor('.kai-chat-turn[data-pending]', { gone: true })
+
+  fakeAi.reply('Fine')
+  await page.click('.kai-chat-approval button:nth-of-type(2)')
+  await page.waitFor(LAST_REPLY, { text: 'Fine' })
+  await page.waitFor('.kai-chat-turn[data-pending]', { gone: true })
+
+  expect(await page.count('.kai-chat-turn[data-editing]')).toBe(1)
+  expect(await page.value('.kai-chat-turn[data-editing] textarea')).toBe('Add bread')
+
+  fakeAi.reply('Edited')
+  await page.click('.kai-chat-save')
+  await page.waitFor(LAST_REPLY, { text: 'Edited' })
+
+  expect((await log(page)).map(entry => entry.slice(0, 11))).toEqual(['u:Add bread', 'a:Edited'])
+  expect(page.errors).toEqual([])
+}, 120_000)
+
+it('says why Enter in the edit field sends nothing while a reply is under way, and stops saying it when the reply ends', async () => {
+  await using page = await site.open('/replaceable')
+
+  await send(page, 'silent', 'fresh roles=u last=silent files=0')
+  await page.click(EDIT)
+  await page.click(REGENERATE)
+  await page.waitFor('.kai-chat-turn[data-pending]')
+
+  expect(await page.evaluate(() => document.querySelector<HTMLButtonElement>('.kai-chat-save')!.disabled)).toBe(true)
+
+  await page.click('.kai-chat-turn[data-editing] textarea')
+  await page.press('Enter')
+  await page.waitFor('.kai-chat-turn[data-editing] .kui-notice', { text: 'Wait for the reply to finish.' })
+
+  expect(await page.count('.kai-chat-turn[data-pending]')).toBe(1)
+
+  await page.click('.kai-chat-form .kai-chat-send')
+  await page.waitFor('.kai-chat-turn[data-pending]', { gone: true })
+  await page.waitFor('.kai-chat-turn[data-editing] .kui-notice', { gone: true })
+}, 120_000)
+
+it('cuts the edit button name between graphemes, so an emoji at the cut is not split', async () => {
+  await using page = await site.open('/replaceable')
+
+  const message = `${'a'.repeat(39)}😀 tail`
+
+  await send(page, message, `fresh roles=u last=${message} files=0`)
+
+  expect(await page.evaluate(() => document.querySelector('.kai-chat-turn[data-role=user] button.kai-chat-action')!.getAttribute('aria-label'))).toBe(`Edit the message: ${'a'.repeat(39)}…`)
+
+  const family = `${'b'.repeat(38)}👨‍👩‍👧 tail`
+
+  await send(page, family, `fresh roles=uau last=${family} files=0`)
+
+  expect(await page.evaluate(() => [...document.querySelectorAll('.kai-chat-turn[data-role=user] button.kai-chat-action')].at(-1)!.getAttribute('aria-label'))).toBe(`Edit the message: ${'b'.repeat(38)}…`)
+}, 120_000)
+
 // A model that says its first words, waits for the test to let it go on, then finishes; an abort ends it where it stands.
 function gated(first: string, rest: string) {
   const gate = Promise.withResolvers<void>()

@@ -169,7 +169,7 @@ A site restyles the panel with custom properties, all optional: `--kai-chat-acce
 
 A chat can let the visitor ask again for the last reply with `regenerate`, and change a message they sent and send it again with `editable`. The reply, or the edited message and everything after it, leave the log. An action that keeps the conversation reads `replaces()` to tell these from a fresh send and to drop that many stored turns before it answers.
 
-An edit stays open while the visitor sends something else, and Escape, Cancel and Save close it. Cancel and Escape put the focus back on the message's edit button, named `Edit the message: ` and the start of the message so each button differs. Save with nothing to send says `editEmptyLabel`.
+An edit stays open while the visitor sends something else, and Escape, Cancel and Save close it. Cancel and Escape put the focus back on the message's edit button, named `Edit the message: ` and the start of the message so each button differs. Save with nothing to send says `editEmptyLabel`, and Enter in the field while a reply is under way says `editBusyLabel`.
 
 A chat that is the main content of a page, such as a page of its own for the assistant, takes the height of its container with `fill`: give the container a height (a flex column, a grid row, `h-dvh`) and the log scrolls inside it while the form stays at the bottom. Without `fill` the log stops growing at `32rem`.
 
