@@ -2,7 +2,7 @@
 
 What each release of kay and its libraries adds, newest first, each feature with where it is documented. kay and its libraries share one version, so one section covers them all; what a release breaks is in [Upgrading](upgrading.md).
 
-## Unreleased
+## 1.79.0
 
 - The `kay` preset of `@kaynooo/eslint` (7.1.4) turns `ts/await-thenable` off in an app's test files, so `await expect(...).rejects...` lints clean with no override: [Lint with ESLint](checks.md#lint-the-script-fences-and-template-expressions-with-eslint).
 - `kay check` reports `server-only-in-island` for an island, or a module it imports, that builds schemas with `s` or reads `process` or `Bun` as it loads, at the island's import line, where the build used to be the first to refuse it: [Server globals in the browser](browser-only.md#server-globals-in-the-browser).
@@ -66,9 +66,4 @@ The rest of this release is in [What's new, older releases](whats-new-archive.md
 
 - A `kay build --compile` executable carries the modules declaring `s.Public`, so `publicEnv` and `/_kay/env.js` work where no `src` sits beside it, as in a container image holding the executable alone: [Environment](environment.md).
 
-## 1.77.0
-
-- kayjs-auth's tables rename the pre-1.71 `auth_*` ones again, for good, so a database still on them moves straight to this version with its users: [Upgrading](upgrading.md).
-- kayjs-ui `stepDraft`'s `maxAge` takes a duration only, and `deprecated-step-draft-max-age` is gone: [Upgrading](upgrading.md).
-
-Releases before 1.77 are in [What's new, older releases](whats-new-archive.md).
+Releases before 1.77.1 are in [What's new, older releases](whats-new-archive.md).

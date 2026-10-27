@@ -1,6 +1,11 @@
 # What's new, older releases
 
-What each release before 1.77 added, and the end of a newest release that was cut short (`(continued)`), newest first, each feature with where it is documented. The newer releases are in [What's new](whats-new.md); what a release breaks is in [Upgrading](upgrading.md).
+What each release before 1.77.1 added, and the end of a newest release that was cut short (`(continued)`), newest first, each feature with where it is documented. The newer releases are in [What's new](whats-new.md); what a release breaks is in [Upgrading](upgrading.md).
+
+## 1.77.0
+
+- kayjs-auth's tables rename the pre-1.71 `auth_*` ones again, for good, so a database still on them moves straight to this version with its users: [Upgrading](upgrading.md).
+- kayjs-ui `stepDraft`'s `maxAge` takes a duration only, and `deprecated-step-draft-max-age` is gone: [Upgrading](upgrading.md).
 
 ## 1.78.0 (continued)
 
