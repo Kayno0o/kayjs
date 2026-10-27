@@ -125,10 +125,10 @@ describe('function tools outside a request', () => {
   })
 
   it('refuses an input that is no kay schema, and a hand-written tool', () => {
-    const foreign = { name: 'foreign', description: 'x', input: { '~standard': {} }, run: () => '' }
+    const handWritten = { name: 'foreign', description: 'x', input: s.Object({}), run: () => '' }
 
     // @ts-expect-error a hand-written object is no FunctionTool
-    expect(() => ask('x', { tools: [foreign] })).not.toThrow('kay schema')
+    expect(() => ask('x', { tools: [handWritten] })).toThrow()
     expect(() => ask('x', { tools: [tool({ name: 'foreign', description: 'x', input: { '~standard': {} } as never, run: () => '' })] })).toThrow('kay schema')
   })
 
