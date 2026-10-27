@@ -68,8 +68,15 @@ describe('sanitizeHtml base', () => {
       .toBe('<img srcset="https://blog.example/post/a.png 1x, https://blog.example/b.png 2x, https://c.example/c.png 3x">')
     expect(clean('<img srcset="a.png 1x, javascript:alert(1) 2x">', { base: BASE, ...KEPT })).toBe('<img>')
     expect(clean('<img srcset="a.png 1x, data:image/png;base64,AAAA 2x">', { base: BASE, ...KEPT })).toBe('<img>')
-    expect(clean('<img srcset="a.png 1x,">', { base: BASE, ...KEPT })).toBe('<img>')
+    expect(clean('<img srcset="a.png 1x,">', { base: BASE, ...KEPT })).toBe('<img srcset="https://blog.example/post/a.png 1x">')
     expect(clean('<img srcset="a.png">', { base: BASE, ...KEPT })).toBe('<img srcset="https://blog.example/post/a.png">')
+  })
+
+  it('reads a srcset URL holding commas as one URL', () => {
+    expect(clean('<img srcset="https://res.cloudinary.com/x/w_300,h_200/a.jpg 1x, /img/a,b.png 2x">', { base: BASE, ...KEPT }))
+      .toBe('<img srcset="https://res.cloudinary.com/x/w_300,h_200/a.jpg 1x, https://blog.example/img/a,b.png 2x">')
+    expect(clean('<img srcset="a.png, b.png 2x">', { base: BASE, ...KEPT })).toBe('<img srcset="https://blog.example/post/a.png, https://blog.example/post/b.png 2x">')
+    expect(clean('<img srcset="a.png 1x&quot; onerror=&quot;x">', { base: BASE, ...KEPT })).toBe('<img>')
   })
 
   it('cannot be made to break out of an attribute', () => {

@@ -287,9 +287,15 @@ On an element, `innerHTML={waves}` takes a project file imported as text, `impor
 
 A string built from a vouched one, such as `markup + '<b>'`, is plain again.
 
-To render a string as markup, pass it through one of two helpers first. `sanitizeHtml(text)` is for markup a user wrote. `trustHtml(text)` is for markup the app made. Its links to other sites open in a new tab, as a template's do. For markup fetched from elsewhere, `sanitizeHtml(body, { base: article.url })` also resolves its relative links and pictures against the address it came from, and drops a URL that does not resolve to a web or mail address.
+To render a string as markup, pass it through one of two helpers first. `sanitizeHtml(text)` is for markup a user wrote. `trustHtml(text)` is for markup the app made. `trustHtml(text)` is for markup the app made.
 
 Call `trustHtml` where the markup is used, not once for a constant kept for hours.
+
+A link that `sanitizeHtml` keeps and that leaves your site opens in a new tab, as a template's does, with `target="_blank"`, `rel="nofollow ugc noopener"` and `data-new-tab`. `links: { outside: 'same-tab' }` in `kay.config.ts` turns that off, and a link that keeps a `target` of its own is left alone.
+
+For markup fetched from elsewhere, such as a feed's body, pass the address it came from: `sanitizeHtml(body, { base: article.url })`. Every kept link and picture, `srcset` included, is resolved against it as a browser would, so a relative or `//host` URL points at the origin it came from.
+
+A URL that does not resolve to a web or mail address is dropped, and so is every relative URL when `base` is not an absolute http(s) address. An `#anchor` in the markup then points at the original page, and opens in a new tab. `base` replaces `relativeUrls`, and its credentials, if any, are copied into every URL.
 
 <ReadMore href="/llms/templates">How the vouching travels from the server to the browser, what the server remembers, and what a dropped value logs.</ReadMore>
 

@@ -29,6 +29,9 @@ export const UNSAFE_ATTRIBUTE = /^(?:on|style$|srcdoc$|formaction$)/i
 const MARKUP_ONLY_URL = /^(?:background|cite|longdesc|ping)$/
 const SRCSET_CANDIDATE = /\s*,\s*/
 const DESCRIPTOR = /\s+\S+$/
+const SPACE = /\s/
+const TRAILING_COMMAS = /,+$/
+const DESCRIPTOR_TEXT = /^[\d.\sxwh]*$/i
 const ATTRIBUTE = /([a-z][\w:-]*)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'=<>`]+))/gi
 const LINK_ATTRIBUTES = ['href']
 
@@ -54,11 +57,11 @@ const TAG = /<(\/?)([a-z][a-z\d]*)(\s[^<>]*|\/)?>/gi
 // A web or mail link, or a path of the site, with no character that could close the attribute and no entity but `&amp;`.
 const SAFE_URL = /^(?:https?:\/\/|mailto:|\/(?![/\\])|#)[^\s"'<>`\\&]*$/i
 const AMPERSAND = /&amp;/g
-// No scheme before the first slash, query or fragment, no `//` host and no character a browser strips or an attribute ends on.
 // A `//host` path, which only a `base` gives a scheme.
 const PROTOCOL_RELATIVE = /^\/\/(?![/\\])[^\s"'<>`\\&]+$/
 const ABSOLUTE_URL = /^(?:https?:\/\/|mailto:)/i
 const RESOLVED = new Set(['http:', 'https:', 'mailto:'])
+// No scheme before the first slash, query or fragment, no `//` host and no character a browser strips or an attribute ends on.
 const RELATIVE_URL = /^(?![^/?#]*:)(?!\/\/)[^\0-\x20\x7F"'<>`\\&]+$/
 const TEXT = /&(?!#\d{1,7};|#x[\da-f]{1,6};|[a-z][a-z\d]{1,31};)|</gi
 
@@ -97,20 +100,58 @@ function kept(url: string, { relative, base }: Rewrite): string | undefined {
   return isSafeUrl(url, relative) ? url : undefined
 }
 
-// What an attribute is written back as, nothing when it is not fine to write: a URL safe, and every URL of a `srcset`. `data` is a URL on an `object` only, a tag never kept, so on any other it is a plain value.
-function keptValue(attribute: string, value: string, rewrite: Rewrite): string | undefined {
-  if (attribute === 'srcset') {
-    const candidates = value.trim().split(SRCSET_CANDIDATE).map((candidate) => {
-      const url = candidate.replace(DESCRIPTOR, '')
-      const found = kept(url, rewrite)
+// The candidates of a `srcset` as the HTML spec reads them: a URL is a run of non-whitespace, so it may hold commas, and only a trailing comma ends a candidate without descriptors. Nothing when a descriptor is more than numbers and a unit.
+function srcsetCandidates(value: string): { url: string, descriptor: string }[] | undefined {
+  const found: { url: string, descriptor: string }[] = []
+  let at = 0
 
-      return found === undefined ? undefined : found + candidate.slice(url.length)
-    })
+  while (at < value.length) {
+    while (at < value.length && (value[at] === ',' || SPACE.test(value[at]!)))
+      at++
 
-    if (candidates.includes(undefined))
+    if (at >= value.length)
+      break
+
+    const start = at
+
+    while (at < value.length && !SPACE.test(value[at]!))
+      at++
+
+    const url = value.slice(start, at).replace(TRAILING_COMMAS, '')
+    let descriptor = ''
+
+    if (url.length === value.slice(start, at).length) {
+      const end = value.indexOf(',', at)
+
+      descriptor = value.slice(at, end === -1 ? value.length : end).trim()
+      at = end === -1 ? value.length : end + 1
+    }
+
+    if (!DESCRIPTOR_TEXT.test(descriptor))
       return undefined
 
-    return rewrite.base === undefined ? value : candidates.join(', ')
+    found.push({ url, descriptor })
+  }
+
+  return found.length === 0 ? undefined : found
+}
+
+// What an attribute is written back as, nothing when it is not fine to write: a URL safe, and every URL of a `srcset`. `data` is a URL on an `object` only, a tag never kept, so on any other it is a plain value.
+function keptValue(attribute: string, value: string, rewrite: Rewrite): string | undefined {
+  if (attribute === 'srcset' && rewrite.base !== undefined) {
+    const candidates = srcsetCandidates(value)?.map(({ url, descriptor }) => {
+      const found = kept(url, rewrite)
+
+      return found === undefined ? undefined : found + (descriptor === '' ? '' : ` ${descriptor}`)
+    })
+
+    return candidates === undefined || candidates.includes(undefined) ? undefined : candidates.join(', ')
+  }
+
+  if (attribute === 'srcset') {
+    const candidates = value.trim().split(SRCSET_CANDIDATE).map(candidate => kept(candidate.replace(DESCRIPTOR, ''), rewrite))
+
+    return candidates.includes(undefined) ? undefined : value
   }
 
   return attribute === 'data' || !isUrlAttribute(attribute) ? value : kept(value, rewrite)

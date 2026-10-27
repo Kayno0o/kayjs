@@ -210,7 +210,7 @@ describe('head', () => {
 
 describe('sanitizeHtml', () => {
   it('keeps formatting, balanced, and a link to the web, a mailbox or the site', () => {
-    expect(String(sanitizeHtml('<p>Hi <B class="x">you</B><br/><a href="https://a.example/?x=1&amp;y=2" onclick="x()">a</a> <a href=\'/p\'>p</a> <a href="mailto:a@b.example">m</a></p>'))).toBe('<p>Hi <b>you</b><br><a href="https://a.example/?x=1&amp;y=2" rel="nofollow ugc">a</a> <a href="/p" rel="nofollow ugc">p</a> <a href="mailto:a@b.example" rel="nofollow ugc">m</a></p>')
+    expect(String(sanitizeHtml('<p>Hi <B class="x">you</B><br/><a href="https://a.example/?x=1&amp;y=2" onclick="x()">a</a> <a href=\'/p\'>p</a> <a href="mailto:a@b.example">m</a></p>'))).toBe('<p>Hi <b>you</b><br><a href="https://a.example/?x=1&amp;y=2" target="_blank" rel="nofollow ugc noopener" data-new-tab>a</a> <a href="/p" rel="nofollow ugc">p</a> <a href="mailto:a@b.example" rel="nofollow ugc">m</a></p>')
     expect(String(sanitizeHtml('<ul><li><em>a</li></ul></strong> & &amp; &eacute; 1 < 2'))).toBe('<ul><li><em>a</em></li></ul> &amp; &amp; &eacute; 1 &lt; 2')
     expect(String(sanitizeHtml('<p><b>open'))).toBe('<p><b>open</b></p>')
   })

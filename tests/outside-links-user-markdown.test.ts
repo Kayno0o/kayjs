@@ -73,8 +73,13 @@ describe('markdownHtml links', () => {
     setSite(undefined)
     // A server has no `location`, which the sanitizer would otherwise take for the site.
     await GlobalRegistrator.unregister()
-    expect(tag(markdownHtml(SOURCE), 'https://x.example/same')).toContain(OUT)
-    GlobalRegistrator.register({ url: 'https://x.example/app/page/' })
+
+    try {
+      expect(tag(markdownHtml(SOURCE), 'https://x.example/same')).toContain(OUT)
+    }
+    finally {
+      GlobalRegistrator.register({ url: 'https://x.example/app/page/' })
+    }
   })
 
   it('writes no target under links.outside same-tab, on the server and in an island', () => {
