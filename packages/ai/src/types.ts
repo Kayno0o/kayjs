@@ -137,6 +137,7 @@ export interface AskOptions {
   model?: string | undefined
   // 4096 by default, as Anthropic requires one.
   maxTokens?: number | undefined
+  // Left out of an Anthropic request that thinks (`reasoning` of `'low'`, `'medium'` or `'high'`), which refuses one; models since 4.7 refuse any temperature, with their own message.
   temperature?: number | undefined
   // How much a reasoning model thinks before answering, `'none'` for a quick reply: sent as `reasoning_effort` to an OpenAI-compatible server, which is asked again without it if it refuses the field, and left out when not given. Anthropic gets adaptive thinking at that effort, its text summarized so it streams (`'none'` asks the lowest effort with thinking disabled, which a model refusing it is asked again without), and `temperature` is then left out while it thinks; a `thinking` in `body` replaces all of it.
   reasoning?: Reasoning | undefined

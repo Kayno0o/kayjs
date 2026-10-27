@@ -1,3 +1,4 @@
+import type { ServerEvent } from './http'
 import type { Finish, Piece, Provider, ProviderMessage, ProviderRequest, Thinking } from './types'
 import { AiError } from './errors'
 import { extraBody } from './extra'
@@ -20,17 +21,41 @@ const TRAILING_SLASHES = /\/+$/
 
 const FINISHES: Record<string, Finish> = { max_tokens: 'length', refusal: 'filtered' }
 
-// The models that refused `thinking: { type: 'disabled' }`, by API root and model, which are asked for `none` with the lowest effort alone from then on.
-const noDisabled = new Set<string>()
+// The parts of what `reasoning: 'none'` sends that a model refused, by API root and model: `none` is asked without them from then on.
+type Part = 'disabled' | 'effort'
 
-// What `reasoning` sets: adaptive thinking at the effort asked, its text summarized so it streams (the models since 4.7 omit it otherwise), and for `none` the lowest effort with thinking disabled where the model takes it.
+const refusedParts = new Map<string, ReadonlySet<Part>>()
+
+// Forgets what the models refused, for a test.
+export function forgetRefusals(): void {
+  refusedParts.clear()
+}
+
+interface Fields {
+  thinking?: { type: string, display?: string }
+  effort?: string
+}
+
+const ABOUT_EFFORT = /effort/i
+const ABOUT_THINKING = /thinking|disabled/i
+const NO_FIELDS: Fields = {}
+
+// The part of the settings a refusal is about, from the server's words.
+function refusedPart(message: string): Part | undefined {
+  if (ABOUT_EFFORT.test(message))
+    return 'effort'
+
+  return ABOUT_THINKING.test(message) ? 'disabled' : undefined
+}
+
+// What `reasoning` sets: adaptive thinking at the effort asked, its text summarized so it streams (the models since 4.7 omit it otherwise), and for `none` the lowest effort with thinking disabled, each left out where the model refused it.
 // A `thinking` of the body replaces all of it, for a model that still wants a budget.
-function reasoningOf({ reasoning }: ProviderRequest, disable: boolean): { thinking?: { type: string, display?: string }, effort?: string } {
+function reasoningOf({ reasoning }: ProviderRequest, refused: ReadonlySet<Part>): Fields {
   if (reasoning === undefined)
-    return {}
+    return NO_FIELDS
 
   if (reasoning === 'none')
-    return disable ? { thinking: { type: 'disabled' }, effort: 'low' } : { effort: 'low' }
+    return { ...refused.has('disabled') ? {} : { thinking: { type: 'disabled' } }, ...refused.has('effort') ? {} : { effort: 'low' } }
 
   return { thinking: { type: 'adaptive', display: 'summarized' }, effort: reasoning }
 }
@@ -114,8 +139,8 @@ export function anthropic({ apiKey, baseUrl = ANTHROPIC_URL, model, body: fields
     async* stream(request, signal) {
       const key = `${root}\0${request.model}`
       const own = { ...extra, ...request.body }
-      const build = (disable: boolean) => {
-        const { thinking, effort } = 'thinking' in own ? {} as ReturnType<typeof reasoningOf> : reasoningOf(request, disable)
+      const build = (refused: ReadonlySet<Part>) => {
+        const { thinking, effort } = 'thinking' in own ? NO_FIELDS : reasoningOf(request, refused)
         const config = { ...typeof own.output_config === 'object' && own.output_config !== null ? own.output_config : {}, ...effort === undefined ? {} : { effort }, ...request.schema === undefined ? {} : { format: { type: 'json_schema', schema: outputSchema(request.schema) } } }
 
         return {
@@ -128,24 +153,25 @@ export function anthropic({ apiKey, baseUrl = ANTHROPIC_URL, model, body: fields
           ...request.cache === false ? {} : { cache_control: request.cache === '1h' ? { type: 'ephemeral', ttl: '1h' } : { type: 'ephemeral' } },
           ...request.system === undefined ? {} : { system: request.system },
           ...request.tools === undefined || request.tools.length === 0 ? {} : { tools: request.tools.map(({ name, description, inputSchema }) => ({ name, description, input_schema: inputSchema })) },
-          // Anthropic refuses a temperature other than 1 while the model thinks, so the app's one is left out then.
+          // Anthropic refuses a temperature other than 1 while the model thinks, so the app's one is left out then (documented on `AskOptions.temperature`).
           ...request.temperature === undefined || thinking?.type === 'adaptive' ? {} : { temperature: request.temperature },
           ...thinking === undefined ? {} : { thinking },
           // The model answers the JSON of the schema as its text, whatever the tools.
           ...Object.keys(config).length === 0 ? {} : { output_config: config },
         }
       }
-      const open = (disable: boolean) => postEvents('anthropic', `${root}/v1/messages`, { 'x-api-key': apiKey, 'anthropic-version': VERSION }, build(disable), request.timeouts, signal, apiKey)
+      const open = (refused: ReadonlySet<Part>) => postEvents('anthropic', `${root}/v1/messages`, { 'x-api-key': apiKey, 'anthropic-version': VERSION }, build(refused), request.timeouts, signal, apiKey)
 
       // Tool calls arrive as a block opened with the name, then the arguments in pieces.
       const calls = new Map<number, { id: string, name: string, arguments: string }>()
       // Thinking arrives as a block too: its text in pieces, then the signature that goes back with it.
       const thoughts = new Map<number, { text: string, signature: string } | { redacted: string }>()
 
-      // Some models refuse `disabled`: the request goes again without it, and the model is remembered once that works.
-      let disable = request.reasoning === 'none' && !noDisabled.has(key) && !('thinking' in own)
-      let events = open(disable)
-      let first: IteratorResult<{ data: string }>
+      // A model that refuses `disabled` or the effort of `none` is asked again without the part its error names, and remembered once that gets through; a level that is refused fails naming `reasoning`.
+      const known = refusedParts.get(key) ?? new Set<Part>()
+      let refused: ReadonlySet<Part> = known
+      let events = open(refused)
+      let first: IteratorResult<ServerEvent>
 
       for (;;) {
         try {
@@ -154,14 +180,24 @@ export function anthropic({ apiKey, baseUrl = ANTHROPIC_URL, model, body: fields
           break
         }
         catch (error) {
-          if (!disable || !(error instanceof AiError) || (error.status !== 400 && error.status !== 422))
+          if (!(error instanceof AiError) || (error.status !== 400 && error.status !== 422) || request.reasoning === undefined || 'thinking' in own)
             throw error
 
-          disable = false
-          noDisabled.add(key)
-          events = open(false)
+          const part = refusedPart(error.message)
+
+          if (part === undefined)
+            throw error
+
+          if (request.reasoning !== 'none' || refused.has(part))
+            throw new AiError('invalid', `${error.message.replace('kayjs-ai: ', '')}; this model may not take the thinking settings \`reasoning\` sends, so leave \`reasoning\` out and set \`body: { thinking }\` yourself`, { status: error.status, cause: error })
+
+          refused = new Set([...refused, part])
+          events = open(refused)
         }
       }
+
+      if (refused.size > known.size)
+        refusedParts.set(key, refused)
 
       const received = (async function* () {
         if (!first.done)

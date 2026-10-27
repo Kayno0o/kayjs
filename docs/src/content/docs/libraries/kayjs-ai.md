@@ -180,7 +180,9 @@ A provider that stalls fails the reply with an `AiError` of kind `timeout`. kay 
 
 ### Thinking
 
-`reasoning: 'none' | 'low' | 'medium' | 'high'` sets how much a reasoning model thinks. An OpenAI-compatible server gets it as `reasoning_effort`. Anthropic gets adaptive thinking at that effort, with its text summarized so it streams. `'none'` asks for the lowest effort with thinking disabled, and a model that refuses `disabled` is asked again with the effort alone.
+`reasoning: 'none' | 'low' | 'medium' | 'high'` sets how much a reasoning model thinks. An OpenAI-compatible server gets it as `reasoning_effort`. Anthropic gets adaptive thinking at that effort, with its text summarized so it streams. `'none'` asks for the lowest effort with thinking disabled, and a model that refuses `disabled` or the effort (Haiku 4.5 and Sonnet 4.5 take no effort) is asked again without that part.
+
+A level such a model refuses fails with an error that names `reasoning` and `body: { thinking }`.
 
 Anthropic refuses a `temperature` while the model thinks, so kayjs-ai leaves yours out then, and the newest models refuse it altogether with their own message. A model that still wants a thinking budget (Haiku 4.5 and older) takes `body: { thinking: { type: 'enabled', budget_tokens: 2000 } }`, which replaces all of this.
 

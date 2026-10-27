@@ -1,7 +1,8 @@
 import type { Piece, Provider, ProviderRequest } from '../src'
 import type { Event } from './helpers/provider'
-import { afterAll, describe, expect, it } from 'bun:test'
+import { afterAll, afterEach, describe, expect, it } from 'bun:test'
 import { anthropic, ask, openai } from '../src'
+import { forgetRefusals } from '../src/anthropic'
 import { converse } from '../src/loop'
 import { anthropicEvents, openaiEvents, provider, stream } from './helpers/provider'
 
@@ -26,6 +27,19 @@ async function collect(source: AsyncIterable<Piece>): Promise<Piece[]> {
     pieces.push(piece)
 
   return pieces
+}
+
+afterEach(forgetRefusals)
+
+async function failed(reply: PromiseLike<string>): Promise<string> {
+  try {
+    await reply
+  }
+  catch (error) {
+    return (error as Error).message
+  }
+
+  throw new Error('the reply did not fail')
 }
 
 function bodyOf(server: ReturnType<typeof provider>): Record<string, unknown> {
@@ -71,6 +85,64 @@ describe('reasoning on Anthropic', () => {
     expect('thinking' in server.seen[1]!.body).toBe(false)
     expect(server.seen[1]!.body.output_config).toEqual({ effort: 'low' })
     expect('thinking' in server.seen[2]!.body).toBe(false)
+  })
+
+  const refusing = (about: string, ...fields: string[]) => serve((_request, seen) => {
+    const config = typeof seen.body.output_config === 'object' ? seen.body.output_config : null
+
+    return fields.some(field => field in seen.body || (config !== null && field in config)) ? Response.json({ error: { message: about } }, { status: 400 }) : stream(anthropicEvents('ok')).response
+  })
+
+  it('surfaces a refusal that is not about thinking, and remembers nothing from it', async () => {
+    const server = serve((_request, seen) => 'top_k' in seen.body ? Response.json({ error: { message: 'top_k: not allowed' } }, { status: 400 }) : stream(anthropicEvents('ok')).response)
+    const provided = anthropic({ baseUrl: server.url, apiKey: 'k', model: 'm' })
+
+    expect(await failed(ask('Hi', { provider: provided, reasoning: 'none', body: { top_k: 3 } }))).toContain('top_k: not allowed')
+    expect(server.seen).toHaveLength(1)
+    await ask('Hi', { provider: provided, reasoning: 'none' })
+    expect(server.seen[1]!.body.thinking).toEqual({ type: 'disabled' })
+  })
+
+  it('remembers a refusal of disabled for its model and root only, and only once the retry got through', async () => {
+    const server = refusing('thinking.type: disabled is not supported', 'thinking')
+    const strict = anthropic({ baseUrl: server.url, apiKey: 'k', model: 'strict' })
+
+    await ask('Hi', { provider: strict, reasoning: 'none' })
+    await ask('Hi', { provider: strict, reasoning: 'none' })
+    expect(server.seen.map(seen => 'thinking' in seen.body)).toEqual([true, false, false])
+
+    await ask('Hi', { provider: anthropic({ baseUrl: server.url, apiKey: 'k', model: 'other' }), reasoning: 'none' })
+    expect(server.seen.at(-2)!.body.thinking).toEqual({ type: 'disabled' })
+
+    const elsewhere = refusing('never', 'nothing')
+
+    await ask('Hi', { provider: anthropic({ baseUrl: elsewhere.url, apiKey: 'k', model: 'strict' }), reasoning: 'none' })
+    expect(elsewhere.seen[0]!.body.thinking).toEqual({ type: 'disabled' })
+  })
+
+  it('does not remember a refusal when the retry is refused too', async () => {
+    const server = refusing('thinking is not supported', 'thinking', 'output_config')
+    const provided = anthropic({ baseUrl: server.url, apiKey: 'k', model: 'm' })
+
+    expect(await failed(ask('Hi', { provider: provided, reasoning: 'none' }))).toContain('thinking is not supported')
+    expect(await failed(ask('Hi', { provider: provided, reasoning: 'none' }))).toBeDefined()
+    expect(server.seen.map(seen => 'thinking' in seen.body)).toEqual([true, false, true, false])
+  })
+
+  it('works for none on a model without effort, by leaving the effort out', async () => {
+    const server = refusing('output_config.effort: extra inputs are not permitted', 'effort')
+    const provided = anthropic({ baseUrl: server.url, apiKey: 'k', model: 'haiku' })
+
+    expect(await ask('Hi', { provider: provided, reasoning: 'none' })).toBe('ok')
+    expect(server.seen[1]!.body.thinking).toEqual({ type: 'disabled' })
+    expect('output_config' in server.seen[1]!.body).toBe(false)
+  })
+
+  it('fails a level on a model without effort with an error naming reasoning and body.thinking', async () => {
+    const server = refusing('output_config.effort: extra inputs are not permitted', 'effort')
+
+    expect(await failed(ask('Hi', { provider: anthropic({ baseUrl: server.url, apiKey: 'k', model: 'haiku' }), reasoning: 'high' }))).toContain('body: { thinking }')
+    expect(server.seen).toHaveLength(1)
   })
 
   it('keeps the effort beside the schema\'s format', async () => {
