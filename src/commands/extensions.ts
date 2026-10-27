@@ -4,7 +4,8 @@ import type { KayCommand } from './command'
 import { existsSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { KayError } from '../compiler/errors'
-import { CONFIG_FILE, loadConfig } from '../config'
+import { CONFIG_FILE } from '../config'
+import { loadConfig } from '../config-loader'
 import { buildingWithoutEnv } from '../server/env-state'
 
 const SPACES = /\s+/

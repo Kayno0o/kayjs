@@ -1,7 +1,7 @@
 import type { KayExtension } from '../config'
 import { AsyncLocalStorage } from 'node:async_hooks'
 import { sep } from 'node:path'
-import { loadConfig } from '../config'
+import { loadConfig } from '../config-loader'
 import { CSS_FILE } from './files'
 
 // What reads a theme the stylesheet does not import itself: `@apply`, `@variant` and the functions of Tailwind that look a token up.

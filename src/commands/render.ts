@@ -1,6 +1,6 @@
 import type { KayConfig } from '../config'
 import type { Command } from './command'
-import { loadConfig } from '../config'
+import { loadConfig } from '../config-loader'
 import { startRenderServer } from '../dev/render-server'
 import { basePath, routerPath } from '../server/base'
 import { projectRoot } from './command'

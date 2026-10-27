@@ -5,7 +5,7 @@ import { readFileSync, realpathSync } from 'node:fs'
 import { relative, sep } from 'node:path'
 import process from 'node:process'
 import { check, configCheckOptions, formatCheckDiagnostic, writeShadowTypes } from '../check'
-import { loadConfig } from '../config'
+import { loadConfig } from '../config-loader'
 import { projectPaths } from '../project'
 import { ANSWER, CHECK, CHECK_SKIPPED, CONFIG_REFUSED, ENTRY, LOAD, MODULES, PROBLEMS, REFUSE } from './refuse'
 

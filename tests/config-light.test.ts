@@ -3,7 +3,7 @@ import { join, resolve } from 'node:path'
 import { expect, test } from 'bun:test'
 import { scratchDir } from './scratch'
 
-const CONFIG_MODULE = resolve(import.meta.dir, '../src/config.ts')
+const LOADER_MODULE = resolve(import.meta.dir, '../src/config-loader.ts')
 
 // Loads the config in a fresh process and says whether the server's entry was loaded with it.
 async function serverLoadedBy(source: string): Promise<{ serverLoaded: boolean, site: unknown }> {
@@ -11,7 +11,7 @@ async function serverLoadedBy(source: string): Promise<{ serverLoaded: boolean, 
 
   await mkdir(dir, { recursive: true })
   await Bun.write(join(dir, 'kay.config.ts'), source)
-  await Bun.write(join(dir, 'probe.ts'), `import { loadConfig } from ${JSON.stringify(CONFIG_MODULE)}\nconst config = await loadConfig(${JSON.stringify(dir)})\nconsole.log(JSON.stringify({ serverLoaded: Object.keys(require.cache).some(path => path.endsWith('/src/server/index.ts')), site: config.site }))\n`)
+  await Bun.write(join(dir, 'probe.ts'), `import { loadConfig } from ${JSON.stringify(LOADER_MODULE)}\nconst config = await loadConfig(${JSON.stringify(dir)})\nconsole.log(JSON.stringify({ serverLoaded: Object.keys(require.cache).some(path => path.endsWith('/src/server/index.ts')), site: config.site }))\n`)
 
   const child = Bun.spawn([process.execPath, join(dir, 'probe.ts')], { cwd: dir, stdout: 'pipe', stderr: 'pipe' })
   const [out, code] = await Promise.all([new Response(child.stdout).text(), child.exited])
@@ -45,7 +45,7 @@ test('a config importing an export a library removed names the export and the no
   await mkdir(join(dir, 'lib'), { recursive: true })
   await Bun.write(join(dir, 'lib/index.ts'), 'export const mail = 1\n')
   await Bun.write(join(dir, 'kay.config.ts'), `import { mailExtension } from './lib/index.ts'\nexport default { site: String(mailExtension) }\n`)
-  await Bun.write(join(dir, 'probe.ts'), `import { loadConfig } from ${JSON.stringify(CONFIG_MODULE)}\ntry { await loadConfig(${JSON.stringify(dir)}) } catch (error) { console.log(String(error instanceof Error ? error.message : error)) }\n`)
+  await Bun.write(join(dir, 'probe.ts'), `import { loadConfig } from ${JSON.stringify(LOADER_MODULE)}\ntry { await loadConfig(${JSON.stringify(dir)}) } catch (error) { console.log(String(error instanceof Error ? error.message : error)) }\n`)
 
   const child = Bun.spawn([process.execPath, join(dir, 'probe.ts')], { cwd: dir, stdout: 'pipe', stderr: 'pipe' })
   const out = await new Response(child.stdout).text()

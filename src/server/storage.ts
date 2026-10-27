@@ -220,7 +220,7 @@ async function activeStore(): Promise<FileStore> {
   if (current.store)
     return current.store
 
-  const config = process.env.NODE_ENV === 'test' ? undefined : await (await import('../config')).loadConfig(process.cwd())
+  const config = process.env.NODE_ENV === 'test' ? undefined : await (await import('../config-loader')).loadConfig(process.cwd())
 
   // The key a private link is signed with is read where the store is, as a server's setup does.
   if (config !== undefined)

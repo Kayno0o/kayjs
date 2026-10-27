@@ -119,7 +119,7 @@ async function configuredEntry(root: string, output: string): Promise<string> {
   if (await record.exists())
     return resolve(root, await record.text())
 
-  const [{ loadConfig }, { projectPaths }] = await Promise.all([import('../config'), import('../project')])
+  const [{ loadConfig }, { projectPaths }] = await Promise.all([import('../config-loader'), import('../project')])
 
   return projectPaths(root, await loadConfig(root)).entry
 }

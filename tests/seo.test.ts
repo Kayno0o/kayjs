@@ -1,7 +1,7 @@
 import { resolve } from 'node:path'
 import process from 'node:process'
 import { describe, expect, it } from 'bun:test'
-import { loadConfig } from '../src/config'
+import { loadConfig } from '../src/config-loader'
 import { siteOrigin as currentSiteOrigin, jsonLd, siteUrl } from '../src/runtime/seo'
 import { isCrossSite } from '../src/server/actions'
 import { siteOrigin } from '../src/server/seo'

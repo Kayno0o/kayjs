@@ -4,7 +4,7 @@ import { join } from 'node:path'
 import process from 'node:process'
 import { describe, expect, it } from 'bun:test'
 import { check } from '../src/check'
-import { loadConfig } from '../src/config'
+import { loadConfig } from '../src/config-loader'
 import { takeDocsBuild } from './docs-build'
 import { listeningPort } from './listening'
 

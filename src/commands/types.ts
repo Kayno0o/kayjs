@@ -1,6 +1,6 @@
 import type { Command } from './command'
 import { configCheckOptions, writeShadowTypes } from '../check'
-import { loadConfig } from '../config'
+import { loadConfig } from '../config-loader'
 import { buildingWithoutEnv } from '../server/env-state'
 import { count, done, formatOption, printDocument, printFailure, projectRoot } from './command'
 import { USAGES } from './usages'

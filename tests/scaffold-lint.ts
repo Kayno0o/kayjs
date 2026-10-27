@@ -1,6 +1,6 @@
 import { builtinModules } from 'node:module'
 import { configCheckOptions, writeShadowTypes } from '../src/check'
-import { loadConfig } from '../src/config'
+import { loadConfig } from '../src/config-loader'
 
 export interface LintResult { filePath: string, messages: { ruleId: string | null, line: number }[] }
 

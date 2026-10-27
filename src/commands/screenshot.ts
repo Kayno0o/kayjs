@@ -1,6 +1,6 @@
 import type { Shot } from '../dev/screenshot'
 import type { Command } from './command'
-import { loadConfig } from '../config'
+import { loadConfig } from '../config-loader'
 import { screenshot } from '../dev/screenshot'
 import { checkSize, MAX_HEIGHT, MAX_WIDTH, ShotRefusedError } from '../dev/screenshot-limits'
 import { basePath } from '../server/base'

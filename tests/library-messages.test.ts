@@ -1,6 +1,6 @@
 import { join } from 'node:path'
 import { beforeAll, describe, expect, test } from 'bun:test'
-import { loadConfig, withConfig } from '../src/config'
+import { loadConfig, withConfig } from '../src/config-loader'
 import { lookup } from '../src/runtime/i18n'
 import { implicitI18n, loadI18n } from '../src/server/i18n'
 import { scratchDir } from './scratch'

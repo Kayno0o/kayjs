@@ -3,7 +3,7 @@ import { mkdir, rm } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
 import process from 'node:process'
 import { describe, expect, it } from 'bun:test'
-import { appModules, buildingTestSite, declaredAppFiles, extensionAppFiles, extensionServers } from '../src/config'
+import { appModules, buildingTestSite, declaredAppFiles, extensionAppFiles, extensionServers } from '../src/config-extensions'
 import { scratchDir } from './scratch'
 
 const CLI = resolve('src/cli.ts')

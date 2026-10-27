@@ -5,7 +5,7 @@ import process from 'node:process'
 import { plugin } from 'bun'
 import { inspecting } from '../build/assets'
 import { SCRIPT_FILE, scriptLoader } from '../build/files'
-import { loadConfig } from '../config'
+import { loadConfig } from '../config-loader'
 import { projectPaths } from '../project'
 
 interface Load {

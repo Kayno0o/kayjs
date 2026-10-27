@@ -1,7 +1,7 @@
 import type { CheckDiagnostic } from '../check'
 import type { Listed } from './env'
 import { dirname, join, relative, resolve } from 'node:path'
-import { loadConfig } from '../config'
+import { loadConfig } from '../config-loader'
 import { CONTENT_CONFIG } from '../project'
 import { fileFormOf } from '../server/env-state'
 

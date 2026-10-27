@@ -1,7 +1,7 @@
 import { mkdir, mkdtemp, rm } from 'node:fs/promises'
 import { basename, join, resolve } from 'node:path'
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
-import { serverExtensions } from '../src/config'
+import { serverExtensions } from '../src/config-extensions'
 import { kayCheck } from './check-helper'
 import { scratchDir } from './scratch'
 

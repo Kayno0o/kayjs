@@ -2,7 +2,7 @@ import { readdir, rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import process from 'node:process'
 import { afterAll, describe, expect, it } from 'bun:test'
-import { loadConfig } from '../src/config'
+import { loadConfig } from '../src/config-loader'
 import { publicEnvFiles } from '../src/server/env-state'
 import { scratchDir } from './scratch'
 
