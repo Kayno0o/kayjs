@@ -13,7 +13,10 @@ import { wording } from 'kay/words'
 // How far a position the parent passes may sit from the audio's own before the player seeks to it, and how long a position the player reported counts as the parent echoing it back, which never seeks: an echo arrives after the audio has moved on.
 const FOLLOW_SECONDS = 1
 const ECHO_MS = 1000
+// How long a hand scroll or a key between cues holds the transcript where the reader left it: a cue changing inside it does not recentre, the first one after it does.
 const HAND_MS = 4000
+const CUE_KEYS = new Set(['ArrowLeft', 'ArrowUp', 'ArrowRight', 'ArrowDown', 'Home', 'End'])
+const BACKWARD = new Set(['ArrowLeft', 'ArrowUp'])
 const WEB = /^https?:\/\//
 
 // 'kui-audio-player' stays as the component's name for an app's CSS. The chapter playing and the cue playing are marked by aria-current.
@@ -170,12 +173,14 @@ function scrolledByHand() {
 }
 
 // One tab stop for all the cues, the cue playing until the reader moves to another, and the arrows go between them.
-const stop = () => focused() ?? Math.max(cueNow(), 0)
+const stop = () => {
+  const held = focused()
+
+  return held !== undefined && held < cues.length ? held : Math.max(cueNow(), 0)
+}
 
 function between(event: KeyboardEvent) {
-  const keys = ['ArrowLeft', 'ArrowUp', 'ArrowRight', 'ArrowDown', 'Home', 'End']
-
-  if (!keys.includes(event.key))
+  if (!CUE_KEYS.has(event.key) || event.altKey || event.ctrlKey || event.metaKey)
     return
 
   const buttons = [...(transcript?.querySelectorAll<HTMLElement>('[data-index]') ?? [])]
@@ -187,7 +192,7 @@ function between(event: KeyboardEvent) {
   event.preventDefault()
   scrolledByHand()
 
-  const to = event.key === 'Home' ? 0 : event.key === 'End' ? buttons.length - 1 : Math.min(Math.max(from + (event.key === 'ArrowLeft' || event.key === 'ArrowUp' ? -1 : 1), 0), buttons.length - 1)
+  const to = event.key === 'Home' ? 0 : event.key === 'End' ? buttons.length - 1 : Math.min(Math.max(from + (BACKWARD.has(event.key) ? -1 : 1), 0), buttons.length - 1)
 
   buttons[to]?.focus()
 }
@@ -283,6 +288,7 @@ function emptied(audio: HTMLAudioElement) {
   playing = false
   at = 0
   lastTold = undefined
+  told.clear()
   measure(audio)
 }
 

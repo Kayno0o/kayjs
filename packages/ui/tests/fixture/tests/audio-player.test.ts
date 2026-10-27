@@ -113,7 +113,6 @@ inBrowser('AudioPlayer in the browser', () => {
       expect(found.rtl).toBe(dir === 'rtl')
       expect(found.drift.length).toBe(2)
       expect(found.drift.map(drift => drift < 1)).toEqual([true, true])
-      expect(found.drift.map(drift => drift < 1)).toEqual([true, true])
       expect(found.under).toBe(true)
     }, 120_000)
   }

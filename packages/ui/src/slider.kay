@@ -4,7 +4,6 @@ import { recipe } from 'kay'
 import { controlledInput } from './controlled-input'
 import { rangeTrack } from './range-track'
 
-// The track and the thumb of both engines are drawn from the field and accent tokens.
 const look = recipe({
   parts: {
     root: 'kui-slider grid grid-cols-[1fr_auto] items-center gap-x-3 gap-y-1',
