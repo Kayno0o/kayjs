@@ -73,6 +73,12 @@ nav Showing the last {period}
 slot
 ```
 
+A value the schema refuses answers 400. A link from a bookmark or an old email may carry one the page no longer takes, so give the field `lenient: true` and it reads as its default instead, or is left out when it has none. The field keeps its real type:
+
+```ts
+export const page = { query: s.Object({ period: s.UnionEnum(['24h', '7d', '30d'], { default: '24h', lenient: true }) }) }
+```
+
 Two files of one route can declare the same name when their schemas are the same. `kay check` reports a name declared with different schemas, on the later file.
 
 <ReadMore href="/llms/routing">Special pages that declare no query, and a page with `layouts: false`.</ReadMore>

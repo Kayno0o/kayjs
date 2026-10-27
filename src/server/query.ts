@@ -12,7 +12,7 @@ import { Denied } from './signals'
 export type ReadFields = { value: Record<string, unknown> } | { refused: Map<string, string> }
 
 interface ObjectSchema {
-  properties?: Record<string, { default?: unknown, error?: unknown }>
+  properties?: Record<string, { default?: unknown, error?: unknown, lenient?: unknown }>
 }
 
 // The JSON schema keywords a param's rule is read from.
@@ -97,7 +97,7 @@ function layoutDeclares(modules: object[]): boolean {
   return false
 }
 
-// `ctx.query`: the search params read against the page's `query` schema, a refusal answering 400.
+// `ctx.query`: the search params read against the page's `query` schema, a refusal answering 400, except for a field marked `lenient`, which a value it refuses leaves to its default.
 // Without a schema, each parameter's text, a repeated one as a list.
 export function readQuery(schema: unknown, url: URL): Readonly<Record<string, unknown>> {
   const input = searchInput(url)
@@ -105,7 +105,16 @@ export function readQuery(schema: unknown, url: URL): Readonly<Record<string, un
   if (!isSchema(schema))
     return input
 
-  const read = readFields(schema, input)
+  let read = readFields(schema, input)
+
+  if ('refused' in read) {
+    const fields = (schema as ObjectSchema).properties ?? {}
+    const stale = [...read.refused.keys()].filter(name => Object.hasOwn(fields, name) && fields[name]!.lenient === true)
+
+    // Read again without them, so the default fills in, or the field stays out; what else was refused still answers 400.
+    if (stale.length > 0)
+      read = readFields(schema, Object.fromEntries(Object.entries(input).filter(([name]) => !stale.includes(name))))
+  }
 
   if ('value' in read)
     return read.value
