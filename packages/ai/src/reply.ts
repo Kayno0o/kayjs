@@ -11,7 +11,7 @@ function snapshot(call: ToolCall): ToolCall {
 
 // A reply over what `open` yields once first read, with `signals` stopping it when any aborts.
 // The text is kept as it comes, so any number of readers (`await`, `for await`, `usage`) share one provider request.
-export function createReply(open: (signal: AbortSignal) => AsyncIterable<Piece>, signals: (AbortSignal | undefined)[], highlight = highlighting, outlive = false, onEnd?: () => void): Reply {
+export function createReply(open: (signal: AbortSignal) => AsyncIterable<Piece>, signals: (AbortSignal | undefined)[], highlight = highlighting, outlive = false, onEnd?: () => void, resumed = false): Reply {
   const controller = new AbortController()
   const deltas: string[] = []
   const thoughts: string[] = []
@@ -309,6 +309,7 @@ export function createReply(open: (signal: AbortSignal) => AsyncIterable<Piece>,
 
       return ending.promise
     },
+    resumed,
     stop,
   }
 }

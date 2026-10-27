@@ -215,6 +215,14 @@ export function ask(prompt: string | Message[], options: AskOptions | Structured
   return schema === undefined ? text : structured(text, schema)
 }
 
+// True when the request being answered is a Chat's resume or stop of a reply that outlived its page, which runs the action again: an action skips what only a start needs, such as loading context for a model call that will not be made.
+// False for a start and for an ordinary call, and outside a request.
+export function resuming(request: Request | undefined = currentRequest()): boolean {
+  const call = replyCallOf(request)
+
+  return call !== undefined && call.op !== 'start'
+}
+
 // A reply with nothing to say, over a provider no one asks.
 function nothing(): AsyncIterable<never> {
   return {
@@ -266,7 +274,7 @@ function resumed(call: ReplyCall | undefined): Reply | undefined {
   if (call === undefined || call.op === 'start')
     return undefined
 
-  const empty = createReply(nothing, [])
+  const empty = createReply(nothing, [], undefined, false, undefined, true)
 
   if (call.key === undefined)
     return empty

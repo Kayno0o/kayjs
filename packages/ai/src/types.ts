@@ -252,6 +252,8 @@ export interface Reply extends PromiseLike<string>, AsyncIterable<string> {
   progress: () => AsyncIterable<Progress>
   // The tool calls once the reply ended, in the order they were made; never rejects, and reading it starts the reply.
   readonly calls: Promise<ToolCall[]>
+  // True for the reply a Chat's resume or stop call gets, which is the kept reply of an `outlive` ask or an empty one, so an action reading the reply on the server does it on the start alone: `if (!answer.resumed) void speak(answer)`.
+  readonly resumed: boolean
   // Aborts the provider request; what was received stays the text of `await`.
   stop: () => void
 }
@@ -275,6 +277,8 @@ export interface StructuredReply<Value, Snapshot = DeepPartial<Value>> extends P
   readonly usage: Promise<Usage | undefined>
   readonly finish: Promise<Finish | undefined>
   readonly calls: Promise<ToolCall[]>
+  // True for the reply a Chat's resume or stop call gets, as on `Reply`.
+  readonly resumed: boolean
   stop: () => void
 }
 

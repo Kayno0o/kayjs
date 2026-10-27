@@ -216,6 +216,15 @@ The request to the provider, the tool loop and every reader on the server go on 
 
 The reply is kept in the memory of the server process for half an hour, so a restart loses it and a second process does not find it. It is kept for the action and the visitor that asked, so another action or another visitor cannot resume or stop it.
 
+A resume or a stop of a Chat runs your action again, and `ask` gives back the kept reply. To read the reply on the server once, check `reply.resumed`, which is false on the call that started it. `resuming()` tells the same before you ask, to skip what only a start needs:
+
+```ts
+const answer = ask(messages, { outlive: true })
+
+if (!answer.resumed)
+  void speak(answer)
+```
+
 <ReadMore href="/llms/kayjs-ai-asking">Every variable, how the provider is picked, and the options of `ask`.</ReadMore>
 
 ## Ask for an object

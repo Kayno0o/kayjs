@@ -1,9 +1,10 @@
 import type { AskOptions, Provider } from '../src'
 import { afterEach, describe, expect, it } from 'bun:test'
+import { s } from 'kay'
 import { nameUser } from 'kay/library'
 import { answeringRequest } from '../../../src/server/log'
 import { sendFrom } from '../../../src/server/rewrite'
-import { ai, ask, fakeAi } from '../src'
+import { ai, ask, fakeAi, resuming } from '../src'
 import { forgetKept } from '../src/kept'
 import { untilHolds } from './until'
 
@@ -383,5 +384,53 @@ describe('resuming a reply by the header a Chat sends', () => {
     model.release()
 
     expect(await (await answering({ provider: model.provider }, { 'x-kai-reply': `resume:${id}` }, { address: null, visitor: 'ann' })).reply).toBe('one two')
+  })
+
+  it('tells a resume or a stop from a start with reply.resumed and resuming()', async () => {
+    const model = gated()
+    const first = await answering({ provider: model.provider, outlive: true }, { 'x-kai-reply': `start:${id}` })
+
+    expect(first.reply.resumed).toBe(false)
+    await readers(first.reply)
+    first.leave()
+    model.release()
+
+    const kept = await answering({ provider: model.provider, outlive: true }, { 'x-kai-reply': `resume:${id}` })
+
+    expect(kept.reply.resumed).toBe(true)
+    expect(await kept.reply).toBe('one two')
+
+    const nothing = await answering({ provider: model.provider, outlive: true }, { 'x-kai-reply': 'resume:nothing-kept-here' })
+
+    expect(nothing.reply.resumed).toBe(true)
+    expect(await nothing.reply).toBe('')
+    expect((await answering({ provider: model.provider, outlive: true }, { 'x-kai-reply': `stop:${id}` })).reply.resumed).toBe(true)
+    expect((await answering({ provider: model.provider })).reply.resumed).toBe(false)
+
+    const structured = await answering({ provider: model.provider, outlive: true, schema: s.Object({}) } as AskOptions, { 'x-kai-reply': `resume:${id}` })
+
+    expect(structured.reply.resumed).toBe(true)
+  })
+
+  it('tells the action before it asks, and every ask of a resume is resumed', async () => {
+    const seen: Record<string, boolean> = {}
+
+    for (const [name, header] of [['start', `start:${id}`], ['resume', `resume:${id}`], ['stop', `stop:${id}`], ['ordinary', undefined]] as const) {
+      const request = new Request('http://localhost/chat', { headers: header === undefined ? {} : { 'x-kai-reply': header } })
+
+      sendFrom(request, '203.0.113.1')
+      await answeringRequest(request, async () => {
+        seen[name] = resuming()
+
+        return {}
+      })
+    }
+
+    expect(seen).toEqual({ start: false, resume: true, stop: true, ordinary: false })
+    expect(resuming()).toBe(false)
+
+    const both = await answeringTwice({ provider: gated().provider, outlive: true }, { provider: gated().provider, outlive: true }, { 'x-kai-reply': `resume:${id}` })
+
+    expect([both.first.resumed, both.second.resumed]).toEqual([true, true])
   })
 })

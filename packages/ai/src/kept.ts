@@ -177,6 +177,7 @@ export function keptFor(key: string, owner: Promise<string | undefined>, empty: 
     get finish() {
       return (async () => (await target).reply.finish)()
     },
+    resumed: true,
     stop: () => void (async () => {
       (await target).reply.stop()
     })(),
