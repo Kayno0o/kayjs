@@ -239,11 +239,11 @@ test('the limits of a list disable Add at the most and Remove at the least', asy
   const page = await open()
 
   await showBar(page, 'ul.limited li:first-child')
-  expect(await page.evaluate(selector => (document.querySelector(selector) as HTMLButtonElement).disabled, ADD)).toBe(true)
+  expect(await page.evaluate(selector => document.querySelector(selector)!.getAttribute('aria-disabled'), ADD)).toBe('true')
   await page.click(REMOVE)
   await page.waitUntil(() => document.querySelectorAll('ul.limited li').length === 1)
   await showBar(page, 'ul.limited li:first-child')
-  expect(await page.evaluate(selector => [(document.querySelector(selector) as HTMLButtonElement).disabled], REMOVE)).toEqual([true])
+  expect(await page.evaluate(selector => [document.querySelector(selector)!.getAttribute('aria-disabled')], REMOVE)).toEqual(['true'])
 }, 60_000)
 
 test('a localized entry changes its own locale\'s draft, in the site\'s words', async () => {
@@ -613,12 +613,14 @@ test('Tab goes from an item to its bar and on, Shift+Tab comes back', async () =
   await page.press('Tab')
   await page.waitUntil(() => document.activeElement?.closest('.kcms-list-bar') != null)
   expect(await barCount(page)).toBe(1)
-  expect(await page.evaluate(() => document.activeElement?.getAttribute('aria-label'))).toContain('down')
+  // The first item cannot move up, and its locked button keeps its tab stop and says so.
+  expect(await page.evaluate(() => [document.activeElement?.getAttribute('aria-label'), document.activeElement?.getAttribute('aria-disabled')])).toEqual([expect.stringContaining('up'), 'true'])
   await page.press('Tab', { modifiers: ['Shift'] } as never)
   await page.waitUntil(() => document.activeElement?.matches('ol.steps li, ol.first li') === true)
 
   await page.press('Tab')
   await page.waitUntil(() => document.activeElement?.closest('.kcms-list-bar') != null)
+  await page.press('Tab')
   await page.press('Tab')
   await page.press('Tab')
   expect(await inBar()).toBe(true)

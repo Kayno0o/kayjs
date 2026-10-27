@@ -353,13 +353,15 @@ test('the side form\'s own list controls are held too while a list item\'s image
   const { root } = await open()
   const [, second] = gallery()
   const controls = () => [...root.querySelectorAll<HTMLButtonElement>('[data-kcms-path="gallery"] .kcms-item-controls button, [data-kcms-path="gallery"] .kcms-list-tools button')]
+  // A locked IconButton keeps its tab stop through aria-disabled, a locked Button is disabled.
+  const locked = (button: HTMLButtonElement) => button.disabled || button.getAttribute('aria-disabled') === 'true'
 
   await until(() => controls().length > 0)
-  expect(controls().some(button => !button.disabled)).toBe(true)
+  expect(controls().some(button => !locked(button))).toBe(true)
   drop(second!, [file()])
-  await until(() => controls().every(button => button.disabled))
+  await until(() => controls().every(locked))
   await until(() => (data().gallery as { image: string }[] | undefined)?.[1]?.image === '/_kay/files/posts/new.png')
-  await until(() => controls().some(button => !button.disabled))
+  await until(() => controls().some(button => !locked(button)))
 })
 
 test('a list item moves again once its image has landed', async () => {

@@ -117,17 +117,17 @@ test('Add and Duplicate stop at maxItems and Remove at minItems', async () => {
   const { drafted, root, click } = await openField(PEOPLE, [{ name: 'Ada', role: 'a' }])
   const removers = () => [...root.querySelectorAll<HTMLButtonElement>('button[aria-label^="Remove"]')]
 
-  expect(removers()[0]!.disabled).toBe(true)
+  expect(removers()[0]!.getAttribute('aria-disabled') === 'true').toBe(true)
   await click('[data-kcms-add]')
   await click('button[aria-label^="Duplicate"]', 0)
   expect(drafted()).toHaveLength(3)
   expect(root.querySelector('[data-kcms-add]')).toBeNull()
-  expect([...root.querySelectorAll<HTMLButtonElement>('button[aria-label^="Duplicate"]')].every(button => button.disabled)).toBe(true)
-  expect(removers().every(button => !button.disabled)).toBe(true)
+  expect([...root.querySelectorAll<HTMLButtonElement>('button[aria-label^="Duplicate"]')].every(button => button.getAttribute('aria-disabled') === 'true')).toBe(true)
+  expect(removers().every(button => button.getAttribute('aria-disabled') !== 'true')).toBe(true)
   await click('button[aria-label^="Remove"]', 2)
   await click('button[aria-label^="Remove"]', 1)
   expect(drafted()).toHaveLength(1)
-  expect(removers()[0]!.disabled).toBe(true)
+  expect(removers()[0]!.getAttribute('aria-disabled') === 'true').toBe(true)
 })
 
 test('Duplicate copies an item right after it without sharing it', async () => {
