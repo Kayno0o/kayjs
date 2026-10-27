@@ -17,7 +17,7 @@ A package can ship `.kay` files. The app that installs it compiles them as its o
 }
 ```
 
-Ship the sources, not a build. List `kay` under `peerDependencies` and import from `kay`, so the app's one copy of kay serves the library too.
+Ship the sources, not a build. List `kay` under `peerDependencies` and import from `kay`, so the app's one copy of kay serves the library too. A library linked from its own folder (`"my-ui": "link:../my-ui"`) may hold kay there as a dev dependency: the app loads that copy, and the copies of its other peers, as its own, so the library's `api()` is served as any route of the app.
 
 The exports map gives each component a specifier: `import Button from 'my-ui/button.kay'`. Without it, a component is imported by its path in the package.
 

@@ -148,6 +148,67 @@ export interface SettingsReplacement {
   replacement: string
 }
 
+const foundPeers = new Map<string, { stamp: string, peers: PeerReplacement[] }>()
+
+// The copies of kay, and of their other peers, that the kay libraries of the app resolve where the app resolves another, each paired with the app's copy: a library linked from its own folder resolves its imports from there, which holds kay as a dev dependency, so its `api()` would make an Elysia instance of another copy than the app's. Read again once the app's package.json or its `node_modules` changes, as installing or linking a package does.
+export function linkedPeers(root: string): PeerReplacement[] {
+  const realRoot = realpathSync(root)
+  const stamp = `${manifestStamp([realRoot])}|${statSync(join(realRoot, 'node_modules'), { throwIfNoEntry: false })?.mtimeMs ?? '-'}`
+  const kept = foundPeers.get(realRoot)
+
+  if (kept?.stamp === stamp)
+    return kept.peers
+
+  const peers = findLinkedPeers(root, realRoot)
+
+  foundPeers.set(realRoot, { stamp, peers })
+
+  return peers
+}
+
+function findLinkedPeers(root: string, realRoot: string): PeerReplacement[] {
+  const manifest = readManifest(root)
+  const found = new Map<string, PeerReplacement>()
+
+  for (const name of manifest ? dependencyNames(manifest, APP_DEPENDENCIES) : []) {
+    const dir = KAY_PACKAGES.has(name) ? undefined : packageDir(root, name)
+    const own = dir === undefined ? undefined : readManifest(dir)
+    const kay = own === undefined ? [] : dependencyNames(own, KAY_DEPENDENCIES).filter(dependency => KAY_PACKAGES.has(dependency))
+
+    if (dir === undefined || own === undefined || kay.length === 0)
+      continue
+
+    const realDir = realpathSync(dir)
+
+    for (const peer of new Set([...kay, ...Object.keys(own.peerDependencies ?? {})])) {
+      const theirs = packageDir(realDir, peer)
+      const ours = KAY_PACKAGES.has(peer) ? [...KAY_PACKAGES].map(kayName => packageDir(root, kayName)).find(found => found !== undefined) : packageDir(root, peer)
+
+      if (theirs === undefined || ours === undefined)
+        continue
+
+      const from = realpathSync(theirs)
+      const to = realpathSync(ours)
+
+      // A copy holding the app or the app's copy, as a kay checkout holds its own examples, is left alone: its files are theirs too.
+      if (!within(realRoot, from) && !within(to, from))
+        found.set(from, { from, to })
+    }
+  }
+
+  return [...found.values()]
+}
+
+function within(path: string, dir: string): boolean {
+  return path === dir || path.startsWith(dir + sep)
+}
+
+export interface PeerReplacement {
+  // The real folder of the library's copy, and of the app's.
+  from: string
+  to: string
+}
+
 // The nearest directory from `dir` up with a package.json naming a package, `dir` itself when none has one: one only setting `type` for a folder leaves it in the package above.
 export function packageRoot(dir: string): string {
   for (let at = dir; ; at = dirname(at)) {

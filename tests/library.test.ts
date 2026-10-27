@@ -5,6 +5,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
 import { findKayLibraries, kayLibrariesOf } from '../src/build/libraries'
 import { outOfStore, throughLinks } from '../src/build/links'
 import { projectPaths } from '../src/project'
+import { testSite } from '../src/test'
 import { kayCheck } from './check-helper'
 import { scratchDir } from './scratch'
 
@@ -523,5 +524,39 @@ describe('kay libraries', () => {
       `${relative(process.cwd(), join(project, 'node_modules/kay-lib/src/typo.kay'))}:4:20 error[TS2339]: Property 'missing' does not exist on type 'string'.`,
       `${relative(process.cwd(), join(project, 'src/routes/typed.kay'))}:5:7 error[TS2322]: Type 'number' is not assignable to type 'string'.`,
     ])
+  })
+})
+
+// A library developed in its own folder installs kay there too: linked into an app, its modules resolve `kay` from that folder unless the app's copy takes its place.
+describe('a linked library bringing its own kay', () => {
+  it('serves its api() module from the app, kay\'s own copy in the library standing for the app\'s', async () => {
+    const app = await scratchDir('dom-')
+    const library = await scratchDir('dom-')
+
+    projects.push(app, library)
+    await write(app, {
+      'package.json': JSON.stringify({ name: 'app', private: true, dependencies: { 'kay-lib': '1.0.0' } }),
+      'kay.config.ts': 'export default {}\n',
+      'src/routes/index.kay': 'p hi\n',
+      'src/api/lib.ts': 'export { default } from \'kay-lib/api\'\n',
+    })
+    await write(library, {
+      'package.json': JSON.stringify({ name: 'kay-lib', version: '1.0.0', type: 'module', peerDependencies: { kay: '*' }, devDependencies: { kay: '*' }, exports: { './api': './src/api.ts' } }),
+      'src/api.ts': 'import { api } from \'kay/server\'\n\nexport default api().get(\'/\', () => ({ from: \'lib\' }))\n',
+      // The library's own copy, which answers no Elysia instance the app's server would take.
+      'node_modules/kay/package.json': JSON.stringify({ name: '@kaynooo/kayjs', type: 'module', exports: { './server': './src/server/index.ts' } }),
+      'node_modules/kay/src/server/index.ts': 'export function api() {\n  return { get: () => ({ copy: true }) }\n}\n',
+    })
+    await mkdir(join(app, 'node_modules'), { recursive: true })
+    await symlink(library, join(app, 'node_modules/kay-lib'))
+
+    const site = await testSite({ root: app })
+
+    try {
+      expect(await (await site.fetch('/api/lib')).json()).toEqual({ from: 'lib' })
+    }
+    finally {
+      await site.close()
+    }
   })
 })

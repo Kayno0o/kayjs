@@ -17,7 +17,7 @@ import { directImports } from './direct-imports'
 import { KAY_MODULE, SCRIPT_FILE, scriptLoader } from './files'
 import { expandGlobs } from './glob'
 import { iconModule, iconNames, installedIconSets } from './icons'
-import { settingsReplacements } from './libraries'
+import { linkedPeers, settingsReplacements } from './libraries'
 import { liveIds } from './live-ids'
 import { embeddedMapTail } from './sourcemap'
 import { embeddedMapCached, transformKayCached } from './transform'
@@ -257,6 +257,21 @@ export function kayPlugin(options: KayPluginOptions, workers: string[]): BunPlug
       for (const { paths, replacement } of settingsReplacements(root, options.settings ?? {})) {
         for (const path of paths)
           build.onLoad({ filter: new RegExp(`^${RegExp.escape(path)}$`) }, () => ({ contents: `export * from ${JSON.stringify(replacement)}\nexport { default } from ${JSON.stringify(replacement)}\n`, loader: 'ts' }))
+      }
+
+      // A linked library's own copy of kay, or of another of its peers, loads as the app's: each of its modules re-exports the app's module at the same place, so the library and the app share one kay.
+      for (const { from, to } of linkedPeers(root)) {
+        build.onLoad({ filter: new RegExp(`^${RegExp.escape(from + sep)}.*\\.(?:[cm]?[jt]sx?)$`) }, async ({ path }) => {
+          const target = join(to, relative(from, path))
+
+          if (!existsSync(target))
+            return { contents: await Bun.file(path).text(), loader: scriptLoader(path) }
+
+          const named = JSON.stringify(target)
+          const exports = new Bun.Transpiler({ loader: scriptLoader(target) }).scan(await Bun.file(target).text()).exports
+
+          return { contents: `export * from ${named}\n${exports.includes('default') ? `export { default } from ${named}\n` : ''}`, loader: 'ts' }
+        })
       }
 
       // `with { type: 'file' }` asks for a wasm module's own path, as a server reading it does; a plugin sees no import's attributes, so they are read in the importer.

@@ -39,6 +39,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 - `memoryJobs()` lists a queue's jobs by when they are due, as `sqliteJobs` and `pgJobs` do: [Queues](queues.md#reference).
 - An action call takes `undefined` on an `s.Optional` field, reports a wrong field at that field, and `Parameters<typeof add>[0]` reads its typed input: [Calling from an island](actions-from-islands.md#calling-from-an-island).
 - `kay check` reads an icon from an imported object of `~icons/` imports, and a list built from it, as data, so such a component no longer renders as an island: [Islands](islands.md).
+- A library linked from its own folder with kay as a dev dependency shares the app's kay, so its `api()` is served: [Component libraries](component-libraries.md).
 
 The rest of this release is in [What's new, older releases](whats-new-archive.md).
 
