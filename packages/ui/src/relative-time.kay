@@ -1,0 +1,23 @@
+---
+import type { JSX } from 'kay'
+import { formatDate, relativeTime } from 'kay/i18n'
+import { recipe } from 'kay'
+
+// 'kui-relative-time' stays as the component's name for an app's CSS.
+const look = recipe({ parts: { root: 'kui-relative-time' } })
+
+const { date, options, dateOptions = { dateStyle: 'long', timeStyle: 'short' }, ...rest } = props<Omit<JSX.IntrinsicElements['time'], 'class' | 'datetime' | 'tabindex' | 'children'> & {
+  // The moment, as a `Date`, a timestamp in milliseconds or a string `new Date` reads.
+  date: Date | number | string
+  // How the relative text is worded, as `Intl.RelativeTimeFormat` takes them: `{ style: 'short' }` for `3 hr. ago`.
+  options?: Intl.RelativeTimeFormatOptions | undefined
+  // How the full date in the tooltip is written, as `Intl.DateTimeFormat` takes them; the time zone is the reader's unless `timeZone` is set.
+  dateOptions?: Intl.DateTimeFormatOptions | undefined
+}>()
+
+const moment = () => new Date(date)
+const ago = relativeTime(moment, options)
+---
+// The text counts on from the page's render time on the server, so hydrating changes nothing, and keeps ticking in the browser.
+if !Number.isNaN(moment().getTime())
+  time(part="root" {...rest} datetime={moment().toISOString()} tabindex="0" data-tooltip={formatDate(moment(), dateOptions)}) {ago()}

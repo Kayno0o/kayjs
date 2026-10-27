@@ -258,7 +258,7 @@ Layout: [Card](/ui/card), [CardRow](/ui/card-row), [PageHeader](/ui/page-header)
 
 Navigation: [Tabs](/ui/tabs), [TabNav](/ui/tab-nav), [Breadcrumb](/ui/breadcrumb), [Segmented](/ui/segmented), [SiteNav](/ui/site-nav), [AppHeader](/ui/app-header), [AppSwitcher](/ui/app-switcher), [Pagination](/ui/pagination), [Steps](/ui/steps), [TreeView](/ui/tree-view), [Timeline](/ui/timeline).
 
-Data: [Table](/ui/table), [Stat](/ui/stat), [Meter](/ui/meter), [BarList](/ui/bar-list), [Badge](/ui/badge), [Avatar](/ui/avatar), [LineChart](/ui/line-chart), [BarChart](/ui/bar-chart), [ScatterChart](/ui/scatter-chart), [MapView](/ui/map-view), [ContributionGraph](/ui/contribution-graph), [QrCode](/ui/qr-code), [SiteFavicon](/ui/site-favicon), [Icon](/ui/icon).
+Data: [Table](/ui/table), [Stat](/ui/stat), [Meter](/ui/meter), [BarList](/ui/bar-list), [Badge](/ui/badge), [RelativeTime](/ui/relative-time), [Avatar](/ui/avatar), [LineChart](/ui/line-chart), [BarChart](/ui/bar-chart), [ScatterChart](/ui/scatter-chart), [MapView](/ui/map-view), [ContributionGraph](/ui/contribution-graph), [QrCode](/ui/qr-code), [SiteFavicon](/ui/site-favicon), [Icon](/ui/icon).
 
 Media: [MediaGallery](/ui/media-gallery), [Carousel](/ui/carousel), [ZoomPane](/ui/zoom-pane), [WhenVisible](/ui/when-visible), [LoadMore](/ui/load-more), [VirtualList](/ui/virtual-list).
 

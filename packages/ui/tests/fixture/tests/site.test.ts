@@ -126,6 +126,16 @@ test('a disabled Button with a tooltip renders aria-disabled and stays a tab sto
   expect(await read('plain-disabled')).toEqual({ 'type': 'button', 'disabled': '', 'aria-disabled': null, 'data-tooltip': null })
 })
 
+test('RelativeTime is a time element worded relative to now, a tab stop carrying the full date, and nothing for a date it cannot read', async () => {
+  const plain = await one('/relative-time', '#plain')
+  const short = await one('/relative-time', '#short')
+
+  expect([plain.tag, plain.text, attr(plain, 'tabindex'), attr(plain, 'datetime')?.length]).toEqual(['time', '3 days ago', '0', 24])
+  expect(attr(plain, 'data-tooltip')).toMatch(/^[A-Z][a-z]+ \d{1,2}, \d{4} at \d{1,2}:\d{2}\s?[AP]M$/)
+  expect([short.text, attr(short, 'data-tooltip'), attr(short, 'class')]).toEqual(['3 days ago', expect.stringMatching(/^\d{1,2}\/\d{1,2}\/\d{2}$/), expect.stringContaining('text-muted')])
+  expect(await find('/relative-time', '#bad')).toEqual([])
+})
+
 test('Tooltip is a tab stop carrying its text for TooltipHost', async () => {
   const found = await one('/buttons', '#tip')
 

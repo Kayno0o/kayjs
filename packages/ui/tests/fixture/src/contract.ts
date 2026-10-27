@@ -54,6 +54,7 @@ import QrCode from '@kaynooo/kayjs-ui/qr-code.kay'
 import RadioGroup from '@kaynooo/kayjs-ui/radio-group.kay'
 import RangeInput from '@kaynooo/kayjs-ui/range-input.kay'
 import Rating from '@kaynooo/kayjs-ui/rating.kay'
+import RelativeTime from '@kaynooo/kayjs-ui/relative-time.kay'
 import SaveForm from '@kaynooo/kayjs-ui/save-form.kay'
 import ScatterChart from '@kaynooo/kayjs-ui/scatter-chart.kay'
 import Segmented from '@kaynooo/kayjs-ui/segmented.kay'
@@ -183,6 +184,7 @@ export const COMPONENTS = {
   'timeline': Timeline,
   'toggle': Toggle,
   'toolbar': Toolbar,
+  'relative-time': RelativeTime,
   'tooltip': Tooltip,
   'tooltip-host': TooltipHost,
   'tree-view': TreeView,
@@ -272,6 +274,7 @@ export const CASES: Record<string, Record<string, unknown>> = {
   'timeline': { entries: [{ key: 'a', time: '08:00', text: 'Home', icon }, { key: 'b', time: '09:00', text: 'Gap', tone: 'muted' }], label: 'Day', selected: 'a', onSelect: noop },
   'toggle': { label: 'Digest' },
   'toolbar': { label: 'Actions', caption: 'Mars', children: 'Move' },
+  'relative-time': { date: 0 },
   'tooltip': { text: 'Published on Monday', children: 'Published' },
   'tooltip-host': {},
   'tree-view': { nodes: tree, label: 'Planets', selected: 'phobos' },

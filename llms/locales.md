@@ -136,6 +136,8 @@ const ago = relativeTime(() => date)
 time {ago()}
 ```
 
+kayjs-ui's `RelativeTime(date)` is this with the full date as a tooltip the keyboard reaches.
+
 ### Link to a path that is no link
 
 `localize` gives a path in the request's locale, for a redirect, a `fetch` or a URL to share:

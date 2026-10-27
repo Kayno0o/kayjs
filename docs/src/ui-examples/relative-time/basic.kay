@@ -1,0 +1,8 @@
+---
+import RelativeTime from '@kaynooo/kayjs-ui/relative-time.kay'
+
+const posted = new Date(Date.now() - 3 * 3_600_000)
+---
+p.pt-10
+  | Posted
+  RelativeTime(date={posted} options={{ style: 'long' }})

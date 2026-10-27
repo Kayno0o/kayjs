@@ -1,0 +1,11 @@
+---
+import RelativeTime from '@kaynooo/kayjs-ui/relative-time.kay'
+import TooltipHost from '@kaynooo/kayjs-ui/tooltip-host.kay'
+
+const threeDays = Date.now() - 3 * 86_400_000
+---
+main
+  RelativeTime#plain(date={threeDays})
+  RelativeTime#short(date={threeDays} options={{ style: 'short' }} dateOptions={{ dateStyle: 'short', timeZone: 'UTC' }} class="text-muted")
+  RelativeTime#bad(date="nope")
+  TooltipHost
