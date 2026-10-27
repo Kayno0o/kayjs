@@ -1,0 +1,22 @@
+---
+import Card from '@kaynooo/kayjs-ui/card.kay'
+import Notice from '@kaynooo/kayjs-ui/notice.kay'
+import PageHeader from '@kaynooo/kayjs-ui/page-header.kay'
+import Table from '@kaynooo/kayjs-ui/table.kay'
+import '../app.css'
+
+// Words with no space to break at, such as an image reference, a digest or a path.
+const ref = 'registry.example.com/team/an-image-with-a-very-long-name-and-no-space/sha256:b99ee817fb95d11e5e91b99ee817fb95d11e5e91b99ee817fb95d11e5e91'
+const rows = [{ id: 1, name: ref, digest: ref }]
+const columns = [{ key: 'name', header: 'Name' }, { key: 'digest', header: 'Digest' }]
+---
+main
+  .w-full.max-w-lg#header
+    PageHeader(title={ref} description={ref})
+  .w-full.max-w-lg#card
+    Card(title="Image")
+      p {ref}
+  .w-full.max-w-lg#notice
+    Notice(tone="danger") {ref}
+  .w-full.max-w-lg#table
+    Table(columns={columns} rows={rows} rowKey="id")

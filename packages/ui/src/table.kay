@@ -22,7 +22,7 @@ const look = recipe({
     selection: 'sticky left-0 flex flex-wrap items-center gap-3 border-solid border-b-[length:var(--border-width)] border-border px-3 py-2 text-sm [&_.kui-checkbox]:min-h-6 [&_.kui-checkbox]:min-w-6',
     selected: 'm-0',
     bulk: 'flex flex-wrap items-center gap-2',
-    table: 'w-full border-collapse text-sm @max-[30rem]/table:block',
+    table: 'w-full border-collapse text-sm [overflow-wrap:anywhere] @max-[30rem]/table:block',
     // Below 30rem of width the rows of a stacked table become cards and its headers one row of sort buttons, the only part of the head that stays. Each card draws its own top line instead of the row's bottom border, so an app dropping the row borders of the wide table still sees the cards apart.
     head: '@max-[30rem]/table:has-[[data-part=sortButton]]:block @max-[30rem]/table:group-data-virtual/table:sticky @max-[30rem]/table:group-data-virtual/table:top-0 @max-[30rem]/table:group-data-virtual/table:z-1 @max-[30rem]/table:group-data-virtual/table:bg-surface @max-[30rem]/table:not-has-[[data-part=sortButton]]:hidden',
     headRow: '@max-[30rem]/table:flex @max-[30rem]/table:flex-wrap @max-[30rem]/table:gap-2 @max-[30rem]/table:border-solid @max-[30rem]/table:border-b-[length:var(--border-width)] @max-[30rem]/table:border-border @max-[30rem]/table:px-3 @max-[30rem]/table:py-2',

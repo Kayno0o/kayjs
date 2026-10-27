@@ -3,7 +3,7 @@ import type { JSX } from 'kay'
 import { recipe } from 'kay'
 
 const look = recipe({
-  parts: { root: 'kui-notice rounded-lg border-solid px-4 py-3 text-sm [font-weight:var(--font-weight-normal)] [background-color:var(--_notice-ground,var(--color-surface-strong))] [border-color:var(--_notice-tone,var(--color-border-strong))] [border-width:var(--border-width)] [color:var(--_notice-tone,var(--color-foreground))] data-compact:border-0 data-compact:bg-transparent data-compact:p-0' },
+  parts: { root: 'kui-notice [overflow-wrap:anywhere] rounded-lg border-solid px-4 py-3 text-sm [font-weight:var(--font-weight-normal)] [background-color:var(--_notice-ground,var(--color-surface-strong))] [border-color:var(--_notice-tone,var(--color-border-strong))] [border-width:var(--border-width)] [color:var(--_notice-tone,var(--color-foreground))] data-compact:border-0 data-compact:bg-transparent data-compact:p-0' },
   variants: {
     // A danger is an alert, read out at once; the other tones are a status, read once the reader is idle.
     tone: { info: '', success: '[--_notice-tone:var(--color-success)]', warning: '[--_notice-tone:var(--color-warning)]', danger: '[--_notice-ground:var(--color-background)] [--_notice-tone:var(--color-danger)]' },

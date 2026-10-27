@@ -1408,6 +1408,26 @@ inBrowser('a non-modal SidePanel and the space skin on a served page', () => {
     expect(await page.a11y()).toEqual([])
     expect(page.errors).toEqual([])
   }, 120_000)
+
+  test('PageHeader, Card, Notice and Table break a word with no space instead of widening the page, on a phone and in a wide table', async () => {
+    const site = await shared()
+    // How far the page, and the widest box inside each part, run past their edge: a table scrolling inside its own box counts.
+    const overflow = (page: { evaluate: <T>(run: () => T) => Promise<T> }) => page.evaluate(() => ({
+      page: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+      parts: Object.fromEntries(['header', 'card', 'notice', 'table'].map(id => [id, Math.max(...[...document.getElementById(id)!.querySelectorAll('*'), document.getElementById(id)!].map(el => el.scrollWidth - el.clientWidth))])),
+    }))
+    const none = { page: 0, parts: { header: 0, card: 0, notice: 0, table: 0 } }
+
+    await using phone = await site.open('/long-text', { width: 400 })
+
+    expect(await overflow(phone as never)).toEqual(none)
+    expect(phone.errors).toEqual([])
+
+    await using wide = await site.open('/long-text', { width: 800 })
+
+    expect(await overflow(wide as never)).toEqual(none)
+    expect(wide.errors).toEqual([])
+  }, 120_000)
 })
 
 inBrowser('the space skin on Segmented, ChipGroup and FileDrop', () => {

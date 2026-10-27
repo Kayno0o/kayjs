@@ -4,7 +4,7 @@ import type { JSX, Snippet } from 'kay'
 
 const look = recipe({
   parts: {
-    root: 'kui-page-header flex flex-col gap-2',
+    root: 'kui-page-header flex flex-col gap-2 [overflow-wrap:anywhere]',
     head: 'flex flex-wrap items-center gap-4',
     title: 'm-0 text-xl [font-weight:var(--font-weight-semibold)] tracking-label text-foreground [font-family:var(--font-label,inherit)] [text-transform:var(--label-case)]',
     meta: 'flex flex-wrap items-center gap-2 text-sm text-muted',
