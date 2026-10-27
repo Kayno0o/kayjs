@@ -50,7 +50,7 @@ describe('the flash cookie', () => {
 
 describe('the flash cookie against a request for another page', () => {
   it('is left for the page it goes back to, whatever fetched another page meanwhile', async () => {
-    for (const [site, path, other] of [[sites.root, '/', '/other'], [sites.mounted, '/blog', '/blog/other']] as const) {
+    for (const [site, path, other] of [[sites.root, '/', '/other'], [sites.mounted, '/blog', '/blog/other'], [sites.strict, '/blog/', '/blog/other/']] as const) {
       const header = (await posted(site, path))[0]!
       const cookie = header.slice(0, header.indexOf(';'))
       const elsewhere = await site.fetch(other, { headers: { cookie } })
@@ -63,6 +63,19 @@ describe('the flash cookie against a request for another page', () => {
       expect(await back.text()).toContain('saved')
       expect(back.headers.getSetCookie().join()).toContain('kay_flash=;')
     }
+  })
+})
+
+describe('the flash cookie on a rewritten page', () => {
+  it('is read by the page the browser asked for, whatever path the rewrite serves it from', async () => {
+    const app = new Elysia().use(await pages({ root: ROOT, prebuilt: false, security: false, rewrite: url => url.pathname === '/shop' ? '/' : undefined }))
+    const post = await app.handle(new Request(`http://localhost${save.url}`, { method: 'POST', headers: { origin: 'http://localhost', referer: 'http://localhost/shop' }, body: new FormData() }))
+    const header = post.headers.getSetCookie()[0]!
+    const cookie = header.slice(0, header.indexOf(';'))
+    const back = await app.handle(new Request('http://localhost/shop', { headers: { cookie } }))
+
+    expect(await back.text()).toContain('saved')
+    expect(back.headers.getSetCookie().join()).toContain('kay_flash=;')
   })
 })
 

@@ -66,6 +66,7 @@ import { chainQuery, queryRules, queryScript, readQuery, readQueryLeniently } fr
 import { reportServerError } from './report'
 import { RequestReadError } from './request-read'
 import { overHttps } from './request-url'
+import { askedPath } from './rewrite'
 import { CONTEXT_LAYOUT, guardUrl, routeChain } from './routes'
 import { savesLess } from './save-data'
 import { askedForEndedEntry, inServerScope, markPrivate, readPersonally, wasReadPersonally, withEndedEntries, withOutcome } from './scope'
@@ -773,7 +774,7 @@ function createRendering(context: RequestContext, params: Record<string, unknown
   // The cookie's flash, whichever page this is: the page it goes back to reads it, and no other takes it.
   let cookieFlash: SuccessFlash | null | undefined
   const fromCookie = () => cookieFlash ??= hasFlash(request, base) ? readFlash(personalCookies(), flashName(overHttps(request), base)) ?? null : null
-  const foreign = () => flashForOther(fromCookie(), routerPath(new URL(request.url).pathname, base))
+  const foreign = () => flashForOther(fromCookie(), routerPath(askedPath(request), base))
   const readOnce = () => flash ??= handedOverFlash(request) ?? (foreign() ? null : fromCookie())
   // A page asking how a form post went depends on the visitor's cookie, carried or not, so it is theirs either way.
   const asked = () => {

@@ -17,9 +17,17 @@ const REWRITTEN = 'x-kay-rewritten'
 const CLIENT = 'x-kay-client'
 // The id of the request rewritten, which its log lines and its answer keep.
 const ID = 'x-kay-request-id'
+// The path the browser asked for, which the rewritten request no longer carries.
+const PATH = 'x-kay-original-path'
 const TOKEN = crypto.randomUUID()
 // Read off the marking headers, which are then dropped, so app code never sees the token.
 const addresses = new WeakMap<Request, string>()
+const originals = new WeakMap<Request, string>()
+
+// The path the browser asked for when kay rewrote the request, or the request's own.
+export function askedPath(request: Request): string {
+  return originals.get(request) ?? new URL(request.url).pathname
+}
 
 // The socket address of a request kay rewrote or kay/test sent, or undefined for any other request.
 export function rewrittenAddress(request: Request): string | undefined {
@@ -39,6 +47,10 @@ export function rewriteRequests(app: Elysia, rewrite: Rewrite, fallback: Elysia)
       const address = request.headers.get(CLIENT)
 
       const id = request.headers.get(ID)
+      const asked = request.headers.get(PATH)
+
+      if (asked !== null)
+        originals.set(request, asked)
 
       if (address !== null)
         addresses.set(request, address)
@@ -49,6 +61,7 @@ export function rewriteRequests(app: Elysia, rewrite: Rewrite, fallback: Elysia)
       request.headers.delete(REWRITTEN)
       request.headers.delete(CLIENT)
       request.headers.delete(ID)
+      request.headers.delete(PATH)
 
       return undefined
     }
@@ -86,6 +99,7 @@ export function rewriteRequests(app: Elysia, rewrite: Rewrite, fallback: Elysia)
 
     headers.set(REWRITTEN, TOKEN)
     headers.set(ID, requestId(request))
+    headers.set(PATH, url.pathname)
     headers.delete(CLIENT)
 
     const address = addresses.get(request) ?? server?.requestIP(request)?.address

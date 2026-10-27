@@ -92,8 +92,8 @@ export function flashPath(base: string): string {
 }
 
 // Whether a page at `path` (under `base`) is not the one the flash goes back to; one that names no page is for any.
-export function flashForOther(flash: Flash | SuccessFlash | null | undefined, path: string): boolean {
-  return flash !== null && flash !== undefined && 'page' in flash && flash.page !== undefined && trimSlash(flash.page) !== trimSlash(path)
+export function flashForOther(flash: SuccessFlash | null, path: string): boolean {
+  return flash !== null && typeof flash.page === 'string' && trimSlash(flash.page) !== trimSlash(path)
 }
 
 function trimSlash(path: string): string {
