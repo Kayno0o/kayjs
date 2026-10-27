@@ -290,4 +290,5 @@ Topics of the kayjs-ui reference the sections above do not link:
 - [Forms, FormDialog and Steps](/llms/kayjs-ui-forms-and-steps)
 - [Tables, tabs and pagination](/llms/kayjs-ui-tables-navigation-and-layout)
 - [Page layout, command palette and trees](/llms/kayjs-ui-page-layout-palette-and-trees)
+- [Infinite lists, LoadMore and a Table over them](/llms/kayjs-ui-infinite-list)
 - [Charts, drag and drop, galleries and image tools](/llms/kayjs-ui-charts-drag-and-media)

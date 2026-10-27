@@ -18,6 +18,8 @@ The table's `sort` and the URL's `sortParam` sort reach the list too, and a sort
 
 `key` tells a row from another: a row a later page repeats because the list shifted meanwhile is dropped instead of shown twice. Leave it out for a source that cannot repeat a row.
 
+`list.patch(id, change)` updates one loaded row, the one `key` reads as `id`, with the fields to merge over it or a function of the row returning it. An action that toggles a row and answers it as the server now holds it feeds the list with `list.patch(row.id, answer)`, and the other rows stay as they are. It answers whether a row matched, and an `undefined` change, such as a failed `attempt`'s, does nothing.
+
 ## A failed page
 
 A `load` that throws, or resolves `undefined` as an `attempt` does once it toasted, stops the list on an alert with a "Try again" button. No other page loads on scroll until it is pressed, and it asks for the same page again.

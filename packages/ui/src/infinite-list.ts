@@ -1,5 +1,5 @@
 import type { SortState } from './table'
-import { signal } from 'kay'
+import { signal, untrack } from 'kay'
 
 // What a source resolves to: the rows of the next page, or `undefined` for a page that failed, such as the result of an `attempt` that toasted. A throw fails the page too.
 export type InfinitePage<Row> = Row[] | undefined
@@ -41,7 +41,12 @@ export interface InfiniteList<Row> {
   sortBy: (sort: SortState | undefined) => Promise<void>
   // Loads again the page that failed; nothing when no page failed.
   retry: () => Promise<void>
+  // Changes the loaded row `key` reads as `id`, from the fields to merge over it or a function returning the row; `undefined` changes nothing, so the answer of an `attempt` that failed passes as is. Answers whether a loaded row matched, which needs the `key` option.
+  patch: (id: unknown, change: RowChange<Row> | undefined) => boolean
 }
+
+// What `patch` applies to a row: the fields to merge over it, or a function of the row returning the row.
+export type RowChange<Row> = Partial<Row> | ((row: Row) => Row)
 
 // The rows of a list that loads its next page as it scrolls, with `LoadMore` after the list drawing the sentinel and the failed state. The first page comes from the server; a page shorter than `pageSize` ends the list, one call runs at a time and a failed page loads no other until `retry`.
 export function infiniteList<Row>(first: Row[], options: InfiniteListOptions<Row>): InfiniteList<Row> {
@@ -125,8 +130,24 @@ export function infiniteList<Row>(first: Row[], options: InfiniteListOptions<Row
     return loadPage()
   }
 
+  function patch(id: unknown, change: RowChange<Row> | undefined): boolean {
+    if (key === undefined || change === undefined)
+      return false
+
+    const index = untrack(rows).findIndex(row => Object.is(key(row), id))
+
+    if (index === -1)
+      return false
+
+    const changed = (row: Row): Row => typeof change === 'function' ? change(row) : { ...row, ...change }
+
+    rows.set(current => current.map((row, at) => at === index ? changed(row) : row))
+
+    return true
+  }
+
   const more = async () => failed() ? undefined : loadPage()
   const retry = async () => failed() ? loadPage() : undefined
 
-  return { rows, ended, failed, pending, more, retry, sort: () => sort, sortBy }
+  return { rows, ended, failed, pending, more, retry, sort: () => sort, sortBy, patch }
 }

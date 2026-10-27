@@ -1,0 +1,17 @@
+# kayjs-ui: Infinite lists, LoadMore and a Table over them
+
+## Common tasks
+
+### infiniteList, LoadMore, Table(list)
+
+- `LoadMore(list={people})` after a list (`button` swaps the sentinel for a "Load more" button; a status tells screen readers how many rows a page added), with `const people = infiniteList(firstRows, { pageSize: 20, key: row => row.id, load: ({ offset, last }) => fetchPage(offset) })` from the package, draw `people.rows()`:
+  - `pageSize` is a full page: a shorter one ends the list. `load` resolves to the next page, `offset` counting every row fetched and `last` the last row fetched for a cursor source. One page loads at a time.
+  - `Table(list={people} columns={...} rowKey=...)` draws `people.rows()` with `LoadMore` after them, and its header clicks sort on the server: `people.sortBy(sort)` starts the list over from offset 0 and `load` gets the sort as `sort` beside `offset` and `last` (`infiniteList`'s `sort` option is the order the first page is in). A column is sortable by carrying a `sortValue` (`numeric` ones have it), which only marks it here. The table's `sort` and the URL's `sortParam` sort reach the list too, and a sort restarts it, so a selected row outside the first page leaves the selection. The list also loads again on mount when the table's sort differs from the `sort` its `infiniteList` was made with, and a boolean `exportable` exports the loaded rows only.
+  - `key` drops a row a later page repeats; leave it out when the source cannot repeat one.
+  - A `load` that throws or resolves `undefined` (an `attempt` that toasted) stops the list on an alert with a retry button, loading no other page until it is pressed.
+  - `people.patch(id, change)` updates the loaded row `key` reads as `id` (so the `key` option is needed) from the fields to merge or a function of the row returning it, and answers whether a row matched: a toggle's action answering the row as the server holds it reads `people.patch(row.id, await flag(row.id, { refresh: false }))`. An `undefined` change, such as a failed `attempt`'s, changes nothing; the other rows keep their identity.
+  - It draws the WhenVisible sentinel, a `status` row while a page loads and the alert. `loadingLabel` (`Loading more…`), `failureLabel` (`Could not load more.`), `retryLabel` (`Try again`) and `margin` are its props; `people.ended()`, `failed()` and `pending()` read the state.
+
+## Reference
+
+- Every `infiniteList` option and method is typed in the package (`InfiniteListOptions`, `InfiniteList`), with its behaviour in the notes above.

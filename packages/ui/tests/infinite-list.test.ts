@@ -227,4 +227,31 @@ describe('infiniteList', () => {
     expect(asked.map(at => at.offset)).toEqual([0, 0])
     expect(list.rows().map(ban => ban.id)).toEqual([1, 2])
   })
+
+  test('patch changes one loaded row by its key and leaves the others as they are', async () => {
+    const { load } = source(bans(4, 3))
+    const first = bans(1, 3).map(ban => ({ ...ban, seen: false }))
+    const list = infiniteList(first, { pageSize: 3, key: ban => ban.id, load: async at => (await load(at))?.map(ban => ({ ...ban, seen: false })) })
+
+    await list.more()
+
+    const before = list.rows()
+
+    expect(list.patch(5, { seen: true })).toBe(true)
+    expect(list.rows().map(row => row.seen)).toEqual([false, false, false, false, true, false])
+    expect(list.rows()[0]).toBe(before[0])
+    expect(list.patch(2, row => ({ ...row, id: 2, seen: !row.seen }))).toBe(true)
+    expect(list.rows()[1]?.seen).toBe(true)
+  })
+
+  test('patch answers false for an unknown row, an undefined change and a list with no key', () => {
+    const { load } = source()
+    const keyed = infiniteList(bans(1, 3), { pageSize: 3, key: ban => ban.id, load })
+    const loose = infiniteList(bans(1, 3), { pageSize: 3, load })
+
+    expect(keyed.patch(9, {})).toBe(false)
+    expect(keyed.patch(1, undefined)).toBe(false)
+    expect(loose.patch(1, {})).toBe(false)
+    expect(keyed.rows()).toEqual(bans(1, 3))
+  })
 })
