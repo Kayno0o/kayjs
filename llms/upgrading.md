@@ -15,6 +15,7 @@ What each minor release breaks, and what an app changes to move to it. kay and i
 ### kayjs-ui: a Table over a `list` no longer filters the loaded rows
 
 - Its `filter` search box now hands the typed text to the list's `load` as `filter.text`, the list starting over from offset 0 after a pause in typing, and the loaded rows are not matched against `filter` again. A `load` that ignored the text used to see the box narrow the rows loaded so far; it now has to narrow its pages itself, as it does for `sort` ([Infinite lists](../packages/ui/llms/infinite-list.md)). `kay check` cannot tell what a `load` reads, so there is no lint for it.
+- The `filter` part of a Table with a search box is now a `div` holding one `label` per field, drawn by the new `field` part, where it was the `label` itself: a stylesheet or a `src/ui.ts` restyling `filter` moves its label rules to `field` ([Restyle a component](../packages/ui/llms/restyle.md)).
 
 ## 1.80.0
 

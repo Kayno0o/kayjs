@@ -12,7 +12,7 @@ A `Table` takes the list as `list={list}` in place of `rows`: it draws `list.row
 
 The list also starts over on mount when the table's sort, from `sort` or the URL, differs from the `sort` the list was made with, so give both the same one to keep the first page. A sort drops the picked rows that are not in the new first page, as a row leaving the table always does.
 
-A `filter` search box filters on the server too. The typed text reaches `load` as `filter.text` once typing pauses, and the list starts over from offset 0 as it does for a sort. The rows already loaded are not matched again, so `load` has to narrow its pages itself. Any value of `filter` shows the box, since a list does not read it. `filterParam` keeps the text in the URL.
+A `filter` search box filters on the server too. The typed text reaches `load` as `filter.text` once typing pauses, and the list starts over from offset 0 as it does for a sort. The rows already loaded are not matched again, so `load` has to narrow its pages itself. `filter` or `filterParam` shows the box, and `filterParam` keeps the text in the URL.
 
 `fields` adds more inputs beside the box: `fields={[{ key: 'origin', label: 'Origin', options }, { key: 'tag', label: 'Tag' }]}`. A field with `options` is a select, one without is a text box. The value reaches `load` as `filter.fields.origin` (empty fields are left out) and stays in the URL under `key`. A sort and a filter changed together load one page.
 
@@ -30,7 +30,7 @@ The table's `sort` and the URL's `sortParam` sort reach the list too, and a sort
 
 An action loading the pages replaces `load`: `infiniteList(first, { pageSize, key, action: listPeople, input: { team }, failure: 'Could not load people.' })`. Each page calls it with `{ refresh: false }` through `attempt`, so a failed call toasts `failure` and fails the page. `input` holds the call's other fields; `offset` and `limit` are added from the page.
 
-For a cursor or a sort, `input` can be a function of where the page starts, such as `at => at.last && { before: at.last.id }`. It answers the whole call, and `undefined` loads an empty page, which is what a list with no row to continue after should do. When the answer is not an array of rows, `rows: answer => answer.items` reads them out.
+For a cursor or a sort, `input` can be a function of where the page starts, such as `at => at.last && { before: at.last.id }` or `at => ({ q: at.filter.text })`. It answers the call with `offset` and `limit` added under what it names, and `undefined` loads an empty page, which is what a list with no row to continue after should do. When the answer is not an array of rows, `rows: answer => answer.items` reads them out.
 
 On the server, `pageFields()` gives the action its `offset` and `limit` fields with their bounds named once, and `pageOf(rows, input)` cuts a list held whole to a page and answers `{ rows, total }`. The action and the page that renders the first rows both call it, so neither slices by hand.
 

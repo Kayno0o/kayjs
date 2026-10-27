@@ -60,18 +60,24 @@ describe('infiniteList over an action', () => {
   })
 
   test('a function input is the whole call, and undefined loads an empty page', async () => {
-    const { calls, action: source } = fake(bans(4, 1))
+    const { calls, action: source } = fake(bans(4, 1), bans(7, 1))
     const list = infiniteList(bans(1, 3), { pageSize: 3, action: source, input: (at: PageAt<Ban>) => at.last && { before: at.last.id }, failure: 'Could not load.' })
 
     await list.more()
 
-    expect(calls.map(call => call.input)).toEqual([{ before: 3 }])
+    expect(calls.map(call => call.input)).toEqual([{ offset: 3, limit: 3, before: 3 }])
+
+    const own = infiniteList(bans(1, 3), { pageSize: 3, action: source, input: () => ({ limit: 2 }), failure: 'Could not load.' })
+
+    await own.more()
+
+    expect(calls.at(-1)?.input).toEqual({ offset: 3, limit: 2 })
 
     const empty = infiniteList<Ban, typeof source>([], { pageSize: 3, action: source, input: () => undefined, failure: 'Could not load.' })
 
     await empty.sortBy({ key: 'id', direction: 'asc' })
 
-    expect(calls).toHaveLength(1)
+    expect(calls).toHaveLength(2)
     expect(empty.rows()).toEqual([])
     expect(empty.ended()).toBe(true)
   })

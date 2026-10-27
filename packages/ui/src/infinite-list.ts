@@ -53,7 +53,7 @@ type RowsOf<Row, Target extends Action<never, unknown>> = [Answered<Target>] ext
 // An action as the source: each page calls it with `{ refresh: false }` through `attempt`, so a failure toasts `failure` and fails the page.
 export type ActionSource<Row, Target extends Action<never, unknown>> = {
   action: Target
-  // The fields of the call besides the paging: with an object, `offset` and `limit` (the page size) are added, so an action declaring both reads them from `pageFields`. A function gets where the page starts and answers the whole input, for a cursor or a sort; `undefined` loads nothing and resolves an empty page, such as a cursor with no row to continue after.
+  // The fields of the call besides the paging: with an object, `offset` and `limit` (the page size) are added, so an action declaring both reads them from `pageFields`. A function gets where the page starts and answers the input, `offset` and `limit` added under what it names, for a cursor, a sort or a filter; `undefined` loads nothing and resolves an empty page, such as a cursor with no row to continue after.
   input?: Partial<InputOf<Target>> | ((at: PageAt<Row>) => Partial<InputOf<Target>> | undefined) | undefined
   // What `attempt` toasts when the call fails.
   failure: string | AttemptOptions
@@ -103,10 +103,13 @@ function loadFromAction<Row, Target extends Action<never, unknown>>(source: Acti
   const rowsOf = source.rows as ((answer: unknown) => Row[]) | undefined
 
   return async (at) => {
-    const given = typeof input === 'function' ? input(at) : { ...input, offset: at.offset, limit: size }
+    const asked = typeof input === 'function' ? input(at) : { ...input }
 
-    if (given === undefined)
+    if (asked === undefined)
       return []
+
+    // The paging a page adds under what a function names itself, and over the fixed fields of an object.
+    const given = typeof input === 'function' ? { offset: at.offset, limit: size, ...asked } : { ...asked, offset: at.offset, limit: size }
 
     const answer = await attempt(async () => call(given, { refresh: false }), source.failure)
 

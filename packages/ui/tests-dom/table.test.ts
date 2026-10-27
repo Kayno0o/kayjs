@@ -226,6 +226,12 @@ describe('Table over an infinite list', () => {
       expect(window.location.search).toContain('tag=x')
     })
 
+    test('a filterParam alone shows the search box of a table over a list', async () => {
+      mounted = await mountComponent(ListedTable, { onLoad, filterParam: 'q' })
+
+      expect(mounted.root.querySelector('[data-part="filterInput"]')).not.toBeNull()
+    })
+
     test('a table whose filter equals the one its list began with loads nothing on mount', async () => {
       mounted = await mountComponent(ListedTable, { onLoad, searchable: true, filterParam: 'q', fields: FIELDS })
       await settle()

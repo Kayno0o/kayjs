@@ -121,6 +121,8 @@ const extra = fields ?? []
 const fieldValues = extra.map(field => persisted(field.key, '', { storage: 'query' }))
 const fieldsNow = () => Object.fromEntries(extra.flatMap((field, index) => fieldValues[index]!() === '' ? [] : [[field.key, fieldValues[index]!()]]))
 const asked = () => ({ text: typed(), fields: fieldsNow() })
+// A table over a list searches on the server, so a `filterParam` alone shows the box.
+const searching = () => filter !== undefined || (list !== undefined && filterParam !== undefined)
 const filtering = () => typed() !== '' || extra.some((_, index) => fieldValues[index]!() !== '')
 
 effect(() => {
@@ -266,9 +268,9 @@ function ariaSort(column: Column<Row>): 'ascending' | 'descending' | undefined {
 }
 ---
 div({...rest} ref={element => box = element} data-narrow={narrow} data-virtual={virtual ? '' : undefined} tabindex={virtual ? '0' : undefined})
-  if filter || extra.length > 0
+  if searching() || extra.length > 0
     div(part="filter")
-      if filter
+      if searching()
         label(part="field")
           span.kui-label-text(part="filterLabel") {filterLabel}
           input.kui-field-input(part="filterInput" type="search" value={typed()} placeholder={filterPlaceholder} autocomplete="off" onInput={event => typed.set(event.currentTarget.value)})
