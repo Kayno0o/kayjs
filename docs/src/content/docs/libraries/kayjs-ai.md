@@ -278,7 +278,25 @@ You decide what counts as a yes, such as the last message of the visitor saying 
 
 The visitor leaving stops the loop. A tool already running finishes, but nothing more is called. With [`outlive: true`](#a-reply-that-outlives-the-visitor) the loop runs to its end instead.
 
-`ask` with tools must run while kay answers a request, in a page, an action or a handler, because the tools run as that visitor. A background job has none.
+An action in `tools` must run while kay answers a request, in a page, an action or a handler, because it runs as that visitor.
+
+A scheduled job or a queue worker has no visitor, so give it plain functions made with `tool`. The input is a schema, the function gets it checked and typed, and what it returns goes back to the model as text or JSON:
+
+```ts
+import { s } from 'kay'
+import { ask, tool } from '@kaynooo/kayjs-ai'
+
+const findArticle = tool({
+  name: 'find_article',
+  description: 'Finds an article by its title',
+  input: s.Object({ title: s.String() }),
+  run: ({ title }) => articles.find(title),
+})
+
+await ask('Write this morning\'s episode', { tools: [findArticle], key: 'podcast' })
+```
+
+A function tool runs with your app's own rights, never a visitor's, in a request or out of one. Because you wrote it and passed it, it is not held for an Allow and `confirm` is not asked about it. `maxSteps` and `signal` work as for actions, and with no visitor the `budget` and `rateLimit` count the `key` you pass, else only the total.
 
 To show the calls in a chat, return `reply.progress()` from the chat's action instead of the reply: `ask(messages, { tools: [addNote] }).progress()`.
 

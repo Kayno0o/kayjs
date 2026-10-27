@@ -88,6 +88,31 @@ export interface Provider {
 // Any action exported by a page module, whatever its input and honeypot.
 export type ToolAction = Action<never, unknown>
 
+// What a function tool receives besides the input the model gave.
+export interface FunctionToolContext {
+  // Aborts when the reply is stopped, as `options.signal` or the request does.
+  signal: AbortSignal
+}
+
+export interface FunctionToolOptions<Schema extends TSchema = TSchema> {
+  // What the model calls it by: letters, digits, `_` and `-`, up to 64 characters, unique among the `tools` of an ask.
+  name: string
+  // What the model reads to decide when to call it.
+  description: string
+  // The object the model gives, a kay schema (`s.Object({ ... })`): a call it refuses is answered to the model, `run` never sees it.
+  input: Schema
+  // What the call does, with the input checked and typed by the schema: its result goes back to the model, as the text it is or as JSON. A throw tells the model the tool could not run, and goes to the app's log.
+  run: (input: Static<Schema>, context: FunctionToolContext) => unknown
+}
+
+// A function the model may call, made by `tool()`.
+export interface FunctionTool {
+  readonly name: string
+  readonly description: string
+  readonly input: TSchema
+  readonly run: (input: never, context: FunctionToolContext) => unknown
+}
+
 // A tool call waiting for `confirm`'s yes: the tool's name, the arguments the model gave and the request being answered.
 export interface ToolRequest {
   name: string
@@ -117,8 +142,9 @@ export interface AskOptions {
   timeout?: { connect?: Duration | undefined, idle?: Duration | undefined } | undefined
   // Who the limits and budget set in `ai()` count this ask for, in place of the signed-in user its `key` names or the address of the request being answered: a job or a test names one.
   key?: string | undefined
-  // Actions the model may call, each run as the visitor through the whole app, guards, validation and rate limits included; passing one is its opt-in. They need the request being answered, so `ask` with tools called outside one throws.
-  tools?: readonly ToolAction[] | undefined
+  // Actions the model may call, each run as the visitor through the whole app, guards, validation and rate limits included; passing one is its opt-in. They need the request being answered, so `ask` with an action called outside one throws.
+  // A `tool({ name, description, input, run })` is a plain function instead, run with the app's own rights and no visitor: it works outside a request, in a scheduled job or a queue worker, and is never held for approval nor asked of `confirm`.
+  tools?: readonly (ToolAction | FunctionTool)[] | undefined
   // The provider requests the tool loop may make, 5 by default; a reply still wanting tools after the last ends with `finish` `steps`.
   maxSteps?: number | undefined
   // Asked before each tool call runs, with its name, arguments and the request: only `true` lets it run, anything else tells the model the visitor has not confirmed it so it asks them first, and a throw fails the call like a tool that throws. A write the visitor must agree to, such as a booking, is checked here; a read answers `true`.

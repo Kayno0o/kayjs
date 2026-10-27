@@ -14,10 +14,13 @@ export interface Offered {
   name: string
   description: string
   inputSchema: object
-  tool: LibraryTool
+  // An action, run as the visitor.
+  tool?: LibraryTool | undefined
+  // A function tool, run with no visitor: its input already checked, it answers the text the model reads.
+  plain?: ((input: Record<string, unknown>, signal: AbortSignal) => Promise<Ran>) | undefined
 }
 
-interface Ran {
+export interface Ran {
   status: 'done' | 'failed'
   result: string
   approval?: string
@@ -97,15 +100,22 @@ function warnHeld(): void {
   log.warn('a tool call was held for the visitor\'s approval; only Chat\'s Allow button or a `confirm` passed to ask() lets it run, and `tool: { readOnly: true }` marks an action that needs none')
 }
 
-async function run(tools: Map<string, LibraryTool>, use: ToolUse, input: Record<string, unknown>, request: Request, confirm: Confirm | false | undefined, tickets: Set<string>): Promise<Ran> {
-  const tool = tools.get(use.name)
+async function run(tools: Map<string, Offered>, use: ToolUse, input: Record<string, unknown>, request: Request | undefined, confirm: Confirm | false | undefined, tickets: Set<string>, signal: AbortSignal): Promise<Ran> {
+  const offered = tools.get(use.name)
 
-  if (!tool)
+  if (!offered)
     return failed(`There is no tool named ${JSON.stringify(clip(use.name, MAX_NAME))}; the tools are ${[...tools.keys()].join(', ')}`)
+
+  if (offered.plain)
+    return offered.plain(input, signal)
+
+  const tool = offered.tool!
+  // Offering an action needs the request, which `ask` checks.
+  const visitor = request!
 
   try {
     if (typeof confirm === 'function') {
-      if (await confirm({ name: use.name, input, request }) !== true)
+      if (await confirm({ name: use.name, input, request: visitor }) !== true)
         return failed('The visitor has not confirmed this call, so it did not run; ask them, then call it again')
     }
     else if (confirm !== false && tool.readOnly !== true) {
@@ -120,7 +130,7 @@ async function run(tools: Map<string, LibraryTool>, use: ToolUse, input: Record<
       }
     }
 
-    const result = await tool.call(input, request)
+    const result = await tool.call(input, visitor)
 
     return { status: result.isError === true ? 'failed' : 'done', result: textOf(result) }
   }
@@ -136,8 +146,8 @@ const USAGE_FIELDS = ['inputTokens', 'outputTokens', 'cacheReadTokens', 'cacheWr
 
 // Asks the provider, answers the tools the model calls as the visitor, and asks again with their results until the model answers in text or `maxSteps` requests were made.
 // Text of one step is separated from the next by a blank line, and the token counts are the sum of the steps.
-export async function* converse(provider: Provider, base: ProviderRequest, offered: Offered[], maxSteps: number, request: Request, signal: AbortSignal, confirm?: Confirm | false): AsyncGenerator<Piece> {
-  const tools = new Map(offered.map(({ name, tool }) => [name, tool]))
+export async function* converse(provider: Provider, base: ProviderRequest, offered: Offered[], maxSteps: number, request: Request | undefined, signal: AbortSignal, confirm?: Confirm | false): AsyncGenerator<Piece> {
+  const tools = new Map(offered.map(item => [item.name, item]))
   const specs = offered.map(({ name, description, inputSchema }) => ({ name, description, inputSchema }))
   const messages: ProviderMessage[] = [...base.messages]
   const tickets = allowed(base.messages)
@@ -248,7 +258,7 @@ export async function* converse(provider: Provider, base: ProviderRequest, offer
       else if ('problem' in parsed)
         ran = failed(parsed.problem)
       else
-        ran = await run(tools, use, parsed.input, request, confirm, tickets)
+        ran = await run(tools, use, parsed.input, request, confirm, tickets, signal)
 
       // A visitor who left while the action ran gets no further call and no further request.
       if (signal.aborted)

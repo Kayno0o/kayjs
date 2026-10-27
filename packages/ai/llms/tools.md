@@ -59,7 +59,23 @@ const outcome = await site.call(assistant, { messages })
 - `tools` takes actions exported by page modules. Passing one is its opt-in: the model is offered those and no other, and a name it invents is an unknown tool.
 - Each tool is described as `/mcp` describes it: the name from the export (`addNote` is `add_note`), the description from the action's `tool` option (a string or `{ name, description }`), else its name as a sentence, and the input schema from the action's schema. `tool: false`, an action taking a file and one of a page with params cannot be a tool: `ask()` throws a `config-invalid` `KayError` naming the index.
 - Each call runs as the visitor, through the whole app as a form post does: guards, validation and rate limits apply, while the honeypot, minimum time and proof of work are skipped. A request a browser sent from another site is refused. The visitor's cookies and headers are used, so an anonymous visitor gets a guarded action refused.
-- `ask()` with tools needs the request being answered (a page, an action or a handler kay is answering), and throws without one; the tools keep running as that visitor after the answer is sent, while a reply streams on. An API route's handler runs outside that context, so offer tools from an action.
+- `ask()` with an action needs the request being answered (a page, an action or a handler kay is answering), and throws without one; the action keeps running as that visitor after the answer is sent, while a reply streams on. An API route's handler runs outside that context, so offer actions from an action, or [function tools](#function-tools).
+
+### Function tools
+
+A scheduled job or a queue worker has no visitor to run an action as. `tool({ name, description, input, run })` (from `@kaynooo/kayjs-ai`) makes a tool of a plain function, which `tools` takes beside actions and which works with or without a request:
+
+```ts
+const findArticle = tool({ name: 'find_article', description: 'Finds an article by its title', input: s.Object({ title: s.String() }), run: ({ title }) => articles.find(title) })
+
+await ask('Write the episode', { tools: [findArticle], key: 'podcast' })
+```
+
+- `name` is letters, digits, `_` and `-` up to 64 characters and unique among the tools of an ask (a clash or a bad one throws a `config-invalid` `KayError`); `input` is an `s.Object` and `run(input, { signal })` gets it checked and typed.
+- It runs as nobody: the app's own rights, no cookies, no guards, no rate limit of an action. Passing it is the opt-in, so it is never held for approval, `confirm` is not called for it (`confirm` still governs the actions of the same ask), and a job that wants a gate checks inside `run`.
+- The result is the returned string, or the JSON of any other value, cut at 20,000 characters. An input the schema refuses is answered `The arguments do not fit the tool: title (...)` and `run` is not called; a throw is `The tool could not run`, the error going to the logger `kayjs-ai`. `signal` aborts with the reply.
+- `maxSteps`, `outlive` and `reply.progress()` work as for actions. With no request, `ai({ budget, rateLimit })` count the ask's `key` and `total` counts always ([limits](limits.md)).
+- `fakeAi` scripts calls to a function tool as to an action: `fakeAi.reply({ calls: [{ name: 'find_article', input: { title: 'Moon' } }] })`.
 
 ### The loop
 
