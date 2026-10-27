@@ -287,7 +287,7 @@ On an element, `innerHTML={waves}` takes a project file imported as text, `impor
 
 A string built from a vouched one, such as `markup + '<b>'`, is plain again.
 
-To render a string as markup, pass it through one of two helpers first. `sanitizeHtml(text)` is for markup a user wrote. `trustHtml(text)` is for markup the app made. `trustHtml(text)` is for markup the app made.
+To render a string as markup, pass it through one of two helpers first. `sanitizeHtml(text)` is for markup a user wrote. `trustHtml(text)` is for markup the app made.
 
 Call `trustHtml` where the markup is used, not once for a constant kept for hours.
 
