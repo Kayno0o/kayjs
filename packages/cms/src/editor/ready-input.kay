@@ -23,7 +23,7 @@ const typing = signal('')
 function addTags(typed: string): void {
   const fresh = [...new Set(typed.split(',').map(word => word.trim()).filter(word => word !== '' && !tags().includes(word)))]
 
-  typing.set('')
+  typing = ''
 
   if (fresh.length > 0)
     onChange([...tags(), ...fresh])
@@ -70,7 +70,7 @@ match field.kind
           span.kcms-tag
             | {tag}
             IconButton(icon="close" label={wording('cms.field.removeTag', 'Remove {tag}', { tag })} size="xs" variant="ghost" onClick={() => removeTag(i)})
-        TextInput.kcms-tag-box(placeholder={wording('cms.field.newTag', 'Add a tag')} aria-label={label} value={typing()} onInput={next => typing.set(next)} onKeyDown={tagKey} onBlur={() => { addTags(typing()); touch() }})
+        TextInput.kcms-tag-box(placeholder={wording('cms.field.newTag', 'Add a tag')} aria-label={label} value={typing()} onInput={next => typing = next} onKeyDown={tagKey} onBlur={() => { addTags(typing()); touch() }})
   when 'color'
     FormField(label={label} hint={hint} issue={issue} required={required} group)
       .kcms-color

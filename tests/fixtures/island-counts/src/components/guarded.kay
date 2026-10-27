@@ -3,7 +3,7 @@ import Flaky from './flaky.kay'
 
 const open = signal(true)
 ---
-button.toggle(onClick={() => open.set(!open())}) Toggle
+button.toggle(onClick={() => open = !open()}) Toggle
 try
   Flaky(fail={true})
 catch

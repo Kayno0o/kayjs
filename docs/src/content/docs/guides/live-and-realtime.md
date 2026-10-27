@@ -266,7 +266,7 @@ import chat from '../api/chat'
 const prompt = signal('')
 const answer = stream(chat, '/answer', { method: 'post', start: false })
 ---
-input(value={prompt()} onInput={event => prompt.set(event.currentTarget.value)})
+input(value={prompt()} onInput={event => prompt = event.currentTarget.value})
 button(onClick={() => answer.start({ body: { prompt: prompt() } })}) Ask
 button(onClick={answer.close} disabled={answer.status() !== 'open'}) Stop
 p {answer.last()}

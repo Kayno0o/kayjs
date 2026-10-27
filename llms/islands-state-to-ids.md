@@ -9,7 +9,7 @@
 ### Shared and persisted state
 
 - A signal a `.ts` module exports is one state for every island of the page that imports it: `export const cart = signal<Item[]>([])` in `src/cart.ts`, read by a header badge and written by a product's button.
-- On the server a module outlives the request, so a value a page's, a layout's or an island's script writes to such a signal while the page renders, as `cart.set(items)` seeding it from props, holds for that request only, and everything rendered after it reads it.
+- On the server a module outlives the request, so a value a page's, a layout's or an island's script writes to such a signal while the page renders, as `cart = items` seeding it from props, holds for that request only, and everything rendered after it reads it.
 - A module's `memo` is computed afresh on each read on the server.
 - `persisted('theme', 'light')` from `kay` is a signal that keeps its value across pages and visits in a cookie named `theme`, which the server reads too, so a page rendered for the request shows the kept value from the first paint, and answers with `Vary: Cookie`.
 - A page `kay build` prerendered renders a `persisted` signal's default, and the island corrects it as it hydrates.

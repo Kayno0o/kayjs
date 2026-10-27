@@ -44,13 +44,13 @@ let asked = 0
 async function askReferrers(row: EntryRow): Promise<void> {
   const mine = ++asked
 
-  referrers.set({})
+  referrers = {}
 
   const found = await readReferrers(collection.name, [row.slug])
 
   // A later open took over while this one was on its way.
   if (mine === asked)
-    referrers.set(found)
+    referrers = found
 }
 
 // A field's column is keyed apart from the built-in ones, so a field named `title` or `actions` clashes with none.

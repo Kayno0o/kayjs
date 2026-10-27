@@ -13,7 +13,7 @@ const columns: Column<Moon>[] = [{ key: 'name', header: 'Name' }]
 const moons = signal<Moon[]>([])
 const addMoon = () => {
   const id = moons().length
-  moons.set([...moons(), { id, name: `Moon ${id + 1}` }])
+  moons = [...moons(), { id, name: `Moon ${id + 1}` }]
 }
 ---
 .flex.flex-col.items-start.gap-2

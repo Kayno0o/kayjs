@@ -8,7 +8,7 @@ function fail() {
     throw new ActionError(400, 'refused')
   }
   catch (error) {
-    message.set(error instanceof ActionError ? String(error.body) : 'other')
+    message = error instanceof ActionError ? String(error.body) : 'other'
   }
 }
 ---

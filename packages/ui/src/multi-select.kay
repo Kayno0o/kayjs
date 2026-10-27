@@ -72,7 +72,7 @@ const picked = signal<readonly Value[]>(value)
 const query = signal('')
 let root: HTMLElement | undefined
 
-effect(() => picked.set(value))
+effect(() => picked = value)
 
 const searchable = () => search ?? options.length > SEARCH_FROM
 const summary = () => selectionSummary(options, picked(), placeholder, selectedLabel ?? (count => wording('ui.multiSelect.selected', '{count} selected', { count })))
@@ -84,7 +84,7 @@ const shown = () => {
 }
 
 function set(next: Value[]) {
-  picked.set(next)
+  picked = next
   onChange?.(next)
 }
 
@@ -96,7 +96,7 @@ onFormReset(() => root, () => {
   const start = initial()
   const same = start.length === picked().length && start.every(one => picked().includes(one))
 
-  query.set('')
+  query = ''
 
   if (!same)
     set([...start])
@@ -115,7 +115,7 @@ function toggled(open: boolean) {
   if (open)
     root?.querySelector<HTMLInputElement>('[data-part=search], [data-part=checkbox]:not(:disabled)')?.focus()
   else
-    query.set('')
+    query = ''
 }
 
 // From the search box or the bar, ArrowDown reaches the first option; there the arrows, Home and End move between enabled options, which Tab would walk one by one.
@@ -151,7 +151,7 @@ div(part="root" {...rest} ref={ref})
         span(part="summary") {summary()}
         Icon(icon="chevron" part="chevron")
     if searchable()
-      input.kui-field-input(part="search" type="search" data-kui-search placeholder={searchLabel} aria-label={`${searchLabel} ${label}`} value={query()} onInput={event => query.set(event.currentTarget.value)})
+      input.kui-field-input(part="search" type="search" data-kui-search placeholder={searchLabel} aria-label={`${searchLabel} ${label}`} value={query()} onInput={event => query = event.currentTarget.value})
     div(part="bar")
       // Under a search, All and None pick and drop only the options it shows.
       button(part="action" type="button" disabled={shown().every(option => option.disabled || picked().includes(option.value))} onClick={() => set(pickedShown(options, picked(), shown(), true))}) {allLabel}

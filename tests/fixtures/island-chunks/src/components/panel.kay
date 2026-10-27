@@ -5,6 +5,6 @@ const { children: _children } = props<{ children?: Snippet }>()
 const open = signal(true)
 ---
 section.panel
-  button.toggle(onClick={() => open.set(!open())}) Toggle
+  button.toggle(onClick={() => open = !open()}) Toggle
   if open()
     slot

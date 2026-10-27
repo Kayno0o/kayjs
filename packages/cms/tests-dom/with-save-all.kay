@@ -9,7 +9,7 @@ const { entry } = props<{ entry: EntryRef }>()
 
 const shown = signal(true)
 ---
-button#hide(onClick={() => shown.set(false)}) Hide
+button#hide(onClick={() => shown = false}) Hide
 button#all(onClick={() => saveAll([entry])}) All
 if shown()
   EntryForm(entry={entry})

@@ -25,5 +25,5 @@ const hidden = signal<number[]>([])
 Table(columns={columns} rows={moons.filter(moon => !hidden().includes(moon.id))} rowKey="id" selectable)
   @bulk(keys)
     Button(label="Hide" onClick={() => {
-      hidden.set([...hidden(), ...keys as number[]])
+      hidden = [...hidden(), ...keys as number[]]
     }})

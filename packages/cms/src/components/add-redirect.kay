@@ -35,7 +35,7 @@ async function offer(text: string, wait = 0): Promise<void> {
   const paths = await fetchSitePaths(text)
 
   if (turn === asked)
-    offered.set(paths)
+    offered = paths
 }
 const add = editing ? wording('cms.redirects.save', 'Save') : wording('cms.missing.add', 'Add redirect')
 ---

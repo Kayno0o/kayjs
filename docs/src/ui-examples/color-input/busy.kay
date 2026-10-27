@@ -10,7 +10,7 @@ async function send(colour: string) {
   if (colour < '#404040')
     return false
 
-  light.set(colour)
+  light = colour
 }
 ---
 .flex.max-w-sm.flex-col.gap-2

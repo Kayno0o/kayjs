@@ -223,7 +223,7 @@ input(bind:value={name} placeholder="Your name")
 label
   input(type="checkbox" bind:checked={agree})
   |  I agree
-button(onClick={() => name.set('')}) Clear
+button(onClick={() => name = ''}) Clear
 ```
 
 `bind:value` and `bind:checked` read and write a signal both ways.

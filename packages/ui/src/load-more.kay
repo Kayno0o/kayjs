@@ -32,8 +32,8 @@ effect(() => {
   const total = list.rows().length
 
   if (total > seen) {
-    added.set(total - seen)
-    flip.set(!untrack(flip))
+    added = total - seen
+    flip = !untrack(flip)
   }
 
   seen = total

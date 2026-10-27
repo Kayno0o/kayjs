@@ -45,9 +45,9 @@ async function press() {
   if (!done)
     return
 
-  copied.set(true)
+  copied = true
   clearTimeout(timer)
-  timer = setTimeout(() => copied.set(false), durationMs(copiedFor))
+  timer = setTimeout(() => copied = false, durationMs(copiedFor))
 }
 ---
 button.kui-btn(part="root" {...rest} type="button" data-variant={variant} data-size={size} onClick={press})

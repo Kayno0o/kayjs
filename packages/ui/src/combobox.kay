@@ -78,12 +78,12 @@ effect(() => {
   const option = untrack(() => [...known(), ...found()].find(candidate => candidate.value === next))
   const chosen = option ?? (next ? { value: next, label: fallbackLabel(next) } : undefined)
 
-  picked.set(chosen)
-  text.set(chosen?.label ?? '')
+  picked = chosen
+  text = chosen?.label ?? ''
 })
 
 effect(() => {
-  enhanced.set(true)
+  enhanced = true
 })
 
 // A FormField wraps the control in its label, so the status line and the rows would join the input's name: it is named by the label's own text instead, and so is the list.
@@ -135,8 +135,8 @@ async function load(query: string) {
   const mine = ++request
 
   if (typeof options !== 'function' || query.trim().length < minLength) {
-    found.set([])
-    answered.set(query)
+    found = []
+    answered = query
 
     return
   }
@@ -147,17 +147,17 @@ async function load(query: string) {
     if (mine !== request)
       return
 
-    found.set(answer)
-    answered.set(query)
-    failed.set(false)
-    active.set(-1)
+    found = answer
+    answered = query
+    failed = false
+    active = -1
   }
   catch (error) {
     if (mine === request) {
       console.error('kayjs-ui: a Combobox could not load its options', error)
-      found.set([])
-      answered.set(query)
-      failed.set(true)
+      found = []
+      answered = query
+      failed = true
     }
   }
 }
@@ -177,16 +177,16 @@ effect(() => {
 // A new key drops the rows and the answer still on its way: they are for an older text.
 function type(next: string) {
   request++
-  open.set(true)
-  text.set(next)
-  active.set(-1)
-  failed.set(false)
+  open = true
+  text = next
+  active = -1
+  failed = false
 
   if (remote)
-    found.set([])
+    found = []
 
   if (picked()) {
-    picked.set(undefined)
+    picked = undefined
     onChange?.('', undefined)
   }
 }
@@ -198,10 +198,10 @@ function pick(index: number) {
   if (!option || option.disabled)
     return
 
-  picked.set(option)
-  text.set(option.label)
-  open.set(false)
-  active.set(-1)
+  picked = option
+  text = option.label
+  open = false
+  active = -1
 
   if (!row)
     onCreate?.(option.label)
@@ -219,8 +219,8 @@ function adopt(): boolean {
   if (!option)
     return false
 
-  picked.set(option)
-  text.set(option.label)
+  picked = option
+  text = option.label
   onChange?.(option.value, option)
 
   return true
@@ -228,20 +228,20 @@ function adopt(): boolean {
 
 function move(step: 1 | -1) {
   if (!open()) {
-    open.set(true)
+    open = true
 
     if (remote)
       void load(text())
   }
 
-  active.set(enabledIndex(flags(), active(), step))
+  active = enabledIndex(flags(), active(), step)
 }
 
 // The arrows move through the options with focus staying in the input, as the combobox pattern has it; Enter picks the active one, Escape closes the list and a second Escape clears the text.
 function keyDown(event: KeyboardEvent) {
   if (event.altKey && event.key === 'ArrowDown') {
     event.preventDefault()
-    open.set(true)
+    open = true
 
     return
   }
@@ -265,7 +265,7 @@ function keyDown(event: KeyboardEvent) {
       }
       else if (adopt()) {
         event.preventDefault()
-        open.set(false)
+        open = false
       }
 
       break
@@ -275,15 +275,15 @@ function keyDown(event: KeyboardEvent) {
         if (shown())
           event.preventDefault()
 
-        open.set(false)
-        active.set(-1)
+        open = false
+        active = -1
       }
       else if (text() !== '' || picked()) {
         const had = picked()
 
         event.preventDefault()
-        text.set('')
-        picked.set(undefined)
+        text = ''
+        picked = undefined
 
         if (had)
           onChange?.('', undefined)
@@ -299,7 +299,7 @@ function focusIn() {
   if (remote && (picked() || text().trim().length < minLength))
     return
 
-  open.set(true)
+  open = true
 
   if (remote && found().length === 0)
     void load(text())
@@ -308,8 +308,8 @@ function focusIn() {
 // A click on an option keeps focus in the input, so the list closes on focus leaving rather than on that press.
 function focusOut() {
   adopt()
-  open.set(false)
-  active.set(-1)
+  open = false
+  active = -1
 }
 
 effect(() => {
@@ -323,10 +323,10 @@ effect(() => {
 const initial = defaultKept(() => input, () => ({ text: text(), picked: picked() }), untrack(() => ({ text: text(), picked: picked() })))
 
 onFormReset(() => input, () => {
-  text.set(initial().text)
-  picked.set(initial().picked)
-  open.set(false)
-  active.set(-1)
+  text = initial().text
+  picked = initial().picked
+  open = false
+  active = -1
 })
 
 const ref = startRef<HTMLInputElement>(element => input = element, rest.ref)

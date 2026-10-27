@@ -13,4 +13,4 @@ const count = signal(0)
 form(action={check})
   input(field="name")
   button Check
-button.bump(type="button" onClick={() => count.set(count() + 1)}) {count()}
+button.bump(type="button" onClick={() => count = count() + 1}) {count()}

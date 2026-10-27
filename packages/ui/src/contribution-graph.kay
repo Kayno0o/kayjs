@@ -46,7 +46,7 @@ function keyDown(event: KeyboardEvent) {
     return
 
   event.preventDefault()
-  stop.set(next)
+  stop = next
 
   const target = (event.currentTarget as HTMLElement).querySelectorAll<HTMLElement>('[role="img"]')[next]
 
@@ -66,4 +66,4 @@ div(part="root" {...rest} role="group" aria-label={label} onKeyDown={keyDown} da
     for start of monthStarts(days.map(day => day.day)) key={start.column}
       span(part="month" aria-hidden="true" style={`grid-column: ${start.column + 1}`}) {start.label}
   for day, index of days key={day.day}
-    span(part="cell" role="img" tabindex={index === current() ? '0' : '-1'} aria-label={describe(day)} data-tooltip={describe(day)} data-today={day.day === today || undefined} style={style(day, index)} onFocus={() => stop.set(index)})
+    span(part="cell" role="img" tabindex={index === current() ? '0' : '-1'} aria-label={describe(day)} data-tooltip={describe(day)} data-today={day.day === today || undefined} style={style(day, index)} onFocus={() => stop = index})

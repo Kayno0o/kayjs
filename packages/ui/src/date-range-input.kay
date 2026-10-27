@@ -37,7 +37,7 @@ const { value = [null, null], min, max, firstDay, label, fromLabel, toLabel, fro
 
 const pair = signal<DateRange>(untrack(() => value))
 
-effect(() => pair.set(value))
+effect(() => pair = value)
 
 let root: HTMLElement | undefined
 
@@ -51,7 +51,7 @@ onFormReset(() => root, () => {
   if (start[0] === pair()[0] && start[1] === pair()[1])
     return
 
-  pair.set(start)
+  pair = start
   onChange?.(start)
 }, true)
 
@@ -64,7 +64,7 @@ function commit(from: string, to: string) {
   if (next[0] === pair()[0] && next[1] === pair()[1])
     return
 
-  pair.set(next)
+  pair = next
   onChange?.(next)
 }
 ---

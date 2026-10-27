@@ -18,14 +18,14 @@ const open = signal(false)
 const hint = signal('Ctrl K')
 
 // The palette opens on Ctrl or Cmd K itself; / opens it too, as on most docs sites.
-shortcut('/', () => open.set(true))
+shortcut('/', () => open = true)
 
 onMount(() => {
   if (navigator.platform.startsWith('Mac'))
-    hint.set('Cmd K')
+    hint = 'Cmd K'
 })
 ---
-button.search-trigger(type="button" aria-haspopup="dialog" onClick={() => open.set(true)})
+button.search-trigger(type="button" aria-haspopup="dialog" onClick={() => open = true})
   SearchIcon
   span Search
   kbd {hint()}

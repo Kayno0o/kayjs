@@ -5,14 +5,14 @@ import Pencil from '~icons/tabler/pencil'
 
 const picked = signal('nothing yet')
 const items: MenuEntry[] = [
-  { label: 'Rename', icon: Pencil, onSelect: () => picked.set('Rename') },
-  { label: 'Duplicate', onSelect: () => picked.set('Duplicate') },
+  { label: 'Rename', icon: Pencil, onSelect: () => picked = 'Rename' },
+  { label: 'Duplicate', onSelect: () => picked = 'Duplicate' },
   'separator',
   {
     label: 'Delete',
     icon: 'delete',
     danger: true,
-    onSelect: () => picked.set('Delete'),
+    onSelect: () => picked = 'Delete',
   },
 ]
 ---

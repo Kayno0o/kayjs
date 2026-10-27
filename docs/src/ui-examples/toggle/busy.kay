@@ -10,7 +10,7 @@ const saved = signal(false)
     checked={saved()}
     onChange={async (next) => {
       await wait(800)
-      saved.set(next)
+      saved = next
     }}
   )
   p Saved as {saved() ? 'on' : 'off'}.

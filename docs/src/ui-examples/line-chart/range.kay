@@ -11,6 +11,6 @@ const span = signal('none yet')
     labels={labels}
     series={series}
     xLabels
-    onRange={(from, to) => span.set(`${labels[from]} to ${labels[to]}`)}
+    onRange={(from, to) => span = `${labels[from]} to ${labels[to]}`}
   )
   p.text-muted Picked: {span()}.

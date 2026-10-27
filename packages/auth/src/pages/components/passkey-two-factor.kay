@@ -10,10 +10,10 @@ const supported = signal(false)
 const error = signal('')
 
 // Shown once the browser proves it can, since a passkey needs script.
-onMount(() => supported.set(canAskPasskey()))
+onMount(() => supported = canAskPasskey())
 
 async function verify() {
-  error.set('')
+  error = ''
 
   try {
     const options = await passkeyOptions({}, { refresh: false })
@@ -23,7 +23,7 @@ async function verify() {
       await passkey({ response })
   }
   catch (caught) {
-    error.set(passkeyFailure(caught, {}, failed))
+    error = passkeyFailure(caught, {}, failed)
   }
 }
 ---

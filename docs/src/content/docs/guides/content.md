@@ -414,7 +414,7 @@ import { markdownHtml } from 'kay/markdown'
 
 const text = signal('')
 ---
-textarea(aria-label="Note" value={text()} onInput={e => text.set(e.currentTarget.value)})
+textarea(aria-label="Note" value={text()} onInput={e => text = e.currentTarget.value})
 div(innerHTML={markdownHtml(text())})
 ```
 

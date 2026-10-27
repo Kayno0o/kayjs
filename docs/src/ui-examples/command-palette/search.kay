@@ -29,7 +29,7 @@ const entries: PaletteEntry[] = [
 ]
 ---
 .flex.flex-wrap.items-center.gap-3
-  Button(label="Open the palette" onClick={() => open.set(true)})
+  Button(label="Open the palette" onClick={() => open = true})
   p.text-muted Try "csv" or "invoice".
 CommandPalette(
   open={open()}

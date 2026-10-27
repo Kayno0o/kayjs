@@ -9,4 +9,4 @@ function shown(): string {
   return label
 }
 ---
-button(onClick={() => count.set(count() + 1)}) {shown()} {count()}
+button(onClick={() => count = count() + 1}) {shown()} {count()}

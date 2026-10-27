@@ -8,7 +8,7 @@ const describe = (file: File) =>
 FileDrop(
   paste
   accept="image/*"
-  onFiles={files => received.set(files.map(describe))}
+  onFiles={files => received = files.map(describe)}
 )
   @content(zone)
     .rounded-lg.border.border-dashed.border-muted(

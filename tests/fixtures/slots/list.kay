@@ -4,6 +4,6 @@ import type { Snippet } from 'kay'
 const { items, row } = props<{ items: string[], row: Snippet<[item: string]> }>()
 const reversed = signal(false)
 ---
-ul.list(onClick={() => reversed.set(!reversed())})
+ul.list(onClick={() => reversed = !reversed()})
   for item of reversed() ? items.toReversed() : items
     li {row(item)}

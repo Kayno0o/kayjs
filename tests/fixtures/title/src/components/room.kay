@@ -4,10 +4,10 @@ const name = signal(label)
 
 onMount(() => {
   // Lets a test change the title from outside the island, as a socket message would, after the island's page is left.
-  ;(window as { kayFlip?: () => void }).kayFlip = () => name.set('Stale')
+  ;(window as { kayFlip?: () => void }).kayFlip = () => name = 'Stale'
 })
 ---
 head
   title {name()}
-button.rename(onClick={() => name.set('Beta')}) Rename
-button.clear(onClick={() => name.set('')}) Clear
+button.rename(onClick={() => name = 'Beta'}) Rename
+button.clear(onClick={() => name = ''}) Clear

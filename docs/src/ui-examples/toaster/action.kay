@@ -6,9 +6,9 @@ const saving = signal(false)
 let attempts = 0
 
 async function save() {
-  saving.set(true)
+  saving = true
   await new Promise(resolve => setTimeout(resolve, 800))
-  saving.set(false)
+  saving = false
   attempts += 1
 
   if (attempts % 2 === 0)

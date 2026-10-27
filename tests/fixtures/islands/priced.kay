@@ -12,4 +12,4 @@ section.priced
       | {name}: {price}
       if stock < 3
         span.badge {stock} left
-  button.rate(onClick={() => rate.set(2)}) Double
+  button.rate(onClick={() => rate = 2}) Double

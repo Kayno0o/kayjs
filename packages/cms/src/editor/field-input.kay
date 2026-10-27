@@ -102,10 +102,10 @@ effect(() => {
 
   void (async () => {
     try {
-      choices.set(await referenceChoices(target))
+      choices = await referenceChoices(target)
     }
     catch {
-      choices.set(null)
+      choices = null
     }
   })()
 })
@@ -232,7 +232,7 @@ function boundsText(): string | undefined {
 
 // The folds follow the items they were made on: every change of the list says how it moved them.
 function mirror(change: (list: boolean[]) => boolean[]): void {
-  folded.set(change(items().map((_, at) => foldedAt(at))))
+  folded = change(items().map((_, at) => foldedAt(at)))
 }
 
 // A change made on the page moves the folds as the form's own do.
@@ -249,7 +249,7 @@ function append(value: unknown): void {
   if (held() || atMax())
     return
 
-  removed.set(undefined)
+  removed = undefined
   set([...items(), value])
   focusItem(rows, count() - 1)
 }
@@ -260,7 +260,7 @@ function prepend(type?: string): void {
 
   const block = list.blocks?.find(found => found.type === type)
 
-  removed.set(undefined)
+  removed = undefined
   mirror(states => [false, ...states])
   set([block ? emptyBlock(block) : emptyValue(list.item), ...items()])
   focusItem(rows, 0)
@@ -286,7 +286,7 @@ function duplicate(at: number): void {
   if (held() || atMax())
     return
 
-  removed.set(undefined)
+  removed = undefined
   mirror(states => states.toSpliced(at + 1, 0, false))
   set(items().toSpliced(at + 1, 0, structuredClone(items()[at])))
   focusItem(rows, at + 1)
@@ -298,7 +298,7 @@ function remove(at: number): void {
 
   const title = itemTitle(list, items()[at], at)
 
-  removed.set({ at, title, value: items()[at] })
+  removed = { at, title, value: items()[at] }
   announce(wording('cms.list.removed', '{item} removed', { item: title }))
   mirror(states => states.filter((_, place) => place !== at))
   set(items().filter((_, place) => place !== at))
@@ -313,7 +313,7 @@ function undo(): void {
 
   const at = Math.min(gone.at, count())
 
-  removed.set(undefined)
+  removed = undefined
   mirror(states => states.toSpliced(at, 0, false))
   set(items().toSpliced(at, 0, gone.value))
   focusItem(rows, at)
@@ -326,7 +326,7 @@ function moveItem(from: number, to: number): void {
 
   const title = list ? itemTitle(list, items()[from], from) : ''
 
-  removed.set(undefined)
+  removed = undefined
   mirror(states => reordered(states, from, to))
   set(reordered(items(), from, to))
 
@@ -501,7 +501,7 @@ function leaveJson(): void {
     when 'select'
       if current.options.length > SEARCH_FROM
         FormField(label={current.label} hint={current.hint} issue={issue()} required={starred()} group)
-          TextInput(type="search" aria-label={wording('cms.field.search', 'Search {field}', { field: current.label })} placeholder={wording('cms.field.search', 'Search {field}', { field: current.label })} value={search()} onInput={next => search.set(next)})
+          TextInput(type="search" aria-label={wording('cms.field.search', 'Search {field}', { field: current.label })} placeholder={wording('cms.field.search', 'Search {field}', { field: current.label })} value={search()} onInput={next => search = next})
           Select(aria-label={current.label} required={starred()} value={text()} options={matching(current.options)} emptyOption={!current.required || value() === undefined} onChange={next => set(current.options.find(option => option.value === next)?.raw ?? cleared)})
       else
         FormField(label={current.label} hint={current.hint} issue={issue()} required={starred()})

@@ -4,9 +4,9 @@ import Dialog from '@kaynooo/kayjs-ui/dialog.kay'
 
 const editing = signal(false)
 ---
-Button(label="Rename" onClick={() => editing.set(true)})
-Dialog(open={editing()} title="Rename" onOpenChange={() => editing.set(false)})
+Button(label="Rename" onClick={() => editing = true})
+Dialog(open={editing()} title="Rename" onOpenChange={() => editing = false})
   @footer
-    Button(label="Cancel" onClick={() => editing.set(false)})
-    Button(label="Rename" tone="accent" onClick={() => editing.set(false)})
+    Button(label="Cancel" onClick={() => editing = false})
+    Button(label="Rename" tone="accent" onClick={() => editing = false})
   input.kui-field-input(name="name" aria-label="Name")

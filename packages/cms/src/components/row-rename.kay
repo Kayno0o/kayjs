@@ -21,13 +21,13 @@ const referrers = signal<string[]>([])
 
 async function start(): Promise<void> {
   open = true
-  held.set(undefined)
-  referrers.set([])
+  held = undefined
+  referrers = []
 
   const [slugs, named] = await Promise.all([readHeldSlugs(collection.name), readReferrers(collection.name, [row.slug])])
 
-  held.set(slugs)
-  referrers.set(named[row.slug] ?? [])
+  held = slugs
+  referrers = named[row.slug] ?? []
 }
 
 async function rename(slug: string, onRefused: (message: string) => void): Promise<boolean> {

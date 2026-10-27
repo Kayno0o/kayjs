@@ -7,7 +7,7 @@ const name = signal('')
 FileDrop(
   accept="image/*"
   size="sm"
-  onFiles={files => name.set(files[0]!.name)}
+  onFiles={files => name = files[0]!.name}
 )
   @content(zone)
     Button(label="Choose a favicon" onClick={zone.open})

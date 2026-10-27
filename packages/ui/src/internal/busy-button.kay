@@ -27,7 +27,7 @@ async function press(event: MouseEvent) {
   if (!isPromiseLike(answer))
     return
 
-  pending.set(true)
+  pending = true
 
   // Logged rather than thrown, as a Toggle's: the button coming back is what the user sees.
   try {
@@ -37,7 +37,7 @@ async function press(event: MouseEvent) {
     console.error('kayjs-ui: a Button\'s onClick failed', error)
   }
   finally {
-    pending.set(false)
+    pending = false
   }
 }
 ---

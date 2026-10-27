@@ -39,7 +39,7 @@ const owns = claim('toaster')
 // The toasts outlive a page swap, so one on screen when the next page's Toaster hydrates is not in the server markup: shown from the mount on, hydration meets the markup it was given.
 const mounted = signal(false)
 
-onMount(() => mounted.set(true))
+onMount(() => mounted = true)
 
 function listed() {
   return mounted() ? toasts() : []
@@ -97,7 +97,7 @@ if owns()
     for item of listed().filter(item => toneOf(item) === 'danger') key={item.id}
       span {item.message}
   // Holding still while the pointer is on the toasts or focus is in them, as timed content must let itself be paused.
-  div(part="root" ref={element => toaster.set(element)} popover="manual" onPointerEnter={() => holdToasts('pointer', true)} onPointerLeave={() => holdToasts('pointer', false)} onFocusIn={() => holdToasts('focus', true)} onFocusOut={event => toaster()?.contains(event.relatedTarget as Node | null) || holdToasts('focus', false)})
+  div(part="root" ref={element => toaster = element} popover="manual" onPointerEnter={() => holdToasts('pointer', true)} onPointerLeave={() => holdToasts('pointer', false)} onFocusIn={() => holdToasts('focus', true)} onFocusOut={event => toaster()?.contains(event.relatedTarget as Node | null) || holdToasts('focus', false)})
     for item of listed() key={item.id}
       div(part="toast" data-id={item.id} data-tone={toneOf(item)} data-type={item.type} onKeyDown={dismissed})
         Icon(icon={ICONS[item.type]} part="icon")

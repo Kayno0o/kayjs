@@ -9,7 +9,7 @@ const { entries, unclickable } = props<EditorProps>()
 
 const clicks = signal(0)
 const issues = signal('')
-const show = async (entries: DraftEntry[]) => issues.set(JSON.stringify((await showDraft(entries)).issues ?? []))
+const show = async (entries: DraftEntry[]) => issues = JSON.stringify((await showDraft(entries)).issues ?? [])
 const draft = async (data: unknown, body?: string) => show([{ collection: 'news', slug: 'launch', data, body }])
 ---
 button.count(onClick={() => clicks.set(n => n + 1)}) Clicked {clicks()}

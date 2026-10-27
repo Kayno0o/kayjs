@@ -6,7 +6,7 @@ const open = signal(initial)
 ---
 section.panel
   header
-    button.toggle(onClick={() => open.set(!open())}) Toggle
+    button.toggle(onClick={() => open = !open()}) Toggle
     | {actions}
   if open()
     div.body

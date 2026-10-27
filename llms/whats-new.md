@@ -2,6 +2,10 @@
 
 What each release of kay and its libraries adds, newest first, each feature with where it is documented. kay and its libraries share one version, so one section covers them all; what a release breaks is in [Upgrading](upgrading.md).
 
+## Unreleased
+
+- `kay check` reports `signal-set-call`, a signal written `count.set(value)` where assigning it, `count = value`, does the same, and `--fix` assigns it: [Signals](components.md#signals).
+
 ## 1.79.0
 
 - The `kay` preset of `@kaynooo/eslint` (7.1.4) turns `ts/await-thenable` off in an app's test files, so `await expect(...).rejects...` lints clean with no override: [Lint with ESLint](checks.md#lint-the-script-fences-and-template-expressions-with-eslint).

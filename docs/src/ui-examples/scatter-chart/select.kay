@@ -10,7 +10,7 @@ const points = [
 
 const picked = signal('Pick a dot')
 const pick = (point: { label: string, x: number, y: number }) =>
-  picked.set(`${point.label}: ${point.x} h, score ${point.y}`)
+  picked = `${point.label}: ${point.x} h, score ${point.y}`
 ---
 .flex.flex-col.gap-2.max-w-xl
   ScatterChart(

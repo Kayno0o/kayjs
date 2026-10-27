@@ -4,7 +4,7 @@ import type { Snippet } from 'kay'
 const { children } = props<{ children?: Snippet }>()
 const open = signal(true)
 ---
-button.toggle(onClick={() => open.set(!open())}) Toggle
+button.toggle(onClick={() => open = !open()}) Toggle
 if open()
   div.body
     slot

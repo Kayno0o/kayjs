@@ -6,21 +6,21 @@ const open = signal(false)
 const saving = signal(false)
 
 function save() {
-  saving.set(true)
+  saving = true
   setTimeout(() => {
-    saving.set(false)
-    open.set(false)
+    saving = false
+    open = false
   }, 2000)
 }
 ---
-Button(label="Publish" onClick={() => open.set(true)})
+Button(label="Publish" onClick={() => open = true})
 Dialog(
   open={open()}
   title="Publish the post"
   dirty={saving()}
-  onOpenChange={() => open.set(false)}
+  onOpenChange={() => open = false}
 )
   @footer
-    Button(label="Cancel" onClick={() => open.set(false)})
+    Button(label="Cancel" onClick={() => open = false})
     Button(label="Publish" tone="accent" busy={saving()} onClick={save})
   p Publishing takes two seconds, and the dialog ignores Escape while it runs.

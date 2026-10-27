@@ -51,7 +51,7 @@ let request = 0
 let shownQuery = ''
 let nextOffset = 0
 
-effect(() => picked.set(value))
+effect(() => picked = value)
 
 effect(() => {
   const next = typed()
@@ -67,7 +67,7 @@ effect(() => void load(query(), 0))
 async function load(needle: string, offset: number) {
   const mine = ++request
 
-  pending.set(true)
+  pending = true
 
   try {
     const found = await search(needle, PAGE_SIZE, offset)
@@ -82,21 +82,21 @@ async function load(needle: string, offset: number) {
     nextOffset = offset + found.length
 
     batch(() => {
-      icons.set(offset === 0 ? found : [...icons(), ...fresh])
+      icons = offset === 0 ? found : [...icons(), ...fresh]
       // An app that ignores the offset gives the same page again: nothing new ends the paging.
-      more.set(found.length >= PAGE_SIZE && fresh.length > 0)
-      failed.set(false)
+      more = found.length >= PAGE_SIZE && fresh.length > 0
+      failed = false
     })
   }
   catch (error) {
     if (mine === request) {
       console.error('kayjs-ui: an IconPicker\'s search failed', error)
-      failed.set(true)
+      failed = true
     }
   }
   finally {
     if (mine === request)
-      pending.set(false)
+      pending = false
   }
 }
 
@@ -109,7 +109,7 @@ function showMore() {
 const chosen = () => icons().find(choice => choice.name === picked())?.icon ?? (last()?.name === picked() ? last()?.icon : undefined)
 
 function pick(next: string) {
-  picked.set(next)
+  picked = next
   onChange?.(next)
 
   if (!hidden)
@@ -128,14 +128,14 @@ const initial = defaultKept(() => searchBox, picked, value)
 
 // The hidden input is no default of its own to reset to, so a reset sends the picker back to `initial`, and empties the search the browser emptied.
 onFormReset(() => searchBox, () => {
-  typed.set('')
+  typed = ''
 
   if (picked() !== initial())
     pick(initial())
 })
 
 function choose(choice: IconChoice) {
-  last.set(choice)
+  last = choice
   pick(picked() === choice.name ? '' : choice.name)
 }
 
@@ -148,7 +148,7 @@ function keepEnter(event: KeyboardEvent) {
 div(part="root" {...rest} ref={ref})
   if name
     input(type="hidden" name={name} value={picked()} ref={element => hidden = element})
-  input.kui-field-input(part="search" ref={element => searchBox = element} type="search" data-kui-search placeholder={placeholder} aria-label={searchLabel} value={typed()} onInput={event => typed.set(event.currentTarget.value)} onKeyDown={keepEnter})
+  input.kui-field-input(part="search" ref={element => searchBox = element} type="search" data-kui-search placeholder={placeholder} aria-label={searchLabel} value={typed()} onInput={event => typed = event.currentTarget.value} onKeyDown={keepEnter})
   ul(part="grid" aria-label={gridLabel} aria-busy={pending() ? 'true' : undefined})
     for choice of icons() key={choice.name}
       li(part="item")

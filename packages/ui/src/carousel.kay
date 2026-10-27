@@ -52,9 +52,9 @@ const root = signal<HTMLElement>()
 // The visitor's own pause, which nothing but the button lifts.
 const paused = signal(false)
 
-const ref = startRef<HTMLElement>(element => root.set(element), rest.ref)
+const ref = startRef<HTMLElement>(element => root = element, rest.ref)
 
-effect(() => shown.set(index))
+effect(() => shown = index)
 
 effect(() => {
   const element = root()
@@ -62,7 +62,7 @@ effect(() => {
   if (!autoplay || !element || typeof IntersectionObserver === 'undefined')
     return
 
-  const observer = new IntersectionObserver(entries => offscreen.set(!entries.at(-1)!.isIntersecting))
+  const observer = new IntersectionObserver(entries => offscreen = !entries.at(-1)!.isIntersecting)
 
   observer.observe(element)
   onCleanup(() => observer.disconnect())
@@ -78,7 +78,7 @@ if (autoplay)
 const active = () => stepIndex(shown(), 0, slides.length)
 
 function go(next: number) {
-  shown.set(next)
+  shown = next
   onIndexChange?.(next)
 }
 
@@ -90,7 +90,7 @@ function numbered(text: string, position: number) {
   return text.replaceAll('{n}', String(position + 1)).replaceAll('{count}', String(slides.length))
 }
 ---
-section(part="root" {...rest} ref={ref} aria-roledescription="carousel" aria-label={label} onPointerEnter={() => pointed.set(true)} onPointerLeave={() => pointed.set(false)} onFocusIn={() => focused.set(true)} onFocusOut={() => focused.set(false)})
+section(part="root" {...rest} ref={ref} aria-roledescription="carousel" aria-label={label} onPointerEnter={() => pointed = true} onPointerLeave={() => pointed = false} onFocusIn={() => focused = true} onFocusOut={() => focused = false})
   div(part="viewport" style={`aspect-ratio: ${ratio}`} aria-live={autoplay ? 'off' : 'polite'})
     for slide, position of slides key={slide.src}
       div(part="slide" role="group" aria-roledescription="slide" aria-label={numbered(slideLabel, position)} aria-hidden={position === active() ? undefined : 'true'} inert={position !== active()} style={`transform: translateX(${(position - active()) * 100}%)`})
@@ -103,4 +103,4 @@ section(part="root" {...rest} ref={ref} aria-roledescription="carousel" aria-lab
         button(part="dot" type="button" aria-label={numbered(dotLabel, position)} aria-current={position === active() ? 'true' : undefined} onClick={() => go(position)})
       IconButton(icon="chevron" label={nextLabel} variant="ghost" part="step" data-side="next" onClick={() => step(1)})
       if autoplay
-        IconButton(icon={paused() ? 'play' : 'pause'} label={paused() ? playLabel : pauseLabel} variant="ghost" part="pause" onClick={() => paused.set(!paused())})
+        IconButton(icon={paused() ? 'play' : 'pause'} label={paused() ? playLabel : pauseLabel} variant="ghost" part="pause" onClick={() => paused = !paused()})

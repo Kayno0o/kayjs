@@ -59,7 +59,7 @@ function put(next: Plate) {
   if (next.scale === was.scale && next.x === was.x && next.y === was.y)
     return
 
-  plate.set(next)
+  plate = next
   onChange?.(next)
 }
 
@@ -117,7 +117,7 @@ function move(event: PointerEvent) {
     return
 
   if (!dragging()) {
-    dragging.set(true)
+    dragging = true
     pane?.setPointerCapture(event.pointerId)
   }
 
@@ -136,7 +136,7 @@ function drop(event: PointerEvent) {
 
   if (points.size === 0) {
     grabbedAt = undefined
-    dragging.set(false)
+    dragging = false
   }
 }
 

@@ -66,19 +66,19 @@ function dragOver(event: DragEvent) {
     return
 
   event.preventDefault()
-  dragging.set(true)
+  dragging = true
 }
 
 // Leaving for a child of the zone is no leaving at all, which is what made the highlight flicker over a zone with content.
 function dragLeave(event: DragEvent) {
   if (!(event.currentTarget as HTMLElement).contains(event.relatedTarget as Node | null))
-    dragging.set(false)
+    dragging = false
 }
 
 function drop(event: DragEvent) {
   const files = event.dataTransfer?.files
 
-  dragging.set(false)
+  dragging = false
 
   if (!files?.length)
     return

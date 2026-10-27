@@ -42,7 +42,7 @@ formIssues.provide(issues)
 // The dialog drops its content once closed, which empties the form; however it closed, its messages are cleared too, so the next open starts afresh.
 effect(() => {
   if (!open)
-    issues.set({})
+    issues = {}
 })
 
 async function submit(event: SubmitEvent) {

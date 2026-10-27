@@ -87,7 +87,7 @@ function keyDown(event: KeyboardEvent) {
     return
 
   event.preventDefault()
-  stop.set(next)
+  stop = next
 
   const target = (event.currentTarget as HTMLElement).parentElement?.children[next]
 
@@ -108,7 +108,7 @@ else
           span(part="tick") {formatValue(tick.ratio * ratios().top)}
       div(part="columns")
         for _, at of labels key={at}
-          span(part="column" role="img" tabindex={at === current() ? '0' : '-1'} aria-label={summaries()[at]} data-tooltip={summaries()[at]} data-stacked={stacked ? '' : undefined} onKeyDown={keyDown} onFocus={() => stop.set(at)})
+          span(part="column" role="img" tabindex={at === current() ? '0' : '-1'} aria-label={summaries()[at]} data-tooltip={summaries()[at]} data-stacked={stacked ? '' : undefined} onKeyDown={keyDown} onFocus={() => stop = at})
             for item, index of series key={item.name}
               if ratios().heights[index]![at]
                 span(part="bar" data-stacked={stacked ? '' : undefined} style={`height: ${ratios().heights[index]![at]! * 100}%; background-color: ${colors(item, index, at)}`})

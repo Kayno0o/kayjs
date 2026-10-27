@@ -69,18 +69,18 @@ function keyDown(event: KeyboardEvent) {
 
   const next = move(at, buttons.length)
 
-  stop.set(next)
+  stop = next
   buttons[next]?.focus()
 }
 
 // A click does not focus a button in every browser, so the button clicked becomes the stop here.
 function preview() {
-  stop.set(actions.length)
+  stop = actions.length
   onPreview()
 }
 ---
 .kui-markdown-tools(onKeyDown={keyDown})
   for action, index of actions key={action}
-    IconButton(icon={ICONS[action]} label={labels[action]} variant="ghost" size="sm" tabindex={tabStop(index)} onFocus={() => stop.set(index)} onClick={() => onAction(action)})
+    IconButton(icon={ICONS[action]} label={labels[action]} variant="ghost" size="sm" tabindex={tabStop(index)} onFocus={() => stop = index} onClick={() => onAction(action)})
 if hasPreview
-  IconButton.kui-markdown-toggle(icon={eye} label={wording('ui.markdownEditor.preview', 'Preview')} variant="ghost" size="sm" aria-pressed={previewing ? 'true' : 'false'} tabindex={tabStop(actions.length)} onFocus={() => stop.set(actions.length)} onKeyDown={keyDown} onClick={preview})
+  IconButton.kui-markdown-toggle(icon={eye} label={wording('ui.markdownEditor.preview', 'Preview')} variant="ghost" size="sm" aria-pressed={previewing ? 'true' : 'false'} tabindex={tabStop(actions.length)} onFocus={() => stop = actions.length} onKeyDown={keyDown} onClick={preview})

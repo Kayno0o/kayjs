@@ -4,6 +4,6 @@ import SidePanel from '@kaynooo/kayjs-ui/side-panel.kay'
 
 const open = signal(false)
 ---
-Button(label="Show details" onClick={() => open.set(true)})
-SidePanel(open={open()} modal={false} title="Io" onOpenChange={() => open.set(false)})
+Button(label="Show details" onClick={() => open = true})
+SidePanel(open={open()} modal={false} title="Io" onOpenChange={() => open = false})
   p The page stays usable while this panel is open.

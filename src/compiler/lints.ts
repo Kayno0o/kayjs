@@ -322,6 +322,13 @@ export const LINTS = {
     wrong: '---\nimport { signal } from \'kay\'\n\nconst title = signal(\'Todos\')\n---\nh1 {title()}',
     right: '---\nconst title = \'Todos\'\n---\nh1 {title}',
   },
+  'signal-set-call': {
+    level: 'warn',
+    group: 'islands',
+    summary: 'A signal written by calling `.set(value)` where assigning it, `open = true`, compiles to the same call. An updater written inline, `count.set(c => c * 2)`, stays a call. `kay check --fix` assigns it.',
+    wrong: '---\nimport { signal } from \'kay\'\n\nconst open = signal(false)\n---\nbutton(onClick={() => open.set(true)}) Open\nif open()\n  p Opened',
+    right: '---\nimport { signal } from \'kay\'\n\nconst open = signal(false)\n---\nbutton(onClick={() => open = true}) Open\nif open()\n  p Opened',
+  },
   'server-only-import': {
     level: 'deny',
     group: 'islands',

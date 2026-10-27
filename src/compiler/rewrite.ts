@@ -385,6 +385,40 @@ class RewriteFinder {
     this.diagnostics.push({ start: source, end, code: 'uncalled-signal', checkOnly: true, message: `\`${name}\` is ${kind === 'live' ? 'a live value' : `a ${kind}`}, read by calling it`, help: `\`${name}()\``, fixes: [{ title: `Call \`${name}\``, edits: [{ start: end, end, text: shorthand ? `: ${name}()` : '()' }], safe: true }] })
   }
 
+  // Reports `count.set(value)` standing as a statement or an arrow's body when checking a project, its fix assigning `count = value`, which compiles to the same call.
+  // An updater written inline, `count.set(c => c + 1)`, stays a call.
+  private reportSetCall(reference: NodePath, name: string) {
+    const { input: { map, check } } = this
+    const member = reference.parentPath
+    const call = member?.parentPath
+
+    if (!check || !member?.isMemberExpression() || member.node.object !== reference.node || member.node.computed || member.node.property.type !== 'Identifier' || member.node.property.name !== 'set')
+      return
+
+    if (!call?.isCallExpression() || call.node.callee !== member.node || call.node.arguments.length !== 1)
+      return
+
+    const [value] = call.node.arguments as [t.Node]
+    const holder = call.parent
+
+    if (value.type === 'SpreadElement' || value.type === 'ArrowFunctionExpression' || value.type === 'FunctionExpression' || call.node.extra?.trailingComma !== undefined)
+      return
+
+    if (holder.type !== 'ExpressionStatement' && !(holder.type === 'ArrowFunctionExpression' && holder.body === call.node))
+      return
+
+    // Babel leaves a parenthesized argument's parentheses out of its span, so the value runs from the first one to the call's closing parenthesis.
+    const valueFrom = (value.extra?.parenStart as number | undefined) ?? value.start!
+    const offsets = [reference.node.start!, reference.node.end! - 1, valueFrom, call.node.end! - 1]
+
+    if (!offsets.every(offset => map.isExact(offset)))
+      return
+
+    const [start, nameEnd, valueStart, callEnd] = offsets.map(offset => map.toSource(offset)) as [number, number, number, number]
+
+    this.diagnostics.push({ start, end: callEnd + 1, code: 'signal-set-call', checkOnly: true, message: `\`${name}\` is a signal, written by assigning it`, help: `\`${name} = ...\``, fixes: [{ title: `Assign \`${name}\``, edits: [{ start: nameEnd + 1, end: valueStart, text: ' = ' }, { start: callEnd, end: callEnd + 1, text: '' }], safe: true }] })
+  }
+
   // Text added at `at`, after a rewrite ending there or before one starting there.
   private insert(at: number, text: string, probe?: Span) {
     const found = this.rewrites.get(at)
@@ -522,6 +556,9 @@ class RewriteFinder {
 
       if (uncalled !== undefined)
         this.reportUncalled(reference, uncalled, name, kind)
+
+      if (kind === 'signal')
+        this.reportSetCall(reference, name)
 
       if (kind === 'live') {
         this.reportLiveWrite(reference, name)

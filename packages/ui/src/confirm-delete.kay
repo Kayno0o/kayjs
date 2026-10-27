@@ -69,7 +69,7 @@ function setOpen(next: boolean) {
   if (open() === next)
     return
 
-  open.set(next)
+  open = next
   onOpenChange?.(next)
 }
 
@@ -86,11 +86,11 @@ function close() {
 }
 
 async function confirm() {
-  pending.set(true)
+  pending = true
 
   const done = await attempt(async () => onConfirm(), { failure, success, refused })
 
-  pending.set(false)
+  pending = false
 
   if (done)
     close()

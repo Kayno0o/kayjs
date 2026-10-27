@@ -48,22 +48,22 @@ function send() {
 // A frame that stops answering the page's pings is stuck in the code it was given, at once or later: it is replaced, which ends that code, and the code is not sent again until the next edit.
 function stuck() {
   compiled = undefined
-  markup.set('')
-  shownInFrame.set('')
-  failure.set(`The code stopped responding for ${RUN_LIMIT_MS / 1000} seconds, so the box was reset. Edit the code to run it again, or reload the page if the box stays blank.`)
+  markup = ''
+  shownInFrame = ''
+  failure = `The code stopped responding for ${RUN_LIMIT_MS / 1000} seconds, so the box was reset. Edit the code to run it again, or reload the page if the box stays blank.`
   dropFrame()
   revive = setTimeout(showFrame, 0)
 }
 
 function dropFrame() {
   frame = undefined
-  ready.set(false)
-  framed.set(false)
+  ready = false
+  framed = false
 }
 
 function showFrame() {
-  generation.set(generation() + 1)
-  framed.set(true)
+  generation = generation() + 1
+  framed = true
 }
 
 // A page kept for the back button keeps its frame, and Chromium starts a new frame of the same site in the process of one that lives: a frame left behind would be the process a later hung frame is replaced in. So the frame goes with the page and comes back with it.
@@ -112,8 +112,8 @@ function build() {
     // A source too long for an address stays out of it.
   }
 
-  problems.set(result.problems)
-  failure.set('')
+  problems = result.problems
+  failure = ''
 
   if (result.server === undefined || result.dom === undefined)
     return
@@ -123,13 +123,13 @@ function build() {
 }
 
 function run() {
-  held.set(false)
+  held = false
   send()
 }
 
 function edit(value: string) {
-  held.set(false)
-  source.set(value)
+  held = false
+  source = value
   clearTimeout(timer)
   timer = setTimeout(build, DEBOUNCE_MS)
 }
@@ -141,14 +141,14 @@ function heard(event: MessageEvent<{ ready?: boolean, pong?: boolean, id?: numbe
   seen()
 
   if (event.data.ready) {
-    ready.set(true)
+    ready = true
     send()
 
     return
   }
 
   if (event.data.shown !== undefined) {
-    shownInFrame.set(event.data.shown)
+    shownInFrame = event.data.shown
 
     return
   }
@@ -156,9 +156,9 @@ function heard(event: MessageEvent<{ ready?: boolean, pong?: boolean, id?: numbe
   if (event.data.id !== sent)
     return
 
-  markup.set(event.data.html ?? '')
-  shownInFrame.set(event.data.live ?? '')
-  failure.set(event.data.error ?? '')
+  markup = event.data.html ?? ''
+  shownInFrame = event.data.live ?? ''
+  failure = event.data.error ?? ''
 }
 
 // Code from the address waits for Run, whether the page opened on it or a link to it was pasted onto the page.
@@ -168,8 +168,8 @@ function openLinked() {
   if (given === undefined)
     return
 
-  source.set(given)
-  held.set(true)
+  source = given
+  held = true
   clearTimeout(timer)
   timer = setTimeout(build, DEBOUNCE_MS)
 }
@@ -189,10 +189,10 @@ onMount(async () => {
     build()
   }
   catch (error) {
-    failure.set(error instanceof Error ? error.message : String(error))
+    failure = error instanceof Error ? error.message : String(error)
   }
   finally {
-    loading.set(false)
+    loading = false
   }
 })
 

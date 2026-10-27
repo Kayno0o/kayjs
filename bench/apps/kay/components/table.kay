@@ -22,11 +22,11 @@ function swap() {
 }
 ---
 div.jumbotron
-  button#run(onClick={() => rows.set(build(1000))}) Create 1,000 rows
-  button#runlots(onClick={() => rows.set(build(10000))}) Create 10,000 rows
+  button#run(onClick={() => rows = build(1000)}) Create 1,000 rows
+  button#runlots(onClick={() => rows = build(10000)}) Create 10,000 rows
   button#add(onClick={() => rows.set(list => [...list, ...build(1000)])}) Append 1,000 rows
   button#update(onClick={() => rows.set(list => list.map((row, i) => i % 10 === 0 ? { ...row, label: `${row.label} !!!` } : row))}) Update every 10th row
-  button#clear(onClick={() => rows.set([])}) Clear
+  button#clear(onClick={() => rows = []}) Clear
   button#swaprows(onClick={swap}) Swap rows
 table.table
   tbody

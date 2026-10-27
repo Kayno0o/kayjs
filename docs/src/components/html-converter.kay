@@ -22,10 +22,10 @@ async function preload() {
 }
 
 async function convert(value: string) {
-  html.set(value)
+  html = value
 
   if (value.trim() === '') {
-    converted.set({ code: '', notes: [] })
+    converted = { code: '', notes: [] }
 
     return
   }
@@ -37,10 +37,10 @@ async function convert(value: string) {
     if (value !== html())
       return
 
-    converted.set(htmlToKay(value))
+    converted = htmlToKay(value)
   }
   catch (error) {
-    converted.set({ code: '', notes: [], error: error instanceof Error ? error.message : String(error) })
+    converted = { code: '', notes: [], error: error instanceof Error ? error.message : String(error) }
   }
 }
 ---

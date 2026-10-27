@@ -16,7 +16,7 @@ function spy() {
       reading = section.id
   }
 
-  current.set(reading)
+  current = reading
 }
 
 onMount(() => {

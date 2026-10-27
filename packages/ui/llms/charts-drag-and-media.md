@@ -49,7 +49,7 @@ const sortable = new Sortable({
 
     next.splice(to, 0, ...next.splice(from, 1))
     await reorder({ ids: next.map(habit => habit.id) })
-    rows.set(next)
+    rows = next
   }, 'Could not reorder'),
 })
 ---

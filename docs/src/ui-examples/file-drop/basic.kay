@@ -6,7 +6,7 @@ const names = signal<string[]>([])
 FileDrop(
   accept="image/*"
   multiple
-  onFiles={files => names.set(files.map(file => file.name))}
+  onFiles={files => names = files.map(file => file.name)}
 )
   @content(zone)
     .p-6.text-center

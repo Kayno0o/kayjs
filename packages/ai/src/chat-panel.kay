@@ -30,12 +30,12 @@ let button: HTMLButtonElement | undefined
 let panel: HTMLElement | undefined
 
 function show() {
-  open.set(true)
+  open = true
   queueMicrotask(() => (panel?.querySelector<HTMLElement>('textarea') ?? panel)?.focus())
 }
 
 function hide() {
-  open.set(false)
+  open = false
   button?.focus()
 }
 
@@ -60,7 +60,7 @@ div(part="root" onKeyDown={keyDown})
       div(part="actions")
         button(part="action" type="button" aria-label={newLabel} data-tooltip={newLabel} data-size="md" data-variant="ghost" data-tooltip-placement="bottom span-left" data-tone="neutral" onClick={startOver})
           | {newIcon}
-        button(part="expand" type="button" aria-label={large() ? collapseLabel : expandLabel} data-tooltip={large() ? collapseLabel : expandLabel} data-size="md" data-variant="ghost" data-tooltip-placement="bottom span-left" data-tone="neutral" onClick={() => large.set(!large())})
+        button(part="expand" type="button" aria-label={large() ? collapseLabel : expandLabel} data-tooltip={large() ? collapseLabel : expandLabel} data-size="md" data-variant="ghost" data-tooltip-placement="bottom span-left" data-tone="neutral" onClick={() => large = !large()})
           | {large() ? collapseIcon : expandIcon}
         button(part="action" type="button" aria-label={closeLabel} data-tooltip={closeLabel} data-size="md" data-variant="ghost" data-tooltip-placement="bottom span-left" data-tone="neutral" onClick={hide})
           | {closeIcon}

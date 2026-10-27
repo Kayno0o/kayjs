@@ -81,7 +81,7 @@ function measure() {
   const now = room()
 
   if (next.width !== now.width || next.height !== now.height || next.right !== now.right || next.bottom !== now.bottom)
-    room.set(next)
+    room = next
 }
 
 function measureSoon() {
@@ -119,7 +119,7 @@ function resizeTo(next: number, settled: boolean) {
 
   const kept = clamp(dock, next)
 
-  reached.set(kept)
+  reached = kept
   onSizeChange?.(kept, settled)
 }
 
@@ -133,7 +133,7 @@ function startResize(event: PointerEvent) {
   const from = dock === 'right' ? { point: event.clientX, size: box.width } : { point: event.clientY, size: box.height }
   const move = (next: PointerEvent) => {
     moved = true
-    dragging.set(true)
+    dragging = true
     resizeTo(from.size + from.point - (dock === 'right' ? next.clientX : next.clientY), false)
   }
   let ended = false
@@ -151,7 +151,7 @@ function startResize(event: PointerEvent) {
     handle.removeEventListener('pointercancel', end)
     const kept = shownSize()
 
-    dragging.set(false)
+    dragging = false
 
     // A bare click on the grip settles nothing.
     if (moved)
@@ -304,4 +304,4 @@ dialog(part="root" aria-label={title} {...rest} open={renderedOpen} data-modal={
       div(part="footer")
         | {footer}
 if docked() && !open && launcher
-  IconButton(part="launcher" icon="menu" label={launcher} variant="ghost" aria-controls={rest.id} style={launcherLayer === undefined ? undefined : `z-index: ${launcherLayer}`} ref={element => launching.set(element)} href={launcherHref} onClick={() => onOpenChange?.(true)})
+  IconButton(part="launcher" icon="menu" label={launcher} variant="ghost" aria-controls={rest.id} style={launcherLayer === undefined ? undefined : `z-index: ${launcherLayer}`} ref={element => launching = element} href={launcherHref} onClick={() => onOpenChange?.(true)})

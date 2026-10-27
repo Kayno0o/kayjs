@@ -8,7 +8,7 @@ const { at, sentence = false, moment = false, author } = props<{ at: number, sen
 const zone = useEditorZone()
 const lang = signal<string>()
 
-onMount(() => lang.set(document.documentElement.lang))
+onMount(() => lang = document.documentElement.lang)
 
 const text = () => {
   const date = moment ? editedMoment(at, zone(), lang()) : editedDay(at, zone(), lang())

@@ -30,7 +30,7 @@ import { cart } from './cart'
 
 const { name } = props<{ name: string }>()
 ---
-button(onClick={() => cart.set([...cart(), name])}) Add {name}
+button(onClick={() => cart = [...cart(), name]}) Add {name}
 p {cart().length} in the cart
 ```
 

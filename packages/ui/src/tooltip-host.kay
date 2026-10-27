@@ -35,7 +35,7 @@ function found(event: Event): HTMLElement | null {
 function hide() {
   clearTimeout(timer)
   at = null
-  aimed.set(null)
+  aimed = null
 }
 
 function onto(next: HTMLElement | null) {
@@ -50,12 +50,12 @@ function onto(next: HTMLElement | null) {
 
   // An element whose popover is open shows no tooltip, which would sit over the popover it opened.
   if (!next || !text || next.getAttribute('aria-expanded') === 'true') {
-    timer = setTimeout(() => aimed.set(null), durationMs(hideDelay))
+    timer = setTimeout(() => aimed = null, durationMs(hideDelay))
 
     return
   }
 
-  timer = setTimeout(() => aimed.set({ element: next, text }), durationMs(showDelay))
+  timer = setTimeout(() => aimed = { element: next, text }, durationMs(showDelay))
 }
 
 function focused(event: FocusEvent) {
@@ -91,7 +91,7 @@ function keyDown(event: KeyboardEvent) {
     return
 
   clearTimeout(timer)
-  aimed.set(null)
+  aimed = null
 }
 
 // A popover opening hides the tooltip, as one shown for its trigger, by a tab say, would cover it.
@@ -180,4 +180,4 @@ effect(() => {
 ---
 // Rendered in the root layout, it shows the tooltip of whichever element the pointer or a tab lands on. A second one, such as an extension's, renders nothing while the first is mounted.
 if owns()
-  div(part="root" id={PANEL_ID} ref={element => panel.set(element)} popover="manual" role="tooltip") {aimed()?.text}
+  div(part="root" id={PANEL_ID} ref={element => panel = element} popover="manual" role="tooltip") {aimed()?.text}

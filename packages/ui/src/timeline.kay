@@ -31,14 +31,14 @@ const { entries, selected, onSelect, label, ...rest } = props<Omit<JSX.Intrinsic
 // Held as string or number: a signal cannot take a type parameter that might be a function.
 const picked = signal<string | number | undefined>(selected)
 
-effect(() => picked.set(selected))
+effect(() => picked = selected)
 
 const selectable = () => onSelect !== undefined || selected !== undefined
 
 function pick(entry: TimelineEntry<Key>) {
   const next = picked() === entry.key ? undefined : entry.key
 
-  picked.set(next)
+  picked = next
   onSelect?.(next, entry)
 }
 ---

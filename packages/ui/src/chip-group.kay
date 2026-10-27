@@ -44,7 +44,7 @@ let root: HTMLElement | undefined
 let synced = 0
 
 effect(() => {
-  picked.set(value)
+  picked = value
   synced++
 })
 
@@ -63,11 +63,11 @@ async function pick(next: Value[]) {
   const before = picked()
   const syncedBefore = synced
 
-  picked.set(next)
+  picked = next
 
   // Put back unless the parent set `value` meanwhile, which has the last word.
   if (!(await changeAccepted('ChipGroup', () => onChange?.(next), busy.set)) && synced === syncedBefore) {
-    picked.set(before)
+    picked = before
     check(before)
   }
 

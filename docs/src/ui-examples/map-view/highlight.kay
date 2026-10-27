@@ -11,6 +11,6 @@ const picked = signal<keyof typeof legs | null>(null)
 .flex.flex-col.gap-2.max-w-xl
   .flex.gap-2
     for name of Object.keys(legs) key={name}
-      button.rounded.border.border-muted.px-3.py-1(type="button" onClick={() => picked.set(name as keyof typeof legs)}) {name}
-    button.rounded.border.border-muted.px-3.py-1(type="button" onClick={() => picked.set(null)}) All
+      button.rounded.border.border-muted.px-3.py-1(type="button" onClick={() => picked = name as keyof typeof legs}) {name}
+    button.rounded.border.border-muted.px-3.py-1(type="button" onClick={() => picked = null}) All
   MapView(label="A walk through Paris" lines={[route]} highlight={picked() ? legs[picked()!] : undefined})

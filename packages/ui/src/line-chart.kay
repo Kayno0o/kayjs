@@ -184,7 +184,7 @@ const fitLabels = () => {
   const now = fit()
 
   if (next.width !== now.width || next.height !== now.height)
-    fit.set(next)
+    fit = next
 }
 
 // Drawn in the browser alone: chartist measures the box it draws into. It is read once the chart is on the page, so the page's own code loads and runs first.
@@ -197,7 +197,7 @@ onMount(() => {
 
     const { width, height } = box.getBoundingClientRect()
 
-    tipSize.set({ width, height, wide: document.documentElement.clientWidth, high: document.documentElement.clientHeight })
+    tipSize = { width, height, wide: document.documentElement.clientWidth, high: document.documentElement.clientHeight }
   })
 
   const drawing = signal<{ chart: InstanceType<typeof LineChartClass>, fixedScale: typeof FixedScaleAxis } | null>(null)
@@ -223,7 +223,7 @@ onMount(() => {
 
     chart = new LineChart(canvas!, { series: [] }, {})
     chart.on('created', (event) => {
-      plot.set({ rect: event.chartRect, axisY: event.axisY })
+      plot = { rect: event.chartRect, axisY: event.axisY }
       fitLabels()
     })
     // Colours and dashes go on each drawn part, so any number of series takes any colour with no stylesheet per chart.
@@ -252,7 +252,7 @@ onMount(() => {
 
       event.element.attr({ style: `${paint}: ${colors()[event.seriesIndex]}${dash ? `; stroke-dasharray: ${dash}` : ''}` })
     })
-    drawing.set({ chart, fixedScale })
+    drawing = { chart, fixedScale }
   })()
 
   effect(() => {
@@ -270,8 +270,8 @@ onMount(() => {
       return
 
     shown = labels
-    hovered.set(null)
-    dragged.set(null)
+    hovered = null
+    dragged = null
   })
 
   onCleanup(() => {
@@ -313,10 +313,10 @@ function pointerMove(event: PointerEvent) {
   if (index === null)
     return
 
-  hovered.set({ index, clientX: event.clientX, clientY: event.clientY })
+  hovered = { index, clientX: event.clientX, clientY: event.clientY }
 
   if (dragged())
-    dragged.set({ from: dragged()!.from, to: index })
+    dragged = { from: dragged()!.from, to: index }
 }
 
 function pointerDown(event: PointerEvent) {
@@ -329,13 +329,13 @@ function pointerDown(event: PointerEvent) {
 
   // Captured, so a drag released past the plot still ends the span.
   overlay.setPointerCapture?.(event.pointerId)
-  dragged.set({ from: index, to: index })
+  dragged = { from: index, to: index }
 }
 
 function finishSpan() {
   const span = dragged()
 
-  dragged.set(null)
+  dragged = null
 
   if (span && span.from !== span.to)
     void onRange?.(Math.min(span.from, span.to), Math.max(span.from, span.to))
@@ -347,7 +347,7 @@ function show(index: number, overlay: HTMLElement) {
   const box = overlay.getBoundingClientRect()
   const x = drawn ? drawn.rect.x1 + positionOf(index, labels.length, times()) * drawn.rect.width() : 0
 
-  hovered.set({ index, clientX: box.left + x, clientY: box.top + (drawn?.rect.y2 ?? 0) })
+  hovered = { index, clientX: box.left + x, clientY: box.top + (drawn?.rect.y2 ?? 0) }
 }
 
 function keyDown(event: KeyboardEvent) {
@@ -357,7 +357,7 @@ function keyDown(event: KeyboardEvent) {
 
   if (event.key === 'Escape' && dragged()) {
     event.preventDefault()
-    dragged.set(null)
+    dragged = null
 
     return
   }
@@ -375,7 +375,7 @@ function keyDown(event: KeyboardEvent) {
     return
 
   event.preventDefault()
-  dragged.set(event.shiftKey && onRange ? { from: dragged()?.from ?? current(), to: index } : null)
+  dragged = event.shiftKey && onRange ? { from: dragged()?.from ?? current(), to: index } : null
   show(index, event.currentTarget as HTMLElement)
 }
 
@@ -388,14 +388,14 @@ function focused(event: FocusEvent) {
 }
 
 function blurred() {
-  hovered.set(null)
-  dragged.set(null)
+  hovered = null
+  dragged = null
 }
 
 // The pointer leaving takes its point along, unless the keyboard is on the plot and still reading one.
 function pointerLeave(event: PointerEvent) {
   if (!(event.currentTarget as HTMLElement).matches(':focus-visible'))
-    hovered.set(null)
+    hovered = null
 }
 ---
 div(part="root" {...rest} role="figure" aria-label={label})
@@ -408,7 +408,7 @@ div(part="root" {...rest} role="figure" aria-label={label})
           div(part="dot" style={dot(index)})
     if band() !== null
       div(part="band" style={band()})
-    div(part="overlay" role="slider" tabindex={labels.length > 0 ? '0' : '-1'} aria-label={label} aria-valuemin="0" aria-valuemax={Math.max(0, labels.length - 1)} aria-valuenow={current()} aria-valuetext={announced()} aria-describedby={onRange ? `${id}-hint` : undefined} data-range={onRange ? '' : undefined} onKeyDown={keyDown} onFocus={focused} onBlur={blurred} onPointerDown={pointerDown} onPointerMove={pointerMove} onPointerUp={finishSpan} onPointerCancel={() => dragged.set(null)} onPointerLeave={pointerLeave})
+    div(part="overlay" role="slider" tabindex={labels.length > 0 ? '0' : '-1'} aria-label={label} aria-valuemin="0" aria-valuemax={Math.max(0, labels.length - 1)} aria-valuenow={current()} aria-valuetext={announced()} aria-describedby={onRange ? `${id}-hint` : undefined} data-range={onRange ? '' : undefined} onKeyDown={keyDown} onFocus={focused} onBlur={blurred} onPointerDown={pointerDown} onPointerMove={pointerMove} onPointerUp={finishSpan} onPointerCancel={() => dragged = null} onPointerLeave={pointerLeave})
   if hovered()
     div(part="tooltip" ref={watchTip} style={tipPlace()} aria-hidden="true")
       div(part="tooltipLabel") {heading(hovered()!.index)}

@@ -7,5 +7,5 @@ function explode(): string {
   throw new Error('failed to render')
 }
 ---
-button(onClick={() => count.set(count() + 1)}) {t('counter.label')} {count()}
+button(onClick={() => count = count() + 1}) {t('counter.label')} {count()}
 p {explode()}

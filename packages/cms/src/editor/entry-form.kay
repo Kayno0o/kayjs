@@ -61,7 +61,7 @@ const removed = signal(false)
 const stranded = signal<string>()
 let created = false
 const lastSave = signal<SavedState>()
-const onSaved = savedHandler(() => source.value()?.entry.url, saved => lastSave.set(saved), rebuildFinished)
+const onSaved = savedHandler(() => source.value()?.entry.url, saved => lastSave = saved, rebuildFinished)
 onCleanup(onSaved.stop)
 // A click on the page types in the entry's text fields there while this form stands.
 onCleanup(registerInline(entryKey(entry), { collection: () => source.value()?.collection, failed: () => source.status() === 'failed', busy: () => saving() || removed() }))
@@ -226,11 +226,11 @@ const referrers = signal<string[]>([])
 const title = () => { const answer = source.value(); return answer ? entryTitle(answer.collection, answer.entry) : entry.slug }
 
 async function askReferrers(): Promise<void> {
-  referrers.set([])
+  referrers = []
 
   const found = await readReferrers(entry.collection, [entry.slug])
 
-  referrers.set(found[entry.slug] ?? [])
+  referrers = found[entry.slug] ?? []
 }
 
 // The page the entry rendered is gone with it. When it was the entry's own page, there is nothing to read again: the editor leads to the collection's screen, replacing that page in the history. Any other page is read again.
@@ -246,7 +246,7 @@ async function remove(): Promise<void> {
     return
 
   drafts.reset(entry)
-  removed.set(true)
+  removed = true
 
   if (screen === undefined) {
     await refresh()
@@ -256,7 +256,7 @@ async function remove(): Promise<void> {
 
   // Declined over edits of other entries: the form stays locked and the notice offers the way on.
   if (!await navigate(screen, { replace: true }))
-    stranded.set(screen)
+    stranded = screen
 }
 
 saveShortcut(save)

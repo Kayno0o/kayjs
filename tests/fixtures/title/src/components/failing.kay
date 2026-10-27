@@ -8,5 +8,5 @@ function explode(): string {
 ---
 head
   title {name()}
-button.rename(onClick={() => name.set('Beta')}) Rename
+button.rename(onClick={() => name = 'Beta'}) Rename
 p {explode()}

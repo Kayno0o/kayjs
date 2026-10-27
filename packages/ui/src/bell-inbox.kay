@@ -54,7 +54,7 @@ effect(() => {
   known = new Set(items().map(note => note.id))
 
   if (fresh)
-    announced.set(wording('ui.bell.new', 'New notification: {title}', { title: fresh.title }))
+    announced = wording('ui.bell.new', 'New notification: {title}', { title: fresh.title })
 })
 
 // A failed call changes nothing: the live update or the next visit shows how the inbox stands.

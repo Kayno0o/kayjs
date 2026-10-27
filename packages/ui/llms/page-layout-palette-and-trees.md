@@ -39,7 +39,7 @@ PageSection(title="Moons")
 ### CommandPalette
 
 ```kay
-CommandPalette(entries={[{ label: 'Moons', group: 'Pages', href: '/moons' }, { label: 'New moon', group: 'Actions', icon: 'plus', onSelect: () => creating.set(true) }]} groups={['Actions', 'Pages']} recent={recent()} onRecentChange={keepRecent})
+CommandPalette(entries={[{ label: 'Moons', group: 'Pages', href: '/moons' }, { label: 'New moon', group: 'Actions', icon: 'plus', onSelect: () => creating = true }]} groups={['Actions', 'Pages']} recent={recent()} onRecentChange={keepRecent})
 ```
 
 - A modal search over places to go and things to do, opened and closed by Cmd on macOS and Ctrl elsewhere with `hotkey` (`k` by default) from anywhere, unless something handled the key first; `hotkey={null}` leaves opening to the app through `open`, and `onOpenChange(open)` reports each change.

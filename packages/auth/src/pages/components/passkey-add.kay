@@ -13,11 +13,11 @@ const supported = signal<boolean>()
 const error = signal('')
 const name = signal('')
 
-onMount(() => supported.set(canMakePasskey()))
+onMount(() => supported = canMakePasskey())
 
 async function add(event: SubmitEvent) {
   event.preventDefault()
-  error.set('')
+  error = ''
 
   try {
     const proof = new FormData(event.currentTarget as HTMLFormElement)
@@ -31,7 +31,7 @@ async function add(event: SubmitEvent) {
       await addPasskey({ response, ...(name() ? { name: name() } : {}) })
   }
   catch (caught) {
-    error.set(passkeyFailure(caught, errors, failed))
+    error = passkeyFailure(caught, errors, failed)
   }
 }
 ---

@@ -54,7 +54,7 @@ const triggerProps: PopoverTriggerProps = {
 
 function toggled(event: ToggleEvent) {
   const opened = event.newState === 'open'
-  shown.set(opened)
+  shown = opened
   onOpenChange?.(opened)
 }
 ---

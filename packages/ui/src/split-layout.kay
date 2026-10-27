@@ -42,9 +42,9 @@ let listPane: HTMLElement | undefined
 
 effect(() => {
   const query = matchMedia(NARROW)
-  const change = (event: MediaQueryListEvent) => narrow.set(event.matches)
+  const change = (event: MediaQueryListEvent) => narrow = event.matches
 
-  narrow.set(query.matches)
+  narrow = query.matches
   query.addEventListener('change', change)
   onCleanup(() => query.removeEventListener('change', change))
 })
@@ -115,7 +115,7 @@ onMount(() => {
     const stored = Number(localStorage.getItem(listWidthKey))
 
     if (stored)
-      listWidth.set(clampWidth(stored))
+      listWidth = clampWidth(stored)
   }
   catch {
     // Storage can be blocked; the default width stands.
@@ -138,7 +138,7 @@ function startResize(event: PointerEvent) {
   const handle = event.currentTarget as HTMLElement
   const startX = event.clientX
   const startWidth = listWidth()
-  const move = (next: PointerEvent) => listWidth.set(clampWidth(startWidth + next.clientX - startX))
+  const move = (next: PointerEvent) => listWidth = clampWidth(startWidth + next.clientX - startX)
 
   event.preventDefault()
   handle.setPointerCapture(event.pointerId)
@@ -163,7 +163,7 @@ function resizeByKey(event: KeyboardEvent) {
     return
 
   event.preventDefault()
-  listWidth.set(clampWidth(listWidth() + delta))
+  listWidth = clampWidth(listWidth() + delta)
   remember()
 }
 ---

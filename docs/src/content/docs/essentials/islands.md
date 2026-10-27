@@ -86,7 +86,7 @@ Children render on the server with the page. The island shows them where its tem
 const { title } = props<{ title: string }>()
 const open = signal(false)
 ---
-button(onClick={() => open.set(!open())}) {title}
+button(onClick={() => open = !open()}) {title}
 if open()
   slot
 ```
@@ -327,7 +327,7 @@ kayjs-ui's popovers and site nav menu need Chrome and Edge 114, Firefox 125 or S
 const width = signal(0)
 
 onMount(() => {
-  width.set(window.innerWidth)
+  width = window.innerWidth
 })
 ---
 p Window is {width()}px wide

@@ -10,7 +10,7 @@ const toPreview = (file: File) => ({
 FileDrop(
   accept="image/*"
   multiple
-  onFiles={files => previews.set(files.map(toPreview))}
+  onFiles={files => previews = files.map(toPreview)}
 )
   @content(zone)
     .rounded-lg.border.border-dashed.border-muted(

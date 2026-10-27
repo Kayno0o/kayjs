@@ -29,7 +29,7 @@
 - A handler given as a function still attaches.
 - A spread sets `innerHTML` only when its value is a `SafeHtml`, which `sanitizeHtml`, `trustHtml` and an icon import return, and drops any other value, with a warning in development: `svg({...icon})` draws, `div({...record})` ignores a `record.innerHTML` that is a plain string.
 - A tag held in a value renders only when it is an element name, `img src=x onerror=...` throwing, and takes its props as a spread does. It cannot be `script`, `style`, `iframe`, `object`, `embed`, `base`, `meta` or `link` in any case: write those in the template.
-- Events are camelCase handlers: `onClick={save}`, `onInput={e => name.set(e.currentTarget.value)}`.
+- Events are camelCase handlers: `onClick={save}`, `onInput={e => name = e.currentTarget.value}`.
 - A lowercase `onclick` or `on:click` attaches nothing, and kay reports it.
 - A handler is read when the event fires, so one a prop, a signal or a loop item holds stays current: `button(onClick={onPress})`.
 - `bind:name={signal}` on a component binds a prop typed `Bindable<T>` ([Components](components.md#bind-a-prop-to-the-parents-signal)).

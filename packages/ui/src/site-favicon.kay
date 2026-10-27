@@ -17,13 +17,13 @@ const failed = signal(false)
 // A new src is a new load: a failure recorded for the one before it no longer applies.
 effect(() => {
   void src
-  failed.set(false)
+  failed = false
 })
 ---
 // A site's icon, or the globe slot in a colour of the site's own when it has none or it fails to load.
 span(part="root" {...rest})
   if src && !failed()
     // kay-allow unsized-image
-    img(part="img" src={src} alt="" onError={() => failed.set(true)})
+    img(part="img" src={src} alt="" onError={() => failed = true})
   else
     Icon(icon="globe" part="icon" style={`color: ${stringToHexColor(name)}`})

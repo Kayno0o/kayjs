@@ -117,7 +117,7 @@ effect(() => {
 
   // The URL's sort stands over the one the table starts from, until the parent passes a new one.
   if (following)
-    current.set(next)
+    current = next
 
   following = true
 })
@@ -140,7 +140,7 @@ const counted = countLabel ?? ((count: number) => wording('ui.table.rowCount', c
 const none: RowKeyValue<Row, Key>[] = []
 const picked = signal(selected ?? none)
 
-effect(() => picked.set(selected ?? none))
+effect(() => picked = selected ?? none)
 
 const keyed = memo(() => rows().map(row => rowKeyOf(row, rowKey)))
 const chosen = memo(() => {
@@ -163,7 +163,7 @@ effect(() => {
 })
 
 function commit(keys: RowKeyValue<Row, Key>[]) {
-  picked.set(keys)
+  picked = keys
 
   if (!onSelect)
     return
@@ -217,7 +217,7 @@ function download() {
 function toggle(column: Column<Row>) {
   const next = nextSort(current(), column)
 
-  current.set(next)
+  current = next
   keptKey?.set(next.key)
   keptDirection?.set(next.direction)
   onSort?.(next)

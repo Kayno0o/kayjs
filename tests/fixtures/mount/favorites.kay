@@ -2,4 +2,4 @@
 import { favorites } from './favorites'
 ---
 p.favorites {favorites().join(', ')}
-button(onClick={() => favorites.set([...favorites(), 'added'])}) Add
+button(onClick={() => favorites = [...favorites(), 'added']}) Add

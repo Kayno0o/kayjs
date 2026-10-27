@@ -46,13 +46,13 @@ const id = uid()
 const shown = signal<string>(value)
 let list: HTMLElement | undefined
 
-effect(() => shown.set(value))
+effect(() => shown = value)
 
 function show(next: Value) {
   if (next === shown())
     return
 
-  shown.set(next)
+  shown = next
   onChange?.(next)
 }
 

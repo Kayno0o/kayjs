@@ -20,7 +20,7 @@ const search = async (query: string, limit: number, offset: number) =>
 function read(event: Event) {
   const data = new FormData(event.currentTarget as HTMLFormElement)
 
-  submitted.set(String(data.get('icon') ?? ''))
+  submitted = String(data.get('icon') ?? '')
 }
 ---
 form.flex.flex-col.items-start.gap-2(onInput={read})

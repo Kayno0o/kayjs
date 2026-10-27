@@ -4,6 +4,6 @@ import { publicEnv, signal } from 'kay'
 const shown = signal(false)
 ---
 p.server {publicEnv.KAY_TEST_MAP_KEY}
-button(onClick={() => shown.set(true)}) Show
+button(onClick={() => shown = true}) Show
 if shown()
   p.browser {publicEnv.KAY_TEST_MAP_KEY}

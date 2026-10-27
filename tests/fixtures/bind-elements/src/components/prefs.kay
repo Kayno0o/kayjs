@@ -13,6 +13,6 @@ details.more(bind:open={more})
   summary More
 input.pick(type="file" aria-label="File" bind:files={files})
 dialog.modal(ref={element => modal = element} bind:open={shown}) Hello
-button.show(onClick={() => { shown.set(true); modal?.showModal() }}) Show
-button.hide(onClick={() => shown.set(false)}) Hide
+button.show(onClick={() => { shown = true; modal?.showModal() }}) Show
+button.hide(onClick={() => shown = false}) Hide
 p.out {tags().join(',')} {more() ? 'open' : 'shut'} {files()?.length ?? 0} {shown() ? 'shown' : 'hidden'}

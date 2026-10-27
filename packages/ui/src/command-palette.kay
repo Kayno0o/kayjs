@@ -79,8 +79,8 @@ let dialog: HTMLDialogElement | undefined
 const searching = siteSearch
 const site = searching ? searchResults(query, searching === true ? {} : searching) : undefined
 
-effect(() => shown.set(open))
-effect(() => followedRecently.set(recent))
+effect(() => shown = open)
+effect(() => followedRecently = recent)
 
 // Headed groups while the query is empty, one flat ranked list once it is not, then the sections the site search found that no entry links already.
 const sections = memo(() => {
@@ -135,7 +135,7 @@ function setShown(next: boolean) {
   if (next === shown())
     return
 
-  shown.set(next)
+  shown = next
   onOpenChange?.(next)
 }
 
@@ -144,8 +144,8 @@ function closed() {
   if (dialog?.open)
     return
 
-  query.set('')
-  selected.set(0)
+  query = ''
+  selected = 0
   setShown(false)
 }
 
@@ -156,7 +156,7 @@ function followed(link: PaletteLink, found: boolean) {
   if (!found) {
     const next = withRecent(followedRecently(), link.href)
 
-    followedRecently.set(next)
+    followedRecently = next
     onRecentChange?.(next)
   }
 
@@ -174,7 +174,7 @@ function keyDown(event: KeyboardEvent) {
 
   if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
     event.preventDefault()
-    selected.set(stepIndex(active(), event.key === 'ArrowDown' ? 1 : -1, count))
+    selected = stepIndex(active(), event.key === 'ArrowDown' ? 1 : -1, count)
 
     return
   }
@@ -207,7 +207,7 @@ dialog(part="root" ref={element => dialog = element} closedby="any" aria-label={
   if shown()
     div(part="search")
       Icon(icon="search" part="icon")
-      input(part="input" value={query()} onInput={event => { query.set(event.currentTarget.value); selected.set(0) }} onKeyDown={keyDown} role="combobox" aria-label={label} aria-expanded="true" aria-controls={`${id}-list`} aria-autocomplete="list" aria-activedescendant={rows()[active()] ? optionId(active()) : undefined} autocomplete="off" spellcheck="false" placeholder={placeholder})
+      input(part="input" value={query()} onInput={event => { query = event.currentTarget.value; selected = 0 }} onKeyDown={keyDown} role="combobox" aria-label={label} aria-expanded="true" aria-controls={`${id}-list`} aria-autocomplete="list" aria-activedescendant={rows()[active()] ? optionId(active()) : undefined} autocomplete="off" spellcheck="false" placeholder={placeholder})
     div(part="list" id={`${id}-list`} role="listbox" aria-label={label})
       for section, sectionIndex of sections() key={sectionIndex}
         div(part="section" role="group" aria-labelledby={section.group === null ? undefined : `${id}-group-${sectionIndex}`})
@@ -215,7 +215,7 @@ dialog(part="root" ref={element => dialog = element} closedby="any" aria-label={
             div.kui-heading-section(part="heading" id={`${id}-group-${sectionIndex}`}) {section.group}
           for row of section.rows key={row.index}
             if linkOf(row.entry) as link
-              a(part="option" data-snippet={row.snippet ? '' : undefined} href={link.href} {...link.external ? OUTSIDE : {}} id={optionId(row.index)} role="option" aria-selected={row.index === active() ? 'true' : 'false'} tabindex="-1" onPointerMove={() => selected.set(row.index)} onClick={() => followed(link, row.snippet !== undefined)})
+              a(part="option" data-snippet={row.snippet ? '' : undefined} href={link.href} {...link.external ? OUTSIDE : {}} id={optionId(row.index)} role="option" aria-selected={row.index === active() ? 'true' : 'false'} tabindex="-1" onPointerMove={() => selected = row.index} onClick={() => followed(link, row.snippet !== undefined)})
                 if link.icon as icon
                   Icon(icon={icon} part="icon")
                 if row.snippet as snippet
@@ -239,7 +239,7 @@ dialog(part="root" ref={element => dialog = element} closedby="any" aria-label={
                 if query().trim() && row.entry.group
                   span(part="group") {row.entry.group}
             else if actionOf(row.entry) as action
-              button(part="option" type="button" id={optionId(row.index)} role="option" aria-selected={row.index === active() ? 'true' : 'false'} tabindex="-1" onPointerMove={() => selected.set(row.index)} onClick={() => act(action)})
+              button(part="option" type="button" id={optionId(row.index)} role="option" aria-selected={row.index === active() ? 'true' : 'false'} tabindex="-1" onPointerMove={() => selected = row.index} onClick={() => act(action)})
                 if action.icon as icon
                   Icon(icon={icon} part="icon")
                 span(part="label") {row.entry.label}

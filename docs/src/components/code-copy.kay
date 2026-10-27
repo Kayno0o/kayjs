@@ -22,11 +22,11 @@ async function copy(event: MouseEvent) {
   // The label not showing sits in data-other, so the button keeps the wider width.
   label.textContent = 'Copied!'
   label.dataset.other = 'Copy'
-  said.set('Copied to the clipboard')
+  said = 'Copied to the clipboard'
   setTimeout(() => {
     label.textContent = 'Copy'
     label.dataset.other = 'Copied!'
-    said.set('')
+    said = ''
   }, COPIED_MS)
 }
 

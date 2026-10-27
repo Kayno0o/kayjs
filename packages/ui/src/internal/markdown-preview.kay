@@ -29,15 +29,15 @@ effect(() => {
       const html = await render(markdown)
 
       if (turn === asked) {
-        rendered.set(html)
-        failed.set(false)
+        rendered = html
+        failed = false
       }
     }
     catch (error) {
       console.error('kayjs-ui: a MarkdownEditor\'s preview failed', error)
 
       if (turn === asked)
-        failed.set(true)
+        failed = true
     }
   }, untrack(rendered) === undefined ? 0 : PREVIEW_DELAY)
 

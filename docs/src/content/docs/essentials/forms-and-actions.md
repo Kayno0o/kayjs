@@ -317,7 +317,7 @@ import { move } from '../routes/board.kay'
 const { id } = props<{ id: number }>()
 const column = signal('todo')
 ---
-button(onClick={() => move({ id, to: 'done' }, { optimistic: () => column.set('done') })}) Done
+button(onClick={() => move({ id, to: 'done' }, { optimistic: () => column = 'done' })}) Done
 p {column()}
 ```
 
@@ -373,7 +373,7 @@ import { reply } from '../routes/chat.kay'
 
 const answer = signal<ActionStream<string> | undefined>(undefined)
 ---
-button(onClick={async () => answer.set(await reply({ prompt: 'Hello' }))}) Ask
+button(onClick={async () => answer = await reply({ prompt: 'Hello' })}) Ask
 p {answer()?.last()}
 ```
 
@@ -431,7 +431,7 @@ async function onRemove() {
   const result = await removing({ id })
 
   if (!result.ok)
-    problem.set(result.data?.message ?? 'Could not remove it')
+    problem = result.data?.message ?? 'Could not remove it'
 }
 ---
 button(disabled={removing.pending()} onClick={onRemove}) Remove

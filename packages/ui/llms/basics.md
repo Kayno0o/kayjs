@@ -53,9 +53,9 @@ A toast stays for six seconds, an error for ten, or until its close button is pr
 ### Dialog, ConfirmDelete
 
 ```kay
-Dialog(open={editing()} title="Rename" onOpenChange={() => editing.set(false)})
+Dialog(open={editing()} title="Rename" onOpenChange={() => editing = false})
   @footer
-    Button(label="Cancel" onClick={() => editing.set(false)})
+    Button(label="Cancel" onClick={() => editing = false})
     Button(label="Rename" tone="accent" onClick={rename})
   input.kui-field-input(name="name")
 ```

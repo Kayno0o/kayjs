@@ -15,7 +15,7 @@ live.on(message => dispatch(message, {
 
     void refresh()
   },
-  present: ({ names, guests }) => present.set({ names, guests }),
+  present: ({ names, guests }) => present = { names, guests },
 }))
 
 function readers({ names, guests }: { names: string[], guests: number }): string {

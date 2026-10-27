@@ -60,7 +60,7 @@ const described = () => cropText.replace(/\{([whxy])\}/g, (_, key: 'w' | 'h' | '
 const scale = () => stageSize.width() / (size()?.width || 1)
 
 function set(next: CropRect) {
-  crop.set(next)
+  crop = next
   onCrop?.(next)
 }
 
@@ -84,7 +84,7 @@ function loaded() {
 
   const next = { width: image.naturalWidth, height: image.naturalHeight }
 
-  size.set(next)
+  size = next
   onLoad?.(next)
 }
 

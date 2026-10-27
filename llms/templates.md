@@ -261,7 +261,7 @@ section.todo-list
       TodoItem(
         todo={todo}
         index={i}
-        onToggle={id => selected.set(todos.find(t => t.id === id))}
+        onToggle={id => selected = todos.find(t => t.id === id)}
       )
     else
       li.empty Nothing matches

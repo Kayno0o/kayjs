@@ -21,7 +21,7 @@ const entries: PaletteEntry[] = [
   },
 ]
 ---
-Button(label="Open the palette" onClick={() => open.set(true)})
+Button(label="Open the palette" onClick={() => open = true})
 CommandPalette(
   open={open()}
   onOpenChange={open.set}

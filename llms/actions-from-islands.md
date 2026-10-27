@@ -94,7 +94,7 @@ import { count } from '../routes/index.kay'
 
 const answer = signal<ActionStream<number> | undefined>(undefined)
 ---
-button(onClick={async () => answer.set(await count({ to: 10 }))}) Count
+button(onClick={async () => answer = await count({ to: 10 })}) Count
 p {answer()?.last()}
 ```
 
@@ -109,7 +109,7 @@ import { move } from '../routes/board.kay'
 const { id } = props<{ id: number }>()
 const column = signal('todo')
 ---
-button(onClick={() => move({ id, to: 'done' }, { optimistic: () => column.set('done') })}) Done
+button(onClick={() => move({ id, to: 'done' }, { optimistic: () => column = 'done' })}) Done
 p {column()}
 ```
 
@@ -122,7 +122,7 @@ p {column()}
 - `add({ title }, { refresh: false })` leaves the page as it is, so a frequent write from an island (a vote, an undo) needs no API route to avoid the refresh; `const save = add.track()` then `await save(input, { refresh: false })` also answers a refusal as a result.
 - `await add.settled()` resolves once no call to `add` is in flight, whichever way they went (a stream counts until it ends; it never rejects), so an island that fired writes without awaiting them waits for them there; `save.settled()` does the same for the calls made through a `track()` handle.
 - `add.pending()` reads, reactively, whether a call the page made is still in flight, and `add.progress()` how much of a call carrying files the browser sent, from 0 to 1: `button(disabled={add.pending()})`.
-- `await move({ id, to }, { optimistic: () => tiers.set(moved) })` shows the change at once: if the call fails, or the function throws, each signal the function wrote goes back to what it held, those another optimistic call made inside it wrote included, a `selection` among them with its `is(key)` flags, unless something wrote it since, while that call's `pending()` follows its own request, and the call throws as any does.
+- `await move({ id, to }, { optimistic: () => tiers = moved })` shows the change at once: if the call fails, or the function throws, each signal the function wrote goes back to what it held, those another optimistic call made inside it wrote included, a `selection` among them with its `is(key)` flags, unless something wrote it since, while that call's `pending()` follows its own request, and the call throws as any does.
 - Two such calls over one signal failing out of order may leave the first one's value, so an island lets one move finish before the next, as `add.pending()` tells.
 - Once it went through, the refresh brings what the server kept, which a `linked` signal then takes.
 - `{ signal }` aborts a call: it rejects with the signal's reason, what `optimistic` showed goes back, and the action records no outcome.

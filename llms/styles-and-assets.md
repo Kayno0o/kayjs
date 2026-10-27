@@ -147,7 +147,7 @@ const result = signal('')
 
 onMount(() => {
   const worker = new Worker(new URL('./worker.ts', import.meta.url), { type: 'module' })
-  worker.onmessage = event => result.set(String(event.data))
+  worker.onmessage = event => result = String(event.data)
   worker.postMessage('start')
   onCleanup(() => worker.terminate())
 })

@@ -117,7 +117,7 @@ As in Next.js, props to an island are serialized, so a page cannot pass one a fu
 
 | React | kay |
 | --- | --- |
-| `useState(0)` | `signal(0)`, read as `count()` and written as `count++` or `count.set(1)` |
+| `useState(0)` | `signal(0)`, read as `count()` and written as `count++` or `count = 1` |
 | `useMemo(() => ..., [a, b])` | `memo(() => ...)`, which tracks what it reads, so there is no dependency list |
 | `useEffect(() => ..., [a])` | `effect(() => ...)`, which runs after the render and again when a signal it read changes |
 | `useEffect(() => ..., [])` | `onMount(() => ...)`, in the browser only |

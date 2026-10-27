@@ -38,15 +38,15 @@ const { post } = props<{ post: Post }>()
 const editing = signal(false)
 const title = signal(post.title)
 ---
-Button(label="Rename" onClick={() => editing.set(true)})
+Button(label="Rename" onClick={() => editing = true})
 FormDialog(
   open={editing()}
   title="Rename"
   action={rename}
   submitLabel="Rename"
   failure="Could not rename"
-  onSaved={saved => title.set(saved.title)}
-  onOpenChange={() => editing.set(false)}
+  onSaved={saved => title = saved.title}
+  onOpenChange={() => editing = false}
 )
   input(type="hidden" name="id" value={post.id})
   FormField(label="Title" name="title" required)
@@ -67,7 +67,7 @@ FormDialog(
   submitLabel="Rename"
   failure="Could not rename"
   refused={data => ({ slug: data.error })}
-  onOpenChange={() => editing.set(false)}
+  onOpenChange={() => editing = false}
 )
 ```
 

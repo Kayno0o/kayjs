@@ -97,7 +97,7 @@ const busy = () => saving() || action?.pending() === true
 
 function check() {
   if (dirty === undefined)
-    changed.set(snapshot() !== baseline)
+    changed = snapshot() !== baseline
 }
 
 let queued = false
@@ -147,13 +147,13 @@ async function submit(event: SubmitEvent) {
   const run = onSave
 
   if (run) {
-    saving.set(true)
+    saving = true
 
     try {
       done = await callAction(form, (() => run()) as unknown as Action<never, Output>, issues, failure, refused)
     }
     finally {
-      saving.set(false)
+      saving = false
     }
 
     // A refusal the app shows itself.
@@ -167,7 +167,7 @@ async function submit(event: SubmitEvent) {
   if (!done)
     return
 
-  issues.set({})
+  issues = {}
   baseline = sent
   adopt()
   check()
@@ -184,7 +184,7 @@ function discard() {
     return
 
   form?.reset()
-  issues.set({})
+  issues = {}
   onDiscard?.()
   check()
 }

@@ -158,12 +158,12 @@ function announce(next: ToolCall[]) {
   }
 
   if (said.length > 0)
-    spoken.set([...spoken(), ...said])
+    spoken = [...spoken(), ...said]
 }
 
 function show(value: string | Progress) {
   if (typeof value === 'string') {
-    partial.set(value)
+    partial = value
 
     return
   }
@@ -171,12 +171,12 @@ function show(value: string | Progress) {
   if (value.outlives === true)
     outlives = true
 
-  partial.set(value.text)
-  calls.set(value.calls)
+  partial = value.text
+  calls = value.calls
   announce(value.calls)
 
   if (value.code)
-    code.set([...code(), ...value.code])
+    code = [...code(), ...value.code]
 }
 
 // A link of a reply opens in a new tab, as the conversation lives in this page and a page swap would drop it, unless `links` is `here` and the link leads to this site.
@@ -219,9 +219,9 @@ function takeBack() {
   if (last?.role !== 'user')
     return
 
-  history.set(history().slice(0, -1))
-  takenBack.set(true)
-  draft.set(draft() === '' ? last.content : `${last.content}\n${draft()}`)
+  history = history().slice(0, -1)
+  takenBack = true
+  draft = draft() === '' ? last.content : `${last.content}\n${draft()}`
 }
 
 // The reply ended on its own, was stopped or broke off: what arrived joins the history.
@@ -233,10 +233,10 @@ function finish(state: string) {
   const made = calls()
   const highlighted = code()
 
-  streaming.set(undefined)
-  partial.set('')
-  calls.set([])
-  code.set([])
+  streaming = undefined
+  partial = ''
+  calls = []
+  code = []
 
   // A page swap closes the stream too, leaving the reply to be asked for again when the chat returns.
   if (state !== 'closed' && remember !== undefined) {
@@ -248,10 +248,10 @@ function finish(state: string) {
     takeBack()
 
   if (text !== '' || made.length > 0)
-    history.set([...history(), { id: nextId++, role: 'assistant', content: text, calls: made, code: highlighted, stopped: state === 'closed' }])
+    history = [...history(), { id: nextId++, role: 'assistant', content: text, calls: made, code: highlighted, stopped: state === 'closed' }]
 
   if (state === 'failed')
-    failure.set(errorMessage)
+    failure = errorMessage
   else if (state === 'closed' && text === '' && made.length === 0)
     takeBack()
 }
@@ -299,7 +299,7 @@ onMount(() => {
   recalled = true
 
   if (turns.length > 0)
-    history.set(turns.map(turn => ({ ...turn, id: nextId++ })))
+    history = turns.map(turn => ({ ...turn, id: nextId++ }))
 
   const id = pendingReply(remember)
 
@@ -369,11 +369,11 @@ async function send(again = false, question?: string, resuming?: string) {
     return
 
   if (!again) {
-    history.set([...history(), { id: nextId++, role: 'user', content: text }])
+    history = [...history(), { id: nextId++, role: 'user', content: text }]
 
     // A suggestion leaves what the visitor was typing.
     if (question === undefined)
-      draft.set('')
+      draft = ''
   }
 
   const mine = new AbortController()
@@ -388,14 +388,14 @@ async function send(again = false, question?: string, resuming?: string) {
   outlives = false
   resumed = resuming !== undefined
   pinned = true
-  failure.set(undefined)
-  takenBack.set(false)
-  partial.set('')
-  calls.set([])
-  code.set([])
+  failure = undefined
+  takenBack = false
+  partial = ''
+  calls = []
+  code = []
   told.clear()
-  spoken.set([])
-  waiting.set(true)
+  spoken = []
+  waiting = true
 
   try {
     // A turn that only called tools has no text to post, which a provider refuses.
@@ -409,7 +409,7 @@ async function send(again = false, question?: string, resuming?: string) {
     }
 
     stream.on(show)
-    streaming.set(stream)
+    streaming = stream
   }
   catch (error) {
     // A call stopped before its first word is not a failure, and its message returns to the field.
@@ -427,11 +427,11 @@ async function send(again = false, question?: string, resuming?: string) {
       if (error instanceof ActionError && error.status === 422)
         takeBack()
 
-      failure.set(error instanceof ActionError && error.status < 500 && error.errors[''] ? error.errors[''] : errorMessage)
+      failure = error instanceof ActionError && error.status < 500 && error.errors[''] ? error.errors[''] : errorMessage
     }
   }
   finally {
-    waiting.set(false)
+    waiting = false
     field?.focus()
   }
 }
@@ -453,14 +453,14 @@ function startOver() {
 // Starts the conversation over: what is under way stops, and the log, the field and the kept history are cleared.
 function reset() {
   stop()
-  history.set([])
-  draft.set('')
-  failure.set(undefined)
-  takenBack.set(false)
-  partial.set('')
-  calls.set([])
-  code.set([])
-  spoken.set([])
+  history = []
+  draft = ''
+  failure = undefined
+  takenBack = false
+  partial = ''
+  calls = []
+  code = []
+  spoken = []
   told.clear()
 }
 

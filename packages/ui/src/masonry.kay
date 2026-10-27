@@ -43,7 +43,7 @@ effect(() => {
   const known = untrack(heights)
 
   if ([...known.keys()].some(name => !present.has(name)))
-    heights.set(new Map([...known].filter(([name]) => present.has(name))))
+    heights = new Map([...known].filter(([name]) => present.has(name)))
 })
 
 const place = (index: number) => layout()?.places[index]
@@ -60,7 +60,7 @@ onMount(() => {
       if (present.has(name)) next.set(name, entry.borderBoxSize?.[0]?.blockSize ?? (entry.target as HTMLElement).offsetHeight)
     }
 
-    heights.set(next)
+    heights = next
   })
 
   for (const [index, node] of [...root!.children].entries()) {

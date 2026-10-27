@@ -3,4 +3,4 @@ const name = signal('Raw room')
 ---
 head
   title(raw) {name()}
-button.rename(onClick={() => name.set('Raw beta')}) Rename
+button.rename(onClick={() => name = 'Raw beta'}) Rename

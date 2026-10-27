@@ -29,7 +29,7 @@ const failed = signal(false)
 // A new src is a new load: a failure recorded for the one before it no longer applies.
 effect(() => {
   void src
-  failed.set(false)
+  failed = false
 })
 
 const ground = () => stringToHexColor(name)
@@ -38,6 +38,6 @@ const ground = () => stringToHexColor(name)
 span({...rest} data-size={size} role={label ? 'img' : undefined} aria-label={label})
   if src && !failed()
     // kay-allow unsized-image
-    img(part="image" src={src} alt="" onError={() => failed.set(true)})
+    img(part="image" src={src} alt="" onError={() => failed = true})
   else
     span(part="initial" aria-hidden="true" style={`background-color: ${ground()}; color: ${isDark(ground()) ? '#fff' : '#000'}`}) {[...name.trim()][0]}

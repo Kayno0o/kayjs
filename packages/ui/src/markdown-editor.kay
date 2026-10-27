@@ -86,7 +86,7 @@ const text = signal(untrack(() => value))
 const previewing = signal(false)
 
 effect(() => {
-  text.set(value)
+  text = value
 })
 
 // The toolbar and the preview pane are separate chunks, fetched once the editor shows buttons or the preview is first asked for: an editor with neither never loads their icons and code.
@@ -109,12 +109,12 @@ async function loadView<View>(load: () => Promise<{ default: View }>, keep: (vie
 // Follows `toolbar` and `preview`, which a parent may change after mount; a chunk that failed is not tried again on each change.
 effect(() => {
   if ((actions().length > 0 || preview) && untrack(toolbarView).length === 0 && !untrack(toolbarFailed))
-    void loadView(async () => import('./internal/markdown-toolbar.kay'), view => toolbarView.set([view]), () => toolbarFailed.set(true))
+    void loadView(async () => import('./internal/markdown-toolbar.kay'), view => toolbarView = [view], () => toolbarFailed = true)
 })
 
 effect(() => {
   if (previewing() && untrack(previewView).length === 0)
-    void loadView(async () => import('./internal/markdown-preview.kay'), view => previewView.set([view]))
+    void loadView(async () => import('./internal/markdown-preview.kay'), view => previewView = [view])
 })
 
 // The attribute fills the field on the server and as it hydrates; afterwards the text lands on it only when it differs, since writing it moves the caret to the end. A reset is reported as if typed.
@@ -123,7 +123,7 @@ const { heard } = controlledValue({
   value: () => value,
   report: (element) => {
     heard(element.value)
-    text.set(element.value)
+    text = element.value
     onInput?.(element.value)
   },
 })
@@ -329,7 +329,7 @@ const previewParts = () => previewClass === undefined ? undefined : { body: prev
 // The textarea comes first in the document, so the label a form field puts around the editor names it and not the first button; the bar is placed above it by the grid.
 div(part="wrap")
   div(part="grid" data-preview={previewing() ? '' : undefined})
-    textarea.kui-field-input(part="root" {...rest} ref={ref} value={untrack(() => value)} placeholder={placeholder} aria-description={keysHint} aria-busy={uploading() > 0 ? 'true' : 'false'} onInput={event => { heard(event.currentTarget.value); text.set(event.currentTarget.value); onInput?.(event.currentTarget.value) }} onKeyDown={keyDown} onPaste={paste} onDrop={drop})
+    textarea.kui-field-input(part="root" {...rest} ref={ref} value={untrack(() => value)} placeholder={placeholder} aria-description={keysHint} aria-busy={uploading() > 0 ? 'true' : 'false'} onInput={event => { heard(event.currentTarget.value); text = event.currentTarget.value; onInput?.(event.currentTarget.value) }} onKeyDown={keyDown} onPaste={paste} onDrop={drop})
     if actions().length > 0 || preview
       div(part="bar" role="toolbar" aria-label={wording('ui.markdownEditor.toolbar', 'Formatting')})
         if toolbarFailed()

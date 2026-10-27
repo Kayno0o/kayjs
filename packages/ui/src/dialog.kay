@@ -67,11 +67,11 @@ function closeWatcher() {
 
 function closed() {
   onOpenChange(false)
-  edited.set(false)
+  edited = false
 }
 ---
 // Named by its title for screen readers, which announce the dialog as it opens.
-dialog(aria-label={title} {...rest} data-size={size === 'md' ? undefined : size} data-bare={bare ? '' : undefined} ref={element => dialog = element} closedby={closeWatcher()} onInput={() => edited.set(true)} onClose={closed})
+dialog(aria-label={title} {...rest} data-size={size === 'md' ? undefined : size} data-bare={bare ? '' : undefined} ref={element => dialog = element} closedby={closeWatcher()} onInput={() => edited = true} onClose={closed})
   if open
     if level === 2
       h2(part="title") {title}

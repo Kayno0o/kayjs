@@ -56,7 +56,7 @@ function keyDown(event: KeyboardEvent) {
     return
 
   event.preventDefault()
-  stop.set(next)
+  stop = next
 
   const target = (event.currentTarget as HTMLElement).parentElement?.querySelectorAll<HTMLElement>('[role="img"]')[next]
 
@@ -88,6 +88,6 @@ else
         if onSelect
           button(part="dot" type="button" data-interactive aria-label={point.label} data-tooltip={point.tooltip ?? point.label} style={place(point)} onClick={() => onSelect?.(point)})
         else
-          span(part="dot" role="img" tabindex={at === current() ? '0' : '-1'} aria-label={point.label} data-tooltip={point.tooltip ?? point.label} style={place(point)} onKeyDown={keyDown} onFocus={() => stop.set(at)})
+          span(part="dot" role="img" tabindex={at === current() ? '0' : '-1'} aria-label={point.label} data-tooltip={point.tooltip ?? point.label} style={place(point)} onKeyDown={keyDown} onFocus={() => stop = at})
     if x.label
       span(part="axisLabel" data-axis="x") {x.label}

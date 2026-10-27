@@ -364,10 +364,10 @@ async function submit(event: SubmitEvent) {
     text: String(fields.get('text')),
   })
 
-  errors.set(found)
+  errors = found
 
   if (Object.keys(found).length === 0) {
-    thanked.set((await comment(fields, { refresh: false })).name)
+    thanked = (await comment(fields, { refresh: false })).name
     form.reset()
   }
 }

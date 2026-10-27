@@ -103,7 +103,7 @@ describe('kay explain', () => {
     const [heading, blank, ...rows] = lintList('islands').split('\n')
 
     expect([heading, blank]).toEqual([`islands: ${LINT_GROUPS.islands}`, ''])
-    expect(rows.map(row => row.split(/\s{2,}/)[0])).toEqual(['positional-key', 'uncalled-signal', 'constant-signal', 'server-only-import', 'island-action', 'island-marker', 'promoted-island'])
+    expect(rows.map(row => row.split(/\s{2,}/)[0])).toEqual(['positional-key', 'uncalled-signal', 'constant-signal', 'signal-set-call', 'server-only-import', 'island-action', 'island-marker', 'promoted-island'])
   })
 
   it('explains a lint with an example it reports and the same written right, indented as code, and every lint\'s examples hold', () => {
@@ -517,10 +517,10 @@ describe('constant-signal', () => {
 
   it('leaves a signal something writes, binds or hands on, and a `signal` that is not kay\'s', () => {
     expect(lints(script('const name = signal(\'\')', 'input(aria-label="Name" bind:value={name})\np {name()}'))).toEqual([])
-    expect(lints(script('const open = signal(false)', 'button(onClick={() => open.set(!open())}) {open()}'))).toEqual([])
+    expect(lints(script('const open = signal(false)', 'button(onClick={() => open.set(o => !o)}) {open()}'))).toEqual([])
     expect(lints(script('const shown = signal(false)\nkeep(shown)', 'p {shown()}'))).toEqual([])
     expect(lints(script('const open = signal(false)', 'Child(open={open})'))).toEqual([])
-    expect(lints(script('const width = signal(0)\neffect(() => width.set(1))', 'p {width()}'))).toEqual([])
+    expect(lints(script('const width = signal(0)\neffect(() => width.set(w => w + 1))', 'p {width()}'))).toEqual([])
     expect(lints('---\nfunction signal(value: number) {\n  return () => value\n}\n\nconst width = signal(1)\n---\np {width()}\n')).toEqual([])
   })
 })
@@ -607,6 +607,31 @@ describe('uncalled-signal', () => {
     const source = '---\nimport KayakCard from \'./kayak-card.kay\'\n\nconst open = signal(false)\n---\nKayakCard(open={open})\n'
 
     expect(compileKay(source, 'list.kay', { check: true }).diagnostics.filter(d => d.code === 'uncalled-signal')).toEqual([])
+  })
+})
+
+describe('signal-set-call', () => {
+  const script = (body: string, template: string) => `---\nimport { signal } from 'kay'\nimport { visits } from './counter.kay'\n\nconst open = signal(false)\nconst count = signal(0)\n${body}\n---\n${template}\n`
+  const found = (source: string) => compileKay(source, 'list.kay', { check: true, importedSignals: { './counter.kay': { visits: 'signal' } } }).diagnostics.filter(d => d.code === 'signal-set-call')
+  const fixed = (source: string) => found(source).flatMap(d => d.fixes![0]!.edits).sort((a, b) => b.start - a.start).reduce((text, edit) => text.slice(0, edit.start) + edit.text + text.slice(edit.end), source)
+
+  it('reports a plain value written through .set as a statement or an arrow\'s body, an imported signal too, and assigns it as its fix', () => {
+    const source = script('function reset() {\n  count.set((1 + 2))\n  visits.set(0)\n}', 'button(onClick={() => open.set(!open())}) {count()}\nbutton(onClick={() => { count.set(0) }}) Reset')
+
+    expect(found(source).toSorted((a, b) => a.start - b.start).map(d => [source.slice(d.start, d.end), d.message])).toEqual([
+      ['count.set((1 + 2))', '`count` is a signal, written by assigning it'],
+      ['visits.set(0)', '`visits` is a signal, written by assigning it'],
+      ['open.set(!open())', '`open` is a signal, written by assigning it'],
+      ['count.set(0)', '`count` is a signal, written by assigning it'],
+    ])
+    expect(fixed(source)).toBe(script('function reset() {\n  count = (1 + 2)\n  visits = 0\n}', 'button(onClick={() => open = !open()}) {count()}\nbutton(onClick={() => { count = 0 }}) Reset'))
+    expect(found(fixed(source))).toEqual([])
+  })
+
+  it('leaves an inline updater, a value used as an expression, a trailing comma and .set on anything but a kay signal', () => {
+    const source = script('const params = new URLSearchParams()\nconst seen = new Map<string, number>()\nfunction step() {\n  count.set(c => c + 1)\n  count.set(function double(c) { return c * 2 })\n  count.set(5,)\n  params.set(\'page\', \'2\')\n  seen.set(\'a\', 1)\n  return count.set(1)\n}', 'button(onClick={() => open() && count.set(1)}) {count()} {open()}')
+
+    expect(found(source)).toEqual([])
   })
 })
 

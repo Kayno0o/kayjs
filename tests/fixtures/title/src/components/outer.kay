@@ -3,5 +3,5 @@ import Room from './room.kay'
 
 const count = signal(0)
 ---
-button.count(onClick={() => count.set(count() + 1)}) {count()}
+button.count(onClick={() => count = count() + 1}) {count()}
 Room(label="Inner")

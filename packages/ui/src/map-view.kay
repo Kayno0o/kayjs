@@ -101,7 +101,7 @@ onMount(() => {
         observer.observe(canvas)
       }
 
-      drawing.set({ view, base: leaflet.layerGroup().addTo(view), picked: leaflet.layerGroup().addTo(view), leaflet })
+      drawing = { view, base: leaflet.layerGroup().addTo(view), picked: leaflet.layerGroup().addTo(view), leaflet }
     }
     catch (error) {
       console.error('kayjs-ui: MapView could not draw', error)

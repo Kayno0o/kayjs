@@ -52,7 +52,7 @@ const now = signal(today())
 let box: HTMLInputElement | undefined
 let root: HTMLElement | undefined
 
-onMount(() => ready.set(true))
+onMount(() => ready = true)
 
 const first = () => firstDay ?? firstDayOf(pageLocale())
 const weeks = memo(() => monthWeeks(cursor(), first()))
@@ -64,24 +64,24 @@ function heard(next: string) {
   if (next === current())
     return
 
-  current.set(next)
+  current = next
   onChange?.(next)
 }
 
 // A parent handing another date moves the box through TextInput, which then reports it back as the same date.
 effect(() => {
   if (value !== undefined)
-    current.set(value)
+    current = value
 })
 
 function toggled(open: boolean) {
-  opened.set(open)
+  opened = open
 
   if (!open)
     return
 
-  now.set(today())
-  cursor.set(clampDate(isDate(current()) ? current() : today(), min, max))
+  now = today()
+  cursor = clampDate(isDate(current()) ? current() : today(), min, max)
   focusCursor()
 }
 
@@ -91,7 +91,7 @@ function focusCursor() {
 }
 
 function go(iso: string) {
-  cursor.set(clampDate(iso, min, max))
+  cursor = clampDate(iso, min, max)
   focusCursor()
 }
 
@@ -103,7 +103,7 @@ function pick(iso: string) {
   box.value = iso
   box.dispatchEvent(new Event('input', { bubbles: true }))
   box.dispatchEvent(new Event('change', { bubbles: true }))
-  opened.set(false)
+  opened = false
 }
 
 const MOVES: Partial<Record<string, (iso: string, shift: boolean) => string>> = {
