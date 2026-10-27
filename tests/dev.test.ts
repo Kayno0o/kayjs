@@ -1630,6 +1630,20 @@ describe.concurrent('kay dev', () => {
         closed,
       }
     }
+    // A connection ends with the server it reached, which a restart ends: the next one reaches the server after it, as a debugger connecting again does. A slow host spreads a change over two restarts, so one is not the last.
+    const reached = async () => {
+      for (let attempt = 0; ; attempt++) {
+        const connected = await session()
+
+        try {
+          return { session: connected, pid: await connected.pid() }
+        }
+        catch (error) {
+          if (attempt === 4)
+            throw error
+        }
+      }
+    }
 
     try {
       await until(() => output.length === 2, 10_000)
@@ -1642,8 +1656,7 @@ describe.concurrent('kay dev', () => {
       // The app's own processes do not try to open it again.
       expect(await Bun.file(spawned).text()).toBe('undefined')
 
-      const first = await session()
-      const pid = await first.pid()
+      const { session: first, pid } = await reached()
 
       // Every attempt from the moment the next server starts, when its inspector is setting up.
       await Bun.write(join(root, 'src/routes/about.kay'), 'p About\n')
@@ -1657,7 +1670,7 @@ describe.concurrent('kay dev', () => {
 
       // The debugger's connection ends with its server, and connecting again reaches the next.
       await first.closed
-      expect(await (await session()).pid()).not.toBe(pid)
+      expect((await reached()).pid).not.toBe(pid)
       // A server let go of exits within milliseconds without a word. The new directory and its file are two events, which a slow host can spread over two restarts, the second one in place; nothing more may be said, so the wait is a fixed span.
       await Bun.sleep(500)
       expect(output.slice(3).filter(line => !line.includes('restarted in'))).toEqual([])
