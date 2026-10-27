@@ -1,0 +1,8 @@
+---
+import Sparkline from '@kaynooo/kayjs-ui/sparkline.kay'
+
+const counts = [12, 18, 9, 30, 44, 38, 21, 0, 15, 27, 33, 19]
+const hints = counts.map((count, hour) => `${hour + 8}:00, ${count} requests`)
+---
+.max-w-xs
+  Sparkline(values={counts} hints={hints} label="Requests per hour from 8:00, 266 in all, busiest at 12:00")

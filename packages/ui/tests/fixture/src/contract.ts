@@ -64,8 +64,10 @@ import SiteFavicon from '@kaynooo/kayjs-ui/site-favicon.kay'
 import SiteNav from '@kaynooo/kayjs-ui/site-nav.kay'
 import Skeleton from '@kaynooo/kayjs-ui/skeleton.kay'
 import Slider from '@kaynooo/kayjs-ui/slider.kay'
+import Sparkline from '@kaynooo/kayjs-ui/sparkline.kay'
 import SplitLayout from '@kaynooo/kayjs-ui/split-layout.kay'
 import Stat from '@kaynooo/kayjs-ui/stat.kay'
+import StatusStrip from '@kaynooo/kayjs-ui/status-strip.kay'
 import Steps from '@kaynooo/kayjs-ui/steps.kay'
 import SubscribeForm from '@kaynooo/kayjs-ui/subscribe-form.kay'
 import TabNav from '@kaynooo/kayjs-ui/tab-nav.kay'
@@ -172,6 +174,8 @@ export const COMPONENTS = {
   'slider': Slider,
   'split-layout': SplitLayout,
   'skeleton': Skeleton,
+  'sparkline': Sparkline,
+  'status-strip': StatusStrip,
   'stat': Stat,
   'steps': Steps,
   'subscribe-form': SubscribeForm,
@@ -262,6 +266,8 @@ export const CASES: Record<string, Record<string, unknown>> = {
   'slider': { label: 'Delay', value: 40, min: 0, max: 100, formatValue: (value: number) => `${value} ms` },
   'split-layout': { list: 'L', detail: 'D' },
   'skeleton': { lines: 2, label: 'Loading' },
+  'sparkline': { values: [1, 3, 2], label: 'Visits' },
+  'status-strip': { cells: ['success', 'danger'], label: 'Up' },
   'stat': { value: 12, label: 'moons', variant: 'tile', tone: 'danger' },
   'steps': { steps: [{ key: 'account', label: 'Account' }, { key: 'details', label: 'Details' }, { key: 'review', label: 'Review' }], current: 'details', url: '/signup?step=details', done: ['account'], label: 'Signup' },
   'subscribe-form': { action, label: 'Email', submitLabel: 'Subscribe' },

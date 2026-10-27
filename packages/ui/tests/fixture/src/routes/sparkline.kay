@@ -1,0 +1,9 @@
+---
+import Sparkline from '@kaynooo/kayjs-ui/sparkline.kay'
+import StatusStrip from '@kaynooo/kayjs-ui/status-strip.kay'
+import '../app.css'
+---
+main
+  Sparkline#spark(values={[2, 4, 0, null, 1]} tone="success" tones={[undefined, undefined, 'danger']} hints={['two', 'four']} label="Visits per hour, 7 in all")
+  Sparkline#flat(values={[0, 0]} label="Nothing yet")
+  StatusStrip#strip(cells={['success', 'danger', undefined, 'warning']} hints={['ok']} label="Up 3 of 4 checks")

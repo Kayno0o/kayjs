@@ -16,7 +16,7 @@ The rest by topic, each file read whole with one command:
 - [Tables, tabs and pagination](llms/tables-navigation-and-layout.md): Table, Segmented, Tabs, TabNav, SiteNav, AppHeader, AppSwitcher, Toggle, Checkbox, Pagination, QrCode
 - [Page layout, command palette and trees](llms/page-layout-palette-and-trees.md): PageHeader, PageSection, CollapsibleSection, Accordion, Widget, CardRow, SidePanel, Toolbar, SplitLayout, CommandPalette, TreeView, Timeline, DescriptionList, Bell
 - [Texts and languages](llms/words.md): the `ui.*` messages that word every default text, and the page's locale in charts
-- [Charts, drag and drop, galleries and image tools](llms/charts-drag-and-media.md): LineChart, BarChart, ScatterChart, MapView, ContributionGraph, Sortable, Board, DropTargets, MediaGallery, Carousel, AudioPlayer, Masonry, WhenVisible, LoadMore, VirtualList, ZoomPane, ImageCropper
+- [Charts, drag and drop, galleries and image tools](llms/charts-drag-and-media.md): LineChart, BarChart, ScatterChart, MapView, ContributionGraph, Sparkline, StatusStrip, Sortable, Board, DropTargets, MediaGallery, Carousel, AudioPlayer, Masonry, WhenVisible, LoadMore, VirtualList, ZoomPane, ImageCropper
 
 ## A `style` on a root
 

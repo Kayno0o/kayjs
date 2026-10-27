@@ -2,7 +2,7 @@
 
 ## Common tasks
 
-### LineChart, BarChart, ScatterChart, ContributionGraph
+### LineChart, BarChart, ScatterChart, ContributionGraph, Sparkline, StatusStrip
 
 - `LineChart(label="Visits" labels={days} series={[{ name: 'Visits', values: visits }]} xLabels)`, drawn by chartist, a peer the app installs to use it: `bun add chartist`. No other component reaches it.
   - A series has a `name`, one value per label, `null` for a gap in the line (a stacked chart counts it as 0 and draws no gap), and an optional CSS `color`; without one it takes the next `--color-chart-1` to `-6` token. Every line after the first is dashed in its own pattern, which the legend samples, so the series stay apart without their colours.
@@ -22,6 +22,8 @@
   - Without `onSelect` the dots are `role="img"` in one tab stop on the first: the arrows and Home and End walk them in `points` order and each focused dot shows its tooltip.
   - `onSelect(point)` makes each dot a button, from an island; `emptyLabel` is what it reads with no points.
 - `ContributionGraph(days={days} color="var(--color-accent)" today={today} months)`: a grid of weeks, each day's cell shaded towards `color` by its `intensity` from 0 to 1, with `description` as hover text before the date, which screen readers read too, or how full the day was (`50% · 2026-09-01`) without one. The grid is a group named by `label`, one tab stop on today's cell: up and down step a day, left and right a week, Home and End reach the ends, and each focused cell shows its tooltip. `days` starts on a Monday: map the dates `gridDays(weeks)` from `@kaynooo/utils/date` lists to `{ day, intensity }`, typed `ContributionDay`; `today` marks its cell, and `months` names each month over the week it starts in. It is static.
+- `Sparkline(label="Requests per hour, 1,204 in all" values={counts} tone="success" tones={tones} hints={hints})`: bars with no axes, ticks or legend, filling the width and `--spark-height` (`1.5rem`), the largest value the full height and a `null`, zero or negative one a hairline. `tone` colours every bar (`accent` by default), `tones` one bar each and `hints` a note per bar shown under the pointer (`data-hint`, so TooltipHost shows it). `label` is the one sentence the keyboard and screen readers get, the bars being `aria-hidden`.
+- `StatusStrip(label="Up 98% of the last 7 days" cells={tones} hints={hints})`: one cell per entry, a `SparkTone` (`success`, `warning`, `danger`, `info`, `accent`, `muted`) or `undefined` for the empty ground, in a row of `--strip-height` (`1.5rem`) that shrinks to fit any number of cells. Like Sparkline it is one `role="img"` carrying `label`, with optional pointer-only `hints`, so 168 cells add no 168 tooltips for the keyboard. Colour is not the only signal: say the state in `label`. Both take data alone, so a static page passes props as to any element.
 
 ### MapView
 

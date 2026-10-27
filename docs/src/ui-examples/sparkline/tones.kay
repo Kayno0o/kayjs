@@ -1,0 +1,8 @@
+---
+import Sparkline from '@kaynooo/kayjs-ui/sparkline.kay'
+
+const times = [210, 190, 230, 640, 205, 180]
+const tones = times.map(time => time > 500 ? 'danger' as const : undefined)
+---
+.max-w-xs
+  Sparkline(values={times} tone="success" tones={tones} label="Response time of the last 6 checks, one slow at 640 ms")

@@ -1,0 +1,7 @@
+---
+import StatusStrip from '@kaynooo/kayjs-ui/status-strip.kay'
+
+const checks = Array.from({ length: 60 }, (_, at) => at === 41 || at === 42 ? 'danger' as const : at < 3 ? undefined : 'success' as const)
+---
+.max-w-md
+  StatusStrip(cells={checks} label="Up for 55 of the last 60 minutes, down from 41 to 42")

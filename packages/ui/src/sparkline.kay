@@ -1,0 +1,34 @@
+---
+import type { JSX } from 'kay'
+import type { SparkTone } from './sparkline'
+import { memo, recipe } from 'kay'
+
+// 'kui-sparkline' stays as the component's name for an app's CSS. A bar is coloured by its own `data-tone`, which wins over `tone`.
+const look = recipe({
+  parts: {
+    root: 'kui-sparkline flex h-[var(--spark-height,1.5rem)] w-full items-end gap-px',
+    bar: 'min-h-px min-w-0 flex-1 rounded-t-[1px] bg-accent data-[tone=muted]:bg-muted data-[tone=accent]:bg-accent data-[tone=success]:bg-success data-[tone=warning]:bg-warning data-[tone=danger]:bg-danger data-[tone=info]:bg-info',
+  },
+})
+
+const { values, tone = 'accent', tones, hints, label, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'role'> & {
+  // One bar per value, the largest filling the height; a `null`, a zero or a negative value leaves a hairline.
+  values: readonly (number | null)[]
+  // Colours every bar; `accent` by default.
+  tone?: SparkTone | undefined
+  // One tone per bar, which wins over `tone`.
+  tones?: readonly (SparkTone | undefined)[] | undefined
+  // One note per bar, shown under the pointer by TooltipHost; the keyboard and screen readers have `label` alone.
+  hints?: readonly (string | undefined)[] | undefined
+  // Says what the whole chart shows, in one sentence, such as "Requests per hour, 1,204 in all, busiest at 14:00".
+  label: string
+}>()
+
+const largest = memo(() => Math.max(0, ...values.map(value => value ?? 0)))
+
+// Each bar's height against the largest value.
+const percent = (value: number | null) => largest() > 0 && value !== null ? Math.max(0, value) / largest() * 100 : 0
+---
+div(part="root" {...rest} role="img" aria-label={label})
+  for value, at of values key={at}
+    span(part="bar" aria-hidden="true" data-tone={tones?.[at] ?? tone} data-hint={hints?.[at]} style={`height: ${percent(value)}%`})

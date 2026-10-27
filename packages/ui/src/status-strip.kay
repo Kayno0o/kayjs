@@ -1,0 +1,25 @@
+---
+import type { JSX } from 'kay'
+import type { SparkTone } from './sparkline'
+import { recipe } from 'kay'
+
+// 'kui-status-strip' stays as the component's name for an app's CSS. A cell is coloured by its own `data-tone`.
+const look = recipe({
+  parts: {
+    root: 'kui-status-strip flex h-[var(--strip-height,1.5rem)] w-full gap-px',
+    cell: 'min-w-0 flex-1 rounded-[1px] bg-surface-strong data-[tone=muted]:bg-muted data-[tone=accent]:bg-accent data-[tone=success]:bg-success data-[tone=warning]:bg-warning data-[tone=danger]:bg-danger data-[tone=info]:bg-info',
+  },
+})
+
+const { cells, hints, label, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'role'> & {
+  // One cell per entry, in the order shown; a cell left `undefined` stays the empty ground.
+  cells: readonly (SparkTone | undefined)[]
+  // One note per cell, shown under the pointer by TooltipHost; the keyboard and screen readers have `label` alone.
+  hints?: readonly (string | undefined)[] | undefined
+  // Says what the whole strip shows in one sentence, which is all a screen reader hears: "Up 98% of the last 7 days, down since 09:10 today".
+  label: string
+}>()
+---
+div(part="root" {...rest} role="img" aria-label={label})
+  for tone, at of cells key={at}
+    span(part="cell" aria-hidden="true" data-tone={tone} data-hint={hints?.[at]})

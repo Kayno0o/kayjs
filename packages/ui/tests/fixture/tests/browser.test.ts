@@ -61,6 +61,25 @@ inBrowser('in the browser', () => {
     expect(page.errors).toEqual([])
   }, 120_000)
 
+  test('Sparkline bars stand on one baseline in their tones, and a strip of many cells fits the width of a phone', async () => {
+    const site = await shared()
+
+    await using page = await site.open('/sparkline', { width: 400 })
+    const found = await page.evaluate(() => {
+      const strip = document.querySelector<HTMLElement>('#strip')!
+      const bars = [...document.querySelectorAll<HTMLElement>('#spark [data-part=bar]')].map(bar => bar.getBoundingClientRect())
+      const colors = [...document.querySelectorAll<HTMLElement>('#strip [data-part=cell]')].map(cell => getComputedStyle(cell).backgroundColor)
+
+      for (let more = 0; more < 164; more++)
+        strip.append(strip.firstElementChild!.cloneNode(true))
+
+      return { bottoms: new Set(bars.map(bar => bar.bottom)).size, tall: bars[1]!.height > bars[4]!.height, distinct: new Set(colors).size, overflow: strip.scrollWidth - strip.clientWidth, page: document.documentElement.scrollWidth - document.documentElement.clientWidth, cell: strip.firstElementChild!.getBoundingClientRect().width > 0 }
+    })
+
+    expect(found).toEqual({ bottoms: 1, tall: true, distinct: 4, overflow: 0, page: 0, cell: true })
+    expect(page.errors).toEqual([])
+  }, 120_000)
+
   test('Table draws a line between the stacked cards whatever the row borders are, and none in the wide table', async () => {
     const site = await shared()
 
