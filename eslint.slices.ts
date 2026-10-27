@@ -4,7 +4,9 @@ export const typeAwareSlices: string[][] = [
   ['src/**/*.ts'],
   ['tests/[a-l]*.ts'],
   ['tests/[!a-l]*.ts'],
-  ['*.ts', 'scripts/*.ts', 'bench/*.ts', 'bench/{shared,sites}/**/*.ts', 'bench/apps/{kay,solid,svelte}/**/*.ts'],
+  ['*.ts', 'scripts/*.ts'],
+  ['bench/*.ts', 'bench/{shared,sites}/**/*.ts'],
+  ['bench/apps/{kay,solid,svelte}/**/*.ts'],
 ]
 
 export const filesTypeAware = typeAwareSlices.flat()
