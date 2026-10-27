@@ -1,7 +1,7 @@
 import * as parser from '@babel/parser'
 import { describe, expect, it, spyOn } from 'bun:test'
 import { compileKay, componentName } from '../src/compiler'
-import { moduleData, moduleKinds, moduleSignals } from '../src/compiler/module-signals'
+import { jsonKinds, moduleData, moduleKinds, moduleSignals } from '../src/compiler/module-signals'
 import { CURRENT, defaultName, GENERATED_NAME, PROPS } from '../src/compiler/names'
 
 function tsx(source: string): string {
@@ -1305,6 +1305,17 @@ describe('module signals', () => {
     expect(moduleData('export { a, b as c, default as d } from \'./x\'\nexport * from \'./y\'\nexport * as ns from \'./y\'\n', false, specifier => specifier === './x' ? { a: 'data', b: 'data', default: 'data' } : { z: 'data', default: 'data', f: 'signal' })).toEqual(['a', 'c', 'd', 'z'])
     expect(moduleKinds('import { signal } from \'kay\'\nexport const a = signal(1)\nexport const b = { x: \'y\' }\n')).toEqual({ a: 'signal', b: 'data' })
     expect(moduleKinds('const a = 1\n')).toEqual({})
+  })
+
+  it('reads a name a destructured export or two stars give as not data', () => {
+    expect(moduleData('export * from \'./x\'\nexport const { a, b: [c], ...d } = source\n', false, () => ({ a: 'data', c: 'data', d: 'data', e: 'data' }))).toEqual(['e'])
+    expect(moduleData('export * from \'./x\'\nexport * from \'./y\'\n', false, specifier => specifier === './x' ? { a: 'data', b: 'data' } : { a: 'data', c: 'data' })).toEqual(['b', 'c'])
+  })
+
+  it('reads a JSON file with a BOM or comments as not data', () => {
+    expect(jsonKinds('{ "a": 1 }')).toEqual({ default: 'data', a: 'data' })
+    expect(jsonKinds('\uFEFF{ "a": 1 }')).toEqual({})
+    expect(jsonKinds('{ // note\n "a": 1 }')).toEqual({})
   })
 })
 

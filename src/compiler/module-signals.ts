@@ -122,6 +122,25 @@ function exportedName(node: t.Identifier | t.StringLiteral): string {
   return node.type === 'Identifier' ? node.name : node.value
 }
 
+// The names a binding pattern declares, `a` and `b` in `const { a, x: [b] } = ...`.
+function boundNames(pattern: t.Node | null | undefined, into: Set<string>): void {
+  if (!pattern)
+    return
+
+  if (pattern.type === 'Identifier')
+    into.add(pattern.name)
+  else if (pattern.type === 'ObjectPattern')
+    for (const property of pattern.properties)
+      boundNames(property.type === 'RestElement' ? property.argument : property.value, into)
+  else if (pattern.type === 'ArrayPattern')
+    for (const element of pattern.elements)
+      boundNames(element, into)
+  else if (pattern.type === 'AssignmentPattern')
+    boundNames(pattern.left, into)
+  else if (pattern.type === 'RestElement')
+    boundNames(pattern.argument, into)
+}
+
 // The names a module exports itself, which win over the same name in an `export *`.
 function ownExports(ast: t.File): Set<string> {
   const own = new Set<string>()
@@ -134,12 +153,8 @@ function ownExports(ast: t.File): Set<string> {
       const declaration = statement.declaration
 
       if (declaration?.type === 'VariableDeclaration') {
-        for (const { id } of declaration.declarations) {
-          if (id.type === 'Identifier')
-            own.add(id.name)
-          else
-            own.add('')
-        }
+        for (const { id } of declaration.declarations)
+          boundNames(id, own)
       }
       else if (declaration && 'id' in declaration && declaration.id?.type === 'Identifier') {
         own.add(declaration.id.name)
@@ -156,6 +171,16 @@ function ownExports(ast: t.File): Set<string> {
 function dataIn(ast: t.File, reexported?: Reexported): string[] {
   const found = new Set<string>()
   const local = new Set<string>()
+  const own = ownExports(ast)
+  const starred = new Map<string, number>()
+
+  for (const statement of ast.program.body) {
+    if (statement.type !== 'ExportAllDeclaration' || statement.exportKind === 'type')
+      continue
+
+    for (const name of Object.keys(reexported?.(statement.source.value) ?? {}))
+      starred.set(name, (starred.get(name) ?? 0) + 1)
+  }
 
   for (const statement of ast.program.body) {
     const declaration = statement.type === 'ExportNamedDeclaration' ? statement.declaration : statement
@@ -182,10 +207,9 @@ function dataIn(ast: t.File, reexported?: Reexported): string[] {
         found.add('default')
     }
     else if (statement.type === 'ExportAllDeclaration' && statement.exportKind !== 'type') {
-      const own = ownExports(ast)
-
+      // A name two stars share is ambiguous, so the module does not export it.
       for (const [name, kind] of Object.entries(reexported?.(statement.source.value) ?? {})) {
-        if (kind === 'data' && name !== 'default' && !own.has(name))
+        if (kind === 'data' && name !== 'default' && !own.has(name) && starred.get(name) === 1)
           found.add(name)
       }
     }
