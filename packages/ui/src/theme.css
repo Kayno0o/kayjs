@@ -647,6 +647,10 @@
     & :where(.leaflet-tile-loaded) {
       visibility: inherit;
     }
+    /* Raster tiles are drawn light, so a map in a dark scheme darkens them, unless the app gave darkTiles; --map-tiles-dark sets the filter, `none` keeping them light. */
+    &[data-dark-tiles] :where(.leaflet-tile-pane) {
+      filter: var(--map-tiles-dark, invert(1) hue-rotate(180deg) brightness(0.95) contrast(0.9));
+    }
     & :where(.leaflet-tile-pane img, .leaflet-tile, .leaflet-overlay-pane svg) {
       max-width: none !important;
       max-height: none !important;
@@ -693,8 +697,13 @@
       stroke: var(--color-accent);
       fill: var(--color-accent);
       fill-opacity: 1;
+      outline: none;
     }
-    /* A dark casing under the accent, so the picked part stands out on tiles that are light in either scheme; --map-casing sets its colour. */
+    & :where(.kui-map-view-marker:focus-visible) {
+      stroke: var(--color-foreground);
+      stroke-width: 3px;
+    }
+    /* A dark casing under the accent, so the picked part stands out on light tiles; --map-casing sets its colour. */
     & :where(.kui-map-view-casing) {
       stroke: var(--map-casing, black);
       stroke-opacity: 0.5;

@@ -56,6 +56,28 @@ inBrowser('chart and media recipes in the browser', () => {
     expect(await looks(page, '#map .leaflet-control-attribution', ['font-size', 'position'])).toMatchObject({ 'font-size': '11px' })
   })
 
+  test('MapView darkens its tiles while its colour scheme is dark, and rings a focused marker in the foreground', async () => {
+    const site = await shared()
+
+    await using page = await site.open('/chart-media', { width: 1000 })
+
+    await page.waitFor('#map .leaflet-overlay-pane path')
+    await page.evaluate(() => document.documentElement.setAttribute('data-theme', 'light'))
+    await page.waitFor('#map [data-part=canvas]:not([data-dark-tiles])')
+    expect(await looks(page, '#map .leaflet-tile-pane', ['filter'])).toEqual({ filter: 'none' })
+
+    await page.evaluate(() => document.documentElement.setAttribute('data-theme', 'dark'))
+    await page.waitFor('#map [data-part=canvas][data-dark-tiles]')
+    expect((await looks(page, '#map .leaflet-tile-pane', ['filter'])).filter).toContain('invert(1)')
+
+    await page.evaluate(() => document.querySelector<SVGElement>('#map path.kui-map-view-marker')!.focus())
+
+    const ring = await looks(page, '#map path.kui-map-view-marker', ['stroke', 'stroke-width'])
+
+    expect(ring['stroke-width']).toBe('3px')
+    expect(ring.stroke).toBe((await looks(page, '#map [data-part=canvas]', ['color'])).color!)
+  })
+
   test('LineChart sizes its frame, plot, legend and key, lays its overlay over the plot, and draws the cursor, dots, band and tooltip it shows on a point', async () => {
     const site = await shared()
 

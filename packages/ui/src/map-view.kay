@@ -1,8 +1,9 @@
 ---
 import type { JSX } from 'kay'
-import type { LeafletApi, LeafletGroup, LeafletLayer, LeafletView, MapMarker, MapPoint } from './map-view'
-import { effect, onCleanup, onMount, recipe, reducedMotion, signal, untrack } from 'kay'
+import type { LeafletApi, LeafletGroup, LeafletLayer, LeafletPath, LeafletView, MapMarker, MapPoint } from './map-view'
+import { effect, mediaQuery, onCleanup, onMount, recipe, reducedMotion, signal, untrack } from 'kay'
 import { drawnPoints, OSM_ATTRIBUTION, OSM_TILES, validPoint } from './map-view'
+import { steppedPoint } from './plot'
 
 const look = recipe({
   parts: {
@@ -17,10 +18,10 @@ const look = recipe({
   },
 })
 
-const { lines = [], markers = [], highlight, tiles = OSM_TILES, attribution = OSM_ATTRIBUTION, maxZoom = 19, center = [20, 0], zoom = 2, label, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'role'> & {
-  // Polylines, each an array of [latitude, longitude] points.
+const { lines = [], markers = [], highlight, tiles = OSM_TILES, attribution = OSM_ATTRIBUTION, darkTiles, darkAttribution, maxZoom = 19, center = [20, 0], zoom = 2, label, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'role'> & {
+  // Polylines, each an array of [latitude, longitude] points; a change redraws them, refitting only while the visitor has not moved the map.
   lines?: readonly (readonly MapPoint[])[] | undefined
-  // Round markers; a `label` shows on hover and is read by screen readers, a `popup` opens on a click and is read in the list too.
+  // Round markers; a `label` shows on hover or focus and is read by screen readers, a `popup` opens on a click, Enter or Space and is read in the list too.
   markers?: readonly MapMarker[] | undefined
   // A path drawn over the lines and brought into view, such as the entry picked in a timeline; one point draws a dot. Unset, the map fits what it draws again.
   highlight?: readonly MapPoint[] | undefined
@@ -28,6 +29,9 @@ const { lines = [], markers = [], highlight, tiles = OSM_TILES, attribution = OS
   tiles?: string | undefined
   // HTML shown in the corner for the tiles' source; set it with `tiles`, and the map follows a change to either.
   attribution?: string | undefined
+  // The tiles drawn while the map's colour scheme is dark, in place of the filter that darkens `tiles` otherwise, credited with `darkAttribution` (`attribution` unset).
+  darkTiles?: string | undefined
+  darkAttribution?: string | undefined
   maxZoom?: number | undefined
   // Where the map looks while there is nothing to fit, and how close.
   center?: MapPoint | undefined
@@ -45,6 +49,10 @@ const names = () => markers.flatMap(marker => marker.label || marker.popup ? [[m
 const textNode = (leaflet: LeafletApi, text: string) => Object.assign(leaflet.DomUtil.create('div'), { textContent: text })
 
 const still = reducedMotion()
+const systemDark = mediaQuery('(prefers-color-scheme: dark)')
+
+// Whether the map's own colour scheme is dark, which `data-theme` on any element around it sets as the system does.
+const dark = signal(false)
 
 // The map once Leaflet has loaded, which the effects below draw on.
 const drawing = signal<{ view: LeafletView, base: LeafletGroup, picked: LeafletGroup, leaflet: LeafletApi } | null>(null)
@@ -53,6 +61,18 @@ onMount(() => {
   let gone = false
   let view: LeafletView | undefined
   let observer: ResizeObserver | undefined
+
+  // A computed `light dark` leaves the choice to the system.
+  const readScheme = (prefersDark: boolean) => {
+    const scheme = canvas ? getComputedStyle(canvas).colorScheme : ''
+
+    dark = scheme.includes('dark') && (!scheme.includes('light') || prefersDark)
+  }
+
+  const themes = typeof MutationObserver === 'undefined' ? undefined : new MutationObserver(() => readScheme(untrack(systemDark)))
+
+  themes?.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'], subtree: true })
+  effect(() => readScheme(systemDark()))
 
   void (async () => {
     let leaflet: LeafletApi
@@ -77,6 +97,10 @@ onMount(() => {
 
       view = leaflet.map(canvas, { zoomSnap: 0.5, attributionControl: false, zoomAnimation: !calm, fadeAnimation: !calm, markerZoomAnimation: !calm })
       view.addControl(leaflet.control.attribution({ prefix: false }))
+      // Any move but a fit is the visitor's, a popup's auto-pan included; a fit's own moves end with the first `moveend`, its zoom animation starting a frame later.
+      view.on('movestart zoomstart', () => moved ||= !fitting)
+      view.on('dragstart', () => moved = true)
+      view.on('moveend', () => fitting = false)
 
       // A map mounted hidden has no size to fit into: it fits once the box gets one, and learns of later resizes.
       if (typeof ResizeObserver !== 'undefined') {
@@ -110,6 +134,9 @@ onMount(() => {
   // Where the map fits: the highlight when there is one, else everything drawn, else the centre.
   let all: MapPoint[] = []
   let chosen: MapPoint[] = []
+  // Whether the visitor panned or zoomed since the last fit, which a change to the lines or markers then leaves be.
+  let moved = false
+  let fitting = false
 
   const fit = (map: LeafletView) => {
     const leaflet = drawing()?.leaflet
@@ -117,6 +144,9 @@ onMount(() => {
 
     if (!leaflet)
       return
+
+    moved = false
+    fitting = true
 
     if (chosen.length > 0)
       map.fitBounds(leaflet.latLngBounds(chosen), { padding: [48, 48], maxZoom: 16, animate })
@@ -135,9 +165,59 @@ onMount(() => {
     if (!ready)
       return
 
+    const own = darkTiles !== undefined && dark()
+
     tileLayer?.remove()
-    tileLayer = ready.leaflet.tileLayer(tiles, { maxZoom, attribution }).addTo(ready.view)
+    tileLayer = ready.leaflet.tileLayer(own ? darkTiles : tiles, { maxZoom, attribution: own ? darkAttribution ?? attribution : attribution }).addTo(ready.view)
   })
+
+  // The markers with a label or a popup, one tab stop in all: the arrows and Home and End walk them in the order of `markers`, as a scatter chart's dots.
+  let stops: SVGElement[] = []
+  let stop = 0
+
+  const focusable = (dot: LeafletPath, marker: MapMarker, at: number, map: LeafletView) => {
+    const element = dot.getElement()
+
+    if (!element)
+      return
+
+    element.setAttribute('tabindex', at === stop ? '0' : '-1')
+    element.setAttribute('role', marker.popup ? 'button' : 'img')
+    element.setAttribute('aria-label', marker.label || marker.popup || '')
+    // Leaflet shows the label on focus, and the marker comes into view if the visitor moved away from it.
+    element.addEventListener('focus', () => {
+      stops[stop]?.setAttribute('tabindex', '-1')
+      stop = at
+      element.setAttribute('tabindex', '0')
+      map.panInside(marker.at, { padding: [24, 24], animate: !untrack(still) })
+    })
+    element.addEventListener('keydown', (event) => {
+      if (event.altKey || event.ctrlKey || event.metaKey)
+        return
+
+      if (marker.popup && (event.key === 'Enter' || event.key === ' ')) {
+        event.preventDefault()
+        dot.togglePopup()
+
+        return
+      }
+
+      if (event.key === 'Escape') {
+        dot.closePopup()
+
+        return
+      }
+
+      const next = steppedPoint(event.key, at, stops.length)
+
+      if (next === undefined)
+        return
+
+      event.preventDefault()
+      stops[next]?.focus({ preventScroll: true })
+    })
+    stops.push(element)
+  }
 
   effect(() => {
     const ready = drawing()
@@ -149,7 +229,15 @@ onMount(() => {
     const paths = lines.map(path => path.filter(validPoint)).filter(path => path.length > 0)
     const marks = markers.filter(marker => validPoint(marker.at))
 
+    all = drawnPoints(paths, marks)
+
+    // Fitting first gives a new map its view, which Leaflet waits for before drawing a layer, so the markers' elements exist below.
+    if (!moved)
+      fit(map)
+
     base.clearLayers()
+    stops = []
+    stop = Math.min(stop, Math.max(0, marks.filter(marker => marker.label || marker.popup).length - 1))
 
     for (const path of paths)
       leaflet.polyline(path, { weight: 3, className: 'kui-map-view-line' }).addTo(base)
@@ -162,10 +250,10 @@ onMount(() => {
 
       if (marker.popup)
         dot.bindPopup(textNode(leaflet, marker.popup))
-    }
 
-    all = drawnPoints(paths, marks)
-    fit(map)
+      if (marker.label || marker.popup)
+        focusable(dot, marker, stops.length, map)
+    }
   })
 
   effect(() => {
@@ -194,12 +282,13 @@ onMount(() => {
   onCleanup(() => {
     gone = true
     observer?.disconnect()
+    themes?.disconnect()
     view?.remove()
   })
 })
 ---
 div(part="root" {...rest} role="region" aria-label={label})
-  div(part="canvas")
+  div(part="canvas" data-dark-tiles={dark() && darkTiles === undefined ? '' : undefined})
     div(part="surface" ref={el => canvas = el})
   if names().length > 0
     ul(part="list")

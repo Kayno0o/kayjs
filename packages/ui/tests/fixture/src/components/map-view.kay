@@ -2,12 +2,12 @@
 import type { MapPoint } from '@kaynooo/kayjs-ui'
 import MapView from '@kaynooo/kayjs-ui/map-view.kay'
 
-// What the test sets: the path highlighted on the map.
-const { highlight, hostile = false } = props<{ highlight?: MapPoint[] | undefined, hostile?: boolean }>()
+// What the tests set: the path highlighted on the map, and the custom map's tiles and route, which they change once it is drawn.
+const { highlight, hostile = false, tiles = 'https://tiles.example/{z}/{x}/{y}.png', attribution = 'Example tiles', darkTiles, maxZoom, route = [[0, 0], [1, 1]] } = props<{ highlight?: MapPoint[] | undefined, hostile?: boolean, tiles?: string, attribution?: string, darkTiles?: string | undefined, maxZoom?: number | undefined, route?: MapPoint[] }>()
 ---
-MapView#map(label="Route" lines={[[[48.85, 2.35], [48.86, 2.37], [48.87, 2.4]], [[48.9, 2.3], [Number.NaN, 2.3]]]} markers={[{ at: [48.85, 2.35], label: 'Start', popup: '<b>Start</b>' }, { at: [48.87, 2.4] }]} highlight={highlight})
+MapView#map(label="Route" lines={[[[48.85, 2.35], [48.86, 2.37], [48.87, 2.4]], [[48.9, 2.3], [Number.NaN, 2.3]]]} markers={[{ at: [48.85, 2.35], label: 'Start', popup: '<b>Start</b>' }, { at: [48.87, 2.4] }, { at: [48.86, 2.37], label: 'Halfway' }]} highlight={highlight})
 MapView#empty(label="Nothing yet")
-MapView#custom(label="Custom" tiles="https://tiles.example/{z}/{x}/{y}.png" attribution="Example tiles" lines={[[[0, 0], [1, 1]]]})
+MapView#custom(label="Custom" tiles={tiles} attribution={attribution} darkTiles={darkTiles} maxZoom={maxZoom} lines={[route]})
 if hostile
   MapView#hostile(label="Hostile" markers={[{ at: [1, 1], label: '<img src=x onerror=alert(1)>' }]})
 MapView#sized(label="Sized" tiles="https://tiles.example/{z}/{x}/{y}.png" lines={[[[0, 0], [1, 1]]]})
