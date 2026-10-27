@@ -29,10 +29,19 @@ function scriptImportsOf(source: string): string[] {
   }
 }
 
+export interface BrowserModules {
+  modules: Set<string>
+  promoted: Set<string>
+  // The components whose own script the browser runs.
+  seeds: string[]
+  // For each module, the first component reaching it and the import of its own that leads there.
+  origins: Map<string, { seed: string, specifier: string }>
+}
+
 // The project's own TypeScript modules the browser bundle reaches: those the script of an island, of a component only islands render and of a static one the build promotes to an island imports, and those they import in turn; and the promoted components themselves, as `findKayFiles` lists them.
 // A static component that passes a function is promoted only when its imports reach an island, the project's own, a library's or a mounted one, as the build decides, and a module the server alone imports is left out, as the browser never loads it.
 // `own` holds the text of the project's own components.
-export async function browserModules(root: string, routesDir: string, extensions: KayExtension[] | undefined, own: Map<string, string>): Promise<{ modules: Set<string>, promoted: Set<string> }> {
+export async function browserModules(root: string, routesDir: string, extensions: KayExtension[] | undefined, own: Map<string, string>): Promise<BrowserModules> {
   const built = await buildFiles(root, extensions)
   const sources = new Map(own)
 
@@ -49,20 +58,29 @@ export async function browserModules(root: string, routesDir: string, extensions
   const seeds = [...new Set([...islands, ...promoted, ...islandOnly])]
   const inside = (file: string) => file.startsWith(project) && !file.includes(`${sep}node_modules${sep}`)
   const reached = new Set<string>()
+  const origins = new Map<string, { seed: string, specifier: string }>()
   const modulesOf = (file: string, specifiers: string[]) => specifiers.filter(specifier => !OUTSIDE.test(specifier)).flatMap((specifier) => {
     const target = resolveFrom(specifier, file)
 
-    return target !== undefined && inside(target) && SCRIPT_MODULE.test(target) && !DECLARATION_FILE.test(target) ? [target] : []
+    return target !== undefined && inside(target) && SCRIPT_MODULE.test(target) && !DECLARATION_FILE.test(target) ? [{ target, specifier }] : []
   })
-  const queue = seeds.flatMap(file => modulesOf(file, scriptImportsOf(sources.get(file)!)))
+  const queue: { module: string, origin: { seed: string, specifier: string } }[] = []
 
-  for (const module of queue) {
+  for (const seed of seeds) {
+    for (const { target, specifier } of modulesOf(seed, scriptImportsOf(sources.get(seed)!)))
+      queue.push({ module: target, origin: { seed, specifier } })
+  }
+
+  for (const { module, origin } of queue) {
     if (reached.has(module))
       continue
 
     reached.add(module)
-    queue.push(...modulesOf(module, await importsOf(module)))
+    origins.set(module, origin)
+
+    for (const { target } of modulesOf(module, await importsOf(module)))
+      queue.push({ module: target, origin })
   }
 
-  return { modules: reached, promoted }
+  return { modules: reached, promoted, seeds, origins }
 }

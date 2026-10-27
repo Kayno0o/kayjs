@@ -12,6 +12,7 @@ import process from 'node:process'
 import { fileURLToPath } from 'node:url'
 import { findKayFiles, findProjectFiles, inWalkScope, writeIfChanged } from '../build/files'
 import { missingContextModules } from '../build/manifests'
+import { mentionsServerOnly } from '../build/server-only'
 import { browserRole, promotedChecks } from '../compiler'
 import { moduleChecks, turnsCaptchaOff } from '../compiler/fence-checks'
 import { isLaunchLint, isLint, isLintGroup, LEVELS, lintLevel, lintLevels } from '../compiler/lints'
@@ -25,6 +26,7 @@ import { CONTENT_CHECK, contentPropsCheck } from './generated'
 import { browserModules } from './island-modules'
 import { FILES_MARKER, stampOf } from './loaded'
 import { configSeoLints } from './seo'
+import { serverOnlyInIsland } from './server-only-reads'
 import { fromCompile } from './shadow-types'
 import { redirectChainLints } from './site-seo'
 import { uiProblems } from './ui'
@@ -138,8 +140,10 @@ async function moduleLints(root: string, options: CheckOptions): Promise<CheckDi
   const texts = new Map(await Promise.all(files.map(async file => [file, await Bun.file(file).text()] as const)))
   // Following the imports of every component is worth it only when some module or component names the entry, or one passes an island a function.
   const componentTexts = new Map(await Promise.all((await findKayFiles(root, { project: true, ownKayOnly: true })).map(async file => [file, await Bun.file(file).text()] as const)))
-  const named = [...texts.values(), ...componentTexts.values()].some(text => text.includes('kay/cache')) || [...componentTexts].some(([file, text]) => browserRole(text, file, undefined, root) === 'promotable')
-  const { modules: inBrowser, promoted } = named ? await browserModules(root, projectPaths(root, options).routes, options.extensions, componentTexts) : { modules: new Set<string>(), promoted: new Set<string>() }
+  const named = [...texts.values(), ...componentTexts.values()].some(text => text.includes('kay/cache') || mentionsServerOnly(text)) || [...componentTexts].some(([file, text]) => browserRole(text, file, undefined, root) === 'promotable')
+  const browser = named ? await browserModules(root, projectPaths(root, options).routes, options.extensions, componentTexts) : undefined
+  const inBrowser = browser?.modules ?? new Set<string>()
+  const promoted = browser?.promoted ?? new Set<string>()
   const report = (file: string, source: string, diagnostics: ReturnType<typeof moduleChecks>) => {
     const levelAt = lintLevels(source, levels)
 
@@ -156,6 +160,7 @@ async function moduleLints(root: string, options: CheckOptions): Promise<CheckDi
       return report(file, source, moduleChecks(source, inBrowser.has(realpathSync(file))))
     }),
     ...[...promoted].flatMap(file => report(file, componentTexts.get(file)!, promotedChecks(componentTexts.get(file)!, root))),
+    ...browser ? await serverOnlyInIsland(root, browser) : [],
   ]
 
   return found

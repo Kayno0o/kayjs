@@ -575,6 +575,77 @@ describe.concurrent('kay check, edge cases', () => {
     }
   })
 
+  describe('server-only-in-island', () => {
+    const island = (imports: string, body = '') => `---\nimport { signal } from 'kay'\n${imports}\n\nconst count = signal(0)\n${body}---\nbutton(onClick={() => count++}) {count()}\n`
+    const page = { 'src/routes/index.kay': '---\nimport Counter from \'../components/counter.kay\'\n---\nCounter\n' }
+    const found = async (files: Record<string, string>) => {
+      const root = await scratchProject({ ...page, ...files })
+
+      try {
+        return (await check(root)).filter(d => d.code === 'server-only-in-island').map(d => ({ at: `${d.file.slice(root.length + 1)}:${d.line}`, message: d.message }))
+      }
+      finally {
+        await rm(root, { recursive: true, force: true })
+      }
+    }
+
+    it('reports an island importing a module that builds s schemas, at the island\'s import line and naming the module', async () => {
+      const diagnostics = await found({
+        'src/components/counter.kay': island('import { SHAPE } from \'../lib/schemas\''),
+        'src/lib/schemas.ts': 'import { s } from \'kay\'\n\nexport const SHAPE = s.Object({ name: s.String() })\n',
+      })
+
+      expect(diagnostics.map(d => d.at)).toEqual(['src/components/counter.kay:3'])
+      expect(diagnostics[0]!.message).toContain('src/lib/schemas.ts')
+      expect(diagnostics[0]!.message).toContain('src/components/counter.kay')
+    })
+
+    it('follows a module an island reaches through another, and an aliased s', async () => {
+      const diagnostics = await found({
+        'src/components/counter.kay': island('import { total } from \'../lib/total\''),
+        'src/lib/total.ts': 'export { total } from \'./deep\'\n',
+        'src/lib/deep.ts': 'import { s as schema } from \'kay\'\n\nconst SHAPE = schema.Object({})\n\nexport const total = SHAPE.type\n',
+      })
+
+      expect(diagnostics.map(d => d.at)).toEqual(['src/components/counter.kay:3'])
+      expect(diagnostics[0]!.message).toContain('src/lib/deep.ts')
+    })
+
+    it('reports an s built in the island\'s own script, at the read', async () => {
+      expect((await found({ 'src/components/counter.kay': island('import { s } from \'kay\'', 'const SHAPE = s.Object({})\n') })).map(d => d.at)).toEqual(['src/components/counter.kay:6'])
+    })
+
+    it('passes a type-only s, an s no module scope builds, and a module only the server imports', async () => {
+      expect(await found({
+        'src/components/counter.kay': island('import { LABEL } from \'../lib/labels\''),
+        'src/lib/labels.ts': 'import type { s } from \'kay\'\n\nexport const LABEL = \'a\'\nexport type Shape = typeof s\n',
+      })).toEqual([])
+      expect(await found({
+        'src/components/counter.kay': island('import { LABEL } from \'../lib/labels\''),
+        'src/lib/labels.ts': 'import { s } from \'kay\'\n\nexport const LABEL = \'a\'\nexport const shape = () => s.Object({})\n',
+      })).toEqual([])
+      expect(await found({
+        'src/components/counter.kay': island('import { LABEL } from \'../lib/labels\''),
+        'src/lib/labels.ts': 'export const LABEL = \'a\'\n',
+        'src/lib/server.ts': 'import { s } from \'kay\'\n\nexport const SHAPE = s.Object({})\n',
+      })).toEqual([])
+    })
+
+    it('reports a process or Bun read as a module an island reaches loads, and passes NODE_ENV and a typeof guard', async () => {
+      const diagnostics = await found({
+        'src/components/counter.kay': island('import { A } from \'../lib/a\'\nimport { B } from \'../lib/b\'\nimport { C } from \'../lib/c\'\nimport { D } from \'../lib/d\''),
+        'src/lib/a.ts': 'export const A = process.env.SECRET\n',
+        'src/lib/b.ts': 'export const B = Bun.env.SECRET\n',
+        'src/lib/c.ts': 'export const C = process.env.NODE_ENV\n',
+        'src/lib/d.ts': 'export const D = typeof process === \'undefined\' ? \'\' : process.env.SECRET\n',
+      })
+
+      expect(diagnostics.map(d => d.at)).toEqual(['src/components/counter.kay:3', 'src/components/counter.kay:4'])
+      expect(diagnostics[0]!.message).toContain('process')
+      expect(diagnostics[1]!.message).toContain('Bun')
+    })
+  })
+
   it('follows a barrel module an island imports through export * and export { x } from', async () => {
     const root = await scratchProject({
       'src/routes/index.kay': '---\nimport Counter from \'../components/counter.kay\'\n---\nCounter\n',

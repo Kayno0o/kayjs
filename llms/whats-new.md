@@ -5,6 +5,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 ## Unreleased
 
 - The `kay` preset of `@kaynooo/eslint` (7.1.4) turns `ts/await-thenable` off in an app's test files, so `await expect(...).rejects...` lints clean with no override: [Lint with ESLint](checks.md#lint-the-script-fences-and-template-expressions-with-eslint).
+- `kay check` reports `server-only-in-island` for an island, or a module it imports, that builds schemas with `s` or reads `process` or `Bun` as it loads, at the island's import line, where the build used to be the first to refuse it: [Server globals in the browser](browser-only.md#server-globals-in-the-browser).
 - `kay docs <words>` prints the section of kay's or an installed library's llms files that words or a name match, with the labels of the next matches and, for a component, its props read from its installed source, `kay mcp` has it as its `docs` tool and `kay explain` of a name that is no lint points at it, so an agent finds a topic in one call: [Find a topic in the docs](editor-and-agent-commands.md#find-a-topic-in-the-docs).
 - kay's manifest link carries `crossorigin="use-credentials"`, so an app behind a cookie login proxy loads its manifest and installs: [Favicon and web manifest](sitemap-search-fonts.md#favicon-and-web-manifest).
 - kayjs-ui has a `Timeline`, a vertical list of time-stamped entries with an optional icon or muted tone, each pickable through a bindable `selected` key ([Page layout](../packages/ui/llms/page-layout-palette-and-trees.md)).

@@ -81,6 +81,64 @@ function readsIn(code: string, fenced: boolean): Set<string> {
   return program === undefined ? new Set() : namesIn(program)
 }
 
+// Whether a source is worth following the browser's imports for: it names a server-only global or imports `s`.
+export function mentionsServerOnly(source: string): boolean {
+  return MENTIONED.test(source) || importsKaySchema(source)
+}
+
+export interface LoadTimeRead {
+  // `s` for kay's schema builder, else the global.
+  name: string
+  // Where in the source it is read.
+  start: number
+}
+
+// What a module reads of the server as it loads, which no tree-shaking drops: the server-only globals `refuseServerOnlyReads` finds, and kay's `s` called or read at module scope, which the browser's stand-in throws on.
+// `fenced` reads a `.kay` file's script and module fences, the ones the browser runs.
+// A read inside a function is left out: whether it runs depends on what the importer calls, which only the build's own bundle knows.
+export function loadTimeReads(source: string, fenced: boolean): LoadTimeRead[] {
+  const file = fenced ? parseKay(source) : undefined
+  const spans = file ? [file.script, file.module].filter(span => span !== undefined) : [{ start: 0, end: source.length }]
+  const found: LoadTimeRead[] = []
+
+  for (const { start, end } of spans) {
+    const text = source.slice(start, end)
+
+    if (!MENTIONED.test(text) && !text.includes('kay'))
+      continue
+
+    const program = parsed(text, fenced)
+
+    if (program === undefined)
+      continue
+
+    walkScope(program, {
+      Identifier(path: NodePath<t.Identifier>) {
+        const { name } = path.node
+
+        if (!path.isReferencedIdentifier() || path.getFunctionParent() !== null || path.findParent(parent => parent.isTSType()) !== null)
+          return
+
+        if (SERVER_ONLY.has(name)) {
+          if (!path.scope.hasBinding(name, { noGlobals: true }) && !defined(path) && !guarded(path, name))
+            found.push({ name, start: start + path.node.start! })
+
+          return
+        }
+
+        const binding = path.scope.getBinding(name)
+        const specifier = binding?.path.node
+        const declaration = binding?.path.parentPath?.node
+
+        if (specifier?.type === 'ImportSpecifier' && specifier.importKind !== 'type' && specifier.imported.type === 'Identifier' && specifier.imported.name === 's' && declaration?.type === 'ImportDeclaration' && declaration.source.value === 'kay' && declaration.importKind !== 'type')
+          found.push({ name: 's', start: start + path.node.start! })
+      },
+    })
+  }
+
+  return found
+}
+
 function namesIn(program: t.File): Set<string> {
   const found = new Set<string>()
 
