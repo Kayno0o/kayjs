@@ -1,0 +1,15 @@
+--- server
+import { action, s } from 'kay'
+
+export const upload = action(s.Object({ file: s.File({ maxSize: '2mb' }) }), ({ file }) => file.size)
+export const own = action(s.Object({ file: s.File({ maxSize: '2mb' }) }), ({ file }) => file.size, { maxSize: '1mb' })
+export const many = action(s.Object({ files: s.Files({ maxSize: '1mb', maxItems: 3 }) }), ({ files }) => files.length)
+
+const failures = [upload.failed(), own.failed(), many.failed()]
+---
+form(action={upload})
+  input(type="file" name="file" aria-label="File")
+  button Send
+for failure of failures
+  if failure
+    p.error {failure.status} {Object.values(failure.errors).join(' ')}

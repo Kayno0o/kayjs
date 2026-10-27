@@ -1,5 +1,7 @@
 import type { TSchema } from 'elysia'
+import type { ByteSize } from './byte-size'
 import { t as schema } from 'elysia'
+import { byteSize } from './byte-size'
 
 type Builder = typeof schema
 
@@ -33,5 +35,25 @@ function UnionKeys<const Keyed extends object>(record: Keyed, options?: Paramete
   return UnionEnum(keys as [keyof Keyed & string, ...(keyof Keyed & string)[]], options)
 }
 
-// Elysia's schema builder, re-exported so an action's schema needs no import of its own, with `Secret` and `Public` for `defineEnv` and `UnionKeys`.
-export const s: Builder & { Secret: typeof Secret, Public: typeof Public, UnionKeys: typeof UnionKeys } = { ...schema, UnionEnum, Secret, Public, UnionKeys }
+type FileOptions = Omit<NonNullable<Parameters<Builder['File']>[0]>, 'minSize' | 'maxSize'> & { minSize?: ByteSize | undefined, maxSize?: ByteSize | undefined }
+type FilesOptions = Omit<NonNullable<Parameters<Builder['Files']>[0]>, 'minSize' | 'maxSize'> & { minSize?: ByteSize | undefined, maxSize?: ByteSize | undefined }
+
+// Elysia reads `'2m'` and `'600k'`, kay everywhere else `'2mb'` and `'600kb'`: the sizes of a file field are read as the action's `maxSize` is and handed to Elysia as bytes.
+function sized<Options extends { minSize?: ByteSize | undefined, maxSize?: ByteSize | undefined }>(options: Options | undefined, name: string): (Omit<Options, 'minSize' | 'maxSize'> & { minSize?: number, maxSize?: number }) | undefined {
+  if (options === undefined)
+    return undefined
+
+  const { minSize, maxSize, ...rest } = options
+
+  return {
+    ...rest,
+    ...minSize !== undefined && { minSize: byteSize(minSize, `${name}({ minSize })`) },
+    ...maxSize !== undefined && { maxSize: byteSize(maxSize, `${name}({ maxSize })`) },
+  }
+}
+
+const File = (options?: FileOptions): ReturnType<Builder['File']> => schema.File(sized(options, 's.File'))
+const Files = (options?: FilesOptions): ReturnType<Builder['Files']> => schema.Files(sized(options, 's.Files'))
+
+// Elysia's schema builder, re-exported so an action's schema needs no import of its own, with `Secret` and `Public` for `defineEnv`, `UnionKeys`, and `File` and `Files` taking a size as an action's `maxSize` does.
+export const s: Omit<Builder, 'File' | 'Files'> & { File: typeof File, Files: typeof Files, Secret: typeof Secret, Public: typeof Public, UnionKeys: typeof UnionKeys } = { ...schema, UnionEnum, File, Files, Secret, Public, UnionKeys }

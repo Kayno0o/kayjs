@@ -14,6 +14,8 @@ const NO_BODY = new Set(['GET', 'HEAD', 'OPTIONS'])
 // What an action or an API module lets a request send, the app's limit when it sets none, and its answer to one sending more.
 export interface BodyLimit {
   bytes?: ByteSize | undefined
+  // What the sized file fields of an action's schema need, which raises the app's limit when `bytes` is unset.
+  files?: number | undefined
   refuse: (request: Request, bytes: number, server: Server | null) => Response | Promise<Response>
 }
 
@@ -57,7 +59,7 @@ function specificity(path: string): number {
 // Any other route with a body (a library's, an extension's, the jobs page) has the app-wide limit.
 export function limitBodies(app: Elysia, size: ByteSize, actionSizes: Map<string, BodyLimit>, mountSizes: Map<string, MountLimit>, routeSizes: RouteBodyLimit[] = []): void {
   const bytes = checkLimit(size, 'maxSize')
-  const inBytes = ({ bytes: own, refuse }: BodyLimit, name: string) => ({ bytes: own === undefined ? undefined : checkLimit(own, name), refuse })
+  const inBytes = ({ bytes: own, files, refuse }: BodyLimit, name: string) => ({ bytes: own === undefined ? undefined : checkLimit(own, name), files, refuse })
   const actions = new Map([...actionSizes].map(([path, limit]) => [path, inBytes(limit, `the maxSize of ${path}`)]))
   const mounts = new Map([...mountSizes].map(([path, { bytes: own, refuse }]) => [path, { bytes: own === undefined ? undefined : checkLimit(own, `the maxSize of ${path}`), refuse }]))
   const routes = routeSizes.map(route => ({ ...route, limit: route.limit && inBytes(route.limit, `the maxSize of ${route.method} ${route.path}`) }))
@@ -81,7 +83,7 @@ export function limitBodies(app: Elysia, size: ByteSize, actionSizes: Map<string
     const path = withoutSlash(requestUrl(request).pathname)
     const own = matchers.find(route => (route.method === request.method || route.method === 'ALL') && route.matcher.test(path))
     const limit = own?.limit ?? actions.get(path) ?? mounted(path)
-    const allowed = limit?.bytes ?? bytes
+    const allowed = limit?.bytes ?? Math.max(bytes, (limit && 'files' in limit ? limit.files : undefined) ?? 0)
 
     return await exceeds(request, allowed) ? (limit ?? { refuse: refusePlainly }).refuse(request, allowed, server) : undefined
   })

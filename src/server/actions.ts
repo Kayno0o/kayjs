@@ -29,6 +29,7 @@ import { importModule } from './bundle'
 import { cookieJar } from './cookies'
 import { eventBody } from './event-stream'
 import { fieldMessage, validated } from './field-errors'
+import { fileBodyLimit } from './file-limit'
 import { handOver, submittedValues, writeSuccess } from './flash'
 import { requiredGuards, runGuards, unguarded } from './guards'
 import { requestLocale, stateFor } from './i18n'
@@ -188,7 +189,7 @@ export async function registerActionRoutes(app: Elysia, routes: ServedRoute[], m
       if (tool && page.params.length === 0)
         tools.push({ name, url: value.url, schema: value.schema, tool, guards: guards.filter(guard => guard.check !== unguarded).map(guard => guard.file) })
 
-      limits.set(value.url, { bytes: value.protection?.maxSize, refuse: async (request, bytes, server) => inLocale(request, options, async () => tooLarge(value, request, bytes, server, back)) })
+      limits.set(value.url, { bytes: value.protection?.maxSize, files: fileBodyLimit(value.schema), refuse: async (request, bytes, server) => inLocale(request, options, async () => tooLarge(value, request, bytes, server, back)) })
       // A span per call, the handler's own spans and the page it renders back nested in it.
       app.post(value.url, async context => traced(`POST ${value.url}`, () => ({ kind: SERVER_SPAN, attributes: { 'http.request.method': 'POST', 'http.route': value.url, 'url.path': value.url, 'kay.request.id': requestId(context.request) } }), async (span) => {
         const response = await answeringRequest(context.request, async () => inLocale(context.request, options, async () => onceWritten(context.request, value.url, async () => runAction(value, sharedContext(context.request, () => ({ ...context })), options, back, { params: () => readPage(context.request, page, match, options), url: () => cachedPageUrl(context.request, () => guardedPage(context.request, page, match, options)) }))))

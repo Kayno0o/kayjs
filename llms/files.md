@@ -184,4 +184,5 @@ if upload.progress() !== undefined
 - On a top-level field, `s.File({ type: 'image/png' })` checks the file's bytes, not its name or declared type.
 - A file it refuses fails like any field, under its name in `errors` with the schema's `error` option when set.
 - A nested file is checked against the type it declares only.
-- A post sends 1 MB at most unless the action raises its `maxSize` (see [Protecting actions](action-protection.md)), which a form taking files usually does.
+- A post sends 1 MB at most unless the action raises its `maxSize` (see [Protecting actions](action-protection.md)).
+- `s.File({ minSize, maxSize })` and `s.Files` take a size as an action's `maxSize` does, `'2mb'`, `'600kb'` or bytes. An action with no `maxSize` of its own takes as many bytes as its sized file fields add up to (a `Files` field counting its `maxItems` files, or one) plus 64 KB for the other fields, never less than the app's, so the limit is written once on the field; an action's own `maxSize` wins.
