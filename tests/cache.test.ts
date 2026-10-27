@@ -125,6 +125,28 @@ describe('cached', () => {
     expect(await cached('strict', '30s', load, { stale: false })).toBe(3)
   })
 
+  it('logs a stale: false refresh whose value its store cannot hold', async () => {
+    const logged = spyOn(console, 'error').mockImplementation(() => undefined)
+    const store = sqliteCache(join(await scratchDir('strict-keep-'), 'cache.sqlite'))
+    let loads = 0
+    const load = async (): Promise<unknown> => {
+      loads++
+      await Bun.sleep(1)
+
+      return loads === 1 ? 'text' : () => undefined
+    }
+
+    try {
+      expect(await cached('strict-keep', '30s', load, { stale: false, store })).toBe('text')
+      setSystemTime(Date.now() + 31_000)
+      await cached('strict-keep', '30s', load, { stale: false, store })
+      expect(logged).toHaveBeenCalledTimes(1)
+    }
+    finally {
+      logged.mockRestore()
+    }
+  })
+
   it('answers the fallback when a first load throws, storing nothing and trying again after a minute', async () => {
     const logged = spyOn(console, 'error').mockImplementation(() => undefined)
     let failing = true

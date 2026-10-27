@@ -130,7 +130,7 @@ const posts = await cached('posts', '5m', listPosts)
 
 - Concurrent calls for a key missing from the cache share one `load`.
 - Past `ttl`, the next call still gets the stale value and refreshes it in the background, so no request waits on a refresh.
-- `{ stale: false }` as the fourth argument, for a live feed that must never be older than its `ttl`: past it the next call waits for a fresh load, which concurrent callers share, a load that throws throws to all of them and the next call loads again.
+- `{ stale: false }` as the fourth argument, for a live feed that must never be older than its `ttl`: past it the next call waits for a fresh load, which concurrent callers share, a load that throws throws to all of them and the next call loads again. Give a key one `stale` setting: mixed with default callers, a failed strict refresh makes them reload in the background on every call, and a strict caller joining their failed refresh gets its error.
 - A first load that throws throws to its callers and keeps nothing; `{ fallback: [] }` gives that value instead, logging the error and storing nothing, so a page lists an outside service's data without it, and the load is tried again a minute later at most (the `ttl` when shorter), or at once after `invalidate(key)`.
 - A refresh that throws is logged and keeps the stale value, trying again a minute later at most.
 - For a visitor in preview mode (see [Preview mode](content-cms.md#preview-mode)), every call runs `load` and keeps nothing, so they see what it gives now, errors included: a `fallback` is not used.

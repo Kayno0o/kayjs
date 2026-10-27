@@ -45,7 +45,7 @@ export interface CacheOptions<T = unknown> {
   store?: CacheStore | false | undefined
   // Every open page that read the value follows it: once an `invalidate` drops the key, or a key it was built from, the page shows what the loads give now. Needs the key read while a page renders, in its server fence or a layout's; a static export of such a page fails.
   live?: boolean | undefined
-  // `false` for a value that must never be older than its ttl, such as a live feed: past the ttl the next call waits for a fresh load, which concurrent callers share, instead of getting the stale value while it refreshes. A load that throws throws to those callers, and the next call loads again.
+  // `false` for a value that must never be older than its ttl, such as a live feed: past the ttl the next call waits for a fresh load, which concurrent callers share, instead of getting the stale value while it refreshes. A load that throws throws to those callers, and the next call loads again. Give a key one `stale` setting: a default caller of a key that failed a strict refresh reloads in the background on every call, and a strict caller joining a default caller's failed refresh gets its error.
   stale?: boolean | undefined
   // What a call gives when the first load throws, with the error logged, instead of throwing: a page that lists an outside service's data renders without it. It is not stored, and the load is tried again after a minute at most (the ttl when shorter), so a service that is down is not called on every request. `invalidate` of the key tries it at once.
   fallback?: T | undefined
@@ -351,7 +351,7 @@ async function withFallback<T>(key: string, seconds: number, fallback: T, loadin
   catch (error) {
     if (!failures.has(key) && before === invalidations) {
       if (failures.size >= MAX_ENTRIES)
-        failures.clear()
+        failures.delete(failures.keys().next().value as string)
 
       failures.set(key, { until: Date.now() + Math.min(seconds * 1000, RETRY_MS), deps })
       kayLog('error', `loading cached('${key}') failed; answering its fallback`, error)
@@ -700,23 +700,28 @@ async function firstLoad<T>(key: string, ttl: number, pending: Entry, load: () =
 
 async function refresh(key: string, ttl: number, entry: Entry, load: () => unknown, store: CacheStore | undefined, tagKeys: string[], inherited: boolean, strict = false): Promise<void> {
   const loading = trackedLoad(load)
+  let loaded = false
 
   entry.loading = loading
 
   try {
-    const { result: value, reads: loaded, invalidated } = await loading
-    const reads = [...tagKeys, ...loaded]
+    const { result: value, reads: read, invalidated } = await loading
+    const reads = [...tagKeys, ...read]
+
+    loaded = true
 
     // Only when nothing invalidated or replaced the key meanwhile, nor a key the load read.
     if (!invalidated && entries.get(key) === entry)
       keep(key, { value, freshUntil: Date.now() + ttl * 1000, loaded: true, ...reads.length > 0 ? { deps: reads } : {} }, store, inherited)
   }
   catch (error) {
-    // A strict refresh threw to the calls waiting for it, and the next one loads again.
-    if (strict)
+    // A strict refresh whose load threw has thrown to the calls waiting for it, and the next one loads again; a refresh that loaded but could not keep the value is logged.
+    if (strict && !loaded)
       return
 
-    entry.freshUntil = Date.now() + Math.min(ttl * 1000, RETRY_MS)
+    if (!strict)
+      entry.freshUntil = Date.now() + Math.min(ttl * 1000, RETRY_MS)
+
     kayLog('error', `refreshing cached('${key}') failed; keeping the stale value`, error)
   }
   finally {
