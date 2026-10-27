@@ -1,11 +1,11 @@
 import type { Elysia } from 'elysia'
 import type { Duration } from '../runtime/duration'
-import type { JobContext, JobStore, QueueOptions } from './queue'
+import type { JobContext, JobStore, QueueOptions, RunHold } from './queue'
 import { parse, stringify } from 'devalue'
 import { KayError } from '../compiler/errors'
 import { durationSeconds } from '../runtime/duration'
 import { kayLog } from '../runtime/log'
-import { attachWorkflow, claimHolds, defaultJobStore, GiveUpError, handedBack, queue, wakeQueue } from './queue'
+import { defaultJobStore, GiveUpError, jobQueue } from './queue'
 
 type Events = Record<string, unknown>
 
@@ -158,9 +158,9 @@ export function workflow<Input = undefined, Known extends Events = Events>(name:
   const { onFailed, store: own, ...rest } = options
   const storeOf = () => own ?? defaultJobStore()
 
-  const handler = async (payload: Payload<Input>, signal: AbortSignal, job: JobContext<unknown>) => {
+  const handler = async (payload: Payload<Input>, signal: AbortSignal, job: JobContext<unknown>, hold: RunHold) => {
     const { update, release } = needs(storeOf(), name)
-    const until = claimHolds.get(job)!
+    const { until } = hold
     const memo = [...payload.memo]
     const inbox = [...payload.inbox ?? []]
     let at = 0
@@ -171,7 +171,7 @@ export function workflow<Input = undefined, Known extends Events = Events>(name:
     // Ends the claim without the code after the step running: the step's promise never settles, so a `try` around it catches nothing.
     const halt = async (): Promise<never> => {
       halted = true
-      handedBack.add(job)
+      hold.handBack()
       ended.resolve()
 
       return new Promise<never>(noop)
@@ -313,7 +313,7 @@ export function workflow<Input = undefined, Known extends Events = Events>(name:
     await Promise.race([run, ended.promise])
   }
 
-  const queued = queue<Payload<Input>>(queueName, handler, {
+  const { queued, admin } = jobQueue<Payload<Input>>(queueName, handler, {
     ...rest,
     ...own && { store: own },
     ...onFailed && {
@@ -360,7 +360,7 @@ export function workflow<Input = undefined, Known extends Events = Events>(name:
     const woken = await update(run.job.id, { payload: stringify({ ...run.payload, memo, waiting: undefined }), runAt: now }, { payload: run.job.payload, now })
 
     if (woken)
-      wakeQueue(queueName)
+      admin.wake()
 
     return woken
   }
@@ -376,7 +376,7 @@ export function workflow<Input = undefined, Known extends Events = Events>(name:
     return true
   }
 
-  attachWorkflow(queueName, { send: async (id, event, data) => flowSend(id, event, data, true), cancel: async jobId => storeOf().complete(jobId) })
+  admin.workflow = { send: async (id, event, data) => flowSend(id, event, data, true), cancel: async jobId => storeOf().complete(jobId) }
 
   return Object.assign(queued as Elysia, {
     start: async (input?: Input, startOptions: StartOptions = {}) => {

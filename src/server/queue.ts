@@ -1,7 +1,6 @@
 import type { Database } from 'bun:sqlite'
 import type { Duration } from '../runtime/duration'
 import type { WorkflowAdmin } from './workflow'
-import { AsyncLocalStorage } from 'node:async_hooks'
 import { existsSync } from 'node:fs'
 import process from 'node:process'
 import { parse, stringify } from 'devalue'
@@ -12,10 +11,13 @@ import { kayLog } from '../runtime/log'
 import { openSqlite } from '../runtime/sqlite.server'
 import { appStore } from './app-store'
 import { MAX_TIMER_MS } from './config-limits'
-import { onDrain, stopGraceMs, STOPPED } from './drain'
+import { stopGraceMs, STOPPED } from './drain'
 import { inMemory } from './memory-mark'
+import { forgetDrain, inFlightWork, POLL_MS, Scheduler } from './queue-scheduler'
 import { onReload } from './reload'
 import { reportBackgroundError } from './report'
+
+export { drainQueues, inFlightWork, trackDetached } from './queue-scheduler'
 
 // A job as a store keeps it, its payload as devalue text.
 export interface StoredJob {
@@ -162,15 +164,11 @@ const DEFAULT_LOST_AFTER = '10m'
 const DEFAULT_KEEP_FAILED = '30d'
 // How often a process's workers drop the failed jobs past `keepFailed`.
 const PURGE_MS = 60 * 60 * 1000
-// How soon an idle queue looks again after a job, the first wait of its backoff.
-const POLL_MS = 1000
 // A store that fails marking a finished job is asked this many times, waiting a little longer between each, before the job is left to be taken again.
 const COMPLETE_TRIES = 3
 const COMPLETE_RETRY_MS = 100
 // The longest an idle queue waits between looks unless `idlePoll` says otherwise: a job another process enqueued waits this at worst.
 const DEFAULT_IDLE_POLL = '10s'
-// The longest a worker waits between looks at a store that keeps failing.
-const MAX_OUTAGE_MS = 60_000
 const DEFAULT_PATH = 'data/jobs.sqlite'
 
 // Thrown from a handler for a failure no retry can mend: the job is kept as failed at once, whatever attempts are left.
@@ -192,9 +190,6 @@ export function retryLater(wait: Duration, reason = 'it asked to run again later
   return new RetryLater(durationSeconds(wait, 'retryLater\'s wait') * 1000, reason)
 }
 
-// What drains each queue made, for `kay/test` to run them all.
-const drains = new Set<() => Promise<number>>()
-
 // What the dev tool's Jobs tab and a jobs page need of a queue: where its jobs are and the calls that act on one.
 export interface QueueAdmin {
   name: string
@@ -214,75 +209,18 @@ export interface QueueAdmin {
 // The queues this process made, by name: a queue made again under the same name (a reload) replaces the earlier one.
 const admins = new Map<string, QueueAdmin>()
 
-// Gives the queue of that name the calls of its workflow; they go with the queue when it is forgotten.
-export function attachWorkflow(name: string, workflow: WorkflowAdmin): void {
-  const admin = admins.get(name)
-
-  if (admin)
-    admin.workflow = workflow
-}
-
 export function queueAdmins(): QueueAdmin[] {
   return [...admins.values()]
 }
-// Work a library started off a response's path, which `drainQueues` waits for before it looks at the queues.
-const detached = new Set<Promise<unknown>>()
 
-// Registers work started off a response's path, such as a mail issued after the answer left, so a test's `runJobs()` finds what it enqueues; a rejection is ignored here, so the work logs its own failure.
-export function trackDetached(work: Promise<unknown>): void {
-  const tracked: Promise<void> = (async () => {
-    try {
-      await work
-    }
-    catch {
-      // The caller handles its own failure; here the work only has to be over.
-    }
-    finally {
-      queueMicrotask(() => detached.delete(tracked))
-    }
-  })()
-
-  detached.add(tracked)
+// What a run of `workflow`'s queue gets besides a handler's arguments.
+export interface RunHold {
+  // The hold the job was claimed with, which the run writes its checkpoints against.
+  until: number
+  // Tells the queue the handler gave the job back itself (a workflow that slept), so it does not complete it: a hold equal to the old one on a claim in the same millisecond would let the late complete delete the live job.
+  handBack: () => void
 }
 
-// Calls of kay's and its libraries' own async entry points (an enqueue, a mail send) that have not settled, which `drainQueues` waits for like detached work, so one an app left unawaited is found without the app declaring anything.
-let inFlight = 0
-const idleWaiters = new Set<() => void>()
-const flying = () => inFlight > 0
-const working = () => detached.size > 0 || flying()
-
-// Runs `work` counting it as in flight, and hands back its own promise, so its rejection reaches the caller as it would and an unawaited one stays unhandled.
-export async function inFlightWork<T>(work: () => Promise<T>): Promise<T> {
-  inFlight++
-
-  try {
-    return await work()
-  }
-  finally {
-    inFlight--
-
-    if (inFlight === 0) {
-      for (const wake of idleWaiters)
-        wake()
-
-      idleWaiters.clear()
-    }
-  }
-}
-
-// The hold each run was claimed with, which `workflow` writes its checkpoints against.
-export const claimHolds = new WeakMap<object, number>()
-
-// The runs whose handler gave the job back itself (a workflow that slept), which the queue then does not complete: a hold equal to the old one on a claim in the same millisecond would let the late complete delete the live job.
-export const handedBack = new WeakSet<object>()
-
-// Wakes the worker of the named queue in this process, for a job made due without an enqueue.
-export function wakeQueue(name: string): void {
-  admins.get(name)?.wake()
-}
-
-// Set while a job runs, so a drain the job awaits does not wait for the run awaiting it.
-const inJob = new AsyncLocalStorage<true>()
 let defaultStore: JobStore | undefined
 
 // Jobs kept in a SQLite file: they survive restarts and deploys, and every process of the machine opening it shares them, each job running in one of them.
@@ -616,6 +554,11 @@ export function defaultJobStore(): JobStore {
 // A queue of jobs the server runs in the background, each surviving a restart: `enqueue` from an action, `app.use(queue)` in the server to run them.
 // A run that throws is retried later, waiting `backoff` then twice as long each time, until `attempts` runs failed: it is then kept as failed, logged and handed to `onFailed`.
 export function queue<Payload, Progress = unknown>(name: string, handler: (payload: Payload, signal: AbortSignal, job: JobContext<Progress>) => unknown, options: QueueOptions<Payload> = {}): Queue<Payload, Progress> {
+  return jobQueue<Payload, Progress>(name, (payload, signal, job) => handler(payload, signal, job), options).queued
+}
+
+// `queue` for `workflow`: its handler also gets the hold of its run, and the admin it returns is what the workflow wakes its own queue and attaches its calls with.
+export function jobQueue<Payload, Progress = unknown>(name: string, handler: (payload: Payload, signal: AbortSignal, job: JobContext<Progress>, run: RunHold) => unknown, options: QueueOptions<Payload> = {}): { queued: Queue<Payload, Progress>, admin: QueueAdmin } {
   const attempts = options.attempts ?? DEFAULT_ATTEMPTS
   const backoff = durationSeconds(options.backoff ?? DEFAULT_BACKOFF, `queue('${name}')'s backoff`) * 1000
   const lostAfter = durationSeconds(options.lostAfter ?? DEFAULT_LOST_AFTER, `queue('${name}')'s lostAfter`) * 1000
@@ -633,35 +576,6 @@ export function queue<Payload, Progress = unknown>(name: string, handler: (paylo
     throw new KayError('config-invalid', `kay: queue('${name}')'s concurrency is ${concurrency}; it takes a whole number of at least 1`)
 
   const store = () => options.store ?? defaultJobStore()
-  let controller: AbortController | undefined
-  let workers: Promise<void>[] = []
-  // The worker looking for jobs while the queue is idle sleeps until its next look, woken when this process enqueues a job or retries one.
-  const pollers = new Set<() => void>()
-  // The others sleep until a claim leaves no worker looking, which wakes one of them to take over.
-  const idlers = new Set<() => void>()
-  // The workers waiting out a store that fails, which nothing wakes but a stop.
-  const outage = new Set<() => void>()
-  // Whether a worker is the one looking for jobs while the queue is idle: the others sleep until something wakes them.
-  let polling = false
-  // The wait of the next empty look: the poll, doubling up to `idlePoll` while no job is found, shared by the workers as one looks at a time.
-  let idleWait = POLL_MS
-  // Counts the wakes of the poller, so one finding that came while it awaited the store looks again.
-  let wakes = 0
-  const wakePoller = () => {
-    wakes++
-
-    for (const sleeper of pollers)
-      sleeper()
-
-    // A poller whose store failed waits in the outage set; an enqueue gives it a reason to ask again now.
-    for (const sleeper of outage)
-      sleeper()
-  }
-  const wakeIdler = () => {
-    const [sleeper] = idlers
-
-    sleeper?.()
-  }
 
   const reportFailed = async (job: StoredJob, error: unknown) => {
     try {
@@ -784,7 +698,7 @@ export function queue<Payload, Progress = unknown>(name: string, handler: (paylo
   }
 
   // Runs one job it claimed, then marks how it went; false when none was due.
-  const runOne = async (): Promise<boolean> => {
+  const runOne = async (scheduler: Scheduler): Promise<boolean> => {
     const now = Date.now()
     const claimedAt = performance.now()
     const job = await store().claim(name, now, now + lostAfter)
@@ -795,11 +709,7 @@ export function queue<Payload, Progress = unknown>(name: string, handler: (paylo
     // The hold the store stored, which every write about this run is matched against.
     const held = job.heldUntil ?? now + lostAfter
 
-    // Unless another worker looks, one asleep wakes to look for the next job while this one runs.
-    idleWait = POLL_MS
-
-    if (!polling)
-      wakeIdler()
+    scheduler.claimed()
 
     // Only runs whose process died never mark how they went: a job that kills its process stops here rather than crash every next one.
     if (job.attempts > attempts) {
@@ -815,7 +725,7 @@ export function queue<Payload, Progress = unknown>(name: string, handler: (paylo
 
     const ended = new AbortController()
     const stop = () => ended.abort(STOPPED)
-    const stopping = controller?.signal
+    const stopping = scheduler.stopping
 
     stopping?.addEventListener('abort', stop)
 
@@ -831,10 +741,16 @@ export function queue<Payload, Progress = unknown>(name: string, handler: (paylo
     let succeeded = false
     // A handler may lower its own `attempts`: a workflow that kept a step starts its count again.
     const context: JobContext<Progress> = { id: job.id, attempts: job.attempts, progress: reports.write }
+    let handedBack = false
+    const hold: RunHold = {
+      until: held,
+      handBack: () => {
+        handedBack = true
+      },
+    }
 
     try {
-      claimHolds.set(context, held)
-      await withinLostAfter(handler(parse(job.payload) as Payload, ended.signal, context), claimedAt, ended)
+      await withinLostAfter(handler(parse(job.payload) as Payload, ended.signal, context, hold), claimedAt, ended)
       await reports.settle()
       succeeded = true
     }
@@ -845,7 +761,7 @@ export function queue<Payload, Progress = unknown>(name: string, handler: (paylo
       if (error instanceof RetryLater && store().release) {
         await store().release!(job.id, held, Date.now() + error.waitMs)
         // The worker looking for jobs may sleep past the time this one is due.
-        wakePoller()
+        scheduler.wake()
         kayLog('info', `a job of queue('${name}') asked to run again in ${Math.round(error.waitMs / 1000)} s, without spending an attempt: ${error.message}`)
 
         return true
@@ -869,7 +785,7 @@ export function queue<Payload, Progress = unknown>(name: string, handler: (paylo
         // A run whose hold went to another process writes nothing and reports nothing: the job is that process's now.
         if (await store().retry(job.id, Date.now() + wait, message, held) !== false) {
           // The worker looking for jobs may sleep past the time this one is due.
-          wakePoller()
+          scheduler.wake()
           kayLog('warn', `a job of queue('${name}') failed, attempt ${context.attempts} of ${attempts}, and runs again in ${Math.round(wait / 1000)} s: ${message}`)
         }
 
@@ -886,7 +802,7 @@ export function queue<Payload, Progress = unknown>(name: string, handler: (paylo
     }
 
     // Outside the try above: a store that fails here ran the handler to its end, so the run is not a failed one, and retrying it would run the handler twice. Past a few tries the job stays claimed and is taken again once its hold lapses, counting an attempt.
-    if (succeeded && !handedBack.has(context)) {
+    if (succeeded && !handedBack) {
       for (let attempt = 1; ; attempt++) {
         try {
           await store().complete(job.id, held)
@@ -908,29 +824,6 @@ export function queue<Payload, Progress = unknown>(name: string, handler: (paylo
     }
 
     return true
-  }
-
-  // Every run in flight, a worker's included: a drain cannot claim a job a worker holds, so it waits for these instead.
-  const running = new Set<Promise<boolean>>()
-  // The runs a drain already counted, which another drain waiting for the same run does not count again.
-  const counted = new WeakSet<Promise<boolean>>()
-
-  const runNext = async (byDrain = false): Promise<boolean> => {
-    const run = inJob.run(true, runOne)
-
-    running.add(run)
-
-    try {
-      const ran = await run
-
-      if (byDrain && ran)
-        counted.add(run)
-
-      return ran
-    }
-    finally {
-      running.delete(run)
-    }
   }
 
   let purged = 0
@@ -968,101 +861,15 @@ export function queue<Payload, Progress = unknown>(name: string, handler: (paylo
     }
   }
 
-  // Whether the store failed at the last look, so an outage is logged once as it starts and once as it ends, whatever the concurrency.
-  let storeDown = false
-
-  const work = async (signal: AbortSignal) => {
-    let outageWait = 0
-
-    while (!signal.aborted) {
-      try {
-        await purgeFailed()
-
-        const ran = await runNext()
-
-        if (storeDown) {
-          storeDown = false
-          kayLog('info', `queue('${name}') reads its store again`)
-        }
-
-        outageWait = 0
-
-        if (ran)
-          continue
-
-        // One worker looks at the store; the others sleep until a claim leaves no worker looking and wakes one of them.
-        if (polling) {
-          await sleep(MAX_TIMER_MS, signal, idlers)
-
-          continue
-        }
-
-        polling = true
-
-        const seen = wakes
-
-        try {
-          const next = await store().nextRunAt(name)
-
-          // Something was enqueued or retried meanwhile, before the sleep could be woken.
-          if (wakes !== seen)
-            continue
-
-          const wait = next === undefined ? idleWait : Math.min(idleWait, Math.max(0, next - Date.now()))
-
-          idleWait = Math.min(idleWait * 2, idlePoll)
-          await sleep(wait, signal, pollers)
-        }
-        finally {
-          polling = false
-        }
-      }
-      // A store that failed, locked past its timeout say, is asked again later and later, up to a minute apart.
-      catch (error) {
-        if (!storeDown) {
-          storeDown = true
-          kayLog('error', `queue('${name}') could not read its store; its workers ask it again less and less often until it answers`, error)
-        }
-
-        outageWait = Math.min(outageWait === 0 ? POLL_MS : outageWait * 2, MAX_OUTAGE_MS)
-        await sleep(outageWait, signal, outage)
-      }
-    }
-  }
+  const scheduler = new Scheduler({ name, concurrency, idlePoll, lazy: options.lazy === true, store, run: runOne, purge: purgeFailed })
 
   // Unnamed, so Elysia never takes two queues for one plugin.
-  let serving = false
-  let forgetDrain: (() => void) | undefined
-  let activated = options.lazy !== true
-  const startWorkers = () => {
-    if (controller || !serving || !activated)
-      return
-
-    const started = new AbortController()
-
-    controller = started
-    workers = Array.from({ length: concurrency }, async () => work(started.signal))
-  }
   const plugin = new Elysia()
-    .onStart(() => {
-      serving = true
-      forgetDrain = onDrain(() => controller?.abort())
-      startWorkers()
-    })
-    .onStop(async () => {
-      forgetDrain?.()
-      serving = false
-      controller?.abort()
-      await Promise.all(workers)
-      controller = undefined
-      workers = []
-    })
+    .onStart(() => scheduler.serve())
+    .onStop(async () => scheduler.stop())
 
   const queued = Object.assign(plugin, {
-    activate: () => {
-      activated = true
-      startWorkers()
-    },
+    activate: () => scheduler.activate(),
     enqueue: async (payload: Payload, enqueueOptions: EnqueueOptions = {}) => inFlightWork(async () => {
       const id = crypto.randomUUID()
       const delay = enqueueOptions.delay === undefined ? 0 : durationSeconds(enqueueOptions.delay, `queue('${name}')'s delay`) * 1000
@@ -1083,7 +890,7 @@ export function queue<Payload, Progress = unknown>(name: string, handler: (paylo
         return held
 
       // A delayed job too: the worker looking for jobs sleeps until the next one is due, which this may precede.
-      wakePoller()
+      scheduler.wake()
       await tidy()
 
       return id
@@ -1104,32 +911,7 @@ export function queue<Payload, Progress = unknown>(name: string, handler: (paylo
         ...found.error !== undefined && { error: found.error },
       }
     },
-    drain: async () => {
-      let ran = 0
-
-      await purgeFailed()
-
-      for (;;) {
-        while (await runNext(true))
-          ran++
-
-        if (running.size === 0 || inJob.getStore())
-          return ran
-
-        // A job a worker holds may enqueue another, so the queue is looked at again once it ends, and counts as run, so `drainQueues` looks at every queue again too.
-        const waited = [...running]
-        const settled = await Promise.allSettled(waited)
-
-        for (const [at, run] of waited.entries()) {
-          const result = settled[at]
-
-          if (result?.status === 'fulfilled' && result.value && !counted.has(run)) {
-            counted.add(run)
-            ran++
-          }
-        }
-      }
-    },
+    drain: scheduler.drain,
     failed: async () => {
       await tidy()
 
@@ -1153,8 +935,7 @@ export function queue<Payload, Progress = unknown>(name: string, handler: (paylo
     },
   }) as Queue<Payload, Progress>
 
-  drains.add(queued.drain)
-  admins.set(name, {
+  const admin: QueueAdmin = {
     name,
     attempts,
     store,
@@ -1163,71 +944,27 @@ export function queue<Payload, Progress = unknown>(name: string, handler: (paylo
       const revived = await store().revive?.(id, Date.now()) === true
 
       if (revived)
-        wakePoller()
+        scheduler.wake()
 
       return revived
     },
     remove: async id => queued.remove(id),
-    wake: wakePoller,
-  })
+    wake: scheduler.wake,
+  }
+
+  admins.set(name, admin)
   // A queue renamed or removed while `kay dev` runs is gone from the tool once its module runs again.
   onReload(() => forgetQueue(queued))
 
-  return queued
-}
-
-// Waits `ms`, or less once the signal aborts or something wakes the sleepers.
-async function sleep(ms: number, signal: AbortSignal, sleepers: Set<() => void>): Promise<void> {
-  if (signal.aborted)
-    return
-
-  let timer: ReturnType<typeof setTimeout> | undefined
-
-  await new Promise<void>((resolve) => {
-    const done = () => {
-      clearTimeout(timer)
-      sleepers.delete(done)
-      signal.removeEventListener('abort', done)
-      resolve()
-    }
-
-    timer = setTimeout(done, ms)
-    sleepers.add(done)
-    signal.addEventListener('abort', done)
-  })
+  return { queued, admin }
 }
 
 // Takes a queue out of what `drainQueues` runs, for a test whose queue's store is gone.
 export function forgetQueue(queued: { drain: () => Promise<number> }): void {
-  drains.delete(queued.drain)
+  forgetDrain(queued.drain)
 
   for (const [name, admin] of admins) {
     if (admin.drain === queued.drain)
       admins.delete(name)
   }
-}
-
-// Runs every due job of every queue in this process, until none is left: `kay/test`'s `runJobs`.
-export async function drainQueues(): Promise<number> {
-  let ran = 0
-
-  for (let more = true; more;) {
-    more = false
-
-    while (working()) {
-      await Promise.all(detached)
-
-      if (flying())
-        await new Promise<void>(resolve => idleWaiters.add(resolve))
-    }
-
-    for (const drain of drains) {
-      const count = await drain()
-
-      ran += count
-      more ||= count > 0
-    }
-  }
-
-  return ran
 }
