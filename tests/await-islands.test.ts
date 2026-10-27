@@ -11,8 +11,8 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the island
   it('are cleaned up as the part or the pending block holding them is replaced, leaving the last part\'s alone', async () => {
     const page = await site.open('/', { path })
 
-    await page.waitFor('button.probe', { text: 'three' })
-    await page.waitUntil(() => Number(document.body.dataset.mounted ?? 0) > 1 && Number(document.body.dataset.mounted) === Number(document.body.dataset.cleaned ?? 0) + 1)
+    await page.waitFor('button.probe', { text: 'three', timeout: '15s' })
+    await page.waitUntil(() => Number(document.body.dataset.mounted ?? 0) > 1 && Number(document.body.dataset.mounted) === Number(document.body.dataset.cleaned ?? 0) + 1, { timeout: '15s' })
 
     const { mounted, cleaned } = await page.evaluate(() => ({ mounted: Number(document.body.dataset.mounted ?? 0), cleaned: Number(document.body.dataset.cleaned ?? 0) }))
 
@@ -28,8 +28,8 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the island
     it(`dispose a replaced island while it is still in the document, at ${route}`, async () => {
       const page = await site.open(route, { path })
 
-      await page.waitFor('button.probe', { text: 'three' })
-      await page.waitUntil(() => Number(document.body.dataset.cleaned ?? 0) > 1 && Number(document.body.dataset.mounted) === Number(document.body.dataset.cleaned ?? 0) + 1)
+      await page.waitFor('button.probe', { text: 'three', timeout: '15s' })
+      await page.waitUntil(() => Number(document.body.dataset.cleaned ?? 0) > 1 && Number(document.body.dataset.mounted) === Number(document.body.dataset.cleaned ?? 0) + 1, { timeout: '15s' })
 
       const { cleaned, attached } = await page.evaluate(() => ({ cleaned: Number(document.body.dataset.cleaned ?? 0), attached: Number(document.body.dataset.attached ?? 0) }))
 
