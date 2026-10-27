@@ -1182,7 +1182,7 @@
 
   /* A tile fills its grid cell: the figure large above its label. */
   .kui-stat-badge:where([data-variant='tile']) {
-    @apply flex flex-col items-start gap-1 px-[calc(var(--spacing)*2.25*var(--density))] py-3;
+    @apply grid grid-cols-[auto_1fr] items-baseline justify-items-start gap-x-2 gap-y-1 px-[calc(var(--spacing)*2.25*var(--density))] py-3;
   }
 
   /* Below lg the links fold behind the toggle, a popover its popovertarget opens; from lg they sit in a row, the popover's frame undone and the toggle hidden. A browser without popovers shows the links as they are and hides the toggle. */

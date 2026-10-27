@@ -3,11 +3,11 @@ import type { JSX } from 'kay'
 import type { SparkTone } from './sparkline'
 import { recipe } from 'kay'
 
-// 'kui-status-strip' stays as the component's name for an app's CSS. A cell is coloured by its own `data-tone`.
+// 'kui-status-strip' stays as the component's name for an app's CSS. A cell is coloured by its own `data-tone`, and one with none is an outline, so it reads as a gap and not as the solid `muted` cell.
 const look = recipe({
   parts: {
     root: 'kui-status-strip flex h-[var(--strip-height,1.5rem)] w-full gap-px',
-    cell: 'min-w-0 flex-1 rounded-[1px] bg-surface-strong data-[tone=muted]:bg-muted data-[tone=accent]:bg-accent data-[tone=success]:bg-success data-[tone=warning]:bg-warning data-[tone=danger]:bg-danger data-[tone=info]:bg-info',
+    cell: 'min-w-0 flex-1 rounded-[1px] not-data-tone:border not-data-tone:border-dashed not-data-tone:border-muted data-[tone=muted]:bg-muted data-[tone=accent]:bg-accent data-[tone=success]:bg-success data-[tone=warning]:bg-warning data-[tone=danger]:bg-danger data-[tone=info]:bg-info',
   },
 })
 

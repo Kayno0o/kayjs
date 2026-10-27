@@ -12,10 +12,10 @@ const look = recipe({
   parts: {
     root: 'kui-stat-badge inline-flex items-center gap-[calc(var(--spacing)*1.25*var(--density))] rounded-lg px-2.25 py-0.75 text-xs [&:is(a)]:no-underline',
     icon: 'size-4 shrink-0',
-    value: 'font-semibold text-foreground',
-    label: 'text-muted',
-    figure: 'flex items-baseline gap-2',
-    delta: 'inline-flex items-center gap-1 font-normal text-muted data-[tone=success]:text-success data-[tone=warning]:text-warning data-[tone=danger]:text-danger data-[tone=info]:text-info',
+    // The label comes before the change for a screen reader, and `order` puts the change back beside the figure.
+    value: 'order-1 font-semibold text-foreground',
+    label: 'order-3 text-muted',
+    delta: 'order-2 inline-flex items-center gap-1 font-normal text-muted data-[tone=success]:text-success data-[tone=warning]:text-warning data-[tone=danger]:text-danger data-[tone=info]:text-info',
     deltaIcon: 'size-3.5 shrink-0',
     deltaValue: '',
     deltaLabel: 'text-muted',
@@ -25,9 +25,10 @@ const look = recipe({
     variant: {
       inline: '',
       tile: {
-        root: 'flex flex-col items-start gap-1 px-[calc(var(--spacing)*2.25*var(--density))] py-3',
+        root: 'grid grid-cols-[auto_1fr] items-baseline justify-items-start gap-x-2 gap-y-1 px-[calc(var(--spacing)*2.25*var(--density))] py-3',
+        icon: 'col-span-full',
         value: 'text-2xl/none',
-        label: '[font-size:var(--text-2xs)] [line-height:var(--text-2xs--line-height)] [font-weight:var(--font-weight-normal)] tracking-label [font-family:var(--font-label,inherit)] [text-transform:var(--label-case)]',
+        label: 'col-span-full [font-size:var(--text-2xs)] [line-height:var(--text-2xs--line-height)] [font-weight:var(--font-weight-normal)] tracking-label [font-family:var(--font-label,inherit)] [text-transform:var(--label-case)]',
       },
     },
     // Colours the figure, such as `danger` past a threshold; `neutral` keeps the text colour.
@@ -52,40 +53,24 @@ const { value, label, icon, href, delta, variant = 'inline', tone = 'neutral', .
   // How the figure moved since the period before, beside the figure with an arrow, so colour is not the only signal.
   delta?: StatDelta | undefined
 }>()
-
-// The link takes the span's own props, typed for a span: its `ref` would not fit an anchor to the type check.
-const handedOn = rest as Record<string, never>
 ---
+snippet body()
+  if icon
+    Icon(icon={icon} part="icon")
+  span(part="value") {value}
+  if label
+    span(part="label") {label}
+  if delta
+    span(part="delta" data-tone={delta.tone === 'neutral' ? undefined : delta.tone})
+      Icon(icon={deltaIcon(delta)} part="deltaIcon")
+      span(part="deltaValue") {delta.value}
+      if delta.label
+        span(part="deltaLabel") {delta.label}
+
 // A figure and what it counts, read together: "12 moons".
 if href !== undefined
-  a(part="root" {...handedOn} href={href} data-variant={variant === 'tile' ? 'tile' : undefined} data-tone={tone === 'neutral' ? undefined : tone})
-    if icon
-      Icon(icon={icon} part="icon")
-    if delta
-      span(part="figure")
-        span(part="value") {value}
-        span(part="delta" data-tone={delta.tone === 'neutral' ? undefined : delta.tone})
-          Icon(icon={deltaIcon(delta)} part="deltaIcon")
-          span(part="deltaValue") {delta.value}
-          if delta.label
-            span(part="deltaLabel") {delta.label}
-    else
-      span(part="value") {value}
-    if label
-      span(part="label") {label}
+  a(part="root" {...rest} href={href} data-variant={variant === 'tile' ? 'tile' : undefined} data-tone={tone === 'neutral' ? undefined : tone})
+    {body()}
 else
   span(part="root" {...rest} data-variant={variant === 'tile' ? 'tile' : undefined} data-tone={tone === 'neutral' ? undefined : tone})
-    if icon
-      Icon(icon={icon} part="icon")
-    if delta
-      span(part="figure")
-        span(part="value") {value}
-        span(part="delta" data-tone={delta.tone === 'neutral' ? undefined : delta.tone})
-          Icon(icon={deltaIcon(delta)} part="deltaIcon")
-          span(part="deltaValue") {delta.value}
-          if delta.label
-            span(part="deltaLabel") {delta.label}
-    else
-      span(part="value") {value}
-    if label
-      span(part="label") {label}
+    {body()}

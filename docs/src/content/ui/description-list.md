@@ -8,7 +8,7 @@ description: Labels and their values as a definition list, stacking when it is n
 
 ## A rich value
 
-An item with a `value` shows it as text, a number included. An item without one is drawn by the `@value(item)` block, for a badge, a link or a copy button. The block gets the item, so one block can draw several.
+An item with a `value` shows it as text, a number included. An item without one is drawn by the `@value(item)` block, for a badge, a link or a copy button. The block gets the item, so one block can draw several. With neither a `value` nor the block, the item shows a dash.
 
 ## Narrow
 

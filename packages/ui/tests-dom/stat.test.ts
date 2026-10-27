@@ -33,3 +33,15 @@ test('tone colours the value through the root, so an app targets no inner class'
 
   expect([stat('toned').getAttribute('data-tone'), stat('plain').getAttribute('data-tone')]).toEqual(['danger', null])
 })
+
+test('a change comes after the label in the document, so a screen reader hears the figure and what it counts first', async () => {
+  const stat = await stats()
+
+  expect([...stat('changed').children].map(child => child.getAttribute('data-part'))).toEqual(['value', 'label', 'delta'])
+})
+
+test('an href makes the stat a link drawing the same parts as the span', async () => {
+  const stat = await stats()
+
+  expect([stat('linked').tagName, stat('linked').getAttribute('href'), [...stat('linked').children].map(child => child.getAttribute('data-part'))]).toEqual(['A', '/moons', ['value', 'label']])
+})

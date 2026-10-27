@@ -92,7 +92,7 @@ DescriptionList(items={[{ label: 'Host', value: 'relay.example.com' }, { label: 
 ```
 
 - A `dl` of label and value pairs: `items` are `DescriptionItem`s (from the package), a `label`, a `value` (text or a number) and an optional `key` (the label by default). The labels share one column, so the values line up.
-- An item with no `value` is drawn by the `@value(item)` block, for a badge, a link or a copy button; one with a `value` shows it as text. Using the block makes the list an island.
+- An item with no `value` is drawn by the `@value(item)` block, for a badge, a link or a copy button, and as a dash when there is no block either; one with a `value` shows it as text. Using the block makes the list an island.
 - Narrower than 24rem, its own width and not the screen's, each label sits above its value. Parts: `root`, `item`, `term` and `detail`.
 
 ## Reference

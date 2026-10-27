@@ -15,7 +15,7 @@ const look = recipe({
 
 const { items, value, ...rest } = props<Omit<JSX.IntrinsicElements['dl'], 'class' | 'children'> & {
   items: readonly Item[]
-  // Draws the value of an item that has none, as the rich value a text cannot be: a badge, a link, a copy button.
+  // Draws the value of an item that has none, as the rich value a text cannot be: a badge, a link, a copy button. An item with neither is drawn as a dash.
   value?: Snippet<[item: Item]> | undefined
 }>()
 ---
@@ -26,5 +26,7 @@ dl(part="root" {...rest})
       dd(part="detail")
         if item.value === undefined && value
           | {value(item)}
+        else if item.value === undefined
+          | -
         else
           | {item.value}
