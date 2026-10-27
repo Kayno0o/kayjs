@@ -399,6 +399,26 @@ describe('a server with no dictionary to use', () => {
     for (const root of [dynamic, failing])
       expect((await Bun.file(join(outputDir(root), 'manifest.json')).json() as { dictionary?: unknown }).dictionary).toBeUndefined()
   }, 120_000)
+
+  it('is not built, nor any dcz copy written, for an app setting compressionDictionary: false, which serves its pages with no link', async () => {
+    const off = await project('export default { compressionDictionary: false }\n')
+
+    await build(off)
+
+    const output = outputDir(off)
+
+    expect((await Bun.file(join(output, 'manifest.json')).json() as { dictionary?: unknown }).dictionary).toBeUndefined()
+    expect((await readdir(output, { recursive: true })).filter(name => name.endsWith('.dcz') || name.includes('dictionary-'))).toEqual([])
+
+    const site = await serve(off)
+
+    sites.push(site)
+
+    const reply = await get(site, '/about', { 'accept-encoding': ACCEPT })
+
+    expect(reply.headers.get('content-encoding')).toBe('br')
+    expect(reply.headers.get('link')).toBeNull()
+  }, 120_000)
 })
 
 describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('in a browser', () => {

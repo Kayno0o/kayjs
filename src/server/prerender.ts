@@ -387,7 +387,7 @@ export async function prerenderPages(project: Project, client: ClientBuild, opti
     await dropOrphanCopies(client, dir, pages)
 
   // A static host cannot answer by what the browser holds, so only a server build has a dictionary, and one with a prerendered page, whose layouts the build renders already.
-  const dictionary = options.exportAll || Object.keys(pages).length === 0 ? undefined : await writeDictionary(client.dir, await renderedMissing())
+  const dictionary = options.exportAll || config.compressionDictionary === false || Object.keys(pages).length === 0 ? undefined : await writeDictionary(client.dir, await renderedMissing())
 
   await writeManifest(root, { ...manifest, pages, site, ...dictionary ? { dictionary } : {}, ...restyled && client.styleUses ? { styleUses: styleUsesOf(root, client.styleUses) } : {} }, output)
   client.pages = new Map(Object.entries(pages))

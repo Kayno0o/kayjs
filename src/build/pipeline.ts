@@ -43,7 +43,7 @@ import { budgetLints, checkBudget, footprintLints } from './budget'
 import { cacheCounts, resetCacheCounts } from './cache'
 import { buildClient } from './client'
 import { compileServer } from './compile'
-import { cachedCopies, pruneCopies } from './compressed'
+import { cachedCopies, cachedDictionaryCopies, pruneCopies, pruneDictionaryCopies } from './compressed'
 import { writeCachedFavicons } from './favicons'
 import { inWalkScope } from './files'
 import { routeFootprints } from './footprint'
@@ -498,11 +498,11 @@ async function outputStage(project: Project, exported: boolean, client: ClientBu
   report({ step: 'compressing' })
 
   await Promise.all([compressFiles(client.dir, copies), compressFiles(join(paths.output, PRERENDERED_DIR), copies)])
-  await writeDictionaryCopies(join(paths.output, PRERENDERED_DIR), client)
+  await writeDictionaryCopies(join(paths.output, PRERENDERED_DIR), client, cachedDictionaryCopies(cacheDir(root, 'dictionary-copies')))
 
   // A static export compresses its own pages next, which can share content with these, so it prunes once it has.
   if (!exported)
-    await pruneCopies(cacheDir(root, 'compressed'))
+    await Promise.all([pruneCopies(cacheDir(root, 'compressed')), pruneDictionaryCopies(cacheDir(root, 'dictionary-copies'))])
 
   lap('compress')
 

@@ -21,6 +21,9 @@ const COPIES_AT_ONCE = 8
 const MIN_PAGE_BYTES = 256
 const DCZ_WEIGHT = /(?:^|,)\s*dcz\s*(?:;\s*q\s*=\s*([\d.]+)\s*)?(?=,|$)/i
 
+// What a copy made at build depends on besides the page and the dictionary, for a cache keeping them.
+export const BUILD_COPY_KEY = `zstd:${BUILD_LEVEL}:${WINDOW_LOG}`
+
 // What the manifest names of a build's dictionary.
 export interface DictionaryRef {
   // Its file in the browser build, served under `/_kay/`.
@@ -144,8 +147,15 @@ function withHeader({ header }: LoadedDictionary, frame: Uint8Array): Uint8Array
   return body
 }
 
+// Makes a page's copy against a dictionary; `kay build` passes one keeping them between builds.
+export type DictionaryCopies = (dictionary: LoadedDictionary, bytes: Uint8Array) => Promise<Uint8Array<ArrayBuffer>>
+
+export async function buildDictionaryCopy(dictionary: LoadedDictionary, bytes: Uint8Array): Promise<Uint8Array<ArrayBuffer>> {
+  return dictionaryBody(dictionary, bytes, BUILD_LEVEL)
+}
+
 // A copy of each prerendered page against the build's dictionary, beside the page, when it comes out smaller than the copy a browser with no dictionary gets.
-export async function writeDictionaryCopies(pagesDir: string, client: ClientBuild): Promise<void> {
+export async function writeDictionaryCopies(pagesDir: string, client: ClientBuild, copyOf: DictionaryCopies): Promise<void> {
   const { dictionary } = client
 
   if (dictionary === undefined)
@@ -156,15 +166,25 @@ export async function writeDictionaryCopies(pagesDir: string, client: ClientBuil
 
   await Promise.all([...client.pages.values()].map(async ({ file, islands, stamps, readsSite }) => limit(async () => {
     const path = join(pagesDir, file)
-    const bytes = await Bun.file(path).bytes()
-    const brotli = Bun.file(`${path}.br`)
-    const rival = await brotli.exists() ? brotli.size : bytes.length * 0.9
-    const body = bytes.length < MIN_PAGE_BYTES || islands !== undefined || stamps || readsSite ? undefined : await dictionaryBody(loaded, bytes, BUILD_LEVEL)
+    const body = islands !== undefined || stamps || readsSite ? undefined : await smallerCopy(path, loaded, copyOf)
 
-    if (body !== undefined && body.length < rival)
+    if (body !== undefined)
       await Bun.write(`${path}${DCZ_SUFFIX}`, body)
     // A copy an earlier run left of the page is of another body.
     else
       await rm(`${path}${DCZ_SUFFIX}`, { force: true })
   })))
+}
+
+async function smallerCopy(path: string, dictionary: LoadedDictionary, copyOf: DictionaryCopies): Promise<Uint8Array<ArrayBuffer> | undefined> {
+  const bytes = await Bun.file(path).bytes()
+
+  if (bytes.length < MIN_PAGE_BYTES)
+    return undefined
+
+  const body = await copyOf(dictionary, bytes)
+  const brotli = Bun.file(`${path}.br`)
+  const rival = await brotli.exists() ? brotli.size : bytes.length * 0.9
+
+  return body.length < rival ? body : undefined
 }
