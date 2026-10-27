@@ -20,7 +20,7 @@ interface Node {
   oneOf?: Node[]
 }
 
-// A file field's size as bytes: kay's `'2mb'`, a number, or the `'2m'` of Elysia's own `t.File`; anything else counts as no size.
+// A file field's size as bytes: kay's `'2mb'`, a number, or the `'2m'` of Elysia's own `t.File`. Anything else counts as 0 and raises nothing, as the limit only grows for a size kay can read: the post then meets the app's limit as it would without the field's size, and the schema judges the file itself.
 function sizeOf(size: unknown): number {
   const elysia = typeof size === 'string' ? ELYSIA_SIZE.exec(size) : null
 

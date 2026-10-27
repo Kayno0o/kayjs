@@ -1,4 +1,5 @@
 import type { Elysia } from 'elysia'
+import type { Static } from '../src/runtime'
 import { rm } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
@@ -47,6 +48,19 @@ describe('a query field marked lenient', () => {
 
   it('leaves a field without the mark refusing, as before', () => {
     expect(() => readQuery(s.Object({ period: s.UnionEnum(['24h', '7d'], { default: '24h' }) }), url('?period=1y'))).toThrow()
+  })
+})
+
+describe('a lenient query field\'s type', () => {
+  it('stays the schema\'s own, a union of its literals and a number, with no widening to string or undefined', () => {
+    const query: Static<typeof lenient> = { period: '7d' }
+    const period: '24h' | '7d' = query.period
+    const rows: number = {} as Static<typeof schema>['rows']
+
+    // @ts-expect-error only the schema's literals
+    const wrong: Static<typeof lenient> = { period: '1y' }
+
+    expect([period, rows, wrong]).toHaveLength(3)
   })
 })
 

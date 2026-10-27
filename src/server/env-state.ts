@@ -139,9 +139,8 @@ export function publicEnvFiles(root: string): string[] {
 
 // The name of the file form of a variable, `<NAME>_FILE`, when it has one: a string field that is not public (a visitor reads those) and whose file form the app does not declare itself.
 // `type` is the schema's own, or the text `kay env` lists, which adds a format in brackets.
-export function fileFormOf(name: string, type: unknown, isPublic: unknown, declared: ReadonlySet<string> | readonly string[]): string | undefined {
+export function fileFormOf(name: string, type: unknown, isPublic: unknown, declared: ReadonlySet<string>): string | undefined {
   const file = `${name}_FILE`
-  const own = Array.isArray(declared) ? declared.includes(file) : (declared as ReadonlySet<string>).has(file)
 
-  return (type === 'string' || (typeof type === 'string' && type.startsWith('string ('))) && isPublic !== true && !own ? file : undefined
+  return (type === 'string' || (typeof type === 'string' && type.startsWith('string ('))) && isPublic !== true && !declared.has(file) ? file : undefined
 }

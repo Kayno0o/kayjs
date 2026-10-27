@@ -329,7 +329,9 @@ export async function compareEnv(root: string, variables: Listed[], files: EnvFi
     const composeNames = composes.map(file => relative(root, file)).join(' or ')
 
     for (const variable of variables.filter(({ required, source }) => required !== false && source !== 'kay')) {
-      if (!set.has(variable.name) && !set.has(fileOf(variable) ?? ''))
+      const file = fileOf(variable)
+
+      if (!set.has(variable.name) && !(file !== undefined && set.has(file)))
         problems.push(diagnostic('error', composes[0]!, 1, `${variable.name} is required in production (${variable.source}) and no service of ${composeNames} sets it`))
     }
 
@@ -358,7 +360,9 @@ export async function compareEnv(root: string, variables: Listed[], files: EnvFi
       }
 
       for (const variable of variables.filter(({ required, source }) => required !== false && source !== 'kay')) {
-        if (!listed.has(variable.name) && set.get(variable.name)?.literal !== true && !listed.has(fileOf(variable) ?? '') && set.get(fileOf(variable) ?? '')?.literal !== true)
+        const file = fileOf(variable)
+
+        if (!listed.has(variable.name) && set.get(variable.name)?.literal !== true && !(file !== undefined && (listed.has(file) || set.get(file)?.literal === true)))
           problems.push(diagnostic('error', examplePath, 1, `${variable.name} is required in production (${variable.source}) and ${relative(root, examplePath)} does not list it`))
       }
     }
@@ -390,7 +394,11 @@ const TRAILING_BREAKS = /\n*$/
 export function withDeclaredVariables(text: string, variables: Listed[]): { text: string, added: string[] } {
   const mentioned = new Set([...text.matchAll(/^\s*(?:#\s*)?(?:export\s+)?([a-z_]\w*)\s*=/gim)].map(match => match[1]!))
   const names = new Set(variables.map(({ name }) => name))
-  const added = variables.filter(variable => !mentioned.has(variable.name) && !mentioned.has(fileFormOf(variable.name, variable.type, variable.public, names) ?? ''))
+  const added = variables.filter((variable) => {
+    const file = fileFormOf(variable.name, variable.type, variable.public, names)
+
+    return !mentioned.has(variable.name) && !(file !== undefined && mentioned.has(file))
+  })
   const blocks = added.map((variable) => {
     const needed = variable.required === 'production' ? 'required in production' : 'required'
     const note = [variable.description, variable.required === false ? undefined : needed].filter(part => part !== undefined)

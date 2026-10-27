@@ -45,19 +45,17 @@ export type EnvSchema = TSchema & { properties: Record<string, TSchema> }
 
 // The text of the file `<NAME>_FILE` names, trimmed and read once, as the server boots; a file that cannot be read or holds nothing is an error naming the variable and the path, never the content.
 function readSecretFile(name: string, file: string, path: string): string {
-  let content: string
-
   try {
-    content = readFileSync(path, 'utf8').trim()
+    const content = readFileSync(path, 'utf8').trim()
+
+    if (content !== '')
+      return content
   }
   catch (error) {
     throw new KayError('env-invalid', `kay: ${file} ${path} cannot be read (${(error as NodeJS.ErrnoException).code ?? 'error'}), and ${name} takes its value from it`)
   }
 
-  if (content === '')
-    throw new KayError('env-invalid', `kay: ${file} ${path} is empty, and ${name} takes its value from it`)
-
-  return content
+  throw new KayError('env-invalid', `kay: ${file} ${path} is empty, and ${name} takes its value from it`)
 }
 
 // The environment read once against `schema`, as the server boots: numbers and booleans from their text, defaults filled in, and every variable missing or refused named in the error that stops it.
@@ -71,7 +69,7 @@ export function defineEnv<Schema extends EnvSchema>(declared: Schema, source: Re
   const production = source.NODE_ENV === 'production'
   const input: Record<string, string> = {}
 
-  const names = Object.keys(declared.properties)
+  const names = new Set(Object.keys(declared.properties))
 
   for (const name of names) {
     const value = source[name]
