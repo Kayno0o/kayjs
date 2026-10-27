@@ -237,7 +237,7 @@ A file of the same name in `public/` replaces either generated file.
 
 `favicon` names a square image of 512 pixels or more, or a square SVG such as `src/favicon.svg`. kay draws every icon from it. Turn any text in an SVG into paths.
 
-kay serves the sizes browsers ask for, plus a web manifest, and links them from every page. A site that names none shows kay's kingfisher on a navy tile.
+kay serves the sizes browsers ask for, plus a web manifest, and links them from every page. The manifest is fetched with the visitor's cookies, so a login proxy in front of the site lets it through. A site that names none shows kay's kingfisher on a navy tile.
 
 The manifest also takes the installed app's `startUrl`, `scope`, `orientation`, `shortcuts` and a `maskable` image for launchers that crop icons.
 

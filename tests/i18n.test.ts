@@ -594,7 +594,7 @@ describe('prerendering', () => {
 
     await Bun.write(join(publicDir, 'manifest.webmanifest'), '{"name":"Mine"}')
     await prerendered(i18n, async (build) => {
-      expect(await Bun.file(join(build.pages, 'en.html')).text()).toContain('<link rel="manifest" href="/manifest.webmanifest">')
+      expect(await Bun.file(join(build.pages, 'en.html')).text()).toContain('<link rel="manifest" href="/manifest.webmanifest" crossorigin="use-credentials">')
     }, { publicDir, seo: { name: { fr: 'Le site', en: 'The site' } } })
   })
 
@@ -1012,8 +1012,8 @@ describe('localized seo defaults', () => {
     const server = await shared()
     const manifest = async (path: string) => (await server.handle(new Request(`http://localhost${path}`))).json() as Promise<{ name: string, description: string }>
 
-    expect(await head('/')).toContain('<link rel="manifest" href="/manifest.webmanifest">')
-    expect(await head('/en')).toContain('<link rel="manifest" href="/manifest.en.webmanifest">')
+    expect(await head('/')).toContain('<link rel="manifest" href="/manifest.webmanifest" crossorigin="use-credentials">')
+    expect(await head('/en')).toContain('<link rel="manifest" href="/manifest.en.webmanifest" crossorigin="use-credentials">')
     expect(await manifest('/manifest.webmanifest')).toMatchObject({ name: 'Le site', description: 'Ce que fait le site' })
     expect(await manifest('/manifest.en.webmanifest')).toMatchObject({ name: 'The site', description: 'What the site does' })
     expect((await server.handle(new Request('http://localhost/manifest.fr.webmanifest'))).status).toBe(404)
@@ -1027,7 +1027,7 @@ describe('localized seo defaults', () => {
     const server = new Elysia().use(await pages({ root: FIXTURE, publicDir, prebuilt: false, security: false, site: SITE, i18n, seo: { name: { fr: 'Le site', en: 'The site' } } }))
     const html = await (await server.handle(new Request('http://localhost/en'))).text()
 
-    expect(html).toContain('<link rel="manifest" href="/manifest.webmanifest">')
+    expect(html).toContain('<link rel="manifest" href="/manifest.webmanifest" crossorigin="use-credentials">')
     expect((await server.handle(new Request('http://localhost/manifest.en.webmanifest'))).status).toBe(404)
     expect(await (await server.handle(new Request('http://localhost/manifest.webmanifest'))).text()).toBe('{"name":"Mine"}')
   })
@@ -1042,7 +1042,7 @@ describe('localized seo defaults', () => {
       const server = new Elysia().use(await pages({ root: dir, prebuilt: false, security: false, site: SITE, i18n: { ...i18n, messages: resolve(dir, 'src/messages') }, seo: { name: { fr: 'Le site', en: 'The site' } }, ...variant }))
       const html = await (await server.handle(new Request(`http://localhost/en`))).text()
 
-      expect(html).toContain(`<link rel="manifest" href="${prefix}/manifest.webmanifest">`)
+      expect(html).toContain(`<link rel="manifest" href="${prefix}/manifest.webmanifest" crossorigin="use-credentials">`)
       expect((await server.handle(new Request(`http://localhost/manifest.en.webmanifest`))).status).toBe(404)
       expect(await (await server.handle(new Request(`http://localhost/manifest.webmanifest`))).text()).toContain('"name":"Mine"')
     }
@@ -1054,7 +1054,7 @@ describe('localized seo defaults', () => {
         const server = new Elysia().use(await pages({ root: FIXTURE, prebuilt: false, security: false, site: SITE, i18n, seo, ...variant }))
         const html = await (await server.handle(new Request(`http://localhost/en${'base' in variant ? '/' : ''}`))).text()
 
-        expect(html).toContain(`<link rel="manifest" href="${'base' in variant ? '/docs' : ''}/manifest.webmanifest">`)
+        expect(html).toContain(`<link rel="manifest" href="${'base' in variant ? '/docs' : ''}/manifest.webmanifest" crossorigin="use-credentials">`)
         const prefix = 'base' in variant ? '/docs' : ''
 
         expect((await server.handle(new Request(`http://localhost${prefix}/manifest.en.webmanifest`))).status).toBe(404)
@@ -1069,7 +1069,7 @@ describe('localized seo defaults', () => {
     const html = await (await server.handle(new Request('http://localhost/en/'))).text()
     const manifest = await (await server.handle(new Request('http://localhost/manifest.en.webmanifest'))).json() as { name: string, start_url: string, icons: { src: string }[] }
 
-    expect(html).toContain('<link rel="manifest" href="/docs/manifest.en.webmanifest">')
+    expect(html).toContain('<link rel="manifest" href="/docs/manifest.en.webmanifest" crossorigin="use-credentials">')
     expect(manifest.name).toBe('The site')
     expect(manifest.start_url).toBe('/docs/')
     expect(manifest.icons[0]!.src).toBe('/docs/icon-192.png')

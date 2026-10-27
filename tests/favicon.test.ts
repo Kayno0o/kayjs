@@ -34,7 +34,7 @@ describe('favicon', () => {
     expect(html).toContain('<link rel="icon" href="/favicon.ico" sizes="16x16 32x32 48x48">')
     expect(html).not.toContain('favicon.svg')
     expect(html).toContain('<link rel="apple-touch-icon" href="/apple-touch-icon.png">')
-    expect(html).toContain('<link rel="manifest" href="/manifest.webmanifest">')
+    expect(html).toContain('<link rel="manifest" href="/manifest.webmanifest" crossorigin="use-credentials">')
     expect(html).toContain('<meta name="theme-color" content="#1e1e2e">')
     expect(html).toContain('<title>About</title>')
   })

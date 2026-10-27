@@ -203,7 +203,8 @@ export function isOwnManifest(tag: HeadTag): boolean {
 
 // The links every page carries for them, which a page's own replace; an SVG is linked after the ICO, which browsers drawing SVG icons then prefer.
 export function faviconTags(favicon: string | FaviconConfig | undefined): HeadTag[] {
-  const manifest: HeadTag = { tag: 'link', props: { rel: 'manifest', href: MANIFEST } }
+  // Sent with the visitor's cookies, as the page was: a login proxy in front of the app otherwise redirects it to its sign-in page.
+  const manifest: HeadTag = { tag: 'link', props: { rel: 'manifest', href: MANIFEST, crossorigin: 'use-credentials' } }
 
   OWN_MANIFEST.add(manifest)
 
