@@ -48,6 +48,10 @@ function reflected(root: Element): string {
     // A combobox's text is the value the browser holds, which the server writes as the attribute.
     if (input.getAttribute('role') === 'combobox')
       input.setAttribute('value', input.value)
+
+    // A seek slider's position is a property in the browser, where the server writes the attribute.
+    if (input.type === 'range' && input.closest('.kui-audio-player'))
+      input.setAttribute('value', input.value)
   }
 
   for (const option of root.querySelectorAll<HTMLOptionElement>('option'))

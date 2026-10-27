@@ -4,6 +4,17 @@ import { defineMessages } from 'kay/i18n'
 export default defineMessages({
   ui: {
     appSwitcher: { label: 'Applications' },
+    audioPlayer: {
+      chapters: 'Chapitres',
+      failure: 'Impossible de lire l\'audio.',
+      link: 'Ouvrir {title}',
+      next: 'Chapitre suivant',
+      pause: 'Pause',
+      play: 'Lecture',
+      previous: 'Chapitre précédent',
+      seek: 'Position',
+      transcript: 'Transcription',
+    },
     barChart: { empty: 'Aucune donnée pour le moment.', total: 'Total' },
     barList: { empty: 'Aucune donnée pour le moment.' },
     bell: {

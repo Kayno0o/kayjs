@@ -1,0 +1,280 @@
+---
+import type { JSX, Snippet } from 'kay'
+import type { AudioChapter, AudioCue } from './audio'
+import { effect, memo, onCleanup, recipe, signal } from 'kay'
+import ExternalLink from '~icons/tabler/external-link'
+import { chapterAt, clock, cueAt, cuesByChapter, previousStart } from './audio'
+import CollapsibleSection from './collapsible-section.kay'
+import IconButton from './icon-button.kay'
+import { attempt } from './toast'
+import { wording } from 'kay/words'
+
+// How far a position the parent passes may sit from the audio's own before the player seeks to it, which keeps the parent echoing `onPositionChange` back from seeking.
+const FOLLOW_SECONDS = 1
+
+// 'kui-audio-player' stays as the component's name for an app's CSS. The chapter playing and the cue playing are marked by aria-current.
+const look = recipe({
+  parts: {
+    root: 'kui-audio-player flex flex-col gap-3',
+    bar: 'flex flex-wrap items-center gap-2',
+    step: 'data-[side=next]:-rotate-90 data-[side=previous]:rotate-90',
+    audio: '',
+    play: '',
+    time: 'text-xs tabular-nums text-muted',
+    seek: 'relative flex min-w-0 flex-1 basis-56 items-center',
+    track: 'h-4 w-full cursor-pointer appearance-none bg-transparent [&::-webkit-slider-runnable-track]:h-1 [&::-webkit-slider-runnable-track]:bg-input [&::-moz-range-track]:h-1 [&::-moz-range-track]:bg-input [&::-webkit-slider-thumb]:size-4 [&::-webkit-slider-thumb]:-mt-1.5 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-sm [&::-webkit-slider-thumb]:border-0 [&::-webkit-slider-thumb]:bg-accent [&::-moz-range-thumb]:size-4 [&::-moz-range-thumb]:rounded-sm [&::-moz-range-thumb]:border-0 [&::-moz-range-thumb]:bg-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-default disabled:opacity-50',
+    marks: 'pointer-events-none absolute inset-0 m-0 list-none p-0',
+    mark: 'absolute top-1/2 h-3 w-0.5 -translate-y-1/2 bg-muted',
+    now: 'm-0 text-sm text-foreground',
+    chapters: 'm-0 flex list-none flex-col gap-1 p-0 text-sm',
+    chapter: 'flex items-center gap-2',
+    jump: 'flex min-w-0 flex-1 cursor-pointer items-baseline gap-3 rounded-md px-2 py-1.5 text-start text-muted hover:bg-surface-strong hover:text-foreground aria-[current=true]:bg-accent/15 aria-[current=true]:text-foreground',
+    start: 'w-12 shrink-0 text-xs tabular-nums',
+    title: 'min-w-0',
+    actions: 'flex shrink-0 items-center gap-1',
+    transcript: 'relative flex max-h-96 flex-col gap-3 overflow-y-auto text-sm',
+    group: 'flex flex-col gap-1',
+    groupTitle: 'm-0 text-xs text-muted',
+    cues: 'm-0',
+    cue: 'inline cursor-pointer text-start text-muted hover:text-foreground aria-[current=true]:bg-accent/15 aria-[current=true]:text-foreground',
+  },
+})
+
+const { src, title, artist, artwork, chapters = [], cues = [], position, onPositionChange, onChapterChange, preload = 'metadata', actions, playLabel = wording('ui.audioPlayer.play', 'Play'), pauseLabel = wording('ui.audioPlayer.pause', 'Pause'), previousLabel = wording('ui.audioPlayer.previous', 'Previous chapter'), nextLabel = wording('ui.audioPlayer.next', 'Next chapter'), seekLabel = wording('ui.audioPlayer.seek', 'Position'), chaptersLabel = wording('ui.audioPlayer.chapters', 'Chapters'), transcriptLabel = wording('ui.audioPlayer.transcript', 'Transcript'), linkLabel = wording('ui.audioPlayer.link', 'Open {title}'), failure = wording('ui.audioPlayer.failure', 'Could not play the audio.'), ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'title'> & {
+  // The audio file or stream.
+  src: string
+  // Names the audio on the lock screen, with the chapter playing as the song when there are chapters.
+  title?: string | undefined
+  artist?: string | undefined
+  // An image shown on the lock screen.
+  artwork?: string | undefined
+  // In time order, as given: the player never sorts them. Each is a button, a mark on the timeline and a step for the previous and next buttons and the lock screen.
+  chapters?: readonly AudioChapter[] | undefined
+  // The transcript, in time order, shown under the chapters they fall in: the cue playing is marked and a click on one seeks to it.
+  cues?: readonly AudioCue[] | undefined
+  // Seconds played; a player whose parent passes another follows it, and `onPositionChange` reports the playing.
+  position?: number | undefined
+  onPositionChange?: ((seconds: number) => unknown) | undefined
+  // Gets the index of the chapter now playing, or -1 before the first.
+  onChapterChange?: ((index: number) => unknown) | undefined
+  // What the browser loads before the first play; the audio's length is known with `metadata`, a stream's may not be.
+  preload?: 'none' | 'metadata' | 'auto' | undefined
+  // Fills a chapter's row after its link: `@actions(chapter, index)`.
+  actions?: Snippet<[chapter: AudioChapter, index: number]> | undefined
+  playLabel?: string | undefined
+  pauseLabel?: string | undefined
+  previousLabel?: string | undefined
+  nextLabel?: string | undefined
+  // Names the timeline's slider for screen readers.
+  seekLabel?: string | undefined
+  chaptersLabel?: string | undefined
+  // Titles the transcript's section.
+  transcriptLabel?: string | undefined
+  // Names a chapter's link, `{title}` standing for the chapter's title.
+  linkLabel?: string | undefined
+  // The toast shown when the browser refuses to play.
+  failure?: string | undefined
+}>()
+
+const player = signal<HTMLAudioElement>()
+const at = signal(0)
+const length = signal(0)
+const playing = signal(false)
+// Set by the first play: the lock screen is this player's from then on.
+const claimed = signal(false)
+const current = memo(() => chapterAt(chapters, at()))
+const cueNow = memo(() => cueAt(cues, at()))
+const groups = memo(() => cuesByChapter(chapters, cues))
+let transcript: HTMLElement | undefined
+let reported: number | undefined
+
+const percent = (seconds: number) => `${seconds / length() * 100}%`
+const marked = () => length() > 0 ? chapters.map((chapter, index) => ({ chapter, index })).filter(({ chapter }) => chapter.start > 0 && chapter.start < length()) : []
+
+effect(() => {
+  const audio = player()
+
+  if (audio && position !== undefined && Math.abs(position - audio.currentTime) > FOLLOW_SECONDS)
+    audio.currentTime = position
+})
+
+effect(() => {
+  const now = current()
+
+  if (reported !== undefined && now !== reported)
+    onChapterChange?.(now)
+
+  reported = now
+})
+
+// The cue playing is kept in view inside the transcript, which scrolls on its own and never moves the page.
+effect(() => {
+  const cue = cueNow()
+  const box = transcript
+  const line = box?.querySelector<HTMLElement>(`[data-index="${cue}"]`)
+
+  if (!box || !line)
+    return
+
+  if (line.offsetTop < box.scrollTop || line.offsetTop + line.offsetHeight > box.scrollTop + box.clientHeight)
+    box.scrollTop = line.offsetTop - (box.clientHeight - line.offsetHeight) / 2
+})
+
+async function seek(seconds: number, play: boolean) {
+  const audio = player()
+
+  if (!audio)
+    return
+
+  audio.currentTime = seconds
+  at = seconds
+  onPositionChange?.(seconds)
+
+  if (play && audio.paused)
+    await attempt(async () => audio.play(), failure)
+}
+
+async function toggle() {
+  const audio = player()
+
+  if (!audio)
+    return
+
+  if (audio.paused)
+    await attempt(async () => audio.play(), failure)
+  else
+    audio.pause()
+}
+
+function previous() {
+  void seek(previousStart(chapters, at()), true)
+}
+
+function next() {
+  const target = chapters[current() + 1]
+
+  if (target)
+    void seek(target.start, true)
+}
+
+function scrub(event: Event) {
+  void seek(Number((event.currentTarget as HTMLInputElement).value), false)
+}
+
+// The lock screen and headset buttons show the chapter playing and skip between chapters.
+const hasSession = () => typeof navigator !== 'undefined' && 'mediaSession' in navigator
+
+function claim() {
+  claimed = true
+
+  if (!hasSession())
+    return
+
+  const session = navigator.mediaSession
+  const skips = chapters.length > 1
+
+  session.setActionHandler('previoustrack', skips ? previous : null)
+  session.setActionHandler('nexttrack', skips ? next : null)
+  session.setActionHandler('seekto', (details) => {
+    if (details.seekTime !== undefined && details.seekTime !== null)
+      void seek(details.seekTime, false)
+  })
+}
+
+function listen(audio: HTMLAudioElement) {
+  const follow = () => {
+    at = audio.currentTime
+    onPositionChange?.(audio.currentTime)
+  }
+  const measure = () => {
+    length = Number.isFinite(audio.duration) ? audio.duration : 0
+  }
+  const started = () => {
+    playing = true
+    claim()
+  }
+  const stopped = () => {
+    playing = false
+  }
+
+  audio.addEventListener('timeupdate', follow)
+  audio.addEventListener('durationchange', measure)
+  audio.addEventListener('loadedmetadata', measure)
+  audio.addEventListener('play', started)
+  audio.addEventListener('pause', stopped)
+  audio.addEventListener('ended', stopped)
+  measure()
+  onCleanup(() => {
+    audio.removeEventListener('timeupdate', follow)
+    audio.removeEventListener('durationchange', measure)
+    audio.removeEventListener('loadedmetadata', measure)
+    audio.removeEventListener('play', started)
+    audio.removeEventListener('pause', stopped)
+    audio.removeEventListener('ended', stopped)
+  })
+}
+
+effect(() => {
+  const chapter = chapters[current()]
+
+  if (!claimed() || !playing() || !hasSession())
+    return
+
+  navigator.mediaSession.metadata = new MediaMetadata({
+    title: chapter?.title ?? title ?? '',
+    artist: artist ?? '',
+    album: chapter ? title ?? '' : '',
+    artwork: artwork ? [{ src: artwork }] : [],
+  })
+})
+
+onCleanup(() => {
+  if (!claimed() || !hasSession())
+    return
+
+  navigator.mediaSession.setActionHandler('previoustrack', null)
+  navigator.mediaSession.setActionHandler('nexttrack', null)
+  navigator.mediaSession.setActionHandler('seekto', null)
+  navigator.mediaSession.metadata = null
+})
+---
+div(part="root" {...rest})
+  // Without `controls`, so the element draws nothing and the bar below is the player.
+  audio(part="audio" ref={(element) => { player = element; listen(element) }} src={src} preload={preload})
+  div(part="bar")
+    if chapters.length > 1
+      IconButton(icon="chevron" label={previousLabel} variant="ghost" part="step" data-side="previous" onClick={previous})
+    IconButton(icon={playing() ? 'pause' : 'play'} label={playing() ? pauseLabel : playLabel} tone="accent" part="play" onClick={toggle})
+    if chapters.length > 1
+      IconButton(icon="chevron" label={nextLabel} variant="ghost" part="step" data-side="next" onClick={next})
+    span(part="time") {clock(at())} / {clock(length())}
+    div(part="seek")
+      input(part="track" type="range" min="0" max={length()} step="1" value={at()} disabled={length() === 0} aria-label={seekLabel} aria-valuetext={`${clock(at())} / ${clock(length())}`} onInput={scrub})
+      if marked().length > 0
+        ol(part="marks" aria-hidden="true")
+          for entry of marked() key={entry.index}
+            li(part="mark" style={`left: ${percent(entry.chapter.start)}`})
+  if chapters[current()]
+    p(part="now") {chapters[current()]!.title}
+  if chapters.length > 0
+    ol(part="chapters" aria-label={chaptersLabel})
+      for chapter, index of chapters key={index}
+        li(part="chapter")
+          button(part="jump" type="button" aria-current={index === current() ? 'true' : undefined} onClick={() => void seek(chapter.start, true)})
+            span(part="start") {clock(chapter.start)}
+            span(part="title") {chapter.title}
+          if chapter.url
+            IconButton(href={chapter.url} icon={ExternalLink} label={linkLabel.replaceAll('{title}', chapter.title)} variant="ghost" size="sm")
+          if actions
+            span(part="actions")
+              | {actions(chapter, index)}
+  if cues.length > 0
+    CollapsibleSection(title={transcriptLabel} open={false})
+      div(part="transcript" ref={element => transcript = element})
+        for group of groups() key={group.chapter}
+          div(part="group")
+            if chapters[group.chapter]
+              p(part="groupTitle") {chapters[group.chapter]!.title}
+            p(part="cues")
+              for cue, offset of group.cues key={offset}
+                button(part="cue" type="button" data-index={group.first + offset} aria-current={group.first + offset === cueNow() ? 'true' : undefined} onClick={() => void seek(cue.start, true)}) {`${cue.text} `}

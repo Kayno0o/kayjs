@@ -6,6 +6,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 
 - A module an island imports may build schemas with `s` as it loads: in the browser `s` builds an inert stand-in with no validator, so a type and its schema live in one module shared with the server, and `server-only-in-island` no longer refuses `s`, only `process` and `Bun` reads: [Schemas](schemas.md#schemas).
 - kayjs-ai: `ask` outside a request takes `tool({ name, description, input, run })` functions as `tools`, run with the app's own rights and never held for approval, so a scheduled job's model can call things: [Function tools](../packages/ai/llms/tools.md#function-tools).
+- kayjs-ui has an `AudioPlayer`: chapters on a timeline and in a list, a timed transcript following the playback, lock screen controls skipping between chapters, an `@actions` slot per chapter and a readable position ([Charts, drag and drop and media](../packages/ui/llms/charts-drag-and-media.md)).
 - `kay check` reports `signal-set-call`, a signal written `count.set(value)` where assigning it, `count = value`, does the same, and `--fix` assigns it: [Signals](components.md#signals).
 
 ## 1.79.0

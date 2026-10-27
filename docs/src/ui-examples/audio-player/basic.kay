@@ -1,0 +1,22 @@
+---
+import type { AudioChapter, AudioCue } from '@kaynooo/kayjs-ui'
+import AudioPlayer from '@kaynooo/kayjs-ui/audio-player.kay'
+import { SILENCE } from './clip'
+
+const chapters: AudioChapter[] = [
+  { title: 'Welcome', start: 0 },
+  { title: 'The news', start: 5, url: 'https://kayjs.dev' },
+  { title: 'Goodbye', start: 10 },
+]
+const cues: AudioCue[] = [
+  { start: 0, end: 2.5, text: 'Hello and welcome.' },
+  { start: 2.5, end: 5, text: 'Here is the show.' },
+  { start: 5, end: 8, text: 'Today, a player with chapters.' },
+  { start: 8, end: 10, text: 'And a transcript.' },
+  { start: 10, end: 15, text: 'See you next time.' },
+]
+const at = signal(0)
+---
+.flex.flex-col.gap-2.max-w-xl
+  AudioPlayer(src={SILENCE} title="Episode 12" artist="The show" chapters={chapters} cues={cues} position={at()} onPositionChange={at.set})
+  p At {Math.floor(at())} seconds.

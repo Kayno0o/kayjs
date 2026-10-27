@@ -1,0 +1,21 @@
+---
+import type { AudioChapter } from '@kaynooo/kayjs-ui'
+import AudioPlayer from '@kaynooo/kayjs-ui/audio-player.kay'
+import IconButton from '@kaynooo/kayjs-ui/icon-button.kay'
+import { SILENCE } from './clip'
+
+const chapters: AudioChapter[] = [
+  { title: 'Welcome', start: 0 },
+  { title: 'The news', start: 5 },
+  { title: 'Goodbye', start: 10 },
+]
+const liked = signal<number[]>([])
+
+function like(index: number) {
+  liked = liked().includes(index) ? liked().filter(other => other !== index) : [...liked(), index]
+}
+---
+.max-w-xl
+  AudioPlayer(src={SILENCE} chapters={chapters})
+    @actions(chapter, index)
+      IconButton(icon="star" label={`Like ${chapter.title}`} size="sm" variant="ghost" aria-pressed={liked().includes(index)} onClick={() => like(index)})

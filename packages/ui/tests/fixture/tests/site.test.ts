@@ -384,6 +384,20 @@ describe('content', () => {
     ])
   })
 
+  test('AudioPlayer draws its own controls over an audio element without any, lists the chapters and folds the transcript, in the app\'s words', async () => {
+    expect(await attributes('/content', '#audio audio', ['src', 'controls', 'preload'])).toEqual([{ src: '/episode.mp3', controls: null, preload: 'metadata' }])
+    expect(await attributes('/content', '#audio [data-part="play"], #audio [data-part="step"], #audio [data-part="track"]', ['aria-label', 'data-side', 'disabled'])).toEqual([
+      { 'aria-label': 'Previous chapter', 'data-side': 'previous', 'disabled': null },
+      { 'aria-label': 'Lire', 'data-side': null, 'disabled': null },
+      { 'aria-label': 'Next chapter', 'data-side': 'next', 'disabled': null },
+      { 'aria-label': 'Position', 'data-side': null, 'disabled': '' },
+    ])
+    expect((await find('/content', '#audio [data-part="jump"]')).map(found => found.text)).toEqual(['0:00Intro', '0:30News'])
+    expect(await attributes('/content', '#audio [data-part="chapters"], #audio a', ['aria-label', 'href'])).toEqual([{ 'aria-label': 'Chapitres', 'href': null }, { 'aria-label': 'Open News', 'href': '/news' }])
+    expect((await find('/content', '#audio summary')).map(found => found.text)).toEqual(['Transcription'])
+    expect((await find('/content', '#audio [data-part="cue"]')).map(found => found.text)).toEqual(['Hello.'])
+  })
+
   test('Carousel draws no controls for a single slide', async () => {
     expect(await attributes('/content', '#lone-slide [aria-label]', ['aria-label'])).toContainEqual({ 'aria-label': 'Slide 1 of 1' })
     expect(await find('/content', '#lone-slide [data-part="controls"]')).toEqual([])

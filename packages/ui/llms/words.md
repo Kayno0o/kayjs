@@ -32,6 +32,7 @@ ui: { sidePanel: { close: 'Fermer' } }
 ### The keys
 
 - `ui.appSwitcher.*`: `label` (`Apps`)
+- `ui.audioPlayer.*`: `chapters` (`Chapters`), `failure` (`Could not play the audio.`), `link` (`Open {title}`), `next` (`Next chapter`), `pause` (`Pause`), `play` (`Play`), `previous` (`Previous chapter`), `seek` (`Position`), `transcript` (`Transcript`)
 - `ui.barChart.*`: `empty` (`No data yet.`), `total` (`Total`)
 - `ui.barList.*`: `empty` (`No data yet.`)
 - `ui.bell.*`: `empty` (`No notifications`), `label` (`Notifications`), `markAll` (`Mark all as read`), `unread` (`{label}, {count} unread`, `{label}, 1 unread` for one), `unreadMark` (`(unread)`, read by screen readers beside an unread item), `new` (`New notification: {title}`, announced when one arrives)
