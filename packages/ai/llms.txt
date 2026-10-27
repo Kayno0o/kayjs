@@ -10,6 +10,7 @@ Each topic is one file, read whole with one command:
 
 - [Environment, ask() and its reply](llms/asking.md): the variables, picking a provider, `ask()`'s options, an object instead of text (`schema`), the reply, `await` blocks and streaming actions
 - [Chat island](llms/chat.md): `Chat(action={reply})`, its props, behaviour, markdown and the rules for passing it the action
+- [Floating chat](llms/chat-launcher.md): `ChatLauncher`, the chat behind a button at the bottom right of every page, and how its panel opens, closes and keeps the conversation
 - [Chat sources](llms/chat-sources.md): `ask({ sources })` and what `Chat` does with the `[n]` a reply cites: links, the cited list under the turn, `remember`, `initial`
 - [Limits and the token budget](llms/limits.md): `ai({ rateLimit, budget, key })`, the stores, when tokens count, the `limited` error and a failing store
 - [Personal data and the AI notice](llms/personal-data.md): what goes to the provider (US transfers, DPA, the privacy notice), what kayjs-ai keeps, the disclosure line `Chat` shows and how to word it
