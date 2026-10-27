@@ -123,6 +123,8 @@ export interface AttemptOptions<Data = unknown> {
   // Toasted once the call goes through.
   success?: string | undefined
   refused?: ((data: Data) => string | undefined) | undefined
+  // Handed what a refusal carries, an action's `ctx.fail` data or a route's JSON answer, instead of toasting anything, for a page that shows the refusal where it is. A failure that is no refusal still toasts `failure`.
+  onRefused?: ((data: Data) => unknown) | undefined
 }
 
 // What a call that went through resolves to: what it returned, or `true` when it returned nothing, so `undefined` only ever means it failed.
@@ -143,10 +145,26 @@ export async function attempt<T, Data = unknown>(run: () => Promise<T>, failure:
     return (value === undefined ? true : value) as Attempted<T>
   }
   catch (error) {
-    toast.error(refusalOf(error, options.refused) ?? options.failure)
+    const data = options.onRefused === undefined ? undefined : refusalData<Data>(error)
+
+    if (data === undefined)
+      toast.error(refusalOf(error, options.refused) ?? options.failure)
+    else
+      options.onRefused?.(data.value)
 
     return undefined
   }
+}
+
+// What a refusal carries for `onRefused`, boxed so a falsy answer still counts: the data an action's handler passed to `ctx.fail`, or the JSON object a route answered with. A schema refusal, a status 0, a 5xx's words and any other error carry none.
+function refusalData<Data>(error: unknown): { value: Data } | undefined {
+  if (error instanceof ActionError)
+    return error.data === undefined ? undefined : { value: error.data as Data }
+
+  if (error instanceof ApiError && error.status !== 0 && typeof error.answer === 'object' && error.answer !== null && !(error.answer instanceof Blob))
+    return { value: error.answer as Data }
+
+  return undefined
 }
 
 // The message of a call that failed, for a page that shows it where it is and not as a toast: what `attempt` would toast for a route's refusal or an action's, else `fallback`, which status 0, a 5xx and any other error get.

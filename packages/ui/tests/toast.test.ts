@@ -188,6 +188,27 @@ describe('attempt', () => {
     // The same error open is shown once.
   })
 
+  test('hands a refusal to `onRefused` without toasting, and still toasts a failure that is no refusal', async () => {
+    const seen: unknown[] = []
+    const onRefused = (data: unknown) => seen.push(data)
+    const reject = (error: Error) => async () => Promise.reject(error)
+
+    expect(await attempt(reject(new ActionError(400, '', {}, { output: 'nginx: [emerg] bad directive' })), { failure: 'Could not apply', onRefused })).toBeUndefined()
+    expect(await attempt(reject(new ApiError(409, 'Conflict', { reason: 'Busy' })), { failure: 'Could not apply', onRefused })).toBeUndefined()
+    // A falsy answer is still the refusal's data.
+    await attempt(reject(new ActionError(400, '', {}, 0)), { failure: 'Could not apply', onRefused })
+
+    expect(seen).toEqual([{ output: 'nginx: [emerg] bad directive' }, { reason: 'Busy' }, 0])
+    expect(shown()).toEqual([])
+
+    await attempt(reject(new Error('offline')), { failure: 'Could not apply', onRefused })
+    await attempt(reject(new ActionError(422, '', { name: 'Required' })), { failure: 'Could not apply', onRefused })
+    await attempt(reject(new ApiError(0, 'Failed to fetch')), { failure: 'Could not apply', onRefused })
+
+    expect(seen).toHaveLength(3)
+    expect(shown().map(({ message }) => message)).toEqual(['Could not apply'])
+  })
+
   test('stays quiet when the call goes through, and hands back what it returned', async () => {
     expect(await attempt(async () => Promise.resolve(42), 'Could not save')).toBe(42)
     expect(toasts()).toHaveLength(0)
