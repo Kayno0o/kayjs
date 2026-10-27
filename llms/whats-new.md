@@ -2,7 +2,7 @@
 
 What each release of kay and its libraries adds, newest first, each feature with where it is documented. kay and its libraries share one version, so one section covers them all; what a release breaks is in [Upgrading](upgrading.md).
 
-## Unreleased
+## 1.80.0
 
 - `formatNumber`, `formatDate`, `formatRelativeTime`, `formatList` and `direction` from `kay/i18n` work outside a request, in the site's default locale, so a job, an alert or a push formats like its pages, and each takes a `locale` option (`formatDate(date, { locale: user.locale })`) that wins over the page's, in the browser too: [Format a number, a date or a list](locales.md#format-a-number-a-date-or-a-list).
 - `promoted-island` no longer reports a static component for a value read from an object of strings or numbers another module exports as a literal (`LABEL[kind]`), as it is data and not a function: [Islands](islands.md#islands).
@@ -35,57 +35,4 @@ What each release of kay and its libraries adds, newest first, each feature with
 - kayjs-ai: a resume or stop of a reply the server kept gives back the attempt the action's `protect.rateLimit` counted, so reloading a page does not spend the limit; a `RateStore` takes an optional `refund(key, resetAt)` for it: [Asking](../packages/ai/llms/asking.md#a-reply-that-outlives-the-visitor), [Rate limits](rate-limits.md).
 - kayjs-ai: `ask(messages, { outlive: true })` lets a reply finish on the server, tool loop and readers included, after the visitor reloaded or left, and a `Chat` with `remember` shows the finished turn after the reload or picks the stream back up, with no app code; an action call takes `{ headers }`: [Asking](../packages/ai/llms/asking.md#a-reply-that-outlives-the-visitor), [Chat](../packages/ai/llms/chat.md#a-reply-that-outlives-the-page).
 
-## 1.78.0
-
-- `site.submit(action, fields, { from: '/path' })` solves a `workChallenge` field of the form on that page, as `from: await site.visit(...)` does: [Testing](testing.md).
-- The placeholder `kay build --compile --verify-load` gives a string field reads as the field's first `enum` value, or a sample its `format` or `pattern` accepts, so a module validating it at load, as `new URL(env.X)` does, loads: [Production](production.md#check-the-executable-starts).
-- The placeholder `kay build --compile --verify-load` gives a string field reads as the field's first `enum` value, or one of kay's samples its `format` or `pattern` accepts (a URL, an email, a pattern's literal start), so a module validating it at load, as `new URL(env.X)` does, loads: [Production](production.md#check-the-executable-starts).
-- A test run needs no `KAY_SECRET` and no writable `.kay` for its secret: under `bun test` the derived secret takes a seed of the process when `.kay/dev-secret` is missing, and `testSite()` with an unwritable `.kay` fails with one message naming the folder and `islands: false`: [Environment](environment.md).
-- kayjs-auth's background prune of expired, erased and guest data is waited for by `site.runJobs()`, so a test of retention settings needs no sleep.
-- `signed.sign(use, value, { maxAge })` and `signed.verify(use, value, token)` from `kay/server` sign an app's own links and values with the app secret, expiring, so an app needs no key file of its own: [The app secret](environment.md#the-app-secret).
-- kayjs-ai `Chat` sends the text of a `kai-chat-send` event on its `.kai-chat` as the next message, so a voice button beside it can post a transcript without touching its field: [Chat](../packages/ai/llms/chat.md).
-- A browser test moves a page's clock with `page.advance('30s')`, running the `every()` and timer ticks due in that span, so a polling island is tested without waiting: [Browser tests](testing-browser.md).
-- A test run needs no `KAY_SECRET` and no writable `.kay` for its secret: under `bun test` the derived secret takes a seed of the process when `.kay/dev-secret` is missing (shared with subprocesses through `KAY_DEV_SEED`), and `testSite()` with an unwritable `.kay` fails with one message naming the folder and `islands: false`: [Environment](environment.md).
-- kayjs-cms's `cmsTest(site)` adds `delete`, `rename`, `move` and `upload`, and `save`, `delete` and `rename` read the entry's `version` themselves when none is named, so a test no longer hand-rolls the calls as the contract moves: [kayjs-cms options](../packages/cms/llms/options.md).
-- `unbounded-string` stays quiet on a string field whose `enum`, `const` or anchored `pattern` with no `*`, `+` or `{n,}` already bounds its length: [Checks](checks.md).
-- An `api()` handler returning `null` answers the JSON `null`, which `response.json()` reads, where it answered an empty body: [API routes](api-routes.md).
-- kayjs-ai: an inline `Chat` shows a New conversation button with `newButton`, and `kai-chat-new` is documented as the way to clear one from outside: [Chat](../packages/ai/llms/chat.md).
-- kayjs-ui `SidePanel` takes no `onOpenChange` when it has a `closeHref`: Escape follows the link as its close button does, so a URL-driven panel in a server page needs no wrapper island and `persist` on a sibling island works: [Page layout](../packages/ui/llms/page-layout-palette-and-trees.md).
-- kayjs-ui `SidePanel` takes no `onOpenChange` when it has a `closeHref`: Escape follows the link as its close button does, so a URL-driven panel in a server page needs no wrapper island: [Page layout](../packages/ui/llms/page-layout-palette-and-trees.md).
-- kayjs-ui `SidePanel` takes a `launcherHref` that makes its launcher a link, and a `closeHref` panel with no `onOpenChange` must give one with its `launcher`: [Page layout](../packages/ui/llms/page-layout-palette-and-trees.md).
-- A kayjs-ui `Table` takes `list={list}` from `infiniteList` in place of `rows`: it draws `LoadMore` after the rows and a header click sorts on the server, `list.sortBy(sort)` reloading from offset 0 and `load` receiving the sort: [LoadMore](../packages/ui/llms/charts-drag-and-media.md).
-- A kayjs-ui `Table` takes `sortable={false}`, which leaves every header unsortable, `numeric` columns included, for rows loaded page by page: [Tables](../packages/ui/llms/tables-navigation-and-layout.md).
-- kayjs-ui's `space` skin's rules sit at one class of specificity or none, so an app's plain class beats them, its `starfield` utility paints `--color-background` and stays fixed, its checkbox outlines in the accent on hover, and the Skins docs say where the import goes with `ui()` and list what each skin sets: [Skins](../packages/ui/llms/setup.md).
-- kayjs-ui's `space` skin sits at one class of specificity or none, so an app rule in `@layer components` beats it (unlayered CSS and `ui.ts` part classes already did), its `starfield` paints `--color-background` and stays fixed, its checkbox outlines in the accent on hover, a disabled button keeps the theme's look, and a keyboard-focused one shows the theme's focus hairline and outline; the Skins docs say where the import goes with `ui()` and list what each skin sets: [Setup](../packages/ui/llms/setup.md).
-- An island passes a `Blob` to an `s.File()` or `s.Files()` field, a `MediaRecorder` recording as it is, and `kay check` accepts it where it asked for a `File`; the handler still gets a `File`: [Files](files.md#files-posted-to-an-action).
-- `session()` no longer warns in production that a cookie with no store cannot be revoked when kayjs-auth uses it, which keeps its own record of each session and refuses a cookie whose session it ended: [Sessions](server.md).
-- `kay check` reports an `s.Public` field in a `.ts` file outside `src` (`public-env-outside-src`), where kay does not find it and an island reads it as a string: [Environment](environment.md).
-- `kay upgrade` runs `bun update bun` itself when the install leaves an npm `bun` (the peer of `bun-plugin-tailwind`) older than the Bun kay needs, so kay runs right after it: [kay upgrade](check-and-tools.md).
-- `kay upgrade` says `nothing left to do by hand` only when its last check printed nothing, warnings such as `promoted-island` included, and exits 1 otherwise: [kay upgrade](check-and-tools.md).
-- `kay check --fix` checks what is left against `kay.config.ts` as the fixes left it, so a fix that rewrites the config no longer ends the same run on locals typed off the old one (`Property 'auth' does not exist on type 'object'`): [Check the project](check-and-tools.md#check-the-project).
-- `kay check --fix` checks what is left against `kay.config.ts` as the fixes left it, so a fix that rewrites the config no longer ends the same run on locals typed off the old one (`Property 'auth' does not exist on type 'object'`): [Check and tools](check-and-tools.md).
-- `security.permissions` grants one `Permissions-Policy` feature, `{ microphone: 'self' }`, merged over kay's list instead of replacing the whole header: [Security headers](proxy-and-security.md#security-headers).
-- A session cookie minted by `auth.sessionCookie()` before the first `testSite()` signs the request in, where it read as anonymous once the site's `store` held the sessions: [kayjs-auth testing](../packages/auth/llms/hardening-and-testing.md).
-- kayjs-ui's Button, framed IconButton and stat badge take their hairline and fill from the documented `--shell-line` and `--shell-fill` (the private `--_shell-line` and `--_shell-fill` are gone), set as utilities on the part in `src/ui.ts`: [Setup](../packages/ui/llms/setup.md).
-- A `for` destructures its item, `for { id, name } of rows` or `for [key, count] of entries`, in the server render, in islands and in `kay check`, where it was a `Malformed for` error: [Templates](templates.md#render-a-list).
-- kayjs-ui `Table` takes `sortParam`, keeping the sort a header click picks in the URL beside `filterParam`, so a reload and back and forward sort the same: [Tables](../packages/ui/llms/tables-navigation-and-layout.md).
-- `kay check` reports a root Dockerfile building `FROM oven/bun:<version>` from a Bun older than the one kay needs (`old-bun-image`), and `kay check --fix`, so `kay upgrade`, moves the tag to the oldest Bun kay runs on, so an image build no longer fails after an upgrade: [Lints](lints.md).
-- `kay check` and `kay upgrade` name an export `kay.config.ts` imports and a release removed (`mailExtension`, `authExtension`, `authPages`) with what replaced it, instead of stopping on Bun's bare `SyntaxError`: [upgrading](upgrading.md).
-- `kay build --compile --verify-load` loads a module reading a `defineEnv` field at load, such as an app's `session({ secret })` or `createAuth({ secret })`, with no environment: the field reads as a placeholder there: [Production](production.md#check-the-executable-starts).
-- `kay check` reports a kayjs-ui theme token or utility still written under its removed `kui-` name (`bg-kui-surface2`, `var(--color-kui-muted)`) as `removed-ui-token`, in `.kay` classes, `@apply`, stylesheets and src/ui.ts, and `kay check --fix` rewrites it where a new name stands for it; the `--kui-border-*` knobs are reported for a hand fix instead of being mapped to `--border-width`: [Upgrading](upgrading.md), [checks](lints.md).
-- An `ActionError`'s `message` reads what a visitor can show: the string given to `ctx.fail`, the form-wide message, the schema's field messages, or the handler data's `message`, rather than the serialized body: [Actions from islands](actions-from-islands.md).
-
-The rest of this release is in [What's new, older releases](whats-new-archive.md).
-
-## 1.77.2
-
-- kayjs-ai `ask(..., { reasoning })` takes `'none'`, `'low'`, `'medium'` or `'high'` and sends it as `reasoning_effort` to an OpenAI-compatible server, so a reasoning model such as Ollama's answers a short question in about a second: [asking](../packages/ai/llms/asking.md#ask-options).
-- A direct child of `<body>` a script marks `data-kay-keep` lives on through every page swap, and kayjs-ui's `announce()` marks its live region, so words said just before a swap, such as kayjs-cms's `Title updated` on ending an inline edit, are still read: [Navigation](navigation.md).
-- The `server` Dockerfile `kay new` writes runs on `debian:trixie-slim` (Debian 13) instead of bookworm, which only gets security fixes: [kay new](project-new-and-add.md).
-- kayjs-mail requires nodemailer 10.2.1 and up, past three addressparser advisories (GHSA-85x2-q946-cp5h, GHSA-8c8m-p3m8-cjg8, GHSA-m943-m63m-w62w): [kayjs-mail](../packages/mail/llms.txt).
-
-## 1.77.1
-
-- A `kay build --compile` executable carries the modules declaring `s.Public`, so `publicEnv` and `/_kay/env.js` work where no `src` sits beside it, as in a container image holding the executable alone: [Environment](environment.md).
-
-Releases before 1.77.1 are in [What's new, older releases](whats-new-archive.md).
+Releases before 1.79 are in [What's new, older releases](whats-new-archive.md).
