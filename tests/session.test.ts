@@ -317,6 +317,28 @@ describe('sessions', () => {
     expect((await browser(counter({ domain: ' .Example.COM ' }))('/count')).set).toMatch(/; Domain=example\.com;/i)
   })
 
+  it('shares under the domain a library named that the visited host is on, unless domain is set, and keeps a host on none to itself', async () => {
+    const shared = (options: Partial<Parameters<typeof session>[0]> = {}) => {
+      const plugin = session<{ count: number }>({ secret: SECRET, ...options })
+
+      plugin.sharesUnder(['example.com', 'other.com'])
+
+      return new Elysia().use(plugin).get('/count', async ({ session }) => {
+        await session.set('count', 1)
+
+        return 'ok'
+      })
+    }
+    const setAt = async (app: ReturnType<typeof shared>, url: string) => (await app.handle(new Request(url, { headers: { 'x-forwarded-host': 'a.example.com' } }))).headers.getSetCookie()[0]!
+
+    expect(await setAt(shared(), 'https://a.other.com/count')).toMatch(/^kay_session=.*; Domain=other\.com;/i)
+    expect(await setAt(shared(), 'https://example.com/count')).toMatch(/^kay_session=.*; Domain=example\.com;/i)
+    expect(await setAt(shared({ domain: 'own.com' }), 'https://a.example.com/count')).toMatch(/^kay_session=.*; Domain=own\.com;/i)
+
+    for (const url of ['https://example.com.evil.com/count', 'https://notexample.com/count', 'http://localhost/count'])
+      expect(await setAt(shared(), url), url).not.toMatch(/Domain=/i)
+  })
+
   it('forgets a session unused for maxAge, and extends one used past half of it', async () => {
     const visit = browser(counter({ maxAge: '100s' }))
 

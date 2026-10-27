@@ -58,6 +58,8 @@ export interface OwnOptions<Role extends string = string, Prefix extends string 
   prefix?: Prefix | undefined
   // The prebuilt pages are served by default; `false` leaves them out, an object tunes them (`remember`, `profile`).
   pages?: boolean | Pick<AuthPagesConfig, 'profile' | 'remember'> | undefined
+  // The session cookie's name, `kay_session` by default; kay names it `__Host-` first over https unless `forwardAuth` shares it under a domain.
+  cookie?: string | undefined
   // Providers by the name their routes take: `{ github: true }` reads `GITHUB_CLIENT_ID` and `GITHUB_CLIENT_SECRET` (a preset: github, discord, google, microsoft or gitlab), an object adds options to a preset, and a full `OAuthApp` is an app of any provider.
   oauth?: Record<string, true | PresetApp | OAuthApp> | undefined
   // The users' data: a pg-orm database at `{ url }`, the store itself, or a function building it. `KAYJS_AUTH_DATABASE_URL` when set, else the database of the app's `store` (`sqliteData(path)`, `pgData(url)`), else `data/auth.db` (SQLite).
@@ -250,7 +252,7 @@ export function builtOwn(site: { cookies: Bun.CookieMap }): OwnTest | undefined 
 /** The `createAuth` an `auth()` with no module makes as the server starts: kay's session, the store, the mailer and the hooks found, the pages on. */
 export async function buildOwn(options: OwnOptions, app: ExtensionApp): Promise<UserMaker & { plugin: AnyElysia }> {
   const { createAuth } = await import('./auth')
-  const { hooks: loadHooks, store, oauth, email, pages, prefix, home, ...rest } = options
+  const { hooks: loadHooks, store, oauth, email, pages, prefix, home, cookie, ...rest } = options
   const hooks = loadHooks ? (await loadHooks()).hooks : conventionalHooks(app.modules.hooks)
   const mailer = await emailOf(email, app)
 
@@ -261,7 +263,7 @@ export async function buildOwn(options: OwnOptions, app: ExtensionApp): Promise<
     ...hooks,
     ...rest,
     ...prefix !== undefined && { prefix },
-    sessions: session<AuthSessionData>(),
+    sessions: session<AuthSessionData>(cookie === undefined ? {} : { cookie }),
     store: await storeOf(store, app.root, app.database, app.exporting),
     ...oauth && { oauth: Object.fromEntries(Object.entries(oauth).map(([name, app]) => [name, appOf(name, app)])) },
     ...mailer && { email: mailer },

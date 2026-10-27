@@ -13,7 +13,7 @@ import { nodeCrypto } from './builtins'
 import { requestCookies } from './cookies'
 import { inMemory } from './memory-mark'
 import { onReload } from './reload'
-import { overHttps } from './request-url'
+import { overHttps, requestUrl } from './request-url'
 import { readPersonally } from './scope'
 import { GENERATE_SECRET, MIN_SECRET_LENGTH, openWith, sealWith, warnLowEntropy, weakSecrets } from './seal'
 import { appSecrets, noAppSecret, useStampSecret } from './stamp'
@@ -155,7 +155,7 @@ export function session<Data extends object = SessionData>(options: SessionOptio
   if (options.sameSite !== undefined && !SAME_SITE.has(options.sameSite))
     throw new KayError('config-invalid', `kay: the session sameSite is ${JSON.stringify(options.sameSite)}, which is none of 'lax', 'strict' and 'none'`)
 
-  const config = { name: options.cookie ?? 'kay_session', sameSite: options.sameSite ?? 'lax', maxAge: options.maxAge === undefined ? DEFAULT_MAX_AGE : wholeSeconds(options.maxAge, 'the session maxAge'), absoluteMaxAge: options.absoluteMaxAge === undefined ? DEFAULT_ABSOLUTE_MAX_AGE : wholeSeconds(options.absoluteMaxAge, 'the session absoluteMaxAge'), browserMaxAge: options.browserMaxAge === undefined ? DEFAULT_BROWSER_MAX_AGE : wholeSeconds(options.browserMaxAge, 'the session browserMaxAge'), domain, store: () => options.store ?? appStore()?.sessions, keys, revokedElsewhere: false }
+  const config: SessionConfig = { name: options.cookie ?? 'kay_session', sameSite: options.sameSite ?? 'lax', maxAge: options.maxAge === undefined ? DEFAULT_MAX_AGE : wholeSeconds(options.maxAge, 'the session maxAge'), absoluteMaxAge: options.absoluteMaxAge === undefined ? DEFAULT_ABSOLUTE_MAX_AGE : wholeSeconds(options.absoluteMaxAge, 'the session absoluteMaxAge'), browserMaxAge: options.browserMaxAge === undefined ? DEFAULT_BROWSER_MAX_AGE : wholeSeconds(options.browserMaxAge, 'the session browserMaxAge'), domain, store: () => options.store ?? appStore()?.sessions, keys, revokedElsewhere: false }
 
   const plugin = new Elysia({ name: 'kay/session', seed: config.name })
     .derive({ as: 'scoped' }, ({ request }) => ({ session: new RequestSession<Data>(request, config) }))
@@ -187,7 +187,19 @@ export function session<Data extends object = SessionData>(options: SessionOptio
     config.revokedElsewhere = true
   }
 
-  return Object.assign(plugin, { deriveSecret, endsSessionsElsewhere })
+  // A library that spreads the session over sibling hosts, kayjs-auth's `forwardAuth`, names their domains: the cookie takes the one the visited host is on, unless `domain` was given. A host on none keeps the cookie to itself.
+  const sharesUnder = (domains: string[]): void => {
+    config.shared = domains
+  }
+
+  return Object.assign(plugin, { deriveSecret, endsSessionsElsewhere, sharesUnder })
+}
+
+// The listed domain a host is, or is a subdomain of; the host as the request URL names it, so a Host header cannot widen it.
+function sharedDomain(domains: string[] | undefined, request: Request): string | undefined {
+  const { hostname } = requestUrl(request)
+
+  return domains?.find(domain => hostname === domain || hostname.endsWith(`.${domain}`))
 }
 
 interface SessionConfig {
@@ -197,6 +209,8 @@ interface SessionConfig {
   absoluteMaxAge: number
   browserMaxAge: number
   domain?: string | undefined
+  // The domains a library shares the session under, used when `domain` is not set.
+  shared?: string[] | undefined
   // The session's own store, else the app's `store.sessions`, read per request as a `session()` made while its module loads comes before the config.
   store: () => SessionStore | undefined
   keys: Buffer[]
@@ -218,11 +232,13 @@ class RequestSession<Data extends object> implements Session<Data> {
   private readonly secure: boolean
   // `__Host-` keeps the cookie to this host over https, so no other host of the site can set it; a Domain rules the prefix out.
   private readonly name: string
+  private readonly domain: string | undefined
   private readonly store: SessionStore | undefined
 
   constructor(private readonly request: Request, private readonly config: SessionConfig) {
     this.secure = overHttps(request)
-    this.name = this.secure && config.domain === undefined && !config.name.startsWith('__') ? `__Host-${config.name}` : config.name
+    this.domain = config.domain ?? sharedDomain(config.shared, request)
+    this.name = this.secure && this.domain === undefined && !config.name.startsWith('__') ? `__Host-${config.name}` : config.name
     this.store = config.store()
 
     if (!this.store && !config.revokedElsewhere)
@@ -369,7 +385,7 @@ class RequestSession<Data extends object> implements Session<Data> {
 
   // Without `maxAge`, a cookie the browser drops on closing.
   private cookie(value: string, maxAge: number | undefined): string {
-    return new Bun.Cookie(this.name, value, { path: '/', ...this.config.domain === undefined ? {} : { domain: this.config.domain }, httpOnly: true, sameSite: this.config.sameSite, secure: this.secure || this.config.sameSite === 'none', ...maxAge === undefined ? {} : { maxAge } }).serialize()
+    return new Bun.Cookie(this.name, value, { path: '/', ...this.domain === undefined ? {} : { domain: this.domain }, httpOnly: true, sameSite: this.config.sameSite, secure: this.secure || this.config.sameSite === 'none', ...maxAge === undefined ? {} : { maxAge } }).serialize()
   }
 }
 

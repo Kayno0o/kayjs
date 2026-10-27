@@ -130,6 +130,8 @@ export interface SessionPlugin<Data extends AuthSessionData> {
   'deriveSecret'?: (purpose: string) => string[]
   // Tells the plugin kayjs-auth ends sessions itself, so it does not warn that a cookie with no store cannot be revoked.
   'endsSessionsElsewhere'?: () => void
+  // Names the domains `forwardAuth` shares the session under, which the cookie takes when the visited host is on one and the session names no `domain`.
+  'sharesUnder'?: (domains: string[]) => void
 }
 
 export interface AuthOptions<Data extends AuthSessionData, Role extends string, Prefix extends string = '/auth', Scope extends string = never, OrgRole extends string = never, UserData extends object = Record<string, never>> {
@@ -1154,6 +1156,9 @@ export function createAuth<Data extends AuthSessionData, Role extends string = s
   const core = createCore(options)
 
   options.sessions.endsSessionsElsewhere?.()
+
+  if (core.forward)
+    options.sessions.sharesUnder?.(core.forward.domains)
 
   const { hasRole, isGranted } = createRoleHierarchy<BareUser, Role>(options.roles ?? {} as RoleHierarchy<Role>, user => user.roles as Role[])
 

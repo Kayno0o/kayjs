@@ -56,7 +56,7 @@ async function served(options: Options, extensions: string[] = []) {
       return current.register(body)
     })
 
-  return { extension, features: async () => (await app.handle(new Request('http://localhost/features'))).json() as Promise<Record<string, unknown>>, register: async () => app.handle(new Request('http://localhost/register', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ email: 'ada@example.com', password: PASSWORD }) })) }
+  return { extension, features: async () => (await app.handle(new Request('http://localhost/features'))).json() as Promise<Record<string, unknown>>, register: async (url = 'http://localhost/register') => app.handle(new Request(url, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ email: 'ada@example.com', password: PASSWORD }) })) }
 }
 
 describe('auth() with no module', () => {
@@ -72,6 +72,13 @@ describe('auth() with no module', () => {
 
     expect(extension.routes?.prefix).toBe('/account')
     expect(await features()).toMatchObject({ prefix: '/account', pages: { prefix: '/account', home: '/dashboard' } })
+  })
+
+  test('cookie names the session cookie, and forwardAuth shares it under its domain with no session option', async () => {
+    const { register } = await served({ cookie: 'login', forwardAuth: 'example.test' })
+
+    expect((await register()).headers.getSetCookie().join(';')).toMatch(/^login=/)
+    expect((await (await served({ cookie: 'login', forwardAuth: 'example.test' })).register('https://auth.example.test/register')).headers.getSetCookie().join(';')).toMatch(/^login=.*; Domain=example\.test;/i)
   })
 
   test('pages: false serves the plugin alone', async () => {

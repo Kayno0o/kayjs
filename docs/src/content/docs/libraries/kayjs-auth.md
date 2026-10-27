@@ -664,13 +664,13 @@ The `examples/noticeboard` project in the kay repository runs kayjs-auth on Post
 
 ```ts
 createAuth({
-  sessions: session<AuthSessionData>({ secret, cookie: 'login', domain: 'example.com' }),
+  sessions: session<AuthSessionData>({ secret, cookie: 'login' }),
   forwardAuth: 'example.com',
   // ...
 })
 ```
 
-The cookie needs the domain so the guarded sites receive it. `forwardAuth` names the domains a sign-in may return to: the domain and its subdomains, over `https` only. A list takes several, and `{ domains, requireTwoFactor: true }` also asks for two-factor.
+The session cookie takes the domain of the host it is set on, among the ones `forwardAuth` names, so the guarded sites receive it. A host on none of them keeps a cookie of its own, and a `domain` given to `session()` wins. With `auth()` in kay.config.ts, `auth({ cookie: 'login', forwardAuth: 'example.com' })` is all it takes. `forwardAuth` names the domains a sign-in may return to: the domain and its subdomains, over `https` only. A list takes several, and `{ domains, requireTwoFactor: true }` also asks for two-factor.
 
 Name your own domain: kay has no list of public suffixes, so `co.uk` or `github.io` are accepted and would open every site under them. A user without two-factor is sent to the account security page, passkey holders included, as a session does not record how it signed in.
 
