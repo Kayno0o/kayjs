@@ -63,7 +63,7 @@ A static component that passes an island a function is listed too, as `format pa
 
 `kay check` warns of such a component as `promoted-island`, naming the call: data built by a list method (`map`, `filter`, `Array.from`) or by a function of the script returning data, and an `~icons/` import of an icon set the project installs, are not functions, while a function read off a global, `Math.max` or `console.log`, and an icon of a set that is not installed are.
 
-A value read from an object of strings or numbers that another module of the app exports as an `export const` literal (`LABEL[kind]`) is data too.
+A value read from an object of strings or numbers that another module of the app exports as a literal is data too (`LABEL[kind]`): an `export const`, a `const` listed in `export { LABEL }`, a default export, a re-export of one, or a `.json` file.
 
 Write `// kay-island` on a line of its own in the component to say it is meant, or `// kay-static` to say it is not: `kay check` reports a marker the component contradicts as `island-marker`.
 

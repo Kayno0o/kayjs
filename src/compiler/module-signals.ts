@@ -33,10 +33,10 @@ function parseModule(source: string, jsx: boolean): t.File | undefined {
 }
 
 // What a component importing a module reads of it: its signals and memos, and the names it exports as literal data. The module is parsed once, and only when it exports something.
-export function moduleKinds(source: string, jsx = false): Record<string, SignalKind | 'data'> {
+export function moduleKinds(source: string, jsx = false, reexported?: Reexported): Record<string, SignalKind | 'data'> {
   const ast = source.includes('export') ? parseModule(source, jsx) : undefined
 
-  return ast ? { ...Object.fromEntries(dataIn(ast).map(name => [name, 'data' as const])), ...NAMES_KAY.test(source) ? signalsIn(ast) : {} } : {}
+  return ast ? { ...Object.fromEntries(dataIn(ast, reexported).map(name => [name, 'data' as const])), ...NAMES_KAY.test(source) ? signalsIn(ast) : {} } : {}
 }
 
 function signalsIn(ast: t.File): Record<string, SignalKind> {
@@ -95,27 +95,81 @@ function isDataLiteral(node: t.Node): boolean {
   return node.type === 'ObjectExpression' && node.properties.every(property => property.type === 'ObjectProperty' && !property.shorthand && (!property.computed || property.key.type === 'StringLiteral' || property.key.type === 'NumericLiteral') && isDataLiteral(property.value))
 }
 
-// The names a module exports as `export const name = <literal>`, never `export { name }` or a re-export, whose values are all strings, numbers, booleans or null: what a component reading one passes an island as data, not as a function.
-export function moduleData(source: string, jsx = false): string[] {
+// The names a module exports as data, whose values are all strings, numbers, booleans or null: what a component reading one passes an island as data, not as a function.
+// That is `export const name = <literal>`, a `const` exported by `export { name }`, an `export default` of a literal or of such a `const`, and what `export { name } from` and `export * from` take from a module `reexported` reads.
+export function moduleData(source: string, jsx = false, reexported?: Reexported): string[] {
   const ast = source.includes('export') ? parseModule(source, jsx) : undefined
 
-  return ast ? dataIn(ast) : []
+  return ast ? dataIn(ast, reexported) : []
 }
 
-function dataIn(ast: t.File): string[] {
-  const found: string[] = []
+// What another module exports, by the specifier a re-export names it with.
+export type Reexported = (specifier: string) => Record<string, SignalKind | 'data'>
+
+// The names of a JSON file's value, which is all data: its default export and each key of an object, which Bun lets a component import by name.
+export function jsonKinds(source: string): Record<string, 'data'> {
+  try {
+    const value: unknown = JSON.parse(source)
+
+    return { default: 'data', ...Object.fromEntries(value !== null && typeof value === 'object' && !Array.isArray(value) ? Object.keys(value).map(key => [key, 'data' as const]) : []) }
+  }
+  catch {
+    return {}
+  }
+}
+
+function exportedName(node: t.Identifier | t.StringLiteral): string {
+  return node.type === 'Identifier' ? node.name : node.value
+}
+
+function dataIn(ast: t.File, reexported?: Reexported): string[] {
+  const found = new Set<string>()
+  const local = new Set<string>()
 
   for (const statement of ast.program.body) {
-    const declaration = statement.type === 'ExportNamedDeclaration' ? statement.declaration : undefined
+    const declaration = statement.type === 'ExportNamedDeclaration' ? statement.declaration : statement
 
     if (declaration?.type !== 'VariableDeclaration' || declaration.kind !== 'const')
       continue
 
     for (const { id, init } of declaration.declarations) {
-      if (id.type === 'Identifier' && init && isDataLiteral(init))
-        found.push(id.name)
+      if (id.type !== 'Identifier' || !init || !isDataLiteral(init))
+        continue
+
+      local.add(id.name)
+
+      if (statement.type === 'ExportNamedDeclaration')
+        found.add(id.name)
     }
   }
 
-  return found
+  for (const statement of ast.program.body) {
+    if (statement.type === 'ExportDefaultDeclaration') {
+      const value = statement.declaration
+
+      if (value.type === 'Identifier' ? local.has(value.name) : isDataLiteral(value))
+        found.add('default')
+    }
+    else if (statement.type === 'ExportAllDeclaration' && statement.exportKind !== 'type') {
+      for (const [name, kind] of Object.entries(reexported?.(statement.source.value) ?? {})) {
+        if (kind === 'data' && name !== 'default')
+          found.add(name)
+      }
+    }
+    else if (statement.type === 'ExportNamedDeclaration' && !statement.declaration && statement.exportKind !== 'type') {
+      const from = statement.source ? reexported?.(statement.source.value) : undefined
+
+      for (const specifier of statement.specifiers) {
+        if (specifier.type !== 'ExportSpecifier' || specifier.exportKind === 'type')
+          continue
+
+        const name = specifier.local.name
+
+        if (statement.source ? from?.[name] === 'data' : local.has(name))
+          found.add(exportedName(specifier.exported))
+      }
+    }
+  }
+
+  return [...found]
 }

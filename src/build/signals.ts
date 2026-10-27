@@ -1,15 +1,18 @@
-import type { ImportedSignals, SignalKind } from '../compiler/module-signals'
+import type { ImportedSignals, Reexported, SignalKind } from '../compiler/module-signals'
 import { AsyncLocalStorage } from 'node:async_hooks'
 import { readFileSync, statSync } from 'node:fs'
-import { moduleKinds } from '../compiler/module-signals'
+import { jsonKinds, moduleKinds } from '../compiler/module-signals'
 import { parseKay } from '../compiler/parser'
 import { resolveFrom, SCRIPT_FILE, scriptLoader, transpilerFor } from './files'
 import { fences } from './libraries'
 
 type ImportedKinds = Record<string, SignalKind | 'data'>
 const KAY_FILE = /\.kay$/
+const JSON_FILE = /\.json$/
+// A key of the modules a read depended on that marks a re-export cycle cut short.
+const CUT = '<cycle>'
 const KAY_MODULE = /^kay(?:\/|$)/
-const scanned = new Map<string, { stamp: string, signals: ImportedKinds }>()
+const scanned = new Map<string, { stamp: string, signals: ImportedKinds, deps: Map<string, string> }>()
 
 // Inside a scope, what a component's imports exported, found once for all the passes over it: the analysis, the browser and the server compile.
 type Memo = Map<string, { source: string, found: ImportedSignals }>
@@ -76,7 +79,7 @@ function readImportedSignals(file: string, source: string): ImportedSignals {
   for (const specifier of specifiers) {
     const path = KAY_MODULE.test(specifier) ? undefined : resolveFrom(specifier, file)
 
-    if (path === undefined || !(SCRIPT_FILE.test(path) || KAY_FILE.test(path)) || (!specifier.startsWith('.') && path.includes('/node_modules/')))
+    if (path === undefined || !(SCRIPT_FILE.test(path) || KAY_FILE.test(path) || JSON_FILE.test(path)) || (!specifier.startsWith('.') && path.includes('/node_modules/')))
       continue
 
     const signals = signalsOf(path)
@@ -96,7 +99,9 @@ export function keepImportedSignals(files: ReadonlySet<string>): void {
   }
 }
 
-function signalsOf(path: string): ImportedKinds {
+// What a module exports, read again once its stamp, or the stamp of a module it re-exports from, changes.
+// `walk` holds the modules being read, so a cycle of re-exports ends, and what a cycle cut short is not remembered.
+function signalsOf(path: string, walk = new Set<string>(), deps = new Map<string, string>()): ImportedKinds {
   try {
     const stats = statSync(path, { throwIfNoEntry: false })
 
@@ -106,15 +111,39 @@ function signalsOf(path: string): ImportedKinds {
     const stamp = `${stats.mtimeMs}-${stats.size}`
     const known = scanned.get(path)
 
-    if (known?.stamp === stamp)
+    deps.set(path, stamp)
+
+    if (known?.stamp === stamp && [...known.deps].every(([dep, depStamp]) => stampOf(dep) === depStamp)) {
+      for (const [dep, depStamp] of known.deps)
+        deps.set(dep, depStamp)
+
       return known.signals
+    }
 
+    if (walk.has(path)) {
+      deps.set(CUT, '')
+
+      return {}
+    }
+
+    walk.add(path)
+
+    const own = new Map<string, string>([[path, stamp]])
     const text = readFileSync(path, 'utf8')
-    // A component's signals are the ones its `--- module` fence exports.
-    const jsx = scriptLoader(path) === 'tsx' || scriptLoader(path) === 'jsx'
-    const signals: ImportedKinds = KAY_FILE.test(path) ? kayModuleSignals(text) : moduleKinds(text, jsx)
+    const reexported: Reexported = (specifier) => {
+      const target = resolveFrom(specifier, path)
 
-    scanned.set(path, { stamp, signals })
+      return target === undefined || !(SCRIPT_FILE.test(target) || KAY_FILE.test(target) || JSON_FILE.test(target)) ? {} : signalsOf(target, walk, own)
+    }
+    const signals = kindsOf(path, text, reexported)
+
+    walk.delete(path)
+
+    for (const [dep, depStamp] of own)
+      deps.set(dep, depStamp)
+
+    if (!own.has(CUT))
+      scanned.set(path, { stamp, signals, deps: own })
 
     return signals
   }
@@ -123,7 +152,24 @@ function signalsOf(path: string): ImportedKinds {
   }
 }
 
-function kayModuleSignals(text: string): ImportedKinds {
+function kindsOf(path: string, text: string, reexported: Reexported): ImportedKinds {
+  if (JSON_FILE.test(path))
+    return jsonKinds(text)
+
+  // A component's signals are the ones its `--- module` fence exports.
+  if (KAY_FILE.test(path))
+    return kayModuleSignals(text, reexported)
+
+  return moduleKinds(text, scriptLoader(path) === 'tsx' || scriptLoader(path) === 'jsx', reexported)
+}
+
+function stampOf(path: string): string | undefined {
+  const stats = statSync(path, { throwIfNoEntry: false })
+
+  return stats && `${stats.mtimeMs}-${stats.size}`
+}
+
+function kayModuleSignals(text: string, reexported: Reexported): ImportedKinds {
   const { module } = parseKay(text)
 
   if (!module)
@@ -131,5 +177,5 @@ function kayModuleSignals(text: string): ImportedKinds {
 
   const fence = text.slice(module.start, module.end)
 
-  return moduleKinds(fence)
+  return moduleKinds(fence, false, reexported)
 }

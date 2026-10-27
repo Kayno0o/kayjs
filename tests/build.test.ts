@@ -1452,6 +1452,26 @@ describe('what a build keeps in memory', () => {
     }
   })
 
+  it('reads the data a module re-exports, again once the module it re-exports from changes, and ends a cycle of re-exports', async () => {
+    const dir = resolve(await scratchDir('kay-reexport-'))
+    const file = join(dir, 'label.kay')
+    const source = '---\nimport { LABELS } from \'./barrel\'\nimport { LOOP } from \'./loop-a\'\nimport copy from \'./copy.json\'\n---\np.label {LABELS.a}\n'
+
+    try {
+      await Bun.write(join(dir, 'barrel.ts'), 'export * from \'./labels\'\n')
+      await Bun.write(join(dir, 'labels.ts'), 'export const LABELS = { a: \'A\' }\n')
+      await Bun.write(join(dir, 'loop-a.ts'), 'export * from \'./loop-b\'\nexport const LOOP = { a: \'l\' }\n')
+      await Bun.write(join(dir, 'loop-b.ts'), 'export * from \'./loop-a\'\n')
+      await Bun.write(join(dir, 'copy.json'), '{ "a": 1 }')
+      expect(importedSignals(file, source)).toEqual({ './barrel': { LABELS: 'data' }, './loop-a': { LOOP: 'data' }, './copy.json': { default: 'data', a: 'data' } })
+      await Bun.write(join(dir, 'labels.ts'), 'export const LABELS = { a: () => \'A\' }\n')
+      expect(importedSignals(file, source)['./barrel']).toBeUndefined()
+    }
+    finally {
+      await rm(dir, { recursive: true, force: true })
+    }
+  })
+
   it('looks up the signals a component imports once inside a scope, and from the disk again in the next', async () => {
     const dir = resolve(await scratchDir('kay-scope-'))
     const file = join(dir, 'count.kay')
