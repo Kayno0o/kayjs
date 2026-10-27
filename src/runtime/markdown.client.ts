@@ -3,7 +3,7 @@ import { claiming, keepServerMarkup } from './dom'
 import { ownSignal, whenHydrated } from './reactive'
 import { vouch } from './safe-html'
 
-type Marked = Element & { _$m?: string }
+type Marked = Element & { _$m?: string | undefined }
 
 const ESCAPED = /[&<>"]/g
 const ESCAPES: Record<string, string> = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }
