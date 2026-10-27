@@ -1,7 +1,7 @@
 import { join } from 'node:path'
 import { afterAll, expect, it } from 'bun:test'
 import { testSite } from 'kay/test'
-import { replied } from './helpers/chat'
+import { replied } from './fixture/tests/replied'
 
 const site = await testSite({ root: join(import.meta.dir, 'fixture'), browser: true })
 

@@ -2,8 +2,8 @@ import { join } from 'node:path'
 import { fakeAi } from '@kaynooo/kayjs-ai'
 import { afterEach, beforeAll, describe, expect, test } from 'bun:test'
 import { browserPath, testSite } from 'kay/test'
-import { markdownDrawn, replied } from '../../helpers/chat'
 import { done, refusals, testing } from '../src/testing'
+import { markdownDrawn, replied } from './replied'
 
 const ROOT = join(import.meta.dir, '..')
 const path = browserPath()
@@ -881,7 +881,8 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the Chat i
       fakeAi.reply(Array.from({ length: 60 }, (_, line) => `Line ${line}\n\n`))
       await page.fill('textarea', 'Long')
       await page.press('Enter')
-      await page.waitFor('[data-pending]', { gone: true })
+      // Formatted before the panel closes, so the reopen alone is tested: a turn formatted later is the next test's.
+      await replied(page)
       await page.waitFor('.kai-chat-text', { text: 'Line 59' })
       await page.click('.kai-launcher-button')
       await page.waitFor(closed)

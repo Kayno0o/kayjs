@@ -200,6 +200,7 @@ let outlives = false
 let resumed = false
 let field: HTMLTextAreaElement | undefined
 let log: HTMLElement | undefined
+let observer: ResizeObserver | undefined
 let pinned = true
 let lastTop = 0
 const told = new Map<string, string>()
@@ -878,8 +879,6 @@ function keyDown(event: KeyboardEvent) {
     void send()
   }
 }
-
-let observer: ResizeObserver | undefined
 
 // A log shown again, such as in a panel reopened, is scrolled to the end when the visitor was at it, as it has no scroll position while hidden. Its turns are watched too, as one can grow with no signal the following effect reads, such as a finished reply formatted once the Markdown renderer arrives.
 function watch(element: HTMLElement) {

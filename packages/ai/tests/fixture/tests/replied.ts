@@ -8,7 +8,7 @@ export async function replied(page: TestPage): Promise<void> {
 
 // Waits for the Markdown renderer once a reply has text, which asks for it: importing its module again resolves once it and its imports have run, and a task later the chat has drawn what it formats.
 export async function markdownDrawn(page: TestPage): Promise<void> {
-  await page.waitUntil(() => document.querySelector('.kai-chat-turn[data-role="assistant"] .kai-chat-text') === null || performance.getEntriesByType('resource').some(entry => entry.name.includes('markdown-render')))
+  await page.waitUntil(() => document.querySelector('.kai-chat-turn[data-role="assistant"] .kai-chat-text') === null || performance.getEntriesByType('resource').some(entry => entry.name.includes('markdown-render')), { what: 'the Markdown renderer to load' })
   await page.evaluate(async () => {
     const renderer = performance.getEntriesByType('resource').find(entry => entry.name.includes('markdown-render'))
 
