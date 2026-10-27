@@ -22,14 +22,26 @@ it('asks for the summary', async () => {
 })
 ```
 
-`aiTest()` scripts and reads `fakeAi`, which forgets its scripts and asks at the start of every test, so no test clears it by hand; call it at the top of a file. It has `reply`, `fail`, `asked` and `last()`, which the bullets below describe on `fakeAi`, the process's own, whose `clear()` stays for a test outside `bun test`'s hooks.
+`aiTest()` scripts and reads `fakeAi`, which forgets its scripts and asks at the start of every test, so no test clears it by hand; call it at the top of a file. It has `reply`, `fail`, `asked`, `last()` and `clear()`, which the bullets below describe on `fakeAi`, the process's own; `clear()` drops the asks and every script not yet read, for a test outside `bun test`'s hooks or one that scripts in two stages.
+
+An action that asks several times in a row (grouping, script, a revision only when the script misses its length, pronunciation) scripts the pass it means by what it asks, so the passes read before it, and the conditional ones that may not run, count for nothing:
+
+```ts
+it('reads the pronunciation pass', async () => {
+  model.reply({ data: { words: ['Kay'] } }, asked => asked.system?.includes('pronunciation') === true)
+
+  const episode = await podcast(site)
+
+  expect(episode.pronunciations).toEqual(['Kay'])
+})
+```
 
 ## Reference
 
 ### The fake's rules
 
-- `fakeAi.reply(script)`: the next ask answers with a text (streamed word by word), an array of pieces, `{ text?, reasoning?, data?, calls: [{ name, input, id? }], cache?, finish? }`: `data` is the object answering an ask with a `schema`, sent as its JSON text in pieces, and any value, so `data: { title: 'x' }` plays a model giving a field short; `calls` call tools (`id` is the call's id, `fake_1`, `fake_2` and so on by default), `cache: { read?, written? }` reports input tokens read from and written to the provider's prompt cache, and `finish` says why the step ended, `stop` by default, `length` for a reply cut by the token cap (also `filtered` and `steps`). A script can also be a function of what was asked returning any of them. A tool loop reads one script per step; a string `input` is sent as the raw arguments, so `'{"title": '` plays a model garbling its JSON. Scripts are used in order; with none left the reply is `Fake reply to: <the last user message>`, or for an ask with a `schema` an object that fits it (`fake` for a string, the minimum for a number, the first choice of an enum, the fields it requires), so `kay dev` needs no key.
-- `fakeAi.fail(error)`: the next ask throws it, an `AiError` say.
+- `fakeAi.reply(script)`: the next ask answers with a text (streamed word by word), an array of pieces, `{ text?, reasoning?, data?, calls: [{ name, input, id? }], cache?, finish? }`: `data` is the object answering an ask with a `schema`, sent as its JSON text in pieces, and any value, so `data: { title: 'x' }` plays a model giving a field short; `calls` call tools (`id` is the call's id, `fake_1`, `fake_2` and so on by default), `cache: { read?, written? }` reports input tokens read from and written to the provider's prompt cache, and `finish` says why the step ended, `stop` by default, `length` for a reply cut by the token cap (also `filtered` and `steps`). A script can also be a function of what was asked returning any of them. A second argument, `fakeAi.reply(script, asked => boolean)`, makes the script for the first ask it accepts instead of the next one read (by its `system`, `schema` or `messages`), and the asks it does not accept leave it unused; the scripts without one keep going to the asks in order. A tool loop reads one script per step; a string `input` is sent as the raw arguments, so `'{"title": '` plays a model garbling its JSON. Scripts are used in order; with none left the reply is `Fake reply to: <the last user message>`, or for an ask with a `schema` an object that fits it (`fake` for a string, the minimum for a number, the first choice of an enum, the fields it requires), so `kay dev` needs no key.
+- `fakeAi.fail(error, when?)`: the next ask, or the first one `when` accepts, throws it, an `AiError` say.
 - `fakeAi.asked` and `fakeAi.last()`: every ask answered, `{ messages, tools, system, model, maxTokens, temperature, schema }`, recorded when the reply is read. `tools` are those offered (`{ name, description, inputSchema }`, absent when none), `schema` the JSON Schema of the object asked for (absent for text); a message carries `calls` when the assistant called tools and `results` when it is the turn answering them. `fakeAi.clear()` forgets asks and scripts.
 - The fake reports a usage of about four characters per token, and in development paces its pieces so a page visibly streams.
 - `site.call(action, input)` on an action returning the reply gives its snapshots.

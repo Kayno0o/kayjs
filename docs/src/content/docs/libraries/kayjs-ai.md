@@ -499,7 +499,15 @@ expect(await ask('Hi')).toBe('It works')
 expect(model.last()?.messages).toEqual([{ role: 'user', content: 'Hi' }])
 ```
 
-`aiTest()` forgets what was scripted and asked at the start of every test, so you clear nothing by hand. Call it at the top of a test file.
+`aiTest()` forgets what was scripted and asked at the start of every test, so you clear nothing by hand. Call it at the top of a test file. `model.clear()` drops them in the middle of a test.
+
+Scripts go to the asks in the order they are read. An action that asks several times in a row has passes that may or may not run, so script the one you mean by what it asks. The second argument is a function of the ask, and the script waits for the first ask it accepts:
+
+```ts
+model.reply({ data: { words: ['Kay'] } }, asked => asked.system?.includes('pronunciation') === true)
+```
+
+Passes read before it, and the conditional ones, no longer shift it. Asks it does not accept keep the default reply, or the scripts you gave without a condition, in order. `model.fail(error, when)` takes the same condition.
 
 `model.reply({ calls: [{ name: 'add_note', input: { title: 'Milk' } }] })` makes the model call a tool, and the next script answers once the results are back.
 

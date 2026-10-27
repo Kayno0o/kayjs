@@ -4,6 +4,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 
 ## Unreleased
 
+- kayjs-ai: `aiTest().reply(script, asked => boolean)` (and `fail`) scripts the reply of the ask it accepts, by its `system`, `schema` or `messages`, so a test of an action asking in several passes no longer queues a placeholder for each pass before the one it means, and `aiTest().clear()` drops the scripts not read: [The fake](../packages/ai/llms/testing-and-errors.md#the-fake).
 - An `s.Files` field without `maxItems` raises its action's body limit by ten files of its `maxSize`, not one, so a post of several files within their size is no longer refused with a 413: [Files posted to an action](files.md#files-posted-to-an-action).
 - kayjs-ui: `Stat` draws its change after its label for a screen reader, an empty `StatusStrip` cell is a hairline along the bottom apart from a `muted` one, and a `DescriptionList` item with neither a `value` nor a block shows a dash: [basics](../packages/ui/llms/basics.md#stat-meter-progress-skeleton-barlist-sitefavicon-copybutton-rating).
 - kayjs-ui: `attempt(run, { failure, onRefused(data) })` hands a refusal (an action's `ctx.fail` data or a route's JSON answer) to the app and toasts nothing, so showing it in a Dialog or a Notice needs no `try`/`catch` and `action.refused`: [Toasts](../packages/ui/llms/basics.md).

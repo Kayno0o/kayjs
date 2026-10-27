@@ -34,14 +34,23 @@ type Scripted = string | string[] | Calls
 
 export type Script = Scripted | ((asked: Asked) => Scripted)
 
+// Tells whether a script is meant for an ask, by what it asked.
+export type When = (asked: Asked) => boolean
+
+interface Entry {
+  script: Script | Error
+  when: When | undefined
+}
+
 export interface Fake extends Provider {
   // Every ask the fake answered, oldest first.
   readonly asked: readonly Asked[]
   last: () => Asked | undefined
   // The next ask read is answered with this (scripts go to asks in the order they are read, not made): a text, split into words, the pieces as they should come, or `{ text?, calls?, cache? }` to call tools or report cache reads and writes (a tool loop reads one script per step); a function reads what was asked. Scripts are used in order, then the default reply returns.
-  reply: (script: Script) => void
-  // The next ask fails with this error.
-  fail: (error: Error) => void
+  // With `when`, the script is for the first ask `when` accepts, whatever asks were read before it, and the asks it does not accept never use it; the scripts without one keep going to the asks in order.
+  reply: (script: Script, when?: When) => void
+  // The next ask fails with this error, or the first one `when` accepts.
+  fail: (error: Error, when?: When) => void
   // Forgets what was asked and scripted.
   clear: () => void
 }
@@ -143,17 +152,25 @@ function saidBy(script: Scripted): string | string[] {
   return script.data === undefined ? script.text ?? [] : JSON.stringify(script.data, null, 2)
 }
 
+// The script for an ask: the first one whose `when` accepts it, else the oldest without a `when`.
+function take(scripts: Entry[], question: Asked): Script | Error | undefined {
+  const at = scripts.findIndex(entry => entry.when?.(question) === true)
+  const found = at === -1 ? scripts.findIndex(entry => entry.when === undefined) : at
+
+  return found === -1 ? undefined : scripts.splice(found, 1)[0]?.script
+}
+
 function createFake(): Fake {
   const asked: Asked[] = []
-  const scripts: (Script | Error)[] = []
+  const scripts: Entry[] = []
 
   return {
     name: 'fake',
     model: 'fake',
     asked,
     last: () => asked.at(-1),
-    reply: script => void scripts.push(script),
-    fail: error => void scripts.push(error),
+    reply: (script, when) => void scripts.push({ script, when }),
+    fail: (error, when) => void scripts.push({ script: error, when }),
     clear: () => {
       asked.length = 0
       scripts.length = 0
@@ -163,7 +180,7 @@ function createFake(): Fake {
 
       asked.push(question)
 
-      const script = scripts.shift() ?? (request.schema === undefined ? `Fake reply to: ${request.messages.findLast(message => message.role === 'user')?.content ?? ''}` : { data: sampleOf(request.schema) })
+      const script = take(scripts, question) ?? (request.schema === undefined ? `Fake reply to: ${request.messages.findLast(message => message.role === 'user')?.content ?? ''}` : { data: sampleOf(request.schema) })
 
       if (script instanceof Error)
         throw script

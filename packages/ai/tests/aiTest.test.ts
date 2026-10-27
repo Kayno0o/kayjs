@@ -24,4 +24,43 @@ describe('aiTest', () => {
 
     await expect((async () => ask('Hi'))()).rejects.toThrow('down')
   })
+
+  describe('a script for one ask', () => {
+    async function pass(system: string) {
+      return ask('x', { system })
+    }
+
+    it('answers the ask it accepts, whatever was read before it, and leaves the rest in order', async () => {
+      model.reply('last', asked => asked.system === 'pronunciation')
+      model.reply('first')
+
+      expect(await pass('grouping')).toBe('first')
+      expect(await pass('script')).toBe('Fake reply to: x')
+      expect(await pass('pronunciation')).toBe('last')
+      expect(model.asked).toHaveLength(3)
+    })
+
+    it('stays unused by an ask it does not accept, and is used once', async () => {
+      model.reply('only', asked => asked.system === 'b')
+
+      expect(await pass('a')).toBe('Fake reply to: x')
+      expect(await pass('b')).toBe('only')
+      expect(await pass('b')).toBe('Fake reply to: x')
+    })
+
+    it('fails the ask it accepts alone', async () => {
+      model.fail(new Error('down'), asked => asked.system === 'b')
+
+      expect(await pass('a')).toBe('Fake reply to: x')
+      await expect(pass('b')).rejects.toThrow('down')
+    })
+
+    it('is dropped by clear', async () => {
+      model.reply('late')
+      model.reply('later', () => true)
+      model.clear()
+
+      expect(await pass('a')).toBe('Fake reply to: x')
+    })
+  })
 })
