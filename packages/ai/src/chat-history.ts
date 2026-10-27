@@ -30,15 +30,20 @@ function said(turns: readonly Message[]): ChatMessage[] {
   })
 }
 
-// The files of the messages before the last, newest first, while they fit `budget` bytes: a message whose files do not fit loses them all, and one left with no text goes too. The last message keeps its files whatever they weigh.
+// The files of the messages before the last, newest first, while they fit `budget` bytes: a message whose files do not fit loses them all, and one left with no text goes too, with the assistant reply that followed it. The last message keeps its files whatever they weigh.
 function withinBudget(turns: ChatMessage[], budget: number): ChatMessage[] {
   const last = turns.at(-1)
   let room = Math.max(0, Math.min(budget, POSTED_FILE_BYTES - bytesOf(last?.attachments ?? [])))
   const kept = turns.slice(0, -1).reduceRight<ChatMessage[]>((result, { attachments, ...turn }) => {
     const bytes = bytesOf(attachments ?? [])
 
-    if (attachments === undefined || bytes > room)
-      return turn.content === '' ? result : [turn, ...result]
+    if (attachments === undefined || bytes > room) {
+      if (turn.content !== '')
+        return [turn, ...result]
+
+      // The reply that answered a dropped files-only message goes with it, so the model never reads a reply to nothing.
+      return turn.role === 'user' && result[0]?.role === 'assistant' ? result.slice(1) : result
+    }
 
     room -= bytes
 

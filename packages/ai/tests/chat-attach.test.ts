@@ -70,8 +70,21 @@ it('leaves out an earlier message of files alone once its files are over the bud
     { role: 'user' as const, content: 'and?' },
   ]
 
-  // The newer 10 MB message is over the 8 MB budget and goes whole, taking its empty text with it; the 6 MB one fits.
-  expect(names(posted(turns, 20))).toEqual([['big.png'], 'seen', 'seen too', 'and?'])
+  // The newer 10 MB message is over the 8 MB budget and goes whole, taking its empty text and the reply it got with it; the 6 MB one fits.
+  expect(names(posted(turns, 20))).toEqual([['big.png'], 'seen', 'and?'])
+})
+
+it('takes the reply of a dropped files-only message with it, and keeps a dropped message that has text with its reply', () => {
+  const turns = [
+    { role: 'user' as const, content: 'look', attachments: [weighing('big.png', 6000)] },
+    { role: 'assistant' as const, content: 'seen' },
+    { role: 'user' as const, content: '', attachments: [weighing('bigger.png', 6000)] },
+    { role: 'assistant' as const, content: 'seen too' },
+    { role: 'user' as const, content: 'and?' },
+  ]
+
+  // The files-only message and its reply leave together; the one with text stays as text, with its reply.
+  expect(names(posted(turns, 20, 40_000, 0))).toEqual(['look', 'seen', 'and?'])
 })
 
 it('posts a message of files alone with an empty content, the files being the message', () => {
