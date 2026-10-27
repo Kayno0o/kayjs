@@ -254,10 +254,10 @@ import { consent } from 'kay/analytics'
 if consent() === ''
   aside(aria-label="Visit statistics")
     p We count visits only if you agree.
-    button(onClick={() => consent.set('yes')}) Agree
-    button(onClick={() => consent.set('no')}) Refuse
+    button(onClick={() => consent = 'yes'}) Agree
+    button(onClick={() => consent = 'no'}) Refuse
 else
-  button(onClick={() => consent.set('')}) Visit statistics: {consent() === 'yes' ? 'on' : 'off'}, change
+  button(onClick={() => consent = ''}) Visit statistics: {consent() === 'yes' ? 'on' : 'off'}, change
 ```
 
 `consent` reads and writes the cookie on its own, so it works for `vitals({ consent: true })` too; kay's notice, though, comes only with the `consent` option on `analytics()`.

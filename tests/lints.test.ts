@@ -628,6 +628,18 @@ describe('signal-set-call', () => {
     expect(found(fixed(source))).toEqual([])
   })
 
+  it('reports a named function handed to .set, which the assignment hands over as it is', () => {
+    const source = script('function reset(next: number) {\n  return next\n}\nconst saved = signal(reset)\nsaved.set(reset)', 'p {count()} {open()}')
+
+    expect(fixed(source)).toBe(script('function reset(next: number) {\n  return next\n}\nconst saved = signal(reset)\nsaved = reset', 'p {count()} {open()}'))
+  })
+
+  it('leaves a parenthesized callee, a type argument, a comment its fix would drop and a name another binding shadows', () => {
+    const source = script('function step(open: { set: (value: boolean) => void }) {\n  open.set(true)\n}\n;(count.set)(1)\n;(count).set(2)\ncount.set<number>(3)\ncount.set(/* reset */ 0)\ncount /* reset */.set(0)', 'p {count()} {open()}')
+
+    expect(found(source)).toEqual([])
+  })
+
   it('leaves an inline updater, a value used as an expression, a trailing comma and .set on anything but a kay signal', () => {
     const source = script('const params = new URLSearchParams()\nconst seen = new Map<string, number>()\nfunction step() {\n  count.set(c => c + 1)\n  count.set(function double(c) { return c * 2 })\n  count.set(5,)\n  params.set(\'page\', \'2\')\n  seen.set(\'a\', 1)\n  return count.set(1)\n}', 'button(onClick={() => open() && count.set(1)}) {count()} {open()}')
 

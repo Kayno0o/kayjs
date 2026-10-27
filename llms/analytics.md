@@ -33,7 +33,7 @@ export default defineConfig({
 
 ### Ask for analytics consent in your own UI
 
-`consent` from `kay/analytics` is a signal holding the visitor's answer to `analytics({ consent })`: `'yes'`, `'no'` or `''` while they have not chosen. Read it as `consent()`, answer with `consent.set('yes')`, `'no'`, or `''` to ask again. It reads and writes the `kay_analytics` cookie kay's own notice uses, so the two never disagree and the server still forwards nothing without the yes. Pass `consent: { notice: false }` to show no notice of kay's (a `data-analytics-consent` click opens none either) and ask in your own UI:
+`consent` from `kay/analytics` is a signal holding the visitor's answer to `analytics({ consent })`: `'yes'`, `'no'` or `''` while they have not chosen. Read it as `consent()`, answer with `consent = 'yes'`, `'no'`, or `''` to ask again. It reads and writes the `kay_analytics` cookie kay's own notice uses, so the two never disagree and the server still forwards nothing without the yes. Pass `consent: { notice: false }` to show no notice of kay's (a `data-analytics-consent` click opens none either) and ask in your own UI:
 
 ```ts
 import { defineConfig } from 'kay/server'
@@ -51,10 +51,10 @@ import { consent } from 'kay/analytics'
 if consent() === ''
   aside(aria-label="Visit statistics")
     p We count visits only if you agree.
-    button(onClick={() => consent.set('yes')}) Agree
-    button(onClick={() => consent.set('no')}) Refuse
+    button(onClick={() => consent = 'yes'}) Agree
+    button(onClick={() => consent = 'no'}) Refuse
 else
-  button(onClick={() => consent.set('')}) Visit statistics: {consent() === 'yes' ? 'on' : 'off'}, change
+  button(onClick={() => consent = ''}) Visit statistics: {consent() === 'yes' ? 'on' : 'off'}, change
 ```
 
 ## Reference
@@ -86,7 +86,7 @@ else
 - The body is `{ p, l, c, i }` (path, LCP in ms, CLS score, INP in ms; a metric the view lacks is left out). The server matches the path to the page's route (`/blog/:slug`), so the store never holds a row per URL.
 - `store.vitals` keeps counts per UTC day, route, metric and log bucket (about 10 % wide), seven days back; `sqliteData(path)` holds it, so replicas sharing the file add up, and another store implements `VitalsStore` (`add`, `counts`). Without one it is this process's memory, and a production start warns.
 - The screen is `prefix` (`/vitals` by default), a table per route of LCP, CLS and INP with their view count, rated `good` up to 2.5 s, 0.1 and 200 ms, `poor` past 4 s, 0.25 and 500 ms. It answers 403 without a `guard` (a function like `auth.guard({ require: 'admin' })`, or `{ load }` returning one, run on the first request); the numbers are collected either way. `vitalsReport()` from `kay/analytics` reads the same numbers in code. Under `trailingSlash` and `i18n` a route shows as the first shape it is served at, such as `/fr/about`, every locale counted together.
-- No cookie, address, title or user agent is kept. `consent: true` waits for `kay_analytics=yes` (kay's notice writes it with `analytics({ consent })`, else your own banner sets it with `consent.set('yes')`, which works without a tracker), `consent: false` never waits; unset it follows `analytics({ consent })` when the site has it, and counts at once otherwise, with no notice. A visitor with `kay_analytics=no` is never counted, from any page. The script served carries the gate, so a visitor who has not said yes sends nothing.
+- No cookie, address, title or user agent is kept. `consent: true` waits for `kay_analytics=yes` (kay's notice writes it with `analytics({ consent })`, else your own banner sets it with `consent = 'yes'`, which works without a tracker), `consent: false` never waits; unset it follows `analytics({ consent })` when the site has it, and counts at once otherwise, with no notice. A visitor with `kay_analytics=no` is never counted, from any page. The script served carries the gate, so a visitor who has not said yes sends nothing.
 - A report is refused when cross-site (403), over 512 bytes (413), malformed or out of range (400), or past 300 a minute from one address (429). `kay dev`, a declined visitor and a path no page serves get 204 and keep nothing.
 - It needs a running server: `kay build --static` refuses it, as the screen cannot be guarded in an export.
 
@@ -111,6 +111,6 @@ The privacy notice names the provider, the purpose and the retention, and the ap
 ### Rules: Ask for analytics consent in your own UI
 
 - A page renders with the answer in the request's cookie and an island starts with the same, so nothing flashes; the signal follows `kay:consent`, so a change made anywhere, a page swap included, reaches every island reading it.
-- `consent` needs the `consent` option on `analytics()`; `consent.set('yes')` starts counting at once (a Fathom or Cloudflare script loads); `'no'` or `''` after a yes reloads the page when a provider's script already ran, and `''` shows kay's notice again unless `notice: false`.
+- `consent` needs the `consent` option on `analytics()`; `consent = 'yes'` starts counting at once (a Fathom or Cloudflare script loads); `'no'` or `''` after a yes reloads the page when a provider's script already ran, and `''` shows kay's notice again unless `notice: false`.
 - A page that calls `consent()` renders per visitor, so one in a shared layout is no longer served from a CDN cache or prerendered with an answer; read it in the island that needs it.
 - `consent.set` is for the browser, in a handler or an effect; on the server it throws, and `consent()` only reads.

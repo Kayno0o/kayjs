@@ -409,6 +409,12 @@ class RewriteFinder {
 
     // Babel leaves a parenthesized argument's parentheses out of its span, so the value runs from the first one to the call's closing parenthesis.
     const valueFrom = (value.extra?.parenStart as number | undefined) ?? value.start!
+    const { code } = this.input
+
+    // The fix rewrites the text from the name to the value, so a parenthesized callee, a type argument or a comment there leaves the call alone.
+    if (code.slice(reference.node.end!, member.node.property.start!).trim() !== '.' || code.slice(member.node.end!, valueFrom).trim() !== '(')
+      return
+
     const offsets = [reference.node.start!, reference.node.end! - 1, valueFrom, call.node.end! - 1]
 
     if (!offsets.every(offset => map.isExact(offset)))
