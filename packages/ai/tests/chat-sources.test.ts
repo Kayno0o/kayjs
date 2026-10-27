@@ -23,7 +23,7 @@ test('a reply with no sources is left as it is', () => {
 })
 
 test('only well-formed sources with a safe href are used, one per number', () => {
-  expect(usableSources([{ n: 1, title: 'a', href: 'javascript:alert(1)' }, { n: 2, title: 'b', href: '//evil.example' }, { n: 3, title: 'c', href: 'https://x.example' }, { n: 3, title: 'dup', href: '/d' }, { n: 1.5, title: 'e', href: '/e' }, { title: 'f', href: '/f' }, null, 'x'])).toEqual([{ n: 3, title: 'c', href: 'https://x.example' }])
+  expect(usableSources([{ n: 1, title: 'a', href: 'javascript:alert(1)' }, { n: 2, title: 'b', href: '//evil.example' }, { n: 5, title: 'g', href: '/\\evil.example' }, { n: 6, title: 'h', href: '/\t/evil.example' }, { n: 7, title: 'i', href: 'https://en.wikipedia.org/wiki/Peter_O\'Toole' }, { n: 8, title: 'j', href: 'https://x.example/a b' }, { n: 3, title: 'c', href: 'https://x.example' }, { n: 3, title: 'dup', href: '/d' }, { n: 1.5, title: 'e', href: '/e' }, { title: 'f', href: '/f' }, null, 'x'])).toEqual([{ n: 3, title: 'c', href: 'https://x.example' }])
   expect(usableSources(undefined)).toEqual([])
 })
 

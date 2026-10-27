@@ -6,7 +6,7 @@ const CITATION = /\[(\d{1,4})\]/g
 const ATTRIBUTE_UNSAFE = /[&"<]/g
 const ENTITIES: Record<string, string> = { '&': '&amp;', '"': '&quot;', '<': '&lt;' }
 // A source leads to a page or a file: no `javascript:` and the like, which a hostile page could have named.
-const SAFE_HREF = /^(?:https?:\/\/|\/(?!\/)|#|mailto:)/i
+const SAFE_HREF = /^(?:https?:\/\/|mailto:|\/(?![/\\])|#)[^\s"'<>`\\]*$/i
 
 export const attribute = (text: string) => text.replace(ATTRIBUTE_UNSAFE, char => ENTITIES[char]!)
 

@@ -5,7 +5,7 @@ import { recipe } from 'kay'
 const look = recipe({ parts: { root: 'kai-chat-sources', label: 'kai-chat-sources-label', list: 'kai-chat-sources-list', item: 'kai-chat-source', link: 'kai-chat-source-link' } })
 
 // A path of this site or an anchor in the page: `//host` is another site.
-const LOCAL_HREF = /^(?:\/(?!\/)|#)/
+const LOCAL_HREF = /^(?:\/(?![/\\])|#)/
 
 const { sources, label, here } = props<{
   sources: Source[]
