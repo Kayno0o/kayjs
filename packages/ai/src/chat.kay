@@ -879,14 +879,16 @@ function keyDown(event: KeyboardEvent) {
   }
 }
 
-// A log shown again, such as in a panel reopened, is scrolled to the end when the visitor was at it, as it has no scroll position while hidden.
+let observer: ResizeObserver | undefined
+
+// A log shown again, such as in a panel reopened, is scrolled to the end when the visitor was at it, as it has no scroll position while hidden. Its turns are watched too, as one can grow with no signal the following effect reads, such as a finished reply formatted once the Markdown renderer arrives.
 function watch(element: HTMLElement) {
   log = element
 
   if (typeof ResizeObserver === 'undefined')
     return
 
-  const observer = new ResizeObserver(() => {
+  observer = new ResizeObserver(() => {
     // A hidden log is scrolled anew once shown, so a scroll then is not read against where it stood before.
     if (element.clientHeight === 0)
       lastTop = 0
@@ -895,7 +897,18 @@ function watch(element: HTMLElement) {
   })
 
   observer.observe(element)
-  onCleanup(() => observer.disconnect())
+
+  // The turns drawn before the log's own ref ran.
+  for (const turn of element.children)
+    observer.observe(turn)
+
+  onCleanup(() => observer?.disconnect())
+}
+
+function watchTurn(turn: HTMLElement) {
+  observer?.observe(turn)
+
+  return () => observer?.unobserve(turn)
 }
 
 function follow() {
@@ -933,7 +946,7 @@ section(part="root" onKeyDown={escape} data-empty={history().length === 0 && !bu
   // The log is the turns so far; the reply streaming in is hidden from screen readers until it is whole, so the finished turn is announced once, not word by word. The status line says the thinking label, then each tool call as it starts and ends.
   div(part="log" role="log" aria-label={label} tabindex="0" ref={watch} onScroll={scrolled})
     for turn of history() key={turn.id}
-      article(part="turn" data-role={turn.role} data-editing={editing() === turn.id ? '' : undefined})
+      article(part="turn" data-role={turn.role} data-editing={editing() === turn.id ? '' : undefined} ref={watchTurn})
         if turn.role === 'user'
           if editing() === turn.id
             Textarea(part="editField" writeFocused ref={element => { queueMicrotask(() => element.focus()) }} value={editDraft()} onInput={value => { editDraft = value; editProblem = undefined }} rows="1" aria-label={editLabel} onKeyDown={event => editKey(event, turn.id)})
@@ -979,7 +992,7 @@ section(part="root" onKeyDown={escape} data-empty={history().length === 0 && !bu
                 slot regenerateIcon
                   Icon(icon="refresh")
     if busy()
-      article(part="turn" data-role="assistant" data-pending="" aria-hidden="true")
+      article(part="turn" data-role="assistant" data-pending="" aria-hidden="true" ref={watchTurn})
         if reasoning && thought() !== ''
           details(part="reasoning" open={thoughtOpen()} onToggle={event => { thoughtOpen = event.currentTarget.open }})
             summary(tabindex="-1") {reasoningLabel}

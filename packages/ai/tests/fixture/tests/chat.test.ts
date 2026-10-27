@@ -2,6 +2,7 @@ import { join } from 'node:path'
 import { fakeAi } from '@kaynooo/kayjs-ai'
 import { afterEach, beforeAll, describe, expect, test } from 'bun:test'
 import { browserPath, testSite } from 'kay/test'
+import { markdownDrawn, replied } from '../../helpers/chat'
 import { done, refusals, testing } from '../src/testing'
 
 const ROOT = join(import.meta.dir, '..')
@@ -62,7 +63,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the Chat i
     fakeAi.reply(['Here is **bold** and ', '![pixel](https://evil.test/p.png) a [link](https://example.com).'])
     await page.fill('textarea', 'Hello')
     await page.click('button[type="submit"]')
-    await page.waitFor('[data-pending]', { gone: true })
+    await replied(page)
     await page.waitFor('.kai-chat-turn[data-role="assistant"] strong', { text: 'bold' })
 
     expect(await page.text('.kai-chat-turn[data-role="user"]')).toBe('Hello')
@@ -79,7 +80,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the Chat i
     await page.fill('textarea', 'Again')
     await page.press('Enter')
     await page.waitFor('.kai-chat-turn[data-role="assistant"]:nth-of-type(4)', { text: 'Second answer' })
-    await page.waitFor('[data-pending]', { gone: true })
+    await replied(page)
 
     expect(fakeAi.asked.map(asked => asked.messages.map(message => message.role))).toEqual([['user'], ['user', 'assistant', 'user']])
     expect(fakeAi.last()?.messages[1]?.content).toContain('Here is **bold**')
@@ -128,7 +129,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the Chat i
     expect(await page.evaluate(() => document.querySelector('.kai-chat-form button')?.getAttribute('aria-label'))).toBe('Stop')
 
     await page.press('Escape')
-    await page.waitFor('[data-pending]', { gone: true })
+    await replied(page)
 
     expect((await page.text('.kai-chat-turn[data-role="assistant"] .kai-chat-text'))?.trim()).toBe('Working')
     expect(await page.text('.kai-chat-note')).toBe('Stopped')
@@ -144,7 +145,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the Chat i
     fakeAi.reply('Done, **all** of it')
     await page.fill('textarea', 'Add milk')
     await page.press('Enter')
-    await page.waitFor('[data-pending]', { gone: true })
+    await replied(page)
     await page.waitFor('.kai-chat-turn[data-role="assistant"] strong', { text: 'all' })
 
     const turn = '.kai-chat-turn[data-role="assistant"]'
@@ -169,7 +170,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the Chat i
     fakeAi.reply({ reasoning: 'First <b>think</b>. Then answer.', text: 'The answer' })
     await page.fill('textarea', 'Why')
     await page.press('Enter')
-    await page.waitFor('[data-pending]', { gone: true })
+    await replied(page)
     await page.waitFor('.kai-chat-turn[data-role="assistant"] .kai-chat-text', { text: 'The answer' })
 
     const turn = '.kai-chat-turn[data-role="assistant"]'
@@ -186,7 +187,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the Chat i
     fakeAi.reply({ reasoning: 'Private thoughts', text: 'Plain answer' })
     await hidden.fill('textarea', 'Why')
     await hidden.press('Enter')
-    await hidden.waitFor('[data-pending]', { gone: true })
+    await replied(hidden)
     await hidden.waitFor('.kai-chat-turn[data-role="assistant"] .kai-chat-text', { text: 'Plain answer' })
 
     expect(await hidden.count('.kai-chat-reasoning')).toBe(0)
@@ -199,7 +200,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the Chat i
     fakeAi.reply('Try:\n\n```ts\nconst a = 1 < 2\n```\n\nand\n\n```html\n<img src=x onerror=alert(1)>\n```\n\nthen\n\n```ts\nopen')
     await page.fill('textarea', 'Show code')
     await page.press('Enter')
-    await page.waitFor('[data-pending]', { gone: true })
+    await replied(page)
 
     const turn = '.kai-chat-turn[data-role="assistant"] .kai-chat-text'
 
@@ -220,7 +221,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the Chat i
     fakeAi.reply('Tides follow the moon [1][2], see `[1]` and [3x] and [4].')
     await page.fill('textarea', 'Why tides?')
     await page.press('Enter')
-    await page.waitFor('[data-pending]', { gone: true })
+    await replied(page)
 
     const turn = '.kai-chat-turn[data-role="assistant"]'
 
@@ -246,7 +247,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the Chat i
     await page.fill('textarea', 'Add milk')
     await page.press('Enter')
     await page.waitFor('.kai-chat-approval')
-    await page.waitFor('[data-pending]', { gone: true })
+    await replied(page)
 
     expect(done).toEqual([])
     expect(await page.text('.kai-chat-approval-text')).toContain('add_note {"title":"Milk"}')
@@ -257,7 +258,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the Chat i
     fakeAi.reply('Added')
     await page.click('.kai-chat-approval button:first-of-type')
     await page.waitFor(`${turn}:nth-of-type(4) .kai-chat-text`, { text: 'Added' })
-    await page.waitFor('[data-pending]', { gone: true })
+    await replied(page)
 
     expect(done).toEqual(['addNote:Milk'])
     expect(await page.text('.kai-chat-turn[data-role="user"]:nth-of-type(3)')).not.toContain('kai-approved')
@@ -269,10 +270,10 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the Chat i
     await page.fill('textarea', 'And bread')
     await page.press('Enter')
     await page.waitFor('.kai-chat-approval')
-    await page.waitFor('[data-pending]', { gone: true })
+    await replied(page)
     fakeAi.reply('Fine, not adding it')
     await page.click('.kai-chat-approval button:last-of-type')
-    await page.waitFor('[data-pending]', { gone: true })
+    await replied(page)
 
     expect(done).toEqual(['addNote:Milk'])
     expect(fakeAi.last()?.messages.at(-1)?.content).toStartWith('Denied: add_note')
@@ -293,7 +294,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the Chat i
     fakeAi.reply('All done')
     await page.fill('textarea', 'Add milk')
     await page.press('Enter')
-    await page.waitFor('[data-pending]', { gone: true })
+    await replied(page)
     await page.waitFor('.kai-chat-turn[data-role="assistant"]', { text: 'All done' })
 
     const heard = await page.evaluate(() => (window as unknown as { heard: string[] }).heard)
@@ -315,7 +316,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the Chat i
       form.requestSubmit()
     })
     await page.waitFor('.kai-chat-turn[data-role="assistant"]')
-    await page.waitFor('[data-pending]', { gone: true })
+    await replied(page)
 
     expect(fakeAi.asked.length).toBe(1)
     expect(await page.count('.kai-chat-turn[data-role="user"]')).toBe(1)
@@ -333,7 +334,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the Chat i
     expect(await slow.evaluate(() => document.querySelector('.kai-chat-form button')?.getAttribute('aria-label'))).toBe('Stop')
 
     await slow.press('Escape')
-    await slow.waitFor('[data-pending]', { gone: true })
+    await replied(slow)
 
     expect(await slow.value('textarea')).toBe('Second')
     expect(await slow.count('.kai-chat-turn[data-role="user"]')).toBe(1)
@@ -352,7 +353,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the Chat i
 
     await send(page, ' Spoken words ')
     await page.waitFor('.kai-chat-turn[data-role="assistant"]')
-    await page.waitFor('[data-pending]', { gone: true })
+    await replied(page)
 
     expect(await page.text('.kai-chat-turn[data-role="user"]')).toBe('Spoken words')
     expect(await page.value('textarea')).toBe('Typing')
@@ -370,7 +371,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the Chat i
     expect(await slow.value('textarea')).toBe('Second')
 
     await slow.press('Escape')
-    await slow.waitFor('[data-pending]', { gone: true })
+    await replied(slow)
   })
 
   test('Shift+Enter breaks the line and Enter sends the whole text', async () => {
@@ -475,7 +476,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the Chat i
     await page.fill('textarea', 'Table please')
     await page.press('Enter')
     await page.waitFor('.kai-chat-turn[data-role="assistant"] .kai-chat-table')
-    await page.waitFor('[data-pending]', { gone: true })
+    await replied(page)
 
     expect(await page.count('.kai-chat-text img')).toBe(0)
     expect(await page.count('.kai-chat-text script')).toBe(0)
@@ -504,12 +505,12 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the Chat i
     fakeAi.reply(table)
     await page.fill('textarea', 'Two tables')
     await page.press('Enter')
-    await page.waitFor('[data-pending]', { gone: true })
+    await replied(page)
     await page.waitFor('.kai-chat-table')
     await page.fill('textarea', 'One table')
     await page.press('Enter')
     await page.waitFor('.kai-chat-turn[data-role="assistant"]:nth-of-type(4) .kai-chat-table')
-    await page.waitFor('[data-pending]', { gone: true })
+    await replied(page)
 
     const boxes = await page.evaluate(() => [...document.querySelectorAll('.kai-chat-table')].map(box => ({ label: box.getAttribute('aria-label'), role: box.getAttribute('role'), attributes: box.getAttributeNames().sort().join(',') })))
 
@@ -560,7 +561,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the Chat i
     await page.fill('textarea', 'Go')
     await page.press('Enter')
     await page.waitFor('[role="alert"]', { text: 'The reply failed.' })
-    await page.waitFor('[data-pending]', { gone: true })
+    await replied(page)
 
     expect((await page.text('.kai-chat-turn[data-role="assistant"] .kai-chat-text'))?.trim()).toBe('Half a reply')
     expect(await page.evaluate(() => document.querySelector('.kai-chat-form button')?.getAttribute('aria-label'))).toBe('Send')
@@ -576,7 +577,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the Chat i
     await page.press('Enter')
     await page.waitFor('[data-pending] .kai-chat-thinking')
     await page.click('.kai-chat-form button')
-    await page.waitFor('[data-pending]', { gone: true })
+    await replied(page)
 
     expect(await page.count('[role="alert"]')).toBe(0)
     expect(await page.count('.kai-chat-turn')).toBe(0)
@@ -646,7 +647,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the Chat i
       await page.waitFor('[data-pending] .kai-chat-text', { text: 'Hel' })
       model.release()
       await page.waitFor(turn, { text: 'Hello there' })
-      await page.waitFor('[data-pending]', { gone: true })
+      await replied(page)
 
       expect(await page.count('.kai-chat-turn')).toBe(2)
       expect(model.state.asked).toBe(1)
@@ -662,7 +663,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the Chat i
       await page.reload()
       await page.waitFor('[data-pending] .kai-chat-text', { text: 'Hel' })
       await page.press('Escape')
-      await page.waitFor('[data-pending]', { gone: true })
+      await replied(page)
       await model.ended
 
       expect(model.state.aborted).toBe(true)
@@ -696,7 +697,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the Chat i
       await page.evaluate(() => window.dispatchEvent(new Event('beforeunload')))
       model.release()
       await page.waitFor(turn, { text: 'Hello there' })
-      await page.waitFor('[data-pending]', { gone: true })
+      await replied(page)
 
       expect(await page.count('[role="alert"]')).toBe(0)
       expect(await page.evaluate(() => sessionStorage.getItem('staying:reply'))).toBeNull()
@@ -710,7 +711,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the Chat i
       await page.press('Enter')
       await page.waitFor('[data-pending] .kai-chat-text', { text: 'Working' })
       await page.press('Escape')
-      await page.waitFor('[data-pending]', { gone: true })
+      await replied(page)
       await Bun.sleep(300)
 
       expect(await calls()).toBe(1)
@@ -776,7 +777,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the Chat i
       fakeAi.reply('See [two](/launcher/two) or [elsewhere](https://example.com).')
       await page.fill('textarea', 'Hello')
       await page.press('Enter')
-      await page.waitFor('[data-pending]', { gone: true })
+      await replied(page)
       await page.waitFor('.kai-chat-text a', { text: 'two' })
 
       expect(await page.evaluate(() => [...document.querySelectorAll('.kai-chat-text a')].map(link => link.getAttribute('target')))).toEqual([null, '_blank'])
@@ -811,7 +812,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the Chat i
       fakeAi.reply(['Hi there'])
       await page.fill('textarea', 'Hello')
       await page.click('button[type="submit"]')
-      await page.waitFor('[data-pending]', { gone: true })
+      await replied(page)
       await page.waitFor('.kai-chat-turn[data-role="assistant"]', { text: 'Hi there' })
       await page.fill('textarea', 'draft')
       await page.click('.kai-chat-new')
@@ -843,7 +844,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the Chat i
       fakeAi.reply('Hi back')
       await page.fill('textarea', 'Hello')
       await page.press('Enter')
-      await page.waitFor('[data-pending]', { gone: true })
+      await replied(page)
       await page.reload()
       await page.click('.kai-launcher-button')
       await page.waitUntil(chatHydrated)
@@ -864,7 +865,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the Chat i
       await page.press('Enter')
       await page.waitFor('[data-pending] .kai-chat-text', { text: 'Working' })
       await page.press('Escape')
-      await page.waitFor('[data-pending]', { gone: true })
+      await replied(page)
 
       expect(await page.count(opened)).toBe(1)
 
@@ -889,6 +890,33 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the Chat i
         const log = document.querySelector('.kai-chat-log')!
 
         return log.scrollHeight > log.clientHeight && log.scrollHeight - log.scrollTop - log.clientHeight < 8
+      })
+    })
+
+    // A slow network brings the renderer after the reply: the turn shows its text as written, then grows once formatted, with no new word to follow.
+    test('a log at its end follows a finished reply that the Markdown renderer formats after it ended', async () => {
+      const page = await site.open('/launcher/one', { height: 500 })
+      const renderer = Promise.withResolvers<void>()
+
+      await page.route(url => url.pathname.includes('markdown-render'), async (request) => {
+        await renderer.promise
+        await request.continue()
+      })
+      await page.click('.kai-launcher-button')
+      await page.waitUntil(chatHydrated)
+      fakeAi.reply(Array.from({ length: 60 }, (_, line) => `Line ${line}\n\n`))
+      await page.fill('textarea', 'Long')
+      await page.press('Enter')
+      await page.waitFor('[data-pending]', { gone: true })
+
+      expect(await page.count('.kai-chat-text p')).toBe(1)
+
+      renderer.resolve()
+      await markdownDrawn(page)
+      await page.waitUntil(() => {
+        const log = document.querySelector('.kai-chat-log')!
+
+        return log.querySelectorAll('.kai-chat-text p').length === 60 && log.scrollHeight - log.scrollTop - log.clientHeight < 8
       })
     })
 
@@ -954,7 +982,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the Chat i
       await page.click('.kai-launcher-button')
       await page.click('.kai-chat-suggestion')
       await page.waitFor('.kai-chat-turn[data-role="assistant"]', { text: 'Answer' })
-      await page.waitFor('[data-pending]', { gone: true })
+      await replied(page)
 
       expect(fakeAi.asked.length).toBe(1)
       expect(await page.count('.kai-chat-turn[data-role="user"]')).toBe(1)
@@ -970,7 +998,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the Chat i
       await page.waitUntil(chatHydrated)
       fakeAi.reply(['One ', 'two ', 'three ', 'four ', 'five.'])
       await page.click('.kai-chat-suggestion')
-      await page.waitFor('[data-pending]', { gone: true })
+      await replied(page)
       await page.waitFor('.kai-chat-turn[data-role="assistant"]', { text: 'One two three four five.' })
 
       expect(await page.count('.kai-chat-note')).toBe(0)
@@ -999,7 +1027,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the Chat i
       fakeAi.reply('Short')
       await page.click('.kai-chat-suggestion')
       await page.waitFor('.kai-chat-text', { text: 'Short' })
-      await page.waitFor('[data-pending]', { gone: true })
+      await replied(page)
 
       const short = await measure()
 
@@ -1010,7 +1038,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the Chat i
       await page.fill('textarea', 'Long')
       await page.press('Enter')
       await page.waitFor('.kai-chat-text', { text: 'Line 59' })
-      await page.waitFor('[data-pending]', { gone: true })
+      await replied(page)
 
       const long = await measure()
 

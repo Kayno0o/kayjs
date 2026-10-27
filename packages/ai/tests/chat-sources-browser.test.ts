@@ -1,6 +1,7 @@
 import { join } from 'node:path'
 import { afterAll, expect, it } from 'bun:test'
 import { testSite } from 'kay/test'
+import { replied } from './helpers/chat'
 
 const site = await testSite({ root: join(import.meta.dir, 'fixture'), browser: true })
 
@@ -19,6 +20,7 @@ async function send(page: Page, text: string, answer: string) {
   await page.fill('.kai-chat-form textarea', text)
   await page.click('.kai-chat-form .kai-chat-send')
   await page.waitFor(`${LAST} .kai-chat-text`, { text: answer })
+  await replied(page)
 }
 
 it('hydrates an initial turn with sources as the server drew it: formatted from the first paint, one list that never flashes', async () => {
@@ -138,6 +140,7 @@ it('leaves no source of a reply that was regenerated, edited away or cleared', a
   await page.fill('.kai-chat-turn[data-editing] textarea', 'none:edited [1]')
   await page.click('.kai-chat-save')
   await page.waitFor(`${LAST} .kai-chat-text`, { text: 'edited' })
+  await replied(page)
 
   expect(await turns(page)).toEqual(['edited [1] | '])
   expect(await page.count('.kai-chat-sources')).toBe(0)
