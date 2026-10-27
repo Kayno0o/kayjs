@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { brotliCompressSync } from 'node:zlib'
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
+import releaseNotes from '../changelogitea.config'
 import { fileTree, pathTree } from '../docs/src/file-tree'
 import { loadComponents, loadLibraries } from '../docs/src/libraries'
 import { pageWeight } from '../docs/src/page-weight'
@@ -31,6 +32,8 @@ const LISTED = /^- \[[^\]]+\]\(llms\/([\w-]+\.md)\): \S/gm
 const KAY_BLOCK = /```kay\n([\s\S]*?)```/g
 const pagesDir = join(root, 'docs/src/content/docs')
 const pageBlocks = (await Promise.all([...new Bun.Glob('**/*.md').scanSync(pagesDir)].toSorted().map(async file => [...(await Bun.file(join(pagesDir, file)).text()).matchAll(KAY_BLOCK)].map((match, index) => [`${file} #${index + 1}`, match[1]!] as const)))).flat()
+// A Markdown link's target, `](production.md#check)`.
+const LINK_TARGET = /\]\(([^)\s]+)\)/g
 const CARD_LINK = /ModuleCard\([^)]*\bhref="([^"]+)"/g
 const PART_ATTRIBUTE = /\bpart="([^"]+)"/g
 const WHITESPACE = /\s+/
@@ -159,6 +162,15 @@ describe('the documentation site', () => {
     const broken = await brokenLinks()
 
     expect(broken).toEqual([])
+  })
+
+  it('links the release notes to the pages the site serves for the links of whats-new.md', async () => {
+    const page = (await loadReference()).find(page => page.slug === 'whats-new')!
+    const targets = (markdown: string) => [...markdown.matchAll(LINK_TARGET)].map(match => match[1]!)
+    const { link } = releaseNotes.highlights
+
+    expect(targets(readFileSync(join(root, 'llms/whats-new.md'), 'utf8')).map(target => link(target) ?? target)).toEqual(targets(page.body))
+    expect(link('production.md#check-the-executable-starts')).toBe('/llms/production#check-the-executable-starts')
   })
 
   // The docs site is read by people: plain prose, one idea per paragraph, as llms/ stays dense for agents.

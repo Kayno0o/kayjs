@@ -16,6 +16,9 @@ const DOC_LINK = /\]\((?:llms\/)?([\w-]+)\.md(#[\w-]+)?\)/g
 export const CROSS_PATH_SOURCE = String.raw`(?:\.\.\/)+(?:packages\/\w+\/llms(?:\/[\w-]+\.md|\.txt)|llms\/[\w-]+\.md)`
 const CROSS_PATH = /^(?:\.\.\/)+(?:packages\/(\w+)\/llms(?:\/([\w-]+)\.md)?|llms\/([\w-]+)\.md)/
 const CROSS_LINK = new RegExp(String.raw`\]\((${CROSS_PATH_SOURCE})(#[\w-]+)?\)`, 'g')
+// A link target naming a doc, as a doc writes it, whole: `production.md#check`, `../packages/ui/llms/forms.md`.
+const DOC_TARGET = /^(?:llms\/)?([\w-]+)\.md(#[\w-]+)?$/
+const CROSS_TARGET = new RegExp(String.raw`^(${CROSS_PATH_SOURCE})(#[\w-]+)?$`)
 const TITLE = /^# (.+)\n+/
 const QUOTED = /^> /gm
 
@@ -31,6 +34,7 @@ export const LLMS_GUIDES = [
 export const isUnlisted = (slug: string) => (LLMS_GUIDES as readonly { slug: string, listed?: boolean }[]).some(guide => guide.slug === slug && guide.listed === false)
 
 const GUIDE_OF = new Map<string, string>(LLMS_GUIDES.map(guide => [guide.topic, `/${guide.slug}`]))
+const docPage = (doc: string) => GUIDE_OF.get(doc) ?? `/llms/${doc}`
 
 export const llmsHref = (slug: string) => slug === 'overview' ? '/llms' : `/llms/${slug}`
 
@@ -38,13 +42,25 @@ export const llmsHref = (slug: string) => slug === 'overview' ? '/llms' : `/llms
 export function crossHref(path: string): string {
   const [, library, topic, doc] = CROSS_PATH.exec(path)!
 
-  return library === undefined ? GUIDE_OF.get(doc!) ?? `/llms/${doc}` : `/llms/kayjs-${library}${topic === undefined ? '' : `-${topic}`}`
+  return library === undefined ? docPage(doc!) : `/llms/kayjs-${library}${topic === undefined ? '' : `-${topic}`}`
 }
 
 // A doc's links to the libraries' pages and to kay's other docs by path, made links between pages.
 export const crossLinked = (markdown: string) => markdown.replace(CROSS_LINK, (_link, path: string, anchor = '') => `](${crossHref(path)}${anchor})`)
 
-const linked = (markdown: string) => crossLinked(markdown).replace(DOC_LINK, (_link, slug: string, anchor = '') => `](${GUIDE_OF.get(slug) ?? `/llms/${slug}`}${anchor})`)
+const linked = (markdown: string) => crossLinked(markdown).replace(DOC_LINK, (_link, slug: string, anchor = '') => `](${docPage(slug)}${anchor})`)
+
+// The page of the site a doc's link target names, `production.md#check` as `/llms/production#check`, or nothing for one naming no doc: the release notes map the links of whats-new.md with it.
+export function docHref(target: string): string | undefined {
+  const cross = CROSS_TARGET.exec(target)
+
+  if (cross !== null)
+    return `${crossHref(cross[1]!)}${cross[2] ?? ''}`
+
+  const doc = DOC_TARGET.exec(target)
+
+  return doc === null ? undefined : `${docPage(doc[1]!)}${doc[2] ?? ''}`
+}
 
 // llms.txt as the overview, then one page per doc it lists, in its order, links between them made links between pages.
 export async function loadReference(): Promise<ReferencePage[]> {

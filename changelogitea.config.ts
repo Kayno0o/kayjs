@@ -1,3 +1,5 @@
+import { docHref } from './docs/src/reference'
+
 export default {
   baseUrl: 'git.kaynooo.fr',
   // The libraries' histories came in as merges under packages/: a release lists the merge, not every commit it brought.
@@ -6,5 +8,7 @@ export default {
   highlights: {
     file: 'llms/whats-new.md',
     url: 'https://kayjs.kaynooo.fr/guides/whats-new',
+    // A doc links another by its file, `production.md#check`, which the site serves as `/llms/production#check`.
+    link: docHref,
   },
 }
