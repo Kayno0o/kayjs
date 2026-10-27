@@ -91,7 +91,6 @@ export function markEnded(key: string): void {
     entry.ended = true
 }
 
-// Ends the reply kept under `key` if `owner` kept it, else the one about to be kept under it when the stop came first.
 // The refund is given, with no await between the check and the count, so parallel resumes cannot exceed the cap.
 function mayRefund(entry: Entry): boolean {
   if (entry.refunds >= MOST_REFUNDS)
@@ -102,6 +101,7 @@ function mayRefund(entry: Entry): boolean {
   return true
 }
 
+// Ends the reply kept under `key` if `owner` kept it, else the one about to be kept under it when the stop came first.
 // `owned` is called once the reply found is the owner's, unless the reply already gave its refunds.
 export function stopKept(key: string, owner: Promise<string | undefined>, owned?: () => Promise<void>): void {
   sweep(Date.now())
