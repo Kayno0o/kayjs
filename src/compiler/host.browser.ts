@@ -10,7 +10,6 @@ export function browserGlobals(): ReadonlySet<string> {
   return new Set()
 }
 
-// A scoped style's attribute only has to differ from another module's, so it need not match Bun.hash.
 export { fnvHash as hash } from './fnv-hash'
 
 export function cwd(): string {

@@ -23,7 +23,7 @@ export function cwd(): string {
   return process.cwd()
 }
 
-// ESLint runs the processor under Node, where a scoped style's attribute only has to differ from another module's.
+// ESLint runs the processor under Node.
 export function hash(text: string): string {
   return typeof Bun === 'undefined' ? fnvHash(text) : Bun.hash(text).toString(36)
 }

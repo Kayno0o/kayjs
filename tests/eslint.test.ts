@@ -865,7 +865,7 @@ describe('kay/eslint without Bun', () => {
   const STYLED = '---\nconst { n } = props<{ n: number }>()\nconst odd = n == 1\n---\n--- style\n.rendered :global(h1) { font-size: 1.5rem; }\n.rendered p { margin: 0 }\n---\n.rendered\n  p {odd || n == 2}\n'
   const tsParser = import('@typescript-eslint/parser')
 
-  // The processor as `prepack` bundles it, with `Bun` shadowed by undefined, as keslint runs it under Node.
+  // The processor with the options of the `build:eslint` script, `Bun` shadowed by undefined, as keslint runs it under Node.
   async function nodeProcessor(): Promise<typeof processor> {
     const dir = await scratchDir('eslint-node-')
     const built = await Bun.build({ entrypoints: [join(import.meta.dir, '..', 'src/eslint/index.ts')], target: 'node', packages: 'external', outdir: dir, naming: 'eslint.js', banner: 'const Bun = undefined;' })
