@@ -11,3 +11,6 @@ export const FIELD_MESSAGE = {
   issues: 'flex flex-col',
   issue: 'text-xs text-danger',
 }
+
+// The label type a Slider, a ColorInput and a FormField write their label in, and a Segmented or a ChipGroup given `showLabel` its own.
+export const LABEL_TEXT = 'text-xs [font-weight:var(--font-weight-normal)] tracking-label text-muted [font-family:var(--font-label,inherit)] [text-transform:var(--label-case)]'

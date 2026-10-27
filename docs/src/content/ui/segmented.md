@@ -48,4 +48,6 @@ An `onChange` of your own still runs first, and a `false` from it stops the move
 
 ## Label
 
-`label` is required. It names the group for screen readers.
+`label` is required. It names the group for screen readers. `showLabel` also writes it above the group, in the type a [Slider](/ui/slider) writes its label in, and names the radiogroup by it, so a row of controls mixing the two shows every label: `Segmented(label="Grid" showLabel options={GRIDS} value="square")`.
+
+The label and the group then sit in a `field` part, the label being `heading`; `class` still reaches the group. Leave it off in a toolbar or a table header, where the group speaks for itself.

@@ -1,7 +1,7 @@
 ---
 import type { Snippet } from 'kay'
 import { recipe } from 'kay'
-import { FIELD_MESSAGE } from './field-look'
+import { FIELD_MESSAGE, LABEL_TEXT } from './field-look'
 import { fieldLinks, formIssues } from './forms'
 
 // One wrapping row, the label taking no box of its own: the head and the action share the first line, the action wrapping under the head rather than over the control, and the rest take a line each.
@@ -12,7 +12,7 @@ const look = recipe({
     root: 'kui-form-field flex w-full flex-wrap items-center gap-1 [:where(&)>*]:basis-full',
     label: 'contents [:where(&)>*]:basis-full',
     head: 'float-left order-first flex flex-1 basis-auto flex-wrap items-center gap-2 p-0',
-    text: 'kui-label-text text-xs [font-weight:var(--font-weight-normal)] tracking-label text-muted [font-family:var(--font-label,inherit)] [text-transform:var(--label-case)]',
+    text: `kui-label-text ${LABEL_TEXT}`,
     required: 'ml-0.5 text-danger',
     action: 'order-first ml-auto flex basis-auto flex-wrap items-center justify-end gap-1.5',
     hint: FIELD_MESSAGE.hint,

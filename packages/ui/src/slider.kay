@@ -2,12 +2,13 @@
 import type { JSX } from 'kay'
 import { recipe } from 'kay'
 import { controlledInput } from './controlled-input'
+import { LABEL_TEXT } from './field-look'
 import { rangeTrack } from './range-track'
 
 const look = recipe({
   parts: {
     root: 'kui-slider grid grid-cols-[1fr_auto] items-center gap-x-3 gap-y-1',
-    label: 'text-xs [font-weight:var(--font-weight-normal)] tracking-label text-muted [font-family:var(--font-label,inherit)] [text-transform:var(--label-case)]',
+    label: LABEL_TEXT,
     input: `col-span-2 ${rangeTrack}`,
     value: 'text-xs text-foreground tabular-nums',
   },

@@ -1,0 +1,11 @@
+---
+import ChipGroup from '@kaynooo/kayjs-ui/chip-group.kay'
+import Segmented from '@kaynooo/kayjs-ui/segmented.kay'
+
+// A Segmented and a ChipGroup writing their label above them, beside ones keeping it for screen readers only.
+const shapes = [{ value: 'grid', label: 'Grid' }, { value: 'list', label: 'List' }] as const
+---
+Segmented#shown(label="Layout" showLabel options={shapes} value="grid")
+Segmented#hidden(label="Hidden layout" options={shapes} value="list")
+ChipGroup#chips-shown(label="Shapes" showLabel options={shapes} value={['grid']})
+ChipGroup#chips-hidden(label="Hidden shapes" options={shapes} value={[]})

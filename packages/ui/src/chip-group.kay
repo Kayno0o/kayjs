@@ -4,6 +4,7 @@ import type { IconProps } from 'kay/icons'
 import type { IconSlot } from './defaults'
 import { effect, recipe, signal, uid, untrack } from 'kay'
 import { changeAccepted } from './change'
+import { LABEL_TEXT } from './field-look'
 import { onFormReset, resetWhenIdle, startRef } from './form-reset'
 import Icon from './icon.kay'
 
@@ -15,16 +16,20 @@ const look = recipe({
     input: 'peer/chip absolute size-0 opacity-0',
     label: 'inline-flex items-center gap-1 rounded-md border-solid border-[length:var(--border-width)] bg-surface px-2.5 py-1 text-xs text-muted transition-colors [border-color:var(--_control-line,var(--color-border))] hover:text-foreground peer-checked/chip:border-accent peer-checked/chip:bg-accent peer-checked/chip:text-accent-foreground peer-checked/chip:hover:text-accent-foreground peer-focus-visible/chip:outline-2 peer-focus-visible/chip:outline-offset-2 peer-focus-visible/chip:outline-accent',
     icon: 'size-3.5 shrink-0',
+    field: 'flex flex-col gap-1',
+    heading: LABEL_TEXT,
   },
 })
 
-const { options, value, label, name, disabled = false, onChange, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'role' | 'onChange'> & {
+const { options, value, label, showLabel = false, name, disabled = false, onChange, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'role' | 'onChange'> & {
   // `icon` sits before the label; `disabled` keeps that chip as it is.
   options: readonly { value: Value, label: string, icon?: IconSlot | IconProps | undefined, disabled?: boolean | undefined }[]
   // The options picked to start with, in any order; a group whose parent passes others follows them.
   value: readonly Value[]
   // Names the group for screen readers.
   label: string
+  // Writes `label` above the chips, in a Slider's label type, and names the group by it.
+  showLabel?: boolean | undefined
   // Disables every chip; an option's own `disabled` still applies when this is false.
   disabled?: boolean | undefined
   // The checkboxes' name, which the group submits under inside a form, once per picked option; one unique on the page is drawn when none is given.
@@ -36,6 +41,8 @@ const { options, value, label, name, disabled = false, onChange, ...rest } = pro
 }>()
 
 const group = name ?? uid()
+// The heading's id while `showLabel` writes it, which then names the group in place of `aria-label`.
+const heading = showLabel ? uid() : undefined
 // Held as string or number: a signal cannot take a type parameter that might be a function.
 const picked = signal<readonly (string | number)[]>(value)
 const busy = signal(false)
@@ -94,11 +101,18 @@ const resetting = resetWhenIdle(busy, () => {
 onFormReset(() => root, resetting.reset)
 ---
 // Real checkboxes drawn as chips, so the group submits like any other field and Space toggles the focused chip. A click while a change is under way ticks nothing.
-div(part="root" {...rest} ref={ref} role="group" aria-label={label} aria-busy={busy() ? 'true' : undefined})
-  for option of options key={option.value}
-    label(part="chip")
-      input(part="input" ref={element => element.defaultChecked = untrack(() => value.includes(option.value))} type="checkbox" name={group} value={option.value} checked={picked().includes(option.value)} disabled={disabled || option.disabled} onClick={event => { if (busy()) event.preventDefault() }} onChange={event => toggle(event.currentTarget, option.value)})
-      span(part="label")
-        if option.icon
-          Icon(icon={option.icon} part="icon")
-        | {option.label}
+snippet chips()
+  div(part="root" {...rest} ref={ref} role="group" aria-label={heading ? undefined : label} aria-labelledby={heading ?? rest['aria-labelledby']} aria-busy={busy() ? 'true' : undefined})
+    for option of options key={option.value}
+      label(part="chip")
+        input(part="input" ref={element => element.defaultChecked = untrack(() => value.includes(option.value))} type="checkbox" name={group} value={option.value} checked={picked().includes(option.value)} disabled={disabled || option.disabled} onClick={event => { if (busy()) event.preventDefault() }} onChange={event => toggle(event.currentTarget, option.value)})
+        span(part="label")
+          if option.icon
+            Icon(icon={option.icon} part="icon")
+          | {option.label}
+if showLabel
+  div(part="field")
+    span(part="heading" id={heading}) {label}
+    {chips()}
+else
+  {chips()}

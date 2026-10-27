@@ -22,4 +22,4 @@ Return a promise from `onChange` to hold the group busy until it settles. If the
 
 ## Label
 
-`label` is required. It names the group for screen readers.
+`label` is required. It names the group for screen readers. `showLabel` also writes it above the chips and names the group by it, as on [Segmented](/ui/segmented#label).

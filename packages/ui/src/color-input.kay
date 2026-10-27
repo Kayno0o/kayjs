@@ -2,13 +2,14 @@
 import type { JSX } from 'kay'
 import { recipe } from 'kay'
 import { controlledInput } from './controlled-input'
+import { LABEL_TEXT } from './field-look'
 
 // The swatch of both engines has no native chrome around it, in the keyline and radius of the fields.
 const look = recipe({
   parts: {
     root: 'kui-color-input inline-flex items-center gap-2',
     input: 'size-8 shrink-0 cursor-pointer appearance-none rounded-md border-solid border-[length:var(--border-width)] border-input bg-transparent p-0.5 [&::-webkit-color-swatch-wrapper]:p-0 [&::-webkit-color-swatch]:rounded-md [&::-webkit-color-swatch]:border-0 [&::-moz-color-swatch]:rounded-md [&::-moz-color-swatch]:border-0 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-default disabled:opacity-50',
-    label: 'text-xs [font-weight:var(--font-weight-normal)] tracking-label text-muted [font-family:var(--font-label,inherit)] [text-transform:var(--label-case)]',
+    label: LABEL_TEXT,
     value: 'text-xs text-foreground tabular-nums',
   },
 })

@@ -2,9 +2,10 @@
 import type { JSX } from 'kay'
 import type { IconProps } from 'kay/icons'
 import type { IconSlot } from './defaults'
-import { recipe, untrack } from 'kay'
+import { recipe, uid, untrack } from 'kay'
 import type { NullOption } from './null-option'
 import { controlledRadios } from './controlled-radios'
+import { LABEL_TEXT } from './field-look'
 import { paramChange } from './param-change'
 import Icon from './icon.kay'
 
@@ -16,16 +17,20 @@ const look = recipe({
     input: 'peer/option absolute size-0 opacity-0',
     label: 'flex items-center gap-1 px-3 py-1.5 text-xs text-muted transition-colors hover:text-foreground peer-checked/option:bg-accent peer-checked/option:text-accent-foreground peer-checked/option:hover:text-accent-foreground peer-focus-visible/option:outline-2 peer-focus-visible/option:-outline-offset-2 peer-focus-visible/option:outline-accent',
     icon: 'size-3.5 shrink-0',
+    field: 'inline-flex flex-col items-start gap-1',
+    heading: LABEL_TEXT,
   },
 })
 
-const { options, value, label, name, param, paramDefault, disabled = false, orientation = 'horizontal', onChange, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'role' | 'onChange'> & {
+const { options, value, label, showLabel = false, name, param, paramDefault, disabled = false, orientation = 'horizontal', onChange, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'role' | 'onChange'> & {
   // `icon` sits before the label; `disabled` keeps that option from being picked.
   options: readonly { value: Value, label: string, icon?: IconSlot | IconProps | undefined, disabled?: boolean | undefined }[] & NullOption<Value, Held>
   // The option picked to start with, or `null` for none, such as while what shows matches no option; a group whose parent passes another follows it.
   value: Held
   // Names the group for screen readers.
   label: string
+  // Writes `label` above the group, in a Slider's label type, and names the group by it.
+  showLabel?: boolean | undefined
   // Disables every option; an option's own `disabled` still applies when this is false.
   disabled?: boolean | undefined
   // The radios' name, which the group submits under inside a form; one unique on the page is drawn when none is given.
@@ -51,13 +56,23 @@ const { group, picked, busy, ref, pick } = controlledRadios({
   onChange: () => paramChange(param, paramDefault, onChange as ((value: string | number | null) => unknown) | undefined),
   appRef: rest.ref,
 })
+
+// The heading's id while `showLabel` writes it, which then names the group in place of `aria-label`.
+const heading = showLabel ? uid() : undefined
 ---
 // Real radios, so the arrow keys move between options and the group submits like any other field.
-div(part="root" {...rest} ref={ref} role="radiogroup" aria-label={label} aria-orientation={orientation === 'vertical' ? 'vertical' : undefined} data-orientation={orientation === 'vertical' ? 'vertical' : undefined} aria-busy={busy() ? 'true' : undefined})
-  for option of options key={option.value}
-    label(part="option")
-      input(part="input" ref={element => element.defaultChecked = untrack(() => option.value === value)} type="radio" name={group} value={option.value ?? ''} checked={picked() === option.value} disabled={disabled || option.disabled} onChange={() => pick(option.value)})
-      span(part="label")
-        if option.icon
-          Icon(icon={option.icon} part="icon")
-        | {option.label}
+snippet radios()
+  div(part="root" {...rest} ref={ref} role="radiogroup" aria-label={heading ? undefined : label} aria-labelledby={heading ?? rest['aria-labelledby']} aria-orientation={orientation === 'vertical' ? 'vertical' : undefined} data-orientation={orientation === 'vertical' ? 'vertical' : undefined} aria-busy={busy() ? 'true' : undefined})
+    for option of options key={option.value}
+      label(part="option")
+        input(part="input" ref={element => element.defaultChecked = untrack(() => option.value === value)} type="radio" name={group} value={option.value ?? ''} checked={picked() === option.value} disabled={disabled || option.disabled} onChange={() => pick(option.value)})
+        span(part="label")
+          if option.icon
+            Icon(icon={option.icon} part="icon")
+          | {option.label}
+if showLabel
+  div(part="field")
+    span(part="heading" id={heading}) {label}
+    {radios()}
+else
+  {radios()}
