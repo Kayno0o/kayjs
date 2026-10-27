@@ -1,8 +1,8 @@
 --- server
-import { ask } from '@kaynooo/kayjs-ai'
+import { ask, chatMessages } from '@kaynooo/kayjs-ai'
 import { s } from 'kay'
 
 // A chat that takes files: a message holds the images the visitor attached.
-export const reply = action(s.Object({ messages: s.Array(s.Object({ role: s.UnionEnum(['user', 'assistant']), content: s.String({ maxLength: 4000 }), attachments: s.Optional(s.Array(s.File({ type: 'image/png' }), { maxItems: 4 })) }), { minItems: 1, maxItems: 50 }) }), ({ messages }) => ask(messages), { maxSize: '2mb' })
+export const reply = action(s.Object({ messages: chatMessages({ maxItems: 50, attachments: { type: 'image/png' } }) }), ({ messages }) => ask(messages), { maxSize: '2mb' })
 ---
 p Chat

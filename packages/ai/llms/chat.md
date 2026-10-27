@@ -6,10 +6,10 @@
 
 ```kay
 --- server
-import { ask } from '@kaynooo/kayjs-ai'
+import { ask, chatMessages } from '@kaynooo/kayjs-ai'
 import { s } from 'kay'
 
-export const reply = action(s.Object({ messages: s.Array(s.Object({ role: s.UnionEnum(['user', 'assistant']), content: s.String({ maxLength: 4000 }) }), { minItems: 1, maxItems: 40 }) }), ({ messages }) => ask(messages, { system: 'Be brief' }))
+export const reply = action(s.Object({ messages: chatMessages() }), ({ messages }) => ask(messages, { system: 'Be brief' }))
 ---
 ```
 
@@ -21,18 +21,18 @@ import { reply } from '../routes/reply.kay'
 Chat(action={reply} label="Assistant")
 ```
 
+`chatMessages({ maxItems, maxLength, attachments })` (from `@kaynooo/kayjs-ai`) is the schema of the history a Chat posts: at least one message with a `role` of `user` or `assistant` and a `content`, at most `maxItems` messages (40) of `maxLength` characters (4,000). `attachments: true` or `{ type, maxFiles }` adds the files of `attach` (images and PDFs, 4 a message by default). An action that keeps the conversation itself and reads only the message just sent takes the same schema and `lastChatMessage(messages)`.
+
 ### Attaching files
 
 `attach` lets the visitor send images and PDFs the model reads ([Images and PDFs](attachments.md)). The action's schema takes them as `attachments` on a message, and `ask(messages)` shows them to the model with nothing else to wire:
 
 ```kay
 --- server
-import { ask } from '@kaynooo/kayjs-ai'
+import { ask, chatMessages } from '@kaynooo/kayjs-ai'
 import { s } from 'kay'
 
-const file = s.File({ type: 'image/png' })
-
-export const reply = action(s.Object({ messages: s.Array(s.Object({ role: s.UnionEnum(['user', 'assistant']), content: s.String({ maxLength: 4000 }), attachments: s.Optional(s.Array(file, { maxItems: 4 })) }), { minItems: 1, maxItems: 40 }) }), ({ messages }) => ask(messages), { maxSize: '20mb' })
+export const reply = action(s.Object({ messages: chatMessages({ attachments: { type: 'image/png' } }) }), ({ messages }) => ask(messages), { maxSize: '20mb' })
 ---
 ```
 

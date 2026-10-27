@@ -9,11 +9,11 @@ Pass actions in `tools` and the model can call them:
 ```kay
 --- server
 import { s } from 'kay'
-import { ask } from '@kaynooo/kayjs-ai'
+import { ask, chatMessages } from '@kaynooo/kayjs-ai'
 
 export const addNote = action(s.Object({ title: s.String({ minLength: 3, maxLength: 100 }) }), ({ title }) => saveNote(title), { tool: 'Adds a note to the visitor\'s list' })
 
-export const assistant = action(s.Object({ messages: s.Array(s.Object({ role: s.UnionEnum(['user', 'assistant']), content: s.String({ maxLength: 4000 }) }), { minItems: 1, maxItems: 40 }) }), ({ messages }) => ask(messages, { tools: [addNote], maxSteps: 4 }).progress())
+export const assistant = action(s.Object({ messages: chatMessages() }), ({ messages }) => ask(messages, { tools: [addNote], maxSteps: 4 }).progress())
 ---
 p Assistant
 ```

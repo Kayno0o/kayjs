@@ -61,14 +61,14 @@ An action returning the reply streams it to the island calling it, with the acti
 ```kay
 --- server
 import { s } from 'kay'
-import { ask } from '@kaynooo/kayjs-ai'
+import { ask, chatMessages } from '@kaynooo/kayjs-ai'
 
-export const reply = action(s.Object({ messages: s.Array(s.Object({ role: s.UnionEnum(['user', 'assistant']), content: s.String({ maxLength: 4000 }) }), { minItems: 1, maxItems: 40 }) }), ({ messages }) => ask(messages, { system: 'You answer for the shop' }))
+export const reply = action(s.Object({ messages: chatMessages() }), ({ messages }) => ask(messages, { system: 'You answer for the shop' }))
 ---
 p Chat
 ```
 
-In the island, `const stream = await reply({ messages })` resolves with an `ActionStream` whose `last()` is the text so far. Bound the history in the schema (`maxItems`, `maxLength`) and rate limit the action: each call bills.
+In the island, `const stream = await reply({ messages })` resolves with an `ActionStream` whose `last()` is the text so far. Bound the history in the schema (`chatMessages({ maxItems, maxLength })` is the one Chat posts: [Chat](chat.md)) and rate limit the action: each call bills.
 
 ## Reference
 
