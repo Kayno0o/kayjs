@@ -118,12 +118,12 @@ export type ListFormatOptions = Intl.ListFormatOptions & LocaleOption
 
 // The options without `locale`, and the locale they name else `fallback`.
 function withLocale<Options extends LocaleOption>(fallback: string, options: Options | undefined): [string, Omit<Options, 'locale'> | undefined] {
-  if (options?.locale === undefined)
+  if (options === undefined || !('locale' in options))
     return [fallback, options]
 
   const { locale, ...rest } = options
 
-  return [locale, rest]
+  return [locale ?? fallback, rest]
 }
 
 // The message files' default export: it keeps the literal text, so `t` knows each message's placeholders.
@@ -256,7 +256,7 @@ export function formatNumber(page: string, value: number, given?: NumberFormatOp
 // A date as the locale writes it, `medium` by default: `4 oct. 2026`.
 export function formatDate(page: string, value: Date | number, given: DateFormatOptions = { dateStyle: 'medium' }): string {
   const [locale, named] = withLocale(page, given)
-  const options = named && Object.keys(named).length === 0 ? { dateStyle: 'medium' } as const : named!
+  const options = named !== given && Object.keys(named!).length === 0 ? { dateStyle: 'medium' } as const : named!
 
   return cached(dateFormats, `${locale}\n${JSON.stringify(options)}`, () => new Intl.DateTimeFormat(locale, options)).format(value)
 }

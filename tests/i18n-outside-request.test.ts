@@ -50,4 +50,13 @@ describe('the formatters outside a request', () => {
     expect(runInLocale(request, all)).toEqual(french)
     expect(formatNumber(1234.5, { locale: 'de' })).toBe('1.234,5')
   })
+
+  it('keep the medium date for a locale alone or left undefined, and the plain one for empty options', () => {
+    const date = Date.UTC(2024, 0, 5, 12)
+
+    expect(formatDate(date, { locale: undefined })).toBe('Jan 5, 2024')
+    expect(formatDate(date, { locale: 'fr' })).toBe('5 janv. 2024')
+    expect(formatDate(date, {})).toBe(new Intl.DateTimeFormat('en', {}).format(date))
+    expect(formatRelativeTime(-2, 'day', { locale: 'fr', numeric: 'always' })).toBe('il y a 2 jours')
+  })
 })
