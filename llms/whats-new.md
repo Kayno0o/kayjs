@@ -36,6 +36,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 - A component mounted by `mountComponent` has `type`, `click` and `press` firing a browser's events, and `setProps` giving it new props as a parent would: [Mounting a component](testing.md#mounting-a-component).
 - `site.logs` in `kay/test` lists what the server logged during the test: [Read the log](testing.md#read-the-log).
 - `waitUntil(condition, { timeout, what })` from `kay/test` polls a condition in a server test and fails naming what it waited for: [Testing requests, jobs and sockets](testing-requests-jobs-sockets.md).
+- `memoryJobs()` lists a queue's jobs by when they are due, as `sqliteJobs` and `pgJobs` do: [Queues](queues.md#reference).
 
 The rest of this release is in [What's new, older releases](whats-new-archive.md).
 

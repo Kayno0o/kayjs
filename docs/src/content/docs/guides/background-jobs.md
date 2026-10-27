@@ -239,7 +239,7 @@ To put the sessions, the cached and live values, the jobs, the schedule locks, t
 
 `purge(queue, before)`, `jobs(queue)`, `revive(id, runAt)`, `release(id, until, runAt?)`, `progress(id, until, progress)` and `state(queue, ref, now)` are optional. Without `purge`, old failed jobs are listed and removed one by one. Without `jobs`, `remove` works by id only.
 
-`jobs` and `failed` may take a limit (and `jobs` a `failed` flag) to cut their result in the query: the dev tool and the jobs page ask for 101 jobs of each kind, so a long queue is never read whole, and a store that ignores it is cut after.
+`jobs` and `failed` list the jobs by when they are due, the earliest first, and may take a limit (and `jobs` a `failed` flag) to cut their result in the query: the dev tool and the jobs page ask for 101 jobs of each kind, so a long queue is never read whole, and a store that ignores it is cut after.
 
 `complete`, `retry` and `fail` get the hold the job was claimed with as `until` and change the job only while it is still the job's, so a run that finishes after its hold ended and another process took the job changes nothing. A store that ignores `until` keeps working, without that guard. `remove` and the purge call `complete` without it.
 

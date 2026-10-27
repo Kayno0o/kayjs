@@ -75,7 +75,7 @@ export interface JobStore {
   failed: (queue: string, limit?: number) => Maybe<StoredJob[]>
   // Puts a failed job back to wait, due at `runAt` with its attempts given back, for a retry from the dev tool or a jobs page; resolves with whether it did: false for a job that is not failed, or whose key a live job holds since.
   revive?: ((id: string, runAt: number) => Maybe<boolean>) | undefined
-  // Every job of the queue, waiting or failed, which `remove` looks through for a payload; a store without it removes jobs by id alone. The dev tool and the jobs page pass `failed: false` for the live ones and a `limit`, so a long queue is never read whole.
+  // Every job of the queue, waiting or failed, by when it is due, the earliest first, which `remove` looks through for a payload; a store without it removes jobs by id alone. The dev tool and the jobs page pass `failed: false` for the live ones and a `limit`, so a long queue is never read whole.
   jobs?: ((queue: string, options?: { limit?: number, failed?: boolean }) => Maybe<StoredJob[]>) | undefined
   // When the queue's next job may run, so a worker sleeps until then.
   nextRunAt: (queue: string) => Maybe<number | undefined>
@@ -515,7 +515,7 @@ export function memoryJobs(): JobStore {
       return [...jobs.values()].filter(job => job.queue === queue && job.failed).sort((a, b) => a.runAt - b.runAt).slice(0, limit).map(stored)
     },
     jobs(queue, options) {
-      return [...jobs.values()].filter(job => job.queue === queue && (options?.failed === undefined || (job.failed === true) === options.failed)).slice(0, options?.limit).map(stored)
+      return [...jobs.values()].filter(job => job.queue === queue && (options?.failed === undefined || (job.failed === true) === options.failed)).sort((a, b) => a.runAt - b.runAt).slice(0, options?.limit).map(stored)
     },
     revive(id, runAt) {
       const job = jobs.get(id)

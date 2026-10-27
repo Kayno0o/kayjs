@@ -438,6 +438,23 @@ describe.each(kinds)('job store contract, $name', ({ name, open }) => {
     })
   })
 
+  describe('jobs', () => {
+    it('lists the jobs of the queue by when they are due, live and failed alike, within the limit', async () => {
+      const store = await open()
+
+      for (const runAt of [30, 10, 40]) await store.add(job({ runAt }))
+
+      const failedOne = job({ runAt: 20 })
+
+      await store.add(failedOne)
+      await store.fail(failedOne.id, 'boom')
+      await store.add(job({ queue: 'other', runAt: 0 }))
+      expect((await store.jobs!('q')).map(found => found.runAt)).toEqual([10, 20, 30, 40])
+      expect((await store.jobs!('q', { limit: 2 })).map(found => found.runAt)).toEqual([10, 20])
+      expect((await store.jobs!('q', { failed: false })).map(found => found.runAt)).toEqual([10, 30, 40])
+    })
+  })
+
   describe('purge', () => {
     it('drops the failed jobs of the queue due before the time given and counts them, leaving live, later and other queues\' ones', async () => {
       const store = await open()
