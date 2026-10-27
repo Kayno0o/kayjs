@@ -118,6 +118,7 @@ p {column()}
 ### Calling from an island
 
 - An island imports the action from the page and calls it, as in [Call an action from an island](#call-an-action-from-an-island): `const id = await add({ title })`.
+- An `s.Optional` field takes `undefined` as the field left out, `exactOptionalPropertyTypes` or not: `resize({ file, width: max ?? undefined })`. A wrong field is reported at that field, not against the `FormData` form of the call.
 - Once a call went through, the page shows what it changed, its loads run again as `refresh()` runs them, where the page swap runs: islands whose props did not change keep their state.
 - `add({ title }, { refresh: false })` leaves the page as it is, so a frequent write from an island (a vote, an undo) needs no API route to avoid the refresh; `const save = add.track()` then `await save(input, { refresh: false })` also answers a refusal as a result.
 - `await add.settled()` resolves once no call to `add` is in flight, whichever way they went (a stream counts until it ends; it never rejects), so an island that fired writes without awaiting them waits for them there; `save.settled()` does the same for the calls made through a `track()` handle.

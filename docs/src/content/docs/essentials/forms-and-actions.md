@@ -256,6 +256,8 @@ export const remove = action(s.Object({ id: s.String({ maxLength: 36 }) }), asyn
 
 An island imports the action from the page and calls it from a submit handler, which stops kay's own post.
 
+An optional field takes `undefined` as the field left out, so `resize({ width: max ?? undefined })` needs no spread. A field the schema does not take is reported at that field.
+
 A refused call throws an `ActionError`, and `add.error('title')` shows the message. Its `message` reads the text given to `ctx.fail`, else the schema's messages or the `message` of the data, so `error.message` can go in a notice.
 
 ```kay

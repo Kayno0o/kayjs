@@ -291,9 +291,9 @@ export interface CallOptions {
 
 // An action seen through the calls one island makes, so a row's button reads its own `pending()`.
 export interface TrackedCall<Input, Result> {
-  // Resolves with how the call went, any answer the server gave included; a failure that is no answer, such as a network error, an abort or a redirect, still throws.
-  (...call: object extends Input ? [input?: Input, options?: CallOptions] : [input: Input, options?: CallOptions]): Promise<Result>
   (form: FormData, options?: CallOptions): Promise<Result>
+  // Resolves with how the call went, any answer the server gave included; a failure that is no answer, such as a network error, an abort or a redirect, still throws. Last, as on `Action`, so a wrong field is named.
+  (...call: object extends Input ? [input?: Input, options?: CallOptions] : [input: Input, options?: CallOptions]): Promise<Result>
   // Whether a call made through this handle is still in flight, read reactively.
   readonly pending: () => boolean
   // Resolves once no call made through this handle is in flight, whichever way they went; never rejects.
@@ -302,9 +302,9 @@ export interface TrackedCall<Input, Result> {
 
 // Called from the browser it posts its input and resolves with the handler's result; `form(action={...})` posts to `url`.
 export interface Action<Input, Output, Honeypot extends string = never> {
-  (input: Input, options?: CallOptions): Promise<Answer<Success<Output>>>
-  // A form's fields, read as a plain form post reads them: `add(new FormData(form))`. Last, so `infer` and the editor read the typed input above, while `Parameters<typeof add>` reads this one.
+  // A form's fields, read as a plain form post reads them: `add(new FormData(form))`. First, so a call matching neither is reported against the typed input below, naming its wrong field, and `Parameters<typeof add>` reads that one.
   (form: FormData, options?: CallOptions): Promise<Answer<Success<Output>>>
+  (input: Input, options?: CallOptions): Promise<Answer<Success<Output>>>
   // Whether a call this page made is still in flight, read reactively: `button(disabled={add.pending()})`.
   readonly pending: () => boolean
   // Resolves once no call of this action is in flight, whichever way they went, so an island that did not await its writes can wait for them: `await add.settled()`. A stream counts until it ends. Never rejects.
@@ -333,8 +333,8 @@ export interface Action<Input, Output, Honeypot extends string = never> {
   [HONEYPOT]?: (field: Honeypot) => void
 }
 
-// What a call may send for an input the handler reads: a `Blob` where it reads a `File`, since the server names every posted Blob.
-export type Sendable<Value> = Value extends File ? Blob : Value extends readonly unknown[] ? { [Key in keyof Value]: Sendable<Value[Key]> } : Value extends Record<string, unknown> ? { [Key in keyof Value]: Sendable<Value[Key]> } : Value
+// What a call may send for an input the handler reads: a `Blob` where it reads a `File`, since the server names every posted Blob, and `undefined` on an optional field, which the schema takes as the field left out.
+export type Sendable<Value> = Value extends File ? Blob : Value extends readonly unknown[] ? { [Key in keyof Value]: Sendable<Value[Key]> } : Value extends Record<string, unknown> ? { [Key in keyof Value]: Partial<Pick<Value, Key>> extends Pick<Value, Key> ? Sendable<Value[Key]> | undefined : Sendable<Value[Key]> } : Value
 
 export interface ServerAction<Schema extends TSchema, Output, Honeypot extends string = never> extends Action<Sendable<Static<Schema>>, Output, Honeypot> {
   readonly schema: Schema

@@ -106,3 +106,34 @@ describe('an action\'s serverError message', () => {
     expect([words, plain, number, unknown]).toHaveLength(4)
   })
 })
+
+const convert = action(t.Object({ file: t.File(), quality: t.Integer(), width: t.Optional(t.Integer()), nested: t.Optional(t.Object({ height: t.Optional(t.Integer()) })) }), input => input.quality)
+
+describe('an action call with an optional field', () => {
+  it('takes undefined there, as the field left out, and names a wrong field rather than the FormData overload', () => {
+    const max = 0 as number | null
+    const file = new File(['x'], 'x.png')
+    // Never run: only the types of these calls are under test.
+    const calls = (): unknown[] => [
+      convert({ file, quality: 80, width: max ?? undefined, nested: { height: undefined } }),
+      convert.track()({ file, quality: 80, width: undefined }),
+      convert({
+        file,
+        // @ts-expect-error the wrong field itself is reported, not `file` against FormData
+        width: 'wide',
+        quality: 80,
+      }),
+      convert.track()({
+        file,
+        // @ts-expect-error the wrong field itself is reported, not `file` against FormData
+        width: 'wide',
+        quality: 80,
+      }),
+      // @ts-expect-error a required field still refuses undefined
+      convert({ file, quality: undefined }),
+    ]
+    const input: Parameters<typeof convert>[0] = { file, quality: 80, width: undefined }
+
+    expect([calls, input]).toHaveLength(2)
+  })
+})
