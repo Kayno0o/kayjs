@@ -63,7 +63,7 @@ describe('MapView', () => {
     globalThis.matchMedia = ((query: string) => {
       queries.push(query)
 
-      return { matches: true, media: query }
+      return { matches: true, media: query, addEventListener: () => undefined, removeEventListener: () => undefined }
     }) as unknown as typeof matchMedia
 
     try {

@@ -435,6 +435,22 @@ const column = elementSize()
 
 <ReadMore href="/llms/islands-state-to-ids#element-size">Keeping the element too, and what the values are before the first measure.</ReadMore>
 
+## Following a media query
+
+`mediaQuery` from `kay` gives whether a CSS media query matches, as a value that changes when the visitor's setting does. `reducedMotion()` is the shorthand for `prefers-reduced-motion: reduce`, so an island that animates stops when the visitor asks for less motion, even while the page is open.
+
+```kay
+---
+import { reducedMotion } from 'kay'
+
+const still = reducedMotion()
+---
+if still()
+  p No animation
+```
+
+The server renders the fallback, `false` unless you pass another, as in `mediaQuery('(max-width: 40rem)', true)`. The island starts from it too and takes the browser's answer once mounted.
+
 ## A page kay does not serve
 
 A page bundled by something else, such as an HTML file `Bun.serve` imports, can render `.kay` components too. List `"kay/bun"` under `[serve.static] plugins` in `bunfig.toml`, or pass `kay({ root })` from `kay/bun` to `Bun.build`. Then render one with `mount` from `kay/mount`, which returns a function that removes it.

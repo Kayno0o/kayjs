@@ -1,7 +1,7 @@
 ---
 import type { JSX } from 'kay'
 import type { LeafletApi, LeafletGroup, LeafletLayer, LeafletView, MapMarker, MapPoint } from './map-view'
-import { effect, onCleanup, onMount, recipe, signal } from 'kay'
+import { effect, onCleanup, onMount, recipe, reducedMotion, signal } from 'kay'
 import { drawnPoints, OSM_ATTRIBUTION, OSM_TILES, validPoint } from './map-view'
 
 const look = recipe({
@@ -44,8 +44,7 @@ const names = () => markers.flatMap(marker => marker.label || marker.popup ? [[m
 // Leaflet writes a string into the page as HTML, so text goes in as an element holding it as text.
 const textNode = (leaflet: LeafletApi, text: string) => Object.assign(leaflet.DomUtil.create('div'), { textContent: text })
 
-const stillQuery = '(prefers-reduced-motion: reduce)'
-const still = () => typeof matchMedia === 'function' && matchMedia(stillQuery).matches
+const still = reducedMotion()
 
 // The map once Leaflet has loaded, which the effects below draw on.
 const drawing = signal<{ view: LeafletView, base: LeafletGroup, picked: LeafletGroup, leaflet: LeafletApi } | null>(null)

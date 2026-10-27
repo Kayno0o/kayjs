@@ -1,6 +1,6 @@
 ---
 import type { JSX, Snippet } from 'kay'
-import { effect, onCleanup, onMount, recipe, signal, untrack } from 'kay'
+import { effect, mediaQuery, onMount, recipe, signal, untrack } from 'kay'
 import IconButton from './icon-button.kay'
 import { wording } from 'kay/words'
 
@@ -35,19 +35,10 @@ const { list, detail, listHead, detailHead, sidebar, sidebarTitle = '', detailOp
 }>()
 
 const listWidth = signal(WIDTH.default)
-const narrow = signal(false)
+const narrow = mediaQuery(NARROW)
 let sidebarPane: HTMLElement | undefined
 let detailPane: HTMLElement | undefined
 let listPane: HTMLElement | undefined
-
-effect(() => {
-  const query = matchMedia(NARROW)
-  const change = (event: MediaQueryListEvent) => narrow = event.matches
-
-  narrow = query.matches
-  query.addEventListener('change', change)
-  onCleanup(() => query.removeEventListener('change', change))
-})
 
 // Below `md` a pane that opens takes focus on its first control, and the control that opened it gets focus back when it closes; the first render and a wide layout leave focus alone.
 function followFocus(open: () => boolean, pane: () => HTMLElement | undefined) {

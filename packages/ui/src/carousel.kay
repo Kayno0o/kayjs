@@ -1,6 +1,6 @@
 ---
 import type { Duration, JSX } from 'kay'
-import { durationMs, effect, every, onCleanup, recipe, signal } from 'kay'
+import { durationMs, effect, every, onCleanup, recipe, reducedMotion, signal } from 'kay'
 import IconButton from './icon-button.kay'
 import { startRef } from './form-reset'
 import { stepIndex } from './cycle'
@@ -72,8 +72,10 @@ effect(() => {
 if (autoplay !== undefined)
   durationMs(autoplay)
 
+const still = reducedMotion()
+
 if (autoplay)
-  every(autoplay, () => step(1), { while: () => !paused() && !pointed() && !focused() && !offscreen() && !matchMedia('(prefers-reduced-motion: reduce)').matches })
+  every(autoplay, () => step(1), { while: () => !paused() && !pointed() && !focused() && !offscreen() && !still() })
 
 const active = () => stepIndex(shown(), 0, slides.length)
 

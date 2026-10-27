@@ -171,6 +171,22 @@ const column = elementSize()
   svg(width={column.width()} height={column.height()})
 ```
 
+### Follow a media query
+
+`mediaQuery('(max-width: 40rem)')` from `kay` is a value that follows the query while the island lives, and `reducedMotion()` is the shorthand for `prefers-reduced-motion: reduce`:
+
+```kay
+---
+import { reducedMotion } from 'kay'
+
+const still = reducedMotion()
+---
+if still()
+  p No animation
+```
+
+The server and the island's first render read the fallback, `false` unless given as the second argument, `mediaQuery(query, true)`, or the only one, `reducedMotion(true)`; the browser's answer replaces it once mounted, so hydrating changes nothing, and a change while the page is open reaches the island.
+
 ## Reference
 
 ### Islands

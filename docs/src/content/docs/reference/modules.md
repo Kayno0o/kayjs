@@ -31,6 +31,7 @@ In a `.ts` file nothing is added. `kay/server` also exports `s`, so a server mod
 | `persisted`, `queryParam`, `linked`, `selection`, `context` | Signal helpers: stored, one query param of the page read by its schema, derived from a source, one selected key, shared down a tree |
 | `followLog` | Keeps a scrolling list at its bottom while the reader is there. See [Islands](/essentials/islands#following-a-log) |
 | `elementSize` | An element's width and height as reactive values, observed while an island lives. See [Islands](/essentials/islands#reading-an-elements-size) |
+| `mediaQuery`, `reducedMotion` | Whether a media query, or reduced motion, matches, following a change while an island lives. See [Islands](/essentials/islands#following-a-media-query) |
 | `s` | The schema builder for actions, config and content (`s.Object`, `s.String`, ...) |
 | `Static`, `InputOf` | Types: what a schema describes, and an action's input. See [Forms and actions](/essentials/forms-and-actions#one-schema-for-the-server-and-the-browser) |
 | `action` | A form post or island call checked by a schema. See [Forms and actions](/essentials/forms-and-actions) |

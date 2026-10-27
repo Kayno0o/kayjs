@@ -140,11 +140,37 @@ test('stops for good from its pause button, which a carousel without autoplay le
   expect((await carousel()).section.querySelector('[data-part="pause"]')).toBeNull()
 })
 
-test('never turns on its own for a visitor asking for reduced motion', async () => {
-  // eslint-disable-next-line ts/unbound-method -- called back on the window below, and put back as it was
+// A `matchMedia` that answers the reduced motion query as `reduced` says, until `ask` changes it and tells whoever listens.
+function askingReducedMotion(reduced: boolean) {
+  // eslint-disable-next-line ts/unbound-method -- put back as it was
   const media = window.matchMedia
+  const listeners = new Set<(event: { matches: boolean }) => void>()
+  let matches = reduced
 
-  window.matchMedia = (query: string) => ({ ...media.call(window, query), matches: query.includes('reduce') })
+  window.matchMedia = ((query: string) => ({
+    get matches() {
+      return query.includes('reduce') && matches
+    },
+    media: query,
+    addEventListener: (_type: string, listener: (event: { matches: boolean }) => void) => listeners.add(listener),
+    removeEventListener: (_type: string, listener: (event: { matches: boolean }) => void) => listeners.delete(listener),
+  })) as unknown as typeof window.matchMedia
+
+  return {
+    ask(next: boolean) {
+      matches = next
+
+      for (const listener of listeners)
+        listener({ matches })
+    },
+    restore() {
+      window.matchMedia = media
+    },
+  }
+}
+
+test('never turns on its own for a visitor asking for reduced motion', async () => {
+  const motion = askingReducedMotion(true)
 
   try {
     await carousel(AUTOPLAY)
@@ -153,7 +179,31 @@ test('never turns on its own for a visitor asking for reduced motion', async () 
     expect(turns).toEqual([])
   }
   finally {
-    window.matchMedia = media
+    motion.restore()
+  }
+})
+
+test('stops turning when the visitor asks for reduced motion while it is open, and turns again when they stop', async () => {
+  const motion = askingReducedMotion(false)
+
+  try {
+    await carousel(AUTOPLAY)
+    await clock.elapse(TWO_TURNS_MS)
+    expect(turns.length).toBeGreaterThan(0)
+
+    motion.ask(true)
+    await clock.settle()
+    turns.length = 0
+    await clock.elapse(TWO_TURNS_MS)
+    expect(turns).toEqual([])
+
+    motion.ask(false)
+    await clock.settle()
+    await clock.elapse(TWO_TURNS_MS)
+    expect(turns.length).toBeGreaterThan(0)
+  }
+  finally {
+    motion.restore()
   }
 })
 

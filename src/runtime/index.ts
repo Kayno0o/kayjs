@@ -30,6 +30,7 @@ export type { Local, LocalConflict, LocalIssue, LocalOptions, LocalStatus } from
 export { local } from './local'
 export type { Log } from './log'
 export { logFrom } from './log'
+export { mediaQuery, reducedMotion } from './media-query'
 export type { NavigateOptions, QueryChanges } from './navigate-api'
 export { navigate, refresh } from './navigate-api'
 export type { PersistStorage } from './persist'
