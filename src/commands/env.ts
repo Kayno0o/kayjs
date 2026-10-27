@@ -7,7 +7,7 @@ import { join, relative, resolve } from 'node:path'
 import { loadConfig } from '../config'
 import { projectPaths } from '../project'
 import { describeEnv } from '../server/env'
-import { buildingWithoutEnv, listingEnv } from '../server/env-state'
+import { buildingWithoutEnv, fileFormOf, listingEnv } from '../server/env-state'
 import { registerLoader } from '../server/loader'
 import { formatOption, printDocument, printedProblems, printFailure, printProblems, projectRoot, withStdoutOnStderr } from './command'
 import { compareEnv, defaultEnvFiles, withDeclaredVariables } from './env-compare'
@@ -182,5 +182,9 @@ function formatListing(variables: Listed[]): string {
   const rows = variables.map(variable => [variable.name, variable.source, `${variable.type}${variable.secret === true ? ' (secret)' : ''}${variable.public === true ? ' (public)' : ''}`, variable.required === false ? 'optional' : variable.required, variable.default === undefined ? '' : JSON.stringify(variable.default), variable.description === undefined ? '' : `# ${variable.description}`])
   const widths = [0, 1, 2, 3, 4].map(column => Math.max(...rows.map(row => row[column]!.length)))
 
-  return rows.map(row => row.map((cell, column) => column === 5 ? cell : cell.padEnd(widths[column]!)).join('  ').trimEnd()).join('\n')
+  const names = new Set(variables.map(({ name }) => name))
+  const filed = variables.some(variable => variable.source !== 'kay' && fileFormOf(variable.name, variable.type, variable.public, names) !== undefined)
+  const table = rows.map(row => row.map((cell, column) => column === 5 ? cell : cell.padEnd(widths[column]!)).join('  ').trimEnd()).join('\n')
+
+  return filed ? `${table}\n\nA string variable above also reads <NAME>_FILE, the path of a file holding its value.` : table
 }

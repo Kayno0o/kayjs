@@ -3,6 +3,7 @@ import type { Listed } from './env'
 import { dirname, join, relative, resolve } from 'node:path'
 import { loadConfig } from '../config'
 import { CONTENT_CONFIG } from '../project'
+import { fileFormOf } from '../server/env-state'
 
 // The files `kay env` compares the declared variables with: a compose file or several, and the example env file.
 export interface EnvFiles {
@@ -297,6 +298,9 @@ export async function compareEnv(root: string, variables: Listed[], files: EnvFi
   const composes = (files.compose === undefined ? [] : [files.compose].flat()).map(path => resolve(root, path))
   const examplePath = files.example === undefined ? undefined : resolve(root, files.example)
   const declared = new Set(variables.map(variable => variable.name))
+  // A string variable also reads `<NAME>_FILE`, which counts as declared, and as setting the variable.
+  const fileNames = new Set(variables.flatMap(variable => fileFormOf(variable.name, variable.type, variable.public, declared) ?? []))
+  const fileOf = (variable: Listed) => fileFormOf(variable.name, variable.type, variable.public, declared)
   const set = new Map<string, Assignment>()
   const interpolated = new Set<string>()
   let composeRead = false
@@ -325,7 +329,7 @@ export async function compareEnv(root: string, variables: Listed[], files: EnvFi
     const composeNames = composes.map(file => relative(root, file)).join(' or ')
 
     for (const variable of variables.filter(({ required, source }) => required !== false && source !== 'kay')) {
-      if (!set.has(variable.name))
+      if (!set.has(variable.name) && !set.has(fileOf(variable) ?? ''))
         problems.push(diagnostic('error', composes[0]!, 1, `${variable.name} is required in production (${variable.source}) and no service of ${composeNames} sets it`))
     }
 
@@ -349,19 +353,19 @@ export async function compareEnv(root: string, variables: Listed[], files: EnvFi
       const listed = new Set(example.map(({ name }) => name))
 
       for (const { name, line } of example) {
-        if (complete && !declared.has(name) && !set.has(name) && !interpolated.has(name))
+        if (complete && !declared.has(name) && !fileNames.has(name) && !set.has(name) && !interpolated.has(name))
           problems.push(diagnostic('error', examplePath, line, `${name} is in ${relative(root, examplePath)} and no schema declares it${composeRead ? ', no compose service sets it and none interpolates it' : ''}`))
       }
 
       for (const variable of variables.filter(({ required, source }) => required !== false && source !== 'kay')) {
-        if (!listed.has(variable.name) && set.get(variable.name)?.literal !== true)
+        if (!listed.has(variable.name) && set.get(variable.name)?.literal !== true && !listed.has(fileOf(variable) ?? '') && set.get(fileOf(variable) ?? '')?.literal !== true)
           problems.push(diagnostic('error', examplePath, 1, `${variable.name} is required in production (${variable.source}) and ${relative(root, examplePath)} does not list it`))
       }
     }
   }
 
   for (const { name, file, line } of complete ? await rawReads(root) : []) {
-    if (!declared.has(name) && !IGNORED_READS.has(name))
+    if (!declared.has(name) && !fileNames.has(name) && !IGNORED_READS.has(name))
       problems.push(diagnostic('warning', file, line, `process.env.${name} is read with no schema declaring it: declare it with defineEnv so kay env lists it, or write // kay-env: raw in a file that must read the environment itself`))
   }
 
@@ -385,7 +389,8 @@ const TRAILING_BREAKS = /\n*$/
 // `text` with every declared variable it does not mention appended, a required one as `NAME=`, an optional one commented out beside its default. What the file already holds is kept as it is.
 export function withDeclaredVariables(text: string, variables: Listed[]): { text: string, added: string[] } {
   const mentioned = new Set([...text.matchAll(/^\s*(?:#\s*)?(?:export\s+)?([a-z_]\w*)\s*=/gim)].map(match => match[1]!))
-  const added = variables.filter(({ name }) => !mentioned.has(name))
+  const names = new Set(variables.map(({ name }) => name))
+  const added = variables.filter(variable => !mentioned.has(variable.name) && !mentioned.has(fileFormOf(variable.name, variable.type, variable.public, names) ?? ''))
   const blocks = added.map((variable) => {
     const needed = variable.required === 'production' ? 'required in production' : 'required'
     const note = [variable.description, variable.required === false ? undefined : needed].filter(part => part !== undefined)

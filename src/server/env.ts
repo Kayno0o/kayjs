@@ -1,6 +1,7 @@
 import type { Elysia, Static, TSchema } from 'elysia'
 import type { PublicFieldsOf, WithPublicFields } from '../runtime/env'
 import type { EnvSchemaRecord } from './env-state'
+import { readFileSync } from 'node:fs'
 import process from 'node:process'
 import { t } from 'elysia'
 import { KayError } from '../compiler/errors'
@@ -8,7 +9,7 @@ import { PUBLIC_ENV } from '../runtime/env'
 import { bundled } from './bundle'
 import { fixedReply } from './compress'
 import { devSecret } from './dev-secret'
-import { building, callerFile, loading, PUBLIC_ENV_PATH, recordEnv } from './env-state'
+import { building, callerFile, fileFormOf, loading, PUBLIC_ENV_PATH, recordEnv } from './env-state'
 import { readFields } from './query'
 import { compiledCheck } from './schema-check'
 
@@ -42,9 +43,27 @@ function loadSamples(length: number, pattern: unknown): string[] {
 // A `s.Object` of the variables, each read on its own.
 export type EnvSchema = TSchema & { properties: Record<string, TSchema> }
 
+// The text of the file `<NAME>_FILE` names, trimmed and read once, as the server boots; a file that cannot be read or holds nothing is an error naming the variable and the path, never the content.
+function readSecretFile(name: string, file: string, path: string): string {
+  let content: string
+
+  try {
+    content = readFileSync(path, 'utf8').trim()
+  }
+  catch (error) {
+    throw new KayError('env-invalid', `kay: ${file} ${path} cannot be read (${(error as NodeJS.ErrnoException).code ?? 'error'}), and ${name} takes its value from it`)
+  }
+
+  if (content === '')
+    throw new KayError('env-invalid', `kay: ${file} ${path} is empty, and ${name} takes its value from it`)
+
+  return content
+}
+
 // The environment read once against `schema`, as the server boots: numbers and booleans from their text, defaults filled in, and every variable missing or refused named in the error that stops it.
 // Holds the declared names only, so logging it never shows the rest of the environment.
 // A field marked `s.Public` reaches islands as `publicEnv` from `kay`, with no config key; a name such as `STRIPE_SECRET` or `DATABASE_URL` is refused.
+// A string field, `s.Public` ones apart, also reads `<NAME>_FILE`, the path of a file holding the value, trimmed and read once, as a compose secret hands it; both set, or a file that cannot be read or is empty, stops the boot naming them.
 // A field with `requiredInProduction: true` is required in production with its default dropped, and outside production takes its default, stays `undefined` under `s.Optional`, or is `''` when it has neither; `s.Secret()` is one that development and tests give a value derived from the project path; `kay env` lists each as required in production.
 export function defineEnv<Schema extends EnvSchema>(declared: Schema, source: Record<string, string | undefined> = process.env): Static<Schema> & (keyof PublicFieldsOf<Schema> extends never ? unknown : WithPublicFields<Schema>) {
   recordEnv(declared, defineEnv)
@@ -52,8 +71,33 @@ export function defineEnv<Schema extends EnvSchema>(declared: Schema, source: Re
   const production = source.NODE_ENV === 'production'
   const input: Record<string, string> = {}
 
-  for (const name of Object.keys(declared.properties)) {
+  const names = Object.keys(declared.properties)
+
+  for (const name of names) {
     const value = source[name]
+    const file = fileFormOf(name, (declared.properties[name] as { type?: unknown }).type, (declared.properties[name] as { public?: unknown }).public, names)
+    const path = file === undefined ? undefined : source[file]
+
+    if (file !== undefined && path !== undefined && path !== '') {
+      if (value !== undefined && value !== '')
+        throw new KayError('env-invalid', `kay: ${name} and ${file} are both set; set one, the value or the path of the file holding it`)
+
+      // A build runs without the server's secrets, so a file it cannot read leaves the variable unset, as a missing variable is.
+      if (!building()) {
+        input[name] = readSecretFile(name, file, path)
+
+        continue
+      }
+
+      try {
+        input[name] = readSecretFile(name, file, path)
+      }
+      catch {
+        // Left unset, for the schema to judge as it does a missing variable.
+      }
+
+      continue
+    }
 
     // An empty variable is how a `.env` file says it is not set, so the default or `s.Optional` applies rather than `''` failing the schema; nothing tells `KEY=` from `KEY=""` by the time it is read.
     if (value !== undefined && value !== '')
