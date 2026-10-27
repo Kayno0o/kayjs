@@ -223,3 +223,47 @@ describe('turning the second factor off', () => {
     expect(await visitor.call('verifyTwoFactor', fresh.recoveryCodes[0]!)).toMatchObject({ ok: true })
   })
 })
+
+describe('enrolling for a test', () => {
+  async function enrolledByTest() {
+    const app = testApp({ name: 'Site' })
+    const made = await app.auth.createUser({ email: 'ada@example.com', password: PASSWORD, emailVerified: true })
+
+    if (!made.ok)
+      throw new Error(JSON.stringify(made.errors))
+
+    return { ...app, user: made.user, enrolment: await app.auth.enrollTotp(made.user.id) }
+  }
+
+  test('turns two-factor on as the app would, so a password sign-in asks for the code, which signs in', async () => {
+    const { browser, store, user, enrolment } = await enrolledByTest()
+    const visitor = browser()
+
+    expect((await store.users.get(user.id))!.totpEnabledAt).not.toBeNull()
+    expect(await visitor.post('/password', { identifier: 'ada@example.com', password: PASSWORD })).toMatchObject({ redirect: '/two-factor' })
+    expect(await visitor.call('verifyTwoFactor', await enrolment.code())).toMatchObject({ ok: true })
+    expect(await visitor.json('/me')).toMatchObject({ email: 'ada@example.com' })
+  })
+
+  test('hands recovery codes that sign in once, and a code for the next step', async () => {
+    const { browser, enrolment } = await enrolledByTest()
+
+    expect(enrolment.recoveryCodes).toHaveLength(10)
+
+    const first = browser()
+    const second = browser()
+
+    await first.post('/password', { identifier: 'ada@example.com', password: PASSWORD })
+    await second.post('/password', { identifier: 'ada@example.com', password: PASSWORD })
+    expect(await first.call('verifyTwoFactor', enrolment.recoveryCodes[0]!)).toMatchObject({ ok: true })
+    expect(await second.call('verifyTwoFactor', enrolment.recoveryCodes[0]!)).toEqual({ ok: false, error: 'invalid' })
+    expect(await second.call('verifyTwoFactor', await enrolment.code(1))).toMatchObject({ ok: true })
+  })
+
+  test('refuses a missing member and one who already has two-factor', async () => {
+    const { auth, user } = await enrolledByTest()
+
+    await expect(auth.enrollTotp('nobody')).rejects.toThrow('no member')
+    await expect(auth.enrollTotp(user.id)).rejects.toThrow('already')
+  })
+})

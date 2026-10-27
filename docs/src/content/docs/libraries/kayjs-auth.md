@@ -814,6 +814,8 @@ To sign a test site in as a member, `await auth.signInAs(site, { email: 'ada@exa
 
 `auth.test(site)` names the site once: `const as = auth.test(site)`, then `as.signInAs({ email })`, `as.signOut()` and `as.sessionCookie(userId)`. With `auth()` alone and no `src/auth.ts` module, `authTest(site)` from `@kaynooo/kayjs-auth/test` makes the same calls on the auth `testSite()` built.
 
+To test two-factor, `await auth.enrollTotp(user.id)` (or `as.enrollTotp(user.id)`) turns it on for a member as the app would once they confirm a code, with no session or mail. It gives `{ secret, code(offset?), recoveryCodes }`: `await enrolment.code()` is the code of the current step, and each recovery code signs in once. It throws for a missing member or one who has two-factor already.
+
 An existing member whose email, username, roles or data differ from the ones you give, or who lacks a role you give, makes `signInAs` throw, so a test never runs as someone other than the member it named.
 
 ```ts

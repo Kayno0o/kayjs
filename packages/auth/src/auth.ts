@@ -27,7 +27,7 @@ import type { UserSession } from './sessions'
 import type { SignInOptions } from './signInOptions'
 import type { RequestState } from './state'
 import type { AuthStore, SessionRecord, UserRecord } from './store'
-import type { TwoFactorResult, TwoFactorSetup } from './twoFactor'
+import type { TotpEnrolment, TwoFactorResult, TwoFactorSetup } from './twoFactor'
 import type { Level, PolicyContext, Predicate, Requirement } from './types'
 import { Elysia } from 'elysia'
 import { configError, nameUser, overHttps, READ_METHODS, requestOfContext, stoppers, underKayDev } from 'kay/library'
@@ -1381,6 +1381,11 @@ export function createAuth<Data extends AuthSessionData, Role extends string = s
       return (await import('./testing')).signInAs(core, plugin as unknown as Elysia, site, who)
     },
 
+    // Turns two-factor on for a member as confirming a code would, for a test: it answers the authenticator's `secret`, `code(offset?)` for the current step and the `recoveryCodes`, all usable at the next sign-in. Throws for a missing member or one who has it already.
+    async enrollTotp(userId: string): Promise<TotpEnrolment> {
+      return (await load.twoFactor()).enrollTotp(core, userId)
+    },
+
     // Signs a test site out, however it was signed in, by dropping its session cookie: the site is anonymous again, its other cookies kept.
     signOut(site: { cookies: Bun.CookieMap }): void {
       dropSession(site.cookies)
@@ -1475,6 +1480,7 @@ export function createAuth<Data extends AuthSessionData, Role extends string = s
       signInAs: async (who: Parameters<typeof instance.signInAs>[1]) => instance.signInAs(site, who),
       signOut: () => instance.signOut(site),
       sessionCookie: async (userId: string, cookieOptions?: { secure?: boolean }) => instance.sessionCookie(userId, cookieOptions),
+      enrollTotp: async (userId: string) => instance.enrollTotp(userId),
     }),
   })
 }

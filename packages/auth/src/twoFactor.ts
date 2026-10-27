@@ -10,7 +10,7 @@ import { spend } from './limits'
 import { notify } from './notify'
 import { reprove } from './proof'
 import { endOtherSessions } from './sessions'
-import { generateTotpSecret, otpauthUri, verifyTotp } from './totp'
+import { generateTotpSecret, otpauthUri, totpCode, totpStep, verifyTotp } from './totp'
 
 const RECOVERY_CODE_COUNT = 10
 // No 0, o, 1 or l, since these get copied by hand.
@@ -104,6 +104,30 @@ export async function enableTwoFactor(state: RequestState, code: string): Promis
     await notify(state, updated, 'two-factor-enabled')
 
   return { ok: true, recoveryCodes: await issueRecoveryCodes(state.core, record.id) }
+}
+
+// What `enrollTotp` hands a test: the authenticator's secret, a code for the current step (or one `offset` steps on), and the recovery codes.
+export interface TotpEnrolment {
+  secret: string
+  code: (offset?: number) => Promise<string>
+  recoveryCodes: string[]
+}
+
+// Turns two-factor on for a member as the app would once they confirm a code, with no session, proof or mail, for a test; the code of the current step stays unspent, so it signs in.
+export async function enrollTotp(core: Core, userId: string): Promise<TotpEnrolment> {
+  const record = await core.store.users.get(userId)
+
+  if (!record)
+    throw new Error(`kayjs-auth: enrollTotp found no member with id ${userId}`)
+
+  if (record.totpEnabledAt !== null)
+    throw new Error('kayjs-auth: enrollTotp found a member who already has two-factor')
+
+  const secret = generateTotpSecret()
+
+  await core.store.users.update(userId, { totpSecret: core.keys.encrypt(secret, totpContext(userId)), totpEnabledAt: new Date(), totpLastStep: 0 })
+
+  return { secret, code: async (offset = 0) => totpCode(secret, totpStep() + offset), recoveryCodes: await issueRecoveryCodes(core, userId) }
 }
 
 export async function disableTwoFactor(state: RequestState, proof: Proof): Promise<{ ok: true } | { ok: false, error: ProofFailure }> {

@@ -1,5 +1,6 @@
 import type { BareUser } from './core'
 import type { CreateUserInput } from './password'
+import type { TotpEnrolment } from './twoFactor'
 import { builtOwn } from './own'
 
 interface Site { cookies: Bun.CookieMap }
@@ -12,6 +13,8 @@ export interface AuthTest {
   signOut: () => void
   // The `Cookie` header of a new session signed in as that user.
   sessionCookie: (userId: string, options?: { secure?: boolean }) => Promise<string>
+  // Turns two-factor on for that member as the app would, so a password sign-in asks for a code: the authenticator's `secret`, `code(offset?)` for the current step and the `recoveryCodes`, all usable at the next sign-in. Throws for a missing member or one who has it already.
+  enrollTotp: (userId: string) => Promise<TotpEnrolment>
 }
 
 export interface OwnTest {
@@ -33,5 +36,6 @@ export function authTest(site: Site): AuthTest {
     signInAs: async who => made().signInAs(who),
     signOut: () => made().signOut(),
     sessionCookie: async (userId, options) => made().sessionCookie(userId, options),
+    enrollTotp: async userId => made().enrollTotp(userId),
   }
 }

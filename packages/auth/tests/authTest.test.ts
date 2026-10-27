@@ -23,6 +23,20 @@ it('signs a site in through the auth() built with no module', async () => {
   expect(site.cookies.size).toBe(0)
 })
 
+it('enrols a member in two-factor through the auth() built with no module', async () => {
+  const site = { cookies: new Bun.CookieMap() }
+
+  await buildOwn({}, { root: process.cwd(), extensions: [], modules: {}, testCookies: site.cookies })
+
+  const user = await authTest(site).signInAs({ email: 'ada@example.com', username: 'Ada' })
+  const enrolment = await authTest(site).enrollTotp(user.id)
+
+  expect(enrolment.secret).toMatch(/^[2-7A-Z]+$/)
+  expect(await enrolment.code()).toMatch(/^\d{6}$/)
+  expect(enrolment.recoveryCodes).toHaveLength(10)
+  await expect(authTest(site).enrollTotp(user.id)).rejects.toThrow('already')
+})
+
 it('signs each site in through its own auth, whichever was built last', async () => {
   const first = { cookies: new Bun.CookieMap() }
   const second = { cookies: new Bun.CookieMap() }

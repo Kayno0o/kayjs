@@ -45,7 +45,9 @@ expect((await site.visit('/auth/account')).url).toBe('/auth/sign-in?redirect=%2F
 
 `signInAs` makes the member when no user has that email or username (`createUser`'s fields: `email`, `username`, `password`, `roles`, `emailVerified`, `locale`, and `data` for the fields of the app's `user` schema), signs an existing one in as they are (it throws when the email, username or data given differ from theirs, or a role given is one they lack), sets the session cookie in the site's cookie jar and returns the user. A second call switches member and `signOut()` makes the site anonymous again, its other cookies kept. It goes through the store, so it works on `pgStore` as on `memoryAuthStore`.
 
-An app with a `src/auth.ts` module calls the same on its `auth` with the site first: `await auth.signInAs(site, { email })`, `auth.signOut(site)`, `await auth.sessionCookie(userId)`; `auth.test(site)` names the site once, as `authTest` does.
+`await as.enrollTotp(user.id)` turns two-factor on for a member as the app would, so a password sign-in asks for a code: it answers `{ secret, code(offset?), recoveryCodes }`, the code of the current step and the recovery codes usable at the next sign-in. It throws for a missing member or one who has two-factor already, so a test never writes the user row's `totpEnabledAt`.
+
+An app with a `src/auth.ts` module calls the same on its `auth` with the site first: `await auth.signInAs(site, { email })`, `auth.signOut(site)`, `await auth.sessionCookie(userId)`, `await auth.enrollTotp(userId)`; `auth.test(site)` names the site once, as `authTest` does.
 
 ## Reference
 
