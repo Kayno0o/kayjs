@@ -183,6 +183,25 @@ describe('resuming a reply by the header a Chat sends', () => {
     expect(model.state.asked).toBe(1)
   })
 
+  it('hands over the steps of the kept reply, and none to another visitor', async () => {
+    const model = gated()
+    const first = await answering({ provider: model.provider, outlive: true }, { 'x-kai-reply': `start:${id}` }, { visitor: 'ann' })
+
+    await readers(first.reply)
+    first.leave()
+    model.release()
+
+    const steps = await first.reply.steps
+    const own = await answering({ provider: model.provider, outlive: true }, { 'x-kai-reply': `resume:${id}` }, { visitor: 'ann' })
+    const other = await answering({ provider: model.provider, outlive: true }, { 'x-kai-reply': `resume:${id}` }, { visitor: 'bob' })
+
+    expect(steps).toHaveLength(1)
+    expect(steps[0]?.finish).toBe('stop')
+    expect(await own.reply.steps).toEqual(steps)
+    expect(await other.reply.steps).toEqual([])
+    expect(model.state.asked).toBe(1)
+  })
+
   it('ends the reply on a stop, and a later resume finds what came', async () => {
     const model = gated()
     const first = await answering({ provider: model.provider, outlive: true }, { 'x-kai-reply': `start:${id}` })

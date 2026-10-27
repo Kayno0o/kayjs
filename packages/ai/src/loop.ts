@@ -335,17 +335,20 @@ export async function* converse(provider: Provider, base: ProviderRequest, offer
       else
         ran = await run(tools, use, parsed.input, request, confirm, tickets, signal)
 
-      // A visitor who left while the action ran gets no further call and no further request.
-      if (signal.aborted)
-        return
-
-      results.push({ id: use.id, content: ran.result, ok: ran.status !== 'failed' })
-
       const done: ToolCall = { ...call, ...ran, ms: Math.round(performance.now() - ranFrom) }
 
       made.push(done)
 
       yield { tool: done }
+
+      // A visitor who left while the action ran gets no further call and no further request, and the step ends on the calls that ran.
+      if (signal.aborted) {
+        yield { step: stepped(made) }
+
+        return
+      }
+
+      results.push({ id: use.id, content: ran.result, ok: ran.status !== 'failed' })
     }
 
     yield { step: stepped(made) }

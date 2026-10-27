@@ -1,3 +1,4 @@
+import type { Piece, Provider } from '../src'
 import { afterEach, describe, expect, it } from 'bun:test'
 import { s } from 'kay'
 import { ask, fakeAi, tool } from '../src'
@@ -54,6 +55,64 @@ describe('reply.steps', () => {
 
     expect(await reply.finish).toBe('steps')
     expect(steps.map(step => step.calls.length)).toEqual([1, 0])
+  })
+
+  it('lists the request a reply was stopped after, with the calls that ran before the stop', async () => {
+    const started = Promise.withResolvers<void>()
+    const release = Promise.withResolvers<void>()
+    const gated = tool({
+      name: 'gated',
+      description: 'Waits for the test',
+      input: s.Object({}),
+      run: async () => {
+        started.resolve()
+        await release.promise
+
+        return 'done'
+      },
+    })
+
+    fakeAi.reply({ calls: [{ name: 'gated' }, { name: 'gated' }] })
+    fakeAi.reply('never')
+
+    const reply = ask('go', { tools: [gated] })
+    const steps = reply.steps
+
+    await started.promise
+    reply.stop()
+    release.resolve()
+
+    const [step, ...rest] = await steps
+
+    expect(rest).toEqual([])
+    expect(step?.calls.map(call => [call.name, call.status])).toEqual([['gated', 'done']])
+    expect(await reply.calls).toEqual(step!.calls)
+    expect(fakeAi.asked).toHaveLength(1)
+  })
+
+  it('estimates the tokens of each tool-loop request a provider gave no counts for', async () => {
+    let asked = 0
+    const silent: Provider = {
+      name: 'silent',
+      model: 'm',
+      async* stream(): AsyncGenerator<Piece> {
+        asked++
+
+        if (asked === 1)
+          yield { toolUse: { id: 'a', name: 'slow', arguments: '{}' } }
+        else
+          yield { text: 'x'.repeat(40) }
+      },
+    }
+
+    const reply = ask('y'.repeat(400), { tools: [slow], provider: silent })
+    const steps = await reply.steps
+
+    expect(steps.map(step => step.usage?.outputTokens)).toEqual([Math.ceil(('slow'.length + 2) / 4), 10])
+    // The second request sends the first again, with its call and result.
+    expect(steps[1]!.usage!.inputTokens).toBeGreaterThan(steps[0]!.usage!.inputTokens)
+    expect(steps[0]!.usage!.inputTokens).toBeGreaterThanOrEqual(100)
+    expect(await reply.usage).toMatchObject({ inputTokens: steps[0]!.usage!.inputTokens + steps[1]!.usage!.inputTokens, outputTokens: 12 })
   })
 
   it('never rejects when the reply fails, and lists no request that did not end', async () => {
