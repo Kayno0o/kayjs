@@ -4,7 +4,7 @@ import type { ClientBuilder } from '../client'
 import type { DevPorts, Phase } from './ports'
 import type { Reporter } from './report'
 import { CONFIG_FILE } from '../../config'
-import { MAX_CHANGED_FILES, tell } from './servers'
+import { MAX_CHANGED_FILES, tell } from './ports'
 
 // The client build beside the servers, by a process kept from one change to the next: started once a server asks for the client, and again once a file it loaded changes or it is gone.
 export class ClientController {
@@ -92,7 +92,7 @@ export class ClientController {
       this.sayExit()
   }
 
-  async stop(): Promise<void> {
+  stop(): Promise<void> | undefined {
     return this.builder?.stop()
   }
 

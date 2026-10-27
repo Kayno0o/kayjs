@@ -35,7 +35,7 @@ export class TypesController {
   // The type check runs in a process of its own beside the server, once the tree it types is written: a reload never waits for it, and its errors reach the open pages, errors.json and the terminal when it ends.
   private readonly checks: boolean
   checking: Promise<void> | undefined
-  private checker: TypesWorker
+  private readonly checker: TypesWorker
   // The config the types are written from, read again once kay.config.ts changes.
   private config: KayConfig | undefined
   private writing: Promise<void> | undefined

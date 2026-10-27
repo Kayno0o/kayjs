@@ -2,6 +2,7 @@ import type { Subprocess } from 'bun'
 import type { DevPorts, TypesWorker } from '../src/dev'
 import type { BuildOutcome } from '../src/dev/builder'
 import type { ClientBuilder } from '../src/dev/client'
+import type { TypeProblem } from '../src/dev/refuse'
 import { mkdir } from 'node:fs/promises'
 import { join } from 'node:path'
 import { PassThrough } from 'node:stream'
@@ -85,7 +86,9 @@ class FakeServer {
 
 class FakeTypes implements TypesWorker {
   configuredEntry: string | undefined
-  problems = []
+  problems: TypeProblem[] = []
+  // The errors each next answer reports, in turn.
+  readonly answers: TypeProblem[][] = []
   readonly writes: { command: string, fresh: boolean }[] = []
   // The files the process reports it loaded, which `loaded` answers for.
   readonly loadedFiles = new Set<string>()
@@ -129,6 +132,7 @@ class FakeTypes implements TypesWorker {
     }
 
     this.trace.push(`${this.name} ${command} answered`)
+    this.problems = this.answers.shift() ?? this.problems
 
     return code
   }
@@ -437,6 +441,29 @@ describe('kay dev\'s session', () => {
       await eventually(() => expect(dev.types.writes).toHaveLength(3))
       await Bun.sleep(SETTLED_MS)
       expect(dev.types.writes).toHaveLength(3)
+      await dev.stop()
+    })
+  })
+
+  describe('an edit during a type check', () => {
+    it('drops the answer of a check a write of the tree made old, and tells the one after it', async () => {
+      const stale = { file: 'src/a.kay', line: 1, column: 1, message: 'stale', report: '' }
+      const fresh = { ...stale, message: 'fresh' }
+      let held: PromiseWithResolvers<number> | undefined
+      const dev = await session({ 'tsconfig.json': '{}', 'src/a.kay': 'p a' }, ({ check }) => {
+        held = check.hold('check')
+        check.answers.push([stale], [fresh])
+      })
+      const server = dev.running()
+      const told = () => server.sent.filter(message => 'typeErrors' in message).map(message => message.typeErrors)
+
+      await eventually(() => expect(dev.check.writes).toHaveLength(1))
+      await dev.edit('src/a.kay')
+      await eventually(() => expect(dev.types.writes).toHaveLength(3))
+      held!.resolve(0)
+      await eventually(() => expect(told()).toEqual([[fresh]]))
+      expect(dev.check.writes).toHaveLength(2)
+      expect(dev.lines.filter(line => line.includes('types: 1 type error'))).toHaveLength(1)
       await dev.stop()
     })
   })

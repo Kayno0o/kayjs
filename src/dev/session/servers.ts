@@ -7,14 +7,13 @@ import { CONFIG_FILE } from '../../config'
 import { writeDevAddress } from '../address'
 import { inspectorProxy } from '../inspector'
 import { stylesOnly } from '../sources'
+import { MAX_CHANGED_FILES, tell } from './ports'
 
 // How long a server gets to reload its modules before the change starts a new process: an entry stuck on top-level work, or a process that stopped answering.
 const RELOAD_TIMEOUT_MS = 5000
 // A process creeps by about 70 KB per reload, so it is replaced before that adds up.
 const MAX_RELOADS = 200
 
-// Past this, as after a checkout, the files changed are not passed on, and open pages reload.
-export const MAX_CHANGED_FILES = 200
 // The address of a server listening on the root path, as kay's do, reads better without its slash.
 const ROOT_PATH = /(?<=\/\/[^/]+)\/$/
 const STOP_SIGNALS = new Set<Subprocess['signalCode']>(['SIGINT', 'SIGTERM', 'SIGHUP'])
@@ -51,10 +50,6 @@ export class ServerSupervisor {
   child: Subprocess<'pipe'> | undefined
   // The entry the running process was started with, which a new entry ends.
   runningEntry: string | undefined
-  // Whether the running process has a server listening, so its first run of the entry is over and it can reload.
-  listening = false
-  // Bun reads these as a process starts, so changing one needs a process started after it.
-  startupChanged = false
   // A process was started, as opposed to only spawned ahead of its start line.
   booted = false
   address: string | undefined
@@ -63,6 +58,10 @@ export class ServerSupervisor {
   restartedAt = performance.now()
   restartedFor: string[] = []
   restartAsked = false
+  // Whether the running process has a server listening, so its first run of the entry is over and it can reload.
+  private listening = false
+  // Bun reads these as a process starts, so changing one needs a process started after it.
+  private startupChanged = false
   private waiting: Subprocess<'pipe'> | undefined
   private waitingEntry: string | undefined
   // Answers a reload with how it ended: reloaded, why it needs a new process, or that the process exited meanwhile.
@@ -88,8 +87,10 @@ export class ServerSupervisor {
     this.inspector = options.inspect === undefined ? undefined : inspectorProxy(options.inspect, () => this.child && this.sockets.get(this.child), () => this.pagePort)
   }
 
-  // A file other than a stylesheet changed, which open pages swap in.
-  changed(file: string) {
+  // A file changed: one Bun reads as a process starts (`startup`) needs a new process, and one other than a stylesheet is swapped in by open pages.
+  changed(file: string, startup: boolean) {
+    this.startupChanged ||= startup
+
     if (stylesOnly(file))
       return
 
@@ -199,6 +200,11 @@ export class ServerSupervisor {
     this.start()
   }
 
+  // The running server listens, its first run of the entry over.
+  heardListening() {
+    this.listening = true
+  }
+
   answer(answer: string) {
     this.reloadAnswer?.(answer)
   }
@@ -269,12 +275,4 @@ export class ServerSupervisor {
     if (server === this.child && this.phase() !== 'stopping' && !STOP_SIGNALS.has(server.signalCode))
       this.hooks.exited(code)
   }
-}
-
-// A server killed for a restart meanwhile takes no message.
-export function tell(server: Subprocess, message: object): void {
-  try {
-    server.send(message)
-  }
-  catch {}
 }

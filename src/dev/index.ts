@@ -15,9 +15,10 @@ import { startClientBuilder } from './client'
 import { readConfigRecord, writeConfigRecord } from './config-record'
 import { mentionsPackage } from './fingerprint'
 import { ClientController } from './session/client'
+import { MAX_CHANGED_FILES, tell } from './session/ports'
 import { ChangeQueue } from './session/queue'
 import { describe, networkAddress, openBrowser, Reporter } from './session/report'
-import { MAX_CHANGED_FILES, ServerSupervisor, tell } from './session/servers'
+import { ServerSupervisor } from './session/servers'
 import { TypesController } from './session/types'
 import { environmentWithoutDotenv, stylesOnly, watchProject } from './sources'
 import { TypesProcess } from './types-process'
@@ -164,7 +165,7 @@ export async function dev(projectRoot: string, options: DevOptions = {}, ports: 
       client.follows(server)
 
     if (server === servers.child && 'listening' in message) {
-      servers.listening = true
+      servers.heardListening()
 
       const told = types.toldOnListen()
 
@@ -273,9 +274,8 @@ export async function dev(projectRoot: string, options: DevOptions = {}, ports: 
   const changedFile = (file: string, inert: boolean) => {
     const startup = !inert && STARTUP_FILE.test(file)
 
-    servers.startupChanged ||= startup
+    servers.changed(file, startup)
     client.changed(file, startup)
-    servers.changed(file)
     queue.changed(file)
   }
   let packageScan: Promise<void> | undefined
