@@ -12,15 +12,14 @@ export const MAX_RESULT = 20_000
 const MAX_NAME = 64
 const CHARS_PER_TOKEN = 4
 
-export interface Offered {
+interface OfferedBase {
   name: string
   description: string
   inputSchema: object
-  // An action, run as the visitor.
-  tool?: LibraryTool | undefined
-  // A function tool, run with no visitor: its input already checked, it answers the text the model reads.
-  plain?: ((input: Record<string, unknown>, signal: AbortSignal) => Promise<Ran>) | undefined
 }
+
+// An action, run as the visitor, or a function tool, run with no visitor: its input already checked, it answers the text the model reads.
+export type Offered = OfferedBase & ({ tool: LibraryTool, plain?: undefined } | { plain: (input: Record<string, unknown>, signal: AbortSignal) => Promise<Ran>, tool?: undefined })
 
 export interface Ran {
   status: 'done' | 'failed'
@@ -111,9 +110,13 @@ async function run(tools: Map<string, Offered>, use: ToolUse, input: Record<stri
   if (offered.plain)
     return offered.plain(input, signal)
 
-  const tool = offered.tool!
+  const tool = offered.tool
+
   // Offering an action needs the request, which `ask` checks.
-  const visitor = request!
+  if (request === undefined)
+    return failed('The tool could not run')
+
+  const visitor = request
 
   try {
     if (typeof confirm === 'function') {

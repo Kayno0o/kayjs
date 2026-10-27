@@ -1,18 +1,17 @@
 import type { TSchema } from 'kay/library'
-import type { Offered, Ran } from './loop'
+import type { Offered } from './loop'
 import type { Replaces } from './resume'
 import type { AskOptions, FunctionTool, Message, Piece, Provider, ProviderMessage, ProviderRequest, Reply, ReplyOf, StructuredAskOptions, Timeouts, ToolAction } from './types'
-import { logFrom } from 'kay'
-import { actionTool, checkAnswer, configError, currentRequest, durationSeconds, jsonSchemaOf, refundRateLimit } from 'kay/library'
+import { actionTool, configError, currentRequest, durationSeconds, jsonSchemaOf, refundRateLimit } from 'kay/library'
 import { attachmentsOf, checkAccepted, DEFAULT_MAX_ATTACHMENT_BYTES, estimatedChars, mediaChars, readAttachments } from './attachments'
 import { choose } from './config'
 import { recorded } from './dev-log'
 import { AiError } from './errors'
 import { extraBody } from './extra'
-import { isFunctionTool } from './function-tool'
+import { isFunctionTool, plainTool } from './function-tool'
 import { keep, keptFor, markEnded, stopKept } from './kept'
 import { guarded, visitorOf } from './limits'
-import { clip, converse, MAX_RESULT } from './loop'
+import { converse } from './loop'
 import { outputSchema } from './output-schema'
 import { createReply } from './reply'
 import { replacesOf, replyCallOf } from './resume'
@@ -97,37 +96,6 @@ function reading(request: ProviderRequest, messages: readonly Message[], maxByte
 
     yield* make({ ...request, messages: read })
   }
-}
-
-const log = logFrom('kayjs-ai')
-
-// A function tool as the loop runs it: the input checked against its schema, the result as the text the model reads.
-function plainTool(tool: FunctionTool): Offered {
-  const plain = jsonSchemaOf(tool.input) as { type?: unknown }
-
-  if (plain.type !== 'object')
-    throw configError(`tool ${tool.name}'s input is an object schema, s.Object({ ... })`)
-
-  const run = async (input: Record<string, unknown>, signal: AbortSignal): Promise<Ran> => {
-    try {
-      const checked = checkAnswer(tool.input, input)
-
-      if (!('value' in checked))
-        return { status: 'failed', result: `The arguments do not fit the tool: ${checked.issues.map(({ path, message }) => `${path === '' ? 'the arguments' : path} (${message})`).join(', ')}` }
-
-      const value = await tool.run(checked.value as never, { signal })
-      const text = typeof value === 'string' ? value : JSON.stringify(value) ?? ''
-
-      return { status: 'done', result: clip(text, MAX_RESULT) }
-    }
-    catch (error) {
-      log.error(`the ${tool.name} tool could not run`, error)
-
-      return { status: 'failed', result: 'The tool could not run' }
-    }
-  }
-
-  return { name: tool.name, description: tool.description, inputSchema: plain, plain: run }
 }
 
 function offer(actions: readonly (ToolAction | FunctionTool)[]): Offered[] {

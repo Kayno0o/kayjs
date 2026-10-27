@@ -148,8 +148,11 @@ export interface FunctionToolOptions<Schema extends TSchema = TSchema> {
   run: (input: Static<Schema>, context: FunctionToolContext) => unknown
 }
 
-// A function the model may call, made by `tool()`.
+declare const functionTool: unique symbol
+
+// A function the model may call, made by `tool()`: only `tool()` makes one, so a hand-written object of the same fields is no `FunctionTool`.
 export interface FunctionTool {
+  readonly [functionTool]: true
   readonly name: string
   readonly description: string
   readonly input: TSchema
