@@ -451,7 +451,7 @@ A success gives `{ ok: true, data }`. A failure with no answer from the server, 
 
 Use `s.File()` in the schema and `input(type="file" name="avatar")` in the form. The handler receives a `File`, which `files.put` stores.
 
-`s.Files()` takes several files from one field. Give it `maxItems` along with `maxSize`, as the action takes the size of one file for a field without it.
+`s.Files()` takes several files from one field. The action takes the size of ten files for a field without `maxItems`, and `maxItems` sets another count.
 
 A form that posts to an action is sent as `multipart/form-data` unless it sets its own `enctype`. An empty file input counts as no file, so `s.Optional(s.File())` works.
 

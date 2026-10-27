@@ -5,7 +5,9 @@ export const upload = action(s.Object({ file: s.File({ maxSize: '2mb' }) }), ({ 
 export const own = action(s.Object({ file: s.File({ maxSize: '2mb' }) }), ({ file }) => file.size, { maxSize: '1mb' })
 export const many = action(s.Object({ files: s.Files({ maxSize: '1mb', maxItems: 3 }) }), ({ files }) => files.length)
 
-const failures = [upload.failed(), own.failed(), many.failed()]
+export const unbounded = action(s.Object({ files: s.Files({ maxSize: '1mb' }) }), ({ files }) => files.length)
+
+const failures = [upload.failed(), own.failed(), many.failed(), unbounded.failed()]
 ---
 form(action={upload})
   input(type="file" name="file" aria-label="File")

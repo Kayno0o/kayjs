@@ -3,6 +3,9 @@ import { byteSize } from '../runtime/byte-size'
 
 const ELYSIA_SIZE = /^(\d+(?:\.\d+)?)([km])$/
 
+// How many files a `Files` field without `maxItems` is taken to hold, as many as a form posts at once in practice.
+const DEFAULT_FILES = 10
+
 // What the other fields and the multipart framing of a post may add to its files.
 const FRAMING = 64 * 1024
 
@@ -32,7 +35,7 @@ function sizeOf(size: unknown): number {
   }
 }
 
-// The most the files of a schema may weigh together, from the `maxSize` of each `s.File` and `s.Files` (times its `maxItems`, or one file), and 0 when a schema has no file with a size.
+// The most the files of a schema may weigh together, from the `maxSize` of each `s.File` and `s.Files` (times its `maxItems`, or ten files), and 0 when a schema has no file with a size.
 function weigh(node: Node | undefined): number {
   if (node === undefined || typeof node !== 'object')
     return 0
@@ -41,7 +44,7 @@ function weigh(node: Node | undefined): number {
     return node.maxSize === undefined ? 0 : sizeOf(node.maxSize)
 
   if (node.items !== undefined)
-    return weigh(node.items) * (node.maxItems ?? 1)
+    return weigh(node.items) * (node.maxItems ?? DEFAULT_FILES)
 
   const variants = node.anyOf ?? node.oneOf
 

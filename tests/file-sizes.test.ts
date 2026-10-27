@@ -10,6 +10,7 @@ const actions = await import(join(import.meta.dir, 'fixtures/file-sizes/src/rout
   upload: Action<{ file: File }, number>
   own: Action<{ file: File }, number>
   many: Action<{ files: File[] }, number>
+  unbounded: Action<{ files: File[] }, number>
 }
 
 afterAll(async () => {
@@ -42,5 +43,13 @@ describe('a file field\'s size', () => {
   it('counts every file a Files field takes', async () => {
     expect((await site.submit(actions.many, { files: [bytes(0.9 * MB), bytes(0.9 * MB), bytes(0.9 * MB)] }, { from: '/' })).html).not.toContain('Too large')
     expect((await site.submit(actions.many, { files: [bytes(MB), bytes(MB), bytes(MB), bytes(MB)] }, { from: '/' })).html).toContain('Too large to send')
+  })
+
+  it('takes ten files of a Files field without maxItems, and refuses an eleventh past the limit', async () => {
+    const files = (count: number) => Array.from({ length: count }, () => bytes(0.9 * MB))
+
+    expect((await site.submit(actions.unbounded, { files: files(6) }, { from: '/' })).html).not.toContain('Too large')
+    expect((await site.submit(actions.unbounded, { files: files(10) }, { from: '/' })).html).not.toContain('Too large')
+    expect((await site.submit(actions.unbounded, { files: files(12) }, { from: '/' })).html).toContain('Too large to send')
   })
 })

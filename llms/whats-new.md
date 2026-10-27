@@ -4,6 +4,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 
 ## Unreleased
 
+- An `s.Files` field without `maxItems` raises its action's body limit by ten files of its `maxSize`, not one, so a post of several files within their size is no longer refused with a 413: [Files posted to an action](files.md#files-posted-to-an-action).
 - A component mounted by `mountComponent` has `type(selector, text)`, `click(selector)` and `press(key)` firing the events a browser would, then settling, so a test no longer dispatches input events by hand: [Mounting a component](testing.md#mounting-a-component).
 - A browser test's `page.waitUntil(fn, { what })` names the wait in its timeout error, and a timed-out `waitFor` or `waitUntil` carries the stack of the test's own call: [Browser tests](testing-browser.md).
 - kayjs-auth: `authTest(site).oauth.stub(provider, { id, email })` makes an OAuth provider answer with a stated account, or with `{ error }` for a refused consent, a rejected code or a provider down, and `oauth.signIn(provider)` signs the test site in through it, with no `fetch` spy: [Testing](../packages/auth/llms/hardening-and-testing.md).
