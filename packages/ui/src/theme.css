@@ -1185,6 +1185,28 @@
     @apply grid grid-cols-[auto_1fr] items-baseline justify-items-start gap-x-2 gap-y-1 px-[calc(var(--spacing)*2.25*var(--density))] py-3;
   }
 
+  /* The icon and the label take a row of their own above and below the figure, and the change, which follows the label in the document, sits beside the figure. */
+  .kui-stat-badge:where([data-variant='tile']) > :where([data-part='icon'], [data-part='label']) {
+    @apply col-span-full;
+  }
+
+  .kui-stat-badge > :where([data-part='value']) {
+    @apply order-1;
+  }
+
+  .kui-stat-badge > :where([data-part='delta']) {
+    @apply order-2;
+  }
+
+  .kui-stat-badge > :where([data-part='label']) {
+    @apply order-3;
+  }
+
+  /* Card, Notice and PageHeader break a long word anywhere, which a control inside would inherit and split its own label by. */
+  :is(.kui-card, .kui-notice, .kui-page-header) :where(button, input, select, textarea, summary, .kui-btn, .kui-shell) {
+    overflow-wrap: normal;
+  }
+
   /* Below lg the links fold behind the toggle, a popover its popovertarget opens; from lg they sit in a row, the popover's frame undone and the toggle hidden. A browser without popovers shows the links as they are and hides the toggle. */
   .kui-site-nav {
     @apply flex items-center;

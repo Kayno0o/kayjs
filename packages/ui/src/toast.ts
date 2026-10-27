@@ -148,21 +148,30 @@ export async function attempt<T, Data = unknown>(run: () => Promise<T>, failure:
     const { onRefused } = options
     const data = onRefused === undefined ? undefined : refusalData<Data>(error)
 
-    if (onRefused === undefined || data === undefined)
+    if (onRefused === undefined || data === undefined) {
       toast.error(refusalOf(error, options.refused) ?? options.failure)
-    else
-      onRefused(data.value)
+    }
+    else {
+      // The app shows the refusal itself, so a handler that throws or rejects leaves `failure` and the console.
+      try {
+        await onRefused(data.value)
+      }
+      catch (handlerError) {
+        console.error('kayjs-ui: the `onRefused` of an attempt threw', handlerError)
+        toast.error(options.failure)
+      }
+    }
 
     return undefined
   }
 }
 
-// What a refusal carries for `onRefused`, boxed so a falsy answer still counts: the data an action's handler passed to `ctx.fail`, or the JSON object a route answered with. A schema refusal, a status 0, a 5xx's words and any other error carry none.
+// What a refusal carries for `onRefused`, boxed so a falsy answer still counts: the data an action's handler passed to `ctx.fail`, or the JSON object a route answered with. A schema refusal, a status 0, a 5xx answer and any other error carry none.
 function refusalData<Data>(error: unknown): { value: Data } | undefined {
   if (error instanceof ActionError)
     return error.data === undefined ? undefined : { value: error.data as Data }
 
-  if (error instanceof ApiError && error.status !== 0 && typeof error.answer === 'object' && error.answer !== null && !(error.answer instanceof Blob))
+  if (error instanceof ApiError && error.status !== 0 && error.status < 500 && typeof error.answer === 'object' && error.answer !== null && !(error.answer instanceof Blob))
     return { value: error.answer as Data }
 
   return undefined

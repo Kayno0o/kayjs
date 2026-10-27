@@ -1,0 +1,19 @@
+---
+import Button from '../button.kay'
+import Dialog from '../dialog.kay'
+
+// The question of a SaveForm with `confirm`, loaded once the form asks one: a form without it never fetches the dialog. The question itself is the form's, as its `confirm` part.
+const { open, title, cancelLabel, confirmLabel, onCancel, onConfirm } = props<{
+  open: boolean
+  title: string
+  cancelLabel: string
+  confirmLabel: string
+  onCancel: () => unknown
+  onConfirm: () => unknown
+}>()
+---
+Dialog(open={open} title={title} size="sm" onOpenChange={() => onCancel()})
+  @footer
+    Button(label={cancelLabel} onClick={() => onCancel()})
+    Button(label={confirmLabel} tone="accent" onClick={() => onConfirm()})
+  slot

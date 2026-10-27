@@ -45,3 +45,10 @@ test('an href makes the stat a link drawing the same parts as the span', async (
 
   expect([stat('linked').tagName, stat('linked').getAttribute('href'), [...stat('linked').children].map(child => child.getAttribute('data-part'))]).toEqual(['A', '/moons', ['value', 'label']])
 })
+
+test('a link tile with a change draws the same parts as the span, in the order the figure, the label and the change are read', async () => {
+  const stat = await stats()
+  const root = stat('linkedChange')
+
+  expect([root.tagName, root.getAttribute('data-variant'), [...root.children].map(child => child.getAttribute('data-part'))]).toEqual(['A', 'tile', ['value', 'label', 'delta']])
+})

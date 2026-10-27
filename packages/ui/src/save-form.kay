@@ -1,8 +1,7 @@
 --- <Output>
 import type { Action, Answer, FailureData, Success } from 'kay'
-import { guardLeave, onCleanup, onMount, recipe, shortcut, signal } from 'kay'
+import { effect, guardLeave, onCleanup, onMount, recipe, shortcut, signal, untrack } from 'kay'
 import Button from './button.kay'
-import Dialog from './dialog.kay'
 import { callAction, formIssues } from './forms'
 import { holdDefaults, onFormReset } from './form-reset'
 import { toast } from './toast'
@@ -51,6 +50,9 @@ const issues = signal<Record<string, string>>({})
 const changed = signal(false)
 const saving = signal(false)
 const asking = signal(false)
+// The dialog of `confirm`, a chunk of its own fetched once there is a question to ask, held in a list of at most one component.
+const confirmView = signal<(typeof import('./internal/save-confirm.kay'))['default'][]>([])
+const confirmFailed = signal(false)
 // Set by the dialog's confirm, so the submit it asks for goes through without asking again.
 let confirmed = false
 let form: HTMLFormElement | undefined
@@ -58,6 +60,22 @@ let form: HTMLFormElement | undefined
 let baseline = ''
 
 formIssues.provide(issues)
+
+// Follows `confirm`, which a parent may set after mount; a chunk that failed is not tried again.
+effect(() => {
+  if (confirm !== undefined && untrack(confirmView).length === 0 && !untrack(confirmFailed))
+    void loadConfirm()
+})
+
+async function loadConfirm() {
+  try {
+    confirmView = [(await import('./internal/save-confirm.kay')).default]
+  }
+  catch (error) {
+    console.error('kayjs-ui: a SaveForm\'s confirmation could not be loaded', error)
+    confirmFailed = true
+  }
+}
 
 function snapshot() {
   return JSON.stringify([...new FormData(form)].map(([name, value]) => [name, typeof value === 'string' ? value : [value.name, value.size, value.lastModified]]))
@@ -157,7 +175,11 @@ async function submit(event: SubmitEvent) {
     return
 
   if (confirm !== undefined && !sure) {
-    asking = true
+    // The question could not be loaded, and a save that needs it must not go through unasked.
+    if (confirmFailed())
+      toast.error(failure)
+    else
+      asking = true
 
     return
   }
@@ -236,8 +258,6 @@ form(part="root" ref={element => form = element} onSubmit={submit} onInput={chec
       Button(label={discardLabel} aria-disabled={!isDirty() || busy() || undefined} onClick={discard})
       Button(label={saveLabel} type="submit" tone="accent" busy={busy()} aria-disabled={!isDirty() || busy() || Boolean(saveDisabled) || undefined} data-tooltip={(typeof saveDisabled === 'string' && saveDisabled) || undefined})
   if confirm !== undefined
-    Dialog(open={asking()} title={confirmLabel ?? saveLabel} size="sm" onOpenChange={() => asking = false})
-      @footer
-        Button(label={cancelLabel} onClick={() => asking = false})
-        Button(label={confirmLabel ?? saveLabel} tone="accent" onClick={confirmSave})
-      p(part="confirm") {confirm}
+    for View of confirmView() key={View}
+      View(open={asking()} title={confirmLabel ?? saveLabel} cancelLabel={cancelLabel} confirmLabel={confirmLabel ?? saveLabel} onCancel={() => asking = false} onConfirm={confirmSave})
+        p(part="confirm") {confirm}

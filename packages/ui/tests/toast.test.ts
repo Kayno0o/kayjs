@@ -209,6 +209,39 @@ describe('attempt', () => {
     expect(shown().map(({ message }) => message)).toEqual(['Could not apply'])
   })
 
+  test('hands a 5xx answer to `failure`, not to `onRefused`, even when it is a JSON object', async () => {
+    const seen: unknown[] = []
+
+    await attempt(async () => Promise.reject(new ApiError(503, 'Unavailable', { reason: 'Down' })), { failure: 'Could not apply', onRefused: data => seen.push(data) })
+
+    expect(seen).toEqual([])
+    expect(shown().map(({ message }) => message)).toEqual(['Could not apply'])
+  })
+
+  test('awaits `onRefused`, and a throw or a rejection of it toasts `failure` instead of escaping', async () => {
+    const order: string[] = []
+    const spy = jest.spyOn(console, 'error').mockImplementation(() => undefined)
+    const refuse = async () => Promise.reject(new ActionError(400, '', {}, { error: 'Busy' }))
+
+    try {
+      expect(await attempt(refuse, { failure: 'Could not apply', onRefused: async () => {
+        await Promise.resolve()
+        order.push('shown')
+      } })).toBeUndefined()
+      order.push('after')
+      expect(await attempt(refuse, { failure: 'Could not apply', onRefused: async () => Promise.reject(new Error('boom')) })).toBeUndefined()
+      expect(await attempt(refuse, { failure: 'Could not apply again', onRefused: () => {
+        throw new Error('boom')
+      } })).toBeUndefined()
+    }
+    finally {
+      spy.mockRestore()
+    }
+
+    expect(order).toEqual(['shown', 'after'])
+    expect(shown().map(({ message }) => message)).toEqual(['Could not apply', 'Could not apply again'])
+  })
+
   test('stays quiet when the call goes through, and hands back what it returned', async () => {
     expect(await attempt(async () => Promise.resolve(42), 'Could not save')).toBe(42)
     expect(toasts()).toHaveLength(0)

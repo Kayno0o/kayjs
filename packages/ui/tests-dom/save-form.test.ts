@@ -453,6 +453,70 @@ describe('SaveForm and the pick of a Combobox and an IconPicker', () => {
   })
 })
 
+describe('SaveForm confirm', () => {
+  const dialogOf = (root: HTMLElement) => root.querySelector<HTMLDialogElement>('dialog')
+
+  test('a form without confirm never loads the dialog', async () => {
+    const root = await saveForm(async name => name.name)
+
+    expect(dialogOf(root)).toBeNull()
+    await settle()
+    expect(dialogOf(root)).toBeNull()
+  })
+
+  test('asks before calling the action, and saves once confirmed', async () => {
+    const calls: string[] = []
+
+    mounted = await mountComponent(SaveFormComponent, { save: async (input: { name: string }) => {
+      calls.push(input.name)
+
+      return input.name
+    }, onSaved: (name: string) => saved.push(name), onDiscard: () => discarded++, confirm: 'Apply this change?' })
+
+    const { root } = mounted
+
+    type(root, 'Grace')
+    await settle()
+    root.querySelector('form')!.requestSubmit()
+    await untilHolds(() => dialogOf(root)?.open === true)
+
+    expect([calls, dialogOf(root)!.textContent]).toEqual([[], expect.stringContaining('Apply this change?')])
+
+    click([...dialogOf(root)!.querySelectorAll('button')][1]!)
+    await settle()
+
+    expect([calls, saved, dialogOf(root)!.open]).toEqual([['Grace'], ['Grace'], false])
+  })
+
+  test('Escape closes the question without saving, and the next Save asks again', async () => {
+    const calls: string[] = []
+
+    mounted = await mountComponent(SaveFormComponent, { save: async (input: { name: string }) => {
+      calls.push(input.name)
+
+      return input.name
+    }, onSaved: (name: string) => saved.push(name), onDiscard: () => discarded++, confirm: 'Apply this change?' })
+
+    const { root } = mounted
+
+    type(root, 'Grace')
+    await settle()
+    root.querySelector('form')!.requestSubmit()
+    await untilHolds(() => dialogOf(root)?.open === true)
+
+    dialogOf(root)!.dispatchEvent(new Event('cancel', { cancelable: true }))
+    dialogOf(root)!.close()
+    await settle()
+
+    expect([calls, dialogOf(root)!.open, status(root)]).toEqual([[], false, 'Unsaved changes.'])
+
+    root.querySelector('form')!.requestSubmit()
+    await settle()
+
+    expect([calls, dialogOf(root)!.open]).toEqual([[], true])
+  })
+})
+
 describe('SaveForm driven by signals', () => {
   async function editor(save: (input: { name: string }) => Promise<boolean | { errors: Record<string, string> } | undefined>, props: { isNew?: boolean, status?: string, cancelHref?: string, confirm?: string, saveDisabled?: string | boolean } = {}) {
     mounted = await mountComponent(SaveFormSignals, { save, onDiscard: () => discarded++, ...props })
