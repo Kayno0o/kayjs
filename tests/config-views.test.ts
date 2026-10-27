@@ -4,7 +4,7 @@ import type { RouteMount } from '../src/server/routes'
 import { join } from 'node:path'
 import { describe, expect, it } from 'bun:test'
 import { CHECK_CONFIG, configCheckOptions } from '../src/check'
-import { readShadowSettings, serializeShadowSettings, SHADOW_SETTINGS } from '../src/check/shadow'
+import { readShadowSettings, serializeShadowSettings, SHADOW_SETTINGS, shadowOptionsFor } from '../src/check/shadow'
 import { CLIENT_CONFIG, clientOptionsOf, PRODUCTION, projectPaths, RENDER_CONFIG, renderOptionsOf } from '../src/project'
 import { scratchDir } from './scratch'
 
@@ -43,5 +43,7 @@ describe('the views of the config', () => {
     await Bun.write(join(projectPaths(root).types, SHADOW_SETTINGS), serializeShadowSettings(root, settings))
 
     expect(readShadowSettings(root)).toEqual(settings)
+    expect(shadowOptionsFor(readShadowSettings(root), join(root, 'pages/_widget.kay'))).toEqual({ routesDir: settings.routesDir, mounts, insideIsland: true, lints: settings.lints })
+    expect(shadowOptionsFor(readShadowSettings(root), join(root, 'pages/index.kay')).insideIsland).toBe(false)
   })
 })

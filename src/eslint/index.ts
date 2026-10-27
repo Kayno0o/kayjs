@@ -7,7 +7,7 @@ import { createRequire } from 'node:module'
 import { dirname, join, relative, resolve } from 'node:path'
 import { version } from '../../package.json'
 import { classEdit, classSpan } from '../check/class-words'
-import { codeEdit, compileShadow, inFences, readShadowSettings, shadowPath, sourceSpan } from '../check/shadow'
+import { codeEdit, compileShadow, inFences, readShadowSettings, shadowOptionsFor, shadowPath, sourceSpan } from '../check/shadow'
 import { offsetAt, positionAt } from '../compiler/mapping'
 import { projectRootOf } from '../project'
 
@@ -75,8 +75,7 @@ export const processor = {
   preprocess(text: string, filename: string): { text: string, filename: string }[] {
     const file = resolve(filename)
     const root = projectRootOf(file)
-    const settings = readShadowSettings(root)
-    const { shadow } = compileShadow(root, file, text, { routesDir: settings.routesDir, mounts: settings.mounts, insideIsland: settings.islandOnly.has(file), lints: settings.lints })
+    const { shadow } = compileShadow(root, file, text, shadowOptionsFor(readShadowSettings(root), file))
 
     const indented = shadow.bodyLines ?? []
 

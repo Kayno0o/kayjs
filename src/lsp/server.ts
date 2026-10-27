@@ -1,7 +1,7 @@
 import type { Subprocess } from 'bun'
 import type { KayLibrary } from '../build/libraries'
 import type { CheckDiagnostic, CheckOptions, ProbeMemory, ShadowTypes } from '../check'
-import type { ShadowFile, SpanMode } from '../check/shadow'
+import type { ShadowFile, ShadowSettings, SpanMode } from '../check/shadow'
 import type { Diagnostic as KayDiagnostic } from '../compiler'
 import type { Span } from '../compiler/ast'
 import type { KayConfig } from '../config'
@@ -24,7 +24,7 @@ import { configCheckOptions, configProblems, contentChecks, generatedChecks, gen
 import { diagnoseShadow, reportsTypeErrors, servedByTheApp, servedLocales } from '../check/diagnose'
 import { messageKeys } from '../check/messages'
 import { withoutMissingCaptcha } from '../check/project'
-import { compileShadow, generatedSpan, layoutQueries, shadowSource, sourceSpan } from '../check/shadow'
+import { compileShadow, generatedSpan, layoutQueries, shadowOptionsFor, shadowSource, sourceSpan } from '../check/shadow'
 import { programShadows, servedPathsOf } from '../check/shadow-types'
 import { elementsIn } from '../compiler/ast'
 import { formatKay } from '../compiler/format'
@@ -53,6 +53,11 @@ import { typedLength, uiFileCursor, uiItems } from './ui-completion'
 interface Target {
   uri: string
   shadow?: ShadowFile
+}
+
+// The settings of a project's shadow tree as its last write left them, which each of its .kay files compiles with.
+function shadowSettingsOf(project: Project): ShadowSettings {
+  return { routesDir: project.routesDir, mounts: project.mounts, islandOnly: project.islandOnly, lints: project.options.lints }
 }
 
 // A folder holding a tsconfig.json: its .kay files compile against its own routes and config, into its own shadow tree.
@@ -518,10 +523,11 @@ export class KayLanguageServer {
   private compile(uri: string, source: string, version: number): Document {
     const file = fileURLToPath(uri)
     const project = this.projectAt(projectRootOf(file, this.root))
-    const insideIsland = project.islandOnly.has(file)
+    const compiling = shadowOptionsFor(shadowSettingsOf(project), file)
+    const { insideIsland } = compiling
     const signals = importedSignals(file, source)
     const placed = this.placed(project, file)
-    const { shadow, diagnostics, queries } = compileShadow(project.root, placed.file, source, { routesDir: project.routesDir, mounts: project.mounts, insideIsland, lints: project.options.lints, signals, shadowOf: placed.shadowOf })
+    const { shadow, diagnostics, queries } = compileShadow(project.root, placed.file, source, { ...compiling, signals, shadowOf: placed.shadowOf })
     const document = { ...shadow, uri, shadowUri: pathToFileURL(placed.shadowOf(placed.file)).href, version, diagnostics, insideIsland, signals: JSON.stringify(signals), queries: JSON.stringify(queries) }
 
     this.documents.set(uri, document)
@@ -1476,7 +1482,7 @@ export class KayLanguageServer {
     const placed = this.placed(project, shadowSource(project.root, path))
     const source = Bun.file(placed.file)
 
-    return await source.exists() ? compileShadow(project.root, placed.file, await source.text(), { routesDir: project.routesDir, mounts: project.mounts, insideIsland: project.islandOnly.has(placed.file), lints: project.options.lints, shadowOf: placed.shadowOf }).shadow : undefined
+    return await source.exists() ? compileShadow(project.root, placed.file, await source.text(), { ...shadowOptionsFor(shadowSettingsOf(project), placed.file), shadowOf: placed.shadowOf }).shadow : undefined
   }
 
   // `offset` is the position in the .kay source.

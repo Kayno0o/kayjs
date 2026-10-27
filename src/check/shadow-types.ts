@@ -8,7 +8,7 @@ import type { LocaleSettings } from '../runtime/i18n'
 import type { ApiModule } from '../server/api-modules'
 import type { PublicFile } from '../server/public'
 import type { Endpoint, Route, RouteMount } from '../server/routes'
-import type { ShadowFile, ShadowOptions } from './shadow'
+import type { ShadowFile, ShadowOptions, ShadowSettings } from './shadow'
 import { existsSync, realpathSync } from 'node:fs'
 import { lstat, mkdir, readdir, readlink, rm, symlink, unlink } from 'node:fs/promises'
 import { basename, dirname, join, relative, resolve, sep } from 'node:path'
@@ -42,7 +42,7 @@ import { mcpRoutes } from './mcp-routes'
 import { unreadOpenSettings } from './open-settings'
 import { publicEnvOutsideSrc } from './public-env-outside-src'
 import { removedUiTokens } from './removed-ui-tokens'
-import { compileShadow, layoutQueries, matcherSource, pageRoute, serializeShadowSettings, SHADOW_SETTINGS, shadowPath } from './shadow'
+import { compileShadow, layoutQueries, matcherSource, pageRoute, serializeShadowSettings, SHADOW_SETTINGS, shadowOptionsFor, shadowPath } from './shadow'
 import { untypedSockets } from './socket-routes'
 import { unknownToolLabels } from './tool-labels'
 import { typingOptions } from './tsgo'
@@ -149,11 +149,11 @@ async function writeShadows(projectRoot: string, options: CheckOptions): Promise
   if (libraries.pages.length > 0)
     await tree.write(EXTENSION_PAGES, libraries.pages.map(file => `import ${JSON.stringify(`./${relative(projectPaths(root).types, shadowPath(root, file)).slice(0, -'.tsx'.length)}`)}\n`).join(''))
 
-  await tree.write(SHADOW_SETTINGS, serializeShadowSettings(root, { routesDir, mounts, islandOnly: own.islandOnly, publicDir: projectPaths(root, options).public, lints: options.lints }))
+  await tree.write(SHADOW_SETTINGS, serializeShadowSettings(root, own.settings))
   // `contentChecks` writes the props check once it read the collections.
   await tree.removeStale([CONTENT_CHECK])
 
-  return { files: tree.shadows, diagnostics: [...own.diagnostics, ...libraries.diagnostics], problems, unreached: libraries.unreached, libraries: libraries.followed, programs: libraries.programs, settings: replaced.lines, exports: exported.lines, islandOnly: own.islandOnly, mounts, locales: served.settings ? localePrefixes(served.settings) : [], served }
+  return { files: tree.shadows, diagnostics: [...own.diagnostics, ...libraries.diagnostics], problems, unreached: libraries.unreached, libraries: libraries.followed, programs: libraries.programs, settings: replaced.lines, exports: exported.lines, islandOnly: own.settings.islandOnly, mounts, locales: served.settings ? localePrefixes(served.settings) : [], served }
 }
 
 function shadowTree(dir: string): ShadowTree {
@@ -200,24 +200,25 @@ function shadowTree(dir: string): ShadowTree {
 }
 
 // The project's own components, each compiled with the lints its source sets.
-async function ownShadows(root: string, options: CheckOptions, tree: ShadowTree, mounts: RouteMount[]): Promise<{ files: string[], diagnostics: CheckDiagnostic[], islandOnly: Set<string> }> {
+async function ownShadows(root: string, options: CheckOptions, tree: ShadowTree, mounts: RouteMount[]): Promise<{ files: string[], diagnostics: CheckDiagnostic[], settings: ShadowSettings }> {
   const { routes: routesDir, cache: cacheDir } = projectPaths(root, options)
   const files = await findKayFiles(root, { project: true, ownOnly: true, ownKayOnly: true })
   const sources = new Map(await Promise.all(files.map(async file => [file, await Bun.file(file).text()] as const)))
   const islands = new Set((await Promise.all(files.map(async file => await rendersAsIslandCached(cacheDir, file, sources.get(file)!) ? [file] : []))).flat())
-  const islandOnly = await islandOnlyComponents(root, routesDir, files, sources, file => islands.has(file))
+  // What every component compiles with, written beside the tree for eslint, which compiles one file at a time.
+  const settings: ShadowSettings = { routesDir, mounts, islandOnly: await islandOnlyComponents(root, routesDir, files, sources, file => islands.has(file)), publicDir: projectPaths(root, options).public, lints: options.lints }
   const diagnostics: CheckDiagnostic[] = []
 
   for (const file of files) {
     const source = sources.get(file)!
-    const { shadow, diagnostics: compileDiagnostics } = await compileShadowCached(cacheDir, root, file, source, { routesDir, mounts, insideIsland: islandOnly.has(file), lints: options.lints, typesOnly: options.typesOnly })
+    const { shadow, diagnostics: compileDiagnostics } = await compileShadowCached(cacheDir, root, file, source, { ...shadowOptionsFor(settings, file), typesOnly: options.typesOnly })
 
     await tree.shadow(shadow, shadowPath(root, file))
     for (const diagnostic of compileDiagnostics)
       diagnostics.push(fromCompile(file, source, diagnostic))
   }
 
-  return { files, diagnostics, islandOnly }
+  return { files, diagnostics, settings }
 }
 
 // A library's components compile against the app's types, and the ones it reaches are reported as its own: `kay build` compiles those.

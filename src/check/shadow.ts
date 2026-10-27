@@ -92,6 +92,11 @@ export interface ShadowOptions {
   shadowOf?: ((file: string) => string) | undefined
 }
 
+// What compiling `file` takes from the shadow settings of its project, as check, the LSP and eslint each compile it.
+export function shadowOptionsFor(settings: ShadowSettings, file: string): Pick<ShadowOptions, 'routesDir' | 'mounts' | 'lints'> & { insideIsland: boolean } {
+  return { routesDir: settings.routesDir, mounts: settings.mounts, insideIsland: settings.islandOnly.has(file), lints: settings.lints }
+}
+
 // Compiles one .kay file for type checking, its route params typed when it is a page of the routes directory or of an extension's, by the matchers beside `routesDir`.
 export function compileShadow(root: string, file: string, source: string, { routesDir, mounts, insideIsland = false, lints, typesOnly, signals = importedSignals(file, source), shadowOf = path => shadowPath(root, path) }: ShadowOptions): { shadow: ShadowFile, diagnostics: Diagnostic[], queries: string[] | undefined } {
   const route = pageRoute(file, routesDir, mounts)
