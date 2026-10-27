@@ -1,14 +1,15 @@
 import type { ImportedSignals, SignalKind } from '../compiler/module-signals'
 import { AsyncLocalStorage } from 'node:async_hooks'
 import { readFileSync, statSync } from 'node:fs'
-import { moduleData, moduleSignals } from '../compiler/module-signals'
+import { moduleKinds } from '../compiler/module-signals'
 import { parseKay } from '../compiler/parser'
 import { resolveFrom, SCRIPT_FILE, scriptLoader, transpilerFor } from './files'
 import { fences } from './libraries'
 
+type ImportedKinds = Record<string, SignalKind | 'data'>
 const KAY_FILE = /\.kay$/
 const KAY_MODULE = /^kay(?:\/|$)/
-const scanned = new Map<string, { stamp: string, signals: Record<string, SignalKind | 'data'> }>()
+const scanned = new Map<string, { stamp: string, signals: ImportedKinds }>()
 
 // Inside a scope, what a component's imports exported, found once for all the passes over it: the analysis, the browser and the server compile.
 type Memo = Map<string, { source: string, found: ImportedSignals }>
@@ -18,7 +19,7 @@ const open = new Set<Memo>()
 // What each component imports, read again only once its text changes.
 const imports = new Map<string, { hash: number | bigint, specifiers: string[] }>()
 
-// The signals and memos the modules a component imports export, which its template reads and writes as its own; part of every cache key of its compile, so editing such a module compiles the component again.
+// The signals and memos the modules a component imports export, and the names they export as literal data, which its template reads and writes as its own; part of every cache key of its compile, so editing such a module compiles the component again.
 // A package is left out, its code too large to scan on every compile, unless a relative import reaches into it, as a library's own components do.
 export function importedSignals(file: string, source: string): ImportedSignals {
   const memo = scope.getStore() ?? (open.size === 1 ? open.values().next().value : undefined)
@@ -95,7 +96,7 @@ export function keepImportedSignals(files: ReadonlySet<string>): void {
   }
 }
 
-function signalsOf(path: string): Record<string, SignalKind | 'data'> {
+function signalsOf(path: string): ImportedKinds {
   try {
     const stats = statSync(path, { throwIfNoEntry: false })
 
@@ -111,7 +112,7 @@ function signalsOf(path: string): Record<string, SignalKind | 'data'> {
     const text = readFileSync(path, 'utf8')
     // A component's signals are the ones its `--- module` fence exports.
     const jsx = scriptLoader(path) === 'tsx' || scriptLoader(path) === 'jsx'
-    const signals: Record<string, SignalKind | 'data'> = KAY_FILE.test(path) ? kayModuleSignals(text) : { ...Object.fromEntries(moduleData(text, jsx).map(name => [name, 'data' as const])), ...moduleSignals(text, jsx) }
+    const signals: ImportedKinds = KAY_FILE.test(path) ? kayModuleSignals(text) : moduleKinds(text, jsx)
 
     scanned.set(path, { stamp, signals })
 
@@ -122,7 +123,7 @@ function signalsOf(path: string): Record<string, SignalKind | 'data'> {
   }
 }
 
-function kayModuleSignals(text: string): Record<string, SignalKind | 'data'> {
+function kayModuleSignals(text: string): ImportedKinds {
   const { module } = parseKay(text)
 
   if (!module)
@@ -130,5 +131,5 @@ function kayModuleSignals(text: string): Record<string, SignalKind | 'data'> {
 
   const fence = text.slice(module.start, module.end)
 
-  return { ...Object.fromEntries(moduleData(fence).map(name => [name, 'data' as const])), ...moduleSignals(fence) }
+  return moduleKinds(fence)
 }

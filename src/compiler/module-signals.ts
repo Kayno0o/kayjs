@@ -18,18 +18,28 @@ const NAMES_KAY = /["']kay["']/
 
 // The names a module exports as `export const name = signal(...)`, or `persisted`, `linked`, `queryParam`, `memo`, `debounced` or `live`, called as imported from `kay`: what a component importing them writes by assigning, and reads by calling.
 export function moduleSignals(source: string, jsx = false): Record<string, SignalKind> {
-  if (!NAMES_KAY.test(source))
-    return {}
+  const ast = NAMES_KAY.test(source) ? parseModule(source, jsx) : undefined
 
-  let ast: t.File
+  return ast ? signalsIn(ast) : {}
+}
 
+function parseModule(source: string, jsx: boolean): t.File | undefined {
   try {
-    ast = parse(source, { sourceType: 'module', attachComment: false, plugins: jsx ? ['typescript', 'jsx'] : ['typescript'] })
+    return parse(source, { sourceType: 'module', attachComment: false, plugins: jsx ? ['typescript', 'jsx'] : ['typescript'] })
   }
   catch {
-    return {}
+    return undefined
   }
+}
 
+// What a component importing a module reads of it: its signals and memos, and the names it exports as literal data. The module is parsed once, and only when it exports something.
+export function moduleKinds(source: string, jsx = false): Record<string, SignalKind | 'data'> {
+  const ast = source.includes('export') ? parseModule(source, jsx) : undefined
+
+  return ast ? { ...Object.fromEntries(dataIn(ast).map(name => [name, 'data' as const])), ...NAMES_KAY.test(source) ? signalsIn(ast) : {} } : {}
+}
+
+function signalsIn(ast: t.File): Record<string, SignalKind> {
   const made = new Map<string, SignalKind>()
   const found: Record<string, SignalKind> = {}
 
@@ -65,7 +75,7 @@ export function moduleSignals(source: string, jsx = false): Record<string, Signa
 
 const SCALARS = new Set(['StringLiteral', 'NumericLiteral', 'BooleanLiteral', 'NullLiteral', 'BigIntLiteral'])
 
-// Whether an expression is plain data, a literal string, number, boolean or null, or an array or object of them, `as const` and `satisfies` aside: nothing in it can be a function.
+// Whether an expression is plain data, a literal string, number, boolean or null, or an array or object of them, `as const` and `satisfies` aside: nothing in it can be a function. A literal another module mutates afterwards is still read as data.
 function isDataLiteral(node: t.Node): boolean {
   if (SCALARS.has(node.type))
     return true
@@ -85,20 +95,14 @@ function isDataLiteral(node: t.Node): boolean {
   return node.type === 'ObjectExpression' && node.properties.every(property => property.type === 'ObjectProperty' && !property.shorthand && (!property.computed || property.key.type === 'StringLiteral' || property.key.type === 'NumericLiteral') && isDataLiteral(property.value))
 }
 
-// The names a module exports as `export const name = <literal>`, whose values are all strings, numbers, booleans or null: what a component reading one passes an island as data, not as a function.
+// The names a module exports as `export const name = <literal>`, never `export { name }` or a re-export, whose values are all strings, numbers, booleans or null: what a component reading one passes an island as data, not as a function.
 export function moduleData(source: string, jsx = false): string[] {
-  if (!source.includes('export'))
-    return []
+  const ast = source.includes('export') ? parseModule(source, jsx) : undefined
 
-  let ast: t.File
+  return ast ? dataIn(ast) : []
+}
 
-  try {
-    ast = parse(source, { sourceType: 'module', attachComment: false, plugins: jsx ? ['typescript', 'jsx'] : ['typescript'] })
-  }
-  catch {
-    return []
-  }
-
+function dataIn(ast: t.File): string[] {
   const found: string[] = []
 
   for (const statement of ast.program.body) {

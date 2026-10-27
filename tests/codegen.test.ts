@@ -1,7 +1,7 @@
 import * as parser from '@babel/parser'
 import { describe, expect, it, spyOn } from 'bun:test'
 import { compileKay, componentName } from '../src/compiler'
-import { moduleSignals } from '../src/compiler/module-signals'
+import { moduleData, moduleKinds, moduleSignals } from '../src/compiler/module-signals'
 import { CURRENT, defaultName, GENERATED_NAME, PROPS } from '../src/compiler/names'
 
 function tsx(source: string): string {
@@ -1297,6 +1297,9 @@ describe('module signals', () => {
     expect(moduleSignals('import { signal as s, memo, persisted } from \'kay\'\nimport { linked } from \'other\'\n\nexport const a = s(1), b = memo(() => a())\nexport const c = persisted(\'c\', 0)\nexport const d = linked(() => 1)\nconst e = s(2)\nexport let f = s(3)\nexport { e }\n')).toEqual({ a: 'signal', b: 'memo', c: 'signal' })
     expect(moduleSignals('import { debounced, signal } from \'kay\'\n\nexport const typed = signal(\'\')\nexport const settled = debounced(typed, \'300ms\')\n')).toEqual({ typed: 'signal', settled: 'memo' })
     expect(moduleSignals('export const a = signal(1)\n')).toEqual({})
+    expect(moduleData('export const a = { x: \'1\', y: [1, -2, true, null, { z: `t` }] } as const\nexport const b = \'s\'\nexport const c = { ...a }\nexport const d = { get x() { return 1 } }\nexport const e = { m() {} }\nexport const f = { [k]: 1 }\nexport const g = { x }\nexport const h = `a${b}`\nexport const i = [1, , 2]\nexport const j = { f: () => 1 }\nexport const k = fn()\nexport let l = \'x\'\nconst m = \'x\'\nexport { m }\n')).toEqual(['a', 'b'])
+    expect(moduleKinds('import { signal } from \'kay\'\nexport const a = signal(1)\nexport const b = { x: \'y\' }\n')).toEqual({ a: 'signal', b: 'data' })
+    expect(moduleKinds('const a = 1\n')).toEqual({})
   })
 })
 

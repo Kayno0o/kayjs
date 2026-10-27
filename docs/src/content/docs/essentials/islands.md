@@ -61,7 +61,9 @@ The effect and its cleanups live until `stop()` is called, and `root` returns wh
 
 A static component that passes an island a function is listed too, as `format passed to Picker, line 8`. That prop may turn it into an island, which the page decides as it renders.
 
-`kay check` warns of such a component as `promoted-island`, naming the call: data built by a list method (`map`, `filter`, `Array.from`) or by a function of the script returning data, an `~icons/` import of an icon set the project installs, and a value read from an object of strings or numbers that another module of the app exports as a literal (`LABEL[kind]`), are not functions, while a function read off a global, `Math.max` or `console.log`, and an icon of a set that is not installed are.
+`kay check` warns of such a component as `promoted-island`, naming the call: data built by a list method (`map`, `filter`, `Array.from`) or by a function of the script returning data, and an `~icons/` import of an icon set the project installs, are not functions, while a function read off a global, `Math.max` or `console.log`, and an icon of a set that is not installed are.
+
+A value read from an object of strings or numbers that another module of the app exports as an `export const` literal (`LABEL[kind]`) is data too.
 
 Write `// kay-island` on a line of its own in the component to say it is meant, or `// kay-static` to say it is not: `kay check` reports a marker the component contradicts as `island-marker`.
 

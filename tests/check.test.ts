@@ -721,6 +721,7 @@ describe.concurrent('kay check, edge cases', () => {
       dated: ['const days = Array.from({ length: 2 }, (_, index) => new Date(Date.UTC(2026, 0, 1 + index)).toISOString().slice(0, 10))', 'Child(format={days})'],
       indexed: ['const hours = [\'a\', \'b\']', 'Child(format={[{ values: hours.map((_, index) => index) }]})'],
       labels: ['import { LABELS, SIZES } from \'../labels\'\nconst { kind } = props<{ kind: \'a\' | \'b\' }>()', 'Child(format={[LABELS[kind], SIZES.small, LABELS]})'],
+      fenced: ['import { TAGS } from \'./tags.kay\'\nconst { kind } = props<{ kind: \'a\' }>()', 'Child(format={TAGS[kind]})'],
       ordered: ['const ids = [3, 1].map(id => id + 1)\nconst sorted = ids.filter(id => id > 1).slice(0, 1)', 'Child(format={sorted})'],
     }
     const functions: Record<string, [script: string, call: string]> = {
@@ -734,6 +735,7 @@ describe.concurrent('kay check, edge cases', () => {
       imported: ['import { handlers } from \'../handlers\'\nconst shown = handlers.filter(Boolean).slice(0, 2)', 'Child(format={shown})'],
       handlerMap: ['import { ACTIONS } from \'../labels\'\nconst { kind } = props<{ kind: \'a\' | \'b\' }>()', 'Child(format={ACTIONS[kind]})'],
       builtMap: ['import { BUILT } from \'../labels\'\nconst { kind } = props<{ kind: \'a\' | \'b\' }>()', 'Child(format={BUILT[kind]})'],
+      fencedFn: ['import { RUNS } from \'./runs.kay\'\nconst { kind } = props<{ kind: \'a\' }>()', 'Child(format={RUNS[kind]})'],
       local: ['const make = () => { const run = () => 1; return run }\nconst made = make()', 'Child(format={made})'],
       optional: ['const { getHandler } = props<{ getHandler?: () => void }>()\nconst got = getHandler?.()', 'Child(format={got})'],
       model: ['const money = Money.from(5)', 'Child(format={money})'],
@@ -753,6 +755,8 @@ describe.concurrent('kay check, edge cases', () => {
       'src/routes/index.kay': `---\n${names.map(name => `import ${name[0]!.toUpperCase()}${name.slice(1)} from '../components/${name}.kay'`).join('\n')}\n---\n${names.map(name => `${name[0]!.toUpperCase()}${name.slice(1)}`).join('\n')}\n`,
       ...Object.fromEntries(names.map(name => [`src/components/${name}.kay`, component(all[name]!)])),
       'src/handlers.ts': 'export const handlers = [() => 1]\n',
+      'src/components/tags.kay': '--- module\nexport const TAGS = { a: \'x\' }\n---\np tags\n',
+      'src/components/runs.kay': '--- module\nexport const RUNS = { a: () => 1 }\n---\np runs\n',
       'src/labels.ts': 'export const LABELS: Record<\'a\' | \'b\', string> = { a: \'A\', b: `B` }\nexport const SIZES = { small: 1, nested: [true, null, { deep: \'x\' }] } as const\nexport const ACTIONS = { a: () => 1, b: () => 2 }\nconst make = () => \'x\'\nexport const BUILT = { a: make(), b: \'b\' }\n',
       'src/components/island.kay': '---\nimport { signal } from \'kay\'\n\nconst count = signal(0)\nconst { format } = props<{ format: unknown }>()\n---\nbutton(onClick={() => count++}) {count()} {String(format)}\n',
     })
