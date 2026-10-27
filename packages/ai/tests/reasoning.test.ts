@@ -196,6 +196,25 @@ describe('reasoning on Anthropic', () => {
     expect(pieces.filter(piece => 'text' in piece)).toEqual([{ text: 'Answer' }])
   })
 
+  it('tells two thinking blocks of one step apart in reasoning, and sends each back as it was written', async () => {
+    const server = serve(() => stream([
+      ['content_block_start', { type: 'content_block_start', index: 0, content_block: { type: 'thinking', thinking: '', signature: '' } }],
+      ['content_block_delta', { type: 'content_block_delta', index: 0, delta: { type: 'thinking_delta', thinking: 'First ' } }],
+      ['content_block_delta', { type: 'content_block_delta', index: 0, delta: { type: 'thinking_delta', thinking: 'one.' } }],
+      ['content_block_delta', { type: 'content_block_delta', index: 0, delta: { type: 'signature_delta', signature: 'a' } }],
+      ['content_block_stop', { type: 'content_block_stop', index: 0 }],
+      ['content_block_start', { type: 'content_block_start', index: 1, content_block: { type: 'thinking', thinking: '', signature: '' } }],
+      ['content_block_delta', { type: 'content_block_delta', index: 1, delta: { type: 'thinking_delta', thinking: 'Second.' } }],
+      ['content_block_delta', { type: 'content_block_delta', index: 1, delta: { type: 'signature_delta', signature: 'b' } }],
+      ['content_block_stop', { type: 'content_block_stop', index: 1 }],
+      ['message_stop', { type: 'message_stop' }],
+    ]).response)
+    const pieces = await collect(anthropic({ baseUrl: server.url, apiKey: 'k' }).stream(BASE, new AbortController().signal))
+
+    expect(pieces.filter(piece => 'reasoning' in piece).map(piece => (piece).reasoning).join('')).toBe('First one.\n\nSecond.')
+    expect(pieces.filter(piece => 'thinking' in piece)).toEqual([{ thinking: { text: 'First one.', signature: 'a' } }, { thinking: { text: 'Second.', signature: 'b' } }])
+  })
+
   it('drops a thinking block that came without a signature', async () => {
     const server = serve(() => stream([
       ['content_block_start', { type: 'content_block_start', index: 0, content_block: { type: 'thinking', thinking: '', signature: '' } }],
@@ -250,6 +269,22 @@ describe('reasoning across the steps of a tool loop', () => {
     expect(pieces.filter(piece => 'reasoning' in piece)).toEqual([{ reasoning: 'a' }, { reasoning: '\n\nb' }])
     expect(pieces.filter(piece => 'thinking' in piece)).toEqual([])
     expect(seen[1]!.messages[1]!.thinking).toEqual([{ text: 'a', signature: 's' }])
+  })
+})
+
+describe('thinking past its cap in a tool loop', () => {
+  it('fails the reply instead of keeping thinking without bound', async () => {
+    const provided: Provider = {
+      name: 'long',
+      model: 'm',
+      async* stream() {
+        yield { thinking: { text: 'x'.repeat(200_000), signature: 's' } }
+        yield { thinking: { text: 'y'.repeat(100_000), signature: 's' } }
+        yield { finish: 'stop' }
+      },
+    }
+
+    await expect(collect(converse(provided, BASE, [], 3, new Request('http://localhost/'), new AbortController().signal))).rejects.toMatchObject({ kind: 'protocol' })
   })
 })
 

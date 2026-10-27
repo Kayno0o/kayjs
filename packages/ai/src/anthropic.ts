@@ -184,6 +184,8 @@ export function anthropic({ apiKey, baseUrl = ANTHROPIC_URL, model, body: fields
       const calls = new Map<number, { id: string, name: string, arguments: string }>()
       // Thinking arrives as a block too: its text in pieces, then the signature that goes back with it.
       const thoughts = new Map<number, { text: string, signature: string } | { redacted: string }>()
+      // Whether a thinking block already streamed its text, so the next one starts after a blank line in `reasoning`.
+      let reasoned = false
 
       // A model that refuses `disabled` or the effort of `none` is asked again without the part its error names, and remembered once that gets through; a level that is refused fails naming `reasoning`.
       const known = refusedParts.get(key) ?? new Set<Part>()
@@ -251,9 +253,11 @@ export function anthropic({ apiKey, baseUrl = ANTHROPIC_URL, model, body: fields
             const thought = typeof event.index === 'number' ? thoughts.get(event.index) : undefined
 
             if (delta?.type === 'thinking_delta' && typeof delta.thinking === 'string' && delta.thinking !== '' && thought && 'text' in thought) {
-              thought.text += delta.thinking
+              // The blank line is for the reader only: the block sent back keeps the text as the model wrote it.
+              yield { reasoning: reasoned && thought.text === '' ? `\n\n${delta.thinking}` : delta.thinking }
 
-              yield { reasoning: delta.thinking }
+              thought.text += delta.thinking
+              reasoned = true
             }
 
             if (delta?.type === 'signature_delta' && typeof delta.signature === 'string' && thought && 'signature' in thought)

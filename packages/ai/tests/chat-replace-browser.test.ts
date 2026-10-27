@@ -553,3 +553,24 @@ it('resumes a regenerated reply the server kept with outlive, after a reload, an
   expect(await page.count(REGENERATE)).toBe(1)
   expect(page.errors).toEqual([])
 }, 120_000)
+
+it('gives the reasoning of a finished reply a height cap and a place in the tab order', async () => {
+  await using page = await site.open('/replaceable-tools')
+
+  fakeAi.reply({ reasoning: 'Long thought. '.repeat(400), text: 'Checking', calls: [{ name: 'add_note', input: { title: 'a note' } }] })
+  fakeAi.reply('Done')
+  await send(page, 'note it', 'Done')
+  await page.waitFor('.kai-chat-turn[data-pending]', { gone: true })
+
+  const finished = await page.evaluate(() => {
+    const details = document.querySelector('.kai-chat-reasoning') as HTMLDetailsElement
+    const text = details.querySelector('.kai-chat-reasoning-text') as HTMLElement
+
+    details.open = true
+
+    return { tabindex: text.getAttribute('tabindex'), scrolls: text.scrollHeight > text.clientHeight, overflow: getComputedStyle(text).overflowY }
+  })
+
+  expect(finished).toEqual({ tabindex: '0', scrolls: true, overflow: 'auto' })
+  expect(page.errors).toEqual([])
+}, 120_000)

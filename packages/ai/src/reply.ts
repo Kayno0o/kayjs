@@ -14,14 +14,17 @@ function snapshot(call: ToolCall): ToolCall {
 export function createReply(open: (signal: AbortSignal) => AsyncIterable<Piece>, signals: (AbortSignal | undefined)[], highlight = highlighting, outlive = false, onEnd?: () => void, { resumed = false, sources = [] }: { resumed?: boolean | undefined, sources?: readonly Source[] | undefined } = {}): Reply {
   const controller = new AbortController()
   const deltas: string[] = []
-  const thoughts: string[] = []
+  // Appended to as it streams, so a snapshot reads it without joining the pieces again.
+  let thought = ''
   const waiters = new Set<() => void>()
   const counted = Promise.withResolvers<Usage | undefined>()
   const ending = Promise.withResolvers<Finish | undefined>()
   const total: Partial<Usage> = {}
   const calls: ToolCall[] = []
-  // Counts each change to the text or to a call, which `progress()` reads from.
+  // Counts each change to the text, to a call or to the reasoning, which `progress()` reads from.
   let version = 0
+  // Counts each change to the text alone, which is what its code blocks are scanned for.
+  let textVersion = 0
   // Counts the times the text started over, which a reader meets by starting from the top.
   let epoch = 0
   let reason: Finish | undefined
@@ -45,15 +48,17 @@ export function createReply(open: (signal: AbortSignal) => AsyncIterable<Piece>,
         if ('text' in piece) {
           deltas.push(piece.text)
           version++
+          textVersion++
         }
         else if ('reasoning' in piece) {
-          thoughts.push(piece.reasoning)
+          thought += piece.reasoning
           version++
         }
         else if ('restart' in piece) {
           deltas.length = 0
           epoch++
           version++
+          textVersion++
         }
         else if ('usage' in piece) {
           Object.assign(total, piece.usage)
@@ -194,6 +199,7 @@ export function createReply(open: (signal: AbortSignal) => AsyncIterable<Piece>,
 
     const highlighted = highlight()
     let seen = 0
+    let scanned = 0
     let closed = false
     // Highlighting runs beside the stream: a snapshot carries the text at once and the blocks finished since, so a slow highlighter never holds the text back.
     let working = false
@@ -203,6 +209,7 @@ export function createReply(open: (signal: AbortSignal) => AsyncIterable<Piece>,
     const scan = () => {
       working = true
       stale = false
+      scanned = textVersion
 
       void (async () => {
         try {
@@ -229,18 +236,21 @@ export function createReply(open: (signal: AbortSignal) => AsyncIterable<Piece>,
 
             finished = []
 
-            return { done: false, value: { text: deltas.join(''), calls: calls.map(snapshot), code, ...thoughts.length > 0 && { reasoning: thoughts.join('') }, ...outlive && { outlives: true }, ...sources.length > 0 && { sources: sources.map(source => ({ ...source })) } } }
+            return { done: false, value: { text: deltas.join(''), calls: calls.map(snapshot), code, ...thought !== '' && { reasoning: thought }, ...outlive && { outlives: true }, ...sources.length > 0 && { sources: sources.map(source => ({ ...source })) } } }
           }
 
           if (seen < version) {
             seen = version
 
-            if (working)
-              stale = true
-            else
-              scan()
+            // A change to the reasoning or a call leaves the text as it was, so it is not scanned again.
+            if (scanned !== textVersion) {
+              if (working)
+                stale = true
+              else
+                scan()
+            }
 
-            return { done: false, value: { text: deltas.join(''), calls: calls.map(snapshot), ...thoughts.length > 0 && { reasoning: thoughts.join('') }, ...outlive && { outlives: true }, ...sources.length > 0 && { sources: sources.map(source => ({ ...source })) } } }
+            return { done: false, value: { text: deltas.join(''), calls: calls.map(snapshot), ...thought !== '' && { reasoning: thought }, ...outlive && { outlives: true }, ...sources.length > 0 && { sources: sources.map(source => ({ ...source })) } } }
           }
 
           if (stale && !working) {

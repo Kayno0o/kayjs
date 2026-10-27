@@ -4,7 +4,8 @@ import { logFrom } from 'kay'
 import { spend, ticketAllows, ticketFor } from './approval'
 import { ticketsIn } from './approval-marker'
 import { mediaChars } from './attachments'
-import { MAX_ARGUMENTS, MAX_CALLS_PER_STEP, MAX_STREAMED_CALLS } from './tool-limits'
+import { AiError } from './errors'
+import { MAX_ARGUMENTS, MAX_CALLS_PER_STEP, MAX_STREAMED_CALLS, MAX_THINKING } from './tool-limits'
 
 const log = logFrom('kayjs-ai')
 
@@ -181,6 +182,7 @@ export async function* converse(provider: Provider, base: ProviderRequest, offer
     const uses: ToolUse[] = []
     const thinking: Thinking[] = []
     let reasoned = false
+    let thoughtSize = 0
     const used: Partial<Usage> = {}
     let text = ''
     let finish: Piece | undefined
@@ -199,6 +201,11 @@ export async function* converse(provider: Provider, base: ProviderRequest, offer
         thought = true
       }
       else if ('thinking' in piece) {
+        thoughtSize += 'redacted' in piece.thinking ? piece.thinking.redacted.length : piece.thinking.text.length + piece.thinking.signature.length
+
+        if (thoughtSize > MAX_THINKING)
+          throw new AiError('protocol', `the model's thinking is over ${MAX_THINKING} characters`)
+
         thinking.push(piece.thinking)
       }
       else if ('toolUse' in piece) {

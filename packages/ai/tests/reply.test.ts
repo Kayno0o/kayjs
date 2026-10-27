@@ -195,3 +195,29 @@ describe('a reply whose text starts over', () => {
     expect(seen.at(-1)).toBe('{"a":1}')
   })
 })
+
+describe('progress() while the model thinks', () => {
+  it('carries the reasoning so far in each snapshot and scans the text for code only when the text changed', async () => {
+    const scanned: string[] = []
+    const highlight = () => async (text: string) => {
+      scanned.push(text)
+
+      return []
+    }
+    const reply = createReply(async function* () {
+      yield { text: 'Hello' }
+      await Bun.sleep(5)
+      yield { reasoning: 'think' }
+      await Bun.sleep(5)
+      yield { reasoning: 'ing' }
+      await Bun.sleep(5)
+    }, [], highlight)
+    const reasonings: (string | undefined)[] = []
+
+    for await (const snapshot of reply.progress())
+      reasonings.push(snapshot.reasoning)
+
+    expect(reasonings.at(-1)).toBe('thinking')
+    expect(scanned).toEqual(['Hello'])
+  })
+})

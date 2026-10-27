@@ -205,7 +205,7 @@ A level such a model refuses fails with an error that names `reasoning` and `bod
 
 Anthropic refuses a `temperature` while the model thinks, so kayjs-ai leaves yours out then, and the newest models refuse it altogether with their own message. A model that still wants a thinking budget (Haiku 4.5 and older) takes `body: { thinking: { type: 'enabled', budget_tokens: 2000 } }`, which replaces all of this.
 
-What the model thinks streams as its own kind of piece, so `await reply` still gives the answer alone. `reply.progress()` carries it as `reasoning`, and a tool loop sends Anthropic's thinking blocks back with the calls as its API requires.
+What the model thinks streams as its own kind of piece, so `await reply` still gives the answer alone. `reply.progress()` carries it as `reasoning`, and a tool loop sends Anthropic's thinking blocks back with the calls as its API requires, a step whose thinking passes 262,144 characters failing the reply.
 
 ### Fields kayjs-ai does not model
 

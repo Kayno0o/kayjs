@@ -5,3 +5,5 @@ export const MAX_ARGUMENTS = 65_536
 export const MAX_NAME_LENGTH = 256
 // Calls a provider keeps while a step streams: a few past the cap, which the loop answers as too many.
 export const MAX_STREAMED_CALLS = MAX_CALLS_PER_STEP + 1
+// The characters of thinking a step keeps to send back with its calls, signatures included: a model thinking past it fails the reply rather than grow the history.
+export const MAX_THINKING = 262_144

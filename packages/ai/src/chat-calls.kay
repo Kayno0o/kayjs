@@ -4,8 +4,10 @@ import { recipe } from 'kay'
 
 const look = recipe({ parts: { root: 'kai-chat-calls', summary: 'kai-chat-calls-summary', list: 'kai-chat-calls-list', call: 'kai-chat-call', name: 'kai-chat-call-name', status: 'kai-chat-call-status', title: 'kai-chat-call-title', code: 'kai-chat-call-code' } })
 
-const { calls, labels, details, runningLabel, doneLabel, failedLabel, argumentsLabel, resultLabel, approvalLabel } = props<{
+const { calls, pending = false, labels, details, runningLabel, doneLabel, failedLabel, argumentsLabel, resultLabel, approvalLabel } = props<{
   calls: ToolCall[]
+  // Set in the turn being written, which is hidden from assistive technology: nothing in it takes focus.
+  pending?: boolean
   // The phrase for a tool by its name, in the folded line.
   labels: Record<string, string>
   // Whether a call opens to its arguments and result.
@@ -46,13 +48,13 @@ function summary() {
 }
 ---
 details(part="root")
-  summary(part="summary") {summary()}
+  summary(part="summary" tabindex={pending ? -1 : undefined}) {summary()}
   ul(part="list")
     for call of calls key={call.id}
       li(part="call" data-status={call.status} data-held={call.approval === undefined ? undefined : ''})
         if details
           details
-            summary
+            summary(tabindex={pending ? -1 : undefined})
               span(part="name") {call.name}
               |
               span(part="status") {status(call)}

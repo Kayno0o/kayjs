@@ -54,6 +54,8 @@ interface Turn extends Message {
   code?: CodeBlock[] | undefined
   // What the model thought before answering, when the action streams `reply.progress()` and the provider sends it.
   reasoning?: string | undefined
+  // Whether the visitor had its reasoning open when the reply ended.
+  reasoningOpen?: boolean | undefined
 }
 
 const { action, initial = [], label = wording('ai.chat.label', 'Chat'), placeholder = wording('ai.chat.placeholder', 'Write a message…'), sendLabel = wording('ai.chat.send', 'Send'), stopLabel = wording('ai.chat.stop', 'Stop'), retryLabel = wording('ai.chat.retry', 'Try again'), thinkingLabel = wording('ai.chat.thinking', 'Thinking…'), sourcesLabel = wording('ai.chat.sources', 'Sources'), reasoning = true, reasoningLabel = wording('ai.chat.reasoning', 'Reasoning'), stoppedLabel = wording('ai.chat.stopped', 'Stopped'), errorMessage = wording('ai.chat.error', 'The reply failed.'), keep = 20, maxChars = POSTED_CHARACTERS, tableLabel = wording('ai.chat.table', 'Table'), toolDetails = true, greeting = wording('ai.chat.greeting', 'How can I help?'), disclosure = wording('ai.chat.disclosure', 'You are talking to an AI. Your messages are sent to its provider to answer.'), suggestions = [], toolLabels = {}, sendIcon, stopIcon, newButton = false, newLabel = wording('ai.chat.new', 'New conversation'), newIcon, remember, links = 'apart', runningLabel = wording('ai.chat.running', 'Running'), doneLabel = wording('ai.chat.done', 'Done'), failedLabel = wording('ai.chat.failed', 'Failed'), argumentsLabel = wording('ai.chat.arguments', 'Arguments'), resultLabel = wording('ai.chat.result', 'Result'), approvalLabel = wording('ai.chat.approval', 'Needs your approval'), allowLabel = wording('ai.chat.allow', 'Allow'), denyLabel = wording('ai.chat.deny', 'Deny'), allowedLabel = wording('ai.chat.allowed', 'Allowed:'), deniedLabel = wording('ai.chat.denied', 'Denied:'), attach = false, accept = ATTACHABLE, maxFiles = 4, maxFileSize = 5 * 1024 * 1024, attachLabel = wording('ai.chat.attach', 'Attach a file'), removeLabel = wording('ai.chat.remove', 'Remove'), attachRefusedLabel = wording('ai.chat.attachRefused', 'Only images and PDFs can be attached.'), attachTooBigLabel = wording('ai.chat.attachTooBig', 'That file is too big to attach.'), attachFullLabel = wording('ai.chat.attachFull', 'No more files can be attached.'), attachIcon, regenerate = false, editable = false, regenerateLabel = wording('ai.chat.regenerate', 'Regenerate the reply'), editLabel = wording('ai.chat.edit', 'Edit the message'), saveLabel = wording('ai.chat.save', 'Save and send'), cancelLabel = wording('ai.chat.cancel', 'Cancel'), editEmptyLabel = wording('ai.chat.editEmpty', 'Write a message to send.'), editBusyLabel = wording('ai.chat.editBusy', 'Wait for the reply to finish.'), regenerateIcon, editIcon, fill = false, variant = 'bubble', tone = 'accent', size = 'md' } = props<{
@@ -164,6 +166,8 @@ const streaming = signal<ActionStream<string | Progress> | undefined>(undefined)
 const partial = signal('')
 // What the model has thought so far in the reply being written.
 const thought = signal('')
+// Whether the visitor opened the reasoning of the reply being written, which the finished turn keeps.
+const thoughtOpen = signal(false)
 // The tool calls of the reply being written, as last seen.
 const calls = signal<ToolCall[]>([])
 // The code blocks of the reply being written that the server highlighted so far.
@@ -388,6 +392,7 @@ function finish(state: string) {
 
   const text = partial()
   const thinking = thought()
+  const thinkingOpen = thoughtOpen()
   const made = calls()
   const highlighted = code()
   const cites = found()
@@ -395,6 +400,7 @@ function finish(state: string) {
   streaming = undefined
   partial = ''
   thought = ''
+  thoughtOpen = false
   calls = []
   code = []
   found = []
@@ -410,7 +416,7 @@ function finish(state: string) {
 
   if (text !== '' || made.length > 0) {
     undone = undefined
-    history = [...history(), { id: nextId++, role: 'assistant', content: text, calls: made, code: highlighted, reasoning: thinking, ...cites.length > 0 && { sources: cites }, stopped: state === 'closed' }]
+    history = [...history(), { id: nextId++, role: 'assistant', content: text, calls: made, code: highlighted, reasoning: thinking, reasoningOpen: thinkingOpen, ...cites.length > 0 && { sources: cites }, stopped: state === 'closed' }]
   }
 
   if (state === 'failed')
@@ -567,6 +573,7 @@ async function send(again = false, question?: string, resuming?: string) {
   takenBack = false
   partial = ''
   thought = ''
+  thoughtOpen = false
   calls = []
   code = []
   found = []
@@ -643,6 +650,7 @@ function reset() {
   takenBack = false
   partial = ''
   thought = ''
+  thoughtOpen = false
   calls = []
   code = []
   found = []
@@ -948,9 +956,9 @@ section(part="root" onKeyDown={escape} data-empty={history().length === 0 && !bu
                   Icon(icon="edit")
         else
           if reasoning && turn.reasoning
-            details(part="reasoning")
+            details(part="reasoning" open={turn.reasoningOpen})
               summary {reasoningLabel}
-              p(part="reasoningText") {turn.reasoning}
+              p(part="reasoningText" tabindex="0") {turn.reasoning}
           if turn.calls && turn.calls.length > 0
             Calls(calls={turn.calls} labels={toolLabels} details={toolDetails} runningLabel={runningLabel} doneLabel={doneLabel} failedLabel={failedLabel} argumentsLabel={argumentsLabel} resultLabel={resultLabel} approvalLabel={approvalLabel})
           for call of waitingFor(turn) key={call.id}
@@ -973,11 +981,11 @@ section(part="root" onKeyDown={escape} data-empty={history().length === 0 && !bu
     if busy()
       article(part="turn" data-role="assistant" data-pending="" aria-hidden="true")
         if reasoning && thought() !== ''
-          details(part="reasoning")
+          details(part="reasoning" open={thoughtOpen()} onToggle={event => { thoughtOpen = event.currentTarget.open }})
             summary(tabindex="-1") {reasoningLabel}
-            p(part="reasoningText") {thought()}
+            p(part="reasoningText" tabindex="-1") {thought()}
         if calls().length > 0
-          Calls(calls={calls()} labels={toolLabels} details={toolDetails} runningLabel={runningLabel} doneLabel={doneLabel} failedLabel={failedLabel} argumentsLabel={argumentsLabel} resultLabel={resultLabel} approvalLabel={approvalLabel})
+          Calls(pending={true} calls={calls()} labels={toolLabels} details={toolDetails} runningLabel={runningLabel} doneLabel={doneLabel} failedLabel={failedLabel} argumentsLabel={argumentsLabel} resultLabel={resultLabel} approvalLabel={approvalLabel})
         if partial() !== ''
           const view = render(partial(), code(), found(), false)
           div(part="text" innerHTML={view.html})
