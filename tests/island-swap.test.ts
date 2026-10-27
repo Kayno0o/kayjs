@@ -2,9 +2,11 @@ import type { TestPage } from '../src/test'
 import { join } from 'node:path'
 import process from 'node:process'
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
+import { CHUNK_TIMEOUT_MS } from '../src/runtime/page-swap'
 import { browse, browserPath } from '../src/test'
 import { scratchBuild } from './prerendered'
 import { pages } from './shared-pages'
+import { shorten } from './shorten'
 
 const ROOT = 'tests/fixtures/island-swap'
 const browserInstalled = browserPath() !== undefined
@@ -208,6 +210,46 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('a deferred 
           fresh.close()
         }
       })
+
+      it('swaps in the inert copy when the code holding a fetched island never answers, and runs then the refresh waiting behind the swap', async () => {
+        const fresh = await browse(`${origin}${path('/deferred-refresh')}`, VIEWPORT)
+        const stalled = Promise.withResolvers<void>()
+        const isPage = (url: URL) => url.pathname === path('/deferred-refresh') && url.search === ''
+
+        try {
+          await fresh.route(/\/swap-held-[^/]*\.js$/, async (request) => {
+            await stalled.promise
+            await request.continue()
+          })
+          await fresh.waitUntil((selector: string) => document.querySelectorAll(selector).length === 1, {}, FETCHED)
+          await watchIslands(fresh)
+          // Long enough for the refresh to start waiting behind the swap before the swap gives up.
+          await shorten(fresh, [CHUNK_TIMEOUT_MS], 1000)
+          fresh.responses.length = 0
+
+          const swapped = fresh.waitForResponse(isPage)
+
+          await fresh.click('a.self')
+          await swapped
+          fresh.responses.length = 0
+
+          const refreshed = fresh.waitForResponse(isPage)
+
+          // The swap still waits for the chunk when the refresh starts.
+          expect(await fresh.evaluate(() => document.documentElement.hasAttribute('aria-busy'))).toBe(true)
+          await fresh.click('button.refresh')
+          await refreshed
+          await fresh.waitUntil((selector: string) => document.querySelectorAll(selector).length === 1 && !document.documentElement.hasAttribute('aria-busy'), {}, FETCHED)
+
+          expect((await states(fresh)).some(slots => slots.some(slot => slot.inert && !slot.form))).toBe(true)
+          expect(await fresh.evaluate(() => (window as { kayAlive?: boolean }).kayAlive)).toBe(true)
+          expect(await labels(fresh)).toEqual(['one'])
+        }
+        finally {
+          stalled.resolve()
+          fresh.close()
+        }
+      }, 30_000)
 
       it('fetches again an island whose first fetch failed, the next page\'s copy standing in its place', async () => {
         const failing = /kay_island=0/

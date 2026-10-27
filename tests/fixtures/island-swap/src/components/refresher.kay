@@ -1,0 +1,4 @@
+---
+import { refresh } from 'kay'
+---
+button.refresh(onClick={() => void refresh()}) Refresh

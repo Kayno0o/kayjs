@@ -4,6 +4,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it } from 'bun:test'
 import { Elysia } from 'elysia'
 import { PAGE_TIMEOUT_MS, TRANSITION_TIMEOUT_MS } from '../src/runtime/page-swap'
 import { browserPath, testSite } from '../src/test'
+import { shorten } from './shorten'
 
 const chrome = browserPath()
 const NAVIGATE = 'x-kay-navigate'
@@ -206,16 +207,6 @@ describe.skipIf(chrome === undefined && (process.env.CI ?? '') === '')('a refres
     expect(await page.text('p.view')).toBe('b')
     expect(page.errors).toEqual([])
   }, 30_000)
-
-  // Makes the page's wait for a page or a transition last a moment, as a timer of exactly that length fires at once.
-  async function shorten(page: TestPage, bounds: number[], to = 100): Promise<void> {
-    await page.evaluate((lengths, to) => {
-      const original = window.setTimeout.bind(window)
-
-      // A timer of exactly one of these lengths fires after `to` instead.
-      window.setTimeout = ((handler: TimerHandler, delay?: number, ...rest: unknown[]) => original(handler, delay !== undefined && lengths.includes(delay) ? to : delay, ...rest)) as typeof window.setTimeout
-    }, bounds, to)
-  }
 
   it('a link whose page never answers is loaded by the browser', async () => {
     await using page = await opened(false)

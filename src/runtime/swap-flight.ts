@@ -40,6 +40,9 @@ export const inFlight: {
 
 export const LATE = Symbol('late')
 
+// How long a swap waits for a lazy chunk the fetched page needs, past which it goes on as if the chunk had failed to load.
+export const CHUNK_TIMEOUT_MS = 4000
+
 // The intent's policy, with history replaced as the swap asks, and the top for a traversal to an entry that saved no position.
 export function policyOf(swap: Swap): Policy {
   const policy = { ...POLICIES[swap.intent] }

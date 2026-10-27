@@ -3,7 +3,7 @@ import type { Policy } from './swap-flight'
 import { historyState, leave, leaving, navigation, pageKey, restoreScroll, saveScroll, takeFormChecks } from './navigation'
 import { forgetPageData } from './page-data'
 import { HTML, ownOrigin, PAGE_TIMEOUT_MS, pageFor } from './swap-fetch'
-import { bounded, inFlight, LATE, policyOf } from './swap-flight'
+import { bounded, CHUNK_TIMEOUT_MS, inFlight, LATE, policyOf } from './swap-flight'
 import { moveFocus } from './swap-focus'
 import { mergeHead, swapRoot } from './swap-head'
 import { holding, swapBody } from './swap-kept'
@@ -11,6 +11,7 @@ import { transitioned, viewTransitions } from './swap-transition'
 import { addressChanged } from './with-query'
 
 export { HTML, PAGE_TIMEOUT_MS, prefetch } from './swap-fetch'
+export { CHUNK_TIMEOUT_MS } from './swap-flight'
 export { TRANSITION_TIMEOUT_MS } from './swap-transition'
 
 // The page swap itself, which `./navigate` loads once a visitor is about to follow a link, and `./forms` once a form is posted.
@@ -167,13 +168,15 @@ export async function show(page: FetchedPage, hash: string, swap: Swap, isCurren
 
   // Only a page the server streamed carries the templates, so the code putting them in place loads for those alone.
   if (next.querySelector(STREAMED_TEMPLATE)) {
-    let streamed: typeof import('./swap-streamed') | undefined
+    let streamed: typeof import('./swap-streamed') | typeof LATE = LATE
 
     try {
-      streamed = await import('./swap-streamed')
+      streamed = await bounded(import('./swap-streamed'), CHUNK_TIMEOUT_MS)
     }
-    catch {
-      // A chunk a deploy replaced is gone: the page loads in full, unless another navigation took over.
+    catch {}
+
+    // A chunk a deploy replaced is gone, or its request never answers: the page loads in full, unless another navigation took over.
+    if (streamed === LATE) {
       if (isCurrent())
         leave(target, replaces)
 
@@ -192,7 +195,9 @@ export async function show(page: FetchedPage, hash: string, swap: Swap, isCurren
 
   await head.loaded
 
-  const held = holds && await holds
+  // A chunk that never answers is given up on as one that failed: the next page's copy of the island shows, inert until fetched.
+  const kept = holds && await bounded(holds, CHUNK_TIMEOUT_MS)
+  const held = kept === LATE ? undefined : kept
 
   // Another navigation started meanwhile and shows its own page; the head it merges drops what this one added.
   if (!isCurrent())

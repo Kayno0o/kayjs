@@ -1,0 +1,15 @@
+--- server
+import { t } from 'elysia'
+import { action } from 'kay'
+
+export const stay = action(t.Object({}), (_, ctx) => ctx.redirect(ctx.url.pathname))
+--- script
+import Refresher from '../components/refresher.kay'
+import Remote from '../components/remote.kay'
+---
+head
+  title Deferred refresh
+h1 Deferred refresh
+Remote(server="defer" label="one" to={stay})
+Refresher
+a.self(href="/deferred-refresh") Self

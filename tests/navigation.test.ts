@@ -2,9 +2,11 @@ import type { TestPage } from '../src/test'
 import { join } from 'node:path'
 import process from 'node:process'
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'bun:test'
+import { CHUNK_TIMEOUT_MS } from '../src/runtime/page-swap'
 import { browse, browserPath } from '../src/test'
 import { listeningPort, spawnSuiteServer, stopSuiteServer } from './listening'
 import { scratchDir } from './scratch'
+import { shorten } from './shorten'
 
 const LISTENING = /port (\d+)/
 // CI installs Chromium and names it in BUN_CHROME_PATH, where a missing browser fails rather than skipping.
@@ -799,6 +801,31 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('page swap i
       expect(await fresh.path()).toBe('/second')
     }
     finally {
+      fresh.close()
+    }
+  })
+
+  it('loads a streamed page fully when the code putting its blocks in place never answers', async () => {
+    const fresh = await open('/')
+    const stalled = Promise.withResolvers<void>()
+
+    try {
+      await fresh.route(/\/swap-streamed-[^/]*\.js$/, async (request) => {
+        await stalled.promise
+        await request.continue()
+      })
+      await shorten(fresh, [CHUNK_TIMEOUT_MS])
+      await fresh.evaluate(() => {
+        (window as { kayAlive?: boolean }).kayAlive = true
+      })
+      await fresh.click('a.later')
+      await fresh.waitFor('p.answer', { text: 'The answer is 42' })
+
+      expect(await sameDocument(fresh)).toBe(false)
+      expect(await fresh.path()).toBe('/later')
+    }
+    finally {
+      stalled.resolve()
       fresh.close()
     }
   })
