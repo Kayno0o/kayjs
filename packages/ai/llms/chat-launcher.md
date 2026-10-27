@@ -1,6 +1,8 @@
 # Floating chat
 
-## Use
+## Common tasks
+
+### Use
 
 `ChatLauncher` (`@kaynooo/kayjs-ai/chat-launcher.kay`) is the chat as a button at the bottom right of every page that opens it in a panel. Put it once in the root layout, a `--- server` fence passing the action as for `Chat`, and it needs no other wiring:
 
@@ -14,7 +16,9 @@ slot
 ChatLauncher(action={reply} label="Ask the docs")
 ```
 
-## Behaviour
+## Reference
+
+### Behaviour
 
 - It takes `Chat`'s props but `links`, which it sets to `here`, and: `openLabel` (`Open the chat`, the button's name, and its tooltip while the panel is closed) and `closeLabel` (`Close the chat`, the name of the panel's close button and the button's tooltip while it is open), `remember` (the session storage key, none by default), `class` on the wrapper, and blocks `newLabel` (`New conversation`), `expandLabel` (`Enlarge the chat`), `collapseLabel` (`Shrink the chat`), blocks `@icon`, `@closeIcon`, `@newIcon`, `@expandIcon` and `@collapseIcon` for the icons (a chat bubble, a cross, a plus and two arrow pairs by default; any `Icon` or inline `svg`), and `@note` for a line under the chat. `@sendIcon` and `@stopIcon` replace the round send and stop buttons' icons (an arrow and a square). `label` heads the panel.
 - The button and panel are one island marked `persist`, so the panel, open or closed, and the conversation stay across page swaps. The chat inside is an island of its own marked `hydrate="visible"` in a hidden panel: its JavaScript loads on the first open, and until then a page carries the button's script only.
