@@ -1,0 +1,7 @@
+--- server
+import { approving } from './tools.kay'
+--- script
+import Chat from '@kaynooo/kayjs-ai/chat.kay'
+---
+h1 Replaceable approving
+Chat(action={approving} label="Assistant" regenerate editable)

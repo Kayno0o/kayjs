@@ -1,11 +1,17 @@
 import { join } from 'node:path'
-import { afterAll, expect, it } from 'bun:test'
+import { afterAll, afterEach, expect, it } from 'bun:test'
 import { testSite } from 'kay/test'
 import { scratchDir } from '../../../tests/scratch'
+import { fakeAi } from '../src'
+import { testing } from './fixture/src/testing'
 
 const site = await testSite({ root: join(import.meta.dir, 'fixture'), browser: true })
 
 afterAll(async () => site.close())
+afterEach(() => {
+  fakeAi.clear()
+  testing.provider = undefined
+})
 
 type Page = Awaited<ReturnType<typeof site.open>>
 
@@ -330,4 +336,140 @@ it('puts the focus in the field, and nowhere later, when an edit is cancelled wh
   await page.waitFor('.kai-chat-turn[data-pending]', { gone: true })
 
   expect(await focused(page)).toContain('textarea')
+}, 120_000)
+
+const LAST_REPLY = '.kai-chat-turn[data-role=assistant]:last-of-type .kai-chat-text'
+const logText = async (page: Page) => page.evaluate(() => document.querySelector('.kai-chat-log')!.textContent ?? '')
+
+it('regenerates a reply that had reasoning and a tool loop: the old reasoning and calls leave the log and are never posted again', async () => {
+  await using page = await site.open('/replaceable-tools')
+
+  fakeAi.reply({ reasoning: 'Thinking one', text: 'Checking', calls: [{ name: 'add_note', input: { title: 'first note' } }] })
+  fakeAi.reply('Done one')
+  await send(page, 'note it', 'Done one')
+
+  expect(await logText(page)).toContain('Thinking one')
+  expect(await logText(page)).toContain('first note')
+
+  const before = fakeAi.asked.length
+
+  fakeAi.reply({ reasoning: 'Thinking two', text: 'Checking', calls: [{ name: 'add_note', input: { title: 'second note' } }] })
+  fakeAi.reply('Done two')
+  await page.click(REGENERATE)
+  await page.waitFor(LAST_REPLY, { text: 'Done two' })
+  await page.waitFor('.kai-chat-turn[data-pending]', { gone: true })
+
+  const text = await logText(page)
+
+  expect(text).toContain('Thinking two')
+  expect(text).toContain('second note')
+  expect(text).not.toContain('Thinking one')
+  expect(text).not.toContain('first note')
+  expect(text).not.toContain('Done one')
+  expect(await page.count('.kai-chat-turn[data-role=assistant]')).toBe(1)
+
+  const posts = fakeAi.asked.slice(before)
+
+  expect(posts.length).toBeGreaterThan(0)
+  expect(posts[0]!.messages.map(message => [message.role, message.content])).toEqual([['user', 'note it']])
+  expect(JSON.stringify(posts)).not.toContain('first note')
+  expect(JSON.stringify(posts)).not.toContain('Thinking one')
+  expect(page.errors).toEqual([])
+}, 120_000)
+
+// The roles of the log's user turns that hold an edit button.
+const editable = async (page: Page) => page.evaluate(() => [...document.querySelectorAll('.kai-chat-turn[data-role=user]')].map(turn => turn.querySelector('button.kai-chat-action') !== null))
+
+it('offers no regenerate while an approval waits or right after its answer, and no edit on the answer', async () => {
+  await using page = await site.open('/replaceable-approving')
+
+  fakeAi.reply({ calls: [{ name: 'add_note', input: { title: 'Milk' } }] })
+  fakeAi.reply('May I add it?')
+  await page.fill('.kai-chat-form textarea', 'Add milk')
+  await page.click('.kai-chat-form .kai-chat-send')
+  await page.waitFor('.kai-chat-approval')
+  await page.waitFor('.kai-chat-turn[data-pending]', { gone: true })
+
+  expect(await page.count(REGENERATE)).toBe(0)
+  expect(await editable(page)).toEqual([true])
+
+  fakeAi.reply({ calls: [{ name: 'add_note', input: { title: 'Milk' } }] })
+  fakeAi.reply('Added')
+  await page.click('.kai-chat-approval button:first-of-type')
+  await page.waitFor(LAST_REPLY, { text: 'Added' })
+  await page.waitFor('.kai-chat-turn[data-pending]', { gone: true })
+
+  expect(await page.count('.kai-chat-approval')).toBe(0)
+  expect(await page.count(REGENERATE)).toBe(0)
+  expect(await editable(page)).toEqual([true, false])
+
+  // The guard lifts with the next message of the visitor's own.
+  fakeAi.reply('You are welcome')
+  await send(page, 'thanks', 'You are welcome')
+
+  expect(await page.count(REGENERATE)).toBe(1)
+  expect(await editable(page)).toEqual([true, false, true])
+  expect(page.errors).toEqual([])
+}, 120_000)
+
+// A model that says its first words, waits for the test to let it go on, then finishes; an abort ends it where it stands.
+function gated(first: string, rest: string) {
+  const gate = Promise.withResolvers<void>()
+  const state = { asked: 0, aborted: false }
+
+  testing.provider = {
+    name: 'gated',
+    model: 'm',
+    async* stream(_request, signal) {
+      state.asked++
+      yield { text: first }
+
+      await Promise.race([gate.promise, new Promise(resolve => signal.addEventListener('abort', resolve))])
+
+      if (signal.aborted) {
+        state.aborted = true
+
+        return
+      }
+
+      yield { text: rest }
+      yield { finish: 'stop' }
+    },
+  }
+
+  return { state, release: gate.resolve }
+}
+
+it('resumes a regenerated reply the server kept with outlive, after a reload, and asks the model once', async () => {
+  const one = gated('Hel', 'lo there')
+
+  await using page = await site.open('/replaceable-staying')
+
+  await page.fill('.kai-chat-form textarea', 'Go')
+  await page.click('.kai-chat-form .kai-chat-send')
+  await page.waitFor('[data-pending] .kai-chat-text', { text: 'Hel' })
+  one.release()
+  await page.waitFor(LAST_REPLY, { text: 'Hello there' })
+  await page.waitFor('.kai-chat-turn[data-pending]', { gone: true })
+
+  const two = gated('Hey', ' again')
+
+  await page.click(REGENERATE)
+  await page.waitFor('[data-pending] .kai-chat-text', { text: 'Hey' })
+  await page.reload()
+  await page.waitFor('[data-pending] .kai-chat-text', { text: 'Hey' })
+
+  // The old reply is gone from the resumed log too.
+  expect(await log(page)).toEqual(['u:Go', 'a:Hey'])
+
+  two.release()
+  await page.waitFor(LAST_REPLY, { text: 'Hey again' })
+  await page.waitFor('.kai-chat-turn[data-pending]', { gone: true })
+
+  expect(await log(page)).toEqual(['u:Go', 'a:Hey again'])
+  expect(one.state.asked).toBe(1)
+  expect(two.state.asked).toBe(1)
+  expect(two.state.aborted).toBe(false)
+  expect(await page.count(REGENERATE)).toBe(1)
+  expect(page.errors).toEqual([])
 }, 120_000)

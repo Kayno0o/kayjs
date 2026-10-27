@@ -1,0 +1,7 @@
+--- server
+import { staying } from './staying.kay'
+--- script
+import Chat from '@kaynooo/kayjs-ai/chat.kay'
+---
+h1 Replaceable staying
+Chat(action={staying} label="Assistant" regenerate editable remember="replaceable-staying")

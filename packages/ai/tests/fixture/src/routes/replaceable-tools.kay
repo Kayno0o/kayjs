@@ -1,0 +1,7 @@
+--- server
+import { helper } from './tools.kay'
+--- script
+import Chat from '@kaynooo/kayjs-ai/chat.kay'
+---
+h1 Replaceable tools
+Chat(action={helper} label="Assistant" regenerate editable)
