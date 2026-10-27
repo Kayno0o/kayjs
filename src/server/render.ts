@@ -1,4 +1,5 @@
 import type { KayConfig } from '../config'
+import type { RenderConfigKey } from '../project'
 import type { CardPageContext, ErrorPageContext, Locals, PageContext, PageError } from '../runtime'
 import type { Action, Outcome } from '../runtime/action'
 import type { PendingBlock } from '../runtime/await.server'
@@ -17,7 +18,6 @@ import type { Refusal, ServedRoute } from './guards'
 import type { SpecialPage, SpecialPages } from './routes'
 import type { SeoHead } from './seo'
 import type { CutIslands } from './server-islands'
-import type { Prefetch } from './speculation'
 import type { Revalidation } from './stale-pages'
 import type { Rendered } from './stream'
 import { relative } from 'node:path'
@@ -143,18 +143,13 @@ export interface ServedPage extends Omit<PrerenderedPage, 'pattern' | 'file' | '
   cut?: CutIslands | undefined
 }
 
-export interface RenderOptions {
-  lang?: string | undefined
-  prefetch?: Prefetch | undefined
-  // Where the API is mounted, which pages are never prefetched under.
-  apiPath?: string | undefined
+export interface RenderOptions extends Pick<KayConfig, RenderConfigKey> {
   // Shows thrown errors with their stack instead of a generic message.
   dev?: boolean | undefined
   // Loads the dev tool's scripts, which the dev routes serve.
   devTools?: boolean | undefined
   // Renders once at build time: what only a request carries throws instead of reading as empty.
   prerendering?: boolean | undefined
-  onError?: KayConfig['onError'] | undefined
   // The tags `site` and `seo` give every page.
   head?: SeoHead | undefined
   // The site's mount point, which every path a page renders goes under.
@@ -171,12 +166,6 @@ export interface RenderOptions {
   offline?: boolean | undefined
   // Also keeps the browser's install offer, which `push()` turns on.
   installOffer?: boolean | undefined
-  // Whether pages load the whole stylesheet after paint, so no class lacks its rule.
-  lateStyles?: boolean | undefined
-  // `false` leaves a French page's spaces as they were typed.
-  typography?: boolean | undefined
-  // `false` serves every visitor the same page, as the `saveData` config key says; else a visitor asking for less data gets one without font preloads and speculation rules.
-  saveData?: boolean | undefined
   // `links: { outside: 'same-tab' }`: islands leave a link leaving the site in the same tab, the page telling them so.
   sameTabLinks?: boolean | undefined
   // The stylesheet declaring the fonts, which a visitor asking for less data gets with each face shown only when cached.

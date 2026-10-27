@@ -1,6 +1,5 @@
-import type { BunPlugin } from 'bun'
-import type { LintLevels } from '../compiler/lints'
-import type { KayConfig, KayExtension } from '../config'
+import type { KayConfig } from '../config'
+import type { ClientConfigKey } from '../project'
 import type { ClassTable } from '../runtime/class-table'
 import type { ClientBuild, ClientManifest } from '../server/client'
 import type { FontFallback } from '../server/fonts'
@@ -47,32 +46,13 @@ import { mergingSupports } from './supports'
 import { analyzeKayCached, KayCompileError, keepAnalyses } from './transform'
 import { UI_FILE } from './ui'
 
-export interface ClientOptions {
+export interface ClientOptions extends Pick<KayConfig, ClientConfigKey> {
   minify?: boolean | undefined
-  plugins?: BunPlugin[] | undefined
-  // Page directory relative to the root: its pages and layouts are where stylesheets are gathered from.
-  routes?: string | undefined
-  // The libraries whose routes the app mounts, built as its own pages are.
-  extensions?: KayExtension[] | undefined
-  // API directory relative to the root: an island importing a module there, or under an extension's, gets where its routes are served, not its code.
-  api?: string | undefined
-  // Where the API is mounted, `/api` by default: the stubs an island imports hold it.
-  apiPath?: string | undefined
   // Links each island chunk to a map of its `.kay` sources, for the browser's devtools; the server points a map at them as it first serves it.
   // `true` links maps for development's devtools, `'external'` keeps them for the server to map the stacks islands report.
   sourcemap?: boolean | 'external' | undefined
   // The site's mount point, which the stylesheets' own paths go under, `url(/bg.png)` included.
   base?: string | undefined
-  // The app's own modules for its libraries' settings, as `kay.config.ts` gives them.
-  settings?: Record<string, string> | undefined
-  // Swaps pages in place: the entry is built whether or not any component is interactive, for the pages posting forms to actions.
-  navigation?: boolean | undefined
-  // How far ahead of the viewport an island marked `hydrate="visible"` starts to hydrate, and a deferred server island starts to load, as CSS root margins; `200px` and `100% 0px` by default.
-  hydration?: { visible?: string | undefined, serverIslands?: string | undefined } | undefined
-  // `lateStyles` is on: every page loads the whole stylesheet, so the build has no class to warn of.
-  lateStyles?: boolean | undefined
-  // `search` is on: a page opened from a search hit marks the words searched for.
-  search?: boolean | undefined
   // The app has locales: the links its islands write go to the page's locale's copy, as the server writes them.
   i18n?: boolean | undefined
   // The app has French pages (a `lang` or a locale of `fr` or `fr-...`) and `typography` is not off: its islands write their text with the same non-breaking spaces as the server's markup. An app without them is built without that code.
@@ -83,10 +63,6 @@ export interface ClientOptions {
   inspect?: boolean | undefined
   // The config declares `publicEnv`: the entry imports its values from the server before any island hydrates.
   publicEnv?: boolean | undefined
-  // The self-hosted fonts: each family is followed by a metric-matched fallback in the stylesheets' font stacks.
-  fonts?: KayConfig['fonts'] | undefined
-  // The level of each lint the dev tool shows in development.
-  lints?: LintLevels | undefined
   // `kay build --static`: no server takes the errors the browser meets, so none are sent.
   exported?: boolean | undefined
   // Measures what the browser loads for islands, `modules` breaking each chunk down by the modules it holds.

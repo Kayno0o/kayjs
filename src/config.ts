@@ -645,6 +645,11 @@ export function defineConfig<Config extends KayConfig>(config: Config & { public
   return config
 }
 
+// The keys of the config a view of kay's takes as written, each one set, undefined when the config leaves it out, as the view's options type derives from the same list.
+export function pickConfig<Key extends keyof KayConfig>(config: KayConfig, keys: readonly Key[]): Pick<KayConfig, Key> {
+  return Object.fromEntries(keys.map(key => [key, config[key]])) as Pick<KayConfig, Key>
+}
+
 // `fresh` reads the file again as it is now, as `kay dev` does once it changed, rather than the module this process imported first.
 export async function loadConfig(root: string, fresh = false): Promise<KayConfig> {
   return withSiteUrl(withPublicFields(root, withExtensions(withLibraryMessages(root, await importConfig(root, fresh)))))

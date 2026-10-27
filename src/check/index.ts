@@ -1,12 +1,6 @@
-import type { BudgetConfig } from '../build/budget'
 import type { Diagnostic } from '../compiler/ast'
 import type { Paint } from '../compiler/frame'
-import type { LintLevels } from '../compiler/lints'
-import type { FaviconConfig, HealthConfig, I18nConfig, ImagesConfig, KayConfig, KayExtension, LiveConfig, ManifestConfig, SeoConfig } from '../config'
-import type { Duration } from '../runtime/duration'
-import type { McpConfig } from '../server/api-modules'
-import type { OpenApiConfig } from '../server/openapi'
-import type { Redirects } from '../server/redirects'
+import type { KayConfig } from '../config'
 import type { TypeScope } from './diagnose'
 import type { ProbeMemory } from './project'
 import type { ShadowFile } from './shadow'
@@ -17,6 +11,7 @@ import { inWalkScope, readText } from '../build/files'
 import { formatReport } from '../compiler/frame'
 import { lintLevels } from '../compiler/lints'
 import { offsetAt, positionAt } from '../compiler/mapping'
+import { pickConfig } from '../config'
 import { projectPaths } from '../project'
 import { diagnoseShadow, reportsTypeErrors, servedByTheApp, shownOutsideKay, unusedCodesOf } from './diagnose'
 import { unknownNameHelp } from './export-homes'
@@ -34,58 +29,60 @@ export type { ContentChecks } from './project'
 export { writeShadowTypes } from './shadow-types'
 export type { ShadowTypes } from './shadow-types'
 
-export interface CheckOptions {
-  tsconfig?: string | undefined
+// The keys of the config `kay check` reads, which `configCheckOptions` passes on as written.
+export const CHECK_CONFIG = [
   // The server entry relative to the root, `src/server.ts` by default: the `app` it exports types `ctx.locals` and the app routes links may point at.
-  entry?: string | undefined
+  'entry',
   // Page directory relative to the root, so `ctx.params` is typed per route.
-  routes?: string | undefined
+  'routes',
   // The libraries whose routes the app mounts, which links may point at too.
-  extensions?: KayExtension[] | undefined
+  'extensions',
   // Public file directory relative to the root, whose files links may point at.
-  publicDir?: string | undefined
-  // API directory relative to the root, whose modules' GET routes links may point at.
-  api?: string | undefined
+  'publicDir',
+  // API directory relative to the root, whose modules' GET routes links may point at, and where they are mounted, `/api` by default.
+  'api',
+  'apiPath',
   // The app's own modules for its libraries' settings, checked against the defaults they replace.
-  settings?: Record<string, string> | undefined
+  'settings',
   // The content config relative to the root, whose collections' entries are read against their schemas.
-  content?: string | undefined
+  'content',
   // The config's redirects, whose targets on the site must be a page or a public file.
-  redirects?: Redirects | undefined
+  'redirects',
   // Where the site is mounted, the origin it is public at and how long a stopping server waits, which the server refuses at boot when it cannot read them.
-  base?: string | undefined
-  site?: string | undefined
-  shutdownTimeout?: Duration | undefined
+  'base',
+  'site',
+  'shutdownTimeout',
   // The settings with a value the server refuses at boot when it cannot read it.
-  health?: HealthConfig | false | undefined
-  live?: LiveConfig | undefined
-  requestIdHeader?: string | undefined
-  timeZone?: string | undefined
-  budget?: BudgetConfig | undefined
+  'health',
+  'live',
+  'requestIdHeader',
+  'timeZone',
+  'budget',
   // The config's locales: links may carry their prefixes, `t()` reads the default locale's messages, and every other locale's must match them.
-  i18n?: I18nConfig | undefined
+  'i18n',
   // The site's one language without `i18n`: `t()` reads its extensions' catalogs and the app's then.
-  lang?: string | undefined
+  'lang',
   // The level of each lint, over its default.
-  lints?: LintLevels | undefined
+  'lints',
+  // What a public site's head starts from, which the `seo` lints read, its favicon, and the maskable icon checked with it.
+  'seo',
+  'favicon',
+  'manifest',
+  // Where `images.card.logo` is checked as the boot draws it.
+  'images',
+  'publicEnv',
+  // Reports each route of the app no guard covers, which the server refuses.
+  'requireGuards',
+  // Reports the actions offered as tools that bot protection alone stands before.
+  'mcp',
+  // Where the OpenAPI document and its reference page are served, which links to them are checked against.
+  'openapi',
+] as const satisfies readonly (keyof KayConfig)[]
+
+export interface CheckOptions extends Pick<KayConfig, (typeof CHECK_CONFIG)[number]> {
+  tsconfig?: string | undefined
   // The tree alone is wanted, as `kay dev` writes it: the diagnostics only `kay check` reports are not looked for.
   typesOnly?: boolean | undefined
-  // What a public site's head starts from, which the `seo` lints read.
-  seo?: SeoConfig | undefined
-  favicon?: string | FaviconConfig | false | undefined
-  // Its maskable icon, checked with the favicon.
-  manifest?: ManifestConfig | undefined
-  // Where `images.card.logo` is checked as the boot draws it.
-  images?: ImagesConfig | undefined
-  publicEnv?: boolean | undefined
-  // Reports each route of the app no guard covers, which the server refuses.
-  requireGuards?: boolean | undefined
-  // Reports the actions offered as tools that bot protection alone stands before.
-  mcp?: boolean | McpConfig | undefined
-  // Where the API modules are mounted, `/api` by default.
-  apiPath?: string | undefined
-  // Where the OpenAPI document and its reference page are served, which links to them are checked against.
-  openapi?: boolean | OpenApiConfig | undefined
   // Whether to report the lints of what a site lacks before it goes public, as `kay build` and `kay check --only seo` do.
   launch?: boolean | undefined
   // Set by `kay build --static`: a static host reads no `SITE_URL` once built, so a missing site is reported.
@@ -112,9 +109,7 @@ function helped({ message, help }: CheckDiagnostic): Pick<CheckDiagnostic, 'help
 }
 
 export function configCheckOptions(config: KayConfig): CheckOptions {
-  const { entry, routes, publicDir, api, apiPath, content, redirects, i18n, lang, settings, base, site, shutdownTimeout, health, live, requestIdHeader, timeZone, budget, lints, extensions, seo, favicon, manifest, images, publicEnv, requireGuards, mcp, openapi } = config
-
-  return { entry, routes, publicDir, api, apiPath, content, redirects, i18n, lang, settings, base, site, shutdownTimeout, health, live, requestIdHeader, timeZone, budget, lints, extensions, seo, favicon, manifest, images, publicEnv, requireGuards, mcp, openapi }
+  return pickConfig(config, CHECK_CONFIG)
 }
 
 // Type-checks a project, .kay components included, and reports every error at the line and column the user wrote.
