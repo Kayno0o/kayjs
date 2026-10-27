@@ -15,8 +15,6 @@ function readsOf(name: string): string {
   return name === 's' ? 'builds a schema with kay\'s `s`, which the browser has as a stand-in that throws' : `reads \`${name}\`, which a browser has not`
 }
 
-// The build's refusal of an island whose chunk reads the server, found from the sources: an island, or a module one imports, building a schema with `s` or reading `process` or `Bun` as it loads.
-// Reported at the island's own import of the module, as the build names the island, and at the read itself when the island's own script holds it.
 // Where the island's own script, or the file itself, imports the specifier: its server fence may import the same module and comes first.
 function importAt(source: string, specifier: string, fenced: boolean): number {
   const file = fenced ? parseKay(source) : undefined
@@ -33,6 +31,8 @@ function importAt(source: string, specifier: string, fenced: boolean): number {
   return 0
 }
 
+// The build's refusal of an island whose chunk reads the server, found from the sources: an island, or a module one imports, building a schema with `s` or reading `process` or `Bun` as it loads.
+// Reported at the island's own import of the module, as the build names the island, and at the read itself when the island's own script holds it.
 export async function serverOnlyInIsland(root: string, { modules, seeds, origins }: BrowserModules): Promise<CheckDiagnostic[]> {
   const project = realpathSync(root)
   const diagnostics: CheckDiagnostic[] = []
