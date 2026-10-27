@@ -24,11 +24,16 @@ const MARK = '\u0001'
 
 // The walks of the history, by the folders they cover: one per commit, as only a commit changes what they read.
 const walks = new Map<string, { head: string, edits: Promise<Map<string, Edit> | undefined> }>()
+// Aborted when the server stops or `kay dev` reloads it, which runs the app's `onStop` hooks, so no git, a walk above all, outlives the module that started it.
+let stopping = new AbortController()
+// The reads of HEAD started so far, and the newest of those answered: one answering after a newer one gives the newer HEAD, as git walks whatever HEAD is by then.
+let reads = 0
+let newest = { read: 0, head: '' }
 
 // Runs git in the repository and gives its output, undefined when git is missing, fails or runs out of time.
 async function git(args: string[], timeout = GIT_LIMIT_MS): Promise<string | undefined> {
   try {
-    const run = Bun.spawn(['git', '--literal-pathspecs', ...args], { cwd: repositoryRoot(), stdout: 'pipe', stderr: 'ignore', killSignal: 'SIGKILL', timeout })
+    const run = Bun.spawn(['git', '--literal-pathspecs', ...args], { cwd: repositoryRoot(), stdout: 'pipe', stderr: 'ignore', killSignal: 'SIGKILL', timeout, signal: stopping.signal })
     const out = await new Response(run.stdout).text()
 
     return await run.exited === 0 ? out : undefined
@@ -63,10 +68,16 @@ async function logged(dirs: string[]): Promise<Map<string, Edit> | undefined> {
 
 // The walk for the folders at the commit checked out, started once per commit; one that failed is started again by the next list.
 async function walk(dirs: string[]): Promise<Map<string, Edit> | undefined> {
-  const head = (await git(['rev-parse', 'HEAD']))?.trim()
+  const read = ++reads
+  const answered = (await git(['rev-parse', 'HEAD']))?.trim()
 
-  if (head === undefined)
+  if (answered === undefined)
     return undefined
+
+  if (read > newest.read)
+    newest = { read, head: answered }
+
+  const { head } = newest
 
   const key = JSON.stringify(dirs)
   const known = walks.get(key)
@@ -79,19 +90,24 @@ async function walk(dirs: string[]): Promise<Map<string, Edit> | undefined> {
       walks.delete(other)
   }
 
-  const walked = async () => {
-    const edits = await logged(dirs)
+  const entry = { head, edits: logged(dirs) }
 
-    if (edits === undefined && walks.get(key)?.head === head)
-      walks.delete(key)
+  walks.set(key, entry)
 
-    return edits
-  }
-  const edits = walked()
+  const edits = await entry.edits
 
-  walks.set(key, { head, edits })
+  // A walk that failed is forgotten, but not one started since, after a stop killed this one.
+  if (edits === undefined && walks.get(key) === entry)
+    walks.delete(key)
 
   return edits
+}
+
+// Kills the walks still running and forgets every walk, for the server stopping or reloading.
+export function stopWalks(): void {
+  stopping.abort()
+  stopping = new AbortController()
+  walks.clear()
 }
 
 // The walk's answer, or undefined once `ms` passed.

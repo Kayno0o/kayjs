@@ -3,20 +3,34 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, beforeAll, expect, it, spyOn } from 'bun:test'
 import { setContentPlace } from '../../../src/content/load'
-import { readEdits, readLastEdit } from '../src/history'
+import { readEdits, readLastEdit, stopWalks } from '../src/history'
 
 let dir = ''
-// How long a walk of the history takes, in seconds, as on a loaded machine, and how many walks ran since the last `walks()`.
+// How long a walk of the history takes, in seconds, as on a loaded machine, how many walks ran since the last `walks()`, and the last one started.
 let delay = 0
 let walked = 0
+let lastWalk: Bun.Subprocess | undefined
+// How long the next read of HEAD takes to answer, in seconds, after reading it.
+let lateHead = 0
 const spawn = Bun.spawn
 const spawned = spyOn(Bun, 'spawn').mockImplementation(((command: string[], ...rest: unknown[]) => {
   const walk = command[0] === 'git' && command.includes('log') && command.includes('-z')
+  const head = command[0] === 'git' && command.includes('rev-parse')
+  let run = walk && delay > 0 ? ['sh', '-c', 'sleep "$0" >/dev/null && exec "$@"', String(delay), ...command] : command
 
-  if (walk)
+  if (head && lateHead > 0) {
+    run = ['sh', '-c', 'out=$("$@") && sleep "$0" >/dev/null && echo "$out"', String(lateHead), ...command]
+    lateHead = 0
+  }
+
+  const started = (spawn as (...args: unknown[]) => Bun.Subprocess)(run, ...rest)
+
+  if (walk) {
     walked++
+    lastWalk = started
+  }
 
-  return (spawn as (...args: unknown[]) => unknown)(walk && delay > 0 ? ['sh', '-c', 'sleep "$0" && exec "$@"', String(delay), ...command] : command, ...rest)
+  return started
 }) as typeof Bun.spawn)
 
 function walks(): number {
@@ -121,6 +135,49 @@ it('waits for a slow git when the list is sorted by the dates', async () => {
   finally {
     delay = 0
   }
+}, 15_000)
+
+it('keeps the walk of the newest commit when a read of HEAD started before it answers after it', async () => {
+  await commit('content/h.md', 'Ada')
+  walks()
+  lateHead = 0.6
+
+  const late = readEdits(['content/h.md'])
+
+  await Bun.sleep(250)
+  await commit('content/h.md', 'Grace')
+
+  expect((await readEdits(['content/h.md'])).get('content/h.md')).toMatchObject({ author: 'Grace' })
+  await late
+  expect((await readEdits(['content/h.md'])).get('content/h.md')).toMatchObject({ author: 'Grace' })
+  expect(walks()).toBe(1)
+}, 15_000)
+
+it('kills a walk still running when the server stops, and the next list walks again', async () => {
+  await commit('content/i.md', 'Linus')
+  walks()
+  delay = 10
+
+  try {
+    const listed = readEdits(['content/i.md'])
+
+    await Bun.sleep(250)
+
+    const run = lastWalk!
+    const started = performance.now()
+
+    stopWalks()
+    await run.exited
+    expect(performance.now() - started).toBeLessThan(1000)
+    expect(run.signalCode).toBe('SIGKILL')
+    expect((await listed).has('content/i.md')).toBe(false)
+  }
+  finally {
+    delay = 0
+  }
+
+  expect((await readEdits(['content/i.md'])).get('content/i.md')).toMatchObject({ author: 'Linus' })
+  expect(walks()).toBe(2)
 }, 15_000)
 
 it('gives the last commit touching a folder', async () => {

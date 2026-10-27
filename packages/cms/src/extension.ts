@@ -6,6 +6,7 @@ import { configError, serverRoot, underKayDev, viewPresenceWith } from 'kay/libr
 import { api, defineEnv } from 'kay/server'
 import { viewMembers } from './editor-names'
 import { forgejo } from './files'
+import { stopWalks } from './history'
 import { collectionInfo, collections } from './kay/content'
 import { hintProblems, missingKindLines } from './kinds'
 import { bodylessLayout, layoutProblems, whenProblems } from './layout'
@@ -104,6 +105,8 @@ export function cms(options: CmsOptions = {}): KayExtension {
         log.warn('no cms({ guard }): outside `kay dev` an edit link or cookie reads only the entries of the pages it opens and saves, publishes, deletes and uploads nothing, and the admin screens stay closed; set cms({ role }) or cms({ guard }) to let editors write')
 
       const plugin = api()
+
+      plugin.onStop(stopWalks)
 
       // Once the server listens, the content config is registered.
       plugin.onStart(async () => {
