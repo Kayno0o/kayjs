@@ -421,6 +421,8 @@ A way in that is switched off no longer counts as one when kayjs-auth checks tha
 
 `passkeys: { rpName, userVerification }` in `createAuth` sets the name the authenticator shows, `name` by default, and whether answering a second factor with a passkey requires a PIN or a biometric: `'required'`, `'preferred'` (the default) or `'discouraged'`. Adding a passkey, signing in with one and re-proving always require it.
 
+A passkey is added and used on the site's own pages only. One asked for in a frame of another site is refused, as kay keeps other sites from framing its pages with `frame-ancestors 'self'`.
+
 A passkey stored before kayjs-auth always asked for user verification may have been made without it, and could never sign in: `listPasskeys()` lists each with `userVerified`, and one with `false` does not count as a way in, so it cannot be what keeps a user from removing their last password or provider. A sign-in or a re-proof with it proves it; otherwise add a new passkey and remove the old one.
 
 ## Passkeys in an island

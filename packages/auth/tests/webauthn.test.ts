@@ -129,6 +129,40 @@ describe('extensions', () => {
   })
 })
 
+describe('a ceremony in a frame of another site', () => {
+  const ALGORITHMS: Algorithm[] = ['ES256', 'RS256', 'EdDSA', 'ML-DSA-44']
+  const SAME_SITE = [{ crossOrigin: false }, { crossOrigin: undefined }]
+  const CROSS_SITE = [{ crossOrigin: true }, { crossOrigin: 'true' }, { crossOrigin: 1 }, { crossOrigin: null }, { crossOrigin: undefined, topOrigin: 'https://other.test' }, { topOrigin: 'https://other.test' }, { topOrigin: '' }, { topOrigin: null }, { crossOrigin: true, topOrigin: 'https://other.test' }]
+
+  for (const algorithm of ALGORITHMS) {
+    test(`a ${algorithm} registration and sign-in pass when the client data says same-site or nothing, and are refused when it says cross-site or names a top origin`, async () => {
+      const device = authenticator({ algorithm })
+      const request = registrationOptions({ rpName: 'Site', rpId: 'site.test', userName: 'ada', userId: 'u', exclude: [] })
+      const expected = { ...EXPECTED, challenge: request.challenge }
+
+      for (const clientData of CROSS_SITE)
+        expect(await verifyRegistration(await device.create(request, { clientData }), expected)).toBeUndefined()
+
+      let stored: { publicKey: string, counter: number } | undefined
+
+      for (const clientData of SAME_SITE) {
+        const registered = await verifyRegistration(await device.create(request, { clientData }), expected)
+
+        expect(registered).toBeDefined()
+        stored = { publicKey: registered!.publicKey, counter: 0 }
+      }
+
+      const credential = device.credentials.at(-1)!.id
+
+      for (const clientData of CROSS_SITE)
+        expect(await verifyAuthentication(await device.get({ challenge: 'challenge' }, { credential, clientData }), EXPECTED, stored!)).toBeUndefined()
+
+      for (const clientData of SAME_SITE)
+        expect(await verifyAuthentication(await device.get({ challenge: 'challenge' }, { credential, clientData }), EXPECTED, stored!)).toBeDefined()
+    })
+  }
+})
+
 describe('hostile answers are refused, never thrown', () => {
   test('a registration missing parts, or with parts of the wrong type', async () => {
     const [{ response, expected }] = vectors.registrations as [Vectors['registrations'][number]]

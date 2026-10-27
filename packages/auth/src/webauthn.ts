@@ -156,10 +156,7 @@ export async function verifyRegistration(response: RegistrationResponseJSON, exp
 // What `response` asserts, when it answers `expected` and is signed by `stored`'s key past its counter; undefined for any answer that does not.
 export async function verifyAuthentication(response: AuthenticationResponseJSON, expected: Expected, stored: { publicKey: string, counter: number }): Promise<Assertion | undefined> {
   try {
-    const clientData = credentialHolds(response) ? clientDataHolds(response.response.clientDataJSON, 'webauthn.get', expected) : undefined
-
-    // An assertion made in a frame of another site names that site; kay expects none.
-    if (!clientData || clientData.topOrigin !== undefined)
+    if (!credentialHolds(response) || !clientDataHolds(response.response.clientDataJSON, 'webauthn.get', expected))
       return undefined
 
     const authData = fromBase64url(response.response.authenticatorData)
@@ -194,16 +191,21 @@ function credentialHolds(response: RegistrationResponseJSON | AuthenticationResp
   return typeof response.id === 'string' && response.id !== '' && response.id === response.rawId && response.type === 'public-key'
 }
 
-// The client data the browser wrote, when it is of the ceremony's `type`, carries the parked challenge and comes from one of the site's origins.
-function clientDataHolds(encoded: string, type: string, expected: Expected): Record<string, unknown> | undefined {
+// The client data the browser wrote is of the ceremony's `type`, carries the parked challenge and comes from one of the site's origins, in no frame of another site: kay serves its pages with `frame-ancestors 'self'`, so a ceremony that says `crossOrigin` or names a `topOrigin` is refused.
+function clientDataHolds(encoded: string, type: string, expected: Expected): boolean {
   const clientData: unknown = JSON.parse(UTF8.decode(fromBase64url(encoded)))
 
   if (typeof clientData !== 'object' || clientData === null)
-    return undefined
+    return false
 
   const fields = clientData as Record<string, unknown>
 
-  return fields.type === type && fields.challenge === expected.challenge && typeof fields.origin === 'string' && expected.origins.includes(fields.origin) ? fields : undefined
+  return fields.type === type
+    && fields.challenge === expected.challenge
+    && typeof fields.origin === 'string'
+    && expected.origins.includes(fields.origin)
+    && (fields.crossOrigin === undefined || fields.crossOrigin === false)
+    && fields.topOrigin === undefined
 }
 
 interface AuthData {
