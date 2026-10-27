@@ -9,6 +9,7 @@ import { PassThrough } from 'node:stream'
 import { describe, expect, it } from 'bun:test'
 import { ConfigRefusedError, dev } from '../src/dev'
 import { CONFIG_REFUSED } from '../src/dev/refuse'
+import { MAX_CHANGED_FILES } from '../src/dev/session/ports'
 import { eventually, turn } from './helpers/eventually'
 import { scratchDir } from './scratch'
 
@@ -406,6 +407,36 @@ describe('kay dev\'s session', () => {
       await dev.edit('src/b.kay')
       await eventually(() => expect(reloadedLines(dev)).toHaveLength(3))
       expect(second.reloads.map(reload => [reload.startedAt, JSON.parse(reload.changed) as string[]])).toEqual([[Number(code), ['src/a.kay']], [second.reloads[0]!.code, ['src/b.kay']]])
+      await dev.stop()
+    })
+
+    it('leaves a stylesheet edited during a reload out of the next one\'s changed files, and names none past the cap', async () => {
+      const dev = await session({ 'src/a.kay': 'p a', 'src/style.css': 'p {}' })
+      const server = dev.running()
+      const held = Promise.withResolvers<void>()
+
+      server.reloadHeld = held
+      await dev.edit('src/a.kay')
+      await eventually(() => expect(server.reloads).toHaveLength(1))
+      await dev.edit('src/style.css')
+      await dev.edit('src/a.kay')
+      await Bun.sleep(SETTLED_MS)
+      server.reloadHeld = undefined
+      held.resolve()
+      await eventually(() => expect(reloadedLines(dev)).toHaveLength(2))
+      expect(server.reloads[1]!.files).toEqual(['src/style.css', 'src/a.kay'])
+      expect(JSON.parse(server.reloads[1]!.changed)).toEqual(['src/a.kay'])
+
+      // As after a checkout: the pages reload whole, and the next reload names only what changed after it.
+      for (let index = 0; index <= MAX_CHANGED_FILES; index++)
+        dev.event(`src/gone-${index}.kay`)
+
+      await eventually(() => expect(reloadedLines(dev)).toHaveLength(3))
+      expect(server.reloads[2]!.changed).toBe('null')
+      expect(server.reloads[2]!.files).toBeNull()
+      await dev.edit('src/a.kay')
+      await eventually(() => expect(reloadedLines(dev)).toHaveLength(4))
+      expect(JSON.parse(server.reloads[3]!.changed)).toEqual(['src/a.kay'])
       await dev.stop()
     })
 

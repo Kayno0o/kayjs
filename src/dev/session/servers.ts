@@ -168,7 +168,7 @@ export class ServerSupervisor {
     let answered = false
 
     try {
-      server.send({ reload: { code: this.codeVersion, startedAt: this.startedAt, changed: JSON.stringify(sent.files.length > MAX_CHANGED_FILES ? null : sent.files), files: files.length > MAX_CHANGED_FILES ? null : files } })
+      server.send({ reload: { code: sent.code, startedAt: this.startedAt, changed: JSON.stringify(sent.files.length > MAX_CHANGED_FILES ? null : sent.files), files: files.length > MAX_CHANGED_FILES ? null : files } })
     }
     catch {
       this.reloadAnswer?.('exited')
