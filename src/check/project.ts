@@ -140,9 +140,14 @@ async function moduleLints(root: string, options: CheckOptions): Promise<CheckDi
   const levels = options.lints
   const files = (await findProjectFiles(root, SCRIPT_MODULE, { project: true, ownKayOnly: true })).filter(file => !DECLARATION_FILE.test(file))
   const texts = new Map(await Promise.all(files.map(async file => [file, await Bun.file(file).text()] as const)))
-  // Following the imports of every component is worth it only when some module or component names the entry, or one passes an island a function.
+  // Following the imports of every component is worth it only when the browser has a component to start from, an island or one the build may promote, and some module or component names the entry or a server-only global, or one passes an island a function.
   const componentTexts = new Map(await Promise.all((await findKayFiles(root, { project: true, ownKayOnly: true })).map(async file => [file, await Bun.file(file).text()] as const)))
-  const named = [...texts.values(), ...componentTexts.values()].some(text => text.includes('kay/cache') || mentionsServerOnly(text)) || [...componentTexts].some(([file, text]) => browserRole(text, file, importedSignals(file, text), root) === 'promotable')
+  const mentioned = [...texts.values(), ...componentTexts.values()].some(text => text.includes('kay/cache') || mentionsServerOnly(text))
+  const named = [...componentTexts].some(([file, text]) => {
+    const role = browserRole(text, file, importedSignals(file, text), root)
+
+    return mentioned ? role !== undefined : role === 'promotable'
+  })
   const browser = named ? await browserModules(root, projectPaths(root, options).routes, options.extensions, componentTexts, apiTrees(root, options)) : undefined
   const inBrowser = browser?.modules ?? new Set<string>()
   const promoted = browser?.promoted ?? new Set<string>()

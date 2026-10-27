@@ -32,7 +32,7 @@ function importAt(source: string, specifier: string, fenced: boolean): number {
 }
 
 // The build's refusal of an island whose chunk reads the server, found from the sources: an island, or a module one imports, reading `process` or `Bun` as it loads.
-// Reported at the island's own import of the module, as the build names the island, and at the read itself when the island's own script holds it.
+// Reported at each island's own import of the module, as the build names the island, and at the read itself when the island's own script holds it.
 export async function serverOnlyInIsland(root: string, { modules, seeds, origins }: BrowserModules): Promise<CheckDiagnostic[]> {
   const project = realpathSync(root)
   const diagnostics: CheckDiagnostic[] = []
@@ -48,30 +48,28 @@ export async function serverOnlyInIsland(root: string, { modules, seeds, origins
   for (const seed of seeds) {
     const source = await textOf(seed)
 
-    for (const { name, start } of loadTimeReads(source, KAY_FILE.test(seed)))
+    for (const { name, start } of loadTimeReads(source, seed))
       report(seed, source, start, `this island ${readsOf(name)}: its first use would throw as the island loads`)
   }
 
   for (const module of [...modules].sort()) {
-    const origin = origins.get(module)
-
-    if (origin === undefined)
-      continue
-
-    const reads: LoadTimeRead[] = loadTimeReads(await textOf(module), false)
+    const reads: LoadTimeRead[] = loadTimeReads(await textOf(module), module)
 
     if (reads.length === 0)
       continue
 
-    const seed = await textOf(origin.seed)
-    const at = importAt(seed, origin.specifier, KAY_FILE.test(origin.seed))
     const where = relative(project, module)
-    const island = relative(project, realpathSync(origin.seed))
 
-    for (const name of new Set(reads.map(read => read.name))) {
-      const line = positionAt(await textOf(module), reads.find(read => read.name === name)!.start).line
+    for (const origin of origins.get(module) ?? []) {
+      const seed = await textOf(origin.seed)
+      const at = importAt(seed, origin.specifier, KAY_FILE.test(origin.seed))
+      const island = relative(project, realpathSync(origin.seed))
 
-      report(origin.seed, seed, at, `${island} reaches ${where} through its import of '${origin.specifier}', which ${readsOf(name)} at line ${line} as it loads, so the island dies as it loads`)
+      for (const name of new Set(reads.map(read => read.name))) {
+        const line = positionAt(await textOf(module), reads.find(read => read.name === name)!.start).line
+
+        report(origin.seed, seed, at, `${island} reaches ${where} through its import of '${origin.specifier}', which ${readsOf(name)} at line ${line} as it loads, so the island dies as it loads`)
+      }
     }
   }
 

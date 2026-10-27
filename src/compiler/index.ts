@@ -135,21 +135,19 @@ export function rendersAsIsland(original: string, imported?: ImportedSignals): b
   return file.client !== undefined || isInteractive(file, script) || (file.server === undefined && liveImport(script, imported) !== undefined)
 }
 
-// Whether a component is an island, or a static component that may be promoted to one by what it passes, which the build does only when its imports reach an island; a page, a layout and a special page are neither.
+// Whether a component is an island, as `compileKay` decides it, or a static component that may be promoted to one by what it passes, which the build does only when its imports reach an island.
+// A file with a server fence, a layout and a special page are islands only by their own handlers or `client`, never by a package's live value, and never promoted.
 export function browserRole(original: string, filename: string, imported?: ImportedSignals, root?: string): 'island' | 'promotable' | undefined {
   const { file } = parseExpanded(original)
   const source = file.source
-
-  if (file.server !== undefined || ROUTE_FILES.has(basename(filename)))
-    return undefined
-
   const server = analyzeServer(source, file.server)
   const script = analyzeScript(source, file.script, serverNames(server), templateReads(file), file.module, iconSetsOf(source, root))
+  const routeFile = file.server !== undefined || ROUTE_FILES.has(basename(filename))
 
-  if (file.client !== undefined || isInteractive(file, script) || liveImport(script, imported) !== undefined)
+  if (file.client !== undefined || isInteractive(file, script) || (!routeFile && liveImport(script, imported) !== undefined))
     return 'island'
 
-  return promotionCause(file, script, imported) === undefined ? undefined : 'promotable'
+  return routeFile || promotionCause(file, script, imported) === undefined ? undefined : 'promotable'
 }
 
 // The fences of the script and of the module that the browser reads.

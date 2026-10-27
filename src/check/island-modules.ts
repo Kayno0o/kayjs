@@ -36,8 +36,8 @@ export interface BrowserModules {
   promoted: Set<string>
   // The components whose own script the browser runs.
   seeds: string[]
-  // For each module, the first component reaching it and the import of its own that leads there.
-  origins: Map<string, { seed: string, specifier: string }>
+  // For each module, every component reaching it and the import of its own that leads there.
+  origins: Map<string, { seed: string, specifier: string }[]>
 }
 
 // The project's own TypeScript modules the browser bundle reaches: those the script of an island, of a component only islands render and of a static one the build promotes to an island imports, and those they import in turn; and the promoted components themselves, as `findKayFiles` lists them.
@@ -62,28 +62,31 @@ export async function browserModules(root: string, routesDir: string, extensions
   const stubbed = isApiStubbed(api)
   const inside = (file: string) => !stubbed(file) && file.startsWith(project) && !file.includes(`${sep}node_modules${sep}`)
   const reached = new Set<string>()
-  const origins = new Map<string, { seed: string, specifier: string }>()
+  const origins = new Map<string, { seed: string, specifier: string }[]>()
+  const imported = new Map<string, Promise<string[]>>()
+  // Read once, whichever seeds reach the module.
+  const importsOfModule = async (module: string) => imported.get(module) ?? imported.set(module, importsOf(module)).get(module)!
   const modulesOf = (file: string, specifiers: string[]) => specifiers.filter(specifier => !OUTSIDE.test(specifier)).flatMap((specifier) => {
     const target = resolveFrom(specifier, file)
 
     return target !== undefined && inside(target) && SCRIPT_MODULE.test(target) && !DECLARATION_FILE.test(target) ? [{ target, specifier }] : []
   })
-  const queue: { module: string, origin: { seed: string, specifier: string } }[] = []
 
   for (const seed of seeds) {
-    for (const { target, specifier } of modulesOf(seed, scriptImportsOf(sources.get(seed)!)))
-      queue.push({ module: target, origin: { seed, specifier } })
-  }
+    const walked = new Set<string>()
+    const queue = modulesOf(seed, scriptImportsOf(sources.get(seed)!)).map(({ target, specifier }) => ({ module: target, specifier }))
 
-  for (const { module, origin } of queue) {
-    if (reached.has(module))
-      continue
+    for (const { module, specifier } of queue) {
+      if (walked.has(module))
+        continue
 
-    reached.add(module)
-    origins.set(module, origin)
+      walked.add(module)
+      reached.add(module)
+      origins.set(module, [...origins.get(module) ?? [], { seed, specifier }])
 
-    for (const { target } of modulesOf(module, await importsOf(module)))
-      queue.push({ module: target, origin })
+      for (const { target } of modulesOf(module, await importsOfModule(module)))
+        queue.push({ module: target, specifier })
+    }
   }
 
   return { modules: reached, promoted, seeds, origins }

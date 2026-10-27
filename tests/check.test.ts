@@ -643,6 +643,45 @@ describe.concurrent('kay check, edge cases', () => {
       expect(diagnostics[0]!.message).toContain('process')
       expect(diagnostics[1]!.message).toContain('Bun')
     })
+
+    it('reports every island reaching a module that reads process, at each one\'s own import', async () => {
+      const diagnostics = await found({
+        'src/routes/index.kay': '---\nimport Counter from \'../components/counter.kay\'\nimport Other from \'../components/other.kay\'\n---\nCounter\nOther\n',
+        'src/components/counter.kay': island('import { A } from \'../lib/a\''),
+        'src/components/other.kay': island('import { shared } from \'../lib/mid\''),
+        'src/lib/mid.ts': 'export { A as shared } from \'./a\'\n',
+        'src/lib/a.ts': 'export const A = process.env.SECRET\n',
+      })
+
+      expect(diagnostics.map(d => d.at).sort()).toEqual(['src/components/counter.kay:3', 'src/components/other.kay:3'])
+      expect(diagnostics.map(d => d.message.slice(0, 22)).sort()).toEqual(['src/components/counter', 'src/components/other.k'])
+    })
+
+    it('reads a plain TypeScript module holding a legacy angle-bracket cast', async () => {
+      const diagnostics = await found({
+        'src/components/counter.kay': island('import { A } from \'../lib/a\''),
+        'src/lib/a.ts': 'const raw: unknown = 1\nexport const A = <number>raw + Number(process.env.SECRET)\n',
+      })
+
+      expect(diagnostics.map(d => d.at)).toEqual(['src/components/counter.kay:3'])
+    })
+
+    it('passes s reached through a namespace import, and one imported in a module fence', async () => {
+      expect(await found({
+        'src/components/counter.kay': island('import { SHAPE } from \'../lib/ns\''),
+        'src/lib/ns.ts': 'import * as k from \'kay\'\n\nexport const SHAPE = k.s.Object({})\n',
+      })).toEqual([])
+      expect(await found({ 'src/components/counter.kay': '--- module\nimport { s } from \'kay\'\nexport const SHAPE = s.Object({})\n--- script\nimport { signal } from \'kay\'\n\nconst count = signal(0)\nconst again = s.Object({})\n---\nbutton(onClick={() => count++}) {count()}\n' })).toEqual([])
+    })
+
+    it('reads a component with a server fence that is still an island', async () => {
+      const diagnostics = await found({
+        'src/components/counter.kay': '---\nimport { signal } from \'kay\'\nimport { KEY } from \'../lib/key\'\n\nconst count = signal(0)\nconst direct = process.env.A\n--- server\nconst label = \'x\'\n---\nbutton(onClick={() => count++}) {count()} {label} {KEY} {direct}\n',
+        'src/lib/key.ts': 'export const KEY = process.env.SECRET\n',
+      })
+
+      expect(diagnostics.map(d => d.at).sort()).toEqual(['src/components/counter.kay:3', 'src/components/counter.kay:6'])
+    })
   })
 
   it('follows a barrel module an island imports through export * and export { x } from', async () => {

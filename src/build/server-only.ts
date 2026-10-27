@@ -53,7 +53,7 @@ function readersOf(names: Set<string>, modules: Map<string, string>): ServerOnly
   if (names.size === 0)
     return []
 
-  const sources = [...modules].map(([module, source]) => ({ module, names: readsIn(source, KAY_FILE.test(module)) }))
+  const sources = [...modules].map(([module, source]) => ({ module, names: readsIn(source, module) }))
 
   return [...names].sort().map(name => ({ name, modules: sources.filter(source => source.names.has(name)).map(source => source.module) }))
 }
@@ -63,15 +63,15 @@ export function serverOnlyNames(code: string): Set<string> | undefined {
   if (!MENTIONED.test(code))
     return new Set()
 
-  const program = parsed(code, false)
+  const program = parsed(code, 'js')
 
   return program === undefined ? undefined : namesIn(program)
 }
 
-// `fenced` reads a `.kay` file, whose script and server fences hold the JavaScript of it.
-function readsIn(code: string, fenced: boolean): Set<string> {
-  const source = fenced ? fences(code) : code
-  const program = MENTIONED.test(source) ? parsed(source, fenced) : undefined
+// A `.kay` file is read by its script and server fences, which hold the JavaScript of it.
+function readsIn(code: string, file: string): Set<string> {
+  const source = KAY_FILE.test(file) ? fences(code) : code
+  const program = MENTIONED.test(source) ? parsed(source, syntaxOf(file)) : undefined
 
   return program === undefined ? new Set() : namesIn(program)
 }
@@ -88,11 +88,12 @@ export interface LoadTimeRead {
 }
 
 // What a module reads of the server as it loads, which no tree-shaking drops: the server-only globals `refuseServerOnlyReads` finds.
-// `fenced` reads a `.kay` file's script and module fences, the ones the browser runs.
+// A `.kay` file is read by its script and module fences, the ones the browser runs.
 // A read inside a function is left out: whether it runs depends on what the importer calls, which only the build's own bundle knows.
-export function loadTimeReads(source: string, fenced: boolean): LoadTimeRead[] {
-  const file = fenced ? parseKay(source) : undefined
+export function loadTimeReads(source: string, path: string): LoadTimeRead[] {
+  const file = KAY_FILE.test(path) ? parseKay(source) : undefined
   const spans = file ? [file.script, file.module].filter(span => span !== undefined) : [{ start: 0, end: source.length }]
+  const syntax = syntaxOf(path)
   const found: LoadTimeRead[] = []
 
   for (const { start, end } of spans) {
@@ -101,8 +102,7 @@ export function loadTimeReads(source: string, fenced: boolean): LoadTimeRead[] {
     if (!MENTIONED.test(text))
       continue
 
-    // A project's own module is TypeScript, or TSX, whichever side it runs on.
-    const program = parsed(text, true)
+    const program = parsed(text, syntax)
 
     if (program === undefined)
       continue
@@ -145,10 +145,21 @@ function namesIn(program: t.File): Set<string> {
   return found
 }
 
-function parsed(source: string, fenced: boolean): t.File | undefined {
+const TS_MODULE = /\.[cm]?ts$/
+
+type Syntax = 'js' | 'ts' | 'tsx'
+
+// A project's own module is TypeScript, and TSX but for a plain `.ts`, where `<T>x` is a cast and not an element.
+function syntaxOf(file: string): Syntax {
+  return TS_MODULE.test(file) ? 'ts' : 'tsx'
+}
+
+const PLUGINS = { js: [], ts: ['typescript'], tsx: ['typescript', 'jsx'] } as const
+
+function parsed(source: string, syntax: Syntax): t.File | undefined {
   try {
     // Built output is plain JavaScript, where `a < b > (c)` is a comparison rather than type arguments.
-    return parse(source, { sourceType: 'unambiguous', allowReturnOutsideFunction: true, errorRecovery: true, attachComment: false, plugins: fenced ? ['typescript', 'jsx'] : [] })
+    return parse(source, { sourceType: 'unambiguous', allowReturnOutsideFunction: true, errorRecovery: true, attachComment: false, plugins: [...PLUGINS[syntax]] })
   }
   catch {
     return undefined
