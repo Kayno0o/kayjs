@@ -169,6 +169,7 @@ form(action={add})
 
 - `form(action={add})` posts without JavaScript.
 - Inside it, `input(field="title")`, on an `input`, `textarea` or `select`, renders `name="title"` plus the constraints the browser checks without JavaScript that the schema gives `title`: `required` where the server would refuse the field left blank (never for a boolean, so a checkbox stays optional, nor a list), `minlength`, `maxlength`, `pattern` (matched anywhere, as the schema matches it, and left out when the browser could not read it), `min`, `max` and `type="email"`, each unless the template writes it.
+- `s.UnionEnum(values)` has no `default` unless the options give one: an optional enum field left out reads `undefined` and a required one is refused with a 422, where Elysia's own fills the first value in.
 - `s.UnionKeys(TOPICS)` is a `UnionEnum` of a record's keys, typed as their union with no cast, for a `select(field="topic")` whose options come from `Object.entries(TOPICS)`.
 - `field` takes written text, never both `field` and `name`, and only inside such a form.
 - `kay check` verifies every `field` and `name` against the schema.

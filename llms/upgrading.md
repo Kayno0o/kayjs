@@ -4,6 +4,10 @@ What each minor release breaks, and what an app changes to move to it. kay and i
 
 ## 1.80.0
 
+### `s.UnionEnum` and `s.UnionKeys` no longer default to their first value
+
+- An optional enum field left out used to read as the first value and a required one was filled in instead of refused with a 422. Both now keep what the visitor sent: an action relying on the fill writes `s.UnionEnum(['a', 'b'], { default: 'a' })`. No lint can recognise it, as the old form is valid and only its result changed.
+
 ### A Button that is disabled with a `data-tooltip` is `aria-disabled`, not `disabled`
 
 - So its reason reaches the keyboard, the button no longer matches `:disabled`: a stylesheet or a test reading `button:disabled` or `toBeDisabled()` on it reads `[aria-disabled='true']` instead, and a locked `type="submit"` button turns `type="button"`. A hand `span(data-tooltip tabindex="0")` wrapped around such a button can go, or become kayjs-ui's `Tooltip`, which `kay check --fix` writes (`hand-tooltip`). No lint can recognise the old form, as `disabled` with a tooltip is valid markup.

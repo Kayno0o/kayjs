@@ -13,6 +13,16 @@ function Public<Field extends TSchema>(field: Field): Field & { public: true } {
   return { ...field, public: true }
 }
 
+// Elysia's `UnionEnum` fills the first value in as `default`, so an optional field read as that value when left out and a required one was never refused; kay leaves `default` out unless the options give one.
+const UnionEnum: Builder['UnionEnum'] = (values, options) => {
+  const field = schema.UnionEnum(values, options)
+
+  if (options === undefined || !('default' in options))
+    delete (field as { default?: unknown }).default
+
+  return field
+}
+
 // A `UnionEnum` of a record's keys, typed as their union, for a `select` whose options come from a record of labels.
 function UnionKeys<const Keyed extends object>(record: Keyed, options?: Parameters<Builder['UnionEnum']>[1]): ReturnType<typeof schema.UnionEnum<[keyof Keyed & string, ...(keyof Keyed & string)[]]>> {
   const keys = Object.keys(record)
@@ -20,8 +30,8 @@ function UnionKeys<const Keyed extends object>(record: Keyed, options?: Paramete
   if (keys.length === 0)
     throw new Error('kay: s.UnionKeys() takes a record with at least one key')
 
-  return schema.UnionEnum(keys as [keyof Keyed & string, ...(keyof Keyed & string)[]], options)
+  return UnionEnum(keys as [keyof Keyed & string, ...(keyof Keyed & string)[]], options)
 }
 
 // Elysia's schema builder, re-exported so an action's schema needs no import of its own, with `Secret` and `Public` for `defineEnv` and `UnionKeys`.
-export const s: Builder & { Secret: typeof Secret, Public: typeof Public, UnionKeys: typeof UnionKeys } = { ...schema, Secret, Public, UnionKeys }
+export const s: Builder & { Secret: typeof Secret, Public: typeof Public, UnionKeys: typeof UnionKeys } = { ...schema, UnionEnum, Secret, Public, UnionKeys }

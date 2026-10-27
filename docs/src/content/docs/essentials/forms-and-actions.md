@@ -36,6 +36,8 @@ Text reaches the schema trimmed, and an optional field left blank counts as left
 
 ## A choice among a record's keys
 
+`s.UnionEnum(values)` accepts only those values and has no default: leave the field out and an optional one reads `undefined`, a required one is refused. Pass `{ default: 'a' }` to fill one in.
+
 A `select` often takes its options from a record that maps each value to a label. `s.UnionKeys(record)` is the schema for the value the visitor picks: only the record's keys pass, and the handler gets them typed as the union of the keys, with no cast.
 
 ```kay

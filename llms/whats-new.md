@@ -4,6 +4,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 
 ## 1.80.0
 
+- `s.UnionEnum(values)` no longer defaults to its first value: an optional enum field left out reads `undefined`, and a required one is refused instead of filled in; pass `{ default }` for one: [Actions](actions.md).
 - `formatNumber`, `formatDate`, `formatRelativeTime`, `formatList` and `direction` from `kay/i18n` work outside a request, in the site's default locale, so a job, an alert or a push formats like its pages, and each takes a `locale` option (`formatDate(date, { locale: user.locale })`) that wins over the page's, in the browser too: [Format a number, a date or a list](locales.md#format-a-number-a-date-or-a-list).
 - `promoted-island` no longer reports a static component for a value read from an object of strings or numbers another module exports as a literal (`LABEL[kind]`), as it is data and not a function: [Islands](islands.md#islands).
 - `promoted-island` no longer reports a static component for a value read from an object of strings or numbers another module exports as a literal (`LABEL[kind]`), by name, in `export { LABEL }`, by default, re-exported or imported from a `.json` file, as it is data and not a function: [Islands](islands.md#islands).

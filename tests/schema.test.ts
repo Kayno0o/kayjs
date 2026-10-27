@@ -1,6 +1,7 @@
 import type { Static } from 'elysia'
 import { rm } from 'node:fs/promises'
 import { join } from 'node:path'
+import { Value } from '@sinclair/typebox/value'
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
 import { t as elysiaSchema } from 'elysia'
 import { TypeCompiler } from 'elysia/type-system'
@@ -88,5 +89,24 @@ describe('s from kay', () => {
     expect(check.Check('toString')).toBe(false)
     expect([typed as string, other as string]).toEqual(['billing', 'sales'])
     expect(() => s.UnionKeys({})).toThrow('kay: s.UnionKeys() takes a record with at least one key')
+  })
+
+  it('leaves an enum without a default unless given one, so a missing value is not filled in', () => {
+    const plain = s.UnionEnum(['critical', 'low'])
+    const given = s.UnionEnum(['critical', 'low'], { default: 'low' })
+    const none = s.UnionEnum(['critical', 'low'], { default: undefined })
+    const shape = s.Object({ level: plain, maybe: s.Optional(s.UnionEnum(['a', 'b'])) })
+    const check = TypeCompiler.Compile(shape)
+
+    expect('default' in plain).toBe(false)
+    expect(given.default).toBe('low')
+    expect('default' in none).toBe(true)
+    expect(Value.Default(shape, {})).toEqual({})
+    expect(Value.Default(s.Object({ maybe: s.Optional(s.UnionEnum(['a', 'b'])) }), {})).toEqual({})
+    expect(check.Check({})).toBe(false)
+    expect(check.Check({ level: 'low' })).toBe(true)
+    expect(check.Check({ level: 'other' })).toBe(false)
+    expect(s.UnionKeys({ a: 1 }).default).toBeUndefined()
+    expect('default' in s.UnionKeys({ a: 1 })).toBe(false)
   })
 })
