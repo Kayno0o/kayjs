@@ -53,6 +53,14 @@ The library's controls follow it and tell their `onChange` or `onInput` what the
 
 A Checkbox, Toggle, ChipGroup or Segmented still waiting on the promise of its `onChange` finishes that change first, then goes back. The search box of an IconPicker or a MultiSelect is not a saved value, so Discard empties it even after a save.
 
+## Cancel, a question and a Save that cannot yet
+
+`cancelHref` adds a Cancel link before Discard, for a new item whose editor has nothing to go back to but the page it came from. Leaving with unsaved changes asks, as for any link.
+
+`confirm` is a question asked in a dialog before saving, Ctrl+S included, for a save with a consequence. Save runs once it is confirmed. `confirmLabel` words the dialog's button, `saveLabel` by default, and `cancelLabel` the other one.
+
+`saveDisabled` keeps Save and the shortcut off while the page says the draft cannot be saved. Give it the reason as a string and it shows as Save's tooltip, which the keyboard reaches too.
+
 ## Leaving and shortcuts
 
 Leaving with unsaved changes asks, as `guardLeave` does. That covers a link of the app, going back, a reload and closing the tab, but not while a save is under way.
@@ -63,7 +71,7 @@ Ctrl+S, or Cmd+S on macOS, saves from any field of the form. It uses the key tha
 
 The bar's status is a live region, so a screen reader hears the changes pile up, the save start and the form come back clean. The buttons stay focusable as the form turns clean, so the focus stays on the one pressed.
 
-`dirtyLabel`, `cleanLabel`, `savingLabel`, `saveLabel` and `discardLabel` replace the texts.
+`dirtyLabel`, `cleanLabel`, `savingLabel`, `saveLabel`, `discardLabel` and `cancelLabel` replace the texts.
 
 ## Controls set from code
 

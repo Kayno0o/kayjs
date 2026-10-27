@@ -454,7 +454,7 @@ describe('SaveForm and the pick of a Combobox and an IconPicker', () => {
 })
 
 describe('SaveForm driven by signals', () => {
-  async function editor(save: (input: { name: string }) => Promise<boolean | { errors: Record<string, string> } | undefined>, props: { isNew?: boolean, status?: string } = {}) {
+  async function editor(save: (input: { name: string }) => Promise<boolean | { errors: Record<string, string> } | undefined>, props: { isNew?: boolean, status?: string, cancelHref?: string, confirm?: string, saveDisabled?: string | boolean } = {}) {
     mounted = await mountComponent(SaveFormSignals, { save, onDiscard: () => discarded++, ...props })
 
     return mounted.root
@@ -571,6 +571,57 @@ describe('SaveForm driven by signals', () => {
     expect(leaves()).toBe(false)
     finish()
     await settle()
+  })
+
+  test('cancelHref draws a Cancel link before Discard', async () => {
+    const root = await editor(async () => undefined, { cancelHref: '/sites' })
+    const link = root.querySelector<HTMLAnchorElement>('.kui-save-bar-actions a')!
+
+    expect([link.textContent, link.getAttribute('href'), link.nextElementSibling?.textContent]).toEqual(['Cancel', '/sites', 'Discard'])
+  })
+
+  test('confirm asks before saving, Ctrl+S included, and saves only once confirmed', async () => {
+    const calls: string[] = []
+    const root = await editor(async (input) => {
+      calls.push(input.name)
+
+      return undefined
+    }, { confirm: 'Apply this change?' })
+    const dialog = () => root.querySelector<HTMLDialogElement>('dialog')!
+    const footer = () => [...dialog().querySelectorAll('button')]
+
+    await edit(root)
+    root.querySelector('#title')!.dispatchEvent(new KeyboardEvent('keydown', { key: 's', ctrlKey: true, bubbles: true, cancelable: true }))
+    await settle()
+
+    expect([calls, dialog().open, dialog().textContent]).toEqual([[], true, expect.stringContaining('Apply this change?')])
+
+    click(footer()[0]!)
+    await settle()
+    expect([calls, dialog().open, status(root)]).toEqual([[], false, 'Unsaved changes.'])
+
+    root.querySelector('form')!.requestSubmit()
+    await settle()
+    click(footer()[1]!)
+    await settle()
+
+    expect([calls, dialog().open, status(root)]).toEqual([['Grace'], false, 'No unsaved change.'])
+  })
+
+  test('saveDisabled keeps Save and the shortcut off and gives its reason as the tooltip', async () => {
+    const calls: string[] = []
+    const root = await editor(async (input) => {
+      calls.push(input.name)
+
+      return undefined
+    }, { saveDisabled: 'The name is empty.' })
+    const save = () => buttons(root)[1]!
+
+    await edit(root)
+    root.querySelector('form')!.requestSubmit()
+    await settle()
+
+    expect([calls, save().getAttribute('aria-disabled'), save().getAttribute('data-tooltip')]).toEqual([[], 'true', 'The name is empty.'])
   })
 
   test('a rejection carrying field errors shows them on their field and keeps the bar unsaved', async () => {

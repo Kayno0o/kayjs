@@ -6,7 +6,7 @@ import TextInput from '@kaynooo/kayjs-ui/text-input.kay'
 import Toaster from '@kaynooo/kayjs-ui/toaster.kay'
 
 // An editor whose state is signals and whose save takes an object: `save` stands in for the server and answers false for a refusal the editor shows itself, or the messages a schema refusal carries.
-const { save, isNew = false, status, onDiscard } = props<{ save: (input: { name: string }) => Promise<boolean | { errors: Record<string, string> } | undefined>, isNew?: boolean, status?: string | undefined, onDiscard: () => void }>()
+const { save, isNew = false, status, onDiscard, cancelHref, confirm, saveDisabled } = props<{ cancelHref?: string | undefined, confirm?: string | undefined, saveDisabled?: string | boolean | undefined, save: (input: { name: string }) => Promise<boolean | { errors: Record<string, string> } | undefined>, isNew?: boolean, status?: string | undefined, onDiscard: () => void }>()
 
 const name = signal('Ada')
 const saved = signal('Ada')
@@ -24,7 +24,7 @@ async function onSave() {
   return accepted
 }
 ---
-SaveForm(dirty={changed()} onSave={onSave} saved="Saved." status={status} onDiscard={() => { name = saved(); onDiscard() }})
+SaveForm(dirty={changed()} onSave={onSave} saved="Saved." status={status} cancelHref={cancelHref} confirm={confirm} saveDisabled={saveDisabled} onDiscard={() => { name = saved(); onDiscard() }})
   button#edit(type="button" onClick={() => name = 'Grace'}) Edit
   FormField(label="Title" name="title")
     TextInput#title(name="title" value={name()} onInput={name.set})
