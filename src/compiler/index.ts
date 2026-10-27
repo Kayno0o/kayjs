@@ -16,6 +16,7 @@ import { islandMarker, markerMismatch } from './island-marker'
 import { applyLints, templateLints } from './lints'
 import { SourceMap } from './mapping'
 import { parseExpanded } from './markdown-block'
+import { signalKind } from './module-signals'
 import { SELF } from './names'
 import { findRewrites } from './rewrite'
 import { scopeAttribute } from './scoped-style'
@@ -148,7 +149,7 @@ export function browserRole(original: string, filename: string, imported?: Impor
   if (file.client !== undefined || isInteractive(file, script) || liveImport(script, imported) !== undefined)
     return 'island'
 
-  return promotionCause(file, script) === undefined ? undefined : 'promotable'
+  return promotionCause(file, script, imported) === undefined ? undefined : 'promotable'
 }
 
 // The fences of the script and of the module that the browser reads.
@@ -157,12 +158,12 @@ function scriptFences(script: ScriptAnalysis): ParsedFence[] {
 }
 
 // The server-only imports in the script of a component the build promotes to an island, which only the project knows: compiling it alone cannot tell whether it is.
-export function promotedChecks(original: string, root?: string): Diagnostic[] {
+export function promotedChecks(original: string, root?: string, imported?: ImportedSignals): Diagnostic[] {
   const { file } = parseExpanded(original)
   const source = file.source
   const server = analyzeServer(source, file.server)
   const script = analyzeScript(source, file.script, serverNames(server), templateReads(file), file.module, iconSetsOf(source, root))
-  const site = promotionSite(file, script)
+  const site = promotionSite(file, script, imported)
   const marker = islandMarker(source)
   const announced = site === undefined || marker !== undefined ? [] : [{ ...site.span, code: 'promoted-island', message: `This component renders as an island: ${site.cause}`, note: 'a function or a block with parameters cannot be sent to the browser as data, so the component hydrates itself', help: 'write `// kay-island` in it to say so, or pass the island what can be serialized', checkOnly: true }]
   const contradicted = marker?.kind === 'static' && site !== undefined ? [{ start: marker.start, end: marker.end, code: 'island-marker', message: `This component renders as an island, and \`// kay-static\` says it does not: ${site.cause}`, note: 'it passes an island what only an island can send', help: 'delete the marker, or pass the island what can be serialized', checkOnly: true }] : []
@@ -189,14 +190,14 @@ export function compileKay(original: string, filename: string, options: CompileO
   const island = client || isInteractive(file, script) || live !== undefined ? islandId(filename, options.root) : undefined
   const hydratableServer = options.output === 'html' && options.hydratable === true
   const twin = hydratableServer && !options.twinBuild && island === undefined && !routeFile ? `./${basename(filename)}${ISLAND_TWIN}` : undefined
-  const promotion = island === undefined && !routeFile ? promotionCause(file, script) : undefined
+  const promotion = island === undefined && !routeFile ? promotionCause(file, script, options.importedSignals) : undefined
   const promote = promotion === undefined ? undefined : islandId(filename, options.root)
   const why = island === undefined ? promotion : islandCause(file, script) ?? (live === undefined ? undefined : `\`${live}\`, a live value`)
   const generateOptions = { classTable: options.classTable, classMerge: options.classMerge, island, client, lives: island === undefined ? undefined : liveBindings(script, options.importedSignals).map(binding => binding.local), twin, promote, output: options.output, hydratable: hydratableServer && (island !== undefined || options.twinBuild === true), moduleId: islandId(filename, options.root), includeServer: options.includeServer, params: options.params, paramTypes: options.paramTypes, outerQueries: options.outerQueries, check: options.check, route: options.check === true && (routeFile || options.page === true), pageFile: routeFile || options.page === true, insideIsland: options.insideIsland, inspect: options.inspect, inspectSource: expansion ? { text: original, real: (offset: number) => expansion.real(offset) } : undefined, relocateImport: options.relocateImport, contextModule: options.check === true ? options.contextModule : undefined, ui: options.output === undefined ? undefined : options.ui, uiAdded: options.output === undefined ? options.ui : undefined, errorPage: basename(filename) === ERROR_PAGE, cardPage: basename(filename) === CARD_PAGE, special: basename(filename).startsWith('_') && basename(filename) !== LAYOUT }
   // The analysis pass names the component so no read resolves to it, then the name is chosen free of what the code reads.
   const analysis = generate(file, script, server, { ...generateOptions, name: SELF })
   const imported = new Map<string, SignalKind>([...script.imports, ...server?.imports ?? []].flatMap((binding) => {
-    const kind = binding.typeOnly ? undefined : options.importedSignals?.[binding.source]?.[binding.imported]
+    const kind = binding.typeOnly ? undefined : signalKind(options.importedSignals?.[binding.source]?.[binding.imported])
 
     return kind ? [[binding.local, kind] as const] : []
   }))

@@ -6,7 +6,7 @@ import type { ParsedFence } from '../compiler/script'
 import { parse } from '@babel/parser'
 import { nodeExpressions } from '../compiler/ast'
 import { loadTraverse } from '../compiler/host'
-import { MADE } from '../compiler/module-signals'
+import { MADE, signalKind } from '../compiler/module-signals'
 import { parseKay } from '../compiler/parser'
 import { patternNames } from '../compiler/pattern-names'
 import { walkScope } from '../compiler/rewrite'
@@ -78,7 +78,7 @@ export function semanticTokens(source: string, imported: ImportedSignals = {}): 
 
   for (const { analysis } of analyses) {
     for (const binding of analysis.imports) {
-      const kind = imported[binding.source]?.[binding.imported]
+      const kind = signalKind(imported[binding.source]?.[binding.imported])
 
       made.set(binding.local, binding.source === 'kay' && Object.hasOwn(MADE, binding.imported) ? MADE[binding.imported] : undefined)
 
@@ -297,7 +297,7 @@ function looseDeclarations(source: string, region: Span, imported: ImportedSigna
   for (const match of text.matchAll(LOOSE_IMPORT)) {
     for (const specifier of match[1]!.matchAll(LOOSE_SPECIFIER)) {
       const local = specifier[2] ?? specifier[1]!
-      const kind = imported[match[3]!]?.[specifier[1]!]
+      const kind = signalKind(imported[match[3]!]?.[specifier[1]!])
 
       if (match[3] === 'kay' && Object.hasOwn(MADE, specifier[1]!))
         made.set(local, MADE[specifier[1]!])

@@ -13,6 +13,7 @@ import { fileURLToPath } from 'node:url'
 import { findKayFiles, findProjectFiles, inWalkScope, writeIfChanged } from '../build/files'
 import { missingContextModules } from '../build/manifests'
 import { mentionsServerOnly } from '../build/server-only'
+import { importedSignals } from '../build/signals'
 import { browserRole, promotedChecks } from '../compiler'
 import { moduleChecks, turnsCaptchaOff } from '../compiler/fence-checks'
 import { isLaunchLint, isLint, isLintGroup, LEVELS, lintLevel, lintLevels } from '../compiler/lints'
@@ -141,7 +142,7 @@ async function moduleLints(root: string, options: CheckOptions): Promise<CheckDi
   const texts = new Map(await Promise.all(files.map(async file => [file, await Bun.file(file).text()] as const)))
   // Following the imports of every component is worth it only when some module or component names the entry, or one passes an island a function.
   const componentTexts = new Map(await Promise.all((await findKayFiles(root, { project: true, ownKayOnly: true })).map(async file => [file, await Bun.file(file).text()] as const)))
-  const named = [...texts.values(), ...componentTexts.values()].some(text => text.includes('kay/cache') || mentionsServerOnly(text)) || [...componentTexts].some(([file, text]) => browserRole(text, file, undefined, root) === 'promotable')
+  const named = [...texts.values(), ...componentTexts.values()].some(text => text.includes('kay/cache') || mentionsServerOnly(text)) || [...componentTexts].some(([file, text]) => browserRole(text, file, importedSignals(file, text), root) === 'promotable')
   const browser = named ? await browserModules(root, projectPaths(root, options).routes, options.extensions, componentTexts, apiTrees(root, options)) : undefined
   const inBrowser = browser?.modules ?? new Set<string>()
   const promoted = browser?.promoted ?? new Set<string>()
@@ -160,7 +161,7 @@ async function moduleLints(root: string, options: CheckOptions): Promise<CheckDi
 
       return report(file, source, moduleChecks(source, inBrowser.has(realpathSync(file))))
     }),
-    ...[...promoted].flatMap(file => report(file, componentTexts.get(file)!, promotedChecks(componentTexts.get(file)!, root))),
+    ...[...promoted].flatMap(file => report(file, componentTexts.get(file)!, promotedChecks(componentTexts.get(file)!, root, importedSignals(file, componentTexts.get(file)!)))),
     ...browser ? await serverOnlyInIsland(root, browser) : [],
   ]
 

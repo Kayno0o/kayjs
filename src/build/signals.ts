@@ -1,14 +1,14 @@
 import type { ImportedSignals, SignalKind } from '../compiler/module-signals'
 import { AsyncLocalStorage } from 'node:async_hooks'
 import { readFileSync, statSync } from 'node:fs'
-import { moduleSignals } from '../compiler/module-signals'
+import { moduleData, moduleSignals } from '../compiler/module-signals'
 import { parseKay } from '../compiler/parser'
 import { resolveFrom, SCRIPT_FILE, scriptLoader, transpilerFor } from './files'
 import { fences } from './libraries'
 
 const KAY_FILE = /\.kay$/
 const KAY_MODULE = /^kay(?:\/|$)/
-const scanned = new Map<string, { stamp: string, signals: Record<string, SignalKind> }>()
+const scanned = new Map<string, { stamp: string, signals: Record<string, SignalKind | 'data'> }>()
 
 // Inside a scope, what a component's imports exported, found once for all the passes over it: the analysis, the browser and the server compile.
 type Memo = Map<string, { source: string, found: ImportedSignals }>
@@ -95,7 +95,7 @@ export function keepImportedSignals(files: ReadonlySet<string>): void {
   }
 }
 
-function signalsOf(path: string): Record<string, SignalKind> {
+function signalsOf(path: string): Record<string, SignalKind | 'data'> {
   try {
     const stats = statSync(path, { throwIfNoEntry: false })
 
@@ -110,7 +110,8 @@ function signalsOf(path: string): Record<string, SignalKind> {
 
     const text = readFileSync(path, 'utf8')
     // A component's signals are the ones its `--- module` fence exports.
-    const signals = KAY_FILE.test(path) ? kayModuleSignals(text) : moduleSignals(text, scriptLoader(path) === 'tsx' || scriptLoader(path) === 'jsx')
+    const jsx = scriptLoader(path) === 'tsx' || scriptLoader(path) === 'jsx'
+    const signals: Record<string, SignalKind | 'data'> = KAY_FILE.test(path) ? kayModuleSignals(text) : { ...Object.fromEntries(moduleData(text, jsx).map(name => [name, 'data' as const])), ...moduleSignals(text, jsx) }
 
     scanned.set(path, { stamp, signals })
 
@@ -121,8 +122,13 @@ function signalsOf(path: string): Record<string, SignalKind> {
   }
 }
 
-function kayModuleSignals(text: string): Record<string, SignalKind> {
+function kayModuleSignals(text: string): Record<string, SignalKind | 'data'> {
   const { module } = parseKay(text)
 
-  return module ? moduleSignals(text.slice(module.start, module.end)) : {}
+  if (!module)
+    return {}
+
+  const fence = text.slice(module.start, module.end)
+
+  return { ...Object.fromEntries(moduleData(fence).map(name => [name, 'data' as const])), ...moduleSignals(fence) }
 }

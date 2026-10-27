@@ -2,6 +2,7 @@ import type { ClassTable } from '../runtime/class-table'
 import type { UiEntry } from '../runtime/ui'
 import type { ConstNode, ElementNode, ErrorMessages, KayFile, Node, Span, TemplateFacts, TemplateHelper } from './ast'
 import type { Rewrite } from './mapping'
+import type { ImportedSignals } from './module-signals'
 import type { WRITE_HELPERS } from './names'
 import type { PageSettingName } from './page-settings'
 import type { Sites } from './rewrite'
@@ -1102,13 +1103,13 @@ export function isInteractive(file: KayFile, script: ScriptAnalysis): boolean {
 }
 
 // What a static component passes a component that may render it as an island, a function, a class or an instance of one, or a block taking parameters, as `onPick passed to Picker, line 8`: the first in the template.
-export function promotionCause(file: KayFile, script: ScriptAnalysis): string | undefined {
-  return promotionSite(file, script)?.cause
+export function promotionCause(file: KayFile, script: ScriptAnalysis, imported?: ImportedSignals): string | undefined {
+  return promotionSite(file, script, imported)?.cause
 }
 
-// The call that makes a static component promotable, with the span of its tag.
-export function promotionSite(file: KayFile, script: ScriptAnalysis): { cause: string, span: Span } | undefined {
-  const names = new Set([...script.functions, ...script.imports.filter(binding => !binding.typeOnly && !binding.source.startsWith('~icons/')).map(binding => binding.local)])
+// The call that makes a static component promotable, with the span of its tag. A name imported from a module that exports it as a literal of strings and numbers is data, `imported` telling which.
+export function promotionSite(file: KayFile, script: ScriptAnalysis, imported?: ImportedSignals): { cause: string, span: Span } | undefined {
+  const names = new Set([...script.functions, ...script.imports.filter(binding => !binding.typeOnly && !binding.source.startsWith('~icons/') && imported?.[binding.source]?.[binding.imported] !== 'data').map(binding => binding.local)])
   let cause: string | undefined
   let span: Span | undefined
 
