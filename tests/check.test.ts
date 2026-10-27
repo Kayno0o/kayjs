@@ -2264,6 +2264,21 @@ describe.concurrent('kay check, edge cases', () => {
     }
   })
 
+  it('hands an island a spread of props that hold markup, as the launcher of kayjs-ai spreads its chat\'s (#2472)', async () => {
+    const root = await scratchProject({
+      'src/components/island.kay': '---\nimport type { Snippet } from \'kay\'\nimport { signal } from \'kay\'\n\nconst { name, icon, extra } = props<{ name: string, icon?: Snippet, extra?: Snippet }>()\nconst open = signal(0)\n---\nbutton(onClick={() => open = open() + 1}) {name} {open()}\n  slot icon\n  slot extra\n',
+      'src/components/wrapper.kay': '---\nimport type { Snippet } from \'kay\'\nimport Island from \'./island.kay\'\n\nconst { class: className, ...rest } = props<{ name: string, icon?: Snippet, extra?: Snippet, class?: string }>()\n---\ndiv(class={className})\n  Island(hydrate="visible" {...rest})\n',
+      'src/routes/index.kay': '---\nimport Wrapper from \'../components/wrapper.kay\'\n---\nWrapper(name="a")\n',
+    })
+
+    try {
+      expect((await check(root)).filter(d => d.code !== undefined).map(d => [d.file.slice(root.length + 1), d.code, d.message])).toEqual([])
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
   it('sends an island a declared Column<Row>[] written out in the page, and still refuses a function the type allows from elsewhere, with or without a boolean prop', async () => {
     const page = '---\nimport Grid from \'../components/grid.kay\'\nimport type { Column } from \'../table\'\nimport { fromModule } from \'../columns\'\n\ninterface Moon { id: number, name: string }\n\nconst moons: Moon[] = [{ id: 1, name: \'Io\' }]\nconst written: Column<Moon>[] = [{ key: \'name\', sortValue: true }]\nconst asConst = [{ key: \'name\', sortValue: true }] satisfies Column<Moon>[]\nlet reassigned: Column<Moon>[] = [{ key: \'name\', sortValue: true }]\nconst people: { email: string }[] = [{ email: \'a@b.c\' }]\n---\nGrid(columns={written} rows={moons})\nGrid(columns={written} rows={moons} virtual)\nGrid(columns={asConst} rows={moons})\nGrid(columns={fromModule} rows={moons})\nGrid(columns={fromModule} rows={moons} virtual)\nGrid(columns={reassigned} rows={moons})\nGrid(columns={written} rows={people})\n'
     const root = await scratchProject({

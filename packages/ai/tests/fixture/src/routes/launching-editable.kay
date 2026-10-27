@@ -4,4 +4,8 @@ import { reply } from './replacing.kay'
 import ChatLauncher from '@kaynooo/kayjs-ai/chat-launcher.kay'
 ---
 h1 Launching
-ChatLauncher(action={reply} label="Assistant" editable)
+ChatLauncher(action={reply} label="Assistant" editable regenerate)
+  @editIcon
+    span.mine-edit E
+  @regenerateIcon
+    span.mine-regenerate R

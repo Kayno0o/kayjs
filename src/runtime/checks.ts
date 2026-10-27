@@ -203,21 +203,26 @@ type Sendable = string | number | boolean | bigint | null | undefined | Date | R
 // A type already being checked further up, such as a tree's own children, adds nothing new, so recursive types end there.
 type Visiting<T, Seen> = Seen extends unknown ? [T] extends [Seen] ? [Seen] extends [T] ? true : never : never : never
 
-type IsSerializable<T, Seen = never> = T extends Sendable | Action<never, unknown>
+// A `Snippet`, which a block hands the component compiled and the checks below must not read as the DOM it is typed with: walking `Node` through every markup prop of a spread made the type checker give up with TS2589 (#2472).
+type IsMarkup<T> = 0 extends 1 & T ? false : [T] extends [JSX.Element] ? [JSX.Element] extends [T] ? true : false : false
+
+type IsSerializable<T, Seen = never> = true extends IsMarkup<T>
   ? true
-  : T extends ((...args: never[]) => unknown) | symbol
-    ? false
-    : true extends Visiting<T, Seen>
-      ? true
-      : T extends ReadonlyMap<infer Key, infer Value>
-        ? [IsSerializable<Key, Seen | T>, IsSerializable<Value, Seen | T>] extends [true, true] ? true : false
-        : T extends ReadonlySet<infer Item>
-          ? IsSerializable<Item, Seen | T>
-          : T extends readonly (infer Item)[]
+  : T extends Sendable | Action<never, unknown>
+    ? true
+    : T extends ((...args: never[]) => unknown) | symbol
+      ? false
+      : true extends Visiting<T, Seen>
+        ? true
+        : T extends ReadonlyMap<infer Key, infer Value>
+          ? [IsSerializable<Key, Seen | T>, IsSerializable<Value, Seen | T>] extends [true, true] ? true : false
+          : T extends ReadonlySet<infer Item>
             ? IsSerializable<Item, Seen | T>
-            : T extends object
-              ? false extends { [Key in keyof T]-?: IsSerializable<T[Key], Seen | T> }[keyof T] ? false : true
-              : false
+            : T extends readonly (infer Item)[]
+              ? IsSerializable<Item, Seen | T>
+              : T extends object
+                ? false extends { [Key in keyof T]-?: IsSerializable<T[Key], Seen | T> }[keyof T] ? false : true
+                : false
 
 // A field named like what a page must not carry: an island's props are written into the page source, so each one is public. Matched on the lowercase name, so `passwordHash`, `API_KEY` and `resetToken` all read.
 type SecretWord = 'password' | 'passwd' | 'secret' | 'token' | 'apikey' | 'api_key' | 'privatekey' | 'private_key' | 'credential' | 'email'
@@ -228,19 +233,21 @@ type SecretKey<Key extends string, Field> = Lowercase<Key> extends `${string}${S
 // The paths to the secret-looking fields a value holds, in arrays as `rows[].email`; a type seen further up ends there, and eight levels are read at most so a deep type stays cheap.
 type SecretPaths<T, Seen = never, Depth extends unknown[] = [], Prefix extends string = ''> = 0 extends 1 & T
   ? never
-  : T extends Sendable | ((...args: never[]) => unknown) | symbol
+  : true extends IsMarkup<T>
     ? never
-    : Depth['length'] extends 8
+    : T extends Sendable | ((...args: never[]) => unknown) | symbol
       ? never
-      : true extends Visiting<T, Seen>
+      : Depth['length'] extends 8
         ? never
-        : T extends ReadonlyMap<unknown, infer Value>
-          ? SecretPaths<Value, Seen | T, [...Depth, 0], `${Prefix}[]`>
-          : T extends ReadonlySet<infer Item> | readonly (infer Item)[]
-            ? SecretPaths<Item, Seen | T, [...Depth, 0], `${Prefix}[]`>
-            : T extends object
-              ? { [Key in keyof T & string]-?: ([SecretKey<Key, T[Key]>] extends [never] ? never : Joined<Prefix, Key>) | SecretPaths<T[Key], Seen | T, [...Depth, 0], Joined<Prefix, Key>> }[keyof T & string]
-              : never
+        : true extends Visiting<T, Seen>
+          ? never
+          : T extends ReadonlyMap<unknown, infer Value>
+            ? SecretPaths<Value, Seen | T, [...Depth, 0], `${Prefix}[]`>
+            : T extends ReadonlySet<infer Item> | readonly (infer Item)[]
+              ? SecretPaths<Item, Seen | T, [...Depth, 0], `${Prefix}[]`>
+              : T extends object
+                ? { [Key in keyof T & string]-?: ([SecretKey<Key, T[Key]>] extends [never] ? never : Joined<Prefix, Key>) | SecretPaths<T[Key], Seen | T, [...Depth, 0], Joined<Prefix, Key>> }[keyof T & string]
+                : never
 
 type Joined<Prefix extends string, Key extends string> = Prefix extends '' ? Key : `${Prefix}.${Key}`
 
@@ -251,15 +258,17 @@ type HoldsAction<T, Open extends boolean, Depth extends unknown[] = []> = 0 exte
   ? Open
   : unknown extends T
     ? Open
-    : T extends Action<never, unknown>
-      ? true
-      : Depth['length'] extends 3
-        ? false
-        : T extends readonly (infer Item)[]
-          ? HoldsAction<Item, Open, [...Depth, 0]>
-          : T extends object
-            ? true extends { [Key in keyof T]-?: HoldsAction<T[Key], Open, [...Depth, 0]> }[keyof T] ? true : false
-            : false
+    : true extends IsMarkup<T>
+      ? false
+      : T extends Action<never, unknown>
+        ? true
+        : Depth['length'] extends 3
+          ? false
+          : T extends readonly (infer Item)[]
+            ? HoldsAction<Item, Open, [...Depth, 0]>
+            : T extends object
+              ? true extends { [Key in keyof T]-?: HoldsAction<T[Key], Open, [...Depth, 0]> }[keyof T] ? true : false
+              : false
 
 // An island whose props name no action receives one as a bare function, which its chunk cannot revive: it needs `Action` imported from `kay` in its script, as the type of the prop. `kay check` reports it as the `island-action` lint.
 type ActionProp<Component, Value> = true extends HoldsAction<Value, false> ? Component extends (props: infer Props) => unknown ? true extends HoldsAction<Props, true> ? unknown : { kayLint: 'island-action' } : unknown : unknown
@@ -267,21 +276,23 @@ type ActionProp<Component, Value> = true extends HoldsAction<Value, false> ? Com
 // The paths to the function-typed fields a value holds, in arrays as `columns[].sortValue`, so the error names which one to look at; a type seen further up ends there, and eight levels are read at most.
 type FunctionPaths<T, Seen = never, Depth extends unknown[] = [], Prefix extends string = ''> = 0 extends 1 & T
   ? never
-  : T extends Sendable | symbol | Action<never, unknown>
+  : true extends IsMarkup<T>
     ? never
-    : T extends ((...args: never[]) => unknown)
-      ? Prefix
-      : Depth['length'] extends 8
-        ? never
-        : true extends Visiting<T, Seen>
+    : T extends Sendable | symbol | Action<never, unknown>
+      ? never
+      : T extends ((...args: never[]) => unknown)
+        ? Prefix
+        : Depth['length'] extends 8
           ? never
-          : T extends ReadonlyMap<unknown, infer Value>
-            ? FunctionPaths<Value, Seen | T, [...Depth, 0], `${Prefix}[]`>
-            : T extends ReadonlySet<infer Item> | readonly (infer Item)[]
-              ? FunctionPaths<Item, Seen | T, [...Depth, 0], `${Prefix}[]`>
-              : T extends object
-                ? { [Key in keyof T & string]-?: FunctionPaths<T[Key], Seen | T, [...Depth, 0], Joined<Prefix, Key>> }[keyof T & string]
-                : never
+          : true extends Visiting<T, Seen>
+            ? never
+            : T extends ReadonlyMap<unknown, infer Value>
+              ? FunctionPaths<Value, Seen | T, [...Depth, 0], `${Prefix}[]`>
+              : T extends ReadonlySet<infer Item> | readonly (infer Item)[]
+                ? FunctionPaths<Item, Seen | T, [...Depth, 0], `${Prefix}[]`>
+                : T extends object
+                  ? { [Key in keyof T & string]-?: FunctionPaths<T[Key], Seen | T, [...Depth, 0], Joined<Prefix, Key>> }[keyof T & string]
+                  : never
 
 type NotSerializable<Value> = [FunctionPaths<Value>] extends [never] ? { kayError: 'A layout, or a page with a server fence, sends an island its props serialized: plain objects, arrays, Dates, Maps, Sets, bigints, URLs and RegExps, but no functions, symbols or class instances; a component of its own passing one renders as an island in its place' } : { kayError: 'A layout, or a page with a server fence, sends an island its props serialized: plain objects, arrays, Dates, Maps, Sets, bigints, URLs and RegExps, but no functions, symbols or class instances; a component of its own passing one renders as an island in its place', kayPath: FunctionPaths<Value> }
 

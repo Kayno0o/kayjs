@@ -71,7 +71,7 @@ export const reply = action(schema, async ({ messages }) => {
 
 - Try again after a failed regenerate or edit posts the same request with the same header, as a fresh send's retry posts its message again; a Stop before the first word puts the history back and forgets it. A resume after a reload carries none, the server having dropped the turns by then.
 - An edit stays open through a message sent from outside, an Allow or Deny and the reply to it, its Save disabled while a reply is under way. Cancel, Escape (in the field or on Save or Cancel, which neither stops a reply nor closes a `ChatLauncher` panel) and Save close it: Cancel and Escape put the focus back on the message's edit button, which is named `Edit the message: <first words>`; Save focuses the field, as the reply is under way. A Save with no text and no file says `ai.chat.editEmpty` (`Write a message to send.`, `editEmptyLabel`).
-- Words: `ai.chat.regenerate` (`Regenerate the reply`), `edit` (`Edit the message`), `save` (`Save and send`) and `cancel`, props `regenerateLabel`, `editLabel`, `saveLabel` and `cancelLabel`; `@regenerateIcon` and `@editIcon` replace the circular arrow and the pencil (kayjs-ui's `refresh` and `edit` slots; `ChatLauncher` takes the two props but not the blocks, so it restyles them through those slots).
+- Words: `ai.chat.regenerate` (`Regenerate the reply`), `edit` (`Edit the message`), `save` (`Save and send`) and `cancel`, props `regenerateLabel`, `editLabel`, `saveLabel` and `cancelLabel`; `@regenerateIcon` and `@editIcon` replace the circular arrow and the pencil (kayjs-ui's `refresh` and `edit` slots); `ChatLauncher` takes them too.
 
 ### Floating chat
 

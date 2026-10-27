@@ -302,3 +302,14 @@ it('keeps an open edit through a message sent from outside and the reply to it, 
   await page.click('.kai-chat-save')
   await page.waitFor('.kai-chat-turn[data-role=assistant]:last-of-type .kai-chat-text', { text: 'edit:6 roles=u last=uno files=0' })
 }, 120_000)
+
+it('draws the icons a ChatLauncher is given for the regenerate and edit buttons', async () => {
+  await using page = await site.open('/launching-editable')
+
+  await page.click('.kai-launcher-button')
+  await page.waitUntil(() => [...document.querySelectorAll('[data-hydrate=visible]')].every(island => '_$k' in island))
+  await send(page, 'one', 'fresh roles=u last=one files=0')
+
+  expect(await page.text(`${EDIT} .mine-edit`)).toBe('E')
+  expect(await page.text(`${REGENERATE} .mine-regenerate`)).toBe('R')
+}, 120_000)
