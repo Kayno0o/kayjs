@@ -2,11 +2,13 @@
 
 What each minor release breaks, and what an app changes to move to it. kay and its libraries share one version, so one section covers them all; a patch breaks nothing, and a minor missing here broke nothing.
 
-## 1.80.0
+## 1.81.0
 
 ### `s.UnionEnum` and `s.UnionKeys` no longer default to their first value
 
 - An enum field left out used to read as its first value. An optional one now reads `undefined`; a required one is refused: an action answers 422, a page's `query` schema answers 400 on a visit without the parameter, a `defineEnv` variable left unset stops the boot, and a content field left out fails the build. An app relying on the fill writes `s.UnionEnum(['a', 'b'], { default: 'a' })`, which also keeps the old error body of an `api` route. No lint can recognise it, as the old form is valid and only its result changed.
+
+## 1.80.0
 
 ### A Button that is disabled with a `data-tooltip` is `aria-disabled`, not `disabled`
 
