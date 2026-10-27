@@ -67,7 +67,7 @@ type Tracker = <T>(load: () => Promise<T>) => Promise<{ result: T, reads: string
 
 const entries = new Map<string, Entry>()
 // When each key whose first load failed, with a `fallback` given, may be loaded again.
-const failures = new Map<string, number>()
+const failures = new Map<string, { until: number, deps: string[] }>()
 // Every store a call named, which `invalidate` empties too.
 const stores = new Set<CacheStore>()
 // The drops of stored rows still running in the background, which a read of a store waits for so it never meets a row an `invalidate` already dropped.
@@ -295,11 +295,11 @@ async function cachedFor<T, const Ttl extends Duration = Duration>(key: string, 
   const fallback = 'fallback' in options
 
   if (!entry) {
-    const until = fallback ? failures.get(key) : undefined
+    const failed = fallback ? failures.get(key) : undefined
 
     // A first load failed a moment ago: the fallback again, without asking the service on every call.
-    if (until !== undefined) {
-      if (Date.now() < until)
+    if (failed) {
+      if (Date.now() < failed.until)
         return options.fallback as T
 
       failures.delete(key)
@@ -312,11 +312,11 @@ async function cachedFor<T, const Ttl extends Duration = Duration>(key: string, 
 
     pending.loading = firstLoad(key, seconds, pending, load, store, tagKeys, options.store === undefined)
 
-    return fallback ? withFallback<T>(key, seconds, options.fallback as T, waited<T>(key, pending)) : waited<T>(key, pending)
+    return fallback ? withFallback<T>(key, seconds, options.fallback as T, waited<T>(key, pending), invalidations, tagKeys) : waited<T>(key, pending)
   }
 
   if (!entry.loaded)
-    return fallback ? withFallback<T>(key, seconds, options.fallback as T, waited<T>(key, entry)) : waited<T>(key, entry)
+    return fallback ? withFallback<T>(key, seconds, options.fallback as T, waited<T>(key, entry), invalidations, tagKeys) : waited<T>(key, entry)
 
   for (const dep of entry.deps ?? [])
     noteRead(dep)
@@ -327,7 +327,12 @@ async function cachedFor<T, const Ttl extends Duration = Duration>(key: string, 
       if (!entry.loading)
         void refresh(key, seconds, entry, load, store, tagKeys, options.store === undefined, true)
 
-      return (await (entry.loading as Promise<{ result: T }>)).result
+      const { result } = await (entry.loading as Promise<{ result: T }>)
+
+      for (const dep of entries.get(key)?.deps ?? [])
+        noteRead(dep)
+
+      return result
     }
 
     if (!entry.loading)
@@ -338,16 +343,17 @@ async function cachedFor<T, const Ttl extends Duration = Duration>(key: string, 
 }
 
 // The first load's value, or the fallback when it throws, which is logged and remembered for a short while.
-async function withFallback<T>(key: string, seconds: number, fallback: T, loading: Promise<T>): Promise<T> {
+// Remembered only when nothing was invalidated while it ran, and dropped with the key or a tag it names.
+async function withFallback<T>(key: string, seconds: number, fallback: T, loading: Promise<T>, before: number, deps: string[]): Promise<T> {
   try {
     return await loading
   }
   catch (error) {
-    if (!failures.has(key)) {
+    if (!failures.has(key) && before === invalidations) {
       if (failures.size >= MAX_ENTRIES)
         failures.clear()
 
-      failures.set(key, Date.now() + Math.min(seconds * 1000, RETRY_MS))
+      failures.set(key, { until: Date.now() + Math.min(seconds * 1000, RETRY_MS), deps })
       kayLog('error', `loading cached('${key}') failed; answering its fallback`, error)
     }
 
@@ -474,11 +480,6 @@ export function refreshLocally(key: string): void {
 function dropAndTell(named: (key: string) => boolean, built: (key: string) => boolean, dropped: Set<string>): void {
   invalidations++
 
-  for (const name of failures.keys()) {
-    if (named(name) || built(name))
-      failures.delete(name)
-  }
-
   for (const name of dropEntries(named, built))
     dropped.add(name)
 
@@ -587,6 +588,11 @@ async function logged(result: Promise<void>, what: string): Promise<void> {
 // Drops the entries a matcher names and those built from one it names, giving back their keys.
 function dropEntries(named: (key: string) => boolean, built: (key: string) => boolean = named): string[] {
   const names: string[] = []
+
+  for (const [name, failure] of failures) {
+    if (named(name) || failure.deps.some(dep => dep === ALL_READS || built(dep)))
+      failures.delete(name)
+  }
 
   for (const [name, entry] of entries) {
     if (named(name) || entry.deps?.some(dep => dep === ALL_READS || built(dep))) {

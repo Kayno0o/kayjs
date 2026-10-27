@@ -2,16 +2,53 @@ import type { CachedFunction, CacheFunctionOptions, CacheStore, CacheTag } from 
 import { rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import process from 'node:process'
-import { afterEach, describe, expect, it } from 'bun:test'
+import { afterEach, describe, expect, it, setSystemTime, spyOn } from 'bun:test'
 import { cache, cacheTag, invalidate, invalidateLocally, onKeysInvalidated, trackStore, untrackStore } from '../src/runtime/cache'
 import { readsOf } from '../src/server/page-reads'
 import { scratchDir } from './scratch'
 
 afterEach(() => {
+  setSystemTime()
   invalidate(() => true)
 })
 
 describe('cache', () => {
+  it('takes stale: false and a fallback, a tag dropping the fallback it remembers', async () => {
+    const logged = spyOn(console, 'error').mockImplementation(() => undefined)
+    const group = cacheTag()
+    let failing = true
+    let loads = 0
+
+    const repos = cache(async (): Promise<string[]> => {
+      loads++
+
+      if (failing)
+        throw new Error('down')
+
+      return ['repo']
+    }, { ttl: '1h', tags: [group], fallback: [] })
+
+    try {
+      expect(await repos()).toEqual([])
+      expect(await repos()).toEqual([])
+      expect(loads).toBe(1)
+      failing = false
+      group.invalidate()
+      expect(await repos()).toEqual(['repo'])
+    }
+    finally {
+      logged.mockRestore()
+    }
+
+    let edition = 1
+    const feed = cache(() => edition, { ttl: '30s', stale: false })
+
+    expect(await feed()).toBe(1)
+    edition = 2
+    setSystemTime(Date.now() + 31_000)
+    expect(await feed()).toBe(2)
+  })
+
   it('keeps a value per call site and drops it with its own invalidate', async () => {
     let loads = 0
     const posts = cache(() => ++loads, { ttl: '5m' })
