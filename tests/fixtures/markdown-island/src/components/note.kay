@@ -1,0 +1,8 @@
+---
+import { signal } from 'kay'
+import { markdownHtml } from 'kay/markdown'
+
+const text = signal('# Note\n\nWritten **bold**.')
+---
+div.note(innerHTML={markdownHtml(text())})
+button.edit(onClick={() => text.set('# Edited\n\nNow *slanted*.')}) Edit

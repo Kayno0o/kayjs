@@ -1,0 +1,5 @@
+--- script
+import Note from '../components/note.kay'
+---
+h1 Markdown
+Note

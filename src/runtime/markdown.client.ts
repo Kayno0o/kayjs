@@ -1,5 +1,6 @@
 import type { SafeHtml } from './checks'
-import { isHydrating, ownSignal } from './reactive'
+import { claiming } from './dom'
+import { ownSignal } from './reactive'
 import { holdServerMarkup, isHeldMarkup, vouch } from './safe-html'
 
 const ESCAPED = /[&<>"]/g
@@ -12,7 +13,7 @@ let loading: Promise<void> | undefined
 // The text as written, in a paragraph, which stands in until the renderer has arrived.
 const asWritten = (markdown: string) => vouch(`<p>${markdown.replace(ESCAPED, char => ESCAPES[char]!)}</p>\n`)
 
-// The renderer (marked and the sanitizer, about 17 KB gzip) is fetched by the first call, so an island that never renders Markdown never loads it. A failed load is not retried, as the browser remembers it failed: the text stays as written.
+// The renderer (marked and the sanitizer, about 17 KB gzip) is fetched by the first call outside hydration, so an island that never renders Markdown, or only the Markdown the server already drew, never loads it. A failed load is not retried, as the browser remembers it failed: the text stays as written.
 function load(): void {
   requested = true
   loading = fetchRenderer()
@@ -34,14 +35,13 @@ export function markdownHtml(markdown: string): SafeHtml {
   if (render)
     return render(markdown)
 
-  if (!requested)
-    void load()
-
   const standIn = asWritten(markdown)
 
-  // The server wrote this Markdown formatted: an island claiming it keeps that until the renderer arrives.
-  if (isHydrating())
+  // The server wrote this Markdown formatted: an island claiming it keeps that, and the renderer loads once the text changes.
+  if (claiming())
     holdServerMarkup(standIn)
+  else if (!requested)
+    load()
 
   return standIn
 }
@@ -49,7 +49,7 @@ export function markdownHtml(markdown: string): SafeHtml {
 // Resolves once the renderer has loaded, or failed to: `await markdownReady()` before a `markdownHtml` call outside a template or effect, such as a click handler, so it returns the formatted HTML.
 export async function markdownReady(): Promise<void> {
   if (!requested)
-    void load()
+    load()
 
   await loading
 }

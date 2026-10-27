@@ -1,7 +1,7 @@
 import { GlobalRegistrator } from '@happy-dom/global-registrator'
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
 import { fresh, hydrate, property } from '../src/runtime/dom'
-import { flush, renderEffect, root } from '../src/runtime/reactive'
+import { createSignal, flush, renderEffect, root } from '../src/runtime/reactive'
 
 // Each test gets its own copy of the shell, whose renderer has not loaded yet.
 async function shell(name: string): Promise<typeof import('../src/runtime/markdown.client')> {
@@ -34,20 +34,26 @@ describe('markdownHtml in an island', () => {
     expect(element.innerHTML).toBe('<p><strong>a</strong> &amp; b</p>\n')
   })
 
-  it('keeps the server\'s formatted markup while an island hydrates, until the renderer has loaded', async () => {
+  it('keeps the server\'s formatted markup while an island hydrates, and loads the renderer only once the text changes', async () => {
     const { markdownHtml } = await shell('hydrate')
     const container = document.createElement('div')
+    const [text, setText] = createSignal('# Title')
 
     container.innerHTML = '<div><h1>Title</h1></div>'
 
     const element = container.firstElementChild!
 
-    root(() => hydrate(() => renderEffect(() => property(element, 'innerHTML', markdownHtml('# Title'))), container))
+    root(() => hydrate(() => renderEffect(() => property(element, 'innerHTML', markdownHtml(text()))), container))
     flush()
+    await Bun.sleep(50)
     expect(element.innerHTML).toBe('<h1>Title</h1>')
 
-    await settled(() => element.innerHTML === '<h1>Title</h1>\n')
-    expect(element.innerHTML).toBe('<h1>Title</h1>\n')
+    setText('# Other')
+    flush()
+    expect(element.innerHTML).toBe('<p># Other</p>\n')
+
+    await settled(() => element.innerHTML.startsWith('<h1'))
+    expect(element.innerHTML).toBe('<h1>Other</h1>\n')
   })
 
   it('forgets a hold no write took when the island ends, so a later island draws its markup', async () => {
@@ -185,6 +191,9 @@ describe('markdownHtml in an island', () => {
     root(() => hydrate(() => fresh(() => renderEffect(() => property(element, 'innerHTML', markdownHtml('*a*')))), container))
     flush()
     expect(element.innerHTML).toBe('<p>*a*</p>\n')
+
+    await settled(() => element.innerHTML.includes('<em>'))
+    expect(element.innerHTML).toBe('<p><em>a</em></p>\n')
   })
 
   it('lets a call outside an effect wait for the renderer', async () => {
