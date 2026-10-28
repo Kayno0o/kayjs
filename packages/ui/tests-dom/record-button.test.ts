@@ -4,10 +4,11 @@ import { mountComponent, settle } from 'kay/test'
 import RecordButton from '../src/record-button.kay'
 import { click } from './dom'
 
-// The recorders made, the tracks opened and the chunk a recorder hands over, which a test empties for a silent one.
+// The recorders made, the tracks opened, the chunk a recorder hands over, which a test empties for a silent one, and what a stopped recorder waits on before it says so.
 let recorders: { state: string }[] = []
 let tracks: FakeTrack[] = []
 let chunk: string[] = ['voice']
+let held: Promise<void> | undefined
 
 // Stand-ins for the microphone happy-dom has not: a track that ends, a stream of one, and a recorder handing over one chunk as browsers do on stop.
 class FakeTrack extends EventTarget {
@@ -36,10 +37,13 @@ class FakeRecorder extends EventTarget {
       return
 
     this.state = 'inactive'
-    queueMicrotask(() => {
-      this.dispatchEvent(Object.assign(new Event('dataavailable'), { data: new Blob(chunk, { type: 'audio/webm' }) }))
-      this.dispatchEvent(new Event('stop'))
-    })
+    void this.stopped()
+  }
+
+  private async stopped() {
+    await held
+    this.dispatchEvent(Object.assign(new Event('dataavailable'), { data: new Blob(chunk, { type: 'audio/webm' }) }))
+    this.dispatchEvent(new Event('stop'))
   }
 }
 
@@ -64,6 +68,7 @@ beforeEach(() => {
   recorders = []
   tracks = []
   chunk = ['voice']
+  held = undefined
   microphone(async () => stream())
   ;(globalThis as { MediaRecorder?: unknown }).MediaRecorder = FakeRecorder
 })
@@ -232,6 +237,27 @@ test('a rejected onRecord says failure, and the recording stops by itself after 
   finally {
     logged.mockRestore()
   }
+})
+
+test('a recording whose maxDuration runs out is handed over as if pressed, and an Escape before its audio arrives drops nothing', async () => {
+  const stopping = later()
+  const { given, button, look } = await mount({ maxDuration: '30ms' })
+
+  held = stopping.promise
+  click(button)
+  await settle()
+  await Bun.sleep(60)
+
+  expect([recorders[0]!.state, look().pressed]).toEqual(['inactive', 'true'])
+  // dispatchEvent is false when a listener prevented the default, which Escape does only when it dropped a recording.
+  expect(button.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }))).toBe(true)
+
+  stopping.settle()
+  await settle()
+
+  expect(given.map(audio => audio.name)).toEqual(['recording.webm'])
+  expect([look().pressed, look().busy, look().status, look().problem]).toEqual(['false', null, '', null])
+  expect(tracks.map(track => track.readyState)).toEqual(['ended'])
 })
 
 test('a RecordButton removed while it records releases the microphone', async () => {

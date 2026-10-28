@@ -14,7 +14,7 @@ const MIC = '.kai-chat-form .kai-chat-record'
 interface Voice {
   said: string
   refusal: string | undefined
-  tracks: { readyState: string }[]
+  tracks: (EventTarget & { readyState: string, stop: () => void })[]
 }
 
 // Chromium in a test has no microphone: a stream of one track, and a recorder handing over `said` as its one chunk, the bytes the fixture's transcribe reads back as the text.
@@ -173,6 +173,26 @@ it('drops a recording on Escape from the keyboard, saying so', async () => {
   await page.waitUntil(() => (window as unknown as Voice).tracks.every(track => track.readyState === 'ended'))
 
   expect(await page.count('.kai-chat-turn')).toBe(0)
+}, 120_000)
+
+it('drops a recording whose microphone is unplugged mid-way, saying so and sending nothing', async () => {
+  await using page = await site.open('/speaking')
+
+  await microphone(page)
+  await page.reload()
+  await page.waitFor(MIC)
+  await page.click(MIC)
+  await page.waitFor(`${MIC}[aria-pressed=true]`)
+  await page.evaluate(() => {
+    const [track] = (window as unknown as Voice).tracks
+
+    track!.stop()
+    track!.dispatchEvent(new Event('ended'))
+  })
+  await page.waitFor('.kai-chat .kui-notice', { text: 'The microphone was disconnected, so the recording was dropped.' })
+  await page.waitFor(`${MIC}[aria-pressed=false]:not([aria-busy])`)
+
+  expect([await page.count('.kai-chat-turn'), await page.value('.kai-chat-form textarea'), await page.text('.kai-chat-status')]).toEqual([0, '', ''])
 }, 120_000)
 
 // Whether a script the page loaded holds the recorder's own code.
