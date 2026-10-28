@@ -311,7 +311,7 @@ describe('rate limits', () => {
   test.each(rows.map(row => [`${row.key}${row.action === undefined ? '' : ` (${row.action})`}`, row.per, row] as const))('%s answers `limited` once its attempts are spent, per %s', async (_name, _per, row) => {
     const key = row.key
     const limit = row.limit ?? DEFAULT_LIMITS[key]
-    const attempt = await row.prepare({ [key]: { max: limit.max, window: typeof limit.window === 'number' ? `${limit.window}s` : limit.window } })
+    const attempt = await row.prepare({ [key]: { max: limit.max, window: limit.window } })
 
     for (let n = 1; n <= limit.max; n++)
       expect(await attempt(n)).toMatchObject(row.answers)
