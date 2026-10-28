@@ -62,7 +62,8 @@ describe('the headers of every kind of answer', () => {
 
     page = shape(first)['content-security-policy']!
 
-    asset = (/\/_kay\/entry-[^"]+\.js/).exec(html)![0]
+    // The page posts a form and holds no island, so it loads the navigation-only entry.
+    asset = (/\/_kay\/nav-[^"]+\.js/).exec(html)![0]
     action = (/<form[^>]*action="([^"]+)"/).exec(html)![1]!.replaceAll('&amp;', '&')
   })
 
@@ -137,8 +138,8 @@ describe('the headers of every kind of answer', () => {
     await expectAnswer(await get(asset), 200, { 'cache-control': IMMUTABLE, 'content-type': 'text/javascript;charset=utf-8', 'vary': 'accept-encoding' })
     await expectAnswer(await get(asset, { 'accept-encoding': 'br' }), 200, { 'cache-control': IMMUTABLE, 'content-encoding': 'br', 'content-type': 'text/javascript;charset=utf-8', 'vary': 'accept-encoding' })
     // However the name is spelled, the file is the build's, and no other.
-    await expectAnswer(await get(asset.replace('entry', '%65ntry')), 200, { 'cache-control': IMMUTABLE, 'content-type': 'text/javascript;charset=utf-8', 'vary': 'accept-encoding' })
-    await expectAnswer(await get(asset.replace('/entry', '/%2e%2e/entry'), { 'accept-encoding': 'br' }), 404, {})
+    await expectAnswer(await get(asset.replace('nav', '%6eav')), 200, { 'cache-control': IMMUTABLE, 'content-type': 'text/javascript;charset=utf-8', 'vary': 'accept-encoding' })
+    await expectAnswer(await get(asset.replace('/nav', '/%2e%2e/nav'), { 'accept-encoding': 'br' }), 404, {})
     expect((await get('/_kay/..%2fpackage.json')).status).toBe(404)
     expect((await get('/_kay/%00')).status).toBe(404)
     await expectAnswer(await get(files.url(key)), 200, { 'accept-ranges': 'bytes', 'cache-control': IMMUTABLE, 'content-disposition': 'inline', 'content-type': 'image/png' })
@@ -226,7 +227,7 @@ describe('HSTS on every kind of answer of an https site', () => {
     const app = await pages({ root: dir, prebuilt: false, log: false, site: 'https://shop.example', dev: false, storage: memoryFiles() })
     const key = await files.put(new File([new Uint8Array(2000)], 'a.png', { type: 'image/png' }))
     const html = await (await app.handle(new Request(`${ORIGIN}/`))).text()
-    const asset = (/\/_kay\/entry-[^"]+\.js/).exec(html)![0]
+    const asset = (/\/_kay\/nav-[^"]+\.js/).exec(html)![0]
     const hsts = async (path: string, init: RequestInit = {}) => (await app.handle(new Request(`${ORIGIN}${path}`, init))).headers.get('strict-transport-security')
 
     for (const path of ['/', asset, files.url(key), '/_kay/missing.js', '/no-such-page'])
