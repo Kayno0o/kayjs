@@ -33,6 +33,17 @@ export const SOURCE_FILE_READ = /(?:Bun\.file|readFile(?:Sync)?)\([^\n]*?[`'"]((
 // What marks a test as depending on the stylesheet of the UI library: it reads it, loads the UI extension that references it, or imports it from a stylesheet. Browser tests are left out of `SOURCE_FILE_READERS`.
 export const UI_THEME_USE = /packages\/ui\/src\/(?:extension|theme\.css)|kayjs-ui\/theme\.css/
 
+// Tests walking every fixture as files, so a new fixture reaches them though no test names it; `tests/land.test.ts` fails for a test walking the fixtures that is not listed here.
+export const FIXTURE_WALKERS = [
+  'tests/format.test.ts',
+  'tests/local-bundle.test.ts',
+  'tests/property.test.ts',
+  'tests/tree-sitter.test.ts',
+]
+
+// What marks a test as walking every fixture: a quoted `tests/fixtures`, or a glob of each fixture under it, or the `.kay` files of its `fixtures` folder.
+export const FIXTURE_WALK = /[`'"]tests\/fixtures(?:\/\*[^`'"]*)?[`'"]|findKayFiles\(fixtures\)/
+
 // Tests reading these folders as files, which an import graph does not show.
 export const READERS: [RegExp, string[]][] = [
   [/^(?:llms\/|llms\.txt$)/, ['tests/llms.test.ts', 'tests/docs.test.ts', 'tests/docs-chat.test.ts', 'tests/errors.test.ts', 'tests/kay-words.test.ts', 'tests/release-links.test.ts', 'tests/bun.test.ts', 'tests/browsers.test.ts', 'tests/dev-tool.test.ts', 'tests/dev-routes.test.ts']],
@@ -42,7 +53,8 @@ export const READERS: [RegExp, string[]][] = [
   // Tests globbing the kay and library sources.
   [SOURCE_CHANGE, SOURCE_READERS],
   ...SOURCE_FILE_READERS,
-  [/^tests\/fixtures\//, ['tests/format.test.ts']],
+  // A fixture without a kay.config.ts of its own is part of the repo root's app (src/build/files.ts), so it also reaches a build rooted at the repo.
+  [/^tests\/fixtures\//, [...FIXTURE_WALKERS, 'tests/navigation.test.ts']],
   // Greps every tracked file for the private forge domain.
   [/^/, ['tests/public-repo.test.ts']],
 ]

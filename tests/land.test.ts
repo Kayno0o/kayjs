@@ -7,7 +7,7 @@ import { describe, expect, it } from 'bun:test'
 import { dependenciesOnly } from '../scripts/dependency-change'
 import { librariesToTest, libraryDependencies } from '../scripts/library-dependents'
 import { addedMarkers } from '../scripts/merge-markers'
-import { READERS, readersOf, SOURCE_CHANGE, SOURCE_FILE_READ, SOURCE_FILE_READERS, SOURCE_READERS, SOURCE_SCAN, sourcesRead, UI_THEME_USE, WHOLE_SUITE } from '../scripts/source-readers'
+import { FIXTURE_WALK, FIXTURE_WALKERS, READERS, readersOf, SOURCE_CHANGE, SOURCE_FILE_READ, SOURCE_FILE_READERS, SOURCE_READERS, SOURCE_SCAN, sourcesRead, UI_THEME_USE, WHOLE_SUITE } from '../scripts/source-readers'
 import { subprocessTests } from '../scripts/subprocess-tests'
 import { scratchDir } from './scratch'
 
@@ -570,5 +570,23 @@ describe('tests scanning the sources as files', () => {
 
     for (const path of ['llms/lints.md', 'tests/land.test.ts', 'packages/ui/llms.txt', 'packages/ui/tests/button.test.ts', 'src/server/codec/avif-enc.wasm'])
       expect(SOURCE_CHANGE.test(path)).toBe(false)
+  })
+})
+
+describe('tests walking every fixture as files', () => {
+  it('are all listed, so a landing adding a fixture runs them', async () => {
+    const walking: string[] = []
+
+    for await (const test of new Bun.Glob('tests/*.test.ts').scan(ROOT)) {
+      if (FIXTURE_WALK.test(await Bun.file(join(ROOT, test)).text()))
+        walking.push(test)
+    }
+
+    expect(walking.toSorted()).toEqual([...FIXTURE_WALKERS].toSorted())
+  })
+
+  it('run, with a build rooted at the repo, for a file of a fixture no test names', () => {
+    expect(readersOf('tests/fixtures/added/src/routes/index.kay')).toEqual(expect.arrayContaining([...FIXTURE_WALKERS, 'tests/navigation.test.ts']))
+    expect(readersOf('tests/land.test.ts')).not.toContain('tests/local-bundle.test.ts')
   })
 })
