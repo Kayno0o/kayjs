@@ -107,6 +107,19 @@ describe('transcribe', () => {
     expect((await failure(transcribe(recording, { provider: voices, model: 'whisper-1', timeout: '50ms' }))).kind).toBe('timeout')
   })
 
+  it('stops when its signal aborts', async () => {
+    const { promise: never } = Promise.withResolvers<Response>()
+    const stop = new AbortController()
+
+    answer = async () => never
+
+    const call = transcribe(recording, { provider: voices, model: 'whisper-1', signal: stop.signal })
+
+    stop.abort(new Error('left'))
+
+    await expect(call).rejects.toThrow('left')
+  })
+
   it('refuses a provider with no speech to text before sending anything', async () => {
     expect((await failure(transcribe(recording, { provider: anthropic({ apiKey: 'k' }), model: 'm' }))).kind).toBe('unsupported')
   })
@@ -152,7 +165,7 @@ describe('speak', () => {
   })
 
   it('refuses a speed out of 0.25 to 4', async () => {
-    expect(speak('Hi', { speed: 5 })).rejects.toThrow('0.25 to 4')
+    await expect(speak('Hi', { speed: 5 })).rejects.toThrow('0.25 to 4')
   })
 
   describe('given its own provider', () => {

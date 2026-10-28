@@ -71,12 +71,12 @@ export interface Embedded {
 }
 
 // What answers a call other than an ask: the value, an error it throws, or a function of what it was given.
-export type Answer<Given, Value> = Value | Error | ((given: Given) => Value)
+export type FakeAnswer<Given, Value> = Value | Error | ((given: Given) => Value)
 
 type OtherCall = 'transcribe' | 'speak' | 'embed'
 
 interface Queued<Given, Value> {
-  answer: Answer<Given, Value>
+  answer: FakeAnswer<Given, Value>
   when: ((given: Given) => boolean) | undefined
 }
 
@@ -94,15 +94,15 @@ export interface Fake extends Provider {
   // Every recording `transcribe()` was given, oldest first.
   readonly heard: readonly Heard[]
   // The next `transcribe()` returns this text, or throws this error; `Fake transcript` when none is left.
-  transcript: (answer: Answer<Heard, string>, when?: (heard: Heard) => boolean) => void
+  transcript: (answer: FakeAnswer<Heard, string>, when?: (heard: Heard) => boolean) => void
   // Every text `speak()` was given, oldest first.
   readonly spoken: readonly Spoken[]
   // The next `speak()` returns this audio, or throws this error; a silent WAV as long as the text when none is left.
-  speech: (answer: Answer<Spoken, Blob>, when?: (spoken: Spoken) => boolean) => void
+  speech: (answer: FakeAnswer<Spoken, Blob>, when?: (spoken: Spoken) => boolean) => void
   // Every `embed()` call, oldest first.
   readonly embedded: readonly Embedded[]
   // The next `embed()` returns these vectors, one per text, or throws this error; when none is left each text gets a stable vector from its words.
-  embedding: (answer: Answer<Embedded, number[][]>, when?: (embedded: Embedded) => boolean) => void
+  embedding: (answer: FakeAnswer<Embedded, number[][]>, when?: (embedded: Embedded) => boolean) => void
   // Forgets what was asked and scripted.
   clear: () => void
 }
@@ -112,6 +112,7 @@ const WORDS = /\S+\s*|\s+/g
 const CHARS_PER_TOKEN = 4
 const DEV_PACE_MS = 20
 const SAMPLE_RATE = 16_000
+const MAX_SILENT_WORDS = 100
 // The length of a fake vector when `embed` names none.
 const DIMENSIONS = 256
 const TOKENS = /[\p{L}\p{N}]+/gu
@@ -228,9 +229,9 @@ function answerOf<Given, Value>(queue: Queued<Given, Value>[], given: Given, fal
   return typeof answer === 'function' ? (answer as (given: Given) => Value)(given) : answer
 }
 
-// 16-bit mono PCM silence in a WAV, 0.3 s a word, so a test reading its length sees a longer text read for longer.
+// 16-bit mono PCM silence in a WAV, 0.3 s a word up to 30 s, so a test reading its length sees a longer text read for longer.
 function silence(text: string): Blob {
-  const samples = Math.max(1, pieces(text.trim()).length) * SAMPLE_RATE * 3 / 10
+  const samples = Math.min(MAX_SILENT_WORDS, Math.max(1, pieces(text.trim()).length)) * SAMPLE_RATE * 3 / 10
   const view = new DataView(new ArrayBuffer(44 + samples * 2))
   const ascii = (at: number, word: string) => {
     for (const [index, char] of [...word].entries()) {
@@ -264,7 +265,7 @@ function vectorOf(text: string, dimensions: number): number[] {
     vector[hash % dimensions]! += Math.floor(hash / dimensions) % 2 === 0 ? 1 : -1
   }
 
-  const length = Math.hypot(...vector)
+  const length = Math.sqrt(vector.reduce((sum, value) => sum + value * value, 0))
 
   if (length === 0)
     vector[0] = 1
@@ -304,7 +305,12 @@ function createFake(): Fake {
 
         embedded.push(given)
 
-        return answerOf(embeddings, given, () => input.map(text => vectorOf(text, dimensions ?? DIMENSIONS)))
+        const vectors = answerOf(embeddings, given, () => input.map(text => vectorOf(text, dimensions ?? DIMENSIONS)))
+
+        if (vectors.length !== input.length)
+          throw new Error(`fakeAi.embedding() answered ${vectors.length} vectors for ${input.length} texts`)
+
+        return vectors
       }),
     }
 

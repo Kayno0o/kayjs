@@ -67,7 +67,7 @@ describe('embed under bun test', () => {
   })
 
   it('refuses dimensions that are no whole number of 1 or more', async () => {
-    expect(embed('Hi', { dimensions: 1.5 })).rejects.toThrow('whole number')
+    await expect(embed('Hi', { dimensions: 1.5 })).rejects.toThrow('whole number')
   })
 })
 

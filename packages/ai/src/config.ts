@@ -19,10 +19,12 @@ export function aiEnv(listed = false) {
     AI_MODEL: s.Optional(s.String(listed ? { description: 'the model asked unless `ask` names one', requiredInProduction: true } : {})),
     AI_PROVIDER: s.Optional(s.String({ pattern: '^(?:anthropic|openai)$', description: 'anthropic or openai: only needed when both keys are set' })),
     AI_AUDIO_URL: s.Optional(s.String({ description: 'the API root of an OpenAI-compatible server for transcribe() and speak(), when it is not the one ask() uses' })),
+    AI_AUDIO_KEY: s.Optional(s.String({ description: 'the key of the AI_AUDIO_URL server, when it wants one other than OPENAI_API_KEY' })),
     AI_TRANSCRIBE_MODEL: s.Optional(s.String({ description: 'the model transcribe() writes a recording down with, such as whisper-1' })),
     AI_SPEECH_MODEL: s.Optional(s.String({ description: 'the model speak() reads a text aloud with, such as gpt-4o-mini-tts' })),
     AI_VOICE: s.Optional(s.String({ description: 'the voice speak() reads in unless it names one' })),
     AI_EMBED_URL: s.Optional(s.String({ description: 'the API root of an OpenAI-compatible server for embed(), when it is not the one ask() uses' })),
+    AI_EMBED_KEY: s.Optional(s.String({ description: 'the key of the AI_EMBED_URL server, when it wants one other than OPENAI_API_KEY' })),
     AI_EMBED_MODEL: s.Optional(s.String({ description: 'the model embed() turns texts into vectors with, such as nomic-embed-text' })),
   })
 }
@@ -90,9 +92,9 @@ export function choose(): Chosen {
 }
 
 const CALLS = {
-  transcribe: { url: 'AI_AUDIO_URL', model: 'AI_TRANSCRIBE_MODEL', what: 'speech to text' },
-  speak: { url: 'AI_AUDIO_URL', model: 'AI_SPEECH_MODEL', what: 'text to speech' },
-  embed: { url: 'AI_EMBED_URL', model: 'AI_EMBED_MODEL', what: 'embeddings' },
+  transcribe: { url: 'AI_AUDIO_URL', key: 'AI_AUDIO_KEY', model: 'AI_TRANSCRIBE_MODEL', what: 'speech to text' },
+  speak: { url: 'AI_AUDIO_URL', key: 'AI_AUDIO_KEY', model: 'AI_SPEECH_MODEL', what: 'text to speech' },
+  embed: { url: 'AI_EMBED_URL', key: 'AI_EMBED_KEY', model: 'AI_EMBED_MODEL', what: 'embeddings' },
 } as const
 
 const DEFAULT_CALL_TIMEOUT = '2m'
@@ -107,17 +109,25 @@ export interface CallOptions {
   timeout?: Duration | undefined
 }
 
+function sameOrigin(a: string, b: string): boolean {
+  return URL.canParse(a) && URL.canParse(b) && new URL(a).origin === new URL(b).origin
+}
+
 // The provider a call other than an ask goes to: the server its own variable names, else the one `ask` uses when it has the call; under `bun test` the fake.
 function chooseFor(call: Call): Chosen & { voice: string | undefined } {
   if (process.env.NODE_ENV === 'test')
     return { provider: fakeAi, model: fakeAi.model, voice: undefined }
 
   const env = defineEnv(READ)
-  const { url, model, what } = CALLS[call]
+  const { url, key, model, what } = CALLS[call]
   const root = env[url]
 
+  // `OPENAI_API_KEY` belongs to the server `ask` uses, so it goes to another only when that server shares its origin.
   if (root !== undefined)
-    return { provider: openai({ baseUrl: root, apiKey: env.OPENAI_API_KEY }), model: env[model], voice: env.AI_VOICE }
+    return { provider: openai({ baseUrl: root, apiKey: env[key] ?? (sameOrigin(root, env.AI_BASE_URL ?? OPENAI_URL) ? env.OPENAI_API_KEY : undefined) }), model: env[model], voice: env.AI_VOICE }
+
+  if (process.env.NODE_ENV !== 'development' && env.ANTHROPIC_API_KEY === undefined && env.OPENAI_API_KEY === undefined && env.AI_BASE_URL === undefined)
+    throw configError(`no server for ${call}(); set ${url} to an OpenAI-compatible server, or OPENAI_API_KEY or AI_BASE_URL for the one ask() uses`)
 
   const { provider } = choose()
 

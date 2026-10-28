@@ -76,12 +76,12 @@ The passages found go to `ask({ sources })`, which a `Chat` cites: [Chat sources
 - `AI_EMBED_URL`: the same for `embed` (`/embeddings`). Ollama serves it, so an app on Ollama sets nothing; one asking Anthropic sets it, as Anthropic has no embeddings.
 - `AI_TRANSCRIBE_MODEL` (`whisper-1`, `gpt-4o-transcribe`), `AI_SPEECH_MODEL` (`gpt-4o-mini-tts`, `tts-1`), `AI_EMBED_MODEL` (`text-embedding-3-small`, `nomic-embed-text`): the model of each call, `{ model }` overriding it. None is built in: a call with neither throws a `config-invalid` error naming the variable.
 - `AI_VOICE`: the voice `speak` reads in unless it names one; with neither, none is sent and the server picks (OpenAI refuses that).
-- `OPENAI_API_KEY` is sent as the bearer to these servers too; a local one wanting none leaves it unset. `ai()` lists them all in `kay env`, none required.
+- `AI_AUDIO_KEY` and `AI_EMBED_KEY`: the bearer of the `AI_AUDIO_URL` and `AI_EMBED_URL` servers. Without one, `OPENAI_API_KEY` is sent only when that server shares the origin of the one `ask` uses (`AI_BASE_URL`, else OpenAI), so the key of one host never goes to another. A local server wanting none sets neither. `ai()` lists them all in `kay env`, none required.
 - Under `bun test` the fake answers whatever is set, and in development until a server is configured; in production a call with none throws, naming what to set.
 
 ### Options and errors
 
-- All three take `model`, `signal`, `timeout` (a duration for the whole call, `'2m'` by default, as a local Whisper loads its model on the first one) and `provider`, one built by hand such as `openai({ baseUrl })`, whose `transcribe`, `speak` and `embed` methods they call; `anthropic()` has none, an `unsupported` error. Under `bun test` the fake answers in its place, `provider` its name.
+- All three take `model`, `signal`, `timeout` (a duration for the whole call, `'2m'` by default, as a local Whisper loads its model on the first one) and `provider`, one built by hand such as `openai({ baseUrl })`, whose `transcribe`, `speak` and `embed` methods they call; `anthropic()` has none, an `unsupported` error. With `provider` the variables are not read, as with `ask`: pass `model` (and `voice`). Under `bun test` the fake answers in its place, `provider` its name.
 - A call stops when the request being answered aborts, or when `signal` does.
 - Errors are `AiError`s of the kinds `ask` throws ([errors](testing-and-errors.md#errors)): `auth`, `rate-limited`, `unavailable`, `invalid` (an unknown model, a file the server cannot read), `network`, `timeout` and `protocol` (an answer of no shape the API gives), the key hidden from what a server echoes.
 - A `Blob` recording is uploaded under a name from its type (`audio.webm`, `audio.m4a`, `audio.mp3`), as OpenAI tells the format by it; a `File` keeps its own.
