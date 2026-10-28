@@ -299,14 +299,14 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('kay/test i
   })
 
   it('clicks a page with JavaScript off only where a click would reach the element', async () => {
-    const plain = await site.open('/', { javaScript: false, timeout: '500ms' })
+    const plain = await site.open('/', { javaScript: false })
 
     try {
       await plain.evaluate(() => {
         document.body.insertAdjacentHTML('afterbegin', '<a id="hidden" href="/second" style="display:none">hidden</a><a id="under" href="/second">under</a><div style="position:fixed;inset:0;background:#fff"></div>')
       })
-      await expect(plain.click('#hidden')).rejects.toThrow('to be actionable')
-      await expect(plain.click('#under')).rejects.toThrow('to be actionable')
+      await expect(plain.click('#hidden', { timeout: '500ms' })).rejects.toThrow('to be actionable')
+      await expect(plain.click('#under', { timeout: '500ms' })).rejects.toThrow('to be actionable')
       expect(await plain.path()).toBe('/')
     }
     finally {
