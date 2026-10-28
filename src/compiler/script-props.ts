@@ -1,9 +1,8 @@
 import type * as t from '@babel/types'
 import type { Diagnostic, Span } from './ast'
-import type { PropsDeclaration, ScriptAnalysis } from './script'
+import type { PropsDeclaration, ScriptAnalysis } from './script-shared'
 import { eachNode } from './each-node'
-import { BINDABLE_TYPE, REMOVED_PROP_TYPES, typeDeclaration } from './script'
-import { keyName } from './script-server'
+import { BINDABLE_TYPE, keyName, REMOVED_PROP_TYPES, typeDeclaration } from './script-shared'
 
 export function withLeadingComments(statement: t.Statement, shift: (node: t.Node | t.Comment) => Span): Span {
   const span = shift(statement)

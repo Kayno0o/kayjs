@@ -1,12 +1,12 @@
 import type { TSchema } from 'elysia'
 import type { ByteSize } from '../runtime/byte-size'
 import type { IconProps, IconSet } from '../runtime/icons'
-import type { FieldHint, FieldInputOptions, StringOptions } from './edit'
+import type { FieldHint, FieldInputOptions, StringOptions } from './edit-shared'
 import { t } from 'elysia'
 import { KayError } from '../compiler/errors'
 import { byteSize } from '../runtime/byte-size'
 import { iconNames, iconProps } from '../runtime/icons'
-import { BUILT_IN_KINDS, KIND_NAME } from './edit'
+import { BUILT_IN_KINDS, KIND_NAME } from './edit-shared'
 
 // A string field naming an entry of another collection by its slug.
 // kept: free

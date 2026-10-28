@@ -2,8 +2,7 @@ import type { ParseResult } from '@babel/parser'
 import type * as t from '@babel/types'
 import type { Diagnostic, Span } from './ast'
 import { walkScope } from './rewrite'
-import { importedName } from './script'
-import { keyName } from './script-server'
+import { importedName, keyName } from './script-shared'
 
 // The names `recipe` goes by in the fence: imported from `kay`, as it is no global of a script.
 export function recipeNames(body: t.Statement[]): Set<string> {

@@ -1,6 +1,6 @@
 import type { TSchema } from 'elysia'
 import type { DraftIssue } from '../runtime/edit'
-import type { CollectionInfo, ContentLoaderOf, DataValue, EntryFile, EntryFilter, EntryPath, JsonSchema, SourceEntry, WrittenEntry } from './edit'
+import type { CollectionInfo, ContentLoaderOf, DataValue, EntryFile, EntryFilter, EntryPath, JsonSchema, SourceEntry, TranslationIndex, WrittenEntry } from './edit-shared'
 import type { Collection, ContentLoader, Entry } from './index'
 import type { CompiledMarkdown } from './markdown'
 import { existsSync } from 'node:fs'
@@ -13,11 +13,11 @@ import { durationSeconds } from '../runtime/duration'
 import { kayLog } from '../runtime/log'
 import { html } from '../runtime/rendered'
 import { isDraft } from './drafts'
-import { CRLF, DELETE, LEADING_NEWLINE, MARKDOWN, SLASHES, SPACE, TRAILING_NEWLINES, YAML_FILE } from './edit'
 import { editSite, registeredCollections } from './edit-registry'
+import { CRLF, DELETE, folderOf, indexes, LEADING_NEWLINE, MARKDOWN, SLASHES, SPACE, TRAILING_NEWLINES, YAML_FILE } from './edit-shared'
 import { entryPath } from './entry-route'
 import { ContentChangedError, contentKey } from './key'
-import { collectionFolder, contentPlace, entryFiles, entrySlug, markdownOf, parseEntry, slugOf, sourcePath, STAMP_SETTLED_MS, translationKey, writableFolder } from './load'
+import { contentPlace, entryFiles, entrySlug, markdownOf, parseEntry, slugOf, sourcePath, STAMP_SETTLED_MS, translationKey, writableFolder } from './load'
 import { compileMarkdown, MarkdownError, splitFrontmatter } from './markdown'
 import { migrateData } from './migrate'
 import { takeTurn } from './turns'
@@ -26,8 +26,6 @@ import { dataIssues, decodeEntries, unknownComponents, withDefaults } from './va
 // The loads under way by collection: a screen asking for a collection's info and its entry at once shares one run of the loader.
 const loading = new Map<string, Promise<Omit<SourceEntry, 'draft'>[]>>()
 
-// Each localized collection's translation index, kept until a save or remove here, an `invalidate()` or the loader's `ttl` drops it; a folder's until one of its files changes.
-export const indexes = new Map<Collection<unknown>, { index: Promise<TranslationIndex>, stamp?: string | undefined, until?: number | undefined }>()
 let hearing = false
 
 // `counts: false` leaves out `body`, `count` and `problem`, so no loader runs and no folder is listed for a caller that needs the names, schemas and kinds alone.
@@ -125,9 +123,6 @@ export async function entryPage(name: string, entry: { slug: string, locale?: st
 
   return pageUrl(collection, entry, decodedData(collection, { slug: entry.slug, locale: entry.locale, data: entry.data as SourceEntry['data'], problem: undefined }))
 }
-
-// A localized collection's entries by what pairs them with their translations, then locale, each holding its slug: what a list reads to show the locales an entry lacks, in place of every entry.
-export type TranslationIndex = ReadonlyMap<string, ReadonlyMap<string, string>>
 
 // The files' names, sizes and times, which hold while no file of the folder changes; undefined while one was written a moment ago, as a second write may keep its stamp.
 async function folderStamp(name: string, dir: string): Promise<string | undefined> {
@@ -598,10 +593,6 @@ export function repoPath(repoRoot: string, file: string): string | undefined {
   const path = relative(repoRoot, file).split(sep).join('/')
 
   return path === '..' || path.startsWith('../') ? undefined : path
-}
-
-export function folderOf(dir: string): string {
-  return collectionFolder(dir)
 }
 
 // A folder missing, as in an executable or a container holding the build alone, throws rather than read as empty, where a CMS would write a file clashing with one it cannot see.

@@ -1,6 +1,6 @@
-import type { EditSite } from './edit'
+import type { EditSite } from './edit-shared'
 import type { Collection } from './index'
-import { folderOf, indexes } from './edit-entries'
+import { folderOf, indexes } from './edit-shared'
 
 let registered: [string, Collection<unknown>][] = []
 let site: EditSite | undefined

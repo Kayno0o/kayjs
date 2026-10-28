@@ -1,112 +1,20 @@
-import type { ParseResult } from '@babel/parser'
 import type * as t from '@babel/types'
-import type { Diagnostic, Span } from './ast'
+import type { Span } from './ast'
 import type { ImportedSignals } from './module-signals'
-import { eachNode } from './each-node'
+import type { ImportBinding, ScriptAnalysis } from './script-shared'
 import { isGlobalFunctionMember, SENDABLE_CLASSES } from './expression'
-import { KAY_VALUES } from './kay-exports'
 import { iconImport } from './module-signals'
-import { codeOf, parseFence, undeclared } from './script-fence'
-import { propsDeclaration, reportMisplacedProps, withLeadingComments } from './script-props'
-import { misplacedRecipe, recipeDeclaration, recipeNames, reportRecipeReads } from './script-recipe'
-import { declaredIdentifiers, isExport, unexported } from './script-server'
+import { propsDeclaration, reportMisplacedProps } from './script-props'
+import { isExport } from './script-server'
+import { plainNames } from './script-shared'
+import { splitFence } from './script-split'
 
 // What `kay` exports that a static component may use and stay static.
-// A broken module whose first statement, comments aside, is a static import.
-const STATIC_IMPORT_START = /^(?:\s*(?:\/\/.*\n|\/\*(?:[^*]|\*(?!\/))*\*\/))*\s*import\b(?!\s*[.(])/
 
-export const WHITESPACE = /\s/
-export const FIRST_TOKEN = /^[\w$]*/
-// A `guards` or `layouts` written as the server reads it, with nothing between the key and the literal.
-export const LITERAL_SETTING = /^(?:[\w$]+|'[^']*'|"[^"]*")\s*:\s*(?:true|false)$/
 // What `kay` exports that reads nothing reactive: a script using only these stays a static component.
 const STATIC_EXPORTS = new Set(['uid', 'describeField', 'sanitizeHtml', 'trustHtml', 'defer', 'route', 'localPath', 'withBase', 'withQuery', 's', 'durationMs', 'refusalMessage', 'recipe', 'ctx'])
 // What `kay/i18n` exports that makes a component an island; the rest of it reads the locale alike on both sides.
 const REACTIVE_I18N = new Set(['relativeTime'])
-
-export const BINDABLE_TYPE = 'Bindable'
-export const REMOVED_PROP_TYPES = new Set(['Signal', 'Memo'])
-
-// What a component script, and a server fence, use from `kay` with no import, as they use `props<T>()`: the compiler imports them.
-// Each name written as a name of its own, not a member or part of a longer one.
-export const KAY_NAME = new RegExp(`(?<![\\w$.])(?:${KAY_VALUES.join('|')})(?![\\w$])`, 'g')
-
-export interface PropsBinding {
-  // Name of a destructured prop, its key on the props object, and its default value when it has one.
-  local: Span
-  key: string
-  fallback?: Span | undefined
-  // What leaves the destructuring without it, separator included, when another name stays.
-  removal?: Span | undefined
-  // Typed `Bindable<T>`: read as a plain value, and written by assigning it, which a parent's `bind:` takes.
-  bindable?: boolean | undefined
-}
-
-export interface PropsDeclaration {
-  statement: Span
-  type?: Span | undefined
-  // `const props = props<T>()` keeps a name; `const { a, b } = props<T>()` destructures.
-  name?: Span | undefined
-  bindings: PropsBinding[]
-  rest?: Span | undefined
-  // The keys of the props typed `Bindable<T>`, destructured or not.
-  bindable: string[]
-}
-
-// One name an import brings in, with the specifier's own span so a duplicate of it can be left out.
-export interface ImportBinding {
-  local: string
-  // `default` and `*` stand for default and namespace imports.
-  imported: string
-  source: string
-  typeOnly: boolean
-  span: Span
-  // The whole `import ... from '...'` statement.
-  declaration: Span
-}
-
-export interface ScriptAnalysis {
-  hoisted: Span[]
-  imports: ImportBinding[]
-  // The quoted module names of hoisted imports and re-exports.
-  specifiers: Span[]
-  // True when the script imports a value from `kay`: it holds client state, so the component becomes an island.
-  reactive: boolean
-  // What the script reads of kay's values without declaring or importing it.
-  implicit: string[]
-  body: Span[]
-  props?: PropsDeclaration
-  // The name of the `const card = recipe({ ... })` of the script, which moves to module level so the props type can take its type: the component takes its variant props from it.
-  recipe?: string | undefined
-  recipeSpan?: Span | undefined
-  // Whether the recipe's literal config gives the root classes, which a template with no root part leaves nowhere to go.
-  recipeRoot?: boolean | undefined
-  // The variants and values of the recipe's literal config, which `src/ui.ts` is checked against; none when the config is not a literal.
-  recipeVariants?: Record<string, string[]> | undefined
-  // The names the component body declares that may hold a function, a class or an instance of one, which no page can send an island.
-  functions: string[]
-  // The `const` names the component body declares as plain data written out, literals in arrays and objects, which a static parent sends an island whatever type the declaration gives them.
-  plain: string[]
-  diagnostics: Diagnostic[]
-  fence?: ParsedFence | undefined
-  // The `--- module` fence, parsed beside the script's.
-  moduleFence?: ParsedFence | undefined
-  // A fence Babel cannot parse and nothing could be recovered of, emitted whole at module level so the editor completes in it through TypeScript's own recovery.
-  unparsed?: Span | undefined
-  // The top-level statements of a fence being typed that Babel cannot parse, left out of the analysis: kept in `body` where they are written, or in `brokenModule` when an import, so the editor still completes in them while the rest of the fence is analysed.
-  broken: Span[]
-  brokenModule: Span[]
-}
-
-// A fence parsed once, which every analysis and check of it reads: `shift` maps a node to its span in the file.
-export interface ParsedFence {
-  code: string
-  offset: number
-  ast: ParseResult<t.File>
-  shift: (node: t.Node | t.Comment) => Span
-  // The statements that failed to parse, blanked in `code` and `ast`.
-  broken: Span[]
-}
 
 // Splits a component script into module-level code (imports, types) and the component body, and finds the props macro.
 // `serverNames` are the names the `--- server` fence hands the script, which a type may take the type of, and `templateReads` the values of `kay` the template reads, which the compiler imports like the script's own.
@@ -238,107 +146,6 @@ function analyzeComponentScript(source: string, script: Span | undefined, server
   return analysis
 }
 
-// A statement a fence keeps out of module level, with the text between it and the statement before it.
-interface FenceStatement {
-  statement: t.Statement
-  span: Span
-  // Text kept as written, the statements that failed to parse among it.
-  gap: Span[]
-}
-
-type FenceAnalysis = Pick<ScriptAnalysis, 'hoisted' | 'imports' | 'specifiers' | 'implicit' | 'diagnostics' | 'fence' | 'unparsed' | 'broken' | 'brokenModule'>
-
-// The text from `start` to `end` as spans, with each broken statement in it as the very span `broken` holds.
-function textAround(start: number, end: number, parsed: Span[], moduleLevel: Span[]): Span[] {
-  const spans: Span[] = []
-  let cursor = start
-
-  for (const span of parsed) {
-    if (span.start < cursor || span.end > end)
-      continue
-
-    if (span.start > cursor)
-      spans.push({ start: cursor, end: span.start })
-
-    if (!moduleLevel.includes(span))
-      spans.push(span)
-
-    cursor = span.end
-  }
-
-  if (cursor < end)
-    spans.push({ start: cursor, end })
-
-  return spans
-}
-
-// Parses a fence once, moves its imports and types to module level and finds which values of `kay` it reads undeclared; the other statements are left in order, then what follows the last.
-// `names` are values from elsewhere that a type of the fence may take the type of, which keeps it out of module level too.
-export function splitFence(source: string, fence: Span, names: string[], analysis: FenceAnalysis, templateReads: readonly string[] = [], withRecipes = false): (ParsedFence & { statements: FenceStatement[], tail: Span[], recipes: { name: string, span: Span, root: boolean, variants: Record<string, string[]> | undefined }[] }) | undefined {
-  const parsed = parseFence(source, fence, analysis.diagnostics)
-
-  if (!parsed) {
-    analysis.unparsed = fence
-
-    return undefined
-  }
-
-  const { ast, shift } = parsed
-  const local = bodyTypes(ast.program.body, names, shift, analysis.diagnostics)
-  const statements: FenceStatement[] = []
-  const recipes: { name: string, span: Span, root: boolean, variants: Record<string, string[]> | undefined }[] = []
-  const recipeStatements = new Set<t.Statement>()
-  const recipeCalls = recipeNames(ast.program.body)
-
-  // A `recipe` written in a server fence with no import and no declaration of its own is kay's, missing its import.
-  if (!withRecipes && !ast.program.body.some(statement => (statement.type === 'ImportDeclaration' && statement.specifiers.some(specifier => specifier.local.name === 'recipe')) || declaredIdentifiers(unexported(statement)).some(identifier => identifier.name === 'recipe')))
-    recipeCalls.add('recipe')
-
-  let cursor = fence.start
-  // Broken statements written before a statement that leaves the body, kept for the next one that stays.
-  let carried: Span[] = []
-
-  analysis.fence = parsed
-
-  for (const span of parsed.broken) {
-    if (STATIC_IMPORT_START.test(source.slice(span.start, span.end)))
-      analysis.brokenModule.push(span)
-    else
-      analysis.broken.push(span)
-  }
-
-  analysis.implicit = undeclared(ast, parsed.code, names, parsed.broken.map(text => codeOf(source.slice(text.start, text.end))).join('\n'), templateReads)
-
-  for (const statement of ast.program.body) {
-    const span = withLeadingComments(statement, shift)
-
-    const recipe = withRecipes ? recipeDeclaration(statement, recipeCalls, shift, analysis.diagnostics) : misplacedRecipe(statement, recipeCalls, shift, analysis.diagnostics)
-
-    if (recipe !== undefined) {
-      recipes.push({ ...recipe, span })
-      recipeStatements.add(statement)
-    }
-
-    if (recipe !== undefined || isHoisted(statement, local)) {
-      analysis.hoisted.push(span)
-      analysis.imports.push(...importBindings(statement, shift))
-      analysis.specifiers.push(...moduleSpecifier(statement, shift))
-      carried.push(...textAround(cursor, span.start, parsed.broken, analysis.brokenModule).filter(text => analysis.broken.includes(text)))
-    }
-    else {
-      statements.push({ statement, span, gap: [...carried, ...textAround(cursor, span.start, parsed.broken, analysis.brokenModule)] })
-      carried = []
-    }
-
-    cursor = span.end
-  }
-
-  if (recipes.length > 0)
-    reportRecipeReads(ast, recipeStatements, new Set(statements.map(item => item.statement)), shift, analysis.diagnostics)
-
-  return { ...parsed, statements, recipes, tail: [...carried, ...textAround(cursor, fence.end, parsed.broken, analysis.brokenModule)] }
-}
-
 // What a body declaration may hold a function or an instance of a class by: writing one, awaiting one, or a call returning one.
 const FUNCTION_VALUES = new Set(['ArrowFunctionExpression', 'FunctionExpression', 'ClassExpression', 'AwaitExpression', 'OptionalCallExpression', 'AssignmentExpression', 'SequenceExpression', 'TaggedTemplateExpression'])
 
@@ -374,34 +181,6 @@ function functionNames(statement: t.Statement, scope: FunctionScope): string[] {
     scope.functions.add(name)
 
   return found
-}
-
-export function plainNames(statement: t.Statement): string[] {
-  if (statement.type !== 'VariableDeclaration' || statement.kind !== 'const')
-    return []
-
-  return statement.declarations.flatMap(declaration => declaration.id.type === 'Identifier' && declaration.init && isPlainData(declaration.init) ? [declaration.id.name] : [])
-}
-
-const PLAIN_LITERALS = new Set(['StringLiteral', 'NumericLiteral', 'BooleanLiteral', 'NullLiteral', 'BigIntLiteral'])
-
-function isPlainData(value: t.Node): boolean {
-  if (value.type === 'TSAsExpression' || value.type === 'TSSatisfiesExpression' || value.type === 'TSNonNullExpression' || value.type === 'ParenthesizedExpression')
-    return isPlainData(value.expression)
-
-  if (value.type === 'ArrayExpression')
-    return value.elements.length > 0 && value.elements.every(element => element !== null && element.type !== 'SpreadElement' && isPlainData(element))
-
-  if (value.type === 'ObjectExpression')
-    return value.properties.length > 0 && value.properties.every(property => property.type === 'ObjectProperty' && !property.computed && isPlainData(property.value))
-
-  if (value.type === 'TemplateLiteral')
-    return value.expressions.length === 0
-
-  if (value.type === 'UnaryExpression')
-    return (value.operator === '-' || value.operator === '+') && value.argument.type === 'NumericLiteral'
-
-  return PLAIN_LITERALS.has(value.type)
 }
 
 // The expressions a function returns, or undefined when a statement it runs hides one: only blocks and `if` are followed.
@@ -575,137 +354,8 @@ function importsReactiveValue(binding: ImportBinding): boolean {
   return binding.source === 'kay' ? !STATIC_EXPORTS.has(binding.imported) : binding.source === 'kay/i18n' && REACTIVE_I18N.has(binding.imported)
 }
 
-// The name an import specifier takes from its module, written as an identifier or, as `import { 'a b' as c }`, a string.
-export function importedName(specifier: t.ImportSpecifier): string {
-  return specifier.imported.type === 'Identifier' ? specifier.imported.name : specifier.imported.value
-}
-
-function moduleSpecifier(statement: t.Statement, shift: (node: t.Node) => Span): Span[] {
-  const source = statement.type === 'ImportDeclaration' || statement.type === 'ExportNamedDeclaration' ? statement.source : undefined
-
-  return source ? [shift(source)] : []
-}
-
-function importBindings(statement: t.Statement, shift: (node: t.Node) => Span): ImportBinding[] {
-  if (statement.type !== 'ImportDeclaration')
-    return []
-
-  const declaration = shift(statement)
-  const source = statement.source.value
-
-  return statement.specifiers.map((specifier) => {
-    const typeOnly = statement.importKind === 'type' || (specifier.type === 'ImportSpecifier' && specifier.importKind === 'type')
-    let imported = '*'
-
-    if (specifier.type === 'ImportDefaultSpecifier')
-      imported = 'default'
-    else if (specifier.type === 'ImportSpecifier')
-      imported = importedName(specifier)
-
-    return { local: specifier.local.name, imported, source, typeOnly, span: shift(specifier), declaration }
-  })
-}
-
-// A `declare` statement describes a global, so it belongs at module level: a function body cannot hold one.
-export function isAmbient(statement: t.Statement): boolean {
-  const declaration = statement.type === 'ExportNamedDeclaration' && statement.declaration ? statement.declaration : statement
-
-  return 'declare' in declaration && declaration.declare === true
-}
-
-export function typeDeclaration(statement: t.Statement): t.TSTypeAliasDeclaration | t.TSInterfaceDeclaration | undefined {
-  const declaration = statement.type === 'ExportNamedDeclaration' ? statement.declaration : statement
-
-  return declaration?.type === 'TSTypeAliasDeclaration' || declaration?.type === 'TSInterfaceDeclaration' ? declaration : undefined
-}
-
-function isHoisted(statement: t.Statement, local: ReadonlySet<t.Statement>): boolean {
-  if (local.has(statement))
-    return false
-
-  // A namespace cannot sit inside a function either.
-  if (statement.type === 'ImportDeclaration' || statement.type === 'TSModuleDeclaration' || isAmbient(statement) || typeDeclaration(statement))
-    return true
-
-  if (statement.type !== 'ExportNamedDeclaration')
-    return false
-
-  return statement.exportKind === 'type'
-}
-
-function leftmost(name: t.Node): string | undefined {
-  if (name.type === 'TSQualifiedName')
-    return leftmost(name.left)
-
-  return name.type === 'Identifier' ? name.name : undefined
-}
-
-// A type is hoisted above the function so it is visible everywhere, but one taking the `typeof` a name the body declares has to stay in the body, and so does one built from such a type.
-function bodyTypes(statements: t.Statement[], extraNames: string[], shift: (node: t.Node) => Span, diagnostics: Diagnostic[]): Set<t.Statement> {
-  const values = new Set(extraNames)
-  const types: { statement: t.Statement, name: string, values: Set<string>, types: Set<string> }[] = []
-
-  for (const statement of statements) {
-    const declaration = typeDeclaration(statement)
-
-    if (!declaration) {
-      if (statement.type !== 'ImportDeclaration' && statement.type !== 'TSModuleDeclaration') {
-        for (const identifier of declaredIdentifiers(statement))
-          values.add(identifier.name)
-      }
-
-      continue
-    }
-
-    const found = { statement, name: declaration.id.name, values: new Set<string>(), types: new Set<string>() }
-
-    eachNode(declaration, (node) => {
-      if (node.type === 'TSTypeQuery') {
-        const reference = leftmost(node.exprName)
-
-        if (reference !== undefined)
-          found.values.add(reference)
-      }
-      else if (node.type === 'TSTypeReference') {
-        const reference = leftmost(node.typeName)
-
-        if (reference !== undefined)
-          found.types.add(reference)
-      }
-    })
-    types.push(found)
-  }
-
-  const local = new Set<t.Statement>()
-  const exported = new Set<t.Statement>()
-  const names = new Set<string>()
-
-  for (let changed = true; changed;) {
-    changed = false
-
-    for (const type of types) {
-      if (local.has(type.statement) || (![...type.values].some(name => values.has(name)) && ![...type.types].some(name => names.has(name))))
-        continue
-
-      // An export belongs at module level, where the body's names are out of reach.
-      if (type.statement.type === 'ExportNamedDeclaration') {
-        if (!exported.has(type.statement))
-          diagnostics.push({ ...shift(type.statement), message: `\`${type.name}\` cannot refer to the script's own names`, note: 'an exported type sits at module level', help: 'drop the `export`' })
-
-        exported.add(type.statement)
-
-        continue
-      }
-
-      local.add(type.statement)
-      names.add(type.name)
-      changed = true
-    }
-  }
-
-  return local
-}
-
 export { codeOf, parseFence } from './script-fence'
 export { analyzeServer } from './script-server'
 export type { PageSetting, PageSettings, SeparateSetting, ServerAnalysis, ServerData } from './script-server'
+export { KAY_NAME } from './script-shared'
+export type { ImportBinding, ParsedFence, PropsBinding, PropsDeclaration, ScriptAnalysis } from './script-shared'

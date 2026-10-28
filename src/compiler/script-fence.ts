@@ -1,11 +1,11 @@
 import type { ParseResult } from '@babel/parser'
 import type * as t from '@babel/types'
 import type { Diagnostic, Span } from './ast'
-import type { ParsedFence } from './script'
+import type { ParsedFence } from './script-shared'
 import { parse } from '@babel/parser'
 import { eachNode } from './each-node'
 import { POSITION_SUFFIX, walkScope } from './rewrite'
-import { FIRST_TOKEN, KAY_NAME, WHITESPACE } from './script'
+import { FIRST_TOKEN, KAY_NAME, WHITESPACE } from './script-shared'
 
 // A fence being typed breaks a handful of statements at most; more than this is not recovered.
 const MAX_BROKEN = 20

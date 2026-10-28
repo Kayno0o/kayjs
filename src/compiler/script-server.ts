@@ -3,11 +3,12 @@ import type { NodePath } from '@babel/traverse'
 import type * as t from '@babel/types'
 import type { Diagnostic, Span } from './ast'
 import type { PageSettingName } from './page-settings'
-import type { ImportBinding, ParsedFence } from './script'
+import type { ImportBinding, ParsedFence } from './script-shared'
 import { eachNode } from './each-node'
 import { PAGE, PAGE_SETTINGS, unreadSettingReport } from './page-settings'
 import { walkScope } from './rewrite'
-import { isAmbient, LITERAL_SETTING, plainNames, splitFence } from './script'
+import { declaredIdentifiers, keyName, LITERAL_SETTING, plainNames } from './script-shared'
+import { splitFence } from './script-split'
 
 export interface ServerData {
   name: string
@@ -266,13 +267,6 @@ function protectsBots(protect: t.Node | undefined): boolean {
   return protect.properties.some(property => property.type === 'SpreadElement' || property.computed || (keyName(property.key) !== undefined && BOT_PROTECTIONS.has(keyName(property.key)!)))
 }
 
-export function keyName(key: t.Node): string | undefined {
-  if (key.type === 'Identifier')
-    return key.name
-
-  return key.type === 'StringLiteral' ? key.value : undefined
-}
-
 // How often the rest of the fence reads what `statement` declares as `name`: Babel counts the export itself as a read.
 function referenceCount(ast: ParseResult<t.File>, statement: t.Statement, name: string): number {
   let count = 1
@@ -427,51 +421,4 @@ function nameSpan(identifier: t.Identifier, shift: (node: t.Node) => Span): Span
   const { start } = shift(identifier)
 
   return { start, end: start + identifier.name.length }
-}
-
-// The declaration an `export` wraps, the statement itself otherwise.
-export function unexported(statement: t.Statement): t.Statement {
-  return statement.type === 'ExportNamedDeclaration' && statement.declaration ? statement.declaration : statement
-}
-
-// A `const enum` is no value to hand on, and an ambient declaration only describes something that exists elsewhere.
-export function declaredIdentifiers(statement: t.Statement): t.Identifier[] {
-  if (isAmbient(statement))
-    return []
-
-  if (statement.type === 'FunctionDeclaration' || statement.type === 'ClassDeclaration')
-    return statement.id ? [statement.id] : []
-
-  if (statement.type === 'TSEnumDeclaration')
-    return statement.const ? [] : [statement.id]
-
-  if (statement.type !== 'VariableDeclaration')
-    return []
-
-  const found: t.Identifier[] = []
-  const collect = (pattern: t.Node | null | undefined) => {
-    if (!pattern)
-      return
-
-    if (pattern.type === 'Identifier') {
-      found.push(pattern)
-    }
-    else if (pattern.type === 'ObjectPattern') {
-      for (const property of pattern.properties) collect(property.type === 'RestElement' ? property.argument : property.value)
-    }
-    else if (pattern.type === 'ArrayPattern') {
-      for (const element of pattern.elements) collect(element)
-    }
-    else if (pattern.type === 'AssignmentPattern') {
-      collect(pattern.left)
-    }
-    else if (pattern.type === 'RestElement') {
-      collect(pattern.argument)
-    }
-  }
-
-  for (const declarator of statement.declarations)
-    collect(declarator.id)
-
-  return found
 }
