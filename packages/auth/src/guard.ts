@@ -16,6 +16,6 @@ export function guard(options: GuardOptions = {}) {
     if (typeof auth?.guarded !== 'function')
       throw new Error('kayjs-auth: no `auth` in this context; add auth() to kay.config.ts, or `.use(auth.plugin)` before the routes')
 
-    await auth.guarded(ctx, options as Parameters<Auth['guarded']>[1])
+    await auth.guarded(ctx, options)
   })
 }
