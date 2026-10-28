@@ -1,13 +1,16 @@
 import type { CheckDiagnostic } from '../src/check'
+import type { Document, LspHost, Project } from '../src/lsp/host'
 import type { CodeAction, CompletionItem, CompletionList, Diagnostic, DocumentHighlight, DocumentLink, DocumentSymbol, FoldingRange, Hover, InlayHint, Location, LocationLink, Range, TextEdit, WorkspaceEdit } from '../src/lsp/protocol'
 import { cp, mkdir, mkdtemp, readdir, rm, symlink } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import process from 'node:process'
 import { pathToFileURL } from 'node:url'
-import { afterAll, beforeAll, describe, expect, it, spyOn } from 'bun:test'
+import { afterAll, beforeAll, describe, expect, it, mock, spyOn } from 'bun:test'
 import { check } from '../src/check'
 import * as shadowModule from '../src/check/shadow'
+import { typedProps } from '../src/lsp/completions'
+import { remembered } from '../src/lsp/host'
 import { Connection } from '../src/lsp/rpc'
 import { DEPENDENTS_DELAY, DIAGNOSTICS_DELAY, KayLanguageServer } from '../src/lsp/server'
 import { eventually } from './helpers/eventually'
@@ -1402,7 +1405,7 @@ describe('kay lsp with a slow tsgo', () => {
   it('publishes an open file whose project problems changed after the publish running, not beside it', async () => {
     const dir = await scratchDir('lsp-slow-problems-')
     const slow = await slowServer(dir)
-    const internals = slow.server as unknown as { problems: Map<string, Diagnostic[]>, publishProblems: () => Promise<void> }
+    const internals = (slow.server as unknown as { checks: { problems: Map<string, Diagnostic[]>, publishProblems: () => Promise<void> } }).checks
 
     try {
       await slow.start()
@@ -1622,9 +1625,9 @@ describe('kay lsp project checks after a save', () => {
     await Promise.all(Object.entries(files).map(async ([path, text]) => Bun.write(join(dir, path), text)))
 
     // The project checks are in-process, so the test follows the server's own debounce timer and runs rather than guessing a quiet spell.
-    const internals = server as unknown as { scheduleProjectChecks: () => void, runProjectChecks: () => Promise<void> }
-    const schedule = internals.scheduleProjectChecks.bind(server)
-    const run = internals.runProjectChecks.bind(server)
+    const internals = (server as unknown as { checks: { scheduleProjectChecks: () => void, runProjectChecks: () => Promise<void> } }).checks
+    const schedule = internals.scheduleProjectChecks.bind(internals)
+    const run = internals.runProjectChecks.bind(internals)
     const checks = { scheduled: 0, due: false, running: 0 }
     let changed = Promise.withResolvers<void>()
     const touch = () => {
@@ -1733,22 +1736,18 @@ describe('kay lsp project checks after a save', () => {
 
 describe('kay lsp lookup caches', () => {
   interface Lookups { paths?: Promise<string[]>, typedProps: Map<string, Promise<unknown>> }
-  interface Internals {
-    remembered: (lookups: Lookups, key: 'paths', ask: () => Promise<string[]>) => Promise<string[]>
-    typedProps: (document: unknown, project: unknown, tag: string, from: string) => Promise<unknown>
-    askProps: (document: unknown, tag: string) => Promise<unknown>
-  }
 
-  const make = () => {
-    const stream = new TransformStream<Uint8Array>()
+  // A host whose tsgo answers each completion with the next of `answers`: a list, or a promise settling when the probe does.
+  const hostAnswering = (...answers: (unknown[] | Promise<unknown>)[]) => {
+    const request = mock(async () => answers.shift())
 
-    return new KayLanguageServer(new Connection(stream.readable, () => undefined)) as unknown as Internals
+    return { host: { server: { notify: () => undefined, request }, nextProbe: () => 1 } as unknown as LspHost, request }
   }
+  const shadow = { file: '/app/src/page.kay', shadowUri: 'file:///app/.kay/types/page.kay.tsx', tsx: '' }
 
   it('drops only its own failed entry, not one a save put in its place', async () => {
-    const server = make()
     const lookups: Lookups = { typedProps: new Map() }
-    const failing = server.remembered(lookups, 'paths', async () => Promise.reject(new Error('probe failed')))
+    const failing = remembered(lookups as Project['lookups'], 'paths', async () => Promise.reject(new Error('probe failed')))
     const fresh = Promise.resolve(['/fresh'])
 
     lookups.paths = fresh
@@ -1757,42 +1756,36 @@ describe('kay lsp lookup caches', () => {
     expect(lookups.paths).toBe(fresh)
 
     const solo: Lookups = { typedProps: new Map() }
-    const alone = server.remembered(solo, 'paths', async () => Promise.reject(new Error('again')))
+    const alone = remembered(solo as Project['lookups'], 'paths', async () => Promise.reject(new Error('again')))
 
     await expect(alone).rejects.toThrow('again')
     expect(solo.paths).toBeUndefined()
   })
 
   it('asks the props of a tag again only when the probe failed, not when it found none', async () => {
-    const server = make()
     const lookups: Lookups = { typedProps: new Map() }
-    const project = { lookups }
-    const document = { file: '/app/src/page.kay' }
-    const asked = spyOn(server, 'askProps').mockResolvedValueOnce([]).mockResolvedValueOnce(undefined).mockResolvedValueOnce([{ name: 'label', optional: false }])
+    const project = { lookups } as unknown as Project
+    const { host, request: asked } = hostAnswering([], Promise.reject(new Error('probe failed')), [{ label: 'label', kind: 5 }])
 
-    expect(await server.typedProps(document, project, 'Plain', './plain')).toEqual([])
-    expect(await server.typedProps(document, project, 'Plain', './plain')).toEqual([])
+    expect(await typedProps(host, shadow as Document, project, 'Plain', './plain')).toEqual([])
+    expect(await typedProps(host, shadow as Document, project, 'Plain', './plain')).toEqual([])
     expect(asked).toHaveBeenCalledTimes(1)
-    expect(await server.typedProps(document, project, 'Failing', './failing')).toBeUndefined()
-    expect(await server.typedProps(document, project, 'Failing', './failing')).toEqual([{ name: 'label', optional: false }])
+    expect(await typedProps(host, shadow as Document, project, 'Failing', './failing')).toBeUndefined()
+    expect(await typedProps(host, shadow as Document, project, 'Failing', './failing')).toEqual([{ name: 'label', optional: false }])
     expect(asked).toHaveBeenCalledTimes(3)
   })
 
   it('keeps the entry a save put in place of a probe that fails while pending', async () => {
-    const server = make()
     const lookups: Lookups = { typedProps: new Map() }
-    const project = { lookups }
-    const document = { file: '/app/src/page.kay' }
-    const key = `${document.file}\0Tag\0./tag`
+    const project = { lookups } as unknown as Project
+    const key = `${shadow.file}\0Tag\0./tag`
     const fresh = Promise.resolve([{ name: 'label', optional: false }])
-    let fail: (value: undefined) => void = () => undefined
-
-    spyOn(server, 'askProps').mockReturnValueOnce(new Promise(resolve => fail = resolve))
-
-    const pending = server.typedProps(document, project, 'Tag', './tag')
+    let fail: (reason: Error) => void = () => undefined
+    const { host } = hostAnswering(new Promise((_resolve, reject) => fail = reject))
+    const pending = typedProps(host, shadow as Document, project, 'Tag', './tag')
 
     lookups.typedProps.set(key, fresh)
-    fail(undefined)
+    fail(new Error('probe failed'))
 
     expect(await pending).toBeUndefined()
     expect(lookups.typedProps.get(key)).toBe(fresh)

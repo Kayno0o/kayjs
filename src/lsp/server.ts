@@ -1,198 +1,89 @@
 import type { Subprocess } from 'bun'
-import type { KayLibrary } from '../build/libraries'
-import type { CheckDiagnostic, CheckOptions, ProbeMemory, ShadowTypes } from '../check'
-import type { ShadowFile, ShadowSettings, SpanMode } from '../check/shadow'
-import type { Diagnostic as KayDiagnostic } from '../compiler'
-import type { Span } from '../compiler/ast'
+import type { CheckOptions } from '../check'
 import type { KayConfig } from '../config'
-import type { Route, RouteMount } from '../server/routes'
-import type { ComponentInterface } from './component-props'
-import type { CodeAction, CodeActionParams, CodeLens, CompletionItem, CompletionList, Diagnostic, DidChangeTextDocumentParams, DocumentDiagnosticReport, DocumentHighlight, DocumentLink, DocumentSymbol, FileEvent, FoldingRange, Hover, InitializeParams, InlayHint, Location, LocationLink, Position, Range, TextDocumentIdentifier, TextDocumentItem, TextDocumentPositionParams, TextEdit, TsgoInlayHint, WorkspaceEdit } from './protocol'
-import type { TemplateData, Wanted } from './template-completion'
-import type { UiData } from './ui-completion'
-import { existsSync } from 'node:fs'
-import { readdir } from 'node:fs/promises'
-import { basename, dirname, join, relative, resolve, sep } from 'node:path'
+import type { Document, LspHost, Project } from './host'
+import type { CodeActionParams, CodeLens, CompletionItem, Diagnostic, DidChangeTextDocumentParams, DocumentSymbol, FileEvent, FoldingRange, InitializeParams, Range, TextDocumentIdentifier, TextDocumentItem, TextDocumentPositionParams, TextEdit } from './protocol'
+import { basename, join, relative, resolve, sep } from 'node:path'
 import process from 'node:process'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { KAY_DIR } from '../build/assets'
-import { findKayFiles, findProjectFiles, inWalkScope, realPath, resolveFrom } from '../build/files'
+import { findKayFiles, inWalkScope, realPath } from '../build/files'
 import { throughNodeModules } from '../build/libraries'
 import { importedSignals } from '../build/signals'
-import { styleInfo, styleInfos, themeTokens } from '../build/ui-info'
-import { configCheckOptions, configProblems, contentChecks, generatedChecks, generatedProblem, projectProblems, stopProbes, writeShadowTypes } from '../check'
-import { diagnoseShadow, reportsTypeErrors, servedByTheApp, servedLocales } from '../check/diagnose'
-import { messageKeys } from '../check/messages'
+import { configCheckOptions, stopProbes, writeShadowTypes } from '../check'
+import { servedLocales } from '../check/diagnose'
 import { withoutMissingCaptcha } from '../check/project'
-import { compileShadow, generatedSpan, layoutQueries, shadowOptionsFor, shadowSource, sourceSpan } from '../check/shadow'
-import { programShadows, servedPathsOf } from '../check/shadow-types'
-import { elementsIn } from '../compiler/ast'
+import { compileShadow, layoutQueries, shadowOptionsFor } from '../check/shadow'
+import { programShadows } from '../check/shadow-types'
 import { formatKay } from '../compiler/format'
-import { HTML_ELEMENTS, lintLevels, LINTS } from '../compiler/lints'
-import { GENERATED_NAME } from '../compiler/names'
 import { nativeExe } from '../compiler/native-typescript'
-import { parseKay } from '../compiler/parser'
-import { analyzeScript, analyzeServer } from '../compiler/script'
 import { CONFIG_FILE } from '../config'
 import { loadConfigWithin } from '../config-loader'
 import { tailwindSorter } from '../format/tailwind'
-import { projectPaths, projectRootOf, SHADOW_DIR } from '../project'
-import { routeMounts, scanRoutes } from '../server/routes'
-import { componentInterface } from './component-props'
+import { projectPaths, projectRootOf } from '../project'
+import { routeMounts } from '../server/routes'
+import { codeActions } from './code-actions'
+import { completion, resolveCompletion } from './completions'
+import { DiagnosticsQueue } from './diagnostics'
+import { links } from './document-links'
+import { FIX_ALL, guard, QUICK_FIX, shadowSettingsOf } from './host'
 import { islandLens } from './island-lens'
+import { applyEdit, filePath, vscodeUri } from './mapping'
+import { definition, highlights, hover, inlayHints, references, signatureHelp } from './navigation'
 import { documentSymbols, foldingRanges } from './outline'
 import { toOffset, toPosition } from './positions'
+import { ProjectChecks } from './project-checks'
 import { formatRange } from './range-format'
-import { importEdits, importSpecifiers, moduleImportEdits } from './renames'
-import { mentionsRoute, routeLinks } from './route-links'
+import { prepareRename, rename, renamedFiles } from './rename'
 import { Connection } from './rpc'
 import { semanticTokens, TOKEN_MODIFIERS, TOKEN_TYPES } from './semantic-tokens'
-import { templateContext, templateItems } from './template-completion'
-import { typedLength, uiFileCursor, uiItems } from './ui-completion'
 
-// Where a file tsgo names is for the editor: its .kay source for a shadow file, the file itself outside the shadow tree.
-interface Target {
-  uri: string
-  shadow?: ShadowFile
-}
-
-// The settings of a project's shadow tree as its last write left them, which each of its .kay files compiles with.
-function shadowSettingsOf(project: Project): ShadowSettings {
-  return { routesDir: project.routesDir, mounts: project.mounts, islandOnly: project.islandOnly, lints: project.options.lints }
-}
-
-// A folder holding a tsconfig.json: its .kay files compile against its own routes and config, into its own shadow tree.
-interface Project {
-  root: string
-  options: CheckOptions
-  routesDir: string
-  // The routes its extensions mount, and their directories, which every compile reads.
-  mounts: RouteMount[]
-  // The prefixes its locales serve pages under.
-  locales: string[]
-  shadowTree: string
-  shadowFiles: Set<string>
-  // The content hash of each, as the last write left it: a time stamp cannot tell two writes within one millisecond apart.
-  shadowStamps: Map<string, bigint>
-  // As of the last shadow write: the static components only islands render, the library components the app never imports, whose errors are the library's, and the libraries.
-  islandOnly: Set<string>
-  unreached: Set<string>
-  libraries: KayLibrary[]
-  // What the checking scripts found last, run again only for a change in what they read.
-  probes: ProbeMemory
-  // The last shadow write, which the project-wide checks read.
-  types?: ShadowTypes
-  configured: boolean
-  // What template completion looked up, dropped on a save and when the config is read again: the route table, the message catalog, the interface of each component read from disk and the props TypeScript gives a tag.
-  lookups: { paths?: Promise<string[]>, messages?: Promise<string[]>, routes?: Promise<Route[]>, ownMatchers?: Promise<string[]>, interfaces: Map<string, ComponentInterface | undefined>, typedProps: Map<string, Promise<ComponentInterface['props'] | undefined>> }
-}
-
-interface Document extends ShadowFile {
-  uri: string
-  shadowUri: string
-  version: number
-  diagnostics: KayDiagnostic[]
-  // Compiled as rendered inline with the islands that alone render it.
-  insideIsland: boolean
-  // The signals of the modules it imports, as compiled with: a module changing them compiles the file again.
-  signals: string
-  // The `query` types of the layouts above it, as compiled with: a layout gaining or dropping one compiles the file again.
-  queries: string
-}
+export { DEPENDENTS_DELAY, DIAGNOSTICS_DELAY } from './diagnostics'
 
 const LAYOUT_SHADOW_SUFFIX = '/_layout.kay.tsx'
 const KAY_FILE = /^file:.*\.kay$/
 // The one TypeScript file the server completes besides the components: where an app restyles them.
 const UI_DOCUMENT = /^file:.*\/src\/ui\.ts$/
-// The module of an import or a re-export in a component's text, fence or template.
-const IMPORT_SOURCE = /\b(?:from|import)\s*['"]([^'"]+)['"]/g
 const SCRIPT_FILE = /\.(?:[cm]?ts|tsx)$/
-const EXTENSION = /\.\w+$/
-const IMPORT_DECLARATION = /^\s*import\s/
-const TRAILING_SEMICOLON = /;$/
-// A one-line named import, as generated code writes them: its names, then its quoted module.
-const NAMED_IMPORT = /^import \{([^}]*)\} from (['"][^'"]+['"])/
-const RESERVED_CHARACTER = /[!'()*]/g
 const FULL_SYNC = 1
-const ERROR = 1 as const
-const WARNING = 2 as const
-const UNNECESSARY = 1
 const CREATED = 1
 const CHANGED = 2
 const DELETED = 3
 // What the editor reports changing on disk: components, the modules they import, the configs deciding how those resolve, and the collections' entries.
 const WATCHED = '**/*.{kay,ts,tsx,js,jsx,json,md,yaml,yml}'
 
-// How long a change waits for the next before the files are checked again, as typing makes many; the first after a quiet spell is checked at once.
-export const DIAGNOSTICS_DELAY = 150
-// How long the open files importing an edited one wait for the next edit before they are checked again, after the edited one is.
-export const DEPENDENTS_DELAY = 750
-// How many of those are checked at once, so an edit coming meanwhile waits for few.
-const DEPENDENTS_BATCH = 4
-// How long the project-wide checks wait after a save for the next, as saving every file at once makes.
-const PROJECT_CHECKS_DELAY = 300
 // How long the events of one save, the editor's save notice and its file watcher's, are waited for before the shadow tree is written once for them all; short of the diagnostics' delay.
 const SAVE_EVENTS_DELAY = 25
-const QUICK_FIX = 'quickfix'
-const CAPITALIZED = /^[A-Z]/
-const WORD_AFTER = /^[\w-]*/
-const MODULE_FILE = /\.(?:[cm]?[jt]s|[jt]sx)$/
-const FIX_ALL = 'source.fixAll.kay'
-const PARAMETER_HINT = 2
-const PLAIN_FORMAT = 1
-const SNIPPET_FORMAT = 2
-const PACKAGE_TYPES = join(SHADOW_DIR, 'kay-packages.d.ts')
-const OPTIONAL_MARK = /\?$/
-const KIND_FIELD = 5
-const KIND_PROPERTY = 10
-const DEFAULT_MEMBER = '.default'
 // Completions offer names from modules not imported yet, as editors do for TypeScript by default; added imports are quoted the way kay's own code is, since generated code would mislead the guess.
 // Types come from the project's own packages, so the server fetches none with npm, which would also run in a project with no npm of its own.
 // Hints for what the author did not write: the type of a variable and of a return, and the name of a parameter given a literal.
 const INLAY_HINTS = { variableTypes: { enabled: true, suppressWhenTypeMatchesName: true }, functionLikeReturnTypes: { enabled: true }, parameterNames: { enabled: 'literals', suppressWhenArgumentMatchesName: true } }
 const TYPESCRIPT_SETTINGS = { suggest: { autoImports: true }, preferences: { quoteStyle: 'single' }, inlayHints: INLAY_HINTS, disableAutomaticTypeAcquisition: true }
 const TYPESCRIPT_SECTIONS = new Set(['js/ts', 'typescript', 'javascript'])
-// How far a question follows names through generated code.
-const MAX_HOPS = 16
 // The modules of the kay running this server, which a config read again keeps rather than loading a second copy of.
 const OWN_MODULES = `${resolve(import.meta.dir, '..')}${sep}`
 
 // Serves .kay files by compiling each to its shadow TSX, forwarding requests to tsgo's language server and mapping positions both ways.
-export class KayLanguageServer {
-  private root = ''
+export class KayLanguageServer implements LspHost {
+  root = ''
   private routesSetting: string | undefined
-  private nodeUris = false
+  nodeUris = false
   private watchesFiles = false
-  private readonly projects = new Map<string, Project>()
+  readonly projects = new Map<string, Project>()
   private tsgo?: { connection: Connection, process: Subprocess<'pipe', 'pipe', 'ignore'> }
-  private readonly documents = new Map<string, Document>()
+  readonly documents = new Map<string, Document>()
   // The open `src/ui.ts` documents by uri; TypeScript's server types them, kay adds the parts, variants and tokens.
-  private readonly uiFiles = new Map<string, string>()
+  readonly uiFiles = new Map<string, string>()
   // Numbers the probe documents, so two asked at once never share one.
   private probeCount = 0
-  // The quiet spell since the last change, and whether another came during it, which publishes again once it ends.
-  private diagnosticsTimer: Timer | undefined
-  private diagnosticsDue = false
-  // The files whose diagnostics wait to be published: those a change or a save reached, which go first, and the open files importing an edited one, which wait for a quiet spell of their own.
-  private readonly urgent = new Set<string>()
-  private readonly later = new Set<string>()
-  private dependentsTimer: Timer | undefined
-  // The run publishing them, one at a time: those asked for meanwhile join it, and see the latest text.
-  private publishing: Promise<void> | undefined
-  // Whether the run in flight takes the files of `later` too, which only the quiet spell after an edit asks for.
-  private takesLater = false
-  private projectChecksTimer?: Timer
-  // The run of the project-wide checks in flight, and whether a save came during it.
-  private projectChecks: Promise<void> | undefined
-  private projectChecksStale = false
+  private readonly diagnostics = new DiagnosticsQueue(this)
+  private readonly checks = new ProjectChecks(this, this.diagnostics)
   // The save waiting for its other events to come, whether any of them changed a module, and the shadow tree's write in flight.
   private savePending: Promise<void> | undefined
   private saveModulesChanged = false
   private saveWriting: Promise<void> = Promise.resolve()
-  // What the project-wide checks found, by file.
-  private problems = new Map<string, Diagnostic[]>()
 
-  constructor(private readonly client: Connection) {
+  constructor(readonly client: Connection) {
     client.onRequest<InitializeParams>('initialize', async params => this.initialize(params))
     client.onNotification('initialized', () => void guard(this.initialized()))
     client.onNotification<{ changes: FileEvent[] }>('workspace/didChangeWatchedFiles', ({ changes }) => void guard(this.filesChanged(changes)))
@@ -200,34 +91,42 @@ export class KayLanguageServer {
     client.onNotification<DidChangeTextDocumentParams>('textDocument/didChange', params => this.change(params))
     client.onNotification<{ textDocument: TextDocumentIdentifier }>('textDocument/didClose', ({ textDocument }) => this.close(textDocument.uri))
     client.onNotification('textDocument/didSave', () => void guard(this.saved()))
-    client.onRequest<TextDocumentPositionParams>('textDocument/hover', async params => this.hover(params))
-    client.onRequest<TextDocumentPositionParams>('textDocument/completion', async params => this.completion(params))
-    client.onRequest<CompletionItem>('completionItem/resolve', async item => this.resolveCompletion(item))
-    client.onRequest<TextDocumentPositionParams>('textDocument/definition', async params => this.definition(params))
-    client.onRequest<TextDocumentPositionParams & { context: unknown }>('textDocument/references', async params => this.references(params))
-    client.onRequest<TextDocumentPositionParams>('textDocument/documentHighlight', async params => this.highlights(params))
-    client.onRequest<TextDocumentPositionParams & { context?: unknown }>('textDocument/signatureHelp', async params => this.signatureHelp(params))
-    client.onRequest<TextDocumentPositionParams>('textDocument/prepareRename', async params => this.prepareRename(params))
-    client.onRequest<TextDocumentPositionParams & { newName: string }>('textDocument/rename', async params => this.rename(params))
+    client.onRequest<TextDocumentPositionParams>('textDocument/hover', async params => hover(this, params))
+    client.onRequest<TextDocumentPositionParams>('textDocument/completion', async params => completion(this, params))
+    client.onRequest<CompletionItem>('completionItem/resolve', async item => resolveCompletion(this, item))
+    client.onRequest<TextDocumentPositionParams>('textDocument/definition', async params => definition(this, params))
+    client.onRequest<TextDocumentPositionParams & { context: unknown }>('textDocument/references', async params => references(this, params))
+    client.onRequest<TextDocumentPositionParams>('textDocument/documentHighlight', async params => highlights(this, params))
+    client.onRequest<TextDocumentPositionParams & { context?: unknown }>('textDocument/signatureHelp', async params => signatureHelp(this, params))
+    client.onRequest<TextDocumentPositionParams>('textDocument/prepareRename', async params => prepareRename(this, params))
+    client.onRequest<TextDocumentPositionParams & { newName: string }>('textDocument/rename', async params => rename(this, params))
     client.onRequest<{ textDocument: TextDocumentIdentifier }>('textDocument/formatting', async ({ textDocument }) => this.format(textDocument.uri))
     client.onRequest<{ textDocument: TextDocumentIdentifier, range: Range }>('textDocument/rangeFormatting', async params => this.formatSelection(params))
-    client.onRequest<CodeActionParams>('textDocument/codeAction', async params => this.codeActions(params))
+    client.onRequest<CodeActionParams>('textDocument/codeAction', async params => codeActions(this, params))
     client.onRequest<{ textDocument: TextDocumentIdentifier }>('textDocument/documentSymbol', ({ textDocument }) => this.symbols(textDocument.uri))
-    client.onRequest<{ textDocument: TextDocumentIdentifier }>('textDocument/documentLink', async ({ textDocument }) => this.links(textDocument.uri))
-    client.onRequest<{ textDocument: TextDocumentIdentifier, range: Range }>('textDocument/inlayHint', async params => this.inlayHints(params))
+    client.onRequest<{ textDocument: TextDocumentIdentifier }>('textDocument/documentLink', async ({ textDocument }) => links(this, textDocument.uri))
+    client.onRequest<{ textDocument: TextDocumentIdentifier, range: Range }>('textDocument/inlayHint', async params => inlayHints(this, params))
     client.onRequest<{ textDocument: TextDocumentIdentifier }>('textDocument/semanticTokens/full', ({ textDocument }) => this.tokens(textDocument.uri))
     client.onRequest<{ textDocument: TextDocumentIdentifier }>('textDocument/foldingRange', ({ textDocument }) => this.folds(textDocument.uri))
     client.onRequest<{ textDocument: TextDocumentIdentifier }>('textDocument/codeLens', ({ textDocument }) => this.lenses(textDocument.uri))
-    client.onRequest<{ files: { oldUri: string, newUri: string }[] }>('workspace/willRenameFiles', async ({ files }) => inWalkScope(async () => this.renamedFiles(files)))
+    client.onRequest<{ files: { oldUri: string, newUri: string }[] }>('workspace/willRenameFiles', async ({ files }) => inWalkScope(async () => renamedFiles(this, files)))
     client.onRequest('shutdown', async () => this.server.request('shutdown'))
     client.onNotification('exit', () => this.exit())
+  }
+
+  get problems(): Map<string, Diagnostic[]> {
+    return this.checks.problems
+  }
+
+  nextProbe(): number {
+    return ++this.probeCount
   }
 
   get listening(): Promise<void> {
     return this.client.closed
   }
 
-  private get server(): Connection {
+  get server(): Connection {
     if (!this.tsgo)
       throw new Error('The server is not initialized')
 
@@ -254,7 +153,7 @@ export class KayLanguageServer {
     this.tsgo = { connection, process: child }
     connection.onUnhandledRequest(() => null)
     connection.onRequest<{ items: { section?: string }[] }>('workspace/configuration', ({ items }) => items.map(item => TYPESCRIPT_SECTIONS.has(item.section ?? '') ? TYPESCRIPT_SETTINGS : null))
-    connection.onRequest('workspace/diagnostic/refresh', () => this.scheduleDiagnostics())
+    connection.onRequest('workspace/diagnostic/refresh', () => this.diagnostics.scheduleDiagnostics())
 
     // tsgo asks this server for its settings, whatever the editor supports.
     const capabilities = { ...params.capabilities, workspace: { ...params.capabilities.workspace as object, configuration: true }, textDocument: { ...params.capabilities.textDocument, diagnostic: { dynamicRegistration: false }, inlayHint: { dynamicRegistration: false } } }
@@ -292,7 +191,7 @@ export class KayLanguageServer {
     if (this.watchesFiles)
       await this.client.request('client/registerCapability', { registrations: [{ id: 'kay-files', method: 'workspace/didChangeWatchedFiles', registerOptions: { watchers: [{ globPattern: WATCHED }] } }] })
 
-    this.scheduleProjectChecks()
+    this.checks.scheduleProjectChecks()
   }
 
   // A file changing on disk rewrites the shadow tree, which reads the config, guards, API modules and settings beside the .kay files; any file but a .kay one goes to tsgo as is. What kay writes under `.kay` is its own.
@@ -328,7 +227,7 @@ export class KayLanguageServer {
     const document = this.compile(item.uri, item.text, item.version)
 
     this.server.notify('textDocument/didOpen', { textDocument: { uri: document.shadowUri, languageId: 'typescriptreact', version: document.version, text: document.tsx } })
-    this.scheduleDiagnostics([document.uri])
+    this.diagnostics.scheduleDiagnostics([document.uri])
   }
 
   private change({ textDocument, contentChanges }: DidChangeTextDocumentParams) {
@@ -349,8 +248,8 @@ export class KayLanguageServer {
     const document = this.compile(textDocument.uri, text, textDocument.version)
 
     this.server.notify('textDocument/didChange', { textDocument: { uri: document.shadowUri, version: document.version }, contentChanges: [{ text: document.tsx }] })
-    this.scheduleDiagnostics([document.uri])
-    this.scheduleDependents(document)
+    this.diagnostics.scheduleDiagnostics([document.uri])
+    this.diagnostics.scheduleDependents(document)
   }
 
   private close(uri: string) {
@@ -414,8 +313,8 @@ export class KayLanguageServer {
       if (this.needsCompile(previous, options, modulesChanged, layoutsChanged))
         this.refresh(previous)
     }
-    this.scheduleDiagnostics()
-    this.scheduleProjectChecks()
+    this.diagnostics.scheduleDiagnostics()
+    this.checks.scheduleProjectChecks()
   }
 
   private needsCompile(previous: Document, options: Map<string, CheckOptions>, modulesChanged: boolean, layoutsChanged: boolean): boolean {
@@ -501,7 +400,7 @@ export class KayLanguageServer {
   }
 
   // A project first met here compiles with the defaults until the next save reads its config.
-  private projectAt(root: string): Project {
+  projectAt(root: string): Project {
     let project = this.projects.get(root)
 
     if (!project)
@@ -510,7 +409,7 @@ export class KayLanguageServer {
     return project
   }
 
-  private shadowProject(path: string): Project | undefined {
+  shadowProject(path: string): Project | undefined {
     return [...this.projects.values()].find(project => path.startsWith(project.shadowTree))
   }
 
@@ -537,501 +436,11 @@ export class KayLanguageServer {
   }
 
   // A page of an extension with options of its own is compiled as the app reaches it, by its `node_modules` link whichever path the editor opened it by, and shadowed beside its real path, where its tsconfig is.
-  private placed(project: Project, file: string): { file: string, shadowOf: (file: string) => string } {
+  placed(project: Project, file: string): { file: string, shadowOf: (file: string) => string } {
     const programs = project.types?.programs ?? []
     const library = programs.map(program => program.library).find(held => held.dir !== held.realDir && file.startsWith(held.realDir + sep))
 
     return { file: library ? throughNodeModules(library, file) : file, shadowOf: programShadows(project.root, programs) }
-  }
-
-  // The given files, every open one when none are.
-  private scheduleDiagnostics(uris: Iterable<string> = this.documents.keys()) {
-    for (const uri of uris) {
-      this.later.delete(uri)
-      this.urgent.add(uri)
-    }
-
-    if (this.diagnosticsTimer === undefined)
-      void guard(this.publishQueued())
-    else
-      this.diagnosticsDue = true
-
-    clearTimeout(this.diagnosticsTimer)
-    this.diagnosticsTimer = setTimeout(() => {
-      this.diagnosticsTimer = undefined
-
-      if (this.diagnosticsDue) {
-        this.diagnosticsDue = false
-        void guard(this.publishQueued())
-      }
-    }, DIAGNOSTICS_DELAY)
-  }
-
-  // An edit can break the open files importing the edited one, directly or through another, and no other.
-  // A file reaching it through a module that is not open waits for the next save, which checks them all.
-  private scheduleDependents(edited: Document) {
-    const found = new Set<string>()
-
-    const queue = [edited]
-
-    for (const target of queue) {
-      for (const document of this.documents.values()) {
-        if (document !== edited && !found.has(document.uri) && importsFile(document, target.file)) {
-          found.add(document.uri)
-          queue.push(document)
-        }
-      }
-    }
-
-    for (const uri of found) {
-      if (!this.urgent.has(uri))
-        this.later.add(uri)
-    }
-
-    if (this.later.size === 0)
-      return
-
-    clearTimeout(this.dependentsTimer)
-    this.dependentsTimer = setTimeout(() => void guard(this.publishQueued(true)), DEPENDENTS_DELAY)
-  }
-
-  // What `kay check` finds across the project, run after a save rather than on every keystroke, since it reads every collection, catalog and route.
-  private scheduleProjectChecks() {
-    clearTimeout(this.projectChecksTimer)
-    this.projectChecksTimer = setTimeout(() => void guard(this.runProjectChecks()), PROJECT_CHECKS_DELAY)
-  }
-
-  private async runProjectChecks() {
-    if (this.projectChecks) {
-      this.projectChecksStale = true
-
-      return
-    }
-
-    try {
-      this.projectChecks = this.publishProblems()
-      await this.projectChecks
-    }
-    finally {
-      this.projectChecks = undefined
-
-      // A save during a run, even a failed one, runs the checks again.
-      if (this.projectChecksStale) {
-        this.projectChecksStale = false
-        this.scheduleProjectChecks()
-      }
-    }
-  }
-
-  // Each file whose problems changed, an open component's along with its own diagnostics, and none any longer for a file that had some.
-  private async publishProblems() {
-    const found = new Map<string, Diagnostic[]>()
-
-    for (const problem of (await Promise.all([...this.projects.values()].map(async project => this.problemsOf(project)))).flat())
-      found.set(problem.file, [...found.get(problem.file) ?? [], problemDiagnostic(problem)])
-
-    const previous = this.problems
-
-    this.problems = found
-
-    let openChanged = false
-
-    for (const file of new Set([...previous.keys(), ...found.keys()])) {
-      if (Bun.deepEquals(previous.get(file), found.get(file)))
-        continue
-
-      if ([...this.documents.values()].some(open => open.file === file))
-        openChanged = true
-      else
-        this.client.notify('textDocument/publishDiagnostics', { uri: this.clientUri(file), diagnostics: found.get(file) ?? [] })
-    }
-
-    // An open file goes through the one publish at a time, which reads the problems just stored.
-    if (openChanged)
-      await this.publishAllDiagnostics()
-  }
-
-  private async problemsOf(project: Project): Promise<CheckDiagnostic[]> {
-    const { root, options, types } = project
-
-    if (!types)
-      return []
-
-    const content = await contentChecks(root, options, project.probes)
-    const [problems, typeErrors] = await Promise.all([projectProblems(root, options, content, project.probes), this.generatedTypeErrors(root)])
-
-    return [...configProblems(root, options, types), ...typeErrors.flatMap(diagnostic => generatedProblem(root, diagnostic, types, content) ?? []), ...problems]
-  }
-
-  // What tsgo finds in the modules kay writes for it to check what only types tell, each opened for the question.
-  private async generatedTypeErrors(root: string): Promise<CheckDiagnostic[]> {
-    const found = await Promise.all(generatedChecks(root).filter(file => existsSync(file)).map(async (file) => {
-      const uri = pathToFileURL(file).href
-
-      this.server.notify('textDocument/didOpen', { textDocument: { uri, languageId: 'typescript', version: 1, text: await Bun.file(file).text() } })
-
-      try {
-        const report = await this.server.request<DocumentDiagnosticReport>('textDocument/diagnostic', { textDocument: { uri } })
-
-        return (report.items ?? []).map((diagnostic): CheckDiagnostic => ({ file, line: diagnostic.range.start.line + 1, column: diagnostic.range.start.character + 1, code: typeof diagnostic.code === 'number' ? `TS${diagnostic.code}` : undefined, message: diagnostic.message }))
-      }
-      finally {
-        this.server.notify('textDocument/didClose', { textDocument: { uri } })
-      }
-    }))
-
-    return found.flat()
-  }
-
-  // Every open file, checked again.
-  private async publishAllDiagnostics() {
-    for (const uri of this.documents.keys())
-      this.urgent.add(uri)
-
-    await this.publishQueued()
-  }
-
-  // Publishes the files waiting, the urgent ones first and the rest a few at a time, one run at a time so a slow tsgo is not asked twice for a file; those asked for meanwhile join the run.
-  private async publishQueued(withLater = false): Promise<void> {
-    this.takesLater ||= withLater
-    this.publishing ??= this.publishRun()
-
-    return this.publishing
-  }
-
-  private async publishRun() {
-    // Past this the run is always stored before it ends.
-    await Promise.resolve()
-
-    let failure: { reason: unknown } | undefined
-
-    try {
-      for (let batch = this.nextBatch(); batch.length > 0; batch = this.nextBatch()) {
-        // Settled, not rejected at the first failure, so none is still running when the next batch starts.
-        const settled = await Promise.allSettled(batch.map(async (uri) => {
-          const document = this.documents.get(uri)
-
-          if (document)
-            await this.publishDiagnostics(document)
-        }))
-        const failed = settled.find(result => result.status === 'rejected')
-
-        failure ??= failed?.status === 'rejected' ? { reason: failed.reason } : undefined
-      }
-    }
-    finally {
-      this.publishing = undefined
-      this.takesLater = false
-    }
-
-    if (failure)
-      throw failure.reason
-  }
-
-  private nextBatch(): string[] {
-    const waiting = this.takesLater ? [...this.later].slice(0, DEPENDENTS_BATCH) : []
-    const batch = this.urgent.size > 0 ? [...this.urgent] : waiting
-
-    for (const uri of batch) {
-      this.urgent.delete(uri)
-      this.later.delete(uri)
-    }
-
-    return batch
-  }
-
-  private async publishDiagnostics(document: Document) {
-    const project = this.projectAt(projectRootOf(document.file, this.root))
-    const rangeOf = (span: Span) => ({ start: toPosition(document.source, span.start), end: toPosition(document.source, Math.max(span.end, span.start + 1)) })
-    // A library component the app never imports is the library's to check, as `kay check` leaves it.
-    const reached = !project.unreached.has(document.file)
-    const compileErrors = (reached ? document.diagnostics : []).map(diagnostic => ({
-      range: rangeOf(diagnostic),
-      severity: diagnostic.severity === 'warning' ? WARNING : ERROR,
-      source: 'kay',
-      ...diagnostic.code !== undefined && { code: diagnostic.code },
-      message: editorMessage(diagnostic),
-      ...diagnostic.related && { relatedInformation: diagnostic.related.map(span => ({ location: { uri: document.uri, range: rangeOf(span) }, message: span.label })) },
-      ...diagnostic.code === 'unread-name' && { tags: [UNNECESSARY] },
-    }))
-    // A compile error leaves the shadow TSX half-written, so its type errors would only be noise; one found by type checking only leaves it whole. The rest of what `kay check` leaves out stays out here too.
-    const broken = new Set(document.diagnostics.some(diagnostic => !diagnostic.checkOnly) ? [document.file] : [])
-    const reports = reportsTypeErrors(document.file, { root: project.root, broken, unreached: project.unreached, libraries: project.libraries })
-    const report = reports ? await this.server.request<DocumentDiagnosticReport>('textDocument/diagnostic', { textDocument: { uri: document.shadowUri } }) : undefined
-
-    if (this.documents.get(document.uri) !== document)
-      return
-
-    // Related information points into the shadow TSX, a file the user never sees. Each one reads as `kay check` reports it: unused code is the `unread-name` lint, which TypeScript only hints at without `noUnusedLocals`.
-    const levelAt = lintLevels(document.source, project.options.lints)
-    // A template expression the shadow code writes twice, as a `match` subject, is mistyped twice in one place.
-    const seen = new Set<string>()
-    const typeErrors = (report?.items ?? []).flatMap(({ relatedInformation: _related, ...diagnostic }) => {
-      const start = toOffset(document.tsx, diagnostic.range.start)
-      const diagnosed = diagnoseShadow(document, { code: typeof diagnostic.code === 'number' ? diagnostic.code : undefined, message: diagnostic.message, start, end: toOffset(document.tsx, diagnostic.range.end) }, levelAt)
-
-      if (!diagnosed || servedByTheApp(document.file, diagnosed.message, project.mounts, project.locales))
-        return []
-
-      const key = JSON.stringify([diagnosed.span, diagnosed.code, diagnosed.message])
-
-      if (seen.has(key))
-        return []
-
-      seen.add(key)
-
-      return [{
-        ...diagnostic,
-        ...diagnosed.code !== undefined && { code: diagnosed.code },
-        ...diagnosed.severity !== undefined && { severity: diagnosed.severity === 'warning' ? WARNING : ERROR },
-        ...diagnosed.unread && { tags: [UNNECESSARY] },
-        message: editorMessage(diagnosed),
-        range: diagnosed.span ? rangeOf(diagnosed.span) : zeroRange(),
-      }]
-    })
-
-    this.client.notify('textDocument/publishDiagnostics', { uri: document.uri, version: document.version, diagnostics: [...compileErrors, ...typeErrors, ...this.problems.get(document.file) ?? []] })
-  }
-
-  private async hover(params: TextDocumentPositionParams): Promise<Hover | null> {
-    const target = this.toShadow(params)
-
-    if (!target)
-      return null
-
-    const hover = await this.server.request<Hover | null>('textDocument/hover', target.params)
-
-    if (!hover)
-      return null
-
-    return { contents: hover.contents, range: hover.range && toSourceRange(target.document, hover.range) }
-  }
-
-  private async completion(params: TextDocumentPositionParams & { context?: unknown }): Promise<CompletionList | null> {
-    const ui = this.uiFiles.get(params.textDocument.uri)
-
-    if (ui !== undefined)
-      return this.uiFileCompletion(ui, params)
-
-    const own = await this.templateCompletion(params)
-
-    if (own)
-      return own
-
-    const target = this.toShadow(params)
-
-    if (!target)
-      return null
-
-    const result = await this.server.request<CompletionList | CompletionItem[] | null>('textDocument/completion', { ...target.params, context: params.context })
-
-    if (!result)
-      return null
-
-    const list = Array.isArray(result) ? { isIncomplete: false, items: result } : result
-    const editRange = list.itemDefaults?.editRange
-    const itemDefaults = list.itemDefaults && { ...list.itemDefaults, editRange: editRange && ('start' in editRange ? toSourceRange(target.document, editRange) : mapInsertReplace(target.document, editRange)) }
-
-    return {
-      ...list,
-      itemDefaults,
-      items: list.items.filter(item => !GENERATED_NAME.test(item.label)).map(item => ({ ...mapCompletionItem(target.document, item, target.offset), data: { uri: target.document.uri, offset: target.offset, data: item.data } })),
-    }
-  }
-
-  // Kay's own completions, where TypeScript sees no code: element, attribute and block names, route paths, message keys and lint names.
-  private async templateCompletion({ textDocument, position }: TextDocumentPositionParams): Promise<CompletionList | undefined> {
-    const document = this.documents.get(textDocument.uri)
-
-    if (!document)
-      return undefined
-
-    const context = templateContext(document.source, toOffset(document.source, position), parseKay(document.source).templateStart)
-
-    if (!context)
-      return undefined
-
-    const range = { start: toPosition(document.source, context.replace.start), end: toPosition(document.source, context.replace.end) }
-    const items = templateItems(context.wanted, await this.templateData(document, context.wanted), (label, text, snippet) => ({ textEdit: { range, newText: text }, filterText: label, insertTextFormat: snippet ? SNIPPET_FORMAT : PLAIN_FORMAT }))
-
-    // A class object with nothing to offer stays empty rather than fall to TypeScript, which would list every global there.
-    return items.length > 0 || context.wanted.kind === 'ui' ? { isIncomplete: false, items } : undefined
-  }
-
-  // The parts, variants and tokens src/ui.ts and a `class={{ }}` complete from, read from the component files and the theme.
-  private async uiData(project: Project, document?: Document, tag?: string): Promise<UiData> {
-    const tokens = themeTokens(project.root)
-
-    if (document === undefined || tag === undefined)
-      return { components: await styleInfos(project.root, project.libraries), tokens }
-
-    const parsed = parseKay(document.source)
-    const { imports } = analyzeScript(document.source, parsed.script, [], [], parsed.module)
-    const binding = imports.find(candidate => candidate.local === tag && !candidate.typeOnly)
-    const file = binding && resolveFrom(binding.source, document.file)
-    const info = file === undefined ? undefined : styleInfo(realPath(file))
-
-    return { components: info === undefined ? [] : [{ ...info, name: tag }], tokens }
-  }
-
-  private async uiFileCompletion(source: string, { textDocument, position }: TextDocumentPositionParams): Promise<CompletionList | null> {
-    const offset = toOffset(source, position)
-    const cursor = uiFileCursor(source, offset)
-
-    if (cursor === undefined)
-      return null
-
-    const length = typedLength(cursor)
-    const range = { start: toPosition(source, offset - length), end: toPosition(source, offset + WORD_AFTER.exec(source.slice(offset))![0].length) }
-    const project = this.projectAt(projectRootOf(fileURLToPath(textDocument.uri), this.root))
-    const items = uiItems(cursor, undefined, await this.uiData(project)).map(item => ({ ...item, textEdit: { range, newText: item.label }, filterText: item.label }))
-
-    return items.length > 0 ? { isIncomplete: false, items } : null
-  }
-
-  private async templateData(document: Document, wanted: Wanted): Promise<TemplateData> {
-    const project = this.projectAt(projectRootOf(document.file, this.root))
-    const data: TemplateData = { lints: [], paths: [], messages: [], components: [], elements: [] }
-
-    if (wanted.kind === 'ui') {
-      data.ui = await this.uiData(project, document, wanted.tag)
-    }
-    else if (wanted.kind === 'lint') {
-      data.lints = Object.entries(LINTS).filter(([, lint]) => !('site' in lint)).map(([name]) => name)
-    }
-    else if (wanted.kind === 'path') {
-      data.paths = await this.remembered(project.lookups, 'paths', async () => this.servedRoutes(project))
-    }
-    else if (wanted.kind === 'message') {
-      data.messages = await this.remembered(project.lookups, 'messages', async () => project.options.i18n ? messageKeys(project.root, project.options.i18n, project.options.extensions) : [])
-    }
-    else {
-      data.elements = [...HTML_ELEMENTS]
-      data.components = await this.importedComponents(document, project, wanted.kind === 'attribute' ? wanted.tag : undefined)
-    }
-
-    return data
-  }
-
-  // A lookup kept until the next save, forgotten when it fails so the next completion asks again; only its own failed promise is dropped, not a newer one a save put there.
-  private async remembered<Key extends 'paths' | 'messages' | 'routes' | 'ownMatchers'>(lookups: Project['lookups'], key: Key, ask: () => Promise<Awaited<NonNullable<Project['lookups'][Key]>>>): Promise<Awaited<NonNullable<Project['lookups'][Key]>>> {
-    const kept = (lookups[key] ?? ask()) as Promise<Awaited<NonNullable<Project['lookups'][Key]>>>
-
-    lookups[key] = kept as Project['lookups'][Key]
-
-    try {
-      return await kept
-    }
-    catch (error) {
-      if (lookups[key] === kept)
-        delete lookups[key]
-
-      throw error
-    }
-  }
-
-  private async servedRoutes(project: Project): Promise<string[]> {
-    const paths = await servedPathsOf(project.root, project.options)
-
-    return [...new Set(paths.filter(path => path.startsWith('/')))].sort()
-  }
-
-  // The components a file imports; a local `.kay` one is read for the props and blocks it takes, and the props of `tag` come from TypeScript when the file alone does not say them: a package's component, or a props type declared elsewhere.
-  private async importedComponents(document: Document, project: Project, tag?: string): Promise<TemplateData['components']> {
-    const parsed = parseKay(document.source)
-    const { imports } = analyzeScript(document.source, parsed.script, [], [], parsed.module)
-    const found: TemplateData['components'] = []
-
-    for (const binding of imports.filter(candidate => CAPITALIZED.test(candidate.local) && !candidate.typeOnly)) {
-      const known = await this.localInterface(document, project, binding.source)
-      const typed = binding.local === tag && (known === undefined || known.typed) ? await this.typedProps(document, project, tag, binding.source) : undefined
-
-      found.push({ name: binding.local, from: binding.source, props: typed !== undefined && typed.length > 0 ? typed : known?.props ?? [], blocks: known?.blocks ?? [] })
-    }
-
-    return found
-  }
-
-  // The interface of the `.kay` file an import names, written with its extension or without: the open text, or the file as of the last save.
-  private async localInterface(document: Document, project: Project, specifier: string): Promise<ComponentInterface | undefined> {
-    if (!specifier.startsWith('.'))
-      return undefined
-
-    const path = resolve(dirname(document.file), specifier.endsWith('.kay') ? specifier : `${specifier}.kay`)
-    const open = [...this.documents.values()].find(candidate => candidate.file === path)
-
-    if (open)
-      return componentInterface(open.source)
-
-    const { interfaces } = project.lookups
-
-    if (!interfaces.has(path))
-      interfaces.set(path, existsSync(path) ? componentInterface(await Bun.file(path).text()) : undefined)
-
-    return interfaces.get(path)
-  }
-
-  // The props TypeScript gives a tag, asked of a copy of the file's shadow with the tag written once more at its end, since the cursor of a completion is not in the shadow itself.
-  private async typedProps(document: Document, project: Project, tag: string, from: string): Promise<ComponentInterface['props'] | undefined> {
-    const key = `${document.file}\0${tag}\0${from}`
-    const cached = project.lookups.typedProps.get(key)
-
-    if (cached)
-      return cached
-
-    const { typedProps } = project.lookups
-    const asked = this.askProps(document, tag)
-
-    typedProps.set(key, asked)
-
-    const props = await asked
-
-    // A failed probe is asked again, unless a newer one took its key.
-    if (props === undefined && typedProps.get(key) === asked)
-      typedProps.delete(key)
-
-    return props
-  }
-
-  private async askProps(document: Document, tag: string): Promise<ComponentInterface['props'] | undefined> {
-    const call = `void (<${tag}  />)`
-    const text = `${document.tsx}\n${call}\n`
-    const uri = `${document.shadowUri}.props${++this.probeCount}.tsx`
-    const position = toPosition(text, text.length - call.length - 1 + call.indexOf('  ') + 1)
-
-    this.server.notify('textDocument/didOpen', { textDocument: { uri, languageId: 'typescriptreact', version: 1, text } })
-
-    try {
-      const result = await this.server.request<CompletionList | CompletionItem[] | null>('textDocument/completion', { textDocument: { uri }, position })
-      const items = (Array.isArray(result) ? result : result?.items ?? []).filter(item => (item.kind === KIND_PROPERTY || item.kind === KIND_FIELD) && item.label !== 'key' && !GENERATED_NAME.test(item.label))
-
-      return items.map(item => ({ name: item.label.replace(OPTIONAL_MARK, ''), optional: item.label.endsWith('?') }))
-    }
-    catch {
-      return undefined
-    }
-    finally {
-      this.server.notify('textDocument/didClose', { textDocument: { uri } })
-    }
-  }
-
-  // Renaming or moving a `.kay` file, or a folder holding some, rewrites the relative imports of the `.kay` files and TypeScript modules importing it, and those of the files that move.
-  private async renamedFiles(files: { oldUri: string, newUri: string }[]): Promise<WorkspaceEdit | null> {
-    const moves = new Map(files.filter(file => file.oldUri.startsWith('file:') && file.newUri.startsWith('file:')).map(file => [filePath(file.oldUri), filePath(file.newUri)]))
-    const changes: Record<string, TextEdit[]> = {}
-
-    const modules = (await findProjectFiles(this.root, MODULE_FILE)).filter(file => !file.endsWith('.d.ts'))
-
-    for (const file of [...await findKayFiles(this.root), ...modules]) {
-      const open = [...this.documents.values()].find(document => document.file === file)
-      const source = open?.source ?? await Bun.file(file).text()
-      const edits = file.endsWith('.kay') ? importEdits(file, source, moves) : moduleImportEdits(file, source, moves)
-
-      if (edits.length > 0)
-        changes[open?.uri ?? this.clientUri(file)] = edits.map(edit => ({ range: { start: toPosition(source, edit.start), end: toPosition(source, edit.end) }, newText: edit.text }))
-    }
-
-    return Object.keys(changes).length > 0 ? { changes } : null
   }
 
   private symbols(uri: string): DocumentSymbol[] {
@@ -1053,81 +462,6 @@ export class KayLanguageServer {
     return islandLens(document.source, path, { route, insideIsland: project.islandOnly.has(path), signals: importedSignals(path, document.source) })
   }
 
-  // The files a relative import names, and the pages the route paths written in the text lead to, so the editor opens them from the specifier or the path.
-  private async links(uri: string): Promise<DocumentLink[]> {
-    const document = this.documents.get(uri)
-
-    if (!document)
-      return []
-
-    const range = (span: Span) => ({ start: toPosition(document.source, span.start), end: toPosition(document.source, span.end) })
-    const imports = importSpecifiers(document.source).flatMap((span) => {
-      const specifier = document.source.slice(span.start, span.end)
-      const target = specifier.startsWith('.') ? resolveFrom(specifier, document.file) : undefined
-
-      return target === undefined ? [] : [{ range: range(span), target: this.clientUri(target) }]
-    })
-    const project = this.projectAt(projectRootOf(document.file, this.root))
-    // The route table is read from disk, so a text with no route path asks for none.
-    const routes = mentionsRoute(document.source) ? await this.routeTable(project) : []
-    const own = new Set(routes.some(route => route.matchers) ? await this.ownMatchers(project) : [])
-
-    return [...imports, ...routeLinks(document.source, routes, project.locales, own).map(link => ({ range: range(link), target: this.clientUri(link.file) }))]
-  }
-
-  // The matchers the project writes in `src/params`, which shadow the ones kay ships.
-  private async ownMatchers(project: Project): Promise<string[]> {
-    try {
-      return await this.remembered(project.lookups, 'ownMatchers', async () => (await readdir(join(project.routesDir, '..', 'params'))).filter(name => name.endsWith('.ts')).map(name => name.slice(0, -3)))
-    }
-    catch {
-      return []
-    }
-  }
-
-  // The pages of the project, none while its route files are ones the router refuses, which `kay check` reports itself.
-  private async routeTable(project: Project): Promise<Route[]> {
-    try {
-      return await this.remembered(project.lookups, 'routes', async () => scanRoutes(project.routesDir, project.mounts))
-    }
-    catch {
-      return []
-    }
-  }
-
-  // tsgo's hints for the types it infers and the names of the parameters a call fills, where the code they follow is the author's own: those of generated code have nowhere to show.
-  private async inlayHints(params: { textDocument: TextDocumentIdentifier, range: Range }): Promise<InlayHint[]> {
-    const document = this.documents.get(params.textDocument.uri)
-
-    if (!document)
-      return []
-
-    const wanted = { start: toOffset(document.source, params.range.start), end: toOffset(document.source, params.range.end) }
-    // The generated code of the range, with a character of slack.
-    const generated = document.map.generatedHull(wanted.start, wanted.end)
-
-    if (!generated)
-      return []
-
-    const range = { start: toPosition(document.tsx, generated.start), end: toPosition(document.tsx, Math.min(generated.end + 1, document.tsx.length)) }
-    const found = await this.server.request<TsgoInlayHint[] | null>('textDocument/inlayHint', { textDocument: { uri: document.shadowUri }, range })
-
-    return (found ?? []).flatMap((hint) => {
-      const at = toOffset(document.tsx, hint.position)
-      // A type follows the code it is of, a parameter's name precedes the argument it names.
-      const span = hint.kind === PARAMETER_HINT ? sourceSpan(document, at, at + 1, 'code') : sourceSpan(document, at - 1, at, 'code')
-      const offset = span && (hint.kind === PARAMETER_HINT ? span.start : span.start + 1)
-
-      if (offset === undefined || offset < wanted.start || offset > wanted.end)
-        return []
-
-      const { label, textEdits, ...rest } = hint
-      const edits = textEdits && sourceEdits(document, textEdits, offset)
-
-      return [{ ...rest, position: toPosition(document.source, offset), label: typeof label === 'string' ? label : label.map(part => part.value).join(''), ...edits && { textEdits: edits } }]
-    })
-  }
-
   // Signals, props and server values told apart from other names, whose tokens TypeScript does not know.
   private tokens(uri: string): { data: number[] } {
     const document = this.documents.get(uri)
@@ -1139,53 +473,6 @@ export class KayLanguageServer {
     const document = this.documents.get(uri)
 
     return document ? foldingRanges(document.source) : []
-  }
-
-  // Items carry the document they were listed for, since the editor may resolve one after another file asked for completions.
-  private async resolveCompletion(item: CompletionItem): Promise<CompletionItem> {
-    const { uri, offset, data } = item.data as { uri: string, offset: number, data: unknown }
-    const document = this.documents.get(uri)
-    const resolved = await this.server.request<CompletionItem>('completionItem/resolve', { ...item, data })
-
-    return { ...(document ? mapCompletionItem(document, resolved, offset) : resolved), data: item.data }
-  }
-
-  // Quick fixes whose every edit lands in what the user wrote, an added import moved into its fence: kay's own, then TypeScript's.
-  private async codeActions(params: CodeActionParams): Promise<CodeAction[] | null> {
-    const document = this.documents.get(params.textDocument.uri)
-    const only = params.context.only
-
-    if (!document)
-      return null
-
-    const fixAll = only === undefined || only.some(kind => FIX_ALL.startsWith(kind)) ? safeFixes(document) : []
-    const fixes = (only?.includes(QUICK_FIX) ?? true) ? await this.quickFixes(document, params) : null
-    const actions = [...fixAll, ...fixes ?? []]
-
-    return actions.length > 0 || fixes ? actions : null
-  }
-
-  private async quickFixes(document: Document, params: CodeActionParams): Promise<CodeAction[] | null> {
-    const own = kayFixes(document, toOffset(document.source, params.range.start), toOffset(document.source, params.range.end))
-    const range = toShadowRange(document, params.range)
-
-    if (!range)
-      return own.length > 0 ? own : null
-
-    const diagnostics = params.context.diagnostics.flatMap((diagnostic) => {
-      const mapped = diagnostic.source === 'kay' ? undefined : toShadowRange(document, diagnostic.range)
-
-      return mapped ? [{ ...diagnostic, range: mapped }] : []
-    })
-    const actions = await this.server.request<CodeAction[] | null>('textDocument/codeAction', { textDocument: { uri: document.shadowUri }, range, context: { ...params.context, diagnostics, only: [QUICK_FIX] } })
-    const offset = toOffset(document.source, params.range.start)
-
-    return [...own, ...(actions ?? []).flatMap((action): CodeAction[] => {
-      const changes = action.edit && action.command == null ? fileEdits(action.edit) : undefined
-      const edits = changes?.length === 1 && changes[0]![0] === document.shadowUri ? sourceEdits(document, changes[0]![1], offset) : undefined
-
-      return edits ? [{ title: action.title, kind: action.kind, isPreferred: action.isPreferred, edit: { changes: { [document.uri]: edits } } }] : []
-    })]
   }
 
   private async format(uri: string): Promise<TextEdit[]> {
@@ -1208,298 +495,6 @@ export class KayLanguageServer {
     const edits = formatRange(document.source, { start: toOffset(document.source, range.start), end: toOffset(document.source, range.end) }, { sortClasses: await tailwindSorter(projectRootOf(document.file, this.root)) })
 
     return edits.map(edit => ({ range: { start: toPosition(document.source, edit.start), end: toPosition(document.source, edit.end) }, newText: edit.text }))
-  }
-
-  private async definition(params: TextDocumentPositionParams): Promise<LocationLink[] | null> {
-    const target = this.toShadow(params)
-
-    if (!target)
-      return null
-
-    const links = await this.sourceLinks(target.document, await this.definitionsAt(target.params), new Set([positionKey(target.params.textDocument.uri, target.params.position)]))
-
-    return uniqueBy(links, link => `${link.targetUri} ${rangeKey(link.targetSelectionRange)}`)
-  }
-
-  private async definitionsAt(at: TextDocumentPositionParams): Promise<(Location | LocationLink)[]> {
-    const result = await this.server.request<Location | Location[] | LocationLink[] | null>('textDocument/definition', at)
-
-    if (result === null)
-      return []
-
-    return Array.isArray(result) ? result : [result]
-  }
-
-  // Definitions inside another component land in its shadow TSX; this points them back at the .kay file.
-  // One that lands in generated glue, such as the `return { srv }` handing a server value to the template, is asked again from there, to reach the declaration it stands for.
-  private async sourceLinks(origin: Document, locations: (Location | LocationLink)[], asked: Set<string>): Promise<LocationLink[]> {
-    const links = await Promise.all(locations.map(async (location) => {
-      const link = 'targetUri' in location ? location : { targetUri: location.uri, targetRange: location.range, targetSelectionRange: location.range }
-      const shadow = await this.shadowOf(link.targetUri)
-      const originSelectionRange = link.originSelectionRange && toSourceRange(origin, link.originSelectionRange)
-      const declared = shadow ? undefined : await packageDeclaration(link.targetUri, link.targetSelectionRange.start.line)
-
-      // A library component's declaration stands for its shadow file, which leads on to its `.kay` source.
-      if (declared) {
-        const key = positionKey(declared.textDocument.uri, declared.position)
-
-        if (!asked.has(key) && asked.size <= MAX_HOPS) {
-          asked.add(key)
-
-          const followed = await this.sourceLinks(origin, await this.definitionsAt(declared), asked)
-
-          if (followed.length > 0)
-            return followed.map(found => ({ ...found, originSelectionRange }))
-        }
-      }
-
-      if (!shadow)
-        return [{ ...link, targetUri: this.clientUri(filePath(link.targetUri)), originSelectionRange }]
-
-      const targetUri = this.clientUri(shadow.file)
-      const selection = toSourceRange(shadow, link.targetSelectionRange)
-
-      if (selection)
-        return [{ originSelectionRange, targetUri, targetRange: toSourceRange(shadow, link.targetRange, 'loose') ?? selection, targetSelectionRange: selection }]
-
-      const key = positionKey(link.targetUri, link.targetSelectionRange.start)
-
-      if (!asked.has(key) && asked.size <= MAX_HOPS) {
-        asked.add(key)
-
-        const followed = await this.sourceLinks(origin, await this.definitionsAt({ textDocument: { uri: link.targetUri }, position: link.targetSelectionRange.start }), asked)
-
-        if (followed.length > 0)
-          return followed.map(found => ({ ...found, originSelectionRange }))
-      }
-
-      return [{ originSelectionRange, targetUri, targetRange: toSourceRange(shadow, link.targetRange, 'loose') ?? zeroRange(), targetSelectionRange: toSourceRange(shadow, link.targetSelectionRange, 'loose') ?? zeroRange() }]
-    }))
-
-    return links.flat()
-  }
-
-  private async references(params: TextDocumentPositionParams & { context: unknown }): Promise<Location[] | null> {
-    const target = this.toShadow(params)
-
-    if (!target)
-      return null
-
-    const { found } = await this.across(target.params, async at => await this.server.request<Location[] | null>('textDocument/references', { ...at, context: params.context }) ?? [])
-
-    return uniqueBy(found.map(({ file, range }) => ({ uri: file.uri, range })), location => `${location.uri} ${rangeKey(location.range)}`)
-  }
-
-  private async highlights(params: TextDocumentPositionParams): Promise<DocumentHighlight[] | null> {
-    const target = this.toShadow(params)
-
-    if (!target)
-      return null
-
-    const { found } = await this.across(target.params, async (at) => {
-      const highlights = await this.server.request<DocumentHighlight[] | null>('textDocument/documentHighlight', at) ?? []
-
-      return highlights.map(highlight => ({ ...highlight, uri: at.textDocument.uri }))
-    })
-
-    return uniqueBy(found.map(({ spot, range }) => ({ range, kind: spot.kind })), highlight => rangeKey(highlight.range))
-  }
-
-  // Signatures carry no positions, so they pass through as they are.
-  private async signatureHelp(params: TextDocumentPositionParams & { context?: unknown }): Promise<unknown> {
-    const target = this.toShadow(params)
-
-    return target ? this.server.request('textDocument/signatureHelp', { ...target.params, context: params.context }) : null
-  }
-
-  // A name only generated code holds cannot be renamed: the editor says so instead of renaming part of it.
-  private async prepareRename(params: TextDocumentPositionParams): Promise<unknown> {
-    const target = this.toShadow(params)
-
-    if (!target)
-      return null
-
-    const result = await this.server.request<Range | { range: Range, placeholder: string } | { defaultBehavior: boolean } | null>('textDocument/prepareRename', target.params)
-
-    if (!result || 'defaultBehavior' in result)
-      return result
-
-    const range = toSourceRange(target.document, 'range' in result ? result.range : result)
-
-    if (!range)
-      return null
-
-    return 'range' in result ? { ...result, range } : range
-  }
-
-  // Only what the user wrote is edited; generated code follows by itself once the source changes.
-  private async rename(params: TextDocumentPositionParams & { newName: string }): Promise<WorkspaceEdit | null> {
-    const target = this.toShadow(params)
-
-    // TypeScript refuses a name it cannot rename, such as a library's.
-    if (!target || !await this.server.request<WorkspaceEdit | null>('textDocument/rename', { ...target.params, newName: params.newName }))
-      return null
-
-    // References follow a name through generated code where a rename stops, and editing each of them renames it whole, a server value's reads in the template included.
-    const { found, complete } = await this.across(target.params, async at => await this.server.request<Location[] | null>('textDocument/references', { ...at, context: { includeDeclaration: true } }) ?? [])
-
-    // A rename that stopped short would leave the code broken, so none is better.
-    if (!complete)
-      throw new Error('kay: this name runs through too much generated code to rename it safely')
-
-    const byFile = new Map<string, Map<string, TextEdit>>()
-    const bare = new Map<string, Map<string, Span>>()
-
-    for (const { spot, file, range } of found) {
-      // Generated code repeats some of the user's names, each mapped back to where it came from: an edit is kept only where the source holds the text it replaces.
-      if (file.shadow ? textAt(file.shadow.source, range) !== textAt(file.shadow.tsx, spot.range) : !this.editable(file.uri))
-        continue
-
-      let edits = byFile.get(file.uri)
-
-      if (!edits)
-        byFile.set(file.uri, edits = new Map<string, TextEdit>())
-
-      edits.set(rangeKey(range), this.renamed(file, range, params.newName, bare))
-    }
-
-    return { changes: Object.fromEntries([...byFile].map(([uri, edits]) => [uri, [...edits.values()]])) }
-  }
-
-  // The name a bare `{title}` attribute shares with its value is the variable's, so a rename keeps the attribute's own name: `title={heading}`.
-  private renamed(file: Target, range: Range, newName: string, bare: Map<string, Map<string, Span>>): TextEdit {
-    if (!file.shadow)
-      return { range, newText: newName }
-
-    const { source } = file.shadow
-    let shorthands = bare.get(file.uri)
-
-    if (!shorthands) {
-      bare.set(file.uri, shorthands = new Map<string, Span>())
-
-      for (const element of elementsIn(parseKay(source).template)) {
-        for (const attribute of element.attributes) {
-          if (attribute.kind === 'expression' && attribute.shorthand)
-            shorthands.set(`${attribute.name.start}-${attribute.name.end}`, attribute.shorthand)
-        }
-      }
-    }
-
-    const start = toOffset(source, range.start)
-    const end = toOffset(source, range.end)
-    const shorthand = shorthands.get(`${start}-${end}`)
-
-    if (shorthand)
-      return { range: { start: toPosition(source, shorthand.start), end: toPosition(source, shorthand.end) }, newText: `${source.slice(start, end)}={${newName}}` }
-
-    return { range, newText: newName }
-  }
-
-  // Generated code joins names TypeScript sees apart, such as a server value and the template's reads of it through `__props`: wherever an answer lands in generated code, the question is asked again from there.
-  // Not `complete` once it gave up following them, past `MAX_HOPS`.
-  private async across<Spot extends { uri: string, range: Range }>(start: TextDocumentPositionParams, ask: (at: TextDocumentPositionParams) => Promise<Spot[]>): Promise<{ found: { spot: Spot, file: Target, range: Range }[], complete: boolean }> {
-    const files = new Map<string, Promise<Target | undefined>>()
-    const known = new Set<string>([positionKey(start.textDocument.uri, start.position)])
-    const queue = [start]
-    const found: { spot: Spot, file: Target, range: Range }[] = []
-    let hops = 0
-    const visit = (uri: string, position: Position) => {
-      const key = positionKey(uri, position)
-
-      if (known.has(key))
-        return
-
-      known.add(key)
-
-      if (++hops <= MAX_HOPS)
-        queue.push({ textDocument: { uri }, position })
-    }
-
-    for (let at = queue.pop(); at; at = queue.pop()) {
-      for (const spot of await ask(at)) {
-        let pending = files.get(spot.uri)
-
-        if (!pending)
-          files.set(spot.uri, pending = this.targetOf(spot.uri))
-
-        const file = await pending
-
-        if (!file)
-          continue
-
-        const range = file.shadow ? toSourceRange(file.shadow, spot.range) : spot.range
-
-        if (!range) {
-          visit(spot.uri, spot.range.start)
-
-          continue
-        }
-
-        found.push({ spot, file, range })
-        known.add(positionKey(spot.uri, spot.range.start))
-        // Every other copy of the name in generated code is asked about too.
-        for (const generated of file.shadow?.map.toGeneratedAll(toOffset(file.shadow.source, range.start)) ?? [])
-          visit(spot.uri, toPosition(file.shadow!.tsx, generated))
-      }
-    }
-
-    return { found, complete: hops <= MAX_HOPS }
-  }
-
-  // A file a rename may change besides .kay files: one of the project's own.
-  private editable(uri: string): boolean {
-    const path = filePath(uri)
-
-    return path.startsWith(`${this.root}/`) && !path.includes('/node_modules/')
-  }
-
-  // The URI the editor knows a file by: the one of its open document, else written like the editor writes them.
-  private clientUri(path: string): string {
-    return [...this.documents.values()].find(document => document.file === path)?.uri ?? (this.nodeUris ? pathToFileURL(path).href : vscodeUri(path))
-  }
-
-  // Undefined for the declarations kay generates beside the shadow files.
-  private async targetOf(uri: string): Promise<Target | undefined> {
-    const shadow = await this.shadowOf(uri)
-
-    if (shadow)
-      return { uri: this.clientUri(shadow.file), shadow }
-
-    return this.shadowProject(filePath(uri)) ? undefined : { uri: this.clientUri(filePath(uri)) }
-  }
-
-  private async shadowOf(uri: string): Promise<ShadowFile | undefined> {
-    const path = filePath(uri)
-    const open = [...this.documents.values()].find(document => filePath(document.shadowUri) === path)
-
-    if (open)
-      return open
-
-    const project = this.shadowProject(path)
-
-    if (!project || !path.endsWith('.kay.tsx'))
-      return undefined
-
-    const placed = this.placed(project, shadowSource(project.root, path))
-    const source = Bun.file(placed.file)
-
-    return await source.exists() ? compileShadow(project.root, placed.file, await source.text(), { ...shadowOptionsFor(shadowSettingsOf(project), placed.file), shadowOf: placed.shadowOf }).shadow : undefined
-  }
-
-  // `offset` is the position in the .kay source.
-  private toShadow(params: TextDocumentPositionParams): { document: Document, offset: number, params: TextDocumentPositionParams } | undefined {
-    const document = this.documents.get(params.textDocument.uri)
-
-    if (!document)
-      return undefined
-
-    const offset = toOffset(document.source, params.position)
-    const generated = document.map.toGenerated(offset)
-
-    if (generated === undefined)
-      return undefined
-
-    return { document, offset, params: { textDocument: { uri: document.shadowUri }, position: toPosition(document.tsx, generated) } }
   }
 
   private exit() {
@@ -1534,225 +529,4 @@ async function projectConfig(root: string): Promise<KayConfig> {
 // Runs until the editor closes the stream.
 export async function startServer(input: ReadableStream<Uint8Array>, write: (data: string) => void): Promise<void> {
   await new KayLanguageServer(new Connection(input, write)).listening
-}
-
-// Whether the component imports the file; a module named by an alias is taken for it when their names match.
-function importsFile(document: Document, file: string): boolean {
-  const stem = (path: string) => basename(path).replace(EXTENSION, '')
-
-  for (const [, specifier] of document.source.matchAll(IMPORT_SOURCE)) {
-    if (specifier!.startsWith('.') ? [specifier!, `${specifier}.kay`].some(path => resolve(dirname(document.file), path) === file) : stem(specifier!) === stem(file))
-      return true
-  }
-
-  return false
-}
-
-// Background work reports its failure instead of ending the process with an unhandled rejection.
-async function guard(task: Promise<void>): Promise<void> {
-  try {
-    await task
-  }
-  catch (error) {
-    console.error('kay lsp:', error)
-  }
-}
-
-function mapCompletionItem(document: ShadowFile, item: CompletionItem, offset: number): CompletionItem {
-  const { textEdit, additionalTextEdits, ...rest } = item
-  const mapped: CompletionItem = { ...rest }
-
-  if (textEdit) {
-    const range = 'range' in textEdit ? toSourceRange(document, textEdit.range) : mapInsertReplace(document, textEdit)
-
-    if (range)
-      mapped.textEdit = 'start' in range ? { range, newText: textEdit.newText } : { ...range, newText: textEdit.newText }
-    else
-      mapped.insertText = textEdit.newText
-  }
-
-  const edits = additionalTextEdits && sourceEdits(document, additionalTextEdits, offset)
-
-  if (edits && edits.length > 0)
-    mapped.additionalTextEdits = edits
-
-  return mapped
-}
-
-// tsgo's edits of a shadow file as edits of its source, all or none: what was copied maps back, and an added import goes to the fence the code at `offset` belongs to.
-function sourceEdits(document: ShadowFile, edits: TextEdit[], offset: number): TextEdit[] | undefined {
-  const mapped: TextEdit[] = []
-
-  for (const edit of edits) {
-    const range = toSourceRange(document, edit.range)
-
-    // A new import goes after the fence's own in its style, even when tsgo puts it among them, styled after generated code.
-    if (range && !IMPORT_DECLARATION.test(edit.newText)) {
-      mapped.push({ range, newText: edit.newText })
-    }
-    else {
-      const declaration = IMPORT_DECLARATION.test(edit.newText) ? edit.newText.trim() : mergedImport(document.tsx, edit)
-
-      if (declaration === undefined || declaration === '')
-        return undefined
-
-      mapped.push(importEdit(document.source, offset, declaration))
-    }
-  }
-
-  return mapped
-}
-
-// tsgo adds a name to an import generated code already has, such as `kay/dom`'s: the names it adds become an import of their own.
-function mergedImport(tsx: string, edit: TextEdit): string | undefined {
-  const line = tsx.split('\n')[edit.range.start.line] ?? ''
-  const before = NAMED_IMPORT.exec(line)
-
-  if (!before || edit.range.end.line !== edit.range.start.line)
-    return undefined
-
-  const after = NAMED_IMPORT.exec(line.slice(0, edit.range.start.character) + edit.newText + line.slice(edit.range.end.character))
-  const names = (match: RegExpExecArray) => match[1]!.split(',').map(name => name.trim()).filter(name => name !== '')
-  const existing = new Set(names(before))
-  const added = after && after[2] === before[2] ? names(after).filter(name => !existing.has(name)) : []
-
-  return added.length > 0 ? `import { ${added.join(', ')} } from ${before[2]}` : undefined
-}
-
-// After the last import of the fence the offset is in, the component script by default; a file without a script gets one.
-function importEdit(source: string, offset: number, declaration: string): TextEdit {
-  const { script, server, module } = parseKay(source)
-  const inServer = server !== undefined && offset >= server.start && offset <= server.end
-  const inModule = module !== undefined && offset >= module.start && offset <= module.end
-  const component = inModule ? module : script
-  const fence = inServer ? server : component
-
-  if (!fence)
-    return { range: { start: toPosition(source, 0), end: toPosition(source, 0) }, newText: `---\n${declaration.replace(TRAILING_SEMICOLON, '')}\n---\n` }
-
-  const hoisted = (inServer ? analyzeServer(source, fence)?.hoisted : analyzeScript(source, script, [], [], module).hoisted.filter(span => span.start >= fence.start && span.end <= fence.end)) ?? []
-  const last = hoisted.filter(span => source.startsWith('import', span.start)).at(-1)
-  const position = toPosition(source, last ? last.end : fence.start)
-  // tsgo reads the semicolon style off generated code; the fence's own imports, or kay's style without them, decide instead.
-  const statement = last && source.slice(last.start, last.end).trimEnd().endsWith(';') ? declaration : declaration.replace(TRAILING_SEMICOLON, '')
-
-  return { range: { start: position, end: position }, newText: last ? `\n${statement}` : `${statement}\n` }
-}
-
-// A source range in the shadow TSX, when both ends were copied there.
-function toShadowRange(document: ShadowFile, range: Range): Range | undefined {
-  const span = generatedSpan(document, toOffset(document.source, range.start), toOffset(document.source, range.end))
-
-  return span && { start: toPosition(document.tsx, span.start), end: toPosition(document.tsx, span.end) }
-}
-
-function fileEdits(edit: WorkspaceEdit): [string, TextEdit[]][] {
-  return [...Object.entries(edit.changes ?? {}), ...(edit.documentChanges ?? []).flatMap(change => 'edits' in change ? [[change.textDocument.uri, change.edits] as [string, TextEdit[]]] : [])]
-}
-
-function textAt(text: string, range: Range): string {
-  return text.slice(toOffset(text, range.start), toOffset(text, range.end))
-}
-
-function positionKey(uri: string, { line, character }: Position): string {
-  return `${filePath(uri)} ${line}:${character}`
-}
-
-// Where the `.default` a line of `kay-packages.d.ts` reads sits, which tsgo takes on to the component's shadow file.
-async function packageDeclaration(uri: string, line: number): Promise<TextDocumentPositionParams | undefined> {
-  if (!filePath(uri).endsWith(PACKAGE_TYPES))
-    return undefined
-
-  const text = (await Bun.file(filePath(uri)).text()).split('\n')[line] ?? ''
-  const at = text.lastIndexOf(DEFAULT_MEMBER)
-
-  return at === -1 ? undefined : { textDocument: { uri }, position: { line, character: at + 1 } }
-}
-
-// URIs of one file differ by how they are percent-encoded, so files are compared by path.
-function filePath(uri: string): string {
-  return uri.startsWith('file:') ? fileURLToPath(uri) : uri
-}
-
-// Every character but the unreserved ones is percent-encoded, as VS Code writes a file URI.
-function vscodeUri(path: string): string {
-  return `file://${path.split('/').map(segment => encodeURIComponent(segment).replaceAll(RESERVED_CHARACTER, character => `%${character.charCodeAt(0).toString(16).toUpperCase()}`)).join('/')}`
-}
-
-function rangeKey({ start, end }: Range): string {
-  return `${start.line}:${start.character}-${end.line}:${end.character}`
-}
-
-function uniqueBy<Item>(items: Item[], key: (item: Item) => string): Item[] {
-  const byKey = new Map<string, Item>()
-
-  for (const item of items) {
-    const found = key(item)
-
-    if (!byKey.has(found))
-      byKey.set(found, item)
-  }
-
-  return [...byKey.values()]
-}
-
-function mapInsertReplace(document: ShadowFile, edit: { insert: Range, replace: Range }): { insert: Range, replace: Range } | undefined {
-  const insert = toSourceRange(document, edit.insert)
-  const replace = toSourceRange(document, edit.replace)
-
-  return insert && replace ? { insert, replace } : undefined
-}
-
-// A generated range back in the .kay source.
-function toSourceRange(document: ShadowFile, range: Range, mode: SpanMode = 'exact'): Range | undefined {
-  const span = sourceSpan(document, toOffset(document.tsx, range.start), toOffset(document.tsx, range.end), mode)
-
-  return span && { start: toPosition(document.source, span.start), end: toPosition(document.source, span.end) }
-}
-
-// A problem of the project, at the start of the line and column it names.
-function problemDiagnostic(problem: CheckDiagnostic): Diagnostic {
-  const position = { line: problem.line - 1, character: problem.column - 1 }
-
-  return { range: { start: position, end: position }, severity: problem.severity === 'warning' ? WARNING : ERROR, source: 'kay', ...problem.code !== undefined && { code: problem.code }, message: editorMessage(problem) }
-}
-
-// A diagnostic as an editor shows it, its label, note and help on their own lines.
-function editorMessage({ message, label, note, help }: Pick<KayDiagnostic, 'message' | 'label' | 'note' | 'help'>): string {
-  return [label !== undefined && label !== '' ? `${message} (${label})` : message, ...[['note', note], ['help', help]].flatMap(([kind, text]) => text === undefined ? [] : [`${kind}: ${text}`])].join('\n')
-}
-
-function applyEdit(source: string, range: Range, text: string): string {
-  return source.slice(0, toOffset(source, range.start)) + text + source.slice(toOffset(source, range.end))
-}
-
-function zeroRange(): Range {
-  return { start: { line: 0, character: 0 }, end: { line: 0, character: 0 } }
-}
-
-// Every safe fix of the file at once, the first of each problem and none whose edits overlap another's: what `kay check --fix` would write, offered to run on save.
-function safeFixes(document: Document): CodeAction[] {
-  const taken: Span[] = []
-  const edits: TextEdit[] = []
-
-  for (const fix of document.diagnostics.flatMap(diagnostic => diagnostic.fixes?.find(candidate => candidate.safe) ?? [])) {
-    if (fix.edits.some(edit => taken.some(other => edit.start === other.start || (edit.start < other.end && other.start < edit.end))))
-      continue
-
-    taken.push(...fix.edits)
-    edits.push(...fix.edits.map(edit => ({ range: { start: toPosition(document.source, edit.start), end: toPosition(document.source, edit.end) }, newText: edit.text })))
-  }
-
-  return edits.length > 0 ? [{ title: 'Fix all safe problems in this file', kind: FIX_ALL, edit: { changes: { [document.uri]: edits } } }] : []
-}
-
-// The fixes kay's own diagnostics carry, for those touching the range the editor asks about; two reads in one statement offer its fixes once.
-function kayFixes(document: Document, start: number, end: number): CodeAction[] {
-  const fixes = document.diagnostics.filter(diagnostic => diagnostic.start <= end && diagnostic.end >= start).flatMap(diagnostic => diagnostic.fixes ?? [])
-
-  return uniqueBy(fixes, fix => JSON.stringify(fix)).map(fix => ({
-    title: fix.title,
-    kind: QUICK_FIX,
-    edit: { changes: { [document.uri]: fix.edits.map(change => ({ range: { start: toPosition(document.source, change.start), end: toPosition(document.source, change.end) }, newText: change.text })) } },
-  }))
 }
