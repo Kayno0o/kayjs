@@ -108,6 +108,8 @@ export interface ServerMode {
   prebuilt: boolean
   // `kay build --static` reads the site from the app, which then serves nobody.
   exported: boolean
+  // NODE_ENV as the process was started with, which the boot warns of when unset or unknown.
+  nodeEnv: string | undefined
   // NODE_ENV is `production`, which turns on compression and the request log by default.
   production: boolean
   // A server answering requests from its own process: neither `kay dev`, which restarts on every change, nor an export.
@@ -122,7 +124,9 @@ export interface ServerEnv extends ServerMode {
 }
 
 export function serverMode(mode: Mode, exported: boolean): ServerMode {
-  return { dev: mode.dev, devRoutes: mode.devRoutes, underKayDev: mode.underKayDev, prebuilt: mode.prebuilt, exported, production: process.env.NODE_ENV === 'production', serving: !mode.dev && !exported }
+  const nodeEnv = process.env.NODE_ENV
+
+  return { dev: mode.dev, devRoutes: mode.devRoutes, underKayDev: mode.underKayDev, prebuilt: mode.prebuilt, exported, nodeEnv, production: nodeEnv === 'production', serving: !mode.dev && !exported }
 }
 
 // The app as what the setup made before it reaches it: held weakly, as the setup's render options keep the spelling of redirects and through it would keep the app past its last request.
@@ -616,14 +620,12 @@ export async function files(boot: Boot, actionOptions: ActionOptions): Promise<v
 // What a server deployed without NODE_ENV=production, or with `seo` and no site, is told as it starts.
 export function bootWarnings({ env, options, setup: { site } }: Boot): void {
   // Elysia keeps the schema a refused request failed out of its answer only under NODE_ENV=production, so a server started with none is told.
-  if (process.env.NODE_ENV === undefined && env.serving)
+  if (env.nodeEnv === undefined && env.serving)
     kayLog('warn', 'NODE_ENV is unset, so this server bundles its browser code as it boots and its API answers a refused request with the schema it failed; set NODE_ENV=production where the app is deployed, or run kay dev')
 
   // Only `production` turns these on, so any other name runs as a development server would in them.
-  const name = process.env.NODE_ENV
-
-  if (name !== undefined && !KNOWN_ENVIRONMENTS.has(name) && env.serving)
-    kayLog('warn', `NODE_ENV is ${JSON.stringify(name)}, which kay does not know, so this server runs without the production defaults: it bundles its browser code as it boots, logs no requests and compresses nothing unless the log and compress options say so, does not take the site's https for a request behind a proxy and answers a refused API request with the schema it failed; set NODE_ENV=production where the app is deployed`)
+  if (env.nodeEnv !== undefined && !KNOWN_ENVIRONMENTS.has(env.nodeEnv) && env.serving)
+    kayLog('warn', `NODE_ENV is ${JSON.stringify(env.nodeEnv)}, which kay does not know, so this server runs without the production defaults: it bundles its browser code as it boots, logs no requests and compresses nothing unless the log and compress options say so, does not take the site's https for a request behind a proxy and answers a refused API request with the schema it failed; set NODE_ENV=production where the app is deployed`)
 
   // `kay build` leaves a server's site to `SITE_URL` at boot, so this is where one with none is told.
   if (site === undefined && options.seo !== undefined && env.serving)
@@ -698,6 +700,11 @@ export async function siteFiles(boot: Boot) {
   return prerendered
 }
 
+// The paths a missing one is compared with; made outside the async stage, as the 404 counter keeps it in its module-level store until its next flush.
+function knownPaths(client: ClientBuild, table: RouteTable): () => string[] {
+  return () => [...client.pages.keys(), ...[...table.paths.keys()].filter(path => !DYNAMIC_PATH.test(path))]
+}
+
 // The config's redirects, the public files and the pages, each path none of them serves answered by the 404 page, then the answer to an uncaught error.
 export async function pageRoutes(boot: Boot, { redirects, publicServed, redirector, prerendered, writes }: { redirects: Redirect[], publicServed: ClaimedFile[], redirector: ReturnType<typeof compressAnswers>, prerendered: Awaited<ReturnType<typeof siteFiles>>, writes: Writes }): Promise<void> {
   const { app, env, options, served, table, compressing, securityOptions, security, project, setup: { client, renderOptions, i18n, locales, matchers, source, mounts } } = boot
@@ -713,7 +720,7 @@ export async function pageRoutes(boot: Boot, { redirects, publicServed, redirect
   redirector?.unrouted(app)
 
   if (env.serving)
-    countMissing(app, { known: () => [...client.pages.keys(), ...[...table.paths.keys()].filter(path => !DYNAMIC_PATH.test(path))], settings: i18n?.settings, trailingSlash: env.trailingSlash })
+    countMissing(app, { known: knownPaths(client, table), settings: i18n?.settings, trailingSlash: env.trailingSlash })
 
   // After the hooks above, which a public file deleted since boot is answered through as a path nothing serves.
   await servePublic(app, served, publicServed, env.dev ? undefined : publicCache, compressing && !env.dev, pageFor)

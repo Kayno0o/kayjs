@@ -1,4 +1,5 @@
 import type { AnyElysia } from 'elysia'
+import type { DevRoutes } from '../src/server/dev'
 import { describe, expect, it } from 'bun:test'
 import { Elysia } from 'elysia'
 import { pages as bundlingPages } from '../src/server'
@@ -160,5 +161,14 @@ describe('the hooks pagesApp registers', () => {
 
     answers['POST an action'] = await run(new Request(`${SITE}${action}`, { method: 'POST', headers: form, body: 'title=one' }))
     expect({ routes: routes(app), start: lifecycle(app, 'start'), stop: lifecycle(app, 'stop'), answers }).toMatchSnapshot()
+  })
+
+  it('lists in the dev tool what registers after its Routes tab: the API module, the actions and the extension\'s route', async () => {
+    const app = await bundlingPages({ root, dev: true, log: quiet, extensions })
+    const { routes: listed } = await (await app.handle(new Request(`${SITE}/_kay/dev/routes`))).json() as DevRoutes
+    const named = listed.map(route => `${route.kind} ${route.method} ${route.path}${route.owner === undefined ? '' : ` (${route.owner})`}`)
+
+    expect(named).toEqual(expect.arrayContaining(['api GET /api/items', 'api POST /api/items', 'api GET /api/items/broken', 'kay GET /ext (the extension hook-order)']))
+    expect(listed.some(route => route.kind === 'plumbing' && route.path.startsWith('/_kay/action'))).toBe(true)
   })
 })
