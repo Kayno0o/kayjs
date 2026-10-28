@@ -36,6 +36,33 @@ describe('what a kept page\'s scan reads of a source', () => {
     expect(readOf('a.kay', '---\nconst { at } = props<{ at: Date }>()\n---\np {at.getTime()}\n')).toBeUndefined()
   })
 
+  it('judges a member written as a string by the name it holds, for a global and for ctx', () => {
+    expect(readOf('a.kay', 'button(onclick={() => window[\'scrollTo\'](0, 0)}) Top\n')).toBeUndefined()
+    expect(readOf('a.ts', 'export const top = () => self[`scrollTo`](0, 0)\nexport const floor = Math[\'floor\'](1.5)\n')).toBeUndefined()
+    expect(readOf('a.ts', 'export const roll = Math[\'random\']()\n')).toBe('Math')
+    expect(readOf('a.ts', 'export const sha = window[\'process\'].env.SHA\n')).toBe('window')
+    expect(readOf('a.ts', 'export const at = (key: string) => window[key]\n')).toBe('window')
+    expect(ctxOf('a.kay', '--- server\nconst here = ctx[\'url\'][\'pathname\']\nconst id = ctx[\'params\'].id\nconst { \'params\': all } = ctx\n---\np {here}{id}{all}\n')).toBeUndefined()
+    expect(readKeptSource('a.kay', '--- server\nconst here = ctx[\'url\'].pathname\n---\np {here}\n').pathname).toBe(true)
+    expect(ctxOf('a.kay', 'p {ctx[\'cookies\'].get(\'a\')}\n')).toBe(3)
+  })
+
+  it('reads no global a name the file binds shadows, in the scope it binds it', () => {
+    expect(readOf('a.ts', 'export function at(Date: number) {\n  return Date\n}\n')).toBeUndefined()
+    expect(readOf('a.ts', 'import { fetch } from \'./api\'\nexport const rows = () => fetch(\'/rows\')\n')).toBeUndefined()
+    expect(readOf('a.ts', 'const process = { env: {} }\nexport const sha = process.env\n')).toBeUndefined()
+    expect(readOf('a.ts', 'export function first() {\n  if (true) {\n    var crypto = 1\n  }\n  return crypto\n}\n')).toBeUndefined()
+    expect(readOf('a.ts', 'export const each = (rows: number[]) => rows.map(({ Math }) => Math)\ntry {}\ncatch (window) {\n  window.Math\n}\n')).toBeUndefined()
+    expect(readOf('a.kay', '---\nimport { performance } from \'./perf\'\n---\np {performance.score}\n')).toBeUndefined()
+
+    expect(readOf('a.ts', 'export function at(Date: number) {\n  return Date\n}\nexport const now = Date.now()\n')).toBe('Date')
+    expect(readOf('a.ts', 'export function at() {\n  {\n    const Date = 1\n  }\n  return Date.now()\n}\n')).toBe('Date')
+    expect(readOf('a.ts', 'import type { Bun } from \'./types\'\nexport const file = Bun.file(\'a\')\n')).toBe('Bun')
+    expect(readOf('a.ts', 'declare const fetch: () => void\nexport const rows = fetch()\n')).toBe('fetch')
+    expect(readOf('a.ts', 'namespace Clock {\n  var Date = 1\n}\nexport const now = Date.now()\n')).toBe('Date')
+    expect(readOf('a.ts', 'export const at = (f = function Date() {}) => Date.now()\n')).toBe('Date')
+  })
+
   it('reads nothing in the value of `lastmod`, which the sitemap reads and no render does', () => {
     const source = '--- server\nexport const page = { lastmod: new Date() }\n---\np x\n'
     const value = source.indexOf('new Date()')

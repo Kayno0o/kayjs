@@ -5,6 +5,7 @@ import { parse, parseExpression } from '@babel/parser'
 import { VISITOR_KEYS } from '@babel/types'
 import { nodeExpressions, visitNodes } from '../compiler/ast'
 import { parseExpanded } from '../compiler/markdown-block'
+import { patternNames } from '../compiler/pattern-names'
 
 // What a kept page's scan reads of one source, from one parse of it: a script whole, a `.kay` file's fences and the expressions of its template, markdown blocks included, as the compiler reads them.
 // Offsets are the file's own.
@@ -50,6 +51,8 @@ const TSX_SCRIPT = /\.tsx$/
 const TYPE_KEYS = new Set(['typeAnnotation', 'returnType', 'typeParameters', 'superTypeParameters', 'typeArguments', 'implements'])
 const TYPE_NODES = new Set(['TSInterfaceDeclaration', 'TSTypeAliasDeclaration', 'TSDeclareFunction', 'TSDeclareMethod'])
 const FUNCTIONS = new Set(['FunctionDeclaration', 'FunctionExpression', 'ArrowFunctionExpression', 'ObjectMethod', 'ClassMethod', 'ClassPrivateMethod'])
+// What a `var` under it binds in.
+const VAR_SCOPES = new Set([...FUNCTIONS, 'Program', 'StaticBlock', 'TSModuleBlock'])
 const MEMBERS = new Set(['MemberExpression', 'OptionalMemberExpression'])
 const CALLS = new Set(['CallExpression', 'OptionalCallExpression'])
 // The parents whose `key` is a name rather than a reference unless computed.
@@ -77,14 +80,129 @@ function nameOf(name: Identifier | StringLiteral): string {
   return name.type === 'Identifier' ? name.name : name.value
 }
 
-// The name a member expression reads, when it is written as one: `a.b` and `a?.b`, not `a[b]`.
+// The name a key is, when it is written as one: `b` of `a.b`, `a?.b`, `a['b']` and ``a[`b`]``, not of `a[b]`.
+function keyName(key: Node, computed: boolean): string | undefined {
+  if (key.type === 'Identifier')
+    return computed ? undefined : key.name
+
+  if (key.type === 'StringLiteral')
+    return key.value
+
+  return key.type === 'TemplateLiteral' && key.expressions.length === 0 ? key.quasis[0]!.value.cooked ?? undefined : undefined
+}
+
+// The name a member expression reads, when it is written as one.
 function memberName(node: Node): string | undefined {
   if (!MEMBERS.has(node.type))
     return undefined
 
   const member = node as Extract<Node, { type: 'MemberExpression' | 'OptionalMemberExpression' }>
 
-  return !member.computed && member.property.type === 'Identifier' ? member.property.name : undefined
+  return keyName(member.property, member.computed)
+}
+
+const scopes = new WeakMap<Node, Set<string> | undefined>()
+
+// The names a node binds for the code under it, undefined for a node that opens no scope; `var` is hoisted to its function, and a declaration only for types binds nothing.
+function scopeOf(node: Node): Set<string> | undefined {
+  if (scopes.has(node))
+    return scopes.get(node)
+
+  const names = new Set<string>()
+  const add = (found: string[]) => {
+    for (const name of found)
+      names.add(name)
+  }
+
+  if (node.type === 'Program' || node.type === 'BlockStatement' || node.type === 'StaticBlock' || node.type === 'TSModuleBlock') {
+    for (const statement of node.body)
+      declared(statement, add)
+  }
+  else if (node.type === 'SwitchStatement') {
+    for (const statement of node.cases.flatMap(item => item.consequent))
+      declared(statement, add)
+  }
+  else if (node.type === 'ForStatement' || node.type === 'ForInStatement' || node.type === 'ForOfStatement') {
+    const head = node.type === 'ForStatement' ? node.init : node.left
+
+    if (head?.type === 'VariableDeclaration')
+      declared(head, add)
+  }
+  else if (node.type === 'CatchClause') {
+    add(patternNames(node.param))
+  }
+  else if (node.type === 'ClassExpression' && node.id != null) {
+    names.add(node.id.name)
+  }
+  else if (FUNCTIONS.has(node.type)) {
+    const fn = node as Extract<Node, { type: 'FunctionExpression' | 'ClassMethod' }>
+
+    add(fn.params.flatMap(param => patternNames(param.type === 'TSParameterProperty' ? param.parameter : param)))
+
+    if (fn.type === 'FunctionExpression' && fn.id != null)
+      names.add(fn.id.name)
+  }
+  else {
+    scopes.set(node, undefined)
+
+    return undefined
+  }
+
+  if (VAR_SCOPES.has(node.type))
+    add(hoisted(node))
+
+  scopes.set(node, names)
+
+  return names
+}
+
+// The names a statement declares in its block: a variable, a function, a class, an enum, a namespace or an import, a type left out.
+function declared(statement: Node, add: (names: string[]) => void): void {
+  const node = statement.type === 'ExportNamedDeclaration' || statement.type === 'ExportDefaultDeclaration' ? statement.declaration : statement
+
+  if (node == null || ('declare' in node && node.declare === true))
+    return
+
+  if (node.type === 'VariableDeclaration')
+    add(node.declarations.flatMap(declarator => patternNames(declarator.id)))
+  else if ((node.type === 'FunctionDeclaration' || node.type === 'ClassDeclaration') && node.id != null)
+    add([node.id.name])
+  else if (node.type === 'TSEnumDeclaration' || (node.type === 'TSModuleDeclaration' && node.id.type === 'Identifier'))
+    add([(node.id as Identifier).name])
+  else if (node.type === 'TSImportEqualsDeclaration' && node.importKind !== 'type')
+    add([node.id.name])
+  else if (node.type === 'ImportDeclaration' && node.importKind !== 'type' && node.importKind !== 'typeof')
+    add(node.specifiers.filter(specifier => specifier.type !== 'ImportSpecifier' || (specifier.importKind !== 'type' && specifier.importKind !== 'typeof')).map(specifier => specifier.local.name))
+}
+
+// The names the `var` declarations under a function, a static block or a program bind there, those of the functions under it left out.
+function hoisted(scope: Node): string[] {
+  const names: string[] = []
+  const pending: Node[] = []
+  const push = (node: Node) => {
+    for (const key of VISITOR_KEYS[node.type] ?? []) {
+      if (TYPE_KEYS.has(key))
+        continue
+
+      const child = (node as unknown as Record<string, unknown>)[key]
+
+      for (const item of Array.isArray(child) ? child : [child]) {
+        if (typeof item === 'object' && item !== null && !VAR_SCOPES.has((item as Node).type))
+          pending.push(item as Node)
+      }
+    }
+  }
+
+  push(scope)
+
+  for (let node = pending.pop(); node !== undefined; node = pending.pop()) {
+    if (node.type === 'VariableDeclaration' && node.kind === 'var' && node.declare !== true)
+      names.push(...node.declarations.flatMap(declarator => patternNames(declarator.id)))
+
+    push(node)
+  }
+
+  return names
 }
 
 // Whether a frame's node is written to: assigned, counted up or down, or deleted.
@@ -106,17 +224,19 @@ function destructuredPath(pattern: ObjectPattern): boolean | undefined {
   let pathname = false
 
   for (const property of pattern.properties) {
-    if (property.type !== 'ObjectProperty' || property.computed || property.key.type !== 'Identifier')
+    if (property.type !== 'ObjectProperty')
       return undefined
 
-    if (property.key.name === 'params')
+    const name = keyName(property.key, property.computed)
+
+    if (name === 'params')
       continue
 
-    if (property.key.name !== 'url' || property.value.type !== 'ObjectPattern')
+    if (name !== 'url' || property.value.type !== 'ObjectPattern')
       return undefined
 
     for (const inner of property.value.properties) {
-      if (inner.type !== 'ObjectProperty' || inner.computed || inner.key.type !== 'Identifier' || inner.key.name !== 'pathname')
+      if (inner.type !== 'ObjectProperty' || keyName(inner.key, inner.computed) !== 'pathname')
         return undefined
 
       const value = inner.value.type === 'AssignmentPattern' ? inner.value.left : inner.value
@@ -134,12 +254,15 @@ function destructuredPath(pattern: ObjectPattern): boolean | undefined {
 class Reader {
   readonly found: KeptSource
 
+  // The names bound around what it parses, the top-level names of a `.kay` file's fences for its template.
+  readonly outer = new Set<string>()
+
   // `source` is the text the parsed spans are of, `real` maps an offset of it to the file's, and `skip` is a span read as written and never run, which nothing in is a read.
   constructor(private readonly source: string, private readonly real: (offset: number) => number, private readonly skip: Span | undefined, uses: KeptSource['uses'] = new Map()) {
     this.found = { pathname: false, imports: [], uses, bindings: new Set(), exports: false }
   }
 
-  program(text: string, start: number, plugins: ParserPlugin[]): void {
+  program(text: string, start: number, plugins: ParserPlugin[]): Program | undefined {
     let program: Program
 
     try {
@@ -148,13 +271,15 @@ class Reader {
     catch (error) {
       this.unparsed(error, start)
 
-      return
+      return undefined
     }
 
     for (const statement of program.body)
       this.statement(statement)
 
     this.walk({ node: program, key: undefined, parent: undefined, pattern: false })
+
+    return program
   }
 
   expression(text: string, start: number): void {
@@ -329,6 +454,9 @@ class Reader {
     uses.push(CALLS.has(parent.type) && frame.key === 'callee' ? (parent as { arguments: Node[] }).arguments : undefined)
     this.found.uses.set(node.name, uses)
 
+    if (node.name !== 'ctx' && this.bound(frame, node.name))
+      return
+
     if (node.name === 'Math') {
       const name = frame.key === 'object' ? memberName(parent) : undefined
 
@@ -347,6 +475,16 @@ class Reader {
     else if (node.name === 'ctx') {
       this.context(frame, node)
     }
+  }
+
+  // Whether a scope around the frame binds the name, which then names no global.
+  private bound(frame: Frame, name: string): boolean {
+    for (let at = frame.parent; at !== undefined; at = at.parent) {
+      if (scopeOf(at.node)?.has(name) === true)
+        return true
+    }
+
+    return this.outer.has(name)
   }
 
   // Only `ctx.url.pathname`, `ctx.params` and a `const { params, url: { pathname } } = ctx` are followed; any other use, `ctx` passed on, aliased, or read at `url`, `search`, `request`, `cookies` or `headers`, is a read of the request.
@@ -382,12 +520,15 @@ class Reader {
     const { file, expansion } = parseExpanded(source)
     const real = expansion === undefined ? (offset: number) => offset : (offset: number) => expansion.real(offset)
 
-    for (const span of [file.script, file.server, file.module]) {
-      if (span !== undefined)
-        this.parseIn(file.source, span, ['typescript', ...SYNTAX])
-    }
-
     const template = new Reader(file.source, real, undefined, this.found.uses)
+
+    // A name a fence declares at its top is the template's to read.
+    for (const span of [file.script, file.server, file.module]) {
+      const program = span === undefined ? undefined : this.parseIn(file.source, span, ['typescript', ...SYNTAX])
+
+      for (const name of program === undefined ? [] : scopeOf(program)!)
+        template.outer.add(name)
+    }
 
     visitNodes(file.template, (node) => {
       const own = binders(node)
@@ -409,8 +550,8 @@ class Reader {
     this.merge(template.found)
   }
 
-  private parseIn(source: string, span: Span, plugins: ParserPlugin[]): void {
-    this.program(source.slice(span.start, span.end), span.start, plugins)
+  private parseIn(source: string, span: Span, plugins: ParserPlugin[]): Program | undefined {
+    return this.program(source.slice(span.start, span.end), span.start, plugins)
   }
 
   private merge(other: KeptSource): void {
