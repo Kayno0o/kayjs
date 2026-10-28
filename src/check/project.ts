@@ -12,6 +12,7 @@ import process from 'node:process'
 import { fileURLToPath } from 'node:url'
 import { findKayFiles, findProjectFiles, inWalkScope, writeIfChanged } from '../build/files'
 import { missingContextModules } from '../build/manifests'
+import { mentionsServerOnly } from '../build/server-only'
 import { importedSignals } from '../build/signals'
 import { browserRole, promotedChecks } from '../compiler'
 import { moduleChecks, turnsCaptchaOff } from '../compiler/fence-checks'
@@ -25,7 +26,7 @@ import { builtinImportsInIsland } from './builtin-imports'
 import { configLocator, readConfigSource } from './config-keys'
 import { dockerfileProblems } from './dockerfile'
 import { CONTENT_CHECK, contentPropsCheck } from './generated'
-import { browserModules } from './island-modules'
+import { browserModules, islandEdges } from './island-modules'
 import { FILES_MARKER, stampOf } from './loaded'
 import { configSeoLints } from './seo'
 import { serverOnlyInIsland } from './server-only-reads'
@@ -140,10 +141,14 @@ async function moduleLints(root: string, options: CheckOptions): Promise<CheckDi
   const levels = options.lints
   const files = (await findProjectFiles(root, SCRIPT_MODULE, { project: true, ownKayOnly: true })).filter(file => !DECLARATION_FILE.test(file))
   const texts = new Map(await Promise.all(files.map(async file => [file, await Bun.file(file).text()] as const)))
-  // Following the imports of every component is worth it only when the browser has a component to start from, an island or one the build may promote: a module it reaches may read the server or import a builtin, whatever its text names.
+  // Following the imports of every component is worth it only when the browser has a component to start from, an island or one the build may promote, and some module or component names the entry or a server-only global, or one passes an island a function.
   const componentTexts = new Map(await Promise.all((await findKayFiles(root, { project: true, ownKayOnly: true })).map(async file => [file, await Bun.file(file).text()] as const)))
-  const named = [...componentTexts].some(([file, text]) => browserRole(text, file, importedSignals(file, text), root) !== undefined)
-  const browser = named ? await browserModules(root, projectPaths(root, options).routes, options.extensions, componentTexts, apiTrees(root, options)) : undefined
+  const mentioned = [...texts.values(), ...componentTexts.values()].some(text => text.includes('kay/cache') || mentionsServerOnly(text))
+  const roles = new Map([...componentTexts].map(([file, text]) => [file, browserRole(text, file, importedSignals(file, text), root)] as const))
+  const named = [...roles.values()].some(role => mentioned ? role !== undefined : role === 'promotable')
+  const api = apiTrees(root, options)
+  const islands = [...roles].filter(([, role]) => role === 'island').map(([file]) => file)
+  const browser = named ? await browserModules(root, projectPaths(root, options).routes, options.extensions, componentTexts, api) : undefined
   const inBrowser = browser?.modules ?? new Set<string>()
   const promoted = browser?.promoted ?? new Set<string>()
   const report = (file: string, source: string, diagnostics: ReturnType<typeof moduleChecks>) => {
@@ -163,7 +168,7 @@ async function moduleLints(root: string, options: CheckOptions): Promise<CheckDi
     }),
     ...[...promoted].flatMap(file => report(file, componentTexts.get(file)!, promotedChecks(componentTexts.get(file)!, root, importedSignals(file, componentTexts.get(file)!)))),
     ...browser ? await serverOnlyInIsland(root, browser) : [],
-    ...browser ? await builtinImportsInIsland(root, browser) : [],
+    ...await builtinImportsInIsland(root, browser?.seeds ?? islands, browser?.edges ?? islandEdges(islands, componentTexts, api), api),
   ]
 
   return found

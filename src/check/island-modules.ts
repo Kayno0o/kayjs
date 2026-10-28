@@ -41,7 +41,7 @@ export interface BrowserModules {
   seeds: string[]
   // For each module, every component reaching it and the import of its own that leads there.
   origins: Map<string, { seed: string, specifier: string }[]>
-  // What each seed and module imports besides the project's types: its own modules, the files of packages, and the builtins by name.
+  // What each seed imports: its own modules, the files of packages, and the builtins by name.
   edges: Map<string, ImportEdge[]>
 }
 
@@ -50,6 +50,25 @@ export interface ImportEdge {
   // The file the import resolves to, or the builtin's name.
   target: string
   builtin?: true
+}
+
+// What a file imports that the browser bundle may take: modules the app's API trees do not stub, a package's JavaScript included, and the builtins by name. Imports that cannot be resolved are the build's to report, and kay has a browser build of its own.
+function importEdges(file: string, specifiers: string[], stubbed: (file: string) => boolean): ImportEdge[] {
+  return specifiers.flatMap((specifier): ImportEdge[] => {
+    if (isBuiltinSpecifier(specifier))
+      return [{ specifier, target: specifier, builtin: true }]
+
+    const target = OUTSIDE.test(specifier) ? undefined : resolveFrom(specifier, file)
+
+    return target !== undefined && !stubbed(target) && BUNDLED_MODULE.test(target) && !DECLARATION_FILE.test(target) ? [{ specifier, target }] : []
+  })
+}
+
+// The imports of the islands alone, which every one of them bundles: all a check needs of the browser when no module is to be read for the server's globals, and far cheaper than finding the components the build promotes.
+export function islandEdges(islands: string[], sources: Map<string, string>, api: RouteMount[]): Map<string, ImportEdge[]> {
+  const stubbed = isApiStubbed(api)
+
+  return new Map(islands.map(island => [island, importEdges(island, scriptImportsOf(sources.get(island)!), stubbed)]))
 }
 
 // The project's own TypeScript modules the browser bundle reaches: those the script of an island, of a component only islands render and of a static one the build promotes to an island imports, and those they import in turn; and the promoted components themselves, as `findKayFiles` lists them.
@@ -85,27 +104,13 @@ export async function browserModules(root: string, routesDir: string, extensions
   })
 
   const edges = new Map<string, ImportEdge[]>()
-  // Imports that cannot be resolved are the build's to report; kay itself has a browser build of its own.
-  const edgesOf = (file: string, specifiers: string[]) => {
-    if (edges.has(file))
-      return
-
-    edges.set(file, specifiers.flatMap((specifier): ImportEdge[] => {
-      if (isBuiltinSpecifier(specifier))
-        return [{ specifier, target: specifier, builtin: true }]
-
-      const target = OUTSIDE.test(specifier) ? undefined : resolveFrom(specifier, file)
-
-      return target !== undefined && !stubbed(target) && BUNDLED_MODULE.test(target) && !DECLARATION_FILE.test(target) ? [{ specifier, target }] : []
-    }))
-  }
 
   for (const seed of seeds) {
     const walked = new Set<string>()
     const seedImports = scriptImportsOf(sources.get(seed)!)
     const queue = modulesOf(seed, seedImports).map(({ target, specifier }) => ({ module: target, specifier }))
 
-    edgesOf(seed, seedImports)
+    edges.set(seed, importEdges(seed, seedImports, stubbed))
 
     for (const { module, specifier } of queue) {
       if (walked.has(module))
@@ -115,11 +120,7 @@ export async function browserModules(root: string, routesDir: string, extensions
       reached.add(module)
       origins.set(module, [...origins.get(module) ?? [], { seed, specifier }])
 
-      const moduleImports = await importsOfModule(module)
-
-      edgesOf(module, moduleImports)
-
-      for (const { target } of modulesOf(module, moduleImports))
+      for (const { target } of modulesOf(module, await importsOfModule(module)))
         queue.push({ module: target, specifier })
     }
   }

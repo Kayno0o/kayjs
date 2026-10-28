@@ -730,7 +730,17 @@ describe.concurrent('kay check, edge cases', () => {
       expect(diagnostics.map(d => d.at).sort()).toEqual(['src/components/counter.kay:3', 'src/components/counter.kay:6'])
     })
 
-    describe('a Node or Bun builtin an island reaches', () => {
+    describe('a builtin a browser build refuses, which an island reaches', () => {
+      const found = async (files: Record<string, string>) => {
+        const root = await scratchProject({ ...page, ...files })
+
+        try {
+          return (await check(root)).filter(d => d.code === 'browser-builtin-import').map(d => ({ at: `${d.file.slice(root.length + 1)}:${d.line}`, message: d.message }))
+        }
+        finally {
+          await rm(root, { recursive: true, force: true })
+        }
+      }
       const pg = { 'node_modules/pg-orm/package.json': '{"name":"pg-orm","main":"index.js"}', 'node_modules/pg-orm/index.js': 'export { AsyncLocalStorage } from \'./store.js\'\n', 'node_modules/pg-orm/store.js': 'export { AsyncLocalStorage } from \'async_hooks\'\n' }
 
       it('reports the chain through a package at the island\'s import, as the build prints it', async () => {
@@ -744,35 +754,58 @@ describe.concurrent('kay check, edge cases', () => {
         expect(diagnostics[0]!.message).toContain('src/components/counter.kay imports a server module, and a browser has no async_hooks: src/components/counter.kay -> src/probe-mod.ts -> pg-orm -> async_hooks')
       })
 
-      it('reports a builtin an app module the island imports names itself, with or without node:, and a Bun one', async () => {
+      it('reports a refused builtin an app module the island imports names itself, with or without node:, and a Bun one', async () => {
         const diagnostics = await found({
-          'src/components/counter.kay': island('import { a } from \'../lib/a\'\nimport { b } from \'../lib/b\'\nimport { c } from \'../lib/c\''),
-          'src/lib/a.ts': 'import { randomUUID } from \'node:crypto\'\n\nexport const a = randomUUID\n',
-          'src/lib/b.ts': 'import { readFileSync } from \'fs\'\n\nexport const b = readFileSync\n',
+          'src/components/counter.kay': island('import { a } from \'../lib/a\'\nimport { b } from \'../lib/b\'\nimport { c } from \'../lib/c\'\nimport { d } from \'../lib/d\''),
+          'src/lib/a.ts': 'import { AsyncLocalStorage } from \'node:async_hooks\'\n\nexport const a = AsyncLocalStorage\n',
+          'src/lib/b.ts': 'import { Worker } from \'worker_threads\'\n\nexport const b = Worker\n',
           'src/lib/c.ts': 'import { Database } from \'bun:sqlite\'\n\nexport const c = Database\n',
+          'src/lib/d.ts': 'import * as bun from \'bun\'\n\nexport const d = bun.file\n',
         })
 
-        expect(diagnostics.map(d => d.at)).toEqual(['src/components/counter.kay:3', 'src/components/counter.kay:4', 'src/components/counter.kay:5'])
-        expect(diagnostics.map(d => d.message.slice(d.message.indexOf(': src/') + 2))).toEqual(['src/components/counter.kay -> src/lib/a.ts -> node:crypto', 'src/components/counter.kay -> src/lib/b.ts -> fs', 'src/components/counter.kay -> src/lib/c.ts -> bun:sqlite'])
+        expect(diagnostics.map(d => d.at)).toEqual(['src/components/counter.kay:3', 'src/components/counter.kay:4', 'src/components/counter.kay:5', 'src/components/counter.kay:6'])
+        expect(diagnostics.map(d => d.message.slice(d.message.indexOf(': src/') + 2))).toEqual(['src/components/counter.kay -> src/lib/a.ts -> node:async_hooks', 'src/components/counter.kay -> src/lib/b.ts -> worker_threads', 'src/components/counter.kay -> src/lib/c.ts -> bun:sqlite', 'src/components/counter.kay -> src/lib/d.ts -> bun'])
       })
 
-      it('reports a builtin the island imports itself, at that import', async () => {
-        const diagnostics = await found({ 'src/components/counter.kay': island('import { hostname } from \'node:os\'', 'const host = hostname()\n') })
+      it('reports a refused builtin the island imports itself, at that import', async () => {
+        const diagnostics = await found({ 'src/components/counter.kay': island('import { AsyncLocalStorage } from \'async_hooks\'', 'const store = new AsyncLocalStorage()\n') })
 
         expect(diagnostics.map(d => d.at)).toEqual(['src/components/counter.kay:3'])
       })
 
-      it('passes a type-only import of the module, and a package that maps its server modules away for a browser', async () => {
+      it('passes the builtins a browser build polyfills, and a type-only or unused import of a module reaching a refused one', async () => {
+        expect(await found({
+          'src/components/counter.kay': island('import { a } from \'../lib/a\''),
+          'src/lib/a.ts': 'import { join } from \'node:path\'\nimport { EventEmitter } from \'events\'\nimport { Buffer } from \'buffer\'\nimport { randomUUID } from \'node:crypto\'\n\nexport const a = [join, EventEmitter, Buffer, randomUUID]\n',
+        })).toEqual([])
         expect(await found({
           ...pg,
-          'src/components/counter.kay': island('import type { Db } from \'../probe-mod\'\nimport { type Db as Other } from \'../probe-mod\'', 'const x: Db | Other | undefined = undefined\n'),
+          'src/components/counter.kay': island('import type { Db } from \'../probe-mod\'\nimport { type Db as Other } from \'../probe-mod\'\nimport { Typed } from \'../typed\'', 'const x: Db | Other | Typed | undefined = undefined\n'),
           'src/probe-mod.ts': 'import { AsyncLocalStorage } from \'pg-orm\'\n\nexport type Db = AsyncLocalStorage<number>\n',
+          'src/typed.ts': 'import { AsyncLocalStorage } from \'pg-orm\'\n\nexport type Typed = AsyncLocalStorage<number>\n',
         })).toEqual([])
+      })
+
+      it('follows a package to the browser condition of its exports and its browser field, and to kay\'s own entries as the build does', async () => {
         expect(await found({
-          'node_modules/web/package.json': '{"name":"web","main":"index.js","browser":{"fs":false}}',
-          'node_modules/web/index.js': 'import \'fs\'\nexport const WEB = 1\n',
-          'src/components/counter.kay': island('import { WEB } from \'web\'', 'const w = WEB\n'),
+          'node_modules/web/package.json': '{"name":"web","exports":{".":{"browser":"./web.js","default":"./server.js"}}}',
+          'node_modules/web/web.js': 'export const WEB = 1\n',
+          'node_modules/web/server.js': 'import \'async_hooks\'\nexport const WEB = 1\n',
+          'node_modules/field/package.json': '{"name":"field","main":"server.js","browser":{"./server.js":"./web.js"}}',
+          'node_modules/field/web.js': 'export const FIELD = 1\n',
+          'node_modules/field/server.js': 'import \'async_hooks\'\nexport const FIELD = 1\n',
+          'node_modules/words/package.json': '{"name":"words","main":"index.js"}',
+          'node_modules/words/index.js': 'import { isServer } from \'kay/words\'\nexport const WORDS = isServer\n',
+          'src/components/counter.kay': island('import { WEB } from \'web\'\nimport { FIELD } from \'field\'\nimport { WORDS } from \'words\'', 'const all = [WEB, FIELD, WORDS]\n'),
         })).toEqual([])
+      })
+
+      it('passes the kayjs-ui and kayjs-cms fixtures, whose islands import kay\'s server-split entries', async () => {
+        for (const library of ['ui', 'cms']) {
+          const root = join(import.meta.dir, '../packages', library, 'tests/fixture')
+
+          expect((await check(root)).filter(d => d.code === 'browser-builtin-import').map(d => d.message)).toEqual([])
+        }
       })
 
       it('passes an island importing only browser-safe modules', async () => {

@@ -76,6 +76,11 @@ function readsIn(code: string, file: string): Set<string> {
   return program === undefined ? new Set() : namesIn(program)
 }
 
+// Whether a source is worth following the browser's imports for: it names a server-only global.
+export function mentionsServerOnly(source: string): boolean {
+  return MENTIONED.test(source)
+}
+
 export interface LoadTimeRead {
   name: string
   // Where in the source it is read.
@@ -388,7 +393,7 @@ export function refusedBuiltins(logs: readonly (BuildMessage | ResolveMessage)[]
 }
 
 // The shortest chain of imports from `start` to one of the refused builtins, as the keys of `inputs` ending on the builtin, and as the build prints it: cut at the first package, since the fix is never inside one.
-export function builtinChain(root: string, inputs: BundleInputs, start: string, refused: ReadonlySet<string>): { path: string[], text: string } | undefined {
+export function builtinChain(root: string, inputs: BundleInputs, start: string, refused: { has: (name: string) => boolean }): { path: string[], text: string } | undefined {
   const parents = new Map<string, string | undefined>([[start, undefined]])
   const queue = [start]
   let reached: { input: string, builtin: string } | undefined
@@ -452,8 +457,23 @@ export function builtinChains(root: string, inputs: BundleInputs, islands: Itera
 }
 
 // Every builtin, the ones Bun polyfills included: one whose polyfill lacks an export would fail the build that only looks for the way to the others.
-const BUILTINS = [...builtinModules, 'node:*', 'bun', 'bun:*']
+export const BUILTINS = [...builtinModules, 'node:*', 'bun', 'bun:*']
 const BUILTIN_NAMES = new Set(BUILTINS)
+let browserRefusals: Promise<(specifier: string) => boolean> | undefined
+
+// Whether a browser build refuses an import: only the builtins Bun does not polyfill, `async_hooks` and `bun:*` among them, so `node:path` and `events` build.
+// Asked of one build of every builtin, once per process, so it follows the Bun running.
+export async function browserRefuses(): Promise<(specifier: string) => boolean> {
+  browserRefusals ??= (async () => {
+    const names = [...builtinModules, ...builtinModules.map(name => `node:${name}`), 'bun']
+    const probe = await Bun.build({ entrypoints: ['probe.js'], files: { 'probe.js': names.map(name => `import ${JSON.stringify(name)}`).join('\n') }, target: 'browser', throw: false })
+    const refused = new Set(refusedBuiltins(probe.logs))
+
+    return (specifier: string) => specifier === 'bun' || specifier.startsWith('bun:') || refused.has(specifier) || (specifier.startsWith('node:') && refused.has(specifier.slice(5)))
+  })()
+
+  return browserRefusals
+}
 
 // Whether an import names a module a browser lacks: a Node builtin, with or without its `node:` prefix, or Bun's.
 export function isBuiltinSpecifier(specifier: string): boolean {

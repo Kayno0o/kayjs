@@ -1,129 +1,83 @@
 import type { CheckDiagnostic } from '.'
 import type { BundleInputs } from '../build/server-only'
-import type { BrowserModules, ImportEdge } from './island-modules'
-import { readFileSync, realpathSync, statSync } from 'node:fs'
-import { relative } from 'node:path'
-import { KAY_FILE, resolveFrom, scriptLoader, transpilerFor } from '../build/files'
-import { builtinChain, isBuiltinSpecifier } from '../build/server-only'
+import type { RouteMount } from '../server/routes'
+import type { ImportEdge } from './island-modules'
+import { realpathSync } from 'node:fs'
+import { dirname, join, relative, resolve } from 'node:path'
+import process from 'node:process'
+import { KAY_FILE } from '../build/files'
+import { browserRefuses, builtinChain, BUILTINS } from '../build/server-only'
 import { positionAt } from '../compiler/mapping'
+import { apiStubs } from '../server/api-modules'
 import { importAt } from './server-only-reads'
 
-const PACKAGE_DIR = /^.*\/node_modules\/(?:@[^/]+\/)?[^/]+/
-const SCRIPT = /\.(?:[cm]?[jt]s|[jt]sx)$/
-const DECLARATION = /\.d\.[cm]?ts$/
-const HELP = 'keep what the island needs of it, a constant or a type, in a module importing no server code, or pass it as a prop'
+const HELP = 'move what the island needs of it, a constant or a type, to a module importing no server code, or pass it as a prop'
 
-interface Scanned {
-  stamp: string
-  imports: string[]
-}
-
-// A package's files stay as they were until their size or time changes, so the next check of the project reads none of them again.
-const scanned = new Map<string, Scanned>()
-const browserPackages = new Map<string, boolean>()
-
-// A package with a `browser` field or condition maps its server modules away in the browser build, which the walk does not follow.
-function mapsForBrowser(file: string): boolean {
-  const dir = PACKAGE_DIR.exec(file)?.[0]
-
-  if (dir === undefined)
-    return false
-
-  if (!browserPackages.has(dir)) {
-    try {
-      browserPackages.set(dir, readFileSync(`${dir}/package.json`, 'utf8').includes('"browser"'))
-    }
-    catch {
-      browserPackages.set(dir, false)
-    }
-  }
-
-  return browserPackages.get(dir)!
-}
-
-function importsOfFile(file: string): string[] {
-  try {
-    const stats = statSync(file, { throwIfNoEntry: false })
-
-    if (stats === undefined)
-      return []
-
-    const { size, mtimeMs } = stats
-    const stamp = `${size}:${mtimeMs}`
-    const known = scanned.get(file)
-
-    if (known?.stamp === stamp)
-      return known.imports
-
-    const imports = transpilerFor(scriptLoader(file)).scanImports(readFileSync(file, 'utf8')).map(entry => entry.path)
-
-    scanned.set(file, { stamp, imports })
-
-    return imports
-  }
-  catch {
-    return []
-  }
-}
-
-// The imports of a package's file, the builtins among them by name; none for a package that maps its server modules away for a browser.
-function packageEdges(file: string): ImportEdge[] {
-  if (mapsForBrowser(file))
-    return []
-
-  return importsOfFile(file).flatMap((specifier): ImportEdge[] => {
-    if (isBuiltinSpecifier(specifier))
-      return [{ specifier, target: specifier, builtin: true }]
-
-    const target = resolveFrom(specifier, file)
-
-    return target !== undefined && SCRIPT.test(target) && !DECLARATION.test(target) ? [{ specifier, target }] : []
-  })
-}
-
-// The build's refusal of an island whose imports reach a Node or Bun builtin, found from the sources: the chain from the island to the builtin, as the build prints it, at the island's own import.
-// The project's modules come from the walk behind `browser`, and the files of the packages they import are followed to their builtins.
-export async function builtinImportsInIsland(root: string, { seeds, edges }: BrowserModules): Promise<CheckDiagnostic[]> {
-  const inputs: BundleInputs = {}
-  const refused = new Set<string>()
-  const queue = [...edges.keys()]
-  const queued = new Set(queue)
-
-  for (const file of queue) {
-    const hops = edges.get(file) ?? packageEdges(file)
-
-    inputs[file] = { imports: hops.map(({ target, builtin }) => ({ path: target, ...builtin ? { external: true } : {} })) }
-
-    for (const { target, builtin } of hops) {
-      if (builtin) {
-        refused.add(target)
-      }
-      else if (!queued.has(target)) {
-        queue.push(target)
-        queued.add(target)
-      }
-    }
-  }
-
-  const diagnostics: CheckDiagnostic[] = []
-  const project = realpathSync(root)
+// The build's refusal of an island whose imports reach a builtin a browser lacks, found before it by the same bundling: the modules each island imports, bundled for the browser with the builtins left out, give the chain to the builtin as the build prints it.
+// Reported at each of the island's own imports leading there. A bundle that fails is left to the build, which says why.
+export async function builtinImportsInIsland(root: string, seeds: string[], edges: Map<string, ImportEdge[]>, api: RouteMount[]): Promise<CheckDiagnostic[]> {
+  const refuses = await browserRefuses()
+  // Each import is bundled from a module beside its island that only imports it, so the bundler resolves it as the build does, a package's browser condition included.
+  const entries = new Map<string, string>()
 
   for (const seed of seeds) {
-    const own = inputs[seed]!.imports
+    for (const { specifier, builtin } of edges.get(seed) ?? []) {
+      const entry = join(dirname(seed), `.kay-import-${entries.size}.js`)
+
+      if (!builtin)
+        entries.set(`${seed}\0${specifier}`, entry)
+    }
+  }
+
+  let inputs: BundleInputs = {}
+
+  if (entries.size > 0) {
+    const files = Object.fromEntries([...entries].map(([key, entry]) => [entry, `import ${JSON.stringify(key.slice(key.indexOf('\0') + 1))}\n`]))
+    const bundle = await Bun.build({
+      entrypoints: Object.keys(files),
+      files,
+      root,
+      target: 'browser',
+      metafile: true,
+      define: { 'process.env.NODE_ENV': '"production"' },
+      external: [...BUILTINS, 'kay', 'kay/*', '*.kay'],
+      plugins: api.length > 0 ? [apiStubs(api)] : [],
+      throw: false,
+    })
+
+    if (!bundle.success)
+      return []
+
+    inputs = bundle.metafile!.inputs
+  }
+
+  const keyOf = new Map(Object.keys(inputs).map(input => [resolve(process.cwd(), input), input]))
+  const project = realpathSync(root)
+  const diagnostics: CheckDiagnostic[] = []
+
+  for (const seed of seeds) {
     const source = await Bun.file(seed).text()
     const island = relative(project, realpathSync(seed))
 
-    // Each import of the island on its own, so every one leading to a builtin is reported.
-    for (const [index, { specifier }] of edges.get(seed)!.entries()) {
-      inputs[seed]!.imports = [own[index]!]
+    for (const { specifier, builtin } of edges.get(seed) ?? []) {
+      let chain: string | undefined
+      let reached = specifier
 
-      const chain = builtinChain(root, inputs, seed, refused)
+      if (builtin) {
+        chain = refuses(specifier) ? specifier : undefined
+      }
+      else {
+        const start = keyOf.get(entries.get(`${seed}\0${specifier}`) ?? '')
+        const found = start === undefined ? undefined : builtinChain(root, inputs, start, { has: refuses })
 
-      if (chain)
-        diagnostics.push({ file: seed, ...positionAt(source, importAt(source, specifier, KAY_FILE.test(seed))), message: `${island} imports a server module, and a browser has no ${chain.path.at(-1)}: ${chain.text}`, code: 'server-only-in-island', severity: 'error', help: HELP })
+        // The chain opens on the module standing in for the island.
+        chain = found?.text.slice(found.text.indexOf(' -> ') + 4)
+        reached = found?.path.at(-1) ?? specifier
+      }
+
+      if (chain !== undefined)
+        diagnostics.push({ file: seed, ...positionAt(source, importAt(source, specifier, KAY_FILE.test(seed))), message: `${island} imports a server module, and a browser has no ${reached}: ${island} -> ${chain}`, code: 'browser-builtin-import', severity: 'error', help: HELP })
     }
-
-    inputs[seed]!.imports = own
   }
 
   return diagnostics
