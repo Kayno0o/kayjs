@@ -25,7 +25,7 @@ import zoomOut from '~icons/tabler/zoom-out'
 import zoomFit from '~icons/tabler/zoom-reset'
 
 // The icons the library's own components ask for, by what they mean rather than by a name in some set.
-export type IconSlot = 'alert' | 'apps' | 'back' | 'bell' | 'calendar' | 'chat' | 'chevron' | 'close' | 'collapse' | 'delete' | 'edit' | 'expand' | 'external' | 'globe' | 'info' | 'menu' | 'pause' | 'play' | 'plus' | 'refresh' | 'search' | 'send' | 'spinner' | 'star' | 'stop' | 'success' | 'trendDown' | 'trendFlat' | 'trendUp' | 'zoomFit' | 'zoomIn' | 'zoomOut'
+export type IconSlot = 'alert' | 'apps' | 'back' | 'bell' | 'calendar' | 'chat' | 'chevron' | 'close' | 'collapse' | 'delete' | 'edit' | 'expand' | 'external' | 'globe' | 'info' | 'menu' | 'microphone' | 'pause' | 'play' | 'plus' | 'refresh' | 'search' | 'send' | 'spinner' | 'star' | 'stop' | 'success' | 'trendDown' | 'trendFlat' | 'trendUp' | 'zoomFit' | 'zoomIn' | 'zoomOut'
 
 // A link of a site's navigation: `icon` is drawn before its label.
 export interface NavLink {
@@ -35,7 +35,7 @@ export interface NavLink {
 }
 
 // The slots added since apps first wrote icon maps of their own: optional, so such a map still type-checks, each drawing its default when left out.
-export type AddedSlot = 'apps' | 'bell' | 'calendar' | 'pause' | 'chat' | 'send' | 'stop' | 'expand' | 'collapse' | 'edit' | 'external' | 'refresh' | 'trendDown' | 'trendFlat' | 'trendUp'
+export type AddedSlot = 'apps' | 'bell' | 'calendar' | 'pause' | 'chat' | 'send' | 'stop' | 'expand' | 'collapse' | 'edit' | 'external' | 'microphone' | 'refresh' | 'trendDown' | 'trendFlat' | 'trendUp'
 
 // What an app may replace through `settings` in its kay.config.ts, spreading these defaults to change a few.
 export interface UiSettings {

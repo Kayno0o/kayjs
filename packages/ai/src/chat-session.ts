@@ -1,6 +1,7 @@
 import type { Action, ActionStream, Failure } from 'kay'
 import type { Attachments } from './chat-attachments'
 import type { ChatMessage, ChatTurn, CodeBlock, Message, Progress, Source, ToolCall } from './types'
+import { recorder, recordWords } from '@kaynooo/kayjs-ui/lib/record'
 import { ActionError, effect, onMount, signal, untrack } from 'kay'
 import { markdownReady } from 'kay/markdown'
 import { filesOf, keepPending, newReplyId, pendingReply, posted, restored, shrunk, stored } from './chat-history'
@@ -38,6 +39,19 @@ export interface ChatSessionOptions {
   readonly focus: () => void
   // Takes the log back to its newest turn, as a reply starts.
   readonly follow: () => void
+  // The microphone of a Chat taking `transcribe`.
+  readonly voice?: ChatVoice | undefined
+}
+
+// What a Chat's `transcribe` action answers: the text, or `{ text }`.
+export type TranscribeAction = Action<{ audio: File }, string | { text: string } | Failure<unknown>>
+
+export interface ChatVoice {
+  readonly transcribe: TranscribeAction
+  // Said while `transcribe` writes, when it finds no text, and when it fails.
+  readonly transcribingLabel: string
+  readonly unheardLabel: string
+  readonly failedLabel: string
 }
 
 // One post: what aborts it, the id it was sent under for a Chat that remembers (what a reload resumes and a Stop ends, gone once ended), whether it said it outlives its request, so its Stop is told to the server, and whether it was asked for again after a reload, so an empty one means the server kept nothing.
@@ -55,6 +69,8 @@ interface Replacement {
 }
 
 const MAX_RETRIES = 5
+// How long the microphone records before it sends what it has, so a recording left running stays within a transcribe action's `maxSize`.
+const VOICE_MS = 5 * 60_000
 
 // The turns of a Chat and the reply under way, which is idle, waiting (the call is out, no word yet), streaming, then ended, when what arrived joins the history. Every transition is here, apart from the DOM: the component draws it and wires its events.
 export function createChatSession(options: ChatSessionOptions) {
@@ -86,6 +102,32 @@ export function createChatSession(options: ChatSessionOptions) {
   let leaving = false
   // What the action took as too long, learned from its 413s, so the app states `maxInputChars` once: the oldest turns go first, the last stays.
   let learned = Infinity
+  const listening = options.voice
+  const voice = listening === undefined ? undefined : recorder({ onAudio: hear, words: recordWords(), failure: listening.failedLabel, sending: listening.transcribingLabel, maxMs: VOICE_MS })
+
+  // What was said joins the field and goes as a typed message does, with the files attached; a reply under way leaves it in the field, as post() then waits.
+  async function hear(audio: File) {
+    try {
+      const answer = await listening!.transcribe({ audio }, { refresh: false })
+      const text = (typeof answer === 'string' ? answer : answer.text).trim()
+
+      if (text === '') {
+        voice!.problem.set(listening!.unheardLabel)
+
+        return
+      }
+
+      draft.set(draft().trim() === '' ? text : `${draft().trimEnd()} ${text}`)
+      void post(false)
+    }
+    catch (error) {
+      console.error(error)
+
+      const refusal = error instanceof ActionError && error.status < 500 ? error.errors[''] : undefined
+
+      voice!.problem.set(refusal === undefined || refusal === '' ? listening!.failedLabel : refusal)
+    }
+  }
 
   function clearLive() {
     partial.set('')
@@ -391,6 +433,7 @@ export function createChatSession(options: ChatSessionOptions) {
     failure,
     takenBack,
     busy,
+    voice,
     send: async (question?: string) => post(false, question),
     // Try again: the same request, the history as it is.
     retry: async () => post(true),
@@ -433,6 +476,7 @@ export function createChatSession(options: ChatSessionOptions) {
     // Starts the conversation over: what is under way stops, and the log, the field and the kept history are cleared.
     reset() {
       stop()
+      voice?.cancel()
       history.set([])
       replacement = undefined
       draft.set('')

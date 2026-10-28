@@ -57,6 +57,7 @@ ui: { sidePanel: { close: 'Fermer' } }
 - `ui.pagination.*`: `label` (`Pagination`), `next` (`Next`), `previous` (`Previous`)
 - `ui.rangeInput.*`: `from` (`{label} from`), `to` (`{label} to`)
 - `ui.rating.*`: `label` (`{value} out of {max}`)
+- `ui.recordButton.*`: `label` (`Record`), `failure` (`The recording could not be sent.`), `recording` (`Recording`), `stopped` (`Recording stopped`), `cancelled` (`Recording cancelled`), `insecure` (`The microphone needs the page opened over https.`), `unsupported` (`This browser cannot record sound.`), `denied` (`The microphone is blocked: allow it for this site in the browser's settings.`), `missing` (`No microphone was found.`), `taken` (`The microphone is in use by another application.`), `failed` (`The microphone could not be opened.`), `lost` (`The microphone was disconnected, so the recording was dropped.`), `empty` (`Nothing was recorded.`); Chat's microphone (kayjs-ai) says the same
 - `ui.rowsField.*`: `add` (`Add row`), `added` (`Row {n} added`), `remove` (`Remove row {n}`), `removed` (`Row {n} removed`)
 - `ui.saveForm.*`: `cancel` (`Cancel`), `clean` (`No unsaved change.`), `dirty` (`Unsaved changes.`), `discard` (`Discard`), `failure` (`Could not save.`), `save` (`Save`), `saving` (`Saving…`)
 - `ui.scatterChart.*`: `empty` (`No data yet.`)

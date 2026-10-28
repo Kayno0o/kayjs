@@ -116,6 +116,12 @@ Popover(placement="bottom-end")
 - `Rating(value={4.6} max={5} label="Rated 4.6 out of 5")`: stars filled to `value`'s share of `max`, part of a star included, kept between none and all. Screen readers read `label`, `4.6 out of 5` by default.
 - BarList, SiteFavicon and CopyButton are islands taking data alone, so a static page passes them their props as it would to any element.
 
+### RecordButton
+
+- `RecordButton(onRecord={audio => transcribe({ audio })})`: records the microphone and hands `onRecord` a `File` (`recording.webm`, `recording.m4a` in Safari), which an `s.File()` field takes as it is. A press asks for the microphone and records, the button pressed (`aria-pressed`) with the `stop` icon and the time beside it; the next press stops and hands it over, busy while the promise `onRecord` returns pends, and a rejection says `failure`. Escape on the button drops the recording, and `maxDuration` (`5m`) stops one left running. The microphone is released however it ends, the component removed included.
+- What went wrong shows in a danger notice under it: a microphone blocked, missing, in use by another application or unplugged mid-recording (which drops it), a page off https, a browser that cannot record, nothing recorded. A visually hidden status region says when it starts, stops and is dropped. `label` (`Record`) names it, `microphone` is its icon slot, and it takes Button's `variant`, `tone` and `size`.
+- `recorder()` and `recordWords()` from `@kaynooo/kayjs-ui/lib/record` are its state for a button drawn otherwise, as kayjs-ai's Chat draws its microphone: the recorder's browser code is a chunk of its own, loaded once one mounts.
+
 ## Reference
 
 - An icon is either a slot name such as `'close'`, which the app's settings map to any icon set, or an icon imported from `~icons/<prefix>/<name>`. The default slots use Tabler, so the app installs `@iconify-json/tabler`.

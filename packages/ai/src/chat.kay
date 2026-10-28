@@ -22,7 +22,7 @@ import './chat.css'
 
 // The chat's own classes are its parts, so an app restyles them from src/ui.ts or a `class` object. The table of a reply is built as a string and keeps its class.
 const look = recipe({
-  parts: { root: 'kai-chat', empty: 'kai-chat-empty', greeting: 'kai-chat-greeting', suggestions: 'kai-chat-suggestions', suggestion: 'kai-chat-suggestion', log: 'kai-chat-log', turn: 'kai-chat-turn', text: 'kai-chat-text kui-prose', thinking: 'kai-chat-text kai-chat-thinking', reasoning: 'kai-chat-reasoning', reasoningText: 'kai-chat-reasoning-text', note: 'kai-chat-note', status: 'kai-chat-status', disclosure: 'kai-chat-disclosure', form: 'kai-chat-form', field: 'min-h-10 max-h-40 rounded-[1.25rem] px-3.5 leading-normal focus-visible:[outline:2px_solid_var(--kai-chat-accent,var(--color-accent))] focus-visible:outline-offset-2', editField: 'min-h-10 max-h-40 rounded-[1.25rem] px-3.5 leading-normal focus-visible:[outline:2px_solid_var(--kai-chat-accent,var(--color-accent))] focus-visible:outline-offset-2', actions: 'kai-chat-actions', regenerate: 'kai-chat-action', edit: 'kai-chat-action', save: 'kai-chat-save kui-btn', cancel: 'kai-chat-cancel kui-btn', send: 'kai-chat-send', new: 'kai-chat-new', retry: 'kui-btn', approval: 'kai-chat-approval', approvalText: 'kai-chat-approval-text', allow: 'kui-btn', deny: 'kui-btn', attach: 'kai-chat-attach', files: 'kai-chat-files', file: 'kai-chat-file', remove: 'kai-chat-file-remove' },
+  parts: { root: 'kai-chat', empty: 'kai-chat-empty', greeting: 'kai-chat-greeting', suggestions: 'kai-chat-suggestions', suggestion: 'kai-chat-suggestion', log: 'kai-chat-log', turn: 'kai-chat-turn', text: 'kai-chat-text kui-prose', thinking: 'kai-chat-text kai-chat-thinking', reasoning: 'kai-chat-reasoning', reasoningText: 'kai-chat-reasoning-text', note: 'kai-chat-note', status: 'kai-chat-status', disclosure: 'kai-chat-disclosure', form: 'kai-chat-form', field: 'min-h-10 max-h-40 rounded-[1.25rem] px-3.5 leading-normal focus-visible:[outline:2px_solid_var(--kai-chat-accent,var(--color-accent))] focus-visible:outline-offset-2', editField: 'min-h-10 max-h-40 rounded-[1.25rem] px-3.5 leading-normal focus-visible:[outline:2px_solid_var(--kai-chat-accent,var(--color-accent))] focus-visible:outline-offset-2', actions: 'kai-chat-actions', regenerate: 'kai-chat-action', edit: 'kai-chat-action', save: 'kai-chat-save kui-btn', cancel: 'kai-chat-cancel kui-btn', send: 'kai-chat-send', new: 'kai-chat-new', retry: 'kui-btn', approval: 'kai-chat-approval', approvalText: 'kai-chat-approval-text', allow: 'kui-btn', deny: 'kui-btn', attach: 'kai-chat-attach', files: 'kai-chat-files', file: 'kai-chat-file', remove: 'kai-chat-file-remove', record: 'kai-chat-record', recordSpinner: 'animate-spin motion-reduce:animate-none' },
   variants: {
     // The form: `bubble` frames the visitor's messages, `plain` draws them as bare text.
     variant: { bubble: '', plain: '' },
@@ -46,7 +46,7 @@ const SANITIZED_LINK = /<a href="([^"]*)" rel="nofollow ugc">/g
 // The images and documents a model reads.
 const ATTACHABLE = 'image/png,image/jpeg,image/gif,image/webp,application/pdf'
 
-const { action, initial = [], label = wording('ai.chat.label', 'Chat'), placeholder = wording('ai.chat.placeholder', 'Write a message…'), sendLabel = wording('ai.chat.send', 'Send'), stopLabel = wording('ai.chat.stop', 'Stop'), retryLabel = wording('ai.chat.retry', 'Try again'), thinkingLabel = wording('ai.chat.thinking', 'Thinking…'), sourcesLabel = wording('ai.chat.sources', 'Sources'), reasoning = true, reasoningLabel = wording('ai.chat.reasoning', 'Reasoning'), stoppedLabel = wording('ai.chat.stopped', 'Stopped'), errorMessage = wording('ai.chat.error', 'The reply failed.'), keep = 20, maxChars = POSTED_CHARACTERS, tableLabel = wording('ai.chat.table', 'Table'), toolDetails = true, greeting = wording('ai.chat.greeting', 'How can I help?'), disclosure = wording('ai.chat.disclosure', 'You are talking to an AI. Your messages are sent to its provider to answer.'), suggestions = [], toolLabels = {}, sendIcon, stopIcon, newButton = false, newLabel = wording('ai.chat.new', 'New conversation'), newIcon, remember, links = 'apart', runningLabel = wording('ai.chat.running', 'Running'), doneLabel = wording('ai.chat.done', 'Done'), failedLabel = wording('ai.chat.failed', 'Failed'), argumentsLabel = wording('ai.chat.arguments', 'Arguments'), resultLabel = wording('ai.chat.result', 'Result'), approvalLabel = wording('ai.chat.approval', 'Needs your approval'), allowLabel = wording('ai.chat.allow', 'Allow'), denyLabel = wording('ai.chat.deny', 'Deny'), allowedLabel = wording('ai.chat.allowed', 'Allowed:'), deniedLabel = wording('ai.chat.denied', 'Denied:'), attach = false, accept = ATTACHABLE, maxFiles = 4, maxFileSize = 5 * 1024 * 1024, attachLabel = wording('ai.chat.attach', 'Attach a file'), removeLabel = wording('ai.chat.remove', 'Remove'), attachRefusedLabel = wording('ai.chat.attachRefused', 'Only images and PDFs can be attached.'), attachTooBigLabel = wording('ai.chat.attachTooBig', 'That file is too big to attach.'), attachFullLabel = wording('ai.chat.attachFull', 'No more files can be attached.'), attachIcon, regenerate = false, editable = false, regenerateLabel = wording('ai.chat.regenerate', 'Regenerate the reply'), editLabel = wording('ai.chat.edit', 'Edit the message'), saveLabel = wording('ai.chat.save', 'Save and send'), cancelLabel = wording('ai.chat.cancel', 'Cancel'), editEmptyLabel = wording('ai.chat.editEmpty', 'Write a message to send.'), editBusyLabel = wording('ai.chat.editBusy', 'Wait for the reply to finish.'), regenerateIcon, editIcon, fill = false, variant = 'bubble', tone = 'accent', size = 'md' } = props<{
+const { action, initial = [], label = wording('ai.chat.label', 'Chat'), placeholder = wording('ai.chat.placeholder', 'Write a message…'), sendLabel = wording('ai.chat.send', 'Send'), stopLabel = wording('ai.chat.stop', 'Stop'), retryLabel = wording('ai.chat.retry', 'Try again'), thinkingLabel = wording('ai.chat.thinking', 'Thinking…'), sourcesLabel = wording('ai.chat.sources', 'Sources'), reasoning = true, reasoningLabel = wording('ai.chat.reasoning', 'Reasoning'), stoppedLabel = wording('ai.chat.stopped', 'Stopped'), errorMessage = wording('ai.chat.error', 'The reply failed.'), keep = 20, maxChars = POSTED_CHARACTERS, tableLabel = wording('ai.chat.table', 'Table'), toolDetails = true, greeting = wording('ai.chat.greeting', 'How can I help?'), disclosure = wording('ai.chat.disclosure', 'You are talking to an AI. Your messages are sent to its provider to answer.'), suggestions = [], toolLabels = {}, sendIcon, stopIcon, newButton = false, newLabel = wording('ai.chat.new', 'New conversation'), newIcon, remember, links = 'apart', runningLabel = wording('ai.chat.running', 'Running'), doneLabel = wording('ai.chat.done', 'Done'), failedLabel = wording('ai.chat.failed', 'Failed'), argumentsLabel = wording('ai.chat.arguments', 'Arguments'), resultLabel = wording('ai.chat.result', 'Result'), approvalLabel = wording('ai.chat.approval', 'Needs your approval'), allowLabel = wording('ai.chat.allow', 'Allow'), denyLabel = wording('ai.chat.deny', 'Deny'), allowedLabel = wording('ai.chat.allowed', 'Allowed:'), deniedLabel = wording('ai.chat.denied', 'Denied:'), attach = false, accept = ATTACHABLE, maxFiles = 4, maxFileSize = 5 * 1024 * 1024, attachLabel = wording('ai.chat.attach', 'Attach a file'), removeLabel = wording('ai.chat.remove', 'Remove'), attachRefusedLabel = wording('ai.chat.attachRefused', 'Only images and PDFs can be attached.'), attachTooBigLabel = wording('ai.chat.attachTooBig', 'That file is too big to attach.'), attachFullLabel = wording('ai.chat.attachFull', 'No more files can be attached.'), attachIcon, regenerate = false, editable = false, regenerateLabel = wording('ai.chat.regenerate', 'Regenerate the reply'), editLabel = wording('ai.chat.edit', 'Edit the message'), saveLabel = wording('ai.chat.save', 'Save and send'), cancelLabel = wording('ai.chat.cancel', 'Cancel'), editEmptyLabel = wording('ai.chat.editEmpty', 'Write a message to send.'), editBusyLabel = wording('ai.chat.editBusy', 'Wait for the reply to finish.'), regenerateIcon, editIcon, transcribe, recordLabel = wording('ai.chat.record', 'Speak a message'), transcribingLabel = wording('ai.chat.transcribing', 'Writing down what was said…'), unheardLabel = wording('ai.chat.unheard', 'Nothing was heard.'), transcribeFailedLabel = wording('ai.chat.transcribeFailed', 'What was said could not be written down.'), recordIcon, fill = false, variant = 'bubble', tone = 'accent', size = 'md' } = props<{
   // The page's streaming action, `action(schema, ({ messages }) => ask(messages))`, which may also `ctx.fail`; the chat posts the latest messages to it and reads the reply as it streams.
   // Returning `ask(messages, { tools }).progress()` instead streams the tool calls as well, which the chat shows before the text of their turn.
   action: Action<{ messages: ChatMessage[] }, AsyncIterable<string | Progress> | Failure<unknown>>
@@ -137,6 +137,15 @@ const { action, initial = [], label = wording('ai.chat.label', 'Chat'), placehol
   // What the regenerate and edit buttons draw, in place of a circular arrow and a pencil.
   regenerateIcon?: Snippet
   editIcon?: Snippet
+  // An action writing down what the visitor said, `action(s.Object({ audio: s.File() }), ...)` returning the text or `{ text }`: given, a microphone button beside the field records, and the text joins the field and is sent as typed. A reply under way keeps it in the field.
+  transcribe?: Action<{ audio: File }, string | { text: string } | Failure<unknown>> | undefined
+  // The microphone button's name and tooltip, what is said while `transcribe` writes, and what a recording that gave no text and one that failed say. The microphone's own troubles are worded by kayjs-ui's `ui.recordButton.*`.
+  recordLabel?: string | undefined
+  transcribingLabel?: string | undefined
+  unheardLabel?: string | undefined
+  transcribeFailedLabel?: string | undefined
+  // What the microphone button draws, in place of a microphone; while it records it draws `@stopIcon`.
+  recordIcon?: Snippet
   // Fills the height of its container, which the app gives a height (a flex column, a grid row or a fixed one): the log takes the space and scrolls, the greeting sits above the form, and the form stays at the bottom, as the launcher's panel does. Without it the log grows to 32rem and scrolls past it.
   fill?: boolean | undefined
 }>()
@@ -159,6 +168,8 @@ const session = createChatSession({
   say: call => `${call.name}: ${call.approval === undefined ? statuses[call.status] : approvalLabel}`,
   focus: () => field?.focus(),
   follow: following.toBottom,
+  // Only a chat taking `transcribe` creates the microphone, so the recorder's own chunk loads only then.
+  voice: transcribe === undefined ? undefined : { get transcribe() { return transcribe! }, get transcribingLabel() { return transcribingLabel }, get unheardLabel() { return unheardLabel }, get failedLabel() { return transcribeFailedLabel } },
 })
 const { history, draft, partial, thought, thoughtOpen, calls, code, found, spoken, failure, takenBack, busy, send, stop } = session
 const { attached, problem: attachProblem } = attachments
@@ -282,6 +293,17 @@ function sendFrom(event: Event) {
 
   if (typeof text === 'string' && text.trim() !== '')
     void send(text.trim())
+}
+
+const { voice } = session
+const voiceBusy = () => voice?.state() === 'asking' || voice?.state() === 'sending'
+
+// Escape on the microphone drops the recording and nothing else, such as a reply under way or the panel around the chat.
+function recordKey(event: KeyboardEvent) {
+  if (event.key === 'Escape' && voice?.cancel()) {
+    event.preventDefault()
+    event.stopPropagation()
+  }
 }
 
 // The button beside the field resets, then puts the cursor back in the field.
@@ -525,6 +547,8 @@ section(part="root" onKeyDown={escape} data-empty={history().length === 0 && !bu
       p {line.text}
     if busy() && partial() === '' && calls().length === 0
       p {thinkingLabel}
+    if voice && voice.said() !== ''
+      p {voice.said()}
   if failure()
     Notice(tone="danger")
       | {failure()}
@@ -535,6 +559,8 @@ section(part="root" onKeyDown={escape} data-empty={history().length === 0 && !bu
     p(part="disclosure") {disclosure}
   if attachProblem()
     Notice(tone="danger") {attachProblem()}
+  if voice?.problem()
+    Notice(tone="danger") {voice.problem()}
   if attached().length > 0
     ul(part="files")
       for file of attached() key={fileKey(file)}
@@ -553,6 +579,16 @@ section(part="root" onKeyDown={escape} data-empty={history().length === 0 && !bu
         slot attachIcon
           Icon(icon="plus")
     Textarea(part="field" writeFocused ref={element => { field = element }} value={draft()} onInput={draft.set} rows="1" onPaste={pasted} aria-label={label} placeholder={placeholder} onKeyDown={keyDown})
+    if voice
+      BareIconButton(part="record" variant="inline" label={recordLabel} aria-pressed={voice.state() === 'recording' ? 'true' : 'false'} aria-busy={voiceBusy() ? 'true' : undefined} onClick={() => { void voice.press() }} onKeyDown={recordKey})
+        if voiceBusy()
+          Icon(part="recordSpinner" icon="spinner")
+        else if voice.state() === 'recording'
+          slot stopIcon
+            Icon(icon="stop")
+        else
+          slot recordIcon
+            Icon(icon="microphone")
     if busy()
       BareIconButton(part="send" variant="inline" label={stopLabel} onClick={stop})
         slot stopIcon

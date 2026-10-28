@@ -8,6 +8,7 @@ import calendar from '~icons/tabler/calendar'
 import external from '~icons/tabler/external-link'
 import apps from '~icons/tabler/grid-dots'
 import chat from '~icons/tabler/message-circle'
+import microphone from '~icons/tabler/microphone'
 import trendFlat from '~icons/tabler/minus'
 import edit from '~icons/tabler/pencil'
 import pause from '~icons/tabler/player-pause'
@@ -17,4 +18,4 @@ import trendDown from '~icons/tabler/trending-down'
 import trendUp from '~icons/tabler/trending-up'
 
 // The default of each slot added since apps first wrote icon maps of their own, drawn when a map leaves it out.
-export const addedIcons: Record<AddedSlot, IconProps> = { apps, bell, calendar, pause, chat, send, stop, expand, collapse, edit, external, refresh, trendDown, trendFlat, trendUp }
+export const addedIcons: Record<AddedSlot, IconProps> = { apps, bell, calendar, pause, chat, send, stop, expand, collapse, edit, external, microphone, refresh, trendDown, trendFlat, trendUp }

@@ -1,0 +1,15 @@
+--- server
+import { s } from 'kay'
+import { reply } from './attaching.kay'
+
+// The fake recorder's bytes are their own transcript, so a test says what was heard; `refuse` is refused as a provider's error would be.
+export const transcribe = action(s.Object({ audio: s.File() }), async ({ audio }, ctx) => {
+  const text = await audio.text()
+
+  return text === 'refuse' ? ctx.fail(422, 'Too noisy to write down.') : { text }
+}, { maxSize: '1mb' })
+--- script
+import Chat from '@kaynooo/kayjs-ai/chat.kay'
+---
+h1 Speaking
+Chat(action={reply} label="Assistant" attach transcribe={transcribe})

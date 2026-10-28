@@ -46,6 +46,23 @@ Chat(action={reply} attach)
 - The files ride on the history: each send posts those of the `keep` latest messages again, so the model sees them in a follow-up, up to 8 MB for the messages before the last, the newest first (a message whose files do not fit leaves them all out, and goes itself, with the assistant reply that answered it, when it held nothing else; the last message keeps its files whatever they weigh), and a 413 shrinks the history counting each file as `ask` prices an image. The files live in the page: `remember` keeps the text of a turn, so after a reload the model no longer sees them.
 - Stop's call to the server posts the last message without its files.
 
+### Speaking a message
+
+`transcribe` takes an action that writes down a recording, returning the text or `{ text }`; the chat adds a microphone beside the field:
+
+```kay
+--- server
+import { s } from 'kay'
+
+export const transcribe = action(s.Object({ audio: s.File() }), async ({ audio }) => ({ text: await whisper(audio) }), { maxSize: '10mb' })
+---
+Chat(action={reply} transcribe={transcribe})
+```
+
+- A press asks for the microphone and records, the button pressed with a stop icon; the next press posts the recording (`recording.webm`, `recording.m4a` in Safari) and the text joins the field and is sent as typed, with any attached files. A reply under way leaves it in the field. Escape on the button drops the recording, and a recording stops by itself after 5 minutes.
+- Its troubles show in a notice: a refused call says its `ctx.fail` message under 500 and `transcribeFailedLabel` otherwise, empty text `unheardLabel`, and the microphone's own (blocked, missing, in use, unplugged, no https, a browser that cannot record) kayjs-ui's [RecordButton](../../ui/llms/basics.md) words, `ui.recordButton.*`. The status region says when recording starts and stops, then `transcribingLabel`.
+- Words: `ai.chat.record` (`recordLabel`, `Speak a message`), `transcribing`, `unheard` and `transcribeFailed`; `@recordIcon` replaces the microphone. The recorder's code loads only in a chat with `transcribe`.
+
 ### Regenerating and editing
 
 `regenerate` adds a button under the last reply that asks again for it, and `editable` one on each message of the visitor that turns it into a field to change and send again. Both are off by default.
@@ -111,7 +128,7 @@ export const reply = action(schema, async ({ messages }) => {
 
 ### Restyle
 
-Its parts - `root`, `empty`, `greeting`, `suggestions`, `suggestion`, `log`, `turn`, `text`, `thinking`, `reasoning`, `reasoningText`, `note`, `status`, `disclosure`, `form`, `field`, `send`, `retry`, `actions`, `regenerate`, `edit`, `editField`, `save` and `cancel` (the Try again button, shown only after a failed reply) - keep their `kai-` classes and take utilities from `src/ui.ts` or a `class` object: `defineUi({ '@kaynooo/kayjs-ai/chat.kay': { parts: { send: 'size-12', turn: 'text-base' } } })`, `Chat(class={{ log: 'max-h-96' }})`. A `class` string restyles the root. The tool calls are `@kaynooo/kayjs-ai/chat-calls.kay` (`root`, `summary`, `list`, `call`, `name`, `status`, `title`, `code`) the sources under a reply `@kaynooo/kayjs-ai/chat-sources.kay` (`root`, `label`, `list`, `item`, `link`) and the launcher's panel `@kaynooo/kayjs-ai/chat-panel.kay` (`root`, `panel`, `head`, `title`, `actions`, `action`, `expand`, `body`, `button`, `glyph`). A table of a reply is built from the reply's markup and keeps `.kai-chat-table`.
+Its parts - `root`, `empty`, `greeting`, `suggestions`, `suggestion`, `log`, `turn`, `text`, `thinking`, `reasoning`, `reasoningText`, `note`, `status`, `disclosure`, `form`, `field`, `send`, `record`, `recordSpinner`, `retry`, `actions`, `regenerate`, `edit`, `editField`, `save` and `cancel` (the Try again button, shown only after a failed reply) - keep their `kai-` classes and take utilities from `src/ui.ts` or a `class` object: `defineUi({ '@kaynooo/kayjs-ai/chat.kay': { parts: { send: 'size-12', turn: 'text-base' } } })`, `Chat(class={{ log: 'max-h-96' }})`. A `class` string restyles the root. The tool calls are `@kaynooo/kayjs-ai/chat-calls.kay` (`root`, `summary`, `list`, `call`, `name`, `status`, `title`, `code`) the sources under a reply `@kaynooo/kayjs-ai/chat-sources.kay` (`root`, `label`, `list`, `item`, `link`) and the launcher's panel `@kaynooo/kayjs-ai/chat-panel.kay` (`root`, `panel`, `head`, `title`, `actions`, `action`, `expand`, `body`, `button`, `glyph`). A table of a reply is built from the reply's markup and keeps `.kai-chat-table`.
 
 ### Behaviour
 

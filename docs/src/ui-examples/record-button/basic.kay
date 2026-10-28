@@ -1,0 +1,10 @@
+---
+import RecordButton from '@kaynooo/kayjs-ui/record-button.kay'
+import { sizeText } from 'kay/words'
+
+const kept = signal('')
+---
+.flex.flex-col.items-start.gap-3
+  RecordButton(label="Record a note" onRecord={audio => kept = `${audio.name}, ${sizeText(audio.size)}`})
+  if kept() !== ''
+    p Recorded {kept()}
