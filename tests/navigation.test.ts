@@ -883,6 +883,7 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('page swap i
     ['formmethod="get"', '<form method="post" action="/_kay/action/x"><button formmethod="get">Send</button></form>', false],
     ['an action named in a query', '<form method="post" action="/plain?next=/_kay/action/x"><button>Send</button></form>', false],
     ['a page of the app', '<form method="post" action="/plain"><button>Send</button></form>', false],
+    ['a post holding controls named method and target', '<form method="post" action="/_kay/action/x"><input name="method" value="put"><input name="target"><button>Send</button></form>', true],
   ])('holds before the forms\' listener loaded only a post the swap takes: %s', async (_name, html, holds) => {
     const fresh = await open('/kept')
 

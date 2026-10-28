@@ -115,7 +115,7 @@ function onEarlySubmit(event: SubmitEvent): void {
   const { submitter } = event
 
   // A cheaper test than the forms' listener's: a post to another site naming an action's path still reaches the browser, its submit event fired again.
-  if (formsListen || event.defaultPrevented || !ACTION_PATH.test(submitter?.getAttribute('formaction') ?? form.getAttribute('action') ?? '') || (submitter?.getAttribute('formmethod') ?? form.method).toLowerCase() !== 'post' || form.closest('[data-reload]') || submitter?.hasAttribute('data-reload') || !['', '_self'].includes(submitter?.getAttribute('formtarget') ?? form.target))
+  if (formsListen || event.defaultPrevented || !ACTION_PATH.test(submitter?.getAttribute('formaction') ?? form.getAttribute('action') ?? '') || (submitter?.getAttribute('formmethod') ?? form.getAttribute('method') ?? '').toLowerCase() !== 'post' || form.closest('[data-reload]') || submitter?.hasAttribute('data-reload') || !['', '_self'].includes(submitter?.getAttribute('formtarget') ?? form.getAttribute('target') ?? ''))
     return
 
   event.preventDefault()

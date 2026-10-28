@@ -57,7 +57,7 @@ async function loadForms(): Promise<typeof import('./forms')> {
 // An action the page cannot resolve is left to the browser, which posts it natively.
 export function swappedActionUrl(form: HTMLFormElement, submitter: HTMLElement | null): URL | undefined {
   const method = (submitter?.getAttribute('formmethod') ?? form.getAttribute('method') ?? 'get').toLowerCase()
-  const target = submitter?.getAttribute('formtarget') ?? form.target
+  const target = submitter?.getAttribute('formtarget') ?? form.getAttribute('target') ?? ''
   let url: URL
 
   try {

@@ -32,6 +32,7 @@ describe('the form posts the page swap takes', () => {
     expect(swapped('<form method="post" action="/app/_kay/action/add"></form>', '<button formtarget="_blank">Send</button>')).toBeUndefined()
     expect(swapped('<form method="post" action="http://elsewhere/app/_kay/action/add"></form>')).toBeUndefined()
     expect(swapped('<form method="post" action="/app/page?next=/app/_kay/action/add"></form>')).toBeUndefined()
+    expect(swapped('<form method="post" action="/app/_kay/action/add"><input name="method" value="put"><input name="target"></form>')).toBe('/app/_kay/action/add')
     expect(swapped('<form method="post" action="http://[::1"></form>')).toBeUndefined()
     expect(swapped('<form method="post" action="http://[::1/_kay/action/add"></form>')).toBeUndefined()
   })
