@@ -7,7 +7,7 @@ const WIDTH = 120
 
 const [file] = Bun.argv.slice(2)
 const text = file === undefined ? await (await fetch(SOURCE)).text() : await Bun.file(file).text()
-const version = /^\/\/ VERSION: (\S+)/m.exec(text)?.[1] ?? 'unknown'
+const version = (/^\/\/ VERSION: (\S+)/m).exec(text)?.[1] ?? 'unknown'
 const rules = text.split('\n').map(line => line.trim()).filter(line => line !== '' && !line.startsWith('//'))
 const packed = Buffer.from(gzipSync(rules.join('\n'))).toString('base64')
 const lines = packed.match(new RegExp(`.{1,${WIDTH}}`, 'g')) ?? []
