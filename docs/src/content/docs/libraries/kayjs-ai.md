@@ -197,6 +197,8 @@ A conversation belongs to the visitor your server names: the signed-in user kayj
 
 `ChatLauncher` takes `keepOnServer` and `conversations` too. As it sits on every page, the conversation it shows is remembered by the browser instead of the address, so a reload, another page or a new tab shows it again, and its list heads the panel. A `Chat` of your own on every page does the same with `conversationIn="browser"`.
 
+If your `ask` has `outlive: true`, a reply still running when the page reloads picks back up as with `remember`: the chat shows the stored turns and the message being answered, and the reply goes on streaming.
+
 When the visitor's session lapses, the chat keeps the conversation it shows, says so with `signedOutLabel`, and posts it whole from then on.
 
 The conversations are kept in `data/ai-conversations.sqlite` unless you give `ai({ conversations })` a store of your own. What they hold is personal data: name it in your privacy notice and delete a user's rows when you erase their account.

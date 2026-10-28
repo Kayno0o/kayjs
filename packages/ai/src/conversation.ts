@@ -12,7 +12,7 @@ import { deferredReply } from './deferred'
 import { AiError } from './errors'
 import { namedVisitor } from './limits'
 import { createReply } from './reply'
-import { conversationCallOf, replacesOf } from './resume'
+import { conversationCallOf, replacesOf, replyCallOf } from './resume'
 
 const log = logFrom('kayjs-ai')
 // The conversations a list shows, the most recently updated first.
@@ -107,15 +107,24 @@ function fitted(kept: readonly StoredTurn[], posted: readonly Message[], maxInpu
   return messages
 }
 
+// A write under way, of a reply asked at `revision`; one that outlives its request names the reply and the turns it stores ahead of it, so a load after a reload shows them and the Chat picks the reply back up.
+interface Writing {
+  done: Promise<void>
+  revision: number
+  replying?: { id: string, drop: number, message: StoredTurn } | undefined
+}
+
 // The writes under way, by conversation, which a send to it waits for: a Stop closes the stream before the stopped reply is stored, so a send right after it would read the revision before that write.
-const writing = new Map<string, Promise<void>>()
+const writing = new Map<string, Writing>()
 // How long a send waits for a write under way, past which it reads the conversation as stored; another tab's reply still running writes later, and this send then meets its 409.
 const WRITE_WAIT_MS = 2000
 // A reply never read never writes, and leaves its entry until a later send to its conversation replaces it: the oldest go past this many.
 const MOST_WRITING = 10_000
 
+const pendingKey = ({ owner, scope, id }: ConversationKey) => `${owner}\0${scope}\0${id}`
+
 async function written(key: string): Promise<void> {
-  const write = writing.get(key)
+  const write = writing.get(key)?.done
 
   if (write === undefined)
     return
@@ -145,7 +154,7 @@ export function heldReply(call: HeldCall, prompt: Message[], options: AskOptions
       throw new AiError('conflict', 'the chat posted to a conversation kept on the server, and no visitor is named any more, as when a session lapsed')
 
     const key: ConversationKey = { owner, scope: scopeOf(call.request), id: call.id }
-    const pending = `${owner}\0${key.scope}\0${key.id}`
+    const pending = pendingKey(key)
 
     await written(pending)
 
@@ -162,9 +171,12 @@ export function heldReply(call: HeldCall, prompt: Message[], options: AskOptions
 
     const reply = make(fitted(turns.slice(0, turns.length - drop), posted, maxInputChars))
     const done = Promise.withResolvers<void>()
+    const started = replyCallOf(call.request)
+    const message = posted[0]
+    const replying = options.outlive === true && started?.op === 'start' && started.id !== undefined && message !== undefined ? { id: started.id, drop, message: { role: message.role, content: message.content } } : undefined
 
     writing.delete(pending)
-    writing.set(pending, done.promise)
+    writing.set(pending, { done: done.promise, revision, replying })
 
     if (writing.size > MOST_WRITING)
       writing.delete(writing.keys().next().value!)
@@ -176,7 +188,7 @@ export function heldReply(call: HeldCall, prompt: Message[], options: AskOptions
       finally {
         done.resolve()
 
-        if (writing.get(pending) === done.promise)
+        if (writing.get(pending)?.done === done.promise)
           writing.delete(pending)
       }
     }
@@ -265,6 +277,13 @@ async function answerOf(call: HeldCall, prompt: readonly Message[], named: strin
     return { owned: true, op: 'remove', id: call.id, done: await store.remove(key) }
 
   const stored = await store.get(key)
+  const revision = stored?.revision ?? 0
+  const turns = (stored?.turns ?? []).map(({ role, content, sources, stopped }) => ({ role, content, ...sources !== undefined && sources.length > 0 && { sources }, ...stopped === true && { stopped } }))
+  const under = writing.get(pendingKey(key))
 
-  return { owned: true, op: 'load', id: call.id, revision: stored?.revision ?? 0, title: stored?.title ?? '', turns: (stored?.turns ?? []).map(({ role, content, sources, stopped }) => ({ role, content, ...sources !== undefined && sources.length > 0 && { sources }, ...stopped === true && { stopped } })) }
+  // A reply still running past its request shows after the turns it stores ahead of it, until its write moves the revision on.
+  if (under?.replying !== undefined && under.revision === revision)
+    return { owned: true, op: 'load', id: call.id, revision, title: stored?.title ?? '', turns: [...turns.slice(0, turns.length - under.replying.drop), under.replying.message], replying: under.replying.id }
+
+  return { owned: true, op: 'load', id: call.id, revision, title: stored?.title ?? '', turns }
 }

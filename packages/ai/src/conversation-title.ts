@@ -12,10 +12,10 @@ export interface ConversationSummary {
   updatedAt: number
 }
 
-// What a load, a list, a rename or a remove answers, as the JSON text of the one snapshot of its reply; `owned` is false for a visitor no one names, who keeps their history in the page.
+// What a load, a list, a rename or a remove answers, as the JSON text of the one snapshot of its reply; `owned` is false for a visitor no one names, who keeps their history in the page, and `replying` names a reply still running past its request, which the Chat resumes.
 export type ConversationAnswer
   = | { owned: false }
-    | { owned: true, op: 'load', id: string | undefined, revision: number, title: string, turns: (ChatTurn & { stopped?: boolean | undefined })[] }
+    | { owned: true, op: 'load', id: string | undefined, revision: number, title: string, turns: (ChatTurn & { stopped?: boolean | undefined })[], replying?: string | undefined }
     | { owned: true, op: 'list', conversations: ConversationSummary[] }
     | { owned: true, op: 'rename', id: string, done: boolean }
     | { owned: true, op: 'remove', id: string, done: boolean }

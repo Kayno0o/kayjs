@@ -3,6 +3,7 @@ import { join } from 'node:path'
 import { afterAll, afterEach, expect, it } from 'bun:test'
 import { testSite } from 'kay/test'
 import { fakeAi } from '../src'
+import { testing } from './fixture/src/testing'
 
 const site = await testSite({ root: join(import.meta.dir, 'fixture'), browser: true })
 
@@ -133,6 +134,47 @@ it('the launcher keeps its conversation on the server, named by the browser rath
   expect(await page.evaluate(() => location.pathname + location.search)).toBe('/held-launcher/two')
   expect(await page.a11y('.kai-launcher')).toEqual([])
   expect(page.errors).toEqual([])
+}, 120_000)
+
+it('a reload while a reply that outlives its request runs shows the message it answers, picks the reply back up, and the next send counts it', async () => {
+  const gate = Promise.withResolvers<void>()
+
+  testing.provider = {
+    name: 'held',
+    model: 'm',
+    async* stream(request) {
+      yield { text: 'Hel' }
+      await gate.promise
+      yield { text: `lo after ${request.messages.length}` }
+      yield { finish: 'stop' }
+    },
+  }
+
+  try {
+    await using page = await site.open('/keeping-staying')
+    const said = async (text: string) => page.waitUntil((wanted: string) => document.querySelector('.kai-chat-log')!.textContent.includes(wanted), {}, text)
+
+    await page.waitFor('.kai-chat-log:not([aria-busy])')
+    await page.fill('.kai-chat-form textarea', 'long question')
+    await page.click('.kai-chat-form .kai-chat-send')
+    await said('Hel')
+    await named(page)
+
+    await page.reload()
+    await page.waitFor('.kai-chat-turn[data-role=user] .kai-chat-text', { text: 'long question' })
+    await said('Hel')
+    gate.resolve()
+    await page.waitFor('.kai-chat-turn[data-role=assistant] .kai-chat-text', { text: 'Hello after 1' })
+
+    testing.provider = undefined
+    await send(page, 'next', 'read 3 after next')
+
+    expect(await log(page)).toEqual(['u:long question', 'a:Hello after 1', 'u:next', 'a:read 3 after next'])
+    expect(page.errors).toEqual([])
+  }
+  finally {
+    testing.provider = undefined
+  }
 }, 120_000)
 
 it('a tab left open on an older revision cannot write: its message goes back to the field and the conversation shows as stored', async () => {

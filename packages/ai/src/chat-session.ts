@@ -209,6 +209,7 @@ export function createChatSession(options: ChatSessionOptions) {
   // Shows the conversation `id`, or a new one; a visitor the server cannot keep one for gets the tab's history back, as without `keepOnServer`.
   async function load(id: string | undefined) {
     const turn = ++loads
+    let replying: string | undefined
 
     asked = id
     left++
@@ -248,6 +249,7 @@ export function createChatSession(options: ChatSessionOptions) {
       revision = answer.revision
       replacement = undefined
       history.set(answer.turns.map(({ sources, ...turn }) => ({ ...turn, ...sources && { sources: usableSources(sources) }, id: nextId++ })))
+      replying = answer.replying
     }
     catch (error) {
       if (turn !== loads)
@@ -260,6 +262,10 @@ export function createChatSession(options: ChatSessionOptions) {
       if (turn === loads)
         loading.set(false)
     }
+
+    // A reply still running on the server past its request, as after a reload, is asked for again as `remember` does.
+    if (replying !== undefined && turn === loads)
+      void post(true, undefined, replying)
   }
 
   async function list() {
@@ -412,18 +418,23 @@ export function createChatSession(options: ChatSessionOptions) {
     if (state !== 'closed' && reply !== undefined)
       forget(reply)
 
-    if (state === 'done' && reply?.resumed === true && text === '' && made.length === 0)
+    // A resume that brought nothing back put the message back in the field; on the server it stored nothing, or the process lost the reply, so the conversation is read again.
+    if (state === 'done' && reply?.resumed === true && text === '' && made.length === 0) {
       takeBack()
+
+      if (holding())
+        void load(shown)
+    }
 
     if (text !== '' || made.length > 0) {
       replacement = undefined
       history.set([...history(), { id: nextId++, role: 'assistant', content: text, calls: made, code: highlighted, reasoning: thinking, reasoningOpen: thinkingOpen, ...cites.length > 0 && { sources: cites }, stopped: state === 'closed' }])
     }
 
-    // The server stored the exchange as it does: a reply that ended, or one stopped or broken off once it had said or called something.
-    const held = holding() && reply?.resumed !== true
+    // The server stored the exchange as it does: a reply that ended, or one stopped or broken off once it had said or called something, a reply resumed after a reload included.
+    const held = holding()
 
-    if (held && (state === 'done' || text !== '' || made.length > 0)) {
+    if (held && (text !== '' || made.length > 0 || (state === 'done' && reply?.resumed !== true))) {
       revision++
       touched()
     }

@@ -291,6 +291,58 @@ describe('a conversation held on the server', () => {
     expect(model.said(0)).toEqual(['user: hello', 'assistant: half', 'user: again'])
   })
 
+  it('shows a reply still running past its request after the message it answers, naming it for the Chat to resume, until it is stored', async () => {
+    const gate = Promise.withResolvers<void>()
+    const slow: Provider = {
+      name: 'slow',
+      model: 'm',
+      async* stream() {
+        yield { text: 'half' }
+        await gate.promise
+        yield { text: ' done' }
+        yield { finish: 'stop' }
+      },
+    }
+
+    async function running(outlive: boolean, reply: string, id: string, revision: number) {
+      const controller = new AbortController()
+      const request = new Request('http://localhost/_kay/action/chat', { headers: { 'x-kai-conversation': `send:${id}:${revision}`, 'x-kai-reply': `start:${reply}` }, signal: controller.signal })
+
+      sendFrom(request, '203.0.113.1')
+      nameUser(request, () => 'ann')
+      await answeringRequest(request, async () => {
+        const reading = ask(said('second'), { provider: slow, outlive })[Symbol.asyncIterator]()
+
+        expect((await reading.next()).value).toBe('half')
+      })
+
+      return { reload: () => controller.abort() }
+    }
+
+    // A reply that stops with its request is not one to resume.
+    await running(false, 'reply-plain-01', 'conv-plain', 0)
+    expect((await loaded('conv-plain') as { replying?: string }).replying).toBeUndefined()
+
+    await visit(said('first'), { provider: recording().provider }, { header: `send:${ID}:0` })
+
+    const page = await running(true, 'reply-outlive-01', ID, 1)
+
+    page.reload()
+    expect(await loaded(ID)).toEqual({ owned: true, op: 'load', id: ID, revision: 1, title: 'first', turns: [{ role: 'user', content: 'first' }, { role: 'assistant', content: 'answer 1' }, { role: 'user', content: 'second' }], replying: 'reply-outlive-01' })
+    expect((await loaded(ID, { user: 'bob' }) as { replying?: string }).replying).toBeUndefined()
+
+    gate.resolve()
+
+    let answer = await loaded(ID)
+
+    for (let tries = 0; 'revision' in answer && answer.revision === 1 && tries < 500; tries++) {
+      await Bun.sleep(5)
+      answer = await loaded(ID)
+    }
+
+    expect(answer).toEqual({ owned: true, op: 'load', id: ID, revision: 2, title: 'first', turns: [{ role: 'user', content: 'first' }, { role: 'assistant', content: 'answer 1' }, { role: 'user', content: 'second' }, { role: 'assistant', content: 'half done' }] })
+  })
+
   it('reads two turns of one role as one once an empty turn between them is left out', async () => {
     const model = recording()
 

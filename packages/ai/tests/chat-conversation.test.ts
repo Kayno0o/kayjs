@@ -95,7 +95,7 @@ function chat(reads: ConversationAnswer[], replies: (() => Promise<ActionStream<
 }
 
 const turns = (session: ReturnType<typeof chat>['session']) => session.history().map(({ role, content }) => `${role}: ${content}`)
-const loaded = (id: string | undefined, revision: number, stored: [string, string][] = []): ConversationAnswer => ({ owned: true, op: 'load', id, revision, title: '', turns: stored.map(([role, content]) => ({ role: role as 'user' | 'assistant', content })) })
+const loaded = (id: string | undefined, revision: number, stored: [string, string][] = [], replying?: string): ConversationAnswer => ({ owned: true, op: 'load', id, revision, title: '', turns: stored.map(([role, content]) => ({ role: role as 'user' | 'assistant', content })), replying })
 
 async function replied(text: string) {
   const stream = fakeStream()
@@ -306,6 +306,41 @@ test('a guest whose first load failed, refused their first send, is not told of 
 test('the greeting waits for a conversation the address names, and shows at once for a new one', () => {
   expect(chat([loaded(SHOWN, 1)], [], { shown: SHOWN }).session.opening()).toBe(true)
   expect(chat([loaded(undefined, 0)], []).session.opening()).toBe(false)
+})
+
+test('resumes a reply the load says still runs past its request, after the message it answers, and counts it once stored', async () => {
+  const resumed = await replied('the whole answer')
+  const next = await replied('next answer')
+  const { session, posts } = chat([loaded(SHOWN, 2, [['user', 'hi'], ['assistant', 'hello'], ['user', 'more']], 'reply-0001')], [resumed.answer, next.answer], { shown: SHOWN })
+
+  await untilHolds(() => posts.length === 1)
+  expect(posts[0]!.headers[REPLY_HEADER]).toBe('resume:reply-0001')
+  expect(turns(session)).toEqual(['user: hi', 'assistant: hello', 'user: more'])
+  await Bun.sleep(0)
+  resumed.finish()
+  expect(turns(session)).toEqual(['user: hi', 'assistant: hello', 'user: more', 'assistant: the whole answer'])
+
+  session.draft.set('again')
+  await session.send()
+  expect(posts[1]!.headers[CONVERSATION_HEADER]).toBe(`send:${SHOWN}:3`)
+  next.finish()
+})
+
+test('a resume that brings nothing back puts the message in the field and reads the conversation again', async () => {
+  const lost = await replied('')
+  const next = await replied('answer')
+  const { session, posts, consulted } = chat([loaded(SHOWN, 2, [['user', 'hi'], ['assistant', 'hello'], ['user', 'more']], 'reply-0001'), loaded(SHOWN, 2, [['user', 'hi'], ['assistant', 'hello']])], [lost.answer, next.answer], { shown: SHOWN })
+
+  await untilHolds(() => posts.length === 1)
+  await Bun.sleep(0)
+  lost.finish()
+  await untilHolds(() => consulted.length === 2 && !session.loading())
+  expect(turns(session)).toEqual(['user: hi', 'assistant: hello'])
+  expect(session.draft()).toBe('more')
+
+  await session.send()
+  expect(posts[1]!.headers[CONVERSATION_HEADER]).toBe(`send:${SHOWN}:2`)
+  next.finish()
 })
 
 test('says the conversation could not be loaded when the action answers none', async () => {
