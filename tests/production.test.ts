@@ -49,6 +49,20 @@ async function until(holds: () => Promise<boolean>, what: string, timeout = 10_0
   }
 }
 
+// Collects until `gone` holds, at most 40 times, each collection in a job of its own before `gone` reads a WeakRef: a read keeps its target alive until its job ends.
+async function collectUntil(gone: () => boolean): Promise<void> {
+  for (let round = 0; round < 40; round++) {
+    // Once the engine is idle, this finishes its JIT compilations and clears the stack it scans: a compilation in flight holds what it profiled as a root, which kept an app nothing reached past 40 collections on a loaded runner.
+    Bun.shrink()
+    // Also lets a request's afterResponse hooks run, which Elysia queues with setImmediate and which hold its app.
+    await Bun.sleep(50)
+    Bun.gc(true)
+
+    if (gone())
+      return
+  }
+}
+
 function directives(policy: string | null): Map<string, string[]> {
   return new Map(policy!.split('; ').map((directive) => {
     const [name, ...sources] = directive.split(' ')
@@ -667,16 +681,16 @@ describe('revalidation', () => {
 
     // An app an earlier test left unreachable may still be collected, which would lower the count under this one: wait until three collections in a row leave it unchanged.
     let before = reached()
+    let stable = 0
 
-    for (let stable = 0, attempt = 0; stable < 3 && attempt < 40; attempt++) {
-      Bun.gc(true)
-      await Bun.sleep(50)
-
+    await collectUntil(() => {
       const now = reached()
 
       stable = now === before ? stable + 1 : 0
       before = now
-    }
+
+      return stable === 3
+    })
 
     // Mounts the fixture's API modules, which kept the last app they were mounted in (kaynooo/kayjs#1895).
     const dropped = await (async () => {
@@ -689,11 +703,7 @@ describe('revalidation', () => {
 
     expect(reached()).toBe(before + 1)
 
-    // A timer of the request holds it a little while.
-    for (let attempt = 0; attempt < 40 && (dropped.deref() !== undefined || reached() > before); attempt++) {
-      Bun.gc(true)
-      await Bun.sleep(50)
-    }
+    await collectUntil(() => dropped.deref() === undefined && reached() <= before)
 
     expect(dropped.deref()).toBeUndefined()
     expect(reached()).toBeLessThanOrEqual(before)
@@ -704,10 +714,7 @@ describe('revalidation', () => {
     // A throwaway app mounts the same modules first; once it is collected a collection certainly ran, whatever the engine skipped before.
     const thrown = await (async () => new WeakRef(await build.serve({ api: resolve(PRODUCTION, 'src/api'), prebuilt: true, security: false, log: false })))()
 
-    for (let attempt = 0; attempt < 40 && thrown.deref() !== undefined; attempt++) {
-      Bun.gc(true)
-      await Bun.sleep(50)
-    }
+    await collectUntil(() => thrown.deref() === undefined)
 
     expect(thrown.deref()).toBeUndefined()
 
