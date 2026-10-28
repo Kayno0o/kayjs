@@ -8,9 +8,6 @@ import { decodeServerValue } from './wire'
 
 // The browser's half of `live()`: the values the islands read, the one connection that follows them and the renewal of the proofs it opens with.
 
-// Defined by the browser build: tested where it is read, so the bundler drops the test for a server.
-declare const KAY_BROWSER: true | undefined
-
 const RENEW_RETRY_MS = 60_000
 // How long a page that no longer holds live values waits before asking again after a refusal: the proof it has will not be taken again.
 const GONE_RETRY_MS = 5 * 60_000
@@ -51,7 +48,7 @@ let settling: ReturnType<typeof setTimeout> | undefined
 let renewing: ReturnType<typeof setTimeout> | undefined
 
 function pagesOf(): LivePage[] {
-  return typeof KAY_BROWSER === 'undefined' && typeof document === 'undefined' ? [] : pageData<LivePage>(LIVE_SCRIPT, decodeServerValue)
+  return pageData<LivePage>(LIVE_SCRIPT, decodeServerValue)
 }
 
 function renderedValue(id: string, key: string): { value: unknown } | undefined {

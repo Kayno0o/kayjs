@@ -6,6 +6,7 @@ import process from 'node:process'
 import { Database } from 'bun:sqlite'
 import { afterAll, beforeEach, describe, expect, it, setSystemTime, spyOn } from 'bun:test'
 import { live, liveSlot, liveStoreReady, setLiveStore, watchSlot } from '../src/runtime/live-value'
+import { serverLive } from '../src/runtime/live-value.server'
 import { setupStore } from '../src/server/app-store'
 import { sqliteLive } from '../src/server/sqlite-live'
 import { untilHolds } from './helpers/until-holds'
@@ -362,11 +363,15 @@ process.exit(0)`)
     const path = await storePath()
     const store = sqliteLive(path)
     const tag = 'second'
-    const copy = await import(`../src/runtime/live-value.ts?${tag}`) as { live: typeof declare }
+    // The server half, where the registry lives: a copy of `live-value.ts` alone would still share this one's.
+    const copy = await import(`../src/runtime/live-value.server.ts?${tag}`) as typeof import('../src/runtime/live-value.server')
 
     setLiveStore(store)
-    expect(copy.live).not.toBe(live as unknown)
-    copy.live(0, 'test:copy', 'copy').set(4)
+    expect(copy.serverLive).not.toBe(serverLive)
+
+    const value = copy.serverLive('test:copy', 0, 'copy', undefined, false) as unknown as ReturnType<typeof declare>
+
+    value.set(4)
     expect(store.entries()).toEqual([['test:copy', '', '[4]']])
     setLiveStore(undefined)
   })
