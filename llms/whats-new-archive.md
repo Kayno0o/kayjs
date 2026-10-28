@@ -42,6 +42,23 @@ What each release before 1.79 added, and the end of a newest release that was cu
 - `withQuery({ page: 2, sort: null })` from `kay` gives the current page's path with those query params set or dropped, in a server fence or an island, where the link follows the address, for a link to the page itself: [Navigating from code](navigation-from-code.md#navigating-from-code).
 - A page's `query` field with `lenient: true` reads a value its schema refuses as its default, or leaves it out, instead of answering 400, and stays typed by the real schema: [Routing](routing.md#reference).
 
+- kayjs-ui: `infiniteList(first, { action, input, failure })` pages through an action, doing the empty guard, `refresh: false` and the toast, and `pageFields` and `pageOf` give the action its `offset` and `limit` and cut a held list to a page, so a list repeats neither its loader nor its paging schema: [Infinite lists](../packages/ui/llms/infinite-list.md).
+- kayjs-ui: `infiniteList` has `patch(id, change)`, which updates one loaded row by its `key` from an action's answer, so a toggle on a row needs no signal of changes merged over `rows()`: [Infinite lists](../packages/ui/llms/infinite-list.md).
+- `kay check` reports `server-only-in-island` once per island reaching a module that reads `process` or `Bun`, finds the read in a component with a `--- server` fence that is an island and in a `.ts` module with an angle-bracket cast, and skips following imports in a project with no island: [Browser-only code](browser-only.md).
+- `mediaQuery('(...)')` and `reducedMotion()` from `kay` are values following a media query or `prefers-reduced-motion` while an island lives, with the server rendering a stated fallback, and kayjs-ui's carousel, map and split layout use them: [Follow a media query](islands.md#follow-a-media-query).
+- `timeZone` in kay.config.ts is the zone `formatDate`, a message's date and `RelativeTime`'s tooltip write in, on the server and in islands alike, and `kay/i18n` has `formatBytes` and `formatDuration` in the page's locale, so an app keeps no `format.ts` of its own: [Locales](locales.md#helpers).
+- kayjs-ui: `DateTimeInput(name="startsAt" min={now})` shows a date and time on the visitor's clock and posts the instant with the visitor's offset, which `s.Date()` reads right, so an app posts no `getTimezoneOffset()` fields: [forms](../packages/ui/llms/forms.md).
+- An `s.Files` field without `maxItems` raises its action's body limit by ten files of its `maxSize`, not one, so a post of several files within their size is no longer refused with a 413: [Files posted to an action](files.md#files-posted-to-an-action).
+- kayjs-ui: `Stat` draws its change after its label for a screen reader, an empty `StatusStrip` cell is a hairline along the bottom apart from a `muted` one, and a `DescriptionList` item with neither a `value` nor a block shows a dash: [basics](../packages/ui/llms/basics.md#stat-meter-progress-skeleton-barlist-sitefavicon-copybutton-rating).
+- kayjs-ui: `attempt(run, { failure, onRefused(data) })` hands a refusal (an action's `ctx.fail` data or a route's JSON answer) to the app and toasts nothing, so showing it in a Dialog or a Notice needs no `try`/`catch` and `action.refused`: [Toasts](../packages/ui/llms/basics.md).
+- kayjs-ui: `SaveForm` takes `cancelHref` for a Cancel link, `confirm` for a question asked before saving and `saveDisabled` to keep Save off with its reason as a tooltip, so an editor with a Cancel, a confirm step or an invalid draft keeps no save bar of its own: [Forms](../packages/ui/llms/forms-and-steps.md).
+- kayjs-ui: a long word with no space to break at (an image reference, a digest, a path) breaks inside `PageHeader`, `Card`, `Notice` and `Table` instead of widening a phone's page, so an app drops its own `wrap-anywhere` on their parts: [PageHeader](../packages/ui/llms/page-layout-palette-and-trees.md#pageheader-pagesection-collapsiblesection-accordion-widget-cardrow-sidepanel-toolbar-splitlayout).
+- `site.logs` in `kay/test` lists the entries the server logged during the test, a `logFrom` line of the app's included, so a log line is asserted with no spy on `console`: [Read the log](testing.md#read-the-log).
+- A component mounted by `mountComponent` has `setProps({ tiles })`, giving it new values for some of its props as a parent would, so a component following a prop is tested without a wrapper island: [Mounting a component](testing.md#mounting-a-component).
+- `signal-set-call` also reports `consent.set('yes')` on the `consent` signal of `kay/analytics`, and `--fix` assigns it: [Signals](components.md#signals).
+- `kay check` on a block written without the parameters its component calls it with (`@value` for a `Snippet<[item: Item]>`) names them in its help, as `@value(item)`, where it only said TS2322 on `Element`: [Slots and snippets](templates-elements-slots-snippets.md).
+- A `withQuery` link in an island follows the address: it is built again after each `navigate({ query })`, page swap, Back and `persisted` query write, instead of keeping the query of the render: [Navigating from code](navigation-from-code.md#navigating-from-code).
+
 ## 1.78.0
 
 - `site.submit(action, fields, { from: '/path' })` solves a `workChallenge` field of the form on that page, as `from: await site.visit(...)` does: [Testing](testing.md).
@@ -81,29 +98,5 @@ What each release before 1.79 added, and the end of a newest release that was cu
 - `kay build --compile --verify-load` loads a module reading a `defineEnv` field at load, such as an app's `session({ secret })` or `createAuth({ secret })`, with no environment: the field reads as a placeholder there: [Production](production.md#check-the-executable-starts).
 - `kay check` reports a kayjs-ui theme token or utility still written under its removed `kui-` name (`bg-kui-surface2`, `var(--color-kui-muted)`) as `removed-ui-token`, in `.kay` classes, `@apply`, stylesheets and src/ui.ts, and `kay check --fix` rewrites it where a new name stands for it; the `--kui-border-*` knobs are reported for a hand fix instead of being mapped to `--border-width`: [Upgrading](upgrading.md), [checks](lints.md).
 - An `ActionError`'s `message` reads what a visitor can show: the string given to `ctx.fail`, the form-wide message, the schema's field messages, or the handler data's `message`, rather than the serialized body: [Actions from islands](actions-from-islands.md).
-
-## 1.77.2
-
-- kayjs-ai `ask(..., { reasoning })` takes `'none'`, `'low'`, `'medium'` or `'high'` and sends it as `reasoning_effort` to an OpenAI-compatible server, so a reasoning model such as Ollama's answers a short question in about a second: [asking](../packages/ai/llms/asking.md#ask-options).
-- A direct child of `<body>` a script marks `data-kay-keep` lives on through every page swap, and kayjs-ui's `announce()` marks its live region, so words said just before a swap, such as kayjs-cms's `Title updated` on ending an inline edit, are still read: [Navigation](navigation.md).
-- The `server` Dockerfile `kay new` writes runs on `debian:trixie-slim` (Debian 13) instead of bookworm, which only gets security fixes: [kay new](project-new-and-add.md).
-- kayjs-mail requires nodemailer 10.2.1 and up, past three addressparser advisories (GHSA-85x2-q946-cp5h, GHSA-8c8m-p3m8-cjg8, GHSA-m943-m63m-w62w): [kayjs-mail](../packages/mail/llms.txt).
-
-## 1.77.1
-
-- A `kay build --compile` executable carries the modules declaring `s.Public`, so `publicEnv` and `/_kay/env.js` work where no `src` sits beside it, as in a container image holding the executable alone: [Environment](environment.md).
-
-## 1.77.0
-
-- kayjs-auth's tables rename the pre-1.71 `auth_*` ones again, for good, so a database still on them moves straight to this version with its users: [Upgrading](upgrading.md).
-- kayjs-ui `stepDraft`'s `maxAge` takes a duration only, and `deprecated-step-draft-max-age` is gone: [Upgrading](upgrading.md).
-
-## 1.78.0 (continued)
-
-- An `ActionError`'s `message` reads what a visitor can show: the string given to `ctx.fail`, the form-wide message, the schema's field messages, or the handler data's `message`, rather than the serialized body it carried before (`Action failed with 502: [...]`), which only a refusal that says nothing readable still gives: [Actions from islands](actions-from-islands.md).
-- The raw environment read check and `kay check --fix` leave a standalone binary's entry (a file a `bun build` script names, wherever it sits) with what it imports, the content config and a file with a `// kay-env: raw` line alone, so they no longer import the app's schema: [Environment](environment.md).
-- A test run (`NODE_ENV=test`, as `bun test` sets) no longer warns that `proxy.key` is set with no `KAY_PROXY_KEY`, so an app behind a proxy has no warning in every test file; `kay start` outside production still does: [proxy and security](proxy-and-security.md).
-- `kay upgrade` across a release that dropped deprecated lints installs the minor before that release first, so an app moving from 1.70 to the latest still gets the 1.71 and 1.72 forms rewritten instead of keeping them silently: [kay upgrade](check-and-tools.md).
-- `kay check` warns (`missing-captcha`) on a call to kayjs-auth's `register`, `requestPasswordReset`, `requestMagicLink` or `signInWithPassword` with no `captcha` option, which the default proof of work refuses (quiet project-wide, in the editor too, once a `createAuth` sets `captcha: false`): [Bots and breached passwords](../packages/auth/llms/hardening-and-testing.md).
 
 Releases before 1.78 are in the notes of their releases, at https://git.kaynooo.fr/kaynooo/kayjs/releases.
