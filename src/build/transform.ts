@@ -69,6 +69,7 @@ export interface Analysis {
   // What makes the component an island, or may make it one when `promote` is set.
   why?: string | undefined
   classes: string[]
+  actionForm: boolean
   diagnostics: Diagnostic[]
 }
 
@@ -178,8 +179,8 @@ export async function analyzeKayCached(source: string, filename: string, root: s
     return cached
   }
 
-  const { island, promote, why, classes, diagnostics } = compileKay(source, throughLinks(root, filename), { root, check, lints, importedSignals: signals })
-  const analysis = { island, promote, why, classes, diagnostics }
+  const { island, promote, why, classes, actionForm, diagnostics } = compileKay(source, throughLinks(root, filename), { root, check, lints, importedSignals: signals })
+  const analysis = { island, promote, why, classes, actionForm, diagnostics }
 
   if (diagnostics.every(diagnostic => diagnostic.checkOnly)) {
     analyzed.set(slot, { file: filename, key: entry.key, analysis })

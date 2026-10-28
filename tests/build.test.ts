@@ -2115,6 +2115,8 @@ describe('the size report', () => {
       'src/big.kay': '---\nimport { signal } from \'kay\'\nimport { words } from \'./data\'\n\nconst shown = signal(0)\n---\nbutton(type="button" onClick={() => shown.set(shown() + 1)}) {words[shown()]}\n',
       'src/small.kay': '---\nimport { signal } from \'kay\'\n\nconst n = signal(0)\n---\nbutton(type="button" onClick={() => n.set(n() + 1)}) {n()}\n',
       'src/routes/index.kay': '---\nimport Big from \'../big.kay\'\nimport Small from \'../small.kay\'\n---\nBig\nSmall\n',
+      // A page posting a form and holding no island, which loads the navigation-only entry.
+      'src/routes/contact.kay': '--- server\nimport { action, s } from \'kay\'\n\nexport const send = action(s.Object({ message: s.String() }), ({ message }) => message.length)\n---\nform(action={send})\n  input(name="message" aria-label="Message")\n  button Send\n',
     })
 
     const { report, dir, entry, entryImports, navEntry, navEntryImports } = await buildClient(root, { minify: true, report: 'modules' })

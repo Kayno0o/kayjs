@@ -174,7 +174,7 @@ A Copy button copies the message and stack as the terminal shows them. A compile
 
 ## What a page weighs
 
-`kay build` prints the JavaScript a page with islands loads, gzipped and minified. It lists the entry first, then the navigation-only entry a production page posting forms and holding no island loads instead, then what each island adds, the heaviest first.
+`kay build` prints the JavaScript a page with islands loads, gzipped and minified. It lists the entry first, then the navigation-only entry a production page posting forms and holding no island loads instead, then what each island adds, the heaviest first. The navigation-only entry is built only when a component renders a form posting to an action.
 
 ```sh
 kay build

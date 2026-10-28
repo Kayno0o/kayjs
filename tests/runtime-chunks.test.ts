@@ -1,7 +1,7 @@
 import { rm } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
 import { afterAll, describe, expect, it } from 'bun:test'
-import { buildClient } from '../src/build/client'
+import { buildClient, clientSession } from '../src/build/client'
 import { directImports } from '../src/build/direct-imports'
 import { kayPlugin } from '../src/build/plugin'
 import { fixtureCopy, scratchDir } from './scratch'
@@ -166,6 +166,32 @@ describe('the navigation-only entry', () => {
     expect(marking).toContain('hashchange')
     for (const [, from] of marking.matchAll(IMPORT_SPECIFIER))
       expect(await Bun.file(join(searched.dir, from!.slice(2))).exists(), `the navigation entry imports ${from} which is not a file of the build`).toBe(true)
+  }, 120_000)
+
+  it('is not built for an app rendering no form posting to an action, and is once an edit adds one', async () => {
+    const root = resolve(await fixtureCopy('runtime-chunks'))
+    const contact = join(root, 'src/routes/contact.kay')
+    const form = await Bun.file(contact).text()
+
+    dirs.push(root)
+    await rm(contact)
+
+    const client = await buildClient(root)
+    const files = await Array.fromAsync(new Bun.Glob('**/*.js').scan(client.dir))
+
+    expect(client.navEntry).toBeUndefined()
+    expect(client.entry).toBeDefined()
+    expect(files.filter(file => file.split('/').pop()!.startsWith('nav-'))).toEqual([])
+
+    // A string action posts as a plain form, which needs no entry.
+    await Bun.write(contact, 'form(action="/contact" method="post")\n  button Send\n')
+    expect((await buildClient(root)).navEntry).toBeUndefined()
+
+    const session = clientSession(root, {}, { incremental: true })
+
+    expect((await session.build(null)).manifest.navEntry).toBeUndefined()
+    await Bun.write(contact, form)
+    expect((await session.build(['src/routes/contact.kay'])).manifest.navEntry).toBeDefined()
   }, 120_000)
 })
 

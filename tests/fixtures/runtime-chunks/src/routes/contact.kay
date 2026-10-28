@@ -1,0 +1,8 @@
+--- server
+import { action, s } from 'kay'
+
+export const send = action(s.Object({ message: s.String() }), ({ message }) => message.length)
+---
+form(action={send})
+  input(name="message" aria-label="Message")
+  button Send

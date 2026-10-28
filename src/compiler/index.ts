@@ -89,6 +89,8 @@ export interface CompileResult {
   why?: string | undefined
   // The `.class` shorthand names, which CSS tools scanning for class names cannot read off `div.md:flex.w-1/2`.
   classes: string[]
+  // Set when the template renders a form posting to an action, which a page holding no island posts through the navigation-only entry.
+  actionForm: boolean
   diagnostics: Diagnostic[]
 }
 
@@ -251,7 +253,8 @@ export function compileKay(original: string, filename: string, options: CompileO
     diagnostics.push({ ...file.client, code: 'client-route-fence', message: 'A page, layout or special page cannot be `--- client`', note: 'it renders on the server', help: 'move what needs the browser to a component it renders, and make that one `--- client`' })
 
   const shorthands = diagnostics.some(diagnostic => (diagnostic.fixes?.length ?? 0) > 0) ? [...elementsIn(file.template)].flatMap(element => element.attributes.filter((attribute): attribute is Shorthand => attribute.kind === 'expression' && attribute.shorthand !== undefined)) : []
-  const classes = [...templateFacts(file).classes, ...expansion?.classes(file) ?? []]
+  const facts = templateFacts(file)
+  const classes = [...facts.classes, ...expansion?.classes(file) ?? []]
   const spelled = (options.check ? applyLints(diagnostics, source, options.lints) : diagnostics).map(diagnostic => spelledOut(diagnostic, shorthands, source))
   const reported = (expansion ? [...spelled.map(diagnostic => expansion.diagnostic(diagnostic)), ...coded(problems, 'template-syntax')] : spelled).sort((a, b) => a.start - b.start)
 
@@ -261,7 +264,7 @@ export function compileKay(original: string, filename: string, options: CompileO
     const lives = liveBindings(script, options.importedSignals)
     const imports = lives.map(binding => `import { ${binding.imported} as ${binding.local} } from ${JSON.stringify(binding.source)}\n`).join('')
 
-    return { tsx: `import { island as KayIsland } from 'kay/island'\n${imports}\nexport default KayIsland(${JSON.stringify(island)}, undefined${islandMessages(source, true, lives.map(binding => binding.local), typesAction(script))})\n`, map: new SourceMap([], []), bodyLines: [], moduleLines: [], island, why, classes, diagnostics: reported }
+    return { tsx: `import { island as KayIsland } from 'kay/island'\n${imports}\nexport default KayIsland(${JSON.stringify(island)}, undefined${islandMessages(source, true, lives.map(binding => binding.local), typesAction(script))})\n`, map: new SourceMap([], []), bodyLines: [], moduleLines: [], island, why, classes, actionForm: facts.actionForm, diagnostics: reported }
   }
 
   return {
@@ -273,6 +276,7 @@ export function compileKay(original: string, filename: string, options: CompileO
     promote,
     why,
     classes,
+    actionForm: facts.actionForm,
     diagnostics: reported,
   }
 }

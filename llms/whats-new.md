@@ -2,6 +2,10 @@
 
 What each release of kay and its libraries adds, newest first, each feature with where it is documented. kay and its libraries share one version, so one section covers them all; what a release breaks is in [Upgrading](upgrading.md).
 
+## Unreleased
+
+- `kay build` writes the navigation-only entry and its chunks only when a component renders a form posting to an action, so an app with none deploys no `nav-*` file: [building](build-and-start.md).
+
 ## 1.82.0
 
 - An extension's API module may default-export a function of the `ExtensionApp`, called with the `appFiles` modules as a `server` function is, so a library serves the app's data file, `api({ cors })` included, and the app writes no module only forwarding it; an island hands such a module to `call()`, `socket()`, `stream()` or `resource()`, typed off the routes it builds: [Component libraries](component-libraries.md).
