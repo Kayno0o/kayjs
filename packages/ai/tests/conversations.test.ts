@@ -394,6 +394,67 @@ describe('a conversation held on the server', () => {
     expect(await load).toMatchObject({ revision: 0, turns: [{ role: 'user', content: 'question' }], replying: 'reply-race-01' })
   })
 
+  it('refuses the next send of a tab whose reply lost its write to another tab sending at once, and lets the winner go on', async () => {
+    const store = sqliteConversations(':memory:')
+    const both = Promise.withResolvers<void>()
+    const first = Promise.withResolvers<void>()
+    const won = Promise.withResolvers<void>()
+    let reads = 0
+
+    // Both tabs read the conversation at revision 0 before either reply is stored.
+    ai({ conversations: { ...store, get: async (key) => {
+      const found = await store.get(key)
+
+      if (++reads === 2)
+        both.resolve()
+
+      await both.promise
+
+      return found
+    } } })
+
+    async function send(reply: string, header: string, provider: Provider) {
+      const request = new Request('http://localhost/_kay/action/chat', { headers: { 'x-kai-conversation': header, 'x-kai-reply': `start:${reply}` } })
+
+      sendFrom(request, '203.0.113.1')
+      nameUser(request, () => 'ann')
+
+      return answeringRequest(request, async () => {
+        let text = ''
+
+        for await (const snapshot of ask(said(reply), { provider }))
+          text = snapshot
+
+        return text
+      })
+    }
+
+    const answering = (gate: Promise<void>): Provider => ({
+      name: 'gated',
+      model: 'm',
+      async* stream() {
+        await gate
+        yield { text: 'answer' }
+        yield { finish: 'stop' }
+      },
+    })
+
+    const winner = send('reply-tab-a1', `send:${ID}:0`, answering(first.promise))
+    // The second tab's reply ends once the first one's is stored, so its write is the one refused.
+    const loser = send('reply-tab-b1', `send:${ID}:0`, answering(won.promise))
+
+    first.resolve()
+    expect(await winner).toBe('answer')
+    won.resolve()
+    expect(await loser).toBe('answer')
+
+    const model = recording()
+
+    expect(await rejection(visit(said('from b'), { provider: model.provider }, { header: `send:${ID}:1:reply-tab-b1` }))).toBeInstanceOf(AiError)
+    expect(await visit(said('from a'), { provider: model.provider }, { header: `send:${ID}:1:reply-tab-a1` })).toBe('answer 1')
+    expect(model.asked).toHaveLength(1)
+  })
+
   it('reads two turns of one role as one once an empty turn between them is left out', async () => {
     const model = recording()
 

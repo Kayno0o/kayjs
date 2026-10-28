@@ -135,7 +135,8 @@ test('shows the conversation the address names, posts the new message alone and 
   await untilHolds(() => posts.length === 2)
   await Bun.sleep(0)
   expect(posts[1]!.messages).toEqual([{ role: 'user', content: 'more' }])
-  expect(posts[1]!.headers[CONVERSATION_HEADER]).toBe(`send:${SHOWN}:3`)
+  // It names the reply it counted, which the server checks wrote the last turn.
+  expect(posts[1]!.headers[CONVERSATION_HEADER]).toBe(`send:${SHOWN}:3:${posts[0]!.headers[REPLY_HEADER]!.slice('start:'.length)}`)
   expect(posts[1]!.headers[REPLACES_HEADER]).toBe('regenerate:2')
   second.finish()
   expect(turns(session)).toEqual(['user: hi', 'assistant: hello', 'user: more', 'assistant: third answer'])
@@ -322,7 +323,7 @@ test('resumes a reply the load says still runs past its request, after the messa
 
   session.draft.set('again')
   await session.send()
-  expect(posts[1]!.headers[CONVERSATION_HEADER]).toBe(`send:${SHOWN}:3`)
+  expect(posts[1]!.headers[CONVERSATION_HEADER]).toBe(`send:${SHOWN}:3:reply-0001`)
   next.finish()
 })
 

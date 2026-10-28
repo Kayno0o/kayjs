@@ -165,6 +165,12 @@ export function heldReply(call: HeldCall, prompt: Message[], options: AskOptions
       throw new AiError('conflict', `the conversation is at revision ${revision} and the chat posted to revision ${call.revision}, as another tab wrote to it`)
 
     const turns = stored?.turns ?? []
+    const last = turns.at(-1)?.reply
+
+    // Two tabs sending at once both count the revision the write that won reached: the reply that wrote the last turn tells the one whose write lost.
+    if (call.after !== undefined && last !== undefined && last !== call.after)
+      throw new AiError('conflict', 'the chat counted a reply whose write another tab won, as both sent at once')
+
     const drop = Math.min(replacesOf(call.request)?.turns ?? 0, turns.length)
     // The Chat posts its new message alone; anything posted before it is the server's to hold, not the client's to add.
     const posted = prompt.slice(-1)
@@ -172,6 +178,7 @@ export function heldReply(call: HeldCall, prompt: Message[], options: AskOptions
     const reply = make(fitted(turns.slice(0, turns.length - drop), posted, maxInputChars))
     const done = Promise.withResolvers<void>()
     const started = replyCallOf(call.request)
+    const writer = started?.op === 'start' ? started.id : undefined
     const message = posted[0]
     const replying = options.outlive === true && started?.op === 'start' && started.id !== undefined && message !== undefined ? { id: started.id, drop, message: { role: message.role, content: message.content } } : undefined
 
@@ -183,7 +190,7 @@ export function heldReply(call: HeldCall, prompt: Message[], options: AskOptions
 
     write = async (ended) => {
       try {
-        await kept(ended, key, revision, drop, posted, options)
+        await kept(ended, key, revision, drop, posted, options, writer)
       }
       finally {
         done.resolve()
@@ -210,7 +217,8 @@ async function ending(reply: Reply): Promise<[calls: readonly unknown[], finish:
 }
 
 // Stores the exchange as the Chat shows it: the posted message, and the reply when it said or called anything, a reply cut off by a failure as one stopped. A reply that failed or was stopped before its first word, which the Chat takes back, stores nothing.
-async function kept(reply: Reply, key: ConversationKey, revision: number, drop: number, prompt: readonly Message[], options: AskOptions): Promise<void> {
+// Each turn it adds names the reply that wrote it, which the next send of that Chat names back.
+async function kept(reply: Reply, key: ConversationKey, revision: number, drop: number, prompt: readonly Message[], options: AskOptions, writer: string | undefined): Promise<void> {
   let text = ''
   let failed = false
 
@@ -230,7 +238,7 @@ async function kept(reply: Reply, key: ConversationKey, revision: number, drop: 
 
   const sources = text === '' ? [] : usableSources(options.sources)
   const answer: StoredTurn[] = text === '' && calls.length === 0 ? [] : [{ role: 'assistant', content: text, ...sources.length > 0 && { sources }, ...(failed || finish === undefined) && { stopped: true } }]
-  const add: StoredTurn[] = [...prompt.map(({ role, content }) => ({ role, content })), ...answer]
+  const add: StoredTurn[] = [...prompt.map(({ role, content }) => ({ role, content })), ...answer].map(turn => writer === undefined ? turn : { ...turn, reply: writer })
 
   try {
     if (await conversationStore().write(key, revision, { drop, add, title: titleOf(prompt.find(({ role }) => role === 'user')?.content ?? '') }) === undefined)

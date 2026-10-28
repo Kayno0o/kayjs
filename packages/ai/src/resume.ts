@@ -43,7 +43,7 @@ export function replacesOf(request: Request | undefined): Replaces | undefined {
   return match ? { kind: match[1] as Replaces['kind'], turns: Number(match[2]) } : undefined
 }
 
-// The header a Chat holding its conversation on the server sends with each call: `send:<id>:<revision>` posts a message to the conversation as the Chat last saw it, `load:<id>` (or `load` alone) and `list` read, `rename:<id>` and `remove:<id>` change it.
+// The header a Chat holding its conversation on the server sends with each call: `send:<id>:<revision>` posts a message to the conversation as the Chat last saw it, `:<reply>` after it naming the last reply it counted in that revision, `load:<id>` (or `load` alone) and `list` read, `rename:<id>` and `remove:<id>` change it.
 export const CONVERSATION_HEADER = 'x-kai-conversation'
 
 export interface ConversationCall {
@@ -52,9 +52,11 @@ export interface ConversationCall {
   id: string | undefined
   // The revision of the conversation the Chat last saw, on a send: 0 for one not stored yet.
   revision: number
+  // The reply the Chat last counted in that revision, on a send that follows one: undefined once it read the conversation.
+  after?: string | undefined
 }
 
-const CONVERSATION = /^(?:list|load|(?:load|rename|remove):([\w-]{8,64})|send:([\w-]{8,64}):(\d{1,9}))$/
+const CONVERSATION = /^(?:list|load|(?:load|rename|remove):([\w-]{8,64})|send:([\w-]{8,64}):(\d{1,9})(?::([\w-]{8,64}))?)$/
 
 // The id a Chat names a conversation by, which the page's `conversation` param holds.
 export const CONVERSATION_ID = /^[\w-]{8,64}$/
@@ -74,5 +76,5 @@ export function conversationCallOf(request: Request | undefined): ConversationCa
   const colon = header.indexOf(':')
   const op = (colon === -1 ? header : header.slice(0, colon)) as ConversationCall['op']
 
-  return { op, id: match[1] ?? match[2], revision: Number(match[3] ?? 0) }
+  return { op, id: match[1] ?? match[2], revision: Number(match[3] ?? 0), ...match[4] !== undefined && { after: match[4] } }
 }

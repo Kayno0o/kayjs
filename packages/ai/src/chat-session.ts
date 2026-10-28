@@ -108,6 +108,8 @@ interface Reply {
   resumed: boolean
   // The conversation the reply was asked in, counted by `left`: a reply ending once the chat left it for another joins no history.
   conversation: number
+  // The id it was asked under, kept once the reply is done with, as the next send names the last reply counted in the revision.
+  name: string
 }
 
 // What a regenerate or an edit replaces (`regenerate:2`), kept for Try again, which posts the same request, and the history as it stood before it cut it, put back when that post is stopped or refused before any word. Both go once a reply lands, which leaves no message for Try again.
@@ -193,6 +195,8 @@ export function createChatSession(options: ChatSessionOptions) {
   const conversations = signal<ConversationSummary[]>([])
   let shown: string | undefined
   let revision = 0
+  // The reply that last raised the revision, which the server checks wrote the last turn, as a tab whose write lost to another's raised it too; none once the conversation is read.
+  let counted: string | undefined
   let mounted = false
   // Counts the loads, so only the latest one shows, and names the conversation the last one asked for, so the address naming it loads it once.
   let loads = 0
@@ -248,6 +252,7 @@ export function createChatSession(options: ChatSessionOptions) {
       owned.set(true)
       shown = answer.id
       revision = answer.revision
+      counted = undefined
       replacement = undefined
       replying = answer.replying
 
@@ -304,6 +309,7 @@ export function createChatSession(options: ChatSessionOptions) {
     left++
     shown = undefined
     revision = 0
+    counted = undefined
     replacement = undefined
     history.set([])
   }
@@ -441,6 +447,7 @@ export function createChatSession(options: ChatSessionOptions) {
 
     if (held && (text !== '' || made.length > 0 || (state === 'done' && reply?.resumed !== true))) {
       revision++
+      counted = reply?.name
       touched()
     }
 
@@ -503,7 +510,8 @@ export function createChatSession(options: ChatSessionOptions) {
     }
 
     // A reply is named, so a Stop ends it on the server and, for a Chat that remembers its history in the tab, a reload finds it.
-    const current: Reply = { abort: new AbortController(), id: resuming ?? newReplyId(), outlives: false, resumed: resuming !== undefined, conversation: left }
+    const name = resuming ?? newReplyId()
+    const current: Reply = { abort: new AbortController(), id: name, name, outlives: false, resumed: resuming !== undefined, conversation: left }
 
     if (options.remember !== undefined && !held && current.id !== undefined)
       keepPending(options.remember, current.id)
@@ -524,7 +532,7 @@ export function createChatSession(options: ChatSessionOptions) {
     try {
       // A turn that only called tools has no text to post, which a provider refuses.
       // A resume after a reload comes once the server has dropped the turns.
-      const stream = await call(current.abort.signal, { [REPLY_HEADER]: `${resuming === undefined ? 'start' : 'resume'}:${current.id}`, ...resuming === undefined && replacement !== undefined && { [REPLACES_HEADER]: replacement.header }, ...held && { [CONVERSATION_HEADER]: `send:${shown}:${revision}` } })
+      const stream = await call(current.abort.signal, { [REPLY_HEADER]: `${resuming === undefined ? 'start' : 'resume'}:${current.id}`, ...resuming === undefined && replacement !== undefined && { [REPLACES_HEADER]: replacement.header }, ...held && { [CONVERSATION_HEADER]: `send:${shown}:${revision}${counted === undefined ? '' : `:${counted}`}` } })
 
       if (current.abort.signal.aborted) {
         stream.close()

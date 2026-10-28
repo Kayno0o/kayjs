@@ -10,6 +10,8 @@ export interface StoredTurn {
   content: string
   sources?: Source[] | undefined
   stopped?: boolean | undefined
+  // The id of the Chat's reply whose write added it, which a store keeps with the turn: a tab whose write lost to another's is then refused its next send.
+  reply?: string | undefined
 }
 
 export interface StoredConversation extends ConversationSummary {
