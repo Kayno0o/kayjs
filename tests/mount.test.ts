@@ -436,7 +436,8 @@ describe('mount', () => {
     expect(document.activeElement).toBe(root.querySelector('.name'))
     expect(lines).toEqual(['input Ada'])
 
-    // Enter commits, then submits the form.
+    // Enter commits, then submits the form, one holding a control named requestSubmit too, which takes the method's place in a browser.
+    Object.defineProperty(root.querySelector('form')!, 'requestSubmit', { value: document.createElement('input'), configurable: true })
     await press('Enter')
     expect(lines).toEqual(['input Ada', 'change Ada', 'submit'])
     lines.length = 0

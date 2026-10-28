@@ -8,7 +8,7 @@ import SaveFormMoment from '../tests/fixture/src/components/save-form-moment.kay
 import SaveFormSignals from '../tests/fixture/src/components/save-form-signals.kay'
 import SaveFormComponent from '../tests/fixture/src/components/save-form.kay'
 import { untilHolds } from '../tests/until'
-import { click } from './dom'
+import { click, clobber } from './dom'
 
 let mounted: Mounted | undefined
 const saved: string[] = []
@@ -298,6 +298,22 @@ describe('SaveForm', () => {
     expect(saved).toEqual(['Grace', 'Hopper'])
   })
 
+  test('saves on Ctrl+S and discards back to the saved values on a form holding controls named elements, requestSubmit and reset', async () => {
+    const root = await saveForm(async input => input.name)
+
+    clobber(root.querySelector('form')!, 'elements', 'requestSubmit', 'reset')
+    type(root, 'Grace')
+    await settle()
+    root.querySelector('#name')!.dispatchEvent(new KeyboardEvent('keydown', { key: 's', ctrlKey: true, bubbles: true, cancelable: true }))
+    await settle()
+    type(root, 'Hopper')
+    await settle()
+    click(buttons(root)[0]!)
+    await settle()
+
+    expect([saved, root.querySelector<HTMLInputElement>('#name')!.value, status(root)]).toEqual([['Grace'], 'Grace', 'No unsaved change.'])
+  })
+
   test('saves on the shortcut it is given instead of Ctrl+S, and on none with false', async () => {
     const root = await saveForm(async input => input.name, 'ctrl+enter')
 
@@ -465,7 +481,7 @@ describe('SaveForm confirm', () => {
     expect(dialogOf(root)).toBeNull()
   })
 
-  test('asks before calling the action, and saves once confirmed', async () => {
+  test('asks before calling the action, and saves once confirmed, on a form holding a control named requestSubmit too', async () => {
     const calls: string[] = []
 
     mounted = await mountComponent(SaveFormComponent, { save: async (input: { name: string }) => {
@@ -475,10 +491,12 @@ describe('SaveForm confirm', () => {
     }, onSaved: (name: string) => saved.push(name), onDiscard: () => discarded++, confirm: 'Apply this change?' })
 
     const { root } = mounted
+    const form = root.querySelector('form')!
 
+    clobber(form, 'requestSubmit')
     type(root, 'Grace')
     await settle()
-    root.querySelector('form')!.requestSubmit()
+    HTMLFormElement.prototype.requestSubmit.call(form)
     await untilHolds(() => dialogOf(root)?.open === true)
 
     expect([calls, dialogOf(root)!.textContent]).toEqual([[], expect.stringContaining('Apply this change?')])

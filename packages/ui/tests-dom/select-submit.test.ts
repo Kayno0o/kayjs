@@ -2,6 +2,7 @@ import type { Mounted } from 'kay/test'
 import { afterEach, expect, test } from 'bun:test'
 import { mountComponent, settle } from 'kay/test'
 import SubmittingSelect from '../tests/fixture/src/components/submitting-select.kay'
+import { clobber } from './dom'
 
 let mounted: Mounted | undefined
 
@@ -28,9 +29,10 @@ async function filter() {
   return { select, posts, choose, key }
 }
 
-test('a Select with submit posts once a mouse pick lands', async () => {
+test('a Select with submit posts once a mouse pick lands, in a form holding a control named requestSubmit too', async () => {
   const { select, posts, choose } = await filter()
 
+  clobber(select.form!, 'requestSubmit')
   select.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }))
   await choose('b')
 

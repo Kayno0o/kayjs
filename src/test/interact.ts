@@ -83,7 +83,10 @@ export function interactions(root: HTMLElement, settle: () => Promise<void>): In
       if (element.dispatchEvent(new KeyboardEvent('keydown', init))) {
         if (key === 'Enter' && element instanceof HTMLInputElement) {
           commit(element)
-          element.form?.requestSubmit()
+
+          // Called through the prototype, as a control named `requestSubmit` takes the method's place on the form.
+          if (element.form)
+            HTMLFormElement.prototype.requestSubmit.call(element.form)
         }
         else if (key === 'Enter' && element instanceof HTMLButtonElement) {
           element.click()

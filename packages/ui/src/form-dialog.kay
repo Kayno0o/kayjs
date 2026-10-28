@@ -61,13 +61,13 @@ async function submit(event: SubmitEvent) {
   onOpenChange(false)
 }
 
-// Enter in a single-line field submits on its own; a textarea keeps Enter for new lines and takes Ctrl+Enter.
+// Enter in a single-line field submits on its own; a textarea keeps Enter for new lines and takes Ctrl+Enter. The method is called through the prototype, as a control named `requestSubmit` takes its place on the form.
 function submitOnCtrlEnter(event: KeyboardEvent) {
-  if (event.key !== 'Enter' || !event.ctrlKey)
+  if (event.key !== 'Enter' || !event.ctrlKey || !form)
     return
 
   event.preventDefault()
-  form?.requestSubmit()
+  HTMLFormElement.prototype.requestSubmit.call(form)
 }
 ---
 // Only a click outside or Escape closes the dialog while `open` is still true; every other way has already closed it.

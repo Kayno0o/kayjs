@@ -88,9 +88,9 @@ function snapshot() {
   return JSON.stringify([...new FormData(form)].map(([name, value]) => [name, typeof value === 'string' ? value : [value.name, value.size, value.lastModified]]))
 }
 
-// What each control holds now, which becomes its default once saved, the library's signal-driven ones included: a Discard then goes back to the saved values, not to the ones first rendered.
+// What each control holds now, which becomes its default once saved, the library's signal-driven ones included: a Discard then goes back to the saved values, not to the ones first rendered. The controls are read through the prototype, as a control named `elements` takes their list's place on the form.
 function values(): () => void {
-  const held = [...form!.elements].map((control): (() => void) => {
+  const held = [...Reflect.get(HTMLFormElement.prototype, 'elements', form!)].map((control): (() => void) => {
     // The search box of an IconPicker or a MultiSelect is no saved value: a reset empties it.
     if (control.hasAttribute('data-kui-search'))
       return () => undefined
@@ -236,10 +236,16 @@ async function submit(event: SubmitEvent) {
     onSaved?.(done.result as Answer<Success<Output>>)
 }
 
+// The form's methods are called through its prototype, as a control named `requestSubmit` or `reset` takes their place on the form.
+function requestSubmit() {
+  if (form)
+    HTMLFormElement.prototype.requestSubmit.call(form)
+}
+
 function confirmSave() {
   asking = false
   confirmed = true
-  form?.requestSubmit()
+  requestSubmit()
   // A form that is invalid fires no submit to take it.
   confirmed = false
 }
@@ -248,7 +254,9 @@ function discard() {
   if (busy())
     return
 
-  form?.reset()
+  if (form)
+    HTMLFormElement.prototype.reset.call(form)
+
   issues = {}
   // A question still being fetched is not asked of the changes discarded.
   asking = false
@@ -257,7 +265,7 @@ function discard() {
 }
 
 // Ctrl or Cmd with S saves unless `shortcut` says otherwise, the browser's own save dialog kept away even when there is nothing to save.
-shortcut(() => saveKeys || null, () => form?.requestSubmit(), { on: () => form })
+shortcut(() => saveKeys || null, requestSubmit, { on: () => form })
 ---
 form(part="root" ref={element => form = element} onSubmit={submit} onInput={checkSoon} onChange={checkSoon})
   div(part="grid")

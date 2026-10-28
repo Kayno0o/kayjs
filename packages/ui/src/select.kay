@@ -72,9 +72,12 @@ const OPENERS = new Set([' ', 'F4'])
 let keyed = false
 let waiting = false
 
+// Called through the prototype, as a control named `requestSubmit` takes the method's place on the form.
 function submitNow(select: HTMLSelectElement) {
   waiting = false
-  select.form?.requestSubmit()
+
+  if (select.form)
+    HTMLFormElement.prototype.requestSubmit.call(select.form)
 }
 
 function picked(select: HTMLSelectElement) {

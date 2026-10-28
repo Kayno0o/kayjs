@@ -2,7 +2,7 @@ import type { Mounted } from 'kay/test'
 import { afterEach, describe, expect, test } from 'bun:test'
 import { mountComponent, settle } from 'kay/test'
 import FormDialogComponent from '../tests/fixture/src/components/form-dialog.kay'
-import { click } from './dom'
+import { click, clobber } from './dom'
 
 let mounted: Mounted | undefined
 const saved: string[] = []
@@ -164,7 +164,7 @@ describe('FormDialog', () => {
     expect([...root.querySelectorAll('.kui-toast [data-part=message]')].at(-1)?.textContent).toBe('Could not rename')
   })
 
-  test('submits on Ctrl+Enter from a textarea, which keeps a plain Enter for new lines', async () => {
+  test('submits on Ctrl+Enter from a textarea, which keeps a plain Enter for new lines, on a form holding a control named requestSubmit too', async () => {
     let calls = 0
     const root = await formDialog(async () => {
       calls++
@@ -172,6 +172,8 @@ describe('FormDialog', () => {
       return 'Ada'
     })
     const notes = root.querySelector('#notes')!
+
+    clobber(notes.closest('form')!, 'requestSubmit')
 
     notes.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))
     await settle()

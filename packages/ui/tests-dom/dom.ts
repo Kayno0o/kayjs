@@ -16,6 +16,16 @@ export function kuiClasses(element: Element | null | undefined): string | undefi
   return element === null || element === undefined ? undefined : [...element.classList].filter(name => name.startsWith('kui-')).join(' ')
 }
 
+// What a browser does for a form holding a control named after one of its members, which happy-dom leaves out: the control takes the member's place on the form.
+export function clobber(form: HTMLFormElement, ...names: string[]): void {
+  for (const name of names) {
+    const control = document.createElement('input')
+
+    control.name = name
+    Object.defineProperty(form, name, { value: control, configurable: true })
+  }
+}
+
 export function click(element: Element | null): void {
   if (!(element instanceof HTMLElement))
     throw new Error('nothing to click')
