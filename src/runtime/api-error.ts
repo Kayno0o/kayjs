@@ -1,4 +1,5 @@
 // What `call()` throws when a route refused or no answer came, aborting aside, and what an action's call throws as an `ActionError`: one class to catch for both.
+// kept: free
 export class ApiError extends Error {
   override name = 'ApiError'
 

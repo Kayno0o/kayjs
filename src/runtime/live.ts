@@ -169,6 +169,7 @@ function readMessage(data: unknown): unknown {
 
 // The handler a message's `type` names, given the message: one function per type in place of a `switch`, every type handled, as the compiler checks.
 // A type no handler names, such as one a newer server sends, throws, saying which.
+// kept: request
 export function dispatch<Message extends { type: string }, Handlers extends { [Type in Message['type']]: (message: Extract<Message, { type: Type }>) => unknown }>(message: Message, handlers: Handlers): ReturnType<Handlers[Message['type']]> {
   if (!Object.hasOwn(handlers, message.type))
     throw new TypeError(`kay: dispatch() has no handler for a message of type ${message.type}`)
@@ -483,6 +484,7 @@ export function routeUrl(module: unknown, path: string, options: UrlInput = {}):
 
 // Where a route of a module under `src/api` is served, its params filled in and its query appended, under the site's `base` in the browser: the path follows `apiPath`, so code naming a route never writes `/api/...`. On the server the module must be mounted, which a prerender never does.
 // A handler passes its `request` for the module it runs in, which it cannot name inside its own chain.
+// kept: request, it names a route of a module the running server mounted, which a prerender never loads.
 export function apiUrl(module: unknown, path = '/', options: UrlInput = {}): string {
   return withBase(routeUrl(module, path, options))
 }
@@ -508,6 +510,7 @@ export type SocketOf<Module, Path> = Socket<Sent<SocketRoute<Module, Path>>, Rec
 
 // Opens a websocket route of a module under `src/api` from an island, once it is in the page: messages typed both ways from the route's `body` and `response` schemas, sent as Elysia reads them.
 // Reconnects after a drop, and closes with the component that opened it.
+// kept: request
 export function socket<Module, const Path extends SocketPath<Module>>(module: Module, path: Path, ...[options]: Optional<SocketOptions<Module, Path>>): SocketOf<Module, Path> {
   // The URL is made in the browser only, as a page prerendering the island imports the module unmounted; a refused param throws here, at the call, rather than from the mount.
   const route = typeof document === 'undefined' ? undefined : routeUrl(module, path, options as UrlInput | undefined)
@@ -593,6 +596,7 @@ function iterate(source: (signal: AbortSignal) => AsyncIterable<unknown>): Event
 
 // Reads a route of a module under `src/api` answering with `eventStream()` from an island, once it is in the page, or with `start: false` each time `start()` is called: each value typed as the route sends it, Dates, Maps and Sets included.
 // A GET stream that drops reconnects; `close()` aborts the request, and a stream closes with the component that opened it.
+// kept: request
 export function stream<Module, const Path extends StreamPath<Module>, const M extends StreamMethod<NodeAt<Module, Path>> = never>(module: Module, path: Path, options: MethodOption<NodeAt<Module, Path>, M> & { start: false }): StreamRun<StreamValue<MethodRoute<Module, Path, Chosen<M>>>, StreamStartOptions<Module, Path, M>>
 export function stream<Module, const Path extends StreamPath<Module>, const M extends StreamMethod<NodeAt<Module, Path>> = never>(module: Module, path: Path, ...[options]: Optional<StreamOptions<Module, Path, M>>): StreamOf<Module, Path, M>
 // Reads any async iterable the same way, once the island is in the page: `source` gets a signal that aborts when `close()` is called or the component is gone, and it has to stop on it, as a source ignoring the signal is not released while it waits for its next value. The stream is `done` once the iterable ends and `failed` when it throws.
@@ -715,6 +719,7 @@ function refusal(answer: unknown, response: Response): string {
 }
 
 // Reads a GET route of a module under `src/api` from an island, once it is in the page, typed from the route. Options given as a function are read reactively: the route is asked again when a signal they read changes, and an answer a newer request overtook is dropped.
+// kept: request
 export function resource<Module, const Path extends ResourcePath<Module>>(module: Module, path: Path, ...[options]: Optional<ResourceOptions<Module, Path> | (() => ResourceOptions<Module, Path>)>): ResourceOf<Module, Path>
 // Reads anything else the same way: `load` gets a signal that aborts when it is superseded or the component is gone, and the signals it reads before its first await are tracked, so it runs again when one changes. A throw is the `error()`, its `status` 0 unless it is an `ApiError`.
 export function resource<T>(load: (signal: AbortSignal) => T | PromiseLike<T>): Resource<Awaited<T>>
@@ -806,6 +811,7 @@ export function resource(module: unknown, path?: string, options?: UrlInput | ((
 export { ApiError }
 
 // The text of a refusal a visitor can read: the message of an `ApiError` the route answered, else `fallback` for an error that came with no answer (status 0, whose message is the browser's) or is no `ApiError`. An action's refusal (an `ActionError`, which carries `errors`) gives its form-wide message, else `fallback`.
+// kept: free
 export function refusalMessage(error: unknown, fallback: string): string {
   if (!(error instanceof ApiError) || error.status === 0)
     return fallback
@@ -880,6 +886,7 @@ function track<Module, const Path extends CallPath<Module>>(module: Module, path
 }
 
 // `call` with `track` on it, built in its declaration and marked pure so a bundle dropping `call` drops `track` and the tracker too.
+// kept: request
 export const call = /* @__PURE__ */ Object.assign(callApi, { track })
 
 // The first segment of a validation path: `/title` and `title.0` name `title`.

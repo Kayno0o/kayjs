@@ -35,6 +35,7 @@ export function wholeSeconds(value: unknown, what: string): number {
 
 // The milliseconds a duration stands for, `'250ms'` or `'3s'`, for a timer of your own; a bare number throws.
 // No check on the text, as a timer takes whatever it gets; a text that is no duration is NaN.
+// kept: free
 export function durationMs(value: Duration): number {
   if (typeof value !== 'string')
     throw new Error(`kay: a duration here takes its unit, such as '3s' or '250ms', not ${String(value)}`)

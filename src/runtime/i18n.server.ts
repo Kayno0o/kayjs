@@ -20,6 +20,7 @@ function current(name: string): LocaleState {
 }
 
 // The message at `key` in the request's locale, its placeholders filled; an island's messages go to the browser with it.
+// kept: free
 export const t = ((key: string, params?: Record<string, MessageValue>) => {
   const state = current('t()')
 
@@ -30,6 +31,7 @@ export const t = ((key: string, params?: Record<string, MessageValue>) => {
 }) as Translate
 
 // The message at `key` with each of its tags rendered through the block of that name: `T(key="intro")` with `@about(text)` for `<about>our story</about>`.
+// kept: free
 export const T = ((props: { key: string }) => {
   const state = current('T')
 
@@ -42,12 +44,14 @@ export const T = ((props: { key: string }) => {
   return [html(`<!--${PART_START}-->`), richMessage(state, props.key, props), html(`<!--${PART_END}-->`)] as JSX.Element
 }) as RichText
 
+// kept: free
 export function locale(): Locale {
   // eslint-disable-next-line ts/no-unnecessary-type-assertion -- Locale is a string in kay itself and an app's own locales once its Register names them
   return current('locale()').locale as Locale
 }
 
 // A path of the site in the request's locale, or in the one given: `localize('/about')` is `/en/about` on an English page.
+// kept: free
 export const localize = ((href: string, target?: string) => {
   const state = current('localize()')
 
@@ -55,6 +59,7 @@ export const localize = ((href: string, target?: string) => {
 }) as Localize
 
 // The page being rendered in another locale, for a language switcher.
+// kept: free
 export function alternate(target: Locale): string {
   const state = current('alternate()')
 
@@ -67,11 +72,13 @@ export function alternate(target: Locale): string {
 }
 
 // Every locale the site is served in, the default one first as `i18n` lists it, for a language switcher: `for code of locales()` with `alternate(code)` and `localeName(code)`.
+// kept: free
 export function locales(): Locale[] {
   return current('locales()').settings.locales as Locale[]
 }
 
 // A locale named in its own language, `Français` for `fr`, whichever locale the page is in.
+// kept: free
 export function localeName(target: Locale): string {
   return localeNameIn(target)
 }
@@ -81,22 +88,27 @@ function formatLocale(): string {
   return localeState()?.locale ?? siteDefaultLocale()
 }
 
+// kept: free
 export function formatNumber(value: number, options?: NumberFormatOptions): string {
   return formatNumberIn(formatLocale(), value, options)
 }
 
+// kept: free, a format by the locale, which a kept copy is stored per.
 export function formatBytes(bytes: number, options?: NumberFormatOptions): string {
   return formatBytesIn(formatLocale(), bytes, options)
 }
 
+// kept: free, a format by the locale, which a kept copy is stored per.
 export function formatDuration(milliseconds: number, options?: DurationFormatOptions): string {
   return formatDurationIn(formatLocale(), milliseconds, options)
 }
 
+// kept: free
 export function formatDate(value: Date | number, options?: DateFormatOptions): string {
   return formatDateIn(formatLocale(), value, options)
 }
 
+// kept: request, it reads the clock.
 export function formatRelativeTime(value: Date | number, options?: RelativeTimeOptions): string
 export function formatRelativeTime(value: number, unit: Intl.RelativeTimeFormatUnit, options?: RelativeFormatOptions): string
 export function formatRelativeTime(value: Date | number, unitOrOptions?: Intl.RelativeTimeFormatUnit | RelativeTimeOptions, options?: RelativeFormatOptions): string {
@@ -104,6 +116,7 @@ export function formatRelativeTime(value: Date | number, unitOrOptions?: Intl.Re
 }
 
 // A date relative to the page's render time, formatted as `formatRelativeTime` does; in the browser it goes on ticking, see the browser's.
+// kept: request, it reads the clock.
 export function relativeTime(value: () => Date | number, options?: RelativeFormatOptions): () => string {
   const state = current('relativeTime()')
 
@@ -114,11 +127,13 @@ export function relativeTime(value: () => Date | number, options?: RelativeForma
   return () => formatRelativeTimeIn(locale, value(), { ...options, now })
 }
 
+// kept: free
 export function formatList(items: Iterable<string>, options?: ListFormatOptions): string {
   return formatListIn(formatLocale(), items, options)
 }
 
 // Which way a locale's script runs, the request's or any one given, for what lays itself out by hand: `rtl` or `ltr`.
+// kept: free
 export function direction(of?: string): Direction {
   return textDirection(of ?? formatLocale())
 }

@@ -39,6 +39,7 @@ export function previewState(): PreviewState | undefined {
 }
 
 // Whether the page renders for a visitor in preview mode, on the server: drafts show, and no prerendered or cached copy is read.
+// kept: request
 export function previewing(): boolean {
   const state = previewState()
 
@@ -58,6 +59,7 @@ export function renderingForVisitor(): boolean {
 }
 
 // Whether the page renders for a visitor in edit mode, a CMS editing its content on the page: preview mode, its fields marked for the editor.
+// kept: request
 export function editing(): boolean {
   return previewState()?.edit === true
 }

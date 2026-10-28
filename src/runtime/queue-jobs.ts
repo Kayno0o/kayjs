@@ -37,6 +37,7 @@ export function readJobsWith(read: Read): void {
 
 // The waiting and running jobs of a queue declared with `live`, earliest due first, in an island: `jobs<{ target: string }>('scans')` follows them as jobs are added, taken, done or failed, in every process.
 // The page proves the queue it read as it does any live value, so whoever may render the page may follow it.
+// kept: request
 export function jobs<Payload = unknown, Progress = unknown>(queue: string): QueuedJob<Payload, Progress>[] {
   handle ??= (live as (initial: Read, id: string, name: string) => Read)((name: string) => {
     if (typeof KAY_BROWSER === 'undefined' && typeof document === 'undefined' && readJobs === undefined)

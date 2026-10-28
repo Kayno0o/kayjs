@@ -8,146 +8,11 @@ import { PAGE, PAGE_SETTINGS } from '../compiler/page-settings'
 import { parseKay } from '../compiler/parser'
 import { analyzeScript, analyzeServer } from '../compiler/script'
 import { templateReads } from '../compiler/template-reads'
+import { CONTENT_EXPORTS, I18N_EXPORTS, IMAGE_EXPORTS, KAY_EXPORTS } from './kept-exports'
 import { neverWritten, parseLiteral } from './literal-writes'
 import { exposedBy, laterExportAt, stateAt } from './module-state'
 import { routeChain } from './routes'
 
-// Every export of `kay` and whether a page importing it stays the same for every visitor and every moment: `free` reads no request, cookie, environment or clock; `request` does, or opens a route, a socket or a call that does.
-// `action` is `free`: it registers a route that answers a POST, which the page's own render never runs, and a kept page is refreshed after the first request that can write.
-// `persisted` is `local`: it reads the request's cookie or query, so it is free only where every use says `storage: 'local'`, kept in `localStorage` and read once the page has hydrated.
-// One list, so an export missing from it is found by `tests/kept-pages.test.ts`, which holds it to the exports of `kay`.
-export const KAY_EXPORTS: Record<string, 'free' | 'request' | 'local'> = {
-  signal: 'free',
-  memo: 'free',
-  effect: 'free',
-  batch: 'free',
-  flush: 'free',
-  onCleanup: 'free',
-  onMount: 'free',
-  root: 'free',
-  untrack: 'free',
-  store: 'free',
-  snapshot: 'free',
-  selection: 'free',
-  recipe: 'free',
-  defineUi: 'free',
-  every: 'free',
-  watch: 'free',
-  debounced: 'free',
-  durationMs: 'free',
-  listen: 'free',
-  linked: 'free',
-  context: 'free',
-  ctx: 'request',
-  uid: 'free',
-  s: 'free',
-  describeField: 'free',
-  sanitizeHtml: 'free',
-  trustHtml: 'free',
-  withBase: 'free',
-  withQuery: 'request',
-  localPath: 'free',
-  route: 'free',
-  markInvalid: 'free',
-  mediaQuery: 'free',
-  reducedMotion: 'free',
-  focusInvalid: 'free',
-  elementSize: 'free',
-  followLog: 'free',
-  guardLeave: 'free',
-  webPush: 'free',
-  installPrompt: 'free',
-  // An empty collection on the server, read from the browser's IndexedDB once hydrated.
-  local: 'free',
-  shortcut: 'free',
-  navigate: 'free',
-  refresh: 'free',
-  refusalMessage: 'free',
-  ActionError: 'free',
-  ActionRedirectError: 'free',
-  ApiError: 'free',
-  persisted: 'local',
-  queryParam: 'request',
-  live: 'request',
-  presence: 'request',
-  jobs: 'request',
-  defer: 'request',
-  guard: 'request',
-  action: 'free',
-  call: 'request',
-  // Names a route of a module the running server mounted, which a prerender never loads.
-  apiUrl: 'request',
-  dispatch: 'request',
-  resource: 'request',
-  socket: 'request',
-  stream: 'request',
-  publicEnv: 'request',
-  editing: 'request',
-  previewing: 'request',
-  logFrom: 'request',
-  searchResults: 'request',
-  searchSite: 'request',
-}
-
-// The same for `kay/content`: `collection` is `folder` because a collection over a folder is compiled by `kay build` and the same for every visitor until the next one, while one over a loader may read a database or refresh on a `ttl` that no invalidation tells the page of; the `request` ones read the files and the edit session now, or write them.
-// A page reading a collection is refreshed by `collection.invalidate()`, and one in preview mode is never served a kept copy, so neither makes a folder collection request-bound.
-export const CONTENT_EXPORTS: Record<string, 'free' | 'request' | 'folder'> = {
-  collection: 'folder',
-  isCollection: 'free',
-  COLLECTION: 'free',
-  PUBLISH_TIMES: 'free',
-  contentKey: 'free',
-  ContentChangedError: 'free',
-  reference: 'free',
-  imageField: 'free',
-  fileField: 'free',
-  markdownField: 'free',
-  customField: 'free',
-  colorField: 'free',
-  moneyField: 'free',
-  tagsField: 'free',
-  linkField: 'free',
-  geoField: 'free',
-  iconField: 'free',
-  findIcons: 'request',
-  untranslated: 'free',
-  blocks: 'free',
-  renderMarkdown: 'free',
-  bodyHtml: 'free',
-  LOADED_HTML: 'free',
-  highlightCode: 'free',
-  MarkdownError: 'free',
-  paginate: 'free',
-  renameField: 'free',
-  setField: 'free',
-  convertField: 'free',
-  unique: 'free',
-  fieldInput: 'free',
-  isPaginated: 'free',
-  collections: 'request',
-  collectionInfo: 'request',
-  collectionLoader: 'request',
-  entryPage: 'request',
-  entries: 'request',
-  entrySource: 'request',
-  entryFile: 'request',
-  saveEntries: 'request',
-  translations: 'request',
-  saveEntry: 'request',
-  removeEntry: 'request',
-  repositoryRoot: 'request',
-}
-
-// The same for `kay/image`: each export is a function of its arguments and of the build's image settings, which a request does not change.
-// `shareCard` signs its URL with the build's own key and reads the page's locale, which a kept copy is stored per.
-export const IMAGE_EXPORTS: Record<string, 'free'> = {
-  image: 'free',
-  shareImage: 'free',
-  shareCard: 'free',
-}
-
-// The same for `kay/i18n`: messages and formats go by the locale, which is part of the key a copy is kept under; the relative time ones read the clock.
-const PURE_I18N_NAMES = new Set(['t', 'T', 'locale', 'locales', 'localeName', 'localize', 'alternate', 'formatNumber', 'formatDate', 'formatList', 'direction', 'defineMessages'])
 const CODE_FILE = /\.(?:kay|[cm]?[jt]sx?)$/
 // An exported `const` that may hold an object or array literal, to spare reading the project to a file that has none.
 const SOURCE_BATCH = 64
@@ -829,7 +694,7 @@ async function scanned(file: string, root: string | undefined, scans: object): P
         const local = name.replace(AS_PREFIX, '')
 
         if (specifier === 'kay/i18n')
-          return !PURE_I18N_NAMES.has(own)
+          return I18N_EXPORTS[own] !== 'free'
 
         const kind = Object.hasOwn(KAY_EXPORTS, own) ? KAY_EXPORTS[own] : 'request'
 

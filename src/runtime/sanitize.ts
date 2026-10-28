@@ -302,6 +302,7 @@ function leavingSite(): (href: string) => boolean {
 }
 
 // Markup from a user, made fit for `innerHTML`: the elements above are kept and balanced, other tags dropped with their text kept, a link leaving the site opening in a new tab, and the result is the same on the server and in an island.
+// kept: free
 export function sanitizeHtml(markup: string, options?: SanitizeOptions): SafeHtml {
   return sanitizeMarkup(markup, options, true)
 }
@@ -357,6 +358,7 @@ export function sanitizeMarkup(markup: string, options: SanitizeOptions | undefi
 }
 
 // Marks markup the app made, such as its own Markdown renderer's or a trusted CMS's, as fit for `innerHTML` as it is.
+// kept: free
 export function trustHtml(markup: string): SafeHtml {
   // Anything but a string is left as it is, so nothing but a string is ever vouched for.
   if (typeof (markup as unknown) !== 'string')

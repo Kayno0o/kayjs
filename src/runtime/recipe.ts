@@ -44,6 +44,7 @@ export interface RecipeConfig<Variants extends VariantTable> {
 }
 
 // A component's classes by part and variant, whose variants become props of the component: the compiler reads `const card = recipe({ ... })` and types the props from it, with no declaration beside it.
+// kept: free
 export function recipe<const Variants extends VariantTable = Record<never, never>>(config: RecipeConfig<Variants>): Recipe<Variants> {
   const base = typeof config.parts === 'string' ? { root: config.parts } : config.parts ?? {}
   const variants = Object.entries(config.variants ?? {})

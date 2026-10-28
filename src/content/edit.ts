@@ -240,6 +240,7 @@ export function clearEditSite(served: EditSite): void {
 }
 
 // A string field naming an entry of another collection by its slug.
+// kept: free
 export function reference(collection: string, options?: StringOptions): ReturnType<typeof t.String> {
   return t.String({ ...options, 'x-kay': { kind: 'reference', collection } })
 }
@@ -302,6 +303,7 @@ function uploadHint<Extra extends UploadFieldOptions>(kind: 'image' | 'file', op
 
 // A string field holding the path the site serves an image at, an upload's `files.url(key)` say, which a CMS edits by uploading or picking one.
 // `alt`, `width` and `height` name fields beside it that the editor fills in, hiding them from the form: the alt text it asks for with the image, and the size of each image uploaded. `accept`, `maxSize`, `minWidth` and `minHeight` narrow what the editor takes.
+// kept: free
 export function imageField(options?: UploadStringOptions<ImageFieldOptions>): ReturnType<typeof t.String> {
   const { hint, rest } = uploadHint('image', options, 'imageField')
 
@@ -310,6 +312,7 @@ export function imageField(options?: UploadStringOptions<ImageFieldOptions>): Re
 
 // A string field holding the path the site serves a file at, an upload's `files.url(key)` say, which a CMS edits by uploading or picking one.
 // `accept` and `maxSize` narrow what the editor takes.
+// kept: free
 export function fileField(options?: UploadStringOptions<UploadFieldOptions>): ReturnType<typeof t.String> {
   const { hint, rest } = uploadHint('file', options, 'fileField')
 
@@ -317,6 +320,7 @@ export function fileField(options?: UploadStringOptions<UploadFieldOptions>): Re
 }
 
 // A hex colour, `#1a2b3c`, which a CMS edits with a colour picker beside the code.
+// kept: free
 export function colorField(options?: StringOptions): ReturnType<typeof t.String> {
   return t.String({ 'error': 'must be a colour such as #1a2b3c', ...options, 'pattern': '^#[0-9a-fA-F]{6}$', 'x-kay': { kind: 'hex-color' } })
 }
@@ -325,6 +329,7 @@ export function colorField(options?: StringOptions): ReturnType<typeof t.String>
 export type MoneyFieldOptions = NonNullable<Parameters<typeof t.Number>[0]> & { currency?: string | undefined }
 
 // An amount of money as a number, never below zero unless `minimum` says so, entered with its currency's symbol beside it.
+// kept: free
 export function moneyField(options?: MoneyFieldOptions): ReturnType<typeof t.Number> {
   const { currency, ...rest } = options ?? {}
 
@@ -345,6 +350,7 @@ function currencySymbol(currency: string): string {
 }
 
 // A list of distinct, non-empty words, which a CMS edits as chips typed into one box.
+// kept: free
 export function tagsField(options?: NonNullable<Parameters<typeof t.Array>[1]>): ReturnType<typeof t.Array<ReturnType<typeof t.String>>> {
   return t.Array(t.String({ minLength: 1 }), { ...options, 'uniqueItems': true, 'x-kay': { kind: 'tag-list' } })
 }
@@ -357,6 +363,7 @@ type BlocksOf<Types extends Record<string, AnyObject>> = ReturnType<typeof t.Arr
 
 // A list whose items are of several declared types, `blocks({ hero: s.Object({ ... }), text: s.Object({ ... }) })`, each stored as an object with a `type` key naming its type: `{ type: 'hero', ... }`.
 // The typed read is the union of the blocks discriminated on `type`, and a CMS adds an item by choosing its type, each type showing its own fields. A block's `title` labels its type.
+// kept: free
 export function blocks<const Types extends Record<string, AnyObject>>(types: Types, options?: Omit<NonNullable<Parameters<typeof t.Array>[1]>, 'x-kay'>): BlocksOf<Types> {
   const variants = Object.entries(types).map(([name, block]) => {
     if (name === '')
@@ -378,11 +385,13 @@ export function blocks<const Types extends Record<string, AnyObject>>(types: Typ
 }
 
 // A call to action: the words of a link and where it goes, a path or an http(s) address.
+// kept: free
 export function linkField(options?: Parameters<typeof t.Object>[1]) {
   return t.Object({ label: t.String({ title: 'Label', minLength: 1 }), href: t.String({ title: 'Address', ...webOnly({ minLength: 1 }) }) }, options)
 }
 
 // A point on the map, in degrees.
+// kept: free
 export function geoField(options?: Parameters<typeof t.Object>[1]) {
   return t.Object({ lat: t.Number({ title: 'Latitude', minimum: -90, maximum: 90 }), lng: t.Number({ title: 'Longitude', minimum: -180, maximum: 180 }) }, options)
 }
@@ -390,6 +399,7 @@ export function geoField(options?: Parameters<typeof t.Object>[1]) {
 const iconSets = new Map<string, IconSet>()
 
 // A string field holding the name of an icon of an iconify set, `tabler:home` say, which a CMS edits with a searchable grid: the set stays on the server, which the editor asks for the page of icons it shows.
+// kept: free
 export function iconField(set: IconSet, options?: StringOptions): ReturnType<typeof t.String> {
   iconSets.set(set.prefix, set)
 
@@ -397,6 +407,7 @@ export function iconField(set: IconSet, options?: StringOptions): ReturnType<typ
 }
 
 // A page of the icons of a set `iconField` registered whose name holds `query`, each as `{ name: 'prefix:icon', icon }`; none for an unknown set.
+// kept: request
 export function findIcons(prefix: string, query: string, limit: number, offset: number): { name: string, icon: IconProps }[] {
   const set = iconSets.get(prefix)
   const needle = query.trim().toLowerCase()
@@ -431,11 +442,13 @@ export function findIcons(prefix: string, query: string, limit: number, offset: 
 }
 
 // A string field holding Markdown, which a CMS edits as it edits a body.
+// kept: free
 export function markdownField(options?: StringOptions): ReturnType<typeof t.String> {
   return t.String({ ...options, 'x-kay': { kind: 'markdown' } })
 }
 
 // A field of any schema a CMS edits with the component the app gives the kind, `src/cms/fields/<kind>.kay` in kayjs-cms; the schema alone validates what it saves.
+// kept: free
 export function customField<Schema extends TSchema>(kind: string, schema: Schema): Schema {
   if (!KIND_NAME.test(kind))
     throw new KayError('content-api-misuse', `kay: customField(${JSON.stringify(kind)}) names a kind outside letters, digits, - and _, which no src/cms/fields/<kind>.kay file can have`)
@@ -447,22 +460,26 @@ export function customField<Schema extends TSchema>(kind: string, schema: Schema
 }
 
 // A field of any schema with options for how a CMS enters it: a placeholder, a prefix or suffix, the rows of a text, the labels of an enum, a list's title field, a sibling it waits for. Its kind and every other keyword are kept.
+// kept: free
 export function fieldInput<Schema extends TSchema>(schema: Schema, options: FieldInputOptions): Schema {
   return { ...schema, 'x-kay-input': options }
 }
 
 // A field of any schema whose value no other entry of the collection, of its locale in a localized one, holds: saving an entry that repeats it is refused.
+// kept: free
 export function unique<Schema extends TSchema>(schema: Schema): Schema {
   return { ...schema, 'x-kay-unique': true }
 }
 
 // A field of any schema that `kay i18n translate` leaves as it is, such as a category, a brand or a code: the translation keeps the default locale's value. Its kind and every other keyword are kept.
+// kept: free
 export function untranslated<Schema extends TSchema>(schema: Schema): Schema {
   return { ...schema, 'x-kay-translate': false }
 }
 
 // Every collection the content config exports, as a CMS edits it.
 // `counts: false` leaves out `body`, `count` and `problem`, so no loader runs and no folder is listed for a caller that needs the names, schemas and kinds alone.
+// kept: request
 export async function collections({ counts = true }: { counts?: boolean | undefined } = {}): Promise<CollectionInfo[]> {
   const repoRoot = repositoryRoot()
 
@@ -471,6 +488,7 @@ export async function collections({ counts = true }: { counts?: boolean | undefi
 
 // The collection exported as `name`, as a CMS edits it, reading no other; undefined when none is.
 // `counts: false` leaves out `body`, `count` and `problem`, which a loaded collection's loader is run to tell and a folder's files are listed to tell, for a caller that needs the schema, the kind and the folder alone.
+// kept: request
 export async function collectionInfo(name: string, { counts = true }: { counts?: boolean | undefined } = {}): Promise<CollectionInfo | undefined> {
   const found = registered.find(([exported]) => exported === name)?.[1]
 
@@ -508,11 +526,13 @@ async function infoOf(name: string, collection: Collection<unknown>, repoRoot: s
 }
 
 // The loader filling the collection exported as `name`, or undefined for a folder's or an unknown name; for a CMS keeping its own rows beside the entries through the loader's `sibling`.
+// kept: request
 export function collectionLoader(name: string): ContentLoader | undefined {
   return registered.find(([exported]) => exported === name)?.[1].loader
 }
 
 // The entries of the collection exported as `name`, drafts included, as their source holds them now, a loader's loaded afresh as preview mode loads them; those the filter keeps alone, a folder reading no other file.
+// kept: request
 export async function entries(name: string, filter: EntryFilter = {}): Promise<SourceEntry[]> {
   const collection = collectionNamed(name)
   const { localized = false } = collection.options
@@ -544,6 +564,7 @@ async function pageUrl(collection: Collection<unknown>, entry: { slug: string, l
 }
 
 // The path of the page an entry would have under this slug and locale, as `entries()` gives `url`, for an entry not written yet or about to be: a CMS moving an entry redirects the page it had to the page it has.
+// kept: request
 export async function entryPage(name: string, entry: { slug: string, locale?: string | undefined, data: unknown }): Promise<string | undefined> {
   const collection = collectionNamed(name)
 
@@ -565,6 +586,7 @@ async function folderStamp(name: string, dir: string): Promise<string | undefine
 }
 
 // The translation index of the collection exported as `name`, empty for one not localized: built once from its entries, then served until a save or remove through this API, `invalidate()` or the loader's `ttl` for a loaded collection, until a file changes for a folder's. Every entry's pairing, drafts and entries the schema refuses included, as `entries()` gives them.
+// kept: request
 export async function translations(name: string): Promise<TranslationIndex> {
   const collection = collectionNamed(name)
   const { localized = false } = collection.options
@@ -680,6 +702,7 @@ function uniqueFields(schema: TSchema): string[] {
 
 // The file holding a folder collection's entry as the editor wrote it, for a CMS to commit, or where it fails the collection; kay writes nothing.
 // An entry the folder holds keeps its file and format, its body too when none is given; a new one is Markdown when it has a body or the folder holds Markdown, JSON otherwise. `create` refuses an entry the folder already holds. `replacing` is the slug of the entry this one takes the place of, as when a slug is renamed: its values do not count as taken for a `unique` field, and the new file has its file's format.
+// kept: request
 export async function entrySource(name: string, slug: string, data: unknown, options: { locale?: string | undefined, body?: string | undefined, create?: boolean | undefined, replacing?: string | undefined } = {}): Promise<{ file: EntryFile } | { issues: DraftIssue[] }> {
   const collection = collectionNamed(name)
 
@@ -713,6 +736,7 @@ export async function entrySource(name: string, slug: string, data: unknown, opt
 }
 
 // The file a folder collection's entry is read from, for a CMS to delete it; or why its slug or locale names none.
+// kept: request
 export async function entryFile(name: string, slug: string, options: { locale?: string | undefined } = {}): Promise<{ file: EntryPath } | { issues: DraftIssue[] }> {
   const collection = collectionNamed(name)
 
@@ -795,6 +819,7 @@ function fileIn(name: string, dir: string, file: string): EntryPath {
 // Hands an entry the editor wrote to a loaded collection's `save`, then reads the collection afresh; or resolves where it fails the collection, saving nothing.
 // `replacing` is the slug of the entry this one takes the place of, as when a slug is renamed, whose values do not count as taken for a `unique` field.
 // `create` refuses an entry the loader already gives, and tells `save`, which refuses one another process created since. A collection's saves and removes run in turn, so two creates here never both find the slug free.
+// kept: request
 export async function saveEntry(name: string, entry: WrittenEntry, options: { create?: boolean | undefined, replacing?: string | undefined } = {}): Promise<{ issues?: DraftIssue[] }> {
   const collection = collectionNamed(name)
   const save = writer(name, collection, 'save')
@@ -838,6 +863,7 @@ export async function saveEntry(name: string, entry: WrittenEntry, options: { cr
 
 // Hands several entries of a loaded collection to its loader's `saveMany` as one all-or-nothing write, a loader without it getting them one `save` at a time; or resolves the issues of the first entry the collection refuses, saving none.
 // An entry with `expect` is written as a compare-and-swap of that field (see `saveMany`), and `changed` answers that one no longer held the number it was read at, nothing written.
+// kept: request
 export async function saveEntries(name: string, written: WrittenEntry[]): Promise<{ issues?: DraftIssue[], changed?: true }> {
   const collection = collectionNamed(name)
   const { loader } = collection
@@ -901,6 +927,7 @@ export async function saveEntries(name: string, written: WrittenEntry[]): Promis
 }
 
 // Has a loaded collection's `remove` delete one of its entries, then reads the collection afresh; or resolves why it names none, deleting nothing.
+// kept: request
 export async function removeEntry(name: string, slug: string, locale?: string): Promise<{ issues?: DraftIssue[] }> {
   const collection = collectionNamed(name)
   const remove = writer(name, collection, 'remove')
@@ -997,6 +1024,7 @@ function collectionNamed(name: string): Collection<unknown> {
 }
 
 // The repository the project sits in, which `dir`, an entry's `path` and a file's `repoPath` are relative to; the project root outside one. The server's own path, never for the editor's browser.
+// kept: request
 export function repositoryRoot(): string {
   const { root } = contentPlace()
 

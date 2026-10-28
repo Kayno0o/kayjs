@@ -40,6 +40,7 @@ function firstBelow(items: ArrayLike<Element>, top: number): Element | undefined
 }
 
 // Keeps a scrolling container at its bottom while the reader is there and the first item showing in place while the reader is above it, whatever changes inside: an item appended, one prepended, a line growing as it streams. The container is the element that scrolls, or a function returning it once the island mounted, as `() => list` for a `ref`'s variable. It starts at its bottom, and does nothing on the server. Its `toBottom()` takes the reader back to the bottom and follows again.
+// kept: free
 export function followLog(container: Element | (() => Element | null | undefined), options: FollowLogOptions = {}): FollowLog {
   let bottom: (() => void) | undefined
   const log: FollowLog = { toBottom: () => bottom?.() }

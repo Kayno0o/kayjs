@@ -272,6 +272,7 @@ function inert<Row, Key extends keyof Row>(): Local<Row, Key> {
 }
 
 // A collection the island reads and writes at once, kept in IndexedDB so it works offline: a write is applied in the browser and queued, then replayed through the collection's action, once, when the server can be reached.
+// kept: free, an empty collection on the server, read from the browser's IndexedDB once hydrated.
 export function local<Row extends object, const Key extends keyof Row & string>(options: LocalOptions<Row, Key>): Local<Row, Key> {
   return onServer() ? inert() : new Collection(options).api()
 }

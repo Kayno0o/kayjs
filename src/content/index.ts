@@ -37,8 +37,10 @@ export { convertField, renameField, setField } from './migrate'
 export type { Page, Paginated } from './paginate'
 export { isPaginated, paginate } from './paginate'
 
+// kept: free
 export const COLLECTION = Symbol.for('kay.collection')
 // The dates the collection's entries are published at, which the server watches to refresh the pages that read it.
+// kept: free
 export const PUBLISH_TIMES = Symbol.for('kay.publishTimes')
 // Never set: it only carries a feed's path in the collection's type, for `kay check` to count it as served.
 declare const FEED_PATH: unique symbol
@@ -207,6 +209,7 @@ interface Entries<Data> {
 
 // A folder of Markdown files, or of JSON and YAML data files, read against a schema: `collection('src/content/posts', { schema })`; or the entries a loader gives, `collection({ name: 'posts', load }, { schema })`.
 // File entries compile once, each cached by its content, so a change recompiles only that entry; `kay build` compiles them all ahead for production. Loaded entries are read when first asked for, and kept as `cached` keeps a value.
+// kept: folder, a collection over a folder is compiled by `kay build` and the same for every visitor until the next one, while one over a loader may read a database or refresh on a `ttl` that no invalidation tells the page of. A page reading it is refreshed by `invalidate()`, and one in preview mode is never served a kept copy.
 export function collection<Schema extends TSchema, Components extends Record<string, Component<never>> = Record<never, never>, const FeedPath extends string = string, Seed extends Static<Schema> | undefined = undefined, const Route extends string = never>(source: string | ContentLoader<Stored<Static<Schema>>>, options: CollectionOptions<Schema, [Route] extends [never] ? false : true> & { components?: Components, feed?: { path: FeedPath } | undefined, seed?: Seed, route?: Route | undefined }): Collection<Static<Schema>, Components, FeedPath, undefined extends Seed ? false : true, [Route] extends [never] ? false : true> {
   type Data = Static<Schema>
   let loading: Promise<Entries<Data>> | undefined
@@ -562,6 +565,7 @@ async function compileLoaded(loader: ContentLoader, preview: boolean, markdown: 
 // The paths the module's collections serve their feeds at, the ones written as literals.
 export type FeedPathsOf<Module> = { [Name in keyof Module]: Module[Name] extends Collection<unknown, Record<string, Component<never>>, infer Path> ? string extends Path ? never : Path : never }[keyof Module]
 
+// kept: free
 export function isCollection(value: unknown): value is Collection<unknown> {
   return typeof value === 'object' && value !== null && COLLECTION in value
 }

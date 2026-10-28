@@ -66,6 +66,7 @@ const ATTRIBUTE_NAME = /^[A-Z_][\w:-]*/i
 const TAGS = /<[^>]*>/g
 
 // What a loader's HTML keeps beyond a user's: relative URLs, which carry no scheme to run.
+// kept: free
 export const LOADED_HTML: SanitizeOptions = { ...MARKDOWN_KEPT, relativeUrls: true }
 // And for its Markdown, a heading's id for its anchor and a code block's language class, which the headings and the highlighter read.
 const LOADED: SanitizeOptions = { ...LOADED_HTML, attributes: { ...MARKDOWN_KEPT.attributes, h1: ['id'], h2: ['id'], h3: ['id'], h4: ['id'], h5: ['id'], h6: ['id'], code: ['class'] } }
@@ -94,6 +95,7 @@ const LINE_BREAK = /\n/g
 // Words as the reader counts them, a CJK text's too, which has no spaces to split on: built on the first count, as making the first segmenter loads ICU's word rules (about 1 ms and 200 KB), which a server compiling no Markdown never needs.
 let words: Intl.Segmenter | undefined
 
+// kept: free
 export class MarkdownError extends Error {
   readonly code = 'markdown-invalid'
 
@@ -167,6 +169,7 @@ export function sanitizedHtml(html: string): string {
 }
 
 // The HTML an entry's Markdown body puts on the page, each component standing as a `<kay-component>` element around what it wraps, so a CMS can check what an editor wrote before saving it; throws a MarkdownError for components kay cannot read.
+// kept: free
 export async function bodyHtml(body: string): Promise<string> {
   const { text, components } = extractComponents(body, 1)
   const { html } = await renderedMarkdown(text)
@@ -185,6 +188,7 @@ export interface RenderedMarkdown {
 // The HTML is the writer's, raw tags included: a user's goes through `sanitizeHtml` before `innerHTML`, and the headings may be ones a user typed as raw tags.
 // A link leaving the site opens in a new tab, as in templates, unless the config keeps the same tab.
 // The highlighter gets the fence's language as written, so for a user's text it falls back on one it does not know rather than throw.
+// kept: free
 export async function renderMarkdown(markdown: string, options: { highlight?: Highlighter | undefined, headingLinks?: boolean | undefined } = {}): Promise<RenderedMarkdown> {
   const rendered = await renderedMarkdown(markdown, options)
 
@@ -216,6 +220,7 @@ async function renderedMarkdown(markdown: string, options: { highlight?: Highlig
 }
 
 // A code block as Markdown renders one, through `highlight` when given, for a page's `innerHTML`.
+// kept: free
 export async function highlightCode(code: string, language?: string, options: { highlight?: Highlighter | undefined } = {}): Promise<SafeHtml> {
   if (options.highlight)
     return vouch(await options.highlight(code, language))

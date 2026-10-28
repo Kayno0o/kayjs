@@ -357,6 +357,7 @@ function refusalText(errors: Record<string, string>, data: unknown): string | un
   return typeof message === 'string' && message !== '' ? message : undefined
 }
 
+// kept: free
 export class ActionError<Data = unknown> extends ApiError {
   override name = 'ActionError'
 
@@ -367,6 +368,7 @@ export class ActionError<Data = unknown> extends ApiError {
 }
 
 // Thrown by a call whose action redirected, where there is no browser to send: a test, a script.
+// kept: free
 export class ActionRedirectError extends ActionError {
   override name = 'ActionRedirectError'
 
@@ -408,6 +410,7 @@ export interface ActionFor<Params extends Readonly<Record<string, unknown>>> {
 
 // Declares a server action in a page's `--- server` fence: Elysia validates the input against `schema` before `handler` runs.
 // Without a schema the action takes no input, as with an empty object schema, and its handler gets the context alone.
+// kept: free, it registers a route answering a POST, which the page's own render never runs, and a kept page is refreshed after the first request that can write.
 export function action<Output, const Honeypot extends string = never>(handler: (ctx: ActionContext) => Output | Promise<Output>, protection?: ActionProtection<Honeypot>): NoInputAction<Settled<Output>, Honeypot>
 export function action<Schema extends TSchema, Output, const Honeypot extends string = never>(schema: Schema, handler: (input: Static<Schema>, ctx: ActionContext) => Output | Promise<Output>, protection?: ActionProtection<Honeypot>): ServerAction<Schema, Settled<Output>, Honeypot>
 export function action(first: unknown, second?: unknown, third?: ActionProtection<string>): unknown {

@@ -10,6 +10,7 @@ export interface ElementSize {
 }
 
 // An element's width and height as reactive values, observed for as long as the island lives: `const column = elementSize()`, then `ref={column.ref}` and `column.width()`.
+// kept: free
 export function elementSize(): ElementSize {
   const [element, setElement] = ownSignal<Element | undefined>(undefined)
   const [width, setWidth] = ownSignal(0)

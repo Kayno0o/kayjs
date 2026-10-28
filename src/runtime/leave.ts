@@ -16,6 +16,7 @@ const LEAVE_MESSAGE = 'This page has unsaved changes. Leave it anyway?'
 const dirtyGuards = new Set<LeaveGuard>()
 
 // Asks before the page is left while `dirty` holds, for as long as the island lives: a link of the app, `navigate()` and going back or forward ask the guard, a reload, closing the tab or another site's link get the browser's own prompt.
+// kept: free
 export function guardLeave(dirty: () => boolean, options: LeaveGuardOptions = {}): void {
   if (typeof KAY_BROWSER === 'undefined' && typeof document === 'undefined')
     return

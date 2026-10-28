@@ -30,6 +30,7 @@ export function mergeQuery(params: URLSearchParams, changes: QueryChanges): void
 
 // The current page with `query` merged into its own, keeping the scroll and the focus as `refresh()` does: a filter or a sort picked in place.
 // Both forms resolve to `false` when a leave guard was declined, so the page stayed, and `true` otherwise.
+// kept: free
 export async function navigate(to: { query: QueryChanges }, options?: NavigateOptions): Promise<boolean>
 // Goes to a page as following a link does: one of the app's swapped in place, under the site's mount point as a link is, another site's loaded. A literal path is checked as a link's is.
 // Last, so a path no page serves is reported against it.
@@ -68,6 +69,7 @@ export async function navigate(to: string | { query: QueryChanges }, options: Na
 }
 
 // Runs the page's loads again and shows what they return, keeping scroll, focus and every island whose props did not change.
+// kept: free
 export async function refresh(): Promise<void> {
   if (typeof KAY_BROWSER === 'undefined' && typeof document === 'undefined')
     return

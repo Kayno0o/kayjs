@@ -19,6 +19,7 @@ export interface DescribeOptions {
 // Adds `ids` to the `aria-describedby` of the first input, select or textarea the calling component renders on the server, its slot included, beside the field's own ids.
 // A component such as a form field links its control to its hint and messages this way, the control being its parent's markup; in an island the browser keeps that link itself.
 // `required` gives the field `aria-required="true"` unless the field sets its own.
+// kept: free
 export function describeField(ids: string, options: DescribeOptions = {}): void {
   const required = options.required ?? false
 

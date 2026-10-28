@@ -47,6 +47,7 @@ function holdConnection(): void {
 // Who else has a room open, in an island: `presence(`entry:${id}`, { name })` lists the others' members, `presence()` counts the tabs on the page.
 // The page proves the room and the member as it does any live read, so what a visitor is listed as comes from the server fence that passed it, and the page is rendered per request.
 // A member is any value that crosses as island props do, compared as JSON; a room and its member take at most 256 characters as JSON.
+// kept: request
 export function presence(): Presence<null>
 export function presence<Member = null>(room: string, member?: Member): Presence<Member>
 export function presence(room?: string, member?: unknown): Presence<unknown> {

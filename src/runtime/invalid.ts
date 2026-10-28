@@ -9,6 +9,7 @@ const marks = new WeakMap<Element, Marks>()
 
 // Marks `element` `aria-invalid="true"` for `by` while `invalid`, and takes the mark off once no source holds it, unless the page had marked the field itself.
 // kay marks a refused field of an island through it, so a component marking the same control, such as a form field showing a message of its own, keeps it invalid.
+// kept: free
 export function markInvalid(element: Element, by: unknown, invalid: boolean): void {
   holdInvalid(element, by, invalid, element.getAttribute('aria-invalid') === 'true')
 }

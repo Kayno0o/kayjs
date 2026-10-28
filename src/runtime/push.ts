@@ -157,6 +157,7 @@ const readState = markSignal((): PushState => (onServer() ? 'unsupported' : push
 
 // The visitor's opt-in to push, once `push()` is in kay.config.ts: `webPush.state()` is a signal to draw the button from, `webPush.subscribe()` asks the browser's permission and registers this device for the signed-in visitor, `webPush.unsubscribe()` takes it back.
 // `subscribe()` asks the permission only while the page has a user gesture to answer, from a click handler; called with none it answers `'needs-gesture'` and asks nothing.
+// kept: free
 export const webPush = {
   state: readState,
   async subscribe(): Promise<PushSubscribeResult> {

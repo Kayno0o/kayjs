@@ -84,6 +84,7 @@ export function setTimeZone(zone: string | undefined): void {
   siteZone = zone
 }
 
+// kept: free, the site's configured zone, the same for every request.
 export function timeZone(): string | undefined {
   return siteZone
 }
@@ -140,6 +141,7 @@ function withLocale<Options extends LocaleOption>(fallback: string, options: Opt
 }
 
 // The message files' default export: it keeps the literal text, so `t` knows each message's placeholders.
+// kept: free
 export function defineMessages<const Tree extends MessageTree>(messages: Tree): Tree {
   return messages
 }

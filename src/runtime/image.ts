@@ -323,6 +323,7 @@ export function storedSize(src: string): { width: number, height: number } | und
 }
 
 // An imported or stored image, or one from a directory in `images.dirs` or a host in `images.remote` given its size, served as WebP variants at each width of the ladder up to its own; drawn at a fixed width, `sizes: '95px'`, at that width for each density up to `images.maxDensity`.
+// kept: free
 export function image(src: string, options: ImageOptions = {}): ImageProps {
   const wanted = options.quality === undefined ? undefined : allowedQuality(options.quality)
   const own = sizes.get(src) ?? storedSize(src) ?? (options.width !== undefined && options.height !== undefined ? { width: options.width, height: options.height } : undefined)
@@ -411,6 +412,7 @@ function allowedAspect(text: string): Aspect {
 }
 
 // The URL of an imported image, or one from `images.dirs` or `images.remote`, cut to the 1200x630 share card social sites show, as a JPEG, for `og:image`: `meta(property="og:image" content={shareImage(hero)})` in a `head` block. Smaller images are enlarged to fill it.
+// kept: free
 export function shareImage(src: string): string {
   if (!RESIZABLE.test(src))
     throw new Error(`kay: shareImage() cannot cut ${src}: it takes a PNG, JPEG, WebP, GIF or AVIF`)
@@ -543,6 +545,7 @@ export function setCardMaker(maker: typeof cardMaker): void {
 }
 
 // The URL of a 1200x630 share card drawn for the page, its title over the image if one is given, for `og:image`: `meta(property="og:image" content={shareCard({ title: post.title, image: post.cover })})` in a `head` block.
+// kept: free, it signs its URL with the build's own key and reads the page's locale, which a kept copy is stored per.
 export function shareCard(card: ShareCardOptions): string {
   if (card.image !== undefined && SVG_IMAGE.test(card.image) && !card.image.startsWith(IMPORTED))
     throw new Error(`kay: shareCard() cannot draw on ${card.image}: an SVG is taken only when imported, not from images.dirs, images.remote or a stored file`)

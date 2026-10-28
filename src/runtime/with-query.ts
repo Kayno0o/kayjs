@@ -30,6 +30,7 @@ export function addressChanged(): void {
 // A null, undefined or empty value drops the param, the others keep their place and the hash is left out; the path is the site's own, under the mount point and in the locale of the page as any link of it is.
 // In an island it follows the address: the link is built again after each `navigate({ query })`, swap and traversal.
 // A page rendered once at build time has no request to read the query of, so it throws there.
+// kept: request
 export function withQuery(changes: QueryChanges): string {
   const params = new URLSearchParams()
   let path: string

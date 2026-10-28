@@ -34,6 +34,7 @@ function browserBase(): string {
 }
 
 // A path of the site under its mount point in the browser: `withBase('/about')` is `/docs/about`, for a link a script builds. On the server it is left as it is, since kay puts what a page renders under the mount point as it goes out.
+// kept: free
 export function withBase(path: string): string {
   return typeof KAY_BROWSER === 'undefined' && typeof document === 'undefined' ? path : joinBase(browserBase(), path)
 }
@@ -65,6 +66,7 @@ export function joinBase(mount: string, path: string): string {
 }
 
 // `value` when it is a path of this site, as a `?next=` param should be, else `fallback`: `ctx.redirect(localPath(ctx.query.next, '/account'))` never sends anyone to another site. The path comes back as a browser resolves it, with no backslash or control character left.
+// kept: free
 export function localPath<const Fallback extends string>(value: unknown, fallback: Fallback & CheckedHref<Fallback>): string {
   if (typeof value !== 'string')
     return fallback

@@ -10,6 +10,7 @@ import { ContentError, withDefaults } from './validate'
 export type Migration = (data: Record<string, unknown>) => Record<string, unknown>
 
 // A step renaming a field, leaving the data as it is when it lacks the old one or already has the new one.
+// kept: free
 export function renameField(from: string, to: string): Migration {
   return (data) => {
     if (!(from in data) || to in data)
@@ -22,6 +23,7 @@ export function renameField(from: string, to: string): Migration {
 }
 
 // A step giving a field a value when it has none, for a field the schema newly requires.
+// kept: free
 export function setField(name: string, value: unknown | ((data: Record<string, unknown>) => unknown)): Migration {
   return (data) => {
     if (data[name] !== undefined)
@@ -32,6 +34,7 @@ export function setField(name: string, value: unknown | ((data: Record<string, u
 }
 
 // A step turning a field's value into another, such as a text into a number; the data without the field is left as it is.
+// kept: free
 export function convertField(name: string, convert: (value: unknown, data: Record<string, unknown>) => unknown): Migration {
   return (data) => {
     return data[name] === undefined ? data : { ...data, [name]: convert(data[name], data) }

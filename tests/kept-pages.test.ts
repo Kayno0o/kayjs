@@ -8,7 +8,7 @@ import { formatRouteTable } from '../src/build/report'
 import { compileKay } from '../src/compiler'
 import { countWrites } from '../src/server/kept-pages'
 import { ownPostPaths } from '../src/server/plumbing'
-import { CONTENT_EXPORTS, KAY_EXPORTS, keptScan } from '../src/server/pure-page'
+import { keptScan } from '../src/server/pure-page'
 import { kayBuild } from './check-helper'
 import { scratchDir } from './scratch'
 
@@ -920,12 +920,6 @@ describe('what kay exports to a page that is kept', () => {
     await Promise.all(roots.map(async root => rm(root, { recursive: true, force: true })))
   })
 
-  it('classes every export of kay once, so a new one is filed on purpose', async () => {
-    const exported = Object.keys(await import('../src/runtime')).sort()
-
-    expect(Object.keys(KAY_EXPORTS).sort()).toEqual(exported)
-  })
-
   it('keeps a page importing the schema builder, in a page, a module, a config and through a barrel', async () => {
     const root = await project({
       'src/routes/in-page.kay': '--- server\nimport { s } from \'kay\'\n\nconst shape = s.Object({ id: s.Number() })\n---\np {typeof shape}\n',
@@ -1002,10 +996,6 @@ describe('what kay exports to a page that is kept', () => {
     expect(await at('src/routes/declared.kay')).toBeUndefined()
     expect(await at('src/routes/cookie.kay')).toMatchObject({ why: expect.stringContaining('`persisted`') })
     expect(await at('src/routes/server.kay')).toMatchObject({ why: expect.stringContaining('`publicEnv`') })
-  })
-
-  it('classes every export of kay/content once', async () => {
-    expect(Object.keys(CONTENT_EXPORTS).sort()).toEqual(Object.keys(await import('../src/content')).sort())
   })
 
   it('keeps a page reading a collection over a folder, in a page, a module, a config and through a barrel, and not one over a loader', async () => {

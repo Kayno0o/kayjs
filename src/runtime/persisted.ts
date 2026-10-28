@@ -19,6 +19,7 @@ export interface PersistedOptions<T> extends SignalOptions<T> {
 
 // A signal whose value is kept across pages and visits under `name`, the cookie's or the localStorage key's, or in the URL under the query param `name`, which the default leaves out.
 // A string unless `T` says otherwise, for a param the page's `query` schema reads as another type: the URL holds text.
+// kept: local, it reads the request's cookie or query, so it is free only where every call says `storage: 'local'`, kept in `localStorage` and read once the page has hydrated.
 export function persisted<T = string>(name: string, value: NoInfer<PlainValue<T>>, options: Omit<PersistedOptions<NoInfer<T>>, 'maxAge' | 'values'> & { storage: 'query' }): Signal<T>
 // `values` types the signal as their union, and the default must be one of them.
 export function persisted<const T extends string | number | boolean>(name: string, value: NoInfer<T>, options: Omit<PersistedOptions<T>, 'maxAge'> & { storage: 'query', values: readonly T[] }): Signal<T>
@@ -38,6 +39,7 @@ export function persisted<T>(name: string, value: PlainValue<T>, options?: Persi
 
 // A signal holding the page's query param `name`, read as the `query` schemas of the page and its layouts read it, so `queryParam<number>('page')` holds a number; the schema's default when the param is left out or refused, which writing leaves out of the URL.
 // Without a schema naming the param, its text, as `persisted(name, '', { storage: 'query' })` keeps it.
+// kept: request
 export function queryParam<T = string | undefined>(name: string): Signal<T> {
   const [own, write] = createSignal<T>(undefined as T)
   const kept = keepParam(name, own, write)

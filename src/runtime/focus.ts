@@ -7,6 +7,7 @@ declare const KAY_BROWSER: true | undefined
 const MAY_HIDE = 'details:not([open]),[hidden]:not([hidden=""])'
 
 // Focuses the first field marked `aria-invalid="true"` under `root` that takes focus, once the effects pending from a write have run, so a field a refusal just rendered or revealed is there; whether one took it.
+// kept: free
 export async function focusInvalid(root?: ParentNode): Promise<boolean> {
   if (typeof KAY_BROWSER === 'undefined' && typeof document === 'undefined')
     return false

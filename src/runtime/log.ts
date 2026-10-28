@@ -16,6 +16,7 @@ export function kayLog(level: LogLevel, message: string, error?: unknown): void 
 }
 
 // A library's log, `from` heading its messages where kay's would say kay: they go where the app's `log` option sends kay's, under the request being answered.
+// kept: request
 export function logFrom(from: string): Log {
   if (from === '')
     throw new TypeError('kay: logFrom takes the name heading the library\'s messages, such as logFrom(\'kayjs-mail\')')

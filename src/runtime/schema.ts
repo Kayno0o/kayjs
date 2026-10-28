@@ -56,4 +56,5 @@ const File = (options?: FileOptions): ReturnType<Builder['File']> => schema.File
 const Files = (options?: FilesOptions): ReturnType<Builder['Files']> => schema.Files(sized(options, 's.Files'))
 
 // Elysia's schema builder, re-exported so an action's schema needs no import of its own, with `Secret` and `Public` for `defineEnv`, `UnionKeys`, and `File` and `Files` taking a size as an action's `maxSize` does.
+// kept: free
 export const s: Omit<Builder, 'File' | 'Files'> & { File: typeof File, Files: typeof Files, Secret: typeof Secret, Public: typeof Public, UnionKeys: typeof UnionKeys } = { ...schema, UnionEnum, File, Files, Secret, Public, UnionKeys }

@@ -26,6 +26,7 @@ interface UiEntryOf<Shape extends UiShape> {
 export type UiConfig = [keyof UiComponents] extends [never] ? Readonly<Record<string, UiEntry>> : { readonly [Key in keyof UiComponents]?: UiEntryOf<UiComponents[Key]> }
 
 // The default export of `src/ui.ts`, read by the compiler as it is written, so it holds string literals alone.
+// kept: free
 export function defineUi(config: UiConfig): UiConfig {
   return config
 }

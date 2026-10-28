@@ -235,11 +235,13 @@ function wrap<T extends object>(target: T): T {
 
 // State mutated in place that a read tracks per property: `game.coins += 1` re-runs what read `game.coins` and nothing else.
 // Plain objects and arrays are tracked, deeply; a Map, a Set, a Date or a class instance is kept as written and is not.
+// kept: free
 export function store<T extends object>(value: T): T {
   return plain(value) ? wrap(kept(unwrap(value))) : value
 }
 
 // A plain deep copy of a store, or of any plain value, with no proxy in it and nothing tracked by reading it: what to save or send.
+// kept: free
 export function snapshot<T>(value: T): T {
   return copy(value, new Map()) as T
 }

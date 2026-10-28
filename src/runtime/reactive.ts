@@ -446,6 +446,7 @@ export function hydrationEnded(): void {
 }
 
 // A derived value, computed when read and cached until what it read changes.
+// kept: free
 export function memo<T>(fn: () => T, options?: SignalOptions<T>): () => T {
   const node = computation(fn, undefined, options?.equals ?? defaultEquals)
   const shared = typeof KAY_BROWSER === 'undefined' && serverRendering === 0
@@ -467,6 +468,7 @@ export function memo<T>(fn: () => T, options?: SignalOptions<T>): () => T {
 }
 
 // Runs `fn` once the current render is done, then again whenever what it read changes; never on the server.
+// kept: free
 export function effect(fn: () => void): void {
   if (typeof KAY_BROWSER === 'undefined' && serverRendering > 0)
     return
@@ -485,17 +487,20 @@ export function renderEffect(fn: () => void): void {
 }
 
 // Runs once, after the component's markup is in place.
+// kept: free
 export function onMount(fn: () => void): void {
   effect(() => untrack(fn))
 }
 
 // Runs when the computation or root it is registered in runs again or goes away.
+// kept: free
 export function onCleanup(fn: () => void): void {
   if (owner)
     (owner.cleanups ??= []).push(fn)
 }
 
 // Reads signals without making the current computation depend on them.
+// kept: free
 export function untrack<T>(fn: () => T): T {
   const previous = listener
 
@@ -515,6 +520,7 @@ export function tracking(): boolean {
 }
 
 // Applies every write `fn` makes, then runs the effects they touch once, before returning.
+// kept: free
 export function batch<T>(fn: () => T): T {
   batching++
 
@@ -528,6 +534,7 @@ export function batch<T>(fn: () => T): T {
 }
 
 // An owner of its own: what `fn` creates lives until `dispose` is called.
+// kept: free
 export function root<T>(fn: (dispose: () => void) => T): T {
   const node = ownerUnder(owner, false)
 
@@ -540,6 +547,7 @@ function effectName(node: Computation): string {
 }
 
 // Runs every effect whose sources changed, now.
+// kept: free
 export function flush(): void {
   scheduled = false
 

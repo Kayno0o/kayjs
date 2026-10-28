@@ -18,6 +18,7 @@ declare const KAY_BROWSER: true | undefined
 // The build gives each declaration its id, so it is written as `export const name = live(...)` at the top of a module.
 // `live(0, { ttl: '7d' })` forgets the value, in every store, that long after its last write.
 // `live(0, { user: true })` is one value for each signed-in user, sent only to that user's own pages: `unread()` reads the visitor's, `unread.set(userId, 3)` writes one user's.
+// kept: request
 export function live<T, const Ttl extends Duration = Duration>(initial: PlainValue<T>, options: LiveOptions<Ttl> & { user: true }): LiveOwn<T>
 export function live<T, const Ttl extends Duration = Duration>(initial: PlainValue<T>, options?: LiveOptions<Ttl>): Live<T>
 export function live<K extends LiveKey, T, const Ttl extends Duration = Duration>(initial: (key: K) => PlainValue<T>, options?: LiveOptions<Ttl>): LiveByKey<K, T>

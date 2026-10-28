@@ -20,6 +20,7 @@ export interface Signal<T> {
 export type Memo<T> = () => T
 
 // A signal read as `count()` and written as `count.set(1)` or `count.set(c => c + 1)`.
+// kept: free
 export function signal<T>(): Signal<T | undefined>
 export function signal<T>(value: PlainValue<T>, options?: SignalOptions<T>): Signal<T>
 export function signal<T>(value?: PlainValue<T>, options?: SignalOptions<T | undefined>): Signal<T | undefined> {
@@ -42,6 +43,7 @@ export interface EveryOptions {
 // Runs `run` every `interval` while the island lives, and while `options.while` holds: `every('3s', refresh, { while: () => issuing })` polls the page until nothing is issuing.
 // Nothing runs while the server renders or the tab is hidden, and a tick is skipped while the promise the last run returned is pending, so a slow refresh never piles up.
 // An interval that is not a positive duration throws.
+// kept: free
 export function every(interval: Duration, run: () => unknown, options?: EveryOptions): void {
   const ms = typeof interval === 'string' ? durationMs(interval) : Number.NaN
   let paused = false
@@ -96,6 +98,7 @@ export interface WatchOptions {
 // Runs `run` whenever `source` gives a new value, not on its first read, handed the value it gave before: `watch(turn, (next, previous) => ...)`.
 // The first read is the island's effects' first run, once its render is done: a write the script makes before then is part of it.
 // Only `source` is tracked, never what `run` reads, and a value equal to the last one runs nothing; nothing runs while the server renders.
+// kept: free
 export function watch<T>(source: () => T, run: (next: T, previous: T) => unknown, options?: WatchOptions & { immediate?: false | undefined }): void
 export function watch<T>(source: () => T, run: (next: T, previous: T | undefined) => unknown, options?: WatchOptions): void
 export function watch<T>(source: () => T, run: (next: T, previous: T | undefined) => unknown, options?: WatchOptions): void {
@@ -119,6 +122,7 @@ export function watch<T>(source: () => T, run: (next: T, previous: T | undefined
 
 // `source`'s value once it has stopped changing for `delay`, starting with its value now: `watch(debounced(typed, '300ms'), lookUp)` looks a name up as the user pauses.
 // The pending timer goes with the island; while the server renders, the value stays the one `source` gave first.
+// kept: free
 export function debounced<T>(source: () => T, delay: Duration): Memo<T> {
   const wait = durationMs(delay)
   const [settled, write] = createSignal(untrack(source))
@@ -139,6 +143,7 @@ type EventMapOf<T> = T extends Window ? WindowEventMap : T extends Document ? Do
 // Listens to `type` events on `target`, `window` or `document` for instance, while the island lives; nothing listens while the server renders.
 // In a `.kay` file the compiler hands `target` over as a function, so `listen(window, ...)` never reads `window` on the server; a `.ts` module writes `listen(() => window, ...)`. A target read from a signal listens to its new value as it changes.
 // The handler runs under the owner `listen` was called in, so a stream it starts closes with that island or block.
+// kept: free
 export function listen<T extends EventTarget, K extends keyof EventMapOf<T> & string>(target: T | (() => T | null | undefined), type: K, handler: (event: EventMapOf<T>[K]) => void, options?: boolean | AddEventListenerOptions): void {
   const owner = getOwner()
 
@@ -156,6 +161,7 @@ export function listen<T extends EventTarget, K extends keyof EventMapOf<T> & st
 }
 
 // A signal an island edits locally that takes `source`'s value again whenever it changes: `const tiers = linked(() => board.tiers)` follows the prop once the page brings a new board.
+// kept: free
 export function linked<T>(source: () => T): Signal<T> {
   const from = memo(source)
   let changes = 0
@@ -184,6 +190,7 @@ export interface Context<T> {
 }
 
 // A value a component hands what it renders, however deep, without passing it through each one's props: `Theme.provide('dark')` in one, `Theme.use()` below it.
+// kept: free
 export function context<T>(fallback: T): Context<T> {
   const key = Symbol('kay.context')
 
@@ -212,6 +219,7 @@ interface Flag {
 
 // One selected key among many rows: `is(key)` reads a flag of that key's own, so a change re-runs what read the old key and the new one, not every row.
 // Flags are made on first read and dropped once nothing reads them.
+// kept: free
 export function selection<Key extends string | number>(initial?: Key): Selection<Key> {
   const flags = new Map<Key, Flag>()
   // The key the flags were last set for, which a write kept in a request's scope leaves behind: the key to answer with is the signal's own.
@@ -340,12 +348,14 @@ declare global {
 }
 
 // The default export of a `_guard.ts`: runs before every page and every action in its directory and below, and lets the request through unless it redirects or denies.
+// kept: request
 export function guard<Own extends object = object>(check: (ctx: GuardContext<Own>) => void | Promise<void>): Guard {
   return check as Guard
 }
 
 // An `await` block takes any promise whatever made it, so this is no longer needed: it still returns the promise as a promise, handling its rejection at once.
 // eslint-disable-next-line ts/promise-function-async -- an async function would hand back a second promise, which rejects with nothing taking it
+// kept: request
 export function defer<T>(value: T | PromiseLike<T>): Deferred<T> {
   const promise = Promise.resolve(value)
 

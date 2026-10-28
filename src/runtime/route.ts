@@ -46,6 +46,7 @@ function encoded(name: string, text: string): string {
 }
 
 // The path of a page for its params, encoded, as a literal `href` would write it: the mount point and the locale are put on it as they are on any link of the site.
+// kept: free
 export function route<const Pattern extends RoutePattern>(pattern: Pattern, ...args: RouteArgs<Pattern>): string {
   const parts = pattern.split('/').slice(1)
   const parameterized = parts.some(part => part[0] === ':' || part[0] === '*')

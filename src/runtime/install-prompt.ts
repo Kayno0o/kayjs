@@ -45,6 +45,7 @@ const readAvailable = markSignal((): boolean => (onServer() ? false : installSig
 
 // The browser's offer to install the site as an app, kept from the first moment of any page rendering an island that uses it, by a small script in the page's head (`beforeinstallprompt` fires before an island hydrates). The listener below covers a page swapped in without it.
 // `installPrompt.available()` is true while an offer is held: draw an "Install" button from it, and call `installPrompt.show()` from its click. Browsers that never make the offer, Safari's included, leave it false.
+// kept: free
 export const installPrompt = {
   available: readAvailable,
   async show(): Promise<InstallOutcome> {

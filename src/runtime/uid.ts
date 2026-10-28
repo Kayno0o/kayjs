@@ -11,6 +11,7 @@ let current: IdScope | undefined
 let unscoped = 0
 
 // An id for a label and its control, a trigger and its popup: one per call, unique on the page.
+// kept: free
 export function uid(): string {
   return !current ? `K${unscoped++}` : `${current.prefix}${current.next++}`
 }

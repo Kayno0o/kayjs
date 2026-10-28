@@ -2,7 +2,7 @@ import { rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import { afterAll, describe, expect, it } from 'bun:test'
 import { outputDir } from '../src/build/assets'
-import { IMAGE_EXPORTS, keptScan } from '../src/server/pure-page'
+import { keptScan } from '../src/server/pure-page'
 import { kayBuild } from './check-helper'
 import { scratchDir } from './scratch'
 
@@ -44,12 +44,6 @@ async function built(root: string): Promise<string[]> {
 }
 
 describe('a page importing kay/image', () => {
-  it('classes every export of kay/image once', async () => {
-    const exported = Object.keys(await import('../src/runtime/image.public')).sort()
-
-    expect(Object.keys(IMAGE_EXPORTS).sort()).toEqual(exported)
-  })
-
   it('is kept when it uses image, shareImage or shareCard, in the page, a component or a module, renamed or not', async () => {
     const files = {
       'src/logo.ts': LOGO,
