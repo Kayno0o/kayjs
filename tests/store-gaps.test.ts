@@ -9,7 +9,7 @@ import { solveWork } from '../src/runtime/work'
 import { setupStore } from '../src/server/app-store'
 import { countWrites } from '../src/server/kept-pages'
 import { TimeoutError } from '../src/server/pg-poll'
-import { apiLimitWait, countSucceeded, memoryRates, overLimit, protectionRefusal, rateLimit, refundRateLimit } from '../src/server/protection'
+import { apiLimitWait, countSucceeded, memoryRates, overLimit, protectionRefusal, rateLimit, ratesFor, refundRateLimit } from '../src/server/protection'
 import { memoryRooms, sqliteRooms } from '../src/server/rooms'
 import { signWork } from '../src/server/work'
 import { verifyWork, workChallenge } from '../src/server/work-scope'
@@ -352,6 +352,26 @@ describe('a rates store that answers', () => {
     }
     finally {
       timers.mockRestore()
+    }
+  })
+
+  it('logs a failing store once while another store under the same name answers', async () => {
+    const seen = warnings('gaps-two-stores')
+
+    try {
+      setupStore({ rates: memoryRates() })
+
+      const broken = brokenRates()
+
+      for (let round = 0; round < 3; round++) {
+        await ratesFor('gaps-two-stores', broken).hit('one', '1m')
+        await ratesFor('gaps-two-stores').hit('one', '1m')
+      }
+
+      expect(seen.count()).toBe(1)
+    }
+    finally {
+      seen.restore()
     }
   })
 

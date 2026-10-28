@@ -595,8 +595,9 @@ function filledIn(value: unknown): boolean {
   return typeof value === 'string' ? value !== '' : value !== undefined && value !== null
 }
 
-// The routes whose rates store failure was logged and has not answered since.
-const failing = new Set<string>()
+// The names each rates store's failure was logged under and has not answered since, per store, so another store under a name leaves its log alone.
+const failing = new WeakMap<RateStore, Set<string>>()
+let anyFailed = false
 
 // How long a rates store that timed out is left alone, so a hanging one holds one request instead of every one.
 const SKIP_MS = 10_000
@@ -700,8 +701,8 @@ async function timed<Result>(name: string, store: RateStore, answer: Promise<Res
 }
 
 function recovered(name: string, store: RateStore): void {
-  if (failing.size > 0)
-    failing.delete(name)
+  if (anyFailed)
+    failing.get(store)?.delete(name)
 
   if (skipping)
     skipped.delete(store)
@@ -714,8 +715,15 @@ function failed<Result>(name: string, store: RateStore, error: unknown, fallback
     skipped.set(store, Date.now() + SKIP_MS)
   }
 
-  if (!failing.has(name)) {
-    failing.add(name)
+  let names = failing.get(store)
+
+  if (!names)
+    failing.set(store, names = new Set())
+
+  anyFailed = true
+
+  if (!names.has(name)) {
+    names.add(name)
     kayLog('warn', `the rates store failed counting ${name}, so this process's memory counts instead`, error)
   }
 
