@@ -1,8 +1,8 @@
-import { existsSync, lstatSync, readdirSync, realpathSync, statSync } from 'node:fs'
-import { dirname, join, relative, sep } from 'node:path'
+import { existsSync, mkdirSync, readdirSync, readlinkSync, realpathSync, renameSync, statSync, symlinkSync } from 'node:fs'
+import { join, relative, sep } from 'node:path'
 
-// The package directory, its name and the file's path in it.
-const STORE_FILE = /^(.*[\\/]node_modules[\\/]\.bun[\\/][^\\/]+[\\/]node_modules[\\/]((?:@[^\\/]+[\\/])?[^\\/]+))[\\/](.+)$/
+// The package's store entry, its id and the file's path in it, under the entry's `node_modules`.
+const STORE_FILE = /^(.*[\\/]node_modules[\\/]\.bun[\\/]([^\\/]+))[\\/](node_modules[\\/].+)$/
 
 // Kept apart from the library scan, which brings the compiler's parser: the server resolves extension directories through it.
 
@@ -28,23 +28,35 @@ export function throughLinks(root: string, file: string): string {
   return found ? join(found[1], relative(found[0], file)) : file
 }
 
-// A file Bun's isolated linker keeps in its store, `node_modules/.bun/<id>/node_modules/<name>/...`, as the project reaches it through the link to its package in the `node_modules` of the project or of a directory above, as a workspace's store links it; the file as it is when nothing there links the package.
-export function outOfStore(root: string, file: string): string {
-  const [, dir, name, rest] = STORE_FILE.exec(file) ?? []
+// A file Bun's isolated linker keeps in its store, `node_modules/.bun/<id>/node_modules/<name>/...`, through a link to its store entry kept in `dir`, whose path holds no `.bun`; the file as it is outside the store.
+// The path keeps the entry's `node_modules` above the file, where the linker puts the package's own dependencies, so a bare `@import` in it resolves as from the store.
+export function outOfStore(dir: string, file: string): string {
+  const [, entry, id, rest] = STORE_FILE.exec(file) ?? []
 
-  if (dir === undefined || name === undefined || rest === undefined)
+  if (entry === undefined || id === undefined || rest === undefined)
     return file
 
-  const real = realpathSync(dir)
+  // Two stores, a workspace's and the app's own, may hold the same id.
+  const link = join(dir, `${id}-${Bun.hash(entry).toString(36)}`)
 
-  for (let at = root; ; at = dirname(at)) {
-    const link = join(at, 'node_modules', name)
+  if (linkTarget(link) !== entry) {
+    const temporary = `${link}.${crypto.randomUUID()}.tmp`
 
-    if (lstatSync(link, { throwIfNoEntry: false })?.isSymbolicLink() === true && existsSync(link) && realpathSync(link) === real)
-      return join(link, rest)
+    mkdirSync(dir, { recursive: true })
+    symlinkSync(entry, temporary, 'junction')
+    // Renamed into place, so two builds linking the same entry never meet a half-made link.
+    renameSync(temporary, link)
+  }
 
-    if (at === dirname(at))
-      return file
+  return join(link, rest)
+}
+
+function linkTarget(link: string): string | undefined {
+  try {
+    return readlinkSync(link)
+  }
+  catch {
+    return undefined
   }
 }
 

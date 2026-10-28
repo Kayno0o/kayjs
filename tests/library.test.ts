@@ -170,6 +170,8 @@ describe('a linked kay library', () => {
 describe('packages in Bun\'s isolated store', () => {
   let workspace: string
   let project: string
+  // An app of the same workspace with no Tailwind plugin, its stylesheets read by Bun's own parser.
+  let bare: string
 
   beforeAll(async () => {
     workspace = await scratchDir('dom-')
@@ -181,15 +183,27 @@ describe('packages in Bun\'s isolated store', () => {
       'src/routes/framed.kay': '---\nimport Framed from \'kay-lib/framed.kay\'\n---\nFramed\n',
       'src/routes/plain.kay': '---\nimport \'@scope/plain/plain.css\'\n---\np.plain Plain\n',
     })
+    bare = join(workspace, 'bare')
+    await write(bare, { ...PROJECT, 'kay.config.ts': 'export default {}\n', 'src/routes/index.kay': '---\nimport Plain from \'kay-lib/plain.kay\'\n---\nPlain\n' })
     // A kay library in the workspace's store, as kayjs-ui is.
     await write(join(workspace, 'node_modules/.bun/kay-lib@1.0.0/node_modules/kay-lib'), {
       ...LIBRARY,
       'src/framed.kay': '---\nimport \'./framed.css\'\n---\np.framed Framed\n',
-      // As kayjs-ui's shell stylesheet starts.
-      'src/framed.css': '@import \'tailwindcss/theme.css\' layer(theme);\n@import \'tailwindcss/utilities.css\' layer(utilities) source(none);\n\n.framed {\n  @apply font-bold;\n}\n',
+      // As kayjs-ui's shell stylesheet starts, then a dependency of the library alone.
+      'src/framed.css': '@import \'tailwindcss/theme.css\' layer(theme);\n@import \'tailwindcss/utilities.css\' layer(utilities) source(none);\n@import \'lib-dep/dep.css\';\n\n.framed {\n  @apply font-bold;\n}\n',
+      'src/plain.kay': '---\nimport \'./plain.css\'\n---\np.lib-plain Plain\n',
+      'src/plain.css': '@import \'lib-dep/dep.css\';\n\n.lib-plain {\n  color: red;\n}\n',
     })
+    // The isolated linker links a package's own dependencies beside it in its store entry, and nowhere the apps reach.
+    await write(join(workspace, 'node_modules/.bun/lib-dep@1.0.0/node_modules/lib-dep'), {
+      'package.json': JSON.stringify({ name: 'lib-dep', version: '1.0.0' }),
+      'dep.css': '.from-dep {\n  color: blue;\n}\n',
+    })
+    await symlink('../../lib-dep@1.0.0/node_modules/lib-dep', join(workspace, 'node_modules/.bun/kay-lib@1.0.0/node_modules/lib-dep'))
     await mkdir(join(project, 'node_modules/@scope'), { recursive: true })
+    await mkdir(join(bare, 'node_modules'), { recursive: true })
     await symlink('../../node_modules/.bun/kay-lib@1.0.0/node_modules/kay-lib', join(project, 'node_modules/kay-lib'))
+    await symlink('../../node_modules/.bun/kay-lib@1.0.0/node_modules/kay-lib', join(bare, 'node_modules/kay-lib'))
     // A scoped package that is no kay library, in the store of an app installed on its own with the isolated linker.
     await write(join(project, 'node_modules/.bun/@scope+plain@1.0.0/node_modules/@scope/plain'), {
       'package.json': JSON.stringify({ name: '@scope/plain', version: '1.0.0' }),
@@ -210,6 +224,21 @@ describe('packages in Bun\'s isolated store', () => {
     expect(css).toMatch(/\.framed\s*\{[^}]*font-weight:\s*var\(--font-weight-bold\)/)
     expect(css).toMatch(/\.plain\s*\{[^}]*font-style:\s*italic/)
     expect(css).not.toContain('@apply')
+    // A dependency the library alone lists, linked only in its store entry.
+    expect(css).toMatch(/\.from-dep\s*\{[^}]*color:\s*(?:blue|#00f)/)
+  }, 120_000)
+
+  it('resolve a bare @import of a dependency only the library lists without a Tailwind plugin too', async () => {
+    const out = join(bare, 'out')
+    const { code, output } = await run('build', bare, '--static', '--outdir', out)
+
+    expect(output).not.toContain('error')
+    expect(code).toBe(0)
+
+    const css = (await Promise.all((await readdir(join(out, '_kay'))).filter(name => name.endsWith('.css')).map(async name => Bun.file(join(out, '_kay', name)).text()))).join('\n')
+
+    expect(css).toMatch(/\.from-dep\s*\{[^}]*color:\s*(?:blue|#00f)/)
+    expect(css).toMatch(/\.lib-plain\s*\{[^}]*color:\s*(?:red|#f00)/)
   }, 120_000)
 })
 

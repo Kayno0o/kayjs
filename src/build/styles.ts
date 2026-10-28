@@ -102,14 +102,15 @@ export function styleImports(root: string, libraries: KayLibrary[] = [], loaded?
   const inProject = (path: string) => path.startsWith(project) && !path.includes(`${sep}node_modules${sep}`)
   // A kay library's components and modules are followed as the app's own are.
   const followed = (path: string) => CSS_FILE.test(path) || ((inProject(path) || libraryOf(libraries, path) !== undefined) && (KAY_FILE.test(path) || SCRIPT_FILE.test(path)))
-  // The Tailwind plugin leaves every file under `node_modules/.bun/` to Bun's own CSS parser, so a stylesheet there reaches the bundler by the link the app reaches its package through.
+  // The Tailwind plugin leaves every file under `node_modules/.bun/` to Bun's own CSS parser, so a stylesheet there reaches the bundler through a link kay keeps to its store entry.
   // Bun resolves an absolute path to its real one, so `onResolve` answers each of these links with the link itself.
+  const store = cacheDir(root, 'store')
   const linkedStylesheets = new Set<string>()
   const linkedOutOfStore = (path: string) => {
     if (!CSS_FILE.test(path) || !PACKAGE_STORE.test(path))
       return path
 
-    const linked = outOfStore(root, path)
+    const linked = outOfStore(store, path)
 
     linkedStylesheets.add(linked)
 
