@@ -1,0 +1,99 @@
+import { rm } from 'node:fs/promises'
+import { join } from 'node:path'
+import { afterAll, describe, expect, it } from 'bun:test'
+import { readKeptSource } from '../src/server/kept-source'
+import { keptScan } from '../src/server/pure-page'
+import { scratchDir } from './scratch'
+
+const readOf = (file: string, source: string) => readKeptSource(file, source).read?.what
+const ctxOf = (file: string, source: string) => readKeptSource(file, source).ctx
+
+describe('what a kept page\'s scan reads of a source', () => {
+  it('finds a read of the request or the moment in code, and none in a comment, a string, a type or a property name', () => {
+    expect(readOf('a.ts', 'export const now = Date.now()\n')).toBe('Date')
+    expect(readOf('a.ts', 'export const roll = Math.random()\n')).toBe('Math')
+    expect(readOf('a.ts', 'export const math = Math\n')).toBe('Math')
+    expect(readOf('a.ts', 'export const load = () => import(\'./b\')\n')).toBe('import(')
+    expect(readOf('a.ts', 'export const here = import.meta.dir\n')).toBe('import.meta')
+    expect(readOf('a.kay', '--- server\nexport const page = { query: s.Object({}) }\n---\np x\n')).toBe('query:')
+    expect(readOf('a.kay', 'p {new Date().getFullYear()}\n')).toBe('Date')
+    expect(readOf('a.kay', 'markdown\n  Built {process.env.SHA}\n')).toBe('process')
+    expect(readOf('a.kay', 'snippet row(at = Date.now())\n  p {at}\n')).toBe('Date')
+
+    expect(readOf('a.ts', '// fetch the Date from process\nexport const floor = Math.floor(1.5)\n')).toBeUndefined()
+    expect(readOf('a.ts', 'export const text = \'fetch a Date from process\'\nexport const label = { fetch: 1 }.fetch\n')).toBeUndefined()
+    expect(readOf('a.ts', 'export function since(at: Date, format: Intl.NumberFormat): string {\n  return format.format(at.getTime())\n}\n')).toBeUndefined()
+    expect(readOf('a.kay', 'p The Date is fetched by process\n')).toBeUndefined()
+    expect(readOf('a.kay', '---\nconst { at } = props<{ at: Date }>()\n---\np {at.getTime()}\n')).toBeUndefined()
+  })
+
+  it('reads nothing in the value of `lastmod`, which the sitemap reads and no render does', () => {
+    const source = '--- server\nexport const page = { lastmod: new Date() }\n---\np x\n'
+    const value = source.indexOf('new Date()')
+
+    expect(readKeptSource('a.kay', source, { start: value, end: value + 'new Date()'.length }).read).toBeUndefined()
+  })
+
+  it('follows ctx only through its path, and a property or a parameter named ctx is not it', () => {
+    expect(ctxOf('a.kay', '--- server\nconst here = ctx.url.pathname\nconst id = ctx?.params?.id\nconst { url: { pathname }, params } = ctx\n---\np {here}{id}{pathname}\n')).toBeUndefined()
+    expect(readKeptSource('a.kay', '--- server\nconst here = ctx.url.pathname\n---\np {here}\n').pathname).toBe(true)
+    expect(ctxOf('a.ts', 'export const draw = (canvas: HTMLCanvasElement) => canvas.getContext(\'2d\')\nexport const widget = { ctx: 1 }.ctx\n')).toBeUndefined()
+    expect(ctxOf('a.kay', '--- server\nexport const save = action(s.Object({}), (input, ctx) => ctx.params.id)\n---\np x\n')).toBeUndefined()
+
+    for (const source of ['p {ctx.url.search}', 'p {ctx.cookies.get(\'a\')}', 'p {here(ctx)}', 'p {ctx.url.pathname = \'/\'}', 'p {ctx[\'url\']}', 'p {(ctx as any).url.pathname}'])
+      expect(ctxOf('a.kay', `${source}\n`), source).toBe(source.indexOf('ctx'))
+
+    expect(ctxOf('a.kay', '--- server\nconst { url, params } = ctx\n---\np {url.search}\n')).toBe('--- server\nconst { url, params } = '.length)
+    expect(ctxOf('a.kay', '--- server\nconst { params, ...rest } = ctx\n---\np {rest}\n')).toBe('--- server\nconst { params, ...rest } = '.length)
+  })
+
+  it('lists the imports and re-exports of code, and none written in a string or the template\'s text', () => {
+    const { imports } = readKeptSource('a.kay', '--- server\nimport { persisted as keep, signal } from \'kay\'\nimport type { Signal } from \'kay\'\nimport { type Bindable } from \'kay\'\nimport Card from \'./card.kay\'\nimport * as all from \'./all\'\nimport \'./effect\'\nexport { a as b } from \'./a\'\nexport * from \'./b\'\nconst sample = \'import { x } from "pkg"\'\n---\npre import { y } from \'other\'\n')
+
+    expect(imports.map(({ specifier, names, withDefault, typesOnly }) => ({ specifier, names: names?.map(({ text }) => text), withDefault, typesOnly }))).toEqual([
+      { specifier: 'kay', names: ['persisted as keep', 'signal'], withDefault: false, typesOnly: false },
+      { specifier: 'kay', names: [], withDefault: false, typesOnly: true },
+      { specifier: './card.kay', names: [], withDefault: true, typesOnly: false },
+      { specifier: './all', names: undefined, withDefault: false, typesOnly: false },
+      { specifier: './effect', names: undefined, withDefault: false, typesOnly: false },
+      { specifier: './a', names: ['a as b'], withDefault: false, typesOnly: false },
+      { specifier: './b', names: undefined, withDefault: false, typesOnly: false },
+    ])
+  })
+
+  it('records each use of a name with the arguments of a call to it', () => {
+    const { uses } = readKeptSource('a.kay', '---\nconst a = persisted<(string | number)[]>(\'a\', [], { storage: \'local\' })\nconst make = persisted\n---\np {a()}\n')
+
+    expect(uses.get('persisted')?.map(args => args?.length)).toEqual([3, undefined])
+  })
+
+  it('says where a source does not parse', () => {
+    expect(readKeptSource('a.ts', 'export const a = (\n').unparsed).toBeNumber()
+    expect(readKeptSource('a.kay', 'p {a +}\n').unparsed).toBeGreaterThanOrEqual(3)
+  })
+})
+
+describe('a page the scan reads from its parse', () => {
+  const roots: string[] = []
+
+  afterAll(async () => {
+    await Promise.all(roots.map(async root => rm(root, { recursive: true, force: true })))
+  })
+
+  it('is kept when it takes only types from kay, and not when a file it reads does not parse', async () => {
+    const root = await scratchDir('kept-source-')
+    const files = {
+      'src/routes/types.kay': '---\nimport { type Signal } from \'kay\'\n\nconst { open } = props<{ open: Signal<boolean> }>()\n---\np {open()}\n',
+      'src/routes/broken.kay': '---\nimport { label } from \'../label\'\n---\np {label}\n',
+      'src/label.ts': 'export const label = (\n',
+    }
+
+    roots.push(root)
+    await Promise.all(Object.entries(files).map(async ([path, content]) => Bun.write(join(root, path), content)))
+
+    const at = async (name: string) => (await keptScan({ file: join(root, `src/routes/${name}.kay`), layouts: [] })).stop
+
+    expect(await at('types')).toBeUndefined()
+    expect(await at('broken')).toMatchObject({ file: join(root, 'src/label.ts'), why: 'does not parse, so nothing shows what it reads' })
+  })
+})

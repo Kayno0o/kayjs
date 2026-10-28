@@ -42,6 +42,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 - A library linked from its own folder with kay as a dev dependency shares the app's kay, so its `api()` is served: [Component libraries](component-libraries.md).
 - A page following a cached value or a live `resource()` refreshes behind a proxy rewriting the live stream's line breaks to `\r\n`: [Following cached values](live-values.md#following-cached-values).
 - `queue(name, handler, { live: true })` lets an island follow the queue's waiting and running jobs with `jobs(name)` from `kay`, across workers and replicas: [Show a queue's jobs on a page](queues.md#show-a-queues-jobs-on-a-page).
+- A page whose only `Date`, `fetch`, `process`, `Bun` or `ctx` sits in a comment, a string, a type or the template's text, or which imports only types from `kay`, is now [kept](prerendering.md).
 
 The rest of this release is in [What's new, older releases](whats-new-archive.md).
 

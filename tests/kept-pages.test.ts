@@ -1199,7 +1199,8 @@ describe('a page reading only what its path fixes', () => {
     expect(await reading('src/routes/params.kay')).toBe(false)
     expect(await stopOf('src/routes/with-nav-search.kay')).toMatchObject({ file: join(root, 'src/nav-search.kay'), why: 'reads `ctx`' })
     expect(await stopOf('src/routes/with-helper.kay')).toMatchObject({ why: 'reads `ctx`' })
-    expect(await stopOf('src/routes/foreign.kay')).toMatchObject({ why: 'reads `ctx`' })
+    // A property named `ctx`, a canvas's say, is no read of the request: kay's `ctx` reaches an object only through a use of the name itself, which stops the page there.
+    expect(await stopOf('src/routes/foreign.kay')).toBeUndefined()
   })
 
   it('keeps every page of a site whose layout reads the pathname, and not the one reading more', async () => {

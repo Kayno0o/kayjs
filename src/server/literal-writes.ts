@@ -697,3 +697,162 @@ export function declaredName(declarator: string): string | undefined {
 
   return rest === '' || rest.startsWith(':') ? start : undefined
 }
+
+const WORD_CHAR = /[\w$]/
+const OPENING_BRACKET = /\[\s*$/
+const CLOSING_BRACKET = /^\s*\]/
+const NOT_LINE_BREAK = /[^\n]/g
+
+// Where a regex literal may start: after nothing, an operator or an opening bracket, or a keyword that takes an expression.
+const BEFORE_REGEX = /(?:^|[(,=:[!&|?{};+\-*%<>~^]|(?<![\w$.])(?:return|typeof|case|do|else|in|of|void|delete|throw|new|yield|await))\s*$/
+// How far back `BEFORE_REGEX` needs to look.
+const REGEX_LOOKBACK = 16
+// How far back a `case` or a label is looked for before its colon.
+const BLOCK_LOOKBACK = 80
+// A `{` that opens an object literal rather than a block: after one of these a `}` ends a value, so a `/` after it divides.
+const BEFORE_VALUE_BRACE = /[(,=[?]\s*$/
+const AFTER_COLON = /:\s*$/
+// The start of a statement opening with a `case`, a `default` or a label, whose colon has a block after it.
+const BLOCK_START = /^\s*(?:case\b|[\w$]+\s*:)/
+const STATEMENT_END = /[;{}\n][^;{}\n]*$/
+
+// The statement `before` ends in, from the `;`, `{`, `}` or line break that starts it.
+function statementOf(before: string): string {
+  const tail = before.slice(-BLOCK_LOOKBACK)
+  const found = STATEMENT_END.exec(tail)
+
+  return found === null ? tail : found[0].slice(1)
+}
+
+// Whether the `{` coming after `before` opens an object literal: after a colon it does as a property's value or a ternary's branch, and does not after a `case`, `default` or label.
+function opensValue(before: string, insideObject: boolean): boolean {
+  if (BEFORE_VALUE_BRACE.test(before.slice(-REGEX_LOOKBACK)))
+    return true
+
+  return AFTER_COLON.test(before.slice(-REGEX_LOOKBACK)) && (insideObject || !BLOCK_START.test(statementOf(before)))
+}
+
+// The offset just after the regex literal starting at `at`, or undefined when its line ends before it closes: then the slash was a division.
+function regexEnd(source: string, at: number): number | undefined {
+  let inClass = false
+
+  for (let end = at + 1; end < source.length; end++) {
+    const char = source[end]
+
+    if (char === '\n')
+      return undefined
+
+    if (char === '\\')
+      end++
+    else if (char === '[')
+      inClass = true
+    else if (char === ']')
+      inClass = false
+    else if (char === '/' && !inClass)
+      return end + 1
+  }
+
+  return undefined
+}
+
+// The source with its comments blanked out, and with `mask` the inside of its single or double quoted strings too, as a name in one is no use of it; strings, regex literals and templates kept (a `${ }` inside one is scanned as code), so a word in a comment is no use of a name and a comment inside a call's arguments hides nothing.
+export function withoutComments(source: string, mask = false): string {
+  let result = ''
+  // The brace depth each open `${ }` was entered at, to know which `}` closes it.
+  const holes: number[] = []
+  let braces = 0
+  let inTemplate = false
+  // Whether each open `{` is an object literal, and the length of `result` right after the last `}` that closed one.
+  const literals: boolean[] = []
+  let valueEnd = -1
+
+  for (let at = 0; at < source.length; at++) {
+    const char = source[at]!
+    const next = source[at + 1]
+    const regex = !inTemplate && char === '/' && next !== '/' && next !== '*' && BEFORE_REGEX.test(result.slice(-REGEX_LOOKBACK)) && result.trimEnd().length !== valueEnd ? regexEnd(source, at) : undefined
+
+    if (inTemplate) {
+      if (char === '\\') {
+        result += source.slice(at, at + 2)
+        at++
+      }
+      else if (char === '$' && next === '{') {
+        result += '${'
+        at++
+        literals.push(false)
+        holes.push(braces++)
+        inTemplate = false
+      }
+      else {
+        result += char
+
+        if (char === '`')
+          inTemplate = false
+      }
+    }
+    else if (char === '`') {
+      result += char
+      inTemplate = true
+    }
+    else if (char === '"' || char === '\'') {
+      let end = at + 1
+
+      for (; end < source.length && source[end] !== char; end++) {
+        if (source[end] === '\\')
+          end++
+      }
+
+      // Masking blanks only a string that closes on its line and does not follow a word, so an apostrophe in prose opens none.
+      const closed = source[end] === char && !source.slice(at, end).includes('\n') && !WORD_CHAR.test(source[at - 1] ?? '')
+
+      if (mask && !closed) {
+        result += char
+      }
+      else if (mask) {
+        const key = OPENING_BRACKET.test(result.slice(-20)) && CLOSING_BRACKET.test(source.slice(end + 1, end + 8))
+
+        result += char + (key ? source.slice(at + 1, end) : source.slice(at + 1, end).replace(NOT_LINE_BREAK, ' ')) + char
+        at = end
+      }
+      else {
+        result += source.slice(at, end + 1)
+        at = end
+      }
+    }
+    else if (char === '/' && (next === '/' || next === '*')) {
+      const line = next === '/'
+      const found = line ? source.indexOf('\n', at) : source.indexOf('*/', at + 2)
+      let end = source.length
+
+      if (found !== -1)
+        end = line ? found : found + 2
+
+      result += source.slice(at, end).replace(NOT_LINE_BREAK, ' ')
+      at = end - 1
+    }
+    else if (regex !== undefined) {
+      result += source.slice(at, regex)
+      at = regex - 1
+    }
+    else {
+      if (char === '{') {
+        literals.push(opensValue(result, literals.at(-1) === true))
+        braces++
+      }
+      else if (char === '}') {
+        braces--
+        // The length `result` will have once this `}` is appended, so a `/` right after it reads as a division.
+        valueEnd = literals.pop() === true ? result.length + 1 : -1
+
+        if (holes.at(-1) === braces) {
+          holes.pop()
+          inTemplate = true
+        }
+      }
+
+      result += char
+    }
+  }
+
+  return result
+}
