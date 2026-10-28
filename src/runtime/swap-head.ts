@@ -1,4 +1,5 @@
 import type { HeadElement } from './navigation'
+import { NAVIGATION_ENTRY } from './navigation-entry'
 import { ROOT_ATTRIBUTES } from './root'
 
 declare const KAY_BROWSER: true | undefined
@@ -12,9 +13,9 @@ const SPECULATION = 'script[type="speculationrules"]'
 const HISTORY = 'script[data-kay-history]'
 const REST_LINK = 'link[data-kay-rest]'
 // The head elements a swap leaves to itself rather than merging.
-// The meta naming the build the page's code belongs to stays through every swap, as that code does.
-const BUILD_TAG = 'meta[name="kay-build"]'
-const UNMERGED = `title,${SPECULATION},${HISTORY},${BUILD_TAG}`
+// The meta naming the build the page's code belongs to stays through every swap, as that code does, and so does the navigation-only entry: a page running it swaps in no page holding islands, and one running the islands' entry has navigation already.
+const KEPT = `meta[name="kay-build"],[${NAVIGATION_ENTRY}]`
+const UNMERGED = `title,${SPECULATION},${HISTORY},${KEPT}`
 // The attributes naming a meta, a head holding one per name and media.
 const META_NAMES = ['name', 'property', 'http-equiv']
 // Scripts the browser runs; any other type, such as `application/json` or `application/ld+json`, holds data of the page it came with.
@@ -156,7 +157,7 @@ export function mergeHead(next: Document): { loaded: Promise<unknown>, commit: (
   const named: Element[] = []
 
   for (const element of document.head.children as HTMLCollectionOf<HeadElement>) {
-    if (element.matches(BUILD_TAG))
+    if (element.matches(KEPT))
       continue
 
     // A stylesheet `kay dev` swapped in for an edited one, and what the page's own scripts only touch the markup of, are the server's as they stand.

@@ -16,7 +16,7 @@
   "sideEffects": [
     "./src/{a11y,build,check,commands,compiler,content,dev,eslint,format,lsp,mcp,migrate,server,test}/**",
     "./src/*.ts",
-    "./src/runtime/{client,i18n.client,i18n-links,live-cache,work-worker}.ts",
+    "./src/runtime/{client,i18n.client,i18n-links,live-cache,page-errors,work-worker}.ts",
     "./{tests,bench,examples,.kay,node_modules/.cache}/**"
   ],
   "publishConfig": {

@@ -42,6 +42,20 @@ describe('the runtime modules a page loads', () => {
 
 // A chunk import in the single or double quotes the bundler may write, naming a file beside the importing one.
 const IMPORT_SPECIFIER = /(?:from|import)\s*["'](\.\/[^"']+\.js)["']/g
+// Any chunk a chunk names, as a static import, a dynamic one or a path it preloads.
+const CHUNK_PATH = /["'](\.\/[^"']+\.js)["']/g
+
+// The chunks a chunk loads, at once or later, itself included.
+async function reachable(dir: string, chunk: string, seen = new Set<string>()): Promise<Set<string>> {
+  seen.add(chunk)
+
+  for (const [, from] of (await Bun.file(join(dir, chunk)).text()).matchAll(CHUNK_PATH)) {
+    if (!seen.has(from!.slice(2)))
+      await reachable(dir, from!.slice(2), seen)
+  }
+
+  return seen
+}
 
 // The function only the module of each block holds, as the client build names them.
 const BLOCKS = { loop: 'function keyedRows', await: 'function awaited(', try: 'function attempt(', spread: 'function spread(' }
@@ -113,13 +127,44 @@ describe('the blocks an island compiles to', () => {
   }, 120_000)
 })
 
+describe('the navigation-only entry', () => {
+  it('is built apart in production, loading no island runtime up front and no chunk of the islands\' build, and not at all in development', async () => {
+    const root = resolve(await fixtureCopy('runtime-chunks'))
+
+    dirs.push(root)
+
+    const client = await buildClient(root)
+    const eager = [client.navEntry!, ...client.navEntryImports!]
+    const islandsBuild = new Set([client.entry!, ...client.entryImports, ...Object.values(client.islands).flat()])
+    const texts = await Promise.all(eager.map(async url => chunkText(client, url)))
+
+    expect(client.navEntry).toBeDefined()
+    expect(eager.some(url => islandsBuild.has(url))).toBe(false)
+    expect(texts.join('\n')).toContain('speculationrules')
+    // What the page throws still goes to the server's `onError`.
+    expect(texts.join('\n')).toContain('unhandledrejection')
+    // The hydration a page with islands runs, which a form-only page never does.
+    expect(texts.join('\n')).not.toContain('did not match its server markup')
+    expect(await chunkText(client, client.entry!)).toContain('did not match its server markup')
+
+    for (const text of texts) {
+      for (const [, from] of text.matchAll(IMPORT_SPECIFIER))
+        expect(await Bun.file(join(client.dir, from!.slice(2))).exists(), `the navigation entry imports ${from} which is not a file of the build`).toBe(true)
+    }
+
+    expect((await buildClient(root, { hot: true })).navEntry).toBeUndefined()
+  }, 120_000)
+})
+
 describe('the page swap', () => {
   it('keeps the code for streamed pages, refused forms and held server islands in chunks of their own, loaded by the swaps needing them', async () => {
     const root = resolve(await fixtureCopy('runtime-chunks'))
 
     dirs.push(root)
     const client = await buildClient(root)
-    const chunks = await Array.fromAsync(new Bun.Glob('*.js').scan(client.dir))
+    // The navigation-only entry's build holds its own copy of the swap and of the chunks it loads.
+    const navigation = await reachable(client.dir, client.navEntry!.split('/').pop()!)
+    const chunks = (await Array.fromAsync(new Bun.Glob('*.js').scan(client.dir))).filter(chunk => !navigation.has(chunk))
     const texts = await Promise.all(chunks.map(async chunk => ({ chunk, text: await Bun.file(join(client.dir, chunk)).text() })))
     const swap = texts.find(({ text }) => text.includes('startViewTransition'))!
     const streamed = texts.filter(({ text }) => text.includes('kay-await:'))

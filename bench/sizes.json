@@ -18,5 +18,9 @@
   "bench-table": {
     "gzip": 13043,
     "files": 2
+  },
+  "form-only": {
+    "gzip": 2287,
+    "files": 1
   }
 }

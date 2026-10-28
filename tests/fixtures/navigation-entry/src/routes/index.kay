@@ -1,0 +1,7 @@
+---
+import Counter from '../components/counter.kay'
+---
+h1 Home
+Counter
+a.login(href="/login") Login
+a.contact(href="/contact") Contact

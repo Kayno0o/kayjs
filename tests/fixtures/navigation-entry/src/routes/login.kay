@@ -1,0 +1,15 @@
+--- server
+import { t } from 'elysia'
+import { action } from 'kay'
+
+// Refuses a name taken, shown in place; any other goes on to the contact page, which holds no island either.
+export const signIn = action(t.Object({ name: t.String({ maxLength: 40 }) }), async ({ name }, ctx) => name === 'Ann' ? ctx.fail(409, 'Taken') : ctx.redirect('/contact'))
+---
+h1 Login
+form(action={signIn})
+  input(name="name" aria-label="Name")
+  if signIn.error() as message
+    p.error {message}
+  button Sign in
+a.home(href="/") Home
+a.contact(href="/contact") Contact

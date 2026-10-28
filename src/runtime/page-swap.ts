@@ -1,6 +1,7 @@
 import type { FetchedPage, Swap } from './navigation'
 import type { Policy } from './swap-flight'
 import { historyState, leave, leaving, navigation, pageKey, restoreScroll, saveScroll, takeFormChecks } from './navigation'
+import { NAVIGATION_ENTRY } from './navigation-entry'
 import { forgetPageData } from './page-data'
 import { HTML, ownOrigin, PAGE_TIMEOUT_MS, pageFor } from './swap-fetch'
 import { bounded, CHUNK_TIMEOUT_MS, inFlight, LATE, policyOf } from './swap-flight'
@@ -21,6 +22,8 @@ export { TRANSITION_TIMEOUT_MS } from './swap-transition'
 
 const ENTRY_SCRIPT = 'script[type="module"][src]:not([src*="/_kay/dev/"])'
 const STREAMED_TEMPLATE = 'template[data-kay-await]'
+// `BUILD_META` of `./swap` written out, as importing it would have the islands' entry export it to this chunk.
+const BUILD_TAG = 'meta[name="kay-build"]'
 
 export async function go(url: URL, swap: Swap): Promise<void> {
   if (swap.intent === 'refresh' && inFlight.asked) {
@@ -157,10 +160,8 @@ export async function show(page: FetchedPage, hash: string, swap: Swap, isCurren
 
   const next = new DOMParser().parseFromString(page.html, 'text/html')
 
-  // Another build or another locale is a fresh start: its islands and messages are not this page's. A page loading no entry keeps the one running.
-  const entry = entryOf(next)
-
-  if ((entry !== undefined && entry !== entryOf(document)) || next.documentElement.lang !== document.documentElement.lang) {
+  // Another build or another locale is a fresh start: its islands and messages are not this page's.
+  if (!runsHere(next) || next.documentElement.lang !== document.documentElement.lang) {
     leave(target, replaces)
 
     return
@@ -268,7 +269,24 @@ function writeHistory({ history: change }: Policy, target: URL): void {
   }
 }
 
+// A page loading no entry keeps the one running, as does one loading this page's own or the navigation-only entry of this build, whose code the islands' entry holds too. A page running the navigation-only entry thus loads one holding islands in full.
+function runsHere(next: Document): boolean {
+  const script = entryOf(next)
+  const entry = script?.getAttribute('src')
+
+  if (entry == null || entry === entryOf(document)?.getAttribute('src'))
+    return true
+
+  const build = buildOf(next)
+
+  return script!.hasAttribute(NAVIGATION_ENTRY) && build !== undefined && build === buildOf(document)
+}
+
 // The dev tool's scripts lead a page with no islands under `kay dev`, and are no build's entry.
-function entryOf(page: Document): string | undefined {
-  return page.querySelector<HTMLScriptElement>(ENTRY_SCRIPT)?.getAttribute('src') ?? undefined
+function entryOf(page: Document): HTMLScriptElement | null {
+  return page.querySelector<HTMLScriptElement>(ENTRY_SCRIPT)
+}
+
+function buildOf(page: Document): string | undefined {
+  return page.querySelector<HTMLMetaElement>(BUILD_TAG)?.content
 }

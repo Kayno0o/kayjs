@@ -14,7 +14,7 @@ const SCRATCH = join(ROOT, '.kay/scratch')
 const BASE = '/repo'
 const CLIENT_PREFIX = /^\/_kay\//
 
-const PAGES = ['static', 'i18n-links', 'live-values', 'bench-products', 'bench-table'] as const
+const PAGES = ['static', 'i18n-links', 'live-values', 'bench-products', 'bench-table', 'form-only'] as const
 
 type Page = typeof PAGES[number]
 
@@ -84,9 +84,9 @@ async function i18nLinks(): Promise<Size> {
   }
 }
 
-// The fixture's home page, with islands reading live values, served by a production build.
-async function liveValues(): Promise<Size> {
-  const root = await copyOf('live-values', join(ROOT, 'tests/fixtures/live-values'))
+// A page of a fixture served by a production build.
+async function servedPage(fixture: string, path: string): Promise<Size> {
+  const root = await copyOf(fixture, join(ROOT, 'tests/fixtures', fixture))
 
   await Bun.write(join(root, 'kay.config.ts'), 'import { defineConfig } from \'kay/server\'\n\nexport default defineConfig({ log: false })\n')
   process.env.NODE_ENV = 'production'
@@ -95,9 +95,9 @@ async function liveValues(): Promise<Size> {
   const { Elysia } = await import('elysia')
   const { pages } = await import('../src/server')
   const app = new Elysia().use(await pages({ root, prebuilt: true, log: false, compress: false }))
-  const get = async (path: string) => (await app.handle(new Request(`http://localhost${path}`))).text()
+  const get = async (url: string) => (await app.handle(new Request(`http://localhost${url}`))).text()
 
-  return total(await eagerJs(scriptUrls(await get('/')), get))
+  return total(await eagerJs(scriptUrls(await get(path)), get))
 }
 
 async function benchPage(page: string): Promise<Size> {
@@ -123,7 +123,10 @@ async function measureHere(page: Page): Promise<Size> {
   switch (page) {
     case 'static': return staticHome()
     case 'i18n-links': return i18nLinks()
-    case 'live-values': return liveValues()
+    // The fixture's home page, with islands reading live values.
+    case 'live-values': return servedPage('live-values', '/')
+    // A page posting a form to an action and holding no island, in an app whose other pages hold some.
+    case 'form-only': return servedPage('forms', '/described')
     case 'bench-products':
     case 'bench-table': return benchPage(page)
   }

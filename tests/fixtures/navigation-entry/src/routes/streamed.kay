@@ -1,0 +1,17 @@
+--- server
+import { t } from 'elysia'
+import { action } from 'kay'
+
+export const note = action(t.Object({ text: t.String({ maxLength: 200 }) }), () => 'Noted')
+
+// Settles after the head went out, so the page streams: a part sent later may render an island, which only the islands' entry hydrates.
+const later = Bun.sleep(20).then(() => 'Later')
+---
+h1 Streamed
+form(action={note})
+  input(name="text" aria-label="Text")
+  button Note
+await later
+  p.pending Waiting
+then text
+  p.later {text}

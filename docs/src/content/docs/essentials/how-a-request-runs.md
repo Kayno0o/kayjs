@@ -24,7 +24,7 @@ An `await` block lets the page go out before its value arrives. A [server island
 
 ## In the browser
 
-The browser shows the HTML as it arrives. A page with no island ships no island code. At most it ships the small script that swaps pages in, on a page posting a form.
+The browser shows the HTML as it arrives. A page with no island ships no island code. At most it ships the small script that swaps pages in, on a page posting a form: about 2 KB gzipped in production. From such a page, a link to a page with islands loads that page in full, as a first visit would.
 
 An [island](/essentials/islands) is a component with an event handler, a `bind:` or a signal. kay rendered it on the server like the rest.
 

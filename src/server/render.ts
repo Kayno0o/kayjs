@@ -32,6 +32,7 @@ import { localePath, textDirection } from '../runtime/i18n'
 import { DEFAULT_MAX_DENSITY, RESOLVED_META } from '../runtime/image'
 import { localeState } from '../runtime/locale-state'
 import { kayLog } from '../runtime/log'
+import { NAVIGATION_ENTRY } from '../runtime/navigation-entry'
 import { editing } from '../runtime/preview'
 import { currentServerScope } from '../runtime/reactive'
 import { BUILD_META } from '../runtime/swap'
@@ -1075,8 +1076,10 @@ function documentOf(files: string[], modules: PageModule[], data: Record<string,
   const follows = client.entry !== undefined && followsCaches()
   const defers = client.entry !== undefined && scan?.modes.includes('defer') === true
   const shipsEntry = hasIslands || posts || follows || defers
+  // A production page only posting forms loads navigation alone; a streamed one may still render islands, which the islands' entry hydrates.
+  const navigates = posts && !hasIslands && !follows && !defers && !streamed && client.navEntry !== undefined
   const checked = posts ? formsScript(forms, options.dev) : ''
-  const scripts = shipsEntry ? islandScripts(client, islands.eager, streamed, hasIslands, islands.lazy > 0 || defers, options.islandPreloads === undefined ? undefined : islands) + checked + workScript(forms, options.prerendering === true) : ''
+  const scripts = shipsEntry ? (navigates ? navigationScripts(client) : islandScripts(client, islands.eager, streamed, hasIslands, islands.lazy > 0 || defers, options.islandPreloads === undefined ? undefined : islands)) + checked + workScript(forms, options.prerendering === true) : ''
   const state = localeState()
   // Without `i18n` the page may say its own language; with it, the locale decides.
   const lang = (state === undefined || state.implicit ? head.lang : undefined) ?? state?.locale ?? options.lang ?? DEFAULT_LANG
@@ -1281,6 +1284,11 @@ function stylesheets(client: ClientBuild, files: string[]): string {
 // A page without islands needs no hydration script, only the entry swapping pages.
 // `saving` is set where a page drops island-only preloads for a visitor saving data. The chunks of the islands hydrating at once, `immediate`, that page keeps: they are marked `data-load`, which the dropping no longer matches.
 // One also needed by an island that waits for that visitor, `waiting`, is marked `data-wait` too, where the code waiting for the viewport is preloaded for that visitor even though no link was dropped.
+// Marked, so a page running the islands' entry that swaps this page in neither runs nor preloads it.
+function navigationScripts(client: ClientBuild): string {
+  return `${client.navEntryImports!.map(chunk => `<link rel="modulepreload" href="${chunk}" ${NAVIGATION_ENTRY}>`).join('')}<script type="module" src="${client.navEntry}" ${NAVIGATION_ENTRY}></script>`
+}
+
 function islandScripts(client: ClientBuild, islands: Set<string>, streamed: boolean, hydration: boolean, lazy: boolean, saving?: { immediate: Set<string>, waiting: Set<string> }): string {
   const immediate = saving?.immediate
   const waiting = saving?.waiting

@@ -90,6 +90,7 @@ const OBJECT_URL = /\bcreateObjectURL\(/
 const WORKER_URL = /["']\.\/(?:assets\/)?([\w.~-]+\.js)["']/g
 // kay's own sources, when it runs from a checkout rather than from `node_modules`.
 const KAY_SOURCE = `${resolve(import.meta.dir, '..')}${sep}`
+const RUNTIME_DIR = resolve(import.meta.dir, '../runtime')
 
 // What the components say before anything is bundled: the islands by id, the classes of the `.class` shorthand, what `kay check` would report of them, and the pages and layouts the stylesheets are gathered from.
 export interface ClientSources {
@@ -556,13 +557,17 @@ async function bundleIslands(root: string, islands: Map<string, string>, options
     throw: false,
   } satisfies Bun.BuildConfig
   const since = raisedMark()
-  const build = await Bun.build({ ...config, outdir: clientDir(root) })
+  // A production page posting forms and holding no island loads navigation alone, from a build of its own: in the islands' build it would move the navigation code out of their runtime's chunk, adding a file to every page. A static export has no server to post to.
+  const [build, nav] = await Promise.all([Bun.build({ ...config, outdir: clientDir(root) }), navigation && !options.hot && options.exported !== true ? bundleNavigation(root, options, { ...config, plugins: plugins() }) : undefined])
 
   if (!build.success) {
     await refuseBuiltinImports(root, build.logs, islands.values(), config)
 
     throw buildFailure(build.logs, 'kay: client build failed', since)
   }
+
+  if (nav && !nav.build.success)
+    throw buildFailure(nav.build.logs, 'kay: client build failed', since)
 
   await refuseServerOnlyReads(root, clientDir(root), build.metafile!.outputs, projectPaths(root).cache)
 
@@ -572,13 +577,39 @@ async function bundleIslands(root: string, islands: Map<string, string>, options
   if (publicEnv !== undefined)
     manifest.entryImports.push(PUBLIC_ENV_PATH)
 
-  const inputs = Object.fromEntries(Object.entries(build.metafile!.outputs).map(([output, meta]) => [output.replace(LEADING_DOT_SLASH, ''), meta.inputs]))
+  if (nav) {
+    const { entry, imports } = entryChunks(root, nav.build.metafile!.outputs, nav.file)!
+
+    manifest.navEntry = entry
+    manifest.navEntryImports = imports
+  }
+
+  const outputs = [...build.outputs, ...nav?.build.outputs ?? []]
+  const inputs = Object.fromEntries([build, ...nav ? [nav.build] : []].flatMap(each => Object.entries(each.metafile!.outputs)).map(([output, meta]) => [output.replace(LEADING_DOT_SLASH, ''), meta.inputs]))
   const directives = await islandDirectives(root, build.outputs)
 
   // The names carry the content hashes, so the id changes with the code of the entry, the runtime or any island.
-  const buildId = options.hot ? undefined : Bun.hash(build.outputs.filter(output => JS_OUTPUT.test(output.path)).map(output => basename(output.path)).sort().join('\n')).toString(36).slice(0, 8)
+  const buildId = options.hot ? undefined : Bun.hash(outputs.filter(output => JS_OUTPUT.test(output.path)).map(output => basename(output.path)).sort().join('\n')).toString(36).slice(0, 8)
 
-  return { manifest: { ...manifest, navigation, ...buildId !== undefined && { build: buildId }, ...directives && { directives } }, inputs, maps: build.outputs.filter(output => output.kind === 'sourcemap').map(output => output.path) }
+  return { manifest: { ...manifest, navigation, ...buildId !== undefined && { build: buildId }, ...directives && { directives } }, inputs, maps: outputs.filter(output => output.kind === 'sourcemap').map(output => output.path) }
+}
+
+// The entry of a page posting forms to actions and holding no island: navigation alone, its swap and form posting loaded as they are needed, with no island runtime. It never hydrates, as a page holding islands loads the islands' entry, which a swap from here loads in full.
+async function bundleNavigation(root: string, options: ClientOptions, config: Bun.BuildConfig & { outdir?: never }): Promise<{ build: Bun.BuildOutput, file: string }> {
+  const file = join(outputDir(root), 'nav.ts')
+
+  await Bun.write(file, [
+    `import ${JSON.stringify(join(RUNTIME_DIR, 'page-errors.ts'))}`,
+    `import { startNavigation } from ${JSON.stringify(join(RUNTIME_DIR, 'navigate.ts'))}`,
+    ...options.search ? [`import { arrive } from ${JSON.stringify(join(RUNTIME_DIR, 'arrival.ts'))}`] : [],
+    '',
+    ...options.search ? ['const at = scrollY', ''] : [],
+    `startNavigation({ hydrate: () => undefined, dispose: () => undefined${options.search ? ', arrive' : ''} })`,
+    ...options.search ? ['void arrive(location.search, at)', 'addEventListener(\'hashchange\', () => void arrive(location.search, scrollY))'] : [],
+    '',
+  ].join('\n'))
+
+  return { build: await Bun.build({ ...config, entrypoints: [file], naming: { entry: '[name]-[hash].[ext]', chunk: 'nav-[name]-[hash].[ext]' }, outdir: clientDir(root) }), file }
 }
 
 // What kay's policy refuses and the islands' chunks or the workers they start need: `'wasm-unsafe-eval'` to compile wasm, `blob:` workers for a package building its worker in memory, as qr-scanner does.
@@ -703,20 +734,7 @@ const HYDRATE_WHEN_SOURCE = /(?:^|[/\\])runtime[/\\]hydrate-when\.ts$/
 export function islandManifest(root: string, outputs: Outputs, islands: Map<string, string>, entry: string, hot: boolean): Omit<ClientManifest, 'styles'> {
   const idByFile = new Map([...islands].map(([id, file]) => [file, id]))
   const files = new Set(islands.values())
-  const entries = new Set([entry])
-  // Every chunk a chunk needs before it can run, itself included.
-  const closure = (output: string, seen = new Set<string>()): Set<string> => {
-    if (seen.has(output))
-      return seen
-
-    seen.add(output)
-    for (const imported of outputs[output]?.imports ?? []) {
-      if (imported.kind === 'import-statement')
-        closure(imported.path, seen)
-    }
-
-    return seen
-  }
+  const closure = (output: string) => staticClosure(outputs, output)
   const manifest: Omit<ClientManifest, 'styles'> = { entryImports: [], islands: {} }
   const whenOutput = Object.entries(outputs).find(([, meta]) => Object.keys(meta.inputs ?? {}).some(input => HYDRATE_WHEN_SOURCE.test(input)))?.[0]
 
@@ -729,37 +747,63 @@ export function islandManifest(root: string, outputs: Outputs, islands: Map<stri
 
     const file = entryFile(root, meta.entryPoint, files)
 
-    if (file !== undefined) {
-      const chunks = [...closure(output)]
-      const id = idByFile.get(file)!
-
-      manifest.islands[id] = chunks.map(assetUrl)
-
-      if (chunks.some(chunk => Object.keys(outputs[chunk]?.inputs ?? {}).some(input => INSTALL_SOURCE.test(input))))
-        (manifest.installs ??= []).push(id)
-
-      // Inputs are named relative to the working directory, the root in development.
-      if (hot) {
-        for (const chunk of chunks)
-          (manifest.chunkInputs ??= {})[assetUrl(chunk)] = Object.keys(outputs[chunk]?.inputs ?? {}).map(input => islandPath(root, input))
-      }
-
+    // Any other entry point is the entry, or a chunk some code imports dynamically, loaded when it asks for it.
+    if (file === undefined)
       continue
+
+    const chunks = [...closure(output)]
+    const id = idByFile.get(file)!
+
+    manifest.islands[id] = chunks.map(assetUrl)
+
+    if (chunks.some(chunk => Object.keys(outputs[chunk]?.inputs ?? {}).some(input => INSTALL_SOURCE.test(input))))
+      (manifest.installs ??= []).push(id)
+
+    // Inputs are named relative to the working directory, the root in development.
+    if (hot) {
+      for (const chunk of chunks)
+        (manifest.chunkInputs ??= {})[assetUrl(chunk)] = Object.keys(outputs[chunk]?.inputs ?? {}).map(input => islandPath(root, input))
     }
+  }
 
-    // Any other entry point is a chunk some code imports dynamically, loaded when it asks for it.
-    if (entryFile(root, meta.entryPoint, entries) === undefined)
-      continue
+  const loaded = entryChunks(root, outputs, entry)
 
-    // An entry holding nothing but the import of the runtime's chunk is a request the page saves by loading that chunk itself.
-    const statics = meta.imports.filter(imported => imported.kind === 'import-statement')
-    const loaded = statics.length === 1 && Object.values(meta.inputs ?? {}).every(input => (input.bytesInOutput ?? 0) === 0) ? statics[0]!.path : output
-
-    manifest.entry = assetUrl(loaded)
-    manifest.entryImports = [...closure(loaded)].filter(chunk => chunk !== loaded).map(assetUrl)
+  if (loaded) {
+    manifest.entry = loaded.entry
+    manifest.entryImports = loaded.imports
   }
 
   return manifest
+}
+
+// Every chunk a chunk needs before it can run, itself included.
+function staticClosure(outputs: Outputs, output: string, seen = new Set<string>()): Set<string> {
+  if (seen.has(output))
+    return seen
+
+  seen.add(output)
+  for (const imported of outputs[output]?.imports ?? []) {
+    if (imported.kind === 'import-statement')
+      staticClosure(outputs, imported.path, seen)
+  }
+
+  return seen
+}
+
+// The URL a page loads an entry by, and the chunks it imports statically, which the page preloads.
+function entryChunks(root: string, outputs: Outputs, entry: string): { entry: string, imports: string[] } | undefined {
+  const entries = new Set([entry])
+  const found = Object.entries(outputs).find(([, meta]) => meta.entryPoint !== undefined && entryFile(root, meta.entryPoint, entries) !== undefined)
+
+  if (!found)
+    return undefined
+
+  const [output, meta] = found
+  // An entry holding nothing but the import of the runtime's chunk is a request the page saves by loading that chunk itself.
+  const statics = meta.imports.filter(imported => imported.kind === 'import-statement')
+  const loaded = statics.length === 1 && Object.values(meta.inputs ?? {}).every(input => (input.bytesInOutput ?? 0) === 0) ? statics[0]!.path : output
+
+  return { entry: assetUrl(loaded), imports: [...staticClosure(outputs, loaded)].filter(chunk => chunk !== loaded).map(assetUrl) }
 }
 
 function islandPath(root: string, input: string): string {

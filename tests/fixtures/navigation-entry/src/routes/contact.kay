@@ -1,0 +1,14 @@
+--- server
+import { t } from 'elysia'
+import { action } from 'kay'
+
+export const send = action(t.Object({ note: t.String({ maxLength: 200 }) }), () => 'Sent')
+---
+h1 Contact
+form(action={send})
+  input(name="note" aria-label="Note")
+  if send.succeeded() as done
+    p.sent {done.data}
+  button Send
+a.home(href="/") Home
+a.login(href="/login") Login
