@@ -463,6 +463,13 @@ describe('a conversation held on the server', () => {
     expect(model.said(0)).toEqual(['user: look this up\n\nand then?'])
   })
 
+  it('lets a send naming a reply through when the last turn was stored with no reply, as before the store kept one', async () => {
+    const model = recording()
+
+    await conversationStore().write({ owner: 'ann', scope: '/_kay/action/chat', id: ID }, 0, { drop: 0, add: [{ role: 'user', content: 'a' }, { role: 'assistant', content: 'b' }], title: '' })
+    expect(await visit(said('c'), { provider: model.provider }, { header: `send:${ID}:1:reply-tab-a1` })).toBe('answer 1')
+  })
+
   it('leaves out the oldest turns the ask cannot take, and opens on a user message', async () => {
     const model = recording(() => 'x'.repeat(30))
 
@@ -485,12 +492,13 @@ describe('the conversation header', () => {
     const of = (header: string) => conversationCallOf(new Request('http://localhost/', { headers: { 'x-kai-conversation': header } }))
 
     expect(of(`send:${ID}:3`)).toEqual({ op: 'send', id: ID, revision: 3 })
+    expect(of(`send:${ID}:3:reply-tab-a1`)).toEqual({ op: 'send', id: ID, revision: 3, after: 'reply-tab-a1' })
     expect(of(`load:${ID}`)).toEqual({ op: 'load', id: ID, revision: 0 })
     expect(of('load')).toEqual({ op: 'load', id: undefined, revision: 0 })
     expect(of('list')).toEqual({ op: 'list', id: undefined, revision: 0 })
     expect(of(`rename:${ID}`)).toEqual({ op: 'rename', id: ID, revision: 0 })
 
-    for (const header of ['', 'send', `send:${ID}`, `send:${ID}:-1`, `list:${ID}`, `load:${ID}:1`, 'send:short:0', `drop:${ID}`, `send:${ID}:0:1`, `rename:${ID}/x`, 'load:abc'])
+    for (const header of ['', 'send', `send:${ID}`, `send:${ID}:-1`, `list:${ID}`, `load:${ID}:1`, 'send:short:0', `drop:${ID}`, `send:${ID}:0:1`, `send:${ID}:0:reply-tab/a1`, `send:${ID}:0:`, `rename:${ID}/x`, 'load:abc'])
       expect(of(header)).toEqual({ op: 'load', id: undefined, revision: 0 })
 
     expect(conversationCallOf(new Request('http://localhost/'))).toBeUndefined()

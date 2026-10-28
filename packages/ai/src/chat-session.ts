@@ -195,7 +195,7 @@ export function createChatSession(options: ChatSessionOptions) {
   const conversations = signal<ConversationSummary[]>([])
   let shown: string | undefined
   let revision = 0
-  // The reply that last raised the revision, which the server checks wrote the last turn, as a tab whose write lost to another's raised it too; none once the conversation is read.
+  // The reply that last raised the revision, which the next send names for the server to check it wrote the last turn: a tab whose write lost to another sending at once raised the revision all the same. None once the conversation is read, as its revision then comes from the store.
   let counted: string | undefined
   let mounted = false
   // Counts the loads, so only the latest one shows, and names the conversation the last one asked for, so the address naming it loads it once.
