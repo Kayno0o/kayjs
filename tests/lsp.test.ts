@@ -1737,9 +1737,13 @@ describe('kay lsp project checks after a save', () => {
 describe('kay lsp lookup caches', () => {
   interface Lookups { paths?: Promise<string[]>, typedProps: Map<string, Promise<unknown>> }
 
-  // A host whose tsgo answers each completion with the next of `answers`: a list, or a promise settling when the probe does.
-  const hostAnswering = (...answers: (unknown[] | Promise<unknown>)[]) => {
-    const request = mock(async () => answers.shift())
+  // A host whose tsgo answers each completion with the next of `answers`: a list, a promise settling when the probe does, or a function run when it is asked.
+  const hostAnswering = (...answers: (unknown[] | Promise<unknown> | (() => Promise<unknown>))[]) => {
+    const request = mock(async () => {
+      const answer = answers.shift()
+
+      return typeof answer === 'function' ? answer() : answer
+    })
 
     return { host: { server: { notify: () => undefined, request }, nextProbe: () => 1 } as unknown as LspHost, request }
   }
@@ -1765,7 +1769,9 @@ describe('kay lsp lookup caches', () => {
   it('asks the props of a tag again only when the probe failed, not when it found none', async () => {
     const lookups: Lookups = { typedProps: new Map() }
     const project = { lookups } as unknown as Project
-    const { host, request: asked } = hostAnswering([], Promise.reject(new Error('probe failed')), [{ label: 'label', kind: 5 }])
+    const { host, request: asked } = hostAnswering([], async () => {
+      throw new Error('probe failed')
+    }, [{ label: 'label', kind: 5 }])
 
     expect(await typedProps(host, shadow as Document, project, 'Plain', './plain')).toEqual([])
     expect(await typedProps(host, shadow as Document, project, 'Plain', './plain')).toEqual([])
