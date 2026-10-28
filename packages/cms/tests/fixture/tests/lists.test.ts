@@ -71,8 +71,9 @@ function barsStill(page: Page) {
   }))
 }
 
-// The tooltip of the button last pressed stays while the pointer rests on it, and can cover a button of the next bar for as long as it is open, so a click right after fails as covered. The pointer is sent off it and the wait ends when it has closed.
+// The tooltip of the button last pressed stays while the pointer rests on it, and can cover a button of the next bar for as long as it is open, so a click right after fails as covered. The real pointer is moved off, as one left where a click put it opens a tooltip again once the page moves under it, then the pointer is sent off it and the wait ends when it has closed.
 async function closeTooltip(page: Page) {
+  await page.cdp('Input.dispatchMouseEvent', { type: 'mouseMoved', x: 0, y: 0 })
   await page.evaluate(() => document.body.dispatchEvent(new PointerEvent('pointerover', { bubbles: true })))
   await page.waitUntil(() => document.querySelector('#kui-tooltip:popover-open') === null)
 }
