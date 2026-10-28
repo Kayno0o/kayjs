@@ -1,4 +1,5 @@
 import { withoutBase } from './base'
+import { controlsOf } from './form-controls'
 import { busyForms, checkedForms, submitNatively } from './form-submits'
 import { leave, loadAgain, navigation, prefetched, swappable } from './navigation'
 import { pendingBlocks } from './pending'
@@ -20,6 +21,9 @@ interface Answer {
 }
 
 const HTTP_PROTOCOLS = new Set(['http:', 'https:'])
+
+// Read through the prototype's getter, as a control named `style` takes the place of `form.style` on the form itself.
+const style = (form: HTMLFormElement): CSSStyleDeclaration => Reflect.get(HTMLElement.prototype, 'style', form)
 
 type Swapper = typeof import('./page-swap')
 
@@ -45,7 +49,7 @@ export async function submit(form: HTMLFormElement, submitter: HTMLElement | nul
   const ours = checkedForms.has(form)
 
   // Past the schema, the constraints the template writes itself, which the browser no longer checks once kay took the form.
-  if ((form.noValidate && !ours) || submitter?.hasAttribute('formnovalidate') || (await passes(form, withoutBase(url.pathname)) && (!ours || form.reportValidity()))) {
+  if ((form.hasAttribute('novalidate') && !ours) || submitter?.hasAttribute('formnovalidate') || (await passes(form, withoutBase(url.pathname)) && (!ours || HTMLFormElement.prototype.reportValidity.call(form)))) {
     // Its `pending` blocks stay shown until the page the answer leads to is in, a redirect's included; a document that replaces the page keeps them shown while it loads.
     const loads = navigation.loads
 
@@ -135,7 +139,7 @@ async function send(form: HTMLFormElement, submitter: HTMLElement | null, url: U
   const data = new FormData(form, submitter)
   const multipart = (submitter?.getAttribute('formenctype') ?? form.getAttribute('enctype') ?? '').toLowerCase() === 'multipart/form-data'
   const focused = document.activeElement
-  const refused = { form: [...document.forms].indexOf(form), control: [...form.elements].indexOf(focused as Element) }
+  const refused = { form: [...document.forms].indexOf(form), control: [...controlsOf(form)].indexOf(focused as Element) }
 
   // Gone before its checks loaded, the form posts nothing.
   if (navigation.visits !== navigated) {
@@ -186,7 +190,7 @@ async function send(form: HTMLFormElement, submitter: HTMLElement | null, url: U
     prefetched.clear()
     busyForms.delete(form)
     form.removeAttribute('aria-busy')
-    form.style.removeProperty('--kay-progress')
+    style(form).removeProperty('--kay-progress')
   }
 
   // The visitor went to another page meanwhile: the answer is the one they left's, and the action has run.
@@ -261,7 +265,7 @@ async function post(url: URL, body: FormData | URLSearchParams, form: HTMLFormEl
 
   try {
     response = await uploaded('POST', url.href, headers, body, (done) => {
-      form.style.setProperty('--kay-progress', String(done))
+      style(form).setProperty('--kay-progress', String(done))
 
       for (const bar of form.querySelectorAll('progress')) {
         bar.max = 1

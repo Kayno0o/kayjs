@@ -696,6 +696,24 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('an island 
     expect(page.errors).toEqual([])
   })
 
+  it('checks, posts and refuses a form holding controls named after its members as one without them', async () => {
+    const page = await site.open('/clobbered', { path })
+
+    await page.fill('form.sign input[name="title"]', 'ab')
+    await page.click('form.sign button')
+    await page.waitUntil(() => (document.querySelector('form.sign input[name="title"]') as HTMLInputElement).validationMessage === 'Too short')
+
+    expect(await page.path()).toBe('/clobbered')
+
+    await page.fill('form.sign input[name="title"]', 'abc')
+    await page.click('form.sign button')
+    await page.waitFor('#sign-error', { text: 'Full' })
+    await page.waitUntil(() => document.activeElement === document.querySelector('form.sign button'))
+
+    expect(await page.value('form.sign input[name="title"]')).toBe('abc')
+    expect(page.errors).toEqual([])
+  })
+
   it('shows what a call was refused for, reactively', async () => {
     const page = await site.open('/', { path })
 

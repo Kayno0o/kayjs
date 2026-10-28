@@ -123,13 +123,13 @@ async function chunkLoaded(on: TestPage, name: string): Promise<boolean> {
   return on.evaluate((chunk: string) => performance.getEntriesByType('resource').some(entry => new RegExp(`/${chunk}-[^/]*\\.js$`).test(entry.name)), name)
 }
 
-// Whether a script the page loaded sets a form's `noValidate`, as the forms' listener does: Bun names the chunk holding it after another module.
+// Whether a script the page loaded sets a form's `novalidate`, as the forms' listener does: Bun names the chunk holding it after another module.
 async function formCodeLoaded(on: TestPage): Promise<boolean> {
   return on.evaluate(async () => {
     const scripts = performance.getEntriesByType('resource').filter(entry => entry.name.endsWith('.js'))
     const texts = await Promise.all(scripts.map(async entry => (await fetch(entry.name)).text()))
 
-    return texts.some(text => text.includes('noValidate'))
+    return texts.some(text => text.includes('"novalidate"'))
   })
 }
 
@@ -843,18 +843,28 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('page swap i
     }
   })
 
-  it('posts multipart a form saying so that holds a control named enctype', async () => {
+  it.each([
+    ['a form saying so that holds a control named enctype', 'multipart/form-data', '', '<input name="enctype" value="plain">'],
+    ['a form saying so in another case', 'Multipart/Form-Data', '', ''],
+    ['a url-encoded form whose button says so', 'application/x-www-form-urlencoded', 'multipart/form-data', ''],
+  ])('posts multipart %s', async (_name, enctype, formenctype, control) => {
     const fresh = await open('/kept')
 
     try {
       await settled(fresh)
-      await fresh.evaluate(async () => {
-        const form = new DOMParser().parseFromString(await (await fetch('/posted')).text(), 'text/html').querySelector<HTMLFormElement>('form.away')!
+      await fresh.evaluate(async (form: { enctype: string, formenctype: string, control: string }) => {
+        const away = new DOMParser().parseFromString(await (await fetch('/posted')).text(), 'text/html').querySelector<HTMLFormElement>('form.away')!
+        const button = away.querySelector('button')!
 
-        form.insertAdjacentHTML('beforeend', '<input name="enctype" value="plain">')
-        document.body.append(form)
-        form.requestSubmit()
-      })
+        away.setAttribute('enctype', form.enctype)
+
+        if (form.formenctype !== '')
+          button.setAttribute('formenctype', form.formenctype)
+
+        away.insertAdjacentHTML('afterbegin', form.control)
+        document.body.append(away)
+        away.requestSubmit(button)
+      }, { enctype, formenctype, control })
       await fresh.waitFor('h1', { text: 'Plain' })
 
       const posted = fresh.responses.filter(response => response.method === 'POST' && response.url.includes('/_kay/action/'))
@@ -866,7 +876,7 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('page swap i
     }
   })
 
-  it('posts natively once a form held for a forms\' listener that cannot load, however often it was pressed', async () => {
+  it('posts natively once a form held for a forms\' listener that cannot load, however often it was pressed, one holding a control named requestSubmit too', async () => {
     const fresh = await open('/kept')
     const posts: string[] = []
 
@@ -880,10 +890,11 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('page swap i
       await fresh.evaluate(async () => {
         const form = new DOMParser().parseFromString(await (await fetch('/posted')).text(), 'text/html').querySelector<HTMLFormElement>('form.away')!
 
+        form.insertAdjacentHTML('afterbegin', '<input type="hidden" name="requestSubmit">')
         document.body.append(form)
         ;(window as { kayAlive?: boolean }).kayAlive = true
-        form.requestSubmit()
-        form.requestSubmit()
+        HTMLFormElement.prototype.requestSubmit.call(form)
+        HTMLFormElement.prototype.requestSubmit.call(form)
       })
       await fresh.waitFor('h1', { text: 'Plain' })
 
@@ -932,7 +943,7 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('page swap i
     }
   })
 
-  it('gives back to the browser a held post whose action the page cannot resolve, with no error', async () => {
+  it('gives back to the browser a held post whose action the page cannot resolve, with no error, holding a control named requestSubmit or not', async () => {
     const fresh = await open('/kept')
 
     try {
@@ -949,12 +960,14 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('page swap i
           page.seen!.push(event.defaultPrevented)
           event.preventDefault()
         })
-        document.body.insertAdjacentHTML('beforeend', '<form method="post" action="http://[::1/_kay/action/x"><button>Send</button></form>')
-        document.querySelector('form')!.requestSubmit()
-      })
-      await fresh.waitUntil(() => (window as { seen?: boolean[] }).seen!.length === 2)
+        document.body.insertAdjacentHTML('beforeend', '<form method="post" action="http://[::1/_kay/action/x"><button>Send</button></form><form method="post" action="http://[::1/_kay/action/x"><input type="hidden" name="requestSubmit"><button>Send</button></form>')
 
-      expect(await fresh.evaluate(() => (window as { seen?: boolean[] }).seen)).toEqual([true, false])
+        for (const form of document.querySelectorAll('form'))
+          HTMLFormElement.prototype.requestSubmit.call(form)
+      })
+      await fresh.waitUntil(() => (window as { seen?: boolean[] }).seen!.length === 4)
+
+      expect(await fresh.evaluate(() => (window as { seen?: boolean[] }).seen)).toEqual([true, true, false, false])
       expect(problem()).toEqual([])
     }
     finally {

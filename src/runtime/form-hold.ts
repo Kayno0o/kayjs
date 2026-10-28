@@ -1,4 +1,5 @@
 import { listen, submits } from './dom'
+import { controlsOf } from './form-controls'
 
 // Kept out of the entry: only an island listening to `submit` loads it. While it answers a promise the form and its submit buttons are `aria-busy`, which kayjs-ui styles as a spinner, and a second submit is dropped.
 const holds = new WeakSet<Element>()
@@ -23,7 +24,7 @@ function holding(handler: (event: Event) => void): (event: Event) => void {
 }
 
 function setBusy(form: HTMLFormElement, busy: boolean): void {
-  for (const element of [form, ...form.elements]) {
+  for (const element of [form, ...controlsOf(form)]) {
     if (element !== form && !(element instanceof HTMLButtonElement && element.type === 'submit'))
       continue
 

@@ -1,6 +1,7 @@
 import type { TSchema } from 'elysia'
 import type { InvalidWord } from '../server/words'
 import { formInput, NUMERIC_FORMATS } from './form'
+import { controlsOf } from './form-controls'
 import { wording } from './words.client'
 
 // What the server sends of an action's schema, for the forms of a page to be checked before they post: the top-level fields, the keywords the browser checks, and their `error` messages.
@@ -73,7 +74,7 @@ export function checkForm(form: HTMLFormElement, action: string): boolean {
   }
 
   if (!valid)
-    form.reportValidity()
+    HTMLFormElement.prototype.reportValidity.call(form)
 
   return valid
 }
@@ -96,7 +97,7 @@ function formRules(action: string): FormRules | undefined {
 
 // The first control posting under `name`, the one a message is shown on.
 function controlOf(form: HTMLFormElement, name: string): HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement | undefined {
-  const found = form.elements.namedItem(name)
+  const found = controlsOf(form).namedItem(name)
   const control = found instanceof RadioNodeList ? found[0] : found
 
   return control instanceof HTMLInputElement || control instanceof HTMLSelectElement || control instanceof HTMLTextAreaElement ? control : undefined

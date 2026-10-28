@@ -78,18 +78,18 @@ export function submitNatively(form: HTMLFormElement, submitter: HTMLElement | n
   navigation.released = true
   navigation.loads++
   nativeSubmits.add(form)
-  form.requestSubmit(submitter instanceof HTMLButtonElement || submitter instanceof HTMLInputElement ? submitter : null)
+  HTMLFormElement.prototype.requestSubmit.call(form, submitter instanceof HTMLButtonElement || submitter instanceof HTMLInputElement ? submitter : null)
 }
 
 // Forms posting to an action are checked by kay once it runs, so the schema's own messages show rather than the browser's for the constraints their fields write for a visit without JavaScript.
 function takeFormCheck(form: HTMLFormElement): void {
-  if (form.noValidate)
+  if (form.hasAttribute('novalidate'))
     return
 
   if (!swappedActionUrl(form, null))
     return
 
-  form.noValidate = true
+  form.setAttribute('novalidate', '')
   checkedForms.add(form)
 }
 

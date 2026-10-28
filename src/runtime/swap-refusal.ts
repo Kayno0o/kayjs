@@ -1,3 +1,5 @@
+import { controlsOf } from './form-controls'
+
 const SPACES = /\s+/
 
 // Loaded here rather than imported, as a module the page's runtime holds is held for every page, and only a refusal needs it. A chunk a deploy replaced fails to load: the form is then announced as one with no invalid field.
@@ -27,7 +29,7 @@ export async function showRefusal(form: HTMLFormElement | undefined, control: nu
   if (message !== undefined && message !== '')
     announce(message)
 
-  const again = form.elements[control]
+  const again = controlsOf(form)[control]
 
   if (!(again instanceof HTMLElement))
     return false

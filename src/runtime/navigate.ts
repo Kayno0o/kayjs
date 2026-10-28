@@ -105,7 +105,7 @@ async function wakeForms(form?: HTMLFormElement, posted?: { submitter: HTMLEleme
 
     // Its submit event fires a second time, as no other way posts the form with what its button adds.
     if (posted)
-      form!.requestSubmit(posted.submitter)
+      HTMLFormElement.prototype.requestSubmit.call(form!, posted.submitter)
   }
 }
 
