@@ -195,6 +195,8 @@ Chat(action={reply} conversations fill)
 
 A conversation belongs to the visitor your server names: the signed-in user kayjs-auth names, or the `key` you give `ai()` or the ask. The browser only says which of their own it shows. A guest, whom no one names, keeps the history in the page as without `keepOnServer`. A tab left open on a conversation another tab has since written to cannot write over it: its send is refused before the model is asked, the message goes back to the field and the conversation shows as stored.
 
+When the visitor's session lapses, the chat keeps the conversation it shows, says so with `signedOutLabel`, and posts it whole from then on.
+
 The conversations are kept in `data/ai-conversations.sqlite` unless you give `ai({ conversations })` a store of your own. What they hold is personal data: name it in your privacy notice and delete a user's rows when you erase their account.
 
 <ReadMore href="/llms/kayjs-ai-chat-conversations">How the server holds and replays the history, the list's words and parts, and the store.</ReadMore>

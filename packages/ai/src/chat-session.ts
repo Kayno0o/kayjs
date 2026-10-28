@@ -233,6 +233,8 @@ export function createChatSession(options: ChatSessionOptions) {
           return
         }
 
+        // A guest whose first send was refused, its ownership unknown, has nothing changed in another tab to be told of.
+        failure.set(undefined)
         recall()
 
         return

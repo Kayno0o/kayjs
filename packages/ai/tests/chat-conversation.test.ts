@@ -292,6 +292,17 @@ test('a session that lapsed keeps the conversation shown, says so, and posts it 
   expect(posts[1]!.headers[CONVERSATION_HEADER]).toBeUndefined()
 })
 
+test('a guest whose first load failed, refused their first send, is not told of a change in another tab', async () => {
+  const { session } = chat([undefined as never, { owned: false }], [async () => Promise.reject(new ActionError(409, '', {}))])
+
+  await untilHolds(() => !session.loading())
+  session.draft.set('hi')
+  await session.send()
+  await untilHolds(() => session.owned() === false)
+  expect(session.failure()).toBeUndefined()
+  expect(session.draft()).toBe('hi')
+})
+
 test('the greeting waits for a conversation the address names, and shows at once for a new one', () => {
   expect(chat([loaded(SHOWN, 1)], [], { shown: SHOWN }).session.opening()).toBe(true)
   expect(chat([loaded(undefined, 0)], []).session.opening()).toBe(false)

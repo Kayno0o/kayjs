@@ -31,6 +31,11 @@ async function send(page: Page, text: string, answer: string) {
   await page.waitFor('.kai-chat-turn[data-role=assistant]:last-of-type .kai-chat-text', { text: answer })
 }
 
+it('renders the greeting for a new conversation, and none for one the address names until it is read', async () => {
+  expect(await (await site.fetch('/keeping')).text()).toContain('data-part="greeting"')
+  expect(await (await site.fetch('/keeping?conversation=conv-00000001')).text()).not.toContain('data-part="greeting"')
+})
+
 it('keeps the conversation on the server: the address names it, a reload shows it again, and the model reads the stored turns', async () => {
   await using page = await site.open('/keeping')
 

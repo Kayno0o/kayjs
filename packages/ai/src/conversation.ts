@@ -99,7 +99,7 @@ function fitted(kept: readonly StoredTurn[], posted: readonly Message[], maxInpu
 
     // The later one keeps its files, and the earlier text comes first.
     if (before?.role === message.role)
-      messages[messages.length - 1] = { ...message, content: `${before.content}\n\n${message.content}` }
+      messages[messages.length - 1] = { ...message, content: message.content === '' ? before.content : `${before.content}\n\n${message.content}` }
     else
       messages.push(message)
   }
@@ -111,12 +111,25 @@ function fitted(kept: readonly StoredTurn[], posted: readonly Message[], maxInpu
 const writing = new Map<string, Promise<void>>()
 // How long a send waits for a write under way, past which it reads the conversation as stored; another tab's reply still running writes later, and this send then meets its 409.
 const WRITE_WAIT_MS = 2000
+// A reply never read never writes, and leaves its entry until a later send to its conversation replaces it: the oldest go past this many.
+const MOST_WRITING = 10_000
 
 async function written(key: string): Promise<void> {
   const write = writing.get(key)
 
-  if (write !== undefined)
-    await Promise.race([write, Bun.sleep(WRITE_WAIT_MS)])
+  if (write === undefined)
+    return
+
+  let timer: ReturnType<typeof setTimeout> | undefined
+
+  try {
+    await Promise.race([write, new Promise<void>((resolve) => {
+      timer = setTimeout(resolve, WRITE_WAIT_MS)
+    })])
+  }
+  finally {
+    clearTimeout(timer)
+  }
 }
 
 // Asks with the conversation the Chat posts to: its stored turns, less those a regenerate or an edit replaces, then the posted messages. Once the reply ends the posted messages and the reply are stored, before the reader is told it ended; a revision that moved since the Chat read it is refused with 409, nothing asked.
@@ -147,12 +160,18 @@ export function heldReply(call: HeldCall, prompt: Message[], options: AskOptions
     // The Chat posts its new message alone; anything posted before it is the server's to hold, not the client's to add.
     const posted = prompt.slice(-1)
 
+    const reply = make(fitted(turns.slice(0, turns.length - drop), posted, maxInputChars))
     const done = Promise.withResolvers<void>()
 
+    writing.delete(pending)
     writing.set(pending, done.promise)
-    write = async (reply) => {
+
+    if (writing.size > MOST_WRITING)
+      writing.delete(writing.keys().next().value!)
+
+    write = async (ended) => {
       try {
-        await kept(reply, key, revision, drop, posted, options)
+        await kept(ended, key, revision, drop, posted, options)
       }
       finally {
         done.resolve()
@@ -162,7 +181,7 @@ export function heldReply(call: HeldCall, prompt: Message[], options: AskOptions
       }
     }
 
-    return { reply: make(fitted(turns.slice(0, turns.length - drop), posted, maxInputChars)) }
+    return { reply }
   })()
 
   return deferredReply(target, { ended: async reply => write?.(reply) })
