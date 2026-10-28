@@ -2220,17 +2220,19 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('page swap i
     }
   })
 
-  it('shows how much of a form\'s upload went, on the form and its progress bars, then nothing once sent', async () => {
+  it('shows how much of a form\'s upload went, on the form and its progress bars, then nothing once sent, the form holding a control named style', async () => {
     const fresh = await open('/posted')
 
     try {
       await fresh.upload('form.upload input', await bigFile())
       await fresh.evaluate(() => {
         const form = document.querySelector<HTMLFormElement>('form.upload')!
+        const style = Reflect.get(HTMLElement.prototype, 'style', form)
         const seen: [string, number][] = []
 
+        form.insertAdjacentHTML('afterbegin', '<input type="hidden" name="style">')
         ;(window as { seen?: typeof seen }).seen = seen
-        new MutationObserver(() => seen.push([form.style.getPropertyValue('--kay-progress'), form.querySelector('progress')!.value])).observe(form, { attributes: true, attributeFilter: ['style'] })
+        new MutationObserver(() => seen.push([style.getPropertyValue('--kay-progress'), form.querySelector('progress')!.value])).observe(form, { attributes: true, attributeFilter: ['style'] })
       })
       await fresh.click('form.upload button')
       await fresh.waitFor('p.sent', { text: `Sent ${4 * 1024 * 1024}` })
