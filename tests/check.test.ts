@@ -4442,9 +4442,10 @@ describe.concurrent('kay check, unused code', () => {
 
     try {
       expect(await watch.report()).toMatchObject({ errors: 1, problems: [{ code: null, message: expect.stringContaining('EACCES') }] })
+      // The chmod is a change of its own, so on a loaded host its check may report the old source or the fix it can now write, before the check of the write.
       await chmod(file, 0o644)
       await Bun.write(file, 'p a\n')
-      expect(await watch.report()).toMatchObject({ errors: 0 })
+      expect(await watch.reportWith(0)).toMatchObject({ errors: 0 })
     }
     finally {
       await watch.stop()
