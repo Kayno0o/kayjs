@@ -223,7 +223,7 @@ export function clientSession(root: string, options: ClientOptions, settings: Se
       last = increments?.next(previous, { sources, islandInputs, styleInputs, classTable: classTableText, manifest: text }, scripts, styles, texts)
 
       if (stamps) {
-        // The reads and the import graph are the process's, kept across the roots it builds: this build's are those of its root and its libraries.
+        // The reads and the import graph are the process's, kept across the roots it builds: this build's are those of its root and its libraries, a module elsewhere counting only once the bundler took it in.
         const own = (file: string) => file.startsWith(realRoot + sep) || file.startsWith(root + sep) || libraryOf(sources.libraries, file) !== undefined
 
         await stamps.finish([...[...readSourcePaths(), ...graph.keys()].filter(own), ...styleInputs, ...islandInputs], text, increments?.mapsPointed)

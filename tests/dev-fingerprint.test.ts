@@ -6,8 +6,10 @@ import process from 'node:process'
 import { afterEach, beforeEach, describe, expect, it, spyOn } from 'bun:test'
 import { clientDir, outputDir } from '../src/build/assets'
 import { buildClient } from '../src/build/client'
+import * as files from '../src/build/files'
 import { devBuilder } from '../src/dev/builder'
 import { BuildStamps, FINGERPRINT, mentionsPackage } from '../src/dev/fingerprint'
+import { holdsSources } from '../src/dev/sources'
 import { BUILD_FAILURE } from '../src/server/client'
 import { scratchDir } from './scratch'
 
@@ -47,6 +49,18 @@ async function write(files: Record<string, string>, settled = true, root = proje
     if (settled)
       utimesSync(join(root, file), past, past)
   }
+}
+
+// Ages every directory of the project, as a checkout a while ago left them: a directory written within two seconds before a walk cannot tell an entry added next by its stamp.
+function settleDirectories(dir: string): void {
+  const past = new Date(Date.now() - 60_000)
+
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    if (entry.isDirectory())
+      settleDirectories(join(dir, entry.name))
+  }
+
+  utimesSync(dir, past, past)
 }
 
 // Waits for the record of the build whose manifest is on disk, not one a build before it left.
@@ -316,6 +330,61 @@ describe('the stamps kay/test keeps in memory', () => {
     await Bun.write(util, 'export const shout = (value: number) => `${value}?!`\n')
     await stamps.finish([util], '{}')
     expect(await stamps.current()).toBe(false)
+  })
+
+  it('walks again while a directory of the sources was written within two seconds, and not once they all settled', async () => {
+    await write(FILES)
+
+    const stamps = new BuildStamps(project)
+    const walks = spyOn(files, 'projectTree')
+    const walked = () => walks.mock.calls.filter(([dir]) => dir === project).length
+
+    try {
+      await stamps.begin(null)
+      await stamps.finish([], '{}')
+      walks.mockClear()
+      expect(await stamps.current()).toBe(true)
+      expect(walked()).toBe(1)
+
+      await Bun.write(join(project, 'src/two.kay'), ISLAND('two'))
+      expect(await stamps.current()).toBe(false)
+
+      rmSync(join(project, 'src/two.kay'))
+      settleDirectories(project)
+      walks.mockClear()
+      expect(await stamps.current()).toBe(true)
+      expect(await stamps.current()).toBe(true)
+      expect(walked()).toBe(1)
+    }
+    finally {
+      walks.mockRestore()
+    }
+  })
+
+  it('holds a source the build did not read by its presence: rewritten it is current, removed it is not', async () => {
+    await write({ ...FILES, 'data/app.sqlite': 'first' })
+
+    const stamps = new BuildStamps(project)
+
+    await stamps.begin(null)
+    await stamps.finish([join(project, 'src/util.ts')], '{}')
+    await Bun.write(join(project, 'data/app.sqlite'), 'second, longer')
+    expect(await stamps.current()).toBe(true)
+
+    rmSync(join(project, 'data/app.sqlite'))
+    expect(await stamps.current()).toBe(false)
+  })
+
+  it('takes the directories that may hold a source: the root, and below a watched one outside tests and what .gitignore names', () => {
+    const ignored = new Set(['uploads'])
+
+    expect(holdsSources(project, project, ignored)).toBe(true)
+    expect(holdsSources(project, join(project, 'src/routes'), ignored)).toBe(true)
+    expect(holdsSources(project, join(project, 'src/__tests__'), ignored)).toBe(false)
+    expect(holdsSources(project, join(project, 'tests/unit'), ignored)).toBe(false)
+    expect(holdsSources(project, join(project, 'uploads/2026'), ignored)).toBe(false)
+    expect(holdsSources(project, join(project, '.cache'), ignored)).toBe(false)
+    expect(holdsSources(project, join(project, 'node_modules/x'), ignored)).toBe(false)
   })
 
   it('sees the .gitignore change, which tells what the sources are', async () => {

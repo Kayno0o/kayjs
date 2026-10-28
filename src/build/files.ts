@@ -279,7 +279,7 @@ export function scoped<T>(key: string, compute: () => T): T {
 // Every file under `root` whose name `matches`, skipping as findKayFiles does.
 export async function findProjectFiles(root: string, matches: RegExp, options: FindOptions = {}): Promise<string[]> {
   if (!walking.getStore())
-    return (await walkProject(root, matches, options)).files
+    return (await walkProject(root, matches, options, false)).files
 
   return (await projectTree(root, options)).files.filter(file => matches.test(basename(file)))
 }
@@ -293,15 +293,16 @@ export interface ProjectTree {
 
 // Every file under `root` and the directories holding them, the walk `findProjectFiles` shares in a scope.
 export async function projectTree(root: string, options: FindOptions = {}): Promise<ProjectTree> {
-  return scoped(`walk ${JSON.stringify([root, options.project ?? false, options.ownOnly ?? false, options.ownKayOnly ?? false])}`, async () => walkProject(root, ANY_NAME, options))
+  return scoped(`walk ${JSON.stringify([root, options.project ?? false, options.ownOnly ?? false, options.ownKayOnly ?? false])}`, async () => walkProject(root, ANY_NAME, options, true))
 }
 
-async function walkProject(root: string, matches: RegExp, { project = false, ownOnly = false, ownKayOnly = false }: FindOptions): Promise<ProjectTree> {
+async function walkProject(root: string, matches: RegExp, { project = false, ownOnly = false, ownKayOnly = false }: FindOptions, stamped: boolean): Promise<ProjectTree> {
   const files: string[] = []
   const directories = new Map<string, string>()
   const at = Date.now()
   const walk = async (dir: string) => {
-    directories.set(dir, directoryStamp(dir) ?? '')
+    if (stamped)
+      directories.set(dir, directoryStamp(dir) ?? '')
 
     const entries = await readable(dir, dir !== root)
 

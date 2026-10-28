@@ -121,6 +121,7 @@ function settleDirectories(dir: string): void {
 describe('testSite keeps the islands it built', () => {
   it('walks nothing again while no source came, changed or went, and builds again for one that came', async () => {
     await Bun.write(greeting, FINE)
+    await testSite({ root })
     settleDirectories(root)
     await testSite({ root })
 
