@@ -156,8 +156,6 @@ export default function shopTab(tool: DevTool): void {
 
 The module is one file and nothing bundles its imports, so import types only. Get data from a route of your own that exists under `kay dev` alone: wrap it with `underKayDev()` from `kay/library` and mount it under `/_kay/`.
 
-`tool.kit` holds the helpers kay's own tabs share: `entry` draws a row, `toolbar` and `filterable` add a filter box over rows, `pill` and `copyButton` draw a pill and a copy button, `positionButton` opens a file in the editor, `ownFetch` fetches without the Network tab listing it, and `signal` is aborted when the tool stops.
-
 Nothing of this reaches `kay build` or a production server.
 
 ## Naming conventions

@@ -6,7 +6,6 @@ What each release of kay and its libraries adds, newest first, each feature with
 
 - kayjs-ai: `transcribe(audio)`, `speak(text)` and `embed(texts)` call an OpenAI-compatible server's audio and embeddings API (a local Whisper or Kokoro server, Ollama, OpenAI) from `AI_AUDIO_URL`, `AI_EMBED_URL` or the server `ask` uses, and the fake answers them under `bun test`, embeddings as stable vectors from the words: [Speech and embeddings](../packages/ai/llms/speech-and-embeddings.md).
 - `kay build` writes the navigation-only entry and its chunks only when a component renders a form posting to an action, so an app with none deploys no `nav-*` file: [building](build-and-start.md).
-- `DevTool` gives a dev tool module `tool.kit`, the signal and the row, filter, pill, copy, editor-position and fetch helpers kay's own tabs share: [a tab for a library](dev-tool.md#a-tab-for-a-library).
 
 ## 1.82.0
 
