@@ -4,7 +4,7 @@ import process from 'node:process'
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
 import { Elysia } from 'elysia'
 import { pages } from '../src/server'
-import { browse, browserPath, testSite } from '../src/test'
+import { browserPath, testSite } from '../src/test'
 import { kayBuild } from './check-helper'
 import { fixtureCopy } from './scratch'
 
@@ -36,28 +36,14 @@ const MODES: [name: string, options: TestOptions, prefix: string, slash: string]
 for (const [name, options, prefix, slash] of MODES) {
   describe.skipIf(path === undefined && (process.env.CI ?? '') === '')(`the navigation-only entry, ${name}`, () => {
     let site: TestSite
-    let front: Bun.Server<undefined>
     const at = (to: string) => to === '/' ? `${prefix}/` : `${prefix}${to}${slash}`
-    const open = async (to: string) => browse(`${front.url.origin}${at(to)}`, { path })
+    const open = async (to: string) => site.open(at(to), { path })
 
     beforeAll(async () => {
       site = await testSite({ root: ROOT, browser: true, ...options })
-      // `site.open()` serves the app without the base a front takes off, so the pages go through `site.fetch`, which does: kaynooo/kayjs#2575
-      front = Bun.serve({
-        port: 0,
-        fetch: async (request) => {
-          const url = new URL(request.url)
-          const body = request.method === 'GET' || request.method === 'HEAD' ? undefined : await request.arrayBuffer()
-          // The front's own origin, which is not the one `site.fetch` sends to: the page's posts are same-origin, as `Sec-Fetch-Site` still says.
-          const headers = Object.fromEntries([...request.headers].filter(([header]) => header !== 'origin'))
-
-          return site.fetch(url.pathname + url.search, { method: request.method, headers, ...body && { body } })
-        },
-      })
     }, 120_000)
 
     afterAll(async () => {
-      await front?.stop(true)
       await site?.close()
     })
 
