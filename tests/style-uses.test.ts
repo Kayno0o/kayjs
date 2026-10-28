@@ -400,6 +400,35 @@ describe('which classes are set from a value the build cannot read', () => {
     expect(await unresolved('el\n  .classList\n  .toggle((tone), on)\n')).toEqual(['2 classList.toggle '])
   })
 
+  it('finds an optional chain setter and a JSX class attribute, and reads a script with decorators', async () => {
+    expect(await unresolved('el?.classList?.add?.(tone)\n')).toEqual(['1 classList.add '])
+    expect(await unresolved('export const Card = () => <p class={tone}>a</p>\n', '', 'card.tsx')).toEqual(['1 class attribute '])
+    expect(await unresolved('@sealed\nclass Menu {\n  @bound open() { this.el.classList.add(tone) }\n}\n')).toEqual(['3 classList.add '])
+  })
+
+  it('judges a name a compound assignment or an increment writes as open', async () => {
+    expect(await unresolved('let tone = \'mt-1\'\ntone -= 1\nel.classList.add(tone)\n')).toEqual(['3 classList.add '])
+    expect(await unresolved('for (let n = 0; n < 3; n++)\n  el.classList.add(\'c\' + n)\n')).toEqual(['2 classList.add c'])
+  })
+
+  it('reads a script again once it was edited', async () => {
+    const root = await scratchDir('style-uses-runtime-edit-')
+    const page = join(root, 'island.ts')
+    const found = async (source: string) => {
+      const all: UnresolvedClass[] = []
+
+      await Bun.write(page, source)
+      styleUses(root, [page], [CSS], { edges: new Map(), open: new Set() }, new Map(), [], { own: () => true, unresolved: (unresolved) => {
+        all.push(...unresolved)
+      } })
+
+      return all.map(({ line, how }) => `${line} ${how}`)
+    }
+
+    expect(await found('const tone = \'mt-1\'\nel.classList.add(tone)\n')).toEqual([])
+    expect(await found('const tone = read()\nel.classList.add(tone)\n')).toEqual(['2 classList.add'])
+  })
+
   it('reads a template line binding a name, and an attribute named like a value, as the compiler does', async () => {
     expect(await unresolved('---\nconst tone = \'mt-1\'\n---\nfor tone of tones\n  p(class={tone}) a\n', '', 'page.kay')).toEqual(['5 class attribute '])
     expect(await unresolved('---\nconst { vote } = props<{ vote: { a: string, b: string } }>()\n---\nconst position = vote.a\np(class={`position-${position}`}) a\nBadge(position={vote.b})\n', '', 'page.kay')).toEqual([])

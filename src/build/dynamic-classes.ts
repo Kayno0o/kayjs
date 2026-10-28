@@ -2,8 +2,9 @@ import type { Expression, Node, ObjectExpression } from '@babel/types'
 import type { ClassIndex, FunctionNode } from './class-sources'
 import { existsSync, statSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
+import { unwrapped } from '../compiler/object-literal'
 import { patternNames } from '../compiler/pattern-names'
-import { classIndex, nodeKey, rootOf, unwrapped } from './class-sources'
+import { classIndex, nodeKey, rootOf } from './class-sources'
 import { readSource, SCRIPT_FILE } from './files'
 
 // A place where a source sets a class from a value the build cannot read: no page carries the rule of a class it ends up naming, unless the app lists it with `@source inline`.
@@ -27,7 +28,7 @@ const WHITESPACE = /\s+/g
 const JOINERS = new Set(['cn', 'cx', 'clsx', 'classNames', 'classnames', 'twMerge', 'twJoin'])
 // An element's own class, read back to be set again.
 const CLASS_READS = new Set(['className', 'classList'])
-const SETTER_WORD = /\bclass|setAttribute/
+const SETTER_WORD = /classList|className|\bclass\s*=|setAttribute/
 const EXPRESSION_LIMIT = 80
 const RESOLVE_DEPTH = 3
 
@@ -71,9 +72,9 @@ function valuesOf(object: ObjectExpression, scope: Scope, depth: number): Verdic
     if (property.type !== 'ObjectProperty')
       return OPEN
 
-    const value = unwrapped(property.value as Expression)
+    const value = unwrapped(property.value)
 
-    return value.type === 'ObjectExpression' ? valuesOf(value, scope, depth) : verdictOf(value, scope, depth)
+    return value.type === 'ObjectExpression' ? valuesOf(value, scope, depth) : verdictOf(value as Expression, scope, depth)
   }))
 }
 

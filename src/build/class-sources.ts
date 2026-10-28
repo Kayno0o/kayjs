@@ -3,10 +3,13 @@ import type { Expression, Node } from '@babel/types'
 import type { Node as KayNode, Span } from '../compiler/ast'
 import { parse, parseExpression } from '@babel/parser'
 import { VISITOR_KEYS } from '@babel/types'
+import { importedName } from '../check/ast'
 import { nodeExpressions, visitNodes } from '../compiler/ast'
+import { unwrapped } from '../compiler/object-literal'
 import { parseKay } from '../compiler/parser'
 import { patternNames } from '../compiler/pattern-names'
 import { binders, bindingNames } from '../compiler/template-reads'
+import { readSource } from './files'
 
 export type FunctionNode = Extract<Node, { type: 'FunctionDeclaration' | 'FunctionExpression' | 'ArrowFunctionExpression' }>
 
@@ -66,15 +69,6 @@ export function rootOf(node: Node): string | undefined {
   return current.type === 'Identifier' ? current.name : undefined
 }
 
-export function unwrapped(node: Expression): Expression {
-  let current = node
-
-  while (current.type === 'ParenthesizedExpression' || current.type === 'TSAsExpression' || current.type === 'TSSatisfiesExpression' || current.type === 'TSNonNullExpression' || current.type === 'TSTypeAssertion')
-    current = current.expression
-
-  return current
-}
-
 const MANY_ARGUMENTS = 8
 const CLASS_LIST_METHODS = new Set(['add', 'toggle', 'replace'])
 // The assignments giving a name the value on their right, `tone ||= 'mt-1'` as `tone = 'mt-1'`; any other operator makes it a value of the runtime.
@@ -85,6 +79,8 @@ const IDENTIFIER = /^\s*[\p{ID_Start}_$][\p{ID_Continue}$]*\s*$/u
 const JSX_SCRIPT = /\.[jt]sx$/
 const TS_SCRIPT = /\.[cm]?ts$/
 const KAY_FILE = /\.kay$/
+// What an app's script may hold besides its language, read rather than leaving the whole file unread.
+const SYNTAX: ParserPlugin[] = ['decorators-legacy', 'explicitResourceManagement']
 
 // `classList.toggle` takes a class and a flag, `replace` two classes, `add` any number.
 function classArguments(method: string): number {
@@ -101,42 +97,58 @@ function pluginsOf(file: string | undefined): ParserPlugin[] {
   return JSX_SCRIPT.test(file) ? ['typescript', 'jsx'] : ['jsx']
 }
 
-function walk(node: Node, each: (node: Node) => void): void {
-  each(node)
+// Visits the node and those under it in source order, types left out, with a stack rather than recursion, which a long `a + b + ...` chain would overflow.
+function walk(root: Node, each: (node: Node) => void): void {
+  const pending: Node[] = [root]
 
-  for (const key of VISITOR_KEYS[node.type] ?? []) {
-    if (TYPE_KEYS.has(key))
-      continue
+  for (let node = pending.pop(); node !== undefined; node = pending.pop()) {
+    each(node)
 
-    const child = (node as unknown as Record<string, unknown>)[key]
+    const keys = VISITOR_KEYS[node.type] ?? []
 
-    if (Array.isArray(child)) {
-      for (const item of child as (Node | null)[]) {
-        if (item !== null)
-          walk(item, each)
+    for (let at = keys.length - 1; at >= 0; at--) {
+      if (TYPE_KEYS.has(keys[at]!))
+        continue
+
+      const child = (node as unknown as Record<string, unknown>)[keys[at]!]
+
+      if (Array.isArray(child)) {
+        for (let item = child.length - 1; item >= 0; item--) {
+          if (child[item] !== null)
+            pending.push(child[item] as Node)
+        }
       }
-    }
-    else if (typeof child === 'object' && child !== null) {
-      walk(child as Node, each)
+      else if (typeof child === 'object' && child !== null) {
+        pending.push(child as Node)
+      }
     }
   }
 }
 
-const indexes = new Map<string, { text: string, index: ClassIndex }>()
+const indexes = new WeakMap<ReturnType<typeof readSource>, ClassIndex>()
 
-// The index of a source, from one parse of a script, or for a `.kay` file of its fences and its template's expressions as the compiler reads them; kept by file until its text changes.
+// The index of a source, from one parse of a script, or for a `.kay` file of its fences and its template's expressions as the compiler reads them; kept with the file's read while the text is the file's, so it goes when `keepSources` forgets the file.
 export function classIndex(text: string, file?: string): ClassIndex {
-  const known = file === undefined ? undefined : indexes.get(file)
+  const read = file === undefined ? undefined : sourceOf(file)
 
-  if (known?.text === text)
-    return known.index
+  if (read?.text !== text)
+    return new Indexer(text).read(file)
 
-  const index = new Indexer(text).read(file)
+  let index = indexes.get(read)
 
-  if (file !== undefined)
-    indexes.set(file, { text, index })
+  if (index === undefined)
+    indexes.set(read, index = new Indexer(text).read(file))
 
   return index
+}
+
+function sourceOf(file: string): ReturnType<typeof readSource> | undefined {
+  try {
+    return readSource(file)
+  }
+  catch {
+    return undefined
+  }
 }
 
 class Indexer {
@@ -157,25 +169,31 @@ class Indexer {
   }
 
   private readProgram(span: Span, plugins: ParserPlugin[]): void {
-    try {
-      const file = parse(this.text.slice(span.start, span.end), { sourceType: 'unambiguous', allowReturnOutsideFunction: true, errorRecovery: true, attachComment: false, plugins, startIndex: span.start })
+    let program: Node
 
-      walk(file.program, node => this.visit(node))
+    try {
+      program = parse(this.text.slice(span.start, span.end), { sourceType: 'unambiguous', allowReturnOutsideFunction: true, errorRecovery: true, attachComment: false, plugins: [...plugins, ...SYNTAX], startIndex: span.start }).program
     }
-    catch {}
+    catch {
+      return
+    }
+
+    walk(program, node => this.visit(node))
   }
 
   private readExpression(span: Span): Expression | undefined {
+    let expression: Expression
+
     try {
-      const expression = parseExpression(this.text.slice(span.start, span.end), { plugins: ['typescript'], startIndex: span.start })
-
-      walk(expression, node => this.visit(node))
-
-      return expression
+      expression = parseExpression(this.text.slice(span.start, span.end), { plugins: ['typescript'], startIndex: span.start })
     }
     catch {
       return undefined
     }
+
+    walk(expression, node => this.visit(node))
+
+    return expression
   }
 
   // The fences hold scripts; the template's binders shadow the names they bind, its `const` lines declare theirs, and its expressions are read as a script's.
@@ -254,7 +272,7 @@ class Indexer {
 
   // A name given a value, a record written into, or a destructuring target, and `el.className = x`.
   private assignment(node: Extract<Node, { type: 'AssignmentExpression' }>): void {
-    const left = node.left.type === 'Identifier' || node.left.type === 'MemberExpression' || node.left.type === 'OptionalMemberExpression' ? node.left : unwrapped(node.left as Expression)
+    const left = node.left.type === 'Identifier' || node.left.type === 'MemberExpression' || node.left.type === 'OptionalMemberExpression' ? node.left : unwrapped(node.left)
 
     if (left.type === 'Identifier') {
       if (VALUE_OPERATORS.has(node.operator))
@@ -314,7 +332,7 @@ class Indexer {
       if (specifier.type !== 'ImportSpecifier' || specifier.importKind === 'type' || specifier.importKind === 'typeof' || this.index.imports.has(specifier.local.name))
         continue
 
-      this.index.imports.set(specifier.local.name, { specifier: node.source.value, imported: specifier.imported.type === 'Identifier' ? specifier.imported.name : specifier.imported.value })
+      this.index.imports.set(specifier.local.name, { specifier: node.source.value, imported: importedName(specifier) })
     }
   }
 
@@ -358,24 +376,11 @@ class Indexer {
     const read = values.flatMap((value) => {
       const node = value.type === 'SpreadElement' ? value.argument : value
 
-      return node.type === 'ArgumentPlaceholder' || node.type === 'JSXNamespacedName' ? [] : [{ node: node as Expression, text: this.written(value) }]
+      return node.type === 'ArgumentPlaceholder' || node.type === 'JSXNamespacedName' ? [] : [{ node: node as Expression, text: this.text.slice(value.start!, value.end!) }]
     })
 
     if (read.length > 0)
       this.index.setters.push({ at, line: this.lineOf(at), how, values: read, receiver })
-  }
-
-  // The text of a node with the parentheses around it.
-  private written(node: Node): string {
-    const start = (node.extra?.parenStart as number | undefined) ?? node.start!
-    let end = node.end!
-
-    for (let open = this.text.slice(start, node.start!).split('(').length - 1; open > 0 && end < this.text.length; end++) {
-      if (this.text[end] === ')')
-        open--
-    }
-
-    return this.text.slice(start, end)
   }
 
   // Whether a destructuring reads the component's props, `props<{ tone: string }>()`.
