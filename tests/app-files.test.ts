@@ -200,6 +200,21 @@ describe('the files an extension names in appFiles', () => {
     }
   }, 60_000)
 
+  it('stop the server when an extension\'s API module exporting a function builds no Elysia instance', async () => {
+    const root = await written(app({ 'lib/api/broken.ts': 'export default () => \'no instance\'\n' }))
+
+    try {
+      const { code, stderr } = await run([process.execPath, 'serve.ts'], root, { KAY_ROOT: root })
+
+      expect(code).not.toBe(0)
+      expect(stderr).toContain('broken.ts must export an Elysia instance by default')
+      expect(stderr).toContain('or a function of the ExtensionApp building one')
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  }, 60_000)
+
   it('reach an extension\'s API module exporting a function, which kay check types: its routes are linked to, and one building no Elysia instance is refused', async () => {
     const root = await written(app({
       'src/routes/index.kay': 'a(href="/api/probe/features") features\n',
@@ -208,8 +223,6 @@ describe('the files an extension names in appFiles', () => {
 
     try {
       const { code, output } = await kayCheck([root])
-
-      console.log(output)
 
       expect(code).toBe(1)
       expect(output).toContain('broken.ts')

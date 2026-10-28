@@ -279,7 +279,7 @@ interface Parent {
   getGlobalDefinitions: () => unknown
 }
 
-// A module's default export, or what the function an extension's module exports builds, which is told where it is served as the instance is.
+// A module's default export, or what the function an extension's module exports builds. The function is told where it is served too, as the server render of an island hands `call()` and `apiUrl()` the module's default export.
 async function moduleInstance(module: ApiModule, appOf: ((extension: string) => Promise<ExtensionApp>) | undefined): Promise<unknown> {
   const exported = (await importModule<{ default?: unknown }>(module.file)).default
 

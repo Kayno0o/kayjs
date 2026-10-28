@@ -16,7 +16,7 @@ describe('kay routes', () => {
     const root = await scratchDir('routes-')
     const config = [
       'import { Elysia } from \'elysia\'\n',
-      'const lib = { name: \'lib\', api: { dir: \'lib/api\', prefix: \'lib\' }, server: new Elysia().get(\'/hooked\', () => 1) }',
+      'const lib = { name: \'lib\', appFiles: { words: \'src/words.ts\' }, api: { dir: \'lib/api\', prefix: \'lib\' }, server: new Elysia().get(\'/hooked\', () => 1) }',
       'const built = { name: \'built\', server: () => new Elysia() }\n',
       'export default { requireGuards: true, extensions: [lib, built, { name: \'modular\', serverModule: { path: \'./plugin\' } }], i18n: { locales: [\'en\', \'fr\'], defaultLocale: \'en\', paths: { \'/about\': { fr: \'/a-propos\' } } }, redirects: { \'/old\': \'/\', \'/tmp\': { to: \'/\', permanent: false }, \'/gone\': { to: \'/\', status: 301 } } }\n',
     ]
@@ -31,6 +31,9 @@ describe('kay routes', () => {
       Bun.write(join(root, 'src/api/exits.ts'), 'process.exit(7)\n'),
       Bun.write(join(root, 'lib/api/_guard.ts'), 'import { guard } from \'kay\'\n\nexport default guard(() => {})\n'),
       Bun.write(join(root, 'lib/api/session.ts'), 'import { Elysia } from \'elysia\'\n\nexport default new Elysia().get(\'/\', () => 1)\n'),
+      // Built from the app's file, as the server builds it.
+      Bun.write(join(root, 'lib/api/word.ts'), 'import { Elysia } from \'elysia\'\n\nexport default ({ modules }: { modules: Record<string, { word?: string } | undefined> }) => new Elysia().get(`/${modules.words?.word}`, () => 1)\n'),
+      Bun.write(join(root, 'src/words.ts'), 'export const word = \'hello\'\n'),
       Bun.write(join(root, 'src/routes/_layout.kay'), 'slot\n'),
       Bun.write(join(root, 'src/routes/index.kay'), '--- server\nimport { action } from \'kay/server\'\n\nexport const page = { guards: false }\nexport const add = action(() => {})\n---\nh1 Home\n'),
       Bun.write(join(root, 'src/routes/admin/_guard.ts'), 'import { guard } from \'kay\'\n\nexport default guard(() => {})\n'),
@@ -74,6 +77,8 @@ describe('kay routes', () => {
         'GET | /fr/posts/:slug | page | src/routes/posts/[slug].kay, fr, 403: no guard under requireGuards',
         'GET | /llms.txt | endpoint | src/routes/llms.txt.ts, 403: no guard under requireGuards',
         'GET | /api/lib/session | api | lib/api/session.ts',
+        'guards | lib/api/_guard.ts',
+        'GET | /api/lib/word/hello | api | lib/api/word.ts',
         'guards | lib/api/_guard.ts',
         'GET | /api/Status | api | src/api/Status.ts, 403: no guard under requireGuards',
         '? | /api/broken/* | api | src/api/broken.ts, not loaded: no database, 403: no guard under requireGuards',

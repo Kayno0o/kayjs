@@ -1,4 +1,4 @@
-import type { KayConfig } from '../config'
+import type { ExtensionApp, KayConfig } from '../config'
 import type { LocaleSettings } from '../runtime/i18n'
 import type { GuardFile, Route } from '../server/routes'
 import type { Command } from './command'
@@ -10,7 +10,7 @@ import { checkContent } from '../check/project'
 import { islandId } from '../compiler'
 import { parseKay } from '../compiler/parser'
 import { analyzeServer } from '../compiler/script'
-import { PLUGINS_DIR, serverExtensions } from '../config-extensions'
+import { extensionApps, PLUGINS_DIR, serverExtensions } from '../config-extensions'
 import { loadConfig } from '../config-loader'
 import { projectPaths } from '../project'
 import { actionUrl } from '../runtime/action'
@@ -143,6 +143,8 @@ async function apiRoutes(root: string, config: KayConfig): Promise<Listed[]> {
     await registerLoader(root, config.settings ?? {})
 
   const listed: Listed[] = []
+  const extensions = serverExtensions(root, config.extensions)
+  const appOf = extensionApps(extensions, root)
 
   for (const module of modules) {
     const guards = module.guards.map(guard => shown(guard.file))
@@ -150,7 +152,10 @@ async function apiRoutes(root: string, config: KayConfig): Promise<Listed[]> {
     const notes = guardNotes(module.guards, module.open === true && module.guards.length === 0, config)
 
     try {
-      const instance = (await importApi(module.file)).default
+      const exported = (await importApi(module.file)).default
+      // An extension's module may build its instance from the app's `appFiles`, as the server does.
+      const extension = module.extension === undefined ? undefined : extensions.find(({ name }) => name === module.extension)
+      const instance = typeof exported === 'function' && extension !== undefined ? await (exported as (app: ExtensionApp) => unknown)(await appOf(extension)) : exported
 
       if (!(instance instanceof Elysia))
         throw new Error('it exports no Elysia instance by default')
