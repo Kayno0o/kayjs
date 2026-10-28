@@ -1,6 +1,8 @@
 [test]
 root = "./tests-dom"
+# kay's own 20 s, as Bun's 5 s fails a file's first test, which compiles the components it mounts, whenever the machine is busy.
 preload = [
+  "../../tests/timeout.ts",
   "kay/test/preload",
   "kay/test/dom",
   "./tests-dom/dom.ts"

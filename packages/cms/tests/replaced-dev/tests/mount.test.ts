@@ -8,16 +8,19 @@ import { cmsSignInAs } from '../../../src/test'
 const ROOT = join(import.meta.dir, '..')
 
 const options = { guard: passwordGuard({ editor: 'pw-editor', admin: 'pw-admin' }), roles: { editor: [], admin: ['delete', 'redirects'] } } as const
+const DEFAULT_MOUNT = {}
+// The process's first site loads the cms and the fixture's pages, which took 17 to 20 s of the default mount's 20 s in CI: made here, outside any test's timeout, it serves that test, and the others reuse what it loaded.
+const first = await testSite({ root: ROOT, extensions: [cms(options)] })
 
 // The app's own dev module sits where the cms's does, so the guard places a request by the next anchor (preview), under any apiPath and base.
 for (const { name, site: siteOptions, root } of [
-  { name: 'under the default mount', site: {}, root: '' },
+  { name: 'under the default mount', site: DEFAULT_MOUNT, root: '' },
   { name: 'under an apiPath', site: { apiPath: '/v1' }, root: '' },
   { name: 'under a base', site: { base: '/site' }, root: '/site' },
   { name: 'under a base and an apiPath', site: { base: '/site', apiPath: '/v1' }, root: '/site' },
 ]) {
   test(`with the dev module replaced, a role lacking an action is refused on its route and one holding it let through, ${name}`, async () => {
-    const site = await testSite({ root: ROOT, extensions: [cms(options)], ...siteOptions })
+    const site = siteOptions === DEFAULT_MOUNT ? first : await testSite({ root: ROOT, extensions: [cms(options)], ...siteOptions })
 
     // The fixture's kay.config.ts calls cms() as it loads, after this one, so the settings are given again once it has.
     cms(options)

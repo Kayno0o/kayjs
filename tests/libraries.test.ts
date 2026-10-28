@@ -46,6 +46,21 @@ describe('scripts/libraries.ts', () => {
     expect(written[1]).toMatch(/failing\/\n.*check out\ncheck err\n.*test out\ntest err\n.*failing: test failed after \d+ s\n$/s)
   })
 
+  it('answers once every output was written, one write at a time', async () => {
+    const root = await scratchDir('libraries-')
+    const folders = await Promise.all(['first', 'second', 'third'].map(async name => fakeLibrary(root, name, '')))
+    const events: string[] = []
+    // A pipe that takes its time, as CI's did when the script exited with the libraries' output still unwritten.
+    const results = await runLibraries(folders, { jobs: 3, write: async () => {
+      events.push('start')
+      await Bun.sleep(200)
+      events.push('end')
+    } })
+
+    expect(results.map(result => result.passed)).toEqual([true, true, true])
+    expect(events).toEqual(['start', 'end', 'start', 'end', 'start', 'end'])
+  })
+
   it('skips the test of a library whose check failed', async () => {
     const root = await scratchDir('libraries-')
     const folder = await fakeLibrary(root, 'unchecked', 'console.log(`${step} ran`)\nif (step === \'check\') process.exit(2)')

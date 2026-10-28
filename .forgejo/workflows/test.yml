@@ -154,7 +154,7 @@ jobs:
           jq -r '.files | to_entries | sort_by(-.value) | .[:40][] | "\(.value / 1000 | floor)s \(.key)"' .kay/timings.json
           echo "KAY_TIMINGS $(jq -c . .kay/timings.json)"
 
-      # Three libraries at a time, as one suite alone keeps under two of the six cores busy; each one's output is printed whole once it ends, a failed one's last, and a suite stuck for five minutes is interrupted, naming its files still running.
+      # Two libraries at a time, as three, each with six test workers, ran every suite 2.4 times slower than alone and timed out the first test of a file; each one's output is printed whole once it ends, a failed one's last, and a suite stuck for five minutes is interrupted, naming its files still running.
       - name: Check and test the libraries
         run: bun scripts/libraries.ts
         env:

@@ -1,4 +1,4 @@
-// `bun scripts/libraries.ts [--jobs=<n>] [<library>...]`: each library's `check` then `test`, as CI runs them, a few libraries at a time: one suite waits on builds and servers most of its run, so alone it keeps under two of the runner's cores busy.
+// `bun scripts/libraries.ts [--jobs=<n>] [<library>...]`: each library's `check` then `test`, as CI runs them, two libraries at a time: each suite runs six test workers, and three at once ran every one 2.4 times slower than alone on the runner's six cores, timing out the first test of a file, which pays its cold build.
 // Each library's output is held until it ends and printed whole, a failed one's after all the others, so its failed tests read as bun prints them and end the step's log.
 import { closeSync, openSync } from 'node:fs'
 import { mkdtemp, readdir, rm } from 'node:fs/promises'
@@ -7,10 +7,10 @@ import { join, relative } from 'node:path'
 import process from 'node:process'
 
 const ROOT = join(import.meta.dir, '..')
-const JOBS = 3
+const JOBS = 2
 const LIMIT_MS = 300_000
 const GRACE_MS = 30_000
-// The two suites of about 80 s in CI, started first so the shorter ones fill the other slots around them.
+// The two suites of about 80 s alone in CI, started first so the shorter ones fill in after them.
 const SLOWEST = ['cms', 'ui']
 const JOBS_FLAG = /^--jobs=(\d+)$/
 
@@ -19,7 +19,7 @@ export interface LibraryRun {
   // A library's check and test share it: the one running when it passes is interrupted, so bun names its files still running, then killed after the grace.
   limitMs?: number
   graceMs?: number
-  write?: (text: string) => void
+  write?: (text: string) => void | Promise<unknown>
 }
 
 export interface LibraryResult { folder: string, passed: boolean }
@@ -101,13 +101,23 @@ async function logText(log: string): Promise<string> {
   }
 }
 
-// Every library through `check` and `test`, `jobs` at a time, each one's output written whole once it ends, the failed ones' last. Answers each library's result in the order given.
+// Every library through `check` and `test`, `jobs` at a time, each one's output written whole once it ends, the failed ones' last. Answers each library's result in the order given, once every write has landed.
 export async function runLibraries(folders: string[], options: LibraryRun = {}): Promise<LibraryResult[]> {
-  const write = options.write ?? ((text: string) => process.stdout.write(text))
+  // Bun.write waits until the pipe took every byte, where process.stdout.write followed by process.exit cut CI's log at a 32 KiB boundary.
+  const write = options.write ?? (async (text: string) => Bun.write(Bun.stdout, text))
   const logs = await mkdtemp(join(tmpdir(), 'kay-libraries-'))
   const results: LibraryResult[] = []
   const failed: string[] = []
   let next = 0
+  // One write at a time, in the order the libraries ended, so two outputs never interleave.
+  let written = Promise.resolve()
+  const after = async (previous: Promise<void>, text: string) => {
+    await previous
+    await write(text)
+  }
+  const print = (text: string) => {
+    written = after(written, text)
+  }
 
   async function worker() {
     while (next < folders.length) {
@@ -121,7 +131,7 @@ export async function runLibraries(folders: string[], options: LibraryRun = {}):
       results[index] = { folder, passed }
 
       if (passed)
-        write(text)
+        print(text)
       else
         failed.push(text)
     }
@@ -135,7 +145,9 @@ export async function runLibraries(folders: string[], options: LibraryRun = {}):
   }
 
   for (const text of failed)
-    write(text)
+    print(text)
+
+  await written
 
   return results
 }
@@ -149,6 +161,6 @@ if (import.meta.main) {
 
   if (failures.length > 0) {
     console.error(`failed: ${failures.map(result => relative(ROOT, result.folder)).join(', ')}`)
-    process.exit(1)
+    process.exitCode = 1
   }
 }

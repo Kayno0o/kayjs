@@ -54,7 +54,7 @@ inBrowser('chart and media recipes in the browser', () => {
     expect(line.stroke).not.toBe('rgb(51, 136, 255)')
     expect(await box(page, '#map .leaflet-control-zoom a')).toMatchObject({ width: 28, height: 28 })
     expect(await looks(page, '#map .leaflet-control-attribution', ['font-size', 'position'])).toMatchObject({ 'font-size': '11px' })
-  })
+  }, 120_000)
 
   test('MapView darkens its tiles while its colour scheme is dark, and rings a focused marker in the foreground', async () => {
     const site = await shared()
@@ -76,7 +76,7 @@ inBrowser('chart and media recipes in the browser', () => {
 
     expect(ring['stroke-width']).toBe('3px')
     expect(ring.stroke).toBe((await looks(page, '#map [data-part=canvas]', ['color'])).color!)
-  })
+  }, 120_000)
 
   test('LineChart sizes its frame, plot, legend and key, lays its overlay over the plot, and draws the cursor, dots, band and tooltip it shows on a point', async () => {
     const site = await shared()
