@@ -9,7 +9,7 @@ export const JOBS_LIVE_ID = 'kay:jobs'
 // A waiting or running job of a queue declared with `live`, as an island reads it.
 export interface QueuedJob<Payload = unknown, Progress = unknown> {
   id: string
-  // What the job was enqueued under, when it has a key.
+  // What the job was enqueued under, when it has a key; like `error` and `progress`, sent with `live: true` alone, as a function passes them to pick from.
   key?: string
   // `running` while a process holds it, `waiting` for a job due, delayed or waiting for a retry.
   status: 'waiting' | 'running'
@@ -21,7 +21,7 @@ export interface QueuedJob<Payload = unknown, Progress = unknown> {
   error?: string
   // What its run last reported.
   progress?: Progress
-  // The payload, or what the queue's `live` gives of it.
+  // The payload, or what the queue's `live` gives of it and of the job's key, error and progress.
   payload: Payload
 }
 

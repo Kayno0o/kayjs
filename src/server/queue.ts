@@ -1,5 +1,6 @@
 import type { Database } from 'bun:sqlite'
 import type { Duration } from '../runtime/duration'
+import type { LiveJob } from './queue-live'
 import type { WorkflowAdmin } from './workflow'
 import { existsSync } from 'node:fs'
 import process from 'node:process'
@@ -109,8 +110,8 @@ export interface QueueOptions<Payload> {
   onFailed?: ((event: { payload: Payload, error: unknown }) => unknown) | undefined
   // Starts no worker with the server: the first `activate()` or `enqueue` does, so a queue an app may never use costs it no idle poll. A job already stored waits until then.
   lazy?: boolean | undefined
-  // Shows the queue's waiting and running jobs to islands, which read them with `jobs(name)` from `kay` and follow them as they change, in every process: `true` sends each job's payload, a function what it gives of it, such as the fields a page shows. Whoever may render a page reading them may follow them.
-  live?: boolean | ((payload: Payload) => unknown) | undefined
+  // Shows the queue's waiting and running jobs to islands, which read them with `jobs(name)` from `kay` and follow them as they change, in every process: `true` sends each job whole, its key, payload, progress and last error; a function sends each job's id, status, attempts and due time, and as its payload what the function gives of the payload and of `{ key, error, progress }`, so nothing else leaves the server. Whoever may render a page reading them may follow them.
+  live?: boolean | ((payload: Payload, job: LiveJob) => unknown) | undefined
 }
 
 export interface EnqueueOptions {
@@ -590,7 +591,7 @@ export function jobQueue<Payload, Progress = unknown>(name: string, handler: (pa
 
   const ownStore = () => options.store ?? defaultJobStore()
   const { live } = options
-  const shown = live === undefined || live === false ? undefined : showJobs(name, ownStore, live === true ? payload => payload : live as (payload: unknown) => unknown)
+  const shown = live === undefined || live === false ? undefined : showJobs(name, ownStore, live === true ? undefined : live as (payload: unknown, job: LiveJob) => unknown)
   const store = shown === undefined ? ownStore : tellingStore(ownStore, shown.changed)
 
   const reportFailed = async (job: StoredJob, error: unknown) => {

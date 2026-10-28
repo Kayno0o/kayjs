@@ -1,5 +1,5 @@
 import type { QueuedJob } from '../src/runtime/queue-jobs'
-import type { JobStore } from '../src/server'
+import type { JobStore, QueueOptions } from '../src/server'
 import type { TestSite } from '../src/test'
 import { existsSync } from 'node:fs'
 import process from 'node:process'
@@ -7,7 +7,7 @@ import { afterAll, beforeAll, describe, expect, it, spyOn } from 'bun:test'
 import { chromium } from 'playwright-core'
 import { jobs, JOBS_LIVE_ID } from '../src/runtime/queue-jobs'
 import { memoryJobs, pgJobs, queue, sqliteJobs } from '../src/server'
-import { jobsEntry, RECHECK_MS } from '../src/server/queue-live'
+import { GATHER_MS, jobsEntry, RECHECK_MS } from '../src/server/queue-live'
 import { browserPath, testSite } from '../src/test'
 import { gates, scans } from './fixtures/live-jobs/src/jobs'
 import { cleanUpAfterFile, freshPg, kinds, pgIt, replicas, sqlitePath } from './job-stores'
@@ -17,6 +17,8 @@ cleanUpAfterFile()
 
 // The failed runs and the cases that log on purpose.
 const errors = spyOn(console, 'error').mockImplementation(() => undefined)
+
+spyOn(console, 'warn').mockImplementation(() => undefined)
 
 const ROOT = 'tests/fixtures/live-jobs'
 // Long enough for a process following a queue to read it again a few times.
@@ -44,7 +46,7 @@ function follow(name: string): { list: () => QueuedJob[], [Symbol.dispose]: () =
 const shown = (list: QueuedJob[]) => list.map(job => [(job.payload as { n: number } | undefined)?.n, job.status])
 
 // A store of the app's own, lacking the optional methods named.
-function without(store: JobStore, ...methods: ('live' | 'jobs')[]): JobStore {
+function without(store: JobStore, ...methods: ('live' | 'jobs' | 'state')[]): JobStore {
   const copy = { ...store }
 
   for (const method of methods)
@@ -77,7 +79,7 @@ describe.each(kinds)('a queue with live, $name', ({ open }) => {
     await listed.enqueue({ n: 1, secret: 's' }, { key: 'one' })
     await listed.enqueue({ n: 2, secret: 's' }, { delay: '1ms' })
     await until(() => following.list().length === 2)
-    expect(following.list()[0]).toMatchObject({ key: 'one', status: 'waiting', attempts: 0, payload: { n: 1 } })
+    expect(following.list()[0]).toEqual({ id: expect.any(String) as string, status: 'waiting', attempts: 0, runAt: expect.any(Number) as number, payload: { n: 1 } })
     expect(JSON.stringify(following.list())).not.toContain('secret')
 
     await Bun.sleep(5)
@@ -156,7 +158,15 @@ describe('a queue with live on a store of its own', () => {
     await until(() => shown(following.list()).join() === [[6, 'waiting']].join())
   })
 
-  it('logs a store that lists no jobs, and a live that throws or gives what a browser cannot be sent, once each', async () => {
+  it('lists with jobs() alone, every job waiting, when the store has neither live() nor state()', async () => {
+    const name = `live-${++queues}`
+    const listed = queue<{ n: number }>(name, () => undefined, { store: without(memoryJobs(), 'live', 'state'), live: true })
+
+    await listed.enqueue({ n: 7 })
+    await until(() => shown(jobs(name)).join() === [[7, 'waiting']].join())
+  })
+
+  it('logs a store that lists no jobs, and a live that throws or gives what a browser cannot be sent, once each however often the list is read', async () => {
     errors.mockClear()
 
     const blind = `live-${++queues}`
@@ -166,19 +176,29 @@ describe('a queue with live on a store of its own', () => {
     expect(jobs(blind)).toEqual([])
 
     const throwing = `live-${++queues}`
-    const thrown = queue<{ n: number }>(throwing, () => undefined, { store: memoryJobs(), live: () => {
-      throw new Error('nope')
+    const thrown = queue<{ n: number }>(throwing, () => undefined, { store: memoryJobs(), live: ({ n }) => {
+      if (n === 1)
+        throw new Error('nope')
+
+      return { n }
     } })
 
     await thrown.enqueue({ n: 1 })
-    expect(jobs(throwing)).toMatchObject([{ status: 'waiting' }])
-    expect(jobs(throwing)[0]!.payload).toBeUndefined()
+    await thrown.enqueue({ n: 2 })
+    await thrown.enqueue({ n: 3 })
+    expect(shown(jobs(throwing))).toEqual([[2, 'waiting'], [3, 'waiting']])
 
     const unsendable = `live-${++queues}`
     const classy = queue<{ n: number }>(unsendable, () => undefined, { store: memoryJobs(), live: () => ({ run: () => 1 }) })
 
-    await classy.enqueue({ n: 1 })
-    expect(jobs(unsendable)).toEqual([])
+    using following = follow(unsendable)
+
+    for (const n of [1, 2, 3]) {
+      await classy.enqueue({ n })
+      await Bun.sleep(GATHER_MS * 2)
+    }
+
+    expect(following.list()).toEqual([])
 
     const logged = errors.mock.calls.map(call => String(call[0]))
 
@@ -191,6 +211,80 @@ describe('a queue with live on a store of its own', () => {
     queue('not-live', () => undefined, { store: memoryJobs() })
     expect(() => jobs('not-live')).toThrow('names no queue declared with `live`')
     expect(jobsEntry('not-live')).toBeUndefined()
+  })
+})
+
+describe('what a queue with live sends', () => {
+  // A job that failed its first run with a secret in its error, waiting for its retry under a secret key, with a progress report.
+  async function failedOnce(live: QueueOptions<{ n: number }>['live']): Promise<string> {
+    const name = `live-${++queues}`
+    const listed = queue<{ n: number }>(name, async (_, __, job) => {
+      job.progress({ done: 1 })
+      await Bun.sleep(5)
+
+      throw new Error('secret-error')
+    }, { store: memoryJobs(), live, attempts: 2, backoff: '1h' })
+
+    await listed.enqueue({ n: 8 }, { key: 'secret-key' })
+    await listed.drain()
+
+    return name
+  }
+
+  it('sends the key, last error and progress with live: true', async () => {
+    const name = await failedOnce(true)
+
+    await until(() => jobs(name)[0]?.progress !== undefined)
+    expect(jobs(name)).toMatchObject([{ key: 'secret-key', status: 'waiting', attempts: 1, error: expect.stringContaining('secret-error') as string, progress: { done: 1 }, payload: { n: 8 } }])
+  })
+
+  it('sends of the key, error and progress only what a live function gives', async () => {
+    const hidden = await failedOnce(({ n }) => ({ n }))
+
+    expect(jobs(hidden)).toHaveLength(1)
+    expect(JSON.stringify(jobs(hidden))).not.toContain('secret')
+
+    const picked = await failedOnce(({ n }, job) => ({ n, failed: job.error !== undefined, progress: job.progress }))
+
+    await until(() => (jobs(picked)[0]?.payload as { progress?: unknown } | undefined)?.progress !== undefined)
+    expect(jobs(picked)[0]!.payload).toEqual({ n: 8, failed: true, progress: { done: 1 } })
+    expect(JSON.stringify(jobs(picked))).not.toContain('secret')
+  })
+
+  it('shows the 100 earliest due jobs of a longer queue', async () => {
+    const name = `live-${++queues}`
+    const listed = queue<{ n: number }>(name, () => undefined, { store: memoryJobs(), live: true })
+
+    for (let n = 120; n > 0; n--)
+      await listed.enqueue({ n }, { delay: `${n}s` })
+
+    const list = jobs(name)
+
+    expect(list).toHaveLength(100)
+    expect(list.map(job => (job.payload as { n: number }).n)).toEqual(Array.from({ length: 100 }, (_, index) => index + 1))
+  })
+
+  it('reads the list once for a burst of changes a tab follows', async () => {
+    const store = memoryJobs()
+    let reads = 0
+    const counted: JobStore = { ...store, live: (...args): ReturnType<NonNullable<JobStore['live']>> => {
+      reads++
+
+      return store.live!(...args)
+    } }
+    const name = `live-${++queues}`
+    const listed = queue<{ n: number }>(name, () => undefined, { store: counted, live: true })
+
+    using following = follow(name)
+
+    reads = 0
+
+    for (let n = 0; n < 20; n++)
+      await listed.enqueue({ n })
+
+    await until(() => following.list().length === 20)
+    await Bun.sleep(GATHER_MS * 2)
+    expect(reads).toBeLessThanOrEqual(2)
   })
 })
 

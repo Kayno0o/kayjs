@@ -192,11 +192,11 @@ for job of jobs<{ target: string }>('scans')
   p {job.payload.target}: {job.status}
 ```
 
-Each job is `{ id, key, status, attempts, runAt, error, progress, payload }`, `status` being `'waiting'` or `'running'`, earliest due first and 100 at most. `live: true` sends the whole payload. A function sends what it returns instead, so a token or an address in the payload stays on the server.
+Each job is `{ id, key, status, attempts, runAt, error, progress, payload }`, `status` being `'waiting'` or `'running'`, earliest due first and 100 at most. `live: true` sends all of it. A function sends each job's `id`, `status`, `attempts` and `runAt`, and as its `payload` what the function returns. It gets the payload and `{ key, error, progress }` to pick from, so a token in the payload, an address in the key or a run's error message stays on the server unless you return it.
 
 The page proves the queue it read, as it does for any live value. Whoever may open the page may follow the list, so the page's guard decides who sees it. A queue without `live` cannot be read at all.
 
-The process that changes a job tells its tabs at once. A process with a tab following the list reads the store again every second, which is how a job another worker or replica took reaches it.
+The process that changes a job tells its tabs within 50 ms, reading the list once for a burst of changes. A process with a tab following the list reads the store again every second, which is how a job another worker or replica took reaches it. On Postgres a page renders the list as last read, and its connection brings it up to date right after.
 
 <ReadMore href="/llms/queues#show-a-queues-jobs-on-a-page">The store method that lists the jobs in one query is in the queues reference.</ReadMore>
 
