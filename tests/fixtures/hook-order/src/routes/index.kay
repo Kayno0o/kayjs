@@ -1,0 +1,13 @@
+--- server
+import { t } from 'elysia'
+import { action } from 'kay'
+
+export const add = action(t.Object({ title: t.String({ minLength: 1 }) }), ({ title }) => title, { tool: true })
+--- script
+import Counter from '../components/counter.kay'
+---
+h1 Home
+form(action={add})
+  input(name="title")
+  button Add
+Counter
