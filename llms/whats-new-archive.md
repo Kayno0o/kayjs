@@ -1,8 +1,8 @@
 # What's new, older releases
 
-What each release before 1.79 added, and the end of a newest release that was cut short (`(continued)`), newest first, each feature with where it is documented. The newer releases are in [What's new](whats-new.md); what a release breaks is in [Upgrading](upgrading.md).
+What each release before 1.80 added, and the end of a newest release that was cut short (`(continued)`), newest first, each feature with where it is documented. The newer releases are in [What's new](whats-new.md); what a release breaks is in [Upgrading](upgrading.md).
 
-## Unreleased (continued)
+## 1.81.0 (continued)
 
 - kayjs-ui: `Stat(href)` links the whole stat and `Stat(delta)` shows the change from the previous period with a `trendUp`, `trendDown` or `trendFlat` arrow, read after its label: [basics](../packages/ui/llms/basics.md#stat-meter-progress-skeleton-barlist-sitefavicon-copybutton-rating).
 - kayjs-ui: `Sparkline(values, label)` draws axis-free bars and `StatusStrip(cells, label)` coloured cells read as one sentence: [charts](../packages/ui/llms/charts-drag-and-media.md#linechart-barchart-scatterchart-contributiongraph-sparkline-statusstrip).
@@ -42,6 +42,17 @@ What each release before 1.79 added, and the end of a newest release that was cu
 - `kay check` names the parameters a block lacks, as `@value(item)`, where it only said TS2322: [Slots and snippets](templates-elements-slots-snippets.md).
 - `kay lint` reads an imported signal and an `~icons/` icon as `kay check` does, and lints a component with a `--- style` fence: [Lint with ESLint](checks.md#lint-the-script-fences-and-template-expressions-with-eslint).
 - `signal-set-call` also reports `consent.set('yes')` on the `consent` signal of `kay/analytics`, and `--fix` assigns it: [Signals](components.md#signals).
+
+## 1.79.0
+
+- The `kay` preset of `@kaynooo/eslint` (7.1.4) turns `ts/await-thenable` off in an app's test files, so `await expect(...).rejects...` lints clean with no override: [Lint with ESLint](checks.md#lint-the-script-fences-and-template-expressions-with-eslint).
+- `kay check` reports `server-only-in-island` for an island, or a module it imports, that builds schemas with `s` or reads `process` or `Bun` as it loads, at the island's import line, where the build used to be the first to refuse it: [Server globals in the browser](browser-only.md#server-globals-in-the-browser).
+- `kay docs <words>` prints the section of kay's or an installed library's llms files that words or a name match, with the labels of the next matches and, for a component, its props read from its installed source, `kay mcp` has it as its `docs` tool and `kay explain` of a name that is no lint points at it, so an agent finds a topic in one call: [Find a topic in the docs](editor-and-agent-commands.md#find-a-topic-in-the-docs).
+- kay's manifest link carries `crossorigin="use-credentials"`, so an app behind a cookie login proxy loads its manifest and installs: [Favicon and web manifest](sitemap-search-fonts.md#favicon-and-web-manifest).
+- kayjs-ui has a `Timeline`, a vertical list of time-stamped entries with an optional icon or muted tone, each pickable through a bindable `selected` key ([Page layout](../packages/ui/llms/page-layout-palette-and-trees.md)).
+- kayjs-ui's `MapView` draws polylines and markers over raster tiles with Leaflet, loaded only on pages using it, fitted to what it draws, with a `highlight` path brought into view, OpenStreetMap's tiles by default and the skin's colours: [kayjs-ui](../packages/ui/llms/charts-drag-and-media.md).
+- kayjs-ai: a resume or stop of a reply the server kept gives back the attempt the action's `protect.rateLimit` counted, so reloading a page does not spend the limit; a `RateStore` takes an optional `refund(key, resetAt)` for it: [Asking](../packages/ai/llms/asking.md#a-reply-that-outlives-the-visitor), [Rate limits](rate-limits.md).
+- kayjs-ai: `ask(messages, { outlive: true })` lets a reply finish on the server, tool loop and readers included, after the visitor reloaded or left, and a `Chat` with `remember` shows the finished turn after the reload or picks the stream back up, with no app code; an action call takes `{ headers }`: [Asking](../packages/ai/llms/asking.md#a-reply-that-outlives-the-visitor), [Chat](../packages/ai/llms/chat.md#a-reply-that-outlives-the-page).
 
 ## 1.78.0
 

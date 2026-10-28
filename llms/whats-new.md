@@ -2,7 +2,7 @@
 
 What each release of kay and its libraries adds, newest first, each feature with where it is documented. kay and its libraries share one version, so one section covers them all; what a release breaks is in [Upgrading](upgrading.md).
 
-## Unreleased
+## 1.81.0
 
 - kayjs-ui: `RowsField` is a repeatable rows field, a box per column with Add and Remove, in a signal editor, a form posting to an action or a `SaveForm`: [RowsField](../packages/ui/llms/forms.md#rowsfield).
 - kayjs-ui: `infiniteList(first, { action, input, failure })` pages through an action, `pageFields` and `pageOf` give the action its paging, and `patch(id, change)` updates one loaded row: [Infinite lists](../packages/ui/llms/infinite-list.md).
@@ -66,15 +66,4 @@ The rest of this release is in [What's new, older releases](whats-new-archive.md
 - kayjs-ai: `Chat(fill)` takes the height of its container, the log (or the greeting) taking the space and the form staying at the bottom, for a chat that is a page's main content: [chat](../packages/ai/llms/chat.md#props).
 - `kay check` reports `signal-set-call`, a signal written `count.set(value)` where assigning it, `count = value`, does the same, and `--fix` assigns it: [Signals](components.md#signals).
 
-## 1.79.0
-
-- The `kay` preset of `@kaynooo/eslint` (7.1.4) turns `ts/await-thenable` off in an app's test files, so `await expect(...).rejects...` lints clean with no override: [Lint with ESLint](checks.md#lint-the-script-fences-and-template-expressions-with-eslint).
-- `kay check` reports `server-only-in-island` for an island, or a module it imports, that builds schemas with `s` or reads `process` or `Bun` as it loads, at the island's import line, where the build used to be the first to refuse it: [Server globals in the browser](browser-only.md#server-globals-in-the-browser).
-- `kay docs <words>` prints the section of kay's or an installed library's llms files that words or a name match, with the labels of the next matches and, for a component, its props read from its installed source, `kay mcp` has it as its `docs` tool and `kay explain` of a name that is no lint points at it, so an agent finds a topic in one call: [Find a topic in the docs](editor-and-agent-commands.md#find-a-topic-in-the-docs).
-- kay's manifest link carries `crossorigin="use-credentials"`, so an app behind a cookie login proxy loads its manifest and installs: [Favicon and web manifest](sitemap-search-fonts.md#favicon-and-web-manifest).
-- kayjs-ui has a `Timeline`, a vertical list of time-stamped entries with an optional icon or muted tone, each pickable through a bindable `selected` key ([Page layout](../packages/ui/llms/page-layout-palette-and-trees.md)).
-- kayjs-ui's `MapView` draws polylines and markers over raster tiles with Leaflet, loaded only on pages using it, fitted to what it draws, with a `highlight` path brought into view, OpenStreetMap's tiles by default and the skin's colours: [kayjs-ui](../packages/ui/llms/charts-drag-and-media.md).
-- kayjs-ai: a resume or stop of a reply the server kept gives back the attempt the action's `protect.rateLimit` counted, so reloading a page does not spend the limit; a `RateStore` takes an optional `refund(key, resetAt)` for it: [Asking](../packages/ai/llms/asking.md#a-reply-that-outlives-the-visitor), [Rate limits](rate-limits.md).
-- kayjs-ai: `ask(messages, { outlive: true })` lets a reply finish on the server, tool loop and readers included, after the visitor reloaded or left, and a `Chat` with `remember` shows the finished turn after the reload or picks the stream back up, with no app code; an action call takes `{ headers }`: [Asking](../packages/ai/llms/asking.md#a-reply-that-outlives-the-visitor), [Chat](../packages/ai/llms/chat.md#a-reply-that-outlives-the-page).
-
-Releases before 1.79 are in [What's new, older releases](whats-new-archive.md).
+Releases before 1.80 are in [What's new, older releases](whats-new-archive.md).
