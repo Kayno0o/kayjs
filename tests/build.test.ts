@@ -2536,7 +2536,7 @@ describe('the build report', () => {
     const now = summary([route('/', 1024)])
     const printed = formatRemoved({ entry: { size: { raw: 0, gzip: 2048 } }, islands: [{ file: 'src/a.kay', size: { raw: 0, gzip: 1024 } }] }, now, previous)
 
-    expect(printed).toBe('Removed since the last build:\n  entry   of navigation alone, loaded by a page posting forms and holding no island  was 1.0 KB\n  island  src/b.kay  was 0.5 KB\n  route   /old  was 1.0 KB')
+    expect(printed).toBe('Removed since the last build:\n  entry   navigation-only, loaded by a page posting forms and holding no island  was 1.0 KB\n  island  src/b.kay  was 0.5 KB\n  route   /old  was 1.0 KB')
     expect(formatRemoved(undefined, now, previous)).toContain('entry   loaded by every page with an island  was 2.0 KB')
     expect(formatRemoved({ entry: { size: { raw: 0, gzip: 2048 } }, navigation: { size: { raw: 0, gzip: 1024 } }, islands: [{ file: 'src/a.kay', size: { raw: 0, gzip: 0 } }, { file: 'src/b.kay', size: { raw: 0, gzip: 0 } }] }, summary([route('/', 1), route('/old', 1)]), previous)).toBe('')
     expect(formatRemoved(undefined, now, undefined)).toBe('')

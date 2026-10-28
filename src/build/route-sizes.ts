@@ -216,7 +216,8 @@ async function factsOf(file: string, root: string, memo: Map<string, Promise<Sou
         return { imports: followedFiles, uses: usesOf(source, file, root, template, named), posts: elements.some(element => actionOf(element, source) !== undefined), defers: elements.some(element => serverIslandOf(element, source)?.mode === 'defer'), full: LIVE.test(source) || elements.some(element => serverIslandOf(element, source) !== undefined) || someNode(template, node => node.kind === 'await'), waits: elements.some(element => waitsToHydrate(element, source)) }
       }
       catch {
-        return { imports: [], uses: new Map(), posts: false, defers: false, full: false, waits: false }
+        // A file it cannot read keeps a form-only route on the islands' entry, the most it may load.
+        return { imports: [], uses: new Map(), posts: false, defers: false, full: true, waits: false }
       }
     })()
     memo.set(file, facts)

@@ -367,7 +367,7 @@ export function formatRemoved(report: SizeReport | undefined, summary: BuildSumm
   const routes = new Set(summary.routes.map(route => route.route))
   const gone = [
     ...previous.entry !== undefined && report?.entry === undefined ? [{ kind: 'entry', name: 'loaded by every page with an island', gzip: previous.entry }] : [],
-    ...previous.navigation !== undefined && report?.navigation === undefined ? [{ kind: 'entry', name: 'of navigation alone, loaded by a page posting forms and holding no island', gzip: previous.navigation }] : [],
+    ...previous.navigation !== undefined && report?.navigation === undefined ? [{ kind: 'entry', name: 'navigation-only, loaded by a page posting forms and holding no island', gzip: previous.navigation }] : [],
     ...Object.entries(previous.islands).filter(([file]) => !islands.has(file)).map(([file, gzip]) => ({ kind: 'island', name: file, gzip })),
     ...Object.entries(previous.routes).filter(([route]) => !routes.has(route)).map(([route, size]) => ({ kind: 'route', name: route, gzip: size.js + size.css })),
   ]
