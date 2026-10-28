@@ -12,7 +12,7 @@ import { Elysia } from 'elysia'
 import { KayError } from '../compiler/errors'
 import { refuseFeedsWithoutSite } from '../content/server'
 import { mcpPath, mcpRateLimit } from './api-modules'
-import { actionOptionsOf, apiDocuments, appRoutes, bootOf, bootWarnings, buildFiles, compressAnswers, files, identifyRequests, kayEndpoints, keptPageWrites, knowPages, lateApp, limitBodiesAndClaimApi, logAnswers, pageRoutes, reports, rewriteAnswers, serveDevRoutes, serveLateDevRoutes, serverMode, siteFiles, stopOnSignals, trustRequests, useExtensions } from './app-stages'
+import { actionOptionsOf, apiDocuments, appRoutes, bootOf, bootWarnings, buildFiles, compressAnswers, files, identifyRequests, kayEndpoints, keptPageWrites, knowPages, lateApp, limitBodiesAndClaimApi, logAnswers, pageRoutes, reports, rewriteAnswers, serveDevRoutes, serverMode, siteFiles, stopOnSignals, trustRequests, useExtensions } from './app-stages'
 import { bundled } from './bundle'
 import { checkRequestIdHeader, checkTimeZone, healthTimeoutMs } from './config-limits'
 import { corsRule } from './cors'
@@ -169,19 +169,16 @@ export async function pagesApp(project: Project<PagesOptions>, loadClient: () =>
   const jobsPage = kayEndpoints(boot, publicModules)
 
   if (boot.env.devRoutes)
-    serveDevRoutes(boot)
+    await serveDevRoutes(boot)
   else
     stopOnSignals(boot)
 
-  const { mountedByExtensions, servers } = await useExtensions(boot)
+  const servers = await useExtensions(boot)
 
   await buildFiles(boot, earlier)
 
   const actionOptions = actionOptionsOf(boot, skipBroken)
   const appServed = await appRoutes(boot, actionOptions, jobsPage, apiMountsServed)
-
-  if (boot.env.devRoutes)
-    await serveLateDevRoutes(boot, { hasActions: appServed.actionLimits.size > 0, api: appServed.api }, mountedByExtensions)
 
   await apiDocuments(boot, appServed, actionOptions, limitBodiesAndClaimApi(boot, appServed, servers))
   reports(boot)

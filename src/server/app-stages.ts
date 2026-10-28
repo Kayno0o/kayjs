@@ -10,6 +10,7 @@ import type { ServedRoute } from './guards'
 import type { ImageRouteOptions } from './image'
 import type { Writes } from './kept-pages'
 import type { Logger } from './log'
+import type { MountedApi } from './openapi'
 import type { Unmatched } from './page-routes'
 import type { ClaimedFile } from './public'
 import type { Publishing } from './publishing'
@@ -171,6 +172,8 @@ export function bootOf(input: BootInput) {
   // Offered, so an app file at the path keeps it; the check is served once every claim is in, and only where it still holds the path.
   const health: Claim | undefined = options.health === false ? undefined : { path: options.health?.path ?? HEALTH_PATH, owner: 'the health check', kind: 'kay' }
   const log: Logger = options.log ?? env.production
+  // The routes later stages register, which the dev tool's Routes tab reads when it answers, as it registers before them.
+  const registered: { extensions: OwnRoutes['extensions'], actions: boolean, api: MountedApi[] } = { extensions: [], actions: false, api: [] }
 
   return {
     ...input,
@@ -186,6 +189,9 @@ export function bootOf(input: BootInput) {
     hasPreview: options.preview !== undefined && options.preview !== false,
     metrics,
     health,
+    registered,
+    // Maps a browser's stack back to the source, for the error reports and the dev tool.
+    mapStack: env.dev ? devStackMapper(client.dir) : browserStackMapper(join(client.dir, '..', MAPS_DIR)),
   }
 }
 
@@ -364,7 +370,9 @@ export function stopOnSignals({ app, options, lifecycle }: Boot): void {
   stopOnSignal(app, lifecycle, options.shutdownTimeout)
 }
 
-export function serveDevRoutes({ app, env, project: { root }, setup: { client }, options }: Boot): void {
+// Every route of the dev tool, before the extensions, so none runs their hooks; the Routes tab reads what later stages registered when it answers.
+export async function serveDevRoutes(boot: Boot): Promise<void> {
+  const { app, env, project: { root, paths }, options, setup: { client, site, endpoints, i18n, matchers }, routes, table, served, filePaths, hasPreview, registered, mapStack } = boot
   const hot = hotSwap(root, client)
 
   refuseRemoteDevTools(app)
@@ -394,67 +402,9 @@ export function serveDevRoutes({ app, env, project: { root }, setup: { client },
     app.get(DEV_INSPECTOR, () => devInspector())
     app.post(DEV_OPEN, async ({ request }) => openInEditor(root, request))
   }
-}
 
-// After kay's own hooks, so their routes are logged and compressed as the pages are, and before the pages, actions and API modules whose context they derive.
-// Returns their servers and, in development, the routes each mounted, for the dev tool.
-export async function useExtensions({ app, env, setup }: Boot) {
-  const mountedByExtensions: OwnRoutes['extensions'] = []
-  const servers: unknown[] = []
+  app.post(DEV_STACK, async ({ request }) => devStack(request, mapStack))
 
-  for (const { name, server } of await setup.extensions) {
-    servers.push(server)
-
-    if (!env.dev) {
-      app.use(server)
-
-      continue
-    }
-
-    const before = new Set(app.routes.map(route => `${route.method} ${route.path}`))
-
-    app.use(server)
-    mountedByExtensions.push(...app.routes.filter(route => !before.has(`${route.method} ${route.path}`)).map(route => ({ owner: name, method: route.method, path: route.path })))
-  }
-
-  return { mountedByExtensions, servers }
-}
-
-// The build's files, whose paths then carry the security headers themselves, and the last routes registered before the pages.
-export async function buildFiles({ app, env, setup: { client }, security, filePaths }: Boot, earlier: Set<string>): Promise<void> {
-  for (const path of await serveBuildFiles(app, client, { dev: env.dev, security, base: env.base }))
-    filePaths.add(path)
-
-  for (const route of app.routes)
-    earlier.add(`${route.method} ${route.path}`)
-}
-
-// The options actions, API modules, endpoints and kay's guarded routes share.
-export function actionOptionsOf({ env, options, setup, late }: Boot, skipBroken: boolean): ActionOptions {
-  return { skipBroken, dev: env.dev, onError: options.onError, i18n: setup.locales, base: env.base, redirectSpelling: (location: string) => late.spell(location), requireGuards: options.requireGuards, cors: options.cors }
-}
-
-// The actions, the API modules and the endpoints, then the jobs page, after the extensions whose derived values the guards read through `ctx.locals`.
-export async function appRoutes(boot: Boot, actionOptions: ActionOptions, jobsPage: ReturnType<typeof kayEndpoints>, apiMountsServed: string[]) {
-  const { app, routes, table, setup } = boot
-  const [{ limits: actionLimits, tools: toolActions }, apiModules] = await Promise.all([registerActionRoutes(app, routes, routeMatch(table, setup.matchers, boot.env.trailingSlash), actionOptions), setup.api])
-  const api = await serveApi(app, apiModules, actionOptions)
-
-  apiMountsServed.push(...apiModules.map(module => module.mount))
-
-  await serveEndpoints(app, setup.endpoints, actionOptions)
-
-  if (jobsPage)
-    serveJobsPage(app, jobsPage, actionOptions)
-
-  return { actionLimits, toolActions, apiModules, api }
-}
-
-type Served = Awaited<ReturnType<typeof appRoutes>>
-
-// The dev tool's Routes tab, once the endpoints and API modules are known, and its Head tab.
-export async function serveLateDevRoutes(boot: Boot, { hasActions, api }: { hasActions: boolean, api: Served['api'] }, mountedByExtensions: OwnRoutes['extensions']): Promise<void> {
-  const { app, project: { root, paths }, options, setup: { site, endpoints, i18n, matchers }, routes, table, served, filePaths, env, hasPreview } = boot
   // Loaded in development only: the seo rules reach the compiler, which a production server does not load.
   const { devHead } = await import('./dev-head')
 
@@ -487,11 +437,68 @@ export async function serveLateDevRoutes(boot: Boot, { hasActions, api }: { hasA
   app.get(DEV_NOT_FOUND, () => Response.json(devNotFound(root, redirected)))
   app.post(DEV_NOT_FOUND, async ({ request }) => devRedirect(root, request, redirected))
   app.get(DEV_ROUTES, () => {
-    const own = { actions: hasActions, publicEnv: Boolean(options.publicEnv), preview: hasPreview, cspReports: typeof options.security === 'object' && options.security.reports === true, buildFiles: filePaths, mounted: mountedByExtensions }
+    const own = { actions: registered.actions, publicEnv: Boolean(options.publicEnv), preview: hasPreview, cspReports: typeof options.security === 'object' && options.security.reports === true, buildFiles: filePaths, mounted: registered.extensions }
 
-    return Response.json(devRoutes(root, routes, endpoints, api.mounted, i18n?.settings, env.base, { claims: served.kay(), extensions: mountedByExtensions, plumbing: plumbing(own, (path, method) => served.heldByApp(path, method)), notes: options.seo !== undefined && site === undefined ? [NO_ORIGIN_NOTE] : [] }))
+    return Response.json(devRoutes(root, routes, endpoints, registered.api, i18n?.settings, env.base, { claims: served.kay(), extensions: registered.extensions, plumbing: plumbing(own, (path, method) => served.heldByApp(path, method)), notes: options.seo !== undefined && site === undefined ? [NO_ORIGIN_NOTE] : [] }))
   })
 }
+
+// After kay's own hooks, so their routes are logged and compressed as the pages are, and before the pages, actions and API modules whose context they derive.
+// Returns their servers, and keeps the routes each mounted in development, for the dev tool.
+export async function useExtensions({ app, env, setup, registered }: Boot): Promise<unknown[]> {
+  const servers: unknown[] = []
+
+  for (const { name, server } of await setup.extensions) {
+    servers.push(server)
+
+    if (!env.dev) {
+      app.use(server)
+
+      continue
+    }
+
+    const before = new Set(app.routes.map(route => `${route.method} ${route.path}`))
+
+    app.use(server)
+    registered.extensions.push(...app.routes.filter(route => !before.has(`${route.method} ${route.path}`)).map(route => ({ owner: name, method: route.method, path: route.path })))
+  }
+
+  return servers
+}
+
+// The build's files, whose paths then carry the security headers themselves, and the last routes registered before the pages.
+export async function buildFiles({ app, env, setup: { client }, security, filePaths }: Boot, earlier: Set<string>): Promise<void> {
+  for (const path of await serveBuildFiles(app, client, { dev: env.dev, security, base: env.base }))
+    filePaths.add(path)
+
+  for (const route of app.routes)
+    earlier.add(`${route.method} ${route.path}`)
+}
+
+// The options actions, API modules, endpoints and kay's guarded routes share.
+export function actionOptionsOf({ env, options, setup, late }: Boot, skipBroken: boolean): ActionOptions {
+  return { skipBroken, dev: env.dev, onError: options.onError, i18n: setup.locales, base: env.base, redirectSpelling: (location: string) => late.spell(location), requireGuards: options.requireGuards, cors: options.cors }
+}
+
+// The actions, the API modules and the endpoints, then the jobs page, after the extensions whose derived values the guards read through `ctx.locals`.
+export async function appRoutes(boot: Boot, actionOptions: ActionOptions, jobsPage: ReturnType<typeof kayEndpoints>, apiMountsServed: string[]) {
+  const { app, routes, table, setup } = boot
+  const [{ limits: actionLimits, tools: toolActions }, apiModules] = await Promise.all([registerActionRoutes(app, routes, routeMatch(table, setup.matchers, boot.env.trailingSlash), actionOptions), setup.api])
+  const api = await serveApi(app, apiModules, actionOptions)
+
+  apiMountsServed.push(...apiModules.map(module => module.mount))
+  boot.registered.actions = actionLimits.size > 0
+  boot.registered.api = api.mounted
+
+  await serveEndpoints(app, setup.endpoints, actionOptions)
+
+  if (jobsPage)
+    serveJobsPage(app, jobsPage, actionOptions)
+
+  return { actionLimits, toolActions, apiModules, api }
+}
+
+type Served = Awaited<ReturnType<typeof appRoutes>>
 
 // The rules a redirect added while the site runs is checked against, the API's claims and the body limits of every route. Returns where the OpenAPI document and the MCP metadata go.
 // Not async, as the closures the runtime redirects keep past the app would hold an async function's parameters, the app among them.
@@ -549,14 +556,9 @@ export async function apiDocuments(boot: Boot, { toolActions, apiModules, api }:
 }
 
 // The routes the browser reports to: errors, with their stack mapped back to the source, then live values, policy violations and previews.
-export function reports({ app, env, options, setup: { client, i18n, site, collections }, hasPreview }: Boot) {
-  const mapStack = env.dev ? devStackMapper(client.dir) : browserStackMapper(join(client.dir, '..', MAPS_DIR))
-
+export function reports({ app, options, setup: { i18n, site, collections }, hasPreview, mapStack }: Boot) {
   useAppOnError(options.onError)
   serveErrorReports(app, options.onError, mapStack)
-
-  if (env.devRoutes)
-    app.post(DEV_STACK, async ({ request }) => devStack(request, mapStack))
 
   serveLive(app, options.live)
 
