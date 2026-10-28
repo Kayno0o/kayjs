@@ -16,7 +16,7 @@ function readsOf(name: string): string {
 }
 
 // Where the island's own script, or the file itself, imports the specifier: its server fence may import the same module and comes first.
-function importAt(source: string, specifier: string, fenced: boolean): number {
+export function importAt(source: string, specifier: string, fenced: boolean): number {
   const file = fenced ? parseKay(source) : undefined
   const spans = file ? [file.script, file.module].filter(span => span !== undefined) : [{ start: 0, end: source.length }]
   const quoted = new RegExp(`['"]${specifier.replace(REGEX_SPECIAL, '\\$&')}['"]`)

@@ -729,6 +729,61 @@ describe.concurrent('kay check, edge cases', () => {
 
       expect(diagnostics.map(d => d.at).sort()).toEqual(['src/components/counter.kay:3', 'src/components/counter.kay:6'])
     })
+
+    describe('a Node or Bun builtin an island reaches', () => {
+      const pg = { 'node_modules/pg-orm/package.json': '{"name":"pg-orm","main":"index.js"}', 'node_modules/pg-orm/index.js': 'export { AsyncLocalStorage } from \'./store.js\'\n', 'node_modules/pg-orm/store.js': 'export { AsyncLocalStorage } from \'async_hooks\'\n' }
+
+      it('reports the chain through a package at the island\'s import, as the build prints it', async () => {
+        const diagnostics = await found({
+          ...pg,
+          'src/components/counter.kay': island('import { MINUTE } from \'../probe-mod\''),
+          'src/probe-mod.ts': 'import { AsyncLocalStorage } from \'pg-orm\'\n\nexport const db = new AsyncLocalStorage()\nexport const MINUTE = 60\n',
+        })
+
+        expect(diagnostics.map(d => d.at)).toEqual(['src/components/counter.kay:3'])
+        expect(diagnostics[0]!.message).toContain('src/components/counter.kay imports a server module, and a browser has no async_hooks: src/components/counter.kay -> src/probe-mod.ts -> pg-orm -> async_hooks')
+      })
+
+      it('reports a builtin an app module the island imports names itself, with or without node:, and a Bun one', async () => {
+        const diagnostics = await found({
+          'src/components/counter.kay': island('import { a } from \'../lib/a\'\nimport { b } from \'../lib/b\'\nimport { c } from \'../lib/c\''),
+          'src/lib/a.ts': 'import { randomUUID } from \'node:crypto\'\n\nexport const a = randomUUID\n',
+          'src/lib/b.ts': 'import { readFileSync } from \'fs\'\n\nexport const b = readFileSync\n',
+          'src/lib/c.ts': 'import { Database } from \'bun:sqlite\'\n\nexport const c = Database\n',
+        })
+
+        expect(diagnostics.map(d => d.at)).toEqual(['src/components/counter.kay:3', 'src/components/counter.kay:4', 'src/components/counter.kay:5'])
+        expect(diagnostics.map(d => d.message.slice(d.message.indexOf(': src/') + 2))).toEqual(['src/components/counter.kay -> src/lib/a.ts -> node:crypto', 'src/components/counter.kay -> src/lib/b.ts -> fs', 'src/components/counter.kay -> src/lib/c.ts -> bun:sqlite'])
+      })
+
+      it('reports a builtin the island imports itself, at that import', async () => {
+        const diagnostics = await found({ 'src/components/counter.kay': island('import { hostname } from \'node:os\'', 'const host = hostname()\n') })
+
+        expect(diagnostics.map(d => d.at)).toEqual(['src/components/counter.kay:3'])
+      })
+
+      it('passes a type-only import of the module, and a package that maps its server modules away for a browser', async () => {
+        expect(await found({
+          ...pg,
+          'src/components/counter.kay': island('import type { Db } from \'../probe-mod\'\nimport { type Db as Other } from \'../probe-mod\'', 'const x: Db | Other | undefined = undefined\n'),
+          'src/probe-mod.ts': 'import { AsyncLocalStorage } from \'pg-orm\'\n\nexport type Db = AsyncLocalStorage<number>\n',
+        })).toEqual([])
+        expect(await found({
+          'node_modules/web/package.json': '{"name":"web","main":"index.js","browser":{"fs":false}}',
+          'node_modules/web/index.js': 'import \'fs\'\nexport const WEB = 1\n',
+          'src/components/counter.kay': island('import { WEB } from \'web\'', 'const w = WEB\n'),
+        })).toEqual([])
+      })
+
+      it('passes an island importing only browser-safe modules', async () => {
+        expect(await found({
+          'node_modules/safe/package.json': '{"name":"safe","main":"index.js"}',
+          'node_modules/safe/index.js': 'export const SAFE = 1\n',
+          'src/components/counter.kay': island('import { MINUTE } from \'../lib/time\''),
+          'src/lib/time.ts': 'import { SAFE } from \'safe\'\n\nexport const MINUTE = 60 + SAFE\n',
+        })).toEqual([])
+      })
+    })
   })
 
   it('follows a barrel module an island imports through export * and export { x } from', async () => {

@@ -76,11 +76,6 @@ function readsIn(code: string, file: string): Set<string> {
   return program === undefined ? new Set() : namesIn(program)
 }
 
-// Whether a source is worth following the browser's imports for: it names a server-only global.
-export function mentionsServerOnly(source: string): boolean {
-  return MENTIONED.test(source)
-}
-
 export interface LoadTimeRead {
   name: string
   // Where in the source it is read.
@@ -392,7 +387,53 @@ export function refusedBuiltins(logs: readonly (BuildMessage | ResolveMessage)[]
   return [...new Set(logs.flatMap(log => log.name === 'ResolveMessage' && BUILTIN_REFUSAL.test(log.message) ? [log.specifier] : []))]
 }
 
-// For each island reaching one of the builtins, the shortest chain of imports from it, cut at the first package since the fix is never inside one.
+// The shortest chain of imports from `start` to one of the refused builtins, as the keys of `inputs` ending on the builtin, and as the build prints it: cut at the first package, since the fix is never inside one.
+export function builtinChain(root: string, inputs: BundleInputs, start: string, refused: ReadonlySet<string>): { path: string[], text: string } | undefined {
+  const parents = new Map<string, string | undefined>([[start, undefined]])
+  const queue = [start]
+  let reached: { input: string, builtin: string } | undefined
+
+  while (queue.length > 0 && !reached) {
+    const input = queue.shift()!
+
+    for (const { path, external } of inputs[input]?.imports ?? []) {
+      if (external && refused.has(path)) {
+        reached = { input, builtin: path }
+
+        break
+      }
+
+      if (!external && !parents.has(path)) {
+        parents.set(path, input)
+        queue.push(path)
+      }
+    }
+  }
+
+  if (!reached)
+    return undefined
+
+  const path: string[] = [reached.builtin]
+
+  for (let input: string | undefined = reached.input; input !== undefined; input = parents.get(input))
+    path.unshift(input)
+
+  const shown: string[] = []
+
+  for (const input of path.slice(0, -1)) {
+    const file = relative(root, resolve(process.cwd(), input))
+    const name = PACKAGE_PATH.exec(file)?.[1]
+
+    shown.push(name ?? file)
+
+    if (name !== undefined)
+      break
+  }
+
+  return { path, text: [...shown, reached.builtin].join(' -> ') }
+}
+
+// For each island reaching one of the builtins, the chain from it.
 // `inputs` is the metafile of the same build with the builtins left external, its modules named relative to where the build ran.
 export function builtinChains(root: string, inputs: BundleInputs, islands: Iterable<string>, builtins: string[]): string[] {
   const refused = new Set(builtins)
@@ -401,52 +442,10 @@ export function builtinChains(root: string, inputs: BundleInputs, islands: Itera
 
   for (const island of islands) {
     const start = keyOf.get(island)
+    const chain = start === undefined ? undefined : builtinChain(root, inputs, start, refused)
 
-    if (start === undefined)
-      continue
-
-    const parents = new Map<string, string | undefined>([[start, undefined]])
-    const queue = [start]
-    let reached: { input: string, builtin: string } | undefined
-
-    while (queue.length > 0 && !reached) {
-      const input = queue.shift()!
-
-      for (const { path, external } of inputs[input]?.imports ?? []) {
-        if (external && refused.has(path)) {
-          reached = { input, builtin: path }
-
-          break
-        }
-
-        if (!external && !parents.has(path)) {
-          parents.set(path, input)
-          queue.push(path)
-        }
-      }
-    }
-
-    if (!reached)
-      continue
-
-    const path: string[] = [reached.builtin]
-
-    for (let input: string | undefined = reached.input; input !== undefined; input = parents.get(input))
-      path.unshift(input)
-
-    const shown: string[] = []
-
-    for (const input of path.slice(0, -1)) {
-      const file = relative(root, resolve(process.cwd(), input))
-      const name = PACKAGE_PATH.exec(file)?.[1]
-
-      shown.push(name ?? file)
-
-      if (name !== undefined)
-        break
-    }
-
-    chains.push([...shown, reached.builtin].join(' -> '))
+    if (chain)
+      chains.push(chain.text)
   }
 
   return chains
@@ -454,6 +453,12 @@ export function builtinChains(root: string, inputs: BundleInputs, islands: Itera
 
 // Every builtin, the ones Bun polyfills included: one whose polyfill lacks an export would fail the build that only looks for the way to the others.
 const BUILTINS = [...builtinModules, 'node:*', 'bun', 'bun:*']
+const BUILTIN_NAMES = new Set(BUILTINS)
+
+// Whether an import names a module a browser lacks: a Node builtin, with or without its `node:` prefix, or Bun's.
+export function isBuiltinSpecifier(specifier: string): boolean {
+  return BUILTIN_NAMES.has(specifier) || specifier.startsWith('node:') || specifier.startsWith('bun:')
+}
 
 // Bun names the module importing a builtin a browser lacks, not the island reaching it: the same build with every builtin left out, in memory, gives the imports leading there.
 // An island bundles all of a module it imports, whatever it opens as it loads included, so the fix is in that chain.

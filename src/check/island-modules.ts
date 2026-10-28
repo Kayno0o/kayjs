@@ -5,6 +5,7 @@ import { sep } from 'node:path'
 import { resolveFrom, transpilerFor } from '../build/files'
 import { importsOf } from '../build/libraries'
 import { buildFiles, promotedFiles } from '../build/promotion'
+import { isBuiltinSpecifier } from '../build/server-only'
 import { importedSignals } from '../build/signals'
 import { browserRole } from '../compiler'
 import { parseKay } from '../compiler/parser'
@@ -12,6 +13,8 @@ import { isApiStubbed } from '../server/api-modules'
 import { islandOnlyComponents } from './island-only'
 
 const SCRIPT_MODULE = /\.(?:[cm]?ts|tsx)$/
+// What the browser bundle takes as a module, a package's JavaScript included.
+const BUNDLED_MODULE = /\.(?:[cm]?[jt]s|[jt]sx)$/
 const DECLARATION_FILE = /\.d\.[cm]?ts$/
 // Imports that name no module of the project.
 const OUTSIDE = /^(?:node:|bun:|kay(?:\/|$))/
@@ -38,6 +41,15 @@ export interface BrowserModules {
   seeds: string[]
   // For each module, every component reaching it and the import of its own that leads there.
   origins: Map<string, { seed: string, specifier: string }[]>
+  // What each seed and module imports besides the project's types: its own modules, the files of packages, and the builtins by name.
+  edges: Map<string, ImportEdge[]>
+}
+
+export interface ImportEdge {
+  specifier: string
+  // The file the import resolves to, or the builtin's name.
+  target: string
+  builtin?: true
 }
 
 // The project's own TypeScript modules the browser bundle reaches: those the script of an island, of a component only islands render and of a static one the build promotes to an island imports, and those they import in turn; and the promoted components themselves, as `findKayFiles` lists them.
@@ -72,9 +84,28 @@ export async function browserModules(root: string, routesDir: string, extensions
     return target !== undefined && inside(target) && SCRIPT_MODULE.test(target) && !DECLARATION_FILE.test(target) ? [{ target, specifier }] : []
   })
 
+  const edges = new Map<string, ImportEdge[]>()
+  // Imports that cannot be resolved are the build's to report; kay itself has a browser build of its own.
+  const edgesOf = (file: string, specifiers: string[]) => {
+    if (edges.has(file))
+      return
+
+    edges.set(file, specifiers.flatMap((specifier): ImportEdge[] => {
+      if (isBuiltinSpecifier(specifier))
+        return [{ specifier, target: specifier, builtin: true }]
+
+      const target = OUTSIDE.test(specifier) ? undefined : resolveFrom(specifier, file)
+
+      return target !== undefined && !stubbed(target) && BUNDLED_MODULE.test(target) && !DECLARATION_FILE.test(target) ? [{ specifier, target }] : []
+    }))
+  }
+
   for (const seed of seeds) {
     const walked = new Set<string>()
-    const queue = modulesOf(seed, scriptImportsOf(sources.get(seed)!)).map(({ target, specifier }) => ({ module: target, specifier }))
+    const seedImports = scriptImportsOf(sources.get(seed)!)
+    const queue = modulesOf(seed, seedImports).map(({ target, specifier }) => ({ module: target, specifier }))
+
+    edgesOf(seed, seedImports)
 
     for (const { module, specifier } of queue) {
       if (walked.has(module))
@@ -84,10 +115,14 @@ export async function browserModules(root: string, routesDir: string, extensions
       reached.add(module)
       origins.set(module, [...origins.get(module) ?? [], { seed, specifier }])
 
-      for (const { target } of modulesOf(module, await importsOfModule(module)))
+      const moduleImports = await importsOfModule(module)
+
+      edgesOf(module, moduleImports)
+
+      for (const { target } of modulesOf(module, moduleImports))
         queue.push({ module: target, specifier })
     }
   }
 
-  return { modules: reached, promoted, seeds, origins }
+  return { modules: reached, promoted, seeds, origins, edges }
 }

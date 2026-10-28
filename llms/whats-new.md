@@ -5,6 +5,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 ## Unreleased
 
 - kayjs-ai: `transcribe(audio)`, `speak(text)` and `embed(texts)` call an OpenAI-compatible server's audio and embeddings API (a local Whisper or Kokoro server, Ollama, OpenAI) from `AI_AUDIO_URL`, `AI_EMBED_URL` or the server `ask` uses, and the fake answers them under `bun test`, embeddings as stable vectors from the words: [Speech and embeddings](../packages/ai/llms/speech-and-embeddings.md).
+- `kay check` reports an island whose imports reach a Node or Bun builtin, through a package or an app module, as `server-only-in-island` at the island's import with the chain the build prints, where only `kay build` refused it: [Browser-only code](browser-only.md).
 - `kay build` writes the navigation-only entry and its chunks only when a component renders a form posting to an action, so an app with none deploys no `nav-*` file: [building](build-and-start.md).
 
 ## 1.82.0
