@@ -201,7 +201,7 @@ export function clientSession(root: string, options: ClientOptions, settings: Se
 
     const classTableText = JSON.stringify([classTable, islandTable])
     // `src/ui.ts` is written into the components it restyles, none of which imports it, so no chunk lists it among its inputs.
-    const islandsAgain = !previous || !sameEntries(previous.sources.islands, sources.islands) || files.some(file => previous.islandInputs.has(file) || file === join(realRoot, UI_FILE)) || previous.classTable !== classTableText || previous.sources.actionForms !== sources.actionForms
+    const islandsAgain = !previous || !sameEntries(previous.sources.islands, sources.islands) || files.some(file => previous.islandInputs.has(file) || file === join(realRoot, UI_FILE)) || previous.classTable !== classTableText || (!options.hot && previous.sources.actionForms !== sources.actionForms)
     const stylesAgain = !previous || await increments!.stylesChanged(previous, sources, texts)
 
     if (previous && islandsAgain)

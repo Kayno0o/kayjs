@@ -192,6 +192,8 @@ describe('the navigation-only entry', () => {
     expect((await session.build(null)).manifest.navEntry).toBeUndefined()
     await Bun.write(contact, form)
     expect((await session.build(['src/routes/contact.kay'])).manifest.navEntry).toBeDefined()
+    await rm(contact)
+    expect((await session.build(['src/routes/contact.kay'])).manifest.navEntry).toBeUndefined()
   }, 120_000)
 })
 
