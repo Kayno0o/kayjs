@@ -9,8 +9,7 @@ import type { LogEntry } from '../server/log'
 import type { BrowserOptions, TestPage } from './browser'
 import type { TestContent } from './content'
 import type { PageReading } from './page'
-import { existsSync } from 'node:fs'
-import { relative, resolve } from 'node:path'
+import { relative } from 'node:path'
 import process from 'node:process'
 import { afterAll, beforeEach } from 'bun:test'
 import { Elysia } from 'elysia'
@@ -19,6 +18,7 @@ import { buildClient } from '../build/client'
 import { KayCompileError } from '../build/transform'
 import { buildingTestSite } from '../config-extensions'
 import { withConfig } from '../config-loader'
+import { BuildStamps } from '../dev/fingerprint'
 import { clientOptionsOf, PRODUCTION, resolveProject } from '../project'
 import { encodeCall, minTimeOf, readActionResponse, SETTLED, STAMP_FIELD } from '../runtime/action'
 import { joinBase } from '../runtime/base'
@@ -267,53 +267,46 @@ function workHeaders(action: Action<never, unknown>): Record<string, string> {
   return work ? { [WORK_HEADER]: solveWork(signWork(action.url, work.difficulty, work.maxAge))! } : {}
 }
 
-const builds = new Map<string, { key: string, build: Promise<ClientBuild> }>()
-
-// The newest edit and the count of files under the project's sources and pages, which tell a build still current from one the test's own edits outdated.
-async function editedAt(root: string, options: ClientOptions): Promise<string> {
-  let newest = 0
-  let count = 0
-
-  for (const dir of new Set(['src', options.routes ?? 'src/routes', options.api ?? 'src/api'])) {
-    const cwd = resolve(root, dir)
-
-    if (!existsSync(cwd))
-      continue
-
-    for await (const file of new Bun.Glob('**').scan({ cwd, absolute: true, onlyFiles: true })) {
-      newest = Math.max(newest, Bun.file(file).lastModified)
-      count++
-    }
-  }
-
-  return `${newest}:${count}`
-}
+const builds = new Map<string, { key: string, stamps: BuildStamps, running: () => boolean, build: Promise<ClientBuild> }>()
 
 // The options that tell two builds apart, as far as they can be written down.
 function optionsKey(options: ClientOptions): string {
   return JSON.stringify(options, (_, value: unknown) => typeof value === 'bigint' ? String(value) : value)
 }
 
-// One build per root and output, rebuilt when its options or sources changed, and one at a time: every build clears and rewrites its output, which the sites of a process share.
-// A site not loaded in a browser builds into `.kay/test-client`, so `kay build`'s output stays as it was.
+// One build per root and output, rebuilt when its options changed or a file it read did, as `kay dev`'s stamps tell, and one at a time: every build clears and rewrites its output, which the sites of a process share.
+// A build still running is the one asked for, and one that failed stays failed until a source changes. A site not loaded in a browser builds into `.kay/test-client`, so `kay build`'s output stays as it was.
 async function islandsBuilt(root: string, options: ClientOptions, inBrowser: boolean): Promise<ClientBuild> {
-  const key = `${optionsKey(options)}\0${await editedAt(root, options)}`
+  const key = optionsKey(options)
   const slot = `${root}\0${inBrowser}`
   const held = builds.get(slot)
 
-  if (held?.key === key)
+  if (held?.key === key && (held.running() || await held.stamps.current()))
     return held.build
 
+  // Another site asked for one while the stamps were compared.
+  const latest = builds.get(slot)
+
+  if (latest !== held && latest?.key === key)
+    return latest.build
+
+  const stamps = new BuildStamps(root)
+  let running = true
   const build = (async () => {
     try {
       await held?.build
     }
     catch {}
 
-    return inBrowser ? buildClient(root, options) : inOutput(`test-client${testWorker()}`, async () => buildClient(root, options))
+    try {
+      return await (inBrowser ? buildClient(root, options, stamps) : inOutput(`test-client${testWorker()}`, async () => buildClient(root, options, stamps)))
+    }
+    finally {
+      running = false
+    }
   })()
 
-  builds.set(slot, { key, build })
+  builds.set(slot, { key, stamps, running: () => running, build })
 
   return build
 }

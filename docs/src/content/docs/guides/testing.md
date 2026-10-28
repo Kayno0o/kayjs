@@ -345,7 +345,7 @@ Every `testSite()` call builds the islands for the browser. It throws that build
 
 A `.kay` file that does not compile is the exception: only the visit of a page importing it answers 500 and logs the error naming the file, so the tests of other pages stay green; a file no page imports goes unreported. A site opened with `browser` needs the whole build and throws it.
 
-The build goes to `.kay/test-client`, so what `kay build` wrote stays as it was. It runs once per process while the files under `src`, your routes and your API are unchanged.
+The build goes to `.kay/test-client`, so what `kay build` wrote stays as it was. It runs once per process while no file it read has changed and no source was added, as `kay dev` tells: any file of your project, `kay.config.ts`, `public` and content included, and the library files it bundled.
 
 The `kay/test/preload` in your bunfig.toml gives every test and hook 20 seconds, so a hook that stops the server or drops a database does not fail on a busy machine. Set `timeout` under `[test]` in bunfig.toml to choose another time, which hooks then follow too. The `--timeout` flag does the same on Linux. On a large app the build may outlast 20 seconds. Pass `testSite({ islands: false })` to skip it, or a longer timeout to `beforeAll`.
 

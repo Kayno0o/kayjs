@@ -90,4 +90,16 @@ describe('testSite builds the islands', () => {
 
     expect(Bun.file(manifest()).lastModified).toBeGreaterThan(first)
   })
+
+  it('builds again for a source written outside src, as kay dev would', async () => {
+    await testSite({ root })
+
+    const first = Bun.file(manifest()).lastModified
+
+    await Bun.sleep(20)
+    await Bun.write(join(root, 'content/note.md'), '# Note\n')
+    await testSite({ root })
+
+    expect(Bun.file(manifest()).lastModified).toBeGreaterThan(first)
+  })
 })
