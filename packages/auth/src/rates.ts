@@ -1,11 +1,13 @@
 import type { Duration, RateStore, RateWindow } from 'kay'
 import type { AuthStore, MaybePromise } from './store'
-import { appStore, durationSeconds } from 'kay/library'
+import { appStore, durationSeconds, ratesFallingBack } from 'kay/library'
 import { log } from './log'
 
 const SWEEP_EVERY = 1000
 // Keys in the app's shared `store.rates` sit apart from kay's own limits and other libraries'.
 const SHARED_PREFIX = 'kayjs-auth\n'
+// What kay's log names a failing store by.
+const COUNTING = 'kayjs-auth attempts'
 
 // Where kayjs-auth counts attempts: kay's `RateStore`, reading a count without adding to it (`peek`) and clearing one once the attempt it guards succeeds (`reset`).
 export type AuthRates = RateStore & Required<Pick<RateStore, 'peek' | 'reset'>>
@@ -81,28 +83,33 @@ function counts(store: RateStore): store is AuthRates {
 
 // The store's pre-1.81 `attempts`, else its own `rates`, else the app's `store.rates` from kay.config.ts when it can peek and reset, else this auth's memory.
 // `attempts` comes first: the built-in stores give `rates` and no `attempts`, so a store holding both spread one and gave the counter shared by its processes.
-// The app's store is read on each count, as kay sets it up after `createAuth` may have run.
+// The app's store is read on each count, as kay sets it up after `createAuth` may have run. A store that fails or hangs counts in this auth's memory meanwhile, as kay's own limits do.
 export function authRates(store: AuthStore): AuthRates {
+  const memory = memoryAuthRates()
   const own = store.attempts ? legacyRates(store.attempts) : store.rates
 
   if (own)
-    return own
+    return ratesFallingBack(COUNTING, own, memory)
 
-  let memory: AuthRates | undefined
   let warned: RateStore | undefined
+  let standIn: { of: AuthRates, rates: AuthRates } | undefined
 
   const target = (): { rates: AuthRates, prefix: string } => {
     const shared = appStore()?.rates
 
-    if (shared && counts(shared))
-      return { rates: shared, prefix: SHARED_PREFIX }
+    if (shared && counts(shared)) {
+      if (standIn?.of !== shared)
+        standIn = { of: shared, rates: ratesFallingBack(COUNTING, shared, memory) }
+
+      return { rates: standIn.rates, prefix: SHARED_PREFIX }
+    }
 
     if (shared && warned !== shared) {
       warned = shared
       log.warn('the app\'s store.rates has no peek or reset, which kayjs-auth needs to read and clear a count, so it counts attempts in this process\'s memory: give the store both, or the auth store `rates`')
     }
 
-    return { rates: memory ??= memoryAuthRates(), prefix: '' }
+    return { rates: memory, prefix: '' }
   }
 
   return {

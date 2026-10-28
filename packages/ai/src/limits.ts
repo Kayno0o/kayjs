@@ -187,7 +187,7 @@ function storeOf(counter: Counter, needsPeek: boolean): RateStore {
 }
 
 // What a store answers, or a refusal to wait for it: a store over the network that hangs must not hang the chat.
-async function bounded<T>(read: () => T | Promise<T>): Promise<T> {
+export async function bounded<T>(read: () => T | Promise<T>): Promise<T> {
   let timer: ReturnType<typeof setTimeout> | undefined
 
   try {

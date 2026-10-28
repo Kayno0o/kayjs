@@ -2,13 +2,14 @@ import type { Asked, Piece, ProviderMessage, ProviderRequest } from '../src'
 import type { Offered } from '../src/loop'
 import type { Outcome, Tools } from './helpers/tools'
 import { join } from 'node:path'
-import { afterAll, afterEach, beforeEach, describe, expect, it } from 'bun:test'
+import { afterAll, afterEach, beforeEach, describe, expect, it, spyOn } from 'bun:test'
 import { testSite } from 'kay/test'
 import { encodeCall } from '../../../src/runtime/action'
+import { appStore, setupStore } from '../../../src/server/app-store'
 import { ai, ask, fakeAi } from '../src'
 import { ticketAllows, ticketFor } from '../src/approval'
 import { approvalMessage, withoutApproval } from '../src/approval-marker'
-import { forgetCounts } from '../src/limits'
+import { forgetCounts, storeTimeout } from '../src/limits'
 import { converse } from '../src/loop'
 import { createReply } from '../src/reply'
 import { done, heard, hooks } from './fixture/src/testing'
@@ -698,6 +699,29 @@ describe('the visitor\'s yes to a write', () => {
     }
 
     expect(ran).toEqual([1, 0])
+  })
+
+  it('runs no call when the store spending its ticket hangs, and gives up on it after the store time limit', async () => {
+    const before = appStore()
+    const errors = spyOn(console, 'error').mockReturnValue()
+
+    try {
+      setupStore({ rates: { hit: async () => new Promise<never>(Function.prototype as never) } })
+      storeTimeout(30)
+      fakeAi.reply({ calls: [{ name: 'book', input }] })
+      fakeAi.reply('done')
+
+      const turn = loop(said(approvalMessage('Yes.', ticketFor('book', input))))
+
+      await turn.reply
+      expect(turn.ran()).toBe(0)
+      expect((await turn.reply.calls)[0]).toMatchObject({ status: 'failed' })
+    }
+    finally {
+      storeTimeout(5000)
+      setupStore(before)
+      errors.mockRestore()
+    }
   })
 
   it('ignores an expired ticket and one sitting in a message that carries tool results', async () => {

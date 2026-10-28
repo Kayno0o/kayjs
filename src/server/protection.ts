@@ -625,26 +625,42 @@ export function ratesFor(name: string, given?: RateStore): RateStore {
   let standIn = named.get(name)
 
   if (!standIn)
-    named.set(name, standIn = standInFor(name, store))
+    named.set(name, standIn = ratesFallingBack(name, store))
 
   return standIn
 }
 
-// `store` with this process's memory under `name` behind it; `peek` and `refund` only where the store has them, as a limit checks for them.
-function standInFor(name: string, store: RateStore): RateStore {
-  const memory = memoryOf(name)
-  const { hit, peek, refund } = store
+// What a store falls back on, answering at once.
+export interface FallbackMemory {
+  hit: (key: string, window: Duration, weight?: number) => RateWindow
+  peek: (key: string) => RateWindow | undefined
+  refund?: ((key: string, resetAt: number) => void) | undefined
+  reset?: ((key: string) => void) | undefined
+}
 
+// The optional methods `Store` surely has, which its stand-in has too.
+type Sure<Store> = { [Key in 'peek' | 'refund' | 'reset' as Key extends keyof Store ? undefined extends Store[Key] ? never : Key : never]-?: NonNullable<RateStore[Key]> }
+
+// `store` with `memory` behind it, `name` naming it in the log, as `ratesFor` keeps one: for a library choosing its store and its memory itself, as kayjs-auth does. `peek`, `refund` and `reset` are there only where the store has them, as a limit checks for them.
+export function ratesFallingBack<Store extends RateStore>(name: string, store: Store, memory: FallbackMemory = memoryOf(name)): RateStore & Sure<Store> {
+  const { peek, refund, reset } = store
+
+  // Each method is read off the store on each call, so one replaced on it later, as a test spies on it, is the one called.
   return {
-    hit: async (key, window, weight) => answered(name, store, hit, [key, window, weight], () => memory.hit(key, window, weight)),
-    ...peek && { peek: async key => answered(name, store, peek, [key], () => memory.peek(key)) },
+    hit: async (key, window, weight) => answered(name, store, store.hit, [key, window, weight], () => memory.hit(key, window, weight)),
+    ...peek && { peek: async key => answered(name, store, store.peek ?? peek, [key], () => memory.peek(key)) },
     // Taken back in memory too, where the attempt was counted if the store failed then; memory only takes it off a window closing at that same `resetAt`.
     ...refund && { refund: async (key, resetAt) => {
-      memory.refund(key, resetAt)
+      memory.refund?.(key, resetAt)
 
-      return answered(name, store, refund, [key, resetAt], () => undefined)
+      return answered(name, store, store.refund ?? refund, [key, resetAt], () => undefined)
     } },
-  }
+    ...reset && { reset: async (key) => {
+      memory.reset?.(key)
+
+      return answered(name, store, store.reset ?? reset, [key], () => undefined)
+    } },
+  } as RateStore & Sure<Store>
 }
 
 // What `store` answers through `method`, else what `fallback` does once the store throws, rejects, or takes longer than the store time limit, or while it is left alone; a store answering at once is not timed.

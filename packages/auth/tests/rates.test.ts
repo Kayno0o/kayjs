@@ -116,6 +116,48 @@ describe('where attempts are counted', () => {
   })
 })
 
+describe('a rates store that fails', () => {
+  const gone = () => {
+    throw new Error('the database went away')
+  }
+
+  test('counts the attempts in memory when the app\'s store.rates throws, so a sign-in still answers and still locks out, logged once', async () => {
+    const warned = spyOn(console, 'warn').mockReturnValue()
+
+    try {
+      setupStore({ rates: { hit: gone, peek: gone, reset: gone } })
+
+      const { browser } = await registered(withoutRates())
+
+      await signIn(browser, WRONG)
+      expect(await signIn(browser, PASSWORD)).toMatchObject({ ok: true })
+      await signIn(browser, WRONG)
+      await signIn(browser, WRONG)
+      expect(await signIn(browser, PASSWORD)).toEqual({ ok: false, error: 'limited' })
+      expect(warned.mock.calls.filter(call => String(call[0]).includes('kayjs-auth'))).toHaveLength(1)
+    }
+    finally {
+      warned.mockRestore()
+    }
+  })
+
+  test('counts in memory when the auth store\'s own rates reject', async () => {
+    const warned = spyOn(console, 'warn').mockReturnValue()
+    const rejected = async () => Promise.reject(new Error('the database went away'))
+
+    try {
+      const { browser } = await registered({ ...memoryAuthStore(), rates: { hit: rejected, peek: rejected, reset: rejected } })
+
+      await signIn(browser, WRONG)
+      await signIn(browser, WRONG)
+      expect(await signIn(browser, PASSWORD)).toEqual({ ok: false, error: 'limited' })
+    }
+    finally {
+      warned.mockRestore()
+    }
+  })
+})
+
 test('the default limits are written as an app writes its own, with a Duration window', () => {
   expect(DEFAULT_LIMITS.signIn).toEqual({ max: 40, window: '15m' })
   expect(DEFAULT_LIMITS.inviteAddress).toEqual({ max: 5, window: '1d' })
