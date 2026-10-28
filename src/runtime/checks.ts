@@ -121,8 +121,9 @@ type IsRoute<Path extends string> = [RoutePatterns] extends [never]
   ? true
   : true extends AnyMatch<SegmentsOf<Path>, RoutePatterns, EndsWithSlash<Path>> | (Path extends PublicFiles ? true : false) | ServedByApp<Path> | ServedByServer<Path, ExtensionServers> | ServedByApi<Path> ? true : false
 
-// The route tree of a module under `src/api`, from its default export.
-export type ApiRoutesOf<Module> = Module extends { default: { '~Routes': infer Routes } } ? Routes : Record<never, never>
+// The route tree of a module under `src/api`, from its default export, or from what the function an extension's module exports builds.
+export type ApiRoutesOf<Module> = Module extends { default: infer Exported } ? RoutesOfInstance<Exported extends (...args: never[]) => infer Built ? Awaited<Built> : Exported> : Record<never, never>
+type RoutesOfInstance<Instance> = Instance extends { '~Routes': infer Routes } ? Routes : Record<never, never>
 
 // What a site-relative path nothing serves fails with, which `kay check` reads to leave an extension the paths outside its prefix.
 export const UNSERVED_MESSAGE = 'No page, public file or app route serves'

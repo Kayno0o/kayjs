@@ -331,6 +331,26 @@ describe.concurrent('kay dev reloading', () => {
     }
   }, 60_000)
 
+  it('builds an extension\'s API module exporting a function again when a file it names in appFiles is added or edited, in the one process', async () => {
+    const project = await served({
+      'src/routes/index.kay': 'p home\n',
+      'lib/api/word.ts': 'import type { ExtensionApp } from \'kay/server\'\nimport { api } from \'kay/server\'\n\nexport default ({ modules }: ExtensionApp) => api().get(\'/\', () => `word:${String(modules.words?.word ?? \'none\')}`)\n',
+      'kay.config.ts': 'import { defineConfig } from \'kay/server\'\n\nexport default defineConfig({ extensions: [{ name: \'probe\', appFiles: { words: \'src/words.ts\' }, api: { dir: \'lib/api\', prefix: \'probe\' } }] })\n',
+    })
+
+    try {
+      await project.sees('word:none', '/api/probe/word')
+      await project.write('src/words.ts', 'export const word = "one"\n')
+      await project.sees('word:one', '/api/probe/word')
+      await project.replace('src/words.ts', 'export const word = "two"\n')
+      await project.sees('word:two', '/api/probe/word')
+      expect(project.children).toHaveLength(1)
+    }
+    finally {
+      await project.cleanup()
+    }
+  }, 60_000)
+
   it('wraps a page in the layout of the files it reaches once an edit imports one, and unwraps it once the import goes, in the one process', async () => {
     const project = await served({
       'src/routes/index.kay': 'p home\n',

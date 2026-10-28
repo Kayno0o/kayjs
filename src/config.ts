@@ -419,7 +419,7 @@ export interface ExtensionProblem {
   help?: string | undefined
 }
 
-// What kay hands an extension's `server` function: the root its own files (a database file, a cache) live under, the modules of the files it named in `appFiles`, and the names of the extensions the config lists.
+// What kay hands an extension's `server` function, and an API module of its `api` exporting a function: the root its own files (a database file, a cache) live under, the modules of the files it named in `appFiles`, and the names of the extensions the config lists.
 export interface ExtensionApp {
   // The project root, or the folder an executable runs in.
   root: string
@@ -448,7 +448,7 @@ export interface KayExtension<Server extends AnyElysia = AnyElysia> {
   // An Elysia plugin `pages()` uses before the pages, actions and API modules, so its derives reach their `ctx.locals` and `kay check` types them; scoped or global hooks reach them, local ones only the plugin's own routes.
   // Given as a function, it is called only when `pages()` builds the app, never when `kay check`, the editor or `kay build` read the config: the way to hand a plugin built on a database or the server's environment.
   server?: Server | ((app: ExtensionApp) => Server | Promise<Server>) | undefined
-  // Optional files of the app the extension reads, by the name it reads them by and their path under the project root: `{ hooks: 'src/auth.ts' }`. kay imports each one that exists as the server starts and hands the modules to a `server` function as `app.modules` (undefined for a file the app has not written), bakes them into an executable `kay build --compile` makes, and reloads them under `kay dev` when one is edited, added or removed. Only a `server` function receives the modules, though every file is baked and reloaded. A path outside the project root stops the server.
+  // Optional files of the app the extension reads, by the name it reads them by and their path under the project root: `{ hooks: 'src/auth.ts' }`. kay imports each one that exists as the server starts and hands the modules to a `server` function as `app.modules` (undefined for a file the app has not written), bakes them into an executable `kay build --compile` makes, and reloads them under `kay dev` when one is edited, added or removed. Only a `server` function and the API modules of `api` exporting a function receive the modules, though every file is baked and reloaded. A path outside the project root stops the server.
   appFiles?: Record<string, string> | undefined
   // The server plugin named by the module that exports it, `{ path: './src/auth', export: 'auth' }` for `export const auth` (`default` by default): imported only as `pages()` builds the app, and baked into an executable `kay build --compile` makes, which a path built at run time inside a library could not be. The export is the plugin, a function building it, or an object carrying it as `plugin`, as a library's `createAuth` result does. `kay check` types the locals off the module itself, and off the extension's `Server` argument when it has one; used beside `server`, the module wins. A path is relative to the project root. `prepare` runs with the export before the plugin is taken from it, for a library to hand the app's module what the extension was given; a throw stops the server.
   serverModule?: { path: string, export?: string | undefined, prepare?: ((exported: unknown) => void | Promise<void>) | undefined } | undefined
@@ -465,6 +465,7 @@ export interface KayExtension<Server extends AnyElysia = AnyElysia> {
   context?: string | undefined
   // A directory of API modules laid over the app's under `prefix`, the root by default, as `routes` is over its pages: `{ dir: 'api', prefix: 'auth' }` serves `api/session.ts` at `/api/auth/session`, unless the app has `src/api/auth/session.ts`.
   // A prefix starting with `/_kay/` is absolute, served there whatever `apiPath` is. `former` is the prefix it had under `apiPath` before it moved: that path still answers, as the new one, for the releases the library says.
+  // A module may default-export a function of the `ExtensionApp` building its instance, `({ modules }) => api({ cors }).get('/', () => modules.features)`, called as the app is built, so it serves the app's `appFiles`.
   api?: { dir: string, prefix?: string | undefined, former?: string | undefined } | undefined
   // A directory of message catalogs, `<locale>.ts` each, under the app's own: a key the app translates is the app's.
   messages?: string | undefined

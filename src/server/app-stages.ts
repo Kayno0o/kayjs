@@ -488,7 +488,7 @@ export function actionOptionsOf({ env, options, setup, late }: Boot, skipBroken:
 export async function appRoutes(boot: Boot, actionOptions: ActionOptions, jobsPage: ReturnType<typeof kayEndpoints>, apiMountsServed: string[]) {
   const { app, routes, table, setup } = boot
   const [{ limits: actionLimits, tools: toolActions }, apiModules] = await Promise.all([registerActionRoutes(app, routes, routeMatch(table, setup.matchers, boot.env.trailingSlash), actionOptions), setup.api])
-  const api = await serveApi(app, apiModules, actionOptions)
+  const api = await serveApi(app, apiModules, actionOptions, setup.extensionApp)
 
   apiMountsServed.push(...apiModules.map(module => module.mount))
   boot.registered.actions = actionLimits.size > 0

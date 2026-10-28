@@ -1,3 +1,4 @@
+import type { ExtensionApp } from '../config'
 import type { Collection } from '../content'
 import type { Project } from '../project'
 import type { LocaleSettings } from '../runtime/i18n'
@@ -11,7 +12,7 @@ import type { Endpoint, Route, RouteMount } from './routes'
 import type { ProjectSource } from './source'
 import { join, resolve } from 'node:path'
 import process from 'node:process'
-import { extensionContexts, extensionServers, serverExtensions } from '../config-extensions'
+import { extensionApps, extensionContexts, extensionServers, serverExtensions } from '../config-extensions'
 import { setContentMode, setMarkdownDefaults } from '../content/load'
 import { projectCollections } from '../content/server'
 import { renderOptionsOf } from '../project'
@@ -79,6 +80,8 @@ export interface PageSetup {
   // The extension servers and API modules, imported while the client builds; nothing prerendering reads.
   extensions: Promise<Awaited<ReturnType<typeof extensionServers>>>
   api: ReturnType<ProjectSource['api']>
+  // What an extension's API module exporting a function is called with, by the extension's name.
+  extensionApp: (extension: string) => Promise<ExtensionApp>
 }
 
 // What serving pages and prerendering them both start from: the routes and their param matchers, the collections, the locales, the head and the render options.
@@ -188,7 +191,10 @@ async function setupWith<Claimed>(project: Project, loadClient: () => Promise<Cl
   void Promise.allSettled([loadingClient])
 
   // Imported while the client builds; the content config is already imported, so an extension or API module may read the collections at import time.
-  const extensions = prerendering ? Promise.resolve([]) : extensionServers(serverExtensions(root, config.extensions, source.plugins(root)), root, exporting)
+  const listed = serverExtensions(root, config.extensions, source.plugins(root))
+  const extensions = prerendering ? Promise.resolve([]) : extensionServers(listed, root, exporting)
+  const appOf = extensionApps(listed, root, exporting)
+  const extensionApp = async (name: string) => appOf(listed.find(extension => extension.name === name) ?? { name })
   const api = prerendering ? Promise.resolve([]) : source.api(root, config)
 
   void Promise.allSettled([extensions, api])
@@ -227,5 +233,5 @@ async function setupWith<Claimed>(project: Project, loadClient: () => Promise<Cl
     }
   }
 
-  return { source, client, mounts, routes, matchers, collections, i18n, locales, base, site, imageCache, scripts, styles, renderOptions, cards, files, endpoints, appManifest: ownManifest, extensions, api, claimed }
+  return { source, client, mounts, routes, matchers, collections, i18n, locales, base, site, imageCache, scripts, styles, renderOptions, cards, files, endpoints, appManifest: ownManifest, extensions, api, extensionApp, claimed }
 }

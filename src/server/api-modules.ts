@@ -19,6 +19,8 @@ export interface ApiModule {
   guards: ApiGuard[]
   // No guard is asked of it on a site with `requireGuards`: it sets `api({ guards: false })`, or a library serves it.
   open?: true | undefined
+  // The extension whose `api` directory holds it, whose `ExtensionApp` a module exporting a function is called with.
+  extension?: string | undefined
 }
 
 export interface ApiGuard {
@@ -130,7 +132,7 @@ export async function scanApi(apiDir: string, mounts: RouteMount[] = [], apiPath
   const trees = [{ dir: apiDir, prefix: '' }, ...mounts]
   const modules: ApiModule[] = []
 
-  for (const [index, { dir, prefix }] of trees.entries()) {
+  for (const [index, { dir, prefix, extension }] of trees.entries()) {
     if (!existsSync(dir))
       continue
 
@@ -155,7 +157,7 @@ export async function scanApi(apiDir: string, mounts: RouteMount[] = [], apiPath
       const file = join(dir, path)
       const open = falseKeys(await Bun.file(file).text(), API_OPTIONS).has('guards')
 
-      modules.push({ file, mount, guards: open ? [] : guardsAt(trees, at), ...(open || index > 0) && { open: true } })
+      modules.push({ file, mount, guards: open ? [] : guardsAt(trees, at), ...(open || index > 0) && { open: true }, ...extension !== undefined && { extension } })
     }
   }
 

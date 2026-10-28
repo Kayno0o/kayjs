@@ -32,11 +32,19 @@ export async function buildingTestSite<T>(cookies: Bun.CookieMap, build: () => P
   return testSites.run(cookies, build)
 }
 
+// What kay hands an extension's `server` function and the API modules of its `api` directory exporting a function: built afresh at each call, its `appFiles` imported again.
+// Made where the extensions' servers are, so it sees the test site being built and the extensions the config lists.
+export function extensionApps(extensions: KayExtension[] | undefined, root: string, exporting = false): (extension: Pick<KayExtension, 'name' | 'appFiles'>) => Promise<ExtensionApp> {
+  const testCookies = testSites.getStore()
+  // An extension carrying only a catalog of messages is what an installed library's `kay.messages` adds to every app, not something the config lists.
+  const names = (extensions ?? []).filter(extension => Object.keys(extension).some(key => key !== 'name' && key !== 'messages')).map(extension => extension.name)
+
+  return async extension => ({ root: bundled() ? process.cwd() : root, modules: await appModules(root, extension), extensions: names, testCookies, database: appStore()?.database, exporting })
+}
+
 // The server plugins the extensions carry, in their order, those given as a function built now.
 export async function extensionServers(extensions: KayExtension[] | undefined, root: string, exporting = false): Promise<{ name: string, server: AnyElysia }[]> {
-  // An extension carrying only a catalog of messages is what an installed library's `kay.messages` adds to every app, not something the config lists.
-  const testCookies = testSites.getStore()
-  const names = (extensions ?? []).filter(extension => Object.keys(extension).some(key => key !== 'name' && key !== 'messages')).map(extension => extension.name)
+  const appOf = extensionApps(extensions, root, exporting)
 
   return Promise.all((extensions ?? []).flatMap((extension) => {
     const { name, server, serverModule } = extension
@@ -44,7 +52,7 @@ export async function extensionServers(extensions: KayExtension[] | undefined, r
     if (serverModule !== undefined)
       return [(async () => ({ name, server: await serverFromModule(name, serverModule, root) }))()]
 
-    return server === undefined ? [] : [(async () => ({ name, server: typeof server === 'function' ? await server({ root: bundled() ? process.cwd() : root, modules: await appModules(root, extension), extensions: names, testCookies, database: appStore()?.database, exporting }) : server }))()]
+    return server === undefined ? [] : [(async () => ({ name, server: typeof server === 'function' ? await server(await appOf(extension)) : server }))()]
   }))
 }
 

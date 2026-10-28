@@ -1,4 +1,5 @@
 import type { Context } from 'elysia'
+import type { ExtensionApp } from '../config'
 import type { Locals } from '../runtime'
 import type { ActionTool } from '../runtime/action'
 import type { ByteSize } from '../runtime/byte-size'
@@ -50,8 +51,9 @@ const RATE_LIMIT = Symbol.for('kay.rateLimit')
 const admitted = new WeakSet<Request>()
 
 // Mounts each module's default export, an Elysia instance, under its path: its guards run first, then a websocket upgrade or an unsafe request from another site is refused, unless the module's `cors` lets that site in.
+// An extension's module may export a function building the instance instead, called with what `appOf` gives for the extension, as its `server` function is.
 // Gives back the body limit of each module by the path it is mounted at, and the modules as mounted.
-export async function serveApi(app: Elysia, modules: ApiModule[], options: ActionOptions): Promise<{ limits: Map<string, BodyLimit>, routeLimits: RouteBodyLimit[], mounted: MountedApi[] }> {
+export async function serveApi(app: Elysia, modules: ApiModule[], options: ActionOptions, appOf?: (extension: string) => Promise<ExtensionApp>): Promise<{ limits: Map<string, BodyLimit>, routeLimits: RouteBodyLimit[], mounted: MountedApi[] }> {
   const limits = new Map<string, BodyLimit>()
   const routeLimits: RouteBodyLimit[] = []
   const mounted: MountedApi[] = []
@@ -74,10 +76,10 @@ export async function serveApi(app: Elysia, modules: ApiModule[], options: Actio
   }
 
   for (const module of modules) {
-    const instance = (await importModule<{ default?: unknown }>(module.file)).default
+    const instance = await moduleInstance(module, appOf)
 
     if (!(instance instanceof Elysia))
-      throw new KayError('route-invalid', `kay: ${module.file} must export an Elysia instance by default: export default new Elysia().get('/', () => ...)`)
+      throw new KayError('route-invalid', `kay: ${module.file} must export an Elysia instance by default: export default new Elysia().get('/', () => ...)${module.extension === undefined ? '' : ', or a function of the ExtensionApp building one'}`)
 
     Object.defineProperty(instance, API_MOUNT, { value: module.mount, configurable: true })
     mounted.push({ ...module, instance })
@@ -275,6 +277,18 @@ interface Parent {
   getServer: () => unknown
   getGlobalRoutes: () => unknown
   getGlobalDefinitions: () => unknown
+}
+
+// A module's default export, or what the function an extension's module exports builds, which is told where it is served as the instance is.
+async function moduleInstance(module: ApiModule, appOf: ((extension: string) => Promise<ExtensionApp>) | undefined): Promise<unknown> {
+  const exported = (await importModule<{ default?: unknown }>(module.file)).default
+
+  if (typeof exported !== 'function' || module.extension === undefined || appOf === undefined)
+    return exported
+
+  Object.defineProperty(exported, API_MOUNT, { value: module.mount, configurable: true })
+
+  return (exported as (app: ExtensionApp) => unknown)(await appOf(module.extension))
 }
 
 // `.use(instance)` leaves closures on the module's instance, which the module cache keeps for the process, pointing at the group and so the whole app (kaynooo/kayjs#1895): they are rebound to the app through a weak reference, so an app nothing else holds can be collected while one that is running keeps answering them.

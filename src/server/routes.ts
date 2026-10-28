@@ -113,6 +113,8 @@ export interface RouteMount {
   editor?: true | undefined
   // Set on the trees of API modules: where the API is mounted, `/api` unless `apiPath` moves it.
   apiPath?: string | undefined
+  // Set on an extension's tree of API modules: its name, which a module exporting a function is built for.
+  extension?: string | undefined
   // A layout the extension wraps every page in, outside the app's own: the mount serves no page and holds no other layout.
   outer?: string | undefined
   // Set with `outer`: the layout wraps only the pages reaching one of these files, or for `'context'` a template that reads `ctx`.
@@ -769,7 +771,7 @@ export function routeMounts(root: string, extensions: KayExtension[] = [], verif
 
 // The API directories each extension in `extensions` mounts, reached as its routes are.
 export function apiMounts(root: string, extensions: KayExtension[] = []): RouteMount[] {
-  return extensions.flatMap(({ api }) => api ? [{ dir: throughLinks(root, resolve(root, api.dir)), prefix: mountPrefix(api.prefix) }] : [])
+  return extensions.flatMap(({ name, api }) => api ? [{ dir: throughLinks(root, resolve(root, api.dir)), prefix: mountPrefix(api.prefix), extension: name }] : [])
 }
 
 // The prefixes under `/_kay` that extensions serve API modules at, which are no files of kay's own.

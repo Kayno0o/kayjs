@@ -4,12 +4,13 @@ import { join, resolve } from 'node:path'
 import process from 'node:process'
 import { describe, expect, it } from 'bun:test'
 import { appModules, buildingTestSite, declaredAppFiles, extensionAppFiles, extensionServers } from '../src/config-extensions'
+import { kayCheck } from './check-helper'
 import { scratchDir } from './scratch'
 
 const CLI = resolve('src/cli.ts')
 const TSCONFIG = JSON.stringify({ compilerOptions: { target: 'ESNext', jsx: 'preserve', jsxImportSource: 'kay', lib: ['ESNext', 'DOM'], rootDirs: ['.', '.kay/types'], module: 'Preserve', moduleResolution: 'bundler', strict: true, noEmit: true, skipLibCheck: true }, include: ['src', '.kay/types'] })
 
-// An extension of the app's own config naming two optional files, and answering with what it found in them and the root it was given.
+// An extension of the app's own config naming two optional files, and answering with what it found in them and the root it was given; its API module serves one of them to another site, the app writing no module of its own.
 const CONFIG = `import { Elysia } from 'elysia'
 import { defineConfig } from 'kay/server'
 
@@ -18,16 +19,26 @@ export default defineConfig({
     name: 'probe',
     appFiles: { hooks: 'src/probe.ts', mail: 'src/probe-mail.ts' },
     server: ({ root, modules, extensions }) => new Elysia().get('/probe', () => JSON.stringify({ hooks: modules.hooks?.word ?? null, mail: modules.mail?.word ?? null, root, extensions })),
+    api: { dir: 'lib/api', prefix: 'probe' },
   }],
 })
+`
+
+const OTHER_SITE = 'https://other.example'
+
+const FEATURES = `import type { ExtensionApp } from 'kay/server'
+import { api } from 'kay/server'
+
+export default ({ modules, extensions }: ExtensionApp) => api({ cors: { origins: ['${OTHER_SITE}'] } }).get('/', () => ({ hooks: modules.hooks?.word ?? null, extensions }))
 `
 
 const SERVE = `import { pages } from 'kay/server'
 
 const app = await pages({ prebuilt: true })
 const get = async (path: string) => (await app.handle(new Request(\`http://localhost\${path}\`))).text()
+const features = await app.handle(new Request('http://localhost/api/probe/features', { headers: { origin: '${OTHER_SITE}' } }))
 
-console.log(JSON.stringify({ probe: await get('/probe') }))
+console.log(JSON.stringify({ probe: await get('/probe'), features: await features.text(), allowed: features.headers.get('access-control-allow-origin') }))
 process.exit(0)
 `
 
@@ -37,6 +48,7 @@ function app(files: Record<string, string> = {}): Record<string, string> {
     'tsconfig.json': TSCONFIG,
     'kay.config.ts': CONFIG,
     'src/routes/index.kay': 'p home\n',
+    'lib/api/features.ts': FEATURES,
     'serve.ts': SERVE,
     ...files,
   }
@@ -60,6 +72,13 @@ async function run(command: string[], cwd: string, env: Record<string, string> =
 // What the probe route answered, as an object.
 function probed(stdout: string): Record<string, unknown> {
   return JSON.parse((JSON.parse(stdout) as { probe: string }).probe) as Record<string, unknown>
+}
+
+// What the extension's API module answered the other site, and the origin it let in.
+function served(stdout: string): { features: unknown, allowed: string | null } {
+  const { features, allowed } = JSON.parse(stdout) as { features: string, allowed: string | null }
+
+  return { features: JSON.parse(features), allowed }
 }
 
 describe('the files an extension names in appFiles', () => {
@@ -173,11 +192,35 @@ describe('the files an extension names in appFiles', () => {
       expect(withFiles.stderr).not.toContain('error')
       expect(probed(withFiles.stdout)).toEqual({ hooks: 'hooked', mail: 'mailed', root: present, extensions: ['probe'] })
       expect(probed(without.stdout)).toEqual({ hooks: null, mail: null, root: absent, extensions: ['probe'] })
+      expect(served(withFiles.stdout)).toEqual({ features: { hooks: 'hooked', extensions: ['probe'] }, allowed: OTHER_SITE })
+      expect(served(without.stdout)).toEqual({ features: { hooks: null, extensions: ['probe'] }, allowed: OTHER_SITE })
     }
     finally {
       await Promise.all([rm(present, { recursive: true, force: true }), rm(absent, { recursive: true, force: true })])
     }
   }, 60_000)
+
+  it('reach an extension\'s API module exporting a function, which kay check types: its routes are linked to, and one building no Elysia instance is refused', async () => {
+    const root = await written(app({
+      'src/routes/index.kay': 'a(href="/api/probe/features") features\n',
+      'lib/api/broken.ts': 'export default () => \'no instance\'\n',
+    }))
+
+    try {
+      const { code, output } = await kayCheck([root])
+
+      console.log(output)
+
+      expect(code).toBe(1)
+      expect(output).toContain('broken.ts')
+      expect(output).toContain('or a function of the ExtensionApp building one')
+      expect(output).not.toContain('features.ts')
+      expect(output).not.toContain('index.kay')
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  }, 120_000)
 
   it('are carried by an executable that finds them with no src folder beside it, and one built without them runs with none', async () => {
     const present = await written(app({ 'src/probe.ts': 'export const word = \'hooked\'\n' }))
@@ -201,6 +244,8 @@ describe('the files an extension names in appFiles', () => {
       // The data the extension keeps lives where the executable runs, not where it was built.
       expect(probed(withFile.stdout)).toEqual({ hooks: 'hooked', mail: null, root: realpathSync(elsewhere), extensions: ['probe'] })
       expect(probed(without.stdout)).toEqual({ hooks: null, mail: null, root: realpathSync(elsewhere), extensions: ['probe'] })
+      expect(served(withFile.stdout)).toEqual({ features: { hooks: 'hooked', extensions: ['probe'] }, allowed: OTHER_SITE })
+      expect(served(without.stdout)).toEqual({ features: { hooks: null, extensions: ['probe'] }, allowed: OTHER_SITE })
     }
     finally {
       await Promise.all([present, absent, elsewhere].map(async dir => rm(dir, { recursive: true, force: true })))
