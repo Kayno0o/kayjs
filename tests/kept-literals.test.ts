@@ -97,6 +97,28 @@ describe('a page importing an exported object or array no module writes to', () 
     expect(await stopOf(files)).toBeUndefined()
   })
 
+  it('is kept when other files only bind or key the same name, or write it as a template element or in a template literal\'s text', async () => {
+    const files = {
+      'src/content.ts': 'export const meta = { title: \'Home\' }\n',
+      'src/routes/index.kay': '---\nimport { meta } from \'../content\'\n---\nhead\n  meta(name="title" content={meta.title})\n',
+      'src/routes/about.kay': '---\nconst label = `meta.title = x`\n---\nhead\n  meta(charset="utf-8")\np {label}\n',
+      'src/other.ts': 'import meta from \'./default\'\n\nexport const keyed = { meta: 1 }\nexport class Page { meta = 2 }\nexport function read(meta: string): number {\n  return meta.length\n}\n',
+      'src/default.ts': 'export default 1\n',
+    }
+
+    expect(await stopOf(files)).toBeUndefined()
+  })
+
+  it('stops when a file holding its name does not parse, as nothing then shows what it does', async () => {
+    const files = {
+      'src/content.ts': CONTACT,
+      'src/routes/index.kay': PAGE('CONTACT'),
+      'src/broken.ts': 'import { CONTACT } from \'./content\'\n\nexport function (CONTACT\n',
+    }
+
+    expect(await stopOf(files)).toEqual(expect.stringContaining('module state'))
+  })
+
   it('is kept through a barrel and a re-export that nothing writes to', async () => {
     const files = {
       'src/content.ts': CONTACT,

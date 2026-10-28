@@ -150,7 +150,7 @@ You often need no flag. `kay build` also keeps a page that reads nothing from it
 
 A module of site constants, such as `export const CONTACT = { email: 'a@b.fr', phone: '01 02' }`, does not stop it either, as long as nothing in the project changes it. If any file assigns into it, pushes to it, or passes it to a function that might, the build cannot tell and renders the page per request, naming the line of the export.
 
-A test file that writes to a constant does not count, as a test runs apart from the site. Neither does a file that uses the whole of an unrelated module, such as `import * as mail from './mail'`.
+Only code counts: the constant's name in a string, a comment, an object key or a template's text, or a `meta` tag beside an `export const meta`, is no use of it. A test file that writes to a constant does not count, as a test runs apart from the site. Neither does a file that uses the whole of an unrelated module, such as `import * as mail from './mail'`.
 
 Lists of objects are fine too. A nav can loop over `export const NAV = [{ id: 'team', label: 'Team' }]` with `for link of NAV` or `NAV.map(link => link.id)`, and the list can hold imported icons, as long as the loop only reads each item.
 

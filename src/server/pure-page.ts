@@ -13,8 +13,8 @@ import { analyzeScript, analyzeServer } from '../compiler/script'
 import { templateReads } from '../compiler/template-reads'
 import { CONTENT_EXPORTS, I18N_EXPORTS, IMAGE_EXPORTS, KAY_EXPORTS } from './kept-exports'
 import { readKeptSource } from './kept-source'
-import { neverWritten, NOT_LINE_BREAK, parseLiteral, withoutComments } from './literal-writes'
-import { exposedBy, laterExportAt, stateAt } from './module-state'
+import { literalOf, neverWritten } from './literal-writes'
+import { exposedBy, firstExportAt, laterExportAt, stateAt, statementState } from './module-state'
 import { routeChain } from './routes'
 
 const CODE_FILE = /\.(?:kay|[cm]?[jt]sx?)$/
@@ -24,53 +24,50 @@ const TEST_FILE = /\.(?:test|spec)\.[cm]?[jt]sx?$/
 const STATIC_FILE = /\.(?:png|jpe?g|gif|webp|avif|svg|ico|woff2?|ttf|otf|json|css|txt|md|html|toml|ya?ml|csv)$/i
 // The names of exports read as written, not run.
 const SETTING_NAMES = new Set<string>([PAGE, ...PAGE_SETTINGS])
-// For a server fence the compiler cannot parse, the part of the rule left: it declares state only when it exports something besides a type or a page setting, which may read it.
-const MODULE_EXPORT = new RegExp(`^export (?!(?:type|interface) )(?!(?:async )?(?:const|let|var|function) (?:${[...SETTING_NAMES].join('|')})\\b)`, 'm')
+const NOT_LINE_BREAK = /[^\n]/g
 
 const STATE = 'declares module state, a `let`, an empty container it fills or an export another module can change'
-// What may be a state declaration anywhere on a line, to spare the compiler's view to a file that has none.
-const MAYBE_STATE = /\b(?:let|var|export)\b|=\s*(?:\[\s*\]|\{\s*\}|new\b)/
 const KAY_ENTRIES = new Set(['kay', 'kay/i18n', 'kay/image', 'kay/content'])
 
 // A `.kay` file runs its scripts and server fence for each render, so a `let` or an empty container there is state only when the compiler moves its statement to module level, as it does one an export of the server fence reads.
-// The offset of the module state in a file, if it holds any.
-function moduleStateAt(file: string, source: string, unchanged: Unchanged | undefined, risks: Map<string, number>): number | undefined {
-  if (!file.endsWith('.kay'))
-    return stateAt(source, SETTING_NAMES, unchanged, risks)
-
-  if (!MAYBE_STATE.test(source))
-    return undefined
-
-  const { server: fence, module } = parseKay(source)
-  const server = analyzeServer(source, fence)
-
+// The offset of the module state in a file, if it holds any, from the parse the scan made of it; `source` is its text with the value of `lastmod` blanked.
+function moduleStateAt(file: string, source: string, read: KeptSource, unchanged: Unchanged | undefined, risks: Map<string, number>): number | undefined {
+  const { module, server, real } = read.levels
   // A `--- module` fence is all module level, so what it holds is state as in a module of its own.
   const moduleRisks = new Map<string, number>()
-  const inModule = module === undefined ? undefined : stateAt(source.slice(module.start, module.end), SETTING_NAMES, unchanged, moduleRisks)
+  const inModule = module === undefined ? undefined : stateAt(module, SETTING_NAMES, unchanged, moduleRisks)
 
-  if (module !== undefined && inModule !== undefined)
-    return module.start + inModule
+  if (inModule !== undefined)
+    return real(inModule)
 
   for (const [name, at] of moduleRisks)
-    risks.set(name, module!.start + at)
+    risks.set(name, real(at))
 
-  if (fence === undefined || server === undefined)
+  if (!file.endsWith('.kay') || server === undefined)
     return undefined
 
-  // A fence being typed, whose statements the compiler cannot place, is judged by the file as before.
-  if (server.unparsed !== undefined || server.broken.length > 0)
-    return MODULE_EXPORT.exec(source)?.index
+  const analysis = analyzeServer(source, parseKay(source).server)
 
-  for (const { start, end } of server.exports) {
-    const at = stateAt(source.slice(start, end), SETTING_NAMES, unchanged)
+  if (analysis === undefined)
+    return undefined
 
-    if (at !== undefined)
-      return start + at
+  // A fence being typed, whose statements the compiler cannot place, declares state only when it exports something besides a type or a page setting, which may read it.
+  if (analysis.unparsed !== undefined || analysis.broken.length > 0) {
+    const at = firstExportAt(server, SETTING_NAMES)
+
+    return at === undefined ? undefined : real(at)
   }
 
-  const later = laterExportAt(source.slice(fence.start, fence.end), SETTING_NAMES, unchanged)
+  for (const { start, end } of analysis.exports) {
+    const statement = server.body.find(statement => real(statement.start!) >= start && real(statement.end!) <= end && statementState(statement, SETTING_NAMES, unchanged))
 
-  return later === undefined ? undefined : fence.start + later
+    if (statement !== undefined)
+      return real(statement.start!)
+  }
+
+  const later = laterExportAt(server, SETTING_NAMES, unchanged)
+
+  return later === undefined ? undefined : real(later)
 }
 
 // Whether the arguments of a `persisted` call give the options as a literal with no spread and every `storage` in it `'local'`: anything else may be a cookie or the query.
@@ -220,7 +217,7 @@ function installedIcon(root: string, specifier: string): boolean {
   return file !== undefined && iconProps(file, name!) !== undefined
 }
 
-// Every code file of the project with its comments blanked, read once per build: an exported literal is unchanged only if none of them writes to it.
+// Every code file of the project, read once per build and parsed when the scan needs it: an exported literal is unchanged only if none of them writes to it.
 const projects = new WeakMap<object, Promise<SourceFile[]>>()
 
 async function projectSources(root: string, scans: object): Promise<SourceFile[]> {
@@ -239,11 +236,11 @@ async function readSources(root: string): Promise<SourceFile[]> {
     try {
       const { text } = readSource(file)
 
-      return { file, text: withoutComments(text), code: withoutComments(text, true) }
+      return { file, text }
     }
     catch {
       // A file that cannot be read may write to anything.
-      return { file, text: '', code: '', unreadable: true }
+      return { file, text: '', unreadable: true }
     }
   })
 }
@@ -256,7 +253,7 @@ async function unchangedIn(file: string, read: KeptSource, root: string | undefi
   const sources = await projectSources(root, scans)
 
   return (name, initializer) => {
-    const literal = parseLiteral(initializer, read.bindings)
+    const literal = literalOf(initializer, read.bindings)
 
     return literal !== undefined && neverWritten(name, literal, file, sources)
   }
@@ -318,12 +315,12 @@ async function scanned(file: string, root: string | undefined, scans: object): P
     return stopAt(read.ctx, 'reads `ctx`')
 
   const risks = new Map<string, number>()
-  const state = moduleStateAt(file, source, await unchangedIn(file, read, root, scans), risks)
+  const state = moduleStateAt(file, source, read, await unchangedIn(file, read, root, scans), risks)
 
   if (state !== undefined)
     return stopAt(state, STATE)
 
-  const exposed = new Map([...exposedBy(source, risks)].map(([name, at]) => [name, lineAt(source, at)]))
+  const exposed = new Map([...read.levels.module === undefined ? [] : exposedBy(read.levels.module, risks)].map(([name, at]) => [name, lineAt(source, at)]))
   const taken = new Map<string, ReadonlySet<string> | 'all'>()
   const imports: (KeptImport & { implicit?: boolean })[] = [...read.imports]
 

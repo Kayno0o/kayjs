@@ -38,24 +38,28 @@ export interface KeptSource {
   exports: boolean
   // Where it fails to parse: nothing then shows what it reads.
   unparsed?: number | undefined
+  // Its module level as parsed, which the state rules read: a script whole, or a `.kay` file's module and server fences, with `real` mapping their offsets to the file's.
+  levels: { module?: Program | undefined, server?: Program | undefined, real: (offset: number) => number }
 }
 
 // Every way a source reads the request or the moment besides `ctx`, as a global it names.
 const READ_GLOBALS = new Set(['Date', 'Intl', 'Temporal', 'crypto', 'process', 'Bun', 'performance', 'fetch', 'globalThis', 'global', 'require', 'eval', 'Function'])
 // The names of the global object a browser has too, which an island reads freely: only a member of it named in `READ_GLOBALS`, or one it computes, is a read.
 const WINDOWS = new Set(['self', 'window'])
+
 // Types, which run nothing.
-const TYPE_KEYS = new Set(['typeAnnotation', 'returnType', 'typeParameters', 'superTypeParameters', 'typeArguments', 'implements'])
-const TYPE_NODES = new Set(['TSInterfaceDeclaration', 'TSTypeAliasDeclaration', 'TSDeclareFunction', 'TSDeclareMethod'])
-const FUNCTIONS = new Set(['FunctionDeclaration', 'FunctionExpression', 'ArrowFunctionExpression', 'ObjectMethod', 'ClassMethod', 'ClassPrivateMethod'])
+export const TYPE_KEYS = new Set(['typeAnnotation', 'returnType', 'typeParameters', 'superTypeParameters', 'typeArguments', 'implements'])
+export const TYPE_NODES = new Set(['TSInterfaceDeclaration', 'TSTypeAliasDeclaration', 'TSDeclareFunction', 'TSDeclareMethod'])
+export const FUNCTIONS = new Set(['FunctionDeclaration', 'FunctionExpression', 'ArrowFunctionExpression', 'ObjectMethod', 'ClassMethod', 'ClassPrivateMethod'])
 // What a `var` under it binds in.
 const VAR_SCOPES = new Set([...FUNCTIONS, 'Program', 'StaticBlock', 'TSModuleBlock'])
-const MEMBERS = new Set(['MemberExpression', 'OptionalMemberExpression'])
-const CALLS = new Set(['CallExpression', 'OptionalCallExpression'])
+
+export const MEMBERS = new Set(['MemberExpression', 'OptionalMemberExpression'])
+export const CALLS = new Set(['CallExpression', 'OptionalCallExpression'])
 // The parents whose `key` is a name rather than a reference unless computed.
-const KEYED = new Set(['ObjectProperty', 'ObjectMethod', 'ClassMethod', 'ClassPrivateMethod', 'ClassProperty', 'ClassPrivateProperty', 'ClassAccessorProperty', 'TSDeclareMethod'])
+export const KEYED = new Set(['ObjectProperty', 'ObjectMethod', 'ClassMethod', 'ClassPrivateMethod', 'ClassProperty', 'ClassPrivateProperty', 'ClassAccessorProperty', 'TSDeclareMethod'])
 // The parents where an identifier is never a reference.
-const NAMING = new Set(['ImportSpecifier', 'ImportDefaultSpecifier', 'ImportNamespaceSpecifier', 'ExportSpecifier', 'ExportNamespaceSpecifier', 'ExportDefaultSpecifier', 'LabeledStatement', 'BreakStatement', 'ContinueStatement', 'MetaProperty', 'TSEnumDeclaration', 'TSModuleDeclaration', 'PrivateName'])
+export const NAMING = new Set(['ImportSpecifier', 'ImportDefaultSpecifier', 'ImportNamespaceSpecifier', 'ExportSpecifier', 'ExportNamespaceSpecifier', 'ExportDefaultSpecifier', 'LabeledStatement', 'BreakStatement', 'ContinueStatement', 'MetaProperty', 'TSEnumDeclaration', 'TSModuleDeclaration', 'PrivateName'])
 
 interface Frame {
   node: Node
@@ -66,7 +70,7 @@ interface Frame {
 }
 
 // A name a module exports, written as one or in quotes: `export { "a-b" as c } from` gives its `local` as a string, which Babel's types leave out.
-function nameOf(name: Identifier | StringLiteral): string {
+export function nameOf(name: Identifier | StringLiteral): string {
   return name.type === 'Identifier' ? name.name : name.value
 }
 
@@ -249,7 +253,7 @@ class Reader {
 
   // `source` is the text the parsed spans are of, `real` maps an offset of it to the file's, and `skip` is a span read as written and never run, which nothing in is a read.
   constructor(private readonly source: string, private readonly real: (offset: number) => number, private readonly skip: Span | undefined, private readonly parses: SourceParses, uses: KeptSource['uses'] = new Map()) {
-    this.found = { pathname: false, imports: [], uses, bindings: new Set(), exports: false }
+    this.found = { pathname: false, imports: [], uses, bindings: new Set(), exports: false, levels: { real } }
   }
 
   // A script or a fence at `span` of `source`, which holds the spans of `this.source`.
@@ -376,7 +380,7 @@ class Reader {
           continue
 
         const child = (node as unknown as Record<string, unknown>)[key]
-        const pattern = this.patternAt(frame, key)
+        const pattern = bindsAt(frame, key)
 
         if (Array.isArray(child)) {
           for (let item = child.length - 1; item >= 0; item--) {
@@ -389,24 +393,6 @@ class Reader {
         }
       }
     }
-  }
-
-  // Whether the child at `key` of a frame binds names rather than reads them.
-  private patternAt({ node, pattern }: Frame, key: string): boolean {
-    if (pattern) {
-      if (node.type === 'AssignmentPattern')
-        return key === 'left'
-
-      if (node.type === 'ObjectProperty')
-        return key === 'value' || (key === 'key' && !node.computed)
-
-      return node.type === 'ObjectPattern' || node.type === 'ArrayPattern' || node.type === 'RestElement' || node.type === 'TSParameterProperty'
-    }
-
-    if (node.type === 'VariableDeclarator' || node.type === 'ClassDeclaration' || node.type === 'ClassExpression')
-      return key === 'id'
-
-    return FUNCTIONS.has(node.type) ? key === 'id' || key === 'params' : node.type === 'CatchClause' && key === 'param'
   }
 
   private read(at: number, what: string): void {
@@ -512,11 +498,12 @@ class Reader {
     const real = expansion === undefined ? (offset: number) => offset : (offset: number) => expansion.real(offset)
 
     const template = new Reader(file.source, real, undefined, this.parses, this.found.uses)
+    const [script, server, module] = [file.script, file.server, file.module].map(span => span === undefined ? undefined : this.program(file.source, span, FENCE_PLUGINS))
+
+    this.found.levels = { module, server, real }
 
     // A name a fence declares at its top is the template's to read.
-    for (const span of [file.script, file.server, file.module]) {
-      const program = span === undefined ? undefined : this.program(file.source, span, FENCE_PLUGINS)
-
+    for (const program of [script, server, module]) {
       for (const name of program === undefined ? [] : scopeOf(program)!)
         template.outer.add(name)
     }
@@ -551,12 +538,12 @@ class Reader {
   }
 
   script(file: string, source: string): void {
-    this.program(source, { start: 0, end: source.length }, scriptPlugins(file))
+    this.found.levels.module = this.program(source, { start: 0, end: source.length }, scriptPlugins(file))
   }
 }
 
 // The spans of a template node that bind names, which `nodeExpressions` lists among its expressions.
-function binders(node: KayNode): Span[] {
+export function binders(node: KayNode): Span[] {
   if (node.kind === 'const')
     return [node.pattern]
 
@@ -567,11 +554,29 @@ function binders(node: KayNode): Span[] {
 }
 
 // The binding patterns of a template node that `nodeExpressions` does not list: a loop's item and index; an alias of an `if`, a `then` or a `catch` is one name, with no default.
-function patterns(node: KayNode): Span[] {
+export function patterns(node: KayNode): Span[] {
   if (node.kind !== 'for')
     return []
 
   return node.index === undefined ? [node.item] : [node.item, node.index]
+}
+
+// Whether the child at `key` of a node binds names rather than reads them, `pattern` when the node itself is part of a binding pattern.
+export function bindsAt({ node, pattern }: { node: Node, pattern: boolean }, key: string): boolean {
+  if (pattern) {
+    if (node.type === 'AssignmentPattern')
+      return key === 'left'
+
+    if (node.type === 'ObjectProperty')
+      return key === 'value' || (key === 'key' && !node.computed)
+
+    return node.type === 'ObjectPattern' || node.type === 'ArrayPattern' || node.type === 'RestElement' || node.type === 'TSParameterProperty'
+  }
+
+  if (node.type === 'VariableDeclarator' || node.type === 'ClassDeclaration' || node.type === 'ClassExpression')
+    return key === 'id'
+
+  return FUNCTIONS.has(node.type) ? key === 'id' || key === 'params' : node.type === 'CatchClause' && key === 'param'
 }
 
 // What one source reads, a `.kay` file by its fences and its template; `skip` is a span of it read as written and never run, the value of a page's `lastmod`.

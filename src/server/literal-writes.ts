@@ -1,209 +1,145 @@
+import type { CallExpression, Expression, MemberExpression, Node } from '@babel/types'
+import type { Node as KayNode } from '../compiler/ast'
+import { parseExpression } from '@babel/parser'
+import { VISITOR_KEYS } from '@babel/types'
 import { resolveFrom } from '../build/files'
+import { FENCE_PLUGINS, scriptPlugins, SourceParses } from '../build/source-parses'
+import { childBlocks, nodeExpressions } from '../compiler/ast'
+import { binders, bindsAt, CALLS, KEYED, MEMBERS, NAMING, patterns, TYPE_KEYS, TYPE_NODES } from './kept-source'
 
 // Whether an exported `const` holding an object or array literal can be shown never to change: its value is made of literals only, and no file of the project writes to it, hands it to code that might, or reaches it in a way the scan cannot follow.
-// Read by name over the whole project, so a write through an import, a re-export, a namespace import or a barrel is found by the name it ends in; whatever the scan cannot tell stays module state.
+// Read by name over each file's parse, so a write through an import, a re-export, a namespace import or a barrel is found by the name it ends in; whatever the scan cannot tell stays module state.
 
 export type Literal = { kind: 'value' } | { kind: 'array', items: Literal[] } | { kind: 'object', props: Map<string, Literal> }
 
-// A source file of the project: its text with the comments blanked, and `code` with the inside of its quoted strings blanked too, which hold no use of a name.
+// A source file of the project, parsed the first time the scan needs it.
 export interface SourceFile {
   file: string
   text: string
-  code: string
   // A file that could not be read, which may write to anything.
   unreadable?: boolean | undefined
-  // The specifiers of its namespaces used in a way the scan cannot follow, found once.
-  misuse?: string[] | undefined
-  // The specifiers of its dynamic imports and `require`s, undefined for one that is not a string, found once.
-  calls?: (string | undefined)[] | undefined
+  // Its parse, null when it does not parse, which then may write to anything too.
+  parsed?: ParsedSource | null | undefined
+  // Whether it holds a namespace, a dynamic import or a `require`, which the scan parses it for whatever name it looks for.
+  reaching?: boolean | undefined
+}
+
+// Where a node sits: its parent and the key it is under.
+interface Link {
+  parent: Node
+  key: string
+}
+
+// What a template expression is to the template besides a value: the list of a `for`, with the name of its rows when it is one and the expressions they are read in, a spread attribute, or the value a `const` destructures.
+type Role = { kind: 'loop', binding: string | undefined, body: Set<Node> } | { kind: 'spread' } | { kind: 'destructured' }
+
+export interface ParsedSource {
+  links: Map<Node, Link>
+  roles: Map<Node, Role>
+  // Each use of a name, by the node it starts at: an identifier read, a specifier, or a member written with that name, `a.NAME` or `a['NAME']`.
+  uses: Map<string, Node[]>
+  // Every name it writes as code, a key or a specifier.
+  names: Set<string>
+  // The specifiers of its namespaces used in a way the scan cannot follow, or exported from a barrel, which only their importers see.
+  misuse: string[]
+  // The specifiers of its dynamic imports and `require`s, undefined for one that is not a string.
+  calls: (string | undefined)[]
+  // It re-exports a module whole, `export *` or `export * as`.
+  exportsAll: boolean
+}
+
+interface Frame {
+  node: Node
+  link: Link | undefined
+  pattern: boolean
 }
 
 const VALUE: Literal = { kind: 'value' }
-const NUMBER = /-?0[xob][\da-f_]+n?|-?(?:\d[\d_]*\.?[\d_]*|\.\d[\d_]*)(?:e[+-]?\d+)?n?/iy
-const KEY = /[A-Z_$][\w$]*|'(?:[^'\\\n]|\\.)*'|"(?:[^"\\\n]|\\.)*"|\d+/iy
-const WORD = /[A-Z_$][\w$]*/iy
-const STRING = /'(?:[^'\\\n]|\\.)*'|"(?:[^"\\\n]|\\.)*"|`(?:[^`\\$]|\\.)*`/y
-const KEYWORD = /(?:true|false|null|undefined)(?![\w$])/y
-// What follows a literal that is a type only: `as const`, `satisfies Config`.
-const TRAILING_END = /[\s;]+$/
+const SCALARS = new Set(['StringLiteral', 'NumericLiteral', 'BigIntLiteral', 'BooleanLiteral', 'NullLiteral'])
 const INDEX = /^\d+$/
-const SPACE = /\s/
-const CAST_START = /^(?:as|satisfies)\s/
-const TYPE_CHARS = /^[\w$.<>[\]\s|&,'"{}:;-]+$/
+const IDENTIFIER = /^[A-Z_$][\w$]*$/i
+const OPENS_PATTERN = /^\s*[[{]/
 const PROTOTYPE_KEYS = new Set(['__proto__', 'constructor', 'prototype'])
 // What a chain of members can end in without handing out a reference to the container: a method that only reads, on a container of values, and takes no callback, which is given the container as its last argument.
 const READERS = new Set(['length', 'join', 'includes', 'indexOf', 'lastIndexOf', 'slice', 'at', 'flat', 'concat', 'entries', 'keys', 'values', 'toString', 'toLocaleString', 'toSorted', 'toReversed', 'toSpliced', 'with', 'hasOwnProperty'])
-const SEGMENT = /\s*(?:\??\.\s*([A-Z_$][\w$]*)|(?:\?\.)?\[\s*(?:(\d+)|'([^'\\]*)'|"([^"\\]*)")\s*\])/iy
-const SCRIPT_LOOP = /\bfor\s*(?:await\s*)?\(\s*(?:const|let|var)\s+([\w$]+)\s+of\s*$/
-const TEMPLATE_LOOP = /^([ \t]*)for\s+([\w$]+)(?:\s*,\s*[\w$]+)?\s+of\s*$/
 // The methods that call back with each item and give back nothing of the container but what the callback computes.
 const CALLBACKS = new Set(['map', 'forEach', 'some', 'every', 'findIndex', 'findLastIndex', 'reduce', 'reduceRight'])
-const CALLBACK = /^\s*\(\s*(?:async\s*)?(?:\(([^()]*)\)(?:\s*:[^=]*[^=\s])?|([\w$]+))\s*=>/
-const ARGUMENTS_END = /^\s*(?:,[^)]*)?\)/
-const PARAM = /^[A-Z_$][\w$]*$/i
-const PARAM_TYPE = /\s*[:=][\s\S]*$/
-const CALL_AFTER = /^\s*(?:\??\.\s*(?:call|apply|bind)\b|\?\.\s*[(`[]|[(`[])/
-const COMPUTED = /\s*(?:\?\.)?\[/y
-const WRITE_AFTER = /\s*(?:=(?![=>])|[-+*/%&|^]=|<<=|>>>?=|\*\*=|&&=|\|\|=|\?\?=|\+\+|--)/y
-const CONTINUES = /^\s*(?:\??\.|[([`])/
-const ASSIGNED = /^\s*=(?![=>])/
-const WRITE_BEFORE = /(?:\+\+|--|\bdelete|\bfor\s*(?:await\s*)?\()\s*$/
-const DECLARED = /(?:^|[^\w$.])(?:const|let|var)\s+$/
-const TYPEOF = /\btypeof\s*(?:\(\s*)?$/
-const SPREAD = /\.\.\.\s*$/
-const ITERATED = /\b(?:of|in)\s+$/
-// What gives back keys, a string or a boolean, never a value of the container.
-const SUMMARY_READ = /\b(?:Object\.keys|JSON\.stringify|Array\.isArray)\s*\(\s*$/
-const HAS_OWN = /\bObject\.hasOwn\s*\(\s*$/
-const CLOSING = /^\s*\)/
-const NEXT_ARGUMENT = /^\s*,/
-const OBJECT_READ = /\b(?:Object\.(?:values|entries)|Array\.from)\s*\(\s*$/
-const ARGUMENT_END = /^\s*[,)]/
-const SPECIFIER_HEAD = /(?:^|[;\s}])(?:import|export)\s+(?:type\s+)?(?:[\w$]+\s*,\s*)?$/
-const NAMESPACE_IMPORT = /\b(?:import|export)\s*(?:[\w$]+\s*,\s*)?\*\s*as\s+([\w$]+)\s*from\s*['"]([^'"]+)['"]/g
-const IMPORT_FROM = /^\s+from\s*['"]/
-const DOT_MEMBER = /^\s*\??\.\s*[A-Z_$]/i
-const DYNAMIC = /\b(?:import|require)\s*\(\s*(?:(['"])([^'"]*)\1\s*\)|(?!['"]))/g
+// The calls that give back keys, a string or a boolean of their one argument, never a value of it.
+const SUMMARIES = new Set(['Object.keys', 'JSON.stringify', 'Array.isArray'])
+const VALUE_READS = new Set(['Object.values', 'Object.entries', 'Array.from'])
+// What wraps an expression for the type checker alone.
+const CASTS = new Set(['TSAsExpression', 'TSSatisfiesExpression', 'TSNonNullExpression', 'TSTypeAssertion', 'TSInstantiationExpression'])
+const PATTERNS = new Set(['ArrayPattern', 'ObjectPattern', 'RestElement'])
 const PROJECT_ALIAS = /^(?:[~#/]|@\/)/
 const BUILTIN_SPECIFIER = /^(?:node|bun):/
-const EXPORT_ALL = /\bexport\s*\*/
-const REGEX_CHARS = /[$()*+.?[\\\]^{|}]/g
-// How far past a member an assignment target is looked for.
-const TARGET_REACH = 4000
+// What a file holds when it has a namespace import or export, a dynamic import or a `require`: a test on the text, which the parse then decides.
+const NAMESPACE_HINT = /\*\s*as\s/
+const CALL_HINT = /\b(?:import|require)\s*\(/
 
-const EVALUATES = /\beval\b|\bFunction\b/
-const EXPORT_NAMESPACE = /\bexport\s*\*\s*as\s+[\w$]+\s*from\s*['"]([^'"]+)['"]/g
-const NON_NULL = /^\s*!(?!=)/
-const ITERATION = /^\s*(?:of|in)\b/
-const ASSIGN_CLOSER = /([}\]])\s*=\s*$/
-const DECLARATION_HEAD = /(?:^|[^\w$.])(?:const|let|var)\s*$/
-// How far back the head of a destructuring declaration is looked for.
-const DECLARATION_REACH = 2000
+// The object or array literal an initializer is, its values imported bindings among others, `as const` and `satisfies` around it allowed, or undefined when it is anything else.
+export function literalOf(initializer: Expression, imported: ReadonlySet<string> = new Set()): Literal | undefined {
+  let value: Node = initializer
 
-function skipSpace(text: string, at: number): number {
-  let i = at
+  while (value.type === 'TSAsExpression' || value.type === 'TSSatisfiesExpression')
+    value = value.expression
 
-  while (i < text.length) {
-    if (SPACE.test(text[i]!)) {
-      i++
+  const literal = literalValue(value, imported)
+
+  return literal?.kind === 'value' ? undefined : literal
+}
+
+// The literal a node is, or undefined for anything not made of strings, numbers, booleans, `null`, `undefined` and arrays and objects of them; an imported binding is another module's value, which stops a page that takes it if that module holds it changeable.
+function literalValue(node: Node, imported: ReadonlySet<string>): Literal | undefined {
+  if (SCALARS.has(node.type) || (node.type === 'TemplateLiteral' && node.expressions.length === 0))
+    return VALUE
+
+  if (node.type === 'UnaryExpression')
+    return node.operator === '-' && (node.argument.type === 'NumericLiteral' || node.argument.type === 'BigIntLiteral') ? VALUE : undefined
+
+  if (node.type === 'Identifier')
+    return node.name === 'undefined' || imported.has(node.name) ? VALUE : undefined
+
+  if (node.type === 'ArrayExpression') {
+    const items: Literal[] = []
+
+    for (const element of node.elements) {
+      const item = element == null ? undefined : literalValue(element, imported)
+
+      if (item === undefined)
+        return undefined
+
+      items.push(item)
     }
-    else if (text.startsWith('//', i)) {
-      const newline = text.indexOf('\n', i)
 
-      i = newline < 0 ? text.length : newline
-    }
-    else if (text.startsWith('/*', i)) {
-      const close = text.indexOf('*/', i + 2)
-
-      i = close < 0 ? text.length : close + 2
-    }
-    else {
-      break
-    }
+    return { kind: 'array', items }
   }
 
-  return i
-}
+  if (node.type !== 'ObjectExpression')
+    return undefined
 
-function matchAt(pattern: RegExp, text: string, at: number): string | undefined {
-  pattern.lastIndex = at
-
-  return pattern.exec(text)?.[0]
-}
-
-// The literal and where it ends, or undefined for anything that is not made of strings, numbers, booleans, `null`, `undefined` and arrays and objects of them.
-function parseValue(text: string, from: number, imported: ReadonlySet<string>): { literal: Literal, end: number } | undefined {
-  const at = skipSpace(text, from)
-  const char = text[at]
-
-  if (char === '[')
-    return parseArray(text, at + 1, imported)
-
-  if (char === '{')
-    return parseObject(text, at + 1, imported)
-
-  // An imported binding is another module's value, which stops a page that takes it if that module holds it changeable.
-  const word = matchAt(WORD, text, at)
-  const scalar = matchAt(STRING, text, at) ?? matchAt(NUMBER, text, at) ?? matchAt(KEYWORD, text, at) ?? (word !== undefined && imported.has(word) ? word : undefined)
-
-  return scalar === undefined ? undefined : { literal: VALUE, end: at + scalar.length }
-}
-
-function parseArray(text: string, from: number, imported: ReadonlySet<string>): { literal: Literal, end: number } | undefined {
-  const items: Literal[] = []
-  let at = skipSpace(text, from)
-
-  while (text[at] !== ']') {
-    const item = parseValue(text, at, imported)
-
-    if (item === undefined)
-      return undefined
-
-    items.push(item.literal)
-    at = skipSpace(text, item.end)
-
-    if (text[at] === ',')
-      at = skipSpace(text, at + 1)
-    else if (text[at] !== ']')
-      return undefined
-  }
-
-  return { literal: { kind: 'array', items }, end: at + 1 }
-}
-
-function parseObject(text: string, from: number, imported: ReadonlySet<string>): { literal: Literal, end: number } | undefined {
   const props = new Map<string, Literal>()
-  let at = skipSpace(text, from)
 
-  while (text[at] !== '}') {
-    const raw = matchAt(KEY, text, at)
-
-    if (raw === undefined)
-      return undefined
-
-    const key = raw[0] === '\'' || raw[0] === '"' ? raw.slice(1, -1) : raw
-
-    at = skipSpace(text, at + raw.length)
-
-    if (PROTOTYPE_KEYS.has(key))
-      return undefined
-
-    // `{ icon }` for an imported `icon` is `{ icon: icon }`.
-    const shorthand = (text[at] === ',' || text[at] === '}') && imported.has(key)
-
-    if (text[at] !== ':' && !shorthand)
-      return undefined
-
-    const value = shorthand ? { literal: VALUE, end: at } : parseValue(text, at + 1, imported)
+  for (const property of node.properties) {
+    const name = property.type === 'ObjectProperty' && !property.computed ? propertyName(property.key) : undefined
+    const value = name === undefined || PROTOTYPE_KEYS.has(name) ? undefined : literalValue((property as Extract<Node, { type: 'ObjectProperty' }>).value, imported)
 
     if (value === undefined)
       return undefined
 
-    props.set(key, value.literal)
-    at = skipSpace(text, value.end)
-
-    if (text[at] === ',')
-      at = skipSpace(text, at + 1)
-    else if (text[at] !== '}')
-      return undefined
+    props.set(name!, value)
   }
 
-  return { literal: { kind: 'object', props }, end: at + 1 }
+  return { kind: 'object', props }
 }
 
-// The object or array literal an initializer is, its values imported bindings among others, `as const`, `satisfies` and a type annotation allowed, or undefined when it is anything else.
-export function parseLiteral(initializer: string, imported: ReadonlySet<string> = new Set()): Literal | undefined {
-  const parsed = parseValue(initializer, 0, imported)
+function propertyName(key: Node): string | undefined {
+  if (key.type === 'Identifier')
+    return key.name
 
-  if (parsed === undefined || parsed.literal.kind === 'value')
-    return undefined
+  if (key.type === 'NumericLiteral')
+    return String(key.value)
 
-  const rest = initializer.slice(parsed.end).replace(TRAILING_END, '').trimStart()
-
-  if (rest === '')
-    return parsed.literal
-
-  return CAST_START.test(rest) && TYPE_CHARS.test(rest) && !rest.includes('||') && !rest.includes('&&') ? parsed.literal : undefined
+  return key.type === 'StringLiteral' ? key.value : undefined
 }
 
 function arrayItem(items: Literal[], key: string): Literal | undefined {
@@ -217,125 +153,6 @@ function flat(literal: Literal): boolean {
   const children = literal.kind === 'array' ? literal.items : [...literal.props.values()]
 
   return children.every(child => child.kind === 'value')
-}
-
-// Whether the expression ending at `from` sits inside a `[ ]`, `{ }` or `( )` that is then assigned to or iterated into, so it is a target of an assignment: `[a.b] = c`, `(a.b as any) = c`, `for ({ k: a.b } of c)`.
-function inPattern(text: string, from: number): boolean {
-  let depth = 0
-
-  for (let at = from; at < Math.min(text.length, from + TARGET_REACH); at++) {
-    const char = text[at]!
-
-    if (char === '"' || char === '\'' || char === '`') {
-      for (at++; at < text.length && text[at] !== char; at++) {
-        if (text[at] === '\\')
-          at++
-      }
-    }
-    else if (char === '(' || char === '[' || char === '{') {
-      depth++
-    }
-    else if (char === ')' || char === ']' || char === '}') {
-      if (--depth >= 0)
-        continue
-
-      depth = 0
-
-      const after = text.slice(at + 1, at + 40)
-
-      if (ASSIGNED.test(after) || ITERATION.test(after))
-        return true
-
-      if (char === ')')
-        return false
-    }
-    else if (char === ';') {
-      return false
-    }
-  }
-
-  return false
-}
-
-// Whether the use at `start` is the right side of a `const`, `let` or `var` declaration whose left side is a destructuring pattern.
-function destructuredFrom(text: string, start: number): boolean {
-  const before = text.slice(Math.max(0, start - DECLARATION_REACH), start)
-  const closer = ASSIGN_CLOSER.exec(before)
-
-  if (closer === null)
-    return false
-
-  let depth = 0
-
-  for (let at = closer.index; at >= 0; at--) {
-    const char = before[at]!
-
-    if (char === '}' || char === ']' || char === ')')
-      depth++
-    else if ((char === '{' || char === '[' || char === '(') && --depth === 0)
-      return DECLARATION_HEAD.test(before.slice(Math.max(0, at - 10), at))
-  }
-
-  return false
-}
-
-// Whether the bare container at [start, end) is only read: listed by key or turned into a string, which hands out nothing, or, for a container of values, spread, iterated, listed or destructured from a declaration.
-function readBare(text: string, start: number, end: number, values: boolean): boolean {
-  const before = text.slice(Math.max(0, start - 300), start)
-  const after = text.slice(end, end + 12)
-
-  if ((SUMMARY_READ.test(before) && CLOSING.test(after)) || (HAS_OWN.test(before) && NEXT_ARGUMENT.test(after)))
-    return true
-
-  return values && (SPREAD.test(before) || ITERATED.test(before) || (OBJECT_READ.test(before) && ARGUMENT_END.test(after)) || destructuredFrom(text, start))
-}
-
-// Whether an import or export specifier list holds the use at `at` without renaming it, or is only a rename to the name.
-function specifierUse(text: string, at: number, end: number, name: string): boolean | undefined {
-  const open = text.lastIndexOf('{', at)
-  const close = text.indexOf('}', end)
-
-  if (open < 0 || close < 0 || text.slice(open + 1, at).includes('}') || text.slice(end, close).includes('{') || !SPECIFIER_HEAD.test(text.slice(Math.max(0, open - 40), open)))
-    return undefined
-
-  const from = Math.max(text.lastIndexOf(',', at), open) + 1
-  const comma = text.indexOf(',', end)
-  const entry = text.slice(from, comma >= 0 && comma < close ? comma : close).trim()
-  const bare = new RegExp(`^(?:type\\s+)?${name.replace(REGEX_CHARS, '\\$&')}$`)
-  const renamedTo = new RegExp(`\\sas\\s+${name.replace(REGEX_CHARS, '\\$&')}$`)
-
-  return bare.test(entry) || renamedTo.test(entry)
-}
-
-// The index after the bracket closing the one opening at `at`, or undefined when it does not close. A quote that closes on no line of its own is prose.
-function closeAt(text: string, at: number): number | undefined {
-  let depth = 0
-
-  for (let i = at; i < Math.min(text.length, at + TARGET_REACH); i++) {
-    const char = text[i]
-
-    if (char === '"' || char === '\'' || char === '`') {
-      const start = i
-
-      for (i++; i < text.length && text[i] !== char; i++) {
-        if (text[i] === '\\')
-          i++
-        else if (text[i] === '\n' && char !== '`')
-          break
-      }
-
-      if (text[i] !== char)
-        i = start
-    }
-    else if (char === '[' || char === '(' || char === '{') {
-      depth++
-    }
-    else if ((char === ']' || char === ')' || char === '}') && --depth === 0) {
-      return i + 1
-    }
-  }
-
-  return undefined
 }
 
 // The merged shape of the items of an array literal, or undefined when they differ in kind.
@@ -381,167 +198,243 @@ function merge(a: Literal, b: Literal): Literal | undefined {
   return undefined
 }
 
-// The binding that holds each item of a loop over the container at [start, end), and the text they are read in: a `for (const item of NAME)` statement or a template's `for item of NAME` block.
-function loopOver(text: string, start: number, end: number): { binding: string, from: number, to: number } | undefined {
-  const before = text.slice(Math.max(0, start - 200), start)
-  const script = SCRIPT_LOOP.exec(before)
+// The key a member reads when it is written as one: `b` of `a.b`, `a['b']`, `a[0]` and ``a[`b`]``, not of `a[b]`.
+function staticKey({ property, computed }: MemberExpression | Extract<Node, { type: 'OptionalMemberExpression' }>): string | undefined {
+  if (!computed)
+    return property.type === 'Identifier' ? property.name : undefined
 
-  if (script !== null) {
-    const header = CLOSING.exec(text.slice(end, end + 12))
+  if (property.type === 'StringLiteral')
+    return property.value
 
-    if (header === null)
-      return undefined
+  if (property.type === 'NumericLiteral')
+    return String(property.value)
 
-    const from = end + header[0].length
-    const body = skipSpace(text, from)
-    // A body without braces may go on over several lines, so it is not followed.
-    const to = text[body] === '{' ? closeAt(text, body) : undefined
+  return property.type === 'TemplateLiteral' && property.expressions.length === 0 ? property.quasis[0]!.value.cooked ?? undefined : undefined
+}
 
-    return to === undefined ? undefined : { binding: script[1]!, from, to }
-  }
+// The text of a string, or of a template literal with no holes.
+function stringOf(node: Node): string | undefined {
+  if (node.type === 'StringLiteral')
+    return node.value
 
-  const line = before.slice(before.lastIndexOf('\n') + 1)
-  const template = TEMPLATE_LOOP.exec(line)
+  return node.type === 'TemplateLiteral' && node.expressions.length === 0 ? node.quasis[0]!.value.cooked ?? undefined : undefined
+}
 
-  if (template === null)
+// `Object.keys` for `Object.keys(...)`: the callee of a call to a method of a global, by name.
+function calleeName(callee: Node): string | undefined {
+  if (callee.type !== 'MemberExpression' || callee.computed || callee.object.type !== 'Identifier' || callee.property.type !== 'Identifier')
     return undefined
 
-  const indent = template[1]!.length
-  let to = text.indexOf('\n', end)
-
-  while (to >= 0) {
-    const next = text.indexOf('\n', to + 1)
-    const row = text.slice(to + 1, next < 0 ? text.length : next)
-
-    if (row.trim() !== '' && row.length - row.trimStart().length <= indent)
-      break
-
-    to = next
-  }
-
-  return { binding: template[2]!, from: end, to: to < 0 ? text.length : to }
+  return `${callee.object.name}.${callee.property.name}`
 }
 
-// Whether every use of `binding` within [from, to) only reads what an item of the container holds.
-function itemsRead(text: string, binding: string, from: number, to: number, item: Literal): boolean {
-  const uses = new RegExp(`(?<![\\w$.])${binding.replace(REGEX_CHARS, '\\$&')}(?![\\w$])`, 'g')
-  const scope = text.slice(0, to)
+// The link of what holds a node once the casts around it are set aside.
+function outerLink(node: Node, parsed: ParsedSource): Link | undefined {
+  let link = parsed.links.get(node)
 
-  uses.lastIndex = from
+  while (link !== undefined && CASTS.has(link.parent.type))
+    link = parsed.links.get(link.parent)
 
-  for (const use of scope.matchAll(uses)) {
-    if (use.index >= from && !readsOnly(scope, use.index, binding, item))
+  return link
+}
+
+// Whether the node is a target of a write: assigned, iterated into, counted up or down or deleted, whole or inside a pattern, a cast around it or not.
+function written(node: Node, parsed: ParsedSource): boolean {
+  for (let at = node; ;) {
+    const link = parsed.links.get(at)
+
+    if (link === undefined)
       return false
-  }
 
-  return true
+    const { parent, key } = link
+
+    if (parent.type === 'AssignmentExpression' || parent.type === 'ForOfStatement' || parent.type === 'ForInStatement')
+      return key === 'left'
+
+    if (parent.type === 'UpdateExpression' || (parent.type === 'UnaryExpression' && parent.operator === 'delete'))
+      return true
+
+    const inside = CASTS.has(parent.type) || PATTERNS.has(parent.type) || (parent.type === 'AssignmentPattern' && key === 'left') || (parent.type === 'ObjectProperty' && key === 'value' && parsed.links.get(parent)?.parent.type === 'ObjectPattern')
+
+    if (!inside)
+      return false
+
+    at = parent
+  }
 }
 
-// Whether the callback of `NAME.method(` at `cursor` only reads its item, and gives back nothing but what its body computes: a reader of the items that takes no more than the item, its index and a result so far, and no `this`.
-function callbackReads(text: string, cursor: number, method: string, items: readonly Literal[]): boolean {
+// Whether what a computed key read gives is then called, however the call is written, which runs a method of the container itself when the key names one.
+function calledAfter(access: Node, parsed: ParsedSource): boolean {
+  const link = outerLink(access, parsed)
+
+  if (link === undefined)
+    return false
+
+  const { parent, key } = link
+
+  if ((CALLS.has(parent.type) && key === 'callee') || (parent.type === 'TaggedTemplateExpression' && key === 'tag'))
+    return true
+
+  if (!MEMBERS.has(parent.type) || key !== 'object')
+    return false
+
+  const member = parent as MemberExpression
+  const next = staticKey(member)
+
+  return member.computed || next === 'call' || next === 'apply' || next === 'bind'
+}
+
+// Whether something is read off the node, or it is called.
+function continued(node: Node, parsed: ParsedSource): boolean {
+  const link = outerLink(node, parsed)
+
+  if (link === undefined)
+    return false
+
+  const { parent, key } = link
+
+  return (MEMBERS.has(parent.type) && key === 'object') || (CALLS.has(parent.type) && key === 'callee') || (parent.type === 'TaggedTemplateExpression' && key === 'tag')
+}
+
+// Whether the node is under one of the roots.
+function within(node: Node, roots: ReadonlySet<Node>, parsed: ParsedSource): boolean {
+  for (let at: Node | undefined = node; at !== undefined; at = parsed.links.get(at)?.parent) {
+    if (roots.has(at))
+      return true
+  }
+
+  return false
+}
+
+// Whether the bare container at the node is only read: listed by key or turned into a string, which hands out nothing, or, for a container of values, spread, iterated, listed or destructured from a declaration.
+function readBare(at: Node, literal: Literal, parsed: ParsedSource): boolean {
+  const values = flat(literal)
+  const link = parsed.links.get(at)
+
+  if (link === undefined)
+    return values && parsed.roles.has(at)
+
+  const { parent, key } = link
+
+  if (CALLS.has(parent.type) && key === 'arguments') {
+    const call = parent as CallExpression
+    const callee = calleeName(call.callee)
+
+    if (callee !== undefined && call.arguments[0] === at && ((SUMMARIES.has(callee) && call.arguments.length === 1) || (callee === 'Object.hasOwn' && call.arguments.length > 1) || (values && VALUE_READS.has(callee))))
+      return true
+  }
+
+  if (!values)
+    return false
+
+  if (parent.type === 'SpreadElement' || ((parent.type === 'ForOfStatement' || parent.type === 'ForInStatement') && key === 'right') || (parent.type === 'BinaryExpression' && parent.operator === 'in' && key === 'right'))
+    return true
+
+  return parent.type === 'VariableDeclarator' && key === 'init' && (parent.id.type === 'ObjectPattern' || parent.id.type === 'ArrayPattern')
+}
+
+// Whether a loop over the array at the node only reads each item: a `for (const item of NAME) { }` statement or a template's `for item of NAME` block.
+function loopReads(at: Node, literal: Literal, parsed: ParsedSource): boolean {
+  const item = literal.kind === 'array' ? itemOf(literal.items) : undefined
+
+  if (item === undefined)
+    return false
+
+  const link = parsed.links.get(at)
+
+  if (link === undefined) {
+    const role = parsed.roles.get(at)
+
+    return role?.kind === 'loop' && role.binding !== undefined && itemsRead(role.binding, role.body, item, parsed)
+  }
+
+  const { parent, key } = link
+
+  // A body without braces may go on over several lines, so it is not followed.
+  if (parent.type !== 'ForOfStatement' || key !== 'right' || parent.body.type !== 'BlockStatement' || parent.left.type !== 'VariableDeclaration' || parent.left.declarations.length !== 1)
+    return false
+
+  const { id } = parent.left.declarations[0]!
+
+  return id.type === 'Identifier' && itemsRead(id.name, new Set([parent.body]), item, parsed)
+}
+
+// Whether every use of `binding` under the roots only reads what an item of the container holds.
+function itemsRead(binding: string, roots: ReadonlySet<Node>, item: Literal, parsed: ParsedSource): boolean {
+  return (parsed.uses.get(binding) ?? []).every(use => use.type !== 'Identifier' || !within(use, roots, parsed) || readsOnly(use, binding, item, parsed))
+}
+
+// Whether the callback of `NAME.method(` at the node only reads its item, and gives back nothing but what its body computes: an arrow function that takes no more than the item, its index and a result so far.
+function callbackReads(at: Node, method: string, items: readonly Literal[], parsed: ParsedSource): boolean {
   const item = itemOf(items)
-  const head = CALLBACK.exec(text.slice(cursor, cursor + 400))
+  const link = parsed.links.get(at)
 
-  if (item === undefined || head === null)
+  if (item === undefined || link === undefined || !CALLS.has(link.parent.type) || link.key !== 'callee')
     return false
 
+  const call = link.parent as CallExpression
   const reduces = method === 'reduce' || method === 'reduceRight'
-  const params = (head[1] ?? head[2]!).split(',').map(param => param.trim().replace(PARAM_TYPE, '')).filter(param => param !== '')
+  const callback = call.arguments[0]
 
-  if (params.length > (reduces ? 3 : 2) || params.some(param => !PARAM.test(param)))
+  // Without a starting value the first item is the accumulator, which the callback may write to; a second argument of another method is its `this`.
+  if (callback?.type !== 'ArrowFunctionExpression' || (reduces ? call.arguments.length < 2 : call.arguments.length !== 1))
     return false
 
-  const from = cursor + head[0].length
-  const body = skipSpace(text, from)
-  const to = text[body] === '{' ? closeAt(text, body) : expressionEnd(text, body)
+  const params = callback.params.map(param => param.type === 'AssignmentPattern' ? param.left : param)
 
-  if (to === undefined)
-    return false
-
-  const close = ARGUMENTS_END.exec(text.slice(to, to + 400))
-
-  // Without a starting value the first item is the accumulator, which the callback may write to.
-  if (close === null || reduces !== close[0].includes(','))
+  if (params.length > (reduces ? 3 : 2) || params.some(param => param.type !== 'Identifier'))
     return false
 
   const binding = params[reduces ? 1 : 0]
 
-  return binding !== undefined && itemsRead(text, binding, from, to, item)
+  return binding?.type === 'Identifier' && itemsRead(binding.name, new Set([callback.body]), item, parsed)
 }
 
-// The end of the arrow function body expression at `at`: a `,` or `)` that closes nothing it opened.
-function expressionEnd(text: string, at: number): number {
-  let depth = 0
+// Whether the use of `name` starting at the node only reads what the literal holds.
+function readsOnly(start: Node, name: string, literal: Literal, parsed: ParsedSource): boolean {
+  const link = parsed.links.get(start)
 
-  for (let i = at; i < text.length; i++) {
-    const char = text[i]!
+  // An import or export list holding the name as it is, or renaming another to it; one renaming it away hands it on under a name the scan does not follow.
+  if (link?.parent.type === 'ImportSpecifier')
+    return link.parent.local.name === name
 
-    if (char === '(' || char === '[' || char === '{') {
-      depth++
-    }
-    else if (char === ')' || char === ']' || char === '}') {
-      if (--depth < 0)
-        return i
-    }
-    else if (char === ',' && depth === 0) {
-      return i
-    }
-  }
+  if (link?.parent.type === 'ExportSpecifier')
+    return (link.parent.exported.type === 'Identifier' ? link.parent.exported.name : link.parent.exported.value) === name
 
-  return text.length
-}
-
-// Whether the use of `name` at `at` only reads what the literal holds.
-function readsOnly(text: string, at: number, name: string, literal: Literal): boolean {
-  const end = at + name.length
-  const before = text.slice(Math.max(0, at - 300), at)
-
-  if (DECLARED.test(before.slice(-30)) || TYPEOF.test(before))
+  if (link?.parent.type === 'UnaryExpression' && link.parent.operator === 'typeof')
     return true
 
-  const specifier = specifierUse(text, at, end, name)
-
-  if (specifier !== undefined)
-    return specifier
-
-  if (WRITE_BEFORE.test(before))
-    return false
-
   let node = literal
-  let cursor = end
+  let current = start
   let member: string | undefined
 
   for (;;) {
-    SEGMENT.lastIndex = cursor
+    const up = parsed.links.get(current)
 
-    const found = SEGMENT.exec(text)
+    if (up === undefined || up.key !== 'object' || !MEMBERS.has(up.parent.type))
+      break
 
-    if (found === null) {
-      // A key that is no literal reads one value of a container of values, which a prototype key cannot make a write: whatever follows is judged below.
-      COMPUTED.lastIndex = cursor
+    const access = up.parent as MemberExpression
+    const key = staticKey(access)
 
-      const computed = COMPUTED.exec(text)
-      const close = computed === null ? undefined : closeAt(text, COMPUTED.lastIndex - 1)
-
-      if (close === undefined || !flat(node))
+    if (key === undefined) {
+      // A key that is no literal reads one value of a container of values, which a prototype key cannot make a write.
+      if (!flat(node))
         break
 
-      // A call on the result, or a `call`, `apply`, `bind` or second key, runs a method of the container itself when the key names one.
-      if (CALL_AFTER.test(text.slice(close, close + TARGET_REACH)))
+      if (calledAfter(access, parsed))
         return false
 
       node = VALUE
-      cursor = close
+      current = access
 
       continue
     }
 
-    const key = found[1] ?? found[3] ?? found[4] ?? found[2]!
-
     if (PROTOTYPE_KEYS.has(key))
       return false
 
-    cursor = SEGMENT.lastIndex
+    current = access
 
     if (node.kind === 'value')
       continue
@@ -557,75 +450,237 @@ function readsOnly(text: string, at: number, name: string, literal: Literal): bo
     node = child
   }
 
-  if (matchAt(WRITE_AFTER, text, cursor) !== undefined || NON_NULL.test(text.slice(cursor, cursor + 8)) || inPattern(text, cursor))
+  if (written(current, parsed) || parsed.links.get(current)?.parent.type === 'TSNonNullExpression')
     return false
 
-  if (node.kind === 'value')
+  if (node.kind === 'value' || member === 'length')
     return true
 
-  if (member === 'length')
-    return true
+  if (member === undefined)
+    return readBare(current, node, parsed) || loopReads(current, node, parsed)
 
-  if (member === undefined) {
-    if (readBare(text, at, cursor, flat(node)))
-      return true
-
-    const loop = node.kind === 'array' ? loopOver(text, at, cursor) : undefined
-    const item = node.kind === 'array' ? itemOf(node.items) : undefined
-
-    return loop !== undefined && item !== undefined && itemsRead(text, loop.binding, loop.from, loop.to, item)
-  }
-
-  if (node.kind === 'array' && CALLBACKS.has(member) && callbackReads(text, cursor, member, node.items))
+  if (node.kind === 'array' && CALLBACKS.has(member) && callbackReads(current, member, node.items, parsed))
     return true
 
   // A member the literal does not hold reads as undefined unless it is called or followed on, which a built-in method could do.
-  return (flat(node) && READERS.has(member)) || !CONTINUES.test(text.slice(cursor, cursor + 12))
+  return (flat(node) && READERS.has(member)) || !continued(current, parsed)
 }
 
-// The specifiers of the namespaces in the text that are used whole or by a computed key, or exported from a barrel, which only their importers see.
-function namespaceMisuse(text: string): string[] {
-  const specifiers = [...text.matchAll(EXPORT_NAMESPACE)].map(match => match[1]!)
+function addUse(parsed: ParsedSource, name: string, start: Node): void {
+  const uses = parsed.uses.get(name)
 
-  for (const [, binding, specifier] of text.matchAll(NAMESPACE_IMPORT)) {
-    if (BUILTIN_SPECIFIER.test(specifier!))
+  if (uses === undefined)
+    parsed.uses.set(name, [start])
+  else
+    uses.push(start)
+}
+
+// Notes what a node is to the scan: a use of a name, a namespace import, a re-export or a dynamic import.
+function note({ node, link, pattern }: Frame, parsed: ParsedSource, namespaces: [string, string][]): void {
+  const parent = link?.parent
+
+  if (node.type === 'Identifier') {
+    parsed.names.add(node.name)
+
+    if (pattern)
+      return
+
+    if (parent === undefined || parent.type === 'ImportSpecifier' || parent.type === 'ExportSpecifier') {
+      addUse(parsed, node.name, node)
+
+      return
+    }
+
+    if (NAMING.has(parent.type) || (parent.type === 'TSEnumMember' && link!.key === 'id') || (KEYED.has(parent.type) && link!.key === 'key' && !(parent as { computed: boolean }).computed))
+      return
+
+    addUse(parsed, node.name, MEMBERS.has(parent.type) && link!.key === 'property' && !(parent as { computed: boolean }).computed ? parent : node)
+
+    return
+  }
+
+  const text = stringOf(node)
+
+  if (text !== undefined && parent !== undefined) {
+    if (parent.type === 'ImportSpecifier' || parent.type === 'ExportSpecifier') {
+      parsed.names.add(text)
+      addUse(parsed, text, node)
+    }
+    else if (MEMBERS.has(parent.type) && link!.key === 'property') {
+      addUse(parsed, text, parent)
+    }
+  }
+  else if (node.type === 'ImportDeclaration' && node.importKind !== 'type') {
+    for (const specifier of node.specifiers) {
+      if (specifier.type === 'ImportNamespaceSpecifier' && !BUILTIN_SPECIFIER.test(node.source.value))
+        namespaces.push([specifier.local.name, node.source.value])
+    }
+  }
+  else if (node.type === 'ExportAllDeclaration') {
+    parsed.exportsAll = true
+  }
+  else if (node.type === 'ExportNamedDeclaration' && node.source != null && node.specifiers.some(specifier => specifier.type === 'ExportNamespaceSpecifier')) {
+    parsed.exportsAll = true
+    parsed.misuse.push(node.source.value)
+  }
+  else if (node.type === 'ImportExpression') {
+    parsed.calls.push(node.source.type === 'StringLiteral' ? node.source.value : undefined)
+  }
+  else if (CALLS.has(node.type)) {
+    const { callee, arguments: args } = node as CallExpression
+
+    if (callee.type === 'Import' || (callee.type === 'Identifier' && callee.name === 'require'))
+      parsed.calls.push(args[0]?.type === 'StringLiteral' ? args[0].value : undefined)
+  }
+}
+
+// Notes the node and those under it, types left out, with a stack rather than recursion, which a long `a + b + ...` chain would overflow.
+function index(root: Node, parsed: ParsedSource, namespaces: [string, string][]): void {
+  const pending: Frame[] = [{ node: root, link: undefined, pattern: false }]
+
+  for (let frame = pending.pop(); frame !== undefined; frame = pending.pop()) {
+    const { node, link } = frame
+
+    if (TYPE_NODES.has(node.type) || (node.type === 'TSModuleDeclaration' && node.declare === true))
       continue
 
-    for (const use of text.matchAll(new RegExp(`(?<![\\w$.])${binding!.replace(REGEX_CHARS, '\\$&')}(?![\\w$])`, 'g'))) {
-      const rest = text.slice(use.index + binding!.length)
+    if (link !== undefined)
+      parsed.links.set(node, link)
 
-      // The import's own binding, followed by `from`, is no use.
-      if (!DOT_MEMBER.test(rest) && !IMPORT_FROM.test(rest)) {
-        specifiers.push(specifier!)
+    note(frame, parsed, namespaces)
 
-        break
+    for (const key of VISITOR_KEYS[node.type] ?? []) {
+      // A shorthand property's key is its value, read as such.
+      if (TYPE_KEYS.has(key) || (key === 'key' && node.type === 'ObjectProperty' && node.shorthand))
+        continue
+
+      const child = (node as unknown as Record<string, unknown>)[key]
+      const pattern = bindsAt(frame, key)
+
+      for (const item of Array.isArray(child) ? child : [child]) {
+        if (typeof item === 'object' && item !== null)
+          pending.push({ node: item as Node, link: { parent: node, key }, pattern })
       }
     }
   }
-
-  return specifiers
 }
 
-// Whether a module imported by `specifier` from `source` may hold the export, or hand it on: it is the declaring module, a module naming it or re-exporting everything, or a project path that does not resolve. A package outside the project cannot.
-function reachesModule(specifier: string, source: SourceFile, word: RegExp, declaredIn: string, sources: readonly SourceFile[]): boolean {
+// Notes the expressions of a template, each loop's own collected in `bodies` for the rows it reads.
+function indexTemplate(nodes: readonly KayNode[], source: string, parses: SourceParses, parsed: ParsedSource, namespaces: [string, string][], bodies: readonly Set<Node>[]): void {
+  for (const node of nodes) {
+    const own = binders(node)
+    const loopPatterns = patterns(node)
+    const spreads = node.kind === 'element' ? node.attributes.flatMap(attribute => attribute.kind === 'spread' ? [attribute.expression] : []) : []
+    const body = new Set<Node>()
+
+    for (const span of [...nodeExpressions(node), ...loopPatterns]) {
+      const text = source.slice(span.start, span.end)
+
+      if (text.trim() === '')
+        continue
+
+      // A binder reads as the parameters of an arrow function, so its default values are read and its names are not.
+      const root: Node = own.includes(span) || loopPatterns.includes(span) ? parseExpression(`(${text})=>0`, { plugins: ['typescript'], startIndex: span.start - 1 }) : parses.expression(source, span)
+
+      index(root, parsed, namespaces)
+
+      for (const rows of node.kind === 'for' && span === node.key ? [...bodies, body] : bodies)
+        rows.add(root)
+
+      if (node.kind === 'for' && span === node.each)
+        parsed.roles.set(root, { kind: 'loop', binding: IDENTIFIER.test(source.slice(node.item.start, node.item.end).trim()) ? source.slice(node.item.start, node.item.end).trim() : undefined, body })
+      else if (spreads.includes(span))
+        parsed.roles.set(root, { kind: 'spread' })
+      else if (node.kind === 'const' && span === node.value && OPENS_PATTERN.test(source.slice(node.pattern.start, node.pattern.end)))
+        parsed.roles.set(root, { kind: 'destructured' })
+    }
+
+    if (node.kind === 'for') {
+      indexTemplate(node.children, source, parses, parsed, namespaces, [...bodies, body])
+      indexTemplate(node.fallback ?? [], source, parses, parsed, namespaces, bodies)
+    }
+    else {
+      for (const block of childBlocks(node))
+        indexTemplate(block, source, parses, parsed, namespaces, bodies)
+    }
+  }
+}
+
+// The parse of a file as the scan reads it: a script whole, a `.kay` file's fences and the expressions of its template; null when any of it does not parse.
+function parseSource(file: string, text: string): ParsedSource | null {
+  const parsed: ParsedSource = { links: new Map(), roles: new Map(), uses: new Map(), names: new Set(), misuse: [], calls: [], exportsAll: false }
+  const namespaces: [string, string][] = []
+  const parses = new SourceParses(undefined, false)
+
+  try {
+    if (file.endsWith('.kay')) {
+      const { file: kay } = parses.kay(text)
+
+      for (const span of [kay.script, kay.server, kay.module]) {
+        if (span !== undefined)
+          index(parses.program(kay.source, span, FENCE_PLUGINS), parsed, namespaces)
+      }
+
+      indexTemplate(kay.template, kay.source, parses, parsed, namespaces, [])
+    }
+    else {
+      index(parses.program(text, { start: 0, end: text.length }, scriptPlugins(file)), parsed, namespaces)
+    }
+  }
+  catch {
+    return null
+  }
+
+  // A namespace used whole or by a computed key hands on every export of its module.
+  for (const [binding, specifier] of namespaces) {
+    const whole = (parsed.uses.get(binding) ?? []).some((use) => {
+      const link = parsed.links.get(use)
+
+      return use.type === 'Identifier' && !(link !== undefined && MEMBERS.has(link.parent.type) && link.key === 'object' && !(link.parent as MemberExpression).computed)
+    })
+
+    if (whole)
+      parsed.misuse.push(specifier)
+  }
+
+  return parsed
+}
+
+function parsedOf(source: SourceFile): ParsedSource | null {
+  if (source.parsed === undefined)
+    source.parsed = source.unreadable === true ? null : parseSource(source.file, source.text)
+
+  return source.parsed
+}
+
+// Whether a module may hold the export, or hand it on: it is the declaring module, names it, re-exports a module whole or does not parse.
+function holds(target: SourceFile, name: string, declaredIn: string): boolean {
+  if (target.file === declaredIn)
+    return true
+
+  const parsed = parsedOf(target)
+
+  return parsed === null || parsed.names.has(name) || parsed.exportsAll
+}
+
+// Whether a module imported by `specifier` from `file` may hold the export: one of the project that does, or a project path that does not resolve. A package outside the project cannot.
+function reachesModule(specifier: string, file: string, name: string, declaredIn: string, sources: readonly SourceFile[]): boolean {
   if (BUILTIN_SPECIFIER.test(specifier))
     return false
 
-  const resolved = resolveFrom(specifier, source.file)
+  const resolved = resolveFrom(specifier, file)
 
   if (resolved === undefined)
     return specifier.startsWith('.') || PROJECT_ALIAS.test(specifier)
 
   const target = sources.find(candidate => candidate.file === resolved)
 
-  return target !== undefined && (target.file === declaredIn || word.test(target.text) || EXPORT_ALL.test(target.text))
+  return target !== undefined && holds(target, name, declaredIn)
 }
 
-// Whether a dynamic import or a `require` in the file may hand over the export: its target is not a literal, or reaches the module holding it.
-function reachesByCall(source: SourceFile, word: RegExp, declaredIn: string, sources: readonly SourceFile[]): boolean {
-  source.calls ??= [...source.text.matchAll(DYNAMIC)].map(call => call[2])
-
-  for (const specifier of source.calls) {
+// Whether a dynamic import or a `require` of the file may hand over the export: its target is not a string, an alias, or reaches the module holding it.
+function reachesByCall(parsed: ParsedSource, file: string, name: string, declaredIn: string, sources: readonly SourceFile[]): boolean {
+  for (const specifier of parsed.calls) {
     if (specifier === undefined)
       return true
 
@@ -638,13 +693,10 @@ function reachesByCall(source: SourceFile, word: RegExp, declaredIn: string, sou
     if (!specifier.startsWith('.'))
       continue
 
-    const resolved = resolveFrom(specifier, source.file)
+    const resolved = resolveFrom(specifier, file)
     const target = resolved === undefined ? undefined : sources.find(candidate => candidate.file === resolved)
 
-    if (target === undefined)
-      continue
-
-    if (target.file === declaredIn || word.test(target.text) || EXPORT_ALL.test(target.text))
+    if (target !== undefined && holds(target, name, declaredIn))
       return true
   }
 
@@ -652,12 +704,8 @@ function reachesByCall(source: SourceFile, word: RegExp, declaredIn: string, sou
 }
 
 // Whether `name`, exported from `declaredIn` as `literal`, is read and never written, handed on or reached some other way by any of `sources`.
+// A file is parsed only when it holds the name, a namespace, a dynamic import or a `require`.
 export function neverWritten(name: string, literal: Literal, declaredIn: string, sources: readonly SourceFile[]): boolean {
-  const escaped = name.replace(REGEX_CHARS, '\\$&')
-  const uses = new RegExp(`(?<![\\w$])${escaped}(?![\\w$])`, 'g')
-  const word = new RegExp(uses.source)
-  const quotedImport = new RegExp(`['"]${escaped}['"]\\s+as\\s`)
-
   // A module outside the project is not read, so a write in it would go unseen.
   if (!sources.some(source => source.file === declaredIn))
     return false
@@ -666,194 +714,30 @@ export function neverWritten(name: string, literal: Literal, declaredIn: string,
     if (source.unreadable === true)
       return false
 
-    source.misuse ??= namespaceMisuse(source.text)
+    const mentions = source.text.includes(name)
 
-    if (source.misuse.some(specifier => reachesModule(specifier, source, word, declaredIn, sources)) || reachesByCall(source, word, declaredIn, sources))
-      return false
+    source.reaching ??= NAMESPACE_HINT.test(source.text) || CALL_HINT.test(source.text)
 
-    if (!source.text.includes(name))
+    if (!mentions && !source.reaching)
       continue
 
-    if (EVALUATES.test(source.text) || quotedImport.test(source.text))
+    const parsed = parsedOf(source)
+
+    if (parsed === null || parsed.misuse.some(specifier => reachesModule(specifier, source.file, name, declaredIn, sources)) || reachesByCall(parsed, source.file, name, declaredIn, sources))
       return false
 
-    for (const use of source.code.matchAll(uses)) {
-      if (!readsOnly(source.code, use.index, name, literal))
+    if (!mentions)
+      continue
+
+    // Code run from a string may write to anything the string names.
+    if (parsed.names.has('eval') || parsed.names.has('Function'))
+      return false
+
+    for (const use of parsed.uses.get(name) ?? []) {
+      if (!readsOnly(use, name, literal, parsed))
         return false
     }
   }
 
   return true
-}
-
-// The name an exported declarator binds, when it is a plain identifier.
-export function declaredName(declarator: string): string | undefined {
-  const start = matchAt(WORD, declarator, 0)
-
-  if (start === undefined)
-    return undefined
-
-  const rest = declarator.slice(start.length).trim()
-
-  return rest === '' || rest.startsWith(':') ? start : undefined
-}
-
-const WORD_CHAR = /[\w$]/
-const OPENING_BRACKET = /\[\s*$/
-const CLOSING_BRACKET = /^\s*\]/
-
-export const NOT_LINE_BREAK = /[^\n]/g
-
-// Where a regex literal may start: after nothing, an operator or an opening bracket, or a keyword that takes an expression.
-const BEFORE_REGEX = /(?:^|[(,=:[!&|?{};+\-*%<>~^]|(?<![\w$.])(?:return|typeof|case|do|else|in|of|void|delete|throw|new|yield|await))\s*$/
-// How far back `BEFORE_REGEX` needs to look.
-const REGEX_LOOKBACK = 16
-// How far back a `case` or a label is looked for before its colon.
-const BLOCK_LOOKBACK = 80
-// A `{` that opens an object literal rather than a block: after one of these a `}` ends a value, so a `/` after it divides.
-const BEFORE_VALUE_BRACE = /[(,=[?]\s*$/
-const AFTER_COLON = /:\s*$/
-// The start of a statement opening with a `case`, a `default` or a label, whose colon has a block after it.
-const BLOCK_START = /^\s*(?:case\b|[\w$]+\s*:)/
-const STATEMENT_END = /[;{}\n][^;{}\n]*$/
-
-// The statement `before` ends in, from the `;`, `{`, `}` or line break that starts it.
-function statementOf(before: string): string {
-  const tail = before.slice(-BLOCK_LOOKBACK)
-  const found = STATEMENT_END.exec(tail)
-
-  return found === null ? tail : found[0].slice(1)
-}
-
-// Whether the `{` coming after `before` opens an object literal: after a colon it does as a property's value or a ternary's branch, and does not after a `case`, `default` or label.
-function opensValue(before: string, insideObject: boolean): boolean {
-  if (BEFORE_VALUE_BRACE.test(before.slice(-REGEX_LOOKBACK)))
-    return true
-
-  return AFTER_COLON.test(before.slice(-REGEX_LOOKBACK)) && (insideObject || !BLOCK_START.test(statementOf(before)))
-}
-
-// The offset just after the regex literal starting at `at`, or undefined when its line ends before it closes: then the slash was a division.
-function regexEnd(source: string, at: number): number | undefined {
-  let inClass = false
-
-  for (let end = at + 1; end < source.length; end++) {
-    const char = source[end]
-
-    if (char === '\n')
-      return undefined
-
-    if (char === '\\')
-      end++
-    else if (char === '[')
-      inClass = true
-    else if (char === ']')
-      inClass = false
-    else if (char === '/' && !inClass)
-      return end + 1
-  }
-
-  return undefined
-}
-
-// The source with its comments blanked out, and with `mask` the inside of its single or double quoted strings too, as a name in one is no use of it; strings, regex literals and templates kept (a `${ }` inside one is scanned as code), so a word in a comment is no use of a name and a comment inside a call's arguments hides nothing.
-export function withoutComments(source: string, mask = false): string {
-  let result = ''
-  // The brace depth each open `${ }` was entered at, to know which `}` closes it.
-  const holes: number[] = []
-  let braces = 0
-  let inTemplate = false
-  // Whether each open `{` is an object literal, and the length of `result` right after the last `}` that closed one.
-  const literals: boolean[] = []
-  let valueEnd = -1
-
-  for (let at = 0; at < source.length; at++) {
-    const char = source[at]!
-    const next = source[at + 1]
-    const regex = !inTemplate && char === '/' && next !== '/' && next !== '*' && BEFORE_REGEX.test(result.slice(-REGEX_LOOKBACK)) && result.trimEnd().length !== valueEnd ? regexEnd(source, at) : undefined
-
-    if (inTemplate) {
-      if (char === '\\') {
-        result += source.slice(at, at + 2)
-        at++
-      }
-      else if (char === '$' && next === '{') {
-        result += '${'
-        at++
-        literals.push(false)
-        holes.push(braces++)
-        inTemplate = false
-      }
-      else {
-        result += char
-
-        if (char === '`')
-          inTemplate = false
-      }
-    }
-    else if (char === '`') {
-      result += char
-      inTemplate = true
-    }
-    else if (char === '"' || char === '\'') {
-      let end = at + 1
-
-      for (; end < source.length && source[end] !== char; end++) {
-        if (source[end] === '\\')
-          end++
-      }
-
-      // Masking blanks only a string that closes on its line and does not follow a word, so an apostrophe in prose opens none.
-      const closed = source[end] === char && !source.slice(at, end).includes('\n') && !WORD_CHAR.test(source[at - 1] ?? '')
-
-      if (mask && !closed) {
-        result += char
-      }
-      else if (mask) {
-        const key = OPENING_BRACKET.test(result.slice(-20)) && CLOSING_BRACKET.test(source.slice(end + 1, end + 8))
-
-        result += char + (key ? source.slice(at + 1, end) : source.slice(at + 1, end).replace(NOT_LINE_BREAK, ' ')) + char
-        at = end
-      }
-      else {
-        result += source.slice(at, end + 1)
-        at = end
-      }
-    }
-    else if (char === '/' && (next === '/' || next === '*')) {
-      const line = next === '/'
-      const found = line ? source.indexOf('\n', at) : source.indexOf('*/', at + 2)
-      let end = source.length
-
-      if (found !== -1)
-        end = line ? found : found + 2
-
-      result += source.slice(at, end).replace(NOT_LINE_BREAK, ' ')
-      at = end - 1
-    }
-    else if (regex !== undefined) {
-      result += source.slice(at, regex)
-      at = regex - 1
-    }
-    else {
-      if (char === '{') {
-        literals.push(opensValue(result, literals.at(-1) === true))
-        braces++
-      }
-      else if (char === '}') {
-        braces--
-        // The length `result` will have once this `}` is appended, so a `/` right after it reads as a division.
-        valueEnd = literals.pop() === true ? result.length + 1 : -1
-
-        if (holes.at(-1) === braces) {
-          holes.pop()
-          inTemplate = true
-        }
-      }
-
-      result += char
-    }
-  }
-
-  return result
 }

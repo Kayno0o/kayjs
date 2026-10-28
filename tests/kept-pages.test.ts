@@ -569,6 +569,7 @@ describe('a kept page and the state a script declares', () => {
       'list-typed-comma': ['const a = 1, seen: Map<string, number> = new Map()\n', false],
       'first-typed-comma': ['const seen: Map<string, number> = new Map()\n', false],
       'first-generic-new': ['const seen = new Map<string, number>()\nconst other = 1\n', false],
+      'new-without-parentheses': ['const seen = new Set\n', false],
       'nested-generic': ['const a = new Map<string, Set<number>>(), seen = {}\n', false],
       'cast': ['const seen = [] as string[]\n', false],
       'trailing-comment': ['const seen = {} // filled later\n', false],

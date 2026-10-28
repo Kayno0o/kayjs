@@ -1,492 +1,269 @@
-import { declaredName } from './literal-writes'
+import type { Expression, Node, Program, Statement } from '@babel/types'
+import { VISITOR_KEYS } from '@babel/types'
+import { patternNames } from '../compiler/pattern-names'
+import { nameOf, TYPE_KEYS, TYPE_NODES } from './kept-source'
 
 // What a module declares at its top level that a second render could find changed: a `let` or `var`, a `const` holding an empty array, object, `Map`, `Set` or the like, which a cache fills, and an exported one holding any array, object or `new`, which another module can change.
-// `settings` are the names of exports read as written, which are not state.
-// Read statement by statement at bracket depth 0, with strings, templates and comments set aside, so a declarator is told from a default value, a parameter or a quoted comma.
-// What type arguments are made of.
-const TYPE_ARGUMENT = /[\w$\s,.[\]|&?:'"{}()<>=]/
-const WHITESPACE = /\s/
-const BRACKETS = /^(?:\[\s*\]|\{\s*\})/
-const CAST = /^(?:as|satisfies)\s/
-// The end of a cast's type name, whose `<` opens type arguments.
-const CAST_TYPE = /\b(?:as|satisfies)\s+[\w$.]+$/
-// What may export a name apart from its declaration.
-const EXPORT_LATER = /\bexport\s*(?:\{|default\b)/
-const DEFAULT_NAME = /^export\s+default\s+([\w$]+)\s*(?:;\s*)?$/
-// An `export default` of an object or array, parenthesised or not, which holds whatever it names.
-const DEFAULT_CONTAINER = /^export\s+default\s+(?:\(+\s*)?[[{]/
-const TYPE_ENTRY = /^type\s/
-const NEW_CONTAINER = /^new\s+(?:Map|Set|WeakMap|WeakSet|Array|Object)\b/y
-const NEW_VALUE = /^(?:[[{]|new\s|store\()/
-const WORD = /[\w$]/
-const OPENERS = '([{'
-const CLOSERS = ')]}'
-// The last character of a line after which the statement goes on, and the first one of the next line that continues it.
-const TRAILING = ',=+-*/%&|^<>?:.(['
-// What a regular expression literal may follow.
-const REGEX_AFTER = '(,=:[!&|?{};+-*%<>~^'
-const LEADING = '.?:,+-*/%&|=<>'
+// `settings` are the names of exports read as written, which are not state. Offsets are those of the parse.
+
+const NEW_CONTAINERS = new Set(['Map', 'Set', 'WeakMap', 'WeakSet', 'Array', 'Object'])
 
 // Judges whether an exported literal, given its name and initializer, is shown never to change: then it is no state.
-export type Unchanged = (name: string, initializer: string) => boolean
+export type Unchanged = (name: string, initializer: Expression) => boolean
 
 // Where the first statement declaring state starts, or undefined when none does.
 // With `risks`, an exported container nothing proves unchanged is no state of the module: it is noted there by name, with where it starts, for a page to be stopped by only when it takes it.
-export function stateAt(source: string, settings: ReadonlySet<string>, unchanged?: Unchanged, risks?: Map<string, number>): number | undefined {
-  const later = risks === undefined ? new Set<string>() : exportedLater(source)
-  let at = skipTrivia(source, 0)
+export function stateAt(program: Program, settings: ReadonlySet<string>, unchanged?: Unchanged, risks?: Map<string, number>): number | undefined {
+  const later = risks === undefined ? new Set<string>() : exportedLater(program)
 
-  while (at < source.length) {
-    const end = statementEnd(source, at)
+  return program.body.find(statement => declaresState(statement, settings, unchanged, risks, later))?.start ?? undefined
+}
 
-    if (statementDeclaresState(source, at, end, settings, unchanged, risks, later))
-      return at
-
-    // A stray closer ends a statement without being part of it.
-    at = skipTrivia(source, Math.max(end, at + 1))
-  }
-
-  return undefined
+// Whether one statement declares state, read alone: what an export of a server fence moves to module level.
+export function statementState(statement: Statement, settings: ReadonlySet<string>, unchanged?: Unchanged): boolean {
+  return declaresState(statement, settings, unchanged, undefined, new Set())
 }
 
 // Where the first top-level `const` holding an object, array or `new` that the module lists in an export further down starts, or undefined when none does.
 // A server fence cannot export that way, but its constant is as open to a write as an exported one.
-export function laterExportAt(source: string, settings: ReadonlySet<string>, unchanged?: Unchanged): number | undefined {
-  const later = exportedLater(source)
+export function laterExportAt(program: Program, settings: ReadonlySet<string>, unchanged?: Unchanged): number | undefined {
+  const later = exportedLater(program)
 
   if (later.size === 0)
     return undefined
 
-  let at = skipTrivia(source, 0)
+  const found = program.body.find(statement => statement.type === 'VariableDeclaration' && statement.kind === 'const' && statement.declare !== true && statement.declarations.some(({ id, init }) => {
+    const name = id.type === 'Identifier' ? id.name : undefined
 
-  while (at < source.length) {
-    const end = statementEnd(source, at)
+    return init != null && name !== undefined && !settings.has(name) && later.has(name) && holdsContainer(init, true) && unchanged?.(name, init) !== true
+  }))
 
-    if (wordAt(source, at) === 'const') {
-      for (const { left, initializer } of declarators(source, skipTrivia(source, at + 5), end)) {
-        const name = declaredName(left.trim())
-
-        if (initializer !== undefined && name !== undefined && !settings.has(name) && later.has(name) && holdsContainer(initializer, true) && unchanged?.(name, initializer) !== true)
-          return at
-      }
-    }
-
-    at = skipTrivia(source, Math.max(end, at + 1))
-  }
-
-  return undefined
+  return found?.start ?? undefined
 }
 
-// The index after the whitespace and comments from `at`.
-function skipTrivia(source: string, at: number): number {
-  let i = at
+// Where the first top-level export that is neither a type nor a page setting starts: what a fence the compiler cannot place declares state by, as such an export may read it.
+export function firstExportAt(program: Program, settings: ReadonlySet<string>): number | undefined {
+  const found = program.body.find((statement) => {
+    if (statement.type === 'ExportDefaultDeclaration')
+      return true
 
-  while (i < source.length) {
-    if (WHITESPACE.test(source[i]!)) {
-      i++
-    }
-    else if (source.startsWith('//', i)) {
-      const newline = source.indexOf('\n', i)
+    if (statement.type !== 'ExportNamedDeclaration' && statement.type !== 'ExportAllDeclaration')
+      return false
 
-      i = newline < 0 ? source.length : newline
-    }
-    else if (source.startsWith('/*', i)) {
-      const close = source.indexOf('*/', i + 2)
+    if (statement.exportKind === 'type')
+      return false
 
-      i = close < 0 ? source.length : close + 2
-    }
-    else {
-      break
-    }
-  }
+    const declaration = statement.type === 'ExportNamedDeclaration' ? statement.declaration : undefined
 
-  return i
+    if (declaration?.type === 'TSInterfaceDeclaration' || declaration?.type === 'TSTypeAliasDeclaration')
+      return false
+
+    if (declaration?.type === 'FunctionDeclaration')
+      return declaration.id == null || !settings.has(declaration.id.name)
+
+    const first = declaration?.type === 'VariableDeclaration' ? declaration.declarations[0]?.id : undefined
+
+    return first?.type !== 'Identifier' || !settings.has(first.name)
+  })
+
+  return found?.start ?? undefined
 }
 
-// The index after the string or template literal opening at `at`, its `${}` holes read as code.
-function skipString(source: string, at: number): number {
-  const quote = source[at]!
+function declaresState(statement: Statement, settings: ReadonlySet<string>, unchanged: Unchanged | undefined, risks: Map<string, number> | undefined, later: ReadonlySet<string>): boolean {
+  const declaredExported = statement.type === 'ExportNamedDeclaration'
+  const declaration = declaredExported ? statement.declaration : statement
 
-  for (let i = at + 1; i < source.length; i++) {
-    const char = source[i]
+  if (declaration?.type !== 'VariableDeclaration' || declaration.declare === true)
+    return false
 
-    if (char === '\\')
-      i++
-    else if (char === quote)
-      return i + 1
-    else if (quote === '`' && char === '$' && source[i + 1] === '{')
-      i = skipHole(source, i + 1) - 1
-  }
-
-  return source.length
-}
-
-// The index after the string, template or regular expression literal opening at `at`, or -1 when none does.
-// A `/` opens a regular expression where an operand is expected: at the start, or after an operator or an opening bracket.
-function skipLiteral(source: string, at: number): number {
-  const char = source[at]!
-
-  if (char === '"' || char === '\'' || char === '`')
-    return skipString(source, at)
-
-  if (char !== '/' || source[at + 1] === '/' || source[at + 1] === '*')
-    return -1
-
-  let before = at - 1
-
-  while (before >= 0 && WHITESPACE.test(source[before]!))
-    before--
-
-  if (before >= 0 && !REGEX_AFTER.includes(source[before]!))
-    return -1
-
-  let inClass = false
-
-  for (let i = at + 1; i < source.length; i++) {
-    const char = source[i]
-
-    if (char === '\n')
-      return -1
-
-    if (char === '\\')
-      i++
-    else if (char === '[')
-      inClass = true
-    else if (char === ']')
-      inClass = false
-    else if (char === '/' && !inClass)
-      return i + 1
-  }
-
-  return -1
-}
-
-// The index after the `{}` opening at `at`, whatever it holds.
-function skipHole(source: string, at: number): number {
-  let depth = 0
-
-  for (let i = at; i < source.length; i++) {
-    const char = source[i]!
-
-    const literal = skipLiteral(source, i)
-
-    if (literal >= 0)
-      i = literal - 1
-    else if (char === '{')
-      depth++
-    else if (char === '}' && --depth === 0)
-      return i + 1
-  }
-
-  return source.length
-}
-
-// The index after the statement starting at `at`: its `;` at depth 0, or a line end at depth 0 where nothing continues it.
-function statementEnd(source: string, at: number): number {
-  let depth = 0
-  let last = ''
-
-  for (let i = at; i < source.length; i++) {
-    const char = source[i]!
-
-    const literal = skipLiteral(source, i)
-
-    if (literal >= 0) {
-      i = literal - 1
-      last = char === '/' ? ')' : char
-    }
-    else if (source.startsWith('//', i) || source.startsWith('/*', i)) {
-      i = skipTrivia(source, i) - 1
-    }
-    else if (OPENERS.includes(char)) {
-      depth++
-      last = char
-    }
-    else if (CLOSERS.includes(char)) {
-      depth--
-      last = char
-
-      if (depth < 0)
-        return i
-    }
-    else if (char === ';' && depth === 0) {
-      return i + 1
-    }
-    else if (char === '\n' && depth === 0 && last !== '' && !TRAILING.includes(last)) {
-      const next = skipTrivia(source, i)
-
-      if (next >= source.length || !LEADING.includes(source[next]!))
-        return i
-    }
-    else if (!WHITESPACE.test(char)) {
-      last = char
-    }
-  }
-
-  return source.length
-}
-
-function statementDeclaresState(source: string, start: number, end: number, settings: ReadonlySet<string>, unchanged: Unchanged | undefined, risks: Map<string, number> | undefined, later: ReadonlySet<string>): boolean {
-  let i = start
-  let word = wordAt(source, i)
-  let exported = false
-
-  if (word === 'export') {
-    exported = true
-    i = skipTrivia(source, i + word.length)
-    word = wordAt(source, i)
-  }
-
-  if (word === 'let' || word === 'var')
+  if (declaration.kind === 'let' || declaration.kind === 'var')
     return true
 
-  return word === 'const' && declaratorsHoldContainer(source, skipTrivia(source, i + word.length), end, exported, settings, unchanged, risks, start, later)
-}
+  if (declaration.kind !== 'const')
+    return false
 
-function wordAt(source: string, at: number): string {
-  let i = at
+  for (const { id, init } of declaration.declarations) {
+    const name = id.type === 'Identifier' ? id.name : undefined
 
-  while (i < source.length && WORD.test(source[i]!))
-    i++
-
-  return source.slice(at, i)
-}
-
-// The declarators of the list from `from` to `end`: each one's left side, and its initializer when it has one.
-function declarators(source: string, from: number, end: number): { left: string, initializer: string | undefined }[] {
-  const found: { left: string, initializer: string | undefined }[] = []
-  let declarator = from
-  let depth = 0
-  let initial = -1
-  // A type annotation's `<>` hold commas that do not end the declarator.
-  let angle = 0
-
-  for (let i = from; i <= end; i++) {
-    const char = i < end ? source[i]! : ','
-
-    const literal = skipLiteral(source, i)
-
-    if (literal >= 0) {
-      i = literal - 1
-    }
-    else if (source.startsWith('//', i) || source.startsWith('/*', i)) {
-      i = skipTrivia(source, i) - 1
-    }
-    else if (OPENERS.includes(char)) {
-      depth++
-    }
-    else if (CLOSERS.includes(char)) {
-      depth--
-    }
-    else if (depth === 0 && angle === 0 && initial < 0 && char === '=' && source[i + 1] !== '>') {
-      initial = i + 1
-    }
-    else if (depth === 0 && char === '<' && (initial < 0 || angle > 0 || genericCall(source, i) > 0 || CAST_TYPE.test(source.slice(Math.max(0, i - 80), i)))) {
-      angle++
-    }
-    else if (depth === 0 && char === '>' && source[i - 1] !== '=' && angle > 0) {
-      angle--
-    }
-    else if (depth === 0 && angle === 0 && char === ',') {
-      found.push(initial >= 0 ? { left: source.slice(declarator, initial - 1), initializer: source.slice(skipTrivia(source, initial), i) } : { left: source.slice(declarator, i), initializer: undefined })
-
-      initial = -1
-      declarator = i + 1
-    }
-  }
-
-  return found
-}
-
-// Whether a declarator of the list from `from` to `end` is initialised with an empty container, or for an export one nothing shows unchanged.
-function declaratorsHoldContainer(source: string, from: number, end: number, declaredExported: boolean, settings: ReadonlySet<string>, unchanged: Unchanged | undefined, risks: Map<string, number> | undefined, start: number, later: ReadonlySet<string>): boolean {
-  for (const { left, initializer } of declarators(source, from, end)) {
-    if (initializer === undefined || settings.has(left.trim()))
+    if (init == null || (name !== undefined && settings.has(name)))
       continue
 
     // A `const` exported further down by `export { X }` or `export default X` is as open to another module as one exported where it is declared.
-    const exported = declaredExported || later.has(declaredName(left.trim()) ?? '')
+    const exported = declaredExported || (name !== undefined && later.has(name))
 
-    if (holdsContainer(initializer, exported) && !(exported && provenUnchanged(left, initializer, unchanged))) {
-      const name = exported ? declaredName(left.trim()) : undefined
+    if (!holdsContainer(init, exported) || (exported && name !== undefined && unchanged?.(name, init) === true))
+      continue
 
-      if (name === undefined || risks === undefined)
-        return true
+    if (!exported || name === undefined || risks === undefined)
+      return true
 
-      risks.set(name, start)
-    }
+    risks.set(name, statement.start!)
   }
 
   return false
 }
 
-function provenUnchanged(declarator: string, initializer: string, unchanged: Unchanged | undefined): boolean {
-  const name = declaredName(declarator.trim())
+// Whether an initializer is an empty container, or for an export starts with any array, object, `new` or `store` call.
+function holdsContainer(initializer: Expression, exported: boolean): boolean {
+  const lead = leading(initializer)
 
-  return name !== undefined && unchanged?.(name, initializer) === true
-}
-
-// Whether an initializer is an empty container, or for an export any array, object or `new`.
-function holdsContainer(initializer: string, exported: boolean): boolean {
   if (exported)
-    return NEW_VALUE.test(initializer)
+    return lead.type === 'ArrayExpression' || lead.type === 'ObjectExpression' || lead.type === 'NewExpression' || (lead.type === 'CallExpression' && lead.callee.type === 'Identifier' && lead.callee.name === 'store')
 
-  const brackets = BRACKETS.exec(initializer)
+  let value: Node = initializer
 
-  if (brackets === null)
-    return newWithoutArguments(initializer)
+  while (value.type === 'TSAsExpression' || value.type === 'TSSatisfiesExpression')
+    value = value.expression
 
-  const rest = initializer.slice(brackets[0].length)
-  const after = rest.slice(skipTrivia(rest, 0))
+  if (value.type === 'ArrayExpression' || value.type === 'ObjectExpression')
+    return (value.type === 'ArrayExpression' ? value.elements : value.properties).length === 0
 
-  return after === '' || CAST.test(after)
+  // `new Map()` and the like with nothing to fill them from, whatever is then called on them.
+  return lead.type === 'NewExpression' && lead.callee.type === 'Identifier' && NEW_CONTAINERS.has(lead.callee.name) && lead.arguments.length === 0
 }
 
-// `new Map()` and the like, type arguments allowed, with nothing to fill them from.
-function newWithoutArguments(initializer: string): boolean {
-  NEW_CONTAINER.lastIndex = 0
+// The operand an expression starts with as written: `[1].concat(a)` starts with `[1]`, `new Map().set(a, b)` with `new Map()`, and a `store(...)` call is its own.
+function leading(expression: Expression): Node {
+  let node: Node = expression
 
-  const name = NEW_CONTAINER.exec(initializer)
-
-  if (name === null)
-    return false
-
-  const close = initializer[name[0].length] === '<' ? genericCall(initializer, name[0].length) : -1
-  const open = skipTrivia(initializer, close < 0 ? name[0].length : close + 1)
-
-  if (initializer[open] !== '(')
-    return false
-
-  return initializer[skipTrivia(initializer, open + 1)] === ')'
+  for (;;) {
+    if (node.type === 'TSAsExpression' || node.type === 'TSSatisfiesExpression' || node.type === 'TSNonNullExpression' || node.type === 'TSInstantiationExpression')
+      node = node.expression
+    else if (node.type === 'MemberExpression' || node.type === 'OptionalMemberExpression')
+      node = node.object
+    else if ((node.type === 'CallExpression' || node.type === 'OptionalCallExpression') && !(node.callee.type === 'Identifier' && node.callee.name === 'store'))
+      node = node.callee
+    else if (node.type === 'TaggedTemplateExpression')
+      node = node.tag
+    else if (node.type === 'BinaryExpression' || node.type === 'LogicalExpression' || node.type === 'AssignmentExpression')
+      node = node.left
+    else if (node.type === 'ConditionalExpression')
+      node = node.test
+    else if (node.type === 'SequenceExpression')
+      node = node.expressions[0]!
+    else if (node.type === 'UpdateExpression' && !node.prefix)
+      node = node.argument
+    else
+      return node
+  }
 }
 
-// For a `<` in an initializer: the index of its closing `>` when it opens type arguments, `new Map<string, number>()`, else -1.
-function genericCall(source: string, at: number): number {
-  if (!WORD.test(source[at - 1] ?? ''))
-    return -1
+// The names a node mentions as code, types left out, in the order it writes them.
+function namesIn(root: Node): string[] {
+  const names: string[] = []
+  const pending: Node[] = [root]
 
-  let depth = 0
+  for (let node = pending.pop(); node !== undefined; node = pending.pop()) {
+    if (TYPE_NODES.has(node.type))
+      continue
 
-  for (let i = at; i < source.length; i++) {
-    const char = source[i]!
+    if (node.type === 'Identifier')
+      names.push(node.name)
 
-    if (char === '<')
-      depth++
-    else if (char === '>' && --depth === 0)
-      return source[skipTrivia(source, i + 1)] === '(' ? i : -1
-    else if (!TYPE_ARGUMENT.test(char))
-      return -1
+    const keys = VISITOR_KEYS[node.type] ?? []
+
+    for (let at = keys.length - 1; at >= 0; at--) {
+      if (TYPE_KEYS.has(keys[at]!))
+        continue
+
+      const child = (node as unknown as Record<string, unknown>)[keys[at]!]
+      const items = Array.isArray(child) ? child : [child]
+
+      for (let item = items.length - 1; item >= 0; item--) {
+        if (typeof items[item] === 'object' && items[item] !== null)
+          pending.push(items[item] as Node)
+      }
+    }
   }
 
-  return -1
+  return names
 }
 
-// A top-level statement of a module: the names it binds, those of its exports, and its text.
+// A top-level statement of a module: the names it binds, those of its exports, and the names it mentions.
 interface Declaration {
   locals: string[]
-  // An exported name, with the local names it stands for, or none for an `export default` expression, which stands for whatever its text names.
+  // An exported name, with the local names it stands for, or none for an `export default` expression, which stands for whatever it names.
   exports: { name: string, of: string[] | undefined }[]
-  text: string
+  names: string[]
 }
 
-const FUNCTION_OR_CLASS = /^(?:declare\s+)?(?:abstract\s+)?(?:async\s+)?(?:function\s*\*\s*|(?:function|class|enum|namespace)\s+)([\w$]+)/
-const IDENTIFIER = /[A-Z_$][\w$]*/gi
-const EXPORT_CLAUSE = /^\{([^}]*)\}\s*(from\b)?/
-const AS = /\s+as\s+/
-const QUOTES = /^['"]|['"]$/g
+// The names a declaration binds at the top of a module, undefined for a type or a `declare`, which bind no value.
+function localsOf(node: Node): string[] | undefined {
+  if ('declare' in node && node.declare === true)
+    return undefined
 
-// The top-level statements of a module that bind names or export them, as the scan reads them.
-function declarations(source: string): Declaration[] {
+  if (node.type === 'VariableDeclaration')
+    return node.declarations.flatMap(declarator => patternNames(declarator.id))
+
+  if ((node.type === 'FunctionDeclaration' || node.type === 'ClassDeclaration' || node.type === 'TSEnumDeclaration') && node.id != null)
+    return [node.id.name]
+
+  return node.type === 'TSModuleDeclaration' && node.id.type === 'Identifier' ? [node.id.name] : undefined
+}
+
+// The top-level statements of a module that bind names or export them.
+function declarations(program: Program): Declaration[] {
   const found: Declaration[] = []
-  let at = skipTrivia(source, 0)
 
-  while (at < source.length) {
-    const end = statementEnd(source, at)
-    const declaration = declarationAt(source, at, end)
+  for (const statement of program.body) {
+    if (statement.type === 'ExportNamedDeclaration') {
+      // A re-export from another module binds and uses nothing of this one.
+      if (statement.source != null || statement.exportKind === 'type')
+        continue
 
-    if (declaration !== undefined)
-      found.push(declaration)
+      const locals = statement.declaration == null ? [] : localsOf(statement.declaration)
 
-    at = skipTrivia(source, Math.max(end, at + 1))
+      if (locals === undefined)
+        continue
+
+      const listed = statement.specifiers.flatMap(specifier => specifier.type === 'ExportSpecifier' && specifier.exportKind !== 'type' ? [{ name: nameOf(specifier.exported), of: [specifier.local.name] }] : [])
+
+      found.push({ locals, exports: [...locals.map(name => ({ name, of: [name] })), ...listed], names: namesIn(statement) })
+    }
+    else if (statement.type === 'ExportDefaultDeclaration') {
+      const { declaration } = statement
+      const named = (declaration.type === 'FunctionDeclaration' || declaration.type === 'ClassDeclaration') && declaration.id != null ? [declaration.id.name] : []
+
+      found.push({ locals: named, exports: [{ name: 'default', of: undefined }], names: namesIn(statement) })
+    }
+    else {
+      const locals = localsOf(statement)
+
+      if (locals !== undefined)
+        found.push({ locals, exports: [], names: namesIn(statement) })
+    }
   }
 
   return found
 }
 
-function declarationAt(source: string, start: number, end: number): Declaration | undefined {
-  const text = source.slice(start, end)
-  let i = start
-  let word = wordAt(source, i)
-  const exported = word === 'export'
+// The names an `export default` expression holds: the bare identifier, or every name of an object or array, which a write through the default import reaches.
+function defaultLocals(declaration: Node): string[] {
+  let value = declaration
 
-  if (exported) {
-    i = skipTrivia(source, i + word.length)
-    word = wordAt(source, i)
-  }
+  while (value.type === 'TSAsExpression' || value.type === 'TSSatisfiesExpression')
+    value = value.expression
 
-  if (exported && source[i] === '{') {
-    const clause = EXPORT_CLAUSE.exec(source.slice(i, end))
+  if (value.type === 'Identifier')
+    return [value.name]
 
-    // A re-export from another module binds and uses nothing of this one.
-    if (clause === null || clause[2] !== undefined)
-      return undefined
-
-    const specifiers = clause[1]!.split(',').map(entry => entry.trim()).filter(entry => entry !== '' && !TYPE_ENTRY.test(entry))
-
-    return { locals: [], exports: specifiers.map((entry) => {
-      const [local, exportedName] = entry.split(AS)
-
-      return { name: (exportedName ?? local!).replace(QUOTES, ''), of: [local!.replace(QUOTES, '')] }
-    }), text }
-  }
-
-  if (exported && word === 'default') {
-    i = skipTrivia(source, i + word.length)
-
-    const named = FUNCTION_OR_CLASS.exec(source.slice(i, end))?.[1]
-
-    return { locals: named === undefined ? [] : [named], exports: [{ name: 'default', of: undefined }], text }
-  }
-
-  if (word === 'const' || word === 'let' || word === 'var') {
-    const locals = declarators(source, skipTrivia(source, i + word.length), end).flatMap((declarator) => {
-      const plain = declaredName(declarator.left.trim())
-
-      return plain === undefined ? declarator.left.match(IDENTIFIER) ?? [] : [plain]
-    })
-
-    return { locals, exports: exported ? locals.map(name => ({ name, of: [name] })) : [], text }
-  }
-
-  const declared = FUNCTION_OR_CLASS.exec(source.slice(i, end))?.[1]
-
-  if (declared === undefined)
-    return undefined
-
-  return { locals: [declared], exports: exported ? [{ name: declared, of: [declared] }] : [], text }
-}
-
-// The names an `export default` expression holds: the bare identifier, or every identifier of an object or array, which a write through the default import reaches.
-function defaultLocals(text: string): string[] {
-  const alone = DEFAULT_NAME.exec(text)?.[1]
-
-  if (alone !== undefined)
-    return [alone]
-
-  return DEFAULT_CONTAINER.test(text) ? text.match(IDENTIFIER) ?? [] : []
+  return value.type === 'ObjectExpression' || value.type === 'ArrayExpression' ? namesIn(value) : []
 }
 
 // The local names a module exports apart from their declaration: `export { X }`, `export { X as Y }`, `export default X`.
-function exportedLater(source: string): Set<string> {
+function exportedLater(program: Program): Set<string> {
   const names = new Set<string>()
 
-  if (!EXPORT_LATER.test(source))
-    return names
-
-  for (const { exports, text } of declarations(source)) {
-    for (const { name, of } of exports) {
-      for (const local of name === 'default' && of === undefined ? defaultLocals(text) : of ?? [])
-        names.add(local)
+  for (const statement of program.body) {
+    if (statement.type === 'ExportDefaultDeclaration') {
+      for (const name of defaultLocals(statement.declaration))
+        names.add(name)
+    }
+    else if (statement.type === 'ExportNamedDeclaration' && statement.declaration == null && statement.source == null && statement.exportKind !== 'type') {
+      for (const specifier of statement.specifiers) {
+        if (specifier.type === 'ExportSpecifier' && specifier.exportKind !== 'type')
+          names.add(specifier.local.name)
+      }
     }
   }
 
@@ -494,19 +271,19 @@ function exportedLater(source: string): Set<string> {
 }
 
 // Which exports of a module lean on the exported containers of `risks`, a name to where the first container it leans on starts: the container itself, a function or a value built from it, a default or a renamed export of either.
-// A binding leans on a container when its text names it or another binding that does, found by name over the module.
-export function exposedBy(source: string, risks: ReadonlyMap<string, number>): Map<string, number> {
-  const all = declarations(source)
+// A binding leans on a container when it names it or another binding that does.
+export function exposedBy(program: Program, risks: ReadonlyMap<string, number>): Map<string, number> {
+  const all = declarations(program)
   const leaning = new Map(risks)
 
   for (let changed = true; changed;) {
     changed = false
 
-    for (const { locals, text } of all) {
+    for (const { locals, names } of all) {
       if (locals.every(name => leaning.has(name)))
         continue
 
-      const root = rootOf(text, leaning)
+      const root = rootOf(names, leaning)
 
       if (root === undefined)
         continue
@@ -522,9 +299,9 @@ export function exposedBy(source: string, risks: ReadonlyMap<string, number>): M
 
   const exposed = new Map<string, number>()
 
-  for (const { exports, text } of all) {
+  for (const { exports, names } of all) {
     for (const { name, of } of exports) {
-      const root = of === undefined ? rootOf(text, leaning) : of.map(local => leaning.get(local)).find(at => at !== undefined)
+      const root = of === undefined ? rootOf(names, leaning) : of.map(local => leaning.get(local)).find(at => at !== undefined)
 
       if (root !== undefined && !exposed.has(name))
         exposed.set(name, root)
@@ -534,10 +311,10 @@ export function exposedBy(source: string, risks: ReadonlyMap<string, number>): M
   return exposed
 }
 
-// Where the first container among `leaning` that the text names starts, if it names one.
-function rootOf(text: string, leaning: ReadonlyMap<string, number>): number | undefined {
-  for (const word of text.match(IDENTIFIER) ?? []) {
-    const at = leaning.get(word)
+// Where the first container among `leaning` that the names hold starts, if they hold one.
+function rootOf(names: readonly string[], leaning: ReadonlyMap<string, number>): number | undefined {
+  for (const name of names) {
+    const at = leaning.get(name)
 
     if (at !== undefined)
       return at
