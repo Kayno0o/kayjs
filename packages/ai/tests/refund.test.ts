@@ -7,6 +7,7 @@ import { answeringRequest } from '../../../src/server/log'
 import { protectionRefusal } from '../../../src/server/protection'
 import { sendFrom } from '../../../src/server/rewrite'
 import { ai, ask, fakeAi } from '../src'
+import { forgetReads } from '../src/conversation'
 import { forgetKept } from '../src/kept'
 import { untilHolds } from './until'
 
@@ -14,6 +15,7 @@ afterEach(() => {
   ai()
   fakeAi.clear()
   forgetKept()
+  forgetReads()
 })
 
 const id = 'reply-0001'
@@ -249,5 +251,32 @@ describe('a resume or stop against the action\'s rateLimit', () => {
     finally {
       warn.mockRestore()
     }
+  })
+})
+
+describe('the reads of a Chat keeping its conversation on the server', () => {
+  // A read through the action as a Chat with `keepOnServer` makes it, answered by `ask` with no model asked.
+  async function read(action: never, header: string, visitor = 'ann') {
+    const request = new Request('http://localhost/_kay/action/chat', { headers: { 'x-kai-conversation': header } })
+
+    sendFrom(request, '203.0.113.1')
+    nameUser(request, () => visitor)
+    await protectionRefusal(action, request, { body: {}, form: false, server: null, plain: false })
+
+    return answeringRequest(request, async () => ({ text: await ask('', { provider: quick }) }))
+  }
+
+  it('give back their attempt for a visitor\'s first ten in a window, and count past them, so the handler cannot be replayed through reads without limit', async () => {
+    const store = memoryRates()
+    const action = actionOf({ max: 100, window: '1m', store })
+
+    for (let index = 0; index < 12; index++)
+      await read(action, index % 2 === 0 ? 'load:conv-0001' : 'list')
+
+    expect(store.peek(KEY)?.count).toBe(2)
+
+    // A change is no read, and counts as a send does.
+    await read(action, 'rename:conv-0001')
+    expect(store.peek(KEY)?.count).toBe(3)
   })
 })

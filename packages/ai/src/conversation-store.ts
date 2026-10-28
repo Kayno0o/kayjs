@@ -84,7 +84,7 @@ export function sqliteConversations(path: string = CONVERSATIONS_FILE): Conversa
       return Promise.resolve(row === null ? undefined : { id: row.id, title: row.title, updatedAt: row.updated_at, revision: row.revision, turns: turnsOf(row.turns) })
     },
     write: async (key, revision, change) => Promise.resolve(db().write(key, revision, change)),
-    rename: async ({ owner, scope, id }, title) => Promise.resolve(db().rename.run(title, Date.now(), owner, scope, id).changes > 0),
+    rename: async ({ owner, scope, id }, title) => Promise.resolve(db().rename.run(title, owner, scope, id).changes > 0),
     remove: async ({ owner, scope, id }) => Promise.resolve(db().remove.run(owner, scope, id).changes > 0),
   }
 }
@@ -99,7 +99,8 @@ function open(path: string) {
   const get = db.query<Row, [string, string, string]>('SELECT id, title, revision, updated_at, turns FROM kai_conversations WHERE owner = ?1 AND scope = ?2 AND id = ?3')
   const upsert = db.query('INSERT INTO kai_conversations (owner, scope, id, title, revision, updated_at, turns) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7) ON CONFLICT (owner, scope, id) DO UPDATE SET revision = ?5, updated_at = ?6, turns = ?7')
   const prune = db.query('DELETE FROM kai_conversations WHERE owner = ?1 AND scope = ?2 AND id NOT IN (SELECT id FROM kai_conversations WHERE owner = ?1 AND scope = ?2 ORDER BY updated_at DESC, rowid DESC LIMIT ?3)')
-  const rename = db.query('UPDATE kai_conversations SET title = ?1, updated_at = ?2 WHERE owner = ?3 AND scope = ?4 AND id = ?5')
+  // A rename keeps the conversation's place in the list and among the ones kept, which only its turns move.
+  const rename = db.query('UPDATE kai_conversations SET title = ?1 WHERE owner = ?2 AND scope = ?3 AND id = ?4')
   const remove = db.query('DELETE FROM kai_conversations WHERE owner = ?1 AND scope = ?2 AND id = ?3')
 
   // The check of the revision and the write are one transaction, so two processes writing at once cannot both pass it.

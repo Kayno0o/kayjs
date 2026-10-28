@@ -38,6 +38,37 @@ export function heldCall(): HeldCall | undefined {
   return { ...call, request }
 }
 
+// A page opening shows a conversation and the list, two reads; a visitor's first ones in a window give back the attempt the action's `rateLimit` counted, so the handler's code before `ask` cannot be replayed through reads without limit.
+const READ_REFUNDS = 10
+const READ_WINDOW_MS = 10 * 60_000
+// The readers counted, oldest first, at most this many, as the process holds them in memory.
+const MOST_READERS = 10_000
+const reads = new Map<string, { since: number, count: number }>()
+
+// For tests, which each start with no read counted.
+export function forgetReads(): void {
+  reads.clear()
+}
+
+// Counts the read with no await between the check and the count, so parallel reads cannot pass the cap.
+function mayRefund(reader: string, now: number): boolean {
+  const counted = reads.get(reader)
+
+  if (counted === undefined || now - counted.since > READ_WINDOW_MS) {
+    reads.delete(reader)
+    reads.set(reader, { since: now, count: 1 })
+
+    if (reads.size > MOST_READERS)
+      reads.delete(reads.keys().next().value!)
+
+    return true
+  }
+
+  counted.count++
+
+  return counted.count <= READ_REFUNDS
+}
+
 // A conversation belongs to the action that holds it, so two chats of one visitor keep apart.
 const scopeOf = (request: Request) => new URL(request.url).pathname
 
@@ -85,33 +116,47 @@ export function heldReply(call: HeldCall, prompt: Message[], options: AskOptions
 
     const turns = stored?.turns ?? []
     const drop = Math.min(replacesOf(call.request)?.turns ?? 0, turns.length)
+    // The Chat posts its new message alone; anything posted before it is the server's to hold, not the client's to add.
+    const posted = prompt.slice(-1)
 
-    write = async reply => kept(reply, key, revision, drop, prompt, options)
+    write = async reply => kept(reply, key, revision, drop, posted, options)
 
-    return { reply: make(fitted(turns.slice(0, turns.length - drop), prompt, maxInputChars)) }
+    return { reply: make(fitted(turns.slice(0, turns.length - drop), posted, maxInputChars)) }
   })()
 
   return deferredReply(target, { ended: async reply => write?.(reply) })
 }
 
-// Stores the exchange as the Chat shows it: the posted messages, and the reply when it said or called anything. A reply that failed, or that was stopped before its first word, which the Chat takes back, stores nothing.
+// The calls a reply made and how it finished, none for one that broke off before telling.
+async function ending(reply: Reply): Promise<[calls: readonly unknown[], finish: unknown]> {
+  try {
+    return await Promise.all([reply.calls, reply.finish])
+  }
+  catch {
+    return [[], undefined]
+  }
+}
+
+// Stores the exchange as the Chat shows it: the posted message, and the reply when it said or called anything, a reply cut off by a failure as one stopped. A reply that failed or was stopped before its first word, which the Chat takes back, stores nothing.
 async function kept(reply: Reply, key: ConversationKey, revision: number, drop: number, prompt: readonly Message[], options: AskOptions): Promise<void> {
   let text: string
+  let failed = false
 
   try {
     text = await reply
   }
-  catch {
-    return
+  catch (error) {
+    text = error instanceof AiError ? error.partial ?? '' : ''
+    failed = true
   }
 
-  const [calls, finish] = await Promise.all([reply.calls, reply.finish])
+  const [calls, finish] = await ending(reply)
 
-  if (text === '' && calls.length === 0 && finish === undefined)
+  if (text === '' && calls.length === 0 && (failed || finish === undefined))
     return
 
   const sources = text === '' ? [] : usableSources(options.sources)
-  const answer: StoredTurn[] = text === '' && calls.length === 0 ? [] : [{ role: 'assistant', content: text, ...sources.length > 0 && { sources }, ...finish === undefined && { stopped: true } }]
+  const answer: StoredTurn[] = text === '' && calls.length === 0 ? [] : [{ role: 'assistant', content: text, ...sources.length > 0 && { sources }, ...(failed || finish === undefined) && { stopped: true } }]
   const add: StoredTurn[] = [...prompt.map(({ role, content }) => ({ role, content })), ...answer]
 
   try {
@@ -141,7 +186,7 @@ async function answerOf(call: HeldCall, prompt: readonly Message[], named: strin
   const scope = scopeOf(call.request)
 
   // A read is a page showing the conversation, not a question, so it gives back the attempt the action's `protect.rateLimit` counted.
-  if (call.op === 'load' || call.op === 'list')
+  if ((call.op === 'load' || call.op === 'list') && mayRefund(`${owner}\0${scope}`, Date.now()))
     await refundRateLimit(call.request)
 
   if (call.op === 'list')

@@ -228,6 +228,53 @@ test('lists the conversations, moves the one a reply landed in to the top, and r
   expect(session.history()).toEqual([])
 })
 
+test('a reply under way when the address leaves the conversation joins neither it nor the next, whose first send posts revision 0', async () => {
+  const running = await replied('unused')
+  const next = await replied('fresh')
+  const { session, posts, conversation } = chat([loaded(SHOWN, 1, [['user', 'a'], ['assistant', 'b']])], [running.answer, next.answer], { shown: SHOWN })
+
+  await untilHolds(() => session.history().length === 2)
+  session.draft.set('long one')
+  await session.send()
+  running.stream.send('half way')
+  flush()
+
+  conversation.set(undefined)
+  flush()
+  await Bun.sleep(0)
+  expect(session.history()).toEqual([])
+
+  session.draft.set('new')
+  await session.send()
+  expect(posts[1]!.headers[CONVERSATION_HEADER]).toMatch(/^send:[\da-f]{32}:0$/)
+})
+
+test('a reply that failed before its first word puts the message back, as the server stored nothing, and the next send posts the same revision', async () => {
+  const broken = await replied('unused')
+  const { session, posts } = chat([loaded(SHOWN, 2, [['user', 'a'], ['assistant', 'b']])], [broken.answer, async () => Promise.reject(new ActionError(500, '', {}))], { shown: SHOWN })
+
+  await untilHolds(() => !session.loading())
+  session.draft.set('first')
+  await session.send()
+  broken.stream.end('failed')
+  flush()
+  expect(turns(session)).toEqual(['user: a', 'assistant: b'])
+  expect(session.draft()).toBe('first')
+  expect(session.failure()).toBe('The reply failed.')
+
+  await session.send()
+  expect(posts[1]!.headers[CONVERSATION_HEADER]).toBe(`send:${SHOWN}:2`)
+  expect(turns(session)).toEqual(['user: a', 'assistant: b'])
+  expect(session.draft()).toBe('first')
+})
+
+test('an address naming no conversation a Chat made, as a crafted link may, loads none', async () => {
+  const { session, consulted } = chat([loaded(undefined, 0)], [], { shown: 'abc' })
+
+  await untilHolds(() => !session.loading())
+  expect(consulted[0]!.headers[CONVERSATION_HEADER]).toBe('load')
+})
+
 test('says the conversation could not be loaded when the action answers none', async () => {
   const { session } = chat([], [], { shown: SHOWN })
 

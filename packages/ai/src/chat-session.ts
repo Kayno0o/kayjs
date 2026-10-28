@@ -7,7 +7,7 @@ import { markdownReady } from 'kay/markdown'
 import { filesOf, keepPending, newReplyId, pendingReply, posted, restored, shrunk, stored } from './chat-history'
 import { sameSources, usableSources } from './chat-sources'
 import { renamedTitle, titleOf } from './conversation-title'
-import { CONVERSATION_HEADER, REPLACES_HEADER, REPLY_HEADER } from './resume'
+import { CONVERSATION_HEADER, CONVERSATION_ID, REPLACES_HEADER, REPLY_HEADER } from './resume'
 
 export interface Turn extends Message {
   id: number
@@ -61,6 +61,9 @@ export interface ChatVoice {
   readonly failedLabel: string
 }
 
+// The conversation the address names, none for a value no Chat made, which a crafted link may hold.
+const named = (id: string | undefined) => id !== undefined && CONVERSATION_ID.test(id) ? id : undefined
+
 // The one snapshot a conversation call answers with, as the JSON it holds; undefined for an answer that is no stream, or a stream that ended without one.
 async function answerIn(answer: unknown): Promise<ConversationAnswer | undefined> {
   if (typeof answer !== 'object' || answer === null || !('on' in answer))
@@ -69,7 +72,7 @@ async function answerIn(answer: unknown): Promise<ConversationAnswer | undefined
   const stream = answer as ActionStream<string | Progress>
   const value = await new Promise<string | Progress | undefined>((resolve) => {
     let off: (() => void) | undefined
-    // A stream that ends with no value says so by its status alone, which no listener hears.
+    // A stream that ends with no value says so by its status alone, which no listener hears: kaynooo/kayjs#2574.
     const timer = setInterval(() => {
       if (stream.status() !== 'open')
         settle(stream.last())
@@ -102,6 +105,8 @@ interface Reply {
   id: string | undefined
   outlives: boolean
   resumed: boolean
+  // The conversation the reply was asked in, counted by `left`: a reply ending once the chat left it for another joins no history.
+  conversation: number
 }
 
 // What a regenerate or an edit replaces (`regenerate:2`), kept for Try again, which posts the same request, and the history as it stood before it cut it, put back when that post is stopped or refused before any word. Both go once a reply lands, which leaves no message for Try again.
@@ -191,6 +196,8 @@ export function createChatSession(options: ChatSessionOptions) {
   // Counts the loads, so only the latest one shows, and names the conversation the last one asked for, so the address naming it loads it once.
   let loads = 0
   let asked: string | undefined
+  // Counts the times the chat left the conversation it showed, for a new one or a loaded one.
+  let left = 0
   const holding = () => options.conversation !== undefined && owned() !== false
 
   // A read or a change of the conversations, which the action answers through `ask` with no model asked: the message only carries a rename's title.
@@ -203,6 +210,7 @@ export function createChatSession(options: ChatSessionOptions) {
     const turn = ++loads
 
     asked = id
+    left++
     loading.set(true)
     failure.set(undefined)
 
@@ -269,6 +277,7 @@ export function createChatSession(options: ChatSessionOptions) {
 
   // A new conversation: nothing is stored until its first reply lands.
   function startNew() {
+    left++
     shown = undefined
     revision = 0
     replacement = undefined
@@ -379,6 +388,13 @@ export function createChatSession(options: ChatSessionOptions) {
     streaming.set(undefined)
     clearLive()
 
+    // A reply stopped as the chat left its conversation belongs to none shown, and the server stored it in its own.
+    if (reply !== undefined && reply.conversation !== left) {
+      forget(reply)
+
+      return
+    }
+
     // A page swap closes the stream too, leaving the reply to be asked for again when the chat returns.
     if (state !== 'closed' && reply !== undefined)
       forget(reply)
@@ -391,11 +407,17 @@ export function createChatSession(options: ChatSessionOptions) {
       history.set([...history(), { id: nextId++, role: 'assistant', content: text, calls: made, code: highlighted, reasoning: thinking, reasoningOpen: thinkingOpen, ...cites.length > 0 && { sources: cites }, stopped: state === 'closed' }])
     }
 
-    // The server stored the exchange as it does: a reply that ended, or one stopped once it had said or called something.
-    if (holding() && reply?.resumed !== true && (state === 'done' || (state === 'closed' && (text !== '' || made.length > 0)))) {
+    // The server stored the exchange as it does: a reply that ended, or one stopped or broken off once it had said or called something.
+    const held = holding() && reply?.resumed !== true
+
+    if (held && (state === 'done' || text !== '' || made.length > 0)) {
       revision++
       touched()
     }
+
+    // A conversation held on the server stored nothing of a reply that failed before its first word, so its message goes back to the field, keeping the turns the chat shows in line with the stored ones.
+    if (held && state === 'failed' && text === '' && made.length === 0)
+      takeBack()
 
     if (state === 'failed')
       failure.set(options.errorMessage)
@@ -452,7 +474,7 @@ export function createChatSession(options: ChatSessionOptions) {
     }
 
     // A reply is named, so a Stop ends it on the server and, for a Chat that remembers its history in the tab, a reload finds it.
-    const current: Reply = { abort: new AbortController(), id: resuming ?? newReplyId(), outlives: false, resumed: resuming !== undefined }
+    const current: Reply = { abort: new AbortController(), id: resuming ?? newReplyId(), outlives: false, resumed: resuming !== undefined, conversation: left }
 
     if (options.remember !== undefined && !held && current.id !== undefined)
       keepPending(options.remember, current.id)
@@ -499,7 +521,8 @@ export function createChatSession(options: ChatSessionOptions) {
           return
         }
 
-        if (error instanceof ActionError && error.status === 422)
+        // A conversation held on the server stored nothing of a refused call either.
+        if (held || (error instanceof ActionError && error.status === 422))
           takeBack()
 
         const refusal = error instanceof ActionError && error.status < 500 ? error.errors[''] : undefined
@@ -557,14 +580,14 @@ export function createChatSession(options: ChatSessionOptions) {
       return
     }
 
-    void load(untrack(options.conversation))
+    void load(named(untrack(options.conversation)))
 
     if (options.listed)
       void list()
   })
 
   effect(() => {
-    const id = options.conversation?.()
+    const id = named(options.conversation?.())
 
     untrack(() => {
       if (!mounted || id === shown || (loading() && id === asked) || owned() === false)

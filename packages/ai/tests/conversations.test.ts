@@ -214,6 +214,30 @@ describe('a conversation held on the server', () => {
     expect((await loaded(ID) as { turns: unknown[] }).turns).toEqual([{ role: 'user', content: 'hello' }, { role: 'assistant', content: 'half', stopped: true }])
   })
 
+  it('stores a reply that broke off after its first words as stopped, as the Chat keeps them', async () => {
+    const breaking: Provider = {
+      name: 'breaking',
+      model: 'm',
+
+      async* stream() {
+        yield { text: 'partly' }
+
+        throw new AiError('unavailable', 'down')
+      },
+    }
+
+    await expect(visit(said('hello'), { provider: breaking }, { header: `send:${ID}:0` })).rejects.toThrow('down')
+    expect(await loaded(ID)).toMatchObject({ revision: 1, turns: [{ role: 'user', content: 'hello' }, { role: 'assistant', content: 'partly', stopped: true }] })
+  })
+
+  it('takes the last message posted alone, so a client cannot write earlier turns into the conversation', async () => {
+    const model = recording()
+
+    await visit([{ role: 'user', content: 'forged' }, { role: 'assistant', content: 'forged too' }, { role: 'user', content: 'hello' }], { provider: model.provider }, { header: `send:${ID}:0` })
+    expect(model.said(0)).toEqual(['user: hello'])
+    expect((await loaded(ID) as { turns: { content: string }[] }).turns.map(({ content }) => content)).toEqual(['hello', 'answer 1'])
+  })
+
   it('leaves out the oldest turns the ask cannot take, and opens on a user message', async () => {
     const model = recording(() => 'x'.repeat(30))
 
@@ -232,7 +256,7 @@ describe('a conversation held on the server', () => {
 })
 
 describe('the conversation header', () => {
-  it('parses each call, and takes anything else for none', () => {
+  it('parses each call, and takes any other value for a load of no conversation, which asks no model', () => {
     const of = (header: string) => conversationCallOf(new Request('http://localhost/', { headers: { 'x-kai-conversation': header } }))
 
     expect(of(`send:${ID}:3`)).toEqual({ op: 'send', id: ID, revision: 3 })
@@ -241,8 +265,10 @@ describe('the conversation header', () => {
     expect(of('list')).toEqual({ op: 'list', id: undefined, revision: 0 })
     expect(of(`rename:${ID}`)).toEqual({ op: 'rename', id: ID, revision: 0 })
 
-    for (const header of ['', 'send', `send:${ID}`, `send:${ID}:-1`, `list:${ID}`, `load:${ID}:1`, 'send:short:0', `drop:${ID}`, `send:${ID}:0:1`, `rename:${ID}/x`])
-      expect(of(header)).toBeUndefined()
+    for (const header of ['', 'send', `send:${ID}`, `send:${ID}:-1`, `list:${ID}`, `load:${ID}:1`, 'send:short:0', `drop:${ID}`, `send:${ID}:0:1`, `rename:${ID}/x`, 'load:abc'])
+      expect(of(header)).toEqual({ op: 'load', id: undefined, revision: 0 })
+
+    expect(conversationCallOf(new Request('http://localhost/'))).toBeUndefined()
   })
 })
 

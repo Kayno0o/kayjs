@@ -507,6 +507,8 @@ const deleting = signal<string | undefined>(undefined)
 const listProblem = signal<string | undefined>(undefined)
 // The button whose rename or delete just closed (`<id>:rename`, `<id>:delete`), which takes the focus back once it is drawn.
 let listFocus: string | undefined
+// Takes the focus once a delete took its row away, as the row's buttons went with it.
+let newConversation: HTMLElement | undefined
 
 const titled = (title: string) => title === '' ? untitledLabel : title
 
@@ -568,6 +570,7 @@ function renameKey(event: KeyboardEvent, id: string) {
 
 async function confirmDelete(id: string) {
   deleting = undefined
+  queueMicrotask(() => newConversation?.focus())
 
   try {
     if (!await session.remove(id))
@@ -599,7 +602,7 @@ section(part="root" onKeyDown={escape} data-empty={history().length === 0 && !bu
   // The visitor's conversations, each a link of the page, which the chat follows to show it.
   if conversations
     nav(part="conversations" aria-label={conversationsLabel})
-      a(part="newConversation" href={withQuery({ conversation: null })})
+      a(part="newConversation" href={withQuery({ conversation: null })} ref={element => newConversation = element})
         Icon(icon="plus")
         | {newLabel}
       if listProblem()
@@ -608,7 +611,7 @@ section(part="root" onKeyDown={escape} data-empty={history().length === 0 && !bu
         for item of session.conversations() key={item.id}
           li(part="conversation" data-current={shownParam?.() === item.id ? '' : undefined})
             if renaming() === item.id
-              TextInput(part="renameField" ref={element => { queueMicrotask(() => element.focus()) }} value={renameDraft()} onInput={value => { renameDraft = value }} aria-label={`${renameLabel}: ${titled(item.title)}`} onKeyDown={event => renameKey(event, item.id)} onBlur={() => { if (renaming() === item.id) void saveRename(item.id) }})
+              TextInput(part="renameField" maxlength="120" ref={element => { queueMicrotask(() => element.focus()) }} value={renameDraft()} onInput={value => { renameDraft = value }} aria-label={`${renameLabel}: ${titled(item.title)}`} onKeyDown={event => renameKey(event, item.id)} onBlur={() => { if (renaming() === item.id) void saveRename(item.id) }})
             else if deleting() === item.id
               div(part="deleteConfirm" role="group" aria-label={`${deleteLabel}: ${titled(item.title)}`} onKeyDown={event => deleteKey(event, item.id)})
                 span {titled(item.title)}: {deleteConfirmLabel}

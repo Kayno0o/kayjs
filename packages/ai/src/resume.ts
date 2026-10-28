@@ -56,13 +56,20 @@ export interface ConversationCall {
 
 const CONVERSATION = /^(?:list|load|(?:load|rename|remove):([\w-]{8,64})|send:([\w-]{8,64}):(\d{1,9}))$/
 
-// What the request says of the conversation it is for, or nothing for a Chat that holds its own history; a header that does not parse is no conversation call.
+// The id a Chat names a conversation by, which the page's `conversation` param holds.
+export const CONVERSATION_ID = /^[\w-]{8,64}$/
+
+// What the request says of the conversation it is for, or nothing for a Chat that holds its own history; a header that does not parse is a load of no conversation, so a crafted one never reaches the model.
 export function conversationCallOf(request: Request | undefined): ConversationCall | undefined {
-  const header = request?.headers.get(CONVERSATION_HEADER) ?? ''
+  const header = request?.headers.get(CONVERSATION_HEADER)
+
+  if (header === undefined || header === null)
+    return undefined
+
   const match = CONVERSATION.exec(header)
 
   if (!match)
-    return undefined
+    return { op: 'load', id: undefined, revision: 0 }
 
   const colon = header.indexOf(':')
   const op = (colon === -1 ? header : header.slice(0, colon)) as ConversationCall['op']
