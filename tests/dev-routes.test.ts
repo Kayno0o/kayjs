@@ -4,7 +4,7 @@ import { join } from 'node:path'
 import process from 'node:process'
 import { describe, expect, it } from 'bun:test'
 import { analytics, vitals } from '../src/server/analytics'
-import { DEV_ROUTES } from '../src/server/dev'
+import { DEV_ROUTES, DEV_TAB, DEV_TABS } from '../src/server/dev'
 import { plumbing } from '../src/server/plumbing'
 import { ServedPaths } from '../src/server/served-paths'
 import { scratchDir } from './scratch'
@@ -134,5 +134,21 @@ describe('kay\'s plumbing in the dev tool\'s routes', () => {
 
     expect(plumbed(found).map(line)).not.toContain('GET /_kay/card')
     expect(plumbed(found).map(line)).toContain('GET /_kay/image')
+  })
+})
+
+describe('the Routes tab module', () => {
+  it('is served as browser code at the path the tool fetches it from, and listed under that name', async () => {
+    const dev = await pages({ prebuilt: false, security: false, dev: true })
+    const response = await dev.handle(new Request(`http://localhost${DEV_TAB}routes.js`))
+    const text = await response.text()
+    const tool = await Bun.file(join(import.meta.dir, '../src/runtime/dev-tool.ts')).text()
+
+    expect(response.status).toBe(200)
+    expect(text).toContain('export default')
+    expect(text).not.toMatch(/^import /m)
+    expect(Object.keys(DEV_TABS)).toContain('routes')
+    expect(tool).toContain(`'${DEV_TAB}routes.js'`)
+    expect((await dev.handle(new Request(`http://localhost${DEV_TAB}nothing.js`))).status).toBe(404)
   })
 })
