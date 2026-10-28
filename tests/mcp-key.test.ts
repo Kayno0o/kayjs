@@ -152,7 +152,11 @@ describe('the key', () => {
     for (let n = 0; n < 3; n++)
       expect((await post(app, message('ping'), { ...bearer(OTHER), ...client })).status).toBe(401)
 
-    expect((await post(app, message('ping'), { ...bearer(OTHER), ...client })).status).toBe(429)
+    const refused = await post(app, message('ping'), { ...bearer(OTHER), ...client })
+
+    expect(refused.status).toBe(429)
+    expect(Number(refused.headers.get('retry-after'))).toBeGreaterThan(0)
+    expect(await refused.text()).toStartWith('Too many requests; try again in ')
     expect((await post(app, message('ping'), { ...bearer(KEY), ...client })).status).toBe(429)
   })
 })

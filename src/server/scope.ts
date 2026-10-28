@@ -80,17 +80,43 @@ export function askedForEndedEntry(): boolean {
   return endedEntries.getStore()?.asked === true
 }
 
-export const VARY_COOKIE = /(?:^|,)\s*cookie\s*(?:,|$)/i
+const VARY_COOKIE = /(?:^|,)\s*cookie\s*(?:,|$)/i
 
-// Keeps every shared cache from storing an answer meant for one caller, unless it set its own caching.
-export function markPrivate(headers: Headers): void {
-  if (headers.has('cache-control'))
+type HeaderAccess = Pick<Headers, 'append' | 'get' | 'has' | 'set'>
+
+// Keeps every shared cache from storing an answer meant for one caller, unless it set its own caching: on a Response's headers, or on the record Elysia's context keeps them in.
+export function markPrivate(headers: Headers | Record<string, unknown>): void {
+  const access = headers instanceof Headers ? headers : recordAccess(headers)
+
+  if (access.has('cache-control'))
     return
 
-  headers.set('cache-control', 'private, no-cache')
+  access.set('cache-control', 'private, no-cache')
 
-  if (!VARY_COOKIE.test(headers.get('vary') ?? ''))
-    headers.append('vary', 'cookie')
+  if (!VARY_COOKIE.test(access.get('vary') ?? ''))
+    access.append('vary', 'cookie')
+}
+
+// Elysia's `set.headers` read and written as Headers are, whatever case the route gave a name in.
+function recordAccess(headers: Record<string, unknown>): HeaderAccess {
+  const named = (name: string) => Object.keys(headers).find(key => key.toLowerCase() === name)
+
+  const get = (name: string) => {
+    const key = named(name)
+
+    return key === undefined || headers[key] === undefined ? null : [headers[key]].flat().join(', ')
+  }
+
+  return {
+    has: name => named(name) !== undefined,
+    get,
+    set: (name, value) => void (headers[named(name) ?? name] = value),
+    append: (name, value) => {
+      const before = get(name)
+
+      headers[named(name) ?? name] = before === null || before === '' ? value : `${before}, ${value}`
+    },
+  }
 }
 
 export function readPersonally(request: Request): void {

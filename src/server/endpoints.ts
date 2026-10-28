@@ -113,10 +113,8 @@ async function answer(endpoint: ServedEndpoint, context: { request: Request }, p
   jar.writeTo(extra)
 
   // What the endpoint or its guards read of the cookies is for that visitor alone, as for a page.
-  if (wasReadPersonally(request) && !response.headers.has('cache-control') && !extra.has('cache-control')) {
-    extra.set('cache-control', 'private, no-cache')
-    extra.append('vary', 'cookie')
-  }
+  if (wasReadPersonally(request) && !response.headers.has('cache-control'))
+    markPrivate(extra)
 
   if (!extra.keys().next().done) {
     response = new Response(response.body, response)

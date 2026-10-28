@@ -25,13 +25,13 @@ import { streamReporters } from './event-stream'
 import { loadGuard, requiredGuards } from './guards'
 import { inRouteReads, LIVE_HEADER, routeProof } from './live'
 import { answeringRequest, statusOf } from './log'
-import { apiLimitWait, checkApiLimit, requestId } from './protection'
+import { apiLimitWait, checkApiLimit, requestId, tooManyRequests } from './protection'
 import { sharedContext } from './render'
 import { isUncaught, reportServerError } from './report'
 import { recordOf, requestRecord } from './request-record'
 import { requestUrl } from './request-url'
 import { apiRoutePath, withoutSlash } from './routes'
-import { VARY_COOKIE, wasReadPersonally } from './scope'
+import { markPrivate, wasReadPersonally } from './scope'
 import { carriedNames, carryContext } from './security'
 import { answered, failed, SERVER_SPAN, startSpan, tracing } from './trace'
 import { socketLimits } from './ws-limits'
@@ -197,8 +197,9 @@ export async function serveApi(app: Elysia, modules: ApiModule[], options: Actio
           if (owner !== undefined && owner !== instance)
             return undefined
 
-          if (owner === instance)
-            privateAnswer(request, set.headers)
+          // An answer to a request whose guards or session read who sent it is for that caller alone, unless the route set its own caching; a Response of the route's own keeps its headers, as the context's never overwrite them.
+          if (owner === instance && wasReadPersonally(request))
+            markPrivate(set.headers)
 
           const value = sendable(responseValue)
 
@@ -286,25 +287,6 @@ function letGoOfParent(instance: object, app: object): void {
     getGlobalRoutes: () => parent.deref()?.getGlobalRoutes() ?? [],
     getGlobalDefinitions: () => parent.deref()?.getGlobalDefinitions() ?? { type: {}, error: {} },
   })
-}
-
-// An answer to a request whose guards or session read who sent it is for that caller alone, unless the route set its own caching; a Response of the route's own keeps its headers, as the context's never overwrite them.
-function privateAnswer(request: Request, headers: Record<string, unknown>): void {
-  if (!wasReadPersonally(request))
-    return
-
-  const named = (name: string) => Object.keys(headers).find(key => key.toLowerCase() === name)
-
-  if (named('cache-control') !== undefined)
-    return
-
-  headers['cache-control'] = 'private, no-cache'
-
-  const key = named('vary') ?? 'vary'
-  const vary = headers[key] === undefined ? '' : [headers[key]].flat().join(', ')
-
-  if (!VARY_COOKIE.test(vary))
-    headers[key] = vary === '' ? 'cookie' : `${vary}, cookie`
 }
 
 // A status as a number: Elysia accepts its names (`'Bad Request'`) too, and a name it does not know counts as a failure.
@@ -561,10 +543,6 @@ function rateLimitsOf(given: ApiRateLimit | ApiRateLimit[] | undefined, place: s
 
     return { name, limit }
   })
-}
-
-function tooManyRequests(wait: number): Response {
-  return new Response(`Too many requests; try again in ${wait} s`, { status: 429, headers: { ...TEXT, 'retry-after': String(wait) } })
 }
 
 function tooLarge(): Response {

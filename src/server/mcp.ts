@@ -17,7 +17,7 @@ import { RESOURCE_METADATA } from './api-modules'
 import { answeredAsPage, currentRequest } from './log'
 import { bearsMcpKey } from './mcp-key'
 import { actionOperation, guardRefusal, toolName } from './openapi'
-import { clientAddress, keepRequestId, markAgentCall, overLimit, requestId, requestServer, wasChallenged } from './protection'
+import { clientAddress, keepRequestId, markAgentCall, overLimit, requestId, requestServer, tooManyRequests, wasChallenged } from './protection'
 import { recordOf, requestRecord } from './request-record'
 import { requestUrl } from './request-url'
 import { sendFrom } from './rewrite'
@@ -475,7 +475,7 @@ export function serveMcp(app: Elysia, document: Schema, options: McpOptions): vo
     const wait = options.perMinute === undefined ? undefined : await overLimit(RATE_NAME, clientAddress(request, server), options.perMinute, MINUTE_MS)
 
     if (wait !== undefined)
-      return new Response('Too many requests', { status: 429, headers: { 'retry-after': String(wait) } })
+      return tooManyRequests(wait)
 
     // Before the body is read or any message answered, so a client without the key learns nothing of the tools.
     if (options.key !== undefined && (options.key === false || !bearsMcpKey(request, options.key)))

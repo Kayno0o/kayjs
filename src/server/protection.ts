@@ -655,6 +655,11 @@ export async function overLimit(name: string, client: string, max: number, windo
   return waitFor(memoryOf(name).hit(key, window), max)
 }
 
+// The refusal of a route over its limit whose caller reads the answer, an API module's or the MCP endpoint's: kay's beacons answer theirs with no body, as their other refusals.
+export function tooManyRequests(wait: number): Response {
+  return new Response(`Too many requests; try again in ${wait} s`, { status: 429, headers: { 'content-type': 'text/plain; charset=utf-8', 'retry-after': String(wait) } })
+}
+
 // The store a limit counts in when it names none: the app's `store.rates`, else this process's memory.
 function sharedRates(name: string): RateStore {
   return appStore()?.rates ?? memoryOf(name)
