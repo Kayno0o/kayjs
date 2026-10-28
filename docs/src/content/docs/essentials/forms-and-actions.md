@@ -383,7 +383,7 @@ p {answer()?.last()}
 
 Yield the whole text so far, not just the new piece. Then `last()` is all the island needs.
 
-Code that needs the stream's end, not each value, awaits `answer.ended()`. It resolves with the last value once the stream ran to its end, or undefined when it sent none. It rejects with an `ActionError` of status 500 when the stream failed, and with an `AbortError` when it was closed first.
+Code that needs the stream's end, not each value, awaits `answer.ended()`. It resolves with the last value once the stream ran to its end, or undefined when it sent none. It rejects with an `ActionError` of status 500 when the stream failed, and with an `AbortError` when it was closed first. A stream closes with its block and when the visitor goes to another page, so code awaiting its end there catches the `AbortError`.
 
 Guards, the schema and rate limits run before the first value, as for any call. A refusal throws an `ActionError`. `reply.pending()` stays true until the stream ends.
 
