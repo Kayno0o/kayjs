@@ -264,6 +264,52 @@ export async function shutdown(app: AnyElysia, force = false): Promise<void> {
   }
 }
 
+type ExitListener = (...args: unknown[]) => void
+type Adapter = AnyElysia['~adapter']
+
+// The `beforeExit` listener each `listen` of an app added, closing over it.
+const exitListeners = new WeakMap<AnyElysia, ExitListener[]>()
+const keptAdapters = new WeakSet<Adapter>()
+
+// An app stopped, by `shutdown` or Elysia's `stop()`, drops the `beforeExit` listener its `listen` added, which would hold it for the life of the process.
+// The adapter wrapped is the one every app made without one shares, so the app `pages()` is used in, which listens, is covered too.
+export function dropExitListenerOnStop(app: AnyElysia): void {
+  app.onStop((root) => {
+    for (const listener of exitListeners.get(root) ?? [])
+      process.off('beforeExit', listener)
+
+    exitListeners.delete(root)
+  })
+
+  const adapter = app['~adapter']
+
+  if (keptAdapters.has(adapter))
+    return
+
+  keptAdapters.add(adapter)
+
+  const listen = adapter.listen.bind(adapter)
+
+  // elysiajs/elysia#2034: Elysia's Bun adapter adds a `beforeExit` listener on each listen that no stop removes.
+  adapter.listen = (listened) => {
+    const start = listen(listened)
+
+    return (options, callback) => {
+      let known = new Set<unknown>(process.listeners('beforeExit'))
+
+      // Elysia adds its listener right after the callback, which is always given, so what the app's own hooks and callback add is known by then.
+      start(options, (server) => {
+        void callback?.(server)
+        known = new Set(process.listeners('beforeExit'))
+      })
+
+      const added = process.listeners('beforeExit').filter(listener => !known.has(listener)) as ExitListener[]
+
+      exitListeners.set(listened, [...exitListeners.get(listened) ?? [], ...added])
+    }
+  }
+}
+
 const ANY_ADDRESS = new Set(['', '0.0.0.0', '::', '[::]'])
 
 // Where the server beside the probe answers: loopback when it listens on every address, else the address `HOST` names.

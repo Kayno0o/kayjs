@@ -709,6 +709,32 @@ describe('revalidation', () => {
     expect(reached()).toBeLessThanOrEqual(before)
   })
 
+  it('lets go of an app that listened once it is shut down, with the beforeExit listener Elysia added for it', async () => {
+    const listeners = process.listeners('beforeExit').length
+
+    const stopped = await (async () => {
+      const app = new Elysia().use(await build.serve({ prebuilt: true, security: false, log: false }))
+
+      app.listen(0)
+      await fetch(`http://localhost:${app.server!.port}/news`)
+      await shutdown(app)
+      // Elysia's own stop() lets go of it too.
+      app.listen(0)
+      await app.stop()
+
+      return new WeakRef(app)
+    })()
+
+    expect(process.listeners('beforeExit')).toHaveLength(listeners)
+
+    for (let attempt = 0; attempt < 40 && stopped.deref() !== undefined; attempt++) {
+      Bun.gc(true)
+      await Bun.sleep(50)
+    }
+
+    expect(stopped.deref()).toBeUndefined()
+  })
+
   it('keeps an API module answering for the app it is mounted in once a collection ran', async () => {
     const { default: echo } = await import('./fixtures/production/src/api/echo') as unknown as { default: { getParent: () => unknown, getGlobalRoutes: () => unknown[] } }
     // A throwaway app mounts the same modules first; once it is collected a collection certainly ran, whatever the engine skipped before.

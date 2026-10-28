@@ -570,6 +570,7 @@ exports[`the hooks pagesApp registers runs in production, for each kind of reque
     "(root) => { const routes = fallingThrough(root); if (Object.keys(routes).length === 0) return; const...",
   ],
   "stop": [
+    "(root) => { for (const listener of exitListeners.get(root) ?? []) process.off("beforeExit", listener...",
     "() => release?.()",
     "() => clearInterval(pruning)",
     "() => clearEditSite(editSite)",
@@ -754,6 +755,7 @@ exports[`the hooks pagesApp registers runs under a base with trailing slashes, i
     "(root) => { const routes = fallingThrough(root); if (Object.keys(routes).length === 0) return; const...",
   ],
   "stop": [
+    "(root) => { for (const listener of exitListeners.get(root) ?? []) process.off("beforeExit", listener...",
     "() => release?.()",
     "() => clearInterval(pruning)",
     "() => clearEditSite(editSite)",
@@ -1042,6 +1044,7 @@ exports[`the hooks pagesApp registers runs in development, its dev routes includ
     "(root) => { const routes = fallingThrough(root); if (Object.keys(routes).length === 0) return; const...",
   ],
   "stop": [
+    "(root) => { for (const listener of exitListeners.get(root) ?? []) process.off("beforeExit", listener...",
     "() => clearInterval(pruning)",
     "() => clearEditSite(editSite)",
     "() => { publishing.stop(); for (const { release } of tracked) release(); clearContentMode(mode, outp...",
@@ -1308,6 +1311,7 @@ exports[`the hooks pagesApp registers runs as \`kay build --static\` reads the s
     "(root) => { const routes = fallingThrough(root); if (Object.keys(routes).length === 0) return; const...",
   ],
   "stop": [
+    "(root) => { for (const listener of exitListeners.get(root) ?? []) process.off("beforeExit", listener...",
     "() => release?.()",
     "() => clearInterval(pruning)",
     "() => clearEditSite(editSite)",
@@ -1715,6 +1719,7 @@ exports[`the hooks pagesApp registers runs with hosts, the jobs page, previews, 
     "(root) => { const routes = fallingThrough(root); if (Object.keys(routes).length === 0) return; const...",
   ],
   "stop": [
+    "(root) => { for (const listener of exitListeners.get(root) ?? []) process.off("beforeExit", listener...",
     "() => release?.()",
     "() => clearInterval(pruning)",
     "() => clearEditSite(editSite)",

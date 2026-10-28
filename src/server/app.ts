@@ -22,6 +22,7 @@ import { PUBLIC_ENV_PATH, publicEnvFiles, publicInFenceMessage } from './env-sta
 import { faviconSource, MANIFEST, manifestJson } from './favicon'
 import { loadGuards } from './guards'
 import { refuseLocaleClashes } from './i18n'
+import { dropExitListenerOnStop } from './lifecycle'
 import { mcpKeySetting, resolveMcpKey } from './mcp-key'
 import { checkProxy } from './protection'
 import { claimPublic } from './public'
@@ -155,6 +156,9 @@ export async function pagesApp(project: Project<PagesOptions>, loadClient: () =>
   const { served, table, publicServed, redirects, mcpAt } = setup.claimed
   const routes = await servedRoutes(setup.routes, setup.claimed.routes, options.requireGuards)
   const app = new Elysia({ name: 'kay/pages', seed: root })
+
+  dropExitListenerOnStop(app)
+
   const boot = bootOf({ app, env: { ...running, base: setup.base, trailingSlash: options.trailingSlash }, project, setup, served, routes, table, late, mcpAt, mcpKey })
   const earlier = knowPages(boot)
   const writes = keptPageWrites(boot)
