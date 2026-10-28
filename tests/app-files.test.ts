@@ -215,9 +215,12 @@ describe('the files an extension names in appFiles', () => {
     }
   }, 60_000)
 
-  it('reach an extension\'s API module exporting a function, which kay check types: its routes are linked to, and one building no Elysia instance is refused', async () => {
+  it('reach an extension\'s API module exporting a function, which kay check types: its routes are linked to and called from an island, and one building no Elysia instance is refused', async () => {
+    const island = (path: string) => `---\nimport { call } from 'kay'\nimport features from '../../lib/api/features'\n\nconst names = signal('')\n---\nbutton(onClick={async () => names = (await call(features, '${path}')).extensions.join(', ')}) Load\np {names()}\n`
     const root = await written(app({
       'src/routes/index.kay': 'a(href="/api/probe/features") features\n',
+      'src/components/features.kay': island('/'),
+      'src/components/nowhere.kay': island('/nowhere'),
       'lib/api/broken.ts': 'export default () => \'no instance\'\n',
     }))
 
@@ -227,7 +230,9 @@ describe('the files an extension names in appFiles', () => {
       expect(code).toBe(1)
       expect(output).toContain('broken.ts')
       expect(output).toContain('or a function of the ExtensionApp building one')
+      expect(output).toContain('Argument of type \'"/nowhere"\' is not assignable to parameter of type \'"/"\'')
       expect(output).not.toContain('features.ts')
+      expect(output).not.toContain('features.kay')
       expect(output).not.toContain('index.kay')
     }
     finally {

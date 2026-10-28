@@ -1,3 +1,4 @@
+import type { ExtensionApp } from '../src/config'
 import { EventEmitter } from 'node:events'
 import * as fs from 'node:fs'
 import { mkdir, mkdtemp, rm } from 'node:fs/promises'
@@ -1081,6 +1082,28 @@ describe('call()', () => {
       void call(notes, '/attachments', { body: { file: new File([], 'a'), caption: '' } })
       // @ts-expect-error: a value from JSON has no Date
       void (await call(notes, '/'))[0]?.at.getTime() // eslint-disable-line ts/no-unsafe-call -- the line is a type test: it must fail to type, which leaves the call unresolved
+    }
+
+    expect(typed).toBeFunction()
+  })
+
+  it('types the routes of an extension\'s module exporting a function of the ExtensionApp off what it builds, sync or async', () => {
+    const extensionNotes = (_app: ExtensionApp) => notes
+    const extensionChat = async (_app: ExtensionApp) => Promise.resolve(chat)
+    const typed = async () => {
+      const titles: string[] = (await call(extensionNotes, '/')).map(note => note.title)
+      const room = socket(extensionChat, '/:room', { params: { room: 'a' } })
+      const ticks = stream(extensionChat, '/ticks', { query: { count: 1 } })
+      const rooms = resource(extensionChat, '/rooms')
+
+      // @ts-expect-error: the route takes a title
+      void call(extensionNotes, '/', { method: 'post', body: {} })
+      // @ts-expect-error: no such path
+      void call(extensionNotes, '/nowhere')
+      // @ts-expect-error: a websocket route is opened with socket()
+      void call(extensionChat, '/:room', { params: { room: 'a' } })
+
+      return [titles, room, ticks, rooms]
     }
 
     expect(typed).toBeFunction()

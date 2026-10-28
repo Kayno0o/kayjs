@@ -37,7 +37,8 @@ const TEXT_TYPE = /^(?:text\/|$)/i
 
 type Method = 'get' | 'post' | 'put' | 'patch' | 'delete' | 'head' | 'options' | 'connect' | 'trace' | 'all' | 'subscribe'
 
-type RoutesOf<Module> = Module extends { '~Routes': infer Routes } ? Routes : never
+// The route tree of a module's default export, or of what the function an extension's module exports builds, as `ApiRoutesOf` reads it for `kay check`.
+type RoutesOf<Module> = (Module extends (...args: never[]) => infer Built ? Awaited<Built> : Module) extends { '~Routes': infer Routes } ? Routes : never
 
 // One less, to stop walking a route tree past any depth an app reaches, and never instantiate it without end while `Module` is still generic.
 type Shallower = [never, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
