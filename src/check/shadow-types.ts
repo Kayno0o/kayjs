@@ -118,6 +118,28 @@ export async function writeShadowTypes(projectRoot: string, options: CheckOption
   return inWalkScope(async () => writeShadows(projectRoot, options))
 }
 
+interface ProjectCheckInput {
+  root: string
+  options: CheckOptions
+  served: ServedProject
+}
+
+// The checks over the served project, in the order their problems are reported.
+const PROJECT_CHECKS: ((input: ProjectCheckInput) => CheckDiagnostic[] | Promise<CheckDiagnostic[]>)[] = [
+  ({ root, options, served }) => redirectChecks(root, options, served),
+  async ({ options, served }) => unguardedRoutes(options, served),
+  async ({ served }) => unreadOpenSettings(served),
+  async ({ options, served }) => unguardedTools(options, served),
+  async ({ options, served }) => mcpRoutes(options, served),
+  async ({ root, options, served }) => largePublicImages(options, root, served),
+  async ({ options, served }) => untypedSockets(options, served),
+  async ({ root, options }) => removedUiTokens(root, options),
+  async ({ root, options }) => unknownToolLabels(root, options),
+  async ({ root, options }) => publicEnvOutsideSrc(root, options),
+  async ({ root, options }) => authAttempts(root, options),
+  async ({ root, options }) => authMethods(root, options),
+]
+
 async function writeShadows(projectRoot: string, options: CheckOptions): Promise<ShadowTypes> {
   const root = resolve(projectRoot)
   const routesDir = projectPaths(root, options).routes
@@ -131,8 +153,10 @@ async function writeShadows(projectRoot: string, options: CheckOptions): Promise
   await tree.write('kay-env.d.ts', await environmentTypes(root, options, served))
 
   // A types-only write discards the problems, so none of their checks run.
-  if (options.typesOnly !== true)
-    problems.push(...redirectChecks(root, options, served), ...await unguardedRoutes(options, served), ...await unreadOpenSettings(served), ...await unguardedTools(options, served), ...await mcpRoutes(options, served), ...await largePublicImages(options, root, served), ...await untypedSockets(options, served), ...await removedUiTokens(root, options), ...await unknownToolLabels(root, options), ...await publicEnvOutsideSrc(root, options), ...await authAttempts(root, options), ...await authMethods(root, options))
+  if (options.typesOnly !== true) {
+    for (const check of PROJECT_CHECKS)
+      problems.push(...await check({ root, options, served }))
+  }
 
   // A script rather than a module, which is what lets it declare a wildcard module.
   await tree.write('kay-assets.d.ts', ASSET_TYPES)
