@@ -183,6 +183,31 @@ describe.each(kinds)('job store contract, $name', ({ name, open }) => {
     })
   })
 
+  describe('live', () => {
+    it('lists the waiting and running jobs of the queue by when they are due, each with its status, never a failed one, within the limit', async () => {
+      const store = await open()
+      const first = job({ runAt: 10, key: 'k', payload: '[{"n":1},1]' })
+
+      for (const added of [job({ runAt: 30 }), first, job({ runAt: 40 }), job({ queue: 'other' })])
+        await store.add(added)
+
+      const failedOne = job({ runAt: 20 })
+
+      await store.add(failedOne)
+      await store.fail(failedOne.id, 'boom')
+      await claimFor(store, SHORT)
+
+      const listed = await store.live!('q', clockNow())
+
+      expect(listed.map(found => [found.runAt, found.status])).toEqual([[10, 'running'], [30, 'waiting'], [40, 'waiting']])
+      expect(listed[0]).toMatchObject({ id: first.id, key: 'k', payload: first.payload, attempts: 1 })
+      expect((await store.live!('q', clockNow(), 2)).map(found => found.runAt)).toEqual([10, 30])
+      await pass(SHORT_PAST)
+      expect((await store.live!('q', clockNow()))[0]?.status).toBe('waiting')
+      expect(await store.live!('none', clockNow())).toEqual([])
+    })
+  })
+
   describe('progress', () => {
     it('is written while the hold is the job\'s, read back, kept by a failure and cleared by the next claim', async () => {
       const store = await open()

@@ -8,6 +8,7 @@ import { CACHE_LIVE_ID } from '../runtime/cache-live-id'
 import { checkLiveWrites, live, LIVE_ROUTE, liveSlot, ownLiveDeclared, PROOF_LIFETIME_MS, readViewerWith, slotValue, watchSlot } from '../runtime/live-value'
 import { kayLog } from '../runtime/log'
 import { PRESENCE_LIVE_ID } from '../runtime/presence'
+import { JOBS_LIVE_ID } from '../runtime/queue-jobs'
 import { currentServerScope } from '../runtime/reactive'
 import { decodeServerValue, encodeValue, unsendable } from '../runtime/wire'
 import { isCrossSite } from './actions'
@@ -17,6 +18,7 @@ import { eventStream, StreamRefusedError } from './event-stream'
 import { presenceEntry } from './presence'
 import { clientAddress, overLimit } from './protection'
 import { recordOf, requestRecord } from './request-record'
+import { jobsEntry } from './queue-live'
 import { userOf } from './request-user'
 import { signedText, signText } from './stamp'
 
@@ -416,6 +418,14 @@ interface Watched {
   watch: (listener: () => void) => () => void
 }
 
+// What the server reads itself for an id kay keeps, rather than a slot's value: the members of a presence room, the jobs of a queue.
+function kayEntry(id: string, key: string, tab: string, request: Request): Omit<Watched, 'id' | 'key'> | undefined {
+  if (id === PRESENCE_LIVE_ID)
+    return presenceEntry(key, tab, request)
+
+  return id === JOBS_LIVE_ID ? jobsEntry(key) : undefined
+}
+
 // The updates a connection sends: every watched value as it is now, then the ones that changed, as often as they do.
 // It ends when the proofs it was let in on expire, `lifetime` from now.
 // It holds a connection slot of the client from the moment it is read until it ends, and is refused when the client has none by then, which a browser retries after its backoff: a response nobody reads holds nothing.
@@ -568,14 +578,14 @@ export function serveLive(app: Elysia, config?: LiveConfig): void {
     for (const [id, key] of asked.watch) {
       const slot = liveSlot(id)
       const provenAt = proven.get(JSON.stringify([id, key]))
-      const here = id === PRESENCE_LIVE_ID && provenAt !== undefined ? presenceEntry(key, tab, request) : undefined
+      const here = provenAt === undefined ? undefined : kayEntry(id, key, tab, request)
 
       if (here !== undefined) {
         oldest = Math.min(oldest, provenAt!)
         watched.push({ id, key, ...here })
       }
-      // A room and member no page proves, or one whose proof is out of date: refused, so a tab does not join as a member its page never named.
-      else if (id === PRESENCE_LIVE_ID) {
+      // A room and member no page proves, or one whose proof is out of date: refused, so a tab does not join as a member its page never named. A queue no page proves, or that this server shows no list of, likewise.
+      else if (id === PRESENCE_LIVE_ID || id === JOBS_LIVE_ID) {
         stale = true
       }
       // A value of each user, of the user whose request this is, which a proof bound to them covers.

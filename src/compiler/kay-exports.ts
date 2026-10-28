@@ -26,6 +26,7 @@ export const KAY_VALUES: readonly string[] = [
   'guard',
   'guardLeave',
   'installPrompt',
+  'jobs',
   'linked',
   'listen',
   'live',

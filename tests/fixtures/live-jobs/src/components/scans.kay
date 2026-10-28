@@ -1,0 +1,10 @@
+---
+import { jobs } from 'kay'
+
+const { queue = 'scans' } = props<{ queue?: string }>()
+const listed = memo(() => jobs<{ target: string }>(queue))
+---
+ul.scans
+  for job of listed()
+    li(data-status={job.status}) {job.payload.target}
+p.count {listed().length}

@@ -13,6 +13,7 @@ import { appStore } from './app-store'
 import { MAX_TIMER_MS } from './config-limits'
 import { stopGraceMs, STOPPED } from './drain'
 import { inMemory } from './memory-mark'
+import { forgetShownJobs, showJobs } from './queue-live'
 import { forgetDrain, inFlightWork, POLL_MS, Scheduler } from './queue-scheduler'
 import { onReload } from './reload'
 import { reportBackgroundError } from './report'
@@ -64,6 +65,8 @@ export interface JobStore {
   progress?: ((id: string, until: number, progress: string) => Maybe<void>) | undefined
   // The waiting or running job of the queue with that key or id, else its last failed one, `now` telling a held job from one whose hold ran out; undefined for a job that completed.
   state?: ((queue: string, ref: { key: string } | { id: string }, now: number) => Maybe<StoredJobState | undefined>) | undefined
+  // The waiting and running jobs of the queue by when they are due, the earliest first, `limit` of them at most, each with its status as `state` tells it at `now`: what a queue with `live` shows its pages, read in one query. A store without it is listed with `jobs` and asked `state` job by job.
+  live?: ((queue: string, now: number, limit?: number) => Maybe<StoredJobState[]>) | undefined
   // Rewrites a job in place: its payload, and when it is due when `runAt` is given. With `{ until }`, only while that hold is still the job's, and the run counts as having started once (a checkpoint of a run that goes on); with `{ payload, now }`, only while the job is not held and its payload is still that text (an event waking a waiting run). Resolves with whether it applied. `workflow` needs it.
   update?: ((id: string, change: { payload: string, runAt?: number | undefined }, guard: { until: number } | { payload: string, now: number }) => Maybe<boolean>) | undefined
   // Keeps it as failed, out of the queue, with `payload` in place of the stored one when the queue redacts what it keeps; a store ignoring it keeps the payload whole. Only while the hold `until` is still the job's when it is given.
@@ -106,6 +109,8 @@ export interface QueueOptions<Payload> {
   onFailed?: ((event: { payload: Payload, error: unknown }) => unknown) | undefined
   // Starts no worker with the server: the first `activate()` or `enqueue` does, so a queue an app may never use costs it no idle poll. A job already stored waits until then.
   lazy?: boolean | undefined
+  // Shows the queue's waiting and running jobs to islands, which read them with `jobs(name)` from `kay` and follow them as they change, in every process: `true` sends each job's payload, a function what it gives of it, such as the fields a page shows. Whoever may render a page reading them may follow them.
+  live?: boolean | ((payload: Payload) => unknown) | undefined
 }
 
 export interface EnqueueOptions {
@@ -295,6 +300,9 @@ export function sqliteJobs(path: string): JobStore {
 
       return row ? { ...toJob(row), status: statusOf(row.failed === 1, row.held_until ?? 0, now) } : undefined
     },
+    live(queue, now, limit) {
+      return open(false)?.live.all(queue, limit ?? -1).map(row => ({ ...toJob(row), status: statusOf(false, row.held_until ?? 0, now) })) ?? []
+    },
     fail(id, error, payload, until) {
       return open(true)!.fail.run(error, payload ?? null, id, until ?? null, until ?? null).changes === 1
     },
@@ -388,6 +396,7 @@ function prepareJobs(db: Database) {
   // A live job comes before a failed one of the same key, the latest failed first.
   const byKey = db.query<StateRow, [string, string]>(`SELECT ${JOB_COLUMNS}, failed, held_until FROM kay_jobs WHERE queue = ? AND job_key = ? ORDER BY failed, run_at DESC LIMIT 1`)
   const byId = db.query<StateRow, [string, string]>(`SELECT ${JOB_COLUMNS}, failed, held_until FROM kay_jobs WHERE queue = ? AND id = ?`)
+  const live = db.query<StateRow, [string, number]>(`SELECT ${JOB_COLUMNS}, failed, held_until FROM kay_jobs WHERE queue = ? AND failed = 0 ORDER BY run_at LIMIT ?`)
   const fail = db.query('UPDATE kay_jobs SET failed = 1, held_until = NULL, error = ?, payload = coalesce(?, payload) WHERE id = ? AND (? IS NULL OR held_until = ?)')
   const purge = db.query('DELETE FROM kay_jobs WHERE queue = ? AND failed = 1 AND run_at < ?')
   const failed = db.query<JobRow, [string, number]>(`SELECT ${JOB_COLUMNS} FROM kay_jobs WHERE queue = ? AND failed = 1 ORDER BY run_at LIMIT ?`)
@@ -398,7 +407,7 @@ function prepareJobs(db: Database) {
   const lock = db.query('INSERT OR IGNORE INTO kay_locks (name, slot) VALUES (?, ?)')
   const pruneLocks = db.query('DELETE FROM kay_locks WHERE name = ? AND slot < ?')
 
-  return { insert, holder, claim, remove, retry, release, progress, updateHeld, updateIdle, byKey, byId, fail, purge, failed, revive, all, next, lock, pruneLocks }
+  return { insert, holder, claim, remove, retry, release, progress, updateHeld, updateIdle, byKey, byId, live, fail, purge, failed, revive, all, next, lock, pruneLocks }
 }
 
 // Jobs kept in this process's memory, gone with it: what tests run on.
@@ -493,6 +502,9 @@ export function memoryJobs(): JobStore {
 
       return job ? { ...stored(job), status: statusOf(job.failed === true, job.heldUntil ?? 0, now) } : undefined
     },
+    live(queue, now, limit) {
+      return waiting(queue).sort((a, b) => a.runAt - b.runAt).slice(0, limit).map(job => ({ ...stored(job), status: statusOf(false, job.heldUntil ?? 0, now) }))
+    },
     fail(id, error, payload, until) {
       const job = jobs.get(id)
 
@@ -576,7 +588,10 @@ export function jobQueue<Payload, Progress = unknown>(name: string, handler: (pa
   if (!Number.isInteger(concurrency) || concurrency < 1)
     throw new KayError('config-invalid', `kay: queue('${name}')'s concurrency is ${concurrency}; it takes a whole number of at least 1`)
 
-  const store = () => options.store ?? defaultJobStore()
+  const ownStore = () => options.store ?? defaultJobStore()
+  const { live } = options
+  const shown = live === undefined || live === false ? undefined : showJobs(name, ownStore, live === true ? payload => payload : live as (payload: unknown) => unknown)
+  const store = shown === undefined ? ownStore : tellingStore(ownStore, shown.changed)
 
   const reportFailed = async (job: StoredJob, error: unknown) => {
     try {
@@ -866,7 +881,11 @@ export function jobQueue<Payload, Progress = unknown>(name: string, handler: (pa
 
   // Unnamed, so Elysia never takes two queues for one plugin.
   const plugin = new Elysia()
-    .onStart(() => scheduler.serve())
+    .onStart(() => {
+      scheduler.serve()
+      // A store that answers late has the list by the first page.
+      shown?.read()
+    })
     .onStop(async () => scheduler.stop())
 
   const queued = Object.assign(plugin, {
@@ -965,7 +984,61 @@ export function forgetQueue(queued: { drain: () => Promise<number> }): void {
   forgetDrain(queued.drain)
 
   for (const [name, admin] of admins) {
-    if (admin.drain === queued.drain)
+    if (admin.drain === queued.drain) {
       admins.delete(name)
+      forgetShownJobs(name)
+    }
   }
+}
+
+// The changes to the store that move a job in or out of the waiting and running ones, or change what they show.
+const CHANGES = new Set<PropertyKey>(['add', 'claim', 'complete', 'retry', 'release', 'progress', 'update', 'fail', 'revive'])
+
+// The store of a queue with `live`, telling it of each change once the store made it: every path that writes a job, the workers, drains, `remove` and the jobs page alike, goes through it.
+function tellingStore(own: () => JobStore, changed: () => void): () => JobStore {
+  const told = new WeakMap<JobStore, JobStore>()
+
+  return () => {
+    const store = own()
+    let telling = told.get(store)
+
+    if (telling === undefined) {
+      telling = new Proxy(store, {
+        get(target, property, receiver) {
+          const value: unknown = Reflect.get(target, property, receiver)
+
+          if (typeof value !== 'function' || !CHANGES.has(property))
+            return value
+
+          // A claim that found no job changed nothing: an idle queue claims at every look.
+          const tell = (result: unknown) => {
+            if (property !== 'claim' || result !== undefined)
+              changed()
+          }
+
+          return (...args: unknown[]) => {
+            const result: unknown = Reflect.apply(value, target, args)
+
+            if (result instanceof Promise)
+              return toldOnce(result, tell)
+
+            tell(result)
+
+            return result
+          }
+        },
+      })
+      told.set(store, telling)
+    }
+
+    return telling
+  }
+}
+
+async function toldOnce(result: Promise<unknown>, tell: (result: unknown) => void): Promise<unknown> {
+  const value: unknown = await result
+
+  tell(value)
+
+  return value
 }

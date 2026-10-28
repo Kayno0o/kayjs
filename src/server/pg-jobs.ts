@@ -375,6 +375,12 @@ export function jobsAfter(source: PgJobsSource, before?: () => Promise<unknown>)
 
       return row === undefined ? undefined : { ...toJob(row), status: statusOf(row) }
     },
+    async live(queue, _now, limit) {
+      const db = await open()
+      const rows = await rowsOf<PgStateRow>(db`SELECT id, queue, payload, attempts, run_at, error, job_key, progress, failed, coalesce(held_until > (floor(extract(epoch FROM statement_timestamp()) * 1000))::bigint, false) AS held FROM kay_jobs WHERE queue = ${queue} AND NOT failed ORDER BY run_at LIMIT ${limit ?? null}`)
+
+      return rows.map(row => ({ ...toJob(row), status: statusOf(row) }))
+    },
     async fail(id, error, payload, until) {
       const db = await open()
 

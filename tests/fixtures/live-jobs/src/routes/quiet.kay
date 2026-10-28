@@ -1,0 +1,5 @@
+---
+import Scans from '../components/scans.kay'
+---
+h1 Quiet
+Scans(queue="quiet")

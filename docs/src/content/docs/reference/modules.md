@@ -24,6 +24,7 @@ In a `.ts` file nothing is added. `kay/server` also exports `s`, so a server mod
 | `root` | An owner of its own, so effects created inside live until its `dispose` is called. See [Islands](/essentials/islands#effects-outside-a-component) |
 | `live` | A value the server changes and every page showing it follows. See [Live and realtime](/guides/live-and-realtime#values-the-server-changes) |
 | `presence` | Who else has a room or a page open, as `others()` and `count()` that follow joins and leaves. See [Live and realtime](/guides/live-and-realtime#who-else-is-here) |
+| `jobs`, `QueuedJob` | The waiting and running jobs of a queue declared with `live`, followed as they change. See [Background jobs](/guides/background-jobs#show-a-queues-jobs-on-a-page) |
 | `watch`, `debounced` | Code running on a change only, handed the value before, and a value once it stops changing |
 | `every` | A timer running while an island lives, and while a condition holds |
 | `durationMs` | The milliseconds a duration written with its unit stands for, `durationMs('3s')` being 3000, for a timer of your own. A bare number throws |

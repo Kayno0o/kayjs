@@ -173,6 +173,33 @@ An idle queue looks for a job from one worker. A job another process enqueued wa
 
 Set `idlePoll: '1s'` to look every second, or `'30s'` to ask the database less often.
 
+### Show a queue's jobs on a page
+
+A page can list the jobs a queue holds and follow them as they are added, start, finish or fail. Give the queue `live`, then read `jobs` from `kay` in an island.
+
+```ts
+// src/jobs.ts
+export const scans = queue('scans', scan, {
+  live: ({ target }: { target: string }) => ({ target }),
+})
+```
+
+```kay
+---
+import { jobs } from 'kay'
+---
+for job of jobs<{ target: string }>('scans')
+  p {job.payload.target}: {job.status}
+```
+
+Each job is `{ id, key, status, attempts, runAt, error, progress, payload }`, `status` being `'waiting'` or `'running'`, earliest due first and 100 at most. `live: true` sends the whole payload. A function sends what it returns instead, so a token or an address in the payload stays on the server.
+
+The page proves the queue it read, as it does for any live value. Whoever may open the page may follow the list, so the page's guard decides who sees it. A queue without `live` cannot be read at all.
+
+The process that changes a job tells its tabs at once. A process with a tab following the list reads the store again every second, which is how a job another worker or replica took reaches it.
+
+<ReadMore href="/llms/queues#show-a-queues-jobs-on-a-page">The store method that lists the jobs in one query is in the queues reference.</ReadMore>
+
 ### Postgres
 
 `pgJobs(db)` keeps the jobs in Postgres. It takes a Bun `SQL`, a pg-orm `Database` or a connection URL.
