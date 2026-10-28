@@ -2,6 +2,12 @@
 
 What each minor release breaks, and what an app changes to move to it. kay and its libraries share one version, so one section covers them all; a patch breaks nothing, and a minor missing here broke nothing.
 
+## 1.82.0
+
+### An `ActionStream` has `ended()`
+
+- An object the app builds as an `ActionStream`, a test's fake stream say, gets a type error from `kay check` until it has `ended: () => Promise<T | undefined>`, resolving with its last value once it ran to its end and rejecting when it failed or was closed ([streaming actions](actions-from-islands.md)). A stream a call resolves with already has it.
+
 ## 1.81.0
 
 ### kayjs-auth: a store counts attempts in `rates`, and `DEFAULT_LIMITS` windows are durations
