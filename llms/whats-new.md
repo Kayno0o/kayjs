@@ -2,7 +2,7 @@
 
 What each release of kay and its libraries adds, newest first, each feature with where it is documented. kay and its libraries share one version, so one section covers them all; what a release breaks is in [Upgrading](upgrading.md).
 
-## Unreleased
+## 1.82.0
 
 - An extension's API module may default-export a function of the `ExtensionApp`, called with the `appFiles` modules as a `server` function is, so a library serves the app's data file, `api({ cors })` included, and the app writes no module only forwarding it; an island hands such a module to `call()`, `socket()`, `stream()` or `resource()`, typed off the routes it builds: [Component libraries](component-libraries.md).
 - An action's stream is read to its end with `await answer.ended()`, resolving with its last value and rejecting when it failed or was closed, with no polling of `status()`: [streaming actions](actions-from-islands.md).
@@ -63,24 +63,4 @@ What each release of kay and its libraries adds, newest first, each feature with
 
 The rest of this release is in [What's new, older releases](whats-new-archive.md).
 
-## 1.80.0
-
-- `formatNumber`, `formatDate`, `formatRelativeTime`, `formatList` and `direction` from `kay/i18n` work outside a request, in the site's default locale, so a job, an alert or a push formats like its pages, and each takes a `locale` option (`formatDate(date, { locale: user.locale })`) that wins over the page's, in the browser too: [Format a number, a date or a list](locales.md#format-a-number-a-date-or-a-list).
-- `promoted-island` no longer reports a static component for a value read from an object of strings or numbers another module exports as a literal (`LABEL[kind]`), by name, in `export { LABEL }`, by default, re-exported or imported from a `.json` file, as it is data and not a function: [Islands](islands.md#islands).
-- `fakeService(routes)` from `kay/test` stands in for an outside HTTP service: a real loopback server whose `url` feeds `overrideEnv`, that records its `requests`, answers errors with `fail(status)` and holds requests with `stall()`, and stops with the test file, so no test hand-rolls a `Bun.serve` fake or a `fetch` spy: [Testing](testing.md#test-an-app-calling-an-outside-api).
-- `testSite({ proxyKey })` checks the `proxy.key` header for that site alone and sends the key with every request, so a test of an app behind a proxy writes no `KAY_PROXY_KEY`: [Testing](testing.md).
-- kayjs-ui has a `RelativeTime(date)`: a `time` worded relative to now in the page's locale (`3 hours ago`), ticking in the browser and hydrating the text the server drew, with the full date as a tooltip reachable by keyboard: [basics](../packages/ui/llms/basics.md).
-- kayjs-ui has a `Tooltip(text="...")` wrapping text in a tab stop that `TooltipHost` shows the tooltip of, so no hand `tabindex="0"` is needed, and a `Button` that is `disabled` with a `data-tooltip` renders `aria-disabled` instead, staying focusable to read its reason while ignoring its press. `kay check --fix` rewrites a hand-written `span(data-tooltip tabindex="0")` to `Tooltip` (`hand-tooltip`): [basics](../packages/ui/llms/basics.md#popover-hovercard-tooltiphost).
-- `sanitizeHtml(markup, { base })` resolves the relative URLs of markup fetched from elsewhere against its address, and the links it keeps that leave your site open in a new tab, like a template's: [Templates](templates-elements-slots-snippets.md).
-- `mcp: { key }` requires a bearer key on the MCP endpoint and so on its tool calls, from `KAY_MCP_KEY` or `KAY_MCP_KEY_FILE` (`key: true`), a string, or `{ file }` made on first use, compared in constant time; with `proxy.key` the endpoint needs no `proxy.open` entry and no app guard, `kay env` lists the variables, and `testSite({ mcpKey })` sends the key from `site.mcp`: [API routes](api-routes.md#mcp).
-- A module an island imports may build schemas with `s` as it loads: in the browser `s` builds an inert stand-in with no validator, so a type and its schema live in one module shared with the server, and `server-only-in-island` no longer refuses `s`, only `process` and `Bun` reads: [Schemas](schemas.md#schemas).
-- kayjs-ai: `ask` outside a request takes `tool({ name, description, input, run })` functions as `tools`, run with the app's own rights and never held for approval, so a scheduled job's model can call things: [Function tools](../packages/ai/llms/tools.md#function-tools).
-- kayjs-ui has an `AudioPlayer`: chapters on a timeline and in a list, a timed transcript following the playback, lock screen controls skipping between chapters, an `@actions` slot per chapter and a readable position ([Charts, drag and drop and media](../packages/ui/llms/charts-drag-and-media.md)).
-- kayjs-ai `reasoning` now works on `anthropic()`, as adaptive thinking at that effort (`'none'` asks the lowest effort with thinking off), what the model thinks streams as `reasoning` in `reply.progress()` for Anthropic and OpenAI-compatible servers without touching `await reply`, tool loops send Anthropic's thinking blocks back, and `Chat` folds it above the reply, `reasoning={false}` hiding it: [asking](../packages/ai/llms/asking.md#ask-options), [chat](../packages/ai/llms/chat.md#props).
-- kayjs-ai `ask(..., { body })`, and `openai({ body })` and `anthropic({ body })` for every ask of a provider, add fields kayjs-ai does not model (`top_p`, `seed`, `stop`, `top_k`, OpenRouter's `provider`) to the request body, so a new provider parameter needs no release: [asking](../packages/ai/llms/asking.md#fields-kayjs-ai-does-not-model).
-- kayjs-ai: a user message holds `attachments`, images and PDFs from a `File`, `Blob`, bytes or a stored file, sent as each provider expects and readable into a `schema`, with `maxAttachmentBytes`, a price in characters against `maxInputChars` and an `unsupported` error; `Chat` takes `attach` with the upload's type and size checks; the fake records them in `asked`: [Images and PDFs](../packages/ai/llms/attachments.md), [Chat](../packages/ai/llms/chat.md#attaching-files).
-- kayjs-ai: `Chat(regenerate)` asks again for the last reply and `Chat(editable)` resends an edited message with every later turn gone, and an action reads `replaces()` to drop the stored turns they replace; kayjs-ui has `refresh` and `edit` icon slots: [chat](../packages/ai/llms/chat.md#regenerating-and-editing).
-- kayjs-ai: `Chat(fill)` takes the height of its container, the log (or the greeting) taking the space and the form staying at the bottom, for a chat that is a page's main content: [chat](../packages/ai/llms/chat.md#props).
-- `kay check` reports `signal-set-call`, a signal written `count.set(value)` where assigning it, `count = value`, does the same, and `--fix` assigns it: [Signals](components.md#signals).
-
-Releases before 1.80 are in [What's new, older releases](whats-new-archive.md).
+Releases before 1.81 are in [What's new, older releases](whats-new-archive.md).
