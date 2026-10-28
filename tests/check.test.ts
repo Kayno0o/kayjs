@@ -465,6 +465,44 @@ describe.concurrent('kay check, edge cases', () => {
     }
   })
 
+  it('counts a loop variable its key reads as read under noUnusedParameters, still reporting one nothing reads', async () => {
+    const root = await scratchProject({
+      'tsconfig.json': tsconfig.replace('"strict":true', '"strict":true,"noUnusedParameters":true'),
+      'src/list.kay': [
+        '---',
+        'const { places, series, rows, tags } = props<{ places: string[], series: { name: string }[], rows: { id: number, label: string, cells: string[] }[], tags: string[] }>()',
+        '---',
+        'for place of places key={place}',
+        '  i star',
+        'for item, index of series key={item.name}',
+        '  b {index}',
+        'for item, index of series key={index}',
+        '  b x',
+        'for { id, label } of rows key={id}',
+        '  p {label}',
+        'for row of rows key={row.id}',
+        '  for cell of row.cells key={cell}',
+        '    td x',
+        'for tag of tags',
+        '  em x',
+        'for tag, position of tags key={tag}',
+        '  em x',
+        '',
+      ].join('\n'),
+    })
+
+    try {
+      expect((await check(root)).map(d => [d.line, d.code, d.message])).toEqual([
+        [8, 'unread-name', '\'item\' is declared but its value is never read.'],
+        [15, 'unread-name', '\'tag\' is declared but its value is never read.'],
+        [17, 'unread-name', '\'position\' is declared but its value is never read.'],
+      ])
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
   it('reports a template const hiding a name, and one reassigned', async () => {
     const root = await scratchProject({ 'src/list.kay': '---\nconst { products } = props<{ products: { name: string }[] }>()\n---\nfor product of products\n  const { name } = product\n  const products = []\n  button(onClick={() => { name = \'x\' }}) {products.length}\n' })
 

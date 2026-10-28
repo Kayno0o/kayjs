@@ -470,13 +470,8 @@ export class JsxTemplate {
       else {
         b.add(`<KayLoopFor each={kayEach} keyed={`)
 
-        if (positional)
-          b.add('false')
-        // A destructured item is declared by the `const` leading the block, which also reads the key, so the pattern is written out once.
-        else if (node.key && node.row === undefined)
-          b.add('(').addSource(node.item).add(') => (').addSource(node.key).add(')')
-        else
-          b.add('() => 0')
+        // The block reads the key instead, where its names are the row's own, so a loop variable only the key reads counts as read, and a destructured pattern is written out once.
+        b.add(positional ? 'false' : '() => 0')
 
         b.add('}')
 
@@ -507,12 +502,12 @@ export class JsxTemplate {
 
       b.add(') => ')
 
-      // A key the loop does not match rows by is still read, so the type check sees it, and hover and rename reach the key's name.
+      // The key is read in the block, so the type check sees it, and hover and rename reach the key's name.
       if (node.key && node.row !== undefined) {
         this.rowKey = node.key
         this.emitRoot(node.children)
       }
-      else if (node.key && (staticLoop || positional)) {
+      else if (node.key) {
         b.add('(void (').addSource(node.key).add('), ')
         this.emitRoot(node.children)
         b.add(')')

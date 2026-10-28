@@ -879,11 +879,12 @@ describe('source mapping', () => {
 
   it('finds every copy of a name, and no run that merely ends where it starts', () => {
     const source = '---\nconst { title } = props<{ title: string }>()\n---\nul\n  for row of [title] key={row}\n    li {row && title}\n'
-    const { tsx, map } = compileKay(source, 'test.kay', { check: true })
-    const copies = (offset: number) => map.toGeneratedAll(offset).map(generated => tsx.slice(generated, generated + 3))
+    const copiesIn = ({ tsx, map }: ReturnType<typeof compileKay>) => (offset: number) => map.toGeneratedAll(offset).map(generated => tsx.slice(generated, generated + 3))
+    const copies = copiesIn(compileKay(source, 'test.kay', { check: true }))
 
-    // A loop's item goes into its key function and its row.
-    expect(copies(source.indexOf('row of'))).toEqual(['row', 'row'])
+    // A browser's loop item goes into its key function and its row, where the type checker reads the key in the row.
+    expect(copiesIn(compileKay(source, 'test.kay', { output: 'dom' }))(source.indexOf('row of'))).toEqual(['row', 'row'])
+    expect(copies(source.indexOf('row of'))).toEqual(['row'])
     // `title` becomes `__props.title`, right after the run copying `row && `.
     expect(copies(source.lastIndexOf('title'))).toEqual(['tit'])
     expect(copies(source.indexOf('title'))).toEqual(['tit'])

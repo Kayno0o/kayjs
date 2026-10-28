@@ -47,7 +47,7 @@ kay lint --cache
 - A template literal whose start or end is interpolated may reach any page it fits.
 - A plain `string`, relative paths, `//host` and other schemes are not checked.
 - Form field names against the action schema.
-- Nothing a `.kay` file declares goes unread (`unread-name`): an import, a declaration in either fence, a destructured prop, or a server value neither the template nor the fence reads, whatever the tsconfig says.
+- Nothing a `.kay` file declares goes unread (`unread-name`): an import, a declaration in either fence, a destructured prop, or a server value neither the template nor the fence reads, whatever the tsconfig says; under `noUnusedParameters`, a `for` loop's item or index too, its `key` counting as a read.
 - `.ts` files are left to its `noUnusedLocals`.
 - A name starting with `_` is unused on purpose, and so is a prop destructured beside `...rest`, which it leaves out.
 - The editor reports them too, greyed out, and offers to remove an unread prop.
