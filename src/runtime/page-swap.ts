@@ -1,6 +1,5 @@
 import type { FetchedPage, Swap } from './navigation'
 import type { Policy } from './swap-flight'
-import { listenToForms } from './form-submits'
 import { historyState, leave, leaving, navigation, pageKey, restoreScroll, saveScroll } from './navigation'
 import { NAVIGATION_ENTRY } from './navigation-entry'
 import { forgetPageData } from './page-data'
@@ -246,9 +245,6 @@ export async function show(page: FetchedPage, hash: string, swap: Swap, isCurren
       restoreScroll(swap.saved, hash)
 
     void moveFocus(swap, policy)
-
-    if (document.forms.length > 0)
-      listenToForms()
 
     navigation.hooks!.hydrate(document.body)
     void navigation.hooks!.arrive?.(target.search, scrollY)

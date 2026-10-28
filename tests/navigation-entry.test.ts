@@ -110,6 +110,7 @@ for (const [name, options, prefix, slash] of MODES) {
       await page.waitFor('h1', { text: 'Contact' })
       expect(await sameDocument(page)).toBe(true)
       expect(await page.path()).toBe(at('/contact'))
+      expect(await page.evaluate(() => document.querySelector('form')!.noValidate)).toBe(true)
 
       await page.fill('input[name="note"]', 'Hello')
       await page.click('form button')
@@ -146,6 +147,7 @@ for (const [name, options, prefix, slash] of MODES) {
       await page.waitFor('h1', { text: 'Login' })
       expect(await sameDocument(page)).toBe(true)
       expect(await page.count('[data-kay-nav]')).toBe(0)
+      await page.waitUntil(() => document.querySelector('form')!.noValidate)
 
       await page.fill('input[name="name"]', 'Ann')
       await page.click('form button')

@@ -1,7 +1,7 @@
 import { withoutBase } from './base'
 import { navigation } from './navigation'
 
-// Takes over the forms posting to an action, which `./navigate` loads once a page shows a form or one takes focus, so a page holding none never fetches it; the posting itself, in `./forms`, loads once one takes focus or is submitted.
+// Takes over the forms posting to an action, which `./navigate` loads once a page shows a form, one takes focus or is posted, so a page holding none never fetches it; the posting itself, in `./forms`, loads once one takes focus or is submitted.
 
 const ACTION_PATH = /^\/_kay\/action\//
 
@@ -22,15 +22,14 @@ export function listenToForms(): void {
     takeFormCheck(form)
 }
 
-// A form taking focus is about to be posted: form posting and its checks load then. An island may render a form after the page loaded, taken here.
-// The form a control taking focus sits in, which the navigation-only entry listens for itself.
-export function onFocusIn(event: FocusEvent): void {
+function onFocusIn(event: FocusEvent): void {
   const form = event.target instanceof Element ? event.target.closest('form') : null
 
   if (form)
     focused(form)
 }
 
+// A form taking focus is about to be posted: form posting and its checks load then. An island may render a form after the page loaded, taken here.
 export function focused(form: HTMLFormElement): void {
   listen()
   takeFormCheck(form)
@@ -44,6 +43,9 @@ function listen(): void {
   if (!listening) {
     listening = true
     document.addEventListener('submit', onSubmit)
+    document.addEventListener('focusin', onFocusIn)
+    // A swap dispatches it once the next page shows.
+    document.addEventListener('kay:navigate', listenToForms)
   }
 }
 
@@ -87,6 +89,18 @@ function takeFormCheck(form: HTMLFormElement): void {
 
   form.noValidate = true
   checkedForms.add(form)
+}
+
+// A submit the islands' entry held while this module loaded, posted as `onSubmit` would have, or by the browser.
+export function submitted(form: HTMLFormElement, submitter: HTMLElement | null): void {
+  listen()
+
+  const url = swappedActionUrl(form, submitter)
+
+  if (!url)
+    submitNatively(form, submitter)
+  else if (!busyForms.has(form))
+    void submit(form, submitter, url)
 }
 
 function onSubmit(event: SubmitEvent): void {

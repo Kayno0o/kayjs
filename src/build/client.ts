@@ -600,14 +600,13 @@ async function bundleNavigation(root: string, options: ClientOptions, config: Bu
 
   await Bun.write(file, [
     `import ${JSON.stringify(join(RUNTIME_DIR, 'page-errors.ts'))}`,
-    `import { listenToForms, onFocusIn } from ${JSON.stringify(join(RUNTIME_DIR, 'form-submits.ts'))}`,
+    `import { listenToForms } from ${JSON.stringify(join(RUNTIME_DIR, 'form-submits.ts'))}`,
     `import { startNavigation } from ${JSON.stringify(join(RUNTIME_DIR, 'navigate.ts'))}`,
     ...options.search ? [`import { arrive } from ${JSON.stringify(join(RUNTIME_DIR, 'arrival.ts'))}`] : [],
     '',
     ...options.search ? ['const at = scrollY', ''] : [],
     `startNavigation({ hydrate: () => undefined, dispose: () => undefined${options.search ? ', arrive' : ''} })`,
     'listenToForms()',
-    'addEventListener(\'focusin\', onFocusIn)',
     ...options.search ? ['void arrive(location.search, at)', 'addEventListener(\'hashchange\', () => void arrive(location.search, scrollY))'] : [],
     '',
   ].join('\n'))

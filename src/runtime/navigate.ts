@@ -3,15 +3,17 @@ import { dirtyGuard, dropScrollSave, historyState, leave, mayLeave, navigation, 
 
 // Swaps pages in place: a link or a form of the app fetches the next page from the server and puts it in this one, islands marked `persist` kept alive.
 // Everything here runs in the browser only, started by the entry; without JavaScript links and forms load pages as they always did.
-// This part only listens: the swap itself, in `./page-swap`, loads once a visitor points at a link or calls `navigate`, and the forms' listener, in `./form-submits`, once the page shows a form or one takes focus, so a page nobody leaves never fetches the one and a page with no form never fetches the other.
+// This part only listens: the swap itself, in `./page-swap`, loads once a visitor points at a link or calls `navigate`, and the forms' listener, in `./form-submits`, once the page shows a form, one takes focus or is posted, so a page nobody leaves never fetches the one and a page with no form never fetches the other.
 
-// Defined by the build of the navigation-only entry, whose boot hands the forms' listener over, loaded with it.
+// Defined by the build of the navigation-only entry, whose boot wires the forms' listener it bundles.
 declare const KAY_NAV_ENTRY: true | undefined
 
 const PREFETCH = 'meta[name="kay-prefetch"]'
 
 let swapModule: Promise<typeof import('./page-swap')> | undefined
 let formsModule: Promise<typeof import('./form-submits')> | undefined
+// Set once the forms' listener runs, which takes every submit from then on.
+let formsListen = false
 // A traversal undone while the guards are asked about it: where it went, and how far.
 let held: { url: URL, delta: number } | undefined
 // A traversal the guards let through, made again.
@@ -46,10 +48,11 @@ export function startNavigation(given: NavigationHooks): void {
   for (const element of document.head.children as HTMLCollectionOf<HeadElement>)
     element._$s = element.outerHTML
 
-  // The navigation-only entry listens to the forms itself, as every page it runs on posts one.
+  // The navigation-only entry's boot listens to the forms itself, as every page it runs on posts one.
   if (typeof KAY_NAV_ENTRY === 'undefined') {
-    if (document.forms.length > 0)
-      void wakeForms()
+    wakeShownForms()
+    document.addEventListener('kay:navigate', wakeShownForms)
+    document.addEventListener('submit', onEarlySubmit)
   }
 
   history.scrollRestoration = 'manual'
@@ -68,18 +71,48 @@ export async function loadSwap(): Promise<typeof import('./page-swap')> {
   return swapModule ??= import('./page-swap')
 }
 
-// The forms' listener, for the page's forms or the one taking focus; one that fails to load leaves them to the browser, which posts them in full.
-async function wakeForms(form?: HTMLFormElement): Promise<void> {
-  try {
-    // A condition Bun folds before it splits chunks: an import left in the navigation-only entry, which bundles the module, would split that entry in three.
-    const forms = await (typeof KAY_NAV_ENTRY === 'undefined' ? formsModule ??= import('./form-submits') : Promise.reject(new Error('unreachable')))
+async function loadFormSubmits(): Promise<typeof import('./form-submits')> {
+  // A condition Bun folds before it splits chunks: an import left in the navigation-only entry, which bundles the module, would split that entry in three.
+  return typeof KAY_NAV_ENTRY === 'undefined' ? formsModule ??= import('./form-submits') : Promise.reject(new Error('unreachable'))
+}
 
-    if (form)
+// Until the forms' listener runs, which then takes the forms a swap brings or a focus lands in itself.
+function wakeShownForms(): void {
+  if (!formsListen && document.forms.length > 0)
+    void wakeForms()
+}
+
+// The forms' listener, for the page's forms, the one taking focus or the submit held for it; one that fails to load leaves them to the browser, which posts them in full.
+async function wakeForms(form?: HTMLFormElement, held?: SubmitEvent): Promise<void> {
+  try {
+    const forms = await loadFormSubmits()
+
+    formsListen = true
+
+    if (held)
+      forms.submitted(form!, held.submitter)
+    else if (form)
       forms.focused(form)
     else
       forms.listenToForms()
   }
-  catch {}
+  catch {
+    formsListen = true
+
+    if (held)
+      form!.requestSubmit(held.submitter)
+  }
+}
+
+// A post to an action before the forms' listener runs, as from a form an island rendered that nothing focused, held until the listener loads.
+function onEarlySubmit(event: SubmitEvent): void {
+  const form = event.target as HTMLFormElement
+
+  if (formsListen || event.defaultPrevented || !(event.submitter?.getAttribute('formaction') ?? form.getAttribute('action'))?.includes('/_kay/action/'))
+    return
+
+  event.preventDefault()
+  void wakeForms(form, event)
 }
 
 // Fetched ahead of the click it hints at; one that fails to load leaves each click to load its page fully.
@@ -242,7 +275,7 @@ function onFocus(event: FocusEvent): void {
   if (rules !== undefined && linkOf(event))
     void wakePrefetch(event)
 
-  if (typeof KAY_NAV_ENTRY === 'undefined') {
+  if (typeof KAY_NAV_ENTRY === 'undefined' && !formsListen) {
     const form = event.target instanceof Element ? event.target.closest('form') : null
 
     if (form)

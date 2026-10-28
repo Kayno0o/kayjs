@@ -781,6 +781,34 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('page swap i
     }
   })
 
+  it('posts in place a form shown after the page loaded and submitted before anything in it took focus', async () => {
+    const fresh = await open('/kept')
+
+    try {
+      await settled(fresh)
+      // A form an island renders, posted by code: no focus ever woke the forms' listener.
+      await fresh.evaluate(async () => {
+        const html = await (await fetch('/posted')).text()
+
+        document.body.append(new DOMParser().parseFromString(html, 'text/html').querySelector('form.away')!)
+        ;(window as { kayAlive?: boolean }).kayAlive = true
+      })
+
+      expect(await formCodeLoaded(fresh)).toBe(false)
+
+      const posted = fresh.waitForResponse('/_kay/action/*')
+
+      await fresh.evaluate(() => document.querySelector('form')!.requestSubmit())
+
+      expect((await posted).requestHeaders['x-kay-page']).toBe('/kept')
+      await fresh.waitFor('h1', { text: 'Plain' })
+      expect(await fresh.evaluate(() => (window as { kayAlive?: boolean }).kayAlive)).toBe(true)
+    }
+    finally {
+      fresh.close()
+    }
+  })
+
   it('loads the swap once a link is pointed at or followed, and swaps a link clicked before it loaded', async () => {
     const fresh = await open('/')
 
