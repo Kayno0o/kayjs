@@ -3,6 +3,16 @@ import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
 import { fresh, hydrate, property } from '../src/runtime/dom'
 import { createSignal, flush, memo, renderEffect, root } from '../src/runtime/reactive'
 
+let offline = false
+
+// While `offline` is set, the shell's import of the renderer fails, as a fetch the network drops does.
+Bun.plugin({
+  name: 'markdown-renderer-offline',
+  setup(build) {
+    build.onResolve({ filter: /markdown-render\.client/ }, () => offline ? { path: '/offline/markdown-render.client.ts' } : undefined)
+  },
+})
+
 // Each test gets its own copy of the shell, whose renderer has not loaded yet.
 async function shell(name: string): Promise<typeof import('../src/runtime/markdown.client')> {
   return import(`../src/runtime/markdown.client.ts?${name}`) as Promise<typeof import('../src/runtime/markdown.client')>
@@ -299,5 +309,30 @@ describe('markdownHtml in an island', () => {
 
     expect<string>(markdownHtml('*a*')).toBe('<p>*a*</p>\n')
     expect<string>(markdownHtml('*a*')).toBe('<p>*a*</p>\n')
+  })
+
+  it('stays unloaded when the renderer fails to arrive, giving the text as written', async () => {
+    const { markdownHtml, markdownLoaded, markdownReady } = await shell('offline')
+
+    offline = true
+
+    try {
+      markdownHtml('*a*')
+      await markdownReady()
+    }
+    finally {
+      offline = false
+    }
+
+    expect(markdownLoaded()).toBe(false)
+    expect<string>(markdownHtml('*a*')).toBe('<p>*a*</p>\n')
+  })
+})
+
+describe('markdownLoaded on the server', () => {
+  it('is true from kay/markdown, which formats at once', async () => {
+    const { markdownLoaded } = await import('kay/markdown')
+
+    expect(markdownLoaded()).toBe(true)
   })
 })

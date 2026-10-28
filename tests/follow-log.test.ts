@@ -1,5 +1,9 @@
+import type { FollowLog } from '../src/runtime/follow-log'
 import process from 'node:process'
-import { afterAll, describe, expect, it } from 'bun:test'
+import { GlobalRegistrator } from '@happy-dom/global-registrator'
+import { afterAll, beforeAll, describe, expect, it, mock } from 'bun:test'
+import { followLog } from '../src/runtime/follow-log'
+import { flush, onMount, root } from '../src/runtime/reactive'
 import { browserPath, testSite } from '../src/test'
 
 const site = await testSite({ root: 'tests/fixtures/follow-log', browser: true })
@@ -233,4 +237,75 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('followLog 
     expect(await page.evaluate(() => document.querySelector<HTMLElement>('ol.list')!.scrollTop)).toBe(set)
     expect(page.errors).toEqual([])
   }, 30_000)
+})
+
+describe('followLog in a DOM simulator', () => {
+  beforeAll(() => {
+    GlobalRegistrator.register()
+  })
+
+  afterAll(async () => {
+    await GlobalRegistrator.unregister()
+  })
+
+  // A list in the document, counting each scroll followLog asks of it.
+  function list(): { element: HTMLElement, scrolls: () => number } {
+    const element = document.createElement('ol')
+    const scrollTo = mock(() => undefined)
+
+    element.append(document.createElement('li'))
+    element.scrollTo = scrollTo
+    document.body.append(element)
+
+    return { element, scrolls: () => scrollTo.mock.calls.length }
+  }
+
+  it('mounts an island with nothing followed where ResizeObserver is undefined', async () => {
+    const { element, scrolls } = list()
+    const observer = globalThis.ResizeObserver
+
+    Reflect.deleteProperty(globalThis, 'ResizeObserver')
+
+    try {
+      const dispose = root((dispose) => {
+        const log = followLog(element)
+
+        onMount(() => log.toBottom())
+
+        return dispose
+      })
+
+      flush()
+      element.append(document.createElement('li'))
+      await Bun.sleep(10)
+      flush()
+      dispose()
+    }
+    finally {
+      globalThis.ResizeObserver = observer
+    }
+
+    expect(scrolls()).toBe(0)
+  })
+
+  it('does nothing on toBottom before the island mounted or after it ended', () => {
+    const { element, scrolls } = list()
+    let log: FollowLog | undefined
+
+    const dispose = root((dispose) => {
+      log = followLog(element)
+      log.toBottom()
+
+      return dispose
+    })
+
+    expect(scrolls()).toBe(0)
+
+    flush()
+    expect(scrolls()).toBe(1)
+
+    dispose()
+    log!.toBottom()
+    expect(scrolls()).toBe(1)
+  })
 })
