@@ -54,8 +54,8 @@ async function collectUntil(gone: () => boolean): Promise<void> {
   for (let round = 0; round < 40; round++) {
     // Once the engine is idle, this finishes its JIT compilations and clears the stack it scans: a compilation in flight holds what it profiled as a root, which kept an app nothing reached past 40 collections on a loaded runner.
     Bun.shrink()
-    // Also lets a request's afterResponse hooks run, which Elysia queues with setImmediate and which hold its app.
-    await Bun.sleep(50)
+    // Also lets a request's afterResponse hooks run, which Elysia queues with setImmediate and which hold its app. Resumed by a timer, not `Bun.sleep`: a collection resuming from `Bun.sleep` kept what an Immediate that already ran had captured until Bun's own collection a second later, which a loaded runner put past 40 rounds.
+    await new Promise(resolve => setTimeout(resolve, 50))
     Bun.gc(true)
 
     if (gone())
