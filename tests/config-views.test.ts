@@ -29,7 +29,7 @@ describe('the views of the config', () => {
   })
 
   // Typed whole, so a field added to ShadowSettings fails the type check until the sample sets it, then this test until both functions carry it.
-  it('the shadow settings eslint and the LSP read back are the ones check wrote', async () => {
+  it('the shadow settings eslint reads back are the ones check wrote, and give each file its compile options', async () => {
     const root = await scratchDir('shadow-settings-')
     const mounts: Pick<Required<RouteMount>, 'dir' | 'prefix' | 'outer'>[] = [{ dir: join(root, 'node_modules/lib/routes'), prefix: '/lib', outer: join(root, 'node_modules/lib/_outer.kay') }]
     const settings: Required<ShadowSettings> = {

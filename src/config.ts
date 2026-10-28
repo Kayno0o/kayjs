@@ -489,7 +489,7 @@ export function defineConfig<Config extends KayConfig>(config: Config & { public
   return config
 }
 
-// The keys of the config a view of kay's takes as written, each one set, undefined when the config leaves it out, as the view's options type derives from the same list.
+// The listed keys of the config, each one present and undefined when the config leaves it out.
 export function pickConfig<Key extends keyof KayConfig>(config: KayConfig, keys: readonly Key[]): Pick<KayConfig, Key> {
   return Object.fromEntries(keys.map(key => [key, config[key]])) as Pick<KayConfig, Key>
 }

@@ -4,7 +4,7 @@ import { describe, expect, it } from 'bun:test'
 const ROOT = process.cwd()
 
 async function siteFrom(env: Record<string, string>): Promise<{ site: unknown, err: string }> {
-  const script = `import { siteFromEnv } from '${ROOT}/src/config'\nconst first = siteFromEnv()\nsiteFromEnv()\nconsole.log(JSON.stringify(first ?? null))`
+  const script = `import { siteFromEnv } from '${ROOT}/src/config-loader'\nconst first = siteFromEnv()\nsiteFromEnv()\nconsole.log(JSON.stringify(first ?? null))`
   const run = Bun.spawn([process.execPath, '-e', script], { cwd: ROOT, env: { ...process.env, SITE_URL: undefined, ORIGIN: undefined, ...env }, stdout: 'pipe', stderr: 'pipe' })
   const [out, err] = await Promise.all([new Response(run.stdout).text(), new Response(run.stderr).text()])
 
