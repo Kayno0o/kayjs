@@ -1,0 +1,16 @@
+--- server
+import { t } from 'elysia'
+import { action } from 'kay'
+
+// Refuses a name taken, shown in place; any other goes on to the done page.
+export const enter = action(t.Object({ name: t.String({ maxLength: 40 }) }), async ({ name }, ctx) => name === 'Ann' ? ctx.fail(409, 'Taken') : ctx.redirect('/done'))
+--- script
+import Echo from '../components/echo.kay'
+---
+h1 Home
+Echo
+form(action={enter})
+  input(name="name" aria-label="Name")
+  if enter.error() as message
+    p.error {message}
+  button.enter Enter

@@ -119,7 +119,7 @@ A site with a `base` in kay.config.ts is tested under it with nothing more. `tes
 
 `visit`, `submit` and `fetch` take a path with the base or without it, `/blog/about` or `/about`. A path starting with the base is taken as written, so a route that starts like it is `/blog/blog/hello`.
 
-`url` on a visit is the path as a browser shows it, base included. `site.open()` serves the site at the root of its port, since no proxy takes the base off there.
+`url` on a visit is the path as a browser shows it, base included. `site.open()` serves the site under its base too, through a proxy of its own that takes the base off as the one in front of the site does, so a page's scripts, posts, redirects and websockets stay under it; a path given without the base opens under it.
 
 <ReadMore href="/llms/testing#test-site">How redirects and cookie paths work under a base are in the full testing reference.</ReadMore>
 

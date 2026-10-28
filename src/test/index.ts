@@ -19,6 +19,7 @@ import { KayCompileError } from '../build/transform'
 import { buildingTestSite } from '../config-extensions'
 import { withConfig } from '../config-loader'
 import { BuildStamps } from '../dev/fingerprint'
+import { mountedAt } from '../dev/base-proxy'
 import { clientOptionsOf, PRODUCTION, resolveProject } from '../project'
 import { encodeCall, minTimeOf, readActionResponse, SETTLED, STAMP_FIELD } from '../runtime/action'
 import { joinBase } from '../runtime/base'
@@ -154,7 +155,7 @@ export interface TestSite {
   socket: <Module, const Path extends SocketPath<Module>>(module: Module, path: Path, ...[options]: Optional<SocketOptions<Module, Path> & VisitInit>) => TestSocket<SocketOf<Module, Path>>
   // A route of a module under `src/api` answering with `eventStream()`, read as an island reads it.
   stream: <Module, const Path extends StreamPath<Module>, const M extends StreamMethod<NodeAt<Module, Path>> = never>(module: Module, path: Path, ...[options]: Optional<StreamOptions<Module, Path, M> & VisitInit>) => TestStream<StreamOf<Module, Path, M>>
-  // A page loaded in a headless Chrome over a server the site starts on a free port, once `browser` is set; its cookies are the browser's, not `cookies`.
+  // A page loaded in a headless Chrome over a server the site starts on a free port, once `browser` is set, under its `base` when it has one; its cookies are the browser's, not `cookies`.
   open: (path: string, options?: BrowserOptions) => Promise<TestPage>
   // The URLs the sitemap at `path` (default `/sitemap.xml`) lists, failing when it does not answer 200.
   sitemap: (path?: string) => Promise<string[]>
@@ -411,6 +412,7 @@ export async function testSite(options: TestOptions = {}): Promise<TestSite> {
   // The URL the browser shows a page at that answered a post in place: the one posted to.
   const answeredAt = new WeakMap<Visit, string>()
   let server: Bun.Server<unknown> | undefined
+  let mounted: ReturnType<typeof mountedAt> | undefined
   const opened = new Set<TestPage>()
   const connections = new Set<{ close: () => void }>()
 
@@ -422,6 +424,13 @@ export async function testSite(options: TestOptions = {}): Promise<TestSite> {
     }
 
     return server
+  }
+
+  // Where the browser loads pages: under a base, through a proxy taking it off as the one in front of the site does.
+  const pageOrigin = (): string => {
+    const origin = `http://localhost:${listening().port}`
+
+    return base === '' ? origin : (mounted ??= mountedAt(origin, base)).origin
   }
 
   // Takes the site off the registry that closes it once the tests ran, as a close by hand leaves nothing to close.
@@ -625,8 +634,12 @@ export async function testSite(options: TestOptions = {}): Promise<TestSite> {
         if (options.browser === undefined || options.browser === false)
           throw new Error('kay: open() loads pages in a browser, which needs their islands built: testSite({ browser: true })')
 
+        const url = new URL(path, pageOrigin())
+
+        url.pathname = joinBase(base, routerPath(url.pathname, base))
+
         // A site made with `as(cookie)` signs the browser in too.
-        const page = await browse(new URL(path, `http://localhost:${listening().port}`).href, { ...browser, ...defaults.cookie !== undefined && { cookies: defaults.cookie }, ...Object.fromEntries(Object.entries(browserOptions ?? {}).filter(([, value]) => value !== undefined)) })
+        const page = await browse(url.href, { ...browser, ...defaults.cookie !== undefined && { cookies: defaults.cookie }, ...Object.fromEntries(Object.entries(browserOptions ?? {}).filter(([, value]) => value !== undefined)) })
         const close = page.close
 
         opened.add(page)
@@ -649,6 +662,9 @@ export async function testSite(options: TestOptions = {}): Promise<TestSite> {
           connection.close()
 
         connections.clear()
+
+        mounted?.stop()
+        mounted = undefined
 
         if (server)
           await shutdown(app, true)
