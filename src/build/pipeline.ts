@@ -144,129 +144,104 @@ async function runBuild(root: string, config: KayConfig, options: BuildOptions):
   if (options.exportTo !== undefined)
     await removeLastExport(root, resolve(root, options.exportTo))
 
-  // A callback throwing while the last build waits aside puts it back, as a failing stage does.
-  const reportAside = async (stage: BuildStage) => {
-    try {
-      await options.onStage?.(stage, result)
-    }
-    catch (error) {
-      if (checking)
-        await putBack(output, previous)
-
-      throw error
-    }
-  }
-
-  // The chunks of the last build wait beside the output until this one is good, then come back into it.
-  await setAsideKept(output, previous)
-
-  // The last build waits aside until this one is known good, which the check decides beside the browser bundle.
-  if (checking)
-    await setAside(output, previous)
-  else
-    await rm(previous, { recursive: true, force: true })
-
-  // The build's own prerender scans the routes, which must not take the record of the last build.
-  await rm(join(output, CONTEXT_RECORD), { force: true })
-  await clearServerRecord(output)
-
   let step: string | undefined
   const report: Report = (progress) => {
     step = progress.step
     options.onProgress?.(progress)
   }
-  let checkEnded = !checking
-  let bundleEnded = false
-  // Whichever of the check and the bundle ends first says what still runs.
-  const checkRun = async () => {
-    const began = performance.now()
-
-    try {
-      return checkWith ? await checkStage(project, checkWith, exported) : []
-    }
-    finally {
-      checkMs = performance.now() - began
-      checkEnded = true
-
-      if (!bundleEnded && step === 'checking and bundling')
-        report({ step: 'bundling' })
-    }
-  }
-  const bundleRun = async () => {
-    const began = performance.now()
-
-    try {
-      return await bundleStage(project, exported, options.analyze === true, report)
-    }
-    finally {
-      bundleMs = performance.now() - began
-      bundleEnded = true
-
-      if (!checkEnded)
-        report({ step: 'checking' })
-    }
-  }
-  const started = performance.now()
-
-  report({ step: checking ? 'checking and bundling' : 'bundling' })
-
-  const [checked, bundled] = await Promise.allSettled([checkRun(), bundleRun()])
-
-  if (checked.status === 'rejected') {
-    await putBack(output, previous)
-
-    throw checked.reason
-  }
-
-  result.checked = checked.value
-  await reportAside('check')
-
-  if (failing(checked.value, options.denyWarnings)) {
-    await putBack(output, previous)
-
-    return { ...result, failed: { stage: 'check' } }
-  }
-
-  if (bundled.status === 'rejected') {
-    if (checking)
-      await putBack(output, previous)
-
-    return { ...result, failed: { stage: 'bundle', error: bundled.reason } }
-  }
-
-  const client = bundled.value
-  let made: Awaited<ReturnType<typeof outputStage>>
+  // The last build waits aside until this one is known good, which the check decides beside the browser bundle: a stage failing or a callback throwing puts it back.
+  const aside = await setOutputAside(output, previous, checking)
+  let client: ClientBuild
 
   try {
-    made = await outputStage(project, exported, client, checking, report)
+    // The build's own prerender scans the routes, which must not take the record of the last build.
+    await rm(join(output, CONTEXT_RECORD), { force: true })
+    await clearServerRecord(output)
+
+    let checkEnded = !checking
+    let bundleEnded = false
+    // Whichever of the check and the bundle ends first says what still runs.
+    const checkRun = async () => {
+      const began = performance.now()
+
+      try {
+        return checkWith ? await checkStage(project, checkWith, exported) : []
+      }
+      finally {
+        checkMs = performance.now() - began
+        checkEnded = true
+
+        if (!bundleEnded && step === 'checking and bundling')
+          report({ step: 'bundling' })
+      }
+    }
+    const bundleRun = async () => {
+      const began = performance.now()
+
+      try {
+        return await bundleStage(project, exported, options.analyze === true, report)
+      }
+      finally {
+        bundleMs = performance.now() - began
+        bundleEnded = true
+
+        if (!checkEnded)
+          report({ step: 'checking' })
+      }
+    }
+    const started = performance.now()
+
+    report({ step: checking ? 'checking and bundling' : 'bundling' })
+
+    const [checked, bundled] = await Promise.allSettled([checkRun(), bundleRun()])
+
+    if (checked.status === 'rejected')
+      throw checked.reason
+
+    result.checked = checked.value
+    await options.onStage?.('check', result)
+
+    if (failing(checked.value, options.denyWarnings))
+      return { ...result, failed: { stage: 'check' } }
+
+    if (bundled.status === 'rejected')
+      return { ...result, failed: { stage: 'bundle', error: bundled.reason } }
+
+    client = bundled.value
+    let made: Awaited<ReturnType<typeof outputStage>>
+
+    try {
+      made = await outputStage(project, exported, client, checking, report)
+    }
+    catch (error) {
+      return { ...result, failed: { stage: 'output', error } }
+    }
+
+    const { prerendered, entries, linted } = made
+
+    result.linted = linted
+
+    if (!failing(linted, options.denyWarnings)) {
+      const summary: BuildSummary = { routes: made.routes, footprints: made.footprints, stages: [...checking ? [{ name: 'check', ms: checkMs }] : [], { name: 'bundle', ms: bundleMs }, ...made.stages], caches: cacheCounts() }
+
+      result.built = { islands: Object.keys(client.islands).length, stylesheets: client.styles.size, prerendered, entries, report: options.analyze === true ? client.report : withoutModules(client.report), summary, previous: lastReport, ms: performance.now() - started }
+    }
+
+    await options.onStage?.('output', result)
+
+    if (failing(linted, options.denyWarnings)) {
+      // Without a check nothing waits aside, and a build failing its lints is not left in place either.
+      if (!checking)
+        await rm(output, { recursive: true, force: true })
+
+      return { ...result, failed: { stage: 'output' } }
+    }
+
+    await aside.keep()
   }
-  catch (error) {
-    if (checking)
-      await putBack(output, previous)
-
-    return { ...result, failed: { stage: 'output', error } }
+  finally {
+    await aside.end()
   }
-
-  const { prerendered, entries, linted } = made
-
-  result.linted = linted
-
-  if (!failing(linted, options.denyWarnings)) {
-    const summary: BuildSummary = { routes: made.routes, footprints: made.footprints, stages: [...checking ? [{ name: 'check', ms: checkMs }] : [], { name: 'bundle', ms: bundleMs }, ...made.stages], caches: cacheCounts() }
-
-    result.built = { islands: Object.keys(client.islands).length, stylesheets: client.styles.size, prerendered, entries, report: options.analyze === true ? client.report : withoutModules(client.report), summary, previous: lastReport, ms: performance.now() - started }
-  }
-
-  await reportAside('output')
-
-  if (failing(linted, options.denyWarnings)) {
-    await putBack(output, previous)
-
-    return { ...result, failed: { stage: 'output' } }
-  }
-
-  await restoreKept(output)
-  await rm(previous, { recursive: true, force: true })
 
   if (options.exportTo !== undefined) {
     const stage = performance.now()
@@ -384,6 +359,30 @@ async function putBack(output: string, previous: string) {
 
   if (existsSync(previous))
     await rename(previous, output)
+}
+
+// The last build and the chunks it kept wait aside while this one runs: `keep` brings the chunks back beside this build and drops the last one, and `end` puts the last one back unless `keep` began. Without a check nothing waits aside, as the build writes in place.
+async function setOutputAside(output: string, previous: string, checking: boolean): Promise<{ keep: () => Promise<void>, end: () => Promise<void> }> {
+  await setAsideKept(output, previous)
+
+  if (checking)
+    await setAside(output, previous)
+  else
+    await rm(previous, { recursive: true, force: true })
+
+  let kept = false
+
+  return {
+    keep: async () => {
+      kept = true
+      await restoreKept(output)
+      await rm(previous, { recursive: true, force: true })
+    },
+    end: async () => {
+      if (!kept && checking)
+        await putBack(output, previous)
+    },
+  }
 }
 
 // The browser bundles and the variants of the images they import, which run no page, API module or guard, so they build while the check runs.

@@ -1,6 +1,8 @@
+import { existsSync } from 'node:fs'
 import { rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import { afterAll, describe, expect, it } from 'bun:test'
+import { outputDir } from '../src/build/assets'
 import { budgetLints, checkBudget } from '../src/build/budget'
 import { byteSize } from '../src/runtime/byte-size'
 import { kayBuild } from './check-helper'
@@ -148,9 +150,12 @@ describe('kay build with a budget', () => {
 
     expect((await built(root, '--deny-warnings')).code).toBe(1)
 
-    const denied = await built(await project('budget: { js: \'2kb\' }, lints: { \'over-budget\': \'deny\' }'))
+    const deniedRoot = await project('budget: { js: \'2kb\' }, lints: { \'over-budget\': \'deny\' }')
+    const denied = await built(deniedRoot)
 
     expect([denied.code, denied.over.map(problem => problem.severity)]).toEqual([1, ['error']])
+    // Without a check no last build waits aside, and the one failing its lints is not left in place.
+    expect(existsSync(outputDir(deniedRoot))).toBe(false)
     expect((await built(await project('budget: { js: \'2kb\' }, lints: { \'over-budget\': \'allow\' }'))).over).toEqual([])
   }, 120_000)
 })
