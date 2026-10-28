@@ -3,7 +3,7 @@ import { join, resolve } from 'node:path'
 import process from 'node:process'
 import { afterAll, describe, expect, it } from 'bun:test'
 import { t } from 'elysia'
-import { action, ActionRedirectError, encodeCall, SETTLED } from '../src/runtime/action'
+import { action, ActionError, ActionRedirectError, encodeCall, readActionResponse, SETTLED } from '../src/runtime/action'
 import { actionStream } from '../src/runtime/action-stream'
 import { browserPath, testSite } from '../src/test'
 import { untilHolds } from './helpers/until-holds'
@@ -367,7 +367,7 @@ describe('the stream an island reads', () => {
 
   it('fails and stops the answer when a value does not decode', async () => {
     const { response, cancelled } = answer('data: [0]\n\ndata: {broken\n\n')
-    const stream = actionStream<number>(response, SETTLED)
+    const stream = actionStream<number>(response, SETTLED, () => new Error('failed'))
     const status = await new Promise(resolve => stream[SETTLED](resolve))
 
     expect(status).toBe('failed')
@@ -377,10 +377,40 @@ describe('the stream an island reads', () => {
 
   it('reads an answer a proxy rewrote with CRLF line breaks', async () => {
     const { response } = answer('data: [1]\r\n\r\nevent: end\r\ndata:\r\n\r\n')
-    const stream = actionStream<number>(response, SETTLED)
+    const stream = actionStream<number>(response, SETTLED, () => new Error('failed'))
     const status = await new Promise(resolve => stream[SETTLED](resolve))
 
     expect(status).toBe('done')
+    expect(stream.last()).toBe(1)
+  })
+
+  it('is awaited to its end with ended(), its last value or undefined for none, even once it ended', async () => {
+    const counted = actionStream<number>(answer('data: [1]\n\ndata: [2]\n\nevent: end\ndata:\n\n').response, SETTLED, () => new Error('failed'))
+    const none = actionStream<number>(answer('event: end\ndata:\n\n').response, SETTLED, () => new Error('failed'))
+
+    expect(await counted.ended()).toBe(2)
+    expect(await counted.ended()).toBe(2)
+    expect(await none.ended()).toBeUndefined()
+  })
+
+  it('rejects ended() with the failure its caller makes when it failed, and an AbortError when it was closed first', async () => {
+    const failure = new Error('failed')
+    const failed = actionStream<number>(answer('data: [1]\n\nevent: error\ndata:\n\n').response, SETTLED, () => failure)
+    const open = actionStream<number>(answer('data: [1]\n\n').response, SETTLED, () => failure)
+    const ending = open.ended()
+
+    open.close()
+
+    await expect(ending).rejects.toHaveProperty('name', 'AbortError')
+    await expect(failed.ended()).rejects.toBe(failure)
+  })
+
+  it('rejects ended() with an ActionError for a call whose stream failed after its first value', async () => {
+    const response = new Response('data: [1]\n\nevent: error\ndata:\n\n', { headers: { 'content-type': 'text/event-stream' } })
+    const stream = await readActionResponse<ActionStream<number>>(response, '/_kay/actions/reply')
+
+    await expect(stream.ended()).rejects.toBeInstanceOf(ActionError)
+    await expect(stream.ended()).rejects.toMatchObject({ status: 500, message: 'The stream of /_kay/actions/reply failed after its first value' })
     expect(stream.last()).toBe(1)
   })
 })

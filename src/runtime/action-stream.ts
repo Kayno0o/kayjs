@@ -10,15 +10,23 @@ const ERROR = 'event: error'
 const LINE_BREAK = /\r?\n/
 
 // kay's own answer holds one line per value, so it is read here rather than by live.ts's reader: what this module imports of the runtime loads up front on every page, so it takes `settled` from its caller too.
-// Values arriving before the first `on()`, until the task the call resolved in ends, go to it when it comes.
-export function actionStream<T>(response: Response, settled: typeof SETTLED): ActionStream<T> & Settles {
+// Values arriving before the first `on()`, until the task the call resolved in ends, go to it when it comes. `failure` is what `ended()` rejects with for a stream that failed, an `ActionError` its caller makes.
+export function actionStream<T>(response: Response, settled: typeof SETTLED, failure: () => Error): ActionStream<T> & Settles {
   const [status, setStatus] = ownSignal<StreamStatus>('open')
   const [last, setLast] = ownSignal<T | undefined>(undefined, { equals: false })
   const listeners = new Set<(value: T) => void>()
   const reader = response.body!.getReader()
   let early: T[] | undefined = []
   let ended: StreamStatus | undefined
+  let latest: T | undefined
   const waiting: ((status: StreamStatus) => void)[] = []
+
+  const onEnd = (then: (status: StreamStatus) => void) => {
+    if (ended)
+      then(ended)
+    else
+      waiting.push(then)
+  }
 
   const end = (final: StreamStatus) => {
     if (ended)
@@ -32,6 +40,7 @@ export function actionStream<T>(response: Response, settled: typeof SETTLED): Ac
   }
 
   const receive = (value: T) => {
+    latest = value
     setLast(value)
     early?.push(value)
 
@@ -72,12 +81,13 @@ export function actionStream<T>(response: Response, settled: typeof SETTLED): Ac
       return () => void listeners.delete(listener)
     },
     close,
-    [settled]: (then: (status: StreamStatus) => void) => {
-      if (ended)
-        then(ended)
+    ended: async () => new Promise((resolve, reject) => onEnd((final) => {
+      if (final === 'done')
+        resolve(latest)
       else
-        waiting.push(then)
-    },
+        reject(final === 'failed' ? failure() : new DOMException('The stream was closed before its end', 'AbortError'))
+    })),
+    [settled]: onEnd,
   }
 }
 

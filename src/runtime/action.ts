@@ -222,7 +222,10 @@ export interface Failure<Data> {
 export type Success<Output> = Exclude<Output, Failure<unknown>>
 
 // What a call to a handler returning an async iterable resolves with: its values read as they come, typed.
-export type ActionStream<T> = EventReader<T>
+export interface ActionStream<T> extends EventReader<T> {
+  // Resolves with the last value once the stream ran to its end, undefined when it sent none; rejects with an `ActionError` when it failed, and an `AbortError` when it was closed first.
+  ended: () => Promise<T | undefined>
+}
 
 // What a handler's return settles to: an async iterable stays one even when it is also a thenable, as a model's reply is, which `Awaited` would read as its text.
 export type Settled<Output> = Output extends AsyncIterable<unknown> ? Output : Awaited<Output>
@@ -1015,7 +1018,7 @@ export async function readActionResponse<Output>(response: Response, action: str
 
   // Loaded only once an action streams, so a page calling none does not carry it.
   if (response.ok && response.headers.get('content-type')?.startsWith('text/event-stream') === true) {
-    const stream = (await import('./action-stream')).actionStream(response, SETTLED)
+    const stream = (await import('./action-stream')).actionStream(response, SETTLED, () => new ActionError(500, '', {}, undefined, `The stream of ${action} failed after its first value`))
 
     closeWithCaller(stream, caller)
 
