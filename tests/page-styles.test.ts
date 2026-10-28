@@ -71,6 +71,8 @@ async function copyOfFixture(): Promise<string> {
   // Pages that build a class from data and are rendered at build time; the second has rules of its own past the limit, so its head links a copy.
   await Bun.write(join(dir, 'src/routes/tone.kay'), TONE)
   await Bun.write(join(dir, 'src/routes/tone-copy.kay'), `${TONE}p(class="${BULK}") bulk\n`)
+  // Listed pages of one route rendering side by side, the first showing a class built from data, which the heads of the others carry too, as when each rendered after it.
+  await Bun.write(join(dir, 'src/routes/shade/[slug].kay'), '--- server\nexport const page = { prerender: [{ slug: \'a\' }, { slug: \'b\' }, { slug: \'c\' }] }\nconst tone = ctx.params.slug === \'a\' ? [\'ring\', 4].join(\'-\') : \'plain\'\n---\nh1 Shade\np(class={tone}) built\n')
   // The same expression on a page with a param, rendered per request.
   await Bun.write(join(dir, 'src/routes/item/[slug].kay'), '--- server\nconst tone = [\'ring\', 4].join(\'-\')\n---\nh1 Item\np(class={tone}) per request\n')
   // A failure and a missing page have chains of their own, and a page rendering a collection's Markdown may name any class.
@@ -573,6 +575,16 @@ describe('a class a server builds from data', () => {
     const tone = read.styleUses!.entries.get(join(root, 'src/routes/tone.kay')) as number[]
 
     expect(tone.map(index => read.styleUses!.classes[index])).toContain('ring-4')
+  }, 120_000)
+
+  it('keeps them in the heads of the pages of the same route that rendered beside the page showing them', async () => {
+    await prerendered()
+
+    for (const slug of ['a', 'b', 'c']) {
+      const file = await Bun.file(join(outputDir(root), `pages/shade/${slug}.html`)).text()
+
+      expect(hasRule([...file.matchAll(STYLE)].map(match => match[1]!).join('\n'), 'ring-4'), slug).toBe(true)
+    }
   }, 120_000)
 
   it('keeps them in the copy of the stylesheet a head links when its own rules pass the limit', async () => {

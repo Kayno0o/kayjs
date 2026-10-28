@@ -2,9 +2,11 @@ import type { OtherPage, RenderedPage } from '../check/seo'
 import type { ErrorName, ExportProblem } from '../compiler/errors'
 import type { Project } from '../project'
 import type { ClientBuild, PrerenderedPage } from './client'
+import type { LocaleCopy } from './i18n'
 import type { ListedParams } from './prerendered'
 import type { Scan, Stop } from './pure-page'
 import type { Route } from './routes'
+import { AsyncLocalStorage } from 'node:async_hooks'
 import { mkdir } from 'node:fs/promises'
 import { join, relative } from 'node:path'
 import { resolveFrom } from '../build/files'
@@ -16,7 +18,7 @@ import { durationSeconds } from '../runtime/duration'
 import { IMAGE_ROUTE } from '../runtime/image'
 import { runInLocale } from '../runtime/locale-state'
 import { kayLog } from '../runtime/log'
-import { standInReads } from '../runtime/site'
+import { countStandInReads } from '../runtime/site'
 import { withPageToken } from '../runtime/uid.server'
 import { projectApi } from './api-modules'
 import { dropOrphanCopies, keepClasses, missingClasses, PRERENDERED_DIR, readManifest, styleUsesOf, writeManifest } from './client'
@@ -39,6 +41,23 @@ import { STAMP_HOLE } from './stamp'
 
 const PARTS = new Intl.ListFormat('en-GB')
 const KAY_IMPORT = /\bfrom\s+['"]([^'"]+\.kay)['"]/g
+// The pages of a route rendering at once: a render waiting on a database, a CMS or a file lets the next ones run, while each page is still judged and written in turn, as one at a time would. Bounded, so the build holds no more pages than this.
+const RENDERS_AT_ONCE = 8
+
+// Whether the renders of the page being judged read the stand-in site, kept per page as several render at once.
+const siteReads = new AsyncLocalStorage<{ read: boolean }>()
+// What the stand-in site counts its reads in: a read marks the page whose render made it.
+const STAND_IN_READS = {
+  get reads() {
+    return 0
+  },
+  set reads(_count: number) {
+    const page = siteReads.getStore()
+
+    if (page)
+      page.read = true
+  },
+}
 
 // The image route in an attribute, `src`, `srcset` or a style's `url()`: a page whose text only names it, as documentation does, links nothing.
 export const IMAGE_LINK = new RegExp(`=(?:"[^"]*|'[^']*)${RegExp.escape(IMAGE_ROUTE)}\\?`)
@@ -64,6 +83,42 @@ export interface KeptStop extends Stop {
   route: string
   // What to do about it, when `drop what it reads` is not it.
   fix?: string | undefined
+}
+
+// A page of a route to prerender: a locale's copy of one listed path.
+interface PlannedCopy {
+  copy: LocaleCopy
+  path: string
+  matched: Record<string, unknown>
+  weight: () => Promise<number | false>
+}
+
+// A copy rendering ahead of its turn to be judged; `first` renders it again as the first render, and `once` as one after it.
+interface RenderingCopy {
+  token: string
+  request: Request
+  site: { read: boolean }
+  once: () => Promise<{ response: Response, html: string }>
+  first: () => Promise<FirstRender>
+  // Thrown once its turn comes, as a route given up on before then leaves it unread.
+  rendered: Promise<{ value: FirstRender } | { error: unknown }>
+}
+
+interface FirstRender {
+  response: Response
+  html: string
+  // The cache keys and collections it read.
+  reads: string[]
+  refused: RequestReadError | undefined
+  renderedAt: number
+  // How many pages had classes kept when it began, which a later one makes stale.
+  epoch: number
+}
+
+// What a `.kay` file holds that the search for a server island follows: whether its own template marks one, and the `.kay` files it imports.
+interface IslandReach {
+  island: boolean
+  imports: string[]
 }
 
 export interface PrerenderOptions {
@@ -93,6 +148,7 @@ export async function prerenderPages(project: Project, client: ClientBuild, opti
   const { source, mounts, routes, matchers, i18n, locales, site, renderOptions } = await setupPages(project, () => client, true)
 
   options.routes?.push(...routes)
+  countStandInReads(STAND_IN_READS)
 
   const pages: Record<string, PrerenderedPage> = {}
   const paths = new Map<string, string>()
@@ -100,10 +156,12 @@ export async function prerenderPages(project: Project, client: ClientBuild, opti
   const tokens = new Set<string>()
   // The files of pages kept without being asked for, which a page that was asked for takes the place of.
   const kept = new Set<string>()
-  // Whether a page showed a class its head had no rule for, which the manifest then keeps.
-  let restyled = false
+  // How many times a page showed a class its head had no rule for, which the manifest then keeps.
+  let restyles = 0
   // What each file read, for the next route to reach it again.
   const scans = new Map<string, Promise<Scan>>()
+  // What each `.kay` file holds of server islands, for the next route to reach it again.
+  const reach = new Map<string, Promise<IslandReach>>()
 
   // `auto` is a page nothing marks, which the build keeps because it provably reads nothing from its request: it is skipped, never failed, as soon as one render shows otherwise.
   // Gives what writes the route, once every locale of it has rendered, so a route given up on leaves nothing behind.
@@ -138,43 +196,103 @@ export async function prerenderPages(project: Project, client: ClientBuild, opti
     if (options.exportAll && (listed === undefined || listed === false))
       throw new KayError('export-needs-params', listed === false ? 'kay: its prerender is false' : `kay: it takes ${route.params.join(', ')}, so \`prerender\` lists the values to export: export const page = { prerender: [{ ${route.params.map(param => `${param}: '...'`).join(', ')} }] }`)
 
+    // Every page of the route in order, one per locale of each listed path, up to params its matchers refuse, which fail the route once the pages before them are judged.
+    const planned: (PlannedCopy | { error: unknown })[] = []
+
     for (const params of await listedParams(route, file, 'prerender', listed, i18n?.settings)) {
-      const path = pathOf(route, params)
-      const matched = matchedParams(route, params, matchers)
+      try {
+        const path = pathOf(route, params)
+        const matched = matchedParams(route, params, matchers)
 
-      if (!matched)
-        throw new KayError('export-needs-params', `kay: ${file} lists ${JSON.stringify(params)} in prerender, which its matchers refuse, so no request would reach it`)
+        if (!matched)
+          throw new KayError('export-needs-params', `kay: ${file} lists ${JSON.stringify(params)} in prerender, which its matchers refuse, so no request would reach it`)
 
-      // The weight of the page's words, worked out once for the locales it is served in.
-      let weighed: Promise<number | false> | undefined
-      const weight = async () => weighed ??= searchWeight(chainSetting(chain, 'search'), params, file)
+        // The weight of the page's words, worked out once for the locales it is served in.
+        let weighed: Promise<number | false> | undefined
+        const weight = async () => weighed ??= searchWeight(chainSetting(chain, 'search'), params, file)
 
-      // One page per locale, each rendered in it.
-      for (const copy of localeCopies(i18n?.settings, path).filter(copy => listedIn(params, copy.locale, i18n?.settings))) {
-        // Rendered at the path the server answers it at, which `trailingSlash` spells.
-        const served = slashedPath(copy.path, config.trailingSlash)
-        const request = new Request(`${copy.host === undefined ? 'http://localhost' : `https://${copy.host}`}${served}`)
+        for (const copy of localeCopies(i18n?.settings, path).filter(copy => listedIn(params, copy.locale, i18n?.settings)))
+          planned.push({ copy, path, matched, weight })
+      }
+      catch (error) {
+        planned.push({ error })
+
+        break
+      }
+    }
+
+    // The copy being judged, and those rendering ahead of it by index, which leave `started` as their turn comes.
+    let at = 0
+    const started = new Map<number, RenderingCopy>()
+    // A page kept without being asked for is skipped at the first render showing it is not, so none renders ahead of it to be thrown away.
+    const ahead = auto ? 1 : RENDERS_AT_ONCE
+
+    const start = (index: number): RenderingCopy => {
+      const { copy, path, matched } = planned[index] as PlannedCopy
+      // Rendered at the path the server answers it at, which `trailingSlash` spells.
+      const served = slashedPath(copy.path, config.trailingSlash)
+      const request = new Request(`${copy.host === undefined ? 'http://localhost' : `https://${copy.host}`}${served}`)
+      // onError is the app's for requests it answers; the build logs what a prerendered page throws, and takes a read of the request for its own to judge.
+      const refusal: { read?: RequestReadError } = {}
+      // Guards run when the page is served, for whoever asks; the build renders what they let through.
+      const render = async () => renderPage({ ...route, guards: [] }, { request }, matched, client, { ...renderOptions, onError: judged(refusal), prerendering: true, guarded: guardedPage(route, config.requireGuards) })
+      const inLocale = async () => runInLocale(stateFor(locales, copy.locale ?? locales.settings.defaultLocale, path, request), render)
+      // The ids a page draws keep apart from those of the page it is swapped for, so each page has a token of its own, the same on every render and build; the body is read within it, as a stream draws its ids as it is read.
+      // Taken in the order the pages are judged in, as rendering one at a time took them.
+      const token = pageToken(copy.key, tokens)
+
+      tokens.add(token)
+      const read = async () => {
+        const rendered = await inLocale()
+
+        return { response: rendered, html: await rendered.text() }
+      }
+      const site = { read: false }
+      const once = async () => siteReads.run(site, async () => withPageToken(token, read))
+      const first = async () => {
+        delete refusal.read
+        site.read = false
         // Taken before the render, so a date passing during it counts as passed since.
         const renderedAt = Date.now()
-        // Guards run when the page is served, for whoever asks; the build renders what they let through.
-        const reads = standInReads()
-        // onError is the app's for requests it answers; the build logs what a prerendered page throws, and takes a read of the request for its own to judge.
-        const refusal: { read?: RequestReadError } = {}
-        const render = async () => renderPage({ ...route, guards: [] }, { request }, matched, client, { ...renderOptions, onError: judged(refusal), prerendering: true, guarded: guardedPage(route, config.requireGuards) })
-        const inLocale = async () => runInLocale(stateFor(locales, copy.locale ?? locales.settings.defaultLocale, path, request), render)
-        // The ids a page draws keep apart from those of the page it is swapped for, so each page has a token of its own, the same on every render and build; the body is read within it, as a stream draws its ids as it is read.
-        const token = pageToken(copy.key, tokens)
+        const epoch = restyles
+        const { result, reads } = await readsOf(once)
 
-        tokens.add(token)
-        const read = async () => {
-          const rendered = await inLocale()
+        return { ...result, reads, refused: refusal.read, renderedAt, epoch }
+      }
 
-          return { response: rendered, html: await rendered.text() }
+      return { token, request, site, once, first, rendered: settled(first()) }
+    }
+
+    try {
+      for (; at < planned.length; at++) {
+        const planning = planned[at]!
+
+        if ('error' in planning)
+          throw planning.error
+
+        for (let next = at; next < Math.min(at + ahead, planned.length) && !('error' in planned[next]!); next++) {
+          if (!started.has(next))
+            started.set(next, start(next))
         }
-        const once = async () => withPageToken(token, read)
-        const { result: first, reads: dataRead } = await readsOf(once)
-        let { response, html } = first
-        const refused = refusal.read
+
+        const { copy, weight } = planning
+        const { token, request, site, once, first, rendered: outcome } = started.get(at)!
+
+        started.delete(at)
+
+        const ended = await outcome
+
+        if ('error' in ended)
+          throw ended.error
+
+        let rendered = ended.value
+
+        // A page that began rendering before an earlier one had classes kept renders again, with the head that keeping gave the route.
+        if (rendered.epoch !== restyles)
+          rendered = await first()
+
+        let { response, html } = rendered
+        const { reads: dataRead, refused, renderedAt } = rendered
 
         if (refused !== undefined) {
           const readAt = `reads \`${refused.read}\`${refused.file === undefined ? '' : ` at ${relative(root, refused.file)}:${refused.line}`}`
@@ -197,7 +315,7 @@ export async function prerenderPages(project: Project, client: ClientBuild, opti
 
         if (shown.length > 0) {
           await keepClasses(client, routeChain(route).files, shown)
-          restyled = true
+          restyles++
           ;({ response, html } = await once())
         }
 
@@ -220,7 +338,7 @@ export async function prerenderPages(project: Project, client: ClientBuild, opti
 
         const islands = serverIslandModes(html)
         const stamps = html.search(STAMP_HOLE) >= 0
-        const readsSite = standInReads() > reads
+        const readsSite = site.read
         const livesOn = html.includes(LIVE_MARK)
 
         if (auto && (islands.length > 0 || stamps || readsSite || livesOn))
@@ -295,6 +413,13 @@ export async function prerenderPages(project: Project, client: ClientBuild, opti
         })
       }
     }
+    finally {
+      // A route given up on leaves the tokens of the pages rendering ahead free, as one rendering a page at a time never took them, and none of them running.
+      for (const { token } of started.values())
+        tokens.delete(token)
+
+      await Promise.all([...started.values()].map(async ({ rendered }) => rendered))
+    }
 
     return pending
   }
@@ -324,7 +449,7 @@ export async function prerenderPages(project: Project, client: ClientBuild, opti
     options.onRoute?.(index, routes.length)
 
     // Read off the source first: a page that prerenders nothing, and is not shown to read nothing, is never imported, nor anything it imports.
-    const marked = route.params.length === 0 && await reachesServerIsland(route.file)
+    const marked = route.params.length === 0 && await reachesServerIsland(route.file, reach)
 
     const settings = await pageFlags(route.file)
     const asked = marked || options.exportAll === true || settings.prerender !== undefined
@@ -383,13 +508,13 @@ export async function prerenderPages(project: Project, client: ClientBuild, opti
   if (problems.length > 0 || apiProblems.length > 0 || endpointProblems.length > 0)
     throw new ExportError(`kay: ${PARTS.format([count(problems.length, 'page'), count(endpointProblems.length, 'endpoint'), count(apiProblems.length, 'API module')].filter(part => part !== ''))} cannot be exported to static files, which no server answers for:\n${[...problems, ...endpointProblems, ...apiProblems].map(problem => `  ${problem.message}`).join('\n')}`, [...problems, ...endpointProblems, ...apiProblems])
 
-  if (restyled)
+  if (restyles > 0)
     await dropOrphanCopies(client, dir, pages)
 
   // A static host cannot answer by what the browser holds, so only a server build has a dictionary, and one with a prerendered page, whose layouts the build renders already.
   const dictionary = options.exportAll || config.compressionDictionary === false || Object.keys(pages).length === 0 ? undefined : await writeDictionary(client.dir, await renderedMissing())
 
-  await writeManifest(root, { ...manifest, pages, site, ...dictionary ? { dictionary } : {}, ...restyled && client.styleUses ? { styleUses: styleUsesOf(root, client.styleUses) } : {} }, output)
+  await writeManifest(root, { ...manifest, pages, site, ...dictionary ? { dictionary } : {}, ...restyles > 0 && client.styleUses ? { styleUses: styleUsesOf(root, client.styleUses) } : {} }, output)
   client.pages = new Map(Object.entries(pages))
   client.dictionary = dictionary
 
@@ -458,29 +583,47 @@ function revalidatePeriod(file: string, value: unknown): number | undefined {
   return value === undefined ? undefined : durationSeconds(value, `${file}'s revalidate`)
 }
 
-// Whether the file's template, or that of a component it imports, however deep, marks a server island.
-export async function reachesServerIsland(file: string, seen = new Set<string>()): Promise<boolean> {
+// Whether the file's template, or that of a component it imports, however deep, marks a server island; `reach` keeps what each file holds, read and parsed once for every route of a build.
+export async function reachesServerIsland(file: string, reach = new Map<string, Promise<IslandReach>>(), seen = new Set<string>()): Promise<boolean> {
   if (seen.has(file))
     return false
 
   seen.add(file)
 
-  const source = await Bun.file(file).text()
+  let held = reach.get(file)
 
-  if ([...elementsIn(parseKay(source).template)].some(element => serverIslandOf(element, source)))
+  if (held === undefined)
+    reach.set(file, held = islandReach(file))
+
+  const { island, imports } = await held
+
+  if (island)
     return true
 
-  for (const [, specifier] of source.matchAll(KAY_IMPORT)) {
-    const imported = resolveFrom(specifier!, file)
-
-    if (imported === undefined)
-      continue
-
-    if (await reachesServerIsland(imported, seen))
+  for (const imported of imports) {
+    if (await reachesServerIsland(imported, reach, seen))
       return true
   }
 
   return false
+}
+
+async function settled<T>(promise: Promise<T>): Promise<{ value: T } | { error: unknown }> {
+  try {
+    return { value: await promise }
+  }
+  catch (error) {
+    return { error }
+  }
+}
+
+async function islandReach(file: string): Promise<IslandReach> {
+  const source = await Bun.file(file).text()
+
+  if ([...elementsIn(parseKay(source).template)].some(element => serverIslandOf(element, source)))
+    return { island: true, imports: [] }
+
+  return { island: false, imports: [...source.matchAll(KAY_IMPORT)].flatMap(([, specifier]) => resolveFrom(specifier!, file) ?? []) }
 }
 
 function unkeptBy(island: boolean, stamps: boolean, live: boolean): string {

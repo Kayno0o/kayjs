@@ -184,6 +184,8 @@ export const page = { prerender: posts }
 ---
 ```
 
+The build renders up to 8 of them at once, so a page waiting on a database does not hold up the next. It still writes and lists them in order.
+
 <Callout type="note">
 
 Add `revalidate: '1h'` to `page` to rebuild a prerendered page in the background once it is older than that.

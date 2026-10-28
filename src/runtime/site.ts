@@ -27,8 +27,9 @@ export function renderedSite(): { origin: string, slashed: boolean } | undefined
   return STAND_IN
 }
 
-export function standInReads(): number {
-  return standIn?.reads ?? 0
+// Has the stand-in count its reads in `counter`, which the build keeps per render, as pages render side by side.
+export function countStandInReads(counter: { reads: number }): void {
+  standIn &&= counter
 }
 
 export function keepsSameTab(): boolean {
