@@ -9,7 +9,7 @@ import { solveWork } from '../src/runtime/work'
 import { setupStore } from '../src/server/app-store'
 import { countWrites } from '../src/server/kept-pages'
 import { TimeoutError } from '../src/server/pg-poll'
-import { apiLimitWait, countSucceeded, memoryRates, overLimit, protectionRefusal, rateLimit, ratesFor, refundRateLimit } from '../src/server/protection'
+import { apiLimitWait, countSucceeded, memoryRates, overLimit, protectionRefusal, rateLimit, ratesFallingBack, ratesFor, refundRateLimit } from '../src/server/protection'
 import { memoryRooms, sqliteRooms } from '../src/server/rooms'
 import { signWork } from '../src/server/work'
 import { verifyWork, workChallenge } from '../src/server/work-scope'
@@ -353,6 +353,46 @@ describe('a rates store that answers', () => {
     finally {
       timers.mockRestore()
     }
+  })
+
+  it('falls back on the memory a library gives, resetting it too, and has only the methods its store has', async () => {
+    const seen = warnings('gaps-library')
+
+    try {
+      const memory = memoryRates()
+      const standIn = ratesFallingBack('gaps-library', { ...brokenRates(), reset: () => {
+        throw new Error('the database went away')
+      } }, memory)
+
+      await standIn.hit('one', '1m')
+      await standIn.hit('one', '1m')
+      expect(memory.peek('one')?.count).toBe(2)
+      await standIn.reset('one')
+      expect(memory.peek('one')).toBeUndefined()
+      expect(seen.count()).toBe(1)
+
+      const bare = ratesFallingBack('gaps-library-bare', { hit: memoryRates().hit })
+
+      expect([bare.peek, bare.refund, bare.reset]).toEqual([undefined, undefined, undefined])
+    }
+    finally {
+      seen.restore()
+    }
+  })
+
+  it('calls a method replaced on the store after its stand-in was made', async () => {
+    const store = memoryRates()
+    const standIn = ratesFallingBack('gaps-replaced', store)
+    const keys: string[] = []
+    const hit = store.hit
+
+    store.hit = (key, window, weight) => {
+      keys.push(key)
+
+      return hit(key, window, weight)
+    }
+    await standIn.hit('one', '1m')
+    expect(keys).toEqual(['one'])
   })
 
   it('logs a failing store once while another store under the same name answers', async () => {

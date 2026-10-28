@@ -345,7 +345,7 @@ A model can be talked into things by the text it reads, a visitor's message say.
 
 An action that changes something does not run on the model's word (a function tool, below, does). The model is told it needs the visitor's approval, and `Chat` shows Allow and Deny under the call.
 
-The row shows the tool and its arguments, so the visitor sees what they allow. Allow sends the visitor's next message with a signed ticket for that exact call, which lets it run once: it expires after 10 minutes, is spent when used, and is read only from the visitor's last message, so text a tool returned cannot allow anything. Set `KAY_SECRET` so every process of the app can read a ticket.
+The row shows the tool and its arguments, so the visitor sees what they allow. Allow sends the visitor's next message with a signed ticket for that exact call, which lets it run once: it expires after 10 minutes, is spent when used (a store that fails or takes over five seconds to spend it runs no call), and is read only from the visitor's last message, so text a tool returned cannot allow anything. Set `KAY_SECRET` so every process of the app can read a ticket.
 
 A tool names its calls for the chat with `tool: { label: 'Read the home' }`, which the model never sees. A tool that only reads says so, `tool: { description: 'Looks a note up', readOnly: true }`, and runs at once. Pass `confirm: false` to run every tool without asking, for an app that asks elsewhere.
 

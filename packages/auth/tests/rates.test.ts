@@ -2,6 +2,7 @@ import type { AuthStore } from '../src/store'
 import { afterEach, describe, expect, spyOn, test } from 'bun:test'
 import { memoryRates } from 'kay/server'
 import { setupStore } from '../../../src/server/app-store'
+import { TimeoutError } from '../../../src/server/pg-poll'
 import { DEFAULT_LIMITS, memoryAuthStore } from '../src'
 import { log } from '../src/log'
 import { memoryAuthRates } from '../src/rates'
@@ -141,20 +142,61 @@ describe('a rates store that fails', () => {
     }
   })
 
-  test('counts in memory when the auth store\'s own rates reject', async () => {
+  test('counts in memory when the auth store\'s own rates or its attempts of before 1.81 reject', async () => {
     const warned = spyOn(console, 'warn').mockReturnValue()
     const rejected = async () => Promise.reject(new Error('the database went away'))
 
     try {
-      const { browser } = await registered({ ...memoryAuthStore(), rates: { hit: rejected, peek: rejected, reset: rejected } })
+      for (const store of [{ ...memoryAuthStore(), rates: { hit: rejected, peek: rejected, reset: rejected } }, { ...memoryAuthStore(), attempts: { count: rejected, hit: rejected, reset: rejected } }]) {
+        const { browser } = await registered(store)
 
-      await signIn(browser, WRONG)
-      await signIn(browser, WRONG)
-      expect(await signIn(browser, PASSWORD)).toEqual({ ok: false, error: 'limited' })
+        await signIn(browser, WRONG)
+        await signIn(browser, WRONG)
+        expect(await signIn(browser, PASSWORD)).toEqual({ ok: false, error: 'limited' })
+      }
     }
     finally {
       warned.mockRestore()
     }
+  })
+
+  test('leaves a store that gave up on a slow database alone for a while, counting in memory meanwhile', async () => {
+    const warned = spyOn(console, 'warn').mockReturnValue()
+    let calls = 0
+    const slow = async () => {
+      calls++
+
+      throw new TimeoutError('too slow')
+    }
+
+    try {
+      setupStore({ rates: { hit: slow, peek: slow, reset: slow } })
+
+      const { browser } = await registered(withoutRates())
+
+      await signIn(browser, WRONG)
+      await signIn(browser, WRONG)
+      expect(await signIn(browser, PASSWORD)).toEqual({ ok: false, error: 'limited' })
+      expect(calls).toBe(1)
+    }
+    finally {
+      warned.mockRestore()
+    }
+  })
+
+  test('counts through the app\'s new store.rates once it is replaced', async () => {
+    const first = memoryRates()
+    const second = memoryRates()
+    const hits = [spyOn(first, 'hit'), spyOn(second, 'hit')]
+
+    setupStore({ rates: first })
+
+    const { browser } = await registered(withoutRates())
+
+    await signIn(browser, WRONG)
+    setupStore({ rates: second })
+    await signIn(browser, WRONG)
+    expect(hits.map(hit => hit.mock.calls.length > 0)).toEqual([true, true])
   })
 })
 

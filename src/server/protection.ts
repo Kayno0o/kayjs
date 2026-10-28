@@ -611,7 +611,7 @@ class RatesTimeout extends Error {}
 // The stores standing in for each store a limit counts in, per name, so each name falls back to its own memory.
 const standIns = new WeakMap<RateStore, Map<string, RateStore>>()
 
-// The store `name` counts in: `given`, else the app's `store.rates`, else this process's memory. A store that fails counts in memory instead, logged once per name until it answers again, so a request is never refused for it; one that takes longer than the store time limit is also left alone for ten seconds, so a hanging store holds one request, not every one.
+// The store `name` counts in: `given`, else the app's `store.rates`, else this process's memory. A store that fails counts in memory instead, logged once per store and name until it answers again, so a request is never refused for it; one that takes longer than the store time limit is also left alone for ten seconds, so a hanging store holds one request, not every one.
 export function ratesFor(name: string, given?: RateStore): RateStore {
   const store = given ?? appStore()?.rates
 
@@ -642,7 +642,7 @@ export interface FallbackMemory {
 // The optional methods `Store` surely has, which its stand-in has too.
 type Sure<Store> = { [Key in 'peek' | 'refund' | 'reset' as Key extends keyof Store ? undefined extends Store[Key] ? never : Key : never]-?: NonNullable<RateStore[Key]> }
 
-// `store` with `memory` behind it, `name` naming it in the log, as `ratesFor` keeps one: for a library choosing its store and its memory itself, as kayjs-auth does. `peek`, `refund` and `reset` are there only where the store has them, as a limit checks for them.
+// `store` with `memory` behind it and `name` naming it in the log, the stand-in `ratesFor` makes, for a library choosing its store and its memory itself, as kayjs-auth does. `peek`, `refund` and `reset` are there only where the store has them, as a limit checks for them.
 export function ratesFallingBack<Store extends RateStore>(name: string, store: Store, memory: FallbackMemory = memoryOf(name)): RateStore & Sure<Store> {
   const { peek, refund, reset } = store
 
