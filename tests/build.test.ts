@@ -19,11 +19,13 @@ import { buildClient, islandManifest, keepMaps, readClientSources } from '../src
 import { forgetSources, keepSources, readSource, realPath, writeAtomically, writeIfChanged } from '../src/build/files'
 import { fileWords, importEdges, reachedFrom, reachingAny } from '../src/build/libraries'
 import { BUNDLED_LICENCES, codecWarnings, thirdPartyNotices, unknownCodecVersions } from '../src/build/licenses'
+import { buildProject } from '../src/build/pipeline'
 import { kay } from '../src/build/plugin'
 import { formatBuildReport, formatRemoved, formatRouteTable, formatSizeReport, gzipSize, shorten, writeStoredReport } from '../src/build/report'
 import { routeSizes } from '../src/build/route-sizes'
 import { anchorModule, runtimeChunk } from '../src/build/runtime-chunk'
 import { withoutPlugins, withProjectPaths } from '../src/build/runtime-config'
+import * as serverRecord from '../src/build/server-record'
 import { importedSignals, inSignalsScope } from '../src/build/signals'
 import { decodeBundleMappings, describeThrown, embeddedMap, mapBundleToKay, mapStack, registerEmbeddedMap, registerSourceMap } from '../src/build/sourcemap'
 import { analyzeKayCached, compilerFingerprint, compilerModules, embeddedMapCached, keepAnalyses, pruneCompileCache, transformKay, transformKayCached } from '../src/build/transform'
@@ -1299,6 +1301,39 @@ describe('kay build checks the project first', () => {
     expect(await new Response(child.stdout).text()).toBe('printer down\n')
     expect(await Bun.file(join(outputDir(root), 'pages/index.html')).text()).toContain('>Home</a>')
     expect(existsSync(`${outputDir(root)}-previous`)).toBe(false)
+  }, 60_000)
+
+  it('puts the last build back when a callback, a progress report or the removal of the server record throws once the output was set aside', async () => {
+    const root = await scratchProject({ 'tsconfig.json': tsconfig, 'src/routes/index.kay': 'p Home\n' })
+    const output = outputDir(root)
+    const last = join(output, 'last-build')
+    const throwing = (message: string) => () => {
+      throw new Error(message)
+    }
+
+    expect((await buildProject(root, {})).failed).toBeUndefined()
+    await Bun.write(last, '')
+
+    const runs: [string, () => Promise<BuildResult>][] = [
+      ['printer down', async () => buildProject(root, {}, { onStage: throwing('printer down') })],
+      ['screen down', async () => buildProject(root, {}, { onProgress: throwing('screen down') })],
+      ['disk down', async () => {
+        const removal = spyOn(serverRecord, 'clearServerRecord').mockImplementation(async () => Promise.reject(new Error('disk down')))
+
+        try {
+          return await buildProject(root, {})
+        }
+        finally {
+          removal.mockRestore()
+        }
+      }],
+    ]
+
+    for (const [message, run] of runs) {
+      await expect(run()).rejects.toThrow(message)
+      expect(existsSync(last)).toBe(true)
+      expect(existsSync(`${output}-previous`)).toBe(false)
+    }
   }, 60_000)
 
   it('warns once of an SVG favicon\'s text, as the check when it runs, as the drawing when it does not', async () => {

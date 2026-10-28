@@ -302,6 +302,22 @@ describe('mentionsPackage', () => {
 })
 
 describe('the stamps kay/test keeps in memory', () => {
+  it('sees a source edited while a build of everything read it, as the stamps came before the read', async () => {
+    await write(FILES)
+
+    const util = join(project, 'src/util.ts')
+    const stamps = new BuildStamps(project)
+
+    await stamps.begin(null)
+    await stamps.finish([util], '{}')
+    expect(await stamps.current()).toBe(true)
+
+    await stamps.begin(null)
+    await Bun.write(util, 'export const shout = (value: number) => `${value}?!`\n')
+    await stamps.finish([util], '{}')
+    expect(await stamps.current()).toBe(false)
+  })
+
   it('sees the .gitignore change, which tells what the sources are', async () => {
     await write(FILES)
 

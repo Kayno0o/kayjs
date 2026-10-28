@@ -2,6 +2,7 @@ import { existsSync, readdirSync, rmSync, utimesSync } from 'node:fs'
 import { join } from 'node:path'
 import { beforeAll, describe, expect, it, spyOn } from 'bun:test'
 import { clientDir, inOutput, outputDir, testWorker } from '../src/build/assets'
+import * as client from '../src/build/client'
 import * as files from '../src/build/files'
 import { testSite } from '../src/test'
 import { scratchDir } from './scratch'
@@ -152,5 +153,51 @@ describe('testSite keeps the islands it built', () => {
     await Bun.write(join(root, 'data/app.sqlite'), 'second, longer')
     await testSite({ root })
     expect(Bun.file(manifest()).lastModified).toBe(first)
+  })
+  it('fails again without building while no source changed after a build that failed, and builds once one did', async () => {
+    const builds = spyOn(client, 'buildClient')
+
+    try {
+      await Bun.write(greeting, BROWSERLESS)
+      await expect(testSite({ root })).rejects.toThrow('browser has no bun:sqlite')
+      await expect(testSite({ root })).rejects.toThrow('browser has no bun:sqlite')
+      expect(builds).toHaveBeenCalledTimes(1)
+
+      await Bun.write(greeting, FINE)
+      await expect(testSite({ root })).resolves.toBeDefined()
+      expect(builds).toHaveBeenCalledTimes(2)
+    }
+    finally {
+      builds.mockRestore()
+    }
+  })
+
+  it('shares the build running with a site asked for meanwhile, and runs builds of other options one after the other', async () => {
+    const buildClient = client.buildClient
+    let running = 0
+    let most = 0
+    const builds = spyOn(client, 'buildClient').mockImplementation(async (...args) => {
+      most = Math.max(most, ++running)
+
+      try {
+        return await buildClient(...args)
+      }
+      finally {
+        running--
+      }
+    })
+
+    try {
+      await Bun.write(greeting, `${FINE}// shared\n`)
+      await Promise.all([testSite({ root }), testSite({ root })])
+      expect(builds).toHaveBeenCalledTimes(1)
+
+      await Promise.all([testSite({ root, base: '/one' }), testSite({ root, base: '/two' })])
+      expect(builds).toHaveBeenCalledTimes(3)
+      expect(most).toBe(1)
+    }
+    finally {
+      builds.mockRestore()
+    }
   })
 })
