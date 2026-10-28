@@ -258,10 +258,17 @@ test('typing keeps the textbox role and the outline layer survives the page taki
   await page.waitUntil(() => document.querySelector('.kcms-editor-status p') === null)
   expect(await page.evaluate(() => document.querySelector('#plain')!.getAttribute('role'))).toBe('textbox')
   await page.press('Enter')
+  await page.waitUntil(() => document.querySelector('#plain')!.getAttribute('role') === 'button')
 
   await page.click(OUTLINE_ALL)
-  await page.waitUntil(() => document.querySelector('.kcms-marks') !== null)
-  await page.evaluate(() => document.querySelector('.kcms-marks')!.remove())
+  // The editor makes the layer again as its state settles, so it is found and taken away in one turn.
+  await page.waitUntil(() => {
+    const marks = document.querySelector('.kcms-marks')
+
+    marks?.remove()
+
+    return marks !== null
+  })
   await page.evaluate(() => document.body.append(document.createElement('i')))
   await page.waitUntil(() => document.querySelectorAll('.kcms-mark').length >= 2)
 }, 60_000)
