@@ -90,7 +90,6 @@ else {
     console.error(warning)
 }
 
-// eslint-disable-next-line unused-imports/no-unused-vars -- held for its disposal, which stops the services as the run ends, failed or not
 await using _services = await startServices()
 const results = new Map<Variant, Result>()
 const producing = PHASE !== 'dev'
