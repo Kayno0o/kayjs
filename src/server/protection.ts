@@ -307,7 +307,7 @@ export function rateLimit(name: string, limit: RateLimit): RateLimiter {
       if (!Number.isSafeInteger(weight) || weight < 1)
         throw new KayError('config-invalid', `kay: rateLimit('${name}').hit()'s weight is ${weight}; it takes a whole number of at least 1`)
 
-      const window = await (limit.store ?? sharedRates(name)).hit(typeof from === 'string' ? `${name}\nkey:${from}` : limitKey(name, clientAddress(from, server)), `${ms}ms`, weight)
+      const window = await ratesFor(name, limit.store).hit(typeof from === 'string' ? `${name}\nkey:${from}` : limitKey(name, clientAddress(from, server)), `${ms}ms`, weight)
 
       // A count below the weight holds less than this hit alone: the store counted one, which shows on a window's first hit.
       if (window.count < weight)
@@ -346,7 +346,7 @@ export async function apiLimitWait(limits: { name: string, limit: ApiRateLimit }
   let wait: number | undefined
 
   for (const { name, limit } of limits) {
-    const own = waitFor(await (limit.store ?? sharedRates(name)).hit(await actionKey(name, limit, request, client, context), windowText(limit)), limit.max)
+    const own = waitFor(await ratesFor(name, limit.store).hit(await actionKey(name, limit, request, client, context), windowText(limit)), limit.max)
 
     if (own !== undefined && (wait === undefined || own > wait))
       wait = own
@@ -446,7 +446,7 @@ export async function protectionRefusal(action: ServerAction<TSchema, unknown>, 
 
   // A form posted without kay's script sends no solution, refused unless `minTime` let it through above, which then checks it alone; an agent's call has no script to solve one.
   if (work && !agentCalls.has(request) && !(plain && minTime && (request.headers.get(WORK_HEADER) ?? '') === '')) {
-    const reason = await workRefusal(action.url, request.headers.get(WORK_HEADER), work.store ?? sharedRates(`${action.url}#work`))
+    const reason = await workRefusal(action.url, request.headers.get(WORK_HEADER), ratesFor(`${action.url}#work`, work.store))
 
     if (reason === 'wrong' && work.pretend)
       return PRETEND
@@ -470,7 +470,7 @@ export async function protectionRefusal(action: ServerAction<TSchema, unknown>, 
 
   // Every limit counts the attempt, whichever refuses it, and the longest wait is the one to tell.
   for (const { name, limit } of limits) {
-    const store = limit.store ?? sharedRates(name)
+    const store = ratesFor(name, limit.store)
 
     if (limit.count === 'succeeded' && !store.peek)
       throw new KayError('config-invalid', `kay: ${name} counts only the posts that went through, so its store needs a peek(key) method; the app's \`store.rates\` has none`)
@@ -517,7 +517,7 @@ export async function countSucceeded(action: ServerAction<TSchema, unknown>, req
   const client = clientAddress(request, server)
 
   for (const { name, limit } of limits)
-    await (limit.store ?? sharedRates(name)).hit(await actionKey(name, limit, request, client, undefined), windowText(limit))
+    await ratesFor(name, limit.store).hit(await actionKey(name, limit, request, client, undefined), windowText(limit))
 }
 
 // Takes back the attempts the action's `rateLimit` counted for this request, once, for a call that started no work: kayjs-ai's resume of a reply it keeps. A limit counting only the posts that went through is left alone, and so is a store with no `refund`; the request being the one the action answers, any other request has nothing counted.
@@ -611,6 +611,99 @@ const skipped = new WeakMap<RateStore, number>()
 
 class RatesTimeout extends Error {}
 
+// The stores standing in for each store a limit counts in, per name, so each name falls back to its own memory.
+const standIns = new WeakMap<RateStore, Map<string, RateStore>>()
+
+// The store `name` counts in: `given`, else the app's `store.rates`, else this process's memory. A store that fails counts in memory instead, logged once per name until it answers again, so a request is never refused for it; one that takes longer than the store time limit is also left alone for ten seconds, so a hanging store holds one request, not every one.
+export function ratesFor(name: string, given?: RateStore): RateStore {
+  const store = given ?? appStore()?.rates
+
+  if (!store)
+    return memoryOf(name)
+
+  let named = standIns.get(store)
+
+  if (!named)
+    standIns.set(store, named = new Map<string, RateStore>())
+
+  let standIn = named.get(name)
+
+  if (!standIn)
+    named.set(name, standIn = standInFor(name, store))
+
+  return standIn
+}
+
+// `store` with this process's memory under `name` behind it; `peek` and `refund` only where the store has them, as a limit checks for them.
+function standInFor(name: string, store: RateStore): RateStore {
+  const memory = memoryOf(name)
+  const { peek, refund } = store
+
+  return {
+    hit: async (key, window, weight) => answered(name, store, async () => store.hit(key, window, weight), () => memory.hit(key, window, weight)),
+    ...peek && { peek: async key => answered(name, store, async () => peek.call(store, key), () => memory.peek(key)) },
+    ...refund && { refund: async (key, resetAt) => {
+      memory.refund(key, resetAt)
+
+      return answered(name, store, async () => refund.call(store, key, resetAt), () => undefined)
+    } },
+  }
+}
+
+// What `store` answers, else what `fallback` does once the store throws, rejects, or takes longer than the store time limit, or while it is left alone; a store answering at once is not timed.
+function answered<Result>(name: string, store: RateStore, ask: () => Result | Promise<Result>, fallback: () => Result): Result | Promise<Result> {
+  if ((skipped.get(store) ?? 0) > Date.now())
+    return fallback()
+
+  let answer: Result | Promise<Result>
+
+  try {
+    answer = ask()
+  }
+  catch (error) {
+    return failed(name, store, error, fallback)
+  }
+
+  if (!(answer instanceof Promise)) {
+    recovered(name, store)
+
+    return answer
+  }
+
+  return timed(name, store, answer, fallback)
+}
+
+async function timed<Result>(name: string, store: RateStore, answer: Promise<Result>, fallback: () => Result): Promise<Result> {
+  try {
+    const result = await withinLimit(answer)
+
+    recovered(name, store)
+
+    return result
+  }
+  catch (error) {
+    return failed(name, store, error, fallback)
+  }
+}
+
+function recovered(name: string, store: RateStore): void {
+  failing.delete(name)
+  skipped.delete(store)
+}
+
+function failed<Result>(name: string, store: RateStore, error: unknown, fallback: () => Result): Result {
+  // A Postgres rates store is under the same limit already, and gives up first with a TimeoutError.
+  if (error instanceof RatesTimeout || error instanceof TimeoutError)
+    skipped.set(store, Date.now() + SKIP_MS)
+
+  if (!failing.has(name)) {
+    failing.add(name)
+    kayLog('warn', `the rates store failed counting ${name}, so this process's memory counts instead`, error)
+  }
+
+  return fallback()
+}
+
 async function withinLimit<Result>(work: Promise<Result>): Promise<Result> {
   let timer: ReturnType<typeof setTimeout> | undefined
 
@@ -625,44 +718,14 @@ async function withinLimit<Result>(work: Promise<Result>): Promise<Result> {
   }
 }
 
-// Seconds until the client may try again under `name`, in the app's `store.rates` else this process's memory, or undefined while it is under the limit: for kay's own routes. A rates store that fails counts in memory instead, logged once per route until it answers again, so a route is never refused for it. One that takes longer than the store time limit is also left alone for ten seconds, so a hanging store holds one request, not every one.
+// Seconds until the client may try again under `name`, in the app's `store.rates` else this process's memory, or undefined while it is under the limit: for kay's own routes.
 export async function overLimit(name: string, client: string, max: number, windowMs: number): Promise<number | undefined> {
-  const key = limitKey(name, client)
-  const window = `${windowMs}ms` as const
-  const shared = appStore()?.rates
-
-  if (shared && (skipped.get(shared) ?? 0) <= Date.now()) {
-    try {
-      const hit = await withinLimit((async () => shared.hit(key, window))())
-
-      failing.delete(name)
-      skipped.delete(shared)
-
-      return waitFor(hit, max)
-    }
-    catch (error) {
-      // A Postgres rates store is under the same limit already, and gives up first with a TimeoutError.
-      if (error instanceof RatesTimeout || error instanceof TimeoutError)
-        skipped.set(shared, Date.now() + SKIP_MS)
-
-      if (!failing.has(name)) {
-        failing.add(name)
-        kayLog('warn', `the rates store failed counting ${name}, so this process's memory counts instead`, error)
-      }
-    }
-  }
-
-  return waitFor(memoryOf(name).hit(key, window), max)
+  return waitFor(await ratesFor(name).hit(limitKey(name, client), `${windowMs}ms`), max)
 }
 
 // The refusal of a route over its limit whose caller reads the answer, an API module's or the MCP endpoint's: kay's beacons answer theirs with no body, as their other refusals.
 export function tooManyRequests(wait: number): Response {
   return new Response(`Too many requests; try again in ${wait} s`, { status: 429, headers: { 'content-type': 'text/plain; charset=utf-8', 'retry-after': String(wait) } })
-}
-
-// The store a limit counts in when it names none: the app's `store.rates`, else this process's memory.
-function sharedRates(name: string): RateStore {
-  return appStore()?.rates ?? memoryOf(name)
 }
 
 function memoryOf(name: string): ReturnType<typeof memoryRates> {

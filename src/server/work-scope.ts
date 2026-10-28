@@ -3,8 +3,7 @@ import type { Duration } from '../runtime/duration'
 import { KayError } from '../compiler/errors'
 import { durationSeconds } from '../runtime/duration'
 import { prerendering } from '../runtime/html'
-import { appStore } from './app-store'
-import { memoryRates } from './protection'
+import { ratesFor } from './protection'
 import { WORK_MARK } from './stamp'
 import { challengeRefusal, SCOPED_WORK, signChallenge } from './work'
 
@@ -24,9 +23,6 @@ export interface VerifyWorkOptions {
   // Where the solutions already used are kept until their challenge expires, the app store's `rates` else this process's memory by default.
   store?: RateStore | undefined
 }
-
-// Each scope's solutions already used, when no store is given.
-const memories = new Map<string, RateStore>()
 
 function difficultyOf(difficulty: number | undefined): number {
   const value = difficulty ?? DEFAULT_DIFFICULTY
@@ -52,10 +48,7 @@ export function workChallenge(scope: string, options: WorkChallengeOptions = {})
 // Why a solution to a `workChallenge` of `scope` does not pass, or undefined when it does, once: `missing`, `expired` (past its `maxAge`, signed before a restart, for another scope or easier than `difficulty`) or `wrong`.
 export async function verifyWork(solution: string | null | undefined, scope: string, options: VerifyWorkOptions = {}): Promise<ProofOfWorkRefusal | undefined> {
   const least = options.difficulty === undefined ? 1 : difficultyOf(options.difficulty)
-  let store = options.store ?? appStore()?.rates ?? memories.get(scope)
-
-  if (!store)
-    memories.set(scope, store = memoryRates())
+  const store = ratesFor(`verifyWork:${scope}`, options.store)
 
   // One handed out before the scope asked for more is refused as stale, so the page signs a harder one.
   if (Number.parseInt(solution?.split('.')[3] ?? '', 36) < least)

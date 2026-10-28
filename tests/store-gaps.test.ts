@@ -9,8 +9,9 @@ import { solveWork } from '../src/runtime/work'
 import { setupStore } from '../src/server/app-store'
 import { countWrites } from '../src/server/kept-pages'
 import { TimeoutError } from '../src/server/pg-poll'
-import { memoryRates, overLimit } from '../src/server/protection'
+import { apiLimitWait, countSucceeded, memoryRates, overLimit, protectionRefusal, rateLimit, refundRateLimit } from '../src/server/protection'
 import { memoryRooms, sqliteRooms } from '../src/server/rooms'
+import { signWork } from '../src/server/work'
 import { verifyWork, workChallenge } from '../src/server/work-scope'
 import { eventually } from './helpers/eventually'
 import { scratchDir } from './scratch'
@@ -133,6 +134,154 @@ describe('overLimit logging', () => {
     }
     finally {
       log.mockRestore()
+    }
+  })
+})
+
+// A store that throws on every call, counting them.
+function brokenRates(): RateStore & { calls: number } {
+  const store = {
+    calls: 0,
+    hit: () => {
+      store.calls++
+
+      throw new Error('the database went away')
+    },
+    peek: () => {
+      store.calls++
+
+      throw new Error('the database went away')
+    },
+  }
+
+  return store
+}
+
+function warnings(name: string): { count: () => number, restore: () => void } {
+  const log = spyOn(console, 'warn').mockReturnValue()
+
+  return { count: () => log.mock.calls.filter(call => String(call[0]).includes(name)).length, restore: () => log.mockRestore() }
+}
+
+const refusalOptions = { body: {}, form: false, server: null, plain: false }
+
+describe('a rates store that fails, given to a limit or the app\'s', () => {
+  it('counts rateLimit() in memory and logs once', async () => {
+    const seen = warnings('gaps-limiter')
+
+    try {
+      const limiter = rateLimit('gaps-limiter', { max: 1, window: '1m', store: brokenRates() })
+
+      expect(await limiter.hit('one')).toBeUndefined()
+      expect(await limiter.hit('one')).toBeGreaterThan(0)
+      expect(seen.count()).toBe(1)
+
+      setupStore({ rates: brokenRates() })
+
+      const shared = rateLimit('gaps-limiter-app', { max: 1, window: '1m' })
+
+      expect(await shared.hit('one')).toBeUndefined()
+      expect(await shared.hit('one')).toBeGreaterThan(0)
+    }
+    finally {
+      seen.restore()
+    }
+  })
+
+  it('counts an API route\'s limit in memory', async () => {
+    const seen = warnings('gaps-api')
+
+    try {
+      const limits = [{ name: 'gaps-api', limit: { max: 1, window: '1m' as const, store: brokenRates() } }]
+      const request = () => new Request('http://localhost/api/items')
+      const context = () => ({ request: request(), locale: 'en', cookies: new Bun.CookieMap(''), locals: {} }) as never
+
+      expect(await apiLimitWait(limits, request(), null, context)).toBeUndefined()
+      expect(await apiLimitWait(limits, request(), null, context)).toBeGreaterThan(0)
+      expect(seen.count()).toBe(1)
+    }
+    finally {
+      seen.restore()
+    }
+  })
+
+  it('counts an action\'s limits in memory, those on the posts that went through and their refunds included', async () => {
+    const seen = warnings('/_kay/action/gaps')
+
+    try {
+      const tried = { url: '/_kay/action/gaps', protection: { rateLimit: { max: 1, window: '1m', store: brokenRates() } } } as never
+      const succeeded = { url: '/_kay/action/gaps-ok', protection: { rateLimit: { max: 1, window: '1m', count: 'succeeded', store: brokenRates() } } } as never
+      const request = () => new Request('http://localhost/_kay/action/gaps', { method: 'POST' })
+
+      expect(await protectionRefusal(tried, request(), refusalOptions)).toBeUndefined()
+
+      const refunded = request()
+
+      expect(await protectionRefusal(tried, refunded, refusalOptions)).toMatchObject({ status: 429 })
+      await refundRateLimit(refunded)
+
+      expect(await protectionRefusal(succeeded, request(), refusalOptions)).toBeUndefined()
+      await countSucceeded(succeeded, request(), null)
+      expect(await protectionRefusal(succeeded, request(), refusalOptions)).toMatchObject({ status: 429 })
+      expect(seen.count()).toBe(2)
+    }
+    finally {
+      seen.restore()
+    }
+  })
+
+  it('still refuses a limit on the posts that went through when the store has no peek', async () => {
+    const action = { url: '/_kay/action/gaps-peekless', protection: { rateLimit: { max: 1, window: '1m', count: 'succeeded', store: { hit: memoryRates().hit } } } } as never
+
+    await expect(protectionRefusal(action, new Request('http://localhost/', { method: 'POST' }), refusalOptions)).rejects.toThrow('peek')
+  })
+
+  it('refuses a replayed proof of work from memory', async () => {
+    const seen = warnings('gaps-work')
+
+    try {
+      const url = '/_kay/action/gaps-work'
+      const action = { url, protection: { proofOfWork: { difficulty: 50, store: brokenRates() } } } as never
+      const solved = solveWork(signWork(url, 50, 60_000))!
+      const request = () => new Request(`http://localhost${url}`, { method: 'POST', headers: { 'x-kay-work': solved } })
+
+      expect(await protectionRefusal(action, request(), refusalOptions)).toBeUndefined()
+      expect(await protectionRefusal(action, request(), refusalOptions)).toMatchObject({ status: 422 })
+
+      const scoped = solveWork(workChallenge('gaps-work-scope', { difficulty: 50 }))!
+      const store = brokenRates()
+
+      expect(await verifyWork(scoped, 'gaps-work-scope', { store })).toBeUndefined()
+      expect(await verifyWork(scoped, 'gaps-work-scope', { store })).toBe('wrong')
+    }
+    finally {
+      seen.restore()
+    }
+  })
+
+  it('leaves a store that hangs alone for a while, so one request waits for it and the next does not', async () => {
+    jest.useFakeTimers()
+
+    const seen = warnings('gaps-limiter-hanging')
+    let calls = 0
+
+    try {
+      const limiter = rateLimit('gaps-limiter-hanging', { max: 1, window: '1m', store: { hit: async () => {
+        calls++
+
+        return new Promise<never>(Function.prototype as never)
+      } } })
+      const first = limiter.hit('one')
+
+      jest.advanceTimersByTime(8_000)
+      expect(await first).toBeUndefined()
+      expect(await limiter.hit('one')).toBeGreaterThan(0)
+      expect(calls).toBe(1)
+      expect(seen.count()).toBe(1)
+    }
+    finally {
+      jest.useRealTimers()
+      seen.restore()
     }
   })
 })

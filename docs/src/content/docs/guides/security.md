@@ -206,6 +206,8 @@ const store: RateStore = {
 
 `reset(key)` is optional as well. It forgets the window under `key`, so the next hit opens a fresh one. kayjs-auth calls it to clear a count once a sign-in succeeds, and counts in its own memory when the app's store has no `peek` or `reset`.
 
+A store that throws or rejects never fails the request: the limit counts in the process's memory instead, and kay logs it once until the store answers again. A store that takes over eight seconds is passed over for the next ten, so a hanging database holds one request rather than every one.
+
 <ReadMore href="/llms/rate-limits">Several limits at once and the exact counting rules.</ReadMore>
 
 ## Rate limit a guard or an API route
