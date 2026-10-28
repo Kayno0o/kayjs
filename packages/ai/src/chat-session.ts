@@ -1,8 +1,7 @@
 import type { Action, ActionStream, Failure } from 'kay'
 import type { Attachments } from './chat-attachments'
 import type { ChatMessage, ChatTurn, CodeBlock, Message, Progress, Source, ToolCall } from './types'
-import { RECORD_LIMIT, recorder, recordWords } from '@kaynooo/kayjs-ui/lib/record'
-import { ActionError, durationMs, effect, onMount, signal, untrack } from 'kay'
+import { ActionError, effect, onMount, signal, untrack } from 'kay'
 import { markdownReady } from 'kay/markdown'
 import { filesOf, keepPending, newReplyId, pendingReply, posted, restored, shrunk, stored } from './chat-history'
 import { sameSources, usableSources } from './chat-sources'
@@ -39,7 +38,7 @@ export interface ChatSessionOptions {
   readonly focus: () => void
   // Takes the log back to its newest turn, as a reply starts.
   readonly follow: () => void
-  // The microphone of a Chat taking `transcribe`.
+  // What a Chat taking `transcribe` sends what was said through; the Chat holds the microphone, so kayjs-ui stays imported by the chat components alone.
   readonly voice?: ChatVoice | undefined
 }
 
@@ -48,8 +47,7 @@ export type TranscribeAction = Action<{ audio: File }, string | { text: string }
 
 export interface ChatVoice {
   readonly transcribe: TranscribeAction
-  // Said while `transcribe` writes, when it finds no text, and when it fails.
-  readonly transcribingLabel: string
+  // What `hear` answers when `transcribe` finds no text, and when it fails.
   readonly unheardLabel: string
   readonly failedLabel: string
 }
@@ -100,39 +98,42 @@ export function createChatSession(options: ChatSessionOptions) {
   let leaving = false
   // What the action took as too long, learned from its 413s, so the app states `maxInputChars` once: the oldest turns go first, the last stays.
   let learned = Infinity
-  const listening = options.voice
-  const voice = listening === undefined ? undefined : recorder({ onAudio: hear, words: recordWords(), failure: listening.failedLabel, sending: listening.transcribingLabel, maxMs: durationMs(RECORD_LIMIT) })
   // Counts the conversations started over, so a transcription finishing after one does not send into the next.
   let conversation = 0
 
-  // What was said joins the field and goes as a typed message does, with the files attached; a reply under way leaves it in the field, as post() then waits.
-  async function hear(audio: File) {
+  // What was said joins the field and goes as a typed message does, with the files attached; a reply under way leaves it in the field, as post() then waits. Answers why nothing was sent, or nothing once the conversation started over meanwhile.
+  async function hear(audio: File): Promise<string | undefined> {
+    const voice = options.voice
     const asked = conversation
 
+    if (voice === undefined)
+      return undefined
+
     try {
-      const answer = await listening!.transcribe({ audio }, { refresh: false })
+      const answer = await voice.transcribe({ audio }, { refresh: false })
 
       if (asked !== conversation)
-        return
+        return undefined
 
       const text = (typeof answer === 'string' ? answer : answer.text).trim()
 
-      if (text === '') {
-        voice!.problem.set(listening!.unheardLabel)
-
-        return
-      }
+      if (text === '')
+        return voice.unheardLabel
 
       draft.set(draft().trim() === '' ? text : `${draft().trimEnd()} ${text}`)
       void post(false)
+
+      return undefined
     }
     catch (error) {
       console.error(error)
 
       const refusal = error instanceof ActionError && error.status < 500 ? error.errors[''] : undefined
 
-      if (asked === conversation)
-        voice!.problem.set(refusal === undefined || refusal === '' ? listening!.failedLabel : refusal)
+      if (asked !== conversation)
+        return undefined
+
+      return refusal === undefined || refusal === '' ? voice.failedLabel : refusal
     }
   }
 
@@ -440,7 +441,7 @@ export function createChatSession(options: ChatSessionOptions) {
     failure,
     takenBack,
     busy,
-    voice,
+    hear,
     send: async (question?: string) => post(false, question),
     // Try again: the same request, the history as it is.
     retry: async () => post(true),
@@ -483,7 +484,6 @@ export function createChatSession(options: ChatSessionOptions) {
     // Starts the conversation over: what is under way stops, and the log, the field and the kept history are cleared.
     reset() {
       stop()
-      voice?.cancel()
       conversation++
       history.set([])
       replacement = undefined

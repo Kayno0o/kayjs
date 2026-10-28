@@ -2,12 +2,13 @@
 import type { Action, Failure, SanitizeOptions, Snippet } from 'kay'
 import type { Turn } from './chat-session'
 import type { ChatMessage, ChatTurn, CodeBlock, Progress, Source, ToolCall } from './types'
-import { effect, followLog, onCleanup, onMount, recipe, sanitizeHtml, signal, trustHtml, untrack } from 'kay'
+import { durationMs, effect, followLog, onCleanup, onMount, recipe, sanitizeHtml, signal, trustHtml, untrack } from 'kay'
 import BareIconButton from '@kaynooo/kayjs-ui/bare-icon-button.kay'
 import Icon from '@kaynooo/kayjs-ui/icon.kay'
 import Notice from '@kaynooo/kayjs-ui/notice.kay'
 import Textarea from '@kaynooo/kayjs-ui/textarea.kay'
 import { acceptsFile } from '@kaynooo/kayjs-ui/lib/accept'
+import { RECORD_LIMIT, recorder, recordWords } from '@kaynooo/kayjs-ui/lib/record'
 import { isHeldMarkdown, markdownHtml, markdownLoaded } from 'kay/markdown'
 import { wording } from 'kay/words'
 import { approvalMessage, ticketsIn, withoutApproval } from './approval-marker'
@@ -168,8 +169,7 @@ const session = createChatSession({
   say: call => `${call.name}: ${call.approval === undefined ? statuses[call.status] : approvalLabel}`,
   focus: () => field?.focus(),
   follow: following.toBottom,
-  // Only a chat taking `transcribe` creates the microphone, so the recorder's own chunk loads only then.
-  voice: transcribe === undefined ? undefined : { get transcribe() { return transcribe! }, get transcribingLabel() { return transcribingLabel }, get unheardLabel() { return unheardLabel }, get failedLabel() { return transcribeFailedLabel } },
+  voice: transcribe === undefined ? undefined : { get transcribe() { return transcribe! }, get unheardLabel() { return unheardLabel }, get failedLabel() { return transcribeFailedLabel } },
 })
 const { history, draft, partial, thought, thoughtOpen, calls, code, found, spoken, failure, takenBack, busy, send, stop } = session
 const { attached, problem: attachProblem } = attachments
@@ -295,8 +295,16 @@ function sendFrom(event: Event) {
     void send(text.trim())
 }
 
-const { voice } = session
+// The microphone of `transcribe`, which is only created for a chat taking one: the recorder's own chunk loads only then.
+const voice = transcribe === undefined ? undefined : recorder({ onAudio: heard, words: recordWords(), failure: transcribeFailedLabel, sending: transcribingLabel, maxMs: durationMs(RECORD_LIMIT) })
 const voiceBusy = () => voice?.state() === 'asking' || voice?.state() === 'sending'
+
+async function heard(audio: File) {
+  const unsent = await session.hear(audio)
+
+  if (unsent !== undefined)
+    voice!.problem.set(unsent)
+}
 
 // Escape on the microphone drops the recording and nothing else, such as a reply under way or the panel around the chat.
 function recordKey(event: KeyboardEvent) {
@@ -314,6 +322,7 @@ function startOver() {
 
 function reset() {
   session.reset()
+  voice?.cancel()
   editing = undefined
   refocus = undefined
 }

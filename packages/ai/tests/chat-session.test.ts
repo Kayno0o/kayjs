@@ -1,5 +1,5 @@
 import type { ActionStream, CallOptions } from 'kay'
-import type { ChatAction, ChatSessionOptions } from '../src/chat-session'
+import type { ChatAction, ChatSessionOptions, TranscribeAction } from '../src/chat-session'
 import type { ChatMessage, ChatTurn, Progress } from '../src/types'
 import { afterEach, beforeEach, expect, mock, spyOn, test } from 'bun:test'
 import { ActionError, flush, root, signal } from 'kay'
@@ -429,4 +429,51 @@ test('a reset stops the reply and clears the log, the field, the files and the s
   expect(session.partial()).toBe('')
   expect(session.spoken()).toEqual([])
   expect(session.busy()).toBe(false)
+})
+
+// A transcribe reading the recording's bytes as what was said, `refuse` refused as a provider's error would be, and one held until `release` lets it answer.
+function transcriber() {
+  const { promise: held, resolve: release } = Promise.withResolvers<void>()
+  const transcribe = (async ({ audio }: { audio: File }) => {
+    const text = await audio.text()
+
+    if (text === 'refuse')
+      throw new ActionError(422, '', { '': 'Too noisy.' })
+
+    if (text.startsWith('held '))
+      await held
+
+    return text.startsWith('held ') ? text.slice(5) : { text }
+  }) as unknown as TranscribeAction
+
+  return { voice: { transcribe, unheardLabel: 'unheard', failedLabel: 'failed' }, release }
+}
+
+const said = (text: string) => new File([text], 'recording.webm', { type: 'audio/webm' })
+
+test('what transcribe wrote down joins the field and is sent, and why nothing was sent is answered', async () => {
+  const reply = fakeStream()
+  const { voice } = transcriber()
+  const { session, posts } = chat([answer(reply.stream)], { voice })
+
+  session.draft.set('Say ')
+
+  expect(await session.hear(said('Hello'))).toBeUndefined()
+
+  await Bun.sleep(0)
+  expect(posts[0]!.messages).toEqual([{ role: 'user', content: 'Say Hello' }])
+
+  expect([await session.hear(said('  ')), await session.hear(said('refuse'))]).toEqual(['unheard', 'Too noisy.'])
+})
+
+test('a transcription finishing after the conversation started over sends nothing and says nothing', async () => {
+  const { voice, release } = transcriber()
+  const { session, posts } = chat([], { voice })
+  const heard = session.hear(said('held Late words'))
+
+  session.reset()
+  release()
+
+  expect(await heard).toBeUndefined()
+  expect([session.draft(), posts.length]).toEqual(['', 0])
 })
