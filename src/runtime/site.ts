@@ -27,7 +27,7 @@ export function renderedSite(): { origin: string, slashed: boolean } | undefined
   return STAND_IN
 }
 
-// Has the stand-in count its reads in `counter`, which the build keeps per render, as pages render side by side.
+// The build hands the stand-in the object its reads count into, whose setter marks the page rendering, as several render at once.
 export function countStandInReads(counter: { reads: number }): void {
   standIn &&= counter
 }

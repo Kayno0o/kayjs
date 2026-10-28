@@ -44,6 +44,18 @@ describe('prerendering the listed pages of a route at once', () => {
     expect(await Bun.file(join(outputDir(root), 'pages/e.html')).text()).toContain('<p>e </p>')
   }, 120_000)
 
+  it('renders no more than 8 of them at once', async () => {
+    const ids = Array.from({ length: 12 }, (_, index) => `p${index}`)
+    const root = await project({
+      'src/running.ts': 'export const running = { now: 0, most: 0 }\n',
+      'src/routes/[id].kay': `--- server\nimport { running } from '../running'\n\nexport const page = { prerender: ${JSON.stringify(ids)}.map(id => ({ id })) }\n\nrunning.now++\nrunning.most = Math.max(running.most, running.now)\nawait new Promise(resolve => setTimeout(resolve, 30))\nrunning.now--\nconst most = running.most\n---\np {most}\n`,
+    })
+    const { code, report, output } = await kayBuild([root, '--no-check'])
+
+    expect(code, `${report}${output}`).toBe(0)
+    expect(await Bun.file(join(outputDir(root), 'pages/p11.html')).text()).toContain('<p>8</p>')
+  }, 120_000)
+
   it('fails the build on the first page in order that fails, not the first to finish', async () => {
     const root = await project({ 'src/routes/[id].kay': `--- server\n${LISTED}\n${WAIT}if (ctx.params.id === 'b' || ctx.params.id === 'd')\n  throw new Error(\`broken \${ctx.params.id}\`)\nconst id = ctx.params.id\n---\np {id}\n` })
     const { code, report, output } = await kayBuild([root, '--no-check'])

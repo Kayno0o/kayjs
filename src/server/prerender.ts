@@ -97,7 +97,9 @@ interface PlannedCopy {
 interface RenderingCopy {
   token: string
   request: Request
-  site: { read: boolean }
+  siteRead: { read: boolean }
+  // How many pages had classes kept when it began rendering, which a later one makes stale.
+  begun: number
   once: () => Promise<{ response: Response, html: string }>
   first: () => Promise<FirstRender>
   // Thrown once its turn comes, as a route given up on before then leaves it unread.
@@ -111,8 +113,6 @@ interface FirstRender {
   reads: string[]
   refused: RequestReadError | undefined
   renderedAt: number
-  // How many pages had classes kept when it began, which a later one makes stale.
-  epoch: number
 }
 
 // What a `.kay` file holds that the search for a server island follows: whether its own template marks one, and the `.kay` files it imports.
@@ -247,49 +247,56 @@ export async function prerenderPages(project: Project, client: ClientBuild, opti
 
         return { response: rendered, html: await rendered.text() }
       }
-      const site = { read: false }
-      const once = async () => siteReads.run(site, async () => withPageToken(token, read))
+      const siteRead = { read: false }
+      const once = async () => siteReads.run(siteRead, async () => withPageToken(token, read))
       const first = async () => {
         delete refusal.read
-        site.read = false
+        siteRead.read = false
         // Taken before the render, so a date passing during it counts as passed since.
         const renderedAt = Date.now()
-        const epoch = restyles
         const { result, reads } = await readsOf(once)
 
-        return { ...result, reads, refused: refusal.read, renderedAt, epoch }
+        return { ...result, reads, refused: refusal.read, renderedAt }
       }
 
-      return { token, request, site, once, first, rendered: settled(first()) }
+      return { token, request, siteRead, begun: restyles, once, first, rendered: settled(first()) }
     }
 
     try {
       for (; at < planned.length; at++) {
+        for (let next = at; next < Math.min(at + ahead, planned.length) && !('error' in planned[next]!); next++) {
+          if (started.has(next))
+            continue
+
+          // A page whose request cannot be made fails the route at its turn, as it did rendering one at a time.
+          try {
+            started.set(next, start(next))
+          }
+          catch (error) {
+            planned[next] = { error }
+
+            break
+          }
+        }
+
         const planning = planned[at]!
 
         if ('error' in planning)
           throw planning.error
 
-        for (let next = at; next < Math.min(at + ahead, planned.length) && !('error' in planned[next]!); next++) {
-          if (!started.has(next))
-            started.set(next, start(next))
-        }
-
         const { copy, weight } = planning
-        const { token, request, site, once, first, rendered: outcome } = started.get(at)!
+        const { token, request, siteRead, begun, once, first, rendered: outcome } = started.get(at)!
 
         started.delete(at)
 
         const ended = await outcome
+        // A page that began rendering before an earlier one had classes kept renders again, with the head that keeping gave the route, whether or not it threw.
+        const stale = begun !== restyles
 
-        if ('error' in ended)
+        if (!stale && 'error' in ended)
           throw ended.error
 
-        let rendered = ended.value
-
-        // A page that began rendering before an earlier one had classes kept renders again, with the head that keeping gave the route.
-        if (rendered.epoch !== restyles)
-          rendered = await first()
+        const rendered = !stale && 'value' in ended ? ended.value : await first()
 
         let { response, html } = rendered
         const { reads: dataRead, refused, renderedAt } = rendered
@@ -338,7 +345,7 @@ export async function prerenderPages(project: Project, client: ClientBuild, opti
 
         const islands = serverIslandModes(html)
         const stamps = html.search(STAMP_HOLE) >= 0
-        const readsSite = site.read
+        const readsSite = siteRead.read
         const livesOn = html.includes(LIVE_MARK)
 
         if (auto && (islands.length > 0 || stamps || readsSite || livesOn))
