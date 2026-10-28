@@ -73,6 +73,7 @@ function mayRefund(reader: string, now: number): boolean {
 const scopeOf = (request: Request) => new URL(request.url).pathname
 
 // A text-only turn of no text, a reply that only called tools or a message of files alone, is kept so the turns line up with the Chat's, and left out of what the model reads, as a provider refuses an empty message.
+// Two turns of one role in a row, left once an empty turn between them is, are read as one, as a provider takes the roles in turn.
 function fitted(kept: readonly StoredTurn[], posted: readonly Message[], maxInputChars: number): Message[] {
   let room = maxInputChars - posted.reduce((sum, message) => sum + message.content.length + estimatedChars(message), 0)
   const earlier: Message[] = []
@@ -91,8 +92,31 @@ function fitted(kept: readonly StoredTurn[], posted: readonly Message[], maxInpu
   }
 
   const first = earlier.findIndex(({ role }) => role === 'user')
+  const messages: Message[] = []
 
-  return [...first === -1 ? [] : earlier.slice(first), ...posted]
+  for (const message of [...first === -1 ? [] : earlier.slice(first), ...posted]) {
+    const before = messages.at(-1)
+
+    // The later one keeps its files, and the earlier text comes first.
+    if (before?.role === message.role)
+      messages[messages.length - 1] = { ...message, content: `${before.content}\n\n${message.content}` }
+    else
+      messages.push(message)
+  }
+
+  return messages
+}
+
+// The writes under way, by conversation, which a send to it waits for: a Stop closes the stream before the stopped reply is stored, so a send right after it would read the revision before that write.
+const writing = new Map<string, Promise<void>>()
+// How long a send waits for a write under way, past which it reads the conversation as stored; another tab's reply still running writes later, and this send then meets its 409.
+const WRITE_WAIT_MS = 2000
+
+async function written(key: string): Promise<void> {
+  const write = writing.get(key)
+
+  if (write !== undefined)
+    await Promise.race([write, Bun.sleep(WRITE_WAIT_MS)])
 }
 
 // Asks with the conversation the Chat posts to: its stored turns, less those a regenerate or an edit replaces, then the posted messages. Once the reply ends the posted messages and the reply are stored, before the reader is told it ended; a revision that moved since the Chat read it is refused with 409, nothing asked.
@@ -103,11 +127,15 @@ export function heldReply(call: HeldCall, prompt: Message[], options: AskOptions
   const target = (async (): Promise<{ reply: Reply }> => {
     const owner = await namedVisitor(call.request, options.key)
 
-    // A visitor no one names keeps no conversation, and their Chat posts its history itself.
+    // A Chat that was told the visitor keeps conversations posts its last message alone; with no one named any more, a lapsed session, asking with it alone would drop the conversation, so the Chat is refused and reads that it holds its history again.
     if (owner === undefined || call.id === undefined)
-      return { reply: make(prompt) }
+      throw new AiError('conflict', 'the chat posted to a conversation kept on the server, and no visitor is named any more, as when a session lapsed')
 
     const key: ConversationKey = { owner, scope: scopeOf(call.request), id: call.id }
+    const pending = `${owner}\0${key.scope}\0${key.id}`
+
+    await written(pending)
+
     const stored = await store.get(key)
     const revision = stored?.revision ?? 0
 
@@ -119,7 +147,20 @@ export function heldReply(call: HeldCall, prompt: Message[], options: AskOptions
     // The Chat posts its new message alone; anything posted before it is the server's to hold, not the client's to add.
     const posted = prompt.slice(-1)
 
-    write = async reply => kept(reply, key, revision, drop, posted, options)
+    const done = Promise.withResolvers<void>()
+
+    writing.set(pending, done.promise)
+    write = async (reply) => {
+      try {
+        await kept(reply, key, revision, drop, posted, options)
+      }
+      finally {
+        done.resolve()
+
+        if (writing.get(pending) === done.promise)
+          writing.delete(pending)
+      }
+    }
 
     return { reply: make(fitted(turns.slice(0, turns.length - drop), posted, maxInputChars)) }
   })()
@@ -139,14 +180,15 @@ async function ending(reply: Reply): Promise<[calls: readonly unknown[], finish:
 
 // Stores the exchange as the Chat shows it: the posted message, and the reply when it said or called anything, a reply cut off by a failure as one stopped. A reply that failed or was stopped before its first word, which the Chat takes back, stores nothing.
 async function kept(reply: Reply, key: ConversationKey, revision: number, drop: number, prompt: readonly Message[], options: AskOptions): Promise<void> {
-  let text: string
+  let text = ''
   let failed = false
 
+  // Read as it streams, so a reply that broke off keeps the words the Chat showed, whatever the error says of them.
   try {
-    text = await reply
+    for await (const snapshot of reply.stream())
+      text = snapshot
   }
-  catch (error) {
-    text = error instanceof AiError ? error.partial ?? '' : ''
+  catch {
     failed = true
   }
 

@@ -46,9 +46,10 @@ export interface ChatSessionOptions {
   readonly conversation?: Signal<string | undefined> | undefined
   // Whether the visitor's conversations are listed, so the session reads and keeps the list.
   readonly listed?: boolean | undefined
-  // Said when another tab wrote to the conversation first, and when it could not be loaded.
+  // Said when another tab wrote to the conversation first, when it could not be loaded, and when the visitor's session lapsed, so the conversation is no longer kept.
   readonly conflictMessage?: string | undefined
   readonly loadFailedMessage?: string | undefined
+  readonly signedOutMessage?: string | undefined
 }
 
 // What a Chat's `transcribe` action answers: the text, or `{ text }`.
@@ -195,7 +196,7 @@ export function createChatSession(options: ChatSessionOptions) {
   let mounted = false
   // Counts the loads, so only the latest one shows, and names the conversation the last one asked for, so the address naming it loads it once.
   let loads = 0
-  let asked: string | undefined
+  let asked = options.conversation === undefined ? undefined : named(untrack(options.conversation))
   // Counts the times the chat left the conversation it showed, for a new one or a loaded one.
   let left = 0
   const holding = () => options.conversation !== undefined && owned() !== false
@@ -221,7 +222,17 @@ export function createChatSession(options: ChatSessionOptions) {
         return
 
       if (answer?.owned === false) {
+        const lapsed = owned() === true
+
         owned.set(false)
+
+        // A session that lapsed leaves the conversation shown, which the next send posts whole, as a Chat holding its own history does.
+        if (lapsed) {
+          failure.set(options.signedOutMessage ?? options.errorMessage)
+
+          return
+        }
+
         recall()
 
         return
@@ -664,6 +675,8 @@ export function createChatSession(options: ChatSessionOptions) {
     hear,
     owned,
     loading,
+    // A conversation the address names is being read: the empty chat's greeting waits for it, while a new one shows it at once.
+    opening: () => loading() && asked !== undefined,
     conversations,
     // Renames a listed conversation, the list showing the title once the server took it; answers whether it did, and throws when the call failed.
     async rename(id: string, title: string): Promise<boolean> {

@@ -45,6 +45,7 @@ export default defineMessages({
       running: 'En cours',
       save: 'Enregistrer et envoyer',
       send: 'Envoyer',
+      signedOut: 'Vous êtes déconnecté, cette conversation n’est donc plus enregistrée.',
       stop: 'Arrêter',
       stopped: 'Arrêtée',
       table: 'Tableau',

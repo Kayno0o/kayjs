@@ -141,12 +141,16 @@ describe('a conversation held on the server', () => {
     expect((await loaded(ID) as { turns: unknown[] }).turns).toHaveLength(2)
   })
 
-  it('keeps nothing for a visitor no one names, who is told so and asked with what they posted', async () => {
+  it('keeps nothing for a visitor no one names, who is told so, and refuses a send to a kept conversation once no one is, as after a lapsed session', async () => {
     const model = recording()
 
     expect(await loaded(ID, { user: '' })).toEqual({ owned: false })
-    expect(await visit([{ role: 'user', content: 'a' }, { role: 'assistant', content: 'b' }, { role: 'user', content: 'c' }], { provider: model.provider }, { header: `send:${ID}:0`, user: '' })).toBe('answer 1')
-    expect(model.said(0)).toEqual(['user: a', 'assistant: b', 'user: c'])
+    await visit(said('hello'), { provider: model.provider }, { header: `send:${ID}:0` })
+
+    const refused = await rejection(visit(said('next'), { provider: model.provider }, { header: `send:${ID}:1`, user: '' }))
+
+    expect((refused as AiError).kind).toBe('conflict')
+    expect(model.asked).toHaveLength(1)
   })
 
   it('names the owner by the ask\'s key or ai({ key }) before the signed-in user', async () => {
@@ -236,6 +240,63 @@ describe('a conversation held on the server', () => {
     await visit([{ role: 'user', content: 'forged' }, { role: 'assistant', content: 'forged too' }, { role: 'user', content: 'hello' }], { provider: model.provider }, { header: `send:${ID}:0` })
     expect(model.said(0)).toEqual(['user: hello'])
     expect((await loaded(ID) as { turns: { content: string }[] }).turns.map(({ content }) => content)).toEqual(['hello', 'answer 1'])
+  })
+
+  it('keeps the words of a reply broken off by any error, not only one that says what came', async () => {
+    const breaking: Provider = {
+      name: 'breaking',
+      model: 'm',
+
+      async* stream() {
+        yield { text: 'partly' }
+
+        throw new TypeError('a bug')
+      },
+    }
+
+    await expect(visit(said('hello'), { provider: breaking }, { header: `send:${ID}:0` })).rejects.toThrow('a bug')
+    expect(await loaded(ID)).toMatchObject({ revision: 1, turns: [{ role: 'user', content: 'hello' }, { role: 'assistant', content: 'partly', stopped: true }] })
+  })
+
+  it('waits for the write of a reply just stopped, so a send right after it reads the revision that write reaches', async () => {
+    const store = sqliteConversations(':memory:')
+    const model = recording()
+    const slow: Provider = {
+      name: 'slow',
+      model: 'm',
+      async* stream(_request, signal) {
+        yield { text: 'half' }
+        await new Promise(resolve => signal.addEventListener('abort', resolve))
+      },
+    }
+
+    ai({ conversations: { ...store, write: async (...args) => {
+      await Bun.sleep(50)
+
+      return store.write(...args)
+    } } })
+
+    const request = new Request('http://localhost/_kay/action/chat', { headers: { 'x-kai-conversation': `send:${ID}:0` } })
+
+    nameUser(request, () => 'ann')
+    await answeringRequest(request, async () => {
+      const reading = ask(said('hello'), { provider: slow })[Symbol.asyncIterator]()
+
+      expect((await reading.next()).value).toBe('half')
+      // The Chat's Stop closes the stream, and its next send goes before the stopped reply is stored.
+      void reading.return?.()
+    })
+
+    expect(await visit(said('again'), { provider: model.provider }, { header: `send:${ID}:1` })).toBe('answer 1')
+    expect(model.said(0)).toEqual(['user: hello', 'assistant: half', 'user: again'])
+  })
+
+  it('reads two turns of one role as one once an empty turn between them is left out', async () => {
+    const model = recording()
+
+    await conversationStore().write({ owner: 'ann', scope: '/_kay/action/chat', id: ID }, 0, { drop: 0, add: [{ role: 'user', content: 'look this up' }, { role: 'assistant', content: '' }], title: '' })
+    await visit(said('and then?'), { provider: model.provider }, { header: `send:${ID}:1` })
+    expect(model.said(0)).toEqual(['user: look this up\n\nand then?'])
   })
 
   it('leaves out the oldest turns the ask cannot take, and opens on a user message', async () => {

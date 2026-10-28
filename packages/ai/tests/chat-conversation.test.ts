@@ -275,6 +275,28 @@ test('an address naming no conversation a Chat made, as a crafted link may, load
   expect(consulted[0]!.headers[CONVERSATION_HEADER]).toBe('load')
 })
 
+test('a session that lapsed keeps the conversation shown, says so, and posts it whole from then on', async () => {
+  const reply = await replied('still here')
+  const { session, posts } = chat([loaded(SHOWN, 1, [['user', 'a'], ['assistant', 'b']]), { owned: false }], [async () => Promise.reject(new ActionError(409, '', {})), reply.answer], { shown: SHOWN, signedOutMessage: 'Signed out.' })
+
+  await untilHolds(() => !session.loading())
+  session.draft.set('c')
+  await session.send()
+  await untilHolds(() => session.owned() === false)
+  expect(turns(session)).toEqual(['user: a', 'assistant: b'])
+  expect(session.failure()).toBe('Signed out.')
+  expect(session.draft()).toBe('c')
+
+  await session.send()
+  expect(posts[1]!.messages.map(({ content }) => content)).toEqual(['a', 'b', 'c'])
+  expect(posts[1]!.headers[CONVERSATION_HEADER]).toBeUndefined()
+})
+
+test('the greeting waits for a conversation the address names, and shows at once for a new one', () => {
+  expect(chat([loaded(SHOWN, 1)], [], { shown: SHOWN }).session.opening()).toBe(true)
+  expect(chat([loaded(undefined, 0)], []).session.opening()).toBe(false)
+})
+
 test('says the conversation could not be loaded when the action answers none', async () => {
   const { session } = chat([], [], { shown: SHOWN })
 
