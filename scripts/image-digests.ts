@@ -1,9 +1,9 @@
 import { join, resolve } from 'node:path'
 import process from 'node:process'
 
-// Checks that each base image `kay new` pins by digest in src/templates.ts still resolves for its tag through the registry API, and prints the refresh for one that moved: `bun scripts/image-digests.ts`.
+// Checks that each base image `kay new` pins by digest in src/template-pins.ts still resolves for its tag through the registry API, and prints the refresh for one that moved: `bun scripts/image-digests.ts`.
 // A moved digest does not break the pin, which keeps building the bytes reviewed; it means the tag now has newer ones, with the fixes of its base, so the script exits 1 for it as for an unresolved tag. It reads the registry and changes nothing.
-const TEMPLATES = join(resolve(import.meta.dir, '..'), 'src/templates.ts')
+const TEMPLATES = join(resolve(import.meta.dir, '..'), 'src/template-pins.ts')
 const PINNED = /^const (\w+_IMAGE) = '([^'@:]+):([^'@]+)@(sha256:[0-9a-f]{64})'$/gm
 const REGISTRY = 'https://registry-1.docker.io'
 const AUTH = 'https://auth.docker.io/token?service=registry.docker.io'
@@ -27,7 +27,7 @@ export function hubRepository(repository: string): string {
   return repository.includes('/') ? repository : `library/${repository}`
 }
 
-// The line of src/templates.ts after the digest of an image moved to `digest`.
+// The line of src/template-pins.ts after the digest of an image moved to `digest`.
 export function refreshed(image: PinnedImage, digest: string): string {
   return `const ${image.constant} = '${image.repository}:${image.tag}@${digest}'`
 }
@@ -53,7 +53,7 @@ async function main(): Promise<number> {
   const images = pinnedImages(await Bun.file(TEMPLATES).text())
 
   if (images.length === 0) {
-    console.error('no pinned image found in src/templates.ts')
+    console.error('no pinned image found in src/template-pins.ts')
 
     return 1
   }
@@ -71,7 +71,7 @@ async function main(): Promise<number> {
       }
 
       failed = true
-      console.log(`moved  ${image.repository}:${image.tag}\n  pinned ${image.digest}\n  now    ${digest}\n  replace the ${image.constant} line of src/templates.ts with:\n  ${refreshed(image, digest)}`)
+      console.log(`moved  ${image.repository}:${image.tag}\n  pinned ${image.digest}\n  now    ${digest}\n  replace the ${image.constant} line of src/template-pins.ts with:\n  ${refreshed(image, digest)}`)
     }
     catch (error) {
       failed = true

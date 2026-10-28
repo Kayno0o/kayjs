@@ -18,8 +18,8 @@ describe('image digests script', () => {
     ])
   })
 
-  it('reads the three images of src/templates.ts', async () => {
-    const images = pinnedImages(await Bun.file(`${import.meta.dir}/../src/templates.ts`).text())
+  it('reads the three images of src/template-pins.ts', async () => {
+    const images = pinnedImages(await Bun.file(`${import.meta.dir}/../src/template-pins.ts`).text())
 
     expect(images.map(image => image.constant)).toEqual(['POSTGRES_IMAGE', 'RUNTIME_IMAGE', 'NGINX_IMAGE'])
   })

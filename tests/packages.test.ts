@@ -61,7 +61,7 @@ describe('kay\'s libraries', () => {
     const importers: string[] = []
 
     for (const file of await Array.fromAsync(new Glob('src/**/*.{ts,kay}').scan())) {
-      if (!['src/new.ts', 'src/templates.ts', 'src/generate-resource.ts'].includes(file) && (/(?:from|import)\s*(?:\(\s*)?['"]@kaynooo\/pg-orm['"]/).test(await Bun.file(file).text()))
+      if (!['src/new.ts', 'src/template-auth.ts', 'src/generate-resource.ts'].includes(file) && (/(?:from|import)\s*(?:\(\s*)?['"]@kaynooo\/pg-orm['"]/).test(await Bun.file(file).text()))
         importers.push(file)
     }
 
