@@ -19,7 +19,7 @@ export interface LibraryRun {
   // A library's check and test share it: the one running when it passes is interrupted, so bun names its files still running, then killed after the grace.
   limitMs?: number
   graceMs?: number
-  write?: (text: string) => void | Promise<unknown>
+  write?: (text: string) => unknown
 }
 
 export interface LibraryResult { folder: string, passed: boolean }
