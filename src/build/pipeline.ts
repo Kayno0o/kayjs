@@ -55,6 +55,7 @@ import { routeSizes } from './route-sizes'
 import { writeSearchIndex } from './search'
 import { clearServerRecord, writeServerRecord } from './server-record'
 import { inSignalsScope } from './signals'
+import { inParseScope } from './source-parses'
 import { exportStatic, refuseStaticConfig, removeLastExport } from './static'
 import { pruneScopedStyles } from './styles'
 import { pruneCompileCache } from './transform'
@@ -111,7 +112,7 @@ export interface BuildResult {
 // Bundles the browser code for production, minified unless kay.config.ts says otherwise, and renders the pages marked `prerender`; the server then boots without bundling.
 // It checks the project while it bundles for the browser, runs no page, API module or guard until that passed, and leaves the last build in place when either fails.
 export async function buildProject(root: string, config: KayConfig, options: BuildOptions = {}): Promise<BuildResult> {
-  return inWalkScope(async () => inSignalsScope(async () => runBuild(root, config, options)))
+  return inWalkScope(async () => inSignalsScope(async () => inParseScope(async () => runBuild(root, config, options))))
 }
 
 async function runBuild(root: string, config: KayConfig, options: BuildOptions): Promise<BuildResult> {

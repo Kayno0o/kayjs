@@ -4,7 +4,7 @@ import type { KeptImport, KeptSource } from './kept-source'
 import type { SourceFile } from './literal-writes'
 import type { Unchanged } from './module-state'
 import { relative } from 'node:path'
-import { findProjectFiles, resolveFrom } from '../build/files'
+import { findProjectFiles, readSource, resolveFrom } from '../build/files'
 import { ICON_IMPORT, iconProps, installedIconSets } from '../build/icons'
 import { parseExpanded } from '../compiler/markdown-block'
 import { PAGE, PAGE_SETTINGS } from '../compiler/page-settings'
@@ -18,8 +18,6 @@ import { exposedBy, laterExportAt, stateAt } from './module-state'
 import { routeChain } from './routes'
 
 const CODE_FILE = /\.(?:kay|[cm]?[jt]sx?)$/
-// How many project files are read at once.
-const SOURCE_BATCH = 64
 // A test runs in a process of its own, so what it writes reaches no page.
 const TEST_FILE = /\.(?:test|spec)\.[cm]?[jt]sx?$/
 // What a file imported for its bytes holds the same on every render; a database, a native module or a wasm file does not.
@@ -236,23 +234,18 @@ async function projectSources(root: string, scans: object): Promise<SourceFile[]
 
 async function readSources(root: string): Promise<SourceFile[]> {
   const files = (await findProjectFiles(root, CODE_FILE, { project: true })).filter(file => !TEST_FILE.test(file))
-  const sources: SourceFile[] = []
 
-  for (let from = 0; from < files.length; from += SOURCE_BATCH) {
-    sources.push(...await Promise.all(files.slice(from, from + SOURCE_BATCH).map(async (file): Promise<SourceFile> => {
-      try {
-        const text = await Bun.file(file).text()
+  return files.map((file): SourceFile => {
+    try {
+      const { text } = readSource(file)
 
-        return { file, text: withoutComments(text), code: withoutComments(text, true) }
-      }
-      catch {
-        // A file that cannot be read may write to anything.
-        return { file, text: '', code: '', unreadable: true }
-      }
-    })))
-  }
-
-  return sources
+      return { file, text: withoutComments(text), code: withoutComments(text, true) }
+    }
+    catch {
+      // A file that cannot be read may write to anything.
+      return { file, text: '', code: '', unreadable: true }
+    }
+  })
 }
 
 // Judges an exported object or array literal: unchanged when it is made of literals and no file of the project writes to it or hands it on; without a root nothing is shown.
@@ -307,7 +300,7 @@ function impureWhy(specifier: string, impure: KeptImport['names'], implicit: boo
 }
 
 async function scanned(file: string, root: string | undefined, scans: object): Promise<Scan> {
-  const raw = await Bun.file(file).text()
+  const raw = readSource(file).text
   const lastmod = lastmodOf(file, raw)
   // The source the state rules read, with the value of `lastmod` blanked, line breaks kept.
   const source = lastmod === undefined ? raw : raw.slice(0, lastmod.start) + raw.slice(lastmod.start, lastmod.end).replace(NOT_LINE_BREAK, ' ') + raw.slice(lastmod.end)

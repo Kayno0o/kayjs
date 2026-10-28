@@ -1,6 +1,11 @@
+import type { CallExpression } from '@babel/types'
+import { utimesSync } from 'node:fs'
 import { rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import { afterAll, describe, expect, it } from 'bun:test'
+import { classIndex } from '../src/build/class-sources'
+import { readSource } from '../src/build/files'
+import { inParseScope } from '../src/build/source-parses'
 import { readKeptSource } from '../src/server/kept-source'
 import { keptScan } from '../src/server/pure-page'
 import { scratchDir } from './scratch'
@@ -132,5 +137,52 @@ describe('a page the scan reads from its parse', () => {
 
     expect(await at('types')).toBeUndefined()
     expect(await at('broken')).toMatchObject({ file: join(root, 'src/label.ts'), why: 'does not parse, so nothing shows what it reads' })
+  })
+
+  it('takes up in a build the parse the class index made of a script, a fence and a template expression, and keeps none of its own', async () => {
+    const root = await scratchDir('kept-source-')
+    const script = join(root, 'tone.ts')
+    const kay = join(root, 'card.kay')
+    const alone = join(root, 'alone.ts')
+    const setsTone = 'const tone = pick(\'a\')\nexport const paint = (el: HTMLElement) => {\n  el.className = tone\n}\n'
+
+    roots.push(root)
+    await Bun.write(script, setsTone)
+    await Bun.write(kay, '---\nconst tone = pick(\'a\')\n---\nmarkdown\n  Some *text*\np(class={shade(\'b\')}) {tone}\n')
+    await Bun.write(alone, setsTone)
+
+    // A file written this recently is read anew at each call, its parses with it.
+    for (const file of [script, kay, alone])
+      utimesSync(file, new Date(Date.now() - 60_000), new Date(Date.now() - 60_000))
+
+    const uses = (file: string) => readKeptSource(file, readSource(file).text).uses
+    const indexed = (file: string) => classIndex(readSource(file).text, file)
+    const argument = (node: unknown) => (node as CallExpression).arguments[0]
+
+    await inParseScope(async () => {
+      const scriptIndex = indexed(script)
+      const kayIndex = indexed(kay)
+      const kayUses = uses(kay)
+
+      expect(uses(script).get('pick')?.[0]?.[0]).toBe(argument(scriptIndex.values.get('tone')![0]))
+      expect(kayUses.get('pick')?.[0]?.[0]).toBe(argument(kayIndex.values.get('tone')![0]))
+      expect(kayUses.get('shade')?.[0]?.[0]).toBe(argument(kayIndex.setters[0]!.values[0]!.node))
+      // The setter after the markdown block is told at its own line.
+      expect(kayIndex.setters.map(({ line, how }) => ({ line, how }))).toEqual([{ line: 6, how: 'class attribute' }])
+
+      const kept = uses(alone).get('pick')?.[0]?.[0]
+
+      expect(argument(indexed(alone).values.get('tone')![0])).not.toBe(kept)
+      expect(uses(script).get('pick')?.[0]?.[0]).not.toBe(argument(scriptIndex.values.get('tone')![0]))
+    })
+
+    // Outside a build nothing is kept.
+    const fresh = await scratchDir('kept-source-')
+    const outside = join(fresh, 'tone.ts')
+
+    roots.push(fresh)
+    await Bun.write(outside, setsTone)
+    utimesSync(outside, new Date(Date.now() - 60_000), new Date(Date.now() - 60_000))
+    expect(uses(outside).get('pick')?.[0]?.[0]).not.toBe(argument(indexed(outside).values.get('tone')![0]))
   })
 })

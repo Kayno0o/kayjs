@@ -1,13 +1,13 @@
 import type { ParserPlugin } from '@babel/parser'
 import type { ExportSpecifier, Identifier, Node, ObjectPattern, Program, StringLiteral } from '@babel/types'
 import type { Node as KayNode, Span } from '../compiler/ast'
-import { parse, parseExpression } from '@babel/parser'
+import { parseExpression } from '@babel/parser'
 import { VISITOR_KEYS } from '@babel/types'
+import { FENCE_PLUGINS, readHolding, scriptPlugins, SourceParses } from '../build/source-parses'
 import { nodeExpressions, visitNodes } from '../compiler/ast'
-import { parseExpanded } from '../compiler/markdown-block'
 import { patternNames } from '../compiler/pattern-names'
 
-// What a kept page's scan reads of one source, from one parse of it: a script whole, a `.kay` file's fences and the expressions of its template, markdown blocks included, as the compiler reads them.
+// What a kept page's scan reads of one source, from one parse of it, which the class index shares: a script whole, a `.kay` file's fences and the expressions of its template, markdown blocks included, as the compiler reads them.
 // Offsets are the file's own.
 
 // An import or a re-export, as the statement writes it.
@@ -44,9 +44,6 @@ export interface KeptSource {
 const READ_GLOBALS = new Set(['Date', 'Intl', 'Temporal', 'crypto', 'process', 'Bun', 'performance', 'fetch', 'globalThis', 'global', 'require', 'eval', 'Function'])
 // The names of the global object a browser has too, which an island reads freely: only a member of it named in `READ_GLOBALS`, or one it computes, is a read.
 const WINDOWS = new Set(['self', 'window'])
-const SYNTAX: ParserPlugin[] = ['decorators-legacy', 'explicitResourceManagement']
-const TS_SCRIPT = /\.[cm]?ts$/
-const TSX_SCRIPT = /\.tsx$/
 // Types, which run nothing.
 const TYPE_KEYS = new Set(['typeAnnotation', 'returnType', 'typeParameters', 'superTypeParameters', 'typeArguments', 'implements'])
 const TYPE_NODES = new Set(['TSInterfaceDeclaration', 'TSTypeAliasDeclaration', 'TSDeclareFunction', 'TSDeclareMethod'])
@@ -66,13 +63,6 @@ interface Frame {
   parent: Frame | undefined
   // A binding pattern, whose names are declared rather than read.
   pattern: boolean
-}
-
-function pluginsOf(file: string): ParserPlugin[] {
-  if (TS_SCRIPT.test(file))
-    return ['typescript', ...SYNTAX]
-
-  return TSX_SCRIPT.test(file) ? ['typescript', 'jsx', ...SYNTAX] : ['jsx', ...SYNTAX]
 }
 
 // A name a module exports, written as one or in quotes: `export { "a-b" as c } from` gives its `local` as a string, which Babel's types leave out.
@@ -258,18 +248,19 @@ class Reader {
   readonly outer = new Set<string>()
 
   // `source` is the text the parsed spans are of, `real` maps an offset of it to the file's, and `skip` is a span read as written and never run, which nothing in is a read.
-  constructor(private readonly source: string, private readonly real: (offset: number) => number, private readonly skip: Span | undefined, uses: KeptSource['uses'] = new Map()) {
+  constructor(private readonly source: string, private readonly real: (offset: number) => number, private readonly skip: Span | undefined, private readonly parses: SourceParses, uses: KeptSource['uses'] = new Map()) {
     this.found = { pathname: false, imports: [], uses, bindings: new Set(), exports: false }
   }
 
-  program(text: string, start: number, plugins: ParserPlugin[]): Program | undefined {
+  // A script or a fence at `span` of `source`, which holds the spans of `this.source`.
+  program(source: string, span: Span, plugins: ParserPlugin[]): Program | undefined {
     let program: Program
 
     try {
-      program = parse(text, { sourceType: 'module', allowReturnOutsideFunction: true, allowAwaitOutsideFunction: true, allowImportExportEverywhere: true, errorRecovery: true, plugins, startIndex: start }).program
+      program = this.parses.program(source, span, plugins)
     }
     catch (error) {
-      this.unparsed(error, start)
+      this.unparsed(error, span.start)
 
       return undefined
     }
@@ -282,15 +273,15 @@ class Reader {
     return program
   }
 
-  expression(text: string, start: number): void {
-    if (text.trim() === '')
+  expression(span: Span): void {
+    if (this.source.slice(span.start, span.end).trim() === '')
       return
 
     try {
-      this.walk({ node: parseExpression(text, { plugins: ['typescript'], startIndex: start }), key: undefined, parent: undefined, pattern: false })
+      this.walk({ node: this.parses.expression(this.source, span), key: undefined, parent: undefined, pattern: false })
     }
     catch (error) {
-      this.unparsed(error, start)
+      this.unparsed(error, span.start)
     }
   }
 
@@ -517,14 +508,14 @@ class Reader {
   }
 
   kay(source: string): void {
-    const { file, expansion } = parseExpanded(source)
+    const { file, expansion } = this.parses.kay(source)
     const real = expansion === undefined ? (offset: number) => offset : (offset: number) => expansion.real(offset)
 
-    const template = new Reader(file.source, real, undefined, this.found.uses)
+    const template = new Reader(file.source, real, undefined, this.parses, this.found.uses)
 
     // A name a fence declares at its top is the template's to read.
     for (const span of [file.script, file.server, file.module]) {
-      const program = span === undefined ? undefined : this.parseIn(file.source, span, ['typescript', ...SYNTAX])
+      const program = span === undefined ? undefined : this.program(file.source, span, FENCE_PLUGINS)
 
       for (const name of program === undefined ? [] : scopeOf(program)!)
         template.outer.add(name)
@@ -534,12 +525,10 @@ class Reader {
       const own = binders(node)
 
       for (const span of nodeExpressions(node)) {
-        const text = file.source.slice(span.start, span.end)
-
         if (own.includes(span))
-          template.binder(text, span.start)
+          template.binder(file.source.slice(span.start, span.end), span.start)
         else
-          template.expression(text, span.start)
+          template.expression(span)
       }
 
       // The patterns `nodeExpressions` leaves out, whose defaults run all the same.
@@ -548,10 +537,6 @@ class Reader {
     })
 
     this.merge(template.found)
-  }
-
-  private parseIn(source: string, span: Span, plugins: ParserPlugin[]): Program | undefined {
-    return this.program(source.slice(span.start, span.end), span.start, plugins)
   }
 
   private merge(other: KeptSource): void {
@@ -566,7 +551,7 @@ class Reader {
   }
 
   script(file: string, source: string): void {
-    this.parseIn(source, { start: 0, end: source.length }, pluginsOf(file))
+    this.program(source, { start: 0, end: source.length }, scriptPlugins(file))
   }
 }
 
@@ -590,8 +575,9 @@ function patterns(node: KayNode): Span[] {
 }
 
 // What one source reads, a `.kay` file by its fences and its template; `skip` is a span of it read as written and never run, the value of a page's `lastmod`.
+// A parse the class index made in the same build is taken up rather than made anew.
 export function readKeptSource(file: string, source: string, skip?: Span): KeptSource {
-  const reader = new Reader(source, offset => offset, skip)
+  const reader = new Reader(source, offset => offset, skip, new SourceParses(readHolding(file, source), false))
 
   if (file.endsWith('.kay'))
     reader.kay(source)

@@ -1,15 +1,13 @@
 import type { ParserPlugin } from '@babel/parser'
 import type { Expression, Node } from '@babel/types'
 import type { Node as KayNode, Span } from '../compiler/ast'
-import { parse, parseExpression } from '@babel/parser'
 import { VISITOR_KEYS } from '@babel/types'
 import { importedName } from '../check/ast'
 import { nodeExpressions, visitNodes } from '../compiler/ast'
 import { unwrapped } from '../compiler/object-literal'
-import { parseKay } from '../compiler/parser'
 import { patternNames } from '../compiler/pattern-names'
 import { binders, bindingNames } from '../compiler/template-reads'
-import { readSource } from './files'
+import { FENCE_PLUGINS, readHolding, scriptPlugins, SourceParses } from './source-parses'
 
 export type FunctionNode = Extract<Node, { type: 'FunctionDeclaration' | 'FunctionExpression' | 'ArrowFunctionExpression' }>
 
@@ -76,11 +74,7 @@ const VALUE_OPERATORS = new Set(['=', '+=', '||=', '??=', '&&='])
 // Types, which set no class and declare no value.
 const TYPE_KEYS = new Set(['typeAnnotation', 'returnType', 'typeParameters', 'superTypeParameters', 'typeArguments', 'implements'])
 const IDENTIFIER = /^\s*[\p{ID_Start}_$][\p{ID_Continue}$]*\s*$/u
-const JSX_SCRIPT = /\.[jt]sx$/
-const TS_SCRIPT = /\.[cm]?ts$/
 const KAY_FILE = /\.kay$/
-// What an app's script may hold besides its language, read rather than leaving the whole file unread.
-const SYNTAX: ParserPlugin[] = ['decorators-legacy', 'explicitResourceManagement']
 
 // `classList.toggle` takes a class and a flag, `replace` two classes, `add` any number.
 function classArguments(method: string): number {
@@ -88,13 +82,6 @@ function classArguments(method: string): number {
     return MANY_ARGUMENTS
 
   return method === 'replace' ? 2 : 1
-}
-
-function pluginsOf(file: string | undefined): ParserPlugin[] {
-  if (file === undefined || TS_SCRIPT.test(file))
-    return ['typescript']
-
-  return JSX_SCRIPT.test(file) ? ['typescript', 'jsx'] : ['jsx']
 }
 
 // Visits the node and those under it in source order, types left out, with a stack rather than recursion, which a long `a + b + ...` chain would overflow.
@@ -125,43 +112,39 @@ function walk(root: Node, each: (node: Node) => void): void {
   }
 }
 
-const indexes = new WeakMap<ReturnType<typeof readSource>, ClassIndex>()
+const indexes = new WeakMap<object, ClassIndex>()
 
-// The index of a source, from one parse of a script, or for a `.kay` file of its fences and its template's expressions as the compiler reads them; kept with the file's read while the text is the file's, so it goes when `keepSources` forgets the file.
+// The index of a source, from one parse of a script, or for a `.kay` file of its fences and its template's expressions as the compiler reads them, markdown blocks included; kept with the file's read while the text is the file's, so it goes when `keepSources` forgets the file. In a build its parses wait for the kept-page scan to take them up.
 export function classIndex(text: string, file?: string): ClassIndex {
-  const read = file === undefined ? undefined : sourceOf(file)
+  const read = readHolding(file, text)
 
-  if (read?.text !== text)
-    return new Indexer(text).read(file)
+  if (read === undefined)
+    return new Indexer(text, new SourceParses(undefined, false)).read(file)
 
   let index = indexes.get(read)
 
   if (index === undefined)
-    indexes.set(read, index = new Indexer(text).read(file))
+    indexes.set(read, index = new Indexer(text, new SourceParses(read, true)).read(file))
 
   return index
-}
-
-function sourceOf(file: string): ReturnType<typeof readSource> | undefined {
-  try {
-    return readSource(file)
-  }
-  catch {
-    return undefined
-  }
 }
 
 class Indexer {
   private readonly index: ClassIndex = { setters: [], declared: new Set(), values: new Map(), functions: new Map(), async: new Set(), shadowed: new Set(), imports: new Map(), props: new Set() }
   private lineStarts: number[] | undefined
+  // The text the parsed spans are of, a `.kay` file's with its markdown blocks lowered, and the file's offset of one of its offsets.
+  private source: string
+  private real: (offset: number) => number = offset => offset
 
-  constructor(private readonly text: string) {}
+  constructor(private readonly text: string, private readonly parses: SourceParses) {
+    this.source = text
+  }
 
   read(file: string | undefined): ClassIndex {
     if (file !== undefined && KAY_FILE.test(file))
       this.readKay()
     else
-      this.readProgram({ start: 0, end: this.text.length }, pluginsOf(file))
+      this.readProgram({ start: 0, end: this.text.length }, scriptPlugins(file))
 
     this.index.setters.sort((a, b) => a.at - b.at)
 
@@ -172,7 +155,7 @@ class Indexer {
     let program: Node
 
     try {
-      program = parse(this.text.slice(span.start, span.end), { sourceType: 'unambiguous', allowReturnOutsideFunction: true, errorRecovery: true, attachComment: false, plugins: [...plugins, ...SYNTAX], startIndex: span.start }).program
+      program = this.parses.program(this.source, span, plugins)
     }
     catch {
       return
@@ -185,7 +168,7 @@ class Indexer {
     let expression: Expression
 
     try {
-      expression = parseExpression(this.text.slice(span.start, span.end), { plugins: ['typescript'], startIndex: span.start })
+      expression = this.parses.expression(this.source, span)
     }
     catch {
       return undefined
@@ -198,11 +181,16 @@ class Indexer {
 
   // The fences hold scripts; the template's binders shadow the names they bind, its `const` lines declare theirs, and its expressions are read as a script's.
   private readKay(): void {
-    const file = parseKay(this.text)
+    const { file, expansion } = this.parses.kay(this.text)
+
+    this.source = file.source
+
+    if (expansion !== undefined)
+      this.real = offset => expansion.real(offset)
 
     for (const span of [file.script, file.server, file.module]) {
       if (span !== undefined)
-        this.readProgram(span, ['typescript'])
+        this.readProgram(span, FENCE_PLUGINS)
     }
 
     visitNodes(file.template, node => this.readNode(node))
@@ -376,11 +364,15 @@ class Indexer {
     const read = values.flatMap((value) => {
       const node = value.type === 'SpreadElement' ? value.argument : value
 
-      return node.type === 'ArgumentPlaceholder' || node.type === 'JSXNamespacedName' ? [] : [{ node: node as Expression, text: this.text.slice(value.start!, value.end!) }]
+      return node.type === 'ArgumentPlaceholder' || node.type === 'JSXNamespacedName' ? [] : [{ node: node as Expression, text: this.source.slice(value.start!, value.end!) }]
     })
 
-    if (read.length > 0)
-      this.index.setters.push({ at, line: this.lineOf(at), how, values: read, receiver })
+    if (read.length === 0)
+      return
+
+    const real = this.real(at)
+
+    this.index.setters.push({ at: real, line: this.lineOf(real), how, values: read, receiver })
   }
 
   // Whether a destructuring reads the component's props, `props<{ tone: string }>()`.
@@ -416,7 +408,7 @@ class Indexer {
   }
 
   private slice(span: Span): string {
-    return this.text.slice(span.start, span.end)
+    return this.source.slice(span.start, span.end)
   }
 
   private lineOf(at: number): number {
