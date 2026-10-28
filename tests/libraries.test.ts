@@ -1,5 +1,6 @@
 import { mkdir } from 'node:fs/promises'
 import { join } from 'node:path'
+import process from 'node:process'
 import { describe, expect, it } from 'bun:test'
 import { libraryFolders, runLibraries } from '../scripts/libraries'
 import { scratchDir } from './scratch'
@@ -64,6 +65,65 @@ describe('scripts/libraries.ts', () => {
     expect(results).toEqual([{ folder, passed: false }])
     expect(written[0]).toContain('started')
     expect(written[0]).toMatch(/stuck: test interrupted after 6 s\n$/)
+  })
+
+  it('interrupts a check running past its limit, leaving its test unstarted', async () => {
+    const root = await scratchDir('libraries-')
+    const folder = await fakeLibrary(root, 'unchecked', 'console.log(`${step} started`)\nif (step === \'check\') {\n  process.on(\'SIGINT\', () => process.exit(130))\n  setInterval(() => {}, 1000)\n}')
+    const { results, written } = await run([folder], { limitMs: 4000, graceMs: 2000 })
+
+    expect(results).toEqual([{ folder, passed: false }])
+    expect(written[0]).toContain('check started')
+    expect(written[0]).not.toContain('test started')
+    expect(written[0]).toMatch(/unchecked: check interrupted after 4 s\n$/)
+  })
+
+  it('holds a library\'s check and test to one limit together', async () => {
+    const root = await scratchDir('libraries-')
+    const folder = await fakeLibrary(root, 'slow', 'if (step === \'check\')\n  await Bun.sleep(3000)\nelse {\n  process.on(\'SIGINT\', () => process.exit(130))\n  setInterval(() => {}, 1000)\n}')
+    const started = performance.now()
+    const { results, written } = await run([folder], { limitMs: 5000, graceMs: 2000 })
+
+    // A test given the whole limit again would end past 8 s.
+    expect(performance.now() - started).toBeLessThan(7000)
+    expect(results).toEqual([{ folder, passed: false }])
+    expect(written[0]).toMatch(/slow: test interrupted after 5 s\n$/)
+  })
+
+  it('fails alone a library whose log cannot be opened', async () => {
+    const root = await scratchDir('libraries-')
+    const tmp = join(root, 'tmp')
+    // The first library's check puts a folder where the second's log goes, under the temporary folder this test points TMPDIR at.
+    const blocker = await fakeLibrary(root, 'blocker', `import { mkdirSync, readdirSync } from 'node:fs'\nimport { join } from 'node:path'\nif (step === 'check') {\n  const logs = readdirSync(${JSON.stringify(tmp)}).find(name => name.startsWith('kay-libraries-'))!\n  mkdirSync(join(${JSON.stringify(tmp)}, logs, '1.log'))\n}`)
+    const unopened = await fakeLibrary(root, 'unopened', '')
+    const after = await fakeLibrary(root, 'after', '')
+    const previous = process.env.TMPDIR
+
+    await mkdir(tmp)
+    process.env.TMPDIR = tmp
+
+    try {
+      const { results, written } = await run([blocker, unopened, after], { jobs: 1 })
+
+      expect(results).toEqual([{ folder: blocker, passed: true }, { folder: unopened, passed: false }, { folder: after, passed: true }])
+      expect(written[2]).toMatch(/unopened\/\n\S*unopened: could not run: EISDIR/)
+    }
+    finally {
+      if (previous === undefined)
+        delete process.env.TMPDIR
+      else
+        process.env.TMPDIR = previous
+    }
+  })
+
+  it('fails alone a library it cannot start', async () => {
+    const root = await scratchDir('libraries-')
+    const missing = join(root, 'packages', 'missing')
+    const present = await fakeLibrary(root, 'present', '')
+    const { results, written } = await run([missing, present])
+
+    expect(results).toEqual([{ folder: missing, passed: false }, { folder: present, passed: true }])
+    expect(written[1]).toMatch(/missing: could not run: ENOENT/)
   })
 
   it('runs as many libraries side by side as it has jobs', async () => {

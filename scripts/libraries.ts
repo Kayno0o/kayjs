@@ -16,7 +16,7 @@ const JOBS_FLAG = /^--jobs=(\d+)$/
 
 export interface LibraryRun {
   jobs?: number
-  // A check or test run stuck past it is interrupted, so bun names its files still running, then killed after the grace.
+  // A library's check and test share it: the one running when it passes is interrupted, so bun names its files still running, then killed after the grace.
   limitMs?: number
   graceMs?: number
   write?: (text: string) => void
@@ -62,13 +62,15 @@ async function script(folder: string, name: string, fd: number, limitMs: number,
 
 // One library's `check`, then its `test` once the check passed, into a log file of its own, answering the line closing its output.
 async function library(folder: string, log: string, options: LibraryRun): Promise<{ passed: boolean, summary: string }> {
-  const fd = openSync(log, 'w')
   const started = performance.now()
   const limitMs = options.limitMs ?? LIMIT_MS
+  let fd: number | undefined
 
   try {
+    fd = openSync(log, 'w')
+
     for (const name of ['check', 'test']) {
-      const outcome = await script(folder, name, fd, limitMs, options.graceMs ?? GRACE_MS)
+      const outcome = await script(folder, name, fd, Math.max(0, started + limitMs - performance.now()), options.graceMs ?? GRACE_MS)
 
       if (outcome === 'interrupted')
         return { passed: false, summary: `${name} interrupted after ${limitMs / 1000} s` }
@@ -84,7 +86,18 @@ async function library(folder: string, log: string, options: LibraryRun): Promis
     return { passed: false, summary: `could not run: ${error instanceof Error ? error.message : String(error)}` }
   }
   finally {
-    closeSync(fd)
+    if (fd !== undefined)
+      closeSync(fd)
+  }
+}
+
+// A library's output, empty when its log could not be opened.
+async function logText(log: string): Promise<string> {
+  try {
+    return await Bun.file(log).text()
+  }
+  catch {
+    return ''
   }
 }
 
@@ -103,7 +116,7 @@ export async function runLibraries(folders: string[], options: LibraryRun = {}):
       const log = join(logs, `${index}.log`)
       const { passed, summary } = await library(folder, log, options)
       const name = relative(process.cwd(), folder)
-      const text = `${name}/\n${await Bun.file(log).text()}${name}: ${summary}\n`
+      const text = `${name}/\n${await logText(log)}${name}: ${summary}\n`
 
       results[index] = { folder, passed }
 
