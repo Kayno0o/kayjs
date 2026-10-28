@@ -499,6 +499,18 @@ describe('a kept page and the state a script declares', () => {
     expect(await readsNothing(route(root, 'src/routes/class.kay'))).toBe(false)
   })
 
+  it('judges a server fence the compiler cannot place, but that parses, by its first export besides a type or a page setting', async () => {
+    const root = await scratch({
+      'src/routes/function.kay': '--- server\nlet count = 0\nconst pending\n\nexport async function bump(): Promise<void> {\n  count++\n}\n---\np {count}\n',
+      'src/routes/settings.kay': '--- server\nlet title = \'Home\'\nconst pending\n\nexport const page = { prerender: true, revalidate: \'1h\' }\n---\nh1 {title}\n',
+      'src/routes/typed.kay': '--- server\nlet title = \'Home\'\nlet title = \'Again\'\n\nexport type Row = { id: number }\n---\nh1 {title}\n',
+    })
+
+    expect(await readsNothing(route(root, 'src/routes/function.kay'))).toBe(false)
+    expect(await readsNothing(route(root, 'src/routes/settings.kay'))).toBe(true)
+    expect(await readsNothing(route(root, 'src/routes/typed.kay'))).toBe(true)
+  })
+
   it('keeps a page whose lastmod reads the clock, as the sitemap reads it and no render does', async () => {
     const root = await scratch({
       'src/routes/dated.kay': '--- server\nexport const page = { sitemap: true, lastmod: new Date(\'2026-03-04T10:00:00Z\') }\n---\nh1 Dated\n',

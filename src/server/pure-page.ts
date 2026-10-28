@@ -46,6 +46,10 @@ function moduleStateAt(file: string, source: string, read: KeptSource, unchanged
   if (!file.endsWith('.kay') || server === undefined)
     return undefined
 
+  // Only a declaration or an export of the fence can declare state, which spares most fences the compiler's analysis.
+  if (!server.body.some(statement => statement.type === 'VariableDeclaration' || statement.type.startsWith('Export')))
+    return undefined
+
   const analysis = analyzeServer(source, parseKay(source).server)
 
   if (analysis === undefined)
@@ -320,7 +324,13 @@ async function scanned(file: string, root: string | undefined, scans: object): P
   if (state !== undefined)
     return stopAt(state, STATE)
 
-  const exposed = new Map([...read.levels.module === undefined ? [] : exposedBy(read.levels.module, risks)].map(([name, at]) => [name, lineAt(source, at)]))
+  const exposed = new Map<string, number>()
+
+  if (read.levels.module !== undefined) {
+    for (const [name, at] of exposedBy(read.levels.module, risks))
+      exposed.set(name, lineAt(source, at))
+  }
+
   const taken = new Map<string, ReadonlySet<string> | 'all'>()
   const imports: (KeptImport & { implicit?: boolean })[] = [...read.imports]
 

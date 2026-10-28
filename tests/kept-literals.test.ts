@@ -164,6 +164,7 @@ describe('a page importing an exported object or array no module writes to', () 
       dynamic: [CONTACT, 'const content = await import(\'./content\')\nconst key = \'CONTACT\'\ncontent[key].email = \'x\''],
       dynamicPath: [CONTACT, 'const content = await import(path)\ncontent.CONTACT.email = \'x\''],
       required: [CONTACT, 'const content = require(\'./content\')\ncontent[\'CONTACT\'].email = \'x\''],
+      importEquals: [CONTACT, 'import content = require(\'./content\')\nconst key = \'CONTACT\'\ncontent[key].email = \'x\''],
       renamedImport: [CONTACT, 'import { CONTACT as C } from \'./content\'\nC.email = \'x\''],
       callbackArray: [LIST, 'LIST.forEach((item, index, all) => { all.push(item) })'],
       callbackNested: ['export const CONTACT = { tags: [\'a\'] }\n', 'CONTACT.tags.map((tag, index, all) => all.pop())'],

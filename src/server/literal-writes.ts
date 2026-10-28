@@ -526,6 +526,9 @@ function note({ node, link, pattern }: Frame, parsed: ParsedSource, namespaces: 
   else if (node.type === 'ImportExpression') {
     parsed.calls.push(node.source.type === 'StringLiteral' ? node.source.value : undefined)
   }
+  else if (node.type === 'TSImportEqualsDeclaration' && node.importKind !== 'type' && node.moduleReference.type === 'TSExternalModuleReference') {
+    parsed.calls.push(node.moduleReference.expression.value)
+  }
   else if (CALLS.has(node.type)) {
     const { callee, arguments: args } = node as CallExpression
 
