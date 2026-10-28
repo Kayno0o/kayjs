@@ -150,13 +150,13 @@ export function createChatSession(options: ChatSessionOptions) {
   let leaving = false
   // What the action took as too long, learned from its 413s, so the app states `maxInputChars` once: the oldest turns go first, the last stays.
   let learned = Infinity
-  // Counts the conversations started over or switched to, so a transcription finishing after one does not send into the next.
-  let conversation = 0
+  // Counts the times the chat left the conversation it showed: started over, or another one loaded. A reply or a transcription ending after it joins none.
+  let left = 0
 
-  // What was said joins the field and goes as a typed message does, with the files attached; a reply under way leaves it in the field, as post() then waits. Answers why nothing was sent, or nothing once the conversation started over meanwhile.
+  // What was said joins the field and goes as a typed message does, with the files attached; a reply under way leaves it in the field, as post() then waits. Answers why nothing was sent, or nothing once the chat left the conversation meanwhile.
   async function hear(audio: File): Promise<string | undefined> {
     const voice = options.voice
-    const asked = conversation
+    const heardIn = left
 
     if (voice === undefined)
       return undefined
@@ -164,7 +164,7 @@ export function createChatSession(options: ChatSessionOptions) {
     try {
       const answer = await voice.transcribe({ audio }, { refresh: false })
 
-      if (asked !== conversation)
+      if (heardIn !== left)
         return undefined
 
       const text = (typeof answer === 'string' ? answer : answer.text).trim()
@@ -182,7 +182,7 @@ export function createChatSession(options: ChatSessionOptions) {
 
       const refusal = error instanceof ActionError && error.status < 500 ? error.errors[''] : undefined
 
-      if (asked !== conversation)
+      if (heardIn !== left)
         return undefined
 
       return refusal === undefined || refusal === '' ? voice.failedLabel : refusal
@@ -201,8 +201,6 @@ export function createChatSession(options: ChatSessionOptions) {
   // Counts the loads, so only the latest one shows, and names the conversation the last one asked for, so the address naming it loads it once.
   let loads = 0
   let asked = options.conversation === undefined ? undefined : named(untrack(options.conversation))
-  // Counts the times the chat left the conversation it showed, for a new one or a loaded one.
-  let left = 0
   const holding = () => options.conversation !== undefined && owned() !== false
 
   // A read or a change of the conversations, which the action answers through `ask` with no model asked: the message only carries a rename's title.
@@ -315,13 +313,13 @@ export function createChatSession(options: ChatSessionOptions) {
   }
 
   function clearLive() {
-  partial.set('')
-  thought.set('')
-  thoughtOpen.set(false)
-  calls.set([])
-  code.set([])
-  found.set([])
-}
+    partial.set('')
+    thought.set('')
+    thoughtOpen.set(false)
+    calls.set([])
+    code.set([])
+    found.set([])
+  }
 
   // The reply's id is done with: no reload resumes it and no Stop ends it on the server.
   function forget(current: Reply) {
@@ -637,8 +635,6 @@ export function createChatSession(options: ChatSessionOptions) {
       if (busy())
         stop()
 
-      conversation++
-
       if (id === undefined)
         startNew()
       else
@@ -730,7 +726,6 @@ export function createChatSession(options: ChatSessionOptions) {
         if (busy())
           stop()
 
-        conversation++
         startNew()
         options.conversation?.set(undefined)
       }
@@ -779,7 +774,7 @@ export function createChatSession(options: ChatSessionOptions) {
     // Starts the conversation over: what is under way stops, and the log, the field and the kept history are cleared.
     reset() {
       stop()
-      conversation++
+      left++
       history.set([])
       replacement = undefined
 
