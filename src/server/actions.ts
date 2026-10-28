@@ -218,12 +218,19 @@ export async function registerActionRoutes(app: Elysia, routes: ServedRoute[], m
           context.body = asForm ? formInput(value.schema, withFixedFields(withoutEmptyFiles(context.body), context.request)) : callInput(context.body)
         },
         // After validation, the one stage where the app's `resolve` values are there for `ctx.locals`.
-        ...(guards.length > 0 && { beforeHandle: async (context: { request: Request }) => inLocale(context.request, options, async () => admit(guards, sharedContext(context.request, () => ({ ...context })), recordOf(context.request)?.pageParams ?? {}, recordOf(context.request)?.pageUrl, options)) }),
+        ...(guards.length > 0 && {
+          beforeHandle: async (context: { request: Request }) => {
+            const { pageParams = {}, pageUrl } = requestRecord(context.request)
+
+            return inLocale(context.request, options, async () => admit(guards, sharedContext(context.request, () => ({ ...context })), pageParams, pageUrl, options))
+          },
+        }),
         error: async (context) => {
           const { code, error, request, body, server, set } = context
 
           if ((code === 'VALIDATION' || code === 'INVALID_FILE_TYPE') && guards.length > 0) {
-            const refusal = await inLocale(request, options, async () => guardsFirst(guards, sharedContext(request, () => ({ ...context })), recordOf(request)?.pageParams ?? {}, recordOf(request)?.pageUrl, options))
+            const { pageParams = {}, pageUrl } = requestRecord(request)
+            const refusal = await inLocale(request, options, async () => guardsFirst(guards, sharedContext(request, () => ({ ...context })), pageParams, pageUrl, options))
 
             if (refusal)
               return refusal
@@ -713,10 +720,12 @@ async function runAction(action: ServerAction<TSchema, unknown>, context: { body
     locale: contextLocale(options),
     // Read on first use, so an action that never reads them runs from any page.
     get params() {
-      if (recordOf(request)?.pageParams === undefined)
+      const record = requestRecord(request)
+
+      if (record.pageParams === undefined)
         read.params()
 
-      return recordOf(request)?.pageParams ?? {}
+      return record.pageParams ?? {}
     },
     get cookies() {
       return jar.cookies

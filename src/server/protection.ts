@@ -408,7 +408,6 @@ export interface RefusalInput {
 }
 
 export type RefundableStore = RateStore & { refund: NonNullable<RateStore['refund']> }
-// The attempts the refusal check counted for a request, which `refundRateLimit` can take back once.
 
 export async function protectionRefusal(action: ServerAction<TSchema, unknown>, request: Request, { body, form, server, plain = form, keyContext }: RefusalInput): Promise<ProtectionRefusal | typeof PRETEND | undefined> {
   const { honeypot, messages } = action.protection ?? {}

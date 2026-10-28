@@ -75,7 +75,6 @@ export interface CacheReads {
 const cacheReads = new AsyncLocalStorage<CacheReads>()
 // The chains of routes whose render read a value of each user, which are rendered with the user resolved.
 const readers = new Set<string>()
-// The reads of each API request in flight, for the hook that answers it.
 // Least recently read or watched first.
 const stamped = new Set<string>()
 // The last invalidation time of each key a page followed, which a connection sends first: the declaration gives 0 to a key never invalidated.
