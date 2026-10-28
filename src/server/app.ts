@@ -1,111 +1,34 @@
-import type { Elysia as App } from 'elysia'
-import type { KayConfig, KayExtension } from '../config'
-import type { Mode, Project } from '../project'
-import type { GuardContext } from '../runtime'
-import type { ActionOptions } from './actions'
+import type { KayConfig } from '../config'
+import type { Project } from '../project'
 import type { ClientBuild } from './client'
-import type { OwnRoutes } from './dev'
 import type { ServedRoute } from './guards'
-import type { ImageRouteOptions } from './image'
-import type { Unmatched } from './page-routes'
 import type { ClaimedFile } from './public'
-import type { Publishing } from './publishing'
 import type { Redirect } from './redirects'
-import type { ServedPage } from './render'
 import type { RouteTable } from './route-table'
 import type { Route } from './routes'
-import type { Claim } from './served-paths'
-import type { PageSetup, Scanned } from './setup'
-import { join, resolve } from 'node:path'
-import process from 'node:process'
+import type { Scanned } from './setup'
+import { join } from 'node:path'
 import { Elysia } from 'elysia'
-import { MAPS_DIR } from '../build/assets'
 import { KayError } from '../compiler/errors'
-import { pageHooks } from '../config'
-import { clearEditSite, registerEditSite } from '../content/edit'
-import { clearContentMode } from '../content/load'
-import { refuseFeedsWithoutSite, serveFeeds } from '../content/server'
-import { cacheDir, offlineOf, pushListed } from '../project'
-import { FILES_ROUTE, IMAGE_ROUTE } from '../runtime/image'
-import { localizedText } from '../runtime/localized'
-import { kayLog } from '../runtime/log'
-import { BUILD_HEADER, DRAFT_ROUTE } from '../runtime/swap'
-import { registerActionRoutes } from './actions'
-import { serveApi } from './api'
-import { apiPathOf, mcpPath, mcpRateLimit, RESOURCE_METADATA, sharedGuards } from './api-modules'
-import { rebaseCss, rebaseRedirects } from './base'
-import { DEFAULT_BODY_LIMIT, limitBodies, mountLimits } from './body'
-import { serveBuildFiles } from './build-files'
+import { refuseFeedsWithoutSite } from '../content/server'
+import { mcpPath, mcpRateLimit } from './api-modules'
+import { actionOptionsOf, apiDocuments, appRoutes, bootOf, bootWarnings, buildFiles, compressAnswers, files, identifyRequests, kayEndpoints, keptPageWrites, knowPages, lateApp, limitBodiesAndClaimApi, logAnswers, pageRoutes, reports, rewriteAnswers, serveDevRoutes, serveLateDevRoutes, serverMode, siteFiles, stopOnSignals, trustRequests, useExtensions } from './app-stages'
 import { bundled } from './bundle'
-import { serveCards } from './card'
-import { compressResponse, fixedTexts } from './compress'
-import { checkRequestIdHeader, checkTimeZone, healthTimeoutMs, remoteLimits } from './config-limits'
+import { checkRequestIdHeader, checkTimeZone, healthTimeoutMs } from './config-limits'
 import { corsRule } from './cors'
-import { DEV_A11Y, DEV_AXE, DEV_DATA, DEV_DATA_QUERY, DEV_DATA_ROWS, DEV_EVENTS, DEV_FOOTPRINT, DEV_HEAD, DEV_INSPECTOR, DEV_JOBS, DEV_JOBS_CANCEL, DEV_JOBS_DELETE, DEV_JOBS_RETRY, DEV_JOBS_SEND, DEV_NOT_FOUND, DEV_OPEN, DEV_PATCH, DEV_ROUTES, DEV_SIZES, DEV_STACK, DEV_STYLES, DEV_TAB, DEV_TABS, DEV_TOOL, DEV_UI, devA11y, devAxe, devEvents, devInspector, devPatch, devRoutes, devStack, devStyles, devTab, devTool, devToolFile, devToolFiles, followBuilds, hotSwap, openInEditor, recordResponses, refuseForeignHosts, refuseRemoteDevTools, rememberBoot, trackRunning } from './dev'
-import { clearDevErrorsOnAnswer } from './dev-errors'
-import { servedDictionary } from './dictionary'
 import { claimEndpoints } from './endpoint-claims'
-import { serveEndpoints } from './endpoints'
-import { entryUrls } from './entry-urls'
-import { holdPublicEnv, servePublicEnv } from './env'
+import { holdPublicEnv } from './env'
 import { PUBLIC_ENV_PATH, publicEnvFiles, publicInFenceMessage } from './env-state'
-import { browserStackMapper, devStackMapper } from './error-maps'
-import { serveErrorReports } from './errors'
-import { FAVICON_DIR, faviconSource, MANIFEST, manifestJson, serveFavicons } from './favicon'
-import { loadGuard, loadGuards, requiredGuards } from './guards'
-import { refuseUnknownHosts } from './host-allowlist'
+import { faviconSource, MANIFEST, manifestJson } from './favicon'
+import { loadGuards } from './guards'
 import { refuseLocaleClashes } from './i18n'
-import { avifQuality, serveImages, webpQuality } from './image'
-import { jobsPageOf, serveJobsPage } from './jobs-page'
-import { countWrites, NO_WRITES } from './kept-pages'
-import { HEALTH_PATH, serveHealth, stopOnSignal } from './lifecycle'
-import { liveConnections, serveLive } from './live'
-import { announceStart, logRequests, pathOf, requestRefusalLogger, useLogger } from './log'
-import { mcpBodyLimit, receiveDispatched, serveMcp, serveToolCallsThrough } from './mcp'
 import { mcpKeySetting, resolveMcpKey } from './mcp-key'
-import { METRICS_PATH, metricsOf, serveMetrics } from './metrics'
-import { newTabStyles } from './new-tab'
-import { countMissing, knowRedirects } from './not-found'
-import { INSTALL_OFFER, serveServiceWorker } from './offline'
-import { claimApi, openApiDocument, openApiSettings, serveOpenApi } from './openapi'
-import { withPageHeaders } from './page-headers'
-import { assetFiles, pageSizes } from './page-hook'
-import { loadPrerendered, pageResponder, servePageRoutes } from './page-routes'
-import { plumbing } from './plumbing'
-import { DRAFT_BODY_LIMIT, serveDrafts, servePreview } from './preview'
-import { checkProxy, requestId, requestIdHeader, setRequestIdHeader, trustProxy } from './protection'
-import { requireProxyKey } from './proxy-key'
-import { claimPublic, publicCacheRules, servePublic } from './public'
-import { NOT_PUBLISHING, watchPublishing } from './publishing'
-import { redirectSpelling } from './redirect-spelling'
-import { claimRedirects, readRedirects, redirectStatus, serveRedirects } from './redirects'
-import { remoteImages, remotePatterns } from './remote'
-import { reportServerError, useAppOnError } from './report'
-import { rewriteRequests, withMovedApi } from './rewrite'
-import { routeMatch, routeTable } from './route-table'
-import { kayApiPrefixes, movedApiPrefixes, READ_METHODS } from './routes'
-import { knowRuntimeRules, missingRedirector } from './runtime-redirect-api'
-import { withSavedData } from './save-data'
-import { securityHeaders, setSecurityHeaders } from './security'
+import { checkProxy } from './protection'
+import { claimPublic } from './public'
+import { claimRedirects, readRedirects } from './redirects'
+import { routeTable } from './route-table'
 import { ServedPaths } from './served-paths'
 import { setupPages } from './setup'
-import { setSiteFacts } from './site-facts'
-import { serveSitemap } from './sitemap'
-import { markPageStale, trackPrerendered } from './stale-pages'
-import { refuseProcessKey } from './stamp'
-import { serveFiles } from './storage'
-import { answerUncaught } from './uncaught'
-import { serveViolationReports } from './violations'
-import { receiveInternal } from './visit'
-import { agreeOnWildcards } from './wildcards'
-
-const JSON_EXTENSION = /\.json$/
-// A router path with a param, an optional segment or a catch-all, which names no one page.
-const DYNAMIC_PATH = /[:*?]/
-// The NODE_ENV values kay acts on, anything else running without the production defaults.
-const KNOWN_ENVIRONMENTS = new Set(['development', 'production', 'test'])
-// What the dev tool's Routes tab says when `seo` is set without the origin the site is public at.
-const NO_ORIGIN_NOTE = 'seo is set but not the origin the site is public at, so there is no sitemap or robots.txt: set site in kay.config.ts or SITE_URL.'
 
 // Options given here win over the project's `kay.config.ts`.
 export interface PagesOptions extends KayConfig {
@@ -184,149 +107,6 @@ function refuseScanned({ root, config }: Project<PagesOptions>, { routes, files,
   return { served, routes: pages, table, publicServed, redirects, mcpAt }
 }
 
-// The routes under `/_kay/files/` carry the security headers themselves, as the build's files and the image route do.
-function ownsHeaders(path: string, filePaths: ReadonlySet<string>): boolean {
-  return filePaths.has(path) || path.startsWith(FILES_ROUTE)
-}
-
-// onRequest runs for every route of the app, its own included; a header the app set before is kept.
-// A file route answers only GET and HEAD with its own: any other method gets Elysia's 404 or 405 off the context.
-function sendSecurityHeaders(app: App, security: Record<string, string>, filePaths: ReadonlySet<string>) {
-  const headers = Object.entries(security)
-
-  app.onRequest(({ request, set }) => {
-    if (!READ_METHODS.has(request.method) || !ownsHeaders(pathOf(request.url), filePaths))
-      setSecurityHeaders(set, headers)
-  })
-}
-
-// The rules a page writes into its head in place of the stylesheets, which the policy and the compressed copies know by their text.
-function inlinePageStyles(client: ClientBuild): string[] {
-  return [...client.pageStyles?.values() ?? []].flatMap(({ inline }) => inline)
-}
-
-// Scoped, so the app's own routes are compressed too; what is encoded already, as the build's copies are, goes as it is.
-function compress(app: App, client: ClientBuild, base: string, mode: Mode, onError: KayConfig['onError']) {
-  // Inlined stylesheets go out as `rebaseHtml` leaves them, under the mount point.
-  const fixed = client.inlineStyles && fixedTexts([...client.inlineStyles.values(), ...inlinePageStyles(client)].map(css => `<style>${rebaseCss(css, base)}</style>`))
-
-  client.fixedStyles = base === '' ? fixed : undefined
-
-  // Development builds none, so its pages are served as they are.
-  const dictionary = mode.dev ? undefined : servedDictionary(client, base)
-
-  // eslint-disable-next-line ts/promise-function-async -- Elysia sends an empty body when a mapResponse promise resolves to undefined
-  app.mapResponse({ as: 'scoped' }, ({ request, responseValue }) => responseValue instanceof Response ? compressResponse(request, responseValue, fixed, error => reportServerError(error, request, onError), dictionary) : undefined)
-}
-
-function serveDevRoutes(app: App, root: string, client: ClientBuild, mode: Mode, base: string, extensions: KayExtension[] | undefined) {
-  const hot = hotSwap(root, client)
-
-  refuseRemoteDevTools(app)
-  rememberBoot(false, hot)
-  app.get(DEV_EVENTS, () => devEvents(false, hot))
-  app.get(DEV_PATCH, () => devPatch())
-  const modules = devToolFiles(root, extensions)
-
-  app.get(DEV_TOOL, () => devTool(modules))
-
-  for (const { url, file } of modules)
-    app.get(url, async () => devToolFile(file))
-
-  app.get(DEV_A11Y, () => devA11y())
-
-  for (const name of Object.keys(DEV_TABS))
-    app.get(`${DEV_TAB}${name}.js`, () => devTab(name))
-
-  app.get(DEV_STYLES, () => devStyles())
-  app.get(DEV_AXE, () => devAxe())
-  recordResponses(app, base)
-
-  if (mode.underKayDev) {
-    app.onStart(listening => trackRunning(listening))
-    followBuilds()
-    clearDevErrorsOnAnswer(app, base)
-    app.get(DEV_INSPECTOR, () => devInspector())
-    app.post(DEV_OPEN, async ({ request }) => openInEditor(root, request))
-  }
-}
-
-// The paths the config names resolve where the server runs, and development serves WebP, so a page's first load does not wait on AVIF encoding.
-async function imageRouteOf({ root, config: options, mode }: Project<PagesOptions>, { source, client, imageCache }: PageSetup, security: Record<string, string> | undefined, actions: ActionOptions): Promise<ImageRouteOptions> {
-  const lookup = options.images?.resolve
-  const runtimeRoot = source.runtimeRoot(root)
-
-  return {
-    clientDir: client.dir,
-    cacheDir: imageCache,
-    dirs: Object.fromEntries(Object.entries(options.images?.dirs ?? {}).map(([prefix, dir]) => [prefix, resolve(runtimeRoot, dir)])),
-    quality: webpQuality(options.images),
-    avif: mode.dev ? undefined : avifQuality(options.images),
-    aspects: options.images?.aspects,
-    saveData: options.saveData,
-    remote: remoteImages(join(imageCache, 'remote'), await remotePatterns(options.images?.remote), imageCache, undefined, remoteLimits(options.images)),
-    security,
-    resolve: lookup && { find: async (src: string, ctx: GuardContext) => {
-      const path = await lookup(src, ctx)
-
-      return path === undefined ? undefined : resolve(runtimeRoot, path)
-    }, guard: options.images?.guard, actions },
-  }
-}
-
-// Tracked for `invalidatePage` while the app runs, each page the build rendered for another site, or that read the site, waiting for a fresh render first.
-function trackWhileRunning(app: App, prerendered: Map<string, Map<string, ServedPage>>, client: ClientBuild, site: string | undefined, mode: Mode, output: string, publishing: Publishing) {
-  // Their canonical links, social URLs and anything built with `siteUrl()` name the site the build ran for.
-  const moved = client.pages.size > 0 && client.site !== site
-
-  // A build with no site, for a server given one at boot, is the way to serve several hosts; a site that changed, or none at all, is worth a word.
-  if (moved && client.site !== undefined)
-    kayLog('warn', `kay build rendered its pages for ${client.site} and this server runs for ${site ?? 'no site'}: each renders again on its first request`)
-
-  const tracked = [...prerendered.values()].map(pages => trackPrerendered(pages, page => moved || page.readsSite === true || publishing.passed(page)))
-
-  // A catch-up that came after the start, a slow loader's or a retry's, finds the pages the check above did not.
-  void (async () => {
-    await publishing.caughtUp
-
-    for (const pages of prerendered.values()) {
-      for (const page of pages.values()) {
-        if (publishing.passed(page))
-          markPageStale(page)
-      }
-    }
-  })()
-
-  app.onStart(() => {
-    publishing.start()
-
-    for (const { track } of tracked)
-      track()
-  })
-  app.onStop(() => {
-    publishing.stop()
-
-    for (const { release } of tracked)
-      release()
-
-    clearContentMode(mode, output)
-  })
-}
-
-// Parameters count one each and a catch-all weighs more than any number of them.
-function labelWeight(label: string): number {
-  let weight = 0
-
-  for (const segment of label.split('/')) {
-    if (segment.endsWith('*'))
-      weight += 1000
-    else if (segment.startsWith(':'))
-      weight += 1
-  }
-
-  return weight
-}
-
 // The Elysia app behind `pages()`, serving whatever browser build `loadClient` provides.
 export async function servePages(project: Project<PagesOptions>, loadClient: () => ClientBuild | Promise<ClientBuild>, skipBroken = false) {
   return (await pagesApp(project, loadClient, false, skipBroken)).app
@@ -358,365 +138,59 @@ async function loadPublicModules(root: string): Promise<string[]> {
 }
 
 // The app, with every path it serves, each claimed as its feature registers it; `exported` when `kay build --static` reads the site from it, its check having reported a missing site.
+// Each stage registers its hooks and routes in turn, and the order is behaviour: `onRequest` hooks run in it, and a route runs only the other hooks registered before it. `tests/app-hooks.test.ts` pins it.
 export async function pagesApp(project: Project<PagesOptions>, loadClient: () => ClientBuild | Promise<ClientBuild>, exported = false, skipBroken = false) {
-  const { root, config: options, paths, mode } = project
-  // The one spelling every redirect goes through, handed to the setup's render options and the actions alike; it reads the routes, so it is set once they are known.
-  let spell = (location: string) => location
+  const { root, config: options, mode } = project
+  const late = lateApp()
 
   refuseOptions(options)
 
+  const running = serverMode(mode, exported)
   // Before anything is built, so a production server without the key it asks for stops at once; a static export serves no endpoint.
   const keySetting = exported ? undefined : mcpKeySetting(options.mcp)
-  const mcpKey = keySetting === undefined ? undefined : resolveMcpKey(keySetting, { root, production: !mode.dev && process.env.NODE_ENV === 'production' }) ?? false
+  const mcpKey = keySetting === undefined ? undefined : resolveMcpKey(keySetting, { root, production: !running.dev && running.production }) ?? false
 
   const publicModules = options.publicEnv ? await loadPublicModules(root) : []
-  const setup = await setupPages(project, loadClient, false, location => spell(location), scanned => refuseScanned(project, scanned), exported)
+  const setup = await setupPages(project, loadClient, false, late.spell, scanned => refuseScanned(project, scanned), exported)
   const { served, table, publicServed, redirects, mcpAt } = setup.claimed
-  const { source, client, mounts, matchers, collections, i18n, locales, base, site, scripts, styles, renderOptions, cards, endpoints, appManifest, extensions, api: apiImport } = setup
   const routes = await servedRoutes(setup.routes, setup.claimed.routes, options.requireGuards)
   const app = new Elysia({ name: 'kay/pages', seed: root })
-  const pageMatch = routeMatch(table, matchers, options.trailingSlash)
+  const boot = bootOf({ app, env: { ...running, base: setup.base, trailingSlash: options.trailingSlash }, project, setup, served, routes, table, late, mcpAt, mcpKey })
+  const earlier = knowPages(boot)
+  const writes = keptPageWrites(boot)
 
-  // The route a request reaches is the most specific that matches: static before a parameter, a parameter before a catch-all, as the router prefers them.
-  const bySpecificity = routes.map(route => ({ route, label: pageMatch.served(route) })).toSorted((a, b) => labelWeight(a.label) - labelWeight(b.label))
+  trustRequests(boot)
+  const redirector = compressAnswers(boot)
 
-  // A redirect to a page goes out as a visit to it is answered, with the trailing slash its page has; a route something else registered, such as an extension's or an API module's, is not one.
-  const pagePaths = new Set(table.paths.keys())
-  // What was registered before the pages, an extension's routes among them: one at a page's own pattern is reached first, so it wins.
-  const earlier = new Set<string>()
-  // Held weakly: the setup's render options keep the spelling, and through it the app would outlive its last request.
-  const appRef = new WeakRef(app)
+  logAnswers(boot)
+  const apiMountsServed = rewriteAnswers(boot)
 
-  spell = redirectSpelling(options.trailingSlash ?? 'never', bySpecificity.map(({ route }) => route), pageMatch, () => [...served.apart(), ...(appRef.deref()?.routes ?? []).filter(route => (route.method === 'GET' || route.method === 'ALL') && (earlier.has(`${route.method} ${route.path}`) || !pagePaths.has(route.path)) && !served.suffixed().has(route.path)).map(route => route.path)])
+  identifyRequests(boot)
+  const jobsPage = kayEndpoints(boot, publicModules)
 
-  setSiteFacts(app, {
-    pageRoute: path => bySpecificity.find(({ route }) => pageMatch.posted(route, path))?.label,
-    base,
-    asksConsent: options.extensions?.some(extension => extension.asksConsent === true) ?? false,
-  })
+  if (boot.env.devRoutes)
+    serveDevRoutes(boot)
+  else
+    stopOnSignals(boot)
 
-  // Only a kept page reads the count, so a build keeping none registers no hook for it.
-  const writes = [...client.pages.values()].some(page => page.kept === true) ? countWrites(app, [mcpAt].filter(path => path !== undefined)) : NO_WRITES
-  // Hashed as they go out, under the mount point.
-  const compressing = options.compress ?? process.env.NODE_ENV === 'production'
-  // The browser fetches the dictionary under `connect-src`, so it joins the policy as what an island needs does: the app's own sources, unless it removed the directive or set it to 'none'.
-  const dictionaryUsed = compressing && !mode.dev && client.dictionary !== undefined
-  const directives = dictionaryUsed ? { ...client.directives, 'connect-src': [...new Set([...client.directives?.['connect-src'] ?? [], '\'self\''])] } : client.directives
-  const securityOptions = { ...options, dev: mode.dev, islands: directives, scripts: client.installs !== undefined && client.installs.length > 0 ? [...scripts, INSTALL_OFFER] : scripts, styles: [...new Set([...styles, ...client.inlineStyles?.values() ?? [], ...inlinePageStyles(client), ...newTabStyles(locales.translations.values())].map(style => rebaseCss(style, base)))] }
-  const security = securityHeaders(securityOptions)
-  // The paths of the build's files and the image route, whose responses carry the security headers themselves.
-  const filePaths = new Set<string>([IMAGE_ROUTE])
-  const log = options.log ?? process.env.NODE_ENV === 'production'
-  const lifecycle = { draining: false }
+  const { mountedByExtensions, servers } = await useExtensions(boot)
 
-  const hasPreview = options.preview !== undefined && options.preview !== false
+  await buildFiles(boot, earlier)
 
-  // Offered, so an app file at the path keeps it; only a running server counts, as `kay dev` restarts on every change and an export serves nothing.
-  const metricsConfig = mode.dev || exported ? undefined : metricsOf(options.metrics)
-  const metrics: Claim | undefined = metricsConfig && { path: metricsConfig.path ?? METRICS_PATH, owner: 'the metrics route', kind: 'kay' }
+  const actionOptions = actionOptionsOf(boot, skipBroken)
+  const appServed = await appRoutes(boot, actionOptions, jobsPage, apiMountsServed)
 
-  setRequestIdHeader(options.requestIdHeader)
-  trustProxy(app, options.proxy)
-  // Before the key check reads the mark, and dropped from the request there, so no handler reads it.
-  app.onRequest(({ request }) => {
-    receiveInternal(request)
-  })
-  requireProxyKey(app, checkProxy(options.proxy), { dev: mode.dev, exported, base, health: options.health === false ? undefined : options.health?.path ?? HEALTH_PATH, endpoint: mcpKey === undefined ? undefined : mcpAt, metrics: () => metrics && served.holds(metrics) ? metrics.path : undefined, logRefused: requestRefusalLogger(log), security })
-  refuseForeignHosts(app, site, security)
+  if (boot.env.devRoutes)
+    await serveLateDevRoutes(boot, { hasActions: appServed.actionLimits.size > 0, api: appServed.api }, mountedByExtensions)
 
-  if (typeof options.security === 'object' && options.security.hosts !== undefined && !mode.dev && !exported)
-    refuseUnknownHosts(app, { site, hosts: options.security.hosts, localeHosts: Object.values(i18n?.settings.hosts ?? {}), security })
+  await apiDocuments(boot, appServed, actionOptions, limitBodiesAndClaimApi(boot, appServed, servers))
+  reports(boot)
+  await files(boot, actionOptions)
+  bootWarnings(boot)
 
-  if (security)
-    sendSecurityHeaders(app, security, filePaths)
+  const prerendered = await siteFiles(boot)
 
-  const redirector = exported ? undefined : missingRedirector({ trailingSlash: options.trailingSlash, base })
+  await pageRoutes(boot, { redirects, publicServed, redirector, prerendered, writes })
 
-  // Before compression, whose `mapResponse` would answer a compressed 404 page first; a redirect it answers skips the later `mapResponse` hooks, as the request log's timing and the dev tool's recording of the response.
-  redirector?.pages(app)
-
-  if (compressing)
-    compress(app, client, base, mode, options.onError)
-
-  // kay's own messages go out whether requests are logged or not.
-  useLogger(typeof log === 'boolean' || log)
-
-  if (log !== false)
-    logRequests(app, log, options.health === false ? undefined : options.health?.path ?? HEALTH_PATH, kayApiPrefixes(options.extensions))
-
-  const apiMountsServed: string[] = []
-  const rewrite = withMovedApi(options.rewrite, movedApiPrefixes(options.extensions), apiPathOf(options.apiPath), base, apiMountsServed)
-
-  if (rewrite)
-    rewriteRequests(app, rewrite, app)
-
-  // The build every answer names, so a page of an older build learns of a deploy from any of them, a 404 for a chunk or an action the new build dropped included.
-  const build = mode.dev ? undefined : client.build
-
-  // After the rewrite, which hands the request served in its place the id it had, as a tool call dispatched through the app does.
-  app.onRequest(({ request, set }) => {
-    receiveDispatched(request)
-    set.headers[requestIdHeader()] = requestId(request)
-
-    if (build !== undefined)
-      set.headers[BUILD_HEADER] = build
-  })
-  serveToolCallsThrough(app)
-
-  if (base !== '')
-    rebaseRedirects(app, base)
-
-  // Offered, so an app file at the path keeps it; the check is served once every claim is in, and only where it still holds the path.
-  const health: Claim | undefined = options.health === false ? undefined : { path: options.health?.path ?? HEALTH_PATH, owner: 'the health check', kind: 'kay' }
-
-  if (health) {
-    served.offer(health)
-    // Before the extension servers, whose hooks it answers ahead of; it answers only where the claims, known once all are in, leave it the path.
-    serveHealth(app, lifecycle, () => served.holds(health), options.health === false ? undefined : options.health)
-  }
-
-  // Read in development too, so a setting without a guard fails there; claimed, so an app file at the path stops the boot.
-  const jobsPage = jobsPageOf(options.jobs)
-
-  if (jobsPage && !mode.dev && !exported)
-    served.claim({ path: jobsPage.path, owner: 'the jobs page', kind: 'kay', method: 'ALL' }, taken => `kay: ${taken.owner} and the jobs page both serve ${jobsPage.path}: move one with \`jobs: { path }\``)
-
-  if (metrics) {
-    served.offer(metrics)
-    serveMetrics(app, { path: metrics.path, base, proxy: checkProxy(options.proxy), health: health?.path, holds: () => served.holds(metrics), connections: liveConnections })
-  }
-
-  if (options.publicEnv)
-    servePublicEnv(app, publicModules)
-
-  // `kay dev` restarts the process on every change, so it has nothing to wait for.
-  if (mode.devRoutes) {
-    serveDevRoutes(app, root, client, mode, base, options.extensions)
-  }
-  else {
-    app.onStart(refuseProcessKey)
-    stopOnSignal(app, lifecycle, options.shutdownTimeout)
-  }
-
-  // After kay's own hooks, so their routes are logged and compressed as the pages are, and before the pages, actions and API modules whose context they derive.
-  const mountedByExtensions: OwnRoutes['extensions'] = []
-
-  const servers: unknown[] = []
-
-  for (const { name, server } of await extensions) {
-    servers.push(server)
-
-    if (!mode.dev) {
-      app.use(server)
-
-      continue
-    }
-
-    const before = new Set(app.routes.map(route => `${route.method} ${route.path}`))
-
-    app.use(server)
-    mountedByExtensions.push(...app.routes.filter(route => !before.has(`${route.method} ${route.path}`)).map(route => ({ owner: name, method: route.method, path: route.path })))
-  }
-
-  for (const path of await serveBuildFiles(app, client, { dev: mode.dev, security, base }))
-    filePaths.add(path)
-
-  for (const route of app.routes)
-    earlier.add(`${route.method} ${route.path}`)
-
-  const actionOptions = { skipBroken, dev: mode.dev, onError: options.onError, i18n: locales, base, redirectSpelling: (location: string) => spell(location), requireGuards: options.requireGuards, cors: options.cors }
-  const [{ limits: actionLimits, tools: toolActions }, apiModules] = await Promise.all([registerActionRoutes(app, routes, routeMatch(table, matchers, options.trailingSlash), actionOptions), apiImport])
-  // A flag, not the limits themselves, which the dev tool's closure would otherwise keep alive with whatever they reach.
-  const hasActions = actionLimits.size > 0
-  const api = await serveApi(app, apiModules, actionOptions)
-
-  apiMountsServed.push(...apiModules.map(module => module.mount))
-
-  await serveEndpoints(app, endpoints, actionOptions)
-
-  // After the extensions, whose derived values the guards read through `ctx.locals`.
-  if (jobsPage && !mode.dev && !exported)
-    serveJobsPage(app, jobsPage, actionOptions)
-
-  // The dev tool's Routes tab, once the endpoints and API modules are known, and its Head tab.
-  if (mode.devRoutes) {
-    // Loaded in development only: the seo rules reach the compiler, which a production server does not load.
-    const { devHead } = await import('./dev-head')
-
-    app.post(DEV_HEAD, async ({ request }) => devHead(request, { config: { site, seo: options.seo, favicon: options.favicon, lints: options.lints }, routes, base, trailingSlash: options.trailingSlash, locales: i18n?.settings }))
-    const { devSizes } = await import('./dev-sizes')
-
-    app.get(DEV_SIZES, async ({ request }) => devSizes(request, { table, match: routeMatch(table, matchers, options.trailingSlash), base, reports: [paths.report, paths.report.replace(JSON_EXTENSION, '-static.json')] }))
-    const { devFootprint } = await import('./dev-footprint')
-
-    app.get(DEV_FOOTPRINT, ({ request }) => devFootprint(request))
-    const { devNotFound, devRedirect } = await import('./dev-not-found')
-    const redirected = Object.keys(options.redirects ?? {})
-
-    const { devData, devQuery, devRows } = await import('./dev-data')
-
-    const { devUi, devUiWrite } = await import('./dev-ui')
-
-    app.get(DEV_UI, async ({ request }) => devUi(root, request))
-    app.post(DEV_UI, async ({ request }) => devUiWrite(root, request))
-    const { devJobAction, devJobs } = await import('./dev-jobs')
-
-    app.get(DEV_JOBS, async ({ request }) => devJobs(request))
-    app.post(DEV_JOBS_RETRY, async ({ request }) => devJobAction(request, 'retry'))
-    app.post(DEV_JOBS_DELETE, async ({ request }) => devJobAction(request, 'delete'))
-    app.post(DEV_JOBS_SEND, async ({ request }) => devJobAction(request, 'send'))
-    app.post(DEV_JOBS_CANCEL, async ({ request }) => devJobAction(request, 'cancel'))
-    app.get(DEV_DATA, async ({ request }) => devData(request))
-    app.get(DEV_DATA_ROWS, async ({ request }) => devRows(request))
-    app.post(DEV_DATA_QUERY, async ({ request }) => devQuery(request))
-    app.get(DEV_NOT_FOUND, () => Response.json(devNotFound(root, redirected)))
-    app.post(DEV_NOT_FOUND, async ({ request }) => devRedirect(root, request, redirected))
-    app.get(DEV_ROUTES, () => {
-      const own = { actions: hasActions, publicEnv: Boolean(options.publicEnv), preview: hasPreview, cspReports: typeof options.security === 'object' && options.security.reports === true, buildFiles: filePaths, mounted: mountedByExtensions }
-
-      return Response.json(devRoutes(root, routes, endpoints, api.mounted, i18n?.settings, base, { claims: served.kay(), extensions: mountedByExtensions, plumbing: plumbing(own, (path, method) => served.heldByApp(path, method)), notes: options.seo !== undefined && site === undefined ? [NO_ORIGIN_NOTE] : [] }))
-    })
-  }
-
-  // Claimed before kay's own files, which give way to them; registered last, before the pages.
-  const openapi = openApiSettings(options.openapi)
-  const apiAt = apiPathOf(options.apiPath)
-  const servesOpenApi = openapi !== undefined && (openapi.dev !== true || mode.devRoutes)
-
-  knowRedirects(Object.keys(options.redirects ?? {}))
-  knowRuntimeRules({
-    redirects: Object.fromEntries(Object.entries(options.redirects ?? {}).map(([from, target]) => [from, typeof target === 'string' ? target : target.to])),
-    statuses: Object.fromEntries(Object.entries(options.redirects ?? {}).map(([from, target]) => [from, redirectStatus(from, target)])),
-    hosts: options.runtimeRedirects?.hosts,
-    served: () => [...served.paths(), ...client.pages.keys(), ...table.paths.keys()],
-    pages: () => [...client.pages.keys(), ...table.paths.keys()].filter(path => !DYNAMIC_PATH.test(path)),
-    base,
-  })
-  claimApi(served, api.mounted, servesOpenApi ? openapi : undefined, apiAt)
-
-  const metadataPaths: string[] = []
-
-  if (mcpAt !== undefined) {
-    // Offered, not claimed: an app serving its own protected resource metadata keeps it, as it keeps the authorization server one.
-    for (const path of [RESOURCE_METADATA, `${RESOURCE_METADATA}${mcpAt}`]) {
-      if (served.offer({ path, owner: '`mcp`', kind: 'kay', method: 'ALL' }))
-        metadataPaths.push(path)
-    }
-  }
-
-  limitBodies(app, options.maxSize ?? DEFAULT_BODY_LIMIT, new Map([...actionLimits, ...hasPreview ? [[DRAFT_ROUTE, DRAFT_BODY_LIMIT] as const] : [], ...mcpAt === undefined ? [] : [[mcpAt, mcpBodyLimit] as const]]), mountLimits(api.limits, options.extensions, options.maxSizes, servers), api.routeLimits)
-
-  // The actions that opted in to being tools are in the document beside the routes, and the MCP endpoint reads its tools from it.
-  const document = servesOpenApi || mcpAt !== undefined
-    ? openApiDocument(api.mounted, { title: openapi?.title ?? localizedText(options.seo?.name, undefined, locales.settings.defaultLocale) ?? 'API', version: openapi?.version ?? '1.0.0', base, apiPath: apiAt }, toolActions)
-    : undefined
-
-  // On a site requiring guards, the document and the tool list are refused unless a guard covers every module not setting `guards: false`, or every module is open with no guard of its own, a library's guarded one counting as guarded.
-  // With no module at all the document stays refused, while the tool list, which holds the actions too, is open: there is no directory to put a guard in.
-  const covering = async (empty: boolean) => requiredGuards(await Promise.all(sharedGuards(apiModules).map(async file => loadGuard({ file, special: {} }))), { file: paths.api, open: (apiModules.length > 0 || empty) && apiModules.every(module => module.open === true && module.guards.length === 0) ? true : undefined }, {}, options.requireGuards)
-
-  if (servesOpenApi && document && openapi !== undefined)
-    serveOpenApi(app, document, openapi, await covering(false), actionOptions, apiAt)
-
-  if (mcpAt !== undefined && document)
-    serveMcp(app, document, { title: (document.info as { title: string }).title, version: (document.info as { version: string }).version, base, guards: await covering(true), actions: actionOptions, metadataPaths, path: mcpAt, perMinute: mcpRateLimit(options.mcp), key: mcpKey })
-
-  const mapStack = mode.dev ? devStackMapper(client.dir) : browserStackMapper(join(client.dir, '..', MAPS_DIR))
-
-  useAppOnError(options.onError)
-  serveErrorReports(app, options.onError, mapStack)
-
-  if (mode.devRoutes)
-    app.post(DEV_STACK, async ({ request }) => devStack(request, mapStack))
-
-  serveLive(app, options.live)
-
-  if (options.security !== undefined && options.security !== false && options.security.reports === true)
-    serveViolationReports(app, options.onError, i18n?.settings.hosts === undefined ? site : undefined)
-
-  if (hasPreview) {
-    servePreview(app)
-    serveDrafts(app, collections)
-  }
-
-  const imageRoute = await imageRouteOf(project, setup, security, actionOptions)
-
-  serveFiles(app, security)
-  serveImages(app, imageRoute)
-  serveCards(app, cards, imageRoute)
-
-  // A collection with a feed has the site, which the boot refused a config without before any build.
-  if (site !== undefined)
-    serveFeeds(app, served, collections, site, mode.dev, i18n, options.trailingSlash)
-
-  const editSite = { urls: entryUrls(routes, base, options.trailingSlash, i18n?.settings, async request => (await appRef.deref()?.handle(request)) ?? new Response(null, { status: 503 })), locales: i18n?.settings.locales, defaultLocale: i18n?.settings.defaultLocale }
-
-  registerEditSite(editSite)
-  app.onStop(() => clearEditSite(editSite))
-
-  // Elysia keeps the schema a refused request failed out of its answer only under NODE_ENV=production, so a server started with none is told.
-  if (process.env.NODE_ENV === undefined && !mode.dev && !exported)
-    kayLog('warn', 'NODE_ENV is unset, so this server bundles its browser code as it boots and its API answers a refused request with the schema it failed; set NODE_ENV=production where the app is deployed, or run kay dev')
-
-  // Only `production` turns these on, so any other name runs as a development server would in them.
-  const env = process.env.NODE_ENV
-
-  if (env !== undefined && !KNOWN_ENVIRONMENTS.has(env) && !mode.dev && !exported)
-    kayLog('warn', `NODE_ENV is ${JSON.stringify(env)}, which kay does not know, so this server runs without the production defaults: it bundles its browser code as it boots, logs no requests and compresses nothing unless the log and compress options say so, does not take the site's https for a request behind a proxy and answers a refused API request with the schema it failed; set NODE_ENV=production where the app is deployed`)
-
-  // `kay build` leaves a server's site to `SITE_URL` at boot, so this is where one with none is told.
-  if (site === undefined && options.seo !== undefined && !mode.dev && !exported)
-    kayLog('warn', '`seo` is set, but not the origin the site is public at, in kay.config.ts or SITE_URL: pages get no canonical link or og:url, and the site no sitemap or robots.txt')
-
-  if (site !== undefined)
-    serveSitemap(app, served, routes, site, { dev: mode.dev, onError: options.onError, trailingSlash: options.trailingSlash, locales: i18n?.settings, robots: options.robots, base })
-
-  const favicon = faviconSource(root, options.favicon, options.manifest)
-
-  if (favicon !== undefined)
-    serveFavicons(app, served, { source: favicon, builtDir: mode.prebuilt ? join(client.dir, '..', FAVICON_DIR) : undefined, cache: source.embedded ? undefined : cacheDir(root, 'favicons'), name: options.seo?.name, description: options.seo?.description, locales: locales.settings, manifest: options.manifest, appManifest, base })
-
-  const prerendered = await loadPrerendered(client, dictionaryUsed)
-  const guarded = new Set(routes.filter(route => route.guards.length > 0).map(route => route.pattern))
-
-  await serveServiceWorker(app, served, { client, offline: offlineOf(options, mode) && options.offline !== false ? options.offline : undefined, base, apiPath: options.apiPath, trailingSlash: options.trailingSlash, lang: options.lang, typography: options.typography, locales, publicPages: [...client.pages].filter(([, page]) => !guarded.has(page.pattern) && page.islands === undefined && page.stamps === undefined).map(([path]) => path), push: pushListed(options) })
-  // A server answering from a build does it in its own process; a static export is written once and `kay dev` shows every entry.
-  const publishing = exported || mode.dev ? NOT_PUBLISHING : await watchPublishing(collections)
-
-  trackWhileRunning(app, prerendered, client, site, mode, paths.output, publishing)
-
-  // `kay dev` prints its own.
-  if (log !== false && !mode.dev)
-    announceStart(app, log, [...prerendered.values()].reduce((count, pages) => count + pages.size, 0))
-
-  // Read in development too, so a duration that is none stops it there rather than in production.
-  const publicCache = publicCacheRules(options.publicCache)
-
-  // The page for a path none serves is built with the page routes, after the public ones, which a file deleted since boot answers with.
-  const pageFor: { unmatched?: Unmatched | undefined } = {}
-
-  serveRedirects(app, redirects, mode.dev)
-
-  // Before the page routes, which a hook registered after them does not reach.
-  redirector?.unrouted(app)
-
-  if (!mode.dev && !exported)
-    countMissing(app, { known: () => [...client.pages.keys(), ...[...table.paths.keys()].filter(path => !DYNAMIC_PATH.test(path))], settings: i18n?.settings, trailingSlash: options.trailingSlash })
-
-  // After the hooks above, which a public file deleted since boot is answered through as a path nothing serves.
-  await servePublic(app, served, publicServed, mode.dev ? undefined : publicCache, compressing && !mode.dev, pageFor)
-
-  const pageFile = assetFiles({ clientDir: client.dir, publicDir: paths.public, base, aspects: options.images?.aspects })
-  const respond = withPageHeaders(withSavedData(pageResponder({ client, renderOptions, prerendered, writes, settings: i18n?.settings, transforms: pageHooks(options.extensions), pageFile, pageSizes: pageSizes(pageFile) }), renderOptions), securityOptions, security)
-
-  const fallback = await source.fallback(project, mounts)
-
-  const { uncaught, unmatched } = servePageRoutes(app, { table, served, matchers, i18n, locales, client, renderOptions, trailingSlash: options.trailingSlash ?? 'never', fallback, respond })
-
-  pageFor.unmatched = unmatched
-
-  answerUncaught(app, { dev: mode.dev, onError: options.onError, page: uncaught })
-  agreeOnWildcards(app)
-
-  return { app, served, locale: locales.settings.defaultLocale, securityOptions, routes }
+  return { app, served, locale: setup.locales.settings.defaultLocale, securityOptions: boot.securityOptions, routes }
 }
