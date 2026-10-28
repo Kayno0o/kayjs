@@ -656,6 +656,34 @@
     }
   }
 
+  /* In the launcher's panel the list heads the chat whatever the window, as the panel leaves no room beside it, and takes the side once the panel is enlarged on a wide window. */
+  .kai-launcher-body .kai-chat:has(> .kai-chat-conversations) {
+    min-height: 0;
+  }
+
+  .kai-launcher-body .kai-chat-conversations {
+    flex-shrink: 0;
+    max-height: 8rem;
+  }
+
+  @media (min-width: 48rem) {
+    .kai-launcher-panel:not([data-large]) .kai-chat:has(> .kai-chat-conversations) {
+      padding-inline-start: 0;
+    }
+
+    .kai-launcher-panel:not([data-large]) .kai-chat-conversations {
+      position: static;
+      width: auto;
+      max-height: 8rem;
+      border-bottom: 1px solid var(--color-border);
+      border-inline-end: 0;
+    }
+
+    .kai-launcher-panel[data-large] .kai-chat-conversations {
+      max-height: none;
+    }
+  }
+
   .kai-chat-conversation-new {
     display: inline-flex;
     align-items: center;
@@ -665,6 +693,15 @@
     color: var(--color-foreground);
     font-weight: 600;
     text-decoration: none;
+  }
+
+  /* A chat named by the browser lists buttons rather than links. */
+  :is(button.kai-chat-conversation-new, button.kai-chat-conversation-link) {
+    border: 0;
+    background: none;
+    font: inherit;
+    text-align: start;
+    cursor: pointer;
   }
 
   .kai-chat-conversation-new .kui-icon {

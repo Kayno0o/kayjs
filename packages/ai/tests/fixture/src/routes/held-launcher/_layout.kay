@@ -1,0 +1,7 @@
+--- server
+import { keeping } from '../keeping.kay'
+--- script
+import ChatLauncher from '@kaynooo/kayjs-ai/chat-launcher.kay'
+---
+slot
+ChatLauncher(action={keeping} label="Assistant" conversations)

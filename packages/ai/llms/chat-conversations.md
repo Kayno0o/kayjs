@@ -34,6 +34,10 @@ Chat(action={reply} conversations fill)
 - Each row is a link to the conversation, titled by the opening words of its first message, with a rename button that turns it into a field (Enter or leaving the field saves, Escape cancels) and a delete button that asks before it deletes for good. The current one is `aria-current="page"`.
 - Below `48rem` the list sits above the chat and scrolls past `12rem`; wider, it takes the side.
 
+### A chat on every page
+
+`conversationIn="browser"` names the conversation shown in this browser's localStorage, under `kai-chat-conversation:` and the action's URL, instead of the address, for a chat that is on every page of the site, whose address names none: a reload, another page, a new tab or a later visit shows it again. The list's rows and its New conversation entry are then buttons, not links, so choosing one swaps no page. The id names nothing to another visitor, as the server only answers its owner. `ChatLauncher` sets it, so `ChatLauncher(action={reply} conversations)` is all a site's floating chat needs, its list heading the panel and scrolling past `8rem`, at the side once the panel is enlarged on a window `48rem` wide or wider. Two tabs each show the conversation they opened, and a switch in one does not follow in the other.
+
 ## Reference
 
 ### Rules that are easy to get wrong
@@ -42,7 +46,6 @@ Chat(action={reply} conversations fill)
 - A visitor's first 10 reads under one action every 10 minutes (a page opening makes two, the conversation and the list) give back the attempt the action's `rateLimit` counted, and later ones stay counted, so the handler's code before `ask` cannot be replayed through reads without limit; this process counts them in memory. Nothing counts against `ai()`'s limits or budget; a send, a rename and a delete count as usual. A `?conversation=` value no Chat made, or a header that does not parse, is a read of no conversation, never a question to the model.
 - A tab left open on a conversation another tab has since written to cannot write over it: its send is refused with 409 (`AiError` kind `conflict`) before the model is asked, its message goes back to the field, and the chat shows the conversation as stored with `conflictLabel`. Each write raises the conversation's revision, which the chat posts and the server checks in one transaction. A send right after a Stop waits for the stopped reply to be stored first, up to 2 seconds, when this process stores it. When two tabs send at the same moment, the reply of the one that lost is shown but not kept, and its next send meets the 409.
 - A reply under way at a reload is not picked back up as `remember` with `outlive` does: the reloaded chat shows the conversation as stored. Renaming keeps a conversation's place in the list.
-- `ChatLauncher` does not take these props yet: its panel keeps the conversation in the page, `remember` across reloads.
 
 ### Words and parts
 

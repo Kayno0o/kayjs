@@ -149,7 +149,7 @@ slot
 ChatLauncher(action={reply} label="Ask the docs")
 ```
 
-The chat's code loads the first time the panel opens, so a visitor who never opens it downloads the button and nothing more. The panel stays open across pages, with the conversation in it, and a link in an answer to a page of your site opens in place instead of in a new tab. The conversation is kept only in the page, so a reload of the tab starts a new one.
+The chat's code loads the first time the panel opens, so a visitor who never opens it downloads the button and nothing more. The panel stays open across pages, with the conversation in it, and a link in an answer to a page of your site opens in place instead of in a new tab. The conversation is kept only in the page, so a reload of the tab starts a new one, unless you give it `remember` or keep it on the server (below).
 
 The button works from the keyboard: Enter or Space opens the panel and puts the focus in the field, and Escape closes it and gives the focus back to the button. A reply under way stops on the first Escape.
 
@@ -194,6 +194,8 @@ Chat(action={reply} conversations fill)
 `conversations` does the same and lists the visitor's conversations beside the chat, each with rename and delete, under a New conversation link. On a narrow screen the list sits above the chat.
 
 A conversation belongs to the visitor your server names: the signed-in user kayjs-auth names, or the `key` you give `ai()` or the ask. The browser only says which of their own it shows. A guest, whom no one names, keeps the history in the page as without `keepOnServer`. A tab left open on a conversation another tab has since written to cannot write over it: its send is refused before the model is asked, the message goes back to the field and the conversation shows as stored.
+
+`ChatLauncher` takes `keepOnServer` and `conversations` too. As it sits on every page, the conversation it shows is remembered by the browser instead of the address, so a reload, another page or a new tab shows it again, and its list heads the panel. A `Chat` of your own on every page does the same with `conversationIn="browser"`.
 
 When the visitor's session lapses, the chat keeps the conversation it shows, says so with `signedOutLabel`, and posts it whole from then on.
 

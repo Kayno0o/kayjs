@@ -89,6 +89,52 @@ it('lists the conversations, follows a link of the list, renames one and deletes
   expect(page.errors).toEqual([])
 }, 120_000)
 
+// The launcher's chat is an island of its own, marked `_$k` once hydrated, which reads its conversation then.
+async function openLauncher(page: Page) {
+  await page.click('.kai-launcher-button')
+  await page.waitUntil(() => (document.querySelector('.kai-launcher-body [data-component]') as unknown as { _$k?: boolean } | null)?._$k === true)
+  await page.waitFor('.kai-launcher-body .kai-chat-log:not([aria-busy])')
+}
+
+const pickConversation = async (page: Page, title: string) => page.evaluate((wanted: string) => [...document.querySelectorAll<HTMLButtonElement>('button.kai-chat-conversation-link')].find(button => button.textContent.trim() === wanted)!.click(), title)
+
+it('the launcher keeps its conversation on the server, named by the browser rather than the address, and lists them in its panel', async () => {
+  await using page = await site.open('/held-launcher/one')
+
+  await openLauncher(page)
+  await send(page, 'launcher question', 'read 1 after launcher question')
+  await page.waitFor('.kai-chat-conversation[data-current] .kai-chat-conversation-link', { text: 'launcher question' })
+
+  expect(await page.evaluate(() => location.search)).toBe('')
+  expect(await page.evaluate(() => Object.keys(localStorage).filter(key => key.startsWith('kai-chat-conversation:')))).toHaveLength(1)
+
+  // A page loaded afresh, not swapped, finds the conversation in the browser.
+  await page.goto('/held-launcher/two')
+  await openLauncher(page)
+  await page.waitFor('.kai-chat-turn[data-role=assistant] .kai-chat-text', { text: 'read 1 after launcher question' })
+  await send(page, 'next', 'read 3 after next')
+
+  // The panel leaves no room beside the chat: the list heads it, as wide as the chat.
+  expect(await page.evaluate(() => {
+    const list = document.querySelector('.kai-launcher-body .kai-chat-conversations')!
+    const chat = document.querySelector('.kai-launcher-body .kai-chat')!
+
+    return { place: getComputedStyle(list).position, width: Math.round(list.getBoundingClientRect().width) === Math.round(chat.getBoundingClientRect().width) }
+  })).toEqual({ place: 'static', width: true })
+
+  await page.click('button.kai-chat-conversation-new')
+  await page.waitUntil(() => document.querySelectorAll('.kai-chat-turn').length === 0)
+  await send(page, 'other question', 'read 1 after other question')
+  await page.waitFor('.kai-chat-conversation[data-current] .kai-chat-conversation-link', { text: 'other question' })
+  await pickConversation(page, 'launcher question')
+  await page.waitFor('.kai-chat-turn[data-role=user]:nth-of-type(3) .kai-chat-text', { text: 'next' })
+
+  expect(await page.evaluate(() => document.querySelector('.kai-chat-conversation[data-current] .kai-chat-conversation-link')?.getAttribute('aria-current'))).toBe('true')
+  expect(await page.evaluate(() => location.pathname + location.search)).toBe('/held-launcher/two')
+  expect(await page.a11y('.kai-launcher')).toEqual([])
+  expect(page.errors).toEqual([])
+}, 120_000)
+
 it('a tab left open on an older revision cannot write: its message goes back to the field and the conversation shows as stored', async () => {
   await using first = await site.open('/keeping')
 

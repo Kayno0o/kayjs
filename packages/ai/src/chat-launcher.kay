@@ -6,7 +6,7 @@ import Icon from '@kaynooo/kayjs-ui/icon.kay'
 
 type ChatProps = typeof Chat extends Component<infer Props> ? Props : never
 
-const { icon, closeIcon, sendIcon, stopIcon, attachIcon, newIcon, expandIcon, collapseIcon, note, openLabel, closeLabel, newLabel, expandLabel, collapseLabel, remember, class: className, ...chat } = props<Omit<ChatProps, 'class' | 'links' | 'remember' | 'newButton' | 'sendIcon' | 'stopIcon' | 'attachIcon'> & {
+const { icon, closeIcon, sendIcon, stopIcon, attachIcon, newIcon, expandIcon, collapseIcon, note, openLabel, closeLabel, newLabel, expandLabel, collapseLabel, remember, class: className, ...chat } = props<Omit<ChatProps, 'class' | 'links' | 'remember' | 'conversationIn' | 'newButton' | 'sendIcon' | 'stopIcon' | 'attachIcon'> & {
   // The text of the button while the panel is closed and while it is open; `Open the chat` and `Close the chat` by default. The chat's `label` heads the panel.
   openLabel?: string | undefined
   closeLabel?: string | undefined
@@ -33,7 +33,7 @@ const { icon, closeIcon, sendIcon, stopIcon, attachIcon, newIcon, expandIcon, co
   class?: string | undefined
 }>()
 ---
-// The panel keeps its state across page swaps, and the chat inside hydrates, and so loads, when the panel is first shown.
+// The panel keeps its state across page swaps, and the chat inside hydrates, and so loads, when the panel is first shown. A conversation kept on the server is named by the browser, as the panel is on every page and the address of none.
 Panel(persist label={chat.label} openLabel={openLabel} closeLabel={closeLabel} newLabel={newLabel} expandLabel={expandLabel} collapseLabel={collapseLabel} class={className})
   @icon
     if icon
@@ -60,7 +60,7 @@ Panel(persist label={chat.label} openLabel={openLabel} closeLabel={closeLabel} n
       | {collapseIcon}
     else
       Icon(icon="collapse")
-  Chat(hydrate="visible" {...chat} remember={remember} links="here")
+  Chat(hydrate="visible" {...chat} remember={remember} links="here" conversationIn="browser")
     @sendIcon
       if sendIcon
         | {sendIcon}
