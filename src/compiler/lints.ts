@@ -659,7 +659,7 @@ export const LINTS = {
     group: 'deprecated',
     since: '1.82',
     site: true,
-    summary: 'A call of one of the flat methods kayjs-auth\'s `Auth` had before 1.82, such as `auth.listUsers()` or `ctx.locals.auth.signInWithPassword(input)`: the methods of a feature are grouped under it, `auth.admin.listUsers()`, `auth.password.signIn(input)`, and the flat names are kept as aliases until 1.85. Found on a receiver named `auth`, alone or ending a chain, in the TypeScript files and `.kay` fences of a project depending on `@kaynooo/kayjs-auth`; the fix renames the call, its arguments unchanged. A flat method read without a call, or destructured, is not found.',
+    summary: 'A call of one of the flat methods kayjs-auth\'s `Auth` had before 1.82, such as `auth.listUsers()` or `ctx.locals.auth.signInWithPassword(input)`: the methods of a feature are grouped under it, `auth.admin.listUsers()`, `auth.password.signIn(input)`, and the flat names are kept as aliases until 1.85. Found on a receiver named `auth`, alone or ending a chain, in the TypeScript files and `.kay` fences of a project depending on `@kaynooo/kayjs-auth`; the fix renames the call, its arguments unchanged. An `auth` the file imports is the app\'s own module and left alone, and a flat method read without a call, destructured, under `typeof` or in a template is not found.',
     wrong: '--- server\nconst users = await ctx.locals.auth.listUsers({ search: \'ada\' })\n---\np x',
     right: '--- server\nconst users = await ctx.locals.auth.admin.listUsers({ search: \'ada\' })\n---\np x',
   },

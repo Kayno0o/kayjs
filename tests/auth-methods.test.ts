@@ -27,12 +27,16 @@ describe('deprecated-auth-methods', () => {
     const page = '--- server\nexport const ban = action(s.Object({ id: s.String() }), async ({ id }, ctx) => ctx.locals.auth.banUser(id, { reason: \'Spam\' }))\n\nconst users = await ctx.locals.auth.listUsers({ limit: 20 })\nconst roles = auth.adminRoles()\n---\np= users.total\n'
     const module = 'export async function mine(ctx: never) {\n  const { auth } = ctx\n\n  return [await auth?.listSessions(), await (ctx as any).locals?.auth.listOrganizations()]\n}\n'
     const untouched = 'export const a = (registry: never, auth: never) => [registry.register(1), auth.admin.listUsers(), auth.user(), auth[\'listUsers\'](), auth.listUsers]\n// kay-allow deprecated-auth-methods\nexport const b = (auth: never) => auth.invite(1)\n'
-    const root = await project({ 'package.json': MANIFEST, 'src/routes/admin.kay': page, 'src/mine.ts': module, 'src/untouched.ts': untouched })
+    const casts = 'export const c = (auth: any) => [auth!.listUsers(), (auth as any).getUser(\'1\')]\n'
+    const own = 'import * as auth from \'./auth\'\n\nexport const r = () => [auth.register(\'x\'), auth.invite(1)]\n'
+    const root = await project({ 'package.json': MANIFEST, 'src/routes/admin.kay': page, 'src/mine.ts': module, 'src/untouched.ts': untouched, 'src/casts.ts': casts, 'src/own.ts': own })
 
     try {
       const found = await authMethods(root, {})
 
       expect(found.map(diagnostic => [diagnostic.file.slice(root.length + 1), diagnostic.line, diagnostic.severity]).sort()).toEqual([
+        ['src/casts.ts', 1, 'warning'],
+        ['src/casts.ts', 1, 'warning'],
         ['src/mine.ts', 4, 'warning'],
         ['src/mine.ts', 4, 'warning'],
         ['src/routes/admin.kay', 2, 'warning'],
@@ -45,6 +49,8 @@ describe('deprecated-auth-methods', () => {
       expect(await Bun.file(join(root, 'src/routes/admin.kay')).text()).toBe(page.replace('auth.banUser(', 'auth.admin.ban(').replace('auth.listUsers(', 'auth.admin.listUsers(').replace('auth.adminRoles(', 'auth.admin.roles('))
       expect(await Bun.file(join(root, 'src/mine.ts')).text()).toBe(module.replace('auth?.listSessions(', 'auth?.sessions.list(').replace('auth.listOrganizations(', 'auth.organizations.list('))
       expect(await Bun.file(join(root, 'src/untouched.ts')).text()).toBe(untouched)
+      expect(await Bun.file(join(root, 'src/casts.ts')).text()).toBe(casts.replace('auth!.listUsers(', 'auth!.admin.listUsers(').replace('.getUser(', '.admin.getUser('))
+      expect(await Bun.file(join(root, 'src/own.ts')).text()).toBe(own)
       expect(await authMethods(root, {})).toEqual([])
     }
     finally {

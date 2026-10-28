@@ -19,7 +19,7 @@ export const decide = action(schemas.oauthConsent, async ({ decision, ...fields 
 
 const auth = ctx.locals.auth
 const refused = decide.failed()?.data?.error
-const request: Parameters<typeof auth.oauthAuthorize>[0] = {}
+const request: Parameters<typeof auth.oauthServer.authorize>[0] = {}
 
 for (const field of FIELDS) {
   const value = ctx.url.searchParams.get(field)

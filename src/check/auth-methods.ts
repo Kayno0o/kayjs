@@ -103,23 +103,25 @@ export async function authMethods(root: string, options: CheckOptions): Promise<
     const parsed = file.endsWith('.kay') ? parseKay(source) : undefined
     const spans = parsed ? [parsed.script, parsed.server, parsed.module].filter(span => span !== undefined) : [{ start: 0, end: source.length }]
 
-    for (const { start: base, end } of spans) {
-      let ast: t.File
-
+    const asts = spans.flatMap(({ start: base, end }) => {
       try {
-        ast = parse(source.slice(base, end), { sourceType: 'module', plugins: file.endsWith('.ts') ? ['typescript'] : ['typescript', 'jsx'], errorRecovery: true })
+        return [{ base, ast: parse(source.slice(base, end), { sourceType: 'module', plugins: file.endsWith('.ts') ? ['typescript'] : ['typescript', 'jsx'], errorRecovery: true }) }]
       }
       catch {
-        continue
+        return []
       }
+    })
+    // An `auth` the file imports is a module of the app's own, whose `register` or `invite` is no kayjs-auth method.
+    const imported = asts.some(({ ast }) => importsAuth(ast))
 
+    for (const { base, ast } of asts) {
       walk(ast, (node) => {
         if (node.type !== 'CallExpression' && node.type !== 'OptionalCallExpression')
           return
 
         const callee = node.callee
 
-        if ((callee.type !== 'MemberExpression' && callee.type !== 'OptionalMemberExpression') || callee.computed || callee.property.type !== 'Identifier' || !Object.hasOwn(AUTH_METHODS, callee.property.name) || !isAuth(callee.object))
+        if ((callee.type !== 'MemberExpression' && callee.type !== 'OptionalMemberExpression') || callee.computed || callee.property.type !== 'Identifier' || !Object.hasOwn(AUTH_METHODS, callee.property.name) || !isAuth(callee.object, imported))
           return
 
         const name = callee.property.name
@@ -147,12 +149,19 @@ export async function authMethods(root: string, options: CheckOptions): Promise<
   return found
 }
 
-// `auth`, or a chain ending in `.auth` such as `ctx.locals.auth`.
-function isAuth(node: t.Node): boolean {
+// `auth`, unless imported, or a chain ending in `.auth` such as `ctx.locals.auth`, seen through `!` and `as`.
+function isAuth(node: t.Node, imported: boolean): boolean {
+  if (node.type === 'TSNonNullExpression' || node.type === 'TSAsExpression' || node.type === 'TSSatisfiesExpression' || node.type === 'ParenthesizedExpression')
+    return isAuth(node.expression, imported)
+
   if (node.type === 'Identifier')
-    return node.name === 'auth'
+    return node.name === 'auth' && !imported
 
   return (node.type === 'MemberExpression' || node.type === 'OptionalMemberExpression') && !node.computed && node.property.type === 'Identifier' && node.property.name === 'auth'
+}
+
+function importsAuth(ast: t.File): boolean {
+  return ast.program.body.some(statement => statement.type === 'ImportDeclaration' && statement.importKind !== 'type' && statement.specifiers.some(specifier => specifier.local.name === 'auth'))
 }
 
 async function dependsOnAuth(root: string): Promise<boolean> {

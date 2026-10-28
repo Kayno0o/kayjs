@@ -6,11 +6,11 @@
 
 The methods of a feature live under it on the request's `auth`, so an editor lists one feature at a time: `ctx.locals.auth.admin.listUsers()`, `ctx.locals.auth.password.signIn(input)`, `ctx.locals.auth.organizations.invite(ref, email)`. A group is there whether its feature is on or not; a method of a feature that is off answers `{ ok: false, error: 'off' }` as before.
 
-What every request reads stays on `auth` itself: `user()`, `requireUser()`, `guarded()`, `signIn`, `signOut`, `signOutEverywhere`, `signInAsGuest`, `features()`, `scopes()`, `hasScope`, `reprove`, `captchaChallenge`, `impersonator()`, the account methods (`changeUsername`, `deleteAccount`, `linkProvider`, `unlink`, `listIdentities`, `updateLocale`, `profile`, `saveProfile`, `exportData`, `listAuditLog`) and `userIdsHolding`.
+The methods no feature owns stay on `auth` itself: the user (`user()`, `bareUser()`, `requireUser()`, `requireAdmin()`, `guarded()`, `signInUrl()`, `via`), signing in and out (`signIn`, `signOut`, `signOutEverywhere`, `signInAsGuest`), what the request may do (`features()`, `scopes()`, `hasScope`, `provedLately`, `reprove`, `captchaRequired`, `captchaChallenge`, `impersonator()`, `userIdsHolding`), the account (`changeUsername`, `deleteAccount`, `deletionImpact`, `linkProvider`, `unlink`, `listIdentities`, `providerToken`, `updateLocale`, `profile`, `saveProfile`, `exportData`, `listAuditLog`) and the OAuth server's resource (`oauthResource`, `oauthOrigin`, `oauthFixed`).
 
 ### Move off the flat names
 
-The flat names before 1.82 still work until 1.85, each calling its grouped method. `kay upgrade`, or `kay check --fix --since 1.82`, renames every call of one on `auth` or `ctx.locals.auth` (`deprecated-auth-methods`); a flat method read without a call or destructured (`const { listUsers } = auth`) is renamed by hand.
+The flat names before 1.82 still work until 1.85, each calling its grouped method. `kay upgrade`, or `kay check --fix --since 1.82`, renames every call of one on `auth` or `ctx.locals.auth` (`deprecated-auth-methods`); a flat method read without a call, destructured (`const { listUsers } = auth`), under `typeof` or in a template expression is renamed by hand.
 
 ## Reference
 

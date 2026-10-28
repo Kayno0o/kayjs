@@ -71,12 +71,12 @@ export function testApp<const Scope extends string = never, OrgRole extends stri
     })
     // `captcha`, `redirect` and `remember` in the posted body are the call's options.
     .post('/register', async ({ auth, body }) => {
-      const { captcha, remember, ...input } = body as Parameters<typeof auth.register>[0] & SignInOptions
+      const { captcha, remember, ...input } = body as Parameters<typeof auth.password.register>[0] & SignInOptions
 
       return auth.password.register(input, { captcha, remember })
     })
     .post('/password', async ({ auth, body }) => {
-      const { captcha, redirect, remember, ...input } = body as Parameters<typeof auth.signInWithPassword>[0] & SignInOptions
+      const { captcha, redirect, remember, ...input } = body as Parameters<typeof auth.password.signIn>[0] & SignInOptions
 
       return auth.password.signIn(input, { captcha, redirect, remember })
     })
