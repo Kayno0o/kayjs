@@ -181,6 +181,9 @@ async function connect(keys: string): Promise<void> {
     reconnect(controller, keys)
 }
 
+// A proxy may rewrite the line breaks kay sends as \r\n: read on the whole buffer, a pair split across two chunks meets again.
+const CRLF = /\r\n/g
+
 async function read(body: ReadableStream<Uint8Array>, controller: AbortController): Promise<void> {
   const reader = body.getReader()
   const decoder = new TextDecoder()
@@ -194,7 +197,7 @@ async function read(body: ReadableStream<Uint8Array>, controller: AbortControlle
     if (done)
       return
 
-    buffer += decoder.decode(value, { stream: true })
+    buffer = (buffer + decoder.decode(value, { stream: true })).replace(CRLF, '\n')
 
     for (let end = buffer.indexOf('\n\n'); end !== -1; end = buffer.indexOf('\n\n')) {
       const data = buffer.slice(0, end).split('\n').filter(line => line.startsWith('data: ')).map(line => line.slice(6)).join('\n')
