@@ -872,6 +872,72 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('page swap i
     }
   })
 
+  it.each([
+    ['a plain post to an action', '<form method="post" action="/_kay/action/x"><button>Send</button></form>', true],
+    ['data-reload on the form', '<form method="post" action="/_kay/action/x" data-reload><button>Send</button></form>', false],
+    ['data-reload around it', '<div data-reload><form method="post" action="/_kay/action/x"><button>Send</button></form></div>', false],
+    ['data-reload on its button', '<form method="post" action="/_kay/action/x"><button data-reload>Send</button></form>', false],
+    ['target="_blank"', '<form method="post" action="/_kay/action/x" target="_blank"><button>Send</button></form>', false],
+    ['formtarget="_blank"', '<form method="post" action="/_kay/action/x"><button formtarget="_blank">Send</button></form>', false],
+    ['a get', '<form action="/_kay/action/x"><button>Send</button></form>', false],
+    ['formmethod="get"', '<form method="post" action="/_kay/action/x"><button formmethod="get">Send</button></form>', false],
+    ['an action named in a query', '<form method="post" action="/plain?next=/_kay/action/x"><button>Send</button></form>', false],
+    ['a page of the app', '<form method="post" action="/plain"><button>Send</button></form>', false],
+  ])('holds before the forms\' listener loaded only a post the swap takes: %s', async (_name, html, holds) => {
+    const fresh = await open('/kept')
+
+    try {
+      await settled(fresh)
+
+      // Listening after kay, so the event says whether kay held it, then kept from leaving the page.
+      expect(await fresh.evaluate((markup) => {
+        const seen: boolean[] = []
+
+        document.addEventListener('submit', (event) => {
+          seen.push(event.defaultPrevented)
+          event.preventDefault()
+        })
+        document.body.insertAdjacentHTML('beforeend', markup)
+        document.querySelector<HTMLFormElement>('body > form, body > div > form')!.requestSubmit(document.querySelector('body > form button, body > div > form button'))
+
+        return seen
+      }, html)).toEqual([holds])
+    }
+    finally {
+      fresh.close()
+    }
+  })
+
+  it('gives back to the browser a held post whose action the page cannot resolve, with no error', async () => {
+    const fresh = await open('/kept')
+
+    try {
+      await settled(fresh)
+
+      const problem = problems(fresh)
+
+      await fresh.evaluate(() => {
+        const page = window as { seen?: boolean[] }
+
+        page.seen = []
+        // Listening after kay: the first submit is held, the second the browser's own, kept here from opening the blocked page Chromium goes to.
+        document.addEventListener('submit', (event) => {
+          page.seen!.push(event.defaultPrevented)
+          event.preventDefault()
+        })
+        document.body.insertAdjacentHTML('beforeend', '<form method="post" action="http://[::1/_kay/action/x"><button>Send</button></form>')
+        document.querySelector('form')!.requestSubmit()
+      })
+      await fresh.waitUntil(() => (window as { seen?: boolean[] }).seen!.length === 2)
+
+      expect(await fresh.evaluate(() => (window as { seen?: boolean[] }).seen)).toEqual([true, false])
+      expect(problem()).toEqual([])
+    }
+    finally {
+      fresh.close()
+    }
+  })
+
   it('leaves to the browser untouched a form the swap would not post, submitted before the forms\' listener loaded', async () => {
     const fresh = await open('/kept')
 

@@ -9,12 +9,14 @@ import { dirtyGuard, dropScrollSave, historyState, leave, mayLeave, navigation, 
 declare const KAY_NAV_ENTRY: true | undefined
 
 const PREFETCH = 'meta[name="kay-prefetch"]'
+// An action's path, before any query or fragment.
+const ACTION_PATH = /^[^?#]*\/_kay\/action\//
 
 let swapModule: Promise<typeof import('./page-swap')> | undefined
 let formsModule: Promise<typeof import('./form-submits')> | undefined
 // Set once the forms' listener runs, which takes every submit from then on.
 let formsListen = false
-// The forms posted before it ran, each held once: a second press while it loads posts nothing more.
+// The forms posted before it ran, each held once: a second press while it loads posts nothing more, as `submitted` runs once a form and the listener's own `busyForms` only takes over after.
 const heldForms = new WeakSet<HTMLFormElement>()
 // A traversal undone while the guards are asked about it: where it went, and how far.
 let held: { url: URL, delta: number } | undefined
@@ -85,14 +87,14 @@ function wakeShownForms(): void {
 }
 
 // The forms' listener, for the page's forms, the one taking focus or the submit held for it; one that fails to load leaves them to the browser, which posts them in full.
-async function wakeForms(form?: HTMLFormElement, held?: [submitter: HTMLElement | null]): Promise<void> {
+async function wakeForms(form?: HTMLFormElement, posted?: { submitter: HTMLElement | null }): Promise<void> {
   try {
     const forms = await loadFormSubmits()
 
     formsListen = true
 
-    if (held)
-      forms.submitted(form!, ...held)
+    if (posted)
+      forms.submitted(form!, posted.submitter)
     else if (form)
       forms.focused(form)
     else
@@ -102,26 +104,25 @@ async function wakeForms(form?: HTMLFormElement, held?: [submitter: HTMLElement 
     formsListen = true
 
     // Its submit event fires a second time, as no other way posts the form with what its button adds.
-    if (held)
-      form!.requestSubmit(held[0])
+    if (posted)
+      form!.requestSubmit(posted.submitter)
   }
 }
 
 // A post to an action before the forms' listener runs, as from a form an island rendered that nothing focused, held until the listener loads.
 function onEarlySubmit(event: SubmitEvent): void {
   const form = event.target as HTMLFormElement
-
   const { submitter } = event
 
-  // A cheaper test than the forms' listener's: a post to another site or with `formmethod="get"` naming an action still reaches the browser, its submit event fired again.
-  if (formsListen || event.defaultPrevented || !(submitter?.getAttribute('formaction') ?? form.getAttribute('action'))?.includes('/_kay/action/') || form.closest('[data-reload]') || submitter?.hasAttribute('data-reload') || !['', '_self'].includes(submitter?.getAttribute('formtarget') ?? form.target))
+  // A cheaper test than the forms' listener's: a post to another site naming an action's path still reaches the browser, its submit event fired again.
+  if (formsListen || event.defaultPrevented || !ACTION_PATH.test(submitter?.getAttribute('formaction') ?? form.getAttribute('action') ?? '') || (submitter?.getAttribute('formmethod') ?? form.method).toLowerCase() !== 'post' || form.closest('[data-reload]') || submitter?.hasAttribute('data-reload') || !['', '_self'].includes(submitter?.getAttribute('formtarget') ?? form.target))
     return
 
   event.preventDefault()
 
   if (!heldForms.has(form)) {
     heldForms.add(form)
-    void wakeForms(form, [submitter])
+    void wakeForms(form, { submitter })
   }
 }
 
