@@ -16,7 +16,7 @@ if (typeof KAY_STATIC_EXPORT === 'undefined' && (typeof KAY_BROWSER !== 'undefin
 }
 
 // Loads the code posting errors to the server on the first one, so a page that never fails never ships it.
-export async function reportLazily(error: unknown, island?: string): Promise<void> {
+async function reportLazily(error: unknown, island?: string): Promise<void> {
   try {
     (await import('./report-error')).sendError(error, island)
   }

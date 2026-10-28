@@ -1,14 +1,19 @@
 import type { TestOptions, TestPage, TestSite } from '../src/test'
-import { resolve } from 'node:path'
+import { join, resolve } from 'node:path'
 import process from 'node:process'
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
+import { Elysia } from 'elysia'
+import { pages } from '../src/server'
 import { browse, browserPath, testSite } from '../src/test'
+import { kayBuild } from './check-helper'
+import { fixtureCopy } from './scratch'
 
 // CI installs Chromium and names it in BUN_CHROME_PATH, where a missing browser fails rather than skipping.
 const path = browserPath()
 const ROOT = 'tests/fixtures/navigation-entry'
 const MESSAGES = resolve('tests/fixtures/i18n/src/messages')
 const NAV_ENTRY = /<script type="module" src="([^"]*\/_kay\/nav-[^"]+\.js)" data-kay-nav><\/script>/
+const ENTRY_URL = /\/_kay\/entry-[^"]+\.js/
 const ISLANDS_ENTRY = /<script type="module" src="[^"]*\/_kay\/entry-[^"]+\.js"><\/script>/
 
 // Set on the window: still there after a navigation means the page was swapped in, not loaded.
@@ -59,7 +64,6 @@ for (const [name, options, prefix, slash] of MODES) {
     it('is what a page posting a form and holding no island loads, a page holding one or streaming loading the islands\' entry', async () => {
       const login = await (await site.fetch(at('/login'))).text()
       const home = await (await site.fetch(at('/'))).text()
-      const streamed = await (await site.fetch(at('/streamed'))).text()
 
       expect(login).toMatch(NAV_ENTRY)
       expect(login).not.toMatch(ISLANDS_ENTRY)
@@ -67,12 +71,20 @@ for (const [name, options, prefix, slash] of MODES) {
       expect(login.match(NAV_ENTRY)![1]!.startsWith(`${options.base ?? ''}/_kay/`)).toBe(true)
       expect(home).toMatch(ISLANDS_ENTRY)
       expect(home).not.toContain('data-kay-nav')
-      expect(streamed).toContain('<p class="later">Later</p>')
-      expect(streamed).toMatch(/\/_kay\/entry-[^"]+\.js/)
-      expect(streamed).not.toContain('data-kay-nav')
     })
 
-    it('posts and follows links between form-only pages in place, and loads a page holding islands in full', async () => {
+    // A part sent later or a value the page follows may bring islands or forms the navigation-only entry cannot run.
+    it('is not what a page posting a form loads when it streams or follows a cached value', async () => {
+      for (const path of ['/streamed', '/followed']) {
+        const html = await (await site.fetch(at(path))).text()
+
+        expect(html, path).toContain('<form')
+        expect(html, path).toMatch(ENTRY_URL)
+        expect(html, path).not.toContain('data-kay-nav')
+      }
+    })
+
+    it('posts and follows links between form-only pages in place, and loads a page holding islands in full, linked or redirected to', async () => {
       await using page = await open('/login')
 
       await mark(page)
@@ -98,6 +110,17 @@ for (const [name, options, prefix, slash] of MODES) {
       await page.click('a.home')
       await page.waitFor('h1', { text: 'Home' })
       expect(await sameDocument(page)).toBe(false)
+      await page.click('button.count')
+      await page.waitFor('button.count', { text: 'Clicked 1' })
+
+      await page.click('a.login')
+      await page.waitFor('h1', { text: 'Login' })
+      await mark(page)
+      await page.fill('input[name="name"]', 'Home')
+      await page.click('form button')
+      await page.waitFor('h1', { text: 'Home' })
+      expect(await page.path()).toBe(at('/'))
+      expect(await page.count('[data-kay-nav]')).toBe(0)
       await page.click('button.count')
       await page.waitFor('button.count', { text: 'Clicked 1' })
       expect(page.errors).toEqual([])
@@ -130,3 +153,23 @@ for (const [name, options, prefix, slash] of MODES) {
     })
   })
 }
+
+// A server island of a prerendered page renders per request, spliced in or fetched as it nears the viewport, which may bring forms or islands: the page loads the islands' entry, which runs them.
+describe('a prerendered page holding a server island and posting a form', () => {
+  it('loads the islands\' entry, not the navigation-only one, whether the island is spliced in or deferred', async () => {
+    const root = await fixtureCopy('navigation-entry')
+
+    await Bun.write(join(root, 'kay.config.ts'), 'import { defineConfig } from \'kay/server\'\n\nexport default defineConfig({ log: false })\n')
+    expect((await kayBuild([root, '--no-check'])).code).toBe(0)
+
+    const app = new Elysia().use(await pages({ root, prebuilt: true, log: false, compress: false }))
+
+    for (const path of ['/joined', '/deferred']) {
+      const html = await (await app.handle(new Request(`http://localhost${path}`))).text()
+
+      expect(html, path).toContain('<form')
+      expect(html, path).toMatch(ENTRY_URL)
+      expect(html, path).not.toContain('data-kay-nav')
+    }
+  }, 120_000)
+})

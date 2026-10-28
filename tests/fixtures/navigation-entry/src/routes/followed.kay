@@ -1,0 +1,14 @@
+--- server
+import { t } from 'elysia'
+import { action } from 'kay'
+import { cached } from 'kay/cache'
+
+export const note = action(t.Object({ text: t.String({ maxLength: 200 }) }), () => 'Noted')
+
+const count = await cached('count', '1m', async () => 1, { live: true })
+---
+h1 Followed
+p.count {count}
+form(action={note})
+  input(name="text" aria-label="Text")
+  button Note

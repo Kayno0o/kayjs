@@ -61,6 +61,7 @@ if (typeof KAY_STATIC_EXPORT === 'undefined') {
     void reportLazily(error, island)
   })
 
+  // `./page-errors` holds a copy for the navigation-only entry, which a change here makes too.
   if (typeof KAY_BROWSER !== 'undefined' || typeof window !== 'undefined') {
     // An error with no error object is another origin's script, whose details the browser hides: nothing to report.
     window.addEventListener('error', (event) => {

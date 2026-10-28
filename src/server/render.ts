@@ -1076,8 +1076,8 @@ function documentOf(files: string[], modules: PageModule[], data: Record<string,
   const follows = client.entry !== undefined && followsCaches()
   const defers = client.entry !== undefined && scan?.modes.includes('defer') === true
   const shipsEntry = hasIslands || posts || follows || defers
-  // A production page only posting forms loads navigation alone; a streamed one may still render islands, which the islands' entry hydrates.
-  const navigates = posts && !hasIslands && !follows && !defers && !streamed && client.navEntry !== undefined
+  // A production page only posting forms loads navigation alone; a streamed one, or a prerendered one holding a server island, may still render islands or forms per request, which the islands' entry runs.
+  const navigates = posts && !hasIslands && !follows && !defers && !streamed && (scan?.modes.length ?? 0) === 0 && client.navEntry !== undefined
   const checked = posts ? formsScript(forms, options.dev) : ''
   const scripts = shipsEntry ? (navigates ? navigationScripts(client) : islandScripts(client, islands.eager, streamed, hasIslands, islands.lazy > 0 || defers, options.islandPreloads === undefined ? undefined : islands)) + checked + workScript(forms, options.prerendering === true) : ''
   const state = localeState()
@@ -1280,15 +1280,15 @@ function stylesheets(client: ClientBuild, files: string[]): string {
   })
 }
 
-// Preloads every chunk the page's eager islands need, and the code waiting for a `visible` or `idle` island or a deferred server island when it holds any, so the browser fetches them alongside the entry instead of one round trip after another. A streamed page loads the entry after its first part instead.
-// A page without islands needs no hydration script, only the entry swapping pages.
-// `saving` is set where a page drops island-only preloads for a visitor saving data. The chunks of the islands hydrating at once, `immediate`, that page keeps: they are marked `data-load`, which the dropping no longer matches.
-// One also needed by an island that waits for that visitor, `waiting`, is marked `data-wait` too, where the code waiting for the viewport is preloaded for that visitor even though no link was dropped.
 // Marked, so a page running the islands' entry that swaps this page in neither runs nor preloads it.
 function navigationScripts(client: ClientBuild): string {
   return `${client.navEntryImports!.map(chunk => `<link rel="modulepreload" href="${chunk}" ${NAVIGATION_ENTRY}>`).join('')}<script type="module" src="${client.navEntry}" ${NAVIGATION_ENTRY}></script>`
 }
 
+// Preloads every chunk the page's eager islands need, and the code waiting for a `visible` or `idle` island or a deferred server island when it holds any, so the browser fetches them alongside the entry instead of one round trip after another. A streamed page loads the entry after its first part instead.
+// A page without islands needs no hydration script, only the entry swapping pages.
+// `saving` is set where a page drops island-only preloads for a visitor saving data. The chunks of the islands hydrating at once, `immediate`, that page keeps: they are marked `data-load`, which the dropping no longer matches.
+// One also needed by an island that waits for that visitor, `waiting`, is marked `data-wait` too, where the code waiting for the viewport is preloaded for that visitor even though no link was dropped.
 function islandScripts(client: ClientBuild, islands: Set<string>, streamed: boolean, hydration: boolean, lazy: boolean, saving?: { immediate: Set<string>, waiting: Set<string> }): string {
   const immediate = saving?.immediate
   const waiting = saving?.waiting

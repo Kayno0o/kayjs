@@ -1,0 +1,8 @@
+---
+import type { Action } from 'kay'
+
+const { to } = props<{ to: Action<{ email: string }, unknown> }>()
+---
+form(action={to})
+  input(name="email" aria-label="Email")
+  button Join

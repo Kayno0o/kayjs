@@ -153,6 +153,16 @@ describe('the navigation-only entry', () => {
     }
 
     expect((await buildClient(root, { hot: true })).navEntry).toBeUndefined()
+    // A static export has no server for a form to post to.
+    expect((await buildClient(root, { exported: true })).navEntry).toBeUndefined()
+
+    // With search on, the page marks the words a hit was opened for, as the islands' entry does.
+    const searched = await buildClient(root, { search: true })
+    const marking = await chunkText(searched, searched.navEntry!)
+
+    expect(marking).toContain('hashchange')
+    for (const [, from] of marking.matchAll(IMPORT_SPECIFIER))
+      expect(await Bun.file(join(searched.dir, from!.slice(2))).exists(), `the navigation entry imports ${from} which is not a file of the build`).toBe(true)
   }, 120_000)
 })
 
