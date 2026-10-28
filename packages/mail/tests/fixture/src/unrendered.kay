@@ -1,0 +1,10 @@
+---
+// kayjs-mail loads these by name, so this component, which nothing renders, is what has `kay check` on the fixture type them.
+import ListConfirm from '@kaynooo/kayjs-mail/list-confirm.kay'
+import ListFooter from '@kaynooo/kayjs-mail/list-footer.kay'
+import ListPage from '@kaynooo/kayjs-mail/list-page.kay'
+---
+div
+  ListConfirm(url="https://example.com/confirm" site="https://example.com" list={undefined} privacy={undefined})
+  ListFooter(url="https://example.com/unsubscribe" site="https://example.com")
+  ListPage(kind="confirmed")

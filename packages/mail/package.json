@@ -42,7 +42,7 @@
   },
   "scripts": {
     "prepare": "$npm_execpath ../../scripts/link-fixture.ts",
-    "check": "$npm_execpath check",
+    "check": "$npm_execpath check && $npm_execpath ../../src/cli.ts check tests/fixture",
     "build:types": "rm -rf types && $npm_execpath ../../src/tsgo.ts -p tsconfig.build.json",
     "prepack": "$npm_execpath run build:types",
     "postpack": "rm -rf types",
