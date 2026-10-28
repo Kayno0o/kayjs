@@ -24,6 +24,13 @@ interface StampRecord {
   stamps: Record<string, string>
 }
 
+// Where `kay dev` keeps the record, `file` in `output`, and the key of the options it builds with.
+interface RecordPlace {
+  file: string
+  output: string
+  options: string
+}
+
 // What the code building the client is: kay's version and compiler, Bun's version.
 function identity(): string {
   return `${version}\0${compilerFingerprint()}\0${Bun.version}`
@@ -77,20 +84,23 @@ async function outputsOf(root: string): Promise<Record<string, number>> {
   return sizes
 }
 
-// Tells whether the build `kay dev` left is still current, so a start whose sources did not change builds nothing: the stamps of what the last build read, taken before it read them, are kept and compared at the next start.
-// A file whose stamp cannot be trusted, written within two seconds before the build began, makes the next start build again once.
+// Tells whether a client build is still the one its sources would give: the stamps of what it read, those of the sources taken before it read them, compared again later.
+// `kay dev` keeps them in a record beside the manifest, so a start whose sources did not change builds nothing; `kay/test` compares them in the process that built. A file the record cannot trust, written within two seconds before the build began, makes the next start build again once.
 export class BuildStamps {
   private known = new Map<string, string>()
+  // The files whose stamps the record cannot trust.
+  private racy = new Set<string>()
   private startedAt = 0
   private generation = 0
   private readonly realRoot: string
-  private readonly record: string
+  private readonly record: RecordPlace | undefined
   // What the build writes for itself: the entries it bundles and the lists it hands the stylesheets.
   private readonly generated: string
 
-  constructor(private readonly root: string, output: string, private readonly options: string) {
+  // `kay dev` gives the output its record goes beside and the key of its options; `kay/test` keeps the stamps in memory only.
+  constructor(private readonly root: string, recorded?: { output: string, options: string }) {
     this.realRoot = realpathSync(root)
-    this.record = join(output, FINGERPRINT)
+    this.record = recorded && { ...recorded, file: join(recorded.output, FINGERPRINT) }
     this.generated = join(this.realRoot, KAY_DIR) + sep
   }
 
@@ -101,16 +111,19 @@ export class BuildStamps {
 
   // Whether the build the last run left is the one these sources and this kay give. The stamps become the ones the next record starts from.
   async fresh(): Promise<boolean> {
+    if (this.record === undefined)
+      return false
+
     let saved: StampRecord
 
     try {
-      saved = await Bun.file(this.record).json() as StampRecord
+      saved = await Bun.file(this.record.file).json() as StampRecord
     }
     catch {
       return false
     }
 
-    const output = join(this.record, '..')
+    const { output, options } = this.record
     let manifest: string | undefined
 
     try {
@@ -118,7 +131,7 @@ export class BuildStamps {
     }
     catch {}
 
-    if (saved.identity !== identity() || saved.options !== this.options || manifest === undefined || saved.manifest !== Bun.hash(manifest).toString(36) || await Bun.file(join(output, BUILD_FAILURE)).exists())
+    if (saved.identity !== identity() || saved.options !== options || manifest === undefined || saved.manifest !== Bun.hash(manifest).toString(36) || await Bun.file(join(output, BUILD_FAILURE)).exists())
       return false
 
     const outputs = Object.entries(saved.outputs)
@@ -134,63 +147,106 @@ export class BuildStamps {
       return false
 
     this.known = new Map(Object.entries(saved.stamps))
+    this.racy.clear()
 
     return true
   }
 
-  // A build starts: the record of the one before no longer describes the output, and the files it was asked to read again are stamped before it reads them.
-  begin(changed: string[] | null): void {
-    this.generation++
-    this.startedAt = Date.now()
-    rmSync(this.record, { force: true })
+  // Whether nothing the last build of this process read has changed since: every file still has the stamp the build took, and no source is new. After a build that failed, the sources it began with.
+  async current(): Promise<boolean> {
+    if (this.known.size === 0)
+      return false
 
-    if (changed === null)
-      this.known.clear()
+    for (const [file, stamp] of this.known) {
+      if ((fileStamp(file) ?? '') !== stamp)
+        return false
+    }
 
-    for (const file of changed ?? [])
-      this.known.set(this.canon(join(this.root, file)), fileStamp(this.canon(join(this.root, file))) ?? '')
+    return !(await sourceFiles(this.root)).some(file => !this.known.has(this.canon(file)))
   }
 
-  // A build succeeded: its record is written once `settled`, the rewriting of the maps it started, is over, unless another build began meanwhile.
-  finish(inputs: Iterable<string>, manifest: string, settled: Promise<unknown> | undefined): void {
+  // A build starts: the record of the one before no longer describes the output, and the files it reads again are stamped before it reads them, every source for a build of everything.
+  async begin(changed: string[] | null): Promise<void> {
+    this.generation++
+    this.startedAt = Date.now()
+
+    if (this.record !== undefined)
+      rmSync(this.record.file, { force: true })
+
+    if (changed !== null) {
+      for (const file of changed) {
+        const path = this.canon(join(this.root, file))
+
+        this.known.set(path, fileStamp(path) ?? '')
+        this.racy.delete(path)
+      }
+
+      return
+    }
+
+    this.known.clear()
+    this.racy.clear()
+
+    for (const file of await sourceFiles(this.root))
+      this.stamp(this.canon(file), this.known, this.racy)
+  }
+
+  // A build succeeded, having read `inputs` besides the project's sources: its record is written once `settled`, the rewriting of the maps it started, is over, unless another build began meanwhile.
+  async finish(inputs: Iterable<string>, manifest: string, settled?: Promise<unknown>): Promise<void> {
     const generation = this.generation
     const stamps = new Map<string, string>()
+    const racy = new Set<string>()
 
-    for (const path of [...inputs, ...kayModules()]) {
+    for (const path of [...await sourceFiles(this.root), ...inputs, ...kayModules()]) {
       const file = this.canon(path)
 
       if (stamps.has(file) || file.startsWith(this.generated))
         continue
 
-      let stamp = this.known.get(file)
+      const stamp = this.known.get(file)
 
       if (stamp === undefined) {
-        stamp = fileStamp(file) ?? ''
+        this.stamp(file, stamps, racy)
 
-        if (unsettled(stamp, this.startedAt))
-          stamp = RACY
+        continue
       }
 
       stamps.set(file, stamp)
+
+      if (this.racy.has(file))
+        racy.add(file)
     }
 
     this.known = stamps
-    void this.write(generation, manifest, settled)
+    this.racy = racy
+
+    if (this.record !== undefined)
+      void this.write(this.record, generation, manifest, settled)
   }
 
-  private async write(generation: number, manifest: string, settled: Promise<unknown> | undefined): Promise<void> {
+  private stamp(file: string, stamps: Map<string, string>, racy: Set<string>): void {
+    const stamp = fileStamp(file) ?? ''
+
+    stamps.set(file, stamp)
+
+    if (unsettled(stamp, this.startedAt))
+      racy.add(file)
+  }
+
+  private async write(record: RecordPlace, generation: number, manifest: string, settled: Promise<unknown> | undefined): Promise<void> {
     try {
       await settled
 
       if (generation !== this.generation)
         return
 
-      const record: StampRecord = { identity: identity(), options: this.options, manifest: Bun.hash(manifest).toString(36), outputs: await outputsOf(this.root), stamps: Object.fromEntries(this.known) }
+      const stamps = Object.fromEntries([...this.known].map(([file, stamp]) => [file, this.racy.has(file) ? RACY : stamp]))
+      const saved: StampRecord = { identity: identity(), options: record.options, manifest: Bun.hash(manifest).toString(36), outputs: await outputsOf(this.root), stamps }
 
-      await writeAtomically(this.record, JSON.stringify(record))
+      await writeAtomically(record.file, JSON.stringify(saved))
 
       if (generation !== this.generation)
-        rmSync(this.record, { force: true })
+        rmSync(record.file, { force: true })
     }
     // Without a record the next start builds, which is what a read-only disk or a build that stopped halfway gets.
     catch {}

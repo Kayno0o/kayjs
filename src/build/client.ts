@@ -1,8 +1,10 @@
 import type { KayConfig } from '../config'
 import type { ClientConfigKey } from '../project'
+import type { BuildStamps } from '../dev/fingerprint'
 import type { ClassTable } from '../runtime/class-table'
 import type { ClientBuild, ClientManifest } from '../server/client'
 import type { FontFallback } from '../server/fonts'
+import type { Built } from './increments'
 import type { ImportGraph, KayLibrary } from './libraries'
 import type { BrowserRole } from './promotion'
 import type { ChunkInputs, IslandWhy } from './report'
@@ -26,7 +28,8 @@ import { fontFallbacks, withFontFallbacks } from '../server/fonts'
 import { ASSET_PREFIX, clientDir, DEV_MAPS_DIR, MAPS_DIR, outputDir } from './assets'
 import { pruneNodes } from './class-rules'
 import { buildClassTable } from './class-table'
-import { CSS_FILE, findKayFiles, findProjectFiles, readSource, writeIfChanged } from './files'
+import { CSS_FILE, findKayFiles, findProjectFiles, forgetSources, inWalkScope, keepSources, readSource, readSourcePaths, readText, writeIfChanged } from './files'
+import { Increments, realPaths, sameEntries } from './increments'
 import { hoistLayerOrder } from './layer-order'
 import { fileWords, importEdges, reachedFrom, reachingAny } from './libraries'
 import { packagesOf } from './licenses'
@@ -103,10 +106,137 @@ export interface ClientSources {
   libraries: KayLibrary[]
 }
 
+// What each module imports, kept by the builds of this process: a module whose content is unchanged is not read for its imports again, as an incremental session does across its builds. Bun's resolver keeps a project's tsconfig.json and package.json for the process too, so a change to them is not seen by a process that built the project before.
+const builtGraph: ImportGraph = new Map()
+
 // Bundles what the browser needs: one entry hydrating the islands, each island in its own chunk, and a stylesheet per page and layout.
-// Every component is compiled first, so all of the project's syntax errors come out together instead of one per bundler run.
-export async function buildClient(root: string, options: ClientOptions = {}): Promise<ClientBuild> {
-  return inSignalsScope(async () => bundleClient(root, options))
+// Every component is compiled first, so all of the project's syntax errors come out together instead of one per bundler run. `stamps` takes what the build read, for the caller to tell later whether it is still current.
+export async function buildClient(root: string, options: ClientOptions = {}, stamps?: BuildStamps): Promise<ClientBuild> {
+  const { sources, manifest, scripts, styles } = await clientSession(root, options, { graph: builtGraph, stamps }).build(null)
+  const built = fromManifest(root, manifest)
+
+  built.unresolved = styles!.server
+  const bundled = Object.values(scripts!.inputs).flatMap(inputs => Object.entries(inputs).filter(([, input]) => (input.bytesInOutput ?? 0) > 0).map(([input]) => input))
+
+  built.packages = packagesOf([...bundled, ...styles!.inputs])
+
+  if (options.report !== undefined)
+    built.report = await sizeReport(root, clientDir(root), scripts!.manifest, sources.islands, sources.why, options.report === 'modules' ? scripts!.inputs : undefined)
+
+  return built
+}
+
+export interface SessionSettings {
+  // `kay dev`'s builder: the session keeps the last build, so one given the files changed bundles again only the islands or the stylesheets they reach, and points the island maps at `.kay` lines in the background. Without it every build is of everything.
+  incremental?: boolean | undefined
+  // The options the build is for, written into the manifest for the servers `kay dev` starts to compare with theirs.
+  key?: string | undefined
+  // What each module imports, kept across the sessions of a process when given; an incremental session reads it afresh for each build of everything.
+  graph?: ImportGraph | undefined
+  stamps?: BuildStamps | undefined
+}
+
+// What one build of a session wrote, `scripts` and `styles` being what it bundled again: both in a build of everything.
+export interface SessionBuild {
+  sources: ClientSources
+  manifest: ClientManifest
+  scripts?: Awaited<ReturnType<typeof bundleIslands>> | undefined
+  styles?: Awaited<ReturnType<typeof bundleStyles>> | undefined
+}
+
+export interface ClientSession {
+  // `changed` is the files changed since the last build, relative to the root, or null for a build of everything. A build that fails makes the next one build everything.
+  build: (changed: string[] | null) => Promise<SessionBuild>
+}
+
+// The one sequence every client build runs, for `kay build`, `kay dev`, `kay/test` and a server bundling its own: the sources, the classes and their tables, the islands and the stylesheets, then the manifest.
+export function clientSession(root: string, options: ClientOptions, settings: SessionSettings = {}): ClientSession {
+  const { key, stamps } = settings
+  const graph: ImportGraph = settings.graph ?? new Map()
+  const increments = settings.incremental === true ? new Increments(root, options) : undefined
+  let last: Built | undefined
+
+  const run = async (changed: string[] | null): Promise<SessionBuild> => {
+    await stamps?.begin(changed)
+    rootMargin(options.hydration?.visible, '200px', 'visible')
+    rootMargin(options.hydration?.serverIslands, '100% 0px', 'serverIslands')
+
+    const references = referencesOf(options.extensions)
+
+    // A build of everything reads every module's imports afresh.
+    if (increments && changed === null) {
+      graph.clear()
+      increments.forgetSignatures()
+      forgetSources()
+    }
+
+    const sources = await readClientSources(root, options, graph)
+
+    if (increments)
+      keepSources()
+
+    const previous = increments && changed !== null && last !== undefined && await readText(join(outputDir(root), MANIFEST)) === last.manifest ? last : undefined
+
+    last = undefined
+    await previous?.read
+
+    const realRoot = realpathSync(root)
+    // By real path, as the bundler names its inputs.
+    const files = (changed ?? []).map(file => join(realRoot, file))
+    const texts = new Map(await Promise.all(files.map(async file => [file, await readText(file)] as const)))
+
+    if (!previous) {
+      await increments?.stopMaps(true)
+      await clearClientOutput(root)
+    }
+
+    await writeClasses(root, sources.classes)
+
+    const classTable = await classTableOf(root, sources, references)
+    const islandTable = await islandClassTableOf(root, sources, references, graph)
+    const classTableText = JSON.stringify([classTable, islandTable])
+    // `src/ui.ts` is written into the components it restyles, none of which imports it, so no chunk lists it among its inputs.
+    const islandsAgain = !previous || !sameEntries(previous.sources.islands, sources.islands) || files.some(file => previous.islandInputs.has(file) || file === join(realRoot, UI_FILE)) || previous.classTable !== classTableText
+    const stylesAgain = !previous || await increments!.stylesChanged(previous, sources, texts)
+
+    if (previous && islandsAgain)
+      await increments!.stopMaps(false)
+
+    const [scripts, styles] = await bothBundles(islandsAgain ? bundleIslands(root, sources.islands, options, classTable, islandTable) : undefined, stylesAgain ? bundleStyles(root, sources, options) : undefined)
+    const styleUses = styles ? styles.uses : previous!.styleUses
+    const manifest: ClientManifest = { ...scripts?.manifest ?? previous!.islands, styles: styles?.styles ?? previous!.styles, ...classTable && { classTable }, ...styleUses && { styleUses }, ...options.hot && { problems: sources.problems }, ...key !== undefined && { options: key } }
+
+    if (scripts && options.sourcemap === 'external')
+      await keepMaps(root, scripts.maps)
+
+    const text = await writeManifest(root, manifest)
+
+    if (scripts)
+      await increments?.pointMaps(scripts)
+
+    if (increments || stamps) {
+      const styleInputs = styles ? realPaths([...styles.inputs, ...styles.followed]) : previous!.styleInputs
+      const islandInputs = scripts ? realPaths(Object.values(scripts.inputs).flatMap(inputs => Object.keys(inputs))) : previous!.islandInputs
+
+      last = increments?.next(previous, { sources, islandInputs, styleInputs, classTable: classTableText, manifest: text }, scripts, styles, texts)
+      await stamps?.finish([...readSourcePaths(), ...graph.keys(), ...styleInputs, ...islandInputs], text, increments?.mapsPointed)
+    }
+
+    return { sources, manifest, scripts, styles }
+  }
+
+  return {
+    build: async changed => inWalkScope(async () => inSignalsScope(async () => {
+      try {
+        return await run(changed)
+      }
+      catch (error) {
+        last = undefined
+
+        throw error
+      }
+    })),
+  }
 }
 
 // A module that can render an island.
@@ -124,41 +254,6 @@ function rootMargin(value: string | undefined, fallback: string, what: string): 
     throw new KayError('config-invalid', `kay: \`hydration.${what}\` is ${JSON.stringify(value)}; it takes one to four lengths in px or %, such as '200px' or '100% 0px'`)
 
   return value
-}
-
-// What each module imports, kept by the builds of this process: a module whose content is unchanged is not read for its imports again, as the dev builder does across its rebuilds. Bun's resolver keeps a project's tsconfig.json and package.json for the process too, so a change to them is not seen by a process that built the project before.
-const builtGraph: ImportGraph = new Map()
-
-async function bundleClient(root: string, options: ClientOptions): Promise<ClientBuild> {
-  rootMargin(options.hydration?.visible, '200px', 'visible')
-  rootMargin(options.hydration?.serverIslands, '100% 0px', 'serverIslands')
-
-  const sources = await readClientSources(root, options, builtGraph)
-
-  await clearClientOutput(root)
-  await writeClasses(root, sources.classes)
-
-  const references = referencesOf(options.extensions)
-  const classTable = await classTableOf(root, sources, references)
-  const [scripts, styles] = await bothBundles(bundleIslands(root, sources.islands, options, classTable, await islandClassTableOf(root, sources, references, builtGraph)), bundleStyles(root, sources, options))
-  const manifest: ClientManifest = { ...scripts.manifest, styles: styles.styles, ...classTable && { classTable }, ...styles.uses && { styleUses: styles.uses }, ...options.hot && { problems: sources.problems } }
-
-  if (options.sourcemap === 'external')
-    await keepMaps(root, scripts.maps)
-
-  await writeManifest(root, manifest)
-
-  const built = fromManifest(root, manifest)
-
-  built.unresolved = styles.server
-  const bundled = Object.values(scripts.inputs).flatMap(inputs => Object.entries(inputs).filter(([, input]) => (input.bytesInOutput ?? 0) > 0).map(([input]) => input))
-
-  built.packages = packagesOf([...bundled, ...styles.inputs])
-
-  if (options.report !== undefined)
-    built.report = await sizeReport(root, clientDir(root), scripts.manifest, sources.islands, sources.why, options.report === 'modules' ? scripts.inputs : undefined)
-
-  return built
 }
 
 function sourcemapOf(option: ClientOptions['sourcemap']): 'linked' | 'external' | 'none' {
@@ -193,7 +288,7 @@ export async function keepMaps(root: string, maps: string[]): Promise<void> {
 }
 
 // Fails on either only once both stopped, so neither goes on writing into the output of the build after; failing both, it reports what each logged.
-export async function bothBundles<Islands extends Promise<unknown> | undefined, Styles extends Promise<unknown> | undefined>(islands: Islands, styles: Styles): Promise<[Awaited<Islands>, Awaited<Styles>]> {
+async function bothBundles<Islands extends Promise<unknown> | undefined, Styles extends Promise<unknown> | undefined>(islands: Islands, styles: Styles): Promise<[Awaited<Islands>, Awaited<Styles>]> {
   const [scripts, sheets] = await Promise.allSettled([islands, styles])
 
   if (scripts.status === 'rejected' && sheets.status === 'rejected')
@@ -295,7 +390,7 @@ export async function readClientSources(root: string, options: ClientOptions = {
 }
 
 // A failed build must not leave the previous manifest pointing at files that are gone.
-export async function clearClientOutput(root: string): Promise<void> {
+async function clearClientOutput(root: string): Promise<void> {
   const base = outputDir(root)
   const dir = clientDir(root)
 
@@ -305,7 +400,7 @@ export async function clearClientOutput(root: string): Promise<void> {
 
 // The stylesheet build hands these to Tailwind, which cannot read the `.class` shorthand: see styleImports.
 // `.kay` ignores itself, as Tailwind would otherwise scan all of it as soon as an app's `@source` names `.kay/classes.txt` (#2239), and read the classes of its own output back in; `scratch` stays seen, as the projects `kay/test` makes there are scanned as their own.
-export async function writeClasses(root: string, classes: Set<string>): Promise<void> {
+async function writeClasses(root: string, classes: Set<string>): Promise<void> {
   const file = projectPaths(root).classes
 
   await writeIfChanged(join(dirname(file), '.gitignore'), '*\n!/scratch/\n!/scratch/**\n')
@@ -314,7 +409,7 @@ export async function writeClasses(root: string, classes: Set<string>): Promise<
 
 // The table of Tailwind classes a later one overrides, from every word of the components and of the other files an app writes markup in; none when the app has no Tailwind.
 // Only an app with Tailwind reads them, and only its sources: a test or a hidden file read here would be one more input a test edit makes `kay dev` build again for.
-export async function classTableOf(root: string, sources: Pick<ClientSources, 'words'>, references: string[]): Promise<ClassTable | undefined> {
+async function classTableOf(root: string, sources: Pick<ClientSources, 'words'>, references: string[]): Promise<ClassTable | undefined> {
   if (await tailwindDesign(root, references) === undefined)
     return undefined
 
@@ -368,7 +463,7 @@ export async function islandClassTableOf(root: string, sources: Pick<ClientSourc
 }
 
 // `inputs` holds the modules of each chunk, `maps` the source maps written.
-export async function bundleIslands(root: string, islands: Map<string, string>, options: ClientOptions, classTable?: ClassTable, islandTable?: ClassTable): Promise<{ manifest: Omit<ClientManifest, 'styles'>, inputs: ChunkInputs, maps: string[] }> {
+async function bundleIslands(root: string, islands: Map<string, string>, options: ClientOptions, classTable?: ClassTable, islandTable?: ClassTable): Promise<{ manifest: Omit<ClientManifest, 'styles'>, inputs: ChunkInputs, maps: string[] }> {
   const navigation = options.navigation ?? true
 
   if (islands.size === 0 && !navigation)
@@ -515,7 +610,7 @@ async function islandDirectives(root: string, outputs: Bun.BuildArtifact[]): Pro
 // Each page and layout is an entry whose code shrinks to its imports, so what comes out is the stylesheet of everything it renders: each one's URL by the file relative to the root, and every module the build read, `followed` adding the ones it shrank to their imports, which the bundler's list of inputs leaves out.
 // The rules of a kay library's stylesheets needing a class nothing names are left out, `unused` listing those classes.
 // `uses` tells which of the classes the stylesheets style each page and layout names, for a production server to leave the rules of the rest out of a page's head; development links the stylesheets whole and compares what the page sets with it.
-export async function bundleStyles(root: string, { pages, libraries, classes, shorthand, islands }: Pick<ClientSources, 'pages' | 'libraries' | 'classes' | 'shorthand' | 'islands'>, options: ClientOptions): Promise<{ styles: Record<string, string>, inputs: string[], followed: string[], unused: Set<string>, uses?: StyleUses, server: UnresolvedClass[] }> {
+async function bundleStyles(root: string, { pages, libraries, classes, shorthand, islands }: Pick<ClientSources, 'pages' | 'libraries' | 'classes' | 'shorthand' | 'islands'>, options: ClientOptions): Promise<{ styles: Record<string, string>, inputs: string[], followed: string[], unused: Set<string>, uses?: StyleUses, server: UnresolvedClass[] }> {
   if (pages.length === 0)
     return { styles: {}, inputs: [], followed: [], unused: new Set(), server: [] }
 
