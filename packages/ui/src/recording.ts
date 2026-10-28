@@ -6,8 +6,8 @@ export type RecordProblem = 'insecure' | 'unsupported' | 'denied' | 'missing' | 
 export interface Recording {
   // Ends the recording and hands what was said to `onEnd`.
   stop: () => void
-  // Ends it and drops what was said, `onEnd` left uncalled.
-  cancel: () => void
+  // Ends it and drops what was said, `onEnd` left uncalled; false when it had already ended, its audio on the way.
+  cancel: () => boolean
 }
 
 export interface RecordOptions {
@@ -17,6 +17,8 @@ export interface RecordOptions {
   maxMs: number
 }
 
+// The longest delay setTimeout keeps, past which it fires at once.
+const LONGEST_TIMER_MS = 2 ** 31 - 1
 const EXTENSIONS: Record<string, string> = { 'audio/webm': 'webm', 'audio/ogg': 'ogg', 'audio/mp4': 'm4a', 'audio/mpeg': 'mp3', 'audio/wav': 'wav' }
 
 function problemOf(error: unknown): RecordProblem {
@@ -79,17 +81,26 @@ export async function startRecording(options: RecordOptions): Promise<Recording 
   // Set by whoever ended the recording; a recorder stopping with none set lost its microphone.
   let outcome: 'keep' | 'drop' | 'failed' | undefined
   let timer: ReturnType<typeof setTimeout> | undefined
+  let reported = false
+
+  // Told once, as a recorder may fire `error` and then `stop`.
+  function report(result: File | RecordProblem) {
+    if (!reported)
+      options.onEnd(result)
+
+    reported = true
+  }
 
   function end(how: 'keep' | 'drop' | 'failed') {
     if (outcome !== undefined)
-      return
+      return false
 
     outcome = how
 
     if (recorder.state !== 'inactive') {
       recorder.stop()
 
-      return
+      return true
     }
 
     // A recorder already stopped fires no stop event to report through.
@@ -97,7 +108,9 @@ export async function startRecording(options: RecordOptions): Promise<Recording 
     release(stream)
 
     if (how === 'failed')
-      options.onEnd('failed')
+      report('failed')
+
+    return true
   }
 
   recorder.addEventListener('dataavailable', (event) => {
@@ -113,14 +126,14 @@ export async function startRecording(options: RecordOptions): Promise<Recording 
       return
 
     if (outcome === undefined || outcome === 'failed') {
-      options.onEnd(outcome ?? 'lost')
+      report(outcome ?? 'lost')
 
       return
     }
 
     const audio = recorded(chunks, recorder)
 
-    options.onEnd(audio.size > 0 ? audio : 'empty')
+    report(audio.size > 0 ? audio : 'empty')
   })
 
   // An unplugged headset ends its track; the recorder stopping by itself is then told apart by no outcome set.
@@ -132,7 +145,7 @@ export async function startRecording(options: RecordOptions): Promise<Recording 
   }
 
   recorder.start()
-  timer = setTimeout(end, options.maxMs, 'keep')
+  timer = setTimeout(end, Math.min(options.maxMs, LONGEST_TIMER_MS), 'keep')
 
-  return { stop: () => end('keep'), cancel: () => end('drop') }
+  return { stop: () => void end('keep'), cancel: () => end('drop') }
 }

@@ -4,7 +4,7 @@ import { durationMs, recipe } from 'kay'
 import { wording } from 'kay/words'
 import Button from './button.kay'
 import Notice from './notice.kay'
-import { elapsed, recorder, recordWords } from './record'
+import { elapsed, RECORD_LIMIT, recorder, recordWords } from './record'
 
 // 'kui-record' stays as the component's name for an app's CSS. The variants are the Button's, handed to it.
 const look = recipe({
@@ -25,14 +25,14 @@ const look = recipe({
   defaults: { variant: 'solid', tone: 'neutral', size: 'md' },
 })
 
-const { onRecord, label = wording('ui.recordButton.label', 'Record'), failure = wording('ui.recordButton.failure', 'The recording could not be sent.'), maxDuration = '5m', variant = 'solid', tone = 'neutral', size = 'md' } = props<{
+const { onRecord, label = wording('ui.recordButton.label', 'Record'), failure = wording('ui.recordButton.failure', 'The recording could not be sent.'), maxDuration = RECORD_LIMIT, variant = 'solid', tone = 'neutral', size = 'md' } = props<{
   // Takes what was said as a `File`, `recording.webm` (`recording.m4a` in Safari), which an action's `s.File()` field takes as it is. A promise it returns holds the button busy until it settles, and a rejection says `failure`.
   onRecord: (audio: File) => unknown
   // Names the button, which stays pressed while it records: a press starts, the next stops and hands the recording over, and Escape drops it.
   label?: string | undefined
   // Said when the promise of `onRecord` rejects.
   failure?: string | undefined
-  // How long a recording runs before it stops and is handed over as if pressed, so one left running does not outgrow the action's `maxSize`.
+  // How long a recording runs before it stops and is handed over as if pressed, `5m` by default, so one left running does not outgrow the action's `maxSize`.
   maxDuration?: Duration | undefined
 }>()
 

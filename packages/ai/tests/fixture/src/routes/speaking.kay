@@ -1,10 +1,21 @@
 --- server
+import { ask, chatMessages } from '@kaynooo/kayjs-ai'
 import { s } from 'kay'
-import { reply } from './attaching.kay'
 
-// The fake recorder's bytes are their own transcript, so a test says what was heard; `refuse` is refused as a provider's error would be.
+// Says one word and keeps working until the visitor stops it, so a test speaks while a reply is under way.
+async function* held() {
+  yield 'Working'
+  await Bun.sleep(30_000)
+}
+
+export const reply = action(s.Object({ messages: chatMessages({ maxItems: 50, attachments: { type: 'image/png' } }) }), ({ messages }) => messages.at(-1)?.content === 'Hold' ? held() : ask(messages), { maxSize: '2mb' })
+
+// The fake recorder's bytes are their own transcript, so a test says what was heard: `refuse` is refused as a provider's error would be, and `slow ...` takes a second.
 export const transcribe = action(s.Object({ audio: s.File() }), async ({ audio }, ctx) => {
   const text = await audio.text()
+
+  if (text.startsWith('slow '))
+    await Bun.sleep(1000)
 
   return text === 'refuse' ? ctx.fail(422, 'Too noisy to write down.') : { text }
 }, { maxSize: '1mb' })
@@ -12,4 +23,4 @@ export const transcribe = action(s.Object({ audio: s.File() }), async ({ audio }
 import Chat from '@kaynooo/kayjs-ai/chat.kay'
 ---
 h1 Speaking
-Chat(action={reply} label="Assistant" attach transcribe={transcribe})
+Chat(action={reply} label="Assistant" attach newButton transcribe={transcribe})

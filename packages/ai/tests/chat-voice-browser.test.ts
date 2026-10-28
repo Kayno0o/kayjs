@@ -119,6 +119,43 @@ it('says why nothing was sent: a refused transcription, no text, and a blocked m
   expect(await page.count('.kai-chat-turn')).toBe(0)
 }, 120_000)
 
+// Speaks `said`: one press records, the next sends it to transcribe.
+async function speak(page: TestPage, said: string) {
+  await page.evaluate((text: string) => {
+    (window as unknown as Voice).said = text
+  }, said)
+  await page.click(MIC)
+  await page.waitFor(`${MIC}[aria-pressed=true]`)
+  await page.click(MIC)
+}
+
+it('leaves what was said in the field while a reply is under way, and drops a transcription the visitor started over during', async () => {
+  await using page = await site.open('/speaking')
+
+  await microphone(page)
+  await page.reload()
+  await page.waitFor(MIC)
+  await page.fill('.kai-chat-form textarea', 'Hold')
+  await page.click('.kai-chat-form .kai-chat-send')
+  await page.waitFor('.kai-chat-turn[data-role=assistant]', { text: 'Working' })
+  await speak(page, 'Hello there')
+  await page.waitUntil(() => document.querySelector('textarea')?.value === 'Hello there')
+
+  expect(await page.count('.kai-chat-turn[data-role=user]')).toBe(1)
+
+  await page.click('.kai-chat-form .kai-chat-new')
+  await page.waitFor('.kai-chat-turn', { gone: true })
+  await page.fill('.kai-chat-form textarea', 'Hi')
+  await page.click('.kai-chat-form .kai-chat-send')
+  await page.waitFor('.kai-chat-turn[data-role=assistant]', { text: 'Fake reply to: Hi' })
+  await speak(page, 'slow Late words')
+  await page.waitFor(`${MIC}[aria-busy=true]`)
+  await page.click('.kai-chat-form .kai-chat-new')
+  await page.waitFor(`${MIC}:not([aria-busy])`, { timeout: '3s' })
+
+  expect([await page.count('.kai-chat-turn'), await page.value('.kai-chat-form textarea'), await page.count('.kai-chat .kui-notice')]).toEqual([0, '', 0])
+}, 120_000)
+
 it('drops a recording on Escape from the keyboard, saying so', async () => {
   await using page = await site.open('/speaking')
 

@@ -1,9 +1,12 @@
-import type { Signal } from 'kay'
+import type { Duration, Signal } from 'kay'
 import type { Recording, RecordProblem } from './recording'
 import { onCleanup, onMount, signal } from 'kay'
 import { wording } from 'kay/words'
 
 export type { RecordProblem } from './recording'
+
+// How long a recording runs by default before it is handed over as if pressed, so one left running stays within an action's `maxSize`.
+export const RECORD_LIMIT: Duration = '5m'
 
 export type RecordWords = Record<RecordProblem | 'recording' | 'stopped' | 'cancelled', string>
 
@@ -112,6 +115,7 @@ export function recorder(options: RecorderOptions): Recorder {
     }
     catch (error) {
       console.error('kayjs-ui: a recording\'s onRecord failed', error)
+      said.set('')
       problem.set(options.failure)
     }
     finally {
@@ -170,11 +174,12 @@ export function recorder(options: RecorderOptions): Recorder {
       await start()
   }
 
+  // A recording whose time ran out just before is already on its way, and is not said to be dropped.
   function cancel() {
-    if (state() !== 'recording')
+    if (state() !== 'recording' || current?.cancel() !== true)
       return false
 
-    finish()?.cancel()
+    finish()
     state.set('idle')
     said.set(words.cancelled)
 

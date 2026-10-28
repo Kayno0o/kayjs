@@ -1,8 +1,8 @@
 import type { Action, ActionStream, Failure } from 'kay'
 import type { Attachments } from './chat-attachments'
 import type { ChatMessage, ChatTurn, CodeBlock, Message, Progress, Source, ToolCall } from './types'
-import { recorder, recordWords } from '@kaynooo/kayjs-ui/lib/record'
-import { ActionError, effect, onMount, signal, untrack } from 'kay'
+import { RECORD_LIMIT, recorder, recordWords } from '@kaynooo/kayjs-ui/lib/record'
+import { ActionError, durationMs, effect, onMount, signal, untrack } from 'kay'
 import { markdownReady } from 'kay/markdown'
 import { filesOf, keepPending, newReplyId, pendingReply, posted, restored, shrunk, stored } from './chat-history'
 import { sameSources, usableSources } from './chat-sources'
@@ -69,8 +69,6 @@ interface Replacement {
 }
 
 const MAX_RETRIES = 5
-// How long the microphone records before it sends what it has, so a recording left running stays within a transcribe action's `maxSize`.
-const VOICE_MS = 5 * 60_000
 
 // The turns of a Chat and the reply under way, which is idle, waiting (the call is out, no word yet), streaming, then ended, when what arrived joins the history. Every transition is here, apart from the DOM: the component draws it and wires its events.
 export function createChatSession(options: ChatSessionOptions) {
@@ -103,12 +101,20 @@ export function createChatSession(options: ChatSessionOptions) {
   // What the action took as too long, learned from its 413s, so the app states `maxInputChars` once: the oldest turns go first, the last stays.
   let learned = Infinity
   const listening = options.voice
-  const voice = listening === undefined ? undefined : recorder({ onAudio: hear, words: recordWords(), failure: listening.failedLabel, sending: listening.transcribingLabel, maxMs: VOICE_MS })
+  const voice = listening === undefined ? undefined : recorder({ onAudio: hear, words: recordWords(), failure: listening.failedLabel, sending: listening.transcribingLabel, maxMs: durationMs(RECORD_LIMIT) })
+  // Counts the conversations started over, so a transcription finishing after one does not send into the next.
+  let conversation = 0
 
   // What was said joins the field and goes as a typed message does, with the files attached; a reply under way leaves it in the field, as post() then waits.
   async function hear(audio: File) {
+    const asked = conversation
+
     try {
       const answer = await listening!.transcribe({ audio }, { refresh: false })
+
+      if (asked !== conversation)
+        return
+
       const text = (typeof answer === 'string' ? answer : answer.text).trim()
 
       if (text === '') {
@@ -125,7 +131,8 @@ export function createChatSession(options: ChatSessionOptions) {
 
       const refusal = error instanceof ActionError && error.status < 500 ? error.errors[''] : undefined
 
-      voice!.problem.set(refusal === undefined || refusal === '' ? listening!.failedLabel : refusal)
+      if (asked === conversation)
+        voice!.problem.set(refusal === undefined || refusal === '' ? listening!.failedLabel : refusal)
     }
   }
 
@@ -477,6 +484,7 @@ export function createChatSession(options: ChatSessionOptions) {
     reset() {
       stop()
       voice?.cancel()
+      conversation++
       history.set([])
       replacement = undefined
       draft.set('')
