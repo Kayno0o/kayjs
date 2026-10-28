@@ -211,9 +211,11 @@ export function createLists(base: Omit<ListHost, 'enqueueMail' | 'enqueueRun' | 
   }
 
   const entries = new Map<string, Entry>()
-  const stores = listRegistry(fallback)
-  // A mailer without a `suppressionStore` keeps them where its lists do, as before 1.81, else in the default file, in their table alone until a list opens the file.
-  const defaultSuppressions = sqliteSuppressions(fallback.file ?? (process.env.NODE_ENV === 'test' ? ':memory:' : LIST_FILE))
+  // Skipped under `bun test` unless the test names it.
+  const defaultFile = fallback.file ?? (process.env.NODE_ENV === 'test' ? undefined : LIST_FILE)
+  const stores = listRegistry({ file: defaultFile, store: fallback.store })
+  // A mailer without a `suppressionStore` keeps them where its lists do, else in the default file, in their table alone until a list opens the file.
+  const defaultSuppressions = sqliteSuppressions(defaultFile ?? ':memory:')
   const suppressions = suppressionsOf({
     write: () => {
       if (fallback.suppressions !== undefined)

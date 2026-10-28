@@ -6,8 +6,21 @@ import { connectionOf, privilegeRefused, relationsMissing } from 'kay/library'
 
 export const SUPPRESSIONS_TABLE = 'CREATE TABLE IF NOT EXISTS kay_mail_suppressions (email text PRIMARY KEY, reason text NOT NULL, source text NOT NULL, at bigint NOT NULL)'
 
+// Creates the suppressions table unless it exists, for a site with no list whose role creates nothing: run it as the database's owner, in a boot script, and list `kay_mail_suppressions` in pg-orm's `ignoreTables`.
+export async function createMailSuppressionTable(source: PgJobsSource): Promise<void> {
+  const db = connectionOf(source)
+
+  try {
+    await db.unsafe(SUPPRESSIONS_TABLE)
+  }
+  finally {
+    if (typeof source === 'string')
+      await db.close()
+  }
+}
+
 // Bounces and complaints in the app's Postgres, in the `kay_mail_suppressions` table alone, shared by every server: `mailer({ suppressionStore: pgSuppressions(db) })` for a site with no list, `db` a Bun `SQL`, a pg-orm `Database` or a connection URL as `pgData` takes. `pgLists` keeps them the same way beside its lists.
-// The table is made by the first suppression, a read or a lift before it finding nobody; a role that may not create it has the owner run `createMailListTables(db)`.
+// The table is made by the first suppression, a read or a lift before it finding nobody; a role that may not create it has the owner run `createMailSuppressionTable(db)`.
 export function pgSuppressions(source: PgJobsSource): SuppressionStore & { close: () => Promise<void> } {
   const db = connectionOf(source)
   let ready: Promise<void> | undefined
@@ -21,7 +34,7 @@ export function pgSuppressions(source: PgJobsSource): SuppressionStore & { close
     }
     catch (error) {
       if (privilegeRefused(error))
-        throw new Error('kayjs-mail: the kay_mail_suppressions table is missing, and the role may not create it: run `await createMailListTables(db)` from kayjs-mail as the database\'s owner, and list `mailListTables` in pg-orm\'s `ignoreTables`', { cause: error })
+        throw new Error('kayjs-mail: the kay_mail_suppressions table is missing, and the role may not create it: run `await createMailSuppressionTable(db)` from kayjs-mail as the database\'s owner (`createMailListTables(db)` beside lists), and list the table in pg-orm\'s `ignoreTables`', { cause: error })
 
       throw error
     }

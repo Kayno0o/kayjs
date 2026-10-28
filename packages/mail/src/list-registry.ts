@@ -1,7 +1,7 @@
 import type { ListStore } from './list-store'
 import { existsSync } from 'node:fs'
 import process from 'node:process'
-import { LIST_FILE, openLists } from './list-store'
+import { openLists } from './list-store'
 
 // Whether the file holds lists, read without making their tables, so a file only suppressions were kept in stays without them.
 function holdsLists(path: string): boolean {
@@ -13,6 +13,9 @@ function holdsLists(path: string): boolean {
   const db = new sqlite.Database(path, { readwrite: true, create: false })
 
   try {
+    // As `openSqlite` waits, so another process checkpointing the file does not fail the read.
+    db.run('PRAGMA busy_timeout = 5000')
+
     return db.query('SELECT 1 FROM sqlite_master WHERE type = \'table\' AND name = \'kay_mail_subscribers\'').get() !== null
   }
   finally {
@@ -20,11 +23,11 @@ function holdsLists(path: string): boolean {
   }
 }
 
-// The list stores of one mailer: the SQLite files its lists opened, the stores given to them or to the mailer (`fallback.store`), and the default file, which a test names as `fallback.file` since it is skipped under `bun test`.
-export function listRegistry(fallback: { file?: string | undefined, store?: ListStore | undefined }) {
+// The list stores of one mailer: the SQLite files its lists opened, the stores given to them or to the mailer (`fallback.store`), and the default file (`fallback.file`), none when undefined.
+export function listRegistry(fallback: { file: string | undefined, store: ListStore | undefined }) {
   const files = new Map<string, ListStore>()
   const given = new Set<ListStore>(fallback.store === undefined ? [] : [fallback.store])
-  const defaultPath = fallback.file ?? (process.env.NODE_ENV === 'test' ? undefined : LIST_FILE)
+  const defaultPath = fallback.file
 
   const open = (file: string): ListStore => {
     let lists = files.get(file)

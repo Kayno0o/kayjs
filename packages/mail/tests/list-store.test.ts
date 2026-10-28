@@ -7,7 +7,7 @@ import { createMailListTables, mailListTables, pgLists } from '../src/list-pg'
 import { DELIVERY_TRIES, openLists } from '../src/list-store'
 import { mailer } from '../src/mailer'
 import { outbox } from '../src/outbox'
-import { pgSuppressions } from '../src/suppressions-pg'
+import { createMailSuppressionTable, pgSuppressions } from '../src/suppressions-pg'
 
 await testSite({ root: 'tests/fixture' })
 
@@ -294,6 +294,10 @@ describe.skipIf(url === '')('a list on Postgres', () => {
       await kept.suppress(email('x'), 'complaint', 'ses')
       expect((await pgLists(db).suppressed!([email('x')])).map(row => row.reason)).toEqual(['complaint'])
       expect(await kept.lift(email('x'))).toBe(true)
+      await db.unsafe('DROP TABLE kay_mail_suppressions')
+      await createMailSuppressionTable(db)
+      await createMailSuppressionTable(db)
+      expect((await db.unsafe<{ found: string | null }[]>('SELECT to_regclass(\'kay_mail_suppressions\') AS found'))[0]!.found).not.toBeNull()
     }
     finally {
       await db.close()

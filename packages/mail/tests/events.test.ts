@@ -566,6 +566,25 @@ describe('suppressions of a mailer with no list', () => {
     expect([...(await lists.suppressed([before, after])).keys()].sort()).toEqual([before, after].sort())
     expect(await lists.lift(before)).toBe(true)
     expect(own.suppressed([before])).toEqual([])
+    await lists.erase(after)
+    expect(await kept.suppressed([after])).toEqual([])
+  })
+
+  it('keeps the bounces of the default file once a list opens that file, and adds the next ones there', async () => {
+    const file = join(await scratchDir('mail-file-shared'), 'mail-list.sqlite')
+    const lists = createLists(host, { file })
+    const [first, second] = [fresh(), fresh()]
+
+    try {
+      await lists.suppress(first, 'bounce', 'test')
+      expect(await lists.list('news', { file }).count()).toBe(0)
+      expect([...(await lists.suppressed([first])).keys()]).toEqual([first])
+      await lists.suppress(second, 'complaint', 'test')
+      expect([...(await createLists(host, { file }).suppressed([first, second])).keys()].sort()).toEqual([first, second].sort())
+    }
+    finally {
+      lists.stopSweeping()
+    }
   })
 
   it('is given to the mailer as suppressionStore', async () => {
