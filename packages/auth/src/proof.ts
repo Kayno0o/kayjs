@@ -21,6 +21,8 @@ export interface Proof {
 // `proof` when the proof was wrong or missing; `stale` when the account has neither a password nor a second factor and was signed into too long ago, so the user signs in again first; `impersonating` when an admin acts as the user, who proves nothing for them.
 export type ProofFailure = 'signed-out' | 'proof' | 'stale' | 'limited' | 'impersonating'
 
+export type ReproveResult = { ok: true } | { ok: false, error: ProofFailure }
+
 // What a sign-in waiting for its second factor keeps in the session.
 export interface Challenge {
   user: string

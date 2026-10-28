@@ -21,8 +21,10 @@ export async function approvedClients(state: RequestState): Promise<ApprovedClie
   return (await state.core.store.oauth.grants.listByUser(record.id)).map(grant => ({ id: grant.clientId, name: grant.clientName, scopes: grant.scopes, createdAt: grant.createdAt, lastUsedAt: grant.lastUsedAt }))
 }
 
+export type RevokeGrantResult = { ok: true } | { ok: false, error: 'signed-out' | 'not-found' }
+
 // Takes the approval back with every token the app was given; `not-found` when there was none, `signed-out` when this is not the user's own session.
-export async function revokeClient(state: RequestState, clientId: string): Promise<{ ok: true } | { ok: false, error: 'signed-out' | 'not-found' }> {
+export async function revokeClient(state: RequestState, clientId: string): Promise<RevokeGrantResult> {
   const record = await approver(state)
   const oauth = state.core.store.oauth
 

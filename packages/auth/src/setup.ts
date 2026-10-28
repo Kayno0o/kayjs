@@ -1,13 +1,16 @@
 import type { Duration } from 'kay'
+import type { Access } from './access'
 import type { AuthOptions } from './auth'
 import type { AuthSessionData, Core } from './core'
 import type { EmailOptions } from './email'
 import type { AuthPagesConfig, PagesHandle } from './pages'
 import type { AuthStore, LinkType, TokenType } from './store'
 import { asConfigError, configError, configuredSite, durationSeconds } from 'kay/library'
+import { accessOf } from './access'
 import { pwnedPassword } from './breached'
 import { proofOfWork } from './captcha'
 import { forwardOf } from './forwardAuth'
+import { guardOf } from './guards'
 import { deriveKeys } from './keys'
 import { resolveLimits } from './limits'
 import { log } from './log'
@@ -157,6 +160,8 @@ export function createCore<Data extends AuthSessionData, Role extends string, Pr
   const pages = pagesOf(options.pages)
   const passkeyOptions = options.passkeys === false ? undefined : options.passkeys
   const paths = pages && pagePaths(pages.prefix)
+  const access = accessOf<Role>(options)
+  const admin = options.admin
 
   const needsUrl = oauthApps.length > 0 || options.email !== undefined
   let bound: SiteBound | undefined
@@ -254,6 +259,9 @@ export function createCore<Data extends AuthSessionData, Role extends string, Pr
     defaultRoles: [...(options.defaultRoles ?? [])],
     roles: options.roles && new Set(Object.keys(options.roles)),
     hierarchy: options.roles,
+    access: access as unknown as Access<string>,
+    ...admin !== undefined && { admin: async user => access.authorize(user, admin, 'write', {}) },
+    guard: guardOptions => guardOf(core, guardOptions),
     onSignUp: hooked(options.onSignUp, (user, profile) => ({ user, profile })),
     onProviderProfile: hooked(options.profileFields, (user, profile) => ({ user, profile })),
     userData: options.user && userDataRules(options.user),
@@ -262,7 +270,7 @@ export function createCore<Data extends AuthSessionData, Role extends string, Pr
     unverifiedMaxAge: unverifiedMaxAge(options.email),
     onExport: hooked(options.exportData, user => ({ user })),
     onAuthEvent: options.onAuthEvent,
-    organizations: options.organizations && organizationsCore(options.organizations),
+    organizations: options.organizations && organizationsCore(options.organizations, access),
     pruned: { at: 0 },
     audit: options.audit == null || options.audit === false ? undefined : { maxAge: auditMaxAge(options.audit), prunedAt: 0, ip: options.audit === true ? 'truncated' : options.audit.ip ?? 'truncated' },
     rememberMaxAge: wholeSeconds(options.remember?.maxAge ?? `${DEFAULT_REMEMBER_MAX_AGE}s`, 'remember.maxAge'),

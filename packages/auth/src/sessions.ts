@@ -1,5 +1,5 @@
 import type { SessionSettings } from 'kay/server'
-import type { Core } from './core'
+import type { BareUser, Core } from './core'
 import type { Device } from './device'
 import type { RequestState } from './state'
 import type { SessionRecord, UserRecord } from './store'
@@ -8,6 +8,10 @@ import { readDevice } from './device'
 import { log } from './log'
 
 const USER_AGENT_MAX_LENGTH = 512
+
+export type RevokeSessionResult = { ok: true } | { ok: false, error: 'signed-out' | 'not-found' }
+
+export type GuestSignInResult = { ok: true, user: BareUser } | { ok: false, error: 'limited' | 'captcha' | 'signed-in' | 'closed' }
 
 // Where the user is signed in, as the app lists it.
 export interface UserSession {
@@ -45,6 +49,23 @@ export async function liveSession(state: RequestState, found: SessionRecord | un
     await core.store.sessions.update(found.id, { lastSeenAt: new Date(now), ip })
 
   return true
+}
+
+// Ends one of the signed-in user's sessions, effective on its next request; ending this one signs out through `signOut`.
+export async function revokeSession(state: RequestState, id: string, signOut: () => Promise<void>): Promise<RevokeSessionResult> {
+  const record = await state.current()
+  const signedIn = await state.session.get('auth')
+
+  if (!record || state.via() !== 'session')
+    return { ok: false, error: 'signed-out' }
+
+  if (signedIn?.session === id) {
+    await signOut()
+
+    return { ok: true }
+  }
+
+  return (await state.core.store.sessions.delete(record.id, id)) ? { ok: true } : { ok: false, error: 'not-found' }
 }
 
 // The signed-in user's sessions, oldest first; a session that ended without signing out, past its lifetime or signed out everywhere, is forgotten on the way.

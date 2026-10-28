@@ -49,6 +49,19 @@ export async function soleOwned(core: Core, record: UserRecord): Promise<SoleOwn
   return owned
 }
 
+// The organizations deleting the signed-in user's account touches, by name: `deleted` the ones they are the only member of, `blocked` the ones they solely own with other members.
+export interface DeletionImpact {
+  deleted: string[]
+  blocked: string[]
+}
+
+export async function deletionImpact(state: RequestState): Promise<DeletionImpact> {
+  const record = await state.current()
+  const owned = record ? await soleOwned(state.core, record) : []
+
+  return { deleted: owned.filter(organization => organization.alone).map(organization => organization.name), blocked: owned.filter(organization => !organization.alone).map(organization => organization.name) }
+}
+
 // Deletes the user with everything kayjs-auth keeps for them, and their notifications and mailing list rows. The app's records go first, so an `onDelete` that throws leaves the account in place, to delete again. The audit log keeps what happened under a new random name, without the addresses, browsers and details that lead back to the user, and the provider tokens held are revoked upstream.
 // For an account nobody leaves, as an unverified one a registration replaces or a guest past `guests.maxAge`: the address's invitations stay for whoever proves it, and no mail goes out to them, only to the new owner of an organization handed over.
 // An organization it solely owned with other members passes to its longest-standing member, as it cannot be refused.

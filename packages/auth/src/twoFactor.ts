@@ -54,8 +54,10 @@ export async function verifyTwoFactor(state: RequestState, code: string, signIn:
   return { ok: true, redirect: challenge.redirect }
 }
 
+export type SetUpTwoFactorResult = { ok: true, setup: TwoFactorSetup } | { ok: false, error: ProofFailure | 'enabled' }
+
 // A new secret for the signed-in user's authenticator, active once `enableTwoFactor` gets a code from it.
-export async function setUpTwoFactor(state: RequestState, proof: Proof): Promise<{ ok: true, setup: TwoFactorSetup } | { ok: false, error: ProofFailure | 'enabled' }> {
+export async function setUpTwoFactor(state: RequestState, proof: Proof): Promise<SetUpTwoFactorResult> {
   const proved = await reprove(state, proof)
 
   if (!proved.ok)
@@ -72,8 +74,10 @@ export async function setUpTwoFactor(state: RequestState, proof: Proof): Promise
   return { ok: true, setup: { secret, uri } }
 }
 
+export type EnableTwoFactorResult = { ok: true, recoveryCodes: string[] } | { ok: false, error: 'signed-out' | 'not-set-up' | 'enabled' | 'invalid' | 'limited' }
+
 // Turns the second factor on once the authenticator proves it holds the secret; answers the recovery codes, shown this once.
-export async function enableTwoFactor(state: RequestState, code: string): Promise<{ ok: true, recoveryCodes: string[] } | { ok: false, error: 'signed-out' | 'not-set-up' | 'enabled' | 'invalid' | 'limited' }> {
+export async function enableTwoFactor(state: RequestState, code: string): Promise<EnableTwoFactorResult> {
   const record = await state.current()
 
   if (!record || state.via() !== 'session')
@@ -130,7 +134,9 @@ export async function enrollTotp(core: Core, userId: string): Promise<TotpEnrolm
   return { secret, code: async (offset = 0) => totpCode(secret, totpStep() + offset), recoveryCodes: await issueRecoveryCodes(core, userId) }
 }
 
-export async function disableTwoFactor(state: RequestState, proof: Proof): Promise<{ ok: true } | { ok: false, error: ProofFailure }> {
+export type DisableTwoFactorResult = { ok: true } | { ok: false, error: ProofFailure }
+
+export async function disableTwoFactor(state: RequestState, proof: Proof): Promise<DisableTwoFactorResult> {
   const proved = await reprove(state, proof, { secondFactor: true })
 
   if (!proved.ok)
@@ -143,8 +149,10 @@ export async function disableTwoFactor(state: RequestState, proof: Proof): Promi
   return { ok: true }
 }
 
+export type RecoveryCodesResult = { ok: true, recoveryCodes: string[] } | { ok: false, error: ProofFailure | 'disabled' }
+
 // A new set of recovery codes, the old ones void.
-export async function regenerateRecoveryCodes(state: RequestState, proof: Proof): Promise<{ ok: true, recoveryCodes: string[] } | { ok: false, error: ProofFailure | 'disabled' }> {
+export async function regenerateRecoveryCodes(state: RequestState, proof: Proof): Promise<RecoveryCodesResult> {
   const proved = await reprove(state, proof, { secondFactor: true })
 
   if (!proved.ok)

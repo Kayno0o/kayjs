@@ -47,9 +47,11 @@ export interface DataExport {
   app: unknown
 }
 
+export type ExportResult = { ok: true, data: DataExport } | { ok: false, error: 'signed-out' | 'limited' | 'impersonating' | 'stale' }
+
 // Not for an admin acting as the user: they see what the user sees, not a copy of everything kept about them.
 // Only within ten minutes of signing in or re-proving, so a session left open or stolen does not download everything the account holds.
-export async function exportData(state: RequestState): Promise<{ ok: true, data: DataExport } | { ok: false, error: 'signed-out' | 'limited' | 'impersonating' | 'stale' }> {
+export async function exportData(state: RequestState): Promise<ExportResult> {
   const { core } = state
   const record = await state.current()
 

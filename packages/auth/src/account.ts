@@ -7,6 +7,7 @@ import { hashPassword } from '@kaynooo/utils'
 import { newPasswordProblem } from './breached'
 import { publicUser } from './core'
 import { eraseLeavingUser, soleOwned } from './erase'
+import { validLocale } from './locale'
 import { notify } from './notify'
 import { reprove } from './proof'
 import { normalizeUsername, usernameProblem } from './rules'
@@ -18,8 +19,10 @@ const NO_ASIDE = { restore: async () => {
   await Promise.resolve()
 } }
 
+export type ChangePasswordResult = { ok: true } | { ok: false, error: ProofFailure } | { ok: false, errors: { password: PasswordProblem | 'breached' } }
+
 // Sets the signed-in user's password, or a first one, and ends their other sessions.
-export async function changePassword(state: RequestState, proof: Proof, password: string): Promise<{ ok: true } | { ok: false, error: ProofFailure } | { ok: false, errors: { password: PasswordProblem | 'breached' } }> {
+export async function changePassword(state: RequestState, proof: Proof, password: string): Promise<ChangePasswordResult> {
   const problem = await newPasswordProblem(state.core, password)
 
   if (problem !== undefined)
@@ -37,6 +40,23 @@ export async function changePassword(state: RequestState, proof: Proof, password
     await state.core.store.tokens.deleteForUser(updated.id)
     await notify(state, updated, 'password-changed')
   }
+
+  return { ok: true }
+}
+
+export type UpdateLocaleResult = { ok: true } | { ok: false, error: 'signed-out' | 'invalid-locale' }
+
+// Sets the language the signed-in user's mails are written in, a BCP 47 tag such as `fr`.
+export async function updateLocale(state: RequestState, locale: string): Promise<UpdateLocaleResult> {
+  const record = await state.current()
+
+  if (!record)
+    return { ok: false, error: 'signed-out' }
+
+  if (!validLocale(locale))
+    return { ok: false, error: 'invalid-locale' }
+
+  state.adopt(await state.core.store.users.update(record.id, { locale }) ?? { ...record, locale })
 
   return { ok: true }
 }
@@ -88,8 +108,10 @@ export async function changeUsername(state: RequestState, username: string): Pro
   return { ok: true, user: publicUser(updated) }
 }
 
+export type UnlinkResult = { ok: true } | { ok: false, error: ProofFailure | 'not-linked' | 'last-way-in' }
+
 // Unlinks a provider from the signed-in user, unless it is their last way in, and ends their other sessions.
-export async function unlink(state: RequestState, provider: string, proof: Proof): Promise<{ ok: true } | { ok: false, error: ProofFailure | 'not-linked' | 'last-way-in' }> {
+export async function unlink(state: RequestState, provider: string, proof: Proof): Promise<UnlinkResult> {
   const proved = await reprove(state, proof)
 
   if (!proved.ok)
@@ -121,8 +143,10 @@ export async function unlink(state: RequestState, provider: string, proof: Proof
   return { ok: true }
 }
 
+export type DeleteAccountResult = { ok: true } | { ok: false, error: ProofFailure | 'last-admin' | 'last-owner' }
+
 // Deletes the signed-in user and everything kayjs-auth keeps for them, then signs this session out. The last admin, and the only owner of an organization with other members, are refused before the proof is spent; an organization the user is alone in is deleted with them.
-export async function deleteAccount(state: RequestState, proof: Proof, signOut: () => Promise<void>): Promise<{ ok: true } | { ok: false, error: ProofFailure | 'last-admin' | 'last-owner' }> {
+export async function deleteAccount(state: RequestState, proof: Proof, signOut: () => Promise<void>): Promise<DeleteAccountResult> {
   const current = await state.current()
   // Without the `admin` option nobody is an admin: no last one to keep and no roles to set aside.
   const admins = state.core.admin ? await import('./admin') : undefined

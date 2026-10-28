@@ -224,8 +224,10 @@ export async function authorize(state: RequestState, params: AuthorizeParams, ro
   }
 }
 
+export type DecideResult = { ok: true, redirect: string } | { ok: false, error: 'client' | 'redirect_uri' | 'signed-out' }
+
 // The user's answer on the consent page, checked again as the request is: where the browser goes back to the client.
-export async function decide(state: RequestState, fields: AuthorizeParams, allow: boolean, root: string): Promise<{ ok: true, redirect: string } | { ok: false, error: 'client' | 'redirect_uri' | 'signed-out' }> {
+export async function decide(state: RequestState, fields: AuthorizeParams, allow: boolean, root: string): Promise<DecideResult> {
   const checked = await check(state, { ...fields, response_type: 'code', code_challenge_method: 'S256' }, root)
 
   if (isOutcome(checked))

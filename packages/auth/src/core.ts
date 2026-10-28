@@ -1,4 +1,5 @@
 import type { Guard } from 'kay'
+import type { Access } from './access'
 import type { OAuthClient } from './authorize/clients'
 import type { CaptchaOptions } from './captcha'
 import type { EmailCore, PendingCode } from './email'
@@ -17,7 +18,7 @@ import type { Challenge } from './proof'
 import type { AuthRates } from './rates'
 import type { ResolvedRules } from './rules'
 import type { AuthStore, IdentityRecord, UserRecord } from './store'
-import type { Level, Requirement } from './types'
+import type { Requirement } from './types'
 import type { UserDataRules } from './userData'
 import { localPath } from 'kay'
 
@@ -161,10 +162,10 @@ export interface Core {
   hierarchy?: Record<string, string[]> | undefined
   // Whether a user meets the `admin` option; nobody does without it.
   admin?: ((user: User) => Promise<boolean>) | undefined
-  // Whether a user meets a requirement, through the app's `authorize` when it has one, as `guard()` asks; for `requireUser({ require })`.
-  authorize?: ((user: BareUser, requirement: Requirement<BareUser, string>, level: Level) => Promise<boolean>) | undefined
+  // Whether a user meets a requirement, through the app's `authorize` when it has one, as `guard()` and `requireUser({ require })` ask.
+  access: Access<string>
   // `auth.guard()` of this `createAuth`, which the `guard()` of a module-less `auth()` asks for through the request's `auth`.
-  guard?: ((options: { redirect?: string, require?: Requirement<BareUser, string>, scope?: string | string[] | false }) => Guard) | undefined
+  guard: (options: { redirect?: string | undefined, require?: Requirement<BareUser, string> | undefined, scope?: string | string[] | false | undefined }) => Guard
   onSignUp?: ((user: User, profile: Profile | undefined) => void | Promise<void>) | undefined
   // The data to keep on the user, laid over what they hold; nothing keeps it as is.
   onProviderProfile?: ((user: User, profile: Profile) => unknown) | undefined

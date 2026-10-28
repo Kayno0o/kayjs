@@ -1,4 +1,5 @@
 import type { Duration } from 'kay'
+import type { Access } from './access'
 import type { BareUser } from './core'
 import type { Requirement } from './types'
 import { durationSeconds } from 'kay/library'
@@ -40,11 +41,13 @@ export interface OrganizationsCore {
   create?: ((user: BareUser) => Promise<boolean>) | undefined
 }
 
-// `create` is wired once the app's `authorize` is known.
-export function organizationsCore<OrgRole extends string, Role extends string>(options: OrganizationsOptions<OrgRole, Role>): OrganizationsCore {
+// `create` asks the app's `authorize`, through `access`.
+export function organizationsCore<OrgRole extends string, Role extends string>(options: OrganizationsOptions<OrgRole, Role>, access: Access<Role>): OrganizationsCore {
   const { isGranted } = createRoleHierarchy<BareUser, OrgRole>(options.roles, user => user.roles as OrgRole[])
+  const create = options.create
 
   return {
+    ...create !== undefined && { create: async user => access.authorize(user, create, 'write', {}) },
     roles: new Set(Object.keys(options.roles)),
     isGranted: (required, held) => isGranted(required, held),
     owner: options.owner,

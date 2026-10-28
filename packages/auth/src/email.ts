@@ -79,8 +79,10 @@ export type ResetPasswordResult = LinkResult | { ok: false, errors: { password: 
 
 export type ChangeEmailResult = { ok: true } | { ok: false, error: ProofFailure | 'unavailable' } | { ok: false, errors: { email: EmailProblem | 'taken' | 'unchanged' } }
 
+export type SendVerificationResult = MailRequestResult | { ok: false, error: 'signed-out' | 'verified' }
+
 // Mails a new verification link to the signed-in user or, with nobody signed in, off the response's path to the account this browser registered or proved the password of.
-export async function sendVerification(state: RequestState): Promise<MailRequestResult | { ok: false, error: 'signed-out' | 'verified' }> {
+export async function sendVerification(state: RequestState): Promise<SendVerificationResult> {
   const current = await state.current()
   const registered = current ? undefined : await state.session.get('authRegistered')
   const record = current ?? (registered === undefined ? undefined : await state.core.store.users.get(registered))
@@ -336,8 +338,10 @@ export async function verifyEmailCode(state: RequestState, code: string): Promis
   return { ok: true, redirect: afterVerifying(state, (await state.current())?.id === spent.record.id, spent.token.redirect) }
 }
 
+export type PendingEmailCode = { type: 'sign-in' | 'verify', email: string } | null
+
 // The code this session waits for, for the page that asks for it.
-export async function pendingCode(state: RequestState): Promise<{ type: 'sign-in' | 'verify', email: string } | null> {
+export async function pendingCode(state: RequestState): Promise<PendingEmailCode> {
   const pending = await state.session.get('authEmailCode')
 
   if (!pending || pending.expires < Date.now())

@@ -149,7 +149,9 @@ export async function listTokens(state: RequestState): Promise<BearerToken[]> {
   return record && state.via() === 'session' ? (await state.core.store.bearerTokens.listByUser(record.id)).filter(token => !token.oauth).map(publicToken) : []
 }
 
-export async function revokeToken(state: RequestState, id: string): Promise<{ ok: true } | { ok: false, error: 'signed-out' | 'not-found' }> {
+export type RevokeTokenResult = { ok: true } | { ok: false, error: 'signed-out' | 'not-found' }
+
+export async function revokeToken(state: RequestState, id: string): Promise<RevokeTokenResult> {
   const record = await state.current()
 
   if (!record || state.via() !== 'session')

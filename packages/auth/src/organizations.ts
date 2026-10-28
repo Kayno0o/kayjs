@@ -59,6 +59,10 @@ export type MemberResult = { ok: true } | { ok: false, error: OrganizationFailur
 
 export type InviteResult<Role extends string = string> = { ok: true, invitation: Invitation<Role> } | { ok: false, error: OrganizationFailure | 'unverified' | 'unknown-role' | 'invalid-email' | 'member' | 'limited' | 'unavailable' }
 
+export type ListMembersResult<Role extends string = string> = { ok: true, members: Member<Role>[] } | { ok: false, error: OrganizationFailure }
+
+export type ListInvitationsResult<Role extends string = string> = { ok: true, invitations: Invitation<Role>[] } | { ok: false, error: OrganizationFailure }
+
 // `wrong-account` when the signed-in user's address is not the one invited, `unverified` while it is but unproven.
 export type AcceptResult<Role extends string = string> = { ok: true, membership: Membership<Role> } | { ok: false, error: 'signed-out' | 'not-found' | 'wrong-account' | 'unverified' | 'member' }
 
@@ -199,8 +203,10 @@ export async function updateOrganization(state: RequestState, ref: string, patch
   return updated ? { ok: true, organization: publicOrganization(updated) } : { ok: false, error: 'not-found' }
 }
 
+export type DeleteOrganizationResult = { ok: true } | { ok: false, error: OrganizationFailure | 'impersonating' }
+
 // Owners only, from a session: every membership and invitation goes with it. Never for an admin acting as the owner, as it cannot be undone.
-export async function deleteOrganization(state: RequestState, ref: string): Promise<{ ok: true } | { ok: false, error: OrganizationFailure | 'impersonating' }> {
+export async function deleteOrganization(state: RequestState, ref: string): Promise<DeleteOrganizationResult> {
   const { config, store } = organizationsOf(state.core)
   const found = await asMember(state, ref, config.owner, true)
 
@@ -217,7 +223,7 @@ export async function deleteOrganization(state: RequestState, ref: string): Prom
 }
 
 // Any member may list the others.
-export async function listMembers(state: RequestState, ref: string): Promise<{ ok: true, members: Member[] } | { ok: false, error: OrganizationFailure }> {
+export async function listMembers(state: RequestState, ref: string): Promise<ListMembersResult> {
   const { store } = organizationsOf(state.core)
   const found = await asMember(state, ref)
 
@@ -378,7 +384,7 @@ export async function invite(state: RequestState, ref: string, email: string, ro
 }
 
 // The organization's invitations still open, oldest first, for its managers; expired ones are left out.
-export async function listInvitations(state: RequestState, ref: string): Promise<{ ok: true, invitations: Invitation[] } | { ok: false, error: OrganizationFailure }> {
+export async function listInvitations(state: RequestState, ref: string): Promise<ListInvitationsResult> {
   const { config, store } = organizationsOf(state.core)
   const found = await asMember(state, ref, config.manage, true)
 
@@ -388,7 +394,9 @@ export async function listInvitations(state: RequestState, ref: string): Promise
   return { ok: true, invitations: (await standing(config, store, open(await store.invitations.listByOrganization(found.organization.id)))).map(invitation => publicInvitation(invitation, found.organization)) }
 }
 
-export async function revokeInvitation(state: RequestState, ref: string, invitationId: string): Promise<{ ok: true } | { ok: false, error: OrganizationFailure }> {
+export type RevokeInvitationResult = { ok: true } | { ok: false, error: OrganizationFailure }
+
+export async function revokeInvitation(state: RequestState, ref: string, invitationId: string): Promise<RevokeInvitationResult> {
   const { config, store } = organizationsOf(state.core)
   const found = await asMember(state, ref, config.manage, true)
 
@@ -495,8 +503,10 @@ export async function acceptInvitation(state: RequestState, invitationId: string
   return { ok: true, membership: membership(organization, member) }
 }
 
+export type RejectInvitationResult = { ok: true } | { ok: false, error: 'signed-out' | 'not-found' }
+
 // The invited user turns it down; `not-found` when it is not open to them, whoever it was meant for.
-export async function declineInvitation(state: RequestState, invitationId: string): Promise<{ ok: true } | { ok: false, error: 'signed-out' | 'not-found' }> {
+export async function declineInvitation(state: RequestState, invitationId: string): Promise<RejectInvitationResult> {
   const { store } = organizationsOf(state.core)
   const record = await state.current()
 

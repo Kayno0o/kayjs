@@ -114,8 +114,10 @@ async function anotherAdmin(state: RequestState, exceptId: string): Promise<bool
   }
 }
 
+export type ListUsersResult = { ok: true, users: ManagedUser[], total: number } | { ok: false, error: 'forbidden' }
+
 // Newest first, a page of `limit` (50 by default) from `offset`.
-export async function listUsers(state: RequestState, query: { search?: string | undefined, offset?: number | undefined, limit?: number | undefined }): Promise<{ ok: true, users: ManagedUser[], total: number } | { ok: false, error: 'forbidden' }> {
+export async function listUsers(state: RequestState, query: { search?: string | undefined, offset?: number | undefined, limit?: number | undefined }): Promise<ListUsersResult> {
   if (!(await actingAdmin(state)))
     return { ok: false, error: 'forbidden' }
 
@@ -129,7 +131,9 @@ export async function listUsers(state: RequestState, query: { search?: string | 
   return { ok: true, users: found.users.map(managedUser), total: found.total }
 }
 
-export async function getUser(state: RequestState, userId: string): Promise<{ ok: true, user: ManagedUser, admin: boolean } | { ok: false, error: AdminFailure }> {
+export type GetUserResult = { ok: true, user: ManagedUser, admin: boolean } | { ok: false, error: AdminFailure }
+
+export async function getUser(state: RequestState, userId: string): Promise<GetUserResult> {
   if (!(await actingAdmin(state)))
     return { ok: false, error: 'forbidden' }
 
@@ -255,16 +259,20 @@ export async function deleteUser(state: RequestState, userId: string): Promise<D
   return await isAdmin(state, record) ? { ok: false, error: 'admin' } : eraseLeavingUser(state, record, { actor, handOver: true })
 }
 
+export type AdminAuditLogResult = { ok: true, entries: AuditEntry[] } | { ok: false, error: 'forbidden' }
+
 // Everyone's audit log, or one user's, newest first.
-export async function adminAuditLog(state: RequestState, query: { userId?: string | undefined, before?: AuditCursorInput | undefined, limit?: number | undefined }): Promise<{ ok: true, entries: AuditEntry[] } | { ok: false, error: 'forbidden' }> {
+export async function adminAuditLog(state: RequestState, query: { userId?: string | undefined, before?: AuditCursorInput | undefined, limit?: number | undefined }): Promise<AdminAuditLogResult> {
   if (!(await actingAdmin(state)))
     return { ok: false, error: 'forbidden' }
 
   return { ok: true, entries: await auditEntries(state.core, query) }
 }
 
+export type ImpersonateResult = { ok: true } | { ok: false, error: AdminFailure | 'stale' | 'self' | 'admin' | 'banned' }
+
 // Signs this browser in as `userId`, the admin's own sign-in kept for `stopImpersonating`; 'stale' unless the admin signed in or re-proved lately. Nothing that takes a proof works meanwhile, and another admin cannot be impersonated.
-export async function impersonate(state: RequestState, userId: string): Promise<{ ok: true } | { ok: false, error: AdminFailure | 'stale' | 'self' | 'admin' | 'banned' }> {
+export async function impersonate(state: RequestState, userId: string): Promise<ImpersonateResult> {
   const acting = await changingAdmin(state)
   const own = await state.session.get('auth')
 
