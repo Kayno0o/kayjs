@@ -354,8 +354,8 @@ export function guard<Own extends object = object>(check: (ctx: GuardContext<Own
 }
 
 // An `await` block takes any promise whatever made it, so this is no longer needed: it still returns the promise as a promise, handling its rejection at once.
-// eslint-disable-next-line ts/promise-function-async -- an async function would hand back a second promise, which rejects with nothing taking it
 // kept: request
+// eslint-disable-next-line ts/promise-function-async -- an async function would hand back a second promise, which rejects with nothing taking it
 export function defer<T>(value: T | PromiseLike<T>): Deferred<T> {
   const promise = Promise.resolve(value)
 
