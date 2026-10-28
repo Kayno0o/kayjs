@@ -469,7 +469,7 @@ export async function browserRefuses(): Promise<(specifier: string) => boolean> 
     const probe = await Bun.build({ entrypoints: ['probe.js'], files: { 'probe.js': names.map(name => `import ${JSON.stringify(name)}`).join('\n') }, target: 'browser', throw: false })
     const refused = new Set(refusedBuiltins(probe.logs))
 
-    return (specifier: string) => specifier === 'bun' || specifier.startsWith('bun:') || refused.has(specifier) || (specifier.startsWith('node:') && refused.has(specifier.slice(5)))
+    return (specifier: string) => specifier === 'bun' || specifier.startsWith('bun:') || refused.has(specifier)
   })()
 
   return browserRefusals

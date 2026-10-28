@@ -757,14 +757,14 @@ describe.concurrent('kay check, edge cases', () => {
       it('reports a refused builtin an app module the island imports names itself, with or without node:, and a Bun one', async () => {
         const diagnostics = await found({
           'src/components/counter.kay': island('import { a } from \'../lib/a\'\nimport { b } from \'../lib/b\'\nimport { c } from \'../lib/c\'\nimport { d } from \'../lib/d\''),
-          'src/lib/a.ts': 'import { AsyncLocalStorage } from \'node:async_hooks\'\n\nexport const a = AsyncLocalStorage\n',
+          'src/lib/a.ts': 'import { AsyncLocalStorage } from \'async_hooks\'\n\nexport const a = AsyncLocalStorage\n',
           'src/lib/b.ts': 'import { Worker } from \'worker_threads\'\n\nexport const b = Worker\n',
           'src/lib/c.ts': 'import { Database } from \'bun:sqlite\'\n\nexport const c = Database\n',
           'src/lib/d.ts': 'import * as bun from \'bun\'\n\nexport const d = bun.file\n',
         })
 
         expect(diagnostics.map(d => d.at)).toEqual(['src/components/counter.kay:3', 'src/components/counter.kay:4', 'src/components/counter.kay:5', 'src/components/counter.kay:6'])
-        expect(diagnostics.map(d => d.message.slice(d.message.indexOf(': src/') + 2))).toEqual(['src/components/counter.kay -> src/lib/a.ts -> node:async_hooks', 'src/components/counter.kay -> src/lib/b.ts -> worker_threads', 'src/components/counter.kay -> src/lib/c.ts -> bun:sqlite', 'src/components/counter.kay -> src/lib/d.ts -> bun'])
+        expect(diagnostics.map(d => d.message.slice(d.message.indexOf(': src/') + 2))).toEqual(['src/components/counter.kay -> src/lib/a.ts -> async_hooks', 'src/components/counter.kay -> src/lib/b.ts -> worker_threads', 'src/components/counter.kay -> src/lib/c.ts -> bun:sqlite', 'src/components/counter.kay -> src/lib/d.ts -> bun'])
       })
 
       it('reports a refused builtin the island imports itself, at that import', async () => {
@@ -773,10 +773,10 @@ describe.concurrent('kay check, edge cases', () => {
         expect(diagnostics.map(d => d.at)).toEqual(['src/components/counter.kay:3'])
       })
 
-      it('passes the builtins a browser build polyfills, and a type-only or unused import of a module reaching a refused one', async () => {
+      it('passes the builtins a browser build polyfills or stubs, node:async_hooks among them, and a type-only or unused import of a module reaching a refused one', async () => {
         expect(await found({
           'src/components/counter.kay': island('import { a } from \'../lib/a\''),
-          'src/lib/a.ts': 'import { join } from \'node:path\'\nimport { EventEmitter } from \'events\'\nimport { Buffer } from \'buffer\'\nimport { randomUUID } from \'node:crypto\'\n\nexport const a = [join, EventEmitter, Buffer, randomUUID]\n',
+          'src/lib/a.ts': 'import { join } from \'node:path\'\nimport { EventEmitter } from \'events\'\nimport { Buffer } from \'buffer\'\nimport { randomUUID } from \'node:crypto\'\nimport { AsyncLocalStorage } from \'node:async_hooks\'\n\nexport const a = [join, EventEmitter, Buffer, randomUUID, AsyncLocalStorage]\n',
         })).toEqual([])
         expect(await found({
           ...pg,
