@@ -1,9 +1,9 @@
-import { mkdir, readdir, rm, symlink } from 'node:fs/promises'
+import { mkdir, readdir, readlink, rm, symlink } from 'node:fs/promises'
 import { join, relative, resolve } from 'node:path'
 import process from 'node:process'
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
 import { findKayLibraries, kayLibrariesOf } from '../src/build/libraries'
-import { throughLinks } from '../src/build/links'
+import { outOfStore, throughLinks } from '../src/build/links'
 import { projectPaths } from '../src/project'
 import { kayCheck } from './check-helper'
 import { scratchDir } from './scratch'
@@ -323,6 +323,36 @@ describe('throughLinks', () => {
 
     expect(throughLinks(link, join(example, 'src/x.kay'))).toBe(join(link, 'src/x.kay'))
     expect(throughLinks(link, join(repo, 'src/lib.kay'))).toBe(join(link, 'node_modules/repo/src/lib.kay'))
+  })
+})
+
+describe('outOfStore', () => {
+  it('links a store entry once, replaces a link gone stale, leaves a file outside the store as it is, and the store file as it is when the cache cannot be written', async () => {
+    const tree = await scratchDir('dom-')
+    const entry = join(tree, 'node_modules/.bun/lib@1.0.0')
+    const file = join(entry, 'node_modules/lib/src/a.css')
+    const store = join(tree, 'cache/store')
+
+    projects.push(tree)
+    await write(tree, { 'node_modules/.bun/lib@1.0.0/node_modules/lib/src/a.css': 'p {}\n', 'elsewhere/b.css': 'p {}\n', 'other/.keep': '' })
+
+    const linked = outOfStore(store, file)
+    const link = linked.slice(0, -'/node_modules/lib/src/a.css'.length)
+
+    expect(linked).toStartWith(join(store, 'lib@1.0.0-'))
+    expect(linked).not.toContain('/.bun/')
+    expect(await Bun.file(linked).text()).toBe('p {}\n')
+    expect(outOfStore(store, file)).toBe(linked)
+
+    await rm(link)
+    await symlink(join(tree, 'other'), link)
+    expect(outOfStore(store, file)).toBe(linked)
+    expect(await readlink(link)).toBe(entry)
+
+    expect(outOfStore(store, join(tree, 'elsewhere/b.css'))).toBe(join(tree, 'elsewhere/b.css'))
+
+    // A cache folder under a file, which no user may create, root included.
+    expect(outOfStore(join(tree, 'elsewhere/b.css/store'), file)).toBe(file)
   })
 })
 

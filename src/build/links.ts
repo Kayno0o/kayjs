@@ -1,5 +1,5 @@
-import { existsSync, mkdirSync, readdirSync, readlinkSync, realpathSync, renameSync, statSync, symlinkSync } from 'node:fs'
-import { join, relative, sep } from 'node:path'
+import { existsSync, mkdirSync, readdirSync, readlinkSync, realpathSync, renameSync, rmSync, statSync, symlinkSync } from 'node:fs'
+import { join, relative, resolve, sep } from 'node:path'
 
 // The package's store entry, its id and the file's path in it, under the entry's `node_modules`.
 const STORE_FILE = /^(.*[\\/]node_modules[\\/]\.bun[\\/]([^\\/]+))[\\/](node_modules[\\/].+)$/
@@ -39,24 +39,42 @@ export function outOfStore(dir: string, file: string): string {
   // Two stores, a workspace's and the app's own, may hold the same id.
   const link = join(dir, `${id}-${Bun.hash(entry).toString(36)}`)
 
-  if (linkTarget(link) !== entry) {
-    const temporary = `${link}.${crypto.randomUUID()}.tmp`
+  if (linksTo(link, entry))
+    return join(link, rest)
 
+  const temporary = `${link}.${crypto.randomUUID()}.tmp`
+
+  // A cache that cannot be written leaves the file to Bun's own parser.
+  try {
     mkdirSync(dir, { recursive: true })
     symlinkSync(entry, temporary, 'junction')
-    // Renamed into place, so two builds linking the same entry never meet a half-made link.
+  }
+  catch {
+    return file
+  }
+
+  // Renamed into place, so two builds linking the same entry never meet a half-made link.
+  try {
     renameSync(temporary, link)
+  }
+  catch {
+    rmSync(temporary, { force: true })
+
+    // Another build may have linked it meanwhile.
+    if (!linksTo(link, entry))
+      return file
   }
 
   return join(link, rest)
 }
 
-function linkTarget(link: string): string | undefined {
+// Windows may read a junction back in another form than it was written.
+function linksTo(link: string, target: string): boolean {
   try {
-    return readlinkSync(link)
+    return resolve(readlinkSync(link)) === resolve(target)
   }
   catch {
-    return undefined
+    return false
   }
 }
 
