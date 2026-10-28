@@ -2,7 +2,7 @@ import type { ClientBuild } from './client'
 import type { PageResponder } from './page-routes'
 import type { RenderOptions } from './render'
 import { joinBase } from '../runtime/base'
-import { speculationRules } from './speculation'
+import { prefetchMeta, speculationRules } from './speculation'
 
 const SAVING = /^\s*on\s*$/i
 const FONT_PRELOAD = /<link\s[^>]*?\brel="preload"[^>]*?\bas="font"[^>]*>/g
@@ -38,12 +38,13 @@ export function lightFontCss(css: string): string {
   return css.replace(FONT_DISPLAY, 'font-display:optional')
 }
 
-// The page responder, with the font preloads and the speculation rules left out of a page for a visitor saving data and its fonts declared to show only when cached; every page it answers says it varies on `Save-Data`, so no cache hands one kind of visitor the other's copy.
+// The page responder, with the font preloads and the speculation rules, or the prefetch meta of a page running the swap, left out of a page for a visitor saving data and its fonts declared to show only when cached; every page it answers says it varies on `Save-Data`, so no cache hands one kind of visitor the other's copy.
 export function withSavedData(respond: PageResponder, options: RenderOptions): PageResponder {
   if (!pagesVary(options))
     return respond
 
   const rules = speculationRules(options.prefetch, options.base, options.apiPath)
+  const meta = prefetchMeta(options.prefetch)
   const fonts = options.fontCss === undefined ? undefined : { full: options.fontCss, light: lightFontCss(options.fontCss) }
   // The chunks as the page names them, under the mount point.
   const base = options.base ?? ''
@@ -52,7 +53,7 @@ export function withSavedData(respond: PageResponder, options: RenderOptions): P
     let lightened = withoutIslandPreloads(head.replace(FONT_PRELOAD, ''), chunks)
 
     if (rules !== '')
-      lightened = lightened.replace(rules, () => '')
+      lightened = lightened.replace(rules, () => '').replace(meta, () => '')
 
     return fonts === undefined ? lightened : lightened.replace(fonts.full, () => fonts.light)
   }

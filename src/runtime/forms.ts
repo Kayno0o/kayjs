@@ -1,10 +1,11 @@
 import { withoutBase } from './base'
-import { busyForms, checkedForms, leave, loadAgain, navigation, prefetched, submitNatively, swappable } from './navigation'
+import { busyForms, checkedForms, submitNatively } from './form-submits'
+import { leave, loadAgain, navigation, prefetched, swappable } from './navigation'
 import { pendingBlocks } from './pending'
 import { FAILURE_HEADER, NAVIGATE_HEADER, PAGE_HEADER, REDIRECT_HEADER, WORK_HEADER, WORK_SCRIPT } from './swap'
 import { uploaded } from './upload'
 
-// Form posting, which `./navigate` loads once a form posting to an action takes focus or is submitted: checked, then sent, then the page it answers shown through the swap.
+// Form posting, which `./form-submits` loads once a form posting to an action takes focus or is submitted: checked, then sent, then the page it answers shown through the swap.
 // The swap is imported as `./navigate` imports it, so that the two load as chunks of their own rather than through a third holding what they share.
 
 // What the server answered a form the swap posted.

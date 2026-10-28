@@ -62,7 +62,6 @@ export interface HistoryState {
 }
 
 const KAY_PATHS = /^\/_kay(?:\/|$)/
-const ACTION_PATH = /^\/_kay\/action\//
 const HASH = /#.*/
 const SCROLL_SAVE_MS = 150
 
@@ -97,13 +96,10 @@ export const leaving = new Set<() => void>()
 // Pages fetched ahead of a click, by URL; an action may change what they show, so each post forgets them.
 export const prefetched = new Map<string, { at: number, page: Promise<FetchedPage> }>()
 export const leaveGuards = new Set<LeaveGuard>()
-export const busyForms = new WeakSet<HTMLFormElement>()
-// A form handed back to the browser after the swap could not send it, which the next submit event lets through.
-export const nativeSubmits = new WeakSet<HTMLFormElement>()
-// The forms kay set `novalidate` on to check them itself; an author's own `novalidate` still skips the check.
-export const checkedForms = new WeakSet<HTMLFormElement>()
 
 let scrollTimer: ReturnType<typeof setTimeout> | undefined
+// The API's path, as the `kay-api` meta of the page first loaded names it: the app's, so the same on every page a swap brings.
+let apiPath: string | undefined
 
 // Whether the page may be left for `to`: the first guard holding unsaved changes asks, once for them all.
 export async function mayLeave(to: URL): Promise<boolean> {
@@ -197,50 +193,7 @@ export function swappable(url: URL): boolean {
     return false
 
   const path = withoutBase(url.pathname)
-  const api = document.querySelector<HTMLMetaElement>('meta[name="kay-api"]')?.content ?? '/api'
+  const api = apiPath ??= document.querySelector<HTMLMetaElement>('meta[name="kay-api"]')?.content ?? '/api'
 
   return !KAY_PATHS.test(path) && path !== api && !path.startsWith(`${api}/`)
-}
-
-// Where a form posts when the swap posts it: one of the app's actions, in this tab, with nothing opting it out.
-export function swappedActionUrl(form: HTMLFormElement, submitter: HTMLElement | null): URL | undefined {
-  const method = (submitter?.getAttribute('formmethod') ?? form.getAttribute('method') ?? 'get').toLowerCase()
-  const url = new URL(submitter?.getAttribute('formaction') ?? form.getAttribute('action') ?? '', location.href)
-  const target = submitter?.getAttribute('formtarget') ?? form.target
-
-  if (method !== 'post' || url.origin !== location.origin || (target !== '' && target !== '_self') || form.closest('[data-reload]') || submitter?.hasAttribute('data-reload'))
-    return undefined
-
-  return ACTION_PATH.test(withoutBase(url.pathname)) ? url : undefined
-}
-
-// The browser posts the form, as it would have without the swap.
-export function submitNatively(form: HTMLFormElement, submitter: HTMLElement | null): void {
-  navigation.released = true
-  navigation.loads++
-  nativeSubmits.add(form)
-  form.requestSubmit(submitter instanceof HTMLButtonElement || submitter instanceof HTMLInputElement ? submitter : null)
-}
-
-// Forms posting to an action are checked by kay once it runs, so the schema's own messages show rather than the browser's for the constraints their fields write for a visit without JavaScript.
-export function takeFormChecks(root: ParentNode): void {
-  for (const form of root.querySelectorAll('form'))
-    takeFormCheck(form)
-}
-
-export function takeFormCheck(form: HTMLFormElement): void {
-  if (form.noValidate)
-    return
-
-  try {
-    if (!swappedActionUrl(form, null))
-      return
-  }
-  catch {
-    // An action the page cannot resolve is left to the browser, which posts it natively.
-    return
-  }
-
-  form.noValidate = true
-  checkedForms.add(form)
 }

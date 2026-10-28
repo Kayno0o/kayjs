@@ -4,15 +4,16 @@ import { savesDataInBrowser } from './save-data'
 type Eagerness = 'conservative' | 'moderate' | 'eager' | false
 
 const HOVER_DELAY_MS = 200
+const EAGERNESS = new Set<string | undefined>(['conservative', 'moderate', 'eager'])
 
 let eagerness: Eagerness = false
 let hoverTimer: ReturnType<typeof setTimeout> | undefined
 
 const handlers: Record<string, (event: Event) => void> = {}
 
-// Prefetches the links the way the server's speculation rules say, which the swap follows; none for a visitor asking for less data, whom a page the server or a cache gave in full reaches here too.
-export function startPrefetch(rules: string | null): void {
-  eagerness = savesDataInBrowser() ? false : eagernessOf(rules)
+// Prefetches the links as eagerly as the server's `kay-prefetch` meta says, which the swap follows; none for a visitor asking for less data, whom a page the server or a cache gave in full reaches here too.
+export function startPrefetch(given: string | undefined): void {
+  eagerness = savesDataInBrowser() || !EAGERNESS.has(given) ? false : given as Eagerness
 
   if (eagerness === 'conservative')
     handlers.pointerdown = onPrefetchHint
@@ -26,15 +27,6 @@ export function startPrefetch(rules: string | null): void {
 // Handles an event heard before the listeners were there.
 export function replay(event: Event): void {
   handlers[event.type]?.(event)
-}
-
-function eagernessOf(rules: string | null): Eagerness {
-  try {
-    return (JSON.parse(rules ?? '') as { prefetch: { eagerness: Eagerness }[] }).prefetch[0]?.eagerness ?? false
-  }
-  catch {
-    return false
-  }
 }
 
 function onHover(event: Event): void {

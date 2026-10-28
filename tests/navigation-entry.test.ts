@@ -73,6 +73,18 @@ for (const [name, options, prefix, slash] of MODES) {
       expect(home).not.toContain('data-kay-nav')
     })
 
+    // The swap prefetches the links itself: the browser's speculation rules would fetch pages it never uses.
+    it('gives a page shipping either entry the prefetch setting alone, and a visitor saving data none', async () => {
+      for (const path of ['/login', '/']) {
+        const html = await (await site.fetch(at(path))).text()
+        const saving = await (await site.fetch(at(path), { headers: { 'save-data': 'on' } })).text()
+
+        expect(html, path).toContain('<meta name="kay-prefetch" content="moderate">')
+        expect(html, path).not.toContain('speculationrules')
+        expect(saving, path).not.toContain('kay-prefetch')
+      }
+    })
+
     // A part sent later or a value the page follows may bring islands or forms the navigation-only entry cannot run.
     it('is not what a page posting a form loads when it streams or follows a cached value', async () => {
       for (const path of ['/streamed', '/followed']) {

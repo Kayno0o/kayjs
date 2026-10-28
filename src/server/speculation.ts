@@ -20,6 +20,11 @@ export function speculationRules(prefetch: Prefetch = 'moderate', base = '', api
   return script
 }
 
+// A page running kay's swap prefetches its links itself, reading only how eagerly.
+export function prefetchMeta(prefetch: Prefetch = 'moderate'): string {
+  return prefetch === false ? '' : `<meta name="kay-prefetch" content="${prefetch}">`
+}
+
 // Never kay's own routes or the API, as the page swap leaves them too, nor a download or a link search engines are told not to follow, as a sign-out link often is.
 function rules(eagerness: Exclude<Prefetch, false>, base = '', apiPath = '/api'): string {
   const where = { and: [{ href_matches: `${base}/*` }, { not: { href_matches: `${base}/_kay/*` } }, { not: { href_matches: `${base}${apiPath}/*` } }, { not: { href_matches: `${base}${apiPath}` } }, { not: { selector_matches: '[data-no-prefetch], [download], [rel~=nofollow]' } }] }

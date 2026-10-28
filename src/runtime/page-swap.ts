@@ -1,6 +1,7 @@
 import type { FetchedPage, Swap } from './navigation'
 import type { Policy } from './swap-flight'
-import { historyState, leave, leaving, navigation, pageKey, restoreScroll, saveScroll, takeFormChecks } from './navigation'
+import { listenToForms } from './form-submits'
+import { historyState, leave, leaving, navigation, pageKey, restoreScroll, saveScroll } from './navigation'
 import { NAVIGATION_ENTRY } from './navigation-entry'
 import { forgetPageData } from './page-data'
 import { HTML, ownOrigin, PAGE_TIMEOUT_MS, pageFor } from './swap-fetch'
@@ -245,7 +246,10 @@ export async function show(page: FetchedPage, hash: string, swap: Swap, isCurren
       restoreScroll(swap.saved, hash)
 
     void moveFocus(swap, policy)
-    takeFormChecks(document)
+
+    if (document.forms.length > 0)
+      listenToForms()
+
     navigation.hooks!.hydrate(document.body)
     void navigation.hooks!.arrive?.(target.search, scrollY)
     // For plain scripts, which no island tells of the swap.

@@ -1,21 +1,23 @@
 import type { HeadElement, HistoryState, NavigationHooks, Swap } from './navigation'
-import { withoutBase } from './base'
-import { busyForms, dirtyGuard, dropScrollSave, historyState, leave, mayLeave, nativeSubmits, navigation, onScroll, pageKey, restoreScroll, saveScroll, submitNatively, swappable, swappedActionUrl, takeFormCheck, takeFormChecks } from './navigation'
+import { dirtyGuard, dropScrollSave, historyState, leave, mayLeave, navigation, onScroll, pageKey, restoreScroll, saveScroll, swappable } from './navigation'
 
 // Swaps pages in place: a link or a form of the app fetches the next page from the server and puts it in this one, islands marked `persist` kept alive.
 // Everything here runs in the browser only, started by the entry; without JavaScript links and forms load pages as they always did.
-// This part only listens: the swap itself, in `./page-swap`, loads once a visitor points at a link or calls `navigate`, and form posting, in `./forms`, once a form takes focus or is submitted, so a page nobody leaves never fetches them.
+// This part only listens: the swap itself, in `./page-swap`, loads once a visitor points at a link or calls `navigate`, and the forms' listener, in `./form-submits`, once the page shows a form or one takes focus, so a page nobody leaves never fetches the one and a page with no form never fetches the other.
 
-const SPECULATION = 'script[type="speculationrules"]'
+// Defined by the build of the navigation-only entry, whose boot hands the forms' listener over, loaded with it.
+declare const KAY_NAV_ENTRY: true | undefined
+
+const PREFETCH = 'meta[name="kay-prefetch"]'
 
 let swapModule: Promise<typeof import('./page-swap')> | undefined
-let formsModule: Promise<typeof import('./forms')> | undefined
+let formsModule: Promise<typeof import('./form-submits')> | undefined
 // A traversal undone while the guards are asked about it: where it went, and how far.
 let held: { url: URL, delta: number } | undefined
 // A traversal the guards let through, made again.
 let passing = false
-// The speculation rules the page came with, until the first pointer or focus on a link loads the code prefetching by them.
-let rules: string | null | undefined
+// How eagerly the page prefetches, as its `kay-prefetch` meta says, until the first pointer or focus on a link loads the code prefetching by it.
+let rules: string | undefined
 let prefetchModule: Promise<typeof import('./prefetch')> | undefined
 
 // Takes over the links and forms of the app; called once by the entry.
@@ -38,23 +40,23 @@ export function startNavigation(given: NavigationHooks): void {
     history.replaceState(historyState(), '')
   }
 
-  // The swap would never use what the browser prefetches for a full load, so the rules go and it prefetches the same links itself, from code loaded once a link is first pointed at.
-  const script = document.querySelector(SPECULATION)
-
-  if (script) {
-    rules = script.textContent
-    script.remove()
-  }
+  // The swap would never use what the browser prefetches for a full load, so a page shipping it carries no speculation rules and it prefetches the same links itself, from code loaded once a link is first pointed at.
+  rules = document.querySelector<HTMLMetaElement>(PREFETCH)?.content
 
   for (const element of document.head.children as HTMLCollectionOf<HeadElement>)
     element._$s = element.outerHTML
 
-  takeFormChecks(document)
+  // The navigation-only entry listens to the forms itself, as every page it runs on posts one.
+  if (typeof KAY_NAV_ENTRY === 'undefined') {
+    if (document.forms.length > 0)
+      void wakeForms()
+  }
+
   history.scrollRestoration = 'manual'
   document.addEventListener('click', onClick)
-  document.addEventListener('submit', onSubmit)
-  document.addEventListener('focusin', onFormFocus)
+  document.addEventListener('focusin', onFocus)
   window.addEventListener('popstate', onPopState)
+  // `pagehide` saves the scroll for a full load only: back or forward between entries of this document fires `popstate` once the entry already changed, too late to save the one left, so the entry is kept up to date as the page scrolls.
   window.addEventListener('scroll', onScroll, { passive: true })
   window.addEventListener('pagehide', saveScroll)
   // Pointing at a link, or pressing one on a touch screen, is the moment to fetch the swap: the click follows.
@@ -66,8 +68,18 @@ export async function loadSwap(): Promise<typeof import('./page-swap')> {
   return swapModule ??= import('./page-swap')
 }
 
-async function loadForms(): Promise<typeof import('./forms')> {
-  return formsModule ??= import('./forms')
+// The forms' listener, for the page's forms or the one taking focus; one that fails to load leaves them to the browser, which posts them in full.
+async function wakeForms(form?: HTMLFormElement): Promise<void> {
+  try {
+    // A condition Bun folds before it splits chunks: an import left in the navigation-only entry, which bundles the module, would split that entry in three.
+    const forms = await (typeof KAY_NAV_ENTRY === 'undefined' ? formsModule ??= import('./form-submits') : Promise.reject(new Error('unreachable')))
+
+    if (form)
+      forms.focused(form)
+    else
+      forms.listenToForms()
+  }
+  catch {}
 }
 
 // Fetched ahead of the click it hints at; one that fails to load leaves each click to load its page fully.
@@ -90,7 +102,7 @@ async function wakePrefetch(event: Event): Promise<void> {
 async function loadPrefetch(): Promise<typeof import('./prefetch')> {
   const module = await import('./prefetch')
 
-  module.startPrefetch(rules ?? null)
+  module.startPrefetch(rules)
   rules = undefined
 
   return module
@@ -226,69 +238,14 @@ function onPointLink(event: PointerEvent): void {
   }
 }
 
-function onSubmit(event: SubmitEvent): void {
-  const form = event.target as HTMLFormElement
-
-  if (nativeSubmits.has(form)) {
-    nativeSubmits.delete(form)
-
-    return
-  }
-
-  if (event.defaultPrevented)
-    return
-
-  const url = swappedActionUrl(form, event.submitter)
-
-  if (!url)
-    return
-
-  event.preventDefault()
-
-  if (busyForms.has(form))
-    return
-
-  void submit(form, event.submitter, url)
-}
-
-// The form is busy from its submit on, so a second submit while form posting or its checks load posts nothing.
-async function submit(form: HTMLFormElement, submitter: HTMLElement | null, url: URL): Promise<void> {
-  busyForms.add(form)
-
-  let forms: typeof import('./forms')
-
-  try {
-    forms = await loadForms()
-  }
-  catch {
-    busyForms.delete(form)
-    submitNatively(form, submitter)
-
-    return
-  }
-
-  await forms.submit(form, submitter, url)
-}
-
-// An island may render a form after the page loaded, taken once it gets focus.
-function onFormFocus(event: FocusEvent): void {
+function onFocus(event: FocusEvent): void {
   if (rules !== undefined && linkOf(event))
     void wakePrefetch(event)
 
-  const form = event.target instanceof Element ? event.target.closest('form') : null
+  if (typeof KAY_NAV_ENTRY === 'undefined') {
+    const form = event.target instanceof Element ? event.target.closest('form') : null
 
-  if (form) {
-    const url = swappedActionUrl(form, null)
-
-    takeFormCheck(form)
-    void preloadChecks(url && withoutBase(url.pathname), form)
+    if (form)
+      void wakeForms(form)
   }
-}
-
-// A form taking focus is about to be posted: form posting and its checks load then, so a page with no form never fetches them.
-async function preloadChecks(action: string | undefined, form: HTMLFormElement): Promise<void> {
-  try {
-    await (await loadForms()).preloadChecks(action, form)
-  }
-  catch {}
 }

@@ -123,6 +123,16 @@ async function chunkLoaded(on: TestPage, name: string): Promise<boolean> {
   return on.evaluate((chunk: string) => performance.getEntriesByType('resource').some(entry => new RegExp(`/${chunk}-[^/]*\\.js$`).test(entry.name)), name)
 }
 
+// Whether a script the page loaded reads a form's `formmethod`, as the forms' listener does: Bun names the chunk holding it after another module.
+async function formCodeLoaded(on: TestPage): Promise<boolean> {
+  return on.evaluate(async () => {
+    const scripts = performance.getEntriesByType('resource').filter(entry => entry.name.endsWith('.js'))
+    const texts = await Promise.all(scripts.map(async entry => (await fetch(entry.name)).text()))
+
+    return texts.some(text => text.includes('formmethod'))
+  })
+}
+
 // What the page logged as a warning or an error from now on, read back later.
 function problems(on: TestPage): () => string[] {
   const from = { warnings: on.warnings.length, errors: on.errors.length }
@@ -227,7 +237,7 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('page swap i
     expect(problem()).toEqual([])
   })
 
-  // The home page with its speculation rules rewritten to another eagerness, or dropped, hovered or pressed on its second link.
+  // The home page with its prefetch meta rewritten to another eagerness, or dropped, hovered or pressed on its second link.
   async function prefetching(eagerness: string | undefined, act: (on: TestPage) => Promise<void>): Promise<{ fetched: string[], loaded: boolean }> {
     const fresh = await open('/')
 
@@ -236,7 +246,7 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('page swap i
         const response = await request.fetch()
         const html = response.text()
 
-        await request.fulfill({ status: response.status, headers: response.headers, body: eagerness === undefined ? html.replace(/<script type="speculationrules">.*?<\/script>/, '') : html.replace('"eagerness":"moderate"', `"eagerness":"${eagerness}"`) })
+        await request.fulfill({ status: response.status, headers: response.headers, body: eagerness === undefined ? html.replace('<meta name="kay-prefetch" content="moderate">', '') : html.replace('<meta name="kay-prefetch" content="moderate">', `<meta name="kay-prefetch" content="${eagerness}">`) })
       })
       await fresh.goto(origin)
       fresh.responses.length = 0
@@ -739,6 +749,32 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('page swap i
 
       expect(await chunkLoaded(fresh, 'validate')).toBe(true)
       expect(await fresh.count('p.error, p.done')).toBe(0)
+    }
+    finally {
+      fresh.close()
+    }
+  })
+
+  it('loads the forms\' listener only once a page shows a form, and takes the forms a swap brings', async () => {
+    const fresh = await open('/kept')
+
+    try {
+      await settled(fresh)
+
+      expect(await fresh.count('form')).toBe(0)
+      expect(await formCodeLoaded(fresh)).toBe(false)
+
+      await fresh.evaluate(() => {
+        const link = document.createElement('a')
+
+        link.href = '/'
+        document.body.append(link)
+        link.click()
+      })
+      await fresh.waitFor('form')
+      await fresh.waitUntil(() => document.querySelector('form')!.noValidate)
+
+      expect(await formCodeLoaded(fresh)).toBe(true)
     }
     finally {
       fresh.close()

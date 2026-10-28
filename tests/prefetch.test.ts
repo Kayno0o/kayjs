@@ -36,7 +36,6 @@ describe('pages fetched ahead of a click', () => {
 
   describe('for a visitor asking for less data', () => {
     let runs = 0
-    const RULES = JSON.stringify({ prefetch: [{ source: 'document', eagerness: 'moderate' }] })
 
     const listening = async (setup: () => (() => void) | undefined) => {
       const restore = setup()
@@ -46,7 +45,7 @@ describe('pages fetched ahead of a click', () => {
         // A fresh module each time, as the listeners it keeps are the page's, started once.
         const { startPrefetch } = await import(`../src/runtime/prefetch.ts?run=${++runs}`) as typeof import('../src/runtime/prefetch')
 
-        startPrefetch(RULES)
+        startPrefetch('moderate')
 
         return added.mock.calls.map(call => call[0])
       }

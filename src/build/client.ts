@@ -522,7 +522,7 @@ async function bundleIslands(root: string, islands: Map<string, string>, options
   ].join('\n'))
 
   // Bun resolves packages' `development` export condition unless NODE_ENV is defined as production, which would ship a package's dev build; a build for development, not NODE_ENV, asks for theirs.
-  const define: Record<string, string> = { 'KAY_BROWSER': 'true', 'process.env.NODE_ENV': JSON.stringify(options.hot === true ? 'development' : 'production'), 'KAY_STATIC_EXPORT': options.exported === true ? 'true' : 'undefined', 'KAY_FRENCH': options.french === true ? 'true' : 'undefined', 'KAY_I18N': options.i18n === true ? 'true' : 'undefined', 'KAY_VISIBLE_MARGIN': JSON.stringify(rootMargin(options.hydration?.visible, '200px', 'visible')), 'KAY_NEAR_MARGIN': JSON.stringify(rootMargin(options.hydration?.serverIslands, '100% 0px', 'serverIslands')) }
+  const define: Record<string, string> = { 'KAY_BROWSER': 'true', 'process.env.NODE_ENV': JSON.stringify(options.hot === true ? 'development' : 'production'), 'KAY_STATIC_EXPORT': options.exported === true ? 'true' : 'undefined', 'KAY_NAV_ENTRY': 'undefined', 'KAY_FRENCH': options.french === true ? 'true' : 'undefined', 'KAY_I18N': options.i18n === true ? 'true' : 'undefined', 'KAY_VISIBLE_MARGIN': JSON.stringify(rootMargin(options.hydration?.visible, '200px', 'visible')), 'KAY_NEAR_MARGIN': JSON.stringify(rootMargin(options.hydration?.serverIslands, '100% 0px', 'serverIslands')) }
   const external = publicEnv !== undefined ? [publicEnv] : []
   const plugins = (anchor?: string, anchored?: ReadonlySet<string>, direct?: boolean) => [withoutStyles(), api, kay({ target: 'dom', root, cacheDir: projectPaths(root).cache, settings: options.settings, anchor, anchored, direct, inspect: options.inspect, api: trees, external, classTable }), ...options.plugins ?? []]
 
@@ -600,16 +600,19 @@ async function bundleNavigation(root: string, options: ClientOptions, config: Bu
 
   await Bun.write(file, [
     `import ${JSON.stringify(join(RUNTIME_DIR, 'page-errors.ts'))}`,
+    `import { listenToForms, onFocusIn } from ${JSON.stringify(join(RUNTIME_DIR, 'form-submits.ts'))}`,
     `import { startNavigation } from ${JSON.stringify(join(RUNTIME_DIR, 'navigate.ts'))}`,
     ...options.search ? [`import { arrive } from ${JSON.stringify(join(RUNTIME_DIR, 'arrival.ts'))}`] : [],
     '',
     ...options.search ? ['const at = scrollY', ''] : [],
     `startNavigation({ hydrate: () => undefined, dispose: () => undefined${options.search ? ', arrive' : ''} })`,
+    'listenToForms()',
+    'addEventListener(\'focusin\', onFocusIn)',
     ...options.search ? ['void arrive(location.search, at)', 'addEventListener(\'hashchange\', () => void arrive(location.search, scrollY))'] : [],
     '',
   ].join('\n'))
 
-  return { build: await Bun.build({ ...config, entrypoints: [file], naming: { entry: '[name]-[hash].[ext]', chunk: 'nav-[name]-[hash].[ext]' }, outdir: clientDir(root) }), file }
+  return { build: await Bun.build({ ...config, entrypoints: [file], define: { ...config.define, KAY_NAV_ENTRY: 'true' }, naming: { entry: '[name]-[hash].[ext]', chunk: 'nav-[name]-[hash].[ext]' }, outdir: clientDir(root) }), file }
 }
 
 // What kay's policy refuses and the islands' chunks or the workers they start need: `'wasm-unsafe-eval'` to compile wasm, `blob:` workers for a package building its worker in memory, as qr-scanner does.

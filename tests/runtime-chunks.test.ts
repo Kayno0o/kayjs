@@ -140,12 +140,15 @@ describe('the navigation-only entry', () => {
 
     expect(client.navEntry).toBeDefined()
     expect(eager.some(url => islandsBuild.has(url))).toBe(false)
-    expect(texts.join('\n')).toContain('speculationrules')
+    expect(texts.join('\n')).toContain('kay-prefetch')
     // What the page throws still goes to the server's `onError`.
     expect(texts.join('\n')).toContain('unhandledrejection')
     // The hydration a page with islands runs, which a form-only page never does.
     expect(texts.join('\n')).not.toContain('did not match its server markup')
     expect(await chunkText(client, client.entry!)).toContain('did not match its server markup')
+    // Every page it runs on posts a form, which the islands' entry listens for once a page shows one.
+    expect(texts.join('\n')).toContain('formmethod')
+    expect((await Promise.all([client.entry!, ...client.entryImports].map(async url => chunkText(client, url)))).join('\n')).not.toContain('formmethod')
 
     for (const text of texts) {
       for (const [, from] of text.matchAll(IMPORT_SPECIFIER))

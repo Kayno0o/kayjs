@@ -1,0 +1,141 @@
+import { withoutBase } from './base'
+import { navigation } from './navigation'
+
+// Takes over the forms posting to an action, which `./navigate` loads once a page shows a form or one takes focus, so a page holding none never fetches it; the posting itself, in `./forms`, loads once one takes focus or is submitted.
+
+const ACTION_PATH = /^\/_kay\/action\//
+
+export const busyForms = new WeakSet<HTMLFormElement>()
+// A form handed back to the browser after the swap could not send it, which the next submit event lets through.
+export const nativeSubmits = new WeakSet<HTMLFormElement>()
+// The forms kay set `novalidate` on to check them itself; an author's own `novalidate` still skips the check.
+export const checkedForms = new WeakSet<HTMLFormElement>()
+
+let formsModule: Promise<typeof import('./forms')> | undefined
+let listening = false
+
+// Called for every page showing a form, as it loads or is swapped in.
+export function listenToForms(): void {
+  listen()
+
+  for (const form of document.forms)
+    takeFormCheck(form)
+}
+
+// A form taking focus is about to be posted: form posting and its checks load then. An island may render a form after the page loaded, taken here.
+// The form a control taking focus sits in, which the navigation-only entry listens for itself.
+export function onFocusIn(event: FocusEvent): void {
+  const form = event.target instanceof Element ? event.target.closest('form') : null
+
+  if (form)
+    focused(form)
+}
+
+export function focused(form: HTMLFormElement): void {
+  listen()
+  takeFormCheck(form)
+
+  const url = swappedActionUrl(form, null)
+
+  void preloadChecks(url && withoutBase(url.pathname), form)
+}
+
+function listen(): void {
+  if (!listening) {
+    listening = true
+    document.addEventListener('submit', onSubmit)
+  }
+}
+
+async function loadForms(): Promise<typeof import('./forms')> {
+  return formsModule ??= import('./forms')
+}
+
+// Where a form posts when the swap posts it: one of the app's actions, in this tab, with nothing opting it out.
+function swappedActionUrl(form: HTMLFormElement, submitter: HTMLElement | null): URL | undefined {
+  const method = (submitter?.getAttribute('formmethod') ?? form.getAttribute('method') ?? 'get').toLowerCase()
+  const url = new URL(submitter?.getAttribute('formaction') ?? form.getAttribute('action') ?? '', location.href)
+  const target = submitter?.getAttribute('formtarget') ?? form.target
+
+  if (method !== 'post' || url.origin !== location.origin || (target !== '' && target !== '_self') || form.closest('[data-reload]') || submitter?.hasAttribute('data-reload'))
+    return undefined
+
+  return ACTION_PATH.test(withoutBase(url.pathname)) ? url : undefined
+}
+
+// The browser posts the form, as it would have without the swap.
+export function submitNatively(form: HTMLFormElement, submitter: HTMLElement | null): void {
+  navigation.released = true
+  navigation.loads++
+  nativeSubmits.add(form)
+  form.requestSubmit(submitter instanceof HTMLButtonElement || submitter instanceof HTMLInputElement ? submitter : null)
+}
+
+// Forms posting to an action are checked by kay once it runs, so the schema's own messages show rather than the browser's for the constraints their fields write for a visit without JavaScript.
+function takeFormCheck(form: HTMLFormElement): void {
+  if (form.noValidate)
+    return
+
+  try {
+    if (!swappedActionUrl(form, null))
+      return
+  }
+  catch {
+    // An action the page cannot resolve is left to the browser, which posts it natively.
+    return
+  }
+
+  form.noValidate = true
+  checkedForms.add(form)
+}
+
+function onSubmit(event: SubmitEvent): void {
+  const form = event.target as HTMLFormElement
+
+  if (nativeSubmits.has(form)) {
+    nativeSubmits.delete(form)
+
+    return
+  }
+
+  if (event.defaultPrevented)
+    return
+
+  const url = swappedActionUrl(form, event.submitter)
+
+  if (!url)
+    return
+
+  event.preventDefault()
+
+  if (busyForms.has(form))
+    return
+
+  void submit(form, event.submitter, url)
+}
+
+// The form is busy from its submit on, so a second submit while form posting or its checks load posts nothing.
+async function submit(form: HTMLFormElement, submitter: HTMLElement | null, url: URL): Promise<void> {
+  busyForms.add(form)
+
+  let forms: typeof import('./forms')
+
+  try {
+    forms = await loadForms()
+  }
+  catch {
+    busyForms.delete(form)
+    submitNatively(form, submitter)
+
+    return
+  }
+
+  await forms.submit(form, submitter, url)
+}
+
+async function preloadChecks(action: string | undefined, form: HTMLFormElement): Promise<void> {
+  try {
+    await (await loadForms()).preloadChecks(action, form)
+  }
+  catch {}
+}
