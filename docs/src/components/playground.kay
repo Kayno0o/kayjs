@@ -6,10 +6,9 @@ import { onCleanup, onMount, signal } from 'kay'
 import { loadCompiler } from '../playground/load'
 import { encodeSource, sourceOfHash } from '../playground/runnable'
 import { SAMPLE } from '../playground/sample'
+import { BEAT_MS, RUN_LIMIT_MS, watchdog } from '../playground/watchdog'
 
 const DEBOUNCE_MS = 150
-const BEAT_MS = 1000
-const RUN_LIMIT_MS = 3000
 
 const source = signal(SAMPLE)
 const problems = signal<Problem[]>([])
@@ -33,8 +32,7 @@ let timer: ReturnType<typeof setTimeout> | undefined
 let sent = 0
 let monitor: ReturnType<typeof setInterval> | undefined
 let revive: ReturnType<typeof setTimeout> | undefined
-let lastHeard = 0
-let overdue = false
+const watched = watchdog()
 
 // The frame runs the code: this page only reads text, so nothing a visitor types runs with the docs' origin. A frame that has not loaded drops the message and says it is ready when it has, which sends it again.
 function send() {
@@ -56,6 +54,7 @@ function stuck() {
 }
 
 function dropFrame() {
+  watched.heard()
   frame = undefined
   ready = false
   framed = false
@@ -77,25 +76,13 @@ function watch() {
   if (!ready() || document.hidden || !frame?.contentWindow)
     return
 
-  // A page task that ran long may fire this timer before the queued replies are handled, so silence is judged on the second overdue tick in a row.
-  if (performance.now() - lastHeard > RUN_LIMIT_MS) {
-    if (overdue) {
-      stuck()
+  if (watched.tick(performance.now()) === 'stuck') {
+    stuck()
 
-      return
-    }
-
-    overdue = true
-  }
-  else {
-    overdue = false
+    return
   }
 
   frame.contentWindow.postMessage({ ping: true }, '*')
-}
-
-function seen() {
-  lastHeard = performance.now()
 }
 
 function build() {
@@ -138,7 +125,7 @@ function heard(event: MessageEvent<{ ready?: boolean, pong?: boolean, id?: numbe
   if (event.source !== frame?.contentWindow)
     return
 
-  seen()
+  watched.heard()
 
   if (event.data.ready) {
     ready = true
@@ -179,9 +166,8 @@ onMount(async () => {
   window.addEventListener('hashchange', openLinked)
   window.addEventListener('pagehide', dropFrame)
   window.addEventListener('pageshow', pageShown)
-  document.addEventListener('visibilitychange', seen)
+  document.addEventListener('visibilitychange', watched.heard)
   monitor = setInterval(watch, BEAT_MS)
-  seen()
   openLinked()
 
   try {
@@ -201,7 +187,7 @@ onCleanup(() => {
   window.removeEventListener('hashchange', openLinked)
   window.removeEventListener('pagehide', dropFrame)
   window.removeEventListener('pageshow', pageShown)
-  document.removeEventListener('visibilitychange', seen)
+  document.removeEventListener('visibilitychange', watched.heard)
   clearInterval(monitor)
   clearTimeout(timer)
   clearTimeout(revive)

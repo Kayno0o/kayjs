@@ -9,6 +9,7 @@ import { isRunnable, playgroundHref, sourceOfHash } from '../docs/src/playground
 import { mount, renderServer } from '../docs/src/playground/runtime'
 import { SAMPLE } from '../docs/src/playground/sample'
 import { stripTypes } from '../docs/src/playground/strip'
+import { watchdog } from '../docs/src/playground/watchdog'
 import { check } from '../src/check'
 import { compileKay } from '../src/compiler'
 import { fixtureCopy, scratchDir } from './scratch'
@@ -114,6 +115,39 @@ describe('the playground\'s sample', () => {
       await rm(root, { recursive: true, force: true })
     }
   }, 120_000)
+})
+
+// Each step is a tick of the page's beat at that time, or `heard` at it for a reply from the frame.
+function judged(steps: (number | ['heard', number])[]): string[] {
+  const watched = watchdog()
+  const verdicts: string[] = []
+
+  for (const step of steps) {
+    if (typeof step === 'number')
+      verdicts.push(`${step} ${watched.tick(step)}`)
+    else
+      watched.heard()
+  }
+
+  return verdicts
+}
+
+describe('the playground\'s watchdog', () => {
+  it('keeps a frame that answers when the page was busy past the limit with no ping out, though the interval\'s next tick follows its late one at once', () => {
+    expect(judged([0, ['heard', 2], 1000, ['heard', 1002], 4990, 4996, ['heard', 5100], 6000])).toEqual(['0 ping', '1000 ping', '4990 ping', '4996 ping', '6000 ping'])
+  })
+
+  it('keeps a frame whose reply to a ping sent before the page went busy is handled after the late tick', () => {
+    expect(judged([0, 3600, 3605, ['heard', 3610], 4000, ['heard', 4001], 5000])).toEqual(['0 ping', '3600 ping', '3605 ping', '4000 ping', '5000 ping'])
+  })
+
+  it('keeps a frame that answers once found overdue, before the next tick on the beat', () => {
+    expect(judged([0, ['heard', 1], 1000, 2000, 3000, 4000, 5000, ['heard', 5200], 6000])).toEqual(['0 ping', '1000 ping', '2000 ping', '3000 ping', '4000 ping', '5000 ping', '6000 ping'])
+  })
+
+  it('finds a frame stuck once a ping went unanswered past the limit, on the next tick on the beat', () => {
+    expect(judged([0, ['heard', 1], 1000, 2000, 3000, 4000, 5000, 5004, 6000])).toEqual(['0 ping', '1000 ping', '2000 ping', '3000 ping', '4000 ping', '5000 ping', '5004 ping', '6000 stuck'])
+  })
 })
 
 describe('the docs\' examples', () => {
