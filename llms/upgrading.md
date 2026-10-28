@@ -8,6 +8,10 @@ What each minor release breaks, and what an app changes to move to it. kay and i
 
 - An object the app builds as an `ActionStream`, a test's fake stream say, gets a type error from `kay check` until it has `ended: () => Promise<T | undefined>`, resolving with its last value once it ran to its end and rejecting when it failed or was closed ([streaming actions](actions-from-islands.md)). A stream a call resolves with already has it.
 
+### kayjs-auth: the methods of a feature are grouped under it
+
+- `auth.listUsers()` is `auth.admin.listUsers()`, `auth.signInWithPassword(input)` is `auth.password.signIn(input)`, and so on for `password`, `email`, `magicLink`, `twoFactor`, `passkeys`, `sessions`, `tokens`, `oauthServer`, `admin` and `organizations` ([the table](../packages/auth/llms/grouped-methods.md)). The flat names still work until 1.85; `kay upgrade` renames the calls on `auth` and `ctx.locals.auth` (`deprecated-auth-methods`), and a flat method read without a call, destructured, under `typeof` or in a template expression is renamed by hand.
+
 ## 1.81.0
 
 ### kayjs-auth: a store counts attempts in `rates`, and `DEFAULT_LIMITS` windows are durations
