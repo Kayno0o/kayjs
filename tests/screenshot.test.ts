@@ -17,6 +17,8 @@ import { scratchDir } from './scratch'
 
 const cli = join(import.meta.dir, '..', 'src', 'cli.ts')
 const PNG = [137, 80, 78, 71]
+// Bun's client, which sends the headers a proxied page's would.
+const BunWebSocket = WebSocket as unknown as new (url: string, options: Bun.WebSocketOptions) => WebSocket
 const tsconfig = JSON.stringify({
   compilerOptions: { target: 'ESNext', jsx: 'preserve', jsxImportSource: 'kay', lib: ['ESNext', 'DOM'], rootDirs: ['.', '.kay/types'], module: 'Preserve', moduleResolution: 'bundler', strict: true, noEmit: true, skipLibCheck: true },
   include: ['src', '.kay/types'],
@@ -111,6 +113,90 @@ describe('the proxy that mounts the site', () => {
       proxy.stop()
       void upstream.stop(true)
       void other.stop(true)
+    }
+  })
+
+  it('pipes a websocket under the base both ways, binary frames and close codes included, and closes one the server refuses', async () => {
+    const opened: { path: string, host: string | null, cookie: string | null }[] = []
+    const closes: number[] = []
+    const { promise: bothClosed, resolve: closeBoth } = Promise.withResolvers<void>()
+    const upstream = Bun.serve({
+      hostname: '127.0.0.1',
+      port: 0,
+      fetch: (request, server) => {
+        const url = new URL(request.url)
+
+        if (url.pathname === '/refused')
+          return new Response('no', { status: 403 })
+
+        opened.push({ path: url.pathname, host: request.headers.get('host'), cookie: request.headers.get('cookie') })
+
+        return server.upgrade(request, { data: undefined }) ? undefined : new Response('not an upgrade', { status: 400 })
+      },
+      websocket: {
+        message(socket, message) {
+          if (message === 'bye')
+            socket.close(4001, 'asked')
+          else
+            socket.send(typeof message === 'string' ? `echo ${message}` : message)
+        },
+        close(_socket, code) {
+          if (closes.push(code) === 2)
+            closeBoth()
+        },
+      },
+    })
+    const proxy = mountedAt(`http://127.0.0.1:${upstream.port}`, '/app')
+    const connect = (path: string) => {
+      const socket = new BunWebSocket(`${proxy.origin.replace('http:', 'ws:')}${path}`, { headers: { cookie: 'a=1' } })
+
+      socket.binaryType = 'arraybuffer'
+
+      return socket
+    }
+    const open = async (path: string) => {
+      const socket = connect(path)
+
+      await new Promise(resolve => socket.addEventListener('open', resolve, { once: true }))
+
+      return socket
+    }
+    const next = async (socket: WebSocket) => new Promise<unknown>(resolve => socket.addEventListener('message', event => resolve(event.data), { once: true }))
+    const closed = async (socket: WebSocket) => new Promise<number>(resolve => socket.addEventListener('close', event => resolve(event.code), { once: true }))
+
+    try {
+      const socket = await open('/app/feed?x=1')
+      // Sent as the browser's side opens, before the server's has, so the proxy holds it until then.
+      const first = next(socket)
+
+      socket.send('early')
+      expect(await first).toBe('echo early')
+      expect(opened).toEqual([{ path: '/feed', host: new URL(proxy.origin).host, cookie: 'a=1' }])
+
+      const bytes = next(socket)
+
+      socket.send(new Uint8Array([1, 2, 3]))
+      expect([...new Uint8Array(await bytes as ArrayBuffer)]).toEqual([1, 2, 3])
+
+      const ended = closed(socket)
+
+      socket.send('bye')
+      expect(await ended).toBe(4001)
+
+      const leaving = await open('/app/feed')
+      const answered = next(leaving)
+
+      leaving.send('hi')
+      await answered
+      leaving.close(1000)
+      await bothClosed
+      expect(closes).toEqual([4001, 1000])
+
+      expect(await closed(connect('/app/refused'))).toBe(1006)
+    }
+    finally {
+      proxy.stop()
+      void upstream.stop(true)
     }
   })
 })

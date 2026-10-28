@@ -28,7 +28,9 @@ for (const [name, options, prefix, slash] of MODES) {
       await site?.close()
     })
 
-    it('loads a page and its island, which opens its socket under the base', async () => {
+    it('loads a page and its island, which opens its socket and follows its live value under the base', async () => {
+      const { hits } = await import(resolve(ROOT, 'src/live.ts')) as { hits: { set: (value: number) => void } }
+
       await using page = await site.open(at('/'))
 
       await page.waitFor('h1', { text: 'Home' })
@@ -37,6 +39,9 @@ for (const [name, options, prefix, slash] of MODES) {
       await page.waitFor('button.count', { text: 'Clicked 1' })
       await page.click('button.send')
       await page.waitFor('p.echo', { text: 'echo hi' })
+      hits.set(3)
+      await page.waitFor('p.hits', { text: '3 hits' })
+      hits.set(0)
       expect(page.errors).toEqual([])
     })
 

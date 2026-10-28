@@ -8,12 +8,12 @@ interface Piped {
   queued: (string | Buffer<ArrayBuffer>)[]
 }
 
-// The headers of a websocket handshake, which the proxy's own connection to the server sends anew.
+// The headers of a websocket handshake, which the proxy's own connection to the server sends anew; the browser is upgraded before the server answers, so a subprotocol, which kay's sockets never ask for, is not carried.
 const HANDSHAKE = ['upgrade', 'connection', 'sec-websocket-key', 'sec-websocket-version', 'sec-websocket-extensions', 'sec-websocket-protocol']
 // Bun's client, which sends the handshake's headers, as a page's `WebSocket` cannot.
 const BunWebSocket = WebSocket as unknown as new (url: string, options: Bun.WebSocketOptions) => WebSocket
-// The close codes a peer is told of but no side may send.
-const UNSENDABLE = new Set([1005, 1006, 1015])
+// The close codes of a connection that dropped or never opened, which no side may send: the browser's is dropped too, so it reconnects as it would to the site, where a plain close (1000) would tell it not to.
+const DROPPED = new Set([1006, 1015])
 
 // A site with a `base` is served by a proxy that takes the mount point off requests, which its pages' links and redirects keep: the server answers `/about`, its pages link `/docs/_kay/...`. This stands in for that proxy on a port of its own, so a browser opened on it sees the site as a visitor does, its websockets piped through.
 // It forwards to the server alone: only a path with one slash after the base, and only for a request addressed to the proxy itself.
@@ -21,14 +21,14 @@ export function mountedAt(origin: string, base: string): { origin: string, stop:
   const server = Bun.serve<Piped>({
     hostname: '127.0.0.1',
     port: 0,
-    // The dev server's event stream and a slow page stay open as long as the browser's page does.
+    // An event stream and a slow page stay open as long as the browser's page does.
     idleTimeout: 0,
     fetch: async (request, proxy) => {
       const url = new URL(request.url)
       const path = routerPath(url.pathname, base)
 
       if (url.host !== `127.0.0.1:${server.port}` || path.startsWith('//'))
-        return new Response('Not a path of the dev server', { status: 400 })
+        return new Response('Not a path of the server', { status: 400 })
 
       const headers = new Headers(request.headers)
       // Set on a copy of the server's address, so that a path is never read as another host.
@@ -53,8 +53,8 @@ export function mountedAt(origin: string, base: string): { origin: string, stop:
         return await fetch(target, { method: request.method, headers, body: request.body, redirect: 'manual', signal: request.signal })
       }
       catch {
-        // The dev server stopped or the browser gave the request up.
-        return new Response('The dev server did not answer', { status: 502 })
+        // The server stopped or the browser gave the request up.
+        return new Response('The server did not answer', { status: 502 })
       }
     },
     // The server's side opens once the browser's has, so what the server refuses or closes closes the browser's too, which reconnects as it would to the site.
@@ -71,7 +71,14 @@ export function mountedAt(origin: string, base: string): { origin: string, stop:
           socket.data.queued = []
         })
         upstream.addEventListener('message', event => void socket.send(event.data as string | ArrayBuffer))
-        upstream.addEventListener('close', event => UNSENDABLE.has(event.code) ? socket.close() : socket.close(event.code, event.reason))
+        upstream.addEventListener('close', (event) => {
+          if (DROPPED.has(event.code))
+            socket.terminate()
+          else if (event.code === 1005)
+            socket.close()
+          else
+            socket.close(event.code, event.reason)
+        })
       },
       message(socket, message) {
         const { upstream } = socket.data

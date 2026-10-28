@@ -1,6 +1,7 @@
 ---
 import { signal, socket } from 'kay'
 import echo from '../api/echo'
+import { hits } from '../live'
 
 const messages = socket(echo, '/')
 const count = signal(0)
@@ -8,3 +9,4 @@ const count = signal(0)
 button.count(type="button" onClick={() => count.set(n => n + 1)}) Clicked {count()}
 button.send(type="button" onClick={() => messages.send({ text: 'hi' })}) Send
 p.echo {messages.last()?.text ?? ''}
+p.hits {hits()} hits
