@@ -4,7 +4,7 @@ import { CACHE_LIVE_ID } from './cache-live-id'
 import { dirtyGuard, navigation } from './navigation'
 import { decodeServerValue } from './wire'
 
-// The twin of `readEvents` in live.ts, kept apart so the code every page loads does not carry it: keep the backoffs alike.
+// The twin of `readEvents` and `parseEvents` in live.ts and sse.ts, kept apart as a module both imported would land in the code every page loads: its backoff starts at a second rather than half of one, and waits for the tab to show but not for the network to come back.
 
 // The cached values a page follows (`cached(..., { live: true })`) are kept up to date by the route live values use, `POST /_kay/live`, through a reader of its own: this module stays out of the code every page loads, so it imports nothing of the runtime that code does not already reach.
 // A `resource()` reading a route the same way follows the keys the route's handler read, through the proof its answer carries.
@@ -19,7 +19,7 @@ const FIRST_RETRY_MS = 1000
 const LAST_RETRY_MS = 30_000
 // A refused connection asks the page for a new proof once in this long: a refusal that stays is backed off, not rendered again.
 const REFUSAL_MS = 60_000
-// Fired by live-value.ts when it asks for new proofs.
+// Fired by live-value.client.ts when it asks for new proofs.
 const RENEW_EVENT = 'kay-renew'
 
 // The longest a refresh waits for a swap in progress: one that never clears `aria-busy` (failed or aborted) would otherwise park every later invalidation.
