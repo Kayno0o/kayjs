@@ -276,10 +276,11 @@ async function answerOf(call: HeldCall, prompt: readonly Message[], named: strin
   if (call.op === 'remove')
     return { owned: true, op: 'remove', id: call.id, done: await store.remove(key) }
 
+  // Read before the store, so a write landing during the read shows as the revision it moved, not as no reply running.
+  const under = writing.get(pendingKey(key))
   const stored = await store.get(key)
   const revision = stored?.revision ?? 0
   const turns = (stored?.turns ?? []).map(({ role, content, sources, stopped }) => ({ role, content, ...sources !== undefined && sources.length > 0 && { sources }, ...stopped === true && { stopped } }))
-  const under = writing.get(pendingKey(key))
 
   // A reply still running past its request shows after the turns it stores ahead of it, until its write moves the revision on.
   if (under?.replying !== undefined && under.revision === revision)

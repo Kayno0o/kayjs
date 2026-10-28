@@ -699,7 +699,9 @@
   :is(button.kai-chat-conversation-new, button.kai-chat-conversation-link) {
     border: 0;
     background: none;
-    font: inherit;
+    font-family: inherit;
+    font-size: inherit;
+    line-height: inherit;
     text-align: start;
     cursor: pointer;
   }

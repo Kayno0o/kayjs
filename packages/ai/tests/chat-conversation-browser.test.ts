@@ -123,6 +123,12 @@ it('the launcher keeps its conversation on the server, named by the browser rath
     return { place: getComputedStyle(list).position, width: Math.round(list.getBoundingClientRect().width) === Math.round(chat.getBoundingClientRect().width) }
   })).toEqual({ place: 'static', width: true })
 
+  // Enlarged on a wide window, the panel has room for the list at the side.
+  await page.click('.kai-launcher-expand')
+  await page.waitFor('.kai-launcher-panel[data-large]')
+  expect(await page.evaluate(() => getComputedStyle(document.querySelector('.kai-launcher-body .kai-chat-conversations')!).position)).toBe('absolute')
+  await page.click('.kai-launcher-expand')
+
   await page.click('button.kai-chat-conversation-new')
   await page.waitUntil(() => document.querySelectorAll('.kai-chat-turn').length === 0)
   await send(page, 'other question', 'read 1 after other question')

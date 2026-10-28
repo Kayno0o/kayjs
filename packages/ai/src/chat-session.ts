@@ -207,7 +207,8 @@ export function createChatSession(options: ChatSessionOptions) {
   }
 
   // Shows the conversation `id`, or a new one; a visitor the server cannot keep one for gets the tab's history back, as without `keepOnServer`.
-  async function load(id: string | undefined) {
+  // `resume` is false once a resume came back empty, so a reply the server still names but no longer keeps is not asked for again and again.
+  async function load(id: string | undefined, resume = true) {
     const turn = ++loads
     let replying: string | undefined
 
@@ -248,8 +249,12 @@ export function createChatSession(options: ChatSessionOptions) {
       shown = answer.id
       revision = answer.revision
       replacement = undefined
-      history.set(answer.turns.map(({ sources, ...turn }) => ({ ...turn, ...sources && { sources: usableSources(sources) }, id: nextId++ })))
       replying = answer.replying
+
+      // A reply not asked for again leaves out the message the server shows ahead of it, which is back in the field.
+      const stored = resume || replying === undefined ? answer.turns : answer.turns.slice(0, -1)
+
+      history.set(stored.map(({ sources, ...turn }) => ({ ...turn, ...sources && { sources: usableSources(sources) }, id: nextId++ })))
     }
     catch (error) {
       if (turn !== loads)
@@ -264,7 +269,7 @@ export function createChatSession(options: ChatSessionOptions) {
     }
 
     // A reply still running on the server past its request, as after a reload, is asked for again as `remember` does.
-    if (replying !== undefined && turn === loads)
+    if (resume && replying !== undefined && turn === loads)
       void post(true, undefined, replying)
   }
 
@@ -423,7 +428,7 @@ export function createChatSession(options: ChatSessionOptions) {
       takeBack()
 
       if (holding())
-        void load(shown)
+        void load(shown, false)
     }
 
     if (text !== '' || made.length > 0) {
@@ -505,7 +510,11 @@ export function createChatSession(options: ChatSessionOptions) {
 
     reply = current
     options.follow()
-    failure.set(undefined)
+
+    // A resume after a conflict keeps saying the conversation changed.
+    if (resuming === undefined)
+      failure.set(undefined)
+
     takenBack.set(false)
     clearLive()
     told.clear()

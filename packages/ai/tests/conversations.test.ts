@@ -343,6 +343,57 @@ describe('a conversation held on the server', () => {
     expect(answer).toEqual({ owned: true, op: 'load', id: ID, revision: 2, title: 'first', turns: [{ role: 'user', content: 'first' }, { role: 'assistant', content: 'answer 1' }, { role: 'user', content: 'second' }, { role: 'assistant', content: 'half done' }] })
   })
 
+  it('still names a reply running past its request when its write lands while the load reads the store', async () => {
+    const store = sqliteConversations(':memory:')
+    const gate = Promise.withResolvers<void>()
+    const reading = Promise.withResolvers<void>()
+    const written = Promise.withResolvers<void>()
+    const slow: Provider = {
+      name: 'slow',
+      model: 'm',
+      async* stream() {
+        yield { text: 'half' }
+        await gate.promise
+        yield { text: ' done' }
+        yield { finish: 'stop' }
+      },
+    }
+    let held: Promise<void> | undefined
+
+    // A store whose read answers what it read once the test lets it, as one over the network may.
+    ai({ conversations: { ...store, get: async (key) => {
+      const found = await store.get(key)
+
+      await held
+
+      return found
+    }, write: async (...args) => {
+      const revision = await store.write(...args)
+
+      written.resolve()
+
+      return revision
+    } } })
+
+    const request = new Request('http://localhost/_kay/action/chat', { headers: { 'x-kai-conversation': `send:${ID}:0`, 'x-kai-reply': 'start:reply-race-01' } })
+
+    sendFrom(request, '203.0.113.1')
+    nameUser(request, () => 'ann')
+    await answeringRequest(request, async () => {
+      expect((await ask(said('question'), { provider: slow, outlive: true })[Symbol.asyncIterator]().next()).value).toBe('half')
+    })
+
+    held = reading.promise
+
+    const load = loaded(ID)
+
+    gate.resolve()
+    await written.promise
+    reading.resolve()
+
+    expect(await load).toMatchObject({ revision: 0, turns: [{ role: 'user', content: 'question' }], replying: 'reply-race-01' })
+  })
+
   it('reads two turns of one role as one once an empty turn between them is left out', async () => {
     const model = recording()
 

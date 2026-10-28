@@ -326,15 +326,18 @@ test('resumes a reply the load says still runs past its request, after the messa
   next.finish()
 })
 
-test('a resume that brings nothing back puts the message in the field and reads the conversation again', async () => {
+test('a resume that brings nothing back puts the message in the field and reads the conversation again, asking for the reply no more', async () => {
   const lost = await replied('')
   const next = await replied('answer')
-  const { session, posts, consulted } = chat([loaded(SHOWN, 2, [['user', 'hi'], ['assistant', 'hello'], ['user', 'more']], 'reply-0001'), loaded(SHOWN, 2, [['user', 'hi'], ['assistant', 'hello']])], [lost.answer, next.answer], { shown: SHOWN })
+  const { session, posts, consulted } = chat([loaded(SHOWN, 2, [['user', 'hi'], ['assistant', 'hello'], ['user', 'more']], 'reply-0001'), loaded(SHOWN, 2, [['user', 'hi'], ['assistant', 'hello'], ['user', 'more']], 'reply-0001')], [lost.answer, next.answer], { shown: SHOWN })
 
   await untilHolds(() => posts.length === 1)
   await Bun.sleep(0)
   lost.finish()
   await untilHolds(() => consulted.length === 2 && !session.loading())
+  // The server still names a reply it no longer keeps: it is not asked for again.
+  await Bun.sleep(10)
+  expect(posts).toHaveLength(1)
   expect(turns(session)).toEqual(['user: hi', 'assistant: hello'])
   expect(session.draft()).toBe('more')
 
