@@ -6,6 +6,7 @@ import type { Reply } from './mime'
 import type { Relayed } from './outbox'
 import type { Relay } from './preview'
 import type { SmtpOverrides } from './smtp'
+import type { SuppressionStore } from './suppressions'
 import type { Address, Delivery, Envelope, Mail, MailMessage, Transport } from './types'
 import process from 'node:process'
 import { Elysia } from 'elysia'
@@ -78,6 +79,8 @@ export interface MailerOptions {
   logSubjects?: boolean | undefined
   // Where the mailing lists live unless a list names its own `store` or `file`, such as `pgLists(db)` for a site on Postgres. It is also where a link of a list this process has not declared yet looks, and what `mail.erase` reaches, so declare it here rather than on each list.
   listStore?: ListStore | undefined
+  // Where bounces and complaints are kept, such as `pgSuppressions(db)` for a site on several servers with no list. Without it they go where the lists keep theirs, else in `data/mail-list.sqlite`, made by the first one.
+  suppressionStore?: SuppressionStore | undefined
   // The secrets of the routes where a provider reports bounces and complaints (`/_kay/mail/events/<provider>`) and a mail server hands over delivery reports and replies (`/_kay/mail/inbound`), `MAIL_EVENTS_<PROVIDER>` and `MAIL_INBOUND_SECRET` in the environment unless given here. A route without its secret answers 404.
   events?: EventSecrets | undefined
   // Called with each reply handed to `/_kay/mail/inbound` (anything but a delivery report, which suppresses its failed recipients instead). A reply carries the `Message-ID` of the mail it answers as `inReplyTo`.
@@ -578,7 +581,7 @@ export function mailer(options: MailerOptions = {}): Mailer {
     configured: () => (configured?.missing() ?? []).length === 0 && !senderless(),
     render,
     deliver,
-  }, { store: options.listStore })
+  }, { store: options.listStore, suppressions: options.suppressionStore })
 
   suppressions.lists = lists
 

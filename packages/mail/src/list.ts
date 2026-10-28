@@ -1,9 +1,9 @@
 import type { Elysia, TSchema } from 'elysia'
 import type { ActionContext, ActionProtect, ActionProtection, Duration, Failure, JSX } from 'kay'
-import type { Suppression, SuppressionReason } from './events'
+import type { SuppressionReason } from './events'
 import type { BroadcastProgress, ListStore, Subscriber } from './list-store'
+import type { SuppressionStore } from './suppressions'
 import type { Address, Mail, MailMessage } from './types'
-import { existsSync } from 'node:fs'
 import process from 'node:process'
 import { s } from 'kay'
 import { configError, durationSeconds, keyedDigest, trackDetached } from 'kay/library'
@@ -11,11 +11,14 @@ import { siteOrigin } from 'kay/seo'
 import { rateLimit, renderLocale, renderToString, retryLater } from 'kay/server'
 import { wording } from 'kay/words'
 import { normalizeAddress } from './list-address'
-import { LIST_FILE, openLists } from './list-store'
+import { listRegistry } from './list-registry'
+import { LIST_FILE } from './list-store'
+import { listSweeper } from './list-sweeper'
 import { checkToken, signToken } from './list-token'
 import { log } from './log'
 import { messageId } from './message-id'
 import { addressOf } from './outbox'
+import { keepsSuppressions, sqliteSuppressions, suppressionsOf } from './suppressions'
 import { htmlToText } from './text'
 
 const domainOf = (address: Address): string | undefined => addressOf(address).split('@').at(-1)
@@ -28,9 +31,6 @@ const PLACEHOLDER = 'https://unsubscribe.invalid/KAYUNSUBSCRIBE'
 const BODY_CLOSE = /<\/body>/i
 // A mail to nobody in particular, rendered once for the whole list.
 const LIST_RECIPIENT = 'list@kay.invalid'
-// The first sweep of the stores waits for the app to boot; the next ones follow at this pace.
-const FIRST_SWEEP_MS = 10_000
-const SWEEP_EVERY_MS = 3_600_000
 
 export interface ListConfirmProps {
   // The link whose click lists the address.
@@ -199,8 +199,8 @@ function personalise(message: StoredMessage, subscriber: Subscriber, list: strin
   }
 }
 
-// `fallback` is where a list with no store of its own lives and a link of an undeclared list looks: the mailer's `listStore`, else the default SQLite file, which a test names as `file` since the default is skipped under `bun test`.
-export function createLists(base: Omit<ListHost, 'enqueueMail' | 'enqueueRun' | 'activate'>, fallback: { file?: string | undefined, store?: ListStore | undefined, sweepAfter?: number, sweepEvery?: number } = {}) {
+// `fallback` is where a list with no store of its own lives and a link of an undeclared list looks: the mailer's `listStore`, else the default SQLite file, which a test names as `file` since the default is skipped under `bun test`. `suppressions` is the mailer's `suppressionStore`.
+export function createLists(base: Omit<ListHost, 'enqueueMail' | 'enqueueRun' | 'activate'>, fallback: { file?: string | undefined, store?: ListStore | undefined, suppressions?: SuppressionStore | undefined, sweepAfter?: number, sweepEvery?: number } = {}) {
   // The queues are made after the lists, which they run: the mailer hands them over with `connect`.
   let queues: Pick<ListHost, 'enqueueMail' | 'enqueueRun' | 'activate'> | undefined
   const host: ListHost = {
@@ -211,65 +211,25 @@ export function createLists(base: Omit<ListHost, 'enqueueMail' | 'enqueueRun' | 
   }
 
   const entries = new Map<string, Entry>()
-  const files = new Map<string, ListStore>()
-  // The stores given to a list, which an erase reaches beside the files.
-  const given = new Set<ListStore>(fallback.store === undefined ? [] : [fallback.store])
+  const stores = listRegistry(fallback)
+  // A mailer without a `suppressionStore` keeps them where its lists do, as before 1.81, else in the default file, in their table alone until a list opens the file.
+  const defaultSuppressions = sqliteSuppressions(fallback.file ?? (process.env.NODE_ENV === 'test' ? ':memory:' : LIST_FILE))
+  const suppressions = suppressionsOf({
+    write: () => {
+      if (fallback.suppressions !== undefined)
+        return [fallback.suppressions]
+
+      const keepers = stores.known().filter(keepsSuppressions)
+
+      return keepers.length > 0 ? keepers : [defaultSuppressions]
+    },
+    // What a list store or the default file kept stays in force.
+    read: () => [...stores.known(), defaultSuppressions],
+  })
   const addressLimit = rateLimit('kmail-list-address', { max: 3, window: '1h' })
   // Across every address of one list, which the per-IP limit alone does not stop from a botnet.
   const confirmLimit = rateLimit('kmail-list-confirm', { max: CONFIRMS_PER_HOUR, window: '1h' })
-
-  const open = (file: string): ListStore => {
-    let lists = files.get(file)
-
-    if (!lists)
-      files.set(file, lists = openLists(file))
-
-    return lists
-  }
-
-  // The default SQLite file once it exists, whichever list this process declared.
-  const defaultSqlite = (): ListStore | undefined => {
-    const fallbackFile = fallback.file ?? (process.env.NODE_ENV === 'test' ? undefined : LIST_FILE)
-
-    return fallbackFile !== undefined && (files.has(fallbackFile) || existsSync(fallbackFile)) ? open(fallbackFile) : undefined
-  }
-
-  // The mailer's store, else the default file: a link in a mail outlives the code that declared its list.
-  const defaultFile = (): ListStore | undefined => fallback.store ?? defaultSqlite()
-  const storeOf = (name: string): ListStore | undefined => entries.get(name)?.lists ?? defaultFile()
-
-  // Every store this process knows, the default file when it exists too.
-  const known = (): ListStore[] => {
-    defaultFile()
-
-    // A store of the app's own may keep no suppressions, which are then in the default file.
-    if (fallback.store !== undefined && fallback.store.suppress === undefined)
-      defaultSqlite()
-
-    return [...new Set([...files.values(), ...given])].filter(store => !store.closed)
-  }
-
-  // The suppressed among the addresses, by their normalised form; only stores already open or existing are asked, so a site with none makes no file.
-  const suppressed = async (addresses: string[]): Promise<Map<string, Suppression>> => {
-    const emails = [...new Set(addresses.flatMap(address => normalizeAddress(address) ?? []))]
-    const found = new Map<string, Suppression>()
-
-    if (emails.length === 0)
-      return found
-
-    for (const store of known()) {
-      // A store that cannot answer must not stop the mail it was asked about.
-      try {
-        for (const entry of await store.suppressed?.(emails) ?? [])
-          found.set(entry.email, entry)
-      }
-      catch (error) {
-        log.warn(`the suppressions of a mailing list store could not be read, so its mails go out: ${error instanceof Error ? error.message : String(error)}`)
-      }
-    }
-
-    return found
-  }
+  const storeOf = (name: string): ListStore | undefined => entries.get(name)?.lists ?? stores.fallback()
 
   const make = (name: string, options: ListOptions): Entry => {
     if (!NAME.test(name))
@@ -280,7 +240,7 @@ export function createLists(base: Omit<ListHost, 'enqueueMail' | 'enqueueRun' | 
 
     const file = options.file ?? (process.env.NODE_ENV === 'test' ? ':memory:' : LIST_FILE)
     const chosen = options.store ?? (options.file === undefined ? fallback.store : undefined)
-    const lists = { get: (): ListStore => chosen ?? open(file) }
+    const lists = { get: (): ListStore => chosen ?? stores.open(file) }
 
     const pace = { batch: options.pace?.batch ?? 20, every: options.pace?.every ?? '1m' }
 
@@ -290,7 +250,7 @@ export function createLists(base: Omit<ListHost, 'enqueueMail' | 'enqueueRun' | 
     durationSeconds(pace.every, `mail.list(${JSON.stringify(name)})'s pace.every`)
 
     if (options.store !== undefined)
-      given.add(options.store)
+      stores.give(options.store)
 
     if (options.privacy !== undefined) {
       try {
@@ -319,7 +279,7 @@ export function createLists(base: Omit<ListHost, 'enqueueMail' | 'enqueueRun' | 
 
       try {
         // A confirmation is list mail: an address that complained or bounced gets none, as no list mail would reach it afterwards.
-        if ((await suppressed([email])).size > 0) {
+        if ((await suppressions.suppressed([email])).size > 0) {
           log.info('a list confirmation mail was skipped: its address bounced or complained')
 
           return
@@ -453,53 +413,14 @@ export function createLists(base: Omit<ListHost, 'enqueueMail' | 'enqueueRun' | 
       },
     }
 
-    const opened = (): ListStore | undefined => chosen ?? files.get(file) ?? (existsSync(file) ? open(file) : undefined)
+    const opened = (): ListStore | undefined => chosen ?? stores.existing(file)
 
     return { list, source: options.store ?? options.file, get lists() {
       return lists.get()
     }, opened, pace }
   }
 
-  // Forgets what the lists keep past its time, in every store this process knows: the unclicked confirmations and the old broadcasts. It runs once the app has booted and every hour, off any subscribe post.
-  const sweep = async (now?: number): Promise<void> => {
-    for (const store of new Set([...entries.values()].map(entry => entry.opened()))) {
-      if (store?.closed)
-        continue
-
-      try {
-        await store?.sweep(now)
-      }
-      catch (error) {
-        log.warn(`a mailing list store could not be swept: ${error instanceof Error ? error.message : String(error)}`)
-      }
-    }
-  }
-  let first: ReturnType<typeof setTimeout> | undefined
-  let every: ReturnType<typeof setInterval> | undefined
-
-  const startSweeping = (): void => {
-    if (every !== undefined)
-      return
-
-    first = setTimeout(() => void sweep(), fallback.sweepAfter ?? FIRST_SWEEP_MS)
-    every = setInterval(() => void sweep(), fallback.sweepEvery ?? SWEEP_EVERY_MS)
-    first.unref()
-    every.unref()
-  }
-
-  // Ends the timers, which a `kay dev` reload does through the mailer's `onStop` so the app that follows starts its own and they do not stack.
-  const stopSweeping = (): void => {
-    clearTimeout(first)
-    clearInterval(every)
-    first = every = undefined
-  }
-
-  // Where a suppression is written: the known stores that keep them, else the default file, opened for it.
-  const keepers = (): ListStore[] => {
-    const found = known().filter(store => store.suppress !== undefined)
-
-    return found.length > 0 ? found : [open(fallback.file ?? (process.env.NODE_ENV === 'test' ? ':memory:' : LIST_FILE))]
-  }
+  const sweeper = listSweeper(() => [...entries.values()].map(entry => entry.opened()), { after: fallback.sweepAfter, every: fallback.sweepEvery })
 
   // The address stops being mailed, and leaves every list of the stores this process knows.
   const suppress = async (address: string, reason: SuppressionReason, source: string): Promise<boolean> => {
@@ -508,10 +429,9 @@ export function createLists(base: Omit<ListHost, 'enqueueMail' | 'enqueueRun' | 
     if (email === undefined)
       return false
 
-    for (const store of keepers())
-      await store.suppress!(email, reason, source)
+    await suppressions.suppress(email, reason, source)
 
-    for (const store of known())
+    for (const store of stores.everywhere())
       await store.erase(email)
 
     return true
@@ -519,15 +439,8 @@ export function createLists(base: Omit<ListHost, 'enqueueMail' | 'enqueueRun' | 
 
   const lift = async (address: string): Promise<boolean> => {
     const email = normalizeAddress(address)
-    let lifted = false
 
-    if (email === undefined)
-      return false
-
-    for (const store of known())
-      lifted = await store.lift?.(email) === true || lifted
-
-    return lifted
+    return email !== undefined && await suppressions.lift(email)
   }
 
   // One process of the broadcast: mails a batch, then asks to run again after the pace until nobody is left.
@@ -585,7 +498,7 @@ export function createLists(base: Omit<ListHost, 'enqueueMail' | 'enqueueRun' | 
 
       if (!entry) {
         entries.set(name, entry = make(name, options))
-        startSweeping()
+        sweeper.start()
         host.activate()
       }
       else if ((options.store ?? options.file) !== undefined && (options.store ?? options.file) !== entry.source) {
@@ -596,43 +509,39 @@ export function createLists(base: Omit<ListHost, 'enqueueMail' | 'enqueueRun' | 
     },
     run,
     suppress,
-    suppressed,
+    suppressed: suppressions.suppressed,
     lift,
-    sweep,
-    stopSweeping,
+    sweep: sweeper.sweep,
+    stopSweeping: sweeper.stop,
     connect(connected: Pick<ListHost, 'enqueueMail' | 'enqueueRun' | 'activate'>): void {
       queues = connected
     },
-    // Takes the address off every list of every file this process opened and of the default file when it exists, so an erase from a script or a route that declared no list still reaches it; how many rows went.
+    // Takes the address off every list of every file this process opened and of the default file when it holds lists, and lifts its suppression, so an erase from a script or a route that declared no list still reaches it; how many rows went.
     async erase(address: string): Promise<number> {
       const email = normalizeAddress(address)
 
       if (email === undefined)
         return 0
 
-      defaultFile()
-
       let total = 0
 
-      for (const lists of new Set([...files.values(), ...given])) {
+      for (const lists of stores.everywhere())
         total += await lists.erase(email)
-        await lists.lift?.(email)
-      }
+
+      await suppressions.lift(email)
 
       return total
     },
-    // What the address is on, in every file this process opened and the default file when it exists, pending rows included.
+    // What the address is on, in every file this process opened and the default file when it holds lists, pending rows included.
     async subscriptions(address: string): Promise<Subscription[]> {
       const email = normalizeAddress(address)
 
       if (email === undefined)
         return []
 
-      defaultFile()
-
       const found: Subscription[] = []
 
-      for (const lists of new Set([...files.values(), ...given])) {
+      for (const lists of stores.everywhere()) {
         for (const row of await lists.forEmail(email))
           found.push({ list: row.list, status: row.status, askedAt: new Date(row.createdAt), confirmedAt: row.confirmedAt === undefined ? null : new Date(row.confirmedAt) })
       }

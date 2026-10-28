@@ -1,13 +1,18 @@
 import type { Action } from 'kay'
 import type { ListStore } from '../src/list-store'
 import { createHmac, generateKeyPairSync, sign } from 'node:crypto'
+import { existsSync } from 'node:fs'
 import { join } from 'node:path'
 import process from 'node:process'
+import { Database } from 'bun:sqlite'
 import { beforeAll, describe, expect, it } from 'bun:test'
+import { memoryJobs } from 'kay/server'
 import { scratchDir, testSite } from 'kay/test'
 import { createLists } from '../src/list'
 import { openLists } from '../src/list-store'
+import { mailer } from '../src/mailer'
 import { outbox } from '../src/outbox'
+import { sqliteSuppressions } from '../src/suppressions'
 import { logged } from './fixture/tests/logged'
 import { untilHolds } from './until'
 
@@ -487,5 +492,89 @@ describe('a store of the app\'s own', () => {
     const restarted = createLists(host, { store: custom, file })
 
     expect([...(await restarted.suppressed([address])).keys()]).toEqual([address])
+  })
+})
+
+describe('suppressions of a mailer with no list', () => {
+  const host = { configured: () => true, render: async () => {
+    throw new Error('unused')
+  }, deliver: async () => undefined }
+
+  const tables = (file: string): string[] => {
+    const db = new Database(file, { readonly: true })
+
+    try {
+      return db.query<{ name: string }, []>('SELECT name FROM sqlite_master WHERE type = \'table\' ORDER BY name').all().map(row => row.name)
+    }
+    finally {
+      db.close()
+    }
+  }
+
+  it('keeps a bounce in the default file, in its table alone, and looks it up, erases or exports a person without making a file before it', async () => {
+    const file = join(await scratchDir('mail-no-list'), 'mail-list.sqlite')
+    const lists = createLists(host, { file })
+    const address = fresh()
+
+    expect((await lists.suppressed([address])).size).toBe(0)
+    expect(await lists.lift(address)).toBe(false)
+    expect(await lists.erase(address)).toBe(0)
+    expect(await lists.subscriptions(address)).toEqual([])
+    expect(existsSync(file)).toBe(false)
+
+    await lists.suppress(address, 'bounce', 'test')
+
+    const restarted = createLists(host, { file })
+
+    expect([...(await restarted.suppressed([address])).keys()]).toEqual([address])
+    expect(await restarted.subscriptions(address)).toEqual([])
+    expect(await restarted.erase(address)).toBe(0)
+    expect((await restarted.suppressed([address])).size).toBe(0)
+    expect(tables(file)).toEqual(['kay_mail_suppressions'])
+  })
+
+  it('reads, lifts and erases what a default file holding lists kept before suppressions had a store of their own', async () => {
+    const file = join(await scratchDir('mail-old-file'), 'mail-list.sqlite')
+    const old = openLists(file)
+    const [bounced, subscribed] = [fresh(), fresh()]
+
+    old.suppress(bounced, 'bounce', 'dsn')
+    old.ask('news', subscribed, 'n1', 'en')
+    old.close()
+
+    const lists = createLists(host, { file })
+
+    expect([...(await lists.suppressed([bounced, subscribed])).keys()]).toEqual([bounced])
+    expect((await lists.subscriptions(subscribed)).map(row => row.list)).toEqual(['news'])
+    expect(await lists.lift(bounced)).toBe(true)
+    expect(await lists.erase(subscribed)).toBe(1)
+  })
+
+  it('writes to the mailer\'s suppressionStore alone, and keeps in force what a list store kept', async () => {
+    const own = openLists(':memory:')
+    const kept = sqliteSuppressions(join(await scratchDir('mail-suppression-store'), 'suppressions.sqlite'))
+    const [before, after] = [fresh(), fresh()]
+
+    own.suppress(before, 'complaint', 'old')
+
+    const lists = createLists(host, { store: own, suppressions: kept })
+
+    await lists.suppress(after, 'bounce', 'test')
+
+    expect((await kept.suppressed([after])).map(row => row.email)).toEqual([after])
+    expect(own.suppressed([after])).toEqual([])
+    expect([...(await lists.suppressed([before, after])).keys()].sort()).toEqual([before, after].sort())
+    expect(await lists.lift(before)).toBe(true)
+    expect(own.suppressed([before])).toEqual([])
+  })
+
+  it('is given to the mailer as suppressionStore', async () => {
+    const kept = sqliteSuppressions(':memory:')
+    const app = mailer({ from: 'a@fixture.test', suppressionStore: kept, queue: { store: memoryJobs(), name: 'suppression-store' } })
+    const address = fresh()
+
+    expect(await app.suppress(address)).toBe(true)
+    expect((await kept.suppressed([address])).map(row => row.reason)).toEqual(['bounce'])
+    expect((await app.suppression(address))?.source).toBe('manual')
   })
 })

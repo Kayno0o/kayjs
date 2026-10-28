@@ -7,6 +7,7 @@ import { createMailListTables, mailListTables, pgLists } from '../src/list-pg'
 import { DELIVERY_TRIES, openLists } from '../src/list-store'
 import { mailer } from '../src/mailer'
 import { outbox } from '../src/outbox'
+import { pgSuppressions } from '../src/suppressions-pg'
 
 await testSite({ root: 'tests/fixture' })
 
@@ -271,6 +272,28 @@ describe.skipIf(url === '')('a list on Postgres', () => {
       expect((await db.unsafe<{ found: string | null }[]>('SELECT to_regclass(\'kay_mail_suppressions\') AS found'))[0]!.found).toBeNull()
       await old.suppress!(email('x'), 'bounce', 'dsn')
       expect((await old.suppressed!([email('x')])).map(row => row.source)).toEqual(['dsn'])
+    }
+    finally {
+      await db.close()
+    }
+  })
+
+  it('keeps suppressions with pgSuppressions alone, in their table made by the first one, where pgLists finds them', async () => {
+    const db = new Bun.SQL(url)
+
+    try {
+      await pg!.count('anything')
+      await db.unsafe('DROP TABLE IF EXISTS kay_mail_suppressions')
+
+      const kept = pgSuppressions(db)
+      const { email } = names()
+
+      expect(await kept.suppressed([email('x')])).toEqual([])
+      expect(await kept.lift(email('x'))).toBe(false)
+      expect((await db.unsafe<{ found: string | null }[]>('SELECT to_regclass(\'kay_mail_suppressions\') AS found'))[0]!.found).toBeNull()
+      await kept.suppress(email('x'), 'complaint', 'ses')
+      expect((await pgLists(db).suppressed!([email('x')])).map(row => row.reason)).toEqual(['complaint'])
+      expect(await kept.lift(email('x'))).toBe(true)
     }
     finally {
       await db.close()
