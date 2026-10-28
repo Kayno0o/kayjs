@@ -6,6 +6,7 @@ import process from 'node:process'
 import { GlobalRegistrator } from '@happy-dom/global-registrator'
 import { afterAll, afterEach, beforeAll, describe, expect, it, spyOn } from 'bun:test'
 import { figuresOf } from '../src/build/footprint-models'
+import routesTab from '../src/runtime/dev-tab-routes'
 import { startDevTool } from '../src/runtime/dev-tool'
 import { PUBLIC_ENV } from '../src/runtime/env'
 import { reportError } from '../src/runtime/reactive'
@@ -1003,26 +1004,32 @@ describe('the dev tool', () => {
       ] }), { status })
     }) as unknown as typeof window.fetch)
 
-    const rows = () => [...shadow().querySelectorAll('#kay-dev-routes .route')].filter(row => row.closest('[hidden]') === null).map(row => [row.querySelector('.method')!.textContent, row.querySelector('.name')!.textContent, row.querySelector('.line .chip')?.textContent ?? '', row.querySelector('.chips')!.textContent].join(' | '))
-    const filter = () => shadow().querySelector<HTMLInputElement>('#kay-dev-routes input')!
-    const sections = () => [...shadow().querySelectorAll('#kay-dev-routes .group')].filter(group => (group as HTMLElement).hidden === false).map(group => `${group.querySelector(':scope > .heading')!.firstChild!.textContent} (${group.querySelector(':scope > .heading .pill')!.textContent})`)
+    const rows = () => [...shadow().querySelectorAll('#kay-dev-routes-under-test .route')].filter(row => row.closest('[hidden]') === null).map(row => [row.querySelector('.method')!.textContent, row.querySelector('.name')!.textContent, row.querySelector('.line .chip')?.textContent ?? '', row.querySelector('.chips')!.textContent].join(' | '))
+    const filter = () => shadow().querySelector<HTMLInputElement>('#kay-dev-routes-under-test input')!
+    const sections = () => [...shadow().querySelectorAll('#kay-dev-routes-under-test .group')].filter(group => (group as HTMLElement).hidden === false).map(group => `${group.querySelector(':scope > .heading')!.firstChild!.textContent} (${group.querySelector(':scope > .heading .pill')!.textContent})`)
 
     try {
       tool = startDevTool()
-      shadow().querySelector<HTMLButtonElement>('#kay-dev-tab-routes')!.click()
+
+      // The tab's module run on a tab of its own, as the tool runs it on first open.
+      let refresh = () => undefined as void
+      const tab = tool.tab({ id: 'routes-under-test', label: 'Routes', shown: () => refresh() })
+
+      refresh = routesTab(tool, tab)
+      shadow().querySelector<HTMLButtonElement>('#kay-dev-tab-routes-under-test')!.click()
       await eventually(() => expect(sections()).toEqual(['Pages (3)', 'API (1)', 'Served by kay (3)', 'kay\'s plumbing (2)']))
 
       expect(fetched).toEqual(['/_kay/dev/routes'])
       expect(rows()).toEqual(['GET | /broken |  | src/routes/broken.kay', 'GET | /items/:id |  | src/routes/items/[id].kay', 'GET | /fr/a-propos | fr | src/routes/about.kay', 'POST | /api/stock/:id |  | src/api/stock.ts', 'GET | /manifest.webmanifest |  | the web app manifest', 'GET | /_kay/image | docs | resized images, by width and crop', 'POST | /_kay/csp | docs | what the Content-Security-Policy blocked'])
-      expect([...shadow().querySelectorAll<HTMLAnchorElement>('#kay-dev-routes a')].map(link => link.getAttribute('href'))).toEqual(['/broken', '/fr/a-propos', '/manifest.webmanifest', '/_kay/image', 'https://kayjs.kaynooo.fr/llms/images', 'https://kayjs.kaynooo.fr/llms/proxy-and-security'])
-      expect([...shadow().querySelectorAll<HTMLAnchorElement>('#kay-dev-routes a[target=_blank]')].map(link => [link.getAttribute('aria-label'), link.rel])).toEqual([['Docs for /_kay/image', 'noopener noreferrer'], ['Docs for /_kay/csp', 'noopener noreferrer']])
-      expect(shadow().querySelector('#kay-dev-routes > .list > .note')?.textContent).toContain('no sitemap or robots.txt')
-      expect(shadow().querySelector('#kay-dev-routes [aria-current=page] .name')?.textContent).toBe('/broken')
+      expect([...shadow().querySelectorAll<HTMLAnchorElement>('#kay-dev-routes-under-test a')].map(link => link.getAttribute('href'))).toEqual(['/broken', '/fr/a-propos', '/manifest.webmanifest', '/_kay/image', 'https://kayjs.kaynooo.fr/llms/images', 'https://kayjs.kaynooo.fr/llms/proxy-and-security'])
+      expect([...shadow().querySelectorAll<HTMLAnchorElement>('#kay-dev-routes-under-test a[target=_blank]')].map(link => [link.getAttribute('aria-label'), link.rel])).toEqual([['Docs for /_kay/image', 'noopener noreferrer'], ['Docs for /_kay/csp', 'noopener noreferrer']])
+      expect(shadow().querySelector('#kay-dev-routes-under-test > .list > .note')?.textContent).toContain('no sitemap or robots.txt')
+      expect(shadow().querySelector('#kay-dev-routes-under-test [aria-current=page] .name')?.textContent).toBe('/broken')
 
       filter().value = 'ABOUT'
       filter().dispatchEvent(new Event('input'))
       expect(rows()).toEqual(['GET | /fr/a-propos | fr | src/routes/about.kay'])
-      expect(await copiedBy(shadow().querySelector<HTMLButtonElement>('#kay-dev-routes .route:not([hidden]) .copy')!)).toBe(new URL('/fr/a-propos', location.href).href)
+      expect(await copiedBy(shadow().querySelector<HTMLButtonElement>('#kay-dev-routes-under-test .route:not([hidden]) .copy')!)).toBe(new URL('/fr/a-propos', location.href).href)
       expect(await copiedBy()).toContain('\n- GET /fr/a-propos')
       // The filter matches kay's plumbing by path and by purpose, its group and the section holding it following the rows shown.
       filter().value = 'content-security'
@@ -1034,12 +1041,12 @@ describe('the dev tool', () => {
       expect(rows()).toEqual(['GET | /_kay/image | docs | resized images, by width and crop'])
       filter().value = 'nothing'
       filter().dispatchEvent(new Event('input'))
-      expect(shadow().querySelector<HTMLElement>('#kay-dev-routes .empty:not([hidden])')?.textContent).toBe('Nothing matches the filter.')
+      expect(shadow().querySelector<HTMLElement>('#kay-dev-routes-under-test .empty:not([hidden])')?.textContent).toBe('Nothing matches the filter.')
 
       // A restart may change the routes: the tab shown asks again.
       status = 500
       window.dispatchEvent(new CustomEvent('kay-dev-built', { detail: JSON.stringify({ changed: 'src/routes/x.kay', ms: 1 }) }))
-      await eventually(() => expect(shadow().querySelector('#kay-dev-routes .empty')?.textContent).toBe('Could not list the routes: the server answered 500'))
+      await eventually(() => expect(shadow().querySelector('#kay-dev-routes-under-test .empty')?.textContent).toBe('Could not list the routes: the server answered 500'))
 
       expect(fetched).toHaveLength(2)
     }

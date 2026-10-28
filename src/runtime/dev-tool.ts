@@ -1,4 +1,4 @@
-import type { DevHead, DevRequest, DevResponse, DevRoute, DevRoutes } from '../server/dev'
+import type { DevHead, DevRequest, DevResponse } from '../server/dev'
 // Loaded by every page a dev server serves: a bar in a corner of the page opens a drawer whose tabs show what kay knows of the page, its problems first; under `kay dev` the inspector adds its own tab and buttons.
 // It runs in the browser from its own route, so it imports types only; its elements live in a shadow root on the root element, which a page swap keeps, styled by an adopted stylesheet, which a policy without inline styles allows.
 import type { DevNotFound } from '../server/dev-not-found'
@@ -12,7 +12,6 @@ const CHECK_PROBLEMS = 'kay-check-problems'
 const TYPE_PROBLEMS = 'kay-type-problems'
 const TYPES_EVENT = 'kay-dev-types'
 const REQUEST = 'kay-dev-request'
-const ROUTES_URL = '/_kay/dev/routes'
 const HEAD_URL = '/_kay/dev/head'
 const ENV_URL = '/_kay/env.js'
 const MODULE_START = 'export default '
@@ -25,6 +24,7 @@ const STACK_URL = '/_kay/dev/stack'
 const DATA_TAB_URL = '/_kay/dev/tab/data.js'
 const JOBS_TAB_URL = '/_kay/dev/tab/jobs.js'
 const STYLES_TAB_URL = '/_kay/dev/tab/styles.js'
+const ROUTES_TAB_URL = '/_kay/dev/tab/routes.js'
 // A stack frame in a chunk of the browser build, which the server can point at its `.kay` line.
 const CHUNK_FRAME = /\/_kay\/[\w.-]+\.js:\d+:\d+/
 // The navigations the Network tab keeps: the page's load, then each swap.
@@ -432,7 +432,7 @@ function pill(tool: Pick<DevTool, 'make' | 'icon'>, text: string, tone?: 'error'
   return element
 }
 
-interface EntryParts {
+export interface EntryParts {
   // Before the rest, as an image's thumbnail.
   lead?: HTMLElement | undefined
   name: HTMLElement | string
@@ -479,7 +479,7 @@ function entry(tool: DevTool, kind: string, parts: EntryParts): HTMLElement {
   return row
 }
 
-interface Toolbar {
+export interface Toolbar {
   element: HTMLElement
   input: HTMLInputElement
   // Shown when the filter hides every row.
@@ -685,6 +685,18 @@ export interface DevTab {
   count: (count: number, tone?: 'error' | 'warn', note?: string) => void
 }
 
+export interface DevKit {
+  // Aborted when the tool stops.
+  signal: AbortSignal
+  entry: (kind: string, parts: EntryParts) => HTMLElement
+  toolbar: (help: string, rerun: () => void, problems?: boolean) => Toolbar
+  filterable: typeof filterable
+  pill: (text: string, tone?: 'error' | 'warn' | 'ok' | 'accent') => HTMLElement
+  copyButton: (what: string, text: string) => HTMLButtonElement
+  positionButton: (source: string) => HTMLButtonElement
+  ownFetch: typeof ownFetch
+}
+
 export interface DevTool {
   root: ShadowRoot
   make: <K extends keyof HTMLElementTagNameMap>(tag: K, className?: string, text?: string) => HTMLElementTagNameMap[K]
@@ -692,6 +704,8 @@ export interface DevTool {
   // A button of its own on the bar, with an icon by name from kay's set before its text.
   button: (text: string, label: string, icon?: DevIconName) => HTMLButtonElement
   icon: (name: DevIconName) => SVGSVGElement
+  // The helpers every list tab shares, for a tab whose code is a module of its own, which the browser loads as it is and so imports nothing from here.
+  kit: DevKit
   // Outlines elements of the page, `text` beside the first, until `hideOutline`.
   outline: (targets: Element[], text: string) => void
   hideOutline: () => void
@@ -1249,6 +1263,16 @@ export function startDevTool(doc: Document = document): DevTool {
     tab,
     button,
     icon: name => iconOf(doc, name),
+    kit: {
+      signal: listening.signal,
+      entry: (kind, parts) => entry(tool, kind, parts),
+      toolbar: (help, rerun, problems) => toolbar(tool, help, rerun, problems),
+      filterable,
+      pill: (text, tone) => pill(tool, text, tone),
+      copyButton: (what, text) => copyButton(tool, what, text),
+      positionButton: source => positionButton(tool, source),
+      ownFetch,
+    },
     outline,
     hideOutline,
     open: async source => opener ? opener(source) : 'no editor here, run kay dev',
@@ -1282,7 +1306,7 @@ export function startDevTool(doc: Document = document): DevTool {
 
   imagesTab(doc, tool, vitals, listening.signal)
   performanceTab(doc, tool, vitals, listening.signal)
-  routesTab(doc, tool, listening.signal)
+  lazyTab(tool, { id: 'routes', label: 'Routes', icon: 'route' }, ROUTES_TAB_URL)
   i18nTab(doc, tool, missing, listening.signal)
   notFoundTab(doc, tool, listening.signal)
   lazyTab(tool, { id: 'data', label: 'Data', icon: 'database' }, DATA_TAB_URL)
@@ -3242,82 +3266,6 @@ function performanceTab(doc: Document, tool: DevTool, vitals: Vitals, signal: Ab
   renderVitals()
 }
 
-const ROUTE_KINDS: Record<Exclude<DevRoute['kind'], 'plumbing'>, string> = { page: 'Pages', endpoint: 'Endpoints', api: 'API', kay: 'Served by kay' }
-const DOCS_ORIGIN = 'https://kayjs.kaynooo.fr'
-
-// Every route the server serves, filtered as typed, each opening its file, the GET paths no request fills in linking to themselves; fetched as the tab shows and again after each restart, so it lists what the running server serves. What kay serves itself holds the pages one visits, then kay's plumbing under a heading of its own.
-function routesTab(doc: Document, tool: DevTool, signal: AbortSignal): void {
-  const win = doc.defaultView!
-  const body = tool.make('div', 'list')
-  let routes: DevRoute[] = []
-  let notes: string[] = []
-  // A restart while a fetch is out asks again; the latest answer wins.
-  let asked = 0
-  let render: () => void = () => undefined
-  const bar = toolbar(tool, 'Filter by path, file or purpose', () => render())
-
-  render = () => {
-    const group = (label: string, rows: DevRoute[], tag: 'h3' | 'h4', before: HTMLElement[] = []) => {
-      const section = tool.make('section', 'group')
-      const heading = tool.make(tag, 'heading', label)
-      const list = tool.make('div')
-
-      list.append(...rows.map(route => filterable(routeRow(tool, route, win.location), `${route.path} ${route.file} ${route.owner ?? ''}`)))
-      heading.append(pill(tool, String(rows.length + before.reduce((count, element) => count + element.querySelectorAll('[data-filter]').length, 0))))
-      section.append(heading, ...rows.length > 0 ? [list] : [], ...before)
-
-      return section
-    }
-    const sections = Object.entries(ROUTE_KINDS).flatMap(([kind, label]) => {
-      const ofKind = routes.filter(route => route.kind === kind)
-      const plumbing = kind === 'kay' ? routes.filter(route => route.kind === 'plumbing') : []
-
-      if (ofKind.length === 0 && plumbing.length === 0)
-        return []
-
-      return [group(label, ofKind, 'h3', plumbing.length === 0 ? [] : [group('kay\'s plumbing', plumbing, 'h4')])]
-    })
-
-    body.replaceChildren(...sections.length > 0 ? sections : [tool.make('div', 'empty', 'No routes.')], bar.empty, ...notes.map(note => tool.make('div', 'note', note)))
-    bar.apply(body)
-  }
-  const list = async () => {
-    const ask = ++asked
-
-    try {
-      const response = await ownFetch(win, ROUTES_URL, { cache: 'no-store' })
-
-      if (ask !== asked)
-        return
-
-      if (!response.ok)
-        throw new Error(`the server answered ${response.status}`)
-
-      const listed = await response.json() as DevRoutes
-
-      if (ask !== asked)
-        return
-
-      routes = listed.routes
-      notes = listed.notes
-      render()
-    }
-    catch (error) {
-      if (ask !== asked)
-        return
-
-      body.replaceChildren(tool.make('div', 'empty', `Could not list the routes: ${error instanceof Error ? error.message : String(error)}`))
-    }
-  }
-  const tab = tool.tab({ id: 'routes', label: 'Routes', icon: 'route', shown: () => void list() })
-
-  tab.panel.append(bar.element, body)
-  win.addEventListener(BUILT_EVENT, () => {
-    if (tab.panel.hidden === false)
-      void list()
-  }, { signal })
-}
-
 // What a lazy tab's module default-exports: it fills the panel and gives back what reads the tab again each time it shows.
 export type DevTabModule = (tool: DevTool, tab: DevTab) => (() => void) | void
 
@@ -3441,34 +3389,6 @@ function notFoundTab(doc: Document, tool: DevTool, signal: AbortSignal): void {
   tab.panel.append(bar.element, status, body)
   win.addEventListener(BUILT_EVENT, reread, { signal })
   reread()
-}
-
-function routeRow(tool: DevTool, route: DevRoute, here: Location): HTMLElement {
-  const name = route.href === undefined ? tool.make('span', 'name', route.path) : Object.assign(tool.make('a', 'name', route.path), { href: route.href })
-  const row = entry(tool, 'route', {
-    name,
-    after: [...route.locale === undefined ? [] : [tool.make('span', 'chip', route.locale)], ...route.href === undefined ? [] : [copyButton(tool, 'the URL', new URL(route.href, here.href).href)], ...route.docs === undefined ? [] : [docsLink(tool, { ...route, docs: route.docs })]],
-    chips: [route.owner === undefined ? positionButton(tool, route.file) : route.owner],
-  })
-
-  name.before(tool.make('span', 'method', route.method))
-
-  if (route.href === here.pathname)
-    row.setAttribute('aria-current', 'page')
-
-  return row
-}
-
-// A link to where the docs site says what a route of kay's is for.
-function docsLink(tool: DevTool, route: DevRoute & { docs: string }): HTMLAnchorElement {
-  const link = tool.make('a', 'chip', 'docs')
-
-  link.href = DOCS_ORIGIN + route.docs
-  link.setAttribute('aria-label', `Docs for ${route.path}`)
-  link.target = '_blank'
-  link.rel = 'noopener noreferrer'
-
-  return link
 }
 
 function formatMs(ms: number): string {
