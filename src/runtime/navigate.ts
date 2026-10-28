@@ -14,6 +14,8 @@ let swapModule: Promise<typeof import('./page-swap')> | undefined
 let formsModule: Promise<typeof import('./form-submits')> | undefined
 // Set once the forms' listener runs, which takes every submit from then on.
 let formsListen = false
+// The forms posted before it ran, each held once: a second press while it loads posts nothing more.
+const heldForms = new WeakSet<HTMLFormElement>()
 // A traversal undone while the guards are asked about it: where it went, and how far.
 let held: { url: URL, delta: number } | undefined
 // A traversal the guards let through, made again.
@@ -83,14 +85,14 @@ function wakeShownForms(): void {
 }
 
 // The forms' listener, for the page's forms, the one taking focus or the submit held for it; one that fails to load leaves them to the browser, which posts them in full.
-async function wakeForms(form?: HTMLFormElement, held?: SubmitEvent): Promise<void> {
+async function wakeForms(form?: HTMLFormElement, held?: [submitter: HTMLElement | null]): Promise<void> {
   try {
     const forms = await loadFormSubmits()
 
     formsListen = true
 
     if (held)
-      forms.submitted(form!, held.submitter)
+      forms.submitted(form!, ...held)
     else if (form)
       forms.focused(form)
     else
@@ -99,8 +101,9 @@ async function wakeForms(form?: HTMLFormElement, held?: SubmitEvent): Promise<vo
   catch {
     formsListen = true
 
+    // Its submit event fires a second time, as no other way posts the form with what its button adds.
     if (held)
-      form!.requestSubmit(held.submitter)
+      form!.requestSubmit(held[0])
   }
 }
 
@@ -108,11 +111,18 @@ async function wakeForms(form?: HTMLFormElement, held?: SubmitEvent): Promise<vo
 function onEarlySubmit(event: SubmitEvent): void {
   const form = event.target as HTMLFormElement
 
-  if (formsListen || event.defaultPrevented || !(event.submitter?.getAttribute('formaction') ?? form.getAttribute('action'))?.includes('/_kay/action/'))
+  const { submitter } = event
+
+  // A cheaper test than the forms' listener's: a post to another site or with `formmethod="get"` naming an action still reaches the browser, its submit event fired again.
+  if (formsListen || event.defaultPrevented || !(submitter?.getAttribute('formaction') ?? form.getAttribute('action'))?.includes('/_kay/action/') || form.closest('[data-reload]') || submitter?.hasAttribute('data-reload') || !['', '_self'].includes(submitter?.getAttribute('formtarget') ?? form.target))
     return
 
   event.preventDefault()
-  void wakeForms(form, event)
+
+  if (!heldForms.has(form)) {
+    heldForms.add(form)
+    void wakeForms(form, [submitter])
+  }
 }
 
 // Fetched ahead of the click it hints at; one that fails to load leaves each click to load its page fully.

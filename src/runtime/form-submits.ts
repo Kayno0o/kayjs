@@ -54,10 +54,18 @@ async function loadForms(): Promise<typeof import('./forms')> {
 }
 
 // Where a form posts when the swap posts it: one of the app's actions, in this tab, with nothing opting it out.
-function swappedActionUrl(form: HTMLFormElement, submitter: HTMLElement | null): URL | undefined {
+// An action the page cannot resolve is left to the browser, which posts it natively.
+export function swappedActionUrl(form: HTMLFormElement, submitter: HTMLElement | null): URL | undefined {
   const method = (submitter?.getAttribute('formmethod') ?? form.getAttribute('method') ?? 'get').toLowerCase()
-  const url = new URL(submitter?.getAttribute('formaction') ?? form.getAttribute('action') ?? '', location.href)
   const target = submitter?.getAttribute('formtarget') ?? form.target
+  let url: URL
+
+  try {
+    url = new URL(submitter?.getAttribute('formaction') ?? form.getAttribute('action') ?? '', location.href)
+  }
+  catch {
+    return undefined
+  }
 
   if (method !== 'post' || url.origin !== location.origin || (target !== '' && target !== '_self') || form.closest('[data-reload]') || submitter?.hasAttribute('data-reload'))
     return undefined
@@ -78,29 +86,23 @@ function takeFormCheck(form: HTMLFormElement): void {
   if (form.noValidate)
     return
 
-  try {
-    if (!swappedActionUrl(form, null))
-      return
-  }
-  catch {
-    // An action the page cannot resolve is left to the browser, which posts it natively.
+  if (!swappedActionUrl(form, null))
     return
-  }
 
   form.noValidate = true
   checkedForms.add(form)
 }
 
-// A submit the islands' entry held while this module loaded, posted as `onSubmit` would have, or by the browser.
+// A post the islands' entry held while this module loaded, posted as `onSubmit` would have, or, for one the entry could not tell apart, by the browser.
 export function submitted(form: HTMLFormElement, submitter: HTMLElement | null): void {
   listen()
 
   const url = swappedActionUrl(form, submitter)
 
-  if (!url)
-    submitNatively(form, submitter)
-  else if (!busyForms.has(form))
+  if (url)
     void submit(form, submitter, url)
+  else
+    submitNatively(form, submitter)
 }
 
 function onSubmit(event: SubmitEvent): void {

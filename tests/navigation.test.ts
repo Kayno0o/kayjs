@@ -123,13 +123,13 @@ async function chunkLoaded(on: TestPage, name: string): Promise<boolean> {
   return on.evaluate((chunk: string) => performance.getEntriesByType('resource').some(entry => new RegExp(`/${chunk}-[^/]*\\.js$`).test(entry.name)), name)
 }
 
-// Whether a script the page loaded reads a form's `formmethod`, as the forms' listener does: Bun names the chunk holding it after another module.
+// Whether a script the page loaded sets a form's `noValidate`, as the forms' listener does: Bun names the chunk holding it after another module.
 async function formCodeLoaded(on: TestPage): Promise<boolean> {
   return on.evaluate(async () => {
     const scripts = performance.getEntriesByType('resource').filter(entry => entry.name.endsWith('.js'))
     const texts = await Promise.all(scripts.map(async entry => (await fetch(entry.name)).text()))
 
-    return texts.some(text => text.includes('formmethod'))
+    return texts.some(text => text.includes('noValidate'))
   })
 }
 
@@ -790,7 +790,7 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('page swap i
       await fresh.evaluate(async () => {
         const html = await (await fetch('/posted')).text()
 
-        document.body.append(new DOMParser().parseFromString(html, 'text/html').querySelector('form.away')!)
+        document.body.append(new DOMParser().parseFromString(html, 'text/html').querySelector<HTMLFormElement>('form.away')!)
         ;(window as { kayAlive?: boolean }).kayAlive = true
       })
 
@@ -803,6 +803,95 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('page swap i
       expect((await posted).requestHeaders['x-kay-page']).toBe('/kept')
       await fresh.waitFor('h1', { text: 'Plain' })
       expect(await fresh.evaluate(() => (window as { kayAlive?: boolean }).kayAlive)).toBe(true)
+    }
+    finally {
+      fresh.close()
+    }
+  })
+
+  it('holds a form posted twice before the forms\' listener loaded once, and posts it once', async () => {
+    const fresh = await open('/kept')
+    const stalled = Promise.withResolvers<void>()
+    const posts: string[] = []
+
+    try {
+      await settled(fresh)
+      await fresh.route(/\/form-submits-[^/]*\.js$/, async (request) => {
+        await stalled.promise
+        await request.continue()
+      })
+      await fresh.route(/\/_kay\/action\//, async (request) => {
+        posts.push(request.method)
+        await request.continue()
+      })
+      await fresh.evaluate(async () => {
+        const form = new DOMParser().parseFromString(await (await fetch('/posted')).text(), 'text/html').querySelector<HTMLFormElement>('form.away')!
+
+        document.body.append(form)
+        ;(window as { kayAlive?: boolean }).kayAlive = true
+        form.requestSubmit()
+        form.requestSubmit()
+      })
+      stalled.resolve()
+      await fresh.waitFor('h1', { text: 'Plain' })
+
+      expect(posts).toEqual(['POST'])
+      expect(await fresh.evaluate(() => (window as { kayAlive?: boolean }).kayAlive)).toBe(true)
+    }
+    finally {
+      fresh.close()
+    }
+  })
+
+  it('posts natively once a form held for a forms\' listener that cannot load, however often it was pressed', async () => {
+    const fresh = await open('/kept')
+    const posts: string[] = []
+
+    try {
+      await settled(fresh)
+      await fresh.route(/\/form-submits-[^/]*\.js$/, async request => request.abort())
+      await fresh.route(/\/_kay\/action\//, async (request) => {
+        posts.push(request.type)
+        await request.continue()
+      })
+      await fresh.evaluate(async () => {
+        const form = new DOMParser().parseFromString(await (await fetch('/posted')).text(), 'text/html').querySelector<HTMLFormElement>('form.away')!
+
+        document.body.append(form)
+        ;(window as { kayAlive?: boolean }).kayAlive = true
+        form.requestSubmit()
+        form.requestSubmit()
+      })
+      await fresh.waitFor('h1', { text: 'Plain' })
+
+      expect(posts).toEqual(['document'])
+      expect(await fresh.evaluate(() => (window as { kayAlive?: boolean }).kayAlive === undefined)).toBe(true)
+    }
+    finally {
+      fresh.close()
+    }
+  })
+
+  it('leaves to the browser untouched a form the swap would not post, submitted before the forms\' listener loaded', async () => {
+    const fresh = await open('/kept')
+
+    try {
+      await settled(fresh)
+      await fresh.evaluate(async () => {
+        const form = new DOMParser().parseFromString(await (await fetch('/posted')).text(), 'text/html').querySelector<HTMLFormElement>('form.away')!
+
+        form.setAttribute('data-reload', '')
+        ;(window as { kayAlive?: boolean }).kayAlive = true
+        form.addEventListener('submit', () => {
+          sessionStorage.setItem('submits', String(Number(sessionStorage.getItem('submits') ?? 0) + 1))
+        })
+        document.body.append(form)
+        form.requestSubmit()
+      })
+      await fresh.waitFor('h1', { text: 'Plain' })
+
+      expect(await fresh.evaluate(() => [sessionStorage.getItem('submits'), (window as { kayAlive?: boolean }).kayAlive === undefined])).toEqual(['1', true])
+      expect(await formCodeLoaded(fresh)).toBe(false)
     }
     finally {
       fresh.close()
