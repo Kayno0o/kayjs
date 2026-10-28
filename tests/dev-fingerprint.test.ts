@@ -5,8 +5,9 @@ import { dirname, join } from 'node:path'
 import process from 'node:process'
 import { afterEach, beforeEach, describe, expect, it, spyOn } from 'bun:test'
 import { clientDir, outputDir } from '../src/build/assets'
+import { buildClient } from '../src/build/client'
 import { devBuilder } from '../src/dev/builder'
-import { FINGERPRINT, mentionsPackage } from '../src/dev/fingerprint'
+import { BuildStamps, FINGERPRINT, mentionsPackage } from '../src/dev/fingerprint'
 import { BUILD_FAILURE } from '../src/server/client'
 import { scratchDir } from './scratch'
 
@@ -36,15 +37,15 @@ afterEach(async () => {
 })
 
 // Written a minute ago, as sources are by the time a project is started again: a file written just before a build cannot be told apart from one changed while it read it.
-async function write(files: Record<string, string>, settled = true): Promise<void> {
+async function write(files: Record<string, string>, settled = true, root = project): Promise<void> {
   const past = new Date(Date.now() - 60_000)
 
   for (const [file, content] of Object.entries(files)) {
-    await mkdir(dirname(join(project, file)), { recursive: true })
-    await Bun.write(join(project, file), content)
+    await mkdir(dirname(join(root, file)), { recursive: true })
+    await Bun.write(join(root, file), content)
 
     if (settled)
-      utimesSync(join(project, file), past, past)
+      utimesSync(join(root, file), past, past)
   }
 }
 
@@ -297,5 +298,42 @@ describe('mentionsPackage', () => {
     await write({ ...FILES })
     await symlink(join(project, 'src/gone.ts'), join(project, 'src/dangling.ts'))
     expect(await mentionsPackage(project)).toBe(true)
+  })
+})
+
+describe('the stamps kay/test keeps in memory', () => {
+  it('sees the .gitignore change, which tells what the sources are', async () => {
+    await write(FILES)
+
+    const stamps = new BuildStamps(project)
+
+    await stamps.begin(null)
+    await stamps.finish([], '{}')
+    expect(await stamps.current()).toBe(true)
+
+    await Bun.write(join(project, '.gitignore'), 'public\n')
+    expect(await stamps.current()).toBe(false)
+  })
+
+  it('holds only what its own root\'s build read, not another root the process built', async () => {
+    const other = await scratchDir('kay-dev-fingerprint-other-')
+
+    try {
+      await write(FILES)
+      await write(FILES, true, other)
+
+      const own = new BuildStamps(project)
+      const others = new BuildStamps(other)
+
+      await buildClient(project, {}, own)
+      await buildClient(other, {}, others)
+      await Bun.write(join(project, 'src/util.ts'), 'export const shout = (value: number) => `${value}?!`\n')
+
+      expect(await others.current()).toBe(true)
+      expect(await own.current()).toBe(false)
+    }
+    finally {
+      await rm(other, { recursive: true, force: true })
+    }
   })
 })

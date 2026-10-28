@@ -2,17 +2,20 @@ import { readdirSync, realpathSync, rmSync } from 'node:fs'
 import { join, sep } from 'node:path'
 import { version } from '../../package.json'
 import { clientDir, KAY_DIR } from '../build/assets'
-import { fileStamp, findProjectFiles, treeEntries, TS_FILE, unsettled, writeAtomically } from '../build/files'
+import { directoryStamp, fileStamp, projectTree, treeEntries, TS_FILE, unsettled, writeAtomically } from '../build/files'
 import { compilerFingerprint } from '../build/transform'
 import { BUILD_FAILURE, MANIFEST } from '../server/client'
-import { gitIgnoredNames, isSource } from './sources'
+import { gitIgnoredNames, holdsSources, isSource } from './sources'
 
 // Written beside the manifest once a build and the rewriting of its maps are over: what the client build read, to tell a later `kay dev` that the build it left is still the one its sources would give.
 export const FINGERPRINT = 'fingerprint.json'
 // The stamp of a file that cannot be told unchanged, which no later look at the file equals.
 const RACY = 'racy'
+// The stamp of a source the build did not read, which `kay/test` holds by its presence only.
+const PRESENT = 'present'
+// Which files are sources, read for each walk of them.
+const GITIGNORE = '.gitignore'
 const MAP_FILE = /\.map$/
-const ANY_NAME = /^/
 
 interface StampRecord {
   identity: string
@@ -45,9 +48,32 @@ function kayModules(): string[] {
 
 // Every file the project's server or build reads, as the walk the build already made finds them.
 export async function sourceFiles(root: string): Promise<string[]> {
-  const ignored = gitIgnoredNames(root)
+  return (await sourceTree(root)).files
+}
 
-  return (await findProjectFiles(root, ANY_NAME, { project: true, ownKayOnly: true })).filter(file => isSource(root, file, ignored, true))
+// The sources and, by the stamps the walk took, the directories that may hold one: none when one of them was written within two seconds before the walk, as an entry added next could leave its stamp as it is.
+async function sourceTree(root: string): Promise<{ files: string[], directories: Map<string, string> }> {
+  const ignored = gitIgnoredNames(root)
+  const tree = await projectTree(root, { project: true, ownKayOnly: true })
+  const files = tree.files.filter(file => isSource(root, file, ignored, true))
+  const directories = new Map<string, string>()
+
+  for (const [dir, stamp] of tree.directories) {
+    if (!holdsSources(root, dir, ignored))
+      continue
+
+    if (stamp === '' || unsettled(stamp, tree.at))
+      return { files, directories: new Map() }
+
+    directories.set(dir, stamp)
+  }
+
+  return { files, directories }
+}
+
+// Whether a file no longer has the stamp a build took of it.
+function moved(file: string, stamp: string): boolean {
+  return stamp === PRESENT ? fileStamp(file) === undefined : (fileStamp(file) ?? '') !== stamp
 }
 
 const CODE_OR_KAY = /\.(?:kay|[cm]?[jt]sx?)$/
@@ -90,6 +116,8 @@ export class BuildStamps {
   private known = new Map<string, string>()
   // The files whose stamps the record cannot trust.
   private racy = new Set<string>()
+  // The directories that may hold a source, by their stamps when the build's walk listed them: while none moved, no source came or went since, and `current` walks nothing. Empty when they cannot be trusted.
+  private directories = new Map<string, string>()
   private startedAt = 0
   private generation = 0
   private readonly realRoot: string
@@ -153,16 +181,27 @@ export class BuildStamps {
   }
 
   // Whether nothing the last build of this process read has changed since: every file still has the stamp the build took, and no source is new. After a build that failed, the sources it began with.
+  // A new source is looked for only once a directory that may hold one moved, and the walk that finds none takes their stamps again.
   async current(): Promise<boolean> {
     if (this.known.size === 0)
       return false
 
     for (const [file, stamp] of this.known) {
-      if ((fileStamp(file) ?? '') !== stamp)
+      if (moved(file, stamp))
         return false
     }
 
-    return !(await sourceFiles(this.root)).some(file => !this.known.has(this.canon(file)))
+    if (this.directories.size > 0 && [...this.directories].every(([dir, stamp]) => directoryStamp(dir) === stamp))
+      return true
+
+    const { files, directories } = await sourceTree(this.root)
+
+    if (files.some(file => !this.known.has(this.canon(file))))
+      return false
+
+    this.directories = directories
+
+    return true
   }
 
   // A build starts: the record of the one before no longer describes the output, and the files it reads again are stamped before it reads them, every source for a build of everything.
@@ -187,28 +226,36 @@ export class BuildStamps {
     this.known.clear()
     this.racy.clear()
 
-    for (const file of await sourceFiles(this.root))
+    const { files, directories } = await sourceTree(this.root)
+
+    for (const file of [...files, join(this.root, GITIGNORE)])
       this.stamp(this.canon(file), this.known, this.racy)
+
+    this.directories = directories
   }
 
-  // A build succeeded, having read `inputs` besides the project's sources: its record is written once `settled`, the rewriting of the maps it started, is over, unless another build began meanwhile.
+  // A build succeeded, having read `inputs`: its record is written once `settled`, the rewriting of the maps it started, is over, unless another build began meanwhile.
+  // `kay dev`'s record holds every source by its stamp, for a later start to read; `kay/test` holds the ones the build did not read by their presence only, so a database a test writes under a watched folder builds nothing again.
   async finish(inputs: Iterable<string>, manifest: string, settled?: Promise<unknown>): Promise<void> {
     const generation = this.generation
     const stamps = new Map<string, string>()
     const racy = new Set<string>()
-
-    for (const path of [...await sourceFiles(this.root), ...inputs, ...kayModules()]) {
-      const file = this.canon(path)
-
+    const take = (file: string, read: boolean) => {
       if (stamps.has(file) || file.startsWith(this.generated))
-        continue
+        return
+
+      if (!read) {
+        stamps.set(file, PRESENT)
+
+        return
+      }
 
       const stamp = this.known.get(file)
 
       if (stamp === undefined) {
         this.stamp(file, stamps, racy)
 
-        continue
+        return
       }
 
       stamps.set(file, stamp)
@@ -217,8 +264,17 @@ export class BuildStamps {
         racy.add(file)
     }
 
+    for (const path of [...inputs, ...kayModules(), join(this.root, GITIGNORE)])
+      take(this.canon(path), true)
+
+    const { files, directories } = await sourceTree(this.root)
+
+    for (const path of files)
+      take(this.canon(path), this.record !== undefined)
+
     this.known = stamps
     this.racy = racy
+    this.directories = directories
 
     if (this.record !== undefined)
       void this.write(this.record, generation, manifest, settled)

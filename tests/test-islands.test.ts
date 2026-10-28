@@ -1,7 +1,8 @@
-import { existsSync, readdirSync } from 'node:fs'
+import { existsSync, readdirSync, rmSync, utimesSync } from 'node:fs'
 import { join } from 'node:path'
-import { beforeAll, describe, expect, it } from 'bun:test'
+import { beforeAll, describe, expect, it, spyOn } from 'bun:test'
 import { clientDir, inOutput, outputDir, testWorker } from '../src/build/assets'
+import * as files from '../src/build/files'
 import { testSite } from '../src/test'
 import { scratchDir } from './scratch'
 
@@ -101,5 +102,55 @@ describe('testSite builds the islands', () => {
     await testSite({ root })
 
     expect(Bun.file(manifest()).lastModified).toBeGreaterThan(first)
+  })
+})
+
+// Ages every directory of the root's sources, as a fixture checked out a while ago has them: a directory written within two seconds before a walk cannot tell an entry added next by its stamp.
+function settleDirectories(dir: string): void {
+  const past = new Date(Date.now() - 60_000)
+
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    if (entry.isDirectory() && entry.name !== '.kay')
+      settleDirectories(join(dir, entry.name))
+  }
+
+  utimesSync(dir, past, past)
+}
+
+describe('testSite keeps the islands it built', () => {
+  it('walks nothing again while no source came, changed or went, and builds again for one that came', async () => {
+    await Bun.write(greeting, FINE)
+    settleDirectories(root)
+    await testSite({ root })
+
+    const walks = spyOn(files, 'projectTree')
+    const first = Bun.file(manifest()).lastModified
+
+    try {
+      await Bun.sleep(20)
+      await testSite({ root })
+      expect(walks.mock.calls.filter(([dir]) => dir === root)).toEqual([])
+      expect(Bun.file(manifest()).lastModified).toBe(first)
+
+      await Bun.write(join(root, 'src/routes/other.kay'), 'p Other\n')
+      await testSite({ root })
+      expect(Bun.file(manifest()).lastModified).toBeGreaterThan(first)
+    }
+    finally {
+      walks.mockRestore()
+      rmSync(join(root, 'src/routes/other.kay'))
+    }
+  })
+
+  it('builds nothing again for a file no build reads that a test rewrites', async () => {
+    await Bun.write(join(root, 'data/app.sqlite'), 'first')
+    await testSite({ root })
+
+    const first = Bun.file(manifest()).lastModified
+
+    await Bun.sleep(20)
+    await Bun.write(join(root, 'data/app.sqlite'), 'second, longer')
+    await testSite({ root })
+    expect(Bun.file(manifest()).lastModified).toBe(first)
   })
 })

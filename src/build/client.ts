@@ -31,7 +31,7 @@ import { buildClassTable } from './class-table'
 import { CSS_FILE, findKayFiles, findProjectFiles, forgetSources, inWalkScope, keepSources, readSource, readSourcePaths, readText, writeIfChanged } from './files'
 import { Increments, realPaths, sameEntries } from './increments'
 import { hoistLayerOrder } from './layer-order'
-import { fileWords, importEdges, reachedFrom, reachingAny } from './libraries'
+import { fileWords, importEdges, libraryOf, reachedFrom, reachingAny } from './libraries'
 import { packagesOf } from './licenses'
 import { throughLinks } from './links'
 import { kay } from './plugin'
@@ -221,7 +221,13 @@ export function clientSession(root: string, options: ClientOptions, settings: Se
       const islandInputs = scripts ? realPaths(Object.values(scripts.inputs).flatMap(inputs => Object.keys(inputs))) : previous!.islandInputs
 
       last = increments?.next(previous, { sources, islandInputs, styleInputs, classTable: classTableText, manifest: text }, scripts, styles, texts)
-      await stamps?.finish([...readSourcePaths(), ...graph.keys(), ...styleInputs, ...islandInputs], text, increments?.mapsPointed)
+
+      if (stamps) {
+        // The reads and the import graph are the process's, kept across the roots it builds: this build's are those of its root and its libraries.
+        const own = (file: string) => file.startsWith(realRoot + sep) || file.startsWith(root + sep) || libraryOf(sources.libraries, file) !== undefined
+
+        await stamps.finish([...[...readSourcePaths(), ...graph.keys()].filter(own), ...styleInputs, ...islandInputs], text, increments?.mapsPointed)
+      }
     }
 
     return { sources, manifest, scripts, styles }

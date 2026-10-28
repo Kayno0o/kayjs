@@ -106,6 +106,17 @@ export function isSource(root: string, file: string, ignored: Set<string>, rootN
   return watchedName(top) && !ignored.has(top) && !TEST_FILE.test(path)
 }
 
+// Whether a directory of the walk may hold a file `isSource` takes: the root, or one below a directory `kay dev` watches and outside any `__tests__`.
+export function holdsSources(root: string, dir: string, ignored: Set<string>): boolean {
+  if (dir === root)
+    return true
+
+  const path = relative(root, dir)
+  const [top = path] = path.split(sep)
+
+  return watchedName(top) && !ignored.has(top) && !TEST_FILE.test(`${path}/`)
+}
+
 // A directory or file at the project root worth reacting to; dependencies, build output, tests and hidden entries, `.env` files apart, are not.
 function watchedName(name: string): boolean {
   return !IGNORED_DIRS.has(name) && !TEST_DIR.test(name) && (!name.startsWith('.') || name.startsWith('.env'))

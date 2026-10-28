@@ -76,6 +76,18 @@ export function fileStamp(file: string): string | undefined {
   }
 }
 
+// What tells a directory's entries changed: its inode and times, which an entry added, removed or renamed moves, as `fileStamp` writes them; undefined for what is no directory.
+export function directoryStamp(dir: string): string | undefined {
+  try {
+    const stats = statSync(dir, { throwIfNoEntry: false })
+
+    return stats?.isDirectory() === true ? `${stats.ino}-${stats.mtimeMs}-${stats.ctimeMs}` : undefined
+  }
+  catch {
+    return undefined
+  }
+}
+
 // When the file of a `fileStamp` was last written, in milliseconds since the epoch.
 export function stampTime(stamp: string): number {
   const from = stamp.indexOf('-') + 1
@@ -267,16 +279,30 @@ export function scoped<T>(key: string, compute: () => T): T {
 // Every file under `root` whose name `matches`, skipping as findKayFiles does.
 export async function findProjectFiles(root: string, matches: RegExp, options: FindOptions = {}): Promise<string[]> {
   if (!walking.getStore())
-    return walkProject(root, matches, options)
+    return (await walkProject(root, matches, options)).files
 
-  const all = scoped(`walk ${JSON.stringify([root, options.project ?? false, options.ownOnly ?? false, options.ownKayOnly ?? false])}`, async () => walkProject(root, ANY_NAME, options))
-
-  return (await all).filter(file => matches.test(basename(file)))
+  return (await projectTree(root, options)).files.filter(file => matches.test(basename(file)))
 }
 
-async function walkProject(root: string, matches: RegExp, { project = false, ownOnly = false, ownKayOnly = false }: FindOptions): Promise<string[]> {
+// What a walk of the project found: its files, and the stamp of each directory it listed, taken before listing it, so while no stamp moved the walk would find the same files. `at` is when it began.
+export interface ProjectTree {
+  files: string[]
+  directories: Map<string, string>
+  at: number
+}
+
+// Every file under `root` and the directories holding them, the walk `findProjectFiles` shares in a scope.
+export async function projectTree(root: string, options: FindOptions = {}): Promise<ProjectTree> {
+  return scoped(`walk ${JSON.stringify([root, options.project ?? false, options.ownOnly ?? false, options.ownKayOnly ?? false])}`, async () => walkProject(root, ANY_NAME, options))
+}
+
+async function walkProject(root: string, matches: RegExp, { project = false, ownOnly = false, ownKayOnly = false }: FindOptions): Promise<ProjectTree> {
   const files: string[] = []
+  const directories = new Map<string, string>()
+  const at = Date.now()
   const walk = async (dir: string) => {
+    directories.set(dir, directoryStamp(dir) ?? '')
+
     const entries = await readable(dir, dir !== root)
 
     if (dir !== root && (entries.some(entry => entry.isFile() && ((ownOnly && entry.name === TSCONFIG) || (ownKayOnly && (entry.name === KAY_CONFIG || entry.name === PACKAGE)))) || await isWorktree(dir, entries)))
@@ -297,7 +323,7 @@ async function walkProject(root: string, matches: RegExp, { project = false, own
 
   await walk(root)
 
-  return files.sort()
+  return { files: files.sort(), directories, at }
 }
 
 // A git worktree inside the project, as Claude Code keeps them under `.claude/worktrees`, holds another version of its files.
