@@ -60,7 +60,7 @@ Chat(action={reply} transcribe={transcribe})
 ```
 
 - A press asks for the microphone and records, the button pressed with a stop icon; the next press posts the recording (`recording.webm`, `recording.m4a` in Safari) and the text joins the field and is sent as typed, with any attached files. A reply under way leaves it in the field. Escape on the button drops the recording, starting over drops one being recorded or written down, and a recording stops by itself after 5 minutes.
-- Its troubles show in a notice: a refused call says its `ctx.fail` message under 500 and `transcribeFailedLabel` otherwise, empty text `unheardLabel`, and the microphone's own (blocked, missing, in use, unplugged, no https, a browser that cannot record) kayjs-ui's [RecordButton](../../ui/llms/basics.md) words, `ui.recordButton.*`. The status region says when recording starts and stops, then `transcribingLabel`.
+- Its troubles show in a notice: a refused call says its `ctx.fail` message under 500 and `transcribeFailedLabel` otherwise, empty text `unheardLabel`, and the microphone's own (blocked, missing, in use, unplugged, no https, a browser that cannot record) kayjs-ui's [RecordButton](../../ui/llms/basics.md) words, `ui.recordButton.*`. The status region says when recording starts and stops, then `transcribingLabel` until what was said is sent.
 - Words: `ai.chat.record` (`recordLabel`, `Speak a message`), `transcribing`, `unheard` and `transcribeFailed`; `@recordIcon` replaces the microphone. The recorder's code loads only in a chat with `transcribe`.
 
 ### Regenerating and editing

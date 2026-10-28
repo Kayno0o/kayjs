@@ -21,7 +21,7 @@ The microphone is released however the recording ends: stopped, dropped, unplugg
 
 ## Keyboard and screen readers
 
-The button is a toggle, `aria-pressed` while it records, so Enter and Space start and stop it. Escape on it drops the recording. A visually hidden status region says when the recording starts, stops and is dropped, as a screen reader does not read a button's new state. The time ticks every second, so it is hidden from screen readers.
+The button is a toggle, `aria-pressed` while it records, so Enter and Space start and stop it. Escape on it drops the recording. A visually hidden status region says when the recording starts, stops and is dropped, and empties once `onRecord` settles, as a screen reader does not read a button's new state. The time ticks every second, so it is hidden from screen readers.
 
 ## Variant
 

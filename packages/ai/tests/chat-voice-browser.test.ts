@@ -69,7 +69,7 @@ async function microphone(page: TestPage) {
   })
 }
 
-it('records from the microphone, sends what transcribe wrote down after the typed text, and releases the microphone', async () => {
+it('records from the microphone, sends what transcribe wrote down after the typed text, stops saying it is written down, and releases the microphone', async () => {
   await using page = await site.open('/speaking')
 
   await microphone(page)
@@ -86,6 +86,7 @@ it('records from the microphone, sends what transcribe wrote down after the type
   await page.waitFor('.kai-chat-turn[data-role=assistant]', { text: 'Fake reply to: Say Hello there' })
 
   expect(await page.text('.kai-chat-turn[data-role=user]')).toBe('Say Hello there')
+  expect(await page.text('.kai-chat-status')).toBe('')
   expect(await page.value('.kai-chat-form textarea')).toBe('')
   expect(await page.evaluate(() => (window as unknown as Voice).tracks.map(track => track.readyState))).toEqual(['ended'])
   expect(page.errors).toEqual([])

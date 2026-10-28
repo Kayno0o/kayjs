@@ -32,7 +32,7 @@ export interface RecorderOptions {
   onAudio: (audio: File) => unknown
   words: RecordWords
   failure: string
-  // What `said` reads while `onAudio`'s promise is pending, `words.stopped` by default.
+  // What `said` reads while `onAudio`'s promise is pending, `words.stopped` by default; it is emptied once the promise settles, so a status region read later does not say the work is still under way.
   sending?: string | undefined
   // How long a recording runs before it is handed over as if pressed.
   maxMs: number
@@ -115,10 +115,10 @@ export function recorder(options: RecorderOptions): Recorder {
     }
     catch (error) {
       console.error('kayjs-ui: a recording\'s onRecord failed', error)
-      said.set('')
       problem.set(options.failure)
     }
     finally {
+      said.set('')
       state.set('idle')
     }
   }

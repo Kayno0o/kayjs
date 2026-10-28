@@ -108,7 +108,7 @@ async function mount(props: Record<string, unknown> = {}) {
   }
 }
 
-test('a press records, the next hands the recording over as a file, busy while onRecord pends, and the microphone is released', async () => {
+test('a press records, the next hands the recording over as a file, busy and said stopped while onRecord pends, and the microphone is released', async () => {
   const sending = later()
   const given: File[] = []
   const { button, look } = await mount({ label: 'Speak', onRecord: async (audio: File) => {
@@ -134,7 +134,7 @@ test('a press records, the next hands the recording over as a file, busy while o
   sending.settle()
   await settle()
 
-  expect([look().busy, look().problem]).toEqual([null, null])
+  expect([look().busy, look().status, look().problem]).toEqual([null, '', null])
 })
 
 test('a microphone the visitor blocks, one missing and one another application holds each say so, and nothing is recorded', async () => {
@@ -226,7 +226,7 @@ test('a rejected onRecord says failure, and the recording stops by itself after 
     await Bun.sleep(60)
     await settle()
 
-    expect([look().pressed, look().busy, look().problem]).toEqual(['false', null, 'Not sent'])
+    expect([look().pressed, look().busy, look().status, look().problem]).toEqual(['false', null, '', 'Not sent'])
     expect(logged).toHaveBeenCalled()
   }
   finally {
