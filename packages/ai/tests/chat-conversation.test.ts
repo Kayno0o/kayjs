@@ -15,7 +15,16 @@ type Status = ReturnType<ActionStream<unknown>['status']>
 function fakeStream() {
   const status = signal<Status>('open')
   const listeners = new Set<(value: string | Progress) => void>()
+  const waiting = new Set<() => void>()
   let last: string | Progress | undefined
+
+  const settle = (state: Status) => {
+    status.set(state)
+
+    for (const then of waiting)
+      then()
+  }
+
   const stream: ActionStream<string | Progress> = {
     last: () => last,
     status,
@@ -24,7 +33,15 @@ function fakeStream() {
 
       return () => listeners.delete(listener)
     },
-    close: () => status.set('closed'),
+    close: () => settle('closed'),
+    ended: async () => new Promise((resolve, reject) => {
+      const then = () => status() === 'done' ? resolve(last) : reject(new Error(`the stream ended ${status()}`))
+
+      if (status() === 'open')
+        waiting.add(then)
+      else
+        then()
+    }),
   }
 
   return {
@@ -36,7 +53,7 @@ function fakeStream() {
         listener(value)
     },
     end(state: 'done' | 'failed') {
-      status.set(state)
+      settle(state)
     },
   }
 }

@@ -67,28 +67,19 @@ const named = (id: string | undefined) => id !== undefined && CONVERSATION_ID.te
 
 // The one snapshot a conversation call answers with, as the JSON it holds; undefined for an answer that is no stream, or a stream that ended without one.
 async function answerIn(answer: unknown): Promise<ConversationAnswer | undefined> {
-  if (typeof answer !== 'object' || answer === null || !('on' in answer))
+  if (typeof answer !== 'object' || answer === null || !('ended' in answer))
     return undefined
 
   const stream = answer as ActionStream<string | Progress>
-  const value = await new Promise<string | Progress | undefined>((resolve) => {
-    let off: (() => void) | undefined
-    // A stream that ends with no value says so by its status alone, which no listener hears: kaynooo/kayjs#2574.
-    const timer = setInterval(() => {
-      if (stream.status() !== 'open')
-        settle(stream.last())
-    }, 50)
+  let value: string | Progress | undefined
 
-    function settle(value: string | Progress | undefined) {
-      clearInterval(timer)
-      off?.()
-      resolve(value)
-    }
-
-    off = stream.on(settle)
-  })
-
-  stream.close()
+  try {
+    value = await stream.ended()
+  }
+  catch {
+    // A stream that broke off or was closed still answers with what it sent.
+    value = stream.last()
+  }
 
   const text = typeof value === 'string' ? value : value?.text
 
