@@ -20,11 +20,11 @@ extensions: [auth({ admin: 'admin', roles: { admin: ['editor'], editor: [] }, au
 
 ### Show who an admin acts as
 
-`impersonate` signs the admin in as the user, and a banner says so on every prebuilt page and, with `viewer: true`, on every page of the app: `You are acting as ada@example.com.` with a `Back to my account` button that posts to `<prefix>/stop-impersonating` (`redirect` for where to go, a path of the site) and lands on the admin pages. Put `ImpersonationBanner` in a layout of your own where `viewer: true` does not reach ([the signed-in user in templates](signed-in-components.md#show-the-impersonation-banner)).
+`admin.impersonate` signs the admin in as the user, and a banner says so on every prebuilt page and, with `viewer: true`, on every page of the app: `You are acting as ada@example.com.` with a `Back to my account` button that posts to `<prefix>/stop-impersonating` (`redirect` for where to go, a path of the site) and lands on the admin pages. Put `ImpersonationBanner` in a layout of your own where `viewer: true` does not reach ([the signed-in user in templates](signed-in-components.md#show-the-impersonation-banner)).
 
 ## Reference
 
 - `auth.requireAdmin()` is the guard of the pages for your own admin page: the signed-in admin as themselves, else the refusal above.
-- `features().admin` is whether an admin is named and `features().audit` whether the audit log is kept; the roles an admin may give are `auth.adminRoles()`, server-side.
+- `features().admin` is whether an admin is named and `features().audit` whether the audit log is kept; the roles an admin may give are `auth.admin.roles()`, server-side.
 - The words are `auth.admin.*` and `auth.impersonation.*` in the app's catalogs; English and French ship.
 - The organization methods in [admin and organizations](admin-and-organizations.md) have their pages in [the organization pages](organization-pages.md).

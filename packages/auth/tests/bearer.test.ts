@@ -14,8 +14,8 @@ async function withToken(options: { scopes?: ('posts:read' | 'posts:write' | 'st
   const app = testApp({ scopes: ['posts:read', 'posts:write', 'stats'] })
   const ada = app.browser()
 
-  await ada.call('register', { email: 'ada@example.com', password: PASSWORD })
-  const minted = await ada.callOk('createToken', { password: PASSWORD }, 'Phone', options)
+  await ada.call('password.register', { email: 'ada@example.com', password: PASSWORD })
+  const minted = await ada.callOk('tokens.create', { password: PASSWORD }, 'Phone', options)
 
   return { ...app, ada, minted, bearer: { authorization: `Bearer ${minted.token}` } }
 }
@@ -32,12 +32,12 @@ describe('bearer tokens', () => {
 
   test('are listed without the token, and stop working once revoked', async () => {
     const { ada, browser, bearer, minted } = await withToken()
-    const tokens = await ada.call('listTokens')
+    const tokens = await ada.call('tokens.list')
 
     expect(tokens).toEqual([{ id: minted.id, label: 'Phone', scopes: null, createdAt: expect.any(String), lastUsedAt: null, expiresAt: expect.any(String), expired: false }])
     expect(JSON.stringify(tokens)).not.toContain(minted.token)
 
-    expect(await ada.call('revokeBearerToken', minted.id)).toEqual({ ok: true })
+    expect(await ada.call('tokens.revoke', minted.id)).toEqual({ ok: true })
     expect(await browser().json('/me', { headers: bearer })).toBe('anonymous')
   })
 
@@ -68,7 +68,7 @@ describe('bearer tokens', () => {
     expect(await post('listTokens')).toEqual([])
     expect(await post('revokeBearerToken', minted.id)).toEqual({ ok: false, error: 'signed-out' })
     expect(await post('enableTwoFactor', '123456')).toEqual({ ok: false, error: 'signed-out' })
-    expect(await ada.call('listTokens')).toHaveLength(1)
+    expect(await ada.call('tokens.list')).toHaveLength(1)
   })
 
   test('cannot set up, disable or reset two-factor, even with the proof', async () => {
@@ -81,7 +81,7 @@ describe('bearer tokens', () => {
     expect(await post('disableTwoFactor', { password: PASSWORD })).toEqual(refused)
     expect(await post('regenerateRecoveryCodes', { password: PASSWORD })).toEqual(refused)
     expect(await post('reprove', { password: PASSWORD })).toEqual(refused)
-    expect(await ada.call('setUpTwoFactor', { password: PASSWORD })).toMatchObject({ ok: true })
+    expect(await ada.call('twoFactor.setUp', { password: PASSWORD })).toMatchObject({ ok: true })
   })
 
   test('cannot mint more tokens, nor revoke another user\'s', async () => {
@@ -89,23 +89,23 @@ describe('bearer tokens', () => {
     const device = browser()
     const bob = browser()
 
-    expect(await device.json('/call/createToken', { method: 'POST', headers: { ...bearer, 'content-type': 'application/json' }, body: JSON.stringify([{ password: PASSWORD }, 'Another']) })).toEqual({ ok: false, error: 'signed-out' })
+    expect(await device.json('/call/tokens.create', { method: 'POST', headers: { ...bearer, 'content-type': 'application/json' }, body: JSON.stringify([{ password: PASSWORD }, 'Another']) })).toEqual({ ok: false, error: 'signed-out' })
 
-    await bob.call('register', { email: 'bob@example.com', password: PASSWORD })
+    await bob.call('password.register', { email: 'bob@example.com', password: PASSWORD })
 
-    expect(await bob.call('revokeBearerToken', minted.id)).toEqual({ ok: false, error: 'not-found' })
+    expect(await bob.call('tokens.revoke', minted.id)).toEqual({ ok: false, error: 'not-found' })
   })
 
   test('minting needs the password and a label', async () => {
     const { ada } = await withToken()
 
-    expect(await ada.call('createToken', { password: 'wrong password!' }, 'Laptop')).toEqual({ ok: false, error: 'proof' })
-    expect(await ada.call('createToken', { password: PASSWORD }, '  ')).toEqual({ ok: false, error: 'label' })
-    expect(await ada.call('createToken', { password: PASSWORD }, '\n\u202E\u0007')).toEqual({ ok: false, error: 'label' })
+    expect(await ada.call('tokens.create', { password: 'wrong password!' }, 'Laptop')).toEqual({ ok: false, error: 'proof' })
+    expect(await ada.call('tokens.create', { password: PASSWORD }, '  ')).toEqual({ ok: false, error: 'label' })
+    expect(await ada.call('tokens.create', { password: PASSWORD }, '\n\u202E\u0007')).toEqual({ ok: false, error: 'label' })
 
-    const minted = await ada.callOk('createToken', { password: PASSWORD }, 'Lap\ntop\u202E\u0000')
+    const minted = await ada.callOk('tokens.create', { password: PASSWORD }, 'Lap\ntop\u202E\u0000')
 
-    expect((await ada.call('listTokens') as { id: string, label: string }[]).find(token => token.id === minted.id)?.label).toBe('Laptop')
+    expect((await ada.call('tokens.list') as { id: string, label: string }[]).find(token => token.id === minted.id)?.label).toBe('Laptop')
   })
 
   test('pass a gate, and a websocket handshake can check one', async () => {
@@ -153,7 +153,7 @@ describe('scoped and expiring tokens', () => {
     const device = gated(app)
     const session = gated(app)
 
-    await session.call('signInWithPassword', { identifier: 'ada@example.com', password: PASSWORD })
+    await session.call('password.signIn', { identifier: 'ada@example.com', password: PASSWORD })
 
     for (const browser of [device, session]) {
       const headers = browser === device ? app.bearer : {}
@@ -183,9 +183,9 @@ describe('scoped and expiring tokens', () => {
   test('only declared scopes are given, and an expiry must lie ahead', async () => {
     const { ada } = await withToken()
 
-    expect(await ada.post('/call/createToken', [{ password: PASSWORD }, 'Laptop', { scopes: ['admin'] }])).toEqual({ ok: false, error: 'scope' })
-    expect(await ada.call('createToken', { password: PASSWORD }, 'Laptop', { scopes: [] })).toEqual({ ok: false, error: 'scope' })
-    expect(await ada.call('createToken', { password: PASSWORD }, 'Laptop', { maxAge: '0s' })).toEqual({ ok: false, error: 'expiry' })
+    expect(await ada.post('/call/tokens.create', [{ password: PASSWORD }, 'Laptop', { scopes: ['admin'] }])).toEqual({ ok: false, error: 'scope' })
+    expect(await ada.call('tokens.create', { password: PASSWORD }, 'Laptop', { scopes: [] })).toEqual({ ok: false, error: 'scope' })
+    expect(await ada.call('tokens.create', { password: PASSWORD }, 'Laptop', { maxAge: '0s' })).toEqual({ ok: false, error: 'expiry' })
   })
 
   test('an expired token is refused, and listed as expired', async () => {
@@ -197,7 +197,7 @@ describe('scoped and expiring tokens', () => {
 
     expect(await browser().json('/me', { headers: bearer })).toBe('anonymous')
     expect(await auth.userFromToken(minted.token)).toBeNull()
-    expect(await ada.call('listTokens')).toEqual([expect.objectContaining({ id: minted.id, expiresAt: expect.any(String), expired: true })])
+    expect(await ada.call('tokens.list')).toEqual([expect.objectContaining({ id: minted.id, expiresAt: expect.any(String), expired: true })])
   })
 })
 
@@ -205,7 +205,7 @@ describe('issuing a token from the server', () => {
   test('mints one for a user with no proof and no mail or event, which a device then signs in with', async () => {
     const events: string[] = []
     const app = testApp({ onAuthEvent: ({ event }) => void events.push(event) })
-    const { user } = await app.browser().callHas('user', 'register', { email: 'ada@example.com', password: PASSWORD })
+    const { user } = await app.browser().callHas('user', 'password.register', { email: 'ada@example.com', password: PASSWORD })
 
     events.length = 0
     const issued = await app.auth.issueToken(user.id, 'Kitchen display', { maxAge: '31536000s' })
@@ -217,7 +217,7 @@ describe('issuing a token from the server', () => {
 
   test('adopts a token the app handed out before, so its devices keep working through a migration', async () => {
     const app = testApp()
-    const { user } = await app.browser().callHas('user', 'register', { email: 'ada@example.com', password: PASSWORD })
+    const { user } = await app.browser().callHas('user', 'password.register', { email: 'ada@example.com', password: PASSWORD })
     const legacy = 'eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxIn0.legacy-signature'
 
     expect(await app.auth.issueToken(user.id, 'Old device', { token: legacy })).toMatchObject({ ok: true, token: legacy })
@@ -226,7 +226,7 @@ describe('issuing a token from the server', () => {
 
   test('refuses a missing or banned user, a token a header cannot carry, and what createToken refuses', async () => {
     const app = testApp()
-    const { user } = await app.browser().callHas('user', 'register', { email: 'ada@example.com', password: PASSWORD })
+    const { user } = await app.browser().callHas('user', 'password.register', { email: 'ada@example.com', password: PASSWORD })
 
     expect(await app.auth.issueToken('nobody', 'Phone')).toEqual({ ok: false, error: 'not-found' })
     expect(await app.auth.issueToken(user.id, 'Phone', { token: 'short' })).toEqual({ ok: false, error: 'token' })
@@ -288,9 +288,9 @@ async function withTokenIn(store: ReturnType<typeof memoryAuthStore>) {
   const app = testApp({ scopes: ['posts:read', 'posts:write', 'stats'], store })
   const ada = app.browser()
 
-  await ada.call('register', { email: 'ada@example.com', password: PASSWORD })
+  await ada.call('password.register', { email: 'ada@example.com', password: PASSWORD })
 
-  return { ...app, ada, minted: await ada.callOk('createToken', { password: PASSWORD }, 'Phone', {}) }
+  return { ...app, ada, minted: await ada.callOk('tokens.create', { password: PASSWORD }, 'Phone', {}) }
 }
 
 const DAY_MS = 24 * 60 * 60 * 1000
@@ -315,7 +315,7 @@ describe('token hygiene', () => {
 
     expect(Math.abs(stored!.expiresAt!.getTime() - (Date.now() + 90 * DAY_MS))).toBeLessThan(60_000)
 
-    const forever = await ada.callOk('createToken', { password: PASSWORD }, 'Forever', { maxAge: null })
+    const forever = await ada.callOk('tokens.create', { password: PASSWORD }, 'Forever', { maxAge: null })
     const issuedForever = await auth.issueToken(id, 'Script', { maxAge: null })
     const issuedDefault = await auth.issueToken(id, 'Default')
     const byId = new Map((await store.bearerTokens.listByUser(id)).map(token => [token.id, token]))

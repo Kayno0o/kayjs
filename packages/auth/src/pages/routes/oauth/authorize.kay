@@ -12,7 +12,7 @@ const FIELDS = ['client_id', 'redirect_uri', 'response_type', 'code_challenge', 
 
 // The answer is checked again as the request is, so a form edited by hand gets no more than the request could.
 export const decide = action(schemas.oauthConsent, async ({ decision, ...fields }, ctx) => {
-  const result = await ctx.locals.auth.oauthDecide({ ...fields, scope: fields.scope === '' ? undefined : fields.scope, state: fields.state === '' ? undefined : fields.state, resource: fields.resource === '' ? undefined : fields.resource }, decision === 'allow')
+  const result = await ctx.locals.auth.oauthServer.decide({ ...fields, scope: fields.scope === '' ? undefined : fields.scope, state: fields.state === '' ? undefined : fields.state, resource: fields.resource === '' ? undefined : fields.resource }, decision === 'allow')
 
   return result.ok ? ctx.redirect(result.redirect) : ctx.fail(400, { error: result.error })
 })
@@ -33,7 +33,7 @@ const resources = ctx.url.searchParams.getAll('resource')
 if (resources.length > 1)
   request.resource = resources
 
-const outcome = refused ? undefined : await auth.oauthAuthorize(request)
+const outcome = refused ? undefined : await auth.oauthServer.authorize(request)
 
 if (outcome?.kind === 'sign-in')
   ctx.redirect(auth.signInUrl())

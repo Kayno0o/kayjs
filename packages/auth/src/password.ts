@@ -238,7 +238,7 @@ async function replaceUnclaimed(state: RequestState, holder: UserRecord): Promis
   await afterResponse('erasing the account a registration replaced', async () => (await import('./erase')).eraseUser(state.core, holder))
 }
 
-// Spends the time hashing a new password takes, so a held address answers no faster than a free one, and leaves this session as a new account's, which `sendVerification` answers alike, mailing no one.
+// Spends the time hashing a new password takes, so a held address answers no faster than a free one, and leaves this session as a new account's, which `email.sendVerification` answers alike, mailing no one.
 async function answerHeld(state: RequestState, holder: UserRecord, password: string | null): Promise<RegisterResult> {
   if (password !== null)
     await hashPassword(password)

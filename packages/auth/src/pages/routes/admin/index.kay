@@ -24,12 +24,12 @@ const auth = ctx.locals.auth
 const features = auth.features()
 const search = (ctx.url.searchParams.get('q') ?? '').trim().slice(0, SEARCH_MAX)
 const requested = pageOf(ctx.url.searchParams.get('page'))
-const first = await auth.listUsers({ search, offset: (requested - 1) * PAGE_SIZE, limit: PAGE_SIZE })
+const first = await auth.admin.listUsers({ search, offset: (requested - 1) * PAGE_SIZE, limit: PAGE_SIZE })
 const total = first.ok ? first.total : 0
 const pages = Math.max(1, Math.ceil(total / PAGE_SIZE))
 const shown = Math.min(requested, pages)
 // A page past the end shows the last one.
-const found = shown === requested ? first : await auth.listUsers({ search, offset: (shown - 1) * PAGE_SIZE, limit: PAGE_SIZE })
+const found = shown === requested ? first : await auth.admin.listUsers({ search, offset: (shown - 1) * PAGE_SIZE, limit: PAGE_SIZE })
 const users = found.ok ? found.users : []
 const base = localize(`${features.pages?.prefix ?? features.prefix}/admin`)
 const date = (value: Date) => formatDate(value, { dateStyle: 'medium' })

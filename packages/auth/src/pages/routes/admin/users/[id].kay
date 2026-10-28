@@ -24,13 +24,13 @@ function endOf(day: string | undefined): Date | null | 'until' {
 
 // Every action answers about the user the route names, never one the input names.
 export const grant = action(schemas.adminRole, async ({ role }, ctx) => {
-  const result = await ctx.locals.auth.grantRole(String(ctx.params.id), role as never)
+  const result = await ctx.locals.auth.admin.grantRole(String(ctx.params.id), role as never)
 
   return result.ok ? 'done' : ctx.fail(400, { error: result.error })
 })
 
 export const revoke = action(schemas.adminRole, async ({ role }, ctx) => {
-  const result = await ctx.locals.auth.revokeRole(String(ctx.params.id), role as never)
+  const result = await ctx.locals.auth.admin.revokeRole(String(ctx.params.id), role as never)
 
   return result.ok ? 'done' : ctx.fail(400, { error: result.error })
 })
@@ -41,13 +41,13 @@ export const ban = action(schemas.adminBan, async ({ reason, until }, ctx) => {
   if (end === 'until')
     return ctx.fail(400, { error: 'until' })
 
-  const result = await ctx.locals.auth.banUser(String(ctx.params.id), { ...reason?.trim() && { reason: reason.trim() }, ...end && { until: end } })
+  const result = await ctx.locals.auth.admin.ban(String(ctx.params.id), { ...reason?.trim() && { reason: reason.trim() }, ...end && { until: end } })
 
   return result.ok ? 'done' : ctx.fail(400, { error: result.error })
 })
 
 export const unban = action(async (ctx) => {
-  const result = await ctx.locals.auth.unbanUser(String(ctx.params.id))
+  const result = await ctx.locals.auth.admin.unban(String(ctx.params.id))
 
   return result.ok ? 'done' : ctx.fail(400, { error: result.error })
 })
@@ -56,7 +56,7 @@ export const remove = action(schemas.adminDelete, async ({ confirm }, ctx) => {
   if (confirm !== true)
     return ctx.fail(400, { error: 'form' })
 
-  const result = await ctx.locals.auth.deleteUser(String(ctx.params.id))
+  const result = await ctx.locals.auth.admin.deleteUser(String(ctx.params.id))
 
   if (!result.ok)
     return ctx.fail(400, { error: result.error })
@@ -67,7 +67,7 @@ export const remove = action(schemas.adminDelete, async ({ confirm }, ctx) => {
 })
 
 export const impersonate = action(async (ctx) => {
-  const result = await ctx.locals.auth.impersonate(String(ctx.params.id))
+  const result = await ctx.locals.auth.admin.impersonate(String(ctx.params.id))
 
   return result.ok ? ctx.redirect(localize(ctx.locals.auth.features().pages?.home ?? '/')) : ctx.fail(400, { error: result.error })
 })
@@ -84,7 +84,7 @@ export const signInAgain = action(async (ctx) => {
 
 const auth = ctx.locals.auth
 const features = auth.features()
-const found = await auth.getUser(String(ctx.params.id))
+const found = await auth.admin.getUser(String(ctx.params.id))
 
 // Only an admin acting as a user is refused, and the admin index shows them the way back.
 if (!found.ok) {
@@ -98,9 +98,9 @@ const user = found.user
 const me = await auth.user()
 const own = me?.id === user.id
 const base = localize(`${features.pages?.prefix ?? features.prefix}/admin`)
-const declared = auth.adminRoles()
+const declared = auth.admin.roles()
 const grantable = declared.filter(role => !user.roles.includes(role))
-const log = await auth.listAdminAuditLog({ userId: user.id, limit: 20 })
+const log = await auth.admin.auditLog({ userId: user.id, limit: 20 })
 const entries = log.ok ? log.entries : []
 const refused = [grant, revoke, ban, unban, remove, impersonate].map(form => form.failed()?.data?.error).find(error => error !== undefined)
 const date = (value: Date) => formatDate(value, { dateStyle: 'medium' })

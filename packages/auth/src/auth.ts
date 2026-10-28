@@ -60,7 +60,7 @@ export interface AuthOptions<Data extends AuthSessionData, Role extends string, 
   signInPage?: string | undefined
   // Where every failed OAuth sign-in goes instead, with no reason in the URL, so that whether an account may sign in does not leak, as with an `allow` list.
   failurePage?: string | undefined
-  // Where a sign-in goes to ask for the second factor, `/two-factor` by default: a page whose form posts the code to an action calling `verifyTwoFactor`.
+  // Where a sign-in goes to ask for the second factor, `/two-factor` by default: a page whose form posts the code to an action calling `twoFactor.verify`.
   twoFactorPage?: string | undefined
   // The prebuilt pages, `auth()` as kay.config.ts lists it or `true` for its defaults: the sign-in, two-factor and sessions pages and the mailed links default to them.
   pages?: boolean | AuthPagesConfig | undefined

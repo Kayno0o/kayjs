@@ -9,13 +9,13 @@ const ID_MAX = 1366
 const credential = { id: t.String({ maxLength: ID_MAX }), rawId: t.String({ maxLength: ID_MAX }), type: t.Literal('public-key'), clientExtensionResults: t.Object({}, { additionalProperties: true }) }
 const transports = t.Optional(t.Array(t.String({ maxLength: 32 }), { maxItems: 16 }))
 
-// The answer to `passkeySignInOptions()`, `twoFactorPasskeyOptions()` or `passkeyProofOptions()`, for the schema of an action calling `signInWithPasskey`, `verifyTwoFactorPasskey` or a proof.
+// The answer to `passkeys.signInOptions()`, `twoFactor.passkeyOptions()` or `passkeys.proofOptions()`, for the schema of an action calling `passkeys.signIn`, `twoFactor.verifyPasskey` or a proof.
 export const passkeyAssertion = t.Unsafe<AuthenticationResponseJSON>(t.Object({
   ...credential,
   response: t.Object({ clientDataJSON: part, authenticatorData: part, signature: part, userHandle: t.Optional(part) }, { additionalProperties: true }),
 }, { additionalProperties: true }))
 
-// The answer to `passkeyRegistrationOptions()`, for the schema of an action calling `registerPasskey`.
+// The answer to `passkeys.registrationOptions()`, for the schema of an action calling `passkeys.register`.
 export const passkeyAttestation = t.Unsafe<RegistrationResponseJSON>(t.Object({
   ...credential,
   response: t.Object({ clientDataJSON: part, attestationObject: part, transports }, { additionalProperties: true }),

@@ -8,10 +8,10 @@ import EmptyState from '@kaynooo/kayjs-ui/empty-state.kay'
 import PageSection from '@kaynooo/kayjs-ui/page-section.kay'
 
 export const revoke = action(schemas.oauthClient, async ({ id }, ctx) => {
-  return (await ctx.locals.auth.revokeOAuthGrant(id)).ok ? 'revoked' : ctx.fail(404, { error: 'not-found' })
+  return (await ctx.locals.auth.oauthServer.revokeGrant(id)).ok ? 'revoked' : ctx.fail(404, { error: 'not-found' })
 })
 
-const clients = await ctx.locals.auth.listOAuthClients()
+const clients = await ctx.locals.auth.oauthServer.clients()
 const date = (value: Date) => formatDate(value, { dateStyle: 'medium' })
 ---
 PageSection(title={wording('auth.account.clients.title', 'Connected apps')})

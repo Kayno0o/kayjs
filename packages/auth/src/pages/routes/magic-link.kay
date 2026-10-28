@@ -12,7 +12,7 @@ export const page = { guards: false, security: { headers: { 'referrer-policy': '
 
 // The link only shows this button, so a mail scanner opening it spends nothing.
 export const spend = action(schemas.token, async ({ token }, ctx) => {
-  const result = await ctx.locals.auth.signInWithMagicLink(token)
+  const result = await ctx.locals.auth.magicLink.signIn(token)
 
   if (!result.ok)
     return ctx.fail(400, { error: result.error === 'invalid' ? 'link' : result.error })

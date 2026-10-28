@@ -55,24 +55,24 @@ describe('signInWithPassword', () => {
   test('takes redirect, remember and captcha as a trailing options object', async () => {
     const { browser } = await setup()
 
-    expect(await browser().call('signInWithPassword', credentials, { redirect: '/account', captcha: 'human' })).toEqual({ ok: true, redirect: '/account' })
-    expect(await browser().call('signInWithPassword', credentials, { captcha: 'bot' })).toEqual({ ok: false, error: 'captcha' })
+    expect(await browser().call('password.signIn', credentials, { redirect: '/account', captcha: 'human' })).toEqual({ ok: true, redirect: '/account' })
+    expect(await browser().call('password.signIn', credentials, { captcha: 'bot' })).toEqual({ ok: false, error: 'captcha' })
     expect(asked).toEqual(['sign-in:human', 'sign-in:bot'])
-    expect(await cookieOf(browser(), 'signInWithPassword', credentials, { remember: true, captcha: 'human' })).toContain(`Max-Age=${90 * DAY}`)
-    expect(await cookieOf(browser(), 'signInWithPassword', credentials, { remember: false, captcha: 'human' })).not.toContain('Max-Age')
+    expect(await cookieOf(browser(), 'password.signIn', credentials, { remember: true, captcha: 'human' })).toContain(`Max-Age=${90 * DAY}`)
+    expect(await cookieOf(browser(), 'password.signIn', credentials, { remember: false, captcha: 'human' })).not.toContain('Max-Age')
   })
 
   test('a redirect, remember or captcha in the input is ignored', async () => {
     const { browser } = await setup()
 
-    expect(await answer(browser(), 'signInWithPassword', { ...credentials, redirect: '/old', captcha: 'bot' }, { captcha: 'human' })).toEqual({ ok: true, redirect: '/' })
-    expect(await cookieOf(browser(), 'signInWithPassword', { ...credentials, remember: true }, { captcha: 'human' })).not.toContain(`Max-Age=${90 * DAY}`)
+    expect(await answer(browser(), 'password.signIn', { ...credentials, redirect: '/old', captcha: 'bot' }, { captcha: 'human' })).toEqual({ ok: true, redirect: '/' })
+    expect(await cookieOf(browser(), 'password.signIn', { ...credentials, remember: true }, { captcha: 'human' })).not.toContain(`Max-Age=${90 * DAY}`)
   })
 
   test.each(HOSTILE)('a redirect of %s leads home', async (redirect) => {
     const { browser } = await setup()
 
-    expect(await browser().call('signInWithPassword', credentials, { redirect, captcha: 'human' })).toEqual({ ok: true, redirect: '/' })
+    expect(await browser().call('password.signIn', credentials, { redirect, captcha: 'human' })).toEqual({ ok: true, redirect: '/' })
   })
 })
 
@@ -80,14 +80,14 @@ describe('register', () => {
   test('takes remember and captcha as a trailing options object', async () => {
     const { browser } = await setup()
 
-    expect(await cookieOf(browser(), 'register', { email: 'bob@example.com', password: PASSWORD }, { remember: true, captcha: 'human' })).toContain(`Max-Age=${90 * DAY}`)
-    expect(await browser().call('register', { email: 'di@example.com', password: PASSWORD }, { captcha: 'bot' })).toEqual({ ok: false, error: 'captcha' })
+    expect(await cookieOf(browser(), 'password.register', { email: 'bob@example.com', password: PASSWORD }, { remember: true, captcha: 'human' })).toContain(`Max-Age=${90 * DAY}`)
+    expect(await browser().call('password.register', { email: 'di@example.com', password: PASSWORD }, { captcha: 'bot' })).toEqual({ ok: false, error: 'captcha' })
   })
 
   test('a remember or captcha in the input is ignored', async () => {
     const { browser } = await setup()
 
-    expect(await cookieOf(browser(), 'register', { email: 'bob@example.com', password: PASSWORD, remember: true, captcha: 'bot' }, { captcha: 'human' })).not.toContain(`Max-Age=${90 * DAY}`)
+    expect(await cookieOf(browser(), 'password.register', { email: 'bob@example.com', password: PASSWORD, remember: true, captcha: 'bot' }, { captcha: 'human' })).not.toContain(`Max-Age=${90 * DAY}`)
   })
 })
 
@@ -95,28 +95,28 @@ describe('requestMagicLink', () => {
   async function redirectOf(app: Awaited<ReturnType<typeof setup>>, ...args: unknown[]) {
     const browser = app.browser()
 
-    expect(await answer(browser, 'requestMagicLink', 'ada@example.com', ...args)).toEqual({ ok: true })
+    expect(await answer(browser, 'magicLink.request', 'ada@example.com', ...args)).toEqual({ ok: true })
 
-    return (await browser.call('signInWithMagicLink', app.tokenOf('magic-link')) as { redirect: string }).redirect
+    return (await browser.call('magicLink.signIn', app.tokenOf('magic-link')) as { redirect: string }).redirect
   }
 
   test('takes redirect, remember and captcha as an options object', async () => {
     const app = await setup()
 
     expect(await redirectOf(app, { redirect: '/account', captcha: 'human' })).toBe('/account')
-    expect(await app.browser().call('requestMagicLink', 'ada@example.com', { captcha: 'bot' })).toEqual({ ok: false, error: 'captcha' })
+    expect(await app.browser().call('magicLink.request', 'ada@example.com', { captcha: 'bot' })).toEqual({ ok: false, error: 'captcha' })
 
     const ada = app.browser()
 
     await app.store.users.create(userRecord({ id: 'u2', email: 'bob@example.com' }))
-    await ada.call('requestMagicLink', 'bob@example.com', { remember: true, captcha: 'human' })
-    expect(await cookieOf(ada, 'signInWithMagicLink', app.tokenOf('magic-link'))).toContain(`Max-Age=${90 * DAY}`)
+    await ada.call('magicLink.request', 'bob@example.com', { remember: true, captcha: 'human' })
+    expect(await cookieOf(ada, 'magicLink.signIn', app.tokenOf('magic-link'))).toContain(`Max-Age=${90 * DAY}`)
   })
 
   test('a positional redirect is no redirect', async () => {
     const app = await setup()
 
-    expect(await answer(app.browser(), 'requestMagicLink', 'ada@example.com', '/old', { captcha: 'human' })).toEqual({ ok: false, error: 'captcha' })
+    expect(await answer(app.browser(), 'magicLink.request', 'ada@example.com', '/old', { captcha: 'human' })).toEqual({ ok: false, error: 'captcha' })
   })
 
   test.each(HOSTILE)('a redirect of %s leads home', async (hostile) => {
@@ -133,22 +133,22 @@ describe('signInWithPasskey', () => {
     const device = authenticator()
 
     await ada.fetch('/sign-in/u1', { method: 'POST' })
-    const { options } = await ada.callOk('passkeyRegistrationOptions', { password: PASSWORD })
+    const { options } = await ada.callOk('passkeys.registrationOptions', { password: PASSWORD })
 
-    await ada.callOk('registerPasskey', await device.create(options))
+    await ada.callOk('passkeys.register', await device.create(options))
 
     const signIn = async (...args: unknown[]) => {
       const visitor = app.browser()
-      const response = await device.get(await visitor.call('passkeySignInOptions'))
+      const response = await device.get(await visitor.call('passkeys.signInOptions'))
 
-      return { visitor, result: await answer(visitor, 'signInWithPasskey', response, ...args) as { ok: boolean, redirect: string } }
+      return { visitor, result: await answer(visitor, 'passkeys.signIn', response, ...args) as { ok: boolean, redirect: string } }
     }
 
     const cookie = async (...args: unknown[]) => {
       const visitor = app.browser()
-      const response = await device.get(await visitor.call('passkeySignInOptions'))
+      const response = await device.get(await visitor.call('passkeys.signInOptions'))
 
-      return cookieOf(visitor, 'signInWithPasskey', response, ...args)
+      return cookieOf(visitor, 'passkeys.signIn', response, ...args)
     }
 
     return { signIn, cookie }

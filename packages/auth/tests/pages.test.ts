@@ -22,8 +22,8 @@ describe('createAuth with the prebuilt pages', () => {
     const ada = browser()
 
     await store.users.create(userRecord({ id: 'u1', email: 'ada@example.com', emailVerifiedAt: new Date() }))
-    await ada.call('requestPasswordReset', 'ada@example.com')
-    await ada.call('requestMagicLink', 'ada@example.com')
+    await ada.call('password.requestReset', 'ada@example.com')
+    await ada.call('magicLink.request', 'ada@example.com')
 
     expect(mails.map(mail => new URL(mail.url!).pathname)).toEqual(['/account-pages/reset-password', '/magic'])
     expect(await ada.call('features')).toMatchObject({ pages: { prefix: '/account-pages', home: '/' } })
@@ -151,9 +151,9 @@ describe('exporting a user\'s data', () => {
   test('gives what kayjs-auth keeps about the user, no secret among it, with the app\'s own', async () => {
     const { browser, store } = testApp({ audit: true, exportData: ({ user }) => ({ posts: [`by ${user.email}`] }) })
     const ada = browser()
-    const { user } = await ada.callHas('user', 'register', { email: 'ada@example.com', password: PASSWORD })
+    const { user } = await ada.callHas('user', 'password.register', { email: 'ada@example.com', password: PASSWORD })
 
-    await ada.call('createToken', { password: PASSWORD }, 'Phone')
+    await ada.call('tokens.create', { password: PASSWORD }, 'Phone')
     await store.identities.create({ provider: 'discord', providerId: '42', userId: user.id, accessToken: 'sealed-access', refreshToken: 'sealed-refresh', tokenExpiresAt: null, createdAt: new Date() })
 
     const exported = await ada.callOk('exportData')
@@ -187,7 +187,7 @@ describe('exporting a user\'s data', () => {
     const { browser } = testApp({ rateLimit: { export: { max: 2, window: '3600s' } } })
     const ada = browser()
 
-    await ada.call('register', { email: 'ada@example.com', password: PASSWORD })
+    await ada.call('password.register', { email: 'ada@example.com', password: PASSWORD })
 
     expect((await ada.call('exportData')).ok).toBe(true)
     expect((await ada.fetch('/auth/export')).status).toBe(200)
@@ -200,7 +200,7 @@ describe('exporting a user\'s data', () => {
       const { browser } = testApp({ rateLimit: { export: { max: 1, window: '3600s' } } })
       const ada = browser()
 
-      await ada.call('register', { email: 'ada@example.com', password: PASSWORD })
+      await ada.call('password.register', { email: 'ada@example.com', password: PASSWORD })
       setSystemTime(new Date(Date.now() + LATER))
 
       expect(await ada.call('exportData')).toEqual({ ok: false, error: 'stale' })
@@ -219,7 +219,7 @@ describe('exporting a user\'s data', () => {
       const { browser } = testApp()
       const ada = browser()
 
-      await ada.call('register', { email: 'ada@example.com', password: PASSWORD })
+      await ada.call('password.register', { email: 'ada@example.com', password: PASSWORD })
       setSystemTime(new Date(Date.now() + LATER))
 
       expect(await ada.call('reprove', { password: 'wrong password' })).toEqual({ ok: false, error: 'proof' })
@@ -251,11 +251,11 @@ describe('exporting a user\'s data', () => {
       const { browser } = testApp()
       const ada = browser()
 
-      await ada.call('register', { email: 'ada@example.com', password: PASSWORD })
+      await ada.call('password.register', { email: 'ada@example.com', password: PASSWORD })
 
-      const { setup } = await ada.callOk('setUpTwoFactor', { password: PASSWORD })
+      const { setup } = await ada.callOk('twoFactor.setUp', { password: PASSWORD })
 
-      await ada.call('enableTwoFactor', await totpCode(setup.secret, totpStep()))
+      await ada.call('twoFactor.enable', await totpCode(setup.secret, totpStep()))
       setSystemTime(new Date(Date.now() + LATER))
 
       expect(await ada.call('exportData')).toEqual({ ok: false, error: 'stale' })

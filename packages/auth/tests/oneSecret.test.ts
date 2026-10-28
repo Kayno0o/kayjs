@@ -60,7 +60,7 @@ describe('one secret for the session and kayjs-auth', () => {
     const attempt = async (options: { secret: string | undefined }) => {
       const app = testApp({ sessions: session<AuthSessionData>({ secret: SECRET }), site: 'https://site.test', email: { mailer: mailbox().mailer, links: LINKS, requireVerified: false }, ...options })
 
-      await app.browser().call('register', { email: 'ada@example.com', password: PASSWORD })
+      await app.browser().call('password.register', { email: 'ada@example.com', password: PASSWORD })
 
       const user = (await app.store.users.findByEmail('ada@example.com'))!
 
@@ -70,7 +70,7 @@ describe('one secret for the session and kayjs-auth', () => {
 
       await visitor.post('/password', { identifier: 'ada@example.com', password: PASSWORD })
 
-      return visitor.call('verifyTwoFactor', await totpCode(secret, totpStep()))
+      return visitor.call('twoFactor.verify', await totpCode(secret, totpStep()))
     }
 
     expect((await attempt({ secret: OLD })).ok).toBe(true)

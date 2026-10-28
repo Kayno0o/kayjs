@@ -262,7 +262,7 @@ describe('app data and provider ids on the user', () => {
 
     await signInWith(ada, 'discord', '1')
 
-    expect(await ada.call('listUsers')).toMatchObject({ ok: true })
+    expect(await ada.call('admin.listUsers')).toMatchObject({ ok: true })
   })
 
   test('the auth event hook sees the provider id', async () => {

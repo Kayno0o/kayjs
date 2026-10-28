@@ -4,12 +4,12 @@ import { action } from 'kay'
 
 // Scoped by the organization the guard checked, a string once it passed, never by the input.
 export const rename = action(t.Object({ name: t.String({ maxLength: 100 }) }), async ({ name }, ctx) => {
-  const result = await ctx.locals.auth.updateOrganization(String(ctx.params.org), { name })
+  const result = await ctx.locals.auth.organizations.update(String(ctx.params.org), { name })
 
   return result.ok ? result.organization.name : ctx.fail(400, { error: result.error })
 })
 
-const membership = (await ctx.locals.auth.getOrganization(ctx.params.org))!
+const membership = (await ctx.locals.auth.organizations.get(ctx.params.org))!
 ---
 h1#organization {membership.organization.name}
 form#rename(action={rename})

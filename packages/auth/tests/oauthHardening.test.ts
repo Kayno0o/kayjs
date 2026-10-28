@@ -208,7 +208,7 @@ function params(clientId: string, extra: Record<string, string> = {}) {
 async function signedIn(app: Server) {
   const ada = app.browser()
 
-  await ada.call('register', { email: 'ada@example.com', password: PASSWORD })
+  await ada.call('password.register', { email: 'ada@example.com', password: PASSWORD })
 
   return ada
 }
@@ -252,8 +252,8 @@ describe('the limits', () => {
     const app = server({ documents, limits: { oauthDocument: { max: 1, window: '900s' } } })
     const ada = await signedIn(app)
 
-    expect(await ada.call('oauthAuthorize', params(DOCUMENT))).toMatchObject({ kind: 'consent' })
-    expect(await ada.call('oauthAuthorize', params('https://other.example/c.json'))).toEqual({ kind: 'error', error: 'client' })
+    expect(await ada.call('oauthServer.authorize', params(DOCUMENT))).toMatchObject({ kind: 'consent' })
+    expect(await ada.call('oauthServer.authorize', params('https://other.example/c.json'))).toEqual({ kind: 'error', error: 'client' })
   })
 })
 
@@ -261,13 +261,13 @@ describe('client metadata documents', () => {
   test('one holding a secret, by its authentication method, is refused', async () => {
     const app = server({ documents: { [DOCUMENT]: { client_id: DOCUMENT, redirect_uris: [REDIRECT], token_endpoint_auth_method: 'client_secret_basic' } } })
 
-    expect(await (await signedIn(app)).call('oauthAuthorize', params(DOCUMENT))).toEqual({ kind: 'error', error: 'client' })
+    expect(await (await signedIn(app)).call('oauthServer.authorize', params(DOCUMENT))).toEqual({ kind: 'error', error: 'client' })
   })
 
   test('one naming itself with bidirectional controls shows without them', async () => {
     const app = server({ documents: { [DOCUMENT]: { client_id: DOCUMENT, client_name: 'Fake‮Bank', redirect_uris: [REDIRECT] } } })
 
-    expect(await (await signedIn(app)).call('oauthAuthorize', params(DOCUMENT))).toMatchObject({ kind: 'consent', client: { name: 'FakeBank' } })
+    expect(await (await signedIn(app)).call('oauthServer.authorize', params(DOCUMENT))).toMatchObject({ kind: 'consent', client: { name: 'FakeBank' } })
   })
 })
 
@@ -277,24 +277,24 @@ describe('the consent page', () => {
     const ada = await signedIn(app)
     const { body } = await register(app)
 
-    expect(await ada.call('oauthAuthorize', params(body.client_id!))).toMatchObject({ kind: 'consent', redirectHost: '127.0.0.1:33418', client: { host: null } })
+    expect(await ada.call('oauthServer.authorize', params(body.client_id!))).toMatchObject({ kind: 'consent', redirectHost: '127.0.0.1:33418', client: { host: null } })
   })
 
   test('prompt=none answers the client instead of showing a page', async () => {
     const app = server()
     const { body } = await register(app)
-    const signedOut = await app.browser().call('oauthAuthorize', params(body.client_id!, { prompt: 'none' })) as { kind: string, url: string }
+    const signedOut = await app.browser().call('oauthServer.authorize', params(body.client_id!, { prompt: 'none' })) as { kind: string, url: string }
 
     expect(new URL(signedOut.url).searchParams.get('error')).toBe('login_required')
 
     const ada = await signedIn(app)
-    const needsConsent = await ada.call('oauthAuthorize', params(body.client_id!, { prompt: 'none' })) as { kind: string, url: string }
+    const needsConsent = await ada.call('oauthServer.authorize', params(body.client_id!, { prompt: 'none' })) as { kind: string, url: string }
 
     expect(new URL(needsConsent.url).searchParams.get('error')).toBe('consent_required')
 
-    await ada.post('/call/oauthDecide', [params(body.client_id!), true])
+    await ada.post('/call/oauthServer.decide', [params(body.client_id!), true])
 
-    const approved = await ada.call('oauthAuthorize', params(body.client_id!, { prompt: 'none' })) as { kind: string, url: string }
+    const approved = await ada.call('oauthServer.authorize', params(body.client_id!, { prompt: 'none' })) as { kind: string, url: string }
 
     expect(new URL(approved.url).searchParams.has('code')).toBe(true)
   })
@@ -303,17 +303,17 @@ describe('the consent page', () => {
     const app = server()
     const { body } = await register(app)
     const admin = app.browser()
-    const { user } = await admin.callHas('user', 'register', { email: 'root@example.com', password: PASSWORD })
+    const { user } = await admin.callHas('user', 'password.register', { email: 'root@example.com', password: PASSWORD })
     const ada = await signedIn(app)
     const { id } = await ada.json('/me') as { id: string }
 
     await app.store.users.update(user.id, { roles: ['admin'] })
-    expect(await admin.call('impersonate', id)).toEqual({ ok: true })
+    expect(await admin.call('admin.impersonate', id)).toEqual({ ok: true })
 
-    const outcome = await admin.call('oauthAuthorize', params(body.client_id!)) as { kind: string, url: string }
+    const outcome = await admin.call('oauthServer.authorize', params(body.client_id!)) as { kind: string, url: string }
 
     expect(new URL(outcome.url).searchParams.get('error')).toBe('access_denied')
-    expect(await admin.post('/call/oauthDecide', [params(body.client_id!), true])).toEqual({ ok: false, error: 'signed-out' })
+    expect(await admin.post('/call/oauthServer.decide', [params(body.client_id!), true])).toEqual({ ok: false, error: 'signed-out' })
     expect(await app.store.oauth!.grants.listByUser(id)).toEqual([])
   })
 })
@@ -323,7 +323,7 @@ describe('the token endpoint and the resource', () => {
     const app = server()
     const { body } = await register(app)
     const ada = await signedIn(app)
-    const answer = await ada.post('/call/oauthDecide', [params(body.client_id!), true]) as { ok: true, redirect: string }
+    const answer = await ada.post('/call/oauthServer.decide', [params(body.client_id!), true]) as { ok: true, redirect: string }
     const code = new URL(answer.redirect).searchParams.get('code')!
     const wrong = await token(app, { grant_type: 'authorization_code', code, code_verifier: VERIFIER, client_id: body.client_id!, redirect_uri: REDIRECT, resource: 'https://other.example/mcp' })
 
@@ -349,7 +349,7 @@ describe('a token is bound to the resource it was asked for', () => {
   async function approvedFor(app: Server, extra: Record<string, string> = {}) {
     const { body } = await register(app)
     const ada = await signedIn(app)
-    const answer = await ada.post('/call/oauthDecide', [params(body.client_id!, extra), true]) as { ok: true, redirect: string }
+    const answer = await ada.post('/call/oauthServer.decide', [params(body.client_id!, extra), true]) as { ok: true, redirect: string }
 
     return { clientId: body.client_id!, code: new URL(answer.redirect).searchParams.get('code')! }
   }
@@ -566,12 +566,12 @@ describe('a token is bound to the resource it was asked for', () => {
     const ada = await signedIn(app)
     const several = { ...params(body.client_id!), resource: [MCP, 'http://localhost/other'] }
 
-    const asked = await ada.call('oauthAuthorize', several) as { kind: string, url: string }
+    const asked = await ada.call('oauthServer.authorize', several) as { kind: string, url: string }
 
     expect(asked.kind).toBe('redirect')
     expect(new URL(asked.url).searchParams.get('error')).toBe('invalid_target')
 
-    const answer = await ada.post('/call/oauthDecide', [several, true]) as { ok: true, redirect: string }
+    const answer = await ada.post('/call/oauthServer.decide', [several, true]) as { ok: true, redirect: string }
 
     expect(new URL(answer.redirect).searchParams.get('error')).toBe('invalid_target')
     expect(new URL(answer.redirect).searchParams.get('code')).toBeNull()
@@ -653,7 +653,7 @@ describe('clients nobody approved', () => {
     const unused = await register(app, 'Unused')
     const used = await register(app, 'Used')
 
-    await ada.post('/call/oauthDecide', [params(used.body.client_id!), true])
+    await ada.post('/call/oauthServer.decide', [params(used.body.client_id!), true])
     setSystemTime(Date.now() + 25 * 60 * 60 * 1000)
     await app.store.prune!({ now: new Date(), bearerExpiredBefore: new Date(0), sessionMaxAge: '1000000000s', sessionAbsoluteMaxAge: '1000000000s' })
 
@@ -712,7 +712,7 @@ describe('a token bound to a resource passes only under it', () => {
     const app = server(url === undefined ? {} : { url })
     const { body } = await register(app)
     const ada = await signedIn(app)
-    const answer = await ada.post('/call/oauthDecide', [params(body.client_id!, resource === undefined ? {} : { resource }), true]) as { ok: true, redirect: string }
+    const answer = await ada.post('/call/oauthServer.decide', [params(body.client_id!, resource === undefined ? {} : { resource }), true]) as { ok: true, redirect: string }
     const code = new URL(answer.redirect).searchParams.get('code')!
     const reply = await token(app, { grant_type: 'authorization_code', code, code_verifier: VERIFIER, client_id: body.client_id!, redirect_uri: REDIRECT })
 

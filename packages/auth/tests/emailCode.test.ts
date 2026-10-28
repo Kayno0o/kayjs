@@ -43,7 +43,7 @@ describe('emailed codes', () => {
     const { browser, nextCodeMail } = await setup({ 'magic-link': 'code' })
     const ada = browser()
 
-    expect(await ada.call('requestMagicLink', 'ada@example.com', { redirect: '/account' })).toEqual({ ok: true })
+    expect(await ada.call('magicLink.request', 'ada@example.com', { redirect: '/account' })).toEqual({ ok: true })
 
     const mail = await nextCodeMail('magic-link')
 
@@ -51,12 +51,12 @@ describe('emailed codes', () => {
     expect(mail.code).toMatch(/^\d{6}$/)
     expect(mail.text).toContain(`Your code: ${mail.code}`)
     expect(mail.html).toContain(mail.code)
-    expect(await ada.call('emailCodePending')).toEqual({ type: 'sign-in', email: 'ada@example.com' })
-    expect(await browser().call('signInWithEmailCode', mail.code)).toEqual({ ok: false, error: 'expired' })
-    expect(await ada.call('signInWithEmailCode', `${mail.code.slice(0, 3)} ${mail.code.slice(3)}`)).toEqual({ ok: true, redirect: '/account' })
+    expect(await ada.call('email.pendingCode')).toEqual({ type: 'sign-in', email: 'ada@example.com' })
+    expect(await browser().call('magicLink.signInWithCode', mail.code)).toEqual({ ok: false, error: 'expired' })
+    expect(await ada.call('magicLink.signInWithCode', `${mail.code.slice(0, 3)} ${mail.code.slice(3)}`)).toEqual({ ok: true, redirect: '/account' })
     expect(await ada.json('/me')).toMatchObject({ id: 'u1' })
-    expect(await ada.call('emailCodePending')).toBeFalsy()
-    expect(await ada.call('signInWithEmailCode', mail.code)).toEqual({ ok: false, error: 'expired' })
+    expect(await ada.call('email.pendingCode')).toBeFalsy()
+    expect(await ada.call('magicLink.signInWithCode', mail.code)).toEqual({ ok: false, error: 'expired' })
   })
 
   test('a code works only in the session that asked for it, even one waiting for its own', async () => {
@@ -64,59 +64,59 @@ describe('emailed codes', () => {
     const ada = browser()
     const thief = browser()
 
-    await ada.call('requestMagicLink', 'ada@example.com')
+    await ada.call('magicLink.request', 'ada@example.com')
     const first = await nextCodeMail('magic-link')
 
-    await thief.call('requestMagicLink', 'ada@example.com')
+    await thief.call('magicLink.request', 'ada@example.com')
     const second = await nextCodeMail('magic-link')
 
-    expect(await thief.call('signInWithEmailCode', first.code)).toEqual({ ok: false, error: 'invalid' })
+    expect(await thief.call('magicLink.signInWithCode', first.code)).toEqual({ ok: false, error: 'invalid' })
     // A new code voids the last one.
-    expect(await ada.call('signInWithEmailCode', first.code)).toEqual({ ok: false, error: 'invalid' })
-    expect(await ada.call('signInWithEmailCode', second.code)).toEqual({ ok: false, error: 'invalid' })
+    expect(await ada.call('magicLink.signInWithCode', first.code)).toEqual({ ok: false, error: 'invalid' })
+    expect(await ada.call('magicLink.signInWithCode', second.code)).toEqual({ ok: false, error: 'invalid' })
   })
 
   test('with both, the mail carries the link and the code, and spending one spends the other', async () => {
     const { browser, nextCodeMail } = await setup('both')
     const ada = browser()
 
-    await ada.call('requestMagicLink', 'ada@example.com')
+    await ada.call('magicLink.request', 'ada@example.com')
     const mail = await nextCodeMail('magic-link')
 
     expect(mail.url).toStartWith('https://site.test/magic?token=')
     expect(mail.text).toContain(`Or type this code where you asked for it: ${mail.code}`)
-    expect(await ada.call('signInWithEmailCode', mail.code)).toMatchObject({ ok: true })
-    expect(await browser().call('signInWithMagicLink', new URL(mail.url!).searchParams.get('token')!)).toEqual({ ok: false, error: 'invalid' })
+    expect(await ada.call('magicLink.signInWithCode', mail.code)).toMatchObject({ ok: true })
+    expect(await browser().call('magicLink.signIn', new URL(mail.url!).searchParams.get('token')!)).toEqual({ ok: false, error: 'invalid' })
 
-    await ada.call('requestMagicLink', 'ada@example.com')
+    await ada.call('magicLink.request', 'ada@example.com')
     const next = await nextCodeMail('magic-link')
 
-    expect(await browser().call('signInWithMagicLink', new URL(next.url!).searchParams.get('token')!)).toMatchObject({ ok: true })
-    expect(await ada.call('signInWithEmailCode', next.code)).toEqual({ ok: false, error: 'invalid' })
+    expect(await browser().call('magicLink.signIn', new URL(next.url!).searchParams.get('token')!)).toMatchObject({ ok: true })
+    expect(await ada.call('magicLink.signInWithCode', next.code)).toEqual({ ok: false, error: 'invalid' })
   })
 
   test('a code dies after five misses, the right one included', async () => {
     const { browser, nextCodeMail } = await setup('code')
     const ada = browser()
 
-    await ada.call('requestMagicLink', 'ada@example.com')
+    await ada.call('magicLink.request', 'ada@example.com')
     const { code } = await nextCodeMail('magic-link')
     const wrong = code === '000000' ? '111111' : '000000'
 
     for (let miss = 1; miss < 5; miss++)
-      expect(await ada.call('signInWithEmailCode', wrong)).toEqual({ ok: false, error: 'invalid' })
+      expect(await ada.call('magicLink.signInWithCode', wrong)).toEqual({ ok: false, error: 'invalid' })
 
-    expect(await ada.call('signInWithEmailCode', wrong)).toEqual({ ok: false, error: 'expired' })
-    expect(await ada.call('signInWithEmailCode', code)).toEqual({ ok: false, error: 'expired' })
+    expect(await ada.call('magicLink.signInWithCode', wrong)).toEqual({ ok: false, error: 'expired' })
+    expect(await ada.call('magicLink.signInWithCode', code)).toEqual({ ok: false, error: 'expired' })
   })
 
   test('two requests spending one code together sign in once', async () => {
     const { browser, nextCodeMail } = await setup('code')
     const ada = browser()
 
-    await ada.call('requestMagicLink', 'ada@example.com')
+    await ada.call('magicLink.request', 'ada@example.com')
     const { code } = await nextCodeMail('magic-link')
-    const results = await Promise.all([ada.call('signInWithEmailCode', code), ada.call('signInWithEmailCode', code)])
+    const results = await Promise.all([ada.call('magicLink.signInWithCode', code), ada.call('magicLink.signInWithCode', code)])
 
     expect(results.filter(result => result.ok === true)).toHaveLength(1)
   })
@@ -125,9 +125,9 @@ describe('emailed codes', () => {
     const { browser, mails } = await setup('code')
     const bob = browser()
 
-    expect(await bob.call('requestMagicLink', 'bob@example.com')).toEqual({ ok: true })
-    expect(await bob.call('emailCodePending')).toEqual({ type: 'sign-in', email: 'bob@example.com' })
-    expect(await bob.call('signInWithEmailCode', '123456')).toEqual({ ok: false, error: 'invalid' })
+    expect(await bob.call('magicLink.request', 'bob@example.com')).toEqual({ ok: true })
+    expect(await bob.call('email.pendingCode')).toEqual({ type: 'sign-in', email: 'bob@example.com' })
+    expect(await bob.call('magicLink.signInWithCode', '123456')).toEqual({ ok: false, error: 'invalid' })
     expect(mails).toEqual([])
   })
 
@@ -139,12 +139,12 @@ describe('emailed codes', () => {
     const mail = await nextCodeMail('verify-email')
 
     expect(mail.url).toBeUndefined()
-    expect(await bob.call('emailCodePending')).toEqual({ type: 'verify', email: 'bob@example.com' })
-    expect(await bob.call('signInWithEmailCode', mail.code)).toEqual({ ok: false, error: 'expired' })
-    expect(await bob.call('verifyEmailCode', mail.code)).toEqual({ ok: true, redirect: '/' })
+    expect(await bob.call('email.pendingCode')).toEqual({ type: 'verify', email: 'bob@example.com' })
+    expect(await bob.call('magicLink.signInWithCode', mail.code)).toEqual({ ok: false, error: 'expired' })
+    expect(await bob.call('email.verifyCode', mail.code)).toEqual({ ok: true, redirect: '/' })
     expect((await store.users.findByEmail('bob@example.com'))?.emailVerifiedAt).toBeInstanceOf(Date)
 
-    await bob.call('requestMagicLink', 'ada@example.com')
+    await bob.call('magicLink.request', 'ada@example.com')
 
     // Magic links stayed links.
     expect((await nextMail('magic-link')).code).toBeUndefined()
@@ -157,11 +157,11 @@ describe('emailed codes', () => {
     await bob.post('/register', { email: 'bob@example.com', password: PASSWORD })
     const first = await nextCodeMail('verify-email')
 
-    await bob.call('sendVerification')
+    await bob.call('email.sendVerification')
     const second = await nextCodeMail('verify-email')
 
     expect(CODE.exec(second.text)?.[1]).toBe(second.code)
-    expect(await bob.call('verifyEmailCode', first.code)).toEqual({ ok: false, error: 'invalid' })
-    expect(await bob.call('verifyEmailCode', second.code)).toEqual({ ok: true, redirect: '/' })
+    expect(await bob.call('email.verifyCode', first.code)).toEqual({ ok: false, error: 'invalid' })
+    expect(await bob.call('email.verifyCode', second.code)).toEqual({ ok: true, redirect: '/' })
   })
 })

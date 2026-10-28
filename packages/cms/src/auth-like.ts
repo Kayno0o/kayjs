@@ -9,14 +9,19 @@ interface AuthLike {
   bareUser?: () => Promise<MemberLike | null>
   user?: () => Promise<MemberLike | null>
   isGranted?: (role: string, user: MemberLike) => boolean
-  listOrganizations?: () => Promise<MembershipLike[]>
-  isMember?: (organization: string, role?: string) => Promise<boolean>
+  organizations?: OrganizationsLike
   userIdsHolding?: (role: string) => Promise<string[]>
-  listMembers?: (organization: string) => Promise<{ ok: true, members: { user: { id: unknown }, roles: readonly string[] }[] } | { ok: false }>
   signInUrl?: (back?: string) => string
   signOut?: () => Promise<void>
   requireUser?: (options: { require: string, bare: true }) => Promise<unknown>
   [REQUIRES]?: unknown
+}
+
+// `auth.organizations`, the methods of kayjs-auth's `organizations` option.
+interface OrganizationsLike {
+  list?: () => Promise<MembershipLike[]>
+  isMember?: (organization: string, role?: string) => Promise<boolean>
+  members?: (organization: string) => Promise<{ ok: true, members: { user: { id: unknown }, roles: readonly string[] }[] } | { ok: false }>
 }
 
 interface MemberLike {
@@ -73,21 +78,23 @@ export function organizationRole(key: string): { organization: string | undefine
 
 const inOrganization = (membership: MembershipLike, organization: string) => membership.organization.id === organization || membership.organization.slug === organization
 
-// The `org:` keys among `keys` the signed-in person holds, the organization's own hierarchy counting through `auth.isMember`.
+// The `org:` keys among `keys` the signed-in person holds, the organization's own hierarchy counting through `auth.organizations.isMember`.
 export async function heldInOrganizations(auth: AuthLike, keys: readonly string[]): Promise<string[]> {
   const wanted = keys.filter(isOrganizationRole)
 
-  if (wanted.length === 0 || typeof auth.listOrganizations !== 'function' || typeof auth.isMember !== 'function')
+  const organizations = auth.organizations
+
+  if (wanted.length === 0 || typeof organizations?.list !== 'function' || typeof organizations.isMember !== 'function')
     return []
 
-  const memberships = await auth.listOrganizations()
+  const memberships = await organizations.list()
   const held: string[] = []
 
   for (const key of wanted) {
     const { organization, role } = organizationRole(key)!
 
     for (const membership of memberships) {
-      if ((organization === undefined || inOrganization(membership, organization)) && await auth.isMember(membership.organization.id, role)) {
+      if ((organization === undefined || inOrganization(membership, organization)) && await organizations.isMember(membership.organization.id, role)) {
         held.push(key)
 
         break
@@ -119,10 +126,12 @@ export async function siteRoleHolders(auth: AuthLike, keys: readonly string[], e
 export async function organizationMembers(auth: AuthLike, keys: readonly string[], except: string | undefined): Promise<string[]> {
   const wanted = keys.filter(isOrganizationRole)
 
-  if (wanted.length === 0 || typeof auth.listOrganizations !== 'function' || typeof auth.listMembers !== 'function')
+  const organizations = auth.organizations
+
+  if (wanted.length === 0 || typeof organizations?.list !== 'function' || typeof organizations.members !== 'function')
     return []
 
-  const memberships = await auth.listOrganizations()
+  const memberships = await organizations.list()
   const found = new Set<string>()
 
   for (const key of wanted) {
@@ -132,7 +141,7 @@ export async function organizationMembers(auth: AuthLike, keys: readonly string[
       if (organization !== undefined && !inOrganization(membership, organization))
         continue
 
-      const listed = await auth.listMembers(membership.organization.id)
+      const listed = await organizations.members(membership.organization.id)
 
       for (const member of listed.ok ? listed.members : []) {
         if (member.roles.includes(role) && String(member.user.id) !== except)

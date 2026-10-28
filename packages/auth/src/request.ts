@@ -1,48 +1,48 @@
 import type { GuardContext } from 'kay'
 import type { KayConfig, Session } from 'kay/server'
-import type { ChangePasswordResult, ChangeUsernameResult, DeleteAccountResult, UnlinkResult, UpdateLocaleResult } from './account'
-import type { AdminAuditLogResult, BanResult, DeleteResult, GetUserResult, ImpersonateResult, ListUsersResult, RoleResult, UnbanResult } from './admin'
-import type { ApprovedClient, RevokeGrantResult } from './authorize/grants'
-import type { AuthorizeOutcome, AuthorizeParams, DecideResult } from './authorize/request'
-import type { BearerToken, CreateTokenResult, RevokeTokenResult, TokenOptions } from './bearer'
+import type { ChangeUsernameResult, DeleteAccountResult, UnlinkResult, UpdateLocaleResult } from './account'
 import type { CaptchaAction } from './captcha'
-import type { AuthSessionData, BareUser, Core, Off, SignedIn, User } from './core'
-import type { ChangeEmailResult, CodeResult, LinkResult, MailRequestResult, PendingEmailCode, ResetPasswordResult, SendVerificationResult, VerifyEmailResult } from './email'
+import type { AuthSessionData, BareUser, Core, SignedIn, User } from './core'
 import type { DeletionImpact } from './erase'
 import type { AuditCursorInput, AuditEntry } from './events'
 import type { ExportResult } from './export'
 import type { ScopeRequirement } from './gate'
 import type { LinkProviderResult } from './oauth/flow'
-import type { AcceptResult, CreateOrganizationResult, DeleteOrganizationResult, Invitation, InviteResult, ListInvitationsResult, ListMembersResult, MemberResult, Membership, RejectInvitationResult, RevokeInvitationResult, UpdateOrganizationResult } from './organizations'
 import type { AuthFeatures, ProfileFieldView } from './pages'
-import type { Passkey, PasskeyOptionsResult, PasskeySignInResult, RegisterPasskeyResult, RenamePasskeyResult, RevokePasskeyResult } from './passkeys'
-import type { PasswordSignInInput, PasswordSignInResult, RegisterInput, RegisterResult } from './password'
 import type { SaveProfileResult } from './profile'
-import type { Proof, ProofFailure, ReproveResult } from './proof'
-import type { GuestSignInResult, RevokeSessionResult, UserSession } from './sessions'
-import type { SignInOptions } from './signInOptions'
+import type { Proof, ReproveResult } from './proof'
+import type { GuestSignInResult } from './sessions'
 import type { RequestState } from './state'
 import type { SessionRecord, UserRecord } from './store'
-import type { DisableTwoFactorResult, EnableTwoFactorResult, RecoveryCodesResult, SetUpTwoFactorResult, TwoFactorResult } from './twoFactor'
 import type { Requirement } from './types'
-import type { AuthenticationResponseJSON, PublicKeyCredentialCreationOptionsJSON, PublicKeyCredentialRequestOptionsJSON, RegistrationResponseJSON } from './webauthn'
-import { configError, nameUser, overHttps, READ_METHODS, stoppers } from 'kay/library'
+import { nameUser, overHttps, READ_METHODS, stoppers } from 'kay/library'
 import { clientAddress, crossSiteRefused, crossSiteResponse, forgetLocalMirrors, forgetPushDevice, rateKey, toolCall } from 'kay/server'
 import { protectedResourceMetadata, rootIsFixed, rootUsable, siteRoot } from './authorize/metadata'
 import { bearerRequest, bearerToken } from './bearerHeader'
 import { admit, captchaChallenge, captchaRequired } from './captcha'
-import { banned, guardPageOf, isNavigation, linkedProviders, linkedUser, newUserRecord, OFF, publicUser, unlinked, withBack } from './core'
+import { banned, guardPageOf, isNavigation, linkedProviders, linkedUser, newUserRecord, publicUser, unlinked, withBack } from './core'
 import { auditEntries, report } from './events'
+import { FlatMethods } from './flatMethods'
 import { scopeAllows } from './gate'
 import { load } from './load'
 import { acceptedLocales } from './locale'
+import { AdminMethods } from './methods/admin'
+import { EmailMethods } from './methods/email'
+import { MagicLinkMethods } from './methods/magicLink'
+import { OAuthServerMethods } from './methods/oauthServer'
+import { OrganizationMethods } from './methods/organizations'
+import { PasskeyMethods } from './methods/passkeys'
+import { PasswordMethods } from './methods/password'
+import { SessionMethods } from './methods/sessions'
+import { TokenMethods } from './methods/tokens'
+import { TwoFactorMethods } from './methods/twoFactor'
 import { noteSignIn, notify } from './notify'
 import { safeRedirect } from './oauth/redirect'
 import { featuresOf } from './pages'
-import { challenged, completeSignIn, provedLately, reprove } from './proof'
+import { completeSignIn, provedLately, reprove } from './proof'
 import { pruneWhenDue } from './prune'
 import { createRoleHierarchy } from './roles'
-import { applyLifetime, chooseRemember, listSessions, liveSession, openSession, revokeBearerTokens, revokeSession } from './sessions'
+import { applyLifetime, chooseRemember, liveSession, openSession, revokeBearerTokens } from './sessions'
 import { registerViewer } from './viewer'
 
 export interface RequireUserOptions<Scope extends string, Role extends string> {
@@ -93,20 +93,37 @@ function guardSession(session: Session<AuthSessionData>, refuse: () => boolean, 
   }
 }
 
+interface Groups<Scope extends string, Role extends string, OrgRole extends string> {
+  password: PasswordMethods
+  email: EmailMethods
+  magicLink: MagicLinkMethods
+  twoFactor: TwoFactorMethods
+  passkeys: PasskeyMethods
+  sessions: SessionMethods
+  tokens: TokenMethods<Scope>
+  oauthServer: OAuthServerMethods
+  admin: AdminMethods<Role>
+  organizations: OrganizationMethods<OrgRole>
+}
+
 // Auth for one request, as `auth` in the context: `ctx.locals.auth` in a page, an action or a guard.
-export class Auth<Scope extends string = string, Role extends string = string, OrgRole extends string = string, UserData extends object = Record<string, unknown>> {
+export class Auth<Scope extends string = string, Role extends string = string, OrgRole extends string = string, UserData extends object = Record<string, unknown>> extends FlatMethods<Scope, Role, OrgRole> {
   readonly [STATE]: RequestState
   readonly [REQUIRES] = true
   private known?: { record: Promise<UserRecord | null>, at: number } | undefined
   private source: 'session' | 'bearer' | null = null
   private tokenScopes: string[] | null = null
   private linked = new WeakMap<UserRecord, Promise<User['providers']>>()
+  // Each group of methods, made on its first use.
+  private readonly groups: Partial<Groups<Scope, Role, OrgRole>> = {}
 
   private readonly session: Session<AuthSessionData>
   // Set-Cookie lines this request's sign-in or sign-out adds to its response, which the plugin sends.
   private readonly cookies: string[] = []
 
   constructor(session: Session<AuthSessionData>, private readonly core: Core, private readonly request: Request, client: string, address: string) {
+    super()
+
     const bearer = bearerRequest(request)
     const crossSite = () => !bearer && crossSiteRefused(request, core.url)
 
@@ -130,6 +147,8 @@ export class Auth<Scope extends string = string, Role extends string = string, O
       current: async () => this.record(),
       via: () => this.source,
       complete: async (record, redirect, method) => completeSignIn(this[STATE], record, redirect, method, async (signedIn, how) => this.establish(signedIn, how)),
+      establish: async (record, method) => this.establish(record, method),
+      signOut: async () => this.signOut(),
       adopt: (record) => {
         this.resolving = Promise.resolve(record)
       },
@@ -178,6 +197,56 @@ export class Auth<Scope extends string = string, Role extends string = string, O
 
   private set resolving(record: Promise<UserRecord | null> | undefined) {
     this.known = record && { record, at: Date.now() }
+  }
+
+  // Registering, signing in, resets and changes by password.
+  get password(): PasswordMethods {
+    return this.groups.password ??= new PasswordMethods(this[STATE])
+  }
+
+  // Verifying the address and changing it.
+  get email(): EmailMethods {
+    return this.groups.email ??= new EmailMethods(this[STATE])
+  }
+
+  // Sign-in links and codes mailed to the address.
+  get magicLink(): MagicLinkMethods {
+    return this.groups.magicLink ??= new MagicLinkMethods(this[STATE])
+  }
+
+  // The second factor of a sign-in, and setting up an authenticator app.
+  get twoFactor(): TwoFactorMethods {
+    return this.groups.twoFactor ??= new TwoFactorMethods(this[STATE])
+  }
+
+  // Making passkeys, signing in and re-proving with one.
+  get passkeys(): PasskeyMethods {
+    return this.groups.passkeys ??= new PasskeyMethods(this[STATE])
+  }
+
+  // Where the signed-in user is signed in.
+  get sessions(): SessionMethods {
+    return this.groups.sessions ??= new SessionMethods(this[STATE])
+  }
+
+  // The signed-in user's bearer tokens.
+  get tokens(): TokenMethods<Scope> {
+    return this.groups.tokens ??= new TokenMethods<Scope>(this[STATE])
+  }
+
+  // The consent page MCP clients send the user to, and the apps they approved.
+  get oauthServer(): OAuthServerMethods {
+    return this.groups.oauthServer ??= new OAuthServerMethods(this[STATE], this.request)
+  }
+
+  // Listing, banning and impersonating users and granting them roles, for the `admin` option's users.
+  get admin(): AdminMethods<Role> {
+    return this.groups.admin ??= new AdminMethods<Role>(this[STATE])
+  }
+
+  // The organizations of the `organizations` option.
+  get organizations(): OrganizationMethods<OrgRole> {
+    return this.groups.organizations ??= new OrganizationMethods<OrgRole>(this[STATE])
   }
 
   // The signed-in user, or the owner of the request's `Authorization: Bearer` token, or null; read on first use, and again past 30 seconds on a websocket.
@@ -293,7 +362,7 @@ export class Auth<Scope extends string = string, Role extends string = string, O
     return this.source
   }
 
-  // Signs `user` in on this session, without asking for their second factor: for a way of signing in the app proves itself. `remember` as for `signInWithPassword`.
+  // Signs `user` in on this session, without asking for their second factor: for a way of signing in the app proves itself. `remember` as for `password.signIn`.
   async signIn(user: Pick<User, 'id'>, options: { remember?: boolean | undefined } = {}): Promise<void> {
     const record = await this.core.store.users.get(user.id)
 
@@ -395,90 +464,6 @@ export class Auth<Scope extends string = string, Role extends string = string, O
     return { ok: true, user: publicUser(record) }
   }
 
-  // A new user with an email and a password, signed in on this session; field errors come back as codes.
-  // With `redirect`, the mail verifying the address leads on to that page.
-  async register(input: RegisterInput, options?: Pick<SignInOptions, 'remember' | 'captcha' | 'redirect'>): Promise<RegisterResult | Off> {
-    if (!this.core.switches.password)
-      return OFF
-
-    await chooseRemember(this[STATE], options?.remember)
-
-    return (await load.password()).register(this[STATE], input, options)
-  }
-
-  // Signs in with an email or a username and a password; a wrong password and an unknown account answer alike.
-  async signInWithPassword(input: PasswordSignInInput, options?: SignInOptions): Promise<PasswordSignInResult | Off> {
-    if (!this.core.switches.password)
-      return OFF
-
-    await chooseRemember(this[STATE], options?.remember)
-
-    return (await load.password()).signInWithPassword(this[STATE], input, options ?? {})
-  }
-
-  // Mails a new link verifying the address to the signed-in user or, with nobody signed in, to the account this browser registered or proved the password of with an 'unverified' answer.
-  async sendVerification(): Promise<SendVerificationResult> {
-    return (await load.email()).sendVerification(this[STATE])
-  }
-
-  // Spends a verification link's token in the browser signed in as the account, that registered it or that proved its password, or given the account's password: `{ ok: false, error: 'confirm' }` asks for one of them, the link still usable.
-  async verifyEmail(token: string, password?: string): Promise<VerifyEmailResult> {
-    return (await load.email()).verifyEmail(this[STATE], token, password)
-  }
-
-  // Mails a reset link to that address when an account has it; answers alike when none does. The reset signs in to `redirect` when given.
-  async requestPasswordReset(email: string, options: Pick<SignInOptions, 'captcha' | 'redirect'> = {}): Promise<MailRequestResult | Off> {
-    if (!this.core.switches.password)
-      return OFF
-
-    return (await load.email()).requestPasswordReset(this[STATE], email, options.captcha, options.redirect)
-  }
-
-  // Spends a reset link's token on a new password, signing the user out everywhere else and in here.
-  async resetPassword(token: string, password: string): Promise<ResetPasswordResult | Off> {
-    return !this.core.switches.password ? OFF : (await load.email()).resetPassword(this[STATE], token, password)
-  }
-
-  // Mails a sign-in link to that address when an account has it; answers alike when none does. `remember` holds for the link opened in this browser, or the code typed in it.
-  async requestMagicLink(email: string, options: SignInOptions = {}): Promise<MailRequestResult | Off> {
-    if (!this.core.switches.magicLink)
-      return OFF
-
-    await chooseRemember(this[STATE], options.remember)
-
-    return (await load.email()).requestMagicLink(this[STATE], email, options.redirect, options.captcha)
-  }
-
-  // Spends a magic link's token, signing its user in.
-  async signInWithMagicLink(token: string): Promise<LinkResult | Off> {
-    return !this.core.switches.magicLink ? OFF : (await load.email()).signInWithMagicLink(this[STATE], token)
-  }
-
-  // Signs in with the code a magic link mail carried, typed in the browser that asked for it.
-  async signInWithEmailCode(code: string): Promise<CodeResult | Off> {
-    return !this.core.switches.magicLink ? OFF : (await load.email()).signInWithEmailCode(this[STATE], code)
-  }
-
-  // Verifies the address with the code its verification mail carried, typed in the browser that asked for it.
-  async verifyEmailCode(code: string): Promise<CodeResult> {
-    return (await load.email()).verifyEmailCode(this[STATE], code)
-  }
-
-  // The code this browser waits for, sign-in or verification, and the address it went to; null when none.
-  async emailCodePending(): Promise<PendingEmailCode> {
-    return (await load.email()).pendingCode(this[STATE])
-  }
-
-  // Mails the signed-in user's new address a link confirming it.
-  async changeEmail(proof: Proof, email: string): Promise<ChangeEmailResult> {
-    return (await load.email()).changeEmail(this[STATE], proof, email)
-  }
-
-  // Spends an email change link's token: the account moves to the new address, and the user's other sessions end.
-  async confirmEmailChange(token: string): Promise<LinkResult> {
-    return (await load.email()).confirmEmailChange(this[STATE], token)
-  }
-
   // A fresh access token for the signed-in user's account at `provider`, refreshed when about to expire; null without one, or once the provider refuses a refresh.
   async providerToken(provider: string): Promise<string | null> {
     return (await load.flow()).providerToken(this[STATE], provider)
@@ -492,26 +477,6 @@ export class Auth<Scope extends string = string, Role extends string = string, O
   // What the config enables, for a page to show only what works: the providers, mail, passkeys, scopes and the prebuilt pages.
   features(): AuthFeatures {
     return featuresOf(this.core)
-  }
-
-  // What the authorization endpoint does with an MCP client's request: send the visitor to sign in, show the consent page, or go back to the client with a code once they approved it for these scopes.
-  async oauthAuthorize(params: AuthorizeParams): Promise<AuthorizeOutcome> {
-    return this.core.oauthServer ? (await load.request()).authorize(this[STATE], params, siteRoot(this.core, this.request)) : { kind: 'error', error: 'client' }
-  }
-
-  // The user's answer on the consent page, checked again as the request is: where the browser goes next.
-  async oauthDecide(fields: AuthorizeParams, allow: boolean): Promise<DecideResult> {
-    return this.core.oauthServer ? (await load.request()).decide(this[STATE], fields, allow, siteRoot(this.core, this.request)) : { ok: false, error: 'client' }
-  }
-
-  // The apps the signed-in user approved to act as them.
-  async listOAuthClients(): Promise<ApprovedClient[]> {
-    return (await load.grants()).approvedClients(this[STATE])
-  }
-
-  // Takes an app's approval back with every token it was given; refused with `not-found` when there was none, and `signed-out` outside the user's own session.
-  async revokeOAuthGrant(clientId: string): Promise<RevokeGrantResult> {
-    return (await load.grants()).revokeClient(this[STATE], clientId)
   }
 
   // The RFC 9728 metadata of the protected resource `name` served at `path`, which kay's MCP endpoint asks for; null while the OAuth server is off. It points MCP clients at the app's own authorization server.
@@ -551,16 +516,6 @@ export class Auth<Scope extends string = string, Role extends string = string, O
     return captchaChallenge(this[STATE], action)
   }
 
-  // Whether this session holds a sign-in waiting for its second factor, for the page that asks for it.
-  async twoFactorPending(): Promise<boolean> {
-    return challenged(this[STATE])
-  }
-
-  // Finishes a sign-in waiting for its second factor with an authenticator code or a recovery code.
-  async verifyTwoFactor(code: string): Promise<TwoFactorResult> {
-    return (await load.twoFactor()).verifyTwoFactor(this[STATE], code, async (record, method) => this.establish(record, method))
-  }
-
   // Whether this session signed in or re-proved its user in the last ten minutes, as `exportData()` and the admin methods ask, for a page to show a form for `reprove` first.
   async provedLately(): Promise<boolean> {
     return provedLately(this[STATE])
@@ -571,37 +526,6 @@ export class Auth<Scope extends string = string, Role extends string = string, O
     const proved = await reprove(this[STATE], proof)
 
     return proved.ok ? { ok: true } : proved
-  }
-
-  // A secret for the signed-in user's authenticator, as text and as a QR code; the second factor turns on once `enableTwoFactor` gets a code from it.
-  async setUpTwoFactor(proof: Proof): Promise<SetUpTwoFactorResult | Off> {
-    return !this.core.switches.twoFactor ? OFF : (await load.twoFactor()).setUpTwoFactor(this[STATE], proof)
-  }
-
-  // Turns the second factor on with a code from the authenticator just set up; answers the recovery codes, to show this once.
-  async enableTwoFactor(code: string): Promise<EnableTwoFactorResult | Off> {
-    return !this.core.switches.twoFactor ? OFF : (await load.twoFactor()).enableTwoFactor(this[STATE], code)
-  }
-
-  async disableTwoFactor(proof: Proof): Promise<DisableTwoFactorResult> {
-    return (await load.twoFactor()).disableTwoFactor(this[STATE], proof)
-  }
-
-  // A new set of recovery codes, the old ones void.
-  async regenerateRecoveryCodes(proof: Proof): Promise<RecoveryCodesResult> {
-    return (await load.twoFactor()).regenerateRecoveryCodes(this[STATE], proof)
-  }
-
-  // How many unused recovery codes the signed-in user has, to warn when few are left.
-  async recoveryCodesLeft(): Promise<number> {
-    const record = await this.record()
-
-    return record ? this.core.store.recoveryCodes.count(record.id) : 0
-  }
-
-  // Sets the signed-in user's password, or a first one, and ends their other sessions.
-  async changePassword(proof: Proof, password: string): Promise<ChangePasswordResult | Off> {
-    return !this.core.switches.password ? OFF : (await load.account()).changePassword(this[STATE], proof, password)
   }
 
   // Names the signed-in user, or renames them, under the rules register checks; no proof, a name being no credential.
@@ -631,11 +555,6 @@ export class Auth<Scope extends string = string, Role extends string = string, O
     return (await load.erase()).deletionImpact(this[STATE])
   }
 
-  // A bearer token for a device or an API client of the signed-in user, shown this once; minted from a session only, never from another token.
-  async createToken(proof: Proof, label: string, options: TokenOptions<Scope> = {}): Promise<CreateTokenResult> {
-    return (await load.bearer()).createToken(this[STATE], proof, label, options)
-  }
-
   // The scopes of the bearer token this request came with; null for a session, or a token with every scope.
   async scopes(): Promise<string[] | null> {
     await this.record()
@@ -646,74 +565,6 @@ export class Auth<Scope extends string = string, Role extends string = string, O
   // Whether this request may reach what `scope` guards: a session may, and a token given that scope or every one.
   async hasScope(scope: Scope): Promise<boolean> {
     return scopeAllows(await this.scopes(), scope)
-  }
-
-  // Where the signed-in user is signed in, this browser marked `current`; empty for a bearer token.
-  async listSessions(): Promise<UserSession[]> {
-    return listSessions(this[STATE])
-  }
-
-  // Ends one of the signed-in user's sessions, effective on its next request; ending this one signs out. Refused with `not-found` when they have none with that id, and `signed-out` through a bearer token.
-  async revokeSession(id: string): Promise<RevokeSessionResult> {
-    return revokeSession(this[STATE], id, async () => this.signOut())
-  }
-
-  // The options for `makePasskey` of `@kaynooo/kayjs-auth/browser`, to make a passkey for the signed-in user once `proof` re-proves them, the second factor when it is on.
-  async passkeyRegistrationOptions(proof: Proof): Promise<PasskeyOptionsResult<PublicKeyCredentialCreationOptionsJSON, ProofFailure | Off['error']>> {
-    return !this.core.switches.passkeys ? OFF : (await load.passkeys()).passkeyRegistrationOptions(this[STATE], proof)
-  }
-
-  // Keeps the passkey `makePasskey` made, under `name` or the browser and system it was made on.
-  async registerPasskey(response: RegistrationResponseJSON, name?: string): Promise<RegisterPasskeyResult | Off> {
-    return !this.core.switches.passkeys ? OFF : (await load.passkeys()).registerPasskey(this[STATE], response, name)
-  }
-
-  async listPasskeys(): Promise<Passkey[]> {
-    return (await load.passkeys()).listPasskeys(this[STATE])
-  }
-
-  // Renames one of the signed-in user's passkeys; refused with `not-found` for one that is not theirs and `invalid-name` for a blank name.
-  async updatePasskeyName(id: string, name: string): Promise<RenamePasskeyResult> {
-    return (await load.passkeys()).renamePasskey(this[STATE], id, name)
-  }
-
-  async revokePasskey(id: string, proof: Proof): Promise<RevokePasskeyResult> {
-    return (await load.passkeys()).removePasskey(this[STATE], id, proof)
-  }
-
-  // The options for `askPasskey` of `@kaynooo/kayjs-auth/browser`, naming no account; with its `autofill` the browser offers the passkeys in the sign-in field's autofill.
-  async passkeySignInOptions(): Promise<PublicKeyCredentialRequestOptionsJSON> {
-    if (!this.core.switches.passkeys)
-      throw configError('passkeys are switched off: `passkeys: false` in the options of createAuth or auth()')
-
-    return (await load.passkeys()).passkeySignInOptions(this[STATE])
-  }
-
-  // Signs in with the passkey that answered `passkeySignInOptions`, with no second factor after it.
-  async signInWithPasskey(response: AuthenticationResponseJSON, options: Pick<SignInOptions, 'redirect' | 'remember'> = {}): Promise<PasskeySignInResult | Off> {
-    if (!this.core.switches.passkeys)
-      return OFF
-
-    await chooseRemember(this[STATE], options.remember)
-
-    return (await load.passkeys()).signInWithPasskey(this[STATE], response, options.redirect, async (record, method) => this.establish(record, method))
-  }
-
-  // The options for answering a pending sign-in's second factor with a passkey; `none` when the user has none.
-  async twoFactorPasskeyOptions(): Promise<PasskeyOptionsResult<PublicKeyCredentialRequestOptionsJSON>> {
-    return !this.core.switches.passkeys ? OFF : (await load.passkeys()).twoFactorPasskeyOptions(this[STATE])
-  }
-
-  async verifyTwoFactorPasskey(response: AuthenticationResponseJSON): Promise<TwoFactorResult | Off> {
-    if (!this.core.switches.passkeys)
-      return OFF
-
-    return (await load.passkeys()).verifyTwoFactorPasskey(this[STATE], response, async (record, method) => this.establish(record, method))
-  }
-
-  // The options for re-proving with a passkey, its answer then passed as `{ passkey }` wherever a proof is asked.
-  async passkeyProofOptions(): Promise<PasskeyOptionsResult<PublicKeyCredentialRequestOptionsJSON>> {
-    return !this.core.switches.passkeys ? OFF : (await load.passkeys()).passkeyProofOptions(this[STATE])
   }
 
   // The signed-in user's own audit log, newest first, a page of `limit` (50 by default) before `before`, an instant or the last entry of the page (which tells entries of one millisecond apart); empty without the `audit` option.
@@ -746,60 +597,6 @@ export class Auth<Scope extends string = string, Role extends string = string, O
     return found
   }
 
-  // The users, newest first, a page of `limit` (50 by default) from `offset`; `search` matches part of an email or a username, or a whole id. For an admin only, as every method below.
-  async listUsers(query: { search?: string, offset?: number, limit?: number } = {}): Promise<ListUsersResult> {
-    return (await load.admin()).listUsers(this[STATE], query)
-  }
-
-  // One user; `admin` tells whether they meet the `admin` option, whom an admin can neither ban, impersonate nor delete.
-  async getUser(userId: string): Promise<GetUserResult> {
-    return (await load.admin()).getUser(this[STATE], userId)
-  }
-
-  // The roles an admin may give, those `roles` declares; none without it.
-  adminRoles(): string[] {
-    return [...this.core.roles ?? []]
-  }
-
-  // Gives a user a role the app declares, effective on their next request.
-  async grantRole(userId: string, role: Role): Promise<RoleResult> {
-    return (await load.admin()).changeRole(this[STATE], userId, role, true)
-  }
-
-  // Takes a role back; one that would leave the admin asking no longer an admin is refused (`self`), and one that races another admin's revoke and would leave none is undone (`last-admin`).
-  async revokeRole(userId: string, role: Role): Promise<RoleResult> {
-    return (await load.admin()).changeRole(this[STATE], userId, role, false)
-  }
-
-  // Bars a user from signing in, for good or `until` then, and signs them out everywhere; another admin is refused.
-  async banUser(userId: string, options: { reason?: string, until?: Date } = {}): Promise<BanResult> {
-    return (await load.admin()).banUser(this[STATE], userId, options)
-  }
-
-  async unbanUser(userId: string): Promise<UnbanResult> {
-    return (await load.admin()).unbanUser(this[STATE], userId)
-  }
-
-  // Deletes a user with everything kayjs-auth keeps for them, calling `onDelete` and mailing them the account-deleted notice; oneself and another admin are refused.
-  async deleteUser(userId: string): Promise<DeleteResult> {
-    return (await load.admin()).deleteUser(this[STATE], userId)
-  }
-
-  // Everyone's audit log, or `userId`'s, newest first.
-  async listAdminAuditLog(query: { userId?: string, before?: AuditCursorInput, limit?: number } = {}): Promise<AdminAuditLogResult> {
-    return (await load.admin()).adminAuditLog(this[STATE], query)
-  }
-
-  // Signs this browser in as `userId`, the admin's own sign-in kept for `stopImpersonating`; 'stale' unless the admin signed in or re-proved lately. Nothing that takes a proof works meanwhile, and another admin cannot be impersonated.
-  async impersonate(userId: string): Promise<ImpersonateResult> {
-    return (await load.admin()).impersonate(this[STATE], userId)
-  }
-
-  // Signs the admin back in as themselves; signed out when their own sign-in ended meanwhile. False when not impersonating.
-  async stopImpersonating(): Promise<boolean> {
-    return (await load.admin()).stopImpersonating(this[STATE])
-  }
-
   // The admin acting as the signed-in user, to show while they do; null otherwise.
   async impersonator(): Promise<User | null> {
     const signedIn = await this.session.get('auth')
@@ -811,103 +608,6 @@ export class Auth<Scope extends string = string, Role extends string = string, O
   // Everything kayjs-auth keeps about the signed-in user, secrets left out, with the app's own from `exportData`: for a download of their data.
   async exportData(): Promise<ExportResult> {
     return (await load.exports()).exportData(this[STATE])
-  }
-
-  // A new organization, the signed-in user its owner. `slug`, lowercase letters, digits and dashes, names it in URLs.
-  async createOrganization(input: { name: string, slug?: string | null | undefined }): Promise<CreateOrganizationResult<OrgRole>> {
-    return (await load.organizations()).createOrganization(this[STATE], input) as Promise<CreateOrganizationResult<OrgRole>>
-  }
-
-  // The organizations the signed-in user belongs to, with their roles in each.
-  async listOrganizations(): Promise<Membership<OrgRole>[]> {
-    return (await load.organizations()).listMemberships(this[STATE]) as Promise<Membership<OrgRole>[]>
-  }
-
-  // The organization `ref` names, by id or slug, with the user's roles there; null unless they are a member.
-  async getOrganization(ref: string): Promise<Membership<OrgRole> | null> {
-    return (await load.organizations()).getMembership(this[STATE], ref) as Promise<Membership<OrgRole> | null>
-  }
-
-  // Whether the user is a member of the organization `ref` names, holding `role` there when given.
-  async isMember(ref: string, role?: OrgRole): Promise<boolean> {
-    const record = await this.record()
-
-    return record !== null && (await load.organizations()).holdsInOrganization(this.core, record.id, ref, role)
-  }
-
-  // Renames it, or changes or clears its slug: for members holding `manage`.
-  async updateOrganization(ref: string, patch: { name?: string | undefined, slug?: string | null | undefined }): Promise<UpdateOrganizationResult> {
-    return (await load.organizations()).updateOrganization(this[STATE], ref, patch)
-  }
-
-  // For members holding `owner`.
-  async deleteOrganization(ref: string): Promise<DeleteOrganizationResult> {
-    return (await load.organizations()).deleteOrganization(this[STATE], ref)
-  }
-
-  // Every member, oldest first, for any member to see.
-  async listMembers(ref: string): Promise<ListMembersResult<OrgRole>> {
-    return (await load.organizations()).listMembers(this[STATE], ref) as Promise<ListMembersResult<OrgRole>>
-  }
-
-  // Replaces a member's roles: for members holding `manage`, giving only roles they hold, to a member holding none above theirs.
-  async setMemberRoles(ref: string, userId: string, roles: OrgRole[]): Promise<MemberResult> {
-    return (await load.organizations()).setMemberRoles(this[STATE], ref, userId, roles)
-  }
-
-  // For members holding `manage`, of a member holding no role above theirs.
-  async deleteMember(ref: string, userId: string): Promise<MemberResult> {
-    return (await load.organizations()).removeMember(this[STATE], ref, userId)
-  }
-
-  async leaveOrganization(ref: string): Promise<MemberResult> {
-    const record = await this.record()
-
-    return record ? (await load.organizations()).removeMember(this[STATE], ref, record.id) : { ok: false, error: 'signed-out' }
-  }
-
-  // Mails `email` a link to the `invitationPage`, else the prebuilt pages' invitation page, giving `roles` (`defaultRoles` when none) once accepted: for members holding `manage` and every role it gives.
-  async invite(ref: string, email: string, roles?: OrgRole[]): Promise<InviteResult<OrgRole>> {
-    return (await load.organizations()).invite(this[STATE], ref, email, roles) as Promise<InviteResult<OrgRole>>
-  }
-
-  // The organization's open invitations, for members holding `manage`.
-  async listInvitations(ref: string): Promise<ListInvitationsResult<OrgRole>> {
-    return (await load.organizations()).listInvitations(this[STATE], ref) as Promise<ListInvitationsResult<OrgRole>>
-  }
-
-  async revokeInvitation(ref: string, invitationId: string): Promise<RevokeInvitationResult> {
-    return (await load.organizations()).revokeInvitation(this[STATE], ref, invitationId)
-  }
-
-  // The invitations open to the signed-in user's verified address.
-  async listMyInvitations(): Promise<Invitation<OrgRole>[]> {
-    return (await load.organizations()).myInvitations(this[STATE]) as Promise<Invitation<OrgRole>[]>
-  }
-
-  // What the invitation link's page shows; null once revoked, accepted or expired.
-  async getInvitation(invitationId: string): Promise<Invitation<OrgRole> | null> {
-    return (await load.organizations()).getInvitation(this[STATE], invitationId) as Promise<Invitation<OrgRole> | null>
-  }
-
-  // For an account verified at the invited address only.
-  async acceptInvitation(invitationId: string): Promise<AcceptResult<OrgRole>> {
-    return (await load.organizations()).acceptInvitation(this[STATE], invitationId) as Promise<AcceptResult<OrgRole>>
-  }
-
-  // Turns down an invitation open to the user; `not-found` for any other.
-  async rejectInvitation(invitationId: string): Promise<RejectInvitationResult> {
-    return (await load.organizations()).declineInvitation(this[STATE], invitationId)
-  }
-
-  // The signed-in user's bearer tokens, without the tokens themselves.
-  async listTokens(): Promise<BearerToken[]> {
-    return (await load.bearer()).listTokens(this[STATE])
-  }
-
-  // Revokes one of the signed-in user's bearer tokens, from a browser session only: `signed-out` through a token, `not-found` for one that is not theirs.
-  async revokeBearerToken(id: string): Promise<RevokeTokenResult> {
-    return (await load.bearer()).revokeToken(this[STATE], id)
   }
 
   // Under a new session id, so one planted before is worth nothing; `method` says how, for the `signed-in` event.

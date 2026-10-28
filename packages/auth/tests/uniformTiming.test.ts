@@ -56,7 +56,7 @@ describe('sign-in answers in the same time for a held address and a free one', (
         await slow.closed
     } })
 
-    await app.browser().call('register', { email: 'ada@example.com', password: PASSWORD })
+    await app.browser().call('password.register', { email: 'ada@example.com', password: PASSWORD })
     armed = true
 
     for (const identifier of ['ada@example.com', 'nobody@example.com'])
@@ -68,7 +68,7 @@ describe('sign-in answers in the same time for a held address and a free one', (
   test('a failed password sign-in does not wait for the audit log write, held address or not', async () => {
     const app = testApp({ audit: true })
 
-    await app.browser().call('register', { email: 'ada@example.com', password: PASSWORD })
+    await app.browser().call('password.register', { email: 'ada@example.com', password: PASSWORD })
 
     const slow = gate()
     const add = app.store.audit!.add.bind(app.store.audit)
@@ -90,7 +90,7 @@ describe('sign-in answers in the same time for a held address and a free one', (
       heard.push(event)
     } })
 
-    await app.browser().call('register', { email: 'ada@example.com', password: PASSWORD })
+    await app.browser().call('password.register', { email: 'ada@example.com', password: PASSWORD })
     await app.browser().json('/password', from('10.0.0.1', { identifier: 'ada@example.com', password: WRONG }))
 
     // Reported after the response: polled for, with room for a busy host.
@@ -107,7 +107,7 @@ describe('sign-in answers in the same time for a held address and a free one', (
         throw new Error('hook down')
     } })
 
-    await app.browser().call('register', { email: 'ada@example.com', password: PASSWORD })
+    await app.browser().call('password.register', { email: 'ada@example.com', password: PASSWORD })
 
     const logged: unknown[][] = []
     const global = globalThis as { [LOG_SINK]?: unknown }
@@ -136,7 +136,7 @@ describe('sign-in answers in the same time for a held address and a free one', (
         await slow.closed
     } })
 
-    await app.browser().call('register', { email: 'ada@example.com', password: PASSWORD })
+    await app.browser().call('password.register', { email: 'ada@example.com', password: PASSWORD })
     const user = (await app.store.users.findByEmail('ada@example.com'))!
 
     await app.store.users.update(user.id, { emailVerifiedAt: new Date() })
@@ -152,7 +152,7 @@ describe('sign-in answers in the same time for a held address and a free one', (
   test('a wrong password is checked against a hash for a held address, a free one and an account without a password alike', async () => {
     const app = testApp()
 
-    await app.browser().call('register', { email: 'ada@example.com', password: PASSWORD })
+    await app.browser().call('password.register', { email: 'ada@example.com', password: PASSWORD })
     await app.store.users.create({ ...(await app.store.users.findByEmail('ada@example.com'))!, id: 'nopass', email: 'nopass@example.com', passwordHash: null })
 
     const compare = spyOn(utils, 'comparePasswords')
@@ -174,13 +174,13 @@ describe('registering an address that is held', () => {
       await slow.closed
     } }, links: LINKS } })
 
-    await app.browser().call('register', { email: 'ada@example.com', password: PASSWORD })
+    await app.browser().call('password.register', { email: 'ada@example.com', password: PASSWORD })
 
     const hash = spyOn(utils, 'hashPassword')
 
     for (const email of ['ada@example.com', 'bob@example.com']) {
       hash.mockClear()
-      expect(await finishes(app.browser().call('register', { email, password: PASSWORD }))).toBe('done')
+      expect(await finishes(app.browser().call('password.register', { email, password: PASSWORD }))).toBe('done')
       expect(hash).toHaveBeenCalledTimes(1)
     }
 
@@ -205,13 +205,13 @@ describe('registering under requireVerified', () => {
       }
     } })
 
-    await app.browser().call('register', { email: 'ada@example.com', password: PASSWORD })
-    await app.browser().call('register', { email: 'grace@example.com', password: PASSWORD })
+    await app.browser().call('password.register', { email: 'ada@example.com', password: PASSWORD })
+    await app.browser().call('password.register', { email: 'grace@example.com', password: PASSWORD })
     await app.store.users.update((await app.store.users.findByEmail('grace@example.com'))!.id, { emailVerifiedAt: new Date() })
     armed = true
 
     for (const email of ['grace@example.com', 'ada@example.com', 'bob@example.com'])
-      expect(await finishes(app.browser().call('register', { email, password: PASSWORD }))).toBe('done')
+      expect(await finishes(app.browser().call('password.register', { email, password: PASSWORD }))).toBe('done')
 
     expect(ran).toEqual([])
     slow.open()
@@ -225,12 +225,12 @@ describe('registering under requireVerified', () => {
 })
 
 describe('mail requests', () => {
-  for (const method of ['requestPasswordReset', 'requestMagicLink'] as const) {
+  for (const method of ['password.requestReset', 'magicLink.request'] as const) {
     test(`${method} does not wait on the mailer for a held address, and parks a code for a free one alike`, async () => {
       const slow = gate()
       const app = testApp({ site: 'https://site.test', email: { mailer: { send: async () => slow.closed }, links: LINKS, codes: 'both', requireVerified: false } })
 
-      await app.browser().call('register', { email: 'ada@example.com', password: PASSWORD })
+      await app.browser().call('password.register', { email: 'ada@example.com', password: PASSWORD })
 
       for (const email of ['ada@example.com', 'nobody@example.com']) {
         const browser = app.browser()
@@ -249,8 +249,8 @@ describe('confirming an address with a password', () => {
     const box = mailbox()
     const app = testApp({ site: 'https://site.test', secret: SECRET, email: { mailer: box.mailer, links: LINKS } })
 
-    await app.browser().call('register', { email: 'ada@example.com', password: PASSWORD })
-    await app.browser().call('register', { email: 'bob@example.com', password: PASSWORD })
+    await app.browser().call('password.register', { email: 'ada@example.com', password: PASSWORD })
+    await app.browser().call('password.register', { email: 'bob@example.com', password: PASSWORD })
 
     const bob = (await app.store.users.findByEmail('bob@example.com'))!
 
@@ -261,7 +261,7 @@ describe('confirming an address with a password', () => {
 
     for (const token of links) {
       compare.mockClear()
-      await app.browser().call('verifyEmail', token, WRONG)
+      await app.browser().call('email.verify', token, WRONG)
       expect(compare).toHaveBeenCalledTimes(1)
     }
   })
@@ -275,13 +275,13 @@ describe('a replaced unverified account whose erase fails', () => {
         throw new Error('hook down')
     } })
 
-    await app.browser().call('register', { email: 'ada@example.com', password: PASSWORD })
+    await app.browser().call('password.register', { email: 'ada@example.com', password: PASSWORD })
 
     const old = (await app.store.users.findByEmail('ada@example.com'))!
 
     const logged = spyOn(console, 'error').mockImplementation(() => undefined)
 
-    await app.browser().call('register', { email: 'ada@example.com', password: PASSWORD })
+    await app.browser().call('password.register', { email: 'ada@example.com', password: PASSWORD })
     // The failing hook runs after the answer and says so when it fails.
     await untilHolds(() => logged.mock.calls.length > 0)
     logged.mockRestore()

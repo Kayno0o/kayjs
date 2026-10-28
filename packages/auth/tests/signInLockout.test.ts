@@ -14,7 +14,7 @@ async function account(limits: LimitsOption, extra: Parameters<typeof testApp>[0
   const box = mailbox()
   const app = testApp({ rateLimit: limits, site: 'https://site.test', email: { mailer: box.mailer, links: LINKS, requireVerified: false }, ...extra })
 
-  await app.browser().call('register', { email: 'ada@example.com', password: PASSWORD })
+  await app.browser().call('password.register', { email: 'ada@example.com', password: PASSWORD })
 
   const user = (await app.store.users.findByEmail('ada@example.com'))!
 
@@ -195,7 +195,7 @@ describe('guessing at an account', () => {
 
     await app.store.users.update(app.user.id, { emailVerifiedAt: null })
 
-    const verify = async (from: string, password: string) => app.browser().json('/call/verifyEmail', { method: 'POST', headers: { 'content-type': 'application/json', 'x-forwarded-for': from }, body: JSON.stringify([token, password]) })
+    const verify = async (from: string, password: string) => app.browser().json('/call/email.verify', { method: 'POST', headers: { 'content-type': 'application/json', 'x-forwarded-for': from }, body: JSON.stringify([token, password]) })
 
     expect(await verify('10.0.0.1', WRONG)).toMatchObject({ ok: false })
     await attempt(app, '10.0.0.1', WRONG)

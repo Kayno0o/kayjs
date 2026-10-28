@@ -482,8 +482,9 @@ export function asyncReplies(fence: ParsedFence): Diagnostic[] {
   return diagnostics
 }
 
-// The kayjs-auth methods that ask a CAPTCHA by default, with the position of the options holding `captcha`.
-const CAPTCHA_CALLS = new Map([['register', 1], ['signInWithPassword', 1], ['requestPasswordReset', 1], ['requestMagicLink', 1]])
+// The kayjs-auth methods that ask a CAPTCHA by default, with the position of the options holding `captcha`: grouped as `auth.password.register`, and flat as before 1.82.
+const CAPTCHA_CALLS = new Map([['password.register', 1], ['password.signIn', 1], ['password.requestReset', 1], ['magicLink.request', 1], ['register', 1], ['signInWithPassword', 1], ['requestPasswordReset', 1], ['requestMagicLink', 1]])
+const CAPTCHA_GROUPS = new Set(['password', 'magicLink'])
 const AUTH_NAME = /auth$/i
 const CAPTCHA_OFF = /\bcaptcha\s*:\s*false\b/
 
@@ -511,9 +512,11 @@ export function missingCaptchas(fence: ParsedFence): Diagnostic[] {
     if (node.type !== 'CallExpression' || node.callee.type !== 'MemberExpression' || node.callee.computed || node.callee.property.type !== 'Identifier')
       return
 
-    const name = node.callee.property.name
+    const object = node.callee.object
+    const grouped = object.type === 'MemberExpression' && !object.computed && object.property.type === 'Identifier' && CAPTCHA_GROUPS.has(object.property.name)
+    const name = grouped ? `${(object.property as t.Identifier).name}.${node.callee.property.name}` : node.callee.property.name
     const at = CAPTCHA_CALLS.get(name)
-    const receiver = receiverName(node.callee.object)
+    const receiver = receiverName(grouped ? object.object : object)
 
     if (at === undefined || receiver === undefined || !AUTH_NAME.test(receiver) || node.arguments.some(argument => argument.type === 'SpreadElement'))
       return

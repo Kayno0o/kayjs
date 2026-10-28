@@ -56,7 +56,7 @@ export async function verifyTwoFactor(state: RequestState, code: string, signIn:
 
 export type SetUpTwoFactorResult = { ok: true, setup: TwoFactorSetup } | { ok: false, error: ProofFailure | 'enabled' }
 
-// A new secret for the signed-in user's authenticator, active once `enableTwoFactor` gets a code from it.
+// A new secret for the signed-in user's authenticator, active once `twoFactor.enable` gets a code from it.
 export async function setUpTwoFactor(state: RequestState, proof: Proof): Promise<SetUpTwoFactorResult> {
   const proved = await reprove(state, proof)
 

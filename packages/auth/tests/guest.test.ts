@@ -32,7 +32,7 @@ describe('guests', () => {
     const { browser } = setup()
     const ada = browser()
 
-    await ada.call('register', { email: 'ada@example.com', password: PASSWORD })
+    await ada.call('password.register', { email: 'ada@example.com', password: PASSWORD })
 
     expect(await ada.call('signInAsGuest')).toEqual({ ok: false, error: 'signed-in' })
   })
@@ -42,7 +42,7 @@ describe('guests', () => {
     const guest = browser()
     const { user } = await guest.callOk('signInAsGuest')
 
-    expect(await guest.call('register', { email: 'ada@example.com', password: PASSWORD, username: 'ada' })).toMatchObject({ ok: true, user: { id: user.id, guest: false, email: 'ada@example.com' }, signedIn: true })
+    expect(await guest.call('password.register', { email: 'ada@example.com', password: PASSWORD, username: 'ada' })).toMatchObject({ ok: true, user: { id: user.id, guest: false, email: 'ada@example.com' }, signedIn: true })
     expect(await guest.json('/me')).toMatchObject({ id: user.id, guest: false, hasPassword: true })
     expect((await store.users.list({ offset: 0, limit: 10 })).total).toBe(1)
     expect(signUps).toHaveLength(1)
@@ -55,19 +55,19 @@ describe('guests', () => {
     const guest = browser()
     const { user } = await guest.callOk('signInAsGuest')
 
-    expect(await guest.call('register', { email: 'ada@example.com', password: PASSWORD })).toEqual({ ok: true, signedIn: false })
+    expect(await guest.call('password.register', { email: 'ada@example.com', password: PASSWORD })).toEqual({ ok: true, signedIn: false })
     expect(await guest.json('/me')).toMatchObject({ id: user.id, guest: true, email: null })
   })
 
   test('a register refused leaves the guest as they were', async () => {
     const { browser } = setup()
 
-    await browser().call('register', { email: 'ada@example.com', password: PASSWORD })
+    await browser().call('password.register', { email: 'ada@example.com', password: PASSWORD })
 
     const guest = browser()
     const { user } = await guest.callOk('signInAsGuest')
 
-    expect(await guest.call('register', { email: 'ada@example.com', password: PASSWORD })).toEqual({ ok: false, errors: { email: 'taken' } })
+    expect(await guest.call('password.register', { email: 'ada@example.com', password: PASSWORD })).toEqual({ ok: false, errors: { email: 'taken' } })
     expect(await guest.json('/me')).toMatchObject({ id: user.id, guest: true, email: null })
   })
 

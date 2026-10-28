@@ -28,10 +28,10 @@ async function tokens(app: Server) {
   const clientId = await register(app)
   const ada = app.browser()
 
-  await ada.call('register', { email: 'ada@example.com', password: PASSWORD })
+  await ada.call('password.register', { email: 'ada@example.com', password: PASSWORD })
 
   const params = { client_id: clientId, redirect_uri: REDIRECT, response_type: 'code', code_challenge: CHALLENGE, code_challenge_method: 'S256', scope: 'posts:read', state: 'abc' }
-  const answer = await ada.post('/call/oauthDecide', [params, true]) as { redirect: string }
+  const answer = await ada.post('/call/oauthServer.decide', [params, true]) as { redirect: string }
   const code = new URL(answer.redirect).searchParams.get('code')!
   const reply = await post(app, 'token', { grant_type: 'authorization_code', code, code_verifier: VERIFIER, client_id: clientId, redirect_uri: REDIRECT })
 
@@ -88,7 +88,7 @@ describe('the revocation endpoint (RFC 7009)', () => {
     const app = server()
     const { clientId, access } = await tokens(app)
     const grace = app.browser()
-    const { user } = await grace.callHas('user', 'register', { email: 'grace@example.com', password: PASSWORD })
+    const { user } = await grace.callHas('user', 'password.register', { email: 'grace@example.com', password: PASSWORD })
     const minted = await app.auth.issueToken(user.id, 'Phone')
 
     expect(minted.ok && (await post(app, 'revoke', { token: minted.token, client_id: clientId })).status).toBe(200)

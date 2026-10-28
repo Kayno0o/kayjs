@@ -16,7 +16,7 @@ import FormField from '@kaynooo/kayjs-ui/form-field.kay'
 export const page = { guards: false }
 
 export const password = action(schemas.signIn, async (input, ctx) => {
-  const result = await ctx.locals.auth.signInWithPassword({ identifier: input.identifier, password: input.password }, { remember: remembered(ctx.locals.auth.features(), input.remember), redirect: input.redirect, captcha: captchaOf(input) })
+  const result = await ctx.locals.auth.password.signIn({ identifier: input.identifier, password: input.password }, { remember: remembered(ctx.locals.auth.features(), input.remember), redirect: input.redirect, captcha: captchaOf(input) })
 
   if (!result.ok)
     return ctx.fail(400, { error: result.error === 'invalid' ? 'credentials' : refusedFor(result.error, input) })
@@ -25,13 +25,13 @@ export const password = action(schemas.signIn, async (input, ctx) => {
 }, guarded)
 
 export const magicLink = action(schemas.magicLink, async (input, ctx) => {
-  const result = await ctx.locals.auth.requestMagicLink(input.email, { redirect: input.redirect, captcha: captchaOf(input), remember: remembered(ctx.locals.auth.features(), input.remember) })
+  const result = await ctx.locals.auth.magicLink.request(input.email, { redirect: input.redirect, captcha: captchaOf(input), remember: remembered(ctx.locals.auth.features(), input.remember) })
 
   return result.ok ? input.email : ctx.fail(400, { error: refusedFor(result.error, input) })
 }, guarded)
 
 export const emailCode = action(schemas.emailCode, async ({ code }, ctx) => {
-  const result = await ctx.locals.auth.signInWithEmailCode(code)
+  const result = await ctx.locals.auth.magicLink.signInWithCode(code)
 
   if (!result.ok)
     return ctx.fail(400, { error: result.error === 'invalid' ? 'code' : result.error })
@@ -39,10 +39,10 @@ export const emailCode = action(schemas.emailCode, async ({ code }, ctx) => {
   return ctx.redirect(localize(result.redirect))
 })
 
-export const passkeyOptions = action(async ctx => ctx.locals.auth.features().passkeys ? ctx.locals.auth.passkeySignInOptions() : ctx.fail(404, { error: 'not-found' }))
+export const passkeyOptions = action(async ctx => ctx.locals.auth.features().passkeys ? ctx.locals.auth.passkeys.signInOptions() : ctx.fail(404, { error: 'not-found' }))
 
 export const passkey = action(schemas.passkey, async (input, ctx) => {
-  const result = await ctx.locals.auth.signInWithPasskey(input.response, { redirect: input.redirect, remember: remembered(ctx.locals.auth.features(), input.remember) })
+  const result = await ctx.locals.auth.passkeys.signIn(input.response, { redirect: input.redirect, remember: remembered(ctx.locals.auth.features(), input.remember) })
 
   return !result.ok ? ctx.fail(400, { error: result.error }) : ctx.redirect(localize(result.redirect))
 })
@@ -58,7 +58,7 @@ if (user && !user.guest)
   ctx.redirect(redirect)
 
 const [captchaSignIn, captchaMagic] = await Promise.all([captchaFor(auth, features.captcha, 'sign-in'), captchaFor(auth, features.captcha, 'magic-link')])
-const pending = await auth.emailCodePending()
+const pending = await auth.email.pendingCode()
 const oauthError = oauthFailure(ctx.url.searchParams.get('error'))
 const signInError = refusal(password.failed(), features.captcha)
 const mailError = refusal(magicLink.failed(), features.captcha)

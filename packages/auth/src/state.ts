@@ -20,6 +20,10 @@ export interface RequestState {
   via: () => 'session' | 'bearer' | null
   // Signs `record` in, `method` saying how for the `signed-in` event, and answers where the browser goes next; refused while an admin bans them.
   complete: (record: UserRecord, redirect: string, method: string) => Promise<{ ok: true, redirect: string } | { ok: false, error: 'banned' }>
+  // Signs `record` in under a new session id, with no ban check: for a flow that checked already, as a second factor does.
+  establish: (record: UserRecord, method: string) => Promise<void>
+  // Signs this session out, telling `onAuthEvent`.
+  signOut: () => Promise<void>
   // Takes `record` as the user this request is, as when an admin starts acting as them.
   adopt: (record: UserRecord) => void
   // Reads who the session is again, and signs it out when nobody is.

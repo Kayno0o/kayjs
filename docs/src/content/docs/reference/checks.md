@@ -83,7 +83,7 @@ Each lint has a level. `deny` is an error, `warn` a warning, `allow` hides it. W
 | `css-import-without-text` | deny | code | A stylesheet imported for a value without `with { type: 'text' }` |
 | `external-redirect` | warn | security | A `redirect()` whose target is not written as a path of the site or wrapped in `localPath()`, and that the request can reach, which makes it an open redirect |
 | `async-reply` | warn | code | An `async` function returning kayjs-ai's `ask()`, which awaits the reply so nothing streams |
-| `missing-captcha` | warn | forms | A kayjs-auth call that asks a CAPTCHA by default (`register`, `requestPasswordReset`, `requestMagicLink`, `signInWithPassword`) written with no `captcha` option, unless a module's `createAuth` sets `captcha: false`, which silences it project-wide, in the editor too |
+| `missing-captcha` | warn | forms | A kayjs-auth call that asks a CAPTCHA by default (`password.register`, `password.requestReset`, `magicLink.request`, `password.signIn`, or their flat names before 1.82) written with no `captcha` option, unless a module's `createAuth` sets `captcha: false`, which silences it project-wide, in the editor too |
 | `literal-tag` | warn | code | An HTML tag written in template text, shown as written |
 | `over-budget` | warn | code | A page loading more JavaScript, CSS or weight than `budget` allows, or with a worse EcoIndex grade |
 | `uncaught-await` | warn | code | An `await` block with no `catch` and no `try` around it |
@@ -122,6 +122,7 @@ Each lint has a level. `deny` is an error, `warn` a warning, `allow` hides it. W
 | `one-way-hreflang` | warn | seo | Alternates that do not point back at each other |
 | `redirect-chain` | warn | seo | A redirect whose target redirects again |
 | `deprecated-auth-attempts` | warn | deprecated | An `attempts` counter in a kayjs-auth store of the app's own, the contract before 1.81: the store counts in `rates`, or attempts count in the app's `store.rates`; the old counter works until 1.84 |
+| `deprecated-auth-methods` | warn | deprecated | A call of one of kayjs-auth's flat methods, the names before 1.82, such as `auth.listUsers()` for `auth.admin.listUsers()`; the flat names work until 1.85, and `kay upgrade` renames the calls |
 
 ## Errors
 

@@ -19,20 +19,20 @@ const expiry = (days: number | undefined) => days === undefined ? undefined : da
 
 // The plain token comes back once, for the page to show it this one time.
 export const create = action(schemas.createToken, async (input, ctx) => {
-  // The app's scopes are its own type, which this page cannot name: createToken refuses any it does not declare.
-  const result = await ctx.locals.auth.createToken(proofOf(input), input.label, { scopes: input.scopes?.length ? input.scopes as never[] : undefined, maxAge: expiry(input.days) })
+  // The app's scopes are its own type, which this page cannot name: tokens.create refuses any it does not declare.
+  const result = await ctx.locals.auth.tokens.create(proofOf(input), input.label, { scopes: input.scopes?.length ? input.scopes as never[] : undefined, maxAge: expiry(input.days) })
 
   return result.ok ? result.token : ctx.fail(400, { error: result.error })
 })
 
 export const revoke = action(schemas.id, async ({ id }, ctx) => {
-  return (await ctx.locals.auth.revokeBearerToken(id)).ok ? 'revoked' : ctx.fail(404, { error: 'not-found' })
+  return (await ctx.locals.auth.tokens.revoke(id)).ok ? 'revoked' : ctx.fail(404, { error: 'not-found' })
 })
 
 const auth = ctx.locals.auth
 const user = await auth.requireUser()
 const features = auth.features()
-const tokens = await auth.listTokens()
+const tokens = await auth.tokens.list()
 const created = create.succeeded()?.data
 const refused = create.failed()?.data?.error
 const date = (value: Date) => formatDate(value, { dateStyle: 'medium' })

@@ -33,8 +33,8 @@ describe('email.maxAge', () => {
     const { browser, mails } = setup({ codes: 'both' })
     const ada = browser()
 
-    await ada.call('register', { email: 'ada@example.com', password: PASSWORD })
-    await ada.call('requestPasswordReset', 'ada@example.com')
+    await ada.call('password.register', { email: 'ada@example.com', password: PASSWORD })
+    await ada.call('password.requestReset', 'ada@example.com')
 
     const verify = mails.find(mail => mail.kind === 'verify-email')!
     const reset = mails.find(mail => mail.kind === 'reset-password')!
@@ -69,11 +69,11 @@ describe('email.maxAge', () => {
 
     const ada = browser()
 
-    await ada.call('register', { email: 'ada@example.com', password: PASSWORD })
-    await ada.call('requestMagicLink', 'ada@example.com')
-    await ada.call('requestMagicLink', 'fr@example.com')
-    await ada.call('requestPasswordReset', 'ada@example.com')
-    await ada.call('changeEmail', { password: PASSWORD }, 'new@example.com')
+    await ada.call('password.register', { email: 'ada@example.com', password: PASSWORD })
+    await ada.call('magicLink.request', 'ada@example.com')
+    await ada.call('magicLink.request', 'fr@example.com')
+    await ada.call('password.requestReset', 'ada@example.com')
+    await ada.call('email.change', { password: PASSWORD }, 'new@example.com')
 
     const of = (kind: string, to?: string) => ({ text: mails.find(mail => mail.kind === kind && (to === undefined || mail.to === to))!.text.replace(/\s/g, ' ') })
 
@@ -88,31 +88,31 @@ describe('email.maxAge', () => {
     const { browser, mails } = setup({ maxAge: { 'reset-password': '2h' } })
     const ada = browser()
 
-    await ada.call('register', { email: 'ada@example.com', password: PASSWORD })
-    await ada.call('requestPasswordReset', 'ada@example.com')
+    await ada.call('password.register', { email: 'ada@example.com', password: PASSWORD })
+    await ada.call('password.requestReset', 'ada@example.com')
 
     const token = tokenOf(mails.find(mail => mail.kind === 'reset-password')!)
 
     setSystemTime(new Date(Date.now() + 121 * 60 * 1000))
-    expect(await ada.call('resetPassword', token, 'a brand new password')).toEqual({ ok: false, error: 'invalid' })
+    expect(await ada.call('password.reset', token, 'a brand new password')).toEqual({ ok: false, error: 'invalid' })
     setSystemTime()
-    await ada.call('requestPasswordReset', 'ada@example.com')
+    await ada.call('password.requestReset', 'ada@example.com')
     setSystemTime(new Date(Date.now() + 90 * 60 * 1000))
-    expect(await ada.call('resetPassword', tokenOf(mails.findLast(mail => mail.kind === 'reset-password')!), 'a brand new password')).toMatchObject({ ok: true })
+    expect(await ada.call('password.reset', tokenOf(mails.findLast(mail => mail.kind === 'reset-password')!), 'a brand new password')).toMatchObject({ ok: true })
   })
 
   test('a verification link set to a week still works after the default day, and a code after its own time', async () => {
     const { browser, mails } = setup({ maxAge: { 'verify-email': '7d', 'verify-code': '1h' }, codes: 'both' })
     const ada = browser()
 
-    await ada.call('register', { email: 'ada@example.com', password: PASSWORD })
+    await ada.call('password.register', { email: 'ada@example.com', password: PASSWORD })
 
     const mail = mails.find(mail => mail.kind === 'verify-email')!
 
     setSystemTime(new Date(Date.now() + 2 * 60 * 60 * 1000))
-    expect(await ada.call('verifyEmailCode', mail.code!)).toEqual({ ok: false, error: 'expired' })
+    expect(await ada.call('email.verifyCode', mail.code!)).toEqual({ ok: false, error: 'expired' })
     setSystemTime(new Date(Date.now() + 3 * 24 * 60 * 60 * 1000))
-    expect(await ada.call('verifyEmail', tokenOf(mail))).toMatchObject({ ok: true })
+    expect(await ada.call('email.verify', tokenOf(mail))).toMatchObject({ ok: true })
   })
 
   test('a bad lifetime fails at boot naming it', () => {

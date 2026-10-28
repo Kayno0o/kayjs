@@ -30,7 +30,7 @@ export function canMakePasskey(): boolean {
   return typeof PublicKeyCredential !== 'undefined' && 'parseCreationOptionsFromJSON' in PublicKeyCredential
 }
 
-// The answer to what `passkeySignInOptions()`, `twoFactorPasskeyOptions()` or `passkeyProofOptions()` gave, for the action calling `signInWithPasskey`, `verifyTwoFactorPasskey` or a proof; null when the person picked none.
+// The answer to what `passkeys.signInOptions()`, `twoFactor.passkeyOptions()` or `passkeys.proofOptions()` gave, for the action calling `passkeys.signIn`, `twoFactor.verifyPasskey` or a proof; null when the person picked none.
 // With `autofill`, the passkeys are offered in the autofill of a field with `autocomplete="username webauthn"` and the call waits until one is picked, or `signal` aborts it.
 export async function askPasskey(options: RequestOptions, { autofill = false, signal }: { autofill?: boolean, signal?: AbortSignal } = {}): Promise<AuthenticationResponseJSON | null> {
   const credential = await navigator.credentials.get({ publicKey: PublicKeyCredential.parseRequestOptionsFromJSON(options), ...autofill && { mediation: 'conditional' }, ...signal && { signal } })
@@ -39,7 +39,7 @@ export async function askPasskey(options: RequestOptions, { autofill = false, si
   return answer !== undefined && isAssertion(answer) ? answer : null
 }
 
-// The answer to what `passkeyRegistrationOptions()` gave, for the action calling `registerPasskey`; null when the person made none.
+// The answer to what `passkeys.registrationOptions()` gave, for the action calling `passkeys.register`; null when the person made none.
 export async function makePasskey(options: CreationOptions): Promise<RegistrationResponseJSON | null> {
   const credential = await navigator.credentials.create({ publicKey: PublicKeyCredential.parseCreationOptionsFromJSON(options) })
   const answer = credential instanceof PublicKeyCredential ? credential.toJSON() : undefined

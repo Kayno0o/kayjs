@@ -18,7 +18,7 @@ async function registered(options: Parameters<typeof testApp>[0] = {}) {
   const app = testApp(options)
   const ada = app.browser()
 
-  await ada.call('register', { email: 'ada@example.com', password: PASSWORD })
+  await ada.call('password.register', { email: 'ada@example.com', password: PASSWORD })
 
   return { ...app, ada }
 }
@@ -27,9 +27,9 @@ describe('changing the password', () => {
   test('needs the current one and sets the new one', async () => {
     const { ada, browser } = await registered()
 
-    expect(await ada.call('changePassword', { password: 'wrong password!' }, 'a brand new password')).toEqual({ ok: false, error: 'proof' })
-    expect(await ada.call('changePassword', { password: PASSWORD }, 'short')).toEqual({ ok: false, errors: { password: 'too-short' } })
-    expect(await ada.call('changePassword', { password: PASSWORD }, 'a brand new password')).toEqual({ ok: true })
+    expect(await ada.call('password.change', { password: 'wrong password!' }, 'a brand new password')).toEqual({ ok: false, error: 'proof' })
+    expect(await ada.call('password.change', { password: PASSWORD }, 'short')).toEqual({ ok: false, errors: { password: 'too-short' } })
+    expect(await ada.call('password.change', { password: PASSWORD }, 'a brand new password')).toEqual({ ok: true })
 
     expect(await ada.json('/me')).toMatchObject({ email: 'ada@example.com' })
     expect(await browser().post('/password', { identifier: 'ada@example.com', password: 'a brand new password' })).toMatchObject({ ok: true })
@@ -41,9 +41,9 @@ describe('the actions that re-prove the user', () => {
 
   // `codeOnly` is whether an account with a second factor refuses the password alone, as what adds a way in or moves where its reset links go does; changing the password is asked of whoever knows the password.
   const actions: [string, boolean, (ada: Browser, proof: Proof) => Promise<unknown>][] = [
-    ['changing the password', false, async (ada, proof) => ada.call('changePassword', proof, 'a first password')],
-    ['changing the email', true, async (ada, proof) => ada.call('changeEmail', proof, 'ada@new.test')],
-    ['adding a passkey', true, async (ada, proof) => ada.call('passkeyRegistrationOptions', proof)],
+    ['changing the password', false, async (ada, proof) => ada.call('password.change', proof, 'a first password')],
+    ['changing the email', true, async (ada, proof) => ada.call('email.change', proof, 'ada@new.test')],
+    ['adding a passkey', true, async (ada, proof) => ada.call('passkeys.registrationOptions', proof)],
     ['linking a provider', true, async (ada, proof) => ada.call('linkProvider', 'github', proof)],
   ]
 
@@ -63,13 +63,13 @@ describe('the actions that re-prove the user', () => {
       await ada.fetch('/sign-in/u1', POST)
     }
     else {
-      await ada.call('register', { email: 'ada@example.com', password: PASSWORD })
+      await ada.call('password.register', { email: 'ada@example.com', password: PASSWORD })
     }
 
     if (shape === 'twoFactor') {
-      const { setup } = await ada.callOk('setUpTwoFactor', { password: PASSWORD })
+      const { setup } = await ada.callOk('twoFactor.setUp', { password: PASSWORD })
 
-      recoveryCodes = (await ada.callOk('enableTwoFactor', await totpCode(setup.secret, totpStep()))).recoveryCodes
+      recoveryCodes = (await ada.callOk('twoFactor.enable', await totpCode(setup.secret, totpStep()))).recoveryCodes
     }
 
     return { ...app, ada, recoveryCodes }
@@ -129,16 +129,16 @@ describe('changing the email on an account with a second factor', () => {
     const ada = app.browser()
 
     if (password) {
-      await ada.call('register', { email: 'ada@example.com', password: PASSWORD })
+      await ada.call('password.register', { email: 'ada@example.com', password: PASSWORD })
     }
     else {
       await app.store.users.create(userRecord({ id: 'u1', email: 'ada@example.com' }))
       await ada.fetch('/sign-in/u1', POST)
     }
 
-    const { setup } = await ada.callOk('setUpTwoFactor', password ? { password: PASSWORD } : {})
+    const { setup } = await ada.callOk('twoFactor.setUp', password ? { password: PASSWORD } : {})
 
-    await ada.call('enableTwoFactor', await totpCode(setup.secret, totpStep()))
+    await ada.call('twoFactor.enable', await totpCode(setup.secret, totpStep()))
 
     return { ...app, ada, secret: setup.secret }
   }
@@ -147,40 +147,40 @@ describe('changing the email on an account with a second factor', () => {
     const { ada, secret } = await twoFactor()
     const code = await totpCode(secret, totpStep() + 1)
 
-    expect(await ada.call('changeEmail', { password: PASSWORD }, 'ada@new.test')).toEqual({ ok: false, error: 'proof' })
-    expect(await ada.call('changeEmail', { code }, 'ada@new.test')).not.toHaveProperty('error')
-    expect(await ada.call('changeEmail', { code }, 'ada@new.test')).toEqual({ ok: false, error: 'proof' })
+    expect(await ada.call('email.change', { password: PASSWORD }, 'ada@new.test')).toEqual({ ok: false, error: 'proof' })
+    expect(await ada.call('email.change', { code }, 'ada@new.test')).not.toHaveProperty('error')
+    expect(await ada.call('email.change', { code }, 'ada@new.test')).toEqual({ ok: false, error: 'proof' })
   })
 
   test('takes a passkey', async () => {
     const { ada, secret } = await twoFactor()
     const device = authenticator()
-    const { options } = await ada.callOk('passkeyRegistrationOptions', { code: await totpCode(secret, totpStep() + 1) })
+    const { options } = await ada.callOk('passkeys.registrationOptions', { code: await totpCode(secret, totpStep() + 1) })
 
-    await ada.call('registerPasskey', await device.create(options))
+    await ada.call('passkeys.register', await device.create(options))
 
-    const proof = await ada.callOk('passkeyProofOptions')
+    const proof = await ada.callOk('passkeys.proofOptions')
 
-    expect(await ada.call('changeEmail', { passkey: await device.get(proof.options) }, 'ada@new.test')).not.toHaveProperty('error')
+    expect(await ada.call('email.change', { passkey: await device.get(proof.options) }, 'ada@new.test')).not.toHaveProperty('error')
   })
 
   test('asks a passwordless account for the code', async () => {
     const { ada, secret } = await twoFactor({ password: false })
 
-    expect(await ada.call('changeEmail', {}, 'ada@new.test')).toEqual({ ok: false, error: 'proof' })
-    expect(await ada.call('changeEmail', { code: await totpCode(secret, totpStep() + 1) }, 'ada@new.test')).not.toHaveProperty('error')
+    expect(await ada.call('email.change', {}, 'ada@new.test')).toEqual({ ok: false, error: 'proof' })
+    expect(await ada.call('email.change', { code: await totpCode(secret, totpStep() + 1) }, 'ada@new.test')).not.toHaveProperty('error')
   })
 
   test('refuses an admin acting as the user, code or not', async () => {
     const { ada, browser, store, secret } = await twoFactor()
     const root = browser()
-    const { user } = await root.callHas('user', 'register', { email: 'root@example.com', password: PASSWORD })
+    const { user } = await root.callHas('user', 'password.register', { email: 'root@example.com', password: PASSWORD })
     const adaId = (await store.users.findByEmail('ada@example.com'))!.id
 
     await store.users.update(user.id, { roles: ['admin'] })
 
-    expect(await root.call('impersonate', adaId)).toEqual({ ok: true })
-    expect(await root.call('changeEmail', { code: await totpCode(secret, totpStep() + 1) }, 'ada@new.test')).toEqual({ ok: false, error: 'impersonating' })
+    expect(await root.call('admin.impersonate', adaId)).toEqual({ ok: true })
+    expect(await root.call('email.change', { code: await totpCode(secret, totpStep() + 1) }, 'ada@new.test')).toEqual({ ok: false, error: 'impersonating' })
     expect(await ada.json('/me')).toMatchObject({ email: 'ada@example.com' })
   })
 })
@@ -239,7 +239,7 @@ describe('changing the username', () => {
 
   test('refuses a device\'s bearer token, which is no session', async () => {
     const { ada, browser } = await registered()
-    const { token } = await ada.callOk('createToken', { password: PASSWORD }, 'Phone')
+    const { token } = await ada.callOk('tokens.create', { password: PASSWORD }, 'Phone')
     const device = browser()
 
     expect(await device.json('/call/changeUsername', { method: 'POST', headers: { 'authorization': `Bearer ${token}`, 'content-type': 'application/json' }, body: JSON.stringify(['carol']) })).toEqual({ ok: false, error: 'signed-out' })
@@ -255,7 +255,7 @@ describe('changing the username', () => {
 
       return auth.user()
     })
-    await ada.call('register', { email: 'ada@example.com', password: PASSWORD })
+    await ada.call('password.register', { email: 'ada@example.com', password: PASSWORD })
 
     expect(await (await ada.fetch('/rename', POST)).json()).toMatchObject({ username: 'ada' })
   })
@@ -275,7 +275,7 @@ describe('unlinking a provider', () => {
     expect(await ada.call('unlink', 'github', {})).toEqual({ ok: false, error: 'not-linked' })
     expect(await ada.call('unlink', 'discord', {})).toEqual({ ok: false, error: 'last-way-in' })
 
-    await ada.call('changePassword', {}, 'a first password')
+    await ada.call('password.change', {}, 'a first password')
 
     expect(await ada.call('unlink', 'discord', { password: 'a first password' })).toEqual({ ok: true })
     expect(await ada.call('listIdentities')).toEqual([])
@@ -309,7 +309,7 @@ describe('deleting the account', () => {
 
     for (const email of ['ada@example.com', 'grace@example.com']) {
       const browser = app.browser()
-      const { user } = await browser.callHas('user', 'register', { email, password: PASSWORD })
+      const { user } = await browser.callHas('user', 'password.register', { email, password: PASSWORD })
 
       await app.store.users.update(user.id, { roles: ['admin'] })
       ids.push(user.id)
@@ -343,7 +343,7 @@ describe('deleting the account', () => {
     const { ada, browser, store } = await registered({ audit: true })
     const id = (await store.users.findByEmail('ada@example.com'))!.id
 
-    await ada.call('changeEmail', { password: PASSWORD }, 'ada@new.example')
+    await ada.call('email.change', { password: PASSWORD }, 'ada@new.example')
     await browser().post('/password', { identifier: 'ada@example.com', password: 'wrong password!' })
 
     expect(await ada.call('deleteAccount', { password: PASSWORD })).toEqual({ ok: true })
@@ -366,7 +366,7 @@ describe('deleting the account', () => {
     expect(await ada.call('deleteAccount', { password: PASSWORD })).toEqual({ ok: false, error: 'last-admin' })
     expect(await store.users.get(adaRecord.id)).toBeTruthy()
 
-    const { user } = await browser().callHas('user', 'register', { email: 'grace@example.com', password: PASSWORD })
+    const { user } = await browser().callHas('user', 'password.register', { email: 'grace@example.com', password: PASSWORD })
 
     await store.users.update(user.id, { roles: ['admin'] })
 
@@ -380,10 +380,10 @@ describe('deleting the account', () => {
     const ada = app.browser()
 
     await ada.fetch('/sign-in/u1', POST)
-    const { setup } = await ada.callOk('setUpTwoFactor', {})
+    const { setup } = await ada.callOk('twoFactor.setUp', {})
     const { totpCode, totpStep } = await import('../src/totp')
 
-    await ada.call('enableTwoFactor', await totpCode(setup.secret, totpStep()))
+    await ada.call('twoFactor.enable', await totpCode(setup.secret, totpStep()))
 
     expect(await ada.call('deleteAccount', {})).toEqual({ ok: false, error: 'proof' })
     expect(await ada.call('deleteAccount', { code: await totpCode(setup.secret, totpStep() + 1) })).toEqual({ ok: true })

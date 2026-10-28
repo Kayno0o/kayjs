@@ -37,7 +37,7 @@ async function setup() {
   const mail = listing()
   const app = testApp({ admin: 'admin', guests: { maxAge: '1d' }, site: 'http://localhost', email: { mailer: mail.mailer, links: LINKS, requireVerified: false } })
   const ada = app.browser()
-  const { user } = await ada.callHas('user', 'register', { email: 'ada@example.com', password: PASSWORD })
+  const { user } = await ada.callHas('user', 'password.register', { email: 'ada@example.com', password: PASSWORD })
 
   await app.store.users.update(user.id, { emailVerifiedAt: new Date() })
   await notify(user.id, { title: 'Welcome' })
@@ -58,10 +58,10 @@ describe('erasing a user takes their notifications and mailing list rows', () =>
   test('by an admin', async () => {
     const { browser, store, user, erased } = await setup()
     const admin = browser()
-    const { user: boss } = await admin.callHas('user', 'register', { email: 'boss@example.com', password: PASSWORD })
+    const { user: boss } = await admin.callHas('user', 'password.register', { email: 'boss@example.com', password: PASSWORD })
 
     await store.users.update(boss.id, { roles: ['admin'] })
-    expect(await admin.call('deleteUser', user.id)).toEqual({ ok: true })
+    expect(await admin.call('admin.deleteUser', user.id)).toEqual({ ok: true })
     expect(await notifications.list(user.id)).toEqual([])
     expect(erased).toEqual(['ada@example.com'])
   })
@@ -120,7 +120,7 @@ describe('erasing a user takes their notifications and mailing list rows', () =>
   test('without a mailer that erases, only the notifications go', async () => {
     const app = testApp({ site: 'http://localhost', email: { mailer: mailbox().mailer, links: LINKS, requireVerified: false } })
     const ada = app.browser()
-    const { user } = await ada.callHas('user', 'register', { email: 'ada@example.com', password: PASSWORD })
+    const { user } = await ada.callHas('user', 'password.register', { email: 'ada@example.com', password: PASSWORD })
 
     await notify(user.id, { title: 'Welcome' })
     expect(await ada.call('deleteAccount', { password: PASSWORD })).toEqual({ ok: true })
@@ -141,7 +141,7 @@ describe('the export lists them', () => {
     const app = testApp({ site: 'http://localhost', email: { mailer: mailbox().mailer, links: LINKS, requireVerified: false } })
     const ada = app.browser()
 
-    await ada.callHas('user', 'register', { email: 'ada@example.com', password: PASSWORD })
+    await ada.callHas('user', 'password.register', { email: 'ada@example.com', password: PASSWORD })
 
     const exported = await ada.callOk('exportData')
 

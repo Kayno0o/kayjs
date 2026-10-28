@@ -192,9 +192,9 @@ describe('coming back from the provider', () => {
     await signInWith(ada, 'discord', '1')
     expect(await ada.json('/me')).toMatchObject({ id: heard[0] })
 
-    const { setup: { secret } } = await ada.callOk('setUpTwoFactor', {})
+    const { setup: { secret } } = await ada.callOk('twoFactor.setUp', {})
 
-    await ada.call('enableTwoFactor', await totpCode(secret, totpStep()))
+    await ada.call('twoFactor.enable', await totpCode(secret, totpStep()))
     const visitor = browser()
 
     expect((await signInWith(visitor, 'discord', '1')).response.headers.get('location')).toBe('/two-factor')
@@ -454,13 +454,13 @@ describe('linking a provider', () => {
     const { browser, store } = setup()
     const shared = browser()
 
-    await browser().call('register', { email: 'bob@example.com', password: 'correct horse battery' })
+    await browser().call('password.register', { email: 'bob@example.com', password: 'correct horse battery' })
     await signInWith(shared, 'discord', '1')
 
     const leaving = await shared.callOk('linkProvider', 'github', {})
     const state = new URL(leaving.url).searchParams.get('state')!
 
-    await shared.call('signInWithPassword', { identifier: 'bob@example.com', password: 'correct horse battery' })
+    await shared.call('password.signIn', { identifier: 'bob@example.com', password: 'correct horse battery' })
 
     expect((await shared.fetch(`/auth/github/callback?code=code-7&state=${state}`)).headers.get('location')).toBe('/login?error=signed-out')
     expect(await store.identities.find('github', '7')).toBeUndefined()
@@ -483,7 +483,7 @@ describe('linking a provider', () => {
     providers({ 7: { id: '7', username: 'ada-gh' }, 8: { id: '8', username: 'other-gh' } })
     const { browser, store } = setup()
     const ada = browser()
-    const { user } = await ada.callHas('user', 'register', { email: 'ada@example.com', password: 'correct horse battery' })
+    const { user } = await ada.callHas('user', 'password.register', { email: 'ada@example.com', password: 'correct horse battery' })
 
     // The provider's own route only ever signs in.
     await signInWith(browser(), 'github', '8', '/auth/github?link=1')

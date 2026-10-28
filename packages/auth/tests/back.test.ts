@@ -24,77 +24,77 @@ describe('registering', () => {
     const { browser, tokenOf } = setup()
     const ada = browser()
 
-    await ada.call('register', { email: 'ada@example.com', password: PASSWORD }, { redirect: '/members?tab=2' })
+    await ada.call('password.register', { email: 'ada@example.com', password: PASSWORD }, { redirect: '/members?tab=2' })
 
-    expect(await ada.call('verifyEmail', tokenOf('verify-email'))).toEqual({ ok: true, redirect: '/members?tab=2' })
+    expect(await ada.call('email.verify', tokenOf('verify-email'))).toEqual({ ok: true, redirect: '/members?tab=2' })
   })
 
   test('with `requireVerified`, the browser that registered goes to the sign-in page, carrying the page', async () => {
     const { browser, tokenOf } = setup({ requireVerified: true })
     const ada = browser()
 
-    await ada.call('register', { email: 'ada@example.com', password: PASSWORD }, { redirect: '/members?tab=2' })
+    await ada.call('password.register', { email: 'ada@example.com', password: PASSWORD }, { redirect: '/members?tab=2' })
 
-    expect(await ada.call('verifyEmail', tokenOf('verify-email'))).toEqual({ ok: true, redirect: '/login?redirect=%2Fmembers%3Ftab%3D2' })
+    expect(await ada.call('email.verify', tokenOf('verify-email'))).toEqual({ ok: true, redirect: '/login?redirect=%2Fmembers%3Ftab%3D2' })
   })
 
   test('another browser opening the mail, given the password, is sent the same way', async () => {
     const { browser, tokenOf } = setup({ requireVerified: true })
 
-    await browser().call('register', { email: 'ada@example.com', password: PASSWORD }, { redirect: '/members' })
+    await browser().call('password.register', { email: 'ada@example.com', password: PASSWORD }, { redirect: '/members' })
 
-    expect(await browser().call('verifyEmail', tokenOf('verify-email'), PASSWORD)).toEqual({ ok: true, redirect: '/login?redirect=%2Fmembers' })
+    expect(await browser().call('email.verify', tokenOf('verify-email'), PASSWORD)).toEqual({ ok: true, redirect: '/login?redirect=%2Fmembers' })
   })
 
   test('with codes, the code verifies and leads on as the link does', async () => {
     const { browser, codeOf } = setup({ requireVerified: true, codes: 'code' })
     const ada = browser()
 
-    await ada.call('register', { email: 'ada@example.com', password: PASSWORD }, { redirect: '/members' })
+    await ada.call('password.register', { email: 'ada@example.com', password: PASSWORD }, { redirect: '/members' })
 
-    expect(await ada.call('verifyEmailCode', codeOf('verify-email'))).toEqual({ ok: true, redirect: '/login?redirect=%2Fmembers' })
+    expect(await ada.call('email.verifyCode', codeOf('verify-email'))).toEqual({ ok: true, redirect: '/login?redirect=%2Fmembers' })
   })
 
   test('a resend keeps the page', async () => {
     const { browser, tokenOf } = setup({ requireVerified: true })
     const ada = browser()
 
-    await ada.call('register', { email: 'ada@example.com', password: PASSWORD }, { redirect: '/members' })
-    expect(await ada.call('sendVerification')).toEqual({ ok: true })
+    await ada.call('password.register', { email: 'ada@example.com', password: PASSWORD }, { redirect: '/members' })
+    expect(await ada.call('email.sendVerification')).toEqual({ ok: true })
 
-    expect(await ada.call('verifyEmail', tokenOf('verify-email'))).toEqual({ ok: true, redirect: '/login?redirect=%2Fmembers' })
+    expect(await ada.call('email.verify', tokenOf('verify-email'))).toEqual({ ok: true, redirect: '/login?redirect=%2Fmembers' })
   })
 
   test('a password sign-in refused as unverified keeps the page for the resend', async () => {
     const { browser, tokenOf } = setup({ requireVerified: true })
 
-    await browser().call('register', { email: 'ada@example.com', password: PASSWORD })
+    await browser().call('password.register', { email: 'ada@example.com', password: PASSWORD })
 
     const again = browser()
 
     expect(await again.post('/password', { identifier: 'ada@example.com', password: PASSWORD, redirect: '/members' })).toEqual({ ok: false, error: 'unverified' })
-    expect(await again.call('sendVerification')).toEqual({ ok: true })
-    expect(await again.call('verifyEmail', tokenOf('verify-email'))).toEqual({ ok: true, redirect: '/login?redirect=%2Fmembers' })
+    expect(await again.call('email.sendVerification')).toEqual({ ok: true })
+    expect(await again.call('email.verify', tokenOf('verify-email'))).toEqual({ ok: true, redirect: '/login?redirect=%2Fmembers' })
   })
 
   test('a registration with no page, or one that leaves the site, leads to the sign-in page, or home, as before', async () => {
     const { browser, tokenOf } = setup({ requireVerified: true })
 
-    await browser().call('register', { email: 'plain@example.com', password: PASSWORD })
-    expect(await browser().call('verifyEmail', tokenOf('verify-email'), PASSWORD)).toEqual({ ok: true, redirect: '/login' })
+    await browser().call('password.register', { email: 'plain@example.com', password: PASSWORD })
+    expect(await browser().call('email.verify', tokenOf('verify-email'), PASSWORD)).toEqual({ ok: true, redirect: '/login' })
 
     for (const [index, hostile] of HOSTILE.entries()) {
       const email = `hostile${index}@example.com`
 
-      await browser().call('register', { email, password: PASSWORD }, { redirect: hostile })
-      expect(await browser().call('verifyEmail', tokenOf('verify-email'), PASSWORD)).toEqual({ ok: true, redirect: '/login' })
+      await browser().call('password.register', { email, password: PASSWORD }, { redirect: hostile })
+      expect(await browser().call('email.verify', tokenOf('verify-email'), PASSWORD)).toEqual({ ok: true, redirect: '/login' })
     }
 
     const signedIn = setup()
     const grace = signedIn.browser()
 
-    await grace.call('register', { email: 'grace@example.com', password: PASSWORD }, { redirect: '//evil.test' })
-    expect(await grace.call('verifyEmail', signedIn.tokenOf('verify-email'))).toEqual({ ok: true, redirect: '/' })
+    await grace.call('password.register', { email: 'grace@example.com', password: PASSWORD }, { redirect: '//evil.test' })
+    expect(await grace.call('email.verify', signedIn.tokenOf('verify-email'))).toEqual({ ok: true, redirect: '/' })
   })
 })
 
@@ -103,27 +103,27 @@ describe('a forgotten password', () => {
     const { browser, take, tokenOf } = setup()
     const ada = browser()
 
-    await ada.call('register', { email: 'ada@example.com', password: PASSWORD })
+    await ada.call('password.register', { email: 'ada@example.com', password: PASSWORD })
     await ada.post('/sign-out', {})
 
     const forgetful = browser()
 
-    await forgetful.call('requestPasswordReset', 'ada@example.com', { redirect: '/members?tab=2' })
+    await forgetful.call('password.requestReset', 'ada@example.com', { redirect: '/members?tab=2' })
     await take({ kind: 'reset-password' })
-    expect(await forgetful.call('resetPassword', tokenOf('reset-password'), 'a brand new passphrase')).toEqual({ ok: true, redirect: '/members?tab=2' })
+    expect(await forgetful.call('password.reset', tokenOf('reset-password'), 'a brand new passphrase')).toEqual({ ok: true, redirect: '/members?tab=2' })
   })
 
   test('a page that leaves the site leads home', async () => {
     const { browser, take, tokenOf } = setup()
     const ada = browser()
 
-    await ada.call('register', { email: 'ada@example.com', password: PASSWORD })
+    await ada.call('password.register', { email: 'ada@example.com', password: PASSWORD })
     await ada.post('/sign-out', {})
 
     for (const hostile of HOSTILE.slice(0, 2)) {
-      await ada.call('requestPasswordReset', 'ada@example.com', { redirect: hostile })
+      await ada.call('password.requestReset', 'ada@example.com', { redirect: hostile })
       await take({ kind: 'reset-password' })
-      expect(await ada.call('resetPassword', tokenOf('reset-password'), `a brand new passphrase ${hostile.length}`)).toEqual({ ok: true, redirect: '/' })
+      expect(await ada.call('password.reset', tokenOf('reset-password'), `a brand new passphrase ${hostile.length}`)).toEqual({ ok: true, redirect: '/' })
       await ada.post('/sign-out', {})
     }
   })
@@ -134,27 +134,27 @@ describe('the second factor', () => {
     const { browser } = testApp({ name: 'Site' })
     const ada = browser()
 
-    await ada.call('register', { email: 'ada@example.com', password: PASSWORD })
+    await ada.call('password.register', { email: 'ada@example.com', password: PASSWORD })
 
-    const setup = await ada.callOk('setUpTwoFactor', { password: PASSWORD })
+    const setup = await ada.callOk('twoFactor.setUp', { password: PASSWORD })
     const secret = setup.setup.secret
 
-    await ada.callOk('enableTwoFactor', await totpCode(secret, totpStep()))
+    await ada.callOk('twoFactor.enable', await totpCode(secret, totpStep()))
     await ada.post('/sign-out', {})
 
     expect(await ada.post('/password', { identifier: 'ada@example.com', password: PASSWORD, redirect: '/members?tab=2' })).toEqual({ ok: true, redirect: '/two-factor?redirect=%2Fmembers%3Ftab%3D2' })
-    expect(await ada.call('verifyTwoFactor', await totpCode(secret, totpStep() + 1))).toEqual({ ok: true, redirect: '/members?tab=2' })
+    expect(await ada.call('twoFactor.verify', await totpCode(secret, totpStep() + 1))).toEqual({ ok: true, redirect: '/members?tab=2' })
   })
 
   test('with no page asked for, the code page is as bare as before', async () => {
     const { browser } = testApp({ name: 'Site' })
     const ada = browser()
 
-    await ada.call('register', { email: 'ada@example.com', password: PASSWORD })
+    await ada.call('password.register', { email: 'ada@example.com', password: PASSWORD })
 
-    const setup = await ada.callOk('setUpTwoFactor', { password: PASSWORD })
+    const setup = await ada.callOk('twoFactor.setUp', { password: PASSWORD })
 
-    await ada.callOk('enableTwoFactor', await totpCode(setup.setup.secret, totpStep()))
+    await ada.callOk('twoFactor.enable', await totpCode(setup.setup.secret, totpStep()))
     await ada.post('/sign-out', {})
 
     expect(await ada.post('/password', { identifier: 'ada@example.com', password: PASSWORD })).toEqual({ ok: true, redirect: '/two-factor' })

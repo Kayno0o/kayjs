@@ -18,7 +18,7 @@ export interface OrganizationsOptions<OrgRole extends string, Role extends strin
   defaultRoles?: NoInfer<OrgRole>[] | undefined
   // Who may create an organization, a site role or a predicate; anyone signed in by default.
   create?: Requirement<BareUser, NoInfer<Role>> | undefined
-  // The app's page an invitation link opens, the invitation's id in `?invitation=`: it shows `getInvitation(id)` and accepts it. The prebuilt pages' own `/auth/invitation` by default; inviting answers 'unavailable' without either.
+  // The app's page an invitation link opens, the invitation's id in `?invitation=`: it shows `organizations.invitation(id)` and accepts it. The prebuilt pages' own `/auth/invitation` by default; inviting answers 'unavailable' without either.
   invitationPage?: string | undefined
   // How long an invitation lasts, `invitations: { maxAge: '7d' }`, a week by default.
   invitations?: { maxAge?: Duration | undefined } | undefined

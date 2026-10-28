@@ -41,7 +41,7 @@ describe('locales', () => {
 
   test('a user registering keeps the browser\'s language, and mails speak it when the site does', async () => {
     const { browser, mails, store } = setup({ locales: ['en', 'fr'] })
-    const { user } = await browser().json('/call/register', speaking('fr-FR,fr;q=0.9,en;q=0.5', { email: 'ada@example.com', password: PASSWORD })) as { user: { id: string } }
+    const { user } = await browser().json('/call/password.register', speaking('fr-FR,fr;q=0.9,en;q=0.5', { email: 'ada@example.com', password: PASSWORD })) as { user: { id: string } }
 
     expect((await store.users.get(user.id))!.locale).toBe('fr-FR')
     expect(mails[0]).toMatchObject({ kind: 'verify-email', locale: 'fr', subject: 'Confirmez votre adresse pour Site' })
@@ -51,7 +51,7 @@ describe('locales', () => {
   test('an English-only site writes English whatever the user reads', async () => {
     const { browser, mails } = setup()
 
-    await browser().json('/call/register', speaking('fr', { email: 'ada@example.com', password: PASSWORD }))
+    await browser().json('/call/password.register', speaking('fr', { email: 'ada@example.com', password: PASSWORD }))
 
     expect(mails[0]).toMatchObject({ locale: 'en', subject: 'Confirm your email for Site' })
   })
@@ -59,19 +59,19 @@ describe('locales', () => {
   test('the locale given on registering wins, setLocale changes it, and a user with none is written to in the browser\'s', async () => {
     const { browser, mails, store, take } = setup({ locales: ['en', 'fr'] })
     const ada = browser()
-    const { user } = await ada.json('/call/register', speaking('en', { email: 'ada@example.com', password: PASSWORD, locale: 'fr' })) as { user: { id: string } }
+    const { user } = await ada.json('/call/password.register', speaking('en', { email: 'ada@example.com', password: PASSWORD, locale: 'fr' })) as { user: { id: string } }
 
     expect(mails.at(-1)!.locale).toBe('fr')
     expect(await ada.call('updateLocale', 'not a tag')).toEqual({ ok: false, error: 'invalid-locale' })
     expect(await ada.call('updateLocale', 'en-GB')).toEqual({ ok: true })
     expect(await ada.json('/me')).toMatchObject({ locale: 'en-GB' })
 
-    await ada.call('requestPasswordReset', 'ada@example.com')
+    await ada.call('password.requestReset', 'ada@example.com')
 
     expect((await take({ kind: 'reset-password' }))[0]).toMatchObject({ locale: 'en' })
 
     await store.users.update(user.id, { locale: null })
-    await browser().json('/call/requestPasswordReset', speaking('fr-BE', 'ada@example.com'))
+    await browser().json('/call/password.requestReset', speaking('fr-BE', 'ada@example.com'))
 
     expect((await take({ kind: 'reset-password' }))[0]).toMatchObject({ locale: 'fr', subject: 'Réinitialisez votre mot de passe Site' })
   })
@@ -83,8 +83,8 @@ describe('locales', () => {
       translations: { de: { 'verify-email': data => ({ subject: `Bestätigen ${data.name}`, text: '', html: '' }) } },
     })
 
-    await browser().json('/call/register', speaking('de-AT', { email: 'ada@example.com', password: PASSWORD }))
-    await browser().json('/call/requestMagicLink', speaking('de', 'ada@example.com'))
+    await browser().json('/call/password.register', speaking('de-AT', { email: 'ada@example.com', password: PASSWORD }))
+    await browser().json('/call/magicLink.request', speaking('de', 'ada@example.com'))
     await take({ kind: 'magic-link' })
 
     expect(mails.map(mail => [mail.kind, mail.locale, mail.subject])).toEqual([['verify-email', 'de', 'Bestätigen Site'], ['magic-link', 'de', 'magic de']])

@@ -154,9 +154,14 @@ describe('missing-captcha', () => {
   const found = (body: string) => lints(server(body)).filter(d => d.code === 'missing-captcha')
 
   it('reports each of the four calls with no options, or options holding no captcha', () => {
+    expect(found('export const a = action(s.Object({ email: s.String() }), async ({ email }, ctx) => ctx.locals.auth.password.requestReset(email))')).toEqual([{ code: 'missing-captcha', severity: 'warning', at: 'requestReset' }])
+    expect(found('export const a = action(s.Object({ email: s.String() }), async ({ email }) => auth.magicLink.request(email, { redirect: \'/\' }))')).toEqual([{ code: 'missing-captcha', severity: 'warning', at: 'request' }])
+    expect(found('export const a = action(s.Object({ email: s.String() }), async (input) => auth.password.register(input, { remember: true }))')).toEqual([{ code: 'missing-captcha', severity: 'warning', at: 'register' }])
+    expect(found('export const a = action(s.Object({ email: s.String() }), async (input) => auth.password.signIn(input))')).toEqual([{ code: 'missing-captcha', severity: 'warning', at: 'signIn' }])
+  })
+
+  it('reports the flat names before 1.82 alike', () => {
     expect(found('export const a = action(s.Object({ email: s.String() }), async ({ email }, ctx) => ctx.locals.auth.requestPasswordReset(email))')).toEqual([{ code: 'missing-captcha', severity: 'warning', at: 'requestPasswordReset' }])
-    expect(found('export const a = action(s.Object({ email: s.String() }), async ({ email }) => auth.requestMagicLink(email, { redirect: \'/\' }))')).toEqual([{ code: 'missing-captcha', severity: 'warning', at: 'requestMagicLink' }])
-    expect(found('export const a = action(s.Object({ email: s.String() }), async (input) => auth.register(input, { remember: true }))')).toEqual([{ code: 'missing-captcha', severity: 'warning', at: 'register' }])
     expect(found('export const a = action(s.Object({ email: s.String() }), async (input) => auth.signInWithPassword(input))')).toEqual([{ code: 'missing-captcha', severity: 'warning', at: 'signInWithPassword' }])
   })
 
@@ -166,6 +171,9 @@ describe('missing-captcha', () => {
     expect(found('export const a = (input: never, options: never) => auth.register(input, options)')).toEqual([])
     expect(found('export const a = (input: never, options: never) => auth.register(input, { ...options })')).toEqual([])
     expect(found('export const a = (input: never) => registry.register(input)')).toEqual([])
+    expect(found('export const a = (input: never) => auth.password.register(input, { captcha: \'x\' })')).toEqual([])
+    expect(found('export const a = (response: never) => auth.passkeys.register(response)')).toEqual([])
+    expect(found('export const a = (input: never) => registry.password.register(input)')).toEqual([])
     expect(found('export const a = (input: never) => auth.register(input)\nexport const auth = createAuth({ captcha: false })')).toEqual([])
     expect(found('// kay-allow missing-captcha\nexport const a = (input: never) => auth.register(input)')).toEqual([])
   })

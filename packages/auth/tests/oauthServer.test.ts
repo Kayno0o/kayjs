@@ -54,14 +54,14 @@ function params(clientId: string, extra: Record<string, string> = {}) {
 async function signedIn(app: Server) {
   const ada = app.browser()
 
-  await ada.call('register', { email: 'ada@example.com', password: PASSWORD })
+  await ada.call('password.register', { email: 'ada@example.com', password: PASSWORD })
 
   return ada
 }
 
 // Approves `clientId` as the signed-in user and answers the code it was given.
 async function approved(ada: Awaited<ReturnType<typeof signedIn>>, clientId: string, extra: Record<string, string> = {}) {
-  const answer = await ada.post('/call/oauthDecide', [params(clientId, extra), true]) as { ok: true, redirect: string }
+  const answer = await ada.post('/call/oauthServer.decide', [params(clientId, extra), true]) as { ok: true, redirect: string }
 
   return new URL(answer.redirect).searchParams.get('code')!
 }
@@ -131,7 +131,7 @@ describe('the authorization request', () => {
     const app = server()
     const { client_id } = await register(app)
 
-    expect(await app.browser().call('oauthAuthorize', params(client_id))).toEqual({ kind: 'sign-in' })
+    expect(await app.browser().call('oauthServer.authorize', params(client_id))).toEqual({ kind: 'sign-in' })
   })
 
   test('never redirects to an unknown client or an unregistered redirect URI', async () => {
@@ -139,11 +139,11 @@ describe('the authorization request', () => {
     const { client_id } = await register(app)
     const ada = await signedIn(app)
 
-    expect(await ada.call('oauthAuthorize', params('kc_unknown'))).toEqual({ kind: 'error', error: 'client' })
-    expect(await ada.call('oauthAuthorize', params(client_id, { redirect_uri: 'http://evil.example/callback' }))).toEqual({ kind: 'error', error: 'redirect_uri' })
-    expect(await ada.call('oauthAuthorize', params(client_id, { redirect_uri: 'javascript:alert(1)' }))).toEqual({ kind: 'error', error: 'redirect_uri' })
-    expect(await ada.call('oauthAuthorize', params(client_id, { redirect_uri: `${REDIRECT}/../other` }))).toEqual({ kind: 'error', error: 'redirect_uri' })
-    expect(await ada.call('oauthAuthorize', params(client_id, { redirect_uri: 'http://127.0.0.1:33418@evil.example/callback' }))).toEqual({ kind: 'error', error: 'redirect_uri' })
+    expect(await ada.call('oauthServer.authorize', params('kc_unknown'))).toEqual({ kind: 'error', error: 'client' })
+    expect(await ada.call('oauthServer.authorize', params(client_id, { redirect_uri: 'http://evil.example/callback' }))).toEqual({ kind: 'error', error: 'redirect_uri' })
+    expect(await ada.call('oauthServer.authorize', params(client_id, { redirect_uri: 'javascript:alert(1)' }))).toEqual({ kind: 'error', error: 'redirect_uri' })
+    expect(await ada.call('oauthServer.authorize', params(client_id, { redirect_uri: `${REDIRECT}/../other` }))).toEqual({ kind: 'error', error: 'redirect_uri' })
+    expect(await ada.call('oauthServer.authorize', params(client_id, { redirect_uri: 'http://127.0.0.1:33418@evil.example/callback' }))).toEqual({ kind: 'error', error: 'redirect_uri' })
   })
 
   test('takes a loopback redirect on any port', async () => {
@@ -151,8 +151,8 @@ describe('the authorization request', () => {
     const { client_id } = await register(app)
     const ada = await signedIn(app)
 
-    expect(await ada.call('oauthAuthorize', params(client_id, { redirect_uri: 'http://127.0.0.1:51234/callback' }))).toMatchObject({ kind: 'consent' })
-    expect(await ada.call('oauthAuthorize', params(client_id, { redirect_uri: 'http://127.0.0.1:51234/other' }))).toEqual({ kind: 'error', error: 'redirect_uri' })
+    expect(await ada.call('oauthServer.authorize', params(client_id, { redirect_uri: 'http://127.0.0.1:51234/callback' }))).toMatchObject({ kind: 'consent' })
+    expect(await ada.call('oauthServer.authorize', params(client_id, { redirect_uri: 'http://127.0.0.1:51234/other' }))).toEqual({ kind: 'error', error: 'redirect_uri' })
   })
 
   test('answers a bad request to the client, with the state and the issuer', async () => {
@@ -161,7 +161,7 @@ describe('the authorization request', () => {
     const ada = await signedIn(app)
 
     for (const [extra, error] of [[{ code_challenge_method: 'plain' }, 'invalid_request'], [{ code_challenge: 'short' }, 'invalid_request'], [{ response_type: 'token' }, 'unsupported_response_type'], [{ scope: 'admin' }, 'invalid_scope'], [{ resource: 'https://other.example/mcp' }, 'invalid_target']] as const) {
-      const outcome = await ada.call('oauthAuthorize', params(client_id, extra)) as { kind: string, url: string }
+      const outcome = await ada.call('oauthServer.authorize', params(client_id, extra)) as { kind: string, url: string }
       const url = new URL(outcome.url)
 
       expect(outcome.kind).toBe('redirect')
@@ -176,14 +176,14 @@ describe('the authorization request', () => {
     const { client_id } = await register(bare)
     const ada = await signedIn(bare)
 
-    expect(await ada.call('oauthAuthorize', params(client_id, { scope: '' }))).toMatchObject({ kind: 'consent', scopes: [] })
-    expect(await ada.call('oauthAuthorize', params(client_id, { scope: 'offline_access' }))).toMatchObject({ kind: 'consent', scopes: [] })
+    expect(await ada.call('oauthServer.authorize', params(client_id, { scope: '' }))).toMatchObject({ kind: 'consent', scopes: [] })
+    expect(await ada.call('oauthServer.authorize', params(client_id, { scope: 'offline_access' }))).toMatchObject({ kind: 'consent', scopes: [] })
 
     const withDefault = server({ defaultScopes: ['posts:read'] })
     const other = await register(withDefault)
     const grace = await signedIn(withDefault)
 
-    expect(await grace.call('oauthAuthorize', params(other.client_id, { scope: '' }))).toMatchObject({ kind: 'consent', scopes: ['posts:read'] })
+    expect(await grace.call('oauthServer.authorize', params(other.client_id, { scope: '' }))).toMatchObject({ kind: 'consent', scopes: ['posts:read'] })
   })
 
   test('a default scope the app does not declare is refused at startup', () => {
@@ -195,18 +195,18 @@ describe('the authorization request', () => {
     const { client_id } = await register(app)
     const ada = await signedIn(app)
 
-    expect(await ada.call('oauthAuthorize', params(client_id))).toMatchObject({ kind: 'consent', client: { name: 'Claude Code' }, scopes: ['posts:read'] })
+    expect(await ada.call('oauthServer.authorize', params(client_id))).toMatchObject({ kind: 'consent', client: { name: 'Claude Code' }, scopes: ['posts:read'] })
 
     const code = await approved(ada, client_id)
 
     expect(code).toBeTruthy()
 
-    const again = await ada.call('oauthAuthorize', params(client_id)) as { kind: string, url: string }
+    const again = await ada.call('oauthServer.authorize', params(client_id)) as { kind: string, url: string }
 
     expect(again.kind).toBe('redirect')
     expect(new URL(again.url).searchParams.get('code')).toBeTruthy()
-    expect(await ada.call('oauthAuthorize', params(client_id, { scope: 'posts:read posts:write' }))).toMatchObject({ kind: 'consent', scopes: ['posts:read', 'posts:write'] })
-    expect(await ada.call('oauthAuthorize', params(client_id, { prompt: 'consent' }))).toMatchObject({ kind: 'consent' })
+    expect(await ada.call('oauthServer.authorize', params(client_id, { scope: 'posts:read posts:write' }))).toMatchObject({ kind: 'consent', scopes: ['posts:read', 'posts:write'] })
+    expect(await ada.call('oauthServer.authorize', params(client_id, { prompt: 'consent' }))).toMatchObject({ kind: 'consent' })
   })
 
   test('an approval held with every scope, from an app declaring none, asks again once the app declares some', async () => {
@@ -221,24 +221,24 @@ describe('the authorization request', () => {
 
     await again.post('/password', { identifier: 'ada@example.com', password: PASSWORD })
 
-    expect(await again.call('oauthAuthorize', params(client_id))).toMatchObject({ kind: 'consent', scopes: ['posts:read'] })
+    expect(await again.call('oauthServer.authorize', params(client_id))).toMatchObject({ kind: 'consent', scopes: ['posts:read'] })
     // A code given before the app declared scopes is refused, as it would give every one.
     expect((await exchange(after, client_id, pending)).body.error).toBe('invalid_grant')
     // A refresh token issued under it is refused too, as it would hold every scope the app declares now.
     expect((await token(after, { grant_type: 'refresh_token', refresh_token: String(first.body.refresh_token), client_id })).body.error).toBe('invalid_grant')
 
-    await again.post('/call/oauthDecide', [params(client_id), true])
+    await again.post('/call/oauthServer.decide', [params(client_id), true])
 
-    expect(await again.call('listOAuthClients')).toEqual([expect.objectContaining({ scopes: ['posts:read'] })])
-    expect(await again.call('oauthAuthorize', params(client_id))).toMatchObject({ kind: 'redirect' })
-    expect(await again.call('oauthAuthorize', params(client_id, { scope: 'posts:write' }))).toMatchObject({ kind: 'consent' })
+    expect(await again.call('oauthServer.clients')).toEqual([expect.objectContaining({ scopes: ['posts:read'] })])
+    expect(await again.call('oauthServer.authorize', params(client_id))).toMatchObject({ kind: 'redirect' })
+    expect(await again.call('oauthServer.authorize', params(client_id, { scope: 'posts:write' }))).toMatchObject({ kind: 'consent' })
   })
 
   test('a denial goes back to the client without a code', async () => {
     const app = server()
     const { client_id } = await register(app)
     const ada = await signedIn(app)
-    const answer = await ada.post('/call/oauthDecide', [params(client_id), false]) as { ok: true, redirect: string }
+    const answer = await ada.post('/call/oauthServer.decide', [params(client_id), false]) as { ok: true, redirect: string }
     const url = new URL(answer.redirect)
 
     expect(url.searchParams.get('error')).toBe('access_denied')
@@ -250,16 +250,16 @@ describe('the authorization request', () => {
     const { client_id } = await register(app)
     const ada = await signedIn(app)
 
-    expect(await ada.post('/call/oauthDecide', [params(client_id, { redirect_uri: 'http://evil.example/cb' }), true])).toEqual({ ok: false, error: 'redirect_uri' })
-    expect(await app.browser().post('/call/oauthDecide', [params(client_id), true])).toEqual({ ok: false, error: 'signed-out' })
+    expect(await ada.post('/call/oauthServer.decide', [params(client_id, { redirect_uri: 'http://evil.example/cb' }), true])).toEqual({ ok: false, error: 'redirect_uri' })
+    expect(await app.browser().post('/call/oauthServer.decide', [params(client_id), true])).toEqual({ ok: false, error: 'signed-out' })
   })
 
   test('a bearer token cannot approve a client', async () => {
     const app = server()
     const { client_id } = await register(app)
     const ada = await signedIn(app)
-    const minted = await ada.callOk('createToken', { password: PASSWORD }, 'Phone')
-    const outcome = await app.browser().fetch('/call/oauthAuthorize', { method: 'POST', headers: { 'content-type': 'application/json', 'authorization': `Bearer ${minted.token}` }, body: JSON.stringify([params(client_id)]) })
+    const minted = await ada.callOk('tokens.create', { password: PASSWORD }, 'Phone')
+    const outcome = await app.browser().fetch('/call/oauthServer.authorize', { method: 'POST', headers: { 'content-type': 'application/json', 'authorization': `Bearer ${minted.token}` }, body: JSON.stringify([params(client_id)]) })
 
     expect(await outcome.json()).toEqual({ kind: 'sign-in' })
   })
@@ -270,8 +270,8 @@ describe('client ID metadata documents', () => {
     const app = server({ documents: { [DOCUMENT]: { client_id: DOCUMENT, client_name: 'Inspector', redirect_uris: [REDIRECT] } } })
     const ada = await signedIn(app)
 
-    expect(await ada.call('oauthAuthorize', params(DOCUMENT))).toMatchObject({ kind: 'consent', client: { id: DOCUMENT, name: 'Inspector', host: 'client.example' } })
-    expect(await ada.call('oauthAuthorize', params(DOCUMENT))).toMatchObject({ kind: 'consent' })
+    expect(await ada.call('oauthServer.authorize', params(DOCUMENT))).toMatchObject({ kind: 'consent', client: { id: DOCUMENT, name: 'Inspector', host: 'client.example' } })
+    expect(await ada.call('oauthServer.authorize', params(DOCUMENT))).toMatchObject({ kind: 'consent' })
     expect(app.fetched).toEqual([DOCUMENT])
   })
 
@@ -279,8 +279,8 @@ describe('client ID metadata documents', () => {
     const app = server({ documents: { [DOCUMENT]: { client_id: 'https://other.example/x', redirect_uris: [REDIRECT] } } })
     const ada = await signedIn(app)
 
-    expect(await ada.call('oauthAuthorize', params(DOCUMENT))).toEqual({ kind: 'error', error: 'client' })
-    expect(await ada.call('oauthAuthorize', params('https://missing.example/client.json'))).toEqual({ kind: 'error', error: 'client' })
+    expect(await ada.call('oauthServer.authorize', params(DOCUMENT))).toEqual({ kind: 'error', error: 'client' })
+    expect(await ada.call('oauthServer.authorize', params('https://missing.example/client.json'))).toEqual({ kind: 'error', error: 'client' })
   })
 })
 
@@ -301,7 +301,7 @@ describe('the token endpoint', () => {
     const { id } = await ada.json('/me') as { id: string }
 
     expect((await app.store.bearerTokens.listByUser(id)).map(each => each.scopes)).toEqual([['posts:read']])
-    expect(await ada.call('listTokens')).toEqual([])
+    expect(await ada.call('tokens.list')).toEqual([])
   })
 
   test('a client asking no scope gets a token and a refresh that reach only routes with scope false', async () => {
@@ -326,7 +326,7 @@ describe('the token endpoint', () => {
 
     expect(second.status).toBe(200)
     expect((await get('/posts', second.body.access_token)).status).toBe(403)
-    expect(await ada.call('listOAuthClients')).toEqual([expect.objectContaining({ scopes: [] })])
+    expect(await ada.call('oauthServer.clients')).toEqual([expect.objectContaining({ scopes: [] })])
   })
 
   test('refuses a wrong PKCE verifier, and the code is spent by the try', async () => {
@@ -467,27 +467,27 @@ describe('refresh tokens', () => {
   test('the last use of an approved app is its last call, not its last refresh', async () => {
     const { app, ada, client_id, first } = await signedInClient()
 
-    expect(await ada.call('listOAuthClients')).toEqual([expect.objectContaining({ lastUsedAt: null })])
+    expect(await ada.call('oauthServer.clients')).toEqual([expect.objectContaining({ lastUsedAt: null })])
 
     const second = await token(app, { grant_type: 'refresh_token', refresh_token: String(first.body.refresh_token), client_id })
 
-    expect(await ada.call('listOAuthClients')).toEqual([expect.objectContaining({ lastUsedAt: null })])
+    expect(await ada.call('oauthServer.clients')).toEqual([expect.objectContaining({ lastUsedAt: null })])
 
     await app.browser().json('/me', { headers: { authorization: `Bearer ${second.body.access_token}` } })
 
-    expect(await ada.call('listOAuthClients')).toEqual([expect.objectContaining({ lastUsedAt: expect.any(String) })])
+    expect(await ada.call('oauthServer.clients')).toEqual([expect.objectContaining({ lastUsedAt: expect.any(String) })])
   })
 
   test('stop working once the user revokes the client, with its access token', async () => {
     const { app, ada, client_id, first } = await signedInClient()
 
-    expect(await ada.call('listOAuthClients')).toEqual([expect.objectContaining({ id: client_id, name: 'Claude Code', scopes: ['posts:read'] })])
-    expect(await ada.call('revokeOAuthGrant', client_id)).toEqual({ ok: true })
-    expect(await ada.call('revokeOAuthGrant', client_id)).toEqual({ ok: false, error: 'not-found' })
-    expect(await ada.call('listOAuthClients')).toEqual([])
+    expect(await ada.call('oauthServer.clients')).toEqual([expect.objectContaining({ id: client_id, name: 'Claude Code', scopes: ['posts:read'] })])
+    expect(await ada.call('oauthServer.revokeGrant', client_id)).toEqual({ ok: true })
+    expect(await ada.call('oauthServer.revokeGrant', client_id)).toEqual({ ok: false, error: 'not-found' })
+    expect(await ada.call('oauthServer.clients')).toEqual([])
     expect((await token(app, { grant_type: 'refresh_token', refresh_token: String(first.body.refresh_token), client_id })).body.error).toBe('invalid_grant')
     expect(await app.browser().json('/me', { headers: { authorization: `Bearer ${first.body.access_token}` } })).toBe('anonymous')
-    expect(await ada.call('oauthAuthorize', params(client_id))).toMatchObject({ kind: 'consent' })
+    expect(await ada.call('oauthServer.authorize', params(client_id))).toMatchObject({ kind: 'consent' })
   })
 
   test('stop working once the user signs out everywhere', async () => {
@@ -507,7 +507,7 @@ describe('the OAuth server being off', () => {
     for (const app of [plain, off]) {
       expect((await app.browser().fetch('/.well-known/oauth-authorization-server')).status).toBe(404)
       expect((await app.browser().fetch('/auth/oauth/token', { method: 'POST', body: '' })).status).toBe(404)
-      expect(await app.browser().call('oauthAuthorize', params('x'))).toEqual({ kind: 'error', error: 'client' })
+      expect(await app.browser().call('oauthServer.authorize', params('x'))).toEqual({ kind: 'error', error: 'client' })
     }
   })
 })

@@ -29,7 +29,7 @@ async function registered(limits: LimitsOption, extra: Parameters<typeof testApp
   const app = testApp({ rateLimit: limits, ...extra })
   const ada = app.browser()
 
-  await ada.call('register', { email: 'ada@example.com', password: PASSWORD })
+  await ada.call('password.register', { email: 'ada@example.com', password: PASSWORD })
 
   return { ...app, ada }
 }
@@ -63,7 +63,7 @@ async function mailed(limits: LimitsOption) {
 
 async function secondFactor(limits: LimitsOption) {
   const app = await registered(limits)
-  const { setup } = await app.ada.callOk('setUpTwoFactor', { password: PASSWORD })
+  const { setup } = await app.ada.callOk('twoFactor.setUp', { password: PASSWORD })
 
   return { ...app, secret: setup.secret }
 }
@@ -71,9 +71,9 @@ async function secondFactor(limits: LimitsOption) {
 async function guessingCodes(limits: LimitsOption) {
   const { ada } = await registered(limits, mail('code'))
 
-  await ada.call('requestMagicLink', 'ada@example.com')
+  await ada.call('magicLink.request', 'ada@example.com')
 
-  return async () => ada.call('signInWithEmailCode', '000000')
+  return async () => ada.call('magicLink.signInWithCode', '000000')
 }
 
 // Every limiter that guards one action and is walked here: attempts up to the maximum are answered, the next one is `limited`.
@@ -117,7 +117,7 @@ const rows: Row[] = [
     prepare: async (limits) => {
       const { ada } = await registered(limits)
 
-      return async () => ada.call('changePassword', { password: WRONG }, 'a brand new password')
+      return async () => ada.call('password.change', { password: WRONG }, 'a brand new password')
     },
   },
   {
@@ -129,7 +129,7 @@ const rows: Row[] = [
     prepare: async (limits) => {
       const { visitor } = await pendingSignIn(limits)
 
-      return async () => visitor.call('verifyTwoFactor', '000000')
+      return async () => visitor.call('twoFactor.verify', '000000')
     },
   },
   {
@@ -141,7 +141,7 @@ const rows: Row[] = [
     prepare: async (limits) => {
       const { ada } = await secondFactor(limits)
 
-      return async () => ada.call('enableTwoFactor', '000000')
+      return async () => ada.call('twoFactor.enable', '000000')
     },
   },
   {
@@ -154,7 +154,7 @@ const rows: Row[] = [
 
       // The right code, once the guesses are spent, is refused too and turns nothing on.
       return async (n) => {
-        const answer = await ada.call('enableTwoFactor', n > 8 ? await totpCode(secret, totpStep()) : '000000')
+        const answer = await ada.call('twoFactor.enable', n > 8 ? await totpCode(secret, totpStep()) : '000000')
 
         expect(await ada.json('/me')).toMatchObject({ twoFactor: false })
 
@@ -172,7 +172,7 @@ const rows: Row[] = [
 
       // The right code, once the guesses are spent, is refused too and signs nobody in.
       return async (n) => {
-        const answer = await visitor.call('verifyTwoFactor', n > 8 ? await totpCode(secret, totpStep()) : '000000')
+        const answer = await visitor.call('twoFactor.verify', n > 8 ? await totpCode(secret, totpStep()) : '000000')
 
         expect(await visitor.json('/me')).toBe('anonymous')
 
@@ -202,7 +202,7 @@ const rows: Row[] = [
     prepare: async (limits) => {
       const { ada } = await registered(limits, mail())
 
-      return async () => ada.call('sendVerification')
+      return async () => ada.call('email.sendVerification')
     },
   },
   {
@@ -213,7 +213,7 @@ const rows: Row[] = [
     prepare: async (limits) => {
       const { ada } = await registered(limits, mail())
 
-      return async n => ada.call('changeEmail', { password: PASSWORD }, `new${n}@example.com`)
+      return async n => ada.call('email.change', { password: PASSWORD }, `new${n}@example.com`)
     },
   },
   {
@@ -224,7 +224,7 @@ const rows: Row[] = [
     prepare: async (limits) => {
       const { browser } = await mailed(limits)
 
-      return async () => browser().call('verifyEmail', 'not-a-token')
+      return async () => browser().call('email.verify', 'not-a-token')
     },
   },
   {
@@ -234,7 +234,7 @@ const rows: Row[] = [
     prepare: async (limits) => {
       const { ada } = await registered(limits, mail())
 
-      return async () => ada.call('sendVerification')
+      return async () => ada.call('email.sendVerification')
     },
   },
   {
@@ -244,7 +244,7 @@ const rows: Row[] = [
     prepare: async (limits) => {
       const { browser } = await mailed(limits)
 
-      return async () => browser().call('requestPasswordReset', 'ada@example.com')
+      return async () => browser().call('password.requestReset', 'ada@example.com')
     },
   },
   {
@@ -255,7 +255,7 @@ const rows: Row[] = [
     prepare: async (limits) => {
       const { browser } = await mailed(limits)
 
-      return async n => browser().call('requestPasswordReset', `user${n}@example.com`)
+      return async n => browser().call('password.requestReset', `user${n}@example.com`)
     },
   },
   {
@@ -265,7 +265,7 @@ const rows: Row[] = [
     prepare: async (limits) => {
       const { browser } = await mailed(limits)
 
-      return async () => browser().call('requestMagicLink', 'ada@example.com')
+      return async () => browser().call('magicLink.request', 'ada@example.com')
     },
   },
   {
@@ -276,7 +276,7 @@ const rows: Row[] = [
     prepare: async (limits) => {
       const { browser } = await mailed(limits)
 
-      return async n => browser().call('requestMagicLink', `user${n}@example.com`)
+      return async n => browser().call('magicLink.request', `user${n}@example.com`)
     },
   },
   {
@@ -286,7 +286,7 @@ const rows: Row[] = [
     prepare: async (limits) => {
       const { ada } = await registered(limits, mail())
 
-      return async n => ada.call('changeEmail', { password: PASSWORD }, `new${n}@example.com`)
+      return async n => ada.call('email.change', { password: PASSWORD }, `new${n}@example.com`)
     },
   },
 ]

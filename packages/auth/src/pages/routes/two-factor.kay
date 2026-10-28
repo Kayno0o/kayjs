@@ -13,7 +13,7 @@ import FormField from '@kaynooo/kayjs-ui/form-field.kay'
 export const page = { guards: false }
 
 export const verify = action(schemas.twoFactor, async ({ code }, ctx) => {
-  const result = await ctx.locals.auth.verifyTwoFactor(code)
+  const result = await ctx.locals.auth.twoFactor.verify(code)
 
   if (!result.ok)
     return ctx.fail(400, { error: result.error === 'invalid' ? 'code' : result.error })
@@ -22,13 +22,13 @@ export const verify = action(schemas.twoFactor, async ({ code }, ctx) => {
 })
 
 export const passkeyOptions = action(async (ctx) => {
-  const result = await ctx.locals.auth.twoFactorPasskeyOptions()
+  const result = await ctx.locals.auth.twoFactor.passkeyOptions()
 
   return result.ok ? result.options : ctx.fail(400, { error: result.error })
 })
 
 export const passkey = action(schemas.passkey, async (input, ctx) => {
-  const result = await ctx.locals.auth.verifyTwoFactorPasskey(input.response)
+  const result = await ctx.locals.auth.twoFactor.verifyPasskey(input.response)
 
   if (!result.ok)
     return ctx.fail(400, { error: result.error === 'invalid' ? 'code' : result.error })
@@ -38,7 +38,7 @@ export const passkey = action(schemas.passkey, async (input, ctx) => {
 
 const auth = ctx.locals.auth
 const features = auth.features()
-const pending = await auth.twoFactorPending()
+const pending = await auth.twoFactor.pending()
 const redirect = localPath(ctx.url.searchParams.get('redirect'), localize(features.pages?.home ?? '/'))
 const error = verify.failed()?.data?.error
 ---

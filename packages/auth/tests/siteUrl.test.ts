@@ -57,7 +57,7 @@ describe('the site\'s origin kayjs-auth builds URLs on', () => {
     const { mails, mailer } = mailbox()
     const ada = testApp({ email: { mailer, links: LINKS } }).browser()
 
-    await ada.call('register', { email: 'ada@example.com', password: 'correct horse battery' })
+    await ada.call('password.register', { email: 'ada@example.com', password: 'correct horse battery' })
 
     expect(mails[0]).toMatchObject({ name: 'app.example.com' })
     expect(mails[0]!.url).toStartWith('https://app.example.com/verify?token=')

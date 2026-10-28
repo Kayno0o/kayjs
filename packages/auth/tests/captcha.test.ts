@@ -70,10 +70,10 @@ describe('a CAPTCHA', () => {
     expect(await ada.post('/register', { email: 'ada@example.com', password: PASSWORD, captcha: 'human' })).toMatchObject({ ok: true })
     expect(await ada.post('/password', { identifier: 'ada@example.com', password: PASSWORD })).toEqual({ ok: false, error: 'captcha' })
     expect(await ada.post('/password', { identifier: 'ada@example.com', password: PASSWORD, captcha: 'human' })).toMatchObject({ ok: true })
-    expect(await ada.call('requestPasswordReset', 'bob@example.com')).toEqual({ ok: false, error: 'captcha' })
-    expect(await ada.call('requestPasswordReset', 'bob@example.com', { captcha: 'human' })).toEqual({ ok: true })
-    expect(await ada.call('requestMagicLink', 'bob@example.com', { redirect: '/', captcha: 'bot' })).toEqual({ ok: false, error: 'captcha' })
-    expect(await ada.call('requestMagicLink', 'bob@example.com', { redirect: '/', captcha: 'human' })).toEqual({ ok: true })
+    expect(await ada.call('password.requestReset', 'bob@example.com')).toEqual({ ok: false, error: 'captcha' })
+    expect(await ada.call('password.requestReset', 'bob@example.com', { captcha: 'human' })).toEqual({ ok: true })
+    expect(await ada.call('magicLink.request', 'bob@example.com', { redirect: '/', captcha: 'bot' })).toEqual({ ok: false, error: 'captcha' })
+    expect(await ada.call('magicLink.request', 'bob@example.com', { redirect: '/', captcha: 'human' })).toEqual({ ok: true })
     expect(asked).toEqual(['register:bot', 'register:human', 'sign-in:human', 'reset:human', 'magic-link:bot', 'magic-link:human'])
   })
 
@@ -90,7 +90,7 @@ describe('a CAPTCHA', () => {
     expect(await ada.call('captchaRequired', 'sign-in')).toBe(true)
     expect(await ada.post('/password', { identifier: 'bob@example.com', password: 'wrong password' })).toEqual({ ok: false, error: 'captcha' })
     expect(await ada.call('captchaRequired', 'reset')).toBe(false)
-    expect(await ada.call('requestPasswordReset', 'bob@example.com')).toEqual({ ok: true })
+    expect(await ada.call('password.requestReset', 'bob@example.com')).toEqual({ ok: true })
     expect(await ada.call('captchaRequired', 'register')).toBe(true)
     expect(await browser().call('captchaRequired', 'sign-in')).toBe(true)
   })
@@ -136,9 +136,9 @@ describe('the proof-of-work CAPTCHA', () => {
 
     expect(await ada.post('/register', { email: 'ada@example.com', password: PASSWORD })).toEqual({ ok: false, error: 'captcha' })
     expect(await ada.post('/register', { email: 'ada@example.com', password: PASSWORD, captcha: solveWork(await challengeOf(ada, 'register')) })).toMatchObject({ ok: true })
-    expect(await ada.call('requestPasswordReset', 'bob@example.com')).toEqual({ ok: false, error: 'captcha' })
-    expect(await ada.call('requestPasswordReset', 'bob@example.com', { captcha: solveWork(await challengeOf(ada, 'reset')) })).toEqual({ ok: true })
-    expect(await ada.call('requestMagicLink', 'bob@example.com', { redirect: '/', captcha: solveWork(await challengeOf(ada, 'magic-link')) })).toEqual({ ok: true })
+    expect(await ada.call('password.requestReset', 'bob@example.com')).toEqual({ ok: false, error: 'captcha' })
+    expect(await ada.call('password.requestReset', 'bob@example.com', { captcha: solveWork(await challengeOf(ada, 'reset')) })).toEqual({ ok: true })
+    expect(await ada.call('magicLink.request', 'bob@example.com', { redirect: '/', captcha: solveWork(await challengeOf(ada, 'magic-link')) })).toEqual({ ok: true })
 
     // An app often signs a guest in with no form to carry a challenge.
     expect(await browser().call('signInAsGuest')).toMatchObject({ ok: true, user: { guest: true } })
@@ -225,15 +225,15 @@ describe('breached passwords', () => {
 
     expect(await ada.post('/register', { email: 'ada@example.com', password: 'password1234' })).toEqual({ ok: false, errors: { password: 'breached' } })
     expect(await ada.post('/register', { email: 'ada@example.com', password: PASSWORD })).toMatchObject({ ok: true })
-    expect(await ada.call('changePassword', { password: PASSWORD }, 'password1234')).toEqual({ ok: false, errors: { password: 'breached' } })
+    expect(await ada.call('password.change', { password: PASSWORD }, 'password1234')).toEqual({ ok: false, errors: { password: 'breached' } })
 
-    await ada.call('requestPasswordReset', 'ada@example.com')
+    await ada.call('password.requestReset', 'ada@example.com')
     const [reset] = await take({ kind: 'reset-password' })
     const token = new URL(reset!.url!).searchParams.get('token')!
 
-    expect(await ada.call('resetPassword', token, 'password1234')).toEqual({ ok: false, errors: { password: 'breached' } })
+    expect(await ada.call('password.reset', token, 'password1234')).toEqual({ ok: false, errors: { password: 'breached' } })
     // The refused password left the link usable.
-    expect(await ada.call('resetPassword', token, 'another good password')).toMatchObject({ ok: true })
+    expect(await ada.call('password.reset', token, 'another good password')).toMatchObject({ ok: true })
   })
 
   test('a check that throws lets the password through', async () => {

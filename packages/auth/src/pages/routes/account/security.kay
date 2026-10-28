@@ -15,7 +15,7 @@ import PageSection from '@kaynooo/kayjs-ui/page-section.kay'
 import QrCode from '@kaynooo/kayjs-ui/qr-code.kay'
 
 export const changePassword = action(schemas.changePassword, async (input, ctx) => {
-  const result = await ctx.locals.auth.changePassword(proofOf(input), input.newPassword)
+  const result = await ctx.locals.auth.password.change(proofOf(input), input.newPassword)
 
   if (!result.ok)
     return ctx.fail(400, 'errors' in result ? { password: result.errors.password } : { error: result.error })
@@ -25,48 +25,48 @@ export const changePassword = action(schemas.changePassword, async (input, ctx) 
 
 // Only the URI comes back: the page draws its QR code and reads the key off it.
 export const setUp = action(schemas.proof, async (input, ctx) => {
-  const result = await ctx.locals.auth.setUpTwoFactor(proofOf(input))
+  const result = await ctx.locals.auth.twoFactor.setUp(proofOf(input))
 
   return result.ok ? result.setup.uri : ctx.fail(400, { error: result.error })
 })
 
 // Posts the URI back with the code, so a wrong code shows the same QR code again.
 export const enable = action(schemas.enableTwoFactor, async ({ code }, ctx) => {
-  const result = await ctx.locals.auth.enableTwoFactor(code)
+  const result = await ctx.locals.auth.twoFactor.enable(code)
 
   return result.ok ? result.recoveryCodes : ctx.fail(400, { error: result.error === 'invalid' ? 'code' : result.error })
 })
 
 export const regenerate = action(schemas.proof, async (input, ctx) => {
-  const result = await ctx.locals.auth.regenerateRecoveryCodes(proofOf(input))
+  const result = await ctx.locals.auth.twoFactor.regenerateRecoveryCodes(proofOf(input))
 
   return result.ok ? result.recoveryCodes : ctx.fail(400, { error: result.error })
 })
 
 export const disable = action(schemas.proof, async (input, ctx) => {
-  const result = await ctx.locals.auth.disableTwoFactor(proofOf(input))
+  const result = await ctx.locals.auth.twoFactor.disable(proofOf(input))
 
   return result.ok ? 'disabled' : ctx.fail(400, { error: result.error })
 })
 
 export const passkeyOptions = action(schemas.proof, async (input, ctx) => {
-  const result = await ctx.locals.auth.passkeyRegistrationOptions(proofOf(input))
+  const result = await ctx.locals.auth.passkeys.registrationOptions(proofOf(input))
 
   return result.ok ? result.options : ctx.fail(400, { error: result.error })
 })
 
 export const addPasskey = action(schemas.registerPasskey, async (input, ctx) => {
-  const result = await ctx.locals.auth.registerPasskey(input.response, input.name)
+  const result = await ctx.locals.auth.passkeys.register(input.response, input.name)
 
   return result.ok ? result.passkey.id : ctx.fail(400, { error: result.error })
 })
 
 export const renamePasskey = action(schemas.renamePasskey, async ({ id, name }, ctx) => {
-  return (await ctx.locals.auth.updatePasskeyName(id, name)).ok ? name : ctx.fail(404, { error: 'not-found' })
+  return (await ctx.locals.auth.passkeys.rename(id, name)).ok ? name : ctx.fail(404, { error: 'not-found' })
 })
 
 export const removePasskey = action(schemas.removePasskey, async (input, ctx) => {
-  const result = await ctx.locals.auth.revokePasskey(input.id, proofOf(input))
+  const result = await ctx.locals.auth.passkeys.revoke(input.id, proofOf(input))
 
   return result.ok ? 'removed' : ctx.fail(400, { error: result.error, id: input.id })
 })
@@ -80,8 +80,8 @@ const setupUri = setUp.succeeded()?.data ?? enable.failed()?.values.uri
 const setupKey = setupUri && new URL(setupUri).searchParams.get('secret')
 const twoFactorError = setUp.failed()?.data?.error ?? enable.failed()?.data?.error ?? regenerate.failed()?.data?.error ?? disable.failed()?.data?.error
 const recoveryCodes = enable.succeeded()?.data ?? regenerate.succeeded()?.data
-const codesLeft = user.twoFactor ? await auth.recoveryCodesLeft() : 0
-const passkeys = features.passkeys ? await auth.listPasskeys() : []
+const codesLeft = user.twoFactor ? await auth.twoFactor.recoveryCodesLeft() : 0
+const passkeys = features.passkeys ? await auth.passkeys.list() : []
 const removeRefused = removePasskey.failed()?.data
 const passkeyErrors = Object.fromEntries((['proof', 'stale', 'limited', 'impersonating', 'expired', 'invalid', 'signed-out'] as const).map(code => [code, failure(code)]))
 ---

@@ -24,8 +24,8 @@ async function verified() {
   })
   const ada = app.browser()
 
-  await ada.call('register', { email: 'ada@example.com', password: PASSWORD })
-  await ada.call('verifyEmail', new URL(mails.at(-1)!.url!).searchParams.get('token')!)
+  await ada.call('password.register', { email: 'ada@example.com', password: PASSWORD })
+  await ada.call('email.verify', new URL(mails.at(-1)!.url!).searchParams.get('token')!)
   mails.length = 0
 
   const notices = () => mails.filter(mail => mail.url === undefined).map(mail => mail.kind)
@@ -58,7 +58,7 @@ describe('changes to what protects the account', () => {
   test('changing the password', async () => {
     const { ada, notices, events } = await verified()
 
-    await ada.call('changePassword', { password: PASSWORD }, 'a brand new password')
+    await ada.call('password.change', { password: PASSWORD }, 'a brand new password')
 
     expect(notices()).toEqual(['password-changed'])
     expect(events.map(entry => entry.event)).toContain('password-changed')
@@ -67,8 +67,8 @@ describe('changes to what protects the account', () => {
   test('moving to another address warns the old one', async () => {
     const { ada, mails } = await verified()
 
-    await ada.call('changeEmail', { password: PASSWORD }, 'ada@new.test')
-    await ada.call('confirmEmailChange', new URL(mails.at(-1)!.url!).searchParams.get('token')!)
+    await ada.call('email.change', { password: PASSWORD }, 'ada@new.test')
+    await ada.call('email.confirmChange', new URL(mails.at(-1)!.url!).searchParams.get('token')!)
 
     expect(mails.at(-1)).toMatchObject({ to: 'ada@example.com', kind: 'email-changed', name: 'Site', detail: 'ada@new.test' })
     expect(mails.at(-1)!.text).toContain('ada@new.test')
@@ -76,15 +76,15 @@ describe('changes to what protects the account', () => {
 
   test('the second factor going on and off, and a recovery code spent', async () => {
     const { ada, browser, notices } = await verified()
-    const { setup } = await ada.callOk('setUpTwoFactor', { password: PASSWORD })
-    const { recoveryCodes } = await ada.callOk('enableTwoFactor', await totpCode(setup.secret, totpStep()))
+    const { setup } = await ada.callOk('twoFactor.setUp', { password: PASSWORD })
+    const { recoveryCodes } = await ada.callOk('twoFactor.enable', await totpCode(setup.secret, totpStep()))
     const visitor = browser()
 
     await visitor.post('/password', { identifier: 'ada@example.com', password: PASSWORD })
-    await visitor.call('verifyTwoFactor', recoveryCodes[0]!)
-    const { recoveryCodes: fresh } = await ada.callOk('regenerateRecoveryCodes', { code: recoveryCodes[1]! })
+    await visitor.call('twoFactor.verify', recoveryCodes[0]!)
+    const { recoveryCodes: fresh } = await ada.callOk('twoFactor.regenerateRecoveryCodes', { code: recoveryCodes[1]! })
 
-    await ada.call('disableTwoFactor', { code: fresh[0]! })
+    await ada.call('twoFactor.disable', { code: fresh[0]! })
 
     expect(notices()).toEqual(['two-factor-enabled', 'recovery-code-used', 'recovery-code-used', 'recovery-codes-regenerated', 'recovery-code-used', 'two-factor-disabled'])
   })
@@ -92,7 +92,7 @@ describe('changes to what protects the account', () => {
   test('a token minted, and the account deleted', async () => {
     const { ada, notices, events } = await verified()
 
-    await ada.call('createToken', { password: PASSWORD }, 'Phone')
+    await ada.call('tokens.create', { password: PASSWORD }, 'Phone')
     await ada.call('deleteAccount', { password: PASSWORD })
 
     expect(notices()).toEqual(['token-created', 'account-deleted'])
@@ -114,8 +114,8 @@ describe('changes to what protects the account', () => {
     const { browser } = testApp({ site: 'https://site.test', email: { mailer: { send: mail => void mails.push(mail) }, links: LINKS, requireVerified: false }, onAuthEvent: ({ event }) => void events.push(event) })
     const ada = browser()
 
-    await ada.call('register', { email: 'ada@example.com', password: PASSWORD })
-    await ada.call('changePassword', { password: PASSWORD }, 'a brand new password')
+    await ada.call('password.register', { email: 'ada@example.com', password: PASSWORD })
+    await ada.call('password.change', { password: PASSWORD }, 'a brand new password')
 
     expect(mails.map(mail => mail.kind)).toEqual(['verify-email'])
     expect(events).toEqual(['signed-in', 'password-changed'])
@@ -150,8 +150,8 @@ describe('a slow mailer', () => {
 
     const ada = app.browser()
 
-    await ada.call('register', { email: 'ada@example.com', password: PASSWORD })
-    await ada.call('verifyEmail', new URL(sent.at(-1)!.url!).searchParams.get('token')!)
+    await ada.call('password.register', { email: 'ada@example.com', password: PASSWORD })
+    await ada.call('email.verify', new URL(sent.at(-1)!.url!).searchParams.get('token')!)
     failing = true
     sent.length = 0
 

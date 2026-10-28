@@ -15,7 +15,7 @@ async function registered(options: Parameters<typeof testApp>[0]): Promise<Mail>
   const mails: Mail[] = []
   const app = testApp({ email: { mailer: { send: mail => void mails.push(mail) }, links: LINKS }, ...options })
 
-  await app.browser().call('register', { email: 'ada@example.com', password: 'correct horse battery' })
+  await app.browser().call('password.register', { email: 'ada@example.com', password: 'correct horse battery' })
 
   return mails.at(-1)!
 }

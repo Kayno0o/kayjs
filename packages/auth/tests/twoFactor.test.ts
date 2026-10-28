@@ -38,11 +38,11 @@ async function enrolled() {
   const app = testApp({ name: 'Site' })
   const ada = app.browser()
 
-  await ada.call('register', { email: 'ada@example.com', password: PASSWORD })
-  const setup = await ada.callOk('setUpTwoFactor', { password: PASSWORD })
+  await ada.call('password.register', { email: 'ada@example.com', password: PASSWORD })
+  const setup = await ada.callOk('twoFactor.setUp', { password: PASSWORD })
   const secret = setup.setup.secret
   const code = async (offset = 0) => totpCode(secret, totpStep() + offset)
-  const enabled = await ada.callOk('enableTwoFactor', await code())
+  const enabled = await ada.callOk('twoFactor.enable', await code())
 
   return { ...app, ada, setup, secret, code, recoveryCodes: enabled.recoveryCodes }
 }
@@ -55,7 +55,7 @@ describe('setting up a second factor', () => {
     expect(recoveryCodes).toHaveLength(10)
     expect(recoveryCodes[0]!).toMatch(/^[2-9a-z]{5}-[2-9a-z]{5}-[2-9a-z]{5}$/)
     expect(await ada.json('/me')).toMatchObject({ twoFactor: true })
-    expect(await ada.call('recoveryCodesLeft')).toBe(10)
+    expect(await ada.call('twoFactor.recoveryCodesLeft')).toBe(10)
     expect((await store.users.findByEmail('ada@example.com'))?.totpSecret).not.toContain(setup.setup.secret)
   })
 
@@ -63,14 +63,14 @@ describe('setting up a second factor', () => {
     const { browser } = testApp()
     const ada = browser()
 
-    await ada.call('register', { email: 'ada@example.com', password: PASSWORD })
+    await ada.call('password.register', { email: 'ada@example.com', password: PASSWORD })
 
-    expect(await ada.call('setUpTwoFactor', { password: 'wrong password!' })).toEqual({ ok: false, error: 'proof' })
-    expect(await ada.call('enableTwoFactor', '123456')).toEqual({ ok: false, error: 'not-set-up' })
+    expect(await ada.call('twoFactor.setUp', { password: 'wrong password!' })).toEqual({ ok: false, error: 'proof' })
+    expect(await ada.call('twoFactor.enable', '123456')).toEqual({ ok: false, error: 'not-set-up' })
 
-    await ada.call('setUpTwoFactor', { password: PASSWORD })
+    await ada.call('twoFactor.setUp', { password: PASSWORD })
 
-    expect(await ada.call('enableTwoFactor', '000000')).toEqual({ ok: false, error: 'invalid' })
+    expect(await ada.call('twoFactor.enable', '000000')).toEqual({ ok: false, error: 'invalid' })
     expect(await ada.json('/me')).toMatchObject({ twoFactor: false })
   })
 })
@@ -82,11 +82,11 @@ describe('signing in with a second factor', () => {
 
     expect(await visitor.post('/password', { identifier: 'ada@example.com', password: PASSWORD, redirect: '/account' })).toEqual({ ok: true, redirect: '/two-factor?redirect=%2Faccount' })
     expect(await visitor.json('/me')).toBe('anonymous')
-    expect(await visitor.call('twoFactorPending')).toBe(true)
+    expect(await visitor.call('twoFactor.pending')).toBe(true)
 
-    expect(await visitor.call('verifyTwoFactor', await code(1))).toEqual({ ok: true, redirect: '/account' })
+    expect(await visitor.call('twoFactor.verify', await code(1))).toEqual({ ok: true, redirect: '/account' })
     expect(await visitor.json('/me')).toMatchObject({ email: 'ada@example.com' })
-    expect(await visitor.call('twoFactorPending')).toBe(false)
+    expect(await visitor.call('twoFactor.pending')).toBe(false)
   })
 
   test('a code works once, even at another sign-in', async () => {
@@ -98,8 +98,8 @@ describe('signing in with a second factor', () => {
     await first.post('/password', { identifier: 'ada@example.com', password: PASSWORD })
     await second.post('/password', { identifier: 'ada@example.com', password: PASSWORD })
 
-    expect(await first.call('verifyTwoFactor', used)).toMatchObject({ ok: true })
-    expect(await second.call('verifyTwoFactor', used)).toEqual({ ok: false, error: 'invalid' })
+    expect(await first.call('twoFactor.verify', used)).toMatchObject({ ok: true })
+    expect(await second.call('twoFactor.verify', used)).toEqual({ ok: false, error: 'invalid' })
   })
 
   test('a recovery code works in place of the code, once', async () => {
@@ -108,26 +108,26 @@ describe('signing in with a second factor', () => {
 
     await visitor.post('/password', { identifier: 'ada@example.com', password: PASSWORD })
 
-    expect(await visitor.call('verifyTwoFactor', recoveryCodes[0]!.toUpperCase())).toMatchObject({ ok: true })
-    expect(await visitor.call('recoveryCodesLeft')).toBe(9)
+    expect(await visitor.call('twoFactor.verify', recoveryCodes[0]!.toUpperCase())).toMatchObject({ ok: true })
+    expect(await visitor.call('twoFactor.recoveryCodesLeft')).toBe(9)
 
     const again = browser()
 
     await again.post('/password', { identifier: 'ada@example.com', password: PASSWORD })
 
-    expect(await again.call('verifyTwoFactor', recoveryCodes[0]!)).toEqual({ ok: false, error: 'invalid' })
+    expect(await again.call('twoFactor.verify', recoveryCodes[0]!)).toEqual({ ok: false, error: 'invalid' })
   })
 
   test('without a parked sign-in, or after ten minutes, there is nothing to finish', async () => {
     const { browser, code } = await enrolled()
     const visitor = browser()
 
-    expect(await visitor.call('verifyTwoFactor', await code())).toEqual({ ok: false, error: 'expired' })
+    expect(await visitor.call('twoFactor.verify', await code())).toEqual({ ok: false, error: 'expired' })
 
     await visitor.post('/password', { identifier: 'ada@example.com', password: PASSWORD })
     setSystemTime(Date.now() + 11 * 60 * 1000)
 
-    expect(await visitor.call('verifyTwoFactor', await code())).toEqual({ ok: false, error: 'expired' })
+    expect(await visitor.call('twoFactor.verify', await code())).toEqual({ ok: false, error: 'expired' })
   })
 
   test('a magic link sign-in asks for the code too', async () => {
@@ -135,21 +135,21 @@ describe('signing in with a second factor', () => {
     const { browser } = testApp({ site: 'https://site.test', email: { mailer: { send: mail => void mails.push(mail) }, links: { 'verify-email': '/v', 'reset-password': '/r', 'magic-link': '/m', 'change-email': '/c' }, requireVerified: false } })
     const ada = browser()
 
-    await ada.call('register', { email: 'ada@example.com', password: PASSWORD })
+    await ada.call('password.register', { email: 'ada@example.com', password: PASSWORD })
     // Verified first: a magic link that proves an address for the first time hands the account over clean, its second factor dropped.
-    await ada.call('verifyEmail', new URL(mails.findLast(mail => mail.kind === 'verify-email')!.url!).searchParams.get('token')!)
-    const { setup } = await ada.callOk('setUpTwoFactor', { password: PASSWORD })
+    await ada.call('email.verify', new URL(mails.findLast(mail => mail.kind === 'verify-email')!.url!).searchParams.get('token')!)
+    const { setup } = await ada.callOk('twoFactor.setUp', { password: PASSWORD })
 
-    await ada.call('enableTwoFactor', await totpCode(setup.secret, totpStep()))
+    await ada.call('twoFactor.enable', await totpCode(setup.secret, totpStep()))
 
     const visitor = browser()
 
-    await visitor.call('requestMagicLink', 'ada@example.com', { redirect: '/account' })
+    await visitor.call('magicLink.request', 'ada@example.com', { redirect: '/account' })
     const token = new URL(mails.at(-1)!.url!).searchParams.get('token')!
 
-    expect(await visitor.call('signInWithMagicLink', token)).toEqual({ ok: true, redirect: '/two-factor?redirect=%2Faccount' })
+    expect(await visitor.call('magicLink.signIn', token)).toEqual({ ok: true, redirect: '/two-factor?redirect=%2Faccount' })
     expect(await visitor.json('/me')).toBe('anonymous')
-    expect(await visitor.call('verifyTwoFactor', await totpCode(setup.secret, totpStep() + 1))).toEqual({ ok: true, redirect: '/account' })
+    expect(await visitor.call('twoFactor.verify', await totpCode(setup.secret, totpStep() + 1))).toEqual({ ok: true, redirect: '/account' })
   })
 })
 
@@ -157,13 +157,13 @@ describe('a secret kept plain before kayjs-auth', () => {
   test('signs in once the store hands it over sealed', async () => {
     const { browser, store } = testApp()
     const secret = base32Encode(new TextEncoder().encode('a-plain-legacy-secret'))
-    const { user } = await browser().callHas('user', 'register', { email: 'ada@example.com', password: PASSWORD })
+    const { user } = await browser().callHas('user', 'password.register', { email: 'ada@example.com', password: PASSWORD })
 
     await store.users.update(user.id, { totpSecret: sealTotpSecret(SECRET, user.id, secret), totpEnabledAt: new Date() })
     const visitor = browser()
 
     expect(await visitor.post('/password', { identifier: 'ada@example.com', password: PASSWORD })).toMatchObject({ redirect: '/two-factor' })
-    expect(await visitor.call('verifyTwoFactor', await totpCode(secret, totpStep()))).toMatchObject({ ok: true })
+    expect(await visitor.call('twoFactor.verify', await totpCode(secret, totpStep()))).toMatchObject({ ok: true })
     expect(await visitor.json('/me')).toMatchObject({ id: user.id, twoFactor: true })
   })
 
@@ -173,28 +173,28 @@ describe('a secret kept plain before kayjs-auth', () => {
     const secret = base32Encode(new TextEncoder().encode('a-plain-legacy-secret'))
 
     for (const [email, sealWith] of [['ada@example.com', [OLD]], ['bob@example.com', [SECRET, OLD]]] as const) {
-      const { user } = await browser().callHas('user', 'register', { email, password: PASSWORD })
+      const { user } = await browser().callHas('user', 'password.register', { email, password: PASSWORD })
 
       await store.users.update(user.id, { totpSecret: sealTotpSecret([...sealWith], user.id, secret), totpEnabledAt: new Date() })
       const visitor = browser()
 
       await visitor.post('/password', { identifier: email, password: PASSWORD })
 
-      expect(await visitor.call('verifyTwoFactor', await totpCode(secret, totpStep()))).toMatchObject({ ok: true })
+      expect(await visitor.call('twoFactor.verify', await totpCode(secret, totpStep()))).toMatchObject({ ok: true })
     }
   })
 
   test('is sealed for its own user only', async () => {
     const { browser, store } = testApp()
     const secret = base32Encode(new TextEncoder().encode('a-plain-legacy-secret'))
-    const { user } = await browser().callHas('user', 'register', { email: 'ada@example.com', password: PASSWORD })
+    const { user } = await browser().callHas('user', 'password.register', { email: 'ada@example.com', password: PASSWORD })
 
     await store.users.update(user.id, { totpSecret: sealTotpSecret(SECRET, 'someone-else', secret), totpEnabledAt: new Date() })
     const visitor = browser()
 
     await visitor.post('/password', { identifier: 'ada@example.com', password: PASSWORD })
 
-    expect(await visitor.call('verifyTwoFactor', await totpCode(secret, totpStep()))).toMatchObject({ ok: false })
+    expect(await visitor.call('twoFactor.verify', await totpCode(secret, totpStep()))).toMatchObject({ ok: false })
   })
 })
 
@@ -202,25 +202,25 @@ describe('turning the second factor off', () => {
   test('needs a code even from an account with a password, and voids the recovery codes', async () => {
     const { ada, recoveryCodes } = await enrolled()
 
-    expect(await ada.call('disableTwoFactor', {})).toEqual({ ok: false, error: 'proof' })
-    expect(await ada.call('disableTwoFactor', { password: PASSWORD })).toEqual({ ok: false, error: 'proof' })
-    expect(await ada.call('regenerateRecoveryCodes', { password: PASSWORD })).toEqual({ ok: false, error: 'proof' })
-    expect(await ada.call('disableTwoFactor', { code: recoveryCodes[0]! })).toEqual({ ok: true })
+    expect(await ada.call('twoFactor.disable', {})).toEqual({ ok: false, error: 'proof' })
+    expect(await ada.call('twoFactor.disable', { password: PASSWORD })).toEqual({ ok: false, error: 'proof' })
+    expect(await ada.call('twoFactor.regenerateRecoveryCodes', { password: PASSWORD })).toEqual({ ok: false, error: 'proof' })
+    expect(await ada.call('twoFactor.disable', { code: recoveryCodes[0]! })).toEqual({ ok: true })
     expect(await ada.json('/me')).toMatchObject({ twoFactor: false })
-    expect(await ada.call('recoveryCodesLeft')).toBe(0)
+    expect(await ada.call('twoFactor.recoveryCodesLeft')).toBe(0)
   })
 
   test('regenerating the codes voids the old set', async () => {
     const { ada, browser, recoveryCodes } = await enrolled()
-    const fresh = await ada.callOk('regenerateRecoveryCodes', { code: recoveryCodes[9]! })
+    const fresh = await ada.callOk('twoFactor.regenerateRecoveryCodes', { code: recoveryCodes[9]! })
     const visitor = browser()
 
     expect(fresh.recoveryCodes).toHaveLength(10)
 
     await visitor.post('/password', { identifier: 'ada@example.com', password: PASSWORD })
 
-    expect(await visitor.call('verifyTwoFactor', recoveryCodes[0]!)).toEqual({ ok: false, error: 'invalid' })
-    expect(await visitor.call('verifyTwoFactor', fresh.recoveryCodes[0]!)).toMatchObject({ ok: true })
+    expect(await visitor.call('twoFactor.verify', recoveryCodes[0]!)).toEqual({ ok: false, error: 'invalid' })
+    expect(await visitor.call('twoFactor.verify', fresh.recoveryCodes[0]!)).toMatchObject({ ok: true })
   })
 })
 
@@ -241,7 +241,7 @@ describe('enrolling for a test', () => {
 
     expect((await store.users.get(user.id))!.totpEnabledAt).not.toBeNull()
     expect(await visitor.post('/password', { identifier: 'ada@example.com', password: PASSWORD })).toMatchObject({ redirect: '/two-factor' })
-    expect(await visitor.call('verifyTwoFactor', await enrolment.code())).toMatchObject({ ok: true })
+    expect(await visitor.call('twoFactor.verify', await enrolment.code())).toMatchObject({ ok: true })
     expect(await visitor.json('/me')).toMatchObject({ email: 'ada@example.com' })
   })
 
@@ -255,9 +255,9 @@ describe('enrolling for a test', () => {
 
     await first.post('/password', { identifier: 'ada@example.com', password: PASSWORD })
     await second.post('/password', { identifier: 'ada@example.com', password: PASSWORD })
-    expect(await first.call('verifyTwoFactor', enrolment.recoveryCodes[0]!)).toMatchObject({ ok: true })
-    expect(await second.call('verifyTwoFactor', enrolment.recoveryCodes[0]!)).toEqual({ ok: false, error: 'invalid' })
-    expect(await second.call('verifyTwoFactor', await enrolment.code(1))).toMatchObject({ ok: true })
+    expect(await first.call('twoFactor.verify', enrolment.recoveryCodes[0]!)).toMatchObject({ ok: true })
+    expect(await second.call('twoFactor.verify', enrolment.recoveryCodes[0]!)).toEqual({ ok: false, error: 'invalid' })
+    expect(await second.call('twoFactor.verify', await enrolment.code(1))).toMatchObject({ ok: true })
   })
 
   test('refuses a missing member and one who already has two-factor', async () => {

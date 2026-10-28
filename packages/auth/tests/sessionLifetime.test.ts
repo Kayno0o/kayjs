@@ -66,10 +66,10 @@ describe('a sign-in follows the session plugin\'s lifetimes', () => {
 
     try {
       setSystemTime(new Date(Date.now() + 5 * DAY * 1000))
-      expect(await ada.call('listSessions')).toHaveLength(1)
+      expect(await ada.call('sessions.list')).toHaveLength(1)
       setSystemTime(new Date(Date.now() + 6 * DAY * 1000))
       expect(await ada.json('/me')).toBe('anonymous')
-      expect(await app.browser().call('listSessions')).toEqual([])
+      expect(await app.browser().call('sessions.list')).toEqual([])
     }
     finally {
       setSystemTime()
@@ -107,7 +107,7 @@ describe('a magic link carries the remember choice', () => {
     const app = await setup({}, { site: 'https://site.test', email: { mailer, links: LINKS } })
     const asker = app.browser()
 
-    await asker.call('requestMagicLink', 'ada@example.com', remember === undefined ? {} : { remember })
+    await asker.call('magicLink.request', 'ada@example.com', remember === undefined ? {} : { remember })
 
     const url = new URL(mails.findLast(mail => mail.kind === 'magic-link')!.url!)
 
@@ -119,7 +119,7 @@ describe('a magic link carries the remember choice', () => {
       const { app, token } = await linked(remember)
       const other = app.browser()
 
-      expect(await other.call('signInWithMagicLink', token)).toMatchObject({ ok: true })
+      expect(await other.call('magicLink.signIn', token)).toMatchObject({ ok: true })
       expect((await app.store.sessions.listByUser('u1'))[0]!.maxAge).toBe(expected)
     }
   })
@@ -129,17 +129,17 @@ describe('a magic link carries the remember choice', () => {
     const bare = token.slice(0, -2)
 
     expect(token.endsWith('.r')).toBe(true)
-    expect(await app.browser().call('signInWithMagicLink', bare)).toMatchObject({ ok: true })
+    expect(await app.browser().call('magicLink.signIn', bare)).toMatchObject({ ok: true })
   })
 
   test('a mark on another kind of link is no token', async () => {
     const { mails, mailer } = mailbox()
     const app = await setup({}, { site: 'https://site.test', email: { mailer, links: LINKS } })
 
-    await app.browser().call('requestPasswordReset', 'ada@example.com')
+    await app.browser().call('password.requestReset', 'ada@example.com')
 
     const token = new URL(mails.findLast(mail => mail.kind === 'reset-password')!.url!).searchParams.get('token')!
 
-    expect(await app.browser().call('resetPassword', `${token}.r`, 'a new password long enough')).toMatchObject({ ok: false, error: 'invalid' })
+    expect(await app.browser().call('password.reset', `${token}.r`, 'a new password long enough')).toMatchObject({ ok: false, error: 'invalid' })
   })
 })

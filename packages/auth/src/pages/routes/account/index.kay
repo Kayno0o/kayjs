@@ -9,13 +9,13 @@ import FormField from '@kaynooo/kayjs-ui/form-field.kay'
 import PageSection from '@kaynooo/kayjs-ui/page-section.kay'
 
 export const resend = action(async (ctx) => {
-  const result = await ctx.locals.auth.sendVerification()
+  const result = await ctx.locals.auth.email.sendVerification()
 
   return result.ok ? 'sent' : ctx.fail(400, { error: result.error })
 })
 
 export const changeEmail = action(schemas.changeEmail, async (input, ctx) => {
-  const result = await ctx.locals.auth.changeEmail(proofOf(input), input.email)
+  const result = await ctx.locals.auth.email.change(proofOf(input), input.email)
 
   if (!result.ok)
     return ctx.fail(400, 'errors' in result ? { email: result.errors.email } : { error: result.error })

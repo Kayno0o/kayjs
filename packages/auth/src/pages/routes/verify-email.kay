@@ -13,7 +13,7 @@ export const page = { guards: false, security: { headers: { 'referrer-policy': '
 
 // The link only shows this button, so a mail scanner opening it spends nothing.
 export const verify = action(schemas.verify, async ({ token, password }, ctx) => {
-  const result = await ctx.locals.auth.verifyEmail(token, password)
+  const result = await ctx.locals.auth.email.verify(token, password)
 
   if (!result.ok)
     return ctx.fail(400, { error: result.error === 'invalid' ? 'link' : result.error })
@@ -22,7 +22,7 @@ export const verify = action(schemas.verify, async ({ token, password }, ctx) =>
 })
 
 export const code = action(schemas.emailCode, async ({ code }, ctx) => {
-  const result = await ctx.locals.auth.verifyEmailCode(code)
+  const result = await ctx.locals.auth.email.verifyCode(code)
 
   if (!result.ok)
     return ctx.fail(400, { error: result.error === 'invalid' ? 'code' : result.error })
@@ -31,7 +31,7 @@ export const code = action(schemas.emailCode, async ({ code }, ctx) => {
 })
 
 export const resend = action(async (ctx) => {
-  const result = await ctx.locals.auth.sendVerification()
+  const result = await ctx.locals.auth.email.sendVerification()
 
   return result.ok ? 'sent' : ctx.fail(400, { error: result.error })
 })
@@ -39,7 +39,7 @@ export const resend = action(async (ctx) => {
 const auth = ctx.locals.auth
 const token = ctx.url.searchParams.get('token') ?? verify.failed()?.values.token
 const user = await auth.user()
-const pending = await auth.emailCodePending()
+const pending = await auth.email.pendingCode()
 const refused = verify.failed()?.data?.error
 const codeError = code.failed()?.data?.error
 const resendError = resend.failed()?.data?.error

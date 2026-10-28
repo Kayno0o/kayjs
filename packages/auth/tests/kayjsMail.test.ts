@@ -17,7 +17,7 @@ describe('with kayjs-mail', () => {
     const mail = mailer({ from: 'Site <site@site.test>', queue: { name: 'auth-sent' } })
     const ada = testApp({ site: 'https://site.test', name: 'Site', email: { mailer: { send: mail.send }, links: LINKS } }).browser()
 
-    await ada.call('register', { email: 'ada@example.com', password: 'correct horse battery' })
+    await ada.call('password.register', { email: 'ada@example.com', password: 'correct horse battery' })
 
     const sent = outbox.to('ada@example.com')
 
@@ -31,7 +31,7 @@ describe('with kayjs-mail', () => {
     const mail = mailer({ from: 'site@site.test', queue: { name: 'auth-queued' } })
     const ada = testApp({ site: 'https://site.test', name: 'Site', email: { mailer: { send: mail.enqueue }, links: LINKS } }).browser()
 
-    await ada.call('register', { email: 'ada@example.com', password: 'correct horse battery' })
+    await ada.call('password.register', { email: 'ada@example.com', password: 'correct horse battery' })
     expect(outbox.mails).toEqual([])
 
     expect(await mail.drain()).toBe(1)

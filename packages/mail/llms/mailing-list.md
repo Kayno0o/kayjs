@@ -42,7 +42,7 @@ await mail.list().status(id) // { done, sent, failed, retrying, unsure, waiting 
 
 - The unsubscribe link opens a page asking to confirm, so a mail scanner opening links unsubscribes no one; its button, and a POST with `List-Unsubscribe=One-Click` (what Gmail and Yahoo send), unsubscribe at once with no sign-in, and a second one answers the same. The row is deleted: no address is kept.
 - `list.count()`, `list.subscribers()` (confirmed, `{ email, confirmedAt, source, wording }`) and `list.unsubscribe(address)`.
-- `mail.erase(address)` takes the address off every list of the mailer, with its delivery rows, and removes the mails queued for it; resolves with how many went. Call it where you erase a person (kay's privacy guide); kayjs-auth's `deleteAccount` and `deleteUser` call it for you. `mail.subscriptions(address)` resolves with what the address is on, `{ list, status, askedAt, confirmedAt }` each, pending rows included.
+- `mail.erase(address)` takes the address off every list of the mailer, with its delivery rows, and removes the mails queued for it; resolves with how many went. Call it where you erase a person (kay's privacy guide); kayjs-auth's `deleteAccount` and `admin.deleteUser` call it for you. `mail.subscriptions(address)` resolves with what the address is on, `{ list, status, askedAt, confirmedAt }` each, pending rows included.
 
 ## Reference
 

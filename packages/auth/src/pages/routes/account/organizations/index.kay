@@ -12,7 +12,7 @@ import FormField from '@kaynooo/kayjs-ui/form-field.kay'
 import PageSection from '@kaynooo/kayjs-ui/page-section.kay'
 
 export const create = action(schemas.organization, async ({ name, slug }, ctx) => {
-  const result = await ctx.locals.auth.createOrganization({ name: name.trim(), ...slug?.trim() && { slug: slug.trim() } })
+  const result = await ctx.locals.auth.organizations.create({ name: name.trim(), ...slug?.trim() && { slug: slug.trim() } })
 
   if (!result.ok)
     return ctx.fail(400, { error: result.error })
@@ -24,7 +24,7 @@ export const create = action(schemas.organization, async ({ name, slug }, ctx) =
 
 // An invitation is accepted or turned down by its id, which only the signed-in user's own open ones answer to.
 export const accept = action(schemas.id, async ({ id }, ctx) => {
-  const result = await ctx.locals.auth.acceptInvitation(id)
+  const result = await ctx.locals.auth.organizations.acceptInvitation(id)
 
   if (!result.ok)
     return ctx.fail(400, { error: result.error })
@@ -35,15 +35,15 @@ export const accept = action(schemas.id, async ({ id }, ctx) => {
 })
 
 export const reject = action(schemas.id, async ({ id }, ctx) => {
-  const result = await ctx.locals.auth.rejectInvitation(id)
+  const result = await ctx.locals.auth.organizations.rejectInvitation(id)
 
   return result.ok ? 'rejected' : ctx.fail(400, { error: result.error })
 })
 
 const auth = ctx.locals.auth
 const features = auth.features()
-const memberships = await auth.listOrganizations()
-const invitations = await auth.listMyInvitations()
+const memberships = await auth.organizations.list()
+const invitations = await auth.organizations.myInvitations()
 const refused = [create, accept, reject].map(form => form.failed()?.data?.error).find(error => error !== undefined)
 const date = (value: Date) => formatDate(value, { dateStyle: 'medium' })
 ---

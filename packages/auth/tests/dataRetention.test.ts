@@ -122,7 +122,7 @@ describe('erasing a user', () => {
     } } }
     const { browser } = testApp({ store, audit: true })
     const ada = browser()
-    const { user } = await ada.callHas('user', 'register', { email: 'ada@example.com', password: PASSWORD })
+    const { user } = await ada.callHas('user', 'password.register', { email: 'ada@example.com', password: PASSWORD })
     const logged = spyOn(console, 'error').mockImplementation(() => undefined)
 
     expect(await ada.post('/call/deleteAccount', [{ password: PASSWORD }])).not.toEqual({ ok: true })
@@ -133,7 +133,7 @@ describe('erasing a user', () => {
   test('the audit log keeps what happened under a name that leads to no one', async () => {
     const { browser, store } = testApp({ audit: true })
     const ada = browser()
-    const { user } = await ada.callHas('user', 'register', { email: 'ada@example.com', password: PASSWORD })
+    const { user } = await ada.callHas('user', 'password.register', { email: 'ada@example.com', password: PASSWORD })
 
     expect(await ada.call('deleteAccount', { password: PASSWORD })).toEqual({ ok: true })
 
@@ -208,7 +208,7 @@ describe('provider tokens', () => {
     const app = setup(true)
     const ada = await signIn(app)
 
-    await ada.call('changePassword', {}, PASSWORD)
+    await ada.call('password.change', {}, PASSWORD)
     expect(await ada.call('unlink', 'discord', { password: PASSWORD })).toEqual({ ok: true })
     expect(revoked).toEqual(['refresh-1'])
   })
@@ -234,7 +234,7 @@ describe('the audit log\'s addresses', () => {
     const full = testApp({ audit: { ip: 'full' } })
 
     for (const { browser } of [truncated, full]) {
-      await browser().call('register', { email: 'ada@example.com', password: PASSWORD })
+      await browser().call('password.register', { email: 'ada@example.com', password: PASSWORD })
       await browser().json('/password', { method: 'POST', headers: { 'content-type': 'application/json', 'x-forwarded-for': '203.0.113.77' }, body: JSON.stringify({ identifier: 'ada@example.com', password: 'a wrong password' }) })
     }
 
@@ -259,7 +259,7 @@ describe('exporting a user\'s data', () => {
   test('includes the apps they approved, the invitations and the last ban once over', async () => {
     const { browser, store } = testApp({ organizations: { roles: { owner: [], member: [] }, owner: 'owner' }, admin: 'admin' })
     const ada = browser()
-    const { user } = await ada.callHas('user', 'register', { email: 'ada@example.com', password: PASSWORD })
+    const { user } = await ada.callHas('user', 'password.register', { email: 'ada@example.com', password: PASSWORD })
     const now = new Date()
 
     await store.oauth!.grants.upsert({ userId: user.id, clientId: 'client', clientName: 'Claude Code', scopes: null, createdAt: now, lastUsedAt: null })
@@ -282,7 +282,7 @@ describe('exporting a user\'s data', () => {
     const { browser } = testApp()
     const ada = browser()
 
-    await ada.call('register', { email: 'ada@example.com', password: PASSWORD })
+    await ada.call('password.register', { email: 'ada@example.com', password: PASSWORD })
 
     expect((await ada.callOk('exportData')).data).toMatchObject({ ban: null, grants: [], invitations: { received: [], sent: [] } })
   })
@@ -300,7 +300,7 @@ describe('erasing a user, the entry recording it', () => {
     } } }
     const { browser } = testApp({ store, audit: true })
     const ada = browser()
-    const { user } = await ada.callHas('user', 'register', { email: 'ada@example.com', password: PASSWORD })
+    const { user } = await ada.callHas('user', 'password.register', { email: 'ada@example.com', password: PASSWORD })
 
     expect(await ada.post('/call/deleteAccount', [{ password: PASSWORD }])).not.toEqual({ ok: true })
     expect(calls).toBe(2)

@@ -33,54 +33,54 @@ describe('where a flow lands when nothing asked for another page', () => {
   test('is pages.home for a reset, a verification, an email change, a magic link, a code, a password and a register', async () => {
     const { browser, tokenOf, take } = setup({ home: HOME })
     const ada = browser()
-    const registered = await ada.callOk('register', { email: 'ada@example.com', password: PASSWORD })
+    const registered = await ada.callOk('password.register', { email: 'ada@example.com', password: PASSWORD })
 
     expect(registered).toMatchObject({ ok: true })
-    expect(await ada.call('verifyEmail', tokenOf('verify-email'))).toEqual({ ok: true, redirect: HOME })
+    expect(await ada.call('email.verify', tokenOf('verify-email'))).toEqual({ ok: true, redirect: HOME })
 
-    await ada.call('changeEmail', { password: PASSWORD }, 'ada@new.test')
-    expect(await ada.call('confirmEmailChange', tokenOf('change-email'))).toEqual({ ok: true, redirect: HOME })
+    await ada.call('email.change', { password: PASSWORD }, 'ada@new.test')
+    expect(await ada.call('email.confirmChange', tokenOf('change-email'))).toEqual({ ok: true, redirect: HOME })
 
     const reset = browser()
 
-    await reset.call('requestPasswordReset', 'ada@new.test')
+    await reset.call('password.requestReset', 'ada@new.test')
     await take({ kind: 'reset-password' })
-    expect(await reset.call('resetPassword', tokenOf('reset-password'), 'a brand new password')).toEqual({ ok: true, redirect: HOME })
+    expect(await reset.call('password.reset', tokenOf('reset-password'), 'a brand new password')).toEqual({ ok: true, redirect: HOME })
 
     const magic = browser()
 
-    await magic.call('requestMagicLink', 'ada@new.test')
+    await magic.call('magicLink.request', 'ada@new.test')
     await take({ kind: 'magic-link' })
-    expect(await magic.call('signInWithMagicLink', tokenOf('magic-link'))).toEqual({ ok: true, redirect: HOME })
-    expect(await browser().call('signInWithPassword', { identifier: 'ada@new.test', password: 'a brand new password' })).toEqual({ ok: true, redirect: HOME })
+    expect(await magic.call('magicLink.signIn', tokenOf('magic-link'))).toEqual({ ok: true, redirect: HOME })
+    expect(await browser().call('password.signIn', { identifier: 'ada@new.test', password: 'a brand new password' })).toEqual({ ok: true, redirect: HOME })
   })
 
   test('a verification in a browser not signed in goes to the sign-in page, and a code signs in to home', async () => {
     const { browser, tokenOf, take } = setup({ home: HOME, requireVerified: true, codes: 'code' })
     const ada = browser()
 
-    await ada.call('register', { email: 'ada@example.com', password: PASSWORD })
+    await ada.call('password.register', { email: 'ada@example.com', password: PASSWORD })
     await take({ kind: 'verify-email' })
-    expect(await ada.call('verifyEmail', tokenOf('verify-email'))).toMatchObject({ ok: true })
+    expect(await ada.call('email.verify', tokenOf('verify-email'))).toMatchObject({ ok: true })
 
-    await ada.call('requestMagicLink', 'ada@example.com')
+    await ada.call('magicLink.request', 'ada@example.com')
 
     const [mail] = await take({ kind: 'magic-link' })
 
-    expect(await ada.call('signInWithEmailCode', mail!.code!)).toEqual({ ok: true, redirect: HOME })
+    expect(await ada.call('magicLink.signInWithCode', mail!.code!)).toEqual({ ok: true, redirect: HOME })
   })
 
   test('a redirect asked for wins, and without pages the fallback stays /', async () => {
     const { browser, tokenOf, take } = setup({ pages: false })
     const ada = browser()
 
-    await ada.call('register', { email: 'ada@example.com', password: PASSWORD })
-    expect(await ada.call('verifyEmail', tokenOf('verify-email'))).toEqual({ ok: true, redirect: '/' })
+    await ada.call('password.register', { email: 'ada@example.com', password: PASSWORD })
+    expect(await ada.call('email.verify', tokenOf('verify-email'))).toEqual({ ok: true, redirect: '/' })
 
-    await ada.call('requestMagicLink', 'ada@example.com', { redirect: '/account' })
+    await ada.call('magicLink.request', 'ada@example.com', { redirect: '/account' })
     await take({ kind: 'magic-link' })
-    expect(await ada.call('signInWithMagicLink', tokenOf('magic-link'))).toEqual({ ok: true, redirect: '/account' })
-    expect(await browser().call('signInWithPassword', { identifier: 'ada@example.com', password: PASSWORD }, { redirect: '//evil.test' })).toEqual({ ok: true, redirect: '/' })
+    expect(await ada.call('magicLink.signIn', tokenOf('magic-link'))).toEqual({ ok: true, redirect: '/account' })
+    expect(await browser().call('password.signIn', { identifier: 'ada@example.com', password: PASSWORD }, { redirect: '//evil.test' })).toEqual({ ok: true, redirect: '/' })
   })
 
   test('a passkey sign-in and an OAuth sign-in land on home', async () => {
@@ -88,15 +88,15 @@ describe('where a flow lands when nothing asked for another page', () => {
     const ada = browser()
     const device = authenticator()
 
-    await ada.call('register', { email: 'ada@example.com', password: PASSWORD })
+    await ada.call('password.register', { email: 'ada@example.com', password: PASSWORD })
 
-    const { options } = await ada.callOk('passkeyRegistrationOptions', { password: PASSWORD })
+    const { options } = await ada.callOk('passkeys.registrationOptions', { password: PASSWORD })
 
-    await ada.callOk('registerPasskey', await device.create(options))
+    await ada.callOk('passkeys.register', await device.create(options))
 
     const visitor = browser()
 
-    expect(await visitor.call('signInWithPasskey', await device.get(await visitor.call('passkeySignInOptions')))).toEqual({ ok: true, redirect: HOME })
+    expect(await visitor.call('passkeys.signIn', await device.get(await visitor.call('passkeys.signInOptions')))).toEqual({ ok: true, redirect: HOME })
 
     globalThis.fetch = (async (input: string | URL | Request) => {
       const url = String(input)
@@ -146,11 +146,11 @@ describe('the lifetime of a sign-in by emailed code', () => {
 
       await store.users.create(userRecord({ id: `u${index}`, email, emailVerifiedAt: new Date() }))
 
-      await visitor.call('requestMagicLink', email, remember === undefined ? {} : { remember })
+      await visitor.call('magicLink.request', email, remember === undefined ? {} : { remember })
 
       const [mail] = await take({ kind: 'magic-link' })
 
-      expect(await visitor.call('signInWithEmailCode', mail!.code!)).toMatchObject({ ok: true })
+      expect(await visitor.call('magicLink.signInWithCode', mail!.code!)).toMatchObject({ ok: true })
 
       const [session] = await store.sessions.listByUser(`u${index}`)
 

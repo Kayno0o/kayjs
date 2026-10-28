@@ -14,7 +14,7 @@ import PageSection from '@kaynooo/kayjs-ui/page-section.kay'
 // Every action answers about the organization the route names, never one the input names, and the methods behind them check who may.
 export const rename = action(schemas.organization, async ({ name, slug }, ctx) => {
   const auth = ctx.locals.auth
-  const result = await auth.updateOrganization(String(ctx.params.org), { name: name.trim(), slug: slug?.trim() || null })
+  const result = await auth.organizations.update(String(ctx.params.org), { name: name.trim(), slug: slug?.trim() || null })
 
   if (!result.ok)
     return ctx.fail(400, { error: result.error })
@@ -25,25 +25,25 @@ export const rename = action(schemas.organization, async ({ name, slug }, ctx) =
 })
 
 export const setRoles = action(schemas.memberRoles, async ({ userId, roles }, ctx) => {
-  const result = await ctx.locals.auth.setMemberRoles(String(ctx.params.org), userId, (roles ?? []) as never[])
+  const result = await ctx.locals.auth.organizations.setMemberRoles(String(ctx.params.org), userId, (roles ?? []) as never[])
 
   return result.ok ? 'done' : ctx.fail(400, { error: result.error })
 })
 
 export const removeMember = action(schemas.member, async ({ userId }, ctx) => {
-  const result = await ctx.locals.auth.deleteMember(String(ctx.params.org), userId)
+  const result = await ctx.locals.auth.organizations.removeMember(String(ctx.params.org), userId)
 
   return result.ok ? 'done' : ctx.fail(400, { error: result.error })
 })
 
 export const invite = action(schemas.invite, async ({ email, roles }, ctx) => {
-  const result = await ctx.locals.auth.invite(String(ctx.params.org), email.trim(), roles?.length ? roles as never[] : undefined)
+  const result = await ctx.locals.auth.organizations.invite(String(ctx.params.org), email.trim(), roles?.length ? roles as never[] : undefined)
 
   return result.ok ? result.invitation.email : ctx.fail(400, { error: result.error })
 })
 
 export const revoke = action(schemas.id, async ({ id }, ctx) => {
-  const result = await ctx.locals.auth.revokeInvitation(String(ctx.params.org), id)
+  const result = await ctx.locals.auth.organizations.revokeInvitation(String(ctx.params.org), id)
 
   return result.ok ? 'done' : ctx.fail(400, { error: result.error })
 })
@@ -53,7 +53,7 @@ export const leave = action(schemas.adminDelete, async ({ confirm }, ctx) => {
     return ctx.fail(400, { error: 'form' })
 
   const auth = ctx.locals.auth
-  const result = await auth.leaveOrganization(String(ctx.params.org))
+  const result = await auth.organizations.leave(String(ctx.params.org))
 
   return result.ok ? ctx.redirect(organizationsPage(auth.features())) : ctx.fail(400, { error: result.error })
 })
@@ -63,7 +63,7 @@ export const remove = action(schemas.adminDelete, async ({ confirm }, ctx) => {
     return ctx.fail(400, { error: 'form' })
 
   const auth = ctx.locals.auth
-  const result = await auth.deleteOrganization(String(ctx.params.org))
+  const result = await auth.organizations.delete(String(ctx.params.org))
 
   return result.ok ? ctx.redirect(organizationsPage(auth.features())) : ctx.fail(400, { error: result.error })
 })
@@ -71,7 +71,7 @@ export const remove = action(schemas.adminDelete, async ({ confirm }, ctx) => {
 const auth = ctx.locals.auth
 const features = auth.features()
 const settings = features.organizations!
-const found = await auth.getOrganization(String(ctx.params.org))
+const found = await auth.organizations.get(String(ctx.params.org))
 
 if (found === null)
   ctx.notFound()
@@ -83,9 +83,9 @@ const held = new Set(found.roles.flatMap(role => settings.grants[role] ?? []))
 
 const manages = held.has(settings.manage)
 const owns = held.has(settings.owner)
-const members = await auth.listMembers(organization.id)
+const members = await auth.organizations.members(organization.id)
 const people = members.ok ? members.members : []
-const open = manages ? await auth.listInvitations(organization.id) : null
+const open = manages ? await auth.organizations.invitations(organization.id) : null
 const invitations = open?.ok ? open.invitations : []
 // A manager changes only members holding no role above theirs, and gives only roles they hold.
 const editable = (roles: string[]) => manages && roles.every(role => held.has(role))

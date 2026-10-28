@@ -522,8 +522,8 @@ describe('guard', () => {
     const { auth, browser } = testApp({ scopes: ['posts:read', 'posts:write'] })
     const ada = browser()
 
-    await ada.call('register', { email: 'ada@example.com', password: 'correct horse battery' })
-    const { token } = await ada.callOk('createToken', { password: 'correct horse battery' }, 'Phone', { scopes: ['posts:read'] })
+    await ada.call('password.register', { email: 'ada@example.com', password: 'correct horse battery' })
+    const { token } = await ada.callOk('tokens.create', { password: 'correct horse battery' }, 'Phone', { scopes: ['posts:read'] })
     const locals = await contextOf(auth.plugin, '', { authorization: `Bearer ${token}` })
     const session = await contextOf(auth.plugin, `kay_session=${ada.cookies.get('kay_session')}`)
 

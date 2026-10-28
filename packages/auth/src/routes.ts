@@ -20,7 +20,7 @@ const UNSAFE_FILE_NAME = /[^\w.-]/g
 
 // What the routes read of Elysia's context.
 interface RouteContext {
-  auth: Pick<Auth, typeof STATE | 'exportData' | 'signOut' | 'stopImpersonating'>
+  auth: Pick<Auth, typeof STATE | 'exportData' | 'signOut' | 'admin'>
   request: Request
   body: unknown
   query: Record<string, unknown>
@@ -94,7 +94,7 @@ export async function stopImpersonatingRoute({ auth, body, redirect, request }: 
   if (auth[STATE].crossSite())
     return crossSiteResponse(request, 'request', core.url)
 
-  await auth.stopImpersonating()
+  await auth.admin.stopImpersonating()
 
   return redirect(safeRedirect(text((body as Record<string, unknown> | undefined)?.redirect), homeOf(core)), 303)
 }

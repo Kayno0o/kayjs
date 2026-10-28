@@ -36,22 +36,22 @@ type Browser = ReturnType<Awaited<ReturnType<typeof setup>>['browser']>
 async function registered(app: Awaited<ReturnType<typeof setup>>, email = 'ada@example.com') {
   const browser = app.browser()
 
-  await browser.call('register', { email, password: PASSWORD })
+  await browser.call('password.register', { email, password: PASSWORD })
 
   return browser
 }
 
 async function addPasskey(browser: Browser, device = authenticator(), name?: string, proof: Proof = { password: PASSWORD }) {
-  const { options } = await browser.callOk('passkeyRegistrationOptions', proof)
-  const added = await browser.callOk('registerPasskey', await device.create(options), name)
+  const { options } = await browser.callOk('passkeys.registrationOptions', proof)
+  const added = await browser.callOk('passkeys.register', await device.create(options), name)
 
   return { device, added }
 }
 
 async function passkeySignIn(browser: Browser, device: ReturnType<typeof authenticator>, answer: Parameters<ReturnType<typeof authenticator>['get']>[1] = {}, redirect?: string) {
-  const options = await browser.call('passkeySignInOptions')
+  const options = await browser.call('passkeys.signInOptions')
 
-  return browser.call('signInWithPasskey', await device.get(options, answer), { redirect })
+  return browser.call('passkeys.signIn', await device.get(options, answer), { redirect })
 }
 
 describe('registering passkeys', () => {
@@ -66,18 +66,18 @@ describe('registering passkeys', () => {
   test('a signed-in user adds a passkey kept on the authenticator, named as they choose, and is mailed', async () => {
     const app = await setup()
     const ada = await registered(app)
-    const { options } = await ada.callOk('passkeyRegistrationOptions', { password: PASSWORD })
+    const { options } = await ada.callOk('passkeys.registrationOptions', { password: PASSWORD })
 
     expect(options).toMatchObject({ rp: { id: 'site.test', name: 'Site' }, authenticatorSelection: { residentKey: 'required' }, attestation: 'none' })
 
     const device = authenticator({ synced: true })
-    const added = await ada.callOk('registerPasskey', await device.create(options), '  Phone  ')
+    const added = await ada.callOk('passkeys.register', await device.create(options), '  Phone  ')
 
     expect(added).toMatchObject({ ok: true, passkey: { name: 'Phone', multiDevice: true, backedUp: true, lastUsedAt: null } })
-    expect(await ada.call('listPasskeys')).toMatchObject([{ id: device.credentials[0]!.id, name: 'Phone' }])
+    expect(await ada.call('passkeys.list')).toMatchObject([{ id: device.credentials[0]!.id, name: 'Phone' }])
     expect(app.events.at(-1)).toMatchObject({ event: 'passkey-added', name: 'Phone' })
 
-    const second = await ada.callOk('passkeyRegistrationOptions', { password: PASSWORD })
+    const second = await ada.callOk('passkeys.registrationOptions', { password: PASSWORD })
 
     // The authenticator is told which passkeys it holds already.
     expect(second.options.excludeCredentials).toMatchObject([{ id: device.credentials[0]!.id }])
@@ -86,14 +86,14 @@ describe('registering passkeys', () => {
   test('without a name, the passkey takes the browser and system it was made on', async () => {
     const app = await setup()
     const ada = await registered(app)
-    const { options } = await ada.callOk('passkeyRegistrationOptions', { password: PASSWORD })
+    const { options } = await ada.callOk('passkeys.registrationOptions', { password: PASSWORD })
     const response = await authenticator().create(options)
-    const added = await ada.callOk('registerPasskey', response)
+    const added = await ada.callOk('passkeys.register', response)
 
     expect(added.passkey.name).toBe('Passkey')
 
-    const next = await ada.callOk('passkeyRegistrationOptions', { password: PASSWORD })
-    const named = await ada.json('/call/registerPasskey', {
+    const next = await ada.callOk('passkeys.registrationOptions', { password: PASSWORD })
+    const named = await ada.json('/call/passkeys.register', {
       method: 'POST',
       headers: { 'content-type': 'application/json', 'user-agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Safari/605.1.15' },
       body: JSON.stringify([await authenticator().create(next.options)]),
@@ -106,39 +106,39 @@ describe('registering passkeys', () => {
     const app = await setup()
     const ada = await registered(app)
 
-    const { options } = await ada.callOk('passkeyRegistrationOptions', { password: PASSWORD })
+    const { options } = await ada.callOk('passkeys.registrationOptions', { password: PASSWORD })
     const response = await authenticator().create(options)
 
-    expect(await ada.call('registerPasskey', response)).toMatchObject({ ok: true })
-    expect(await ada.call('registerPasskey', response)).toEqual({ ok: false, error: 'expired' })
+    expect(await ada.call('passkeys.register', response)).toMatchObject({ ok: true })
+    expect(await ada.call('passkeys.register', response)).toEqual({ ok: false, error: 'expired' })
   })
 
   test('with two-factor on, the password alone adds none: a code or a passkey does', async () => {
     const app = await setup()
     const ada = await registered(app)
-    const { setup: twoFactor } = await ada.callOk('setUpTwoFactor', { password: PASSWORD })
-    const { recoveryCodes } = await ada.callOk('enableTwoFactor', await totpCode(twoFactor.secret, totpStep()))
+    const { setup: twoFactor } = await ada.callOk('twoFactor.setUp', { password: PASSWORD })
+    const { recoveryCodes } = await ada.callOk('twoFactor.enable', await totpCode(twoFactor.secret, totpStep()))
 
-    expect(await ada.call('passkeyRegistrationOptions', { password: PASSWORD })).toEqual({ ok: false, error: 'proof' })
+    expect(await ada.call('passkeys.registrationOptions', { password: PASSWORD })).toEqual({ ok: false, error: 'proof' })
 
     const { device } = await addPasskey(ada, authenticator(), undefined, { code: recoveryCodes[0]! })
-    const proof = await ada.callOk('passkeyProofOptions')
+    const proof = await ada.callOk('passkeys.proofOptions')
 
     expect(await addPasskey(ada, authenticator(), undefined, { passkey: await device.get(proof.options) })).toMatchObject({ added: { ok: true } })
-    expect(await ada.call('listPasskeys')).toHaveLength(2)
+    expect(await ada.call('passkeys.list')).toHaveLength(2)
   })
 
   test('a passkey made for another site, or answering another challenge, is refused', async () => {
     const app = await setup()
     const ada = await registered(app)
-    const first = await ada.callOk('passkeyRegistrationOptions', { password: PASSWORD })
+    const first = await ada.callOk('passkeys.registrationOptions', { password: PASSWORD })
 
-    expect(await ada.call('registerPasskey', await authenticator({ origin: 'https://evil.test' }).create(first.options))).toEqual({ ok: false, error: 'invalid' })
+    expect(await ada.call('passkeys.register', await authenticator({ origin: 'https://evil.test' }).create(first.options))).toEqual({ ok: false, error: 'invalid' })
 
-    const second = await ada.callOk('passkeyRegistrationOptions', { password: PASSWORD })
+    const second = await ada.callOk('passkeys.registrationOptions', { password: PASSWORD })
 
-    expect(await ada.call('registerPasskey', await authenticator().create({ ...second.options, challenge: first.options.challenge }))).toEqual({ ok: false, error: 'invalid' })
-    expect(await ada.call('listPasskeys')).toEqual([])
+    expect(await ada.call('passkeys.register', await authenticator().create({ ...second.options, challenge: first.options.challenge }))).toEqual({ ok: false, error: 'invalid' })
+    expect(await ada.call('passkeys.list')).toEqual([])
   })
 })
 
@@ -151,24 +151,24 @@ describe('signing in with a passkey', () => {
     await app.store.users.update(user!.id, { totpEnabledAt: new Date() })
 
     const visitor = app.browser()
-    const options = await visitor.call('passkeySignInOptions')
+    const options = await visitor.call('passkeys.signInOptions')
 
     expect(options.allowCredentials).toBeUndefined()
     expect(options.userVerification).toBe('required')
-    expect(await visitor.call('signInWithPasskey', await device.get(options), { redirect: '//evil.test' })).toEqual({ ok: true, redirect: '/' })
+    expect(await visitor.call('passkeys.signIn', await device.get(options), { redirect: '//evil.test' })).toEqual({ ok: true, redirect: '/' })
     expect(await visitor.json('/me')).toMatchObject({ email: 'ada@example.com' })
-    expect((await visitor.call('listPasskeys'))[0]!.lastUsedAt).not.toBeNull()
+    expect((await visitor.call('passkeys.list'))[0]!.lastUsedAt).not.toBeNull()
   })
 
   test('a replayed answer, one without user verification, or one from a cloned authenticator signs nobody in', async () => {
     const app = await setup()
     const { device } = await addPasskey(await registered(app))
     const visitor = app.browser()
-    const options = await visitor.call('passkeySignInOptions')
+    const options = await visitor.call('passkeys.signInOptions')
     const response = await device.get(options)
 
-    expect(await visitor.call('signInWithPasskey', response)).toMatchObject({ ok: true })
-    expect(await visitor.call('signInWithPasskey', response)).toEqual({ ok: false, error: 'expired' })
+    expect(await visitor.call('passkeys.signIn', response)).toMatchObject({ ok: true })
+    expect(await visitor.call('passkeys.signIn', response)).toEqual({ ok: false, error: 'expired' })
     expect(await passkeySignIn(app.browser(), device, { userVerified: false })).toEqual({ ok: false, error: 'invalid' })
 
     // The store holds the counter at 1: a copy of the key still counting from there gives itself away.
@@ -181,11 +181,11 @@ describe('signing in with a passkey', () => {
     const { device } = await addPasskey(await registered(app))
     const thief = app.browser()
     const victim = app.browser()
-    const stolen = await victim.call('passkeySignInOptions')
+    const stolen = await victim.call('passkeys.signInOptions')
 
-    await thief.call('passkeySignInOptions')
+    await thief.call('passkeys.signInOptions')
 
-    expect(await thief.call('signInWithPasskey', await device.get(stolen))).toEqual({ ok: false, error: 'invalid' })
+    expect(await thief.call('passkeys.signIn', await device.get(stolen))).toEqual({ ok: false, error: 'invalid' })
     expect(await thief.json('/me')).toBe('anonymous')
 
     const stranger = authenticator()
@@ -248,7 +248,7 @@ describe('a passkey as second factor and as proof', () => {
     const answers: unknown[] = []
 
     for (let guess = 0; guess < 5; guess++)
-      answers.push(await visitor.call('verifyTwoFactorPasskey', {} as never))
+      answers.push(await visitor.call('twoFactor.verifyPasskey', {} as never))
 
     expect(answers.at(-1)).toEqual({ ok: false, error: 'limited' })
     // The notice is mailed off the response's path.
@@ -265,13 +265,13 @@ describe('a passkey as second factor and as proof', () => {
 
     const visitor = app.browser()
 
-    expect(await visitor.call('twoFactorPasskeyOptions')).toEqual({ ok: false, error: 'expired' })
+    expect(await visitor.call('twoFactor.passkeyOptions')).toEqual({ ok: false, error: 'expired' })
     expect(await visitor.post('/password', { identifier: 'ada@example.com', password: PASSWORD })).toMatchObject({ ok: true, redirect: '/two-factor' })
 
-    const { options } = await visitor.callOk('twoFactorPasskeyOptions')
+    const { options } = await visitor.callOk('twoFactor.passkeyOptions')
 
     expect(options.allowCredentials).toMatchObject([{ id: device.credentials[0]!.id }])
-    expect(await visitor.call('verifyTwoFactorPasskey', await device.get(options, { userVerified: false }))).toEqual({ ok: true, redirect: '/' })
+    expect(await visitor.call('twoFactor.verifyPasskey', await device.get(options, { userVerified: false }))).toEqual({ ok: true, redirect: '/' })
     expect(await visitor.json('/me')).toMatchObject({ email: 'ada@example.com' })
   })
 
@@ -281,16 +281,16 @@ describe('a passkey as second factor and as proof', () => {
     const { device } = await addPasskey(ada, authenticator(), 'Laptop')
     const id = device.credentials[0]!.id
 
-    expect(await ada.call('revokePasskey', id, { password: 'wrong' })).toEqual({ ok: false, error: 'proof' })
+    expect(await ada.call('passkeys.revoke', id, { password: 'wrong' })).toEqual({ ok: false, error: 'proof' })
 
-    const { options } = await ada.callOk('passkeyProofOptions')
+    const { options } = await ada.callOk('passkeys.proofOptions')
 
     expect(await ada.call('reprove', { passkey: await device.get(options) })).toEqual({ ok: true })
 
-    const again = await ada.callOk('passkeyProofOptions')
+    const again = await ada.callOk('passkeys.proofOptions')
 
-    expect(await ada.call('revokePasskey', id, { passkey: await device.get(again.options) })).toEqual({ ok: true })
-    expect(await ada.call('listPasskeys')).toEqual([])
+    expect(await ada.call('passkeys.revoke', id, { passkey: await device.get(again.options) })).toEqual({ ok: true })
+    expect(await ada.call('passkeys.list')).toEqual([])
     expect(app.events.at(-1)).toMatchObject({ event: 'passkey-removed', name: 'Laptop' })
   })
 
@@ -302,9 +302,9 @@ describe('a passkey as second factor and as proof', () => {
 
     await app.store.users.update(user!.id, { passwordHash: null })
 
-    const { options } = await ada.callOk('passkeyProofOptions')
+    const { options } = await ada.callOk('passkeys.proofOptions')
 
-    expect(await ada.call('revokePasskey', device.credentials[0]!.id, { passkey: await device.get(options) })).toEqual({ ok: false, error: 'last-way-in' })
+    expect(await ada.call('passkeys.revoke', device.credentials[0]!.id, { passkey: await device.get(options) })).toEqual({ ok: false, error: 'last-way-in' })
   })
 
   test('a passkey that never proved user verification is no way in, and is listed as such', async () => {
@@ -318,9 +318,9 @@ describe('a passkey as second factor and as proof', () => {
     await app.store.identities.create({ provider: 'discord', providerId: '1', userId: user!.id, accessToken: null, refreshToken: null, tokenExpiresAt: null, createdAt: new Date() })
     await app.store.passkeys.update(id, { userVerified: false })
 
-    expect(await ada.call('listPasskeys')).toMatchObject([{ userVerified: false }])
+    expect(await ada.call('passkeys.list')).toMatchObject([{ userVerified: false }])
     expect(await ada.call('unlink', 'discord', {})).toEqual({ ok: false, error: 'last-way-in' })
-    expect(await ada.call('revokePasskey', id, {})).toEqual({ ok: true })
+    expect(await ada.call('passkeys.revoke', id, {})).toEqual({ ok: true })
     expect(await ada.call('unlink', 'discord', {})).toEqual({ ok: false, error: 'last-way-in' })
   })
 
@@ -334,8 +334,8 @@ describe('a passkey as second factor and as proof', () => {
     await app.store.users.update(user!.id, { passwordHash: null })
     await app.store.passkeys.update(id, { userVerified: false })
 
-    expect(await ada.call('revokePasskey', id, {})).toEqual({ ok: false, error: 'last-way-in' })
-    expect(await ada.call('listPasskeys')).toHaveLength(1)
+    expect(await ada.call('passkeys.revoke', id, {})).toEqual({ ok: false, error: 'last-way-in' })
+    expect(await ada.call('passkeys.list')).toHaveLength(1)
   })
 
   test('a user-verified sign-in proves a stored passkey, which then counts as a way in', async () => {
@@ -348,14 +348,14 @@ describe('a passkey as second factor and as proof', () => {
     await app.store.users.update(user!.id, { passwordHash: null })
     await app.store.passkeys.update(id, { userVerified: false })
 
-    const { options } = await ada.callOk('passkeyProofOptions')
+    const { options } = await ada.callOk('passkeys.proofOptions')
 
     expect(await ada.call('reprove', { passkey: await device.get(options) })).toEqual({ ok: true })
-    expect(await ada.call('listPasskeys')).toMatchObject([{ userVerified: true }])
+    expect(await ada.call('passkeys.list')).toMatchObject([{ userVerified: true }])
 
-    const again = await ada.callOk('passkeyProofOptions')
+    const again = await ada.callOk('passkeys.proofOptions')
 
-    expect(await ada.call('revokePasskey', id, { passkey: await device.get(again.options) })).toEqual({ ok: false, error: 'last-way-in' })
+    expect(await ada.call('passkeys.revoke', id, { passkey: await device.get(again.options) })).toEqual({ ok: false, error: 'last-way-in' })
   })
 
   test('a passkey is renamed by its owner only', async () => {
@@ -365,10 +365,10 @@ describe('a passkey as second factor and as proof', () => {
     const bob = await registered(app, 'bob@example.com')
     const id = device.credentials[0]!.id
 
-    expect(await bob.call('updatePasskeyName', id, 'Mine')).toEqual({ ok: false, error: 'not-found' })
-    expect(await ada.call('updatePasskeyName', id, ' ')).toEqual({ ok: false, error: 'invalid-name' })
-    expect(await ada.call('updatePasskeyName', id, 'Work laptop')).toEqual({ ok: true })
-    expect(await ada.call('listPasskeys')).toMatchObject([{ name: 'Work laptop' }])
+    expect(await bob.call('passkeys.rename', id, 'Mine')).toEqual({ ok: false, error: 'not-found' })
+    expect(await ada.call('passkeys.rename', id, ' ')).toEqual({ ok: false, error: 'invalid-name' })
+    expect(await ada.call('passkeys.rename', id, 'Work laptop')).toEqual({ ok: true })
+    expect(await ada.call('passkeys.list')).toMatchObject([{ name: 'Work laptop' }])
   })
 })
 
@@ -377,33 +377,33 @@ describe('passkey options', () => {
     const named = await registered(await setup({ rpName: 'Acme Inc' }))
     const plain = await registered(await setup())
 
-    expect((await named.callOk('passkeyRegistrationOptions', { password: PASSWORD })).options.rp).toEqual({ id: 'site.test', name: 'Acme Inc' })
-    expect((await plain.callOk('passkeyRegistrationOptions', { password: PASSWORD })).options.rp.name).toBe('Site')
+    expect((await named.callOk('passkeys.registrationOptions', { password: PASSWORD })).options.rp).toEqual({ id: 'site.test', name: 'Acme Inc' })
+    expect((await plain.callOk('passkeys.registrationOptions', { password: PASSWORD })).options.rp.name).toBe('Site')
   })
 
   test('registering, sign-in and re-proof always require user verification, whatever userVerification says', async () => {
     for (const level of ['required', 'preferred', 'discouraged'] as const) {
       const app = await setup({ userVerification: level })
       const ada = await registered(app)
-      const { options } = await ada.callOk('passkeyRegistrationOptions', { password: PASSWORD })
+      const { options } = await ada.callOk('passkeys.registrationOptions', { password: PASSWORD })
 
       expect(options.authenticatorSelection?.userVerification).toBe('required')
-      expect((await app.browser().call('passkeySignInOptions')).userVerification).toBe('required')
+      expect((await app.browser().call('passkeys.signInOptions')).userVerification).toBe('required')
     }
 
     const lax = await registered(await setup({ userVerification: 'discouraged' }))
-    const registration = await lax.callOk('passkeyRegistrationOptions', { password: PASSWORD })
+    const registration = await lax.callOk('passkeys.registrationOptions', { password: PASSWORD })
 
-    expect(await lax.call('registerPasskey', await authenticator().create(registration.options, { userVerified: false }))).toEqual({ ok: false, error: 'invalid' })
-    expect(await lax.call('listPasskeys')).toEqual([])
+    expect(await lax.call('passkeys.register', await authenticator().create(registration.options, { userVerified: false }))).toEqual({ ok: false, error: 'invalid' })
+    expect(await lax.call('passkeys.list')).toEqual([])
   })
 
   test('required refuses a passkey made without user verification and a second factor answered without it', async () => {
     const app = await setup({ userVerification: 'required' })
     const ada = await registered(app)
-    const { options } = await ada.callOk('passkeyRegistrationOptions', { password: PASSWORD })
+    const { options } = await ada.callOk('passkeys.registrationOptions', { password: PASSWORD })
 
-    expect(await ada.call('registerPasskey', await authenticator().create(options, { userVerified: false }))).toEqual({ ok: false, error: 'invalid' })
+    expect(await ada.call('passkeys.register', await authenticator().create(options, { userVerified: false }))).toEqual({ ok: false, error: 'invalid' })
 
     const { device } = await addPasskey(ada)
     const user = await app.store.users.findByEmail('ada@example.com')
@@ -414,10 +414,10 @@ describe('passkey options', () => {
 
     await visitor.post('/password', { identifier: 'ada@example.com', password: PASSWORD })
 
-    const second = await visitor.callOk('twoFactorPasskeyOptions')
+    const second = await visitor.callOk('twoFactor.passkeyOptions')
 
     expect(second.options.userVerification).toBe('required')
-    expect(await visitor.call('verifyTwoFactorPasskey', await device.get(second.options, { userVerified: false }))).toEqual({ ok: false, error: 'invalid' })
+    expect(await visitor.call('twoFactor.verifyPasskey', await device.get(second.options, { userVerified: false }))).toEqual({ ok: false, error: 'invalid' })
   })
 
   test('discouraged takes a second factor answered without user verification', async () => {
@@ -431,9 +431,9 @@ describe('passkey options', () => {
 
     await visitor.post('/password', { identifier: 'ada@example.com', password: PASSWORD })
 
-    const { options } = await visitor.callOk('twoFactorPasskeyOptions')
+    const { options } = await visitor.callOk('twoFactor.passkeyOptions')
 
     expect(options.userVerification).toBe('discouraged')
-    expect(await visitor.call('verifyTwoFactorPasskey', await device.get(options, { userVerified: false }))).toEqual({ ok: true, redirect: '/' })
+    expect(await visitor.call('twoFactor.verifyPasskey', await device.get(options, { userVerified: false }))).toEqual({ ok: true, redirect: '/' })
   })
 })

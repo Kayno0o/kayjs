@@ -90,7 +90,7 @@ export async function passkeyRegistrationOptions(state: RequestState, proof: Pro
   return { ok: true, options }
 }
 
-// Keeps the passkey the browser made from `passkeyRegistrationOptions`, under `name` or the device it was made on.
+// Keeps the passkey the browser made from `passkeys.registrationOptions`, under `name` or the device it was made on.
 export async function registerPasskey(state: RequestState, response: RegistrationResponseJSON, name?: string): Promise<RegisterPasskeyResult> {
   const { core } = state
   const relying = relyingParty(core)
@@ -203,7 +203,7 @@ export async function passkeySignInOptions(state: RequestState): Promise<PublicK
   return options
 }
 
-// Signs in the user whose passkey answered `passkeySignInOptions`. A passkey with user verification is two factors in one, so no second factor is asked after it.
+// Signs in the user whose passkey answered `passkeys.signInOptions`. A passkey with user verification is two factors in one, so no second factor is asked after it.
 export async function signInWithPasskey(state: RequestState, response: AuthenticationResponseJSON, redirect: string | undefined, signIn: (record: UserRecord, method: string) => Promise<void>): Promise<PasskeySignInResult> {
   const { core } = state
 
@@ -286,7 +286,7 @@ export async function passkeyProofOptions(state: RequestState): Promise<PasskeyO
   return userOptions(state, record, 'reprove')
 }
 
-// Whether `response` re-proves `record` with one of their passkeys, against the challenge `passkeyProofOptions` parked.
+// Whether `response` re-proves `record` with one of their passkeys, against the challenge `passkeys.proofOptions` parked.
 export async function provePasskey(state: RequestState, record: UserRecord, response: AuthenticationResponseJSON): Promise<boolean> {
   const challenge = await take(state, 'reprove', record.id)
   const passkey = challenge === undefined ? undefined : await state.core.store.passkeys.get(response.id)

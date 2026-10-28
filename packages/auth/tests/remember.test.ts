@@ -28,7 +28,7 @@ describe('remember me', () => {
     const { browser, store } = await setup()
     const ada = browser()
 
-    expect(await cookieOf(ada, 'register', { email: 'grace@example.com', password: PASSWORD }, { remember: true })).toContain(`Max-Age=${90 * DAY}`)
+    expect(await cookieOf(ada, 'password.register', { email: 'grace@example.com', password: PASSWORD }, { remember: true })).toContain(`Max-Age=${90 * DAY}`)
 
     const [session] = await store.sessions.listByUser((await ada.json('/me') as { id: string }).id)
 
@@ -77,10 +77,10 @@ describe('remember me', () => {
     const { browser, store } = await setup()
     const ada = browser()
 
-    await ada.call('register', { email: 'grace@example.com', password: PASSWORD })
+    await ada.call('password.register', { email: 'grace@example.com', password: PASSWORD })
     await ada.fetch('/sign-out', { method: 'POST' })
-    expect(await ada.call('signInWithPassword', { identifier: 'grace@example.com', password: 'wrong password' }, { remember: true })).toMatchObject({ ok: false })
-    expect(await cookieOf(ada, 'signInWithPassword', { identifier: 'grace@example.com', password: PASSWORD })).toContain(`Max-Age=${30 * DAY}`)
+    expect(await ada.call('password.signIn', { identifier: 'grace@example.com', password: 'wrong password' }, { remember: true })).toMatchObject({ ok: false })
+    expect(await cookieOf(ada, 'password.signIn', { identifier: 'grace@example.com', password: PASSWORD })).toContain(`Max-Age=${30 * DAY}`)
 
     const { id } = await ada.json('/me') as { id: string }
 

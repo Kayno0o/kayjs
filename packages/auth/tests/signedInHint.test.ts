@@ -119,10 +119,10 @@ describe('the cookie marking a browser as signed in', () => {
 
     const visitor = app.browser()
 
-    await visitor.call('requestMagicLink', 'ada@example.com')
+    await visitor.call('magicLink.request', 'ada@example.com')
 
     const token = new URL(mails.findLast(mail => mail.url !== undefined)!.url!).searchParams.get('token')!
-    const link = await visitor.fetch('/call/signInWithMagicLink', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify([token]) })
+    const link = await visitor.fetch('/call/magicLink.signIn', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify([token]) })
 
     expect(cookiesOf(link)).toMatch(HINT)
   })
@@ -143,15 +143,15 @@ describe('the cookie marking a browser as signed in', () => {
 
     await owner.fetch(`/sign-in/${ada.id}`, { method: 'POST' })
 
-    const set = await owner.callOk('setUpTwoFactor', { password: PASSWORD })
+    const set = await owner.callOk('twoFactor.setUp', { password: PASSWORD })
 
-    await owner.callOk('enableTwoFactor', await totpCode(set.setup.secret, totpStep()))
+    await owner.callOk('twoFactor.enable', await totpCode(set.setup.secret, totpStep()))
 
     const phone = app.browser()
     const password = await phone.fetch('/password', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ identifier: 'ada@example.com', password: PASSWORD }) })
 
     expect(cookiesOf(password)).not.toContain('kay_user')
-    expect(cookiesOf(await phone.fetch('/call/verifyTwoFactor', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify([await totpCode(set.setup.secret, totpStep() + 1)]) }))).toMatch(HINT)
+    expect(cookiesOf(await phone.fetch('/call/twoFactor.verify', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify([await totpCode(set.setup.secret, totpStep() + 1)]) }))).toMatch(HINT)
   })
 
   test('is cleared when the session turns out to have ended elsewhere', async () => {

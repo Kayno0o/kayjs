@@ -7,7 +7,7 @@ export const page = { query: t.Object({ token: t.Optional(t.String()) }), guards
 
 // The link only shows this button: a mail scanner opening it spends nothing.
 export const spend = action(t.Object({ token: t.String() }), async ({ token }, ctx) => {
-  const result = await ctx.locals.auth.signInWithMagicLink(token)
+  const result = await ctx.locals.auth.magicLink.signIn(token)
 
   return !result.ok ? ctx.fail(400, { error: result.error }) : ctx.redirect(result.redirect)
 })

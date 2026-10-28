@@ -12,7 +12,7 @@ const SOURCE_PATH = /packages\/auth\/src\/(.+)$/
 async function signedIn(app: { browser: ReturnType<typeof testApp>['browser'] }) {
   const visitor = app.browser()
 
-  await visitor.call('register', { email: 'ada@example.com', password: PASSWORD })
+  await visitor.call('password.register', { email: 'ada@example.com', password: PASSWORD })
 
   return visitor
 }
@@ -22,7 +22,7 @@ const scenarios: Record<string, () => Promise<void>> = {
   async minimal() {
     const visitor = testApp().browser()
 
-    await visitor.call('register', { email: 'ada@example.com', password: PASSWORD })
+    await visitor.call('password.register', { email: 'ada@example.com', password: PASSWORD })
     await visitor.json('/me')
   },
   // The default app with the prebuilt pages, probed on a provider route it does not have.
@@ -39,7 +39,7 @@ const scenarios: Record<string, () => Promise<void>> = {
   // A bearer token the app issued itself, then used for a request.
   async bearerIssued() {
     const app = testApp()
-    const { user } = await app.browser().callHas('user', 'register', { email: 'ada@example.com', password: PASSWORD })
+    const { user } = await app.browser().callHas('user', 'password.register', { email: 'ada@example.com', password: PASSWORD })
     const issued = await app.auth.issueToken(user.id, 'Kitchen display')
 
     await app.browser().fetch('/me', { headers: { authorization: `Bearer ${issued.ok ? issued.token : ''}` } })
@@ -60,12 +60,12 @@ const scenarios: Record<string, () => Promise<void>> = {
     const app = testApp({ site: SITE, passkeys: false, twoFactor: false, password: false, magicLink: false })
     const visitor = app.browser()
 
-    await visitor.call('signInWithPassword', { identifier: 'ada@example.com', password: PASSWORD })
-    await visitor.call('signInWithMagicLink', 'token')
-    await visitor.call('setUpTwoFactor', { password: PASSWORD })
-    await visitor.call('enableTwoFactor', '123456')
-    await visitor.call('signInWithPasskey', {} as never)
-    await visitor.call('changePassword', { password: PASSWORD }, PASSWORD)
+    await visitor.call('password.signIn', { identifier: 'ada@example.com', password: PASSWORD })
+    await visitor.call('magicLink.signIn', 'token')
+    await visitor.call('twoFactor.setUp', { password: PASSWORD })
+    await visitor.call('twoFactor.enable', '123456')
+    await visitor.call('passkeys.signIn', {} as never)
+    await visitor.call('password.change', { password: PASSWORD }, PASSWORD)
   },
   async forwardAuth() {
     const visitor = testApp({ site: SITE, forwardAuth: 'example.test' }).browser()
@@ -75,22 +75,22 @@ const scenarios: Record<string, () => Promise<void>> = {
   async passkeys() {
     const visitor = await signedIn(testApp({ site: SITE }))
 
-    await visitor.call('passkeySignInOptions')
+    await visitor.call('passkeys.signInOptions')
   },
   async twoFactor() {
     const visitor = await signedIn(testApp())
 
-    await visitor.call('setUpTwoFactor', { password: PASSWORD })
+    await visitor.call('twoFactor.setUp', { password: PASSWORD })
   },
   async organizations() {
     const visitor = await signedIn(testApp({ organizations: { roles: { owner: [], member: [] }, owner: 'owner' } }))
 
-    await visitor.call('createOrganization', { name: 'Acme' })
+    await visitor.call('organizations.create', { name: 'Acme' })
   },
   async admin() {
     const visitor = await signedIn(testApp({ admin: 'admin' }))
 
-    await visitor.call('listUsers')
+    await visitor.call('admin.listUsers')
   },
   async oauth() {
     const visitor = testApp({ site: SITE, oauth: { discord: { provider: discordProvider(), clientId: 'id', clientSecret: 'secret' } } }).browser()

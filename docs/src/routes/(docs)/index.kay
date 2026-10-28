@@ -44,7 +44,7 @@ const Credentials = s.Object({
 })
 
 export const signIn = action(Credentials, async (input, ctx) => {
-  const result = await ctx.locals.auth.signInWithPassword(input)
+  const result = await ctx.locals.auth.password.signIn(input)
 
   if (!result.ok)
     return ctx.fail(400, { error: result.error })

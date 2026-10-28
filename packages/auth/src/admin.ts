@@ -271,7 +271,7 @@ export async function adminAuditLog(state: RequestState, query: { userId?: strin
 
 export type ImpersonateResult = { ok: true } | { ok: false, error: AdminFailure | 'stale' | 'self' | 'admin' | 'banned' }
 
-// Signs this browser in as `userId`, the admin's own sign-in kept for `stopImpersonating`; 'stale' unless the admin signed in or re-proved lately. Nothing that takes a proof works meanwhile, and another admin cannot be impersonated.
+// Signs this browser in as `userId`, the admin's own sign-in kept for `admin.stopImpersonating`; 'stale' unless the admin signed in or re-proved lately. Nothing that takes a proof works meanwhile, and another admin cannot be impersonated.
 export async function impersonate(state: RequestState, userId: string): Promise<ImpersonateResult> {
   const acting = await changingAdmin(state)
   const own = await state.session.get('auth')

@@ -14,7 +14,7 @@ export interface Proof {
   password?: string
   // An authenticator code, or a recovery code.
   code?: string
-  // A passkey's answer to `passkeyProofOptions`, which stands for the password and the second factor both.
+  // A passkey's answer to `passkeys.proofOptions`, which stands for the password and the second factor both.
   passkey?: AuthenticationResponseJSON
 }
 

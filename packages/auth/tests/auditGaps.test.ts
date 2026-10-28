@@ -29,16 +29,16 @@ describe('emailed codes', () => {
     const thief = browser()
     const ada = browser()
 
-    await thief.call('requestMagicLink', 'ada@example.com')
-    await ada.call('requestMagicLink', 'ada@example.com')
+    await thief.call('magicLink.request', 'ada@example.com')
+    await ada.call('magicLink.request', 'ada@example.com')
 
     const [, mail] = await take({ kind: 'magic-link' }, 2)
     const code = mail!.code!
 
     for (let miss = 0; miss < 6; miss++)
-      await thief.call('signInWithEmailCode', code === '000000' ? '111111' : '000000')
+      await thief.call('magicLink.signInWithCode', code === '000000' ? '111111' : '000000')
 
-    expect(await ada.call('signInWithEmailCode', code)).toMatchObject({ ok: true })
+    expect(await ada.call('magicLink.signInWithCode', code)).toMatchObject({ ok: true })
   })
 })
 
@@ -58,10 +58,10 @@ describe('resetting a password', () => {
     const visitor = browser()
 
     for (let i = 0; i < 6; i++)
-      await visitor.call('resetPassword', 'forged', PASSWORD)
+      await visitor.call('password.reset', 'forged', PASSWORD)
 
     expect(asked.length).toBeLessThanOrEqual(2)
-    expect(await visitor.call('resetPassword', 'forged', PASSWORD)).toEqual({ ok: false, error: 'limited' })
+    expect(await visitor.call('password.reset', 'forged', PASSWORD)).toEqual({ ok: false, error: 'limited' })
   })
 
   test('a refused password still leaves the link usable', async () => {
@@ -69,13 +69,13 @@ describe('resetting a password', () => {
     const { browser, store } = testApp({ site: 'https://site.test', email: { mailer, links: LINKS }, breachedPasswords: password => password === 'known breached one' })
 
     await store.users.create(userRecord({ id: 'u1', email: 'ada@example.com', emailVerifiedAt: new Date() }))
-    await browser().call('requestPasswordReset', 'ada@example.com')
+    await browser().call('password.requestReset', 'ada@example.com')
 
     const token = new URL((await take({ kind: 'reset-password' }))[0]!.url!).searchParams.get('token')!
     const visitor = browser()
 
-    expect(await visitor.call('resetPassword', token, 'known breached one')).toEqual({ ok: false, errors: { password: 'breached' } })
-    expect(await visitor.call('resetPassword', token, PASSWORD)).toMatchObject({ ok: true })
+    expect(await visitor.call('password.reset', token, 'known breached one')).toEqual({ ok: false, errors: { password: 'breached' } })
+    expect(await visitor.call('password.reset', token, PASSWORD)).toMatchObject({ ok: true })
   })
 })
 
@@ -84,7 +84,7 @@ describe('the second factor cap', () => {
     const box = mailbox()
     const app = testApp({ rateLimit: { twoFactorAccount: { max: 3, window: '900s' } }, site: 'https://site.test', email: { mailer: box.mailer, links: LINKS, requireVerified: false } })
 
-    await app.browser().call('register', { email: 'ada@example.com', password: PASSWORD })
+    await app.browser().call('password.register', { email: 'ada@example.com', password: PASSWORD })
 
     const user = (await app.store.users.findByEmail('ada@example.com'))!
     const secret = base32Encode(new TextEncoder().encode('a-plain-legacy-secret'))
@@ -98,7 +98,7 @@ describe('the second factor cap', () => {
     const answers: unknown[] = []
 
     for (let i = 0; i < 7; i++)
-      answers.push(await visitor.call('verifyTwoFactor', '000000'))
+      answers.push(await visitor.call('twoFactor.verify', '000000'))
 
     expect(answers.at(-1)).toEqual({ ok: false, error: 'limited' })
     // The notice is mailed off the response's path.

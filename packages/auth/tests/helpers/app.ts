@@ -1,4 +1,5 @@
 import type { Auth, AuthOptions, AuthSessionData } from '../../src/auth'
+import type { FlatMethods } from '../../src/flatMethods'
 import type { SignInOptions } from '../../src/signInOptions'
 import type { AuthStore, UserRecord } from '../../src/store'
 import { Elysia } from 'elysia'
@@ -72,18 +73,19 @@ export function testApp<const Scope extends string = never, OrgRole extends stri
     .post('/register', async ({ auth, body }) => {
       const { captcha, remember, ...input } = body as Parameters<typeof auth.register>[0] & SignInOptions
 
-      return auth.register(input, { captcha, remember })
+      return auth.password.register(input, { captcha, remember })
     })
     .post('/password', async ({ auth, body }) => {
       const { captcha, redirect, remember, ...input } = body as Parameters<typeof auth.signInWithPassword>[0] & SignInOptions
 
-      return auth.signInWithPassword(input, { captcha, redirect, remember })
+      return auth.password.signIn(input, { captcha, redirect, remember })
     })
-    // Calls any method of `auth` with the posted arguments, so a test drives what an action would.
+    // Calls any method of `auth`, or of one of its groups as `admin.listUsers`, with the posted arguments, so a test drives what an action would.
     .post('/call/:method', async ({ auth, params, body }) => {
-      const method = (auth as unknown as Record<string, (...args: unknown[]) => Promise<unknown>>)[params.method]!
+      const [group, name] = params.method.includes('.') ? params.method.split('.') as [string, string] : [undefined, params.method]
+      const target = (group === undefined ? auth : (auth as unknown as Record<string, unknown>)[group]) as Record<string, (...args: unknown[]) => Promise<unknown>>
 
-      return (await method.apply(auth, body as unknown[])) ?? null
+      return (await target[name]!.apply(target, body as unknown[])) ?? null
     })
     .post('/sign-out', async ({ auth }) => {
       await auth.signOut()
@@ -107,7 +109,16 @@ export function testApp<const Scope extends string = never, OrgRole extends stri
   return { auth, app, store, browser: () => browserOn(app), browserOn, pruned }
 }
 
-type Method<A, M extends keyof A> = A[M] extends (...args: infer Args) => infer Answer ? { args: Args, answer: Awaited<Answer> } : never
+// The flat names before 1.82, which the tests leave to `flatMethods.test.ts`.
+type Flat = Exclude<keyof FlatMethods<string, string, string>, Groups>
+type Groups = 'password' | 'email' | 'magicLink' | 'twoFactor' | 'passkeys' | 'sessions' | 'tokens' | 'oauthServer' | 'admin' | 'organizations'
+
+// What `call` takes: a method of `auth`, or `group.method` for one of its groups.
+type MethodPath<A> = { [K in Exclude<keyof A & string, Flat>]: A[K] extends (...args: never[]) => unknown ? K : A[K] extends object ? `${K}.${keyof A[K] & string}` : never }[Exclude<keyof A & string, Flat>]
+
+type At<A, P extends string> = P extends `${infer G}.${infer K}` ? G extends keyof A ? K extends keyof A[G] ? A[G][K] : never : never : P extends keyof A ? A[P] : never
+
+type Method<A, P extends string> = At<A, P> extends (...args: infer Args) => infer Answer ? { args: Args, answer: Awaited<Answer> } : never
 
 // What an answer is once it went through JSON: dates are strings, and a method answering nothing answers null.
 type Wire<T> = T extends undefined ? null : Shape<T>
@@ -125,11 +136,11 @@ export function browser<A = Record<string, never>>(app: { handle: (request: Requ
       return jar.send(async request => app.handle(request), new Request(`http://localhost${path}`, init))
     },
     // Calls `auth[method](...args)` in this browser and reads the answer.
-    async call<M extends keyof A & string>(method: M, ...args: Method<A, M>['args']): Promise<Wire<Method<A, M>['answer']>> {
+    async call<M extends MethodPath<A>>(method: M, ...args: Method<A, M>['args']): Promise<Wire<Method<A, M>['answer']>> {
       return await this.post(`/call/${method}`, args) as Wire<Method<A, M>['answer']>
     },
     // As `call`, for a test that needs the answer of a call that must have worked: anything but `ok: true` fails it.
-    async callOk<M extends keyof A & string>(method: M, ...args: Method<A, M>['args']): Promise<Extract<Wire<Method<A, M>['answer']>, { ok: true }>> {
+    async callOk<M extends MethodPath<A>>(method: M, ...args: Method<A, M>['args']): Promise<Extract<Wire<Method<A, M>['answer']>, { ok: true }>> {
       const answer = await this.call(method, ...args)
 
       if (typeof answer !== 'object' || answer === null || !('ok' in answer) || answer.ok !== true) {
@@ -139,7 +150,7 @@ export function browser<A = Record<string, never>>(app: { handle: (request: Requ
       return answer as Extract<Wire<Method<A, M>['answer']>, { ok: true }>
     },
     // As `callOk`, for an answer that has `key` only in some of its successes, such as a registration that signed the user in.
-    async callHas<Key extends string, M extends keyof A & string>(key: Key, method: M, ...args: Method<A, M>['args']): Promise<Extract<Wire<Method<A, M>['answer']>, { ok: true } & Record<Key, unknown>>> {
+    async callHas<Key extends string, M extends MethodPath<A>>(key: Key, method: M, ...args: Method<A, M>['args']): Promise<Extract<Wire<Method<A, M>['answer']>, { ok: true } & Record<Key, unknown>>> {
       const answer = await this.callOk(method, ...args)
 
       if (!(key in answer)) {

@@ -144,6 +144,8 @@ const user = await ctx.locals.auth.requireUser()
 p Hello {user.email}
 ```
 
+The methods of each feature are grouped under it: `auth.password`, `auth.email`, `auth.magicLink`, `auth.twoFactor`, `auth.passkeys`, `auth.sessions`, `auth.tokens`, `auth.oauthServer`, `auth.admin` and `auth.organizations`. Before 1.82 they were flat, `auth.listUsers()` for `auth.admin.listUsers()`; the flat names work until 1.85, and `kay upgrade` renames the calls. The [grouped methods](/llms/kayjs-auth-grouped-methods) lists them all.
+
 ### Your own data on the user
 
 Give `createAuth` a `user` schema to keep your own fields on the user, such as a provider's avatar. `profileFields` returns what to store on every provider sign-in, and `user().data` gives it back typed.
@@ -162,7 +164,7 @@ The patch is all or nothing: one field the schema refuses, or a result over 16 K
 
 `user().providers` holds the id each linked provider gave the user, such as `user.providers.discord?.id`.
 
-It is read for `user()` and `requireUser()` and for the hooks (`onSignUp`, `profileFields`, `onDelete`, `exportData`, `admin`, `onAuthEvent`). Guards, gates, `authorize`, the admin's lists and results such as `register` give a `BareUser`, which has no `providers`, so they cost no query.
+It is read for `user()` and `requireUser()` and for the hooks (`onSignUp`, `profileFields`, `onDelete`, `exportData`, `admin`, `onAuthEvent`). Guards, gates, `authorize`, the admin's lists and results such as `password.register` give a `BareUser`, which has no `providers`, so they cost no query.
 
 `user()` returns provider ids, so a route that sends `await auth.user()` whole to the client now sends them too: pick the fields to show.
 
@@ -257,7 +259,7 @@ export const signIn = action(s.Object({
   identifier: s.String({ maxLength: 254 }),
   password: s.String({ maxLength: 128 }),
 }), async (input, ctx) => {
-  const result = await ctx.locals.auth.signInWithPassword(input)
+  const result = await ctx.locals.auth.password.signIn(input)
 
   if (!result.ok)
     return ctx.fail(400, { error: result.error })
@@ -271,15 +273,15 @@ form(action={signIn})
   button Sign in
 ```
 
-`register({ email, password, username })` creates an account the same way, answering `errors` by field.
+`password.register({ email, password, username })` creates an account the same way, answering `errors` by field.
 
-Every way of signing in takes what is not a credential in one trailing options object: `signInWithPassword(input, { redirect, remember, captcha })`, `register(input, { redirect, remember, captcha })`, `requestMagicLink(email, { redirect, remember, captcha })`, `requestPasswordReset(email, { redirect, captcha })` and `signInWithPasskey(response, { redirect, remember })`. A `redirect` that is not a path of the site leads home.
+Every way of signing in takes what is not a credential in one trailing options object: `password.signIn(input, { redirect, remember, captcha })`, `password.register(input, { redirect, remember, captcha })`, `magicLink.request(email, { redirect, remember, captcha })`, `password.requestReset(email, { redirect, captcha })` and `passkeys.signIn(response, { redirect, remember })`. A `redirect` that is not a path of the site leads home.
 
 The page a visitor asked for survives registering, the mailed verification and reset links, a failed OAuth sign-in and the second factor, so signing in always brings them back to it.
 
 With a mailer, it signs no one in until the address is verified. It answers a held address as a free one and mails its holder instead.
 
-To keep the time the same too, your `onSignUp` hook, and the `onDelete` of an unverified account that a new registration replaces, run after the response is sent. `register` may return before they have finished.
+To keep the time the same too, your `onSignUp` hook, and the `onDelete` of an unverified account that a new registration replaces, run after the response is sent. `password.register` may return before they have finished.
 
 Set `email: { requireVerified: false }` to sign in at once. It answers `'taken'` for a held address, which tells anyone which addresses have an account.
 
@@ -299,13 +301,13 @@ form(action={start})
   button Continue as a guest
 ```
 
-When the guest registers, the account keeps their id, so the app's data stays theirs. `user.guest` is `true` until then. A guest whose session ends is left in the store, and `listUsers` shows them, until they are deleted: 30 days after they were made by default, or `guests: { maxAge: '7d' }` in `createAuth`. Only a guest with no session left goes, and `onDelete` is called as for any user.
+When the guest registers, the account keeps their id, so the app's data stays theirs. `user.guest` is `true` until then. A guest whose session ends is left in the store, and `admin.listUsers` shows them, until they are deleted: 30 days after they were made by default, or `guests: { maxAge: '7d' }` in `createAuth`. Only a guest with no session left goes, and `onDelete` is called as for any user.
 
 An account registered and never verified goes the same way, 30 days after it was made, when `requireVerified` is on, as nobody can sign in to it. Set `email: { unverifiedMaxAge: '7d' }` to change that, or to turn it on without `requireVerified`, where an account never verified may be in use and goes once its session ends. An account with a session, a linked provider or a role beyond `defaultRoles` stays.
 
 A guest costs nothing to make, so kayjs-auth does not name it to other libraries: kayjs-ai's limits count a guest by address, and a signed-in user by id.
 
-`signUp: false` in `createAuth` closes self-service accounts. `register` and `signInAsGuest` answer `'closed'`. Make users yourself with `auth.createUser({ email, password, roles })`, or the first one from the terminal:
+`signUp: false` in `createAuth` closes self-service accounts. `password.register` and `signInAsGuest` answer `'closed'`. Make users yourself with `auth.createUser({ email, password, roles })`, or the first one from the terminal:
 
 ```sh
 kay auth create-user ada@example.com --role admin
@@ -317,7 +319,7 @@ It needs `kay.config.ts` and the source, so it cannot run from a built or compil
 
 ### Breached passwords
 
-`breachedPasswords: true` refuses a new password that Have I Been Pwned lists, as `errors.password: 'breached'`. It runs on `register`, `resetPassword` and `changePassword`.
+`breachedPasswords: true` refuses a new password that Have I Been Pwned lists, as `errors.password: 'breached'`. It runs on `password.register`, `password.reset` and `password.change`.
 
 Only the first five characters of the password's SHA-1 leave the server. A check that fails or takes over three seconds lets the password through, so an outage never stops anyone registering.
 
@@ -331,22 +333,22 @@ It is `Secure` when the session cookie is. It lasts as long as a session can, an
 
 ## Account changes
 
-Changing what protects the account takes a `proof`. That covers `changePassword`, `changeEmail`, `deleteAccount`, the second factor, passkeys, linked providers and tokens. A proof is `{ password }`, `{ code }` from the authenticator or a recovery code, or `{ passkey }`.
+Changing what protects the account takes a `proof`. That covers `password.change`, `email.change`, `deleteAccount`, the second factor, passkeys, linked providers and tokens. A proof is `{ password }`, `{ code }` from the authenticator or a recovery code, or `{ passkey }`.
 
-With two-factor on, `changeEmail`, `disableTwoFactor`, `regenerateRecoveryCodes`, `passkeyRegistrationOptions` and `linkProvider` refuse the password alone. They take the code or a passkey.
+With two-factor on, `email.change`, `twoFactor.disable`, `twoFactor.regenerateRecoveryCodes`, `passkeys.registrationOptions` and `linkProvider` refuse the password alone. They take the code or a passkey.
 
 ## Two-factor
 
 Two-factor asks for a code from an authenticator app after the password. It takes two steps to turn on.
 
-`setUpTwoFactor(proof)` answers a secret and an `otpauth://` URI. Draw the URI with kayjs-ui's `QrCode`. `enableTwoFactor(code)` turns it on once the authenticator gives a right code, and answers ten recovery codes. Show them once.
+`twoFactor.setUp(proof)` answers a secret and an `otpauth://` URI. Draw the URI with kayjs-ui's `QrCode`. `twoFactor.enable(code)` turns it on once the authenticator gives a right code, and answers ten recovery codes. Show them once.
 
 ```kay
 --- server
 import { s } from 'kay'
 
 export const enable = action(s.Object({ code: s.String({ maxLength: 20 }) }), async ({ code }, ctx) => {
-  const result = await ctx.locals.auth.enableTwoFactor(code)
+  const result = await ctx.locals.auth.twoFactor.enable(code)
 
   if (!result.ok)
     return ctx.fail(400, { error: result.error })
@@ -359,16 +361,16 @@ form(action={enable})
   button Turn on
 ```
 
-From then on, every way of signing in stops at the two-factor page. `verifyTwoFactor(code)` finishes it with an authenticator code or a recovery code. A recovery code works once.
+From then on, every way of signing in stops at the two-factor page. `twoFactor.verify(code)` finishes it with an authenticator code or a recovery code. A recovery code works once.
 
-`regenerateRecoveryCodes(proof)` makes a new set, `recoveryCodesLeft()` counts the unused ones, and `disableTwoFactor(proof)` turns the factor off.
+`twoFactor.regenerateRecoveryCodes(proof)` makes a new set, `twoFactor.recoveryCodesLeft()` counts the unused ones, and `twoFactor.disable(proof)` turns the factor off.
 
 ## Bearer tokens
 
-A bearer token lets a device or a script call your API with `Authorization: Bearer <token>`. `createToken(proof, label, options)` makes one from a signed-in session. The token is shown once, as only its digest is stored.
+A bearer token lets a device or a script call your API with `Authorization: Bearer <token>`. `tokens.create(proof, label, options)` makes one from a signed-in session. The token is shown once, as only its digest is stored.
 
 ```ts
-const result = await auth.createToken({ password }, 'Deploy script', { scopes: ['posts:read'], maxAge: '30d' })
+const result = await auth.tokens.create({ password }, 'Deploy script', { scopes: ['posts:read'], maxAge: '30d' })
 
 if (result.ok)
   console.log(result.token)
@@ -378,7 +380,7 @@ if (result.ok)
 
 Control characters are removed from a token's label and from a passkey's name.
 
-`listTokens()` lists the user's tokens and `revokeBearerToken(id)` revokes one and answers `{ ok }`, `{ ok: false, error: 'not-found' }` for a token that is not theirs. A password change, a reset and `signOutEverywhere` end them all. Both need a browser session: a token cannot list or revoke tokens, nor turn on two-factor. Anything that asks for your password or a code first, such as changing two-factor, passkeys, the password or deleting the account, needs a browser session as well.
+`tokens.list()` lists the user's tokens and `tokens.revoke(id)` revokes one and answers `{ ok }`, `{ ok: false, error: 'not-found' }` for a token that is not theirs. A password change, a reset and `signOutEverywhere` end them all. Both need a browser session: a token cannot list or revoke tokens, nor turn on two-factor. Anything that asks for your password or a code first, such as changing two-factor, passkeys, the password or deleting the account, needs a browser session as well.
 
 For a flow you gate yourself, such as pairing a device, `auth.issueToken(userId, label)` makes a token on the server with no proof, on the same terms. Its `token` option adopts one you handed out before, at least 32 characters long with at least 10 distinct ones. An adopted token expires after 90 days too, so pass `maxAge: null` to keep an old device working. Only `null` means never: do not forward a client's value into `maxAge` unchecked.
 
@@ -423,7 +425,7 @@ A way in that is switched off no longer counts as one when kayjs-auth checks tha
 
 A passkey is added and used on the page's own origin only. One asked for in a frame of another origin is refused, as kay keeps other origins from framing its pages with `frame-ancestors 'self'`.
 
-A passkey stored before kayjs-auth always asked for user verification may have been made without it, and could never sign in: `listPasskeys()` lists each with `userVerified`, and one with `false` does not count as a way in, so it cannot be what keeps a user from removing their last password or provider. A sign-in or a re-proof with it proves it; otherwise add a new passkey and remove the old one.
+A passkey stored before kayjs-auth always asked for user verification may have been made without it, and could never sign in: `passkeys.list()` lists each with `userVerified`, and one with `false` does not count as a way in, so it cannot be what keeps a user from removing their last password or provider. A sign-in or a re-proof with it proves it; otherwise add a new passkey and remove the old one.
 
 ## Passkeys in an island
 
@@ -431,7 +433,7 @@ An island asks for a passkey with `@kaynooo/kayjs-auth/browser`. It calls the br
 
 `askPasskey(options)` and `makePasskey(options)` take the options an action returned. They answer the JSON the next action takes, or null when the person picked none.
 
-`askPasskey(options, { autofill: true })` offers the passkeys in the autofill of a field with `autocomplete="username webauthn"` instead. `canAskPasskey()` and `canMakePasskey()` say whether to show the button. `passkeyFailure(caught, errors, failed)` gives the message for what threw. `rememberChoice()` says whether the page's "keep me signed in" box, `input[name="remember"]`, is checked, and is undefined when the page has none: pass it as the `remember` of `signInWithPasskey`.
+`askPasskey(options, { autofill: true })` offers the passkeys in the autofill of a field with `autocomplete="username webauthn"` instead. `canAskPasskey()` and `canMakePasskey()` say whether to show the button. `passkeyFailure(caught, errors, failed)` gives the message for what threw. `rememberChoice()` says whether the page's "keep me signed in" box, `input[name="remember"]`, is checked, and is undefined when the page has none: pass it as the `remember` of `passkeys.signIn`.
 
 An action takes that answer with `passkeyAssertion` for a sign-in, a second factor or a proof, and `passkeyAttestation` for adding a passkey. They type it as kayjs-auth reads it, so no cast is needed. An answer missing a part is refused with a 422.
 
@@ -439,7 +441,7 @@ An action takes that answer with `passkeyAssertion` for a sign-in, a second fact
 
 Registering, password resets and magic links ask for a proof of work by default, and a password sign-in from the third attempt. The browser hashes for some tens of milliseconds before the request goes through, with no third party and no cookie.
 
-The prebuilt pages carry it. Your own form carries `captchaChallenge` in a `data-kay-work` field, and your action passes its solution on as `captcha`. `kay check` reports a call to `register`, `requestPasswordReset`, `requestMagicLink` or `signInWithPassword` with no `captcha` option (`missing-captcha`), since without the token it answers `{ ok: false, error: 'captcha' }` and the form fails with no message.
+The prebuilt pages carry it. Your own form carries `captchaChallenge` in a `data-kay-work` field, and your action passes its solution on as `captcha`. `kay check` reports a call to `password.register`, `password.requestReset`, `magicLink.request` or `password.signIn` with no `captcha` option (`missing-captcha`), since without the token it answers `{ ok: false, error: 'captcha' }` and the form fails with no message.
 
 ```kay
 --- server
@@ -450,7 +452,7 @@ export const register = action(s.Object({
   password: s.String({ maxLength: 128 }),
   captcha: s.Optional(s.String({ maxLength: 512 })),
 }), async ({ captcha, ...input }, ctx) => {
-  const result = await ctx.locals.auth.register(input, { captcha })
+  const result = await ctx.locals.auth.password.register(input, { captcha })
 
   if (!result.ok)
     return ctx.fail(400, { error: 'error' in result ? result.error : 'invalid' })
@@ -520,20 +522,20 @@ A deleted user's entries stay, but nothing in them leads back to the person.
 `admin: 'admin'` names who may manage users. It takes any requirement a guard takes. Without it, every method below answers `{ ok: false, error: 'forbidden' }`.
 
 ```ts
-const found = await auth.listUsers({ search: 'ada', limit: 20 })
+const found = await auth.admin.listUsers({ search: 'ada', limit: 20 })
 
 if (found.ok) {
-  await auth.grantRole(found.users[0].id, 'editor')
-  await auth.banUser(found.users[0].id, { reason: 'Spam', until: new Date('2030-01-01') })
+  await auth.admin.grantRole(found.users[0].id, 'editor')
+  await auth.admin.ban(found.users[0].id, { reason: 'Spam', until: new Date('2030-01-01') })
 }
 ```
 
-- `listUsers({ search, offset, limit })` gives the users newest first, with `total`. `getUser(id)` gives one, with `admin` telling whether they meet the `admin` option. `adminRoles()` lists the roles an admin may give.
-- `grantRole(id, role)` and `revokeRole(id, role)` take a role your `roles` option declares. If two admins revoke each other's role at the same moment, at least one stays an admin, and a revoke that would have left none is undone and answers `last-admin`. Two admins deleting their own accounts at the same moment are held to the same rule, which needs an `admin` option that reads the user's roles.
-- `banUser(id, { reason, until })` bars the user from signing in and signs them out everywhere. `until` leaves it for good when left out. `unbanUser(id)` lifts it. An admin cannot ban themselves or another admin.
-- `deleteUser(id)` deletes the user as `deleteAccount` does, notifications and mailing lists included (for a verified address). An organization the user solely owns with other members passes to its longest-standing member, who is told by mail and by an `organization-handed-over` event, so an abandoned account can always be removed.
-- `impersonate(id)` signs the admin in as the user, within ten minutes of their own sign-in or re-proof; later it answers `stale`. `impersonator()` gives the admin, to show a banner, and `stopImpersonating()` signs back in as themselves.
-- `listAdminAuditLog({ userId, before, limit })` reads everyone's audit log, or one user's.
+- `admin.listUsers({ search, offset, limit })` gives the users newest first, with `total`. `admin.getUser(id)` gives one, with `admin` telling whether they meet the `admin` option. `admin.roles()` lists the roles an admin may give.
+- `admin.grantRole(id, role)` and `admin.revokeRole(id, role)` take a role your `roles` option declares. If two admins revoke each other's role at the same moment, at least one stays an admin, and a revoke that would have left none is undone and answers `last-admin`. Two admins deleting their own accounts at the same moment are held to the same rule, which needs an `admin` option that reads the user's roles.
+- `admin.ban(id, { reason, until })` bars the user from signing in and signs them out everywhere. `until` leaves it for good when left out. `admin.unban(id)` lifts it. An admin cannot ban themselves or another admin.
+- `admin.deleteUser(id)` deletes the user as `deleteAccount` does, notifications and mailing lists included (for a verified address). An organization the user solely owns with other members passes to its longest-standing member, who is told by mail and by an `organization-handed-over` event, so an abandoned account can always be removed.
+- `admin.impersonate(id)` signs the admin in as the user, within ten minutes of their own sign-in or re-proof; later it answers `stale`. `impersonator()` gives the admin, to show a banner, and `admin.stopImpersonating()` signs back in as themselves.
+- `admin.auditLog({ userId, before, limit })` reads everyone's audit log, or one user's.
 
 Changing a user needs a sign-in or `reprove()` under ten minutes old. Otherwise the method answers `'stale'`. Reading users takes no such proof.
 
@@ -566,27 +568,27 @@ createAuth({
 })
 ```
 
-Whoever creates an organization holds `owner`. The last owner cannot leave, lose the role or delete their account: `deleteAccount` answers `last-owner` until another member is made an owner. An admin's `deleteUser` does not: the organization passes to its longest-standing member, who is told. Requests that race for the last owner, or for a user's last way in, cannot both win: a write that would leave none is undone and answers `last-owner` (or `last-way-in`), so at least one stays.
+Whoever creates an organization holds `owner`. The last owner cannot leave, lose the role or delete their account: `deleteAccount` answers `last-owner` until another member is made an owner. An admin's `admin.deleteUser` does not: the organization passes to its longest-standing member, who is told. Requests that race for the last owner, or for a user's last way in, cannot both win: a write that would leave none is undone and answers `last-owner` (or `last-way-in`), so at least one stays.
 
 An owner who is the only member deletes the organization along with the account. `deletionImpact()` lists both kinds of organization by name, and the account page shows them before the user confirms.
 
 A guest or an unverified account that is dropped without anyone asking passes an organization it solely owned to its longest-standing member. `manage` is the role that renames, invites and removes members. It is `owner` by default.
 
 ```ts
-const made = await auth.createOrganization({ name: 'Acme' })
+const made = await auth.organizations.create({ name: 'Acme' })
 
 if (made.ok)
-  await auth.invite(made.membership.organization.id, 'grace@example.com', ['member'])
+  await auth.organizations.invite(made.membership.organization.id, 'grace@example.com', ['member'])
 ```
 
-- `listOrganizations()` lists the user's memberships and `getOrganization(ref)` gives one, by id or slug.
-- `listMembers(ref)`, `setMemberRoles(ref, userId, roles)`, `deleteMember(ref, userId)` and `leaveOrganization(ref)` manage who is in it.
-- `updateOrganization(ref, { name, slug })` renames it and `deleteOrganization(ref)` deletes it. Only owners delete.
+- `organizations.list()` lists the user's memberships and `organizations.get(ref)` gives one, by id or slug.
+- `organizations.members(ref)`, `organizations.setMemberRoles(ref, userId, roles)`, `organizations.removeMember(ref, userId)` and `organizations.leave(ref)` manage who is in it.
+- `organizations.update(ref, { name, slug })` renames it and `organizations.delete(ref)` deletes it. Only owners delete.
 - Creating, renaming or deleting an organization, changing roles, removing members and everything about invitations (sending, listing, revoking, accepting, declining) need a signed-in browser session. A bearer token or an OAuth token for an API client or an AI agent cannot do them, so a leaked key cannot wipe a team.
 
-`invite(ref, email, roles?)` mails a link to `invitationPage` with `?invitation=<id>`, or to the prebuilt `/auth/invitation` page when you set none. It needs a mailer. The page reads `getInvitation(id)` and posts to an action calling `acceptInvitation(id)`. Only an account verified at the invited address joins, and only while the member who invited them still manages the organization and holds the roles it gives.
+`organizations.invite(ref, email, roles?)` mails a link to `invitationPage` with `?invitation=<id>`, or to the prebuilt `/auth/invitation` page when you set none. It needs a mailer. The page reads `organizations.invitation(id)` and posts to an action calling `organizations.acceptInvitation(id)`. Only an account verified at the invited address joins, and only while the member who invited them still manages the organization and holds the roles it gives.
 
-`listMyInvitations()` lists those open to the user, and `rejectInvitation(id)` turns one down and answers `{ ok }`, `{ ok: false, error: 'not-found' }` for one not open to the user. `listInvitations(ref)` and `revokeInvitation(ref, id)` are for managers.
+`organizations.myInvitations()` lists those open to the user, and `organizations.rejectInvitation(id)` turns one down and answers `{ ok }`, `{ ok: false, error: 'not-found' }` for one not open to the user. `organizations.invitations(ref)` and `organizations.revokeInvitation(ref, id)` are for managers.
 
 `auth.memberOf('admin')` is a requirement met by a member holding that role in the organization the route's `org` param names.
 
@@ -767,7 +769,7 @@ The new tables are created by `db.sync()` if you use Postgres or SQLite.
 
 ## Limits
 
-Attempts are counted where every process shares them: in the store (`memoryAuthStore` and `pgStore` keep them), else in the app's `store.rates` from `kay.config.ts`, else in the process's memory, where they also count while a store fails, so a sign-in still answers. They are counted per client address and per account, the address kept as a keyed digest. Creating organizations is limited too, to 10 a day for each account: past that, `createOrganization` answers `limited`.
+Attempts are counted where every process shares them: in the store (`memoryAuthStore` and `pgStore` keep them), else in the app's `store.rates` from `kay.config.ts`, else in the process's memory, where they also count while a store fails, so a sign-in still answers. They are counted per client address and per account, the address kept as a keyed digest. Creating organizations is limited too, to 10 a day for each account: past that, `organizations.create` answers `limited`.
 
 Give the app `sqliteRates` or `pgRates` as `store.rates` rather than `memoryRates`, which drops open windows past 10,000, so a flood of typed addresses could lift a lockout.
 
@@ -859,6 +861,7 @@ Topics of the kayjs-auth reference the sections above do not link:
 
 - [Setup, pages and the signed-in user](/llms/kayjs-auth-setup)
 - [Sessions and guards](/llms/kayjs-auth-sessions-and-guards)
+- [Grouped methods](/llms/kayjs-auth-grouped-methods)
 - [OAuth sign-in, two-factor, passkeys, re-proof and the account](/llms/kayjs-auth-oauth-passkeys-two-factor)
 - [Passwords, guests, mailed links and security mails](/llms/kayjs-auth-passwords-and-mails)
 - [The signed-in user in templates](/llms/kayjs-auth-signed-in-components)

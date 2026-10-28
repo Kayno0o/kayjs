@@ -17,7 +17,7 @@ export const accept = action(schemas.id, async ({ id }, ctx) => {
   if (!auth.features().organizations)
     return ctx.fail(404, { error: 'not-found' })
 
-  const result = await auth.acceptInvitation(id)
+  const result = await auth.organizations.acceptInvitation(id)
 
   if (!result.ok)
     return ctx.fail(400, { error: result.error })
@@ -33,7 +33,7 @@ export const reject = action(schemas.id, async ({ id }, ctx) => {
   if (!auth.features().organizations)
     return ctx.fail(404, { error: 'not-found' })
 
-  const result = await auth.rejectInvitation(id)
+  const result = await auth.organizations.rejectInvitation(id)
 
   return result.ok ? ctx.redirect(organizationsPage(auth.features())) : ctx.fail(400, { error: result.error })
 })
@@ -62,7 +62,7 @@ if (!features.organizations)
 const prefix = features.pages?.prefix ?? features.prefix
 const requested = ctx.url.searchParams.get('invitation') ?? accept.failed()?.values.id ?? reject.failed()?.values.id ?? ''
 const id = requested.length <= ID_MAX ? requested : ''
-const invitation = id !== '' ? await auth.getInvitation(id) : null
+const invitation = id !== '' ? await auth.organizations.invitation(id) : null
 const user = invitation && await auth.via() === 'session' ? await auth.user() : null
 const signedIn = user !== null && !user.guest
 const mine = signedIn && user.email === invitation?.email

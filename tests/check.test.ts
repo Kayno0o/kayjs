@@ -4626,6 +4626,19 @@ describe('kay check, deprecated-auth-attempts', () => {
   })
 })
 
+describe('kay check, deprecated-auth-methods', () => {
+  it('reports a flat kayjs-auth call in a project depending on the library', async () => {
+    const root = await scratchProject({ 'package.json': JSON.stringify({ dependencies: { '@kaynooo/kayjs-auth': '^1.82.0' } }), 'src/users.ts': 'export const users = async (auth: { listUsers: () => Promise<unknown> }) => auth.listUsers()\n' })
+
+    try {
+      expect((await check(root)).filter(d => d.code === 'deprecated-auth-methods').map(d => d.fixes?.[0]?.title)).toEqual(['Call auth.admin.listUsers'])
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+})
+
 describe('kay check, missing-captcha', () => {
   const page = '--- server\nconst auth = { register: async (_input: unknown) => 1 }\n\nawait auth.register({})\n---\np x\n'
   const found = async (files: Record<string, string>, options?: Parameters<typeof check>[1]) => (await check(await scratchProject({ 'src/routes/index.kay': page, ...files }), options)).filter(d => d.code === 'missing-captcha').length

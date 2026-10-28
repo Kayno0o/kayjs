@@ -23,9 +23,9 @@ function setup(forwardAuth: ForwardDomains | ForwardAuthOptions = 'example.test'
     await browser.post(`/sign-in/${made.user.id}`, {})
 
     if (twoFactor) {
-      const set = await browser.callOk('setUpTwoFactor', { password: PASSWORD })
+      const set = await browser.callOk('twoFactor.setUp', { password: PASSWORD })
 
-      await browser.callOk('enableTwoFactor', await totpCode(set.setup.secret, totpStep()))
+      await browser.callOk('twoFactor.enable', await totpCode(set.setup.secret, totpStep()))
     }
 
     return { browser, user: made.user }

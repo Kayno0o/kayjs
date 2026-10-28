@@ -20,10 +20,10 @@ describe('credential rules', () => {
     const { browser } = testApp({ rules: RULES })
     const ada = browser()
 
-    expect(await ada.call('register', { email: 'ada@example.com', password: 'only 11 ch1', username: 'ab' })).toMatchObject({ ok: false, errors: { password: 'too-short', username: 'length' } })
-    expect(await ada.call('register', { email: 'ada@example.com', password: `${GOOD}${'x'.repeat(10)}`, username: 'abcdefg' })).toMatchObject({ ok: false, errors: { password: 'too-long', username: 'length' } })
-    expect(await ada.call('register', { email: 'ada@example.com', password: 'twelve chars!', username: 'Ada' })).toMatchObject({ ok: false, errors: { password: 'Add a digit.' } })
-    expect(await ada.call('register', { email: 'ada@example.com', password: GOOD, username: 'Ada' })).toMatchObject({ ok: true })
+    expect(await ada.call('password.register', { email: 'ada@example.com', password: 'only 11 ch1', username: 'ab' })).toMatchObject({ ok: false, errors: { password: 'too-short', username: 'length' } })
+    expect(await ada.call('password.register', { email: 'ada@example.com', password: `${GOOD}${'x'.repeat(10)}`, username: 'abcdefg' })).toMatchObject({ ok: false, errors: { password: 'too-long', username: 'length' } })
+    expect(await ada.call('password.register', { email: 'ada@example.com', password: 'twelve chars!', username: 'Ada' })).toMatchObject({ ok: false, errors: { password: 'Add a digit.' } })
+    expect(await ada.call('password.register', { email: 'ada@example.com', password: GOOD, username: 'Ada' })).toMatchObject({ ok: true })
   })
 
   test('reset, change password, change username and createUser apply them', async () => {
@@ -31,15 +31,15 @@ describe('credential rules', () => {
     const { auth, browser } = testApp({ rules: RULES, site: 'https://site.test', email: { mailer, links: { 'verify-email': '/v', 'reset-password': '/r', 'magic-link': '/m', 'change-email': '/c' }, requireVerified: false } })
     const ada = browser()
 
-    await ada.call('register', { email: 'ada@example.com', password: GOOD })
-    await ada.call('requestPasswordReset', 'ada@example.com')
+    await ada.call('password.register', { email: 'ada@example.com', password: GOOD })
+    await ada.call('password.requestReset', 'ada@example.com')
 
     const token = new URL(mails.findLast(mail => mail.kind === 'reset-password')!.url!).searchParams.get('token')!
 
-    expect(await ada.call('resetPassword', token, 'twelve chars!')).toEqual({ ok: false, errors: { password: 'Add a digit.' } })
-    expect(await ada.call('resetPassword', token, 'short1')).toEqual({ ok: false, errors: { password: 'too-short' } })
-    expect(await ada.call('changePassword', { password: GOOD }, 'twelve chars!')).toEqual({ ok: false, errors: { password: 'Add a digit.' } })
-    expect(await ada.call('changePassword', { password: GOOD }, 'twelve chars 2')).toEqual({ ok: true })
+    expect(await ada.call('password.reset', token, 'twelve chars!')).toEqual({ ok: false, errors: { password: 'Add a digit.' } })
+    expect(await ada.call('password.reset', token, 'short1')).toEqual({ ok: false, errors: { password: 'too-short' } })
+    expect(await ada.call('password.change', { password: GOOD }, 'twelve chars!')).toEqual({ ok: false, errors: { password: 'Add a digit.' } })
+    expect(await ada.call('password.change', { password: GOOD }, 'twelve chars 2')).toEqual({ ok: true })
     expect(await ada.call('changeUsername', 'toolongname')).toEqual({ ok: false, errors: { username: 'length' } })
     expect(await ada.call('changeUsername', 'Ada')).toMatchObject({ ok: true })
     expect(await auth.createUser({ email: 'bob@example.com', username: 'Bob', password: 'nodigitsatall' })).toEqual({ ok: false, errors: { password: 'Add a digit.' } })

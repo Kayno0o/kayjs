@@ -7,7 +7,7 @@ async function setup() {
   const app = testApp({})
   const member = async (email: string, roles: string[] = []) => {
     const browser = app.browser()
-    const { user } = await browser.callHas('user', 'register', { email, password: PASSWORD })
+    const { user } = await browser.callHas('user', 'password.register', { email, password: PASSWORD })
 
     await app.store.users.update(user.id, { roles })
 

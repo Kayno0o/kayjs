@@ -8,7 +8,7 @@ describe('naming the user to other libraries', () => {
 
     expect(await ada.json('/named')).toBe('anonymous')
 
-    const registered = await ada.call('register', { email: 'ada@example.com', password: 'correct horse battery' })
+    const registered = await ada.call('password.register', { email: 'ada@example.com', password: 'correct horse battery' })
 
     expect(await ada.json('/named')).toBe((registered as { user: { id: string } }).user.id)
     expect(await browser().json('/named')).toBe('anonymous')

@@ -9,6 +9,7 @@
 The rest is split by topic, each file read whole with one command:
 
 - [Setup, pages and the signed-in user](llms/setup.md): `auth()`, the prebuilt pages and the signed-in user
+- [Grouped methods](llms/grouped-methods.md): the methods under `auth.password`, `auth.admin`, `auth.organizations` and the other features, and the flat names they had before 1.82
 - [Sessions and guards](llms/sessions-and-guards.md): a user's sessions, guards and gates
 - [OAuth sign-in, two-factor, passkeys, re-proof and the account](llms/oauth-passkeys-two-factor.md): OAuth providers, two-factor, passkeys, re-proof and the account
 - [Passwords, guests, mailed links and security mails](llms/passwords-and-mails.md): passwords, guests, verification, reset and magic links, security mails

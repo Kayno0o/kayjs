@@ -133,7 +133,7 @@ describe('an authenticated request', () => {
     const { browser } = testApp({ store })
     const ada = browser()
 
-    await ada.call('register', { email: 'ada@example.com', password: PASSWORD })
+    await ada.call('password.register', { email: 'ada@example.com', password: PASSWORD })
     order.length = 0
 
     expect(await ada.json('/me')).toMatchObject({ email: 'ada@example.com' })
@@ -147,7 +147,7 @@ describe('lists', () => {
     const app = testApp({ store, site: 'https://site.test', email: { mailer, links: LINKS, requireVerified: false }, organizations: { roles: { owner: ['member'], member: [] }, owner: 'owner', manage: 'owner', defaultRoles: ['member'], invitationPage: '/invitation' } })
     const owner = app.browser()
 
-    await owner.call('register', { email: 'owner@example.com', password: PASSWORD })
+    await owner.call('password.register', { email: 'owner@example.com', password: PASSWORD })
 
     return { store, owner }
   }
@@ -155,13 +155,13 @@ describe('lists', () => {
   test('members cost one user query, memberships one organization query, invitations one list', async () => {
     const log = recorded()
     const { store, owner } = await organizations(log.store)
-    const first = await owner.callOk('createOrganization', { name: 'Acme' })
+    const first = await owner.callOk('organizations.create', { name: 'Acme' })
 
-    await owner.call('createOrganization', { name: 'Beta' })
+    await owner.call('organizations.create', { name: 'Beta' })
 
     const orgId = first.membership.organization.id
 
-    const sender = (await owner.callOk('listMembers', orgId)).members[0]?.user.id ?? ''
+    const sender = (await owner.callOk('organizations.members', orgId)).members[0]?.user.id ?? ''
 
     for (const email of ['b@example.com', 'c@example.com', 'd@example.com']) {
       await store.users.create(userRecord({ id: email, email }))
@@ -171,29 +171,29 @@ describe('lists', () => {
 
     log.reset()
 
-    expect((await owner.callOk('listMembers', orgId)).members).toHaveLength(4)
+    expect((await owner.callOk('organizations.members', orgId)).members).toHaveLength(4)
     expect(log.count('users.getMany')).toBe(1)
     expect(log.calls.filter(call => call.name === 'users.get').map(call => call.args[0])).not.toContain('b@example.com')
 
     log.reset()
-    expect(await owner.call('listOrganizations')).toHaveLength(2)
+    expect(await owner.call('organizations.list')).toHaveLength(2)
     expect(log.count('organizations.getMany')).toBe(1)
     expect(log.count('organizations.get')).toBe(0)
 
     log.reset()
-    expect((await owner.callOk('listInvitations', orgId)).invitations).toHaveLength(3)
+    expect((await owner.callOk('organizations.invitations', orgId)).invitations).toHaveLength(3)
     expect(log.count('invitations.listByOrganization')).toBe(1)
   })
 
   test('an expired invitation is left out of the list without a delete', async () => {
     const log = recorded()
     const { store, owner } = await organizations(log.store)
-    const { membership } = await owner.callOk('createOrganization', { name: 'Acme' })
+    const { membership } = await owner.callOk('organizations.create', { name: 'Acme' })
 
     await store.invitations!.create({ id: 'late', organizationId: membership.organization.id, email: 'late@example.com', roles: ['member'], invitedBy: null, createdAt: new Date(), expiresAt: new Date(Date.now() - 1000) })
     log.reset()
 
-    expect((await owner.callOk('listInvitations', membership.organization.id)).invitations).toEqual([])
+    expect((await owner.callOk('organizations.invitations', membership.organization.id)).invitations).toEqual([])
     expect(log.count('invitations.delete')).toBe(0)
   })
 
@@ -204,14 +204,14 @@ describe('lists', () => {
     delete base.organizations!.getMany
 
     const { store, owner } = await organizations(base)
-    const { membership } = await owner.callOk('createOrganization', { name: 'Acme' })
+    const { membership } = await owner.callOk('organizations.create', { name: 'Acme' })
     const organization = membership.organization
 
     await store.users.create(userRecord({ id: 'b', email: 'b@example.com' }))
     await store.members!.add({ organizationId: organization.id, userId: 'b', roles: ['member'], createdAt: new Date() })
 
-    expect((await owner.callOk('listMembers', organization.id)).members).toHaveLength(2)
-    expect(await owner.call('listOrganizations')).toHaveLength(1)
+    expect((await owner.callOk('organizations.members', organization.id)).members).toHaveLength(2)
+    expect(await owner.call('organizations.list')).toHaveLength(1)
   })
 })
 
@@ -221,9 +221,9 @@ describe('revoking in bulk', () => {
     const { browser } = testApp({ store: log.store })
     const ada = browser()
 
-    await ada.call('register', { email: 'ada@example.com', password: PASSWORD })
-    await ada.call('createToken', { password: PASSWORD }, 'one')
-    await ada.call('createToken', { password: PASSWORD }, 'two')
+    await ada.call('password.register', { email: 'ada@example.com', password: PASSWORD })
+    await ada.call('tokens.create', { password: PASSWORD }, 'one')
+    await ada.call('tokens.create', { password: PASSWORD }, 'two')
     log.reset()
     await ada.fetch('/sign-out-everywhere', { method: 'POST' })
 
@@ -239,9 +239,9 @@ describe('revoking in bulk', () => {
     const { browser } = testApp({ store })
     const ada = browser()
 
-    await ada.call('register', { email: 'ada@example.com', password: PASSWORD })
-    await ada.call('createToken', { password: PASSWORD }, 'one')
-    await ada.call('createToken', { password: PASSWORD }, 'two')
+    await ada.call('password.register', { email: 'ada@example.com', password: PASSWORD })
+    await ada.call('tokens.create', { password: PASSWORD }, 'one')
+    await ada.call('tokens.create', { password: PASSWORD }, 'two')
 
     const [user] = (await store.users.list({ offset: 0, limit: 10 })).users
 
@@ -257,7 +257,7 @@ describe('revoking in bulk', () => {
     const { mails, mailer } = mailbox()
     const { browser, store } = testApp({ store: log.store, site: 'https://site.test', email: { mailer, links: LINKS, requireVerified: false } })
 
-    await browser().call('register', { email: 'ada@example.com', password: PASSWORD })
+    await browser().call('password.register', { email: 'ada@example.com', password: PASSWORD })
 
     const [user] = (await store.users.list({ offset: 0, limit: 10 })).users
 
@@ -266,12 +266,12 @@ describe('revoking in bulk', () => {
 
     const owner = browser()
 
-    await owner.call('requestPasswordReset', 'ada@example.com')
+    await owner.call('password.requestReset', 'ada@example.com')
 
     const token = new URL(mails.findLast(mail => mail.kind === 'reset-password')!.url!).searchParams.get('token')!
 
     log.reset()
-    await owner.call('resetPassword', token, 'another correct horse')
+    await owner.call('password.reset', token, 'another correct horse')
 
     expect(log.count('identities.deleteForUser')).toBe(1)
     expect(log.count('identities.delete')).toBe(0)
@@ -286,7 +286,7 @@ describe('the last admin', () => {
     const root = app.browser()
 
     for (const [who, email] of [[root, 'root@example.com'], [app.browser(), 'other@example.com']] as const) {
-      const { user } = await who.callHas('user', 'register', { email, password: PASSWORD })
+      const { user } = await who.callHas('user', 'password.register', { email, password: PASSWORD })
 
       await app.store.users.update(user.id, { roles: ['admin'] })
     }
@@ -337,7 +337,7 @@ describe('attempt keys', () => {
     const answers: { ok: boolean, error?: string }[] = []
 
     for (let attempt = 0; attempt < 4; attempt++)
-      answers.push(await browser().call('requestPasswordReset', attempt % 2 === 0 ? 'Ada@Example.com' : 'ada@example.com'))
+      answers.push(await browser().call('password.requestReset', attempt % 2 === 0 ? 'Ada@Example.com' : 'ada@example.com'))
 
     const keys = log.calls.filter(call => call.name === 'rates.hit').map(call => call.args[0] as string)
 

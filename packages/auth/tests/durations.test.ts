@@ -17,7 +17,7 @@ describe('time options take a Duration', () => {
       const { browser, store } = testApp({ remember: { maxAge } })
       const ada = browser()
 
-      await ada.call('register', { email: 'ada@example.com', password: PASSWORD }, { remember: true })
+      await ada.call('password.register', { email: 'ada@example.com', password: PASSWORD }, { remember: true })
       expect((await store.sessions.listByUser((await ada.json('/me') as { id: string }).id))[0]!.maxAge).toBe(45 * 24 * 60 * 60)
     }
 
@@ -29,7 +29,7 @@ describe('time options take a Duration', () => {
     const { browser, store } = testApp({ remember: { maxAge: '0.4s' } })
     const ada = browser()
 
-    await ada.call('register', { email: 'ada@example.com', password: PASSWORD }, { remember: true })
+    await ada.call('password.register', { email: 'ada@example.com', password: PASSWORD }, { remember: true })
     expect((await store.sessions.listByUser((await store.users.findByEmail('ada@example.com'))!.id))[0]!.maxAge).toBe(1)
   })
 
@@ -62,7 +62,7 @@ describe('time options take a Duration', () => {
     const now = Date.now()
 
     setSystemTime(now)
-    await browser().call('register', { email: 'ada@example.com', password: PASSWORD })
+    await browser().call('password.register', { email: 'ada@example.com', password: PASSWORD })
     await untilHolds(() => cutoffs.length > 0)
 
     expect(cutoffs.length).toBeGreaterThan(0)
@@ -73,7 +73,7 @@ describe('time options take a Duration', () => {
     const { browser, store } = testApp({ audit: { maxAge: '1m' } })
     const ada = browser()
 
-    await ada.call('register', { email: 'ada@example.com', password: PASSWORD })
+    await ada.call('password.register', { email: 'ada@example.com', password: PASSWORD })
     setSystemTime(new Date(Date.now() + 2 * 60 * 60 * 1000))
     await ada.fetch('/sign-out', { method: 'POST' })
 
@@ -91,7 +91,7 @@ describe('time options take a Duration', () => {
     } } }
     const { browser } = testApp({ store, rateLimit: { register: { max: 1, window: '2h' } } })
 
-    await browser().call('register', { email: 'ada@example.com', password: PASSWORD })
+    await browser().call('password.register', { email: 'ada@example.com', password: PASSWORD })
     expect(windows).toContain('2h')
     expect(() => testApp({ rateLimit: { signIn: { max: 1, window: '-5m' } } })).toThrow('rateLimit.signIn.window is \'-5m\'')
   })
@@ -106,7 +106,7 @@ describe('time options take a Duration', () => {
     } } }
     const { browser } = testApp({ store, rateLimit: { register: { max: 1, window: '3h' }, signIn: { max: 1, window: '1h' } } })
 
-    await browser().call('register', { email: 'ada@example.com', password: PASSWORD })
+    await browser().call('password.register', { email: 'ada@example.com', password: PASSWORD })
     expect(windows).toContain('3h')
     expect(windows).not.toContain('2h')
     expect(() => testApp({ rateLimit: { signIn: { max: 1, window: '-5m' } } })).toThrow('kay: rateLimit.signIn.window is \'-5m\'')
@@ -116,14 +116,14 @@ describe('time options take a Duration', () => {
     const { browser, store } = testApp({ scopes: ['posts:read'] })
     const ada = browser()
 
-    await ada.call('register', { email: 'ada@example.com', password: PASSWORD })
+    await ada.call('password.register', { email: 'ada@example.com', password: PASSWORD })
 
-    const minted = await ada.callOk('createToken', { password: PASSWORD }, 'Phone', { maxAge: '30d' })
+    const minted = await ada.callOk('tokens.create', { password: PASSWORD }, 'Phone', { maxAge: '30d' })
     const [stored] = await store.bearerTokens.listByUser((await ada.json('/me') as { id: string }).id)
 
     expect(minted.id).toBe(stored!.id)
     expect(stored!.expiresAt!.getTime() - Date.now()).toBeGreaterThan(30 * DAY_MS - 60_000)
-    expect(await ada.call('createToken', { password: PASSWORD }, 'Tablet', { maxAge: 'forever' as Duration })).toEqual({ ok: false, error: 'expiry' })
-    expect(await ada.call('createToken', { password: PASSWORD }, 'Tablet', { maxAge: '3600s' })).toMatchObject({ ok: true })
+    expect(await ada.call('tokens.create', { password: PASSWORD }, 'Tablet', { maxAge: 'forever' as Duration })).toEqual({ ok: false, error: 'expiry' })
+    expect(await ada.call('tokens.create', { password: PASSWORD }, 'Tablet', { maxAge: '3600s' })).toMatchObject({ ok: true })
   })
 })
