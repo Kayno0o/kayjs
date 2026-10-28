@@ -1,0 +1,11 @@
+--- server
+import { ask, chatMessages } from '@kaynooo/kayjs-ai'
+import { s } from 'kay'
+
+// Keeps one visitor's conversations on the server, the visitor the ask names, as a fixture with no session can.
+export const keeping = action(s.Object({ messages: chatMessages({ maxItems: 50 }) }), ({ messages }) => ask(messages, { key: 'visitor' }))
+--- script
+import Chat from '@kaynooo/kayjs-ai/chat.kay'
+---
+h1 Keeping
+Chat(action={keeping} label="Assistant" regenerate conversations)

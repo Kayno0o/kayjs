@@ -1,4 +1,5 @@
 import type { Reply } from './types'
+import { deferredReply } from './deferred'
 
 const KEPT_MS = 30 * 60_000
 const MOST_KEPT = 200
@@ -134,7 +135,7 @@ export function keptFor(key: string, owner: Promise<string | undefined>, empty: 
   if (entry === undefined)
     return undefined
 
-  const target = (async (): Promise<{ reply: Reply }> => {
+  return deferredReply((async (): Promise<{ reply: Reply }> => {
     if (!same(await entry.owner, await owner))
       return { reply: empty }
 
@@ -143,48 +144,7 @@ export function keptFor(key: string, owner: Promise<string | undefined>, empty: 
       void owned?.()
 
     return { reply: entry.reply }
-  })()
-  const ahead = <Value>(pick: (reply: Reply) => AsyncIterable<Value>): AsyncIterable<Value> => ({
-    [Symbol.asyncIterator]: () => {
-      let source: AsyncIterator<Value> | undefined
-
-      return {
-        async next() {
-          source ??= pick((await target).reply)[Symbol.asyncIterator]()
-
-          return source.next()
-        },
-        async return(value?: unknown) {
-          return await source?.return?.(value) ?? { done: true, value: undefined }
-        },
-      }
-    },
-  })
-
-  return {
-    // eslint-disable-next-line kaynooo/no-then -- the thenable's own `then`, passed through
-    then: async (onFulfilled, onRejected) => (await target).reply.then(onFulfilled, onRejected),
-    [Symbol.asyncIterator]: () => ahead(reply => reply)[Symbol.asyncIterator](),
-    stream: () => ahead(reply => reply.stream()),
-    deltas: options => ahead(reply => reply.deltas(options)),
-    progress: () => ahead(reply => reply.progress()),
-    get calls() {
-      return (async () => (await target).reply.calls)()
-    },
-    get steps() {
-      return (async () => (await target).reply.steps)()
-    },
-    get usage() {
-      return (async () => (await target).reply.usage)()
-    },
-    get finish() {
-      return (async () => (await target).reply.finish)()
-    },
-    resumed: true,
-    stop: () => void (async () => {
-      (await target).reply.stop()
-    })(),
-  }
+  })(), { resumed: true })
 }
 
 export function forgetKept(): void {

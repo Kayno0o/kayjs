@@ -42,3 +42,30 @@ export function replacesOf(request: Request | undefined): Replaces | undefined {
 
   return match ? { kind: match[1] as Replaces['kind'], turns: Number(match[2]) } : undefined
 }
+
+// The header a Chat holding its conversation on the server sends with each call: `send:<id>:<revision>` posts a message to the conversation as the Chat last saw it, `load:<id>` (or `load` alone) and `list` read, `rename:<id>` and `remove:<id>` change it.
+export const CONVERSATION_HEADER = 'x-kai-conversation'
+
+export interface ConversationCall {
+  op: 'send' | 'load' | 'list' | 'rename' | 'remove'
+  // Undefined for `list`, and for a `load` of no conversation yet, which only asks whether the visitor can keep one.
+  id: string | undefined
+  // The revision of the conversation the Chat last saw, on a send: 0 for one not stored yet.
+  revision: number
+}
+
+const CONVERSATION = /^(?:list|load|(?:load|rename|remove):([\w-]{8,64})|send:([\w-]{8,64}):(\d{1,9}))$/
+
+// What the request says of the conversation it is for, or nothing for a Chat that holds its own history; a header that does not parse is no conversation call.
+export function conversationCallOf(request: Request | undefined): ConversationCall | undefined {
+  const header = request?.headers.get(CONVERSATION_HEADER) ?? ''
+  const match = CONVERSATION.exec(header)
+
+  if (!match)
+    return undefined
+
+  const colon = header.indexOf(':')
+  const op = (colon === -1 ? header : header.slice(0, colon)) as ConversationCall['op']
+
+  return { op, id: match[1] ?? match[2], revision: Number(match[3] ?? 0) }
+}

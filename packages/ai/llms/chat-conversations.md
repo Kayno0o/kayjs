@@ -1,0 +1,63 @@
+# kayjs-ai: Conversations kept on the server
+
+## Common tasks
+
+### Keeping a conversation on the server
+
+`keepOnServer` has the server keep the conversation: each send posts the new message alone, `ask` adds the turns it stored before it, and a reload, a link or Back shows the conversation again. The action is the same plain one, nothing in it changes:
+
+```kay
+--- server
+import { ask, chatMessages } from '@kaynooo/kayjs-ai'
+import { s } from 'kay'
+
+export const reply = action(s.Object({ messages: chatMessages() }), ({ messages }) => ask(messages))
+--- script
+import Chat from '@kaynooo/kayjs-ai/chat.kay'
+---
+Chat(action={reply} keepOnServer)
+```
+
+- The conversation is the visitor's the server names: the ask's `key`, else `ai({ key })`'s, else the signed-in user kayjs-auth (or another library) names to kay, never an id the browser sends, and it is kept under the action's path, so two chats of one visitor keep apart. The browser only says which of the visitor's conversations it shows. A visitor no one names, a guest, keeps their history in the page as without `keepOnServer`.
+- The page's `conversation` query param names the conversation shown, written by the first send and read when the page loads, so the address can be bookmarked; it is only one of the visitor's own, so a link shared to someone else opens an empty chat for them.
+- Regenerate and edit work as they do without it: the server drops the turns `replaces()` counts and stores the new exchange. A reply stopped part way is kept marked stopped, one stopped before its first word or that failed keeps nothing, as the chat puts the message back.
+- The model reads the stored turns, the newest ones that fit the ask's `maxInputChars` (50,000 by default), opening on a visitor's message. Files are posted with their message and read once: the server keeps the text of each turn and the sources it cited, never files nor tool calls.
+
+### Listing the conversations
+
+`conversations` keeps them on the server as `keepOnServer` does and lists the visitor's 100 latest beside the chat, the most recently updated first, under a New conversation link:
+
+```kay
+Chat(action={reply} conversations fill)
+```
+
+- Each row is a link to the conversation, titled by the opening words of its first message, with a rename button that turns it into a field (Enter or leaving the field saves, Escape cancels) and a delete button that asks before it deletes for good. The current one is `aria-current="page"`.
+- Below `48rem` the list sits above the chat and scrolls past `12rem`; wider, it takes the side.
+
+## Reference
+
+### Rules that are easy to get wrong
+
+- The action returns `ask`'s reply for every post, as the plain arrow does: a load, the list, a rename and a delete go through the same action and are answered by `ask` with no model asked, and an action answering something else for them leaves the chat saying it could not load. `resuming()` is true for them, so an action doing work around `ask` skips it with `if (resuming()) return ask(messages)`. An action calling `ask` twice holds the conversation in the first.
+- These reads give back the attempt the action's `rateLimit` counted, and nothing counts against `ai()`'s limits or budget; a send counts as usual.
+- A tab left open on a conversation another tab has since written to cannot write over it: its send is refused with 409 (`AiError` kind `conflict`) before the model is asked, its message goes back to the field, and the chat shows the conversation as stored with `conflictLabel`. Each write raises the conversation's revision, which the chat posts and the server checks in one transaction.
+- `ChatLauncher` does not take these props yet: its panel keeps the conversation in the page, `remember` across reloads.
+
+### Words and parts
+
+- Words: `conversationsLabel` (`Conversations`, names the list), `untitledLabel` (`Untitled conversation`, a conversation opened on files alone), `renameLabel` (`Rename the conversation`) and `deleteLabel` (`Delete the conversation`), each button followed by the conversation's title, `deleteConfirmLabel` (`Delete for good?`), `conflictLabel` (`This conversation changed in another tab, so it was reloaded.`), `loadFailedLabel` (`The conversation could not be loaded.`) and `changeFailedLabel` (`The change could not be saved.`), under `ai.chat.conversations`, `untitled`, `rename`, `delete`, `deleteConfirm`, `conflict`, `loadFailed` and `changeFailed`; the New conversation link reads `newLabel`. kayjs-ai ships the French.
+- Parts: `conversations` (the `nav`), `newConversation`, `conversationList`, `conversation` (a row, `data-current` on the shown one), `conversationLink`, `renameField`, `rename`, `delete`, `deleteConfirm` and `confirm`, restyled as the rest of `Chat`'s ([Restyle](chat.md#restyle)).
+
+### The store
+
+- By default the conversations are kept in `data/ai-conversations.sqlite`, opened by the first one stored, in memory under `bun test`. An owner keeps at most 200 conversations under one action, the least recently updated going first, and a conversation its 500 latest turns.
+- `ai({ conversations })` takes a store of your own, a `ConversationStore` (`list`, `get`, `write`, `rename`, `remove`, each async): `write(key, revision, change)` applies `{ drop, add, title }` only when the conversation is still at `revision` (0 for a new one) and answers the new revision, or `undefined` when another write came first. `sqliteConversations(path)` builds the default on another file.
+
+```ts
+import { ai, sqliteConversations } from '@kaynooo/kayjs-ai'
+import { defineConfig } from 'kay/server'
+
+export default defineConfig({ extensions: [ai({ conversations: sqliteConversations('data/chats.sqlite') })] })
+```
+
+- What is stored is personal data: see [Personal data](personal-data.md#what-kayjs-ai-keeps).

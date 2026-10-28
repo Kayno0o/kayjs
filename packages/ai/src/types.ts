@@ -197,7 +197,7 @@ export interface AskOptions {
   sources?: readonly Source[] | undefined
   // How long to wait, as a duration: `connect` for the provider to start answering (`'30s'` by default), `idle` for the next chunk of a reply once it began (`'60s'` by default). A stall past either fails the reply with a `timeout` error. Each step of a tool loop counts them anew.
   timeout?: { connect?: Duration | undefined, idle?: Duration | undefined } | undefined
-  // Who the limits and budget set in `ai()` count this ask for, in place of the signed-in user its `key` names or the address of the request being answered: a job or a test names one.
+  // Who the limits and budget set in `ai()` count this ask for, and whose conversation a `Chat` with `keepOnServer` keeps, in place of the signed-in user its `key` names or the address of the request being answered: a job or a test names one.
   key?: string | undefined
   // Actions the model may call, each run as the visitor through the whole app, guards, validation and rate limits included; passing one is its opt-in. They need the request being answered, so `ask` with an action called outside one throws.
   // A `tool({ name, description, input, run })` is a plain function instead, run with the app's own rights and no visitor: it works outside a request, in a scheduled job or a queue worker, and is never held for approval nor asked of `confirm`.

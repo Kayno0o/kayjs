@@ -22,7 +22,8 @@ A chat of your own, built on `ask` without `Chat`, shows its own notice. Say whe
 
 ### What kayjs-ai keeps
 
-- Nothing of the messages or replies: it writes no log of them and no file. An error in the app's log names the failure, not the text.
+- Nothing of the messages or replies, unless a `Chat` has `keepOnServer` or `conversations`: it writes no log of them and no file. An error in the app's log names the failure, not the text.
+- With `keepOnServer` or `conversations`, the text of each turn, the sources a reply cited and the conversation's title, under the visitor's user id (or the `key` naming them), in `data/ai-conversations.sqlite` or the store given to `ai({ conversations })`, until the visitor deletes the conversation or it is pruned past their 200 latest. Erasing a user's data (art. 17) deletes their rows: `DELETE FROM kai_conversations WHERE owner = ?` on the default file. Name the purpose and the time kept in the privacy notice ([Conversations kept on the server](chat-conversations.md)).
 - The limits count per visitor under a key that is the signed-in user's id, else the visitor's address (one key per IPv6 /64), in this process's memory or in the `store` you give, for the length of the window. That address or id is personal data: a `sqliteRates` file holds it until the window ends, and a store of your own for as long as it keeps it.
 - `ChatLauncher` and `Chat` keep the conversation in the tab's session storage only when `remember` names a key ([Chat island](chat.md)).
 - `kay i18n translate` sends the app's own messages and entries to the provider, not a visitor's.

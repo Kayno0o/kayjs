@@ -1,10 +1,12 @@
 import type { TSchema } from 'kay/library'
+import type { HeldCall } from './conversation'
 import type { Offered } from './loop'
 import type { Replaces } from './resume'
 import type { AskOptions, FunctionTool, Message, Piece, Provider, ProviderMessage, ProviderRequest, Reply, ReplyOf, StructuredAskOptions, Timeouts, ToolAction } from './types'
 import { actionTool, configError, currentRequest, durationSeconds, jsonSchemaOf, refundRateLimit } from 'kay/library'
 import { attachmentsOf, checkAccepted, DEFAULT_MAX_ATTACHMENT_BYTES, estimatedChars, mediaChars, readAttachments } from './attachments'
 import { choose, given } from './config'
+import { conversationReply, heldCall, heldReply } from './conversation'
 import { recorded } from './dev-log'
 import { AiError } from './errors'
 import { extraBody } from './extra'
@@ -14,7 +16,7 @@ import { guarded, visitorOf } from './limits'
 import { converse, single } from './loop'
 import { outputSchema } from './output-schema'
 import { createReply } from './reply'
-import { replacesOf, replyCallOf } from './resume'
+import { conversationCallOf, replacesOf, replyCallOf } from './resume'
 import { structured } from './structured'
 
 const DEFAULT_MAX_TOKENS = 4096
@@ -178,17 +180,27 @@ export function ask(prompt: string | Message[], options?: AskOptions): Reply
 export function ask(prompt: string | Message[], options: AskOptions | StructuredAskOptions = {}): Reply | ReplyOf<TSchema> {
   const schema = 'schema' in options ? options.schema : undefined
   const call = replyCall()
-  const text = resumed(call) ?? remembered(reply(prompt, options, schema, call), options, call)
+  const held = heldCall()
+  const text = resumed(call) ?? (held === undefined || held.op === 'send' ? remembered(asked(prompt, options, schema, call, held), options, call) : conversationReply(held, messagesOf(prompt), options.key))
 
   return schema === undefined ? text : structured(text, schema)
 }
 
-// True when the request being answered is a Chat's resume or stop of a reply that outlived its page, which runs the action again: an action skips what only a start needs, such as loading context for a model call that will not be made.
-// False for a start and for an ordinary call, and outside a request.
+// A Chat with `keepOnServer` posts its new message alone, and the conversation it holds on the server is asked with it.
+function asked(prompt: string | Message[], options: AskOptions, schema: TSchema | undefined, call: ReplyCall | undefined, held: HeldCall | undefined): Reply {
+  if (held === undefined)
+    return reply(prompt, options, schema, call)
+
+  return heldReply(held, messagesOf(prompt), options, options.maxInputChars ?? DEFAULT_MAX_INPUT_CHARS, messages => reply(messages, options, schema, call))
+}
+
+// True when the request being answered is a Chat's resume or stop of a reply that outlived its page, or its read or change of a conversation it keeps on the server, which runs the action again: an action skips what only a start needs, such as loading context for a model call that will not be made.
+// False for a start, a send and an ordinary call, and outside a request.
 export function resuming(request: Request | undefined = currentRequest()): boolean {
   const call = replyCallOf(request)
+  const held = conversationCallOf(request)
 
-  return call !== undefined && call.op !== 'start'
+  return (call !== undefined && call.op !== 'start') || (held !== undefined && held.op !== 'send')
 }
 
 // A reply with nothing to say, over a provider no one asks.

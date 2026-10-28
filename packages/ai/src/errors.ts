@@ -23,6 +23,8 @@ export type AiErrorKind
     | 'schema'
   // An attachment is none of the kinds a model is shown (a PNG, JPEG, GIF or WebP image, a PDF), or the provider does not take its kind: nothing was sent.
     | 'unsupported'
+  // A `Chat` with `keepOnServer` posted to its conversation as it stood before another tab wrote to it: nothing was sent, and the Chat reloads the conversation.
+    | 'conflict'
 
 // Which limit refused an ask: `asks` is `limit`, `budget` the visitor's tokens, `total` the tokens of all visitors.
 export type AiLimit = 'asks' | 'budget' | 'total'
@@ -72,6 +74,10 @@ export class AiError extends Error {
 
     if (kind === 'unsupported') {
       Object.defineProperty(this, REFUSED, { value: { status: 415, retryAfter: undefined, message: 'That file cannot be read here; send a PNG, JPEG, GIF or WebP image or a PDF' } })
+    }
+
+    if (kind === 'conflict') {
+      Object.defineProperty(this, REFUSED, { value: { status: 409, retryAfter: undefined, message: 'This conversation changed in another tab' } })
     }
 
     if (kind === 'too-long') {

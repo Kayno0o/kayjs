@@ -1,4 +1,5 @@
 import type { Duration, RateStore } from 'kay'
+import type { ConversationStore } from './conversation-store'
 import type { AiLimit } from './errors'
 import type { Piece, Usage } from './types'
 import process from 'node:process'
@@ -39,8 +40,10 @@ export interface AiOptions {
   rateLimit?: LimitOptions | false | undefined
   // In production 100,000 tokens per visitor and 2,000,000 in all every day unless set; `false` lifts it. A budget set without a `total` logs a warning at boot in production.
   budget?: BudgetOptions | false | undefined
-  // Who a signed-in visitor is, such as their id: counted in place of their address, and in place of the user a library such as kayjs-auth names. Left out, that user counts, else the address.
+  // Who a signed-in visitor is, such as their id: counted in place of their address, and the owner of the conversations a `Chat` keeps on the server, and in place of the user a library such as kayjs-auth names. Left out, that user counts, else the address.
   key?: ((request: Request) => string | undefined | Promise<string | undefined>) | undefined
+  // Where the conversations of a `Chat` with `keepOnServer` are kept: `sqliteConversations('data/ai-conversations.sqlite')` unless given (in memory under `bun test`).
+  conversations?: ConversationStore | undefined
 }
 
 interface Counter {
@@ -225,6 +228,21 @@ async function visitorKey(keyOf: Settings['key'], { request, visitor: named }: A
 // Who a request counts as, the same key the limits count it under: the signed-in user, else the address; undefined for one with neither (no socket, as under `app.handle()`), which no one can tell apart from the next.
 export async function visitorOf(request: Request): Promise<string | undefined> {
   return visitorKey(slot().settings.key, { request, visitor: undefined, chars: 0, maxTokens: 0 }, true)
+}
+
+// Who a request is for when someone names them, the ask's `key`, else `ai({ key })`, else the user a library names, never the address: what owns a conversation kept on the server. A `key` hook that throws names no one.
+export async function namedVisitor(request: Request, named: string | undefined): Promise<string | undefined> {
+  if (named !== undefined && named !== '')
+    return named
+
+  try {
+    const hooked = await slot().settings.key?.(request)
+
+    return typeof hooked === 'string' && hooked !== '' ? hooked : await userOf(request)
+  }
+  catch {
+    return undefined
+  }
 }
 
 // A store shared by processes, a database say, then holds no address nor user id, only a digest keyed by the app's secret to count under.

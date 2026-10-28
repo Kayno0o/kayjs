@@ -63,10 +63,11 @@ it('reads the pronunciation pass', async () => {
 | `limited` | a limit or budget set in `ai()` refused the ask: `retryAfter` and `limit` (`asks`, `budget`, `total`), see [limits](limits.md) |
 | `too-long` | the messages, files counted, are over the `maxInputChars` of `ask` (50,000 characters), or a file is over its `maxAttachmentBytes`: nothing was sent, an action answers 413 |
 | `unsupported` | an attachment is no PNG, JPEG, GIF or WebP image nor a PDF, or the provider does not take its kind (a PDF at a server that is neither OpenAI nor Mistral): nothing was sent, an action answers 415, see [Images and PDFs](attachments.md) |
+| `conflict` | a `Chat` with `keepOnServer` posted to an older revision of the conversation than the stored one, as another tab wrote to it: nothing was asked, an action answers 409, see [Conversations kept on the server](chat-conversations.md) |
 | `schema` | the answer of an ask with a `schema` does not fit it: no JSON object, cut by `maxTokens`, refused, or fields the schema refuses (`fields`, with `partial` the text), see [an object instead of text](asking.md#an-object-instead-of-text) |
 | `protocol` | an event that is not JSON of the provider's API, or a server answering JSON instead of streaming |
 
-Messages name the provider and what it said, with the key hidden if the provider echoes it. Redirects are refused (`network`), so a key never follows one to another origin. Nothing retries: a caller wanting to waits `retryAfter` and asks again. An action letting the error out answers 500 and logs it, except a `limited` one, which answers 429 with `Retry-After`, a `too-long` one, which answers 413, and an `unsupported` one, 415; catch it to answer the visitor in words.
+Messages name the provider and what it said, with the key hidden if the provider echoes it. Redirects are refused (`network`), so a key never follows one to another origin. Nothing retries: a caller wanting to waits `retryAfter` and asks again. An action letting the error out answers 500 and logs it, except a `limited` one, which answers 429 with `Retry-After`, a `too-long` one, which answers 413, an `unsupported` one, 415, and a `conflict` one, 409; catch it to answer the visitor in words.
 
 ### Providers by hand
 

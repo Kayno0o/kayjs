@@ -1,11 +1,13 @@
-import type { Action, ActionStream, Failure } from 'kay'
+import type { Action, ActionStream, Failure, Signal } from 'kay'
 import type { Attachments } from './chat-attachments'
+import type { ConversationAnswer, ConversationSummary } from './conversation-title'
 import type { ChatMessage, ChatTurn, CodeBlock, Message, Progress, Source, ToolCall } from './types'
 import { ActionError, effect, onMount, signal, untrack } from 'kay'
 import { markdownReady } from 'kay/markdown'
 import { filesOf, keepPending, newReplyId, pendingReply, posted, restored, shrunk, stored } from './chat-history'
 import { sameSources, usableSources } from './chat-sources'
-import { REPLACES_HEADER, REPLY_HEADER } from './resume'
+import { renamedTitle, titleOf } from './conversation-title'
+import { CONVERSATION_HEADER, REPLACES_HEADER, REPLY_HEADER } from './resume'
 
 export interface Turn extends Message {
   id: number
@@ -40,6 +42,13 @@ export interface ChatSessionOptions {
   readonly follow: () => void
   // What a Chat taking `transcribe` sends what was said through; the Chat holds the microphone, so kayjs-ui stays imported by the chat components alone.
   readonly voice?: ChatVoice | undefined
+  // Where the id of a conversation held on the server is kept, the page's `conversation` query param; undefined for a Chat that holds its history itself.
+  readonly conversation?: Signal<string | undefined> | undefined
+  // Whether the visitor's conversations are listed, so the session reads and keeps the list.
+  readonly listed?: boolean | undefined
+  // Said when another tab wrote to the conversation first, and when it could not be loaded.
+  readonly conflictMessage?: string | undefined
+  readonly loadFailedMessage?: string | undefined
 }
 
 // What a Chat's `transcribe` action answers: the text, or `{ text }`.
@@ -50,6 +59,41 @@ export interface ChatVoice {
   // What `hear` answers when `transcribe` finds no text, and when it fails.
   readonly unheardLabel: string
   readonly failedLabel: string
+}
+
+// The one snapshot a conversation call answers with, as the JSON it holds; undefined for an answer that is no stream, or a stream that ended without one.
+async function answerIn(answer: unknown): Promise<ConversationAnswer | undefined> {
+  if (typeof answer !== 'object' || answer === null || !('on' in answer))
+    return undefined
+
+  const stream = answer as ActionStream<string | Progress>
+  const value = await new Promise<string | Progress | undefined>((resolve) => {
+    let off: (() => void) | undefined
+    // A stream that ends with no value says so by its status alone, which no listener hears.
+    const timer = setInterval(() => {
+      if (stream.status() !== 'open')
+        settle(stream.last())
+    }, 50)
+
+    function settle(value: string | Progress | undefined) {
+      clearInterval(timer)
+      off?.()
+      resolve(value)
+    }
+
+    off = stream.on(settle)
+  })
+
+  stream.close()
+
+  const text = typeof value === 'string' ? value : value?.text
+
+  try {
+    return text === undefined ? undefined : JSON.parse(text) as ConversationAnswer
+  }
+  catch {
+    return undefined
+  }
 }
 
 // One post: what aborts it, the id it was sent under for a Chat that remembers (what a reload resumes and a Stop ends, gone once ended), whether it said it outlives its request, so its Stop is told to the server, and whether it was asked for again after a reload, so an empty one means the server kept nothing.
@@ -98,7 +142,7 @@ export function createChatSession(options: ChatSessionOptions) {
   let leaving = false
   // What the action took as too long, learned from its 413s, so the app states `maxInputChars` once: the oldest turns go first, the last stays.
   let learned = Infinity
-  // Counts the conversations started over, so a transcription finishing after one does not send into the next.
+  // Counts the conversations started over or switched to, so a transcription finishing after one does not send into the next.
   let conversation = 0
 
   // What was said joins the field and goes as a typed message does, with the files attached; a reply under way leaves it in the field, as post() then waits. Answers why nothing was sent, or nothing once the conversation started over meanwhile.
@@ -137,14 +181,108 @@ export function createChatSession(options: ChatSessionOptions) {
     }
   }
 
-  function clearLive() {
-    partial.set('')
-    thought.set('')
-    thoughtOpen.set(false)
-    calls.set([])
-    code.set([])
-    found.set([])
+  // A conversation held on the server: whether the visitor can keep one (unknown until the first answer, and false for a visitor no one names, whose history the page holds), the id whose turns the history shows, the revision they were read at, and the visitor's conversations when listed.
+  const owned = signal<boolean | undefined>(undefined)
+  const loading = signal(options.conversation !== undefined)
+  const conversations = signal<ConversationSummary[]>([])
+  let shown: string | undefined
+  let revision = 0
+  let mounted = false
+  // Counts the loads, so only the latest one shows, and names the conversation the last one asked for, so the address naming it loads it once.
+  let loads = 0
+  let asked: string | undefined
+  const holding = () => options.conversation !== undefined && owned() !== false
+
+  // A read or a change of the conversations, which the action answers through `ask` with no model asked: the message only carries a rename's title.
+  async function consult(header: string, content = ''): Promise<ConversationAnswer | undefined> {
+    return answerIn(await options.action({ messages: [{ role: 'user', content }] }, { refresh: false, headers: { [CONVERSATION_HEADER]: header } }))
   }
+
+  // Shows the conversation `id`, or a new one; a visitor the server cannot keep one for gets the tab's history back, as without `keepOnServer`.
+  async function load(id: string | undefined) {
+    const turn = ++loads
+
+    asked = id
+    loading.set(true)
+    failure.set(undefined)
+
+    try {
+      const answer = await consult(id === undefined ? 'load' : `load:${id}`)
+
+      if (turn !== loads)
+        return
+
+      if (answer?.owned === false) {
+        owned.set(false)
+        recall()
+
+        return
+      }
+
+      if (answer?.owned !== true || answer.op !== 'load')
+        throw new Error('the action answered no conversation; it returns the reply of ask() as it is')
+
+      owned.set(true)
+      shown = answer.id
+      revision = answer.revision
+      replacement = undefined
+      history.set(answer.turns.map(({ sources, ...turn }) => ({ ...turn, ...sources && { sources: usableSources(sources) }, id: nextId++ })))
+    }
+    catch (error) {
+      if (turn !== loads)
+        return
+
+      console.error(error)
+      failure.set(options.loadFailedMessage ?? options.errorMessage)
+    }
+    finally {
+      if (turn === loads)
+        loading.set(false)
+    }
+  }
+
+  async function list() {
+    try {
+      const answer = await consult('list')
+
+      if (answer?.owned === true && answer.op === 'list')
+        conversations.set(answer.conversations)
+      else if (answer?.owned === false)
+        owned.set(false)
+    }
+    catch (error) {
+      console.error(error)
+    }
+  }
+
+  // The conversation shown moves to the top of the list once a reply landed in it, under the opening words of its first message when it is new.
+  function touched() {
+    if (!options.listed || shown === undefined)
+      return
+
+    const id = shown
+    const known = conversations().find(item => item.id === id)
+    const first = history().find(({ role }) => role === 'user')
+
+    conversations.set([{ id, title: known?.title ?? titleOf(first?.content ?? ''), updatedAt: Date.now() }, ...conversations().filter(item => item.id !== id)])
+  }
+
+  // A new conversation: nothing is stored until its first reply lands.
+  function startNew() {
+    shown = undefined
+    revision = 0
+    replacement = undefined
+    history.set([])
+  }
+
+  function clearLive() {
+  partial.set('')
+  thought.set('')
+  thoughtOpen.set(false)
+  calls.set([])
+  code.set([])
+  found.set([])
+}
 
   // The reply's id is done with: no reload resumes it and no Stop ends it on the server.
   function forget(current: Reply) {
@@ -253,6 +391,12 @@ export function createChatSession(options: ChatSessionOptions) {
       history.set([...history(), { id: nextId++, role: 'assistant', content: text, calls: made, code: highlighted, reasoning: thinking, reasoningOpen: thinkingOpen, ...cites.length > 0 && { sources: cites }, stopped: state === 'closed' }])
     }
 
+    // The server stored the exchange as it does: a reply that ended, or one stopped once it had said or called something.
+    if (holding() && reply?.resumed !== true && (state === 'done' || (state === 'closed' && (text !== '' || made.length > 0)))) {
+      revision++
+      touched()
+    }
+
     if (state === 'failed')
       failure.set(options.errorMessage)
     else if (state === 'closed' && text === '' && made.length === 0)
@@ -260,9 +404,10 @@ export function createChatSession(options: ChatSessionOptions) {
   }
 
   // Posts the history; a 413 halves what is posted, at most 5 times a send since each counts against the action's rate limit, until the action takes it or only the last message is left.
+  // A conversation held on the server is posted its last message alone.
   async function call(abort: AbortSignal, headers: Record<string, string>): Promise<ActionStream<string | Progress>> {
     for (let retries = 0; ; retries++) {
-      const sent = posted(history(), options.keep, Math.min(options.maxChars, learned))
+      const sent = posted(history(), headers[CONVERSATION_HEADER] === undefined ? options.keep : 1, Math.min(options.maxChars, learned))
 
       try {
         return await options.action({ messages: sent }, { signal: abort, refresh: false, headers })
@@ -281,7 +426,7 @@ export function createChatSession(options: ChatSessionOptions) {
     const text = question ?? draft().trim()
     const sent = question === undefined ? attachments.attached() : []
 
-    if (busy() || (!again && text === '' && sent.length === 0))
+    if (busy() || loading() || (!again && text === '' && sent.length === 0))
       return
 
     // A history the server drew never loads the renderer: fetched now, it arrives while the model writes its first words.
@@ -298,10 +443,18 @@ export function createChatSession(options: ChatSessionOptions) {
       }
     }
 
-    // A reply is named, so a Stop ends it on the server and, for a Chat that remembers, a reload finds it.
+    const held = holding()
+
+    // A new conversation is named by its first send, and the page's address keeps the name, so a reload or Back finds it.
+    if (held && shown === undefined) {
+      shown = newReplyId()
+      options.conversation?.set(shown)
+    }
+
+    // A reply is named, so a Stop ends it on the server and, for a Chat that remembers its history in the tab, a reload finds it.
     const current: Reply = { abort: new AbortController(), id: resuming ?? newReplyId(), outlives: false, resumed: resuming !== undefined }
 
-    if (options.remember !== undefined && current.id !== undefined)
+    if (options.remember !== undefined && !held && current.id !== undefined)
       keepPending(options.remember, current.id)
 
     reply = current
@@ -316,7 +469,7 @@ export function createChatSession(options: ChatSessionOptions) {
     try {
       // A turn that only called tools has no text to post, which a provider refuses.
       // A resume after a reload comes once the server has dropped the turns.
-      const stream = await call(current.abort.signal, { [REPLY_HEADER]: `${resuming === undefined ? 'start' : 'resume'}:${current.id}`, ...resuming === undefined && replacement !== undefined && { [REPLACES_HEADER]: replacement.header } })
+      const stream = await call(current.abort.signal, { [REPLY_HEADER]: `${resuming === undefined ? 'start' : 'resume'}:${current.id}`, ...resuming === undefined && replacement !== undefined && { [REPLACES_HEADER]: replacement.header }, ...held && { [CONVERSATION_HEADER]: `send:${shown}:${revision}` } })
 
       if (current.abort.signal.aborted) {
         stream.close()
@@ -336,6 +489,15 @@ export function createChatSession(options: ChatSessionOptions) {
       else {
         console.error(error)
         forget(current)
+
+        // Another tab wrote to the conversation first: the message goes back to the field and the conversation is read again.
+        if (held && error instanceof ActionError && error.status === 409) {
+          takeBack()
+          void load(shown)
+          failure.set(options.conflictMessage ?? options.errorMessage)
+
+          return
+        }
 
         if (error instanceof ActionError && error.status === 422)
           takeBack()
@@ -385,8 +547,43 @@ export function createChatSession(options: ChatSessionOptions) {
     options.focus()
   }
 
-  // The conversation of the tab's last visit, put back once hydrated since the server renders the initial one.
+  // A conversation held on the server is read once hydrated, and again when the address names another one, by a link of the list or Back.
   onMount(() => {
+    mounted = true
+
+    if (options.conversation === undefined) {
+      recall()
+
+      return
+    }
+
+    void load(untrack(options.conversation))
+
+    if (options.listed)
+      void list()
+  })
+
+  effect(() => {
+    const id = options.conversation?.()
+
+    untrack(() => {
+      if (!mounted || id === shown || (loading() && id === asked) || owned() === false)
+        return
+
+      if (busy())
+        stop()
+
+      conversation++
+
+      if (id === undefined)
+        startNew()
+      else
+        void load(id)
+    })
+  })
+
+  // The conversation of the tab's last visit, put back once hydrated since the server renders the initial one.
+  function recall() {
     const key = options.remember
 
     if (key === undefined)
@@ -406,7 +603,7 @@ export function createChatSession(options: ChatSessionOptions) {
       void post(true, undefined, id)
     else if (id !== undefined)
       keepPending(key, undefined)
-  })
+  }
 
   effect(() => {
     const turns = history()
@@ -442,6 +639,38 @@ export function createChatSession(options: ChatSessionOptions) {
     takenBack,
     busy,
     hear,
+    owned,
+    loading,
+    conversations,
+    // Renames a listed conversation, the list showing the title once the server took it; answers whether it did, and throws when the call failed.
+    async rename(id: string, title: string): Promise<boolean> {
+      const answer = await consult(`rename:${id}`, title)
+      const done = answer?.owned === true && answer.op === 'rename' && answer.done
+
+      if (done)
+        conversations.set(conversations().map(item => item.id === id ? { ...item, title: renamedTitle(title) } : item))
+
+      return done
+    },
+    // Deletes a conversation for good; the one shown leaves the chat empty for a new one.
+    async remove(id: string): Promise<boolean> {
+      const answer = await consult(`remove:${id}`)
+      const done = answer?.owned === true && answer.op === 'remove'
+
+      if (done)
+        conversations.set(conversations().filter(item => item.id !== id))
+
+      if (done && id === shown) {
+        if (busy())
+          stop()
+
+        conversation++
+        startNew()
+        options.conversation?.set(undefined)
+      }
+
+      return done
+    },
     send: async (question?: string) => post(false, question),
     // Try again: the same request, the history as it is.
     retry: async () => post(true),
@@ -487,6 +716,13 @@ export function createChatSession(options: ChatSessionOptions) {
       conversation++
       history.set([])
       replacement = undefined
+
+      // A conversation held on the server stays stored, and the address names none until the next send.
+      if (shown !== undefined) {
+        startNew()
+        options.conversation?.set(undefined)
+      }
+
       draft.set('')
       attachments.clear()
       failure.set(undefined)

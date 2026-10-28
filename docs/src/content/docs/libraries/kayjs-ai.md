@@ -183,6 +183,22 @@ If your `ask` has `outlive: true` (see [A reply that outlives the visitor](#a-re
 
 Stop, Escape and New conversation end that reply on the server too, with one more call to your action. Return `ask(...).progress()` for that: its snapshots tell the chat the reply outlives, so a chat whose reply does not makes no extra call. The resume and stop go through your action like a send, so its guards and rate limit apply to them. A resume or stop that finds your visitor's reply gives its attempt back, so reloading the page does not use up the limit.
 
+### Conversations kept on the server
+
+With `keepOnServer`, the server keeps the conversation and your action stays the same `({ messages }) => ask(messages)`. Each send posts the new message alone, `ask` adds the turns it stored before it and stores the new exchange once the reply ends, and the page's `?conversation=` param names the conversation, so a reload, a bookmark or Back shows it again. Regenerate and edit drop the turns they replace on the server too.
+
+```kay
+Chat(action={reply} conversations fill)
+```
+
+`conversations` does the same and lists the visitor's conversations beside the chat, each with rename and delete, under a New conversation link. On a narrow screen the list sits above the chat.
+
+A conversation belongs to the visitor your server names: the signed-in user kayjs-auth names, or the `key` you give `ai()` or the ask. The browser only says which of their own it shows. A guest, whom no one names, keeps the history in the page as without `keepOnServer`. A tab left open on a conversation another tab has since written to cannot write over it: its send is refused before the model is asked, the message goes back to the field and the conversation shows as stored.
+
+The conversations are kept in `data/ai-conversations.sqlite` unless you give `ai({ conversations })` a store of your own. What they hold is personal data: name it in your privacy notice and delete a user's rows when you erase their account.
+
+<ReadMore href="/llms/kayjs-ai-chat-conversations">How the server holds and replays the history, the list's words and parts, and the store.</ReadMore>
+
 ## The reply
 
 - `await reply` is the whole text.
@@ -442,7 +458,7 @@ Everything a visitor types into the chat is sent to the AI provider, along with 
 - Name the provider, the purpose and the transfer in your privacy notice, where the visitor can read it before writing.
 - Return only the fields an answer needs from an action you offer as a tool, since its result goes to the provider as it is.
 
-kayjs-ai writes no log or file of the messages. It counts each visitor's asks and tokens under a digest of their user id or their address, in memory or in the store you give, until the window closes. The tab's session storage is used only when you pass `remember`.
+kayjs-ai writes no log or file of the messages, unless a `Chat` keeps its conversations on the server. It counts each visitor's asks and tokens under a digest of their user id or their address, in memory or in the store you give, until the window closes. The tab's session storage is used only when you pass `remember`.
 
 The AI Act asks that a person be told they are talking to an AI. `Chat` and `ChatLauncher` show a line under the conversation: "You are talking to an AI. Your messages are sent to its provider to answer." Reword it for your provider with the `disclosure` prop, translate it by giving the `ai.chat.disclosure` message in your catalog, or hide it with `disclosure=""` when the page says so already. A chat you build yourself on `ask` shows its own notice.
 
@@ -485,7 +501,7 @@ A run that stops half way leaves whole files. Run it again to translate what is 
 
 ## Errors
 
-A failure throws an `AiError` with a `kind`: `auth`, `rate-limited`, `unavailable`, `invalid`, `network`, `timeout`, `cut`, `protocol`, `limited`, `too-long`, `schema` or `unsupported`. A rate limit has `retryAfter` in seconds. A reply cut halfway has `partial`, the text that came. A `schema` error has `fields` too. Nothing is retried for you.
+A failure throws an `AiError` with a `kind`: `auth`, `rate-limited`, `unavailable`, `invalid`, `network`, `timeout`, `cut`, `protocol`, `limited`, `too-long`, `schema`, `unsupported` or `conflict`. A rate limit has `retryAfter` in seconds. A reply cut halfway has `partial`, the text that came. A `schema` error has `fields` too. Nothing is retried for you.
 
 ## Test it
 

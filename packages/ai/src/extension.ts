@@ -3,6 +3,7 @@ import type { AiOptions } from './limits'
 import { underKayDev } from 'kay/library'
 import { api } from 'kay/server'
 import { aiEnv, choose } from './config'
+import { useConversations } from './conversation-store'
 import { recordedAsks } from './dev-log'
 import { configureLimits, limitsInEffect } from './limits'
 
@@ -21,6 +22,7 @@ function providerNow(): { provider: string, model: string | null } | { error: st
 // Lists the variables `ask` reads in `kay.config.ts`'s `extensions`, so `kay env` shows them without the app wiring them, holds the limit and budget every `ask` counts against, adds `kay i18n translate` and the dev tool's AI tab; `ask` works without it, unlimited in development and under the production defaults otherwise.
 export function ai(options: AiOptions = {}): KayExtension {
   configureLimits(options)
+  useConversations(options.conversations)
 
   return {
     name: '@kaynooo/kayjs-ai',
