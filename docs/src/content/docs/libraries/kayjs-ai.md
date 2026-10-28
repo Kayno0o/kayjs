@@ -505,6 +505,26 @@ A run that stops half way leaves whole files. Run it again to translate what is 
 
 <ReadMore href="/llms/kayjs-ai-translating">The checks on a reply, which fields of an entry are translated, and how each kind of entry is marked.</ReadMore>
 
+## Speech and embeddings
+
+Three more calls work like `ask`. `transcribe(audio)` writes a recording down and returns the text. `speak(text)` reads a text aloud and returns the audio as a `Blob`. `embed(texts)` turns texts into vectors, for a search over your own data.
+
+```ts
+import { embed, speak, transcribe } from '@kaynooo/kayjs-ai'
+
+const text = await transcribe(recording, { language: 'fr' })
+const audio = await speak('Your table is booked', { voice: 'nova' })
+const vectors = await embed(['first passage', 'second passage'], { dimensions: 768 })
+```
+
+They speak OpenAI's audio and embeddings API, which OpenAI, Ollama and most local servers serve. By default they go to the server `ask` uses. `AI_AUDIO_URL` and `AI_EMBED_URL` send them to another one, which you need with Anthropic, as it has neither. Each call reads its model from its own variable: `AI_TRANSCRIBE_MODEL`, `AI_SPEECH_MODEL` and `AI_EMBED_MODEL`.
+
+Give `embed` the size of the column you store the vectors in. A model that answers another size fails the call, so a vector never meets a column it does not fit. pg-orm keeps them in a pgvector column and sorts by distance to a question.
+
+Under `bun test` the fake answers all three. Embeddings are stable vectors built from the words, so texts that share words come out near each other.
+
+<ReadMore href="/llms/kayjs-ai-speech-and-embeddings">The variables, storing and searching vectors with pgvector, the errors, and scripting the fake.</ReadMore>
+
 ## Errors
 
 A failure throws an `AiError` with a `kind`: `auth`, `rate-limited`, `unavailable`, `invalid`, `network`, `timeout`, `cut`, `protocol`, `limited`, `too-long`, `schema`, `unsupported` or `conflict`. A rate limit has `retryAfter` in seconds. A reply cut halfway has `partial`, the text that came. A `schema` error has `fields` too. Nothing is retried for you.

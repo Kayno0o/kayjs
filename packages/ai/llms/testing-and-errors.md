@@ -45,6 +45,7 @@ it('reads the pronunciation pass', async () => {
 - `fakeAi.asked` and `fakeAi.last()`: every ask answered, `{ provider, messages, tools, system, model, maxTokens, temperature, schema }`, recorded when the reply is read. `tools` are those offered (`{ name, description, inputSchema }`, absent when none), `schema` the JSON Schema of the object asked for (absent for text); a message carries `calls` when the assistant called tools and `results` when it is the turn answering them. `fakeAi.clear()` forgets asks and scripts.
 - The fake reports a usage of about four characters per token, and in development paces its pieces so a page visibly streams.
 - `site.call(action, input)` on an action returning the reply gives its snapshots.
+- `transcribe()`, `speak()` and `embed()` are answered by the fake too, scripted with `transcript`, `speech` and `embedding` and read through `heard`, `spoken` and `embedded`: [Speech and embeddings](speech-and-embeddings.md#the-fake).
 - Under `bun test` `ask()` always answers from `fakeAi`, whatever keys the environment holds, and an ask given its own `provider` too: the fake answers in its place, `asked.provider` is that provider's name and `asked.model` its model, so the code that builds a second provider is tested with the rest. A library testing a provider itself sets `KAYJS_AI_REAL_PROVIDERS=1`, which sends such an ask to the provider given; in development it does until `ANTHROPIC_API_KEY`, `OPENAI_API_KEY` or `AI_BASE_URL` is set. Production with none of them throws.
 
 ### Errors

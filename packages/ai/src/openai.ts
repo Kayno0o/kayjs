@@ -3,6 +3,7 @@ import type { Finish, Piece, Provider, ProviderMessage, ProviderRequest } from '
 import { AiError } from './errors'
 import { extraBody } from './extra'
 import { json, postEvents } from './http'
+import { openaiCalls } from './openai-calls'
 import { allRequired, outputSchema } from './output-schema'
 import { MAX_ARGUMENTS, MAX_NAME_LENGTH, MAX_STREAMED_CALLS } from './tool-limits'
 
@@ -165,6 +166,7 @@ export function openai({ baseUrl = OPENAI_URL, apiKey, model, body: fields, pdf 
     name: 'openai',
     model,
     accepts: documents === false ? ['image'] : ['image', 'pdf'],
+    ...openaiCalls(root, apiKey),
     async* stream(request, signal) {
       const messages = [...request.system === undefined ? [] : [{ role: 'system', content: request.system }], ...request.messages.flatMap(message => turnsOf(message, documents))]
       const body = {

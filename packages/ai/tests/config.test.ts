@@ -65,7 +65,7 @@ describe('the extension', () => {
   it('lists the variables for kay env, the model required in production', () => {
     const { env } = ai()
 
-    expect(Object.keys(env!.properties)).toEqual(['ANTHROPIC_API_KEY', 'OPENAI_API_KEY', 'AI_BASE_URL', 'AI_MODEL', 'AI_PROVIDER'])
+    expect(Object.keys(env!.properties)).toEqual(['ANTHROPIC_API_KEY', 'OPENAI_API_KEY', 'AI_BASE_URL', 'AI_MODEL', 'AI_PROVIDER', 'AI_AUDIO_URL', 'AI_TRANSCRIBE_MODEL', 'AI_SPEECH_MODEL', 'AI_VOICE', 'AI_EMBED_URL', 'AI_EMBED_MODEL'])
     expect(env!.properties.AI_MODEL).toMatchObject({ requiredInProduction: true })
     expect(env!.properties.ANTHROPIC_API_KEY).not.toMatchObject({ requiredInProduction: true })
   })

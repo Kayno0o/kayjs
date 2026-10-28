@@ -103,6 +103,35 @@ export async function refusal(name: string, response: Response, secret?: string)
   return new AiError('invalid', `${name} refused the request (${status})${detail}`, { status })
 }
 
+// Posts one request and reads its answer with `read`, both within `timeout` milliseconds; an answer that is no success throws what the provider said.
+export async function exchange<T>(name: string, url: string, init: { headers: Record<string, string>, body: BodyInit }, timeout: number, signal: AbortSignal, read: (response: Response) => Promise<T>, secret?: string): Promise<T> {
+  const late = new AbortController()
+  const timer = setTimeout(() => late.abort(), timeout)
+
+  try {
+    const response = await fetch(url, { method: 'POST', headers: init.headers, body: init.body, signal: AbortSignal.any([signal, late.signal]), redirect: 'error' })
+
+    if (!response.ok)
+      throw await refusal(name, response, secret)
+
+    return await read(response)
+  }
+  catch (error) {
+    signal.throwIfAborted()
+
+    if (error instanceof AiError)
+      throw error
+
+    if (late.signal.aborted)
+      throw new AiError('timeout', `${name} did not answer within ${timeout} ms`, { cause: error })
+
+    throw new AiError('network', `${name} could not be reached (${error instanceof Error ? error.message : String(error)})`, { cause: error })
+  }
+  finally {
+    clearTimeout(timer)
+  }
+}
+
 // Posts JSON and gives the stream of events back; an answer that is no success throws what the provider said.
 export async function* postEvents(name: string, url: string, headers: Record<string, string>, body: unknown, timeouts: Timeouts, signal: AbortSignal, secret?: string): AsyncGenerator<ServerEvent> {
   let response: Response

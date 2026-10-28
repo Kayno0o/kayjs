@@ -44,15 +44,16 @@ The attach button, the upload's checks (`accept`, `maxFiles`, `maxFileSize`), th
 
 ### Speaking a message
 
-`transcribe` takes an action that writes down a recording, returning the text or `{ text }`; the chat adds a microphone beside the field:
+`transcribe` takes an action that writes down a recording, returning the text or `{ text }`, which kayjs-ai's own `transcribe()` does ([Speech and embeddings](speech-and-embeddings.md)); the chat adds a microphone beside the field:
 
 ```kay
 --- server
 import { s } from 'kay'
+import { transcribe } from '@kaynooo/kayjs-ai'
 
-export const transcribe = action(s.Object({ audio: s.File() }), async ({ audio }) => ({ text: await whisper(audio) }), { maxSize: '10mb' })
+export const dictate = action(s.Object({ audio: s.File() }), async ({ audio }) => ({ text: await transcribe(audio) }), { maxSize: '10mb' })
 ---
-Chat(action={reply} transcribe={transcribe})
+Chat(action={reply} transcribe={dictate})
 ```
 
 - A press asks for the microphone and records, the button pressed with a stop icon; the next press posts the recording (`recording.webm`, `recording.m4a` in Safari) and the text joins the field and is sent as typed, with any attached files. A reply under way leaves it in the field. Escape on the button drops the recording, starting over drops one being recorded or written down, and a recording stops by itself after 5 minutes.

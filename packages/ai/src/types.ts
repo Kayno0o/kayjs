@@ -129,6 +129,40 @@ export interface Provider {
   readonly accepts?: readonly Media['kind'][] | undefined
   // Starts the request when first read, and stops it, the body cancelled, when `signal` aborts or the iterator returns.
   stream: (request: ProviderRequest, signal: AbortSignal) => AsyncIterable<Piece>
+  // Writes a recording down, for `transcribe()`; a provider without it, Anthropic, has no speech to text.
+  transcribe?: ((request: TranscribeRequest, signal: AbortSignal) => Promise<string>) | undefined
+  // Reads a text aloud, for `speak()`, the audio typed by its `type`.
+  speak?: ((request: SpeakRequest, signal: AbortSignal) => Promise<Blob>) | undefined
+  // One vector per text, in their order, for `embed()`.
+  embed?: ((request: EmbedRequest, signal: AbortSignal) => Promise<number[][]>) | undefined
+}
+
+// The formats a text is read aloud in, the `response_format` of OpenAI's `/audio/speech`.
+export type AudioFormat = 'mp3' | 'opus' | 'aac' | 'flac' | 'wav' | 'pcm'
+
+export interface TranscribeRequest {
+  audio: Blob
+  model: string
+  // An ISO 639-1 code such as `fr`, left out to let the model tell.
+  language: string | undefined
+  // How long the whole call may take, in milliseconds.
+  timeout: number
+}
+
+export interface SpeakRequest {
+  text: string
+  model: string
+  voice: string | undefined
+  speed: number | undefined
+  format: AudioFormat | undefined
+  timeout: number
+}
+
+export interface EmbedRequest {
+  input: string[]
+  model: string
+  dimensions: number | undefined
+  timeout: number
 }
 
 // Any action exported by a page module, whatever its input and honeypot.

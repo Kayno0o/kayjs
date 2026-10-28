@@ -1,4 +1,4 @@
-import type { Finish, Piece, Provider, ProviderMessage, ProviderRequest, Reasoning, ToolSpec } from './types'
+import type { AudioFormat, Finish, Piece, Provider, ProviderMessage, ProviderRequest, Reasoning, ToolSpec } from './types'
 import process from 'node:process'
 import { mediaChars } from './attachments'
 
@@ -44,6 +44,42 @@ interface Entry {
   when: When | undefined
 }
 
+// A recording `transcribe()` was given.
+export interface Heard {
+  provider: string
+  model: string
+  audio: Blob
+  language: string | undefined
+}
+
+// A text `speak()` was given.
+export interface Spoken {
+  provider: string
+  model: string
+  text: string
+  voice: string | undefined
+  speed: number | undefined
+  format: AudioFormat | undefined
+}
+
+// The texts one `embed()` was given, a single text as a list of one.
+export interface Embedded {
+  provider: string
+  model: string
+  input: string[]
+  dimensions: number | undefined
+}
+
+// What answers a call other than an ask: the value, an error it throws, or a function of what it was given.
+export type Answer<Given, Value> = Value | Error | ((given: Given) => Value)
+
+type OtherCall = 'transcribe' | 'speak' | 'embed'
+
+interface Queued<Given, Value> {
+  answer: Answer<Given, Value>
+  when: ((given: Given) => boolean) | undefined
+}
+
 export interface Fake extends Provider {
   // Every ask the fake answered, oldest first.
   readonly asked: readonly Asked[]
@@ -55,6 +91,18 @@ export interface Fake extends Provider {
   reply: (script: Script, when?: When) => void
   // The next ask fails with this error, or the first one `when` accepts.
   fail: (error: Error, when?: When) => void
+  // Every recording `transcribe()` was given, oldest first.
+  readonly heard: readonly Heard[]
+  // The next `transcribe()` returns this text, or throws this error; `Fake transcript` when none is left.
+  transcript: (answer: Answer<Heard, string>, when?: (heard: Heard) => boolean) => void
+  // Every text `speak()` was given, oldest first.
+  readonly spoken: readonly Spoken[]
+  // The next `speak()` returns this audio, or throws this error; a silent WAV as long as the text when none is left.
+  speech: (answer: Answer<Spoken, Blob>, when?: (spoken: Spoken) => boolean) => void
+  // Every `embed()` call, oldest first.
+  readonly embedded: readonly Embedded[]
+  // The next `embed()` returns these vectors, one per text, or throws this error; when none is left each text gets a stable vector from its words.
+  embedding: (answer: Answer<Embedded, number[][]>, when?: (embedded: Embedded) => boolean) => void
   // Forgets what was asked and scripted.
   clear: () => void
 }
@@ -63,6 +111,10 @@ const FAKE = Symbol.for('kayjs-ai.fake')
 const WORDS = /\S+\s*|\s+/g
 const CHARS_PER_TOKEN = 4
 const DEV_PACE_MS = 20
+const SAMPLE_RATE = 16_000
+// The length of a fake vector when `embed` names none.
+const DIMENSIONS = 256
+const TOKENS = /[\p{L}\p{N}]+/gu
 
 function pieces(text: string): string[] {
   return text.match(WORDS) ?? []
@@ -164,23 +216,121 @@ function take(scripts: Entry[], question: Asked): Script | Error | undefined {
   return found === -1 ? undefined : scripts.splice(found, 1)[0]?.script
 }
 
+// The first answer `when` accepts, else the oldest without one, run on what was given.
+function answerOf<Given, Value>(queue: Queued<Given, Value>[], given: Given, fallback: (given: Given) => Value): Value {
+  const at = queue.findIndex(entry => entry.when?.(given) === true)
+  const found = at === -1 ? queue.findIndex(entry => entry.when === undefined) : at
+  const answer = found === -1 ? fallback : queue.splice(found, 1)[0]!.answer
+
+  if (answer instanceof Error)
+    throw answer
+
+  return typeof answer === 'function' ? (answer as (given: Given) => Value)(given) : answer
+}
+
+// 16-bit mono PCM silence in a WAV, 0.3 s a word, so a test reading its length sees a longer text read for longer.
+function silence(text: string): Blob {
+  const samples = Math.max(1, pieces(text.trim()).length) * SAMPLE_RATE * 3 / 10
+  const view = new DataView(new ArrayBuffer(44 + samples * 2))
+  const ascii = (at: number, word: string) => {
+    for (const [index, char] of [...word].entries()) {
+      view.setUint8(at + index, char.charCodeAt(0))
+    }
+  }
+
+  ascii(0, 'RIFF')
+  view.setUint32(4, 36 + samples * 2, true)
+  ascii(8, 'WAVEfmt ')
+  view.setUint32(16, 16, true)
+  view.setUint16(20, 1, true)
+  view.setUint16(22, 1, true)
+  view.setUint32(24, SAMPLE_RATE, true)
+  view.setUint32(28, SAMPLE_RATE * 2, true)
+  view.setUint16(32, 2, true)
+  view.setUint16(34, 16, true)
+  ascii(36, 'data')
+  view.setUint32(40, samples * 2, true)
+
+  return new Blob([view.buffer], { type: 'audio/wav' })
+}
+
+// A unit vector from the words of a text, each hashed to one dimension: the same text always gets the same vector, and texts sharing words are near.
+function vectorOf(text: string, dimensions: number): number[] {
+  const vector = Array.from<number>({ length: dimensions }).fill(0)
+
+  for (const word of text.toLowerCase().match(TOKENS) ?? []) {
+    const hash = Bun.hash.crc32(word)
+
+    vector[hash % dimensions]! += Math.floor(hash / dimensions) % 2 === 0 ? 1 : -1
+  }
+
+  const length = Math.hypot(...vector)
+
+  if (length === 0)
+    vector[0] = 1
+
+  return length === 0 ? vector : vector.map(value => value / length)
+}
+
 function createFake(): Fake {
   const asked: Asked[] = []
   const scripts: Entry[] = []
+  const heard: Heard[] = []
+  const transcripts: Queued<Heard, string>[] = []
+  const spoken: Spoken[] = []
+  const speeches: Queued<Spoken, Blob>[] = []
+  const embedded: Embedded[] = []
+  const embeddings: Queued<Embedded, number[][]>[] = []
+
+  // The calls other than an ask, answered under `provider`'s name; a stand-in offers only those of the provider it replaces, so one with no speech to text has none either.
+  function calls(provider: string, has: (call: OtherCall) => boolean): Pick<Provider, OtherCall> {
+    const all: Required<Pick<Provider, OtherCall>> = {
+      transcribe: async ({ audio, model, language }) => Promise.try(() => {
+        const given: Heard = { provider, model, audio, language }
+
+        heard.push(given)
+
+        return answerOf(transcripts, given, () => 'Fake transcript')
+      }),
+      speak: async ({ text, model, voice, speed, format }) => Promise.try(() => {
+        const given: Spoken = { provider, model, text, voice, speed, format }
+
+        spoken.push(given)
+
+        return answerOf(speeches, given, () => silence(text))
+      }),
+      embed: async ({ input, model, dimensions }) => Promise.try(() => {
+        const given: Embedded = { provider, model, input: [...input], dimensions }
+
+        embedded.push(given)
+
+        return answerOf(embeddings, given, () => input.map(text => vectorOf(text, dimensions ?? DIMENSIONS)))
+      }),
+    }
+
+    return Object.fromEntries(Object.entries(all).filter(([call]) => has(call as OtherCall)))
+  }
 
   const fake: Fake = {
     name: 'fake',
     model: 'fake',
     asked,
     last: () => asked.at(-1),
-    standIn: provider => ({ name: provider.name, model: provider.model, accepts: provider.accepts, stream: (request, signal) => answer(request, signal, provider.name) }),
+    standIn: provider => ({ name: provider.name, model: provider.model, accepts: provider.accepts, stream: (request, signal) => answer(request, signal, provider.name), ...calls(provider.name, call => provider[call] !== undefined) }),
     reply: (script, when) => void scripts.push({ script, when }),
     fail: (error, when) => void scripts.push({ script: error, when }),
+    heard,
+    transcript: (answer, when) => void transcripts.push({ answer, when }),
+    spoken,
+    speech: (answer, when) => void speeches.push({ answer, when }),
+    embedded,
+    embedding: (answer, when) => void embeddings.push({ answer, when }),
     clear: () => {
-      asked.length = 0
-      scripts.length = 0
+      for (const list of [asked, scripts, heard, transcripts, spoken, speeches, embedded, embeddings])
+        list.length = 0
     },
     stream: (request, signal) => answer(request, signal, 'fake'),
+    ...calls('fake', () => true),
   }
 
   async function* answer(request: ProviderRequest, signal: AbortSignal, provider: string): AsyncGenerator<Piece> {

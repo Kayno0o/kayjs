@@ -82,6 +82,8 @@ In the island, `const stream = await reply({ messages })` resolves with an `Acti
 
 Mistral: `AI_BASE_URL=https://api.mistral.ai/v1`, its key in `OPENAI_API_KEY`, `AI_MODEL=mistral-small-2603`. Pin a dated model id: an alias such as `mistral-small-latest` moves to the next model and bills at its price. Nothing else is set: kay drops the `stream_options` Mistral refuses, reads its array content for the text, and counts the usage it sends unasked.
 
+`transcribe()`, `speak()` and `embed()` read their own variables (`AI_AUDIO_URL`, `AI_EMBED_URL`, a model each, `AI_VOICE`): [Speech and embeddings](speech-and-embeddings.md).
+
 The provider is `AI_BASE_URL` when set, else the one key set. Nothing is read at import: a missing variable throws at the `ask()` call, naming what to set, and never while `kay build` runs.
 
 ### ask options
