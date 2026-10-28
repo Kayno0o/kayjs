@@ -7,7 +7,7 @@ import type { ImportEdges } from './libraries'
 import type { RouteSize, SizeReport } from './report'
 import { realpathSync } from 'node:fs'
 import { join, relative, sep } from 'node:path'
-import { actionOf, elementsIn, serverIslandOf } from '../compiler/ast'
+import { actionOf, elementsIn, serverIslandOf, someNode } from '../compiler/ast'
 import { parseKay } from '../compiler/parser'
 import { bindingNames, scopedBlocks } from '../compiler/template-reads'
 import { describeStop } from '../server/pure-page'
@@ -30,6 +30,8 @@ const GUARD = /^(?:([A-Z_$][\w$]*)\.)?([A-Z_$][\w$]*)$/i
 // Stands in a call's props for a spread, which may pass any.
 const SPREAD = '*'
 const BIND_PREFIX = /^bind:/
+// A `live` option, which a cached value a page follows is read with; one naming something else only weighs a form-only route with the islands' entry, the most it loads.
+const LIVE = /\blive\s*:/
 
 // What each route loads, gzip: the stylesheets of its layouts and page, and the scripts its prerendered pages link, the heaviest page of them.
 // A route none of whose pages was prerendered has no page to read, so its scripts are the entry and every island its components can reach, through helpers, dynamic imports and aliases too, which is at most what a request loads.
@@ -68,6 +70,7 @@ export async function routeSizes(root: string, client: ClientBuild, routes: Rout
   }
 
   const entryChunks = report?.entry?.chunks ?? []
+  const navigationChunks = report?.navigation?.chunks
   const reads = new Map<string, Promise<SourceFacts>>()
   // The import graph the scan of the routes read, with the libraries a component may come from; opened once a file is read, as a root with no files has none to open.
   let opened: Promise<Imports> | undefined
@@ -95,7 +98,9 @@ export async function routeSizes(root: string, client: ClientBuild, routes: Rout
 
     const facts = await factsOf(file, root, reads, imports)
 
-    found.ships ||= (facts.posts && client.navigation === true) || facts.defers
+    found.posts ||= facts.posts && client.navigation === true
+    found.defers ||= facts.defers
+    found.full ||= facts.full
     found.waits ||= facts.waits || facts.defers
 
     for (const imported of facts.imports) {
@@ -135,7 +140,7 @@ export async function routeSizes(root: string, client: ClientBuild, routes: Rout
       continue
     }
 
-    const found: Reach = { islands: new Set(), ships: false, waits: false }
+    const found: Reach = { islands: new Set(), posts: false, defers: false, full: false, waits: false }
     const seen = new Set<string>()
 
     for (const file of [...route.layouts, route.file])
@@ -143,9 +148,12 @@ export async function routeSizes(root: string, client: ClientBuild, routes: Rout
 
     // A chunk two islands share is weighed once, and the entry ships with an island or when a form or a deferred island needs it.
     // A page holding an island that waits to be visible or idle, or a deferred server island, preloads the code waiting for it too.
-    const chunks = found.islands.size === 0 && !found.ships ? [] : new Set([...entryChunks, ...found.waits ? client.hydrateWhen ?? [] : [], ...[...found.islands].flatMap(island => islandChunks.get(island)!)])
+    // A page only posting forms loads the navigation-only entry, as `documentOf` in src/server/render.ts decides, when the build made one.
+    const navigates = found.islands.size === 0 && found.posts && !found.defers && !found.full && navigationChunks !== undefined
+    const ships = found.islands.size > 0 || found.posts || found.defers
+    const chunks = ships ? new Set([...entryChunks, ...found.waits ? client.hydrateWhen ?? [] : [], ...[...found.islands].flatMap(island => islandChunks.get(island)!)]) : []
 
-    bySize.set(route.pattern, { route: route.pattern, js: await total(chunks), css, islands: [...found.islands].sort(), pages: 0, kept, ...why !== undefined && { stop: why }, estimated: true })
+    bySize.set(route.pattern, { route: route.pattern, js: await total(navigates ? navigationChunks : chunks), css, islands: [...found.islands].sort(), pages: 0, kept, ...why !== undefined && { stop: why }, estimated: true })
   }
 
   return [...bySize.values()]
@@ -160,6 +168,8 @@ interface SourceFacts {
   posts: boolean
   // A server island the entry fetches once the page has loaded.
   defers: boolean
+  // What keeps a page posting forms on the islands' entry: a server island, an `await` block it streams, a cached value it follows.
+  full: boolean
   // An island marked to hydrate when visible or idle, or by a value the build cannot read.
   waits: boolean
 }
@@ -171,7 +181,9 @@ interface Use {
 
 interface Reach {
   islands: Set<string>
-  ships: boolean
+  posts: boolean
+  defers: boolean
+  full: boolean
   waits: boolean
 }
 
@@ -196,15 +208,15 @@ async function factsOf(file: string, root: string, memo: Map<string, Promise<Sou
         const followedFiles = (await edges(realpathSync(file))).map(named)
 
         if (!file.endsWith('.kay'))
-          return { imports: followedFiles, uses: new Map(), posts: false, defers: false, waits: false }
+          return { imports: followedFiles, uses: new Map(), posts: false, defers: false, full: LIVE.test(source), waits: false }
 
         const { template } = parseKay(source)
         const elements = [...elementsIn(template)]
 
-        return { imports: followedFiles, uses: usesOf(source, file, root, template, named), posts: elements.some(element => actionOf(element, source) !== undefined), defers: elements.some(element => serverIslandOf(element, source)?.mode === 'defer'), waits: elements.some(element => waitsToHydrate(element, source)) }
+        return { imports: followedFiles, uses: usesOf(source, file, root, template, named), posts: elements.some(element => actionOf(element, source) !== undefined), defers: elements.some(element => serverIslandOf(element, source)?.mode === 'defer'), full: LIVE.test(source) || elements.some(element => serverIslandOf(element, source) !== undefined) || someNode(template, node => node.kind === 'await'), waits: elements.some(element => waitsToHydrate(element, source)) }
       }
       catch {
-        return { imports: [], uses: new Map(), posts: false, defers: false, waits: false }
+        return { imports: [], uses: new Map(), posts: false, defers: false, full: false, waits: false }
       }
     })()
     memo.set(file, facts)

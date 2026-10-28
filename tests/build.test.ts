@@ -2117,11 +2117,12 @@ describe('the size report', () => {
       'src/routes/index.kay': '---\nimport Big from \'../big.kay\'\nimport Small from \'../small.kay\'\n---\nBig\nSmall\n',
     })
 
-    const { report, dir, entry, entryImports } = await buildClient(root, { minify: true, report: 'modules' })
+    const { report, dir, entry, entryImports, navEntry, navEntryImports } = await buildClient(root, { minify: true, report: 'modules' })
     const gzip = async (url: string) => Bun.gzipSync(await Bun.file(join(dir, url.replace('/_kay/', ''))).bytes(), { level: 9 }).length
     const entryGzip = (await Promise.all([entry!, ...entryImports].map(gzip))).reduce((sum, size) => sum + size, 0)
 
     expect(report!.entry!.size.gzip).toBe(entryGzip)
+    expect(report!.navigation!.size.gzip).toBe((await Promise.all([navEntry!, ...navEntryImports!].map(gzip))).reduce((sum, size) => sum + size, 0))
     expect(report!.entry!.modules!.map(module => module.name)).toContain('kay/src/runtime/dom.ts')
     expect(report!.islands.map(island => island.file)).toEqual(['src/big.kay', 'src/small.kay'])
     expect(report!.islands[0]!.size.gzip).toBeGreaterThan(report!.islands[1]!.size.gzip)
@@ -2129,7 +2130,8 @@ describe('the size report', () => {
 
     const printed = formatSizeReport(report!)
 
-    expect(printed).toMatch(/^ {2}entry, loaded by every page with an island {2}\d+\.\d KB \(\d+\.\d KB\)$/m)
+    expect(printed).toMatch(/^ {2}entry, loaded by every page with an island {2,}\d+\.\d KB \(\d+\.\d KB\)$/m)
+    expect(printed).toMatch(/^ {2}navigation entry, loaded by a page posting forms and holding no island {2,}\d+\.\d KB \(\d+\.\d KB\)$/m)
     expect(printed).toMatch(/^ {2}src\/big\.kay +\+\d+\.\d KB \(\d+\.\d KB\)\n {6}an island because of `onClick`, line 7\n {6}src\/data\.ts {2}\d+\.\d KB$/m)
     // An island holding only itself is not broken down.
     expect(printed.split('\n').at(-1)).toBe('      an island because of `onClick`, line 6')
@@ -2218,8 +2220,10 @@ describe('the build report', () => {
   })
 
   it('compares the islands to the last build', () => {
-    const report: SizeReport = { entry: { size: { raw: 9000, gzip: 4096 } }, islands: [{ file: 'src/a.kay', size: { raw: 3000, gzip: 2048 } }, { file: 'src/b.kay', size: { raw: 800, gzip: 400 } }] }
-    const printed = formatSizeReport(report, { previous: { version: 1, exported: false, entry: 4096, islands: { 'src/a.kay': 1024 }, routes: {} } })
+    const report: SizeReport = { entry: { size: { raw: 9000, gzip: 4096 } }, navigation: { size: { raw: 5000, gzip: 2048 } }, islands: [{ file: 'src/a.kay', size: { raw: 3000, gzip: 2048 } }, { file: 'src/b.kay', size: { raw: 800, gzip: 400 } }] }
+    const printed = formatSizeReport(report, { previous: { version: 1, exported: false, entry: 4096, navigation: 1024, islands: { 'src/a.kay': 1024 }, routes: {} } })
+
+    expect(printed).toMatch(/^ {2}navigation entry, loaded by a page posting forms and holding no island +2\.0 KB \(4\.9 KB\) \[\+1\.0 KB\]$/m)
 
     expect(printed).toMatch(/^ {2}src\/a\.kay +\+2\.0 KB \(2\.9 KB\) \[\+1\.0 KB\]$/m)
     expect(printed).toMatch(/^ {2}src\/b\.kay +\+0\.4 KB \(0\.8 KB\) \[new\]$/m)
@@ -2320,6 +2324,42 @@ describe('the build report', () => {
       expect(sizes['/form']).toBe(entry)
       expect(sizes['/defer']).toBe(entry! + a! + shared! + when!)
       expect(sizes['/plain']).toBe(0)
+    }
+    finally {
+      await rm(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('weighs an unprerendered route only posting forms with the navigation-only entry, and one streaming, following a cached value or holding a server island with the islands\' entry', async () => {
+    const dir = await scratchDir('route-sizes-navigation-')
+
+    try {
+      const chunk = async (name: string, size: number) => Bun.write(join(dir, 'out', name), Array.from({ length: size }, (_, index) => `export const v${index} = ${index * 7919 % 1013}\n`).join(''))
+
+      await Promise.all([chunk('entry.js', 60), chunk('nav.js', 20), chunk('nav-shared.js', 10), chunk('a.js', 40)])
+      await Promise.all(Object.entries({
+        'src/a.kay': 'p A\n',
+        'src/c.kay': 'p C\n',
+        'src/count.ts': 'import { cached } from \'kay/cache\'\n\nexport const count = () => cached(\'count\', \'1m\', async () => 1, { live: true })\n',
+        'src/routes/form.kay': 'form(action={add})\n  input(name="title")\n',
+        'src/routes/island.kay': '---\nimport A from \'../a.kay\'\n---\nA\nform(action={add})\n  input(name="title")\n',
+        'src/routes/streamed.kay': 'form(action={add})\n  input(name="title")\nawait later\n  p Waiting\nthen text\n  p {text}\n',
+        'src/routes/followed.kay': '---\nimport { count } from \'../count\'\n---\nform(action={add})\n  input(name="title")\n',
+        'src/routes/served.kay': '---\nimport C from \'../c.kay\'\n---\nC(server)\nform(action={add})\n  input(name="title")\n',
+        'src/routes/plain.kay': 'p Plain\n',
+      }).map(async ([path, content]) => Bun.write(join(dir, path), content)))
+
+      const url = (name: string) => `/_kay/${name}`
+      const islands = [{ file: 'src/a.kay', size: { raw: 0, gzip: 0 }, chunks: [url('a.js')] }]
+      const routes = ['form', 'island', 'streamed', 'followed', 'served', 'plain'].map(name => ({ pattern: `/${name}`, file: join(dir, `src/routes/${name}.kay`), params: [], layouts: [] }) as unknown as Route)
+      const client = { dir: join(dir, 'out'), styles: new Map(), navigation: true } as unknown as ClientBuild
+      const weigh = async (report: SizeReport) => Object.fromEntries((await routeSizes(dir, client, routes, [], report)).map(each => [each.route, each.js]))
+      const [entry, nav, navShared, a] = await Promise.all(['entry.js', 'nav.js', 'nav-shared.js', 'a.js'].map(async name => gzipSize(await Bun.file(join(dir, 'out', name)).bytes())))
+      const entryOnly: SizeReport = { entry: { size: { raw: 0, gzip: 0 }, chunks: [url('entry.js')] }, islands }
+
+      expect(await weigh({ ...entryOnly, navigation: { size: { raw: 0, gzip: 0 }, chunks: [url('nav.js'), url('nav-shared.js')] } })).toEqual({ '/form': nav! + navShared!, '/island': entry! + a!, '/streamed': entry!, '/followed': entry!, '/served': entry!, '/plain': 0 })
+      // A build making no navigation-only entry, as `kay dev` and a static export.
+      expect((await weigh(entryOnly))['/form']).toBe(entry)
     }
     finally {
       await rm(dir, { recursive: true, force: true })
@@ -2492,13 +2532,13 @@ describe('the build report', () => {
   })
 
   it('lists what the last build had and this one does not', () => {
-    const previous: StoredReport = { version: 1, exported: false, entry: 2048, islands: { 'src/a.kay': 1024, 'src/b.kay': 512 }, routes: { '/': { js: 1024, css: 0 }, '/old': { js: 512, css: 512 } } }
+    const previous: StoredReport = { version: 1, exported: false, entry: 2048, navigation: 1024, islands: { 'src/a.kay': 1024, 'src/b.kay': 512 }, routes: { '/': { js: 1024, css: 0 }, '/old': { js: 512, css: 512 } } }
     const now = summary([route('/', 1024)])
     const printed = formatRemoved({ entry: { size: { raw: 0, gzip: 2048 } }, islands: [{ file: 'src/a.kay', size: { raw: 0, gzip: 1024 } }] }, now, previous)
 
-    expect(printed).toBe('Removed since the last build:\n  island  src/b.kay  was 0.5 KB\n  route   /old  was 1.0 KB')
+    expect(printed).toBe('Removed since the last build:\n  entry   of navigation alone, loaded by a page posting forms and holding no island  was 1.0 KB\n  island  src/b.kay  was 0.5 KB\n  route   /old  was 1.0 KB')
     expect(formatRemoved(undefined, now, previous)).toContain('entry   loaded by every page with an island  was 2.0 KB')
-    expect(formatRemoved({ entry: { size: { raw: 0, gzip: 2048 } }, islands: [{ file: 'src/a.kay', size: { raw: 0, gzip: 0 } }, { file: 'src/b.kay', size: { raw: 0, gzip: 0 } }] }, summary([route('/', 1), route('/old', 1)]), previous)).toBe('')
+    expect(formatRemoved({ entry: { size: { raw: 0, gzip: 2048 } }, navigation: { size: { raw: 0, gzip: 1024 } }, islands: [{ file: 'src/a.kay', size: { raw: 0, gzip: 0 } }, { file: 'src/b.kay', size: { raw: 0, gzip: 0 } }] }, summary([route('/', 1), route('/old', 1)]), previous)).toBe('')
     expect(formatRemoved(undefined, now, undefined)).toBe('')
     expect(formatBuildReport(undefined, now, { previous })).toContain('Removed since the last build:')
   })

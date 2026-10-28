@@ -784,7 +784,7 @@ A command that cannot run, such as on a directory that does not exist, prints `{
 | `exported` | `{ pages, files, dir, ms }`, under `--static` |
 | `compiled` | `{ executable, ms }`, under `--compile` |
 
-`sizes` has the `raw` and `gzip` bytes of the entry and of each island, with `modules` under `--analyze`. Each island says `why` it is one.
+`sizes` has the `raw` and `gzip` bytes of the entry, of the navigation-only entry as `navigation` and of each island, with `modules` under `--analyze`. Each island says `why` it is one.
 
 `routes` has each route's `js` and `css` gzip bytes and the `islands` its pages render. It also has `pages` prerendered and `kept`, the pages the build kept on its own. For a route rendered per request it gives the `stop` that decided so, and `estimated` when its scripts are a guess, see [What a page weighs](/guides/performance#what-a-page-weighs). `stages` is a list of `{ name, ms }`, and `caches` of `{ name, cached, made }`.
 

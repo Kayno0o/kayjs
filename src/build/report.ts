@@ -29,6 +29,12 @@ export interface IslandSize extends IslandWhy {
   modules?: ModuleSize[] | undefined
 }
 
+export interface EntrySize {
+  size: Size
+  chunks?: string[] | undefined
+  modules?: ModuleSize[] | undefined
+}
+
 export interface ModuleSize {
   // A file of the app relative to the root, or a package by name, its files summed.
   name: string
@@ -38,7 +44,9 @@ export interface ModuleSize {
 
 // What the browser loads for islands: the entry every page with one loads first, then each island's own chunks.
 export interface SizeReport {
-  entry?: { size: Size, chunks?: string[] | undefined, modules?: ModuleSize[] | undefined } | undefined
+  entry?: EntrySize | undefined
+  // The navigation-only entry, which a production page posting forms and holding no island loads instead.
+  navigation?: EntrySize | undefined
   islands: IslandSize[]
 }
 
@@ -93,6 +101,12 @@ export async function sizeReport(root: string, dir: string, manifest: Omit<Clien
 
   if (entryChunks.length > 0)
     report.entry = { size: await total(entryChunks), chunks: entryChunks, modules: modules(entryChunks) }
+
+  if (manifest.navEntry !== undefined) {
+    const chunks = [manifest.navEntry, ...manifest.navEntryImports ?? []]
+
+    report.navigation = { size: await total(chunks), chunks, modules: modules(chunks) }
+  }
 
   for (const [id, chunks] of Object.entries(manifest.islands)) {
     const own = chunks.filter(chunk => !loaded.has(chunk))
@@ -174,6 +188,7 @@ export interface StoredReport {
   // A static export weighs differently from a server build, so only the same kind is compared.
   exported: boolean
   entry?: number | undefined
+  navigation?: number | undefined
   islands: Record<string, number>
   // `estimated` when no page of the route was prerendered, so its scripts are what its components can load.
   routes: Record<string, { js: number, css: number, estimated?: boolean | undefined }>
@@ -184,6 +199,7 @@ export function storedReport(report: SizeReport | undefined, summary: BuildSumma
     version: 1,
     exported,
     entry: report?.entry?.size.gzip,
+    navigation: report?.navigation?.size.gzip,
     islands: Object.fromEntries((report?.islands ?? []).map(island => [island.file, island.size.gzip])),
     routes: Object.fromEntries(summary.routes.map(route => [route.route, { js: route.js, css: route.css, estimated: route.estimated }])),
   }
@@ -215,6 +231,7 @@ export interface ReportView {
 }
 
 const SHOWN_ROUTES = 25
+const NAVIGATION_ROW = 'navigation entry, loaded by a page posting forms and holding no island'
 
 // The islands as `kay build` prints them, one line each, the heaviest first.
 export function formatSizeReport(report: SizeReport, { width = Infinity, previous }: ReportView = {}): string {
@@ -224,6 +241,7 @@ export function formatSizeReport(report: SizeReport, { width = Infinity, previou
   const compared = previous !== undefined
   const rows: [string, string, ModuleSize[] | undefined, string | undefined][] = [
     ...report.entry === undefined ? [] : [['entry, loaded by every page with an island', kilobytes(report.entry.size) + change(report.entry.size.gzip, previous?.entry, compared), report.entry.modules, undefined] satisfies [string, string, ModuleSize[] | undefined, string | undefined]],
+    ...report.navigation === undefined ? [] : [[NAVIGATION_ROW, kilobytes(report.navigation.size) + change(report.navigation.size.gzip, previous?.navigation, compared), report.navigation.modules, undefined] satisfies [string, string, ModuleSize[] | undefined, string | undefined]],
     ...report.islands.map(island => [island.file, `+${kilobytes(island.size)}${change(island.size.gzip, previous?.islands[island.file], compared)}`, island.modules, becauseOf(island)] satisfies [string, string, ModuleSize[] | undefined, string | undefined]),
   ]
   const room = Math.max(...rows.map(([, size]) => size.length))
@@ -349,6 +367,7 @@ export function formatRemoved(report: SizeReport | undefined, summary: BuildSumm
   const routes = new Set(summary.routes.map(route => route.route))
   const gone = [
     ...previous.entry !== undefined && report?.entry === undefined ? [{ kind: 'entry', name: 'loaded by every page with an island', gzip: previous.entry }] : [],
+    ...previous.navigation !== undefined && report?.navigation === undefined ? [{ kind: 'entry', name: 'of navigation alone, loaded by a page posting forms and holding no island', gzip: previous.navigation }] : [],
     ...Object.entries(previous.islands).filter(([file]) => !islands.has(file)).map(([file, gzip]) => ({ kind: 'island', name: file, gzip })),
     ...Object.entries(previous.routes).filter(([route]) => !routes.has(route)).map(([route, size]) => ({ kind: 'route', name: route, gzip: size.js + size.css })),
   ]
