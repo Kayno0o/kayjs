@@ -465,7 +465,7 @@ describe.concurrent('kay check, edge cases', () => {
     }
   })
 
-  it('counts a loop variable its key reads as read under noUnusedParameters, still reporting one nothing reads', async () => {
+  it('counts a loop variable its key reads as read under noUnusedParameters, still reporting one nothing reads, and a key matching rows sees no index, as in the browser', async () => {
     const root = await scratchProject({
       'tsconfig.json': tsconfig.replace('"strict":true', '"strict":true,"noUnusedParameters":true'),
       'src/list.kay': [
@@ -487,6 +487,12 @@ describe.concurrent('kay check, edge cases', () => {
         '  em x',
         'for tag, position of tags key={tag}',
         '  em x',
+        'for tag, position of tags key={position + 1}',
+        '  em {tag} {position}',
+        'for { id }, position of rows key={`${id}-${position}`}',
+        '  em {position}',
+        'for item of series key={item.nope}',
+        '  em {item.name}',
         '',
       ].join('\n'),
     })
@@ -496,6 +502,9 @@ describe.concurrent('kay check, edge cases', () => {
         [8, 'unread-name', '\'item\' is declared but its value is never read.'],
         [15, 'unread-name', '\'tag\' is declared but its value is never read.'],
         [17, 'unread-name', '\'position\' is declared but its value is never read.'],
+        [19, 'TS2304', 'Cannot find name \'position\'.'],
+        [21, 'TS2304', 'Cannot find name \'position\'.'],
+        [23, 'TS2339', 'Property \'nope\' does not exist on type \'{ name: string; }\'.'],
       ])
     }
     finally {

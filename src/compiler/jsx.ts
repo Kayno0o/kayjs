@@ -43,7 +43,7 @@ const PLAIN_PARAMETER = /^[\p{ID_Start}$_][\p{ID_Continue}$\u200C\u200D]*$/u
 
 // A template as JSX: what the analysis pass reads for scope, and `kay check` type-checks.
 export class JsxTemplate {
-  private rowKey: Span | undefined
+  private rowKey: { key: Span, index: Span | undefined } | undefined
 
   constructor(private readonly b: CodeBuilder, private readonly src: string, private readonly facts: TemplateFacts, private readonly options: JsxOptions, private readonly sites: Sites) {}
 
@@ -158,18 +158,14 @@ export class JsxTemplate {
     b.add(' return ')
 
     // The key a loop does not match rows by, read where its destructured names are in scope.
-    const key = node.row === undefined ? undefined : this.rowKey
+    const rowKey = node.row === undefined ? undefined : this.rowKey
 
     this.rowKey = undefined
 
-    if (key) {
-      b.add('(void (').addSource(key).add('), ')
+    if (rowKey)
+      this.emitKeyRead(rowKey.key, rowKey.index, rest)
+    else
       this.emitRoot(rest)
-      b.add(')')
-    }
-    else {
-      this.emitRoot(rest)
-    }
 
     b.add(' })()}')
   }
@@ -491,7 +487,10 @@ export class JsxTemplate {
 
       addRowItem(b, node)
 
-      if (node.index) {
+      // A key the loop matches rows by sees the item alone, as the browser's key function does, so the index is declared after it is read.
+      const keyIndex = node.key && !staticLoop && !positional ? node.index : undefined
+
+      if (node.index && !keyIndex) {
         b.add(', ')
 
         if (!staticLoop && !positional)
@@ -503,20 +502,15 @@ export class JsxTemplate {
       b.add(') => ')
 
       // The key is read in the block, so the type check sees it, and hover and rename reach the key's name.
-      if (node.key && node.row !== undefined) {
-        this.rowKey = node.key
-        this.emitRoot(node.children)
-      }
-      else if (node.key) {
-        b.add('(void (').addSource(node.key).add('), ')
-        this.emitRoot(node.children)
-        b.add(')')
-      }
-      else {
-        this.emitRoot(node.children)
-      }
+      if (node.key && node.row !== undefined)
+        this.rowKey = { key: node.key, index: keyIndex }
 
-      b.add(node.index ? ')(KayRow(kayEach), 0)' : ')(KayRow(kayEach))')
+      if (node.key && node.row === undefined)
+        this.emitKeyRead(node.key, keyIndex, node.children)
+      else
+        this.emitRoot(node.children)
+
+      b.add(node.index && !keyIndex ? ')(KayRow(kayEach), 0)' : ')(KayRow(kayEach))')
 
       if (staticLoop) {
         if (node.fallback) {
@@ -532,6 +526,25 @@ export class JsxTemplate {
 
       b.add(' })()}')
     })
+  }
+
+  private emitKeyRead(key: Span, index: Span | undefined, nodes: Node[]) {
+    const { b } = this
+
+    b.add('(void (').addSource(key).add('), ')
+
+    if (index) {
+      b.add('((')
+      this.sites.rows.add(b.code.length)
+      b.addSource(index).add(') => ')
+      this.emitRoot(nodes)
+      b.add(')(0)')
+    }
+    else {
+      this.emitRoot(nodes)
+    }
+
+    b.add(')')
   }
 
   // Nothing here updates, so the loop's callback gets the item and the index themselves rather than `For`'s accessors.
