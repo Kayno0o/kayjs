@@ -3,12 +3,15 @@ import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
 import { CACHE_LIVE_ID } from '../src/runtime/cache-live-id'
 import { encodeValue } from '../src/runtime/wire'
 
+// Past the longest random wait before a resource asks its route again.
+const REFETCH_MS = 3000
+const realFetch = globalThis.fetch
 let followRoute: typeof import('../src/runtime/live-cache').followRoute
 let chunks: string[] = []
 
-async function until(condition: () => boolean, timeout = 5000): Promise<void> {
+async function until(condition: () => boolean): Promise<void> {
   for (const start = Date.now(); !condition(); await Bun.sleep(5)) {
-    if (Date.now() - start > timeout)
+    if (Date.now() - start > REFETCH_MS)
       throw new Error('timed out')
   }
 }
@@ -24,7 +27,7 @@ async function refetchesOn(sent: string[]): Promise<boolean> {
   })
 
   try {
-    await until(() => refetched, 3000)
+    await until(() => refetched)
 
     return true
   }
@@ -56,6 +59,7 @@ beforeAll(async () => {
 })
 
 afterAll(async () => {
+  globalThis.fetch = realFetch
   await GlobalRegistrator.unregister()
 })
 
