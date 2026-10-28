@@ -133,7 +133,7 @@ async function passes(form: HTMLFormElement, action: string): Promise<boolean> {
 // Posts the form as the browser would, multipart unless it says otherwise, then shows the page the action sends the browser back to.
 async function send(form: HTMLFormElement, submitter: HTMLElement | null, url: URL, { go, HTML, show }: Swapper, navigated: number | undefined): Promise<void> {
   const data = new FormData(form, submitter)
-  const multipart = (submitter?.getAttribute('formenctype') ?? form.enctype) === 'multipart/form-data'
+  const multipart = (submitter?.getAttribute('formenctype') ?? form.getAttribute('enctype') ?? '').toLowerCase() === 'multipart/form-data'
   const focused = document.activeElement
   const refused = { form: [...document.forms].indexOf(form), control: [...form.elements].indexOf(focused as Element) }
 

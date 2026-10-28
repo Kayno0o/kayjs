@@ -843,6 +843,29 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('page swap i
     }
   })
 
+  it('posts multipart a form saying so that holds a control named enctype', async () => {
+    const fresh = await open('/kept')
+
+    try {
+      await settled(fresh)
+      await fresh.evaluate(async () => {
+        const form = new DOMParser().parseFromString(await (await fetch('/posted')).text(), 'text/html').querySelector<HTMLFormElement>('form.away')!
+
+        form.insertAdjacentHTML('beforeend', '<input name="enctype" value="plain">')
+        document.body.append(form)
+        form.requestSubmit()
+      })
+      await fresh.waitFor('h1', { text: 'Plain' })
+
+      const posted = fresh.responses.filter(response => response.method === 'POST' && response.url.includes('/_kay/action/'))
+
+      expect(posted.map(response => response.requestHeaders['content-type'])).toEqual([expect.stringMatching(/^multipart\/form-data;/)])
+    }
+    finally {
+      fresh.close()
+    }
+  })
+
   it('posts natively once a form held for a forms\' listener that cannot load, however often it was pressed', async () => {
     const fresh = await open('/kept')
     const posts: string[] = []
