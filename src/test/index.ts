@@ -294,7 +294,7 @@ async function islandsBuilt(root: string, options: ClientOptions, inBrowser: boo
   let running = true
   const build = (async () => {
     try {
-      await held?.build
+      await latest?.build
     }
     catch {}
 

@@ -1,6 +1,5 @@
 import type { ClientOptions } from '../build/client'
 import { realpathSync } from 'node:fs'
-import { rm } from 'node:fs/promises'
 import { join, sep } from 'node:path'
 import process from 'node:process'
 import { outputDir } from '../build/assets'
@@ -50,8 +49,6 @@ export function devBuilder(root: string, options: ClientOptions): (changed: stri
         // The first build of a process, of everything: the output an earlier run left stays when nothing it read has changed.
         if (first && changed === null && await stamps.fresh())
           return { failed: false }
-
-        await rm(join(output, BUILD_FAILURE), { force: true })
 
         const { styles } = await session.build(changed)
 

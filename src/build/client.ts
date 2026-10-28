@@ -22,7 +22,7 @@ import { projectPaths } from '../project'
 import { kayLog } from '../runtime/log'
 import { apiStubs, apiTrees } from '../server/api-modules'
 import { rebaseCss } from '../server/base'
-import { fromManifest, MANIFEST, PRERENDERED_DIR, writeManifest } from '../server/client'
+import { BUILD_FAILURE, fromManifest, MANIFEST, PRERENDERED_DIR, writeManifest } from '../server/client'
 import { PUBLIC_ENV_PATH } from '../server/env-state'
 import { fontFallbacks, withFontFallbacks } from '../server/fonts'
 import { ASSET_PREFIX, clientDir, DEV_MAPS_DIR, MAPS_DIR, outputDir } from './assets'
@@ -185,6 +185,10 @@ export function clientSession(root: string, options: ClientOptions, settings: Se
     const files = (changed ?? []).map(file => join(realRoot, file))
     const texts = new Map(await Promise.all(files.map(async file => [file, await readText(file)] as const)))
 
+    // The tables come before the output is cleared, so a Tailwind failure there leaves the last build served.
+    const classTable = await classTableOf(root, sources, references)
+    const islandTable = await islandClassTableOf(root, sources, references, graph)
+
     if (!previous) {
       await increments?.stopMaps(true)
       await clearClientOutput(root)
@@ -192,8 +196,6 @@ export function clientSession(root: string, options: ClientOptions, settings: Se
 
     await writeClasses(root, sources.classes)
 
-    const classTable = await classTableOf(root, sources, references)
-    const islandTable = await islandClassTableOf(root, sources, references, graph)
     const classTableText = JSON.stringify([classTable, islandTable])
     // `src/ui.ts` is written into the components it restyles, none of which imports it, so no chunk lists it among its inputs.
     const islandsAgain = !previous || !sameEntries(previous.sources.islands, sources.islands) || files.some(file => previous.islandInputs.has(file) || file === join(realRoot, UI_FILE)) || previous.classTable !== classTableText
@@ -394,7 +396,7 @@ async function clearClientOutput(root: string): Promise<void> {
   const base = outputDir(root)
   const dir = clientDir(root)
 
-  await Promise.all([rm(dir, { recursive: true, force: true }), rm(join(base, PRERENDERED_DIR), { recursive: true, force: true }), rm(join(base, MANIFEST), { force: true }), rm(join(base, MAPS_DIR), { recursive: true, force: true }), rm(join(base, DEV_MAPS_DIR), { recursive: true, force: true })])
+  await Promise.all([rm(dir, { recursive: true, force: true }), rm(join(base, PRERENDERED_DIR), { recursive: true, force: true }), rm(join(base, MANIFEST), { force: true }), rm(join(base, BUILD_FAILURE), { force: true }), rm(join(base, MAPS_DIR), { recursive: true, force: true }), rm(join(base, DEV_MAPS_DIR), { recursive: true, force: true })])
   await mkdir(dir, { recursive: true })
 }
 
