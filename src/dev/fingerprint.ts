@@ -1,11 +1,11 @@
 import { readdirSync, realpathSync, rmSync } from 'node:fs'
-import { join, sep } from 'node:path'
+import { join, relative, sep } from 'node:path'
 import { version } from '../../package.json'
 import { clientDir, KAY_DIR } from '../build/assets'
 import { directoryStamp, fileStamp, projectTree, treeEntries, TS_FILE, unsettled, writeAtomically } from '../build/files'
 import { compilerFingerprint } from '../build/transform'
 import { BUILD_FAILURE, MANIFEST } from '../server/client'
-import { gitIgnoredNames, holdsSources, isSource } from './sources'
+import { gitIgnoredNames, gitIgnoreTest, holdsSources, isSource } from './sources'
 
 // Written beside the manifest once a build and the rewriting of its maps are over: what the client build read, to tell a later `kay dev` that the build it left is still the one its sources would give.
 export const FINGERPRINT = 'fingerprint.json'
@@ -52,10 +52,12 @@ export async function sourceFiles(root: string): Promise<string[]> {
 }
 
 // The sources and, by the stamps the walk took, the directories that may hold one: none when one of them was written within two seconds before the walk, as an entry added next could leave its stamp as it is.
-async function sourceTree(root: string): Promise<{ files: string[], directories: Map<string, string> }> {
+// `globs` also leaves out what the lines of `.gitignore` that `gitIgnoredNames` skips name, a database and its `-wal` as `data/*.sqlite*`.
+async function sourceTree(root: string, globs = false): Promise<{ files: string[], directories: Map<string, string> }> {
   const ignored = gitIgnoredNames(root)
   const tree = await projectTree(root, { project: true, ownKayOnly: true })
-  const files = tree.files.filter(file => isSource(root, file, ignored, true))
+  const gitIgnored = globs ? gitIgnoreTest(root) : undefined
+  const files = tree.files.filter(file => isSource(root, file, ignored, true) && !gitIgnored?.(relative(root, file).split(sep).join('/')))
   const directories = new Map<string, string>()
 
   for (const [dir, stamp] of tree.directories) {
@@ -132,6 +134,11 @@ export class BuildStamps {
     this.generated = join(this.realRoot, KAY_DIR) + sep
   }
 
+  // `kay dev`'s record holds every source, as a gitignored `.env.local` can feed what a build inlines; `kay/test`, whose process reads its environment once, leaves out what `.gitignore` does.
+  private async sources(): Promise<{ files: string[], directories: Map<string, string> }> {
+    return sourceTree(this.root, this.record === undefined)
+  }
+
   // By the path the bundler names a file: the real one.
   private canon(path: string): string {
     return path.startsWith(this.root + sep) ? this.realRoot + path.slice(this.root.length) : path
@@ -194,7 +201,7 @@ export class BuildStamps {
     if (this.directories.size > 0 && [...this.directories].every(([dir, stamp]) => directoryStamp(dir) === stamp))
       return true
 
-    const { files, directories } = await sourceTree(this.root)
+    const { files, directories } = await this.sources()
 
     if (files.some(file => !this.known.has(this.canon(file))))
       return false
@@ -226,7 +233,7 @@ export class BuildStamps {
     this.known.clear()
     this.racy.clear()
 
-    const { files, directories } = await sourceTree(this.root)
+    const { files, directories } = await this.sources()
 
     for (const file of [...files, join(this.root, GITIGNORE)])
       this.stamp(this.canon(file), this.known, this.racy)
@@ -267,7 +274,7 @@ export class BuildStamps {
     for (const path of [...inputs, ...kayModules(), join(this.root, GITIGNORE)])
       take(this.canon(path), true)
 
-    const { files, directories } = await sourceTree(this.root)
+    const { files, directories } = await this.sources()
 
     for (const path of files)
       take(this.canon(path), this.record !== undefined)

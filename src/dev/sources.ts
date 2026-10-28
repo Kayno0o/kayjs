@@ -88,6 +88,72 @@ export function gitIgnoredNames(root: string): Set<string> {
   return names
 }
 
+interface IgnoreLine {
+  glob: Bun.Glob
+  negated: boolean
+  directories: boolean
+}
+
+// The root `.gitignore` as git reads it, for a path relative to the root written with `/`: a line without a slash but a trailing one matches at any depth, a trailing slash only directories, `!` takes a path back, the last line matching decides, and nothing below a directory left out comes back.
+export function gitIgnoreTest(root: string): (path: string) => boolean {
+  let text: string
+
+  try {
+    text = readFileSync(join(root, '.gitignore'), 'utf8')
+  }
+  catch {
+    return () => false
+  }
+
+  const lines: IgnoreLine[] = []
+
+  for (const raw of text.split(NEWLINE)) {
+    let line = raw.trimEnd()
+
+    if (line === '' || line.startsWith('#'))
+      continue
+
+    const negated = line.startsWith('!')
+
+    if (negated)
+      line = line.slice(1)
+
+    const directories = line.endsWith('/')
+
+    line = line.replace(TRAILING_SLASH, '')
+
+    const anchored = line.includes('/')
+
+    line = line.replace(LEADING_SLASH, '')
+
+    if (line !== '')
+      lines.push({ glob: new Bun.Glob(anchored ? line : `**/${line}`), negated, directories })
+  }
+
+  const left = (path: string, directory: boolean) => lines.reduce((out, line) => (directory || !line.directories) && line.glob.match(path) ? !line.negated : out, false)
+  // The files of a walk share their directories, each judged once.
+  const directories = new Map<string, boolean>()
+
+  return (path) => {
+    const parts = path.split('/')
+
+    for (let depth = 1; depth < parts.length; depth++) {
+      const dir = parts.slice(0, depth).join('/')
+      let out = directories.get(dir)
+
+      if (out === undefined) {
+        out = left(dir, true)
+        directories.set(dir, out)
+      }
+
+      if (out)
+        return true
+    }
+
+    return left(path, false)
+  }
+}
+
 // The files the server and its build read, as `kay dev` watches them; `.env` files are read as the server starts, not built.
 export async function serverSources(root: string): Promise<string[]> {
   const ignored = gitIgnoredNames(root)

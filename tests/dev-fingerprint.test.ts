@@ -9,7 +9,7 @@ import { buildClient } from '../src/build/client'
 import * as files from '../src/build/files'
 import { devBuilder } from '../src/dev/builder'
 import { BuildStamps, FINGERPRINT, mentionsPackage } from '../src/dev/fingerprint'
-import { holdsSources } from '../src/dev/sources'
+import { gitIgnoreTest, holdsSources } from '../src/dev/sources'
 import { BUILD_FAILURE } from '../src/server/client'
 import { scratchDir } from './scratch'
 
@@ -373,6 +373,19 @@ describe('the stamps kay/test keeps in memory', () => {
 
     rmSync(join(project, 'data/app.sqlite'))
     expect(await stamps.current()).toBe(false)
+  })
+
+  it('reads the .gitignore as git does: globs at any depth, anchored and directory lines, negations, and nothing back below a folder left out', async () => {
+    await write({ '.gitignore': '# data\n*.sqlite\n*.sqlite-wal\n!keep.sqlite\n/out\nlogs/\ncache/**/*.bin\nbuild/\n!build/kept.txt\n' })
+
+    const ignored = gitIgnoreTest(project)
+
+    expect(['data/app.sqlite', 'app.sqlite', 'data/deep/run-1.sqlite', 'data/app.sqlite-wal', 'out', 'out/x.js', 'src/logs/a.txt', 'cache/a/b.bin', 'build/kept.txt'].filter(path => !ignored(path))).toEqual([])
+    expect(['data/keep.sqlite', 'src/out/x.js', 'logs', 'cache/a/b.txt', 'data/app.json', 'src/routes/index.kay'].filter(ignored)).toEqual([])
+  })
+
+  it('reads no .gitignore as leaving nothing out', () => {
+    expect(gitIgnoreTest(project)('data/app.sqlite')).toBe(false)
   })
 
   it('takes the directories that may hold a source: the root, and below a watched one outside tests and what .gitignore names', () => {

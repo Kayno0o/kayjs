@@ -144,6 +144,31 @@ describe('testSite keeps the islands it built', () => {
     }
   })
 
+  it('builds nothing again for a file a test creates or removes that the .gitignore leaves out, and again for one it does not', async () => {
+    await Bun.write(join(root, '.gitignore'), 'data/*.sqlite\n*.sqlite-wal\n')
+    await testSite({ root })
+
+    const first = Bun.file(manifest()).lastModified
+
+    try {
+      await Bun.sleep(20)
+      await Bun.write(join(root, 'data/run-1.sqlite'), 'rows')
+      await Bun.write(join(root, 'data/run-1.sqlite-wal'), 'log')
+      await testSite({ root })
+      rmSync(join(root, 'data/run-1.sqlite-wal'))
+      await testSite({ root })
+      expect(Bun.file(manifest()).lastModified).toBe(first)
+
+      await Bun.write(join(root, 'data/seed.json'), '[]')
+      await testSite({ root })
+      expect(Bun.file(manifest()).lastModified).toBeGreaterThan(first)
+    }
+    finally {
+      rmSync(join(root, '.gitignore'))
+      rmSync(join(root, 'data'), { recursive: true, force: true })
+    }
+  })
+
   it('builds nothing again for a file no build reads that a test rewrites', async () => {
     await Bun.write(join(root, 'data/app.sqlite'), 'first')
     await testSite({ root })
