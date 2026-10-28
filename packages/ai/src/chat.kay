@@ -1,19 +1,20 @@
 ---
-import type { Action, ActionStream, Failure, SanitizeOptions, Snippet } from 'kay'
-import type { ChatMessage, ChatTurn, CodeBlock, Message, Progress, Source, ToolCall } from './types'
-import { ActionError, effect, followLog, onCleanup, onMount, recipe, sanitizeHtml, signal, trustHtml, untrack } from 'kay'
+import type { Action, Failure, SanitizeOptions, Snippet } from 'kay'
+import type { Turn } from './chat-session'
+import type { ChatMessage, ChatTurn, CodeBlock, Progress, Source, ToolCall } from './types'
+import { effect, followLog, onCleanup, onMount, recipe, sanitizeHtml, signal, trustHtml, untrack } from 'kay'
 import BareIconButton from '@kaynooo/kayjs-ui/bare-icon-button.kay'
 import Icon from '@kaynooo/kayjs-ui/icon.kay'
 import Notice from '@kaynooo/kayjs-ui/notice.kay'
 import Textarea from '@kaynooo/kayjs-ui/textarea.kay'
-import { acceptsFile } from '@kaynooo/kayjs-ui/lib/accept'
-import { isHeldMarkdown, markdownHtml, markdownLoaded, markdownReady } from 'kay/markdown'
+import { isHeldMarkdown, markdownHtml, markdownLoaded } from 'kay/markdown'
 import { wording } from 'kay/words'
 import { approvalMessage, ticketsIn, withoutApproval } from './approval-marker'
 import { MARK, MARKED, withoutMarker } from './marker'
-import { REPLACES_HEADER, REPLY_HEADER } from './resume'
-import { attribute, citedAsWritten, linkAsWritten, linkSources, opensApart, REL_APART, sameSources, usableSources } from './chat-sources'
-import { filesOf, keepPending, newReplyId, pendingReply, posted, POSTED_CHARACTERS, restored, shrunk, stored } from './chat-history'
+import { attribute, citedAsWritten, linkAsWritten, linkSources, opensApart, REL_APART } from './chat-sources'
+import { filesOf, POSTED_CHARACTERS } from './chat-history'
+import { createAttachments, fileKey } from './chat-attachments'
+import { createChatSession } from './chat-session'
 import Calls from './chat-calls.kay'
 import Sources from './chat-sources.kay'
 import './chat.css'
@@ -43,20 +44,6 @@ const SANITIZED_LINK = /<a href="([^"]*)" rel="nofollow ugc">/g
 
 // The images and documents a model reads.
 const ATTACHABLE = 'image/png,image/jpeg,image/gif,image/webp,application/pdf'
-
-interface Turn extends Message {
-  id: number
-  // A reply the visitor stopped, or one whose stream broke off, cut where it was.
-  stopped?: boolean | undefined
-  // The tools the reply called, when the action streams `reply.progress()`.
-  calls?: ToolCall[] | undefined
-  // The reply's code blocks the server highlighted.
-  code?: CodeBlock[] | undefined
-  // What the model thought before answering, when the action streams `reply.progress()` and the provider sends it.
-  reasoning?: string | undefined
-  // Whether the visitor had its reasoning open when the reply ended.
-  reasoningOpen?: boolean | undefined
-}
 
 const { action, initial = [], label = wording('ai.chat.label', 'Chat'), placeholder = wording('ai.chat.placeholder', 'Write a message…'), sendLabel = wording('ai.chat.send', 'Send'), stopLabel = wording('ai.chat.stop', 'Stop'), retryLabel = wording('ai.chat.retry', 'Try again'), thinkingLabel = wording('ai.chat.thinking', 'Thinking…'), sourcesLabel = wording('ai.chat.sources', 'Sources'), reasoning = true, reasoningLabel = wording('ai.chat.reasoning', 'Reasoning'), stoppedLabel = wording('ai.chat.stopped', 'Stopped'), errorMessage = wording('ai.chat.error', 'The reply failed.'), keep = 20, maxChars = POSTED_CHARACTERS, tableLabel = wording('ai.chat.table', 'Table'), toolDetails = true, greeting = wording('ai.chat.greeting', 'How can I help?'), disclosure = wording('ai.chat.disclosure', 'You are talking to an AI. Your messages are sent to its provider to answer.'), suggestions = [], toolLabels = {}, sendIcon, stopIcon, newButton = false, newLabel = wording('ai.chat.new', 'New conversation'), newIcon, remember, links = 'apart', runningLabel = wording('ai.chat.running', 'Running'), doneLabel = wording('ai.chat.done', 'Done'), failedLabel = wording('ai.chat.failed', 'Failed'), argumentsLabel = wording('ai.chat.arguments', 'Arguments'), resultLabel = wording('ai.chat.result', 'Result'), approvalLabel = wording('ai.chat.approval', 'Needs your approval'), allowLabel = wording('ai.chat.allow', 'Allow'), denyLabel = wording('ai.chat.deny', 'Deny'), allowedLabel = wording('ai.chat.allowed', 'Allowed:'), deniedLabel = wording('ai.chat.denied', 'Denied:'), attach = false, accept = ATTACHABLE, maxFiles = 4, maxFileSize = 5 * 1024 * 1024, attachLabel = wording('ai.chat.attach', 'Attach a file'), removeLabel = wording('ai.chat.remove', 'Remove'), attachRefusedLabel = wording('ai.chat.attachRefused', 'Only images and PDFs can be attached.'), attachTooBigLabel = wording('ai.chat.attachTooBig', 'That file is too big to attach.'), attachFullLabel = wording('ai.chat.attachFull', 'No more files can be attached.'), attachIcon, regenerate = false, editable = false, regenerateLabel = wording('ai.chat.regenerate', 'Regenerate the reply'), editLabel = wording('ai.chat.edit', 'Edit the message'), saveLabel = wording('ai.chat.save', 'Save and send'), cancelLabel = wording('ai.chat.cancel', 'Cancel'), editEmptyLabel = wording('ai.chat.editEmpty', 'Write a message to send.'), editBusyLabel = wording('ai.chat.editBusy', 'Wait for the reply to finish.'), regenerateIcon, editIcon, fill = false, variant = 'bubble', tone = 'accent', size = 'md' } = props<{
   // The page's streaming action, `action(schema, ({ messages }) => ask(messages))`, which may also `ctx.fail`; the chat posts the latest messages to it and reads the reply as it streams.
@@ -153,32 +140,27 @@ const { action, initial = [], label = wording('ai.chat.label', 'Chat'), placehol
   fill?: boolean | undefined
 }>()
 
-let nextId = 0
-const history = signal<Turn[]>(untrack(() => initial).map(({ sources, ...message }) => ({ ...message, ...sources && { sources: usableSources(sources) }, id: nextId++ })))
-const draft = signal('')
-// The files chosen for the next message, and why one was left out.
-const attached = signal<File[]>([])
-const attachProblem = signal<string | undefined>(undefined)
-// The call is out and no word of the reply is there yet.
-const waiting = signal(false)
-const streaming = signal<ActionStream<string | Progress> | undefined>(undefined)
-// The reply so far, which becomes a turn of the history once the stream ends.
-const partial = signal('')
-// What the model has thought so far in the reply being written.
-const thought = signal('')
-// Whether the visitor opened the reasoning of the reply being written, which the finished turn keeps.
-const thoughtOpen = signal(false)
-// The tool calls of the reply being written, as last seen.
-const calls = signal<ToolCall[]>([])
-// The code blocks of the reply being written that the server highlighted so far.
-const code = signal<CodeBlock[]>([])
-// The documents the reply being written cites, as last seen.
-const found = signal<Source[]>([])
-// What the status line said of the calls, one line each and added to it, since a line replaced before the screen reader reads it is lost.
-const spoken = signal<{ id: number, text: string }[]>([])
-const failure = signal<string | undefined>(undefined)
-// The last call was refused and its message taken back, so no message waits for an answer that Try again could ask for.
-const takenBack = signal(false)
+const statuses = { running: runningLabel, done: doneLabel, failed: failedLabel }
+// The props they read are getters, so each read stays a live read of the prop.
+const attachments = createAttachments({ get accept() { return accept }, get maxFiles() { return maxFiles }, get maxFileSize() { return maxFileSize }, get tooBigLabel() { return attachTooBigLabel }, get fullLabel() { return attachFullLabel }, get refusedLabel() { return attachRefusedLabel } })
+let field: HTMLTextAreaElement | undefined
+let log: HTMLElement | undefined
+// Keeps the newest text in view unless the visitor scrolled up to read, a finished turn formatted late and a panel reopened included.
+const following = followLog(() => log, { threshold: PINNED_PX })
+const session = createChatSession({
+  get action() { return action },
+  initial: untrack(() => initial),
+  get keep() { return keep },
+  get maxChars() { return maxChars },
+  get remember() { return remember },
+  get errorMessage() { return errorMessage },
+  attachments,
+  say: call => `${call.name}: ${call.approval === undefined ? statuses[call.status] : approvalLabel}`,
+  focus: () => field?.focus(),
+  follow: following.toBottom,
+})
+const { history, draft, partial, thought, thoughtOpen, calls, code, found, spoken, failure, takenBack, busy, send, stop } = session
+const { attached, problem: attachProblem } = attachments
 // The message being edited, and what the field holds.
 const editing = signal<number | undefined>(undefined)
 const editDraft = signal('')
@@ -186,67 +168,6 @@ const editDraft = signal('')
 const editProblem = signal<string | undefined>(undefined)
 // The message whose edit just closed, whose edit button takes the focus back once it is drawn.
 let refocus: number | undefined
-const busy = () => waiting() || streaming() !== undefined
-// What the post under way replaces (`regenerate:2`), kept for Try again, which posts the same request; a fresh send, a message taken back or a reset forgets it.
-let replacing: string | undefined
-// The history as it stood before a regenerate or an edit cut it, put back when that post is stopped or refused before any word, since nothing replaced the turns it dropped.
-let undone: Turn[] | undefined
-let run: AbortController | undefined
-// The id the reply under way was sent under, for a Chat that remembers: what a reload resumes and a Stop ends.
-let replying: string | undefined
-// The reply under way said it outlives its request, so its Stop is told to the server.
-let outlives = false
-// The reply under way is one asked for again after a reload, so an empty one means the server kept nothing.
-let resumed = false
-let field: HTMLTextAreaElement | undefined
-let log: HTMLElement | undefined
-// Keeps the newest text in view unless the visitor scrolled up to read, a finished turn formatted late and a panel reopened included.
-const following = followLog(() => log, { threshold: PINNED_PX })
-const told = new Map<string, string>()
-const statuses = { running: runningLabel, done: doneLabel, failed: failedLabel }
-
-// Says the calls whose status changed since the last snapshot, each as `name: status`.
-function announce(next: ToolCall[]) {
-  const said: { id: number, text: string }[] = []
-
-  for (const call of next) {
-    if (told.get(call.id) === call.status)
-      continue
-
-    told.set(call.id, call.status)
-    said.push({ id: nextId++, text: `${call.name}: ${call.approval === undefined ? statuses[call.status] : approvalLabel}` })
-  }
-
-  if (said.length > 0)
-    spoken = [...spoken(), ...said]
-}
-
-function show(value: string | Progress) {
-  if (typeof value === 'string') {
-    partial = value
-
-    return
-  }
-
-  if (value.outlives === true)
-    outlives = true
-
-  partial = value.text
-  thought = value.reasoning ?? ''
-  calls = value.calls
-  announce(value.calls)
-
-  if (value.sources) {
-    const next = usableSources(value.sources)
-
-    // Every snapshot of a stream repeats the list, which would redraw the reply for nothing.
-    if (!sameSources(next, found()))
-      found = next
-  }
-
-  if (value.code)
-    code = [...code(), ...value.code]
-}
 
 // A link of a reply opens in a new tab, as the conversation lives in this page and a page swap would drop it, unless `links` is `here` and the link leads to this site.
 function linksOpenApart(html: string): string {
@@ -291,43 +212,18 @@ function render(text: string, blocks: CodeBlock[] | undefined, sources: readonly
   }).replaceAll('</table>', '</table></div>')), cited: linked.cited }
 }
 
-const sameFile = (a: File, b: File) => a.name === b.name && a.size === b.size && a.lastModified === b.lastModified
-const fileKey = (file: File) => `${file.name}\n${file.size}\n${file.lastModified}`
-
-// Files the picker, a drop or a paste gave, that fit the message: a file past `maxFileSize` or beyond `maxFiles` is left out and says so, and one already attached is not added twice.
-function attachFiles(chosen: File[]) {
-  const sized = chosen.filter(file => file.size <= maxFileSize && !attached().some(known => sameFile(known, file)))
-  const taken = sized.slice(0, Math.max(0, maxFiles - attached().length))
-
-  attached = [...attached(), ...taken]
-
-  if (sized.length < chosen.length && chosen.some(file => file.size > maxFileSize))
-    attachProblem = attachTooBigLabel
-  else if (taken.length < sized.length)
-    attachProblem = attachFullLabel
-}
-
-const acceptable = (file: File) => acceptsFile(accept, file)
 // The picker the attach button opens, a plain input: a FileDrop component here would ship in every chat's island, attach or not.
 let picker: HTMLInputElement | undefined
 
 // Files pasted into the field (a screenshot) or dropped on the form: only the kinds `accept` names are taken, the rest of the clipboard stays text.
 function pasted(event: ClipboardEvent) {
-  const given = [...event.clipboardData?.files ?? []].filter(acceptable)
+  const given = [...event.clipboardData?.files ?? []].filter(attachments.accepts)
 
   if (!attach || busy() || given.length === 0)
     return
 
   event.preventDefault()
-  attachFiles(given)
-}
-
-// The files of the picker or of a drop on the form: the kinds `accept` names are taken, and any other says so.
-function take(given: File[]) {
-  attachFiles(given.filter(acceptable))
-
-  if (given.some(file => !acceptable(file)))
-    attachProblem = attachRefusedLabel
+  attachments.add(given)
 }
 
 function picked(event: Event) {
@@ -336,7 +232,7 @@ function picked(event: Event) {
 
   // Cleared, so choosing the same file again still counts.
   input.value = ''
-  take(given)
+  attachments.take(given)
 }
 
 function dropped(event: DragEvent) {
@@ -349,104 +245,15 @@ function dropped(event: DragEvent) {
   if (busy())
     return
 
-  take([...event.dataTransfer.files])
+  attachments.take([...event.dataTransfer.files])
 }
-
-function unattach(file: File) {
-  attached = attached().filter(known => known !== file)
-  attachProblem = undefined
-}
-
-// A message the schema refuses would fail every later send, and one stopped before any word came has no answer, so a next send would post two user turns: it leaves the history and goes back to the field, ahead of what the visitor typed since.
-function takeBack() {
-  const last = history().at(-1)
-
-  if (last?.role !== 'user')
-    return
-
-  const edited = replacing?.startsWith('edit')
-  const restore = undone
-
-  undone = undefined
-  replacing = undefined
-  takenBack = true
-
-  // A regenerate or an edit puts the history back as it was; an edit's text returns to the field, its files staying with the turn they came from, and a regenerate has no message to return.
-  if (restore !== undefined) {
-    history = restore
-
-    if (edited)
-      draft = draft() === '' ? last.content : `${last.content}\n${draft()}`
-
-    return
-  }
-
-  history = history().slice(0, -1)
-  draft = draft() === '' ? last.content : `${last.content}\n${draft()}`
-  attached = [...filesOf(last), ...attached()]
-}
-
-// The reply ended on its own, was stopped or broke off: what arrived joins the history.
-function finish(state: string) {
-  if (leaving)
-    return
-
-  const text = partial()
-  const thinking = thought()
-  const thinkingOpen = thoughtOpen()
-  const made = calls()
-  const highlighted = code()
-  const cites = found()
-
-  streaming = undefined
-  partial = ''
-  thought = ''
-  thoughtOpen = false
-  calls = []
-  code = []
-  found = []
-
-  // A page swap closes the stream too, leaving the reply to be asked for again when the chat returns.
-  if (state !== 'closed' && remember !== undefined) {
-    keepPending(remember, undefined)
-    replying = undefined
-  }
-
-  if (state === 'done' && resumed && text === '' && made.length === 0)
-    takeBack()
-
-  if (text !== '' || made.length > 0) {
-    undone = undefined
-    history = [...history(), { id: nextId++, role: 'assistant', content: text, calls: made, code: highlighted, reasoning: thinking, reasoningOpen: thinkingOpen, ...cites.length > 0 && { sources: cites }, stopped: state === 'closed' }]
-  }
-
-  if (state === 'failed')
-    failure = errorMessage
-  else if (state === 'closed' && text === '' && made.length === 0)
-    takeBack()
-}
-
-let recalled = false
-// The page is being left, which breaks the stream off without the reply having failed or been stopped: what it holds stays as it was, for the next visit to ask for.
-let leaving = false
-
-// The conversation of the tab's last visit, put back once hydrated since the server renders the initial one.
 
 onMount(() => {
   let timer: ReturnType<typeof setTimeout> | undefined
 
-  // A stream that ended while the page was going is settled now, if the page stayed after all, such as a download or a refused leave.
-  const back = () => {
-    leaving = false
-
-    const stream = streaming()
-    const state = stream?.status()
-
-    if (state !== undefined && state !== 'open')
-      finish(state)
-  }
+  const back = () => session.back()
   const leave = () => {
-    leaving = true
+    session.leave()
     clearTimeout(timer)
     timer = setTimeout(back, LEAVING_MS)
   }
@@ -460,44 +267,6 @@ onMount(() => {
     window.removeEventListener('pagehide', leave)
     window.removeEventListener('pageshow', back)
   })
-
-  if (remember === undefined)
-    return
-
-  const turns = restored(remember)
-
-  recalled = true
-
-  if (turns.length > 0)
-    history = turns.map(turn => ({ ...turn, id: nextId++ }))
-
-  const id = pendingReply(remember)
-
-  // A reply that was under way when the tab went is asked for again: the server finished it or goes on with it.
-  if (id !== undefined && turns.at(-1)?.role === 'user')
-    void send(true, undefined, id)
-  else if (id !== undefined)
-    keepPending(remember, undefined)
-})
-
-effect(() => {
-  const turns = history()
-
-  // Before the last visit's turns are back, the history would overwrite them with the initial one.
-  if (remember !== undefined && recalled)
-    stored(remember, turns)
-})
-
-effect(() => {
-  const stream = streaming()
-
-  if (stream === undefined)
-    return
-
-  const state = stream.status()
-
-  if (state !== 'open')
-    untrack(() => finish(state))
 })
 
 // The wait the edit's Enter was told to make is over once no reply is under way, whether it ended or was stopped before its first word.
@@ -506,120 +275,12 @@ effect(() => {
     editProblem = undefined
 })
 
-// What the action took as too long, learned from its 413s, so the app states `maxInputChars` once: the oldest turns go first, the last stays.
-let learned = Infinity
-const MAX_RETRIES = 5
-
-// Posts the history; a 413 halves what is posted, at most 5 times a send since each counts against the action's rate limit, until the action takes it or only the last message is left.
-async function call(abort: AbortSignal, headers?: Record<string, string>): Promise<ActionStream<string | Progress>> {
-  for (let retries = 0; ; retries++) {
-    const sent = posted(history(), keep, Math.min(maxChars, learned))
-
-    try {
-      return await action({ messages: sent }, { signal: abort, refresh: false, ...headers && { headers } })
-    }
-    catch (error) {
-      if (!(error instanceof ActionError) || error.status !== 413 || sent.length < 2 || retries === MAX_RETRIES || abort.aborted)
-        throw error
-
-      learned = shrunk(sent)
-    }
-  }
-}
-
-async function send(again = false, question?: string, resuming?: string) {
-  const text = question ?? draft().trim()
-  const sent = question === undefined ? attached() : []
-
-  if (busy() || (!again && text === '' && sent.length === 0))
-    return
-
-  // A history the server drew never loads the renderer: fetched now, it arrives while the model writes its first words.
-  void markdownReady()
-
-  if (!again) {
-    replacing = undefined
-    undone = undefined
-    history = [...history(), { id: nextId++, role: 'user', content: text, ...sent.length > 0 && { attachments: sent } }]
-
-    // A suggestion leaves what the visitor was typing.
-    if (question === undefined) {
-      draft = ''
-      attached = []
-      attachProblem = undefined
-    }
-  }
-
-  const mine = new AbortController()
-  // A reply is named, so a Stop ends it on the server and, for a Chat that remembers, a reload finds it.
-  const id = resuming ?? newReplyId()
-
-  if (remember !== undefined && id !== undefined)
-    keepPending(remember, id)
-
-  run = mine
-  replying = id
-  outlives = false
-  resumed = resuming !== undefined
-  following.toBottom()
-  failure = undefined
-  takenBack = false
-  partial = ''
-  thought = ''
-  thoughtOpen = false
-  calls = []
-  code = []
-  found = []
-  told.clear()
-  spoken = []
-  waiting = true
-
-  try {
-    // A turn that only called tools has no text to post, which a provider refuses.
-    // A resume after a reload comes once the server has dropped the turns.
-    const stream = await call(mine.signal, { [REPLY_HEADER]: `${resuming === undefined ? 'start' : 'resume'}:${id}`, ...resuming === undefined && replacing !== undefined && { [REPLACES_HEADER]: replacing } })
-
-    if (mine.signal.aborted) {
-      stream.close()
-      takeBack()
-
-      return
-    }
-
-    stream.on(show)
-    streaming = stream
-  }
-  catch (error) {
-    // A call stopped before its first word is not a failure, and its message returns to the field.
-    if (mine.signal.aborted) {
-      takeBack()
-    }
-    else {
-      console.error(error)
-
-      if (remember !== undefined)
-        keepPending(remember, undefined)
-
-      replying = undefined
-
-      if (error instanceof ActionError && error.status === 422)
-        takeBack()
-
-      failure = error instanceof ActionError && error.status < 500 && error.errors[''] ? error.errors[''] : errorMessage
-    }
-  }
-  finally {
-    waiting = false
-    field?.focus()
-  }
-}
-
 // Text from outside the field, such as a voice transcript, is sent as a suggestion is: the draft stays, and a reply under way or blank text ignores it.
 function sendFrom(event: Event) {
   const text = (event as CustomEvent<unknown>).detail
 
   if (typeof text === 'string' && text.trim() !== '')
-    void send(false, text.trim())
+    void send(text.trim())
 }
 
 // The button beside the field resets, then puts the cursor back in the field.
@@ -628,35 +289,18 @@ function startOver() {
   queueMicrotask(() => field?.focus())
 }
 
-// Starts the conversation over: what is under way stops, and the log, the field and the kept history are cleared.
 function reset() {
-  stop()
-  history = []
-  replacing = undefined
-  undone = undefined
+  session.reset()
   editing = undefined
   refocus = undefined
-  draft = ''
-  attached = []
-  attachProblem = undefined
-  failure = undefined
-  takenBack = false
-  partial = ''
-  thought = ''
-  thoughtOpen = false
-  calls = []
-  code = []
-  found = []
-  spoken = []
-  told.clear()
 }
 
 // The visitor's answer to a held tool call is their next message: the allowance carries the ticket the server issued for that very call.
 function decide(call: ToolCall, allowed: boolean) {
   if (!allowed)
-    void send(false, `${deniedLabel} ${call.name}`)
+    void send(`${deniedLabel} ${call.name}`)
   else if (call.approval !== undefined)
-    void send(false, approvalMessage(`${allowedLabel} ${call.name} ${JSON.stringify(call.input)}`, call.approval))
+    void send(approvalMessage(`${allowedLabel} ${call.name} ${JSON.stringify(call.input)}`, call.approval))
 }
 
 // An answer to a held tool call carries a ticket that is spent, so it is neither edited nor posted again.
@@ -670,17 +314,6 @@ function canRegenerate(turn: Turn): boolean {
 }
 
 const canEdit = (turn: Turn) => editable && !busy() && !approval(turn)
-
-// Asks again for the last reply: it leaves the log and the history, and the post ends on the message before it, which replaces both turns on a server that keeps the conversation.
-function regenerateReply() {
-  if (busy())
-    return
-
-  replacing = 'regenerate:2'
-  undone = history()
-  history = history().slice(0, -1)
-  void send(true)
-}
 
 function startEdit(turn: Turn) {
   editing = turn.id
@@ -737,42 +370,20 @@ function takeFocus(element: HTMLElement, turn: Turn) {
   queueMicrotask(() => element.focus())
 }
 
-// The edited message and every turn after it leave the history, and the post ends on the new message: its files stay, and it replaces all those turns on a server that keeps the conversation.
 function saveEdit() {
-  const turns = history()
-  const index = turns.findIndex(turn => turn.id === editing())
-  const edited = turns[index]
-  const text = editDraft().trim()
+  const sent = session.edit(editing(), editDraft())
 
-  // Only Enter in the field gets here while a reply is under way, as the Save button is disabled.
-  if (busy()) {
-    editProblem = editBusyLabel
-
-    return
-  }
-
-  if (edited === undefined) {
-    editing = undefined
-
-    return
-  }
-
-  const files = filesOf(edited)
-
-  if (text === '' && files.length === 0) {
-    editProblem = editEmptyLabel
+  // Only Enter in the field finds a reply under way, as the Save button is disabled.
+  if (sent === 'busy' || sent === 'empty') {
+    editProblem = sent === 'busy' ? editBusyLabel : editEmptyLabel
 
     return
   }
 
   editing = undefined
-  editProblem = undefined
-  // The edit field is gone, and the edit button too while the reply is under way.
-  field?.focus()
-  replacing = `edit:${turns.length - index}`
-  undone = turns
-  history = [...turns.slice(0, index), { id: nextId++, role: 'user', content: text, ...files.length > 0 && { attachments: files } }]
-  void send(true)
+
+  if (sent === 'sent')
+    editProblem = undefined
 }
 
 function editKey(event: KeyboardEvent, id: number) {
@@ -817,43 +428,7 @@ function waitingFor(turn: Turn): ToolCall[] {
 }
 
 function ask(question: string) {
-  void send(false, question)
-}
-
-// Tells the server to end a reply that outlives its request, which closing the stream does not.
-async function endOnServer(id: string, messages: ChatMessage[]) {
-  try {
-    const answer = await action({ messages }, { refresh: false, headers: { [REPLY_HEADER]: `stop:${id}` } })
-
-    if (typeof answer === 'object' && answer !== null && 'close' in answer)
-      (answer as ActionStream<unknown>).close()
-  }
-  catch (error) {
-    console.warn('the reply could not be ended on the server', error)
-  }
-}
-
-function stop() {
-  const stream = streaming()
-  const id = replying
-
-  // A reply that showed nothing yet is ended too, as it may outlive: only one that streamed without saying so is left alone.
-  if (id !== undefined && busy() && (outlives || (partial() === '' && calls().length === 0))) {
-    if (remember !== undefined)
-      keepPending(remember, undefined)
-
-    replying = undefined
-    // Only the last message goes, without its files, which any size the action takes holds.
-    void endOnServer(id, posted(history(), keep, maxChars).slice(-1).map(({ role, content }) => ({ role, content })))
-  }
-
-  // Aborting a call whose answer arrived would break the body read; closing the stream is enough then.
-  if (stream === undefined)
-    run?.abort()
-  else
-    stream.close()
-
-  field?.focus()
+  void send(question)
 }
 
 // Heard on the whole chat, so the Stop button and the log stop a reply too.
@@ -926,7 +501,7 @@ section(part="root" onKeyDown={escape} data-empty={history().length === 0 && !bu
             small(part="note") {stoppedLabel}
           if canRegenerate(turn)
             div(part="actions")
-              BareIconButton(part="regenerate" variant="inline" size="xs" label={regenerateLabel} onClick={regenerateReply})
+              BareIconButton(part="regenerate" variant="inline" size="xs" label={regenerateLabel} onClick={session.regenerate})
                 slot regenerateIcon
                   Icon(icon="refresh")
     if busy()
@@ -954,7 +529,7 @@ section(part="root" onKeyDown={escape} data-empty={history().length === 0 && !bu
       | {failure()}
       |
       if !busy() && !takenBack() && history().at(-1)?.role === 'user'
-        button(part="retry" type="button" data-variant="solid" data-size="md" onClick={() => { void send(true) }}) {retryLabel}
+        button(part="retry" type="button" data-variant="solid" data-size="md" onClick={() => { void session.retry() }}) {retryLabel}
   if disclosure !== ''
     p(part="disclosure") {disclosure}
   if attachProblem()
@@ -964,7 +539,7 @@ section(part="root" onKeyDown={escape} data-empty={history().length === 0 && !bu
       for file of attached() key={fileKey(file)}
         li(part="file")
           | {file.name}
-          BareIconButton(part="remove" variant="inline" size="xs" label={`${removeLabel} ${file.name}`} onClick={() => unattach(file)})
+          BareIconButton(part="remove" variant="inline" size="xs" label={`${removeLabel} ${file.name}`} onClick={() => attachments.remove(file)})
             Icon(icon="close")
   form(part="form" onSubmit={event => { event.preventDefault(); void send() }} onDragOver={event => { if (attach) event.preventDefault() }} onDrop={dropped})
     if newButton && history().length > 0
