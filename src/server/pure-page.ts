@@ -13,7 +13,7 @@ import { analyzeScript, analyzeServer } from '../compiler/script'
 import { templateReads } from '../compiler/template-reads'
 import { CONTENT_EXPORTS, I18N_EXPORTS, IMAGE_EXPORTS, KAY_EXPORTS } from './kept-exports'
 import { readKeptSource } from './kept-source'
-import { neverWritten, parseLiteral, withoutComments } from './literal-writes'
+import { neverWritten, NOT_LINE_BREAK, parseLiteral, withoutComments } from './literal-writes'
 import { exposedBy, laterExportAt, stateAt } from './module-state'
 import { routeChain } from './routes'
 
@@ -30,7 +30,6 @@ const SETTING_NAMES = new Set<string>([PAGE, ...PAGE_SETTINGS])
 const MODULE_EXPORT = new RegExp(`^export (?!(?:type|interface) )(?!(?:async )?(?:const|let|var|function) (?:${[...SETTING_NAMES].join('|')})\\b)`, 'm')
 
 const STATE = 'declares module state, a `let`, an empty container it fills or an export another module can change'
-const NOT_LINE_BREAK = /[^\n]/g
 // What may be a state declaration anywhere on a line, to spare the compiler's view to a file that has none.
 const MAYBE_STATE = /\b(?:let|var|export)\b|=\s*(?:\[\s*\]|\{\s*\}|new\b)/
 const KAY_ENTRIES = new Set(['kay', 'kay/i18n', 'kay/image', 'kay/content'])
@@ -80,7 +79,8 @@ function moduleStateAt(file: string, source: string, unchanged: Unchanged | unde
 function savesLocally(args: Node[]): boolean {
   const options = args[2]
 
-  if (options?.type !== 'ObjectExpression')
+  // A spread before the options moves them to a place the scan cannot tell.
+  if (options?.type !== 'ObjectExpression' || args.some(arg => arg.type === 'SpreadElement'))
     return false
 
   let local = false

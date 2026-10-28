@@ -701,7 +701,8 @@ export function declaredName(declarator: string): string | undefined {
 const WORD_CHAR = /[\w$]/
 const OPENING_BRACKET = /\[\s*$/
 const CLOSING_BRACKET = /^\s*\]/
-const NOT_LINE_BREAK = /[^\n]/g
+
+export const NOT_LINE_BREAK = /[^\n]/g
 
 // Where a regex literal may start: after nothing, an operator or an opening bracket, or a keyword that takes an expression.
 const BEFORE_REGEX = /(?:^|[(,=:[!&|?{};+\-*%<>~^]|(?<![\w$.])(?:return|typeof|case|do|else|in|of|void|delete|throw|new|yield|await))\s*$/

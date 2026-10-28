@@ -1,5 +1,5 @@
 import type { ParserPlugin } from '@babel/parser'
-import type { ExportSpecifier, Identifier, Node, ObjectPattern, Program } from '@babel/types'
+import type { ExportSpecifier, Identifier, Node, ObjectPattern, Program, StringLiteral } from '@babel/types'
 import type { Node as KayNode, Span } from '../compiler/ast'
 import { parse, parseExpression } from '@babel/parser'
 import { VISITOR_KEYS } from '@babel/types'
@@ -40,7 +40,9 @@ export interface KeptSource {
 }
 
 // Every way a source reads the request or the moment besides `ctx`, as a global it names.
-const READ_GLOBALS = new Set(['Date', 'Intl', 'Temporal', 'crypto', 'process', 'Bun', 'performance', 'fetch', 'globalThis', 'require', 'eval'])
+const READ_GLOBALS = new Set(['Date', 'Intl', 'Temporal', 'crypto', 'process', 'Bun', 'performance', 'fetch', 'globalThis', 'global', 'require', 'eval', 'Function'])
+// The names of the global object a browser has too, which an island reads freely: only a member of it named in `READ_GLOBALS`, or one it computes, is a read.
+const WINDOWS = new Set(['self', 'window'])
 const SYNTAX: ParserPlugin[] = ['decorators-legacy', 'explicitResourceManagement']
 const TS_SCRIPT = /\.[cm]?ts$/
 const TSX_SCRIPT = /\.tsx$/
@@ -53,7 +55,7 @@ const CALLS = new Set(['CallExpression', 'OptionalCallExpression'])
 // The parents whose `key` is a name rather than a reference unless computed.
 const KEYED = new Set(['ObjectProperty', 'ObjectMethod', 'ClassMethod', 'ClassPrivateMethod', 'ClassProperty', 'ClassPrivateProperty', 'ClassAccessorProperty', 'TSDeclareMethod'])
 // The parents where an identifier is never a reference.
-const NAMING = new Set(['ImportSpecifier', 'ImportDefaultSpecifier', 'ImportNamespaceSpecifier', 'ExportSpecifier', 'ExportNamespaceSpecifier', 'ExportDefaultSpecifier', 'LabeledStatement', 'BreakStatement', 'ContinueStatement', 'MetaProperty', 'TSEnumDeclaration', 'TSModuleDeclaration'])
+const NAMING = new Set(['ImportSpecifier', 'ImportDefaultSpecifier', 'ImportNamespaceSpecifier', 'ExportSpecifier', 'ExportNamespaceSpecifier', 'ExportDefaultSpecifier', 'LabeledStatement', 'BreakStatement', 'ContinueStatement', 'MetaProperty', 'TSEnumDeclaration', 'TSModuleDeclaration', 'PrivateName'])
 
 interface Frame {
   node: Node
@@ -68,6 +70,11 @@ function pluginsOf(file: string): ParserPlugin[] {
     return ['typescript', ...SYNTAX]
 
   return TSX_SCRIPT.test(file) ? ['typescript', 'jsx', ...SYNTAX] : ['jsx', ...SYNTAX]
+}
+
+// A name a module exports, written as one or in quotes: `export { "a-b" as c } from` gives its `local` as a string, which Babel's types leave out.
+function nameOf(name: Identifier | StringLiteral): string {
+  return name.type === 'Identifier' ? name.name : name.value
 }
 
 // The name a member expression reads, when it is written as one: `a.b` and `a?.b`, not `a[b]`.
@@ -125,10 +132,12 @@ function destructuredPath(pattern: ObjectPattern): boolean | undefined {
 }
 
 class Reader {
-  readonly found: KeptSource = { pathname: false, imports: [], uses: new Map(), bindings: new Set(), exports: false }
+  readonly found: KeptSource
 
   // `source` is the text the parsed spans are of, `real` maps an offset of it to the file's, and `skip` is a span read as written and never run, which nothing in is a read.
-  constructor(private readonly source: string, private readonly real: (offset: number) => number, private readonly skip: Span | undefined) {}
+  constructor(private readonly source: string, private readonly real: (offset: number) => number, private readonly skip: Span | undefined, uses: KeptSource['uses'] = new Map()) {
+    this.found = { pathname: false, imports: [], uses, bindings: new Set(), exports: false }
+  }
 
   program(text: string, start: number, plugins: ParserPlugin[]): void {
     let program: Program
@@ -200,7 +209,7 @@ class Reader {
       this.found.imports.push({
         specifier: statement.source.value,
         at: this.real(statement.start!),
-        names: whole ? undefined : values.map(specifier => ({ own: specifier.imported.type === 'Identifier' ? specifier.imported.name : specifier.imported.value, local: specifier.local.name, text: this.textOf(specifier) })),
+        names: whole ? undefined : values.map(specifier => ({ own: nameOf(specifier.imported), local: specifier.local.name, text: this.textOf(specifier) })),
         withDefault,
         typesOnly: !whole && !withDefault && named.length > 0 && values.length === 0,
       })
@@ -216,7 +225,7 @@ class Reader {
         specifier: statement.source.value,
         at: this.real(statement.start!),
         // A re-export binds nothing in the module, so `local` is the name it takes.
-        names: whole ? undefined : values.map(specifier => ({ own: specifier.local.name, local: specifier.local.name, text: this.textOf(specifier) })),
+        names: whole ? undefined : values.map(specifier => ({ own: nameOf(specifier.local), local: nameOf(specifier.local), text: this.textOf(specifier) })),
         withDefault: false,
         typesOnly: !whole && statement.specifiers.length > 0 && values.length === 0,
       })
@@ -329,6 +338,12 @@ class Reader {
     else if (READ_GLOBALS.has(node.name)) {
       this.read(node.start!, node.name)
     }
+    else if (WINDOWS.has(node.name) && frame.key === 'object' && MEMBERS.has(parent.type)) {
+      const name = memberName(parent)
+
+      if (name === undefined || name === 'Math' || READ_GLOBALS.has(name))
+        this.read(node.start!, node.name)
+    }
     else if (node.name === 'ctx') {
       this.context(frame, node)
     }
@@ -365,16 +380,15 @@ class Reader {
 
   kay(source: string): void {
     const { file, expansion } = parseExpanded(source)
-    const real = expansion === undefined ? (offset: number) => offset : (offset: number) => (expansion).real(offset)
+    const real = expansion === undefined ? (offset: number) => offset : (offset: number) => expansion.real(offset)
 
     for (const span of [file.script, file.server, file.module]) {
       if (span !== undefined)
         this.parseIn(file.source, span, ['typescript', ...SYNTAX])
     }
 
-    const template = new Reader(file.source, real, undefined)
+    const template = new Reader(file.source, real, undefined, this.found.uses)
 
-    template.found.uses = this.found.uses
     visitNodes(file.template, (node) => {
       const own = binders(node)
 
@@ -386,6 +400,10 @@ class Reader {
         else
           template.expression(text, span.start)
       }
+
+      // The patterns `nodeExpressions` leaves out, whose defaults run all the same.
+      for (const span of patterns(node))
+        template.binder(file.source.slice(span.start, span.end), span.start)
     })
 
     this.merge(template.found)
@@ -420,6 +438,14 @@ function binders(node: KayNode): Span[] {
     return [node.params]
 
   return node.kind === 'slot' && node.params !== undefined ? [node.params] : []
+}
+
+// The binding patterns of a template node that `nodeExpressions` does not list: a loop's item and index; an alias of an `if`, a `then` or a `catch` is one name, with no default.
+function patterns(node: KayNode): Span[] {
+  if (node.kind !== 'for')
+    return []
+
+  return node.index === undefined ? [node.item] : [node.item, node.index]
 }
 
 // What one source reads, a `.kay` file by its fences and its template; `skip` is a span of it read as written and never run, the value of a page's `lastmod`.

@@ -20,7 +20,16 @@ describe('what a kept page\'s scan reads of a source', () => {
     expect(readOf('a.kay', 'markdown\n  Built {process.env.SHA}\n')).toBe('process')
     expect(readOf('a.kay', 'snippet row(at = Date.now())\n  p {at}\n')).toBe('Date')
 
+    expect(readOf('a.ts', 'export const sha = global.process.env.SHA\n')).toBe('global')
+    expect(readOf('a.ts', 'export const id = self.crypto.randomUUID()\n')).toBe('self')
+    expect(readOf('a.ts', 'export const roll = window[\'Math\'].random()\n')).toBe('window')
+    expect(readOf('a.ts', 'export const now = new Function(\'return Date.now()\')()\n')).toBe('Function')
+    expect(readOf('a.kay', 'for { at = Date.now() } of rows\n  p {at}\n')).toBe('Date')
+    expect(readOf('a.kay', 'for [row, at = Date.now()] of rows\n  p {row}{at}\n')).toBe('Date')
+
     expect(readOf('a.ts', '// fetch the Date from process\nexport const floor = Math.floor(1.5)\n')).toBeUndefined()
+    expect(readOf('a.ts', 'export class Clock {\n  #fetch = 1\n  #Date() {\n    return this.#fetch\n  }\n}\n')).toBeUndefined()
+    expect(readOf('a.kay', 'button(onclick={() => window.scrollTo(0, 0)}) Top\n')).toBeUndefined()
     expect(readOf('a.ts', 'export const text = \'fetch a Date from process\'\nexport const label = { fetch: 1 }.fetch\n')).toBeUndefined()
     expect(readOf('a.ts', 'export function since(at: Date, format: Intl.NumberFormat): string {\n  return format.format(at.getTime())\n}\n')).toBeUndefined()
     expect(readOf('a.kay', 'p The Date is fetched by process\n')).toBeUndefined()
@@ -59,6 +68,7 @@ describe('what a kept page\'s scan reads of a source', () => {
       { specifier: './a', names: ['a as b'], withDefault: false, typesOnly: false },
       { specifier: './b', names: undefined, withDefault: false, typesOnly: false },
     ])
+    expect(readKeptSource('a.ts', 'export { "a-b" as c } from \'./a\'\n').imports[0]?.names?.map(({ own }) => own)).toEqual(['a-b'])
   })
 
   it('records each use of a name with the arguments of a call to it', () => {
