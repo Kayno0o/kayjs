@@ -2,12 +2,13 @@ import type { CallExpression } from '@babel/types'
 import { utimesSync } from 'node:fs'
 import { rm } from 'node:fs/promises'
 import { join } from 'node:path'
-import { afterAll, describe, expect, it } from 'bun:test'
+import { afterAll, describe, expect, it, spyOn } from 'bun:test'
 import { classIndex } from '../src/build/class-sources'
 import { readSource } from '../src/build/files'
-import { inParseScope } from '../src/build/source-parses'
+import { inParseScope, SourceParses } from '../src/build/source-parses'
 import { readKeptSource } from '../src/server/kept-source'
 import { keptScan } from '../src/server/pure-page'
+import { kayBuild } from './check-helper'
 import { scratchDir } from './scratch'
 
 const readOf = (file: string, source: string) => readKeptSource(file, source).read?.what
@@ -185,4 +186,41 @@ describe('a page the scan reads from its parse', () => {
     utimesSync(outside, new Date(Date.now() - 60_000), new Date(Date.now() - 60_000))
     expect(uses(outside).get('pick')?.[0]?.[0]).not.toBe(argument(indexed(outside).values.get('tone')![0]))
   })
+
+  it('takes up in `kay build` the parses the class index made of a page', async () => {
+    const root = await scratchDir('kept-source-')
+    const files = {
+      'tsconfig.json': JSON.stringify({ compilerOptions: { target: 'ESNext', jsx: 'preserve', jsxImportSource: 'kay', lib: ['ESNext', 'DOM'], rootDirs: ['.', '.kay/types'], module: 'Preserve', moduleResolution: 'bundler', strict: true, noEmit: true, skipLibCheck: true }, include: ['src', '.kay/types'] }),
+      'kay.config.ts': 'import { defineConfig } from \'kay/server\'\n\nexport default defineConfig({ log: false })\n',
+      'src/routes/index.kay': '---\nconst tone = [\'mt-1\', \'mt-2\'][0]\n---\np(class={tone}) Hi\n',
+    }
+
+    roots.push(root)
+    await Promise.all(Object.entries(files).map(async ([path, content]) => Bun.write(join(root, path), content)))
+    utimesSync(join(root, 'src/routes/index.kay'), new Date(Date.now() - 60_000), new Date(Date.now() - 60_000))
+
+    // What the kept-page scan found kept for it, a parse for each it took up.
+    const taken: string[] = []
+    const parses = SourceParses.prototype as unknown as { taken: (kept: Map<string, unknown>, key: string, text: string) => unknown }
+    const take = parses.taken
+    const spy = spyOn(parses, 'taken').mockImplementation(function (this: unknown, kept, key, text) {
+      const known = take.call(this, kept, key, text)
+
+      if (known !== undefined)
+        taken.push(key)
+
+      return known
+    })
+
+    try {
+      expect((await kayBuild([root, '--no-check'])).code).toBe(0)
+    }
+    finally {
+      spy.mockRestore()
+    }
+
+    expect(taken).toContain('kay')
+    expect(taken.some(key => key.startsWith('program '))).toBe(true)
+    expect(taken.some(key => key.startsWith('expression '))).toBe(true)
+  }, 120_000)
 })

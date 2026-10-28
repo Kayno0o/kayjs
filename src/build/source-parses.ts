@@ -54,6 +54,11 @@ export async function inParseScope<T>(run: () => Promise<T>): Promise<T> {
   return building.getStore() ? run() : building.run(new Map(), run)
 }
 
+// Drops what the kept-page scan left of the build's parses, once it ran, rather than hold them to the end of the build.
+export function dropKeptParses(): void {
+  building.getStore()?.clear()
+}
+
 // The Babel parses of one source, shared by the class index and the kept-page scan, which read the same spans with the same options.
 // The class index, which `stores`, keeps what it parses with the file's read in a build; the kept-page scan, which runs after it and reads each file once, takes a parse kept and keeps none.
 export class SourceParses {
@@ -85,12 +90,12 @@ export class SourceParses {
   }
 
   private made<T extends Parsed>(key: string, text: string, make: (text: string) => T): T {
-    const known = this.kept?.get(key)
+    if (this.kept === undefined)
+      return make(text)
 
-    if (known?.text === text) {
-      if (!this.stores)
-        this.kept!.delete(key)
+    const known = this.stores ? undefined : this.taken(this.kept, key, text)
 
+    if (known !== undefined) {
       if ('error' in known)
         throw known.error
 
@@ -99,19 +104,28 @@ export class SourceParses {
 
     const entry: Made = { text }
 
-    try {
-      entry.parsed = make(text)
+    if (this.stores)
+      this.kept.set(key, entry)
 
-      return entry.parsed as T
+    try {
+      return entry.parsed = make(text)
     }
     catch (error) {
       entry.error = error
 
       throw error
     }
-    finally {
-      if (this.stores)
-        this.kept?.set(key, entry)
-    }
+  }
+
+  // The parse kept of `text`, which nothing reads again once taken.
+  private taken(kept: Map<string, Made>, key: string, text: string): Made | undefined {
+    const known = kept.get(key)
+
+    if (known?.text !== text)
+      return undefined
+
+    kept.delete(key)
+
+    return known
   }
 }

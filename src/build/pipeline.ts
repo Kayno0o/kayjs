@@ -55,7 +55,7 @@ import { routeSizes } from './route-sizes'
 import { writeSearchIndex } from './search'
 import { clearServerRecord, writeServerRecord } from './server-record'
 import { inSignalsScope } from './signals'
-import { inParseScope } from './source-parses'
+import { dropKeptParses, inParseScope } from './source-parses'
 import { exportStatic, refuseStaticConfig, removeLastExport } from './static'
 import { pruneScopedStyles } from './styles'
 import { pruneCompileCache } from './transform'
@@ -441,6 +441,8 @@ async function outputStage(project: Project, exported: boolean, client: ClientBu
   const routes: Route[] = []
   const stops = new Map<string, KeptStop>()
   const prerendered = await prerenderPages(project, client, { exportAll: exported, rendered, others, routes, stops, onRoute: (done, total) => report({ step: 'prerendering', done, total, unit: 'routes' }) })
+
+  dropKeptParses()
 
   warnServerClasses(root, client, routes, exported)
 
