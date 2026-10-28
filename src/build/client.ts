@@ -1,6 +1,6 @@
 import type { KayConfig } from '../config'
-import type { ClientConfigKey } from '../project'
 import type { BuildStamps } from '../dev/fingerprint'
+import type { ClientConfigKey } from '../project'
 import type { ClassTable } from '../runtime/class-table'
 import type { ClientBuild, ClientManifest } from '../server/client'
 import type { FontFallback } from '../server/fonts'
