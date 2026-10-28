@@ -1,9 +1,11 @@
+import type { RequestRecord } from './request-record'
 import { isContextDefinition, setContextLoader, setTemplateContext } from '../runtime/template-context'
 import { importModule } from './bundle'
 import { RequestReadError } from './request-read'
+import { recordOf, requestRecord } from './request-record'
 import { readPersonally, scopeRequest } from './scope'
 
-interface Provider {
+export interface ContextProvider {
   modules: readonly string[]
   prerendering: boolean
   // The keys the page reads, every key when none.
@@ -11,30 +13,24 @@ interface Provider {
 }
 
 // What a request has loaded so far: the values, the keyed loaders that ran and the contexts loading every key at once.
-interface Loaded {
+export interface LoadedContexts {
   values: Record<string, unknown>
   keys: Set<string>
   wholes: Set<number>
 }
 
-// The extensions' context modules each request renders with, and what they loaded for it.
-const providers = new WeakMap<Request, Provider>()
-const loaded = new WeakMap<Request, Loaded>()
-const pending = new WeakMap<Request, Promise<boolean>>()
-// The provider a request has everything loaded for, so a second layout asking costs nothing.
-const satisfied = new WeakMap<Request, Provider>()
-
 // Called where a render starts, so a layout can load the values of the request being rendered. `keys` are the ones the page reads, every key when not given.
 export function useContexts(request: Request, modules: readonly string[], prerendering: boolean, keys?: readonly string[]): void {
-  providers.set(request, { modules, prerendering, keys: keys === undefined ? undefined : new Set(keys) })
+  requestRecord(request).contextProvider = { modules, prerendering, keys: keys === undefined ? undefined : new Set(keys) }
 }
 
 // A page rendered in place of another, an error page, reads keys the first did not, so every key loads, as its layouts reuse what the failed page's loaded.
 export async function loadEveryContextKey(request: Request): Promise<void> {
-  const provider = providers.get(request)
+  const record = recordOf(request)
+  const provider = record?.contextProvider
 
-  if (provider !== undefined) {
-    providers.set(request, { ...provider, keys: undefined })
+  if (record && provider !== undefined) {
+    record.contextProvider = { ...provider, keys: undefined }
     await loadContextValues(request)
   }
 }
@@ -43,7 +39,7 @@ export async function loadEveryContextKey(request: Request): Promise<void> {
 setTemplateContext(() => {
   const request = scopeRequest()
 
-  return request === undefined ? undefined : loaded.get(request)?.values
+  return request === undefined ? undefined : recordOf(request)?.loadedContexts?.values
 })
 
 async function definitionOf(file: string) {
@@ -57,9 +53,11 @@ async function definitionOf(file: string) {
 
 // Loads what the page reads of every extension's context once for the request, and marks the page as the visitor's own. A load that fails stops the page and is tried again by the next layout asking, such as an error page's.
 export async function loadContextValues(request: Request): Promise<void> {
-  const provider = providers.get(request)
+  const record = recordOf(request)
+  const provider = record?.contextProvider
 
-  if (provider === undefined || satisfied.get(request) === provider)
+  // The provider a request has everything loaded for is kept, so a second layout asking costs nothing.
+  if (!record || provider === undefined || record.satisfiedProvider === provider)
     return
 
   if (provider.prerendering)
@@ -69,10 +67,10 @@ export async function loadContextValues(request: Request): Promise<void> {
 
   // Another layout may ask for keys the one loading now does not, so it goes round until a pass has nothing left to load.
   for (let ran = true; ran;) {
-    const joined = pending.get(request)
-    const running = joined ?? loadMissing(request, provider)
+    const joined = record.loadingContexts
+    const running = joined ?? loadMissing(request, record, provider)
 
-    pending.set(request, running)
+    record.loadingContexts = running
 
     try {
       const loadedNow = await running
@@ -81,16 +79,16 @@ export async function loadContextValues(request: Request): Promise<void> {
       ran = joined === undefined ? loadedNow : true
     }
     finally {
-      if (pending.get(request) === running)
-        pending.delete(request)
+      if (record.loadingContexts === running)
+        record.loadingContexts = undefined
     }
   }
 
-  satisfied.set(request, provider)
+  record.satisfiedProvider = provider
 }
 
-async function loadMissing(request: Request, provider: Provider): Promise<boolean> {
-  const state = loaded.get(request) ?? { values: Object.create(null) as Record<string, unknown>, keys: new Set<string>(), wholes: new Set<number>() }
+async function loadMissing(request: Request, record: RequestRecord, provider: ContextProvider): Promise<boolean> {
+  const state = record.loadedContexts ?? { values: Object.create(null) as Record<string, unknown>, keys: new Set<string>(), wholes: new Set<number>() }
   const definitions = await Promise.all(provider.modules.map(definitionOf))
   const jobs: { module: string, key?: string, whole?: number, run: () => unknown }[] = []
 
@@ -111,7 +109,7 @@ async function loadMissing(request: Request, provider: Provider): Promise<boolea
   }
 
   if (jobs.length === 0) {
-    loaded.set(request, state)
+    record.loadedContexts = state
 
     return false
   }
@@ -167,7 +165,7 @@ async function loadMissing(request: Request, provider: Provider): Promise<boolea
 
   // A render that loaded nothing reads an error, not an empty object.
   if (state.keys.size + state.wholes.size > 0)
-    loaded.set(request, state)
+    record.loadedContexts = state
 
   if (failure !== undefined)
     throw failure.reason

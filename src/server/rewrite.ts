@@ -3,6 +3,7 @@ import { ASSET_PREFIX } from '../build/assets'
 import { kayLog } from '../runtime/log'
 import { routerPath } from './base'
 import { keepRequestId, requestId } from './protection'
+import { recordOf, requestRecord } from './request-record'
 import { isInternal, markInternal } from './visit'
 
 // Returns the path, query included, to serve the request from instead, or undefined to serve it as it came.
@@ -20,23 +21,20 @@ const ID = 'x-kay-request-id'
 // The path the browser asked for, which the rewritten request no longer carries.
 const PATH = 'x-kay-original-path'
 const TOKEN = crypto.randomUUID()
-// Read off the marking headers, which are then dropped, so app code never sees the token.
-const addresses = new WeakMap<Request, string>()
-const originals = new WeakMap<Request, string>()
 
 // The path the browser asked for when kay rewrote the request, or the request's own.
 export function askedPath(request: Request): string {
-  return originals.get(request) ?? new URL(request.url).pathname
+  return recordOf(request)?.askedPath ?? new URL(request.url).pathname
 }
 
 // The socket address of a request kay rewrote or kay/test sent, or undefined for any other request.
 export function rewrittenAddress(request: Request): string | undefined {
-  return addresses.get(request)
+  return recordOf(request)?.address
 }
 
 // Where a request sent without a socket comes from, as kay/test gives each test a client of its own.
 export function sendFrom(request: Request, address: string): void {
-  addresses.set(request, address)
+  requestRecord(request).address = address
 }
 
 // Serves a request from the path `rewrite` gives, through the whole app again, the browser keeping its URL; kay's own `/_kay/` routes are never rewritten.
@@ -49,11 +47,12 @@ export function rewriteRequests(app: Elysia, rewrite: Rewrite, fallback: Elysia)
       const id = request.headers.get(ID)
       const asked = request.headers.get(PATH)
 
+      // Read off the marking headers, which are then dropped, so app code never sees the token.
       if (asked !== null)
-        originals.set(request, asked)
+        requestRecord(request).askedPath = asked
 
       if (address !== null)
-        addresses.set(request, address)
+        requestRecord(request).address = address
 
       if (id !== null)
         keepRequestId(request, id)
@@ -102,7 +101,7 @@ export function rewriteRequests(app: Elysia, rewrite: Rewrite, fallback: Elysia)
     headers.set(PATH, url.pathname)
     headers.delete(CLIENT)
 
-    const address = addresses.get(request) ?? server?.requestIP(request)?.address
+    const address = recordOf(request)?.address ?? server?.requestIP(request)?.address
 
     if (address !== undefined)
       headers.set(CLIENT, address)

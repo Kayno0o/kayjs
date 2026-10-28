@@ -16,6 +16,7 @@ import { readCapped } from './errors'
 import { eventStream, StreamRefusedError } from './event-stream'
 import { presenceEntry } from './presence'
 import { clientAddress, overLimit } from './protection'
+import { recordOf, requestRecord } from './request-record'
 import { userOf } from './request-user'
 import { signedText, signText } from './stamp'
 
@@ -55,7 +56,7 @@ const SKEW_MS = 5000
 const BEAT_MS = 250
 const MAX_AHEAD_MS = SKEW_MS + BEAT_MS
 
-interface CacheReads {
+export interface CacheReads {
   // The time the render read each key it follows.
   at: Map<string, number>
   sent: Set<string>
@@ -75,7 +76,6 @@ const cacheReads = new AsyncLocalStorage<CacheReads>()
 // The chains of routes whose render read a value of each user, which are rendered with the user resolved.
 const readers = new Set<string>()
 // The reads of each API request in flight, for the hook that answers it.
-const routeReads = new WeakMap<Request, CacheReads>()
 // Least recently read or watched first.
 const stamped = new Set<string>()
 // The last invalidation time of each key a page followed, which a connection sends first: the declaration gives 0 to a key never invalidated.
@@ -195,16 +195,18 @@ export async function withIslandReads<T>(run: () => Promise<T>, request: Request
 export function inRouteReads<T>(request: Request, run: () => T): T {
   const reads: CacheReads = { at: new Map(), sent: new Set(), route: true, bytes: 0 }
 
-  routeReads.set(request, reads)
+  requestRecord(request).routeReads = reads
 
   return cacheReads.run(reads, run)
 }
 
 // The proof of what a route's handler read, as a header value, or undefined when it read no key with `live: true`.
 export function routeProof(request: Request): string | undefined {
-  const reads = routeReads.get(request)
+  const record = recordOf(request)
+  const reads = record?.routeReads
 
-  routeReads.delete(request)
+  if (record)
+    record.routeReads = undefined
 
   if (reads === undefined || reads.at.size === 0)
     return undefined

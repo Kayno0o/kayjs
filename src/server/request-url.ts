@@ -1,6 +1,7 @@
 import process from 'node:process'
 import { kayLog } from '../runtime/log'
 import { configuredSite } from '../runtime/site'
+import { requestRecord } from './request-record'
 
 // The first proxy's `X-Forwarded-Proto` saying the browser came over https.
 const FORWARDED_HTTPS = /^\s*https\s*(?:,|$)/i
@@ -8,18 +9,11 @@ const FORWARDED_HTTPS = /^\s*https\s*(?:,|$)/i
 const LOCAL_HOST = /^(?:localhost|127\.\d+\.\d+\.\d+|\[::1\])$/
 let warnedScheme = false
 
-const parsed = new WeakMap<Request, URL>()
-
 // The request's URL, parsed once however many of kay's routes, hooks and scopes read it; shared, so never changed.
 export function requestUrl(request: Request): URL {
-  let url = parsed.get(request)
+  const record = requestRecord(request)
 
-  if (!url) {
-    url = new URL(request.url)
-    parsed.set(request, url)
-  }
-
-  return url
+  return record.url ??= new URL(request.url)
 }
 
 // Over https, kay's cookies never travel in clear; behind a proxy, `X-Forwarded-Proto` says how the browser came, and without one, in production, an https `site` in kay.config.ts stands in, for a proxy that does not pass it on.

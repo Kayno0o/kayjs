@@ -2,7 +2,6 @@ import type { Context } from 'elysia'
 import type { Locals } from '../runtime'
 import type { ActionTool } from '../runtime/action'
 import type { ByteSize } from '../runtime/byte-size'
-import type { LocaleState } from '../runtime/locale-state'
 import type { ActionOptions } from './actions'
 import type { ApiModule } from './api-modules'
 import type { BodyLimit, RouteBodyLimit } from './body'
@@ -10,7 +9,6 @@ import type { CorsOptions, CorsRule } from './cors'
 import type { LoadedGuard } from './guards'
 import type { MountedApi } from './openapi'
 import type { ApiRateLimit } from './protection'
-import type { Span } from './trace'
 import type { SocketLimits } from './ws-limits'
 import { Cookie, Elysia, ElysiaCustomStatusResponse, ElysiaFile, getSchemaValidator, StatusMap } from 'elysia'
 import { underKayDev } from '../build/assets'
@@ -30,6 +28,7 @@ import { answeringRequest, statusOf } from './log'
 import { apiLimitWait, checkApiLimit, requestId } from './protection'
 import { sharedContext } from './render'
 import { isUncaught, reportServerError } from './report'
+import { recordOf, requestRecord } from './request-record'
 import { requestUrl } from './request-url'
 import { apiRoutePath, withoutSlash } from './routes'
 import { VARY_COOKIE, wasReadPersonally } from './scope'
@@ -50,12 +49,6 @@ const RATE_LIMIT = Symbol.for('kay.rateLimit')
 // The requests the guards of their module let through, whose later errors are no refused input.
 const admitted = new WeakSet<Request>()
 
-// The span of each API request in flight.
-const spans = new WeakMap<Request, Span>()
-
-// The module a request matched, as the first hook of its group saw it.
-const owners = new WeakMap<Request, object>()
-
 // Mounts each module's default export, an Elysia instance, under its path: its guards run first, then a websocket upgrade or an unsafe request from another site is refused, unless the module's `cors` lets that site in.
 // Gives back the body limit of each module by the path it is mounted at, and the modules as mounted.
 export async function serveApi(app: Elysia, modules: ApiModule[], options: ActionOptions): Promise<{ limits: Map<string, BodyLimit>, routeLimits: RouteBodyLimit[], mounted: MountedApi[] }> {
@@ -68,12 +61,13 @@ export async function serveApi(app: Elysia, modules: ApiModule[], options: Actio
   // Global: a group's own afterResponse hook never runs once the app holds a global one, as the request log does; with no module no span starts.
   if (modules.length > 0) {
     app.onAfterResponse({ as: 'global' }, ({ request, set, responseValue }) => {
-      const span = spans.get(request)
+      const record = recordOf(request)
+      const span = record?.apiSpan
 
       if (!span)
         return
 
-      spans.delete(request)
+      record.apiSpan = undefined
       answered(span, statusOf(responseValue, set))
       span.end()
     })
@@ -139,7 +133,10 @@ export async function serveApi(app: Elysia, modules: ApiModule[], options: Actio
       const guarded = group
         // A span from the guards to the response, which the handler's own spans do not nest under: the handler runs in Elysia's call, not in one kay makes.
         .onBeforeHandle(({ request, route: mounted }) => {
-          owners.set(request, instance)
+          // The module a request matched, as the first hook of its group saw it.
+          const record = requestRecord(request)
+
+          record.apiOwner = instance
           // What `apiUrl(request, path)` in a handler reads to name the route of the module it runs in.
           Object.defineProperty(request, API_MOUNT, { value: module.mount, configurable: true })
 
@@ -150,7 +147,7 @@ export async function serveApi(app: Elysia, modules: ApiModule[], options: Actio
             const span = startSpan(`${request.method} ${route}`, { kind: SERVER_SPAN, attributes: { 'http.request.method': request.method, 'http.route': route, 'url.path': requestUrl(request).pathname, 'kay.request.id': requestId(request) } })
 
             if (span)
-              spans.set(request, span)
+              record.apiSpan = span
           }
         })
 
@@ -195,7 +192,7 @@ export async function serveApi(app: Elysia, modules: ApiModule[], options: Actio
       const mounting = guarded
         // Elysia runs the `mapResponse` of every module registered before the one matched, so only the matched module's, which knows its cors rule, acts.
         .mapResponse(({ request, responseValue, set }) => {
-          const owner = owners.get(request)
+          const owner = recordOf(request)?.apiOwner
 
           if (owner !== undefined && owner !== instance)
             return undefined
@@ -208,7 +205,7 @@ export async function serveApi(app: Elysia, modules: ApiModule[], options: Actio
           return value instanceof Response ? carriedOver(set, value, cors !== undefined && owner === instance) : jsonReply(value, set)
         })
         .onError(({ request, error, code, set }) => {
-          const span = spans.get(request)
+          const span = recordOf(request)?.apiSpan
 
           // A response failing its own schema is the route's mistake, not the caller's: reported here, before the module's own `onError` may answer it.
           if (isResponseMismatch(error, code))
@@ -330,15 +327,10 @@ function answerStatus(value: unknown, set: { status?: number | string }): number
 }
 
 // The locale state of each API request, resolved once for its guards, rate limits, handler and error hooks.
-const states = new WeakMap<Request, LocaleState>()
-
 function inApiLocale<T>(request: Request, options: ActionOptions, run: () => T): T {
-  let state = states.get(request)
+  const record = requestRecord(request)
 
-  if (state === undefined)
-    states.set(request, state = requestState(request, options))
-
-  return runInLocale(state, run)
+  return runInLocale(record.apiLocale ??= requestState(request, options), run)
 }
 
 type Handler = (context: { request: Request }, ...rest: unknown[]) => unknown

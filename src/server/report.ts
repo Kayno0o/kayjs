@@ -3,6 +3,7 @@ import { kayLog } from '../runtime/log'
 import { recordRequestError } from './dev-errors'
 import { logMessage } from './log'
 import { judgingReads, RequestReadError } from './request-read'
+import { requestRecord } from './request-record'
 
 const ELYSIA_CODES = new Set(['NOT_FOUND', 'PARSE', 'VALIDATION', 'INVALID_COOKIE_SIGNATURE', 'INVALID_FILE_TYPE'])
 
@@ -15,11 +16,10 @@ export function isUncaught(error: unknown, code: unknown): boolean {
   return typeof code === 'string' && !ELYSIA_CODES.has(code) && (error as { code?: unknown } | null)?.code === code
 }
 
-const reported = new WeakMap<Request, Set<unknown>>()
-
 // Logs an error kay caught while answering `request`, under that request, and hands it to the app's `onError`, without holding the response for it.
 export function reportServerError(error: unknown, request: Request, onError: KayConfig['onError']): void {
-  const seen = reported.get(request)
+  const record = requestRecord(request)
+  const seen = record.reported
 
   // Reported once per request, as the catch-all for errors no route caught meets the ones a route's own handler reported already.
   if (seen?.has(error))
@@ -28,7 +28,7 @@ export function reportServerError(error: unknown, request: Request, onError: Kay
   if (seen)
     seen.add(error)
   else
-    reported.set(request, new Set([error]))
+    record.reported = new Set([error])
 
   // A read of what a request holds, met while the build renders a page once, is for the build to judge: it is no failure of a request.
   if (error instanceof RequestReadError && onError && judgingReads.has(onError)) {

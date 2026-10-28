@@ -407,9 +407,8 @@ export interface RefusalInput {
   keyContext?: (() => Omit<RateKeyContext, 'client'>) | undefined
 }
 
-type RefundableStore = RateStore & { refund: NonNullable<RateStore['refund']> }
+export type RefundableStore = RateStore & { refund: NonNullable<RateStore['refund']> }
 // The attempts the refusal check counted for a request, which `refundRateLimit` can take back once.
-const hitsCounted = new WeakMap<Request, { store: RefundableStore, key: string, resetAt: number }[]>()
 
 export async function protectionRefusal(action: ServerAction<TSchema, unknown>, request: Request, { body, form, server, plain = form, keyContext }: RefusalInput): Promise<ProtectionRefusal | typeof PRETEND | undefined> {
   const { honeypot, messages } = action.protection ?? {}
@@ -490,10 +489,10 @@ export async function protectionRefusal(action: ServerAction<TSchema, unknown>, 
       own = waitFor(window, limit.max)
 
       if (store.refund) {
-        const counted = hitsCounted.get(request) ?? []
+        const record = requestRecord(request)
 
-        counted.push({ store: store as RefundableStore, key, resetAt: window.resetAt })
-        hitsCounted.set(request, counted)
+        record.refundableHits ??= []
+        record.refundableHits.push({ store: store as RefundableStore, key, resetAt: window.resetAt })
       }
     }
 
@@ -524,12 +523,13 @@ export async function countSucceeded(action: ServerAction<TSchema, unknown>, req
 
 // Takes back the attempts the action's `rateLimit` counted for this request, once, for a call that started no work: kayjs-ai's resume of a reply it keeps. A limit counting only the posts that went through is left alone, and so is a store with no `refund`; the request being the one the action answers, any other request has nothing counted.
 export async function refundRateLimit(request: Request | undefined): Promise<void> {
-  const counted = request && hitsCounted.get(request)
+  const record = request && recordOf(request)
+  const counted = record?.refundableHits
 
-  if (!counted)
+  if (!record || !counted)
     return
 
-  hitsCounted.delete(request)
+  record.refundableHits = undefined
 
   for (const { store, key, resetAt } of counted) {
     try {
@@ -543,14 +543,12 @@ export async function refundRateLimit(request: Request | undefined): Promise<voi
 
 // The most characters of a custom key kept as it is, a longer one is hashed: a store keeps a key whole.
 const MAX_KEY_LENGTH = 256
-// The key each limit counted a request under, so the count after the handler follows the one before it, whatever the handler changed.
-const countedKeys = new WeakMap<Request, Map<object, string>>()
 const warnedKeys = new WeakSet<object>()
 
 // What the limit counts the request under: its `key`'s text, else the client's address; an empty text, one that is not a text or a key that throws counts the address, so the limit stays.
+// The key each limit counted a request under is kept, so the count after the handler follows the one before it, whatever the handler changed.
 async function actionKey(name: string, limit: { key?: RateKey | undefined }, request: Request, client: string, context: (() => Omit<RateKeyContext, 'client'>) | undefined): Promise<string> {
-  let kept = countedKeys.get(request)
-  const known = kept?.get(limit)
+  const known = recordOf(request)?.countedKeys?.get(limit)
 
   if (known !== undefined)
     return known
@@ -579,10 +577,10 @@ async function actionKey(name: string, limit: { key?: RateKey | undefined }, req
 
   const counted = identity === undefined ? limitKey(name, client) : `${name}\nkey:${identity.length > MAX_KEY_LENGTH ? new Bun.CryptoHasher('sha256').update(identity).digest('base64url') : identity}`
 
-  if (!kept)
-    countedKeys.set(request, kept = new Map<object, string>())
+  const record = requestRecord(request)
 
-  kept.set(limit, counted)
+  record.countedKeys ??= new Map<object, string>()
+  record.countedKeys.set(limit, counted)
 
   return counted
 }

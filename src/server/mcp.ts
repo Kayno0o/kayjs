@@ -322,12 +322,10 @@ export interface ToolCall {
   from: string
 }
 
-const toolCalls = new WeakMap<Request, ToolCall>()
-
 // Whether `request` is a tool call the MCP endpoint dispatched, and which: from a hook registered before `pages()` and from a guard alike.
 // Only the endpoint holds the per-process marker, so a header a client sends makes no call a tool call.
 export function toolCall(request: Request): ToolCall | undefined {
-  const read = toolCalls.get(request)
+  const read = recordOf(request)?.toolCall
 
   if (read !== undefined)
     return read
@@ -372,7 +370,7 @@ export function receiveDispatched(request: Request): void {
   if (marked === undefined)
     return
 
-  toolCalls.set(request, marked)
+  requestRecord(request).toolCall = marked
   markAgentCall(request)
 
   if (address !== null)

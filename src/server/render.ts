@@ -65,6 +65,7 @@ import { matchesEtag } from './public'
 import { chainQuery, queryRules, queryScript, readQuery, readQueryLeniently } from './query'
 import { reportServerError } from './report'
 import { RequestReadError } from './request-read'
+import { requestRecord } from './request-record'
 import { overHttps } from './request-url'
 import { askedPath } from './rewrite'
 import { CONTEXT_LAYOUT, guardUrl, routeChain } from './routes'
@@ -187,18 +188,11 @@ export interface RequestContext {
   request: Request
 }
 
-const copiedContexts = new WeakMap<Request, RequestContext>()
-
 // A request's context as kay's guards and handlers read it, copied once so they share it: Elysia's Sucrose reads a handler passing its whole context to a function, `context,` or `context)`, as using all of it, and would parse the cookies, query, headers and body of every request.
 export function sharedContext<T extends RequestContext>(request: Request, copy: () => T): T {
-  let shared = copiedContexts.get(request) as T | undefined
+  const record = requestRecord(request)
 
-  if (!shared) {
-    shared = copy()
-    copiedContexts.set(request, shared)
-  }
-
-  return shared
+  return (record.sharedContext ??= copy()) as T
 }
 
 interface Rendering {

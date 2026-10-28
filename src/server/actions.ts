@@ -37,6 +37,7 @@ import { answeringRequest } from './log'
 import { countSucceeded, isAgentCall, markChallenge, PRETEND, protectionRefusal, requestId } from './protection'
 import { sharedContext } from './render'
 import { reportServerError } from './report'
+import { recordOf, requestRecord } from './request-record'
 import { overHttps, requestUrl } from './request-url'
 import { guardUrl } from './routes'
 import { fieldOf } from './schema-check'
@@ -92,12 +93,6 @@ function refusalMessage(action: ServerAction<TSchema, unknown>, { status, retryA
   return typeof words === 'string' ? words : words(retryAfter)
 }
 
-// What the guards set on the response, carried to the handler they let through.
-const guarded = new WeakMap<Request, GuardedRequest>()
-// The params of the page each post came from, read by its guards and its action alike.
-const pageParams = new WeakMap<Request, RouteParams>()
-// The page each guarded post came from, which its guards read as `ctx.url`.
-const pageUrls = new WeakMap<Request, URL>()
 const TEXT = 'text/plain; charset=utf-8'
 // The methods that change nothing, which any page may send anywhere.
 const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS'])
@@ -205,7 +200,7 @@ export async function registerActionRoutes(app: Elysia, routes: ServedRoute[], m
 
           // Guards may check the params and the page's URL, so a post from no page of the file never reaches them; without guards, only an action reading `ctx.params` needs its page.
           if (guards.length > 0)
-            pageUrls.set(context.request, guardedPage(context.request, page, match, options))
+            requestRecord(context.request).pageUrl = guardedPage(context.request, page, match, options)
 
           const call = isCall(context.request)
           // A call may send a form's fields, read as a plain form post's are.
@@ -223,12 +218,12 @@ export async function registerActionRoutes(app: Elysia, routes: ServedRoute[], m
           context.body = asForm ? formInput(value.schema, withFixedFields(withoutEmptyFiles(context.body), context.request)) : callInput(context.body)
         },
         // After validation, the one stage where the app's `resolve` values are there for `ctx.locals`.
-        ...(guards.length > 0 && { beforeHandle: async (context: { request: Request }) => inLocale(context.request, options, async () => admit(guards, sharedContext(context.request, () => ({ ...context })), pageParams.get(context.request) ?? {}, pageUrls.get(context.request), options)) }),
+        ...(guards.length > 0 && { beforeHandle: async (context: { request: Request }) => inLocale(context.request, options, async () => admit(guards, sharedContext(context.request, () => ({ ...context })), recordOf(context.request)?.pageParams ?? {}, recordOf(context.request)?.pageUrl, options)) }),
         error: async (context) => {
           const { code, error, request, body, server, set } = context
 
           if ((code === 'VALIDATION' || code === 'INVALID_FILE_TYPE') && guards.length > 0) {
-            const refusal = await inLocale(request, options, async () => guardsFirst(guards, sharedContext(request, () => ({ ...context })), pageParams.get(request) ?? {}, pageUrls.get(request), options))
+            const refusal = await inLocale(request, options, async () => guardsFirst(guards, sharedContext(request, () => ({ ...context })), recordOf(request)?.pageParams ?? {}, recordOf(request)?.pageUrl, options))
 
             if (refusal)
               return refusal
@@ -339,12 +334,9 @@ function readPage(request: Request, page: ActionPage, match: RouteMatch, { base 
 
 // The page url of a post, worked out once however many times the handler reads `ctx.url`.
 function cachedPageUrl(request: Request, work: () => URL): URL {
-  let url = pageUrls.get(request)
+  const record = requestRecord(request)
 
-  if (url === undefined)
-    pageUrls.set(request, url = work())
-
-  return url
+  return record.pageUrl ??= work()
 }
 
 // The page of the file a guarded post came from, as a visit to it reaches the guards, so a path they check covers its actions: its static segments as the router names them, without `base` or a trailing slash.
@@ -388,7 +380,7 @@ function postedPage(request: Request, page: ActionPage, match: RouteMatch, base:
     const posted = match.posted(route, path)
 
     if (posted) {
-      pageParams.set(request, Object.fromEntries(Object.entries(posted.params).filter(([name]) => page.params.includes(name))))
+      requestRecord(request).pageParams = Object.fromEntries(Object.entries(posted.params).filter(([name]) => page.params.includes(name)))
 
       return { path: posted.path, search: url.search }
     }
@@ -542,23 +534,22 @@ export function boundToPage(action: object): boolean | undefined {
   return pageBound.get(action)
 }
 
-// What `isCrossSite` answered for a request, as kayjs-auth asks again on every session read of one.
-const crossSiteAnswers = new WeakMap<Request, { site: string | undefined, crossSite: boolean }>()
-
 // Whether a browser's cross-site POST or websocket upgrade should be refused, for code on a plain Elysia app that kay's own actions and API do not reach; `site` is the app's public URL, whose host counts as the request's own.
 export function crossSiteRefused(request: Request, site?: string): boolean {
   return (!SAFE_METHODS.has(request.method) || request.headers.get('upgrade')?.toLowerCase() === 'websocket') && crossSiteOnce(request, site) && !corsAdmitted.has(request)
 }
 
+// What `isCrossSite` answered for a request is kept, as kayjs-auth asks again on every session read of one.
 function crossSiteOnce(request: Request, site: string | undefined): boolean {
-  const known = crossSiteAnswers.get(request)
+  const record = requestRecord(request)
+  const known = record.crossSite
 
   if (known !== undefined && known.site === site)
     return known.crossSite
 
   const crossSite = isCrossSite(request, site)
 
-  crossSiteAnswers.set(request, { site, crossSite })
+  record.crossSite = { site, crossSite }
 
   return crossSite
 }
@@ -588,7 +579,7 @@ async function admit(guards: LoadedGuard[], context: { request: Request }, param
   if (passed instanceof Response)
     return passed
 
-  guarded.set(context.request, passed)
+  requestRecord(context.request).guarded = passed
 
   return undefined
 }
@@ -666,17 +657,14 @@ function isFormCall(request: Request): boolean {
   return request.headers.get('x-kay-action') === FORM_CALL
 }
 
-// Where each post came from, worked out once however many of the post's stages ask.
-const postedFromCache = new WeakMap<Request, string | null>()
-
-// The page a post came from on this site: the one its form names when a refused post rendered it, else the one kay's script names, else its `Referer`.
+// The page a post came from on this site: the one its form names when a refused post rendered it, else the one kay's script names, else its `Referer`; worked out once however many of the post's stages ask.
 export function postedFrom(request: Request): string | undefined {
-  let from = postedFromCache.get(request)
+  const record = requestRecord(request)
 
-  if (from === undefined)
-    postedFromCache.set(request, from = fromWhere(request) ?? null)
+  if (record.postedFrom === undefined)
+    record.postedFrom = fromWhere(request) ?? null
 
-  return from ?? undefined
+  return record.postedFrom ?? undefined
 }
 
 function fromWhere(request: Request): string | undefined {
@@ -713,7 +701,7 @@ function backTo(request: Request, base: string): string {
 // The Elysia context, with what the app derives and resolves, is the action's `ctx.locals`.
 async function runAction(action: ServerAction<TSchema, unknown>, context: { body: unknown, request: Request, server: Server | null }, options: ActionOptions, back: Back, read: { params: () => void, url: () => URL }): Promise<Response> {
   const { request } = context
-  const state = guarded.get(request) ?? { jar: cookieJar(request), headers: new Headers() }
+  const state = recordOf(request)?.guarded ?? { jar: cookieJar(request), headers: new Headers() }
   const { jar, headers } = state
   let status = 200
   const ctx: ActionContext = {
@@ -725,10 +713,10 @@ async function runAction(action: ServerAction<TSchema, unknown>, context: { body
     locale: contextLocale(options),
     // Read on first use, so an action that never reads them runs from any page.
     get params() {
-      if (!pageParams.has(request))
+      if (recordOf(request)?.pageParams === undefined)
         read.params()
 
-      return pageParams.get(request) ?? {}
+      return recordOf(request)?.pageParams ?? {}
     },
     get cookies() {
       return jar.cookies
