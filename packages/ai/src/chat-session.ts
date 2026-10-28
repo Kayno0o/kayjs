@@ -33,11 +33,11 @@ export interface ChatSessionOptions {
   readonly errorMessage: string
   readonly attachments: Attachments
   // The status line of a call whose status changed.
-  say: (call: ToolCall) => string
+  readonly say: (call: ToolCall) => string
   // Puts the cursor back in the field.
-  focus: () => void
+  readonly focus: () => void
   // Takes the log back to its newest turn, as a reply starts.
-  follow: () => void
+  readonly follow: () => void
 }
 
 // One post: what aborts it, the id it was sent under for a Chat that remembers (what a reload resumes and a Stop ends, gone once ended), whether it said it outlives its request, so its Stop is told to the server, and whether it was asked for again after a reload, so an empty one means the server kept nothing.
@@ -48,7 +48,7 @@ interface Reply {
   resumed: boolean
 }
 
-// What a regenerate or an edit replaces (`regenerate:2`), kept for Try again, which posts the same request, and the history as it stood before it cut it, put back when that post is stopped or refused before any word.
+// What a regenerate or an edit replaces (`regenerate:2`), kept for Try again, which posts the same request, and the history as it stood before it cut it, put back when that post is stopped or refused before any word. Both go once a reply lands, which leaves no message for Try again.
 interface Replacement {
   header: string
   before: Turn[]
@@ -381,7 +381,6 @@ export function createChatSession(options: ChatSessionOptions) {
   return {
     history,
     draft,
-    attachments,
     partial,
     thought,
     thoughtOpen,
@@ -458,5 +457,3 @@ export function createChatSession(options: ChatSessionOptions) {
     },
   }
 }
-
-export type ChatSession = ReturnType<typeof createChatSession>

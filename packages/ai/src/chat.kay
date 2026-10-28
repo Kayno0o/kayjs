@@ -7,6 +7,7 @@ import BareIconButton from '@kaynooo/kayjs-ui/bare-icon-button.kay'
 import Icon from '@kaynooo/kayjs-ui/icon.kay'
 import Notice from '@kaynooo/kayjs-ui/notice.kay'
 import Textarea from '@kaynooo/kayjs-ui/textarea.kay'
+import { acceptsFile } from '@kaynooo/kayjs-ui/lib/accept'
 import { isHeldMarkdown, markdownHtml, markdownLoaded } from 'kay/markdown'
 import { wording } from 'kay/words'
 import { approvalMessage, ticketsIn, withoutApproval } from './approval-marker'
@@ -142,7 +143,7 @@ const { action, initial = [], label = wording('ai.chat.label', 'Chat'), placehol
 
 const statuses = { running: runningLabel, done: doneLabel, failed: failedLabel }
 // The props they read are getters, so each read stays a live read of the prop.
-const attachments = createAttachments({ get accept() { return accept }, get maxFiles() { return maxFiles }, get maxFileSize() { return maxFileSize }, get tooBigLabel() { return attachTooBigLabel }, get fullLabel() { return attachFullLabel }, get refusedLabel() { return attachRefusedLabel } })
+const attachments = createAttachments({ accepts: file => acceptsFile(accept, file), get maxFiles() { return maxFiles }, get maxFileSize() { return maxFileSize }, get tooBigLabel() { return attachTooBigLabel }, get fullLabel() { return attachFullLabel }, get refusedLabel() { return attachRefusedLabel } })
 let field: HTMLTextAreaElement | undefined
 let log: HTMLElement | undefined
 // Keeps the newest text in view unless the visitor scrolled up to read, a finished turn formatted late and a panel reopened included.
@@ -251,7 +252,7 @@ function dropped(event: DragEvent) {
 onMount(() => {
   let timer: ReturnType<typeof setTimeout> | undefined
 
-  const back = () => session.back()
+  const back = session.back
   const leave = () => {
     session.leave()
     clearTimeout(timer)

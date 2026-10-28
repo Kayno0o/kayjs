@@ -74,12 +74,12 @@ function chat(answers: Answer[], options: Partial<ChatSessionOptions> & { initia
     return next(call.signal!)
   }) as unknown as ChatAction
 
-  const attachments = createAttachments({ accept: 'image/png', maxFiles: 2, maxFileSize: 100, tooBigLabel: 'too big', fullLabel: 'full', refusedLabel: 'refused' })
+  const attachments = createAttachments({ accepts: file => file.type === 'image/png', maxFiles: 2, maxFileSize: 100, tooBigLabel: 'too big', fullLabel: 'full', refusedLabel: 'refused' })
   const session = root(() => createChatSession({ action, initial: [], keep: 20, maxChars: 40_000, remember: undefined, errorMessage: 'The reply failed.', attachments, say: call => `${call.name}: ${call.status}`, focus: () => focused++, follow: () => followed++, ...options }))
 
   flush()
 
-  return { session, posts, stops, focused: () => focused, followed: () => followed }
+  return { session, attachments, posts, stops, focused: () => focused, followed: () => followed }
 }
 
 const turns = (session: ReturnType<typeof chat>['session']) => session.history().map(({ role, content }) => `${role}: ${content}`)
@@ -155,23 +155,23 @@ test('a blank draft sends nothing, and a send while a reply is under way is igno
 })
 
 test('a suggestion leaves the draft and the files as they were', async () => {
-  const { session } = chat([answer(fakeStream().stream)])
+  const { session, attachments } = chat([answer(fakeStream().stream)])
   const file = new File(['x'], 'a.png', { type: 'image/png' })
 
   session.draft.set('typing')
-  session.attachments.add([file])
+  attachments.add([file])
   await session.send('a suggestion')
 
   expect(session.draft()).toBe('typing')
-  expect(session.attachments.attached()).toEqual([file])
+  expect(attachments.attached()).toEqual([file])
 })
 
 test('a stop before the first word takes the message back to the field with its files, and ends the reply on the server', async () => {
-  const { session, posts, stops } = chat([hang])
+  const { session, attachments, posts, stops } = chat([hang])
   const file = new File(['x'], 'a.png', { type: 'image/png' })
 
   session.draft.set('hi')
-  session.attachments.add([file])
+  attachments.add([file])
 
   const sent = session.send()
 
@@ -181,7 +181,7 @@ test('a stop before the first word takes the message back to the field with its 
 
   expect(turns(session)).toEqual([])
   expect(session.draft()).toBe('hi\nmore')
-  expect(session.attachments.attached()).toEqual([file])
+  expect(attachments.attached()).toEqual([file])
   expect(session.takenBack()).toBe(true)
   expect(session.failure()).toBeUndefined()
   expect(stops).toHaveLength(1)
@@ -414,18 +414,18 @@ test('a stream closed while the page is left is settled only once the page staye
 
 test('a reset stops the reply and clears the log, the field, the files and the status', async () => {
   const reply = fakeStream()
-  const { session } = chat([answer(reply.stream)])
+  const { session, attachments } = chat([answer(reply.stream)])
 
   await session.send('hi')
   reply.send({ text: 'Half', calls: [{ id: 'c1', name: 'search', input: {}, status: 'running' }] })
   session.draft.set('typing')
-  session.attachments.add([new File(['x'], 'a.png', { type: 'image/png' })])
+  attachments.add([new File(['x'], 'a.png', { type: 'image/png' })])
   session.reset()
   flush()
 
   expect(turns(session)).toEqual([])
   expect(session.draft()).toBe('')
-  expect(session.attachments.attached()).toEqual([])
+  expect(attachments.attached()).toEqual([])
   expect(session.partial()).toBe('')
   expect(session.spoken()).toEqual([])
   expect(session.busy()).toBe(false)

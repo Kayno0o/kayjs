@@ -1,9 +1,9 @@
-import { acceptsFile } from '@kaynooo/kayjs-ui/lib/accept'
 import { signal } from 'kay'
 
-// What the files of one message may be, read live as the props they come from: the types `accept` names, and what a refused file says.
+// What the files of one message may be, read live as the props they come from, and what a refused file says.
 export interface AttachmentLimits {
-  readonly accept: string
+  // Whether a file is of a type `accept` names: given by the Chat, so kayjs-ui stays an optional peer that only the chat components import.
+  readonly accepts: (file: File) => boolean
   readonly maxFiles: number
   readonly maxFileSize: number
   readonly tooBigLabel: string
@@ -19,7 +19,7 @@ export const fileKey = (file: File) => `${file.name}\n${file.size}\n${file.lastM
 export function createAttachments(limits: AttachmentLimits) {
   const attached = signal<File[]>([])
   const problem = signal<string | undefined>(undefined)
-  const accepts = (file: File) => acceptsFile(limits.accept, file)
+  const { accepts } = limits
 
   // Files the picker, a drop or a paste gave, that fit the message: a file past `maxFileSize` or beyond `maxFiles` is left out and says so, and one already attached is not added twice.
   function add(chosen: File[]) {
