@@ -530,14 +530,9 @@ export async function refundRateLimit(request: Request | undefined): Promise<voi
 
   record.refundableHits = undefined
 
-  for (const { store, key, resetAt } of counted) {
-    try {
-      await store.refund(key, resetAt)
-    }
-    catch (error) {
-      kayLog('warn', 'a rate limit store could not take back an attempt, which stays counted', error)
-    }
-  }
+  // Each store came from `ratesFor`, which logs a refund that fails and goes on.
+  for (const { store, key, resetAt } of counted)
+    await store.refund(key, resetAt)
 }
 
 // The most characters of a custom key kept as it is, a longer one is hashed: a store keeps a key whole.
@@ -606,8 +601,9 @@ const failing = new Set<string>()
 // How long a rates store that timed out is left alone, so a hanging one holds one request instead of every one.
 const SKIP_MS = 10_000
 
-// Until when each rates store is skipped.
+// Until when each rates store is skipped, read only once one timed out.
 const skipped = new WeakMap<RateStore, number>()
+let skipping = false
 
 class RatesTimeout extends Error {}
 
@@ -637,28 +633,29 @@ export function ratesFor(name: string, given?: RateStore): RateStore {
 // `store` with this process's memory under `name` behind it; `peek` and `refund` only where the store has them, as a limit checks for them.
 function standInFor(name: string, store: RateStore): RateStore {
   const memory = memoryOf(name)
-  const { peek, refund } = store
+  const { hit, peek, refund } = store
 
   return {
-    hit: async (key, window, weight) => answered(name, store, async () => store.hit(key, window, weight), () => memory.hit(key, window, weight)),
-    ...peek && { peek: async key => answered(name, store, async () => peek.call(store, key), () => memory.peek(key)) },
+    hit: async (key, window, weight) => answered(name, store, hit, [key, window, weight], () => memory.hit(key, window, weight)),
+    ...peek && { peek: async key => answered(name, store, peek, [key], () => memory.peek(key)) },
+    // Taken back in memory too, where the attempt was counted if the store failed then; memory only takes it off a window closing at that same `resetAt`.
     ...refund && { refund: async (key, resetAt) => {
       memory.refund(key, resetAt)
 
-      return answered(name, store, async () => refund.call(store, key, resetAt), () => undefined)
+      return answered(name, store, refund, [key, resetAt], () => undefined)
     } },
   }
 }
 
-// What `store` answers, else what `fallback` does once the store throws, rejects, or takes longer than the store time limit, or while it is left alone; a store answering at once is not timed.
-function answered<Result>(name: string, store: RateStore, ask: () => Result | Promise<Result>, fallback: () => Result): Result | Promise<Result> {
-  if ((skipped.get(store) ?? 0) > Date.now())
+// What `store` answers through `method`, else what `fallback` does once the store throws, rejects, or takes longer than the store time limit, or while it is left alone; a store answering at once is not timed.
+function answered<Args extends unknown[], Result>(name: string, store: RateStore, method: (...args: Args) => Result | Promise<Result>, args: Args, fallback: () => Result): Result | Promise<Result> {
+  if (skipping && (skipped.get(store) ?? 0) > Date.now())
     return fallback()
 
   let answer: Result | Promise<Result>
 
   try {
-    answer = ask()
+    answer = method.apply(store, args)
   }
   catch (error) {
     return failed(name, store, error, fallback)
@@ -687,14 +684,19 @@ async function timed<Result>(name: string, store: RateStore, answer: Promise<Res
 }
 
 function recovered(name: string, store: RateStore): void {
-  failing.delete(name)
-  skipped.delete(store)
+  if (failing.size > 0)
+    failing.delete(name)
+
+  if (skipping)
+    skipped.delete(store)
 }
 
 function failed<Result>(name: string, store: RateStore, error: unknown, fallback: () => Result): Result {
   // A Postgres rates store is under the same limit already, and gives up first with a TimeoutError.
-  if (error instanceof RatesTimeout || error instanceof TimeoutError)
+  if (error instanceof RatesTimeout || error instanceof TimeoutError) {
+    skipping = true
     skipped.set(store, Date.now() + SKIP_MS)
+  }
 
   if (!failing.has(name)) {
     failing.add(name)

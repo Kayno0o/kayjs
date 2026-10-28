@@ -209,7 +209,10 @@ describe('a rates store that fails, given to a limit or the app\'s', () => {
     const seen = warnings('/_kay/action/gaps')
 
     try {
-      const tried = { url: '/_kay/action/gaps', protection: { rateLimit: { max: 1, window: '1m', store: brokenRates() } } } as never
+      const broken = { ...brokenRates(), refund: () => {
+        throw new Error('the database went away')
+      } }
+      const tried = { url: '/_kay/action/gaps', protection: { rateLimit: { max: 2, window: '1m', store: broken } } } as never
       const succeeded = { url: '/_kay/action/gaps-ok', protection: { rateLimit: { max: 1, window: '1m', count: 'succeeded', store: brokenRates() } } } as never
       const request = () => new Request('http://localhost/_kay/action/gaps', { method: 'POST' })
 
@@ -217,8 +220,11 @@ describe('a rates store that fails, given to a limit or the app\'s', () => {
 
       const refunded = request()
 
-      expect(await protectionRefusal(tried, refunded, refusalOptions)).toMatchObject({ status: 429 })
+      expect(await protectionRefusal(tried, refunded, refusalOptions)).toBeUndefined()
       await refundRateLimit(refunded)
+      // The refund took the second attempt back off the memory count, so a third fits.
+      expect(await protectionRefusal(tried, request(), refusalOptions)).toBeUndefined()
+      expect(await protectionRefusal(tried, request(), refusalOptions)).toMatchObject({ status: 429 })
 
       expect(await protectionRefusal(succeeded, request(), refusalOptions)).toBeUndefined()
       await countSucceeded(succeeded, request(), null)
@@ -282,6 +288,96 @@ describe('a rates store that fails, given to a limit or the app\'s', () => {
     finally {
       jest.useRealTimers()
       seen.restore()
+    }
+  })
+})
+
+describe('a rates store that answers', () => {
+  // A store keeping its windows on itself, so it answers only when called on itself.
+  class OwnRates {
+    readonly windows = new Map<string, number>()
+
+    hit = async function (this: OwnRates, key: string) {
+      const count = (this.windows.get(key) ?? 0) + 1
+
+      this.windows.set(key, count)
+
+      return { count, resetAt: Date.now() + 60_000 }
+    }
+
+    peek = async function (this: OwnRates, key: string) {
+      const count = this.windows.get(key)
+
+      return count === undefined ? undefined : { count, resetAt: Date.now() + 60_000 }
+    }
+
+    refund = async function (this: OwnRates, key: string) {
+      this.windows.set(key, (this.windows.get(key) ?? 1) - 1)
+    }
+  }
+
+  it('counts there, called on itself, with no memory fallback', async () => {
+    const seen = warnings('/_kay/action/gaps-answers')
+    const store = new OwnRates()
+
+    try {
+      const action = { url: '/_kay/action/gaps-answers', protection: { rateLimit: { max: 1, window: '1m', store } } } as never
+      const refunded = new Request('http://localhost/', { method: 'POST' })
+
+      expect(await protectionRefusal(action, refunded, refusalOptions)).toBeUndefined()
+      expect([...store.windows.values()]).toEqual([1])
+      await refundRateLimit(refunded)
+      expect([...store.windows.values()]).toEqual([0])
+      expect(await protectionRefusal(action, new Request('http://localhost/', { method: 'POST' }), refusalOptions)).toBeUndefined()
+      expect(await protectionRefusal(action, new Request('http://localhost/', { method: 'POST' }), refusalOptions)).toMatchObject({ status: 429 })
+      expect(seen.count()).toBe(0)
+    }
+    finally {
+      seen.restore()
+    }
+  })
+
+  it('is not timed when it answers at once', async () => {
+    const timers = spyOn(globalThis, 'setTimeout')
+
+    try {
+      const limiter = rateLimit('gaps-sync', { max: 5, window: '1m', store: memoryRates() })
+
+      expect(await limiter.hit('one')).toBeUndefined()
+      expect(timers.mock.calls.filter(call => call[1] === 8_000)).toHaveLength(0)
+
+      setupStore({ rates: memoryRates() })
+      expect(await overLimit('gaps-sync-app', '10.0.0.8', 5, 60_000)).toBeUndefined()
+      expect(timers.mock.calls.filter(call => call[1] === 8_000)).toHaveLength(0)
+    }
+    finally {
+      timers.mockRestore()
+    }
+  })
+
+  it('is left alone under every name once one timed out on it', async () => {
+    jest.useFakeTimers()
+
+    const log = spyOn(console, 'warn').mockReturnValue()
+    let calls = 0
+
+    try {
+      setupStore({ rates: { hit: async () => {
+        calls++
+
+        return new Promise<never>(Function.prototype as never)
+      } } })
+
+      const first = overLimit('gaps-skip-one', '10.0.0.9', 1, 60_000)
+
+      jest.advanceTimersByTime(8_000)
+      expect(await first).toBeUndefined()
+      expect(await overLimit('gaps-skip-two', '10.0.0.9', 1, 60_000)).toBeUndefined()
+      expect(calls).toBe(1)
+    }
+    finally {
+      jest.useRealTimers()
+      log.mockRestore()
     }
   })
 })
