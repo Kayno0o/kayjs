@@ -70,6 +70,7 @@ export const KAY_EXPORTS: Record<string, 'free' | 'request' | 'local'> = {
   queryParam: 'request',
   live: 'request',
   presence: 'request',
+  jobs: 'request',
   defer: 'request',
   guard: 'request',
   action: 'free',
