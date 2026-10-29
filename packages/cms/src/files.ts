@@ -340,7 +340,7 @@ export function forgejo({ baseUrl, repo, branch, token, timeout: wait = '15s', f
 }
 
 // The file's version once a commit was refused for naming another, or undefined when the forge cannot say.
-export async function conflictVersion(currentSha: () => Promise<string | undefined>): Promise<string | null | undefined> {
+async function conflictVersion(currentSha: () => Promise<string | undefined>): Promise<string | null | undefined> {
   try {
     return await currentSha() ?? null
   }

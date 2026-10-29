@@ -720,7 +720,7 @@ If you decline the question about edits not saved when Delete takes you to the c
 
 After a save the site shows only once it has rebuilt, the line by the buttons says `Not live yet` until the public page serves the change, then `Live now`.
 
-A commit shows on the site once it has rebuilt from it. The Forgejo or GitHub token needs write access to the repository's contents, and the commit is the token's user's.
+A commit shows on the site once it has rebuilt from it. The Forgejo or GitHub token needs write access to the repository's contents, and the commit is the token's user's, unless `author` names an editor, which `github()` records as both author and committer.
 
 A save or a delete made over another save is refused rather than writing over it. So is one made over your own save before the site rebuilt from it. The refusal stays on the form, names the fields both sides changed, and offers Take their version, which drops your edits for the saved copy. Its Keep my edits button lets the next save write your edits over that save.
 

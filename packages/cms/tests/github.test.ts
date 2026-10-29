@@ -249,12 +249,6 @@ describe('github', () => {
     expect(second.repo.files('main')).toEqual({ 'old.md': 'o', 'ref.md': 'changed' })
   })
 
-  test('gives up when the branch keeps moving, naming GitHub\'s refusal', async () => {
-    const { saver } = hub({}, { refuse: { method: 'PATCH', pattern: /refs/, response: Response.json({ message: 'Update is not a fast forward' }, { status: 422 }) } })
-
-    await expect(saver.save({ ...change, repoPath: 'a.md', text: 'a' })).rejects.toThrow('GitHub answered 422: Update is not a fast forward')
-  })
-
   test('throws what GitHub said when it refuses', async () => {
     const { saver } = hub({}, { refuse: { method: 'GET', pattern: /git\/ref\//, response: Response.json({ message: 'Bad credentials' }, { status: 401 }) } })
     const failure = saver.save({ ...change, repoPath: 'a.md', text: 'a' })
@@ -306,5 +300,40 @@ describe('github', () => {
     expect(make('http://ghe.example.com')).toThrow('kay: github baseUrl is \'http://ghe.example.com\'')
     expect(make('http://localhost:3000')).not.toThrow()
     expect(make('https://ghe.example.com/api/v3')).not.toThrow()
+  })
+})
+
+describe('github refusals of the ref update', () => {
+  test('retries a 409 not a fast forward, and reports a branch still moving as a conflict', async () => {
+    const { repo, saver } = hub({}, { refuse: { method: 'PATCH', pattern: /refs/, response: Response.json({ message: 'Update is not a fast forward' }, { status: 409 }) } })
+    const failure = await failureOf<SaveConflictError>(saver.save({ ...change, repoPath: 'a.md', text: 'a' }))
+
+    expect(failure).toBeInstanceOf(SaveConflictError)
+    expect(repo.sent.filter(({ method }) => method === 'PATCH')).toHaveLength(3)
+  })
+
+  test('does not retry a refusal that is not about the branch moving, such as a protected branch', async () => {
+    const { repo, saver } = hub({}, { refuse: { method: 'PATCH', pattern: /refs/, response: Response.json({ message: 'Protected branch update failed' }, { status: 422 }) } })
+    const failure = await failureOf<ForgeError>(saver.save({ ...change, repoPath: 'a.md', text: 'a' }))
+
+    expect(failure).toBeInstanceOf(ForgeError)
+    expect(failure.message).toBe('GitHub answered 422: Protected branch update failed')
+    expect(repo.sent.filter(({ method }) => method === 'PATCH')).toHaveLength(1)
+  })
+
+  test('does not say a save may have gone through when it fails reading again after a refused update', async () => {
+    let refs = 0
+    const base = hub({})
+    const flaky = github({ repo: 'me/site', branch: 'main', token: 't', fetch: (async (input: string, init?: RequestInit) => {
+      if (String(input).includes('/git/refs/'))
+        return Response.json({ message: 'Update is not a fast forward' }, { status: 422 })
+
+      if (String(input).includes('/git/ref/') && ++refs === 2)
+        throw Object.assign(new Error('reset'), { code: 'ECONNRESET' })
+
+      return base.request(input, init)
+    }) as unknown as typeof fetch })
+
+    await expect(flaky.save({ ...change, repoPath: 'a.md', text: 'a' })).rejects.toThrow(/^Could not reach GitHub \(ECONNRESET\)$/)
   })
 })

@@ -12,7 +12,7 @@ export interface GithubOptions {
   token: string
   // The REST API's address: `https://api.github.com` by default, `https://github.example.com/api/v3` for a GitHub Enterprise Server.
   baseUrl?: string | undefined
-  // How long a save may take, its requests to GitHub together, before it fails: `'15s'` by default. The extra read naming the file's version after a conflict has its own.
+  // How long a save may take, its requests to GitHub together, before it fails: `'15s'` by default.
   timeout?: Duration | undefined
   fetch?: typeof fetch | undefined
 }
@@ -25,6 +25,7 @@ interface TreeEntry {
   path: string
   mode: '100644'
   type: 'blob'
+  // Rewriting a file resets its mode, which content files never need changed.
   // null deletes the path; a path with `content` is written.
   sha?: null
   content?: string
@@ -32,6 +33,7 @@ interface TreeEntry {
 
 // A branch moving between reading its head and updating it is retried from the read, as the other save may have touched other files.
 const ATTEMPTS = 3
+const NOT_FAST_FORWARD = /fast.?forward/i
 
 function encodePath(path: string): string {
   return path.split('/').map(encodeURIComponent).join('/')
@@ -85,10 +87,11 @@ export function github({ repo, branch, token, baseUrl = 'https://api.github.com'
   }
 
   // Commits what `plan` reads at the branch's head and judges, undefined when it plans nothing; a head that moved meanwhile makes the whole read happen again, so a conflict is only ever reported for a file that changed.
-  async function commit(message: string, author: Identity | undefined, signal: AbortSignal, posting: () => void, plan: (head: string, signal: AbortSignal) => Promise<TreeEntry[] | undefined>): Promise<Commit | undefined> {
+  async function commit(message: string, author: Identity | undefined, signal: AbortSignal, posting: (made: boolean) => void, plan: (head: string, signal: AbortSignal) => Promise<TreeEntry[] | undefined>): Promise<Commit | undefined> {
     const name = await branchName(signal)
 
     for (let attempt = 1; ; attempt++) {
+      posting(false)
       const head = (await send<Ref>(`/git/ref/heads/${encodePath(name)}`, signal)).object.sha
       const planned = await plan(head, signal)
 
@@ -100,7 +103,7 @@ export function github({ repo, branch, token, baseUrl = 'https://api.github.com'
       const created = await send<{ sha: string, html_url?: string }>('/git/commits', signal, 'POST', { message, tree: made.sha, parents: [head], author })
 
       // Nothing is visible before the ref moves, so a failure until here leaves the repository as it was.
-      posting()
+      posting(true)
 
       const moved = await request(`${api}/git/refs/heads/${encodePath(name)}`, { method: 'PATCH', headers, signal, body: JSON.stringify({ sha: created.sha, force: false }) })
 
@@ -108,14 +111,18 @@ export function github({ repo, branch, token, baseUrl = 'https://api.github.com'
         return { sha: created.sha, url: created.html_url }
 
       // Not a fast forward: another save moved the branch, so the versions are read again from its new head.
-      if ((moved.status === 422 || moved.status === 409) && attempt < ATTEMPTS)
-        continue
+      if ((moved.status === 422 || moved.status === 409) && NOT_FAST_FORWARD.test(await moved.clone().text())) {
+        if (attempt < ATTEMPTS)
+          continue
+
+        throw new SaveConflictError()
+      }
 
       await answer(moved)
     }
   }
 
-  async function save({ repoPath, text, message, author, base }: FileChange, signal: AbortSignal, posting: () => void): Promise<Commit | undefined> {
+  async function save({ repoPath, text, message, author, base }: FileChange, signal: AbortSignal, posting: (made: boolean) => void): Promise<Commit | undefined> {
     return commit(message, author, signal, posting, async (head, planSignal) => {
       const version = await versionAt(head, repoPath, planSignal)
 
@@ -128,7 +135,7 @@ export function github({ repo, branch, token, baseUrl = 'https://api.github.com'
     })
   }
 
-  async function move({ from, to, text, message, author, base, also = [] }: FileMove, signal: AbortSignal, posting: () => void): Promise<Commit> {
+  async function move({ from, to, text, message, author, base, also = [] }: FileMove, signal: AbortSignal, posting: (made: boolean) => void): Promise<Commit> {
     const saved = await commit(message, author, signal, posting, async (head, planSignal) => {
       const [sha, taken, ...held] = await Promise.all([from.repoPath, to.repoPath, ...also.map(change => change.repoPath)].map(async path => versionAt(head, path, planSignal)))
 
@@ -159,11 +166,11 @@ export function github({ repo, branch, token, baseUrl = 'https://api.github.com'
   }
 
   // Turns what a request threw into the error a save reports; once the ref was being moved, GitHub may have moved it without its answer arriving.
-  async function guarded<T>(run: (signal: AbortSignal, posting: () => void) => Promise<T>): Promise<T> {
+  async function guarded<T>(run: (signal: AbortSignal, posting: (made: boolean) => void) => Promise<T>): Promise<T> {
     let posted = false
 
     try {
-      return await run(AbortSignal.timeout(timeout), () => posted = true)
+      return await run(AbortSignal.timeout(timeout), made => posted = made)
     }
     catch (error) {
       if (error instanceof SaveConflictError || error instanceof ForgeError)
