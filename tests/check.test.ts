@@ -3279,6 +3279,16 @@ describe('kay check, string fields an action leaves unbounded', () => {
     ])
   })
 
+  it('reads the last word of a field name, whatever its case', () => {
+    const named = (name: string) => fields(`export const add = action(t.Object({ ${name}: t.String() }), () => 1)`).length
+
+    for (const name of ['workEmail', 'first_name', 'postal_code', 'userEmail', 'contactName', 'NAME'])
+      expect(named(name), name).toBe(1)
+
+    for (const name of ['message', 'bio', 'description', 'nameless', 'tags'])
+      expect(named(name), name).toBe(0)
+  })
+
   it('leaves a string whose enum, const or anchored pattern without an unbounded quantifier already bounds it alone', () => {
     expect(fields('export const add = action(t.Object({ time: t.String({ pattern: \'^([01]?\\\\d|2[0-3]):[0-5]\\\\d$\' }), kind: t.String({ enum: [\'a\', \'b\'] }), fixed: t.String({ const: \'x\' }), code: t.String({ pattern: \'^[a-z]{2,8}$\' }), star: t.String({ pattern: \'^[*+]$\' }) }), () => 1)')).toEqual([])
   })

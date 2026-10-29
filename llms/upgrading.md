@@ -18,7 +18,7 @@ What each minor release breaks, and what an app changes to move to it. kay and i
 - `AI_PROVIDER=openai` without `OPENAI_API_KEY` throws unless `AI_BASE_URL` names a server. `kay check` cannot recognise either, as both depend on the environment, so there is no deprecated lint.
 ### A string field of an action is bounded to 10,000 characters
 
-- A string field of an action's schema, or an `s.String`, with no `maxLength` is now refused past 10,000 characters: declare a `maxLength` on a field that takes more, a long text or a pasted document say. `unbounded-string` is a warning now, so a `// kay-allow` or a level it was given stays valid.
+- A string field of an action's schema with no `maxLength` is now refused past 10,000 characters: declare a `maxLength` on a field that takes more, a long text or a pasted document say. `unbounded-string` is a warning now, so a `// kay-allow` or a level it was given stays valid.
 
 ### The `island-action` lint is gone
 

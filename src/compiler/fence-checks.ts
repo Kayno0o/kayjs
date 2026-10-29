@@ -146,8 +146,13 @@ function isBoundedByValue(property: NodeOfType<'Property'>): boolean {
   return key === 'pattern' && property.value.type === 'Literal' && typeof property.value.value === 'string' && isBoundedPattern(property.value.value)
 }
 
-// The fields that hold a short value whatever the app, which the default bound of 10,000 characters leaves far too long.
-const SHORT_FIELD = /^(?:(?:first|last|full|user|display|nick|company|project|team|file)?name|email|title|subject|label|slug|handle|login|phone|tel|city|country|zip|postcode|postalcode|code|sku|isbn|iban|siret|siren)$/i
+// The words ending the name of a field that holds a short value whatever the app, which the default bound of 10,000 characters leaves far too long: `email`, `firstName`, `postal_code`.
+const SHORT_WORDS = new Set(['name', 'email', 'title', 'subject', 'label', 'slug', 'handle', 'login', 'username', 'phone', 'tel', 'city', 'country', 'zip', 'postcode', 'code', 'sku', 'isbn', 'iban', 'siret', 'siren'])
+const FIELD_WORD = /[A-Z]?[a-z]+|[A-Z]+(?![a-z])/g
+
+function isShortField(field: string): boolean {
+  return SHORT_WORDS.has((field.match(FIELD_WORD) ?? []).at(-1)?.toLowerCase() ?? '')
+}
 
 // A string field of an action's schema that is a name, an email or a title, with no `maxLength` of its own, which takes the default bound of 10,000 characters: it likely needs a tighter one. Any other string field takes the default and is left alone, as is a secret.
 export function unboundedFields(server: ServerAnalysis | undefined): Diagnostic[] {
@@ -168,7 +173,7 @@ export function unboundedFields(server: ServerAnalysis | undefined): Diagnostic[
       const options = call.arguments[0]
       const known = options === undefined || (options.type === 'ObjectExpression' && options.properties.every(property => property.type !== 'SpreadElement'))
 
-      if (!known || (options?.type === 'ObjectExpression' && options.properties.some(property => property.type !== 'SpreadElement' && (propertyKey(property) === 'maxLength' || isBoundedByValue(property)))) || field === undefined || isSecret(field) || !SHORT_FIELD.test(field))
+      if (!known || (options?.type === 'ObjectExpression' && options.properties.some(property => property.type !== 'SpreadElement' && (propertyKey(property) === 'maxLength' || isBoundedByValue(property)))) || field === undefined || isSecret(field) || !isShortField(field))
         return
 
       const edit = maxLengthEdit(call, options)

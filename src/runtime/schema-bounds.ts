@@ -1,35 +1,47 @@
 import type { TSchema } from 'elysia'
 import { isSecret } from './form'
 
-// The longest a string field takes when its schema declares no bound of its own: room for a long message, under the request body limit.
+// The longest a string field of an action takes when its schema declares no bound of its own: room for a long message, under the request body limit.
 export const DEFAULT_MAX_LENGTH = 10_000
 
 const WRAPPERS = ['anyOf', 'oneOf', 'allOf'] as const
+const NESTED = ['items', 'additionalProperties', 'not'] as const
 
-// A copy of an action's schema in which every string field with no `maxLength`, `enum` or `const` of its own takes `DEFAULT_MAX_LENGTH`, as `s.String` does, so a schema written with Elysia's `t` is bounded too. A secret, which is checked or hashed rather than kept, is left alone.
+function isSchema(value: unknown): value is TSchema {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
+function bounded(value: unknown, field: string | undefined): unknown {
+  return isSchema(value) ? withDefaultBounds(value, field) : value
+}
+
+// A copy of an action's schema in which every string field with no `maxLength`, `enum` or `const` of its own takes `DEFAULT_MAX_LENGTH`, so a schema written with Elysia's `t` is bounded too and the server, the form's `maxlength` and the tool's schema read one bound. A field named like a secret, which is checked or hashed rather than kept, is left alone.
 export function withDefaultBounds<Schema extends TSchema>(schema: Schema, field?: string): Schema {
   const node = schema as Record<string, unknown>
-
-  if (typeof node !== 'object' || node === null)
-    return schema
-
-  const copy: Record<PropertyKey, unknown> = { ...node }
 
   if (node.type === 'string' && field !== undefined && isSecret(field))
     return schema
 
-  if (node.type === 'string' && !('maxLength' in node) && !('enum' in node) && !('const' in node) && node.secret !== true)
+  const copy: Record<PropertyKey, unknown> = { ...node }
+
+  if (node.type === 'string' && node.maxLength === undefined && !('enum' in node) && !('const' in node))
     copy.maxLength = DEFAULT_MAX_LENGTH
 
-  if (typeof node.properties === 'object' && node.properties !== null)
-    copy.properties = Object.fromEntries(Object.entries(node.properties).map(([key, value]) => [key, withDefaultBounds(value as TSchema, key)]))
+  for (const keyword of ['properties', 'patternProperties'] as const) {
+    const members = node[keyword]
 
-  if (typeof node.items === 'object' && node.items !== null)
-    copy.items = withDefaultBounds(node.items as TSchema, field)
+    if (isSchema(members))
+      copy[keyword] = Object.fromEntries(Object.entries(members).map(([key, value]) => [key, bounded(value, keyword === 'properties' ? key : field)]))
+  }
 
-  for (const wrapper of WRAPPERS) {
-    if (Array.isArray(node[wrapper]))
-      copy[wrapper] = (node[wrapper] as TSchema[]).map(inner => withDefaultBounds(inner, field))
+  for (const keyword of NESTED) {
+    if (isSchema(node[keyword]))
+      copy[keyword] = bounded(node[keyword], field)
+  }
+
+  for (const keyword of [...WRAPPERS, 'items', 'prefixItems'] as const) {
+    if (Array.isArray(node[keyword]))
+      copy[keyword] = (node[keyword] as unknown[]).map(inner => bounded(inner, field))
   }
 
   return copy as Schema
