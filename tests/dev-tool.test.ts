@@ -12,6 +12,7 @@ import { PUBLIC_ENV } from '../src/runtime/env'
 import { reportError } from '../src/runtime/reactive'
 import { ISLAND_PARAM } from '../src/runtime/server-islands'
 import { DEV_BOOT, liveReload, problemsBlock } from '../src/server/dev'
+import { loadTab } from './helpers/dev-tabs'
 import { eventually, turn } from './helpers/eventually'
 import { scratchDir } from './scratch'
 import { pages } from './shared-pages'
@@ -105,7 +106,7 @@ describe('the dev tool', () => {
     document.head.innerHTML = problemsBlock([check])
     console.error('[kay] island a.kay did not match its server markup')
     console.warn('not kay')
-    tool = startDevTool()
+    tool = startDevTool(document, loadTab)
     console.warn('[kay] the persisted signal note could not be kept')
     console.warn('[kay] the persisted signal note could not be kept')
     await turn()
@@ -122,7 +123,7 @@ describe('the dev tool', () => {
     const mistyped = 'error[TS2322]: Type \'string\' is not assignable to type \'number\'.\n --> src/routes/index.kay:2:7'
 
     document.head.innerHTML = problemsBlock(['warning[missing-title]: a page needs a title']) + problemsBlock([mistyped], 'kay-type-problems')
-    tool = startDevTool()
+    tool = startDevTool(document, loadTab)
     await turn()
 
     expect(problems()).toEqual([['warn', 'warning[missing-title]: a page needs a title'], ['error', mistyped]])
@@ -145,7 +146,7 @@ describe('the dev tool', () => {
     document.head.innerHTML = problemsBlock(['error[missing-alt]: An `img` needs `alt`\n --> src/routes/index.kay:3:5'])
     console.error('[kay] island a.kay did not match its server markup')
     console.warn('[kay] a note to dismiss')
-    tool = startDevTool()
+    tool = startDevTool(document, loadTab)
     console.error('[kay] island a.kay did not match its server markup')
     await turn()
     ;[...shadow().querySelectorAll<HTMLElement>('.problem')].find(problem => problem.textContent?.includes('a note to dismiss'))!.querySelector<HTMLButtonElement>('button')!.click()
@@ -185,7 +186,7 @@ describe('the dev tool', () => {
     const rows = () => [...shadow().querySelectorAll('#kay-dev-network .fetch')].filter(row => row.closest('[hidden]') === null).map(row => [row.querySelector('.name')!.textContent, row.querySelector('.line .pill')?.textContent ?? '', row.querySelector('.chips')!.textContent].join(' | '))
 
     try {
-      tool = startDevTool()
+      tool = startDevTool(document, loadTab)
       shadow().querySelector<HTMLButtonElement>('#kay-dev-tab-network')!.click()
       observed.report('resource', [
         at('/_kay/entry-abc12345.js', { initiatorType: 'script', startTime: 5 }),
@@ -302,7 +303,7 @@ describe('the dev tool', () => {
     }
 
     try {
-      tool = startDevTool()
+      tool = startDevTool(document, loadTab)
       shadow().querySelector<HTMLButtonElement>('#kay-dev-tab-network')!.click()
 
       // The live reload's fetch of the page is hidden by what the server answered it with, the app's own fetch of the same address started in the same instant is listed.
@@ -402,7 +403,7 @@ describe('the dev tool', () => {
   })
 
   it('lists its tabs in a vertical rail that moves by Up and Down, and keeps the size it was given for the browser', async () => {
-    tool = startDevTool()
+    tool = startDevTool(document, loadTab)
     tool.tab({ id: 'other', label: 'Other' })
     await turn()
 
@@ -427,7 +428,7 @@ describe('the dev tool', () => {
     expect(icons()[5]).toEqual(['Restore the size', 'Restore the size', ''])
     tool.stop()
 
-    tool = startDevTool()
+    tool = startDevTool(document, loadTab)
     await turn()
 
     expect(shadow().querySelector('.ui.max')).not.toBeNull()
@@ -436,7 +437,7 @@ describe('the dev tool', () => {
   })
 
   it('opens on the bar or Alt+Shift+K, moves between tabs by arrow keys, closes on Escape from inside it, and keeps its tab for the browser tab and its dock for the browser', async () => {
-    tool = startDevTool()
+    tool = startDevTool(document, loadTab)
     tool.tab({ id: 'other', label: 'Other' })
     await turn()
 
@@ -472,7 +473,7 @@ describe('the dev tool', () => {
     tool.stop()
     sessionStorage.clear()
 
-    tool = startDevTool()
+    tool = startDevTool(document, loadTab)
     await turn()
 
     expect(drawer().hidden).toBe(true)
@@ -485,7 +486,7 @@ describe('the dev tool', () => {
 
     for (const [corner, expected] of [['bottom-left', ['--kay-dev-bar-bottom-left']], ['bottom-right', ['--kay-dev-bar-bottom-right']], ['top-left', []], ['top-right', []]] as [string, string[]][]) {
       localStorage.setItem('kay-dev-layout', JSON.stringify({ dock: 'float', corner }))
-      tool = startDevTool()
+      tool = startDevTool(document, loadTab)
       await turn()
       expect(published()).toEqual(expected)
       tool.stop()
@@ -497,7 +498,7 @@ describe('the dev tool', () => {
     const measured = spyOn(Element.prototype, 'getBoundingClientRect').mockReturnValue({ height: 40 } as DOMRect)
 
     try {
-      tool = startDevTool()
+      tool = startDevTool(document, loadTab)
       await turn()
       expect([...document.adoptedStyleSheets].flatMap(sheet => [...sheet.cssRules].map(rule => rule.cssText)).join(' ')).toContain('--kay-dev-bar-bottom-left: 52px')
     }
@@ -513,7 +514,7 @@ describe('the dev tool', () => {
     const dockTo = (label: string) => shadow().querySelector<HTMLButtonElement>(`.icon[aria-label="${label}"]`)!.click()
 
     localStorage.setItem('kay-dev-layout', '{"dock":"sideways","corner":"middle","box":{"left":"x"},"bottom":"tall"}')
-    tool = startDevTool()
+    tool = startDevTool(document, loadTab)
     await turn()
 
     // A floating drawer resizes from every edge and corner, the keyboard reaching its bottom right corner.
@@ -551,7 +552,7 @@ describe('the dev tool', () => {
 
     // A layout stored as no object at all.
     localStorage.setItem('kay-dev-layout', 'null')
-    tool = startDevTool()
+    tool = startDevTool(document, loadTab)
     await turn()
     expect(shadow().querySelector('.ui.floating')).not.toBeNull()
   })
@@ -570,7 +571,7 @@ describe('the dev tool', () => {
     }) as unknown as typeof window.fetch)
     const push = (error: Error) => (window as unknown as { $kayProblems: { push: (problem: unknown) => void } }).$kayProblems.push({ level: 'error', kind: 'uncaught', text: `Uncaught ${error.message}`, error })
 
-    tool = startDevTool()
+    tool = startDevTool(document, loadTab)
     push(Object.assign(new TypeError('count is undefined'), { stack }))
     await eventually(() => expect(problems()).toEqual([['error', mapped]]))
 
@@ -586,7 +587,7 @@ describe('the dev tool', () => {
 
   it('dismisses the problems shown for the rest of the browser tab, drops what the page logged as a swap starts, and reads what kay check finds again as it ends', async () => {
     document.head.innerHTML = problemsBlock(['warning[missing-title]: a page needs a title'])
-    tool = startDevTool()
+    tool = startDevTool(document, loadTab)
     console.warn('[kay] first')
     await turn()
 
@@ -601,7 +602,7 @@ describe('the dev tool', () => {
 
     tool.stop()
     document.head.innerHTML = problemsBlock(['warning[missing-title]: a page needs a title', 'warning[missing-alt]: an img needs alt'])
-    tool = startDevTool()
+    tool = startDevTool(document, loadTab)
     console.warn('[kay] on this page')
     await turn()
     expect(problems()).toEqual([['warn', 'on this page'], ['warn', 'warning[missing-alt]: an img needs alt']])
@@ -624,7 +625,7 @@ describe('the dev tool', () => {
   })
 
   it('lists what nothing caught and what the policy blocked, each under its heading, and dismisses one problem alone', async () => {
-    tool = startDevTool()
+    tool = startDevTool(document, loadTab)
     window.dispatchEvent(new ErrorEvent('error', { message: 'boom', error: Object.assign(new Error('boom'), { stack: 'Error: boom\n    at click (/_kay/client/a.js:1:2)' }) }))
 
     const rejected = new Event('unhandledrejection')
@@ -650,7 +651,7 @@ describe('the dev tool', () => {
   })
 
   it('lists an error kay caught in an island, heads a stack that lacks them with its name and message, and leaves out a resize observer note', async () => {
-    tool = startDevTool()
+    tool = startDevTool(document, loadTab)
 
     const thrown = Object.assign(new TypeError('no count'), { stack: 'counted@http://localhost/_kay/client/a.js:1:2' })
     const rejected = new Event('unhandledrejection')
@@ -675,7 +676,7 @@ describe('the dev tool', () => {
 
   it('outlines the elements an accessibility problem names on hover', async () => {
     document.body.innerHTML = '<img class="hero" src="/a.png"><img class="hero" src="/b.png">'
-    tool = startDevTool()
+    tool = startDevTool(document, loadTab)
     console.warn('[kay] a11y image-alt: Images must have alternative text\n  img.hero\n  #in >>> img\n  and 3 more\nhttps://dequeuniversity.com/rules/axe/4.14/image-alt')
     await turn()
 
@@ -691,7 +692,7 @@ describe('the dev tool', () => {
   })
 
   it('finds the .kay files a problem names by kay\'s route names, with a line alone, and none inside a URL', async () => {
-    tool = startDevTool()
+    tool = startDevTool(document, loadTab)
     console.error('[kay] src/routes/todos/[id].kay:3:4, src/routes/(site)/[[page]].kay:12, src/routes/[...rest].kay and http://localhost:3000/src/x.kay')
     await turn()
 
@@ -699,7 +700,7 @@ describe('the dev tool', () => {
   })
 
   it('finds the scripts and stylesheets a problem names by a folder or a line, but no word like Node.js, URL path or URL of kay\'s own', async () => {
-    tool = startDevTool()
+    tool = startDevTool(document, loadTab)
     console.error('[kay] at load (src/lib/db.ts:12:5), C:\\app\\src\\x.tsx:3, styles.css:4, src/app.css, Node.js, /_kay/entry-1.js:2:1, https://cdn.example/x.js:1:1, GET /assets/app.js 404, /home/me/app/src/y.ts:3:5 and lib.mjs')
     await turn()
 
@@ -709,7 +710,7 @@ describe('the dev tool', () => {
   it('opens each .kay file a problem names once an opener is set, saying why it could not', async () => {
     const opened: string[] = []
 
-    tool = startDevTool()
+    tool = startDevTool(document, loadTab)
     console.error('[kay] island src/components/card.kay did not match, see src/routes/index.kay:4:3.')
     console.error('[kay] line alone in src/routes/about.kay:7')
     await turn()
@@ -740,7 +741,7 @@ describe('the dev tool', () => {
 
     document.body.innerHTML = '<button type="button" data-kay-open="src/stock.ts:4:11">src/stock.ts:4:11</button><button type="button" data-kay-copy="kay-error-text">Copy</button><pre id="kay-error-text" hidden>Error: no stock</pre>'
     Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: async (copy: string) => void copied.push(copy) } })
-    tool = startDevTool()
+    tool = startDevTool(document, loadTab)
     tool.setOpener(async (source) => {
       opened.push(source)
 
@@ -761,7 +762,7 @@ describe('the dev tool', () => {
   })
 
   it('says nothing on the bar of a rebuild, and keeps no state of one for the page', async () => {
-    tool = startDevTool()
+    tool = startDevTool(document, loadTab)
     window.dispatchEvent(new CustomEvent('kay-dev-built', { detail: JSON.stringify({ changed: 'src/routes/index.kay', ms: 58 }) }))
 
     expect(shadow().querySelector('.built')).toBeNull()
@@ -770,7 +771,7 @@ describe('the dev tool', () => {
   })
 
   it('gives a tab its icon, the default one when it names none, and tones its count', () => {
-    tool = startDevTool()
+    tool = startDevTool(document, loadTab)
 
     const plain = tool.tab({ id: 'plain', label: 'Plain', summary: count => `${count} plain` })
     const named = tool.tab({ id: 'named', label: 'Named', icon: 'mail', summary: count => `${count} named` })
@@ -801,7 +802,7 @@ describe('the dev tool', () => {
     const { href } = location
 
     happyDOM.setURL('http://localhost/docs?page=2')
-    tool = startDevTool()
+    tool = startDevTool(document, loadTab)
 
     try {
       expect(shadow().querySelector('.head .where')!.textContent).toBe('/docs?page=2')
@@ -850,7 +851,7 @@ describe('the dev tool', () => {
     }) as unknown as typeof window.fetch)
 
     document.head.append(block({ route: '/items/:id', page: 'src/routes/items/[id].kay', layouts: ['src/routes/_layout.kay'], params: { id: '7' }, id: 'abc', guards: [{ file: 'src/routes/_guard.ts', outcome: 'passed' }, { file: 'src/routes/items/_guard.ts', outcome: 'passed' }], prerender: 'listed', locale: 'fr', status: 200, loads: [{ file: 'src/routes/_layout.kay', ms: 1.5 }, { file: 'src/routes/items/[id].kay', ms: 42.4 }] }))
-    tool = startDevTool()
+    tool = startDevTool(document, loadTab)
     shadow().querySelector<HTMLButtonElement>('#kay-dev-tab-request')!.click()
     await eventually(() => expect(line()).toEqual(['GET', `${location.pathname}${location.search}`, '200', '51 ms on the server']))
 
@@ -955,13 +956,13 @@ describe('the dev tool', () => {
     const count = () => shadow().querySelector('#kay-dev-tab-i18n .count')?.textContent
 
     document.head.append(block({ ...PAGE, locale: 'en' }))
-    tool = startDevTool()
+    tool = startDevTool(document, loadTab)
     expect(panel()).toBeNull()
     tool.stop()
 
     console.error('[kay] no locale has the message "nav.home"; production shows the key itself')
     document.head.replaceChildren(block({ ...PAGE, locale: 'en', locales: [{ locale: 'en', href: '/docs/about' }, { locale: 'fr', href: '/docs/fr/a-propos' }] }))
-    tool = startDevTool()
+    tool = startDevTool(document, loadTab)
     expect(links()).toEqual(['en current', 'fr /docs/fr/a-propos'])
     expect(panel()!.textContent).toContain('nav.home')
     expect(count()).toBe('1')
@@ -1009,7 +1010,7 @@ describe('the dev tool', () => {
     const sections = () => [...shadow().querySelectorAll('#kay-dev-routes-under-test .group')].filter(group => (group as HTMLElement).hidden === false).map(group => `${group.querySelector(':scope > .heading')!.firstChild!.textContent} (${group.querySelector(':scope > .heading .pill')!.textContent})`)
 
     try {
-      tool = startDevTool()
+      tool = startDevTool(document, loadTab)
 
       // The tab's module run on a tab of its own, as the tool runs it on first open.
       let refresh = () => undefined as void
@@ -1075,7 +1076,7 @@ describe('the dev tool', () => {
     const rows = () => [...shadow().querySelectorAll('#kay-dev-not-found .missing')].map(row => [row.querySelector('.name')!.textContent, row.querySelector('.pill')!.textContent, row.querySelector('.chips')?.textContent ?? '', row.querySelector('input')!.value, row.querySelector('.body > .note')!.textContent].join(' | '))
 
     try {
-      tool = startDevTool()
+      tool = startDevTool(document, loadTab)
       shadow().querySelector<HTMLButtonElement>('#kay-dev-tab-not-found')!.click()
       await eventually(() => expect(rows()).toEqual(['/old | 3 hits | from a.example | /new | Suggested target (slug): /new', '/other | 1 hit |  |  | No target suggested: name one to redirect.']))
 
@@ -1133,7 +1134,7 @@ describe('the dev tool', () => {
     const text = (selector: string) => [...panel().querySelectorAll(selector)].map(element => element.textContent)
 
     try {
-      tool = startDevTool()
+      tool = startDevTool(document, loadTab)
 
       // The count is there before the tab is opened, and opening it reads again.
       await eventually(() => expect(shadow().querySelector<HTMLElement>('#kay-dev-tab-head .count')!.textContent).toBe('1'))
@@ -1230,7 +1231,7 @@ describe('the dev tool', () => {
     const panel = () => shadow().querySelector('#kay-dev-head')!
 
     try {
-      tool = startDevTool()
+      tool = startDevTool(document, loadTab)
       shadow().querySelector<HTMLButtonElement>('#kay-dev-tab-head')!.click()
 
       // Both asks are held back until the swap has asked again.
@@ -1289,7 +1290,8 @@ describe('the dev tool', () => {
 
     try {
       happyDOM.setURL('http://localhost/')
-      tool = startDevTool()
+      tool = startDevTool(document, loadTab)
+      await turn()
       asked.length = 0
       shadow().querySelector<HTMLButtonElement>('#kay-dev-tab-env')!.click()
       await eventually(() => expect(rows()).toHaveLength(8))
@@ -1400,7 +1402,8 @@ describe('the dev tool', () => {
     const rows = () => [...shadow().querySelectorAll('#kay-dev-images .image')].map(row => [`${row.querySelector('.name')!.textContent}${row.querySelector('.line .pill') === null ? '' : ' (largest paint)'}`, [...row.querySelectorAll('.chip')].map(chip => chip.textContent).join(' - '), ...[...row.querySelectorAll('.issue')].map(flag => flag.textContent)].join(' | '))
 
     try {
-      tool = startDevTool()
+      tool = startDevTool(document, loadTab)
+      await turn()
       asked.length = 0
       signals.length = 0
       observed.report('largest-contentful-paint', [{ startTime: 900, renderTime: 900, element: document.getElementById('hero')! }])
@@ -1488,7 +1491,7 @@ describe('the dev tool', () => {
     const flags = () => [...shadow().querySelectorAll('#kay-dev-images .image')].map(row => [row.querySelector('.line')?.textContent, ...[...row.querySelectorAll('.issue')].map(flag => flag.textContent)].join(' | '))
 
     try {
-      tool = startDevTool()
+      tool = startDevTool(document, loadTab)
       shadow().querySelector<HTMLButtonElement>('#kay-dev-tab-images')!.click()
       await eventually(() => expect(flags()).toEqual([
         '/_kay/assets/logo.svg | no width and height, so the page shifts as it loads',
@@ -1559,7 +1562,7 @@ describe('the dev tool', () => {
     const visible = () => [...shadow().querySelectorAll<HTMLElement>('.outline')].filter(outline => outline.hidden === false).length
 
     try {
-      tool = startDevTool()
+      tool = startDevTool(document, loadTab)
       shadow().querySelector<HTMLButtonElement>('#kay-dev-tab-images')!.click()
       await eventually(() => expect(rows()).toEqual([
         '/logo.svg4 copies | not resized by kay - format not looked up - 150x150 drawn 16x16 at 1.2x | lazy-loaded but in view, which delays it',
@@ -1602,7 +1605,7 @@ describe('the dev tool', () => {
     const fetching = spyOn(window, 'fetch').mockImplementation((async (_url: string, init: RequestInit) => new Promise((_, reject) => init.signal?.addEventListener('abort', () => reject(new Error('timeout'))))) as unknown as typeof window.fetch)
 
     try {
-      tool = startDevTool()
+      tool = startDevTool(document, loadTab)
       fetching.mockClear()
       observed.report('largest-contentful-paint', [])
       shadow().querySelector<HTMLButtonElement>('#kay-dev-tab-images')!.click()
@@ -1691,7 +1694,7 @@ describe('the dev tool', () => {
     }
 
     try {
-      tool = startDevTool()
+      tool = startDevTool(document, loadTab)
       observed.report('largest-contentful-paint', [{ startTime: 3000, renderTime: 3000, element: null }])
       observed.report('layout-shift', [{ startTime: 100, value: 0.04, hadRecentInput: false }, { startTime: 400, value: 0.08, hadRecentInput: false }, { startTime: 450, value: 0.5, hadRecentInput: true }, { startTime: 9000, value: 0.01, hadRecentInput: false }])
       shadow().querySelector<HTMLButtonElement>('#kay-dev-tab-performance')!.click()

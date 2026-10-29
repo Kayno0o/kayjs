@@ -1,8 +1,8 @@
-import type { ReadingItem } from '../src/runtime/dev-tool'
+import type { ReadingItem } from '../src/runtime/dev-tab-reading'
 import type { TestPage, TestSite } from '../src/test'
 import process from 'node:process'
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'bun:test'
-import { readingFlags } from '../src/runtime/dev-tool'
+import { readingFlags } from '../src/runtime/dev-tab-reading'
 import { browserPath, testSite } from '../src/test'
 
 const path = browserPath()

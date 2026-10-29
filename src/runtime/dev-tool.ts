@@ -1,7 +1,6 @@
-import type { DevHead, DevRequest, DevResponse } from '../server/dev'
+import type { DevRequest, DevResponse } from '../server/dev'
 // Loaded by every page a dev server serves: a bar in a corner of the page opens a drawer whose tabs show what kay knows of the page, its problems first; under `kay dev` the inspector adds its own tab and buttons.
 // It runs in the browser from its own route, so it imports types only; its elements live in a shadow root on the root element, which a page swap keeps, styled by an adopted stylesheet, which a policy without inline styles allows.
-import type { DevNotFound } from '../server/dev-not-found'
 import type { DevProblem, DevProblems } from './dev-boot'
 
 const HOST = 'kay-dev'
@@ -12,19 +11,19 @@ const CHECK_PROBLEMS = 'kay-check-problems'
 const TYPE_PROBLEMS = 'kay-type-problems'
 const TYPES_EVENT = 'kay-dev-types'
 const REQUEST = 'kay-dev-request'
-const HEAD_URL = '/_kay/dev/head'
-const ENV_URL = '/_kay/env.js'
-const MODULE_START = 'export default '
 const HEAD_HEADER = 'x-kay-dev'
 const REQUEST_URL = '/_kay/dev/request'
 const SIZES_URL = '/_kay/dev/sizes'
 const FOOTPRINT_URL = '/_kay/dev/footprint'
-const NOT_FOUND_URL = '/_kay/dev/not-found'
 const STACK_URL = '/_kay/dev/stack'
 const DATA_TAB_URL = '/_kay/dev/tab/data.js'
 const JOBS_TAB_URL = '/_kay/dev/tab/jobs.js'
 const STYLES_TAB_URL = '/_kay/dev/tab/styles.js'
 const ROUTES_TAB_URL = '/_kay/dev/tab/routes.js'
+const HEAD_TAB_URL = '/_kay/dev/tab/head.js'
+const READING_TAB_URL = '/_kay/dev/tab/reading.js'
+const ENV_TAB_URL = '/_kay/dev/tab/env.js'
+const NOT_FOUND_TAB_URL = '/_kay/dev/tab/not-found.js'
 // A stack frame in a chunk of the browser build, which the server can point at its `.kay` line.
 const CHUNK_FRAME = /\/_kay\/[\w.-]+\.js:\d+:\d+/
 // The navigations the Network tab keeps: the page's load, then each swap.
@@ -63,8 +62,6 @@ const SOURCE_EXTENSION = String.raw`(?:[cm]?[jt]sx?|css)`
 // A source file a problem names, with its line and column when it gives them, not one inside a URL nor a URL of kay's own: a `.kay` file named alone, a script or stylesheet once a folder or a line tells it from a word like Node.js, and an absolute one, as a URL path reads, only with a line, as a stack trace gives.
 const SOURCE_POSITION = new RegExp(String.raw`(?<![\w@.+=:/\\)\]-])(?![\\/]_kay[\\/])(?:(?:[A-Za-z]:)?[\\/]?(?:${SEGMENT}[\\/])*${SEGMENT}\.kay|(?:${SEGMENT}[\\/])+${SEGMENT}\.${SOURCE_EXTENSION}|(?:[A-Za-z]:)?[\\/]?(?:${SEGMENT}[\\/])*${SEGMENT}\.${SOURCE_EXTENSION}(?=:\d))(?::\d+(?::\d+)?)?(?!\.?\w)`, 'g')
 const OPENED_POSITION = /^(.+\.\w+)(?::(\d+))?(?::(\d+))?$/
-// A value the Head tab gives a copy button, as a link.
-const WEB_URL = /^https?:\/\//i
 // An entry of the `Server-Timing` header kay sends, one of its phases rather than a single load.
 const SERVER_PHASE = /(?:^|,)\s*(guards|import|loads|render)(?:;[^,;]*)*?;dur=(\d+(?:\.\d+)?)/g
 
@@ -498,13 +495,6 @@ function filterable<T extends HTMLElement>(element: T, text: string, problem = f
   return element
 }
 
-// A section the "Problems only" toggle hides, as it lists no problem.
-function plain<T extends HTMLElement>(element: T): T {
-  element.dataset.plain = ''
-
-  return element
-}
-
 // An icon button copying `text`, saying for a moment whether it could.
 function copyButton(tool: DevTool, what: string, text: string): HTMLButtonElement {
   const button = tool.make('button', 'copy')
@@ -695,6 +685,8 @@ export interface DevKit {
   copyButton: (what: string, text: string) => HTMLButtonElement
   positionButton: (source: string) => HTMLButtonElement
   ownFetch: typeof ownFetch
+  withPositions: (text: string) => Node[]
+  walkComposed: typeof walkComposed
 }
 
 export interface DevTool {
@@ -751,7 +743,9 @@ export async function loadDevModules(tool: DevTool, modules: DevToolModule[], lo
   }
 }
 
-export function startDevTool(doc: Document = document): DevTool {
+const importTab: LoadTab = async url => await import(url) as { default: DevTabModule }
+
+export function startDevTool(doc: Document = document, load: LoadTab = importTab): DevTool {
   const win = doc.defaultView! as Window & { $kayProblems?: DevProblems }
   const state = readState(win)
   const layout = readLayout(win)
@@ -1272,6 +1266,8 @@ export function startDevTool(doc: Document = document): DevTool {
       copyButton: (what, text) => copyButton(tool, what, text),
       positionButton: source => positionButton(tool, source),
       ownFetch,
+      withPositions: text => withPositions(text, tool),
+      walkComposed,
     },
     outline,
     hideOutline,
@@ -1299,19 +1295,19 @@ export function startDevTool(doc: Document = document): DevTool {
   problems = problemsTab(doc, tool, state, save, missing)
   request = requestTab(doc, tool)
   networkTab(doc, tool, listening.signal)
-  headTab(doc, tool, listening.signal)
-  readingTab(doc, tool, listening.signal)
-  envTab(doc, tool, listening.signal)
+  lazyTab(tool, { id: 'head', label: 'Head', icon: 'scan-search' }, HEAD_TAB_URL, load, true)
+  lazyTab(tool, { id: 'screen-reader', label: 'Screen reader', icon: 'ear', hidden: () => tool.hideOutline() }, READING_TAB_URL, load, true)
+  lazyTab(tool, { id: 'env', label: 'Env', icon: 'key-round' }, ENV_TAB_URL, load, true)
   const vitals = watchVitals(doc.defaultView!, listening.signal)
 
   imagesTab(doc, tool, vitals, listening.signal)
   performanceTab(doc, tool, vitals, listening.signal)
-  lazyTab(tool, { id: 'routes', label: 'Routes', icon: 'route' }, ROUTES_TAB_URL)
+  lazyTab(tool, { id: 'routes', label: 'Routes', icon: 'route' }, ROUTES_TAB_URL, load)
   i18nTab(doc, tool, missing, listening.signal)
-  notFoundTab(doc, tool, listening.signal)
-  lazyTab(tool, { id: 'data', label: 'Data', icon: 'database' }, DATA_TAB_URL)
-  lazyTab(tool, { id: 'jobs', label: 'Jobs', icon: 'list-checks' }, JOBS_TAB_URL)
-  lazyTab(tool, { id: 'styles', label: 'Styles', icon: 'palette' }, STYLES_TAB_URL)
+  lazyTab(tool, { id: 'not-found', label: 'Not found', icon: 'circle-x' }, NOT_FOUND_TAB_URL, load, true)
+  lazyTab(tool, { id: 'data', label: 'Data', icon: 'database' }, DATA_TAB_URL, load)
+  lazyTab(tool, { id: 'jobs', label: 'Jobs', icon: 'list-checks' }, JOBS_TAB_URL, load)
+  lazyTab(tool, { id: 'styles', label: 'Styles', icon: 'palette' }, STYLES_TAB_URL, load)
   doc.addEventListener('click', (event) => {
     const target = event.target instanceof Element ? event.target.closest<HTMLButtonElement>('button[data-kay-open],button[data-kay-copy]') : null
 
@@ -2052,396 +2048,6 @@ function fetchRow(tool: DevTool, fetched: PerformanceResourceTiming, start: numb
   const after = [...status === 0 ? [] : [pill(tool, String(status), status >= 400 ? 'error' : 'ok')], copyButton(tool, 'the address', fetched.name)]
 
   return filterable(entry(tool, 'fetch', { name, after, chips }), `${name} ${kind} ${status}`, status >= 400)
-}
-
-// What a search result shows of a title before cutting it.
-const TITLE_LENGTH = 60
-
-// A length against the limit search results cut at, the bar full and amber once past it; the length alone when the limit is not known.
-function meter(tool: DevTool, length: number, limit?: number): HTMLElement {
-  const over = limit !== undefined && length > limit
-  const element = tool.make('span', over ? 'meter over' : 'meter')
-  const track = tool.make('span', 'track')
-
-  if (limit === undefined) {
-    element.append(tool.make('span', 'n', `${length} characters`))
-
-    return element
-  }
-
-  const fill = tool.make('i')
-
-  fill.style.width = `${Math.min(100, length / limit * 100)}%`
-  track.append(fill)
-  element.append(track, tool.make('span', 'n', `${length} / ${limit}${over ? ', cut in results' : ''}`))
-
-  return element
-}
-
-// A JSON-LD block named by its type and what it is about, as `BlogPosting · Bonjour kay`.
-function ldSummary(data: unknown): string {
-  const first = (Array.isArray(data) ? data[0] : data) as { '@type'?: unknown, 'headline'?: unknown, 'name'?: unknown } | null
-  const type = Array.isArray(first?.['@type']) ? (first['@type'] as unknown[]).join(', ') : first?.['@type']
-  const about = first?.headline ?? first?.name
-
-  return [type, about].filter((part): part is string => typeof part === 'string' && part !== '').join(' · ') || 'JSON-LD block'
-}
-
-// A tag of the page's head, by its `name` or `property`.
-function metaContent(head: HTMLHeadElement, key: string): string | undefined {
-  const content = head.querySelector(`meta[name="${key}"],meta[property="${key}"]`)?.getAttribute('content')?.trim()
-
-  return content === '' ? undefined : content
-}
-
-// The page's head as it is now: the search result it makes, its title, description, canonical link, alternates and robots tag, its og and twitter tags with the card image, and its JSON-LD blocks, each parsed or with its error; what `kay check` would flag in it comes from the server, which also says whether the sitemap lists the page. Read as the tool starts and again after each page swap, so its count is there before the tab is opened.
-function headTab(doc: Document, tool: DevTool, signal: AbortSignal): void {
-  const win = doc.defaultView!
-  let reread: () => void = () => undefined
-  const tab = tool.tab({ id: 'head', label: 'Head', icon: 'scan-search', shown: () => reread() })
-  const content = tool.make('div', 'stack')
-  const bar = toolbar(tool, 'Filter tags and JSON-LD', () => bar.apply(content), true)
-  // A swap while a fetch is out asks again; the latest answer wins.
-  let asked = 0
-  const read = async () => {
-    const ask = ++asked
-    // One snapshot of the head, so a swap during the fetch cannot mix two heads in what is shown.
-    const head = doc.head.cloneNode(true) as HTMLHeadElement
-    const href = win.location.href
-    const path = win.location.pathname
-    const title = head.querySelector('title')?.textContent?.trim() ?? ''
-    const description = metaContent(head, 'description')
-    const canonical = head.querySelector('link[rel="canonical"]')?.getAttribute('href') ?? undefined
-    let server: DevHead | undefined
-    let failure: string | undefined
-
-    try {
-      const response = await ownFetch(win, HEAD_URL, { method: 'POST', headers: { 'content-type': 'application/json', [HEAD_HEADER]: '1' }, body: JSON.stringify({ path, head: head.outerHTML }), cache: 'no-store' })
-
-      if (!response.ok)
-        throw new Error(`the server answered ${response.status}`)
-
-      server = await response.json() as DevHead
-    }
-    catch (error) {
-      failure = error instanceof Error ? error.message : String(error)
-    }
-
-    if (ask !== asked)
-      return
-
-    const limit = server?.descriptionLength
-    const children: Node[] = []
-    const facts = tool.make('dl', 'facts')
-    const fact = (term: string, ...values: (Node | string)[]) => {
-      const value = tool.make('dd')
-
-      value.append(...values)
-      facts.append(filterable(tool.make('dt', '', term), `${term} ${value.textContent}`), filterable(value, `${term} ${value.textContent}`))
-    }
-    const none = () => tool.make('span', 'note', 'none')
-    const problems = server?.problems ?? []
-
-    tab.count(problems.length, problems.some(problem => problem.severity === 'error') ? 'error' : 'warn')
-
-    if (failure !== undefined)
-      children.push(tool.make('div', 'empty', `Could not check the head: ${failure}`))
-
-    if (problems.length > 0) {
-      const list = tool.make('div', 'list')
-
-      for (const problem of problems) {
-        const error = problem.severity === 'error'
-        const element = tool.make('div', `problem ${error ? 'error' : 'warn'}`)
-
-        const text = [problem.message, problem.note, problem.help === undefined ? undefined : `help: ${problem.help}`].filter(Boolean).join('\n')
-
-        const pre = tool.make('pre', 'mono')
-
-        pre.append(...withPositions(text, tool))
-        element.append(tool.icon(error ? 'circle-x' : 'triangle-alert'), pre)
-        list.append(filterable(element, text, true))
-      }
-
-      children.push(list)
-    }
-
-    const snippet = tool.make('div', 'preview serp')
-    const clipped = limit !== undefined && description !== undefined && description.length > limit ? `${description.slice(0, limit).trimEnd()}...` : description
-    const previews = plain(tool.make('div', 'previews'))
-    const share = tool.make('div', 'preview')
-
-    snippet.append(
-      tool.make('span', 'cap', 'In search results'),
-      tool.make('span', 'site', canonical ?? href),
-      tool.make('span', 't', title === '' ? 'No title' : title),
-      tool.make('span', 'd', clipped ?? 'No description'),
-    )
-    share.append(tool.make('span', 'cap', 'Share card, og:image'))
-    previews.append(snippet, share)
-    children.push(previews)
-
-    fact('Title', ...title === '' ? [none()] : [title, meter(tool, title.length, TITLE_LENGTH)])
-    fact('Description', ...description === undefined ? [none()] : [description, meter(tool, description.length, limit)])
-    fact('Canonical', ...canonical === undefined ? [none()] : [tool.make('span', 'mono', canonical), copyButton(tool, 'the canonical URL', canonical)])
-
-    const alternates = [...head.querySelectorAll('link[rel="alternate"][hreflang]')].map(link => [`${link.getAttribute('hreflang')}: ${link.getAttribute('href')}`, link.getAttribute('href') ?? ''] as const)
-    const chips = tool.make('span', 'chips')
-
-    for (const [line, alternate] of alternates) {
-      const chip = tool.make('span', 'chip', line)
-
-      if (alternate !== '')
-        chip.append(copyButton(tool, `the ${line.slice(0, line.indexOf(':'))} alternate URL`, new URL(alternate, href).href))
-
-      chips.append(chip)
-    }
-
-    fact('Alternates', alternates.length === 0 ? none() : chips)
-    fact('Robots', metaContent(head, 'robots') ?? tool.make('span', 'note', 'no tag, indexable'))
-
-    if (server !== undefined) {
-      let sitemap: HTMLElement = server.sitemap === 'listed' ? pill(tool, 'listed', 'ok') : pill(tool, 'not listed')
-
-      if (server.sitemap === 'error')
-        sitemap = tool.make('span', 'error', `could not be read: ${server.sitemapError ?? 'unknown error'}`)
-      else if (server.sitemap === 'none')
-        sitemap = tool.make('span', 'note', 'none, the site has no origin (set site in kay.config.ts or SITE_URL)')
-
-      fact('Sitemap', sitemap)
-    }
-
-    const tags = plain(tool.make('section', 'group'))
-
-    tags.append(tool.make('h3', 'heading', 'Tags'), facts)
-    children.push(tags)
-
-    for (const [heading, prefix] of [['Open Graph', 'og:'], ['Twitter', 'twitter:']] as const) {
-      const found = [...head.querySelectorAll('meta')].flatMap((meta) => {
-        const key = meta.getAttribute('property') ?? meta.getAttribute('name') ?? ''
-
-        return key.startsWith(prefix) ? [[key, meta.getAttribute('content') ?? ''] as const] : []
-      })
-      const group = plain(tool.make('section', 'group'))
-      const table = tool.make('table', 'kv')
-      const title = tool.make('h3', 'heading', heading)
-
-      for (const [key, tagValue] of found) {
-        const row = tool.make('tr')
-
-        const value = tool.make('td', '', tagValue)
-
-        if (WEB_URL.test(tagValue))
-          value.append(copyButton(tool, `the ${key} URL`, tagValue))
-
-        row.append(tool.make('td', '', key), value)
-        table.append(filterable(row, `${key} ${tagValue}`))
-      }
-
-      title.append(pill(tool, String(found.length)))
-      group.append(title, found.length === 0 ? tool.make('div', 'note', 'No tags.') : table)
-      children.push(group)
-    }
-
-    const image = metaContent(head, 'og:image') ?? metaContent(head, 'twitter:image')
-
-    if (image === undefined) {
-      share.append(tool.make('span', 'note', 'No og:image or twitter:image tag.'))
-    }
-    else {
-      try {
-        const url = new URL(image, href)
-        const card = tool.make('img', 'card')
-
-        // The site's own origin is not the dev server's, so the card is read from here.
-        card.src = server?.site !== undefined && url.origin === new URL(server.site).origin ? `${win.location.origin}${url.pathname}${url.search}` : url.href
-        card.alt = 'The social card image'
-        share.append(card)
-      }
-      catch {
-        share.append(tool.make('div', 'error', `The social card image is not a valid URL: ${image}`))
-      }
-    }
-
-    const blocks = [...head.querySelectorAll('script[type="application/ld+json"]')]
-    const ld = plain(tool.make('section', 'group'))
-    const ldHeading = tool.make('h3', 'heading', 'JSON-LD')
-
-    ldHeading.append(pill(tool, String(blocks.length)))
-    ld.append(ldHeading)
-
-    for (const block of blocks) {
-      try {
-        const data = JSON.parse(block.textContent ?? '') as unknown
-        const details = tool.make('details', 'json')
-        const summary = tool.make('summary', '', ldSummary(data))
-
-        const json = JSON.stringify(data, null, 2)
-
-        details.append(summary, tool.make('pre', 'mono', json))
-        ld.append(filterable(details, `${summary.textContent} ${json}`))
-      }
-      catch (error) {
-        const text = `Not valid JSON: ${error instanceof Error ? error.message : String(error)}`
-
-        ld.append(filterable(tool.make('div', 'error', text), text, true))
-      }
-    }
-
-    if (blocks.length === 0)
-      ld.append(tool.make('div', 'note', 'None.'))
-
-    children.push(ld)
-    content.replaceChildren(...children, bar.empty)
-    bar.apply(content)
-  }
-
-  reread = () => void read()
-  tab.panel.append(bar.element, content)
-  let scheduled = false
-  // A page swap patches the head in place, in many small changes: one read follows them.
-  const swaps = new MutationObserver(() => {
-    if (scheduled)
-      return
-
-    scheduled = true
-    queueMicrotask(() => {
-      scheduled = false
-      void read()
-    })
-  })
-
-  swaps.observe(doc.head, { childList: true, subtree: true, characterData: true, attributes: true })
-  signal.addEventListener('abort', () => swaps.disconnect())
-  // The tab's count is there from the start, not once it is opened.
-  void read()
-}
-
-// Names a variable of a secret goes by, and the shapes of the values of one: a URL carrying a password, a token with a well-known prefix, a long run of random-looking characters.
-const SECRET_NAME = /SECRET|PASSW(?:OR)?D|PRIVATE|TOKEN|CREDENTIAL|AUTH_?(?:KEY|TOKEN|SECRET)|(?:^|_)(?:DATABASE|DB|POSTGRES|PG|MYSQL|REDIS|MONGO(?:DB)?)_URL$/i
-// A key may be public by design (a map or analytics key), so its name alone only calls for a look.
-const KEY_NAME = /(?:^|_)KEY$/i
-const PUBLIC_NAME = /PUBLIC|PUBLISHABLE/i
-const SECRET_PREFIX = /^(?:sk|rk)_(?:live|test)_|^sk-|^gh[pousr]_|^github_pat_|^glpat-|^npm_|^SG\.|^xox[abprs]-|^AKIA[0-9A-Z]{16}|^eyJ[\w-]+\.[\w-]+\.|^-----BEGIN /
-const URL_PASSWORD = /^[a-z][\w+.-]*:\/\/[^/\s:@]+:[^/\s@]+@/i
-const HEX_SECRET = /^[0-9a-f]{32,}$/i
-const RANDOM_LIKE = /^[\w+/=.-]{24,}$/
-// Bits per character of a run of random base64 sits near 5; words and paths stay under 4.
-const RANDOM_ENTROPY = 4
-
-function entropy(value: string): number {
-  const counts = new Map<string, number>()
-
-  for (const character of value)
-    counts.set(character, (counts.get(character) ?? 0) + 1)
-
-  return -[...counts.values()].reduce((sum, count) => sum + count / value.length * Math.log2(count / value.length), 0)
-}
-
-// Why a public variable looks like a secret, if it does; `maybe` when only its name is a key's, which may be public by design.
-function secretReason(name: string, value: unknown): { reason: string, maybe: boolean } | undefined {
-  if (SECRET_NAME.test(name))
-    return { reason: 'its name looks like a secret', maybe: false }
-
-  if (typeof value === 'string') {
-    if (URL_PASSWORD.test(value))
-      return { reason: 'its value is a URL with a password', maybe: false }
-
-    if (SECRET_PREFIX.test(value))
-      return { reason: 'its value looks like a token', maybe: false }
-
-    if (HEX_SECRET.test(value))
-      return { reason: 'its value is a long hexadecimal string, like a token', maybe: false }
-
-    // A path or a URL has slashes in the places a base64 string has none.
-    if (RANDOM_LIKE.test(value) && !value.startsWith('/') && !value.includes('://') && entropy(value) >= RANDOM_ENTROPY)
-      return { reason: 'its value looks random, like a key', maybe: false }
-  }
-
-  return KEY_NAME.test(name) && !PUBLIC_NAME.test(name) ? { reason: 'its name is a key\'s, which is fine if the key is public by design, such as a map\'s', maybe: true } : undefined
-}
-
-// The variables `publicEnv` sends every visitor, read from the module the browser loads, so a secret declared public is seen; fetched as the tab shows and again after each restart.
-function envTab(doc: Document, tool: DevTool, signal: AbortSignal): void {
-  const win = doc.defaultView!
-  let reread: () => void = () => undefined
-  const tab = tool.tab({ id: 'env', label: 'Env', icon: 'key-round', shown: () => reread() })
-  const content = tool.make('div', 'stack')
-  const bar = toolbar(tool, 'Filter by name or value', () => bar.apply(content))
-  let asked = 0
-  const read = async () => {
-    const ask = ++asked
-    let values: Record<string, unknown> | undefined
-    let failure: string | undefined
-
-    try {
-      const response = await ownFetch(win, ENV_URL, { cache: 'no-store' })
-
-      // The route is there only when a field is `s.Public`; any other answer is a failure to read it.
-      if (response.status !== 404) {
-        if (!response.ok)
-          throw new Error(`the server answered ${response.status}`)
-
-        const text = await response.text()
-
-        if (!(response.headers.get('content-type') ?? '').includes('javascript') || !text.startsWith(MODULE_START))
-          throw new Error('the module is not the one kay sends')
-
-        values = JSON.parse(text.slice(MODULE_START.length)) as Record<string, unknown>
-      }
-    }
-    catch (error) {
-      failure = error instanceof Error ? error.message : String(error)
-    }
-
-    if (ask !== asked)
-      return
-
-    bar.element.hidden = values === undefined || Object.keys(values).length === 0
-
-    if (failure !== undefined) {
-      tab.count(0)
-      content.replaceChildren(tool.make('div', 'empty', `Could not read the public env: ${failure}`))
-
-      return
-    }
-
-    if (values === undefined) {
-      tab.count(0)
-      content.replaceChildren(tool.make('div', 'empty', 'This app sends no public env to the browser: no `defineEnv` field is `s.Public`.'))
-
-      return
-    }
-
-    const entries = Object.entries(values)
-    const list = tool.make('div')
-    let flagged = 0
-
-    for (const [name, value] of entries) {
-      const found = secretReason(name, value)
-      const secret = found !== undefined && !found.maybe
-      const shown = typeof value === 'string' ? value : JSON.stringify(value)
-
-      if (secret)
-        flagged++
-
-      list.append(filterable(entry(tool, 'env', {
-        name,
-        after: [tool.make('span', 'val', shown), copyButton(tool, `the value of ${name}`, shown)],
-        issues: secret ? [{ text: `Every visitor reads this, and ${found.reason}. Keep a secret in defineEnv, read on the server alone.`, tone: 'error', icon: 'lock' }] : [],
-        note: found?.maybe === true ? `Every visitor reads this: ${found.reason}.` : undefined,
-      }), `${name} ${shown}`))
-    }
-
-    tab.count(flagged, flagged > 0 ? 'error' : undefined)
-    content.replaceChildren(tool.make('div', 'note', `${entries.length} variable${entries.length === 1 ? '' : 's'} sent to every visitor at ${ENV_URL}.`), entries.length === 0 ? tool.make('div', 'empty', 'The app sends no public env: no variable is `s.Public`.') : list, bar.empty)
-    bar.apply(content)
-  }
-
-  reread = () => void read()
-  tab.panel.append(bar.element, content)
-  win.addEventListener(BUILT_EVENT, reread, { signal })
-  reread()
 }
 
 // An image served more than this many times the pixels it is drawn with is flagged: the ladder's widths are at most 2 apart, so a variant picked for the size drawn is under 2 times as wide, 4 times the pixels, even at its worst.
@@ -3269,126 +2875,49 @@ function performanceTab(doc: Document, tool: DevTool, vitals: Vitals, signal: Ab
 // What a lazy tab's module default-exports: it fills the panel and gives back what reads the tab again each time it shows.
 export type DevTabModule = (tool: DevTool, tab: DevTab) => (() => void) | void
 
+// How the tool fetches a tab's module, which a test replaces with the module itself.
+export type LoadTab = (url: string) => Promise<{ default: DevTabModule }>
+
 // A tab whose code is a module of its own, fetched the first time the tab opens so the tool carries none of it until then; a module that fails to load says so in the panel and is tried again at the next open.
-function lazyTab(tool: DevTool, options: Pick<DevTabOptions, 'id' | 'label' | 'icon'>, url: string): void {
+// A tab with `early` shows a badge from the page itself, so its module is fetched at once and sets the badge as it runs, the panel read again if it is open by then.
+function lazyTab(tool: DevTool, options: Pick<DevTabOptions, 'id' | 'label' | 'icon' | 'hidden'>, url: string, load: LoadTab, early = false): void {
   let refresh: (() => void) | undefined
   let loading = false
-  const tab: DevTab = tool.tab({
-    ...options,
-    shown: () => {
-      if (refresh !== undefined)
-        return refresh()
+  let open: () => void = () => undefined
+  const tab: DevTab = tool.tab({ ...options, shown: () => open() })
 
-      if (loading)
-        return
+  open = () => {
+    if (refresh !== undefined)
+      return refresh()
 
-      loading = true
-      void (async () => {
-        try {
-          const loaded = await import(url) as { default: DevTabModule }
+    if (loading)
+      return
 
-          refresh = loaded.default(tool, tab) ?? (() => undefined)
+    loading = true
+    void (async () => {
+      try {
+        const loaded = await load(url)
+
+        // The tool stopped while the module was on its way.
+        if (tool.kit.signal.aborted)
+          return
+
+        refresh = loaded.default(tool, tab) ?? (() => undefined)
+
+        if (!early || tab.panel.hidden === false)
           refresh()
-        }
-        catch (error) {
-          tab.panel.replaceChildren(tool.make('div', 'empty', `Could not load the ${options.label} tab: ${error instanceof Error ? error.message : String(error)}`))
-        }
-        finally {
-          loading = false
-        }
-      })()
-    },
-  })
-}
-
-const REFERRER_LIMIT = 3
-
-// The paths a production run recorded visitors found nothing at, most hit first, each with the hosts they came from and the target kay suggests; a click writes the redirect into kay.config.ts, as `kay not-found --redirect` does. Fetched as the tab shows and again after each restart.
-function notFoundTab(doc: Document, tool: DevTool, signal: AbortSignal): void {
-  const win = doc.defaultView!
-  const body = tool.make('div', 'list')
-  const status = tool.make('div', 'note')
-  let asked = 0
-  let reread: () => void = () => undefined
-  const tab = tool.tab({ id: 'not-found', label: 'Not found', icon: 'circle-x', shown: () => reread() })
-  const redirect = async (path: string, to: string, row: HTMLElement) => {
-    try {
-      const response = await ownFetch(win, NOT_FOUND_URL, { method: 'POST', headers: { 'content-type': 'application/json', [HEAD_HEADER]: '1' }, body: JSON.stringify({ path, ...to === '' ? {} : { to } }), cache: 'no-store' })
-      const answer = await response.json() as { error?: string, redirect?: { from: string, to: string } }
-
-      if (!response.ok || answer.redirect === undefined)
-        throw new Error(answer.error ?? `the server answered ${response.status}`)
-
-      status.textContent = `Added to kay.config.ts: ${answer.redirect.from} to ${answer.redirect.to}. kay dev restarts to serve it.`
-      row.remove()
-    }
-    catch (error) {
-      status.textContent = `Could not add the redirect: ${error instanceof Error ? error.message : String(error)}`
-    }
-  }
-  const missingRow = (missing: DevNotFound['missing'][number]) => {
-    const input = tool.make('input', 'filter')
-    const add = tool.make('button', 'tool', 'Add redirect')
-    const actions = tool.make('div', 'actions')
-    const row = entry(tool, 'missing', {
-      name: missing.path,
-      after: [pill(tool, `${missing.hits} hit${missing.hits === 1 ? '' : 's'}`, 'accent')],
-      chips: [...new Set(missing.referrers.map(({ host }) => host))].slice(0, REFERRER_LIMIT).map(host => `from ${host}`).concat(new Set(missing.referrers.map(({ host }) => host)).size > REFERRER_LIMIT ? ['...'] : []),
-      note: missing.target === undefined ? 'No target suggested: name one to redirect.' : `Suggested target (${missing.reason}): ${missing.target}`,
-    })
-
-    input.type = 'text'
-    input.value = missing.target ?? ''
-    input.placeholder = '/new-path'
-    input.setAttribute('aria-label', `Redirect target of ${missing.path}`)
-    add.type = 'button'
-    add.onclick = async () => {
-      add.disabled = true
-      await redirect(missing.path, input.value.trim(), row)
-      add.disabled = false
-    }
-    actions.append(input, add)
-    row.querySelector('.body')!.append(actions)
-
-    return filterable(row, missing.path)
-  }
-  const bar = toolbar(tool, 'Filter by path', () => bar.apply(body))
-  const list = async () => {
-    const ask = ++asked
-
-    try {
-      const response = await ownFetch(win, NOT_FOUND_URL, { cache: 'no-store' })
-
-      if (!response.ok)
-        throw new Error(`the server answered ${response.status}`)
-
-      const listed = await response.json() as DevNotFound
-
-      if (ask !== asked)
-        return
-
-      tab.count(listed.missing.length)
-      bar.element.hidden = listed.missing.length === 0
-
-      if (!listed.recorded)
-        body.replaceChildren(tool.make('div', 'empty', `No ${listed.file} here: the production server records the pages visitors asked for and found nothing at, and kay dev records none.`))
-      else if (listed.missing.length === 0)
-        body.replaceChildren(tool.make('div', 'empty', 'Every recorded path has a redirect.'))
-      else
-        body.replaceChildren(...listed.missing.map(missingRow), bar.empty)
-
-      bar.apply(body)
-    }
-    catch (error) {
-      if (ask === asked)
-        body.replaceChildren(tool.make('div', 'empty', `Could not list the missing paths: ${error instanceof Error ? error.message : String(error)}`))
-    }
+      }
+      catch (error) {
+        tab.panel.replaceChildren(tool.make('div', 'empty', `Could not load the ${options.label} tab: ${error instanceof Error ? error.message : String(error)}`))
+      }
+      finally {
+        loading = false
+      }
+    })()
   }
 
-  reread = () => void list()
-  tab.panel.append(bar.element, status, body)
-  win.addEventListener(BUILT_EVENT, reread, { signal })
-  reread()
+  if (early)
+    open()
 }
 
 function formatMs(ms: number): string {
@@ -4293,594 +3822,6 @@ function startTabOrder(doc: Document, root: ShadowRoot, make: DevTool['make']): 
   return {
     show,
     stop: () => show(false),
-  }
-}
-
-// Waiting for the page to stop changing before it is read again.
-const READING_WAIT = 250
-// How many times a read takes the page may be left alone for before it is read again.
-const READING_SLACK = 10
-const SPACES_RUN = /\s+/g
-const HEADING_TAG = /^h([1-6])$/
-// What a screen reader announces as a stop of its own: the elements that may have a role of a landmark, heading, link, control or field.
-const READABLE = 'a[href], area[href], button, summary, input, select, textarea, h1, h2, h3, h4, h5, h6, nav, main, aside, header, footer, section, form, search, [role]'
-const LANDMARKS = new Set(['banner', 'complementary', 'contentinfo', 'form', 'main', 'navigation', 'region', 'search'])
-const CONTROLS = new Set(['button', 'tab', 'menuitem', 'menuitemcheckbox', 'menuitemradio'])
-const FIELDS = new Set(['textbox', 'searchbox', 'checkbox', 'radio', 'combobox', 'listbox', 'slider', 'spinbutton', 'switch'])
-// The roles whose name comes from their content.
-const NAMED_BY_CONTENT = new Set(['button', 'link', 'heading', 'tab', 'menuitem', 'menuitemcheckbox', 'menuitemradio', 'option', 'checkbox', 'radio', 'switch', 'cell', 'gridcell', 'columnheader', 'rowheader', 'treeitem', 'tooltip'])
-// The roles whose value is their name inside another element's label.
-const VALUED = new Set(['textbox', 'searchbox', 'combobox', 'listbox', 'slider', 'spinbutton'])
-const BUTTON_DEFAULTS: Record<string, string> = { submit: 'Submit', reset: 'Reset' }
-const BUTTON_INPUTS = new Set(['button', 'submit', 'reset', 'image', 'file', 'color'])
-const TEXT_INPUTS = new Set(['', 'text', 'email', 'tel', 'url', 'password'])
-const SECTIONING = 'article, aside, main, nav, section, [role=article], [role=complementary], [role=main], [role=navigation], [role=region]'
-const LABELABLE = new Set(['input', 'select', 'textarea', 'button', 'meter', 'output', 'progress'])
-const READING_OBSERVED = { subtree: true, childList: true, characterData: true, attributes: true, attributeFilter: ['aria-label', 'aria-labelledby', 'aria-describedby', 'aria-description', 'aria-required', 'aria-level', 'aria-hidden', 'role', 'alt', 'title', 'href', 'for', 'id', 'required', 'value', 'placeholder', 'type', 'multiple', 'size', 'list', 'open', 'inert', 'hidden', 'class', 'style', 'aria-busy'] }
-
-export type ReadingKind = 'landmark' | 'heading' | 'link' | 'control' | 'field'
-
-// One stop of a screen reader's walk through the page.
-export interface ReadingItem {
-  element: Element
-  kind: ReadingKind
-  role: string
-  name: string
-  // A heading's level.
-  level?: number
-  // Where a link goes, as the browser resolves it.
-  target?: string
-  description?: string
-  required?: boolean
-}
-
-// What is wrong with the page as a whole, and the elements to outline for it.
-export interface ReadingPageIssue {
-  text: string
-  elements: Element[]
-}
-
-export interface ReadingFlags {
-  page: ReadingPageIssue[]
-  items: Map<ReadingItem, string[]>
-}
-
-const NO_NAME = 'No accessible name'
-
-// What is wrong with the items read: a heading level skipped, no main landmark or several, a link, control or field with no name, and links of one name going to different places. Pure, so it needs no page.
-export function readingFlags(items: ReadingItem[]): ReadingFlags {
-  const flags = new Map<ReadingItem, string[]>()
-  const page: ReadingPageIssue[] = []
-  const flag = (item: ReadingItem, text: string) => flags.set(item, [...flags.get(item) ?? [], text])
-  const links = new Map<string, ReadingItem[]>()
-  let level = 0
-
-  for (const item of items) {
-    if (item.kind === 'heading') {
-      const own = item.level ?? 2
-
-      if (level === 0 && own > 1)
-        flag(item, `Starts at h${own}, with no h1 before it`)
-      else if (own > level + 1)
-        flag(item, `Skips from h${level} to h${own}`)
-
-      level = own
-    }
-
-    if (item.kind !== 'landmark' && item.name === '')
-      flag(item, NO_NAME)
-
-    if (item.kind === 'link' && item.name !== '') {
-      const key = item.name.toLowerCase()
-
-      links.set(key, [...links.get(key) ?? [], item])
-    }
-  }
-
-  for (const same of links.values()) {
-    for (const item of same) {
-      const elsewhere = same.filter(other => other.target !== item.target).length
-
-      if (elsewhere > 0)
-        flag(item, elsewhere === 1 ? 'Same name as 1 other link that goes elsewhere' : `Same name as ${elsewhere} other links that go elsewhere`)
-    }
-  }
-
-  const mains = items.filter(item => item.role === 'main')
-
-  if (mains.length === 0)
-    page.push({ text: 'No main landmark, so a screen reader user cannot jump to the content', elements: [] })
-
-  if (mains.length > 1) {
-    page.push({ text: `A page has one main landmark, this one has ${mains.length}`, elements: mains.map(main => main.element) })
-
-    for (const main of mains)
-      flag(main, `One of ${mains.length} main landmarks`)
-  }
-
-  return { page, items: flags }
-}
-
-// Whether a screen reader would skip the element: not rendered, or `inert`, or `aria-hidden`.
-function hiddenFromReader(element: Element): boolean {
-  return element.getAttribute('aria-hidden') === 'true' || element.hasAttribute('inert') || !isRendered(element)
-}
-
-// Rendered, a `display: contents` element counting as rendered when the element around it is, as it has no box and still reads.
-function isRendered(element: Element): boolean {
-  if (typeof element.checkVisibility !== 'function' || element.checkVisibility({ visibilityProperty: true }))
-    return true
-
-  const parent = parentOf(element)
-
-  // An image map's area has no box of its own.
-  if (element instanceof HTMLAreaElement)
-    return parent !== null && isRendered(parent)
-
-  return getComputedStyle(element).display === 'contents' && parent !== null && isRendered(parent)
-}
-
-// The element's role: the first word of `role`, else what its tag stands for. A `header` or `footer` inside a section is no landmark, and a `section` or `form` is one only with a name, which `named: false` does not look for, as the name's own steps ask for the role.
-function roleOf(element: Element, named = true): string {
-  const explicit = element.getAttribute('role')?.trim().split(SPACES_RUN)[0]
-
-  if (explicit !== undefined && explicit !== '')
-    return explicit
-
-  const tag = element.localName
-  const heading = HEADING_TAG.test(tag)
-  const input = element instanceof HTMLInputElement ? element : undefined
-
-  if (heading)
-    return 'heading'
-
-  if (input !== undefined)
-    return inputRole(input)
-
-  switch (tag) {
-    case 'a':
-    case 'area':
-      return element.hasAttribute('href') ? 'link' : ''
-    case 'button':
-    case 'summary':
-      return 'button'
-    case 'nav':
-      return 'navigation'
-    case 'main':
-      return 'main'
-    case 'aside':
-      return 'complementary'
-    case 'search':
-      return 'search'
-    case 'header':
-      return element.closest(SECTIONING) === null ? 'banner' : ''
-    case 'footer':
-      return element.closest(SECTIONING) === null ? 'contentinfo' : ''
-    case 'section':
-      return named && accessibleName(element) !== '' ? 'region' : ''
-    case 'form':
-      return named && accessibleName(element) !== '' ? 'form' : ''
-    case 'textarea':
-      return 'textbox'
-    case 'select':
-      return (element as HTMLSelectElement).multiple || (element as HTMLSelectElement).size > 1 ? 'listbox' : 'combobox'
-    default:
-      return ''
-  }
-}
-
-function inputRole(input: HTMLInputElement): string {
-  const type = input.type
-
-  if (type === 'hidden')
-    return ''
-
-  if (BUTTON_INPUTS.has(type))
-    return 'button'
-
-  if (type === 'checkbox' || type === 'radio')
-    return type
-
-  if (type === 'range')
-    return 'slider'
-
-  if (type === 'number')
-    return 'spinbutton'
-
-  if (type === 'search')
-    return input.list === null ? 'searchbox' : 'combobox'
-
-  return TEXT_INPUTS.has(type) && input.list !== null ? 'combobox' : 'textbox'
-}
-
-function kindOf(role: string): ReadingKind | undefined {
-  if (LANDMARKS.has(role))
-    return 'landmark'
-
-  if (role === 'heading')
-    return 'heading'
-
-  if (role === 'link')
-    return 'link'
-
-  if (CONTROLS.has(role))
-    return 'control'
-
-  return FIELDS.has(role) ? 'field' : undefined
-}
-
-// How a name is being worked out: from a node `aria-labelledby` or `aria-describedby` names (`labelled`, whose own `aria-labelledby` is not followed again, and `direct` for the node itself, read even when hidden), or from within another node's content (`nested`); `seen` holds the elements being read, so a loop ends.
-interface NameContext {
-  labelled: boolean
-  direct: boolean
-  nested: boolean
-  seen: Set<Element>
-}
-
-function squeezed(text: string): string {
-  return text.replace(SPACES_RUN, ' ').trim()
-}
-
-function referenced(element: Element, attribute: string): Element[] {
-  const root = element.getRootNode() as Document | ShadowRoot
-
-  return (element.getAttribute(attribute)?.split(SPACES_RUN) ?? []).flatMap(id => id === '' ? [] : root.getElementById(id) ?? [])
-}
-
-// The element's accessible name, by the steps of the accessible name computation: `aria-labelledby`, `aria-label`, what the element is (`alt`, a `label`, a button's `value`), its content when its role is named by it, and `title`. It approximates the browser's: the text a CSS `::before` or `::after` adds is not read.
-function accessibleName(element: Element): string {
-  return squeezed(nameFrom(element, { labelled: false, direct: false, nested: false, seen: new Set() }))
-}
-
-function nameFrom(element: Element, context: NameContext): string {
-  if (context.seen.has(element) || (!context.direct && hiddenFromReader(element)))
-    return ''
-
-  context.seen.add(element)
-
-  try {
-    if (!context.labelled) {
-      // An element naming itself gives its own `aria-label` and content.
-      const alone = new Set(context.seen)
-
-      alone.delete(element)
-
-      const named = referenced(element, 'aria-labelledby').map(other => squeezed(nameFrom(other, { labelled: true, direct: true, nested: false, seen: other === element ? alone : context.seen }))).join(' ').trim()
-
-      if (named !== '')
-        return named
-    }
-
-    const label = squeezed(element.getAttribute('aria-label') ?? '')
-
-    if (label !== '')
-      return label
-
-    // A field inside another's label gives its value.
-    if (context.nested && VALUED.has(roleOf(element, false))) {
-      if (element instanceof HTMLSelectElement)
-        return [...element.selectedOptions].map(option => option.text).join(' ')
-
-      return (element as HTMLInputElement).value ?? ''
-    }
-
-    const native = nativeName(element, context)
-
-    if (native !== undefined && native.trim() !== '')
-      return native
-
-    if (context.direct || context.nested || NAMED_BY_CONTENT.has(roleOf(element, false))) {
-      const content = squeezed(contentOf(element, context))
-
-      if (content !== '')
-        return content
-    }
-
-    const title = element.getAttribute('title') ?? ''
-
-    return title === '' ? placeholderOf(element) : title
-  }
-  finally {
-    context.seen.delete(element)
-  }
-}
-
-function placeholderOf(element: Element): string {
-  return (element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement) ? element.placeholder : ''
-}
-
-// What the element is called by its kind: an image's `alt`, a button input's `value`, the `label` elements of a field.
-function nativeName(element: Element, context: NameContext): string | undefined {
-  if (element instanceof HTMLImageElement || element instanceof HTMLAreaElement)
-    return element.getAttribute('alt') ?? undefined
-
-  if (element instanceof HTMLInputElement && BUTTON_INPUTS.has(element.type)) {
-    const fallback = BUTTON_DEFAULTS[element.type] ?? ''
-
-    return element.type === 'image' ? element.alt || element.value : element.value || fallback
-  }
-
-  // Inside another label, a field is read for its own content, as its own label would hold the text around it again.
-  if (context.nested || !LABELABLE.has(element.localName) || !('labels' in element))
-    return undefined
-
-  const labels = [...(element.labels as NodeListOf<HTMLLabelElement> | null) ?? []]
-
-  return labels.map(label => contentOf(label, { ...context, direct: false, nested: true })).join(' ')
-}
-
-// The text of an element's content, an image's `alt` and an element's own name counting, a box laid out as a block set apart by spaces.
-function contentOf(element: Element, context: NameContext): string {
-  const nodes: Node[] = []
-
-  if (element.shadowRoot !== null)
-    nodes.push(...element.shadowRoot.childNodes)
-  else if (element instanceof HTMLSlotElement)
-    nodes.push(...element.assignedNodes({ flatten: true }).length > 0 ? element.assignedNodes({ flatten: true }) : element.childNodes)
-  else
-    nodes.push(...element.childNodes)
-
-  return nodes.map((node) => {
-    if (node.nodeType === Node.TEXT_NODE)
-      return node.textContent ?? ''
-
-    if (!(node instanceof Element))
-      return ''
-
-    const text = nameFrom(node, { ...context, direct: false, nested: true })
-    const gap = getComputedStyle(node).display.startsWith('inline') ? '' : ' '
-
-    return `${gap}${text}${gap}`
-  }).join('')
-}
-
-// What describes a field beyond its name: the elements `aria-describedby` names, else `aria-description`, else the `title` when it did not name the field.
-function descriptionOf(element: Element, name: string): string {
-  const described = referenced(element, 'aria-describedby')
-
-  if (described.length > 0)
-    return squeezed(described.map(other => nameFrom(other, { labelled: true, direct: true, nested: false, seen: new Set() })).join(' '))
-
-  const own = squeezed(element.getAttribute('aria-description') ?? '')
-
-  if (own !== '')
-    return own
-
-  const title = squeezed(element.getAttribute('title') ?? '')
-
-  return title === name ? '' : title
-}
-
-function isRequired(element: Element): boolean {
-  if (element.getAttribute('aria-required') === 'true')
-    return true
-
-  return (element instanceof HTMLInputElement || element instanceof HTMLSelectElement || element instanceof HTMLTextAreaElement) && element.required
-}
-
-function levelOf(element: Element): number {
-  const tag = HEADING_TAG.exec(element.localName)?.[1]
-  const level = Number.parseInt(tag ?? element.getAttribute('aria-level') ?? '', 10)
-
-  return level > 0 ? level : 2
-}
-
-function readingItem(element: Element): ReadingItem | undefined {
-  const role = roleOf(element)
-  const kind = kindOf(role)
-
-  if (kind === undefined || hiddenFromReader(element))
-    return undefined
-
-  const name = accessibleName(element)
-  const item: ReadingItem = { element, kind, role, name }
-
-  if (kind === 'heading')
-    item.level = levelOf(element)
-
-  if (kind === 'link')
-    item.target = typeof (element as Partial<HTMLAnchorElement>).href === 'string' ? (element as HTMLAnchorElement).href : element.getAttribute('href') ?? ''
-
-  if (kind === 'field') {
-    item.required = isRequired(element)
-    item.description = descriptionOf(element, name)
-  }
-
-  return item
-}
-
-// Every stop of the page a screen reader reads, in the order it reads them, and the open shadow roots met on the way.
-function readPage(doc: Document): { items: ReadingItem[], roots: ShadowRoot[] } {
-  const items: ReadingItem[] = []
-  const roots = walkComposed(doc, (element) => {
-    if (element.localName === HOST || element.localName === 'head' || element.hasAttribute('hidden') || element.hasAttribute('inert') || element.getAttribute('aria-hidden') === 'true')
-      return false
-
-    const item = element.matches(READABLE) ? readingItem(element) : undefined
-
-    if (item !== undefined)
-      items.push(item)
-
-    return true
-  })
-
-  return { items, roots }
-}
-
-// The `.kay` position of the element, or of the nearest element around it that has one.
-function sourceOf(element: Element): string | undefined {
-  for (let node: Element | null = element; node !== null; node = parentOf(node)) {
-    const source = node.getAttribute('data-kay-src')
-
-    if (source !== null)
-      return source
-  }
-
-  return undefined
-}
-
-function roleText(item: ReadingItem): string {
-  return item.kind === 'heading' ? `heading ${item.level}` : item.role
-}
-
-// A link's address as the page would show it: the path of one on this site, else the whole address.
-function targetText(target: string, here: Location): string {
-  try {
-    const url = new URL(target, here.href)
-
-    return url.origin === here.origin ? `${url.pathname}${url.search}${url.hash}` : url.href
-  }
-  catch {
-    return target
-  }
-}
-
-// The page as a screen reader reads it, in its order: landmarks, headings, links, controls and form fields each with the name a screen reader would speak, what is wrong flagged, and a hover or focus outlines the element and names the `.kay` file that wrote it. It reads the page again after it changes, a page swap and an island included, and counts what it flags on its tab.
-function readingTab(doc: Document, tool: DevTool, signal: AbortSignal): void {
-  const win = doc.defaultView!
-  const tab = tool.tab({ id: 'screen-reader', label: 'Screen reader', icon: 'ear', shown: () => draw(), hidden: () => tool.hideOutline() })
-  const content = tool.make('div', 'stack')
-  const bar = toolbar(tool, 'Filter by role, name or problem', () => bar.apply(content), true)
-  let read: { items: ReadingItem[], flags: ReadingFlags, key: string } | undefined
-  // Whether the rows show what was read last.
-  let drawn = false
-  let timer = 0
-  // A page that changes all the time is read at most this often, slower the longer a read takes.
-  let wait = READING_WAIT
-  const busy = () => doc.documentElement.hasAttribute('aria-busy')
-  const changes = new MutationObserver(schedule)
-
-  tab.panel.append(bar.element, content)
-  signal.addEventListener('abort', () => {
-    win.clearTimeout(timer)
-    changes.disconnect()
-  })
-  changes.observe(doc.documentElement, READING_OBSERVED)
-  schedule()
-
-  // The first change waits, the rest until the read it ordered, so a page that never stops changing is still read.
-  function schedule(): void {
-    if (timer === 0)
-      timer = win.setTimeout(scan, wait)
-  }
-
-  function scan(): void {
-    timer = 0
-
-    // The end of a page swap changes the page again.
-    if (busy())
-      return
-
-    const started = win.performance.now()
-    const page = readPage(doc)
-
-    // Changes inside an open shadow root are not seen from the page's.
-    for (const root of page.roots)
-      changes.observe(root, READING_OBSERVED)
-
-    changes.takeRecords()
-
-    const flags = readingFlags(page.items)
-    const flagged = flags.page.length + flags.items.size
-
-    const key = JSON.stringify([flags.page.map(issue => issue.text), page.items.map(item => [item.role, item.name, item.level, item.target, item.required, item.description, flags.items.get(item), sourceOf(item.element)])])
-    const same = read !== undefined && read.key === key && read.items.every((item, index) => item.element === page.items[index]!.element)
-
-    tab.count(flagged, flagged > 0 ? 'warn' : undefined)
-
-    // Rows rebuilt for nothing would drop the focus and the outline a person is on.
-    if (!same) {
-      read = { items: page.items, flags, key }
-      drawn = false
-    }
-
-    draw()
-    wait = Math.max(READING_WAIT, (win.performance.now() - started) * READING_SLACK)
-  }
-
-  function outlineOf(item: ReadingItem): string {
-    const source = sourceOf(item.element)
-
-    return source === undefined ? item.element.localName : `${item.element.localName}  ${source}`
-  }
-
-  // Scrolled into view, since a row selected by a click may be of an element out of sight.
-  function reveal(element: Element, text: string): void {
-    element.scrollIntoView({ block: 'center' })
-    win.requestAnimationFrame(() => tool.outline([element], text))
-  }
-
-  function highlight(row: HTMLElement, elements: Element[], text: string): void {
-    row.tabIndex = 0
-    row.setAttribute('role', 'group')
-    row.onpointerenter = row.onfocus = () => tool.outline(elements, text)
-    row.onpointerleave = row.onblur = () => tool.hideOutline()
-    row.onclick = (event) => {
-      if (elements[0] !== undefined && !(event.target as Element).closest('button'))
-        reveal(elements[0], text)
-    }
-    row.onkeydown = (event) => {
-      if ((event.key === 'Enter' || event.key === ' ') && event.target === row && elements[0] !== undefined) {
-        event.preventDefault()
-        reveal(elements[0], text)
-      }
-    }
-  }
-
-  function draw(): void {
-    if (read === undefined || drawn || tab.panel.hidden === true)
-      return
-
-    drawn = true
-
-    tool.hideOutline()
-
-    const rows: HTMLElement[] = []
-
-    for (const issue of read.flags.page) {
-      const label = pill(tool, 'page')
-      const row = entry(tool, 'reading', { name: label, issues: [{ text: issue.text, tone: 'warn' }] })
-
-      label.classList.add('role')
-      row.setAttribute('aria-label', issue.text)
-
-      if (issue.elements.length > 0)
-        highlight(row, issue.elements, issue.elements[0]!.localName)
-
-      rows.push(filterable(row, `page ${issue.text}`, true))
-    }
-
-    for (const item of read.items) {
-      const flags = read.flags.items.get(item) ?? []
-      const role = pill(tool, roleText(item))
-      const source = sourceOf(item.element)
-      const chips = [
-        ...item.target === undefined ? [] : [targetText(item.target, win.location)],
-        ...item.required === true ? ['required'] : [],
-        ...item.description === undefined || item.description === '' ? [] : [`described by: ${item.description}`],
-      ]
-      const label = tool.make('span', item.name === '' && item.kind !== 'landmark' ? 'accname none' : 'accname', item.name === '' ? 'no name' : item.name)
-      const row = entry(tool, 'reading', {
-        name: role,
-        after: [...item.name === '' && item.kind === 'landmark' ? [] : [label], ...source === undefined ? [] : [positionButton(tool, source)]],
-        chips,
-        issues: flags.map(text => ({ text, tone: 'warn' as const })),
-      })
-
-      role.classList.add('role')
-      row.dataset.kind = item.kind
-      row.setAttribute('aria-label', `${roleText(item)}${item.name === '' ? '' : `, ${item.name}`}`)
-      highlight(row, [item.element], outlineOf(item))
-      rows.push(filterable(row, [roleText(item), item.name, ...chips, ...flags].join(' '), flags.length > 0))
-    }
-
-    bar.element.hidden = rows.length === 0
-    content.replaceChildren(
-      ...rows.length === 0 ? [tool.make('div', 'empty', 'Nothing here for a screen reader to stop at.')] : rows,
-      bar.empty,
-      tool.make('div', 'note', 'Names are worked out from the page by the steps of the accessible name computation and may differ in small ways from the browser\'s own: text a stylesheet adds with ::before or ::after is not read.'),
-    )
-    bar.apply(content)
   }
 }
 
