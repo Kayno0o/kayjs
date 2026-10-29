@@ -46,6 +46,8 @@
   },
   "scripts": {
     "prepare": "$npm_execpath ../../scripts/link-fixture.ts",
+    "prepack": "$npm_execpath ../../scripts/pack-links.ts rewrite ../..",
+    "postpack": "$npm_execpath ../../scripts/pack-links.ts restore ../..",
     "check": "$npm_execpath check && $npm_execpath ../../src/cli.ts check tests/fixture",
     "prelint": "$npm_execpath run --cwd ../.. build:eslint",
     "lint": "$npm_execpath ../../scripts/lint-cache.ts && keslint --cache",
