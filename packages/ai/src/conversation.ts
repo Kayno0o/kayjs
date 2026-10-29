@@ -6,7 +6,7 @@ import { logFrom } from 'kay'
 import { currentRequest, refundRateLimit } from 'kay/library'
 import { estimatedChars, toolChars } from './attachments'
 import { usableSources } from './chat-sources'
-import { conversationStore } from './conversation-store'
+import { conversationStore, LEFT_OUT } from './conversation-store'
 import { renamedTitle, titleOf } from './conversation-title'
 import { deferredReply } from './deferred'
 import { AiError } from './errors'
@@ -73,8 +73,6 @@ function mayRefund(reader: string, now: number): boolean {
 // A conversation belongs to the action that holds it, so two chats of one visitor keep apart.
 const scopeOf = (request: Request) => new URL(request.url).pathname
 
-// What a replayed result is shortened to once the conversation outgrows what the ask takes.
-const LEFT_OUT = '(left out)'
 // What stands for the answer of a reply that called tools and said nothing, as a provider needs an assistant turn after the results.
 const NO_ANSWER = '(no answer was given)'
 
@@ -83,8 +81,9 @@ type Replayed = Message & Pick<ProviderMessage, 'calls' | 'results'>
 // A turn as the model read it: the user's text, or for a reply each request's calls and their results, then its text.
 // A turn of no text and no calls, a message of files alone, is kept so the turns line up with the Chat's, and left out of what the model reads, as a provider refuses an empty message.
 // A call's id is told apart by the turn it is in, as a provider leaving ids out has them reissued as `call_1` in every turn and Anthropic refuses a repeated one.
-function replayed({ role, content, steps }: StoredTurn, shortened: boolean, at: number): Replayed[] {
-  if (role === 'user' || steps === undefined || steps.length === 0)
+// A reply stopped before it said anything is left out whole, calls and results with it: no words stand for it that the model could take for its own, and the turns around it read as one.
+function replayed({ role, content, steps, stopped }: StoredTurn, shortened: boolean, at: number): Replayed[] {
+  if (role === 'user' || steps === undefined || steps.length === 0 || (stopped === true && content === ''))
     return content === '' ? [] : [{ role, content }]
 
   return [
@@ -237,7 +236,7 @@ export function heldReply(call: HeldCall, prompt: Message[], options: AskOptions
 // A call still running when the reply ended has no result to replay.
 const isAnswered = (call: ToolCall) => call.status !== 'running' && call.result !== undefined
 
-// A result is kept to this many characters, as the replay of an older one is shortened anyway.
+// A result is kept to this many characters, as the replay of an older one is shortened anyway, and a conversation keeps `MOST_STORED_RESULTS` of them in all.
 const MOST_STORED_RESULT = 4000
 
 const storedCall = ({ id, name, input, result, status }: ToolCall): StoredCall => ({ id, name, arguments: JSON.stringify(input), result: clip(result ?? '', MOST_STORED_RESULT), ok: status === 'done' })

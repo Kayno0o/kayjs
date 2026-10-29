@@ -63,6 +63,31 @@ export const CONVERSATIONS_FILE = 'data/ai-conversations.sqlite'
 // What one owner keeps under one action: the least recently updated conversation goes past it, and the oldest turns of a conversation past its own.
 export const MOST_CONVERSATIONS = 200
 export const MOST_TURNS = 500
+// The tool results one conversation keeps, in characters (each is clipped on its own too): past it the oldest turns' results are replaced by `LEFT_OUT`, as the replay shortens them once the ask is full.
+export const MOST_STORED_RESULTS = 200_000
+// What a result becomes once it is shortened.
+export const LEFT_OUT = '(left out)'
+
+// The turns with the results of the oldest replaced by `LEFT_OUT` until the results kept fit `MOST_STORED_RESULTS`; the turns of the latest exchange are never touched.
+export function withinResultCap(turns: StoredTurn[]): StoredTurn[] {
+  const size = (turn: StoredTurn) => (turn.steps ?? []).reduce((sum, calls) => sum + calls.reduce((inner, call) => inner + call.result.length, 0), 0)
+  let total = turns.reduce((sum, turn) => sum + size(turn), 0)
+
+  if (total <= MOST_STORED_RESULTS)
+    return turns
+
+  return turns.map((turn, at) => {
+    if (total <= MOST_STORED_RESULTS || at >= turns.length - 2 || turn.steps === undefined)
+      return turn
+
+    const before = size(turn)
+    const shortened = { ...turn, steps: turn.steps.map(calls => calls.map(call => call.result.length > LEFT_OUT.length ? { ...call, result: LEFT_OUT } : call)) }
+
+    total -= before - size(shortened)
+
+    return shortened
+  })
+}
 
 interface Row {
   id: string
@@ -125,7 +150,7 @@ function open(path: string) {
       return undefined
 
     const turns = row === null ? [] : turnsOf(row.turns)
-    const next = [...turns.slice(0, Math.max(0, turns.length - drop)), ...add].slice(-MOST_TURNS)
+    const next = withinResultCap([...turns.slice(0, Math.max(0, turns.length - drop)), ...add].slice(-MOST_TURNS))
 
     upsert.run(owner, scope, id, title, revision + 1, Date.now(), JSON.stringify(next))
 

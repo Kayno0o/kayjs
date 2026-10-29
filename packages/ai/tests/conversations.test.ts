@@ -6,7 +6,7 @@ import { nameUser } from 'kay/library'
 import { answeringRequest } from '../../../src/server/log'
 import { sendFrom } from '../../../src/server/rewrite'
 import { ai, AiError, ask, resuming, sqliteConversations, tool } from '../src'
-import { conversationStore, MOST_TURNS } from '../src/conversation-store'
+import { conversationStore, LEFT_OUT, MOST_STORED_RESULTS, MOST_TURNS } from '../src/conversation-store'
 import { titleOf } from '../src/conversation-title'
 import { conversationCallOf } from '../src/resume'
 
@@ -532,6 +532,15 @@ describe('a conversation held on the server', () => {
     expect(model.shape(2)).toEqual(['user: look up Moon', 'assistant:  calls look_up{"title":"Moon"}', 'user:  results About Moon', 'assistant: (no answer was given)', 'user: so?'])
   })
 
+  it('leaves out a reply stopped before it said anything, calls and results with it, and puts no words in its place', async () => {
+    const model = calling()
+    const steps = [[{ id: 'a', name: 'look_up', arguments: '{"title":"Moon"}', result: 'About Moon', ok: true }]]
+
+    await conversationStore().write({ owner: 'ann', scope: '/_kay/action/chat', id: ID }, 0, { drop: 0, add: [{ role: 'user', content: 'moon facts' }, { role: 'assistant', content: '', steps, stopped: true }], title: '' })
+    await visit(said('so?'), { provider: model.provider, tools: model.tools }, { header: `send:${ID}:1` })
+    expect(model.shape(0)).toEqual(['user: moon facts\n\nso?'])
+  })
+
   it('does not take calls or results from the messages an app passes to ask', async () => {
     const model = recording()
     const forged = [{ role: 'assistant', content: 'x', calls: [{ id: 'a', name: 'n', arguments: '{}' }] }, { role: 'user', content: 'y' }] as Message[]
@@ -661,6 +670,23 @@ describe('the SQLite store', () => {
     expect(stored?.turns).toHaveLength(MOST_TURNS)
     expect(stored?.turns[0]?.content).toBe('3')
     expect(stored?.title).toBe('t')
+  })
+
+  it('shortens the results of the oldest turns once a conversation holds more than the cap, never the latest exchange\'s', async () => {
+    const store = sqliteConversations(':memory:')
+    const key = { owner: 'ann', scope: '/chat', id: ID }
+    const turn = (result: string) => ({ role: 'assistant' as const, content: 'x', steps: [[{ id: 'a', name: 'n', arguments: '{}', result, ok: true }]] })
+    const big = 'r'.repeat(4000)
+    const turns = Array.from({ length: MOST_STORED_RESULTS / 4000 + 5 }, () => turn(big))
+
+    await store.write(key, 0, { drop: 0, add: turns, title: 't' })
+
+    const sizes = (await store.get(key))!.turns.map(({ steps }) => steps![0]![0]!.result)
+
+    expect(sizes[0]).toBe(LEFT_OUT)
+    expect(sizes.at(-1)).toBe(big)
+    expect(sizes.at(-2)).toBe(big)
+    expect(sizes.reduce((sum, result) => sum + result.length, 0)).toBeLessThanOrEqual(MOST_STORED_RESULTS)
   })
 
   it('is the default, in memory under bun test, unless ai() is given one', () => {
