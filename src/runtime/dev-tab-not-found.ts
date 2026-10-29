@@ -3,6 +3,7 @@ import type { DevTab, DevTool } from './dev-tool'
 
 // The Not found tab's code, fetched at once as its badge counts the missing paths, with the tool's shared helpers from `tool.kit`.
 const NOT_FOUND_URL = '/_kay/dev/not-found'
+// Copied from dev-tool.ts, as a tab module imports nothing.
 const HEAD_HEADER = 'x-kay-dev'
 const BUILT_EVENT = 'kay-dev-built'
 const REFERRER_LIMIT = 3

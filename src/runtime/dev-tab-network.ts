@@ -1,6 +1,7 @@
 import type { DevKit, DevTab, DevTool } from './dev-tool'
 
 // The Network tab's code, fetched at once as its badge counts the requests answered with an error, with the tool's shared helpers from `tool.kit`.
+// Copied from dev-tool.ts, as a tab module imports nothing.
 const DEV_PATH = /\/_kay\/dev\//
 const ACTION_PATH = /\/_kay\/action\//
 // server-islands.ts's ISLAND_PARAM, copied as this file imports types only.

@@ -787,6 +787,57 @@ describe('the dev tool', () => {
     expect('$kayBuilt' in window).toBe(false)
   })
 
+  it('loads an early tab at once, says when its module fails and tries again at the next open', async () => {
+    let fails = true
+    let loads = 0
+    const loadOnly = async (url: string) => {
+      if (url !== '/_kay/dev/tab/env.js')
+        return loadTab(url)
+
+      loads++
+
+      if (fails)
+        throw new Error('no module')
+
+      return loadTab(url)
+    }
+
+    tool = startDevTool(document, loadOnly)
+    await turn()
+
+    const panel = () => shadow().querySelector('#kay-dev-env')!
+
+    expect(loads).toBe(1)
+    expect(panel().textContent).toContain('Could not load the Env tab: no module')
+    fails = false
+    shadow().querySelector<HTMLButtonElement>('#kay-dev-tab-env')!.click()
+    await eventually(() => expect(panel().textContent).toContain('Could not read the public env'))
+
+    expect(loads).toBe(2)
+  })
+
+  it('runs no module that arrives once the tool stopped', async () => {
+    const release: (() => void)[] = []
+    const ran: string[] = []
+    const slow = async (url: string) => {
+      await new Promise<void>(resolve => release.push(resolve))
+      ran.push(url)
+
+      return { default: () => {
+        ran.push('run')
+      } }
+    }
+
+    tool = startDevTool(document, slow)
+    shadow().querySelector<HTMLButtonElement>('#kay-dev-tab-head')!.click()
+    tool.stop()
+    for (const resolve of release)
+      resolve()
+    await turn()
+
+    expect(ran.filter(entry => entry === 'run')).toEqual([])
+  })
+
   it('gives a tab its icon, the default one when it names none, and tones its count', () => {
     tool = startDevTool(document, loadTab)
 

@@ -1,9 +1,11 @@
 import type { DevKit, DevTab, DevTool, VitalName } from './dev-tool'
 
 // The Performance tab's code, fetched at once as its badge counts the vitals past their limits, with the tool's shared helpers from `tool.kit`.
+// Copied from dev-tool.ts, as a tab module imports nothing.
 const HOST = 'kay-dev'
 const SIZES_URL = '/_kay/dev/sizes'
 const FOOTPRINT_URL = '/_kay/dev/footprint'
+// Copied from dev-tool.ts, as a tab module imports nothing.
 const HEAD_HEADER = 'x-kay-dev'
 const REQUEST_MS = 3000
 const RATING_TONES = { good: 'ok', needs: 'warn', poor: 'error' } as const

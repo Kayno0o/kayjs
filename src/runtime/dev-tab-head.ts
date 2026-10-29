@@ -3,11 +3,12 @@ import type { DevTab, DevTool } from './dev-tool'
 
 // The Head tab's code, fetched at once as its badge counts what is wrong with the page's head, with the tool's shared helpers from `tool.kit`.
 const HEAD_URL = '/_kay/dev/head'
+// Copied from dev-tool.ts, as a tab module imports nothing.
 const HEAD_HEADER = 'x-kay-dev'
 // A value the Head tab gives a copy button, as a link.
 const WEB_URL = /^https?:\/\//i
 
-// A section the "Problems only" toggle hides, as it lists no problem.
+// A section the "Problems only" toggle hides, as it lists no problem; copied from dev-tool.ts, whose `[data-plain]` rule reads it.
 function plain<T extends HTMLElement>(element: T): T {
   element.dataset.plain = ''
 
