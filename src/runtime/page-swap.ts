@@ -40,7 +40,7 @@ export async function go(url: URL, swap: Swap): Promise<void> {
   }
 
   // Another click on the link of a page being fetched is the same visit: it joins the swap under way instead of fetching the page again.
-  if (inFlight.asked && inFlight.fetch?.key === pageKey(url) && inFlight.fetch.intent === swap.intent && (swap.intent === 'visit' || swap.intent === 'query')) {
+  if (joins(url, swap)) {
     await inFlight.asked
 
     return
@@ -65,6 +65,16 @@ export async function go(url: URL, swap: Swap): Promise<void> {
   }
 }
 
+// Whether the swap asks for exactly what the one fetching its page does, so joining it changes nothing the visitor asked for.
+function joins(url: URL, swap: Swap): boolean {
+  const flight = inFlight.fetch
+
+  if (!inFlight.asked || !flight)
+    return false
+
+  return (swap.intent === 'visit' || swap.intent === 'query') && flight.intent === swap.intent && flight.href === url.href && flight.replace === swap.replace && flight.scroll === swap.scroll && flight.transition === swap.transition
+}
+
 async function swapTo(url: URL, swap: Swap): Promise<void> {
   navigation.flush?.()
 
@@ -86,7 +96,7 @@ async function swapTo(url: URL, swap: Swap): Promise<void> {
   if (inFlight.fetch?.key !== key)
     inFlight.fetch?.controller.abort()
 
-  const flight = { controller, key, intent: swap.intent }
+  const flight = { controller, key, href: url.href, intent: swap.intent, replace: swap.replace, scroll: swap.scroll, transition: swap.transition }
 
   inFlight.fetch = flight
   void holding()
@@ -131,6 +141,10 @@ async function swapTo(url: URL, swap: Swap): Promise<void> {
       return
     }
 
+    // The page is fetched: a click from here on is a reload, not a second request for the same load.
+    if (inFlight.fetch === flight)
+      inFlight.fetch = undefined
+
     if (!isCurrent())
       return
 
@@ -149,7 +163,7 @@ async function swapTo(url: URL, swap: Swap): Promise<void> {
     if (isCurrent())
       document.documentElement.removeAttribute('aria-busy')
 
-    // Once the swap ends, a click on the page reloads it.
+    // A swap that ended before its page came leaves nothing to join.
     if (inFlight.fetch === flight)
       inFlight.fetch = undefined
   }

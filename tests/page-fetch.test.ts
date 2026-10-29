@@ -8,12 +8,16 @@ describe('the fetch of a page being navigated to', () => {
   let nav: typeof import('../src/runtime/navigation')
   let fetched: ReturnType<typeof spyOn<typeof globalThis, 'fetch'>>
   let assigned: ReturnType<typeof spyOn<Location, 'assign'>>
-  const gates = new Map<string, () => void>()
+  // A plain text answer ends a swap in a full load; markup is swapped in.
+  let markup = 'x'
+  const gates = new Map<string, (() => void)[]>()
   const requests: string[] = []
   const link = () => document.createElement('a')
   const visit = async (path: string, intent: 'visit' | 'query' | 'refresh' = 'visit') => swapModule.go(new URL(path, 'http://localhost/'), { intent })
-  const release = (path: string) => gates.get(`http://localhost${path}`)?.()
-  const pushed = () => history.length
+  const release = (path: string) => {
+    for (const open of gates.get(`http://localhost${path}`) ?? [])
+      open()
+  }
 
   beforeAll(async () => {
     GlobalRegistrator.register({ url: 'http://localhost/' })
@@ -28,21 +32,23 @@ describe('the fetch of a page being navigated to', () => {
 
       const { promise, resolve } = Promise.withResolvers<void>()
 
-      gates.set(input, resolve)
+      gates.set(input, [...gates.get(input) ?? [], resolve])
       init?.signal?.addEventListener('abort', () => resolve())
       await promise
 
       if (init?.signal?.aborted)
         throw new DOMException('aborted', 'AbortError')
 
-      return Object.defineProperty(new Response('x', { headers: { 'content-type': 'text/plain' } }), 'url', { value: input })
+      return Object.defineProperty(new Response(markup, { headers: { 'content-type': markup === 'x' ? 'text/plain' : 'text/html' } }), 'url', { value: input })
     }) as unknown as typeof fetch)
     assigned = spyOn(location, 'assign').mockImplementation(() => undefined)
   })
 
   afterEach(() => {
-    for (const release of gates.values())
-      release()
+    for (const opens of gates.values()) {
+      for (const open of opens)
+        open()
+    }
 
     gates.clear()
     requests.length = 0
@@ -50,6 +56,7 @@ describe('the fetch of a page being navigated to', () => {
     flight.inFlight.fetch = undefined
     flight.inFlight.asked = undefined
     assigned.mockClear()
+    markup = 'x'
   })
 
   afterAll(async () => {
@@ -159,14 +166,36 @@ describe('the fetch of a page being navigated to', () => {
     expect(requests).toEqual(['http://localhost/a'])
   })
 
-  it('adds no history entry for a repeated click', async () => {
-    const before = pushed()
+  it('adds one history entry for a repeated click on a page swapped in', async () => {
+    markup = '<!doctype html><html><head><title>t</title></head><body><p>x</p></body></html>'
+    nav.navigation.hooks = { hydrate: () => undefined, dispose: () => undefined }
+
+    const pushes = spyOn(history, 'pushState')
     const first = visit('/a')
     const second = visit('/a')
 
     release('/a')
     await Promise.all([first, second])
 
-    expect(pushed()).toBe(before)
+    expect(requests).toEqual(['http://localhost/a'])
+    expect(pushes).toHaveBeenCalledTimes(1)
+    pushes.mockRestore()
+  })
+
+  it('does not join a click asking for another hash or other options', async () => {
+    const first = visit('/a#one')
+
+    await settle()
+
+    const hash = visit('/a#two')
+
+    await settle()
+
+    const replaced = swapModule.go(new URL('/a#two', 'http://localhost/'), { intent: 'visit', replace: true })
+
+    release('/a')
+    await Promise.all([first, hash, replaced])
+
+    expect(requests).toEqual(['http://localhost/a', 'http://localhost/a', 'http://localhost/a'])
   })
 })
