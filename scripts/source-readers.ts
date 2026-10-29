@@ -16,6 +16,7 @@ export const SOURCE_READERS = [
   'tests/packages.test.ts',
   'tests/pg-order.test.ts',
   'tests/privacy-storage.test.ts',
+  'tests/scope.test.ts',
   'tests/side-effects.test.ts',
 ]
 
