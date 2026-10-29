@@ -1,8 +1,8 @@
-import type * as t from '@babel/types'
+import type { ObjectExpression, ObjectProperty } from 'oxc-parser'
 import type { CheckDiagnostic, CheckOptions } from '.'
 import { join } from 'node:path'
-import { parse } from '@babel/parser'
 import { findProjectFiles } from '../build/files'
+import { parseProgram } from '../compiler/estree'
 import { lintLevel, lintLevels } from '../compiler/lints'
 import { positionAt } from '../compiler/mapping'
 import { constBindings, exportedObject, keyName, unwrapped } from '../compiler/object-literal'
@@ -14,6 +14,11 @@ const SOURCE_FILE = /(?<!\.d)\.tsx?$/
 const OLD_KEY = new RegExp(`\\b(?:${Object.keys(RENAMED_KEYS).join('|')})\\b`)
 // The options of `pages()` and `testSite()` are the config's own, so they carry the same keys.
 const OPTION_FUNCTIONS: Record<string, string> = { pages: 'kay/server', testSite: 'kay/test' }
+
+// A `key: value` or shorthand property with a name written out: not a spread, a method, an accessor or a computed key.
+function isPlain(property: ObjectExpression['properties'][number]): property is ObjectProperty {
+  return property.type === 'Property' && property.kind === 'init' && !property.method && !property.computed
+}
 
 const renamed = (name: string): string | undefined => Object.hasOwn(RENAMED_KEYS, name) ? RENAMED_KEYS[name as keyof typeof RENAMED_KEYS] : undefined
 
@@ -33,20 +38,13 @@ export async function deprecatedConfigKeys(root: string, options: CheckOptions):
     if (!OLD_KEY.test(source) || (!isConfig && !source.includes('pages(') && !source.includes('testSite(')))
       continue
 
-    let ast: t.File
-
-    try {
-      ast = parse(source, { sourceType: 'module', plugins: ['typescript', 'jsx'], errorRecovery: true })
-    }
-    catch {
-      continue
-    }
+    const { program: ast } = parseProgram(source, { lang: file.endsWith('.tsx') ? 'tsx' : 'ts', recover: true })
 
     const levelAt = lintLevels(source, options.lints)
-    const objects: t.ObjectExpression[] = []
+    const objects: ObjectExpression[] = []
 
     if (isConfig) {
-      const exported = exportedObject(ast.program, constBindings(ast.program, true))
+      const exported = exportedObject(ast, constBindings(ast, true))
 
       if (exported)
         objects.push(exported)
@@ -65,10 +63,10 @@ export async function deprecatedConfigKeys(root: string, options: CheckOptions):
     })
 
     for (const object of objects) {
-      const names = new Set(object.properties.flatMap(property => property.type === 'ObjectProperty' ? [keyName(property)] : []))
+      const names = new Set(object.properties.flatMap(property => isPlain(property) ? [keyName(property)] : []))
 
       for (const property of object.properties) {
-        if (property.type !== 'ObjectProperty' || property.computed)
+        if (!isPlain(property))
           continue
 
         const old = keyName(property)
@@ -77,13 +75,13 @@ export async function deprecatedConfigKeys(root: string, options: CheckOptions):
         if (old === undefined || name === undefined)
           continue
 
-        const level = levelAt('deprecated-config-keys', property.key.start!)
+        const level = levelAt('deprecated-config-keys', property.key.start)
 
         if (level === 'allow')
           continue
 
-        const start = property.key.start!
-        const end = property.key.end!
+        const start = property.key.start
+        const end = property.key.end
         const clash = names.has(name)
 
         found.push({
@@ -94,7 +92,7 @@ export async function deprecatedConfigKeys(root: string, options: CheckOptions):
           help: clash ? `\`${name}\` is set beside it, which wins: drop \`${old}\`` : `write \`${name}\``,
           code: 'deprecated-config-keys',
           severity: level === 'warn' ? 'warning' : 'error',
-          ...!clash && { fixes: [{ title: `Rename ${old} to ${name}`, edits: [{ start, end: property.shorthand ? property.value.end! : end, text: property.shorthand ? `${name}: ${old}` : name }], safe: true }] },
+          ...!clash && { fixes: [{ title: `Rename ${old} to ${name}`, edits: [{ start, end: property.shorthand ? property.value.end : end, text: property.shorthand ? `${name}: ${old}` : name }], safe: true }] },
         })
       }
     }
