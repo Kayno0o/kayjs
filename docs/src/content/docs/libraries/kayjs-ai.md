@@ -441,7 +441,7 @@ for (const turn of [{ ask: 'Will it rain tomorrow?', expect: 'forecast' }, { ask
 }
 ```
 
-Run it with `bun`, not `bun test`, where `ask` answers from the fake. The conversation is scripted, so each follow-up meets the text history a chat posts, and the calls are scored against what you expect.
+Run it as `bun --preload kay/test/preload bench.ts`, which lets a script import `.kay` modules, and not under `bun test`, where `ask` answers from the fake. The conversation is scripted, so each follow-up meets the text history a chat posts, and the calls are scored against what you expect.
 
 ## Limit what visitors spend
 

@@ -76,6 +76,19 @@ export function mediaChars(message: Pick<ProviderMessage, 'attachments'>): numbe
   return (message.attachments ?? []).reduce((sum, media) => sum + charsOfMedia(media.kind, media.data.byteLength), 0)
 }
 
+// The characters of a message's calls and results.
+export function toolChars(message: Pick<ProviderMessage, 'calls' | 'results'>): number {
+  let chars = 0
+
+  for (const call of message.calls ?? [])
+    chars += call.name.length + call.arguments.length
+
+  for (const result of message.results ?? [])
+    chars += result.content.length
+
+  return chars
+}
+
 function kindOf(bytes: Uint8Array): { type: string, kind: Media['kind'] } | undefined {
   const head = bytes.subarray(0, SNIFFED_BYTES)
 

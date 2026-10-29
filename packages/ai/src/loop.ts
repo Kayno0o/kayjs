@@ -3,7 +3,7 @@ import type { Confirm, Finish, Piece, Provider, ProviderMessage, ProviderRequest
 import { logFrom } from 'kay'
 import { spend, ticketAllows, ticketFor } from './approval'
 import { ticketsIn } from './approval-marker'
-import { mediaChars } from './attachments'
+import { mediaChars, toolChars } from './attachments'
 import { AiError } from './errors'
 import { MAX_ARGUMENTS, MAX_CALLS_PER_STEP, MAX_STREAMED_CALLS, MAX_THINKING } from './tool-limits'
 
@@ -32,19 +32,6 @@ export interface Ran {
 
 function failed(result: string): Ran {
   return { status: 'failed', result }
-}
-
-// The characters of a message's calls and results.
-export function toolChars(message: Pick<ProviderMessage, 'calls' | 'results'>): number {
-  let chars = 0
-
-  for (const call of message.calls ?? [])
-    chars += call.name.length + call.arguments.length
-
-  for (const result of message.results ?? [])
-    chars += result.content.length
-
-  return chars
 }
 
 // The characters a step sends: every message with its calls and results.

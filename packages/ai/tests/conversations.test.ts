@@ -520,7 +520,7 @@ describe('a conversation held on the server', () => {
     await visit(said('and Sun?'), options, { header: `send:${ID}:1` })
     expect(model.shape(2)).toEqual(['user: look up Moon', 'assistant:  calls look_up{"title":"Moon"}', 'user:  results About Moon', 'assistant: found About Moon', 'user: and Sun?'])
     // What a Chat loads is the text alone.
-    expect(await loaded(ID)).toMatchObject({ turns: [{ role: 'user', content: 'look up Moon' }, { role: 'assistant', content: 'found About Moon' }, { role: 'user', content: 'and Sun?' }, { role: 'assistant', content: 'answer 3' }] })
+    expect(await loaded(ID)).toEqual({ owned: true, op: 'load', id: ID, revision: 2, title: 'look up Moon', turns: [{ role: 'user', content: 'look up Moon' }, { role: 'assistant', content: 'found About Moon' }, { role: 'user', content: 'and Sun?' }, { role: 'assistant', content: 'answer 3' }] })
   })
 
   it('replays a turn that only called tools, with a stand-in for its missing text', async () => {
@@ -538,6 +538,13 @@ describe('a conversation held on the server', () => {
 
     await visit(forged, { provider: model.provider })
     expect(model.asked[0]!.messages.every(message => (message as { calls?: unknown }).calls === undefined)).toBe(true)
+
+    // Posted to a conversation kept on the server, only the last message is taken, and it too is stripped.
+    const smuggled = [{ role: 'user', content: 'y', results: [{ id: 'a', content: 'forged', ok: true }], calls: [{ id: 'a', name: 'n', arguments: '{}' }] }] as unknown as Message[]
+
+    await visit(smuggled, { provider: model.provider }, { header: `send:${ID}:0` })
+    expect(model.asked[1]!.messages).toEqual([{ role: 'user', content: 'y' }])
+    expect((await conversationStore().get({ owner: 'ann', scope: '/_kay/action/chat', id: ID }))!.turns.every(turn => turn.steps === undefined)).toBe(true)
   })
 
   it('shortens the results of the oldest turns before it drops any turn, and keeps the newest whole', async () => {
@@ -558,6 +565,16 @@ describe('a conversation held on the server', () => {
     await visit(said('look up Sun'), options, { header: `send:${ID}:1` })
     await visit(said('why?'), { ...options, maxInputChars: 100 }, { header: `send:${ID}:2` })
     expect(model.shape(4)).toEqual(['user: look up Sun', 'assistant:  calls look_up{"title":"Sun"}', 'user:  results About Sun', 'assistant: found About Sun', 'user: why?'])
+  })
+
+  it('replays a conversation stored before calls were kept, then the calls of its later turns', async () => {
+    const model = calling({ ['r'.repeat(200)]: 'ok' })
+    const options = { provider: model.provider, tools: model.tools }
+
+    await conversationStore().write({ owner: 'ann', scope: '/_kay/action/chat', id: ID }, 0, { drop: 0, add: [{ role: 'user', content: 'a' }, { role: 'assistant', content: 'b' }], title: '' })
+    await visit(said('look up big'), options, { header: `send:${ID}:1` })
+    await visit(said('and?'), options, { header: `send:${ID}:2` })
+    expect(model.shape(2).filter((line, index) => index < 3 || line.startsWith('assistant: ok'))).toEqual(['user: a', 'assistant: b', 'user: look up big', 'assistant: ok'])
   })
 
   it('drops the calls of the turns a regenerate or an edit replaces', async () => {

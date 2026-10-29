@@ -56,7 +56,7 @@ const outcome = await site.call(assistant, { messages })
 
 ### Benching a prompt against the real model
 
-`mocked(action, run)` (from `@kaynooo/kayjs-ai`) makes a function tool of an action with the action's own name, description, label and input schema and a `run` of yours, so a script outside the server asks the real model with the tools the app offers, answered by mocks. It throws for an action that cannot be a tool (one taking a file, one of a page with params, `tool: false`). The input is checked against the action's schema before `run`, as for `tool()`.
+`mocked(action, run)` (from `@kaynooo/kayjs-ai`) makes a function tool of an action with the action's own name, description, label and input schema and a `run` of yours, so a script outside the server asks the real model with the tools the app offers, answered by mocks. It throws for an action that cannot be a tool (one taking a file, or `tool: false`; a page with params is refused once the app serves it, not in a script). The input is checked against the action's schema before `run`, as for `tool()`.
 
 ```ts
 import type { Message } from '@kaynooo/kayjs-ai'
@@ -78,7 +78,7 @@ for (const turn of [{ ask: 'Will it rain tomorrow?', expect: 'forecast' }, { ask
 }
 ```
 
-Run it with `bun`, not `bun test`, where `ask` answers from the fake. The history is the text a Chat posts, so a bench of follow-ups meets what a visitor's model meets.
+Run it as `bun --preload kay/test/preload bench.ts`, which lets the script import `.kay` modules (a `bunfig.toml` `preload` does the same), and not under `bun test`, where `ask` answers from the fake. The history is the text a Chat posts, so a bench of follow-ups meets what a visitor's model meets.
 
 ## Reference
 

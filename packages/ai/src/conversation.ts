@@ -4,14 +4,14 @@ import type { ConversationCall } from './resume'
 import type { AskOptions, Message, ProviderMessage, Reply, ToolCall } from './types'
 import { logFrom } from 'kay'
 import { currentRequest, refundRateLimit } from 'kay/library'
-import { estimatedChars } from './attachments'
+import { estimatedChars, toolChars } from './attachments'
 import { usableSources } from './chat-sources'
 import { conversationStore } from './conversation-store'
 import { renamedTitle, titleOf } from './conversation-title'
 import { deferredReply } from './deferred'
 import { AiError } from './errors'
 import { namedVisitor } from './limits'
-import { toolChars } from './loop'
+import { clip } from './loop'
 import { createReply } from './reply'
 import { conversationCallOf, replacesOf, replyCallOf } from './resume'
 
@@ -236,7 +236,10 @@ export function heldReply(call: HeldCall, prompt: Message[], options: AskOptions
 // A call still running when the reply ended has no result to replay.
 const isAnswered = (call: ToolCall) => call.status !== 'running' && call.result !== undefined
 
-const storedCall = ({ id, name, input, result, status }: ToolCall): StoredCall => ({ id, name, arguments: JSON.stringify(input), result: result ?? '', ok: status === 'done' })
+// A result is kept to this many characters, as the replay of an older one is shortened anyway.
+const MOST_STORED_RESULT = 4000
+
+const storedCall = ({ id, name, input, result, status }: ToolCall): StoredCall => ({ id, name, arguments: JSON.stringify(input), result: clip(result ?? '', MOST_STORED_RESULT), ok: status === 'done' })
 
 // The calls a reply made, request by request, and how it finished, none for one that broke off before telling.
 async function ending(reply: Reply): Promise<[calls: readonly unknown[], finish: unknown, steps: StoredCall[][]]> {
