@@ -1,23 +1,11 @@
 // What the compiler asks of Bun and the file system, which a browser build swaps for the stand-ins of `host.browser.ts` through the `browser` field of package.json: the server compiler keeps these direct calls.
-import type traverseModule from '@babel/traverse'
 import { statSync } from 'node:fs'
-import { createRequire } from 'node:module'
 import { join } from 'node:path'
 import process from 'node:process'
 import { installedIconSets } from '../build/icons'
 import { fnvHash } from './fnv-hash'
 
 export { browserGlobals } from './globals'
-
-const require = createRequire(import.meta.url)
-let loadedTraverse: typeof traverseModule | undefined
-
-// Loading it takes longer than most compiles, so a server whose `.kay` files all come from the compile cache never does; `kay dev` loads it ahead of time.
-export function loadTraverse(): typeof traverseModule {
-  loadedTraverse ??= (require('@babel/traverse') as { default: typeof traverseModule }).default
-
-  return loadedTraverse
-}
 
 export function cwd(): string {
   return process.cwd()

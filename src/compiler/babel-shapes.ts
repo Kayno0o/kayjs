@@ -382,3 +382,6 @@ export const LOOP_TYPES: ReadonlySet<string> = new Set([
   'WhileStatement',
   'ForOfStatement',
 ])
+
+// The names `Scope#hasBinding` takes as declared without a declaration, which are the `Scope.globals` and `Scope.contextVariables` of @babel/traverse.
+export const BUILTIN_GLOBALS: ReadonlySet<string> = new Set(['decodeURI', 'decodeURIComponent', 'encodeURI', 'encodeURIComponent', 'escape', 'eval', 'globalThis', 'isFinite', 'isNaN', 'parseFloat', 'parseInt', 'undefined', 'unescape', 'AggregateError', 'Array', 'ArrayBuffer', 'Atomics', 'BigInt', 'BigInt64Array', 'BigUint64Array', 'Boolean', 'DataView', 'Date', 'Error', 'EvalError', 'FinalizationRegistry', 'Float16Array', 'Float32Array', 'Float64Array', 'Function', 'Infinity', 'Int16Array', 'Int32Array', 'Int8Array', 'Intl', 'Iterator', 'JSON', 'Map', 'Math', 'NaN', 'Number', 'Object', 'Promise', 'Proxy', 'RangeError', 'ReferenceError', 'Reflect', 'RegExp', 'Set', 'SharedArrayBuffer', 'String', 'Symbol', 'SyntaxError', 'TypeError', 'Uint16Array', 'Uint32Array', 'Uint8Array', 'Uint8ClampedArray', 'URIError', 'WeakMap', 'WeakRef', 'WeakSet', 'arguments'])

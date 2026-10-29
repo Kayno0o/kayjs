@@ -1,7 +1,6 @@
 import type { Server } from 'bun'
 import { join } from 'node:path'
 import process from 'node:process'
-import { loadTraverse } from '../compiler/host'
 import { CONFIG_FILE } from '../config'
 import { declaredAppFiles } from '../config-extensions'
 import { loadConfig } from '../config-loader'
@@ -21,7 +20,6 @@ import '../build/plugin'
 // Preloaded into the server process `kay dev` starts: kay and its compiler load while the first types are written, before anything waits on them.
 // Bun runs the entry once this resolves, as the main module, when `kay dev` writes a line.
 // The process then stays for the session: a change to what kay loads itself reloads the changed modules and runs the entry again, which takes over the server it started.
-loadTraverse()
 // The debugger `kay dev --inspect` opens is this process's: a Bun process the app starts would fail to open it again.
 delete process.env.BUN_INSPECT
 

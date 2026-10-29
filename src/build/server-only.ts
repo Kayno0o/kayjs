@@ -1,14 +1,13 @@
-import type { NodePath, Scope } from '@babel/traverse'
 import type * as t from '@babel/types'
+import type { Path, Scope } from '../compiler/scope'
 import { readFileSync } from 'node:fs'
 import { builtinModules } from 'node:module'
 import { basename, join, relative, resolve, sep } from 'node:path'
 import process from 'node:process'
 import { parse } from '@babel/parser'
 import { KayError } from '../compiler/errors'
-import { loadTraverse } from '../compiler/host'
 import { parseKay } from '../compiler/parser'
-import { walkScope } from '../compiler/rewrite'
+import { eachDescendant, walkScope } from '../compiler/walk'
 import { readCacheEntry, writeCacheEntry } from './cache'
 import { KAY_FILE } from './files'
 
@@ -23,7 +22,9 @@ const BUILTIN_REFUSAL = /^Browser build cannot import (?:Node\.js|Bun) builtin/
 const PACKAGE_PATH = /node_modules\/((?:@[^/]+\/)?[^/]+)/
 // Under the build cache: each chunk's scan by a hash of its content, its server-only names or null where it did not parse.
 const SCANS_FILE = 'server-only.json'
-const SCANNER_PACKAGES = ['@babel/parser/package.json', '@babel/traverse/package.json']
+const SCANNER_PACKAGES = ['@babel/parser/package.json']
+// The scope pass the scan reads names with.
+const SCANNER_MODULES = ['../compiler/scope.ts', '../compiler/walk.ts', '../compiler/babel-shapes.ts']
 let scannerKey: string | undefined
 
 type Scans = Record<string, string[] | null>
@@ -108,13 +109,13 @@ export function loadTimeReads(source: string, path: string): LoadTimeRead[] {
       continue
 
     walkScope(program, {
-      Identifier(path: NodePath<t.Identifier>) {
+      Identifier(path) {
         const { name } = path.node
 
-        if (!path.isReferencedIdentifier() || path.getFunctionParent() !== null || path.findParent(parent => parent.isTSType() || ((parent.isClassProperty() || parent.isClassPrivateProperty()) && !parent.node.static)) !== null)
+        if (!path.isReferencedIdentifier() || path.getFunctionParent() !== null || path.findParent(parent => parent.isTSType() || ((parent.node.type === 'ClassProperty' || parent.node.type === 'ClassPrivateProperty') && !parent.node.static)) !== null)
           return
 
-        if (SERVER_ONLY.has(name) && !path.scope.hasBinding(name, { noGlobals: true }) && !defined(path) && !guarded(path, name))
+        if (SERVER_ONLY.has(name) && !path.scope.hasBinding(name, true) && !defined(path) && !guarded(path, name))
           found.push({ name, start: start + path.node.start! })
       },
     })
@@ -128,14 +129,14 @@ function namesIn(program: t.File): Set<string> {
 
   // A name declared in two fences is refused by Babel's scope, and reports nothing here: the fence reports it itself.
   walkScope(program, {
-    Identifier(path: NodePath<t.Identifier>) {
+    Identifier(path) {
       const { name } = path.node
 
       if (!SERVER_ONLY.has(name) || !path.isReferencedIdentifier())
         return
 
       // A chunk carrying a polyfill of its own binds the name, and so does any local called `process`.
-      if (path.scope.hasBinding(name, { noGlobals: true }) || defined(path) || guarded(path, name))
+      if (path.scope.hasBinding(name, true) || defined(path) || guarded(path, name))
         return
 
       found.add(name)
@@ -177,15 +178,15 @@ function fences(source: string): string {
 }
 
 // `process.env.NODE_ENV`, which the client build replaces with a literal: a module reading it is not one to go and fix.
-function defined(path: NodePath<t.Identifier>): boolean {
+function defined(path: Path<t.Identifier>): boolean {
   const env = path.parentPath
 
-  if (!env?.isMemberExpression() || env.node.object !== path.node || property(env.node) !== 'env')
+  if (env?.node.type !== 'MemberExpression' || env.node.object !== path.node || property(env.node) !== 'env')
     return false
 
-  const read = env.parentPath
+  const read = env.parentPath?.node
 
-  return read.isMemberExpression() && property(read.node) === DEFINED
+  return read?.type === 'MemberExpression' && property(read) === DEFINED
 }
 
 function property(node: t.MemberExpression): string | undefined {
@@ -196,15 +197,15 @@ function property(node: t.MemberExpression): string | undefined {
 }
 
 // Whether a `typeof` of the same name, or a `try` catching what the read throws, stands between the read and the code around it: the shapes a module takes to run on either side.
-function guarded(path: NodePath<t.Identifier>, name: string): boolean {
-  if (path.parentPath?.isUnaryExpression() && path.parentPath.node.operator === 'typeof')
+function guarded(path: Path<t.Identifier>, name: string): boolean {
+  if (path.parentPath?.node.type === 'UnaryExpression' && path.parentPath.node.operator === 'typeof')
     return true
 
-  let child: NodePath = path
-  let parent: NodePath | null = path.parentPath
+  let child: Path = path
+  let parent: Path | null = path.parentPath
 
   // Only up to the function holding the read: a guard outside it does not say this code runs.
-  while (parent && !parent.isFunction() && !parent.isProgram()) {
+  while (parent && !parent.isFunction() && parent.node.type !== 'Program') {
     if (branchGuarded(parent, child, name, path.scope) || exitsEarlier(parent, child, name) || caught(parent, child))
       return true
 
@@ -216,27 +217,29 @@ function guarded(path: NodePath<t.Identifier>, name: string): boolean {
 }
 
 // A branch a guard chose: either side of an `if` or a `?:` asking about the name, the right of an `&&` or `||`, and the body of a loop.
-function branchGuarded(parent: NodePath, child: NodePath, name: string, scope: Scope): boolean {
-  if (parent.isIfStatement() || parent.isConditionalExpression())
-    return (child.node === parent.node.consequent || child.node === parent.node.alternate) && asks(parent.node.test, name, scope)
+function branchGuarded(parent: Path, child: Path, name: string, scope: Scope): boolean {
+  const { node } = parent
 
-  if (parent.isLogicalExpression())
-    return child.node === parent.node.right && asks(parent.node.left, name, scope)
+  if (node.type === 'IfStatement' || node.type === 'ConditionalExpression')
+    return (child.node === node.consequent || child.node === node.alternate) && asks(node.test, name, scope)
 
-  if (parent.isWhileStatement() || parent.isDoWhileStatement() || (parent.isForStatement() && parent.node.test !== null))
-    return child.node === parent.node.body && asks(parent.node.test!, name, scope)
+  if (node.type === 'LogicalExpression')
+    return child.node === node.right && asks(node.left, name, scope)
+
+  if (node.type === 'WhileStatement' || node.type === 'DoWhileStatement' || (node.type === 'ForStatement' && node.test !== null))
+    return child.node === node.body && asks(node.test!, name, scope)
 
   return false
 }
 
 // The block of a `try` with a `catch`, which takes the ReferenceError a missing global throws: `try { p = process } catch {}`. A `finally` alone lets it through.
-function caught(parent: NodePath, child: NodePath): boolean {
-  return parent.isTryStatement() && child.node === parent.node.block && parent.node.handler !== null
+function caught(parent: Path, child: Path): boolean {
+  return parent.node.type === 'TryStatement' && child.node === parent.node.block && parent.node.handler !== null
 }
 
 // `if (typeof process === 'undefined') return`, after which the block runs only where it exists.
-function exitsEarlier(parent: NodePath, child: NodePath, name: string): boolean {
-  const body = parent.isBlockStatement() || parent.isProgram() ? parent.node.body : undefined
+function exitsEarlier(parent: Path, child: Path, name: string): boolean {
+  const body = parent.node.type === 'BlockStatement' || parent.node.type === 'Program' ? parent.node.body : undefined
 
   if (body === undefined)
     return false
@@ -262,7 +265,7 @@ function asks(test: t.Node, name: string, scope: Scope): boolean {
 
   for (const read of references(test)) {
     const binding = scope.getBinding(read)
-    const declarator = binding?.path.isVariableDeclarator() ? binding.path.node : undefined
+    const declarator = binding?.path.node.type === 'VariableDeclarator' ? binding.path.node : undefined
 
     if (declarator?.init && asksTypeof(declarator.init, name))
       return true
@@ -271,7 +274,7 @@ function asks(test: t.Node, name: string, scope: Scope): boolean {
   return false
 }
 
-// Babel's traverse visits a node's children and not the node, which a test of one identifier is made of.
+// A walk visits a node's children and not the node, which a test of one identifier is made of.
 function references(node: t.Node): Set<string> {
   const names = new Set<string>()
   const add = (found: t.Node) => {
@@ -280,7 +283,7 @@ function references(node: t.Node): Set<string> {
   }
 
   add(node)
-  loadTraverse()(node, { noScope: true, Identifier: (path: NodePath<t.Identifier>) => add(path.node) })
+  eachDescendant(node, add)
 
   return names
 }
@@ -294,7 +297,7 @@ function asksTypeof(node: t.Node, name: string): boolean {
   }
 
   ask(node)
-  loadTraverse()(node, { noScope: true, UnaryExpression: (path: NodePath<t.UnaryExpression>) => ask(path.node) })
+  eachDescendant(node, ask)
 
   return askedOf === name
 }
@@ -363,9 +366,9 @@ function scanned(code: string, cached: Scans, scans: Scans): Set<string> | undef
   return names
 }
 
-// What a scan depends on besides the chunk: this module, and the parser and traverse it runs through.
+// What a scan depends on besides the chunk: this module, the scope pass and the parser it runs through.
 function scanKey(): string {
-  scannerKey ??= Bun.hash([import.meta.path, ...SCANNER_PACKAGES.map(manifest => Bun.resolveSync(manifest, import.meta.dir))].map(file => readFileSync(file, 'utf8')).join('\0')).toString(36)
+  scannerKey ??= Bun.hash([import.meta.path, ...SCANNER_MODULES.map(module => join(import.meta.dir, module)), ...SCANNER_PACKAGES.map(manifest => Bun.resolveSync(manifest, import.meta.dir))].map(file => readFileSync(file, 'utf8')).join('\0')).toString(36)
 
   return scannerKey
 }

@@ -1,11 +1,12 @@
-import type { NodePath } from '@babel/traverse'
 import type * as t from '@babel/types'
 import type { Diagnostic, Fix, KayFile, Span } from './ast'
+import type { Path } from './scope'
 import { parse } from '@babel/parser'
 import { visitNodes } from './ast'
 import { browserGlobals } from './host'
 import { parameterNames } from './items'
-import { importedFromKay, walkScope } from './rewrite'
+import { importedFromKay } from './rewrite'
+import { walkScope } from './walk'
 
 // One part of the program `browserReads` analyzes: generated text standing for the source from `source` on, character for character.
 interface Segment {
@@ -88,7 +89,7 @@ export function browserReads(file: KayFile, island: boolean, serverNames: string
   const reads: Read[] = []
   const varying: Varying[] = []
 
-  const noteVarying = (path: NodePath<t.CallExpression | t.NewExpression>) => {
+  const noteVarying = (path: Path<t.CallExpression | t.NewExpression>) => {
     const found = island ? varyingValue(path) : undefined
 
     if (found)
@@ -98,20 +99,20 @@ export function browserReads(file: KayFile, island: boolean, serverNames: string
   // A name the template binds twice over the script's, which no block can tell apart, leaves nothing to report rather than failing the check.
   const walked = walkScope(ast, {
     Function(path) {
-      const parent = path.parentPath
+      const parent = path.parentPath!
 
-      if (parent.isCallExpression() && (parent.node.callee === path.node || rendersCallback(parent.node, path.node)))
+      if (parent.is('CallExpression') && (parent.node.callee === path.node || rendersCallback(parent.node, path.node)))
         transparent.add(path.node)
 
-      if (path.isFunctionDeclaration() && parent.isProgram() && path.node.id)
+      if (path.is('FunctionDeclaration') && parent.is('Program') && path.node.id)
         functions.set(path.node.id.name, path.node)
-      else if (parent.isVariableDeclarator() && parent.node.id.type === 'Identifier' && parent.parentPath.parentPath?.isProgram())
+      else if (parent.is('VariableDeclarator') && parent.node.id.type === 'Identifier' && parent.parentPath?.parentPath?.is('Program'))
         functions.set(parent.node.id.name, path.node)
     },
     CallExpression(path) {
       const callee = path.node.callee
 
-      if (callee.type === 'Identifier' && path.scope.getBinding(callee.name)?.scope.path.isProgram())
+      if (callee.type === 'Identifier' && path.scope.getBinding(callee.name)?.scope.node.type === 'Program')
         calls.push({ name: callee.name, chain: functionChain(path) })
 
       noteVarying(path)
@@ -125,13 +126,14 @@ export function browserReads(file: KayFile, island: boolean, serverNames: string
       if (!names.has(name) || !path.isReferencedIdentifier() || path.scope.hasBinding(name, true) || inType(path) || listenTarget(path))
         return
 
-      const typeOf = path.parentPath.isUnaryExpression({ operator: 'typeof' })
+      const holder = path.parentPath!.node
+      const typeOf = holder.type === 'UnaryExpression' && holder.operator === 'typeof'
 
       if (!typeOf && guarded(path, program.code, names))
         return
 
       const chain = functionChain(path)
-      const statement = chain.length === 0 ? path.findParent(ancestor => ancestor.parentPath?.isProgram() === true)?.node as t.Statement | undefined : undefined
+      const statement = chain.length === 0 ? path.findParent(ancestor => ancestor.parentPath?.node.type === 'Program')?.node as t.Statement | undefined : undefined
 
       reads.push({ name, at: path.node.start!, chain, typeOf, statement })
     },
@@ -186,13 +188,13 @@ export function browserReads(file: KayFile, island: boolean, serverNames: string
 }
 
 // The clock, a random number, or a locale or time zone left to the platform, as a call or a `new` gives them; options the code computes are taken as setting them.
-function varyingValue(path: NodePath<t.CallExpression | t.NewExpression>): Omit<Varying, 'start' | 'end' | 'chain'> | undefined {
+function varyingValue(path: Path<t.CallExpression | t.NewExpression>): Omit<Varying, 'start' | 'end' | 'chain'> | undefined {
   const { callee, arguments: args } = path.node
   const global = (node: t.Node, name: string) => node.type === 'Identifier' && node.name === name && !path.scope.hasBinding(name, true)
   const noLocale = (locale: t.Node | undefined) => locale === undefined || global(locale, 'undefined')
 
   if (global(callee, 'Date'))
-    return args.length === 0 ? { label: path.isNewExpression() ? 'new Date()' : 'Date()', ...CLOCK } : undefined
+    return args.length === 0 ? { label: path.node.type === 'NewExpression' ? 'new Date()' : 'Date()', ...CLOCK } : undefined
 
   if (callee.type !== 'MemberExpression' || callee.computed || callee.property.type !== 'Identifier')
     return undefined
@@ -212,7 +214,7 @@ function varyingValue(path: NodePath<t.CallExpression | t.NewExpression>): Omit<
     return name === 'DateTimeFormat' && lacksOption(args[1], 'timeZone') ? { label: 'Intl.DateTimeFormat', ...NO_TIME_ZONE } : undefined
   }
 
-  if (!path.isCallExpression() || !LOCALE_METHODS.has(name))
+  if (path.node.type !== 'CallExpression' || !LOCALE_METHODS.has(name))
     return undefined
 
   if (noLocale(args[0]))
@@ -228,8 +230,12 @@ function lacksOption(options: t.Node | undefined, key: string): boolean {
 }
 
 // A read in the target of `listen(window, 'keydown', ...)`, which the compiler hands `listen` as a function the browser calls.
-function listenTarget(path: NodePath): boolean {
-  return path.find(parent => parent.parentPath?.isCallExpression() === true && parent.parentPath.node.arguments[0] === parent.node && importedFromKay(parent.scope, parent.parentPath.node.callee) === 'listen') !== null
+function listenTarget(path: Path): boolean {
+  return path.find((parent) => {
+    const call = parent.parentPath?.node
+
+    return call?.type === 'CallExpression' && call.arguments[0] === parent.node && importedFromKay(parent.scope, call.callee) === 'listen'
+  }) !== null
 }
 
 // `memo(() => ...)` and `rows.map(row => ...)` run the function they take before they return.
@@ -246,7 +252,7 @@ function rendersCallback(call: t.CallExpression, fn: t.Node): boolean {
 }
 
 // A read the code already keeps from running on the server: under a `typeof` check of a browser-only global, or inside a `try`.
-function guarded(path: NodePath, code: string, names: ReadonlySet<string>): boolean {
+function guarded(path: Path, code: string, names: ReadonlySet<string>): boolean {
   const at = path.node.start!
   const checks = (test: t.Node) => Array.from(code.slice(test.start!, test.end!).matchAll(TYPEOF_GLOBAL), match => match[1]!).some(name => names.has(name))
 
@@ -263,16 +269,16 @@ function guarded(path: NodePath, code: string, names: ReadonlySet<string>): bool
   }) !== null
 }
 
-function functionChain(path: NodePath): t.Node[] {
+function functionChain(path: Path): t.Node[] {
   const chain: t.Node[] = []
 
-  for (let fn = path.getFunctionParent(); fn; fn = fn.parentPath.getFunctionParent())
+  for (let fn = path.getFunctionParent(); fn; fn = fn.getFunctionParent())
     chain.push(fn.node)
 
   return chain
 }
 
-function inType(path: NodePath): boolean {
+function inType(path: Path): boolean {
   return path.findParent(ancestor => ancestor.node.type.startsWith('TS') && !TS_EXPRESSIONS.has(ancestor.node.type)) !== null
 }
 

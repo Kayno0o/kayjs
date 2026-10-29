@@ -2,8 +2,8 @@ import { describe, expect, it } from 'bun:test'
 import { compileKay } from '../src/compiler'
 import { serverOnlyImports } from '../src/compiler/fence-checks'
 import { parseKay } from '../src/compiler/parser'
-import { walkScope } from '../src/compiler/rewrite'
 import { analyzeScript, analyzeServer, parseFence } from '../src/compiler/script'
+import { walkScope } from '../src/compiler/walk'
 import { semanticTokens } from '../src/lsp/semantic-tokens'
 
 // An edit passes through a fence declaring one name twice, which Babel's scope refuses; the fence still compiles, and its tsgo error is the one reported.

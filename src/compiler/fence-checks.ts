@@ -1,15 +1,15 @@
 // The checks a fence takes once parsed, beside what analyzing it reports: a schema field with no bound, a stylesheet imported for its text without asking, a page setting outside `page`.
 
-import type { NodePath } from '@babel/traverse'
 import type * as t from '@babel/types'
 import type { Diagnostic, Fix } from './ast'
+import type { Scope as BindingScope } from './scope'
 import type { PageSettings, ParsedFence, SeparateSetting, ServerAnalysis } from './script'
 import { isSecret } from '../runtime/form'
 import { eachNode } from './each-node'
 import { PAGE } from './page-settings'
 import { patternNames } from './pattern-names'
-import { walkScope } from './rewrite'
 import { parseFence } from './script'
+import { walkScope } from './walk'
 
 // A line break before a line with text: a blank line moving into `page` stays blank.
 const LINE_WITH_TEXT = /\n(?=[^\n])/g
@@ -201,7 +201,7 @@ function namespaceReads<Entry extends Named>(fence: ParsedFence, namespaces: Map
     return []
 
   const found: { key: t.Node, moved: Entry }[] = []
-  const movedBy = (object: t.Node | null | undefined, name: string | undefined, scope: NodePath['scope'] | undefined): Entry | undefined => {
+  const movedBy = (object: t.Node | null | undefined, name: string | undefined, scope: BindingScope | undefined): Entry | undefined => {
     if (object?.type !== 'Identifier')
       return undefined
 
@@ -210,7 +210,7 @@ function namespaceReads<Entry extends Named>(fence: ParsedFence, namespaces: Map
 
     return specifier && namespaces.get(specifier)?.find(entry => entry.name === name)
   }
-  const destructured = (pattern: t.ObjectPattern, init: t.Node | null | undefined, scope: NodePath['scope'] | undefined) => {
+  const destructured = (pattern: t.ObjectPattern, init: t.Node | null | undefined, scope: BindingScope | undefined) => {
     for (const property of pattern.properties) {
       if (property.type !== 'ObjectProperty')
         continue
@@ -221,7 +221,7 @@ function namespaceReads<Entry extends Named>(fence: ParsedFence, namespaces: Map
         found.push({ key: property.key, moved })
     }
   }
-  const visit = (node: t.Node, scope: NodePath['scope'] | undefined): void => {
+  const visit = (node: t.Node, scope: BindingScope | undefined): void => {
     if (node.type === 'MemberExpression' || node.type === 'OptionalMemberExpression') {
       const { property } = node
       const moved = movedBy(node.object, memberName(property, node.computed), scope)
@@ -238,7 +238,7 @@ function namespaceReads<Entry extends Named>(fence: ParsedFence, namespaces: Map
     }
   }
 
-  if (!walkScope(fence.ast, { enter: (path: NodePath) => visit(path.node, path.scope) })) {
+  if (!walkScope(fence.ast, { enter: path => visit(path.node, path.scope) })) {
     found.length = 0
 
     for (const statement of fence.ast.program.body)

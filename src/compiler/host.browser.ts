@@ -1,10 +1,4 @@
 // The browser's stand-ins for `host.ts`: the playground compiles one file in memory, so nothing reads a project or runs Bun.
-import traverse from '@babel/traverse'
-
-// Bundled with the page, whose chunk loads when the playground opens.
-export function loadTraverse(): typeof traverse {
-  return (traverse as unknown as { default?: typeof traverse }).default ?? traverse
-}
 
 export function browserGlobals(): ReadonlySet<string> {
   return new Set()

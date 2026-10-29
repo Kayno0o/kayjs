@@ -1,10 +1,11 @@
-import type { Binding, NodePath } from '@babel/traverse'
 import type * as t from '@babel/types'
+import type { Binding } from '../compiler/scope'
 import { basename, dirname } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { parse } from '@babel/parser'
-import { loadTraverse } from '../compiler/host'
 import { constBindings, exportedObject } from '../compiler/object-literal'
+import { analyze } from '../compiler/scope'
+import { eachDescendant } from '../compiler/walk'
 
 interface Range {
   start: number
@@ -21,22 +22,15 @@ const COMMENTS = new Set(['CommentBlock', 'CommentLine'])
 // A declaration referencing itself, or one a type mentions, stays: what is left must run as it did.
 export function withoutPlugins(source: string): string | undefined {
   const ast = parseModule(source, true)
-  let program: NodePath<t.Program> | undefined
 
   if (!ast)
     return undefined
 
-  loadTraverse()(ast, {
-    Program(path) {
-      program = path
-      path.stop()
-    },
-  })
-
-  const config = program && exportedObject(program.node, constBindings(program.node, true))
+  const { program } = analyze(ast)
+  const config = exportedObject(program.node, constBindings(program.node, true))
 
   // A spread may carry plugins of its own.
-  if (!program || !config || config.properties.some(entry => entry.type === 'SpreadElement'))
+  if (!config || config.properties.some(entry => entry.type === 'SpreadElement'))
     return undefined
 
   const properties = config.properties.filter(entry => entry.type !== 'SpreadElement' && !entry.computed && keyName(entry.key) === 'plugins')
@@ -49,7 +43,7 @@ export function withoutPlugins(source: string): string | undefined {
   const removed: Range[] = properties.map(property => withTrailingComma(tokens, property))
   const inside = (node: t.Node) => removed.some(range => node.start! >= range.start && node.end! <= range.end)
   const unused = (binding: Binding | undefined) => binding !== undefined && binding.referencePaths.every(reference => inside(reference.node))
-  const bindings = Object.values(scope.bindings)
+  const bindings = [...scope.bindings.values()]
 
   // Dropping a declaration can leave another referenced only from it, so this runs until nothing more goes.
   for (let changed = true; changed;) {
@@ -89,17 +83,18 @@ export function withProjectPaths(source: string, file: string): string {
   if (!ast)
     return source
 
-  const visit = (path: NodePath<t.MemberExpression | t.OptionalMemberExpression>) => {
-    const { object, property, computed } = path.node
-    const name = memberName(property, computed)
-
-    if (object.type !== 'MetaProperty' || object.meta.name !== 'import' || name === undefined || !Object.hasOwn(paths, name) || (name === 'url' && namesShippedFile(path)))
+  eachDescendant(ast, (node, parent) => {
+    if (node.type !== 'MemberExpression' && node.type !== 'OptionalMemberExpression')
       return
 
-    found.push({ start: path.node.start!, end: path.node.end!, value: paths[name]! })
-  }
+    const { object, property, computed } = node
+    const name = memberName(property, computed)
 
-  loadTraverse()(ast, { MemberExpression: visit, OptionalMemberExpression: visit })
+    if (object.type !== 'MetaProperty' || object.meta.name !== 'import' || name === undefined || !Object.hasOwn(paths, name) || (name === 'url' && namesShippedFile(node, parent)))
+      return
+
+    found.push({ start: node.start!, end: node.end!, value: paths[name]! })
+  })
 
   let pinned = source
 
@@ -118,10 +113,8 @@ function memberName(property: t.Node, computed: boolean): string | undefined {
 }
 
 // `import.meta.url` as the base of `new URL('./file', ...)`.
-function namesShippedFile(path: NodePath): boolean {
-  const call = path.parent
-
-  return call.type === 'NewExpression' && call.callee.type === 'Identifier' && call.callee.name === 'URL' && call.arguments[1] === path.node && call.arguments[0]?.type === 'StringLiteral'
+function namesShippedFile(node: t.Node, call: t.Node): boolean {
+  return call.type === 'NewExpression' && call.callee.type === 'Identifier' && call.callee.name === 'URL' && call.arguments[1] === node && call.arguments[0]?.type === 'StringLiteral'
 }
 
 // Undefined for what Babel does not read, though Bun might: the config then goes in as it is.

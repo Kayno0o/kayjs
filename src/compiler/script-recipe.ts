@@ -1,8 +1,8 @@
 import type { ParseResult } from '@babel/parser'
 import type * as t from '@babel/types'
 import type { Diagnostic, Span } from './ast'
-import { walkScope } from './rewrite'
 import { importedName, keyName } from './script-shared'
+import { traverse, walkScope } from './walk'
 
 // The names `recipe` goes by in the fence: imported from `kay`, as it is no global of a script.
 export function recipeNames(body: t.Statement[]): Set<string> {
@@ -130,18 +130,19 @@ function stylesRoot(call: t.CallExpression): boolean {
 export function reportRecipeReads(ast: ParseResult<t.File>, recipeStatements: ReadonlySet<t.Node>, kept: ReadonlySet<t.Node>, shift: (node: t.Node) => Span, diagnostics: Diagnostic[]): void {
   walkScope(ast, {
     Program(program) {
-      program.traverse({
+      traverse(program, {
         Identifier(identifier) {
           if (!identifier.isReferencedIdentifier() || !identifier.findParent(parent => recipeStatements.has(parent.node)))
             return
 
           const binding = identifier.scope.getBinding(identifier.node.name)
 
-          if (binding?.scope === program.scope && kept.has(binding.path.find(path => path.parentPath?.isProgram() === true)?.node as t.Node))
+          if (binding?.scope === program.scope && kept.has(binding.path.find(path => path.parentPath?.node.type === 'Program')?.node as t.Node))
             diagnostics.push({ ...shift(identifier.node), message: `A recipe is built once, before the component runs, so it cannot read \`${identifier.node.name}\``, note: 'the compiler moves `const card = recipe({ ... })` to module level, above the script\'s own declarations', help: 'write the value in the recipe, or import it from a module' })
         },
       })
-      program.stop()
+
+      return 'stop'
     },
   })
 }

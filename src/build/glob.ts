@@ -3,7 +3,7 @@ import { existsSync } from 'node:fs'
 import { dirname, join, relative, resolve, sep } from 'node:path'
 import { parse } from '@babel/parser'
 import { KayError } from '../compiler/errors'
-import { loadTraverse } from '../compiler/host'
+import { eachDescendant } from '../compiler/walk'
 import { GLOBBED } from './globbed'
 import { ICON_IMPORT, iconNames, installedIconSets } from './icons'
 
@@ -175,43 +175,43 @@ function globCalls(code: string, importer: string, loader: Bun.JavaScriptLoader)
   const calls: GlobCall[] = []
   const ast = parse(code, { sourceType: 'module', attachComment: false, plugins: loader === 'tsx' || loader === 'jsx' ? ['typescript', 'jsx'] : ['typescript'], errorRecovery: true })
 
-  loadTraverse()(ast, {
-    noScope: true,
-    CallExpression(path) {
-      const { callee, arguments: args } = path.node
+  eachDescendant(ast, (node) => {
+    if (node.type !== 'CallExpression')
+      return
 
-      if (callee.type !== 'MemberExpression' || callee.object.type !== 'MetaProperty' || callee.object.meta.name !== 'import' || callee.property.type !== 'Identifier' || callee.property.name !== 'glob')
-        return
+    const { callee, arguments: args } = node
 
-      const refuse = (what: string) => new KayError('glob-import', `kay: import.meta.glob in ${importer} ${what}, as the build reads them before the module runs: ${USAGE}`)
-      const [first, second] = args
-      const patterns = first?.type === 'ArrayExpression' ? first.elements.map(element => element?.type === 'StringLiteral' ? element.value : undefined) : [first?.type === 'StringLiteral' ? first.value : undefined]
+    if (callee.type !== 'MemberExpression' || callee.object.type !== 'MetaProperty' || callee.object.meta.name !== 'import' || callee.property.type !== 'Identifier' || callee.property.name !== 'glob')
+      return
 
-      if (patterns.length === 0 || patterns.includes(undefined))
-        throw refuse('takes its patterns as strings written in the call')
+    const refuse = (what: string) => new KayError('glob-import', `kay: import.meta.glob in ${importer} ${what}, as the build reads them before the module runs: ${USAGE}`)
+    const [first, second] = args
+    const patterns = first?.type === 'ArrayExpression' ? first.elements.map(element => element?.type === 'StringLiteral' ? element.value : undefined) : [first?.type === 'StringLiteral' ? first.value : undefined]
 
-      if (patterns.some(pattern => !RELATIVE.test(pattern!.replace(NEGATED, '')) && !pattern!.replace(NEGATED, '').startsWith('/') && !pattern!.replace(NEGATED, '').startsWith(ICONS)))
-        throw refuse(`takes patterns starting with ./, ../ or / for the project's root, or ${ICONS} for icons: ${ICON_USAGE}`)
+    if (patterns.length === 0 || patterns.includes(undefined))
+      throw refuse('takes its patterns as strings written in the call')
 
-      const options = second === undefined ? [] : objectProperties(second)
-      const call: GlobCall = { start: path.node.start!, end: path.node.end!, patterns: patterns as string[], eager: false }
+    if (patterns.some(pattern => !RELATIVE.test(pattern!.replace(NEGATED, '')) && !pattern!.replace(NEGATED, '').startsWith('/') && !pattern!.replace(NEGATED, '').startsWith(ICONS)))
+      throw refuse(`takes patterns starting with ./, ../ or / for the project's root, or ${ICONS} for icons: ${ICON_USAGE}`)
 
-      for (const option of options ?? [undefined]) {
-        const key = option?.type === 'ObjectProperty' && !option.computed ? keyName(option.key) : undefined
+    const options = second === undefined ? [] : objectProperties(second)
+    const call: GlobCall = { start: node.start!, end: node.end!, patterns: patterns as string[], eager: false }
 
-        if (option?.type !== 'ObjectProperty' || key === undefined || !OPTIONS.has(key))
-          throw refuse('takes `eager` and `import` as options written in the call')
+    for (const option of options ?? [undefined]) {
+      const key = option?.type === 'ObjectProperty' && !option.computed ? keyName(option.key) : undefined
 
-        if (key === 'eager' && option.value.type === 'BooleanLiteral')
-          call.eager = option.value.value
-        else if (key === 'import' && option.value.type === 'StringLiteral')
-          call.import = option.value.value
-        else
-          throw refuse(`takes \`${key}\` as a ${key === 'eager' ? 'boolean' : 'string'} written in the call`)
-      }
+      if (option?.type !== 'ObjectProperty' || key === undefined || !OPTIONS.has(key))
+        throw refuse('takes `eager` and `import` as options written in the call')
 
-      calls.push(call)
-    },
+      if (key === 'eager' && option.value.type === 'BooleanLiteral')
+        call.eager = option.value.value
+      else if (key === 'import' && option.value.type === 'StringLiteral')
+        call.import = option.value.value
+      else
+        throw refuse(`takes \`${key}\` as a ${key === 'eager' ? 'boolean' : 'string'} written in the call`)
+    }
+
+    calls.push(call)
   })
 
   return calls

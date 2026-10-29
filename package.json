@@ -267,7 +267,6 @@
   },
   "dependencies": {
     "@babel/parser": "^7.29.7",
-    "@babel/traverse": "^7.29.10",
     "@babel/types": "^7.29.7",
     "@jsquash/avif": "2.1.1",
     "@kaynooo/utils": "^2.29.0",
@@ -279,6 +278,7 @@
     "typescript7": "npm:typescript@^7.0.2"
   },
   "devDependencies": {
+    "@babel/traverse": "^7.29.10",
     "@fontsource/inter": "^5.3.0",
     "@happy-dom/global-registrator": "^21.0.4",
     "@iconify-json/tabler": "^1.2.42",

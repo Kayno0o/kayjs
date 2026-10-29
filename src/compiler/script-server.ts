@@ -1,14 +1,14 @@
 import type { ParseResult } from '@babel/parser'
-import type { NodePath } from '@babel/traverse'
 import type * as t from '@babel/types'
 import type { Diagnostic, Span } from './ast'
 import type { PageSettingName } from './page-settings'
+import type { Path } from './scope'
 import type { ImportBinding, ParsedFence } from './script-shared'
 import { eachNode } from './each-node'
 import { PAGE, PAGE_SETTINGS, unreadSettingReport } from './page-settings'
-import { walkScope } from './rewrite'
 import { declaredIdentifiers, keyName, LITERAL_SETTING, plainNames } from './script-shared'
 import { splitFence } from './script-split'
+import { traverse, walkScope } from './walk'
 
 export interface ServerData {
   name: string
@@ -210,16 +210,16 @@ function separateFunction(ast: ParseResult<t.File>, statement: t.Statement, decl
 // Whether a function reads its own name, `this` or `arguments`, none of which an arrow in `page` would give it.
 function readsItself(ast: ParseResult<t.File>, declaration: t.FunctionDeclaration): boolean {
   const name = declaration.id!.name
-  const ownFunction = (path: NodePath) => path.findParent(parent => parent.isFunction() && !parent.isArrowFunctionExpression())?.node
+  const ownFunction = (path: Path) => path.findParent(parent => parent.isFunction() && parent.node.type !== 'ArrowFunctionExpression')?.node
   let found = true
 
   walkScope(ast, {
-    FunctionDeclaration(path: NodePath<t.FunctionDeclaration>) {
+    FunctionDeclaration(path) {
       if (path.node !== declaration)
         return
 
       found = false
-      path.traverse({
+      traverse(path, {
         ThisExpression(inner) {
           found ||= ownFunction(inner) === declaration
         },
@@ -230,7 +230,8 @@ function readsItself(ast: ParseResult<t.File>, declaration: t.FunctionDeclaratio
           found ||= inner.node.name === name ? inner.scope.getBinding(name)?.path.node === declaration : inner.node.name === 'arguments' && ownFunction(inner) === declaration
         },
       })
-      path.stop()
+
+      return 'stop'
     },
   })
 
@@ -273,14 +274,14 @@ function referenceCount(ast: ParseResult<t.File>, statement: t.Statement, name: 
 
   // Babel refuses a fence declaring a name twice, which the fence reports itself.
   walkScope(ast, {
-    Program(path: NodePath<t.Program>) {
+    Program(path) {
       const binding = path.scope.getBinding(name)
-      const within = (reference: NodePath) => reference.find(path => path.node === statement) !== null
+      const within = (reference: Path) => reference.find(path => path.node === statement) !== null
 
       if (binding && within(binding.path))
         count = binding.referencePaths.filter(reference => !within(reference)).length
 
-      path.stop()
+      return 'stop'
     },
   })
 
@@ -336,7 +337,7 @@ function sharedWithExports(ast: ParseResult<t.File>, exported: t.Statement[], pe
   walkScope(ast, {
     Program(program) {
       const reads = new Map<t.Statement, StatementReads>()
-      const readsOf = (statement: NodePath<t.Statement>): StatementReads => {
+      const readsOf = (statement: Path<t.Statement>): StatementReads => {
         const known = reads.get(statement.node)
 
         if (known)
@@ -344,7 +345,7 @@ function sharedWithExports(ast: ParseResult<t.File>, exported: t.Statement[], pe
 
         const found: StatementReads = { names: new Map(), readsCtx: false, awaits: false }
 
-        statement.traverse({
+        traverse(statement, {
           ReferencedIdentifier(reference) {
             const name = reference.node.name
             const binding = reference.scope.getBinding(name)
@@ -365,7 +366,7 @@ function sharedWithExports(ast: ParseResult<t.File>, exported: t.Statement[], pe
 
         return found
       }
-      const paths = new Map(program.get('body').map(statement => [statement.node, statement]))
+      const paths = new Map(program.children.filter(child => child.listKey === 'body').map(statement => [statement.node, statement as Path<t.Statement>]))
       const queue = exported.flatMap(statement => [...readsOf(paths.get(statement)!).names.keys()].map(name => declaredBy.get(name)!))
 
       for (let statement = queue.pop(); statement !== undefined; statement = queue.pop()) {
@@ -409,7 +410,7 @@ function sharedWithExports(ast: ParseResult<t.File>, exported: t.Statement[], pe
       for (const statement of why.keys())
         shared.delete(statement)
 
-      program.stop()
+      return 'stop'
     },
   })
 

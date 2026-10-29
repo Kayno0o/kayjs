@@ -1,4 +1,3 @@
-import type traverseModule from '@babel/traverse'
 import type * as t from '@babel/types'
 import type { Diagnostic, Span } from './ast'
 import type { Rewrite, SourceMap } from './mapping'
@@ -6,7 +5,6 @@ import type { SignalKind } from './module-signals'
 import type { Binding, Path, Scope } from './scope'
 import type { PropsBinding } from './script'
 import { parse } from '@babel/parser'
-import { loadTraverse } from './host'
 import { CURRENT, DEFAULTED, defaultName, HANDED, LOAD, PROBE, PROPS, VALUES, WRITABLE, WRITE_HELPERS } from './names'
 import { analyze } from './scope'
 
@@ -38,22 +36,6 @@ const KAY_SIGNAL_EXPORTS = new Map([['kay/analytics', new Set(['consent'])]])
 const CHECKED_WRITE: Rewrite = { before: WRITABLE, after: ')' }
 
 export const POSITION_SUFFIX = / \(\d+:\d+\)$/
-// Walks the fence with Babel's scope, false when the scope refuses a name declared twice, as an import and a `const` an edit passes through. The half-built scope is dropped then: Babel marks a scope built before crawling it, so a later walk would read it as whole and not refuse the fence.
-export function walkScope(ast: t.Node, visitor: Parameters<typeof traverseModule>[1]): boolean {
-  try {
-    loadTraverse()(ast, visitor)
-
-    return true
-  }
-  catch (error) {
-    if (!(error instanceof TypeError && error.message.startsWith('Duplicate declaration')))
-      throw error
-
-    loadTraverse().cache.clearScope()
-
-    return false
-  }
-}
 
 export type Rewrites = Map<number, Rewrite & { end: number }>
 
@@ -224,38 +206,36 @@ class RewriteFinder {
 
   // What the walk does at each kind of node, in the order the nodes come.
   private visit(path: Path) {
-    const { node } = path
-
-    if (node.type === 'Program') {
-      this.program(path as Path<t.Program>)
+    if (path.is('Program')) {
+      this.program(path)
     }
-    else if (node.type === 'Identifier') {
-      this.globalRead(path as Path<t.Identifier>)
+    else if (path.is('Identifier')) {
+      this.globalRead(path)
     }
-    else if (node.type === 'CallExpression') {
-      this.listenTarget(path as Path<t.CallExpression>)
+    else if (path.is('CallExpression')) {
+      this.listenTarget(path)
     }
-    else if (node.type === 'ArrowFunctionExpression') {
-      this.rows(path as Path<t.ArrowFunctionExpression>)
+    else if (path.is('ArrowFunctionExpression')) {
+      this.rows(path)
     }
-    else if (node.type === 'VariableDeclarator') {
-      const at = node.id.start!
+    else if (path.is('VariableDeclarator')) {
+      const at = path.node.id.start!
 
       if (this.input.sites.consts.has(at))
-        this.templateConst(path as Path<t.VariableDeclarator>, this.input.sites.consts.get(at)!, this.input.sites.loopItems.has(at))
+        this.templateConst(path, this.input.sites.consts.get(at)!, this.input.sites.loopItems.has(at))
       else if (this.input.sites.snippets.has(at))
-        this.templateConst(path as Path<t.VariableDeclarator>, false, false, 'snippet')
+        this.templateConst(path, false, false, 'snippet')
       else
-        this.declaration(path as Path<t.VariableDeclarator>)
+        this.declaration(path)
     }
-    else if (node.type === 'AssignmentExpression' || node.type === 'UpdateExpression') {
-      this.assignment(path as Path<t.AssignmentExpression | t.UpdateExpression>)
+    else if (path.is('AssignmentExpression') || path.is('UpdateExpression')) {
+      this.assignment(path)
     }
-    else if (node.type === 'FunctionDeclaration') {
-      this.loadReads(path as Path<t.FunctionDeclaration>)
+    else if (path.is('FunctionDeclaration')) {
+      this.loadReads(path)
     }
-    else if (node.type === 'TSTypeQuery') {
-      this.typeQuery(path as Path<t.TSTypeQuery>)
+    else if (path.is('TSTypeQuery')) {
+      this.typeQuery(path)
     }
   }
 

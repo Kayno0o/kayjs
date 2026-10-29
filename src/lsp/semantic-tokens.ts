@@ -1,17 +1,17 @@
-import type { Binding, NodePath } from '@babel/traverse'
 import type * as t from '@babel/types'
 import type { Node, Span } from '../compiler/ast'
 import type { ImportedSignals, SignalKind } from '../compiler/module-signals'
+import type { Binding, Path } from '../compiler/scope'
 import type { ParsedFence } from '../compiler/script'
 import { parse } from '@babel/parser'
 import { nodeExpressions } from '../compiler/ast'
-import { loadTraverse } from '../compiler/host'
 import { MADE, signalKind } from '../compiler/module-signals'
 import { parseKay } from '../compiler/parser'
 import { patternNames } from '../compiler/pattern-names'
-import { walkScope } from '../compiler/rewrite'
+import { analyze } from '../compiler/scope'
 import { analyzeScript, analyzeServer } from '../compiler/script'
 import { bindingNames, scopedBlocks } from '../compiler/template-reads'
+import { traverse, walkScope } from '../compiler/walk'
 
 // Standard types and modifiers, so a theme colours them without knowing kay; `signal`, `prop` and `server` are kay's own, which a theme or the user's `semanticTokenColorCustomizations` may style.
 export const TOKEN_TYPES = ['variable', 'property', 'function']
@@ -173,7 +173,7 @@ function fenceTokens(fence: ParsedFence, known: Categories, handed: Categories |
   for (const [name, category] of own)
     declared.set(name, category)
 
-  const categoryOf = (path: NodePath<t.Identifier>): Category | undefined => {
+  const categoryOf = (path: Path<t.Identifier>): Category | undefined => {
     const binding = path.scope.getBinding(path.node.name)
 
     // Babel gives a destructured `catch` parameter no binding, so a read in its block meets the file's name.
@@ -183,7 +183,7 @@ function fenceTokens(fence: ParsedFence, known: Categories, handed: Categories |
     if (binding === undefined)
       return known.get(path.node.name) ?? handed?.get(path.node.name)
 
-    return binding.scope.path.isProgram() ? own.get(path.node.name) ?? known.get(path.node.name) : undefined
+    return binding.scope.node.type === 'Program' ? own.get(path.node.name) ?? known.get(path.node.name) : undefined
   }
 
   // Babel refuses a name declared twice, as an import and a `const` of one name, which an edit passes through: the fence then has no tokens.
@@ -198,20 +198,20 @@ function fenceTokens(fence: ParsedFence, known: Categories, handed: Categories |
 }
 
 // Whether the identifier is, or reads, a name a destructured `catch` parameter declares around it, unless a binding nearer than the `catch` holds the name.
-function declaredByCatch(identifier: NodePath<t.Identifier>, binding: Binding | undefined): boolean {
-  const clause = identifier.findParent(path => path.isCatchClause() && patternNames(path.node.param).includes(identifier.node.name))
+function declaredByCatch(identifier: Path<t.Identifier>, binding: Binding | undefined): boolean {
+  const clause = identifier.findParent(path => path.node.type === 'CatchClause' && patternNames(path.node.param).includes(identifier.node.name))
 
   return clause !== null && (binding === undefined || clause.isDescendant(binding.scope.path))
 }
 
 // Whether the identifier is declared by a `catch` parameter pattern, which Babel gives no binding when destructured.
-function inCatchParameter(identifier: NodePath<t.Identifier>): boolean {
-  return identifier.find(path => path.key === 'param' && path.parentPath?.isCatchClause() === true) !== null
+function inCatchParameter(identifier: Path<t.Identifier>): boolean {
+  return identifier.find(path => path.key === 'param' && path.parentPath?.node.type === 'CatchClause') !== null
 }
 
 // Whether the identifier is a use of the name: a declaration, a read or the left of an assignment, not a property key, a member or a type.
-function isNameSite(identifier: NodePath<t.Identifier>): boolean {
-  const path: NodePath = identifier
+function isNameSite(identifier: Path<t.Identifier>): boolean {
+  const path: Path = identifier
   const parent = path.parent
 
   if (TYPE_PARENTS.has(parent.type) || path.findParent(ancestor => ancestor.isTSType()))
@@ -273,7 +273,7 @@ function expressionTokens(source: string, span: Span, known: Categories, hidden:
     return
   }
 
-  loadTraverse()(file, {
+  traverse(analyze(file).program, {
     Identifier(path) {
       // What the expression itself declares, a destructured `catch` parameter included, is never the file's.
       const category = hidden.has(path.node.name) || inCatchParameter(path) || path.scope.getBinding(path.node.name) ? undefined : known.get(path.node.name)

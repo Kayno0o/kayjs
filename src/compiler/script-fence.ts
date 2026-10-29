@@ -4,8 +4,9 @@ import type { Diagnostic, Span } from './ast'
 import type { ParsedFence } from './script-shared'
 import { parse } from '@babel/parser'
 import { eachNode } from './each-node'
-import { POSITION_SUFFIX, walkScope } from './rewrite'
+import { POSITION_SUFFIX } from './rewrite'
 import { FIRST_TOKEN, KAY_NAME, WHITESPACE } from './script-shared'
+import { walkScope } from './walk'
 
 // A fence being typed breaks a handful of statements at most; more than this is not recovered.
 const MAX_BROKEN = 20
@@ -281,8 +282,9 @@ export function undeclared(ast: ParseResult<t.File>, code: string, declared: str
 
   const walked = walkScope(ast, {
     Program(path) {
-      found.push(...mentioned.filter(name => (name in path.scope.globals || inTyped.has(name) || read.includes(name)) && !path.scope.hasBinding(name)))
-      path.stop()
+      found.push(...mentioned.filter(name => (path.scope.globals.has(name) || inTyped.has(name) || read.includes(name)) && !path.scope.hasBinding(name)))
+
+      return 'stop'
     },
   })
 

@@ -1,16 +1,49 @@
 import type * as t from '@babel/types'
-import { BLOCK_PARENT_TYPES, FUNCTION_PARENT_TYPES, FUNCTION_TYPES, LOOP_TYPES, METHOD_TYPES, PATTERN_TYPES, SCOPABLE_TYPES, STATEMENT_TYPES, TS_TYPES, VISITOR_KEYS } from './babel-shapes'
+import { BLOCK_PARENT_TYPES, BUILTIN_GLOBALS, FUNCTION_PARENT_TYPES, FUNCTION_TYPES, LOOP_TYPES, METHOD_TYPES, PATTERN_TYPES, SCOPABLE_TYPES, STATEMENT_TYPES, TS_TYPES, VISITOR_KEYS } from './babel-shapes'
 
 // Kay's own scope pass over Babel's AST, which is all the rewrites need of `@babel/traverse`: a path to each node, the scope each node sits in, and for every binding its references and the writes to it.
 // It follows Babel's scope rules, down to what Babel gets wrong, so what the rewrites find does not change; `tests/scope.test.ts` compares the two on the source of this repository.
 // One thing it leaves out: Babel crawls a scope inside a type annotation on its own, which registers its parameters and `var`s, and kay's pass does not (a function in a computed key of a type literal).
 type BindingKind = 'var' | 'let' | 'const' | 'module' | 'hoisted' | 'param' | 'local' | 'unknown'
 
-type NodeOfType<T extends string> = Extract<t.Node, { type: T }>
+export type NodeOfType<T extends string> = Extract<t.Node, { type: T }>
+
+// Where the identifiers a declaration holds are, by node type.
+const BINDING_KEYS: Readonly<Record<string, readonly string[]>> = {
+  CatchClause: ['param'],
+  LabeledStatement: ['label'],
+  UnaryExpression: ['argument'],
+  AssignmentExpression: ['left'],
+  ImportSpecifier: ['local'],
+  ImportNamespaceSpecifier: ['local'],
+  ImportDefaultSpecifier: ['local'],
+  ImportDeclaration: ['specifiers'],
+  TSImportEqualsDeclaration: ['id'],
+  ExportSpecifier: ['exported'],
+  ExportNamespaceSpecifier: ['exported'],
+  ExportDefaultSpecifier: ['exported'],
+  FunctionDeclaration: ['id', 'params'],
+  FunctionExpression: ['id', 'params'],
+  ArrowFunctionExpression: ['params'],
+  ObjectMethod: ['params'],
+  ClassMethod: ['params'],
+  ClassPrivateMethod: ['params'],
+  ForInStatement: ['left'],
+  ForOfStatement: ['left'],
+  ClassDeclaration: ['id'],
+  ClassExpression: ['id'],
+  RestElement: ['argument'],
+  UpdateExpression: ['argument'],
+  ObjectProperty: ['value'],
+  AssignmentPattern: ['left'],
+  ArrayPattern: ['elements'],
+  ObjectPattern: ['properties'],
+  VariableDeclaration: ['declarations'],
+  VariableDeclarator: ['id'],
+}
 
 // A tag that is an element of the browser, written in lower case.
 const COMPAT_TAG = /^[a-z]/
-const PROGRAM_TYPES = new Set(['Program'])
 
 // A node, the way down to it from the program and the scope it sits in.
 export class Path<N extends t.Node = t.Node> {
@@ -20,8 +53,17 @@ export class Path<N extends t.Node = t.Node> {
     readonly parentPath: Path | null,
     readonly key: string | number | undefined,
     readonly listKey: string | undefined,
-    public scope: Scope,
-  ) {}
+    scope?: Scope,
+  ) {
+    if (scope)
+      this.scope = scope
+  }
+
+  // Set by the pass for the paths it walks, as a scope can be made only once its path exists.
+  scope!: Scope
+
+  // The paths of the children, in the order Babel visits them; empty for a path made on the side.
+  readonly children: Path[] = []
 
   is<T extends t.Node['type']>(type: T): this is Path<NodeOfType<T>> {
     return this.node.type === type
@@ -67,6 +109,33 @@ export class Path<N extends t.Node = t.Node> {
     return new Path((this.node as unknown as Record<string, t.Node>)[key]!, this.node, this, key, undefined, this.scope)
   }
 
+  // A name a declaration holds: the identifiers of a parameter, a `catch`, an import, a declarator or a loop's left side.
+  isBindingIdentifier(): boolean {
+    const { node, parent } = this
+
+    if (node.type !== 'Identifier')
+      return false
+
+    if (parent.type === 'ObjectProperty' && this.parentPath?.parent.type === 'ObjectExpression')
+      return false
+
+    const keys = BINDING_KEYS[parent.type]
+
+    return keys !== undefined && keys.some((key) => {
+      const value = (parent as unknown as Record<string, unknown>)[key]
+
+      return Array.isArray(value) ? value.includes(node) : value === node
+    })
+  }
+
+  find(predicate: (path: Path) => boolean): Path | null {
+    return predicate(this) ? this : this.findParent(predicate)
+  }
+
+  isDescendant(ancestor: Path): boolean {
+    return this.findParent(parent => parent === ancestor) !== null
+  }
+
   findParent(predicate: (path: Path) => boolean): Path | null {
     for (let path = this.parentPath; path; path = path.parentPath) {
       if (predicate(path))
@@ -97,7 +166,7 @@ export class Binding {
   readonly referencePaths: Path[] = []
   constant = true
 
-  constructor(readonly identifier: t.Identifier, readonly path: Path, readonly kind: BindingKind) {
+  constructor(readonly identifier: t.Identifier, readonly path: Path, readonly kind: BindingKind, readonly scope: Scope) {
     if ((kind === 'var' || kind === 'hoisted') && initInLoop(path))
       this.reassign(path)
   }
@@ -116,24 +185,29 @@ export class Scope {
   // The names read or assigned that no scope declares, of the whole program.
   readonly globals: Set<string>
 
-  constructor(readonly node: t.Node, readonly parent: Scope | null) {
+  constructor(readonly path: Path, readonly parent: Scope | null) {
     this.globals = parent ? parent.globals : new Set()
+  }
+
+  get node(): t.Node {
+    return this.path.node
   }
 
   getBinding(name: string): Binding | undefined {
     return lookup(this, name)
   }
 
-  private nearest(types: ReadonlySet<string>): Scope | null {
-    return nearestScope(this, types)
+  // Whether a scope around declares the name, or with `noGlobals` false the language itself does.
+  hasBinding(name: string, noGlobals = false): boolean {
+    return declaresAround(this, name) || (!noGlobals && BUILTIN_GLOBALS.has(name))
   }
 
   blockParent(): Scope {
-    return this.nearest(BLOCK_PARENT_TYPES)!
+    return nearestScope(this, BLOCK_PARENT_TYPES)!
   }
 
   functionOrProgram(): Scope {
-    return this.nearest(FUNCTION_PARENT_TYPES) ?? this.nearest(PROGRAM_TYPES)!
+    return functionOrProgramFrom(this)
   }
 }
 
@@ -156,6 +230,25 @@ function lookup(from: Scope, name: string): Binding | undefined {
   return undefined
 }
 
+function declaresAround(from: Scope, name: string): boolean {
+  for (let scope: Scope | null = from; scope; scope = scope.parent) {
+    if (scope.bindings.has(name))
+      return true
+  }
+
+  return false
+}
+
+// The program is the outermost scope, so the first function or program going up is the nearest function parent, or the program when there is none.
+function functionOrProgramFrom(from: Scope): Scope {
+  let scope = from
+
+  while (scope.parent && !FUNCTION_PARENT_TYPES.has(scope.node.type))
+    scope = scope.parent
+
+  return scope
+}
+
 function nearestScope(from: Scope, types: ReadonlySet<string>): Scope | null {
   for (let scope: Scope | null = from; scope; scope = scope.parent) {
     if (types.has(scope.node.type))
@@ -170,21 +263,28 @@ export interface ScopeAnalysis {
   program: Path<t.Program>
   // The paths of the node types `EVENT_TYPES` lists.
   events: Path[]
-  // Every scope, outermost first.
-  scopes: Scope[]
 }
 
 // The node types the rewrites visit, whose paths `analyze` hands back.
 const EVENT_TYPES = new Set(['Program', 'Identifier', 'CallExpression', 'ArrowFunctionExpression', 'VariableDeclarator', 'AssignmentExpression', 'UpdateExpression', 'FunctionDeclaration', 'TSTypeQuery'])
 
+// Kept per file, as Babel keeps the scopes of a tree it has crawled, so the passes over one fence share it.
+const analyses = new WeakMap<t.File, ScopeAnalysis>()
+
 // Throws the `TypeError` Babel does for a name declared twice where it cannot be.
 export function analyze(file: t.File): ScopeAnalysis {
-  return new Analysis().run(file)
+  let found = analyses.get(file)
+
+  if (!found) {
+    found = new Analysis().run(file)
+    analyses.set(file, found)
+  }
+
+  return found
 }
 
 class Analysis {
   private readonly events: Path[] = []
-  private readonly scopes: Scope[] = []
   private readonly references: Path[] = []
   private readonly assignments: Path[] = []
   private readonly violations: Path[] = []
@@ -214,7 +314,7 @@ class Analysis {
     for (const path of this.violations)
       this.reassign(path)
 
-    return { program: this.program, events: this.events, scopes: this.scopes }
+    return { program: this.program, events: this.events }
   }
 
   private reassign(path: Path) {
@@ -224,9 +324,10 @@ class Analysis {
 
   // `crawl` is false inside a type annotation, whose names the scope leaves out.
   private visit(node: t.Node, parent: t.Node, parentPath: Path | null, key: string | number, listKey: string | undefined, crawl: boolean) {
-    const path = new Path(node, parent, parentPath, key, listKey, undefined as unknown as Scope)
+    const path = new Path(node, parent, parentPath, key, listKey)
 
     path.scope = this.scopeOf(path)
+    parentPath?.children.push(path)
 
     if (EVENT_TYPES.has(node.type)) {
       if (node.type === 'Program')
@@ -267,18 +368,11 @@ class Analysis {
     const { node, parent, parentPath } = path
     let holder = parentPath
 
-    // A method's key and decorators, and a `switch`'s subject, are read outside the scope of the node holding them.
-    if (holder && (((path.key === 'key' || path.listKey === 'decorators') && METHOD_TYPES.has(holder.node.type)) || (path.key === 'discriminant' && holder.node.type === 'SwitchStatement')))
+    // A method's key and a `switch`'s subject, are read outside the scope of the node holding them.
+    if (holder && ((path.key === 'key' && METHOD_TYPES.has(holder.node.type)) || (path.key === 'discriminant' && holder.node.type === 'SwitchStatement')))
       holder = holder.parentPath
 
-    if (!makesScope(node, parent))
-      return holder!.scope
-
-    const scope = new Scope(node, enclosingScope(path))
-
-    this.scopes.push(scope)
-
-    return scope
+    return !makesScope(node, parent) ? holder!.scope : new Scope(path, enclosingScope(path))
   }
 
   private enter(path: Path) {
@@ -415,7 +509,7 @@ class Analysis {
       const local = scope.bindings.get(name)
 
       if (!local) {
-        scope.bindings.set(name, new Binding(identifier, binding, kind))
+        scope.bindings.set(name, new Binding(identifier, binding, kind, scope))
 
         return
       }
@@ -468,12 +562,12 @@ function makesScope(node: t.Node, parent: t.Node): boolean {
   return SCOPABLE_TYPES.has(node.type)
 }
 
-// The scope around a scope's node, which skips the node holding it when it is a method's key or decorator.
+// The scope around a scope's node, which skips the node holding it when it is a method's key.
 function enclosingScope(path: Path): Scope | null {
   let current: Path | null = path
 
   while (current) {
-    const skip = current.key === 'key' || current.listKey === 'decorators'
+    const skip = current.key === 'key'
 
     current = current.parentPath
 
@@ -513,40 +607,6 @@ function assignedNames(node: t.Node): string[] {
   }
 
   return [...names]
-}
-
-// Where the identifiers a declaration holds are, by node type.
-const BINDING_KEYS: Readonly<Record<string, readonly string[]>> = {
-  CatchClause: ['param'],
-  LabeledStatement: ['label'],
-  UnaryExpression: ['argument'],
-  AssignmentExpression: ['left'],
-  ImportSpecifier: ['local'],
-  ImportNamespaceSpecifier: ['local'],
-  ImportDefaultSpecifier: ['local'],
-  ImportDeclaration: ['specifiers'],
-  TSImportEqualsDeclaration: ['id'],
-  ExportSpecifier: ['exported'],
-  ExportNamespaceSpecifier: ['exported'],
-  ExportDefaultSpecifier: ['exported'],
-  FunctionDeclaration: ['id', 'params'],
-  FunctionExpression: ['id', 'params'],
-  ArrowFunctionExpression: ['params'],
-  ObjectMethod: ['params'],
-  ClassMethod: ['params'],
-  ClassPrivateMethod: ['params'],
-  ForInStatement: ['left'],
-  ForOfStatement: ['left'],
-  ClassDeclaration: ['id'],
-  ClassExpression: ['id'],
-  RestElement: ['argument'],
-  UpdateExpression: ['argument'],
-  ObjectProperty: ['value'],
-  AssignmentPattern: ['left'],
-  ArrayPattern: ['elements'],
-  ObjectPattern: ['properties'],
-  VariableDeclaration: ['declarations'],
-  VariableDeclarator: ['id'],
 }
 
 // Gives each identifier a declaration declares, in the order Babel's `getBindingIdentifiers` finds them; `outerOnly` stops at the function expressions inside it.
