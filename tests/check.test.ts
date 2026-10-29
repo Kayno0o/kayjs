@@ -808,6 +808,51 @@ describe.concurrent('kay check, edge cases', () => {
         }
       })
 
+      it('reports a refused builtin behind a package marked sideEffects: false, imported bare or by name', async () => {
+        const pure = { 'node_modules/pure/package.json': '{"name":"pure","main":"index.js","sideEffects":false}', 'node_modules/pure/index.js': 'import \'async_hooks\'\nexport const PURE = 1\n' }
+
+        for (const [imports, body] of [['import \'pure\'', ''], ['import { PURE } from \'pure\'', 'const x = PURE\n']] as const) {
+          const diagnostics = await found({ ...pure, 'src/components/counter.kay': island(imports, body) })
+
+          expect(diagnostics.map(d => d.at)).toEqual(['src/components/counter.kay:3'])
+          expect(diagnostics[0]!.message).toContain('src/components/counter.kay -> pure -> async_hooks')
+        }
+      })
+
+      it('keeps the other islands\' reports when one island import fails to bundle', async () => {
+        const diagnostics = await found({
+          'src/routes/index.kay': '---\nimport Counter from \'../components/counter.kay\'\nimport Other from \'../components/other.kay\'\n---\nCounter\nOther\n',
+          'src/components/counter.kay': island('import { broken } from \'../lib/broken\'', 'const x = broken\n'),
+          'src/components/other.kay': island('import { a } from \'../lib/a\'', 'const x = a\n'),
+          'src/lib/broken.ts': 'export const broken = (\n',
+          'src/lib/a.ts': 'import { AsyncLocalStorage } from \'async_hooks\'\n\nexport const a = AsyncLocalStorage\n',
+        })
+
+        expect(diagnostics.map(d => d.at)).toEqual(['src/components/other.kay:3'])
+      })
+
+      it('follows a child component an island renders, at the island\'s import of it', async () => {
+        const diagnostics = await found({
+          'src/components/counter.kay': '---\nimport { signal } from \'kay\'\nimport Child from \'./child.kay\'\n\nconst count = signal(0)\n---\nbutton(onClick={() => count++}) {count()}\nChild\n',
+          'src/components/child.kay': '---\nimport { a } from \'../lib/a\'\n---\np {a}\n',
+          'src/lib/a.ts': 'import { AsyncLocalStorage } from \'async_hooks\'\n\nexport const a = AsyncLocalStorage\n',
+        })
+
+        expect(diagnostics.map(d => d.at)).toEqual(['src/components/counter.kay:3'])
+        expect(diagnostics[0]!.message).toContain('src/components/counter.kay -> src/components/child.kay -> src/lib/a.ts -> async_hooks')
+      })
+
+      it('reports a chain once per island, however many imports reach it, and once for each island sharing it', async () => {
+        const diagnostics = await found({
+          'src/routes/index.kay': '---\nimport Counter from \'../components/counter.kay\'\nimport Other from \'../components/other.kay\'\n---\nCounter\nOther\n',
+          'src/components/counter.kay': island('import { a } from \'../lib/a\'\nimport { again } from \'../lib/a\'', 'const x = [a, again]\n'),
+          'src/components/other.kay': island('import { a } from \'../lib/a\'', 'const x = a\n'),
+          'src/lib/a.ts': 'import { AsyncLocalStorage } from \'async_hooks\'\n\nexport const a = AsyncLocalStorage\nexport const again = 1\n',
+        })
+
+        expect(diagnostics.map(d => d.at).sort()).toEqual(['src/components/counter.kay:3', 'src/components/other.kay:3'])
+      })
+
       it('passes an island importing only browser-safe modules', async () => {
         expect(await found({
           'node_modules/safe/package.json': '{"name":"safe","main":"index.js"}',

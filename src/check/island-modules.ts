@@ -19,7 +19,7 @@ const DECLARATION_FILE = /\.d\.[cm]?ts$/
 // Imports that name no module of the project.
 const OUTSIDE = /^(?:node:|bun:|kay(?:\/|$))/
 
-function scriptImportsOf(source: string): string[] {
+export function scriptImportsOf(source: string): string[] {
   const { script, module } = parseKay(source)
   const fences = [script, module].filter(span => span !== undefined)
 
@@ -53,7 +53,7 @@ export interface ImportEdge {
 }
 
 // What a file imports that the browser bundle may take: modules the app's API trees do not stub, a package's JavaScript included, and the builtins by name. Imports that cannot be resolved are the build's to report, and kay has a browser build of its own.
-function importEdges(file: string, specifiers: string[], stubbed: (file: string) => boolean): ImportEdge[] {
+export function importEdges(file: string, specifiers: string[], stubbed: (file: string) => boolean): ImportEdge[] {
   return specifiers.flatMap((specifier): ImportEdge[] => {
     if (isBuiltinSpecifier(specifier))
       return [{ specifier, target: specifier, builtin: true }]
