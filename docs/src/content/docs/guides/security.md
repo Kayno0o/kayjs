@@ -371,8 +371,8 @@ export default defineConfig({
 
 An action and an API route refuse a post another site sends, from its `Origin` or `Sec-Fetch-Site` header. The refusal is a 403 that says what it saw.
 
-
 On a site served over https, an `http:` origin of the site's own host is refused too, except on `localhost`.
+
 Code on a plain Elysia route that kay does not reach asks for itself. `crossSiteRefused(request)` from `kay/server` is true for a browser's cross-site POST or websocket upgrade. `crossSiteResponse(request, 'request')` is the 403 to answer with, saying what the request sent and what kay took for the site. Pass `'action'` as the second argument for a form post.
 
 ```ts

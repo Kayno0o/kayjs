@@ -5,7 +5,7 @@ import { brotliDecompressSync } from 'node:zlib'
 import { afterAll, describe, expect, it, spyOn } from 'bun:test'
 import { check } from '../src/check'
 import { configuredSite, setSite } from '../src/runtime/site'
-import { admitCrossSite, crossSiteRefused, crossSiteResponse } from '../src/server/actions'
+import { admitCrossSite, crossSiteRefused, crossSiteResponse, postedFrom } from '../src/server/actions'
 import { corsRule, preflight } from '../src/server/cors'
 import { testSite } from '../src/test'
 import { scratchDir } from './scratch'
@@ -315,9 +315,27 @@ describe('crossSiteRefused', () => {
       expect(crossSiteRefused(post({ origin: 'http://app.test' }))).toBe(true)
     }
     finally {
-      process.env.NODE_ENV = mode
+      if (mode === undefined)
+        delete process.env.NODE_ENV
+      else
+        process.env.NODE_ENV = mode
+
       setSite(before?.origin, before?.slashed ? 'always' : undefined)
     }
+  })
+
+  it('holds only the Origin to the scheme: a page named by a path behind a TLS-terminating proxy is still the site\'s', () => {
+    const proxied = (headers: Record<string, string>) => new Request('http://app.test/x?kay_back=%2Fen%2Fabout', { method: 'POST', headers: { 'x-forwarded-proto': 'https', ...headers } })
+
+    expect(postedFrom(proxied({}))).toBe('http://app.test/en/about')
+    expect(postedFrom(proxied({ 'x-kay-page': '/en/page' }))).toBe('http://app.test/en/about')
+    expect(postedFrom(new Request('http://app.test/x', { method: 'POST', headers: { 'x-forwarded-proto': 'https', 'x-kay-page': '/en/page' } }))).toBe('http://app.test/en/page')
+  })
+
+  it('says an http origin on an https site was refused for its scheme', async () => {
+    const text = await crossSiteResponse(post({ 'origin': 'http://app.test', 'x-forwarded-proto': 'https' }), 'action').text()
+
+    expect(text).toStartWith('Cross-site action refused: Origin http://app.test is an http: origin on an https site, not this site')
   })
 
   it('names the origin it saw and the ones it takes for the site, with the request or action word', async () => {

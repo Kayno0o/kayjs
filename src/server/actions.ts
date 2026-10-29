@@ -500,10 +500,12 @@ export function crossSiteResponse(request: Request, what: 'action' | 'request', 
   const head = `Cross-site ${what} refused`
   let reason: string
 
-  if (origin !== null && !sameHost(request, URL.parse(origin), site)) {
+  const from = origin === null ? null : URL.parse(origin)
+
+  if (origin !== null && (!sameHost(request, from, site) || downgraded(request, from, site))) {
     const own = [requestUrl(request).origin, configuredSite()?.origin, site === undefined ? undefined : URL.parse(site)?.origin].filter((value, index, all) => value !== undefined && all.indexOf(value) === index)
 
-    reason = `Origin ${shown(origin)} is not this site (${own.join(' or ')}; set or fix site in kay.config.ts if a proxy changes the host)`
+    reason = `Origin ${shown(origin)} ${downgraded(request, from, site) ? 'is an http: origin on an https site, not this site' : 'is not this site'} (${own.join(' or ')}; set or fix site in kay.config.ts if a proxy changes the host)`
   }
   else {
     const seen = shown(fetchSite ?? '')
@@ -521,7 +523,9 @@ export function isCrossSite(request: Request, site?: string): boolean {
   const origin = request.headers.get('origin')
   const fetchSite = request.headers.get('sec-fetch-site')
 
-  return (origin !== null && !sameHost(request, URL.parse(origin), site)) || (fetchSite !== null && !SAME_SITE_FETCH.has(fetchSite))
+  const from = origin === null ? null : URL.parse(origin)
+
+  return (origin !== null && (!sameHost(request, from, site) || downgraded(request, from, site))) || (fetchSite !== null && !SAME_SITE_FETCH.has(fetchSite))
 }
 
 // The requests an `api({ cors })` module let in from another site, which a library checking Origin itself, such as kayjs-auth, leaves alone.
@@ -645,18 +649,20 @@ function configuredHost(): string | undefined {
   return siteHost.host
 }
 
-// Hosts rather than origins, but for a plain `http:` origin on an https site: behind a TLS-terminating proxy the browser says https while the request arrives as http. The host of `site` in kay.config.ts counts too, for a proxy that does not pass the browser's `Host` on.
+// Hosts rather than origins: behind a TLS-terminating proxy the browser says https while the request arrives as http. The host of `site` in kay.config.ts counts too, for a proxy that does not pass the browser's `Host` on.
 function sameHost(request: Request, url: URL | null, appUrl?: string): url is URL {
   if (url === null)
     return false
 
   const { host } = url
 
-  // An `http:` origin on an https site is a downgrade only a network attacker makes, so it is no match; a machine tried locally may run either.
-  if (url.protocol === 'http:' && !LOCAL_HOST.test(url.hostname) && (overHttps(request) || appUrl?.startsWith('https:') === true))
-    return false
-
   return host === requestUrl(request).host || host === configuredHost() || (appUrl !== undefined && host === URL.parse(appUrl)?.host)
+}
+
+// Whether an `Origin` is an `http:` one on an https site, a downgrade only a network attacker makes; a machine tried locally may run either.
+// Only the `Origin` header is held to it: the page names a post carries are paths resolved against the request's own URL, which is `http:` behind a TLS-terminating proxy.
+function downgraded(request: Request, url: URL | null, appUrl?: string): boolean {
+  return url !== null && url.protocol === 'http:' && !LOCAL_HOST.test(url.hostname) && (overHttps(request) || appUrl?.startsWith('https:') === true)
 }
 
 // A fetch from an island wants a result; a plain form post goes back to the page it came from.
