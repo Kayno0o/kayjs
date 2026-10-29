@@ -398,7 +398,7 @@ export const news = collection({
 
 ### Caches
 
-Each Markdown entry compiles once, and the result is kept in `.kay/cache/content`. A change to an entry recompiles that entry only. A change to a module the content config imports recompiles every entry when the collection has a highlighter.
+Each Markdown entry compiles once, and the result is kept in `.kay/cache/content`. A change to an entry recompiles that entry only. A change to a module the content config imports recompiles every entry when the collection has a highlighter. The Markdown bodies of a collection with a `load` function are kept there too, in one file for the collection.
 
 A highlighter whose output changes with no change to its source needs that folder cleared. That is a new theme passed in, or a `.kay` or JSON file it reads. Only `.ts` and `.js` modules are watched.
 

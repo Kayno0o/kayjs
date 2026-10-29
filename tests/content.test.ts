@@ -9,7 +9,7 @@ import { outputDir } from '../src/build/assets'
 import { check } from '../src/check'
 import { bodyHtml, collection, highlightCode, renderMarkdown } from '../src/content'
 import { feedXml } from '../src/content/feed'
-import { contentMode, contentPlace, loadEntries, manifestFile, setContentMode, setContentPlace } from '../src/content/load'
+import { contentMode, contentPlace, loadedBodies, loadEntries, manifestFile, setContentMode, setContentPlace } from '../src/content/load'
 import { compileMarkdown, MarkdownError } from '../src/content/markdown'
 import { serveFeeds, writeContentManifests } from '../src/content/server'
 import { sanitizeHtml } from '../src/runtime'
@@ -187,6 +187,96 @@ describe('the compile cache of entries', () => {
       setContentPlace(before.root, before.base)
       await rm(root, { recursive: true, force: true })
     }
+  })
+})
+
+describe('the compile cache of a loader\'s bodies', () => {
+  const plain = { highlight: undefined, headingLinks: true }
+
+  async function inProject<Result>(run: (root: string) => Promise<Result>): Promise<Result> {
+    const root = await mkdtemp(join(tmpdir(), 'kay-content-loaded-'))
+    const before = contentPlace()
+
+    try {
+      setContentPlace(root, root)
+
+      return await run(root)
+    }
+    finally {
+      setContentPlace(before.root, before.base)
+      await rm(root, { recursive: true, force: true })
+    }
+  }
+
+  async function made(options: Parameters<typeof loadedBodies>[1], sanitize: boolean, bodies: Record<string, string>): Promise<string[]> {
+    const cache = await loadedBodies('things', options, sanitize, false)
+    const compiled: string[] = []
+
+    for (const [slug, body] of Object.entries(bodies))
+      compiled.push(JSON.stringify(await cache.compile(slug, body)))
+
+    await cache.save()
+
+    return compiled
+  }
+
+  it('compiles an unchanged body once, again only the one that changed, and drops the slugs it no longer has', async () => {
+    await inProject(async (root) => {
+      const file = join(root, '.kay/cache/content', `${Bun.hash('things').toString(36)}.loaded.json`)
+      const first = await made(plain, false, { a: '# A\n', b: 'body b\n' })
+
+      expect(await Bun.file(file).exists()).toBe(true)
+
+      const stored = await Bun.file(file).text()
+
+      expect(await made(plain, false, { a: '# A\n', b: 'body b\n' })).toEqual(first)
+      expect(await Bun.file(file).text()).toBe(stored)
+
+      const changed = await made(plain, false, { a: '# A\n', b: 'body b2\n' })
+
+      expect(changed[0]).toBe(first[0])
+      expect(changed[1]).not.toBe(first[1]!)
+
+      await made(plain, false, { a: '# A\n' })
+      expect(Object.keys(((await Bun.file(file).json()) as { value: object }).value)).toEqual(['a'])
+    })
+  })
+
+  it('compiles again when the settings, the highlighter or the sanitizing change', async () => {
+    await inProject(async () => {
+      const bodies = { a: '```ts\nlet x\n```\n\n# Title\n\n<b onclick="x()">hi</b>\n' }
+      const highlight = (code: string) => `<pre data-one>${code}</pre>`
+      const render = async (settings: Parameters<typeof loadedBodies>[1], sanitize = false) => (await made(settings, sanitize, bodies))[0]!
+      const first = await render({ highlight, headingLinks: true })
+
+      expect(first).toContain('data-one')
+      expect(await render({ highlight, headingLinks: false })).not.toBe(first)
+      expect(await render({ highlight: code => `<pre data-other>${code}</pre>`, headingLinks: true })).toContain('data-other')
+      expect(await render({ highlight, headingLinks: true }, true)).not.toBe(first)
+      expect(await render({ highlight, headingLinks: true })).toBe(first)
+    })
+  })
+
+  it('writes nothing for a prebuilt server or a draft preview', async () => {
+    await inProject(async (root) => {
+      const before = contentMode()
+
+      try {
+        setContentMode({ dev: false, prebuilt: true })
+        await (await loadedBodies('things', plain, false, false)).compile('a', 'x')
+        setContentMode({ dev: false, prebuilt: false })
+
+        const preview = await loadedBodies('things', plain, false, true)
+
+        await preview.compile('a', 'x')
+        await preview.save()
+        expect(await Bun.file(join(root, '.kay/cache/content')).exists()).toBe(false)
+        expect(await readdir(root)).toEqual([])
+      }
+      finally {
+        setContentMode(before)
+      }
+    })
   })
 })
 

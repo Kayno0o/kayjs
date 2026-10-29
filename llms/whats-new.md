@@ -11,6 +11,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 - `kay check` reports an island whose imports reach a Node or Bun builtin, through a package or an app module, as `server-only-in-island` at the island's import with the chain the build prints, where only `kay build` refused it: [Browser-only code](browser-only.md).
 - `kay check` reports an island whose imports reach a builtin a browser build refuses, `async_hooks` through a database library or `bun:sqlite` say, as `browser-builtin-import` at the island's import with the chain the build prints, where only `kay build` refused it: [Browser-only code](browser-only.md).
 - `kay build` writes the navigation-only entry and its chunks only when a component renders a form posting to an action, so an app with none deploys no `nav-*` file: [building](build-and-start.md).
+- A content collection with a `load` function keeps its compiled Markdown bodies in `.kay/cache/content` as a folder collection does, so a build compiles only the bodies that changed: [Content](content-markdown-to-caching.md).
 
 ## 1.82.0
 

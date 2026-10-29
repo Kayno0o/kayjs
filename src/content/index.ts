@@ -22,8 +22,8 @@ import { checkPublishField, isDraft, publishTime } from './drafts'
 import { entryPath } from './entry-route'
 import { sizedImages } from './images'
 import { ContentChangedError, contentKey } from './key'
-import { contentMode, loadEntries, markdownOf, translationKey } from './load'
-import { compileMarkdown, countWords, MarkdownError, sanitizedHtml } from './markdown'
+import { contentMode, loadedBodies, loadEntries, markdownOf, translationKey } from './load'
+import { countWords, MarkdownError, sanitizedHtml } from './markdown'
 import { hasSteps, migrateEntries, migrateLoaded, withMigrationHint, writeBack } from './migrate'
 import { ContentError, decodeEntries, isBlockItem, validEntries } from './validate'
 
@@ -523,6 +523,7 @@ async function compileLoaded(loader: ContentLoader, preview: boolean, markdown: 
   const problems: ContentProblem[] = []
   const slugs = new Set<string>()
   const entries: RawEntry[] = []
+  const bodies = await loadedBodies(loader.name, markdown, options.trusted !== true, preview)
 
   for (const [index, item] of (given as unknown[]).entries()) {
     const { slug, data, body, html } = (typeof item === 'object' && item !== null ? item : {}) as Partial<LoadedEntry>
@@ -547,7 +548,7 @@ async function compileLoaded(loader: ContentLoader, preview: boolean, markdown: 
       const sanitize = options.trusted !== true
       const safe = typeof html === 'string' && sanitize ? sanitizedHtml(html) : html
       const fromHtml = typeof safe === 'string' ? { segments: [safe], headings: [], words: countWords(safe) } : undefined
-      const compiled = typeof body === 'string' ? await compileMarkdown(body, 1, markdown.highlight, markdown.headingLinks, sanitize) : fromHtml
+      const compiled = typeof body === 'string' ? await bodies.compile(slug, body) : fromHtml
 
       entries.push({ slug, file, data, lines: {}, segments: compiled?.segments, headings: compiled?.headings, words: compiled?.words })
     }
@@ -558,6 +559,8 @@ async function compileLoaded(loader: ContentLoader, preview: boolean, markdown: 
 
   if (problems.length > 0)
     throw new ContentError(problems)
+
+  await bodies.save()
 
   return { raw: entries, carried: migrated.carried }
 }

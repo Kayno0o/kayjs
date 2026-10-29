@@ -1,12 +1,12 @@
 import type { Mode } from '../project'
 import type { LinkedImage } from './images'
-import type { Heading, Highlighter, Segment } from './markdown'
+import type { CompiledMarkdown, Heading, Highlighter, Segment } from './markdown'
 import type { ContentProblem } from './validate'
 import { mkdir, readdir, rm, stat } from 'node:fs/promises'
 import { join, relative, resolve, sep } from 'node:path'
 import process from 'node:process'
 import { clientDir, writeAsset, writtenAsset } from '../build/assets'
-import { pruneCache, touchCacheFile } from '../build/cache'
+import { pruneCache, readCacheEntry, touchCacheFile, writeCacheEntry } from '../build/cache'
 import { resolveFrom, scriptLoader, transpilerFor, writeAtomically } from '../build/files'
 import { KayError } from '../compiler/errors'
 import { modeOf, cacheDir as projectCache } from '../project'
@@ -63,7 +63,7 @@ interface CachedEntry {
 }
 export const STAMP_SETTLED_MS = 2000
 const LEGACY_CACHE_FILE = /^[\da-z]+\.json$/
-const ENTRY_CACHE_FILE = /\.entry\.json$/
+const ENTRY_CACHE_FILE = /\.(?:entry|loaded)\.json$/
 const sweptCaches = new Set<string>()
 // The cache directories a collection was compiled into in this process, which a full build may prune.
 const compiledInto = new Set<string>()
@@ -300,6 +300,58 @@ async function compileDirectory(dir: string, highlight: Highlighter | undefined,
     throw new ContentError(problems)
 
   return entries
+}
+
+// What the cache holds for a loader collection's bodies: each slug's source hash and what it compiled to.
+type LoadedCache = Record<string, { hash: string, compiled: CompiledMarkdown }>
+
+export interface LoadedBodies {
+  compile: (slug: string, body: string) => Promise<CompiledMarkdown>
+  // Writes the bodies this load compiled or kept, dropping the slugs it no longer has; nothing is written while every body came from the cache.
+  save: () => void | Promise<void>
+}
+
+// A loader collection's Markdown bodies, compiled as a folder's entries are and kept in one file per collection under `.kay/cache/content`, while the build is not prebuilt and no draft preview is read.
+// A body is reused while its source, the collection's Markdown settings, the highlighter with the modules the config imports, kay's compiler and Bun's version are as they were; a fresh compile is the fallback for all else.
+export async function loadedBodies(name: string, markdown: { highlight: Highlighter | undefined, headingLinks: boolean }, sanitize: boolean, preview: boolean): Promise<LoadedBodies> {
+  if (contentMode().prebuilt || preview)
+    return { compile: async (_, body) => compileMarkdown(body, 1, markdown.highlight, markdown.headingLinks, sanitize), save: () => undefined }
+
+  const root = rootOf()
+  const cacheDir = projectCache(root, 'content')
+  const imported = markdown.highlight === undefined ? '' : await importedSource(root, [place?.config, join(root, 'kay.config.ts')])
+  const { compilerFingerprint } = await import('../build/transform')
+  const key = Bun.hash(`${CACHE_VERSION}:${markdown.headingLinks}:${sanitize}:${compilerFingerprint()}:${markdown.highlight?.toString() ?? ''}:${imported}`).toString(36)
+  const slot = { file: join(cacheDir, `${Bun.hash(name).toString(36)}.loaded.json`), key }
+  const known = await readCacheEntry<LoadedCache>(slot) ?? {}
+  const kept: LoadedCache = {}
+  let changed = false
+
+  compiledInto.add(cacheDir)
+
+  return {
+    compile: async (slug, body) => {
+      const hash = Bun.hash(body).toString(36)
+      const cached = known[slug]
+
+      if (cached?.hash === hash) {
+        kept[slug] = cached
+
+        return cached.compiled
+      }
+
+      const compiled = await compileMarkdown(body, 1, markdown.highlight, markdown.headingLinks, sanitize)
+
+      kept[slug] = { hash, compiled }
+      changed = true
+
+      return compiled
+    },
+    save: async () => {
+      if (changed || Object.keys(kept).length !== Object.keys(known).length)
+        await writeCacheEntry(slot, kept)
+    },
+  }
 }
 
 // A cache file that is missing or unreadable, such as one a crash left half written, is a miss.
