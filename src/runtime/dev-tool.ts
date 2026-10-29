@@ -26,9 +26,9 @@ const I18N_TAB_URL = '/_kay/dev/tab/i18n.js'
 const NETWORK_TAB_URL = '/_kay/dev/tab/network.js'
 const IMAGES_TAB_URL = '/_kay/dev/tab/images.js'
 const PERFORMANCE_TAB_URL = '/_kay/dev/tab/performance.js'
-// A stack frame in a chunk of the browser build, which the server can point at its `.kay` line.
 // The page swaps kept for the Network tab, as many as it lists navigations.
 const SWAP_LOG = 10
+// A stack frame in a chunk of the browser build, which the server can point at its `.kay` line.
 const CHUNK_FRAME = /\/_kay\/[\w.-]+\.js:\d+:\d+/
 // The addresses the dev tool fetched itself, which the Network tab leaves out.
 const OWN_FETCHES = new Set<string>()

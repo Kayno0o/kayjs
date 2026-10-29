@@ -812,6 +812,50 @@ describe('the dev tool', () => {
     expect(visible('#kay-dev-network', 'h3').map(heading => heading.replace(/\d+$/, ''))).toEqual(['This page, /new', 'Before, /old'])
   })
 
+  it('files a swap\'s own page fetch, reported after the Network tab replayed the swap, in the swap it started', async () => {
+    const happy = (window as unknown as { happyDOM: { setURL: (url: string) => void } }).happyDOM
+    const SWAP_START = 1_000_000
+    let release = () => undefined as void
+    const late = async (url: string) => {
+      if (url === '/_kay/dev/tab/network.js')
+        await new Promise<void>((resolve) => { release = resolve })
+
+      return loadTab(url)
+    }
+    const at = (path: string, startTime: number) => ({ name: new URL(path, location.href).href, entryType: 'resource', startTime, duration: 12, transferSize: 300, encodedBodySize: 200, decodedBodySize: 500, responseStatus: 200, contentType: '', initiatorType: 'fetch', serverTiming: [] })
+
+    happy.setURL('http://localhost/old')
+
+    const observed = fakeObserver()
+
+    try {
+      tool = startDevTool(document, late)
+
+      const clock = spyOn(window.performance, 'now').mockReturnValue(SWAP_START)
+
+      document.documentElement.setAttribute('aria-busy', 'true')
+      await turn()
+      clock.mockRestore()
+      happy.setURL('http://localhost/new')
+      document.documentElement.removeAttribute('aria-busy')
+      await turn()
+      release()
+      await turn()
+      shadow().querySelector<HTMLButtonElement>('#kay-dev-tab-network')!.click()
+      // The browser reports what the swap fetched once the module's observer exists: the app's fetch just before it stays in the page it came from, the page's own fetch goes in the swap's.
+      observed.report('resource', [at('/api/data', SWAP_START - 10), at('/new', SWAP_START - 4)])
+
+      const section = (heading: string) => [...shadow().querySelectorAll('#kay-dev-network .group')].find(group => group.querySelector('h3')!.textContent.startsWith(heading))!
+      const listed = (heading: string) => [...section(heading).querySelectorAll('.fetch .name')].map(name => name.textContent)
+
+      expect(listed('This page, /new')).toEqual(['/new'])
+      expect(listed('Before, /old')).toEqual(['/api/data'])
+    }
+    finally {
+      delete (window as { PerformanceObserver?: unknown }).PerformanceObserver
+    }
+  })
+
   it('loads an early tab at once, says when its module fails and tries again at the next open', async () => {
     let fails = true
     let loads = 0
@@ -860,7 +904,9 @@ describe('the dev tool', () => {
       resolve()
     await turn()
 
-    expect(ran.filter(entry => entry === 'run')).toEqual([])
+    // The loader did resolve, so it is the stop that kept the module from running.
+    expect(ran).toContain('/_kay/dev/tab/head.js')
+    expect(ran).not.toContain('run')
   })
 
   it('gives a tab its icon, the default one when it names none, and tones its count', () => {
