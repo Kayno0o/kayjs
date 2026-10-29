@@ -6,6 +6,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 
 - kayjs-ai: a conversation a Chat keeps on the server (`keepOnServer`) keeps each reply's tool calls and results too, and the next ask replays them to the model, which no longer invents follow-up answers a tool already gave: [Conversations](../packages/ai/llms/chat-conversations.md).
 - kayjs-ai: `mocked(action, run)` makes a tool of an app's action with its own name, description and input schema and a `run` of yours, so a script benches a prompt against the real model with nothing restated: [Actions as tools](../packages/ai/llms/tools.md#benching-a-prompt-against-the-real-model).
+- kayjs-ai: `ai({ imageAlt: true })` drafts the `alt` of each imported image a server-rendered page shows with none, once per image content and kept in `.kay/cache`, `kay check` lists the drafts for review and no longer reports `missing-alt` for those images, and `describeImage()` asks the model for one: [Images and PDFs](../packages/ai/llms/attachments.md#draft-the-alt-of-imported-images).
 - An extension can declare `satisfies: ['missing-alt']`, which makes `kay check` skip an `img` of a server-rendered page whose `src` is an imported image, and `kay/library` exports `libraryCacheSlot`, `readCacheEntry` and `writeCacheEntry` for a library's own entries under `.kay/cache`: [Component libraries](component-libraries.md).
 
 ## 1.83.0

@@ -333,6 +333,19 @@ To let visitors attach files in a chat, add `attach` to `Chat` and have the acti
 
 <ReadMore href="/llms/kayjs-ai-attachments">What is accepted, what each provider gets, and how the limits count.</ReadMore>
 
+### Draft the alt text of images
+
+An `img` of an imported image with no `alt` can get one from the model. Turn it on once:
+
+```ts
+// kay.config.ts
+ai({ imageAlt: true })
+```
+
+`kay build` and a server render then write a drafted `alt` on each imported image a page shows with none. Each image is described once, kept in `.kay/cache`, and never sent again while it is unchanged.
+
+An `alt` you write, even an empty one, always wins. `kay check` stops reporting `missing-alt` for such an image and lists each draft instead, so you can review it. With no model configured, pages stay as they are. Images inside islands are drawn in the browser, so they keep the `missing-alt` lint.
+
 ## Prompt caching
 
 Providers bill a repeated prompt at a fraction of the price when they cached it. kayjs-ai asks for that on every `ask`, so a chat does not pay full price for its system prompt, tools and earlier messages on each turn and each tool step. You set nothing. A prompt shorter than the provider's minimum is simply not cached.

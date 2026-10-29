@@ -40,6 +40,16 @@ export const read = action(s.Object({ scan: s.File({ type: 'application/pdf' }) 
 - The files ride on the history: each send posts those of the `keep` latest messages again, so the model sees them in a follow-up, up to 8 MB for the messages before the last, the newest first (a message whose files do not fit leaves them all out, and goes itself, with the assistant reply that answered it, when it held nothing else; the last message keeps its files whatever they weigh), and a 413 shrinks the history counting each file as `ask` prices an image. The files live in the page: `remember` keeps the text of a turn, so after a reload the model no longer sees them.
 - Stop's call to the server posts the last message without its files.
 
+### Draft the alt of imported images
+
+`ai({ imageAlt: true })` in `extensions` writes an `alt` on each `img` whose `src` is an imported image and that has none, in `kay build` and in every server render (lazily in `kay dev`), and makes `kay check` skip `missing-alt` for those images.
+
+- Each image is described once per locale (`page.locale`, in that language) by `describeImage(image, { language?, signal? })`, which you can call yourself: it asks with a `schema` for one short sentence and gives the trimmed text, empty for a decorative image (such a draft is not kept or written).
+- The drafts live in `.kay/cache/libraries/kayjs-ai`, one file per image content and locale, so an unchanged image is never sent again; deleting the folder drafts again. A failing model (a PNG, JPEG, GIF or WebP only: an AVIF or SVG is refused) leaves the img without an `alt` and is tried again on the next render.
+- An `alt` the author wrote, even `alt=""`, wins, and so do `aria-hidden="true"` and `role="presentation"` or `none`. An img inside an island is left to the `missing-alt` lint, as it renders in the browser.
+- `kay check` lists each kept draft as a warning, read from the cache and never calling the model, with a warning more when `imageAlt` is on and no model is configured (development's fake is none). Under `bun test` the fake answers, so script it with `fakeAi.reply({ data: { alt } })`.
+- Drafts count against the limits like any `ask`: in `kay build` there is no visitor, and a render that is refused keeps the img as it is.
+
 ## Reference
 
 ### What is accepted

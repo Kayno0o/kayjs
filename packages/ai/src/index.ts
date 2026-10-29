@@ -17,6 +17,8 @@ export type { Asked, Calls, Embedded, Fake, FakeAnswer, Heard, Script, Spoken, W
 export { mocked, tool } from './function-tool'
 export { ground } from './ground'
 export type { GroundOptions, Passage } from './ground'
+export { describeImage } from './image-alt'
+export type { DescribeImageOptions } from './image-alt'
 export type { AiOptions, BudgetOptions, LimitOptions } from './limits'
 export { openai } from './openai'
 export type { OpenAiOptions } from './openai'

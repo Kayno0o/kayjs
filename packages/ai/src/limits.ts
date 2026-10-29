@@ -44,6 +44,8 @@ export interface AiOptions {
   key?: ((request: Request) => string | undefined | Promise<string | undefined>) | undefined
   // Where the conversations of a `Chat` with `keepOnServer` are kept: `sqliteConversations('data/ai-conversations.sqlite')` unless given (in memory under `bun test`).
   conversations?: ConversationStore | undefined
+  // Drafts the `alt` of each imported image a server-rendered page shows with none, once per image content, and `kay check` lists the drafts for review. Off by default, as it sends the images to the model.
+  imageAlt?: boolean | undefined
 }
 
 interface Counter {
