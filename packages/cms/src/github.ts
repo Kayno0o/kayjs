@@ -23,9 +23,9 @@ interface Ref {
 
 interface TreeEntry {
   path: string
+  // Rewriting a file resets its mode, which content files never need changed.
   mode: '100644'
   type: 'blob'
-  // Rewriting a file resets its mode, which content files never need changed.
   // null deletes the path; a path with `content` is written.
   sha?: null
   content?: string
