@@ -5,7 +5,9 @@ import { DOCS_BUILT, takeDocsBuilt } from './docs-build'
 const CHUNK_NAME = /[\w-]+\.js/g
 // A chunk reaching another, by a static import or a dynamic one.
 const CHUNK_IMPORT = /["']\.\/([\w-]+\.js)["']/g
-const DYNAMIC_IMPORT = /\bimport\("\.\/([\w-]+\.js)"\)/g
+const CONVERTER_URL = '/playground/converter.js'
+// A message only the converter holds.
+const CONVERTER_MARK = 'the HTML does not parse'
 // The page's file, and its folder's index when the build writes both.
 const CONVERTER_PAGES = ['migrating/from-html.html', 'migrating/from-html/index.html']
 
@@ -35,7 +37,7 @@ function chunksOf(html: string): string[] {
   return (html.match(CHUNK_NAME) ?? []).filter(name => chunks.has(name))
 }
 
-// The converter of `kay fmt --from-html` is a chunk only the box on the converter page fetches, so the build is read for who can reach it.
+// The converter of `kay fmt --from-html` is served by a route with the parser's WebAssembly build and fetched by the box on the converter page alone, so the build is read for who can reach that box: no other page loads any of it.
 describe('the docs converter chunk', () => {
   beforeAll(async () => {
     const release = await takeDocsBuilt()
@@ -56,7 +58,7 @@ describe('the docs converter chunk', () => {
       pages.set(file, await Bun.file(join(CLIENT, 'pages', file)).text())
   }
 
-  it('is fetched by the converter box alone and reached by no other page', () => {
+  it('is fetched by the converter box alone, which holds its address and not the converter', () => {
     // The build also carries the chunks kept from earlier builds, which no page of this one links.
     const linked = reachable([...pages.values()].flatMap(chunksOf))
     const box = [...linked].filter(name => name.startsWith('html-converter-'))
@@ -64,15 +66,10 @@ describe('the docs converter chunk', () => {
     expect(box).toHaveLength(1)
 
     const [island] = box
-    const converter = [...chunks.get(island!)!.matchAll(DYNAMIC_IMPORT)].map(([, name]) => name!)
 
-    expect(converter).toHaveLength(1)
-    expect(chunks.get(converter[0]!)).toContain('the HTML does not parse')
     expect(pages.has(CONVERTER_PAGES[0]!)).toBe(true)
-
-    const reaching = [...chunks].filter(([name, code]) => linked.has(name) && name !== island && [...code.matchAll(CHUNK_IMPORT)].some(([, next]) => next === island || next === converter[0])).map(([name]) => name)
-
-    expect(reaching).toEqual([])
-    expect([...pages].filter(([, html]) => reachable(chunksOf(html)).has(converter[0]!)).map(([file]) => file)).toEqual(CONVERTER_PAGES.filter(page => pages.has(page)))
+    expect(chunks.get(island!)).toContain(CONVERTER_URL)
+    expect([...pages].filter(([, html]) => reachable(chunksOf(html)).has(island!)).map(([file]) => file)).toEqual(CONVERTER_PAGES.filter(page => pages.has(page)))
+    expect([...chunks].filter(([, code]) => code.includes(CONVERTER_MARK)).map(([name]) => name)).toEqual([])
   })
 })
