@@ -48,7 +48,7 @@ describe('hints for the first template mistakes', () => {
     const found = await report(`${signals}input(type="text" bind:value={n})\ninput(type="checkbox" bind:value={open})\n`)
 
     expect(errors(found)).toEqual([
-      [6, 19, 'TS2345', 'a text input holds a string; give the input `type="number"` or `type="range"` for a signal holding a number, or make the signal a string'],
+      [6, 19, 'TS2345', '`bind:value` writes a string; for an input give it `type="number"` or `type="range"` for a signal holding a number, or make the signal a string'],
       [7, 23, 'TS2345', 'a checkbox is bound with `bind:checked={...}`, which holds a boolean; `bind:value` holds the checkbox\'s `value` string'],
     ])
   })
@@ -63,6 +63,22 @@ describe('hints for the first template mistakes', () => {
     const found = await report('---\n---\nbutton(className="x") go\nbutton(class="x" htmlFor="y") go\n')
 
     expect(errors(found).map(error => error[3])).toEqual(['kay writes the HTML attribute, `class`, not `className`', 'kay writes the HTML attribute, `for`, not `htmlFor`'])
+  })
+
+  it('keeps every unknown element and reports each elif once, nested or beside siblings', async () => {
+    const typos = errors(await report('---\n---\ndiv\n  p a\n  lii b\n  p c\n  spann d\n'))
+
+    expect(typos.map(error => [error[2], error[3]])).toEqual(Array.from({ length: 4 }, () => ['TS2339', undefined]))
+
+    const nested = errors(await report('---\nconst a = true\n---\ndiv\n  if a\n    p a\n  elif a\n    p b\n  elif a\n    p c\n  span x\n'))
+
+    expect(nested.map(error => [error[0], error[3]])).toEqual([[7, 'kay writes it as two words, `else if condition`'], [9, 'kay writes it as two words, `else if condition`']])
+  })
+
+  it('adds no help to valid handlers and binds', async () => {
+    const found = await report('---\nimport { signal } from "kay"\nconst text = signal("")\nconst bump = () => {}\n---\nbutton(onClick={() => bump()}) go\nbutton(onClick={bump}) go\nlabel Name\n  input(type="text" bind:value={text})\n')
+
+    expect(errors(found).every(error => error[3] === undefined)).toBe(true)
   })
 
   it('reports an unquoted attribute value once with its braces', async () => {

@@ -599,6 +599,16 @@ describe('diagnostics', () => {
     ])
   })
 
+  it('suggests braces only for a bare value that stands alone', () => {
+    const helps = (source: string) => parse(source).diagnostics.map(d => d.help)
+
+    expect(helps('Card(a=b.c d=-1 e=1.5 f=$x)\n')).toEqual(['`a={b.c}`', '`d={-1}`', '`e={1.5}`', '`f={$x}`'])
+    expect(helps('Card(a=b-c)\n')[0]).toBe('`a={...}`')
+    expect(helps('Card(a=3px)\n')[0]).toBe('`a={...}`')
+    expect(helps('Card(a=b?.c)\n')[0]).toBe('`a={...}`')
+    expect(helps('Card(a=foo(1))\n')[0]).toBe('`a={...}`')
+  })
+
   it('keeps node spans on the source they came from', () => {
     const file = parse('---\nconst x = 1\n---\nsection\n  p {x}\n')
     const section = element(file.template[0])

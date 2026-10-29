@@ -125,7 +125,7 @@ export function diagnoseShadow(shadow: ShadowFile, diagnostic: TsgoDiagnostic, l
   if (blockHelp !== undefined)
     return { message: diagnostic.message, help: blockHelp, span }
 
-  const hint = templateHint(diagnostic, shadow.source, span)
+  const hint = templateHint(diagnostic, shadow.source, span, shadow.tsx)
 
   if (hint === 'duplicate')
     return undefined

@@ -14,7 +14,8 @@ export interface TemplateHint {
 }
 
 // A row answers a hint, `'duplicate'` for a report that repeats another's, or undefined when the diagnostic is not its mistake.
-type Row = (diagnostic: TsgoDiagnostic, source: string, span: Span) => TemplateHint | 'duplicate' | undefined
+// `tsx` is the generated code the diagnostic is an offset into.
+type Row = (diagnostic: TsgoDiagnostic, source: string, span: Span, tsx: string) => TemplateHint | 'duplicate' | undefined
 
 // Names a React habit writes where kay writes another.
 const REACT_NAMES: Record<string, string> = { className: 'class', htmlFor: 'for' }
@@ -111,7 +112,7 @@ const calledHandler: Row = (diagnostic, source, span) => {
   const [, callee, args] = call
   const wrapped = `\`${name}={() => ${value}}\``
 
-  return { span: attribute, help: args!.trim() === '' ? `\`${value}\` runs as the page renders and hands its result over: pass the function, \`${name}={${callee}}\`, or wrap the call, ${wrapped}` : `\`${value}\` runs as the page renders and hands its result over: wrap the call so it runs on the event, ${wrapped}` }
+  return { span: attribute, help: args!.trim() === '' && !callee!.includes('.') ? `\`${value}\` runs as the page renders and hands its result over: pass the function, \`${name}={${callee}}\`, or wrap the call, ${wrapped}` : `\`${value}\` runs as the page renders and hands its result over: wrap the call so it runs on the event, ${wrapped}` }
 }
 
 // `bind:value` on a signal holding another type than the string an input gives, reported at the tag.
@@ -138,25 +139,31 @@ const mistypedBind: Row = (diagnostic, source, span) => {
     return { span: attribute, help: 'a checkbox is bound with `bind:checked={...}`, which holds a boolean; `bind:value` holds the checkbox\'s `value` string' }
 
   if (given === 'string' && held === 'number')
-    return { span: attribute, help: 'a text input holds a string; give the input `type="number"` or `type="range"` for a signal holding a number, or make the signal a string' }
+    return { span: attribute, help: '`bind:value` writes a string; for an input give it `type="number"` or `type="range"` for a signal holding a number, or make the signal a string' }
 
   return { span: attribute, help: `\`bind:value\` writes a ${given} here, and the signal holds ${held}: bind a signal of that type` }
 }
 
-// `elif a`, an element to TypeScript, reported on the line and again on its closing tag.
-const elseIf: Row = (diagnostic, source, span) => {
+// `elif a`, an element to TypeScript, reported at its opening tag, which the source maps loosely, and again at its closing tag.
+const elseIf: Row = (diagnostic, source, _span, tsx) => {
   const name = diagnostic.code === MISSING_PROPERTY ? UNKNOWN_ELEMENT.exec(diagnostic.message)?.[1] : undefined
 
-  if (name === undefined)
+  if (name === undefined || !ELSE_IF_SPELLINGS.has(name))
     return undefined
 
-  if (!source.startsWith(name, span.start))
+  if (tsx.startsWith('</', diagnostic.start))
     return 'duplicate'
 
-  if (!ELSE_IF_SPELLINGS.has(name))
+  // The source maps the tag loosely, so it is the nth line opening on the name that stands for the nth such tag of the generated code.
+  const ordinal = tsx.slice(0, diagnostic.start).split(`<${name}`).length - 1
+  const token = [...source.matchAll(new RegExp(`^[ \\t]*${name}(?![\\w$-])`, 'gm'))][ordinal]
+
+  if (!token)
     return undefined
 
-  return { span: { start: span.start, end: span.start + name.length }, help: `kay writes it as two words, \`else if condition\`` }
+  const start = token.index + token[0].length - name.length
+
+  return { span: { start, end: start + name.length }, help: 'kay writes it as two words, `else if condition`' }
 }
 
 // `className` and `htmlFor`: kay writes the HTML names.
@@ -174,12 +181,12 @@ const reactNames: Row = (diagnostic, source, span) => {
 
 const ROWS: Row[] = [calledHandler, mistypedBind, elseIf, reactNames]
 
-export function templateHint(diagnostic: TsgoDiagnostic, source: string, span: Span | undefined): TemplateHint | 'duplicate' | undefined {
+export function templateHint(diagnostic: TsgoDiagnostic, source: string, span: Span | undefined, tsx: string): TemplateHint | 'duplicate' | undefined {
   if (span === undefined)
     return undefined
 
   for (const row of ROWS) {
-    const hint = row(diagnostic, source, span)
+    const hint = row(diagnostic, source, span, tsx)
 
     if (hint !== undefined)
       return hint
