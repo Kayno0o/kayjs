@@ -2,7 +2,7 @@
 
 What each release of kay and its libraries adds, newest first, each feature with where it is documented. kay and its libraries share one version, so one section covers them all; what a release breaks is in [Upgrading](upgrading.md).
 
-## Unreleased
+## 1.83.0
 
 - kayjs-ai: `ground(found, read)` turns the rows pg-orm 8's `nearest()` found into the `system` and `sources` of an `ask`, so a chat answers from the app's own documents and cites them, and the fake answers it all under `bun test`: [Speech and embeddings](../packages/ai/llms/speech-and-embeddings.md).
 - kay and its libraries accept `@kaynooo/pg-orm` 7 or 8 as their peer, and `kay new` and `kay add` scaffold an app on 8, where a call that matched every row (an empty WHERE on an update or delete, an object as a key) throws `ValidationError`: [pg-orm 8's guide](https://git.kaynooo.fr/kaynooo/pg-orm/src/branch/main/MIGRATION_v8.0.0.md). kayjs-ai's embeddings example uses 8's `embedding()` trait and `repo.read.nearest()`.
@@ -33,48 +33,4 @@ What each release of kay and its libraries adds, newest first, each feature with
 - kayjs-ai: `ChatLauncher` takes `keepOnServer` and `conversations`, the panel's conversation named by this browser through `Chat`'s new `conversationIn="browser"`, so a reload, another page or a new tab shows it again: [A chat on every page](../packages/ai/llms/chat-conversations.md#a-chat-on-every-page).
 - kayjs-ai: an approval ticket whose store fails or takes over 5 s runs no call, where a hanging store held the reply: [Actions as tools](../packages/ai/llms/tools.md).
 
-## 1.81.0
-
-- kayjs-ui: `RowsField` is a repeatable rows field, a box per column with Add and Remove, in a signal editor, a form posting to an action or a `SaveForm`: [RowsField](../packages/ui/llms/forms.md#rowsfield).
-- kayjs-ui: `infiniteList(first, { action, input, failure })` pages through an action, `pageFields` and `pageOf` give the action its paging, and `patch(id, change)` updates one loaded row: [Infinite lists](../packages/ui/llms/infinite-list.md).
-- kayjs-ui: a Table over a `list` sends its search text and its `fields` to the list's `load` as `filter`, kept in the URL, and `list.filterBy` and `list.restart` do the same from code: [Infinite lists](../packages/ui/llms/infinite-list.md).
-- kayjs-ui: `SaveForm` takes `cancelHref` for a Cancel link, `confirm` for a question before saving and `saveDisabled` to keep Save off with its reason: [Forms](../packages/ui/llms/forms-and-steps.md).
-- kayjs-ui: `attempt(run, { failure, onRefused(data) })` hands a refusal to the app instead of toasting it: [Toasts](../packages/ui/llms/basics.md).
-- kayjs-ui: `Select` and `Segmented` take `param` (with `paramDefault`) to hold a query param of the page with no island of the app's: [tables](../packages/ui/llms/tables-navigation-and-layout.md).
-- kayjs-ui: `TabNav(tabs param="tab")` builds its links from a query param and marks the current tab, a link taking `prefix` or `also` to stay current on sub-pages: [tables](../packages/ui/llms/tables-navigation-and-layout.md).
-- kayjs-ui: `DateTimeInput` shows a date and time on the visitor's clock and posts the instant with its offset, which `s.Date()` reads: [forms](../packages/ui/llms/forms.md).
-- kayjs-ui: the `kui-prose` class styles running text you did not template, such as `markdownHtml` or `sanitizeHtml` output: [forms](../packages/ui/llms/forms.md).
-- `withQuery({ page: 2, sort: null })` from `kay` gives the current page's path with those query params set or dropped, following the address in an island: [Navigating from code](navigation-from-code.md#navigating-from-code).
-- A page's `query` field with `lenient: true` reads a value its schema refuses as its default instead of answering 400: [Routing](routing.md#reference).
-- `mediaQuery('(...)')` and `reducedMotion()` from `kay` follow a media query or `prefers-reduced-motion` in an island, the server rendering a stated fallback: [Follow a media query](islands.md#follow-a-media-query).
-- `timeZone` in kay.config.ts sets the zone dates are written in, on the server and in islands, and `kay/i18n` has `formatBytes` and `formatDuration`: [Locales](locales.md#helpers).
-- `cached(key, ttl, load, { stale: false })` waits for a fresh load past its ttl, and `{ fallback }` answers a value when the first load throws; `cache()` takes both: [Caching](rendering.md#caching).
-- `s.UnionEnum(values)` no longer defaults to its first value, so a field that wants one passes `{ default }`: [Actions](actions.md).
-- `s.File` and `s.Files` take `minSize` and `maxSize` as `'2mb'`, and an action with no `maxSize` takes what its file fields add up to, ten files for an `s.Files` without `maxItems`: [Files posted to an action](files.md#files-posted-to-an-action).
-- A string `defineEnv` field also reads `<NAME>_FILE`, a file holding its value, as a compose secret hands it: [Environment](environment.md#environment).
-- `basicAuth({ user, password, realm })` from `kay/server` is a `_guard.ts` for HTTP Basic, refusing every request while the credentials are unset: [Guards](server.md#basic-auth).
-- `kay build` and `kay dev` build an app in a workspace on Bun's isolated linker, so `linker = "hoisted"` in `bunfig.toml` is no longer needed: [Component libraries](component-libraries.md).
-- `kay build` prerenders up to 8 of a route's pages at once: [Prerendering](prerendering.md#prerendering).
-- `compressionDictionary: false` in kay.config.ts builds no compression dictionary, and a rebuild compresses again only the pages that changed: [Compression](proxy-and-security.md#compression).
-- kayjs-ai: `ask(messages, { sources })` has a reply cite documents as `[n]`, which `Chat` links and lists under the turn: [Chat sources](../packages/ai/llms/chat-sources.md).
-- kayjs-ai: `chatMessages({ maxItems, maxLength, attachments })` is the schema of the history a `Chat` posts, and `lastChatMessage(messages)` reads the one just sent: [Chat](../packages/ai/llms/chat.md).
-- kayjs-ai: `ChatTurn` is the type of `Chat`'s `initial`, `{ role, content, sources? }`: [Chat](../packages/ai/llms/chat.md#props).
-- kayjs-ai: `tool: { label }` on an action, or `label` on a `tool()`, words its calls in `Chat`, and `kay check` warns (`unknown-tool-label`) of a `toolLabels` key naming no tool: [Actions as tools](../packages/ai/llms/tools.md), [Chat](../packages/ai/llms/chat.md).
-- kayjs-ai: `await reply.steps` lists the model requests a reply made, with their timing, usage and tool calls, and a finished `ToolCall` has `ms`: [Asking](../packages/ai/llms/asking.md).
-- kayjs-auth: a store of the app's own needs no `attempts`, which count in the app's `store.rates` or the store's `rates`, `DEFAULT_LIMITS` writes its windows as durations, and kay's `RateStore` gains an optional `reset(key)`: [Limits](../packages/auth/llms/hardening-and-testing.md#limits).
-- kayjs-auth: `forwardAuth` sets the session cookie on the visited host's domain with no `domain` on `session()`, naming it `kay_session` so its users sign in once more, and `auth({ cookie })` names the cookie: [Guarding other sites](../packages/auth/llms/oauth-server-and-tokens.md).
-- kayjs-mail: bounces and complaints have a store of their own, `mailer({ suppressionStore: pgSuppressions(db) })` keeping them in Postgres, so a mailer with no list opens no list store: [Bounces and replies](../packages/mail/llms/bounces-and-replies.md).
-- A component mounted by `mountComponent` has `type`, `click` and `press` firing a browser's events, and `setProps` giving it new props as a parent would: [Mounting a component](testing.md#mounting-a-component).
-- `site.logs` in `kay/test` lists what the server logged during the test: [Read the log](testing.md#read-the-log).
-- `waitUntil(condition, { timeout, what })` from `kay/test` polls a condition in a server test and fails naming what it waited for: [Testing requests, jobs and sockets](testing-requests-jobs-sockets.md).
-- `memoryJobs()` lists a queue's jobs by when they are due, as `sqliteJobs` and `pgJobs` do: [Queues](queues.md#reference).
-- An action call takes `undefined` on an `s.Optional` field, reports a wrong field at that field, and `Parameters<typeof add>[0]` reads its typed input: [Calling from an island](actions-from-islands.md#calling-from-an-island).
-- `kay check` reads an icon from an imported object of `~icons/` imports, and a list built from it, as data, so such a component no longer renders as an island: [Islands](islands.md).
-- A library linked from its own folder with kay as a dev dependency shares the app's kay, so its `api()` is served: [Component libraries](component-libraries.md).
-- A page following a cached value or a live `resource()` refreshes behind a proxy rewriting the live stream's line breaks to `\r\n`: [Following cached values](live-values.md#following-cached-values).
-- `queue(name, handler, { live: true })` lets an island follow the queue's waiting and running jobs with `jobs(name)` from `kay`, across workers and replicas: [Show a queue's jobs on a page](queues.md#show-a-queues-jobs-on-a-page).
-- A page whose only `Date`, `fetch`, `process`, `Bun` or `ctx` sits in a comment, a string, a type or the template's text, or which imports only types from `kay`, is now [kept](prerendering.md).
-
-The rest of this release is in [What's new, older releases](whats-new-archive.md).
-
-Releases before 1.81 are in [What's new, older releases](whats-new-archive.md).
+Releases before 1.82 are in [What's new, older releases](whats-new-archive.md).
