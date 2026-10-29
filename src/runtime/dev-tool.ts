@@ -13,8 +13,6 @@ const TYPES_EVENT = 'kay-dev-types'
 const REQUEST = 'kay-dev-request'
 const HEAD_HEADER = 'x-kay-dev'
 const REQUEST_URL = '/_kay/dev/request'
-const SIZES_URL = '/_kay/dev/sizes'
-const FOOTPRINT_URL = '/_kay/dev/footprint'
 const STACK_URL = '/_kay/dev/stack'
 const DATA_TAB_URL = '/_kay/dev/tab/data.js'
 const JOBS_TAB_URL = '/_kay/dev/tab/jobs.js'
@@ -24,19 +22,12 @@ const HEAD_TAB_URL = '/_kay/dev/tab/head.js'
 const READING_TAB_URL = '/_kay/dev/tab/reading.js'
 const ENV_TAB_URL = '/_kay/dev/tab/env.js'
 const NOT_FOUND_TAB_URL = '/_kay/dev/tab/not-found.js'
+const I18N_TAB_URL = '/_kay/dev/tab/i18n.js'
+const NETWORK_TAB_URL = '/_kay/dev/tab/network.js'
+const IMAGES_TAB_URL = '/_kay/dev/tab/images.js'
+const PERFORMANCE_TAB_URL = '/_kay/dev/tab/performance.js'
 // A stack frame in a chunk of the browser build, which the server can point at its `.kay` line.
 const CHUNK_FRAME = /\/_kay\/[\w.-]+\.js:\d+:\d+/
-// The navigations the Network tab keeps: the page's load, then each swap.
-const MAX_NAVIGATIONS = 5
-// The most requests one navigation lists, the rest counted.
-const MAX_FETCHES = 300
-// How long before the dev tool hears of a swap its own fetch may start, as the page calls fetch in the task marking itself busy.
-const SWAP_SLACK_MS = 20
-// How long before a swap the page it brings may have been prefetched, as the swap keeps a prefetch for this long.
-const PREFETCH_TTL_MS = 30_000
-// The Server-Timing entry dev.ts answers the live reload's fetches with.
-const LIVE_RELOAD_TIMING = 'kay-live-reload'
-const RELOAD_START_MS = 50
 // The addresses the dev tool fetched itself, which the Network tab leaves out.
 const OWN_FETCHES = new Set<string>()
 const DEV_PATH = /\/_kay\/dev\//
@@ -53,8 +44,6 @@ const MAX_DISMISSED = 200
 const COPIED_MS = 1500
 // The pending reset of each button saying it copied.
 const copyResets = new WeakMap<HTMLButtonElement, ReturnType<typeof setTimeout>>()
-// The event the live reload script fires for each restart or stylesheet swap `kay dev` announces.
-const BUILT_EVENT = 'kay-dev-built'
 // A path segment, kay's `(group)`, `[param]`, `[[optional]]` and `[...rest]` names included.
 const SEGMENT = String.raw`(?:\([\w@.+=-]+\)|\[{1,2}(?:\.{3})?[\w-]+\]{1,2}|[\w@.+=-])+`
 const SOURCE_EXTENSION = String.raw`(?:[cm]?[jt]sx?|css)`
@@ -397,7 +386,6 @@ function setIcon(button: HTMLButtonElement, label: string, name: DevIconName): v
 
 // The icon a count's tone puts in the bar's badge.
 const TONE_ICONS = { error: 'circle-x', warn: 'triangle-alert' } as const satisfies Record<'error' | 'warn', DevIconName>
-const RATING_TONES = { good: 'ok', needs: 'warn', poor: 'error' } as const
 
 // A guard that did not run is no failure, so it has no tone.
 function guardTone(outcome: string): 'ok' | 'error' | undefined {
@@ -405,13 +393,6 @@ function guardTone(outcome: string): 'ok' | 'error' | undefined {
     return undefined
 
   return outcome === 'passed' ? 'ok' : 'error'
-}
-
-function worstTone(bad: string[]): 'error' | 'warn' | undefined {
-  if (bad.includes('poor'))
-    return 'error'
-
-  return bad.length > 0 ? 'warn' : undefined
 }
 
 // The tabs kay makes itself; those a library adds sit under a line.
@@ -686,6 +667,14 @@ export interface DevKit {
   positionButton: (source: string) => HTMLButtonElement
   ownFetch: typeof ownFetch
   withPositions: (text: string) => Node[]
+  missing: MissingMessages
+  vitals: Vitals
+  formatBytes: typeof formatBytes
+  fetchKind: typeof fetchKind
+  formatMs: typeof formatMs
+  // The addresses the tool fetched itself, which the Network tab leaves out.
+  ownFetches: ReadonlySet<string>
+  parseUrl: typeof parseUrl
   walkComposed: typeof walkComposed
 }
 
@@ -1242,6 +1231,8 @@ export function startDevTool(doc: Document = document, load: LoadTab = importTab
 
   // The buttons kay's error pages carry need a script and have no other.
   const listening = new AbortController()
+  const missing = missingMessages()
+  const vitals = watchVitals(doc.defaultView!, listening.signal)
   // A page swap marks the document busy until the new page is in, and a back or forward step moves without one.
   const swaps = new MutationObserver(showWhere)
 
@@ -1267,6 +1258,13 @@ export function startDevTool(doc: Document = document, load: LoadTab = importTab
       positionButton: source => positionButton(tool, source),
       ownFetch,
       withPositions: text => withPositions(text, tool),
+      missing,
+      vitals,
+      formatBytes,
+      fetchKind,
+      formatMs,
+      ownFetches: OWN_FETCHES,
+      parseUrl,
       walkComposed,
     },
     outline,
@@ -1290,20 +1288,20 @@ export function startDevTool(doc: Document = document, load: LoadTab = importTab
     },
   }
 
-  const missing = missingMessages()
-
   problems = problemsTab(doc, tool, state, save, missing)
   request = requestTab(doc, tool)
-  networkTab(doc, tool, listening.signal)
+  lazyTab(tool, { id: 'network', label: 'Network', icon: 'network' }, NETWORK_TAB_URL, load, true)
   lazyTab(tool, { id: 'head', label: 'Head', icon: 'scan-search' }, HEAD_TAB_URL, load, true)
   lazyTab(tool, { id: 'screen-reader', label: 'Screen reader', icon: 'ear', hidden: () => tool.hideOutline() }, READING_TAB_URL, load, true)
   lazyTab(tool, { id: 'env', label: 'Env', icon: 'key-round' }, ENV_TAB_URL, load, true)
-  const vitals = watchVitals(doc.defaultView!, listening.signal)
-
-  imagesTab(doc, tool, vitals, listening.signal)
-  performanceTab(doc, tool, vitals, listening.signal)
+  lazyTab(tool, { id: 'images', label: 'Images', icon: 'image' }, IMAGES_TAB_URL, load, true)
+  lazyTab(tool, { id: 'performance', label: 'Performance', icon: 'gauge' }, PERFORMANCE_TAB_URL, load, true)
   lazyTab(tool, { id: 'routes', label: 'Routes', icon: 'route' }, ROUTES_TAB_URL, load)
-  i18nTab(doc, tool, missing, listening.signal)
+
+  // Only a site with `i18n` has the tab, whose request block lists the locales.
+  if ((JSON.parse(doc.getElementById(REQUEST)?.textContent ?? 'null') as DevRequest | null)?.locales !== undefined)
+    lazyTab(tool, { id: 'i18n', label: 'i18n', icon: 'languages' }, I18N_TAB_URL, load, true)
+
   lazyTab(tool, { id: 'not-found', label: 'Not found', icon: 'circle-x' }, NOT_FOUND_TAB_URL, load, true)
   lazyTab(tool, { id: 'data', label: 'Data', icon: 'database' }, DATA_TAB_URL, load)
   lazyTab(tool, { id: 'jobs', label: 'Jobs', icon: 'list-checks' }, JOBS_TAB_URL, load)
@@ -1534,7 +1532,7 @@ function problemsTab(doc: Document, tool: DevTool, state: DevState, save: () => 
 const MISSING_MESSAGE = /no locale has the message ("(?:[^"\\]|\\.)*")/
 
 // The message keys the page asked for that no locale has, read off the problems kay logs, which `changed` hears of.
-interface MissingMessages {
+export interface MissingMessages {
   keys: Set<string>
   changed: () => void
   note: (problem: DevProblem) => void
@@ -1563,74 +1561,6 @@ function missingMessages(): MissingMessages {
   }
 
   return missing
-}
-
-// The page's locale, a link to the page in each other one, and the messages no locale has; only for a site with `i18n`, whose request block lists the locales.
-function i18nTab(doc: Document, tool: DevTool, missing: MissingMessages, signal: AbortSignal): void {
-  const read = () => JSON.parse(doc.getElementById(REQUEST)?.textContent ?? 'null') as DevRequest | null
-
-  if (read()?.locales === undefined)
-    return
-
-  let render: () => void = () => undefined
-  const tab = tool.tab({ id: 'i18n', label: 'i18n', icon: 'languages', shown: () => render() })
-
-  render = () => {
-    const request = read()
-
-    if (request?.locales === undefined)
-      return
-
-    const facts = tool.make('dl', 'facts')
-    const switcher = tool.make('dd')
-    const chips = tool.make('span', 'locales')
-    const messages = tool.make('section', 'group')
-    const heading = tool.make('h3', 'heading', 'Missing messages')
-    const keys = tool.make('ul', 'missing')
-
-    for (const { locale, href } of request.locales) {
-      const current = locale === request.locale
-      const chip = current ? tool.make('span', 'locale-chip', locale) : Object.assign(tool.make('a', 'locale-chip', locale), { href })
-
-      if (current)
-        chip.setAttribute('aria-current', 'true')
-
-      chips.append(chip)
-    }
-
-    switcher.append(chips)
-
-    for (const key of missing.keys) {
-      const item = tool.make('li')
-
-      item.append(tool.icon('circle-x'), key)
-      keys.append(item)
-    }
-
-    heading.append(pill(tool, String(missing.keys.size), missing.keys.size > 0 ? 'error' : undefined))
-    messages.append(heading, missing.keys.size === 0 ? tool.make('span', 'note', 'none') : keys)
-    facts.append(tool.make('dt', '', 'Locale'), tool.make('dd', 'mono', request.locale), tool.make('dt', '', 'Page in'), switcher)
-    tab.count(missing.keys.size, missing.keys.size > 0 ? 'error' : undefined)
-    tab.panel.replaceChildren(facts, messages)
-  }
-  // A page swap brings the next page's block, and starts with the old page's problems gone.
-  const blocks = new MutationObserver((records) => {
-    if (records.some(record => [...record.addedNodes, ...record.removedNodes].some(node => (node as Element).id === REQUEST)))
-      render()
-  })
-  const swaps = new MutationObserver(() => {
-    if (doc.documentElement.hasAttribute('aria-busy'))
-      missing.clear()
-  })
-
-  missing.changed = render
-  render()
-  blocks.observe(doc.head, { childList: true })
-  swaps.observe(doc.documentElement, { attributeFilter: ['aria-busy'] })
-  signal.addEventListener('abort', () => {
-    blocks.disconnect()
-    swaps.disconnect()
-  })
 }
 
 // What served the page: the route it matched, the files that rendered it, outermost first, its params and status, and how long each load took on the scale of the whole request; read again after each page swap.
@@ -1817,187 +1747,13 @@ function serverPhases(header: string): ServerPhases {
   return phases
 }
 
-interface Navigation {
-  // The page it showed, empty while a swap brings it.
-  path: string
-  start: number
-  fetches: PerformanceResourceTiming[]
-  more: number
-}
-
-// What the page fetched, by navigation, newest first: its load and the last few swaps, each request with its kind, status, size and time; the dev tool's own requests are left out, and an error status is counted on the tab for the page shown.
-function networkTab(doc: Document, tool: DevTool, signal: AbortSignal): void {
-  const win = doc.defaultView!
-  // The live reload script's fetches of the page, which the dev server answers with a Server-Timing entry only they carry.
-  // `serverTiming` is only exposed in a secure context, so the script also notes the address and time of each fetch for a page over plain HTTP.
-  const reloadFetch = (fetched: PerformanceResourceTiming) => fetched.serverTiming?.some(timing => timing.name === LIVE_RELOAD_TIMING) === true
-    || ((win as Window & { $kayReloads?: [string, number][] }).$kayReloads?.some(([href, started]) => href === fetched.name && fetched.startTime >= started && fetched.startTime - started <= RELOAD_START_MS) === true)
-  let draw: () => void = () => undefined
-  const tab = tool.tab({ id: 'network', label: 'Network', icon: 'network', shown: () => draw() })
-  const content = tool.make('div', 'stack')
-  const bar = toolbar(tool, 'Filter by address, kind or status', () => bar.apply(content), true)
-  const here = () => `${win.location.pathname}${win.location.search}`
-  const navigations: Navigation[] = [{ path: here(), start: 0, fetches: [], more: 0 }]
-  // What each navigation's section shows, kept so a new request adds its row rather than redrawing the rest, a focused copy button with it.
-  const drawn = new Map<Navigation, { group: HTMLElement, heading: HTMLElement, list: HTMLElement, empty: HTMLElement, more: HTMLElement, rows: number }>()
-  const changed = () => {
-    const current = navigations.at(-1)!
-
-    tab.count(current.fetches.filter(fetched => statusOf(fetched) >= 400).length, 'error')
-
-    if (tab.panel.hidden === false)
-      draw()
-  }
-  // A page fetch that started a moment before the tool heard of the running swap, which may be the swap's own and is told once the swap names its page.
-  const early: PerformanceResourceTiming[] = []
-  const place = (fetched: PerformanceResourceTiming, navigation: Navigation) => {
-    if (navigation.fetches.length < MAX_FETCHES)
-      navigation.fetches.push(fetched)
-    else
-      navigation.more++
-  }
-  const earlyPage = (fetched: PerformanceResourceTiming) => {
-    if (fetched.initiatorType !== 'fetch' && fetched.initiatorType !== 'xmlhttprequest')
-      return false
-
-    const url = new URL(fetched.name)
-
-    return !ACTION_PATH.test(url.pathname) && !url.searchParams.has(ISLAND_PARAM)
-  }
-  const addressOf = (fetched: PerformanceResourceTiming) => {
-    const url = new URL(fetched.name)
-
-    return `${url.pathname}${url.search}`
-  }
-  // Whether the request was kept, in the navigation it started in: only a swap's own page fetch, which starts a moment before the tool hears of the swap, goes in the swap's, matched by its address.
-  const add = (fetched: PerformanceResourceTiming) => {
-    if (DEV_PATH.test(fetched.name) || ((fetched.initiatorType === 'fetch' || fetched.initiatorType === 'xmlhttprequest') && (OWN_FETCHES.has(fetched.name) || reloadFetch(fetched))))
-      return false
-
-    const swap = navigations.at(-1)!
-    const before = swap.start > fetched.startTime && earlyPage(fetched)
-
-    if (before && swap.start <= fetched.startTime + SWAP_SLACK_MS && swap.path === '') {
-      early.push(fetched)
-
-      return false
-    }
-
-    // The page the swap went to, fetched by the swap or a prefetch before it, which may be reported once the swap has ended.
-    const own = before && swap.path !== '' && swap.start <= fetched.startTime + PREFETCH_TTL_MS && addressOf(fetched) === swap.path
-    const navigation = navigations.findLast(candidate => candidate.start <= fetched.startTime || (own && candidate === swap)) ?? navigations[0]!
-
-    place(fetched, navigation)
-
-    return true
-  }
-
-  draw = () => {
-    for (const [navigation, { group }] of drawn) {
-      if (!navigations.includes(navigation)) {
-        group.remove()
-        drawn.delete(navigation)
-      }
-    }
-
-    for (const [index, navigation] of navigations.entries()) {
-      let shown = drawn.get(navigation)
-
-      if (shown === undefined) {
-        shown = { group: tool.make('section', 'group'), heading: tool.make('h3', 'heading'), list: tool.make('div', 'list'), empty: tool.make('div', 'note', 'Nothing fetched.'), more: tool.make('div', 'note'), rows: 0 }
-        shown.group.append(shown.heading, shown.empty, shown.list, shown.more)
-        // Newest first: each navigation goes above those before it.
-        content.prepend(shown.group)
-        drawn.set(navigation, shown)
-      }
-
-      shown.heading.replaceChildren(`${index === navigations.length - 1 ? 'This page' : 'Before'}, ${navigation.path === '' ? 'loading' : navigation.path}`, pill(tool, String(navigation.fetches.length + navigation.more)))
-
-      // In the order they started, which is not the order the browser reports them in once done.
-      for (const fetched of navigation.fetches.slice(shown.rows)) {
-        const row = fetchRow(tool, fetched, navigation.start, win)
-        const after = [...shown.list.children].find(other => Number((other as HTMLElement).dataset.start) > fetched.startTime)
-
-        row.dataset.start = String(fetched.startTime)
-        shown.list.insertBefore(row, after ?? null)
-      }
-
-      shown.rows = navigation.fetches.length
-      shown.empty.hidden = navigation.fetches.length > 0
-      shown.more.hidden = navigation.more === 0
-      shown.more.textContent = `${navigation.more} more not listed.`
-    }
-
-    bar.apply(content)
-  }
-
-  const [loaded] = win.performance.getEntriesByType('navigation') as PerformanceResourceTiming[]
-
-  if (loaded !== undefined)
-    add(loaded)
-
+function parseUrl(src: string, base: string): URL | undefined {
   try {
-    const observer = new win.PerformanceObserver((list) => {
-      let kept = false
-
-      for (const fetched of list.getEntries())
-        kept = add(fetched as PerformanceResourceTiming) || kept
-
-      if (kept)
-        changed()
-    })
-
-    observer.observe({ type: 'resource', buffered: true })
-    signal.addEventListener('abort', () => observer.disconnect())
+    return new URL(src, base)
   }
   catch {
-    // A browser without Resource Timing lists the document alone.
+    return undefined
   }
-
-  // A swap opens a navigation as it starts and names it once it ends.
-  const swaps = new MutationObserver(() => {
-    const busy = doc.documentElement.getAttribute('aria-busy') === 'true'
-    const last = navigations.at(-1)!
-
-    if (busy && last.path !== '') {
-      navigations.push({ path: '', start: win.performance.now(), fetches: [], more: 0 })
-
-      if (navigations.length > MAX_NAVIGATIONS)
-        navigations.shift()
-    }
-    else if (!busy && last.path === '') {
-      last.path = here()
-
-      for (const fetched of early.splice(0))
-        place(fetched, addressOf(fetched) === last.path ? last : navigations.findLast(candidate => candidate !== last && candidate.start <= fetched.startTime) ?? navigations[0]!)
-
-      // A swap that fetched nothing itself took the page from a prefetch, which the page it left listed as it was reported and keeps listing, as it did fetch it there.
-      const left = navigations.at(-2)
-
-      if (left !== undefined && left.path !== last.path && !last.fetches.some(fetched => earlyPage(fetched) && addressOf(fetched) === last.path)) {
-        const prefetched = left.fetches.findLast(fetched => earlyPage(fetched) && addressOf(fetched) === last.path && last.start > fetched.startTime && last.start <= fetched.startTime + PREFETCH_TTL_MS)
-
-        if (prefetched !== undefined)
-          place(prefetched, last)
-      }
-    }
-    else {
-      return
-    }
-
-    changed()
-  })
-
-  swaps.observe(doc.documentElement, { attributes: true, attributeFilter: ['aria-busy'] })
-  signal.addEventListener('abort', () => swaps.disconnect())
-  content.append(bar.empty)
-  tab.panel.append(bar.element, content)
-  changed()
-}
-
-// The status a request was answered with, 0 when the browser does not tell, as for another site's answer.
-function statusOf(fetched: PerformanceResourceTiming): number {
-  return 'responseStatus' in fetched && typeof fetched.responseStatus === 'number' ? fetched.responseStatus : 0
 }
 
 // What a request was for: an action, a server island, a page a swap or prefetch fetched, another fetch, or the kind of file the page loaded.
@@ -2031,158 +1787,13 @@ function fetchKind(fetched: PerformanceResourceTiming, url: URL): string {
   return fetched.initiatorType === '' ? 'other' : fetched.initiatorType
 }
 
-// What a request brought, as the bytes on the wire or from the cache; nothing when the browser does not tell, as for another site's answer.
-function fetchedSize(fetched: PerformanceResourceTiming): string[] {
-  if (fetched.transferSize === 0 && fetched.decodedBodySize > 0)
-    return ['from the cache']
-
-  return fetched.encodedBodySize > 0 ? [formatBytes(fetched.encodedBodySize)] : []
-}
-
-function fetchRow(tool: DevTool, fetched: PerformanceResourceTiming, start: number, win: Window): HTMLElement {
-  const url = new URL(fetched.name)
-  const status = statusOf(fetched)
-  const kind = fetchKind(fetched, url)
-  const name = url.origin === win.location.origin ? `${url.pathname}${url.search}` : fetched.name
-  const chips = [kind, ...fetchedSize(fetched), formatMs(fetched.duration), `at ${formatMs(Math.max(0, fetched.startTime - start))}`]
-  const after = [...status === 0 ? [] : [pill(tool, String(status), status >= 400 ? 'error' : 'ok')], copyButton(tool, 'the address', fetched.name)]
-
-  return filterable(entry(tool, 'fetch', { name, after, chips }), `${name} ${kind} ${status}`, status >= 400)
-}
-
-// An image served more than this many times the pixels it is drawn with is flagged: the ladder's widths are at most 2 apart, so a variant picked for the size drawn is under 2 times as wide, 4 times the pixels, even at its worst.
-const OVERSIZED = 4
-const IMAGE_ROUTE = '/_kay/image'
-const SVG_TYPE = /^image\/svg\+xml\s*(?:;|$)/i
-// The files `kay build` wrote for the variants.
-const IMAGE_FILES = '/_kay/images/'
-// How many formats are asked of the server at once, and how long one gets.
-const IMAGE_REQUESTS = 4
-const IMAGE_REQUEST_MS = 3000
-const VARIANT_FILE = /-(card|\d+)(?:-(\d+x\d+))?\.(?:webp|avif|jpg)$/
-// The accept header browsers send for an image, which the image route picks AVIF or WebP from.
-const IMAGE_ACCEPT = 'image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8'
-
-interface ImageInfo {
-  image: HTMLImageElement
-  // The URL in use, shortened to its path and the `src` of the image route.
-  url: string
-  // The address the browser loaded.
-  src: string
-  variant: string
-  natural: string
-  drawn: string
-  // What is wrong with it, one sentence each.
-  flags: string[]
-  lcp: boolean
-}
-
-function parseUrl(src: string, base: string): URL | undefined {
-  try {
-    return new URL(src, base)
-  }
-  catch {
-    return undefined
-  }
-}
-
-// A URL's path with its percent-encoding read; a name that is not valid percent-encoding is read as it is.
-function decodedPath(url: URL): string {
-  try {
-    return decodeURIComponent(url.pathname)
-  }
-  catch {
-    return url.pathname
-  }
-}
-
-// What kay's URL for an image says it is: a width of the ladder, a crop, the share card, a file `kay build` wrote, or an image kay did not resize.
-function imageVariant(src: string, origin: string): string {
-  const url = parseUrl(src, origin)
-
-  if (url === undefined || url.origin !== origin)
-    return 'not resized by kay'
-
-  if (url.pathname === IMAGE_ROUTE) {
-    const crop = url.searchParams.get('crop')
-
-    return url.searchParams.has('card') ? 'share card, 1200x630, resized on request' : `${url.searchParams.get('w') ?? 'original'}w${crop === null ? '' : `, cut ${crop}`}, resized on request`
-  }
-
-  const path = decodedPath(url)
-
-  const file = VARIANT_FILE.exec(path)
-
-  if (path.startsWith('/_kay/images/') && file)
-    return `${file[1] === 'card' ? 'share card' : `${file[1]}w`}${file[2] === undefined ? '' : `, cut ${file[2]}`}, written by kay build`
-
-  return 'not resized by kay'
-}
-
-// Whether an image is an SVG: a path ending in `.svg` whatever its query or hash, else the content type its fetch answered, as Resource Timing kept it, since asking again could run the app's own handler. The browser gives an SVG without a size a natural size of 150x150, and an SVG draws at any size from the same bytes, so its natural size says nothing about what was served.
-function isVector(src: string, win: Window & typeof globalThis): boolean {
-  const url = parseUrl(src, win.location.href)
-
-  if (url === undefined)
-    return false
-
-  if (decodedPath(url).toLowerCase().endsWith('.svg'))
-    return true
-
-  url.hash = ''
-
-  return win.performance.getEntriesByName(url.href, 'resource').some(entry => 'contentType' in entry && typeof entry.contentType === 'string' && SVG_TYPE.test(entry.contentType))
-}
-
-// Every image of the page with what it is, what it is drawn at and what is wrong with it; `lcp` is the element the browser reported as the largest paint.
-function pageImages(doc: Document, lcp: Element | undefined): ImageInfo[] {
-  const win = doc.defaultView!
-  const density = win.devicePixelRatio || 1
-  // Chromium reports a zoom's density as a float, 1.2000000476837158 at 120%.
-  const shown = Number(density.toFixed(2))
-
-  return [...doc.querySelectorAll('img')].flatMap((image) => {
-    const src = image.currentSrc === '' ? image.getAttribute('src') : image.currentSrc
-
-    if (src === null || src === '' || src.startsWith('data:'))
-      return []
-
-    const box = image.getBoundingClientRect()
-    const flags: string[] = []
-    const served = image.naturalWidth * image.naturalHeight
-    const needed = box.width * box.height * density * density
-
-    if (served > 0 && needed > 0 && served > needed * OVERSIZED && !isVector(src, win))
-      flags.push(`served ${Math.round(served / needed)} times the pixels it is drawn with, give it a smaller width or \`sizes\``)
-
-    if (!image.hasAttribute('width') || !image.hasAttribute('height'))
-      flags.push('no width and height, so the page shifts as it loads')
-
-    if (image.loading === 'lazy' && box.bottom > 0 && box.top < win.innerHeight && box.right > 0 && box.left < win.innerWidth)
-      flags.push('lazy-loaded but in view, which delays it')
-
-    return [{
-      image,
-      url: src.replace(win.location.origin, ''),
-      src,
-      variant: imageVariant(src, win.location.origin),
-      natural: image.naturalWidth > 0 ? `${image.naturalWidth}x${image.naturalHeight}` : 'not loaded',
-      drawn: `${Math.round(box.width)}x${Math.round(box.height)}${shown === 1 ? '' : ` at ${shown}x`}`,
-      flags,
-      lcp: image === lcp,
-    }]
-  })
-}
-
-// The Web Vitals "good" and "poor" limits: a value up to the first is good, past the second poor.
-const VITAL_LIMITS = { lcp: [2500, 4000], cls: [0.1, 0.25], inp: [200, 500] } as const
 // A new window of layout shifts starts after a gap this long, and one never lasts past the second.
 const SHIFT_GAP_MS = 1000
 const SHIFT_WINDOW_MS = 5000
 
-type VitalName = keyof typeof VITAL_LIMITS
+export type VitalName = 'lcp' | 'cls' | 'inp'
 
-interface Vitals {
+export interface Vitals {
   // The page the browser loaded them for: a link swapping in another page starts no new load.
   path: string
   // The largest paint so far, the element it painted when it is on the page.
@@ -2191,15 +1802,6 @@ interface Vitals {
   inp?: number | undefined
   // Called with the vital that changed.
   changed: ((name: VitalName) => void)[]
-}
-
-function rateVital(name: VitalName, value: number): 'good' | 'needs' | 'poor' {
-  const [good, poor] = VITAL_LIMITS[name]
-
-  if (value <= good)
-    return 'good'
-
-  return value <= poor ? 'needs' : 'poor'
 }
 
 interface ShiftEntry extends PerformanceEntry {
@@ -2291,587 +1893,6 @@ function watchVitals(win: Window & typeof globalThis, signal: AbortSignal): Vita
   return vitals
 }
 
-// The images of the page: the variant and format each got, the size served against the size drawn, which one is the largest paint, and what is wrong with it; hovering or focusing a row outlines the image, and the list is read again as the tab shows and as the page changes under it.
-function imagesTab(doc: Document, tool: DevTool, vitals: Vitals, signal: AbortSignal): void {
-  const win = doc.defaultView!
-  let asked = 0
-  let reread: () => void = () => undefined
-  const tab = tool.tab({ id: 'images', label: 'Images', icon: 'image', shown: () => reread() })
-  const content = tool.make('div', 'stack')
-  const bar = toolbar(tool, 'Filter by address, variant or problem', () => bar.apply(content), true)
-  // What the server answered an image with, by address, until the next rebuild; a failed lookup is kept too, so a reread does not send one more request per failing image.
-  const answers = new Map<string, Promise<string>>()
-  const slots = limiter(IMAGE_REQUESTS)
-  let scheduled = false
-  const schedule = () => {
-    if (scheduled)
-      return
-
-    scheduled = true
-    queueMicrotask(() => {
-      scheduled = false
-      reread()
-    })
-  }
-
-  vitals.changed.push((name) => {
-    if (name === 'lcp')
-      schedule()
-  })
-
-  const read = async () => {
-    const ask = ++asked
-    const images = pageImages(doc, vitals.lcp?.element?.isConnected === true ? vitals.lcp.element : undefined)
-    const body = tool.make('div')
-    const formats: HTMLElement[] = []
-    const flagged = images.filter(info => info.flags.length > 0).length
-
-    tab.count(images.reduce((sum, info) => sum + info.flags.length, 0), flagged > 0 ? 'warn' : undefined)
-
-    // Closed, the tab only keeps its count; the rows and the format lookups wait for it to be opened.
-    if (tab.panel.hidden === true)
-      return
-
-    tool.hideOutline()
-
-    bar.element.hidden = images.length === 0
-
-    if (images.length === 0) {
-      content.replaceChildren(tool.make('div', 'empty', 'No images on this page.'))
-
-      return
-    }
-
-    // Copies of one image drawn at one size share a row, as the logo of a header and a footer would, with what is wrong with any of them.
-    const copies = new Map<string, ImageInfo[]>()
-
-    for (const info of images) {
-      const key = JSON.stringify([info.src, info.variant, info.drawn])
-      const same = copies.get(key)
-
-      if (same === undefined)
-        copies.set(key, [info])
-      else
-        same.push(info)
-    }
-
-    const rows = [...copies.values()]
-
-    for (const same of rows) {
-      const info = same[0]!
-      const lcp = same.some(copy => copy.lcp)
-      const thumb = tool.make('img', 'thumb')
-      const format = tool.make('span', 'chip', 'format...')
-      const label = lcp ? 'largest paint' : 'image'
-      const issues = [...new Set(same.flatMap(copy => copy.flags))]
-      const row = entry(tool, 'image', {
-        lead: thumb,
-        name: info.url,
-        after: [...lcp ? [pill(tool, 'largest paint', 'accent')] : [], ...same.length > 1 ? [pill(tool, `${same.length} copies`)] : [], copyButton(tool, 'the address', info.src)],
-        chips: [info.variant, format, info.natural === 'not loaded' ? `not loaded, drawn ${info.drawn}` : `${info.natural} drawn ${info.drawn}`],
-        issues: issues.map(text => ({ text, tone: 'warn' as const })),
-      })
-
-      formats.push(format)
-      thumb.src = info.src
-      thumb.alt = ''
-      thumb.loading = 'lazy'
-      thumb.decoding = 'async'
-      row.tabIndex = 0
-      row.setAttribute('role', 'group')
-      row.setAttribute('aria-label', same.length > 1 ? `${info.url}, ${same.length} copies` : info.url)
-      row.onpointerenter = row.onfocus = () => tool.outline(same.map(copy => copy.image), label)
-      row.onpointerleave = row.onblur = () => tool.hideOutline()
-      body.append(filterable(row, [info.url, info.variant, ...issues].join(' '), issues.length > 0))
-    }
-
-    content.replaceChildren(tool.make('div', 'note', `${images.length} image${images.length === 1 ? '' : 's'}, ${flagged} to look at`), body, bar.empty, tool.make('div', 'note', 'Formats are those the server picks for a browser accepting AVIF and WebP. Those of images kay does not serve are not looked up, as asking could run the app\'s own handler.'))
-    bar.apply(content)
-
-    // An image the server is not asked about answers at once; the others go a few at a time, so a page of many images does not ask the server for all of them at once, and one that hangs holds back one slot only.
-    await Promise.all(rows.map(async (same, index) => {
-      const info = same[0]!
-      let text = unaskedFormat(win, info.image, info.src)
-
-      if (text === undefined) {
-        let answer = answers.get(info.src)
-
-        if (answer === undefined) {
-          answer = slots(async () => askedFormat(win, info.src))
-          answers.set(info.src, answer)
-        }
-
-        text = await answer
-      }
-
-      if (ask === asked)
-        formats[index]!.textContent = text
-    }))
-  }
-
-  reread = () => void read()
-  tab.panel.append(bar.element, content)
-  doc.addEventListener('load', schedule, { capture: true, signal })
-  doc.addEventListener('error', schedule, { capture: true, signal })
-  win.addEventListener(BUILT_EVENT, () => {
-    answers.clear()
-    schedule()
-  }, { signal })
-
-  const changes = new MutationObserver(schedule)
-
-  changes.observe(doc.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['src', 'srcset', 'sizes', 'loading', 'width', 'height'] })
-  signal.addEventListener('abort', () => changes.disconnect())
-  schedule()
-}
-
-// A limit on how many calls of a kind run at once; the rest wait their turn.
-function limiter(max: number): <T>(run: () => Promise<T>) => Promise<T> {
-  let running = 0
-  const waiting: (() => void)[] = []
-
-  return async (run) => {
-    if (running >= max)
-      await new Promise<void>(resolve => waiting.push(resolve))
-
-    running++
-
-    try {
-      return await run()
-    }
-    finally {
-      running--
-      waiting.shift()?.()
-    }
-  }
-}
-
-// The format of an image the server is not asked about, or undefined for one that is. Only an image of kay's own routes loaded by the page is asked, with a HEAD request: the route's code is kay's, it writes no variant the page did not already draw, and the type is negotiated so the URL does not say it. Any other image could run the app's own handler, so its size comes from the browser's resource timing and its format is not looked up.
-function unaskedFormat(win: Window & typeof globalThis, image: HTMLImageElement, src: string): string | undefined {
-  // The page's policy lets it ask its own origin only.
-  const url = parseUrl(src, win.location.href)
-
-  if (url === undefined)
-    return 'format unknown'
-
-  if (url.origin !== win.location.origin)
-    return 'on another host'
-
-  if (url.pathname !== IMAGE_ROUTE && !url.pathname.startsWith(IMAGE_FILES))
-    return `format not looked up${transferred(win, url.href)}`
-
-  return !image.complete || image.naturalWidth === 0 ? 'not loaded' : undefined
-}
-
-// The format and size the server gives an image of kay's routes.
-async function askedFormat(win: Window & typeof globalThis, src: string): Promise<string> {
-  try {
-    const response = await ownFetch(win, src, { method: 'HEAD', headers: { accept: IMAGE_ACCEPT }, cache: 'no-store', signal: AbortSignal.timeout(IMAGE_REQUEST_MS) })
-    const type = response.headers.get('content-type') ?? ''
-
-    if (!response.ok)
-      return `the server answered ${response.status}`
-
-    const format = type.startsWith('image/') ? type.slice('image/'.length) : 'not an image'
-    const bytes = Number(response.headers.get('content-length'))
-
-    return bytes > 0 ? `${format}, ${formatBytes(bytes)}` : format
-  }
-  catch {
-    return 'format unknown'
-  }
-}
-
-// What the browser says it downloaded for an address, as ` - 12.0 KB`; nothing when it did not report it.
-function transferred(win: Window & typeof globalThis, href: string): string {
-  const entry = win.performance.getEntriesByName(href, 'resource').at(-1) as PerformanceResourceTiming | undefined
-
-  return entry !== undefined && entry.encodedBodySize > 0 ? `, ${formatBytes(entry.encodedBodySize)}` : ''
-}
-
-interface BuiltSizes {
-  route: string
-  js: number
-  css: number
-  estimated: boolean
-  exported: boolean
-  built: number
-}
-
-// What the last `kay build` measured for this page's route, which the server reads from the report kept under `.kay`; nothing when no build was made or the route is not in it.
-async function builtSizes(win: Window & typeof globalThis): Promise<BuiltSizes | undefined> {
-  try {
-    const response = await ownFetch(win, `${SIZES_URL}?path=${encodeURIComponent(win.location.pathname)}`, { headers: { [HEAD_HEADER]: '1' }, cache: 'no-store', signal: AbortSignal.timeout(IMAGE_REQUEST_MS) })
-
-    return response.ok ? ((await response.json()) as { sizes?: BuiltSizes }).sizes : undefined
-  }
-  catch {
-    return undefined
-  }
-}
-
-// How long ago, in the largest whole unit.
-function ago(ms: number): string {
-  const minutes = Math.floor(ms / 60_000)
-
-  if (minutes < 1)
-    return 'less than a minute ago'
-
-  if (minutes < 60)
-    return `${minutes} min ago`
-
-  if (minutes < 1440)
-    return `${Math.floor(minutes / 60)} h ago`
-
-  const days = Math.floor(minutes / 1440)
-
-  return days === 1 ? '1 day ago' : `${days} days ago`
-}
-
-function formatBytes(bytes: number): string {
-  return bytes < 1024 ? `${bytes} B` : `${(bytes / 1024).toFixed(1)} KB`
-}
-
-// The gzipped size of some text, as a server would send it.
-async function gzipSize(text: string): Promise<number> {
-  const stream = new Blob([text]).stream().pipeThrough(new CompressionStream('gzip'))
-
-  return (await new Response(stream).arrayBuffer()).byteLength
-}
-
-// The page's HTML as the browser holds it, without the dev tool: what the server sent, as live reload and swaps changed it, so the server renders nothing again.
-function deliveredHtml(doc: Document): string {
-  const copy = doc.documentElement.cloneNode(true) as HTMLElement
-
-  for (const host of copy.querySelectorAll(HOST))
-    host.remove()
-
-  return `<!doctype html>${copy.outerHTML}`
-}
-
-const MEDIA_KINDS: Record<string, 'images' | 'fonts'> = { font: 'fonts', image: 'images' }
-
-interface Weight {
-  html: number
-  css: { url: string, bytes: number }[]
-  entry: { url: string, bytes: number }[]
-  islands: { url: string, bytes: number }[]
-  other: { url: string, bytes: number }[]
-  images: { url: string, bytes: number }[]
-  fonts: { url: string, bytes: number }[]
-  files: { url: string, bytes: number }[]
-  // The page's elements and the requests it made, the document's own included, for the EcoIndex.
-  dom: number
-  requests: number
-  // Requests whose size the browser does not tell, another site's or one it kept in memory, counted as requests only.
-  unweighed: number
-}
-
-// A built file's name without its hash, `counter` of `counter-48rr5xzz.js`.
-const HASHED_NAME = /^(.*)-[a-z\d]{8}\.(?:js|css)$/
-const DIRECTORY_PREFIX = /^.*\//
-const KAY_SUFFIX = /\.kay$/
-const SCRIPT_OR_STYLE = /\.(?:js|css)$/
-
-// The page's HTML (the document the browser holds), the stylesheets and scripts it loaded gzipped, as sent in development: not minified, with the dev-only code, so larger than `kay build` makes them. The images, fonts and other files it loaded count as many bytes as the browser says came. The dev tool's own scripts, the live reload and the public env stay out; a file rebuilt since it first loaded counts once, in its latest form, and a stylesheet only while the page links it.
-async function pageWeight(doc: Document): Promise<Weight> {
-  const win = doc.defaultView!
-  const here = win.location.origin
-  const linked = new Set([...doc.querySelectorAll<HTMLLinkElement>('link[rel="stylesheet"]')].map(link => new URL(link.href, here).pathname))
-  const latest = new Map<string, string>()
-  const media = new Map<string, { url: string, bytes: number, kind: 'images' | 'fonts' | 'files', known: boolean }>()
-  const components = new Set([...doc.querySelectorAll('[data-component]')].map(element => (element.getAttribute('data-component') ?? '').replace(DIRECTORY_PREFIX, '').replace(KAY_SUFFIX, '')))
-
-  for (const entry of win.performance.getEntriesByType('resource')) {
-    const url = parseUrl(entry.name, here)
-
-    if (url === undefined)
-      continue
-
-    const own = url.origin === here
-
-    if (own && (url.pathname.startsWith('/_kay/dev/') || url.pathname === '/_kay/env.js'))
-      continue
-
-    if (!own || !SCRIPT_OR_STYLE.test(url.pathname)) {
-      const fetched = entry as PerformanceResourceTiming
-      const kind = fetchKind(fetched, url)
-
-      // A page a swap or prefetch fetched and an action are the visitor's moves, not what the page loaded.
-      if (kind === 'page' || kind === 'action')
-        continue
-
-      const bytes = [fetched.encodedBodySize, fetched.transferSize].find(size => size > 0) ?? 0
-
-      media.set(url.href, { url: own ? `${url.pathname}${url.search}` : url.href, bytes, kind: MEDIA_KINDS[kind] ?? 'files', known: bytes > 0 })
-
-      continue
-    }
-
-    if (url.pathname.endsWith('.css') && !linked.has(url.pathname))
-      continue
-
-    const file = url.pathname.slice(url.pathname.lastIndexOf('/') + 1)
-    const name = HASHED_NAME.exec(file)?.[1]
-
-    // Later entries are later loads: the hash of the entry or an island rebuilt since replaces the one before. Any other file keeps its address, as a name ending in 8 letters, `chart-calendar.js`, may not be hashed at all.
-    latest.set(name === undefined || !(name === 'entry' || components.has(name)) ? url.pathname : `${url.pathname.slice(0, url.pathname.length - file.length)}${name}.${file.slice(file.lastIndexOf('.') + 1)}`, url.pathname)
-  }
-
-  const sized = async (url: string, accept = '*/*') => {
-    const response = await ownFetch(win, url, { headers: { accept } })
-
-    if (!response.ok)
-      throw new Error(`${url} answered ${response.status}`)
-
-    return gzipSize(await response.text())
-  }
-  const settled = await Promise.allSettled([...latest.values()].map(async url => ({ url, bytes: await sized(url) })))
-  const files = settled.flatMap(result => result.status === 'fulfilled' ? [result.value] : [])
-  const isEntry = (url: string) => url.slice(url.lastIndexOf('/') + 1).startsWith('entry-')
-  const isIsland = (url: string) => components.has(HASHED_NAME.exec(url.slice(url.lastIndexOf('/') + 1))?.[1] ?? '')
-  const scripts = files.filter(file => file.url.endsWith('.js'))
-  const loaded = [...media.values()]
-  const ofKind = (kind: 'images' | 'fonts' | 'files') => loaded.filter(file => file.kind === kind && file.known)
-
-  return {
-    // The root and its descendants, as the EcoIndex counts them, without the dev tool's own.
-    dom: 1 + doc.documentElement.querySelectorAll('*').length - [...doc.querySelectorAll(HOST)].reduce((sum, host) => sum + 1 + host.querySelectorAll('*').length, 0),
-    requests: 1 + latest.size + media.size,
-    unweighed: loaded.filter(file => !file.known).length,
-    images: ofKind('images'),
-    fonts: ofKind('fonts'),
-    files: ofKind('files'),
-    html: await gzipSize(deliveredHtml(doc)),
-    css: files.filter(file => file.url.endsWith('.css')),
-    entry: scripts.filter(file => isEntry(file.url)),
-    islands: scripts.filter(file => !isEntry(file.url) && isIsland(file.url)),
-    other: scripts.filter(file => !isEntry(file.url) && !isIsland(file.url)),
-  }
-}
-
-interface Footprint {
-  score: number
-  grade: string
-  co2: number
-  ecoindex: string
-  swd: number
-}
-
-const GRADE_TONES = { A: 'ok', B: 'ok', C: 'warn', D: 'warn' } as const
-
-// The EcoIndex and the carbon of the page, worked out on the server by the models `kay build` uses; nothing when it does not answer.
-async function pageFootprint(win: Window & typeof globalThis, weight: Weight, bytes: number): Promise<Footprint | undefined> {
-  try {
-    const response = await ownFetch(win, `${FOOTPRINT_URL}?dom=${weight.dom}&requests=${weight.requests}&bytes=${bytes}`, { headers: { [HEAD_HEADER]: '1' }, cache: 'no-store', signal: AbortSignal.timeout(IMAGE_REQUEST_MS) })
-
-    return response.ok ? (await response.json()) as Footprint : undefined
-  }
-  catch {
-    return undefined
-  }
-}
-
-// How far past the poor limit a vital's scale reaches.
-const SCALE_PAST_POOR = 1.25
-
-// A vital's value as its digits and its unit, and a limit as a tick under its scale.
-function vitalDigits(name: VitalName, value: number): [string, string] {
-  return name === 'cls' ? [value.toFixed(3), ''] : [String(Math.round(value)), 'ms']
-}
-
-function vitalTick(name: VitalName, limit: number): string {
-  return name !== 'cls' && limit >= 1000 ? `${limit / 1000} s` : String(limit)
-}
-
-// The page's weight and Web Vitals: LCP, CLS and INP each as a tile with its scale, good and poor limits marked, as the page is used, and the HTML, CSS and JS gzipped as bars, the island chunks split from the entry.
-function performanceTab(doc: Document, tool: DevTool, vitals: Vitals, signal: AbortSignal): void {
-  let scheduled = false
-  let reread: () => void = () => undefined
-  const tab = tool.tab({ id: 'performance', label: 'Performance', icon: 'gauge', shown: () => reread() })
-  const vitalsPanel = tool.make('div', 'vitals')
-  const weightPanel = tool.make('section', 'group')
-  const footprintPanel = tool.make('section', 'group')
-  const loadNote = tool.make('div', 'note')
-  let asked = 0
-  const vital = (name: VitalName, label: string, value: number | undefined, detail?: string) => {
-    const [good, poor] = VITAL_LIMITS[name]
-    const tile = tool.make('div', 'vital')
-    const top = tool.make('div', 'top')
-    const number = tool.make('span', 'num')
-    const box = tool.make('div', 'scalebox')
-    const scale = tool.make('div', 'scale')
-    const reach = poor * SCALE_PAST_POOR
-    const part = (className: string, from: number, to: number) => {
-      const segment = tool.make('i', className)
-
-      segment.style.width = `${(to - from) / reach * 100}%`
-      scale.append(segment)
-    }
-    const tick = (limit: number) => {
-      const element = tool.make('span', 'tick', vitalTick(name, limit))
-
-      element.style.left = `${limit / reach * 100}%`
-      box.append(element)
-    }
-
-    top.append(tool.make('span', 'name', label))
-    part('g', 0, good)
-    part('n', good, poor)
-    part('p', poor, reach)
-    box.append(scale)
-    tick(good)
-    tick(poor)
-
-    if (value === undefined) {
-      number.append(tool.make('span', 'note', name === 'inp' ? 'no interaction yet' : 'not reported yet'))
-    }
-    else {
-      const rating = rateVital(name, value)
-      const [digits, unit] = vitalDigits(name, value)
-      const marker = tool.make('span', 'mk')
-
-      marker.style.left = `${Math.min(100, value / reach * 100)}%`
-      box.append(marker)
-      top.append(pill(tool, rating === 'needs' ? 'needs work' : rating, RATING_TONES[rating]))
-      number.append(digits)
-
-      if (unit !== '')
-        number.append(tool.make('small', '', unit))
-    }
-
-    tile.append(top, number, box)
-
-    if (detail !== undefined && value !== undefined)
-      tile.append(tool.make('span', 'note', detail))
-
-    vitalsPanel.append(tile)
-  }
-  const renderVitals = () => {
-    const element = vitals.lcp?.element
-    const painted = element === undefined ? undefined : `${element.localName}${element.id === '' ? '' : `#${element.id}`}`
-    const rated = [vitals.lcp?.ms === undefined ? undefined : rateVital('lcp', vitals.lcp.ms), vitals.inp === undefined ? undefined : rateVital('inp', vitals.inp), rateVital('cls', vitals.cls)]
-    const bad = rated.filter(rating => rating !== undefined && rating !== 'good')
-
-    loadNote.textContent = doc.defaultView!.location.pathname === vitals.path ? `Measured on the load of ${vitals.path}.` : `Measured on the load of ${vitals.path}, not on this page: a link swapped it in without a load.`
-    vitalsPanel.replaceChildren()
-    vital('lcp', 'LCP', vitals.lcp?.ms, painted === undefined ? undefined : `painted: ${painted}`)
-    vital('cls', 'CLS', vitals.cls)
-    vital('inp', 'INP', vitals.inp)
-    tab.count(bad.length, worstTone(bad))
-  }
-  const reload = async () => {
-    const ask = ++asked
-
-    renderVitals()
-    weightPanel.replaceChildren(tool.make('div', 'note', 'Measuring the weight...'))
-    footprintPanel.replaceChildren()
-
-    let weight: Weight
-
-    try {
-      weight = await pageWeight(doc)
-    }
-    catch (error) {
-      if (ask === asked)
-        weightPanel.replaceChildren(tool.make('div', 'empty', `Could not measure the weight: ${error instanceof Error ? error.message : String(error)}`))
-
-      return
-    }
-
-    if (ask !== asked)
-      return
-
-    const grid = tool.make('div', 'weight')
-    const total = (files: { bytes: number }[]) => files.reduce((sum, file) => sum + file.bytes, 0)
-    const rows: [string, number, { url: string, bytes: number }[]][] = [
-      ['HTML', weight.html, []],
-      ['CSS', total(weight.css), weight.css],
-      ...([['Entry', weight.entry], ['Islands', weight.islands], ['Other chunks', weight.other], ['Images', weight.images], ['Fonts', weight.fonts], ['Other files', weight.files]] as const).flatMap(([name, files]) => files.length === 0 ? [] : [[name, total(files), files] as [string, number, { url: string, bytes: number }[]]]),
-    ]
-    const bytes = rows.reduce((sum, [, size]) => sum + size, 0)
-    const longest = Math.max(...rows.map(([, bytes]) => bytes))
-
-    for (const [name, bytes, files] of rows) {
-      const track = tool.make('span', 'bars')
-      const fill = tool.make('i')
-
-      fill.style.width = `${longest === 0 ? 0 : Math.max(1, bytes / longest * 100)}%`
-      track.append(fill)
-      grid.append(tool.make('span', '', name), track, tool.make('span', 'v', formatBytes(bytes)))
-
-      if (files.length > 0)
-        grid.append(tool.make('span', 'files', files.map(file => `${file.url} ${formatBytes(file.bytes)}`).join(', ')))
-    }
-
-    grid.append(tool.make('span', 'rule'), tool.make('span', 'total', 'Total'), tool.make('span'), tool.make('span', 'v total', formatBytes(bytes)))
-    weightPanel.replaceChildren(tool.make('h3', 'heading', 'Weight, compressed'), grid, tool.make('div', 'note', 'Dev sizes: not minified and with the dev-only code, so `kay build` makes them smaller.'))
-
-    const [footprint, built] = await Promise.all([pageFootprint(doc.defaultView!, weight, bytes), builtSizes(doc.defaultView!)])
-
-    if (ask !== asked)
-      return
-
-    if (footprint === undefined) {
-      footprintPanel.replaceChildren(tool.make('h3', 'heading', 'Footprint of the page'), tool.make('div', 'note', 'The server did not answer with the EcoIndex and the carbon of the page.'))
-    }
-    else {
-      const facts = tool.make('dl', 'facts')
-      const fact = (term: string, ...values: (Node | string)[]) => {
-        const value = tool.make('dd')
-
-        value.append(...values)
-        facts.append(tool.make('dt', '', term), value)
-      }
-
-      fact('EcoIndex', pill(tool, footprint.grade, GRADE_TONES[footprint.grade as keyof typeof GRADE_TONES] ?? 'error'), `${footprint.score} of 100`)
-      fact('Carbon', `${footprint.co2.toFixed(footprint.co2 < 0.1 ? 3 : 2)} gCO2e per view`)
-      fact('DOM elements', String(weight.dom))
-      fact('Requests', String(weight.requests))
-      footprintPanel.replaceChildren(tool.make('h3', 'heading', 'Footprint of the page'), facts, tool.make('div', 'note', `Measured in this browser, with the dev sizes above, so \`kay build\` reports a lighter page.${weight.unweighed === 0 ? '' : ` ${weight.unweighed} ${weight.unweighed === 1 ? 'request' : 'requests'} of unknown weight, not counted.`} EcoIndex ${footprint.ecoindex}, Sustainable Web Design v${footprint.swd}.`))
-    }
-
-    if (built === undefined)
-      return
-
-    const production = tool.make('div', 'build')
-    const mark = built.estimated ? '~' : ''
-    const figure = (name: string, bytes: string) => {
-      const element = tool.make('span', '', `${name} `)
-
-      element.append(tool.make('b', '', bytes))
-
-      return element
-    }
-
-    production.append(tool.make('span', '', `Last kay build, ${ago(Date.now() - built.built)}`), figure('JS', `${mark}${formatBytes(built.js)}`), figure('CSS', formatBytes(built.css)))
-    weightPanel.append(production, tool.make('div', 'note', `Route ${built.route}, ${built.exported ? 'static export' : 'server build'}, gzipped, minified and without the dev-only code${built.estimated ? '; ~ marks an estimate, as no page of the route was prerendered, the scripts being what its components can load' : ''}. Build again for sizes of the code as it is now.`))
-  }
-
-  reread = () => void reload()
-  vitals.changed.push(renderVitals)
-
-  // A page swap brings other HTML, styles and islands: the weight is measured again.
-  const swaps = new MutationObserver(() => {
-    if (tab.panel.hidden === false && !scheduled) {
-      scheduled = true
-      queueMicrotask(() => {
-        scheduled = false
-        reread()
-      })
-    }
-  })
-
-  swaps.observe(doc.head, { childList: true })
-  signal.addEventListener('abort', () => swaps.disconnect())
-
-  const vitalsSection = tool.make('section', 'group')
-
-  vitalsSection.append(tool.make('h3', 'heading', 'Web Vitals of the page load'), vitalsPanel, loadNote)
-  tab.panel.append(vitalsSection, footprintPanel, weightPanel)
-  renderVitals()
-}
-
 // What a lazy tab's module default-exports: it fills the panel and gives back what reads the tab again each time it shows.
 export type DevTabModule = (tool: DevTool, tab: DevTab) => (() => void) | void
 
@@ -2918,6 +1939,10 @@ function lazyTab(tool: DevTool, options: Pick<DevTabOptions, 'id' | 'label' | 'i
 
   if (early)
     open()
+}
+
+function formatBytes(bytes: number): string {
+  return bytes < 1024 ? `${bytes} B` : `${(bytes / 1024).toFixed(1)} KB`
 }
 
 function formatMs(ms: number): string {

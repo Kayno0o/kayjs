@@ -71,7 +71,7 @@ const A11Y_SOURCE = resolve(import.meta.dir, '../runtime/dev-a11y.ts')
 const STYLES_SOURCE = resolve(import.meta.dir, '../runtime/dev-styles.ts')
 
 // The tabs whose code the dev tool fetches when the tab first opens, served from `DEV_TAB`.
-export const DEV_TABS: Record<string, string> = { 'data': resolve(import.meta.dir, '../runtime/dev-tab-data.ts'), 'jobs': resolve(import.meta.dir, '../runtime/dev-tab-jobs.ts'), 'styles': resolve(import.meta.dir, '../runtime/dev-tab-styles.ts'), 'routes': resolve(import.meta.dir, '../runtime/dev-tab-routes.ts'), 'head': resolve(import.meta.dir, '../runtime/dev-tab-head.ts'), 'reading': resolve(import.meta.dir, '../runtime/dev-tab-reading.ts'), 'env': resolve(import.meta.dir, '../runtime/dev-tab-env.ts'), 'not-found': resolve(import.meta.dir, '../runtime/dev-tab-not-found.ts') }
+export const DEV_TABS: Record<string, string> = Object.fromEntries(['data', 'jobs', 'styles', 'routes', 'head', 'reading', 'env', 'not-found', 'i18n', 'network', 'images', 'performance'].map(name => [name, resolve(import.meta.dir, `../runtime/dev-tab-${name}.ts`)]))
 // What the inspector sends, which a page of another site cannot without a preflight nothing answers.
 const OPEN_HEADER = 'x-kay-dev'
 const MAX_STACK_BYTES = 16 * 1024

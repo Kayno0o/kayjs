@@ -6,6 +6,10 @@ const MODULES: Record<string, () => ReturnType<LoadTab>> = {
   '/_kay/dev/tab/reading.js': async () => import('../../src/runtime/dev-tab-reading'),
   '/_kay/dev/tab/env.js': async () => import('../../src/runtime/dev-tab-env'),
   '/_kay/dev/tab/not-found.js': async () => import('../../src/runtime/dev-tab-not-found'),
+  '/_kay/dev/tab/network.js': async () => import('../../src/runtime/dev-tab-network'),
+  '/_kay/dev/tab/i18n.js': async () => import('../../src/runtime/dev-tab-i18n'),
+  '/_kay/dev/tab/images.js': async () => import('../../src/runtime/dev-tab-images'),
+  '/_kay/dev/tab/performance.js': async () => import('../../src/runtime/dev-tab-performance'),
 }
 
 export const loadTab: LoadTab = async (url) => {
