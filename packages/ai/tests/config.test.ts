@@ -1,6 +1,6 @@
 import process from 'node:process'
 import { afterAll, afterEach, beforeEach, describe, expect, it } from 'bun:test'
-import { ai, embed, fakeAi, speak, transcribe } from '../src'
+import { ai, anthropic, embed, fakeAi, openai, speak, transcribe } from '../src'
 import { choose } from '../src/config'
 
 const NAMES = ['NODE_ENV', 'ANTHROPIC_API_KEY', 'OPENAI_API_KEY', 'AI_BASE_URL', 'AI_INSECURE', 'AI_MODEL', 'AI_PROVIDER', 'AI_AUDIO_URL', 'AI_AUDIO_KEY', 'AI_TRANSCRIBE_MODEL', 'AI_SPEECH_MODEL', 'AI_VOICE', 'AI_EMBED_URL', 'AI_EMBED_KEY', 'AI_EMBED_MODEL']
@@ -97,6 +97,23 @@ describe('the base URLs', () => {
     expect(() => fresh(env)).toThrow('AI_INSECURE')
     expect(fresh({ ...env, AI_INSECURE: 'true' }).provider.name).toBe('openai')
     expect(fresh({ NODE_ENV: 'production', AI_BASE_URL: env.AI_BASE_URL }).provider.name).toBe('openai')
+  })
+
+  it('treat only the loopback names as loopback, whatever resembles them', () => {
+    for (const base of ['http://127.evil.com', 'http://localhost.evil.com', 'http://localhost@evil.com', 'http://127.0.0.1.evil.com', 'http://localhost./v1', 'http://[::ffff:127.0.0.1]', 'http://a.localhost'])
+      expect(() => fresh({ NODE_ENV: 'production', AI_BASE_URL: base, OPENAI_API_KEY: 'k' }), base).toThrow('AI_INSECURE')
+
+    for (const base of ['http://LOCALHOST:1/v1', 'http://evil.com@localhost', 'http://127.1', 'http://[0:0:0:0:0:0:0:1]'])
+      expect(fresh({ NODE_ENV: 'production', AI_BASE_URL: base, OPENAI_API_KEY: 'k' }).provider.name, base).toBe('openai')
+  })
+
+  it('check the base URL of a proxy for Anthropic, and of a provider built by hand', () => {
+    expect(() => fresh({ NODE_ENV: 'production', AI_PROVIDER: 'anthropic', ANTHROPIC_API_KEY: 'a', AI_BASE_URL: 'proxy.example.com' })).toThrow('AI_BASE_URL')
+    expect(() => fresh({ NODE_ENV: 'production', AI_PROVIDER: 'anthropic', ANTHROPIC_API_KEY: 'a', AI_BASE_URL: 'http://proxy.example.com' })).toThrow('AI_INSECURE')
+    expect(() => openai({ baseUrl: 'localhost:11434', apiKey: 'k' })).toThrow('openai({ baseUrl })')
+    expect(() => anthropic({ apiKey: 'k', baseUrl: 'http://proxy.example.com' })).toThrow('anthropic({ baseUrl })')
+    expect(openai({ baseUrl: 'http://proxy.example.com', apiKey: 'k', insecure: true }).name).toBe('openai')
+    expect(anthropic({ apiKey: 'k', baseUrl: 'http://proxy.example.com', insecure: true }).name).toBe('anthropic')
   })
 
   it('hold for the audio and embedding servers, and for the key an ask forwards to them', async () => {

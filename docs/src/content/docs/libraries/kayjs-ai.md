@@ -40,7 +40,9 @@ Then pick a provider with environment variables:
 
 For Mistral, set `AI_BASE_URL=https://api.mistral.ai/v1`, put its key in `OPENAI_API_KEY` and set `AI_MODEL` to a dated model such as `mistral-small-2603`. Avoid an alias like `mistral-small-latest`: it moves to the next model, and you pay that model's price. Nothing else is needed.
 
-With both keys set, add `AI_PROVIDER=anthropic` or `openai` to say which one to use. kay stops rather than guess which account to bill. With `AI_PROVIDER=anthropic`, `AI_BASE_URL` is the root of a proxy for Anthropic.
+With both keys set, add `AI_PROVIDER=anthropic` or `openai` to say which one to use. kay stops rather than guess which account to bill. With `AI_PROVIDER=anthropic`, `AI_BASE_URL` is the root of a proxy for Anthropic. `AI_PROVIDER=openai` needs `OPENAI_API_KEY` unless `AI_BASE_URL` names a server.
+
+An API root must be an http(s) URL, and a key goes over plain http only to `localhost`, `127.0.0.1` or `[::1]`. On a network you trust, such as a compose network, set `AI_INSECURE=true`.
 
 ## Ask in a page
 
