@@ -91,15 +91,15 @@ async function swapTo(url: URL, swap: Swap): Promise<void> {
   const token = ++navigation.current
   const key = pageKey(url)
   const running = inFlight.fetch
-  // A traversal takes the page already being fetched; any other swap replaces the fetch, a refresh asking for a fresh page and the rest for their own options.
+  // A traversal takes the page already being fetched; any other swap cancels it and fetches its own, a refresh to get a fresh page.
   const reused = swap.intent === 'traverse' && running?.key === key ? running : undefined
 
   if (!reused)
     running?.controller.abort()
 
   const controller = reused?.controller ?? new AbortController()
-  const asked = reused?.page ?? pageFor(url, controller.signal)
-  const flight = { controller, key, page: asked, href: url.href, intent: swap.intent, replace: swap.replace, scroll: swap.scroll, transition: swap.transition }
+  const pending = reused?.page ?? pageFor(url, controller.signal)
+  const flight = { controller, key, page: pending, href: url.href, intent: swap.intent, replace: swap.replace, scroll: swap.scroll, transition: swap.transition }
 
   inFlight.fetch = flight
   void holding()
@@ -121,11 +121,13 @@ async function swapTo(url: URL, swap: Swap): Promise<void> {
 
     try {
       // A refresh runs in the background and may be slow: only a visit is given up on.
-      const fetched = swap.intent === 'refresh' ? await asked : await bounded(asked, PAGE_TIMEOUT_MS)
+      const fetched = swap.intent === 'refresh' ? await pending : await bounded(pending, PAGE_TIMEOUT_MS)
 
       // A page that never answered is loaded by the browser.
       if (fetched === LATE) {
-        controller.abort()
+        // A traversal sharing the fetch has its own time to wait.
+        if (inFlight.fetch === flight)
+          controller.abort()
 
         if (isCurrent())
           leave(url)

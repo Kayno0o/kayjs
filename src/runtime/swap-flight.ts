@@ -26,7 +26,7 @@ const POLICIES: Record<Intent, Policy> = {
 
 // What the swaps under way share, which each one reads before it acts: `navigation.current` is the token of the latest one started, which every swap that is not it gives way to.
 export const inFlight: {
-  // The fetch of the latest navigation until its page arrives, which a newer one to another page cancels: its page would never be shown. A visit asking the same of the same address joins it, a traversal to its page takes its page, and a prefetch of its page is skipped.
+  // The fetch of the latest navigation until its page arrives, which any newer swap cancels, except a traversal to its page, which takes it over. A visit asking the same of the same address joins it, a traversal to its page takes its page, and a prefetch of its page is skipped.
   fetch?: { controller: AbortController, key: string, page: Promise<FetchedPage>, href: string, intent: Intent, replace: boolean | undefined, scroll: Swap['scroll'], transition: boolean | undefined } | undefined
   // The swap a link, a query change or a traversal has under way, which a refresh waits for rather than supersedes: the visitor asked for it, and the refresh's page would be the one being left.
   asked?: Promise<void> | undefined
