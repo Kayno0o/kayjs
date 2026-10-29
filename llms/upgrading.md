@@ -27,6 +27,10 @@ What each minor release breaks, and what an app changes to move to it. kay and i
 
 - `memoryStore()` and `sqliteStore(path)` of `kay/server` are `memorySessions()` and `sqliteSessions(path)`, named for what they hold like `memoryJobs` and `sqliteRates`. The old names still work until 1.87; `kay upgrade` renames the imports and their uses (`deprecated-session-stores`).
 
+### kayjs-auth: `safeRedirect` is kay's `localPath`
+
+- `safeRedirect(path, fallback?)` of kayjs-auth is `localPath(path, fallback)` from `kay`, with `'/'` as the fallback `safeRedirect` defaulted to. It works until 1.87; `kay upgrade` rewrites the calls and the import (`deprecated-safe-redirect`), a fallback that is no string literal or a `safeRedirect` read as a value by hand.
+
 ### `session.settings` holds durations
 
 - `session.settings.maxAge`, `absoluteMaxAge` and `browserMaxAge` are durations in whole seconds such as `'2592000s'`, where they were bare numbers of seconds. Code reading one as a number gets a type error from `kay check`; `durationMs(settings.maxAge)` from `kay` gives milliseconds. No `deprecated` lint can carry a type change.

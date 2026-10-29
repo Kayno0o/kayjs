@@ -44,6 +44,7 @@ import { unreadOpenSettings } from './open-settings'
 import { publicEnvOutsideSrc } from './public-env-outside-src'
 import { removedUiTokens } from './removed-ui-tokens'
 import { sessionStores } from './renamed-exports'
+import { safeRedirects } from './safe-redirect'
 import { compileShadow, layoutQueries, matcherSource, pageRoute, serializeShadowSettings, SHADOW_SETTINGS, shadowOptionsFor, shadowPath } from './shadow'
 import { untypedSockets } from './socket-routes'
 import { unknownToolLabels } from './tool-labels'
@@ -140,6 +141,7 @@ const PROJECT_CHECKS: ((input: ProjectCheckInput) => CheckDiagnostic[] | Promise
   async ({ root, options }) => authAttempts(root, options),
   async ({ root, options }) => authMethods(root, options),
   async ({ root, options }) => sessionStores(root, options),
+  async ({ root, options }) => safeRedirects(root, options),
 ]
 
 async function writeShadows(projectRoot: string, options: CheckOptions): Promise<ShadowTypes> {

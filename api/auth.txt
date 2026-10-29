@@ -1687,7 +1687,7 @@ interface ProfileField
   label: string | Record<string, string>
   maxLength?: number | undefined
   required?: boolean | undefined
-  type?: "url" | "email" | "text" | "textarea" | "tel" | undefined
+  type?: "email" | "url" | "text" | "textarea" | "tel" | undefined
 
 [.] ProfileFieldView
 interface ProfileFieldView extends Omit<ProfileField, 'label'>
@@ -1696,7 +1696,7 @@ interface ProfileFieldView extends Omit<ProfileField, 'label'>
   maxLength: number
   name: string
   required?: boolean | undefined
-  type?: "url" | "email" | "text" | "textarea" | "tel" | undefined
+  type?: "email" | "url" | "text" | "textarea" | "tel" | undefined
   value: string
 
 [.] ProfileOptions

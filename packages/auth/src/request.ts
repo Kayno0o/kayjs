@@ -15,6 +15,7 @@ import type { GuestSignInResult } from './sessions'
 import type { RequestState } from './state'
 import type { SessionRecord, UserRecord } from './store'
 import type { Requirement } from './types'
+import { localPath } from 'kay'
 import { durationSeconds, nameUser, overHttps, READ_METHODS, stoppers } from 'kay/library'
 import { clientAddress, crossSiteRefused, crossSiteResponse, forgetLocalMirrors, forgetPushDevice, rateKey, toolCall } from 'kay/server'
 import { protectedResourceMetadata, rootIsFixed, rootUsable, siteRoot } from './authorize/metadata'
@@ -37,7 +38,6 @@ import { SessionMethods } from './methods/sessions'
 import { TokenMethods } from './methods/tokens'
 import { TwoFactorMethods } from './methods/twoFactor'
 import { noteSignIn, notify } from './notify'
-import { safeRedirect } from './oauth/redirect'
 import { featuresOf } from './pages'
 import { completeSignIn, provedLately, reprove } from './proof'
 import { pruneWhenDue } from './prune'
@@ -325,7 +325,7 @@ export class Auth<Scope extends string = string, Role extends string = string, O
   private signInLink(page: string, back?: string): string {
     const here = new URL(this.request.url)
 
-    return withBack(page, safeRedirect(back ?? here.pathname + here.search))
+    return withBack(page, localPath(back ?? here.pathname + here.search, '/'))
   }
 
   // The fields of the profile form the account page shows beside the username, with what this user holds in each, or null when `pages.profile` is not set or the user is not signed in with a session.

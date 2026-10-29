@@ -2,6 +2,7 @@ import type { Elysia } from 'elysia'
 import type { Core } from './core'
 import type { OAuthFailure } from './oauth/flow'
 import type { Auth } from './request'
+import { localPath } from 'kay'
 import { configError, underKayDev } from 'kay/library'
 import { crossSiteResponse } from 'kay/server'
 import { rootUsable } from './authorize/metadata'
@@ -9,7 +10,6 @@ import { serveOAuthServer } from './authorize/routes'
 import { backOf, homeOf, withBack, withQuery } from './core'
 import { returnTarget } from './forwardAuth'
 import { load } from './load'
-import { safeRedirect } from './oauth/redirect'
 import { STATE, TAKE_COOKIES } from './request'
 
 // Where `kay dev` answers the dev tool's Auth tab with the session's user.
@@ -82,11 +82,16 @@ export async function exportRoute({ auth, set, status }: RouteContext, core: Cor
   return exported.data
 }
 
+// Where a form's `redirect` field sends: a path of the site, else the pages' home.
+function afterwards(body: unknown, core: Core): string {
+  return localPath(text((body as Record<string, unknown> | undefined)?.redirect), homeOf(core))
+}
+
 // The sign-out button of any page: a form posting here, with `redirect` for where to go after, a path of the site, else the pages' home or `/`. A post only, so a link or a prefetch signs no one out, and a cross-site one is refused with a 403.
 export async function signOutRoute({ auth, body, redirect }: RouteContext, core: Core) {
   await auth.signOut()
 
-  return redirect(safeRedirect(text((body as Record<string, unknown> | undefined)?.redirect), homeOf(core)), 303)
+  return redirect(afterwards(body, core), 303)
 }
 
 // The impersonation banner's button: a form posting here signs the admin back in as themselves, then goes to `redirect`, a path of the site, else the pages' home. A post only, as sign-out is, and a cross-site one is refused with a 403.
@@ -96,7 +101,7 @@ export async function stopImpersonatingRoute({ auth, body, redirect, request }: 
 
   await auth.admin.stopImpersonating()
 
-  return redirect(safeRedirect(text((body as Record<string, unknown> | undefined)?.redirect), homeOf(core)), 303)
+  return redirect(afterwards(body, core), 303)
 }
 
 // A GET, so a sign-in link works without JavaScript: give it `data-no-prefetch` so a hover starts nothing.

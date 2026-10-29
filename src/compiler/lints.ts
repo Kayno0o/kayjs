@@ -671,6 +671,15 @@ export const LINTS = {
     wrong: '--- server\nimport { memoryStore, session } from \'kay/server\'\n\nexport const sessions = session({ store: memoryStore() })\n---\np x',
     right: '--- server\nimport { memorySessions, session } from \'kay/server\'\n\nexport const sessions = session({ store: memorySessions() })\n---\np x',
   },
+  'deprecated-safe-redirect': {
+    level: 'warn',
+    group: 'deprecated',
+    since: '1.84',
+    site: true,
+    summary: 'A call of kayjs-auth\'s `safeRedirect(path, fallback?)`, kay\'s `localPath(path, fallback)` under another name with `/` as the default fallback; kayjs-auth keeps it until 1.87. Found in the TypeScript files and `.kay` fences importing it from `@kaynooo/kayjs-auth`; the fix calls `localPath` imported from `kay`, adding the `/` fallback when the call gave none. A call whose fallback is not a string literal, as `localPath` takes a literal, and a `safeRedirect` read as a value are reported with no fix.',
+    wrong: '--- server\nimport { safeRedirect } from \'@kaynooo/kayjs-auth\'\n\nconst next = safeRedirect(ctx.query.next)\n---\np= next',
+    right: '--- server\nimport { localPath } from \'kay\'\n\nconst next = localPath(ctx.query.next, \'/\')\n---\np= next',
+  },
 } as const satisfies Record<string, Lint>
 
 export type LintName = keyof typeof LINTS

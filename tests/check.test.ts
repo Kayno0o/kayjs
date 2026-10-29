@@ -4795,6 +4795,19 @@ describe('kay check, deprecated-session-stores', () => {
   })
 })
 
+describe('kay check, deprecated-safe-redirect', () => {
+  it('reports a safeRedirect call with a fix calling localPath', async () => {
+    const root = await scratchProject({ 'src/next.ts': 'import { safeRedirect } from \'@kaynooo/kayjs-auth\'\n\nexport const next = (value: unknown) => safeRedirect(value)\n' })
+
+    try {
+      expect((await check(root)).filter(d => d.code === 'deprecated-safe-redirect').map(d => d.fixes?.[0]?.title)).toEqual(['Call `localPath(path, \'/\')` from kay'])
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+})
+
 describe('kay check, missing-captcha', () => {
   const page = '--- server\nconst auth = { register: async (_input: unknown) => 1 }\n\nawait auth.register({})\n---\np x\n'
   const found = async (files: Record<string, string>, options?: Parameters<typeof check>[1]) => (await check(await scratchProject({ 'src/routes/index.kay': page, ...files }), options)).filter(d => d.code === 'missing-captcha').length
