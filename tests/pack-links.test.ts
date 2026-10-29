@@ -1,9 +1,9 @@
-import { describe, expect, it } from 'bun:test'
 import { existsSync } from 'node:fs'
 import { cp, mkdir, readdir, readFile } from 'node:fs/promises'
 import { dirname, join, relative, resolve } from 'node:path'
 import { $ } from 'bun'
-import { rewrite, rewriteLinks, restore } from '../scripts/pack-links'
+import { describe, expect, it } from 'bun:test'
+import { restore, rewrite, rewriteLinks } from '../scripts/pack-links'
 import { scratchDir } from './scratch'
 
 const ROOT = join(import.meta.dir, '..')
@@ -62,7 +62,7 @@ describe('packed tarballs', () => {
       await $`bun pm pack --destination ${tarballs} --quiet --ignore-scripts`.cwd(join(mirror, folder)).quiet()
 
       const target = join(installed, name.replace('@kaynooo/', ''))
-      const tarball = (await readdir(tarballs)).find(file => file.startsWith(name.replace('@', '').replace('/', '-') + '-'))
+      const tarball = (await readdir(tarballs)).find(file => file.startsWith(`${name.replace('@', '').replace('/', '-')}-`))
 
       await mkdir(target, { recursive: true })
       await $`tar -xzf ${join(tarballs, tarball!)} --strip-components=1 -C ${target}`.quiet()

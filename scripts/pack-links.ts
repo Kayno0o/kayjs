@@ -8,6 +8,8 @@ import process from 'node:process'
 const BACKUP = join('node_modules', '.cache', 'pack-links')
 // A Markdown link target that is a relative path: not a URL, an absolute path or a bare anchor.
 const LINK = /\]\((?!\w+:|\/|#)([^)\s#]+)(#[^)\s]*)?\)/g
+const SCOPE = /^@kaynooo\//
+const PACKAGE_FOLDER = /^packages\/[^/]+/
 
 // The folder each package holds in node_modules/@kaynooo, by the folder it lives in: `` for kay, `packages/ui` for kayjs-ui.
 async function installedFolders(root: string): Promise<Map<string, string>> {
@@ -17,13 +19,13 @@ async function installedFolders(root: string): Promise<Map<string, string>> {
     const manifest = join(root, 'packages', entry.name, 'package.json')
 
     if (entry.isDirectory() && existsSync(manifest))
-      folders.set(`packages/${entry.name}`, ((await Bun.file(manifest).json()) as { name: string }).name.replace(/^@kaynooo\//, ''))
+      folders.set(`packages/${entry.name}`, ((await Bun.file(manifest).json()) as { name: string }).name.replace(SCOPE, ''))
   }
 
   return folders
 }
 
-const packageOf = (path: string) => /^packages\/[^/]+/.exec(path)?.[0] ?? ''
+const packageOf = (path: string) => PACKAGE_FOLDER.exec(path)?.[0] ?? ''
 
 // `markdown`, the text of the repo file `file`, with each link into another package written as it resolves from node_modules/@kaynooo.
 export function rewriteLinks(file: string, markdown: string, folders: ReadonlyMap<string, string>): string {
@@ -97,4 +99,3 @@ if (import.meta.main) {
   else
     throw new Error('usage: bun scripts/pack-links.ts rewrite|restore [root]')
 }
-
