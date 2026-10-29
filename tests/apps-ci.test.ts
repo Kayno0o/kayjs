@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test'
-import { APPS, overrideKay, pointAtKay, SCRIPTS, tarballName } from '../scripts/apps-ci'
+import { APPS, overrideKay, pointApp, pointAtKay, SCRIPTS, tarballName } from '../scripts/apps-ci'
 import { BLOCKING, exitCode, SECRET_UNSET } from '../scripts/release-apps'
 
 interface Step {
@@ -72,6 +72,35 @@ describe('overrideKay', () => {
     const next = overrideKay({ overrides: { left: '1.0.0' } }, { '@kaynooo/kayjs': '/t/kayjs.tgz', '@kaynooo/kayjs-ui': '/t/ui.tgz' })
 
     expect(next.overrides).toEqual({ 'left': '1.0.0', '@kaynooo/kayjs': 'file:/t/kayjs.tgz', '@kaynooo/kayjs-ui': 'file:/t/ui.tgz', 'kay': 'file:/t/kayjs.tgz' })
+  })
+})
+
+describe('pointApp', () => {
+  const tarballs = { '@kaynooo/kayjs': '/t/kayjs.tgz', '@kaynooo/kayjs-ui': '/t/ui.tgz' }
+
+  it('overrides at a workspace root that has no kay dependency of its own', () => {
+    const next = pointApp({
+      'package.json': { workspaces: ['shell', 'relay'] },
+      'shell/package.json': { dependencies: { kay: 'npm:@kaynooo/kayjs@~1.77.0' } },
+      'relay/package.json': { dependencies: { elysia: '^1.4.0' } },
+    }, 'package.json', tarballs)
+
+    expect(Object.keys(next).sort()).toEqual(['package.json', 'shell/package.json'])
+    expect(next['package.json']).toEqual({ workspaces: ['shell', 'relay'], overrides: { '@kaynooo/kayjs': 'file:/t/kayjs.tgz', '@kaynooo/kayjs-ui': 'file:/t/ui.tgz', 'kay': 'file:/t/kayjs.tgz' } })
+  })
+
+  it('overrides at a root that depends on kay itself, and only for the install folder', () => {
+    const next = pointApp({
+      'dashboard/package.json': { dependencies: { '@kaynooo/kayjs-ui': '~1.77.0' } },
+      'other/package.json': { dependencies: { '@kaynooo/kayjs-ui': '~1.77.0' } },
+    }, 'dashboard/package.json', tarballs)
+
+    expect(next['dashboard/package.json']?.overrides).toBeDefined()
+    expect(next['other/package.json']?.overrides).toBeUndefined()
+  })
+
+  it('changes nothing when no manifest names kay', () => {
+    expect(pointApp({ 'package.json': { workspaces: ['a'] }, 'a/package.json': {} }, 'package.json', tarballs)).toEqual({})
   })
 })
 

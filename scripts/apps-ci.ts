@@ -48,7 +48,7 @@ const DEPENDENCY_FIELDS = ['dependencies', 'devDependencies', 'optionalDependenc
 const SCOPE_PREFIX = /^@/
 const KAY_ALIAS = 'npm:@kaynooo/kayjs@'
 
-interface Manifest {
+export interface Manifest {
   name?: string
   version?: string
   scripts?: Record<string, string>
@@ -99,6 +99,25 @@ export function overrideKay(manifest: Manifest, tarballs: Record<string, string>
   const merged: Record<string, string> = { ...(manifest.overrides as Record<string, string> | undefined), ...overrides }
 
   return { ...manifest, overrides: Object.fromEntries(Object.entries(merged).sort(([a], [b]) => (a < b ? -1 : 1))) }
+}
+
+// The manifests of an app (by path from its repository root) that change to run on the tarballs: those naming kay or a library, and `installPath`, the install root's, with the overrides as soon as any of them changes, so a workspace root that only lists its children pins what their dependencies pull in too.
+export function pointApp(manifests: Record<string, Manifest>, installPath: string, tarballs: Record<string, string>): Record<string, Manifest> {
+  const pointed: Record<string, Manifest> = {}
+
+  for (const [path, manifest] of Object.entries(manifests)) {
+    const next = pointAtKay(manifest, tarballs)
+
+    if (next !== undefined)
+      pointed[path] = next
+  }
+
+  const rootManifest = pointed[installPath] ?? manifests[installPath]
+
+  if (Object.keys(pointed).length > 0 && rootManifest !== undefined)
+    pointed[installPath] = overrideKay(rootManifest, tarballs)
+
+  return pointed
 }
 
 const root = resolve(import.meta.dir, '..')
@@ -178,22 +197,18 @@ async function run(app: App) {
   await mkdir(join(workDir, 'apps'), { recursive: true })
   await clone(app, directory)
 
-  let pointed = 0
-
   const prefix = app.install === undefined ? '' : `${app.install}/`
+  const manifests: Record<string, Manifest> = {}
 
-  for (const path of (await manifestPaths(directory)).filter(file => file.startsWith(prefix))) {
-    const file = join(directory, path)
-    const rewritten = pointAtKay(await Bun.file(file).json() as Manifest, tarballs)
-    const next = path === join(app.install ?? '.', 'package.json') && rewritten !== undefined ? overrideKay(rewritten, tarballs) : rewritten
+  for (const path of (await manifestPaths(directory)).filter(file => file.startsWith(prefix)))
+    manifests[path] = await Bun.file(join(directory, path)).json() as Manifest
 
-    if (next !== undefined) {
-      await Bun.write(file, `${JSON.stringify(next, null, 2)}\n`)
-      pointed++
-    }
-  }
+  const pointedManifests = Object.entries(pointApp(manifests, join(app.install ?? '.', 'package.json'), tarballs))
 
-  if (pointed === 0)
+  for (const [path, next] of pointedManifests)
+    await Bun.write(join(directory, path), `${JSON.stringify(next, null, 2)}\n`)
+
+  if (pointedManifests.length === 0)
     throw new Error(`${app.name}: no package.json depends on kay, nothing to test`)
 
   const env: Record<string, string | undefined> = { ...process.env, CI: 'true', HUSKY: '0' }
