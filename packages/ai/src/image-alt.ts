@@ -3,10 +3,10 @@ import type { ExtensionProblem, PageHook, RenderedPage } from 'kay/server'
 // Alt text drafted for the imported images of a page: one model call per image content, kept under `.kay/cache`, written into the HTML as a page is built or served.
 import type { Attachment, Message } from './types'
 import { readdir } from 'node:fs/promises'
-import { basename, dirname, join } from 'node:path'
+import { basename, dirname } from 'node:path'
 import process from 'node:process'
 import { logFrom, s } from 'kay'
-import { IMPORTED, KAY_DIR, libraryCacheSlot, readCacheEntry, serverRoot, writeCacheEntry } from 'kay/library'
+import { IMPORTED, libraryCacheSlot, readCacheEntry, serverRoot, writeCacheEntry } from 'kay/library'
 import { ask } from './ask'
 import { choose } from './config'
 import { fakeAi } from './fake'
@@ -173,7 +173,7 @@ async function make(place: Place): Promise<string | undefined> {
   }
 }
 
-// Queues the draft of an image unless it is under way or done; never rejects.
+// Queues the draft of an image unless it is under way or done; never rejects. The workers must be running (`ai({ imageAlt })` starts them), else the promise never settles.
 async function draftOnce(place: Place): Promise<string | undefined> {
   const { file } = slotOf(place)
   let pending = drafting.get(file)
@@ -274,25 +274,7 @@ export const writeKeptImageAlts: PageHook = async page => filled(page, async (pl
   return alt
 })
 
-// The folders of imported assets the last builds left, where a draft's image is looked for: the production build's and `kay dev`'s.
-const ASSET_FOLDERS = ['client', 'dev'].map(output => join(KAY_DIR, output, 'dist', 'assets'))
-
-// The names of the assets the last builds hold, undefined when no build is there to tell by.
-async function builtAssets(root: string): Promise<Set<string> | undefined> {
-  const found = await Promise.all(ASSET_FOLDERS.map(async (folder) => {
-    try {
-      return await readdir(join(root, folder))
-    }
-    catch {
-      return undefined
-    }
-  }))
-  const folders = found.filter(names => names !== undefined)
-
-  return folders.length === 0 ? undefined : new Set(folders.flat())
-}
-
-// The drafts kept so far, for a person to review: none is sent to the model again, and an author's own `alt` replaces one. A draft whose image is no longer in the last build (deleted, or edited, which renames it) is left out, and so is one the app lists in `imageAlt: { reviewed }`.
+// The drafts kept so far, for a person to review: none is sent to the model again, and an author's own `alt` replaces one. One the app lists in `imageAlt: { reviewed }` is left out, by image name for every locale; a draft of a deleted or edited image stays until its file is deleted, as no build output tells reliably which images are still used.
 export async function draftProblems(reviewed: readonly string[] = []): Promise<ExtensionProblem[]> {
   const root = await serverRoot()
   const { file } = libraryCacheSlot(root, LIBRARY, 'x', '')
@@ -306,10 +288,9 @@ export async function draftProblems(reviewed: readonly string[] = []): Promise<E
     return []
   }
 
-  const built = await builtAssets(root)
   const kept = await Promise.all(names.map(async name => readDraft(`${folder}/${name}`)))
 
-  return kept.flatMap(entry => entry === undefined || entry.alt === '' || reviewed.includes(entry.name) || (built !== undefined && !built.has(entry.name)) ? [] : [{ message: `imageAlt drafted the alt of ${entry.name}${entry.locale === '' ? '' : ` (${entry.locale})`}: "${entry.alt}"`, help: `check it, then write the img's own alt to keep your wording and list ${JSON.stringify(entry.name)} in ai({ imageAlt: { reviewed } }) to stop this warning; delete .kay/cache/libraries/kayjs-ai to draft again` }])
+  return kept.flatMap(entry => entry === undefined || entry.alt === '' || reviewed.includes(entry.name) ? [] : [{ message: `imageAlt drafted the alt of ${entry.name}${entry.locale === '' ? '' : ` (${entry.locale})`}: "${entry.alt}"`, help: `check it, then write the img's own alt to keep your wording and list '${entry.name}' in ai({ imageAlt: { reviewed } }) to stop this warning; delete .kay/cache/libraries/kayjs-ai to draft again` }])
 }
 
 async function readDraft(file: string): Promise<Draft | undefined> {

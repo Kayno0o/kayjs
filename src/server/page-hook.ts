@@ -155,6 +155,8 @@ export async function hookPrerendered(root: string, hooks: PageHook[], dirs: Ass
 }
 
 // The messages a page hook failed with, so a hook that throws on every request is logged once.
+// Bounded, as a message may carry the request's data.
+const MOST_FAILURES = 100
 const hookFailures = new Set<string>()
 
 // A page rendered for a request, through the hooks made for it; anything but an HTML page is returned as it is.
@@ -175,7 +177,7 @@ export async function hookedServed(response: Response, hooks: PageHook[], path: 
   catch (error) {
     const message = error instanceof Error ? error.message : String(error)
 
-    if (!hookFailures.has(message)) {
+    if (!hookFailures.has(message) && hookFailures.size < MOST_FAILURES) {
       hookFailures.add(message)
       kayLog('warn', `a page hook failed on ${path}, so the page is sent as it was rendered: ${message}`, error)
     }

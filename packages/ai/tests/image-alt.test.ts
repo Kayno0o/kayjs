@@ -262,7 +262,7 @@ describe('imageAlt', () => {
     expect(problems.map(problem => problem.message)).toEqual(['imageAlt drafted the alt of team-abc.png (fr): "A team"'])
     expect(fakeAi.asked).toHaveLength(asked)
   })
-  it('stops listing a draft whose image is no longer in the last build, or that the app marks reviewed', async () => {
+  it('stops listing the images the app marks reviewed, for every locale', async () => {
     fakeAi.reply({ data: { alt: 'A team' } })
     fakeAi.reply({ data: { alt: 'A logo' } })
 
@@ -270,19 +270,7 @@ describe('imageAlt', () => {
     await page('<img src="/_kay/assets/logo-abc.png">', { '/_kay/assets/logo-abc.png': await image('logo-abc.png') })
 
     expect(await draftProblems()).toHaveLength(2)
-
-    const assets = join(await serverRoot(), '.kay/dev/dist/assets')
-
-    try {
-      await Bun.write(join(assets, 'team-abc.png'), PNG)
-      expect((await draftProblems()).map(problem => problem.message)).toEqual(['imageAlt drafted the alt of team-abc.png (en): "A team"'])
-      await Bun.write(join(assets, 'logo-abc.png'), PNG)
-      expect(await draftProblems()).toHaveLength(2)
-      expect((await draftProblems(['team-abc.png'])).map(problem => problem.message)).toEqual(['imageAlt drafted the alt of logo-abc.png (en): "A logo"'])
-      expect((await ai({ imageAlt: { reviewed: ['team-abc.png', 'logo-abc.png'] } }).check!()).filter(problem => problem.message.includes('drafted'))).toEqual([])
-    }
-    finally {
-      await rm(join(await serverRoot(), '.kay/dev'), { recursive: true, force: true })
-    }
+    expect((await draftProblems(['team-abc.png'])).map(problem => problem.message)).toEqual(['imageAlt drafted the alt of logo-abc.png (en): "A logo"'])
+    expect((await ai({ imageAlt: { reviewed: ['team-abc.png', 'logo-abc.png'] } }).check!()).filter(problem => problem.message.includes('drafted'))).toEqual([])
   })
 })
