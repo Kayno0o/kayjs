@@ -269,6 +269,9 @@ interface Message
   role: "user" | "assistant"
   sources?: readonly Source[] | undefined
 
+[.] mocked
+function mocked<const Schema extends TSchema, const Honeypot extends string = never>(action: ServerAction<Schema, unknown, Honeypot>, run: (input: (Schema & { params: []; })["static"], context: FunctionToolContext) => unknown): FunctionTool
+
 [.] openai
 function openai({ baseUrl, apiKey, model, body: fields, pdf }?: OpenAiOptions): Provider
 
@@ -429,6 +432,7 @@ interface StoredTurn
   reply?: string | undefined
   role: "user" | "assistant"
   sources?: Source[] | undefined
+  steps?: StoredCall[][] | undefined
   stopped?: boolean | undefined
 
 [.] StructuredAskOptions
