@@ -184,7 +184,7 @@ async function run(app: App) {
   if (pointed === 0)
     throw new Error(`${app.name}: no package.json depends on kay, nothing to test`)
 
-  const env = { ...process.env, CI: 'true', HUSKY: '0' }
+  const env: Record<string, string | undefined> = { ...process.env, CI: 'true', HUSKY: '0' }
 
   // The apps' scripts and their dependencies' install scripts have no use for the token.
   delete env.KAY_APPS_TOKEN
