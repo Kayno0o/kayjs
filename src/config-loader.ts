@@ -166,10 +166,10 @@ function withExtensions<Config extends KayConfig>(config: Config): Config {
     return [extension.config]
   })
 
-  if (layers.length === 0)
-    return config
+  const merged = layers.length === 0 ? config : underlay(layers.reduce<KayConfig>((under, layer) => underlay(under, layer) as KayConfig, {}), config) as Config
+  const satisfied = [...new Set((config.extensions ?? []).flatMap(extension => extension.satisfies ?? []))]
 
-  return underlay(layers.reduce<KayConfig>((under, layer) => underlay(under, layer) as KayConfig, {}), config) as Config
+  return satisfied.length === 0 ? merged : { ...merged, lints: { ...merged.lints, satisfied } }
 }
 
 // `over` merged onto `under`: plain objects key by key, arrays joined, anything else `over`'s unless it leaves it undefined.

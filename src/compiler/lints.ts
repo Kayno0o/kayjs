@@ -667,7 +667,8 @@ export const LINTS = {
 
 export type LintName = keyof typeof LINTS
 
-export type LintLevels = Partial<Record<LintName | LintGroup, LintLevel>>
+// `satisfied` is set by kay from the extensions' `satisfies`, never written in `kay.config.ts`: the lints an extension answers for a place it fills in by itself.
+export type LintLevels = Partial<Record<LintName | LintGroup, LintLevel>> & { satisfied?: LintName[] | undefined }
 
 export const LEVELS: ReadonlySet<string> = new Set<LintLevel>(['allow', 'warn', 'deny'])
 
@@ -767,6 +768,9 @@ export function applyLints(diagnostics: Diagnostic[], source: string, levels: Li
   const leveled = diagnostics.flatMap((diagnostic) => {
     if (!isLint(diagnostic.code))
       return [diagnostic]
+
+    if (diagnostic.satisfiable === true && levels.satisfied?.includes(diagnostic.code))
+      return []
 
     const level = levelAt(diagnostic.code, diagnostic.start)
 

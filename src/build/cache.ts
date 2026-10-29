@@ -14,6 +14,11 @@ interface CacheEntry<Value> {
   value: Value
 }
 
+// The slot of a library's value `id` under `.kay/cache/libraries/<library>`, a folder no build of kay prunes: valid while `inputs` are what it was made from.
+export function libraryCacheSlot(root: string, library: string, id: string, inputs: string): CacheSlot {
+  return { file: join(root, '.kay', 'cache', 'libraries', library, `${id}.json`), key: Bun.hash(inputs).toString(36) }
+}
+
 // How often each named cache answered from disk and how often its value had to be made, for the build report.
 const counts = new Map<string, { cached: number, made: number }>()
 

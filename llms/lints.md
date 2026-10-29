@@ -84,7 +84,7 @@ kay check --only seo
 | Lint | Default | Group | Reports |
 | --- | --- | --- | --- |
 | `unread-name` | deny | code | A prop, server value, import or declaration nothing reads (see [What `kay check` verifies](checks.md#what-kay-check-verifies)). |
-| `missing-alt` | deny | a11y | An `img` or `input(type="image")` with no `alt`. |
+| `missing-alt` | deny | a11y | An `img` or `input(type="image")` with no `alt`; an extension with `satisfies: ['missing-alt']` (kayjs-ai's `imageAlt`) answers it for a server-rendered `img` whose `src` is an imported image. |
 | `missing-title` | deny | a11y | An `iframe` with no `title`. |
 | `unreachable-click` | deny | a11y | An `onClick` on an element no keyboard reaches, with no `role`. |
 | `empty-control` | deny | a11y | A `button`, or an `a` with an `href`, with nothing for a screen reader to announce: no text, no value, no `aria-label`, an icon alone. |

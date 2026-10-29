@@ -41,7 +41,7 @@ Each lint has a level. `deny` is an error, `warn` a warning, `allow` hides it. W
 | Lint | Default | Group | Reports |
 | --- | --- | --- | --- |
 | `unread-name` | deny | code | A prop, import or declaration nothing reads |
-| `missing-alt` | deny | a11y | An `img` with no `alt` |
+| `missing-alt` | deny | a11y | An `img` with no `alt`, unless an extension that writes it (`satisfies: ['missing-alt']`) covers an imported image on a server-rendered page |
 | `missing-title` | deny | a11y | An `iframe` with no `title` |
 | `unreachable-click` | deny | a11y | An `onClick` on an element no keyboard reaches |
 | `empty-control` | deny | a11y | A button or link with nothing to announce |

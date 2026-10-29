@@ -25,6 +25,8 @@ export interface Diagnostic extends Span {
   fixes?: Fix[] | undefined
   // Reported by type checking only: the code generated around it is whole, so the file's type errors still count.
   checkOnly?: boolean | undefined
+  // Set on a lint an extension can declare it `satisfies` for this place alone: it is dropped when one does.
+  satisfiable?: boolean | undefined
 }
 
 export interface Labelled extends Span {
@@ -32,7 +34,7 @@ export interface Labelled extends Span {
 }
 
 // What a diagnostic says besides its message and span.
-export type Details = Pick<Diagnostic, 'label' | 'related' | 'note' | 'help' | 'fixes'>
+export type Details = Pick<Diagnostic, 'label' | 'related' | 'note' | 'help' | 'fixes' | 'satisfiable'>
 
 // Edits to the `.kay` source, by offset into it.
 export interface Fix {

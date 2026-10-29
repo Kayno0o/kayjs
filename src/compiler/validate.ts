@@ -7,7 +7,7 @@ import { RESIZABLE } from '../runtime/image'
 import { WIDGET_ROLES } from './aria'
 import { childBlocks, EVENT_MODIFIERS, FIELD_ATTRIBUTE, FIELD_ELEMENTS, isHead, isSlot, modifiersOf, nodeExpressions, serverIslandOf, templateFacts, visitNodes } from './ast'
 
-type ValidateOptions = Pick<GenerateOptions, 'island' | 'insideIsland' | 'check' | 'special' | 'includeServer' | 'pageFile'>
+type ValidateOptions = Pick<GenerateOptions, 'island' | 'insideIsland' | 'check' | 'client' | 'special' | 'includeServer' | 'pageFile'>
 
 // The elements each property of an element can be bound to; `group` and `files` also need an input of a type, `radio` or `checkbox` and `file`.
 const BINDABLE: ReadonlyMap<string, ReadonlySet<string>> = new Map([['value', new Set(['input', 'textarea', 'select'])], ['checked', new Set(['input', 'textarea', 'select'])], ['group', new Set(['input'])], ['files', new Set(['input'])], ['open', new Set(['details', 'dialog'])]])
@@ -637,7 +637,7 @@ class Validator {
     const widgetRole = role !== undefined && (role.kind !== 'static' || role.text.trim().toLowerCase().split(WHITESPACE).some(token => WIDGET_ROLES.has(token)))
 
     if (required && !names.has(required[0]))
-      this.lint(at, required[0] === 'alt' ? 'missing-alt' : 'missing-title', required[1], { help: required[2] })
+      this.lint(at, required[0] === 'alt' ? 'missing-alt' : 'missing-title', required[1], { help: required[2], satisfiable: required[0] === 'alt' && this.importedImage(element) })
 
     if (this.unsized(element, names))
       this.lint(at, 'unsized-image', `This \`${element.name}\` has no \`width\` and \`height\`, so the page shifts as it loads`, { help: 'write both, as the image\'s own size: only their ratio matters, CSS sets how large it is drawn; `// kay-allow unsized-image` keeps an image whose box CSS reserves in a way the lint cannot read, as a bound class' })
@@ -654,6 +654,16 @@ class Validator {
       this.lint(at, 'unreachable-click', `This \`${element.name}\` reacts to \`onClick\` but is out of reach of the keyboard and screen readers`, { help: 'use a `button`, or give it a widget\'s `role`, such as `button` or `option`, along with a `tabindex` and a key handler; `// kay-allow unreachable-click` keeps a click a keyboard has another way to, such as a backdrop Escape also closes' })
     else if (!this.modal(element) && !(role.kind === 'static' && role.text.trim().toLowerCase().split(WHITESPACE).some(token => token === 'dialog' || token === 'alertdialog')))
       this.lint(at, 'unannounced-click', `This \`${element.name}\` reacts to \`onClick\` but its \`role\` names no widget, so screen readers do not announce it as one`, { help: 'use a `button`, or a widget\'s `role`, such as `button` or `option`; `// kay-allow unannounced-click` keeps a click a keyboard has another way to, such as a backdrop Escape also closes' })
+  }
+
+  // An `img` rendered on the server whose `src` is an imported image: an extension that writes the `alt` into the page as it is served (kayjs-ai's `imageAlt`) can satisfy `missing-alt` for it, which it cannot for one rendered in the browser.
+  private importedImage(element: ElementNode): boolean {
+    if (element.name !== 'img' || this.options.island !== undefined || this.options.insideIsland === true || this.options.client === true)
+      return false
+
+    const src = element.attributes.find(attribute => attribute.kind === 'expression' && this.text(attribute.name) === 'src')
+
+    return src?.kind === 'expression' && this.sizedImports.has(this.text(src.expression).trim())
   }
 
   // `aria-modal` written as an expression may be true, and a written `false` is no backdrop.

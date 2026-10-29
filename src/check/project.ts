@@ -1,6 +1,7 @@
 // What `kay check` finds across the project beside each file's compile and type errors, shared with the editor, which reports it on save.
 import type { Subprocess } from 'bun'
 import type { CheckDiagnostic, CheckOptions } from '.'
+import type { LintLevels } from '../compiler/lints'
 import type { ExtensionProblem } from '../config'
 import type { CollectionFeed, CollectionRoute } from '../content/claims'
 import type { ComponentUse } from '../content/server'
@@ -114,11 +115,11 @@ function contextModuleProblems(root: string): CheckDiagnostic[] {
 }
 
 // A type error tsgo reports in `kay.config.ts` for a lint or level `lints` names that kay does not have, which kay's own message says better.
-export function lintConfigTypeError(root: string, lints: Record<string, string> = {}, diagnostic: CheckDiagnostic): boolean {
+export function lintConfigTypeError(root: string, lints: LintLevels = {}, diagnostic: CheckDiagnostic): boolean {
   if (diagnostic.file !== join(root, CONFIG_FILE) || !LINT_TYPE_ERRORS.has(diagnostic.code ?? ''))
     return false
 
-  return Object.entries(lints).some(([name, level]) => !isLint(name) && !isLintGroup(name) ? diagnostic.message.includes(`'${name}'`) : !LEVELS.has(level) && diagnostic.message.includes(`"${level}"`))
+  return levelEntries(lints).some(([name, level]) => !isLint(name) && !isLintGroup(name) ? diagnostic.message.includes(`'${name}'`) : !LEVELS.has(level) && diagnostic.message.includes(`"${level}"`))
 }
 
 // `missing-captcha` is moot in an app whose `createAuth` turns the CAPTCHA off, in whichever module it sits, unless the config sets the lint itself.
@@ -267,12 +268,17 @@ export async function checkContent(root: string, config: string | undefined, sit
   return { problems: [...problemsOf(root, read.marked(PROBLEMS_MARKER)), ...extensionProblemsOf(root, read.marked(EXTENSIONS_MARKER))], uses: read.marked(USES_MARKER) ?? [], feeds: read.marked(FEEDS_MARKER) ?? [], routes: read.marked(ROUTES_MARKER) ?? [] }
 }
 
+// The levels the app wrote, not the `satisfied` list kay adds from the extensions.
+function levelEntries(lints: LintLevels): [string, string][] {
+  return Object.entries(lints).filter(([name]) => name !== 'satisfied') as [string, string][]
+}
+
 // A lint or a level `lints` names that kay does not have, which would otherwise pass unnoticed, reported at its entry in kay.config.ts.
-function lintConfigProblems(root: string, lints: Record<string, string> = {}): CheckDiagnostic[] {
+function lintConfigProblems(root: string, lints: LintLevels = {}): CheckDiagnostic[] {
   const locate = configLocator(readConfigSource(root))
   const file = join(root, CONFIG_FILE)
 
-  return Object.entries(lints).flatMap(([name, level]) => {
+  return levelEntries(lints).flatMap(([name, level]) => {
     const at = { file, ...locate(['lints', name]) }
 
     if (!isLint(name) && !isLintGroup(name))

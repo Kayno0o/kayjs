@@ -1056,3 +1056,24 @@ describe('server-only-import', () => {
     ])
   })
 })
+
+describe('an extension satisfying missing-alt', () => {
+  const imported = '---\nimport team from \'./team.png\'\n---\nimg(src={team} width="1" height="1")\n'
+  const satisfied = { lints: { satisfied: ['missing-alt' as const] } }
+
+  it('reports an image import with no alt unless an extension satisfies the lint', () => {
+    expect(lints(imported).map(d => d.code)).toEqual(['missing-alt'])
+    expect(lints(imported, satisfied)).toEqual([])
+  })
+
+  it('keeps reporting an img whose src is no import, an image button and an img inside an island', () => {
+    expect(lints('img(src="/a.png" width="1" height="1")\n', satisfied).map(d => d.code)).toEqual(['missing-alt'])
+    expect(lints('input(type="image" src="/a.png" width="1" height="1")\n', satisfied).map(d => d.code)).toEqual(['missing-alt'])
+    expect(lints(imported, { ...satisfied, insideIsland: true }).map(d => d.code)).toEqual(['missing-alt'])
+    expect(lints(`---\nimport team from './team.png'\nimport { signal } from 'kay'\nconst n = signal(0)\n---\nbutton(onClick={() => n++}) {n()}\nimg(src={team} width="1" height="1")\n`, satisfied).map(d => d.code)).toEqual(['missing-alt'])
+  })
+
+  it('does not relax any other lint', () => {
+    expect(lints(`${imported}iframe(src="/map")\n`, satisfied).map(d => d.code)).toEqual(['missing-title'])
+  })
+})

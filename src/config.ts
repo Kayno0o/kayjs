@@ -479,6 +479,8 @@ export interface KayExtension<Server extends AnyElysia = AnyElysia> {
   commands?: Record<string, string> | undefined
   // Called by `kay check` and the editor, with the content config read and its collections registered, in place of running `server`: returns the problems with how the app configured the extension that the server would otherwise only log or refuse once it listens. Name the collection and the field path in each message.
   check?: (() => ExtensionProblem[] | Promise<ExtensionProblem[]>) | undefined
+  // Lints the extension answers for the places it fills in by itself, so `kay check` drops them there: `['missing-alt']` for an extension writing the `alt` of every `img` of a server-rendered page whose `src` is an imported image. Only `missing-alt` is relaxed so far, and only for such an `img`; one rendered inside an island is still reported.
+  satisfies?: 'missing-alt'[] | undefined
   // Called with each page `kay build` prerenders, once the files it links are written and before it is compressed, and again when the server renders it afresh: returns the HTML to write.
   transformPage?: PageHook | undefined
 }

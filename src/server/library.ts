@@ -16,6 +16,8 @@ export interface Logo {
   href?: string | undefined
 }
 export { KAY_DIR, underKayDev } from '../build/assets'
+export { libraryCacheSlot, readCacheEntry, writeCacheEntry } from '../build/cache'
+export type { CacheSlot } from '../build/cache'
 export type { UiConfigEntry } from '../build/ui'
 export type { KayCommand, Parsed } from '../commands/command'
 export { appModules } from '../config-extensions'
