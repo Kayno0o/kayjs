@@ -808,15 +808,19 @@ describe.concurrent('kay check, edge cases', () => {
         }
       })
 
-      it('reports a refused builtin behind a package marked sideEffects: false, imported bare or by name', async () => {
-        const pure = { 'node_modules/pure/package.json': '{"name":"pure","main":"index.js","sideEffects":false}', 'node_modules/pure/index.js': 'import \'async_hooks\'\nexport const PURE = 1\n' }
-
-        for (const [imports, body] of [['import \'pure\'', ''], ['import { PURE } from \'pure\'', 'const x = PURE\n']] as const) {
-          const diagnostics = await found({ ...pure, 'src/components/counter.kay': island(imports, body) })
-
-          expect(diagnostics.map(d => d.at)).toEqual(['src/components/counter.kay:3'])
-          expect(diagnostics[0]!.message).toContain('src/components/counter.kay -> pure -> async_hooks')
+      it('reports a refused builtin behind a package marked sideEffects: false, where the island uses what reaches it only', async () => {
+        const pure = {
+          'node_modules/pure/package.json': '{"name":"pure","main":"index.js","sideEffects":false}',
+          'node_modules/pure/index.js': 'export { PURE } from \'./a.js\'\nexport { DB } from \'./b.js\'\n',
+          'node_modules/pure/a.js': 'export const PURE = 1\n',
+          'node_modules/pure/b.js': 'import \'async_hooks\'\nexport const DB = 1\n',
         }
+        const diagnostics = await found({ ...pure, 'src/components/counter.kay': island('import { DB } from \'pure\'', 'const x = DB\n') })
+
+        expect(diagnostics.map(d => d.at)).toEqual(['src/components/counter.kay:3'])
+        expect(diagnostics[0]!.message).toContain('src/components/counter.kay -> pure -> async_hooks')
+        expect(await found({ ...pure, 'src/components/counter.kay': island('import { PURE } from \'pure\'', 'const x = PURE\n') })).toEqual([])
+        expect(await found({ ...pure, 'src/components/counter.kay': island('import \'pure\'') })).toEqual([])
       })
 
       it('keeps the other islands\' reports when one island import fails to bundle', async () => {

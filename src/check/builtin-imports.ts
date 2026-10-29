@@ -12,6 +12,13 @@ import { apiStubs, isApiStubbed } from '../server/api-modules'
 import { importEdges, scriptImportsOf } from './island-modules'
 import { importAt } from './server-only-reads'
 
+const PACKAGE_DIR = /node_modules\/((?:@[^/]+\/)?[^/]+)/
+
+const NAMED_IMPORTS = /\{([^}]*)\}/
+const NAMESPACE_IMPORT = /\*\s*as\s+(\w+)/
+const DEFAULT_IMPORT = /^\s*([\w$]+)\s*(?:,|$)/
+const AS_NAME = /\s+as\s+/
+
 const HELP = 'move what the island needs of it, a constant or a type, to a module importing no server code, or pass it as a prop'
 
 // An import an island's chunk bundles: its own, or one of a child component it renders.
@@ -36,9 +43,9 @@ function sourceOf(file: string): string | undefined {
 }
 
 // The imports an island bundles: its own, and those of each `.kay` component it imports in turn, which the browser build compiles into the island's chunk.
-function probesOf(seed: string, source: string, edges: ImportEdge[], stubbed: (file: string) => boolean): Probe[] {
+function probesOf(seed: string, source: string, edges: ImportEdge[], stubbed: (file: string) => boolean, islands: Set<string>): Probe[] {
   const probes: Probe[] = edges.map(({ specifier, builtin }) => ({ specifier, file: seed, request: specifier, builtin: builtin === true, via: [] }))
-  const seen = new Set([seed])
+  const seen = new Set(islands)
 
   const follow = (file: string, text: string, at: string | undefined, via: string[]): void => {
     for (const specifier of scriptImportsOf(text)) {
@@ -64,6 +71,34 @@ function probesOf(seed: string, source: string, edges: ImportEdge[], stubbed: (f
   return probes
 }
 
+// The module standing in for an import: it re-exports the names the file imports from `request`, as the build keeps only what an import uses of a package claiming no side effects, a type-only name left out.
+function standIn(text: string, request: string): string {
+  const pattern = new RegExp(String.raw`\bimport\s+(type\s+)?([^'"]*?)\s*from\s*(['"])${request.replace(/[.*+?^${}()|[\]\\]/g, String.raw`\// The metafile inputs`)}\3`, 'g')
+  const lines: string[] = []
+
+  for (const [, typeOnly, clause] of text.matchAll(pattern)) {
+    if (typeOnly !== undefined)
+      continue
+
+    const named = NAMED_IMPORTS.exec(clause!)?.[1]
+    const namespace = NAMESPACE_IMPORT.exec(clause!)?.[1]
+    const standard = DEFAULT_IMPORT.exec(clause!)?.[1]
+    const members = (named ?? '').split(',').map(member => member.trim()).filter(member => member !== '' && !member.startsWith('type '))
+    const taken = lines.length
+
+    if (namespace !== undefined)
+      lines.push(`export * as ns${taken} from ${JSON.stringify(request)}`)
+
+    if (standard !== undefined && namespace === undefined)
+      lines.push(`export { default as d${taken} } from ${JSON.stringify(request)}`)
+
+    if (members.length > 0)
+      lines.push(`export { ${members.map((member, at) => `${member.split(AS_NAME)[0]} as m${taken}_${at}`).join(', ')} } from ${JSON.stringify(request)}`)
+  }
+
+  return lines.length > 0 ? `${lines.join('\n')}\n` : `import ${JSON.stringify(request)}\n`
+}
+
 // The metafile inputs of the entries bundled for the browser as the build does, or nothing when they fail to.
 async function bundle(files: Record<string, string>, root: string, api: RouteMount[]): Promise<BundleInputs | undefined> {
   const result = await Bun.build({
@@ -73,7 +108,7 @@ async function bundle(files: Record<string, string>, root: string, api: RouteMou
     target: 'browser',
     metafile: true,
     define: { 'process.env.NODE_ENV': '"production"' },
-    external: [...BUILTINS, 'kay', 'kay/*', '*.kay'],
+    external: [...BUILTINS, 'kay', 'kay/*', '*.kay', '~icons/*'],
     plugins: api.length > 0 ? [apiStubs(api)] : [],
     throw: false,
   })
@@ -86,15 +121,17 @@ async function bundle(files: Record<string, string>, root: string, api: RouteMou
 export async function builtinImportsInIsland(root: string, seeds: string[], edges: Map<string, ImportEdge[]>, api: RouteMount[]): Promise<CheckDiagnostic[]> {
   const refuses = await browserRefuses()
   const stubbed = isApiStubbed(api)
+  const islands = new Set(seeds)
   const sources = new Map<string, string>()
   const probes = new Map<string, Probe[]>()
-  // Each import is bundled from a module beside the one holding it that only re-exports it, so the bundler resolves it as the build does, a package's browser condition included, and keeps it though its package claims no side effects.
+  // Each import is bundled from a module beside the one holding it that only re-exports what the file takes of it, so the bundler resolves it as the build does, a package's browser condition included, and keeps what it takes of a package claiming no side effects, as the build does.
   const files: Record<string, string> = {}
   const entryOf = new Map<Probe, string>()
+  const shared = new Map<string, string>()
 
   for (const seed of seeds) {
     const source = await Bun.file(seed).text()
-    const found = probesOf(seed, source, edges.get(seed) ?? [], stubbed)
+    const found = probesOf(seed, source, edges.get(seed) ?? [], stubbed, islands)
 
     sources.set(seed, source)
     probes.set(seed, found)
@@ -103,10 +140,17 @@ export async function builtinImportsInIsland(root: string, seeds: string[], edge
       if (probe.builtin)
         continue
 
-      const entry = join(dirname(probe.file), `.kay-import-${entryOf.size}.js`)
+      const content = standIn(sourceOf(probe.file) ?? '', probe.request)
+      const key = `${dirname(probe.file)}\0${content}`
+      let entry = shared.get(key)
+
+      if (entry === undefined) {
+        entry = join(dirname(probe.file), `.kay-import-${shared.size}.js`)
+        shared.set(key, entry)
+        files[entry] = content
+      }
 
       entryOf.set(probe, entry)
-      files[entry] = `export * as imported from ${JSON.stringify(probe.request)}\n`
     }
   }
 
@@ -153,7 +197,9 @@ export async function builtinImportsInIsland(root: string, seeds: string[], edge
       if (chain === undefined)
         continue
 
-      const route = [island, ...probe.via.map(child => relative(project, realpathSync(child))), chain].join(' -> ')
+      // A component of a package is shown as the package, the way a chain is cut at its first one.
+      const library = PACKAGE_DIR.exec(probe.via[0] ?? '')?.[1]
+      const route = (library === undefined ? [island, ...probe.via.map(child => relative(project, realpathSync(child))), chain] : [island, library, reached]).join(' -> ')
 
       // One report per island and chain, however many of its imports lead there.
       if (reported.has(route))
