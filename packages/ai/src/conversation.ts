@@ -82,14 +82,15 @@ type Replayed = Message & Pick<ProviderMessage, 'calls' | 'results'>
 
 // A turn as the model read it: the user's text, or for a reply each request's calls and their results, then its text.
 // A turn of no text and no calls, a message of files alone, is kept so the turns line up with the Chat's, and left out of what the model reads, as a provider refuses an empty message.
-function replayed({ role, content, steps }: StoredTurn, shortened: boolean): Replayed[] {
+// A call's id is told apart by the turn it is in, as a provider leaving ids out has them reissued as `call_1` in every turn and Anthropic refuses a repeated one.
+function replayed({ role, content, steps }: StoredTurn, shortened: boolean, at: number): Replayed[] {
   if (role === 'user' || steps === undefined || steps.length === 0)
     return content === '' ? [] : [{ role, content }]
 
   return [
     ...steps.flatMap(calls => [
-      { role: 'assistant' as const, content: '', calls: calls.map(({ id, name, arguments: input }) => ({ id, name, arguments: input })) },
-      { role: 'user' as const, content: '', results: calls.map(({ id, result, ok }) => ({ id, content: shortened && result.length > LEFT_OUT.length ? LEFT_OUT : result, ok })) },
+      { role: 'assistant' as const, content: '', calls: calls.map(({ id, name, arguments: input }) => ({ id: `t${at}_${id}`, name, arguments: input })) },
+      { role: 'user' as const, content: '', results: calls.map(({ id, result, ok }) => ({ id: `t${at}_${id}`, content: shortened && result.length > LEFT_OUT.length ? LEFT_OUT : result, ok })) },
     ]),
     { role, content: content === '' ? NO_ANSWER : content },
   ]
@@ -100,14 +101,14 @@ const charsOf = (messages: readonly Replayed[]) => messages.reduce((sum, message
 // Two turns of one role in a row, left once an empty turn between them is, are read as one, as a provider takes the roles in turn; a message of calls or results stands alone.
 function fitted(kept: readonly StoredTurn[], posted: readonly Message[], maxInputChars: number): Replayed[] {
   const room = maxInputChars - posted.reduce((sum, message) => sum + message.content.length + estimatedChars(message), 0)
-  const turns = kept.filter(turn => replayed(turn, false).length > 0)
-  const cost = (turn: StoredTurn, shortened: boolean) => charsOf(replayed(turn, shortened))
-  let total = turns.reduce((sum, turn) => sum + cost(turn, false), 0)
+  const turns = kept.map((turn, at) => ({ turn, at })).filter(({ turn, at }) => replayed(turn, false, at).length > 0)
+  const cost = ({ turn, at }: (typeof turns)[number], shortened: boolean) => charsOf(replayed(turn, shortened, at))
+  let total = turns.reduce((sum, item) => sum + cost(item, false), 0)
   let shortened = 0
   let dropped = 0
 
-  // The results of the oldest turns go first, then the oldest turns whole: the newest are the ones kept when the conversation outgrows what the ask takes.
-  while (total > room && shortened < turns.length) {
+  // The results of the oldest turns go first, but not those of the last two turns, the latest exchange: past them the oldest turns leave whole, so the newest are the ones kept when the conversation outgrows what the ask takes.
+  while (total > room && shortened < turns.length - 2) {
     total += cost(turns[shortened]!, true) - cost(turns[shortened]!, false)
     shortened++
   }
@@ -117,11 +118,11 @@ function fitted(kept: readonly StoredTurn[], posted: readonly Message[], maxInpu
     dropped++
   }
 
-  const earlier = turns.slice(dropped).map((turn, index) => ({ turn, shortened: dropped + index < shortened }))
+  const earlier = turns.slice(dropped).map((item, index) => ({ ...item, short: dropped + index < shortened }))
   const first = earlier.findIndex(({ turn }) => turn.role === 'user')
   const messages: Replayed[] = []
 
-  for (const message of [...first === -1 ? [] : earlier.slice(first).flatMap(({ turn, shortened: short }) => replayed(turn, short)), ...posted]) {
+  for (const message of [...first === -1 ? [] : earlier.slice(first).flatMap(({ turn, at, short }) => replayed(turn, short, at)), ...posted]) {
     const before = messages.at(-1)
 
     // The later one keeps its files, and the earlier text comes first.

@@ -33,7 +33,7 @@ function recording(text?: (count: number) => string) {
 }
 
 // A model that looks a title up when a turn says `look up <title>`, and answers `found <result>` (or nothing for `silent`) once it has the result.
-function calling(texts: Record<string, string> = {}) {
+function calling(texts: Record<string, string> = {}, blankIds = false) {
   const asked: ProviderRequest[] = []
   const lookup = tool({ name: 'look_up', description: 'Looks an article up', input: schema.Object({ title: schema.String() }), run: ({ title }) => title === 'big' ? 'r'.repeat(200) : `About ${title}` })
   const provider: Provider = {
@@ -51,7 +51,7 @@ function calling(texts: Record<string, string> = {}) {
           yield { text }
       }
       else if (last.content.startsWith('look up')) {
-        yield { toolUse: { id: `use-${asked.length}`, name: 'look_up', arguments: JSON.stringify({ title: last.content.slice(8) }) } }
+        yield { toolUse: { id: blankIds ? '' : `use-${asked.length}`, name: 'look_up', arguments: JSON.stringify({ title: last.content.slice(8) }) } }
       }
       else {
         yield { text: `answer ${asked.length}` }
@@ -575,6 +575,33 @@ describe('a conversation held on the server', () => {
     await visit(said('look up big'), options, { header: `send:${ID}:1` })
     await visit(said('and?'), options, { header: `send:${ID}:2` })
     expect(model.shape(2).filter((line, index) => index < 3 || line.startsWith('assistant: ok'))).toEqual(['user: a', 'assistant: b', 'user: look up big', 'assistant: ok'])
+  })
+
+  it('drops the oldest turns before it shortens the results of the latest exchange', async () => {
+    const model = calling({ ['r'.repeat(200)]: 'ok' })
+    const options = { provider: model.provider, tools: model.tools }
+
+    await visit(said('look up big'), options, { header: `send:${ID}:0` })
+    await visit(said('look up big'), options, { header: `send:${ID}:1` })
+    // The room holds the latest exchange with its whole result and not the first one, even shortened.
+    await visit(said('why?'), { ...options, maxInputChars: 260 }, { header: `send:${ID}:2` })
+    expect(model.shape(4)).toEqual(['user: look up big', 'assistant:  calls look_up{"title":"big"}', `user:  results ${'r'.repeat(200)}`, 'assistant: ok', 'user: why?'])
+  })
+
+  it('tells the calls of different turns apart when the provider leaves their ids out', async () => {
+    const model = calling({}, true)
+    const options = { provider: model.provider, tools: model.tools }
+
+    await visit(said('look up Moon'), options, { header: `send:${ID}:0` })
+    await visit(said('look up Sun'), options, { header: `send:${ID}:1` })
+    await visit(said('why?'), options, { header: `send:${ID}:2` })
+
+    const ids = model.asked[4]!.messages.flatMap(message => message.calls?.map(call => call.id) ?? [])
+    const answered = model.asked[4]!.messages.flatMap(message => message.results?.map(result => result.id) ?? [])
+
+    expect(ids).toHaveLength(2)
+    expect(new Set(ids).size).toBe(2)
+    expect(answered).toEqual(ids)
   })
 
   it('drops the calls of the turns a regenerate or an edit replaces', async () => {
