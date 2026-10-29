@@ -531,7 +531,7 @@ const found = await db.repo(Passage).read.nearest(await embed(question, { dimens
 return ask(messages, ground(found, row => ({ title: row.title, href: `/help/${row.slug}`, text: row.text }), { system: 'You are the help desk of Acme.' })).progress()
 ```
 
-With nothing found, the model is told so and says it does not know. The `embedding()` trait embeds a row when it is inserted or its text changes, so the table needs no more code. A kayjs-cms entry is not a pg-orm row: keep a table of your own and write it from `cms({ onSave })`.
+With nothing found, the model is told so and says it does not know. The `embedding()` trait embeds a row when it is inserted or its text changes, so saving a row needs no more code than the trait's declaration. A kayjs-cms entry is not a pg-orm row: keep a table of your own and write it from `cms({ onSave })`.
 
 Under `bun test` the fake answers all three. Embeddings are stable vectors built from the words, so texts that share words come out near each other.
 
