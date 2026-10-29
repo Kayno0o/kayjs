@@ -166,7 +166,7 @@ class Translator {
         continue
 
       if (attribute.value?.type === 'Literal')
-        this.lang(this.line(attribute), attribute.value.value)
+        this.lang(this.line(attribute), decodeEntities(attribute.value.value))
       else
         this.note(this.line(attribute), `\`lang\` on html: set \`lang: ${this.text(attribute.value!)}\` in kay.config.ts, which writes it on every page`)
     }
@@ -395,7 +395,7 @@ class Translator {
   // astro-icon's `<Icon name="mdi:sun" />`, drawn as the icon imported from its `@iconify-json` set.
   private icon(element: JSXElement): string[] {
     const name = element.openingElement.attributes.find((attribute): attribute is JSXAttribute => attribute.type === 'JSXAttribute' && this.attributeName(attribute) === 'name')
-    const match = name?.value?.type === 'Literal' ? ICON_NAME.exec(name.value.value) : null
+    const match = name?.value?.type === 'Literal' ? ICON_NAME.exec(decodeEntities(name.value.value)) : null
 
     if (!match)
       return this.untranslated(element, 'an astro-icon whose name is not a plain `set:name` (a local icon, or a computed name): import the icon from `@iconify-json/<prefix>` as `~icons/<prefix>/<name>` and draw it as a tag, or import the svg file')
@@ -431,7 +431,7 @@ class Translator {
         continue
       }
 
-      const slotName = (slot.value as StringLiteral).value
+      const slotName = decodeEntities((slot.value as StringLiteral).value)
 
       named.set(slotName, [...named.get(slotName) ?? [], ...this.child(child)])
     }
@@ -531,7 +531,7 @@ class Translator {
         let html: string | undefined
 
         if (value?.type === 'Literal')
-          html = JSON.stringify(value.value)
+          html = JSON.stringify(decodeEntities(value.value))
         else if (value?.type === 'JSXExpressionContainer' && value.expression.type !== 'JSXEmptyExpression')
           html = this.expression(value.expression)
 
@@ -546,8 +546,10 @@ class Translator {
       const target = RENAMED_ATTRIBUTES.get(name) ?? name
 
       if (value?.type === 'Literal') {
+        const text = decodeEntities(value.value)
+
         if (target === 'class') {
-          for (const token of value.value.split(WHITESPACE).filter(Boolean)) {
+          for (const token of text.split(WHITESPACE).filter(Boolean)) {
             if (isClassToken(token))
               shorthand.push(`.${token}`)
             else
@@ -557,13 +559,13 @@ class Translator {
           continue
         }
 
-        if (target === 'id' && ID_TOKEN.test(value.value) && !id) {
-          id = `#${value.value}`
+        if (target === 'id' && ID_TOKEN.test(text) && !id) {
+          id = `#${text}`
 
           continue
         }
 
-        attributes.push(value.value.includes('"') ? `${target}={${JSON.stringify(value.value)}}` : `${target}="${value.value}"`)
+        attributes.push(text.includes('"') ? `${target}={${JSON.stringify(text)}}` : `${target}="${text}"`)
       }
       else if (value?.type === 'JSXExpressionContainer') {
         if (value.expression.type !== 'JSXEmptyExpression')
@@ -607,7 +609,7 @@ class Translator {
     if (!named)
       return ['slot']
 
-    const slotName = (named.value as StringLiteral).value
+    const slotName = decodeEntities((named.value as StringLiteral).value)
 
     this.note(this.line(element), `the named slot \`${slotName}\` renders the \`${slotName}\` prop: add \`${slotName}?: Snippet\` to the component's props`)
 

@@ -1402,7 +1402,7 @@ function keyRead(reference: Path, name: string, key: string[] | undefined, code:
   for (const member of key) {
     const parent = read.parentPath
 
-    if (!parent?.is('MemberExpression') || parent.node.object !== read.node || parent.node.computed || parent.node.property.type !== 'Identifier' || parent.node.property.name !== member)
+    if (!parent?.is('MemberExpression') || parent.node.object !== read.node || parent.node.computed || parent.node.optional || parent.node.property.type !== 'Identifier' || parent.node.property.name !== member)
       return undefined
 
     read = parent

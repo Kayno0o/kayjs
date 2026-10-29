@@ -24,6 +24,11 @@ describe('parseProgram', () => {
     expect(comments[0]!.start).toBe(102)
   })
 
+  it('points an unclosed brace where the text ends and a redeclaration at the repeat', () => {
+    expect(parseProgram('function f() {\n  a()\n', { recover: true }).errors[0]!.pos).toBeGreaterThan(18)
+    expect(parseProgram('const a = 1\nconst a = 2\n', { recover: true, semantic: true }).errors[0]!.pos).toBe(18)
+  })
+
   it('throws the first error with its position, or returns every error with recover', () => {
     const error = (() => {
       try {

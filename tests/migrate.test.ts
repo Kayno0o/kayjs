@@ -198,6 +198,10 @@ svg({...rest}) {name}
 `)
   })
 
+  it('decodes the character references of an attribute as of text', () => {
+    expect(component(`<a href="/a?x=1&amp;y=2" class="a&#32;b">go</a>\n`).code).toBe(`a.a.b(href="/a?x=1&y=2") go\n`)
+  })
+
   it('writes a brace in text as text, and lists a handler written as a string and Astro.props read in the markup', () => {
     const { code, notes } = component(`<button onclick="go()">Set &#123;x&#125;</button>\n<p>{Astro.props.title}</p>\n`)
 

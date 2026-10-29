@@ -75,7 +75,7 @@ export function sentParts(code: string): { parts: Span[], functions: boolean } |
         if (property.type === 'Property' && property.method)
           functions = true
         else
-          visit(property.type === 'SpreadElement' ? property.argument : (property).value)
+          visit(property.type === 'SpreadElement' ? property.argument : property.value)
       }
     }
     else if (node.type === 'SpreadElement') {

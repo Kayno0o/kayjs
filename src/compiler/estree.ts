@@ -39,6 +39,8 @@ export interface Parsed {
   comments: Comment[]
 }
 
+// A redeclaration is labelled at the first declaration, then at the one that repeats it, which is where it fails.
+const REDECLARED = /has already been declared/
 const RETURN_OUTSIDE = /^A 'return' statement can only be used within a function body/
 
 // An error that carries its position, as the one a failed parse throws.
@@ -52,7 +54,7 @@ export class ParseError extends SyntaxError {
 export function parseProgram(code: string, options: ParseOptions = {}): Parsed {
   const { lang = 'ts', offset = 0 } = options
   const result = parseSync(`file.${lang}`, code, { lang, sourceType: 'module', preserveParens: options.parens === true, showSemanticErrors: options.semantic === true })
-  const errors = result.errors.filter(error => !(options.returnOutside === true && RETURN_OUTSIDE.test(error.message))).map((error): Fault => ({ pos: (error.labels.at(-1)?.start ?? 0) + offset, message: error.message }))
+  const errors = result.errors.filter(error => !(options.returnOutside === true && RETURN_OUTSIDE.test(error.message))).map((error): Fault => ({ pos: ((REDECLARED.test(error.message) ? error.labels.at(-1) : error.labels[0])?.start ?? 0) + offset, message: error.message }))
 
   if (errors.length > 0 && options.recover !== true)
     throw new ParseError(errors[0]!.message, errors[0]!.pos)
