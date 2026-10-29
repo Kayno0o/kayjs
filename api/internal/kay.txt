@@ -1,0 +1,1368 @@
+[.] BindableMark
+interface BindableMark
+
+[.] BoundProp
+type BoundProp<Tag, Key> = Key extends BindableKeys<Tag> ? unknown : { kayError: 'bind: needs a prop typed Bindable<T> in the component' }
+
+[.] BoundValue
+type BoundValue<Tag, Key> = Key extends keyof PropsOfComponent<Tag> ? Required<PropsOfComponent<Tag>>[Key] : never
+
+[.] CheckedHref
+type CheckedHref<Href extends string> = string extends Href ? unknown : Href extends `//${string}` | `/_kay/${string}` ? unknown : Href extends `/${string}` ? IsRoute<PathOf<Href>> extends true ? unknown : {
+  kayError: `${typeof UNSERVED_MESSAGE} ${PathOf<Href>}`
+} : unknown
+
+[.] CheckedHtml
+type CheckedHtml<Markup> = [UnsafeHtml<Markup>] extends [never] ? unknown : {
+  kayError: 'This string would render as markup: pass sanitizeHtml(value) for markup a user wrote, or trustHtml(value) for markup the app made'
+}
+
+[.] FunctionProp
+type FunctionProp<Component> = Component extends IslandBrand ? {
+  kayError: 'A layout, or a page with a server fence, sends an island its props serialized: plain objects, arrays, Dates, Maps, Sets, bigints, URLs and RegExps, but no functions, symbols or class instances; a component of its own passing one renders as an island in its place'
+} : 0
+
+[.] HandedPart
+type HandedPart<Component, Name extends string> = PartClass<Component> extends infer Class ? Class extends object ? Name extends keyof Class ? Class[Name] : never : never : never
+
+[.] HandedSignal
+type HandedSignal<Parameter> = 0 extends 1 & Parameter ? {
+  kayLint: 'uncalled-signal'
+} : [Parameter] extends [UnresolvedParameter] ? unknown : unknown extends Parameter ? {
+  kayLint: 'uncalled-signal'
+} : unknown
+
+[.] HandsPart
+type HandsPart<Component, Name extends string> = 0 extends 1 & Component ? unknown : [HandedPart<Component, Name>] extends [never] ? {
+  kayError: `The called component has no part ${Name}`
+} : unknown
+
+[.] Inferred
+interface Inferred
+
+[.] IslandBrand
+interface IslandBrand
+
+[.] PlainIslandProp
+type PlainIslandProp<Component, Value> = Component extends IslandBrand ? SecretProp<Value> & ActionProp<Component, Value> : unknown
+
+[.] TemplateContext
+type TemplateContext = TemplateValues extends { values: infer Values extends object } ? Values : object
+
+[.] TemplateHelpers
+interface TemplateHelpers
+  Await: <T>(props: { value: T; pending?: Element; ready?: Element; failed?: Element; }) => Element
+  Dynamic: <Tag>(props: { component: Tag; } & PropsOf<Tag>) => Element
+  For: {
+  <T>(props: {
+    each: false | readonly T[] | null | undefined;
+    keyed: (item: T) => unknown;
+    fallback?: Element;
+    children: Element;
+  }): Element;
+  <T>(props: {
+    each: false | readonly T[] | null | undefined;
+    keyed: false;
+    fallback?: Element;
+    children: Element;
+  }): Element;
+}
+  Try: (props: { block: Element; failed?: Element; }) => Element
+  awaited: <T>(value: T) => Settled<T>
+  componentClass: <List extends readonly unknown[]>(list: List) => ComponentClass<List>
+  head: (tags: { tag: string; props: Record<string, unknown>; }[]) => void
+  omit: <Props extends object, Key extends keyof Props>(props: Props, ...keys: Key[]) => Omit<Props, Key>
+  partClass: (props: unknown, part: string) => unknown
+  partHanded: (part: string, list: readonly unknown[]) => unknown
+  partsClass: (list: readonly unknown[]) => unknown
+  staticFor: <T>(each: false | readonly T[] | null | undefined, rendered: Element, fallback?: Element) => Element
+
+[.] TemplateValues
+interface TemplateValues
+
+[.] Truthy
+type Truthy<T> = Exclude<T, false | 0 | 0n | '' | null | undefined>
+
+[.] UnresolvedParameter
+interface UnresolvedParameter
+  kayUnresolved: true
+
+[.] WidenedProps
+type WidenedProps<Props, Added> = Props extends unknown ? Without<Props, keyof Added> & {
+  [Name in keyof Pick<Props, keyof Added & KnownKeys<Props>>]: Pick<Props, keyof Added & KnownKeys<Props>>[Name] | VariantValue<Record<Added[Name & keyof Added] & string, unknown>>
+} & {
+  [Name in Exclude<keyof Added, KnownKeys<Props>>]?: VariantValue<Record<Added[Name] & string, unknown>> | undefined
+} : never
+
+[./arrival] ARRIVAL_HIGHLIGHT
+const ARRIVAL_HIGHLIGHT: "kay-search"
+
+[./arrival] ARRIVAL_PARAM
+const ARRIVAL_PARAM: "kay_q"
+
+[./arrival] arrive
+function arrive(search: string, from: number): Promise<void>
+
+[./arrival] arrives
+function arrives(search: string): boolean
+
+[./await] Await
+function Await<T>(props: AwaitProps<T>): Element
+
+[./await] collectDeferred
+function collectDeferred<T>(render: () => T, within?: string | undefined): { result: T; deferred: PendingBlock[]; }
+
+[./await] earlyRejections
+const earlyRejections: Pick<EarlyRejections, "graceMs">
+
+[./await] PendingBlock
+interface PendingBlock
+  failed?: ((error: unknown) => unknown) | undefined
+  fallback?: ((error: unknown) => unknown) | undefined
+  id: string
+  ready: (value: never) => unknown
+  site?: Error | undefined
+  value: Promise<unknown> | AsyncIterable<unknown>
+
+[./await] rejectedAt
+function rejectedAt(block: PendingBlock, reason: unknown): unknown
+
+[./client] disposeIslands
+function disposeIslands(root: ParentNode): void
+
+[./client] enableHotSwap
+function enableHotSwap(registry: IslandRegistry): void
+
+[./client] HotSwap
+interface HotSwap
+  entry?: string | undefined
+  fresh: string[]
+  from: number
+  islands: Record<string, string[]>
+
+[./client] hydrateIslands
+function hydrateIslands(registry: IslandRegistry, root?: ParentNode): Promise<void>
+
+[./client] IslandRegistry
+type IslandRegistry = Record<string, () => Promise<{ default: (props: object) => unknown }>>
+
+[./client] refreshForEdit
+function refreshForEdit(): Promise<void>
+
+[./client] startNavigation
+function startNavigation(given: NavigationHooks): void
+
+[./dom] animated
+function animated(unit: Unit | null): boolean
+
+[./dom] append
+function append(parent: Node, node: Node): void
+
+[./dom] attribute
+function attribute(element: Element, name: string, value: unknown, written?: boolean): void
+
+[./dom] Block
+interface Block
+  dispose: (() => void) | undefined
+  region: Region
+  rendered: boolean
+  units: Unit[]
+
+[./dom] blockIn
+function blockIn(region: Region): Block
+
+[./dom] branches
+function branches(element: Node | null, start: Node | null, end: Node | null, list: [test: (() => unknown) | null, render: (value: () => unknown) => unknown][]): void
+
+[./dom] choose
+function choose(element: Node | null, start: Node | null, end: Node | null, list: [test: (() => unknown) | null, render: () => unknown][]): void
+
+[./dom] claiming
+function claiming(): boolean
+
+[./dom] claimNode
+function claimNode(): Node
+
+[./dom] close
+function close(start: Node): Node
+
+[./dom] component
+function component<P>(fn: (props: P) => unknown, props: P): unknown
+
+[./dom] componentClass
+function componentClass(list: readonly unknown[]): string | undefined
+
+[./dom] createElement
+function createElement(tag: string): Element
+
+[./dom] dispatch
+function dispatch(event: Event): void
+
+[./dom] effect
+function effect(fn: () => void): void
+
+[./dom] entered
+function entered(unit: Unit | null): void
+
+[./dom] errorParagraph
+function errorParagraph(message: string | undefined, id: string, classes: string): Element | undefined
+
+[./dom] firstOf
+function firstOf(unit: Unit): Node
+
+[./dom] fragment
+function fragment(build: (parent: Node) => void): Unit | null
+
+[./dom] fresh
+function fresh<T>(render: () => T): T
+
+[./dom] holdSubmits
+function holdSubmits(): void
+
+[./dom] hydrate
+function hydrate<T>(render: () => T, container: Node): T
+
+[./dom] HydrationMismatchError
+class HydrationMismatchError
+  new (message?: string | undefined): HydrationMismatchError
+  new (message?: string | undefined, options?: ErrorOptions | undefined): HydrationMismatchError
+  new (message?: string | undefined, options?: ErrorOptions | undefined): HydrationMismatchError
+  name: string
+
+[./dom] insert
+function insert(element: Node | null, start: Node | null, end: Node | null, fn: () => unknown, reactive?: boolean): void
+
+[./dom] insertUnit
+function insertUnit(parent: Node, unit: Unit, before: Node | null): void
+
+[./dom] islandHost
+function islandHost(): Element | undefined
+
+[./dom] islandOf
+function islandOf(node: Node): string | undefined
+
+[./dom] keepServerMarkup
+function keepServerMarkup(keeps: (element: Element, value: unknown) => boolean): void
+
+[./dom] lastOf
+function lastOf(unit: Unit): Node
+
+[./dom] leavesInBrowser
+function leavesInBrowser(href: unknown): boolean
+
+[./dom] listen
+function listen(element: Element, name: string, handler: (event: Event) => void): void
+
+[./dom] listenSubmit
+function listenSubmit(element: Element, name: string, handler: (event: Event) => void): void
+
+[./dom] localizeLinks
+function localizeLinks(given: (href: string) => string): void
+
+[./dom] markers
+function markers(parent: Node): [start: Node, end: Node]
+
+[./dom] memo
+function memo<T>(fn: () => T, options?: SignalOptions<T> | undefined): () => T
+
+[./dom] merge
+function merge(...sources: readonly object[]): Record<string, unknown>
+
+[./dom] omit
+function omit(props: object, ...keys: string[]): Record<string, unknown>
+
+[./dom] outside
+function outside<T>(element: Element, href: T, ownRel?: boolean): T
+
+[./dom] partClass
+function partClass(props: unknown, part: string): unknown
+
+[./dom] partHanded
+function partHanded(part: string, list: readonly unknown[]): unknown
+
+[./dom] partsClass
+function partsClass(list: readonly unknown[]): unknown
+
+[./dom] playTransitions
+function playTransitions(given: Transitions): void
+
+[./dom] property
+function property(element: Element, name: string, value: unknown, written?: boolean): void
+
+[./dom] Range
+class Range
+  new (first: Node, last: Node): Range
+  first: Node
+  held?: DocumentFragment | undefined
+  last: Node
+  nodes?: Node[] | undefined
+
+[./dom] ref
+function ref(element: Element, target: unknown): void
+
+[./dom] Region
+class Region
+  new (element: Node | null, start: Node | null, end: Node | null): Region
+  claim: <T>(fn: () => T) => T
+  clear: () => void
+  element: Node | null
+  end: Node | null
+  insert: (unit: Unit, before?: Node | null) => void
+  parent: Node
+  start: Node | null
+
+[./dom] release
+function release(block: Block): void
+
+[./dom] removeUnit
+function removeUnit(unit: Unit): void
+
+[./dom] render
+function render(fn: () => unknown, container: Element): () => void
+
+[./dom] renderAppended
+function renderAppended(fn: () => unknown, container: Element): () => void
+
+[./dom] rowUnit
+function rowUnit(made: Unit[]): Unit | null
+
+[./dom] setClass
+function setClass(element: Element, value: unknown): void
+
+[./dom] setStyle
+function setStyle(element: Element, value: unknown, props?: readonly (readonly [string, unknown])[] | undefined): void
+
+[./dom] spreadAttributes
+function spreadAttributes<T>(source: T): T
+
+[./dom] spreadWith
+function spreadWith(sources: readonly object[], styles?: readonly (readonly [string, unknown])[] | undefined, binds?: readonly (readonly [name: string | undefined, read: () => unknown, event: string, write: (event: Event) => void])[] | undefined): object[]
+
+[./dom] submits
+const submits: { listen?: (element: Element, name: string, handler: (event: Event) => void) => void; }
+
+[./dom] swap
+function swap(block: Block, render: () => unknown, owned?: boolean): void
+
+[./dom] template
+function template(html: string): () => Element
+
+[./dom] text
+function text(parent: Node, data: string): void
+
+[./dom] transition
+function transition(element: Element, part: string, value: unknown): void
+
+[./dom] Transitions
+interface Transitions
+  back: (nodes: Node[]) => void
+  enter: (node: Node) => void
+  has: (node: Node) => node is Element
+  leave: (node: Node) => void
+  leaving: ReadonlySet<Node>
+
+[./dom] Unit
+type Unit = Node | Range
+
+[./dom] units
+function units(value: unknown): Unit[]
+
+[./dom] unlisten
+function unlisten(element: Element, name: string): void
+
+[./dom] untrack
+function untrack<T>(fn: () => T): T
+
+[./dom] within
+function within<T>(parent: Node, value: T): T
+
+[./dom-await] awaited
+function awaited(element: Node | null, start: Node | null, end: Node | null, value: () => unknown, pending: (() => unknown) | undefined, ready: (value: unknown) => unknown, failed: ((error: unknown) => unknown) | undefined, fallback?: ((error: unknown) => unknown) | undefined): void
+
+[./dom-image] image
+function image(element: Element, src: unknown, sized: boolean, sizes?: unknown): void
+
+[./dom-loop] loop
+function loop<T>(element: Node | null, start: Node | null, end: Node | null, each: () => false | readonly T[] | null | undefined, key: false | ((item: T) => unknown), render: (item: () => T, index: number | (() => number)) => unknown, fallback?: (() => unknown) | undefined): void
+
+[./dom-loop] rowKey
+function rowKey(item: unknown): unknown
+
+[./dom-spread] dynamic
+function dynamic(tag: unknown, props: Record<string, unknown>): unknown
+
+[./dom-spread] spread
+function spread(element: Element, sources: () => readonly object[], content?: boolean, link?: boolean): void
+
+[./dom-try] attempt
+function attempt(element: Node | null, start: Node | null, end: Node | null, render: (caught: (error: unknown) => unknown) => unknown, fallback: ((error: unknown) => unknown) | undefined): void
+
+[./html] attempt
+function attempt(render: (caught: (error: unknown) => string) => string, fallback?: ((error: unknown) => string) | undefined): string
+
+[./html] attribute
+function attribute(name: string, value: unknown, literal?: boolean): string
+
+[./html] AwaitNote
+interface AwaitNote
+  pending: boolean
+  settled?: number | undefined
+  stack: string
+  started: number
+
+[./html] awaitNotes
+function awaitNotes(): AwaitNote[] | undefined
+
+[./html] child
+function child(value: unknown): string
+
+[./html] className
+function className(value: unknown): string
+
+[./html] component
+function component<P>(fn: (props: P) => unknown, props: P): unknown
+
+[./html] componentClass
+function componentClass(list: readonly unknown[]): string | undefined
+
+[./html] currentPage
+function currentPage(href: unknown, section?: boolean | undefined): string
+
+[./html] dynamic
+function dynamic(tag: unknown, props: object): unknown
+
+[./html] element
+function element(written: string, sources: readonly object[], content?: (() => string) | undefined): Html
+
+[./html] errorParagraph
+function errorParagraph(message: string | undefined, id: string, classes: string): string
+
+[./html] escape
+function escape(text: string): string
+
+[./html] escapeAttribute
+function escapeAttribute(text: string): string
+
+[./html] FAILED_MARKER
+const FAILED_MARKER: "<!--kay-failed-->"
+
+[./html] fieldDescribed
+function fieldDescribed(own?: unknown, type?: unknown, ownRequired?: unknown): string
+
+[./html] formConstraints
+function formConstraints(target: unknown, name: string, written: readonly string[]): string
+
+[./html] head
+function head(tags: HeadTag[]): void
+
+[./html] html
+function html(markup: string): Html
+
+[./html] Html
+interface Html
+  t: string
+
+[./html] imageAttributes
+function imageAttributes(src: unknown, sized: boolean, sizes?: unknown, placeholder?: boolean | undefined): string
+
+[./html] innerMarkup
+function innerMarkup(value: unknown): string
+
+[./html] isRendered
+function isRendered(value: object): value is Html
+
+[./html] leadingNewline
+function leadingNewline(markup: string): string
+
+[./html] linkHref
+function linkHref(href: unknown, localize: boolean, ownRel: boolean): string
+
+[./html] localHref
+function localHref(href: unknown): unknown
+
+[./html] localLinks
+function localLinks(markup: string): string
+
+[./html] loop
+function loop<T>(each: false | readonly T[] | null | undefined, render: (item: T | (() => T), index: number | (() => number)) => string, fallback?: (() => string) | undefined, accessors?: "keyed" | "positional" | undefined): string
+
+[./html] memo
+function memo<T>(fn: () => T, options?: SignalOptions<T> | undefined): () => T
+
+[./html] merge
+function merge(...sources: readonly object[]): Record<string, unknown>
+
+[./html] newServerIslands
+function newServerIslands(scanning: boolean, path?: Set<unknown>, skip?: ServerIslandMode | undefined): ServerIslands
+
+[./html] nonEmptyAttribute
+function nonEmptyAttribute(name: string, text: string): string
+
+[./html] omit
+function omit(props: object, ...keys: string[]): Record<string, unknown>
+
+[./html] outsideLink
+function outsideLink(href: unknown, ownRel?: boolean): string
+
+[./html] outsideLinks
+function outsideLinks(markup: string): string
+
+[./html] partClass
+function partClass(props: unknown, part: string): unknown
+
+[./html] partHanded
+function partHanded(part: string, list: readonly unknown[]): unknown
+
+[./html] partsClass
+function partsClass(list: readonly unknown[]): unknown
+
+[./html] prerendering
+function prerendering(): boolean
+
+[./html] raw
+function raw(value: unknown): string
+
+[./html] rawData
+function rawData(value: unknown): string
+
+[./html] rawTyped
+function rawTyped(type: unknown, value: unknown): string
+
+[./html] refillOptions
+function refillOptions(posted: string | undefined, markup: string, value?: (() => unknown) | undefined): string
+
+[./html] reportRenderFailure
+function reportRenderFailure(error: unknown): void
+
+[./html] selectOptions
+function selectOptions(value: unknown, markup: string, only?: boolean): string
+
+[./html] SERVER_ISLAND
+const SERVER_ISLAND: RegExp
+
+[./html] serverIsland
+function serverIsland<P>(fn: (props: P) => unknown, props: P, mode: ServerIslandMode, noscript?: unknown): unknown
+
+[./html] ServerIslandMode
+type ServerIslandMode = 'inline' | 'defer'
+
+[./html] ServerIslands
+interface ServerIslands
+  awaits?: AwaitNote[] | undefined
+  html: string[]
+  inside: number
+  modes: ServerIslandMode[]
+  path: Set<unknown>
+  scanning: boolean
+  skip?: ServerIslandMode | undefined
+  stack: unknown[]
+
+[./html] show
+function show<T>(value: T, render: (value: () => Truthy<T>) => string, fallback?: (() => string) | undefined): string
+
+[./html] spreadAttributes
+function spreadAttributes<T>(source: T): T
+
+[./html] spreadWith
+function spreadWith(sources: readonly object[], styles?: readonly (readonly [string, unknown])[] | undefined, binds?: readonly (readonly [name: string | undefined, read: () => unknown, event: string, write: (event: Event) => void])[] | undefined): object[]
+
+[./html] style
+function style(value: unknown, props?: readonly (readonly [string, unknown])[] | undefined): string
+
+[./html] UNDESCRIBED_TYPES
+const UNDESCRIBED_TYPES: Set<string>
+
+[./html] UNREQUIRABLE_TYPES
+const UNREQUIRABLE_TYPES: Set<string>
+
+[./html] untrack
+function untrack<T>(fn: () => T): T
+
+[./html] withServerIslands
+function withServerIslands<T>(state: ServerIslands, render: () => T): T
+
+[./i18n-links] localizedHref
+function localizedHref(href: string): string
+
+[./i18n-links] noteLinkPayload
+function noteLinkPayload(payload: LinkPayload): void
+
+[./internal] actionStub
+function actionStub(url: string): Action<unknown, unknown, never>
+
+[./internal] autoDefer
+function autoDefer<T>(value: T): T
+
+[./internal] bindable
+function bindable<Props extends object>(props: Props, keys: readonly string[]): Props
+
+[./internal] formAction
+function formAction(target: string | Action<never, unknown, never>): string
+
+[./internal] formChecked
+function formChecked(target: unknown, name: string, value: unknown): boolean | undefined
+
+[./internal] formDescribed
+function formDescribed(element: Element, target: unknown, field: string, id: string): void
+
+[./internal] formError
+function formError(target: unknown, field: string): string | undefined
+
+[./internal] formInvalid
+function formInvalid(target: unknown, name: string): "true" | undefined
+
+[./internal] formMarked
+function formMarked(element: Element, target: unknown, field: string): void
+
+[./internal] formProtection
+function formProtection(target: unknown): string
+
+[./internal] formValue
+function formValue(target: unknown, name: string): string | undefined
+
+[./internal] isAction
+function isAction(value: unknown): value is ServerAction<TSchema, unknown, never>
+
+[./internal] loadTemplateContext
+function loadTemplateContext({ request }: { request: Request; }): Promise<void>
+
+[./internal] registerActions
+function registerActions(moduleId: string, exports: Record<string, unknown>): void
+
+[./internal] registerImage
+function registerImage(url: string, width: number, height: number): string
+
+[./internal] registerPlaceholder
+function registerPlaceholder(url: string, color: string): string
+
+[./internal] reviveActions
+function reviveActions(): void
+
+[./internal] uiRecipe
+function uiRecipe(config: RecipeConfig<Readonly<Record<string, Readonly<Record<string, VariantClasses>>>>>, base?: Pick<Recipe<Readonly<Record<string, Readonly<Record<string, VariantClasses>>>>>, "defaults"> | undefined): Recipe<Readonly<Record<string, Readonly<Record<string, VariantClasses>>>>>
+
+[./internal] updateBack
+function updateBack<Current, Next = Current | Written<Current>>(current: Current, update: (current: Written<Current>) => Next): Kept<Current, Next>
+
+[./internal] updateTo
+function updateTo<Target, Key extends keyof Target, Next extends Written<Target[Key]> | Target[Key] = Written<Target[Key]>>(object: Target, key: Key, update: (current: Written<Target[Key]>) => Next, form?: "post" | "logical" | undefined, _probe?: Probe<Target, Key> | undefined): Next
+
+[./internal] writeBack
+function writeBack<Current, Value extends BackValue<Current> = Current | Written<Current>>(current: Current, value: Value): Kept<Current, Value>
+
+[./internal] writeTo
+function writeTo<Target, Key extends keyof Target, Value extends Written<Target[Key]> | Target[Key]>(object: Target, key: Key, value: Value, _probe?: Probe<Target, Key> | undefined): Value
+
+[./internal/server] buildingWithoutEnv
+function buildingWithoutEnv(): void
+
+[./internal/server] Bundle
+interface Bundle
+  api?: ApiModule[]
+  clientDir: string
+  config: KayConfig
+  editor?: string
+  endpoints?: Endpoint[]
+  extensionMessages?: Record<string, string[]>
+  fallback: SpecialPages
+  modules: Record<string, unknown>
+  name?: string | undefined
+  plugins?: string[]
+  publicDir: string
+  publicModules?: string[]
+  root: string
+  routes: Route[]
+
+[./internal/server] listenIdleApps
+function listenIdleApps(): void
+
+[./internal/server] loadingWithoutEnv
+function loadingWithoutEnv(): void
+
+[./internal/server] probeHealth
+function probeHealth(config: false | HealthConfig | undefined, port?: string, host?: string | undefined): Promise<number>
+
+[./internal/server] registerBundle
+function registerBundle(value: Bundle): void
+
+[./internal/server] registerEmbeddedMap
+function registerEmbeddedMap(name: string, blob: string): void
+
+[./internal/server] runAsPrimary
+function runAsPrimary(argv: string[], env: Record<string, string | undefined>): Promise<number | undefined>
+
+[./internal/title] pageTitle
+function pageTitle(read: () => string, raw: boolean): void
+
+[./island] collectIslands
+function collectIslands<T>(render: () => T, salt?: string | undefined, chunks?: Record<string, string> | undefined): { result: T; islands: RenderedIslands; }
+
+[./island] insideIsland
+function insideIsland(): boolean
+
+[./island] island
+function island<P extends object>(id: string, component: ((props: P) => Element) | undefined, messages?: readonly string[], client?: boolean, why?: string, lives?: readonly unknown[], takesActions?: boolean): IslandComponent<P>
+
+[./island] islandCheckpoint
+function islandCheckpoint(): (() => void) | undefined
+
+[./island] IslandPropsError
+class IslandPropsError
+  new (message?: string | undefined): IslandPropsError
+  new (message?: string | undefined, options?: ErrorOptions | undefined): IslandPropsError
+  new (message?: string | undefined, options?: ErrorOptions | undefined): IslandPropsError
+  name: string
+
+[./island] noteMessage
+function noteMessage(key: string): void
+
+[./island] promote
+function promote<P extends object>(id: string, render: (props: P) => Element, hydrated: (props: P) => Element, messages?: readonly string[], takesActions?: boolean): (props: P) => Element
+
+[./island] RenderedIslands
+interface RenderedIslands
+  chunks?: Record<string, string> | undefined
+  count: number
+  eager: Set<string>
+  immediate: Set<string>
+  lazy: number
+  messages: Set<string>
+  used: Set<string>
+  waiting: Set<string>
+
+[./library] acceptedLocales
+function acceptedLocales(header: string): string[]
+
+[./library] actionTool
+function actionTool(action: ServerAction<TSchema, unknown, string>, taken?: Set<string> | undefined): LibraryTool | undefined
+
+[./library] addRuntimeRedirect
+function addRuntimeRedirect(from: string, to: string, options?: { status?: RuntimeStatus | undefined; file?: string | undefined; }): RuntimeRedirect
+
+[./library] admitEditSession
+function admitEditSession(ctx: { cookies: CookieMap; request: Request; }, given?: string | undefined): void
+
+[./library] AnswerIssue
+interface AnswerIssue
+  message: string
+  path: string
+
+[./library] appModules
+function appModules(root: string, { name, appFiles }: Pick<KayExtension<AnyElysia>, "name" | "appFiles">): Promise<Record<string, Record<string, unknown> | undefined>>
+
+[./library] appSecrets
+function appSecrets(): string[] | undefined
+
+[./library] appStore
+function appStore(): AppStore | undefined
+
+[./library] asConfigError
+function asConfigError<T>(read: () => T): T
+
+[./library] byteSize
+function byteSize(value: unknown, what: string): number
+
+[./library] ByteSize
+type ByteSize = number | `${number}${'b' | 'kb' | 'mb'}`
+
+[./library] CacheSlot
+interface CacheSlot
+  file: string
+  key: string
+
+[./library] checkAnswer
+function checkAnswer(schema: TSchema, value: unknown): CheckedAnswer
+
+[./library] CheckedAnswer
+type CheckedAnswer = { value: unknown } | { issues: AnswerIssue[] }
+
+[./library] clearMissing
+function clearMissing(file?: string | undefined): number
+
+[./library] configError
+function configError(message: string, options?: ErrorOptions | undefined): KayError
+function configError(option: string, value: unknown, takes: string): KayError
+
+[./library] configuredHighlighter
+function configuredHighlighter(): Promise<Highlighter | undefined>
+
+[./library] configuredRedirects
+function configuredRedirects(): { from: string; to: string; status: RedirectStatus; }[]
+
+[./library] configuredSite
+function configuredSite(): { origin: string; slashed: boolean; } | undefined
+
+[./library] connectionOf
+function connectionOf(source: PgJobsSource): SQL
+
+[./library] ContextDefinition
+interface ContextDefinition<Values extends object = object>
+  load?: ((request: Request) => Values | Promise<Values>) | undefined
+  loaders?: Record<string, (request: Request) => unknown> | undefined
+  values?: Values | undefined
+
+[./library] currentRequest
+function currentRequest(): Request | undefined
+
+[./library] DataValue
+type DataValue = string | number | boolean | bigint | null | undefined | Date | DataValue[] | { [key: string]: DataValue }
+
+[./library] defineContext
+function defineContext<Values extends object>(load: (request: Request) => Values | Promise<Values>): ContextDefinition<Values>
+function defineContext<Loaders extends Record<string, (request: Request) => unknown>>(loaders: Loaders): ContextDefinition<{
+  [Key in keyof Loaders]: Awaited<ReturnType<Loaders[Key]>>;
+}>
+
+[./library] dismissMissing
+function dismissMissing(path: string, file?: string | undefined): boolean
+function dismissMissing(paths: readonly string[], file?: string | undefined): number
+
+[./library] drainQueues
+function drainQueues(): Promise<number>
+
+[./library] durationSeconds
+function durationSeconds(value: unknown, what: string): number
+
+[./library] durationWords
+function durationWords(seconds: number, locale: string): string
+
+[./library] editSessionAdmitted
+function editSessionAdmitted(request: Request): boolean
+
+[./library] escapeHtml
+function escapeHtml(text: string): string
+
+[./library] FallbackMemory
+interface FallbackMemory
+  hit: (key: string, window: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w`, weight?: number | undefined) => RateWindow
+  peek: (key: string) => RateWindow | undefined
+  refund?: ((key: string, resetAt: number) => void) | undefined
+  reset?: ((key: string) => void) | undefined
+
+[./library] GENERATE_SECRET
+const GENERATE_SECRET: "`bun -e \"console.log(crypto.randomUUID() + crypto.randomUUID())\"`"
+
+[./library] Highlighter
+type Highlighter = (code: string, language: string | undefined) => string | Promise<string>
+
+[./library] IMPORTED
+const IMPORTED: "/_kay/assets/"
+
+[./library] inFlightWork
+function inFlightWork<T>(work: () => Promise<T>): Promise<T>
+
+[./library] invalidateLocally
+function invalidateLocally(key: string): void
+
+[./library] isUrlAttribute
+function isUrlAttribute(name: string): boolean
+
+[./library] JsonSchema
+interface JsonSchema
+  anyOf?: JsonSchema[] | undefined
+  const?: DataValue
+  default?: DataValue
+  description?: string | undefined
+  enum?: DataValue[] | undefined
+  format?: string | undefined
+  items?: JsonSchema | JsonSchema[] | undefined
+  properties?: Record<string, JsonSchema> | undefined
+  required?: string[] | undefined
+  title?: string | undefined
+  type?: string | string[] | undefined
+  x-kay-input?: FieldInputOptions | undefined
+  x-kay?: FieldHint | undefined
+
+[./library] jsonSchemaOf
+function jsonSchemaOf(schema: unknown): unknown
+
+[./library] KAY_DIR
+const KAY_DIR: ".kay"
+
+[./library] KayCommand
+interface KayCommand extends Omit<Command, 'run'>
+  normalize?: (args: string[]) => string[]
+  options: ParseArgsOptionsConfig
+  positionals: number
+  run: (parsed: Parsed, refuse: (reason?: string | undefined) => number, project: { root: string; config: KayConfig; }) => number | Promise<number>
+  usage: string
+
+[./library] keyedDigest
+function keyedDigest(use: string, text: string): string
+
+[./library] knownAddress
+function knownAddress(request: Request, server: Server<unknown> | null | undefined, setting?: number | boolean | ProxyConfig | undefined): string | undefined
+
+[./library] lazily
+function lazily(guard: Guard | LazyGuard): Guard
+
+[./library] LazyGuard
+interface LazyGuard
+  load: () => Guard | Promise<Guard>
+
+[./library] libraryCacheSlot
+function libraryCacheSlot(root: string, library: string, id: string, inputs: string): CacheSlot
+
+[./library] LibraryTool
+interface LibraryTool
+  call: (args: Record<string, unknown>, request?: Request | undefined) => Promise<ToolResult>
+  description: string
+  inputSchema: object
+  label?: string | undefined
+  name: string
+  readOnly?: boolean | undefined
+
+[./library] localizedEntry
+function localizedEntry(root: string, config: Pick<KayConfig, "i18n" | "content">, collection: string, slug: string): Promise<LocalizedEntry>
+
+[./library] LocalizedEntry
+interface LocalizedEntry
+  body: string | undefined
+  data: Record<string, DataValue>
+  mark: "field" | "comment" | undefined
+  schema: JsonSchema
+
+[./library] Logo
+interface Logo
+  alt: string
+  height?: number | undefined
+  href?: string | undefined
+  src: string
+  width?: number | undefined
+
+[./library] matchLocale
+function matchLocale(locales: readonly string[], wanted: readonly string[]): string | undefined
+
+[./library] memoryRates
+function memoryRates(): SyncRates
+
+[./library] MIN_SECRET_LENGTH
+const MIN_SECRET_LENGTH: 32
+
+[./library] MissingPath
+interface MissingPath
+  firstAt: number
+  hits: number
+  lastAt: number
+  path: string
+  reason?: Reason | undefined
+  referrers: { host: string; page?: string | undefined; hits: number; }[]
+  target?: string | undefined
+
+[./library] missingTranslations
+function missingTranslations(root: string, config: Pick<KayConfig, "i18n" | "content" | "extensions">): Promise<Record<string, MissingTranslations>>
+
+[./library] MissingTranslations
+interface MissingTranslations
+  entries: Record<string, string[]>
+  messages: Record<string, Message>
+
+[./library] nameUser
+function nameUser(request: Request, name: Namer): void
+
+[./library] onKeysInvalidated
+function onKeysInvalidated(listener: KeyListener): () => void
+
+[./library] openSqlite
+function openSqlite(path: string): Database
+
+[./library] openWith
+function openWith(keys: Uint8Array<ArrayBufferLike>[], value: string, context?: string | undefined): { text: string; key: number; } | undefined
+
+[./library] optionMs
+function optionMs(value: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w`, what: string): number
+
+[./library] overHttps
+function overHttps(request: Request): boolean
+
+[./library] Parsed
+interface Parsed
+  positionals: string[]
+  values: Record<string, string | boolean | string[] | undefined>
+
+[./library] parseEvents
+function parseEvents<End>(body: ReadableStream<Uint8Array<ArrayBufferLike>>, signal: AbortSignal, onEvent: (event: string, data: string) => End | undefined): Promise<End | undefined>
+
+[./library] PgJobsSource
+type PgJobsSource = SQL | { sql: SQL } | string
+
+[./library] PresenceView
+type PresenceView = (request: Request | undefined, room: string, members: string[], member: string) => string[]
+
+[./library] privilegeRefused
+function privilegeRefused(error: unknown): boolean
+
+[./library] ratesFallingBack
+function ratesFallingBack<Store extends RateStore>(name: string, store: Store, memory?: FallbackMemory): RateStore & Sure<Store>
+
+[./library] READ_METHODS
+const READ_METHODS: Set<string>
+
+[./library] readCacheEntry
+function readCacheEntry<Value>(slot: CacheSlot): Promise<Value | undefined>
+
+[./library] redirectMovedPage
+function redirectMovedPage(from: string | undefined, to: string | undefined): void
+
+[./library] RedirectRefusedError
+class RedirectRefusedError
+  new (message?: string | undefined): RedirectRefusedError
+  new (message?: string | undefined, options?: ErrorOptions | undefined): RedirectRefusedError
+  new (message?: string | undefined, options?: ErrorOptions | undefined): RedirectRefusedError
+
+[./library] refundRateLimit
+function refundRateLimit(request: Request | undefined): Promise<void>
+
+[./library] relationsMissing
+function relationsMissing(db: SQL, names: readonly string[]): Promise<boolean>
+
+[./library] removeRuntimeRedirect
+function removeRuntimeRedirect(from: string, file?: string | undefined): boolean
+
+[./library] requestOfContext
+function requestOfContext(): Request | undefined
+
+[./library] RESTART_RELOAD
+const RESTART_RELOAD: string
+
+[./library] RuntimeRedirect
+interface RuntimeRedirect
+  addedAt: number
+  from: string
+  status: RuntimeStatus
+  to: string
+
+[./library] runtimeRedirects
+function runtimeRedirects(file?: string | undefined): RuntimeRedirect[]
+
+[./library] safeCode
+function safeCode(markup: string): string
+
+[./library] sameText
+function sameText(given: string, expected: string): boolean
+
+[./library] sealWith
+function sealWith(key: Uint8Array<ArrayBufferLike>, text: string, context?: string | undefined): string
+
+[./library] serverRoot
+function serverRoot(): Promise<string>
+
+[./library] setSite
+function setSite(origin: string | undefined, trailingSlash?: "never" | "always" | "ignore" | undefined, prerendering?: boolean, keepSameTab?: boolean): void
+
+[./library] sitePaths
+function sitePaths(): string[]
+
+[./library] siteWithBase
+function siteWithBase(site: string | undefined, base: string | undefined): string | undefined
+
+[./library] sourceHash
+function sourceHash(text: string): string
+
+[./library] stoppers
+function stoppers(request: Request): Pick<RequestContext<Record<string, string>>, "redirect" | "notFound" | "deny">
+
+[./library] ToolResult
+interface ToolResult
+  content: Content[]
+  isError?: boolean
+  structuredContent?: object
+
+[./library] trackDetached
+function trackDetached(work: Promise<unknown>): void
+
+[./library] TSchema
+interface TSchema extends TKind, SchemaOptions
+
+[./library] uiConfigEntries
+function uiConfigEntries(text: string): Promise<UiConfigEntry[] | undefined>
+
+[./library] UiConfigEntry
+interface UiConfigEntry
+  key: string
+  keySpan: Span
+  value: Span
+
+[./library] unansweredPaths
+function unansweredPaths(file?: string | undefined): MissingPath[]
+
+[./library] underKayDev
+function underKayDev(): boolean
+
+[./library] UNSAFE_ATTRIBUTE
+const UNSAFE_ATTRIBUTE: RegExp
+
+[./library] UNSAFE_TAGS
+const UNSAFE_TAGS: ReadonlySet<string>
+
+[./library] userOf
+function userOf(request: Request): Promise<string | undefined>
+
+[./library] validLocale
+function validLocale(tag: string): boolean
+
+[./library] viewPresenceWith
+function viewPresenceWith(next: PresenceView): () => void
+
+[./library] weakSecrets
+function weakSecrets(secrets: string[]): boolean
+
+[./library] writeCacheEntry
+function writeCacheEntry(slot: CacheSlot, value: unknown): Promise<void>
+
+[./library] writeDraftEntry
+function writeDraftEntry(root: string, config: Pick<KayConfig, "i18n" | "content">, collection: string, locale: string, slug: string, entry: {
+  data: Record<string, DataValue>;
+  body?: string | undefined;
+}): Promise<string>
+
+[./library] writeDraftMessages
+function writeDraftMessages(root: string, config: Pick<KayConfig, "i18n">, locale: string, messages: Record<string, Message>): Promise<string[]>
+
+[./library/auth-mails] AUTH_LINK_KINDS
+const AUTH_LINK_KINDS: readonly ["verify-email", "reset-password", "magic-link", "change-email", "invitation", "account-exists"]
+
+[./library/auth-mails] AUTH_MAIL_ENGLISH
+const AUTH_MAIL_ENGLISH: {
+  readonly link: "link";
+  readonly code: "code";
+  readonly orPaste: "Or paste this into your browser:";
+  readonly yourCode: "Your code:";
+  readonly orTypeCode: "Or type this code where you asked for it:";
+  readonly linkWorks: "The link works for {duration}.";
+  readonly codeWorks: "The code works for {duration}, typed where you asked for it.";
+  readonly codeLasts: "10 minutes";
+  readonly once: ", once";
+  readonly review: "See where your account is signed in, and end what you do not know:";
+  readonly 'verify-email': {
+    readonly subject: "Confirm your email for {site}";
+    readonly lead: "Confirm {email} as the address of your {site} account.";
+    readonly button: "Confirm my email";
+    readonly lasts: "24 hours";
+    readonly ending: "If you did not create an account, ignore this mail.";
+  };
+  readonly 'reset-password': {
+    readonly subject: "Reset your {site} password";
+    readonly lead: "Someone asked to reset the password of the {site} account for {email}.";
+    readonly button: "Choose a new password";
+    readonly lasts: "one hour";
+    readonly ending: "If you did not ask for it, ignore this mail: your password stays as it is.";
+  };
+  readonly 'magic-link': {
+    readonly subject: "Sign in to {site}";
+    readonly lead: "Here is your {what} to sign in to {site}.";
+    readonly button: "Sign in";
+    readonly lasts: "15 minutes, once";
+    readonly ending: "If you did not ask for it, ignore this mail.";
+  };
+  readonly 'change-email': {
+    readonly subject: "Confirm your new email for {site}";
+    readonly lead: "Confirm {email} as the new address of your {site} account.";
+    readonly button: "Confirm the change";
+    readonly lasts: "one hour";
+    readonly ending: "If you did not ask for this change, ignore this mail.";
+  };
+  readonly invitation: {
+    readonly subject: "Join {detail} on {site}";
+    readonly lead: "You are invited to join {detail} on {site}, with an account at {email}.";
+    readonly button: "See the invitation";
+    readonly lasts: "";
+    readonly ending: "If you did not expect it, ignore this mail.";
+  };
+  readonly 'account-exists': {
+    readonly subject: "You already have a {site} account";
+    readonly lead: "Someone tried to create a {site} account for {email}, which has one already. Sign in to it, or ask for a new password on the sign-in page if you forgot yours.";
+    readonly button: "Sign in";
+    readonly lasts: "";
+    readonly ending: "If this was not you, ignore this mail: nothing changed on your account.";
+  };
+  readonly 'new-sign-in': {
+    readonly subject: "New sign-in on {site}";
+    readonly lead: "Your {site} account was just signed into from a device or network it had not used before.";
+    readonly ending: "If this was not you, reset your password and check your account at once.";
+  };
+  readonly 'sign-in-locked': {
+    readonly subject: "Sign-in locked on {site}";
+    readonly lead: "Too many wrong passwords or codes were tried on your {site} account, so signing in to it is paused for a while.";
+    readonly ending: "If this was not you, reset your password and check your account at once.";
+  };
+  readonly 'password-changed': {
+    readonly subject: "Password changed on {site}";
+    readonly lead: "The password of your {site} account was changed, and its other sessions signed out.";
+    readonly ending: "If this was not you, reset your password and check your account at once.";
+  };
+  readonly 'email-changed': {
+    readonly subject: "Email changed on {site}";
+    readonly lead: "Your {site} account moved from {email} to {detail}. This address no longer signs into it.";
+    readonly ending: "If this was not you, contact the site at once.";
+  };
+  readonly 'two-factor-enabled': {
+    readonly subject: "Two-factor turned on on {site}";
+    readonly lead: "Your {site} account now asks for a code from your authenticator when signing in.";
+    readonly ending: "If this was not you, reset your password and check your account at once.";
+  };
+  readonly 'two-factor-disabled': {
+    readonly subject: "Two-factor turned off on {site}";
+    readonly lead: "Your {site} account no longer asks for a code when ...#85fdf47e (3 lines)
+  readonly 'recovery-code-used': { ...#bcc21fd1 (5 lines)
+  readonly 'recovery-codes-regenerated': { ...#1cb297df (5 lines)
+  readonly 'provider-linked': { ...#4eb8c2f9 (5 lines)
+  readonly 'provider-unlinked': { ...#955b9e33 (5 lines)
+  readonly 'passkey-added': { ...#ddeecc7b (5 lines)
+  readonly 'passkey-removed': { ...#f2113959 (5 lines)
+  readonly 'token-created': { ...#94575c89 (5 lines)
+  readonly 'signed-out-everywhere': { ...#c9455c2f (5 lines)
+  readonly 'account-deleted': { ...#594d411e (5 lines)
+  readonly 'organization-handed-over': { ...#b0df7a7f (6 lines)
+
+[./library/auth-mails] AUTH_MAIL_FRENCH
+const AUTH_MAIL_FRENCH: {
+  readonly link: "lien";
+  readonly code: "code";
+  readonly orPaste: "Ou collez ceci dans votre navigateur :";
+  readonly yourCode: "Votre code :";
+  readonly orTypeCode: "Ou saisissez ce code là où vous l'avez demandé :";
+  readonly linkWorks: "Le lien est valable {duration}.";
+  readonly codeWorks: "Le code est valable {duration}, saisi là où vous l'avez demandé.";
+  readonly codeLasts: "10 minutes";
+  readonly once: ", une seule fois";
+  readonly review: "Voyez où votre compte est connecté, et mettez fin à ce que vous ne reconnaissez pas :";
+  readonly 'verify-email': {
+    readonly subject: "Confirmez votre adresse pour {site}";
+    readonly lead: "Confirmez {email} comme adresse de votre compte {site}.";
+    readonly button: "Confirmer mon adresse";
+    readonly lasts: "24 heures";
+    readonly ending: "Si vous n'avez pas créé de compte, ignorez ce message.";
+  };
+  readonly 'reset-password': {
+    readonly subject: "Réinitialisez votre mot de passe {site}";
+    readonly lead: "Quelqu'un a demandé à réinitialiser le mot de passe du compte {site} de {email}.";
+    readonly button: "Choisir un nouveau mot de passe";
+    readonly lasts: "une heure";
+    readonly ending: "Si vous ne l'avez pas demandé, ignorez ce message : votre mot de passe reste inchangé.";
+  };
+  readonly 'magic-link': {
+    readonly subject: "Connexion à {site}";
+    readonly lead: "Voici votre {what} pour vous connecter à {site}.";
+    readonly button: "Me connecter";
+    readonly lasts: "15 minutes, une seule fois";
+    readonly ending: "Si vous ne l'avez pas demandé, ignorez ce message.";
+  };
+  readonly 'change-email': {
+    readonly subject: "Confirmez votre nouvelle adresse pour {site}";
+    readonly lead: "Confirmez {email} comme nouvelle adresse de votre compte {site}.";
+    readonly button: "Confirmer le changement";
+    readonly lasts: "une heure";
+    readonly ending: "Si vous n'avez pas demandé ce changement, ignorez ce message.";
+  };
+  readonly invitation: {
+    readonly subject: "Rejoignez {detail} sur {site}";
+    readonly lead: "Vous êtes invité à rejoindre {detail} sur {site}, avec un compte à l'adresse {email}.";
+    readonly button: "Voir l'invitation";
+    readonly lasts: "";
+    readonly ending: "Si vous ne l'attendiez pas, ignorez ce message.";
+  };
+  readonly 'account-exists': {
+    readonly subject: "Vous avez déjà un compte {site}";
+    readonly lead: "Quelqu'un a tenté de créer un compte {site} pour {email}, qui en a déjà un. Connectez-vous-y, ou demandez un nouveau mot de passe depuis la page de connexion si vous l'avez oublié.";
+    readonly button: "Me connecter";
+    readonly lasts: "";
+    readonly ending: "Si ce n'était pas vous, ignorez ce message : rien n'a changé sur votre compte.";
+  };
+  readonly 'new-sign-in': {
+    readonly subject: "Nouvelle connexion sur {site}";
+    readonly lead: "Votre compte {site} vient d'être utilisé depuis un appareil ou un réseau qu'il n'avait jamais utilisé.";
+    readonly ending: "Si ce n'était pas vous, réinitialisez votre mot de passe et vérifiez votre compte sans attendre.";
+  };
+  readonly 'sign-in-locked': {
+    readonly subject: "Connexion suspendue sur {site}";
+    readonly lead: "Trop de mots de passe ou de codes incorrects ont été essayés sur votre compte {site} : la connexion est suspendue pour un moment.";
+    readonly ending: "Si ce n'était pas vous, réinitialisez votre mot de passe et vérifiez votre compte sans attendre.";
+  };
+  readonly 'password-changed': {
+    readonly subject: "Mot de passe modifié sur {site}";
+    readonly lead: "Le mot de passe de votre compte {site} a été modifié, et ses autres sessions déconnectées.";
+    readonly ending: "Si ce n'était pas vous, réinitialisez votre mot de passe et vérifiez votre compte sans attendre.";
+  };
+  readonly 'email-changed': {
+    readonly subject: "Adresse modifiée sur {site}";
+    readonly lead: "Votre compte {site} est passé de {email} à {detail}. Cette adresse ne permet plus de s'y connecter.";
+    readonly ending: "Si ce n'était pas vous, contactez le site sans attendre.";
+  };
+  readonly 'two-factor-enabled': {
+    readonly subject: "Double authentification activée sur {site}";
+    readonly lead: "Votre compte {site} demande désormais un code de votre application d'authentification à chaque connexion.";
+    readonly ending: "Si ce n'était pas vous, réinitialisez votre mot de passe et vérifiez votre compte sans attendre.";
+  };
+  readonly 'two-factor-disabled': {
+    readonly subject: "Double authentification désactivée sur {site}";
+    readonly lead: "Votre compte {site} ne demande plus de code à la c ...#85d71b43 (3 lines)
+  readonly 'recovery-code-used': { ...#db5048ae (5 lines)
+  readonly 'recovery-codes-regenerated': { ...#19ea6642 (5 lines)
+  readonly 'provider-linked': { ...#23a4bd63 (5 lines)
+  readonly 'provider-unlinked': { ...#97e68b6a (5 lines)
+  readonly 'passkey-added': { ...#4136214e (5 lines)
+  readonly 'passkey-removed': { ...#a6aae3f1 (5 lines)
+  readonly 'token-created': { ...#fecb3eed (5 lines)
+  readonly 'signed-out-everywhere': { ...#e9a57f47 (5 lines)
+  readonly 'account-deleted': { ...#396e5e90 (5 lines)
+  readonly 'organization-handed-over': { ...#89b11890 (6 lines)
+
+[./library/auth-mails] AUTH_MAIL_SAMPLES
+const AUTH_MAIL_SAMPLES: Readonly<Record<AuthMailKind, Pick<AuthMailData, "url" | "code" | "detail">>>
+
+[./library/auth-mails] AUTH_MAIL_WORDING
+const AUTH_MAIL_WORDING: Readonly<Record<string, AuthMailWording>>
+
+[./library/auth-mails] AUTH_NOTICE_KINDS
+const AUTH_NOTICE_KINDS: readonly ["new-sign-in", "sign-in-locked", "password-changed", "email-changed", "two-factor-enabled", "two-factor-disabled", "recovery-code-used", "recovery-codes-regenerated", "provider-linked", "provider-unlinked", "passkey-added", "passkey-removed", "token-created", "signed-out-everywhere", "account-deleted", "organization-handed-over"]
+
+[./library/auth-mails] AuthLinkKind
+type AuthLinkKind = typeof AUTH_LINK_KINDS[number]
+
+[./library/auth-mails] AuthLinkLines
+interface AuthLinkLines
+  button: string
+  ending: string
+  lasts: string
+  lead: string
+  subject: string
+
+[./library/auth-mails] AuthMailData
+interface AuthMailData
+  code?: string | undefined
+  detail?: string | undefined
+  email: string
+  locale: string
+  maxAge?: { link?: number; code?: number; } | undefined
+  name: string
+  url?: string | undefined
+
+[./library/auth-mails] AuthMailKind
+type AuthMailKind = AuthLinkKind | AuthNoticeKind
+
+[./library/auth-mails] AuthMailWording
+type AuthMailWording = {
+  link: string code: string orPaste: string yourCode: string orTypeCode: string linkWorks: string codeWorks: string codeLasts: string once: string review: string
+} & Record<AuthLinkKind, AuthLinkLines> & Record<AuthNoticeKind, AuthNoticeLines>
+
+[./library/auth-mails] AuthNoticeKind
+type AuthNoticeKind = typeof AUTH_NOTICE_KINDS[number]
+
+[./library/auth-mails] AuthNoticeLines
+interface AuthNoticeLines
+  ending: string
+  lead: string
+  subject: string
+
+[./pending] pendingBlock
+function pendingBlock(block: Element, source: PendingSource, on: boolean): void
+
+[./pending] pendingBlocks
+function pendingBlocks(form: Element, source: PendingSource, on: boolean): void
+
+[./pending] pendingCall
+function pendingCall(block: Element, action: unknown): void
+
+[./pending] PendingSource
+type PendingSource = 'post' | 'hold' | 'call'

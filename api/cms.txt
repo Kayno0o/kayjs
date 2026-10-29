@@ -23,7 +23,11 @@ interface CmsOptions
   files?: FileSaver | undefined
   fourEyes?: boolean | undefined
   guard?: Guard | LazyGuard | undefined
-  history?: false | { revisions?: number | undefined; trash?: false | `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w` | undefined; maxAge?: false | `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w` | undefined; } | undefined
+  history?: false | {
+  revisions?: number | undefined;
+  trash?: false | `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w` | undefined;
+  maxAge?: false | `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w` | undefined;
+} | undefined
   member?: ((ctx: GuardContext) => MemberInfo | Promise<MemberInfo | undefined> | undefined) | undefined
   newsletter?: Record<string, NewsletterOptions> | undefined
   onSave?: ((event: SaveEvent) => void | Promise<void>) | undefined
@@ -54,7 +58,42 @@ interface Commit
   url?: string | undefined
 
 [.] createDrafts
-function createDrafts({ show, delay, keep }: DraftsOptions): { open(entry: DraftEntry, version?: string | undefined): void; entry(ref: EntryRef): DraftEntry | undefined; kept(ref: EntryRef): boolean; version(ref: EntryRef): string | undefined; value(ref: EntryRef, path: FieldPath): unknown; set(ref: EntryRef, path: Fiel ...#22b0751f
+function createDrafts({
+  show, delay, keep
+}: DraftsOptions): {
+  open(entry: DraftEntry, version?: string | undefined): void;
+  entry(ref: EntryRef): DraftEntry | undefined;
+  kept(ref: EntryRef): boolean;
+  version(ref: EntryRef): string | undefined;
+  value(ref: EntryRef, path: FieldPath): unknown;
+  set(ref: EntryRef, path: FieldPath, value: unknown): void;
+  changed(ref: EntryRef): boolean;
+  reset(ref: EntryRef): void;
+  markSaved(ref: EntryRef, sent: DraftEntry, version?: string | undefined): void;
+  refuse: (ref: EntryRef, refusal: Refusal | undefined) => void;
+  refusal(ref: EntryRef): Refusal | undefined;
+  keepEdits(ref: EntryRef): void;
+  adopt(ref: EntryRef, entry: DraftEntry, version: string | undefined): void;
+  differences(ref: EntryRef, other: DraftEntry): FieldPath[];
+  anyChanged(shown?: readonly EntryRef[] | undefined): boolean;
+  flush: () => void;
+  discardAll(): void;
+  recovery(ref: EntryRef): Recovery | undefined;
+  recreating(ref: EntryRef): boolean;
+  reapply(): void;
+  stale(): EntryRef[];
+  report(refusals: readonly Issue[], ref?: EntryRef | undefined): void;
+  dismissWhere(ref: EntryRef, match: (issue: Issue) => boolean): void;
+  block(ref: EntryRef, path: string, message: string | undefined): void;
+  blocked(ref: EntryRef, path?: string | undefined): {
+    path: string;
+    message: string;
+  }[];
+  issues(ref: EntryRef, path?: FieldPath | undefined): Issue[];
+  failure: () => string | undefined;
+  rendering: () => boolean;
+  pending: () => boolean;
+}
 
 [.] CustomFieldProps
 interface CustomFieldProps
@@ -109,7 +148,40 @@ interface EntryForm extends FormScope
   collection: ScreenCollection
   denied?: Partial<Record<"publish" | "review" | "delete" | "upload" | "redirects", string>> | undefined
   dirty: () => boolean
-  drafts: { open(entry: DraftEntry, version?: string | undefined): void; entry(ref: EntryRef): DraftEntry | undefined; kept(ref: EntryRef): boolean; version(ref: EntryRef): string | undefined; value(ref: EntryRef, path: FieldPath): unknown; set(ref: EntryRef, path: FieldPath, value: unknown): void; changed(re ...#8ed3f0ff
+  drafts: {
+  open(entry: DraftEntry, version?: string | undefined): void;
+  entry(ref: EntryRef): DraftEntry | undefined;
+  kept(ref: EntryRef): boolean;
+  version(ref: EntryRef): string | undefined;
+  value(ref: EntryRef, path: FieldPath): unknown;
+  set(ref: EntryRef, path: FieldPath, value: unknown): void;
+  changed(ref: EntryRef): boolean;
+  reset(ref: EntryRef): void;
+  markSaved(ref: EntryRef, sent: DraftEntry, version?: string | undefined): void;
+  refuse: (ref: EntryRef, refusal: Refusal | undefined) => void;
+  refusal(ref: EntryRef): Refusal | undefined;
+  keepEdits(ref: EntryRef): void;
+  adopt(ref: EntryRef, entry: DraftEntry, version: string | undefined): void;
+  differences(ref: EntryRef, other: DraftEntry): FieldPath[];
+  anyChanged(shown?: readonly EntryRef[] | undefined): boolean;
+  flush: () => void;
+  discardAll(): void;
+  recovery(ref: EntryRef): Recovery | undefined;
+  recreating(ref: EntryRef): boolean;
+  reapply(): void;
+  stale(): EntryRef[];
+  report(refusals: readonly Issue[], ref?: EntryRef | undefined): void;
+  dismissWhere(ref: EntryRef, match: (issue: Issue) => boolean): void;
+  block(ref: EntryRef, path: string, message: string | undefined): void;
+  blocked(ref: EntryRef, path?: string | undefined): {
+    path: string;
+    message: string;
+  }[];
+  issues(ref: EntryRef, path?: FieldPath | undefined): Issue[];
+  failure: () => string | undefined;
+  rendering: () => boolean;
+  pending: () => boolean;
+}
   ended: () => boolean
   ends: () => string | undefined
   entry: EntryRef
@@ -188,7 +260,27 @@ interface EntryScreen
 function eraseHistory(ref: EntryRef): Promise<number>
 
 [.] Field
-type Field = | FieldBase & { kind: 'text' | 'textarea' | 'markdown' | 'number' | 'integer' | 'boolean' | 'date' | 'datetime' | 'json' } // A hex colour, a list of words and an icon of the set a server registered, which `colorField`, `tagsField` and `iconField` report. | FieldBase & { kind: 'color' | ...#d83d12ab
+type Field = | FieldBase & {
+  kind: 'text' | 'textarea' | 'markdown' | 'number' | 'integer' | 'boolean' | 'date' | 'datetime' | 'json'
+} // A hex colour, a list of words and an icon of the set a server registered, which `colorField`, `tagsField` and `iconField` report. | FieldBase & {
+  kind: 'color' | 'tags'
+} | FieldBase & {
+  kind: 'icon', set: string
+} | FieldBase & {
+  kind: 'image' | 'file', upload?: UploadHints | undefined
+} | FieldBase & {
+  kind: 'select', options: Choice[]
+} | FieldBase & {
+  kind: 'reference', collection: string
+} // A `blocks()` list holds `blocks` too: `item` is then an empty group, each item showing the fields of the block its `type` names. | FieldBase & {
+  kind: 'list', item: Field, numbered: boolean, minItems?: number | undefined, maxItems?: number | undefined, titleField?: string, blocks?: Block[]
+} // A list of strings entered one per line. | FieldBase & {
+  kind: 'lines'
+} | FieldBase & {
+  kind: 'group', fields: Field[]
+} // A kind the app names with `customField`, edited by `src/cms/fields/<name>.kay`. | FieldBase & {
+  kind: 'custom', name: string
+}
 
 [.] FieldMarker
 interface FieldMarker extends EntryRef
@@ -274,7 +366,40 @@ interface FormLayout
 interface FormScope
   collection: ScreenCollection
   denied?: Partial<Record<"publish" | "review" | "delete" | "upload" | "redirects", string>> | undefined
-  drafts: { open(entry: DraftEntry, version?: string | undefined): void; entry(ref: EntryRef): DraftEntry | undefined; kept(ref: EntryRef): boolean; version(ref: EntryRef): string | undefined; value(ref: EntryRef, path: FieldPath): unknown; set(ref: EntryRef, path: FieldPath, value: unknown): void; changed(re ...#8ed3f0ff
+  drafts: {
+  open(entry: DraftEntry, version?: string | undefined): void;
+  entry(ref: EntryRef): DraftEntry | undefined;
+  kept(ref: EntryRef): boolean;
+  version(ref: EntryRef): string | undefined;
+  value(ref: EntryRef, path: FieldPath): unknown;
+  set(ref: EntryRef, path: FieldPath, value: unknown): void;
+  changed(ref: EntryRef): boolean;
+  reset(ref: EntryRef): void;
+  markSaved(ref: EntryRef, sent: DraftEntry, version?: string | undefined): void;
+  refuse: (ref: EntryRef, refusal: Refusal | undefined) => void;
+  refusal(ref: EntryRef): Refusal | undefined;
+  keepEdits(ref: EntryRef): void;
+  adopt(ref: EntryRef, entry: DraftEntry, version: string | undefined): void;
+  differences(ref: EntryRef, other: DraftEntry): FieldPath[];
+  anyChanged(shown?: readonly EntryRef[] | undefined): boolean;
+  flush: () => void;
+  discardAll(): void;
+  recovery(ref: EntryRef): Recovery | undefined;
+  recreating(ref: EntryRef): boolean;
+  reapply(): void;
+  stale(): EntryRef[];
+  report(refusals: readonly Issue[], ref?: EntryRef | undefined): void;
+  dismissWhere(ref: EntryRef, match: (issue: Issue) => boolean): void;
+  block(ref: EntryRef, path: string, message: string | undefined): void;
+  blocked(ref: EntryRef, path?: string | undefined): {
+    path: string;
+    message: string;
+  }[];
+  issues(ref: EntryRef, path?: FieldPath | undefined): Issue[];
+  failure: () => string | undefined;
+  rendering: () => boolean;
+  pending: () => boolean;
+}
   entry: EntryRef
   problem?: string | undefined
   shown: Shown
@@ -323,7 +448,16 @@ interface ListLayout
   columns?: string[] | undefined
 
 [.] listScreen
-function listScreen({ collection: name, q, page, status, sort, dir }: { collection: string; q?: string | undefined; page?: number | undefined; status?: EntryStatus | undefined; sort?: string | undefined; dir?: "asc" | "desc" | undefined; }): Promise<ListScreen | undefined>
+function listScreen({
+  collection: name, q, page, status, sort, dir
+}: {
+  collection: string;
+  q?: string | undefined;
+  page?: number | undefined;
+  status?: EntryStatus | undefined;
+  sort?: string | undefined;
+  dir?: "asc" | "desc" | undefined;
+}): Promise<ListScreen | undefined>
 
 [.] ListScreen
 interface ListScreen
@@ -395,7 +529,9 @@ interface SaveEvent
   verb: "publish" | "delete" | "move" | "unpublish" | "duplicate" | "rename" | "add" | "update" | "restore"
 
 [.] ScreenCollection
-type ScreenCollection = CollectionInfo & { layout?: CollectionLayout | undefined, history?: true | undefined, trash?: true | undefined, newsletter?: true | undefined, review?: true | undefined }
+type ScreenCollection = CollectionInfo & {
+  layout?: CollectionLayout | undefined, history?: true | undefined, trash?: true | undefined, newsletter?: true | undefined, review?: true | undefined
+}
 
 [.] Settings
 interface Settings
@@ -492,7 +628,40 @@ component default
 
 [./field-input.kay] default
 component default
-  drafts: { open(entry: DraftEntry, version?: string | undefined): void; entry(ref: EntryRef): DraftEntry | undefined; kept(ref: EntryRef): boolean; version(ref: EntryRef): string | undefined; value(ref: EntryRef, path: FieldPath): unknown; set(ref: EntryRef, path: FieldPath, value: unknown): void; changed(re ...#8ed3f0ff
+  drafts: {
+  open(entry: DraftEntry, version?: string | undefined): void;
+  entry(ref: EntryRef): DraftEntry | undefined;
+  kept(ref: EntryRef): boolean;
+  version(ref: EntryRef): string | undefined;
+  value(ref: EntryRef, path: FieldPath): unknown;
+  set(ref: EntryRef, path: FieldPath, value: unknown): void;
+  changed(ref: EntryRef): boolean;
+  reset(ref: EntryRef): void;
+  markSaved(ref: EntryRef, sent: DraftEntry, version?: string | undefined): void;
+  refuse: (ref: EntryRef, refusal: Refusal | undefined) => void;
+  refusal(ref: EntryRef): Refusal | undefined;
+  keepEdits(ref: EntryRef): void;
+  adopt(ref: EntryRef, entry: DraftEntry, version: string | undefined): void;
+  differences(ref: EntryRef, other: DraftEntry): FieldPath[];
+  anyChanged(shown?: readonly EntryRef[] | undefined): boolean;
+  flush: () => void;
+  discardAll(): void;
+  recovery(ref: EntryRef): Recovery | undefined;
+  recreating(ref: EntryRef): boolean;
+  reapply(): void;
+  stale(): EntryRef[];
+  report(refusals: readonly Issue[], ref?: EntryRef | undefined): void;
+  dismissWhere(ref: EntryRef, match: (issue: Issue) => boolean): void;
+  block(ref: EntryRef, path: string, message: string | undefined): void;
+  blocked(ref: EntryRef, path?: string | undefined): {
+    path: string;
+    message: string;
+  }[];
+  issues(ref: EntryRef, path?: FieldPath | undefined): Issue[];
+  failure: () => string | undefined;
+  rendering: () => boolean;
+  pending: () => boolean;
+}
   entry: EntryRef
   field: Field
   note?: string | undefined
@@ -512,7 +681,18 @@ component default
   value: string
 
 [./form] createEntryForm
-function createEntryForm({ prefix, collection, entry, locale, copy, source, denied, review: reviewed }: { review?: ReviewView | undefined; denied?: Partial<Record<"publish" | "review" | "delete" | "upload" | "redirects", string>> | undefined; prefix: string; collection: ScreenCollection; entry?: StoredEntry | (() => Stored ...#bc1ba21e
+function createEntryForm({
+  prefix, collection, entry, locale, copy, source, denied, review: reviewed
+}: {
+  review?: ReviewView | undefined;
+  denied?: Partial<Record<"publish" | "review" | "delete" | "upload" | "redirects", string>> | undefined;
+  prefix: string;
+  collection: ScreenCollection;
+  entry?: StoredEntry | (() => StoredEntry | undefined) | undefined;
+  locale?: string | undefined;
+  copy?: PairedEntry | undefined;
+  source?: PairedEntry | undefined;
+}): EntryForm
 
 [./form] createShown
 function createShown(): Shown
@@ -526,7 +706,40 @@ interface EntryForm extends FormScope
   collection: ScreenCollection
   denied?: Partial<Record<"publish" | "review" | "delete" | "upload" | "redirects", string>> | undefined
   dirty: () => boolean
-  drafts: { open(entry: DraftEntry, version?: string | undefined): void; entry(ref: EntryRef): DraftEntry | undefined; kept(ref: EntryRef): boolean; version(ref: EntryRef): string | undefined; value(ref: EntryRef, path: FieldPath): unknown; set(ref: EntryRef, path: FieldPath, value: unknown): void; changed(re ...#8ed3f0ff
+  drafts: {
+  open(entry: DraftEntry, version?: string | undefined): void;
+  entry(ref: EntryRef): DraftEntry | undefined;
+  kept(ref: EntryRef): boolean;
+  version(ref: EntryRef): string | undefined;
+  value(ref: EntryRef, path: FieldPath): unknown;
+  set(ref: EntryRef, path: FieldPath, value: unknown): void;
+  changed(ref: EntryRef): boolean;
+  reset(ref: EntryRef): void;
+  markSaved(ref: EntryRef, sent: DraftEntry, version?: string | undefined): void;
+  refuse: (ref: EntryRef, refusal: Refusal | undefined) => void;
+  refusal(ref: EntryRef): Refusal | undefined;
+  keepEdits(ref: EntryRef): void;
+  adopt(ref: EntryRef, entry: DraftEntry, version: string | undefined): void;
+  differences(ref: EntryRef, other: DraftEntry): FieldPath[];
+  anyChanged(shown?: readonly EntryRef[] | undefined): boolean;
+  flush: () => void;
+  discardAll(): void;
+  recovery(ref: EntryRef): Recovery | undefined;
+  recreating(ref: EntryRef): boolean;
+  reapply(): void;
+  stale(): EntryRef[];
+  report(refusals: readonly Issue[], ref?: EntryRef | undefined): void;
+  dismissWhere(ref: EntryRef, match: (issue: Issue) => boolean): void;
+  block(ref: EntryRef, path: string, message: string | undefined): void;
+  blocked(ref: EntryRef, path?: string | undefined): {
+    path: string;
+    message: string;
+  }[];
+  issues(ref: EntryRef, path?: FieldPath | undefined): Issue[];
+  failure: () => string | undefined;
+  rendering: () => boolean;
+  pending: () => boolean;
+}
   ended: () => boolean
   ends: () => string | undefined
   entry: EntryRef
@@ -565,13 +778,79 @@ interface EntryForm extends FormScope
   unschedule: () => Promise<void>
 
 [./form] formScope
-function formScope(drafts: { open(entry: DraftEntry, version?: string | undefined): void; entry(ref: EntryRef): DraftEntry | undefined; kept(ref: EntryRef): boolean; version(ref: EntryRef): string | undefined; value(ref: EntryRef, path: FieldPath): unknown; set(ref: EntryRef, path: FieldPath, value: unknown): void; c ...#99496158
+function formScope(drafts: {
+  open(entry: DraftEntry, version?: string | undefined): void;
+  entry(ref: EntryRef): DraftEntry | undefined;
+  kept(ref: EntryRef): boolean;
+  version(ref: EntryRef): string | undefined;
+  value(ref: EntryRef, path: FieldPath): unknown;
+  set(ref: EntryRef, path: FieldPath, value: unknown): void;
+  changed(ref: EntryRef): boolean;
+  reset(ref: EntryRef): void;
+  markSaved(ref: EntryRef, sent: DraftEntry, version?: string | undefined): void;
+  refuse: (ref: EntryRef, refusal: Refusal | undefined) => void;
+  refusal(ref: EntryRef): Refusal | undefined;
+  keepEdits(ref: EntryRef): void;
+  adopt(ref: EntryRef, entry: DraftEntry, version: string | undefined): void;
+  differences(ref: EntryRef, other: DraftEntry): FieldPath[];
+  anyChanged(shown?: readonly EntryRef[] | undefined): boolean;
+  flush: () => void;
+  discardAll(): void;
+  recovery(ref: EntryRef): Recovery | undefined;
+  recreating(ref: EntryRef): boolean;
+  reapply(): void;
+  stale(): EntryRef[];
+  report(refusals: readonly Issue[], ref?: EntryRef | undefined): void;
+  dismissWhere(ref: EntryRef, match: (issue: Issue) => boolean): void;
+  block(ref: EntryRef, path: string, message: string | undefined): void;
+  blocked(ref: EntryRef, path?: string | undefined): {
+    path: string;
+    message: string;
+  }[];
+  issues(ref: EntryRef, path?: FieldPath | undefined): Issue[];
+  failure: () => string | undefined;
+  rendering: () => boolean;
+  pending: () => boolean;
+}, entry: EntryRef, collection: ScreenCollection, problem?: string | undefined, source?: PairedEntry | undefined, denied?: Partial<Record<"publish" | "review" | "delete" | "upload" | "redirects", string>> | undefined): FormScope
 
 [./form] FormScope
 interface FormScope
   collection: ScreenCollection
   denied?: Partial<Record<"publish" | "review" | "delete" | "upload" | "redirects", string>> | undefined
-  drafts: { open(entry: DraftEntry, version?: string | undefined): void; entry(ref: EntryRef): DraftEntry | undefined; kept(ref: EntryRef): boolean; version(ref: EntryRef): string | undefined; value(ref: EntryRef, path: FieldPath): unknown; set(ref: EntryRef, path: FieldPath, value: unknown): void; changed(re ...#8ed3f0ff
+  drafts: {
+  open(entry: DraftEntry, version?: string | undefined): void;
+  entry(ref: EntryRef): DraftEntry | undefined;
+  kept(ref: EntryRef): boolean;
+  version(ref: EntryRef): string | undefined;
+  value(ref: EntryRef, path: FieldPath): unknown;
+  set(ref: EntryRef, path: FieldPath, value: unknown): void;
+  changed(ref: EntryRef): boolean;
+  reset(ref: EntryRef): void;
+  markSaved(ref: EntryRef, sent: DraftEntry, version?: string | undefined): void;
+  refuse: (ref: EntryRef, refusal: Refusal | undefined) => void;
+  refusal(ref: EntryRef): Refusal | undefined;
+  keepEdits(ref: EntryRef): void;
+  adopt(ref: EntryRef, entry: DraftEntry, version: string | undefined): void;
+  differences(ref: EntryRef, other: DraftEntry): FieldPath[];
+  anyChanged(shown?: readonly EntryRef[] | undefined): boolean;
+  flush: () => void;
+  discardAll(): void;
+  recovery(ref: EntryRef): Recovery | undefined;
+  recreating(ref: EntryRef): boolean;
+  reapply(): void;
+  stale(): EntryRef[];
+  report(refusals: readonly Issue[], ref?: EntryRef | undefined): void;
+  dismissWhere(ref: EntryRef, match: (issue: Issue) => boolean): void;
+  block(ref: EntryRef, path: string, message: string | undefined): void;
+  blocked(ref: EntryRef, path?: string | undefined): {
+    path: string;
+    message: string;
+  }[];
+  issues(ref: EntryRef, path?: FieldPath | undefined): Issue[];
+  failure: () => string | undefined;
+  rendering: () => boolean;
+  pending: () => boolean;
+}
   entry: EntryRef
   problem?: string | undefined
   shown: Shown
@@ -622,29 +901,14 @@ interface EntryPresence
   member: Member
   room: string
 
-[./room] editorsOf
-function editorsOf(others: readonly Member[], count: number, own: Member): { names: string[]; unnamed: number; }
-
 [./room] entryRoom
 function entryRoom(collection: string, entry: { slug: string; locale?: string | undefined; }, listed: Member): { room: string; member: Member; }
-
-[./room] hashOf
-function hashOf(text: string): string
 
 [./room] Member
 interface Member
   name: string
   page?: true | undefined
   watching?: true | undefined
-
-[./room] openRoom
-function openRoom(room: string): string
-
-[./room] WATCHED_ROWS
-const WATCHED_ROWS: 50
-
-[./room] watchRoom
-function watchRoom(room: string): string
 
 [./sqlite] LoaderOptions
 interface LoaderOptions

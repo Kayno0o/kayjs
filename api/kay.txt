@@ -1,6 +1,8 @@
 [.] action
 function action<Output, const Honeypot extends string = never>(handler: (ctx: ActionContext<Readonly<Record<string, unknown>>>) => Output | Promise<Output>, protection?: ActionProtection<Honeypot> | undefined): NoInputAction<Settled<Output>, Honeypot>
-function action<Schema extends TSchema, Output, const Honeypot extends string = never>(schema: Schema, handler: (input: (Schema & { params: []; })["static"], ctx: ActionContext<Readonly<Record<string, unknown>>>) => Output | Promise<Output>, protection?: ActionProtection<Honeypot> | undefined): ServerAction<Schema ...#afbc8db6
+function action<Schema extends TSchema, Output, const Honeypot extends string = never>(schema: Schema, handler: (input: (Schema & {
+  params: [];
+})["static"], ctx: ActionContext<Readonly<Record<string, unknown>>>) => Output | Promise<Output>, protection?: ActionProtection<Honeypot> | undefined): ServerAction<Schema, Settled<Output>, Honeypot>
 
 [.] Action
 interface Action<Input, Output, Honeypot extends string = never>
@@ -88,13 +90,14 @@ interface ActionStream<T> extends EventReader<T>
 type Answer<Output> = Output extends AsyncIterable<infer Value> ? ActionStream<Value> : Output
 
 [.] Answered
-type Answered<Value> = unknown extends Value ? unknown : Value extends EventStream<unknown> ? never : Value extends Response ? unknown : Value extends Blob ? Blob | string : Value extends string ? Value : Value extends number | boolean | bigint ? string : Value extends null | undefined | void ? '' : ...#cf817a8e
+type Answered<Value> = unknown extends Value ? unknown : Value extends EventStream<unknown> ? never : Value extends Response ? unknown : Value extends Blob ? Blob | string : Value extends string ? Value : Value extends number | boolean | bigint ? string : Value extends null | undefined | void ? '' : Jsonified<Value>
 
 [.] ApiAnswer
 type ApiAnswer<Module, Path, M> = Answered<Received<MethodRoute<Module, Path, Chosen<M>>>>
 
 [.] ApiCallOptions
-type ApiCallOptions<Module, Path, M> = ApiRequest<Module, Path, M> & { // Aborts the call, which rejects with the signal's reason. signal?: AbortSignal | undefined // Called as a body carrying files uploads, with how much of it went, from 0 to 1. progress?: ((sent: number) => void) | undefined }
+type ApiCallOptions<Module, Path, M> = ApiRequest<Module, Path, M> & {
+  // Aborts the call, which rejects with the signal's reason. signal?: AbortSignal | undefined // Called as a body carrying files uploads, with how much of it went, from 0 to 1. progress?: ((sent: number) => void) | undefined }
 
 [.] ApiError
 class ApiError
@@ -104,7 +107,9 @@ class ApiError
   status: number
 
 [.] ApiRoutesOf
-type ApiRoutesOf<Module> = Module extends { default: infer Exported } ? RoutesOfInstance<Exported extends (...args: never[]) => infer Built ? Awaited<Built> : Exported> : Record<never, never>
+type ApiRoutesOf<Module> = Module extends {
+  default: infer Exported
+} ? RoutesOfInstance<Exported extends (...args: never[]) => infer Built ? Awaited<Built> : Exported> : Record<never, never>
 
 [.] apiUrl
 function apiUrl(module: unknown, path?: string, options?: UrlInput): string
@@ -123,15 +128,6 @@ function batch<T>(fn: () => T): T
 [.] Bindable
 type Bindable<T> = (T & BindableMark) | Extract<T, null | undefined>
 
-[.] BindableMark
-interface BindableMark
-
-[.] BoundProp
-type BoundProp<Tag, Key> = Key extends BindableKeys<Tag> ? unknown : { kayError: 'bind: needs a prop typed Bindable<T> in the component' }
-
-[.] BoundValue
-type BoundValue<Tag, Key> = Key extends keyof PropsOfComponent<Tag> ? Required<PropsOfComponent<Tag>>[Key] : never
-
 [.] call
 function call<Module, const Path extends CallPath<Module>, const M extends CallMethod<NodeAt<Module, Path>> = never>(module: Module, path: Path, ...[options]: Optional<ApiCallOptions<Module, Path, M>>): Promise<Answered<Received<MethodRoute<Module, Path, Chosen<M>>>>>
 
@@ -146,7 +142,9 @@ interface CallOptions
   signal?: AbortSignal | undefined
 
 [.] CallPath
-type CallPath<Module> = Nodes<RoutesOf<Module>> extends infer Found ? Found extends { path: infer Path, node: infer Node } ? [CallMethod<Node>] extends [never] ? never : Path : never : never
+type CallPath<Module> = Nodes<RoutesOf<Module>> extends infer Found ? Found extends {
+  path: infer Path, node: infer Node
+} ? [CallMethod<Node>] extends [never] ? never : Path : never : never
 
 [.] CallResult
 type CallResult<Data, Failed> = | { ok: true, data: Data } | { ok: false, status: number, errors: Record<string, string>, data: Failed | undefined }
@@ -166,12 +164,6 @@ interface CardPageContext<Params extends Record<string, unknown> = Record<string
   request: Request
   status: (code: number) => void
   url: URL
-
-[.] CheckedHref
-type CheckedHref<Href extends string> = string extends Href ? unknown : Href extends `//${string}` | `/_kay/${string}` ? unknown : Href extends `/${string}` ? IsRoute<PathOf<Href>> extends true ? unknown : { kayError: `${typeof UNSERVED_MESSAGE} ${PathOf<Href>}` } : unknown
-
-[.] CheckedHtml
-type CheckedHtml<Markup> = [UnsafeHtml<Markup>] extends [never] ? unknown : { kayError: 'This string would render as markup: pass sanitizeHtml(value) for markup a user wrote, or trustHtml(value) for markup the app made' }
 
 [.] Component
 type Component<Props = object> = (props: Props) => JSX.Element
@@ -210,7 +202,13 @@ interface DescribeOptions
   required?: boolean | "all" | undefined
 
 [.] dispatch
-function dispatch<Message extends { type: string; }, Handlers extends { [Type in Message["type"]]: (message: Extract<Message, { type: Type; }>) => unknown; }>(message: Message, handlers: Handlers): ReturnType<Handlers[Message["type"]]>
+function dispatch<Message extends {
+  type: string;
+}, Handlers extends {
+  [Type in Message["type"]]: (message: Extract<Message, {
+    type: Type;
+  }>) => unknown;
+}>(message: Message, handlers: Handlers): ReturnType<Handlers[Message["type"]]>
 
 [.] Duration
 type Duration = `${number}${'ms' | keyof typeof UNIT_SECONDS}`
@@ -323,9 +321,6 @@ interface FormFailure<Input, Data, Honeypot extends string = never>
 interface FormSuccess<Output>
   data: Output
 
-[.] FunctionProp
-type FunctionProp<Component> = Component extends IslandBrand ? { kayError: 'A layout, or a page with a server fence, sends an island its props serialized: plain objects, arrays, Dates, Maps, Sets, bigints, URLs and RegExps, but no functions, symbols or class instances; a component of its own passing ...#2815b3c5
-
 [.] guard
 function guard<Own extends object = object>(check: (ctx: GuardContext<Own>) => void | Promise<void>): Guard
 
@@ -338,15 +333,6 @@ type GuardContext<Own extends object = object> = Omit<RequestContext<RouteParams
 [.] guardLeave
 function guardLeave(dirty: () => boolean, options?: LeaveGuardOptions): void
 
-[.] HandedPart
-type HandedPart<Component, Name extends string> = PartClass<Component> extends infer Class ? Class extends object ? Name extends keyof Class ? Class[Name] : never : never : never
-
-[.] HandedSignal
-type HandedSignal<Parameter> = 0 extends 1 & Parameter ? { kayLint: 'uncalled-signal' } : [Parameter] extends [UnresolvedParameter] ? unknown : unknown extends Parameter ? { kayLint: 'uncalled-signal' } : unknown
-
-[.] HandsPart
-type HandsPart<Component, Name extends string> = 0 extends 1 & Component ? unknown : [HandedPart<Component, Name>] extends [never] ? { kayError: `The called component has no part ${Name}` } : unknown
-
 [.] HoneypotOptions
 interface HoneypotOptions<Field extends string = string>
   field: Field
@@ -354,9 +340,6 @@ interface HoneypotOptions<Field extends string = string>
 
 [.] HydrateWhen
 type HydrateWhen = 'load' | 'idle' | 'visible' | 'client'
-
-[.] Inferred
-interface Inferred
 
 [.] InputOf
 type InputOf<Target> = Target extends Action<infer Input, unknown> ? Input : never
@@ -366,9 +349,6 @@ type InstallOutcome = 'accepted' | 'dismissed' | 'unavailable'
 
 [.] installPrompt
 const installPrompt: { available: () => boolean; show(): Promise<InstallOutcome>; }
-
-[.] IslandBrand
-interface IslandBrand
 
 [.] IslandComponent
 type IslandComponent<Props> = ((props: Props & IslandOptions) => JSX.Element) & IslandBrand
@@ -385,7 +365,9 @@ type IslandProp<Component, Value> = Component extends IslandBrand ? [IsSerializa
 function jobs<Payload = unknown, Progress = unknown>(queue: string): QueuedJob<Payload, Progress>[]
 
 [.] Jsonified
-type Jsonified<T> = T extends Date | bigint ? string : T extends readonly (infer Item)[] ? Jsonified<Item>[] : T extends object ? { [Key in keyof T]: Jsonified<T[Key]> } : T
+type Jsonified<T> = T extends Date | bigint ? string : T extends readonly (infer Item)[] ? Jsonified<Item>[] : T extends object ? {
+  [Key in keyof T]: Jsonified<T[Key]>
+} : T
 
 [.] Lastmod
 type Lastmod = Date | string | number
@@ -401,7 +383,9 @@ function linked<T>(source: () => T): Signal<T>
 function listen<T extends EventTarget, K extends keyof EventMapOf<T> & string>(target: T | (() => T | null | undefined), type: K, handler: (event: EventMapOf<T>[K]) => void, options?: boolean | AddEventListenerOptions | undefined): void
 
 [.] live
-function live<T, const Ttl extends Duration = `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w`>(initial: PlainValue<T>, options: LiveOptions<Ttl> & { user: true; }): LiveOwn<T>
+function live<T, const Ttl extends Duration = `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w`>(initial: PlainValue<T>, options: LiveOptions<Ttl> & {
+  user: true;
+}): LiveOwn<T>
 function live<T, const Ttl extends Duration = `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w`>(initial: PlainValue<T>, options?: LiveOptions<Ttl> | undefined): Live<T>
 function live<K extends LiveKey, T, const Ttl extends Duration = `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w`>(initial: (key: K) => PlainValue<T>, options?: LiveOptions<Ttl> | undefined): LiveByKey<K, T>
 
@@ -477,7 +461,11 @@ interface LocalOptions<Row extends object, Key extends keyof Row & string>
 function localPath<const Fallback extends string>(value: unknown, fallback: Fallback & CheckedHref<Fallback>): string
 
 [.] Locals
-type Locals = (Register extends { locals: infer Values extends object } ? Values : Inferred extends { locals: infer Values extends object } ? Values : object) & ([ExtensionServers] extends [never] ? unknown : Intersected<ServerLocals<ExtensionServers>>)
+type Locals = (Register extends {
+  locals: infer Values extends object
+} ? Values : Inferred extends {
+  locals: infer Values extends object
+} ? Values : object) & ([ExtensionServers] extends [never] ? unknown : Intersected<ServerLocals<ExtensionServers>>)
 
 [.] LocalsOf
 type LocalsOf<App extends Pick<Elysia, '~Singleton' | '~Ephemeral' | '~Volatile'>> = App['~Singleton']['decorator'] & App['~Singleton']['derive'] & App['~Singleton']['resolve'] & App['~Ephemeral']['derive'] & App['~Ephemeral']['resolve'] & App['~Volatile']['derive'] & App['~Volatile']['resolve']
@@ -584,9 +572,22 @@ type PartClass<Component> = Component extends (props: infer Props) => unknown ? 
 
 [.] persisted
 function persisted<T = string>(name: string, value: NoInfer<PlainValue<T>>, options: Omit<PersistedOptions<NoInfer<T>>, "maxAge" | "values"> & { storage: "query"; }): Signal<T>
-function persisted<const T extends string | number | boolean>(name: string, value: NoInfer<T>, options: Omit<PersistedOptions<T>, "maxAge"> & { storage: "query"; values: readonly T[]; }): Signal<T>
-function persisted<const T extends string | number | boolean>(name: string, value: NoInfer<T>, options: (PersistedOptions<T> & { storage?: "cookie" | undefined; values: readonly T[]; }) | (Omit<PersistedOptions<T>, "maxAge"> & { storage: "local"; values: readonly T[]; })): Signal<T>
-function persisted<T>(name: string, value: PlainValue<T>, options?: (Omit<PersistedOptions<T>, "values"> & { storage?: "cookie" | undefined; }) | (Omit<PersistedOptions<T>, "maxAge" | "values"> & { storage: "local"; }) | undefined): Signal<T>
+function persisted<const T extends string | number | boolean>(name: string, value: NoInfer<T>, options: Omit<PersistedOptions<T>, "maxAge"> & {
+  storage: "query";
+  values: readonly T[];
+}): Signal<T>
+function persisted<const T extends string | number | boolean>(name: string, value: NoInfer<T>, options: (PersistedOptions<T> & {
+  storage?: "cookie" | undefined;
+  values: readonly T[];
+}) | (Omit<PersistedOptions<T>, "maxAge"> & {
+  storage: "local";
+  values: readonly T[];
+})): Signal<T>
+function persisted<T>(name: string, value: PlainValue<T>, options?: (Omit<PersistedOptions<T>, "values"> & {
+  storage?: "cookie" | undefined;
+}) | (Omit<PersistedOptions<T>, "maxAge" | "values"> & {
+  storage: "local";
+}) | undefined): Signal<T>
 
 [.] PersistedOptions
 interface PersistedOptions<T> extends SignalOptions<T>
@@ -598,11 +599,16 @@ interface PersistedOptions<T> extends SignalOptions<T>
 [.] PersistStorage
 type PersistStorage = 'cookie' | 'local' | 'query'
 
-[.] PlainIslandProp
-type PlainIslandProp<Component, Value> = Component extends IslandBrand ? SecretProp<Value> & ActionProp<Component, Value> : unknown
-
 [.] PrerenderedContext
-type PrerenderedContext<Flag, Context> = [Flag] extends [false | null | undefined] ? Context : boolean extends Flag ? Context : Omit<Context, 'cookies' | 'query' | 'locals'> & { cookies: { kayError: 'A prerendered page renders once, at build time, with no ctx.cookies; drop prerender from export cons ...#25ed448b
+type PrerenderedContext<Flag, Context> = [Flag] extends [false | null | undefined] ? Context : boolean extends Flag ? Context : Omit<Context, 'cookies' | 'query' | 'locals'> & {
+  cookies: {
+    kayError: 'A prerendered page renders once, at build time, with no ctx.cookies; drop prerender from export const page to render it per request'
+  } query: {
+    kayError: 'A prerendered page renders once, at build time, with no ctx.query; drop prerender from export const page to render it per request'
+  } locals: {
+    kayError: 'A prerendered page renders once, at build time, with no ctx.locals; drop prerender from export const page to render it per request'
+  }
+}
 
 [.] presence
 function presence(): Presence<null>
@@ -642,10 +648,20 @@ const publicEnv: Readonly<Record<never, never>>
 type PublicEnv = Register extends { publicEnv: infer Values extends object } ? Readonly<Values> : Readonly<Record<never, never>>
 
 [.] PublicFieldsOf
-type PublicFieldsOf<Schema extends TSchema> = Schema extends { properties: infer Fields extends Record<string, TSchema> } ? { [Name in keyof Static<Schema> as Name extends keyof Fields ? Fields[Name] extends { public: true } ? Name : never : never]: Static<Schema>[Name] } : Record<never, never>
+type PublicFieldsOf<Schema extends TSchema> = Schema extends {
+  properties: infer Fields extends Record<string, TSchema>
+} ? {
+  [Name in keyof Static<Schema> as Name extends keyof Fields ? Fields[Name] extends {
+    public: true
+  } ? Name : never : never]: Static<Schema>[Name]
+} : Record<never, never>
 
 [.] PublicFieldsOfModule
-type PublicFieldsOfModule<Module> = Intersection<{ [Name in keyof Module]: Module[Name] extends { readonly [PUBLIC_FIELDS]: infer Fields } ? Fields : never }[keyof Module]>
+type PublicFieldsOfModule<Module> = Intersection<{
+  [Name in keyof Module]: Module[Name] extends {
+    readonly [PUBLIC_FIELDS]: infer Fields
+  } ? Fields : never
+}[keyof Module]>
 
 [.] PushState
 type PushState = 'unsupported' | 'denied' | 'subscribed' | 'off'
@@ -769,7 +785,15 @@ interface ResourceFailure
   status: number
 
 [.] ResourcePath
-type ResourcePath<Module> = Nodes<RoutesOf<Module>> extends infer Found ? Found extends { path: infer Path, node: { get: infer Route } } ? Route extends { response: { 200: infer Value } } ? Readable<Value> extends true ? Path : never : Path : never : never
+type ResourcePath<Module> = Nodes<RoutesOf<Module>> extends infer Found ? Found extends {
+  path: infer Path, node: {
+    get: infer Route
+  }
+} ? Route extends {
+  response: {
+    200: infer Value
+  }
+} ? Readable<Value> extends true ? Path : never : Path : never : never
 
 [.] ResourceStatus
 type ResourceStatus = 'loading' | 'ready' | 'failed'
@@ -781,7 +805,7 @@ function root<T>(fn: (dispose: () => void) => T): T
 function route<const Pattern extends RoutePattern>(pattern: Pattern, ...args: RouteArgs<Pattern>): string
 
 [.] RouteArgs
-type RouteArgs<Pattern extends string> = string extends Pattern ? [params?: Readonly<Record<string, unknown>>, options?: RouteOptions] : [keyof ParamsOf<Pattern>] extends [never] ? [options?: RouteOptions] : Record<never, never> extends Flat<ParamsOf<Pattern>> ? [params?: Flat<ParamsOf<Pattern>>, op ...#838c976b
+type RouteArgs<Pattern extends string> = string extends Pattern ? [params?: Readonly<Record<string, unknown>>, options?: RouteOptions] : [keyof ParamsOf<Pattern>] extends [never] ? [options?: RouteOptions] : Record<never, never> extends Flat<ParamsOf<Pattern>> ? [params?: Flat<ParamsOf<Pattern>>, options?: RouteOptions] : [params: Flat<ParamsOf<Pattern>>, options?: RouteOptions]
 
 [.] RouteOptions
 interface RouteOptions
@@ -795,7 +819,39 @@ type RouteParams = Readonly<Record<string, unknown>>
 type RoutePattern = Register extends { patterns: infer Patterns extends string } ? Patterns : string
 
 [.] s
-const s: Omit<Omit<JavaScriptTypeBuilder, "String" | "Transform"> & { String: (property?: ElysiaStringOptions | undefined) => TString; Numeric: (property?: NumberOptions | undefined) => TNumber; NumericEnum<T extends AssertNumericEnum<T>>(item: T, property?: SchemaOptions | undefined): TEnum<T>; Integer: (pr ...#4aa8442d
+const s: Omit<Omit<JavaScriptTypeBuilder, "String" | "Transform"> & {
+  String: (property?: ElysiaStringOptions | undefined) => TString;
+  Numeric: (property?: NumberOptions | undefined) => TNumber;
+  NumericEnum<T extends AssertNumericEnum<T>>(item: T, property?: SchemaOptions | undefined): TEnum<T>;
+  Integer: (property?: IntegerOptions | undefined) => TInteger;
+  Date: (property?: DateOptions | undefined) => TDate;
+  BooleanString: (property?: SchemaOptions | undefined) => TBoolean;
+  ObjectString: <T extends TProperties>(properties: T, options?: ObjectOptions | undefined) => TObject<T>;
+  ArrayString: <T extends TSchema = TString>(children?: T | undefined, options?: ArrayOptions | undefined) => TArray<T>;
+  ArrayQuery: <T extends TSchema = TString>(children?: T | undefined, options?: ArrayOptions | undefined) => TArray<T>;
+  File: TFile;
+  Files: (options?: FilesOptions | undefined) => TUnsafe<File[]>;
+  Nullable: <T extends TSchema>(schema: T, options?: SchemaOptions | undefined) => TUnion<[T, TNull]>;
+  MaybeEmpty: <T extends TSchema>(schema: T, options?: SchemaOptions | undefined) => TUnion<[T, TNull, TUndefined]>;
+  Cookie: <T extends TProperties>(properties: T, {
+    domain, expires, httpOnly, maxAge, path, priority, sameSite, secure, secrets, sign, ...options
+  }?: CookieValidatorOptions<T> | undefined) => TObject<T>;
+  UnionEnum: <const T extends NonEmptyArray<TEnumValue> | Readonly<NonEmptyArray<TEnumValue>>>(values: T, options?: SchemaOptions | undefined) => TUnionEnum<T>;
+  NoValidate: <T extends TAnySchema>(v: T, enabled?: boolean | undefined) => T;
+  Form: <T extends TProperties>(v: T, options?: ObjectOptions | undefined) => TForm<T>;
+  ArrayBuffer(options?: TArrayBuffer | undefined): TUnsafe<ArrayBuffer>;
+  Uint8Array: (options: Uint8ArrayOptions) => TUnsafe<Uint8Array<ArrayBufferLike>>;
+} & {
+  Transform<Type extends TSchema>(type: Type): ElysiaTransformDecodeBuilder<Type>;
+}, "File" | "Files"> & {
+  File: (options?: FileOptions | undefined) => TUnsafe<File>;
+  Files: (options?: FilesOptions | undefined) => TUnsafe<File[]>;
+  Secret: (options?: ElysiaStringOptions | undefined) => TString;
+  Public: <Field extends TSchema>(field: Field) => Field & {
+    public: true;
+  };
+  UnionKeys: <const Keyed extends object>(record: Keyed, options?: SchemaOptions | undefined) => TUnionEnum<[keyof Keyed & string, ...(keyof Keyed & string)[]]>;
+}
 
 [.] SafeHtml
 type SafeHtml = string & { readonly [SAFE_HTML]: true }
@@ -927,12 +983,16 @@ type Static<Type extends TSchema, Params extends unknown[] = [], Result = (Type 
 function store<T extends object>(value: T): T
 
 [.] stream
-function stream<Module, const Path extends StreamPath<Module>, const M extends StreamMethod<NodeAt<Module, Path>> = never>(module: Module, path: Path, options: MethodOption<NodeAt<Module, Path>, M> & { start: false; }): StreamRun<StreamValue<MethodRoute<Module, Path, Chosen<M>>>, StreamStartOptions<Module, Path, M ...#99db259b
+function stream<Module, const Path extends StreamPath<Module>, const M extends StreamMethod<NodeAt<Module, Path>> = never>(module: Module, path: Path, options: MethodOption<NodeAt<Module, Path>, M> & {
+  start: false;
+}): StreamRun<StreamValue<MethodRoute<Module, Path, Chosen<M>>>, StreamStartOptions<Module, Path, M>>
 function stream<Module, const Path extends StreamPath<Module>, const M extends StreamMethod<NodeAt<Module, Path>> = never>(module: Module, path: Path, ...[options]: Optional<StreamOptions<Module, Path, M>>): StreamOf<Module, Path, M>
 function stream<T>(source: (signal: AbortSignal) => AsyncIterable<T>): EventReader<T>
 
 [.] StreamPath
-type StreamPath<Module> = Nodes<RoutesOf<Module>> extends infer Found ? Found extends { path: infer Path, node: infer Node } ? [StreamMethod<Node>] extends [never] ? never : Path : never : never
+type StreamPath<Module> = Nodes<RoutesOf<Module>> extends infer Found ? Found extends {
+  path: infer Path, node: infer Node
+} ? [StreamMethod<Node>] extends [never] ? never : Path : never : never
 
 [.] StreamRun
 interface StreamRun<T, Options> extends EventReader<T>
@@ -953,27 +1013,6 @@ type Success<Output> = Exclude<Output, Failure<unknown>>
 
 [.] SuccessOf
 type SuccessOf<Target> = Target extends Action<never, unknown> ? FormSuccess<Final<Success<ResultOf<Target>>>> : never
-
-[.] TemplateContext
-type TemplateContext = TemplateValues extends { values: infer Values extends object } ? Values : object
-
-[.] TemplateHelpers
-interface TemplateHelpers
-  Await: <T>(props: { value: T; pending?: Element; ready?: Element; failed?: Element; }) => Element
-  Dynamic: <Tag>(props: { component: Tag; } & PropsOf<Tag>) => Element
-  For: { <T>(props: { each: false | readonly T[] | null | undefined; keyed: (item: T) => unknown; fallback?: Element; children: Element; }): Element; <T>(props: { each: false | readonly T[] | null | undefined; keyed: false; fallback?: Element; children: Element; }): Element; }
-  Try: (props: { block: Element; failed?: Element; }) => Element
-  awaited: <T>(value: T) => Settled<T>
-  componentClass: <List extends readonly unknown[]>(list: List) => ComponentClass<List>
-  head: (tags: { tag: string; props: Record<string, unknown>; }[]) => void
-  omit: <Props extends object, Key extends keyof Props>(props: Props, ...keys: Key[]) => Omit<Props, Key>
-  partClass: (props: unknown, part: string) => unknown
-  partHanded: (part: string, list: readonly unknown[]) => unknown
-  partsClass: (list: readonly unknown[]) => unknown
-  staticFor: <T>(each: false | readonly T[] | null | undefined, rendered: Element, fallback?: Element) => Element
-
-[.] TemplateValues
-interface TemplateValues
 
 [.] TrackedApi
 interface TrackedApi<Module, Path>
@@ -997,14 +1036,13 @@ interface TransitionClasses
 [.] trustHtml
 function trustHtml(markup: string): SafeHtml
 
-[.] Truthy
-type Truthy<T> = Exclude<T, false | 0 | 0n | '' | null | undefined>
-
 [.] UiComponents
 interface UiComponents
 
 [.] UiConfig
-type UiConfig = [keyof UiComponents] extends [never] ? Readonly<Record<string, UiEntry>> : { readonly [Key in keyof UiComponents]?: UiEntryOf<UiComponents[Key]> }
+type UiConfig = [keyof UiComponents] extends [never] ? Readonly<Record<string, UiEntry>> : {
+  readonly [Key in keyof UiComponents]?: UiEntryOf<UiComponents[Key]>
+}
 
 [.] uid
 function uid(): string
@@ -1014,10 +1052,6 @@ type UiEntry = Omit<RecipeConfig<VariantTable>, 'defaults'>
 
 [.] Unmatched
 type Unmatched<Rest> = [Rest] extends [never] ? unknown : false extends Finite<Rest> ? unknown : IncompleteMatch<Rest>
-
-[.] UnresolvedParameter
-interface UnresolvedParameter
-  kayUnresolved: true
 
 [.] untrack
 function untrack<T>(fn: () => T): T
@@ -1032,9 +1066,6 @@ interface WatchOptions
 
 [.] webPush
 const webPush: { state: () => PushState; subscribe(): Promise<PushSubscribeResult>; unsubscribe(): Promise<boolean>; }
-
-[.] WidenedProps
-type WidenedProps<Props, Added> = Props extends unknown ? Without<Props, keyof Added> & { [Name in keyof Pick<Props, keyof Added & KnownKeys<Props>>]: Pick<Props, keyof Added & KnownKeys<Props>>[Name] | VariantValue<Record<Added[Name & keyof Added] & string, unknown>> } & { [Name in Exclude<keyof Ad ...#189c05e0
 
 [.] withBase
 function withBase(path: string): string
@@ -1241,39 +1272,6 @@ interface VitalSummary
   value: number
   views: number
 
-[./arrival] ARRIVAL_HIGHLIGHT
-const ARRIVAL_HIGHLIGHT: "kay-search"
-
-[./arrival] ARRIVAL_PARAM
-const ARRIVAL_PARAM: "kay_q"
-
-[./arrival] arrive
-function arrive(search: string, from: number): Promise<void>
-
-[./arrival] arrives
-function arrives(search: string): boolean
-
-[./await] Await
-function Await<T>(props: AwaitProps<T>): Element
-
-[./await] collectDeferred
-function collectDeferred<T>(render: () => T, within?: string | undefined): { result: T; deferred: PendingBlock[]; }
-
-[./await] earlyRejections
-const earlyRejections: Pick<EarlyRejections, "graceMs">
-
-[./await] PendingBlock
-interface PendingBlock
-  failed?: ((error: unknown) => unknown) | undefined
-  fallback?: ((error: unknown) => unknown) | undefined
-  id: string
-  ready: (value: never) => unknown
-  site?: Error | undefined
-  value: Promise<unknown> | AsyncIterable<unknown>
-
-[./await] rejectedAt
-function rejectedAt(block: PendingBlock, reason: unknown): unknown
-
 [./bun] default
 const default: BunPlugin
 
@@ -1352,31 +1350,6 @@ interface SyncCacheStore extends CacheStore
   set: (key: string, text: string, freshUntil: number) => void
   subscribe?: (listener: (message: string) => void) => void
 
-[./client] disposeIslands
-function disposeIslands(root: ParentNode): void
-
-[./client] enableHotSwap
-function enableHotSwap(registry: IslandRegistry): void
-
-[./client] HotSwap
-interface HotSwap
-  entry?: string | undefined
-  fresh: string[]
-  from: number
-  islands: Record<string, string[]>
-
-[./client] hydrateIslands
-function hydrateIslands(registry: IslandRegistry, root?: ParentNode): Promise<void>
-
-[./client] IslandRegistry
-type IslandRegistry = Record<string, () => Promise<{ default: (props: object) => unknown }>>
-
-[./client] refreshForEdit
-function refreshForEdit(): Promise<void>
-
-[./client] startNavigation
-function startNavigation(given: NavigationHooks): void
-
 [./compiler] compileKay
 function compileKay(original: string, filename: string, options?: CompileOptions): CompileResult
 
@@ -1442,7 +1415,18 @@ function blocks<const Types extends Record<string, AnyObject>>(types: Types, opt
 function bodyHtml(body: string): Promise<string>
 
 [./content] collection
-function collection<Schema extends TSchema, Components extends Record<string, Component<never>> = Record<never, never>, const FeedPath extends string = string, Seed extends Static<Schema> | undefined = undefined, const Route extends string = never>(source: string | ContentLoader<Stored<(Schema & { params: []; })["stat ...#6446439f
+function collection<Schema extends TSchema, Components extends Record<string, Component<never>> = Record<never, never>, const FeedPath extends string = string, Seed extends Static<Schema> | undefined = undefined, const Route extends string = never>(source: string | ContentLoader<Stored<(Schema & {
+  params: [];
+})["static"]>>, options: CollectionOptions<Schema, [Route] extends [never] ? false : true> & {
+  components?: Components;
+  feed?: {
+    path: FeedPath;
+  } | undefined;
+  seed?: Seed;
+  route?: Route | undefined;
+}): Collection<(Schema & {
+  params: [];
+})["static"], Components, FeedPath, undefined extends Seed ? false : true, [Route] extends [never] ? false : true>
 
 [./content] Collection
 interface Collection<Data, Components extends Record<string, Component<never>> = Record<string, Component<never>>, FeedPath extends string = string, Seeded extends boolean = boolean, Routed extends boolean = boolean>
@@ -1539,7 +1523,16 @@ interface ContentLoader<Data = unknown>
   name: string
   remove?: ((entry: { slug: string; locale?: string | undefined; }) => void | Promise<void>) | undefined
   save?: ((entry: { slug: string; locale?: string | undefined; data: Data; body?: string | undefined; create?: true; }) => void | Promise<void>) | undefined
-  saveMany?: ((entries: { slug: string; locale?: string | undefined; data: Data; body?: string | undefined; expect?: { field: string; was: number | undefined; } | undefined; }[]) => void | Promise<void>) | undefined
+  saveMany?: ((entries: {
+  slug: string;
+  locale?: string | undefined;
+  data: Data;
+  body?: string | undefined;
+  expect?: {
+    field: string;
+    was: number | undefined;
+  } | undefined;
+}[]) => void | Promise<void>) | undefined
   sibling?: ((kind: string) => ContentLoader<unknown>) | undefined
   store?: CacheStore | undefined
   ttl?: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w` | undefined
@@ -1599,7 +1592,16 @@ interface EntryPath
   repoPath: string
 
 [./content] entrySource
-function entrySource(name: string, slug: string, data: unknown, options?: { locale?: string | undefined; body?: string | undefined; create?: boolean | undefined; replacing?: string | undefined; }): Promise<{ file: EntryFile; } | { issues: DraftIssue[]; }>
+function entrySource(name: string, slug: string, data: unknown, options?: {
+  locale?: string | undefined;
+  body?: string | undefined;
+  create?: boolean | undefined;
+  replacing?: string | undefined;
+}): Promise<{
+  file: EntryFile;
+} | {
+  issues: DraftIssue[];
+}>
 
 [./content] FeedItem
 interface FeedItem
@@ -1620,7 +1622,9 @@ interface FeedOptions<Data, Routed extends boolean = boolean>
   title: string
 
 [./content] FeedPathsOf
-type FeedPathsOf<Module> = { [Name in keyof Module]: Module[Name] extends Collection<unknown, Record<string, Component<never>>, infer Path> ? string extends Path ? never : Path : never }[keyof Module]
+type FeedPathsOf<Module> = {
+  [Name in keyof Module]: Module[Name] extends Collection<unknown, Record<string, Component<never>>, infer Path> ? string extends Path ? never : Path : never
+}[keyof Module]
 
 [./content] FieldHint
 interface FieldHint
@@ -1806,7 +1810,9 @@ interface SourceEntry
   url?: string | undefined
 
 [./content] Stored
-type Stored<Data> = Data extends Date ? string : Data extends readonly (infer Item)[] ? Stored<Item>[] : Data extends object ? { [Field in keyof Data]: Stored<Data[Field]> } : Data
+type Stored<Data> = Data extends Date ? string : Data extends readonly (infer Item)[] ? Stored<Item>[] : Data extends object ? {
+  [Field in keyof Data]: Stored<Data[Field]>
+} : Data
 
 [./content] tagsField
 function tagsField(options?: ArrayOptions | undefined): TArray<TString>
@@ -1843,7 +1849,7 @@ interface DevTab
 interface DevTabOptions
   announce?: boolean
   hidden?: () => void
-  icon?: "search" | "copy" | "image" | "circle-x" | "triangle-alert" | "database" | "list-checks" | "server" | "list-ordered" | "scan-search" | "key-round" | "gauge" | "route" | "languages" | "boxes" | "mail" | "network" | "crosshair" | "maximize-2" | "minimize-2" | "panel-right" | "panel-left" | "panel-bott ...#309410b9
+  icon?: "search" | "copy" | "image" | "circle-x" | "triangle-alert" | "database" | "list-checks" | "server" | "list-ordered" | "scan-search" | "key-round" | "gauge" | "route" | "languages" | "boxes" | "mail" | "network" | "crosshair" | "maximize-2" | "minimize-2" | "panel-right" | "panel-left" | "panel-bottom" | "app-window" | "x" | "check" | "clipboard-copy" | "lock" | "user-round" | "pencil" | "ear" | "palette" | "puzzle"
   id: string
   label: string
   shown?: () => void
@@ -1851,251 +1857,6 @@ interface DevTabOptions
 
 [./dev-tool] DevTool
 type DevTool = Pick<Tool, 'make' | 'icon' | 'tab' | 'button' | 'outline' | 'hideOutline' | 'open'>
-
-[./dom] animated
-function animated(unit: Unit | null): boolean
-
-[./dom] append
-function append(parent: Node, node: Node): void
-
-[./dom] attribute
-function attribute(element: Element, name: string, value: unknown, written?: boolean): void
-
-[./dom] Block
-interface Block
-  dispose: (() => void) | undefined
-  region: Region
-  rendered: boolean
-  units: Unit[]
-
-[./dom] blockIn
-function blockIn(region: Region): Block
-
-[./dom] branches
-function branches(element: Node | null, start: Node | null, end: Node | null, list: [test: (() => unknown) | null, render: (value: () => unknown) => unknown][]): void
-
-[./dom] choose
-function choose(element: Node | null, start: Node | null, end: Node | null, list: [test: (() => unknown) | null, render: () => unknown][]): void
-
-[./dom] claiming
-function claiming(): boolean
-
-[./dom] claimNode
-function claimNode(): Node
-
-[./dom] close
-function close(start: Node): Node
-
-[./dom] component
-function component<P>(fn: (props: P) => unknown, props: P): unknown
-
-[./dom] componentClass
-function componentClass(list: readonly unknown[]): string | undefined
-
-[./dom] createElement
-function createElement(tag: string): Element
-
-[./dom] dispatch
-function dispatch(event: Event): void
-
-[./dom] effect
-function effect(fn: () => void): void
-
-[./dom] entered
-function entered(unit: Unit | null): void
-
-[./dom] errorParagraph
-function errorParagraph(message: string | undefined, id: string, classes: string): Element | undefined
-
-[./dom] firstOf
-function firstOf(unit: Unit): Node
-
-[./dom] fragment
-function fragment(build: (parent: Node) => void): Unit | null
-
-[./dom] fresh
-function fresh<T>(render: () => T): T
-
-[./dom] holdSubmits
-function holdSubmits(): void
-
-[./dom] hydrate
-function hydrate<T>(render: () => T, container: Node): T
-
-[./dom] HydrationMismatchError
-class HydrationMismatchError
-  new (message?: string | undefined): HydrationMismatchError
-  new (message?: string | undefined, options?: ErrorOptions | undefined): HydrationMismatchError
-  new (message?: string | undefined, options?: ErrorOptions | undefined): HydrationMismatchError
-  name: string
-
-[./dom] insert
-function insert(element: Node | null, start: Node | null, end: Node | null, fn: () => unknown, reactive?: boolean): void
-
-[./dom] insertUnit
-function insertUnit(parent: Node, unit: Unit, before: Node | null): void
-
-[./dom] islandHost
-function islandHost(): Element | undefined
-
-[./dom] islandOf
-function islandOf(node: Node): string | undefined
-
-[./dom] keepServerMarkup
-function keepServerMarkup(keeps: (element: Element, value: unknown) => boolean): void
-
-[./dom] lastOf
-function lastOf(unit: Unit): Node
-
-[./dom] leavesInBrowser
-function leavesInBrowser(href: unknown): boolean
-
-[./dom] listen
-function listen(element: Element, name: string, handler: (event: Event) => void): void
-
-[./dom] listenSubmit
-function listenSubmit(element: Element, name: string, handler: (event: Event) => void): void
-
-[./dom] localizeLinks
-function localizeLinks(given: (href: string) => string): void
-
-[./dom] markers
-function markers(parent: Node): [start: Node, end: Node]
-
-[./dom] memo
-function memo<T>(fn: () => T, options?: SignalOptions<T> | undefined): () => T
-
-[./dom] merge
-function merge(...sources: readonly object[]): Record<string, unknown>
-
-[./dom] omit
-function omit(props: object, ...keys: string[]): Record<string, unknown>
-
-[./dom] outside
-function outside<T>(element: Element, href: T, ownRel?: boolean): T
-
-[./dom] partClass
-function partClass(props: unknown, part: string): unknown
-
-[./dom] partHanded
-function partHanded(part: string, list: readonly unknown[]): unknown
-
-[./dom] partsClass
-function partsClass(list: readonly unknown[]): unknown
-
-[./dom] playTransitions
-function playTransitions(given: Transitions): void
-
-[./dom] property
-function property(element: Element, name: string, value: unknown, written?: boolean): void
-
-[./dom] Range
-class Range
-  new (first: Node, last: Node): Range
-  first: Node
-  held?: DocumentFragment | undefined
-  last: Node
-  nodes?: Node[] | undefined
-
-[./dom] ref
-function ref(element: Element, target: unknown): void
-
-[./dom] Region
-class Region
-  new (element: Node | null, start: Node | null, end: Node | null): Region
-  claim: <T>(fn: () => T) => T
-  clear: () => void
-  element: Node | null
-  end: Node | null
-  insert: (unit: Unit, before?: Node | null) => void
-  parent: Node
-  start: Node | null
-
-[./dom] release
-function release(block: Block): void
-
-[./dom] removeUnit
-function removeUnit(unit: Unit): void
-
-[./dom] render
-function render(fn: () => unknown, container: Element): () => void
-
-[./dom] renderAppended
-function renderAppended(fn: () => unknown, container: Element): () => void
-
-[./dom] rowUnit
-function rowUnit(made: Unit[]): Unit | null
-
-[./dom] setClass
-function setClass(element: Element, value: unknown): void
-
-[./dom] setStyle
-function setStyle(element: Element, value: unknown, props?: readonly (readonly [string, unknown])[] | undefined): void
-
-[./dom] spreadAttributes
-function spreadAttributes<T>(source: T): T
-
-[./dom] spreadWith
-function spreadWith(sources: readonly object[], styles?: readonly (readonly [string, unknown])[] | undefined, binds?: readonly (readonly [name: string | undefined, read: () => unknown, event: string, write: (event: Event) => void])[] | undefined): object[]
-
-[./dom] submits
-const submits: { listen?: (element: Element, name: string, handler: (event: Event) => void) => void; }
-
-[./dom] swap
-function swap(block: Block, render: () => unknown, owned?: boolean): void
-
-[./dom] template
-function template(html: string): () => Element
-
-[./dom] text
-function text(parent: Node, data: string): void
-
-[./dom] transition
-function transition(element: Element, part: string, value: unknown): void
-
-[./dom] Transitions
-interface Transitions
-  back: (nodes: Node[]) => void
-  enter: (node: Node) => void
-  has: (node: Node) => node is Element
-  leave: (node: Node) => void
-  leaving: ReadonlySet<Node>
-
-[./dom] Unit
-type Unit = Node | Range
-
-[./dom] units
-function units(value: unknown): Unit[]
-
-[./dom] unlisten
-function unlisten(element: Element, name: string): void
-
-[./dom] untrack
-function untrack<T>(fn: () => T): T
-
-[./dom] within
-function within<T>(parent: Node, value: T): T
-
-[./dom-await] awaited
-function awaited(element: Node | null, start: Node | null, end: Node | null, value: () => unknown, pending: (() => unknown) | undefined, ready: (value: unknown) => unknown, failed: ((error: unknown) => unknown) | undefined, fallback?: ((error: unknown) => unknown) | undefined): void
-
-[./dom-image] image
-function image(element: Element, src: unknown, sized: boolean, sizes?: unknown): void
-
-[./dom-loop] loop
-function loop<T>(element: Node | null, start: Node | null, end: Node | null, each: () => false | readonly T[] | null | undefined, key: false | ((item: T) => unknown), render: (item: () => T, index: number | (() => number)) => unknown, fallback?: (() => unknown) | undefined): void
-
-[./dom-loop] rowKey
-function rowKey(item: unknown): unknown
-
-[./dom-spread] dynamic
-function dynamic(tag: unknown, props: Record<string, unknown>): unknown
-
-[./dom-spread] spread
-function spread(element: Element, sources: () => readonly object[], content?: boolean, link?: boolean): void
-
-[./dom-try] attempt
-function attempt(element: Node | null, start: Node | null, end: Node | null, render: (caught: (error: unknown) => unknown) => unknown, fallback: ((error: unknown) => unknown) | undefined): void
 
 [./edit] DraftEntry
 interface DraftEntry
@@ -2136,190 +1897,6 @@ interface Unclickable extends EntryRef
   locale?: string
   path: string
   slug: string
-
-[./html] attempt
-function attempt(render: (caught: (error: unknown) => string) => string, fallback?: ((error: unknown) => string) | undefined): string
-
-[./html] attribute
-function attribute(name: string, value: unknown, literal?: boolean): string
-
-[./html] AwaitNote
-interface AwaitNote
-  pending: boolean
-  settled?: number | undefined
-  stack: string
-  started: number
-
-[./html] awaitNotes
-function awaitNotes(): AwaitNote[] | undefined
-
-[./html] child
-function child(value: unknown): string
-
-[./html] className
-function className(value: unknown): string
-
-[./html] component
-function component<P>(fn: (props: P) => unknown, props: P): unknown
-
-[./html] componentClass
-function componentClass(list: readonly unknown[]): string | undefined
-
-[./html] currentPage
-function currentPage(href: unknown, section?: boolean | undefined): string
-
-[./html] dynamic
-function dynamic(tag: unknown, props: object): unknown
-
-[./html] element
-function element(written: string, sources: readonly object[], content?: (() => string) | undefined): Html
-
-[./html] errorParagraph
-function errorParagraph(message: string | undefined, id: string, classes: string): string
-
-[./html] escape
-function escape(text: string): string
-
-[./html] escapeAttribute
-function escapeAttribute(text: string): string
-
-[./html] FAILED_MARKER
-const FAILED_MARKER: "<!--kay-failed-->"
-
-[./html] fieldDescribed
-function fieldDescribed(own?: unknown, type?: unknown, ownRequired?: unknown): string
-
-[./html] formConstraints
-function formConstraints(target: unknown, name: string, written: readonly string[]): string
-
-[./html] head
-function head(tags: HeadTag[]): void
-
-[./html] html
-function html(markup: string): Html
-
-[./html] Html
-interface Html
-  t: string
-
-[./html] imageAttributes
-function imageAttributes(src: unknown, sized: boolean, sizes?: unknown, placeholder?: boolean | undefined): string
-
-[./html] innerMarkup
-function innerMarkup(value: unknown): string
-
-[./html] isRendered
-function isRendered(value: object): value is Html
-
-[./html] leadingNewline
-function leadingNewline(markup: string): string
-
-[./html] linkHref
-function linkHref(href: unknown, localize: boolean, ownRel: boolean): string
-
-[./html] localHref
-function localHref(href: unknown): unknown
-
-[./html] localLinks
-function localLinks(markup: string): string
-
-[./html] loop
-function loop<T>(each: false | readonly T[] | null | undefined, render: (item: T | (() => T), index: number | (() => number)) => string, fallback?: (() => string) | undefined, accessors?: "keyed" | "positional" | undefined): string
-
-[./html] memo
-function memo<T>(fn: () => T, options?: SignalOptions<T> | undefined): () => T
-
-[./html] merge
-function merge(...sources: readonly object[]): Record<string, unknown>
-
-[./html] newServerIslands
-function newServerIslands(scanning: boolean, path?: Set<unknown>, skip?: ServerIslandMode | undefined): ServerIslands
-
-[./html] nonEmptyAttribute
-function nonEmptyAttribute(name: string, text: string): string
-
-[./html] omit
-function omit(props: object, ...keys: string[]): Record<string, unknown>
-
-[./html] outsideLink
-function outsideLink(href: unknown, ownRel?: boolean): string
-
-[./html] outsideLinks
-function outsideLinks(markup: string): string
-
-[./html] partClass
-function partClass(props: unknown, part: string): unknown
-
-[./html] partHanded
-function partHanded(part: string, list: readonly unknown[]): unknown
-
-[./html] partsClass
-function partsClass(list: readonly unknown[]): unknown
-
-[./html] prerendering
-function prerendering(): boolean
-
-[./html] raw
-function raw(value: unknown): string
-
-[./html] rawData
-function rawData(value: unknown): string
-
-[./html] rawTyped
-function rawTyped(type: unknown, value: unknown): string
-
-[./html] refillOptions
-function refillOptions(posted: string | undefined, markup: string, value?: (() => unknown) | undefined): string
-
-[./html] reportRenderFailure
-function reportRenderFailure(error: unknown): void
-
-[./html] selectOptions
-function selectOptions(value: unknown, markup: string, only?: boolean): string
-
-[./html] SERVER_ISLAND
-const SERVER_ISLAND: RegExp
-
-[./html] serverIsland
-function serverIsland<P>(fn: (props: P) => unknown, props: P, mode: ServerIslandMode, noscript?: unknown): unknown
-
-[./html] ServerIslandMode
-type ServerIslandMode = 'inline' | 'defer'
-
-[./html] ServerIslands
-interface ServerIslands
-  awaits?: AwaitNote[] | undefined
-  html: string[]
-  inside: number
-  modes: ServerIslandMode[]
-  path: Set<unknown>
-  scanning: boolean
-  skip?: ServerIslandMode | undefined
-  stack: unknown[]
-
-[./html] show
-function show<T>(value: T, render: (value: () => Truthy<T>) => string, fallback?: (() => string) | undefined): string
-
-[./html] spreadAttributes
-function spreadAttributes<T>(source: T): T
-
-[./html] spreadWith
-function spreadWith(sources: readonly object[], styles?: readonly (readonly [string, unknown])[] | undefined, binds?: readonly (readonly [name: string | undefined, read: () => unknown, event: string, write: (event: Event) => void])[] | undefined): object[]
-
-[./html] style
-function style(value: unknown, props?: readonly (readonly [string, unknown])[] | undefined): string
-
-[./html] UNDESCRIBED_TYPES
-const UNDESCRIBED_TYPES: Set<string>
-
-[./html] UNREQUIRABLE_TYPES
-const UNREQUIRABLE_TYPES: Set<string>
-
-[./html] untrack
-function untrack<T>(fn: () => T): T
-
-[./html] withServerIslands
-function withServerIslands<T>(state: ServerIslands, render: () => T): T
 
 [./i18n] alternate
 function alternate(target: string): string
@@ -2380,7 +1957,9 @@ interface LocaleSettings
 function localize<const Href extends string>(href: Href & CheckedHref<Href>, locale?: string | undefined): string
 
 [./i18n] MergeMessages
-type MergeMessages<A, B> = { readonly [Key in keyof A | keyof B]: Key extends keyof B ? Key extends keyof A ? IsGroup<A[Key]> extends true ? IsGroup<B[Key]> extends true ? MergeMessages<A[Key], B[Key]> : B[Key] : B[Key] : B[Key] : Key extends keyof A ? A[Key] : never }
+type MergeMessages<A, B> = {
+  readonly [Key in keyof A | keyof B]: Key extends keyof B ? Key extends keyof A ? IsGroup<A[Key]> extends true ? IsGroup<B[Key]> extends true ? MergeMessages<A[Key], B[Key]> : B[Key] : B[Key] : B[Key] : Key extends keyof A ? A[Key] : never
+}
 
 [./i18n] Message
 type Message = string | Plural
@@ -2409,7 +1988,11 @@ interface RelativeTimeOptions extends Intl.RelativeTimeFormatOptions, LocaleOpti
   now?: number | Date | undefined
 
 [./i18n] RichText
-type RichText = [Messages] extends [never] ? (props: { key: string } & Record<string, MessageValue | Block>) => JSX.Element : <Key extends KeysOf<Messages>>(props: { key: Key } & Params<At<Messages, Key>> & Record<TagsOf<At<Messages, Key>>, Block>) => JSX.Element
+type RichText = [Messages] extends [never] ? (props: {
+  key: string
+} & Record<string, MessageValue | Block>) => JSX.Element : <Key extends KeysOf<Messages>>(props: {
+  key: Key
+} & Params<At<Messages, Key>> & Record<TagsOf<At<Messages, Key>>, Block>) => JSX.Element
 
 [./i18n] t
 function t(key: string, params?: Record<string, MessageValue> | undefined): string
@@ -2419,12 +2002,6 @@ function T(props: { key: string; } & Record<string, MessageValue | Block>): Elem
 
 [./i18n] timeZone
 function timeZone(): string | undefined
-
-[./i18n-links] localizedHref
-function localizedHref(href: string): string
-
-[./i18n-links] noteLinkPayload
-function noteLinkPayload(payload: LinkPayload): void
 
 [./icons] iconNames
 function iconNames(set: IconSet): string[]
@@ -2480,587 +2057,6 @@ interface ShareCardOptions
 [./image] shareImage
 function shareImage(src: string): string
 
-[./internal] actionStub
-function actionStub(url: string): Action<unknown, unknown, never>
-
-[./internal] autoDefer
-function autoDefer<T>(value: T): T
-
-[./internal] bindable
-function bindable<Props extends object>(props: Props, keys: readonly string[]): Props
-
-[./internal] formAction
-function formAction(target: string | Action<never, unknown, never>): string
-
-[./internal] formChecked
-function formChecked(target: unknown, name: string, value: unknown): boolean | undefined
-
-[./internal] formDescribed
-function formDescribed(element: Element, target: unknown, field: string, id: string): void
-
-[./internal] formError
-function formError(target: unknown, field: string): string | undefined
-
-[./internal] formInvalid
-function formInvalid(target: unknown, name: string): "true" | undefined
-
-[./internal] formMarked
-function formMarked(element: Element, target: unknown, field: string): void
-
-[./internal] formProtection
-function formProtection(target: unknown): string
-
-[./internal] formValue
-function formValue(target: unknown, name: string): string | undefined
-
-[./internal] isAction
-function isAction(value: unknown): value is ServerAction<TSchema, unknown, never>
-
-[./internal] loadTemplateContext
-function loadTemplateContext({ request }: { request: Request; }): Promise<void>
-
-[./internal] registerActions
-function registerActions(moduleId: string, exports: Record<string, unknown>): void
-
-[./internal] registerImage
-function registerImage(url: string, width: number, height: number): string
-
-[./internal] registerPlaceholder
-function registerPlaceholder(url: string, color: string): string
-
-[./internal] reviveActions
-function reviveActions(): void
-
-[./internal] uiRecipe
-function uiRecipe(config: RecipeConfig<Readonly<Record<string, Readonly<Record<string, VariantClasses>>>>>, base?: Pick<Recipe<Readonly<Record<string, Readonly<Record<string, VariantClasses>>>>>, "defaults"> | undefined): Recipe<Readonly<Record<string, Readonly<Record<string, VariantClasses>>>>>
-
-[./internal] updateBack
-function updateBack<Current, Next = Current | Written<Current>>(current: Current, update: (current: Written<Current>) => Next): Kept<Current, Next>
-
-[./internal] updateTo
-function updateTo<Target, Key extends keyof Target, Next extends Written<Target[Key]> | Target[Key] = Written<Target[Key]>>(object: Target, key: Key, update: (current: Written<Target[Key]>) => Next, form?: "post" | "logical" | undefined, _probe?: Probe<Target, Key> | undefined): Next
-
-[./internal] writeBack
-function writeBack<Current, Value extends BackValue<Current> = Current | Written<Current>>(current: Current, value: Value): Kept<Current, Value>
-
-[./internal] writeTo
-function writeTo<Target, Key extends keyof Target, Value extends Written<Target[Key]> | Target[Key]>(object: Target, key: Key, value: Value, _probe?: Probe<Target, Key> | undefined): Value
-
-[./internal/server] buildingWithoutEnv
-function buildingWithoutEnv(): void
-
-[./internal/server] Bundle
-interface Bundle
-  api?: ApiModule[]
-  clientDir: string
-  config: KayConfig
-  editor?: string
-  endpoints?: Endpoint[]
-  extensionMessages?: Record<string, string[]>
-  fallback: SpecialPages
-  modules: Record<string, unknown>
-  name?: string | undefined
-  plugins?: string[]
-  publicDir: string
-  publicModules?: string[]
-  root: string
-  routes: Route[]
-
-[./internal/server] listenIdleApps
-function listenIdleApps(): void
-
-[./internal/server] loadingWithoutEnv
-function loadingWithoutEnv(): void
-
-[./internal/server] probeHealth
-function probeHealth(config: false | HealthConfig | undefined, port?: string, host?: string | undefined): Promise<number>
-
-[./internal/server] registerBundle
-function registerBundle(value: Bundle): void
-
-[./internal/server] registerEmbeddedMap
-function registerEmbeddedMap(name: string, blob: string): void
-
-[./internal/server] runAsPrimary
-function runAsPrimary(argv: string[], env: Record<string, string | undefined>): Promise<number | undefined>
-
-[./internal/title] pageTitle
-function pageTitle(read: () => string, raw: boolean): void
-
-[./island] collectIslands
-function collectIslands<T>(render: () => T, salt?: string | undefined, chunks?: Record<string, string> | undefined): { result: T; islands: RenderedIslands; }
-
-[./island] insideIsland
-function insideIsland(): boolean
-
-[./island] island
-function island<P extends object>(id: string, component: ((props: P) => Element) | undefined, messages?: readonly string[], client?: boolean, why?: string, lives?: readonly unknown[], takesActions?: boolean): IslandComponent<P>
-
-[./island] islandCheckpoint
-function islandCheckpoint(): (() => void) | undefined
-
-[./island] IslandPropsError
-class IslandPropsError
-  new (message?: string | undefined): IslandPropsError
-  new (message?: string | undefined, options?: ErrorOptions | undefined): IslandPropsError
-  new (message?: string | undefined, options?: ErrorOptions | undefined): IslandPropsError
-  name: string
-
-[./island] noteMessage
-function noteMessage(key: string): void
-
-[./island] promote
-function promote<P extends object>(id: string, render: (props: P) => Element, hydrated: (props: P) => Element, messages?: readonly string[], takesActions?: boolean): (props: P) => Element
-
-[./island] RenderedIslands
-interface RenderedIslands
-  chunks?: Record<string, string> | undefined
-  count: number
-  eager: Set<string>
-  immediate: Set<string>
-  lazy: number
-  messages: Set<string>
-  used: Set<string>
-  waiting: Set<string>
-
-[./library] acceptedLocales
-function acceptedLocales(header: string): string[]
-
-[./library] actionTool
-function actionTool(action: ServerAction<TSchema, unknown, string>, taken?: Set<string> | undefined): LibraryTool | undefined
-
-[./library] addRuntimeRedirect
-function addRuntimeRedirect(from: string, to: string, options?: { status?: RuntimeStatus | undefined; file?: string | undefined; }): RuntimeRedirect
-
-[./library] admitEditSession
-function admitEditSession(ctx: { cookies: CookieMap; request: Request; }, given?: string | undefined): void
-
-[./library] AnswerIssue
-interface AnswerIssue
-  message: string
-  path: string
-
-[./library] appModules
-function appModules(root: string, { name, appFiles }: Pick<KayExtension<AnyElysia>, "name" | "appFiles">): Promise<Record<string, Record<string, unknown> | undefined>>
-
-[./library] appSecrets
-function appSecrets(): string[] | undefined
-
-[./library] appStore
-function appStore(): AppStore | undefined
-
-[./library] asConfigError
-function asConfigError<T>(read: () => T): T
-
-[./library] byteSize
-function byteSize(value: unknown, what: string): number
-
-[./library] ByteSize
-type ByteSize = number | `${number}${'b' | 'kb' | 'mb'}`
-
-[./library] CacheSlot
-interface CacheSlot
-  file: string
-  key: string
-
-[./library] checkAnswer
-function checkAnswer(schema: TSchema, value: unknown): CheckedAnswer
-
-[./library] CheckedAnswer
-type CheckedAnswer = { value: unknown } | { issues: AnswerIssue[] }
-
-[./library] clearMissing
-function clearMissing(file?: string | undefined): number
-
-[./library] configError
-function configError(message: string, options?: ErrorOptions | undefined): KayError
-function configError(option: string, value: unknown, takes: string): KayError
-
-[./library] configuredHighlighter
-function configuredHighlighter(): Promise<Highlighter | undefined>
-
-[./library] configuredRedirects
-function configuredRedirects(): { from: string; to: string; status: RedirectStatus; }[]
-
-[./library] configuredSite
-function configuredSite(): { origin: string; slashed: boolean; } | undefined
-
-[./library] connectionOf
-function connectionOf(source: PgJobsSource): SQL
-
-[./library] ContextDefinition
-interface ContextDefinition<Values extends object = object>
-  load?: ((request: Request) => Values | Promise<Values>) | undefined
-  loaders?: Record<string, (request: Request) => unknown> | undefined
-  values?: Values | undefined
-
-[./library] currentRequest
-function currentRequest(): Request | undefined
-
-[./library] DataValue
-type DataValue = string | number | boolean | bigint | null | undefined | Date | DataValue[] | { [key: string]: DataValue }
-
-[./library] defineContext
-function defineContext<Values extends object>(load: (request: Request) => Values | Promise<Values>): ContextDefinition<Values>
-function defineContext<Loaders extends Record<string, (request: Request) => unknown>>(loaders: Loaders): ContextDefinition<{ [Key in keyof Loaders]: Awaited<ReturnType<Loaders[Key]>>; }>
-
-[./library] dismissMissing
-function dismissMissing(path: string, file?: string | undefined): boolean
-function dismissMissing(paths: readonly string[], file?: string | undefined): number
-
-[./library] drainQueues
-function drainQueues(): Promise<number>
-
-[./library] durationSeconds
-function durationSeconds(value: unknown, what: string): number
-
-[./library] durationWords
-function durationWords(seconds: number, locale: string): string
-
-[./library] editSessionAdmitted
-function editSessionAdmitted(request: Request): boolean
-
-[./library] escapeHtml
-function escapeHtml(text: string): string
-
-[./library] FallbackMemory
-interface FallbackMemory
-  hit: (key: string, window: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w`, weight?: number | undefined) => RateWindow
-  peek: (key: string) => RateWindow | undefined
-  refund?: ((key: string, resetAt: number) => void) | undefined
-  reset?: ((key: string) => void) | undefined
-
-[./library] GENERATE_SECRET
-const GENERATE_SECRET: "`bun -e \"console.log(crypto.randomUUID() + crypto.randomUUID())\"`"
-
-[./library] Highlighter
-type Highlighter = (code: string, language: string | undefined) => string | Promise<string>
-
-[./library] IMPORTED
-const IMPORTED: "/_kay/assets/"
-
-[./library] inFlightWork
-function inFlightWork<T>(work: () => Promise<T>): Promise<T>
-
-[./library] invalidateLocally
-function invalidateLocally(key: string): void
-
-[./library] isUrlAttribute
-function isUrlAttribute(name: string): boolean
-
-[./library] JsonSchema
-interface JsonSchema
-  anyOf?: JsonSchema[] | undefined
-  const?: DataValue
-  default?: DataValue
-  description?: string | undefined
-  enum?: DataValue[] | undefined
-  format?: string | undefined
-  items?: JsonSchema | JsonSchema[] | undefined
-  properties?: Record<string, JsonSchema> | undefined
-  required?: string[] | undefined
-  title?: string | undefined
-  type?: string | string[] | undefined
-  x-kay-input?: FieldInputOptions | undefined
-  x-kay?: FieldHint | undefined
-
-[./library] jsonSchemaOf
-function jsonSchemaOf(schema: unknown): unknown
-
-[./library] KAY_DIR
-const KAY_DIR: ".kay"
-
-[./library] KayCommand
-interface KayCommand extends Omit<Command, 'run'>
-  normalize?: (args: string[]) => string[]
-  options: ParseArgsOptionsConfig
-  positionals: number
-  run: (parsed: Parsed, refuse: (reason?: string | undefined) => number, project: { root: string; config: KayConfig; }) => number | Promise<number>
-  usage: string
-
-[./library] keyedDigest
-function keyedDigest(use: string, text: string): string
-
-[./library] knownAddress
-function knownAddress(request: Request, server: Server<unknown> | null | undefined, setting?: number | boolean | ProxyConfig | undefined): string | undefined
-
-[./library] lazily
-function lazily(guard: Guard | LazyGuard): Guard
-
-[./library] LazyGuard
-interface LazyGuard
-  load: () => Guard | Promise<Guard>
-
-[./library] libraryCacheSlot
-function libraryCacheSlot(root: string, library: string, id: string, inputs: string): CacheSlot
-
-[./library] LibraryTool
-interface LibraryTool
-  call: (args: Record<string, unknown>, request?: Request | undefined) => Promise<ToolResult>
-  description: string
-  inputSchema: object
-  label?: string | undefined
-  name: string
-  readOnly?: boolean | undefined
-
-[./library] localizedEntry
-function localizedEntry(root: string, config: Pick<KayConfig, "i18n" | "content">, collection: string, slug: string): Promise<LocalizedEntry>
-
-[./library] LocalizedEntry
-interface LocalizedEntry
-  body: string | undefined
-  data: Record<string, DataValue>
-  mark: "field" | "comment" | undefined
-  schema: JsonSchema
-
-[./library] Logo
-interface Logo
-  alt: string
-  height?: number | undefined
-  href?: string | undefined
-  src: string
-  width?: number | undefined
-
-[./library] matchLocale
-function matchLocale(locales: readonly string[], wanted: readonly string[]): string | undefined
-
-[./library] memoryRates
-function memoryRates(): SyncRates
-
-[./library] MIN_SECRET_LENGTH
-const MIN_SECRET_LENGTH: 32
-
-[./library] MissingPath
-interface MissingPath
-  firstAt: number
-  hits: number
-  lastAt: number
-  path: string
-  reason?: Reason | undefined
-  referrers: { host: string; page?: string | undefined; hits: number; }[]
-  target?: string | undefined
-
-[./library] missingTranslations
-function missingTranslations(root: string, config: Pick<KayConfig, "i18n" | "content" | "extensions">): Promise<Record<string, MissingTranslations>>
-
-[./library] MissingTranslations
-interface MissingTranslations
-  entries: Record<string, string[]>
-  messages: Record<string, Message>
-
-[./library] nameUser
-function nameUser(request: Request, name: Namer): void
-
-[./library] onKeysInvalidated
-function onKeysInvalidated(listener: KeyListener): () => void
-
-[./library] openSqlite
-function openSqlite(path: string): Database
-
-[./library] openWith
-function openWith(keys: Uint8Array<ArrayBufferLike>[], value: string, context?: string | undefined): { text: string; key: number; } | undefined
-
-[./library] optionMs
-function optionMs(value: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w`, what: string): number
-
-[./library] overHttps
-function overHttps(request: Request): boolean
-
-[./library] Parsed
-interface Parsed
-  positionals: string[]
-  values: Record<string, string | boolean | string[] | undefined>
-
-[./library] parseEvents
-function parseEvents<End>(body: ReadableStream<Uint8Array<ArrayBufferLike>>, signal: AbortSignal, onEvent: (event: string, data: string) => End | undefined): Promise<End | undefined>
-
-[./library] PgJobsSource
-type PgJobsSource = SQL | { sql: SQL } | string
-
-[./library] PresenceView
-type PresenceView = (request: Request | undefined, room: string, members: string[], member: string) => string[]
-
-[./library] privilegeRefused
-function privilegeRefused(error: unknown): boolean
-
-[./library] ratesFallingBack
-function ratesFallingBack<Store extends RateStore>(name: string, store: Store, memory?: FallbackMemory): RateStore & Sure<Store>
-
-[./library] READ_METHODS
-const READ_METHODS: Set<string>
-
-[./library] readCacheEntry
-function readCacheEntry<Value>(slot: CacheSlot): Promise<Value | undefined>
-
-[./library] redirectMovedPage
-function redirectMovedPage(from: string | undefined, to: string | undefined): void
-
-[./library] RedirectRefusedError
-class RedirectRefusedError
-  new (message?: string | undefined): RedirectRefusedError
-  new (message?: string | undefined, options?: ErrorOptions | undefined): RedirectRefusedError
-  new (message?: string | undefined, options?: ErrorOptions | undefined): RedirectRefusedError
-
-[./library] refundRateLimit
-function refundRateLimit(request: Request | undefined): Promise<void>
-
-[./library] relationsMissing
-function relationsMissing(db: SQL, names: readonly string[]): Promise<boolean>
-
-[./library] removeRuntimeRedirect
-function removeRuntimeRedirect(from: string, file?: string | undefined): boolean
-
-[./library] requestOfContext
-function requestOfContext(): Request | undefined
-
-[./library] RESTART_RELOAD
-const RESTART_RELOAD: string
-
-[./library] RuntimeRedirect
-interface RuntimeRedirect
-  addedAt: number
-  from: string
-  status: RuntimeStatus
-  to: string
-
-[./library] runtimeRedirects
-function runtimeRedirects(file?: string | undefined): RuntimeRedirect[]
-
-[./library] safeCode
-function safeCode(markup: string): string
-
-[./library] sameText
-function sameText(given: string, expected: string): boolean
-
-[./library] sealWith
-function sealWith(key: Uint8Array<ArrayBufferLike>, text: string, context?: string | undefined): string
-
-[./library] serverRoot
-function serverRoot(): Promise<string>
-
-[./library] setSite
-function setSite(origin: string | undefined, trailingSlash?: "never" | "always" | "ignore" | undefined, prerendering?: boolean, keepSameTab?: boolean): void
-
-[./library] sitePaths
-function sitePaths(): string[]
-
-[./library] siteWithBase
-function siteWithBase(site: string | undefined, base: string | undefined): string | undefined
-
-[./library] sourceHash
-function sourceHash(text: string): string
-
-[./library] stoppers
-function stoppers(request: Request): Pick<RequestContext<Record<string, string>>, "redirect" | "notFound" | "deny">
-
-[./library] ToolResult
-interface ToolResult
-  content: Content[]
-  isError?: boolean
-  structuredContent?: object
-
-[./library] trackDetached
-function trackDetached(work: Promise<unknown>): void
-
-[./library] TSchema
-interface TSchema extends TKind, SchemaOptions
-
-[./library] uiConfigEntries
-function uiConfigEntries(text: string): Promise<UiConfigEntry[] | undefined>
-
-[./library] UiConfigEntry
-interface UiConfigEntry
-  key: string
-  keySpan: Span
-  value: Span
-
-[./library] unansweredPaths
-function unansweredPaths(file?: string | undefined): MissingPath[]
-
-[./library] underKayDev
-function underKayDev(): boolean
-
-[./library] UNSAFE_ATTRIBUTE
-const UNSAFE_ATTRIBUTE: RegExp
-
-[./library] UNSAFE_TAGS
-const UNSAFE_TAGS: ReadonlySet<string>
-
-[./library] userOf
-function userOf(request: Request): Promise<string | undefined>
-
-[./library] validLocale
-function validLocale(tag: string): boolean
-
-[./library] viewPresenceWith
-function viewPresenceWith(next: PresenceView): () => void
-
-[./library] weakSecrets
-function weakSecrets(secrets: string[]): boolean
-
-[./library] writeCacheEntry
-function writeCacheEntry(slot: CacheSlot, value: unknown): Promise<void>
-
-[./library] writeDraftEntry
-function writeDraftEntry(root: string, config: Pick<KayConfig, "i18n" | "content">, collection: string, locale: string, slug: string, entry: { data: Record<string, DataValue>; body?: string | undefined; }): Promise<string>
-
-[./library] writeDraftMessages
-function writeDraftMessages(root: string, config: Pick<KayConfig, "i18n">, locale: string, messages: Record<string, Message>): Promise<string[]>
-
-[./library/auth-mails] AUTH_LINK_KINDS
-const AUTH_LINK_KINDS: readonly ["verify-email", "reset-password", "magic-link", "change-email", "invitation", "account-exists"]
-
-[./library/auth-mails] AUTH_MAIL_ENGLISH
-const AUTH_MAIL_ENGLISH: { readonly link: "link"; readonly code: "code"; readonly orPaste: "Or paste this into your browser:"; readonly yourCode: "Your code:"; readonly orTypeCode: "Or type this code where you asked for it:"; readonly linkWorks: "The link works for {duration}."; readonly codeWorks: "The code works for {dura ...#d006173e
-
-[./library/auth-mails] AUTH_MAIL_FRENCH
-const AUTH_MAIL_FRENCH: { readonly link: "lien"; readonly code: "code"; readonly orPaste: "Ou collez ceci dans votre navigateur :"; readonly yourCode: "Votre code :"; readonly orTypeCode: "Ou saisissez ce code là où vous l'avez demandé :"; readonly linkWorks: "Le lien est valable {duration}."; readonly codeWorks: "Le code  ...#5a6b12e0
-
-[./library/auth-mails] AUTH_MAIL_SAMPLES
-const AUTH_MAIL_SAMPLES: Readonly<Record<AuthMailKind, Pick<AuthMailData, "url" | "code" | "detail">>>
-
-[./library/auth-mails] AUTH_MAIL_WORDING
-const AUTH_MAIL_WORDING: Readonly<Record<string, AuthMailWording>>
-
-[./library/auth-mails] AUTH_NOTICE_KINDS
-const AUTH_NOTICE_KINDS: readonly ["new-sign-in", "sign-in-locked", "password-changed", "email-changed", "two-factor-enabled", "two-factor-disabled", "recovery-code-used", "recovery-codes-regenerated", "provider-linked", "provider-unlinked", "passkey-added", "passkey-removed", "token-created", "signed-out-everywhere", "acco ...#88c650a0
-
-[./library/auth-mails] AuthLinkKind
-type AuthLinkKind = typeof AUTH_LINK_KINDS[number]
-
-[./library/auth-mails] AuthLinkLines
-interface AuthLinkLines
-  button: string
-  ending: string
-  lasts: string
-  lead: string
-  subject: string
-
-[./library/auth-mails] AuthMailData
-interface AuthMailData
-  code?: string | undefined
-  detail?: string | undefined
-  email: string
-  locale: string
-  maxAge?: { link?: number; code?: number; } | undefined
-  name: string
-  url?: string | undefined
-
-[./library/auth-mails] AuthMailKind
-type AuthMailKind = AuthLinkKind | AuthNoticeKind
-
-[./library/auth-mails] AuthMailWording
-type AuthMailWording = { link: string code: string orPaste: string yourCode: string orTypeCode: string linkWorks: string codeWorks: string codeLasts: string once: string review: string } & Record<AuthLinkKind, AuthLinkLines> & Record<AuthNoticeKind, AuthNoticeLines>
-
-[./library/auth-mails] AuthNoticeKind
-type AuthNoticeKind = typeof AUTH_NOTICE_KINDS[number]
-
-[./library/auth-mails] AuthNoticeLines
-interface AuthNoticeLines
-  ending: string
-  lead: string
-  subject: string
-
 [./markdown] isHeldMarkdown
 function isHeldMarkdown(_html: string): boolean
 
@@ -3085,26 +2081,42 @@ function slug(value: string): string | undefined
 [./params] uuid
 function uuid(value: string): string | undefined
 
-[./pending] pendingBlock
-function pendingBlock(block: Element, source: PendingSource, on: boolean): void
-
-[./pending] pendingBlocks
-function pendingBlocks(form: Element, source: PendingSource, on: boolean): void
-
-[./pending] pendingCall
-function pendingCall(block: Element, action: unknown): void
-
-[./pending] PendingSource
-type PendingSource = 'post' | 'hold' | 'call'
-
 [./pg-orm] jobTables
-const jobTables: readonly [TableDef<"kay_jobs", ExtractColumns<{ id: ColumnBuilder<string, NotNullable, NoDefault, IsPrimaryKey, NotGenerated>; queue: ColumnBuilder<string, NotNullable, NoDefault, NotPrimaryKey, NotGenerated>; payload: ColumnBuilder<string, NotNullable, NoDefault, NotPrimaryKey, NotGenerated>; attem ...#9bcfdbdc
+const jobTables: readonly [TableDef<"kay_jobs", ExtractColumns<{
+  id: ColumnBuilder<string, NotNullable, NoDefault, IsPrimaryKey, NotGenerated>;
+  queue: ColumnBuilder<string, NotNullable, NoDefault, NotPrimaryKey, NotGenerated>;
+  payload: ColumnBuilder<string, NotNullable, NoDefault, NotPrimaryKey, NotGenerated>;
+  attempts: ColumnBuilder<number, NotNullable, NoDefault, NotPrimaryKey, NotGenerated>;
+  run_at: ColumnBuilder<bigint, NotNullable, NoDefault, NotPrimaryKey, NotGenerated>;
+  held_until: ColumnBuilder<bigint, IsNullable, NoDefault, NotPrimaryKey, NotGenerated>;
+  failed: ColumnBuilder<boolean, NotNullable, HasDefault, NotPrimaryKey, NotGenerated>;
+  error: ColumnBuilder<string, IsNullable, NoDefault, NotPrimaryKey, NotGenerated>;
+  job_key: ColumnBuilder<string, IsNullable, NoDefault, NotPrimaryKey, NotGenerated>;
+  progress: ColumnBuilder<string, IsNullable, NoDefault, NotPrimaryKey, NotGenerated>;
+}>, {}, {}>, TableDef<"kay_locks", ExtractColumns<{
+  name: ColumnBuilder<string, NotNullable, NoDefault, IsPrimaryKey, NotGenerated>;
+  slot: ColumnBuilder<bigint, NotNullable, NoDefault, IsPrimaryKey, NotGenerated>;
+}>, {}, {}>]
 
 [./pg-orm] KayJobs
-const KayJobs: TableDef<"kay_jobs", ExtractColumns<{ id: ColumnBuilder<string, NotNullable, NoDefault, IsPrimaryKey, NotGenerated>; queue: ColumnBuilder<string, NotNullable, NoDefault, NotPrimaryKey, NotGenerated>; payload: ColumnBuilder<string, NotNullable, NoDefault, NotPrimaryKey, NotGenerated>; attempts: Colum ...#b4319fa2
+const KayJobs: TableDef<"kay_jobs", ExtractColumns<{
+  id: ColumnBuilder<string, NotNullable, NoDefault, IsPrimaryKey, NotGenerated>;
+  queue: ColumnBuilder<string, NotNullable, NoDefault, NotPrimaryKey, NotGenerated>;
+  payload: ColumnBuilder<string, NotNullable, NoDefault, NotPrimaryKey, NotGenerated>;
+  attempts: ColumnBuilder<number, NotNullable, NoDefault, NotPrimaryKey, NotGenerated>;
+  run_at: ColumnBuilder<bigint, NotNullable, NoDefault, NotPrimaryKey, NotGenerated>;
+  held_until: ColumnBuilder<bigint, IsNullable, NoDefault, NotPrimaryKey, NotGenerated>;
+  failed: ColumnBuilder<boolean, NotNullable, HasDefault, NotPrimaryKey, NotGenerated>;
+  error: ColumnBuilder<string, IsNullable, NoDefault, NotPrimaryKey, NotGenerated>;
+  job_key: ColumnBuilder<string, IsNullable, NoDefault, NotPrimaryKey, NotGenerated>;
+  progress: ColumnBuilder<string, IsNullable, NoDefault, NotPrimaryKey, NotGenerated>;
+}>, {}, {}>
 
 [./pg-orm] KayLocks
-const KayLocks: TableDef<"kay_locks", ExtractColumns<{ name: ColumnBuilder<string, NotNullable, NoDefault, IsPrimaryKey, NotGenerated>; slot: ColumnBuilder<bigint, NotNullable, NoDefault, IsPrimaryKey, NotGenerated>; }>, {}, {}>
+const KayLocks: TableDef<"kay_locks", ExtractColumns<{
+  name: ColumnBuilder<string, NotNullable, NoDefault, IsPrimaryKey, NotGenerated>;
+  slot: ColumnBuilder<bigint, NotNullable, NoDefault, IsPrimaryKey, NotGenerated>;
+}>, {}, {}>
 
 [./seo] breadcrumbList
 function breadcrumbList(trail: Crumb[]): JsonLd
@@ -3130,7 +2142,34 @@ function siteOrigin(): string
 function siteUrl(path?: string): string
 
 [./server] api
-function api(options?: ApiOptions): Elysia<"", { decorator: Empty; store: Empty; derive: Empty; resolve: ApiLocals; }, { typebox: {}; error: {}; }, { schema: {}; standaloneSchema: {}; macro: {}; macroFn: {}; parser: {}; response: {}; }, {}, { derive: {}; resolve: {}; schema: {}; standaloneSchema: {}; response:  ...#7302437d
+function api(options?: ApiOptions): Elysia<"", {
+  decorator: Empty;
+  store: Empty;
+  derive: Empty;
+  resolve: ApiLocals;
+}, {
+  typebox: {};
+  error: {};
+}, {
+  schema: {};
+  standaloneSchema: {};
+  macro: {};
+  macroFn: {};
+  parser: {};
+  response: {};
+}, {}, {
+  derive: {};
+  resolve: {};
+  schema: {};
+  standaloneSchema: {};
+  response: {};
+}, {
+  derive: {};
+  resolve: {};
+  schema: {};
+  standaloneSchema: {};
+  response: {};
+}>
 
 [./server] ApiModule
 interface ApiModule
@@ -3192,7 +2231,34 @@ interface AsyncRoomStore extends RoomStoreBase
   update?: (room: string, change: (current: string | undefined) => string) => Promise<string>
 
 [./server] background
-function background(work: (signal: AbortSignal) => unknown, options?: BackgroundOptions): Elysia<"", { decorator: {}; store: {}; derive: {}; resolve: {}; }, { typebox: {}; error: {}; }, { schema: {}; standaloneSchema: {}; macro: {}; macroFn: {}; parser: {}; response: {}; }, {}, { derive: {}; resolve: {}; schema: {}; s ...#e4ede4b6
+function background(work: (signal: AbortSignal) => unknown, options?: BackgroundOptions): Elysia<"", {
+  decorator: {};
+  store: {};
+  derive: {};
+  resolve: {};
+}, {
+  typebox: {};
+  error: {};
+}, {
+  schema: {};
+  standaloneSchema: {};
+  macro: {};
+  macroFn: {};
+  parser: {};
+  response: {};
+}, {}, {
+  derive: {};
+  resolve: {};
+  schema: {};
+  standaloneSchema: {};
+  response: {};
+}, {
+  derive: {};
+  resolve: {};
+  schema: {};
+  standaloneSchema: {};
+  response: {};
+}>
 
 [./server] BackgroundOptions
 interface BackgroundOptions
@@ -3258,7 +2324,9 @@ const dataTables: readonly string[]
 function defineConfig<Config extends KayConfig>(config: Config & { publicEnv?: never; }): Config
 
 [./server] defineEnv
-function defineEnv<Schema extends EnvSchema>(declared: Schema, source?: Record<string, string | undefined>): (Schema & { params: []; })["static"] & (keyof PublicFieldsOf<Schema> extends never ? unknown : WithPublicFields<Schema>)
+function defineEnv<Schema extends EnvSchema>(declared: Schema, source?: Record<string, string | undefined>): (Schema & {
+  params: [];
+})["static"] & (keyof PublicFieldsOf<Schema> extends never ? unknown : WithPublicFields<Schema>)
 
 [./server] DeletableSessionStore
 type DeletableSessionStore = SessionStore & { deleteWhere: (match: SessionMatch) => number | Promise<number> }
@@ -3316,7 +2384,17 @@ interface FailedJob<Payload>
   payload: Payload
 
 [./server] files
-const files: { put(data: Blob, options?: PutOptions): Promise<string>; get(key: string): Promise<Blob | undefined>; delete(key: string): Promise<void>; list(options?: { folder?: string | undefined; }): Promise<StoredFile[]>; variants(keys: string[]): Promise<Map<string, string[]>>; url(key: string, options?: Url ...#477294da
+const files: {
+  put(data: Blob, options?: PutOptions): Promise<string>;
+  get(key: string): Promise<Blob | undefined>;
+  delete(key: string): Promise<void>;
+  list(options?: {
+    folder?: string | undefined;
+  }): Promise<StoredFile[]>;
+  variants(keys: string[]): Promise<Map<string, string[]>>;
+  url(key: string, options?: UrlOptions): string;
+  response(key: string, request?: Request | undefined): Promise<Response>;
+}
 
 [./server] FileStore
 interface FileStore
@@ -3337,7 +2415,13 @@ function forgetPushDevice(request: Request, user: string): Promise<void>
 function holdsType(bytes: Uint8Array<ArrayBufferLike>, type: string): boolean
 
 [./server] imageSize
-function imageSize(input: Blob | ArrayBuffer | Uint8Array<ArrayBufferLike>, options?: { maxPixels?: number | undefined; }): Promise<{ width: number; height: number; format: string; }>
+function imageSize(input: Blob | ArrayBuffer | Uint8Array<ArrayBufferLike>, options?: {
+  maxPixels?: number | undefined;
+}): Promise<{
+  width: number;
+  height: number;
+  format: string;
+}>
 
 [./server] Inbox
 interface Inbox
@@ -3378,7 +2462,15 @@ interface JobStore
   retry: (id: string, runAt: number, error: string, until?: number | undefined) => Maybe<boolean | void>
   revive?: ((id: string, runAt: number) => Maybe<boolean>) | undefined
   state?: ((queue: string, ref: { key: string; } | { id: string; }, now: number) => Maybe<StoredJobState | undefined>) | undefined
-  update?: ((id: string, change: { payload: string; runAt?: number | undefined; }, guard: { until: number; } | { payload: string; now: number; }) => Maybe<boolean>) | undefined
+  update?: ((id: string, change: {
+  payload: string;
+  runAt?: number | undefined;
+}, guard: {
+  until: number;
+} | {
+  payload: string;
+  now: number;
+}) => Maybe<boolean>) | undefined
 
 [./server] jobTables
 const jobTables: readonly ["kay_jobs", "kay_locks"]
@@ -3539,7 +2631,18 @@ interface Notification
   url?: string | undefined
 
 [./server] notifications
-const notifications: { list(user: string, { limit }?: { limit?: number | undefined; }): Promise<Notification[]>; inbox(user: string): Promise<Inbox>; unread(user: string): Promise<number>; markRead(user: string, id: string): Promise<boolean>; markAllRead(user: string): Promise<number>; erase(user: string): Promise<numbe ...#c1b02dd0
+const notifications: {
+  list(user: string, {
+    limit
+  }?: {
+    limit?: number | undefined;
+  }): Promise<Notification[]>;
+  inbox(user: string): Promise<Inbox>;
+  unread(user: string): Promise<number>;
+  markRead(user: string, id: string): Promise<boolean>;
+  markAllRead(user: string): Promise<number>;
+  erase(user: string): Promise<number>;
+}
 
 [./server] NotificationStore
 interface NotificationStore
@@ -3566,7 +2669,34 @@ interface NotifyOptions
 type PageHook = (page: RenderedPage) => string | Promise<string>
 
 [./server] pages
-function pages(options?: PagesOptions): Promise<Elysia<"", { decorator: {}; store: {}; derive: {}; resolve: {}; }, { typebox: {}; error: {}; }, { schema: {}; standaloneSchema: {}; macro: {}; macroFn: {}; parser: {}; response: {}; }, {}, { derive: {}; resolve: {}; schema: {}; standaloneSchema: {}; response: {}; }, ...#29343348
+function pages(options?: PagesOptions): Promise<Elysia<"", {
+  decorator: {};
+  store: {};
+  derive: {};
+  resolve: {};
+}, {
+  typebox: {};
+  error: {};
+}, {
+  schema: {};
+  standaloneSchema: {};
+  macro: {};
+  macroFn: {};
+  parser: {};
+  response: {};
+}, {}, {
+  derive: {};
+  resolve: {};
+  schema: {};
+  standaloneSchema: {};
+  response: {};
+}, {
+  derive: {};
+  resolve: {};
+  schema: {};
+  standaloneSchema: {};
+  response: {};
+}>>
 
 [./server] PagesOptions
 interface PagesOptions extends KayConfig
@@ -3642,7 +2772,20 @@ interface PagesOptions extends KayConfig
   typography?: boolean | undefined
 
 [./server] pgData
-function pgData(source: PgJobsSource): { close: () => Promise<void>; [Symbol.asyncDispose]: () => Promise<void>; notifications: NotificationStore; push: PushStore; database?: string; sessions: DeletableSessionStore; cache: CacheStore; jobs: JobStore; rates: RateStore; rooms: AsyncRoomStore; vitals: VitalsStore; li ...#4f6a2630
+function pgData(source: PgJobsSource): {
+  close: () => Promise<void>;
+  [Symbol.asyncDispose]: () => Promise<void>;
+  notifications: NotificationStore;
+  push: PushStore;
+  database?: string;
+  sessions: DeletableSessionStore;
+  cache: CacheStore;
+  jobs: JobStore;
+  rates: RateStore;
+  rooms: AsyncRoomStore;
+  vitals: VitalsStore;
+  live: LiveStore;
+}
 
 [./server] pgJobs
 function pgJobs(source: PgJobsSource): JobStore
@@ -3660,7 +2803,11 @@ interface PreviewScope
   slug: string
 
 [./server] previewUrl
-function previewUrl(path: string, options?: { ttl?: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w`; edit?: boolean; entry?: PreviewScope; }): string
+function previewUrl(path: string, options?: {
+  ttl?: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w`;
+  edit?: boolean;
+  entry?: PreviewScope;
+}): string
 
 [./server] ProcessedImage
 interface ProcessedImage
@@ -3738,7 +2885,13 @@ interface PutOptions
 function queue<Payload, Progress = unknown>(name: string, handler: (payload: Payload, signal: AbortSignal, job: JobContext<Progress>) => unknown, options?: QueueOptions<Payload>): Queue<Payload, Progress>
 
 [./server] Queue
-type Queue<Payload, Progress = unknown> = Elysia & { // Keeps the job for a worker to run, surviving a restart; resolves with its id once stored. enqueue: (payload: Payload, options?: EnqueueOptions) => Promise<string> // The waiting or running job with that key, else the last one with it that faile ...#bc073abf
+type Queue<Payload, Progress = unknown> = Elysia & {
+  // Keeps the job for a worker to run, surviving a restart;
+  resolves with its id once stored. enqueue: (payload: Payload, options?: EnqueueOptions) => Promise<string> // The waiting or running job with that key, else the last one with it that failed, or the job of that id;
+  undefined for one that completed or never was. Needs a store with `state()`, as `sqliteJobs`, `memoryJobs` and `pgJobs` have. job: (job: string | {
+    id: string
+  }) => Promise<JobState<Progress> | undefined> // Runs every job whose time has come, here and now, until none is left and none a worker took is still running: for a test, or a script with no server. drain: () => Promise<number> failed: () => Promise<FailedJob<Payload>[]> // Starts the workers of a `lazy` queue, at once when the server runs and else at its start;
+  a queue that is not lazy has them already. activate: () => void // Removes the job of that id, or every job, waiting or failed, whose payload `match` returns true for, such as a person's mails once they asked to be erased; resolves with how many went. remove: (match: string | ((payload: Payload) => boolean)) => Promise<number> }
 
 [./server] QueueOptions
 interface QueueOptions<Payload>
@@ -3810,9 +2963,18 @@ interface RoomRecipients
   to?: string
 
 [./server] rooms
-function rooms<Message, Member = undefined, State = undefined>(...[options]: undefined extends State ? [options?: RoomsOptions<Message, State, RoomStore>] : [options: RoomsOptions<Message, State, RoomStore> & { state: () => State; }]): Rooms<Message, Member, State>
-function rooms<Message, Member = undefined, State = undefined>(...[options]: undefined extends State ? [options: RoomsOptions<Message, State, AsyncRoomStore> & { store: AsyncRoomStore; }] : [options: RoomsOptions<Message, State, AsyncRoomStore> & { store: AsyncRoomStore; state: () => State; }]): AsyncRooms<Messag ...#ee5d2df8
-function rooms<Message, Member = undefined, State = undefined>(...[options]: undefined extends State ? [options?: RoomsOptions<Message, State, RoomStore | AsyncRoomStore>] : [options: RoomsOptions<Message, State, RoomStore | AsyncRoomStore> & { state: () => State; }]): StoreRooms<Message, Member, State>
+function rooms<Message, Member = undefined, State = undefined>(...[options]: undefined extends State ? [options?: RoomsOptions<Message, State, RoomStore>] : [options: RoomsOptions<Message, State, RoomStore> & {
+  state: () => State;
+}]): Rooms<Message, Member, State>
+function rooms<Message, Member = undefined, State = undefined>(...[options]: undefined extends State ? [options: RoomsOptions<Message, State, AsyncRoomStore> & {
+  store: AsyncRoomStore;
+}] : [options: RoomsOptions<Message, State, AsyncRoomStore> & {
+  store: AsyncRoomStore;
+  state: () => State;
+}]): AsyncRooms<Message, Member, State>
+function rooms<Message, Member = undefined, State = undefined>(...[options]: undefined extends State ? [options?: RoomsOptions<Message, State, RoomStore | AsyncRoomStore>] : [options: RoomsOptions<Message, State, RoomStore | AsyncRoomStore> & {
+  state: () => State;
+}]): StoreRooms<Message, Member, State>
 
 [./server] Rooms
 interface Rooms<Message, Member = undefined, State = undefined> extends RoomsBase<Message, Member>
@@ -3863,7 +3025,39 @@ interface Route
   special: SpecialPages
 
 [./server] s
-const s: Omit<Omit<JavaScriptTypeBuilder, "String" | "Transform"> & { String: (property?: ElysiaStringOptions | undefined) => TString; Numeric: (property?: NumberOptions | undefined) => TNumber; NumericEnum<T extends AssertNumericEnum<T>>(item: T, property?: SchemaOptions | undefined): TEnum<T>; Integer: (pr ...#4aa8442d
+const s: Omit<Omit<JavaScriptTypeBuilder, "String" | "Transform"> & {
+  String: (property?: ElysiaStringOptions | undefined) => TString;
+  Numeric: (property?: NumberOptions | undefined) => TNumber;
+  NumericEnum<T extends AssertNumericEnum<T>>(item: T, property?: SchemaOptions | undefined): TEnum<T>;
+  Integer: (property?: IntegerOptions | undefined) => TInteger;
+  Date: (property?: DateOptions | undefined) => TDate;
+  BooleanString: (property?: SchemaOptions | undefined) => TBoolean;
+  ObjectString: <T extends TProperties>(properties: T, options?: ObjectOptions | undefined) => TObject<T>;
+  ArrayString: <T extends TSchema = TString>(children?: T | undefined, options?: ArrayOptions | undefined) => TArray<T>;
+  ArrayQuery: <T extends TSchema = TString>(children?: T | undefined, options?: ArrayOptions | undefined) => TArray<T>;
+  File: TFile;
+  Files: (options?: FilesOptions | undefined) => TUnsafe<File[]>;
+  Nullable: <T extends TSchema>(schema: T, options?: SchemaOptions | undefined) => TUnion<[T, TNull]>;
+  MaybeEmpty: <T extends TSchema>(schema: T, options?: SchemaOptions | undefined) => TUnion<[T, TNull, TUndefined]>;
+  Cookie: <T extends TProperties>(properties: T, {
+    domain, expires, httpOnly, maxAge, path, priority, sameSite, secure, secrets, sign, ...options
+  }?: CookieValidatorOptions<T> | undefined) => TObject<T>;
+  UnionEnum: <const T extends NonEmptyArray<TEnumValue> | Readonly<NonEmptyArray<TEnumValue>>>(values: T, options?: SchemaOptions | undefined) => TUnionEnum<T>;
+  NoValidate: <T extends TAnySchema>(v: T, enabled?: boolean | undefined) => T;
+  Form: <T extends TProperties>(v: T, options?: ObjectOptions | undefined) => TForm<T>;
+  ArrayBuffer(options?: TArrayBuffer | undefined): TUnsafe<ArrayBuffer>;
+  Uint8Array: (options: Uint8ArrayOptions) => TUnsafe<Uint8Array<ArrayBufferLike>>;
+} & {
+  Transform<Type extends TSchema>(type: Type): ElysiaTransformDecodeBuilder<Type>;
+}, "File" | "Files"> & {
+  File: (options?: FileOptions | undefined) => TUnsafe<File>;
+  Files: (options?: FilesOptions | undefined) => TUnsafe<File[]>;
+  Secret: (options?: ElysiaStringOptions | undefined) => TString;
+  Public: <Field extends TSchema>(field: Field) => Field & {
+    public: true;
+  };
+  UnionKeys: <const Keyed extends object>(record: Keyed, options?: SchemaOptions | undefined) => TUnionEnum<[keyof Keyed & string, ...(keyof Keyed & string)[]]>;
+}
 
 [./server] s3Files
 function s3Files(options?: S3Options & { publicUrl?: string | undefined; }): FileStore
@@ -3872,9 +3066,92 @@ function s3Files(options?: S3Options & { publicUrl?: string | undefined; }): Fil
 function safePath(root: string, name: string): string | undefined
 
 [./server] schedule
-function schedule<const Every extends Duration>(every: Every & PositiveDuration<Every>, jobs: Jobs, options?: EveryOptions | undefined): Elysia<"", { decorator: {}; store: {}; derive: {}; resolve: {}; }, { typebox: {}; error: {}; }, { schema: {}; standaloneSchema: {}; macro: {}; macroFn: {}; parser: {}; response: {} ...#778cf68d
-function schedule<const Cron extends string>(cron: Cron & CronSchedule<Cron>, jobs: Jobs, options?: ScheduleOptions | undefined): Elysia<"", { decorator: {}; store: {}; derive: {}; resolve: {}; }, { typebox: {}; error: {}; }, { schema: {}; standaloneSchema: {}; macro: {}; macroFn: {}; parser: {}; response: {}; }, {} ...#76140ad8
-function schedule<const Table extends Record<string, Jobs>>(table: Table & { readonly [Key in keyof Table & string]: WhenOf<Key>; }, options?: ScheduleOptions | undefined): Elysia<"", { decorator: {}; store: {}; derive: {}; resolve: {}; }, { typebox: {}; error: {}; }, { schema: {}; standaloneSchema: {}; macro: {}; m ...#91e6acdc
+function schedule<const Every extends Duration>(every: Every & PositiveDuration<Every>, jobs: Jobs, options?: EveryOptions | undefined): Elysia<"", {
+  decorator: {};
+  store: {};
+  derive: {};
+  resolve: {};
+}, {
+  typebox: {};
+  error: {};
+}, {
+  schema: {};
+  standaloneSchema: {};
+  macro: {};
+  macroFn: {};
+  parser: {};
+  response: {};
+}, {}, {
+  derive: {};
+  resolve: {};
+  schema: {};
+  standaloneSchema: {};
+  response: {};
+}, {
+  derive: {};
+  resolve: {};
+  schema: {};
+  standaloneSchema: {};
+  response: {};
+}>
+function schedule<const Cron extends string>(cron: Cron & CronSchedule<Cron>, jobs: Jobs, options?: ScheduleOptions | undefined): Elysia<"", {
+  decorator: {};
+  store: {};
+  derive: {};
+  resolve: {};
+}, {
+  typebox: {};
+  error: {};
+}, {
+  schema: {};
+  standaloneSchema: {};
+  macro: {};
+  macroFn: {};
+  parser: {};
+  response: {};
+}, {}, {
+  derive: {};
+  resolve: {};
+  schema: {};
+  standaloneSchema: {};
+  response: {};
+}, {
+  derive: {};
+  resolve: {};
+  schema: {};
+  standaloneSchema: {};
+  response: {};
+}>
+function schedule<const Table extends Record<string, Jobs>>(table: Table & {
+  readonly [Key in keyof Table & string]: WhenOf<Key>;
+}, options?: ScheduleOptions | undefined): Elysia<"", {
+  decorator: {};
+  store: {};
+  derive: {};
+  resolve: {};
+}, {
+  typebox: {};
+  error: {};
+}, {
+  schema: {};
+  standaloneSchema: {};
+  macro: {};
+  macroFn: {};
+  parser: {};
+  response: {};
+}, {}, {
+  derive: {};
+  resolve: {};
+  schema: {};
+  standaloneSchema: {};
+  response: {};
+}, {
+  derive: {};
+  resolve: {};
+  schema: {};
+  standaloneSchema: {};
+  response: {};
+}>
 
 [./server] ScheduleOptions
 interface ScheduleOptions
@@ -3899,7 +3176,40 @@ interface ScriptHashOptions
 function sendPush(user: string, message: PushMessage, options?: PushSendOptions): Promise<PushResult>
 
 [./server] session
-function session<Data extends object = SessionData>(options?: SessionOptions): Elysia<"", { decorator: {}; store: {}; derive: {}; resolve: {}; }, { typebox: {}; error: {}; }, { schema: {}; standaloneSchema: {}; macro: {}; macroFn: {}; parser: {}; response: {}; }, {}, { derive: { readonly session: RequestSession<Dat ...#33f240cf
+function session<Data extends object = SessionData>(options?: SessionOptions): Elysia<"", {
+  decorator: {};
+  store: {};
+  derive: {};
+  resolve: {};
+}, {
+  typebox: {};
+  error: {};
+}, {
+  schema: {};
+  standaloneSchema: {};
+  macro: {};
+  macroFn: {};
+  parser: {};
+  response: {};
+}, {}, {
+  derive: {
+    readonly session: RequestSession<Data>;
+  };
+  resolve: {};
+  schema: {};
+  standaloneSchema: {};
+  response: {};
+}, {
+  derive: {};
+  resolve: {};
+  schema: {};
+  standaloneSchema: {};
+  response: {};
+}> & {
+  deriveSecret: (purpose: string) => string[];
+  endsSessionsElsewhere: () => void;
+  sharesUnder: (domains: string[]) => void;
+}
 
 [./server] Session
 interface Session<Data extends object>
@@ -3955,7 +3265,18 @@ interface SignOptions
 const SNIFFED_BYTES: 4096
 
 [./server] sqliteData
-function sqliteData(path: string): { notifications: NotificationStore; push: PushStore; database?: string; sessions: DeletableSessionStore; cache: SyncCacheStore; jobs: JobStore; rates: SyncRates; live: LiveStore; rooms: RoomStore; vitals: VitalsStore; }
+function sqliteData(path: string): {
+  notifications: NotificationStore;
+  push: PushStore;
+  database?: string;
+  sessions: DeletableSessionStore;
+  cache: SyncCacheStore;
+  jobs: JobStore;
+  rates: SyncRates;
+  live: LiveStore;
+  rooms: RoomStore;
+  vitals: VitalsStore;
+}
 
 [./server] sqliteJobs
 function sqliteJobs(path: string): JobStore
@@ -4073,7 +3394,8 @@ interface WorkChallengeOptions
 function workflow<Input = undefined, Known extends Events = Events>(name: string, flow: (run: WorkflowRun<Input, Known>) => unknown, options?: WorkflowOptions<Input>): Workflow<Input, Known>
 
 [./server] Workflow
-type Workflow<Input, Known extends Events> = Elysia & { // Starts a run, which the server's workers carry out, surviving restarts; resolves with its id once stored. start: (...args: undefined extends Input ? [input?: Input, options?: StartOptions] : [input: Input, options?: StartOptions]) => Promise ...#f29f15b3
+type Workflow<Input, Known extends Events> = Elysia & {
+  // Starts a run, which the server's workers carry out, surviving restarts; resolves with its id once stored. start: (...args: undefined extends Input ? [input?: Input, options?: StartOptions] : [input: Input, options?: StartOptions]) => Promise<string> // Hands the event to the run, waking it now when it waits for it, else keeping it for the wait that names it; resolves with whether the run took it. An event sent while a step runs, or once a worker took the run after its timeout, is dropped. send: <Event extends keyof Known & string>(id: string, event: Event, ...data: undefined extends Known[Event] ? [data?: Known[Event]] : [data: Known[Event]]) => Promise<boolean> // Where the run stands; undefined once it completed, was cancelled or never started. status: (id: string) => Promise<WorkflowStatus | undefined> // Ends a run: one not running goes at once, one running stops at its next step. Resolves with whether there was one. cancel: (id: string) => Promise<boolean> // Runs every run whose time has come, here and now, as `drain` of a queue does. drain: () => Promise<number> }
 
 [./server] WorkflowOptions
 interface WorkflowOptions<Input> extends Pick<QueueOptions<never>, 'store' | 'attempts' | 'backoff' | 'concurrency' | 'lostAfter' | 'idlePoll' | 'keepFailed'>
@@ -4103,7 +3425,12 @@ interface WorkflowStatus
 interface WorkflowStep<Known extends Events>
   run: <Result>(name: string, work: (signal: AbortSignal) => Result | Promise<Result>) => Promise<Awaited<Result>>
   sleep: (wait: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w`) => Promise<void>
-  waitFor: { <Event extends keyof Known & string>(event: Event): Promise<Known[Event]>; <Event extends keyof Known & string>(event: Event, options: { timeout: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w`; }): Promise<WaitResult<Known[Event]>>; }
+  waitFor: {
+  <Event extends keyof Known & string>(event: Event): Promise<Known[Event]>;
+  <Event extends keyof Known & string>(event: Event, options: {
+    timeout: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w`;
+  }): Promise<WaitResult<Known[Event]>>;
+}
 
 [./test] A11yViolation
 interface A11yViolation
@@ -4444,7 +3771,10 @@ interface TestPage
   value: (selector: string) => Promise<string | null>
   view: WebView
   waitFor: (selector: string, options?: WaitForOptions | undefined) => Promise<void>
-  waitForResponse: (match: RouteMatch, options?: { timeout?: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w` | undefined; complete?: boolean | undefined; } | undefined) => Promise<PageResponse>
+  waitForResponse: (match: RouteMatch, options?: {
+  timeout?: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w` | undefined;
+  complete?: boolean | undefined;
+} | undefined) => Promise<PageResponse>
   waitUntil: <Args extends unknown[]>(condition: (...args: Args) => unknown, options?: WaitUntilOptions | undefined, ...args: Args) => Promise<void>
   warnings: string[]
 
@@ -4453,7 +3783,25 @@ function testSite(options?: TestOptions): Promise<TestSite>
 
 [./test] TestSite
 interface TestSite
-  api: <Module, const Path extends CallPath<Module>, const M extends CallMethod<NodeAt<Module, Path>> = never>(module: Module, path: Path, ...[options]: Optional<MethodOption<NodeAt<Module, Path>, M> & (MethodRoute<Module, Path, Chosen<M>> extends { params: infer Params; } ? Record<never, never> extends Pa ...#4e3387ab
+  api: <Module, const Path extends CallPath<Module>, const M extends CallMethod<NodeAt<Module, Path>> = never>(module: Module, path: Path, ...[options]: Optional<MethodOption<NodeAt<Module, Path>, M> & (MethodRoute<Module, Path, Chosen<M>> extends {
+  params: infer Params;
+} ? Record<never, never> extends Params ? {
+  params?: Params;
+} : {
+  params: Params;
+} : {
+  params?: Record<string, unknown>;
+}) & (MethodRoute<Module, Path, Chosen<M>> extends {
+  query: infer Query;
+} ? unknown extends Query ? {
+  query?: Record<string, unknown>;
+} : Record<never, never> extends Query ? {
+  query?: Query;
+} : {
+  query: Query;
+} : {
+  query?: Record<string, unknown>;
+}) & CallBody<MethodRoute<Module, Path, Chosen<M>>> & VisitInit>) => Promise<ApiResult<ApiAnswer<Module, Path, M>>>
   as: (who: string | Record<string, string>) => TestSite
   call: <Target extends Action<never, unknown>>(action: Target, ...call: CallArguments<Target>) => Promise<Tested<ResultOf<Target>>>
   close: () => Promise<void>
@@ -4462,22 +3810,89 @@ interface TestSite
   fetch: (path: string, init?: (Omit<RequestInit, "headers"> & VisitInit) | undefined) => Promise<Response>
   handle: (request: Request) => Promise<Response>
   logs: readonly LogEntry[]
-  mcp: { tools: (init?: VisitInit | undefined) => Promise<McpTool[]>; call: (name: string, args?: object | undefined, init?: VisitInit | undefined) => Promise<McpCall>; }
+  mcp: {
+  tools: (init?: VisitInit | undefined) => Promise<McpTool[]>;
+  call: (name: string, args?: object | undefined, init?: VisitInit | undefined) => Promise<McpCall>;
+}
   open: (path: string, options?: BrowserOptions | undefined) => Promise<TestPage>
-  refusal: <Target extends Action<never, unknown>>(action: Target, input: FormData | InputOf<Target>, init?: (VisitInit & { from?: string; }) | undefined) => Promise<ActionError<FailuresOf<Target>>>
+  refusal: <Target extends Action<never, unknown>>(action: Target, input: FormData | InputOf<Target>, init?: (VisitInit & {
+  from?: string;
+}) | undefined) => Promise<ActionError<FailuresOf<Target>>>
   runJobs: () => Promise<number>
   sitemap: (path?: string | undefined) => Promise<string[]>
-  socket: <Module, const Path extends SocketPath<Module>>(module: Module, path: Path, ...[options]: Optional<(SocketRoute<Module, Path> extends { params: infer Params; } ? Record<never, never> extends Params ? { params?: Params; } : { params: Params; } : { params?: Record<string, unknown>; }) & (SocketRoute<M ...#b7839178
-  socketRefusal: <Module, const Path extends SocketPath<Module>>(module: Module, path: Path, ...[options]: Optional<(SocketRoute<Module, Path> extends { params: infer Params; } ? Record<never, never> extends Params ? { params?: Params; } : { params: Params; } : { params?: Record<string, unknown>; }) & (SocketRoute<M ...#9dfc99cc
-  stream: <Module, const Path extends StreamPath<Module>, const M extends StreamMethod<NodeAt<Module, Path>> = never>(module: Module, path: Path, ...[options]: Optional<MethodOption<NodeAt<Module, Path>, M> & (MethodRoute<Module, Path, Chosen<M>> extends { params: infer Params; } ? Record<never, never> extend ...#29b0f810
-  submit: <Input, Honeypot extends string = never>(action: Action<Input, unknown, Honeypot>, fields: Partial<Record<Honeypot | Extract<keyof Input, string> | "kay_since", FormValue | FormValue[] | undefined>>, init?: (VisitInit & { from?: string | Visit; openedFor?: 0 | `${number}ms` | `${number}s` | `${numbe ...#bf9b8d88
+  socket: <Module, const Path extends SocketPath<Module>>(module: Module, path: Path, ...[options]: Optional<(SocketRoute<Module, Path> extends {
+  params: infer Params;
+} ? Record<never, never> extends Params ? {
+  params?: Params;
+} : {
+  params: Params;
+} : {
+  params?: Record<string, unknown>;
+}) & (SocketRoute<Module, Path> extends {
+  query: infer Query;
+} ? unknown extends Query ? {
+  query?: Record<string, unknown>;
+} : Record<never, never> extends Query ? {
+  query?: Query;
+} : {
+  query: Query;
+} : {
+  query?: Record<string, unknown>;
+}) & VisitInit>) => TestSocket<SocketOf<Module, Path>>
+  socketRefusal: <Module, const Path extends SocketPath<Module>>(module: Module, path: Path, ...[options]: Optional<(SocketRoute<Module, Path> extends {
+  params: infer Params;
+} ? Record<never, never> extends Params ? {
+  params?: Params;
+} : {
+  params: Params;
+} : {
+  params?: Record<string, unknown>;
+}) & (SocketRoute<Module, Path> extends {
+  query: infer Query;
+} ? unknown extends Query ? {
+  query?: Record<string, unknown>;
+} : Record<never, never> extends Query ? {
+  query?: Query;
+} : {
+  query: Query;
+} : {
+  query?: Record<string, unknown>;
+}) & VisitInit>) => Promise<Response>
+  stream: <Module, const Path extends StreamPath<Module>, const M extends StreamMethod<NodeAt<Module, Path>> = never>(module: Module, path: Path, ...[options]: Optional<MethodOption<NodeAt<Module, Path>, M> & (MethodRoute<Module, Path, Chosen<M>> extends {
+  params: infer Params;
+} ? Record<never, never> extends Params ? {
+  params?: Params;
+} : {
+  params: Params;
+} : {
+  params?: Record<string, unknown>;
+}) & (MethodRoute<Module, Path, Chosen<M>> extends {
+  query: infer Query;
+} ? unknown extends Query ? {
+  query?: Record<string, unknown>;
+} : Record<never, never> extends Query ? {
+  query?: Query;
+} : {
+  query: Query;
+} : {
+  query?: Record<string, unknown>;
+}) & Body<MethodRoute<Module, Path, Chosen<M>>> & VisitInit>) => TestStream<StreamOf<Module, Path, M>>
+  submit: <Input, Honeypot extends string = never>(action: Action<Input, unknown, Honeypot>, fields: Partial<Record<Honeypot | Extract<keyof Input, string> | "kay_since", FormValue | FormValue[] | undefined>>, init?: (VisitInit & {
+  from?: string | Visit;
+  openedFor?: 0 | `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w`;
+  stamp?: string | undefined;
+}) | undefined) => Promise<Visit>
   visit: (path: string, init?: VisitInit | undefined) => Promise<Visit>
 
 [./test] TestSocket
-type TestSocket<Client> = Client & { // Every message received so far, in order. received: Received<Client>[] // The oldest message `next()` has not returned yet, waiting for one when there is none. next: () => Promise<Received<Client>> }
+type TestSocket<Client> = Client & {
+  // Every message received so far, in order. received: Received<Client>[] // The oldest message `next()` has not returned yet, waiting for one when there is none. next: () => Promise<Received<Client>>
+}
 
 [./test] TestStream
-type TestStream<Client> = Client & { received: Received<Client>[] next: () => Promise<Received<Client>> // Every value, once the stream ended, failed or was closed. finished: () => Promise<Received<Client>[]> }
+type TestStream<Client> = Client & {
+  received: Received<Client>[] next: () => Promise<Received<Client>> // Every value, once the stream ended, failed or was closed. finished: () => Promise<Received<Client>[]>
+}
 
 [./test] Visit
 interface Visit extends PageReading

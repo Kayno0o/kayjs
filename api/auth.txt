@@ -1,8 +1,12 @@
 [.] AcceptResult
-type AcceptResult<Role extends string = string> = { ok: true, membership: Membership<Role> } | { ok: false, error: 'signed-out' | 'not-found' | 'wrong-account' | 'unverified' | 'member' }
+type AcceptResult<Role extends string = string> = {
+  ok: true, membership: Membership<Role>
+} | {
+  ok: false, error: 'signed-out' | 'not-found' | 'wrong-account' | 'unverified' | 'member'
+}
 
 [.] ActivityEvent
-type ActivityEvent = 'signed-in' | 'signed-out' | 'sign-in-failed' | 'role-granted' | 'role-revoked' | 'banned' | 'unbanned' | 'impersonation-started' | 'impersonation-ended' | 'organization-created' | 'organization-deleted' | 'member-joined' | 'member-left' | 'member-removed' | 'member-roles-change ...#17dbf887
+type ActivityEvent = 'signed-in' | 'signed-out' | 'sign-in-failed' | 'role-granted' | 'role-revoked' | 'banned' | 'unbanned' | 'impersonation-started' | 'impersonation-ended' | 'organization-created' | 'organization-deleted' | 'member-joined' | 'member-left' | 'member-removed' | 'member-roles-changed' | 'oauth-client-approved' | 'oauth-client-revoked'
 
 [.] AdminAuditLogResult
 type AdminAuditLogResult = { ok: true, entries: AuditEntry[] } | { ok: false, error: 'forbidden' }
@@ -59,7 +63,102 @@ const auditWording: Record<string, AuditWording>
 type AuditWording = Record<AuthEvent, AuditPhrase>
 
 [.] auth
-function auth<Role extends string = string, Prefix extends string = "/auth", const Scope extends string = never, OrgRole extends string = never, UserData extends object = Record<string, never>>(options?: OwnOptions<Role, Prefix, Scope, OrgRole, UserData> | undefined): AuthPages<Elysia<"", { decorator: {}; store: ...#a5dfaf9e
+function auth<Role extends string = string, Prefix extends string = "/auth", const Scope extends string = never, OrgRole extends string = never, UserData extends object = Record<string, never>>(options?: OwnOptions<Role, Prefix, Scope, OrgRole, UserData> | undefined): AuthPages<Elysia<"", {
+  decorator: {};
+  store: {};
+  derive: {
+    readonly auth: Auth<Scope, Role, OrgRole, UserData>;
+  };
+  resolve: {};
+}, {
+  typebox: {};
+  error: {};
+}, {
+  schema: {};
+  standaloneSchema: {};
+  macro: {};
+  macroFn: {};
+  parser: {};
+  response: {} & ExtractErrorFromHandle<{
+    readonly auth: Auth<Scope, Role, OrgRole, UserData>;
+  }>;
+}, {} & CreateEden<JoinPath<"", `${Prefix}/export`>, {
+  get: {
+    body: unknown;
+    params: IsNever<keyof IntersectIfObject<ResolvePath<JoinPath<"", `${Prefix}/export`>>, unknown>> extends true ? ResolvePath<`${Prefix}/export`> : IntersectIfObject<ResolvePath<JoinPath<"", `${Prefix}/export`>>, unknown>;
+    query: unknown;
+    headers: unknown;
+    response: {
+      [K in keyof ComposeElysiaResponse<IntersectIfObjectSchema<UnwrapRoute<InputSchema<never>, {}, JoinPath<"", `${Prefix}/export`>>, {}>, (ctx: {
+        body: unknown;
+        query: Record<string, string>;
+        params: undefined extends IntersectIfObject<ResolvePath<JoinPath<"", `${Prefix}/export`>>, unknown> ? Record<string, string> : PrettifyIfObject<IntersectIfObject<ResolvePath<JoinPath<"", `${Prefix}/export`>>, unknown>>;
+        headers: Record<string, string | undefined>;
+        cookie: Record<string, Cookie<unknown>>;
+        server: Server<unknown> | null;
+        redirect: (url: string, status?: 301 | 302 | 303 | 307 | 308 | undefined) => Response;
+        set: {
+          headers: HTTPHeaders;
+          status?: number | "Continue" | "Switching Protocols" | "Processing" | "Early Hints" | "OK" | "Created" | "Accepted" | "Non-Authoritative Information" | "No Content" | "Reset Content" | "Partial Content" | "Multi-Status" | "Already Reported" | "Multiple Choices" | "Moved Permanently" | "Found" | "See Other" | "Not Modified" | "Temporary Redirect" | "Permanent Redirect" | "Bad Request" | "Unauthorized" | "Payment Required" | "Forbidden" | "Not Found" | "Method Not Allowed" | "Not Acceptable" | "Proxy Authentication Required" | "Request Timeout" | "Conflict" | "Gone" | "Length Required" | "Precondition Failed" | "Payload Too Large" | "URI Too Long" | "Unsupported Media Type" | "Range Not Satisfiable" | "Expectation Failed" | "I'm a teapot" | "Enhance Your Calm" | "Misdirected Request" | "Unprocessable Content" | "Locked" | "Failed Dependency" | "Too Early" | "Upgrade Required" | "Precondition Required" | "Too Many Requests" | "Request Header Fields Too Large" | "Unavailable For Legal Reasons" | "Internal Server Error" | "Not Implemented" | "Bad Gateway" | "Service Unavailable" | "Gateway Timeout" | "HTTP Version Not Supported" | "Variant Also Negotiates" | "Insufficient Storage" | "Loop Detected" | "Not Extended" | "Network Authentication Required";
+          redirect?: string;
+          cookie?: Record<string, {
+            domain?: string | undefined;
+            expires?: Date | undefined;
+            httpOnly?: boolean | undefined;
+            maxAge?: number | undefined;
+            path?: string | undefined;
+            priority?: "low" | "medium" | "high" | undefined;
+            partitioned?: boolean | undefined;
+            sameSite?: boolean | "lax" | "strict" | "none" | undefined;
+            secure?: boolean | undefined;
+            secrets?: string | (string | null)[] | null;
+            value?: unknown;
+          }>;
+        };
+        path: string;
+        route: string;
+        request: Request;
+        store: {};
+        status: <const Code extends number | keyof StatusMap, const T = Code extends 300 | 301 | 302 | 303 | 307 | 308 | 401 | 403 | 404 | 429 | 100 | 101 | 102 | 103 | 200 | 201 | 202 | 203 | 204 | 205 | 206 | 207 | 208 | 304 | 400 | 402 | 405 | 406 | 407 | 408 | 409 | 410 | 411 | 412 | 413 | 414 | 415 | 416 | 417 | 418 | 420 | 421 | 422 | 423 | 424 | 425 | 426 | 428 | 431 | 451 | 500 | 501 | 502 | 503 | 504 | 505 | 506 | 507 | 508 | 510 | 511 ? {
+          readonly 100: "Continue";
+          readonly 101: "Switching Protocols";
+          readonly 102: "Processing";
+          readonly 103: "Early Hints";
+          readonly 200: "OK";
+          readonly 201: "Created";
+          readonly 202: "Accepted";
+          readonly 203: "Non-Authoritative Information";
+          readonly 204: "No Content";
+          readonly 205: "Reset Content";
+          readonly 206: "Partial Content";
+          readonly 207: "Multi-Status";
+          readonly 208: "Already Reported";
+          readonly 300: "Multiple Choices";
+          readonly 301: "Moved Permanently";
+          readonly 302: "Found";
+          readonly 303: "See Other";
+          readonly 304: "Not Modified";
+          readonly 307: "Temporary Redirect";
+          readonly 308: "Permanent Redirect";
+          readonly 400: "Bad Request";
+          readonly 401: "Unauthorized";
+          readonly 402: "Payment Required";
+          readonly 403: "Forbidden"; ...#19244c9f (262 lines)
+  post: { ...#49e81ac2 (322 lines)
+  post: { ...#b404340b (322 lines)
+  get: { ...#8f997215 (322 lines)
+  get: { ...#3a38f79a (322 lines)
+  post: { ...#32c44ad6 (322 lines)
+  derive: {};
+  resolve: {};
+  schema: {};
+  standaloneSchema: {};
+  response: {}; ...#4abc5abd (2 lines)
+  derive: {};
+  resolve: {};
+  schema: {};
+  standaloneSchema: {};
+  response: {}; ...#b28f3903 (2 lines)
 function auth(options: AuthExtensionOptions): AuthPages<AnyElysia>
 
 [.] Auth
@@ -98,7 +197,11 @@ class Auth
   getUser: (userId: string) => Promise<GetUserResult>
   grantRole: (userId: string, role: Role) => Promise<RoleResult>
   groups: Partial<Groups<Scope, Role, OrgRole>>
-  guarded: (ctx: GuardContext, options: { redirect?: string | undefined; require?: Requirement<BareUser<Record<string, unknown>>, string> | undefined; scope?: string | false | string[] | undefined; }) => Promise<void>
+  guarded: (ctx: GuardContext, options: {
+  redirect?: string | undefined;
+  require?: Requirement<BareUser<Record<string, unknown>>, string> | undefined;
+  scope?: string | false | string[] | undefined;
+}) => Promise<void>
   hasScope: (scope: Scope) => Promise<boolean>
   impersonate: (userId: string) => Promise<ImpersonateResult>
   impersonator: () => Promise<User<Record<string, unknown>> | null>
@@ -151,7 +254,14 @@ class Auth
   requestMagicLink: (email: string, options?: SignInOptions | undefined) => Promise<Off | MailRequestResult>
   requestPasswordReset: (email: string, options?: Pick<SignInOptions, "redirect" | "captcha"> | undefined) => Promise<Off | MailRequestResult>
   requireAdmin: () => Promise<User<UserData>>
-  requireUser: { (options: RequireUserOptions<Scope, Role> & { bare: true; }): Promise<BareUser<UserData>>; (options?: (RequireUserOptions<Scope, Role> & { bare?: undefined; }) | undefined): Promise<User<UserData>>; }
+  requireUser: {
+  (options: RequireUserOptions<Scope, Role> & {
+    bare: true;
+  }): Promise<BareUser<UserData>>;
+  (options?: (RequireUserOptions<Scope, Role> & {
+    bare?: undefined;
+  }) | undefined): Promise<User<UserData>>;
+}
   resetPassword: (token: string, password: string) => Promise<Off | ResetPasswordResult>
   resolve: () => Promise<UserRecord | null>
   resolving: Promise<UserRecord | null> | undefined
@@ -289,9 +399,16 @@ interface AuthOptions<Data extends AuthSessionData, Role extends string, Prefix 
   passkeys?: false | { rpId?: string; origins?: string[]; rpName?: string; userVerification?: "required" | "preferred" | "discouraged"; } | undefined
   password?: boolean | undefined
   prefix?: Prefix | undefined
-  profileFields?: ((event: { user: User<UserData>; profile: Profile; }) => void | { [Field in keyof UserData]?: UserData[Field] | undefined; } | Promise<void | { [Field in keyof UserData]?: UserData[Field] | undefined; }>) | undefined
+  profileFields?: ((event: {
+  user: User<UserData>;
+  profile: Profile;
+}) => void | {
+  [Field in keyof UserData]?: UserData[Field] | undefined;
+} | Promise<void | {
+  [Field in keyof UserData]?: UserData[Field] | undefined;
+}>) | undefined
   proxy?: number | boolean | ProxyConfig | undefined
-  rateLimit?: Partial<Record<"signIn" | "signInAccount" | "signInAccountAll" | "register" | "resend" | "resendAccount" | "forgot" | "forgotAccount" | "magicLink" | "magicLinkAccount" | "emailChange" | "emailChangeAccount" | "twoFactor" | "twoFactorAccount" | "reprove" | "emailCode" | "emailCodeAccount" | "invite" ...#4289d195
+  rateLimit?: Partial<Record<"signIn" | "signInAccount" | "signInAccountAll" | "register" | "resend" | "resendAccount" | "forgot" | "forgotAccount" | "magicLink" | "magicLinkAccount" | "emailChange" | "emailChangeAccount" | "twoFactor" | "twoFactorAccount" | "reprove" | "emailCode" | "emailCodeAccount" | "invite" | "inviteAddress" | "organization" | "export" | "oauthRegister" | "oauthDocument" | "oauthToken" | "link" | "oauthRegisterAll", Limit>> | undefined
   remember?: { maxAge?: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w` | undefined; } | undefined
   roles?: Record<Role, NoInfer<Role>[]> | undefined
   rules?: CredentialRules | undefined
@@ -308,10 +425,22 @@ interface AuthOptions<Data extends AuthSessionData, Role extends string, Prefix 
   user?: (TSchema & { static: UserData; }) | undefined
 
 [.] AuthorizeOutcome
-type AuthorizeOutcome = | { kind: 'error', error: 'client' | 'redirect_uri' } // Back to the client, with the code or the error. | { kind: 'redirect', url: string } // The visitor signs in first. | { kind: 'sign-in' } | { kind: 'consent', client: { id: string, name: string, host: string | null }, re ...#cd8d8ceb
+type AuthorizeOutcome = | {
+  kind: 'error', error: 'client' | 'redirect_uri'
+} // Back to the client, with the code or the error. | {
+  kind: 'redirect', url: string
+} // The visitor signs in first. | {
+  kind: 'sign-in'
+} | {
+  kind: 'consent', client: {
+    id: string, name: string, host: string | null
+  }, redirectHost: string, scopes: string[] | null, fields: ConsentFields
+}
 
 [.] AuthorizeParams
-type AuthorizeParams = Partial<Record<'client_id' | 'redirect_uri' | 'response_type' | 'code_challenge' | 'code_challenge_method' | 'scope' | 'state' | 'prompt', string | undefined>> & { // An array when the request named the parameter more than once, which is refused as it is at the token endpoint. ...#22fcba62
+type AuthorizeParams = Partial<Record<'client_id' | 'redirect_uri' | 'response_type' | 'code_challenge' | 'code_challenge_method' | 'scope' | 'state' | 'prompt', string | undefined>> & {
+  // An array when the request named the parameter more than once, which is refused as it is at the token endpoint. resource?: string | string[] | undefined
+}
 
 [.] AuthPages
 interface AuthPages<Server extends AnyElysia = AnyElysia> extends KayExtension<Server>
@@ -351,20 +480,137 @@ interface AuthSessionData
 [.] AuthStore
 interface AuthStore
   attempts?: LegacyAttempts | undefined
-  audit?: { add: (entry: AuditRecord) => MaybePromise<void>; list: (query: { userId?: string; before?: AuditCursor; limit: number; }) => MaybePromise<AuditRecord[]>; prune: (before: Date) => MaybePromise<void>; forget: (userId: string, pseudonym: string) => MaybePromise<void>; }
-  bearerTokens: { create: (token: BearerTokenRecord) => MaybePromise<void>; findByDigest: (digest: string) => MaybePromise<BearerTokenRecord | undefined>; findByDigestWithUser?: (digest: string) => MaybePromise<{ token: BearerTokenRecord; user: UserRecord; } | undefined>; listByUser: (userId: string) => MaybePromis ...#97c75ac6
-  identities: { find: (provider: string, providerId: string) => MaybePromise<IdentityRecord | undefined>; listByUser: (userId: string) => MaybePromise<IdentityRecord[]>; create: (identity: IdentityRecord) => MaybePromise<void>; update: (provider: string, providerId: string, patch: Partial<Pick<IdentityRecord, "ac ...#a243e7e3
-  invitations?: { create: (invitation: InvitationRecord) => MaybePromise<void>; get: (id: string) => MaybePromise<InvitationRecord | undefined>; listByOrganization: (organizationId: string) => MaybePromise<InvitationRecord[]>; listByEmail: (email: string) => MaybePromise<InvitationRecord[]>; delete: (id: string) => ...#c40589ca
-  members?: { add: (member: MemberRecord) => MaybePromise<void>; get: (organizationId: string, userId: string) => MaybePromise<MemberRecord | undefined>; listByOrganization: (organizationId: string) => MaybePromise<MemberRecord[]>; listByUser: (userId: string) => MaybePromise<MemberRecord[]>; update: (organizat ...#b9b08467
-  oauth?: { clients: { create: (client: OAuthClientRecord) => MaybePromise<void>; get: (id: string) => MaybePromise<OAuthClientRecord | undefined>; }; grants: { get: (userId: string, clientId: string) => MaybePromise<OAuthGrantRecord | undefined>; upsert: (grant: OAuthGrantRecord) => MaybePromise<void>; touch ...#439c206e
-  organizations?: { create: (organization: OrganizationRecord) => MaybePromise<void>; get: (id: string) => MaybePromise<OrganizationRecord | undefined>; getMany?: (ids: string[]) => MaybePromise<OrganizationRecord[]>; findBySlug: (slug: string) => MaybePromise<OrganizationRecord | undefined>; update: (id: string, pat ...#417f04b0
-  passkeys: { create: (passkey: PasskeyRecord) => MaybePromise<void>; get: (id: string) => MaybePromise<PasskeyRecord | undefined>; listByUser: (userId: string) => MaybePromise<PasskeyRecord[]>; update: (id: string, patch: Partial<Pick<PasskeyRecord, "name" | "counter" | "backedUp" | "userVerified" | "lastUsedA ...#e592cc0f
+  audit?: {
+  add: (entry: AuditRecord) => MaybePromise<void>;
+  list: (query: {
+    userId?: string;
+    before?: AuditCursor;
+    limit: number;
+  }) => MaybePromise<AuditRecord[]>;
+  prune: (before: Date) => MaybePromise<void>;
+  forget: (userId: string, pseudonym: string) => MaybePromise<void>;
+}
+  bearerTokens: {
+  create: (token: BearerTokenRecord) => MaybePromise<void>;
+  findByDigest: (digest: string) => MaybePromise<BearerTokenRecord | undefined>;
+  findByDigestWithUser?: (digest: string) => MaybePromise<{
+    token: BearerTokenRecord;
+    user: UserRecord;
+  } | undefined>;
+  listByUser: (userId: string) => MaybePromise<BearerTokenRecord[]>;
+  touch: (id: string, at: Date) => MaybePromise<void>;
+  delete: (userId: string, id: string) => MaybePromise<boolean>;
+  deleteForUser?: (userId: string) => MaybePromise<void>;
+}
+  identities: {
+  find: (provider: string, providerId: string) => MaybePromise<IdentityRecord | undefined>;
+  listByUser: (userId: string) => MaybePromise<IdentityRecord[]>;
+  create: (identity: IdentityRecord) => MaybePromise<void>;
+  update: (provider: string, providerId: string, patch: Partial<Pick<IdentityRecord, "accessToken" | "refreshToken" | "tokenExpiresAt">>) => MaybePromise<void>;
+  delete: (provider: string, providerId: string) => MaybePromise<void>;
+  deleteForUser?: (userId: string) => MaybePromise<void>;
+}
+  invitations?: {
+  create: (invitation: InvitationRecord) => MaybePromise<void>;
+  get: (id: string) => MaybePromise<InvitationRecord | undefined>;
+  listByOrganization: (organizationId: string) => MaybePromise<InvitationRecord[]>;
+  listByEmail: (email: string) => MaybePromise<InvitationRecord[]>;
+  delete: (id: string) => MaybePromise<boolean>;
+}
+  members?: {
+  add: (member: MemberRecord) => MaybePromise<void>;
+  get: (organizationId: string, userId: string) => MaybePromise<MemberRecord | undefined>;
+  listByOrganization: (organizationId: string) => MaybePromise<MemberRecord[]>;
+  listByUser: (userId: string) => MaybePromise<MemberRecord[]>;
+  update: (organizationId: string, userId: string, patch: Pick<MemberRecord, "roles">) => MaybePromise<MemberRecord | undefined>;
+  delete: (organizationId: string, userId: string) => MaybePromise<boolean>;
+}
+  oauth?: {
+  clients: {
+    create: (client: OAuthClientRecord) => MaybePromise<void>;
+    get: (id: string) => MaybePromise<OAuthClientRecord | undefined>;
+  };
+  grants: {
+    get: (userId: string, clientId: string) => MaybePromise<OAuthGrantRecord | undefined>;
+    upsert: (grant: OAuthGrantRecord) => MaybePromise<void>;
+    touch: (userId: string, clientId: string, at: Date) => MaybePromise<void>;
+    listByUser: (userId: string) => MaybePromise<OAuthGrantRecord[]>;
+    revoke: (userId: string, clientId: string) => MaybePromise<boolean>;
+  };
+  codes: {
+    create: (code: OAuthCodeRecord) => MaybePromise<void>;
+    get?: (digest: string) => MaybePromise<OAuthCodeRecord | undefined>;
+    use: (digest: string, at: Date) => MaybePromise<{
+      code: OAuthCodeRecord;
+      reused: boolean;
+    } | undefined>;
+  };
+  refresh: {
+    create: (token: OAuthRefreshRecord) => MaybePromise<void>;
+    get?: (digest: string) => MaybePromise<OAuthRefreshRecord | undefined>;
+    use: (digest: string, at: Date) => MaybePromise<{
+      token: OAuthRefreshRecord;
+      reused: boolean;
+    } | undefined>;
+    revokeFamily: (userId: string, family: string) => MaybePromise<void>;
+    deleteForUser: (userId: string) => MaybePromise<void>;
+  };
+}
+  organizations?: {
+  create: (organization: OrganizationRecord) => MaybePromise<void>;
+  get: (id: string) => MaybePromise<OrganizationRecord | undefined>;
+  getMany?: (ids: string[]) => MaybePromise<OrganizationRecord[]>;
+  findBySlug: (slug: string) => MaybePromise<OrganizationRecord | undefined>;
+  update: (id: string, patch: Partial<Pick<OrganizationRecord, "name" | "slug">>) => MaybePromise<OrganizationRecord | undefined>;
+  delete: (id: string) => MaybePromise<boolean>;
+}
+  passkeys: {
+  create: (passkey: PasskeyRecord) => MaybePromise<void>;
+  get: (id: string) => MaybePromise<PasskeyRecord | undefined>;
+  listByUser: (userId: string) => MaybePromise<PasskeyRecord[]>;
+  update: (id: string, patch: Partial<Pick<PasskeyRecord, "name" | "counter" | "backedUp" | "userVerified" | "lastUsedAt">>) => MaybePromise<void>;
+  delete: (userId: string, id: string) => MaybePromise<boolean>;
+}
   prune?: (limits: PruneLimits) => MaybePromise<void>
   rates?: AuthRates | undefined
-  recoveryCodes: { replace: (userId: string, digests: string[]) => MaybePromise<void>; consume: (userId: string, digest: string) => MaybePromise<boolean>; count: (userId: string) => MaybePromise<number>; }
-  sessions: { create: (session: SessionRecord) => MaybePromise<void>; get: (id: string) => MaybePromise<SessionRecord | undefined>; listByUser: (userId: string) => MaybePromise<SessionRecord[]>; update: (id: string, patch: Partial<Pick<SessionRecord, "version" | "ip" | "lastSeenAt">>) => MaybePromise<void>; del ...#7cdc7536
-  tokens: { create: (token: TokenRecord) => MaybePromise<void>; consume: (digest: string, type: TokenType) => MaybePromise<TokenRecord | undefined>; deleteForUser: (userId: string, type?: TokenType | undefined) => MaybePromise<void>; }
-  users: { get: (id: string) => MaybePromise<UserRecord | undefined>; getMany?: (ids: string[]) => MaybePromise<UserRecord[]>; findByEmail: (email: string) => MaybePromise<UserRecord | undefined>; findByUsername: (username: string) => MaybePromise<UserRecord | undefined>; create: (user: UserRecord) => MaybeP ...#b7911848
+  recoveryCodes: {
+  replace: (userId: string, digests: string[]) => MaybePromise<void>;
+  consume: (userId: string, digest: string) => MaybePromise<boolean>;
+  count: (userId: string) => MaybePromise<number>;
+}
+  sessions: {
+  create: (session: SessionRecord) => MaybePromise<void>;
+  get: (id: string) => MaybePromise<SessionRecord | undefined>;
+  listByUser: (userId: string) => MaybePromise<SessionRecord[]>;
+  update: (id: string, patch: Partial<Pick<SessionRecord, "version" | "ip" | "lastSeenAt">>) => MaybePromise<void>;
+  delete: (userId: string, id: string) => MaybePromise<boolean>;
+}
+  tokens: {
+  create: (token: TokenRecord) => MaybePromise<void>;
+  consume: (digest: string, type: TokenType) => MaybePromise<TokenRecord | undefined>;
+  deleteForUser: (userId: string, type?: TokenType | undefined) => MaybePromise<void>;
+}
+  users: {
+  get: (id: string) => MaybePromise<UserRecord | undefined>;
+  getMany?: (ids: string[]) => MaybePromise<UserRecord[]>;
+  findByEmail: (email: string) => MaybePromise<UserRecord | undefined>;
+  findByUsername: (username: string) => MaybePromise<UserRecord | undefined>;
+  create: (user: UserRecord) => MaybePromise<void | UserRecord>;
+  update: (id: string, patch: Partial<Omit<UserRecord, "id" | "createdAt">>) => MaybePromise<UserRecord | undefined>;
+  delete: (id: string) => MaybePromise<void>;
+  staleGuests?: (createdBefore: Date, limit: number) => MaybePromise<UserRecord[]>;
+  staleUnverified?: (createdBefore: Date, limit: number) => MaybePromise<UserRecord[]>;
+  list: (query: {
+    search?: string;
+    offset: number;
+    limit: number;
+    total?: boolean;
+  }) => MaybePromise<{
+    users: UserRecord[];
+    total: number;
+  }>;
+  advanceTotpStep: (id: string, step: number) => MaybePromise<boolean>;
+}
 
 [.] BanResult
 type BanResult = { ok: true, user: ManagedUser } | { ok: false, error: AdminChangeFailure | 'self' | 'admin' | 'until' }
@@ -434,13 +680,29 @@ interface CaptchaWidget
 function challengeOf(verifier: string): Promise<string>
 
 [.] ChangeEmailResult
-type ChangeEmailResult = { ok: true } | { ok: false, error: ProofFailure | 'unavailable' } | { ok: false, errors: { email: EmailProblem | 'taken' | 'unchanged' } }
+type ChangeEmailResult = {
+  ok: true
+} | {
+  ok: false, error: ProofFailure | 'unavailable'
+} | {
+  ok: false, errors: {
+    email: EmailProblem | 'taken' | 'unchanged'
+  }
+}
 
 [.] ChangePasswordResult
 type ChangePasswordResult = { ok: true } | { ok: false, error: ProofFailure } | { ok: false, errors: { password: PasswordProblem | 'breached' } }
 
 [.] ChangeUsernameResult
-type ChangeUsernameResult = { ok: true, user: BareUser } | { ok: false, error: 'signed-out' } | { ok: false, errors: { username: UsernameProblem | 'taken' | 'unchanged' } }
+type ChangeUsernameResult = {
+  ok: true, user: BareUser
+} | {
+  ok: false, error: 'signed-out'
+} | {
+  ok: false, errors: {
+    username: UsernameProblem | 'taken' | 'unchanged'
+  }
+}
 
 [.] CodedLink
 type CodedLink = 'magic-link' | 'verify-email'
@@ -464,25 +726,157 @@ interface ConsentFields
   state: string
 
 [.] createAuth
-function createAuth<Data extends AuthSessionData, Role extends string = string, Prefix extends string = "/auth", const Scope extends string = never, OrgRole extends string = never, UserData extends object = Record<string, never>>(options: AuthOptions<Data, Role, Prefix, Scope, OrgRole, UserData>): { createUser(input:  ...#7287ac1d
+function createAuth<Data extends AuthSessionData, Role extends string = string, Prefix extends string = "/auth", const Scope extends string = never, OrgRole extends string = never, UserData extends object = Record<string, never>>(options: AuthOptions<Data, Role, Prefix, Scope, OrgRole, UserData>): {
+  createUser(input: Omit<CreateUserInput, "roles"> & {
+    roles?: Role[] | undefined;
+  }): Promise<CreateUserResult>;
+  issueToken(userId: string, label: string, tokenOptions?: TokenOptions<Scope> & {
+    token?: string | undefined;
+  }): Promise<IssueTokenResult>;
+  userFromToken(token: string, url?: string | undefined): Promise<User<Record<string, unknown>> | null>;
+  gate(gateOptions?: {
+    require?: AuthRequirement<Role>;
+    scope?: ScopeRequirement<Scope>;
+  }): <Base extends string, Single extends SingletonBase, Defs extends DefinitionBase, Meta extends MetadataBase, Routes extends RouteBase, Eph extends EphemeralType, Vol extends EphemeralType>(app: Elysia<Base, Single, Defs, Meta, Routes, Eph, Vol>) => Elysia<Base, {
+    decorator: Single["decorator"] & {};
+    store: {
+      [K in keyof (Single["store"] & {})]: (Single["store"] & {})[K];
+    };
+    derive: Single["derive"] & {
+      readonly auth: Auth<Scope, Role, OrgRole, UserData>;
+    };
+    resolve: Single["resolve"] & {};
+  }, Defs & {
+    typebox: {};
+    error: {};
+  }, {
+    schema: (Meta & {
+      schema: {};
+      standaloneSchema: {};
+      macro: {};
+      macroFn: {};
+      parser: {};
+      response: {} & ExtractErrorFromHandle<{
+        readonly auth: Auth<Scope, Role, OrgRole, UserData>;
+      }>;
+    })["schema"];
+    standaloneSchema: (Meta & {
+      schema: {};
+      standaloneSchema: {};
+      macro: {};
+      macroFn: {};
+      parser: {};
+      response: {} & ExtractErrorFromHandle<{
+        readonly auth: Auth<Scope, Role, OrgRole, UserData>;
+      }>;
+    })["standaloneSchema"];
+    macro: (Meta & {
+      schema: {};
+      standaloneSchema: {};
+      macro: {};
+      macroFn: {};
+      parser: {};
+      response: {} & ExtractErrorFromHandle<{
+        readonly auth: Auth<Scope, Role, OrgRole, UserData>;
+      }>;
+    })["macro"] & Partial<{
+      readonly auth: false | Requirement<BareUser<Record<string, unknown>>, Role> | undefined;
+      readonly scope: ScopeRequirement<Scope> | undefined;
+    }>;
+    macroFn: (Meta & {
+      schema: {};
+      standaloneSchema: {};
+      macro: {};
+      macroFn: {};
+      parser: {};
+      response: {} & ExtractErrorFromHandle<{
+        readonly auth: Auth<Scope, Role, OrgRole, UserData>;
+      }>;
+    })["macroFn"] & {
+      readonly auth: (requirement: false | Requirement<BareUser<Record<string, unknown>>, Role> | undefined) => {
+        readonly transform: (ctx: object) => void;
+      };
+      readonly scope: (scope: ScopeRequirement<Scope> | undefined) => {
+        readonly transform: (ctx: object) => void;
+      };
+    };
+    parser: (Meta & {
+      schema: {};
+      standaloneSchema: {};
+      macro: {};
+      macroFn: {};
+      parser: {};
+      response: {} & ExtractErrorFromHandle<{ ...#17b2dbd2 (3885 lines)
+  guard: (guardOptions?: RouteGuardOptions<Role, Scope>) => Guard;
+  test: (site: OAuthSite) => { ...#e872ca38 (9 lines)
+  sessionCookie(userId: string, cookieOptions?: { ...#73ac2c57 (3 lines)
+  signInAs(site: { ...#730c06b7 (3 lines)
+  enrollTotp(userId: string): Promise<TotpEnrolment>;
+  oauth(site: OAuthSite): OAuthTest;
+  signOut(site: { ...#2b384ff2 (3 lines)
+  [PAGES_OF]: PagesHandle | undefined;
+  [CHECK_USER]: (input: CreateUserInput) => Promise<RegisterErrors>;
+  plugin: Elysia<"", { ...#8cb7e894 (1964 lines)
+  hasRole: (required: Role) => Predicate<BareUser<Record<string, unknown>>>;
+  isGranted: (role: Role, user: BareUser<Record<string, unknown>>) => boolean;
+  memberOf: (role?: OrgRole | undefined, memberOptions?: { ...#6ade75cc (3 lines)
+  socketUser: (ws: { ...#7266a8b7 (5 lines)
 
 [.] createGate
-function createGate<P, G extends string, S extends string = string>(deps: GateDeps<P, G, S>): <Base extends string, Single extends SingletonBase, Defs extends DefinitionBase, Meta extends MetadataBase, Routes extends RouteBase, Eph extends EphemeralType, Vol extends EphemeralType>(app: Elysia<Base, Single, Defs, Meta, ...#87a544a8
+function createGate<P, G extends string, S extends string = string>(deps: GateDeps<P, G, S>): <Base extends string, Single extends SingletonBase, Defs extends DefinitionBase, Meta extends MetadataBase, Routes extends RouteBase, Eph extends EphemeralType, Vol extends EphemeralType>(app: Elysia<Base, Single, Defs, Meta, Routes, Eph, Vol>) => Elysia<Base, Single, Defs, {
+  schema: Meta["schema"];
+  standaloneSchema: Meta["standaloneSchema"];
+  macro: Meta["macro"] & Partial<{
+    readonly auth: false | Requirement<P, G> | undefined;
+    readonly scope: ScopeRequirement<S> | undefined;
+  }>;
+  macroFn: Meta["macroFn"] & {
+    readonly auth: (requirement: false | Requirement<P, G> | undefined) => {
+      readonly transform: (ctx: object) => void;
+    };
+    readonly scope: (scope: ScopeRequirement<S> | undefined) => {
+      readonly transform: (ctx: object) => void;
+    };
+  };
+  parser: Meta["parser"];
+  response: Meta["response"];
+}, Routes, Eph, Vol>
 
 [.] createOAuthClient
-function createOAuthClient<Raw = unknown, User = unknown>(provider: OAuthProvider<Raw, User>, config: OAuthClientConfig): { authorizeUrl({ state, codeChallenge, nonce, extraParams }?: AuthorizeUrlOptions): Promise<string>; exchangeCode(code: string, opts?: { codeVerifier?: string; }): Promise<OAuthTokens>; refreshTokens(refr ...#8d08a83f
+function createOAuthClient<Raw = unknown, User = unknown>(provider: OAuthProvider<Raw, User>, config: OAuthClientConfig): {
+  authorizeUrl({
+    state, codeChallenge, nonce, extraParams
+  }?: AuthorizeUrlOptions): Promise<string>;
+  exchangeCode(code: string, opts?: {
+    codeVerifier?: string;
+  }): Promise<OAuthTokens>;
+  refreshTokens(refreshToken: string): Promise<OAuthTokens>;
+  revokeToken(token: string): Promise<boolean>;
+  fetchUser(accessToken: string): Promise<User>;
+  readUser(tokens: OAuthTokens, opts?: {
+    nonce?: string | undefined;
+    callback?: Record<string, string>;
+  }): Promise<User>;
+}
 
 [.] createOAuthTokenRefresher
 function createOAuthTokenRefresher<K, S>(deps: OAuthTokenRefresherDeps<K, S>): { getValidToken(subject: S): Promise<string | null>; }
 
 [.] CreateOrganizationResult
-type CreateOrganizationResult<Role extends string = string> = { ok: true, membership: Membership<Role> } | { ok: false, error: 'signed-out' | 'forbidden' | 'invalid-name' | 'invalid-slug' | 'slug-taken' | 'limited' }
+type CreateOrganizationResult<Role extends string = string> = {
+  ok: true, membership: Membership<Role>
+} | {
+  ok: false, error: 'signed-out' | 'forbidden' | 'invalid-name' | 'invalid-slug' | 'slug-taken' | 'limited'
+}
 
 [.] createPkcePair
 function createPkcePair(): Promise<PkcePair>
 
 [.] createRoleHierarchy
-function createRoleHierarchy<P, R extends string>(hierarchy: RoleHierarchy<R>, getRoles: (principal: P) => R[]): { isGranted: (role: string, userRoles: string[]) => boolean; hasRole: (required: R) => Predicate<P>; }
+function createRoleHierarchy<P, R extends string>(hierarchy: RoleHierarchy<R>, getRoles: (principal: P) => R[]): {
+  isGranted: (role: string, userRoles: string[]) => boolean;
+  hasRole: (required: R) => Predicate<P>;
+}
 
 [.] createTokenRefresher
 function createTokenRefresher<K, S>(deps: TokenRefresherDeps<K, S>): { getValidToken(subject: S): Promise<string | null>; }
@@ -503,7 +897,11 @@ interface CreateUserInput
 type CreateUserResult = { ok: true, user: BareUser } | { ok: false, errors: RegisterErrors }
 
 [.] createWsAuthStore
-function createWsAuthStore<T>(verify: (token: string, ws: Ws) => T | Promise<T | null> | null): { handleAuth(ws: Ws, token: string): Promise<void>; get(ws: Ws): Promise<T | undefined>; forget: (ws: Ws) => boolean; }
+function createWsAuthStore<T>(verify: (token: string, ws: Ws) => T | Promise<T | null> | null): {
+  handleAuth(ws: Ws, token: string): Promise<void>;
+  get(ws: Ws): Promise<T | undefined>;
+  forget: (ws: Ws) => boolean;
+}
 
 [.] CredentialRules
 interface CredentialRules
@@ -535,7 +933,92 @@ function decide<P, G extends string>(store: GrantStore<P, G>, principal: Princip
 type DecideResult = { ok: true, redirect: string } | { ok: false, error: 'client' | 'redirect_uri' | 'signed-out' }
 
 [.] DEFAULT_LIMITS
-const DEFAULT_LIMITS: { signIn: { max: number; window: "15m"; }; signInAccount: { max: number; window: "15m"; }; signInAccountAll: { max: number; window: "15m"; }; register: { max: number; window: "1h"; }; resend: { max: number; window: "1h"; }; resendAccount: { max: number; window: "1h"; }; forgot: { max: number; window ...#f4a45dbb
+const DEFAULT_LIMITS: {
+  signIn: {
+    max: number;
+    window: "15m";
+  };
+  signInAccount: {
+    max: number;
+    window: "15m";
+  };
+  signInAccountAll: {
+    max: number;
+    window: "15m";
+  };
+  register: {
+    max: number;
+    window: "1h";
+  };
+  resend: {
+    max: number;
+    window: "1h";
+  };
+  resendAccount: {
+    max: number;
+    window: "1h";
+  };
+  forgot: {
+    max: number;
+    window: "1h";
+  };
+  forgotAccount: {
+    max: number;
+    window: "1h";
+  };
+  magicLink: {
+    max: number;
+    window: "1h";
+  };
+  magicLinkAccount: {
+    max: number;
+    window: "1h";
+  };
+  emailChange: {
+    max: number;
+    window: "1h";
+  };
+  emailChangeAccount: {
+    max: number;
+    window: "1h";
+  };
+  twoFactor: {
+    max: number;
+    window: "15m";
+  };
+  twoFactorAccount: {
+    max: number;
+    window: "15m";
+  };
+  reprove: {
+    max: number;
+    window: "15m";
+  };
+  emailCode: {
+    max: number;
+    window: "15m";
+  };
+  emailCodeAccount: {
+    max: number;
+    window: "15m";
+  };
+  invite: {
+    max: number;
+    window: "1h";
+  };
+  inviteAddress: {
+    max: number;
+    window: "1d";
+  };
+  organization: {
+    max: number;
+    window: "1d";
+  };
+  export: { ...#c1e7d987 (4 lines)
+  oauthRegister: { ...#2f1f3360 (4 lines)
+  oauthDocument: { ...#680f3e10 (4 lines)
+  oauthToken: { ...#28d361f4 (4 lines)
+  link: { ...#e18004fc (5 lines)
 
 [.] DEFAULT_RULES
 const DEFAULT_RULES: ResolvedRules
@@ -719,7 +1202,11 @@ interface InvitationRecord
   roles: string[]
 
 [.] InviteResult
-type InviteResult<Role extends string = string> = { ok: true, invitation: Invitation<Role> } | { ok: false, error: OrganizationFailure | 'unverified' | 'unknown-role' | 'invalid-email' | 'member' | 'limited' | 'unavailable' }
+type InviteResult<Role extends string = string> = {
+  ok: true, invitation: Invitation<Role>
+} | {
+  ok: false, error: OrganizationFailure | 'unverified' | 'unknown-role' | 'invalid-email' | 'member' | 'limited' | 'unavailable'
+}
 
 [.] IssueTokenResult
 type IssueTokenResult = { ok: true, token: string, id: string } | { ok: false, error: TokenProblem | 'token' | 'not-found' | 'banned' }
@@ -1035,7 +1522,9 @@ interface OwnOptions<Role extends string = string, Prefix extends string = '/aut
   forwardAuth?: ForwardDomains | ForwardAuthOptions | undefined
   guests?: { maxAge: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w`; } | undefined
   home?: string | undefined
-  hooks?: (() => Promise<{ hooks: Partial<Pick<AuthOptions<AuthSessionData, string, "/auth", never, never, Record<string, never>>, "exportData" | "authorize" | "allow" | "onSignUp" | "profileFields" | "onDelete" | "onAuthEvent" | "locate">>; }>) | undefined
+  hooks?: (() => Promise<{
+  hooks: Partial<Pick<AuthOptions<AuthSessionData, string, "/auth", never, never, Record<string, never>>, "exportData" | "authorize" | "allow" | "onSignUp" | "profileFields" | "onDelete" | "onAuthEvent" | "locate">>;
+}>) | undefined
   locate?: ((ip: string) => string | Promise<string | null | undefined> | null | undefined) | undefined
   magicLink?: boolean | undefined
   module?: undefined
@@ -1051,9 +1540,16 @@ interface OwnOptions<Role extends string = string, Prefix extends string = '/aut
   password?: boolean | undefined
   plugin?: undefined
   prefix?: Prefix | undefined
-  profileFields?: ((event: { user: User<UserData>; profile: Profile; }) => void | { [Field in keyof UserData]?: UserData[Field] | undefined; } | Promise<void | { [Field in keyof UserData]?: UserData[Field] | undefined; }>) | undefined
+  profileFields?: ((event: {
+  user: User<UserData>;
+  profile: Profile;
+}) => void | {
+  [Field in keyof UserData]?: UserData[Field] | undefined;
+} | Promise<void | {
+  [Field in keyof UserData]?: UserData[Field] | undefined;
+}>) | undefined
   proxy?: number | boolean | ProxyConfig | undefined
-  rateLimit?: Partial<Record<"signIn" | "signInAccount" | "signInAccountAll" | "register" | "resend" | "resendAccount" | "forgot" | "forgotAccount" | "magicLink" | "magicLinkAccount" | "emailChange" | "emailChangeAccount" | "twoFactor" | "twoFactorAccount" | "reprove" | "emailCode" | "emailCodeAccount" | "invite" ...#4289d195
+  rateLimit?: Partial<Record<"signIn" | "signInAccount" | "signInAccountAll" | "register" | "resend" | "resendAccount" | "forgot" | "forgotAccount" | "magicLink" | "magicLinkAccount" | "emailChange" | "emailChangeAccount" | "twoFactor" | "twoFactorAccount" | "reprove" | "emailCode" | "emailCodeAccount" | "invite" | "inviteAddress" | "organization" | "export" | "oauthRegister" | "oauthDocument" | "oauthToken" | "link" | "oauthRegisterAll", Limit>> | undefined
   remember?: { maxAge?: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w` | undefined; } | undefined
   roles?: Record<Role, NoInfer<Role>[]> | undefined
   rules?: CredentialRules | undefined
@@ -1087,7 +1583,11 @@ const passkeyAssertion: TUnsafe<AuthenticationResponseJSON>
 const passkeyAttestation: TUnsafe<RegistrationResponseJSON>
 
 [.] PasskeyOptionsResult
-type PasskeyOptionsResult<Options, Failure extends string = 'signed-out' | 'none' | 'expired' | 'off'> = { ok: true, options: Options } | { ok: false, error: Failure }
+type PasskeyOptionsResult<Options, Failure extends string = 'signed-out' | 'none' | 'expired' | 'off'> = {
+  ok: true, options: Options
+} | {
+  ok: false, error: Failure
+}
 
 [.] PasskeyRecord
 interface PasskeyRecord
@@ -1136,7 +1636,15 @@ interface PkcePair
   verifier: string
 
 [.] PluginOf
-type PluginOf<Module> = Module extends { auth: { plugin: infer Plugin extends AnyElysia } } ? Plugin : Module extends { default: { plugin: infer Plugin extends AnyElysia } } ? Plugin : never
+type PluginOf<Module> = Module extends {
+  auth: {
+    plugin: infer Plugin extends AnyElysia
+  }
+} ? Plugin : Module extends {
+  default: {
+    plugin: infer Plugin extends AnyElysia
+  }
+} ? Plugin : never
 
 [.] PolicyContext
 interface PolicyContext
@@ -1195,7 +1703,11 @@ interface ProfileFieldView extends Omit<ProfileField, 'label'>
 interface ProfileOptions<Field extends string = string>
   fields: Record<Field, ProfileField>
   load: (user: BareUser<Record<string, unknown>>) => Partial<Record<Field, string | null | undefined>> | Promise<Partial<Record<Field, string | null | undefined>>>
-  save: (user: BareUser<Record<string, unknown>>, values: Record<Field, string>) => void | { errors: Partial<Record<Field, string>>; } | Promise<void | { errors: Partial<Record<Field, string>>; }>
+  save: (user: BareUser<Record<string, unknown>>, values: Record<Field, string>) => void | {
+  errors: Partial<Record<Field, string>>;
+} | Promise<void | {
+  errors: Partial<Record<Field, string>>;
+}>
 
 [.] ProfileProblem
 type ProfileProblem = 'required' | 'too-long' | { message: string }
@@ -1267,7 +1779,15 @@ interface RegisterInput
 type RegisterPasskeyResult = { ok: true, passkey: Passkey } | { ok: false, error: 'signed-out' | 'expired' | 'invalid' }
 
 [.] RegisterResult
-type RegisterResult = { ok: true, user: BareUser, signedIn: true } | { ok: true, signedIn: false } | { ok: false, errors: RegisterErrors } | { ok: false, error: 'limited' | 'captcha' | 'closed' }
+type RegisterResult = {
+  ok: true, user: BareUser, signedIn: true
+} | {
+  ok: true, signedIn: false
+} | {
+  ok: false, errors: RegisterErrors
+} | {
+  ok: false, error: 'limited' | 'captcha' | 'closed'
+}
 
 [.] RejectInvitationResult
 type RejectInvitationResult = { ok: true } | { ok: false, error: 'signed-out' | 'not-found' }
@@ -1438,7 +1958,11 @@ type UnlinkResult = { ok: true } | { ok: false, error: ProofFailure | 'not-linke
 type UpdateLocaleResult = { ok: true } | { ok: false, error: 'signed-out' | 'invalid-locale' }
 
 [.] UpdateOrganizationResult
-type UpdateOrganizationResult = { ok: true, organization: Organization } | { ok: false, error: OrganizationFailure | 'invalid-name' | 'invalid-slug' | 'slug-taken' }
+type UpdateOrganizationResult = {
+  ok: true, organization: Organization
+} | {
+  ok: false, error: OrganizationFailure | 'invalid-name' | 'invalid-slug' | 'slug-taken'
+}
 
 [.] User
 interface User<Data extends object = Record<string, unknown>> extends BareUser<Data>
@@ -1513,10 +2037,34 @@ interface WsSender
   send: (msg: string) => void
 
 [./add] default
-function default(project: Project): { description: string; files: { 'src/routes/_guard.ts': string; }; edits: { file: string; find: RegExp; replace: (_match: string, open: string, space: string, close: string) => string; done: string; import: string; }[]; example: string[]; ignore: string[]; extension: { import: st ...#c8707185
+function default(project: Project): {
+  description: string;
+  files: {
+    'src/routes/_guard.ts': string;
+  };
+  edits: {
+    file: string;
+    find: RegExp;
+    replace: (_match: string, open: string, space: string, close: string) => string;
+    done: string;
+    import: string;
+  }[];
+  example: string[];
+  ignore: string[];
+  extension: {
+    import: string;
+    expression: string;
+  };
+  notes: string[];
+}
 
 [./browser] askPasskey
-function askPasskey(options: PublicKeyCredentialRequestOptionsJSON, { autofill, signal }?: { autofill?: boolean; signal?: AbortSignal; }): Promise<AuthenticationResponseJSON | null>
+function askPasskey(options: PublicKeyCredentialRequestOptionsJSON, {
+  autofill, signal
+}?: {
+  autofill?: boolean;
+  signal?: AbortSignal;
+}): Promise<AuthenticationResponseJSON | null>
 
 [./browser] canAskPasskey
 function canAskPasskey(): boolean
@@ -1570,7 +2118,20 @@ function accept(input: { id: string; }, options?: CallOptions | undefined): Prom
 component default
 
 [./pages/invitation.kay] load
-function load(ctx: PageContext<Record<string, string>, Readonly<Record<string, unknown>>>): Promise<{ auth: any; features: any; prefix: any; requested: string; id: string; invitation: any; user: any; signedIn: boolean; mine: boolean; unverified: boolean; back: string; refused: any; }>
+function load(ctx: PageContext<Record<string, string>, Readonly<Record<string, unknown>>>): Promise<{
+  auth: any;
+  features: any;
+  prefix: any;
+  requested: string;
+  id: string;
+  invitation: any;
+  user: any;
+  signedIn: boolean;
+  mine: boolean;
+  unverified: boolean;
+  back: string;
+  refused: any;
+}>
 
 [./pages/invitation.kay] page
 const page: { guards: false; security: { headers: { 'referrer-policy': string; }; }; }
@@ -1600,27 +2161,86 @@ function spend(input: { token: string; }, options?: CallOptions | undefined): Pr
 component default
 
 [./pages/register.kay] load
-function load(ctx: PageContext<Record<string, string>, Readonly<Record<string, unknown>>>): Promise<{ auth: any; features: any; prefix: any; redirect: string; user: any; askRemember: boolean; providerLinks: { name: string; label: string; href: string; }[]; captcha: { shown: boolean; challenge: string | null; };  ...#77014f21
+function load(ctx: PageContext<Record<string, string>, Readonly<Record<string, unknown>>>): Promise<{
+  auth: any;
+  features: any;
+  prefix: any;
+  redirect: string;
+  user: any;
+  askRemember: boolean;
+  providerLinks: {
+    name: string;
+    label: string;
+    href: string;
+  }[];
+  captcha: {
+    shown: boolean;
+    challenge: string | null;
+  };
+  refused: {
+    readonly fields: any;
+    readonly error?: never;
+  } | {
+    readonly error: any;
+    readonly fields?: never;
+  } | undefined;
+  fields: any;
+  error: string | undefined;
+  verify: boolean;
+}>
 
 [./pages/register.kay] page
 const page: { guards: false; }
 
 [./pages/register.kay] register
 function register(form: FormData, options?: CallOptions | undefined): Promise<"verify">
-function register(input: { redirect?: string | undefined; remember?: boolean | undefined; username?: string | undefined; 'cf-turnstile-response'?: string | undefined; 'h-captcha-response'?: string | undefined; 'kayjs-captcha'?: string | undefined; email: string; password: string; }, options?: CallOptions | undefined ...#2d33827e
+function register(input: {
+  redirect?: string | undefined;
+  remember?: boolean | undefined;
+  username?: string | undefined;
+  'cf-turnstile-response'?: string | undefined;
+  'h-captcha-response'?: string | undefined;
+  'kayjs-captcha'?: string | undefined;
+  email: string;
+  password: string;
+}, options?: CallOptions | undefined): Promise<"verify">
 
 [./pages/reset-password.kay] default
 component default
 
 [./pages/reset-password.kay] load
-function load(ctx: PageContext<Record<string, string>, Readonly<Record<string, unknown>>>): Promise<{ auth: any; features: any; redirect: string; token: string | undefined; captcha: { shown: boolean; challenge: string | null; }; requestError: string | undefined; refused: { readonly password: any; readonly error? ...#ffb5fe32
+function load(ctx: PageContext<Record<string, string>, Readonly<Record<string, unknown>>>): Promise<{
+  auth: any;
+  features: any;
+  redirect: string;
+  token: string | undefined;
+  captcha: {
+    shown: boolean;
+    challenge: string | null;
+  };
+  requestError: string | undefined;
+  refused: {
+    readonly password: any;
+    readonly error?: never;
+  } | {
+    readonly error: any;
+    readonly password?: never;
+  } | undefined;
+  sent: boolean;
+}>
 
 [./pages/reset-password.kay] page
 const page: { guards: false; security: { headers: { 'referrer-policy': string; }; }; }
 
 [./pages/reset-password.kay] request
 function request(form: FormData, options?: CallOptions | undefined): Promise<"sent">
-function request(input: { redirect?: string | undefined; 'cf-turnstile-response'?: string | undefined; 'h-captcha-response'?: string | undefined; 'kayjs-captcha'?: string | undefined; email: string; }, options?: CallOptions | undefined): Promise<"sent">
+function request(input: {
+  redirect?: string | undefined;
+  'cf-turnstile-response'?: string | undefined;
+  'h-captcha-response'?: string | undefined;
+  'kayjs-captcha'?: string | undefined;
+  email: string;
+}, options?: CallOptions | undefined): Promise<"sent">
 
 [./pages/reset-password.kay] reset
 function reset(form: FormData, options?: CallOptions | undefined): Promise<never>
@@ -1634,18 +2254,56 @@ function emailCode(form: FormData, options?: CallOptions | undefined): Promise<n
 function emailCode(input: { code: string; }, options?: CallOptions | undefined): Promise<never>
 
 [./pages/sign-in.kay] load
-function load(ctx: PageContext<Record<string, string>, Readonly<Record<string, unknown>>>): Promise<{ auth: any; features: any; prefix: any; redirect: string; user: any; captchaSignIn: { shown: boolean; challenge: string | null; }; captchaMagic: { shown: boolean; challenge: string | null; }; pending: any; oauthE ...#e9aa08c7
+function load(ctx: PageContext<Record<string, string>, Readonly<Record<string, unknown>>>): Promise<{
+  auth: any;
+  features: any;
+  prefix: any;
+  redirect: string;
+  user: any;
+  captchaSignIn: {
+    shown: boolean;
+    challenge: string | null;
+  };
+  captchaMagic: {
+    shown: boolean;
+    challenge: string | null;
+  };
+  pending: any;
+  oauthError: string | undefined;
+  signInError: string | undefined;
+  mailError: string | undefined;
+  codeError: any;
+  mailedTo: string | undefined;
+  askRemember: boolean;
+  providerLinks: {
+    name: string;
+    label: string;
+    href: string;
+  }[];
+  codes: any;
+}>
 
 [./pages/sign-in.kay] magicLink
 function magicLink(form: FormData, options?: CallOptions | undefined): Promise<string>
-function magicLink(input: { redirect?: string | undefined; remember?: boolean | undefined; 'cf-turnstile-response'?: string | undefined; 'h-captcha-response'?: string | undefined; 'kayjs-captcha'?: string | undefined; email: string; }, options?: CallOptions | undefined): Promise<string>
+function magicLink(input: {
+  redirect?: string | undefined;
+  remember?: boolean | undefined;
+  'cf-turnstile-response'?: string | undefined;
+  'h-captcha-response'?: string | undefined;
+  'kayjs-captcha'?: string | undefined;
+  email: string;
+}, options?: CallOptions | undefined): Promise<string>
 
 [./pages/sign-in.kay] page
 const page: { guards: false; }
 
 [./pages/sign-in.kay] passkey
 function passkey(form: FormData, options?: CallOptions | undefined): Promise<never>
-function passkey(input: { redirect?: string | undefined; remember?: boolean | undefined; response: AuthenticationResponseJSON; }, options?: CallOptions | undefined): Promise<never>
+function passkey(input: {
+  redirect?: string | undefined;
+  remember?: boolean | undefined;
+  response: AuthenticationResponseJSON;
+}, options?: CallOptions | undefined): Promise<never>
 
 [./pages/sign-in.kay] passkeyOptions
 function passkeyOptions(form: FormData, options?: CallOptions | undefined): Promise<any>
@@ -1654,20 +2312,38 @@ function passkeyOptions(input?: undefined, options?: CallOptions | undefined): P
 
 [./pages/sign-in.kay] password
 function password(form: FormData, options?: CallOptions | undefined): Promise<never>
-function password(input: { redirect?: string | undefined; remember?: boolean | undefined; 'cf-turnstile-response'?: string | undefined; 'h-captcha-response'?: string | undefined; 'kayjs-captcha'?: string | undefined; password: string; identifier: string; }, options?: CallOptions | undefined): Promise<never>
+function password(input: {
+  redirect?: string | undefined;
+  remember?: boolean | undefined;
+  'cf-turnstile-response'?: string | undefined;
+  'h-captcha-response'?: string | undefined;
+  'kayjs-captcha'?: string | undefined;
+  password: string;
+  identifier: string;
+}, options?: CallOptions | undefined): Promise<never>
 
 [./pages/two-factor.kay] default
 component default
 
 [./pages/two-factor.kay] load
-function load(ctx: PageContext<Record<string, string>, Readonly<Record<string, unknown>>>): Promise<{ auth: any; features: any; pending: any; redirect: string; error: any; }>
+function load(ctx: PageContext<Record<string, string>, Readonly<Record<string, unknown>>>): Promise<{
+  auth: any;
+  features: any;
+  pending: any;
+  redirect: string;
+  error: any;
+}>
 
 [./pages/two-factor.kay] page
 const page: { guards: false; }
 
 [./pages/two-factor.kay] passkey
 function passkey(form: FormData, options?: CallOptions | undefined): Promise<never>
-function passkey(input: { redirect?: string | undefined; remember?: boolean | undefined; response: AuthenticationResponseJSON; }, options?: CallOptions | undefined): Promise<never>
+function passkey(input: {
+  redirect?: string | undefined;
+  remember?: boolean | undefined;
+  response: AuthenticationResponseJSON;
+}, options?: CallOptions | undefined): Promise<never>
 
 [./pages/two-factor.kay] passkeyOptions
 function passkeyOptions(form: FormData, options?: CallOptions | undefined): Promise<any>
@@ -1686,7 +2362,16 @@ function code(input: { code: string; }, options?: CallOptions | undefined): Prom
 component default
 
 [./pages/verify-email.kay] load
-function load(ctx: PageContext<Record<string, string>, Readonly<Record<string, unknown>>>): Promise<{ auth: any; token: string | undefined; user: any; pending: any; refused: any; codeError: any; resendError: any; resent: boolean; }>
+function load(ctx: PageContext<Record<string, string>, Readonly<Record<string, unknown>>>): Promise<{
+  auth: any;
+  token: string | undefined;
+  user: any;
+  pending: any;
+  refused: any;
+  codeError: any;
+  resendError: any;
+  resent: boolean;
+}>
 
 [./pages/verify-email.kay] page
 const page: { guards: false; security: { headers: { 'referrer-policy': string; }; }; }
@@ -1701,55 +2386,326 @@ function verify(form: FormData, options?: CallOptions | undefined): Promise<neve
 function verify(input: { password?: string | undefined; token: string; }, options?: CallOptions | undefined): Promise<never>
 
 [./pg] AuthAttempts
-const AuthAttempts: TableDef<"kay_attempts", ExtractColumns<{ key: ColumnBuilder<string, NotNullable, NoDefault, IsPrimaryKey, NotGenerated>; count: ColumnBuilder<number, NotNullable, NoDefault, NotPrimaryKey, NotGenerated>; reset_at: ColumnBuilder<Date, NotNullable, NoDefault, NotPrimaryKey, NotGenerated>; }>, {}, {}>
+const AuthAttempts: TableDef<"kay_attempts", ExtractColumns<{
+  key: ColumnBuilder<string, NotNullable, NoDefault, IsPrimaryKey, NotGenerated>;
+  count: ColumnBuilder<number, NotNullable, NoDefault, NotPrimaryKey, NotGenerated>;
+  reset_at: ColumnBuilder<Date, NotNullable, NoDefault, NotPrimaryKey, NotGenerated>;
+}>, {}, {}>
 
 [./pg] AuthAudit
-const AuthAudit: TableDef<"kay_audits", ExtractColumns<{ id: ColumnBuilder<string, NotNullable, NoDefault, IsPrimaryKey, NotGenerated>; user_id: ColumnBuilder<string, NotNullable, NoDefault, NotPrimaryKey, NotGenerated>; event: ColumnBuilder<string, NotNullable, NoDefault, NotPrimaryKey, NotGenerated>; detail: Colum ...#e7cee26b
+const AuthAudit: TableDef<"kay_audits", ExtractColumns<{
+  id: ColumnBuilder<string, NotNullable, NoDefault, IsPrimaryKey, NotGenerated>;
+  user_id: ColumnBuilder<string, NotNullable, NoDefault, NotPrimaryKey, NotGenerated>;
+  event: ColumnBuilder<string, NotNullable, NoDefault, NotPrimaryKey, NotGenerated>;
+  detail: ColumnBuilder<string, IsNullable, NoDefault, NotPrimaryKey, NotGenerated>;
+  ip: ColumnBuilder<string, NotNullable, NoDefault, NotPrimaryKey, NotGenerated>;
+  user_agent: ColumnBuilder<string, NotNullable, NoDefault, NotPrimaryKey, NotGenerated>;
+  actor_id: ColumnBuilder<string, IsNullable, NoDefault, NotPrimaryKey, NotGenerated>;
+  at: ColumnBuilder<Date, NotNullable, NoDefault, NotPrimaryKey, NotGenerated>;
+}>, {}, {}>
 
 [./pg] AuthBearerTokens
-const AuthBearerTokens: TableDef<"kay_bearer_tokens", ExtractColumns<{ id: ColumnBuilder<string, NotNullable, NoDefault, IsPrimaryKey, NotGenerated>; user_id: ColumnBuilder<string, NotNullable, NoDefault, NotPrimaryKey, NotGenerated>; label: ColumnBuilder<string, NotNullable, NoDefault, NotPrimaryKey, NotGenerated>; digest ...#36f8e918
+const AuthBearerTokens: TableDef<"kay_bearer_tokens", ExtractColumns<{
+  id: ColumnBuilder<string, NotNullable, NoDefault, IsPrimaryKey, NotGenerated>;
+  user_id: ColumnBuilder<string, NotNullable, NoDefault, NotPrimaryKey, NotGenerated>;
+  label: ColumnBuilder<string, NotNullable, NoDefault, NotPrimaryKey, NotGenerated>;
+  digest: ColumnBuilder<string, NotNullable, NoDefault, NotPrimaryKey, NotGenerated>;
+  scopes: ColumnBuilder<string[], IsNullable, NoDefault, NotPrimaryKey, NotGenerated>;
+  created_at: ColumnBuilder<Date, NotNullable, NoDefault, NotPrimaryKey, NotGenerated>;
+  last_used_at: ColumnBuilder<Date, IsNullable, NoDefault, NotPrimaryKey, NotGenerated>;
+  expires_at: ColumnBuilder<Date, IsNullable, NoDefault, NotPrimaryKey, NotGenerated>;
+  oauth_client: ColumnBuilder<string, IsNullable, NoDefault, NotPrimaryKey, NotGenerated>;
+  oauth_family: ColumnBuilder<string, IsNullable, NoDefault, NotPrimaryKey, NotGenerated>;
+  oauth_resource: ColumnBuilder<string, IsNullable, NoDefault, NotPrimaryKey, NotGenerated>;
+}>, {}, {}>
 
 [./pg] AuthIdentities
-const AuthIdentities: TableDef<"kay_identities", ExtractColumns<{ id: ColumnBuilder<number, NotNullable, HasDefault, IsPrimaryKey, NotGenerated>; provider: ColumnBuilder<string, NotNullable, NoDefault, NotPrimaryKey, NotGenerated>; provider_id: ColumnBuilder<string, NotNullable, NoDefault, NotPrimaryKey, NotGenerated>; u ...#15a99c12
+const AuthIdentities: TableDef<"kay_identities", ExtractColumns<{
+  id: ColumnBuilder<number, NotNullable, HasDefault, IsPrimaryKey, NotGenerated>;
+  provider: ColumnBuilder<string, NotNullable, NoDefault, NotPrimaryKey, NotGenerated>;
+  provider_id: ColumnBuilder<string, NotNullable, NoDefault, NotPrimaryKey, NotGenerated>;
+  user_id: ColumnBuilder<string, NotNullable, NoDefault, NotPrimaryKey, NotGenerated>;
+  access_token: ColumnBuilder<string, IsNullable, NoDefault, NotPrimaryKey, NotGenerated>;
+  refresh_token: ColumnBuilder<string, IsNullable, NoDefault, NotPrimaryKey, NotGenerated>;
+  token_expires_at: ColumnBuilder<Date, IsNullable, NoDefault, NotPrimaryKey, NotGenerated>;
+  created_at: ColumnBuilder<Date, NotNullable, NoDefault, NotPrimaryKey, NotGenerated>;
+}>, {}, {}>
 
 [./pg] AuthInvitations
-const AuthInvitations: TableDef<"kay_invitations", ExtractColumns<{ id: ColumnBuilder<string, NotNullable, NoDefault, IsPrimaryKey, NotGenerated>; organization_id: ColumnBuilder<string, NotNullable, NoDefault, NotPrimaryKey, NotGenerated>; email: ColumnBuilder<string, NotNullable, NoDefault, NotPrimaryKey, NotGenerated>;  ...#14aec96a
+const AuthInvitations: TableDef<"kay_invitations", ExtractColumns<{
+  id: ColumnBuilder<string, NotNullable, NoDefault, IsPrimaryKey, NotGenerated>;
+  organization_id: ColumnBuilder<string, NotNullable, NoDefault, NotPrimaryKey, NotGenerated>;
+  email: ColumnBuilder<string, NotNullable, NoDefault, NotPrimaryKey, NotGenerated>;
+  roles: ColumnBuilder<string[], NotNullable, NoDefault, NotPrimaryKey, NotGenerated>;
+  invited_by: ColumnBuilder<string, IsNullable, NoDefault, NotPrimaryKey, NotGenerated>;
+  created_at: ColumnBuilder<Date, NotNullable, NoDefault, NotPrimaryKey, NotGenerated>;
+  expires_at: ColumnBuilder<Date, NotNullable, NoDefault, NotPrimaryKey, NotGenerated>;
+}>, {}, {}>
 
 [./pg] AuthMembers
-const AuthMembers: TableDef<"kay_members", ExtractColumns<{ id: ColumnBuilder<number, NotNullable, HasDefault, IsPrimaryKey, NotGenerated>; organization_id: ColumnBuilder<string, NotNullable, NoDefault, NotPrimaryKey, NotGenerated>; user_id: ColumnBuilder<string, NotNullable, NoDefault, NotPrimaryKey, NotGenerated>; r ...#49edd118
+const AuthMembers: TableDef<"kay_members", ExtractColumns<{
+  id: ColumnBuilder<number, NotNullable, HasDefault, IsPrimaryKey, NotGenerated>;
+  organization_id: ColumnBuilder<string, NotNullable, NoDefault, NotPrimaryKey, NotGenerated>;
+  user_id: ColumnBuilder<string, NotNullable, NoDefault, NotPrimaryKey, NotGenerated>;
+  roles: ColumnBuilder<string[], NotNullable, NoDefault, NotPrimaryKey, NotGenerated>;
+  created_at: ColumnBuilder<Date, NotNullable, NoDefault, NotPrimaryKey, NotGenerated>;
+}>, {}, {}>
 
 [./pg] AuthOAuthClients
-const AuthOAuthClients: TableDef<"kay_oauth_clients", ExtractColumns<{ id: ColumnBuilder<string, NotNullable, NoDefault, IsPrimaryKey, NotGenerated>; name: ColumnBuilder<string, NotNullable, NoDefault, NotPrimaryKey, NotGenerated>; redirect_uris: ColumnBuilder<string[], NotNullable, NoDefault, NotPrimaryKey, NotGenerated>; ...#29d1c55f
+const AuthOAuthClients: TableDef<"kay_oauth_clients", ExtractColumns<{
+  id: ColumnBuilder<string, NotNullable, NoDefault, IsPrimaryKey, NotGenerated>;
+  name: ColumnBuilder<string, NotNullable, NoDefault, NotPrimaryKey, NotGenerated>;
+  redirect_uris: ColumnBuilder<string[], NotNullable, NoDefault, NotPrimaryKey, NotGenerated>;
+  created_at: ColumnBuilder<Date, NotNullable, NoDefault, NotPrimaryKey, NotGenerated>;
+}>, {}, {}>
 
 [./pg] AuthOAuthCodes
-const AuthOAuthCodes: TableDef<"kay_oauth_codes", ExtractColumns<{ digest: ColumnBuilder<string, NotNullable, NoDefault, IsPrimaryKey, NotGenerated>; user_id: ColumnBuilder<string, NotNullable, NoDefault, NotPrimaryKey, NotGenerated>; client_id: ColumnBuilder<string, NotNullable, NoDefault, NotPrimaryKey, NotGenerated>;  ...#62a67990
+const AuthOAuthCodes: TableDef<"kay_oauth_codes", ExtractColumns<{
+  digest: ColumnBuilder<string, NotNullable, NoDefault, IsPrimaryKey, NotGenerated>;
+  user_id: ColumnBuilder<string, NotNullable, NoDefault, NotPrimaryKey, NotGenerated>;
+  client_id: ColumnBuilder<string, NotNullable, NoDefault, NotPrimaryKey, NotGenerated>;
+  redirect_uri: ColumnBuilder<string, NotNullable, NoDefault, NotPrimaryKey, NotGenerated>;
+  challenge: ColumnBuilder<string, NotNullable, NoDefault, NotPrimaryKey, NotGenerated>;
+  scopes: ColumnBuilder<string[], IsNullable, NoDefault, NotPrimaryKey, NotGenerated>;
+  family: ColumnBuilder<string, NotNullable, NoDefault, NotPrimaryKey, NotGenerated>;
+  resource: ColumnBuilder<string, IsNullable, NoDefault, NotPrimaryKey, NotGenerated>;
+  created_at: ColumnBuilder<Date, NotNullable, NoDefault, NotPrimaryKey, NotGenerated>;
+  expires_at: ColumnBuilder<Date, NotNullable, NoDefault, NotPrimaryKey, NotGenerated>;
+  used_at: ColumnBuilder<Date, IsNullable, NoDefault, NotPrimaryKey, NotGenerated>;
+}>, {}, {}>
 
 [./pg] AuthOAuthGrants
-const AuthOAuthGrants: TableDef<"kay_oauth_grants", ExtractColumns<{ id: ColumnBuilder<number, NotNullable, HasDefault, IsPrimaryKey, NotGenerated>; user_id: ColumnBuilder<string, NotNullable, NoDefault, NotPrimaryKey, NotGenerated>; client_id: ColumnBuilder<string, NotNullable, NoDefault, NotPrimaryKey, NotGenerated>; cl ...#6bc4f812
+const AuthOAuthGrants: TableDef<"kay_oauth_grants", ExtractColumns<{
+  id: ColumnBuilder<number, NotNullable, HasDefault, IsPrimaryKey, NotGenerated>;
+  user_id: ColumnBuilder<string, NotNullable, NoDefault, NotPrimaryKey, NotGenerated>;
+  client_id: ColumnBuilder<string, NotNullable, NoDefault, NotPrimaryKey, NotGenerated>;
+  client_name: ColumnBuilder<string, NotNullable, NoDefault, NotPrimaryKey, NotGenerated>;
+  scopes: ColumnBuilder<string[], IsNullable, NoDefault, NotPrimaryKey, NotGenerated>;
+  created_at: ColumnBuilder<Date, NotNullable, NoDefault, NotPrimaryKey, NotGenerated>;
+  last_used_at: ColumnBuilder<Date, IsNullable, NoDefault, NotPrimaryKey, NotGenerated>;
+}>, {}, {}>
 
 [./pg] AuthOAuthRefresh
-const AuthOAuthRefresh: TableDef<"kay_oauth_refresh_tokens", ExtractColumns<{ digest: ColumnBuilder<string, NotNullable, NoDefault, IsPrimaryKey, NotGenerated>; user_id: ColumnBuilder<string, NotNullable, NoDefault, NotPrimaryKey, NotGenerated>; client_id: ColumnBuilder<string, NotNullable, NoDefault, NotPrimaryKey, NotGen ...#7b6572db
+const AuthOAuthRefresh: TableDef<"kay_oauth_refresh_tokens", ExtractColumns<{
+  digest: ColumnBuilder<string, NotNullable, NoDefault, IsPrimaryKey, NotGenerated>;
+  user_id: ColumnBuilder<string, NotNullable, NoDefault, NotPrimaryKey, NotGenerated>;
+  client_id: ColumnBuilder<string, NotNullable, NoDefault, NotPrimaryKey, NotGenerated>;
+  scopes: ColumnBuilder<string[], IsNullable, NoDefault, NotPrimaryKey, NotGenerated>;
+  family: ColumnBuilder<string, NotNullable, NoDefault, NotPrimaryKey, NotGenerated>;
+  resource: ColumnBuilder<string, IsNullable, NoDefault, NotPrimaryKey, NotGenerated>;
+  created_at: ColumnBuilder<Date, NotNullable, NoDefault, NotPrimaryKey, NotGenerated>;
+  expires_at: ColumnBuilder<Date, NotNullable, NoDefault, NotPrimaryKey, NotGenerated>;
+  used_at: ColumnBuilder<Date, IsNullable, NoDefault, NotPrimaryKey, NotGenerated>;
+}>, {}, {}>
 
 [./pg] AuthOrganizations
-const AuthOrganizations: TableDef<"kay_organizations", ExtractColumns<{ id: ColumnBuilder<string, NotNullable, NoDefault, IsPrimaryKey, NotGenerated>; name: ColumnBuilder<string, NotNullable, NoDefault, NotPrimaryKey, NotGenerated>; slug: ColumnBuilder<string, IsNullable, NoDefault, NotPrimaryKey, NotGenerated>; created_at: ...#583de472
+const AuthOrganizations: TableDef<"kay_organizations", ExtractColumns<{
+  id: ColumnBuilder<string, NotNullable, NoDefault, IsPrimaryKey, NotGenerated>;
+  name: ColumnBuilder<string, NotNullable, NoDefault, NotPrimaryKey, NotGenerated>;
+  slug: ColumnBuilder<string, IsNullable, NoDefault, NotPrimaryKey, NotGenerated>;
+  created_at: ColumnBuilder<Date, NotNullable, NoDefault, NotPrimaryKey, NotGenerated>;
+}>, {}, {}>
 
 [./pg] AuthPasskeys
-const AuthPasskeys: TableDef<"kay_passkeys", ExtractColumns<{ id: ColumnBuilder<string, NotNullable, NoDefault, IsPrimaryKey, NotGenerated>; user_id: ColumnBuilder<string, NotNullable, NoDefault, NotPrimaryKey, NotGenerated>; name: ColumnBuilder<string, NotNullable, NoDefault, NotPrimaryKey, NotGenerated>; public_key:  ...#75d490b2
+const AuthPasskeys: TableDef<"kay_passkeys", ExtractColumns<{
+  id: ColumnBuilder<string, NotNullable, NoDefault, IsPrimaryKey, NotGenerated>;
+  user_id: ColumnBuilder<string, NotNullable, NoDefault, NotPrimaryKey, NotGenerated>;
+  name: ColumnBuilder<string, NotNullable, NoDefault, NotPrimaryKey, NotGenerated>;
+  public_key: ColumnBuilder<string, NotNullable, NoDefault, NotPrimaryKey, NotGenerated>;
+  counter: ColumnBuilder<bigint, NotNullable, NoDefault, NotPrimaryKey, NotGenerated>;
+  transports: ColumnBuilder<string[], NotNullable, NoDefault, NotPrimaryKey, NotGenerated>;
+  multi_device: ColumnBuilder<boolean, NotNullable, NoDefault, NotPrimaryKey, NotGenerated>;
+  backed_up: ColumnBuilder<boolean, NotNullable, NoDefault, NotPrimaryKey, NotGenerated>;
+  user_verified: ColumnBuilder<boolean, NotNullable, HasDefault, NotPrimaryKey, NotGenerated>;
+  created_at: ColumnBuilder<Date, NotNullable, NoDefault, NotPrimaryKey, NotGenerated>;
+  last_used_at: ColumnBuilder<Date, IsNullable, NoDefault, NotPrimaryKey, NotGenerated>;
+}>, {}, {}>
 
 [./pg] AuthRecoveryCodes
-const AuthRecoveryCodes: TableDef<"kay_recovery_codes", ExtractColumns<{ id: ColumnBuilder<number, NotNullable, HasDefault, IsPrimaryKey, NotGenerated>; user_id: ColumnBuilder<string, NotNullable, NoDefault, NotPrimaryKey, NotGenerated>; digest: ColumnBuilder<string, NotNullable, NoDefault, NotPrimaryKey, NotGenerated>; }>, ...#a67895b2
+const AuthRecoveryCodes: TableDef<"kay_recovery_codes", ExtractColumns<{
+  id: ColumnBuilder<number, NotNullable, HasDefault, IsPrimaryKey, NotGenerated>;
+  user_id: ColumnBuilder<string, NotNullable, NoDefault, NotPrimaryKey, NotGenerated>;
+  digest: ColumnBuilder<string, NotNullable, NoDefault, NotPrimaryKey, NotGenerated>;
+}>, {}, {}>
 
 [./pg] AuthSessions
-const AuthSessions: TableDef<"kay_auth_sessions", ExtractColumns<{ id: ColumnBuilder<string, NotNullable, NoDefault, IsPrimaryKey, NotGenerated>; user_id: ColumnBuilder<string, NotNullable, NoDefault, NotPrimaryKey, NotGenerated>; version: ColumnBuilder<number, NotNullable, NoDefault, NotPrimaryKey, NotGenerated>; user ...#d93aa77b
+const AuthSessions: TableDef<"kay_auth_sessions", ExtractColumns<{
+  id: ColumnBuilder<string, NotNullable, NoDefault, IsPrimaryKey, NotGenerated>;
+  user_id: ColumnBuilder<string, NotNullable, NoDefault, NotPrimaryKey, NotGenerated>;
+  version: ColumnBuilder<number, NotNullable, NoDefault, NotPrimaryKey, NotGenerated>;
+  user_agent: ColumnBuilder<string, NotNullable, NoDefault, NotPrimaryKey, NotGenerated>;
+  ip: ColumnBuilder<string, NotNullable, NoDefault, NotPrimaryKey, NotGenerated>;
+  created_at: ColumnBuilder<Date, NotNullable, NoDefault, NotPrimaryKey, NotGenerated>;
+  last_seen_at: ColumnBuilder<Date, NotNullable, NoDefault, NotPrimaryKey, NotGenerated>;
+  max_age: ColumnBuilder<number, IsNullable, NoDefault, NotPrimaryKey, NotGenerated>;
+}>, {}, {}>
 
 [./pg] authTables
-const authTables: readonly [TableDef<"kay_users", ExtractColumns<{ id: ColumnBuilder<string, NotNullable, NoDefault, IsPrimaryKey, NotGenerated>; email: ColumnBuilder<string, IsNullable, NoDefault, NotPrimaryKey, NotGenerated>; email_verified_at: ColumnBuilder<Date, IsNullable, NoDefault, NotPrimaryKey, NotGenerated> ...#5d6dc28c
+const authTables: readonly [TableDef<"kay_users", ExtractColumns<{
+  id: ColumnBuilder<string, NotNullable, NoDefault, IsPrimaryKey, NotGenerated>;
+  email: ColumnBuilder<string, IsNullable, NoDefault, NotPrimaryKey, NotGenerated>;
+  email_verified_at: ColumnBuilder<Date, IsNullable, NoDefault, NotPrimaryKey, NotGenerated>;
+  username: ColumnBuilder<string, IsNullable, NoDefault, NotPrimaryKey, NotGenerated>;
+  username_key: ColumnBuilder<string, IsNullable, NoDefault, NotPrimaryKey, NotGenerated>;
+  password_hash: ColumnBuilder<string, IsNullable, NoDefault, NotPrimaryKey, NotGenerated>;
+  totp_secret: ColumnBuilder<string, IsNullable, NoDefault, NotPrimaryKey, NotGenerated>;
+  totp_enabled_at: ColumnBuilder<Date, IsNullable, NoDefault, NotPrimaryKey, NotGenerated>;
+  totp_last_step: ColumnBuilder<number, NotNullable, HasDefault, NotPrimaryKey, NotGenerated>;
+  roles: ColumnBuilder<string[], NotNullable, HasDefault, NotPrimaryKey, NotGenerated>;
+  session_version: ColumnBuilder<number, NotNullable, HasDefault, NotPrimaryKey, NotGenerated>;
+  last_sign_in: ColumnBuilder<string, IsNullable, NoDefault, NotPrimaryKey, NotGenerated>;
+  locale: ColumnBuilder<string, IsNullable, NoDefault, NotPrimaryKey, NotGenerated>;
+  guest: ColumnBuilder<boolean, NotNullable, HasDefault, NotPrimaryKey, NotGenerated>;
+  banned_at: ColumnBuilder<Date, IsNullable, NoDefault, NotPrimaryKey, NotGenerated>;
+  banned_until: ColumnBuilder<Date, IsNullable, NoDefault, NotPrimaryKey, NotGenerated>;
+  ban_reason: ColumnBuilder<string, IsNullable, NoDefault, NotPrimaryKey, NotGenerated>;
+  data: ColumnBuilder<Record<string, unknown>, NotNullable, HasDefault, NotPrimaryKey, NotGenerated>;
+  created_at: ColumnBuilder<Date, NotNullable, NoDefault, NotPrimaryKey, NotGenerated>;
+}>, {}, {}>, TableDef<"kay_identities", ExtractColumns<{
+  id: ColumnBuilder<number, NotNullable, HasDefault, IsPrimaryKey, NotGenerated>;
+  provider: ColumnBuilder<string, NotNullable, NoDefault, NotPrimaryKey, NotGenerated>;
+  provider_id: ColumnBuilder<string, NotNullable, NoDefault, NotPrimaryKey, NotGenerated>;
+  user_id: ColumnBuilder<string, NotNullable, NoDefault, NotPrimaryKey, NotGenerated>;
+  access_token: ColumnBuilder<string, IsNullable, NoDefault, NotPrimaryKey, NotGenerated>;
+  refresh_token: ColumnBuilder<string, IsNullable, NoDefault, NotPrimaryKey, NotGenerated>;
+  token_expires_at: ColumnBuilder<Date, IsNullable, NoDefault, NotPrimaryKey, NotGenerated>;
+  created_at: ColumnBuilder<Date, NotNullable, NoDefault, NotPrimaryKey, NotGenerated>;
+}>, {}, {}>, TableDef<"kay_tokens", ExtractColumns<{
+  digest: ColumnBuilder<string, NotNullable, NoDefault, IsPrimaryKey, NotGenerated>;
+  type: ColumnBuilder<string, NotNullable, NoDefault, NotPrimaryKey, NotGenerated>;
+  user_id: ColumnBuilder<string, NotNullable, NoDefault, NotPrimaryKey, NotGenerated>;
+  email: ColumnBuilder<string, NotNullable, NoDefault, NotPrimaryKey, NotGenerated>;
+  redirect: ColumnBuilder<string, IsNullable, NoDefault, NotPrimaryKey, NotGenerated>;
+  expires_at: ColumnBuilder<Date, NotNullable, NoDefault, NotPrimaryKey, NotGenerated>;
+}>, {}, {}>, TableDef<"kay_recovery_codes", ExtractColumns<{
+  id: ColumnBuilder<number, NotNullable, HasDefault, IsPrimaryKey, NotGenerated>;
+  user_id: ColumnBuilder<string, NotNullable, NoDefault, NotPrimaryKey, NotGenerated>;
+  digest: ColumnBuilder<string, NotNullable, NoDefault, NotPrimaryKey, NotGenerated>;
+}>, {}, {}>, TableDef<"kay_bearer_tokens", ExtractColumns<{
+  id: ColumnBuilder<string, NotNullable, NoDefault, IsPrimaryKey, NotGenerated>;
+  user_id: ColumnBuilder<string, NotNullable, NoDefault, NotPrimaryKey, NotGenerated>;
+  label: ColumnBuilder<string, NotNullable, NoDefault, NotPrimaryKey, NotGenerated>;
+  digest: ColumnBuilder<string, NotNullable, NoDefault, NotPrimaryKey, NotGenerated>;
+  scopes: ColumnBuilder<string[], IsNullable, NoDefault, NotPrimaryKey, NotGenerated>;
+  created_at: ColumnBuilder<Date, NotNullable, NoDefault, NotPrimaryKey, NotGenerated>;
+  last_used_at: ColumnBuilder<Date, IsNullable, NoDefault, NotPrimaryKey, NotGenerated>;
+  expires_at: ColumnBuilder<Date, IsNullable, NoDefault, NotPrimaryKey, NotGenerated>;
+  oauth_client: ColumnBuilder<string, IsNullable, NoDefault, NotPrimaryKey, NotGenerated>;
+  oauth_family: ColumnBuilder<string, IsNullable, NoDefault, NotPrimaryKey, NotGenerated>;
+  oauth_resource: ColumnBuilder<string, IsNullable, NoDefault, NotPrimaryKey, NotGenerated>;
+}>, {}, {}>, TableDef<"kay_auth_sessions", ExtractColumns<{
+  id: ColumnBuilder<string, NotNullable, NoDefault, IsPrimaryKey, NotGenerated>;
+  user_id: ColumnBuilder<string, NotNullable, NoDefault, NotPrimaryKey, NotGenerated>;
+  version: ColumnBuilder<number, NotNullable, NoDefault, NotPrimaryKey, NotGenerated>;
+  user_agent: ColumnBuilder<string, NotNullable, NoDefault, NotPrimaryKey, NotGenerated>;
+  ip: ColumnBuilder<string, NotNullable, NoDefault, NotPrimaryKey, NotGenerated>;
+  created_at: ColumnBuilder<Date, NotNullable, NoDefault, NotPrimaryKey, NotGenerated>;
+  last_seen_at: ColumnBuilder<Date, NotNullable, NoDefault, NotPrimaryKey, NotGenerated>;
+  max_age: ColumnBuilder<number, IsNullable, NoDefault, NotPrimaryKey, NotGenerated>;
+}>, {}, {}>, TableDef<"kay_passkeys", ExtractColumns<{
+  id: ColumnBuilder<string, NotNullable, NoDefault, IsPrimaryKey, NotGenerated>;
+  user_id: ColumnBuilder<string, NotNullable, NoDefault, NotPrimaryKey, NotGenerated>;
+  name: ColumnBuilder<string, NotNullable, NoDefault, NotPrimaryKey, NotGenerated>;
+  public_key: ColumnBuilder<string, NotNullable, NoDefault, NotPrimaryKey, NotGenerated>;
+  counter: ColumnBuilder<bigint, NotNullable, NoDefault, NotPrimaryKey, NotGenerated>;
+  transports: ColumnBuilder<string[], NotNullable, NoDefault, NotPrimaryKey, NotGenerated>;
+  multi_device: ColumnBuilder<boolean, NotNullable, NoDefault, NotPrimaryKey, NotGenerated>;
+  backed_up: ColumnBuilder<boolean, NotNullable, NoDefault, NotPrimaryKey, NotGenerated>;
+  user_verified: ColumnBuilder<boolean, NotNullable, HasDefault, NotPrimaryKey, NotGenerated>;
+  created_at: ColumnBuilder<Date, NotNullable, NoDefault, NotPrimaryKey, NotGenerated>;
+  last_used_at: ColumnBuilder<Date, IsNullable, NoDefault, NotPrimaryKey, NotGenerated>;
+}>, {}, {}>, TableDef<"kay_audits", ExtractColumns<{
+  id: ColumnBuilder<string, NotNullable, NoDefault, IsPrimaryKey, NotGenerated>;
+  user_id: ColumnBuilder<string, NotNullable, NoDefault, NotPrimaryKey, NotGenerated>;
+  event: ColumnBuilder<string, NotNullable, NoDefault, NotPrimaryKey, NotGenerated>;
+  detail: ColumnBuilder<string, IsNullable, NoDefault, NotPrimaryKey, NotGenerated>;
+  ip: ColumnBuilder<string, NotNullable, NoDefault, NotPrimaryKey, NotGenerated>;
+  user_agent: ColumnBuilder<string, NotNullable, NoDefault, NotPrimaryKey, NotGenerated>;
+  actor_id: ColumnBuilder<string, IsNullable, NoDefault, NotPrimaryKey, NotGenerated>;
+  at: ColumnBuilder<Date, NotNullable, NoDefault, NotPrimaryKey, NotGe ...#674d1ab3 (2 lines)
+  id: ColumnBuilder<string, NotNullable, NoDefault, IsPrimaryKey, NotGenerated>;
+  name: ColumnBuilder<string, NotNullable, NoDefault, NotPrimaryKey, NotGenerated>;
+  slug: ColumnBuilder<string, IsNullable, NoDefault, NotPrimaryKey, NotGenerated>;
+  created_at: ColumnBuilder<Date, NotNullable, NoDefault, NotPrimaryKe ...#ff2f5561 (2 lines)
+  id: ColumnBuilder<number, NotNullable, HasDefault, IsPrimaryKey, NotGenerated>;
+  organization_id: ColumnBuilder<string, NotNullable, NoDefault, NotPrimaryKey, NotGenerated>;
+  user_id: ColumnBuilder<string, NotNullable, NoDefault, NotPrimaryKey, NotGenerated>;
+  roles: ColumnBuilder<string[], NotNullable, NoDefault, NotPrimaryKey, NotGenerated>;
+  created_at: ColumnBuilder<Date, NotNullable, NoDefault, NotPrimaryKe ...#1dd8a410 (2 lines)
+  id: ColumnBuilder<string, NotNullable, NoDefault, IsPrimaryKey, NotGenerated>;
+  organization_id: ColumnBuilder<string, NotNullable, NoDefault, NotPrimaryKey, NotGenerated>;
+  email: ColumnBuilder<string, NotNullable, NoDefault, NotPrimaryKey, NotGenerated>;
+  roles: ColumnBuilder<string[], NotNullable, NoDefault, NotPrimaryKey, NotGenerated>;
+  invited_by: ColumnBuilder<string, IsNullable, NoDefault, NotPrimaryKey, NotGenerated>;
+  created_at: ColumnBuilder<Date, NotNullable, NoDefault, NotPrimaryKey, NotGenerated>;
+  expires_at: ColumnBuilder<Date, NotNullable, NoDefault, NotPrimaryKe ...#6be76abf (2 lines)
+  key: ColumnBuilder<string, NotNullable, NoDefault, IsPrimaryKey, NotGenerated>;
+  count: ColumnBuilder<number, NotNullable, NoDefault, NotPrimaryKey, NotGenerated>;
+  reset_at: ColumnBuilder<Date, NotNullable, NoDefault, NotPrimaryKey, ...#ce1e961b (2 lines)
+  id: ColumnBuilder<string, NotNullable, NoDefault, IsPrimaryKey, NotGenerated>;
+  name: ColumnBuilder<string, NotNullable, NoDefault, NotPrimaryKey, NotGenerated>;
+  redirect_uris: ColumnBuilder<string[], NotNullable, NoDefault, NotPrimaryKey, NotGenerated>;
+  created_at: ColumnBuilder<Date, NotNullable, NoDefault, NotPrimaryKe ...#67d78c41 (2 lines)
+  id: ColumnBuilder<number, NotNullable, HasDefault, IsPrimaryKey, NotGenerated>;
+  user_id: ColumnBuilder<string, NotNullable, NoDefault, NotPrimaryKey, NotGenerated>;
+  client_id: ColumnBuilder<string, NotNullable, NoDefault, NotPrimaryKey, NotGenerated>;
+  client_name: ColumnBuilder<string, NotNullable, NoDefault, NotPrimaryKey, NotGenerated>;
+  scopes: ColumnBuilder<string[], IsNullable, NoDefault, NotPrimaryKey, NotGenerated>;
+  created_at: ColumnBuilder<Date, NotNullable, NoDefault, NotPrimaryKey, NotGenerated>;
+  last_used_at: ColumnBuilder<Date, IsNullable, NoDefault, NotPrimaryK ...#637ffdbe (2 lines)
+  digest: ColumnBuilder<string, NotNullable, NoDefault, IsPrimaryKey, NotGenerated>;
+  user_id: ColumnBuilder<string, NotNullable, NoDefault, NotPrimaryKey, NotGenerated>;
+  client_id: ColumnBuilder<string, NotNullable, NoDefault, NotPrimaryKey, NotGenerated>;
+  redirect_uri: ColumnBuilder<string, NotNullable, NoDefault, NotPrimaryKey, NotGenerated>;
+  challenge: ColumnBuilder<string, NotNullable, NoDefault, NotPrimaryKey, NotGenerated>;
+  scopes: ColumnBuilder<string[], IsNullable, NoDefault, NotPrimaryKey, NotGenerated>;
+  family: ColumnBuilder<string, NotNullable, NoDefault, NotPrimaryKey, NotGenerated>;
+  resource: ColumnBuilder<string, IsNullable, NoDefault, NotPrimaryKey, NotGenerated>;
+  created_at: ColumnBuilder<Date, NotNullable, NoDefault, NotPrimaryKey, NotGenerated>;
+  expires_at: ColumnBuilder<Date, NotNullable, NoDefault, NotPrimaryKey, NotGenerated>;
+  used_at: ColumnBuilder<Date, IsNullable, NoDefault, NotPrimaryKey, N ...#597bb4d8 (2 lines)
+  digest: ColumnBuilder<string, NotNullable, NoDefault, IsPrimaryKey, NotGenerated>;
+  user_id: ColumnBuilder<string, NotNullable, NoDefault, NotPrimaryKey, NotGenerated>;
+  client_id: ColumnBuilder<string, NotNullable, NoDefault, NotPrimaryKey, NotGenerated>;
+  scopes: ColumnBuilder<string[], IsNullable, NoDefault, NotPrimaryKey, NotGenerated>;
+  family: ColumnBuilder<string, NotNullable, NoDefault, NotPrimaryKey, NotGenerated>;
+  resource: ColumnBuilder<string, IsNullable, NoDefault, NotPrimaryKey, NotGenerated>;
+  created_at: ColumnBuilder<Date, NotNullable, NoDefault, NotPrimaryKey, NotGenerated>;
+  expires_at: ColumnBuilder<Date, NotNullable, NoDefault, NotPrimaryKey, NotGenerated>;
+  used_at: ColumnBuilder<Date, IsNullable, NoDefault, NotPrimaryKey, N ...#d445f7e4 (2 lines)
 
 [./pg] AuthTokens
-const AuthTokens: TableDef<"kay_tokens", ExtractColumns<{ digest: ColumnBuilder<string, NotNullable, NoDefault, IsPrimaryKey, NotGenerated>; type: ColumnBuilder<string, NotNullable, NoDefault, NotPrimaryKey, NotGenerated>; user_id: ColumnBuilder<string, NotNullable, NoDefault, NotPrimaryKey, NotGenerated>; email: Col ...#dabe0e9f
+const AuthTokens: TableDef<"kay_tokens", ExtractColumns<{
+  digest: ColumnBuilder<string, NotNullable, NoDefault, IsPrimaryKey, NotGenerated>;
+  type: ColumnBuilder<string, NotNullable, NoDefault, NotPrimaryKey, NotGenerated>;
+  user_id: ColumnBuilder<string, NotNullable, NoDefault, NotPrimaryKey, NotGenerated>;
+  email: ColumnBuilder<string, NotNullable, NoDefault, NotPrimaryKey, NotGenerated>;
+  redirect: ColumnBuilder<string, IsNullable, NoDefault, NotPrimaryKey, NotGenerated>;
+  expires_at: ColumnBuilder<Date, NotNullable, NoDefault, NotPrimaryKey, NotGenerated>;
+}>, {}, {}>
 
 [./pg] AuthUsers
-const AuthUsers: TableDef<"kay_users", ExtractColumns<{ id: ColumnBuilder<string, NotNullable, NoDefault, IsPrimaryKey, NotGenerated>; email: ColumnBuilder<string, IsNullable, NoDefault, NotPrimaryKey, NotGenerated>; email_verified_at: ColumnBuilder<Date, IsNullable, NoDefault, NotPrimaryKey, NotGenerated>; username ...#69315b97
+const AuthUsers: TableDef<"kay_users", ExtractColumns<{
+  id: ColumnBuilder<string, NotNullable, NoDefault, IsPrimaryKey, NotGenerated>;
+  email: ColumnBuilder<string, IsNullable, NoDefault, NotPrimaryKey, NotGenerated>;
+  email_verified_at: ColumnBuilder<Date, IsNullable, NoDefault, NotPrimaryKey, NotGenerated>;
+  username: ColumnBuilder<string, IsNullable, NoDefault, NotPrimaryKey, NotGenerated>;
+  username_key: ColumnBuilder<string, IsNullable, NoDefault, NotPrimaryKey, NotGenerated>;
+  password_hash: ColumnBuilder<string, IsNullable, NoDefault, NotPrimaryKey, NotGenerated>;
+  totp_secret: ColumnBuilder<string, IsNullable, NoDefault, NotPrimaryKey, NotGenerated>;
+  totp_enabled_at: ColumnBuilder<Date, IsNullable, NoDefault, NotPrimaryKey, NotGenerated>;
+  totp_last_step: ColumnBuilder<number, NotNullable, HasDefault, NotPrimaryKey, NotGenerated>;
+  roles: ColumnBuilder<string[], NotNullable, HasDefault, NotPrimaryKey, NotGenerated>;
+  session_version: ColumnBuilder<number, NotNullable, HasDefault, NotPrimaryKey, NotGenerated>;
+  last_sign_in: ColumnBuilder<string, IsNullable, NoDefault, NotPrimaryKey, NotGenerated>;
+  locale: ColumnBuilder<string, IsNullable, NoDefault, NotPrimaryKey, NotGenerated>;
+  guest: ColumnBuilder<boolean, NotNullable, HasDefault, NotPrimaryKey, NotGenerated>;
+  banned_at: ColumnBuilder<Date, IsNullable, NoDefault, NotPrimaryKey, NotGenerated>;
+  banned_until: ColumnBuilder<Date, IsNullable, NoDefault, NotPrimaryKey, NotGenerated>;
+  ban_reason: ColumnBuilder<string, IsNullable, NoDefault, NotPrimaryKey, NotGenerated>;
+  data: ColumnBuilder<Record<string, unknown>, NotNullable, HasDefault, NotPrimaryKey, NotGenerated>;
+  created_at: ColumnBuilder<Date, NotNullable, NoDefault, NotPrimaryKey, NotGenerated>;
+}>, {}, {}>
 
 [./pg] pgStore
 function pgStore(db: Database): AuthStore

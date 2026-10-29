@@ -1,0 +1,2173 @@
+[./field-look] CHECKBOX
+const CHECKBOX: { root: string; input: string; label: string; hint: string; }
+
+[./field-look] FIELD_MESSAGE
+const FIELD_MESSAGE: { hint: string; issues: string; issue: string; }
+
+[./field-look] LABEL_TEXT
+const LABEL_TEXT: "text-xs [font-weight:var(--font-weight-normal)] tracking-label text-muted [font-family:var(--font-label,inherit)] [text-transform:var(--label-case)]"
+
+[./lib/accept] acceptsFile
+function acceptsFile(accept: string | undefined, file: Pick<File, "name" | "type">): boolean
+
+[./lib/add] default
+const default: { description: string; extension: { import: string; expression: string; }; notes: string[]; }
+
+[./lib/added-icons] addedIcons
+const addedIcons: Record<AddedSlot, IconProps>
+
+[./lib/announce] announce
+function announce(message: string, from?: Element | null): void
+
+[./lib/app-switcher] SwitcherApp
+interface SwitcherApp
+  description?: string | undefined
+  href: string
+  icon?: IconProps | IconSlot | undefined
+  id: string
+  label: string
+  newTab?: boolean | undefined
+  rel?: string | undefined
+
+[./lib/audio] AudioChapter
+interface AudioChapter
+  start: number
+  title: string
+  url?: string | undefined
+
+[./lib/audio] AudioCue
+interface AudioCue
+  end: number
+  start: number
+  text: string
+
+[./lib/audio] chapterAt
+function chapterAt(chapters: readonly AudioChapter[], seconds: number): number
+
+[./lib/audio] clock
+function clock(seconds: number): string
+
+[./lib/audio] cueAt
+function cueAt(cues: readonly AudioCue[], seconds: number): number
+
+[./lib/audio] cuesByChapter
+function cuesByChapter(chapters: readonly AudioChapter[], cues: readonly AudioCue[]): { chapter: number; first: number; cues: AudioCue[]; }[]
+
+[./lib/audio] lockScreen
+const lockScreen: { owner: object | undefined; }
+
+[./lib/audio] previousStart
+function previousStart(chapters: readonly AudioChapter[], seconds: number): number
+
+[./lib/audio] RESTART_CHAPTER_SECONDS
+const RESTART_CHAPTER_SECONDS: 3
+
+[./lib/button-props] AsButton
+type AsButton = Omit<JSX.IntrinsicElements['button'], 'type' | 'class'> & Look & {
+  href?: undefined type?: 'button' | 'submit' | 'reset' | undefined // Whether the disclosure the button opens is showing, for a popover or a panel it toggles. expanded?: boolean | undefined // For a toggle button: whether it is on. Written as `aria-pressed`, and the button draws an accent keyline while it is. pressed?: boolean | undefined
+}
+
+[./lib/button-props] AsLink
+type AsLink = Omit<JSX.IntrinsicElements['a'], 'class'> & Look & { href: string }
+
+[./lib/button-props] buttonOf
+function buttonOf(attributes: TagAttributes): {
+  disabled: undefined;
+  'aria-expanded': string | undefined;
+  'aria-pressed': string | undefined;
+  command?: "close" | "show-modal" | "request-close" | "show-popover" | "hide-popover" | "toggle-popover" | `--${string}` | undefined;
+  form?: Value;
+  slot?: Value;
+  style?: StyleValue;
+  title?: Value;
+  children?: Element;
+  onFocus?: EventHandler<HTMLButtonElement, FocusEvent> | undefined;
+  onInput?: EventHandler<HTMLButtonElement, InputEvent> | undefined;
+  onLoad?: EventHandler<HTMLButtonElement, Event> | undefined;
+  onClose?: EventHandler<HTMLButtonElement, Event> | undefined;
+  onPause?: EventHandler<HTMLButtonElement, Event> | undefined;
+  onPlay?: EventHandler<HTMLButtonElement, Event> | undefined;
+  onError?: EventHandler<HTMLButtonElement, ErrorEvent> | undefined;
+  onFullscreenchange?: EventHandler<HTMLButtonElement, Event> | undefined;
+  onFullscreenerror?: EventHandler<HTMLButtonElement, Event> | undefined;
+  onAbort?: EventHandler<HTMLButtonElement, UIEvent> | undefined;
+  onAnimationCancel?: EventHandler<HTMLButtonElement, AnimationEvent> | undefined;
+  onAnimationEnd?: EventHandler<HTMLButtonElement, AnimationEvent> | undefined;
+  onAnimationIteration?: EventHandler<HTMLButtonElement, AnimationEvent> | undefined;
+  onAnimationStart?: EventHandler<HTMLButtonElement, AnimationEvent> | undefined;
+  onAuxClick?: EventHandler<HTMLButtonElement, PointerEvent> | undefined;
+  onBeforeInput?: EventHandler<HTMLButtonElement, InputEvent> | undefined;
+  onBeforematch?: EventHandler<HTMLButtonElement, Event> | undefined;
+  onBeforeToggle?: EventHandler<HTMLButtonElement, ToggleEvent> | undefined;
+  onBlur?: EventHandler<HTMLButtonElement, FocusEvent> | undefined;
+  onCancel?: EventHandler<HTMLButtonElement, Event> | undefined;
+  onCanPlay?: EventHandler<HTMLButtonElement, Event> | undefined;
+  onCanPlayThrough?: EventHandler<HTMLButtonElement, Event> | undefined;
+  onChange?: EventHandler<HTMLButtonElement, Event> | undefined;
+  onClick?: EventHandler<HTMLButtonElement, PointerEvent> | undefined;
+  onCommand?: EventHandler<HTMLButtonElement, Event> | undefined;
+  onCompositionEnd?: EventHandler<HTMLButtonElement, CompositionEvent> | undefined;
+  onCompositionStart?: EventHandler<HTMLButtonElement, CompositionEvent> | undefined;
+  onCompositionUpdate?: EventHandler<HTMLButtonElement, CompositionEvent> | undefined;
+  onContextLost?: EventHandler<HTMLButtonElement, Event> | undefined;
+  onContextMenu?: EventHandler<HTMLButtonElement, PointerEvent> | undefined;
+  onContextRestored?: EventHandler<HTMLButtonElement, Event> | undefined;
+  onCopy?: EventHandler<HTMLButtonElement, ClipboardEvent> | undefined;
+  onCuechange?: EventHandler<HTMLButtonElement, Event> | undefined;
+  onCut?: EventHandler<HTMLButtonElement, ClipboardEvent> | undefined;
+  onDblClick?: EventHandler<HTMLButtonElement, MouseEvent> | undefined;
+  onDrag?: EventHandler<HTMLButtonElement, DragEvent> | undefined;
+  onDragEnd?: EventHandler<HTMLButtonElement, DragEvent> | undefined;
+  onDragEnter?: EventHandler<HTMLButtonElement, DragEvent> | undefined;
+  onDragLeave?: EventHandler<HTMLButtonElement, DragEvent> | undefined;
+  onDragOver?: EventHandler<HTMLButtonElement, DragEvent> | undefined;
+  onDragStart?: EventHandler<HTMLButtonElement, DragEvent> | undefined;
+  onDrop?: EventHandler<HTMLButtonElement, DragEvent> | undefined;
+  onDurationChange?: EventHandler<HTMLButtonElement, Event> | undefined;
+  onEmptied?: EventHandler<HTMLButtonElement, Event> | undefined;
+  onEnded?: EventHandler<HTMLButtonElement, Event> | undefined;
+  onFocusIn?: EventHandler<HTMLButtonElement, FocusEvent> | undefined;
+  onFocusOut?: EventHandler<HTMLButtonElement, FocusEvent> | undefined;
+  onFormdata?: EventHandler<HTMLButtonElement, FormDataEvent> | undefined;
+  onGotPointerCapture?: EventHandler<HTMLButtonElement, PointerEvent> | undefined;
+  onInvalid?: EventHandler<HTMLButtonElement, Event> | undefined;
+  onKeyDown?: EventHandler<HTMLButtonElement, KeyboardEvent> | undefined;
+  onKeyPress?: EventHandler<HTMLButtonElement, KeyboardEvent> | undefined;
+  onKeyUp?: EventHandler<HTMLButtonElement, KeyboardEvent> | undefined;
+  onLoadedData?: EventHandler<HTMLButtonElement, Event> | undefined;
+  onLoadedMetadata?: EventHandler<HTMLButtonElement, Event> | undefined;
+  onLoadStart?: EventHandler<HTMLButtonElement, Event> | undefined;
+  onLostPointerCapture?: EventHandler<HTMLButtonElement, PointerEvent> | undefined;
+  onMouseDown?: EventHandler<HTMLButtonElement, MouseEvent> | undefined;
+  onMouseEnter?: EventHandler<HTMLButtonElement, MouseEvent> | undefined;
+  onMouseLeave?: EventHandler<HTMLButtonElement, MouseEvent> | undefined;
+  onMouseMove?: EventHandler<HTMLButtonElement, MouseEvent> | undefined;
+  onMouseOut?: EventHandler<HTMLButtonElement, MouseEvent> | undefined;
+  onMouseOver?: EventHandler<HTMLButtonElement, MouseEvent> | undefined;
+  onMouseUp?: EventHandler<HTMLButtonElement, MouseEvent> | undefined;
+  onPaste?: EventHandler<HTMLButtonElement, ClipboardEvent> | undefined;
+  onPlaying?: EventHandler<HTMLButtonElement, Event> | undefined;
+  onPointerCancel?: EventHandler<HTMLButtonElement, PointerEvent> | undefined;
+  onPointerDown?: EventHandler<HTMLButtonElement, PointerEvent> | undefined;
+  onPointerEnter?: EventHandler<HTMLButtonElement, PointerEvent> | undefined;
+  onPointerLeave?: EventHandler<HTMLButtonElement, PointerEvent> | undefined;
+  onPointerMove?: EventHandler<HTMLButtonElement, PointerEvent> | undefined;
+  onPointerOut?: EventHandler<HTMLButtonElement, PointerEvent> | undefined;
+  onPointerOver?: EventHandler<HTMLButtonElement, PointerEvent> | undefined;
+  onPointerrawupdate?: EventHandler<HTMLButtonElement, Event> | undefined;
+  onPointerUp?: EventHandler<HTMLButtonElement, PointerEvent> | undefined;
+  onProgress?: EventHandler<HTMLButtonElement, ProgressEvent<EventTarget>> | undefined;
+  onRateChange?: EventHandler<HTMLButtonElement, Event> | undefined;
+  onReset?: EventHandler<HTMLButtonElement, Event> | undefined;
+  onResize?: EventHandler<HTMLButtonElement, UIEvent> | undefined;
+  onScroll?: EventHandler<HTMLButtonElement, Event> | undefined;
+  onScrollend?: EventHandler<HTMLButtonElement, Event> | undefined;
+  onSecurityPolicyViolation?: EventHandler<HTMLButtonElement, SecurityPolicyViolationEvent> | undefined;
+  onSeeked?: EventHandler<HTMLButtonElement, Event> | undefined;
+  onSeeking?: EventHandler<HTMLButtonElement, Event> | undefined;
+  onSelect?: EventHandler<HTMLButtonElement, Event> | undefined;
+  onSelectionChange?: EventHandler<HTMLButtonElement, Event> | undefined;
+  onSelectStart?: EventHandler<HTMLButtonElement, Event> | undefined;
+  onSlotchange?: EventHandler<HTMLButtonElement, Event> | undefined;
+  onStalled?: EventHandler<HTMLButtonElement, Event> | undefined;
+  onSubmit?: EventHandler<HTMLButtonElement, SubmitEvent> | undefined;
+  onSuspend?: EventHandler<HTMLButtonElement, Event> | undefined;
+  onTimeUpdate?: EventHandler<HTMLButtonElement, Event> | undefined;
+  onToggle?: EventHandler<HTMLButtonElement, ToggleEvent> | undefined;
+  onTouchCancel?: EventHandler<HTMLButtonElement, TouchEvent> | undefined;
+  onTouchEnd?: EventHandler<HTMLButtonElement, TouchEvent> | undefined;
+  onTouchMove?: EventHandler<HTMLButtonElement, TouchEvent> | undefined;
+  onTouchStart?: EventHandler<HTMLButtonElement, TouchEvent> | undefined;
+  onTransitionCancel?: EventHandler<HTMLButtonElement, TransitionEvent> | undefined;
+  onTransitionEnd?: EventHandler<HTMLButtonElement, TransitionEvent> | undefined;
+  onTransitionRun?: EventHandler<HTMLButtonElement, TransitionEvent> | undefined;
+  onTransitionStart?: EventHandler<HTMLButtonElement, TransitionEvent> | undefined;
+  onVolumeChange?: EventHandler<HTMLButtonElement, Event> | undefined;
+  onWaiting?: EventHandler<HTMLButtonElement, Event> | undefined;
+  onWebkitanimationend?: EventHandler<HTMLButtonElement, Event> | undefined;
+  onWebkitanimationiteration?: EventHandler<HTMLButtonElement, Event> | undefined;
+  onWebkitanimationstart?: EventHandler<HTMLButtonElement, Event> | undefined;
+  onWebkittransitionend?: EventHandler<HTMLButtonElement, Event> | undefined;
+  onWheel?: EventHandler<HTMLButtonElement, WheelEvent> | undefined;
+  autocapitalize?: Value;
+  dir?: Value;
+  draggable?: Value;
+  hidden?: Value;
+  inert?: Value;
+  innerText?: string | undefined;
+  lang?: Value;
+  popover?: Value;
+  spellcheck?: Value;
+  translate?: Value;
+  id?: Value;
+  innerHTML?: string | undefined;
+  part?: Value;
+  textContent?: string | undefined;
+  role?: Value;
+  autofocus?: Value;
+  nonce?: Value;
+  ref?: ((element: HTMLButtonElement) => unknown) | undefined;
+  tabindex?: Value;
+  exportparts?: Value;
+  is?: Value;
+  contenteditable?: Value;
+  accesskey?: Value;
+  enterkeyhint?: Value;
+  inputmode?: Value;
+  itemid?: Value;
+  itemprop?: Value;
+  itemref?: Value;
+  itemscope?: Value;
+  itemtype?: Value;
+  writingsuggestions?: Value;
+  transition?: string | TransitionClasses | undefined;
+  'transition:enter'?: string | undefined;
+  'transition:enter-from'?: string | undefined;
+  'transition:enter-to'?: string | undefined;
+  'transition:leave'?: string | undefined;
+  'transition:leave-from'?: string | undefined;
+  'transition:leave-to'?: string | undefined;
+  name?: Value;
+  commandForElement?: Value;
+  formAction?: Value;
+  formEnctype?: Value;
+  formMethod?: Value;
+  formNoValidate?: Value;
+  formTarget?: Value;
+  labels?: Value;
+  validationMessage?: Value;
+  validity?: Value;
+  value?: Value;
+  willValidate?: Value;
+  popoverTargetAction?: Value;
+  popoverTargetElement?: Value;
+  commandforelement?: Value;
+  formaction?: Value;
+  formenctype?: Value;
+  formmethod?: Value;
+  formnovalidate?: Value;
+  formtarget?: Value;
+  validationmessage?: Value;
+  willvalidate?: Value;
+  popovertargetaction?: Value;
+  popovertargetelement?: Value;
+  popovertarget?: Value;
+  commandfor?: Value;
+  href?: undefined;
+  type: "button";
+  'aria-disabled': "true"; ...#35e55001 (2 lines)
+  'aria-expanded': string | undefined;
+  'aria-pressed': string | undefined;
+  type: "reset" | "submit" | "button";
+  disabled: Value;
+  command?: "close" | "show-modal" | "request-close" | "show-popover" | "hide-popover" | "toggle-popover" | `--${string}` | undefined;
+  form?: Value;
+  slot?: Value;
+  style?: StyleValue;
+  title?: Value;
+  children?: Element;
+  onFocus?: EventHandler<HTMLButtonElement, FocusEvent> | undefined;
+  onInput?: EventHandler<HTMLButtonElement, InputEvent> | undefined;
+  onLoad?: EventHandler<HTMLButtonElement, Event> | undefined;
+  onClose?: EventHandler<HTMLButtonElement, Event> | undefined;
+  onPause?: EventHandler<HTMLButtonElement, Event> | undefined;
+  onPlay?: EventHandler<HTMLButtonElement, Event> | undefined;
+  onError?: EventHandler<HTMLButtonElement, ErrorEvent> | undefined;
+  onFullscreenchange?: EventHandler<HTMLButtonElement, Event> | undefined;
+  onFullscreenerror?: EventHandler<HTMLButtonElement, Event> | undefined;
+  onAbort?: EventHandler<HTMLButtonElement, UIEvent> | undefined;
+  onAnimationCancel?: EventHandler<HTMLButtonElement, AnimationEvent> | undefined;
+  onAnimationEnd?: EventHandler<HTMLButtonElement, AnimationEvent> | undefined;
+  onAnimationIteration?: EventHandler<HTMLButtonElement, AnimationEvent> | undefined;
+  onAnimationStart?: EventHandler<HTMLButtonElement, AnimationEvent> | undefined;
+  onAuxClick?: EventHandler<HTMLButtonElement, PointerEvent> | undefined;
+  onBeforeInput?: EventHandler<HTMLButtonElement, InputEvent> | undefined;
+  onBeforematch?: EventHandler<HTMLButtonElement, Event> | undefined;
+  onBeforeToggle?: EventHandler<HTMLButtonElement, ToggleEvent> | undefined;
+  onBlur?: EventHandler<HTMLButtonElement, FocusEvent> | undefined;
+  onCancel?: EventHandler<HTMLButtonElement, Event> | undefined;
+  onCanPlay?: EventHandler<HTMLButtonElement, Event> | undefined;
+  onCanPlayThrough?: EventHandler<HTMLButtonElement, Event> | undefined;
+  onChange?: EventHandler<HTMLButtonElement, Event> | undefined;
+  onClick?: EventHandler<HTMLButtonElement, PointerEvent> | undefined;
+  onCommand?: EventHandler<HTMLButtonElement, Event> | undefined;
+  onCompositionEnd?: EventHandler<HTMLButtonElement, CompositionEvent> | undefined;
+  onCompositionStart?: EventHandler<HTMLButtonElement, CompositionEvent> | undefined;
+  onCompositionUpdate?: EventHandler<HTMLButtonElement, CompositionEvent> | undefined;
+  onContextLost?: EventHandler<HTMLButtonElement, Event> | undefined;
+  onContextMenu?: EventHandler<HTMLButtonElement, PointerEvent> | undefined;
+  onContextRestored?: EventHandler<HTMLButtonElement, Event> | undefined;
+  onCopy?: EventHandler<HTMLButtonElement, ClipboardEvent> | undefined;
+  onCuechange?: EventHandler<HTMLButtonElement, Event> | undefined;
+  onCut?: EventHandler<HTMLButtonElement, ClipboardEvent> | undefined;
+  onDblClick?: EventHandler<HTMLButtonElement, MouseEvent> | undefined;
+  onDrag?: EventHandler<HTMLButtonElement, DragEvent> | undefined;
+  onDragEnd?: EventHandler<HTMLButtonElement, DragEvent> | undefined;
+  onDragEnter?: EventHandler<HTMLButtonElement, DragEvent> | undefined;
+  onDragLeave?: EventHandler<HTMLButtonElement, DragEvent> | undefined;
+  onDragOver?: EventHandler<HTMLButtonElement, DragEvent> | undefined;
+  onDragStart?: EventHandler<HTMLButtonElement, DragEvent> | undefined;
+  onDrop?: EventHandler<HTMLButtonElement, DragEvent> | undefined;
+  onDurationChange?: EventHandler<HTMLButtonElement, Event> | undefined;
+  onEmptied?: EventHandler<HTMLButtonElement, Event> | undefined;
+  onEnded?: EventHandler<HTMLButtonElement, Event> | undefined;
+  onFocusIn?: EventHandler<HTMLButtonElement, FocusEvent> | undefined;
+  onFocusOut?: EventHandler<HTMLButtonElement, FocusEvent> | undefined;
+  onFormdata?: EventHandler<HTMLButtonElement, FormDataEvent> | undefined;
+  onGotPointerCapture?: EventHandler<HTMLButtonElement, PointerEvent> | undefined;
+  onInvalid?: EventHandler<HTMLButtonElement, Event> | undefined;
+  onKeyDown?: EventHandler<HTMLButtonElement, KeyboardEvent> | undefined;
+  onKeyPress?: EventHandler<HTMLButtonElement, KeyboardEvent> | undefined;
+  onKeyUp?: EventHandler<HTMLButtonElement, KeyboardEvent> | undefined;
+  onLoadedData?: EventHandler<HTMLButtonElement, Event> | undefined;
+  onLoadedMetadata?: EventHandler<HTMLButtonElement, Event> | undefined;
+  onLoadStart?: EventHandler<HTMLButtonElement, Event> | undefined;
+  onLostPointerCapture?: EventHandler<HTMLButtonElement, PointerEvent> | undefined;
+  onMouseDown?: EventHandler<HTMLButtonElement, MouseEvent> | undefined;
+  onMouseEnter?: EventHandler<HTMLButtonElement, MouseEvent> | undefined;
+  onMouseLeave?: EventHandler<HTMLButtonElement, MouseEvent> | undefined;
+  onMouseMove?: EventHandler<HTMLButtonElement, MouseEvent> | undefined;
+  onMouseOut?: EventHandler<HTMLButtonElement, MouseEvent> | undefined;
+  onMouseOver?: EventHandler<HTMLButtonElement, MouseEvent> | undefined;
+  onMouseUp?: EventHandler<HTMLButtonElement, MouseEvent> | undefined;
+  onPaste?: EventHandler<HTMLButtonElement, ClipboardEvent> | undefined;
+  onPlaying?: EventHandler<HTMLButtonElement, Event> | undefined;
+  onPointerCancel?: EventHandler<HTMLButtonElement, PointerEvent> | undefined;
+  onPointerDown?: EventHandler<HTMLButtonElement, PointerEvent> | undefined;
+  onPointerEnter?: EventHandler<HTMLButtonElement, PointerEvent> | undefined;
+  onPointerLeave?: EventHandler<HTMLButtonElement, PointerEvent> | undefined;
+  onPointerMove?: EventHandler<HTMLButtonElement, PointerEvent> | undefined;
+  onPointerOut?: EventHandler<HTMLButtonElement, PointerEvent> | undefined;
+  onPointerOver?: EventHandler<HTMLButtonElement, PointerEvent> | undefined;
+  onPointerrawupdate?: EventHandler<HTMLButtonElement, Event> | undefined;
+  onPointerUp?: EventHandler<HTMLButtonElement, PointerEvent> | undefined;
+  onProgress?: EventHandler<HTMLButtonElement, ProgressEvent<EventTarget>> | undefined;
+  onRateChange?: EventHandler<HTMLButtonElement, Event> | undefined;
+  onReset?: EventHandler<HTMLButtonElement, Event> | undefined;
+  onResize?: EventHandler<HTMLButtonElement, UIEvent> | undefined;
+  onScroll?: EventHandler<HTMLButtonElement, Event> | undefined;
+  onScrollend?: EventHandler<HTMLButtonElement, Event> | undefined;
+  onSecurityPolicyViolation?: EventHandler<HTMLButtonElement, SecurityPolicyViolationEvent> | undefined;
+  onSeeked?: EventHandler<HTMLButtonElement, Event> | undefined;
+  onSeeking?: EventHandler<HTMLButtonElement, Event> | undefined;
+  onSelect?: EventHandler<HTMLButtonElement, Event> | undefined;
+  onSelectionChange?: EventHandler<HTMLButtonElement, Event> | undefined;
+  onSelectStart?: EventHandler<HTMLButtonElement, Event> | undefined;
+  onSlotchange?: EventHandler<HTMLButtonElement, Event> | undefined;
+  onStalled?: EventHandler<HTMLButtonElement, Event> | undefined;
+  onSubmit?: EventHandler<HTMLButtonElement, SubmitEvent> | undefined;
+  onSuspend?: EventHandler<HTMLButtonElement, Event> | undefined;
+  onTimeUpdate?: EventHandler<HTMLButtonElement, Event> | undefined;
+  onToggle?: EventHandler<HTMLButtonElement, ToggleEvent> | undefined;
+  onTouchCancel?: EventHandler<HTMLButtonElement, TouchEvent> | undefined;
+  onTouchEnd?: EventHandler<HTMLButtonElement, TouchEvent> | undefined;
+  onTouchMove?: EventHandler<HTMLButtonElement, TouchEvent> | undefined;
+  onTouchStart?: EventHandler<HTMLButtonElement, TouchEvent> | undefined;
+  onTransitionCancel?: EventHandler<HTMLButtonElement, TransitionEvent> | undefined;
+  onTransitionEnd?: EventHandler<HTMLButtonElement, TransitionEvent> | undefined;
+  onTransitionRun?: EventHandler<HTMLButtonElement, TransitionEvent> | undefined;
+  onTransitionStart?: EventHandler<HTMLButtonElement, TransitionEvent> | undefined;
+  onVolumeChange?: EventHandler<HTMLButtonElement, Event> | undefined;
+  onWaiting?: EventHandler<HTMLButtonElement, Event> | undefined;
+  onWebkitanimationend?: EventHandler<HTMLButtonElement, Event> | undefined;
+  onWebkitanimationiteration?: EventHandler<HTMLButtonElement, Event> | undefined;
+  onWebkitanimationstart?: EventHandler<HTMLButtonElement, Event> | undefined;
+  onWebkittransitionend?: EventHandler<HTMLButtonElement, Event> | undefined;
+  onWheel?: EventHandler<HTMLButtonElement, WheelEvent> | undefined;
+  autocapitalize?: Value;
+  dir?: Value;
+  draggable?: Value;
+  hidden?: Value;
+  inert?: Value;
+  innerText?: string | undefined;
+  lang?: Value;
+  popover?: Value;
+  spellcheck?: Value;
+  translate?: Value;
+  id?: Value;
+  innerHTML?: string | undefined;
+  part?: Value;
+  textContent?: string | undefined;
+  role?: Value;
+  autofocus?: Value;
+  nonce?: Value;
+  ref?: ((element: HTMLButtonElement) => unknown) | undefined;
+  tabindex?: Value;
+  exportparts?: Value;
+  is?: Value;
+  contenteditable?: Value;
+  accesskey?: Value;
+  enterkeyhint?: Value;
+  inputmode?: Value;
+  itemid?: Value;
+  itemprop?: Value;
+  itemref?: Value;
+  itemscope?: Value;
+  itemtype?: Value;
+  writingsuggestions?: Value;
+  transition?: string | TransitionClasses | undefined;
+  'transition:enter'?: string | undefined;
+  'transition:enter-from'?: string | undefined;
+  'transition:enter-to'?: string | undefined;
+  'transition:leave'?: string | undefined;
+  'transition:leave-from'?: string | undefined;
+  'transition:leave-to'?: string | undefined;
+  name?: Value;
+  commandForElement?: Value;
+  formAction?: Value;
+  formEnctype?: Value;
+  formMethod?: Value;
+  formNoValidate?: Value;
+  formTarget?: Value;
+  labels?: Value;
+  validationMessage?: Value;
+  validity?: Value;
+  value?: Value;
+  willValidate?: Value;
+  popoverTargetAction?: Value;
+  popoverTargetElement?: Value;
+  commandforelement?: Value;
+  formaction?: Value;
+  formenctype?: Value;
+  formmethod?: Value;
+  formnovalidate?: Value;
+  formtarget?: Value;
+  validationmessage?: Value;
+  willvalidate?: Value;
+  popovertargetaction?: Value;
+  popovertargetelement?: Value;
+  popovertarget?: Value;
+  commandfor?: Value;
+  href?: undefined; ...#1f3d701d (2 lines)
+
+[./lib/button-props] ButtonProps
+type ButtonProps = AsButton | AsLink
+
+[./lib/button-props] linkOf
+function linkOf(attributes: TagAttributes): Omit<AsLink, keyof Look> | undefined
+
+[./lib/button-props] lockedWithTooltip
+function lockedWithTooltip(attributes: TagAttributes): boolean
+
+[./lib/button-props] Look
+interface Look
+  busy?: boolean | undefined
+  icon?: IconProps | IconSlot | undefined
+  label?: string | undefined
+  size?: "xs" | "sm" | "md" | "lg" | undefined
+  spinner?: boolean | undefined
+  tone?: "success" | "neutral" | "danger" | "accent" | undefined
+  variant?: "solid" | "ghost" | "inline" | undefined
+
+[./lib/button-props] TagAttributes
+type TagAttributes = Omit<AsButton, keyof Look> | Omit<AsLink, keyof Look>
+
+[./lib/change] changeAccepted
+function changeAccepted(control: string, run: () => unknown, busy: (pending: boolean) => void): Promise<boolean>
+
+[./lib/change] isPromiseLike
+function isPromiseLike(value: unknown): value is PromiseLike<unknown>
+
+[./lib/chart-axis] chartData
+function chartData(labels: string[], series: (number | null)[][], times: number[] | null): LineChartData
+
+[./lib/chart-axis] headings
+function headings(labels: string[], times: number[] | null, format?: LabelFormat | undefined): string[]
+
+[./lib/chart-axis] indexAt
+function indexAt(position: number, count: number, times: number[] | null): number
+
+[./lib/chart-axis] LabelContext
+interface LabelContext
+  index: number
+  place: "tick" | "tooltip"
+  seconds: boolean
+  span: number
+
+[./lib/chart-axis] LabelFormat
+type LabelFormat = (label: string, context: LabelContext) => string
+
+[./lib/chart-axis] labelTimes
+function labelTimes(labels: string[]): number[] | null
+
+[./lib/chart-axis] positionOf
+function positionOf(index: number, count: number, times: number[] | null): number
+
+[./lib/chart-axis] secondsApart
+function secondsApart(labels: string[]): boolean
+
+[./lib/chart-axis] spanOf
+function spanOf(times: number[] | null): number
+
+[./lib/chart-axis] stackValues
+function stackValues(series: (number | null)[][]): number[][]
+
+[./lib/chart-axis] tickIndices
+function tickIndices(total: number): number[]
+
+[./lib/chart-axis] tickTexts
+function tickTexts(labels: string[], times: number[] | null, format?: LabelFormat | undefined): string[]
+
+[./lib/chart-axis] totalAt
+function totalAt(series: { values: (number | null)[]; }[], index: number): number
+
+[./lib/chart-axis] xAxisOptions
+function xAxisOptions(labels: string[], times: number[] | null, showLabels: boolean, fixedScale: typeof FixedScaleAxis, format?: LabelFormat | undefined): AxisOptions
+
+[./lib/claim] claim
+function claim(job: "toaster" | "tooltips"): () => boolean
+
+[./lib/claim] Job
+type Job = keyof typeof claimants
+
+[./lib/combobox] ComboboxOption
+interface ComboboxOption<Value extends string = string>
+  disabled?: boolean | undefined
+  label: string
+  value: Value
+
+[./lib/combobox] ComboboxOptions
+type ComboboxOptions<Value extends string = string> = readonly ComboboxOption<Value>[] | ((input: ComboboxQuery) => PromiseLike<readonly ComboboxOption<Value>[]>)
+
+[./lib/combobox] ComboboxQuery
+interface ComboboxQuery
+  q: string
+
+[./lib/combobox] enabledIndex
+function enabledIndex(disabled: readonly boolean[], from: number, step: 1 | -1): number
+
+[./lib/combobox] exactOption
+function exactOption<Value extends string>(options: readonly ComboboxOption<Value>[], text: string): ComboboxOption<Value> | undefined
+
+[./lib/combobox] matchingOptions
+function matchingOptions<Value extends string>(options: readonly ComboboxOption<Value>[], text: string): readonly ComboboxOption<Value>[]
+
+[./lib/combobox] offersCreate
+function offersCreate(options: readonly ComboboxOption<string>[], text: string): boolean
+
+[./lib/context] default
+const default: ContextDefinition<{ inbox: boolean; }>
+
+[./lib/contribution] ContributionDay
+interface ContributionDay
+  day: string
+  description?: string | undefined
+  intensity: number
+
+[./lib/contribution] monthStarts
+function monthStarts(days: readonly string[]): { column: number; label: string; }[]
+
+[./lib/contribution] steppedCell
+function steppedCell(key: string, index: number, count: number): number | undefined
+
+[./lib/controlled-checkbox] controlledCheckbox
+function controlledCheckbox({
+  control, checked, onChange, start, settled, appRef
+}: Options): {
+  on: () => boolean;
+  busy: () => boolean;
+  ref: (element: HTMLInputElement) => void;
+  change: (input: HTMLInputElement) => Promise<void>;
+}
+
+[./lib/controlled-input] controlledInput
+function controlledInput<Value extends boolean | number | string, Box extends HTMLInputElement = HTMLInputElement>({
+  control, value, onChange, read, write, defaultOf, setDefault, start, settled: afterChange, restored, appRef
+}: Options<Value, Box>): {
+  shown: () => Value;
+  busy: () => boolean;
+  ref: (element: Box) => void;
+  move: (input: Box) => boolean;
+  change: (input: Box) => Promise<void>;
+}
+
+[./lib/controlled-radios] controlledRadios
+function controlledRadios({
+  control, input, options, value, name, onChange, appRef
+}: Options): {
+  group: string;
+  picked: () => Held;
+  busy: () => boolean;
+  ref: (element: HTMLElement) => void;
+  pick: (next: Held) => Promise<void>;
+}
+
+[./lib/controlled-value] controlledValue
+function controlledValue<Box extends Element & {
+  value: string;
+}>({
+  box, value, report, reads, writable, write
+}: Options<Box>): {
+  heard: (text: string) => void;
+  sync: (left?: boolean | undefined) => void;
+}
+
+[./lib/cycle] stepIndex
+function stepIndex(index: number, delta: number, count: number): number
+
+[./lib/date] addDays
+function addDays(iso: string, days: number): string
+
+[./lib/date] addMonths
+function addMonths(iso: string, months: number): string
+
+[./lib/date] clampDate
+function clampDate(iso: string, min?: string | undefined, max?: string | undefined): string
+
+[./lib/date] DateRange
+type DateRange = [string | null, string | null]
+
+[./lib/date] dateRangeFrom
+function dateRangeFrom(from: string, to: string): DateRange
+
+[./lib/date] dayName
+function dayName(iso: string, locale: string): string
+
+[./lib/date] firstDayOf
+function firstDayOf(locale: string): number
+
+[./lib/date] isDate
+function isDate(text: string | null | undefined): text is string
+
+[./lib/date] localDateTime
+function localDateTime(instant: string | Date | null | undefined): string
+
+[./lib/date] monthTitle
+function monthTitle(iso: string, locale: string): string
+
+[./lib/date] monthWeeks
+function monthWeeks(iso: string, firstDay: number): string[][]
+
+[./lib/date] sameInstant
+function sameInstant(a: string, b: string): boolean
+
+[./lib/date] sameMonth
+function sameMonth(a: string, b: string): boolean
+
+[./lib/date] today
+function today(): string
+
+[./lib/date] weekdays
+function weekdays(locale: string, firstDay: number): { short: string; long: string; }[]
+
+[./lib/date] weekEdge
+function weekEdge(iso: string, firstDay: number, end: boolean): string
+
+[./lib/date] withinBounds
+function withinBounds(iso: string, min?: string | undefined, max?: string | undefined): boolean
+
+[./lib/date] zonedInstant
+function zonedInstant(text: string): string
+
+[./lib/defaults] AddedSlot
+type AddedSlot = 'apps' | 'bell' | 'calendar' | 'pause' | 'chat' | 'send' | 'stop' | 'expand' | 'collapse' | 'edit' | 'external' | 'microphone' | 'refresh' | 'trendDown' | 'trendFlat' | 'trendUp'
+
+[./lib/defaults] default
+const default: UiSettings
+
+[./lib/defaults] IconSlot
+type IconSlot = 'alert' | 'apps' | 'back' | 'bell' | 'calendar' | 'chat' | 'chevron' | 'close' | 'collapse' | 'delete' | 'edit' | 'expand' | 'external' | 'globe' | 'info' | 'menu' | 'microphone' | 'pause' | 'play' | 'plus' | 'refresh' | 'search' | 'send' | 'spinner' | 'star' | 'stop' | 'success' | 'trendDown' | 'trendFlat' | 'trendUp' | 'zoomFit' | 'zoomIn' | 'zoomOut'
+
+[./lib/defaults] NavLink
+interface NavLink
+  href: string
+  icon?: IconProps | IconSlot | undefined
+  label: string
+
+[./lib/defaults] UiSettings
+interface UiSettings
+  icons: Record<"alert" | "back" | "chevron" | "close" | "delete" | "globe" | "info" | "menu" | "play" | "plus" | "search" | "spinner" | "star" | "success" | "zoomFit" | "zoomIn" | "zoomOut", IconProps> & Partial<Record<AddedSlot, IconProps>>
+
+[./lib/description-list] DescriptionItem
+interface DescriptionItem
+  key?: string | undefined
+  label: string
+  value?: string | number | undefined
+
+[./lib/diff-command] default
+const default: KayCommand
+
+[./lib/dnd] Bar
+interface Bar
+  height: number
+  left: number
+  top: number
+
+[./lib/dnd] Board
+class Board
+  new (options: BoardOptions): Board
+  #arm: (id: Id, event: PointerEvent) => void
+  #containers: Map<Id, HTMLElement>
+  #drag: Drag | null
+  #end: (drop: boolean) => void
+  #follow: (drag: Drag) => void
+  #items: Map<Id, { el: HTMLElement; container: Id; }>
+  #layout: () => Placed[]
+  #measure: () => Measured
+  #move: (move: BoardMove, kept?: number | undefined) => Promise<void>
+  #moving: boolean
+  #onMove: (move: BoardMove) => unknown
+  #start: (id: Id, origin: Point) => void
+  #step: (id: Id, event: KeyboardEvent) => void
+  #tick: () => void
+  container: (id: Id) => (el: HTMLElement) => void
+  dragging: Signal<Id | null>
+  drop: Signal<BoardDrop | null>
+  item: (id: Id, container: Id) => (el: HTMLElement) => void
+
+[./lib/dnd] BoardDrop
+interface BoardDrop
+  bar: Bar
+  container: Id
+  index: number
+
+[./lib/dnd] BoardMove
+interface BoardMove
+  from: Id
+  index: number
+  item: Id
+  to: Id
+
+[./lib/dnd] BoardOptions
+interface BoardOptions
+  onMove: (move: BoardMove) => unknown
+
+[./lib/dnd] DropTargets
+class DropTargets
+  new <Item extends Id = Id, Target extends Id = Id>(options: DropTargetsOptions<Item, Target>): DropTargets<Item, Target>
+  #arm: (id: Item, event: PointerEvent) => void
+  #drag: Drag<Item> | null
+  #drop: (item: Item, target: Target) => Promise<void>
+  #dropping: boolean
+  #end: (drop: boolean) => void
+  #follow: (drag: Drag<Item>) => void
+  #items: Map<Item, HTMLElement>
+  #options: DropTargetsOptions<Item, Target>
+  #start: (id: Item, origin: Point) => void
+  #targetAt: (drag: Drag<Item>) => Target | null
+  #targets: WeakMap<Element, Target>
+  #tick: () => void
+  dragging: Signal<Item | null>
+  item: (id: Item) => (el: HTMLElement) => void
+  over: Signal<Target | null>
+  target: (id: Target) => (el: HTMLElement) => void
+
+[./lib/dnd] DropTargetsOptions
+interface DropTargetsOptions<Item extends Id, Target extends Id>
+  accepts?: (item: Item, target: Target) => boolean
+  onDrop: (item: Item, target: Target) => unknown
+  onLinger?: (target: Target) => unknown
+
+[./lib/dnd] Sortable
+class Sortable
+  new (options: SortableOptions): Sortable
+  #arm: (id: Id, event: PointerEvent) => void
+  #drag: Drag | null
+  #end: (drop: boolean) => void
+  #handles: Map<Id, HTMLElement>
+  #items: Map<Id, HTMLElement>
+  #layout: (drag: Drag) => void
+  #move: (id: Id, from: number, to: number, kept?: number | undefined) => Promise<void>
+  #moving: boolean
+  #onReorder: (from: number, to: number) => unknown
+  #ordered: () => HTMLElement[]
+  #start: (id: Id, originY: number) => void
+  #step: (id: Id, event: KeyboardEvent) => void
+  #tick: () => void
+  handle: (id: Id) => (el: HTMLElement) => void
+  item: (id: Id) => (el: HTMLElement) => void
+
+[./lib/dnd] SortableOptions
+interface SortableOptions
+  onReorder: (from: number, to: number) => unknown
+
+[./lib/editing] editing
+function editing<Row, Draft = void>(): Editing<Row, Draft>
+
+[./lib/editing] Editing
+interface Editing<Row, Draft = void>
+  close: () => void
+  create: (draft: Draft) => void
+  draft: () => Draft | undefined
+  edit: (row: Row) => void
+  open: () => boolean
+  row: () => Row | undefined
+
+[./lib/eject] Changes
+interface Changes
+  notes: string[]
+  rewritten: string[]
+  writes: Map<string, string>
+
+[./lib/eject] changesFor
+function changesFor(root: string, ejection: Ejection): Promise<Changes | { exists: string[]; }>
+
+[./lib/eject] componentFile
+function componentFile(name: string): string | undefined
+
+[./lib/eject] Ejected
+interface Ejected
+  files: string[]
+  helpers?: Record<string, string>
+  version: string
+
+[./lib/eject] EJECTED_DIR
+const EJECTED_DIR: "components/ui"
+
+[./lib/eject] Ejection
+interface Ejection
+  file: string
+  files: string[]
+  users: string[]
+
+[./lib/eject] guarded
+function guarded(name: string, run: () => Promise<number>): Promise<number>
+
+[./lib/eject] hashOf
+function hashOf(text: string): string
+
+[./lib/eject] libraryFile
+function libraryFile(path: string): string
+
+[./lib/eject] libraryVersion
+function libraryVersion(): Promise<string>
+
+[./lib/eject] Manifest
+type Manifest = Record<string, Ejected | undefined>
+
+[./lib/eject] MANIFEST
+const MANIFEST: "ejected.json"
+
+[./lib/eject] plan
+function plan(file: string): Promise<Ejection>
+
+[./lib/eject] readManifest
+function readManifest(root: string): Promise<Manifest>
+
+[./lib/eject] unifiedDiff
+function unifiedDiff(before: string, after: string, label: string): string
+
+[./lib/eject] UPSTREAM_DIR
+const UPSTREAM_DIR: ".upstream"
+
+[./lib/eject] upstreamBase
+function upstreamBase(root: string, path: string): Promise<string>
+
+[./lib/eject] UpstreamError
+class UpstreamError
+  new (message?: string | undefined): UpstreamError
+  new (message?: string | undefined, options?: ErrorOptions | undefined): UpstreamError
+  new (message?: string | undefined, options?: ErrorOptions | undefined): UpstreamError
+
+[./lib/eject] upstreamPath
+function upstreamPath(root: string, path: string): string
+
+[./lib/eject] writeAll
+function writeAll(writes: Map<string, string>): Promise<void>
+
+[./lib/eject-command] default
+const default: KayCommand
+
+[./lib/extension] ui
+function ui(): KayExtension<AnyElysia>
+
+[./lib/field-look] CHECKBOX
+const CHECKBOX: { root: string; input: string; label: string; hint: string; }
+
+[./lib/field-look] FIELD_MESSAGE
+const FIELD_MESSAGE: { hint: string; issues: string; issue: string; }
+
+[./lib/field-look] LABEL_TEXT
+const LABEL_TEXT: "text-xs [font-weight:var(--font-weight-normal)] tracking-label text-muted [font-family:var(--font-label,inherit)] [text-transform:var(--label-case)]"
+
+[./lib/form-reset] defaultKept
+function defaultKept<Value>(element: () => Element | undefined, current: () => Value, start: Value): () => Value
+
+[./lib/form-reset] holdDefaults
+function holdDefaults(form: HTMLFormElement): () => void
+
+[./lib/form-reset] onFormDefaults
+function onFormDefaults(element: () => Element | undefined, hold: () => () => void): void
+
+[./lib/form-reset] onFormReset
+function onFormReset(element: () => Element | undefined, after: () => void, last?: boolean): void
+
+[./lib/form-reset] resetWhenIdle
+function resetWhenIdle(busy: () => boolean, restore: () => void): { reset: () => void; idle: () => void; waiting: () => boolean; }
+
+[./lib/form-reset] startRef
+function startRef<Target extends Element>(first: (element: Target) => void, app?: unknown): (element: Target) => void
+
+[./lib/forms] callAction
+function callAction<Output>(form: HTMLFormElement, action: Action<never, Output, never>, issues: Signal<Record<string, string>>, failure: string, refused?: ((data: FailureData<Output>) => string | Record<string, string> | undefined) | undefined): Promise<{
+  result: Answer<Success<Output>>;
+} | undefined>
+
+[./lib/forms] fieldLinks
+function fieldLinks(group: boolean, hint: boolean, messages: () => readonly unknown[], required?: boolean): FieldLinks
+
+[./lib/forms] FieldLinks
+interface FieldLinks
+  described: () => string[]
+  frame: string
+  hint: string
+  issues: string
+
+[./lib/forms] formIssues
+const formIssues: Context<(() => Record<string, string>) | undefined>
+
+[./lib/hover-card] HoverCardPlacement
+type HoverCardPlacement = PopoverPlacement | 'top' | 'bottom' | 'left' | 'right'
+
+[./lib/icon-picker] IconChoice
+interface IconChoice
+  icon: IconProps
+  name: string
+
+[./lib/icon-picker] nameOf
+function nameOf(icon: string): string
+
+[./lib/index] ActionSource
+type ActionSource<Row, Target extends Action<never, unknown>> = {
+  action: Target // The fields of the call besides the paging: with an object, `offset` and `limit` (the page size) are added, so an action declaring both reads them from `pageFields`. A function gets where the page starts and answers the input, `offset` and `limit` added under what it names, for a cursor, a sort or a filter;
+  `undefined` loads nothing and resolves an empty page, such as a cursor with no row to continue after. input?: Partial<InputOf<Target>> | ((at: PageAt<Row>) => Partial<InputOf<Target>> | undefined) | undefined // What `attempt` toasts when the call fails. failure: string | AttemptOptions load?: undefined
+} & RowsOf<Row, Target>
+
+[./lib/index] attempt
+function attempt<T, Data = unknown>(run: () => Promise<T>, failure: string | AttemptOptions<Data>, refused?: ((data: Data) => string | undefined) | undefined): Promise<Attempted<T> | undefined>
+
+[./lib/index] Attempted
+type Attempted<T> = T extends void ? true : T
+
+[./lib/index] AttemptOptions
+interface AttemptOptions<Data = unknown>
+  failure: string
+  onRefused?: ((data: Data) => unknown) | undefined
+  refused?: ((data: Data) => string | undefined) | undefined
+  success?: string | undefined
+
+[./lib/index] AudioChapter
+interface AudioChapter
+  start: number
+  title: string
+  url?: string | undefined
+
+[./lib/index] AudioCue
+interface AudioCue
+  end: number
+  start: number
+  text: string
+
+[./lib/index] AxisScale
+type AxisScale = 'linear' | 'log'
+
+[./lib/index] AxisTick
+interface AxisTick
+  label: string
+  value: number
+
+[./lib/index] BarListRow
+interface BarListRow
+  display?: string
+  href?: string
+  key: string | number
+  label: string
+  value: number
+
+[./lib/index] BarSeries
+interface BarSeries extends ChartSeries
+  color?: string
+  colors?: (string | null | undefined)[]
+  name: string
+  notes?: (string | null | undefined)[]
+  values: (number | null)[]
+
+[./lib/index] ChartSeries
+interface ChartSeries
+  color?: string
+  name: string
+  values: (number | null)[]
+
+[./lib/index] Column
+interface Column<Row>
+  align?: "start" | "center" | "end"
+  cell?: boolean
+  defaultDirection?: SortDirection
+  header: string
+  key: string
+  numeric?: true
+  sortValue?: true | ((row: Row) => string | number)
+
+[./lib/index] ComboboxOption
+interface ComboboxOption<Value extends string = string>
+  disabled?: boolean | undefined
+  label: string
+  value: Value
+
+[./lib/index] ComboboxOptions
+type ComboboxOptions<Value extends string = string> = readonly ComboboxOption<Value>[] | ((input: ComboboxQuery) => PromiseLike<readonly ComboboxOption<Value>[]>)
+
+[./lib/index] ComboboxQuery
+interface ComboboxQuery
+  q: string
+
+[./lib/index] ContributionDay
+interface ContributionDay
+  day: string
+  description?: string | undefined
+  intensity: number
+
+[./lib/index] currentStep
+function currentStep<Key extends string>(url: string | URL, keys: readonly Key[], done?: readonly string[], param?: string): Key
+
+[./lib/index] DateRange
+type DateRange = [string | null, string | null]
+
+[./lib/index] dateRangeFrom
+function dateRangeFrom(from: string, to: string): DateRange
+
+[./lib/index] DescriptionItem
+interface DescriptionItem
+  key?: string | undefined
+  label: string
+  value?: string | number | undefined
+
+[./lib/index] dismissToast
+function dismissToast(id: number): void
+
+[./lib/index] editing
+function editing<Row, Draft = void>(): Editing<Row, Draft>
+
+[./lib/index] Editing
+interface Editing<Row, Draft = void>
+  close: () => void
+  create: (draft: Draft) => void
+  draft: () => Draft | undefined
+  edit: (row: Row) => void
+  open: () => boolean
+  row: () => Row | undefined
+
+[./lib/index] FilterField
+interface FilterField
+  key: string
+  label: string
+  options?: readonly { value: string; label: string; }[] | undefined
+
+[./lib/index] formIssues
+const formIssues: Context<(() => Record<string, string>) | undefined>
+
+[./lib/index] holdToasts
+function holdToasts(hold: ToastHold, on: boolean): void
+
+[./lib/index] HoverCardPlacement
+type HoverCardPlacement = PopoverPlacement | 'top' | 'bottom' | 'left' | 'right'
+
+[./lib/index] IconChoice
+interface IconChoice
+  icon: IconProps
+  name: string
+
+[./lib/index] IconSlot
+type IconSlot = 'alert' | 'apps' | 'back' | 'bell' | 'calendar' | 'chat' | 'chevron' | 'close' | 'collapse' | 'delete' | 'edit' | 'expand' | 'external' | 'globe' | 'info' | 'menu' | 'microphone' | 'pause' | 'play' | 'plus' | 'refresh' | 'search' | 'send' | 'spinner' | 'star' | 'stop' | 'success' | 'trendDown' | 'trendFlat' | 'trendUp' | 'zoomFit' | 'zoomIn' | 'zoomOut'
+
+[./lib/index] infiniteList
+function infiniteList<Row, Target extends Action<never, unknown> = never>(first: Row[], options: InfiniteListOptions<Row, Target>): InfiniteList<Row>
+
+[./lib/index] InfiniteList
+interface InfiniteList<Row>
+  ended: () => boolean
+  failed: () => boolean
+  filter: () => ListFilter
+  filterBy: (filter: Partial<ListFilter>) => Promise<void>
+  more: () => Promise<void>
+  patch: (id: unknown, change: RowChange<Row> | undefined) => boolean
+  pending: () => boolean
+  restart: (change: { sort?: SortState | undefined; filter?: Partial<ListFilter>; }) => Promise<void>
+  retry: () => Promise<void>
+  rows: () => Row[]
+  sort: () => SortState | undefined
+  sortBy: (sort: SortState | undefined) => Promise<void>
+
+[./lib/index] InfiniteListOptions
+type InfiniteListOptions<Row, Target extends Action<never, unknown> = never> = InfiniteListBase<Row> & (LoadSource<Row> | ActionSource<Row, Target>)
+
+[./lib/index] InfinitePage
+type InfinitePage<Row> = Row[] | undefined
+
+[./lib/index] ListFilter
+interface ListFilter
+  fields: Record<string, string>
+  text: string
+
+[./lib/index] LoadSource
+interface LoadSource<Row>
+  action?: undefined
+  load: (at: PageAt<Row>) => InfinitePage<Row> | Promise<InfinitePage<Row>>
+
+[./lib/index] MapMarker
+interface MapMarker
+  at: MapPoint
+  label?: string | undefined
+  popup?: string | undefined
+
+[./lib/index] MapPoint
+type MapPoint = readonly number[]
+
+[./lib/index] MediaItem
+interface MediaItem
+  captions?: string
+  full?: string
+  key: string | number
+  kind: "image" | "video"
+  preview: string
+  src?: string
+  thumb: string
+  title?: string
+
+[./lib/index] MenuAction
+interface MenuAction
+  danger?: boolean
+  disabled?: boolean
+  icon?: IconProps | IconSlot
+  label: string
+  onSelect: () => unknown
+  tone?: "neutral" | "danger" | undefined
+
+[./lib/index] MenuEntry
+type MenuEntry = MenuAction | 'separator'
+
+[./lib/index] messageOf
+function messageOf(error: unknown, fallback: string): string
+
+[./lib/index] MultiSelectOption
+interface MultiSelectOption<Value extends string = string>
+  disabled?: boolean | undefined
+  icon?: IconProps | IconSlot | undefined
+  label: string
+  value: Value
+
+[./lib/index] NavLink
+interface NavLink
+  href: string
+  icon?: IconProps | IconSlot | undefined
+  label: string
+
+[./lib/index] PageAt
+interface PageAt<Row>
+  filter: ListFilter
+  last: Row | undefined
+  offset: number
+  sort: SortState | undefined
+
+[./lib/index] pageFields
+function pageFields(max?: number): { offset: TOptional<TInteger>; limit: TOptional<TInteger>; }
+
+[./lib/index] PageInput
+interface PageInput
+  limit?: number | undefined
+  offset?: number | undefined
+
+[./lib/index] pageOf
+function pageOf<Row>(rows: Row[], { offset, limit }?: PageInput): { rows: Row[]; total: number; }
+
+[./lib/index] PaletteAction
+interface PaletteAction extends PaletteBase
+  group: string
+  icon?: IconProps | IconSlot | undefined
+  keywords?: string | undefined
+  label: string
+  onSelect: () => unknown
+
+[./lib/index] PaletteEntry
+type PaletteEntry = PaletteLink | PaletteAction
+
+[./lib/index] PaletteLink
+interface PaletteLink extends PaletteBase
+  external?: boolean | undefined
+  group: string
+  href: string
+  icon?: IconProps | IconSlot | undefined
+  keywords?: string | undefined
+  label: string
+
+[./lib/index] Plate
+interface Plate
+  scale: number
+  x: number
+  y: number
+
+[./lib/index] PopoverPlacement
+type PopoverPlacement = 'bottom-start' | 'bottom-end' | 'top-start' | 'top-end'
+
+[./lib/index] PopoverTriggerProps
+interface PopoverTriggerProps
+  aria-expanded: "true" | "false"
+  popovertarget: string
+  style: string
+
+[./lib/index] rangeFrom
+function rangeFrom(low: string, high: string): RangeValue
+
+[./lib/index] RangeValue
+type RangeValue = [number | null, number | null]
+
+[./lib/index] RowChange
+type RowChange<Row> = Partial<Row> | ((row: Row) => Row)
+
+[./lib/index] RowFilter
+type RowFilter<Row> = readonly (keyof Row & string)[] | ((row: Row) => (string | number | null | undefined)[])
+
+[./lib/index] RowKey
+type RowKey<Row> = (keyof Row & string) | ((row: Row) => string | number)
+
+[./lib/index] RowKeyValue
+type RowKeyValue<Row, Key extends RowKey<Row>> = Key extends keyof Row ? Row[Key] : Key extends (row: Row) => infer Value ? Value : never
+
+[./lib/index] ScatterAxis
+interface ScatterAxis
+  domain?: readonly [number, number]
+  label?: string
+  scale?: AxisScale
+  ticks?: readonly AxisTick[]
+
+[./lib/index] ScatterPoint
+interface ScatterPoint
+  key: string | number
+  label: string
+  tooltip?: string
+  weight?: number
+  x: number
+  y: number
+
+[./lib/index] SortDirection
+type SortDirection = 'asc' | 'desc'
+
+[./lib/index] SortState
+interface SortState
+  direction: SortDirection
+  key: string
+
+[./lib/index] SparkTone
+type SparkTone = 'muted' | 'accent' | 'success' | 'warning' | 'danger' | 'info'
+
+[./lib/index] StatDelta
+interface StatDelta
+  direction?: "up" | "down" | "flat" | undefined
+  label?: string | undefined
+  tone?: "info" | "success" | "neutral" | "danger" | "warning" | undefined
+  value: string
+
+[./lib/index] StepCookies
+interface StepCookies
+  delete: (name: string, options?: { path?: string; } | undefined) => void
+  get: (name: string) => string | null | undefined
+  set: (name: string, value: string, options?: {
+  path?: string;
+  httpOnly?: boolean;
+  sameSite?: "lax" | "strict" | "none";
+  maxAge?: number;
+  secure?: boolean;
+} | undefined) => void
+
+[./lib/index] stepDraft
+function stepDraft(cookies: StepCookies, name: string, { check, maxAge, path, request, secure }: StepDraftOptions): StepDraft
+
+[./lib/index] StepDraft
+interface StepDraft
+  clear: () => void
+  done: () => string[]
+  merged: () => Values
+  save: (step: string, values: Values) => void
+  values: () => Record<string, Values>
+
+[./lib/index] StepDraftOptions
+interface StepDraftOptions
+  check: (step: string, values: Values) => boolean
+  maxAge?: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w` | undefined
+  path?: string | undefined
+  request?: Request | undefined
+  secure?: boolean | undefined
+
+[./lib/index] stepHref
+function stepHref(url: string | URL, key: string, param?: string): string
+
+[./lib/index] StepItem
+interface StepItem<Key extends string = string>
+  key: Key
+  label: string
+
+[./lib/index] SwitcherApp
+interface SwitcherApp
+  description?: string | undefined
+  href: string
+  icon?: IconProps | IconSlot | undefined
+  id: string
+  label: string
+  newTab?: boolean | undefined
+  rel?: string | undefined
+
+[./lib/index] TimelineEntry
+interface TimelineEntry<Key extends string | number = string>
+  icon?: IconProps | IconSlot | undefined
+  key: Key
+  pickable?: boolean | undefined
+  text: string
+  time: string
+  tone?: "info" | "success" | "danger" | "warning" | "muted" | "accent" | undefined
+
+[./lib/index] toast
+const toast: {
+  error: (message: string, options?: ToastOptions) => number;
+  success: (message: string, options?: ToastOptions) => number;
+  info: (message: string, options?: ToastOptions) => number;
+}
+
+[./lib/index] Toast
+interface Toast
+  id: number
+  message: string
+  tone?: ToastTone | undefined
+  type: ToastType
+
+[./lib/index] ToastHold
+type ToastHold = 'pointer' | 'focus'
+
+[./lib/index] ToastOptions
+interface ToastOptions
+  duration?: false | `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w` | undefined
+
+[./lib/index] toasts
+function toasts(): Toast[]
+
+[./lib/index] ToastTone
+type ToastTone = 'danger' | 'success' | 'info'
+
+[./lib/index] ToastType
+type ToastType = 'error' | 'success' | 'info'
+
+[./lib/index] toCsv
+function toCsv<Row>(rows: Row[], columns: Column<Row>[]): string
+
+[./lib/index] TOOLBAR_ACTIONS
+const TOOLBAR_ACTIONS: readonly ["bold", "italic", "heading", "bulletList", "numberedList", "link", "image"]
+
+[./lib/index] ToolbarAction
+type ToolbarAction = typeof TOOLBAR_ACTIONS[number]
+
+[./lib/index] TreeId
+type TreeId = string | number
+
+[./lib/index] TreeNode
+interface TreeNode<Id extends TreeId = string>
+  children?: readonly TreeNode<Id>[] | undefined
+  icon?: IconProps | IconSlot | undefined
+  id: Id
+  label: string
+
+[./lib/index] uiDefaults
+const uiDefaults: UiSettings
+
+[./lib/index] UiSettings
+interface UiSettings
+  icons: Record<"alert" | "back" | "chevron" | "close" | "delete" | "globe" | "info" | "menu" | "play" | "plus" | "search" | "spinner" | "star" | "success" | "zoomFit" | "zoomIn" | "zoomOut", IconProps> & Partial<Record<AddedSlot, IconProps>>
+
+[./lib/infinite-list] ActionSource
+type ActionSource<Row, Target extends Action<never, unknown>> = {
+  action: Target // The fields of the call besides the paging: with an object, `offset` and `limit` (the page size) are added, so an action declaring both reads them from `pageFields`. A function gets where the page starts and answers the input, `offset` and `limit` added under what it names, for a cursor, a sort or a filter;
+  `undefined` loads nothing and resolves an empty page, such as a cursor with no row to continue after. input?: Partial<InputOf<Target>> | ((at: PageAt<Row>) => Partial<InputOf<Target>> | undefined) | undefined // What `attempt` toasts when the call fails. failure: string | AttemptOptions load?: undefined
+} & RowsOf<Row, Target>
+
+[./lib/infinite-list] infiniteList
+function infiniteList<Row, Target extends Action<never, unknown> = never>(first: Row[], options: InfiniteListOptions<Row, Target>): InfiniteList<Row>
+
+[./lib/infinite-list] InfiniteList
+interface InfiniteList<Row>
+  ended: () => boolean
+  failed: () => boolean
+  filter: () => ListFilter
+  filterBy: (filter: Partial<ListFilter>) => Promise<void>
+  more: () => Promise<void>
+  patch: (id: unknown, change: RowChange<Row> | undefined) => boolean
+  pending: () => boolean
+  restart: (change: { sort?: SortState | undefined; filter?: Partial<ListFilter>; }) => Promise<void>
+  retry: () => Promise<void>
+  rows: () => Row[]
+  sort: () => SortState | undefined
+  sortBy: (sort: SortState | undefined) => Promise<void>
+
+[./lib/infinite-list] InfiniteListOptions
+type InfiniteListOptions<Row, Target extends Action<never, unknown> = never> = InfiniteListBase<Row> & (LoadSource<Row> | ActionSource<Row, Target>)
+
+[./lib/infinite-list] InfinitePage
+type InfinitePage<Row> = Row[] | undefined
+
+[./lib/infinite-list] ListFilter
+interface ListFilter
+  fields: Record<string, string>
+  text: string
+
+[./lib/infinite-list] LoadSource
+interface LoadSource<Row>
+  action?: undefined
+  load: (at: PageAt<Row>) => InfinitePage<Row> | Promise<InfinitePage<Row>>
+
+[./lib/infinite-list] PageAt
+interface PageAt<Row>
+  filter: ListFilter
+  last: Row | undefined
+  offset: number
+  sort: SortState | undefined
+
+[./lib/infinite-list] RowChange
+type RowChange<Row> = Partial<Row> | ((row: Row) => Row)
+
+[./lib/locked-button] lockedButton
+function lockedButton<T extends object>(attributes: T): T & { "type": "button"; "aria-disabled": "true"; }
+
+[./lib/map-view] drawnPoints
+function drawnPoints(lines: readonly (readonly MapPoint[])[], markers: readonly MapMarker[]): MapPoint[]
+
+[./lib/map-view] LeafletApi
+interface LeafletApi
+  DomUtil: { create: (tag: string) => HTMLElement; }
+  circleMarker: (at: MapPoint, options: { radius: number; weight: number; className: string; interactive: boolean; }) => LeafletPath
+  control: { attribution: (options: { prefix: false; }) => unknown; }
+  latLngBounds: (points: MapPoint[]) => unknown
+  layerGroup: () => LeafletGroup
+  map: (element: HTMLElement, options: {
+  zoomSnap: number;
+  attributionControl: boolean;
+  zoomAnimation: boolean;
+  fadeAnimation: boolean;
+  markerZoomAnimation: boolean;
+}) => LeafletView
+  polyline: (path: MapPoint[], options: { weight: number; className: string; interactive?: boolean; }) => LeafletPath
+  tileLayer: (url: string, options: { maxZoom: number; attribution: string; }) => LeafletLayer
+
+[./lib/map-view] LeafletGroup
+interface LeafletGroup extends LeafletLayer
+  addTo: (target: LeafletView | LeafletGroup) => LeafletGroup
+  clearLayers: () => LeafletGroup
+  remove: () => LeafletGroup
+
+[./lib/map-view] LeafletLayer
+interface LeafletLayer
+  addTo: (target: LeafletView | LeafletGroup) => LeafletLayer
+  remove: () => LeafletLayer
+
+[./lib/map-view] LeafletPath
+interface LeafletPath extends LeafletLayer
+  addTo: (target: LeafletView | LeafletGroup) => LeafletPath
+  bindPopup: (content: HTMLElement) => LeafletPath
+  bindTooltip: (content: HTMLElement) => LeafletPath
+  closePopup: () => LeafletPath
+  getElement: () => SVGElement | undefined
+  remove: () => LeafletPath
+  togglePopup: () => LeafletPath
+
+[./lib/map-view] LeafletView
+interface LeafletView
+  addControl: (control: unknown) => LeafletView
+  fitBounds: (bounds: unknown, options: { padding: [number, number]; maxZoom: number; animate: boolean; }) => LeafletView
+  getSize: () => { x: number; y: number; }
+  invalidateSize: (options: { animate: boolean; }) => LeafletView
+  on: (events: string, handler: () => void) => LeafletView
+  panInside: (at: MapPoint, options: { padding: [number, number]; animate: boolean; }) => LeafletView
+  remove: () => LeafletView
+  setView: (center: MapPoint, zoom: number, options: { animate: boolean; }) => LeafletView
+
+[./lib/map-view] MapMarker
+interface MapMarker
+  at: MapPoint
+  label?: string | undefined
+  popup?: string | undefined
+
+[./lib/map-view] MapPoint
+type MapPoint = readonly number[]
+
+[./lib/map-view] OSM_ATTRIBUTION
+const OSM_ATTRIBUTION: "&copy; <a href=\"https://www.openstreetmap.org/copyright\" target=\"_blank\" rel=\"noopener\">OpenStreetMap</a>"
+
+[./lib/map-view] OSM_TILES
+const OSM_TILES: "https://tile.openstreetmap.org/{z}/{x}/{y}.png"
+
+[./lib/map-view] validPoint
+function validPoint(point: MapPoint): boolean
+
+[./lib/markdown-edit] enterEdit
+function enterEdit(value: string, start: number, end: number): TextEdit | null
+
+[./lib/markdown-edit] escaped
+function escaped(url: string): string
+
+[./lib/markdown-edit] headingEdit
+function headingEdit(value: string, start: number, end: number): TextEdit
+
+[./lib/markdown-edit] imageEdit
+function imageEdit(value: string, start: number, end: number): TextEdit
+
+[./lib/markdown-edit] indentEdit
+function indentEdit(value: string, start: number, end: number, outdent: boolean): TextEdit | null
+
+[./lib/markdown-edit] linkEdit
+function linkEdit(value: string, start: number, end: number): TextEdit
+
+[./lib/markdown-edit] listContinuation
+function listContinuation(line: string): { next: string; clear: boolean; } | null
+
+[./lib/markdown-edit] listEdit
+function listEdit(value: string, start: number, end: number, ordered: boolean): TextEdit
+
+[./lib/markdown-edit] MARKDOWN_INDENT
+const MARKDOWN_INDENT: "  "
+
+[./lib/markdown-edit] TextEdit
+interface TextEdit
+  end: number
+  selectionEnd: number
+  selectionStart: number
+  start: number
+  text: string
+
+[./lib/markdown-edit] TOOLBAR_ACTIONS
+const TOOLBAR_ACTIONS: readonly ["bold", "italic", "heading", "bulletList", "numberedList", "link", "image"]
+
+[./lib/markdown-edit] ToolbarAction
+type ToolbarAction = typeof TOOLBAR_ACTIONS[number]
+
+[./lib/markdown-edit] wrapEdit
+function wrapEdit(value: string, start: number, end: number, marker: string): TextEdit
+
+[./lib/masonry] laneCount
+function laneCount(width: number, minWidth: number, gap: number): number
+
+[./lib/masonry] MASONRY_TOLERANCE
+const MASONRY_TOLERANCE: 16
+
+[./lib/masonry] masonryLayout
+function masonryLayout(heights: readonly (number | undefined)[], lanes: number, gap: number, tolerance?: number): MasonryLayout
+
+[./lib/masonry] MasonryLayout
+interface MasonryLayout
+  height: number
+  places: MasonryPlace[]
+
+[./lib/masonry] MasonryPlace
+interface MasonryPlace
+  lane: number
+  top: number
+
+[./lib/media] isPlayable
+function isPlayable(item: MediaItem): item is MediaItem & { src: string; }
+
+[./lib/media] MediaItem
+interface MediaItem
+  captions?: string
+  full?: string
+  key: string | number
+  kind: "image" | "video"
+  preview: string
+  src?: string
+  thumb: string
+  title?: string
+
+[./lib/media] playSource
+function playSource(video: HTMLVideoElement, src: string): () => void
+
+[./lib/menu] MenuAction
+interface MenuAction
+  danger?: boolean
+  disabled?: boolean
+  icon?: IconProps | IconSlot
+  label: string
+  onSelect: () => unknown
+  tone?: "neutral" | "danger" | undefined
+
+[./lib/menu] MenuEntry
+type MenuEntry = MenuAction | 'separator'
+
+[./lib/menu-look] MENU_FOOTER
+const MENU_FOOTER: "flex w-full cursor-pointer items-center gap-2 px-2 py-1.5 text-left text-sm outline-none hover:bg-hover focus:bg-hover focus-visible:[box-shadow:inset_2px_0_0_var(--color-accent)] focus-visible:[outline-offset:-2px] focus-visible:[outline:2px_solid_transparent] border-0 border-t border-solid border-border font-medium text-accent"
+
+[./lib/menu-look] MENU_ITEM
+const MENU_ITEM: "flex w-full cursor-pointer items-center gap-2 px-2 py-1.5 text-left text-sm outline-none hover:bg-hover focus:bg-hover text-foreground focus-visible:[box-shadow:inset_2px_0_0_var(--color-accent)] focus-visible:[outline-offset:-2px] focus-visible:[outline:2px_solid_transparent]"
+
+[./lib/menu-look] MENU_LIST
+const MENU_LIST: "flex flex-col gap-px p-1 outline-none"
+
+[./lib/multi-select] MultiSelectOption
+interface MultiSelectOption<Value extends string = string>
+  disabled?: boolean | undefined
+  icon?: IconProps | IconSlot | undefined
+  label: string
+  value: Value
+
+[./lib/multi-select] pickedLabels
+function pickedLabels<Value extends string>(options: readonly MultiSelectOption<Value>[], value: readonly Value[]): string[]
+
+[./lib/multi-select] pickedShown
+function pickedShown<Value extends string>(options: readonly MultiSelectOption<Value>[], value: readonly Value[], shown: readonly MultiSelectOption<Value>[], pick: boolean): Value[]
+
+[./lib/multi-select] selectionSummary
+function selectionSummary<Value extends string>(options: readonly MultiSelectOption<Value>[], value: readonly Value[], placeholder: string, counted?: (count: number) => string): string
+
+[./lib/multi-select] toggledValue
+function toggledValue<Value extends string>(options: readonly MultiSelectOption<Value>[], value: readonly Value[], option: Value): Value[]
+
+[./lib/null-option] NullOption
+type NullOption<Value, Held> = null extends Value ? null extends Held ? '' extends Value ? string extends Value ? unknown : {
+  'a null option and an option of "" post the same empty string': never
+} : unknown : {
+  'a null option needs a value typed to allow null': never
+} : unknown
+
+[./lib/outside] OUTSIDE
+const OUTSIDE: { readonly target: "_blank"; readonly rel: "noopener noreferrer"; readonly 'data-new-tab': ""; }
+
+[./lib/pagination] currentPage
+function currentPage(page: number, pages: number): number
+
+[./lib/pagination] offsetHref
+function offsetHref(url: string | URL, offset: number, param?: string): string
+
+[./lib/pagination] OpenPosition
+type OpenPosition = { page: number, offset?: never, limit?: never } | { page?: never, offset: number, limit: number }
+
+[./lib/pagination] openSteps
+function openSteps(position: OpenPosition, more: boolean, url: string | URL, param?: string | undefined): { previous: string | undefined; next: string | undefined; }
+
+[./lib/pagination] PagedList
+interface PagedList
+  href: (page: number) => string
+  page: number
+  pages: number
+
+[./lib/pagination] PageGap
+type PageGap = 'gap'
+
+[./lib/pagination] pageHref
+function pageHref(url: string | URL, page: number, param?: string): string
+
+[./lib/pagination] pageItems
+function pageItems(page: number, pages: number, siblings?: number): (number | "gap")[]
+
+[./lib/paging] pageFields
+function pageFields(max?: number): { offset: TOptional<TInteger>; limit: TOptional<TInteger>; }
+
+[./lib/paging] PageInput
+interface PageInput
+  limit?: number | undefined
+  offset?: number | undefined
+
+[./lib/paging] pageOf
+function pageOf<Row>(rows: Row[], { offset, limit }?: PageInput): { rows: Row[]; total: number; }
+
+[./lib/palette] isPaletteLink
+function isPaletteLink(entry: PaletteEntry): entry is PaletteLink
+
+[./lib/palette] PaletteAction
+interface PaletteAction extends PaletteBase
+  group: string
+  icon?: IconProps | IconSlot | undefined
+  keywords?: string | undefined
+  label: string
+  onSelect: () => unknown
+
+[./lib/palette] PaletteEntry
+type PaletteEntry = PaletteLink | PaletteAction
+
+[./lib/palette] PaletteHit
+interface PaletteHit
+  labelParts?: SearchPart[] | undefined
+  link: PaletteLink
+  more: number
+  snippet: SearchPart[]
+
+[./lib/palette] paletteHits
+function paletteHits(hits: SearchHit[], matches: PaletteEntry[]): PaletteHit[]
+
+[./lib/palette] PaletteLink
+interface PaletteLink extends PaletteBase
+  external?: boolean | undefined
+  group: string
+  href: string
+  icon?: IconProps | IconSlot | undefined
+  keywords?: string | undefined
+  label: string
+
+[./lib/palette] paletteMatches
+function paletteMatches(entries: PaletteEntry[], query: string, groups?: string[]): PaletteEntry[]
+
+[./lib/palette] paletteScore
+function paletteScore(entry: Pick<PaletteBase, "label" | "group" | "keywords">, query: string): number
+
+[./lib/palette] PaletteSection
+interface PaletteSection
+  entries: PaletteEntry[]
+  group: string
+
+[./lib/palette] paletteSections
+function paletteSections(entries: PaletteEntry[], recent?: string[], groups?: string[], recentGroup?: string): PaletteSection[]
+
+[./lib/palette] RECENT_GROUP
+const RECENT_GROUP: "Recent"
+
+[./lib/palette] splitMatches
+function splitMatches(matches: PaletteEntry[], query: string): { strong: PaletteEntry[]; loose: PaletteEntry[]; }
+
+[./lib/palette] withRecent
+function withRecent(recent: string[], href: string, limit?: number): string[]
+
+[./lib/param-change] paramChange
+function paramChange<Value extends string | number | null>(param: string | undefined, paramDefault: string | number | undefined, onChange: ((value: Value) => unknown) | undefined): ((value: Value) => unknown) | undefined
+
+[./lib/plot] axisExtent
+function axisExtent(values: readonly number[], axis: ScatterAxis): [number, number]
+
+[./lib/plot] axisPercent
+function axisPercent(value: number, extent: readonly [number, number], scale?: AxisScale): number
+
+[./lib/plot] AxisScale
+type AxisScale = 'linear' | 'log'
+
+[./lib/plot] AxisTick
+interface AxisTick
+  label: string
+  value: number
+
+[./lib/plot] BarListRow
+interface BarListRow
+  display?: string
+  href?: string
+  key: string | number
+  label: string
+  value: number
+
+[./lib/plot] barRatios
+function barRatios(values: readonly (readonly (number | null)[])[], stacked: boolean, count: number): { heights: number[][]; top: number; }
+
+[./lib/plot] BarSeries
+interface BarSeries extends ChartSeries
+  color?: string
+  colors?: (string | null | undefined)[]
+  name: string
+  notes?: (string | null | undefined)[]
+  values: (number | null)[]
+
+[./lib/plot] ChartSeries
+interface ChartSeries
+  color?: string
+  name: string
+  values: (number | null)[]
+
+[./lib/plot] dashSample
+function dashSample(color: string, dash: string): string
+
+[./lib/plot] dotSize
+function dotSize(weight: number, heaviest: number): number
+
+[./lib/plot] PALETTE
+const PALETTE: string[]
+
+[./lib/plot] ScatterAxis
+interface ScatterAxis
+  domain?: readonly [number, number]
+  label?: string
+  scale?: AxisScale
+  ticks?: readonly AxisTick[]
+
+[./lib/plot] ScatterPoint
+interface ScatterPoint
+  key: string | number
+  label: string
+  tooltip?: string
+  weight?: number
+  x: number
+  y: number
+
+[./lib/plot] SERIES_DASHES
+const SERIES_DASHES: readonly ["", "6 3", "2 3", "10 3 2 3", "2 6", "8 2 2 2"]
+
+[./lib/plot] steppedPoint
+function steppedPoint(key: string, index: number, count: number): number | undefined
+
+[./lib/plot] valueTicks
+function valueTicks(top: number): { ratio: number; }[]
+
+[./lib/popover] PopoverPlacement
+type PopoverPlacement = 'bottom-start' | 'bottom-end' | 'top-start' | 'top-end'
+
+[./lib/popover] PopoverTriggerProps
+interface PopoverTriggerProps
+  aria-expanded: "true" | "false"
+  popovertarget: string
+  style: string
+
+[./lib/range] rangeFrom
+function rangeFrom(low: string, high: string): RangeValue
+
+[./lib/range] RangeValue
+type RangeValue = [number | null, number | null]
+
+[./lib/range-track] rangeTrack
+const rangeTrack: "h-4 w-full cursor-pointer appearance-none bg-transparent [&::-webkit-slider-runnable-track]:h-1 [&::-webkit-slider-runnable-track]:bg-input [&::-moz-range-track]:h-1 [&::-moz-range-track]:bg-input [&::-webkit-slider-thumb]:size-4 [&::-webkit-slider-thumb]:-mt-1.5 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-sm [&::-webkit-slider-thumb]:border-0 [&::-webkit-slider-thumb]:bg-accent [&::-moz-range-thumb]:size-4 [&::-moz-range-thumb]:rounded-sm [&::-moz-range-thumb]:border-0 [&::-moz-range-thumb]:bg-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-default disabled:opacity-50"
+
+[./lib/record] elapsed
+function elapsed(total: number): string
+
+[./lib/record] RECORD_LIMIT
+const RECORD_LIMIT: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w`
+
+[./lib/record] recorder
+function recorder(options: RecorderOptions): Recorder
+
+[./lib/record] Recorder
+interface Recorder
+  cancel: () => boolean
+  press: () => Promise<void>
+  problem: Signal<string | undefined>
+  said: Signal<string>
+  seconds: Signal<number>
+  state: Signal<"idle" | "asking" | "recording" | "sending">
+
+[./lib/record] RecorderOptions
+interface RecorderOptions
+  failure: string
+  maxMs: number
+  onAudio: (audio: File) => unknown
+  sending?: string | undefined
+  words: RecordWords
+
+[./lib/record] RecordProblem
+type RecordProblem = 'insecure' | 'unsupported' | 'denied' | 'missing' | 'taken' | 'failed' | 'lost' | 'empty'
+
+[./lib/record] recordWords
+function recordWords(): RecordWords
+
+[./lib/record] RecordWords
+type RecordWords = Record<RecordProblem | 'recording' | 'stopped' | 'cancelled', string>
+
+[./lib/recording] Recording
+interface Recording
+  cancel: () => boolean
+  stop: () => void
+
+[./lib/recording] RecordOptions
+interface RecordOptions
+  maxMs: number
+  onEnd: (result: File | RecordProblem) => void
+
+[./lib/recording] RecordProblem
+type RecordProblem = 'insecure' | 'unsupported' | 'denied' | 'missing' | 'taken' | 'failed' | 'lost' | 'empty'
+
+[./lib/recording] startRecording
+function startRecording(options: RecordOptions): Promise<RecordProblem | Recording>
+
+[./lib/settings] default
+const default: UiSettings
+
+[./lib/shade] shade
+function shade(color: string, value: number): string | undefined
+
+[./lib/sparkline] SparkTone
+type SparkTone = 'muted' | 'accent' | 'success' | 'warning' | 'danger' | 'info'
+
+[./lib/stat] deltaIcon
+function deltaIcon({ value, direction }: StatDelta): IconSlot
+
+[./lib/stat] StatDelta
+interface StatDelta
+  direction?: "up" | "down" | "flat" | undefined
+  label?: string | undefined
+  tone?: "info" | "success" | "neutral" | "danger" | "warning" | undefined
+  value: string
+
+[./lib/steps] currentStep
+function currentStep<Key extends string>(url: string | URL, keys: readonly Key[], done?: readonly string[], param?: string): Key
+
+[./lib/steps] StepCookies
+interface StepCookies
+  delete: (name: string, options?: { path?: string; } | undefined) => void
+  get: (name: string) => string | null | undefined
+  set: (name: string, value: string, options?: {
+  path?: string;
+  httpOnly?: boolean;
+  sameSite?: "lax" | "strict" | "none";
+  maxAge?: number;
+  secure?: boolean;
+} | undefined) => void
+
+[./lib/steps] stepDraft
+function stepDraft(cookies: StepCookies, name: string, { check, maxAge, path, request, secure }: StepDraftOptions): StepDraft
+
+[./lib/steps] StepDraft
+interface StepDraft
+  clear: () => void
+  done: () => string[]
+  merged: () => Values
+  save: (step: string, values: Values) => void
+  values: () => Record<string, Values>
+
+[./lib/steps] StepDraftOptions
+interface StepDraftOptions
+  check: (step: string, values: Values) => boolean
+  maxAge?: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w` | undefined
+  path?: string | undefined
+  request?: Request | undefined
+  secure?: boolean | undefined
+
+[./lib/steps] stepHref
+function stepHref(url: string | URL, key: string, param?: string): string
+
+[./lib/steps] StepItem
+interface StepItem<Key extends string = string>
+  key: Key
+  label: string
+
+[./lib/tab-nav] currentTab
+function currentTab(links: readonly TabLink[], current: string | URL): string | undefined
+
+[./lib/tab-nav] keptHref
+function keptHref(href: string, current: string | URL, keep: readonly string[]): string
+
+[./lib/tab-nav] TabLink
+interface TabLink
+  also?: readonly string[] | undefined
+  href: string
+  prefix?: boolean | undefined
+
+[./lib/table] cellText
+function cellText<Row>(row: Row, column: Column<Row>): string
+
+[./lib/table] Column
+interface Column<Row>
+  align?: "start" | "center" | "end"
+  cell?: boolean
+  defaultDirection?: SortDirection
+  header: string
+  key: string
+  numeric?: true
+  sortValue?: true | ((row: Row) => string | number)
+
+[./lib/table] compareValues
+function compareValues(a: string | number, b: string | number): number
+
+[./lib/table] csvField
+function csvField(value: unknown): string
+
+[./lib/table] drawnByBlock
+function drawnByBlock<Row>(column: Column<Row>, columns: Column<Row>[]): boolean
+
+[./lib/table] exportHref
+function exportHref(href: string, sort: SortState | undefined, param: string, text: string, fields?: Record<string, string>): string
+
+[./lib/table] FilterField
+interface FilterField
+  key: string
+  label: string
+  options?: readonly { value: string; label: string; }[] | undefined
+
+[./lib/table] nextSort
+function nextSort<Row>(sort: SortState | undefined, column: Column<Row>): SortState
+
+[./lib/table] resolvedColumn
+function resolvedColumn<Row>(column: Column<Row>, sortable?: boolean): Column<Row>
+
+[./lib/table] restoredSort
+function restoredSort<Row>(columns: Column<Row>[], key: string | undefined, direction: string | undefined): SortState | undefined
+
+[./lib/table] RowFilter
+type RowFilter<Row> = readonly (keyof Row & string)[] | ((row: Row) => (string | number | null | undefined)[])
+
+[./lib/table] RowKey
+type RowKey<Row> = (keyof Row & string) | ((row: Row) => string | number)
+
+[./lib/table] rowKeyOf
+function rowKeyOf<Row, Key extends RowKey<Row>>(row: Row, key: Key): RowKeyValue<Row, Key>
+
+[./lib/table] RowKeyValue
+type RowKeyValue<Row, Key extends RowKey<Row>> = Key extends keyof Row ? Row[Key] : Key extends (row: Row) => infer Value ? Value : never
+
+[./lib/table] rowLabel
+function rowLabel<Row>(row: Row, columns: Column<Row>[], key: RowKey<Row>): string
+
+[./lib/table] rowsMatching
+function rowsMatching<Row>(rows: Row[], filter: RowFilter<Row>, text: string): Row[]
+
+[./lib/table] sameFields
+function sameFields(a: Record<string, string>, b: Record<string, string>): boolean
+
+[./lib/table] SortDirection
+type SortDirection = 'asc' | 'desc'
+
+[./lib/table] sortedRows
+function sortedRows<Row>(rows: Row[], columns: Column<Row>[], sort: SortState | undefined): Row[]
+
+[./lib/table] SortState
+interface SortState
+  direction: SortDirection
+  key: string
+
+[./lib/table] toCsv
+function toCsv<Row>(rows: Row[], columns: Column<Row>[]): string
+
+[./lib/timeline] TimelineEntry
+interface TimelineEntry<Key extends string | number = string>
+  icon?: IconProps | IconSlot | undefined
+  key: Key
+  pickable?: boolean | undefined
+  text: string
+  time: string
+  tone?: "info" | "success" | "danger" | "warning" | "muted" | "accent" | undefined
+
+[./lib/toast] attempt
+function attempt<T, Data = unknown>(run: () => Promise<T>, failure: string | AttemptOptions<Data>, refused?: ((data: Data) => string | undefined) | undefined): Promise<Attempted<T> | undefined>
+
+[./lib/toast] Attempted
+type Attempted<T> = T extends void ? true : T
+
+[./lib/toast] AttemptOptions
+interface AttemptOptions<Data = unknown>
+  failure: string
+  onRefused?: ((data: Data) => unknown) | undefined
+  refused?: ((data: Data) => string | undefined) | undefined
+  success?: string | undefined
+
+[./lib/toast] dismissToast
+function dismissToast(id: number): void
+
+[./lib/toast] holdToasts
+function holdToasts(hold: ToastHold, on: boolean): void
+
+[./lib/toast] messageOf
+function messageOf(error: unknown, fallback: string): string
+
+[./lib/toast] toast
+const toast: {
+  error: (message: string, options?: ToastOptions) => number;
+  success: (message: string, options?: ToastOptions) => number;
+  info: (message: string, options?: ToastOptions) => number;
+}
+
+[./lib/toast] Toast
+interface Toast
+  id: number
+  message: string
+  tone?: ToastTone | undefined
+  type: ToastType
+
+[./lib/toast] ToastHold
+type ToastHold = 'pointer' | 'focus'
+
+[./lib/toast] ToastOptions
+interface ToastOptions
+  duration?: false | `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w` | undefined
+
+[./lib/toast] toasts
+function toasts(): Toast[]
+
+[./lib/toast] ToastTone
+type ToastTone = 'danger' | 'success' | 'info'
+
+[./lib/toast] ToastType
+type ToastType = 'error' | 'success' | 'info'
+
+[./lib/tree] TreeId
+type TreeId = string | number
+
+[./lib/tree] treeKey
+function treeKey<Id extends TreeId>(rows: readonly TreeRow<Id>[], focused: TreeId, key: string, open: ReadonlySet<TreeId>): TreeMove<Id>
+
+[./lib/tree] TreeMove
+type TreeMove<Id extends TreeId> = { focus: Id } | { open: Id } | { close: Id } | undefined
+
+[./lib/tree] TreeNode
+interface TreeNode<Id extends TreeId = string>
+  children?: readonly TreeNode<Id>[] | undefined
+  icon?: IconProps | IconSlot | undefined
+  id: Id
+  label: string
+
+[./lib/tree] treePath
+function treePath<Id extends TreeId>(nodes: readonly TreeNode<Id>[], id: TreeId): Id[] | undefined
+
+[./lib/tree] TreeRow
+interface TreeRow<Id extends TreeId = string>
+  level: number
+  node: TreeNode<Id>
+  parent: Id | undefined
+  position: number
+  size: number
+
+[./lib/tree] treeRows
+function treeRows<Id extends TreeId>(nodes: readonly TreeNode<Id>[], open: ReadonlySet<TreeId>, level?: number, parent?: Id | undefined): TreeRow<Id>[]
+
+[./lib/virtual] INITIAL_VIEWPORT
+const INITIAL_VIEWPORT: 640
+
+[./lib/virtual] offsetsOf
+function offsetsOf(count: number, sizeAt: (index: number) => number): Float64Array<ArrayBufferLike>
+
+[./lib/virtual] VirtualOptions
+interface VirtualOptions<Item>
+  estimate: number
+  items: () => Item[]
+  keyOf: (item: Item, index: number) => unknown
+  overscan: number
+
+[./lib/virtual] virtualRows
+function virtualRows<Item>(options: VirtualOptions<Item>): {
+  rows: () => Item[];
+  start: () => number;
+  before: () => number;
+  after: () => number;
+  count: () => number;
+  attach: (box: HTMLElement, content: HTMLElement) => () => void;
+}
+
+[./lib/virtual] windowOf
+function windowOf(offsets: Float64Array<ArrayBufferLike>, top: number, viewport: number, overscan: number): { start: number; end: number; }
+
+[./lib/words] dayMonth
+function dayMonth(date: Date): string
+
+[./lib/words] fullDate
+function fullDate(date: Date, time: false | "minutes" | "seconds"): string
+
+[./lib/words] monthShort
+function monthShort(date: Date): string
+
+[./lib/words] timeOfDay
+function timeOfDay(date: Date, seconds: boolean): string
+
+[./lib/zoom] fitted
+function fitted(): Plate
+
+[./lib/zoom] Frame
+interface Frame
+  height: number
+  width: number
+
+[./lib/zoom] held
+function held(plate: Plate, frame: Frame): Plate
+
+[./lib/zoom] MOST
+const MOST: 8
+
+[./lib/zoom] movedBy
+function movedBy(plate: Plate, dx: number, dy: number): Plate
+
+[./lib/zoom] NOTCH_ZOOM
+const NOTCH_ZOOM: 1.15
+
+[./lib/zoom] Plate
+interface Plate
+  scale: number
+  x: number
+  y: number
+
+[./lib/zoom] wheelZoom
+function wheelZoom(deltaY: number, deltaMode?: number, notch?: number): number
+
+[./lib/zoom] zoomedAt
+function zoomedAt(plate: Plate, at: { x: number; y: number; }, by: number, most?: number, least?: number): Plate

@@ -14,7 +14,7 @@ class AiError
   status: number | undefined
 
 [.] AiErrorKind
-type AiErrorKind = | 'auth' // Too many requests (429): `retryAfter` is the seconds the provider asked to wait, when it said. | 'rate-limited' // The provider is down or overloaded (5xx, or an error event in the stream). | 'unavailable' // The provider refused the request (another 4xx): a model it d ...#549f3ce1
+type AiErrorKind = | 'auth' // Too many requests (429): `retryAfter` is the seconds the provider asked to wait, when it said. | 'rate-limited' // The provider is down or overloaded (5xx, or an error event in the stream). | 'unavailable' // The provider refused the request (another 4xx): a model it does not know, a message it cannot take. | 'invalid' // The provider could not be reached. | 'network' // The provider took longer than the `timeout` of `ask` to answer, or to send the next event: `partial` holds what came. | 'timeout' // The stream ended before the provider said the reply was done: `partial` holds what came. | 'cut' // The provider sent something that is no server-sent event of its API. | 'protocol' // The visitor or the chat is over a limit or budget set in `ai()`: `retryAfter` is the seconds until its window closes, `limit` which one. | 'limited' // The messages, with their attachments counted, are longer than the `maxInputChars` of `ask`, or an attachment is over `maxAttachmentBytes`: nothing was sent to the provider. | 'too-long' // The model's answer does not fit the `schema` of `ask`: it is no JSON object, was cut by `maxTokens` or refused, or breaks the schema. `fields` names the fields it refuses and `partial` holds the text. | 'schema' // An attachment is none of the kinds a model is shown (a PNG, JPEG, GIF or WebP image, a PDF), or the provider does not take its kind: nothing was sent. | 'unsupported' // A `Chat` with `keepOnServer` posted to its conversation as it stood before another tab wrote to it: nothing was sent, and the Chat reloads the conversation. | 'conflict'
 
 [.] AiLimit
 type AiLimit = 'asks' | 'budget' | 'total'
@@ -72,7 +72,10 @@ interface AskOptions
   sources?: readonly Source[] | undefined
   system?: string | undefined
   temperature?: number | undefined
-  timeout?: { connect?: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w` | undefined; idle?: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w` | undefined; } | undefined
+  timeout?: {
+  connect?: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w` | undefined;
+  idle?: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w` | undefined;
+} | undefined
   tools?: readonly (ToolAction | FunctionTool)[] | undefined
 
 [.] Attachment
@@ -151,7 +154,9 @@ interface ConversationSummary
   updatedAt: number
 
 [.] DeepPartial
-type DeepPartial<Value> = Value extends string ? string : Value extends readonly (infer Item)[] ? DeepPartial<Item>[] : Value extends (...args: never[]) => unknown ? Value : Value extends Date ? Value : Value extends object ? { [Key in keyof Value]?: DeepPartial<Value[Key]> } : Value
+type DeepPartial<Value> = Value extends string ? string : Value extends readonly (infer Item)[] ? DeepPartial<Item>[] : Value extends (...args: never[]) => unknown ? Value : Value extends Date ? Value : Value extends object ? {
+  [Key in keyof Value]?: DeepPartial<Value[Key]>
+} : Value
 
 [.] DeltasOptions
 interface DeltasOptions
@@ -280,7 +285,9 @@ interface Message
   sources?: readonly Source[] | undefined
 
 [.] mocked
-function mocked<const Schema extends TSchema, const Honeypot extends string = never>(action: ServerAction<Schema, unknown, Honeypot>, run: (input: (Schema & { params: []; })["static"], context: FunctionToolContext) => unknown): FunctionTool
+function mocked<const Schema extends TSchema, const Honeypot extends string = never>(action: ServerAction<Schema, unknown, Honeypot>, run: (input: (Schema & {
+  params: [];
+})["static"], context: FunctionToolContext) => unknown): FunctionTool
 
 [.] openai
 function openai({ baseUrl, apiKey, insecure, model, body: fields, pdf }?: OpenAiOptions): Provider
@@ -301,7 +308,25 @@ interface Passage
   title: string
 
 [.] Piece
-type Piece = { text: string } | { reasoning: string } | { thinking: Thinking } | { usage: Partial<Usage> } | { finish: Finish } | { toolUse: ToolUse } | { tool: ToolCall } | { step: Step } | { restart: true }
+type Piece = {
+  text: string
+} | {
+  reasoning: string
+} | {
+  thinking: Thinking
+} | {
+  usage: Partial<Usage>
+} | {
+  finish: Finish
+} | {
+  toolUse: ToolUse
+} | {
+  tool: ToolCall
+} | {
+  step: Step
+} | {
+  restart: true
+}
 
 [.] Progress
 interface Progress
@@ -465,7 +490,10 @@ interface StructuredAskOptions<Schema extends TSchema = TSchema> extends AskOpti
   sources?: readonly Source[] | undefined
   system?: string | undefined
   temperature?: number | undefined
-  timeout?: { connect?: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w` | undefined; idle?: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w` | undefined; } | undefined
+  timeout?: {
+  connect?: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w` | undefined;
+  idle?: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w` | undefined;
+} | undefined
   tools?: readonly (ToolAction | FunctionTool)[] | undefined
 
 [.] StructuredReply
@@ -663,7 +691,18 @@ component default
 [./chat-panel.kay] default
 component default
   children?: Element
-  class?: string | { root?: string; panel?: string; head?: string; title?: string; actions?: string; action?: string; expand?: string; body?: string; button?: string; glyph?: string; } | undefined
+  class?: string | {
+  root?: string;
+  panel?: string;
+  head?: string;
+  title?: string;
+  actions?: string;
+  action?: string;
+  expand?: string;
+  body?: string;
+  button?: string;
+  glyph?: string;
+} | undefined
   closeIcon: Element
   closeLabel?: string | undefined
   collapseIcon: Element
@@ -699,7 +738,53 @@ component default
   attachTooBigLabel?: string | undefined
   cancelLabel?: string | undefined
   changeFailedLabel?: string | undefined
-  class?: string | { root?: string; conversations?: string; newConversation?: string; conversationList?: string; conversation?: string; renameField?: any; deleteConfirm?: string; confirm?: string; cancel?: string; conversationLink?: string; rename?: any; delete?: any; empty?: string; greeting?: string; sugges ...#4e932da1
+  class?: string | {
+  root?: string;
+  conversations?: string;
+  newConversation?: string;
+  conversationList?: string;
+  conversation?: string;
+  renameField?: any;
+  deleteConfirm?: string;
+  confirm?: string;
+  cancel?: string;
+  conversationLink?: string;
+  rename?: any;
+  delete?: any;
+  empty?: string;
+  greeting?: string;
+  suggestions?: string;
+  suggestion?: string;
+  log?: string;
+  turn?: string;
+  editField?: any;
+  text?: string;
+  files?: string;
+  file?: string;
+  actions?: string;
+  save?: string;
+  edit?: any;
+  reasoning?: string;
+  reasoningText?: string;
+  approval?: string;
+  approvalText?: string;
+  allow?: string;
+  deny?: string;
+  note?: string;
+  regenerate?: any;
+  thinking?: string;
+  status?: string;
+  retry?: string;
+  disclosure?: string;
+  remove?: any;
+  form?: string;
+  new?: any;
+  attach?: any;
+  field?: any;
+  record?: any;
+  recordSpinner?: any;
+  send?: any;
+} | undefined
   conflictLabel?: string | undefined
   conversationIn?: "address" | "browser" | undefined
   conversations?: boolean | undefined

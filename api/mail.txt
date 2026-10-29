@@ -75,10 +75,14 @@ interface BroadcastStatus extends BroadcastProgress
   waiting: number
 
 [.] contactForm
-function contactForm<const Extra extends Record<string, TSchema> = Record<never, TSchema>, const Honeypot extends string = "website", const Consent extends boolean = false>(mail: Pick<Mailer, "enqueue">, options?: ContactOptions<Extra, Honeypot, Consent>): [schema: ContactSchema<Extra, Consent>, handler: (input: Contac ...#a897a1af
+function contactForm<const Extra extends Record<string, TSchema> = Record<never, TSchema>, const Honeypot extends string = "website", const Consent extends boolean = false>(mail: Pick<Mailer, "enqueue">, options?: ContactOptions<Extra, Honeypot, Consent>): [schema: ContactSchema<Extra, Consent>, handler: (input: ContactInput<Extra, Consent>, ctx: ActionContext<Readonly<Record<string, unknown>>>) => Promise<Failure<string> | undefined>, protection: ActionProtection<Honeypot>]
 
 [.] ContactInput
-type ContactInput<Extra extends Record<string, TSchema> = Record<never, TSchema>, Consent extends boolean = false> = { name: string, email: string, message: string } & (Consent extends true ? { consent: true } : unknown) & Static<ReturnType<typeof s.Object<Extra>>>
+type ContactInput<Extra extends Record<string, TSchema> = Record<never, TSchema>, Consent extends boolean = false> = {
+  name: string, email: string, message: string
+} & (Consent extends true ? {
+  consent: true
+} : unknown) & Static<ReturnType<typeof s.Object<Extra>>>
 
 [.] ContactMailProps
 interface ContactMailProps
@@ -225,7 +229,9 @@ const mailDefaults: MailSettings
 function mailer(options?: MailerOptions): Mailer
 
 [.] Mailer
-type Mailer = Elysia & { // False for an `optional` mailer lacking its settings, whose sends throw `MailNotConfiguredError`. configured: boolean // Renders the message and sends it now, throwing when the server refuses it or cannot be reached. send: <P extends object>(message: MailMessage<P>) => Pro ...#cb231200
+type Mailer = Elysia & {
+  // False for an `optional` mailer lacking its settings, whose sends throw `MailNotConfiguredError`. configured: boolean // Renders the message and sends it now, throwing when the server refuses it or cannot be reached. send: <P extends object>(message: MailMessage<P>) => Promise<Delivery> // Renders the message now and leaves it to the queue to send, retrying a failure: the server using the mailer runs it. enqueue: <P extends object>(message: MailMessage<P>, options?: EnqueueOptions) => Promise<string> render: <P extends object>(message: MailMessage<P>) => Promise<Mail> // Sends every queued mail whose time has come, here and now, as a script or a test does without the server running the queue. drain: () => Promise<number> // The queued mails given up after their last attempt, each with why it failed, kept 7 days unless `queue.keepFailed` says otherwise, with the recipients and subject but not the body. failed: () => Promise<FailedJob<Mail>[]> // Removes the queued mail of that id, every one, waiting or failed, sent to `{ recipient }` among its to, cc and bcc, a person's once they asked to be erased say, or every one `match` returns true for; resolves with how many went. remove: (match: string | { recipient: string } | ((mail: Mail) => boolean)) => Promise<number> // A mailing list of the site, `default` when unnamed, made on the first call and the same afterwards. It keeps its subscribers in kay's own store (`data/mail-list.sqlite`), mounts the confirmation and unsubscribe links, and sends through this mailer's queue. list: (name?: string, options?: ListOptions) => MailingList // Stops mailing the address (a bounce unless `reason` says a complaint), as a provider's report does: later sends skip it, and it leaves every list. Resolves false for a string that is no address. suppress: (address: string, reason?: SuppressionReason) => Promise<boolean> // Mails the address again;
+  whether it was suppressed. unsuppress: (address: string) => Promise<boolean> // Why the address is not mailed, undefined when it is. suppression: (address: string) => Promise<Suppression | undefined> // Erases a person: the address leaves every list, its suppression is lifted and the mails queued for it are removed. Resolves with how many subscriptions and queued mails went. erase: (address: string) => Promise<number> // What an address is on, for the export of a person's data: each list with its state and dates, pending rows included. subscriptions: (address: string) => Promise<Subscription[]> }
 
 [.] MailerOptions
 interface MailerOptions
@@ -258,7 +264,10 @@ interface MailField
 [.] MailingList
 interface MailingList
   count: () => Promise<number>
-  form: () => [schema: SubscribeSchema, handler: (input: { email: string; wording?: string | undefined; }, ctx: ActionContext<Readonly<Record<string, unknown>>>) => Promise<Failure<string> | undefined>, protection: ActionProtection<string>]
+  form: () => [schema: SubscribeSchema, handler: (input: {
+  email: string;
+  wording?: string | undefined;
+}, ctx: ActionContext<Readonly<Record<string, unknown>>>) => Promise<Failure<string> | undefined>, protection: ActionProtection<string>]
   name: string
   preview: <P extends object>(message: ListMessage<P>) => Promise<{ subject: string; html: string | undefined; text: string; }>
   send: <P extends object>(message: ListMessage<P>) => Promise<{ id: string; recipients: number; }>

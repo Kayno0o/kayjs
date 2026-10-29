@@ -95,7 +95,7 @@ See [Restyle a component](restyle.md): `class` as a string or an object of parts
 
 When a recipe cannot express the change, `kay ui eject card` copies `card.kay` into `src/components/ui/`, with the files only it uses, and points the imports of `@kaynooo/kayjs-ui/card.kay` in the app's `src/`, `tests/` and root `.ts` files (`kay.config.ts`) at the copy. Edit the copy; the theme, the `ui.*` messages and the other components stay the library's.
 
-- Files other components share (`icon.kay`, `defaults.ts`) stay in the library, and the copy imports them as `@kaynooo/kayjs-ui/icon.kay` and `@kaynooo/kayjs-ui/lib/defaults` (`lib/` is for copies and not a stable API). Another public component the copy uses stays upstream too: eject it separately.
+- Files other components share (`icon.kay`, `defaults.ts`) stay in the library, and the copy imports them as `@kaynooo/kayjs-ui/icon.kay` and `@kaynooo/kayjs-ui/lib/defaults` (`lib/` and `field-look` are for copies and not a stable API). Another public component the copy uses stays upstream too: eject it separately.
 - kayjs-ui's own components keep the library's version of what they use (`FormDialog` uses the library's `Dialog`); the command lists them.
 - An entry of `src/ui.ts` keyed by the import path is repeated under the copy's path, so the copy and the library's own users keep the app's look; one keyed by the name (`Card`) becomes the library's path key plus the copy's, as a name names two components after the copy.
 - `src/components/ui/.upstream/` records the version and the library's text each copy came from, to commit with it. `--dry-run` writes nothing, and an ejected or existing file is refused.

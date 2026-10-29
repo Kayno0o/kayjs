@@ -1,0 +1,14 @@
+[./room] editorsOf
+function editorsOf(others: readonly Member[], count: number, own: Member): { names: string[]; unnamed: number; }
+
+[./room] hashOf
+function hashOf(text: string): string
+
+[./room] openRoom
+function openRoom(room: string): string
+
+[./room] WATCHED_ROWS
+const WATCHED_ROWS: 50
+
+[./room] watchRoom
+function watchRoom(room: string): string

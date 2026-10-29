@@ -202,7 +202,7 @@ A page can pass a Dialog or a Popover its content. A layout, or a page with a `-
 
 A recipe in `src/ui.ts` cannot change a component's markup. For that, `kay ui eject card` copies `card.kay` into `src/components/ui/`, with the files only it uses, and points your imports of `@kaynooo/kayjs-ui/card.kay` in `src/`, `tests/` and the `.ts` files at the root, such as `kay.config.ts`, at the copy. You then edit it like any of your components. Messages and the theme keep working, as they are not part of the file.
 
-Files other components share, such as `icon.kay`, stay in the library, and the copy imports them from `@kaynooo/kayjs-ui/<name>.kay` or `@kaynooo/kayjs-ui/lib/<name>`, which is for such copies and not a stable API.
+Files other components share, such as `icon.kay`, stay in the library, and the copy imports them from `@kaynooo/kayjs-ui/<name>.kay`, `@kaynooo/kayjs-ui/lib/<name>` or `@kaynooo/kayjs-ui/field-look`, which are for such copies and not a stable API.
 
 Components of the library that use the one you copied, such as `FormDialog` for `Dialog`, keep the library's version; the command lists them. An entry of `src/ui.ts` keyed by the import path is repeated under the copy's path, so both keep your look. One keyed by the name (`Card`) becomes the library's path key plus the copy's, as a name names two components after the copy. `--dry-run` shows what would change without writing.
 

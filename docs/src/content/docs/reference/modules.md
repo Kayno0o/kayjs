@@ -122,7 +122,7 @@ Types include `BrowserError` and `CspViolationError`, the browser errors and CSP
 | `kay/eslint` | The ESLint processor for `.kay` files. See [Checks](/reference/checks) |
 | `kay/tsconfig.json` | The base tsconfig a project extends |
 | `kay/jsx-runtime` | Where TypeScript finds the JSX types, through the `jsxImportSource` of the base tsconfig. Nothing to import |
-| `kay/html`, `kay/dom`, `kay/island`, `kay/await`, `kay/internal` and the like | What compiled `.kay` files import. Not API, and free to change in any release |
+| `kay/html`, `kay/dom`, `kay/island`, `kay/await`, `kay/internal` and the like | What compiled `.kay` files import, and `kay/library`, which kay's libraries share with kay. Not API, and free to change in any release, as are the compile-time types behind the generated shadow types (`BindableMark`, `IslandBrand`, `CheckedHref`, `TemplateContext` and the like) |
 
 <Callout type="note">
 
