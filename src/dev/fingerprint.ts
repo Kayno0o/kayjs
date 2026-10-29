@@ -3,7 +3,7 @@ import { join, relative, sep } from 'node:path'
 import { version } from '../../package.json'
 import { clientDir, KAY_DIR } from '../build/assets'
 import { directoryStamp, fileStamp, projectTree, treeEntries, TS_FILE, unsettled, writeAtomically } from '../build/files'
-import { compilerFingerprint } from '../build/transform'
+import { compilerFingerprint } from '../build/fingerprint'
 import { BUILD_FAILURE, MANIFEST } from '../server/client'
 import { gitIgnoredNames, gitIgnoreTest, holdsSources, isSource } from './sources'
 

@@ -223,22 +223,55 @@ describe('the compile cache of a loader\'s bodies', () => {
   it('compiles an unchanged body once, again only the one that changed, and drops the slugs it no longer has', async () => {
     await inProject(async (root) => {
       const file = join(root, '.kay/cache/content', `${Bun.hash('things').toString(36)}.loaded.json`)
-      const first = await made(plain, false, { a: '# A\n', b: 'body b\n' })
+      let compiles = 0
+      const counting = { highlight: (code: string) => {
+        compiles++
 
+        return `<pre>${code}</pre>`
+      }, headingLinks: true }
+      const body = (text: string) => `\`\`\`ts\n${text}\n\`\`\`\n`
+      const first = await made(counting, false, Object.fromEntries([['a', body('a')], ['b', body('b')], ['__proto__', body('p')]]))
+
+      expect(compiles).toBe(3)
       expect(await Bun.file(file).exists()).toBe(true)
 
       const stored = await Bun.file(file).text()
 
-      expect(await made(plain, false, { a: '# A\n', b: 'body b\n' })).toEqual(first)
+      expect(await made(counting, false, Object.fromEntries([['a', body('a')], ['b', body('b')], ['__proto__', body('p')]]))).toEqual(first)
+      expect(compiles).toBe(3)
       expect(await Bun.file(file).text()).toBe(stored)
 
-      const changed = await made(plain, false, { a: '# A\n', b: 'body b2\n' })
+      const changed = await made(counting, false, { a: body('a'), b: body('b2') })
 
+      expect(compiles).toBe(4)
       expect(changed[0]).toBe(first[0])
-      expect(changed[1]).not.toBe(first[1]!)
+      expect(changed[1]).not.toBe(first[1])
 
-      await made(plain, false, { a: '# A\n' })
+      await made(counting, false, { a: body('a') })
+      expect(compiles).toBe(4)
       expect(Object.keys(((await Bun.file(file).json()) as { value: object }).value)).toEqual(['a'])
+    })
+  })
+
+  it('compiles again when a module the config imports changes, as the highlighter may use it', async () => {
+    await inProject(async (root) => {
+      const config = join(root, 'kay.config.ts')
+      let compiles = 0
+      const settings = { highlight: (code: string) => {
+        compiles++
+
+        return code
+      }, headingLinks: true }
+
+      await Bun.write(config, 'import \'./theme\'\n')
+      await Bun.write(join(root, 'theme.ts'), 'export const theme = 1\n')
+      setContentPlace(root, root, config)
+      await made(settings, false, { a: '```ts\nx\n```\n' })
+      await made(settings, false, { a: '```ts\nx\n```\n' })
+      expect(compiles).toBe(1)
+      await Bun.write(join(root, 'theme.ts'), 'export const theme = 2\n')
+      await made(settings, false, { a: '```ts\nx\n```\n' })
+      expect(compiles).toBe(2)
     })
   })
 
@@ -263,7 +296,7 @@ describe('the compile cache of a loader\'s bodies', () => {
 
       try {
         setContentMode({ dev: false, prebuilt: true })
-        await (await loadedBodies('things', plain, false, false)).compile('a', 'x')
+        expect((await (await loadedBodies('things', plain, false, false)).compile('a', 'x')).segments).toEqual(['<p>x</p>\n'])
         setContentMode({ dev: false, prebuilt: false })
 
         const preview = await loadedBodies('things', plain, false, true)

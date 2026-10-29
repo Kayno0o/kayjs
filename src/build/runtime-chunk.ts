@@ -5,7 +5,7 @@ import { dirname, join, resolve, sep } from 'node:path'
 import { countCache, readCacheEntry, writeCacheEntry } from './cache'
 import { directImports } from './direct-imports'
 import { fileStamp, settledBefore } from './files'
-import { compilerFingerprint } from './transform'
+import { compilerFingerprint } from './fingerprint'
 
 // Bun's code splitting gives each set of entry points sharing code a chunk of its own: an entry, islands and the page swap reaching kay's runtime each in their own way leave a page loading it in four or five small files.
 // Every one of them importing one module, which reaches all of the runtime any of them uses, puts that runtime in a single chunk, the entry's own code included: a page loads it, then its islands.
