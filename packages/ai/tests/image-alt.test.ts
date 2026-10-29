@@ -127,6 +127,32 @@ describe('imageAlt', () => {
     }
   })
 
+  it('keeps writing the drafts already kept when no model is configured any more, and keeps a decorative image out of the page and the listing', async () => {
+    fakeAi.reply({ data: { alt: 'A team' } })
+    fakeAi.reply({ data: { alt: '' } })
+
+    const path = await image('team-abc.png')
+    const other = await image('logo-abc.png')
+    const both = `${IMG}<img src="/_kay/assets/logo-abc.png">`
+    const files = { [ASSET]: path, '/_kay/assets/logo-abc.png': other }
+
+    await page(both, files)
+
+    const was = process.env.NODE_ENV
+
+    process.env.NODE_ENV = 'production'
+
+    try {
+      expect(await page(both, files)).toBe(`<img src="${ASSET}" width="1" height="1" alt="A team"><img src="/_kay/assets/logo-abc.png">`)
+      expect(fakeAi.asked).toHaveLength(2)
+    }
+    finally {
+      process.env.NODE_ENV = was ?? 'test'
+    }
+
+    expect((await draftProblems()).map(problem => problem.message)).toEqual(['imageAlt drafted the alt of team-abc.png (en): "A team"'])
+  })
+
   it('lists each draft for review offline, without calling the model', async () => {
     fakeAi.reply({ data: { alt: 'A team' } })
 

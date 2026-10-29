@@ -32,3 +32,10 @@ describe('a library\'s cache slot', () => {
     expect(await readCacheEntry(libraryCacheSlot(root, 'kayjs-ai', 'a1', 'photo\0other'))).toBeUndefined()
   })
 })
+
+test('drops a satisfied list written in the app\'s own lints', async () => {
+  const root = await scratchDir('extension-satisfies-')
+
+  await Bun.write(join(root, 'kay.config.ts'), 'export default { lints: { satisfied: [\'missing-alt\'] } as never }\n')
+  expect((await loadConfig(root)).lints).toEqual({})
+})

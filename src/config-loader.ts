@@ -169,7 +169,10 @@ function withExtensions<Config extends KayConfig>(config: Config): Config {
   const merged = layers.length === 0 ? config : underlay(layers.reduce<KayConfig>((under, layer) => underlay(under, layer) as KayConfig, {}), config) as Config
   const satisfied = [...new Set((config.extensions ?? []).flatMap(extension => extension.satisfies ?? []))]
 
-  return satisfied.length === 0 ? merged : { ...merged, lints: { ...merged.lints, satisfied } }
+  // Only an extension's `satisfies` sets it: one written in the app's own `lints` is dropped.
+  const levels = Object.fromEntries(Object.entries(merged.lints ?? {}).filter(([name]) => name !== 'satisfied'))
+
+  return merged.lints === undefined && satisfied.length === 0 ? merged : { ...merged, lints: { ...levels, ...satisfied.length > 0 && { satisfied } } }
 }
 
 // `over` merged onto `under`: plain objects key by key, arrays joined, anything else `over`'s unless it leaves it undefined.

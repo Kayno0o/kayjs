@@ -62,12 +62,14 @@ async function draft(root: string, path: string, locale: string): Promise<string
   const kept = await readCacheEntry<Draft>(slot)
 
   if (kept !== undefined)
-    return kept.alt
+    return kept.alt === '' ? undefined : kept.alt
+
+  if (!modelConfigured())
+    return undefined
 
   const alt = await describeImage(Bun.file(path), { language: locale })
 
-  if (alt !== '')
-    await writeCacheEntry(slot, { alt, name, locale } satisfies Draft)
+  await writeCacheEntry(slot, { alt, name, locale } satisfies Draft)
 
   return alt === '' ? undefined : alt
 }
@@ -148,9 +150,9 @@ async function withAlts(html: string, alts: ReadonlyMap<string, string>): Promis
   return rewriter.transform(new Response(html)).text()
 }
 
-// The page with a drafted `alt` on each server-rendered `img` of an imported image that has none; a page without such an image, or with no model configured, is returned as it is.
+// The page with a drafted `alt` on each server-rendered `img` of an imported image that has none; a page without such an image is returned as it is, and one with no model configured gets the drafts already kept.
 export const writeImageAlts: PageHook = async (page) => {
-  if (!page.html.includes(ASSETS) || !modelConfigured())
+  if (!page.html.includes(ASSETS))
     return page.html
 
   const sources = [...new Set(await candidates(page.html))]
@@ -188,7 +190,7 @@ export async function draftProblems(): Promise<ExtensionProblem[]> {
 
   const kept = await Promise.all(names.map(async name => readDraft(`${folder}/${name}`)))
 
-  return kept.flatMap(entry => entry === undefined ? [] : [{ message: `imageAlt drafted the alt of ${entry.name}${entry.locale === '' ? '' : ` (${entry.locale})`}: "${entry.alt}"`, help: 'check it, then write the img\'s own alt to keep your wording; delete .kay/cache/libraries/kayjs-ai to draft again' }])
+  return kept.flatMap(entry => entry === undefined || entry.alt === '' ? [] : [{ message: `imageAlt drafted the alt of ${entry.name}${entry.locale === '' ? '' : ` (${entry.locale})`}: "${entry.alt}"`, help: 'check it, then write the img\'s own alt to keep your wording; delete .kay/cache/libraries/kayjs-ai to draft again' }])
 }
 
 async function readDraft(file: string): Promise<Draft | undefined> {
