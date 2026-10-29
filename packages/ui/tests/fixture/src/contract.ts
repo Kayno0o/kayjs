@@ -262,7 +262,7 @@ export const CASES: Record<string, Record<string, unknown>> = {
   'qr-code': { value: 'https://kaynooo.fr', label: 'Site' },
   'radio-group': { label: 'Planet', options, value: 'mars' },
   'range-input': { label: 'Hours', min: 0, max: 24 },
-  'rating': { value: 4.5 },
+  'rating': { value: 4.5, label: 'Rated 4.5 out of 5' },
   'record-button': { onRecord: noop },
   'rows-field': { label: 'Headers', columns: [{ key: 'name', label: 'Header' }], rows: [{ name: 'A' }] },
   'save-form': { action, failure: 'Failed' },

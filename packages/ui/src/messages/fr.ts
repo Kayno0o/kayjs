@@ -123,7 +123,6 @@ export default defineMessages({
     },
     pagination: { label: 'Pagination', next: 'Suivant', previous: 'Précédent' },
     rangeInput: { from: '{label} de', to: '{label} à' },
-    rating: { label: '{value} sur {max}' },
     recordButton: {
       cancelled: 'Enregistrement annulé',
       denied: 'Le micro est bloqué : autorisez-le pour ce site dans les réglages du navigateur.',
