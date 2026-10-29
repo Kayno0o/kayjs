@@ -17,6 +17,7 @@ export function compilerFingerprint(bunVersion = Bun.version): string {
     const compilerDir = join(import.meta.dir, '../compiler')
     const sources = [
       ...compilerModules(compilerDir),
+      import.meta.path,
       join(import.meta.dir, 'transform.ts'),
       join(import.meta.dir, 'probe.ts'),
       join(import.meta.dir, '../check/shadow.ts'),
