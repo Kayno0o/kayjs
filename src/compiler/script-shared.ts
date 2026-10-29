@@ -1,6 +1,6 @@
-import type { ParseResult } from '@babel/parser'
-import type * as t from '@babel/types'
+import type { Comment, Node, Program, Statement, TSInterfaceDeclaration, TSTypeAliasDeclaration } from 'oxc-parser'
 import type { Diagnostic, Span } from './ast'
+import type { NodeOfType } from './estree'
 import { KAY_VALUES } from './kay-exports'
 
 export const WHITESPACE = /\s/
@@ -73,9 +73,9 @@ export interface ScriptAnalysis {
   fence?: ParsedFence | undefined
   // The `--- module` fence, parsed beside the script's.
   moduleFence?: ParsedFence | undefined
-  // A fence Babel cannot parse and nothing could be recovered of, emitted whole at module level so the editor completes in it through TypeScript's own recovery.
+  // A fence the parser cannot parse and nothing could be recovered of, emitted whole at module level so the editor completes in it through TypeScript's own recovery.
   unparsed?: Span | undefined
-  // The top-level statements of a fence being typed that Babel cannot parse, left out of the analysis: kept in `body` where they are written, or in `brokenModule` when an import, so the editor still completes in them while the rest of the fence is analysed.
+  // The top-level statements of a fence being typed that the parser cannot parse, left out of the analysis: kept in `body` where they are written, or in `brokenModule` when an import, so the editor still completes in them while the rest of the fence is analysed.
   broken: Span[]
   brokenModule: Span[]
 }
@@ -84,70 +84,72 @@ export interface ScriptAnalysis {
 export interface ParsedFence {
   code: string
   offset: number
-  ast: ParseResult<t.File>
-  shift: (node: t.Node | t.Comment) => Span
+  ast: Program
+  comments: Comment[]
+  shift: (node: Span) => Span
   // The statements that failed to parse, blanked in `code` and `ast`.
   broken: Span[]
 }
-export function plainNames(statement: t.Statement): string[] {
+type Identifier = NodeOfType<'Identifier'>
+type ImportSpecifier = NodeOfType<'ImportSpecifier'>
+
+export function plainNames(statement: Statement): string[] {
   if (statement.type !== 'VariableDeclaration' || statement.kind !== 'const')
     return []
 
   return statement.declarations.flatMap(declaration => declaration.id.type === 'Identifier' && declaration.init && isPlainData(declaration.init) ? [declaration.id.name] : [])
 }
 
-const PLAIN_LITERALS = new Set(['StringLiteral', 'NumericLiteral', 'BooleanLiteral', 'NullLiteral', 'BigIntLiteral'])
-
-function isPlainData(value: t.Node): boolean {
-  if (value.type === 'TSAsExpression' || value.type === 'TSSatisfiesExpression' || value.type === 'TSNonNullExpression' || value.type === 'ParenthesizedExpression')
+function isPlainData(value: Node): boolean {
+  if (value.type === 'TSAsExpression' || value.type === 'TSSatisfiesExpression' || value.type === 'TSNonNullExpression')
     return isPlainData(value.expression)
 
   if (value.type === 'ArrayExpression')
     return value.elements.length > 0 && value.elements.every(element => element !== null && element.type !== 'SpreadElement' && isPlainData(element))
 
   if (value.type === 'ObjectExpression')
-    return value.properties.length > 0 && value.properties.every(property => property.type === 'ObjectProperty' && !property.computed && isPlainData(property.value))
+    return value.properties.length > 0 && value.properties.every(property => property.type === 'Property' && property.kind === 'init' && !property.method && !property.computed && isPlainData(property.value))
 
   if (value.type === 'TemplateLiteral')
     return value.expressions.length === 0
 
   if (value.type === 'UnaryExpression')
-    return (value.operator === '-' || value.operator === '+') && value.argument.type === 'NumericLiteral'
+    return (value.operator === '-' || value.operator === '+') && value.argument.type === 'Literal' && typeof value.argument.value === 'number'
 
-  return PLAIN_LITERALS.has(value.type)
+  return value.type === 'Literal' && !('regex' in value)
 }
 
 // The name an import specifier takes from its module, written as an identifier or, as `import { 'a b' as c }`, a string.
-export function importedName(specifier: t.ImportSpecifier): string {
+export function importedName(specifier: ImportSpecifier): string {
   return specifier.imported.type === 'Identifier' ? specifier.imported.name : specifier.imported.value
 }
 // A `declare` statement describes a global, so it belongs at module level: a function body cannot hold one.
-export function isAmbient(statement: t.Statement): boolean {
+export function isAmbient(statement: Statement): boolean {
   const declaration = statement.type === 'ExportNamedDeclaration' && statement.declaration ? statement.declaration : statement
 
   return 'declare' in declaration && declaration.declare === true
 }
 
-export function typeDeclaration(statement: t.Statement): t.TSTypeAliasDeclaration | t.TSInterfaceDeclaration | undefined {
+export function typeDeclaration(statement: Statement): TSTypeAliasDeclaration | TSInterfaceDeclaration | undefined {
   const declaration = statement.type === 'ExportNamedDeclaration' ? statement.declaration : statement
 
   return declaration?.type === 'TSTypeAliasDeclaration' || declaration?.type === 'TSInterfaceDeclaration' ? declaration : undefined
 }
 
-export function keyName(key: t.Node): string | undefined {
+export function keyName(key: Node): string | undefined {
   if (key.type === 'Identifier')
     return key.name
 
-  return key.type === 'StringLiteral' ? key.value : undefined
+  return key.type === 'Literal' && typeof key.value === 'string' ? key.value : undefined
 }
 
 // The declaration an `export` wraps, the statement itself otherwise.
-export function unexported(statement: t.Statement): t.Statement {
+export function unexported(statement: Statement): Statement {
   return statement.type === 'ExportNamedDeclaration' && statement.declaration ? statement.declaration : statement
 }
 
 // A `const enum` is no value to hand on, and an ambient declaration only describes something that exists elsewhere.
-export function declaredIdentifiers(statement: t.Statement): t.Identifier[] {
+export function declaredIdentifiers(statement: Statement): Identifier[] {
   if (isAmbient(statement))
     return []
 
@@ -160,8 +162,8 @@ export function declaredIdentifiers(statement: t.Statement): t.Identifier[] {
   if (statement.type !== 'VariableDeclaration')
     return []
 
-  const found: t.Identifier[] = []
-  const collect = (pattern: t.Node | null | undefined) => {
+  const found: Identifier[] = []
+  const collect = (pattern: Node | null | undefined) => {
     if (!pattern)
       return
 

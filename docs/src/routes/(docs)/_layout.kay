@@ -2,6 +2,9 @@
 import { navigation } from '../../pages'
 import { reply } from './_actions.kay'
 
+// The playground and the HTML converter compile the parser's WebAssembly build in the page; the policy gives wasm alone, never `'unsafe-eval'`.
+export const page = { security: { csp: { 'script-src': ['\'wasm-unsafe-eval\''] } } }
+
 const nav = await navigation()
 const current = ctx.url.pathname.replace(/\/$/, '') || '/'
 --- script

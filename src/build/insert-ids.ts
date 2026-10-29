@@ -1,14 +1,15 @@
-import type * as t from '@babel/types'
-import { parse } from '@babel/parser'
+import type { CallExpression } from 'oxc-parser'
+import type { Parsed } from '../compiler/estree'
+import { parseProgram } from '../compiler/estree'
 
 const SPACE = /\s/
 
 export interface Insert { at: number, text: string }
 
 // The module's syntax tree, or nothing for a source that does not parse, which its caller leaves as it is.
-export function parseModule(source: string, jsx: boolean): t.File | undefined {
+export function parseModule(source: string, jsx: boolean): Parsed | undefined {
   try {
-    return parse(source, { sourceType: 'module', attachComment: false, plugins: jsx ? ['typescript', 'jsx'] : ['typescript'] })
+    return parseProgram(source, { lang: jsx ? 'tsx' : 'ts' })
   }
   catch {
     return undefined
@@ -16,9 +17,9 @@ export function parseModule(source: string, jsx: boolean): t.File | undefined {
 }
 
 // Where a call's last argument ends: after its last token, parentheses and a trailing comma included, before any comment closing the call.
-export function argumentsEnd(source: string, ast: t.File, call: t.CallExpression): number {
-  const comments = ast.comments ?? []
-  let at = call.end! - 1
+export function argumentsEnd(source: string, ast: Parsed, call: CallExpression): number {
+  const { comments } = ast
+  let at = call.end - 1
 
   for (let moved = true; moved;) {
     moved = false
@@ -29,7 +30,7 @@ export function argumentsEnd(source: string, ast: t.File, call: t.CallExpression
     const comment = comments.find(found => found.end === at)
 
     if (comment) {
-      at = comment.start!
+      at = comment.start
       moved = true
     }
   }

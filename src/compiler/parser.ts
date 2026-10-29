@@ -1,7 +1,7 @@
-import type * as t from '@babel/types'
 import type { Attribute, AwaitBranch, AwaitNode, ConstNode, Details, Diagnostic, ElementNode, ErrorNode, ForNode, IfBranch, IfNode, KayFile, MatchNode, Node, PendingNode, SlotNode, SnippetNode, Span, TextNode, TryNode } from './ast'
-import { parseExpression } from '@babel/parser'
+import type { Expression } from './estree'
 import { scanClassName } from './class-name'
+import { parseExpression } from './estree'
 import { Scanner } from './scanner'
 
 // `--- server`, `--- client`, `--- script`, `--- module`, or `--- <T extends Row>` making the component generic, its type parameters in the third or fourth group: `--- client <T>` takes both.
@@ -485,16 +485,16 @@ class TemplateParser {
     if (at === undefined)
       return undefined
 
-    let cast: t.Expression
+    let cast: Expression
 
     try {
-      cast = parseExpression(`${CAST}${this.src.slice(at + 2, test.end)}`, { plugins: ['typescript'] })
+      cast = parseExpression(`${CAST}${this.src.slice(at + 2, test.end)}`, { lang: 'ts' })
     }
     catch {
       return undefined
     }
 
-    const type = cast.type === 'TSAsExpression' && cast.typeAnnotation.type === 'TSTypeReference' && !cast.typeAnnotation.typeParameters ? cast.typeAnnotation.typeName : undefined
+    const type = cast.type === 'TSAsExpression' && cast.typeAnnotation.type === 'TSTypeReference' && !cast.typeAnnotation.typeArguments ? cast.typeAnnotation.typeName : undefined
 
     if (type?.type !== 'Identifier' || type.name === 'const' || CAPITALIZED_NAME.test(type.name))
       return undefined
@@ -508,7 +508,7 @@ class TemplateParser {
 
     test.end = end
 
-    return { start: type.start! + shift, end: type.end! + shift }
+    return { start: type.start + shift, end: type.end + shift }
   }
 
   // Where the last ` as ` of `span` starts outside its brackets, strings, template literals, regex literals and comments.

@@ -1,8 +1,8 @@
-import type * as t from '@babel/types'
 import type { Diagnostic, Fix, KayFile, Span } from './ast'
+import type { Node, NodeOfType, Program } from './estree'
 import type { Path } from './scope'
-import { parse } from '@babel/parser'
 import { visitNodes } from './ast'
+import { parseProgram } from './estree'
 import { browserGlobals } from './host'
 import { parameterNames } from './items'
 import { importedFromKay } from './rewrite'
@@ -19,10 +19,10 @@ interface Read {
   name: string
   at: number
   // The functions around the read, innermost first.
-  chain: t.Node[]
+  chain: Node[]
   typeOf: boolean
   // The fence's top-level statement holding it, when it sits there outside any function.
-  statement?: t.Statement | undefined
+  statement?: Node | undefined
 }
 
 const WORD = /[a-z_$][\w$]*/gi
@@ -53,7 +53,7 @@ interface Varying {
   remedy: string
   start: number
   end: number
-  chain: t.Node[]
+  chain: Node[]
 }
 
 // Browser-only globals the component reads while it renders, which throws on the server, and `typeof` checks of them, which render differently there and break hydration.
@@ -69,10 +69,10 @@ export function browserReads(file: KayFile, island: boolean, serverNames: string
     return []
 
   const program = buildProgram(file, serverNames, expressions)
-  let ast: t.File
+  let ast: Program
 
   try {
-    ast = parse(program.code, { sourceType: 'module', attachComment: false, plugins: ['typescript'], errorRecovery: true })
+    ast = parseProgram(program.code, { recover: true }).program
   }
   catch {
     return []
@@ -83,17 +83,17 @@ export function browserReads(file: KayFile, island: boolean, serverNames: string
 
     return segment && segment.source + generated - segment.generated
   }
-  const transparent = new Set<t.Node>()
-  const functions = new Map<string, t.Node>()
-  const calls: { name: string, chain: t.Node[] }[] = []
+  const transparent = new Set<Node>()
+  const functions = new Map<string, Node>()
+  const calls: { name: string, chain: Node[] }[] = []
   const reads: Read[] = []
   const varying: Varying[] = []
 
-  const noteVarying = (path: Path<t.CallExpression | t.NewExpression>) => {
-    const found = island ? varyingValue(path) : undefined
+  const noteVarying = (path: Path<NodeOfType<'CallExpression' | 'NewExpression'>>) => {
+    const found = island && !inChain(path) ? varyingValue(path) : undefined
 
     if (found)
-      varying.push({ ...found, start: path.node.start!, end: path.node.end!, chain: functionChain(path) })
+      varying.push({ ...found, start: path.node.start, end: path.node.end, chain: functionChain(path) })
   }
 
   // A name the template binds twice over the script's, which no block can tell apart, leaves nothing to report rather than failing the check.
@@ -101,7 +101,7 @@ export function browserReads(file: KayFile, island: boolean, serverNames: string
     Function(path) {
       const parent = path.parentPath!
 
-      if (parent.is('CallExpression') && (parent.node.callee === path.node || rendersCallback(parent.node, path.node)))
+      if (parent.is('CallExpression') && !inChain(parent) && (parent.node.callee === path.node || rendersCallback(parent.node, path.node)))
         transparent.add(path.node)
 
       if (path.is('FunctionDeclaration') && parent.is('Program') && path.node.id)
@@ -112,7 +112,7 @@ export function browserReads(file: KayFile, island: boolean, serverNames: string
     CallExpression(path) {
       const callee = path.node.callee
 
-      if (callee.type === 'Identifier' && path.scope.getBinding(callee.name)?.scope.node.type === 'Program')
+      if (!inChain(path) && callee.type === 'Identifier' && path.scope.getBinding(callee.name)?.scope.node.type === 'Program')
         calls.push({ name: callee.name, chain: functionChain(path) })
 
       noteVarying(path)
@@ -133,9 +133,9 @@ export function browserReads(file: KayFile, island: boolean, serverNames: string
         return
 
       const chain = functionChain(path)
-      const statement = chain.length === 0 ? path.findParent(ancestor => ancestor.parentPath?.node.type === 'Program')?.node as t.Statement | undefined : undefined
+      const statement = chain.length === 0 ? path.findParent(ancestor => ancestor.parentPath?.node.type === 'Program')?.node : undefined
 
-      reads.push({ name, at: path.node.start!, chain, typeOf, statement })
+      reads.push({ name, at: path.node.start, chain, typeOf, statement })
     },
   })
 
@@ -143,7 +143,7 @@ export function browserReads(file: KayFile, island: boolean, serverNames: string
     return []
 
   const rendering = new Set(transparent)
-  const renders = (chain: t.Node[]) => chain.every(fn => rendering.has(fn))
+  const renders = (chain: Node[]) => chain.every(fn => rendering.has(fn))
   let grew = true
 
   while (grew) {
@@ -188,10 +188,10 @@ export function browserReads(file: KayFile, island: boolean, serverNames: string
 }
 
 // The clock, a random number, or a locale or time zone left to the platform, as a call or a `new` gives them; options the code computes are taken as setting them.
-function varyingValue(path: Path<t.CallExpression | t.NewExpression>): Omit<Varying, 'start' | 'end' | 'chain'> | undefined {
+function varyingValue(path: Path<NodeOfType<'CallExpression' | 'NewExpression'>>): Omit<Varying, 'start' | 'end' | 'chain'> | undefined {
   const { callee, arguments: args } = path.node
-  const global = (node: t.Node, name: string) => node.type === 'Identifier' && node.name === name && !path.scope.hasBinding(name, true)
-  const noLocale = (locale: t.Node | undefined) => locale === undefined || global(locale, 'undefined')
+  const global = (node: Node, name: string) => node.type === 'Identifier' && node.name === name && !path.scope.hasBinding(name, true)
+  const noLocale = (locale: Node | undefined) => locale === undefined || global(locale, 'undefined')
 
   if (global(callee, 'Date'))
     return args.length === 0 ? { label: path.node.type === 'NewExpression' ? 'new Date()' : 'Date()', ...CLOCK } : undefined
@@ -225,8 +225,25 @@ function varyingValue(path: Path<t.CallExpression | t.NewExpression>): Omit<Vary
 }
 
 // Options written out without the key; computed ones are taken as setting it.
-function lacksOption(options: t.Node | undefined, key: string): boolean {
-  return options === undefined || (options.type === 'ObjectExpression' && options.properties.every(property => property.type === 'ObjectProperty' && !property.computed && !(property.key.type === 'Identifier' && property.key.name === key) && !(property.key.type === 'StringLiteral' && property.key.value === key)))
+function lacksOption(options: Node | undefined, key: string): boolean {
+  return options === undefined || (options.type === 'ObjectExpression' && options.properties.every(property => property.type === 'Property' && !property.method && property.kind === 'init' && !property.computed && !(property.key.type === 'Identifier' && property.key.name === key) && !(property.key.type === 'Literal' && property.key.value === key)))
+}
+
+// Whether a call or member is part of an optional chain, which Babel called an optional call or member and its visitors for a call skipped.
+function inChain(path: Path): boolean {
+  let at = path
+
+  for (let parent = at.parentPath; parent; at = parent, parent = parent.parentPath) {
+    if (parent.node.type === 'ChainExpression')
+      return true
+
+    const spine = (parent.node.type === 'CallExpression' && parent.node.callee === at.node) || (parent.node.type === 'MemberExpression' && parent.node.object === at.node)
+
+    if (!spine)
+      return false
+  }
+
+  return false
 }
 
 // A read in the target of `listen(window, 'keydown', ...)`, which the compiler hands `listen` as a function the browser calls.
@@ -239,7 +256,7 @@ function listenTarget(path: Path): boolean {
 }
 
 // `memo(() => ...)` and `rows.map(row => ...)` run the function they take before they return.
-function rendersCallback(call: t.CallExpression, fn: t.Node): boolean {
+function rendersCallback(call: NodeOfType<'CallExpression'>, fn: Node): boolean {
   if (call.arguments[0] !== fn)
     return false
 
@@ -253,24 +270,24 @@ function rendersCallback(call: t.CallExpression, fn: t.Node): boolean {
 
 // A read the code already keeps from running on the server: under a `typeof` check of a browser-only global, or inside a `try`.
 function guarded(path: Path, code: string, names: ReadonlySet<string>): boolean {
-  const at = path.node.start!
-  const checks = (test: t.Node) => Array.from(code.slice(test.start!, test.end!).matchAll(TYPEOF_GLOBAL), match => match[1]!).some(name => names.has(name))
+  const at = path.node.start
+  const checks = (test: Node) => Array.from(code.slice(test.start, test.end).matchAll(TYPEOF_GLOBAL), match => match[1]!).some(name => names.has(name))
 
   return path.findParent((ancestor) => {
     const node = ancestor.node
 
     if (node.type === 'TryStatement')
-      return at >= node.block.start! && at < node.block.end!
+      return at >= node.block.start && at < node.block.end
 
     if (node.type === 'IfStatement' || node.type === 'ConditionalExpression')
-      return (at < node.test.start! || at >= node.test.end!) && checks(node.test)
+      return (at < node.test.start || at >= node.test.end) && checks(node.test)
 
-    return node.type === 'LogicalExpression' && at >= node.right.start! && checks(node.left)
+    return node.type === 'LogicalExpression' && at >= node.right.start && checks(node.left)
   }) !== null
 }
 
-function functionChain(path: Path): t.Node[] {
-  const chain: t.Node[] = []
+function functionChain(path: Path): Node[] {
+  const chain: Node[] = []
 
   for (let fn = path.getFunctionParent(); fn; fn = fn.parentPath?.getFunctionParent() ?? null)
     chain.push(fn.node)
@@ -389,13 +406,13 @@ function effectFix(file: KayFile, code: string, read: Read, toSource: (generated
     return []
 
   // The expression alone: a statement ending the script takes the next template value's `;` with it.
-  const start = toSource(statement.expression.start!)
-  const end = toSource(statement.expression.end!)
+  const start = toSource(statement.expression.start)
+  const end = toSource(statement.expression.end)
 
   if (start === undefined || end === undefined || start < file.script.start || end > file.script.end)
     return []
 
-  const expression = code.slice(statement.expression.start!, statement.expression.end!)
+  const expression = code.slice(statement.expression.start, statement.expression.end)
 
   return [{ title: `Read \`${read.name}\` in an effect, once the component renders in the browser`, edits: [{ start, end, text: `effect(() => ${expression})` }] }]
 }

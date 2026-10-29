@@ -1,5 +1,6 @@
-import type * as t from '@babel/types'
-import { importsOf, walk } from './ast'
+import type { ArrowFunctionExpression, Function, MemberExpression, ObjectProperty, ObjectPropertyKind } from 'oxc-parser'
+import type { Node, Program } from '../compiler/estree'
+import { childrenOf, importsOf, walk } from './ast'
 
 export interface ApiScope {
   // The local names `api` is imported as from `kay/server`.
@@ -12,7 +13,7 @@ export interface ApiScope {
 }
 
 // Whether `node` is a call of `api` or of a helper returning one, or a chain of calls on it, or a name holding one: a `cache.get('k', () => ...)` is no route.
-export function fromApi(node: t.Node, scope: ApiScope): boolean {
+export function fromApi(node: Node, scope: ApiScope): boolean {
   let current = node
 
   while (current.type === 'CallExpression' && current.callee.type === 'MemberExpression' && !isNamespaceApi(current.callee, scope))
@@ -27,12 +28,12 @@ export function fromApi(node: t.Node, scope: ApiScope): boolean {
   return current.type === 'Identifier' && scope.names.has(current.name)
 }
 
-function isNamespaceApi(callee: t.MemberExpression, scope: ApiScope): boolean {
+function isNamespaceApi(callee: MemberExpression, scope: ApiScope): boolean {
   return !callee.computed && callee.object.type === 'Identifier' && scope.namespaces.has(callee.object.name) && callee.property.type === 'Identifier' && callee.property.name === 'api'
 }
 
 // What the file holds of `api()`: its import names, then, until nothing new turns up, the names declared or assigned one and the functions returning one.
-export function apiScope(ast: t.File): ApiScope {
+export function apiScope(ast: Program): ApiScope {
   const { locals, namespaces } = importsOf(ast, from => from === 'kay/server', 'api')
   const scope: ApiScope = { imports: locals, namespaces, names: new Set(), helpers: new Set() }
 
@@ -70,28 +71,24 @@ export function apiScope(ast: t.File): ApiScope {
 }
 
 // Whether a function returns an instance: an expression body, or a `return` of its own, not one of a function nested in it.
-function returnsApi(fn: t.ArrowFunctionExpression | t.FunctionExpression | t.FunctionDeclaration, scope: ApiScope): boolean {
+function returnsApi(fn: ArrowFunctionExpression | Function, scope: ApiScope): boolean {
+  if (fn.body === null)
+    return false
+
   if (fn.body.type !== 'BlockStatement')
     return fromApi(fn.body, scope)
 
   let found = false
 
-  const visit = (node: t.Node) => {
-    if (node !== fn.body && (node.type === 'ArrowFunctionExpression' || node.type === 'FunctionExpression' || node.type === 'FunctionDeclaration' || node.type === 'ObjectMethod' || node.type === 'ClassMethod'))
+  const visit = (node: Node) => {
+    if (node !== fn.body && (node.type === 'ArrowFunctionExpression' || node.type === 'FunctionExpression' || node.type === 'FunctionDeclaration'))
       return
 
     if (node.type === 'ReturnStatement' && node.argument && fromApi(node.argument, scope))
       found = true
 
-    for (const [key, value] of Object.entries(node)) {
-      if (key === 'loc' || key.endsWith('Comments'))
-        continue
-
-      for (const child of Array.isArray(value) ? value : [value]) {
-        if (child !== null && typeof child === 'object' && typeof (child as { type?: unknown }).type === 'string')
-          visit(child as t.Node)
-      }
-    }
+    for (const child of childrenOf(node))
+      visit(child)
   }
 
   visit(fn.body)
@@ -99,12 +96,17 @@ function returnsApi(fn: t.ArrowFunctionExpression | t.FunctionExpression | t.Fun
   return found
 }
 
-export function keyName(property: t.ObjectProperty): string | undefined {
+// A property written as `name: value` or `name`, not a method, getter, setter or spread.
+export function isPlain(property: ObjectPropertyKind): property is ObjectProperty {
+  return property.type === 'Property' && !property.method && property.kind === 'init'
+}
+
+export function keyName(property: ObjectProperty): string | undefined {
   if (property.computed)
     return undefined
 
   if (property.key.type === 'Identifier')
     return property.key.name
 
-  return property.key.type === 'StringLiteral' ? property.key.value : undefined
+  return property.key.type === 'Literal' && typeof property.key.value === 'string' ? property.key.value : undefined
 }

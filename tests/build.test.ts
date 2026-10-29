@@ -2045,6 +2045,11 @@ process.exit(0)
     // Bun writes a map beside the executable and its AVIF worker, which the executable embeds instead.
     expect((await readdir(root)).filter(name => name.endsWith('.map'))).toEqual([])
 
+    // The parser is a native addon `bun build --compile` cannot embed, so an executable must carry neither it nor the compiler that loads it.
+    const embedded = Buffer.from(await Bun.file(join(root, 'server')).arrayBuffer())
+
+    expect(['oxc-parser', 'Cannot find native binding'].filter(text => embedded.includes(text))).toEqual([])
+
     const { frame, expected } = await counterFrame(join(outputDir(root), MAPS_DIR))
 
     await rename(join(root, 'src'), join(root, 'moved'))

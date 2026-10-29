@@ -1,11 +1,12 @@
-import type * as t from '@babel/types'
+import type { Argument, ObjectProperty } from 'oxc-parser'
 import type { CheckDiagnostic, CheckOptions } from '.'
+import type { Node } from '../compiler/estree'
 import type { ParsedApi } from './api-modules'
 import type { ServedProject } from './shadow-types'
 import { lintLevel } from '../compiler/lints'
 import { positionAt } from '../compiler/mapping'
 import { parsedApiModules } from './api-modules'
-import { fromApi, keyName } from './api-scope'
+import { fromApi, isPlain, keyName } from './api-scope'
 import { walk } from './ast'
 
 const ROUTE_METHODS = new Set(['get', 'post', 'put', 'patch', 'delete', 'all'])
@@ -27,7 +28,7 @@ export async function mcpRoutes(options: CheckOptions, { apiModules }: ServedPro
       const label = `${route.method.toUpperCase()} ${route.path}`
 
       if (route.hidden && route.tool)
-        found.push({ file: module.file, ...positionAt(source, route.at.start!), end: route.at.end!, message: `The route \`${label}\` sets both \`hide\` and \`tool\`: a hidden route is no tool`, help: 'drop `hide` to offer it as a tool, or `tool` to keep it hidden', code: 'hidden-tool', severity: contradicted === 'warn' ? 'warning' : 'error' })
+        found.push({ file: module.file, ...positionAt(source, route.at.start), end: route.at.end, message: `The route \`${label}\` sets both \`hide\` and \`tool\`: a hidden route is no tool`, help: 'drop `hide` to offer it as a tool, or `tool` to keep it hidden', code: 'hidden-tool', severity: contradicted === 'warn' ? 'warning' : 'error' })
     }
   }
 
@@ -36,7 +37,7 @@ export async function mcpRoutes(options: CheckOptions, { apiModules }: ServedPro
 
 interface ReadRoute {
   // The `.get` in the call, where the route is reported.
-  at: t.Node
+  at: Node
   method: string
   path: string
   hidden: boolean
@@ -55,31 +56,31 @@ function routesOf({ source, ast, scope }: ParsedApi): ReadRoute[] {
 
     const [path, handler, hooks] = node.arguments
 
-    if (path === undefined || handler === undefined || (path.type !== 'StringLiteral' && path.type !== 'TemplateLiteral') || (handler.type !== 'ArrowFunctionExpression' && handler.type !== 'FunctionExpression'))
+    if (path === undefined || handler === undefined || ((path.type !== 'Literal' || typeof path.value !== 'string') && path.type !== 'TemplateLiteral') || (handler.type !== 'ArrowFunctionExpression' && handler.type !== 'FunctionExpression'))
       return
 
-    routes.push({ at: node.callee.property, method: node.callee.property.name, path: path.type === 'StringLiteral' ? path.value : source.slice(path.start! + 1, path.end! - 1), ...readHooks(hooks) })
+    routes.push({ at: node.callee.property, method: node.callee.property.name, path: path.type === 'Literal' ? String(path.value) : source.slice(path.start + 1, path.end - 1), ...readHooks(hooks) })
   })
 
   return routes
 }
 
-function readHooks(hooks: t.CallExpression['arguments'][number] | undefined): Pick<ReadRoute, 'hidden' | 'tool'> {
-  if (hooks === undefined || hooks.type !== 'ObjectExpression' || hooks.properties.some(property => property.type !== 'ObjectProperty'))
+function readHooks(hooks: Argument | undefined): Pick<ReadRoute, 'hidden' | 'tool'> {
+  if (hooks === undefined || hooks.type !== 'ObjectExpression' || hooks.properties.some(property => !isPlain(property)))
     return { hidden: false, tool: false }
 
-  const detail = hooks.properties.find((property): property is t.ObjectProperty => property.type === 'ObjectProperty' && keyName(property) === 'detail')
+  const detail = hooks.properties.find((property): property is ObjectProperty => isPlain(property) && keyName(property) === 'detail')
 
-  if (detail === undefined || detail.value.type !== 'ObjectExpression' || detail.value.properties.some(property => property.type !== 'ObjectProperty'))
+  if (detail === undefined || detail.value.type !== 'ObjectExpression' || detail.value.properties.some(property => !isPlain(property)))
     return { hidden: false, tool: false }
 
-  const entries = detail.value.properties as t.ObjectProperty[]
+  const entries = detail.value.properties as ObjectProperty[]
   const hide = entries.find(property => keyName(property) === 'hide')?.value
   const tool = entries.find(property => keyName(property) === 'tool')?.value
 
   return {
-    hidden: hide?.type === 'BooleanLiteral' && hide.value,
+    hidden: hide?.type === 'Literal' && hide.value === true,
     // Anything but a literal `false` offers the route, or may.
-    tool: tool !== undefined && !(tool.type === 'BooleanLiteral' && !tool.value),
+    tool: tool !== undefined && !(tool.type === 'Literal' && tool.value === false),
   }
 }

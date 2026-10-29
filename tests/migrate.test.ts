@@ -473,6 +473,6 @@ const b = import.meta.env?.B
     expect(fonts).toEqual([{ line: 2, fontsource: '@fontsource/roboto', subset: 'cyrillic', weight: 700, style: 'normal' }])
     expect(code).toContain('import ABC from \'~icons/a-b/c\'\nimport ABC2 from \'~icons/a/b-c\'\n')
     expect(code).toContain('script(data-t="x y={z}") {`1`}')
-    expect(notes.map(note => [note.line, lead(note.message)])).toEqual([[4, 'import.meta.env is Vite\'s'], [5, 'import.meta.env is Vite\'s'], [7, 'an astro-icon whose name is not a plain `set']])
+    expect(notes.map(note => [note.line, lead(note.message)])).toEqual([[4, 'import.meta.env is Vite\'s'], [5, 'import.meta.env.B is Vite\'s'], [7, 'an astro-icon whose name is not a plain `set']])
   })
 })

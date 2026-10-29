@@ -1,5 +1,5 @@
-import * as parser from '@babel/parser'
 import { describe, expect, it } from 'bun:test'
+import { parseSync } from 'oxc-parser'
 import { compileKay } from '../src/compiler'
 import { selection, signal } from '../src/runtime/core'
 import { updateBack, updateTo, writeBack, writeTo } from '../src/runtime/internal'
@@ -11,7 +11,7 @@ function compiled(source: string, output: Output, check = false) {
   const result = compileKay(source, 'test.kay', check ? { check: true } : { output })
 
   expect(result.diagnostics.map(d => d.message)).toEqual([])
-  expect(() => parser.parse(result.tsx, { sourceType: 'module', plugins: ['typescript', 'jsx'] })).not.toThrow()
+  expect(parseSync('test.tsx', result.tsx).errors).toEqual([])
 
   // The probe type checking adds is read apart, in the test of it.
   return check ? result.tsx.replaceAll(/(?:, undefined)?, \(KayTarget, KayKey\) => \{ KayTarget\[KayKey\] = undefined as never \}/g, '') : result.tsx

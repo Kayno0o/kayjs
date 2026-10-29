@@ -1,16 +1,17 @@
-import type * as t from '@babel/types'
-import type { NodeOfType, Path } from './scope'
-import { FUNCTION_TYPES, VISITOR_KEYS } from './babel-shapes'
+import type { Node, NodeOfType, Program } from './estree'
+import type { Path } from './scope'
+import { VISITOR_KEYS } from './estree'
+import { FUNCTION_TYPES } from './estree-shapes'
 import { analyze } from './scope'
 
 // A handler that returns `'stop'` ends the walk, as `path.stop()` does in Babel.
-type Handler<N extends t.Node> = (path: Path<N>) => void | 'stop'
+type Handler<N extends Node> = (path: Path<N>) => void | 'stop'
 
 // What a walk calls for a node: `enter` for every node, then the handler of its type, then `Function` and `ReferencedIdentifier`, the aliases of Babel's visitors that kay's passes use.
-export type Visitor = { [Type in t.Node['type']]?: Handler<NodeOfType<Type>> } & {
-  enter?: Handler<t.Node>
-  Function?: Handler<t.Function>
-  ReferencedIdentifier?: Handler<t.Identifier | t.JSXIdentifier>
+export type Visitor = { [Type in Node['type']]?: Handler<NodeOfType<Type>> } & {
+  enter?: Handler<Node>
+  Function?: Handler<NodeOfType<'FunctionDeclaration' | 'FunctionExpression' | 'ArrowFunctionExpression'>>
+  ReferencedIdentifier?: Handler<NodeOfType<'Identifier' | 'JSXIdentifier'>>
 }
 
 type AnyHandler = ((path: Path) => void | 'stop') | undefined
@@ -40,7 +41,7 @@ export function traverse(path: Path, visitor: Visitor): void {
 }
 
 // Walks a fence with kay's scope pass, false when the scope refuses a name declared twice, as an import and a `const` an edit passes through.
-export function walkScope(ast: t.File, visitor: Visitor): boolean {
+export function walkScope(ast: Program, visitor: Visitor): boolean {
   try {
     visit(analyze(ast).program, visitor)
 
@@ -55,9 +56,9 @@ export function walkScope(ast: t.File, visitor: Visitor): boolean {
 }
 
 // Visits every node under `node`, parents first, in the order Babel's traversal meets them and with no scope.
-export function eachDescendant(node: t.Node, visitNode: (node: t.Node, parent: t.Node) => void): void {
+export function eachDescendant(node: Node, visitNode: (node: Node, parent: Node) => void): void {
   for (const key of VISITOR_KEYS[node.type] ?? []) {
-    const child = (node as unknown as Record<string, t.Node | (t.Node | null)[] | null>)[key]
+    const child = (node as unknown as Record<string, Node | (Node | null)[] | null>)[key]
 
     for (const inner of Array.isArray(child) ? child : [child]) {
       if (inner) {

@@ -1,5 +1,6 @@
-import type { Expression, Node, Program, Statement } from '@babel/types'
-import { VISITOR_KEYS } from '@babel/types'
+import type { Statement } from 'oxc-parser'
+import type { Expression, Node, Program } from '../compiler/estree'
+import { VISITOR_KEYS } from '../compiler/estree'
 import { patternNames } from '../compiler/pattern-names'
 import { nameOf, TYPE_KEYS, TYPE_NODES } from './kept-source'
 
@@ -97,7 +98,7 @@ function declaresState(statement: Statement, settings: ReadonlySet<string>, unch
     if (!exported || name === undefined || risks === undefined)
       return true
 
-    risks.set(name, statement.start!)
+    risks.set(name, statement.start)
   }
 
   return false
@@ -129,9 +130,11 @@ function leading(expression: Expression): Node {
   for (;;) {
     if (node.type === 'TSAsExpression' || node.type === 'TSSatisfiesExpression' || node.type === 'TSNonNullExpression' || node.type === 'TSInstantiationExpression')
       node = node.expression
-    else if (node.type === 'MemberExpression' || node.type === 'OptionalMemberExpression')
+    else if (node.type === 'ChainExpression')
+      node = node.expression
+    else if (node.type === 'MemberExpression')
       node = node.object
-    else if ((node.type === 'CallExpression' || node.type === 'OptionalCallExpression') && !(node.callee.type === 'Identifier' && node.callee.name === 'store'))
+    else if (node.type === 'CallExpression' && !(node.callee.type === 'Identifier' && node.callee.name === 'store'))
       node = node.callee
     else if (node.type === 'TaggedTemplateExpression')
       node = node.tag
@@ -216,7 +219,7 @@ function declarations(program: Program): Declaration[] {
       if (locals === undefined)
         continue
 
-      const listed = statement.specifiers.flatMap(specifier => specifier.type === 'ExportSpecifier' && specifier.exportKind !== 'type' ? [{ name: nameOf(specifier.exported), of: [specifier.local.name] }] : [])
+      const listed = statement.specifiers.flatMap(specifier => specifier.type === 'ExportSpecifier' && specifier.exportKind !== 'type' ? [{ name: nameOf(specifier.exported), of: [nameOf(specifier.local)] }] : [])
 
       found.push({ locals, exports: [...locals.map(name => ({ name, of: [name] })), ...listed], names: namesIn(statement) })
     }
@@ -262,7 +265,7 @@ function exportedLater(program: Program): Set<string> {
     else if (statement.type === 'ExportNamedDeclaration' && statement.declaration == null && statement.source == null && statement.exportKind !== 'type') {
       for (const specifier of statement.specifiers) {
         if (specifier.type === 'ExportSpecifier' && specifier.exportKind !== 'type')
-          names.add(specifier.local.name)
+          names.add(nameOf(specifier.local))
       }
     }
   }

@@ -1,5 +1,6 @@
-import type * as t from '@babel/types'
+import type { Expression, Node, Statement } from 'oxc-parser'
 import type { Span } from './ast'
+import type { NodeOfType } from './estree'
 import type { ImportedSignals } from './module-signals'
 import type { ImportBinding, ScriptAnalysis } from './script-shared'
 import { isGlobalFunctionMember, SENDABLE_CLASSES } from './expression'
@@ -59,7 +60,7 @@ function analyzeModule(source: string, module: Span, iconSets: ReadonlySet<strin
   analysis.reactive = analysis.implicit.some(name => !STATIC_EXPORTS.has(name)) || analysis.imports.some(importsReactiveValue)
 
   for (const { statement, span } of split.statements) {
-    if (propsDeclaration(statement, split.ast.program.body, split.shift, [])) {
+    if (propsDeclaration(statement, split.ast.body, split.shift, [])) {
       analysis.diagnostics.push({ ...span, message: 'A `--- module` fence declares no props', help: 'declare them in the component script' })
 
       continue
@@ -114,7 +115,7 @@ function analyzeComponentScript(source: string, script: Span | undefined, server
   for (const { statement, span, gap } of split.statements) {
     analysis.body.push(...gap)
 
-    const props = propsDeclaration(statement, ast.program.body, shift, analysis.diagnostics)
+    const props = propsDeclaration(statement, ast.body, shift, analysis.diagnostics)
 
     if (props) {
       if (analysis.props)
@@ -147,7 +148,7 @@ function analyzeComponentScript(source: string, script: Span | undefined, server
 }
 
 // What a body declaration may hold a function or an instance of a class by: writing one, awaiting one, or a call returning one.
-const FUNCTION_VALUES = new Set(['ArrowFunctionExpression', 'FunctionExpression', 'ClassExpression', 'AwaitExpression', 'OptionalCallExpression', 'AssignmentExpression', 'SequenceExpression', 'TaggedTemplateExpression'])
+const FUNCTION_VALUES = new Set(['ArrowFunctionExpression', 'FunctionExpression', 'ClassExpression', 'AwaitExpression', 'AssignmentExpression', 'SequenceExpression', 'TaggedTemplateExpression'])
 
 // The names the script declared so far that hold a function, and the functions among them whose returns are plain data.
 interface FunctionScope {
@@ -156,13 +157,13 @@ interface FunctionScope {
 }
 
 // The names a statement declares that hold a function, which it adds to the scope along with the functions returning data.
-function functionNames(statement: t.Statement, scope: FunctionScope): string[] {
-  const declared: [string, t.Node][] = []
+function functionNames(statement: Statement, scope: FunctionScope): string[] {
+  const declared: [string, Node][] = []
 
   if (statement.type === 'FunctionDeclaration' && statement.id)
     declared.push([statement.id.name, statement])
   else if (statement.type === 'VariableDeclaration')
-    declared.push(...statement.declarations.flatMap(declaration => declaration.id.type === 'Identifier' && declaration.init ? [[declaration.id.name, declaration.init] as [string, t.Node]] : []))
+    declared.push(...statement.declarations.flatMap(declaration => declaration.id.type === 'Identifier' && declaration.init ? [[declaration.id.name, declaration.init] as [string, Node]] : []))
 
   const found: string[] = []
 
@@ -184,7 +185,7 @@ function functionNames(statement: t.Statement, scope: FunctionScope): string[] {
 }
 
 // The expressions a function returns, or undefined when a statement it runs hides one: only blocks and `if` are followed.
-function returned(body: t.Node): t.Expression[] | undefined {
+function returned(body: Node): Expression[] | undefined {
   if (body.type === 'BlockStatement') {
     const parts = body.body.map(returned)
 
@@ -204,7 +205,7 @@ function returned(body: t.Node): t.Expression[] | undefined {
 }
 
 // The locals a function body declares that hold a function, over the statements `returned` follows.
-function declareLocals(body: t.Node, scope: FunctionScope) {
+function declareLocals(body: Node, scope: FunctionScope) {
   if (body.type === 'BlockStatement') {
     for (const statement of body.body)
       declareLocals(statement, scope)
@@ -226,18 +227,23 @@ function declareLocals(body: t.Node, scope: FunctionScope) {
   }
 }
 
-type FunctionNode = t.ArrowFunctionExpression | t.FunctionExpression | t.FunctionDeclaration
+type FunctionNode = NodeOfType<'ArrowFunctionExpression' | 'FunctionExpression' | 'FunctionDeclaration'>
 
 // A function of the script whose returns are plain data: its parameters may be anything, so returning one is not.
 function functionReturnsData(fn: FunctionNode, scope: FunctionScope): boolean {
-  const values = fn.body.type === 'BlockStatement' ? returned(fn.body) : [fn.body]
+  const { body } = fn
+
+  if (body === null)
+    return false
+
+  const values = body.type === 'BlockStatement' ? returned(body) : [body]
 
   if (fn.async || fn.generator || values === undefined || fn.params.some(param => param.type !== 'Identifier'))
     return false
 
-  const inner: FunctionScope = { ...scope, functions: new Set([...scope.functions, ...fn.params.map(param => (param as t.Identifier).name)]) }
+  const inner: FunctionScope = { ...scope, functions: new Set([...scope.functions, ...fn.params.map(param => (param as NodeOfType<'Identifier'>).name)]) }
 
-  declareLocals(fn.body, inner)
+  declareLocals(body, inner)
 
   return !values.some(value => holdsFunction(value, inner))
 }
@@ -246,7 +252,7 @@ function functionReturnsData(fn: FunctionNode, scope: FunctionScope): boolean {
 const DATA_NAMESPACES = new Set(['Math', 'Number', 'String', 'Boolean', 'BigInt', 'Date', 'console'])
 
 // A callback given to a list method over data: its parameters are items of that data.
-function callbackReturnsData(callback: t.Node, scope: FunctionScope): boolean {
+function callbackReturnsData(callback: Node, scope: FunctionScope): boolean {
   if (callback.type === 'MemberExpression' && callback.object.type === 'Identifier' && isGlobalFunctionMember(callback, name => scope.functions.has(name)))
     return DATA_NAMESPACES.has(callback.object.name)
 
@@ -256,10 +262,15 @@ function callbackReturnsData(callback: t.Node, scope: FunctionScope): boolean {
   if (callback.type !== 'ArrowFunctionExpression' && callback.type !== 'FunctionExpression')
     return false
 
-  const values = callback.body.type === 'BlockStatement' ? returned(callback.body) : [callback.body]
+  const { body } = callback
+
+  if (body === null)
+    return false
+
+  const values = body.type === 'BlockStatement' ? returned(body) : [body]
   const inner: FunctionScope = { ...scope, functions: new Set(scope.functions) }
 
-  declareLocals(callback.body, inner)
+  declareLocals(body, inner)
 
   return !callback.async && !callback.generator && values !== undefined && !values.some(value => holdsFunction(value, inner))
 }
@@ -273,9 +284,9 @@ const LIST_PLAIN = new Set(['slice', 'concat', 'flat', 'reverse', 'toReversed', 
 const PRIMITIVE_METHODS = new Set(['toISOString', 'toJSON', 'toString', 'toFixed', 'toPrecision', 'toLocaleString', 'toLocaleDateString', 'toLocaleTimeString', 'getTime', 'toLowerCase', 'toUpperCase', 'trim', 'trimStart', 'trimEnd', 'padStart', 'padEnd', 'replace', 'replaceAll'])
 
 // A call whose result is plain data: a list method or static over data, or a call to a function of the script returning data.
-function isDataCall(call: t.CallExpression, scope: FunctionScope): boolean {
+function isDataCall(call: NodeOfType<'CallExpression'>, scope: FunctionScope): boolean {
   const { callee } = call
-  const plain = (argument: t.Node) => !holdsFunction(argument, scope)
+  const plain = (argument: Node) => !holdsFunction(argument, scope)
 
   if (callee.type === 'Identifier')
     return scope.data.has(callee.name) && call.arguments.every(plain)
@@ -301,9 +312,9 @@ function isDataCall(call: t.CallExpression, scope: FunctionScope): boolean {
   return LIST_BUILDERS.has(method) ? call.arguments.every(argument => callbackReturnsData(argument, scope)) : LIST_PLAIN.has(method) && call.arguments.every(plain)
 }
 
-function holdsFunction(value: t.Node, scope: FunctionScope): boolean {
+function holdsFunction(value: Node, scope: FunctionScope): boolean {
   if (value.type === 'ObjectExpression')
-    return value.properties.some(property => property.type === 'ObjectMethod' || holdsFunction(property.type === 'SpreadElement' ? property.argument : property.value, scope))
+    return value.properties.some(property => (property.type === 'Property' && (property.method || property.kind !== 'init')) || holdsFunction(property.type === 'SpreadElement' ? property.argument : property.value, scope))
 
   if (value.type === 'ArrayExpression')
     return value.elements.some(element => element !== null && holdsFunction(element.type === 'SpreadElement' ? element.argument : element, scope))
@@ -314,13 +325,17 @@ function holdsFunction(value: t.Node, scope: FunctionScope): boolean {
   if (value.type === 'CallExpression')
     return !isDataCall(value, scope)
 
-  if (value.type === 'TSAsExpression' || value.type === 'TSSatisfiesExpression' || value.type === 'TSNonNullExpression' || value.type === 'ParenthesizedExpression')
+  if (value.type === 'TSAsExpression' || value.type === 'TSSatisfiesExpression' || value.type === 'TSNonNullExpression')
     return holdsFunction(value.expression, scope)
 
   if (value.type === 'Identifier')
     return scope.functions.has(value.name)
 
-  if (value.type === 'MemberExpression' || value.type === 'OptionalMemberExpression')
+  // A chain ending in a call is a call whose result is unknown.
+  if (value.type === 'ChainExpression')
+    return value.expression.type === 'CallExpression' || holdsFunction(value.expression, scope)
+
+  if (value.type === 'MemberExpression')
     return isGlobalFunctionMember(value, name => scope.functions.has(name)) || holdsFunction(value.object, scope)
 
   if (value.type === 'ConditionalExpression')

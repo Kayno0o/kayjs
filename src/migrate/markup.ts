@@ -1,7 +1,8 @@
-import type * as t from '@babel/types'
-import { parseExpression } from '@babel/parser'
+import type { Comment, Expression, JSXAttribute, JSXChild, JSXElement, JSXExpressionContainer, JSXFragment, Node, StringLiteral } from 'oxc-parser'
 import { isClassToken } from '../compiler/class-name'
 import { eachNode } from '../compiler/each-node'
+import { parseProgram, positionOf } from '../compiler/estree'
+import { decodeEntities } from '../compiler/expression'
 
 // The translation of markup into a kay template, which `kay migrate astro` and `kay fmt --from-html` share: the markup is read as JSX, which Astro's is and HTML is made to be.
 
@@ -72,7 +73,7 @@ export interface Imports {
 export interface MarkupHost {
   note: (line: number, message: string) => void
   lang: (line: number, value: string) => void
-  expression: (node: t.Node, code: string) => string
+  expression: (node: Node, code: string, source: string) => string
   // HTML keeps its `slot` and `key` attributes, scripts and styles as written, and a `<slot>` is a web component's, not kay's.
   mode: 'astro' | 'html'
   // Makes HTML safe to read as JSX.
@@ -91,27 +92,35 @@ export function translateMarkup(markup: string, host: MarkupHost, imports: Impor
     .replace(HTML_COMMENT, (_whole, text: string) => `{/*${text.replace(COMMENT_END, '* /')}*/}`)
     .replace(VOID_TAG, (whole, tag: string, attributes: string, closed: string) => closed ? whole : `<${tag}${attributes} />`)
   const wrapped = `<>${prepared}</>`
-  let root: t.JSXFragment
+  let root: JSXFragment
+  let comments: Comment[]
 
   try {
-    root = parseExpression(wrapped, { plugins: ['jsx', 'typescript'] }) as t.JSXFragment
+    const parsed = parseProgram(wrapped, { lang: 'tsx' })
+    const statement = parsed.program.body[0]
+
+    if (parsed.program.body.length !== 1 || statement?.type !== 'ExpressionStatement' || statement.expression.type !== 'JSXFragment')
+      throw new MarkupError('Unexpected token')
+
+    root = statement.expression
+    comments = parsed.comments
   }
   catch (error) {
-    throw new MarkupError(error instanceof Error ? error.message : String(error))
+    throw error instanceof MarkupError ? error : new MarkupError(error instanceof Error ? error.message : String(error))
   }
 
-  const translator = new Translator(wrapped, host, imports, raws)
+  const translator = new Translator(wrapped, host, imports, raws, comments)
 
   return translator.document(root.children)
 }
 
-type Child = t.JSXText | t.JSXExpressionContainer | t.JSXSpreadChild | t.JSXElement | t.JSXFragment
+type Child = JSXChild
 
 class Translator {
   private readonly note: MarkupHost['note']
   private readonly lang: MarkupHost['lang']
 
-  constructor(private readonly source: string, private readonly host: MarkupHost, private readonly imports: Imports, private readonly raws: RawBlock[]) {
+  constructor(private readonly source: string, private readonly host: MarkupHost, private readonly imports: Imports, private readonly raws: RawBlock[], private readonly comments: Comment[]) {
     this.note = host.note
     this.lang = host.lang
   }
@@ -120,21 +129,21 @@ class Translator {
     return this.host.mode === 'html'
   }
 
-  private text(node: t.Node): string {
-    return this.source.slice(node.start!, node.end!)
+  private text(node: Node): string {
+    return this.source.slice(node.start, node.end)
   }
 
-  private line(node: t.Node): number {
-    return node.loc!.start.line
+  private line(node: Node): number {
+    return positionOf(this.source, node.start).line
   }
 
   // An expression as kay reads it, its JSX, if any, unreadable to kay.
-  private expression(node: t.Node): string {
-    return this.host.expression(node, this.text(node))
+  private expression(node: Node): string {
+    return this.host.expression(node, this.text(node), this.source)
   }
 
   // An expression kay cannot render, its source kept commented out under a note.
-  private untranslated(node: t.Node, why: string): string[] {
+  private untranslated(node: Node, why: string): string[] {
     this.note(this.line(node), `${why}: commented out`)
 
     return [`// kay migrate: ${why}`, ...this.text(node).split('\n').map(line => `  ${line.trimEnd()}`)]
@@ -143,7 +152,7 @@ class Translator {
   // The top level of a file: a layout's `html` gives its `head` children to kay's `head` block and its `body` children to the template.
   document(children: Child[]): string {
     const top = this.meaningful(children)
-    const html = top.find((child): child is t.JSXElement => child.type === 'JSXElement' && this.tagName(child) === 'html')
+    const html = top.find((child): child is JSXElement => child.type === 'JSXElement' && this.tagName(child) === 'html')
 
     if (!html)
       return `${this.block(children).join('\n')}\n`
@@ -156,7 +165,7 @@ class Translator {
       if (attribute.type !== 'JSXAttribute' || this.attributeName(attribute) !== 'lang')
         continue
 
-      if (attribute.value?.type === 'StringLiteral')
+      if (attribute.value?.type === 'Literal')
         this.lang(this.line(attribute), attribute.value.value)
       else
         this.note(this.line(attribute), `\`lang\` on html: set \`lang: ${this.text(attribute.value!)}\` in kay.config.ts, which writes it on every page`)
@@ -201,7 +210,7 @@ class Translator {
   private meaningful(children: Child[]): Child[] {
     const kept = children.filter(child => !(child.type === 'JSXExpressionContainer' && child.expression.type === 'JSXEmptyExpression' && !this.hasComment(child)))
 
-    return kept.filter((child, index) => !(child.type === 'JSXText' && trimSpace(child.value) === '' && child.value.includes('\n')) || (index > 0 && index < kept.length - 1 && this.isFlow(kept[index - 1]!) && this.isFlow(kept[index + 1]!)))
+    return kept.filter((child, index) => !(child.type === 'JSXText' && trimSpace(decodeEntities(child.value)) === '' && decodeEntities(child.value).includes('\n')) || (index > 0 && index < kept.length - 1 && this.isFlow(kept[index - 1]!) && this.isFlow(kept[index + 1]!)))
   }
 
   private isFlow(child: Child): boolean {
@@ -211,8 +220,12 @@ class Translator {
     return child.type === 'JSXExpressionContainer' && child.expression.type !== 'JSXEmptyExpression' && !containsJsx(child.expression)
   }
 
-  private hasComment(container: t.JSXExpressionContainer): boolean {
-    return (container.expression.innerComments ?? []).length > 0
+  private hasComment(container: JSXExpressionContainer): boolean {
+    return this.commentsIn(container.expression).length > 0
+  }
+
+  private commentsIn(node: Node): Comment[] {
+    return this.comments.filter(comment => comment.start >= node.start && comment.end <= node.end)
   }
 
   private block(children: Child[]): string[] {
@@ -222,7 +235,7 @@ class Translator {
   private child(child: Child, before?: Child, after?: Child): string[] {
     switch (child.type) {
       case 'JSXText':
-        return this.textLine(child.value, before, after)
+        return this.textLine(decodeEntities(child.value), before, after)
       case 'JSXElement':
         return this.element(child)
       case 'JSXFragment':
@@ -249,18 +262,18 @@ class Translator {
     return child.type === 'JSXElement' && BLOCK_TAGS.has(this.tagName(child))
   }
 
-  private container(container: t.JSXExpressionContainer): string[] {
+  private container(container: JSXExpressionContainer): string[] {
     const { expression } = container
 
     if (expression.type === 'JSXEmptyExpression')
-      return (expression.innerComments ?? []).flatMap(comment => comment.value.trim().split('\n').map(line => `// ${line.trim()}`))
+      return this.commentsIn(expression).flatMap(comment => comment.value.trim().split('\n').map(line => `// ${line.trim()}`))
 
     return this.rendering(expression, container)
   }
 
   // An expression in the markup: control flow written as `&&`, a ternary or `.map` becomes `if` and `for`.
   // `outer` is what a part kay cannot read is kept as, the braces around the expression included.
-  private rendering(expression: t.Expression, outer: t.Node = expression): string[] {
+  private rendering(expression: Expression, outer: Node = expression): string[] {
     if (!containsJsx(expression))
       return [`| {${this.expression(expression)}}`]
 
@@ -285,7 +298,7 @@ class Translator {
   }
 
   // `items.map((item, i) => <li>...</li>)`, the callback giving its markup at once or from a lone return.
-  private loop(expression: t.Expression, outer: t.Node): string[] | undefined {
+  private loop(expression: Expression, outer: Node): string[] | undefined {
     if (expression.type !== 'CallExpression' || expression.callee.type !== 'MemberExpression' || expression.callee.property.type !== 'Identifier' || expression.callee.property.name !== 'map' || containsJsx(expression.callee.object))
       return undefined
 
@@ -299,7 +312,10 @@ class Translator {
     if (!item || item.type !== 'Identifier' || (index && index.type !== 'Identifier') || callback.params.length > 2)
       return this.untranslated(outer, '`.map` with a destructured parameter, which `for` does not take: name the item and read its fields')
 
-    let body: t.Node = callback.body
+    let { body } = callback
+
+    if (body === null)
+      return undefined
 
     if (body.type === 'BlockStatement') {
       const statement = body.body.length === 1 ? body.body[0] : undefined
@@ -310,7 +326,7 @@ class Translator {
       body = statement.argument
     }
 
-    const key = body.type === 'JSXElement' ? body.openingElement.attributes.find((attribute): attribute is t.JSXAttribute => attribute.type === 'JSXAttribute' && this.attributeName(attribute) === 'key') : undefined
+    const key = body.type === 'JSXElement' ? body.openingElement.attributes.find((attribute): attribute is JSXAttribute => attribute.type === 'JSXAttribute' && this.attributeName(attribute) === 'key') : undefined
     const keyText = key?.value?.type === 'JSXExpressionContainer' && key.value.expression.type !== 'JSXEmptyExpression' ? ` key={${this.expression(key.value.expression)}}` : ''
     const head = `for ${item.name}${index ? `, ${index.name}` : ''} of ${this.expression(expression.callee.object)}${keyText}`
 
@@ -321,15 +337,15 @@ class Translator {
     return lines.map(line => `  ${line}`)
   }
 
-  private tagName(element: t.JSXElement): string {
+  private tagName(element: JSXElement): string {
     return this.text(element.openingElement.name)
   }
 
-  private attributeName(attribute: t.JSXAttribute): string {
+  private attributeName(attribute: JSXAttribute): string {
     return this.text(attribute.name)
   }
 
-  private element(element: t.JSXElement): string[] {
+  private element(element: JSXElement): string[] {
     const name = this.tagName(element)
     const raw = RAW_TAG.exec(name)
 
@@ -354,7 +370,7 @@ class Translator {
         : this.slot(element)
     }
 
-    if (this.html && (name === 'pre' || name === 'textarea') && element.children.some(inner => inner.type === 'JSXText' && PRESERVED_SPACE.test(inner.value)))
+    if (this.html && (name === 'pre' || name === 'textarea') && element.children.some(inner => inner.type === 'JSXText' && PRESERVED_SPACE.test(decodeEntities(inner.value))))
       this.note(this.line(element), `${name} keeps its whitespace in HTML: the template collapses it to single spaces, so write its text with \`\\n\` by hand`)
 
     const tag = this.imports.image.has(name) ? 'img' : name
@@ -377,9 +393,9 @@ class Translator {
   }
 
   // astro-icon's `<Icon name="mdi:sun" />`, drawn as the icon imported from its `@iconify-json` set.
-  private icon(element: t.JSXElement): string[] {
-    const name = element.openingElement.attributes.find((attribute): attribute is t.JSXAttribute => attribute.type === 'JSXAttribute' && this.attributeName(attribute) === 'name')
-    const match = name?.value?.type === 'StringLiteral' ? ICON_NAME.exec(name.value.value) : null
+  private icon(element: JSXElement): string[] {
+    const name = element.openingElement.attributes.find((attribute): attribute is JSXAttribute => attribute.type === 'JSXAttribute' && this.attributeName(attribute) === 'name')
+    const match = name?.value?.type === 'Literal' ? ICON_NAME.exec(name.value.value) : null
 
     if (!match)
       return this.untranslated(element, 'an astro-icon whose name is not a plain `set:name` (a local icon, or a computed name): import the icon from `@iconify-json/<prefix>` as `~icons/<prefix>/<name>` and draw it as a tag, or import the svg file')
@@ -399,7 +415,7 @@ class Translator {
   }
 
   // A component's children given to a named slot, `<h2 slot="title">`, become its `@title` block.
-  private componentChildren(element: t.JSXElement, children: Child[]): string[] {
+  private componentChildren(element: JSXElement, children: Child[]): string[] {
     if (!UPPERCASE_START.test(this.tagName(element)))
       return children.flatMap((child, index) => this.child(child, children[index - 1], children[index + 1]))
 
@@ -407,7 +423,7 @@ class Translator {
     const rest: string[] = []
 
     for (const [index, child] of children.entries()) {
-      const slot = child.type === 'JSXElement' ? child.openingElement.attributes.find((attribute): attribute is t.JSXAttribute => attribute.type === 'JSXAttribute' && this.attributeName(attribute) === 'slot' && attribute.value?.type === 'StringLiteral') : undefined
+      const slot = child.type === 'JSXElement' ? child.openingElement.attributes.find((attribute): attribute is JSXAttribute => attribute.type === 'JSXAttribute' && this.attributeName(attribute) === 'slot' && attribute.value?.type === 'Literal') : undefined
 
       if (!slot) {
         rest.push(...this.child(child, children[index - 1], children[index + 1]))
@@ -415,7 +431,7 @@ class Translator {
         continue
       }
 
-      const slotName = (slot.value as t.StringLiteral).value
+      const slotName = (slot.value as StringLiteral).value
 
       named.set(slotName, [...named.get(slotName) ?? [], ...this.child(child)])
     }
@@ -429,7 +445,7 @@ class Translator {
 
     for (const child of children) {
       if (child.type === 'JSXText') {
-        parts.push(text(child.value))
+        parts.push(text(decodeEntities(child.value)))
       }
       else if (child.type === 'JSXExpressionContainer' && child.expression.type !== 'JSXEmptyExpression' && !containsJsx(child.expression)) {
         parts.push(`{${this.expression(child.expression)}}`)
@@ -454,19 +470,19 @@ class Translator {
   }
 
   // A JSON-LD script's `set:html`, which kay writes as its text, escaping what would end the script.
-  private jsonText(element: t.JSXElement): string | undefined {
-    const attributes = element.openingElement.attributes.filter((attribute): attribute is t.JSXAttribute => attribute.type === 'JSXAttribute')
+  private jsonText(element: JSXElement): string | undefined {
+    const attributes = element.openingElement.attributes.filter((attribute): attribute is JSXAttribute => attribute.type === 'JSXAttribute')
     const type = attributes.find(attribute => this.attributeName(attribute) === 'type')?.value
     const html = attributes.find(attribute => this.attributeName(attribute) === 'set:html')?.value
 
-    if (this.tagName(element) !== 'script' || type?.type !== 'StringLiteral' || !type.value.endsWith('json') || html?.type !== 'JSXExpressionContainer' || html.expression.type === 'JSXEmptyExpression')
+    if (this.tagName(element) !== 'script' || type?.type !== 'Literal' || !type.value.endsWith('json') || html?.type !== 'JSXExpressionContainer' || html.expression.type === 'JSXEmptyExpression')
       return undefined
 
     return this.expression(html.expression)
   }
 
   // `tag.class#id(attributes)`, with the static classes and id as shorthand where kay's syntax takes them.
-  private head(element: t.JSXElement, tag: string, skip?: string): string {
+  private head(element: JSXElement, tag: string, skip?: string): string {
     const shorthand: string[] = []
     const attributes: string[] = []
     let id = ''
@@ -489,7 +505,7 @@ class Translator {
         continue
 
       // `onclick="..."` is code in a string, where kay's `onClick={...}` takes a function.
-      if (EVENT_ATTRIBUTE.test(name) && value?.type === 'StringLiteral')
+      if (EVENT_ATTRIBUTE.test(name) && value?.type === 'Literal')
         this.note(this.line(attribute), `${name} holds code as text: write it as \`on${name[2]!.toUpperCase()}${name.slice(3)}={() => ...}\` in an island`)
 
       if (DROPPED.has(name))
@@ -514,7 +530,7 @@ class Translator {
       if (name === 'set:html') {
         let html: string | undefined
 
-        if (value?.type === 'StringLiteral')
+        if (value?.type === 'Literal')
           html = JSON.stringify(value.value)
         else if (value?.type === 'JSXExpressionContainer' && value.expression.type !== 'JSXEmptyExpression')
           html = this.expression(value.expression)
@@ -529,7 +545,7 @@ class Translator {
 
       const target = RENAMED_ATTRIBUTES.get(name) ?? name
 
-      if (value?.type === 'StringLiteral') {
+      if (value?.type === 'Literal') {
         if (target === 'class') {
           for (const token of value.value.split(WHITESPACE).filter(Boolean)) {
             if (isClassToken(token))
@@ -573,8 +589,8 @@ class Translator {
     return `${bare ? '' : tag}${id}${shorthand.join('')}${merged.length > 0 ? `(${merged.join(' ')})` : ''}`
   }
 
-  private fragment(element: t.JSXElement): string[] {
-    const html = element.openingElement.attributes.find((attribute): attribute is t.JSXAttribute => attribute.type === 'JSXAttribute' && this.attributeName(attribute) === 'set:html')
+  private fragment(element: JSXElement): string[] {
+    const html = element.openingElement.attributes.find((attribute): attribute is JSXAttribute => attribute.type === 'JSXAttribute' && this.attributeName(attribute) === 'set:html')
 
     if (html)
       return this.untranslated(element, 'a Fragment with set:html: put the markup in an element\'s `innerHTML`')
@@ -582,8 +598,8 @@ class Translator {
     return this.block(element.children)
   }
 
-  private slot(element: t.JSXElement): string[] {
-    const named = element.openingElement.attributes.find((attribute): attribute is t.JSXAttribute => attribute.type === 'JSXAttribute' && this.attributeName(attribute) === 'name' && attribute.value?.type === 'StringLiteral')
+  private slot(element: JSXElement): string[] {
+    const named = element.openingElement.attributes.find((attribute): attribute is JSXAttribute => attribute.type === 'JSXAttribute' && this.attributeName(attribute) === 'name' && attribute.value?.type === 'Literal')
 
     if (this.meaningful(element.children).length > 0)
       this.note(this.line(element), 'a slot\'s fallback content: render it with `if` when the slot is empty')
@@ -591,7 +607,7 @@ class Translator {
     if (!named)
       return ['slot']
 
-    const slotName = (named.value as t.StringLiteral).value
+    const slotName = (named.value as StringLiteral).value
 
     this.note(this.line(element), `the named slot \`${slotName}\` renders the \`${slotName}\` prop: add \`${slotName}?: Snippet\` to the component's props`)
 
@@ -599,7 +615,7 @@ class Translator {
   }
 
   // A `<script>` or `<style>` taken out before parsing: an inline script and a stylesheet stay as their element, a bundled script cannot.
-  private rawBlock(block: RawBlock, element: t.JSXElement): string[] {
+  private rawBlock(block: RawBlock, element: JSXElement): string[] {
     // An attribute holding an expression is listed below, not read as text.
     const expressions: string[] = []
     const plain = block.attributes.replace(EXPRESSION_ATTRIBUTE, (_whole, quoted: string | undefined, name: string | undefined) => {
@@ -655,7 +671,7 @@ function text(value: string): string {
   return value.replace(HTML_SPACE, ' ').replace(BRACE, brace => `{'${brace}'}`).replace(INTERPOLATION, '\\#[').replace(ENTITY_START, '{\'&\'}')
 }
 
-function containsJsx(node: t.Node): boolean {
+function containsJsx(node: Node): boolean {
   let found = false
 
   eachNode(node, (inner) => {
@@ -668,6 +684,6 @@ function containsJsx(node: t.Node): boolean {
   return found
 }
 
-function isNothing(node: t.Node): boolean {
-  return node.type === 'NullLiteral' || (node.type === 'Identifier' && node.name === 'undefined') || (node.type === 'StringLiteral' && node.value === '') || (node.type === 'BooleanLiteral' && !node.value)
+function isNothing(node: Node): boolean {
+  return (node.type === 'Literal' && (node.raw === 'null' || node.value === '' || node.value === false)) || (node.type === 'Identifier' && node.name === 'undefined')
 }

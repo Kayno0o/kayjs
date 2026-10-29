@@ -1,12 +1,14 @@
-import type * as t from '@babel/types'
-import { BLOCK_PARENT_TYPES, BUILTIN_GLOBALS, FUNCTION_PARENT_TYPES, FUNCTION_TYPES, LOOP_TYPES, METHOD_TYPES, PATTERN_TYPES, SCOPABLE_TYPES, STATEMENT_TYPES, TS_TYPES, VISITOR_KEYS } from './babel-shapes'
+import type { Node, NodeOfType, Program } from './estree'
+import { VISITOR_KEYS } from './estree'
+import { BLOCK_PARENT_TYPES, BUILTIN_GLOBALS, FUNCTION_PARENT_TYPES, FUNCTION_TYPES, LOOP_TYPES, PATTERN_TYPES, SCOPABLE_TYPES, STATEMENT_TYPES, TS_TYPES } from './estree-shapes'
 
-// Kay's own scope pass over Babel's AST, which is all the rewrites need of `@babel/traverse`: a path to each node, the scope each node sits in, and for every binding its references and the writes to it.
-// It follows Babel's scope rules, down to what Babel gets wrong, so what the rewrites find does not change; `tests/scope.test.ts` compares the two on the source of this repository.
+type Identifier = NodeOfType<'Identifier'>
+type AnyFunction = NodeOfType<'FunctionDeclaration' | 'FunctionExpression' | 'ArrowFunctionExpression'>
+
+// Kay's own scope pass over the oxc AST, which is all the rewrites need of a traversal library: a path to each node, the scope each node sits in, and for every binding its references and the writes to it.
+// It follows the scope rules of `@babel/traverse`, down to what Babel gets wrong, so what the rewrites find does not change; `tests/scope.test.ts` compares the two on the source of this repository.
 // One thing it leaves out: Babel crawls a scope inside a type annotation on its own, which registers its parameters and `var`s, and kay's pass does not (a function in a computed key of a type literal).
 type BindingKind = 'var' | 'let' | 'const' | 'module' | 'hoisted' | 'param' | 'local' | 'unknown'
-
-export type NodeOfType<T extends string> = Extract<t.Node, { type: T }>
 
 // Where the identifiers a declaration holds are, by node type.
 const BINDING_KEYS: Readonly<Record<string, readonly string[]>> = {
@@ -25,16 +27,14 @@ const BINDING_KEYS: Readonly<Record<string, readonly string[]>> = {
   FunctionDeclaration: ['id', 'params'],
   FunctionExpression: ['id', 'params'],
   ArrowFunctionExpression: ['params'],
-  ObjectMethod: ['params'],
-  ClassMethod: ['params'],
-  ClassPrivateMethod: ['params'],
+  TSParameterProperty: ['parameter'],
   ForInStatement: ['left'],
   ForOfStatement: ['left'],
   ClassDeclaration: ['id'],
   ClassExpression: ['id'],
   RestElement: ['argument'],
   UpdateExpression: ['argument'],
-  ObjectProperty: ['value'],
+  Property: ['value'],
   AssignmentPattern: ['left'],
   ArrayPattern: ['elements'],
   ObjectPattern: ['properties'],
@@ -46,10 +46,10 @@ const BINDING_KEYS: Readonly<Record<string, readonly string[]>> = {
 const COMPAT_TAG = /^[a-z]/
 
 // A node, the way down to it from the program and the scope it sits in.
-export class Path<N extends t.Node = t.Node> {
+export class Path<N extends Node = Node> {
   constructor(
     readonly node: N,
-    readonly parent: t.Node,
+    readonly parent: Node,
     readonly parentPath: Path | null,
     readonly key: string | number | undefined,
     readonly listKey: string | undefined,
@@ -65,7 +65,7 @@ export class Path<N extends t.Node = t.Node> {
   // The paths of the children, in the order Babel visits them; empty for a path made on the side.
   readonly children: Path[] = []
 
-  is<T extends t.Node['type']>(type: T): this is Path<NodeOfType<T>> {
+  is<T extends Node['type']>(type: T): this is Path<NodeOfType<T>> {
     return this.node.type === type
   }
 
@@ -106,7 +106,7 @@ export class Path<N extends t.Node = t.Node> {
 
   // The path of a child node, made when asked for.
   get(key: string): Path {
-    return new Path((this.node as unknown as Record<string, t.Node>)[key]!, this.node, this, key, undefined, this.scope)
+    return new Path((this.node as unknown as Record<string, Node>)[key]!, this.node, this, key, undefined, this.scope)
   }
 
   // A name a declaration holds: the identifiers of a parameter, a `catch`, an import, a declarator or a loop's left side.
@@ -116,7 +116,7 @@ export class Path<N extends t.Node = t.Node> {
     if (node.type !== 'Identifier')
       return false
 
-    if (parent.type === 'ObjectProperty' && this.parentPath?.parent.type === 'ObjectExpression')
+    if (parent.type === 'Property' && this.parentPath?.parent.type === 'ObjectExpression')
       return false
 
     const keys = BINDING_KEYS[parent.type]
@@ -150,8 +150,8 @@ export class Path<N extends t.Node = t.Node> {
   }
 
   // The names a declaration or a pattern declares, by name.
-  getBindingIdentifiers(): Record<string, t.Identifier> {
-    const found: Record<string, t.Identifier> = Object.create(null)
+  getBindingIdentifiers(): Record<string, Identifier> {
+    const found: Record<string, Identifier> = Object.create(null)
 
     bindingIdentifiers(this.node, false, (name, identifier) => {
       found[name] = identifier
@@ -166,7 +166,7 @@ export class Binding {
   readonly referencePaths: Path[] = []
   constant = true
 
-  constructor(readonly identifier: t.Identifier, readonly path: Path, readonly kind: BindingKind, readonly scope: Scope) {
+  constructor(readonly identifier: Identifier, readonly path: Path, readonly kind: BindingKind, readonly scope: Scope) {
     if ((kind === 'var' || kind === 'hoisted') && initInLoop(path))
       this.reassign(path)
   }
@@ -189,7 +189,7 @@ export class Scope {
     this.globals = parent ? parent.globals : new Set()
   }
 
-  get node(): t.Node {
+  get node(): Node {
     return this.path.node
   }
 
@@ -212,7 +212,7 @@ export class Scope {
 }
 
 function lookup(from: Scope, name: string): Binding | undefined {
-  let previous: t.Node | undefined
+  let previous: Node | undefined
 
   for (let scope: Scope | null = from; scope; previous = scope.node, scope = scope.parent) {
     const binding = scope.bindings.get(name)
@@ -260,7 +260,7 @@ function nearestScope(from: Scope, types: ReadonlySet<string>): Scope | null {
 
 // What the pass found, in the order a traversal meets it.
 export interface ScopeAnalysis {
-  program: Path<t.Program>
+  program: Path<NodeOfType<'Program'>>
   // The paths of the node types `EVENT_TYPES` lists.
   events: Path[]
 }
@@ -269,15 +269,15 @@ export interface ScopeAnalysis {
 const EVENT_TYPES = new Set(['Program', 'Identifier', 'CallExpression', 'ArrowFunctionExpression', 'VariableDeclarator', 'AssignmentExpression', 'UpdateExpression', 'FunctionDeclaration', 'TSTypeQuery'])
 
 // Kept per file, as Babel keeps the scopes of a tree it has crawled, so the passes over one fence share it.
-const analyses = new WeakMap<t.File, ScopeAnalysis>()
+const analyses = new WeakMap<Program, ScopeAnalysis>()
 
 // Throws the `TypeError` Babel does for a name declared twice where it cannot be.
-export function analyze(file: t.File): ScopeAnalysis {
-  let found = analyses.get(file)
+export function analyze(program: Program): ScopeAnalysis {
+  let found = analyses.get(program)
 
   if (!found) {
-    found = new Analysis().run(file)
-    analyses.set(file, found)
+    found = new Analysis().run(program)
+    analyses.set(program, found)
   }
 
   return found
@@ -288,10 +288,10 @@ class Analysis {
   private readonly references: Path[] = []
   private readonly assignments: Path[] = []
   private readonly violations: Path[] = []
-  private program!: Path<t.Program>
+  private program!: Path<NodeOfType<'Program'>>
 
-  run(file: t.File): ScopeAnalysis {
-    this.visit(file.program, file, null, 'program', undefined, true)
+  run(program: Program): ScopeAnalysis {
+    this.visit(program, program, null, 'program', undefined, true)
 
     for (const path of this.assignments) {
       for (const name of assignedNames(path.node)) {
@@ -303,12 +303,12 @@ class Analysis {
     }
 
     for (const reference of this.references) {
-      const binding = reference.scope.getBinding((reference.node as t.Identifier).name)
+      const binding = reference.scope.getBinding((reference.node as Identifier).name)
 
       if (binding)
         binding.referencePaths.push(reference)
       else
-        this.program.scope.globals.add((reference.node as t.Identifier).name)
+        this.program.scope.globals.add((reference.node as Identifier).name)
     }
 
     for (const path of this.violations)
@@ -323,7 +323,7 @@ class Analysis {
   }
 
   // `crawl` is false inside a type annotation, whose names the scope leaves out.
-  private visit(node: t.Node, parent: t.Node, parentPath: Path | null, key: string | number, listKey: string | undefined, crawl: boolean) {
+  private visit(node: Node, parent: Node, parentPath: Path | null, key: string | number, listKey: string | undefined, crawl: boolean) {
     const path = new Path(node, parent, parentPath, key, listKey)
 
     path.scope = this.scopeOf(path)
@@ -331,7 +331,7 @@ class Analysis {
 
     if (EVENT_TYPES.has(node.type)) {
       if (node.type === 'Program')
-        this.program = path as Path<t.Program>
+        this.program = path as Path<NodeOfType<'Program'>>
 
       this.events.push(path)
     }
@@ -349,18 +349,18 @@ class Analysis {
 
         if (Array.isArray(child)) {
           for (let index = 0; index < child.length; index++) {
-            if (child[index] as t.Node | null)
-              this.visit(child[index] as t.Node, node, path, index, name, inner)
+            if (child[index] as Node | null)
+              this.visit(child[index] as Node, node, path, index, name, inner)
           }
         }
         else if (child !== null && child !== undefined) {
-          this.visit(child as t.Node, node, path, name, undefined, inner)
+          this.visit(child as Node, node, path, name, undefined, inner)
         }
       }
     }
 
     if (crawl && (node.type === 'ExportNamedDeclaration' || node.type === 'ExportDefaultDeclaration'))
-      this.exportedReferences(path as Path<t.ExportNamedDeclaration | t.ExportDefaultDeclaration>)
+      this.exportedReferences(path as Path<NodeOfType<'ExportNamedDeclaration' | 'ExportDefaultDeclaration'>>)
   }
 
   // The scope a node is read in, which is its own when the node makes one.
@@ -368,8 +368,8 @@ class Analysis {
     const { node, parent, parentPath } = path
     let holder = parentPath
 
-    // A method's key and a `switch`'s subject, are read outside the scope of the node holding them.
-    if (holder && (((path.key === 'key' || path.listKey === 'decorators') && METHOD_TYPES.has(holder.node.type)) || (path.key === 'discriminant' && holder.node.type === 'SwitchStatement')))
+    // A `switch`'s subject is read outside the scope of the node holding it.
+    if (holder && path.key === 'discriminant' && holder.node.type === 'SwitchStatement')
       holder = holder.parentPath
 
     return !makesScope(node, parent) ? holder!.scope : new Scope(path, enclosingScope(path))
@@ -392,14 +392,14 @@ class Analysis {
       this.blockScoped(path)
 
       if (node.type === 'FunctionDeclaration')
-        this.params(path as Path<t.FunctionDeclaration>)
+        this.params(path as Path<NodeOfType<'FunctionDeclaration'>>)
     }
     else if (node.type === 'TSImportEqualsDeclaration') {
       this.declare(path.scope.functionOrProgram(), 'unknown', node, path)
       this.declare(path.scope.blockParent(), 'unknown', node, path)
     }
     else if (node.type === 'ImportDeclaration') {
-      this.imports(path as Path<t.ImportDeclaration>)
+      this.imports(path as Path<NodeOfType<'ImportDeclaration'>>)
     }
     else if (node.type === 'Identifier' || node.type === 'JSXIdentifier') {
       if (path.isReferencedIdentifier() && !(path.parent.type === 'TSQualifiedName' && path.parent.right === node) && path.parentPath!.node.type !== 'TSImportEqualsDeclaration')
@@ -421,7 +421,7 @@ class Analysis {
       this.declare(path.scope, 'let', node, path)
     }
     else if (FUNCTION_TYPES.has(node.type)) {
-      this.params(path as Path<t.Function>)
+      this.params(path as Path<AnyFunction>)
 
       if (node.type === 'FunctionExpression' && node.id)
         this.declare(path.scope, 'local', node.id, path.get('id'), path)
@@ -431,18 +431,18 @@ class Analysis {
     }
   }
 
-  private params(path: Path<t.Function>) {
+  private params(path: Path<AnyFunction>) {
     for (const [index, param] of path.node.params.entries())
       this.declare(path.scope, 'param', param, new Path(param, path.node, path, index, 'params', path.scope))
   }
 
-  private imports(path: Path<t.ImportDeclaration>) {
+  private imports(path: Path<NodeOfType<'ImportDeclaration'>>) {
     const { node } = path
-    const typeOnly = node.importKind === 'type' || node.importKind === 'typeof'
+    const typeOnly = node.importKind === 'type'
     const scope = path.scope.blockParent()
 
     for (const [index, specifier] of node.specifiers.entries()) {
-      const isType = typeOnly || (specifier.type === 'ImportSpecifier' && (specifier.importKind === 'type' || specifier.importKind === 'typeof'))
+      const isType = typeOnly || (specifier.type === 'ImportSpecifier' && (specifier.importKind === 'type'))
 
       this.declare(scope, isType ? 'unknown' : 'module', specifier, new Path(specifier, node, path, index, 'specifiers', path.scope))
     }
@@ -477,7 +477,7 @@ class Analysis {
   }
 
   // An exported name counts as read, at the exported declaration's end.
-  private exportedReferences(path: Path<t.ExportNamedDeclaration | t.ExportDefaultDeclaration>) {
+  private exportedReferences(path: Path<NodeOfType<'ExportNamedDeclaration' | 'ExportDefaultDeclaration'>>) {
     const declaration = path.node.declaration
 
     if (!declaration)
@@ -494,7 +494,7 @@ class Analysis {
   }
 
   // Declares what `node` declares in `scope`, as `path` (or `binding`, when that is another path) does.
-  private declare(scope: Scope, kind: BindingKind, node: t.Node | null, path: Path, binding: Path = path) {
+  private declare(scope: Scope, kind: BindingKind, node: Node | null, path: Path, binding: Path = path) {
     if (!node)
       return
 
@@ -552,7 +552,7 @@ function initInLoop(path: Path): boolean {
   return false
 }
 
-function makesScope(node: t.Node, parent: t.Node): boolean {
+function makesScope(node: Node, parent: Node): boolean {
   if (node.type === 'BlockStatement' && (FUNCTION_TYPES.has(parent.type) || parent.type === 'CatchClause'))
     return false
 
@@ -562,19 +562,10 @@ function makesScope(node: t.Node, parent: t.Node): boolean {
   return SCOPABLE_TYPES.has(node.type)
 }
 
-// The scope around a scope's node, which skips the node holding it when it is a method's key.
+// The scope around a scope's node.
 function enclosingScope(path: Path): Scope | null {
-  let current: Path | null = path
-
-  while (current) {
-    const skip = current.key === 'key' || current.listKey === 'decorators'
-
-    current = current.parentPath
-
-    if (skip && current && METHOD_TYPES.has(current.node.type))
-      current = current.parentPath
-
-    if (current && makesScope(current.node, current.parent))
+  for (let current = path.parentPath; current; current = current.parentPath) {
+    if (makesScope(current.node, current.parent))
       return current.scope
   }
 
@@ -582,9 +573,9 @@ function enclosingScope(path: Path): Scope | null {
 }
 
 // The names an assignment, an update, a `delete` or a loop writes.
-function assignedNames(node: t.Node): string[] {
+function assignedNames(node: Node): string[] {
   const names = new Set<string>()
-  const search: (t.Node | null)[] = [node]
+  const search: (Node | null)[] = [node]
 
   while (search.length > 0) {
     const current = search.pop()
@@ -598,7 +589,7 @@ function assignedNames(node: t.Node): string[] {
       search.push(current.left)
     else if (current.type === 'ObjectPattern')
       search.push(...current.properties)
-    else if (current.type === 'ObjectProperty')
+    else if (current.type === 'Property')
       search.push(current.value)
     else if (current.type === 'RestElement' || current.type === 'UpdateExpression' || (current.type === 'UnaryExpression' && current.operator === 'delete'))
       search.push(current.argument)
@@ -610,8 +601,8 @@ function assignedNames(node: t.Node): string[] {
 }
 
 // Gives each identifier a declaration declares, in the order Babel's `getBindingIdentifiers` finds them; `outerOnly` stops at the function expressions inside it.
-function bindingIdentifiers(root: t.Node, outerOnly: boolean, add: (name: string, identifier: t.Identifier) => void) {
-  const search: (t.Node | null | undefined)[] = [root]
+function bindingIdentifiers(root: Node, outerOnly: boolean, add: (name: string, identifier: Identifier) => void) {
+  const search: (Node | null | undefined)[] = [root]
 
   for (const node of search) {
     if (!node)
@@ -647,7 +638,7 @@ function bindingIdentifiers(root: t.Node, outerOnly: boolean, add: (name: string
       continue
 
     for (const key of keys) {
-      const child = (node as unknown as Record<string, t.Node | t.Node[] | null>)[key]
+      const child = (node as unknown as Record<string, Node | Node[] | null>)[key]
 
       if (Array.isArray(child))
         search.push(...child)
@@ -659,22 +650,25 @@ function bindingIdentifiers(root: t.Node, outerOnly: boolean, add: (name: string
 
 const DECLARATIONS = new Set(['FunctionDeclaration', 'VariableDeclaration', 'ClassDeclaration', 'ImportDeclaration', 'TSDeclareFunction', 'TSInterfaceDeclaration', 'TSTypeAliasDeclaration', 'TSEnumDeclaration', 'TSModuleDeclaration', 'TSImportEqualsDeclaration'])
 
-function isDeclaration(node: t.Node): boolean {
+function isDeclaration(node: Node): boolean {
   return DECLARATIONS.has(node.type)
 }
 
 // The parents whose identifiers declare, label or name something rather than read a value.
-const NOT_READING = new Set(['PrivateName', 'LabeledStatement', 'CatchClause', 'RestElement', 'BreakStatement', 'ContinueStatement', 'FunctionDeclaration', 'FunctionExpression', 'ExportNamespaceSpecifier', 'ExportDefaultSpecifier', 'ImportDefaultSpecifier', 'ImportNamespaceSpecifier', 'ImportSpecifier', 'ImportAttribute', 'JSXAttribute', 'ObjectPattern', 'ArrayPattern', 'MetaProperty'])
+const NOT_READING = new Set(['LabeledStatement', 'CatchClause', 'RestElement', 'BreakStatement', 'ContinueStatement', 'FunctionDeclaration', 'FunctionExpression', 'ExportNamespaceSpecifier', 'ExportDefaultSpecifier', 'ImportDefaultSpecifier', 'ImportNamespaceSpecifier', 'ImportSpecifier', 'ImportAttribute', 'JSXAttribute', 'ObjectPattern', 'ArrayPattern', 'MetaProperty', 'TSTypeParameter'])
 
 // Whether an identifier whose parent is `parent` reads a value, rather than names a property, a parameter or a label.
-function isReferenced(node: t.Node, parent: t.Node, grandparent: t.Node | undefined): boolean {
+function isReferenced(node: Node, parent: Node, grandparent: Node | undefined): boolean {
   const { type } = parent
 
   if (NOT_READING.has(type))
     return false
 
-  if (type === 'MemberExpression' || type === 'OptionalMemberExpression')
-    return (parent as t.MemberExpression).property === node ? Boolean((parent as t.MemberExpression).computed) : (parent as t.MemberExpression).object === node
+  if (type === 'MemberExpression') {
+    const member = parent as NodeOfType<'MemberExpression'>
+
+    return member.property === node ? member.computed : member.object === node
+  }
 
   if (type === 'JSXMemberExpression')
     return (parent).object === node
@@ -685,32 +679,35 @@ function isReferenced(node: t.Node, parent: t.Node, grandparent: t.Node | undefi
   if (type === 'ArrowFunctionExpression')
     return (parent).body === node
 
-  if (type === 'ClassMethod' || type === 'ClassPrivateMethod' || type === 'ObjectMethod')
-    return (parent as t.ClassMethod).key === node ? Boolean((parent as t.ClassMethod).computed) : false
+  if (type === 'MethodDefinition' || type === 'TSAbstractMethodDefinition')
+    return (parent).key === node ? (parent).computed : false
 
-  if (type === 'ObjectProperty')
-    return (parent).key === node ? Boolean((parent).computed) : grandparent?.type !== 'ObjectPattern'
+  if (type === 'Property') {
+    const property = parent as NodeOfType<'Property'>
 
-  if (type === 'ClassProperty' || type === 'ClassAccessorProperty')
-    return (parent as t.ClassProperty).key === node ? Boolean((parent as t.ClassProperty).computed) : true
+    return property.key === node ? property.computed : grandparent?.type !== 'ObjectPattern'
+  }
 
-  if (type === 'ClassPrivateProperty')
-    return (parent).key !== node
+  if (type === 'PropertyDefinition' || type === 'AccessorProperty' || type === 'TSAbstractPropertyDefinition' || type === 'TSAbstractAccessorProperty')
+    return (parent as NodeOfType<'PropertyDefinition'>).key === node ? (parent as NodeOfType<'PropertyDefinition'>).computed : true
 
   if (type === 'ClassDeclaration' || type === 'ClassExpression')
-    return (parent as t.ClassDeclaration).superClass === node
+    return (parent).superClass === node
 
   if (type === 'AssignmentExpression' || type === 'AssignmentPattern')
-    return (parent as t.AssignmentExpression).right === node
+    return (parent as NodeOfType<'AssignmentExpression'>).right === node
 
   if (type === 'ExportSpecifier')
-    return (grandparent as t.ExportNamedDeclaration | undefined)?.source ? false : (parent).local === node
+    return (grandparent as NodeOfType<'ExportNamedDeclaration'> | undefined)?.source ? false : (parent).local === node
 
   if (type === 'TSEnumMember')
     return (parent).id !== node
 
+  if (type === 'TSMappedType')
+    return (parent).key !== node
+
   if (type === 'TSPropertySignature')
-    return (parent).key === node ? (parent).computed === true : true
+    return (parent).key === node ? (parent).computed : true
 
   return true
 }

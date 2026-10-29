@@ -1,7 +1,7 @@
-import type * as t from '@babel/types'
 import type { Node } from '../compiler/ast'
-import { parse } from '@babel/parser'
+import type { Node as EstreeNode, Expression, NodeOfType, Program } from '../compiler/estree'
 import { elementsIn } from '../compiler/ast'
+import { parseProgram } from '../compiler/estree'
 import { objectOf, unwrapped } from '../compiler/object-literal'
 import { KAY_FILE } from './files'
 
@@ -27,7 +27,7 @@ export function rendersContent(template: readonly Node[]): boolean {
 export function importedNames(code: string): Map<string, Set<string>> {
   const names = new Map<string, Set<string>>()
 
-  for (const statement of parsed(code)?.program.body ?? []) {
+  for (const statement of parsed(code)?.body ?? []) {
     if (statement.type !== 'ImportDeclaration' || statement.importKind === 'type')
       continue
 
@@ -49,9 +49,9 @@ export function importedNames(code: string): Map<string, Set<string>> {
 // The `.kay` components each collection a module exports hands its Markdown, as written: `collection(folder, { components: { Chart } })` with `Chart` imported from a `.kay` file.
 // A collection kay cannot read that way, its components spread from elsewhere or built at run time, gives none.
 export function collectionComponents(code: string): Map<string, string[]> {
-  const body = parsed(code)?.program.body ?? []
+  const body = parsed(code)?.body ?? []
   const bindings = new Map<string, Binding>()
-  const declared = new Map<string, t.Expression>()
+  const declared = new Map<string, Expression>()
   const exported = new Map<string, string>()
 
   for (const statement of body) {
@@ -76,7 +76,7 @@ export function collectionComponents(code: string): Map<string, string[]> {
     if (statement.type === 'ExportNamedDeclaration' && !statement.source) {
       for (const specifier of statement.specifiers) {
         if (specifier.type === 'ExportSpecifier')
-          exported.set(nameOf(specifier.exported), specifier.local.name)
+          exported.set(nameOf(specifier.exported), nameOf(specifier.local))
       }
     }
 
@@ -84,7 +84,7 @@ export function collectionComponents(code: string): Map<string, string[]> {
       exported.set('default', statement.declaration.name)
   }
 
-  const isCollection = (callee: t.Node) => {
+  const isCollection = (callee: EstreeNode) => {
     const binding = callee.type === 'Identifier' ? bindings.get(callee.name) : undefined
 
     return binding?.source === 'kay/content' && binding.imported === 'collection'
@@ -98,9 +98,9 @@ export function collectionComponents(code: string): Map<string, string[]> {
     if (call?.type !== 'CallExpression' || !isCollection(call.callee))
       continue
 
-    const property = objectOf(call.arguments[1], declared)?.properties.find((candidate): candidate is t.ObjectProperty => candidate.type === 'ObjectProperty' && !candidate.computed && keyOf(candidate.key) === 'components')
-    const files = (objectOf(property?.value, declared)?.properties ?? []).flatMap((entry) => {
-      const value = entry.type === 'ObjectProperty' ? unwrapped(entry.value) : undefined
+    const property = objectOf(call.arguments[1], declared)?.properties.find(candidate => candidate.type === 'Property' && candidate.kind === 'init' && !candidate.method && !candidate.computed && keyOf(candidate.key) === 'components')
+    const files = (objectOf(property?.type === 'Property' ? property.value : undefined, declared)?.properties ?? []).flatMap((entry) => {
+      const value = entry.type === 'Property' && entry.kind === 'init' && !entry.method ? unwrapped(entry.value) : undefined
       const binding = value?.type === 'Identifier' ? bindings.get(value.name) : undefined
 
       return binding?.imported === 'default' && KAY_FILE.test(binding.source) ? [binding.source] : []
@@ -112,29 +112,29 @@ export function collectionComponents(code: string): Map<string, string[]> {
   return components
 }
 
-function parsed(code: string): t.File | undefined {
+function parsed(code: string): Program | undefined {
   try {
-    return parse(code, { sourceType: 'module', allowAwaitOutsideFunction: true, allowReturnOutsideFunction: true, errorRecovery: true, plugins: ['typescript'] })
+    return parseProgram(code, { returnOutside: true, recover: true }).program
   }
   catch {
     return undefined
   }
 }
 
-function nameOf(node: t.Identifier | t.StringLiteral): string {
-  return node.type === 'Identifier' ? node.name : node.value
+function nameOf(node: EstreeNode): string {
+  return node.type === 'Identifier' ? node.name : String((node as { value?: unknown }).value)
 }
 
-function importedName(specifier: t.ImportDeclaration['specifiers'][number]): string {
+function importedName(specifier: NodeOfType<'ImportSpecifier' | 'ImportDefaultSpecifier' | 'ImportNamespaceSpecifier'>): string {
   if (specifier.type === 'ImportSpecifier')
     return nameOf(specifier.imported)
 
   return specifier.type === 'ImportDefaultSpecifier' ? 'default' : '*'
 }
 
-function keyOf(node: t.Node): string | undefined {
+function keyOf(node: EstreeNode): string | undefined {
   if (node.type === 'Identifier')
     return node.name
 
-  return node.type === 'StringLiteral' ? node.value : undefined
+  return node.type === 'Literal' && typeof node.value === 'string' ? node.value : undefined
 }

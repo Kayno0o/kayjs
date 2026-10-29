@@ -1,6 +1,7 @@
-import type * as t from '@babel/types'
 import type { Span } from './ast'
-import { parseExpression } from '@babel/parser'
+import type { Expression, Node } from './estree'
+import { parseExpression } from './estree'
+import { ENTITIES } from './jsx-entities'
 
 // The classes whose instances island props carry.
 export const SENDABLE_CLASSES = new Set(['Date', 'Map', 'Set', 'URL', 'URLSearchParams', 'RegExp'])
@@ -17,7 +18,7 @@ export function isFunctionAt(source: string, span: Span, known: Map<number, bool
 
 function isFunctionExpression(code: string): boolean {
   try {
-    const expression = parseExpression(code, { plugins: ['typescript'] })
+    const expression = parseExpression(code, { lang: 'ts' })
 
     return expression.type === 'ArrowFunctionExpression' || expression.type === 'FunctionExpression'
   }
@@ -32,23 +33,25 @@ const NOT_FUNCTIONS = new Set(['name', 'length', 'prototype'])
 const FUNCTION_NAMESPACES = new Set(['Math', 'console', 'JSON', 'Object', 'Array', 'Number', 'String', 'Boolean', 'Date', 'Promise', 'Reflect', 'Intl', 'BigInt'])
 
 // Whether a node reads a function off a global, `Math.max` as a value; `shadowed` says whether the script declares the global's name itself.
-export function isGlobalFunctionMember(node: t.Node, shadowed: (name: string) => boolean): boolean {
-  if ((node.type !== 'MemberExpression' && node.type !== 'OptionalMemberExpression') || node.computed || node.object.type !== 'Identifier' || node.property.type !== 'Identifier')
+export function isGlobalFunctionMember(node: Node, shadowed: (name: string) => boolean): boolean {
+  const member = node.type === 'ChainExpression' ? node.expression : node
+
+  if (member.type !== 'MemberExpression' || member.computed || member.object.type !== 'Identifier' || member.property.type !== 'Identifier')
     return false
 
-  return FUNCTION_NAMESPACES.has(node.object.name) && !shadowed(node.object.name) && LOWERCASE.test(node.property.name) && !NOT_FUNCTIONS.has(node.property.name)
+  return FUNCTION_NAMESPACES.has(member.object.name) && !shadowed(member.object.name) && LOWERCASE.test(member.property.name) && !NOT_FUNCTIONS.has(member.property.name)
 }
 
 // Values no island prop check needs to see.
-const LITERALS = new Set(['StringLiteral', 'NumericLiteral', 'BooleanLiteral', 'NullLiteral', 'BigIntLiteral', 'TemplateLiteral'])
+const isPlainLiteral = (node: Node) => (node.type === 'Literal' && !('regex' in node)) || node.type === 'TemplateLiteral'
 
 // The parts of a prop's value a static parent checks as sent to an island, each on its own, relative to `code`; nothing when it does not parse.
 // A literal array or object, a literal value and the branches of a condition stay out, wrapping them would stop a generic component's other props from typing them, so their parts are checked instead; an operand of `&&`, `||` or `??` is not, as wrapping it would lose what it narrows. `functions` when the value holds one, which is checked apart.
 export function sentParts(code: string): { parts: Span[], functions: boolean } | undefined {
-  let expression: t.Expression
+  let expression: Expression
 
   try {
-    expression = parseExpression(code, { plugins: ['typescript'] })
+    expression = parseExpression(code, { lang: 'ts' })
   }
   catch {
     return undefined
@@ -56,7 +59,7 @@ export function sentParts(code: string): { parts: Span[], functions: boolean } |
 
   const parts: Span[] = []
   let functions = false
-  const visit = (node: t.Node): void => {
+  const visit = (node: Node): void => {
     if (node.type === 'ArrayExpression') {
       for (const element of node.elements) {
         if (element !== null)
@@ -64,15 +67,15 @@ export function sentParts(code: string): { parts: Span[], functions: boolean } |
       }
     }
     // A shorthand property, a getter or a setter has no value apart from its key to wrap, so its object is checked whole, the functions it holds included.
-    else if (node.type === 'ObjectExpression' && node.properties.some(property => property.type === 'ObjectProperty' ? property.shorthand : property.type === 'ObjectMethod' && property.kind !== 'method')) {
-      parts.push({ start: node.start!, end: node.end! })
+    else if (node.type === 'ObjectExpression' && node.properties.some(property => property.type === 'Property' && (property.shorthand || property.kind !== 'init'))) {
+      parts.push({ start: node.start, end: node.end })
     }
     else if (node.type === 'ObjectExpression') {
       for (const property of node.properties) {
-        if (property.type === 'ObjectMethod')
+        if (property.type === 'Property' && property.method)
           functions = true
         else
-          visit(property.type === 'SpreadElement' ? property.argument : property.value)
+          visit(property.type === 'SpreadElement' ? property.argument : (property).value)
       }
     }
     else if (node.type === 'SpreadElement') {
@@ -85,8 +88,8 @@ export function sentParts(code: string): { parts: Span[], functions: boolean } |
     else if (node.type === 'ArrowFunctionExpression' || node.type === 'FunctionExpression') {
       functions = true
     }
-    else if (!LITERALS.has(node.type)) {
-      parts.push({ start: node.start!, end: node.end! })
+    else if (!isPlainLiteral(node)) {
+      parts.push({ start: node.start, end: node.end })
     }
   }
 
@@ -102,28 +105,32 @@ const BUILDER_METHODS = new Set(['map', 'flatMap'])
 
 // Whether an expression may hold a function, a class or an instance of one, which no static parent can send an island: it writes one, or reads one of `names`.
 export function mayHoldFunction(code: string, names: ReadonlySet<string>): boolean {
-  let expression: t.Expression
+  let expression: Expression
 
   try {
-    expression = parseExpression(code, { plugins: ['typescript'] })
+    expression = parseExpression(code, { lang: 'ts' })
   }
   catch {
     return false
   }
 
-  const visit = (value: unknown): boolean => {
+  const visit = (value: unknown, chain = false): boolean => {
     if (Array.isArray(value))
-      return value.some(visit)
+      return value.some(item => visit(item))
 
     if (typeof value !== 'object' || value === null || typeof (value as { type?: unknown }).type !== 'string')
       return false
 
-    const node = value as t.Node
+    const node = value as Node
 
-    if (node.type === 'CallExpression' && node.callee.type === 'MemberExpression' && !node.callee.computed && node.callee.property.type === 'Identifier' && PREDICATE_METHODS.has(node.callee.property.name))
+    // A chain's calls and members, the spine from the expression down its callees and objects, were Babel's optional ones, which the checks below leave out.
+    if (node.type === 'ChainExpression')
+      return visit(node.expression, true)
+
+    if (!chain && node.type === 'CallExpression' && node.callee.type === 'MemberExpression' && !node.callee.computed && node.callee.property.type === 'Identifier' && PREDICATE_METHODS.has(node.callee.property.name))
       return visit(node.callee.object)
 
-    if (node.type === 'CallExpression' && node.callee.type === 'MemberExpression' && !node.callee.computed && node.callee.property.type === 'Identifier' && BUILDER_METHODS.has(node.callee.property.name)) {
+    if (!chain && node.type === 'CallExpression' && node.callee.type === 'MemberExpression' && !node.callee.computed && node.callee.property.type === 'Identifier' && BUILDER_METHODS.has(node.callee.property.name)) {
       const [callback, ...rest] = node.arguments
       // `rows.map(Math.abs)` calls the function, it does not pass it on.
       const body = callback?.type === 'ArrowFunctionExpression' && !callback.async ? callback.body : callback
@@ -132,11 +139,11 @@ export function mayHoldFunction(code: string, names: ReadonlySet<string>): boole
     }
 
     // A call of `Math.max` returns what its arguments make, it does not pass the function on.
-    if ((node.type === 'CallExpression' || node.type === 'OptionalCallExpression') && isGlobalFunctionMember(node.callee, name => names.has(name)))
+    if (node.type === 'CallExpression' && isGlobalFunctionMember(node.callee, name => names.has(name)))
       return visit(node.arguments)
 
     // A property of a global's function, `Math.max.name`, is not the function.
-    if ((node.type === 'MemberExpression' || node.type === 'OptionalMemberExpression') && !node.computed && node.property.type === 'Identifier' && NOT_FUNCTIONS.has(node.property.name) && isGlobalFunctionMember(node.object, name => names.has(name)))
+    if (node.type === 'MemberExpression' && !node.computed && node.property.type === 'Identifier' && NOT_FUNCTIONS.has(node.property.name) && isGlobalFunctionMember(node.object, name => names.has(name)))
       return false
 
     if (node.type === 'ArrowFunctionExpression' || node.type === 'FunctionExpression' || node.type === 'ClassExpression' || isGlobalFunctionMember(node, name => names.has(name)))
@@ -145,28 +152,38 @@ export function mayHoldFunction(code: string, names: ReadonlySet<string>): boole
     if (node.type === 'NewExpression' && (node.callee.type !== 'Identifier' || !SENDABLE_CLASSES.has(node.callee.name)))
       return true
 
-    return node.type === 'Identifier' ? names.has(node.name) : Object.values(node).some(visit)
+    if (node.type === 'Identifier')
+      return names.has(node.name)
+
+    // A method, getter or setter is a function value in oxc's tree, which Babel walked into rather than counting as a function.
+    if (node.type === 'Property' && (node.method || node.kind !== 'init'))
+      return visit(node.key) || Object.values(node.value).some(child => visit(child))
+
+    const spine = chain && (node.type === 'CallExpression' || node.type === 'MemberExpression')
+
+    return Object.entries(node).some(([key, child]) => visit(child, spine && (key === 'callee' || key === 'object')))
   }
 
   return visit(expression)
 }
 
-// The string a JSX attribute or text spells, its entities decoded, as a component receives it.
+// The character references of a JSX string attribute: decimal, hexadecimal (a lowercase `x`) and the named ones of XHTML, whose names are at most nine characters.
+const REFERENCE = /&(?:#(\d+)|#x([\da-fA-F]+)|(\w{1,9}));/g
+
+// The string a JSX attribute spells, its entities decoded, as a component receives it.
 export function decodeEntities(text: string): string {
   if (!text.includes('&'))
     return text
 
   try {
-    const expression = parseExpression(`<a b="${text.replaceAll('"', '&quot;')}" />`, { plugins: ['jsx'] })
+    return text.replace(REFERENCE, (reference, decimal?: string, hex?: string, name?: string) => {
+      if (name !== undefined)
+        return ENTITIES.get(name) ?? reference
 
-    if (expression.type === 'JSXElement') {
-      const value = expression.openingElement.attributes[0]
-
-      if (value?.type === 'JSXAttribute' && value.value?.type === 'StringLiteral')
-        return value.value.value
-    }
+      return String.fromCodePoint(Number.parseInt(decimal ?? hex!, decimal === undefined ? 16 : 10))
+    })
   }
-  catch {}
-
-  return text
+  catch {
+    return text
+  }
 }

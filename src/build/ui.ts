@@ -1,11 +1,12 @@
-import type * as t from '@babel/types'
 import type { Dirent } from 'node:fs'
+import type { ExportDefaultDeclaration, ObjectProperty } from 'oxc-parser'
 import type { Span } from '../compiler/ast'
+import type { Node, Program } from '../compiler/estree'
 import type { UiEntry } from '../runtime/ui'
 import { readdirSync, readFileSync, realpathSync, statSync } from 'node:fs'
 import { basename, dirname, join } from 'node:path'
-import { parse } from '@babel/parser'
 import { componentName, ROUTE_FILES } from '../compiler'
+import { parseProgram } from '../compiler/estree'
 import { constBindings, exportedObject, propertiesOf, unwrapped } from '../compiler/object-literal'
 import { parseKay } from '../compiler/parser'
 
@@ -57,29 +58,30 @@ function record<T>(): Record<string, T> {
   return Object.create(null) as Record<string, T>
 }
 
-function span(node: t.Node): Span {
-  return { start: node.start ?? 0, end: node.end ?? 0 }
+function span(node: Node): Span {
+  return { start: node.start, end: node.end }
 }
 
-export function keyOf(property: t.ObjectProperty): string | undefined {
-  if (property.computed)
+// A method, a getter or a setter has no key a value is written under.
+export function keyOf(property: ObjectProperty): string | undefined {
+  if (property.computed || property.method || property.kind !== 'init')
     return undefined
 
   if (property.key.type === 'Identifier')
     return property.key.name
 
-  if (property.key.type === 'StringLiteral')
-    return property.key.value
+  if (property.key.type !== 'Literal')
+    return undefined
 
-  return property.key.type === 'NumericLiteral' ? String(property.key.value) : undefined
+  return typeof property.key.value === 'string' || typeof property.key.value === 'number' ? String(property.key.value) : undefined
 }
 
 // The classes a literal gives: a string, or a template whose expressions are all names `lookup` answers.
-export function classesOf(node: t.Node, lookup?: (name: string) => string | undefined): string | undefined {
+export function classesOf(node: Node, lookup?: (name: string) => string | undefined): string | undefined {
   const value = unwrapped(node)
 
-  if (value.type === 'StringLiteral')
-    return value.value
+  if (value.type === 'Literal')
+    return typeof value.value === 'string' ? value.value : undefined
 
   if (value.type === 'Identifier')
     return lookup?.(value.name)
@@ -103,7 +105,7 @@ export function classesOf(node: t.Node, lookup?: (name: string) => string | unde
 }
 
 // An object literal of properties named by plain keys, each handed to `each`; anything else is reported where it stands.
-function eachProperty(node: t.Node, what: string, problems: UiProblem[], each: (key: string, value: t.Node, property: t.ObjectProperty) => void): void {
+function eachProperty(node: Node, what: string, problems: UiProblem[], each: (key: string, value: Node, property: ObjectProperty) => void): void {
   const object = unwrapped(node)
 
   if (object.type !== 'ObjectExpression') {
@@ -113,16 +115,16 @@ function eachProperty(node: t.Node, what: string, problems: UiProblem[], each: (
   }
 
   for (const property of object.properties) {
-    const key = property.type === 'ObjectProperty' ? keyOf(property) : undefined
+    const key = property.type === 'Property' ? keyOf(property) : undefined
 
-    if (property.type !== 'ObjectProperty' || key === undefined)
+    if (property.type !== 'Property' || key === undefined)
       problems.push({ ...span(property), message: `${what} takes plain keys`, help: 'write each key as a name or a string, with no spread or computed key' })
     else
       each(key, property.value, property)
   }
 }
 
-function classesProblem(node: t.Node, problems: UiProblem[]): string | undefined {
+function classesProblem(node: Node, problems: UiProblem[]): string | undefined {
   const classes = classesOf(node)
 
   if (classes === undefined)
@@ -132,7 +134,7 @@ function classesProblem(node: t.Node, problems: UiProblem[]): string | undefined
 }
 
 // A variant value's classes: a string for the root, or a string per part.
-function variantClasses(node: t.Node, problems: UiProblem[]): string | Record<string, string> | undefined {
+function variantClasses(node: Node, problems: UiProblem[]): string | Record<string, string> | undefined {
   const root = classesOf(node)
 
   if (root !== undefined)
@@ -150,7 +152,7 @@ function variantClasses(node: t.Node, problems: UiProblem[]): string | Record<st
   return found
 }
 
-function entryOf(node: t.Node, component: UiComponent, problems: UiProblem[]): void {
+function entryOf(node: Node, component: UiComponent, problems: UiProblem[]): void {
   const entry: UiEntry = {}
 
   eachProperty(node, 'A component\'s entry', problems, (key, value, property) => {
@@ -207,8 +209,8 @@ function entryOf(node: t.Node, component: UiComponent, problems: UiProblem[]): v
 }
 
 // The default export of the file: `export default defineUi({ ... })`, or the object itself.
-export function exported(ast: t.File): t.Node | undefined {
-  const statement = ast.program.body.find((item): item is t.ExportDefaultDeclaration => item.type === 'ExportDefaultDeclaration')
+export function exported(program: Program): Node | undefined {
+  const statement = program.body.find((item): item is ExportDefaultDeclaration => item.type === 'ExportDefaultDeclaration')
 
   if (statement === undefined)
     return undefined
@@ -353,16 +355,16 @@ function readUi(file: string): UiSource | undefined {
   }
 
   const problems: UiProblem[] = []
-  let ast: t.File
+  let program: Program
 
   try {
-    ast = parse(source, { sourceType: 'module', plugins: ['typescript'] })
+    program = parseProgram(source).program
   }
   catch (error) {
     return { file, source, components: [], problems: [{ start: 0, end: 0, message: `src/ui.ts does not parse: ${error instanceof Error ? error.message : String(error)}` }] }
   }
 
-  const config = exported(ast)
+  const config = exported(program)
   const components: UiComponent[] = []
 
   if (config === undefined) {
@@ -436,23 +438,23 @@ export interface UiConfigEntry {
 
 // The entries of the object a `src/ui.ts` text exports by default, with their spans, for a tool that rewrites the file; none when it does not parse, and an empty list when it exports no object literal.
 export function uiConfigEntries(text: string): UiConfigEntry[] | undefined {
-  let ast: t.File
+  let program: Program
 
   try {
-    ast = parse(text, { sourceType: 'module', plugins: ['typescript'], createParenthesizedExpressions: true })
+    program = parseProgram(text, { parens: true }).program
   }
   catch {
     return undefined
   }
 
-  const bindings = constBindings(ast.program)
-  const object = exportedObject(ast.program, bindings)
+  const bindings = constBindings(program)
+  const object = exportedObject(program, bindings)
   const entries: UiConfigEntry[] = []
 
   for (const property of object ? propertiesOf(object, bindings) : []) {
-    const key = property.type === 'ObjectProperty' && !property.shorthand ? keyOf(property) : undefined
+    const key = property.type === 'Property' && !property.shorthand ? keyOf(property) : undefined
 
-    if (property.type === 'ObjectProperty' && key !== undefined)
+    if (property.type === 'Property' && key !== undefined)
       entries.push({ key, keySpan: span(property.key), value: span(property.value) })
   }
 

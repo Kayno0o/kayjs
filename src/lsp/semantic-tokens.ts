@@ -1,10 +1,10 @@
-import type * as t from '@babel/types'
 import type { Node, Span } from '../compiler/ast'
+import type { NodeOfType, Program } from '../compiler/estree'
 import type { ImportedSignals, SignalKind } from '../compiler/module-signals'
 import type { Binding, Path } from '../compiler/scope'
 import type { ParsedFence } from '../compiler/script'
-import { parse } from '@babel/parser'
 import { nodeExpressions } from '../compiler/ast'
+import { parseProgram } from '../compiler/estree'
 import { MADE, signalKind } from '../compiler/module-signals'
 import { parseKay } from '../compiler/parser'
 import { patternNames } from '../compiler/pattern-names'
@@ -133,7 +133,7 @@ function signalCategory(kind: 'signal' | 'memo' | 'live'): Category {
 
 // Marks the names a fence declares at its top level, and every read or write of them; `known` holds those of the module that the code reads without declaring, which the server fence hands the script. The categories of what the fence declares are put in `declared`.
 function fenceTokens(fence: ParsedFence, known: Categories, handed: Categories | undefined, add: (span: Span, category: Category, declaration: boolean) => void, declared: Categories, made: ReadonlyMap<string, SignalKind | undefined>, plain: Set<string>): void {
-  const program = fence.ast.program
+  const program = fence.ast
   const own = new Map<string, Category>()
 
   for (const statement of program.body) {
@@ -173,7 +173,7 @@ function fenceTokens(fence: ParsedFence, known: Categories, handed: Categories |
   for (const [name, category] of own)
     declared.set(name, category)
 
-  const categoryOf = (path: Path<t.Identifier>): Category | undefined => {
+  const categoryOf = (path: Path<NodeOfType<'Identifier'>>): Category | undefined => {
     const binding = path.scope.getBinding(path.node.name)
 
     // Babel gives a destructured `catch` parameter no binding, so a read in its block meets the file's name.
@@ -198,19 +198,19 @@ function fenceTokens(fence: ParsedFence, known: Categories, handed: Categories |
 }
 
 // Whether the identifier is, or reads, a name a destructured `catch` parameter declares around it, unless a binding nearer than the `catch` holds the name.
-function declaredByCatch(identifier: Path<t.Identifier>, binding: Binding | undefined): boolean {
+function declaredByCatch(identifier: Path<NodeOfType<'Identifier'>>, binding: Binding | undefined): boolean {
   const clause = identifier.findParent(path => path.node.type === 'CatchClause' && patternNames(path.node.param).includes(identifier.node.name))
 
   return clause !== null && (binding === undefined || clause.isDescendant(binding.scope.path))
 }
 
 // Whether the identifier is declared by a `catch` parameter pattern, which Babel gives no binding when destructured.
-function inCatchParameter(identifier: Path<t.Identifier>): boolean {
+function inCatchParameter(identifier: Path<NodeOfType<'Identifier'>>): boolean {
   return identifier.find(path => path.key === 'param' && path.parentPath?.node.type === 'CatchClause') !== null
 }
 
 // Whether the identifier is a use of the name: a declaration, a read or the left of an assignment, not a property key, a member or a type.
-function isNameSite(identifier: Path<t.Identifier>): boolean {
+function isNameSite(identifier: Path<NodeOfType<'Identifier'>>): boolean {
   const path: Path = identifier
   const parent = path.parent
 
@@ -263,23 +263,23 @@ function binderSpans(node: Node): Span[] {
 }
 
 function expressionTokens(source: string, span: Span, known: Categories, hidden: ReadonlySet<string>, add: (span: Span, category: Category) => void): void {
-  let file: ReturnType<typeof parse>
+  let program: Program
 
   // Parenthesized, so an object literal is the expression and not a block; the columns are one off.
   try {
-    file = parse(`(${source.slice(span.start, span.end)})`, { plugins: ['typescript'] })
+    program = parseProgram(`(${source.slice(span.start, span.end)})`).program
   }
   catch {
     return
   }
 
-  traverse(analyze(file).program, {
+  traverse(analyze(program).program, {
     Identifier(path) {
       // What the expression itself declares, a destructured `catch` parameter included, is never the file's.
       const category = hidden.has(path.node.name) || inCatchParameter(path) || path.scope.getBinding(path.node.name) ? undefined : known.get(path.node.name)
 
       if (category && isNameSite(path))
-        add({ start: span.start + path.node.start! - 1, end: span.start + path.node.end! - 1 }, category)
+        add({ start: span.start + path.node.start - 1, end: span.start + path.node.end - 1 }, category)
     },
   })
 }

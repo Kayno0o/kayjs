@@ -46,15 +46,25 @@ const asyncHooks: Bun.BunPlugin = {
   },
 }
 
-// What a browser lacks of the Node a library written for both reads: Babel asks `process.env` and `process.emitWarning`, which would throw as its chunk evaluates, so they are defined away rather than shimmed.
+const OXC_PARSER = /^oxc-parser$/
+
+// The parser is a native binding, so the browser gets the WebAssembly build the binding package ships as one file, which fetches `parser.wasm32-wasip1.wasm` from beside the bundle (a route of the docs serves it).
+const wasmParser: Bun.BunPlugin = {
+  name: 'playground-wasm-parser',
+  setup(build) {
+    build.onResolve({ filter: OXC_PARSER }, () => ({ path: Bun.resolveSync('@oxc-parser/binding-wasm32-wasip1/package.json', import.meta.dir).replace('package.json', 'browser-bundle.js') }))
+  },
+}
+
+// What a browser lacks of the Node a library written for both reads: the parser asks `process.env` and `process.emitWarning`, which would throw as its chunk evaluates, so they are defined away rather than shimmed.
 const DEFINED = { 'process.env': '{}', 'process.emitWarning': 'undefined' }
 
-// A playground file bundled for the browser when first asked for (the server asks once it listens), then kept: no docs page carries it, and kay's own client build would refuse Babel's reads of `process`.
+// A playground file bundled for the browser when first asked for (the server asks once it listens), then kept: no docs page carries it, and kay's own client build would refuse the parser's reads of `process`.
 export function bundled(file: string, minify: boolean): () => Promise<Bundled> {
   let kept: Promise<Bundled> | undefined
 
   async function build(): Promise<Bundled> {
-    const result = await Bun.build({ entrypoints: [join(import.meta.dir, file)], target: 'browser', format: 'esm', minify, define: DEFINED, plugins: [asyncHooks] })
+    const result = await Bun.build({ entrypoints: [join(import.meta.dir, file)], target: 'browser', format: 'esm', minify, define: DEFINED, plugins: [asyncHooks, wasmParser] })
 
     if (!result.success)
       throw new Error(`The playground's ${file} did not build: ${result.logs.join('\n')}`)

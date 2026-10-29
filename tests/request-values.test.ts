@@ -225,7 +225,7 @@ describe('a production server started from disk', () => {
   const recordOf = async (root: string) => await Bun.file(recorded(root)).json() as Recorded
 
   // The result of `body` after `pages()` ran in a process of its own, with the compiler's files it loaded.
-  const afterPages = (options: string, body: string) => `const options = ${options}\nconst { pages } = await import(${JSON.stringify(resolve('src/server'))})\nconst app = await pages(options)\n${body}\nconsole.log(JSON.stringify({ result, loaded: Object.keys(require.cache).filter(key => key.includes('@babel/parser')).length }))\n`
+  const afterPages = (options: string, body: string) => `const options = ${options}\nconst { pages } = await import(${JSON.stringify(resolve('src/server'))})\nconst app = await pages(options)\n${body}\nconsole.log(JSON.stringify({ result, loaded: Object.keys(require.cache).filter(key => key.includes('oxc-parser')).length }))\n`
 
   // Where the build writes it, apart for each worker of a parallel run.
   const recordFile = (root: string) => join(outputDir(root), 'context-reads.json')
@@ -250,14 +250,14 @@ describe('a production server started from disk', () => {
 
   // The pages of the server started from the build in `options` in a process of its own, with the files of the compiler it loaded.
   async function boot(options: string, paths: string[], headers: Record<string, string> = { 'x-user': 'Ada', 'x-roles': 'admin' }, warned = false) {
-    const script = `const options = ${options}\nconst { pages } = await import(${JSON.stringify(resolve('src/server'))})\nconst app = await pages(options)\nconst answers = []\nfor (const path of ${JSON.stringify(paths)}) {\n  const response = await app.handle(new Request('http://localhost' + path, { headers: ${JSON.stringify(headers)} }))\n  answers.push({ status: response.status, html: await response.text() })\n}\nconsole.log(JSON.stringify({ answers, loaded: Object.keys(require.cache).filter(key => key.includes('@babel/parser')).length }))\n`
+    const script = `const options = ${options}\nconst { pages } = await import(${JSON.stringify(resolve('src/server'))})\nconst app = await pages(options)\nconst answers = []\nfor (const path of ${JSON.stringify(paths)}) {\n  const response = await app.handle(new Request('http://localhost' + path, { headers: ${JSON.stringify(headers)} }))\n  answers.push({ status: response.status, html: await response.text() })\n}\nconsole.log(JSON.stringify({ answers, loaded: Object.keys(require.cache).filter(key => key.includes('oxc-parser')).length }))\n`
 
     return JSON.parse(await run(script, warned)) as { answers: { status: number, html: string }[], loaded: number }
   }
 
   // The routes a scan finds and the packages of the compiler it loaded, with the record of the build or without.
   async function scan(root: string, options: string, recorded: boolean) {
-    const script = `const { routeMounts, scanRoutes } = await import(${JSON.stringify(resolve('src/server/routes'))})\nconst { readContextRecord } = await import(${JSON.stringify(resolve('src/server/context-record'))})\nconst root = ${JSON.stringify(root)}\nconst record = ${recorded} ? await readContextRecord(${JSON.stringify(outputDir(root))}, root) : undefined\nconst routes = await scanRoutes(root + '/src/routes', routeMounts(root, (${options}).extensions), record)\nconst loaded = Object.keys(require.cache).filter(key => key.includes('@babel/parser') || key.includes('context-reads'))\nconsole.log(JSON.stringify({ routes: routes.map(route => [route.pattern, route.layouts]), loaded: loaded.length }))\n`
+    const script = `const { routeMounts, scanRoutes } = await import(${JSON.stringify(resolve('src/server/routes'))})\nconst { readContextRecord } = await import(${JSON.stringify(resolve('src/server/context-record'))})\nconst root = ${JSON.stringify(root)}\nconst record = ${recorded} ? await readContextRecord(${JSON.stringify(outputDir(root))}, root) : undefined\nconst routes = await scanRoutes(root + '/src/routes', routeMounts(root, (${options}).extensions), record)\nconst loaded = Object.keys(require.cache).filter(key => key.includes('oxc-parser') || key.includes('context-reads'))\nconsole.log(JSON.stringify({ routes: routes.map(route => [route.pattern, route.layouts]), loaded: loaded.length }))\n`
 
     return JSON.parse(await run(script)) as { routes: [string, string[]][], loaded: number }
   }
@@ -394,7 +394,7 @@ describe('a production server started from disk', () => {
     await Bun.write(resolve(root, 'src/routes/enter.kay'), '--- server\nimport { t } from \'elysia\'\nimport { action } from \'kay\'\n\nexport const enter = action(t.Object({ name: t.String() }), async (_input, ctx) => {\n  ctx.redirect(\'/plain\')\n})\n---\nform(method="post" action={enter.url})\n  input(name="name")\n  button Go\n')
     await build(options)
 
-    const script = `const options = ${options}\nconst { pages } = await import(${JSON.stringify(resolve('src/server'))})\nconst app = await pages(options)\nconst page = await (await app.handle(new Request('http://localhost/enter'))).text()\nconst url = /action="([^"]+)"/.exec(page)[1]\nconst posted = await app.handle(new Request('http://localhost' + url, { method: 'POST', headers: { origin: 'http://localhost', 'content-type': 'application/x-www-form-urlencoded' }, body: 'name=Ada' }))\nconsole.log(JSON.stringify({ status: posted.status, location: posted.headers.get('location'), loaded: Object.keys(require.cache).filter(key => key.includes('@babel/parser')).length }))\n`
+    const script = `const options = ${options}\nconst { pages } = await import(${JSON.stringify(resolve('src/server'))})\nconst app = await pages(options)\nconst page = await (await app.handle(new Request('http://localhost/enter'))).text()\nconst url = /action="([^"]+)"/.exec(page)[1]\nconst posted = await app.handle(new Request('http://localhost' + url, { method: 'POST', headers: { origin: 'http://localhost', 'content-type': 'application/x-www-form-urlencoded' }, body: 'name=Ada' }))\nconsole.log(JSON.stringify({ status: posted.status, location: posted.headers.get('location'), loaded: Object.keys(require.cache).filter(key => key.includes('oxc-parser')).length }))\n`
 
     expect(JSON.parse(await run(script))).toEqual({ status: 303, location: '/plain', loaded: 0 })
   }, 120_000)
@@ -653,7 +653,7 @@ describe('a production server started from disk', () => {
 
     await build(options)
 
-    const script = `const { registerPrebuiltLoader } = await import(${JSON.stringify(resolve('src/server/prebuilt-loader'))})\nconst answers = await Promise.all([registerPrebuiltLoader(${JSON.stringify(resolve(root))}, ${JSON.stringify(outputDir(root))}), registerPrebuiltLoader(${JSON.stringify(resolve(root))}, ${JSON.stringify(outputDir(root))})])\nconst gate = await import(${JSON.stringify(resolve(root, 'lib/gate.kay'))})\nconsole.log(JSON.stringify({ answers, gate: typeof gate.default, loaded: Object.keys(require.cache).filter(key => key.includes('@babel/parser')).length }))\n`
+    const script = `const { registerPrebuiltLoader } = await import(${JSON.stringify(resolve('src/server/prebuilt-loader'))})\nconst answers = await Promise.all([registerPrebuiltLoader(${JSON.stringify(resolve(root))}, ${JSON.stringify(outputDir(root))}), registerPrebuiltLoader(${JSON.stringify(resolve(root))}, ${JSON.stringify(outputDir(root))})])\nconst gate = await import(${JSON.stringify(resolve(root, 'lib/gate.kay'))})\nconsole.log(JSON.stringify({ answers, gate: typeof gate.default, loaded: Object.keys(require.cache).filter(key => key.includes('oxc-parser')).length }))\n`
 
     expect(JSON.parse(await run(script))).toEqual({ answers: [true, true], gate: 'function', loaded: 0 })
   }, 120_000)

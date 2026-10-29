@@ -1,13 +1,13 @@
-import type * as t from '@babel/types'
+import type { Program } from '../compiler/estree'
 import type { ApiModule } from '../server/api-modules'
 import type { ApiScope } from './api-scope'
-import { parse } from '@babel/parser'
+import { parseProgram } from '../compiler/estree'
 import { apiScope } from './api-scope'
 
 export interface ParsedApi {
   file: string
   source: string
-  ast: t.File
+  ast: Program
   scope: ApiScope
 }
 
@@ -21,7 +21,11 @@ async function parseModules(modules: ApiModule[]): Promise<ParsedApi[]> {
 
   for (const { file, source } of read) {
     try {
-      const ast = parse(source, { sourceType: 'module', plugins: ['typescript'], errorRecovery: true })
+      const { program: ast, errors } = parseProgram(source, { recover: true })
+
+      // A fatal error leaves an empty program, which is no module that parsed.
+      if (errors.length > 0 && ast.body.length === 0)
+        continue
 
       found.push({ file, source, ast, scope: apiScope(ast) })
     }

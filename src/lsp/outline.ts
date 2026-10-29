@@ -1,5 +1,5 @@
-import type * as t from '@babel/types'
 import type { ElementNode, Node, Span } from '../compiler/ast'
+import type { Node as EstreeNode, Program } from '../compiler/estree'
 import type { DocumentSymbol, FoldingRange, Range } from './protocol'
 import { childBlocks } from '../compiler/ast'
 import { parseKay } from '../compiler/parser'
@@ -59,10 +59,10 @@ export function documentSymbols(source: string): DocumentSymbol[] {
 type MakeSymbol = (name: string, kind: number, span: Span, header?: Span, detail?: string, children?: DocumentSymbol[]) => DocumentSymbol
 
 // The top-level names of a fence: props, signals, actions, functions and variables.
-function declarations(fence: { ast: { program: t.Program }, shift: (node: t.Node) => Span }, symbol: MakeSymbol, actions = new Set<string>()): DocumentSymbol[] {
+function declarations(fence: { ast: Program, shift: (node: EstreeNode) => Span }, symbol: MakeSymbol, actions = new Set<string>()): DocumentSymbol[] {
   const found: DocumentSymbol[] = []
 
-  for (const statement of fence.ast.program.body) {
+  for (const statement of fence.ast.body) {
     const declaration = (statement.type === 'ExportNamedDeclaration' ? statement.declaration : statement) ?? undefined
 
     if (declaration?.type === 'FunctionDeclaration' && declaration.id) {
@@ -78,7 +78,7 @@ function declarations(fence: { ast: { program: t.Program }, shift: (node: t.Node
         const span = fence.shift(statement)
 
         if (callee === 'props' && declarator.id.type === 'ObjectPattern') {
-          found.push(...declarator.id.properties.flatMap(property => property.type === 'ObjectProperty' && property.key.type === 'Identifier' ? [symbol(property.key.name, PROPERTY, fence.shift(property), fence.shift(property.key), 'prop')] : []))
+          found.push(...declarator.id.properties.flatMap(property => property.type === 'Property' && property.key.type === 'Identifier' ? [symbol(property.key.name, PROPERTY, fence.shift(property), fence.shift(property.key), 'prop')] : []))
         }
         else if (declarator.id.type === 'Identifier') {
           const name = declarator.id.name

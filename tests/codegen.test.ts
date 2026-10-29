@@ -1,5 +1,5 @@
-import * as parser from '@babel/parser'
 import { describe, expect, it, spyOn } from 'bun:test'
+import * as parser from 'oxc-parser'
 import { compileKay, componentName } from '../src/compiler'
 import { jsonKinds, moduleData, moduleKinds, moduleSignals } from '../src/compiler/module-signals'
 import { CURRENT, defaultName, GENERATED_NAME, PROPS } from '../src/compiler/names'
@@ -598,7 +598,7 @@ describe('fences', () => {
       const lines = source.split('\n')
       const fenceLines = lines.slice(0, lines.findLastIndex(line => line.startsWith('---'))).filter(line => !line.startsWith('---'))
 
-      expect(diagnostics.map(d => d.message)).toEqual(Array.from<string>({ length: broken }).fill('Unterminated string constant.'))
+      expect(diagnostics.map(d => d.message)).toEqual(Array.from<string>({ length: broken }).fill('Unterminated string'))
 
       for (const line of fenceLines) {
         const at = map.toGenerated(source.indexOf(`${line}\n`))!
@@ -618,7 +618,7 @@ describe('fences', () => {
     expect(withBroken.tsx.replace(broken[1]!, '')).toBe(without.tsx)
     expect(withBroken.tsx).toContain('const b = count.\n')
     expect(withBroken.tsx).toContain('import { signal } from \'kay\'')
-    expect(withBroken.diagnostics.map(d => d.message)).toEqual(['Missing semicolon.', '`items` is a signal, read by calling it'])
+    expect(withBroken.diagnostics.map(d => d.message)).toEqual(['Expected a semicolon or an implicit semicolon after a statement, but found none', '`items` is a signal, read by calling it'])
   })
 
   it('blame the statement left unfinished, not the good one that follows it', () => {
@@ -749,22 +749,19 @@ describe('fences', () => {
     const script = 'const a = signal(true)\nconst f = () => 1\nconst g = () => 2\n'
     const server = 'import { t } from \'kay\'\n\nexport const page = { query: t.Object({}) }\n'
     const source = `--- server\n${server}---\n---\nimport { signal } from 'kay'\n${script}---\nbutton(onclick={a() ? f : g}) x\n`
-    const parse = spyOn(parser, 'parse')
-    const parseExpression = spyOn(parser, 'parseExpression')
+    const parse = spyOn(parser, 'parseSync')
 
     try {
       for (const options of [{ check: true }, { output: 'html' as const }, { output: 'dom' as const }]) {
         parse.mockClear()
-        parseExpression.mockClear()
         compileKay(source, 'test.kay', options)
 
-        expect(parse.mock.calls.filter(([code]) => code === server || code === `import { signal } from 'kay'\n${script}`)).toHaveLength(2)
-        expect(parseExpression.mock.calls.filter(([code]) => code === 'a() ? f : g').length).toBeLessThanOrEqual(1)
+        expect(parse.mock.calls.filter(([, code]) => code === server || code === `import { signal } from 'kay'\n${script}`)).toHaveLength(2)
+        expect(parse.mock.calls.filter(([, code]) => code === '(a() ? f : g\n)').length).toBeLessThanOrEqual(1)
       }
     }
     finally {
       parse.mockRestore()
-      parseExpression.mockRestore()
     }
   })
 })
@@ -1207,17 +1204,17 @@ describe('invalid code', () => {
 
   it('reports template expressions that do not parse at their position in the source', () => {
     expect(at('p {x +}')).toEqual([{ message: expect.stringContaining('Unexpected token'), text: '}' }])
-    expect(at('---\nconst p = 1\n---\np {await p}')).toEqual([{ message: expect.stringContaining('\'await\''), text: 'await' }])
+    expect(at('---\nconst p = 1\n---\np {await p}')).toEqual([{ message: expect.stringContaining('`await`'), text: 'await' }])
     expect(compileKay('---\nconst p = 1\n---\np {await p}', 'test.kay').diagnostics[0]?.help).toBe('read async data in the `--- server` fence')
   })
 
   it('reports code that does not parse in a fence at its position, with no position of its own in the message', () => {
-    expect(at('---\nconst a = 1 2\n---\np {a}')).toEqual([{ message: 'Missing semicolon.', text: ' 2\n--' }])
+    expect(at('---\nconst a = 1 2\n---\np {a}')).toEqual([{ message: 'Expected a semicolon or an implicit semicolon after a statement, but found none', text: ' 2\n--' }])
     expect(at('--- server\nconst a = \n---\np {a}')).toEqual([{ message: 'Unexpected token', text: '---\np' }])
   })
 
   it('flags an await in the component script', () => {
-    expect(at('---\nconst x = await Promise.resolve(1)\n---\np {x}')).toEqual([{ message: expect.stringContaining('\'await\''), text: 'await' }])
+    expect(at('---\nconst x = await Promise.resolve(1)\n---\np {x}')).toEqual([{ message: expect.stringContaining('`await`'), text: 'await' }])
   })
 
   it('reports a duplicate declaration, which the generated code cannot hold', () => {
@@ -1294,7 +1291,7 @@ describe('signal writes', () => {
 
     for (const { tsx: code, diagnostics } of [runs, served, checked]) {
       expect(diagnostics.map(d => d.message)).toEqual([])
-      expect(() => parser.parse(code, { sourceType: 'module', plugins: ['typescript', 'jsx'] })).not.toThrow()
+      expect(parser.parseSync('test.tsx', code).errors).toEqual([])
     }
 
     for (const { tsx: code } of [runs, served]) {

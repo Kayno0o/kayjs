@@ -1,9 +1,9 @@
-import type * as t from '@babel/types'
+import type { Node, Program } from './compiler/estree'
 import { existsSync } from 'node:fs'
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
-import { parse } from '@babel/parser'
 import { detectFeatures } from './add'
+import { parseProgram } from './compiler/estree'
 import { resourceFiles, withTable } from './generate-resource'
 
 const KINDS = ['page', 'component', 'island', 'action', 'api', 'guard', 'resource'] as const
@@ -176,10 +176,10 @@ async function pageBelow(dir: string, name: string): Promise<string | undefined>
 
 // The names a server fence declares or imports at its top level and the ones it exports, read from its parsed statements so a comment, a string or a handler's own local never counts; `undefined` when it does not parse.
 function topLevelNames(source: string): { declared: Set<string>, exported: Set<string> } | undefined {
-  let program: t.Program
+  let program: Program
 
   try {
-    program = parse(source, { sourceType: 'module', plugins: ['typescript'] }).program
+    program = parseProgram(source).program
   }
   catch {
     return undefined
@@ -187,7 +187,7 @@ function topLevelNames(source: string): { declared: Set<string>, exported: Set<s
 
   const declared = new Set<string>()
   const exported = new Set<string>()
-  const bind = (pattern: t.Node | null | undefined, into: Set<string>) => {
+  const bind = (pattern: Node | null | undefined, into: Set<string>) => {
     if (pattern?.type === 'Identifier') {
       into.add(pattern.name)
     }
@@ -204,13 +204,13 @@ function topLevelNames(source: string): { declared: Set<string>, exported: Set<s
       for (const element of pattern.elements) bind(element, into)
     }
   }
-  const declare = (statement: t.Statement | t.Declaration, exports: boolean) => {
-    const ids: t.Node[] = []
+  const declare = (statement: Node, exports: boolean) => {
+    const ids: (Node | null)[] = []
 
     if (statement.type === 'VariableDeclaration')
       ids.push(...statement.declarations.map(declarator => declarator.id))
     else if (statement.type === 'FunctionDeclaration' || statement.type === 'ClassDeclaration' || statement.type === 'TSEnumDeclaration' || statement.type === 'TSModuleDeclaration' || statement.type === 'TSDeclareFunction')
-      ids.push(statement.id as t.Node)
+      ids.push(statement.id)
     else if (statement.type === 'TSImportEqualsDeclaration')
       ids.push(statement.id)
 
@@ -237,7 +237,7 @@ function topLevelNames(source: string): { declared: Set<string>, exported: Set<s
       }
     }
     else if (statement.type === 'ExportDefaultDeclaration') {
-      declare(statement.declaration as t.Statement, false)
+      declare(statement.declaration, false)
     }
     else {
       declare(statement, false)

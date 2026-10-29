@@ -1,11 +1,12 @@
-import type * as t from '@babel/types'
+import type { Statement } from 'oxc-parser'
+import type { Lang, Node, NodeOfType, Program } from '../compiler/estree'
 import type { Path, Scope } from '../compiler/scope'
 import { readFileSync } from 'node:fs'
 import { builtinModules } from 'node:module'
 import { basename, join, relative, resolve, sep } from 'node:path'
 import process from 'node:process'
-import { parse } from '@babel/parser'
 import { KayError } from '../compiler/errors'
+import { parseProgram } from '../compiler/estree'
 import { parseKay } from '../compiler/parser'
 import { eachDescendant, walkScope } from '../compiler/walk'
 import { readCacheEntry, writeCacheEntry } from './cache'
@@ -22,9 +23,9 @@ const BUILTIN_REFUSAL = /^Browser build cannot import (?:Node\.js|Bun) builtin/
 const PACKAGE_PATH = /node_modules\/((?:@[^/]+\/)?[^/]+)/
 // Under the build cache: each chunk's scan by a hash of its content, its server-only names or null where it did not parse.
 const SCANS_FILE = 'server-only.json'
-const SCANNER_PACKAGES = ['@babel/parser/package.json']
+const SCANNER_PACKAGES = ['oxc-parser/package.json']
 // The scope pass the scan reads names with.
-const SCANNER_MODULES = ['../compiler/scope.ts', '../compiler/walk.ts', '../compiler/babel-shapes.ts']
+const SCANNER_MODULES = ['../compiler/scope.ts', '../compiler/walk.ts', '../compiler/estree.ts', '../compiler/estree-shapes.ts']
 let scannerKey: string | undefined
 
 type Scans = Record<string, string[] | null>
@@ -112,11 +113,11 @@ export function loadTimeReads(source: string, path: string): LoadTimeRead[] {
       Identifier(path) {
         const { name } = path.node
 
-        if (!path.isReferencedIdentifier() || path.getFunctionParent() !== null || path.findParent(parent => parent.isTSType() || ((parent.node.type === 'ClassProperty' || parent.node.type === 'ClassPrivateProperty') && !parent.node.static)) !== null)
+        if (!path.isReferencedIdentifier() || path.getFunctionParent() !== null || path.findParent(parent => parent.isTSType() || ((parent.node.type === 'PropertyDefinition' || parent.node.type === 'TSAbstractPropertyDefinition') && !parent.node.static)) !== null)
           return
 
         if (SERVER_ONLY.has(name) && !path.scope.hasBinding(name, true) && !defined(path) && !guarded(path, name))
-          found.push({ name, start: start + path.node.start! })
+          found.push({ name, start: start + path.node.start })
       },
     })
   }
@@ -124,7 +125,7 @@ export function loadTimeReads(source: string, path: string): LoadTimeRead[] {
   return found
 }
 
-function namesIn(program: t.File): Set<string> {
+function namesIn(program: Program): Set<string> {
   const found = new Set<string>()
 
   // A name declared in two fences is refused by Babel's scope, and reports nothing here: the fence reports it itself.
@@ -149,22 +150,21 @@ function namesIn(program: t.File): Set<string> {
 const TS_MODULE = /\.[cm]?ts$/
 const JS_MODULE = /\.[cm]?js$/
 
-type Syntax = 'js' | 'ts' | 'tsx'
-
 // A project's own module is TypeScript, and TSX but for a plain `.ts`, where `<T>x` is a cast and not an element; a plain JavaScript one, a package's say, is read as such.
-function syntaxOf(file: string): Syntax {
+function syntaxOf(file: string): Lang {
   if (JS_MODULE.test(file))
     return 'js'
 
   return TS_MODULE.test(file) ? 'ts' : 'tsx'
 }
 
-const PLUGINS = { js: [], ts: ['typescript'], tsx: ['typescript', 'jsx'] } as const
-
-function parsed(source: string, syntax: Syntax): t.File | undefined {
+// A source oxc cannot read at all gives an empty program with its error, which is no chunk free of reads.
+function parsed(source: string, lang: Lang): Program | undefined {
   try {
     // Built output is plain JavaScript, where `a < b > (c)` is a comparison rather than type arguments.
-    return parse(source, { sourceType: 'unambiguous', allowReturnOutsideFunction: true, errorRecovery: true, attachComment: false, plugins: [...PLUGINS[syntax]] })
+    const { program, errors } = parseProgram(source, { lang, returnOutside: true, recover: true })
+
+    return errors.length > 0 && program.body.length === 0 ? undefined : program
   }
   catch {
     return undefined
@@ -178,26 +178,27 @@ function fences(source: string): string {
 }
 
 // `process.env.NODE_ENV`, which the client build replaces with a literal: a module reading it is not one to go and fix.
-function defined(path: Path<t.Identifier>): boolean {
+function defined(path: Path<NodeOfType<'Identifier'>>): boolean {
   const env = path.parentPath
 
-  if (env?.node.type !== 'MemberExpression' || env.node.object !== path.node || property(env.node) !== 'env')
+  // An optional chain is not what the client build replaces.
+  if (env?.node.type !== 'MemberExpression' || env.node.optional || env.node.object !== path.node || property(env.node) !== 'env')
     return false
 
   const read = env.parentPath?.node
 
-  return read?.type === 'MemberExpression' && property(read) === DEFINED
+  return read?.type === 'MemberExpression' && !read.optional && property(read) === DEFINED
 }
 
-function property(node: t.MemberExpression): string | undefined {
+function property(node: NodeOfType<'MemberExpression'>): string | undefined {
   if (!node.computed && node.property.type === 'Identifier')
     return node.property.name
 
-  return node.property.type === 'StringLiteral' ? node.property.value : undefined
+  return node.property.type === 'Literal' && typeof node.property.value === 'string' ? node.property.value : undefined
 }
 
 // Whether a `typeof` of the same name, or a `try` catching what the read throws, stands between the read and the code around it: the shapes a module takes to run on either side.
-function guarded(path: Path<t.Identifier>, name: string): boolean {
+function guarded(path: Path<NodeOfType<'Identifier'>>, name: string): boolean {
   if (path.parentPath?.node.type === 'UnaryExpression' && path.parentPath.node.operator === 'typeof')
     return true
 
@@ -244,7 +245,7 @@ function exitsEarlier(parent: Path, child: Path, name: string): boolean {
   if (body === undefined)
     return false
 
-  for (const statement of body.slice(0, body.indexOf(child.node as t.Statement))) {
+  for (const statement of body.slice(0, body.indexOf(child.node as Statement))) {
     if (statement.type === 'IfStatement' && asksTypeof(statement.test, name) && exits(statement.consequent))
       return true
   }
@@ -252,14 +253,14 @@ function exitsEarlier(parent: Path, child: Path, name: string): boolean {
   return false
 }
 
-function exits(node: t.Statement): boolean {
+function exits(node: Statement): boolean {
   const last = node.type === 'BlockStatement' ? node.body.at(-1) : node
 
   return last !== undefined && (last.type === 'ReturnStatement' || last.type === 'ThrowStatement')
 }
 
 // Whether a test asks whether the name exists, itself or through a flag it was stored in once.
-function asks(test: t.Node, name: string, scope: Scope): boolean {
+function asks(test: Node, name: string, scope: Scope): boolean {
   if (asksTypeof(test, name))
     return true
 
@@ -275,9 +276,9 @@ function asks(test: t.Node, name: string, scope: Scope): boolean {
 }
 
 // A walk visits a node's children and not the node, which a test of one identifier is made of.
-function references(node: t.Node): Set<string> {
+function references(node: Node): Set<string> {
   const names = new Set<string>()
-  const add = (found: t.Node) => {
+  const add = (found: Node) => {
     if (found.type === 'Identifier')
       names.add(found.name)
   }
@@ -289,9 +290,9 @@ function references(node: t.Node): Set<string> {
 }
 
 // The name the first `typeof` of the node asks about, which must be the one at hand: a guard on another global says nothing about this one.
-function asksTypeof(node: t.Node, name: string): boolean {
+function asksTypeof(node: Node, name: string): boolean {
   let askedOf: string | undefined
-  const ask = (found: t.Node) => {
+  const ask = (found: Node) => {
     if (found.type === 'UnaryExpression' && found.operator === 'typeof' && found.argument.type === 'Identifier')
       askedOf ??= found.argument.name
   }

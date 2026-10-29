@@ -1,8 +1,9 @@
-import type { Comment, Statement } from '@babel/types'
+import type { ModuleExportName } from 'oxc-parser'
+import type { Comment, Node, Program } from '../src/compiler/estree'
 import { readFileSync } from 'node:fs'
 import { dirname, join, relative, resolve } from 'node:path'
 import process from 'node:process'
-import { parse } from '@babel/parser'
+import { parseProgram, positionOf } from '../src/compiler/estree'
 
 // Writes src/server/kept-exports.ts, the class a kept page gives each export of kay's public entries, from the `// kept: <class>` line among the comments right above the export's declaration in its own module: `bun scripts/kept-exports.ts`.
 // `tests/kept-exports.test.ts` fails for an export with no such line and for a map this would write differently.
@@ -38,24 +39,44 @@ interface Trail {
   at?: string | undefined
 }
 
-const modules = new Map<string, Statement[]>()
+interface Module {
+  text: string
+  body: Program['body']
+  comments: Comment[]
+}
 
-function bodyOf(file: string): Statement[] {
-  let body = modules.get(file)
+type Statement = Program['body'][number]
 
-  if (body === undefined)
-    modules.set(file, body = parse(readFileSync(file, 'utf8'), { sourceType: 'module', plugins: ['typescript'] }).program.body)
+const modules = new Map<string, Module>()
 
-  return body
+function moduleOf(file: string): Module {
+  let module = modules.get(file)
+
+  if (module === undefined) {
+    const text = readFileSync(file, 'utf8')
+    const { program, comments } = parseProgram(text)
+
+    modules.set(file, module = { text, body: program.body, comments })
+  }
+
+  return module
+}
+
+function bodyOf(file: string): Program['body'] {
+  return moduleOf(file).body
 }
 
 function resolved(specifier: string, from: string): string {
   return Bun.resolveSync(specifier, dirname(from))
 }
 
-function classOf(comments: readonly Comment[] | null | undefined): string | undefined {
-  for (const comment of comments ?? []) {
-    const found = comment.type === 'CommentLine' ? KEPT.exec(comment.value) : null
+// The class named by the comments between the previous statement and this one,.
+function classOf(file: string, statement: Statement): string | undefined {
+  const { body, comments } = moduleOf(file)
+  const before = body[body.indexOf(statement) - 1]?.end ?? 0
+
+  for (const comment of comments) {
+    const found = comment.type === 'Line' && comment.start >= before && comment.end <= statement.start ? KEPT.exec(comment.value) : null
 
     if (found !== null)
       return found[1]
@@ -64,11 +85,11 @@ function classOf(comments: readonly Comment[] | null | undefined): string | unde
   return undefined
 }
 
-function exportedName(node: { type: 'Identifier', name: string } | { type: 'StringLiteral', value: string }): string {
+function exportedName(node: ModuleExportName): string {
   return node.type === 'Identifier' ? node.name : node.value
 }
 
-function declares(declaration: Statement, name: string): boolean {
+function declares(declaration: Node, name: string): boolean {
   if (declaration.type === 'VariableDeclaration')
     return declaration.declarations.some(declarator => declarator.id.type === 'Identifier' && declarator.id.name === name)
 
@@ -96,9 +117,9 @@ function bindingClass(file: string, name: string, trail: Trail): string | undefi
     if (TYPE_DECLARATIONS.has(declaration.type))
       return null
 
-    trail.at ??= `${relative(ROOT, file)}:${statement.loc?.start.line}`
+    trail.at ??= `${relative(ROOT, file)}:${positionOf(moduleOf(file).text, statement.start).line}`
 
-    const found = classOf(statement.leadingComments)
+    const found = classOf(file, statement)
 
     if (found !== undefined)
       return found
@@ -135,7 +156,7 @@ function exportClass(file: string, name: string, trail: Trail): string | undefin
       if (statement.exportKind === 'type' || specifier.exportKind === 'type')
         return null
 
-      return bindingClass(statement.source == null ? file : resolved(statement.source.value, file), specifier.local.name, trail)
+      return bindingClass(statement.source == null ? file : resolved(statement.source.value, file), exportedName(specifier.local), trail)
     }
   }
 

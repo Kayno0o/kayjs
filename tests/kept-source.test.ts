@@ -1,4 +1,4 @@
-import type { CallExpression } from '@babel/types'
+import type { NodeOfType } from '../src/compiler/estree'
 import { utimesSync } from 'node:fs'
 import { rm } from 'node:fs/promises'
 import { join } from 'node:path'
@@ -158,7 +158,7 @@ describe('a page the scan reads from its parse', () => {
 
     const uses = (file: string) => readKeptSource(file, readSource(file).text).uses
     const indexed = (file: string) => classIndex(readSource(file).text, file)
-    const argument = (node: unknown) => (node as CallExpression).arguments[0]
+    const argument = (node: unknown) => (node as NodeOfType<'CallExpression'>).arguments[0]
 
     await inParseScope(async () => {
       const scriptIndex = indexed(script)

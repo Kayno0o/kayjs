@@ -34,7 +34,7 @@ describe('the pages a production server renders inside a layout holding an islan
 
       expect(Object.keys(record.files)).toContain('src/components/glyph.kay?island')
 
-      const served = await run(`const options = ${options}\nconst { pages } = await import(${JSON.stringify(resolve('src/server'))})\nconst app = await pages(options)\nconst answers = []\nfor (const [method, path] of ${JSON.stringify(REQUESTS)}) {\n  const response = await app.handle(new Request('http://localhost' + path, { method }))\n  answers.push({ method, path, status: response.status, html: await response.text() })\n}\nconsole.log(JSON.stringify({ answers, loaded: Object.keys(require.cache).filter(key => key.includes('@babel/parser')).length }))\n`)
+      const served = await run(`const options = ${options}\nconst { pages } = await import(${JSON.stringify(resolve('src/server'))})\nconst app = await pages(options)\nconst answers = []\nfor (const [method, path] of ${JSON.stringify(REQUESTS)}) {\n  const response = await app.handle(new Request('http://localhost' + path, { method }))\n  answers.push({ method, path, status: response.status, html: await response.text() })\n}\nconsole.log(JSON.stringify({ answers, loaded: Object.keys(require.cache).filter(key => key.includes('oxc-parser')).length }))\n`)
 
       expect(served.code).toBe(0)
 
@@ -67,7 +67,7 @@ async function buildFixture(): Promise<{ root: string, options: string }> {
 }
 
 async function serve(options: string, paths: string[]): Promise<{ answers: Answer[], errors: string, loaded: number }> {
-  const served = await run(`const options = ${options}\nconst { pages } = await import(${JSON.stringify(resolve('src/server'))})\nconst app = await pages(options)\nconst answers = []\nfor (const path of ${JSON.stringify(paths)}) {\n  const response = await app.handle(new Request('http://localhost' + path))\n  answers.push({ method: 'GET', path, status: response.status, html: await response.text() })\n}\nconsole.log(JSON.stringify({ answers, loaded: Object.keys(require.cache).filter(key => key.includes('@babel/parser')).length }))\n`)
+  const served = await run(`const options = ${options}\nconst { pages } = await import(${JSON.stringify(resolve('src/server'))})\nconst app = await pages(options)\nconst answers = []\nfor (const path of ${JSON.stringify(paths)}) {\n  const response = await app.handle(new Request('http://localhost' + path))\n  answers.push({ method: 'GET', path, status: response.status, html: await response.text() })\n}\nconsole.log(JSON.stringify({ answers, loaded: Object.keys(require.cache).filter(key => key.includes('oxc-parser')).length }))\n`)
 
   expect(served.code).toBe(0)
 

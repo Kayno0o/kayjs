@@ -1,10 +1,9 @@
-import type { ParserPlugin } from '@babel/parser'
-import type { ExportSpecifier, Identifier, Node, ObjectPattern, Program, StringLiteral } from '@babel/types'
+import type { ModuleExportName, ObjectPattern } from 'oxc-parser'
 import type { Node as KayNode, Span } from '../compiler/ast'
-import { parseExpression } from '@babel/parser'
-import { VISITOR_KEYS } from '@babel/types'
-import { FENCE_PLUGINS, readHolding, scriptPlugins, SourceParses } from '../build/source-parses'
+import type { Lang, Node, NodeOfType, Program } from '../compiler/estree'
+import { FENCE_LANG, readHolding, scriptLang, SourceParses } from '../build/source-parses'
 import { nodeExpressions, visitNodes } from '../compiler/ast'
+import { parseExpression, VISITOR_KEYS } from '../compiler/estree'
 import { patternNames } from '../compiler/pattern-names'
 
 // What a kept page's scan reads of one source, from one parse of it, which the class index shares: a script whole, a `.kay` file's fences and the expressions of its template, markdown blocks included, as the compiler reads them.
@@ -48,18 +47,18 @@ const READ_GLOBALS = new Set(['Date', 'Intl', 'Temporal', 'crypto', 'process', '
 const WINDOWS = new Set(['self', 'window'])
 
 // Types, which run nothing.
-export const TYPE_KEYS = new Set(['typeAnnotation', 'returnType', 'typeParameters', 'superTypeParameters', 'typeArguments', 'implements'])
-export const TYPE_NODES = new Set(['TSInterfaceDeclaration', 'TSTypeAliasDeclaration', 'TSDeclareFunction', 'TSDeclareMethod'])
-const FUNCTIONS = new Set(['FunctionDeclaration', 'FunctionExpression', 'ArrowFunctionExpression', 'ObjectMethod', 'ClassMethod', 'ClassPrivateMethod'])
+export const TYPE_KEYS = new Set(['typeAnnotation', 'returnType', 'typeParameters', 'superTypeParameters', 'superTypeArguments', 'typeArguments', 'implements'])
+export const TYPE_NODES = new Set(['TSInterfaceDeclaration', 'TSTypeAliasDeclaration', 'TSDeclareFunction', 'TSAbstractMethodDefinition', 'TSEmptyBodyFunctionExpression'])
+const FUNCTIONS = new Set(['FunctionDeclaration', 'FunctionExpression', 'ArrowFunctionExpression'])
 // What a `var` under it binds in.
 const VAR_SCOPES = new Set([...FUNCTIONS, 'Program', 'StaticBlock', 'TSModuleBlock'])
 
-export const MEMBERS = new Set(['MemberExpression', 'OptionalMemberExpression'])
-export const CALLS = new Set(['CallExpression', 'OptionalCallExpression'])
+export const MEMBERS = new Set(['MemberExpression'])
+export const CALLS = new Set(['CallExpression'])
 // The parents whose `key` is a name rather than a reference unless computed.
-export const KEYED = new Set(['ObjectProperty', 'ObjectMethod', 'ClassMethod', 'ClassPrivateMethod', 'ClassProperty', 'ClassPrivateProperty', 'ClassAccessorProperty', 'TSDeclareMethod'])
+export const KEYED = new Set(['Property', 'MethodDefinition', 'PropertyDefinition', 'AccessorProperty', 'TSAbstractMethodDefinition', 'TSAbstractPropertyDefinition', 'TSAbstractAccessorProperty'])
 // The parents where an identifier is never a reference.
-export const NAMING = new Set(['ImportSpecifier', 'ImportDefaultSpecifier', 'ImportNamespaceSpecifier', 'ExportSpecifier', 'ExportNamespaceSpecifier', 'ExportDefaultSpecifier', 'LabeledStatement', 'BreakStatement', 'ContinueStatement', 'MetaProperty', 'TSEnumDeclaration', 'TSModuleDeclaration', 'PrivateName'])
+export const NAMING = new Set(['ImportSpecifier', 'ImportDefaultSpecifier', 'ImportNamespaceSpecifier', 'ExportSpecifier', 'ExportAllDeclaration', 'LabeledStatement', 'BreakStatement', 'ContinueStatement', 'MetaProperty', 'TSEnumDeclaration', 'TSModuleDeclaration'])
 
 interface Frame {
   node: Node
@@ -69,8 +68,8 @@ interface Frame {
   pattern: boolean
 }
 
-// A name a module exports, written as one or in quotes: `export { "a-b" as c } from` gives its `local` as a string, which Babel's types leave out.
-export function nameOf(name: Identifier | StringLiteral): string {
+// A name a module exports, written as one or in quotes: `export { "a-b" as c } from` gives its `local` as a string.
+export function nameOf(name: ModuleExportName): string {
   return name.type === 'Identifier' ? name.name : name.value
 }
 
@@ -79,7 +78,7 @@ function keyName(key: Node, computed: boolean): string | undefined {
   if (key.type === 'Identifier')
     return computed ? undefined : key.name
 
-  if (key.type === 'StringLiteral')
+  if (key.type === 'Literal' && typeof key.value === 'string')
     return key.value
 
   return key.type === 'TemplateLiteral' && key.expressions.length === 0 ? key.quasis[0]!.value.cooked ?? undefined : undefined
@@ -90,7 +89,7 @@ function memberName(node: Node): string | undefined {
   if (!MEMBERS.has(node.type))
     return undefined
 
-  const member = node as Extract<Node, { type: 'MemberExpression' | 'OptionalMemberExpression' }>
+  const member = node as Extract<Node, { type: 'MemberExpression' }>
 
   return keyName(member.property, member.computed)
 }
@@ -129,7 +128,7 @@ function scopeOf(node: Node): Set<string> | undefined {
     names.add(node.id.name)
   }
   else if (FUNCTIONS.has(node.type)) {
-    const fn = node as Extract<Node, { type: 'FunctionExpression' | 'ClassMethod' }>
+    const fn = node as NodeOfType<'FunctionExpression' | 'FunctionDeclaration' | 'ArrowFunctionExpression'>
 
     add(fn.params.flatMap(param => patternNames(param.type === 'TSParameterProperty' ? param.parameter : param)))
 
@@ -162,11 +161,11 @@ function declared(statement: Node, add: (names: string[]) => void): void {
   else if ((node.type === 'FunctionDeclaration' || node.type === 'ClassDeclaration') && node.id != null)
     add([node.id.name])
   else if (node.type === 'TSEnumDeclaration' || (node.type === 'TSModuleDeclaration' && node.id.type === 'Identifier'))
-    add([(node.id as Identifier).name])
+    add([(node.id as Extract<Node, { type: 'Identifier' }>).name])
   else if (node.type === 'TSImportEqualsDeclaration' && node.importKind !== 'type')
     add([node.id.name])
-  else if (node.type === 'ImportDeclaration' && node.importKind !== 'type' && node.importKind !== 'typeof')
-    add(node.specifiers.filter(specifier => specifier.type !== 'ImportSpecifier' || (specifier.importKind !== 'type' && specifier.importKind !== 'typeof')).map(specifier => specifier.local.name))
+  else if (node.type === 'ImportDeclaration' && node.importKind !== 'type')
+    add(node.specifiers.filter(specifier => specifier.type !== 'ImportSpecifier' || (specifier.importKind !== 'type')).map(specifier => specifier.local.name))
 }
 
 // The names the `var` declarations under a function, a static block or a program bind there, those of the functions under it left out.
@@ -200,7 +199,13 @@ function hoisted(scope: Node): string[] {
 }
 
 // Whether a frame's node is written to: assigned, counted up or down, or deleted.
-function written(frame: Frame): boolean {
+function written(start: Frame): boolean {
+  // The wrapper of an optional chain is no parent of what it holds.
+  let frame = start
+
+  while (frame.parent?.node.type === 'ChainExpression')
+    frame = frame.parent
+
   const parent = frame.parent?.node
 
   if (parent === undefined)
@@ -218,7 +223,7 @@ function destructuredPath(pattern: ObjectPattern): boolean | undefined {
   let pathname = false
 
   for (const property of pattern.properties) {
-    if (property.type !== 'ObjectProperty')
+    if (property.type !== 'Property')
       return undefined
 
     const name = keyName(property.key, property.computed)
@@ -230,7 +235,7 @@ function destructuredPath(pattern: ObjectPattern): boolean | undefined {
       return undefined
 
     for (const inner of property.value.properties) {
-      if (inner.type !== 'ObjectProperty' || keyName(inner.key, inner.computed) !== 'pathname')
+      if (inner.type !== 'Property' || keyName(inner.key, inner.computed) !== 'pathname')
         return undefined
 
       const value = inner.value.type === 'AssignmentPattern' ? inner.value.left : inner.value
@@ -257,11 +262,11 @@ class Reader {
   }
 
   // A script or a fence at `span` of `source`, which holds the spans of `this.source`.
-  program(source: string, span: Span, plugins: ParserPlugin[]): Program | undefined {
+  program(source: string, span: Span, lang: Lang): Program | undefined {
     let program: Program
 
     try {
-      program = this.parses.program(source, span, plugins)
+      program = this.parses.program(source, span, lang)
     }
     catch (error) {
       this.unparsed(error, span.start)
@@ -295,7 +300,7 @@ class Reader {
       return
 
     try {
-      this.walk({ node: parseExpression(`(${text})=>0`, { plugins: ['typescript'], startIndex: start - 1 }), key: undefined, parent: undefined, pattern: false })
+      this.walk({ node: parseExpression(`(${text})=>0`, { offset: start - 1 }), key: undefined, parent: undefined, pattern: false })
     }
     catch (error) {
       this.unparsed(error, start)
@@ -328,32 +333,31 @@ class Reader {
 
       this.found.imports.push({
         specifier: statement.source.value,
-        at: this.real(statement.start!),
+        at: this.real(statement.start),
         names: whole ? undefined : values.map(specifier => ({ own: nameOf(specifier.imported), local: specifier.local.name, text: this.textOf(specifier) })),
         withDefault,
         typesOnly: !whole && !withDefault && named.length > 0 && values.length === 0,
       })
     }
     else if (statement.type === 'ExportAllDeclaration' && statement.exportKind !== 'type') {
-      this.found.imports.push({ specifier: statement.source.value, at: this.real(statement.start!), withDefault: false, typesOnly: false })
+      this.found.imports.push({ specifier: statement.source.value, at: this.real(statement.start), withDefault: false, typesOnly: false })
     }
     else if (statement.type === 'ExportNamedDeclaration' && statement.source != null && statement.exportKind !== 'type') {
-      const values = statement.specifiers.filter((specifier): specifier is ExportSpecifier => specifier.type === 'ExportSpecifier' && specifier.exportKind !== 'type')
-      const whole = statement.specifiers.some(specifier => specifier.type === 'ExportNamespaceSpecifier')
+      const values = statement.specifiers.filter(specifier => specifier.exportKind !== 'type')
 
       this.found.imports.push({
         specifier: statement.source.value,
-        at: this.real(statement.start!),
+        at: this.real(statement.start),
         // A re-export binds nothing in the module, so `local` is the name it takes.
-        names: whole ? undefined : values.map(specifier => ({ own: nameOf(specifier.local), local: nameOf(specifier.local), text: this.textOf(specifier) })),
+        names: values.map(specifier => ({ own: nameOf(specifier.local), local: nameOf(specifier.local), text: this.textOf(specifier) })),
         withDefault: false,
-        typesOnly: !whole && statement.specifiers.length > 0 && values.length === 0,
+        typesOnly: statement.specifiers.length > 0 && values.length === 0,
       })
     }
   }
 
   private textOf(node: Node): string {
-    return this.source.slice(node.start!, node.end!)
+    return this.source.slice(node.start, node.end)
   }
 
   // Visits the node and those under it, types left out, with a stack rather than recursion, which a long `a + b + ...` chain would overflow.
@@ -363,7 +367,7 @@ class Reader {
     for (let frame = pending.pop(); frame !== undefined; frame = pending.pop()) {
       const { node } = frame
 
-      if (TYPE_NODES.has(node.type) || (this.skip !== undefined && node.start! >= this.skip.start && node.end! <= this.skip.end))
+      if (TYPE_NODES.has(node.type) || (this.skip !== undefined && node.start >= this.skip.start && node.end <= this.skip.end))
         continue
 
       if (node.type === 'TSModuleDeclaration' && node.declare === true)
@@ -407,13 +411,13 @@ class Reader {
     const parent = frame.parent?.node
 
     if (node.type === 'MetaProperty' && node.meta.name === 'import')
-      this.read(node.start!, 'import.meta')
-    else if (node.type === 'Import' || node.type === 'ImportExpression')
-      this.read(node.start!, 'import(')
+      this.read(node.start, 'import.meta')
+    else if (node.type === 'ImportExpression')
+      this.read(node.start, 'import(')
     else if (node.type === 'TSExternalModuleReference')
-      this.read(node.start!, 'require')
-    else if (node.type === 'ObjectProperty' && !node.computed && node.key.type === 'Identifier' && node.key.name === 'query')
-      this.read(node.key.start!, 'query:')
+      this.read(node.start, 'require')
+    else if (node.type === 'Property' && node.kind === 'init' && !node.method && !node.computed && node.key.type === 'Identifier' && node.key.name === 'query')
+      this.read(node.key.start, 'query:')
 
     if (node.type !== 'Identifier' || frame.pattern || parent === undefined || NAMING.has(parent.type))
       return
@@ -424,7 +428,7 @@ class Reader {
     this.use(frame, node)
   }
 
-  private use(frame: Frame, node: Identifier): void {
+  private use(frame: Frame, node: Extract<Node, { type: 'Identifier' }>): void {
     const parent = frame.parent!.node
     const uses = this.found.uses.get(node.name) ?? []
 
@@ -438,16 +442,16 @@ class Reader {
       const name = frame.key === 'object' ? memberName(parent) : undefined
 
       if (name === undefined || name === 'random')
-        this.read(node.start!, 'Math')
+        this.read(node.start, 'Math')
     }
     else if (READ_GLOBALS.has(node.name)) {
-      this.read(node.start!, node.name)
+      this.read(node.start, node.name)
     }
     else if (WINDOWS.has(node.name) && frame.key === 'object' && MEMBERS.has(parent.type)) {
       const name = memberName(parent)
 
       if (name === undefined || name === 'Math' || READ_GLOBALS.has(name))
-        this.read(node.start!, node.name)
+        this.read(node.start, node.name)
     }
     else if (node.name === 'ctx') {
       this.context(frame, node)
@@ -466,7 +470,7 @@ class Reader {
 
   // Only `ctx.url.pathname`, `ctx.params` and a `const { params, url: { pathname } } = ctx` are followed; any other use, `ctx` passed on, aliased, or read at `url`, `search`, `request`, `cookies` or `headers`, is a read of the request.
   // A kept copy is served for the one pathname it was rendered at, and a page has no params to read, so neither is a request read.
-  private context(frame: Frame, node: Identifier): void {
+  private context(frame: Frame, node: Extract<Node, { type: 'Identifier' }>): void {
     const parent = frame.parent!
     const name = frame.key === 'object' ? memberName(parent.node) : undefined
 
@@ -487,7 +491,7 @@ class Reader {
       return
     }
 
-    const at = this.real(node.start!)
+    const at = this.real(node.start)
 
     if (this.found.ctx === undefined || at < this.found.ctx)
       this.found.ctx = at
@@ -498,7 +502,7 @@ class Reader {
     const real = expansion === undefined ? (offset: number) => offset : (offset: number) => expansion.real(offset)
 
     const template = new Reader(file.source, real, undefined, this.parses, this.found.uses)
-    const [script, server, module] = [file.script, file.server, file.module].map(span => span === undefined ? undefined : this.program(file.source, span, FENCE_PLUGINS))
+    const [script, server, module] = [file.script, file.server, file.module].map(span => span === undefined ? undefined : this.program(file.source, span, FENCE_LANG))
 
     this.found.levels = { module, server, real }
 
@@ -538,7 +542,7 @@ class Reader {
   }
 
   script(file: string, source: string): void {
-    this.found.levels.module = this.program(source, { start: 0, end: source.length }, scriptPlugins(file))
+    this.found.levels.module = this.program(source, { start: 0, end: source.length }, scriptLang(file))
   }
 }
 
@@ -567,7 +571,7 @@ export function bindsAt({ node, pattern }: { node: Node, pattern: boolean }, key
     if (node.type === 'AssignmentPattern')
       return key === 'left'
 
-    if (node.type === 'ObjectProperty')
+    if (node.type === 'Property')
       return key === 'value' || (key === 'key' && !node.computed)
 
     return node.type === 'ObjectPattern' || node.type === 'ArrayPattern' || node.type === 'RestElement' || node.type === 'TSParameterProperty'

@@ -1,8 +1,7 @@
-import type { ParserPlugin } from '@babel/parser'
-import type { Expression, Program } from '@babel/types'
 import type { Span } from '../compiler/ast'
+import type { Expression, Lang, Program } from '../compiler/estree'
 import { AsyncLocalStorage } from 'node:async_hooks'
-import { parse, parseExpression } from '@babel/parser'
+import { ParseError, parseExpression, parseProgram } from '../compiler/estree'
 import { parseExpanded } from '../compiler/markdown-block'
 import { readSource } from './files'
 
@@ -16,21 +15,19 @@ interface Made {
   error?: unknown
 }
 
-// What an app's script may hold besides its language, read rather than leaving the whole file unread.
-const SYNTAX: ParserPlugin[] = ['decorators-legacy', 'explicitResourceManagement']
 const TS_SCRIPT = /\.[cm]?ts$/
 const TSX_SCRIPT = /\.tsx$/
 
 // A `.kay` file's fences.
-export const FENCE_PLUGINS: ParserPlugin[] = ['typescript', ...SYNTAX]
+export const FENCE_LANG: Lang = 'ts'
 const building = new AsyncLocalStorage<Map<SourceRead, Map<string, Made>>>()
 
-// The plugins a script file is parsed with, TypeScript for one with no file.
-export function scriptPlugins(file: string | undefined): ParserPlugin[] {
+// The language a script file is parsed as, TypeScript for one with no file.
+export function scriptLang(file: string | undefined): Lang {
   if (file === undefined || TS_SCRIPT.test(file))
-    return FENCE_PLUGINS
+    return FENCE_LANG
 
-  return TSX_SCRIPT.test(file) ? ['typescript', 'jsx', ...SYNTAX] : ['jsx', ...SYNTAX]
+  return TSX_SCRIPT.test(file) ? 'tsx' : 'jsx'
 }
 
 // The file's read while it holds `text`.
@@ -59,7 +56,7 @@ export function dropKeptParses(): void {
   building.getStore()?.clear()
 }
 
-// The Babel parses of one source, shared by the class index and the kept-page scan, which read the same spans with the same options.
+// The parses of one source, shared by the class index and the kept-page scan, which read the same spans with the same options.
 // The class index, which `stores`, keeps what it parses with the file's read in a build; the kept-page scan, which runs after it and reads each file once, takes a parse kept and keeps none.
 export class SourceParses {
   private readonly kept: Map<string, Made> | undefined
@@ -75,13 +72,21 @@ export class SourceParses {
   }
 
   // A script or a fence, from `span` of `source`, its offsets the source's; throws what the parser throws.
-  program(source: string, span: Span, plugins: ParserPlugin[]): Program {
-    return this.made(`program ${plugins.join(',')} ${span.start}`, source.slice(span.start, span.end), text => parse(text, { sourceType: 'module', allowReturnOutsideFunction: true, allowAwaitOutsideFunction: true, allowImportExportEverywhere: true, errorRecovery: true, attachComment: false, plugins, startIndex: span.start }).program)
+  program(source: string, span: Span, lang: Lang): Program {
+    return this.made(`program ${lang} ${span.start}`, source.slice(span.start, span.end), (text) => {
+      const { program, errors } = parseProgram(text, { lang, offset: span.start, returnOutside: true, recover: true })
+
+      // After an error it cannot recover from the parser leaves an empty program, which is no parse.
+      if (errors.length > 0 && program.body.length === 0 && text.trim() !== '')
+        throw new ParseError(errors[0]!.message, errors[0]!.pos)
+
+      return program
+    })
   }
 
   // An expression of a `.kay` template.
   expression(source: string, span: Span): Expression {
-    return this.made(`expression ${span.start}`, source.slice(span.start, span.end), text => parseExpression(text, { plugins: ['typescript'], startIndex: span.start }))
+    return this.made(`expression ${span.start}`, source.slice(span.start, span.end), text => parseExpression(text, { offset: span.start }))
   }
 
   // The `.kay` file of the read, its markdown blocks lowered to the template they stand for.

@@ -1,5 +1,6 @@
 // Draft messages: a machine's translation waiting for a person, a message whose line in its locale's file ends on a `// draft` comment.
-import type * as t from '@babel/types'
+import type { Comment, Node, ObjectExpression, ObjectProperty } from 'oxc-parser'
+import type { Parsed } from '../compiler/estree'
 import type { Bindings } from '../compiler/object-literal'
 import type { KayConfig } from '../config'
 import type { Message } from '../runtime/i18n'
@@ -7,8 +8,8 @@ import { existsSync } from 'node:fs'
 import { mkdir, rename, rm } from 'node:fs/promises'
 import { dirname } from 'node:path'
 import process from 'node:process'
-import { parse } from '@babel/parser'
 import { KayError } from '../compiler/errors'
+import { parseProgram, positionOf } from '../compiler/estree'
 import { constBindings, exportedObject, keyName, objectOf, propertiesOf, unwrapped } from '../compiler/object-literal'
 import { messagesFile } from './i18n'
 
@@ -23,7 +24,7 @@ const PLURAL_KEYS = new Set(['zero', 'one', 'two', 'few', 'many', 'other'])
 interface WrittenMessage {
   key: string
   line: number
-  draft?: t.CommentLine | undefined
+  draft?: Comment | undefined
 }
 
 // The keys of the messages a file marks `// draft`, with the line each is on, in the order written; none for a file kay cannot read the messages of.
@@ -33,8 +34,8 @@ export function draftMessages(source: string): { key: string, line: number }[] {
 
 // The source with every `// draft` comment of its messages removed, and how many it removed: one comment after several messages of a line counts once.
 export function acceptDrafts(source: string): { source: string, accepted: number } {
-  const comments = new Map(writtenMessages(source).flatMap(message => message.draft === undefined ? [] : [[message.draft.start!, message.draft] as const]))
-  const drafts = [...comments.values()].toSorted((a, b) => b.start! - a.start!)
+  const comments = new Map(writtenMessages(source).flatMap(message => message.draft === undefined ? [] : [[message.draft.start, message.draft] as const]))
+  const drafts = [...comments.values()].toSorted((a, b) => b.start - a.start)
   let accepted = source
 
   for (const comment of drafts) {
@@ -118,7 +119,7 @@ function withMessage(source: string, parts: string[], message: Message, style: S
   let { object } = catalog
 
   for (const [index, part] of parts.entries()) {
-    const found: t.ObjectProperty | undefined = propertiesOf(object, catalog.bindings).find((property): property is t.ObjectProperty => property.type === 'ObjectProperty' && keyName(property) === part)
+    const found: ObjectProperty | undefined = propertiesOf(object, catalog.bindings).find((property): property is ObjectProperty => isPlain(property) && keyName(property) === part)
 
     if (!found)
       return inserted(source, object, entryText(parts.slice(index), message, style.unit), style)
@@ -135,30 +136,30 @@ function withMessage(source: string, parts: string[], message: Message, style: S
 }
 
 // The source with `entry`, lines of text without their indent, added as the object's last property.
-function inserted(source: string, object: t.ObjectExpression, entry: string[], { newline, unit }: Style): string {
-  const outer = lineIndent(source, object.start!)
+function inserted(source: string, object: ObjectExpression, entry: string[], { newline, unit }: Style): string {
+  const outer = lineIndent(source, object.start)
   const last = object.properties.at(-1)
 
   // A one-line object, `{}` or `{ home: 'Accueil' }`, opens on lines of its own so the comment ends one, what it held kept as written on the first.
-  if (object.loc!.start.line === object.loc!.end.line) {
+  if (positionOf(source, object.start).line === positionOf(source, object.end).line) {
     const inner = `${outer}${unit}`
-    const held = source.slice(object.start! + 1, object.end! - 1).trim()
-    const comma = last && !followedByComma(source, last.end!, object.end! - 1) ? ',' : ''
+    const held = source.slice(object.start + 1, object.end - 1).trim()
+    const comma = last && !followedByComma(source, last.end, object.end - 1) ? ',' : ''
     const kept = held === '' ? [] : [`${inner}${held}${comma}`]
     const added = entry.map(line => `${inner}${line}`)
 
-    return `${source.slice(0, object.start!)}{${newline}${[...kept, ...added].join(newline)}${newline}${outer}}${source.slice(object.end!)}`
+    return `${source.slice(0, object.start)}{${newline}${[...kept, ...added].join(newline)}${newline}${outer}}${source.slice(object.end)}`
   }
 
-  const inner = last ? lineIndent(source, last.start!) : `${outer}${unit}`
-  const brace = object.end! - 1
+  const inner = last ? lineIndent(source, last.start) : `${outer}${unit}`
+  const brace = object.end - 1
   const lineStart = source.lastIndexOf('\n', brace - 1) + 1
   // The closing brace alone on its line takes the entry above it, one sharing a line with the last property after a line break.
   const alone = source.slice(lineStart, brace).trim() === ''
   const at = alone ? lineStart : brace
   const lines = entry.map(line => `${inner}${line}${newline}`).join('')
   const added = alone ? lines : `${newline}${lines}${outer}`
-  const comma = last && !followedByComma(source, last.end!, brace) ? last.end! : undefined
+  const comma = last && !followedByComma(source, last.end, brace) ? last.end : undefined
 
   if (comma === undefined)
     return source.slice(0, at) + added + source.slice(at)
@@ -211,12 +212,12 @@ function writtenMessages(source: string): WrittenMessage[] {
   if (!ast || !bindings || !object)
     return []
 
-  const drafts = new Map((ast.comments ?? []).filter((comment): comment is t.CommentLine => comment.type === 'CommentLine' && DRAFT.test(comment.value)).map(comment => [comment.loc!.start.line, comment]))
+  const drafts = new Map(ast.comments.filter(comment => comment.type === 'Line' && DRAFT.test(comment.value)).map(comment => [positionOf(source, comment.start).line, comment]))
   const found: WrittenMessage[] = []
-  const walked = new Set<t.ObjectProperty>()
-  const walk = (node: t.ObjectExpression, prefix: string) => {
+  const walked = new Set<ObjectProperty>()
+  const walk = (node: ObjectExpression, prefix: string) => {
     for (const property of propertiesOf(node, bindings)) {
-      if (property.type !== 'ObjectProperty')
+      if (!isPlain(property))
         continue
 
       const name = keyName(property)
@@ -234,14 +235,14 @@ function writtenMessages(source: string): WrittenMessage[] {
         continue
       }
 
-      if (value.type === 'StringLiteral' || value.type === 'TemplateLiteral' || group) {
+      if ((value.type === 'Literal' && typeof value.value === 'string') || value.type === 'TemplateLiteral' || group) {
         // A const group named by two paths is one literal, edited once: only the first path lists its messages.
         if (walked.has(property))
           continue
 
         walked.add(property)
 
-        const line = property.loc!.start.line
+        const line = positionOf(source, property.start).line
 
         found.push({ key, line, draft: drafts.get(line) })
       }
@@ -253,7 +254,7 @@ function writtenMessages(source: string): WrittenMessage[] {
   return found
 }
 
-function messagesObject(source: string): { object: t.ObjectExpression, bindings: Bindings } | undefined {
+function messagesObject(source: string): { object: ObjectExpression, bindings: Bindings } | undefined {
   const ast = parsed(source)
   const bindings = ast && constBindings(ast.program)
   const object = ast && bindings && exportedObject(ast.program, bindings)
@@ -261,9 +262,9 @@ function messagesObject(source: string): { object: t.ObjectExpression, bindings:
   return bindings && object ? { object, bindings } : undefined
 }
 
-function parsed(source: string): t.File | undefined {
+function parsed(source: string): Parsed | undefined {
   try {
-    return parse(source, { sourceType: 'module', plugins: ['typescript'] })
+    return parseProgram(source)
   }
   catch {
     return undefined
@@ -271,8 +272,13 @@ function parsed(source: string): t.File | undefined {
 }
 
 // A plural's forms, `{ one: '...', other: '...' }`, read as one message as `isPlural` reads the value.
-function isPluralObject(node: t.ObjectExpression): boolean {
-  const keys = node.properties.map(property => property.type === 'ObjectProperty' ? keyName(property) : undefined)
+function isPluralObject(node: ObjectExpression): boolean {
+  const keys = node.properties.map(property => isPlain(property) ? keyName(property) : undefined)
 
   return keys.includes('other') && keys.every(key => key !== undefined && PLURAL_KEYS.has(key))
+}
+
+// A `key: value` entry, which is neither a method, an accessor nor a spread.
+function isPlain(node: Node): node is ObjectProperty {
+  return node.type === 'Property' && node.kind === 'init' && !node.method
 }

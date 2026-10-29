@@ -1,15 +1,14 @@
-import type { ParserPlugin } from '@babel/parser'
-import type { Expression, Node } from '@babel/types'
 import type { Node as KayNode, Span } from '../compiler/ast'
-import { VISITOR_KEYS } from '@babel/types'
+import type { Expression, Lang, Node, NodeOfType } from '../compiler/estree'
 import { importedName } from '../check/ast'
 import { nodeExpressions, visitNodes } from '../compiler/ast'
+import { VISITOR_KEYS } from '../compiler/estree'
 import { unwrapped } from '../compiler/object-literal'
 import { patternNames } from '../compiler/pattern-names'
 import { binders, bindingNames } from '../compiler/template-reads'
-import { FENCE_PLUGINS, readHolding, scriptPlugins, SourceParses } from './source-parses'
+import { FENCE_LANG, readHolding, scriptLang, SourceParses } from './source-parses'
 
-export type FunctionNode = Extract<Node, { type: 'FunctionDeclaration' | 'FunctionExpression' | 'ArrowFunctionExpression' }>
+export type FunctionNode = NodeOfType<'FunctionDeclaration' | 'FunctionExpression' | 'ArrowFunctionExpression'>
 
 // A place a source sets the class attribute, with the values it sets.
 export interface ClassSetter {
@@ -44,8 +43,7 @@ export interface ClassIndex {
   props: Set<string>
 }
 
-const SPAN_KEYS = new Set(['start', 'end', 'loc', 'range', 'extra', 'optional', 'leadingComments', 'trailingComments', 'innerComments', 'comments', 'errors', 'tokens'])
-const OPTIONAL_TYPE = /^Optional\B/
+const SPAN_KEYS = new Set(['start', 'end', 'raw', 'optional'])
 
 // What a node reads as, written the same whatever the spacing, the quotes and `?.`: the receiver of `el.className = el.className + x` is told by it from another element, whatever it is made of, a call, an index or a cast.
 export function nodeKey(node: Node): string {
@@ -53,7 +51,10 @@ export function nodeKey(node: Node): string {
     if (SPAN_KEYS.has(key))
       return undefined
 
-    return key === 'type' && typeof value === 'string' ? value.replace(OPTIONAL_TYPE, '') : value
+    if (typeof value === 'bigint')
+      return String(value)
+
+    return typeof value === 'object' && value !== null && (value as { type?: unknown }).type === 'ChainExpression' ? (value as { expression: unknown }).expression : value
   })
 }
 
@@ -61,8 +62,8 @@ export function nodeKey(node: Node): string {
 export function rootOf(node: Node): string | undefined {
   let current = node
 
-  while (current.type === 'MemberExpression' || current.type === 'OptionalMemberExpression')
-    current = current.object
+  while (current.type === 'MemberExpression' || current.type === 'ChainExpression')
+    current = current.type === 'ChainExpression' ? current.expression : current.object
 
   return current.type === 'Identifier' ? current.name : undefined
 }
@@ -144,18 +145,18 @@ class Indexer {
     if (file !== undefined && KAY_FILE.test(file))
       this.readKay()
     else
-      this.readProgram({ start: 0, end: this.text.length }, scriptPlugins(file))
+      this.readProgram({ start: 0, end: this.text.length }, scriptLang(file))
 
     this.index.setters.sort((a, b) => a.at - b.at)
 
     return this.index
   }
 
-  private readProgram(span: Span, plugins: ParserPlugin[]): void {
+  private readProgram(span: Span, lang: Lang): void {
     let program: Node
 
     try {
-      program = this.parses.program(this.source, span, plugins)
+      program = this.parses.program(this.source, span, lang)
     }
     catch {
       return
@@ -190,7 +191,7 @@ class Indexer {
 
     for (const span of [file.script, file.server, file.module]) {
       if (span !== undefined)
-        this.readProgram(span, FENCE_PLUGINS)
+        this.readProgram(span, FENCE_LANG)
     }
 
     visitNodes(file.template, node => this.readNode(node))
@@ -236,7 +237,7 @@ class Indexer {
   }
 
   private visit(node: Node): void {
-    if (node.type === 'CallExpression' || node.type === 'OptionalCallExpression')
+    if (node.type === 'CallExpression')
       this.call(node)
     else if (node.type === 'AssignmentExpression')
       this.assignment(node)
@@ -250,17 +251,17 @@ class Indexer {
       this.shadow(patternNames(node.param))
     else if (node.type === 'FunctionDeclaration')
       this.declaration(node)
-    else if (node.type === 'FunctionExpression' || node.type === 'ArrowFunctionExpression' || node.type === 'ObjectMethod' || node.type === 'ClassMethod' || node.type === 'ClassPrivateMethod' || node.type === 'TSDeclareMethod')
+    else if (node.type === 'FunctionExpression' || node.type === 'ArrowFunctionExpression' || node.type === 'TSEmptyBodyFunctionExpression')
       this.parameters(node.params)
     else if (node.type === 'ImportDeclaration')
       this.imports(node)
     else if (node.type === 'JSXAttribute' && node.name.type === 'JSXIdentifier' && node.name.name === 'class' && node.value?.type === 'JSXExpressionContainer' && node.value.expression.type !== 'JSXEmptyExpression')
-      this.setter(node.name.start!, 'class attribute', [node.value.expression], undefined)
+      this.setter(node.name.start, 'class attribute', [node.value.expression], undefined)
   }
 
   // A name given a value, a record written into, or a destructuring target, and `el.className = x`.
   private assignment(node: Extract<Node, { type: 'AssignmentExpression' }>): void {
-    const left = node.left.type === 'Identifier' || node.left.type === 'MemberExpression' || node.left.type === 'OptionalMemberExpression' ? node.left : unwrapped(node.left)
+    const left = node.left.type === 'Identifier' || node.left.type === 'MemberExpression' ? node.left : unwrapped(node.left)
 
     if (left.type === 'Identifier') {
       if (VALUE_OPERATORS.has(node.operator))
@@ -271,7 +272,7 @@ class Indexer {
       return
     }
 
-    if (left.type !== 'MemberExpression' && left.type !== 'OptionalMemberExpression') {
+    if (left.type !== 'MemberExpression') {
       this.shadow(patternNames(left))
 
       return
@@ -279,8 +280,8 @@ class Indexer {
 
     this.shadow([rootOf(left)])
 
-    if (left.type === 'MemberExpression' && !left.computed && left.property.type === 'Identifier' && left.property.name === 'className' && (node.operator === '=' || node.operator === '+='))
-      this.setter(left.property.start!, 'className =', [node.right], nodeKey(left.object))
+    if (!left.computed && left.property.type === 'Identifier' && left.property.name === 'className' && (node.operator === '=' || node.operator === '+='))
+      this.setter(left.property.start, 'className =', [node.right], nodeKey(left.object))
   }
 
   private declarator(node: Extract<Node, { type: 'VariableDeclarator' }>): void {
@@ -301,7 +302,7 @@ class Indexer {
     }
   }
 
-  private declaration(node: Extract<Node, { type: 'FunctionDeclaration' }>): void {
+  private declaration(node: FunctionNode): void {
     const name = node.id?.name
 
     if (name !== undefined && node.async)
@@ -313,11 +314,11 @@ class Indexer {
   }
 
   private imports(node: Extract<Node, { type: 'ImportDeclaration' }>): void {
-    if (node.importKind === 'type' || node.importKind === 'typeof')
+    if (node.importKind === 'type')
       return
 
     for (const specifier of node.specifiers) {
-      if (specifier.type !== 'ImportSpecifier' || specifier.importKind === 'type' || specifier.importKind === 'typeof' || this.index.imports.has(specifier.local.name))
+      if (specifier.type !== 'ImportSpecifier' || specifier.importKind === 'type' || this.index.imports.has(specifier.local.name))
         continue
 
       this.index.imports.set(specifier.local.name, { specifier: node.source.value, imported: importedName(specifier) })
@@ -325,9 +326,9 @@ class Indexer {
   }
 
   // `el.classList.add(x)`, `classList.toggle(x)` and `el.setAttribute('class', x)`.
-  private call(node: Extract<Node, { type: 'CallExpression' | 'OptionalCallExpression' }>): void {
+  private call(node: Extract<Node, { type: 'CallExpression' }>): void {
     const callee = node.callee
-    const member = callee.type === 'MemberExpression' || callee.type === 'OptionalMemberExpression' ? callee : undefined
+    const member = callee.type === 'MemberExpression' ? callee : undefined
     const method = member === undefined ? callee : member.property
 
     if (method.type !== 'Identifier' || member?.computed === true)
@@ -336,8 +337,8 @@ class Indexer {
     const [first, second] = node.arguments
 
     if (method.name === 'setAttribute') {
-      if (first?.type === 'StringLiteral' && first.value === 'class' && second !== undefined)
-        this.setter(method.start!, 'setAttribute(\'class\')', [second], member && nodeKey(member.object))
+      if (first?.type === 'Literal' && first.value === 'class' && second !== undefined)
+        this.setter(method.start, 'setAttribute(\'class\')', [second], member && nodeKey(member.object))
 
       return
     }
@@ -351,20 +352,20 @@ class Indexer {
 
     if (list.type === 'Identifier') {
       if (list.name === 'classList')
-        this.setter(list.start!, how, values, undefined)
+        this.setter(list.start, how, values, undefined)
 
       return
     }
 
-    if ((list.type === 'MemberExpression' || list.type === 'OptionalMemberExpression') && !list.computed && list.property.type === 'Identifier' && list.property.name === 'classList')
-      this.setter(list.property.start!, how, values, nodeKey(list.object))
+    if (list.type === 'MemberExpression' && !list.computed && list.property.type === 'Identifier' && list.property.name === 'classList')
+      this.setter(list.property.start, how, values, nodeKey(list.object))
   }
 
   private setter(at: number, how: string, values: Node[], receiver: string | undefined): void {
     const read = values.flatMap((value) => {
       const node = value.type === 'SpreadElement' ? value.argument : value
 
-      return node.type === 'ArgumentPlaceholder' || node.type === 'JSXNamespacedName' ? [] : [{ node: node as Expression, text: this.source.slice(value.start!, value.end!) }]
+      return node.type === 'JSXNamespacedName' ? [] : [{ node: node as Expression, text: this.source.slice(value.start, value.end) }]
     })
 
     if (read.length === 0)

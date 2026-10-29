@@ -1,6 +1,6 @@
-import type * as t from '@babel/types'
+import type { CallExpression, Node, ObjectExpression, ObjectProperty } from 'oxc-parser'
 import type { MigratedFile, Note } from './astro'
-import { parse } from '@babel/parser'
+import { parseProgram, positionOf } from '../compiler/estree'
 
 // An Astro content config, `defineCollection` with a zod schema, as kay's: `collection(folder, { schema })` with the schema in `s`.
 
@@ -17,20 +17,20 @@ class SchemaTranslator {
 
   constructor(private readonly source: string, private readonly zod: Set<string>) {}
 
-  private text(node: t.Node): string {
-    return this.source.slice(node.start!, node.end!)
+  private text(node: Node): string {
+    return this.source.slice(node.start, node.end)
   }
 
-  private untranslated(node: t.Node, why: string): string {
-    this.notes.push({ line: node.loc!.start.line, message: `${why}: left as written` })
+  private untranslated(node: Node, why: string): string {
+    this.notes.push({ line: positionOf(this.source, node.start).line, message: `${why}: left as written` })
 
     return `/* kay migrate: ${why} */ ${this.text(node)}`
   }
 
   // `z.string().min(1).optional()`: the chain read from its base call outwards.
-  schema(node: t.Node): string {
-    const chain: t.CallExpression[] = []
-    let current: t.Node = node
+  schema(node: Node): string {
+    const chain: CallExpression[] = []
+    let current: Node = node
 
     while (current.type === 'CallExpression' && current.callee.type === 'MemberExpression') {
       chain.unshift(current)
@@ -52,7 +52,7 @@ class SchemaTranslator {
     let integer = false
     const options: string[] = []
     const checks = CHECKS_BY_KIND.get(kind)
-    const rest: t.CallExpression[] = []
+    const rest: CallExpression[] = []
 
     for (const call of chain) {
       const name = call.callee.type === 'MemberExpression' && call.callee.property.type === 'Identifier' ? call.callee.property.name : ''
@@ -60,8 +60,8 @@ class SchemaTranslator {
 
       if (option === 'format')
         options.push(`format: '${name === 'url' ? 'uri' : 'email'}'`)
-      else if (option === 'pattern' && call.arguments[0]?.type === 'RegExpLiteral')
-        options.push(`pattern: ${JSON.stringify(call.arguments[0].pattern)}`)
+      else if (option === 'pattern' && call.arguments[0]?.type === 'Literal' && 'regex' in call.arguments[0])
+        options.push(`pattern: ${JSON.stringify((call.arguments[0] as { regex: { pattern: string } }).regex.pattern)}`)
       else if (option !== undefined && call.arguments[0])
         options.push(`${option}: ${this.text(call.arguments[0])}`)
       else if (kind === 'number' && name === 'int')
@@ -71,7 +71,7 @@ class SchemaTranslator {
     }
 
     if (kind === 'object' && args[0]?.type === 'ObjectExpression') {
-      const fields = args[0].properties.map(property => property.type === 'ObjectProperty' ? `${this.text(property.key)}: ${this.schema(property.value)}` : this.untranslated(property, 'a spread in an object schema'))
+      const fields = args[0].properties.map(property => isPlain(property) ? `${this.text(property.key)}: ${this.schema(property.value)}` : this.untranslated(property, 'a spread in an object schema'))
 
       built = `s.Object({ ${fields.join(', ')} })`
     }
@@ -96,7 +96,7 @@ class SchemaTranslator {
     return this.modifiers(built, rest, node)
   }
 
-  private modifiers(built: string, calls: t.CallExpression[], node: t.Node): string {
+  private modifiers(built: string, calls: CallExpression[], node: Node): string {
     let result = built
 
     for (const call of calls) {
@@ -116,20 +116,25 @@ class SchemaTranslator {
   }
 }
 
-function literalKey(key: t.Node): string | undefined {
+function literalKey(key: Node): string | undefined {
   if (key.type === 'Identifier')
     return key.name
 
-  return key.type === 'StringLiteral' ? key.value : undefined
+  return key.type === 'Literal' && typeof key.value === 'string' ? key.value : undefined
 }
 
-function callOf(node: t.Node | undefined): t.CallExpression | undefined {
+// An `key: value` entry of an object, which is neither a method, an accessor nor a spread.
+function isPlain(node: Node): node is ObjectProperty {
+  return node.type === 'Property' && node.kind === 'init' && !node.method
+}
+
+function callOf(node: Node | undefined): CallExpression | undefined {
   return node?.type === 'CallExpression' ? node : undefined
 }
 
 // The folder a collection's entries are in, relative to the config: the `glob` loader's `base`, else Astro's `src/content/<name>`.
-function folderOf(options: t.ObjectExpression, name: string): string | undefined {
-  const loader = options.properties.find((property): property is t.ObjectProperty => property.type === 'ObjectProperty' && property.key.type === 'Identifier' && property.key.name === 'loader')
+function folderOf(options: ObjectExpression, name: string): string | undefined {
+  const loader = options.properties.find((property): property is ObjectProperty => isPlain(property) && property.key.type === 'Identifier' && property.key.name === 'loader')
 
   if (!loader)
     return `content/${name}`
@@ -137,9 +142,9 @@ function folderOf(options: t.ObjectExpression, name: string): string | undefined
   if (loader.value.type !== 'CallExpression' || loader.value.callee.type !== 'Identifier' || loader.value.callee.name !== 'glob' || loader.value.arguments[0]?.type !== 'ObjectExpression')
     return undefined
 
-  const base = loader.value.arguments[0].properties.find((property): property is t.ObjectProperty => property.type === 'ObjectProperty' && property.key.type === 'Identifier' && property.key.name === 'base')
+  const base = loader.value.arguments[0].properties.find((property): property is ObjectProperty => isPlain(property) && property.key.type === 'Identifier' && property.key.name === 'base')
 
-  if (base?.value.type !== 'StringLiteral')
+  if (base?.value.type !== 'Literal' || typeof base.value.value !== 'string')
     return undefined
 
   // Astro's `base` is relative to the project root, kay's folder to the config in `src/`.
@@ -149,15 +154,15 @@ function folderOf(options: t.ObjectExpression, name: string): string | undefined
 }
 
 export function migrateContentConfig(source: string): Pick<MigratedFile, 'code' | 'notes'> {
-  const ast = parse(source, { sourceType: 'module', plugins: ['typescript'] })
+  const { program } = parseProgram(source)
   const zod = new Set<string>()
   const translator = new SchemaTranslator(source, zod)
   const notes: Note[] = []
   const collections: string[] = []
   const kept: string[] = []
-  const declared = new Map<string, t.CallExpression>()
+  const declared = new Map<string, CallExpression>()
 
-  for (const statement of ast.program.body) {
+  for (const statement of program.body) {
     if (statement.type === 'ImportDeclaration') {
       if (['astro:content', 'astro/zod', 'astro/loaders', 'zod'].includes(statement.source.value)) {
         for (const specifier of statement.specifiers) {
@@ -166,7 +171,7 @@ export function migrateContentConfig(source: string): Pick<MigratedFile, 'code' 
         }
       }
       else {
-        kept.push(source.slice(statement.start!, statement.end!))
+        kept.push(source.slice(statement.start, statement.end))
       }
 
       continue
@@ -184,11 +189,11 @@ export function migrateContentConfig(source: string): Pick<MigratedFile, 'code' 
         else if (declarator.id.name === 'collections' && declarator.init.type === 'ObjectExpression')
           collections.push(...collectionsOf(declarator.init, declared, translator, notes, source))
         else
-          kept.push(source.slice(statement.start!, statement.end!))
+          kept.push(source.slice(statement.start, statement.end))
       }
     }
     else if (statement.type !== 'ExportNamedDeclaration' || statement.declaration) {
-      kept.push(source.slice(statement.start!, statement.end!))
+      kept.push(source.slice(statement.start, statement.end))
     }
   }
 
@@ -201,26 +206,26 @@ export function migrateContentConfig(source: string): Pick<MigratedFile, 'code' 
   return { code: `${code}\n`, notes: [...notes, ...translator.notes].toSorted((a, b) => a.line - b.line) }
 }
 
-function collectionsOf(object: t.ObjectExpression, declared: Map<string, t.CallExpression>, translator: SchemaTranslator, notes: Note[], source: string): string[] {
+function collectionsOf(object: ObjectExpression, declared: Map<string, CallExpression>, translator: SchemaTranslator, notes: Note[], source: string): string[] {
   const result: string[] = []
 
   for (const property of object.properties) {
-    if (property.type !== 'ObjectProperty' && property.type !== 'ObjectMethod')
+    if (property.type !== 'Property')
       continue
 
     const name = literalKey(property.key)
-    const value = property.type === 'ObjectProperty' ? property.value : undefined
+    const value = property.method || property.kind !== 'init' ? undefined : property.value
     const call = value?.type === 'Identifier' ? declared.get(value.name) : callOf(value)
 
     if (name === undefined || name === '' || !call || call.arguments[0]?.type !== 'ObjectExpression') {
-      notes.push({ line: property.loc!.start.line, message: `the collection ${name ?? source.slice(property.start!, property.end!)} is not a \`defineCollection({...})\` kay migrate reads: write it by hand` })
+      notes.push({ line: positionOf(source, property.start).line, message: `the collection ${name ?? source.slice(property.start, property.end)} is not a \`defineCollection({...})\` kay migrate reads: write it by hand` })
 
       continue
     }
 
     const options = call.arguments[0]
     const folder = folderOf(options, name)
-    const schemaProperty = options.properties.find((option): option is t.ObjectProperty => option.type === 'ObjectProperty' && option.key.type === 'Identifier' && option.key.name === 'schema')
+    const schemaProperty = options.properties.find((option): option is ObjectProperty => isPlain(option) && option.key.type === 'Identifier' && option.key.name === 'schema')
     let schema = schemaProperty?.value
 
     // `schema: ({ image }) => z.object(...)`: an image is its URL in kay.
@@ -228,7 +233,7 @@ function collectionsOf(object: t.ObjectExpression, declared: Map<string, t.CallE
       schema = schema.body
 
     if (folder === undefined)
-      notes.push({ line: call.loc!.start.line, message: `the collection ${name} uses a loader other than \`glob({ base })\`: kay reads a folder of files, so give it the folder` })
+      notes.push({ line: positionOf(source, call.start).line, message: `the collection ${name} uses a loader other than \`glob({ base })\`: kay reads a folder of files, so give it the folder` })
 
     result.push(`export const ${name} = collection('${folder ?? `content/${name}`}', {\n  schema: ${schema ? translator.schema(schema) : 's.Object({})'},\n})`)
   }

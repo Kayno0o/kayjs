@@ -1,8 +1,8 @@
-import type * as t from '@babel/types'
-import { parseExpression } from '@babel/parser'
+import type { Node } from './estree'
+import { parseExpression } from './estree'
 
 // The names a binding pattern or a parameter declares, in order.
-export function patternNames(pattern: t.Node | null | undefined): string[] {
+export function patternNames(pattern: Node | null | undefined): string[] {
   if (pattern?.type === 'Identifier')
     return [pattern.name]
 
@@ -21,7 +21,7 @@ export function patternNames(pattern: t.Node | null | undefined): string[] {
 // The names a pattern or a parameter list (`{ a: b }, [c], ...d` or `x: typeof y`) binds: a key or a type it holds binds none. Undefined when it does not parse.
 export function parsedBindingNames(pattern: string): string[] | undefined {
   try {
-    const expression = parseExpression(`(${pattern}\n) => 0`, { plugins: ['typescript'] })
+    const expression = parseExpression(`(${pattern}\n) => 0`, { lang: 'ts' })
 
     return expression.type === 'ArrowFunctionExpression' ? expression.params.flatMap(param => patternNames(param)) : []
   }

@@ -1,8 +1,9 @@
-import type * as t from '@babel/types'
+import type { ObjectExpression, PropertyKey } from 'oxc-parser'
+import type { Node } from '../compiler/estree'
 import { existsSync } from 'node:fs'
 import { dirname, join, relative, resolve, sep } from 'node:path'
-import { parse } from '@babel/parser'
 import { KayError } from '../compiler/errors'
+import { parseProgram } from '../compiler/estree'
 import { eachDescendant } from '../compiler/walk'
 import { GLOBBED } from './globbed'
 import { ICON_IMPORT, iconNames, installedIconSets } from './icons'
@@ -173,9 +174,9 @@ export function expandGlobs(code: string, importer: string, root: string, loader
 
 function globCalls(code: string, importer: string, loader: Bun.JavaScriptLoader): GlobCall[] {
   const calls: GlobCall[] = []
-  const ast = parse(code, { sourceType: 'module', attachComment: false, plugins: loader === 'tsx' || loader === 'jsx' ? ['typescript', 'jsx'] : ['typescript'], errorRecovery: true })
+  const { program } = parseProgram(code, { lang: loader === 'tsx' || loader === 'jsx' ? 'tsx' : 'ts', returnOutside: true })
 
-  eachDescendant(ast, (node) => {
+  eachDescendant(program, (node) => {
     if (node.type !== 'CallExpression')
       return
 
@@ -186,7 +187,7 @@ function globCalls(code: string, importer: string, loader: Bun.JavaScriptLoader)
 
     const refuse = (what: string) => new KayError('glob-import', `kay: import.meta.glob in ${importer} ${what}, as the build reads them before the module runs: ${USAGE}`)
     const [first, second] = args
-    const patterns = first?.type === 'ArrayExpression' ? first.elements.map(element => element?.type === 'StringLiteral' ? element.value : undefined) : [first?.type === 'StringLiteral' ? first.value : undefined]
+    const patterns = first?.type === 'ArrayExpression' ? first.elements.map(element => element?.type === 'Literal' && typeof element.value === 'string' ? element.value : undefined) : [first?.type === 'Literal' && typeof first.value === 'string' ? first.value : undefined]
 
     if (patterns.length === 0 || patterns.includes(undefined))
       throw refuse('takes its patterns as strings written in the call')
@@ -195,17 +196,17 @@ function globCalls(code: string, importer: string, loader: Bun.JavaScriptLoader)
       throw refuse(`takes patterns starting with ./, ../ or / for the project's root, or ${ICONS} for icons: ${ICON_USAGE}`)
 
     const options = second === undefined ? [] : objectProperties(second)
-    const call: GlobCall = { start: node.start!, end: node.end!, patterns: patterns as string[], eager: false }
+    const call: GlobCall = { start: node.start, end: node.end, patterns: patterns as string[], eager: false }
 
     for (const option of options ?? [undefined]) {
-      const key = option?.type === 'ObjectProperty' && !option.computed ? keyName(option.key) : undefined
+      const key = option?.type === 'Property' && !option.computed ? keyName(option.key) : undefined
 
-      if (option?.type !== 'ObjectProperty' || key === undefined || !OPTIONS.has(key))
+      if (option?.type !== 'Property' || option.kind !== 'init' || option.method || key === undefined || !OPTIONS.has(key))
         throw refuse('takes `eager` and `import` as options written in the call')
 
-      if (key === 'eager' && option.value.type === 'BooleanLiteral')
+      if (key === 'eager' && option.value.type === 'Literal' && typeof option.value.value === 'boolean')
         call.eager = option.value.value
-      else if (key === 'import' && option.value.type === 'StringLiteral')
+      else if (key === 'import' && option.value.type === 'Literal' && typeof option.value.value === 'string')
         call.import = option.value.value
       else
         throw refuse(`takes \`${key}\` as a ${key === 'eager' ? 'boolean' : 'string'} written in the call`)
@@ -217,13 +218,13 @@ function globCalls(code: string, importer: string, loader: Bun.JavaScriptLoader)
   return calls
 }
 
-function objectProperties(node: t.Node): t.ObjectExpression['properties'] | undefined {
+function objectProperties(node: Node): ObjectExpression['properties'] | undefined {
   return node.type === 'ObjectExpression' ? node.properties : undefined
 }
 
-function keyName(key: t.ObjectProperty['key']): string | undefined {
+function keyName(key: PropertyKey): string | undefined {
   if (key.type === 'Identifier')
     return key.name
 
-  return key.type === 'StringLiteral' ? key.value : undefined
+  return key.type === 'Literal' && typeof key.value === 'string' ? key.value : undefined
 }

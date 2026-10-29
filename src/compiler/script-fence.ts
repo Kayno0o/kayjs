@@ -1,10 +1,8 @@
-import type { ParseResult } from '@babel/parser'
-import type * as t from '@babel/types'
+import type { Node, Program } from 'oxc-parser'
 import type { Diagnostic, Span } from './ast'
 import type { ParsedFence } from './script-shared'
-import { parse } from '@babel/parser'
 import { eachNode } from './each-node'
-import { POSITION_SUFFIX } from './rewrite'
+import { parseProgram } from './estree'
 import { FIRST_TOKEN, KAY_NAME, WHITESPACE } from './script-shared'
 import { walkScope } from './walk'
 
@@ -15,25 +13,18 @@ const UNFINISHED = /[.,([{=+\-*/&|?:<>!~^%]/
 // A line of a fence that begins a statement: written from its first column, and not closing or continuing the one before it.
 const STATEMENT_START = /^(?![\s})\]]|else\b|catch\b|finally\b)/
 
-// Without `blank`, the parse is the one Babel's recovery gives, its statements that do not parse left in; none is read again.
+// Without `blank`, the parse is the first one, with the errors it recovers from and nothing blanked; none is read again.
 export function parseFence(source: string, span: Span, diagnostics: Diagnostic[], blank = true): ParsedFence | undefined {
   const original = source.slice(span.start, span.end)
   const broken: Span[] = []
   let code = original
   let reported = false
 
-  // A statement Babel cannot parse, or recovers from only with an error the shadow code would not survive, is blanked and the rest parsed again: one being typed costs the editor only its own analysis.
+  // A statement the parser cannot parse, or recovers from only with an error the shadow code would not survive, is blanked and the rest parsed again: one being typed costs the editor only its own analysis.
   while (true) {
-    let ast: ParseResult<t.File> | undefined
-    let errors: { pos: number, message: string }[]
-
-    try {
-      ast = parse(code, { sourceType: 'module', plugins: ['typescript'], errorRecovery: true })
-      errors = (ast.errors ?? []).map(error => ({ pos: (error as unknown as { pos?: number }).pos ?? 0, message: error.message }))
-    }
-    catch (error) {
-      errors = [{ pos: (error as { pos?: number }).pos ?? 0, message: (error as Error).message }]
-    }
+    const { program: ast, errors, comments } = parseProgram(code, { recover: true, semantic: true })
+    // After an error it cannot recover from the parser leaves an empty program, which is nothing to analyse.
+    const unrecovered = errors.length > 0 && ast.body.length === 0 && code.trim() !== ''
 
     if (!reported) {
       reported = true
@@ -42,13 +33,13 @@ export function parseFence(source: string, span: Span, diagnostics: Diagnostic[]
         return undefined
 
       for (const { pos, message } of errors)
-        diagnostics.push({ start: span.start + pos, end: span.start + pos + 1, code: 'fence-syntax', message: message.replace(POSITION_SUFFIX, '') })
+        diagnostics.push({ start: span.start + pos, end: span.start + pos + 1, code: 'fence-syntax', message })
     }
 
     const statements = blank && broken.length < MAX_BROKEN ? new Map(errors.flatMap(({ pos }) => brokenStatement(code, pos)).map(statement => [statement.start, statement])) : new Map<number, { start: number, end: number }>()
 
     if (errors.length === 0 || statements.size === 0)
-      return ast && { code, offset: span.start, ast, broken, shift: node => ({ start: span.start + node.start!, end: span.start + node.end! }) }
+      return unrecovered ? undefined : { code, offset: span.start, ast, comments, broken, shift: node => ({ start: span.start + node.start, end: span.start + node.end }) }
 
     for (const { start, end } of statements.values()) {
       // A statement that swallows an earlier blank one replaces it.
@@ -151,12 +142,10 @@ function brokenStatement(code: string, pos: number): { start: number, end: numbe
 
 // Markup in a fence reads as JSX, which kay never compiles: the template is the only place for it.
 function reportJsx(code: string, span: Span, diagnostics: Diagnostic[]): boolean {
-  let jsx: t.Node | undefined
+  let jsx: Node | undefined
 
   try {
-    const ast = parse(code, { sourceType: 'module', plugins: ['typescript', 'jsx'] })
-
-    jsx = findJsx(ast.program)
+    jsx = findJsx(parseProgram(code, { lang: 'tsx', semantic: true }).program)
   }
   catch {
     return false
@@ -165,13 +154,13 @@ function reportJsx(code: string, span: Span, diagnostics: Diagnostic[]): boolean
   if (!jsx)
     return false
 
-  diagnostics.push({ start: span.start + jsx.start!, end: span.start + jsx.end!, message: 'A fence holds TypeScript, never JSX', help: 'put markup in the template, or in a component of its own' })
+  diagnostics.push({ start: span.start + jsx.start, end: span.start + jsx.end, message: 'A fence holds TypeScript, never JSX', help: 'put markup in the template, or in a component of its own' })
 
   return true
 }
 
-function findJsx(node: t.Node): t.Node | undefined {
-  let jsx: t.Node | undefined
+function findJsx(node: Node): Node | undefined {
+  let jsx: Node | undefined
 
   eachNode(node, (inner) => {
     if (inner.type === 'JSXElement' || inner.type === 'JSXFragment')
@@ -269,7 +258,7 @@ export function codeOf(text: string): string {
 }
 
 // Which of `kay`'s values, `declared` aside, the fence reads with nothing in it declaring or importing them, `typed` being the code of the statements that did not parse, where a mention counts as a read, and `read` the ones the template reads.
-export function undeclared(ast: ParseResult<t.File>, code: string, declared: string[], typed: string, read: readonly string[]): string[] {
+export function undeclared(ast: Program, code: string, declared: string[], typed: string, read: readonly string[]): string[] {
   // `ctx` in a fence is the request, which only a template reading it unimported gets from `kay`.
   const written = new Set([...(typed === '' ? [code] : [code, typed]).flatMap(text => (text.match(KAY_NAME) ?? []).filter(name => name !== 'ctx')), ...read])
   const mentioned = [...written].filter(name => !declared.includes(name))
@@ -288,7 +277,7 @@ export function undeclared(ast: ParseResult<t.File>, code: string, declared: str
     },
   })
 
-  // A fence Babel's scope refuses takes as read every name it mentions outside its strings and comments.
+  // A fence kay's scope pass refuses takes as read every name it mentions outside its strings and comments.
   if (!walked) {
     const outside = new Set([...(codeOf(code).match(KAY_NAME) ?? []), ...inTyped, ...read])
 

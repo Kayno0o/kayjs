@@ -1,8 +1,7 @@
 import type { CompileOptions } from '../src/compiler'
 import { join } from 'node:path'
 import process from 'node:process'
-import * as parser from '@babel/parser'
-import { describe, expect, it, spyOn } from 'bun:test'
+import { describe, expect, it } from 'bun:test'
 import { compileKay } from '../src/compiler'
 import { moduleChecks } from '../src/compiler/fence-checks'
 import { explainLint, isLint, LINT_GROUPS, lintList, LINTS, typeLint } from '../src/compiler/lints'
@@ -415,20 +414,12 @@ describe('the checks that read a module', () => {
     expect(moduleChecks(twice).map(d => d.code)).toEqual(['css-import-without-text'])
   })
 
-  it('reads a module whose statement does not parse once, so the checks inside that statement still run', () => {
-    const module = 'export const a = 1 foo\nimport theme from \'./theme.css\' bar\n'
-    const parse = spyOn(parser, 'parse')
+  it('reads a module whose statement does not parse again with it blanked, so the checks of the others still run', () => {
+    const module = 'export const a = 1 foo\nimport theme from \'./theme.css\'\n'
+    const found = moduleChecks(module)
 
-    try {
-      const found = moduleChecks(module)
-
-      expect(found.map(d => d.code)).toEqual(['css-import-without-text'])
-      expect(found[0]!.message).toContain('./theme.css')
-      expect(parse).toHaveBeenCalledTimes(1)
-    }
-    finally {
-      parse.mockRestore()
-    }
+    expect(found.map(d => d.code)).toEqual(['css-import-without-text'])
+    expect(found[0]!.message).toContain('./theme.css')
   })
 })
 

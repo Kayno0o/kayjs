@@ -1,4 +1,4 @@
-import type * as t from '@babel/types'
+import type { Node, Statement } from 'oxc-parser'
 import type { Diagnostic, Span } from './ast'
 import type { ImportBinding, ParsedFence, ScriptAnalysis } from './script-shared'
 import { eachNode } from './each-node'
@@ -12,7 +12,7 @@ const STATIC_IMPORT_START = /^(?:\s*(?:\/\/.*\n|\/\*(?:[^*]|\*(?!\/))*\*\/))*\s*
 
 // A statement a fence keeps out of module level, with the text between it and the statement before it.
 interface FenceStatement {
-  statement: t.Statement
+  statement: Statement
   span: Span
   // Text kept as written, the statements that failed to parse among it.
   gap: Span[]
@@ -56,14 +56,16 @@ export function splitFence(source: string, fence: Span, names: string[], analysi
   }
 
   const { ast, shift } = parsed
-  const local = bodyTypes(ast.program.body, names, shift, analysis.diagnostics)
+  // Where the statement before ended, past which its leading comments begin.
+  let previousEnd = 0
+  const local = bodyTypes(ast.body, names, shift, analysis.diagnostics)
   const statements: FenceStatement[] = []
   const recipes: { name: string, span: Span, root: boolean, variants: Record<string, string[]> | undefined }[] = []
-  const recipeStatements = new Set<t.Statement>()
-  const recipeCalls = recipeNames(ast.program.body)
+  const recipeStatements = new Set<Statement>()
+  const recipeCalls = recipeNames(ast.body)
 
   // A `recipe` written in a server fence with no import and no declaration of its own is kay's, missing its import.
-  if (!withRecipes && !ast.program.body.some(statement => (statement.type === 'ImportDeclaration' && statement.specifiers.some(specifier => specifier.local.name === 'recipe')) || declaredIdentifiers(unexported(statement)).some(identifier => identifier.name === 'recipe')))
+  if (!withRecipes && !ast.body.some(statement => (statement.type === 'ImportDeclaration' && statement.specifiers.some(specifier => specifier.local.name === 'recipe')) || declaredIdentifiers(unexported(statement)).some(identifier => identifier.name === 'recipe')))
     recipeCalls.add('recipe')
 
   let cursor = fence.start
@@ -81,8 +83,10 @@ export function splitFence(source: string, fence: Span, names: string[], analysi
 
   analysis.implicit = undeclared(ast, parsed.code, names, parsed.broken.map(text => codeOf(source.slice(text.start, text.end))).join('\n'), templateReads)
 
-  for (const statement of ast.program.body) {
-    const span = withLeadingComments(statement, shift)
+  for (const statement of ast.body) {
+    const span = withLeadingComments(statement, previousEnd, parsed)
+
+    previousEnd = statement.end
 
     const recipe = withRecipes ? recipeDeclaration(statement, recipeCalls, shift, analysis.diagnostics) : misplacedRecipe(statement, recipeCalls, shift, analysis.diagnostics)
 
@@ -111,13 +115,13 @@ export function splitFence(source: string, fence: Span, names: string[], analysi
   return { ...parsed, statements, recipes, tail: [...carried, ...textAround(cursor, fence.end, parsed.broken, analysis.brokenModule)] }
 }
 
-function moduleSpecifier(statement: t.Statement, shift: (node: t.Node) => Span): Span[] {
+function moduleSpecifier(statement: Statement, shift: (node: Span) => Span): Span[] {
   const source = statement.type === 'ImportDeclaration' || statement.type === 'ExportNamedDeclaration' ? statement.source : undefined
 
   return source ? [shift(source)] : []
 }
 
-function importBindings(statement: t.Statement, shift: (node: t.Node) => Span): ImportBinding[] {
+function importBindings(statement: Statement, shift: (node: Span) => Span): ImportBinding[] {
   if (statement.type !== 'ImportDeclaration')
     return []
 
@@ -137,7 +141,7 @@ function importBindings(statement: t.Statement, shift: (node: t.Node) => Span): 
   })
 }
 
-function isHoisted(statement: t.Statement, local: ReadonlySet<t.Statement>): boolean {
+function isHoisted(statement: Statement, local: ReadonlySet<Statement>): boolean {
   if (local.has(statement))
     return false
 
@@ -151,7 +155,7 @@ function isHoisted(statement: t.Statement, local: ReadonlySet<t.Statement>): boo
   return statement.exportKind === 'type'
 }
 
-function leftmost(name: t.Node): string | undefined {
+function leftmost(name: Node): string | undefined {
   if (name.type === 'TSQualifiedName')
     return leftmost(name.left)
 
@@ -159,9 +163,9 @@ function leftmost(name: t.Node): string | undefined {
 }
 
 // A type is hoisted above the function so it is visible everywhere, but one taking the `typeof` a name the body declares has to stay in the body, and so does one built from such a type.
-function bodyTypes(statements: t.Statement[], extraNames: string[], shift: (node: t.Node) => Span, diagnostics: Diagnostic[]): Set<t.Statement> {
+function bodyTypes(statements: Statement[], extraNames: string[], shift: (node: Span) => Span, diagnostics: Diagnostic[]): Set<Statement> {
   const values = new Set(extraNames)
-  const types: { statement: t.Statement, name: string, values: Set<string>, types: Set<string> }[] = []
+  const types: { statement: Statement, name: string, values: Set<string>, types: Set<string> }[] = []
 
   for (const statement of statements) {
     const declaration = typeDeclaration(statement)
@@ -194,8 +198,8 @@ function bodyTypes(statements: t.Statement[], extraNames: string[], shift: (node
     types.push(found)
   }
 
-  const local = new Set<t.Statement>()
-  const exported = new Set<t.Statement>()
+  const local = new Set<Statement>()
+  const exported = new Set<Statement>()
   const names = new Set<string>()
 
   for (let changed = true; changed;) {

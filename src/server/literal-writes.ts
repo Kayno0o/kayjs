@@ -1,10 +1,10 @@
-import type { CallExpression, Expression, MemberExpression, Node } from '@babel/types'
+import type { CallExpression, MemberExpression, ObjectProperty } from 'oxc-parser'
 import type { Node as KayNode } from '../compiler/ast'
-import { parseExpression } from '@babel/parser'
-import { VISITOR_KEYS } from '@babel/types'
+import type { Expression, Node } from '../compiler/estree'
 import { resolveFrom } from '../build/files'
-import { FENCE_PLUGINS, scriptPlugins, SourceParses } from '../build/source-parses'
+import { FENCE_LANG, scriptLang, SourceParses } from '../build/source-parses'
 import { childBlocks, nodeExpressions } from '../compiler/ast'
+import { parseExpression, VISITOR_KEYS } from '../compiler/estree'
 import { binders, bindsAt, CALLS, KEYED, MEMBERS, NAMING, patterns, TYPE_KEYS, TYPE_NODES } from './kept-source'
 
 // Whether an exported `const` holding an object or array literal can be shown never to change: its value is made of literals only, and no file of the project writes to it, hands it to code that might, or reaches it in a way the scan cannot follow.
@@ -55,7 +55,6 @@ interface Frame {
 }
 
 const VALUE: Literal = { kind: 'value' }
-const SCALARS = new Set(['StringLiteral', 'NumericLiteral', 'BigIntLiteral', 'BooleanLiteral', 'NullLiteral'])
 const INDEX = /^\d+$/
 const IDENTIFIER = /^[A-Z_$][\w$]*$/i
 const OPENS_PATTERN = /^\s*[[{]/
@@ -90,11 +89,11 @@ export function literalOf(initializer: Expression, imported: ReadonlySet<string>
 
 // The literal a node is, or undefined for anything not made of strings, numbers, booleans, `null`, `undefined` and arrays and objects of them; an imported binding is another module's value, which stops a page that takes it if that module holds it changeable.
 function literalValue(node: Node, imported: ReadonlySet<string>): Literal | undefined {
-  if (SCALARS.has(node.type) || (node.type === 'TemplateLiteral' && node.expressions.length === 0))
+  if (isScalar(node) || (node.type === 'TemplateLiteral' && node.expressions.length === 0))
     return VALUE
 
   if (node.type === 'UnaryExpression')
-    return node.operator === '-' && (node.argument.type === 'NumericLiteral' || node.argument.type === 'BigIntLiteral') ? VALUE : undefined
+    return node.operator === '-' && node.argument.type === 'Literal' && (typeof node.argument.value === 'number' || 'bigint' in node.argument) ? VALUE : undefined
 
   if (node.type === 'Identifier')
     return node.name === 'undefined' || imported.has(node.name) ? VALUE : undefined
@@ -120,8 +119,8 @@ function literalValue(node: Node, imported: ReadonlySet<string>): Literal | unde
   const props = new Map<string, Literal>()
 
   for (const property of node.properties) {
-    const name = property.type === 'ObjectProperty' && !property.computed ? propertyName(property.key) : undefined
-    const value = name === undefined || PROTOTYPE_KEYS.has(name) ? undefined : literalValue((property as Extract<Node, { type: 'ObjectProperty' }>).value, imported)
+    const name = isPlain(property) && !property.computed ? propertyName(property.key) : undefined
+    const value = name === undefined || PROTOTYPE_KEYS.has(name) ? undefined : literalValue((property as ObjectProperty).value, imported)
 
     if (value === undefined)
       return undefined
@@ -132,14 +131,24 @@ function literalValue(node: Node, imported: ReadonlySet<string>): Literal | unde
   return { kind: 'object', props }
 }
 
+// A string, number, bigint, boolean or `null`, not a regular expression.
+function isScalar(node: Node): boolean {
+  return node.type === 'Literal' && !('regex' in node)
+}
+
+// A `key: value` entry of an object, neither a method, an accessor nor a spread.
+function isPlain(node: Node): node is ObjectProperty {
+  return node.type === 'Property' && node.kind === 'init' && !node.method
+}
+
 function propertyName(key: Node): string | undefined {
   if (key.type === 'Identifier')
     return key.name
 
-  if (key.type === 'NumericLiteral')
+  if (key.type === 'Literal' && typeof key.value === 'number')
     return String(key.value)
 
-  return key.type === 'StringLiteral' ? key.value : undefined
+  return key.type === 'Literal' && typeof key.value === 'string' ? key.value : undefined
 }
 
 function arrayItem(items: Literal[], key: string): Literal | undefined {
@@ -199,14 +208,14 @@ function merge(a: Literal, b: Literal): Literal | undefined {
 }
 
 // The key a member reads when it is written as one: `b` of `a.b`, `a['b']`, `a[0]` and ``a[`b`]``, not of `a[b]`.
-function staticKey({ property, computed }: MemberExpression | Extract<Node, { type: 'OptionalMemberExpression' }>): string | undefined {
+function staticKey({ property, computed }: MemberExpression): string | undefined {
   if (!computed)
     return property.type === 'Identifier' ? property.name : undefined
 
-  if (property.type === 'StringLiteral')
+  if (property.type === 'Literal' && typeof property.value === 'string')
     return property.value
 
-  if (property.type === 'NumericLiteral')
+  if (property.type === 'Literal' && typeof property.value === 'number')
     return String(property.value)
 
   return property.type === 'TemplateLiteral' && property.expressions.length === 0 ? property.quasis[0]!.value.cooked ?? undefined : undefined
@@ -214,7 +223,7 @@ function staticKey({ property, computed }: MemberExpression | Extract<Node, { ty
 
 // The text of a string, or of a template literal with no holes.
 function stringOf(node: Node): string | undefined {
-  if (node.type === 'StringLiteral')
+  if (node.type === 'Literal' && typeof node.value === 'string')
     return node.value
 
   return node.type === 'TemplateLiteral' && node.expressions.length === 0 ? node.quasis[0]!.value.cooked ?? undefined : undefined
@@ -254,7 +263,7 @@ function written(node: Node, parsed: ParsedSource): boolean {
     if (parent.type === 'UpdateExpression' || (parent.type === 'UnaryExpression' && parent.operator === 'delete'))
       return true
 
-    const inside = CASTS.has(parent.type) || PATTERNS.has(parent.type) || (parent.type === 'AssignmentPattern' && key === 'left') || (parent.type === 'ObjectProperty' && key === 'value' && parsed.links.get(parent)?.parent.type === 'ObjectPattern')
+    const inside = CASTS.has(parent.type) || PATTERNS.has(parent.type) || (parent.type === 'AssignmentPattern' && key === 'left') || (parent.type === 'Property' && key === 'value' && parsed.links.get(parent)?.parent.type === 'ObjectPattern')
 
     if (!inside)
       return false
@@ -518,13 +527,12 @@ function note({ node, link, pattern }: Frame, parsed: ParsedSource, namespaces: 
   }
   else if (node.type === 'ExportAllDeclaration') {
     parsed.exportsAll = true
-  }
-  else if (node.type === 'ExportNamedDeclaration' && node.source != null && node.specifiers.some(specifier => specifier.type === 'ExportNamespaceSpecifier')) {
-    parsed.exportsAll = true
-    parsed.misuse.push(node.source.value)
+
+    if (node.exported != null)
+      parsed.misuse.push(node.source.value)
   }
   else if (node.type === 'ImportExpression') {
-    parsed.calls.push(node.source.type === 'StringLiteral' ? node.source.value : undefined)
+    parsed.calls.push(node.source.type === 'Literal' && typeof node.source.value === 'string' ? node.source.value : undefined)
   }
   else if (node.type === 'TSImportEqualsDeclaration' && node.importKind !== 'type' && node.moduleReference.type === 'TSExternalModuleReference') {
     parsed.calls.push(node.moduleReference.expression.value)
@@ -532,8 +540,8 @@ function note({ node, link, pattern }: Frame, parsed: ParsedSource, namespaces: 
   else if (CALLS.has(node.type)) {
     const { callee, arguments: args } = node as CallExpression
 
-    if (callee.type === 'Import' || (callee.type === 'Identifier' && callee.name === 'require'))
-      parsed.calls.push(args[0]?.type === 'StringLiteral' ? args[0].value : undefined)
+    if (callee.type === 'Identifier' && callee.name === 'require')
+      parsed.calls.push(args[0]?.type === 'Literal' && typeof args[0].value === 'string' ? args[0].value : undefined)
   }
 }
 
@@ -554,7 +562,7 @@ function index(root: Node, parsed: ParsedSource, namespaces: [string, string][])
 
     for (const key of VISITOR_KEYS[node.type] ?? []) {
       // A shorthand property's key is its value, read as such.
-      if (TYPE_KEYS.has(key) || (key === 'key' && node.type === 'ObjectProperty' && node.shorthand))
+      if (TYPE_KEYS.has(key) || (key === 'key' && node.type === 'Property' && node.shorthand))
         continue
 
       const child = (node as unknown as Record<string, unknown>)[key]
@@ -562,7 +570,7 @@ function index(root: Node, parsed: ParsedSource, namespaces: [string, string][])
 
       for (const item of Array.isArray(child) ? child : [child]) {
         if (typeof item === 'object' && item !== null)
-          pending.push({ node: item as Node, link: { parent: node, key }, pattern })
+          pending.push({ node: item as Node, link: node.type === 'ChainExpression' ? link : { parent: node, key }, pattern })
       }
     }
   }
@@ -583,7 +591,9 @@ function indexTemplate(nodes: readonly KayNode[], source: string, parses: Source
         continue
 
       // A binder reads as the parameters of an arrow function, so its default values are read and its names are not.
-      const root: Node = own.includes(span) || loopPatterns.includes(span) ? parseExpression(`(${text})=>0`, { plugins: ['typescript'], startIndex: span.start - 1 }) : parses.expression(source, span)
+      const parsedRoot: Node = own.includes(span) || loopPatterns.includes(span) ? parseExpression(`(${text})=>0`, { offset: span.start - 1 }) : parses.expression(source, span)
+      // The wrapper of an optional chain is left out of the links, so the root is the chain itself.
+      const root = parsedRoot.type === 'ChainExpression' ? parsedRoot.expression : parsedRoot
 
       index(root, parsed, namespaces)
 
@@ -621,13 +631,13 @@ function parseSource(file: string, text: string): ParsedSource | null {
 
       for (const span of [kay.script, kay.server, kay.module]) {
         if (span !== undefined)
-          index(parses.program(kay.source, span, FENCE_PLUGINS), parsed, namespaces)
+          index(parses.program(kay.source, span, FENCE_LANG), parsed, namespaces)
       }
 
       indexTemplate(kay.template, kay.source, parses, parsed, namespaces, [])
     }
     else {
-      index(parses.program(text, { start: 0, end: text.length }, scriptPlugins(file)), parsed, namespaces)
+      index(parses.program(text, { start: 0, end: text.length }, scriptLang(file)), parsed, namespaces)
     }
   }
   catch {

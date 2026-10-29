@@ -1,5 +1,5 @@
-import type { Node } from '@babel/types'
 import type { Span } from '../compiler/ast'
+import type { Node } from '../compiler/estree'
 import type { KeptImport, KeptSource } from './kept-source'
 import type { SourceFile } from './literal-writes'
 import type { Unchanged } from './module-state'
@@ -63,10 +63,10 @@ function moduleStateAt(file: string, source: string, read: KeptSource, unchanged
   }
 
   for (const { start, end } of analysis.exports) {
-    const statement = server.body.find(statement => real(statement.start!) >= start && real(statement.end!) <= end && statementState(statement, SETTING_NAMES, unchanged))
+    const statement = server.body.find(statement => real(statement.start) >= start && real(statement.end) <= end && statementState(statement, SETTING_NAMES, unchanged))
 
     if (statement !== undefined)
-      return real(statement.start!)
+      return real(statement.start)
   }
 
   const later = laterExportAt(server, SETTING_NAMES, unchanged)
@@ -86,13 +86,13 @@ function savesLocally(args: Node[]): boolean {
 
   for (const property of options.properties) {
     // A key the scan cannot read as `storage` or as another name: a spread, a computed one, or `storage` written in quotes.
-    if (property.type === 'SpreadElement' || property.computed || (property.key.type === 'StringLiteral' && property.key.value === 'storage'))
+    if (property.type === 'SpreadElement' || property.computed || (property.key.type === 'Literal' && property.key.value === 'storage'))
       return false
 
     if (property.key.type !== 'Identifier' || property.key.name !== 'storage')
       continue
 
-    if (property.type !== 'ObjectProperty' || property.value.type !== 'StringLiteral' || property.value.value !== 'local')
+    if (property.kind !== 'init' || property.method || property.value.type !== 'Literal' || property.value.value !== 'local')
       return false
 
     local = true
@@ -105,7 +105,7 @@ function savesLocally(args: Node[]): boolean {
 function startsWithFolder(args: Node[]): boolean {
   const first = args[0]
 
-  return first?.type === 'StringLiteral' || (first?.type === 'TemplateLiteral' && first.expressions.length === 0)
+  return (first?.type === 'Literal' && typeof first.value === 'string') || (first?.type === 'TemplateLiteral' && first.expressions.length === 0)
 }
 
 // Whether every use of `name` is a call whose arguments `accepts`, and there is one.

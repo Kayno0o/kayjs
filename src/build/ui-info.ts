@@ -1,10 +1,11 @@
-import type * as t from '@babel/types'
+import type { ObjectExpression, ObjectProperty } from 'oxc-parser'
+import type { Expression, Program } from '../compiler/estree'
 import type { KayLibrary } from './libraries'
 import { existsSync, readFileSync, realpathSync, statSync } from 'node:fs'
 import { dirname, relative, resolve, sep } from 'node:path'
-import { parse } from '@babel/parser'
 import { offered } from '../check/ui'
 import { componentName } from '../compiler'
+import { parseProgram } from '../compiler/estree'
 import { constBindings } from '../compiler/object-literal'
 import { parseKay } from '../compiler/parser'
 import { findKayFiles } from './files'
@@ -132,7 +133,7 @@ export function tokensNamedBy(classes: string, tokens: Token[]): Token[] {
   return tokens.filter(token => names.has(token.name))
 }
 
-function recipeConfig(node: t.Node | null | undefined): t.ObjectExpression | undefined {
+function recipeConfig(node: Expression | null | undefined): ObjectExpression | undefined {
   let value = node
 
   while (value && (value.type === 'TSAsExpression' || value.type === 'TSSatisfiesExpression' || value.type === 'ParenthesizedExpression'))
@@ -151,7 +152,7 @@ const MODULE_ENDINGS = ['', '.ts', '/index.ts']
 const CONSTANT_DEPTH = 4
 
 // The string constants a module's names stand for: its own top-level consts, and the ones it imports from a relative module, read lazily.
-function constantsOf(program: t.Program, dir: string, depth: number): (name: string) => string | undefined {
+function constantsOf(program: Program, dir: string, depth: number): (name: string) => string | undefined {
   const bindings = constBindings(program)
   const imports = new Map<string, { from: string, name: string }>()
   const seen = new Set<string>()
@@ -195,9 +196,9 @@ function constantsOf(program: t.Program, dir: string, depth: number): (name: str
       return undefined
 
     try {
-      const module = parse(readFileSync(file, 'utf8'), { sourceType: 'module', plugins: ['typescript'], errorRecovery: true })
+      const { program: module } = parseProgram(readFileSync(file, 'utf8'), { recover: true })
 
-      return constantsOf(module.program, dirname(file), depth + 1)(imported.name)
+      return constantsOf(module, dirname(file), depth + 1)(imported.name)
     }
     catch {
       return undefined
@@ -215,24 +216,24 @@ export function recipeParts(source: string, file?: string): Record<string, strin
   if (script === undefined)
     return found
 
-  let ast: t.File
+  let program: Program
 
   try {
-    ast = parse(source.slice(script.start, script.end), { sourceType: 'module', plugins: ['typescript'], errorRecovery: true })
+    program = parseProgram(source.slice(script.start, script.end), { recover: true }).program
   }
   catch {
     return found
   }
 
-  const lookup = file === undefined ? undefined : constantsOf(ast.program, dirname(file), 0)
+  const lookup = file === undefined ? undefined : constantsOf(program, dirname(file), 0)
 
-  for (const statement of ast.program.body) {
+  for (const statement of program.body) {
     if (statement.type !== 'VariableDeclaration')
       continue
 
     for (const declarator of statement.declarations) {
       const config = recipeConfig(declarator.init)
-      const parts = config?.properties.find((property): property is t.ObjectProperty => property.type === 'ObjectProperty' && keyOf(property) === 'parts')?.value
+      const parts = config?.properties.find((property): property is ObjectProperty => property.type === 'Property' && keyOf(property) === 'parts')?.value
 
       if (parts === undefined)
         continue
@@ -244,8 +245,8 @@ export function recipeParts(source: string, file?: string): Record<string, strin
       }
       else if (parts.type === 'ObjectExpression') {
         for (const property of parts.properties) {
-          const name = property.type === 'ObjectProperty' ? keyOf(property) : undefined
-          const classes = property.type === 'ObjectProperty' ? classesOf(property.value, lookup) : undefined
+          const name = property.type === 'Property' ? keyOf(property) : undefined
+          const classes = property.type === 'Property' && name !== undefined ? classesOf(property.value, lookup) : undefined
 
           if (name !== undefined && classes !== undefined)
             found[name] = classes

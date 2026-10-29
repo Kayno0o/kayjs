@@ -8,7 +8,7 @@ import { scratchDir } from './scratch'
 const LOADED = join(import.meta.dir, '..', 'src', 'check', 'loaded')
 
 test('listing the loaded files does not load the parser', async () => {
-  const script = `import '${LOADED}'; console.log(Object.keys(require.cache).some(path => path.includes('@babel/parser')))`
+  const script = `import '${LOADED}'; console.log(Object.keys(require.cache).some(path => path.includes('oxc-parser')))`
   const dir = await scratchDir('loaded-parser-')
 
   await writeFile(join(dir, 'probe.ts'), script)

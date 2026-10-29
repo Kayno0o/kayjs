@@ -122,7 +122,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the docs p
     expect((await fetch(`${origin}getting-started/introduction`)).headers.get('link')).toContain('rel="compression-dictionary"')
     expect(response.headers.get('link')).toBeNull()
     expect(policy).toContain('\'unsafe-eval\'')
-    expect((await (await fetch(origin)).text())).not.toContain('unsafe-eval')
+    expect((await (await fetch(origin)).text())).not.toContain('\'unsafe-eval\'')
     expect(await page.evaluate(() => document.querySelector('.playground-frame')?.getAttribute('sandbox'))).toBe('allow-scripts')
   })
 
@@ -291,9 +291,9 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the docs p
     expect(page.errors).toEqual([])
   }, 90_000)
 
-  it('leaves the other pages\' policy without eval', async () => {
+  it('leaves the other pages\' policy without eval, WebAssembly alone allowed for the parser', async () => {
     const response = await fetch(`${origin}getting-started/introduction`)
 
-    expect(response.headers.get('content-security-policy') ?? '').not.toContain('unsafe-eval')
+    expect(response.headers.get('content-security-policy') ?? '').not.toContain('\'unsafe-eval\'')
   })
 })

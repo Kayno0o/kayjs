@@ -1,8 +1,8 @@
-import type * as t from '@babel/types'
+import type { ObjectExpression, PropertyKey } from 'oxc-parser'
 import type { CheckDiagnostic, CheckOptions } from '.'
-import { parseExpression } from '@babel/parser'
 import { findProjectFiles } from '../build/files'
 import { elementsIn } from '../compiler/ast'
+import { parseExpression } from '../compiler/estree'
 import { lintLevel, lintLevels } from '../compiler/lints'
 import { positionAt } from '../compiler/mapping'
 import { parseKay } from '../compiler/parser'
@@ -87,13 +87,13 @@ function labelsIn(file: string, source: string): Labelled[] {
       rest = rest.slice(0, attribute.expression.start) + ' '.repeat(attribute.expression.end - attribute.expression.start) + rest.slice(attribute.expression.end)
 
       for (const property of expression.properties) {
-        if (property.type !== 'ObjectProperty' || property.computed)
+        if (property.type !== 'Property' || property.computed || property.method || property.kind !== 'init')
           continue
 
         const name = keyName(property.key)
 
         if (name !== undefined)
-          keys.push({ name, at: attribute.expression.start + property.key.start!, end: attribute.expression.start + property.key.end! })
+          keys.push({ name, at: attribute.expression.start + property.key.start, end: attribute.expression.start + property.key.end })
       }
     }
   }
@@ -101,9 +101,9 @@ function labelsIn(file: string, source: string): Labelled[] {
   return keys.length === 0 ? [] : [{ file, source, keys, rest }]
 }
 
-function parseObject(text: string): t.ObjectExpression | undefined {
+function parseObject(text: string): ObjectExpression | undefined {
   try {
-    const expression = parseExpression(text, { plugins: ['typescript'] })
+    const expression = parseExpression(text)
 
     return expression.type === 'ObjectExpression' ? expression : undefined
   }
@@ -112,9 +112,9 @@ function parseObject(text: string): t.ObjectExpression | undefined {
   }
 }
 
-function keyName(key: t.ObjectProperty['key']): string | undefined {
+function keyName(key: PropertyKey): string | undefined {
   if (key.type === 'Identifier')
     return key.name
 
-  return key.type === 'StringLiteral' ? key.value : undefined
+  return key.type === 'Literal' && typeof key.value === 'string' ? key.value : undefined
 }

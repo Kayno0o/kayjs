@@ -1,7 +1,8 @@
-import type * as t from '@babel/types'
+import type { ObjectExpression, ObjectProperty } from 'oxc-parser'
 import type { CheckDiagnostic, CheckOptions } from '.'
-import { parse } from '@babel/parser'
+import type { Comment, Node, Program } from '../compiler/estree'
 import { findProjectFiles } from '../build/files'
+import { parseProgram } from '../compiler/estree'
 import { lintLevel } from '../compiler/lints'
 import { positionAt } from '../compiler/mapping'
 import { keyName } from '../compiler/object-literal'
@@ -39,16 +40,9 @@ export async function authAttempts(root: string, options: CheckOptions): Promise
 
     for (const { start: base, end } of spans) {
       const text = source.slice(base, end)
-      let ast: t.File
+      const { program: ast, comments } = parseProgram(text, { lang: file.endsWith('.ts') ? 'ts' : 'tsx', recover: true })
 
-      try {
-        ast = parse(text, { sourceType: 'module', plugins: file.endsWith('.ts') ? ['typescript'] : ['typescript', 'jsx'], errorRecovery: true })
-      }
-      catch {
-        continue
-      }
-
-      if (!ast.program.body.some(statement => statement.type === 'ImportDeclaration' && statement.source.value.startsWith(AUTH_PACKAGE)))
+      if (!ast.body.some(statement => statement.type === 'ImportDeclaration' && statement.source.value.startsWith(AUTH_PACKAGE)))
         continue
 
       const { locals, namespaces } = importsOf(ast, from => from === AUTH_PACKAGE, 'memoryAuthStore')
@@ -57,20 +51,20 @@ export async function authAttempts(root: string, options: CheckOptions): Promise
         if (node.type !== 'ObjectExpression')
           return
 
-        const names = new Set(node.properties.flatMap(property => property.type === 'SpreadElement' || property.computed ? [] : [keyName(property as t.ObjectProperty)]))
-        const index = node.properties.findIndex(property => property.type === 'ObjectProperty' && keyName(property) === 'attempts')
+        const names = new Set(node.properties.flatMap(property => property.type === 'SpreadElement' || property.computed ? [] : [keyName(property)]))
+        const index = node.properties.findIndex(property => isPlain(property) && keyName(property) === 'attempts')
 
         if (index === -1 || !STORE_KEYS.every(key => names.has(key)))
           return
 
-        const property = node.properties[index] as t.ObjectProperty
+        const property = node.properties[index] as ObjectProperty
         const memory = memoryCounter(property.value, locals, namespaces)
-        const edits = memory === undefined ? undefined : [removal(text, node.properties, index), ...unreadImport(ast, text, memory)].map(edit => ({ ...edit, start: base + edit.start, end: base + edit.end }))
+        const edits = memory === undefined ? undefined : [removal(text, comments, node.properties, index), ...unreadImport(ast, text, memory)].map(edit => ({ ...edit, start: base + edit.start, end: base + edit.end }))
 
         found.push({
           file,
-          ...positionAt(source, base + property.key.start!),
-          end: base + property.key.end!,
+          ...positionAt(source, base + property.key.start),
+          end: base + property.key.end,
           message: '`attempts` of a kayjs-auth store is the counter before 1.81: kayjs-auth counts in the store\'s `rates`, else the app\'s `store.rates`, else memory',
           help: memory === undefined ? 'give the store `rates`, a kay RateStore with `peek` and `reset` over the same database, or drop `attempts` to count in the app\'s `store.rates`' : 'drop it: kayjs-auth counts in memory itself when the app keeps no `store.rates`',
           code: 'deprecated-auth-attempts',
@@ -85,7 +79,7 @@ export async function authAttempts(root: string, options: CheckOptions): Promise
 }
 
 // The local name of `memoryAuthStore` when `value` is `memoryAuthStore().attempts`, so the counter lived in memory.
-function memoryCounter(value: t.Node, locals: Set<string>, namespaces: Set<string>): string | undefined {
+function memoryCounter(value: Node, locals: Set<string>, namespaces: Set<string>): string | undefined {
   if (value.type !== 'MemberExpression' || value.computed || value.property.type !== 'Identifier' || value.property.name !== 'attempts' || value.object.type !== 'CallExpression')
     return undefined
 
@@ -99,32 +93,52 @@ function memoryCounter(value: t.Node, locals: Set<string>, namespaces: Set<strin
 
 // A property on lines of its own goes with those lines: the comments above it, its comma and a comment ending its line.
 // One sharing its line goes with its comma, up to the next member or the comments above it, so what follows keeps its place.
-function removal(text: string, properties: t.ObjectExpression['properties'], index: number): Edit {
+function removal(text: string, comments: Comment[], properties: ObjectExpression['properties'], index: number): Edit {
   const property = properties[index]!
   const next = properties[index + 1]
   const onOwnLine = (at: number) => text.slice(text.lastIndexOf('\n', at - 1) + 1, at).trim() === ''
-  const start = property.leadingComments?.find(comment => onOwnLine(comment.start!))?.start ?? property.start!
-  const rest = LINE_REST.exec(text.slice(property.end!))
+  const start = leadingComments(text, comments, property.start).find(comment => onOwnLine(comment.start))?.start ?? property.start
+  const rest = LINE_REST.exec(text.slice(property.end))
 
   if (onOwnLine(start) && rest)
-    return { start: text.lastIndexOf('\n', start - 1) + 1, end: property.end! + rest[0].length, text: '' }
+    return { start: text.lastIndexOf('\n', start - 1) + 1, end: property.end + rest[0].length, text: '' }
 
   if (next)
-    return { start: property.start!, end: next.leadingComments?.[0]?.start ?? next.start!, text: '' }
+    return { start: property.start, end: leadingComments(text, comments, next.start)[0]?.start ?? next.start, text: '' }
 
   const previous = properties[index - 1]
 
-  return { start: previous?.end ?? property.start!, end: property.end!, text: '' }
+  return { start: previous?.end ?? property.start, end: property.end, text: '' }
+}
+
+// A property written as `name: value` or `name`, not a method, getter or setter.
+function isPlain(property: ObjectExpression['properties'][number]): property is ObjectProperty {
+  return property.type === 'Property' && !property.method && property.kind === 'init'
+}
+
+// The comments right above a node, with nothing but whitespace between them and the node, the nearest last.
+function leadingComments(text: string, comments: Comment[], start: number): Comment[] {
+  const found: Comment[] = []
+  let at = start
+
+  for (const comment of comments.toSorted((a, b) => b.end - a.end)) {
+    if (comment.end <= at && text.slice(comment.end, at).trim() === '') {
+      found.unshift(comment)
+      at = comment.start
+    }
+  }
+
+  return found
 }
 
 // The import of `memoryAuthStore` once the dropped counter was its only read: the specifier, or the whole import when it was alone.
-function unreadImport(ast: t.File, text: string, local: string): Edit[] {
+function unreadImport(ast: Program, text: string, local: string): Edit[] {
   if (local === '')
     return []
 
   let reads = 0
 
-  for (const statement of ast.program.body) {
+  for (const statement of ast.body) {
     if (statement.type === 'ImportDeclaration')
       continue
 
@@ -138,7 +152,7 @@ function unreadImport(ast: t.File, text: string, local: string): Edit[] {
   if (reads > 1)
     return []
 
-  for (const statement of ast.program.body) {
+  for (const statement of ast.body) {
     if (statement.type !== 'ImportDeclaration' || statement.source.value !== AUTH_PACKAGE)
       continue
 
@@ -148,12 +162,12 @@ function unreadImport(ast: t.File, text: string, local: string): Edit[] {
       continue
 
     if (statement.specifiers.length === 1)
-      return [{ start: statement.start!, end: statement.end! + (NEWLINE.exec(text.slice(statement.end!))?.[0].length ?? 0), text: '' }]
+      return [{ start: statement.start, end: statement.end + (NEWLINE.exec(text.slice(statement.end))?.[0].length ?? 0), text: '' }]
 
     const specifier = statement.specifiers[index]!
     const next = statement.specifiers[index + 1]
 
-    return [next ? { start: specifier.start!, end: next.start!, text: '' } : { start: statement.specifiers[index - 1]!.end!, end: specifier.end!, text: '' }]
+    return [next ? { start: specifier.start, end: next.start, text: '' } : { start: statement.specifiers[index - 1]!.end, end: specifier.end, text: '' }]
   }
 
   return []

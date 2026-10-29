@@ -1,5 +1,6 @@
-import type * as t from '@babel/types'
-import { parse } from '@babel/parser'
+import type { BindingIdentifier, ExportDefaultDeclaration, ExportNamedDeclaration, ImportDeclaration, ModuleExportName, TSAsExpression, TSTypeAssertion } from 'oxc-parser'
+import type { Node } from '../../../src/compiler/estree'
+import { parseProgram, VISITOR_KEYS } from '../../../src/compiler/estree'
 
 interface Edit {
   start: number
@@ -10,8 +11,7 @@ interface Edit {
 // Nodes that wrap a value and are written back as that value.
 const AFTER = new Set(['TSAsExpression', 'TSSatisfiesExpression', 'TSNonNullExpression', 'TSInstantiationExpression'])
 // Nodes that only exist in the types, whatever they hold.
-const ERASED = new Set(['TSInterfaceDeclaration', 'TSTypeAliasDeclaration', 'TSDeclareFunction', 'TSTypeAnnotation', 'TSTypeParameterDeclaration', 'TSTypeParameterInstantiation', 'TSIndexSignature', 'TSDeclareMethod'])
-const NOT_CHILDREN = new Set(['loc', 'leadingComments', 'trailingComments', 'innerComments', 'extra'])
+const ERASED = new Set(['TSInterfaceDeclaration', 'TSTypeAliasDeclaration', 'TSDeclareFunction', 'TSTypeAnnotation', 'TSTypeParameterDeclaration', 'TSTypeParameterInstantiation', 'TSIndexSignature', 'TSAbstractMethodDefinition'])
 
 export class StripError extends Error {
   start: number
@@ -22,11 +22,11 @@ export class StripError extends Error {
   }
 }
 
-function isNode(value: unknown): value is t.Node {
+function isNode(value: unknown): value is Node {
   return typeof value === 'object' && value !== null && typeof (value as { type?: unknown }).type === 'string'
 }
 
-function nameOf(node: t.Identifier | t.StringLiteral): string {
+function nameOf(node: BindingIdentifier | ModuleExportName): string {
   return node.type === 'Identifier' ? node.name : node.value
 }
 
@@ -35,9 +35,9 @@ class Stripper {
   private exported: string[] = []
 
   run(code: string): string {
-    const ast = parse(code, { sourceType: 'module', plugins: ['typescript'] })
+    const { program } = parseProgram(code)
 
-    for (const statement of ast.program.body)
+    for (const statement of program.body)
       this.visit(statement)
 
     let out = code
@@ -52,30 +52,30 @@ class Stripper {
     this.edits.push({ start, end, text })
   }
 
-  private visit(node: t.Node): void {
+  private visit(node: Node): void {
     const { type } = node
-    const start = node.start!
-    const end = node.end!
+    const { start, end } = node
 
-    if (ERASED.has(type)) {
+    // A method with no body, an overload or an abstract one.
+    if (ERASED.has(type) || (type === 'MethodDefinition' && node.value.type === 'TSEmptyBodyFunctionExpression')) {
       this.cut(start, end)
 
       return
     }
 
     if (AFTER.has(type)) {
-      const { expression } = node as t.TSAsExpression
+      const { expression } = node as TSAsExpression
 
-      this.cut(expression.end!, end)
+      this.cut(expression.end, end)
       this.visit(expression)
 
       return
     }
 
     if (type === 'TSTypeAssertion') {
-      const { expression } = node as t.TSTypeAssertion
+      const { expression } = node as TSTypeAssertion
 
-      this.cut(start, expression.start!)
+      this.cut(start, expression.start)
       this.visit(expression)
 
       return
@@ -85,19 +85,19 @@ class Stripper {
       throw new StripError('The playground does not run TypeScript enums, namespaces or `import =`', start)
 
     if (type === 'ImportDeclaration') {
-      this.importOf(node as t.ImportDeclaration)
+      this.importOf(node as ImportDeclaration)
 
       return
     }
 
     if (type === 'ExportNamedDeclaration') {
-      this.exportOf(node as t.ExportNamedDeclaration)
+      this.exportOf(node as ExportNamedDeclaration)
 
       return
     }
 
     if (type === 'ExportDefaultDeclaration') {
-      this.defaultOf(node as t.ExportDefaultDeclaration)
+      this.defaultOf(node as ExportDefaultDeclaration)
 
       return
     }
@@ -106,12 +106,11 @@ class Stripper {
       throw new StripError('The playground has no module to `export *` from', start)
 
     // `x?: T` and `let x!: T`: the marker sits right after the name, before the annotation.
-    if (type === 'Identifier' && ((node as t.Identifier).optional || (node as { definite?: boolean }).definite))
-      this.cut(start + (node as t.Identifier).name.length, start + (node as t.Identifier).name.length + 1)
+    if (type === 'Identifier' && ((node as BindingIdentifier).optional || (node as { definite?: boolean }).definite))
+      this.cut(start + (node as BindingIdentifier).name.length, start + (node as BindingIdentifier).name.length + 1)
 
-    for (const [key, value] of Object.entries(node)) {
-      if (NOT_CHILDREN.has(key))
-        continue
+    for (const key of VISITOR_KEYS[type] ?? []) {
+      const value = (node as unknown as Record<string, unknown>)[key]
 
       if (Array.isArray(value)) {
         for (const item of value) {
@@ -125,9 +124,9 @@ class Stripper {
     }
   }
 
-  private importOf(node: t.ImportDeclaration): void {
+  private importOf(node: ImportDeclaration): void {
     if (node.importKind === 'type') {
-      this.cut(node.start!, node.end!)
+      this.cut(node.start, node.end)
 
       return
     }
@@ -141,29 +140,29 @@ class Stripper {
         namespace = specifier.local.name
       }
       else if (specifier.type === 'ImportDefaultSpecifier') {
-        named.push(`default: ${specifier.local.name}`)
+        named.push(`default: ${nameOf(specifier.local)}`)
       }
       else if (specifier.importKind !== 'type') {
         const imported = nameOf(specifier.imported)
 
-        named.push(imported === specifier.local.name ? imported : `${JSON.stringify(imported)}: ${specifier.local.name}`)
+        named.push(imported === specifier.local.name ? imported : `${JSON.stringify(imported)}: ${nameOf(specifier.local)}`)
       }
     }
 
     const reads = [namespace === undefined ? '' : `const ${namespace} = __require(${source});`, named.length === 0 ? '' : `const { ${named.join(', ')} } = __require(${source});`]
 
-    this.cut(node.start!, node.end!, reads.join(' ').trim() || `__require(${source});`)
+    this.cut(node.start, node.end, reads.join(' ').trim() || `__require(${source});`)
   }
 
-  private exportOf(node: t.ExportNamedDeclaration): void {
+  private exportOf(node: ExportNamedDeclaration): void {
     if (node.exportKind === 'type') {
-      this.cut(node.start!, node.end!)
+      this.cut(node.start, node.end)
 
       return
     }
 
     if (node.source)
-      throw new StripError('The playground has no module to re-export from', node.start!)
+      throw new StripError('The playground has no module to re-export from', node.start)
 
     const { declaration } = node
 
@@ -178,7 +177,7 @@ class Stripper {
         this.exported.push(`${declaration.id.name}: ${declaration.id.name}`)
       }
 
-      this.cut(node.start!, declaration.start!)
+      this.cut(node.start, declaration.start)
       this.visit(declaration)
 
       return
@@ -186,21 +185,21 @@ class Stripper {
 
     for (const specifier of node.specifiers) {
       if (specifier.type === 'ExportSpecifier' && specifier.exportKind !== 'type')
-        this.exported.push(`${JSON.stringify(nameOf(specifier.exported))}: ${specifier.local.name}`)
+        this.exported.push(`${JSON.stringify(nameOf(specifier.exported))}: ${nameOf(specifier.local)}`)
     }
 
-    this.cut(node.start!, node.end!)
+    this.cut(node.start, node.end)
   }
 
-  private defaultOf(node: t.ExportDefaultDeclaration): void {
+  private defaultOf(node: ExportDefaultDeclaration): void {
     const { declaration } = node
 
     if ((declaration.type === 'FunctionDeclaration' || declaration.type === 'ClassDeclaration') && declaration.id) {
-      this.cut(node.start!, declaration.start!)
+      this.cut(node.start, declaration.start)
       this.exported.push(`default: ${declaration.id.name}`)
     }
     else {
-      this.cut(node.start!, declaration.start!, '__exports.default = ')
+      this.cut(node.start, declaration.start, '__exports.default = ')
     }
 
     this.visit(declaration)

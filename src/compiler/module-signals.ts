@@ -1,5 +1,5 @@
-import type * as t from '@babel/types'
-import { parse } from '@babel/parser'
+import type { Node, NodeOfType, Program } from './estree'
+import { parseProgram } from './estree'
 
 // A signal is written by assigning its name; a memo is only read; a live value is only read in the browser, the server changing it.
 export type SignalKind = 'signal' | 'memo' | 'live'
@@ -23,9 +23,9 @@ export function moduleSignals(source: string, jsx = false): Record<string, Signa
   return ast ? signalsIn(ast) : {}
 }
 
-function parseModule(source: string, jsx: boolean): t.File | undefined {
+function parseModule(source: string, jsx: boolean): Program | undefined {
   try {
-    return parse(source, { sourceType: 'module', attachComment: false, plugins: jsx ? ['typescript', 'jsx'] : ['typescript'] })
+    return parseProgram(source, { lang: jsx ? 'tsx' : 'ts', semantic: true }).program
   }
   catch {
     return undefined
@@ -36,7 +36,7 @@ function parseModule(source: string, jsx: boolean): t.File | undefined {
 export function importedModules(source: string): string[] {
   const modules: string[] = []
 
-  for (const statement of parseModule(source, false)?.program.body ?? []) {
+  for (const statement of parseModule(source, false)?.body ?? []) {
     if (statement.type === 'ImportDeclaration' && statement.importKind !== 'type' && !allTypes(statement.specifiers))
       modules.push(statement.source.value)
     else if ((statement.type === 'ExportAllDeclaration' || (statement.type === 'ExportNamedDeclaration' && !allTypes(statement.specifiers))) && statement.source && statement.exportKind !== 'type')
@@ -47,7 +47,7 @@ export function importedModules(source: string): string[] {
 }
 
 // `import { type A, type B }`, which Bun drops as it would `import type`.
-function allTypes(specifiers: t.Node[]): boolean {
+function allTypes(specifiers: Node[]): boolean {
   return specifiers.length > 0 && specifiers.every(specifier => (specifier.type === 'ImportSpecifier' && specifier.importKind === 'type') || (specifier.type === 'ExportSpecifier' && specifier.exportKind === 'type'))
 }
 
@@ -59,11 +59,11 @@ export function moduleKinds(source: string, jsx = false, reexported?: Reexported
   return ast ? { ...Object.fromEntries(dataIn(ast, reexported, iconSets).map(name => [name, 'data' as const])), ...NAMES_KAY.test(source) ? signalsIn(ast) : {} } : {}
 }
 
-function signalsIn(ast: t.File): Record<string, SignalKind> {
+function signalsIn(ast: Program): Record<string, SignalKind> {
   const made = new Map<string, SignalKind>()
   const found: Record<string, SignalKind> = {}
 
-  for (const statement of ast.program.body) {
+  for (const statement of ast.body) {
     if (statement.type !== 'ImportDeclaration' || statement.source.value !== 'kay' || statement.importKind === 'type')
       continue
 
@@ -76,7 +76,7 @@ function signalsIn(ast: t.File): Record<string, SignalKind> {
     }
   }
 
-  for (const statement of ast.program.body) {
+  for (const statement of ast.body) {
     const declaration = statement.type === 'ExportNamedDeclaration' ? statement.declaration : undefined
 
     if (declaration?.type !== 'VariableDeclaration' || declaration.kind !== 'const')
@@ -85,15 +85,16 @@ function signalsIn(ast: t.File): Record<string, SignalKind> {
     for (const { id, init } of declaration.declarations) {
       const kind = id.type === 'Identifier' && init?.type === 'CallExpression' && init.callee.type === 'Identifier' ? made.get(init.callee.name) : undefined
 
-      if (kind)
-        found[(id as t.Identifier).name] = kind
+      if (id.type === 'Identifier' && kind)
+        found[id.name] = kind
     }
   }
 
   return found
 }
 
-const SCALARS = new Set(['StringLiteral', 'NumericLiteral', 'BooleanLiteral', 'NullLiteral', 'BigIntLiteral'])
+// A literal of a string, number, boolean, null or bigint, a regular expression bar.
+const isScalar = (node: Node) => node.type === 'Literal' && !('regex' in node)
 
 const ICON_SET = /^~icons\/([a-z0-9-]+)\//
 
@@ -105,8 +106,8 @@ export function iconImport(specifier: string, iconSets: ReadonlySet<string> | un
 }
 
 // Whether an expression is plain data, a literal string, number, boolean or null, an icon in `icons`, or an array or object of them, `as const` and `satisfies` aside: nothing in it can be a function. A literal another module mutates afterwards is still read as data.
-function isDataLiteral(node: t.Node, icons: ReadonlySet<string>): boolean {
-  if (SCALARS.has(node.type))
+function isDataLiteral(node: Node, icons: ReadonlySet<string>): boolean {
+  if (isScalar(node))
     return true
 
   if (node.type === 'Identifier')
@@ -119,19 +120,19 @@ function isDataLiteral(node: t.Node, icons: ReadonlySet<string>): boolean {
     return isDataLiteral(node.expression, icons)
 
   if (node.type === 'UnaryExpression')
-    return (node.operator === '-' || node.operator === '+') && node.argument.type === 'NumericLiteral'
+    return (node.operator === '-' || node.operator === '+') && node.argument.type === 'Literal' && typeof node.argument.value === 'number'
 
   if (node.type === 'ArrayExpression')
     return node.elements.every(element => element !== null && isDataLiteral(element, icons))
 
-  return node.type === 'ObjectExpression' && node.properties.every(property => property.type === 'ObjectProperty' && (!property.computed || property.key.type === 'StringLiteral' || property.key.type === 'NumericLiteral') && isDataLiteral(property.value, icons))
+  return node.type === 'ObjectExpression' && node.properties.every(property => property.type === 'Property' && !property.method && property.kind === 'init' && (!property.computed || (property.key.type === 'Literal' && (typeof property.key.value === 'string' || typeof property.key.value === 'number'))) && isDataLiteral(property.value, icons))
 }
 
 // The names a module's default imports of `~icons/` bind, for the sets in `iconSets` or, unset, all of them.
-function iconsIn(ast: t.File, iconSets: ReadonlySet<string> | undefined): ReadonlySet<string> {
+function iconsIn(ast: Program, iconSets: ReadonlySet<string> | undefined): ReadonlySet<string> {
   const icons = new Set<string>()
 
-  for (const statement of ast.program.body) {
+  for (const statement of ast.body) {
     if (statement.type !== 'ImportDeclaration' || statement.importKind === 'type')
       continue
 
@@ -170,12 +171,12 @@ export function jsonKinds(source: string): Record<string, 'data'> {
   }
 }
 
-function exportedName(node: t.Identifier | t.StringLiteral): string {
-  return node.type === 'Identifier' ? node.name : node.value
+function exportedName(node: NodeOfType<'Identifier' | 'Literal'>): string {
+  return node.type === 'Identifier' ? node.name : String(node.value)
 }
 
 // The names a binding pattern declares, `a` and `b` in `const { a, x: [b] } = ...`.
-function boundNames(pattern: t.Node | null | undefined, into: Set<string>): void {
+function boundNames(pattern: Node | null | undefined, into: Set<string>): void {
   if (!pattern)
     return
 
@@ -199,10 +200,10 @@ function boundNames(pattern: t.Node | null | undefined, into: Set<string>): void
 }
 
 // The names a module exports itself, which win over the same name in an `export *`.
-function ownExports(ast: t.File): Set<string> {
+function ownExports(ast: Program): Set<string> {
   const own = new Set<string>()
 
-  for (const statement of ast.program.body) {
+  for (const statement of ast.body) {
     if (statement.type === 'ExportDefaultDeclaration') {
       own.add('default')
     }
@@ -218,22 +219,26 @@ function ownExports(ast: t.File): Set<string> {
       }
 
       for (const specifier of statement.specifiers)
-        own.add(specifier.exported.type === 'Identifier' ? specifier.exported.name : specifier.exported.value)
+        own.add(exportedName(specifier.exported))
+    }
+    // `export * as name from` exports a name, where Babel made it a named export with a namespace specifier.
+    else if (statement.type === 'ExportAllDeclaration' && statement.exported) {
+      own.add(exportedName(statement.exported))
     }
   }
 
   return own
 }
 
-function dataIn(ast: t.File, reexported?: Reexported, iconSets?: ReadonlySet<string>): string[] {
+function dataIn(ast: Program, reexported?: Reexported, iconSets?: ReadonlySet<string>): string[] {
   const icons = iconsIn(ast, iconSets)
   const found = new Set<string>()
   const local = new Set<string>()
-  const stars = new Map<t.ExportAllDeclaration, Record<string, SignalKind | 'data'>>()
+  const stars = new Map<NodeOfType<'ExportAllDeclaration'>, Record<string, SignalKind | 'data'>>()
   const starred = new Map<string, number>()
 
-  for (const statement of ast.program.body) {
-    if (statement.type !== 'ExportAllDeclaration' || statement.exportKind === 'type')
+  for (const statement of ast.body) {
+    if (statement.type !== 'ExportAllDeclaration' || statement.exported || statement.exportKind === 'type')
       continue
 
     const names = reexported?.(statement.source.value) ?? {}
@@ -246,7 +251,7 @@ function dataIn(ast: t.File, reexported?: Reexported, iconSets?: ReadonlySet<str
 
   const own = stars.size === 0 ? new Set<string>() : ownExports(ast)
 
-  for (const statement of ast.program.body) {
+  for (const statement of ast.body) {
     const declaration = statement.type === 'ExportNamedDeclaration' ? statement.declaration : statement
 
     if (declaration?.type !== 'VariableDeclaration' || declaration.kind !== 'const')
@@ -263,14 +268,14 @@ function dataIn(ast: t.File, reexported?: Reexported, iconSets?: ReadonlySet<str
     }
   }
 
-  for (const statement of ast.program.body) {
+  for (const statement of ast.body) {
     if (statement.type === 'ExportDefaultDeclaration') {
       const value = statement.declaration
 
       if (value.type === 'Identifier' ? local.has(value.name) || icons.has(value.name) : isDataLiteral(value, icons))
         found.add('default')
     }
-    else if (statement.type === 'ExportAllDeclaration' && statement.exportKind !== 'type') {
+    else if (statement.type === 'ExportAllDeclaration' && !statement.exported && statement.exportKind !== 'type') {
       // A name two stars share is ambiguous, so the module does not export it.
       for (const [name, kind] of Object.entries(stars.get(statement) ?? {})) {
         if (kind === 'data' && name !== 'default' && !own.has(name) && starred.get(name) === 1)
@@ -284,7 +289,7 @@ function dataIn(ast: t.File, reexported?: Reexported, iconSets?: ReadonlySet<str
         if (specifier.type !== 'ExportSpecifier' || specifier.exportKind === 'type')
           continue
 
-        const name = specifier.local.name
+        const name = exportedName(specifier.local)
 
         if (statement.source ? from?.[name] === 'data' : local.has(name))
           found.add(exportedName(specifier.exported))

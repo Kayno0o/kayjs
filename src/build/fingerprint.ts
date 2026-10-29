@@ -3,7 +3,7 @@ import { dirname, join } from 'node:path'
 import { nativeManifestIfInstalled } from '../compiler/native-typescript'
 
 // The packages a compile runs through, their versions part of every cache key.
-const COMPILER_PACKAGES = ['@babel/parser/package.json', '@babel/types/package.json']
+const COMPILER_PACKAGES = ['oxc-parser/package.json']
 const fingerprints = new Map<string, string>()
 const SCRIPT_FILE = /\.tsx?$/
 

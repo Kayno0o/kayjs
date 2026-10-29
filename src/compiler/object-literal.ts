@@ -1,13 +1,17 @@
 // The one reader of an exported object literal that the config, the `ui` file and the message catalogs share: the object a module exports by default, through type wrappers, single-argument calls and top-level consts.
-import type * as t from '@babel/types'
+import type { Expression, Node, NodeOfType, Program } from './estree'
 
-const WRAPPERS = new Set(['TSAsExpression', 'TSSatisfiesExpression', 'TSNonNullExpression', 'TSTypeAssertion', 'ParenthesizedExpression'])
+type Identifier = NodeOfType<'Identifier'>
+type ObjectExpression = NodeOfType<'ObjectExpression'>
+type Property = NodeOfType<'Property'>
+
+const WRAPPERS = new Set(['TSAsExpression', 'TSSatisfiesExpression', 'TSNonNullExpression', 'TSTypeAssertion'])
 
 // The top-level `const` bindings of a module by name, which an identifier in the exported object may name.
-export type Bindings = Map<string, t.Expression>
+export type Bindings = Map<string, Expression>
 
 // `any` follows `let` and `var` bindings too, for the config files that read an object a plain `let` holds.
-export function constBindings(program: t.Program, any = false): Bindings {
+export function constBindings(program: Program, any = false): Bindings {
   const bindings: Bindings = new Map()
 
   for (const statement of program.body) {
@@ -26,18 +30,18 @@ export function constBindings(program: t.Program, any = false): Bindings {
 }
 
 // What `as`, `satisfies`, `!`, `<T>` and parentheses wrap.
-export function unwrapped(node: t.Node): t.Node {
+export function unwrapped(node: Node): Node {
   let found = node
 
   while (WRAPPERS.has(found.type))
-    found = (found as t.TSAsExpression).expression
+    found = (found as NodeOfType<'TSAsExpression'>).expression
 
   return found
 }
 
 // The node a module exports as its default: `export default <node>`, or `export { name as default }`, which answers the identifier.
-export function exportedDefault(program: t.Program): t.Node | undefined {
-  let exported: t.Node | undefined
+export function exportedDefault(program: Program): Node | undefined {
+  let exported: Node | undefined
 
   for (const statement of program.body) {
     if (statement.type === 'ExportDefaultDeclaration')
@@ -56,7 +60,7 @@ export function exportedDefault(program: t.Program): t.Node | undefined {
 }
 
 // The object literal `node` is or wraps, followed through top-level consts. With `calls`, a call handed one argument is transparent too (`defineMessages({ ... })`, `omit({ ... })`), which only the exported value is: inside it a call is a value, though a const bound to one is followed.
-export function objectOf(node: t.Node | null | undefined, bindings: Bindings, calls = false, seen: ReadonlySet<string> = new Set()): t.ObjectExpression | undefined {
+export function objectOf(node: Node | null | undefined, bindings: Bindings, calls = false, seen: ReadonlySet<string> = new Set()): ObjectExpression | undefined {
   const value = node && unwrapped(node)
 
   if (!value)
@@ -74,29 +78,29 @@ export function objectOf(node: t.Node | null | undefined, bindings: Bindings, ca
   return undefined
 }
 
-export function exportedObject(program: t.Program, bindings: Bindings = constBindings(program)): t.ObjectExpression | undefined {
+export function exportedObject(program: Program, bindings: Bindings = constBindings(program)): ObjectExpression | undefined {
   return objectOf(exportedDefault(program), bindings, true)
 }
 
-// The name a non-computed property is written under, as an identifier or a string.
-export function keyName(property: t.ObjectProperty): string | undefined {
-  if (property.computed)
+// The name a non-computed property is written under, as an identifier or a string; a method, a getter and a setter have none.
+export function keyName(property: Property): string | undefined {
+  if (property.computed || property.method || property.kind !== 'init')
     return undefined
 
   if (property.key.type === 'Identifier')
     return property.key.name
 
-  return property.key.type === 'StringLiteral' ? property.key.value : undefined
+  return property.key.type === 'Literal' && typeof property.key.value === 'string' ? property.key.value : undefined
 }
 
-function nameOf(property: t.ObjectExpression['properties'][number]): string | undefined {
-  return property.type === 'ObjectProperty' ? keyName(property) : undefined
+function nameOf(property: ObjectExpression['properties'][number]): string | undefined {
+  return property.type === 'Property' ? keyName(property) : undefined
 }
 
 // The properties of an object with the spread of a const object replaced by that object's own, in order, so a key written by `{ ...base }` reads as written in place. A spread that is not a const object stays as it is, and a key a later property writes again drops the earlier ones, as the object holds only the last. A node a const spread twice brings in is kept once, named or not, as it is one place to read or edit.
-export function propertiesOf(object: t.ObjectExpression, bindings: Bindings): t.ObjectExpression['properties'] {
+export function propertiesOf(object: ObjectExpression, bindings: Bindings): ObjectExpression['properties'] {
   const flat = flattened(object, bindings, new Set())
-  const last = new Map<string, t.ObjectExpression['properties'][number]>()
+  const last = new Map<string, ObjectExpression['properties'][number]>()
 
   for (const property of flat) {
     const name = nameOf(property)
@@ -105,7 +109,7 @@ export function propertiesOf(object: t.ObjectExpression, bindings: Bindings): t.
       last.set(name, property)
   }
 
-  const kept = new Set<t.ObjectExpression['properties'][number]>()
+  const kept = new Set<ObjectExpression['properties'][number]>()
 
   return flat.filter((property) => {
     if (kept.has(property))
@@ -119,7 +123,7 @@ export function propertiesOf(object: t.ObjectExpression, bindings: Bindings): t.
   })
 }
 
-function flattened(object: t.ObjectExpression, bindings: Bindings, seen: ReadonlySet<string>): t.ObjectExpression['properties'] {
+function flattened(object: ObjectExpression, bindings: Bindings, seen: ReadonlySet<string>): ObjectExpression['properties'] {
   return object.properties.flatMap((property) => {
     if (property.type !== 'SpreadElement')
       return [property]
@@ -127,6 +131,6 @@ function flattened(object: t.ObjectExpression, bindings: Bindings, seen: Readonl
     const name = unwrapped(property.argument)
     const spread = name.type === 'Identifier' && !seen.has(name.name) ? objectOf(name, bindings) : undefined
 
-    return spread ? flattened(spread, bindings, new Set([...seen, (name as t.Identifier).name])) : [property]
+    return spread ? flattened(spread, bindings, new Set([...seen, (name as Identifier).name])) : [property]
   })
 }

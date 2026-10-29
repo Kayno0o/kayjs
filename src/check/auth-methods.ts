@@ -1,8 +1,8 @@
-import type * as t from '@babel/types'
 import type { CheckDiagnostic, CheckOptions } from '.'
+import type { Node, Program } from '../compiler/estree'
 import { join } from 'node:path'
-import { parse } from '@babel/parser'
 import { findProjectFiles } from '../build/files'
+import { parseProgram } from '../compiler/estree'
 import { lintLevel, lintLevels } from '../compiler/lints'
 import { positionAt } from '../compiler/mapping'
 import { parseKay } from '../compiler/parser'
@@ -105,7 +105,7 @@ export async function authMethods(root: string, options: CheckOptions): Promise<
 
     const asts = spans.flatMap(({ start: base, end }) => {
       try {
-        return [{ base, ast: parse(source.slice(base, end), { sourceType: 'module', plugins: file.endsWith('.ts') ? ['typescript'] : ['typescript', 'jsx'], errorRecovery: true }) }]
+        return [{ base, ast: parseProgram(source.slice(base, end), { lang: file.endsWith('.ts') ? 'ts' : 'tsx', recover: true }).program }]
       }
       catch {
         return []
@@ -116,17 +116,17 @@ export async function authMethods(root: string, options: CheckOptions): Promise<
 
     for (const { base, ast } of asts) {
       walk(ast, (node) => {
-        if (node.type !== 'CallExpression' && node.type !== 'OptionalCallExpression')
+        if (node.type !== 'CallExpression')
           return
 
         const callee = node.callee
 
-        if ((callee.type !== 'MemberExpression' && callee.type !== 'OptionalMemberExpression') || callee.computed || callee.property.type !== 'Identifier' || !Object.hasOwn(AUTH_METHODS, callee.property.name) || !isAuth(callee.object, imported))
+        if (callee.type !== 'MemberExpression' || callee.computed || callee.property.type !== 'Identifier' || !Object.hasOwn(AUTH_METHODS, callee.property.name) || !isAuth(callee.object, imported))
           return
 
         const name = callee.property.name
         const grouped = AUTH_METHODS[name]!
-        const start = base + callee.property.start!
+        const start = base + callee.property.start
         const level = levelAt('deprecated-auth-methods', start)
 
         if (level === 'allow')
@@ -135,12 +135,12 @@ export async function authMethods(root: string, options: CheckOptions): Promise<
         found.push({
           file,
           ...positionAt(source, start),
-          end: base + callee.property.end!,
+          end: base + callee.property.end,
           message: `\`auth.${name}\` is the flat name kayjs-auth had before 1.82, kept until 1.85: the method is \`auth.${grouped}\``,
           help: `call \`auth.${grouped}\`, with the same arguments`,
           code: 'deprecated-auth-methods',
           severity: level === 'warn' ? 'warning' : 'error',
-          fixes: [{ title: `Call auth.${grouped}`, edits: [{ start, end: base + callee.property.end!, text: grouped }], safe: true }],
+          fixes: [{ title: `Call auth.${grouped}`, edits: [{ start, end: base + callee.property.end, text: grouped }], safe: true }],
         })
       })
     }
@@ -150,18 +150,18 @@ export async function authMethods(root: string, options: CheckOptions): Promise<
 }
 
 // `auth`, unless imported, or a chain ending in `.auth` such as `ctx.locals.auth`, seen through `!` and `as`.
-function isAuth(node: t.Node, imported: boolean): boolean {
-  if (node.type === 'TSNonNullExpression' || node.type === 'TSAsExpression' || node.type === 'TSSatisfiesExpression' || node.type === 'ParenthesizedExpression')
+function isAuth(node: Node, imported: boolean): boolean {
+  if (node.type === 'TSNonNullExpression' || node.type === 'TSAsExpression' || node.type === 'TSSatisfiesExpression')
     return isAuth(node.expression, imported)
 
   if (node.type === 'Identifier')
     return node.name === 'auth' && !imported
 
-  return (node.type === 'MemberExpression' || node.type === 'OptionalMemberExpression') && !node.computed && node.property.type === 'Identifier' && node.property.name === 'auth'
+  return node.type === 'MemberExpression' && !node.computed && node.property.type === 'Identifier' && node.property.name === 'auth'
 }
 
-function importsAuth(ast: t.File): boolean {
-  return ast.program.body.some(statement => statement.type === 'ImportDeclaration' && statement.importKind !== 'type' && statement.specifiers.some(specifier => specifier.local.name === 'auth'))
+function importsAuth(ast: Program): boolean {
+  return ast.body.some(statement => statement.type === 'ImportDeclaration' && statement.importKind !== 'type' && statement.specifiers.some(specifier => specifier.local.name === 'auth'))
 }
 
 async function dependsOnAuth(root: string): Promise<boolean> {

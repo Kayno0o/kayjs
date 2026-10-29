@@ -1,6 +1,6 @@
-import type { ParseResult } from '@babel/parser'
-import type * as t from '@babel/types'
+import type { Statement } from 'oxc-parser'
 import type { Diagnostic, Span } from './ast'
+import type { Node, NodeOfType, Program } from './estree'
 import type { PageSettingName } from './page-settings'
 import type { Path } from './scope'
 import type { ImportBinding, ParsedFence } from './script-shared'
@@ -29,7 +29,7 @@ export interface PageSettings {
 }
 
 // The source from the start of `first` to the end of `last`.
-type TextOf = (first: t.Node, last?: t.Node) => string
+type TextOf = (first: Node, last?: Node) => string
 
 // A setting exported under its own name, as before `page` held them.
 export interface SeparateSetting {
@@ -150,7 +150,7 @@ export function analyzeServer(source: string, server: Span | undefined): ServerA
 }
 
 // Reads `export const page` as written, and the settings exported under their own names, as they were before `page`.
-function pageSettings(ast: ParseResult<t.File>, statement: t.Statement, declaration: t.VariableDeclaration, span: Span, shift: (node: t.Node) => Span, text: TextOf, analysis: ServerAnalysis): void {
+function pageSettings(ast: Program, statement: Statement, declaration: NodeOfType<'VariableDeclaration'>, span: Span, shift: (node: Node) => Span, text: TextOf, analysis: ServerAnalysis): void {
   for (const declarator of declaration.declarations) {
     if (declarator.id.type !== 'Identifier' || !declarator.init)
       continue
@@ -172,9 +172,9 @@ function pageSettings(ast: ParseResult<t.File>, statement: t.Statement, declarat
       const settings = new Map<string, PageSetting>()
 
       for (const property of object.properties) {
-        const key = property.type === 'ObjectProperty' && !property.computed ? keyName(property.key) : undefined
+        const key = property.type === 'Property' && !property.method && property.kind === 'init' && !property.computed ? keyName(property.key) : undefined
 
-        if (property.type !== 'ObjectProperty' || key === undefined) {
+        if (property.type !== 'Property' || key === undefined) {
           analysis.diagnostics.push({ ...shift(property), message: 'kay reads each setting of `page` as written', help: 'write it `key: value`, with no spread, method or computed key' })
 
           continue
@@ -198,17 +198,17 @@ function pageSettings(ast: ParseResult<t.File>, statement: t.Statement, declarat
 }
 
 // `export async function prerender() { ... }`, which moves into `page` as an arrow, unless it is a generator or reads what an arrow would not give it.
-function separateFunction(ast: ParseResult<t.File>, statement: t.Statement, declaration: t.FunctionDeclaration, span: Span, shift: (node: t.Node) => Span, text: TextOf): SeparateSetting {
+function separateFunction(ast: Program, statement: Statement, declaration: NodeOfType<'FunctionDeclaration'>, span: Span, shift: (node: Node) => Span, text: TextOf): SeparateSetting {
   const id = declaration.id!
   const params = declaration.params.length > 0 ? text(declaration.params[0]!, declaration.params.at(-1)) : ''
-  const value = `${declaration.async ? 'async ' : ''}(${params})${declaration.returnType ? text(declaration.returnType) : ''} => ${text(declaration.body)}`
+  const value = `${declaration.async ? 'async ' : ''}(${params})${declaration.returnType ? text(declaration.returnType) : ''} => ${text(declaration.body!)}`
   const movable = !declaration.generator && !declaration.typeParameters && !readsItself(ast, declaration) && referenceCount(ast, statement, id.name) === 0
 
   return { name: id.name as PageSettingName, local: shift(id), statement: span, value, movable }
 }
 
 // Whether a function reads its own name, `this` or `arguments`, none of which an arrow in `page` would give it.
-function readsItself(ast: ParseResult<t.File>, declaration: t.FunctionDeclaration): boolean {
+function readsItself(ast: Program, declaration: NodeOfType<'FunctionDeclaration'>): boolean {
   const name = declaration.id!.name
   const ownFunction = (path: Path) => path.findParent(parent => parent.isFunction() && parent.node.type !== 'ArrowFunctionExpression')?.node
   let found = true
@@ -241,16 +241,16 @@ function readsItself(ast: ParseResult<t.File>, declaration: t.FunctionDeclaratio
 const BOT_PROTECTIONS = new Set(['honeypot', 'minTime', 'proofOfWork'])
 
 // What an `action(...)` call's options say, when one of its arguments is an object literal setting `tool`.
-function toolOptions(args: t.CallExpression['arguments']): { botProtected: boolean } | undefined {
+function toolOptions(args: NodeOfType<'CallExpression'>['arguments']): { botProtected: boolean } | undefined {
   for (const arg of args.slice(1)) {
     if (arg.type !== 'ObjectExpression')
       continue
 
-    const keys = new Map(arg.properties.flatMap(property => property.type === 'ObjectProperty' && !property.computed ? [[keyName(property.key), property.value] as const] : []))
+    const keys = new Map(arg.properties.flatMap(property => property.type === 'Property' && !property.method && property.kind === 'init' && !property.computed ? [[keyName(property.key), property.value] as const] : []))
     const tool = keys.get('tool')
 
     // A spread may bring any of them, so it counts as one; options that are not an object literal cannot be read, and the action is not taken for a tool.
-    if (tool !== undefined && !(tool.type === 'BooleanLiteral' && !tool.value))
+    if (tool !== undefined && !(tool.type === 'Literal' && tool.value === false))
       return { botProtected: arg.properties.some(property => property.type === 'SpreadElement') || [...keys.keys()].some(key => key !== undefined && BOT_PROTECTIONS.has(key)) || protectsBots(keys.get('protect')) }
   }
 
@@ -258,7 +258,7 @@ function toolOptions(args: t.CallExpression['arguments']): { botProtected: boole
 }
 
 // Whether the `protect` group sets one of the bot protections; one that is not an object literal cannot be read, so it counts as setting one.
-function protectsBots(protect: t.Node | undefined): boolean {
+function protectsBots(protect: Node | undefined): boolean {
   if (protect === undefined)
     return false
 
@@ -269,7 +269,7 @@ function protectsBots(protect: t.Node | undefined): boolean {
 }
 
 // How often the rest of the fence reads what `statement` declares as `name`: Babel counts the export itself as a read.
-function referenceCount(ast: ParseResult<t.File>, statement: t.Statement, name: string): number {
+function referenceCount(ast: Program, statement: Statement, name: string): number {
   let count = 1
 
   // Babel refuses a fence declaring a name twice, which the fence reports itself.
@@ -288,7 +288,7 @@ function referenceCount(ast: ParseResult<t.File>, statement: t.Statement, name: 
   return count
 }
 
-export function isExport(statement: t.Statement): boolean {
+export function isExport(statement: Statement): boolean {
   return statement.type === 'ExportNamedDeclaration' || statement.type === 'ExportDefaultDeclaration' || statement.type === 'ExportAllDeclaration'
 }
 
@@ -312,9 +312,9 @@ function sharedReason(readsCtx: boolean, awaits: boolean, perRequestName: string
 
 // The statements an export reads, directly or through one another, which therefore run once at module level rather than per request in `load`.
 // One that reads `ctx` or awaits has to stay per request, and the export reading it is reported.
-function sharedWithExports(ast: ParseResult<t.File>, exported: t.Statement[], perRequest: t.Statement[], shift: (node: t.Node) => Span, diagnostics: Diagnostic[]): Set<t.Statement> {
-  const shared = new Set<t.Statement>()
-  const declaredBy = new Map<string, t.Statement>()
+function sharedWithExports(ast: Program, exported: Statement[], perRequest: Statement[], shift: (node: Node) => Span, diagnostics: Diagnostic[]): Set<Statement> {
+  const shared = new Set<Statement>()
+  const declaredBy = new Map<string, Statement>()
 
   for (const statement of perRequest) {
     for (const identifier of declaredIdentifiers(statement))
@@ -336,8 +336,8 @@ function sharedWithExports(ast: ParseResult<t.File>, exported: t.Statement[], pe
 
   walkScope(ast, {
     Program(program) {
-      const reads = new Map<t.Statement, StatementReads>()
-      const readsOf = (statement: Path<t.Statement>): StatementReads => {
+      const reads = new Map<Statement, StatementReads>()
+      const readsOf = (statement: Path<Statement>): StatementReads => {
         const known = reads.get(statement.node)
 
         if (known)
@@ -366,7 +366,7 @@ function sharedWithExports(ast: ParseResult<t.File>, exported: t.Statement[], pe
 
         return found
       }
-      const paths = new Map(program.children.filter(child => child.listKey === 'body').map(statement => [statement.node, statement as Path<t.Statement>]))
+      const paths = new Map(program.children.filter(child => child.listKey === 'body').map(statement => [statement.node, statement as Path<Statement>]))
       const queue = exported.flatMap(statement => [...readsOf(paths.get(statement)!).names.keys()].map(name => declaredBy.get(name)!))
 
       for (let statement = queue.pop(); statement !== undefined; statement = queue.pop()) {
@@ -378,7 +378,7 @@ function sharedWithExports(ast: ParseResult<t.File>, exported: t.Statement[], pe
       }
 
       // Why a statement stays per request, settled until nothing changes, since it may only read one that does.
-      const why = new Map<t.Statement, string>()
+      const why = new Map<Statement, string>()
 
       for (let changed = true; changed;) {
         changed = false
@@ -418,7 +418,7 @@ function sharedWithExports(ast: ParseResult<t.File>, exported: t.Statement[], pe
 }
 
 // The name alone: an annotated identifier's range runs on through `: string`.
-function nameSpan(identifier: t.Identifier, shift: (node: t.Node) => Span): Span {
+function nameSpan(identifier: NodeOfType<'Identifier'>, shift: (node: Node) => Span): Span {
   const { start } = shift(identifier)
 
   return { start, end: start + identifier.name.length }

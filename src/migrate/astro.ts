@@ -1,7 +1,7 @@
-import type * as t from '@babel/types'
+import type { Node, Program } from 'oxc-parser'
 import type { Imports } from './markup'
-import { parse } from '@babel/parser'
 import { eachNode } from '../compiler/each-node'
+import { parseProgram, positionOf } from '../compiler/estree'
 import { formatKay } from '../compiler/format'
 import { MarkupError, translateMarkup } from './markup'
 
@@ -93,7 +93,7 @@ export function migrateAstro(source: string, options: MigrateOptions): MigratedF
 }
 
 function migrateTemplate(markup: string, options: MigrateOptions, imports: Imports, note: (line: number, message: string) => void, lang: (line: number, value: string) => void): string {
-  const expression = (node: t.Node, code: string) => applyEdits(code, astroEdits(node, code, node.start!, options.role, 'template', note))
+  const expression = (node: Node, code: string, parsed: string) => applyEdits(code, astroEdits(node, code, node.start, parsed, options.role, 'template', note))
 
   try {
     return translateMarkup(markup, { mode: 'astro', note, lang, expression }, imports)
@@ -112,10 +112,10 @@ function migrateFrontmatter(code: string, options: MigrateOptions, imports: Impo
   if (code.trim() === '')
     return ''
 
-  let ast: t.File
+  let ast: Program
 
   try {
-    ast = parse(code, { sourceType: 'module', plugins: ['typescript'], allowReturnOutsideFunction: true, allowAwaitOutsideFunction: true })
+    ast = parseProgram(code, { returnOutside: true }).program
   }
   catch (error) {
     note(0, `the frontmatter does not parse (${error instanceof Error ? error.message : String(error)}): kept as written`)
@@ -124,15 +124,15 @@ function migrateFrontmatter(code: string, options: MigrateOptions, imports: Impo
   }
 
   const edits: Edit[] = []
-  const lineOf = (node: t.Node) => node.loc!.start.line
-  const hasProps = ast.program.body.some(statement => (statement.type === 'TSInterfaceDeclaration' || statement.type === 'TSTypeAliasDeclaration') && statement.id.name === 'Props')
+  const lineOf = (node: Node) => positionOf(code, node.start).line
+  const hasProps = ast.body.some(statement => (statement.type === 'TSInterfaceDeclaration' || statement.type === 'TSTypeAliasDeclaration') && statement.id.name === 'Props')
   let imageMetadata: string | undefined
   let htmlAttributes: string | undefined
 
-  for (const statement of ast.program.body) {
+  for (const statement of ast.body) {
     if (statement.type === 'ImportDeclaration') {
       const from = statement.source.value
-      const remove = () => edits.push({ start: statement.start!, end: statement.end!, text: '' })
+      const remove = () => edits.push({ start: statement.start, end: statement.end, text: '' })
 
       if (from === 'astro:assets') {
         for (const specifier of statement.specifiers) {
@@ -194,39 +194,39 @@ function migrateFrontmatter(code: string, options: MigrateOptions, imports: Impo
         if (target === undefined)
           note(lineOf(statement), `${from} is no .astro file of the project kay migrate found: point the import at the .kay file`)
         else
-          edits.push({ start: statement.source.start!, end: statement.source.end!, text: `'${target}'` })
+          edits.push({ start: statement.source.start, end: statement.source.end, text: `'${target}'` })
       }
       else if (OTHER_FRAMEWORK.test(from)) {
         note(lineOf(statement), `${from} is another framework's component: rewrite it as a .kay island`)
       }
-      else if (RAW_QUERY.test(from) && (statement.attributes?.length ?? 0) === 0) {
+      else if (RAW_QUERY.test(from) && statement.attributes.length === 0) {
         // `?raw` is Vite's; Bun reads a file's text through an import attribute.
-        edits.push({ start: statement.source.start!, end: statement.end!, text: `'${from.replace(RAW_QUERY, '')}' with { type: 'text' }` })
+        edits.push({ start: statement.source.start, end: statement.end, text: `'${from.replace(RAW_QUERY, '')}' with { type: 'text' }` })
       }
     }
     else if (statement.type === 'ExportNamedDeclaration' && statement.declaration?.type === 'FunctionDeclaration' && statement.declaration.id?.name === 'getStaticPaths') {
       note(lineOf(statement), 'getStaticPaths: list the params in `export const page = { prerender: [...] }` instead (see Prerendering); commented out')
-      edits.push({ start: statement.start!, end: statement.end!, text: code.slice(statement.start!, statement.end!).split('\n').map(line => `// ${line}`).join('\n') })
+      edits.push({ start: statement.start, end: statement.end, text: code.slice(statement.start, statement.end).split('\n').map(line => `// ${line}`).join('\n') })
     }
   }
 
   // `ImageMetadata` is what an imported image is in Astro; in kay it is its URL.
   // The imports are removed whole, so the walks leave them out.
-  const statements = ast.program.body.filter(statement => statement.type !== 'ImportDeclaration')
+  const statements = ast.body.filter(statement => statement.type !== 'ImportDeclaration')
 
   const aliased = new Set<string>()
 
   for (const statement of statements) {
     eachNode(statement, (node) => {
       if (imageMetadata !== undefined && node.type === 'Identifier' && node.name === imageMetadata)
-        edits.push({ start: node.start!, end: node.end!, text: 'string' })
+        edits.push({ start: node.start, end: node.end, text: 'string' })
 
       // `HTMLAttributes<'svg'>`, the attributes of an element, is kay's `JSX.IntrinsicElements['svg']`.
       if (htmlAttributes !== undefined && node.type === 'TSTypeReference' && node.typeName.type === 'Identifier' && node.typeName.name === htmlAttributes) {
-        const [element] = node.typeParameters?.params ?? []
+        const [element] = node.typeArguments?.params ?? []
 
-        if (element?.type === 'TSLiteralType' && element.literal.type === 'StringLiteral') {
-          edits.push({ start: node.start!, end: node.end!, text: `JSX.IntrinsicElements['${element.literal.value}']` })
+        if (element?.type === 'TSLiteralType' && element.literal.type === 'Literal' && typeof element.literal.value === 'string') {
+          edits.push({ start: node.start, end: node.end, text: `JSX.IntrinsicElements['${element.literal.value}']` })
           imports.kayTypes.add('JSX')
         }
         else {
@@ -237,19 +237,19 @@ function migrateFrontmatter(code: string, options: MigrateOptions, imports: Impo
       }
 
       // An interface extends a name only, so the attributes get one: `interface Props extends SvgAttributes`.
-      if (htmlAttributes !== undefined && node.type === 'TSExpressionWithTypeArguments' && node.expression.type === 'Identifier' && node.expression.name === htmlAttributes) {
-        const [element] = node.typeParameters?.params ?? []
+      if (htmlAttributes !== undefined && (node.type === 'TSInterfaceHeritage' || node.type === 'TSClassImplements') && node.expression.type === 'Identifier' && node.expression.name === htmlAttributes) {
+        const [element] = node.typeArguments?.params ?? []
 
-        if (element?.type === 'TSLiteralType' && element.literal.type === 'StringLiteral') {
+        if (element?.type === 'TSLiteralType' && element.literal.type === 'Literal' && typeof element.literal.value === 'string') {
           const tag = element.literal.value
           const name = `${tag[0]!.toUpperCase()}${tag.slice(1)}Attributes`
 
-          edits.push({ start: node.start!, end: node.end!, text: name })
+          edits.push({ start: node.start, end: node.end, text: name })
           imports.kayTypes.add('JSX')
 
           if (!aliased.has(name)) {
             aliased.add(name)
-            edits.push({ start: statement.start!, end: statement.start!, text: `type ${name} = JSX.IntrinsicElements['${tag}']\n\n` })
+            edits.push({ start: statement.start, end: statement.start, text: `type ${name} = JSX.IntrinsicElements['${tag}']\n\n` })
           }
         }
         else {
@@ -262,7 +262,7 @@ function migrateFrontmatter(code: string, options: MigrateOptions, imports: Impo
       return true
     })
 
-    edits.push(...astroEdits(statement, code, 0, options.role, hasProps ? 'typed' : 'untyped', note))
+    edits.push(...astroEdits(statement, code, 0, code, options.role, hasProps ? 'typed' : 'untyped', note))
 
     // Astro awaits in any component, kay in the server fence of a page or a layout only.
     if (options.role === 'component') {
@@ -279,23 +279,23 @@ function migrateFrontmatter(code: string, options: MigrateOptions, imports: Impo
 }
 
 // The `Astro.*` reads under `node`, as kay reads them: `Astro.props` through `props<Props>()`, which the template cannot call, a page's request through `ctx`.
-function astroEdits(node: t.Node, code: string, offset: number, role: Role, props: 'typed' | 'untyped' | 'template', note: (line: number, message: string) => void): Edit[] {
+function astroEdits(node: Node, code: string, offset: number, parsed: string, role: Role, props: 'typed' | 'untyped' | 'template', note: (line: number, message: string) => void): Edit[] {
   const edits: Edit[] = []
-  const at = (inner: t.Node, text: string) => edits.push({ start: inner.start! - offset, end: inner.end! - offset, text })
+  const at = (inner: Node, text: string) => edits.push({ start: inner.start - offset, end: inner.end - offset, text })
   const page = role === 'page'
 
   eachNode(node, (inner, parent) => {
     if (isMetaEnv(inner)) {
       const read = parent?.type === 'MemberExpression' && parent.object === inner && !parent.computed && parent.property.type === 'Identifier' ? `.${parent.property.name}` : ''
 
-      note(inner.loc!.start.line, `import.meta.env${read} is Vite's: declare the variable in a \`defineEnv\` schema from \`kay/server\` and read it from there (see Environment variables), or as an \`s.Public\` field for an island`)
+      note(positionOf(parsed, inner.start).line, `import.meta.env${read} is Vite's: declare the variable in a \`defineEnv\` schema from \`kay/server\` and read it from there (see Environment variables), or as an \`s.Public\` field for an island`)
 
       return false
     }
 
     // `return Astro.redirect('/login')` ends the frontmatter; `ctx.redirect` stops the render by itself.
     if (inner.type === 'ReturnStatement' && inner.argument?.type === 'CallExpression' && isAstro(inner.argument.callee, 'redirect') && page) {
-      at(inner, code.slice(inner.argument.start! - offset, inner.argument.end! - offset).replace('Astro.redirect', 'ctx.redirect'))
+      at(inner, code.slice(inner.argument.start - offset, inner.argument.end - offset).replace('Astro.redirect', 'ctx.redirect'))
 
       return false
     }
@@ -304,7 +304,7 @@ function astroEdits(node: t.Node, code: string, offset: number, role: Role, prop
       return true
 
     const name = inner.property.name
-    const line = inner.loc!.start.line
+    const line = positionOf(parsed, inner.start).line
 
     if (name === 'props' && props === 'template') {
       note(line, 'Astro.props in the markup: destructure the prop in the fence, `const { title } = props<Props>()`, and read it by its name')
@@ -331,7 +331,7 @@ function astroEdits(node: t.Node, code: string, offset: number, role: Role, prop
   return edits
 }
 
-function isMetaEnv(node: t.Node): boolean {
+function isMetaEnv(node: Node): boolean {
   return node.type === 'MemberExpression' && node.object.type === 'MetaProperty' && node.object.meta.name === 'import' && node.object.property.name === 'meta' && node.property.type === 'Identifier' && node.property.name === 'env'
 }
 
@@ -362,6 +362,6 @@ function fontOf(specifier: string, line: number): FontImport | undefined {
   return undefined
 }
 
-function isAstro(node: t.Node, name: string): boolean {
+function isAstro(node: Node, name: string): boolean {
   return node.type === 'MemberExpression' && node.object.type === 'Identifier' && node.object.name === 'Astro' && node.property.type === 'Identifier' && node.property.name === name
 }

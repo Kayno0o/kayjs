@@ -1,6 +1,6 @@
 import type { CheckDiagnostic } from '.'
 import type { Route } from '../server/routes'
-import { parseExpression } from '@babel/parser'
+import { parseExpression } from '../compiler/estree'
 import { serverFacts } from './layout-facts'
 
 interface Field {
@@ -14,10 +14,14 @@ interface Field {
 }
 
 // The keys of a syntax tree node that say where it is written rather than what.
-const POSITIONS = new Set(['start', 'end', 'loc', 'extra', 'leadingComments', 'trailingComments', 'innerComments'])
+const POSITIONS = new Set(['start', 'end'])
 
-function withoutPositions(key: string, value: unknown): unknown {
-  return POSITIONS.has(key) ? undefined : value
+// A literal's `raw` is its quotes and spelling, which tell nothing about the schema.
+function withoutPositions(this: unknown, key: string, value: unknown): unknown {
+  if (POSITIONS.has(key) || (key === 'raw' && (this as { type?: unknown }).type === 'Literal'))
+    return undefined
+
+  return typeof value === 'bigint' ? String(value) : value
 }
 
 // A name two files of one route's chain declare in their `query` with schemas written differently, which the server refuses to merge; only schemas written inline as `s.Object({ ... })` are compared, the server checking the others when it renders.
@@ -64,7 +68,7 @@ async function fieldsOf(file: string): Promise<Map<string, Field> | undefined> {
     return undefined
 
   try {
-    const call = parseExpression(source.slice(query.value.start, query.value.end), { plugins: ['typescript'] })
+    const call = parseExpression(source.slice(query.value.start, query.value.end))
     const object = call.type === 'CallExpression' ? call.arguments[0] : undefined
 
     if (object?.type !== 'ObjectExpression')
@@ -73,18 +77,18 @@ async function fieldsOf(file: string): Promise<Map<string, Field> | undefined> {
     const found = new Map<string, Field>()
 
     for (const property of object.properties) {
-      if (property.type !== 'ObjectProperty' || property.computed)
+      if (property.type !== 'Property' || property.computed || property.method || property.kind !== 'init')
         continue
 
       let name: string | undefined
 
       if (property.key.type === 'Identifier')
         name = property.key.name
-      else if (property.key.type === 'StringLiteral')
+      else if (property.key.type === 'Literal' && typeof property.key.value === 'string')
         name = property.key.value
 
       if (name !== undefined)
-        found.set(name, { file, source, at: query.value.start + property.key.start!, length: property.key.end! - property.key.start!, text: JSON.stringify(property.value, withoutPositions) })
+        found.set(name, { file, source, at: query.value.start + property.key.start, length: property.key.end - property.key.start, text: JSON.stringify(property.value, withoutPositions) })
     }
 
     return found

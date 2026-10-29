@@ -1,4 +1,5 @@
-import type { Expression, Node, ObjectExpression } from '@babel/types'
+import type { ObjectExpression } from 'oxc-parser'
+import type { Expression, Node } from '../compiler/estree'
 import type { ClassIndex, FunctionNode } from './class-sources'
 import { existsSync, statSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
@@ -69,7 +70,7 @@ function merged(verdicts: Verdict[]): Verdict {
 // Every value of an object literal, those of the objects nested in it included, each judged as an expression: a spread or a method is open.
 function valuesOf(object: ObjectExpression, scope: Scope, depth: number): Verdict {
   return merged(object.properties.map((property) => {
-    if (property.type !== 'ObjectProperty')
+    if (property.type !== 'Property' || property.kind !== 'init' || property.method)
       return OPEN
 
     const value = unwrapped(property.value)
@@ -105,11 +106,11 @@ function lookup(name: string, scope: Scope): { scope: Scope, name: string }[] {
   return found
 }
 
-const FUNCTION_TYPES = new Set(['FunctionDeclaration', 'FunctionExpression', 'ArrowFunctionExpression', 'ObjectMethod', 'ClassMethod', 'ClassPrivateMethod', 'ClassDeclaration', 'ClassExpression'])
+const FUNCTION_TYPES = new Set(['FunctionDeclaration', 'FunctionExpression', 'ArrowFunctionExpression', 'ClassDeclaration', 'ClassExpression'])
 
 // The values a function returns, those of the functions inside it left out, undefined for one whose result is no plain value.
 function returnsOf(fn: FunctionNode): Expression[] | undefined {
-  if (fn.async || fn.generator)
+  if (fn.async || fn.generator || fn.body === null)
     return undefined
 
   if (fn.body.type !== 'BlockStatement')
@@ -165,12 +166,17 @@ function callVerdict(fns: FunctionNode[], scope: Scope, depth: number): Verdict 
   }))
 }
 
+// A number, a boolean or `null`, which is no class; a regular expression or a bigint is a value of the runtime.
+function isPlainLiteral(node: Extract<Expression, { type: 'Literal' }>): boolean {
+  return typeof node.value === 'number' || typeof node.value === 'boolean' || (node.value === null && !('regex' in node))
+}
+
 // What an expression is made of: string literals and the quasis of a template are its parts, a ternary, a logical, a concatenation or an array is all of its branches, a prop is its parent's to name, a `const` is what it was given, and anything else is open.
 function verdictOf(node: Expression, scope: Scope, depth = 0): Verdict {
-  if (node.type === 'StringLiteral')
+  if (node.type === 'Literal' && typeof node.value === 'string')
     return { parts: [node.value], open: false }
 
-  if (node.type === 'NumericLiteral' || node.type === 'NullLiteral' || node.type === 'BooleanLiteral' || node.type === 'ObjectExpression')
+  if (node.type === 'Literal' ? isPlainLiteral(node) : node.type === 'ObjectExpression')
     return CLOSED
 
   // `undefined` is no class, like `null` and `false`.
@@ -178,7 +184,7 @@ function verdictOf(node: Expression, scope: Scope, depth = 0): Verdict {
     return CLOSED
 
   if (node.type === 'TemplateLiteral')
-    return merged([...node.quasis.map(quasi => ({ parts: [quasi.value.cooked ?? ''], open: false })), ...node.expressions.map(inner => verdictOf(inner as Expression, scope, depth))])
+    return merged([...node.quasis.map(quasi => ({ parts: [quasi.value.cooked ?? ''], open: false })), ...node.expressions.map(inner => verdictOf(inner, scope, depth))])
 
   if (node.type === 'ConditionalExpression')
     return merged([verdictOf(node.consequent, scope, depth), verdictOf(node.alternate, scope, depth)])
@@ -187,7 +193,7 @@ function verdictOf(node: Expression, scope: Scope, depth = 0): Verdict {
     return node.operator === '&&' ? verdictOf(node.right, scope, depth) : merged([verdictOf(node.left, scope, depth), verdictOf(node.right, scope, depth)])
 
   if (node.type === 'BinaryExpression')
-    return node.operator === '+' && node.left.type !== 'PrivateName' ? merged([verdictOf(node.left, scope, depth), verdictOf(node.right, scope, depth)]) : OPEN
+    return node.operator === '+' ? merged([verdictOf(node.left, scope, depth), verdictOf(node.right, scope, depth)]) : OPEN
 
   if (node.type === 'ParenthesizedExpression' || node.type === 'TSAsExpression' || node.type === 'TSSatisfiesExpression' || node.type === 'TSNonNullExpression')
     return verdictOf(node.expression, scope, depth)
@@ -195,7 +201,11 @@ function verdictOf(node: Expression, scope: Scope, depth = 0): Verdict {
   if (node.type === 'ArrayExpression')
     return merged(node.elements.map(element => element === null || element.type === 'SpreadElement' ? OPEN : verdictOf(element, scope, depth)))
 
-  if (node.type === 'Identifier' || node.type === 'MemberExpression' || node.type === 'OptionalMemberExpression') {
+  // A chain ending in a call is a call's result, whose value is not read.
+  if (node.type === 'ChainExpression')
+    return node.expression.type === 'CallExpression' ? OPEN : verdictOf(node.expression, scope, depth)
+
+  if (node.type === 'Identifier' || node.type === 'MemberExpression') {
     // What the element being written holds in `className` or `classList` is what the page already set on it.
     if (node.type !== 'Identifier' && !node.computed && node.property.type === 'Identifier' && CLASS_READS.has(node.property.name) && scope.receiver !== undefined && nodeKey(node.object) === scope.receiver)
       return CLOSED
@@ -227,7 +237,7 @@ function verdictOf(node: Expression, scope: Scope, depth = 0): Verdict {
 
   if (node.type === 'CallExpression') {
     if (node.callee.type === 'Identifier' && JOINERS.has(node.callee.name))
-      return merged(node.arguments.map(argument => argument.type === 'SpreadElement' || argument.type === 'ArgumentPlaceholder' ? OPEN : joined(argument, scope, depth)))
+      return merged(node.arguments.map(argument => argument.type === 'SpreadElement' ? OPEN : joined(argument, scope, depth)))
 
     // A function whose every return is a value judged as any other is those values.
     const called = node.callee.type === 'Identifier' && depth < RESOLVE_DEPTH ? lookup(node.callee.name, scope) : []
@@ -239,7 +249,7 @@ function verdictOf(node: Expression, scope: Scope, depth = 0): Verdict {
     // `el.getAttribute('class')` reads back what the element has.
     const [argument] = node.arguments
 
-    if (node.callee.type === 'MemberExpression' && !node.callee.computed && node.callee.property.type === 'Identifier' && node.callee.property.name === 'getAttribute' && argument?.type === 'StringLiteral' && argument.value === 'class' && scope.receiver !== undefined && nodeKey(node.callee.object) === scope.receiver)
+    if (node.callee.type === 'MemberExpression' && !node.callee.computed && node.callee.property.type === 'Identifier' && node.callee.property.name === 'getAttribute' && argument?.type === 'Literal' && argument.value === 'class' && scope.receiver !== undefined && nodeKey(node.callee.object) === scope.receiver)
       return CLOSED
   }
 

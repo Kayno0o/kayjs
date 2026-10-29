@@ -1,7 +1,7 @@
 // The checks a fence takes once parsed, beside what analyzing it reports: a schema field with no bound, a stylesheet imported for its text without asking, a page setting outside `page`.
 
-import type * as t from '@babel/types'
 import type { Diagnostic, Fix } from './ast'
+import type { Node, NodeOfType } from './estree'
 import type { Scope as BindingScope } from './scope'
 import type { PageSettings, ParsedFence, SeparateSetting, ServerAnalysis } from './script'
 import { isSecret } from '../runtime/form'
@@ -87,14 +87,14 @@ function lineEnd(source: string, end: number): number {
 const SUGGESTED_MAX_LENGTH = 200
 
 // Where and what to insert to bound a string field: a new options object, the first property of an empty one, or a property before the others.
-function maxLengthEdit(call: t.CallExpression, options: t.CallExpression['arguments'][number] | undefined): { at: number, text: string } {
+function maxLengthEdit(call: NodeOfType<'CallExpression'>, options: NodeOfType<'CallExpression'>['arguments'][number] | undefined): { at: number, text: string } {
   if (options === undefined)
-    return { at: call.end! - 1, text: `{ maxLength: ${SUGGESTED_MAX_LENGTH} }` }
+    return { at: call.end - 1, text: `{ maxLength: ${SUGGESTED_MAX_LENGTH} }` }
 
   if (options.type === 'ObjectExpression' && options.properties.length === 0)
-    return { at: options.start! + 1, text: ` maxLength: ${SUGGESTED_MAX_LENGTH} ` }
+    return { at: options.start + 1, text: ` maxLength: ${SUGGESTED_MAX_LENGTH} ` }
 
-  return { at: (options as t.ObjectExpression).properties[0]!.start!, text: `maxLength: ${SUGGESTED_MAX_LENGTH}, ` }
+  return { at: (options as NodeOfType<'ObjectExpression'>).properties[0]!.start, text: `maxLength: ${SUGGESTED_MAX_LENGTH}, ` }
 }
 
 const UNBOUNDED_QUANTIFIER = /^\{\d+,\}/
@@ -137,13 +137,13 @@ function isBoundedPattern(source: string): boolean {
 }
 
 // A property whose value already bounds the string: an `enum` or a `const`, or a `pattern` written as a literal that only matches strings of bounded length.
-function isBoundedByValue(property: t.ObjectProperty | t.ObjectMethod): boolean {
+function isBoundedByValue(property: NodeOfType<'Property'>): boolean {
   const key = propertyKey(property)
 
   if (key === 'enum' || key === 'const')
     return true
 
-  return key === 'pattern' && property.type === 'ObjectProperty' && property.value.type === 'StringLiteral' && isBoundedPattern(property.value.value)
+  return key === 'pattern' && property.value.type === 'Literal' && typeof property.value.value === 'string' && isBoundedPattern(property.value.value)
 }
 
 // A string field of an action's schema with no `maxLength` takes whatever a visitor posts into it, up to the request body limit, unless its `enum`, `const` or anchored `pattern` already bounds it. A secret, such as a password, is checked or hashed rather than kept or shown, so it needs none.
@@ -155,8 +155,10 @@ export function unboundedFields(server: ServerAnalysis | undefined): Diagnostic[
 
   const diagnostics: Diagnostic[] = []
 
-  eachNode(fence.ast.program, (node) => {
-    if (node.type !== 'CallExpression' || node.callee.type !== 'Identifier' || node.callee.name !== 'action' || !node.arguments[0] || node.arguments[0].type === 'ArrowFunctionExpression' || node.arguments[0].type === 'FunctionExpression')
+  const optional = optionalParts()
+
+  eachNode(fence.ast, (node, parent) => {
+    if (optional(node, parent) || node.type !== 'CallExpression' || node.callee.type !== 'Identifier' || node.callee.name !== 'action' || !node.arguments[0] || node.arguments[0].type === 'ArrowFunctionExpression' || node.arguments[0].type === 'FunctionExpression')
       return
 
     schemaStrings(node.arguments[0], undefined, (call, field) => {
@@ -185,8 +187,8 @@ export function unboundedFields(server: ServerAnalysis | undefined): Diagnostic[
 }
 
 // The name a property key writes: an identifier read as written unless computed, or a string literal.
-function memberName(key: t.Node, computed: boolean): string | undefined {
-  if (key.type === 'StringLiteral')
+function memberName(key: Node, computed: boolean): string | undefined {
+  if (key.type === 'Literal' && typeof key.value === 'string')
     return key.value
 
   return key.type === 'Identifier' && !computed ? key.name : undefined
@@ -196,12 +198,12 @@ interface Named { name: string }
 
 // The names a namespace import hands out that moved, read off it (`server.invalidatePage`, `server['invalidatePage']`) or destructured from it (`const { invalidatePage } = server`), as the node writing the name.
 // Babel's scopes tell the namespace from an inner binding of the same name; a fence giving it none, a name declared twice, is read by name alone.
-function namespaceReads<Entry extends Named>(fence: ParsedFence, namespaces: Map<t.ImportNamespaceSpecifier, Entry[]>): { key: t.Node, moved: Entry }[] {
+function namespaceReads<Entry extends Named>(fence: ParsedFence, namespaces: Map<NodeOfType<'ImportNamespaceSpecifier'>, Entry[]>): { key: Node, moved: Entry }[] {
   if (namespaces.size === 0)
     return []
 
-  const found: { key: t.Node, moved: Entry }[] = []
-  const movedBy = (object: t.Node | null | undefined, name: string | undefined, scope: BindingScope | undefined): Entry | undefined => {
+  const found: { key: Node, moved: Entry }[] = []
+  const movedBy = (object: Node | null | undefined, name: string | undefined, scope: BindingScope | undefined): Entry | undefined => {
     if (object?.type !== 'Identifier')
       return undefined
 
@@ -210,9 +212,9 @@ function namespaceReads<Entry extends Named>(fence: ParsedFence, namespaces: Map
 
     return specifier && namespaces.get(specifier)?.find(entry => entry.name === name)
   }
-  const destructured = (pattern: t.ObjectPattern, init: t.Node | null | undefined, scope: BindingScope | undefined) => {
+  const destructured = (pattern: NodeOfType<'ObjectPattern'>, init: Node | null | undefined, scope: BindingScope | undefined) => {
     for (const property of pattern.properties) {
-      if (property.type !== 'ObjectProperty')
+      if (property.type !== 'Property')
         continue
 
       const moved = movedBy(init, memberName(property.key, property.computed), scope)
@@ -221,8 +223,8 @@ function namespaceReads<Entry extends Named>(fence: ParsedFence, namespaces: Map
         found.push({ key: property.key, moved })
     }
   }
-  const visit = (node: t.Node, scope: BindingScope | undefined): void => {
-    if (node.type === 'MemberExpression' || node.type === 'OptionalMemberExpression') {
+  const visit = (node: Node, scope: BindingScope | undefined): void => {
+    if (node.type === 'MemberExpression') {
       const { property } = node
       const moved = movedBy(node.object, memberName(property, node.computed), scope)
 
@@ -241,7 +243,7 @@ function namespaceReads<Entry extends Named>(fence: ParsedFence, namespaces: Map
   if (!walkScope(fence.ast, { enter: path => visit(path.node, path.scope) })) {
     found.length = 0
 
-    for (const statement of fence.ast.program.body)
+    for (const statement of fence.ast.body)
       eachNode(statement, (node) => { visit(node, undefined) })
   }
 
@@ -257,8 +259,8 @@ export function serverOnlyImports(fence: ParsedFence): Diagnostic[] {
     return []
 
   const diagnostics: Diagnostic[] = []
-  const namespaces = new Map<t.ImportNamespaceSpecifier, Named[]>()
-  const report = (node: t.Node, name: string) => diagnostics.push({
+  const namespaces = new Map<NodeOfType<'ImportNamespaceSpecifier'>, Named[]>()
+  const report = (node: Node, name: string) => diagnostics.push({
     ...fence.shift(node),
     code: 'server-only-import',
     message: `\`${name}\` is exported to the server alone, and this code runs in the browser`,
@@ -267,7 +269,7 @@ export function serverOnlyImports(fence: ParsedFence): Diagnostic[] {
     checkOnly: true,
   })
 
-  for (const node of fence.ast.program.body) {
+  for (const node of fence.ast.body) {
     if (node.type !== 'ImportDeclaration' || node.source.value !== 'kay/cache' || node.importKind === 'type')
       continue
 
@@ -297,7 +299,7 @@ export function cssImportsWithoutText(fence: ParsedFence): Diagnostic[] {
   if (!CSS_BINDING.test(fence.code))
     return []
 
-  return fence.ast.program.body.flatMap((node) => {
+  return fence.ast.body.flatMap((node) => {
     if (node.type !== 'ImportDeclaration' || !node.source.value.endsWith('.css') || node.specifiers.length === 0 || node.importKind === 'type')
       return []
 
@@ -316,39 +318,61 @@ export function cssImportsWithoutText(fence: ParsedFence): Diagnostic[] {
 }
 
 // Every `s.String(...)` call in a schema, with the name of the field it types, the nearest property holding it.
-function schemaStrings(node: t.Node | null | undefined, field: string | undefined, found: (call: t.CallExpression, field: string | undefined) => void): void {
-  eachNode(node, (inner) => {
-    if (inner.type === 'ObjectProperty')
+function schemaStrings(node: Node | null | undefined, field: string | undefined, found: (call: NodeOfType<'CallExpression'>, field: string | undefined) => void): void {
+  const optional = optionalParts()
+
+  eachNode(node, (inner, parent) => {
+    if (isPlainProperty(inner))
       schemaStrings(inner.value, propertyKey(inner) ?? field, found)
-    else if (inner.type === 'CallExpression' && inner.callee.type === 'MemberExpression' && inner.callee.property.type === 'Identifier' && inner.callee.property.name === 'String')
+    else if (!optional(inner, parent) && inner.type === 'CallExpression' && inner.callee.type === 'MemberExpression' && inner.callee.property.type === 'Identifier' && inner.callee.property.name === 'String')
       found(inner, field)
 
     // A property's value is walked above, under the property's own name.
-    return inner.type !== 'ObjectProperty'
+    return !isPlainProperty(inner)
   })
 }
 
-function propertyKey(property: t.ObjectProperty | t.ObjectMethod): string | undefined {
+// A `key: value` property, which Babel told from a method, a getter and a setter by their own node types.
+function isPlainProperty(node: Node): node is NodeOfType<'Property'> {
+  return node.type === 'Property' && !node.method && node.kind === 'init'
+}
+
+// Tells the calls and members of an optional chain, `a?.b.c()`, which Babel typed as optional ones its checks did not match: a node is one when its parent is the chain, or a chain part it is the callee or object of.
+function optionalParts(): (node: Node, parent: Node | undefined) => boolean {
+  const parts = new Set<Node>()
+
+  return (node, parent) => {
+    const part = parent !== undefined && (parent.type === 'ChainExpression' || (parts.has(parent) && ((parent.type === 'CallExpression' && parent.callee === node) || (parent.type === 'MemberExpression' && parent.object === node))))
+
+    if (part)
+      parts.add(node)
+
+    return part
+  }
+}
+
+function propertyKey(property: NodeOfType<'Property'>): string | undefined {
   if (property.computed)
     return undefined
 
   if (property.key.type === 'Identifier')
     return property.key.name
 
-  return property.key.type === 'StringLiteral' ? property.key.value : undefined
+  return property.key.type === 'Literal' && typeof property.key.value === 'string' ? property.key.value : undefined
 }
 
 const AI_PACKAGE = '@kaynooo/kayjs-ai'
 const ASYNC_KEYWORD = /^(?:(?:static|public|private|protected|override)\s+)*(async\s*)/
 
-type FunctionNode = t.ArrowFunctionExpression | t.FunctionExpression | t.FunctionDeclaration | t.ObjectMethod | t.ClassMethod | t.ClassPrivateMethod
+// A method is its `FunctionExpression` value in oxc's tree.
+type FunctionNode = NodeOfType<'ArrowFunctionExpression' | 'FunctionExpression' | 'FunctionDeclaration'>
 
-function isFunction(node: t.Node): node is FunctionNode {
-  return node.type === 'ArrowFunctionExpression' || node.type === 'FunctionExpression' || node.type === 'FunctionDeclaration' || node.type === 'ObjectMethod' || node.type === 'ClassMethod' || node.type === 'ClassPrivateMethod'
+function isFunction(node: Node): node is FunctionNode {
+  return node.type === 'ArrowFunctionExpression' || node.type === 'FunctionExpression' || node.type === 'FunctionDeclaration'
 }
 
 // The values an expression may be: both branches of a condition, the operands of a logical expression, and what a type assertion or a non-null mark wraps.
-function candidates(node: t.Node): t.Node[] {
+function candidates(node: Node): Node[] {
   if (node.type === 'ConditionalExpression')
     return [...candidates(node.consequent), ...candidates(node.alternate)]
 
@@ -362,23 +386,23 @@ function candidates(node: t.Node): t.Node[] {
 }
 
 interface Body {
-  returned: t.Node[]
+  returned: Node[]
   awaits: boolean
   // The names the function declares itself, parameters included, and the `const` locals with their initializer.
   declared: Set<string>
-  consts: Map<string, t.Node>
+  consts: Map<string, Node>
 }
 
-function declare(into: Set<string>, pattern: t.Node | null | undefined): void {
+function declare(into: Set<string>, pattern: Node | null | undefined): void {
   for (const name of patternNames(pattern))
     into.add(name)
 }
 
 // What the function itself returns and whether it awaits, its inner functions left alone.
 function returnsAndAwaits(fn: FunctionNode): Body {
-  const returned: t.Node[] = fn.body.type === 'BlockStatement' ? [] : [fn.body]
+  const returned: Node[] = fn.body && fn.body.type !== 'BlockStatement' ? [fn.body] : []
   const declared = new Set<string>()
-  const consts = new Map<string, t.Node>()
+  const consts = new Map<string, Node>()
   let awaits = false
 
   for (const param of fn.params)
@@ -421,7 +445,7 @@ function returnsAndAwaits(fn: FunctionNode): Body {
 }
 
 // Whether the call's callee, or the namespace it is read from, is declared by the function itself, so the call is not the import's.
-function shadowed(declared: Set<string>, call: t.CallExpression): boolean {
+function shadowed(declared: Set<string>, call: NodeOfType<'CallExpression'>): boolean {
   const { callee } = call
   const root = callee.type === 'MemberExpression' ? callee.object : callee
 
@@ -436,7 +460,7 @@ export function asyncReplies(fence: ParsedFence): Diagnostic[] {
   const names = new Set<string>()
   const namespaces = new Set<string>()
 
-  for (const node of fence.ast.program.body) {
+  for (const node of fence.ast.body) {
     if (node.type !== 'ImportDeclaration' || node.source.value !== AI_PACKAGE || node.importKind === 'type')
       continue
 
@@ -451,17 +475,19 @@ export function asyncReplies(fence: ParsedFence): Diagnostic[] {
   if (names.size === 0 && namespaces.size === 0)
     return []
 
-  const isAsk = (node: t.Node): node is t.CallExpression => node.type === 'CallExpression' && (node.callee.type === 'Identifier'
+  const isAsk = (node: Node): node is NodeOfType<'CallExpression'> => node.type === 'CallExpression' && (node.callee.type === 'Identifier'
     ? names.has(node.callee.name)
     : node.callee.type === 'MemberExpression' && !node.callee.computed && node.callee.object.type === 'Identifier' && namespaces.has(node.callee.object.name) && node.callee.property.type === 'Identifier' && node.callee.property.name === 'ask')
   const diagnostics: Diagnostic[] = []
 
-  eachNode(fence.ast.program, (node) => {
+  eachNode(fence.ast, (node, parent) => {
     if (!isFunction(node) || !node.async || ('generator' in node && node.generator))
       return
 
     const { returned, awaits, declared, consts } = returnsAndAwaits(node)
-    const keyword = ASYNC_KEYWORD.exec(fence.code.slice(node.start!))
+    // A method starts at its key or its `static` and `async`, where its function value starts at the parameters.
+    const start = (parent?.type === 'Property' && (parent.method || parent.kind !== 'init') && parent.value === node) || (parent?.type === 'MethodDefinition' && parent.value === node) ? parent.start : node.start
+    const keyword = ASYNC_KEYWORD.exec(fence.code.slice(start))
     // A local `const` holding the reply and returned is the reply.
     const values = returned.flatMap(value => value.type === 'Identifier' && consts.has(value.name) ? candidates(consts.get(value.name)!) : [value])
     const call = values.find(isAsk)
@@ -474,7 +500,7 @@ export function asyncReplies(fence: ParsedFence): Diagnostic[] {
         message: 'This `ask()` is returned from an `async` function, which awaits it: the answer arrives as its whole text, with no streaming',
         note: 'the reply is a thenable async iterable, and an action or an `await` block streams it only when it is returned as it is',
         help: awaits ? 'return `ask(...).stream()`, which an `async` function hands on as it is; `return await ask(...)` says the whole text is meant' : 'remove `async`, or write `return await ask(...)` when the whole text is meant',
-        fixes: !awaits && keyword && !node.returnType && values.every(isAsk) ? [{ title: 'Remove `async`', edits: [{ start: fence.offset + node.start! + keyword.index + keyword[0].length - keyword[1]!.length, end: fence.offset + node.start! + keyword[0].length, text: '' }], safe: true }] : [],
+        fixes: !awaits && keyword && !node.returnType && values.every(isAsk) ? [{ title: 'Remove `async`', edits: [{ start: fence.offset + start + keyword.index + keyword[0].length - keyword[1]!.length, end: fence.offset + start + keyword[0].length, text: '' }], safe: true }] : [],
       })
     }
   })
@@ -494,7 +520,7 @@ export function turnsCaptchaOff(source: string): boolean {
 }
 
 // The last name of a receiver, `auth` for `ctx.locals.auth`.
-function receiverName(node: t.Node): string | undefined {
+function receiverName(node: Node): string | undefined {
   if (node.type === 'Identifier')
     return node.name
 
@@ -508,13 +534,15 @@ export function missingCaptchas(fence: ParsedFence): Diagnostic[] {
 
   const diagnostics: Diagnostic[] = []
 
-  eachNode(fence.ast.program, (node) => {
-    if (node.type !== 'CallExpression' || node.callee.type !== 'MemberExpression' || node.callee.computed || node.callee.property.type !== 'Identifier')
+  const optional = optionalParts()
+
+  eachNode(fence.ast, (node, parent) => {
+    if (optional(node, parent) || node.type !== 'CallExpression' || node.callee.type !== 'MemberExpression' || node.callee.computed || node.callee.property.type !== 'Identifier')
       return
 
     const object = node.callee.object
     const grouped = object.type === 'MemberExpression' && !object.computed && object.property.type === 'Identifier' && CAPTCHA_GROUPS.has(object.property.name)
-    const name = grouped ? `${(object.property as t.Identifier).name}.${node.callee.property.name}` : node.callee.property.name
+    const name = grouped ? `${(object.property as NodeOfType<'Identifier'>).name}.${node.callee.property.name}` : node.callee.property.name
     const at = CAPTCHA_CALLS.get(name)
     const receiver = receiverName(grouped ? object.object : object)
 
@@ -522,7 +550,7 @@ export function missingCaptchas(fence: ParsedFence): Diagnostic[] {
       return
 
     const options = node.arguments[at]
-    const lacking = options?.type === 'ObjectExpression' && !options.properties.some(property => property.type === 'SpreadElement') && !options.properties.some(property => property.type === 'ObjectProperty' && ((property.key.type === 'Identifier' && !property.computed && property.key.name === 'captcha') || (property.key.type === 'StringLiteral' && property.key.value === 'captcha')))
+    const lacking = options?.type === 'ObjectExpression' && !options.properties.some(property => property.type === 'SpreadElement') && !options.properties.some(property => property.type === 'Property' && !property.method && property.kind === 'init' && ((property.key.type === 'Identifier' && !property.computed && property.key.name === 'captcha') || (property.key.type === 'Literal' && property.key.value === 'captcha')))
 
     if (options !== undefined && !lacking)
       return
@@ -539,9 +567,14 @@ export function missingCaptchas(fence: ParsedFence): Diagnostic[] {
   return diagnostics
 }
 
+// A string literal; the other literals, `null` and numbers, are no string.
+function isString(node: Node): node is NodeOfType<'Literal'> & { value: string } {
+  return node.type === 'Literal' && typeof node.value === 'string'
+}
+
 // The values of a template that follow its first one with no text between: they extend the prefix, where later ones follow text the prefix already ended with.
-function adjacent(node: t.TemplateLiteral): t.Node[] {
-  const found: t.Node[] = []
+function adjacent(node: NodeOfType<'TemplateLiteral'>): Node[] {
+  const found: Node[] = []
 
   for (let at = 1; at < node.expressions.length && (node.quasis[at]!.value.cooked ?? '') === ''; at++)
     found.push(node.expressions[at]!)
@@ -553,10 +586,10 @@ function adjacent(node: t.TemplateLiteral): t.Node[] {
 const SITE_CHECKERS = new Set(['localPath', 'safeRedirect'])
 
 // Whether a redirect target is written as a path of this site: a literal starting with one slash, a template or a concatenation whose text before the first value is `/` and a name (`/posts/`) or whose first value is itself a site path, a call to a checker, `localize(...)` of a site path, or a `const` holding one.
-function isSitePath(node: t.Node, constants: Scope, seen = new Set<readonly t.Node[]>()): boolean {
-  const site = (inner: t.Node) => isSitePath(inner, constants, seen)
+function isSitePath(node: Node, constants: Scope, seen = new Set<readonly Node[]>()): boolean {
+  const site = (inner: Node) => isSitePath(inner, constants, seen)
 
-  if (node.type === 'StringLiteral')
+  if (isString(node))
     return SITE_PATH.test(node.value)
 
   if (node.type === 'TemplateLiteral') {
@@ -569,7 +602,7 @@ function isSitePath(node: t.Node, constants: Scope, seen = new Set<readonly t.No
   }
 
   if (node.type === 'BinaryExpression' && node.operator === '+')
-    return node.left.type === 'StringLiteral' ? BUILT_PATH.test(node.left.value) : site(node.left) && (node.left.type === 'BinaryExpression' || node.left.type === 'CallExpression' || node.left.type === 'Identifier') && !readsRequest(node.right, constants, new Set())
+    return isString(node.left) ? BUILT_PATH.test(node.left.value) : site(node.left) && (node.left.type === 'BinaryExpression' || node.left.type === 'CallExpression' || node.left.type === 'Identifier') && !readsRequest(node.right, constants, new Set())
 
   if (node.type === 'ConditionalExpression')
     return site(node.consequent) && site(node.alternate)
@@ -608,7 +641,7 @@ function isSitePath(node: t.Node, constants: Scope, seen = new Set<readonly t.No
 
 // The variables one block, function or catch clause declares: a name's initialisers, or no value known for it (a parameter, a pattern, an assigned name).
 class Scope {
-  readonly inits = new Map<string, t.Node[]>()
+  readonly inits = new Map<string, Node[]>()
   readonly unknown = new Set<string>()
   // The unknown names a parameter or a declaration pulled out of an object, as `({ headers })` or `const { url } = ctx`.
   readonly destructured = new Set<string>()
@@ -616,7 +649,7 @@ class Scope {
   constructor(readonly parent?: Scope, readonly isFunction = true) {}
 
   // The scope that declares a name and what it holds there; undefined when the name is unknown or declared in no scope.
-  resolve(name: string): { inits: readonly t.Node[], scope: Scope } | undefined {
+  resolve(name: string): { inits: readonly Node[], scope: Scope } | undefined {
     if (this.unknown.has(name))
       return undefined
 
@@ -643,12 +676,12 @@ class Scope {
   }
 }
 
-function opensScope(node: t.Node): boolean {
+function opensScope(node: Node): boolean {
   return isFunction(node) || node.type === 'BlockStatement' || node.type === 'CatchClause' || node.type === 'ForStatement' || node.type === 'ForInStatement' || node.type === 'ForOfStatement' || node.type === 'SwitchStatement' || node.type === 'StaticBlock'
 }
 
 // The names a binding pattern declares, each with whether an object pattern pulls it out, behind a default (`{ headers } = {}`) or inside an array pattern (`[{ url }]`).
-function pulledNames(node: t.Node | null, pulled = false): [string, boolean][] {
+function pulledNames(node: Node | null, pulled = false): [string, boolean][] {
   if (!node)
     return []
 
@@ -668,14 +701,14 @@ function pulledNames(node: t.Node | null, pulled = false): [string, boolean][] {
 }
 
 // The names a function's parameters or a catch clause's parameter bind, each with whether an object pattern pulls it out.
-function boundNames(node: t.Node): [string, boolean][] {
+function boundNames(node: Node): [string, boolean][] {
   if (node.type === 'CatchClause' && node.param)
     return pulledNames(node.param)
 
   return isFunction(node) ? node.params.flatMap(pattern => pulledNames(pattern)) : []
 }
 
-function declareIn(node: t.Node, scope: Scope, scopes: Map<t.Node, Scope>): void {
+function declareIn(node: Node, scope: Scope, scopes: Map<Node, Scope>): void {
   eachNode(node, (inner, parent) => {
     if (inner !== node && opensScope(inner)) {
       const own = new Scope(scope, isFunction(inner))
@@ -721,8 +754,8 @@ function declareIn(node: t.Node, scope: Scope, scopes: Map<t.Node, Scope>): void
 }
 
 // Visits every node of `node` with the scope it is written in.
-function eachScoped(node: t.Node, scope: Scope, scopes: ReadonlyMap<t.Node, Scope>, visit: (node: t.Node, scope: Scope) => void): void {
-  eachNode(node, (inner) => {
+function eachScoped(node: Node, scope: Scope, scopes: ReadonlyMap<Node, Scope>, visit: (node: Node, scope: Scope, parent: Node | undefined) => void): void {
+  eachNode(node, (inner, parent) => {
     const own = inner === node ? undefined : scopes.get(inner)
 
     if (own) {
@@ -731,20 +764,20 @@ function eachScoped(node: t.Node, scope: Scope, scopes: ReadonlyMap<t.Node, Scop
       return false
     }
 
-    visit(inner, scope)
+    visit(inner, scope, parent)
 
     return true
   })
 }
 
 // The variables of a fence by scope, a name assigned after it is declared holding nothing known.
-function scopesOf(fence: ParsedFence): { root: Scope, scopes: Map<t.Node, Scope> } {
+function scopesOf(fence: ParsedFence): { root: Scope, scopes: Map<Node, Scope> } {
   const root = new Scope()
-  const scopes = new Map<t.Node, Scope>()
+  const scopes = new Map<Node, Scope>()
 
-  declareIn(fence.ast.program, root, scopes)
+  declareIn(fence.ast, root, scopes)
 
-  eachScoped(fence.ast.program, root, scopes, (node, scope) => {
+  eachScoped(fence.ast, root, scopes, (node, scope) => {
     if (node.type !== 'AssignmentExpression')
       return
 
@@ -767,20 +800,20 @@ function isRoot(name: string, constants: Scope): boolean {
 }
 
 // A call result is a value the callee made: a request member it was given taints it, the bare request object (an action's `input`) does not.
-function isCall(node: t.Node): boolean {
+function isCall(node: Node): boolean {
   return node.type === 'AwaitExpression' ? isCall(node.argument) : node.type === 'CallExpression'
 }
 
 // The name a member access reads: `.query` or `['query']`.
-function accessedName(property: t.Node, computed: boolean): string | undefined {
+function accessedName(property: Node, computed: boolean): string | undefined {
   if (property.type === 'Identifier' && !computed)
     return property.name
 
-  return property.type === 'StringLiteral' ? property.value : undefined
+  return isString(property) ? property.value : undefined
 }
 
 // Whether a node reads the request: `ctx.query...`, `ctx.url...`, a destructured `query` or a `const` holding one.
-function readsRequest(node: t.Node, constants: Scope, seen: Set<readonly t.Node[]>, bare = true): boolean {
+function readsRequest(node: Node, constants: Scope, seen: Set<readonly Node[]>, bare = true): boolean {
   let found = false
 
   eachNode(node, (inner, parent) => {
@@ -788,23 +821,29 @@ function readsRequest(node: t.Node, constants: Scope, seen: Set<readonly t.Node[
       return false
 
     // A property name or an object key is no variable.
-    if (inner.type === 'Identifier' && parent !== undefined && ((parent.type === 'MemberExpression' && parent.property === inner && !parent.computed) || (parent.type === 'OptionalMemberExpression' && parent.property === inner && !parent.computed) || (parent.type === 'ObjectProperty' && parent.key === inner && !parent.computed && !parent.shorthand)))
+    if (inner.type === 'Identifier' && parent !== undefined && ((parent.type === 'MemberExpression' && parent.property === inner && !parent.computed) || (isPlainProperty(parent) && parent.key === inner && !parent.computed && !parent.shorthand)))
       return true
 
     // What a checker returns is a path of the site, whatever it was given.
     if (inner.type === 'CallExpression' && inner.callee.type === 'Identifier' && SITE_CHECKERS.has(inner.callee.name))
       return false
 
-    if (inner.type === 'MemberExpression' || inner.type === 'OptionalMemberExpression') {
-      let base: t.Node = inner
-      let first: t.Node = inner
+    if (inner.type === 'MemberExpression') {
+      let base: Node = inner
+      let first: NodeOfType<'MemberExpression'> = inner
 
-      while ((base.type === 'MemberExpression' || base.type === 'OptionalMemberExpression')) {
-        first = base
-        base = base.object
+      // A parenthesized chain, `(ctx?.query).page`, is looked through as Babel's optional members were.
+      while (base.type === 'MemberExpression' || base.type === 'ChainExpression') {
+        if (base.type === 'MemberExpression') {
+          first = base
+          base = base.object
+        }
+        else {
+          base = base.expression
+        }
       }
 
-      const member = 'property' in first ? accessedName(first.property, first.computed) : undefined
+      const member = accessedName(first.property, first.computed)
 
       if (base.type === 'Identifier' && member !== undefined)
         found = base.name === 'ctx' ? REQUEST_CONTEXT.has(member) && (bare || !POSTED.has(member)) : isRoot(base.name, constants) && (bare || !POSTED.has(base.name))
@@ -830,8 +869,8 @@ function readsRequest(node: t.Node, constants: Scope, seen: Set<readonly t.Node[
 
 // Whether a target that is not written as a site path may be any URL: a literal or text that is not a path, an unknown name, a member of the request, or a call fed the request.
 // A value a helper builds from the app's own values (`organizationPage(features, org)`, `result.redirect`) is left alone, as it does not come from the visitor.
-function leaks(node: t.Node, constants: Scope, seen = new Set<readonly t.Node[]>()): boolean {
-  const next = (inner: t.Node) => leaks(inner, constants, seen)
+function leaks(node: Node, constants: Scope, seen = new Set<readonly Node[]>()): boolean {
+  const next = (inner: Node) => leaks(inner, constants, seen)
 
   if (isSitePath(node, constants))
     return false
@@ -843,7 +882,7 @@ function leaks(node: t.Node, constants: Scope, seen = new Set<readonly t.Node[]>
   }
 
   if (node.type === 'BinaryExpression' && node.operator === '+')
-    return node.left.type === 'StringLiteral' ? !BUILT_PATH.test(node.left.value) : next(node.left) || readsRequest(node.right, constants, new Set())
+    return isString(node.left) ? !BUILT_PATH.test(node.left.value) : next(node.left) || readsRequest(node.right, constants, new Set())
 
   if (node.type === 'ConditionalExpression')
     return next(node.consequent) || next(node.alternate)
@@ -854,7 +893,7 @@ function leaks(node: t.Node, constants: Scope, seen = new Set<readonly t.Node[]>
   if (node.type === 'TSAsExpression' || node.type === 'TSNonNullExpression' || node.type === 'ParenthesizedExpression' || node.type === 'AwaitExpression')
     return next('expression' in node ? node.expression : node.argument)
 
-  if (node.type === 'NullLiteral' || (node.type === 'Identifier' && node.name === 'undefined'))
+  if ((node.type === 'Literal' && node.raw === 'null') || (node.type === 'Identifier' && node.name === 'undefined'))
     return false
 
   if (node.type === 'Identifier') {
@@ -872,7 +911,7 @@ function leaks(node: t.Node, constants: Scope, seen = new Set<readonly t.Node[]>
     return leaking
   }
 
-  if (node.type === 'MemberExpression' || node.type === 'OptionalMemberExpression' || node.type === 'CallExpression' || node.type === 'OptionalCallExpression')
+  if (node.type === 'MemberExpression' || node.type === 'ChainExpression' || node.type === 'CallExpression')
     return readsRequest(node, constants, new Set())
 
   return true
@@ -886,8 +925,10 @@ export function openRedirects(fence: ParsedFence): Diagnostic[] {
   const diagnostics: Diagnostic[] = []
   const { root, scopes } = scopesOf(fence)
 
-  eachScoped(fence.ast.program, root, scopes, (node, constants) => {
-    if (node.type !== 'CallExpression' || !node.arguments[0] || node.arguments[0].type === 'SpreadElement')
+  const optional = optionalParts()
+
+  eachScoped(fence.ast, root, scopes, (node, constants, parent) => {
+    if (optional(node, parent) || node.type !== 'CallExpression' || !node.arguments[0] || node.arguments[0].type === 'SpreadElement')
       return
 
     const callee = node.callee
@@ -918,7 +959,7 @@ export function moduleChecks(source: string, browser = false): Diagnostic[] {
   const whole = { start: 0, end: source.length }
   const recovered = parseFence(source, whole, [], false)
 
-  // Babel's own recovery keeps every statement for the checks; a module it cannot read, or whose scopes it cannot build, is read again with its broken statements blanked.
+  // A module the parser cannot read in one piece, or whose scopes it cannot build, is read again with its broken statements blanked.
   try {
     if (recovered)
       return checksOf(recovered, browser)

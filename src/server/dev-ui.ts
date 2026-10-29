@@ -1,14 +1,14 @@
-import type * as t from '@babel/types'
+import type { Comment, Node, ObjectExpression, ObjectProperty } from 'oxc-parser'
 import type { KayLibrary } from '../build/libraries'
 import type { UiSource } from '../build/ui'
 import type { StyleInfo } from '../build/ui-info'
 import { existsSync, realpathSync } from 'node:fs'
 import { mkdir } from 'node:fs/promises'
 import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path'
-import { parse } from '@babel/parser'
 import { findKayLibraries } from '../build/libraries'
 import { classesOf, componentFile, componentsNamed, exported, forgetNames, isComponentName, keyOf, UI_FILE, uiOf } from '../build/ui'
 import { appSpecifier, styleInfo, themeTokens, tokensNamedBy } from '../build/ui-info'
+import { parseProgram } from '../compiler/estree'
 import { unwrapped } from '../compiler/object-literal'
 import { isCrossSite } from './actions'
 
@@ -93,14 +93,14 @@ function indentOf(source: string, offset: number): string {
 }
 
 // The offset just past the comma closing `from`, looking through whitespace and comments up to `limit`, or undefined without one.
-function commaAfter(source: string, from: number, limit: number, comments: readonly t.Comment[]): number | undefined {
+function commaAfter(source: string, from: number, limit: number, comments: readonly Comment[]): number | undefined {
   let at = from
 
   while (at < limit) {
     const comment = comments.find(c => c.start === at)
 
     if (comment !== undefined)
-      at = comment.end!
+      at = comment.end
     else if (source[at] === ',')
       return at + 1
     else if (source[at]!.trim() === '')
@@ -113,67 +113,67 @@ function commaAfter(source: string, from: number, limit: number, comments: reado
 }
 
 // Adds `property` as the last one of an object literal, in the indentation of the others.
-function appendProperty(source: string, object: t.ObjectExpression, property: string, comments: readonly t.Comment[]): Edit {
+function appendProperty(source: string, object: ObjectExpression, property: string, comments: readonly Comment[]): Edit {
   const last = object.properties.at(-1)
-  const start = object.start!
-  const inline = !source.slice(start, object.end!).includes('\n')
+  const start = object.start
+  const inline = !source.slice(start, object.end).includes('\n')
 
   if (last === undefined && inline) {
     // A block comment in the braces stays, the property goes after it.
-    const kept = source.slice(start + 1, object.end! - 1).trim()
+    const kept = source.slice(start + 1, object.end - 1).trim()
     const lead = kept === '' ? '' : `${kept} `
 
-    return { at: start, remove: object.end! - start, text: `{ ${lead}${property} }` }
+    return { at: start, remove: object.end - start, text: `{ ${lead}${property} }` }
   }
 
   if (last === undefined) {
-    const kept = source.slice(start + 1, object.end! - 1).trimEnd()
+    const kept = source.slice(start + 1, object.end - 1).trimEnd()
 
     // A comment inside the braces stays, the property goes below it.
     if (kept.trim() !== '')
       return { at: start + 1 + kept.length, remove: 0, text: `\n${indentOf(source, start)}  ${property},` }
 
-    return { at: start, remove: object.end! - start, text: `{\n${indentOf(source, start)}  ${property},\n${indentOf(source, start)}}` }
+    return { at: start, remove: object.end - start, text: `{\n${indentOf(source, start)}  ${property},\n${indentOf(source, start)}}` }
   }
 
-  const indent = indentOf(source, object.properties[0]!.start!)
-  const commaEnd = commaAfter(source, last.end!, object.end! - 1, comments)
-  const trailing = commaEnd === undefined ? null : commaEnd - last.end!
+  const indent = indentOf(source, object.properties[0]!.start)
+  const commaEnd = commaAfter(source, last.end, object.end - 1, comments)
+  const trailing = commaEnd === undefined ? null : commaEnd - last.end
 
   if (inline)
-    return trailing === null ? { at: last.end!, remove: 0, text: `, ${property}` } : { at: last.end! + trailing, remove: 0, text: ` ${property},` }
+    return trailing === null ? { at: last.end, remove: 0, text: `, ${property}` } : { at: last.end + trailing, remove: 0, text: ` ${property},` }
 
-  const tail = source.slice(last.end!, object.end! - 1).trimEnd()
+  const tail = source.slice(last.end, object.end - 1).trimEnd()
   const comment = trailing === null ? tail !== '' : `${tail.slice(0, trailing - 1)}${tail.slice(trailing)}`.trim() !== ''
 
   // Comments after the last property stay where they are, the new one goes below them.
   if (comment)
-    return trailing === null ? { at: last.end!, remove: tail.length, text: `,${tail}\n${indent}${property}` } : { at: last.end! + tail.length, remove: 0, text: `\n${indent}${property},` }
+    return trailing === null ? { at: last.end, remove: tail.length, text: `,${tail}\n${indent}${property}` } : { at: last.end + tail.length, remove: 0, text: `\n${indent}${property},` }
 
-  return trailing === null ? { at: last.end!, remove: 0, text: `,\n${indent}${property}` } : { at: last.end! + trailing, remove: 0, text: `\n${indent}${property},` }
+  return trailing === null ? { at: last.end, remove: 0, text: `,\n${indent}${property}` } : { at: last.end + trailing, remove: 0, text: `\n${indent}${property},` }
 }
 
-const isLiteral = (node: t.Node) => classesOf(node) !== undefined
+const isLiteral = (node: Node) => classesOf(node) !== undefined
 
 // The edit setting `part`'s classes in the source of `src/ui.ts`; a message when the file holds something it cannot edit in place.
 function editFor(source: string, key: string, part: string, classes: string): Edit | string {
-  let ast: t.File
+  let ast: ReturnType<typeof parseProgram>
 
   try {
-    ast = parse(source, { sourceType: 'module', plugins: ['typescript'] })
+    ast = parseProgram(source)
   }
   catch {
     return 'src/ui.ts does not parse'
   }
 
-  const comments = ast.comments ?? []
-  const root = exported(ast)
+  const { comments } = ast
+  const root = exported(ast.program)
   const object = root === undefined ? undefined : unwrapped(root)
 
   if (object?.type !== 'ObjectExpression')
     return 'src/ui.ts has no `defineUi({ ... })` object to add to'
 
-  const entries = object.properties.filter((property): property is t.ObjectProperty => property.type === 'ObjectProperty')
+  const entries = object.properties.filter((property): property is ObjectProperty => property.type === 'Property')
   const quoted = literal(classes)
   const partText = `${keyText(part)}: ${quoted}`
   const entry = entries.find(property => keyOf(property) === key)
@@ -186,7 +186,7 @@ function editFor(source: string, key: string, part: string, classes: string): Ed
   if (value.type !== 'ObjectExpression')
     return `the entry of ${key} is not an object literal`
 
-  const parts = value.properties.find((property): property is t.ObjectProperty => property.type === 'ObjectProperty' && keyOf(property) === 'parts')
+  const parts = value.properties.find((property): property is ObjectProperty => property.type === 'Property' && keyOf(property) === 'parts')
 
   if (parts === undefined)
     return appendProperty(source, value, `parts: { ${partText} }`, comments)
@@ -194,19 +194,19 @@ function editFor(source: string, key: string, part: string, classes: string): Ed
   const body = unwrapped(parts.value)
 
   if (isLiteral(body))
-    return part === 'root' ? { at: body.start!, remove: body.end! - body.start!, text: quoted } : { at: body.start!, remove: body.end! - body.start!, text: `{ root: ${source.slice(body.start!, body.end!)}, ${partText} }` }
+    return part === 'root' ? { at: body.start, remove: body.end - body.start, text: quoted } : { at: body.start, remove: body.end - body.start, text: `{ root: ${source.slice(body.start, body.end)}, ${partText} }` }
 
   if (body.type !== 'ObjectExpression')
     return `the parts of ${key} are not an object literal`
 
-  const existing = body.properties.find((property): property is t.ObjectProperty => property.type === 'ObjectProperty' && keyOf(property) === part)
+  const existing = body.properties.find((property): property is ObjectProperty => property.type === 'Property' && keyOf(property) === part)
 
   if (existing === undefined)
     return appendProperty(source, body, partText, comments)
 
   const current = unwrapped(existing.value)
 
-  return isLiteral(current) ? { at: current.start!, remove: current.end! - current.start!, text: quoted } : `the ${part} part of ${key} is not a string`
+  return isLiteral(current) ? { at: current.start, remove: current.end - current.start, text: quoted } : `the ${part} part of ${key} is not a string`
 }
 
 // What the Styles tab shows of the component a file holds: its parts with their recipe classes and what `src/ui.ts` sets over them, its variants, and the theme tokens its classes name.
@@ -287,7 +287,7 @@ export async function devUiWrite(root: string, request: Request): Promise<Respon
   const written = source.slice(0, edit.at) + edit.text + source.slice(edit.at + edit.remove)
 
   try {
-    parse(written, { sourceType: 'module', plugins: ['typescript'] })
+    parseProgram(written)
   }
   catch {
     return refused('the edit would leave src/ui.ts unparsable, so it was not written', 422)

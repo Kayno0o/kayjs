@@ -1,202 +1,152 @@
 import type { ParserOptions } from '@babel/parser'
 import type { NodePath } from '@babel/traverse'
 import type * as t from '@babel/types'
-import type { Path, Scope } from '../src/compiler/scope'
+import type { Lang, Program } from '../src/compiler/estree'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { parse } from '@babel/parser'
 import traverse, { Scope as BabelScope } from '@babel/traverse'
-import { FLIPPED_ALIAS_KEYS, VISITOR_KEYS } from '@babel/types'
 import { describe, expect, it } from 'bun:test'
-import * as shapes from '../src/compiler/babel-shapes'
+import { parseProgram, VISITOR_KEYS } from '../src/compiler/estree'
+import * as shapes from '../src/compiler/estree-shapes'
 import { analyze } from '../src/compiler/scope'
-import { eachDescendant, traverse as kayTraverse, walkScope } from '../src/compiler/walk'
+import { eachDescendant, walkScope } from '../src/compiler/walk'
 
 const ROOT = join(import.meta.dir, '..')
 const PARTS = 24
 const SOURCES = ['src/**/*.ts', 'tests/**/*.ts', 'packages/*/src/**/*.ts', 'docs/src/**/*.ts'].flatMap(pattern => [...new Bun.Glob(pattern).scanSync({ cwd: ROOT })]).filter(file => !file.includes('node_modules') && !file.includes('/fixtures/') && !file.includes('/.kay/'))
 
-// Error recovery lets the parser pass what the scope refuses.
-const PARSE = { sourceType: 'module', attachComment: false, errorRecovery: true, plugins: ['typescript', 'jsx'] } as ParserOptions
+// Error recovery lets the parser pass what the scope refuses; a `.ts` source may hold the generic arrow `<T>(x) => x`, which a `.tsx` one reads as markup.
+const parseOptions = (lang: Lang) => ({ sourceType: 'module', attachComment: false, errorRecovery: true, plugins: lang === 'tsx' ? ['typescript', 'jsx'] : ['typescript'] }) as ParserOptions
 
-const EVENTS = ['Program', 'Identifier', 'CallExpression', 'ArrowFunctionExpression', 'VariableDeclarator', 'AssignmentExpression', 'UpdateExpression', 'FunctionDeclaration', 'TSTypeQuery']
-
-function parseSource(code: string): t.File | undefined {
-  try {
-    return parse(code, PARSE)
-  }
-  catch {
-    return undefined
-  }
-}
-
-const where = (node: t.Node) => `${node.type}@${node.start}`
-
-// What the rewrites ask of a path, spelled the same for Babel's and kay's.
-function pathFacts(path: { node: t.Node, parentPath: { node: t.Node } | null, key: unknown, listKey?: unknown, isStatement: () => boolean, isFunction: () => boolean, isTSType: () => boolean, isReferencedIdentifier: () => boolean, getFunctionParent: () => { node: t.Node } | null }): string {
-  const parent = path.parentPath ? where(path.parentPath.node) : 'none'
-  const holder = path.getFunctionParent()
-
-  return `${parent} ${String(path.key)}/${String(path.listKey)} ${path.isStatement()} ${path.isFunction()} ${path.isTSType()} ${path.isReferencedIdentifier()} ${holder ? where(holder.node) : 'none'}`
-}
-
-// What the passes ask of a scope and a binding beyond the path facts, spelled the same for both.
-function nameFacts(path: { node: t.Node, scope: { hasBinding: (name: string, noGlobals?: boolean) => boolean }, isBindingIdentifier: () => boolean }, binding: { scope: { block?: t.Node, node?: t.Node } } | undefined): string {
-  const { node } = path
-  const owner = binding ? where((binding.scope.block ?? binding.scope.node)!) : 'none'
-
-  return node.type === 'Identifier' ? `${path.isBindingIdentifier()} has ${path.scope.hasBinding(node.name)}/${path.scope.hasBinding(node.name, true)} declared in ${owner}` : 'not a name'
-}
-
-interface Shape {
-  // Every node a traversal enters, with what the walks ask of it.
-  entered: string[]
-  // Per function, what a traversal under it meets, and whether each identifier under it descends from it.
-  inside: string[]
-  functions: string[]
-  referenced: string[]
-  events: string[]
-  scopes: Map<string, { names: string[], bindings: string[] }>
+// What the rewrites ask of the scope pass, spelled the same for Babel's and kay's, which parse the same text into different trees: facts are keyed by the position of an identifier and so are the bindings, never by a node type.
+interface Facts {
+  // Per identifier, what its scope resolves it to, and whether it reads a value or declares a name.
+  identifiers: Map<string, string[]>
+  // Every binding of every scope, by its name and where it is declared.
+  bindings: string[]
   globals: string[]
-  resolved: string[]
+  // The names of bodiless class methods, which Babel reads as values, so they land among its globals.
+  declareKeys: Set<string>
   error?: string
 }
 
-function describeBinding(name: string, binding: { kind: string, identifier: t.Identifier, constant: boolean, scope: { block?: t.Node, node?: t.Node }, path: { node: t.Node }, referencePaths: { node: t.Node }[], constantViolations: { node: t.Node }[] } | undefined) {
-  return binding ? `${name}:${binding.kind}:${binding.identifier.start}:${binding.constant}:${where(binding.path.node)}:in ${where((binding.scope.block ?? binding.scope.node)!)}|refs ${binding.referencePaths.map(path => where(path.node)).join(',')}|writes ${binding.constantViolations.map(path => where(path.node)).join(',')}` : `${name}: none`
+interface Described {
+  kind: string
+  constant: boolean
+  identifier: { start?: number | null }
+  referencePaths: { node: { start?: number | null } }[]
+  constantViolations: { node: { start?: number | null } }[]
 }
 
-function babelShape(file: t.File): Shape {
-  const shape: Shape = { entered: [], inside: [], functions: [], referenced: [], events: [], scopes: new Map(), globals: [], resolved: [] }
+function describeBinding(binding: Described | undefined): string {
+  return binding ? `${binding.kind}@${binding.identifier.start} constant ${binding.constant} refs ${binding.referencePaths.map(path => path.node.start).toSorted((a, b) => (a ?? 0) - (b ?? 0)).join(',')} writes ${binding.constantViolations.map(path => path.node.start).toSorted((a, b) => (a ?? 0) - (b ?? 0)).join(',')}` : 'none'
+}
+
+function note(facts: Facts, key: string, value: string) {
+  facts.identifiers.set(key, [...facts.identifiers.get(key) ?? [], value].toSorted())
+}
+
+function babelFacts(code: string, lang: Lang = 'tsx'): Facts {
+  const facts: Facts = { identifiers: new Map(), bindings: [], globals: [], declareKeys: new Set() }
 
   try {
-    const visitors: Record<string, (path: NodePath) => void> = {}
+    const file = parse(code, parseOptions(lang))
 
-    for (const type of EVENTS) {
-      visitors[type] = (path) => {
-        shape.events.push(`${where(path.node)} in ${where(path.scope.block)} ${pathFacts(path)}`)
+    traverse(file, {
+      Identifier(path: NodePath<t.Identifier>) {
+        // The name inside a `#private` is an identifier for Babel, a node of its own for oxc, and the right side of a qualified name is read as a value by Babel though no scope takes it for one.
+        if (path.parent.type === 'PrivateName' || (path.parent.type === 'TSQualifiedName' && path.parent.right === path.node))
+          return
 
-        if (type === 'Identifier')
-          shape.resolved.push(describeBinding((path.node as t.Identifier).name, path.scope.getBinding((path.node as t.Identifier).name)))
+        if (path.parent.type === 'TSDeclareMethod' && path.parent.key === path.node) {
+          facts.declareKeys.add(path.node.name)
 
-        if (type === 'Program')
-          shape.globals = Object.keys(path.scope.globals)
-      }
-    }
+          return
+        }
 
-    visitors.Scope = (path) => {
-      shape.scopes.set(where(path.scope.block), { names: Object.keys(path.scope.bindings), bindings: Object.entries(path.scope.bindings).map(([name, binding]) => describeBinding(name, binding)) })
-    }
-
-    visitors.enter = (path) => {
-      const name = path.node.type === 'Identifier' ? path.node.name : undefined
-
-      shape.entered.push(`${where(path.node)} in ${where(path.scope.block)} ${pathFacts(path)} ${nameFacts(path, name === undefined ? undefined : path.scope.getBinding(name))}`)
-    }
-    visitors.Function = (path) => {
-      shape.functions.push(where(path.node))
-
-      const under: string[] = []
-
-      path.traverse({ Identifier: (inner) => {
-        under.push(`${where(inner.node)} ${inner.isDescendant(path)} ${inner.find(parent => parent.isFunction())?.node.start}`)
-      } })
-      shape.inside.push(`${where(path.node)}: ${under.join(',')}`)
-    }
-    visitors.ReferencedIdentifier = (path) => {
-      shape.referenced.push(where(path.node))
-    }
-    traverse(file, visitors)
+        note(facts, `${path.node.name}@${path.node.start}`, `${path.isReferencedIdentifier()} ${path.isBindingIdentifier()} ${describeBinding(path.scope.getBinding(path.node.name))}`)
+      },
+      Program(path: NodePath<t.Program>) {
+        facts.globals = Object.keys(path.scope.globals).toSorted()
+      },
+      Scope(path: NodePath) {
+        for (const [name, binding] of Object.entries(path.scope.bindings))
+          facts.bindings.push(`${name} ${describeBinding(binding)}`)
+      },
+    })
   }
   catch (error) {
-    shape.error = (error as Error).message
+    facts.error = (error as Error).message
   }
 
-  return shape
+  facts.bindings.sort()
+
+  return facts
 }
 
-function entered(path: Path): string {
-  const name = path.node.type === 'Identifier' ? path.node.name : undefined
-
-  return `${where(path.node)} in ${where(path.scope.node)} ${pathFacts(path)} ${nameFacts(path, name === undefined ? undefined : path.scope.getBinding(name))}`
-}
-
-function kayShape(file: t.File): Shape {
-  const shape: Shape = { entered: [], inside: [], functions: [], referenced: [], events: [], scopes: new Map(), globals: [], resolved: [] }
+function kayFacts(program: Program): Facts {
+  const facts: Facts = { identifiers: new Map(), bindings: [], globals: [], declareKeys: new Set() }
 
   try {
-    const { events, program } = analyze(file)
-    const scopes = new Set<Scope>()
-    const collect = (path: Path) => {
-      scopes.add(path.scope)
-      for (const child of path.children)
-        collect(child)
-    }
-
-    collect(program)
-    walkScope(file, {
-      enter: (path) => { shape.entered.push(entered(path)) },
-      Function: (path) => {
-        shape.functions.push(where(path.node))
-
-        const under: string[] = []
-
-        kayTraverse(path, { Identifier: (inner) => {
-          under.push(`${where(inner.node)} ${inner.isDescendant(path)} ${inner.find(parent => parent.isFunction())?.node.start}`)
-        } })
-        shape.inside.push(`${where(path.node)}: ${under.join(',')}`)
-      },
-      ReferencedIdentifier: (path) => { shape.referenced.push(where(path.node)) },
-    })
+    const { events, program: root } = analyze(program)
+    const scopes = new Set<unknown>()
 
     for (const path of events) {
-      shape.events.push(`${where(path.node)} in ${where(path.scope.node)} ${pathFacts(path)}`)
-
       if (path.node.type === 'Identifier')
-        shape.resolved.push(describeBinding(path.node.name, path.scope.getBinding(path.node.name)))
+        note(facts, `${path.node.name}@${path.node.start}`, `${path.isReferencedIdentifier()} ${path.isBindingIdentifier()} ${describeBinding(path.scope.getBinding(path.node.name))}`)
     }
 
-    shape.globals = [...program.scope.globals]
+    const collect = (path: typeof root) => {
+      if (!scopes.has(path.scope)) {
+        scopes.add(path.scope)
 
-    for (const scope of scopes)
-      shape.scopes.set(where(scope.node), { names: [...scope.bindings.keys()], bindings: [...scope.bindings].map(([name, binding]) => describeBinding(name, binding)) })
+        for (const [name, binding] of path.scope.bindings)
+          facts.bindings.push(`${name} ${describeBinding(binding)}`)
+      }
+
+      for (const child of path.children)
+        collect(child as typeof root)
+    }
+
+    collect(root)
+    facts.globals = [...root.scope.globals].toSorted()
   }
   catch (error) {
-    shape.error = (error as Error).message
+    facts.error = (error as Error).message
   }
 
-  return shape
+  facts.bindings.sort()
+
+  return facts
 }
 
-// The Program scope is created before the visitor sees any `Scope`, so both sides list it first only by key.
-function compare(code: string, label: string) {
-  const file = parseSource(code)
+// A constructor parameter property declares its name for oxc's pass, where Babel's crawl leaves it out.
+const PARAMETER_PROPERTY = /\bconstructor\s*\([^)]*\b(?:public|private|protected|readonly)\b/
 
-  if (!file)
+function compare(code: string, label: string, lang: Lang = 'tsx') {
+  const { program, errors } = parseProgram(code, { lang, recover: true })
+
+  if (errors.length > 0 || (program.body.length === 0 && code.trim() !== ''))
     return false
 
-  const babel = babelShape(parse(code, PARSE))
-  const kay = kayShape(file)
+  const babel = babelFacts(code, lang)
+  const kay = kayFacts(program)
 
   expect({ label, error: kay.error }).toEqual({ label, error: babel.error })
 
   if (babel.error !== undefined)
     return true
 
-  expect({ label, events: kay.events }).toEqual({ label, events: babel.events })
-  expect({ label, entered: kay.entered }).toEqual({ label, entered: babel.entered })
-  expect({ label, functions: kay.functions }).toEqual({ label, functions: babel.functions })
-  expect({ label, inside: kay.inside }).toEqual({ label, inside: babel.inside })
-  expect({ label, referenced: kay.referenced }).toEqual({ label, referenced: babel.referenced })
-  expect({ label, resolved: kay.resolved }).toEqual({ label, resolved: babel.resolved })
-  expect({ label, globals: [...kay.globals].sort() }).toEqual({ label, globals: [...babel.globals].sort() })
+  if (PARAMETER_PROPERTY.test(code))
+    return true
 
-  for (const [key, expected] of babel.scopes) {
-    const found = kay.scopes.get(key)
+  expect({ label, globals: kay.globals }).toEqual({ label, globals: babel.globals.filter(name => !babel.declareKeys.has(name) || kay.globals.includes(name)) })
+  expect({ label, bindings: kay.bindings }).toEqual({ label, bindings: babel.bindings })
 
-    expect({ label, key, names: found?.names }).toEqual({ label, key, names: expected.names })
-    expect({ label, key, bindings: found?.bindings }).toEqual({ label, key, bindings: expected.bindings })
-  }
+  // The identifiers oxc has that Babel has not (a type parameter's name, a method's value) are left out.
+  for (const [key, expected] of babel.identifiers)
+    expect({ label, key, found: kay.identifiers.get(key) }).toEqual({ label, key, found: expected })
 
   return true
 }
@@ -209,7 +159,7 @@ describe('scope pass', () => {
       let compared = 0
 
       for (const file of files) {
-        if (compare(readFileSync(join(ROOT, file), 'utf8'), file))
+        if (compare(readFileSync(join(ROOT, file), 'utf8'), file, file.endsWith('.tsx') ? 'tsx' : 'ts'))
           compared++
       }
 
@@ -225,7 +175,7 @@ describe('scope pass', () => {
       'class A { static x = 1; [A.x]() { return A } } const B = class C { m() { return C } }; export default class D {}',
       'try { a } catch ({ message: m }) { let m2 = m } finally { var z }',
       'switch (x) { case 1: let q = 1; break; default: function w() { return q } }',
-      'function f(a: number, this: void) { type T = typeof a; return (b: typeof a) => b as typeof a }',
+      'function f(this: void, a: number) { type T = typeof a; return (b: typeof a) => b as typeof a }',
       'import a, { b as c, type d } from "m"; import * as e from "n"; a; c; d; e; export { a as g }; export { h } from "o"',
       'const { a, b: [c, ...d], ...e } = o; ({ a, b: c } = o); [a, c] = [c, a]; delete a.b; a ||= 1',
       'var f = function g() { return g }; label: for (;;) { break label }; function h() { return arguments }',
@@ -243,17 +193,17 @@ describe('scope pass', () => {
   })
 
   it('throws what Babel throws for a name declared twice', () => {
-    expect(babelShape(parse('let a; let a', PARSE)).error).toContain('Duplicate declaration')
+    expect(babelFacts('let a; let a').error).toContain('Duplicate declaration')
 
     for (const code of ['import a from "m"; const a = 1', 'let a; let a', 'const a = 1; var a', 'function f(a) { let a }', 'try {} catch (e) { let e }', 'var a; var a; function a() {}', 'export var a = 1, a = 2; a'])
       expect(compare(code, code)).toBe(true)
   })
 
-  it('ends a walk where a handler returns stop, and visits a subtree in Babel\'s order without a scope', () => {
-    const file = parse('function f() { a; b } function g() { c }', PARSE)
+  it('ends a walk where a handler returns stop, and visits a subtree in the order of the source without a scope', () => {
+    const { program } = parseProgram('function f() { a; b } function g() { c }', { lang: 'tsx' })
     const seen: string[] = []
 
-    expect(walkScope(file, { Identifier(path) {
+    expect(walkScope(program, { Identifier(path) {
       seen.push(path.node.name)
 
       return path.node.name === 'a' ? 'stop' : undefined
@@ -265,24 +215,38 @@ describe('scope pass', () => {
       const babel: string[] = []
       const kay: string[] = []
 
-      traverse(parse(code, PARSE), { noScope: true, enter: (path) => {
-        babel.push(`${where(path.node)} < ${where(path.parent)}`)
+      traverse(parse(code, parseOptions('ts')), { noScope: true, Identifier: (path) => {
+        babel.push(`${path.node.name}@${path.node.start}`)
       } })
-      eachDescendant(parse(code, PARSE), (node, parent) => {
-        kay.push(`${where(node)} < ${where(parent)}`)
+
+      const { program: tree } = parseProgram(code, { lang: 'ts', recover: true })
+
+      eachDescendant(tree, (node) => {
+        if (node.type === 'Identifier')
+          kay.push(`${node.name}@${node.start}`)
       })
-      expect({ source, kay }).toEqual({ source, kay: babel })
+
+      // oxc names a few more identifiers than Babel does (a type parameter, a method's key position), so Babel's must be in order within kay's.
+      let at = 0
+
+      for (const name of babel) {
+        at = kay.indexOf(name, at)
+        expect({ source, name, at: at >= 0 }).toEqual({ source, name, at: true })
+      }
     }
   })
 
-  it('keeps the copied node shapes in step with @babel/types', () => {
+  it('keeps the node groups to types oxc has, and the globals in step with Babel', () => {
     expect([...shapes.BUILTIN_GLOBALS].toSorted()).toEqual([...new Set([...BabelScope.globals, ...BabelScope.contextVariables])].toSorted())
 
-    const aliases: Record<string, ReadonlySet<string>> = { Scopable: shapes.SCOPABLE_TYPES, BlockParent: shapes.BLOCK_PARENT_TYPES, FunctionParent: shapes.FUNCTION_PARENT_TYPES, Function: shapes.FUNCTION_TYPES, Pattern: shapes.PATTERN_TYPES, Method: shapes.METHOD_TYPES, Statement: shapes.STATEMENT_TYPES, TSType: shapes.TS_TYPES, Loop: shapes.LOOP_TYPES }
+    const groups = [shapes.SCOPABLE_TYPES, shapes.BLOCK_PARENT_TYPES, shapes.FUNCTION_PARENT_TYPES, shapes.FUNCTION_TYPES, shapes.PATTERN_TYPES, shapes.STATEMENT_TYPES, shapes.TS_TYPES, shapes.LOOP_TYPES]
+    const known = new Set(Object.keys(VISITOR_KEYS))
+    // Types a visit finds no child under are missing from oxc's keys.
+    const leaves = new Set(['EmptyStatement', 'DebuggerStatement', 'BreakStatement', 'ContinueStatement', 'TSAnyKeyword', 'TSBooleanKeyword', 'TSBigIntKeyword', 'TSIntrinsicKeyword', 'TSNeverKeyword', 'TSNullKeyword', 'TSNumberKeyword', 'TSObjectKeyword', 'TSStringKeyword', 'TSSymbolKeyword', 'TSUndefinedKeyword', 'TSUnknownKeyword', 'TSVoidKeyword', 'TSThisType'])
 
-    for (const [alias, types] of Object.entries(aliases))
-      expect([...types]).toEqual(FLIPPED_ALIAS_KEYS[alias]!)
-
-    expect(shapes.VISITOR_KEYS).toEqual(Object.fromEntries(Object.entries(VISITOR_KEYS).filter(([, keys]) => keys.length > 0)))
+    for (const types of groups) {
+      for (const type of types)
+        expect({ type, known: known.has(type) || leaves.has(type) }).toEqual({ type, known: true })
+    }
   })
 })

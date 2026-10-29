@@ -1,7 +1,7 @@
-import type * as t from '@babel/types'
 import type { Attribute, KayFile, Node, Span } from './ast'
-import { parseExpression } from '@babel/parser'
+import type { Node as EstreeNode, Expression } from './estree'
 import { childBlocks, nodeExpressions, visitNodes } from './ast'
+import { parseExpression } from './estree'
 import { parsedBindingNames } from './pattern-names'
 import { codeOf, KAY_NAME } from './script'
 
@@ -37,19 +37,20 @@ export function binders(node: Node): Span[] {
 // Every name a function inside the expression takes as a parameter, or a declaration or catch inside it binds, which shadows a value of kay there; none when the expression does not parse.
 function parameters(code: string): Set<string> | undefined {
   const names = new Set<string>()
-  let expression: t.Expression
+  let expression: Expression
 
   try {
-    expression = parseExpression(code, { plugins: ['typescript'] })
+    expression = parseExpression(code, { lang: 'ts' })
   }
   catch {
     return undefined
   }
 
-  const walk = (value: unknown, inParameters: boolean): void => {
+  // `plain` marks the function of a method, getter or setter, whose parameters Babel's tree left out as it had no function node there.
+  const walk = (value: unknown, inParameters: boolean, plain = false): void => {
     if (Array.isArray(value)) {
       for (const child of value)
-        walk(child, inParameters)
+        walk(child, inParameters, plain)
 
       return
     }
@@ -57,13 +58,15 @@ function parameters(code: string): Set<string> | undefined {
     if (typeof value !== 'object' || value === null || typeof (value as { type?: unknown }).type !== 'string')
       return
 
-    const node = value as t.Node
+    const node = value as EstreeNode
 
     if (inParameters && node.type === 'Identifier')
       names.add(node.name)
 
+    const method = (node.type === 'Property' && (node.method || node.kind !== 'init')) || node.type === 'MethodDefinition'
+
     for (const [key, child] of Object.entries(node))
-      walk(child, inParameters || ((node.type === 'ArrowFunctionExpression' || node.type === 'FunctionExpression') && key === 'params') || (node.type === 'VariableDeclarator' && key === 'id') || (node.type === 'CatchClause' && key === 'param'))
+      walk(child, inParameters || (!plain && (node.type === 'ArrowFunctionExpression' || node.type === 'FunctionExpression') && key === 'params') || (node.type === 'VariableDeclarator' && key === 'id') || (node.type === 'CatchClause' && key === 'param'), method && key === 'value')
   }
 
   walk(expression, false)

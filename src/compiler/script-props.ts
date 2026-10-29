@@ -1,21 +1,25 @@
-import type * as t from '@babel/types'
+import type { Node, Program, Statement, TSType } from 'oxc-parser'
 import type { Diagnostic, Span } from './ast'
-import type { PropsDeclaration, ScriptAnalysis } from './script-shared'
+import type { NodeOfType } from './estree'
+import type { ParsedFence, PropsDeclaration, ScriptAnalysis } from './script-shared'
 import { eachNode } from './each-node'
-import { BINDABLE_TYPE, keyName, REMOVED_PROP_TYPES, typeDeclaration } from './script-shared'
+import { BINDABLE_TYPE, importedName, keyName, REMOVED_PROP_TYPES, typeDeclaration } from './script-shared'
 
-export function withLeadingComments(statement: t.Statement, shift: (node: t.Node | t.Comment) => Span): Span {
-  const span = shift(statement)
-  const first = statement.leadingComments?.[0]
+type CallExpression = NodeOfType<'CallExpression'>
 
-  return first ? { start: shift(first).start, end: span.end } : span
+// The statement's span, from the first comment written between it and the statement before it, which ends at `previousEnd`.
+export function withLeadingComments(statement: Statement, previousEnd: number, fence: Pick<ParsedFence, 'comments' | 'shift'>): Span {
+  const span = fence.shift(statement)
+  const first = fence.comments.find(comment => comment.start >= previousEnd && comment.end <= statement.start)
+
+  return first ? { start: fence.shift(first).start, end: span.end } : span
 }
 
-function isPropsCall(node: t.Node | null | undefined): node is t.CallExpression {
+function isPropsCall(node: Node | null | undefined): node is CallExpression {
   return node?.type === 'CallExpression' && node.callee.type === 'Identifier' && node.callee.name === 'props'
 }
 
-export function propsDeclaration(statement: t.Statement, body: t.Statement[], shift: (node: t.Node) => Span, diagnostics: Diagnostic[]): PropsDeclaration | undefined {
+export function propsDeclaration(statement: Statement, body: Statement[], shift: (node: Span) => Span, diagnostics: Diagnostic[]): PropsDeclaration | undefined {
   if (statement.type !== 'VariableDeclaration' || statement.declarations.length !== 1)
     return undefined
 
@@ -24,7 +28,7 @@ export function propsDeclaration(statement: t.Statement, body: t.Statement[], sh
   if (!isPropsCall(declarator.init))
     return undefined
 
-  const typeArgument = declarator.init.typeParameters?.params[0]
+  const typeArgument = declarator.init.typeArguments?.params[0]
   const bindable = bindableProps(typeArgument, body)
 
   reportSignalProps(typeArgument, body, shift, diagnostics)
@@ -78,7 +82,7 @@ export function propsDeclaration(statement: t.Statement, body: t.Statement[], sh
   return declaration
 }
 
-function kayImports(body: t.Statement[], wanted: Set<string>): Map<string, string> {
+function kayImports(body: Statement[], wanted: Set<string>): Map<string, string> {
   const local = new Map<string, string>()
 
   for (const statement of body) {
@@ -93,8 +97,7 @@ function kayImports(body: t.Statement[], wanted: Set<string>): Map<string, strin
         continue
       }
 
-      const imported = specifier.type === 'ImportSpecifier' ? specifier.imported : undefined
-      const name = imported?.type === 'Identifier' ? imported.name : imported?.value
+      const name = specifier.type === 'ImportSpecifier' ? importedName(specifier) : undefined
 
       if (name !== undefined && wanted.has(name))
         local.set(specifier.local.name, name)
@@ -104,11 +107,11 @@ function kayImports(body: t.Statement[], wanted: Set<string>): Map<string, strin
   return local
 }
 
-interface PropType { key: string, options: (t.TSType | undefined)[] }
+interface PropType { key: string, options: (TSType | undefined)[] }
 
 // The props of a props type, written inline or through an interface or a type alias of the script, each with the types it is written as (a union split into its members).
-function propTypes(type: t.TSType | undefined, body: t.Statement[]): PropType[] {
-  const named = type?.type === 'TSTypeReference' && type.typeName.type === 'Identifier' && !type.typeParameters ? type.typeName.name : undefined
+function propTypes(type: TSType | undefined, body: Statement[]): PropType[] {
+  const named = type?.type === 'TSTypeReference' && type.typeName.type === 'Identifier' && !type.typeArguments ? type.typeName.name : undefined
   const declared = named === undefined ? undefined : body.map(typeDeclaration).find(declaration => declaration?.id.name === named)
   const literal = declared?.type === 'TSTypeAliasDeclaration' ? declared.typeAnnotation : type
   const literalMembers = literal?.type === 'TSTypeLiteral' ? literal.members : []
@@ -130,7 +133,7 @@ function propTypes(type: t.TSType | undefined, body: t.Statement[]): PropType[] 
 }
 
 // The `kay` name a type reference writes, as `Signal` or as `kay.Signal` through a namespace import.
-function kayName(option: t.TSType | undefined, names: Map<string, string>): string | undefined {
+function kayName(option: TSType | undefined, names: Map<string, string>): string | undefined {
   if (option?.type !== 'TSTypeReference')
     return undefined
 
@@ -139,18 +142,18 @@ function kayName(option: t.TSType | undefined, names: Map<string, string>): stri
   if (typeName.type === 'Identifier')
     return names.get(typeName.name)
 
-  return typeName.left.type === 'Identifier' ? names.get(`${typeName.left.name}.${typeName.right.name}`) : undefined
+  return typeName.type === 'TSQualifiedName' && typeName.left.type === 'Identifier' ? names.get(`${typeName.left.name}.${typeName.right.name}`) : undefined
 }
 
 // The props a props type writes as `Bindable<T>` from `kay`: read as values, and written by assigning. `Bindable<T> | undefined` is as bindable as `Bindable<T>`.
-function bindableProps(type: t.TSType | undefined, body: t.Statement[]): Set<string> {
+function bindableProps(type: TSType | undefined, body: Statement[]): Set<string> {
   const names = kayImports(body, new Set([BINDABLE_TYPE]))
 
   return new Set(propTypes(type, body).filter(({ options }) => options.some(option => kayName(option, names) !== undefined)).map(({ key }) => key))
 }
 
 // A prop typed `Signal<T>` or `Memo<T>` of `kay` is a plain value since 1.74, so it compiles and silently stops working as a getter.
-function reportSignalProps(type: t.TSType | undefined, body: t.Statement[], shift: (node: t.Node) => Span, diagnostics: Diagnostic[]) {
+function reportSignalProps(type: TSType | undefined, body: Statement[], shift: (node: Span) => Span, diagnostics: Diagnostic[]) {
   const names = kayImports(body, REMOVED_PROP_TYPES)
 
   if (names.size === 0)
@@ -172,10 +175,10 @@ function reportSignalProps(type: t.TSType | undefined, body: t.Statement[], shif
   }
 }
 
-export function reportMisplacedProps(ast: t.File, analysis: ScriptAnalysis, shift: (node: t.Node) => Span) {
+export function reportMisplacedProps(ast: Program, analysis: ScriptAnalysis, shift: (node: Span) => Span) {
   const declared = analysis.props?.statement
 
-  eachNode(ast.program, (node) => {
+  eachNode(ast, (node) => {
     if (!isPropsCall(node))
       return
 
