@@ -17,6 +17,7 @@ const PACKAGE_DIR = /node_modules\/((?:@[^/]+\/)?[^/]+)/
 const NAMED_IMPORTS = /\{([^}]*)\}/
 const NAMESPACE_IMPORT = /\*\s*as\s+(\w+)/
 const DEFAULT_IMPORT = /^\s*([\w$]+)\s*(?:,|$)/
+const ESCAPED = /[.*+?^${}()|[\]\\]/g
 const AS_NAME = /\s+as\s+/
 
 const HELP = 'move what the island needs of it, a constant or a type, to a module importing no server code, or pass it as a prop'
@@ -73,7 +74,7 @@ function probesOf(seed: string, source: string, edges: ImportEdge[], stubbed: (f
 
 // The module standing in for an import: it re-exports the names the file imports from `request`, as the build keeps only what an import uses of a package claiming no side effects, a type-only name left out.
 function standIn(text: string, request: string): string {
-  const pattern = new RegExp(String.raw`\bimport\s+(type\s+)?([^'"]*?)\s*from\s*(['"])${request.replace(/[.*+?^${}()|[\]\\]/g, String.raw`\// The metafile inputs`)}\3`, 'g')
+  const pattern = new RegExp(String.raw`\bimport\s+(type\s+)?([^'"]*?)\s*from\s*(['"])${request.replace(ESCAPED, match => `\\${match}`)}\3`, 'g')
   const lines: string[] = []
 
   for (const [, typeOnly, clause] of text.matchAll(pattern)) {

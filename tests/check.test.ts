@@ -820,6 +820,7 @@ describe.concurrent('kay check, edge cases', () => {
         expect(diagnostics.map(d => d.at)).toEqual(['src/components/counter.kay:3'])
         expect(diagnostics[0]!.message).toContain('src/components/counter.kay -> pure -> async_hooks')
         expect(await found({ ...pure, 'src/components/counter.kay': island('import { PURE } from \'pure\'', 'const x = PURE\n') })).toEqual([])
+        expect((await found({ ...Object.fromEntries(Object.entries(pure).map(([file, text]) => [file.replace('pure', 'pure.lib'), text])), 'src/components/counter.kay': island('import { DB } from \'pure.lib\'', 'const x = DB\n') })).map(d => d.at)).toEqual(['src/components/counter.kay:3'])
         expect(await found({ ...pure, 'src/components/counter.kay': island('import \'pure\'') })).toEqual([])
       })
 
