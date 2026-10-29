@@ -653,6 +653,15 @@ export const LINTS = {
     wrong: 'const store: AuthStore = { users, identities, tokens, ...rest, attempts: memoryAuthStore().attempts }',
     right: 'const store: AuthStore = { users, identities, tokens, ...rest }',
   },
+  'deprecated-config-keys': {
+    level: 'warn',
+    group: 'deprecated',
+    since: '1.84',
+    site: true,
+    summary: 'A config key under the name it had before 1.84, when every directory key came to end in `Dir` and no two keys differed by a letter: `routes` is `routesDir`, `api` is `apiDir`, `content` is `contentConfig`, `storage` is `fileStore`, `maxSizes` is `maxSizeByPath` and `settings` is `librarySettings`. The old names are still read until 1.87. Found in the object `kay.config.ts` exports and in the object literal handed to `pages()` or `testSite()`; the fix renames the key, a shorthand `{ routes }` becoming `{ routesDir: routes }`. A key written beside its new name is reported with no fix, as the old one is ignored there.',
+    wrong: 'export default defineConfig({ api: \'src/endpoints\', storage: diskFiles(\'data/files\') })',
+    right: 'export default defineConfig({ apiDir: \'src/endpoints\', fileStore: diskFiles(\'data/files\') })',
+  },
   'deprecated-auth-methods': {
     level: 'warn',
     group: 'deprecated',

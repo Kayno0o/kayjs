@@ -205,7 +205,7 @@ export function defaultFileStore(): FileStore {
   return defaultStore ??= process.env.NODE_ENV === 'test' ? memoryFiles() : diskFiles()
 }
 
-// `storage` from kay.config.ts, which the server's `files` reads, and the directory where the image route copies a file from a store not on this disk.
+// `fileStore` from kay.config.ts, which the server's `files` reads, and the directory where the image route copies a file from a store not on this disk.
 export function setupStorage(store: FileStore | undefined, cacheDir: string, variantsDir?: string): void {
   current = { store: store ?? defaultFileStore(), cacheDir, variantsDir, exported: false }
 }
@@ -215,7 +215,7 @@ export function linkStoredFiles(store: FileStore | undefined): void {
   current = { store: store ?? defaultFileStore(), cacheDir: undefined, exported: true }
 }
 
-// A script or a test that started no server reads `storage` from the kay.config.ts where it runs; `bun test` keeps files in memory.
+// A script or a test that started no server reads `fileStore` from the kay.config.ts where it runs; `bun test` keeps files in memory.
 async function activeStore(): Promise<FileStore> {
   if (current.store)
     return current.store
@@ -226,7 +226,7 @@ async function activeStore(): Promise<FileStore> {
   if (config !== undefined)
     setupStampSecret(config.secret)
 
-  return current.store ??= config?.storage ?? defaultFileStore()
+  return current.store ??= config?.fileStore ?? defaultFileStore()
 }
 
 // A script that signs a link before it read the config still has `KAY_SECRET`; `secret` in the config is read with the store.
@@ -239,7 +239,7 @@ function readScriptSecret(): void {
   }
 }
 
-// Stores, reads and links the files of the store `storage` in kay.config.ts names: `const key = await files.put(input.avatar)` in an action, then `img(src={files.url(key)})` in a page.
+// Stores, reads and links the files of the store `fileStore` in kay.config.ts names: `const key = await files.put(input.avatar)` in an action, then `img(src={files.url(key)})` in a page.
 export const files = {
   // Stores a file under a new key and gives it back, for the app to save; an image's key holds its size.
   async put(data: Blob, options: PutOptions = {}): Promise<string> {

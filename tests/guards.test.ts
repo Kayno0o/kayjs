@@ -109,7 +109,7 @@ describe('requireGuards', () => {
   })
 
   it('is reported by kay check, route by route, layouts with actions included', async () => {
-    const reported = async (requireGuards: boolean) => (await writeShadowTypes(dir, { routes: 'routes', api: 'api', requireGuards })).problems.filter(found => found.code === 'unguarded-route').map(found => [relative(dir, found.file), found.message])
+    const reported = async (requireGuards: boolean) => (await writeShadowTypes(dir, { routesDir: 'routes', apiDir: 'api', requireGuards })).problems.filter(found => found.code === 'unguarded-route').map(found => [relative(dir, found.file), found.message])
 
     expect(await reported(true)).toEqual([
       ['routes/index.kay', 'No guard covers `/`, so the server refuses it'],

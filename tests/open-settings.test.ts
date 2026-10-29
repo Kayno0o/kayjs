@@ -97,7 +97,7 @@ describe('kay check', () => {
   })
 
   it('reports each one at its line, in a page, a layout, an endpoint and an api module', async () => {
-    const { problems, diagnostics } = await writeShadowTypes(dir, { routes: 'routes', api: 'api' })
+    const { problems, diagnostics } = await writeShadowTypes(dir, { routesDir: 'routes', apiDir: 'api' })
     const reported = [
       ...problems.filter(found => found.message.startsWith('kay reads')).map(found => [relative(dir, found.file), found.line, found.message]),
       ...diagnostics.filter(found => found.message.startsWith('kay reads')).map(found => [found.message]),
@@ -133,7 +133,7 @@ describe('a guards or layouts getter or method', () => {
         Bun.write(`${dir}/api/notes.ts`, 'import { api } from \'kay/server\'\n\nexport default api({\n  get guards() {\n    return false\n  },\n}).get(\'/\', () => [])\n'),
       ])
 
-      const { problems } = await writeShadowTypes(dir, { routes: 'routes', api: 'api' })
+      const { problems } = await writeShadowTypes(dir, { routesDir: 'routes', apiDir: 'api' })
 
       expect(problems.filter(found => found.message.startsWith('kay reads')).map(found => [relative(dir, found.file), found.line, found.message]).toSorted()).toEqual([
         ['api/notes.ts', 4, SETTING('guards')],

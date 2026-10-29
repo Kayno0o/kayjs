@@ -34,18 +34,18 @@ export const CHECK_CONFIG = [
   // The server entry relative to the root, `src/server.ts` by default: the `app` it exports types `ctx.locals` and the app routes links may point at.
   'entry',
   // Page directory relative to the root, so `ctx.params` is typed per route.
-  'routes',
+  'routesDir',
   // The libraries whose routes the app mounts, which links may point at too.
   'extensions',
   // Public file directory relative to the root, whose files links may point at.
   'publicDir',
   // API directory relative to the root, whose modules' GET routes links may point at, and where they are mounted, `/api` by default.
-  'api',
+  'apiDir',
   'apiPath',
   // The app's own modules for its libraries' settings, checked against the defaults they replace.
-  'settings',
+  'librarySettings',
   // The content config relative to the root, whose collections' entries are read against their schemas.
-  'content',
+  'contentConfig',
   // The config's redirects, whose targets on the site must be a page or a public file.
   'redirects',
   // Where the site is mounted, the origin it is public at and how long a stopping server waits, which the server refuses at boot when it cannot read them.

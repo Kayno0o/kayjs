@@ -6,7 +6,7 @@ The options `cms()` takes, from `kay.config.ts`.
 
 ### Mount the screens elsewhere
 
-`prefix` is where the screens live, `/admin` by default; `pageSize` sets the entries a list shows on a page, and the `logo` before the name in the admin's header (an image, `/logo.svg` or an https URL) is set in the cms settings module: `settings: { '@kaynooo/kayjs-cms': './src/cms-settings.ts' }`, default-exporting `{ ...defaults, logo: { src, alt, width?, height? } }`, with `defaults` and `Settings` from `@kaynooo/kayjs-cms`.
+`prefix` is where the screens live, `/admin` by default; `pageSize` sets the entries a list shows on a page, and the `logo` before the name in the admin's header (an image, `/logo.svg` or an https URL) is set in the cms settings module: `librarySettings: { '@kaynooo/kayjs-cms': './src/cms-settings.ts' }`, default-exporting `{ ...defaults, logo: { src, alt, width?, height? } }`, with `defaults` and `Settings` from `@kaynooo/kayjs-cms`.
 
 ```ts
 cms({ prefix: '/studio', pageSize: 25, guard, files })

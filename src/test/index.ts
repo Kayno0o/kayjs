@@ -159,7 +159,7 @@ export async function testSite(options: TestOptions = {}): Promise<TestSite> {
   const loaded = await withConfig(root, options)
   // A site setting none is served where the visits go, so pages reading siteUrl() or siteOrigin() render as in production; files go to memory, fresh for each site, rather than to the store kay.config.ts names, and so do the sessions, jobs, rate counts, presence rooms, vitals and notifications of its `store` (sessions only when it keeps them), its cached and live values staying in the process.
   const mcpKey = options.mcpKey ?? (mcpKeySetting(loaded.mcp) === undefined ? undefined : crypto.randomUUID())
-  const config = { ...loaded, ...mcpKey !== undefined && loaded.mcp !== undefined && loaded.mcp !== false && { mcp: { ...loaded.mcp === true ? {} : loaded.mcp, key: mcpKey } }, site: loaded.site ?? ORIGIN, storage: options.storage ?? memoryFiles(), store: options.store === undefined && loaded.store !== undefined ? { ...loaded.store.sessions && { sessions: memorySessions() }, jobs: memoryJobs(), rates: memoryRates(), rooms: memoryRooms(), vitals: memoryVitals(), notifications: memoryNotifications() } : loaded.store }
+  const config = { ...loaded, ...mcpKey !== undefined && loaded.mcp !== undefined && loaded.mcp !== false && { mcp: { ...loaded.mcp === true ? {} : loaded.mcp, key: mcpKey } }, site: loaded.site ?? ORIGIN, fileStore: options.fileStore ?? options.storage ?? memoryFiles(), store: options.store === undefined && loaded.store !== undefined ? { ...loaded.store.sessions && { sessions: memorySessions() }, jobs: memoryJobs(), rates: memoryRates(), rooms: memoryRooms(), vitals: memoryVitals(), notifications: memoryNotifications() } : loaded.store }
   const project = resolveProject(root, config, { dev: config.dev === true, prebuilt: false, underKayDev: false, devRoutes: config.dev === true })
   const inBrowser = options.browser !== undefined && options.browser !== false
   const proxyKey = options.proxyKey?.trim()
@@ -192,7 +192,7 @@ export async function testSite(options: TestOptions = {}): Promise<TestSite> {
   const locals = options.locals
   const before = [...options.use ?? [], ...locals ? [new Elysia().derive({ as: 'global' }, async ({ request }) => locals(request))] : []]
   const app = before.length === 0 ? pages : before.reduce<AnyElysia>((served, plugin) => served.use(plugin), new Elysia()).use(pages)
-  const { content, release } = await testContent(root, config.content)
+  const { content, release } = await testContent(root, config.contentConfig)
   const base = basePath(config.base)
   let address = nextClient()
 

@@ -769,11 +769,11 @@ describe('kay.config.ts', () => {
   })
 
   it('lets options given in code win over the config, except those given as undefined', async () => {
-    const root = await scratchProject({ 'kay.config.ts': 'export default { routes: \'pages\', lang: \'en\' }\n' })
+    const root = await scratchProject({ 'kay.config.ts': 'export default { routesDir: \'pages\', lang: \'en\' }\n' })
 
-    const config: KayConfig = await withConfig(root, { routes: undefined, lang: 'fr' })
+    const config: KayConfig = await withConfig(root, { routesDir: undefined, lang: 'fr' })
 
-    expect(config).toEqual({ routes: 'pages', lang: 'fr' })
+    expect(config).toEqual({ routesDir: 'pages', lang: 'fr' })
   })
 
   it('keeps the config\'s value for an option pages() is given as undefined', async () => {

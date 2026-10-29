@@ -70,7 +70,7 @@ describe('kay/eslint', () => {
       // Read with the default `src/routes`, the page is no route, and its params are untyped.
       expect(processor.preprocess(source, page)[0]!.text).not.toContain('"id": string')
 
-      await writeShadowTypes(root, { routes: 'pages', lints: { 'unread-name': 'allow' } })
+      await writeShadowTypes(root, { routesDir: 'pages', lints: { 'unread-name': 'allow' } })
 
       expect(processor.preprocess(source, page)[0]!.text).toContain('"id": string')
       // And the lint levels it compiled with.

@@ -216,7 +216,7 @@ async function resolveImport(base: string): Promise<string | undefined> {
 // The content config the project names, `src/content.config.ts` by default, for the config may not load.
 async function contentConfig(root: string): Promise<string> {
   try {
-    return resolve(root, (await loadConfig(root)).content ?? CONTENT_CONFIG)
+    return resolve(root, (await loadConfig(root)).contentConfig ?? CONTENT_CONFIG)
   }
   catch {
     return resolve(root, CONTENT_CONFIG)

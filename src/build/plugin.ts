@@ -33,7 +33,7 @@ export interface KayPluginOptions {
   cacheDir?: string | undefined
   // `false` reads no imported image for the color its box shows until it loads: `images.placeholder`.
   placeholder?: false | undefined
-  // The app's own module for a library's settings, by the library's name, relative to the root: `kay.config.ts`'s `settings`.
+  // The app's own module for a library's settings, by the library's name, relative to the root: `kay.config.ts`'s `librarySettings`.
   settings?: Record<string, string> | undefined
   // A module every component imports, which ties the runtime it uses to the chunk the page loads first: see runtime-chunk.ts.
   anchor?: string | undefined

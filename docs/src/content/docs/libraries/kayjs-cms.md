@@ -805,7 +805,7 @@ Write a page at the screen's path, such as `src/routes/admin/collections/shop/[.
 
 The screens have a chrome of their own, with none of your site's layouts, header or footer around them. It has a skip link, a nav with Content, Missing pages, Media and Unused uploads, and a link back to the site. Every title ends in `Content admin`, which you reword with `cms.admin.brand`.
 
-Give the header a logo in the cms settings: name a module in `kay.config.ts` as `settings: { '@kaynooo/kayjs-cms': './src/cms-settings.ts' }`, and have it default-export `{ ...defaults, logo: { src: '/logo.svg', alt: 'Acme', width: 120, height: 32 } }` (`defaults` and the `Settings` type come from `@kaynooo/kayjs-cms`).
+Give the header a logo in the cms settings: name a module in `kay.config.ts` as `librarySettings: { '@kaynooo/kayjs-cms': './src/cms-settings.ts' }`, and have it default-export `{ ...defaults, logo: { src: '/logo.svg', alt: 'Acme', width: 120, height: 32 } }` (`defaults` and the `Settings` type come from `@kaynooo/kayjs-cms`).
 
 `src` is a file of `public/` or an https URL, shown before the name, and `width`, `height` and `href` are optional (`href` is not used here, as the header links to the admin, and the image is drawn 1.5rem high whatever the size, which only gives its proportions). A `src` that is no path of the site or https URL answers the admin with a 500 naming it.
 

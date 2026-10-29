@@ -89,8 +89,8 @@ export function limitBodies(app: Elysia, size: ByteSize, actionSizes: Map<string
   })
 }
 
-// The limits of every path no action covers, by the path a request is read at: the API modules', the extensions' and the app's `maxSizes`.
-// For one path the app's `maxSizes` wins over the module's own `maxSize`, which wins over an extension's; the answer is the module's (its cors grant included) or else the extension's cross-origin rule, else a plain 413.
+// The limits of every path no action covers, by the path a request is read at: the API modules', the extensions' and the app's `maxSizeByPath`.
+// For one path the app's `maxSizeByPath` wins over the module's own `maxSize`, which wins over an extension's; the answer is the module's (its cors grant included) or else the extension's cross-origin rule, else a plain 413.
 export function mountLimits(modules: Map<string, BodyLimit>, extensions: KayExtension[] | undefined, own: Record<string, ByteSize> | undefined = undefined, servers: unknown[] = []): Map<string, MountLimit> {
   const limits = new Map<string, MountLimit>()
 
@@ -114,7 +114,7 @@ export function mountLimits(modules: Map<string, BodyLimit>, extensions: KayExte
   }
 
   for (const [path, bytes] of Object.entries(own ?? {})) {
-    const key = slashed(path, 'maxSizes in kay.config.ts')
+    const key = slashed(path, 'maxSizeByPath in kay.config.ts')
 
     limits.set(key, { ...limits.get(key), bytes })
   }

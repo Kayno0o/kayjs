@@ -48,8 +48,8 @@ Every option is optional. The tables give each option's default. The full refere
 | Option | Effect |
 | --- | --- |
 | `entry` | The server entry, `src/server.ts` by default. Every command reads it, and `--entry` on a command wins over it. With no file there, kay serves the pages itself |
-| `routes` | The page directory, `src/routes` by default. See [Routing](/essentials/routing) |
-| `api` | The directory of API modules, `src/api` by default. See [API routes](/guides/api-routes) |
+| `routesDir` | The page directory, `src/routes` by default. See [Routing](/essentials/routing) |
+| `apiDir` | The directory of API modules, `src/api` by default. See [API routes](/guides/api-routes) |
 | `publicCache` | How long the browser keeps a public file without asking again, as globs on the served path: `{ '/fonts/**': '365d' }`. `0` revalidates. Fonts it leaves out are kept 30 days, images a day, the rest revalidates. See [Styling and assets](/essentials/styling-and-assets#public-files) |
 | `publicDir` | The directory of files served as they are at their path, `public` by default. See [Styling and assets](/essentials/styling-and-assets#public-files) |
 | `redirects` | Old paths sent to new ones with a 308, a 307 with `permanent: false`, or the 301, 302, 307 or 308 that `status` names. See [Routing](/essentials/routing) |
@@ -68,10 +68,10 @@ Every option is optional. The tables give each option's default. The full refere
 
 | Option | Effect |
 | --- | --- |
-| `content` | The module exporting the collections, `src/content.config.ts` by default. See [Content](/guides/content) |
+| `contentConfig` | The module exporting the collections, `src/content.config.ts` by default. See [Content](/guides/content) |
 | `markdown` | `highlight`, `headingLinks`, `readingSpeed` and `imageSizes` for every collection, which a collection's own option overrides. See [Content](/guides/content) |
 | `preview` | Lets an editor see drafts on the live site, `false` for none. `secret` signs the preview links; left out, a key is made from the app's `secret`. `maxAge` is how long a visitor stays in preview mode, an hour by default |
-| `storage` | Where `files` keeps uploads: `diskFiles()` by default, or `s3Files()`. See [File storage](/guides/file-storage) |
+| `fileStore` | Where `files` keeps uploads: `diskFiles()` by default, or `s3Files()`. See [File storage](/guides/file-storage) |
 | `store` | Where sessions, cached values, live values, jobs, schedule locks, rate limit counts, presence members, Web Vitals and notifications live for everything naming no store of its own: `sqliteData('data/app.sqlite')`, `pgData(db)` on Postgres (kayjs-auth keeps its users in the database a `sqliteData(path)` or `pgData(url)` names, as `AppStore.database`), or `{ sessions, cache, live, jobs, rates, rooms, vitals, notifications }` of your own. Kay's rate limits (actions, API routes, `rateLimit()`, proof of work and kay's own routes) and kayjs-auth's count in memory while their store fails, and for ten seconds after one takes over eight seconds to answer. See [Background jobs](/guides/background-jobs) |
 | `i18n` | `locales`, `defaultLocale`, and optionally `prefixDefault` or per-locale `domains`, and `paths` translating a page's path per locale, and `messages`, the folder of the message files (`src/messages` by default). See [Internationalization](/guides/i18n) |
 
@@ -88,7 +88,7 @@ Every option is optional. The tables give each option's default. The full refere
 | `timeZone` | The IANA time zone dates are written in, `Europe/Paris`: `formatDate`, a message's date and the relative time tooltip, on the server and in islands, unless a call names its own. The server's and the visitor's zone by default. See [Internationalization](/guides/i18n#sizes-durations-and-the-time-zone) |
 | `typography` | `false` leaves the spaces of a French page, the ones before `: ; ! ?` and inside `« »`, as they were typed. On by default for a page whose `lang` is `fr` or `fr-...`, islands included. See [Internationalization](/guides/i18n#french-typography) |
 | `minify` | Minifies the browser build. On for `kay build`, off for `kay dev` unless set to `true` |
-| `settings` | A module for a kay library's settings, such as `{ '@kaynooo/kayjs-ui': './src/ui-settings.ts' }`. See [kayjs-ui](/libraries/kayjs-ui) |
+| `librarySettings` | A module for a kay library's settings, such as `{ '@kaynooo/kayjs-ui': './src/ui-settings.ts' }`. See [kayjs-ui](/libraries/kayjs-ui) |
 | `lints` | The level of each lint. See [Checks](/reference/checks) |
 
 ## Server
@@ -103,7 +103,7 @@ Every option is optional. The tables give each option's default. The full refere
 | `health` | The route a load balancer polls, `/_kay/health` by default. `{ path, check, timeout }` renames it and fails it with 503 when `check` returns false, throws or takes longer than `timeout` (5 seconds by default). `false` serves none |
 | `log` | One line per request, and kay's own messages. On in production as text; `'json'` writes one JSON object each, a function receives each `LogEntry`, and `false` turns the request lines off |
 | `maxSize` | The most a request with a body to any route may send. An action or an API route may set its own. bytes or a size such as `'4mb'`, 1 MB by default. A bigger one answers 413. See [The request body limit](/guides/security#the-request-body-limit) |
-| `maxSizes` | The most a request to a route of your own may send, by path: `{ '/upload': '50mb' }` sets it for the route and what is under it. See [The request body limit](/guides/security#the-request-body-limit) |
+| `maxSizeByPath` | The most a request to a route of your own may send, by path: `{ '/upload': '50mb' }` sets it for the route and what is under it. See [The request body limit](/guides/security#the-request-body-limit) |
 | `checks` | Your own checks, which `kay check` runs with its own: each gets `{ root, routes, report }` and reports problems with `report()`. See [Your own checks](/reference/cli#your-own-checks) |
 | `env` | The compose file or files and the example env file, `{ compose: 'compose.prod.yaml', example: '.env.example' }`, that `kay check` and `kay env` compare with the declared variables. `false` turns the comparison off, the default one included. |
 | `requireGuards` | `true` makes every page, action, endpoint and API module answer 403 unless a guard covers it or it sets `guards: false`. `kay build --static` refuses to export such a page. A library's routes are left open. See [Sessions and guards](/guides/sessions-and-guards) |

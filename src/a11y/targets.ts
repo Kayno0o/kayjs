@@ -35,7 +35,7 @@ export async function pagesToAudit(root: string, config: KayConfig): Promise<{ t
   const targets: Target[] = []
   const skipped: Skipped[] = []
 
-  await registerLoader(root, config.settings ?? {})
+  await registerLoader(root, config.librarySettings ?? {})
 
   for (const route of pages) {
     const file = relative(root, route.file)

@@ -140,7 +140,7 @@ async function apiRoutes(root: string, config: KayConfig): Promise<Listed[]> {
   const modules = await projectApi(root, config)
 
   if (modules.length > 0)
-    await registerLoader(root, config.settings ?? {})
+    await registerLoader(root, config.librarySettings ?? {})
 
   const listed: Listed[] = []
   const extensions = serverExtensions(root, config.extensions)
@@ -193,7 +193,7 @@ function redirectRoutes(config: KayConfig): Listed[] {
 }
 
 async function feedRoutes(root: string, config: KayConfig): Promise<Listed[]> {
-  const { feeds } = await checkContent(root, config.content, config.site !== undefined)
+  const { feeds } = await checkContent(root, config.contentConfig, config.site !== undefined)
 
   return feeds.map(feed => ({ methods: 'GET', path: feed.path, kind: 'feed', by: `the collection ${feed.collection}`, notes: feed.localized ? ['under each locale\'s prefix'] : [] }))
 }

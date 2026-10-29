@@ -749,7 +749,7 @@ describe('the test helper', () => {
 describe('kay check', () => {
   const COVERED = '--- server\nimport { t } from \'elysia\'\nimport { action } from \'kay\'\n\nexport const covered = action(t.Object({}), () => 1, { tool: true, protect: { honeypot: \'website\' } })\n---\nh1 Covered\n'
 
-  const reported = async (dir: string, mcp: boolean, lints?: object) => (await writeShadowTypes(dir, { routes: 'src/routes', api: 'src/api', mcp, lints })).problems.filter(found => found.code === 'unguarded-tool').map(found => [relative(dir, found.file), found.message.match(/`(\w+)`/)![1]])
+  const reported = async (dir: string, mcp: boolean, lints?: object) => (await writeShadowTypes(dir, { routesDir: 'src/routes', apiDir: 'src/api', mcp, lints })).problems.filter(found => found.code === 'unguarded-tool').map(found => [relative(dir, found.file), found.message.match(/`(\w+)`/)![1]])
 
   it('warns of a tool action with bot protection that no guard covers, and of that alone', async () => {
     const dir = await fixtureCopy('mcp')
@@ -780,7 +780,7 @@ describe('kay check', () => {
 
   it('reports each route where it is written, not at the start of its chain', async () => {
     const dir = await fixtureCopy('mcp')
-    const found = (await writeShadowTypes(dir, { routes: 'src/routes', api: 'src/api', mcp: true })).problems.find(problem => problem.code === 'hidden-tool')!
+    const found = (await writeShadowTypes(dir, { routesDir: 'src/routes', apiDir: 'src/api', mcp: true })).problems.find(problem => problem.code === 'hidden-tool')!
     const line = (await Bun.file(found.file).text()).split('\n')[found.line - 1]!
 
     expect(line).toContain('/both')
@@ -795,7 +795,7 @@ describe('kay check', () => {
 
   it('refuses a page at the endpoint\'s path', async () => {
     const dir = await fixtureCopy('mcp-clash')
-    const problems = await bootProblems(dir, { routes: 'src/routes', mcp: true })
+    const problems = await bootProblems(dir, { routesDir: 'src/routes', mcp: true })
 
     expect(problems.some(problem => problem.message.includes('`mcp` both serve /mcp'))).toBe(true)
   })
@@ -939,7 +939,7 @@ describe('a tool call an app can tell', () => {
 })
 
 describe('kay check on routes that opt in', () => {
-  const codes = async (dir: string, mcp = true, lints?: object) => (await writeShadowTypes(dir, { routes: 'src/routes', api: 'src/api', mcp, lints })).problems.filter(found => found.code === 'hidden-tool').map(found => [found.code, found.message.match(/`([A-Z]+ [^`]+)`/)![1]])
+  const codes = async (dir: string, mcp = true, lints?: object) => (await writeShadowTypes(dir, { routesDir: 'src/routes', apiDir: 'src/api', mcp, lints })).problems.filter(found => found.code === 'hidden-tool').map(found => [found.code, found.message.match(/`([A-Z]+ [^`]+)`/)![1]])
   const both = '{ detail: { hide: true, tool: true } }'
 
   it('reports the route that hides and opts in, and nothing else', async () => {

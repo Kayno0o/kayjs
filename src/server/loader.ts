@@ -104,11 +104,11 @@ function scoped(project: Project, inner: BunPlugin): BunPlugin {
 }
 
 // Lets this process import `.kay` files as server modules. Each project root loads its own files, with its own library settings, so a process can load several; a module is compiled once, whichever project asks for it again.
-// Without `settings`, the project's `kay.config.ts` gives them, so whichever caller registers first renders libraries as the app configured them.
+// Without `librarySettings`, the project's `kay.config.ts` gives them, so whichever caller registers first renders libraries as the app configured them.
 // Under `kay dev`, every element carries its source position for its inspector.
 export async function registerLoader(root: string, settings?: Record<string, string>): Promise<void> {
   const config = await loadConfig(root)
-  const chosen = settings ?? config.settings ?? {}
+  const chosen = settings ?? config.librarySettings ?? {}
   const key = JSON.stringify(Object.entries(chosen).sort(([a], [b]) => a.localeCompare(b)))
   const at = resolve(root)
   let known = projects.get(at)

@@ -33,6 +33,7 @@ import { extensionEditor, patternShapes, routeMounts, scanEndpoints, scanRoutes,
 import { readRuntimeRedirects } from '../server/runtime-redirects'
 import { authAttempts } from './auth-attempts'
 import { authMethods } from './auth-methods'
+import { deprecatedConfigKeys } from './deprecated-config-keys'
 import { ownFile } from './diagnose'
 import { ASSET_TYPES, environmentTypes, kayPaths, packageTypes } from './env-types'
 import { CONTENT_CHECK, EXPORTS_CHECK, exportsCheck, SETTINGS_CHECK, settingsCheck } from './generated'
@@ -142,6 +143,7 @@ const PROJECT_CHECKS: ((input: ProjectCheckInput) => CheckDiagnostic[] | Promise
   async ({ root, options }) => authMethods(root, options),
   async ({ root, options }) => sessionStores(root, options),
   async ({ root, options }) => safeRedirects(root, options),
+  async ({ root, options }) => deprecatedConfigKeys(root, options),
 ]
 
 async function writeShadows(projectRoot: string, options: CheckOptions): Promise<ShadowTypes> {
@@ -168,7 +170,7 @@ async function writeShadows(projectRoot: string, options: CheckOptions): Promise
   await tree.write('kay-packages.d.ts', packageTypes(root, libraries.libraries))
   await tree.write('kay-ui.d.ts', uiTypes(root, libraries.libraries, own.files))
 
-  const replaced = settingsCheck(root, options.settings ?? {}, problems)
+  const replaced = settingsCheck(root, options.librarySettings ?? {}, problems)
   const exported = exportsCheck(root, routesDir, served.routes, served.apiModules, served.endpoints)
 
   await tree.write(SETTINGS_CHECK, replaced.code)

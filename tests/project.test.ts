@@ -30,7 +30,7 @@ describe('projectPaths', () => {
       tests: '/app/.kay/test',
       report: `/app/.kay/report${testWorker()}.json`,
     })
-    expect(projectPaths(join(root, 'site', '..'), { routes: 'pages', publicDir: 'static', api: 'api', content: 'content.ts', entry: 'server.ts' })).toMatchObject({ root, routes: '/app/pages', public: '/app/static', api: '/app/api', content: '/app/content.ts', entry: '/app/server.ts' })
+    expect(projectPaths(join(root, 'site', '..'), { routesDir: 'pages', publicDir: 'static', apiDir: 'api', contentConfig: 'content.ts', entry: 'server.ts' })).toMatchObject({ root, routes: '/app/pages', public: '/app/static', api: '/app/api', content: '/app/content.ts', entry: '/app/server.ts' })
   })
 })
 

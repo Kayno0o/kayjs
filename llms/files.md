@@ -70,13 +70,13 @@ export default api().get('/*', ({ params, request }) => files.response(params['*
 
 ### Keep files in an S3 bucket
 
-`storage` in kay.config.ts says where files go, `s3Files` any service speaking the S3 API:
+`fileStore` in kay.config.ts says where files go, `s3Files` any service speaking the S3 API:
 
 ```ts
 import { defineConfig, s3Files } from 'kay/server'
 
 export default defineConfig({
-  storage: s3Files({ publicUrl: 'https://files.example.com' }),
+  fileStore: s3Files({ publicUrl: 'https://files.example.com' }),
 })
 ```
 
@@ -137,13 +137,13 @@ const real = holdsType(await file.slice(0, SNIFFED_BYTES).bytes(), typeOfName(fi
 
 ### Stores
 
-`storage` in kay.config.ts says where files go: `diskFiles('data/files')` from `kay/server` by default, relative to where the server runs, as the job store is.
+`fileStore` in kay.config.ts says where files go: `diskFiles('data/files')` from `kay/server` by default, relative to where the server runs, as the job store is.
 
 ```ts
 import { defineConfig, s3Files } from 'kay/server'
 
 export default defineConfig({
-  storage: s3Files({ publicUrl: 'https://files.example.com' }),
+  fileStore: s3Files({ publicUrl: 'https://files.example.com' }),
 })
 ```
 

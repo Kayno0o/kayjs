@@ -130,7 +130,7 @@ export async function listEnv(root: string): Promise<{ variables: Listed[], unre
   const entry = relative(root, projectPaths(root, config).entry)
   const files = [...new Bun.Glob('src/**/*.{ts,kay}').scanSync({ cwd: root })].sort().filter(file => !TEST_FILE.test(file) && file !== entry)
 
-  await registerLoader(root, config.settings ?? {})
+  await registerLoader(root, config.librarySettings ?? {})
 
   // The module an extension with an env list builds its server from may build the library with options that change what it needs, as a mailer that is `optional`: it is read too, and one that does not load leaves the extension's list.
   const built = new Set((config.extensions ?? []).flatMap(({ env, serverModule }) => env === undefined || serverModule === undefined ? [] : resolvedUnder(root, serverModule.path)))

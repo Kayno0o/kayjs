@@ -18,7 +18,7 @@ Settings live in a `kay.config.ts` at the root that `export default`s its config
 import { defineConfig } from 'kay/server'
 
 export default defineConfig({
-  routes: 'src/routes',
+  routesDir: 'src/routes',
   lang: 'en',
   minify: true,
   prefetch: 'moderate',
@@ -84,7 +84,7 @@ export const app = new Elysia()
 import { defineConfig } from 'kay/server'
 
 export default defineConfig({
-  routes: 'src/routes',
+  routesDir: 'src/routes',
   lang: 'en',
   minify: true,
   prefetch: 'moderate',

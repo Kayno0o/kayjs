@@ -52,7 +52,7 @@ export async function projectCollections(root: string, config?: string): Promise
 
 // The collections by the name the content config exports each under.
 export async function namedCollections(root: string, config?: string): Promise<[string, Collection<unknown>][]> {
-  const file = projectPaths(root, { content: config }).content
+  const file = projectPaths(root, { contentConfig: config }).content
 
   setContentPlace(root, dirname(file), file)
 
@@ -152,7 +152,7 @@ export async function contentProblems(root: string, config?: string, site = true
   const feeds: CollectionFeed[] = []
   const routes: CollectionRoute[] = []
   // What the collections were read from, beside the modules loaded: the config, the catalogs and each folder of entries.
-  const read = [projectPaths(root, { content: config }).content, ...await catalogsOf(root)]
+  const read = [projectPaths(root, { contentConfig: config }).content, ...await catalogsOf(root)]
 
   for (const [name, collection] of await namedCollections(root, config)) {
     if (collection.options.feed)
@@ -162,10 +162,10 @@ export async function contentProblems(root: string, config?: string, site = true
       routes.push({ collection: name, route: collection.options.route })
 
     if (collection.options.feed && !site)
-      problems.push({ file: relative(root, projectPaths(root, { content: config }).content), line: 1, message: feedNeedsSite(collection).message })
+      problems.push({ file: relative(root, projectPaths(root, { contentConfig: config }).content), line: 1, message: feedNeedsSite(collection).message })
 
     if (collection.options.trusted !== undefined && collection.loader === undefined)
-      problems.push({ file: relative(root, projectPaths(root, { content: config }).content), line: 1, message: `the collection ${collection.name} sets \`trusted\`, which only a loader's collection reads: a folder's files always keep their raw HTML`, code: 'trusted-folder' })
+      problems.push({ file: relative(root, projectPaths(root, { contentConfig: config }).content), line: 1, message: `the collection ${collection.name} sets \`trusted\`, which only a loader's collection reads: a folder's files always keep their raw HTML`, code: 'trusted-folder' })
 
     if (collection.dir === undefined)
       continue

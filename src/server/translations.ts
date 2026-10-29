@@ -11,13 +11,13 @@ export interface MissingTranslations {
 }
 
 // What each locale but the default lacks, the extensions' catalogs read as the server reads them; nothing for a site without `i18n`.
-export async function missingTranslations(root: string, config: Pick<KayConfig, 'i18n' | 'extensions' | 'content'>): Promise<Record<string, MissingTranslations>> {
+export async function missingTranslations(root: string, config: Pick<KayConfig, 'i18n' | 'extensions' | 'contentConfig'>): Promise<Record<string, MissingTranslations>> {
   const { i18n } = config
 
   if (!i18n)
     return {}
 
-  const [messages, slugs] = await Promise.all([missingMessages(root, i18n, config.extensions), localizedSlugs(root, config.content)])
+  const [messages, slugs] = await Promise.all([missingMessages(root, i18n, config.extensions), localizedSlugs(root, config.contentConfig)])
   const missing: Record<string, MissingTranslations> = {}
 
   for (const locale of i18n.locales.filter(code => code !== i18n.defaultLocale)) {

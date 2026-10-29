@@ -45,6 +45,10 @@ What each minor release breaks, and what an app changes to move to it. kay and i
 
 - A key kay does not know in `kay.config.ts` (or in an extension's `config`), at its top level or in `security`, `i18n`, `seo`, `offline`, `health` and `proxy`, now stops every command with the nearest known name, where it used to leave kay's default in place. An app whose config already carries a typo starts failing: correct the key, or drop it.
 
+### Config keys are named by what they hold
+
+- `routes`, `api`, `content`, `storage`, `maxSizes` and `settings` in `kay.config.ts`, and in the options of `pages()` and `testSite()`, are `routesDir`, `apiDir`, `contentConfig`, `fileStore`, `maxSizeByPath` and `librarySettings`: a key naming a directory ends in `Dir`, one naming a file or module is `...Config`, and no two keys are a letter apart. The old names work until 1.87 and `kay check` reports them as `deprecated-config-keys`; `kay upgrade` renames them.
+
 ## 1.82.0
 
 ### An `ActionStream` has `ended()`

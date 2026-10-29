@@ -114,14 +114,14 @@ const ROUTER_SYNTAX = /[:*']/
 const REGEX_SYNTAX = /[.*+?^${}()|[\]\\]/g
 
 // The app's API modules and its extensions', as `pages()` serves them.
-export async function projectApi(root: string, config: Pick<KayConfig, 'api' | 'extensions' | 'apiPath'>): Promise<ApiModule[]> {
+export async function projectApi(root: string, config: Pick<KayConfig, 'apiDir' | 'extensions' | 'apiPath'>): Promise<ApiModule[]> {
   const [app, ...mounts] = apiTrees(root, config)
 
   return scanApi(app!.dir, mounts, apiPathOf(config.apiPath))
 }
 
 // The app's API directory at the root of the API tree, then each extension's under its prefix.
-export function apiTrees(root: string, config: Pick<KayConfig, 'api' | 'extensions' | 'apiPath'>): RouteMount[] {
+export function apiTrees(root: string, config: Pick<KayConfig, 'apiDir' | 'extensions' | 'apiPath'>): RouteMount[] {
   const apiPath = apiPathOf(config.apiPath)
 
   return [{ dir: projectPaths(root, config).api, prefix: '' }, ...apiMounts(root, config.extensions)].map(tree => ({ ...tree, apiPath }))

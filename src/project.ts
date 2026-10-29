@@ -8,6 +8,7 @@ import process from 'node:process'
 import { clientDir, KAY_DIR, outputDir, testWorker, underKayDev } from './build/assets'
 import { TSCONFIG } from './build/files'
 import { pickConfig } from './config'
+import { renamedKeys } from './config-shape'
 import { isFrench } from './runtime/french'
 import { IMAGE_WIDTHS, parseWidths } from './runtime/image'
 import { basePath } from './server/base'
@@ -55,16 +56,16 @@ export interface ProjectPaths {
   report: string
 }
 
-export function projectPaths(root: string, config: Pick<KayConfig, 'routes' | 'publicDir' | 'api' | 'content' | 'entry'> = {}): ProjectPaths {
+export function projectPaths(root: string, config: Pick<KayConfig, 'routesDir' | 'publicDir' | 'apiDir' | 'contentConfig' | 'entry'> = {}): ProjectPaths {
   const absolute = resolve(root)
 
   return {
     root: absolute,
-    routes: resolve(absolute, config.routes ?? 'src/routes'),
+    routes: resolve(absolute, config.routesDir ?? 'src/routes'),
     public: resolve(absolute, config.publicDir ?? 'public'),
-    api: resolve(absolute, config.api ?? 'src/api'),
+    api: resolve(absolute, config.apiDir ?? 'src/api'),
     entry: resolve(absolute, config.entry ?? 'src/server.ts'),
-    content: resolve(absolute, config.content ?? CONTENT_CONFIG),
+    content: resolve(absolute, config.contentConfig ?? CONTENT_CONFIG),
     cache: join(absolute, KAY_DIR, 'cache'),
     compile: join(absolute, KAY_DIR, 'compile'),
     output: outputDir(absolute),
@@ -100,15 +101,15 @@ export function cacheDir(root: string, ...names: string[]): string {
 export const CLIENT_CONFIG = [
   'plugins',
   // Page directory relative to the root: its pages and layouts are where stylesheets are gathered from.
-  'routes',
+  'routesDir',
   // The libraries whose routes the app mounts, built as its own pages are.
   'extensions',
   // API directory relative to the root: an island importing a module there, or under an extension's, gets where its routes are served, not its code.
-  'api',
+  'apiDir',
   // Where the API is mounted, `/api` by default: the stubs an island imports hold it.
   'apiPath',
   // The app's own modules for its libraries' settings, as `kay.config.ts` gives them.
-  'settings',
+  'librarySettings',
   // Swaps pages in place: the entry is built whether or not any component is interactive, for the pages posting forms to actions.
   'navigation',
   // How far ahead of the viewport an island marked `hydrate="visible"` starts to hydrate, and a deferred server island starts to load, as CSS root margins; `200px` and `100% 0px` by default.
@@ -200,7 +201,9 @@ export interface Project<Config extends KayConfig = KayConfig> {
 }
 
 export function resolveProject<Config extends KayConfig>(root: string, config: Config, mode: Mode = PRODUCTION): Project<Config> {
-  return { root: resolve(root), config, paths: projectPaths(root, config), mode }
+  const named = renamedKeys(config)
+
+  return { root: resolve(root), config: named, paths: projectPaths(root, named), mode }
 }
 
 // Whether the islands of an app write French spaces: a French `lang` or locale, and `typography` not off.

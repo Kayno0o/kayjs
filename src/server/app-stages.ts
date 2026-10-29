@@ -534,7 +534,7 @@ export function limitBodiesAndClaimApi(boot: Boot, { actionLimits, api }: Served
     }
   }
 
-  limitBodies(app, options.maxSize ?? DEFAULT_BODY_LIMIT, new Map([...actionLimits, ...hasPreview ? [[DRAFT_ROUTE, DRAFT_BODY_LIMIT] as const] : [], ...mcpAt === undefined ? [] : [[mcpAt, mcpBodyLimit] as const]]), mountLimits(api.limits, options.extensions, options.maxSizes, servers), api.routeLimits)
+  limitBodies(app, options.maxSize ?? DEFAULT_BODY_LIMIT, new Map([...actionLimits, ...hasPreview ? [[DRAFT_ROUTE, DRAFT_BODY_LIMIT] as const] : [], ...mcpAt === undefined ? [] : [[mcpAt, mcpBodyLimit] as const]]), mountLimits(api.limits, options.extensions, options.maxSizeByPath, servers), api.routeLimits)
 
   return { openapi, apiAt, servesOpenApi, metadataPaths }
 }

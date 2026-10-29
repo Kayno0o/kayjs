@@ -428,12 +428,12 @@ async function outputStage(project: Project, exported: boolean, client: ClientBu
   setImageColors(config.images?.placeholder !== false)
 
   // Before prerendering, whose pages read the collections from what it writes.
-  const entries = await writeContentManifests(root, paths.output, config.content)
+  const entries = await writeContentManifests(root, paths.output, config.contentConfig)
 
   // A static host has no image route, so pages link the variant files the build writes, and no file route, so stored files where their store serves them.
   if (exported) {
     linkVariantFiles()
-    linkStoredFiles(config.storage)
+    linkStoredFiles(config.fileStore)
   }
 
   const rendered: RenderedPage[] = []

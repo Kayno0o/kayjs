@@ -57,7 +57,7 @@ An app replaces it by the library's name in `kay.config.ts`:
 
 ```ts
 export default defineConfig({
-  settings: { 'my-ui': './src/my-ui-settings.ts' },
+  librarySettings: { 'my-ui': './src/my-ui-settings.ts' },
 })
 ```
 

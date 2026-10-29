@@ -26,8 +26,12 @@ import type { Tracer } from './server/trace'
 // What `kay.config.ts` exports by default; `pages()`, `kay build`, `kay dev` and `kay check` all read it.
 export interface KayConfig {
   // Page directory, relative to the root. Defaults to `src/routes`.
+  routesDir?: string | undefined
+  /** @deprecated Renamed `routesDir` in 1.84; the old name works until 1.87, and `kay upgrade` renames it. */
   routes?: string | undefined
   // Elysia modules mounted under `/api` by their path, relative to the root: `src/api/chat.ts` serves `/api/chat`. Defaults to `src/api`.
+  apiDir?: string | undefined
+  /** @deprecated Renamed `apiDir` in 1.84; the old name works until 1.87, and `kay upgrade` renames it. */
   api?: string | undefined
   // The path the API modules, the OpenAPI document and its reference page are served under, `/api` by default: `apiPath: '/v1'` serves `src/api/chat.ts` at `/v1/chat`. Absolute, plain segments, no trailing slash, not under `/_kay`; `mcp.path` and the `openapi` paths keep their own settings. Libraries read it through `apiUrl()`.
   apiPath?: string | undefined
@@ -66,6 +70,8 @@ export interface KayConfig {
   // The most a request with a body to any route may send (`maxSize`), bytes or a size such as `'4mb'`, 1 MB by default; an action or an `api()` module raises or lowers it for itself. A bigger one answers 413 before it is read.
   maxSize?: ByteSize | undefined
   // The most a request to a route of your own (`new Elysia().post()`) may send, by path: the route itself and what is under it, bytes or a size such as '50mb', in place of `maxSize`. The path is the one the server routes, without the `base`.
+  maxSizeByPath?: Record<string, ByteSize> | undefined
+  /** @deprecated Renamed `maxSizeByPath` in 1.84; the old name works until 1.87, and `kay upgrade` renames it. */
   maxSizes?: Record<string, ByteSize> | undefined
   // Every page, action, endpoint and API module of the app answers 403 unless a `_guard.ts` covers it or it sets `guards: false`, in its `page` or its `api()` options; `kay check` reports each such route. A library's routes keep the guards it gives them.
   requireGuards?: boolean | undefined
@@ -113,6 +119,8 @@ export interface KayConfig {
   // Whether a page's URL ends with a slash: `never`, the default, redirects `/about/` to `/about`; `always` the other way; `ignore` serves both.
   trailingSlash?: TrailingSlash | undefined
   // The module exporting the project's content collections, `src/content.config.ts` by default; their folders are relative to it.
+  contentConfig?: string | undefined
+  /** @deprecated Renamed `contentConfig` in 1.84; the old name works until 1.87, and `kay upgrade` renames it. */
   content?: string | undefined
   // How every collection's Markdown compiles; a collection's own option of the same name wins.
   markdown?: MarkdownConfig | undefined
@@ -135,6 +143,8 @@ export interface KayConfig {
   // Bun plugins the browser build runs, such as Tailwind's.
   plugins?: BunPlugin[] | undefined
   // The app's own module for a kay library's settings, by the library's name: `{ '@kaynooo/kayjs-ui': './src/ui-settings.ts' }`. It replaces the module the library's package.json names as `"kay": { "settings" }`, on the server and in islands alike.
+  librarySettings?: Record<string, string> | undefined
+  /** @deprecated Renamed `librarySettings` in 1.84; the old name works until 1.87, and `kay upgrade` renames it. */
   settings?: Record<string, string> | undefined
   // The level of each lint `kay check`, `kay build`, `kay dev` and the editor report, or of each lint in a group, over its default: `{ 'positional-key': 'deny', 'seo': 'deny', 'unread-name': 'warn' }`. `kay explain` lists them.
   lints?: LintLevels | undefined
@@ -143,6 +153,8 @@ export interface KayConfig {
   // Lets an editor see drafts on the live site, `false` for none: a visitor in preview mode sees every draft, and pages render for them alone, past prerendered and cached copies.
   preview?: PreviewConfig | false | undefined
   // Where `files` from `kay/server` keeps what it stores: `diskFiles('data/files')` by default, `s3Files()` for a bucket, or memory under `bun test`.
+  fileStore?: FileStore | undefined
+  /** @deprecated Renamed `fileStore` in 1.84; the old name works until 1.87, and `kay upgrade` renames it. */
   storage?: FileStore | undefined
   // Where the app keeps what outlives one process, for every feature naming no store of its own: `session()`'s data, `cached` values, `live()` values, queued jobs and schedule locks, rate limit counts, the tabs a page's `presence()` lists and the Web Vitals `vitals()` counts and the notifications `notify()` stores. `sqliteData('data/app.sqlite')` keeps them all in one file; `{ sessions, cache, live, jobs, rates, rooms, vitals, notifications }` takes stores of your own, each optional, Redis say. Without it sessions travel in their cookie, jobs stay in `data/jobs.sqlite` and the others in memory.
   store?: AppStore | undefined
@@ -514,8 +526,8 @@ type Misspelled<Key, Known> = [CaseVariant<Key, Known>] extends [never] ? 'unkno
 
 type UnknownKeys<Given, Known> = Given extends object ? { [Key in Exclude<keyof Given, keyof Known>]: Misspelled<Key, Known> } : unknown
 
-// The config with every key `KayConfig` and its nested bags lack typed so that setting it is an error: an inferred type parameter gets no excess property check of its own.
-type Checked<Config> = UnknownKeys<Config, KayConfig> & { [Key in keyof NestedBags & keyof Config]?: UnknownKeys<Config[Key], NestedBags[Key]> }
+// The config with every key `KayConfig` and its nested bags lack typed so that setting it is an error: an inferred type parameter gets no excess property check of its own. The bags are indexed by `NestedBags` rather than by the given config's keys, as a mapped type over those loses the contextual type of a callback elsewhere in the config.
+type Checked<Config> = UnknownKeys<Config, KayConfig> & { [Key in keyof NestedBags]?: UnknownKeys<Key extends keyof Config ? Config[Key] : unknown, NestedBags[Key]> }
 
 // Gives the config back as written, so `kay check` reads the types of what it declares off it.
 export function defineConfig<Config extends KayConfig>(config: Config & Checked<Config>): Config {

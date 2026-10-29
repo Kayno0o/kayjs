@@ -46,7 +46,7 @@ export async function writeServerRecord(project: Project): Promise<void> {
   await clearServerRecord(paths.output)
 
   const base = realpathSync(root)
-  const settings = config.settings ?? {}
+  const settings = config.librarySettings ?? {}
   const placeholder = config.images?.placeholder
   const { modules } = await serverParts(project)
   const { loads, modules: virtual, resolves } = await capturedLoads(kay({ target: 'ssr', root, cacheDir: paths.cache, settings, placeholder, embedMaps: true, mapName: file => file }))

@@ -391,7 +391,7 @@ export class KayLanguageServer implements LspHost {
 
     const config = await projectConfig(project.root)
 
-    project.options = await withoutMissingCaptcha(project.root, { ...configCheckOptions(config), routes: (project.root === this.root ? this.routesSetting : undefined) ?? config.routes })
+    project.options = await withoutMissingCaptcha(project.root, { ...configCheckOptions(config), routesDir: (project.root === this.root ? this.routesSetting : undefined) ?? config.routesDir })
     project.routesDir = projectPaths(project.root, project.options).routes
     project.mounts = routeMounts(project.root, project.options.extensions)
     project.locales = servedLocales(project.options.i18n)

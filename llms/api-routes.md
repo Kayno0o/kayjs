@@ -115,7 +115,7 @@ Point an MCP client at `https://example.com/mcp`. `addNote` is the tool `add_not
 
 ### API modules
 
-Each `.ts` module under `src/api/`, the `api` option of `kay.config.ts` naming another directory, exports an Elysia instance by default, which `pages()` mounts at `/api` plus its path there, with nothing to register: `src/api/chat.ts` serves its routes under `/api/chat`, `src/api/index.ts` under `/api`.
+Each `.ts` module under `src/api/`, the `apiDir` option of `kay.config.ts` naming another directory, exports an Elysia instance by default, which `pages()` mounts at `/api` plus its path there, with nothing to register: `src/api/chat.ts` serves its routes under `/api/chat`, `src/api/index.ts` under `/api`.
 
 Files and directories starting with `_`, and `.test.ts` files, are left out.
 

@@ -65,7 +65,7 @@ export interface ContentChecks {
 
 // The collections read, in a process of their own, and the props their entries give components written to the module tsgo types them in.
 export async function contentChecks(root: string, options: CheckOptions, memory?: ProbeMemory): Promise<ContentChecks> {
-  const content = await checkContent(root, options.content, options.site !== undefined, memory, options.extensions?.some(({ check }) => check !== undefined))
+  const content = await checkContent(root, options.contentConfig, options.site !== undefined, memory, options.extensions?.some(({ check }) => check !== undefined))
   const props = contentPropsCheck(resolve(root), projectPaths(root, options).content, content.uses)
 
   await writeIfChanged(join(projectPaths(root).types, CONTENT_CHECK), props.code)
@@ -263,7 +263,7 @@ export async function checkContent(root: string, config: string | undefined, sit
   const read = await probe(root, CONTENT_PROBLEMS, [config ?? '', site ? 'site' : ''], 'reading the collections', memory)
 
   if ('failed' in read)
-    return { problems: [{ file: projectPaths(root, { content: config }).content, line: 1, column: 1, message: read.failed }], uses: [], feeds: [], routes: [] }
+    return { problems: [{ file: projectPaths(root, { contentConfig: config }).content, line: 1, column: 1, message: read.failed }], uses: [], feeds: [], routes: [] }
 
   return { problems: [...problemsOf(root, read.marked(PROBLEMS_MARKER)), ...extensionProblemsOf(root, read.marked(EXTENSIONS_MARKER))], uses: read.marked(USES_MARKER) ?? [], feeds: read.marked(FEEDS_MARKER) ?? [], routes: read.marked(ROUTES_MARKER) ?? [] }
 }

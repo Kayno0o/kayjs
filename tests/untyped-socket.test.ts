@@ -11,7 +11,7 @@ async function problems(source: string, lints?: object): Promise<string[]> {
   await mkdir(join(dir, 'src', 'api'), { recursive: true })
   await writeFile(join(dir, 'src', 'api', 'chat.ts'), source)
 
-  const { problems } = await writeShadowTypes(dir, { routes: 'src/routes', api: 'src/api', lints })
+  const { problems } = await writeShadowTypes(dir, { routesDir: 'src/routes', apiDir: 'src/api', lints })
 
   return problems.filter(found => found.code === 'untyped-socket').map(found => found.message.match(/`([^`]+)`/)![1]!).sort()
 }

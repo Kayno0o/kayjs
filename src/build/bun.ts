@@ -5,7 +5,7 @@ import { kay as kayPlugin } from './plugin'
 export interface KayBunOptions {
   // `.kay` files and assets resolve from here, and imported assets are written under its `.kay/client`; defaults to the working directory.
   root?: string | undefined
-  // The app's own module for a library's settings, by the library's name, relative to the root, as `kay.config.ts`'s `settings`.
+  // The app's own module for a library's settings, by the library's name, relative to the root, as `kay.config.ts`'s `librarySettings`.
   settings?: Record<string, string> | undefined
 }
 

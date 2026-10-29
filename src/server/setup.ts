@@ -114,7 +114,7 @@ async function setupWith<Claimed>(project: Project, loadClient: () => Promise<Cl
 
   void Promise.allSettled([logoDrawn])
 
-  await source.prepare(root, config.settings, mode.prebuilt ? paths.output : undefined)
+  await source.prepare(root, config.librarySettings, mode.prebuilt ? paths.output : undefined)
   // Scanned beside the routes, which the refusals before the build need.
   const scanning = Promise.all([publicFiles(paths.public), source.endpoints(paths.routes, mounts)])
 
@@ -163,7 +163,7 @@ async function setupWith<Claimed>(project: Project, loadClient: () => Promise<Cl
     setupStampSecret(config.secret)
     setupPreview(config.preview, base)
     setTracer(config.tracer)
-    setupStorage(config.storage, join(imageCache, 'stored'), imageCache)
+    setupStorage(config.fileStore, join(imageCache, 'stored'), imageCache)
     setAppRoot(root)
     // An export serves nobody, so it keeps only the database url libraries read and none of the stores: a pgData store would otherwise poll, open its connection and create its tables while the build runs, and a build with no database reachable still ends.
     setupStore(await sharedStores(exporting && config.store ? { database: config.store.database } : config.store))
@@ -175,7 +175,7 @@ async function setupWith<Claimed>(project: Project, loadClient: () => Promise<Cl
   setMarkdownDefaults(config.markdown)
 
   // The content config is imported beside the scans, as its refusals (a missing file, a feed without the site) come before the build too.
-  const loadingCollections = projectCollections(root, config.content)
+  const loadingCollections = projectCollections(root, config.contentConfig)
 
   void Promise.allSettled([loadingCollections])
 

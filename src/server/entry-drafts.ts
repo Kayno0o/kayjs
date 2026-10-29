@@ -22,13 +22,13 @@ export interface LocalizedEntry {
   mark: 'field' | 'comment' | undefined
 }
 
-async function localizedCollection(root: string, config: Pick<KayConfig, 'i18n' | 'content'>, collection: string): Promise<string> {
+async function localizedCollection(root: string, config: Pick<KayConfig, 'i18n' | 'contentConfig'>, collection: string): Promise<string> {
   const { i18n } = config
 
   if (!i18n)
     throw new KayError('locales-invalid', 'kay: a draft entry is written in a locale, and kay.config.ts sets no i18n')
 
-  const found = (await namedCollections(root, config.content)).find(([name]) => name === collection)
+  const found = (await namedCollections(root, config.contentConfig)).find(([name]) => name === collection)
 
   if (!found)
     throw new KayError('content-api-misuse', `kay: the content config exports no collection ${JSON.stringify(collection)}`)
@@ -40,7 +40,7 @@ async function localizedCollection(root: string, config: Pick<KayConfig, 'i18n' 
 }
 
 // The default locale's entry of the collection, as its source holds it, and how a translation of it would be marked.
-export async function localizedEntry(root: string, config: Pick<KayConfig, 'i18n' | 'content'>, collection: string, slug: string): Promise<LocalizedEntry> {
+export async function localizedEntry(root: string, config: Pick<KayConfig, 'i18n' | 'contentConfig'>, collection: string, slug: string): Promise<LocalizedEntry> {
   const defaultLocale = await localizedCollection(root, config, collection)
   const [entry] = await entries(collection, { locale: defaultLocale, slug })
   const info = await collectionInfo(collection, { counts: false })
@@ -63,7 +63,7 @@ function markOf(draftField: string | undefined, file: string | undefined): Local
 }
 
 // Writes the translation of an entry into the locale's folder, validated against the collection's schema and marked a draft, as a file that did not exist: an entry the locale already has is never overwritten. Answers the file written, relative to the project root.
-export async function writeDraftEntry(root: string, config: Pick<KayConfig, 'i18n' | 'content'>, collection: string, locale: string, slug: string, entry: { data: Record<string, DataValue>, body?: string | undefined }): Promise<string> {
+export async function writeDraftEntry(root: string, config: Pick<KayConfig, 'i18n' | 'contentConfig'>, collection: string, locale: string, slug: string, entry: { data: Record<string, DataValue>, body?: string | undefined }): Promise<string> {
   const defaultLocale = await localizedCollection(root, config, collection)
   const { i18n } = config
 

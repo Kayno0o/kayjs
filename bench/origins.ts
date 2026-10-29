@@ -34,7 +34,7 @@ const JS_OUTPUT = /\.js$/
 
 // The client kay serves, minified as in production, built with source maps so every byte and profiled function maps to its origin.
 async function buildChunks(): Promise<Map<string, Chunk>> {
-  await buildClient(ROOT, { minify: true, sourcemap: true, routes: 'routes' })
+  await buildClient(ROOT, { minify: true, sourcemap: true, routesDir: 'routes' })
 
   const chunks = new Map<string, Chunk>()
 

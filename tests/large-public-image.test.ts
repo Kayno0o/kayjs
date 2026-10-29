@@ -29,7 +29,7 @@ async function project(): Promise<string> {
   return dir
 }
 
-const found = async (dir: string, lints?: object, base?: string, extra: object = {}) => (await writeShadowTypes(dir, { routes: 'src/routes', lints, base, ...extra })).problems.filter(problem => problem.code === 'large-public-image')
+const found = async (dir: string, lints?: object, base?: string, extra: object = {}) => (await writeShadowTypes(dir, { routesDir: 'src/routes', lints, base, ...extra })).problems.filter(problem => problem.code === 'large-public-image')
 
 const at = (problems: Awaited<ReturnType<typeof found>>) => problems.map(problem => `${problem.file.split('/').pop()}:${problem.line}`).toSorted()
 

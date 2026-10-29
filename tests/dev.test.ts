@@ -278,7 +278,7 @@ describe.concurrent('kay dev', () => {
     await Bun.write(join(root, 'src/server.ts'), 'setInterval(() => undefined, 1000)\n')
     await Bun.write(join(root, 'src/routes/index.kay'), 'p Home\n')
     await Bun.write(join(root, 'site-content.ts'), 'export {}\n')
-    const stop = await dev(root, { config: { lints: { 'unread-name': 'allow' }, content: 'site-content.ts' }, onRestart: child => children.push(child) })
+    const stop = await dev(root, { config: { lints: { 'unread-name': 'allow' }, contentConfig: 'site-content.ts' }, onRestart: child => children.push(child) })
 
     try {
       expect(children).toHaveLength(1)

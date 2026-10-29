@@ -41,7 +41,7 @@ export interface RewrittenCollection {
 
 // Rewrites the files of every folder collection that declares `migrations`, in the entries a step carried to the shape the schema accepts; an entry the schema accepts or no step helps is left as it is. With `write` false the files are only listed. A loader's collection writes its entries back through its `save` when it is read.
 export async function migrateFolders(root: string, write = true): Promise<{ collections: RewrittenCollection[], declared: number }> {
-  const content = (await loadConfig(root)).content
+  const content = (await loadConfig(root)).contentConfig
   const collections: RewrittenCollection[] = []
   let declared = 0
 
@@ -51,7 +51,7 @@ export async function migrateFolders(root: string, write = true): Promise<{ coll
     if (collection.dir === undefined || migrations === undefined || migrations.length === 0)
       continue
 
-    const dir = resolve(dirname(projectPaths(root, { content }).content), collection.dir)
+    const dir = resolve(dirname(projectPaths(root, { contentConfig: content }).content), collection.dir)
 
     if (!existsSync(dir))
       continue

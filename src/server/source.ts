@@ -34,7 +34,7 @@ export interface ProjectSource {
   // A server started from the build reads which templates read `ctx` from its record, not from the templates.
   routes: (project: Pick<Project, 'root' | 'mode' | 'paths'>, mounts: RouteMount[]) => Promise<Route[]>
   fallback: (project: Pick<Project, 'root' | 'mode' | 'paths'>, mounts: RouteMount[]) => Promise<SpecialPages>
-  api: (root: string, config: Pick<KayConfig, 'api' | 'extensions'>) => Promise<ApiModule[]>
+  api: (root: string, config: Pick<KayConfig, 'apiDir' | 'extensions'>) => Promise<ApiModule[]>
   endpoints: (routesDir: string, mounts: RouteMount[]) => Promise<Endpoint[]>
   // The file names under `src/plugins`: an executable holds the ones it was built with.
   plugins: (root: string) => string[]

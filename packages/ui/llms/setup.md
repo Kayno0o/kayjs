@@ -71,7 +71,7 @@ The icons the components draw come from slots, each named for what it means: `al
 
 ```ts
 // kay.config.ts
-export default defineConfig({ settings: { '@kaynooo/kayjs-ui': './src/ui-settings.ts' } })
+export default defineConfig({ librarySettings: { '@kaynooo/kayjs-ui': './src/ui-settings.ts' } })
 ```
 
 ```ts

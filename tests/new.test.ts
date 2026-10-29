@@ -216,8 +216,8 @@ const DOCKER_COPY = /^COPY (?!--from)(.+) \S+$/gm
 const MIGRATIONS = /migrationsDir: '([^']+)'/g
 // The package each command a script runs comes from, Bun aside.
 const SCRIPT_BINS: Record<string, string | undefined> = { 'bun': undefined, 'kay': 'kay', 'keslint': '@kaynooo/eslint', 'pg-orm': '@kaynooo/pg-orm' }
-// Declared though nothing imports them: Bun's types, Elysia, which kay needs beside it, and pg-orm, which kayjs-auth's default SQLite store loads from the app.
-const UNIMPORTED = new Set(['@types/bun', 'elysia', '@iconify-json/tabler', '@kaynooo/pg-orm'])
+// Declared though nothing imports them: Bun's types, Elysia, which kay needs beside it, pg-orm, which kayjs-auth's default SQLite store loads from the app, and Tailwind's plugin, which kay adds itself.
+const UNIMPORTED = new Set(['@types/bun', 'elysia', '@iconify-json/tabler', '@kaynooo/pg-orm', 'bun-plugin-tailwind'])
 
 // What a scaffold's files name that it lacks: a relative import, preload, extended tsconfig, copied file or migrations folder, a package it imports without depending on it, a script package.json does not hold; and a dependency nothing imports.
 function unresolved(files: Record<string, string>): { paths: string[], undeclared: string[], unused: string[], scripts: string[] } {
