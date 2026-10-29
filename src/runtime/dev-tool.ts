@@ -27,6 +27,8 @@ const NETWORK_TAB_URL = '/_kay/dev/tab/network.js'
 const IMAGES_TAB_URL = '/_kay/dev/tab/images.js'
 const PERFORMANCE_TAB_URL = '/_kay/dev/tab/performance.js'
 // A stack frame in a chunk of the browser build, which the server can point at its `.kay` line.
+// The page swaps kept for the Network tab, as many as it lists navigations.
+const SWAP_LOG = 10
 const CHUNK_FRAME = /\/_kay\/[\w.-]+\.js:\d+:\d+/
 // The addresses the dev tool fetched itself, which the Network tab leaves out.
 const OWN_FETCHES = new Set<string>()
@@ -674,6 +676,8 @@ export interface DevKit {
   formatMs: typeof formatMs
   // The addresses the tool fetched itself, which the Network tab leaves out.
   ownFetches: ReadonlySet<string>
+  // The page swaps from the tool's start, for a tab whose module arrives later to replay.
+  swaps: { path: string, log: { busy: boolean, at: number, path: string }[] }
   parseUrl: typeof parseUrl
   walkComposed: typeof walkComposed
 }
@@ -1231,6 +1235,17 @@ export function startDevTool(doc: Document = document, load: LoadTab = importTab
 
   // The buttons kay's error pages carry need a script and have no other.
   const listening = new AbortController()
+  const here = () => `${win.location.pathname}${win.location.search}`
+  const swapLog = { path: here(), log: [] as { busy: boolean, at: number, path: string }[] }
+  const swapWatch = new MutationObserver(() => {
+    swapLog.log.push({ busy: doc.documentElement.getAttribute('aria-busy') === 'true', at: win.performance.now(), path: here() })
+
+    if (swapLog.log.length > SWAP_LOG)
+      swapLog.log.shift()
+  })
+
+  swapWatch.observe(doc.documentElement, { attributes: true, attributeFilter: ['aria-busy'] })
+  listening.signal.addEventListener('abort', () => swapWatch.disconnect())
   const missing = missingMessages()
   const vitals = watchVitals(doc.defaultView!, listening.signal)
   // A page swap marks the document busy until the new page is in, and a back or forward step moves without one.
@@ -1264,6 +1279,7 @@ export function startDevTool(doc: Document = document, load: LoadTab = importTab
       fetchKind,
       formatMs,
       ownFetches: OWN_FETCHES,
+      swaps: swapLog,
       parseUrl,
       walkComposed,
     },

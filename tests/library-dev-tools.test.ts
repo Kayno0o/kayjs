@@ -6,6 +6,7 @@ import authDevTool from '../packages/auth/src/devTool'
 import cmsDevTool from '../packages/cms/src/devTool'
 import mailDevTool from '../packages/mail/src/devTool'
 import { startDevTool } from '../src/runtime/dev-tool'
+import { loadTab } from './helpers/dev-tabs'
 import { eventually, turn } from './helpers/eventually'
 
 // The Auth, Mail and CMS tabs the libraries ship as browser modules, run on the real dev tool with the library's dev routes answered by a stub.
@@ -59,7 +60,7 @@ describe('the libraries\' dev tool tabs', () => {
     })
 
     document.head.innerHTML = '<meta name="kay-base" content="/shop">'
-    tool = startDevTool()
+    tool = startDevTool(document, loadTab)
     authDevTool(tool)
     expect(shadow().querySelector('#kay-dev-tab-auth svg')).not.toBeNull()
     expect(shadow().querySelector('#kay-dev-tab-auth svg')!.innerHTML).not.toBe(shadow().querySelector('#kay-dev-tab-problems svg')!.innerHTML)
@@ -92,7 +93,7 @@ describe('the libraries\' dev tool tabs', () => {
     ]
     const fetching = answering({ 'GET /_kay/mail.json': () => Response.json(mails) })
 
-    tool = startDevTool()
+    tool = startDevTool(document, loadTab)
     mailDevTool(tool)
     expect(shadow().querySelector('#kay-dev-tab-mail svg')).not.toBeNull()
     expect(shadow().querySelector('#kay-dev-tab-mail svg')!.innerHTML).not.toBe(shadow().querySelector('#kay-dev-tab-problems svg')!.innerHTML)
@@ -134,7 +135,7 @@ describe('the libraries\' dev tool tabs', () => {
     }) as unknown as typeof window.fetch)
     const badges = () => [...shadow().querySelectorAll('.bar > button:not([hidden]) .pill')].map(badge => `${badge.className} ${badge.textContent}`)
 
-    tool = startDevTool()
+    tool = startDevTool(document, loadTab)
     mailDevTool(tool)
     shadow().querySelector<HTMLButtonElement>('#kay-dev-tab-mail')!.click()
 
@@ -174,7 +175,7 @@ describe('the libraries\' dev tool tabs', () => {
       'GET /_kay/mail/delivery': () => answer(),
     })
 
-    tool = startDevTool()
+    tool = startDevTool(document, loadTab)
     mailDevTool(tool)
     shadow().querySelector<HTMLButtonElement>('#kay-dev-tab-mail')!.click()
     await eventually(() => {
@@ -184,7 +185,7 @@ describe('the libraries\' dev tool tabs', () => {
 
     answer = () => new Response(null, { status: 404 })
     tool.stop()
-    tool = startDevTool()
+    tool = startDevTool(document, loadTab)
     mailDevTool(tool)
     shadow().querySelector<HTMLButtonElement>('#kay-dev-tab-mail')!.click()
     await eventually(() => {
@@ -205,7 +206,7 @@ describe('the libraries\' dev tool tabs', () => {
       return url === '/_kay/mail/delivery' ? Response.json({ on: false, missing: [], server: 'localhost:1025' }) : new Response(null, { status: 404 })
     }) as unknown as typeof window.fetch)
 
-    tool = startDevTool()
+    tool = startDevTool(document, loadTab)
     mailDevTool(tool)
     shadow().querySelector<HTMLButtonElement>('#kay-dev-tab-mail')!.click()
     await eventually(() => expect(panel('mail').querySelector('form')).not.toBeNull())
@@ -227,7 +228,7 @@ describe('the libraries\' dev tool tabs', () => {
       'GET /_kay/mail/samples.json': () => Response.json(['welcome.kay', 'auth/reset password.kay']),
     })
 
-    tool = startDevTool()
+    tool = startDevTool(document, loadTab)
     mailDevTool(tool)
     shadow().querySelector<HTMLButtonElement>('#kay-dev-tab-mail')!.click()
 
@@ -261,7 +262,7 @@ describe('the libraries\' dev tool tabs', () => {
       return new Response(null, { status: 404 })
     }) as unknown as typeof window.fetch)
 
-    tool = startDevTool()
+    tool = startDevTool(document, loadTab)
     mailDevTool(tool)
     shadow().querySelector<HTMLButtonElement>('#kay-dev-tab-mail')!.click()
     await eventually(() => expect(panel('mail').querySelector('form button')).not.toBeNull())
@@ -306,7 +307,7 @@ describe('the libraries\' dev tool tabs', () => {
     }) as unknown as typeof window.fetch)
     const clear = () => [...panel('mail').querySelectorAll('button')].find(button => button.textContent === 'Clear')!
 
-    tool = startDevTool()
+    tool = startDevTool(document, loadTab)
     mailDevTool(tool)
     shadow().querySelector<HTMLButtonElement>('#kay-dev-tab-mail')!.click()
     await eventually(() => expect(panel('mail').querySelectorAll('.row')).toHaveLength(1))
@@ -335,7 +336,7 @@ describe('the libraries\' dev tool tabs', () => {
 
     Stream.open = 0
 
-    tool = startDevTool()
+    tool = startDevTool(document, loadTab)
     mailDevTool(tool)
     // Nothing opens a stream before the tab is shown, which a turn lets any read of the outbox show.
     await turn()
@@ -351,7 +352,7 @@ describe('the libraries\' dev tool tabs', () => {
     let answer = new Response(null, { status: 404 })
     const fetching = answering({ 'GET /_kay/mail.json': () => answer })
 
-    tool = startDevTool()
+    tool = startDevTool(document, loadTab)
     mailDevTool(tool)
     shadow().querySelector<HTMLButtonElement>('#kay-dev-tab-mail')!.click()
     await eventually(() => expect(panel('mail').textContent).toContain('under `kay dev` alone'))
@@ -375,7 +376,7 @@ describe('the libraries\' dev tool tabs', () => {
       },
     })
 
-    tool = startDevTool()
+    tool = startDevTool(document, loadTab)
     cmsDevTool(tool)
     expect(shadow().querySelector('#kay-dev-tab-cms svg')).not.toBeNull()
     expect(shadow().querySelector('#kay-dev-tab-cms svg')!.innerHTML).not.toBe(shadow().querySelector('#kay-dev-tab-problems svg')!.innerHTML)
@@ -403,7 +404,7 @@ describe('the libraries\' dev tool tabs', () => {
       'GET /_kay/cms/dev': () => status === 200 ? Response.json({ editing: false, prefix: '/admin', exit: '/_kay/cms/preview/exit', words }) : new Response(null, { status }),
     })
 
-    tool = startDevTool()
+    tool = startDevTool(document, loadTab)
     cmsDevTool(tool)
     shadow().querySelector<HTMLButtonElement>('#kay-dev-tab-cms')!.click()
     await eventually(() => {
@@ -434,7 +435,7 @@ describe('the libraries\' dev tool tabs', () => {
     let found = true
     const fetching = answering({ 'GET /_kay/ai': () => found ? Response.json(state) : new Response(null, { status: 404 }) })
 
-    tool = startDevTool()
+    tool = startDevTool(document, loadTab)
     aiDevTool(tool)
     shadow().querySelector<HTMLButtonElement>('#kay-dev-tab-ai')!.click()
     await eventually(() => {
@@ -450,7 +451,7 @@ describe('the libraries\' dev tool tabs', () => {
 
     found = false
     tool.stop()
-    tool = startDevTool()
+    tool = startDevTool(document, loadTab)
     aiDevTool(tool)
     shadow().querySelector<HTMLButtonElement>('#kay-dev-tab-ai')!.click()
     await eventually(() => expect(panel('ai').textContent).toContain('under `kay dev` alone'))

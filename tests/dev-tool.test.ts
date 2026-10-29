@@ -787,6 +787,31 @@ describe('the dev tool', () => {
     expect('$kayBuilt' in window).toBe(false)
   })
 
+  it('lists a page swap that ended before the Network tab\'s module ran as it would have, from the tool\'s start', async () => {
+    const happy = (window as unknown as { happyDOM: { setURL: (url: string) => void } }).happyDOM
+    let release = () => undefined as void
+    const late = async (url: string) => {
+      if (url === '/_kay/dev/tab/network.js')
+        await new Promise<void>((resolve) => { release = resolve })
+
+      return loadTab(url)
+    }
+
+    happy.setURL('http://localhost/old')
+    fakeObserver()
+    tool = startDevTool(document, late)
+    document.documentElement.setAttribute('aria-busy', 'true')
+    await turn()
+    happy.setURL('http://localhost/new')
+    document.documentElement.removeAttribute('aria-busy')
+    await turn()
+    release()
+    await turn()
+    shadow().querySelector<HTMLButtonElement>('#kay-dev-tab-network')!.click()
+
+    expect(visible('#kay-dev-network', 'h3').map(heading => heading.replace(/\d+$/, ''))).toEqual(['This page, /new', 'Before, /old'])
+  })
+
   it('loads an early tab at once, says when its module fails and tries again at the next open', async () => {
     let fails = true
     let loads = 0

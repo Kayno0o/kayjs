@@ -4,6 +4,7 @@ import { GlobalRegistrator } from '@happy-dom/global-registrator'
 import { afterAll, afterEach, beforeAll, describe, expect, it, spyOn } from 'bun:test'
 import jobsTab from '../src/runtime/dev-tab-jobs'
 import { startDevTool } from '../src/runtime/dev-tool'
+import { loadTab } from './helpers/dev-tabs'
 import { eventually } from './helpers/eventually'
 
 beforeAll(() => {
@@ -32,7 +33,7 @@ describe('the Jobs tab', () => {
       return answer(url, init)
     }) as unknown as typeof window.fetch)
 
-    tool = startDevTool()
+    tool = startDevTool(document, loadTab)
 
     const tab = tool.tab({ id: 'jobs-under-test', label: 'Jobs' })
     const refresh = jobsTab(tool, tab)
@@ -152,7 +153,7 @@ describe('the Jobs tab', () => {
   })
 
   it('opens from the rail without its code in the tool, saying so when the module cannot be loaded', async () => {
-    tool = startDevTool()
+    tool = startDevTool(document, loadTab)
     document.querySelector('kay-dev')!.shadowRoot!.querySelector<HTMLButtonElement>('#kay-dev-tab-jobs')!.click()
     await eventually(() => expect(document.querySelector('kay-dev')!.shadowRoot!.querySelector('#kay-dev-jobs .empty')?.textContent).toContain('Could not load the Jobs tab'))
   })

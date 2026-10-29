@@ -28,7 +28,7 @@ interface Navigation {
 
 // What the page fetched, by navigation, newest first: its load and the last few swaps, each request with its kind, status, size and time; the dev tool's own requests are left out, and an error status is counted on the tab for the page shown.
 export default function networkTab(tool: DevTool, tab: DevTab): () => void {
-  const { pill, signal, toolbar } = tool.kit
+  const { pill, signal, swaps: seen, toolbar } = tool.kit
   const doc = tool.root.ownerDocument
   const win = doc.defaultView!
   // The live reload script's fetches of the page, which the dev server answers with a Server-Timing entry only they carry.
@@ -39,7 +39,7 @@ export default function networkTab(tool: DevTool, tab: DevTab): () => void {
   const content = tool.make('div', 'stack')
   const bar = toolbar('Filter by address, kind or status', () => bar.apply(content), true)
   const here = () => `${win.location.pathname}${win.location.search}`
-  const navigations: Navigation[] = [{ path: here(), start: 0, fetches: [], more: 0 }]
+  const navigations: Navigation[] = [{ path: seen.path, start: 0, fetches: [], more: 0 }]
   // What each navigation's section shows, kept so a new request adds its row rather than redrawing the rest, a focused copy button with it.
   const drawn = new Map<Navigation, { group: HTMLElement, heading: HTMLElement, list: HTMLElement, empty: HTMLElement, more: HTMLElement, rows: number }>()
   const changed = () => {
@@ -157,18 +157,17 @@ export default function networkTab(tool: DevTool, tab: DevTab): () => void {
   }
 
   // A swap opens a navigation as it starts and names it once it ends.
-  const swaps = new MutationObserver(() => {
-    const busy = doc.documentElement.getAttribute('aria-busy') === 'true'
+  const swap = (busy: boolean, at: number, path: string) => {
     const last = navigations.at(-1)!
 
     if (busy && last.path !== '') {
-      navigations.push({ path: '', start: win.performance.now(), fetches: [], more: 0 })
+      navigations.push({ path: '', start: at, fetches: [], more: 0 })
 
       if (navigations.length > MAX_NAVIGATIONS)
         navigations.shift()
     }
     else if (!busy && last.path === '') {
-      last.path = here()
+      last.path = path
 
       for (const fetched of early.splice(0))
         place(fetched, addressOf(fetched) === last.path ? last : navigations.findLast(candidate => candidate !== last && candidate.start <= fetched.startTime) ?? navigations[0]!)
@@ -188,7 +187,13 @@ export default function networkTab(tool: DevTool, tab: DevTab): () => void {
     }
 
     changed()
-  })
+  }
+
+  // The swaps from before this module ran.
+  for (const { busy, at, path } of seen.log)
+    swap(busy, at, path)
+
+  const swaps = new MutationObserver(() => swap(doc.documentElement.getAttribute('aria-busy') === 'true', win.performance.now(), here()))
 
   swaps.observe(doc.documentElement, { attributes: true, attributeFilter: ['aria-busy'] })
   signal.addEventListener('abort', () => swaps.disconnect())

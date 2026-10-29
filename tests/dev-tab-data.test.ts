@@ -3,6 +3,7 @@ import { GlobalRegistrator } from '@happy-dom/global-registrator'
 import { afterAll, afterEach, beforeAll, describe, expect, it, spyOn } from 'bun:test'
 import dataTab from '../src/runtime/dev-tab-data'
 import { startDevTool } from '../src/runtime/dev-tool'
+import { loadTab } from './helpers/dev-tabs'
 import { eventually } from './helpers/eventually'
 
 beforeAll(() => {
@@ -35,7 +36,7 @@ describe('the Data tab', () => {
       return answer(url, init)
     }) as unknown as typeof window.fetch)
 
-    tool = startDevTool()
+    tool = startDevTool(document, loadTab)
 
     const tab = tool.tab({ id: 'data-under-test', label: 'Data' })
     const refresh = dataTab(tool, tab)
@@ -129,7 +130,7 @@ describe('the Data tab', () => {
   })
 
   it('opens from the rail without its code in the tool, saying so when the module cannot be loaded', async () => {
-    tool = startDevTool()
+    tool = startDevTool(document, loadTab)
     shadow().querySelector<HTMLButtonElement>('#kay-dev-tab-data')!.click()
     await eventually(() => expect(shadow().querySelector('#kay-dev-data .empty')?.textContent).toContain('Could not load the Data tab'))
   })

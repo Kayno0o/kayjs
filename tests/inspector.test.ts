@@ -4,6 +4,7 @@ import { Elysia } from 'elysia'
 import { compileKay } from '../src/compiler'
 import { startInspector } from '../src/runtime/dev-inspector'
 import { startDevTool } from '../src/runtime/dev-tool'
+import { loadTab } from './helpers/dev-tabs'
 import { eventually, turn } from './helpers/eventually'
 import { pages } from './shared-pages'
 
@@ -61,7 +62,7 @@ describe('the inspector', () => {
 
   const host = () => document.querySelector('kay-dev')!.shadowRoot!
   const start = () => {
-    const tool = startDevTool()
+    const tool = startDevTool(document, loadTab)
     const inspector = startInspector(tool)
 
     return { ...inspector, stop: () => {

@@ -3,6 +3,7 @@ import { GlobalRegistrator } from '@happy-dom/global-registrator'
 import { afterAll, afterEach, beforeAll, describe, expect, it, spyOn } from 'bun:test'
 import stylesTab from '../src/runtime/dev-tab-styles'
 import { startDevTool } from '../src/runtime/dev-tool'
+import { loadTab } from './helpers/dev-tabs'
 import { eventually, turn } from './helpers/eventually'
 
 beforeAll(() => {
@@ -32,7 +33,7 @@ describe('the Styles tab', () => {
       return answer(url, init)
     }) as unknown as typeof window.fetch)
 
-    tool = startDevTool()
+    tool = startDevTool(document, loadTab)
 
     const tab = tool.tab({ id: 'styles-under-test', label: 'Styles' })
 
