@@ -15,7 +15,7 @@ import type { GuestSignInResult } from './sessions'
 import type { RequestState } from './state'
 import type { SessionRecord, UserRecord } from './store'
 import type { Requirement } from './types'
-import { nameUser, overHttps, READ_METHODS, stoppers } from 'kay/library'
+import { durationSeconds, nameUser, overHttps, READ_METHODS, stoppers } from 'kay/library'
 import { clientAddress, crossSiteRefused, crossSiteResponse, forgetLocalMirrors, forgetPushDevice, rateKey, toolCall } from 'kay/server'
 import { protectedResourceMetadata, rootIsFixed, rootUsable, siteRoot } from './authorize/metadata'
 import { bearerRequest, bearerToken } from './bearerHeader'
@@ -629,7 +629,7 @@ export class Auth<Scope extends string = string, Role extends string = string, O
     this.source = 'session'
     this.resolving = Promise.resolve(record)
     // Browser-only (`remember: false`) leaves it a session cookie like the session's; else it lasts as long as the session can, since the session's own cookie is renewed with use.
-    this.markBrowser(!record.guest, remember === false ? undefined : this.session.settings.absoluteMaxAge)
+    this.markBrowser(!record.guest, remember === false ? undefined : durationSeconds(this.session.settings.absoluteMaxAge, 'the session absoluteMaxAge'))
     await noteSignIn(this[STATE], record)
     await report(this[STATE], record, 'signed-in', method)
   }

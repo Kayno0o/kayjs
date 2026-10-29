@@ -111,7 +111,7 @@ await ctx.locals.session.maxAge(input.remember ? '90d' : 'browser')
 
 `'browser'` sends a cookie the browser drops when it closes. The server keeps that session for `browserMaxAge` without use, one day by default.
 
-A library that must follow the app's session reads `ctx.locals.session.settings`: the `maxAge`, `absoluteMaxAge` and `browserMaxAge` the plugin resolved, in seconds.
+A library that must follow the app's session reads `ctx.locals.session.settings`: the `maxAge`, `absoluteMaxAge` and `browserMaxAge` the plugin resolved, as durations in whole seconds such as `'2592000s'`.
 
 ### The app secret
 

@@ -3243,9 +3243,9 @@ interface SessionOptions
 
 [./server] SessionSettings
 interface SessionSettings
-  absoluteMaxAge: number
-  browserMaxAge: number
-  maxAge: number
+  absoluteMaxAge: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w`
+  browserMaxAge: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w`
+  maxAge: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w`
 
 [./server] SessionStore
 interface SessionStore

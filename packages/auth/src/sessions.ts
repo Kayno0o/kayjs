@@ -3,6 +3,7 @@ import type { BareUser, Core } from './core'
 import type { Device } from './device'
 import type { RequestState } from './state'
 import type { SessionRecord, UserRecord } from './store'
+import { durationSeconds } from 'kay/library'
 import { TOUCH_EVERY_MS } from './core'
 import { readDevice } from './device'
 import { log } from './log'
@@ -102,7 +103,7 @@ export async function listSessions(state: RequestState): Promise<UserSession[]> 
 }
 
 function live(settings: SessionSettings, session: SessionRecord, record: UserRecord, now: number): boolean {
-  return session.version === record.sessionVersion && now - session.lastSeenAt.getTime() < (session.maxAge ?? settings.maxAge) * 1000 && now - session.createdAt.getTime() < settings.absoluteMaxAge * 1000
+  return session.version === record.sessionVersion && now - session.lastSeenAt.getTime() < (session.maxAge ?? durationSeconds(settings.maxAge, 'the session maxAge')) * 1000 && now - session.createdAt.getTime() < durationSeconds(settings.absoluteMaxAge, 'the session absoluteMaxAge') * 1000
 }
 
 // A failure is logged, not thrown: a lookup service down must not hide the list.
@@ -130,14 +131,14 @@ export async function applyLifetime(state: RequestState, remember: boolean | und
   const { core, session } = state
 
   if (remember === undefined) {
-    await session.maxAge(`${session.settings.maxAge}s`)
+    await session.maxAge(session.settings.maxAge)
 
     return null
   }
 
   await session.maxAge(remember ? `${core.rememberMaxAge}s` : 'browser')
 
-  return remember ? core.rememberMaxAge : session.settings.browserMaxAge
+  return remember ? core.rememberMaxAge : durationSeconds(session.settings.browserMaxAge, 'the session browserMaxAge')
 }
 
 // After a change to how the account is signed in to: every session the user holds ends but this browser's, and every bearer token with them, since one minted from a stolen session would outlive it.

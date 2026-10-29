@@ -69,14 +69,14 @@ export interface Session<Data extends object> {
   regenerate: () => Promise<void>
   // This session's own maxAge in place of `maxAge`, kept until it is destroyed, for "remember me": a string such as '90d', or 'browser' for a cookie the browser drops on closing, lasting `browserMaxAge` without being used.
   maxAge: (maxAge: Duration | 'browser') => Promise<void>
-  // The lifetimes the plugin resolved, in seconds, defaults included: for a library that must agree with the app's session instead of asking for them again.
+  // The lifetimes the plugin resolved as durations such as '2592000s', defaults included: for a library that must agree with the app's session instead of asking for them again.
   readonly settings: SessionSettings
 }
 
 export interface SessionSettings {
-  readonly maxAge: number
-  readonly absoluteMaxAge: number
-  readonly browserMaxAge: number
+  readonly maxAge: Duration
+  readonly absoluteMaxAge: Duration
+  readonly browserMaxAge: Duration
 }
 
 interface Sealed {
@@ -284,7 +284,7 @@ class RequestSession<Data extends object> implements Session<Data> {
   get settings(): SessionSettings {
     const { maxAge, absoluteMaxAge, browserMaxAge } = this.config
 
-    return { maxAge, absoluteMaxAge, browserMaxAge }
+    return { maxAge: `${maxAge}s`, absoluteMaxAge: `${absoluteMaxAge}s`, browserMaxAge: `${browserMaxAge}s` }
   }
 
   async maxAge(maxAge: Duration | 'browser'): Promise<void> {

@@ -1,6 +1,6 @@
 import type { SessionSettings } from 'kay/server'
 import type { Core } from './core'
-import { trackDetached } from 'kay/library'
+import { durationSeconds, trackDetached } from 'kay/library'
 import { log } from './log'
 
 // What expired is deleted at most this often.
@@ -23,7 +23,7 @@ export function pruneWhenDue(core: Core, settings: SessionSettings): void {
 
 async function prune(core: Core, settings: SessionSettings, now: number): Promise<void> {
   try {
-    await core.store.prune?.({ now: new Date(now), bearerExpiredBefore: new Date(now - BEARER_EXPIRED_KEPT_MS), sessionMaxAge: `${Math.max(settings.maxAge, core.rememberMaxAge, settings.browserMaxAge)}s`, sessionAbsoluteMaxAge: `${settings.absoluteMaxAge}s` })
+    await core.store.prune?.({ now: new Date(now), bearerExpiredBefore: new Date(now - BEARER_EXPIRED_KEPT_MS), sessionMaxAge: `${Math.max(durationSeconds(settings.maxAge, 'the session maxAge'), core.rememberMaxAge, durationSeconds(settings.browserMaxAge, 'the session browserMaxAge'))}s`, sessionAbsoluteMaxAge: settings.absoluteMaxAge })
   }
   catch (error) {
     log.error('pruning what expired failed', error)

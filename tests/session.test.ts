@@ -515,10 +515,8 @@ describe('sessions', () => {
       return await (await app.handle(new Request('http://localhost/settings'))).json() as unknown
     }
 
-    const DAY = 24 * 60 * 60
-
-    expect(await read({})).toEqual({ maxAge: 30 * DAY, absoluteMaxAge: 90 * DAY, browserMaxAge: DAY })
-    expect(await read({ maxAge: '7d', absoluteMaxAge: '3600s', browserMaxAge: '2h' })).toEqual({ maxAge: 7 * DAY, absoluteMaxAge: 3600, browserMaxAge: 7200 })
+    expect(await read({})).toEqual({ maxAge: '2592000s', absoluteMaxAge: '7776000s', browserMaxAge: '86400s' })
+    expect(await read({ maxAge: '7d', absoluteMaxAge: '3600s', browserMaxAge: '2h' })).toEqual({ maxAge: '604800s', absoluteMaxAge: '3600s', browserMaxAge: '7200s' })
   })
 
   it('caps a browser session\'s lifetime in the store too', async () => {
