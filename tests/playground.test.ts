@@ -38,10 +38,10 @@ const runnable = examples.filter(([, source]) => runs(source) && renders(source)
 
 let browserCompile: typeof import('../docs/src/playground/compile').compile
 
-// The compiler as the docs ship it to a browser, bundled for one with the stand-ins of `host.browser.ts`, and run here.
+// The compiler as the docs ship it to a browser, bundled for one with the stand-ins of `host.browser.ts`, and run here with the native parser, as the browser's WebAssembly build of it cannot load in Bun.
 beforeAll(async () => {
   const dir = await scratchDir('playground-')
-  const built = await Bun.build({ entrypoints: [join(root, 'docs/src/playground/compile.ts')], target: 'browser', outdir: dir })
+  const built = await Bun.build({ entrypoints: [join(root, 'docs/src/playground/compile.ts')], target: 'browser', external: ['oxc-parser'], outdir: dir })
 
   expect(built.success, built.logs.join('\n')).toBe(true)
   browserCompile = (await import(built.outputs[0]!.path) as { compile: typeof browserCompile }).compile
