@@ -227,7 +227,9 @@ export function pgStore(db: Database): AuthStore {
         await users.write.insertOne(fromUser(user))
       },
       async update(id, patch) {
-        return toUser(await users.write.updateById(id, fromUser(patch)))
+        const row = fromUser(patch)
+
+        return toUser(isEmpty(row) ? await users.read.findById(id) : await users.write.updateById(id, row))
       },
       async staleGuests(createdBefore, limit) {
         const rows = await db.raw<{ id: string }>`
@@ -268,7 +270,10 @@ export function pgStore(db: Database): AuthStore {
         await identities.write.insertOne({ provider: identity.provider, provider_id: identity.providerId, user_id: identity.userId, access_token: identity.accessToken, refresh_token: identity.refreshToken, token_expires_at: identity.tokenExpiresAt, created_at: identity.createdAt })
       },
       async update(provider, providerId, patch) {
-        await identities.write.updateOne(withoutUndefined({ access_token: patch.accessToken, refresh_token: patch.refreshToken, token_expires_at: patch.tokenExpiresAt }), { provider, provider_id: providerId })
+        const row = withoutUndefined({ access_token: patch.accessToken, refresh_token: patch.refreshToken, token_expires_at: patch.tokenExpiresAt })
+
+        if (!isEmpty(row))
+          await identities.write.updateOne(row, { provider, provider_id: providerId })
       },
       async delete(provider, providerId) {
         await identities.write.deleteMany({ provider, provider_id: providerId })
@@ -298,7 +303,10 @@ export function pgStore(db: Database): AuthStore {
       get: async id => toSession(await sessions.read.findById(id)),
       listByUser: async userId => (await sessions.read.findMany(q => q.where({ user_id: userId }).orderBy('created_at', 'asc'))).map(row => toSession(row)!),
       async update(id, patch) {
-        await sessions.write.updateById(id, withoutUndefined({ version: patch.version, ip: patch.ip, last_seen_at: patch.lastSeenAt }))
+        const row = withoutUndefined({ version: patch.version, ip: patch.ip, last_seen_at: patch.lastSeenAt })
+
+        if (!isEmpty(row))
+          await sessions.write.updateById(id, row)
       },
       delete: async (userId, id) => await sessions.write.deleteOne({ id, user_id: userId }) !== null,
     },
@@ -309,7 +317,10 @@ export function pgStore(db: Database): AuthStore {
       get: async id => toPasskey(await passkeys.read.findById(id)),
       listByUser: async userId => (await passkeys.read.findMany(q => q.where({ user_id: userId }).orderBy('created_at', 'asc'))).map(row => toPasskey(row)!),
       async update(id, patch) {
-        await passkeys.write.updateById(id, withoutUndefined({ name: patch.name, counter: patch.counter === undefined ? undefined : BigInt(patch.counter), backed_up: patch.backedUp, user_verified: patch.userVerified, last_used_at: patch.lastUsedAt }))
+        const row = withoutUndefined({ name: patch.name, counter: patch.counter === undefined ? undefined : BigInt(patch.counter), backed_up: patch.backedUp, user_verified: patch.userVerified, last_used_at: patch.lastUsedAt })
+
+        if (!isEmpty(row))
+          await passkeys.write.updateById(id, row)
       },
       delete: async (userId, id) => await passkeys.write.deleteOne({ id, user_id: userId }) !== null,
     },
@@ -333,7 +344,11 @@ export function pgStore(db: Database): AuthStore {
       get: async id => toOrganization(await organizations.read.findById(id)),
       getMany: async ids => (await organizations.read.findMany({ id: { in: ids } })).map(row => toOrganization(row)!),
       findBySlug: async slug => toOrganization(await organizations.read.findOne({ slug })),
-      update: async (id, patch) => toOrganization(await organizations.write.updateById(id, withoutUndefined({ name: patch.name, slug: patch.slug }))),
+      async update(id, patch) {
+        const row = withoutUndefined({ name: patch.name, slug: patch.slug })
+
+        return toOrganization(isEmpty(row) ? await organizations.read.findById(id) : await organizations.write.updateById(id, row))
+      },
       delete: async id => await organizations.write.deleteById(id) !== null,
     },
     members: {
@@ -678,6 +693,11 @@ function toAudit(row: InferEntity<typeof AuthAudit>): AuditRecord {
 
 function toPasskey(row: InferEntity<typeof AuthPasskeys> | null): PasskeyRecord | undefined {
   return row ? { id: row.id, userId: row.user_id, name: row.name, publicKey: row.public_key, counter: Number(row.counter), transports: row.transports, multiDevice: row.multi_device, backedUp: row.backed_up, userVerified: row.user_verified, createdAt: row.created_at, lastUsedAt: row.last_used_at } : undefined
+}
+
+// pg-orm refuses an update with nothing to set, so an empty patch skips it.
+function isEmpty(row: object): boolean {
+  return Object.keys(row).length === 0
 }
 
 // pg-orm refuses an `undefined` value, so a patch names only the fields it changes.

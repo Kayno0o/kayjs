@@ -326,6 +326,7 @@ describe('organizations', () => {
 
     expect(await grace.browser.call('organizations.update', org, { name: 'Acme Inc', slug: 'acme-inc' })).toMatchObject({ ok: true, organization: { name: 'Acme Inc', slug: 'acme-inc' } })
     expect(await grace.browser.call('organizations.update', org, { slug: 'other' })).toEqual({ ok: false, error: 'slug-taken' })
+    expect(await grace.browser.call('organizations.update', 'acme-inc', {})).toMatchObject({ ok: true, organization: { id: org, name: 'Acme Inc', slug: 'acme-inc' } })
     expect(await grace.browser.call('organizations.update', 'acme-inc', { slug: null })).toMatchObject({ ok: true, organization: { slug: null } })
     expect(await grace.browser.call('organizations.delete', org)).toEqual({ ok: false, error: 'forbidden' })
     expect(await ada.browser.call('organizations.delete', org)).toEqual({ ok: true })

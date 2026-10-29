@@ -338,6 +338,19 @@ export function storeContract(name: string, fresh: () => Promise<AuthStore>) {
       expect(await store.sessions.get('s1')).toBeUndefined()
     })
 
+    test('an update with nothing to change leaves the user and the organization as they are', async () => {
+      const store = await fresh()
+      const at = new Date()
+
+      await store.users.create(userRecord({ id: 'u1', email: 'ada@example.com' }))
+      await store.organizations!.create({ id: 'o1', name: 'Acme', slug: 'acme', createdAt: at })
+
+      expect(await store.users.update('u1', {})).toEqual(await store.users.get('u1'))
+      expect(await store.users.update('missing', {})).toBeUndefined()
+      expect(await store.organizations!.update('o1', {})).toEqual({ id: 'o1', name: 'Acme', slug: 'acme', createdAt: at })
+      expect(await store.organizations!.update('missing', {})).toBeUndefined()
+    })
+
     test('organizations are found by id and slug, keep slugs unique, and take their members and invitations when deleted', async () => {
       const at = new Date('2026-01-01T00:00:00Z')
 

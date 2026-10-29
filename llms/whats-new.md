@@ -14,6 +14,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 - `kay check` reports a refused builtin behind a `sideEffects: false` package or a child `.kay` component an island renders as `browser-builtin-import` too, keeps the other islands' reports when one import fails to bundle, and reports one chain once per island: [Browser-only code](browser-only.md).
 - `kay build` writes the navigation-only entry and its chunks only when a component renders a form posting to an action, so an app with none deploys no `nav-*` file: [building](build-and-start.md).
 - A content collection with a `load` function keeps its compiled Markdown bodies in `.kay/cache/content` as a folder collection does, so a build compiles only the bodies that changed: [Content](content-markdown-to-caching.md).
+- kayjs-auth: `organizations.update(id, {})` and an empty update of a user answer the row as it is on the pg store, where it threw and the organization update reported `slug-taken`; `slug-taken` now means a slug another organization holds.
 
 ## 1.82.0
 

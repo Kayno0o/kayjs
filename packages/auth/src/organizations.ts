@@ -196,8 +196,14 @@ export async function updateOrganization(state: RequestState, ref: string, patch
   try {
     updated = await store.organizations.update(found.organization.id, { ...name === undefined ? {} : { name }, ...slug === undefined ? {} : { slug } })
   }
-  catch {
-    return { ok: false, error: 'slug-taken' }
+  catch (error) {
+    // Only a slug another organization took meanwhile is a conflict, any other failure is the store's.
+    const holder = slug == null ? undefined : await store.organizations.findBySlug(slug)
+
+    if (holder && holder.id !== found.organization.id)
+      return { ok: false, error: 'slug-taken' }
+
+    throw error
   }
 
   return updated ? { ok: true, organization: publicOrganization(updated) } : { ok: false, error: 'not-found' }
