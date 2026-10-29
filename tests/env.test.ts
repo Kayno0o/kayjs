@@ -842,6 +842,24 @@ describe('kay env against compose and .env.example', () => {
     expect(defineConfig({ publicEnv: true })).toBeDefined()
   })
 
+  it('refuses a config key kay does not know, naming the nearest one, in the file, an option bag and an extension\'s config, and types it out of defineConfig', async () => {
+    const bad = async (config: string) => kay(['check', await project({ ...files, 'kay.config.ts': config })], process.cwd())
+    const spread = { lang: 'en' }
+
+    expect((await bad('export default { lang: \'en\', trailingslash: \'always\', prefech: \'eager\' }\n')).stderr).toContain('`trailingslash`, did you mean `trailingSlash`?; `prefech`, did you mean `prefetch`?')
+    expect((await bad('export default { security: { reprots: true }, i18n: { locales: [\'en\'], defaultLocale: \'en\', mesages: \'m\' } }\n')).stderr).toContain('`security.reprots`, did you mean `security.reports`?; `i18n.mesages`, did you mean `i18n.messages`?')
+    expect((await bad('export default { extensions: [{ name: \'lib\', config: { requireGuard: true } }] }\n')).stderr).toContain('the config of the extension lib has an option kay does not know: `requireGuard`, did you mean `requireGuards`?')
+    expect((await bad('export default { nothing: 1 }\n')).stderr).toContain('`nothing`')
+    expect((await bad('export default { lang: \'en\', offline: true, health: false, security: false }\n')).stderr).not.toContain('does not know')
+    // @ts-expect-error a key kay does not know, next to valid ones
+    expect(defineConfig({ lang: 'en', trailingslash: 'always' })).toBeDefined()
+    // @ts-expect-error the same through a spread
+    expect(defineConfig({ ...spread, prefech: 'eager' })).toBeDefined()
+    // @ts-expect-error a mistyped key of an option bag
+    expect(defineConfig({ security: { reprots: true } })).toBeDefined()
+    expect(defineConfig({ lang: 'en', trailingSlash: 'always', offline: true, security: { hosts: true } })).toBeDefined()
+  })
+
   it('prints the findings as text and exits 1 on an error', async () => {
     const root = await project({ ...files, 'app.env': '' })
     const { stderr, code } = await kay(['env', '--compose', 'compose.yaml'], root)

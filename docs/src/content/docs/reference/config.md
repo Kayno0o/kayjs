@@ -3,7 +3,7 @@ title: Config
 order: 2
 description: The options of kay.config.ts most projects set.
 ---
-`kay.config.ts` at the project root exports the config by default. `defineConfig` types it, and `kay dev`, `kay build`, `kay check` and the server all read it.
+`kay.config.ts` at the project root exports the config by default. `defineConfig` types it, and `kay dev`, `kay build`, `kay check` and the server all read it. A key kay does not know, at the top or in an option bag such as `security`, is a type error in `defineConfig` and stops every command with the nearest known name, so a mistyped `trailingslash` never leaves the default in place unnoticed.
 
 ```ts
 import { defineConfig } from 'kay/server'

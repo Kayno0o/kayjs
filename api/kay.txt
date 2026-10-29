@@ -2321,7 +2321,7 @@ class CspViolationError
 const dataTables: readonly string[]
 
 [./server] defineConfig
-function defineConfig<Config extends KayConfig>(config: Config): Config
+function defineConfig<Config extends KayConfig>(config: Config & UnknownKeys<Config, KayConfig> & { [Key in keyof NestedBags & keyof Config]?: UnknownKeys<Config[Key], NestedBags[Key]>; }): Config
 
 [./server] defineEnv
 function defineEnv<Schema extends EnvSchema>(declared: Schema, source?: Record<string, string | undefined>): (Schema & {

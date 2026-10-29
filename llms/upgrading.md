@@ -41,6 +41,9 @@ What each minor release breaks, and what an app changes to move to it. kay and i
 ### A session sealed before kay 1.72.0 signs its visitor out once
 
 - `session()` opens a cookie with the key derived for it only, no longer with the bare SHA-256 of the secret that kay sealed under before v1.72.0. A visitor whose cookie was last written by such a kay, and never since by a later one, is signed out once. Nothing changes in the app, and no lint can carry it as it is cookie data.
+### A misspelled config key is refused
+
+- A key kay does not know in `kay.config.ts` (or in an extension's `config`), at its top level or in `security`, `i18n`, `seo`, `offline`, `health` and `proxy`, now stops every command with the nearest known name, where it used to leave kay's default in place. An app whose config already carries a typo starts failing: correct the key, or drop it.
 
 ## 1.82.0
 

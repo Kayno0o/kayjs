@@ -496,8 +496,29 @@ export type LoadedConfig = KayConfig & InternalConfig
 
 export const CONFIG_FILE = 'kay.config.ts'
 
+// The nested bags whose own keys are checked as the config's are, by the key holding them and the shape they take.
+interface NestedBags {
+  security: SecurityConfig
+  i18n: I18nConfig
+  seo: SeoConfig
+  offline: OfflineConfig
+  health: HealthConfig
+  proxy: ProxyConfig
+}
+
+// The known key a mistyped one differs from by its case alone, which a type can tell; `kay check` names the nearest by distance.
+type CaseVariant<Key, Known> = { [Name in keyof Known & string]: Lowercase<Name> extends Lowercase<Key & string> ? Name : never }[keyof Known & string]
+
+// What an unknown key's value must be: a string naming the problem, which nothing a config gives matches, so the error lands on the key.
+type Misspelled<Key, Known> = [CaseVariant<Key, Known>] extends [never] ? 'unknown option' : `unknown option, did you mean \`${CaseVariant<Key, Known> & string}\`?`
+
+type UnknownKeys<Given, Known> = Given extends object ? { [Key in Exclude<keyof Given, keyof Known>]: Misspelled<Key, Known> } : unknown
+
+// The config with every key `KayConfig` and its nested bags lack typed so that setting it is an error: an inferred type parameter gets no excess property check of its own.
+type Checked<Config> = UnknownKeys<Config, KayConfig> & { [Key in keyof NestedBags & keyof Config]?: UnknownKeys<Config[Key], NestedBags[Key]> }
+
 // Gives the config back as written, so `kay check` reads the types of what it declares off it.
-export function defineConfig<Config extends KayConfig>(config: Config): Config {
+export function defineConfig<Config extends KayConfig>(config: Config & Checked<Config>): Config {
   return config
 }
 

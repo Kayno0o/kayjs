@@ -5,6 +5,7 @@ import process from 'node:process'
 import { libraryMessageExtensions } from './build/manifests'
 import { KayError } from './compiler/errors'
 import { CONFIG_FILE } from './config'
+import { unknownConfigKeys } from './config-shape'
 import { publicEnvFiles } from './server/env-state'
 
 // `fresh` reads the file again as it is now, as `kay dev` does once it changed, rather than the module this process imported first.
@@ -125,9 +126,16 @@ async function importedConfig(file: string, fresh: boolean): Promise<{ default?:
 }
 
 // The keys `kay check` and `kay env` read in their own way, refused when they are not the shape they take.
-function checkedConfig({ checks, env, publicEnv }: LoadedConfig, where = CONFIG_FILE): void {
+function checkedConfig(config: LoadedConfig, where = CONFIG_FILE): void {
+  const { checks, env, publicEnv } = config
+
   if (publicEnv !== undefined)
     throw new KayError('config-invalid', `kay: \`publicEnv\` in ${where} is gone: mark the fields an island reads \`s.Public\` in \`defineEnv\` instead`)
+
+  const unknown = unknownConfigKeys(config)
+
+  if (unknown.length > 0)
+    throw new KayError('config-invalid', `kay: ${where} has ${unknown.length === 1 ? 'an option' : 'options'} kay does not know: ${unknown.join('; ')}`)
 
   if (checks !== undefined && !Array.isArray(checks))
     throw new KayError('config-invalid', `kay: \`checks\` in ${where} is a list of functions, not ${typeof checks}`)

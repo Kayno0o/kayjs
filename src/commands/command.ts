@@ -11,6 +11,7 @@ import { parseArgs } from 'node:util'
 import { colors, createColors } from '@kaynooo/utils/tools/colors'
 import { errorCodeOf } from '../compiler/errors'
 import { offsetAt, positionAt } from '../compiler/mapping'
+import { nearest } from '../nearest'
 
 const SHELL_SAFE = /^[\w@%+=:,./-]+$/
 // What a workflow command's message and properties escape.
@@ -88,24 +89,9 @@ function unknownOption(error: unknown, command: Command, fail: (message: string)
     return undefined
 
   const typed = unknown.replace(LEADING_DASHES, '')
-  const [near] = [...Object.keys(command.options), 'help'].map(option => ({ option, distance: editDistance(typed, option) })).filter(({ distance }) => distance <= Math.min(2, Math.ceil(typed.length / 3))).sort((a, b) => a.distance - b.distance)
+  const near = nearest(typed, [...Object.keys(command.options), 'help'])
 
-  return fail(`kay ${COMMAND_WORDS.exec(command.usage)?.[0] ?? command.usage}: unknown option ${unknown}${near === undefined || !unknown.startsWith('--') ? '' : `, did you mean --${near.option}?`}`)
-}
-
-function editDistance(a: string, b: string): number {
-  let row = Array.from({ length: b.length + 1 }, (_, index) => index)
-
-  for (let i = 1; i <= a.length; i++) {
-    const next = [i]
-
-    for (let j = 1; j <= b.length; j++)
-      next[j] = Math.min(row[j]! + 1, next[j - 1]! + 1, row[j - 1]! + (a[i - 1] === b[j - 1] ? 0 : 1))
-
-    row = next
-  }
-
-  return row[b.length]!
+  return fail(`kay ${COMMAND_WORDS.exec(command.usage)?.[0] ?? command.usage}: unknown option ${unknown}${near === undefined || !unknown.startsWith('--') ? '' : `, did you mean --${near}?`}`)
 }
 
 // The directory a command works on, or nothing once it said, in `format`, that the path is none.

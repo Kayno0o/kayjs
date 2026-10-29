@@ -76,6 +76,7 @@ export const app = new Elysia()
 - An entry other than `src/server.ts` is named once, as `entry: 'src/main.ts'` in `kay.config.ts`, which `kay dev`, `start`, `render`, `check`, `build` and `build --compile` all read; `--entry` on a command wins over it, `kay build --entry` also pointing its check step at that entry.
 - An entry `kay check` does not read registers it instead: `declare module 'kay' { interface Register { app: typeof app } }`.
 
+- A key kay does not know in `kay.config.ts`, at its top or in the `security`, `i18n`, `seo`, `offline`, `health` and `proxy` bags, stops every command with the nearest known name (`` `trailingslash`, did you mean `trailingSlash`? ``), and `defineConfig` types it as an error, since a mistyped key would otherwise leave kay's default in place with nothing said.
 - Project settings live in an optional `kay.config.ts` at the root, read by `pages()` and every command; options passed to `pages()` or `testSite()` win over it key by key, an `undefined` option leaving the file's value, and in an executable `kay build --compile` wrote, the root, routes and public directory it was built with win over both.
 - It must `export default` its config, or the command fails with a message saying so.
 
