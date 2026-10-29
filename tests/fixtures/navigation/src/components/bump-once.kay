@@ -1,0 +1,4 @@
+---
+import { bump } from '../routes/index.kay'
+---
+button.bump-once(onClick={() => bump({})}) Bump once

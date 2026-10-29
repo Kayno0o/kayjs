@@ -15,12 +15,14 @@ const bumps = store.bumps
 import Aside from '../components/aside.kay'
 import Box from '../components/box.kay'
 import Bump from '../components/bump.kay'
+import BumpOnce from '../components/bump-once.kay'
 ---
 head
   title Home
 h1 Home
 p.bumps Bumped {bumps}
 Bump
+BumpOnce
 Box
   p.same Same each time
 Box
