@@ -1,0 +1,11 @@
+---
+import Tabs from '@kaynooo/kayjs-ui/tabs.kay'
+
+// What the tests read back: each tab shown.
+const { onChange, paramDefault } = props<{ onChange?: (value: string) => void, paramDefault?: string }>()
+
+const tabs = [{ value: 'details', label: 'Details' }, { value: 'reviews', label: 'Reviews' }, { value: 'shipping', label: 'Shipping' }] as const
+---
+Tabs#tabs(tabs={tabs} param="tab" paramDefault={paramDefault} label="Product" onChange={onChange})
+  @panel(tab)
+    p {tab}

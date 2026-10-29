@@ -2,10 +2,10 @@
 import Tabs from '@kaynooo/kayjs-ui/tabs.kay'
 
 // What the test reads back: each tab shown.
-const { onChange } = props<{ onChange?: (value: string) => void }>()
+const { onChange, value = 'venus', disabledFirst = false } = props<{ onChange?: (value: string) => void, value?: string, disabledFirst?: boolean }>()
 
-const tabs = [{ value: 'mars', label: 'Mars' }, { value: 'venus', label: 'Venus' }, { value: 'earth', label: 'Earth' }] as const
+const tabs = [{ value: 'mars', label: 'Mars', disabled: disabledFirst }, { value: 'venus', label: 'Venus', disabled: disabledFirst && value === 'venus' }, { value: 'earth', label: 'Earth' }] as const
 ---
-Tabs#tabs(tabs={tabs} value="venus" label="Planets" onChange={onChange})
+Tabs#tabs(tabs={tabs} value={value} label="Planets" onChange={onChange})
   @panel(planet)
     input(name={planet} value={planet})

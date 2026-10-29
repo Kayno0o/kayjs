@@ -2,7 +2,7 @@
 import type { JSX, Snippet } from 'kay'
 import type { IconProps } from 'kay/icons'
 import type { IconSlot } from './defaults'
-import { effect, recipe, signal, uid, untrack } from 'kay'
+import { effect, persisted, recipe, signal, uid, untrack } from 'kay'
 import { stepIndex } from './cycle'
 import Icon from './icon.kay'
 
@@ -28,31 +28,57 @@ const look = recipe({
   },
 })
 
-const { tabs, value, label, onChange, panel, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'onChange'> & {
+const { tabs, value, param, paramDefault, label, onChange, panel, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'onChange'> & {
   // `icon` sits before the label; `disabled` keeps that tab from being shown, and the arrow keys skip it.
   tabs: readonly { value: Value, label: string, icon?: IconSlot | IconProps | undefined, disabled?: boolean | undefined }[]
-  // The tab shown to start with; tabs whose parent passes another follow it.
-  value: Value
   // Names the tab list for screen readers.
   label: string
   onChange?: ((value: Value) => unknown) | undefined
   // Draws each tab's panel: `@panel(tab)`, given the tab's value. Every panel is drawn once and hidden while its tab is not shown, so what it holds survives a switch.
   // A hidden panel is hidden until found: find in page, a link to an id inside it, or kay's `focusInvalid` reaching a field in it shows its tab.
   panel: Snippet<[value: Value]>
-}>()
+} & (
+  {
+    // The tab shown to start with; tabs whose parent passes another follow it. A value naming no enabled tab shows the first enabled one, with no `onChange` for the fallback.
+    value: Value
+    param?: undefined
+    paramDefault?: undefined
+  } | {
+    // Holds the shown tab in a query param of the page with no island of the app's, in place of `value`: the server draws that tab from the first paint, and a pick rewrites the address without a navigation (every panel is already drawn), the other params kept and the current history entry replaced. `onChange` still runs.
+    param: string
+    // The tab the page shows while `param` is left out: picking it leaves the param out. Without it the first enabled tab is shown, and picking it sets the param like any other.
+    paramDefault?: Value | undefined
+    value?: undefined
+  }
+)>()
 
 const id = uid()
 // Held as a string: a signal cannot take a type parameter that might be a function.
-const shown = signal<string>(value)
+const shown = signal<string>(value ?? '')
+const kept = param === undefined ? undefined : persisted(param, paramDefault ?? '', { storage: 'query' })
 let list: HTMLElement | undefined
 
-effect(() => shown = value)
+effect(() => {
+  if (value !== undefined)
+    shown = value
+})
+
+// The tab on screen: the one asked for when it is enabled, else the first enabled one, so a value naming none (an unknown one read from a URL, a disabled tab) still leaves a tab in the page's tab order.
+const active = () => {
+  const asked = kept ? kept() : shown()
+
+  return tabs.some(tab => tab.value === asked && !tab.disabled) ? asked : tabs.find(tab => !tab.disabled)?.value
+}
 
 function show(next: Value) {
-  if (next === shown())
+  if (next === active())
     return
 
-  shown = next
+  if (kept)
+    kept.set(next)
+  else
+    shown = next
+
   onChange?.(next)
 }
 
@@ -68,7 +94,7 @@ function keyDown(event: KeyboardEvent) {
 
   event.preventDefault()
 
-  let next = move(tabs.findIndex(tab => tab.value === shown()), tabs.length)
+  let next = move(tabs.findIndex(tab => tab.value === active()), tabs.length)
 
   // The arrows go on past a disabled tab, Home and End to the nearest one that is not, every tab being checked at most once.
   const step = key === 'ArrowLeft' || key === 'End' ? -1 : 1
@@ -86,11 +112,11 @@ function keyDown(event: KeyboardEvent) {
 div(part="root" {...rest})
   div(part="list" ref={element => list = element} role="tablist" aria-label={label} onKeyDown={keyDown})
     for tab, index of tabs key={tab.value}
-      button(part="tab" type="button" role="tab" id={`${id}-tab-${index}`} aria-controls={`${id}-panel-${index}`} aria-selected={shown() === tab.value ? 'true' : 'false'} tabindex={shown() === tab.value ? 0 : -1} disabled={tab.disabled} onClick={() => show(tab.value)})
+      button(part="tab" type="button" role="tab" id={`${id}-tab-${index}`} aria-controls={`${id}-panel-${index}`} aria-selected={active() === tab.value ? 'true' : 'false'} tabindex={active() === tab.value ? 0 : -1} disabled={tab.disabled} onClick={() => show(tab.value)})
         if tab.icon
           Icon(icon={tab.icon} part="icon")
         | {tab.label}
   for tab, index of tabs key={tab.value}
-    div(part="panel" ref={element => element.addEventListener('beforematch', () => show(tab.value))} role="tabpanel" id={`${id}-panel-${index}`} aria-labelledby={`${id}-tab-${index}`} tabindex={shown() === tab.value ? 0 : undefined} hidden={shown() === tab.value ? undefined : 'until-found'})
+    div(part="panel" ref={element => element.addEventListener('beforematch', () => show(tab.value))} role="tabpanel" id={`${id}-panel-${index}`} aria-labelledby={`${id}-tab-${index}`} tabindex={active() === tab.value ? 0 : undefined} hidden={active() === tab.value ? undefined : 'until-found'})
       // Untracked, so a tab relabelled, such as with a count, keeps its panel and the focus inside it.
       | {untrack(() => panel(tab.value))}
