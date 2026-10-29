@@ -44,7 +44,7 @@ interface Inferred
 interface IslandBrand
 
 [.] PlainIslandProp
-type PlainIslandProp<Component, Value> = Component extends IslandBrand ? SecretProp<Value> & ActionProp<Component, Value> : unknown
+type PlainIslandProp<Component, Value> = Component extends IslandBrand ? SecretProp<Value> : unknown
 
 [.] TemplateContext
 type TemplateContext = TemplateValues extends { values: infer Values extends object } ? Values : object
@@ -635,9 +635,6 @@ function registerImage(url: string, width: number, height: number): string
 [./internal] registerPlaceholder
 function registerPlaceholder(url: string, color: string): string
 
-[./internal] reviveActions
-function reviveActions(): void
-
 [./internal] uiRecipe
 function uiRecipe(config: RecipeConfig<Readonly<Record<string, Readonly<Record<string, VariantClasses>>>>>, base?: Pick<Recipe<Readonly<Record<string, Readonly<Record<string, VariantClasses>>>>>, "defaults"> | undefined): Recipe<Readonly<Record<string, Readonly<Record<string, VariantClasses>>>>>
 
@@ -701,7 +698,7 @@ function collectIslands<T>(render: () => T, salt?: string | undefined, chunks?: 
 function insideIsland(): boolean
 
 [./island] island
-function island<P extends object>(id: string, component: ((props: P) => Element) | undefined, messages?: readonly string[], client?: boolean, why?: string, lives?: readonly unknown[], takesActions?: boolean): IslandComponent<P>
+function island<P extends object>(id: string, component: ((props: P) => Element) | undefined, messages?: readonly string[], client?: boolean, why?: string, lives?: readonly unknown[]): IslandComponent<P>
 
 [./island] islandCheckpoint
 function islandCheckpoint(): (() => void) | undefined
@@ -717,7 +714,7 @@ class IslandPropsError
 function noteMessage(key: string): void
 
 [./island] promote
-function promote<P extends object>(id: string, render: (props: P) => Element, hydrated: (props: P) => Element, messages?: readonly string[], takesActions?: boolean): (props: P) => Element
+function promote<P extends object>(id: string, render: (props: P) => Element, hydrated: (props: P) => Element, messages?: readonly string[]): (props: P) => Element
 
 [./island] RenderedIslands
 interface RenderedIslands

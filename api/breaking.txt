@@ -1,6 +1,2 @@
-ui [./rating.kay] default
-kay [./internal] reviveActions
-kay [./island] island
-kay [./island] promote
 kay [.] IslandProp
-kay [.] PlainIslandProp
+ui [./rating.kay] default

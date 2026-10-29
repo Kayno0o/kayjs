@@ -359,7 +359,7 @@ interface IslandOptions
   persist?: string | boolean | undefined
 
 [.] IslandProp
-type IslandProp<Component, Value> = Component extends IslandBrand ? [IsSerializable<Value>] extends [true] ? SecretProp<Value> & ActionProp<Component, Value> : NotSerializable<Value> : unknown
+type IslandProp<Component, Value> = Component extends IslandBrand ? [IsSerializable<Value>] extends [true] ? SecretProp<Value> : NotSerializable<Value> : unknown
 
 [.] jobs
 function jobs<Payload = unknown, Progress = unknown>(queue: string): QueuedJob<Payload, Progress>[]
