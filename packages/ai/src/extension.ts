@@ -24,7 +24,9 @@ function providerNow(): { provider: string, model: string | null } | { error: st
 export function ai(options: AiOptions = {}): KayExtension {
   configureLimits(options)
 
-  if (options.imageAlt === true)
+  const imageAlt = options.imageAlt === true || typeof options.imageAlt === 'object'
+
+  if (imageAlt)
     startDrafting()
 
   useConversations(options.conversations)
@@ -34,11 +36,11 @@ export function ai(options: AiOptions = {}): KayExtension {
     env: aiEnv(true),
     commands: { 'i18n translate': `${import.meta.dir}/translate.ts` },
     devTool: { module: `${import.meta.dir}/devTool.ts` },
-    ...options.imageAlt === true && {
+    ...imageAlt && {
       satisfies: ['missing-alt' as const],
       transformPage: writeImageAlts,
       transformServedPage: writeKeptImageAlts,
-      check: async () => [...noModelProblems(), ...await draftProblems()],
+      check: async () => [...noModelProblems(), ...await draftProblems(typeof options.imageAlt === 'object' ? options.imageAlt.reviewed : undefined)],
     },
     // What the tab reads, answered under `kay dev` alone.
     server: () => {

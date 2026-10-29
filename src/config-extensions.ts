@@ -159,12 +159,17 @@ async function serverFromModule(name: string, { path, export: exported = 'defaul
   return server as AnyElysia
 }
 
+// The page hooks the extensions carry under `key`, in their order.
+function hooksOf(extensions: KayExtension[] | undefined, key: 'transformPage' | 'transformServedPage'): PageHook[] {
+  return (extensions ?? []).flatMap(extension => extension[key] === undefined ? [] : [extension[key]])
+}
+
 // The hooks of the extensions for a page rendered per request, in their order.
 export function servedPageHooks(extensions: KayExtension[] | undefined): PageHook[] {
-  return (extensions ?? []).flatMap(extension => extension.transformServedPage === undefined ? [] : [extension.transformServedPage])
+  return hooksOf(extensions, 'transformServedPage')
 }
 
 // The page hooks the extensions carry, in their order.
 export function pageHooks(extensions: KayExtension[] | undefined): PageHook[] {
-  return (extensions ?? []).flatMap(extension => extension.transformPage === undefined ? [] : [extension.transformPage])
+  return hooksOf(extensions, 'transformPage')
 }

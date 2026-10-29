@@ -1,5 +1,6 @@
 import { join } from 'node:path'
 import { describe, expect, test } from 'bun:test'
+import { clearCache } from '../src/build/cache'
 import { loadConfig } from '../src/config-loader'
 import { libraryCacheSlot, readCacheEntry, writeCacheEntry } from '../src/server/library'
 import { scratchDir } from './scratch'
@@ -31,6 +32,18 @@ describe('a library\'s cache slot', () => {
     expect(await readCacheEntry(slot)).toEqual({ alt: 'A cat' })
     expect(await readCacheEntry(libraryCacheSlot(root, 'kayjs-ai', 'a1', 'photo\0other'))).toBeUndefined()
   })
+})
+
+test('`--no-cache` empties the build\'s cache but not what a library kept', async () => {
+  const root = await scratchDir('library-cache-')
+  const cache = join(root, '.kay', 'cache')
+  const slot = libraryCacheSlot(root, 'kayjs-ai', 'a1', 'photo')
+
+  await writeCacheEntry(slot, { alt: 'A cat' })
+  await Bun.write(join(cache, 'transform', 'x.json'), '{}')
+  await clearCache(cache)
+  expect(await Bun.file(join(cache, 'transform', 'x.json')).exists()).toBe(false)
+  expect(await readCacheEntry(slot)).toEqual({ alt: 'A cat' })
 })
 
 test('drops a satisfied list written in the app\'s own lints', async () => {

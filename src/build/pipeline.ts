@@ -41,7 +41,7 @@ import { remoteImages, remotePatterns } from '../server/remote'
 import { contextReadsOf, routeMounts, slashedPath } from '../server/routes'
 import { linkStoredFiles } from '../server/storage'
 import { budgetLints, checkBudget, footprintLints } from './budget'
-import { cacheCounts, resetCacheCounts } from './cache'
+import { cacheCounts, clearCache, resetCacheCounts } from './cache'
 import { buildClient } from './client'
 import { compileServer } from './compile'
 import { cachedCopies, cachedDictionaryCopies, pruneCopies, pruneDictionaryCopies } from './compressed'
@@ -134,8 +134,9 @@ async function runBuild(root: string, config: KayConfig, options: BuildOptions):
 
   resetCacheCounts()
 
+  // A library's entries are kept, as they hold what cost a call to make, such as kayjs-ai's drafted alts.
   if (options.fresh)
-    await rm(project.paths.cache, { recursive: true, force: true })
+    await clearCache(project.paths.cache)
 
   // The last executable and export are no sources: Tailwind scans every file of the project it does not know to skip, the executable and a custom folder among them.
   if (options.compile && statSync(resolve(root, options.compile.outfile), { throwIfNoEntry: false })?.isFile() === true)

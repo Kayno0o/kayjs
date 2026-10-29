@@ -3,10 +3,10 @@ import type { ExtensionProblem, PageHook, RenderedPage } from 'kay/server'
 // Alt text drafted for the imported images of a page: one model call per image content, kept under `.kay/cache`, written into the HTML as a page is built or served.
 import type { Attachment, Message } from './types'
 import { readdir } from 'node:fs/promises'
-import { basename, dirname } from 'node:path'
+import { basename, dirname, join } from 'node:path'
 import process from 'node:process'
 import { logFrom, s } from 'kay'
-import { IMPORTED, libraryCacheSlot, readCacheEntry, serverRoot, writeCacheEntry } from 'kay/library'
+import { IMPORTED, KAY_DIR, libraryCacheSlot, readCacheEntry, serverRoot, writeCacheEntry } from 'kay/library'
 import { ask } from './ask'
 import { choose } from './config'
 import { fakeAi } from './fake'
@@ -79,11 +79,13 @@ const known = new Map<string, string>()
 const drafting = new Map<string, Promise<string | undefined>>()
 // The images a failure was logged for, so a retry stays quiet.
 const reported = new Set<string>()
+// The timers that forget a failed draft, cleared with the drafts so none outlives them.
+const retrying = new Set<ReturnType<typeof setTimeout>>()
 const queue: { place: Place, done: (alt: string | undefined) => void }[] = []
 const sleeping: (() => void)[] = []
 let started = false
 
-// The workers describing the queued images, `AT_ONCE` of them. They run outside any request, started where the config is read, so a draft is charged to no visitor's limits and no request's abort stops it.
+// The workers describing the queued images, `AT_ONCE` of them. They run outside any request, started only where the config is read (`ai({ imageAlt })`, never by a draft asked for inside a request, which would make a request's context theirs), so a draft is charged to no visitor's limits and no request's abort stops it.
 export function startDrafting(): void {
   if (started)
     return
@@ -107,11 +109,19 @@ async function work(): Promise<void> {
 
 // Ends the wait before a failed draft is tried again, for a test.
 export function forgetRetry(): void {
+  for (const retry of retrying)
+    clearTimeout(retry)
+
+  retrying.clear()
   drafting.clear()
 }
 
 // Drops what this process remembers of the drafts, for a test that clears the cache folder.
 export function forgetDrafts(): void {
+  for (const retry of retrying)
+    clearTimeout(retry)
+
+  retrying.clear()
   known.clear()
   drafting.clear()
   reported.clear()
@@ -151,7 +161,13 @@ async function make(place: Place): Promise<string | undefined> {
       log.warn(`imageAlt could not draft the alt of ${name}: ${error instanceof Error ? error.message : String(error)}`)
     }
 
-    setTimeout(() => drafting.delete(slot.file), RETRY_MS).unref()
+    const retry = setTimeout(() => {
+      retrying.delete(retry)
+      drafting.delete(slot.file)
+    }, RETRY_MS)
+
+    retry.unref()
+    retrying.add(retry)
 
     return undefined
   }
@@ -163,7 +179,6 @@ async function draftOnce(place: Place): Promise<string | undefined> {
   let pending = drafting.get(file)
 
   if (pending === undefined) {
-    startDrafting()
     pending = new Promise<string | undefined>((done) => {
       queue.push({ place, done })
       sleeping.shift()?.()
@@ -259,8 +274,26 @@ export const writeKeptImageAlts: PageHook = async page => filled(page, async (pl
   return alt
 })
 
-// The drafts kept so far, for a person to review: none is sent to the model again, and an author's own `alt` replaces one.
-export async function draftProblems(): Promise<ExtensionProblem[]> {
+// The folders of imported assets the last builds left, where a draft's image is looked for: the production build's and `kay dev`'s.
+const ASSET_FOLDERS = ['client', 'dev'].map(output => join(KAY_DIR, output, 'dist', 'assets'))
+
+// The names of the assets the last builds hold, undefined when no build is there to tell by.
+async function builtAssets(root: string): Promise<Set<string> | undefined> {
+  const found = await Promise.all(ASSET_FOLDERS.map(async (folder) => {
+    try {
+      return await readdir(join(root, folder))
+    }
+    catch {
+      return undefined
+    }
+  }))
+  const folders = found.filter(names => names !== undefined)
+
+  return folders.length === 0 ? undefined : new Set(folders.flat())
+}
+
+// The drafts kept so far, for a person to review: none is sent to the model again, and an author's own `alt` replaces one. A draft whose image is no longer in the last build (deleted, or edited, which renames it) is left out, and so is one the app lists in `imageAlt: { reviewed }`.
+export async function draftProblems(reviewed: readonly string[] = []): Promise<ExtensionProblem[]> {
   const root = await serverRoot()
   const { file } = libraryCacheSlot(root, LIBRARY, 'x', '')
   const folder = dirname(file)
@@ -273,9 +306,10 @@ export async function draftProblems(): Promise<ExtensionProblem[]> {
     return []
   }
 
+  const built = await builtAssets(root)
   const kept = await Promise.all(names.map(async name => readDraft(`${folder}/${name}`)))
 
-  return kept.flatMap(entry => entry === undefined || entry.alt === '' ? [] : [{ message: `imageAlt drafted the alt of ${entry.name}${entry.locale === '' ? '' : ` (${entry.locale})`}: "${entry.alt}"`, help: 'check it, then write the img\'s own alt to keep your wording; delete .kay/cache/libraries/kayjs-ai to draft again' }])
+  return kept.flatMap(entry => entry === undefined || entry.alt === '' || reviewed.includes(entry.name) || (built !== undefined && !built.has(entry.name)) ? [] : [{ message: `imageAlt drafted the alt of ${entry.name}${entry.locale === '' ? '' : ` (${entry.locale})`}: "${entry.alt}"`, help: `check it, then write the img's own alt to keep your wording and list ${JSON.stringify(entry.name)} in ai({ imageAlt: { reviewed } }) to stop this warning; delete .kay/cache/libraries/kayjs-ai to draft again` }])
 }
 
 async function readDraft(file: string): Promise<Draft | undefined> {

@@ -2,6 +2,7 @@ import type { StrongestCopies } from './compress'
 import { join, normalize, resolve, sep } from 'node:path'
 import { ASSET_PREFIX, outputDir } from '../build/assets'
 import { IMAGE_ROUTE } from '../runtime/image'
+import { kayLog } from '../runtime/log'
 import { PRERENDERED_DIR, readManifest, writeManifest } from './client'
 import { servedSize, wholeResponse } from './compress'
 import { FAVICON_DIR, FAVICON_PATHS } from './favicon'
@@ -153,6 +154,9 @@ export async function hookPrerendered(root: string, hooks: PageHook[], dirs: Ass
   await writeManifest(root, manifest, base)
 }
 
+// The messages a page hook failed with, so a hook that throws on every request is logged once.
+const hookFailures = new Set<string>()
+
 // A page rendered for a request, through the hooks made for it; anything but an HTML page is returned as it is.
 export async function hookedServed(response: Response, hooks: PageHook[], path: string, locale: string, file: RenderedPage['file'], sizes: PageSizes): Promise<Response> {
   if (response.body === null || !response.headers.get('content-type')?.startsWith('text/html'))
@@ -164,11 +168,18 @@ export async function hookedServed(response: Response, hooks: PageHook[], path: 
 
   const html = await response.text()
 
-  // A hook that throws leaves the page as it was rendered, rather than turning it into a 500 that skips the error page.
+  // A hook that throws leaves the page as it was rendered, rather than turning it into a 500 that skips the error page, and is logged the first time it throws that message.
   try {
     return wholeResponse(await applyPageHooks(hooks, path, locale, html, file, sizes), { status: response.status, headers })
   }
-  catch {
+  catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+
+    if (!hookFailures.has(message)) {
+      hookFailures.add(message)
+      kayLog('warn', `a page hook failed on ${path}, so the page is sent as it was rendered: ${message}`, error)
+    }
+
     return wholeResponse(html, { status: response.status, headers })
   }
 }

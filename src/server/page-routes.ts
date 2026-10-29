@@ -105,13 +105,15 @@ async function forVisitor(render: () => Promise<Response>): Promise<Response> {
 
 // How a page answers one request: rendered afresh, or the copy `kay build` rendered, revalidated, with its server islands filled in.
 export function pageResponder({ client, renderOptions, prerendered, settings, transforms, served: servedHooks, pageFile, pageSizes, writes }: ResponderOptions): PageResponder {
+  // The locale the request is answered in, read where the page is rendered.
+  const localeOf = () => localeState()?.locale ?? settings?.defaultLocale ?? ''
   // Rendered as `kay build` renders it: without the request, for whoever its guards let through; it starts within the request, so in its locale.
-  const prerender = async (route: ServedRoute, params: Record<string, unknown>, url: URL, key: string) => hookedResponse(await renderPage({ ...route, guards: [] }, { request: new Request(`http://localhost${url.pathname}`) }, params, client, { ...renderOptions, prerendering: true, guarded: route.guards.length > 0 }), transforms, key, localeState()?.locale ?? settings?.defaultLocale ?? '', pageFile, pageSizes)
+  const prerender = async (route: ServedRoute, params: Record<string, unknown>, url: URL, key: string) => hookedResponse(await renderPage({ ...route, guards: [] }, { request: new Request(`http://localhost${url.pathname}`) }, params, client, { ...renderOptions, prerendering: true, guarded: route.guards.length > 0 }), transforms, key, localeOf(), pageFile, pageSizes)
 
   return async (route, params, context, url) => {
     const render = servedHooks.length === 0
       ? async () => renderPage(route, context, params, client, renderOptions)
-      : async () => hookedServed(await renderPage(route, context, params, client, renderOptions), servedHooks, url.pathname, localeState()?.locale ?? settings?.defaultLocale ?? '', pageFile, pageSizes)
+      : async () => hookedServed(await renderPage(route, context, params, client, renderOptions), servedHooks, url.pathname, localeOf(), pageFile, pageSizes)
 
     const preview = previewRequested(context.request)
 

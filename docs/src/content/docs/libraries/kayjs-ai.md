@@ -344,7 +344,9 @@ ai({ imageAlt: true })
 
 `kay build` then writes a drafted `alt` on each imported image a page shows with none. In `kay dev` and on pages rendered per request, the first render shows the drafts already kept and drafts the others in the background, so the next one has them. Each image is described once, kept in `.kay/cache`, and never sent again while it is unchanged.
 
-An `alt` you write, even an empty one, always wins. `kay check` stops reporting `missing-alt` for such an image and lists each draft instead, so you can review it. With no model configured, pages stay as they are. Images inside islands are drawn in the browser, so they keep the `missing-alt` lint.
+An `alt` you write, even an empty one, always wins. `kay check` stops reporting `missing-alt` for such an image and lists each draft instead, so you can review it. `ai({ imageAlt: { reviewed: ['team-abc.png'] } })` marks the ones you reviewed, and a draft whose image left the build is no longer listed.
+
+`kay build --no-cache` keeps the drafts. With no model configured, pages stay as they are. Images inside islands are drawn in the browser, so they keep the `missing-alt` lint, and a component an island also imports is checked as server markup only, so give its `img` an `alt`.
 
 ## Prompt caching
 

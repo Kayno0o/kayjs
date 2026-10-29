@@ -14,9 +14,25 @@ interface CacheEntry<Value> {
   value: Value
 }
 
+const LIBRARIES = 'libraries'
+
 // The slot of a library's value `id` under `.kay/cache/libraries/<library>`, a folder no build of kay prunes: valid while `inputs` are what it was made from.
 export function libraryCacheSlot(root: string, library: string, id: string, inputs: string): CacheSlot {
-  return { file: join(root, '.kay', 'cache', 'libraries', library, `${id}.json`), key: Bun.hash(inputs).toString(36) }
+  return { file: join(root, '.kay', 'cache', LIBRARIES, library, `${id}.json`), key: Bun.hash(inputs).toString(36) }
+}
+
+// Empties `.kay/cache` for `kay build --no-cache`, except the libraries' folder: what a library kept there cost it more than a build, and `libraryCacheSlot` promises no build of kay drops it.
+export async function clearCache(cache: string): Promise<void> {
+  let names: string[]
+
+  try {
+    names = await readdir(cache)
+  }
+  catch {
+    return
+  }
+
+  await Promise.all(names.filter(name => name !== LIBRARIES).map(async name => rm(join(cache, name), { recursive: true, force: true })))
 }
 
 // How often each named cache answered from disk and how often its value had to be made, for the build report.

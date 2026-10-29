@@ -7,7 +7,10 @@ import { afterEach, describe, expect, it, spyOn } from 'bun:test'
 import { serverRoot } from 'kay/library'
 import { applyPageHooks, assetFiles, pageSizes } from '../../../src/server/page-hook'
 import { ai, AiError, describeImage, fakeAi } from '../src'
-import { draftProblems, forgetDrafts, forgetRetry, writeImageAlts, writeKeptImageAlts } from '../src/image-alt'
+import { draftProblems, forgetDrafts, forgetRetry, startDrafting, writeImageAlts, writeKeptImageAlts } from '../src/image-alt'
+
+// The workers start where `ai({ imageAlt })` is read, which these tests skip.
+startDrafting()
 
 const PNG = Uint8Array.fromBase64('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGP4z8DwHwAFAAH/iZk9HQAAAABJRU5ErkJggg==')
 const ASSET = '/_kay/assets/team-abc.png'
@@ -258,5 +261,28 @@ describe('imageAlt', () => {
     expect(await draftProblems()).toEqual([{ message: 'imageAlt drafted the alt of team-abc.png (fr): "A team"', help: expect.stringContaining('write the img\'s own alt') }])
     expect(problems.map(problem => problem.message)).toEqual(['imageAlt drafted the alt of team-abc.png (fr): "A team"'])
     expect(fakeAi.asked).toHaveLength(asked)
+  })
+  it('stops listing a draft whose image is no longer in the last build, or that the app marks reviewed', async () => {
+    fakeAi.reply({ data: { alt: 'A team' } })
+    fakeAi.reply({ data: { alt: 'A logo' } })
+
+    await page(IMG, { [ASSET]: await image('team-abc.png') })
+    await page('<img src="/_kay/assets/logo-abc.png">', { '/_kay/assets/logo-abc.png': await image('logo-abc.png') })
+
+    expect(await draftProblems()).toHaveLength(2)
+
+    const assets = join(await serverRoot(), '.kay/dev/dist/assets')
+
+    try {
+      await Bun.write(join(assets, 'team-abc.png'), PNG)
+      expect((await draftProblems()).map(problem => problem.message)).toEqual(['imageAlt drafted the alt of team-abc.png (en): "A team"'])
+      await Bun.write(join(assets, 'logo-abc.png'), PNG)
+      expect(await draftProblems()).toHaveLength(2)
+      expect((await draftProblems(['team-abc.png'])).map(problem => problem.message)).toEqual(['imageAlt drafted the alt of logo-abc.png (en): "A logo"'])
+      expect((await ai({ imageAlt: { reviewed: ['team-abc.png', 'logo-abc.png'] } }).check!()).filter(problem => problem.message.includes('drafted'))).toEqual([])
+    }
+    finally {
+      await rm(join(await serverRoot(), '.kay/dev'), { recursive: true, force: true })
+    }
   })
 })

@@ -5,7 +5,7 @@ import { existsSync } from 'node:fs'
 import { mkdtemp, readdir, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { afterAll, describe, expect, it } from 'bun:test'
+import { afterAll, describe, expect, it, spyOn } from 'bun:test'
 import { outputDir } from '../src/build/assets'
 import { cachedCopies } from '../src/build/compressed'
 import { PRERENDERED_DIR, readManifest, writeManifest } from '../src/server/client'
@@ -224,10 +224,29 @@ describe('hookedServed', () => {
   })
 
   it('serves the page as it was rendered when a hook throws', async () => {
+    const warn = spyOn(console, 'warn').mockImplementation(() => undefined)
     const response = await hookedServed(page('kept', { headers: { 'content-type': 'text/html' } }), [() => {
       throw new Error('boom')
     }], '/', '', none, sizes)
 
+    warn.mockRestore()
     expect(await response.text()).toBe('kept')
+  })
+
+  it('logs a hook that throws once per message, not on every request', async () => {
+    const warn = spyOn(console, 'warn').mockImplementation(() => undefined)
+    const failing = () => {
+      throw new Error('hook down')
+    }
+
+    try {
+      for (let request = 0; request < 3; request++)
+        await hookedServed(page('kept', { headers: { 'content-type': 'text/html' } }), [failing], '/a', '', none, sizes)
+
+      expect(warn.mock.calls.filter(([line]) => String(line).includes('hook down'))).toHaveLength(1)
+    }
+    finally {
+      warn.mockRestore()
+    }
   })
 })
