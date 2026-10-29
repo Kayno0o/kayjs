@@ -1,16 +1,18 @@
+import type { BunPlugin } from 'bun'
 import type { InternalConfig, KayConfig, LoadedConfig } from './config'
 import { existsSync, realpathSync } from 'node:fs'
 import { join } from 'node:path'
 import process from 'node:process'
-import { libraryMessageExtensions } from './build/manifests'
+import { APP_DEPENDENCIES, dependencyNames, libraryMessageExtensions, readManifest } from './build/manifests'
 import { KayError } from './compiler/errors'
 import { CONFIG_FILE } from './config'
 import { unknownConfigKeys } from './config-shape'
+import { NATIVE_PLUGINS } from './native-plugins'
 import { publicEnvFiles } from './server/env-state'
 
 // `fresh` reads the file again as it is now, as `kay dev` does once it changed, rather than the module this process imported first.
 export async function loadConfig(root: string, fresh = false): Promise<LoadedConfig> {
-  return withSiteUrl(withPublicFields(root, withExtensions(withLibraryMessages(root, await importConfig(root, fresh)))))
+  return withTailwind(root, withSiteUrl(withPublicFields(root, withExtensions(withLibraryMessages(root, await importConfig(root, fresh))))))
 }
 
 const CONFIG_TIMEOUT = 30_000
@@ -235,6 +237,34 @@ export function baseFromEnv(): string | undefined {
 }
 
 // The config with `site` and `base` read from `SITE_URL` and `SITE_BASE` where it sets none: a deployment names where the site is public, so the config declares neither.
+const TAILWIND = 'bun-plugin-tailwind'
+
+// The plugins kay added itself, which no line of `kay.config.ts` lists: an executable build has none to strip from the config's source.
+export const implicitPlugins = new WeakSet<BunPlugin>()
+
+// The config with Tailwind's plugin among its `plugins` when the project depends on `bun-plugin-tailwind`, after the ones it lists: the dependency is the declaration, so `plugins` is for the others. A config already listing it, by the name `kay/test`'s lazy shim carries too, runs it once. The plugin is resolved from the project as its own config would, so it loads where `kay/test` swaps it for the shim.
+async function withTailwind<Config extends KayConfig>(root: string, config: Config): Promise<Config> {
+  const manifest = typeof Bun === 'undefined' ? undefined : readManifest(root)
+
+  if (manifest === undefined || !dependencyNames(manifest, APP_DEPENDENCIES).includes(TAILWIND) || (config.plugins ?? []).some(plugin => plugin.name === NATIVE_PLUGINS[TAILWIND]))
+    return config
+
+  let installed: string
+
+  try {
+    installed = Bun.resolveSync(TAILWIND, root)
+  }
+  catch {
+    return config
+  }
+
+  const { default: tailwind } = await import(installed) as { default: BunPlugin }
+
+  implicitPlugins.add(tailwind)
+
+  return { ...config, plugins: [...config.plugins ?? [], tailwind] }
+}
+
 function withSiteUrl<Config extends KayConfig>(config: Config): Config {
   const site = siteFromEnv()
   const base = baseFromEnv()
@@ -245,7 +275,7 @@ function withSiteUrl<Config extends KayConfig>(config: Config): Config {
 
 // The project's config under the options given in code; an option passed as `undefined` leaves the config's value alone rather than wiping it.
 export async function withConfig<Options extends KayConfig>(root: string, options: Options): Promise<KayConfig & Options> {
-  return withPublicFields(root, mergeConfig(withLibraryMessages(root, await importConfig(root)), options))
+  return withTailwind(root, withPublicFields(root, mergeConfig(withLibraryMessages(root, await importConfig(root)), options)))
 }
 
 // `config` is as `kay.config.ts` writes it, so the extensions the options name lie under it rather than the file's.

@@ -6,14 +6,15 @@ import { classNameList, shim } from '../src/test/lazy-plugins'
 import { fixtureCopy, scratchDir } from './scratch'
 
 // Bun keeps the global of a file alive for as long as the process runs once the file loaded a native addon, and under `bun test --isolate` that is every module the file imported: a site whose config imports Tailwind's plugin costs the run its whole module graph per file.
-it.skipIf(!existsSync('/proc/self/maps'))('a site that builds no client for a browser loads no native addon, though its config imports the Tailwind plugin', async () => {
+it.skipIf(!existsSync('/proc/self/maps')).each([['its config imports the Tailwind plugin', true], ['kay adds the Tailwind plugin its package.json depends on', false]])('a site that builds no client for a browser loads no native addon, though %s', async (_, listed) => {
   const root = resolve(await fixtureCopy('bare'))
   const script = join(await scratchDir('native-'), 'run.ts')
 
   // A stylesheet only Tailwind's plugin parses, which the check build must not hand to Bun's own parser.
   await Bun.write(join(root, 'src/app.css'), '@import "tailwindcss" source("..");\n')
   await Bun.write(join(root, 'src/routes/_layout.kay'), `---\nimport '../app.css'\n---\nslot\n`)
-  await Bun.write(join(root, 'kay.config.ts'), `import tailwind from 'bun-plugin-tailwind'\nimport { defineConfig } from 'kay/server'\n\nexport default defineConfig({ plugins: [tailwind] })\n`)
+  await Bun.write(join(root, 'package.json'), JSON.stringify({ name: 'app', devDependencies: { 'bun-plugin-tailwind': '*' } }))
+  await Bun.write(join(root, 'kay.config.ts'), listed ? `import tailwind from 'bun-plugin-tailwind'\nimport { defineConfig } from 'kay/server'\n\nexport default defineConfig({ plugins: [tailwind] })\n` : `import { defineConfig } from 'kay/server'\n\nexport default defineConfig({})\n`)
   await Bun.write(script, `import { readFileSync } from 'node:fs'
 import { testSite } from ${JSON.stringify(resolve('src/test'))}
 
@@ -187,4 +188,28 @@ process.exit(0)
 `, dir)
 
   expect(result).toBe(7)
+}, 60_000)
+
+// A project depending on `bun-plugin-tailwind` gets the plugin with no line in its config, and no copy of it when the config lists it too.
+it('adds the Tailwind plugin for a project depending on it, once, after the plugins its config lists', async () => {
+  const names = async (config: string, dependency: boolean) => {
+    const root = resolve(await fixtureCopy('bare'))
+
+    await Bun.write(join(root, 'package.json'), JSON.stringify({ name: 'app', devDependencies: dependency ? { 'bun-plugin-tailwind': '*' } : {} }))
+    await Bun.write(join(root, 'kay.config.ts'), config)
+
+    return run(`import { lazyNativePlugins } from ${JSON.stringify(resolve('src/test/lazy-plugins'))}
+import { loadConfig } from ${JSON.stringify(resolve('src/config-loader'))}
+
+lazyNativePlugins()
+console.log(JSON.stringify((await loadConfig(${JSON.stringify(root)})).plugins?.map(plugin => plugin.name) ?? null))
+process.exit(0)
+`, root)
+  }
+  const own = 'import tailwind from \'bun-plugin-tailwind\'\nexport default { plugins: [{ name: \'mine\', setup() {} }, tailwind] }\n'
+
+  expect(await names('export default {}\n', true)).toEqual(['@tailwindcss/bun'])
+  expect(await names('export default { plugins: [{ name: \'mine\', setup() {} }] }\n', true)).toEqual(['mine', '@tailwindcss/bun'])
+  expect(await names(own, true)).toEqual(['mine', '@tailwindcss/bun'])
+  expect(await names('export default {}\n', false)).toBeNull()
 }, 60_000)

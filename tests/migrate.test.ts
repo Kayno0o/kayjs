@@ -300,7 +300,7 @@ export const authors = collection('content/authors', {
     expect(report.written.toSorted()).toEqual(['.gitignore', '.npmrc', '.vscode/extensions.json', '.vscode/settings.json', 'AGENTS.md', 'kay.config.ts', 'package.json', 'src/layouts/layout.kay', 'src/routes/index.kay', 'src/server.ts', 'tsconfig.json'])
     expect(report.copied.toSorted()).toEqual(['public/.well-known/security.txt', 'public/favicon.svg', 'src/styles/global.css'])
     expect(await Bun.file(join(out, 'src/routes/index.kay')).text()).toBe('--- server\nimport Layout from \'../layouts/layout.kay\'\n---\nLayout\n  h1 Accueil\n')
-    expect(await Bun.file(join(out, 'kay.config.ts')).text()).toBe('import tailwind from \'bun-plugin-tailwind\'\nimport { defineConfig } from \'kay/server\'\n\nexport default defineConfig({\n  lang: \'fr\',\n  site: \'https://example.com\',\n  base: \'/docs\',\n  plugins: [tailwind],\n})\n')
+    expect(await Bun.file(join(out, 'kay.config.ts')).text()).toBe('import { defineConfig } from \'kay/server\'\n\nexport default defineConfig({\n  lang: \'fr\',\n  site: \'https://example.com\',\n  base: \'/docs\',\n})\n')
     expect(await Bun.file(join(out, 'tsconfig.json')).json()).toEqual({ extends: 'kay/tsconfig.json', compilerOptions: { paths: { '@/*': ['./src/*'] } } })
     // Its pages keep their own titles, so no `seo.name` ends them and AGENTS.md names none.
     expect(await Bun.file(join(out, 'AGENTS.md')).text()).not.toContain('seo.name')

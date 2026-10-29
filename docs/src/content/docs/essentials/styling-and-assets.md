@@ -93,14 +93,7 @@ export default defineConfig({ inlineStyles: false })
 
 ## Tailwind
 
-Tailwind runs as a build plugin. Install it with `bun add -d tailwindcss bun-plugin-tailwind`, then register it in `kay.config.ts`.
-
-```ts
-import tailwind from 'bun-plugin-tailwind'
-import { defineConfig } from 'kay/server'
-
-export default defineConfig({ plugins: [tailwind] })
-```
+Tailwind runs as a build plugin, and kay adds it for a project that depends on it. Install it with `bun add -d tailwindcss bun-plugin-tailwind` and there is nothing to register in `kay.config.ts`. `plugins` stays for other build plugins, and listing Tailwind's there too runs it once.
 
 Import `src/app.css` from the root `_layout.kay`. It needs only `@import 'tailwindcss';`. Classes written with the `.class` shorthand work too.
 

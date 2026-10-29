@@ -16,14 +16,7 @@ article.card
 
 ### Use Tailwind
 
-`bun add -d tailwindcss bun-plugin-tailwind`, then the plugin goes in `kay.config.ts`:
-
-```ts
-import tailwind from 'bun-plugin-tailwind'
-import { defineConfig } from 'kay/server'
-
-export default defineConfig({ plugins: [tailwind] })
-```
+`bun add -d tailwindcss bun-plugin-tailwind`: kay adds the plugin to the browser build when `package.json` depends on `bun-plugin-tailwind`, after the `plugins` `kay.config.ts` lists, and runs it once when the config lists it too (`plugins: [tailwind]` from `import tailwind from 'bun-plugin-tailwind'` still works). `plugins` is for other plugins.
 
 `src/app.css`, imported by the root `_layout.kay`, needs nothing more than `@import 'tailwindcss';`.
 
@@ -190,14 +183,7 @@ export default defineConfig({ inlineStyles: false })
 - With `compress` on, a rendered page compresses only what lies around them, their compressed copy made once as the server starts, so it goes out as gzip even to a browser taking zstd or brotli: on a 110 KB stylesheet, a fifth of the CPU brotli takes, for no more bytes.
 - Their relative `url()`s point where the linked file's did, and kay's `content-security-policy` lets each through by its hash.
 - Pages `kay build` prerendered keep what the setting and the stylesheets were then, so it belongs in kay.config.ts rather than in `pages()` alone, where a server turning it off would hash none of their styles.
-- Tailwind runs as a build plugin. `bun add -d tailwindcss bun-plugin-tailwind`, then:
-
-```ts
-import tailwind from 'bun-plugin-tailwind'
-import { defineConfig } from 'kay/server'
-
-export default defineConfig({ plugins: [tailwind] })
-```
+- Tailwind runs as a build plugin kay adds itself: `bun add -d tailwindcss bun-plugin-tailwind` is all it takes, with no line in `kay.config.ts`.
 
 - `src/app.css`, imported by the root `_layout.kay`, needs nothing more than `@import 'tailwindcss';`.
 - Tailwind cannot read classes off the `.class` shorthand, `div.md:flex.w-1/2`, so kay collects them into `.kay/classes.txt` and hands them to it as the stylesheets build, with no `@source` line; one pointing at that file works, as `.kay/.gitignore` keeps Tailwind from scanning the rest of `.kay`.

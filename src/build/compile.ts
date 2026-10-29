@@ -7,6 +7,7 @@ import { basename, dirname, join, resolve } from 'node:path'
 import { buildFailure, KayError, raisedMark } from '../compiler/errors'
 import { CONFIG_FILE } from '../config'
 import { extensionAppFiles, extensionContexts, extensionServerModules, pluginFiles, serverExtensions } from '../config-extensions'
+import { implicitPlugins } from '../config-loader'
 import { PAGES_ENTRY } from '../dev/sources'
 import { projectApi } from '../server/api-modules'
 import { packageName } from '../server/app-identity'
@@ -163,7 +164,7 @@ export async function compileServer(project: Project, options: CompileOptions): 
   const configSource = existsSync(configFile) ? await Bun.file(configFile).text() : undefined
   const runtime = configSource === undefined ? undefined : withoutPlugins(configSource)
 
-  if (runtime === undefined && (config.plugins?.length ?? 0) > 0)
+  if (runtime === undefined && (config.plugins ?? []).some(plugin => !implicitPlugins.has(plugin)))
     console.warn(`kay: the plugins in ${CONFIG_FILE} cannot be told apart from the rest of the config, which they can as a property of the object it exports by default with no spread beside them, so the executable carries them; one loading a native addon, as Tailwind does, fails where the project's node_modules is not`)
 
   // Bun loads a module by its real path, a symlinked project's included.

@@ -1,0 +1,2 @@
+// Plugins that load a native addon, which Bun keeps its global alive for: under `bun test --isolate` every file then pins its whole module graph for the rest of the run. Each maps to the `name` of the plugin it holds, which the shim `kay/test` loads it through carries so builds keyed on plugin names (`runtime-search-build.json`) share a slot with a `kay build`.
+export const NATIVE_PLUGINS: Record<string, string> = { 'bun-plugin-tailwind': '@tailwindcss/bun' }
