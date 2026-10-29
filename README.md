@@ -24,6 +24,31 @@ bun run dev   # http://localhost:3000, reloads on every change
 
 The project depends on it as `"kay": "npm:@kaynooo/kayjs@~<version>"`, a tilde since a minor may break, so imports read `kay`, `kay/server` and so on, and carries an `.npmrc` pointing the scope at the registry. `bun src/cli.ts new ../my-app` from a checkout of this repository depends on a packed copy of it instead.
 
+## A page and an island
+
+A page is a `.kay` file under `src/routes`, and a component with state is an island that runs in the browser, hydrated where the page uses it.
+
+`src/counter.kay`:
+
+```kay
+---
+const count = signal(0)
+---
+button(onClick={() => count++}) Clicked {count()} times
+```
+
+`src/routes/index.kay`:
+
+```kay
+---
+import Counter from '../counter.kay'
+---
+head
+  title Home
+h1 Hello
+Counter
+```
+
 ## Ship it
 
 ```sh
@@ -37,29 +62,40 @@ In production the server serves what `kay build` wrote and bundles nothing at bo
 
 ## Commands
 
+Every command takes an optional project directory and prints its usage for `--help`; [the CLI page](https://kayjs.kaynooo.fr/reference/cli) lists each one's options.
+
 | Command | Does |
 | --- | --- |
-| `kay new <dir> [--template blank\|server\|site\|app] [--with <features>] [--without <features>] [--forge forgejo\|github] [--runner <label>] [-y] [--kay <dependency>]` | scaffold a project that checks, builds and runs: one bare page, a server run as one executable, a static site, or an app with kayjs-auth sign-in and its users in SQLite (Postgres with `--with postgres`); in a terminal with none of these options it asks for a preset, then for each feature; `--with` and `--without` change the preset's features, `--forge` picks the Forgejo or GitHub CI workflow, by default from the `origin` remote, `--runner` its runner label, `-y` takes the server preset without asking, `--kay` sets its `kay` dependency |
-| `kay add <features> [dir] [--no-install]` | add `kay new` features (or `ai`, `mail`, `cms`) to an existing project, stopping with the edit to make by hand when a file is not what `kay new` wrote |
-| `kay dev [dir] [--entry <file>] [--port <port>] [--host[=<address>]] [--inspect[=<address>]] [--open] [--format text\|json]` | run the server, restarting on change, errors shown in the browser |
-| `kay build [dir] [-p tsconfig.json] [--no-check] [--analyze]` | bundle the browser code for production while checking the project as `kay check` does, keeping the last build when either fails; `--no-check` skips the check |
-| `kay build [dir] --compile <file> [--entry <file>]` | the same, plus the server and everything it serves in one executable, `--entry` naming the server entry |
-| `kay build [dir] --static [--outdir dist]` | the same, then the whole site as static files for a host with no server |
-| `kay check [dir] [paths...] [-p tsconfig.json] [--entry <file>] [--deny-warnings] [--fix] [--only <group>] [--format text\|github\|json] [--watch]` | type-check the project, `.kay` files included, `-p` naming another tsconfig and `--entry` the server entry whose `app` types `ctx.locals`; warnings fail it only with `--deny-warnings`, which a scaffolded app leaves out, and `--fix` applies the fixes that change nothing else first |
-| `kay start [dir] [--entry <file>] [--port <port>]` | serve the last build as production does |
-| `kay render <url> [dir] [--method <method>] [--body <text>] [--header <name: value>] [--cookie <name=value>] [-i] [--entry <file>]` | print what the server answers for one URL, as `kay dev` serves it, without starting it on a port |
-| `kay routes [dir]` | list every route the project serves, and the file serving it |
-| `kay explain [lint\|error\|group]` | list the lints and the errors, or a group's, or explain one: a lint with an example it reports and the same written right, an error with where its fix is written |
-| `kay docs [words]` | print the section of kay's or an installed library's docs that words or a name match, or the one a label names |
-| `kay fmt [paths...] [--check]` | format `.kay` files |
-| `kay types [dir]` | write the types the editor's ESLint reads for `.kay` files, without checking |
-| `kay lint [keslint arguments]...` | write the types the lint of `.kay` files reads, then run the project's `keslint` on the arguments, with no `kay check` needed first |
-| `kay migrate astro [dir] [--outdir <dir>]` | translate an Astro project into `.kay` files, listing what is left by hand |
-| `kay lsp --stdio` | language server for the editor extension in `editors/vscode` |
+| `kay new` | scaffold a project: one bare page, a server run as one executable, a static site, or an app with sign-in |
+| `kay add` | add `kay new` features, or a kay library, to an existing project |
+| `kay generate` | write a starter page, component, island, action, API module or guard, with a test |
+| `kay dev` | run the server, restarting on change, with errors shown in the browser |
+| `kay build` | check the project and bundle the browser code for production, as a server, one executable or static files |
+| `kay start` | serve the last build as production does |
+| `kay render` | print what the server answers for one URL, without starting it on a port |
+| `kay screenshot` | shoot a page of the running `kay dev` in a headless Chrome |
+| `kay a11y` | check every page of the site with axe-core and draft its accessibility statement |
+| `kay check` | type-check the project, `.kay` files included |
+| `kay upgrade` | move kay and its libraries to the latest version and rewrite the old forms |
+| `kay routes` | list every route the project serves, and the file serving it |
+| `kay not-found` | list the old URLs visitors hit and found nothing at, and turn one into a redirect |
+| `kay env` | list the environment variables the project, its libraries and kay declare |
+| `kay doctor` | check Bun, versions, config, environment, port and build, and say how to fix each failure |
+| `kay explain` | list the lints and the errors, or explain one |
+| `kay docs` | print the section of kay's or an installed library's docs that words or a name match |
+| `kay types` | write the types the editor's ESLint reads for `.kay` files, without checking |
+| `kay fmt` | format `.kay` files |
+| `kay lint` | run the project's ESLint with the types it reads for `.kay` files |
+| `kay test` | run `bun test` with each file isolated and kay's preload loaded |
+| `kay i18n missing` | list what each locale lacks against the default one |
+| `kay i18n accept` | accept a locale's draft messages |
+| `kay migrate` | translate an Astro project into `.kay` files, or rewrite the entry files that `migrations` carry over |
+| `kay lsp` | the language server behind the editor extension in `editors/vscode` |
+| `kay mcp` | serve the project to an agent as MCP tools and resources |
 
 ## Upgrading
 
-A minor release may break an app. [Upgrading](llms/upgrading.md) lists what each one breaks and what to change.
+[What's new](llms/whats-new.md) lists what each release adds, and a minor release may break an app: [Upgrading](llms/upgrading.md) lists what each one breaks and what to change.
 
 ## Contributing
 
