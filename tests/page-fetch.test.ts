@@ -12,8 +12,9 @@ describe('the fetch of a page being navigated to', () => {
   let markup = 'x'
   const gates = new Map<string, (() => void)[]>()
   const requests: string[] = []
+  const signals: AbortSignal[] = []
   const link = () => document.createElement('a')
-  const visit = async (path: string, intent: 'visit' | 'query' | 'refresh' = 'visit') => swapModule.go(new URL(path, 'http://localhost/'), { intent })
+  const visit = async (path: string, intent: 'visit' | 'query' | 'refresh' | 'traverse' = 'visit') => swapModule.go(new URL(path, 'http://localhost/'), { intent })
   const release = (path: string) => {
     for (const open of gates.get(`http://localhost${path}`) ?? [])
       open()
@@ -29,6 +30,7 @@ describe('the fetch of a page being navigated to', () => {
     // Each request waits for its path to be released.
     fetched = spyOn(globalThis, 'fetch').mockImplementation((async (input: string, init?: RequestInit) => {
       requests.push(input)
+      signals.push(init!.signal!)
 
       const { promise, resolve } = Promise.withResolvers<void>()
 
@@ -52,6 +54,7 @@ describe('the fetch of a page being navigated to', () => {
 
     gates.clear()
     requests.length = 0
+    signals.length = 0
     nav.prefetched.clear()
     flight.inFlight.fetch = undefined
     flight.inFlight.asked = undefined
@@ -197,5 +200,88 @@ describe('the fetch of a page being navigated to', () => {
     await Promise.all([first, hash, replaced])
 
     expect(requests).toEqual(['http://localhost/a', 'http://localhost/a', 'http://localhost/a'])
+  })
+
+  it('is joined by a traverse to the same page, one request for it', async () => {
+    const first = visit('/a', 'traverse')
+
+    await settle()
+
+    const second = visit('/a', 'traverse')
+
+    release('/a')
+    await Promise.all([first, second])
+
+    expect(requests).toEqual(['http://localhost/a'])
+    expect(signals[0]!.aborted).toBe(false)
+  })
+
+  it('leaves one fetch running through a traverse back, forward and back again while the page loads', async () => {
+    const back = visit('/a', 'traverse')
+
+    await settle()
+
+    const forward = visit('/b', 'traverse')
+
+    await settle()
+
+    const again = visit('/a', 'traverse')
+
+    await settle()
+    expect(signals.filter(signal => !signal.aborted)).toHaveLength(1)
+    release('/a')
+    release('/b')
+    await Promise.all([back, forward, again])
+
+    expect(requests).toEqual(['http://localhost/a', 'http://localhost/b', 'http://localhost/a'])
+    expect(signals.map(signal => signal.aborted)).toEqual([true, true, false])
+  })
+
+  it('is joined by a traverse while a refresh fetches the page, and cancelled with it by another page', async () => {
+    const refresh = visit('/a', 'refresh')
+
+    await settle()
+
+    const back = visit('/a', 'traverse')
+
+    await settle()
+    expect(requests).toEqual(['http://localhost/a'])
+
+    const other = visit('/b')
+
+    await settle()
+    expect(signals[0]!.aborted).toBe(true)
+    release('/b')
+    await Promise.all([refresh, back, other])
+  })
+
+  it('leaves a refresh waiting for the traverse to the same page, without a request of its own', async () => {
+    const back = visit('/a', 'traverse')
+
+    await settle()
+
+    const refresh = visit('/a', 'refresh')
+
+    await settle()
+    expect(requests).toEqual(['http://localhost/a'])
+    release('/a')
+    await Promise.all([back, refresh])
+
+    expect(requests).toEqual(['http://localhost/a'])
+  })
+
+  it('replaces the fetch of a refresh by another refresh, which asks for a fresh page', async () => {
+    const first = visit('/a', 'refresh')
+
+    await settle()
+
+    const second = visit('/a', 'refresh')
+
+    await settle()
+    expect(signals.map(signal => signal.aborted)).toEqual([true, false])
+    release('/a')
+    await Promise.all([first, second])
+
+    expect(requests).toEqual(['http://localhost/a', 'http://localhost/a'])
   })
 })

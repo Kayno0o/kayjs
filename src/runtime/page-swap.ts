@@ -89,14 +89,17 @@ async function swapTo(url: URL, swap: Swap): Promise<void> {
   }
 
   const token = ++navigation.current
-  const controller = new AbortController()
-
   const key = pageKey(url)
+  const running = inFlight.fetch
+  // A traversal takes the page already being fetched; any other swap replaces the fetch, a refresh asking for a fresh page and the rest for their own options.
+  const reused = swap.intent === 'traverse' && running?.key === key ? running : undefined
 
-  if (inFlight.fetch?.key !== key)
-    inFlight.fetch?.controller.abort()
+  if (!reused)
+    running?.controller.abort()
 
-  const flight = { controller, key, href: url.href, intent: swap.intent, replace: swap.replace, scroll: swap.scroll, transition: swap.transition }
+  const controller = reused?.controller ?? new AbortController()
+  const asked = reused?.page ?? pageFor(url, controller.signal)
+  const flight = { controller, key, page: asked, href: url.href, intent: swap.intent, replace: swap.replace, scroll: swap.scroll, transition: swap.transition }
 
   inFlight.fetch = flight
   void holding()
@@ -117,7 +120,6 @@ async function swapTo(url: URL, swap: Swap): Promise<void> {
     let page: FetchedPage
 
     try {
-      const asked = pageFor(url, controller.signal)
       // A refresh runs in the background and may be slow: only a visit is given up on.
       const fetched = swap.intent === 'refresh' ? await asked : await bounded(asked, PAGE_TIMEOUT_MS)
 
