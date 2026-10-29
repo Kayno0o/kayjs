@@ -161,6 +161,8 @@ export async function prerenderPages(project: Project, client: ClientBuild, opti
   const paths = new Map<string, string>()
   // The tokens the pages so far draw their ids from.
   const tokens = new Set<string>()
+  // The `await` blocks the pages waited on or hid a pending branch behind, by block, each said once with the pages it was found on.
+  const awaited = new Map<string, AwaitFinding & { paths: string[] }>()
   // The files of pages kept without being asked for, which a page that was asked for takes the place of.
   const kept = new Set<string>()
   // How many times a page showed a class its head had no rule for, which the manifest then keeps.
@@ -400,8 +402,14 @@ export async function prerenderPages(project: Project, client: ClientBuild, opti
 
         reserved.set(name, copy.key)
 
-        for (const message of awaitWarnings(copy.path, awaits, root))
-          kayLog('warn', message)
+        for (const found of awaitFindings(awaits, root)) {
+          const seen = awaited.get(found.key)
+
+          if (seen === undefined)
+            awaited.set(found.key, { ...found, paths: [copy.path] })
+          else
+            seen.paths.push(copy.path)
+        }
 
         pending.push(async () => {
           paths.set(name, copy.key)
@@ -521,6 +529,9 @@ export async function prerenderPages(project: Project, client: ClientBuild, opti
 
   options.onRoute?.(routes.length, routes.length)
 
+  for (const { message, paths } of awaited.values())
+    kayLog('warn', message(paths[0]!, paths.length > 1 ? ` and ${paths.length - 1} more page${paths.length > 2 ? 's' : ''}` : ''))
+
   const apiProblems: ExportProblem[] = options.exportAll ? (await projectApi(root, config)).map(module => ({ code: 'export-api-module', message: `${relative(root, module.file)}: an API module answers requests, which only a server does; a file such as src/routes/llms.txt.ts exporting GET is written to a file` })) : []
   const endpointProblems = options.exportAll ? (await exportedEndpoints(root, await scanEndpoints(routesDir, mounts), config.requireGuards)).problems : []
 
@@ -540,26 +551,37 @@ export async function prerenderPages(project: Project, client: ClientBuild, opti
   return Object.keys(pages).length
 }
 
-// A page's `await` blocks resolve at build: a pending branch no visitor sees, and a slow value the build waits for.
-function awaitWarnings(path: string, awaits: AwaitNote[], root: string): string[] {
-  const warnings: string[] = []
+// What a page's `await` blocks hold that the build resolves: a pending branch no visitor sees, and a slow value the build waits for. `key` is the block, so the pages sharing it are said once.
+interface AwaitFinding {
+  key: string
+  message: (path: string, more: string) => string
+}
+
+function awaitFindings(awaits: AwaitNote[], root: string): AwaitFinding[] {
+  const findings: AwaitFinding[] = []
   const placed = (note: AwaitNote) => {
     const at = writtenAt(note.stack, [RUNTIME_FOLDER])
 
     return at === undefined ? 'a component' : `${relative(root, at.file)}:${at.line}`
   }
 
-  for (const note of awaits.filter(({ pending }) => pending))
-    warnings.push(`${path} renders an \`await\` block with a pending branch at ${placed(note)}: the build resolves it, so its pending content never shows; wrap it in a client island, or in a deferred server island (\`server="defer"\`), to show it to a visitor`)
+  for (const note of awaits.filter(({ pending }) => pending)) {
+    const place = placed(note)
+
+    findings.push({ key: `pending ${place}`, message: (path, more) => `${path}${more} renders an \`await\` block with a pending branch at ${place}: the build resolves it, so its pending content never shows; wrap it in a client island, or in a deferred server island (\`server="defer"\`), to show it to a visitor` })
+  }
 
   for (const note of awaits) {
     const waited = (note.settled ?? note.started) - note.started
 
-    if (waited >= SLOW_AWAIT_MS)
-      warnings.push(`${path} waited ${(waited / 1000).toFixed(1)}s on an \`await\` block at ${placed(note)}, which the build resolves: the wait is spent on every build; move it to a client island or a deferred server island, or make its value faster`)
+    if (waited >= SLOW_AWAIT_MS) {
+      const place = placed(note)
+
+      findings.push({ key: `slow ${place}`, message: (path, more) => `${path}${more} waited ${(waited / 1000).toFixed(1)}s on an \`await\` block at ${place}, which the build resolves: the wait is spent on every build; move it to a client island or a deferred server island, or make its value faster` })
+    }
   }
 
-  return warnings
+  return findings
 }
 
 // Whether a guard answers for the page, `requireGuards` refusing one no guard covers: its words stay out of the public search index.

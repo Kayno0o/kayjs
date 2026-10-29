@@ -107,4 +107,49 @@ describe('the build and the await blocks of a prerendered page', () => {
 
     expect(`${report}${output}`).not.toContain('waited')
   }, 120_000)
+
+  it('follows a block inside the then of another and one over an async iterable', async () => {
+    const nested = await project({ 'src/routes/index.kay': PAGE(`${slow(1)}\nconst inner = new Promise<string>(resolve => setTimeout(resolve, 1, 'inner'))`, 'await value\nthen text\n  p {text}\n  await inner\n    p inner loading\n  then more\n    p {more}\n') })
+    const first = await kayBuild([nested, '--no-check'])
+
+    expect(first.code, `${first.report}${first.output}`).toBe(0)
+    expect(`${first.report}${first.output}`).toContain('with a pending branch at src/routes/index.kay:8')
+
+    const parts = await project({ 'src/routes/index.kay': PAGE('async function* values() {\n  yield \'a\'\n}\nconst value = values()', AWAIT) })
+    const second = await kayBuild([parts, '--no-check'])
+
+    expect(second.code, `${second.report}${second.output}`).toBe(0)
+    expect(`${second.report}${second.output}`).toContain('with a pending branch at src/routes/index.kay:7')
+  }, 120_000)
+
+  it('says a block once for the pages sharing it, with how many', async () => {
+    const root = await project({ 'src/routes/[id].kay': `---\n${slow(1)}\n---\n--- server\nexport const page = { prerender: ['a', 'b', 'c'].map(id => ({ id })) }\n---\n${PENDING}` })
+    const { code, report, output } = await kayBuild([root, '--no-check'])
+    const said = `${report}${output}`.split('\n').filter(line => line.includes('with a pending branch'))
+
+    expect(code, `${report}${output}`).toBe(0)
+    expect(said).toHaveLength(1)
+    expect(said[0]).toContain('/a and 2 more pages renders')
+  }, 120_000)
+
+  it('names a block whose value rejects, without failing the build', async () => {
+    const root = await project({ 'src/routes/index.kay': PAGE('const value = new Promise<string>((_, reject) => setTimeout(reject, 1, new Error(\'no\')))', 'await value\n  p loading\nthen text\n  p {text}\ncatch\n  p failed\n') })
+    const { code, report, output } = await kayBuild([root, '--no-check'])
+
+    expect(code, `${report}${output}`).toBe(0)
+    expect(`${report}${output}`).toContain('with a pending branch at src/routes/index.kay:4')
+    expect(await Bun.file(join(outputDir(root), 'pages/index.html')).text()).toContain('<p>failed</p>')
+  }, 120_000)
+
+  it('says nothing of a kept page the build then gives up on', async () => {
+    const root = await project({
+      'src/count.ts': 'export function next(): number {\n  const holder = globalThis as { kayCount?: number }\n\n  holder.kayCount = (holder.kayCount ?? 0) + 1\n\n  return holder.kayCount\n}\n',
+      'src/routes/index.kay': PAGE(`import { next } from '../count'\n${slow(1)}\nconst n = next()`, `p {n}\n${PENDING}`),
+    })
+    const { code, report, output } = await kayBuild([root, '--no-check'])
+
+    expect(code, `${report}${output}`).toBe(0)
+    expect(`${report}${output}`).toContain('on request')
+    expect(`${report}${output}`).not.toContain('`await` block')
+  }, 120_000)
 })

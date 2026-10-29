@@ -119,11 +119,35 @@ export function collectDeferred<T>(render: () => T, within?: string): { result: 
   }
 }
 
+// The notes of the prerendered page whose block is rendering its `then` or `catch`, which the blocks inside it add to: they render later, outside the page's own render.
+let inherited: AwaitNote[] | undefined
+
+function following<T>(notes: AwaitNote[] | undefined, render: () => T): T {
+  if (notes === undefined)
+    return render()
+
+  const outer = inherited
+
+  inherited = notes
+
+  try {
+    return render()
+  }
+  finally {
+    inherited = outer
+  }
+}
+
 // Keeps where a prerendered page's block is written and when its value settled, for the build to say what the page waited on and which pending content no visitor sees.
-function noteAwait(notes: AwaitNote[], value: Promise<unknown>, pending: boolean): void {
+// A promise is timed until it settles; an iterable has no wait to name.
+function noteAwait(notes: AwaitNote[], value: Promise<unknown> | undefined, pending: boolean): void {
   const note: AwaitNote = { stack: new Error('await').stack ?? '', pending, started: performance.now() }
 
   notes.push(note)
+
+  if (value === undefined)
+    return
+
   void (async () => {
     try {
       await value
@@ -151,10 +175,10 @@ export function Await<T>(props: AwaitProps<T>): JSX.Element {
     return props.pending?.()
   }
 
-  const notes = awaitNotes()
+  const notes = awaitNotes() ?? inherited
 
-  if (notes !== undefined && !parts)
-    noteAwait(notes, value as Promise<unknown>, props.pending !== undefined)
+  if (notes !== undefined)
+    noteAwait(notes, parts ? undefined : value as Promise<unknown>, props.pending !== undefined)
 
   const id = `${deferred.prefix}${(deferred.next++).toString(36)}`
   const collecting = deferred
@@ -164,7 +188,7 @@ export function Await<T>(props: AwaitProps<T>): JSX.Element {
 
   const fallback = props.fallback
 
-  collecting.blocks.push({ id, value, ready: (settled: never) => runWithOwner(parent, () => props.ready(settled)), failed: failed && (error => runWithOwner(parent, () => failed(error))), fallback: fallback && (error => runWithOwner(parent, () => fallback(error))), site: failed ? undefined : new Error('await') })
+  collecting.blocks.push({ id, value, ready: (settled: never) => runWithOwner(parent, () => following(notes, () => props.ready(settled))), failed: failed && (error => runWithOwner(parent, () => following(notes, () => failed(error)))), fallback: fallback && (error => runWithOwner(parent, () => following(notes, () => fallback(error)))), site: failed ? undefined : new Error('await') })
   // The streamed block replaces this one whole, so an `await` inside it renders its own pending block and streams nothing.
   deferred = undefined
 
