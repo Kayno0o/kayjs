@@ -1,7 +1,7 @@
 import { existsSync } from 'node:fs'
 import { Glob } from 'bun'
 import { expect, it } from 'bun:test'
-import { compare, snapshots } from '../scripts/api'
+import { breakingKeys, compare, snapshots } from '../scripts/api'
 
 const root = process.cwd()
 
@@ -23,4 +23,11 @@ it('matches the committed API snapshot', async () => {
 // The shadows the components' props are read from come from the libraries' sources, which a change to one must reach this test through.
 it('has components to read props from', () => {
   expect([...new Glob('packages/ui/src/*.kay').scanSync()].length).toBeGreaterThan(0)
+})
+
+it('counts a removal as breaking always and a change unless it is said to be compatible', () => {
+  const change = { added: ['[.] a'], removed: ['[.] b'], changed: ['[.] c'] }
+
+  expect(breakingKeys('api/ai.txt', change, false)).toEqual(['ai [.] b', 'ai [.] c'])
+  expect(breakingKeys('api/ai.txt', change, true)).toEqual(['ai [.] b'])
 })

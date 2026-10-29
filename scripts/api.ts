@@ -6,8 +6,8 @@ import ts from 'typescript'
 import { writeShadowTypes } from '../src/check/shadow-types'
 import { BREAKING_FILE } from './breaking'
 
-// `bun scripts/api.ts [--update [--breaking]]`: the public surface of kay and of each library, every `exports` entry's names and their types, as the text files of `api/`.
-// Without a flag it prints the difference from the committed snapshot and exits 1 when there is one. `--update` writes the snapshot, and refuses a removed or changed export unless `--breaking` is given, which records it in `api/breaking.txt` for the release to read.
+// `bun scripts/api.ts [--update [--breaking|--compatible]]`: the public surface of kay and of each library, every `exports` entry's names and their types, as the text files of `api/`.
+// Without a flag it prints the difference from the committed snapshot and exits 1 when there is one. `--update` writes the snapshot, and refuses a removed or changed export unless `--breaking` is given, which records it in `api/breaking.txt` for the release to read, or, for a changed export that stays compatible (an optional member added, a type widened), `--compatible`, which records nothing. A removal always needs `--breaking`.
 export const SNAPSHOT_DIR = 'api'
 
 interface Manifest {
@@ -194,6 +194,13 @@ export interface ApiChange {
   changed: string[]
 }
 
+// The `<package> [entry] name` keys a change breaks: a removal always, a changed export unless the author says it stays compatible.
+export function breakingKeys(path: string, { removed, changed }: ApiChange, compatible: boolean): string[] {
+  const name = path.slice(SNAPSHOT_DIR.length + 1, -'.txt'.length)
+
+  return [...removed, ...(compatible ? [] : changed)].map(key => `${name} ${key}`)
+}
+
 export function compare(committed: string, current: string): ApiChange {
   const before = blocksOf(committed)
   const after = blocksOf(current)
@@ -209,14 +216,16 @@ if (import.meta.main) {
   const root = process.cwd()
   const current = await snapshots(root)
   const update = process.argv.includes('--update')
+  const compatible = process.argv.includes('--compatible')
   const breaking: string[] = []
   const report: string[] = []
 
   for (const [path, text] of current) {
     const committed = existsSync(join(root, path)) ? readFileSync(join(root, path), 'utf8') : ''
-    const { added, removed, changed } = compare(committed, text)
+    const change = compare(committed, text)
+    const { added, removed, changed } = change
 
-    breaking.push(...[...removed, ...changed].map(key => `${path.slice(SNAPSHOT_DIR.length + 1, -'.txt'.length)} ${key}`))
+    breaking.push(...breakingKeys(path, change, compatible))
 
     for (const [label, keys] of [['added', added], ['removed', removed], ['changed', changed]] as const)
       report.push(...keys.map(key => `${label} ${path} ${key}`))
@@ -230,7 +239,7 @@ if (import.meta.main) {
     process.exit(1)
   }
   else if (breaking.length > 0 && !process.argv.includes('--breaking')) {
-    console.log(`${report.join('\n')}\n\nThese remove or change an export a ^ range of an app relies on. Rerun with --breaking if the change means to break it, and add its line to llms/upgrading.md.`)
+    console.log(`${report.join('\n')}\n\nThese remove or change an export a ^ range of an app relies on. Rerun with --breaking if the change means to break it, and add its line to llms/upgrading.md; --compatible accepts a changed export that breaks nothing (a removal still needs --breaking).`)
     process.exit(1)
   }
   else {
