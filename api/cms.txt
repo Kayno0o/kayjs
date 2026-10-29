@@ -405,6 +405,18 @@ interface FormScope
   shown: Shown
   source?: PairedEntry | undefined
 
+[.] github
+function github({ repo, branch, token, baseUrl, timeout: wait, fetch: request }: GithubOptions): FileSaver
+
+[.] GithubOptions
+interface GithubOptions
+  baseUrl?: string | undefined
+  branch?: string | undefined
+  fetch?: typeof fetch | undefined
+  repo: string
+  timeout?: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w` | undefined
+  token: string
+
 [.] GivenLayout
 type GivenLayout = CollectionLayout & { icon?: IconProps | undefined, history?: false | undefined }
 

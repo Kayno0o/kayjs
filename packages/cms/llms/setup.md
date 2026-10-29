@@ -6,7 +6,7 @@ Installing the cms, where a folder entry's file goes when an editor saves, and h
 
 ### Install the cms
 
-`kay add cms` installs the packages and adds `cms()` to `extensions`. `role` lets in the kayjs-auth users holding it, the app's `authorize` deciding as in `auth.guard()`; a production server with no `files` commits to the Forgejo `CMS_BASE_URL`, `CMS_REPO`, `CMS_TOKEN` and `CMS_BRANCH` name (`kay env` lists them), and refuses to boot without them.
+`kay add cms` installs the packages and adds `cms()` to `extensions`. `role` lets in the kayjs-auth users holding it, the app's `authorize` deciding as in `auth.guard()`; a production server with no `files` commits to the Forgejo `CMS_BASE_URL`, `CMS_REPO`, `CMS_TOKEN` and `CMS_BRANCH` name, or to GitHub with `CMS_HOST=github` and the same minus `CMS_BASE_URL` (`kay env` lists them), and refuses to boot without them. Hosts: Forgejo and GitHub (github.com and GitHub Enterprise Server) ship a saver; `forgejo()` is written against Forgejo's batch contents endpoint and is not verified against Gitea, and GitLab or any other host needs a saver of your own, below.
 
 ```ts
 import { auth } from '@kaynooo/kayjs-auth'
@@ -22,6 +22,14 @@ export default defineConfig({ extensions: [auth({ module: './src/auth' }), cms({
 
 ```ts
 cms({ guard, files: forgejo({ baseUrl: 'https://git.example.com', repo: 'me/site', token: env.FORGEJO_TOKEN }) })
+```
+
+### Commit saves to GitHub
+
+`github({ repo, branch?, token, baseUrl?, timeout?, fetch? })` commits through GitHub's Git Data API: it reads the branch's head, builds a tree and a commit on it, and moves the branch to it. A save of several files (a rename with the entries that named the renamed one) is one commit or nothing. The token needs write access to the repository's contents.
+
+```ts
+cms({ guard, files: github({ repo: 'me/site', token: env.GITHUB_TOKEN }) })
 ```
 
 ### Write saves in the working tree
@@ -48,7 +56,8 @@ const saver: FileSaver = {
 
 ## Reference
 
-- `cms({ prefix, role, guard, files, uploads, pageSize, collections, rawHtml, author, onSave })`: `prefix` is where the screens live (`/admin`), `role` the kayjs-auth role an editor needs, or `guard` who may use them and the API, as `{ load }` returning the guard (not both), `files` where a folder entry's file goes (`workingTree()` by default; a production server takes `forgejo()` from the `CMS_*` variables, else refuses to boot unless named). Every option, the upload checks, `rawHtml` and `author` are in [Options of cms()](options.md).
+- `cms({ prefix, role, guard, files, uploads, pageSize, collections, rawHtml, author, onSave })`: `prefix` is where the screens live (`/admin`), `role` the kayjs-auth role an editor needs, or `guard` who may use them and the API, as `{ load }` returning the guard (not both), `files` where a folder entry's file goes (`workingTree()` by default; a production server takes `forgejo()`, or `github()` with `CMS_HOST=github`, from the `CMS_*` variables, else refuses to boot unless named). Every option, the upload checks, `rawHtml` and `author` are in [Options of cms()](options.md).
+- `github({ repo, branch?, token, baseUrl?, timeout?, fetch? })`: `baseUrl` is the REST API's address, `https://api.github.com` by default and `https://<host>/api/v3` for GitHub Enterprise Server, https or http on localhost as for `forgejo()`; the token goes as a Bearer. A save reads the file's blob sha at the branch's head (Contents API), checks `base`, then creates a tree and a commit (`parents` the head, the commit's `author` the editor's, GitHub taking the committer from it) and updates the ref without `force`. A ref update GitHub refuses as not a fast forward (another push or save moved the branch, 422 or 409) restarts from the read, up to three times, so a save only conflicts when its own file changed, and `SaveConflictError` then carries that file's version. `move` is one commit with the `also` files (`together: true`), so a refused referrer writes nothing. Errors are `ForgeError` as for `forgejo()`, saying GitHub; a failure after the ref update was sent says the save may have gone through. The default branch is looked up on each save when `branch` is left out.
 - `forgejo({ baseUrl, repo, branch?, token, timeout?, fetch? })`: `baseUrl` must be https, or http on `localhost`, `127.x.x.x` or `[::1]`, else it throws, as the token travels in every request; commits each file through Forgejo's contents API, reading the file's sha first. Throws `ForgeError` with Forgejo's `status` and message, its first 200 characters (the log gets the rest), 504 when the save, its requests together, takes over `timeout` (a duration string, `'15s'`, a bare number throws; the read naming the version after a conflict has its own), or 502 naming why the forge could not be reached; one failing once the commit was sent says it may have gone through. The editor sees it as the save's issue, the log getting the whole error. Forgejo refusing the commit's sha (409, or 422 naming the sha) throws `SaveConflictError`.
 - A save or a delete names the version of the file the editor opened, its git blob sha (`fileVersion(text)`): a saver finding the file at another, as after another editor's save, or one's own before the site rebuilt from it, throws `SaveConflictError` with the version it found as `current`. The editor keeps the refusal shown while the editor types, and its Keep my edits button takes that version as the one the edits were made from, so the next save writes them over it; nothing else is lost. A new entry must not exist yet. An app's own `FileSaver` checks `change.base` the same way, `null` meaning the file must not exist and `undefined` writing whatever is there; `workingTree()` checks and writes one save of a file at a time.
 - The API refuses a save or a delete naming no version for a folder entry the server holds, as from an editor older than the server, logging it: reloading the page loads the editor that names it. A delete from the entry list names the version the list showed, and one from the editor after Keep my edits over a file deleted and made again since names none, so it is refused with a message telling the editor to reload rather than that it is older. Edits kept over a file deleted meanwhile are written as a new entry, refused if the file was made since.

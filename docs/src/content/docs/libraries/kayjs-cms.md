@@ -5,7 +5,7 @@ description: Edit a kay site's content on the page it renders, and manage each c
 ---
 `@kaynooo/kayjs-cms` edits a kay site's [content collections](/guides/content) in two ways. Edit mode opens the real page: click a title, edit it in a sidebar, and the page updates as you type. The screens, generated from each collection's schema, list, search, add, edit, publish and delete entries.
 
-Both save the same way. A file entry is a Forgejo commit, or a change in the working tree under `kay dev`. A loaded entry goes through its collection's loader.
+Both save the same way. A file entry is a Forgejo or GitHub commit, or a change in the working tree under `kay dev`. A loaded entry goes through its collection's loader.
 
 ## Install
 
@@ -45,7 +45,7 @@ The screens live at `/admin`. Set `prefix` to move them, to `/` if the site is o
 
 `guard` is the other way to say who gets in, and you give one or the other. It takes a guard loaded on the first request, `{ load: async () => (await import('./src/auth')).auth.guard({ require: 'editor' }) }`, so `kay.config.ts` imports nothing of the app's auth or database. It also takes the built guard itself. Then `kay.config.ts` imports `./src/auth`, and with it the app's database, for every `kay build` and `kay check`.
 
-Without `files`, saves go to the working tree, which suits `kay dev`. A production server without it commits them to Forgejo, through `forgejo()` built from `CMS_BASE_URL`, `CMS_REPO`, `CMS_TOKEN` and the optional `CMS_BRANCH`. `kay env` lists them. With none of them set, the server refuses to boot, as the next deploy would drop its saves.
+Without `files`, saves go to the working tree, which suits `kay dev`. A production server without it commits them to Forgejo, through `forgejo()` built from `CMS_BASE_URL`, `CMS_REPO`, `CMS_TOKEN` and the optional `CMS_BRANCH`, or through `github()` when `CMS_HOST` is `github`, which needs no `CMS_BASE_URL` unless it is a GitHub Enterprise Server. `kay env` lists them. With none of them set, the server refuses to boot, as the next deploy would drop its saves.
 
 ## Signing in and roles
 
@@ -289,11 +289,11 @@ The old address of the page redirects to the new one, with nothing to write in `
 
 Rename twice and both old addresses go straight to the last one. Rename back and the redirect from the address that exists again is removed, so nothing loops.
 
-A folder entry's file is moved and keeps its format. With `forgejo()` it is one commit. A saver of your own needs `move` to allow it. A loaded entry is saved under the new slug and removed from the old one, with its history, and it does not go to the trash.
+A folder entry's file is moved and keeps its format. With `forgejo()` or `github()` it is one commit. A saver of your own needs `move` to allow it. A loaded entry is saved under the new slug and removed from the old one, with its history, and it does not go to the trash.
 
 Every entry that refers to this one in a `reference` field is pointed at the new slug, in lists, groups and blocks, in every language it is written in, in folder and loaded collections alike. The dialog lists them before you rename.
 
-With `forgejo()` they are part of the same commit as the move, and the working tree writes them with it. A saver of your own saves them one by one afterwards, as it does loaded entries, whose save shows in their history. If a folder entry committed with the move was saved meanwhile, the rename is refused and nothing is written. If one saved afterwards cannot be saved, the editor names it so you can change it by hand.
+With `forgejo()` or `github()` they are part of the same commit as the move, and the working tree writes them with it. A saver of your own saves them one by one afterwards, as it does loaded entries, whose save shows in their history. If a folder entry committed with the move was saved meanwhile, the rename is refused and nothing is written. If one saved afterwards cannot be saved, the editor names it so you can change it by hand.
 
 A rename is refused if the new slug is taken or names another place, or if an entry that refers to this one lives in a folder outside the repository.
 
@@ -476,7 +476,7 @@ Every upload goes to one folder shared by all collections, named by the hash of 
 
 An upload a kept version or a deleted entry in the trash still mentions is marked as kept by them in the library, and cannot be deleted. It shows 48 uploads a page and has a search box for the name.
 
-Uploads an older release kept in a folder per collection move over by themselves when the server starts: each one an entry names is copied into the shared folder, and the entries naming it are saved pointing at the copy, through the same saver as any edit (one commit per entry on Forgejo). Nothing changes in the app, though under `kay dev` the first start rewrites the content files that name an older upload.
+Uploads an older release kept in a folder per collection move over by themselves when the server starts: each one an entry names is copied into the shared folder, and the entries naming it are saved pointing at the copy, through the same saver as any edit (one commit per entry on Forgejo and GitHub). Nothing changes in the app, though under `kay dev` the first start rewrites the content files that name an older upload.
 
 The old file stays where it was, since pages the site has not rebuilt from still name it; the library hides it and the unused-uploads screen offers it for deletion once no entry names it. An entry that cannot be saved right then is tried again at the next start.
 
@@ -666,7 +666,9 @@ It runs in the server that handled the save, before the editor gets the answer, 
 
 ## Where files are saved
 
-A folder entry is a file, and `files` says where it goes. `forgejo()` commits it. `workingTree()` writes it in place, which is the default under `kay dev`. The token travels with every request, so `forgejo()` throws for a plain `http:` address unless it is `localhost`, `127.0.0.1` or `[::1]`.
+A folder entry is a file, and `files` says where it goes. `forgejo()` commits it to a Forgejo and `github()` to GitHub (`github({ repo: 'me/site', token })`, or `baseUrl: 'https://<host>/api/v3'` for GitHub Enterprise Server).
+
+Both commit a rename and the entries that named it as one commit, or nothing. `forgejo()` is not verified against Gitea, and GitLab or another host needs a saver of your own. `workingTree()` writes it in place, which is the default under `kay dev`. The token travels with every request, so `forgejo()` and `github()` throw for a plain `http:` address unless it is `localhost`, `127.0.0.1` or `[::1]`.
 
 A production server refuses to boot on the working tree, as the next deploy would drop its saves. Name `workingTree()` yourself where the files outlive a deploy.
 
@@ -698,7 +700,7 @@ const saver: FileSaver = {
 
 A saver may also have `move(move)`, which renames an entry's file. `move.from` and `move.to` hold the `repoPath` and `absolute` path of each, `move.text` is the text the file has at `to`, `move.base` is the version of `from`, and `move.message` and `move.author` are as in a save.
 
-It writes `to`, then removes `from`; `forgejo()` does both in one commit. It throws `SaveConflictError` when `from` is at another version or gone, or when `to` exists (`new SaveConflictError(undefined, true)`). `workingTree()` does it in place. A saver without `move` cannot rename entries.
+It writes `to`, then removes `from`; `forgejo()` and `github()` do both in one commit. It throws `SaveConflictError` when `from` is at another version or gone, or when `to` exists (`new SaveConflictError(undefined, true)`). `workingTree()` does it in place. A saver without `move` cannot rename entries.
 
 ## The entries API
 
@@ -718,7 +720,7 @@ If you decline the question about edits not saved when Delete takes you to the c
 
 After a save the site shows only once it has rebuilt, the line by the buttons says `Not live yet` until the public page serves the change, then `Live now`.
 
-A commit shows on the site once it has rebuilt from it. The Forgejo token needs write access to the repository's contents, and the commit is the token's user's.
+A commit shows on the site once it has rebuilt from it. The Forgejo or GitHub token needs write access to the repository's contents, and the commit is the token's user's.
 
 A save or a delete made over another save is refused rather than writing over it. So is one made over your own save before the site rebuilt from it. The refusal stays on the form, names the fields both sides changed, and offers Take their version, which drops your edits for the saved copy. Its Keep my edits button lets the next save write your edits over that save.
 

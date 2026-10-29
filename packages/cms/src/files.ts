@@ -70,7 +70,7 @@ export function fileVersion(bytes: Uint8Array | string): string {
   return new Bun.CryptoHasher('sha1').update(`blob ${content.byteLength}\0`).update(content).digest('hex')
 }
 
-function checkBase(base: string | null | undefined, current: string | undefined, at?: string): void {
+export function checkBase(base: string | null | undefined, current: string | undefined, at?: string): void {
   if (base !== undefined && base !== (current ?? null))
     throw new SaveConflictError(current ?? null, base === null, at)
 }
@@ -196,7 +196,8 @@ export class ForgeError extends Error {
 const SHA_MISMATCH = /sha/i
 // How much of a refusal the editor is shown; the log gets it whole.
 const SHOWN_REFUSAL = 200
-const TRAILING_SLASHES = /\/+$/
+
+export const TRAILING_SLASHES = /\/+$/
 
 function commitOperation(text: string | undefined, sha: string | undefined): 'delete' | 'create' | 'update' {
   if (text === undefined)
@@ -208,11 +209,11 @@ function commitOperation(text: string | undefined, sha: string | undefined): 'de
 const LOOPBACK = /^(?:localhost|127(?:\.\d{1,3}){3}|\[::1\])$/
 
 // The token travels in every request, so a plain http: address is refused unless it is this machine's.
-function requireSecure(url: string): void {
+export function requireSecure(url: string, saver = 'forgejo'): void {
   const parsed = URL.parse(url)
 
   if (parsed === null || (parsed.protocol !== 'https:' && !(parsed.protocol === 'http:' && LOOPBACK.test(parsed.hostname))))
-    throw configError(`forgejo baseUrl is '${url}', which must be https:, or http: on localhost`)
+    throw configError(`${saver} baseUrl is '${url}', which must be https:, or http: on localhost`)
 }
 
 // Commits each change through Forgejo's contents API, so the site rebuilds from git and every edit has history.
@@ -339,7 +340,7 @@ export function forgejo({ baseUrl, repo, branch, token, timeout: wait = '15s', f
 }
 
 // The file's version once a commit was refused for naming another, or undefined when the forge cannot say.
-async function conflictVersion(currentSha: () => Promise<string | undefined>): Promise<string | null | undefined> {
+export async function conflictVersion(currentSha: () => Promise<string | undefined>): Promise<string | null | undefined> {
   try {
     return await currentSha() ?? null
   }
@@ -348,7 +349,7 @@ async function conflictVersion(currentSha: () => Promise<string | undefined>): P
   }
 }
 
-function networkReason(error: unknown): string {
+export function networkReason(error: unknown): string {
   if (!(error instanceof Error))
     return String(error)
 
@@ -358,7 +359,7 @@ function networkReason(error: unknown): string {
 }
 
 // Forgejo explains a refusal in a JSON `message`; a proxy in front of it may answer anything, an HTML page say, which is cut short and logged whole.
-async function errorMessage(response: Response): Promise<string> {
+export async function errorMessage(response: Response, host = 'Forgejo'): Promise<string> {
   const text = await response.text()
   let message: string
 
@@ -372,7 +373,7 @@ async function errorMessage(response: Response): Promise<string> {
   if (message.length <= SHOWN_REFUSAL)
     return message
 
-  log.warn(`Forgejo answered ${response.status}: ${message}`)
+  log.warn(`${host} answered ${response.status}: ${message}`)
 
   return `${message.slice(0, SHOWN_REFUSAL)}…`
 }

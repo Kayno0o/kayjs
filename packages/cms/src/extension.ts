@@ -6,6 +6,7 @@ import { configError, serverRoot, underKayDev, viewPresenceWith } from 'kay/libr
 import { api, defineEnv } from 'kay/server'
 import { viewMembers } from './editor-names'
 import { forgejo } from './files'
+import { github } from './github'
 import { stopWalks } from './history'
 import { collectionInfo, collections } from './kay/content'
 import { hintProblems, missingKindLines } from './kinds'
@@ -43,20 +44,30 @@ async function setupWarnings(): Promise<string[]> {
 
 // What a production server with no `cms({ files })` commits through, listed for `kay env`.
 const CMS_ENV = s.Object({
-  CMS_BASE_URL: s.Optional(s.String({ description: 'the Forgejo a production cms commits edits to, such as https://git.example.com, when cms({ files }) is not set' })),
+  CMS_HOST: s.Optional(s.Union([s.Literal('forgejo'), s.Literal('github')], { description: 'the kind of git host a production cms commits edits to, forgejo by default, when cms({ files }) is not set' })),
+  CMS_BASE_URL: s.Optional(s.String({ description: 'the address of that host: the Forgejo, such as https://git.example.com, or for github the API of a GitHub Enterprise Server (https://api.github.com when unset)' })),
   CMS_REPO: s.Optional(s.String({ description: 'the repository the cms commits to, as owner/name' })),
-  CMS_TOKEN: s.Optional(s.String({ description: 'a Forgejo token allowed to write that repository\'s contents' })),
+  CMS_TOKEN: s.Optional(s.String({ description: 'a token of that host allowed to write that repository\'s contents' })),
   CMS_BRANCH: s.Optional(s.String({ description: 'the branch the cms commits to, the repository\'s default when unset' })),
 })
 
-const NO_SAVER = 'a production server saves no edit to the working tree, which the next deploy replaces: set CMS_BASE_URL, CMS_REPO and CMS_TOKEN for a Forgejo, or cms({ files: forgejo(...) }), or cms({ files: workingTree() }) where the files outlive a deploy'
+const NO_SAVER = 'a production server saves no edit to the working tree, which the next deploy replaces: set CMS_BASE_URL, CMS_REPO and CMS_TOKEN for a Forgejo (or CMS_HOST=github with CMS_REPO and CMS_TOKEN for GitHub), or cms({ files: forgejo(...) }) or cms({ files: github(...) }), or cms({ files: workingTree() }) where the files outlive a deploy'
 
-// The Forgejo the environment names, for a production server given no `files`; with none of it set, or part of it, the boot stops naming what is missing.
+// The Forgejo or GitHub the environment names, for a production server given no `files`; with none of it set, or part of it, the boot stops naming what is missing.
 function savedFromEnv(): FileSaver {
-  const { CMS_BASE_URL: baseUrl, CMS_REPO: repo, CMS_TOKEN: token, CMS_BRANCH: branch } = defineEnv(CMS_ENV)
+  const { CMS_HOST: host = 'forgejo', CMS_BASE_URL: baseUrl, CMS_REPO: repo, CMS_TOKEN: token, CMS_BRANCH: branch } = defineEnv(CMS_ENV)
 
   if (baseUrl === undefined && repo === undefined && token === undefined)
     throw configError(NO_SAVER)
+
+  if (host === 'github') {
+    const lacking = Object.entries({ CMS_REPO: repo, CMS_TOKEN: token }).filter(([, value]) => value === undefined).map(([name]) => name)
+
+    if (repo === undefined || token === undefined)
+      throw configError(`the cms commits to the GitHub the environment names, which lacks ${lacking.join(' and ')}`)
+
+    return github({ baseUrl, repo, token, branch })
+  }
 
   const missing = Object.entries({ CMS_BASE_URL: baseUrl, CMS_REPO: repo, CMS_TOKEN: token }).filter(([, value]) => value === undefined).map(([name]) => name)
 

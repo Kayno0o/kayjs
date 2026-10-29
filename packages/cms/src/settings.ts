@@ -61,7 +61,7 @@ export interface CmsOptions {
   guard?: Guard | LazyGuard | undefined
   // The kayjs-auth role an editor needs, `cms({ role: 'editor' })` standing for a guard of `requireUser({ require: 'editor' })`, the app's `authorize` deciding as in `auth.guard()`, with no route params. Not given with `guard`.
   role?: string | undefined
-  // Where a folder entry's file goes: `forgejo(...)` on a deployed site, the working tree by default, for `kay dev`. Left out, a production server builds `forgejo()` from `CMS_BASE_URL`, `CMS_REPO`, `CMS_TOKEN` and `CMS_BRANCH`.
+  // Where a folder entry's file goes: `forgejo(...)` or `github(...)` on a deployed site, the working tree by default, for `kay dev`. Left out, a production server builds `forgejo()` from `CMS_BASE_URL`, `CMS_REPO`, `CMS_TOKEN` and `CMS_BRANCH`, or `github()` when `CMS_HOST` is `github`.
   files?: FileSaver | undefined
   // The types an upload may have, exact or as `image/*`: PNG, JPEG, WebP, GIF, AVIF and PDF by default; `{ types, maxSize }` also sets the most an upload may weigh, in bytes or as `'50mb'`, 20 MB by default, 127.9 MB at most (Bun refuses a request body over 128 MB). The upload route takes that size whatever the app's own `maxSize` is.
   uploads?: string[] | UploadOptions | undefined

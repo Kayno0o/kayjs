@@ -1,6 +1,6 @@
 # kayjs-cms
 
-A CMS for kay sites' [content collections](../../llms/content.md): open the real page in edit mode, click a title, edit it in a sidebar, and the page updates as you type. The same package holds collection screens, generated from each collection's schema, to list, search, add, edit, publish and delete entries. Both save the same way: a file entry as a Forgejo commit, or in the working tree under `kay dev`, and a loaded entry through its collection's loader.
+A CMS for kay sites' [content collections](../../llms/content.md): open the real page in edit mode, click a title, edit it in a sidebar, and the page updates as you type. The same package holds collection screens, generated from each collection's schema, to list, search, add, edit, publish and delete entries. Both save the same way: a file entry as a Forgejo or GitHub commit, or in the working tree under `kay dev`, and a loaded entry through its collection's loader.
 
 ## Install
 

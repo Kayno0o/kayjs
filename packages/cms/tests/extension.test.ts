@@ -95,10 +95,49 @@ describe('cms()', () => {
         await settings().files.save({ repoPath: 'src/content/posts/a.md', absolute: '/nowhere/a.md', text: 'hi', message: 'add a' })
 
         expect(posted).toEqual([{ path: '/api/v1/repos/team/site/contents', token: 'token secret', body: expect.objectContaining({ branch: 'content' }) }])
-        expect(Object.keys(cms().env?.properties ?? {})).toEqual(Object.keys(variables))
+        expect(Object.keys(cms().env?.properties ?? {})).toEqual(['CMS_HOST', ...Object.keys(variables)])
       }
       finally {
         await forge.stop()
+      }
+    })
+
+    test('commits through GitHub when CMS_HOST names it, needing no CMS_BASE_URL', async () => {
+      Object.assign(process.env, variables, { CMS_HOST: 'github' })
+
+      const posted: string[] = []
+      const hub = Bun.serve({ port: 0, fetch: (request) => {
+        posted.push(`${request.method} ${new URL(request.url).pathname}`)
+
+        return Response.json({ object: { sha: 'c0' } })
+      } })
+
+      try {
+        process.env.CMS_BASE_URL = `http://localhost:${hub.port}`
+        boot()
+
+        try {
+          await settings().files.save({ repoPath: 'a.md', absolute: '/nowhere/a.md', text: 'hi', message: 'add a' })
+        }
+        catch {}
+
+        expect(posted[0]).toBe('GET /repos/team/site/git/ref/heads/content')
+      }
+      finally {
+        await hub.stop()
+        delete process.env.CMS_HOST
+      }
+    })
+
+    test('stops the boot naming what GitHub lacks', () => {
+      process.env.CMS_HOST = 'github'
+      process.env.CMS_REPO = 'team/site'
+
+      try {
+        expect(boot).toThrow('GitHub the environment names, which lacks CMS_TOKEN')
+      }
+      finally {
+        delete process.env.CMS_HOST
       }
     })
 
