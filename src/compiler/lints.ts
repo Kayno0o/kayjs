@@ -12,7 +12,7 @@ export const LINT_GROUPS = {
   code: 'Code nothing uses, and failures nothing shows.',
   a11y: 'What keeps a page from a keyboard or a screen reader.',
   forms: 'Fields and the schemas of the actions they post to.',
-  islands: 'Keys, signals and what an island renders again.',
+  islands: 'Keys, signals, what an island renders again and what differs between the server and the browser.',
   performance: 'What makes a page shift as it loads or load more than it shows.',
   seo: 'What search engines and social networks read off a public site: warnings once `site` or `seo` is set, or the site is exported with `--static`, and nothing otherwise.',
   security: 'What anyone may reach on a site asking for guards.',
