@@ -42,7 +42,8 @@
   - Files dropped on the zone, picked through `zone.open()` or, with `paste`, pasted anywhere on the page outside a text field, reach `onFiles(files)`: those `accept` allows, one unless `multiple`, never an empty list. A file the browser gives no type, such as a `.csv` on Windows, passes a type in `accept`, for its receiver to judge by its name. `onReject(files)` gets the dropped or picked files left out (not pasted ones), those `accept` refuses and, without `multiple`, the matching ones beyond the first, to say why they were ignored.
   - `zone.dragging()` reads whether files hover the zone, which also carries `data-dragging`.
   - `size="sm"` (`md` by default) draws it as a slim row, its content from the left, to sit inline in a form rather than as a large target.
-- `Menu(label="Actions" icon="plus" items={[{ label: 'Rename', onSelect: rename }, 'separator', { label: 'Delete', icon: 'delete', tone: 'danger', onSelect: remove }]})`: The old `danger: true` flag on an item is deprecated for `tone: 'danger'` and goes in 2.0.0.
+- `Menu(label="Actions" icon="plus" items={[{ label: 'Rename', onSelect: rename }, 'separator', { label: 'Delete', icon: 'delete', tone: 'danger', onSelect: remove }]})`:
+  - An item's old `danger: true` flag is deprecated for `tone: 'danger'`, which wins when both are given, and goes in 2.0.0.
   - An IconButton opening a `role="menu"` popover; `'separator'` draws a rule between groups, and `class` styles that button.
   - Opening focuses the first enabled entry; the arrows, Home and End move between enabled entries, an accent bar marking the one the keyboard is on, and Tab closes it.
   - `at={{ x, y }}` with `open` and `onOpenChange` opens it at a point of the window (`clientX`, `clientY` of a click) with no trigger and no `icon`, as a context menu or a choice next to a click; `placement` is `bottom-start` then, the browser flips it inside the window, Escape and a click outside close it and give focus back.

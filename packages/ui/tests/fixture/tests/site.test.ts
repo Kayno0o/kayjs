@@ -244,6 +244,19 @@ describe('controls', () => {
   })
 })
 
+describe('Tabs of a query param', () => {
+  // What the server draws for the address, with no JavaScript: the tabs in the tab order and the panels shown.
+  async function drawn(address: string) {
+    return [(await find(address, '[role="tab"][tabindex="0"]')).map(tab => tab.text), (await find(address, '[role="tabpanel"]')).filter(panel => attr(panel, 'hidden') === null).map(panel => panel.text)]
+  }
+
+  test('draw the tab the address names from the first paint, the first while the param is left out or names none', async () => {
+    expect(await drawn('/tabs-param?tab=reviews&sort=new')).toEqual([['Reviews'], ['reviews']])
+    expect(await drawn('/tabs-param')).toEqual([['Details'], ['details']])
+    expect(await drawn('/tabs-param?tab=nothing')).toEqual([['Details'], ['details']])
+  })
+})
+
 describe('breadcrumb', () => {
   test('Breadcrumb is a named nav listing the trail, the last item the current page and no link', async () => {
     expect(await attributes('/breadcrumb', '#long nav', ['aria-label'])).toEqual([{ 'aria-label': 'Trail' }])

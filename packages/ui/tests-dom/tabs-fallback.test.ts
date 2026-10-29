@@ -71,4 +71,19 @@ describe('tabs of a query param', () => {
     expect(changes).toEqual(['shipping', 'details'])
     expect(history.length).toBe(entries)
   })
+
+  test('write the tab a fallback shows when it is picked, so a stale or missing param gives way', async () => {
+    const changes: string[] = []
+
+    for (const search of ['', '?tab=nothing']) {
+      mounted?.unmount()
+      mounted = await open(search, { onChange: value => changes.push(value) })
+      click(mounted.root.querySelectorAll('[role="tab"]')[0]!)
+      await settle()
+      await new Promise(resolve => setTimeout(resolve, 250))
+      expect(location.search).toBe('?tab=details')
+    }
+
+    expect(changes).toEqual(['details', 'details'])
+  })
 })

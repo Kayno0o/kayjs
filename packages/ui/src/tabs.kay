@@ -64,14 +64,17 @@ effect(() => {
 })
 
 // The tab on screen: the one asked for when it is enabled, else the first enabled one, so a value naming none (an unknown one read from a URL, a disabled tab) still leaves a tab in the page's tab order.
-const active = () => {
-  const asked = kept ? kept() : shown()
+const asked = () => kept ? kept() : shown()
 
-  return tabs.some(tab => tab.value === asked && !tab.disabled) ? asked : tabs.find(tab => !tab.disabled)?.value
+const active = () => {
+  const wanted = asked()
+
+  return tabs.some(tab => tab.value === wanted && !tab.disabled) ? wanted : tabs.find(tab => !tab.disabled)?.value
 }
 
 function show(next: Value) {
-  if (next === active())
+  // Picking the tab a fallback shows still writes it, so a stale value gives way to the pick.
+  if (next === asked() && next === active())
     return
 
   if (kept)
@@ -93,6 +96,9 @@ function keyDown(event: KeyboardEvent) {
     return
 
   event.preventDefault()
+
+  if (tabs.length === 0)
+    return
 
   let next = move(tabs.findIndex(tab => tab.value === active()), tabs.length)
 

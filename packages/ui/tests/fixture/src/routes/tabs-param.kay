@@ -1,0 +1,4 @@
+---
+import QueryTabs from '../components/query-tabs.kay'
+---
+QueryTabs(paramDefault="details")
