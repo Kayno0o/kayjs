@@ -224,10 +224,23 @@ function withPublicFields<Config extends KayConfig>(root: string, config: Config
   return typeof Bun === 'undefined' || publicEnvFiles(root).length === 0 ? config : { ...config, publicEnv: true }
 }
 
+// The mount point the environment gives: `SITE_BASE`, written with or without its leading slash, empty for the host's root.
+export function baseFromEnv(): string | undefined {
+  const { SITE_BASE } = process.env
+
+  if (SITE_BASE === undefined || SITE_BASE === '')
+    return undefined
+
+  return SITE_BASE.startsWith('/') ? SITE_BASE : `/${SITE_BASE}`
+}
+
+// The config with `site` and `base` read from `SITE_URL` and `SITE_BASE` where it sets none: a deployment names where the site is public, so the config declares neither.
 function withSiteUrl<Config extends KayConfig>(config: Config): Config {
   const site = siteFromEnv()
+  const base = baseFromEnv()
+  const withSite = config.site !== undefined || site === undefined ? config : { ...config, site }
 
-  return config.site !== undefined || site === undefined ? config : { ...config, site }
+  return withSite.base !== undefined || base === undefined ? withSite : { ...withSite, base }
 }
 
 // The project's config under the options given in code; an option passed as `undefined` leaves the config's value alone rather than wiping it.

@@ -55,7 +55,7 @@ export default defineConfig({
 
 ### Base path
 
-`base: '/docs'` in kay.config.ts mounts the site under a path of its host, as Pages does under `/<owner>/<repo>`.
+`base: '/docs'` in kay.config.ts mounts the site under a path of its host, as Pages does under `/<owner>/<repo>`. A deployment sets `SITE_BASE=/<repo>` instead, as it sets `SITE_URL` for `site`, and the config declares neither; a `base` written in the config wins over `SITE_BASE`, and an empty one is the host's root.
 
 ## Reference
 

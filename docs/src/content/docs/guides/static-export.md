@@ -50,6 +50,8 @@ export default defineConfig({
 })
 ```
 
+A deployment can set the path instead: kay reads `SITE_BASE` where `base` is left out, as it reads `SITE_URL` for `site`, so the same build config serves a site at the root and under `/<repo>`. A `base` in the config wins over it, and an empty `SITE_BASE` is the root.
+
 Write links without it, as `a(href="/about")`. kay puts the base in front of every root-relative `href`, `src` and `action` a page renders. It does the same for redirects, canonical links, the sitemap, `robots.txt`, feeds and the web manifest.
 
 A route that starts like the base is no exception. Under `base: '/blog'`, `a(href="/blog/hello")` goes to `/blog/blog/hello`.

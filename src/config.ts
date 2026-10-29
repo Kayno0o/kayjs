@@ -105,7 +105,7 @@ export interface KayConfig {
   i18n?: I18nConfig | undefined
   // The IANA time zone dates are written in, `Europe/Paris`: `formatDate` and the dates of kay's own screens, on the server and in the islands alike, unless a call names its own `timeZone`. The server's and the visitor's zone by default.
   timeZone?: string | undefined
-  // Where the site is mounted when not at its host's root, `/docs`: the links, assets, forms and redirects pages render, the sitemap and the feeds carry it, links stay written without it, and a proxy in front of the server takes it off requests.
+  // Where the site is mounted when not at its host's root, `/docs`; `SITE_BASE` when left out, as `site` reads `SITE_URL`, and a `base` written here wins over it. The links, assets, forms and redirects pages render, the sitemap and the feeds carry it, links stay written without it, and a proxy in front of the server takes it off requests.
   base?: string | undefined
   // Where a link leaving the site opens: kay adds `target="_blank" rel="noopener"` to an `a` whose href is another origin, in templates, islands, Markdown and content bodies, unless the element sets its own `target`. `{ outside: 'same-tab' }` writes none.
   // `schemes` lists the URL schemes the app trusts in a bound `href`, `src`, `action`, `formaction`, `xlink:href`, `poster` or `data`, `['webcal', 'geo']`: any other scheme but the web's, mail, phone, sms and blob goes out as `unsafe:`, as `javascript:` would. `javascript`, `vbscript` and `data` are refused. `kay dev` logs each bound URL it rewrote.
