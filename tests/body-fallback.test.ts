@@ -84,6 +84,24 @@ describe('a route no action, API module or extension limit covers', () => {
     expect((await stream(site, '/auth/token', 4096)).status).toBe(200)
   })
 
+  it('stops reading a chunked body at about the limit instead of buffering it whole', async () => {
+    const site = await app()
+    const before = reached.length
+    let pulled = 0
+    const body = new ReadableStream<Uint8Array>({
+      pull(controller) {
+        pulled += 65_536
+        controller.enqueue(new Uint8Array(65_536))
+      },
+    })
+    const response = await site.handle(new Request('http://localhost/auth/token', { method: 'POST', headers: { 'content-type': 'application/octet-stream' }, body, duplex: 'half' } as RequestInit))
+
+    expect(response.status).toBe(413)
+    // The 1 MB limit, plus what a stream reads ahead of its consumer: nowhere near a body of hundreds of MB.
+    expect(pulled).toBeLessThan(8 * MB)
+    expect(reached).toHaveLength(before)
+  })
+
   it('refuses a lying Content-Length without reading the body', async () => {
     const site = await app()
     const response = await site.handle(new Request('http://localhost/auth/token', { method: 'POST', headers: { 'content-length': String(200 * MB) }, body: 'x' }))
