@@ -4,7 +4,7 @@ import { ActionError, ApiError, durationMs, signal, untrack } from 'kay'
 // What a toast means, in the vocabulary of every tone: a failed call is a `danger`.
 export type ToastTone = 'danger' | 'success' | 'info'
 
-// Deprecated: the old name of a toast's tone, `error` for `danger`.
+/** @deprecated The old name of a toast's tone, `error` for `danger`: read `Toast.tone`. Removed in 2.0.0. */
 export type ToastType = 'error' | 'success' | 'info'
 
 export interface Toast {
@@ -12,7 +12,7 @@ export interface Toast {
   message: string
   // A toast pushed by hand with only a `type` takes its tone from it.
   tone?: ToastTone | undefined
-  // Deprecated: use `tone`.
+  /** @deprecated Read `tone`, where `error` is `danger`. Removed in 2.0.0, when a toast is `{ id, message, tone }`. */
   type: ToastType
 }
 

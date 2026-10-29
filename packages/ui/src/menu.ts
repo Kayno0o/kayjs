@@ -6,7 +6,7 @@ export interface MenuAction {
   icon?: IconSlot | IconProps
   // `danger` paints the entry as destructive.
   tone?: 'neutral' | 'danger' | undefined
-  // Deprecated: use `tone: 'danger'`, which wins when both are given.
+  /** @deprecated Use `tone: 'danger'`, which wins when both are given. Removed in 2.0.0. */
   danger?: boolean
   disabled?: boolean
   // Runs once the menu has closed, so a dialog it opens takes focus from the page rather than from a vanished menu.

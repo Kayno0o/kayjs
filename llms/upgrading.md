@@ -8,6 +8,11 @@ What each minor release breaks, and what an app changes to move to it. kay and i
 
 - `Rating(value={4.6})` fails `kay check`: give it the text screen readers read, as `Meter` and `Progress` already need, `Rating(value={4.6} label="Rated 4.6 out of 5")`. The `ui.rating.label` message (`{value} out of {max}`) that stood in for a missing one is gone.
 
+### kayjs-ui: `MenuAction.danger` and `Toast.type` are deprecated
+
+- A `MenuAction` with `danger: true` becomes `tone: 'danger'`, which wins when both are given. Both still work until 2.0.0, and the editor strikes them out (`@deprecated`).
+- A read of `toasts()[n].type`, or of the `ToastType` type, becomes `tone`, where the old `'error'` is `'danger'`. 2.0.0 makes a toast `{ id, message, tone }`; `toast.error()` stays the method for a failure and pushes a `danger` toast.
+
 ## 1.82.0
 
 ### An `ActionStream` has `ended()`
