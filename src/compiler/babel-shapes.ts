@@ -1,4 +1,5 @@
 // The node shapes of @babel/types that kay's scope pass reads, copied so that compiling a file loads no part of it.
+// Regenerate them by printing `VISITOR_KEYS` and the `FLIPPED_ALIAS_KEYS` of the aliases below from @babel/types.
 // `tests/scope.test.ts` compares them with the installed @babel/types, which a Babel upgrade can change.
 
 // The keys holding child nodes, in the order Babel visits them; a type with none is left out.

@@ -29,6 +29,14 @@ function parseSource(code: string): t.File | undefined {
 
 const where = (node: t.Node) => `${node.type}@${node.start}`
 
+// What the rewrites ask of a path, spelled the same for Babel's and kay's.
+function pathFacts(path: { node: t.Node, parentPath: { node: t.Node } | null, key: unknown, listKey?: unknown, isStatement: () => boolean, isFunction: () => boolean, isTSType: () => boolean, isReferencedIdentifier: () => boolean, getFunctionParent: () => { node: t.Node } | null }): string {
+  const parent = path.parentPath ? where(path.parentPath.node) : 'none'
+  const holder = path.getFunctionParent()
+
+  return `${parent} ${String(path.key)}/${String(path.listKey)} ${path.isStatement()} ${path.isFunction()} ${path.isTSType()} ${path.isReferencedIdentifier()} ${holder ? where(holder.node) : 'none'}`
+}
+
 interface Shape {
   events: string[]
   scopes: Map<string, { names: string[], bindings: string[] }>
@@ -49,7 +57,7 @@ function babelShape(file: t.File): Shape {
 
     for (const type of EVENTS) {
       visitors[type] = (path) => {
-        shape.events.push(`${where(path.node)} in ${where(path.scope.block)}`)
+        shape.events.push(`${where(path.node)} in ${where(path.scope.block)} ${pathFacts(path)}`)
 
         if (type === 'Identifier')
           shape.resolved.push(describeBinding((path.node as t.Identifier).name, path.scope.getBinding((path.node as t.Identifier).name)))
@@ -79,7 +87,7 @@ function kayShape(file: t.File): Shape {
     const { events, program, scopes } = analyze(file)
 
     for (const path of events) {
-      shape.events.push(`${where(path.node)} in ${where(path.scope.node)}`)
+      shape.events.push(`${where(path.node)} in ${where(path.scope.node)} ${pathFacts(path)}`)
 
       if (path.node.type === 'Identifier')
         shape.resolved.push(describeBinding(path.node.name, path.scope.getBinding(path.node.name)))
@@ -135,7 +143,7 @@ describe('scope pass', () => {
         compared++
     }
 
-    expect(compared).toBeGreaterThan(500)
+    expect(compared).toBe(SOURCES.length)
   })
 
   it('follows Babel on the corners of scope', () => {
@@ -154,6 +162,7 @@ describe('scope pass', () => {
       'x = 1; undefinedGlobal; typeof maybe; ({ k: undefinedKey } = {}); for (var v of []) { function inner() { v } }',
       'const f = ({ a = 1 }, [b] = [a]) => a + b; function g(x = () => y, y) {}',
       'switch (find(() => a)) { case 1: let a }',
+      'const __props = $props<{ a: number }>(); const { a } = __props; const el = <KayLoopFor each={a} keyed={(r) => r.id}>{(row, index) => <p>{row.x}{index}</p>}</KayLoopFor>; export const s = signal(0), m = memo(() => s() + 1); s = 2',
       'const o = { [k]: 1, get p() { return k }, m() { return k }, async *n() {} }; var k',
     ]
 
@@ -162,7 +171,9 @@ describe('scope pass', () => {
   })
 
   it('throws what Babel throws for a name declared twice', () => {
-    for (const code of ['import a from "m"; const a = 1', 'let a; let a', 'const a = 1; var a', 'function f(a) { let a }', 'try {} catch (e) { let e }', 'var a; var a; function a() {}'])
+    expect(babelShape(parse('let a; let a', PARSE)).error).toContain('Duplicate declaration')
+
+    for (const code of ['import a from "m"; const a = 1', 'let a; let a', 'const a = 1; var a', 'function f(a) { let a }', 'try {} catch (e) { let e }', 'var a; var a; function a() {}', 'export var a = 1, a = 2; a'])
       expect(compare(code, code)).toBe(true)
   })
 

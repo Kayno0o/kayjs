@@ -3,7 +3,8 @@ import { BLOCK_PARENT_TYPES, FUNCTION_PARENT_TYPES, FUNCTION_TYPES, LOOP_TYPES, 
 
 // Kay's own scope pass over Babel's AST, which is all the rewrites need of `@babel/traverse`: a path to each node, the scope each node sits in, and for every binding its references and the writes to it.
 // It follows Babel's scope rules, down to what Babel gets wrong, so what the rewrites find does not change; `tests/scope.test.ts` compares the two on the source of this repository.
-export type BindingKind = 'var' | 'let' | 'const' | 'module' | 'hoisted' | 'param' | 'local' | 'unknown'
+// One thing it leaves out: Babel crawls a scope inside a type annotation on its own, which registers its parameters and `var`s, and kay's pass does not (a function in a computed key of a type literal).
+type BindingKind = 'var' | 'let' | 'const' | 'module' | 'hoisted' | 'param' | 'local' | 'unknown'
 
 type NodeOfType<T extends string> = Extract<t.Node, { type: T }>
 
@@ -390,11 +391,11 @@ class Analysis {
 
     if (declaration.type === 'ClassDeclaration' || declaration.type === 'FunctionDeclaration') {
       if (declaration.id)
-        path.scope.getBinding(declaration.id.name)?.referencePaths.push(path)
+        pushOnce(path.scope.getBinding(declaration.id.name), path)
     }
     else if (declaration.type === 'VariableDeclaration') {
       for (const declarator of declaration.declarations)
-        bindingIdentifiers(declarator, false, name => path.scope.getBinding(name)?.referencePaths.push(path))
+        bindingIdentifiers(declarator, false, name => pushOnce(path.scope.getBinding(name), path))
     }
   }
 
@@ -426,6 +427,11 @@ class Analysis {
       local.reassign(binding)
     })
   }
+}
+
+function pushOnce(binding: Binding | undefined, path: Path) {
+  if (binding && !binding.referencePaths.includes(path))
+    binding.referencePaths.push(path)
 }
 
 // A name declared twice where one of them is block scoped, a parameter excepted, is an error.
