@@ -1,5 +1,6 @@
 import process from 'node:process'
 import { $, Glob } from 'bun'
+import { BREAKING_FILE, breakingRefused } from './breaking'
 import { brokenLinks } from './links'
 import { ARCHIVES, INDEX, LINKING, MAX_PAGE_BYTES, oversizedPages, releasePages, WHATS_NEW } from './whats-new'
 import { ZED_MANIFEST, zedReleasable, zedRelease } from './zed-release'
@@ -18,14 +19,13 @@ if (level === -1)
 if ((await $`git status --porcelain`.text()).trim() !== '')
   throw new Error('the working tree has changes: commit them first')
 
-// Named here rather than imported from scripts/api.ts, which loads the TypeScript compiler. `bun scripts/api.ts --update --breaking` records the exports a change removed or narrowed, which only a major release ships and then clears.
-const BREAKING_FILE = 'api/breaking.txt'
+const current = ((await Bun.file('package.json').json()) as { version: string }).version
+// `bun scripts/api.ts --update --breaking` records the exports a change removed or narrowed, which the release that ships them clears.
 const breaking = (await Bun.file(BREAKING_FILE).exists()) ? (await Bun.file(BREAKING_FILE).text()).trim() : ''
 
-if (breaking !== '' && LEVELS[level] !== 'major')
-  throw new Error(`${BREAKING_FILE} lists breaking changes, which only a major release ships:\n${breaking}`)
+if (breakingRefused(LEVELS[level]!, current, breaking))
+  throw new Error(`${BREAKING_FILE} lists breaking changes, which this release must not ship:\n${breaking}`)
 
-const current = ((await Bun.file('package.json').json()) as { version: string }).version
 const parts = current.split('.').map((part, index) => {
   if (index < level)
     return Number(part)

@@ -4,11 +4,11 @@ import process from 'node:process'
 import { Glob } from 'bun'
 import ts from 'typescript'
 import { writeShadowTypes } from '../src/check/shadow-types'
+import { BREAKING_FILE } from './breaking'
 
 // `bun scripts/api.ts [--update [--breaking]]`: the public surface of kay and of each library, every `exports` entry's names and their types, as the text files of `api/`.
 // Without a flag it prints the difference from the committed snapshot and exits 1 when there is one. `--update` writes the snapshot, and refuses a removed or changed export unless `--breaking` is given, which records it in `api/breaking.txt` for the release to read.
 export const SNAPSHOT_DIR = 'api'
-export const BREAKING_FILE = `${SNAPSHOT_DIR}/breaking.txt`
 
 interface Manifest {
   name: string

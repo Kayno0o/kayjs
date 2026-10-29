@@ -1,5 +1,6 @@
 import { Glob } from 'bun'
 import { describe, expect, it } from 'bun:test'
+import { breakingRefused } from '../scripts/breaking'
 import { archiveOldest, capNewest, capUnreleased, indexArchive, MAX_PAGE_BYTES, NEWEST_CAP, oversizedPages, releasePages, relinkMoved, stampUnreleased, trimArchive } from '../scripts/whats-new'
 
 interface Manifest {
@@ -550,5 +551,22 @@ describe('the tests that spawn Bun', () => {
     }
 
     expect(found).toEqual([])
+  })
+})
+
+describe('the breaking gate of a release', () => {
+  it('refuses a patch with breaking changes listed, at any version', () => {
+    expect(breakingRefused('patch', '1.83.0', 'kay [.] x')).toBe(true)
+    expect(breakingRefused('patch', '2.1.0', 'kay [.] x')).toBe(true)
+  })
+
+  it('lets a 1.x minor and any major ship them, and refuses a minor from 2.0.0', () => {
+    expect(breakingRefused('minor', '1.83.0', 'kay [.] x')).toBe(false)
+    expect(breakingRefused('major', '2.1.0', 'kay [.] x')).toBe(false)
+    expect(breakingRefused('minor', '2.0.0', 'kay [.] x')).toBe(true)
+  })
+
+  it('has nothing to refuse for an empty list', () => {
+    expect(breakingRefused('patch', '2.0.0', '')).toBe(false)
   })
 })
