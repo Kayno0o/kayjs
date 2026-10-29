@@ -130,3 +130,21 @@ jobs:
         run: bun scripts/apps-ci.ts orbit
         env:
           KAY_APPS_TOKEN: ${{ secrets.KAY_APPS_TOKEN }}
+
+      - name: orbit-relay-auth
+        if: ${{ !cancelled() && steps.pack.outcome == 'success' && (inputs.apps == '' || contains(format(' {0} ', inputs.apps), ' orbit-relay-auth ')) }}
+        run: bun scripts/apps-ci.ts orbit-relay-auth
+        env:
+          KAY_APPS_TOKEN: ${{ secrets.KAY_APPS_TOKEN }}
+
+      - name: enshrouded-dashboard
+        if: ${{ !cancelled() && steps.pack.outcome == 'success' && (inputs.apps == '' || contains(format(' {0} ', inputs.apps), ' enshrouded-dashboard ')) }}
+        run: bun scripts/apps-ci.ts enshrouded-dashboard
+        env:
+          KAY_APPS_TOKEN: ${{ secrets.KAY_APPS_TOKEN }}
+
+      - name: mc-stats
+        if: ${{ !cancelled() && steps.pack.outcome == 'success' && (inputs.apps == '' || contains(format(' {0} ', inputs.apps), ' mc-stats ')) }}
+        run: bun scripts/apps-ci.ts mc-stats
+        env:
+          KAY_APPS_TOKEN: ${{ secrets.KAY_APPS_TOKEN }}

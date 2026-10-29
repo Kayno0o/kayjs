@@ -1,3 +1,4 @@
+import { existsSync } from 'node:fs'
 import { mkdir, rm } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
 import process from 'node:process'
@@ -10,7 +11,9 @@ export interface App {
   repo: string
   // A branch that is not the repository's default.
   branch?: string
-  // The packages whose scripts run, relative to the repository root; the root alone by default.
+  // The folder holding the lockfile the app installs from, relative to the repository root; the root by default.
+  install?: string
+  // The packages whose scripts run, relative to the install folder; it alone by default.
   dirs?: string[]
   // A script that cannot run in CI, with the reason it prints instead.
   skip?: Partial<Record<Script, string>>
@@ -24,7 +27,7 @@ const COMPOSE = 'needs the compose stack of its own test database'
 const ORBIT_DIRS = ['atlas', 'aurora', 'hubble', 'relay', 'selene']
 const ORBIT_DATABASE = 'needs a database and services only its compose files start'
 
-// The apps of the `kay-sites` memory that have a remote; kay-mail-test has none, and relay/auth is not one of orbit's workspaces.
+// The apps of the `kay-sites` memory that have a remote (kay-mail-test has none), with enshrouded's dashboard and mc-stats, which pin kay too; relay/auth is not an orbit workspace, so it installs on its own.
 export const APPS: App[] = [
   { name: 'kaynooo.fr', repo: 'kaynooo/kaynooo.fr', skip: { test: COMPOSE } },
   { name: 'kloe-couture', repo: 'kaynooo/kloecouture', skip: { test: COMPOSE } },
@@ -36,6 +39,9 @@ export const APPS: App[] = [
   { name: 'assemblee', repo: 'kaynooo/assemblee' },
   { name: 'azael-kaynooo', repo: 'kaynooo/azael-kaynooo', branch: 'kay-port', skip: { test: COMPOSE } },
   { name: 'orbit', repo: 'kaynooo/orbit', dirs: ORBIT_DIRS, skip: { test: ORBIT_DATABASE } },
+  { name: 'orbit-relay-auth', repo: 'kaynooo/orbit', install: 'relay/auth' },
+  { name: 'enshrouded-dashboard', repo: 'kaynooo/enshrouded', install: 'dashboard' },
+  { name: 'mc-stats', repo: 'kaynooo/mc-stats' },
 ]
 
 const DEPENDENCY_FIELDS = ['dependencies', 'devDependencies', 'optionalDependencies'] as const
@@ -89,7 +95,10 @@ export function pointAtKay(manifest: Manifest, tarballs: Record<string, string>)
 export function overrideKay(manifest: Manifest, tarballs: Record<string, string>): Manifest {
   const overrides = Object.fromEntries([...Object.entries(tarballs).map(([name, tarball]) => [name, `file:${tarball}`]), ['kay', `file:${tarballs['@kaynooo/kayjs']}`]])
 
-  return { ...manifest, overrides: { ...(manifest.overrides as Record<string, string> | undefined), ...overrides } }
+  // Sorted, as the apps' own lint asks of a manifest.
+  const merged: Record<string, string> = { ...(manifest.overrides as Record<string, string> | undefined), ...overrides }
+
+  return { ...manifest, overrides: Object.fromEntries(Object.entries(merged).sort(([a], [b]) => (a < b ? -1 : 1))) }
 }
 
 const root = resolve(import.meta.dir, '..')
@@ -134,7 +143,7 @@ async function clone(app: App, directory: string) {
   if (local !== undefined) {
     const branch = app.branch === undefined ? [] : ['--branch', app.branch]
 
-    await $`git clone --quiet --depth 1 ${branch} ${`file://${resolve(local, app.name)}`} ${directory}`.quiet()
+    await $`git clone --quiet --depth 1 ${branch} ${`file://${resolve(local, existsSync(resolve(local, app.name)) ? app.name : app.repo.slice(app.repo.indexOf('/') + 1))}`} ${directory}`.quiet()
 
     return
   }
@@ -163,6 +172,7 @@ async function run(app: App) {
   const directory = join(workDir, 'apps', app.name)
   const tarballs = await Bun.file(join(tarballDir, 'tarballs.json')).json() as Record<string, string>
   const dirs = app.dirs ?? ['.']
+  const installDir = join(directory, app.install ?? '.')
 
   await rm(directory, { recursive: true, force: true })
   await mkdir(join(workDir, 'apps'), { recursive: true })
@@ -170,10 +180,12 @@ async function run(app: App) {
 
   let pointed = 0
 
-  for (const path of await manifestPaths(directory)) {
+  const prefix = app.install === undefined ? '' : `${app.install}/`
+
+  for (const path of (await manifestPaths(directory)).filter(file => file.startsWith(prefix))) {
     const file = join(directory, path)
     const rewritten = pointAtKay(await Bun.file(file).json() as Manifest, tarballs)
-    const next = path === 'package.json' && rewritten !== undefined ? overrideKay(rewritten, tarballs) : rewritten
+    const next = path === join(app.install ?? '.', 'package.json') && rewritten !== undefined ? overrideKay(rewritten, tarballs) : rewritten
 
     if (next !== undefined) {
       await Bun.write(file, `${JSON.stringify(next, null, 2)}\n`)
@@ -191,14 +203,14 @@ async function run(app: App) {
   const filters = dirs.length > 1 || dirs[0] !== '.' ? dirs.flatMap(dir => ['--filter', dir]) : []
 
   console.log(`== ${app.name}: install`)
-  await $`bun install ${filters}`.cwd(directory).env(env)
+  await $`bun install ${filters}`.cwd(installDir).env(env)
 
   const failures: string[] = []
   const skipped: string[] = []
 
   for (const dir of dirs) {
     const label = dir === '.' ? app.name : `${app.name}/${dir}`
-    const manifest = await Bun.file(join(directory, dir, 'package.json')).json() as Manifest
+    const manifest = await Bun.file(join(installDir, dir, 'package.json')).json() as Manifest
 
     for (const script of SCRIPTS) {
       const reason = app.skip?.[script] ?? (manifest.scripts?.[script] === undefined ? 'the app has no such script' : undefined)
@@ -211,7 +223,7 @@ async function run(app: App) {
 
       console.log(`== ${label}: ${script}`)
 
-      const result = await $`bun run ${script}`.cwd(join(directory, dir)).env(env).nothrow()
+      const result = await $`bun run ${script}`.cwd(join(installDir, dir)).env(env).nothrow()
 
       if (result.exitCode !== 0)
         failures.push(`${label} ${script}`)

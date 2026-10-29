@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'bun:test'
 import { APPS, overrideKay, pointAtKay, SCRIPTS, tarballName } from '../scripts/apps-ci'
+import { BLOCKING, exitCode, SECRET_UNSET } from '../scripts/release-apps'
 
 interface Step {
   name?: string
@@ -71,5 +72,21 @@ describe('overrideKay', () => {
     const next = overrideKay({ overrides: { left: '1.0.0' } }, { '@kaynooo/kayjs': '/t/kayjs.tgz', '@kaynooo/kayjs-ui': '/t/ui.tgz' })
 
     expect(next.overrides).toEqual({ 'left': '1.0.0', '@kaynooo/kayjs': 'file:/t/kayjs.tgz', '@kaynooo/kayjs-ui': 'file:/t/ui.tgz', 'kay': 'file:/t/kayjs.tgz' })
+  })
+})
+
+describe('release wait', () => {
+  it('lets a red run go through until the apps block a release, and stops it after', () => {
+    expect(exitCode('success', false)).toBe(0)
+    expect(exitCode('failure', false)).toBe(0)
+    expect(exitCode('success', true)).toBe(0)
+    expect(exitCode('failure', true)).toBe(1)
+  })
+
+  it('names the secret the workflow reports when it is unset', async () => {
+    const workflow = await Bun.file('.forgejo/workflows/apps.yml').text()
+
+    expect(workflow).toContain(SECRET_UNSET)
+    expect(typeof BLOCKING).toBe('boolean')
   })
 })
