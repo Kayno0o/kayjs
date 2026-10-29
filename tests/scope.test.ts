@@ -11,6 +11,7 @@ import * as shapes from '../src/compiler/babel-shapes'
 import { analyze } from '../src/compiler/scope'
 
 const ROOT = join(import.meta.dir, '..')
+const PARTS = 12
 const SOURCES = ['src/**/*.ts', 'tests/**/*.ts', 'packages/*/src/**/*.ts', 'docs/src/**/*.ts'].flatMap(pattern => [...new Bun.Glob(pattern).scanSync({ cwd: ROOT })]).filter(file => !file.includes('node_modules') && !file.includes('/fixtures/') && !file.includes('/.kay/'))
 
 // Error recovery lets the parser pass what the scope refuses.
@@ -135,16 +136,21 @@ function compare(code: string, label: string) {
 }
 
 describe('scope pass', () => {
-  it('finds the scopes, bindings, references and writes Babel does in the sources of this repository', () => {
-    let compared = 0
+  // The sources are compared in parts, each a share of the files, so a slow machine keeps every test inside its timeout.
+  for (let part = 0; part < PARTS; part++) {
+    it(`finds the scopes, bindings, references and writes Babel does in the sources of this repository, part ${part + 1} of ${PARTS}`, () => {
+      const files = SOURCES.filter((_, index) => index % PARTS === part)
+      let compared = 0
 
-    for (const file of SOURCES) {
-      if (compare(readFileSync(join(ROOT, file), 'utf8'), file))
-        compared++
-    }
+      for (const file of files) {
+        if (compare(readFileSync(join(ROOT, file), 'utf8'), file))
+          compared++
+      }
 
-    expect(compared).toBe(SOURCES.length)
-  })
+      expect(files.length).toBeGreaterThan(0)
+      expect(compared).toBe(files.length)
+    })
+  }
 
   it('follows Babel on the corners of scope', () => {
     const cases = [
