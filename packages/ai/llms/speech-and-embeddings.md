@@ -67,7 +67,32 @@ export async function nearest(question: string) {
 
 The `embedding()` trait and `nearest()` need pg-orm 8. The trait embeds the `source` text of every insert, and of an update that changed it, in one `embed` call per write, and the column is `nullable` as it is filled just after the row. The trait also adds a nullable `embeddingHash` column, so the table needs a migration. `nearest()` returns the closest rows, each with its `distance`, cosine by default.
 
-The passages found go to `ask({ sources })`, which a `Chat` cites: [Chat sources](chat-sources.md).
+### Answer from your own documents
+
+`ground(found, read, { system })` turns the rows `nearest()` found into the two options of an `ask`: a `system` that numbers the passages for the model to answer from and cite as `[n]`, and the `sources` a `Chat` links ([Chat sources](chat-sources.md)). `read` maps a row to `{ title, href, text }`, `href` being where the visitor reads it in full.
+
+```kay
+--- server
+import { s } from 'kay'
+import { ask, chatMessages, embed, ground, lastChatMessage } from '@kaynooo/kayjs-ai'
+import { db } from '../db'
+import { Passage } from '../db/passage'
+
+export const reply = action(s.Object({ messages: chatMessages() }), async ({ messages }) => {
+  const question = lastChatMessage(messages).content
+  const found = await db.repo(Passage).read.nearest(await embed(question, { dimensions: 768 }), { k: 4, maxDistance: 0.6 })
+
+  return ask(messages, ground(found, row => ({ title: row.title, href: `/help/${row.slug}`, text: row.text }), { system: 'You are the help desk of Acme.' })).progress()
+})
+---
+p Help
+```
+
+The model is told to answer only from the passages and to say it does not know when they do not answer, and with nothing found (`maxDistance` cut every row) it is told so and no source is cited. A passage is wrapped as data: a stored text cannot close its block, and the model is told never to follow instructions inside one. Keep `maxDistance` and `k` for the model's context: `ground` sends every text it is given whole, and `maxInputChars` does not count the `system`.
+
+Entries are embedded on save by the trait alone: `insertMany`, `insert` and an `update` changing the source text embed in the same write, an unchanged one not at all. A kayjs-cms collection is not a pg-orm table, so its entries are not: keep a passage table of your own (an entry's `title`, `slug` and `text`) and write it from `cms({ onSave })` with an upsert, the trait embedding what changed (kayjs-cms's loaders page, After a save).
+
+Under `bun test` the fake embeds the question and the texts, so a test ranks passages with no server: `model.last().system` holds what the model was given.
 
 ## Reference
 

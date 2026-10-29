@@ -521,6 +521,18 @@ They speak OpenAI's audio and embeddings API, which OpenAI, Ollama and most loca
 
 Give `embed` the size of the column you store the vectors in. A model that answers another size fails the call, so a vector never meets a column it does not fit. pg-orm 8 keeps them in a pgvector column, embeds a row's text through an `embedding()` trait and reads the closest rows with `nearest()`.
 
+### Answer from your own documents
+
+To answer a visitor's question from your documents, embed the question, find the closest rows with `nearest()` and give them to `ground()`. It writes the `system` that has the model answer only from those passages and cite them as `[n]`, and the `sources` a `Chat` turns into links.
+
+```ts
+const found = await db.repo(Passage).read.nearest(await embed(question, { dimensions: 768 }), { k: 4, maxDistance: 0.6 })
+
+return ask(messages, ground(found, row => ({ title: row.title, href: `/help/${row.slug}`, text: row.text }), { system: 'You are the help desk of Acme.' })).progress()
+```
+
+With nothing found, the model is told so and says it does not know. The `embedding()` trait embeds a row when it is inserted or its text changes, so the table needs no more code. A kayjs-cms entry is not a pg-orm row: keep a table of your own and write it from `cms({ onSave })`.
+
 Under `bun test` the fake answers all three. Embeddings are stable vectors built from the words, so texts that share words come out near each other.
 
 <ReadMore href="/llms/kayjs-ai-speech-and-embeddings">The variables, storing and searching vectors with pgvector, the errors, and scripting the fake.</ReadMore>

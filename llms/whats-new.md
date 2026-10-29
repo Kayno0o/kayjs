@@ -4,6 +4,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 
 ## Unreleased
 
+- kayjs-ai: `ground(found, read)` turns the rows pg-orm 8's `nearest()` found into the `system` and `sources` of an `ask`, so a chat answers from the app's own documents and cites them, and the fake answers it all under `bun test`: [Speech and embeddings](../packages/ai/llms/speech-and-embeddings.md).
 - kay and its libraries accept `@kaynooo/pg-orm` 7 or 8 as their peer, and `kay new` and `kay add` scaffold an app on 8, where a call that matched every row (an empty WHERE on an update or delete, an object as a key) throws `ValidationError`: [pg-orm 8's guide](https://git.kaynooo.fr/kaynooo/pg-orm/src/branch/main/MIGRATION_v8.0.0.md). kayjs-ai's embeddings example uses 8's `embedding()` trait and `repo.read.nearest()`.
 - Re-clicking or re-hovering a link whose page is still loading no longer fetches it again: a repeated click joins the load under way and a prefetch waits for it, so a slow page costs one request.
 - Re-clicking or re-hovering a link whose page is still loading no longer fetches it again: a repeated click joins the load under way and a prefetch is skipped, so a slow page costs one request.
