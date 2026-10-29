@@ -1,7 +1,8 @@
 import type { AwaitProps } from './checks'
+import type { AwaitNote } from './html'
 import type { JSX } from './jsx'
 import type { Html } from './rendered'
-import { child } from './html'
+import { awaitNotes, child } from './html'
 import { insideIsland } from './island.server'
 import { getOwner, runWithOwner } from './reactive'
 import { html } from './rendered'
@@ -118,6 +119,21 @@ export function collectDeferred<T>(render: () => T, within?: string): { result: 
   }
 }
 
+// Keeps where a prerendered page's block is written and when its value settled, for the build to say what the page waited on and which pending content no visitor sees.
+function noteAwait(notes: AwaitNote[], value: Promise<unknown>, pending: boolean): void {
+  const note: AwaitNote = { stack: new Error('await').stack ?? '', pending, started: performance.now() }
+
+  notes.push(note)
+  void (async () => {
+    try {
+      await value
+    }
+    catch {}
+
+    note.settled = performance.now()
+  })()
+}
+
 // On a page, a pending value renders its `pending` block between markers that the streamed result replaces; a settled one renders right away.
 // Typed as the browser build is, which `kay check` reads templates against.
 export function Await<T>(props: AwaitProps<T>): JSX.Element {
@@ -134,6 +150,11 @@ export function Await<T>(props: AwaitProps<T>): JSX.Element {
 
     return props.pending?.()
   }
+
+  const notes = awaitNotes()
+
+  if (notes !== undefined && !parts)
+    noteAwait(notes, value as Promise<unknown>, props.pending !== undefined)
 
   const id = `${deferred.prefix}${(deferred.next++).toString(36)}`
   const collecting = deferred

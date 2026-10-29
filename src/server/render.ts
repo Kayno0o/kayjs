@@ -6,7 +6,7 @@ import type { PendingBlock } from '../runtime/await.server'
 import type { EditorProps } from '../runtime/edit'
 import type { EntryRef } from '../runtime/fields'
 import type { HeadOptions, HeadTag, RenderedHead } from '../runtime/head'
-import type { ServerIslandMode } from '../runtime/html'
+import type { AwaitNote, ServerIslandMode } from '../runtime/html'
 import type { Locale } from '../runtime/i18n'
 import type { QueryRules } from '../runtime/query-param'
 import type { ServerScope } from '../runtime/reactive'
@@ -152,6 +152,8 @@ export interface RenderOptions extends Pick<KayConfig, RenderConfigKey> {
   devTools?: boolean | undefined
   // Renders once at build time: what only a request carries throws instead of reading as empty.
   prerendering?: boolean | undefined
+  // Where a prerendering build collects the `await` blocks the page renders outside its islands.
+  awaits?: AwaitNote[] | undefined
   // The tags `site` and `seo` give every page.
   head?: SeoHead | undefined
   // The site's mount point, which every path a page renders goes under.
@@ -1040,7 +1042,7 @@ function documentOf(files: string[], modules: PageModule[], data: Record<string,
   const view = viewOf(modules, data, entry)
   const chunks = islandChunks(client)
   // A prerendered page holds each server island between marks the server splits it at.
-  const scan = options.prerendering ? newServerIslands(true) : undefined
+  const scan = options.prerendering ? Object.assign(newServerIslands(true), { awaits: options.awaits }) : undefined
   // In edit mode the page's markup is marked with the fields of the entries it renders, once whole.
   const marks = editMarks()
   const file = marks === undefined ? undefined : options.editor

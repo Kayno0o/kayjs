@@ -1,6 +1,7 @@
 import type { OtherPage, RenderedPage } from '../check/seo'
 import type { ErrorName, ExportProblem } from '../compiler/errors'
 import type { Project } from '../project'
+import type { AwaitNote } from '../runtime/html'
 import type { ClientBuild, PrerenderedPage } from './client'
 import type { LocaleCopy } from './i18n'
 import type { ListedParams } from './prerendered'
@@ -8,7 +9,7 @@ import type { Scan, Stop } from './pure-page'
 import type { Route } from './routes'
 import { AsyncLocalStorage } from 'node:async_hooks'
 import { mkdir } from 'node:fs/promises'
-import { join, relative } from 'node:path'
+import { join, relative, resolve } from 'node:path'
 import { resolveFrom } from '../build/files'
 import { elementsIn, serverIslandOf } from '../compiler/ast'
 import { exportProblem, KayError } from '../compiler/errors'
@@ -33,7 +34,7 @@ import { matchedParams } from './params'
 import { listedIn, listedParams, pageEtag, pageToken, pathOf, storedHeaders } from './prerendered'
 import { keptScan } from './pure-page'
 import { renderPage, renderUnmatched } from './render'
-import { judgingReads, RequestReadError } from './request-read'
+import { judgingReads, RequestReadError, writtenAt } from './request-read'
 import { routeChain, scanEndpoints, slashedPath } from './routes'
 import { serverIslandModes } from './server-islands'
 import { setupPages } from './setup'
@@ -43,6 +44,9 @@ const PARTS = new Intl.ListFormat('en-GB')
 const KAY_IMPORT = /\bfrom\s+['"]([^'"]+\.kay)['"]/g
 // The pages of a route rendering at once: a render waiting on a database, a CMS or a file lets the next ones run, while each page is still judged and written in turn, as one at a time would. Bounded, so the build holds no more pages than this.
 const RENDERS_AT_ONCE = 8
+// A page waiting this long on one `await` block is named by the build.
+const RUNTIME_FOLDER = `${resolve(import.meta.dir, '..', 'runtime')}/`
+const SLOW_AWAIT_MS = 1000
 
 // Whether the renders of the page being judged read the stand-in site, kept per page as several render at once.
 const siteReads = new AsyncLocalStorage<{ read: boolean }>()
@@ -113,6 +117,8 @@ interface FirstRender {
   reads: string[]
   refused: RequestReadError | undefined
   renderedAt: number
+  // The `await` blocks the page rendered outside its islands.
+  awaits: AwaitNote[]
 }
 
 // What a `.kay` file holds that the search for a server island follows: whether its own template marks one, and the `.kay` files it imports.
@@ -235,28 +241,29 @@ export async function prerenderPages(project: Project, client: ClientBuild, opti
       // onError is the app's for requests it answers; the build logs what a prerendered page throws, and takes a read of the request for its own to judge.
       const refusal: { read?: RequestReadError } = {}
       // Guards run when the page is served, for whoever asks; the build renders what they let through.
-      const render = async () => renderPage({ ...route, guards: [] }, { request }, matched, client, { ...renderOptions, onError: judged(refusal), prerendering: true, guarded: guardedPage(route, config.requireGuards) })
-      const inLocale = async () => runInLocale(stateFor(locales, copy.locale ?? locales.settings.defaultLocale, path, request), render)
+      const render = async (awaits?: AwaitNote[]) => renderPage({ ...route, guards: [] }, { request }, matched, client, { ...renderOptions, onError: judged(refusal), prerendering: true, awaits, guarded: guardedPage(route, config.requireGuards) })
+      const inLocale = async (awaits?: AwaitNote[]) => runInLocale(stateFor(locales, copy.locale ?? locales.settings.defaultLocale, path, request), async () => render(awaits))
       // The ids a page draws keep apart from those of the page it is swapped for, so each page has a token of its own, the same on every render and build; the body is read within it, as a stream draws its ids as it is read.
       // Taken in the order the pages are judged in, as rendering one at a time took them.
       const token = pageToken(copy.key, tokens)
 
       tokens.add(token)
-      const read = async () => {
-        const rendered = await inLocale()
+      const read = async (awaits?: AwaitNote[]) => {
+        const rendered = await inLocale(awaits)
 
         return { response: rendered, html: await rendered.text() }
       }
       const siteRead = { read: false }
-      const once = async () => siteReads.run(siteRead, async () => withPageToken(token, read))
+      const once = async (awaits?: AwaitNote[]) => siteReads.run(siteRead, async () => withPageToken(token, async () => read(awaits)))
       const first = async () => {
         delete refusal.read
         siteRead.read = false
         // Taken before the render, so a date passing during it counts as passed since.
         const renderedAt = Date.now()
-        const { result, reads } = await readsOf(once)
+        const awaits: AwaitNote[] = []
+        const { result, reads } = await readsOf(async () => once(awaits))
 
-        return { ...result, reads, refused: refusal.read, renderedAt }
+        return { ...result, reads, refused: refusal.read, renderedAt, awaits }
       }
 
       return { token, request, siteRead, begun: restyles, once, first, rendered: settled(first()) }
@@ -299,7 +306,7 @@ export async function prerenderPages(project: Project, client: ClientBuild, opti
         const rendered = !stale && 'value' in ended ? ended.value : await first()
 
         let { response, html } = rendered
-        const { reads: dataRead, refused, renderedAt } = rendered
+        const { reads: dataRead, refused, renderedAt, awaits } = rendered
 
         if (refused !== undefined) {
           const readAt = `reads \`${refused.read}\`${refused.file === undefined ? '' : ` at ${relative(root, refused.file)}:${refused.line}`}`
@@ -374,6 +381,9 @@ export async function prerenderPages(project: Project, client: ClientBuild, opti
 
         if (unfollowed !== undefined)
           kayLog('warn', `${copy.path} reads ${unfollowed.keys.slice(0, 5).map(key => `'${key}'`).join(', ')}${unfollowed.keys.length > 5 ? ' and more' : ''} with \`live: true\` in its own render, which the build runs once: what the page shows of it itself goes stale and only its server islands follow, so drop \`prerender\` from \`export const page\` if the page shows it`)
+
+        for (const message of awaitWarnings(copy.path, awaits, root))
+          kayLog('warn', message)
 
         const name = `${copy.key === '/' ? 'index' : copy.key.slice(1)}.html`
         const taken = reserved.get(name) ?? paths.get(name)
@@ -529,6 +539,28 @@ export async function prerenderPages(project: Project, client: ClientBuild, opti
 }
 
 // Whether a guard answers for the page, `requireGuards` refusing one no guard covers: its words stay out of the public search index.
+// A page's `await` blocks resolve at build: a pending branch no visitor sees, and a slow value the build waits for.
+function awaitWarnings(path: string, awaits: AwaitNote[], root: string): string[] {
+  const warnings: string[] = []
+  const placed = (note: AwaitNote) => {
+    const at = writtenAt(note.stack, [RUNTIME_FOLDER])
+
+    return at === undefined ? 'a component' : `${relative(root, at.file)}:${at.line}`
+  }
+
+  for (const note of awaits.filter(({ pending }) => pending))
+    warnings.push(`${path} renders an \`await\` block with a pending branch at ${placed(note)}: the build resolves it, so its pending content never shows; wrap it in a client island, or in a deferred server island (\`server="defer"\`), to show it to a visitor`)
+
+  for (const note of awaits) {
+    const waited = (note.settled ?? note.started) - note.started
+
+    if (waited >= SLOW_AWAIT_MS)
+      warnings.push(`${path} waited ${(waited / 1000).toFixed(1)}s on an \`await\` block at ${placed(note)}, which the build resolves: the wait is spent on every build; move it to a client island or a deferred server island, or make its value faster`)
+  }
+
+  return warnings
+}
+
 function guardedPage(route: Route, required: boolean | undefined): boolean {
   return route.guards.length > 0 || (required === true && route.open !== true)
 }

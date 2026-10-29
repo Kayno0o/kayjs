@@ -363,6 +363,14 @@ export function dynamic(tag: unknown, props: object): unknown {
 
 export type ServerIslandMode = 'inline' | 'defer'
 
+// An `await` block the build rendered on a prerendered page outside any island, which resolves at build: where it is written (the stack of its render), whether it has a pending branch no visitor will see, and when the page reached it and its value settled.
+export interface AwaitNote {
+  stack: string
+  pending: boolean
+  started: number
+  settled?: number | undefined
+}
+
 // A page render looking for its server islands. Scanning renders every component, noting those a server island sits in; otherwise only those render, the rest of the page coming from its prerendered copy.
 export interface ServerIslands {
   scanning: boolean
@@ -372,6 +380,8 @@ export interface ServerIslands {
   modes: ServerIslandMode[]
   stack: unknown[]
   inside: number
+  // Where the build collects the `await` blocks its prerendered page renders; none for a request.
+  awaits?: AwaitNote[] | undefined
   // Islands this request has no use for, left unrendered: a scan renders them all.
   skip?: ServerIslandMode | undefined
 }
@@ -403,6 +413,11 @@ export function withServerIslands<T>(state: ServerIslands, render: () => T): T {
 // Whether this is the build rendering a prerendered page, outside its server islands: what must be new on every request, as a form's stamp, is left for the server to fill in.
 export function prerendering(): boolean {
   return islands?.scanning === true && islands.inside === 0
+}
+
+// The notes a build keeps of the `await` blocks of the prerendered page being rendered, none outside one.
+export function awaitNotes(): AwaitNote[] | undefined {
+  return prerendering() ? islands?.awaits : undefined
 }
 
 function throughServerIslands<P>(state: ServerIslands, fn: (props: P) => unknown, props: P): unknown {

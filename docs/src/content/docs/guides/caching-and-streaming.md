@@ -132,7 +132,11 @@ catch
   p Comments are unavailable
 ```
 
-Without `catch`, a rejection renders the `catch` of the nearest `try` around the block, and with no `try` removes the pending block and is reported at its `await` line. Islands inside a streamed block hydrate when it lands. A form inside one is checked and sent by kay as one in the page is, with the page's locale words and its proof-of-work challenge.
+Without `catch`, a rejection renders the `catch` of the nearest `try` around the block, and with no `try` removes the pending block and is reported at its `await` line.
+
+On a prerendered page the block resolves at build. The page is written with the settled content, a visitor never sees `Loading comments`, and a slow value makes the build wait. `kay build` warns of such a block with its page and line, and names a page that waited a second or more. To show the pending content, put the block in a client island or a deferred server island (`server="defer"`), or render the page per request with `prerender: false`.
+
+Islands inside a streamed block hydrate when it lands. A form inside one is checked and sent by kay as one in the page is, with the page's locale words and its proof-of-work challenge.
 
 An `await` block takes any promise, wherever it came from. A property, a prop or a promise a component made all work the same way.
 
