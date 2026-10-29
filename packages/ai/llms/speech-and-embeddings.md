@@ -39,13 +39,14 @@ pgvector through pg-orm keeps and searches them; the database needs the extensio
 
 ```ts
 // src/db/passage.ts
-import { defineTable } from '@kaynooo/pg-orm'
+import { embed } from '@kaynooo/kayjs-ai'
+import { defineTable, embedding } from '@kaynooo/pg-orm'
 
 export const Passage = defineTable('passage', f => ({
   id: f.serial().primaryKey(),
   text: f.text(),
-  embedding: f.vector(768),
-}))
+  embedding: f.vector(768).nullable().index({ method: 'hnsw', opclass: 'vector_cosine_ops' }),
+})).withTrait(embedding({ column: 'embedding', source: row => row.text, embed: texts => embed(texts, { dimensions: 768 }) }))
 ```
 
 ```ts
@@ -54,17 +55,17 @@ import { db } from './db'
 import { Passage } from './db/passage'
 
 export async function store(texts: string[]) {
-  const vectors = await embed(texts, { dimensions: 768 })
-
-  await db.repo(Passage).write.insertMany(texts.map((text, index) => ({ text, embedding: vectors[index]! })))
+  await db.repo(Passage).write.insertMany(texts.map(text => ({ text })))
 }
 
 export async function nearest(question: string) {
   const vector = await embed(question, { dimensions: 768 })
 
-  return db.repo(Passage).read.findMany(q => q.pick('id', 'text').orderBy(e => e.vectorCosineDistance('embedding', vector)).limit(5))
+  return db.repo(Passage).read.nearest(vector, { k: 5 })
 }
 ```
+
+The `embedding()` trait and `nearest()` need pg-orm 8. The trait embeds the `source` text of every insert, and of an update that changed it, in one `embed` call per write, and the column is `nullable` as it is filled just after the row. `nearest()` returns the closest rows, each with its `distance`, cosine by default.
 
 The passages found go to `ask({ sources })`, which a `Chat` cites: [Chat sources](chat-sources.md).
 

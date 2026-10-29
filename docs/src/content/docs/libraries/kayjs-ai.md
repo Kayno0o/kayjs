@@ -519,7 +519,7 @@ const vectors = await embed(['first passage', 'second passage'], { dimensions: 7
 
 They speak OpenAI's audio and embeddings API, which OpenAI, Ollama and most local servers serve. By default they go to the server `ask` uses. `AI_AUDIO_URL` and `AI_EMBED_URL` send them to another one, which you need with Anthropic, as it has neither. Each call reads its model from its own variable: `AI_TRANSCRIBE_MODEL`, `AI_SPEECH_MODEL` and `AI_EMBED_MODEL`.
 
-Give `embed` the size of the column you store the vectors in. A model that answers another size fails the call, so a vector never meets a column it does not fit. pg-orm keeps them in a pgvector column and sorts by distance to a question.
+Give `embed` the size of the column you store the vectors in. A model that answers another size fails the call, so a vector never meets a column it does not fit. pg-orm 8 keeps them in a pgvector column, embeds a row's text through an `embedding()` trait and reads the closest rows with `nearest()`.
 
 Under `bun test` the fake answers all three. Embeddings are stable vectors built from the words, so texts that share words come out near each other.
 
