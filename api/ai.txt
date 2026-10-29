@@ -1,0 +1,759 @@
+[.] ai
+function ai(options?: AiOptions): KayExtension<AnyElysia>
+
+[.] AiError
+class AiError
+  new (kind: AiErrorKind, message: string, { status, retryAfter, partial, limit, fields, cause }?: AiErrorDetails): AiError
+  code: AiErrorKind
+  fields: string[] | undefined
+  kind: AiErrorKind
+  limit: AiLimit | undefined
+  name: "AiError"
+  partial: string | undefined
+  retryAfter: number | undefined
+  status: number | undefined
+
+[.] AiErrorKind
+type AiErrorKind = | 'auth' // Too many requests (429): `retryAfter` is the seconds the provider asked to wait, when it said. | 'rate-limited' // The provider is down or overloaded (5xx, or an error event in the stream). | 'unavailable' // The provider refused the request (another 4xx): a model it d ...#549f3ce1
+
+[.] AiLimit
+type AiLimit = 'asks' | 'budget' | 'total'
+
+[.] AiOptions
+interface AiOptions
+  budget?: false | BudgetOptions | undefined
+  conversations?: ConversationStore | undefined
+  key?: ((request: Request) => string | Promise<string | undefined> | undefined) | undefined
+  rateLimit?: false | LimitOptions | undefined
+
+[.] anthropic
+function anthropic({ apiKey, baseUrl, model, body: fields }: AnthropicOptions): Provider
+
+[.] AnthropicOptions
+interface AnthropicOptions
+  apiKey: string
+  baseUrl?: string | undefined
+  body?: Record<string, unknown> | undefined
+  model?: string | undefined
+
+[.] ask
+function ask<const Schema extends TSchema>(prompt: string | Message[], options: StructuredAskOptions<Schema>): ReplyOf<Schema>
+function ask(prompt: string | Message[], options?: AskOptions | undefined): Reply
+
+[.] Asked
+interface Asked
+  maxTokens: number
+  messages: ProviderMessage[]
+  model: string
+  provider: string
+  reasoning?: Reasoning | undefined
+  schema?: object | undefined
+  system: string | undefined
+  temperature: number | undefined
+  tools?: ToolSpec[] | undefined
+
+[.] AskOptions
+interface AskOptions
+  body?: Record<string, unknown> | undefined
+  cache?: boolean | "1h" | undefined
+  confirm?: false | Confirm | undefined
+  key?: string | undefined
+  maxAttachmentBytes?: number | undefined
+  maxInputChars?: number | undefined
+  maxSteps?: number | undefined
+  maxTokens?: number | undefined
+  model?: string | undefined
+  outlive?: boolean | undefined
+  provider?: Provider | undefined
+  reasoning?: Reasoning | undefined
+  signal?: AbortSignal | undefined
+  sources?: readonly Source[] | undefined
+  system?: string | undefined
+  temperature?: number | undefined
+  timeout?: { connect?: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w` | undefined; idle?: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w` | undefined; } | undefined
+  tools?: readonly (ToolAction | FunctionTool)[] | undefined
+
+[.] Attachment
+type Attachment = Blob | Uint8Array | ArrayBuffer | StoredFile
+
+[.] AudioFormat
+type AudioFormat = 'mp3' | 'opus' | 'aac' | 'flac' | 'wav' | 'pcm'
+
+[.] BudgetOptions
+interface BudgetOptions
+  store?: RateStore | undefined
+  tokens: number
+  total?: number | undefined
+  window: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w`
+
+[.] Calls
+interface Calls
+  cache?: { read?: number | undefined; written?: number | undefined; } | undefined
+  calls?: { name: string; input?: unknown; id?: string | undefined; }[] | undefined
+  data?: unknown
+  finish?: Finish | undefined
+  reasoning?: string | string[] | undefined
+  text?: string | string[] | undefined
+
+[.] ChatMessage
+interface ChatMessage
+  attachments?: File[]
+  content: string
+  role: "user" | "assistant"
+
+[.] chatMessages
+function chatMessages(options?: WithoutFiles | undefined): TArray<TObject<{ role: TUnionEnum<["user", "assistant"]>; content: TString; }>>
+function chatMessages(options: ChatMessagesOptions): TArray<TObject<{ attachments: TOptional<TArray<TUnsafe<File>>>; role: TUnionEnum<["user", "assistant"]>; content: TString; }>>
+
+[.] ChatMessagesOptions
+interface ChatMessagesOptions
+  attachments?: boolean | { type?: string | string[] | undefined; maxFiles?: number | undefined; } | undefined
+  maxItems?: number | undefined
+  maxLength?: number | undefined
+
+[.] ChatTurn
+type ChatTurn = Pick<Message, 'role' | 'content' | 'sources'>
+
+[.] CodeBlock
+interface CodeBlock
+  html: string
+  markup: string
+
+[.] Confirm
+type Confirm = (call: ToolRequest) => boolean | Promise<boolean>
+
+[.] ConversationChange
+interface ConversationChange
+  add: StoredTurn[]
+  drop: number
+  title: string
+
+[.] ConversationKey
+interface ConversationKey
+  id: string
+  owner: string
+  scope: string
+
+[.] ConversationStore
+interface ConversationStore
+  get: (key: ConversationKey) => Promise<StoredConversation | undefined>
+  list: (owner: string, scope: string, limit: number) => Promise<ConversationSummary[]>
+  remove: (key: ConversationKey) => Promise<boolean>
+  rename: (key: ConversationKey, title: string) => Promise<boolean>
+  write: (key: ConversationKey, revision: number, change: ConversationChange) => Promise<number | undefined>
+
+[.] ConversationSummary
+interface ConversationSummary
+  id: string
+  title: string
+  updatedAt: number
+
+[.] DeepPartial
+type DeepPartial<Value> = Value extends string ? string : Value extends readonly (infer Item)[] ? DeepPartial<Item>[] : Value extends (...args: never[]) => unknown ? Value : Value extends Date ? Value : Value extends object ? { [Key in keyof Value]?: DeepPartial<Value[Key]> } : Value
+
+[.] DeltasOptions
+interface DeltasOptions
+  onRestart?: (() => void) | undefined
+
+[.] embed
+function embed(text: string, options?: EmbedOptions | undefined): Promise<number[]>
+function embed(texts: readonly string[], options?: EmbedOptions | undefined): Promise<number[][]>
+
+[.] Embedded
+interface Embedded
+  dimensions: number | undefined
+  input: string[]
+  model: string
+  provider: string
+
+[.] EmbedOptions
+interface EmbedOptions extends CallOptions
+  dimensions?: number | undefined
+  model?: string | undefined
+  provider?: Provider | undefined
+  signal?: AbortSignal | undefined
+  timeout?: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w` | undefined
+
+[.] EmbedRequest
+interface EmbedRequest
+  dimensions: number | undefined
+  input: string[]
+  model: string
+  timeout: number
+
+[.] Fake
+interface Fake extends Provider
+  accepts?: readonly ("image" | "pdf")[] | undefined
+  asked: readonly Asked[]
+  clear: () => void
+  embed?: ((request: EmbedRequest, signal: AbortSignal) => Promise<number[][]>) | undefined
+  embedded: readonly Embedded[]
+  embedding: (answer: FakeAnswer<Embedded, number[][]>, when?: ((embedded: Embedded) => boolean) | undefined) => void
+  fail: (error: Error, when?: When | undefined) => void
+  heard: readonly Heard[]
+  last: () => Asked | undefined
+  model?: string | undefined
+  name: string
+  reply: (script: Script, when?: When | undefined) => void
+  speak?: ((request: SpeakRequest, signal: AbortSignal) => Promise<Blob>) | undefined
+  speech: (answer: FakeAnswer<Spoken, Blob>, when?: ((spoken: Spoken) => boolean) | undefined) => void
+  spoken: readonly Spoken[]
+  standIn: (provider: Provider) => Provider
+  stream: (request: ProviderRequest, signal: AbortSignal) => AsyncIterable<Piece>
+  transcribe?: ((request: TranscribeRequest, signal: AbortSignal) => Promise<string>) | undefined
+  transcript: (answer: FakeAnswer<Heard, string>, when?: ((heard: Heard) => boolean) | undefined) => void
+
+[.] fakeAi
+const fakeAi: Fake
+
+[.] FakeAnswer
+type FakeAnswer<Given, Value> = Value | Error | ((given: Given) => Value)
+
+[.] Finish
+type Finish = 'stop' | 'length' | 'filtered' | 'steps'
+
+[.] FunctionTool
+interface FunctionTool
+  description: string
+  input: TSchema
+  label?: string | undefined
+  name: string
+  run: (input: never, context: FunctionToolContext) => unknown
+
+[.] FunctionToolContext
+interface FunctionToolContext
+  signal: AbortSignal
+
+[.] FunctionToolOptions
+interface FunctionToolOptions<Schema extends TSchema = TSchema>
+  description: string
+  input: Schema
+  label?: string | undefined
+  name: string
+  run: (input: (Schema & { params: []; })["static"], context: FunctionToolContext) => unknown
+
+[.] ground
+function ground<T>(found: readonly T[], read: (item: T) => Passage, options?: GroundOptions): { system: string; sources: Source[]; }
+
+[.] GroundOptions
+interface GroundOptions
+  system?: string | undefined
+
+[.] Heard
+interface Heard
+  audio: Blob
+  language: string | undefined
+  model: string
+  provider: string
+
+[.] lastChatMessage
+function lastChatMessage<Messages extends readonly ChatMessage[]>(messages: Messages): Messages[number]
+
+[.] LimitOptions
+interface LimitOptions
+  max: number
+  store?: RateStore | undefined
+  window: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w`
+
+[.] Media
+interface Media
+  data: Uint8Array<ArrayBufferLike>
+  kind: "image" | "pdf"
+  name?: string | undefined
+  type: string
+
+[.] Message
+interface Message
+  attachments?: readonly Attachment[] | undefined
+  content: string
+  role: "user" | "assistant"
+  sources?: readonly Source[] | undefined
+
+[.] openai
+function openai({ baseUrl, apiKey, model, body: fields, pdf }?: OpenAiOptions): Provider
+
+[.] OpenAiOptions
+interface OpenAiOptions
+  apiKey?: string | undefined
+  baseUrl?: string | undefined
+  body?: Record<string, unknown> | undefined
+  model?: string | undefined
+  pdf?: Documents | undefined
+
+[.] Passage
+interface Passage
+  href: string
+  text: string
+  title: string
+
+[.] Piece
+type Piece = { text: string } | { reasoning: string } | { thinking: Thinking } | { usage: Partial<Usage> } | { finish: Finish } | { toolUse: ToolUse } | { tool: ToolCall } | { step: Step } | { restart: true }
+
+[.] Progress
+interface Progress
+  calls: ToolCall[]
+  code?: CodeBlock[] | undefined
+  outlives?: true | undefined
+  reasoning?: string | undefined
+  sources?: Source[] | undefined
+  text: string
+
+[.] Provider
+interface Provider
+  accepts?: readonly ("image" | "pdf")[] | undefined
+  embed?: ((request: EmbedRequest, signal: AbortSignal) => Promise<number[][]>) | undefined
+  model?: string | undefined
+  name: string
+  speak?: ((request: SpeakRequest, signal: AbortSignal) => Promise<Blob>) | undefined
+  stream: (request: ProviderRequest, signal: AbortSignal) => AsyncIterable<Piece>
+  transcribe?: ((request: TranscribeRequest, signal: AbortSignal) => Promise<string>) | undefined
+
+[.] ProviderMessage
+interface ProviderMessage extends Omit<Message, 'attachments'>
+  attachments?: Media[] | undefined
+  calls?: ToolUse[] | undefined
+  content: string
+  results?: ToolOutcome[] | undefined
+  role: "user" | "assistant"
+  sources?: readonly Source[] | undefined
+  thinking?: Thinking[] | undefined
+
+[.] ProviderRequest
+interface ProviderRequest
+  body?: Record<string, unknown> | undefined
+  cache?: boolean | "1h" | undefined
+  maxTokens: number
+  messages: ProviderMessage[]
+  model: string
+  reasoning?: Reasoning | undefined
+  schema?: object | undefined
+  system: string | undefined
+  temperature: number | undefined
+  timeouts: Timeouts
+  tools?: ToolSpec[] | undefined
+
+[.] Reasoning
+type Reasoning = 'none' | 'low' | 'medium' | 'high'
+
+[.] replaces
+function replaces(request?: Request | undefined): Replaces | undefined
+
+[.] Replaces
+interface Replaces
+  kind: "regenerate" | "edit"
+  turns: number
+
+[.] Reply
+interface Reply extends PromiseLike<string>, AsyncIterable<string>
+  calls: Promise<ToolCall[]>
+  deltas: (options?: DeltasOptions | undefined) => AsyncIterable<string>
+  finish: Promise<Finish | undefined>
+  progress: () => AsyncIterable<Progress>
+  resumed: boolean
+  steps: Promise<Step[]>
+  stop: () => void
+  stream: () => AsyncIterable<string>
+  usage: Promise<Usage | undefined>
+
+[.] ReplyOf
+type ReplyOf<Schema extends TSchema> = StructuredReply<Static<Schema>>
+
+[.] resuming
+function resuming(request?: Request | undefined): boolean
+
+[.] Script
+type Script = Scripted | ((asked: Asked) => Scripted)
+
+[.] Source
+interface Source
+  href: string
+  n: number
+  title: string
+
+[.] speak
+function speak(text: string, options?: SpeakOptions): Promise<Blob>
+
+[.] SpeakOptions
+interface SpeakOptions extends CallOptions
+  format?: AudioFormat | undefined
+  model?: string | undefined
+  provider?: Provider | undefined
+  signal?: AbortSignal | undefined
+  speed?: number | undefined
+  timeout?: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w` | undefined
+  voice?: string | undefined
+
+[.] SpeakRequest
+interface SpeakRequest
+  format: AudioFormat | undefined
+  model: string
+  speed: number | undefined
+  text: string
+  timeout: number
+  voice: string | undefined
+
+[.] Spoken
+interface Spoken
+  format: AudioFormat | undefined
+  model: string
+  provider: string
+  speed: number | undefined
+  text: string
+  voice: string | undefined
+
+[.] sqliteConversations
+function sqliteConversations(path?: string): ConversationStore
+
+[.] Step
+interface Step
+  calls: ToolCall[]
+  finish: Finish | undefined
+  firstTokenMs: number | undefined
+  ms: number
+  usage: Usage | undefined
+
+[.] StoredConversation
+interface StoredConversation extends ConversationSummary
+  id: string
+  revision: number
+  title: string
+  turns: StoredTurn[]
+  updatedAt: number
+
+[.] storedFile
+function storedFile(key: string): StoredFile
+
+[.] StoredTurn
+interface StoredTurn
+  content: string
+  reply?: string | undefined
+  role: "user" | "assistant"
+  sources?: Source[] | undefined
+  stopped?: boolean | undefined
+
+[.] StructuredAskOptions
+interface StructuredAskOptions<Schema extends TSchema = TSchema> extends AskOptions
+  body?: Record<string, unknown> | undefined
+  cache?: boolean | "1h" | undefined
+  confirm?: false | Confirm | undefined
+  key?: string | undefined
+  maxAttachmentBytes?: number | undefined
+  maxInputChars?: number | undefined
+  maxSteps?: number | undefined
+  maxTokens?: number | undefined
+  model?: string | undefined
+  outlive?: boolean | undefined
+  provider?: Provider | undefined
+  reasoning?: Reasoning | undefined
+  schema: Schema
+  signal?: AbortSignal | undefined
+  sources?: readonly Source[] | undefined
+  system?: string | undefined
+  temperature?: number | undefined
+  timeout?: { connect?: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w` | undefined; idle?: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w` | undefined; } | undefined
+  tools?: readonly (ToolAction | FunctionTool)[] | undefined
+
+[.] StructuredReply
+interface StructuredReply<Value, Snapshot = DeepPartial<Value>> extends PromiseLike<Value>, AsyncIterable<Snapshot>
+  calls: Promise<ToolCall[]>
+  deltas: (options?: DeltasOptions | undefined) => AsyncIterable<string>
+  finish: Promise<Finish | undefined>
+  resumed: boolean
+  steps: Promise<Step[]>
+  stop: () => void
+  stream: () => AsyncIterable<Snapshot>
+  usage: Promise<Usage | undefined>
+
+[.] Timeouts
+interface Timeouts
+  connect: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w`
+  idle: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w`
+
+[.] tool
+function tool<const Schema extends TSchema>(options: FunctionToolOptions<Schema>): FunctionTool
+
+[.] ToolAction
+type ToolAction = Action<never, unknown>
+
+[.] ToolCall
+interface ToolCall
+  approval?: string | undefined
+  id: string
+  input: Record<string, unknown>
+  label?: string | undefined
+  ms?: number | undefined
+  name: string
+  result?: string | undefined
+  status: "running" | "done" | "failed"
+
+[.] ToolOutcome
+interface ToolOutcome
+  content: string
+  id: string
+  ok: boolean
+
+[.] ToolRequest
+interface ToolRequest
+  input: Record<string, unknown>
+  name: string
+  request: Request
+
+[.] ToolSpec
+interface ToolSpec
+  description: string
+  inputSchema: object
+  name: string
+
+[.] ToolUse
+interface ToolUse
+  arguments: string
+  id: string
+  name: string
+
+[.] transcribe
+function transcribe(audio: Blob, options?: TranscribeOptions): Promise<string>
+
+[.] TranscribeOptions
+interface TranscribeOptions extends CallOptions
+  language?: string | undefined
+  model?: string | undefined
+  provider?: Provider | undefined
+  signal?: AbortSignal | undefined
+  timeout?: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w` | undefined
+
+[.] TranscribeRequest
+interface TranscribeRequest
+  audio: Blob
+  language: string | undefined
+  model: string
+  timeout: number
+
+[.] Usage
+interface Usage
+  cacheReadTokens?: number | undefined
+  cacheWriteTokens?: number | undefined
+  inputTokens: number
+  outputTokens: number
+
+[.] When
+type When = (asked: Asked) => boolean
+
+[./add] default
+const default: { description: string; extension: { import: string; expression: string; }; notes: string[]; }
+
+[./chat-calls.kay] default
+component default
+  approvalLabel: string
+  argumentsLabel: string
+  calls: ToolCall[]
+  class?: string | { root?: string; summary?: string; list?: string; call?: string; name?: string; status?: string; title?: string; code?: string; } | undefined
+  details: boolean
+  doneLabel: string
+  failedLabel: string
+  labels: Record<string, string>
+  pending?: boolean
+  resultLabel: string
+  runningLabel: string
+
+[./chat-launcher.kay] default
+component default
+  accept?: string | undefined
+  action: Action<{ messages: ChatMessage[]; }, AsyncIterable<string | Progress> | Failure<unknown>, never>
+  allowLabel?: string | undefined
+  allowedLabel?: string | undefined
+  approvalLabel?: string | undefined
+  argumentsLabel?: string | undefined
+  attach?: boolean | undefined
+  attachFullLabel?: string | undefined
+  attachIcon?: Element
+  attachLabel?: string | undefined
+  attachRefusedLabel?: string | undefined
+  attachTooBigLabel?: string | undefined
+  cancelLabel?: string | undefined
+  changeFailedLabel?: string | undefined
+  class?: string | undefined
+  closeIcon?: Element
+  closeLabel?: string | undefined
+  collapseIcon?: Element
+  collapseLabel?: string | undefined
+  conflictLabel?: string | undefined
+  conversations?: boolean | undefined
+  conversationsLabel?: string | undefined
+  deleteConfirmLabel?: string | undefined
+  deleteLabel?: string | undefined
+  deniedLabel?: string | undefined
+  denyLabel?: string | undefined
+  disclosure?: string | undefined
+  doneLabel?: string | undefined
+  editBusyLabel?: string | undefined
+  editEmptyLabel?: string | undefined
+  editIcon?: Element
+  editLabel?: string | undefined
+  editable?: boolean | undefined
+  errorMessage?: string | undefined
+  expandIcon?: Element
+  expandLabel?: string | undefined
+  failedLabel?: string | undefined
+  fill?: boolean | undefined
+  greeting?: string | undefined
+  icon?: Element
+  initial?: ChatTurn[] | undefined
+  keep?: number | undefined
+  keepOnServer?: boolean | undefined
+  label?: string | undefined
+  loadFailedLabel?: string | undefined
+  maxChars?: number | undefined
+  maxFileSize?: number | undefined
+  maxFiles?: number | undefined
+  newIcon?: Element
+  newLabel?: string | undefined
+  note?: Element
+  openLabel?: string | undefined
+  placeholder?: string | undefined
+  reasoning?: boolean | undefined
+  reasoningLabel?: string | undefined
+  recordIcon?: Element
+  recordLabel?: string | undefined
+  regenerate?: boolean | undefined
+  regenerateIcon?: Element
+  regenerateLabel?: string | undefined
+  remember?: string | undefined
+  removeLabel?: string | undefined
+  renameLabel?: string | undefined
+  resultLabel?: string | undefined
+  retryLabel?: string | undefined
+  runningLabel?: string | undefined
+  saveLabel?: string | undefined
+  sendIcon?: Element
+  sendLabel?: string | undefined
+  signedOutLabel?: string | undefined
+  size?: "sm" | "md" | "lg" | undefined
+  sourcesLabel?: string | undefined
+  stopIcon?: Element
+  stopLabel?: string | undefined
+  stoppedLabel?: string | undefined
+  suggestions?: string[] | undefined
+  tableLabel?: string | undefined
+  thinkingLabel?: string | undefined
+  tone?: "accent" | "neutral" | undefined
+  toolDetails?: boolean | undefined
+  toolLabels?: Record<string, string> | undefined
+  transcribe?: Action<{ audio: File; }, string | Failure<unknown> | { text: string; }, never> | undefined
+  transcribeFailedLabel?: string | undefined
+  transcribingLabel?: string | undefined
+  unheardLabel?: string | undefined
+  untitledLabel?: string | undefined
+  variant?: "bubble" | "plain" | undefined
+
+[./chat-panel.kay] default
+component default
+  children?: Element
+  class?: string | { root?: string; panel?: string; head?: string; title?: string; actions?: string; action?: string; expand?: string; body?: string; button?: string; glyph?: string; } | undefined
+  closeIcon: Element
+  closeLabel?: string | undefined
+  collapseIcon: Element
+  collapseLabel?: string | undefined
+  expandIcon: Element
+  expandLabel?: string | undefined
+  icon: Element
+  label?: string | undefined
+  newIcon: Element
+  newLabel?: string | undefined
+  openLabel?: string | undefined
+
+[./chat-sources.kay] default
+component default
+  class?: string | { root?: string; label?: string; list?: string; item?: string; link?: string; } | undefined
+  here: boolean
+  label: string
+  sources: Source[]
+
+[./chat.kay] default
+component default
+  accept?: string | undefined
+  action: Action<{ messages: ChatMessage[]; }, AsyncIterable<string | Progress> | Failure<unknown>, never>
+  allowLabel?: string | undefined
+  allowedLabel?: string | undefined
+  approvalLabel?: string | undefined
+  argumentsLabel?: string | undefined
+  attach?: boolean | undefined
+  attachFullLabel?: string | undefined
+  attachIcon?: Element
+  attachLabel?: string | undefined
+  attachRefusedLabel?: string | undefined
+  attachTooBigLabel?: string | undefined
+  cancelLabel?: string | undefined
+  changeFailedLabel?: string | undefined
+  class?: string | { root?: string; conversations?: string; newConversation?: string; conversationList?: string; conversation?: string; renameField?: any; deleteConfirm?: string; confirm?: string; cancel?: string; conversationLink?: string; rename?: any; delete?: any; empty?: string; greeting?: string; sugges ...#4e932da1
+  conflictLabel?: string | undefined
+  conversationIn?: "address" | "browser" | undefined
+  conversations?: boolean | undefined
+  conversationsLabel?: string | undefined
+  deleteConfirmLabel?: string | undefined
+  deleteLabel?: string | undefined
+  deniedLabel?: string | undefined
+  denyLabel?: string | undefined
+  disclosure?: string | undefined
+  doneLabel?: string | undefined
+  editBusyLabel?: string | undefined
+  editEmptyLabel?: string | undefined
+  editIcon?: Element
+  editLabel?: string | undefined
+  editable?: boolean | undefined
+  errorMessage?: string | undefined
+  failedLabel?: string | undefined
+  fill?: boolean | undefined
+  greeting?: string | undefined
+  initial?: ChatTurn[] | undefined
+  keep?: number | undefined
+  keepOnServer?: boolean | undefined
+  label?: string | undefined
+  links?: "apart" | "here" | undefined
+  loadFailedLabel?: string | undefined
+  maxChars?: number | undefined
+  maxFileSize?: number | undefined
+  maxFiles?: number | undefined
+  newButton?: boolean | undefined
+  newIcon?: Element
+  newLabel?: string | undefined
+  placeholder?: string | undefined
+  reasoning?: boolean | undefined
+  reasoningLabel?: string | undefined
+  recordIcon?: Element
+  recordLabel?: string | undefined
+  regenerate?: boolean | undefined
+  regenerateIcon?: Element
+  regenerateLabel?: string | undefined
+  remember?: string | undefined
+  removeLabel?: string | undefined
+  renameLabel?: string | undefined
+  resultLabel?: string | undefined
+  retryLabel?: string | undefined
+  runningLabel?: string | undefined
+  saveLabel?: string | undefined
+  sendIcon?: Element
+  sendLabel?: string | undefined
+  signedOutLabel?: string | undefined
+  size?: "sm" | "md" | "lg" | undefined
+  sourcesLabel?: string | undefined
+  stopIcon?: Element
+  stopLabel?: string | undefined
+  stoppedLabel?: string | undefined
+  suggestions?: string[] | undefined
+  tableLabel?: string | undefined
+  thinkingLabel?: string | undefined
+  tone?: "accent" | "neutral" | undefined
+  toolDetails?: boolean | undefined
+  toolLabels?: Record<string, string> | undefined
+  transcribe?: Action<{ audio: File; }, string | Failure<unknown> | { text: string; }, never> | undefined
+  transcribeFailedLabel?: string | undefined
+  transcribingLabel?: string | undefined
+  unheardLabel?: string | undefined
+  untitledLabel?: string | undefined
+  variant?: "bubble" | "plain" | undefined
+
+[./test] aiTest
+function aiTest(): AiTest
+
+[./test] AiTest
+type AiTest = Pick<Fake, 'reply' | 'fail' | 'asked' | 'last' | 'clear' | 'heard' | 'transcript' | 'spoken' | 'speech' | 'embedded' | 'embedding'>

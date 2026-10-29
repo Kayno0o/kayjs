@@ -1,0 +1,3274 @@
+[.] ActionSource
+type ActionSource<Row, Target extends Action<never, unknown>> = { action: Target // The fields of the call besides the paging: with an object, `offset` and `limit` (the page size) are added, so an action declaring both reads them from `pageFields`. A function gets where the page starts and answers t ...#4c6d0e5f
+
+[.] attempt
+function attempt<T, Data = unknown>(run: () => Promise<T>, failure: string | AttemptOptions<Data>, refused?: ((data: Data) => string | undefined) | undefined): Promise<Attempted<T> | undefined>
+
+[.] Attempted
+type Attempted<T> = T extends void ? true : T
+
+[.] AttemptOptions
+interface AttemptOptions<Data = unknown>
+  failure: string
+  onRefused?: ((data: Data) => unknown) | undefined
+  refused?: ((data: Data) => string | undefined) | undefined
+  success?: string | undefined
+
+[.] AudioChapter
+interface AudioChapter
+  start: number
+  title: string
+  url?: string | undefined
+
+[.] AudioCue
+interface AudioCue
+  end: number
+  start: number
+  text: string
+
+[.] AxisScale
+type AxisScale = 'linear' | 'log'
+
+[.] AxisTick
+interface AxisTick
+  label: string
+  value: number
+
+[.] BarListRow
+interface BarListRow
+  display?: string
+  href?: string
+  key: string | number
+  label: string
+  value: number
+
+[.] BarSeries
+interface BarSeries extends ChartSeries
+  color?: string
+  colors?: (string | null | undefined)[]
+  name: string
+  notes?: (string | null | undefined)[]
+  values: (number | null)[]
+
+[.] ChartSeries
+interface ChartSeries
+  color?: string
+  name: string
+  values: (number | null)[]
+
+[.] Column
+interface Column<Row>
+  align?: "start" | "center" | "end"
+  cell?: boolean
+  defaultDirection?: SortDirection
+  header: string
+  key: string
+  numeric?: true
+  sortValue?: true | ((row: Row) => string | number)
+
+[.] ComboboxOption
+interface ComboboxOption<Value extends string = string>
+  disabled?: boolean | undefined
+  label: string
+  value: Value
+
+[.] ComboboxOptions
+type ComboboxOptions<Value extends string = string> = readonly ComboboxOption<Value>[] | ((input: ComboboxQuery) => PromiseLike<readonly ComboboxOption<Value>[]>)
+
+[.] ComboboxQuery
+interface ComboboxQuery
+  q: string
+
+[.] ContributionDay
+interface ContributionDay
+  day: string
+  description?: string | undefined
+  intensity: number
+
+[.] currentStep
+function currentStep<Key extends string>(url: string | URL, keys: readonly Key[], done?: readonly string[], param?: string): Key
+
+[.] DateRange
+type DateRange = [string | null, string | null]
+
+[.] dateRangeFrom
+function dateRangeFrom(from: string, to: string): DateRange
+
+[.] DescriptionItem
+interface DescriptionItem
+  key?: string | undefined
+  label: string
+  value?: string | number | undefined
+
+[.] dismissToast
+function dismissToast(id: number): void
+
+[.] editing
+function editing<Row, Draft = void>(): Editing<Row, Draft>
+
+[.] Editing
+interface Editing<Row, Draft = void>
+  close: () => void
+  create: (draft: Draft) => void
+  draft: () => Draft | undefined
+  edit: (row: Row) => void
+  open: () => boolean
+  row: () => Row | undefined
+
+[.] FilterField
+interface FilterField
+  key: string
+  label: string
+  options?: readonly { value: string; label: string; }[] | undefined
+
+[.] formIssues
+const formIssues: Context<(() => Record<string, string>) | undefined>
+
+[.] holdToasts
+function holdToasts(hold: ToastHold, on: boolean): void
+
+[.] HoverCardPlacement
+type HoverCardPlacement = PopoverPlacement | 'top' | 'bottom' | 'left' | 'right'
+
+[.] IconChoice
+interface IconChoice
+  icon: IconProps
+  name: string
+
+[.] IconSlot
+type IconSlot = 'alert' | 'apps' | 'back' | 'bell' | 'calendar' | 'chat' | 'chevron' | 'close' | 'collapse' | 'delete' | 'edit' | 'expand' | 'external' | 'globe' | 'info' | 'menu' | 'microphone' | 'pause' | 'play' | 'plus' | 'refresh' | 'search' | 'send' | 'spinner' | 'star' | 'stop' | 'success' | ' ...#a61d87e6
+
+[.] infiniteList
+function infiniteList<Row, Target extends Action<never, unknown> = never>(first: Row[], options: InfiniteListOptions<Row, Target>): InfiniteList<Row>
+
+[.] InfiniteList
+interface InfiniteList<Row>
+  ended: () => boolean
+  failed: () => boolean
+  filter: () => ListFilter
+  filterBy: (filter: Partial<ListFilter>) => Promise<void>
+  more: () => Promise<void>
+  patch: (id: unknown, change: RowChange<Row> | undefined) => boolean
+  pending: () => boolean
+  restart: (change: { sort?: SortState | undefined; filter?: Partial<ListFilter>; }) => Promise<void>
+  retry: () => Promise<void>
+  rows: () => Row[]
+  sort: () => SortState | undefined
+  sortBy: (sort: SortState | undefined) => Promise<void>
+
+[.] InfiniteListOptions
+type InfiniteListOptions<Row, Target extends Action<never, unknown> = never> = InfiniteListBase<Row> & (LoadSource<Row> | ActionSource<Row, Target>)
+
+[.] InfinitePage
+type InfinitePage<Row> = Row[] | undefined
+
+[.] ListFilter
+interface ListFilter
+  fields: Record<string, string>
+  text: string
+
+[.] LoadSource
+interface LoadSource<Row>
+  action?: undefined
+  load: (at: PageAt<Row>) => InfinitePage<Row> | Promise<InfinitePage<Row>>
+
+[.] MapMarker
+interface MapMarker
+  at: MapPoint
+  label?: string | undefined
+  popup?: string | undefined
+
+[.] MapPoint
+type MapPoint = readonly number[]
+
+[.] MediaItem
+interface MediaItem
+  captions?: string
+  full?: string
+  key: string | number
+  kind: "image" | "video"
+  preview: string
+  src?: string
+  thumb: string
+  title?: string
+
+[.] MenuAction
+interface MenuAction
+  danger?: boolean
+  disabled?: boolean
+  icon?: IconProps | IconSlot
+  label: string
+  onSelect: () => unknown
+  tone?: "neutral" | "danger" | undefined
+
+[.] MenuEntry
+type MenuEntry = MenuAction | 'separator'
+
+[.] messageOf
+function messageOf(error: unknown, fallback: string): string
+
+[.] MultiSelectOption
+interface MultiSelectOption<Value extends string = string>
+  disabled?: boolean | undefined
+  icon?: IconProps | IconSlot | undefined
+  label: string
+  value: Value
+
+[.] NavLink
+interface NavLink
+  href: string
+  icon?: IconProps | IconSlot | undefined
+  label: string
+
+[.] PageAt
+interface PageAt<Row>
+  filter: ListFilter
+  last: Row | undefined
+  offset: number
+  sort: SortState | undefined
+
+[.] pageFields
+function pageFields(max?: number): { offset: TOptional<TInteger>; limit: TOptional<TInteger>; }
+
+[.] PageInput
+interface PageInput
+  limit?: number | undefined
+  offset?: number | undefined
+
+[.] pageOf
+function pageOf<Row>(rows: Row[], { offset, limit }?: PageInput): { rows: Row[]; total: number; }
+
+[.] PaletteAction
+interface PaletteAction extends PaletteBase
+  group: string
+  icon?: IconProps | IconSlot | undefined
+  keywords?: string | undefined
+  label: string
+  onSelect: () => unknown
+
+[.] PaletteEntry
+type PaletteEntry = PaletteLink | PaletteAction
+
+[.] PaletteLink
+interface PaletteLink extends PaletteBase
+  external?: boolean | undefined
+  group: string
+  href: string
+  icon?: IconProps | IconSlot | undefined
+  keywords?: string | undefined
+  label: string
+
+[.] Plate
+interface Plate
+  scale: number
+  x: number
+  y: number
+
+[.] PopoverPlacement
+type PopoverPlacement = 'bottom-start' | 'bottom-end' | 'top-start' | 'top-end'
+
+[.] PopoverTriggerProps
+interface PopoverTriggerProps
+  aria-expanded: "true" | "false"
+  popovertarget: string
+  style: string
+
+[.] rangeFrom
+function rangeFrom(low: string, high: string): RangeValue
+
+[.] RangeValue
+type RangeValue = [number | null, number | null]
+
+[.] RowChange
+type RowChange<Row> = Partial<Row> | ((row: Row) => Row)
+
+[.] RowFilter
+type RowFilter<Row> = readonly (keyof Row & string)[] | ((row: Row) => (string | number | null | undefined)[])
+
+[.] RowKey
+type RowKey<Row> = (keyof Row & string) | ((row: Row) => string | number)
+
+[.] RowKeyValue
+type RowKeyValue<Row, Key extends RowKey<Row>> = Key extends keyof Row ? Row[Key] : Key extends (row: Row) => infer Value ? Value : never
+
+[.] ScatterAxis
+interface ScatterAxis
+  domain?: readonly [number, number]
+  label?: string
+  scale?: AxisScale
+  ticks?: readonly AxisTick[]
+
+[.] ScatterPoint
+interface ScatterPoint
+  key: string | number
+  label: string
+  tooltip?: string
+  weight?: number
+  x: number
+  y: number
+
+[.] SortDirection
+type SortDirection = 'asc' | 'desc'
+
+[.] SortState
+interface SortState
+  direction: SortDirection
+  key: string
+
+[.] SparkTone
+type SparkTone = 'muted' | 'accent' | 'success' | 'warning' | 'danger' | 'info'
+
+[.] StatDelta
+interface StatDelta
+  direction?: "up" | "down" | "flat" | undefined
+  label?: string | undefined
+  tone?: "info" | "success" | "neutral" | "danger" | "warning" | undefined
+  value: string
+
+[.] StepCookies
+interface StepCookies
+  delete: (name: string, options?: { path?: string; } | undefined) => void
+  get: (name: string) => string | null | undefined
+  set: (name: string, value: string, options?: { path?: string; httpOnly?: boolean; sameSite?: "lax" | "strict" | "none"; maxAge?: number; secure?: boolean; } | undefined) => void
+
+[.] stepDraft
+function stepDraft(cookies: StepCookies, name: string, { check, maxAge, path, request, secure }: StepDraftOptions): StepDraft
+
+[.] StepDraft
+interface StepDraft
+  clear: () => void
+  done: () => string[]
+  merged: () => Values
+  save: (step: string, values: Values) => void
+  values: () => Record<string, Values>
+
+[.] StepDraftOptions
+interface StepDraftOptions
+  check: (step: string, values: Values) => boolean
+  maxAge?: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w` | undefined
+  path?: string | undefined
+  request?: Request | undefined
+  secure?: boolean | undefined
+
+[.] stepHref
+function stepHref(url: string | URL, key: string, param?: string): string
+
+[.] StepItem
+interface StepItem<Key extends string = string>
+  key: Key
+  label: string
+
+[.] SwitcherApp
+interface SwitcherApp
+  description?: string | undefined
+  href: string
+  icon?: IconProps | IconSlot | undefined
+  id: string
+  label: string
+  newTab?: boolean | undefined
+  rel?: string | undefined
+
+[.] TimelineEntry
+interface TimelineEntry<Key extends string | number = string>
+  icon?: IconProps | IconSlot | undefined
+  key: Key
+  pickable?: boolean | undefined
+  text: string
+  time: string
+  tone?: "info" | "success" | "danger" | "warning" | "muted" | "accent" | undefined
+
+[.] toast
+const toast: { error: (message: string, options?: ToastOptions) => number; success: (message: string, options?: ToastOptions) => number; info: (message: string, options?: ToastOptions) => number; }
+
+[.] Toast
+interface Toast
+  id: number
+  message: string
+  tone?: ToastTone | undefined
+  type: ToastType
+
+[.] ToastHold
+type ToastHold = 'pointer' | 'focus'
+
+[.] ToastOptions
+interface ToastOptions
+  duration?: false | `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w` | undefined
+
+[.] toasts
+function toasts(): Toast[]
+
+[.] ToastTone
+type ToastTone = 'danger' | 'success' | 'info'
+
+[.] ToastType
+type ToastType = 'error' | 'success' | 'info'
+
+[.] toCsv
+function toCsv<Row>(rows: Row[], columns: Column<Row>[]): string
+
+[.] TOOLBAR_ACTIONS
+const TOOLBAR_ACTIONS: readonly ["bold", "italic", "heading", "bulletList", "numberedList", "link", "image"]
+
+[.] ToolbarAction
+type ToolbarAction = typeof TOOLBAR_ACTIONS[number]
+
+[.] TreeId
+type TreeId = string | number
+
+[.] TreeNode
+interface TreeNode<Id extends TreeId = string>
+  children?: readonly TreeNode<Id>[] | undefined
+  icon?: IconProps | IconSlot | undefined
+  id: Id
+  label: string
+
+[.] uiDefaults
+const uiDefaults: UiSettings
+
+[.] UiSettings
+interface UiSettings
+  icons: Record<"alert" | "back" | "chevron" | "close" | "delete" | "globe" | "info" | "menu" | "play" | "plus" | "search" | "spinner" | "star" | "success" | "zoomFit" | "zoomIn" | "zoomOut", IconProps> & Partial<Record<AddedSlot, IconProps>>
+
+[./accordion.kay] default
+component default
+  boxed?: boolean | undefined
+  class?: string | { root?: string; } | undefined
+  items: readonly { value: string; title: string; open?: boolean | undefined; }[]
+  multiple?: boolean | undefined
+  panel: (value: string) => Element
+
+[./add] default
+const default: { description: string; extension: { import: string; expression: string; }; notes: string[]; }
+
+[./announce] announce
+function announce(message: string, from?: Element | null): void
+
+[./app-header.kay] default
+component default
+  brand?: Element
+  class?: string | { root?: string; brand?: string; nav?: string | { root?: string; toggle?: string; menuIcon?: string | { root?: string; } | undefined; closeIcon?: string | { root?: string; } | undefined; list?: string; item?: string; link?: string; icon?: string | { root?: string; } | undefined; } | undefin ...#e179caf0
+  current: string | URL
+  end?: Element
+  label: string
+  links: readonly NavLink[]
+  menuLabel?: string | undefined
+  sticky?: boolean | undefined
+
+[./app-switcher.kay] default
+component default
+  apps: readonly SwitcherApp[]
+  class?: string | { root?: string | { root?: string | { root?: string; } | undefined; } | undefined; menu?: string | { root?: string; anchor?: string; } | undefined; grid?: string; tile?: string; icon?: string | { root?: string; } | undefined; initial?: string; name?: string; } | undefined
+  current?: string | undefined
+  icon?: IconProps | IconSlot | undefined
+  id?: string | undefined
+  label?: string | undefined
+  newTab?: boolean | undefined
+  placement?: PopoverPlacement | undefined
+  tile?: ((app: SwitcherApp) => Element) | undefined
+
+[./audio-player.kay] default
+component default
+  actions?: ((chapter: AudioChapter, index: number) => Element) | undefined
+  artist?: string | undefined
+  artwork?: string | undefined
+  chapters?: readonly AudioChapter[] | undefined
+  chaptersLabel?: string | undefined
+  class?: string | { root?: string; audio?: string; bar?: string; step?: string | { root?: string | { root?: string; } | undefined; } | undefined; play?: string | { root?: string | { root?: string; } | undefined; } | undefined; time?: string; seek?: string; marks?: string; mark?: string; track?: string; now?: ...#ae63d0bc
+  cues?: readonly AudioCue[] | undefined
+  failure?: string | undefined
+  linkLabel?: string | undefined
+  nextLabel?: string | undefined
+  onChapterChange?: ((index: number) => unknown) | undefined
+  onPositionChange?: ((seconds: number) => unknown) | undefined
+  pauseLabel?: string | undefined
+  playLabel?: string | undefined
+  position?: number | undefined
+  preload?: "none" | "metadata" | "auto" | undefined
+  previousLabel?: string | undefined
+  seekLabel?: string | undefined
+  src: string
+  title?: string | undefined
+  transcriptLabel?: string | undefined
+
+[./avatar.kay] default
+component default
+  class?: string | { root?: string; image?: string; initial?: string; } | undefined
+  label?: string | undefined
+  name: string
+  size?: "xs" | "sm" | "md" | "lg" | undefined
+  src?: string | null | undefined
+
+[./badge.kay] default
+component default
+  children?: Element
+  class?: string | { root?: string; icon?: string | { root?: string; } | undefined; } | undefined
+  icon?: IconProps | IconSlot | undefined
+  label?: string | number | undefined
+  tone?: "info" | "success" | "neutral" | "danger" | "warning" | "accent" | undefined
+  variant?: "outline" | "solid" | "stamp" | undefined
+
+[./bar-chart.kay] default
+component default
+  class?: string | { root?: string; plot?: string; grid?: string; tick?: string; columns?: string; column?: string; bar?: string; axis?: string; axisLabel?: string; legend?: string; legendItem?: string; key?: string; } | undefined
+  emptyLabel?: string | undefined
+  formatLabel?: LabelFormat | undefined
+  formatValue?: ((value: number) => string) | undefined
+  label: string
+  labels: string[]
+  legend?: boolean | undefined
+  series: BarSeries[]
+  stacked?: boolean | undefined
+  totalLabel?: string | undefined
+  xLabels?: boolean | undefined
+
+[./bar-list.kay] default
+component default
+  class?: string | { root?: string; item?: string; row?: string; label?: string; value?: string; track?: string; fill?: string; } | undefined
+  emptyLabel?: string | undefined
+  onSelect?: ((row: Row) => unknown) | undefined
+  rows: Row[]
+
+[./bare-icon-button.kay] default
+component default
+  children?: Element
+  class?: string | { root?: string; } | undefined
+  href?: string | undefined
+  label: string
+  size?: "xs" | "sm" | "md" | "lg" | undefined
+  tone?: "neutral" | "danger" | "accent" | undefined
+  type?: "reset" | "submit" | "button" | undefined
+  variant?: "solid" | "ghost" | "inline" | undefined
+
+[./bell-inbox.kay] default
+component default
+  class?: string | { root?: string; menu?: string | { root?: string; anchor?: string; } | undefined; list?: string; empty?: string; item?: string; dot?: string; title?: string; unread?: string; all?: string; announce?: string; count?: string; } | undefined
+  label?: string | undefined
+  placement?: PopoverPlacement | undefined
+
+[./bell.kay] default
+component default
+  label?: string | undefined
+  placement?: PopoverPlacement | undefined
+
+[./breadcrumb.kay] default
+component default
+  class?: string | { root?: string; list?: string; more?: string; item?: string; link?: string; text?: string; } | undefined
+  items: readonly { label: string; href?: string | undefined; }[]
+  label: string
+  structured?: boolean | undefined
+
+[./button.kay] default
+component default
+  | { busy?: boolean | undefined; children?: Element; class?: string | { root?: any; spinner?: any; } | undefined; expanded?: boolean | undefined; href?: undefined; icon?: IconProps | IconSlot | undefined; label?: string | undefined; pressed?: boolean | undefined; size?: "xs" | "sm" | "md" | "lg" | undefined; spinner?: boolean | undefined; tone?: "success" | "neutral" | "danger" | "accent" | undefined; type?: "reset" | "submit" | "button" | undefined; variant?: "solid" | "ghost" | "inline" | undefined }
+  | { busy?: boolean | undefined; children?: Element; class?: string | { root?: any; spinner?: any; } | undefined; href: string; icon?: IconProps | IconSlot | undefined; label?: string | undefined; size?: "xs" | "sm" | "md" | "lg" | undefined; spinner?: boolean | undefined; tone?: "success" | "neutral" | "danger" | "accent" | undefined; variant?: "solid" | "ghost" | "inline" | undefined }
+
+[./card-row.kay] default
+component default
+  actions?: Element
+  children?: Element
+  class?: string | { root?: string; body?: string; actions?: string; } | undefined
+  left?: Element
+  right?: Element
+
+[./card.kay] default
+component default
+  bare?: boolean | undefined
+  children?: Element
+  class?: string | { root?: string; head?: string; title?: string; body?: string; } | undefined
+  head?: Element
+  level?: 2 | 1 | 3 | 4 | 5 | 6 | undefined
+  title?: string | undefined
+
+[./carousel.kay] default
+component default
+  autoplay?: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w` | undefined
+  class?: string | { root?: string; viewport?: string; slide?: string; image?: string; controls?: string; step?: string | { root?: string | { root?: string; } | undefined; } | undefined; dot?: string; pause?: string | { root?: string | { root?: string; } | undefined; } | undefined; } | undefined
+  dotLabel?: string | undefined
+  index?: number | undefined
+  label?: string | undefined
+  nextLabel?: string | undefined
+  onIndexChange?: ((index: number) => unknown) | undefined
+  pauseLabel?: string | undefined
+  playLabel?: string | undefined
+  previousLabel?: string | undefined
+  ratio?: string | undefined
+  slideLabel?: string | undefined
+  slides: readonly { src: string; alt: string; }[]
+
+[./checkbox.kay] default
+component default
+  checked?: boolean | undefined
+  class?: string | { root?: string; input?: string; label?: string; hint?: string; } | undefined
+  hint?: string | number | undefined
+  indeterminate?: boolean | undefined
+  label?: string | undefined
+  onChange?: ((checked: boolean) => unknown) | undefined
+
+[./chip-group.kay] default
+component default
+  class?: string | { root?: string; chip?: string; input?: string; label?: string; icon?: string | { root?: string; } | undefined; field?: string; heading?: string; } | undefined
+  disabled?: boolean | undefined
+  label: string
+  name?: string | undefined
+  onChange?: ((value: Value[]) => unknown) | undefined
+  options: readonly { value: Value; label: string; icon?: IconProps | IconSlot | undefined; disabled?: boolean | undefined; }[]
+  showLabel?: boolean | undefined
+  value: readonly Value[]
+
+[./collapsible-section.kay] default
+component default
+  boxed?: boolean | undefined
+  children?: Element
+  class?: string | { root?: string; summary?: string; title?: string; meta?: string; chevron?: string | { root?: string; } | undefined; body?: string; } | undefined
+  meta?: Element
+  open?: boolean | undefined
+  title: string
+
+[./color-input.kay] default
+component default
+  class?: string | { root?: string; input?: string; label?: string; value?: string; } | undefined
+  label: string
+  onChange?: ((value: string) => unknown) | undefined
+  value: string
+
+[./combobox.kay] default
+component default
+  class?: string | { root?: string; input?: string; list?: string; option?: string; status?: string; } | undefined
+  create?: boolean | undefined
+  createLabel?: ((text: string) => string) | undefined
+  disabled?: boolean | undefined
+  emptyLabel?: string | undefined
+  failureLabel?: string | undefined
+  id?: string | undefined
+  label?: string | undefined
+  loadingLabel?: string | undefined
+  minLength?: number | undefined
+  name?: string | undefined
+  onChange?: ((value: "" | Value, option: ComboboxOption<Value> | undefined) => unknown) | undefined
+  onCreate?: ((text: string) => unknown) | undefined
+  options: ComboboxOptions<Value>
+  value?: "" | Value | undefined
+  valueLabel?: string | undefined
+
+[./command-palette.kay] default
+component default
+  class?: string | { root?: string; search?: string; icon?: string | { root?: string; } | undefined; input?: string; list?: string; section?: string; heading?: string; option?: string; text?: string; label?: string; mark?: string; snippet?: string; more?: string; group?: string; empty?: string; count?: string ...#70915ae8
+  emptyLabel?: string | undefined
+  entries: PaletteEntry[]
+  groups?: string[] | undefined
+  hotkey?: string | null | undefined
+  label?: string | undefined
+  onOpenChange?: ((open: boolean) => unknown) | undefined
+  onRecentChange?: ((recent: string[]) => unknown) | undefined
+  open?: boolean | undefined
+  placeholder?: string | undefined
+  recent?: string[] | undefined
+  recentLabel?: string | undefined
+  resultsLabel?: ((count: number) => string) | undefined
+  siteSearch?: boolean | { limit?: number | undefined; } | undefined
+  siteSearchError?: string | undefined
+  siteSearchLabel?: string | undefined
+  siteSearchMore?: ((count: number) => string) | undefined
+
+[./confirm-delete.kay] default
+component default
+  ask?: "dialog" | "inline" | undefined
+  cancelLabel?: string | undefined
+  class?: string | { root?: string | { root?: string | { root?: string; } | undefined; } | { root?: any; spinner?: any; } | undefined; armed?: string; message?: string; } | undefined
+  confirmLabel?: string | undefined
+  disabled?: boolean | undefined
+  failure: string
+  label?: string | undefined
+  message: string
+  onConfirm: () => unknown
+  onOpenChange?: ((open: boolean) => unknown) | undefined
+  pendingLabel?: string | undefined
+  refused?: ((data: Data) => string | undefined) | undefined
+  size?: "xs" | "sm" | "md" | "lg" | undefined
+  success?: string | undefined
+  title?: string | undefined
+  tone?: "neutral" | "danger" | undefined
+  trigger?: "link" | "button" | "icon" | undefined
+  variant?: "solid" | "ghost" | "inline" | undefined
+
+[./contact-form.kay] default
+component default
+  action: Action<never, unknown, never>
+  children?: Element
+  class?: string | { root?: string; consent?: string; link?: string; issues?: string; issue?: string; privacy?: string; } | undefined
+  consent?: boolean | undefined
+  consentLabel?: string | undefined
+  emailLabel?: string | undefined
+  messageLabel?: string | undefined
+  nameLabel?: string | undefined
+  privacy?: string | undefined
+  privacyLabel?: string | undefined
+  rows?: number | undefined
+  sentLabel?: string | undefined
+  submitLabel?: string | undefined
+
+[./contribution-graph.kay] default
+component default
+  class?: string | { root?: string; month?: string; cell?: string; } | undefined
+  color: string
+  days: readonly ContributionDay[]
+  label?: string | undefined
+  months?: boolean | undefined
+  today: string
+
+[./copy-button.kay] default
+component default
+  class?: string | { root?: string; text?: string; live?: string; } | undefined
+  copiedFor?: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w` | undefined
+  copiedLabel?: string | undefined
+  failure?: string | undefined
+  html?: string | undefined
+  label: string
+  size?: "xs" | "sm" | "md" | "lg" | undefined
+  text: string
+  tone?: "success" | "neutral" | "danger" | "accent" | undefined
+  variant?: "solid" | "ghost" | "inline" | undefined
+
+[./date-input.kay] default
+component default
+  class?: string | { root?: string; input?: string | { root?: string; } | undefined; panel?: string | { root?: string; anchor?: string; } | undefined; trigger?: string; head?: string; step?: string; stepIcon?: string | { root?: string; } | undefined; title?: string; grid?: string; weekdayRow?: string; weekday ...#f0628f1d
+  firstDay?: 0 | 2 | 1 | 3 | 4 | 5 | 6 | undefined
+  max?: string | undefined
+  min?: string | undefined
+  nextLabel?: string | undefined
+  onChange?: ((value: string) => unknown) | undefined
+  openLabel?: string | undefined
+  previousLabel?: string | undefined
+  todayLabel?: string | undefined
+  value?: string | undefined
+
+[./date-range-input.kay] default
+component default
+  class?: string | { root?: string; separator?: string; } | undefined
+  disabled?: boolean | undefined
+  firstDay?: 0 | 2 | 1 | 3 | 4 | 5 | 6 | undefined
+  fromLabel?: string | undefined
+  fromName?: string | undefined
+  label: string
+  max?: string | undefined
+  min?: string | undefined
+  onChange?: ((value: DateRange) => unknown) | undefined
+  toLabel?: string | undefined
+  toName?: string | undefined
+  value?: DateRange | undefined
+
+[./date-time-input.kay] default
+component default
+  class?: string | { root?: string; input?: string | { root?: string; } | undefined; } | undefined
+  disabled?: boolean | undefined
+  form?: string | undefined
+  max?: string | Date | undefined
+  min?: string | Date | undefined
+  name?: string | undefined
+  onChange?: ((value: string) => unknown) | undefined
+  value?: string | undefined
+
+[./description-list.kay] default
+component default
+  class?: string | { root?: string; item?: string; term?: string; detail?: string; } | undefined
+  items: readonly Item[]
+  value?: ((item: Item) => Element) | undefined
+
+[./dialog.kay] default
+component default
+  bare?: boolean | undefined
+  children?: Element
+  class?: string | { root?: string; title?: string; body?: string; footer?: string; } | undefined
+  dirty?: boolean | undefined
+  footer?: Element
+  level?: 2 | 3 | 4 | 5 | 6 | undefined
+  onOpenChange: (open: boolean) => unknown
+  open: boolean
+  size?: "sm" | "md" | "lg" | "full" | undefined
+  title: string
+
+[./dnd] Bar
+interface Bar
+  height: number
+  left: number
+  top: number
+
+[./dnd] Board
+class Board
+  new (options: BoardOptions): Board
+  #arm: (id: Id, event: PointerEvent) => void
+  #containers: Map<Id, HTMLElement>
+  #drag: Drag | null
+  #end: (drop: boolean) => void
+  #follow: (drag: Drag) => void
+  #items: Map<Id, { el: HTMLElement; container: Id; }>
+  #layout: () => Placed[]
+  #measure: () => Measured
+  #move: (move: BoardMove, kept?: number | undefined) => Promise<void>
+  #moving: boolean
+  #onMove: (move: BoardMove) => unknown
+  #start: (id: Id, origin: Point) => void
+  #step: (id: Id, event: KeyboardEvent) => void
+  #tick: () => void
+  container: (id: Id) => (el: HTMLElement) => void
+  dragging: Signal<Id | null>
+  drop: Signal<BoardDrop | null>
+  item: (id: Id, container: Id) => (el: HTMLElement) => void
+
+[./dnd] BoardDrop
+interface BoardDrop
+  bar: Bar
+  container: Id
+  index: number
+
+[./dnd] BoardMove
+interface BoardMove
+  from: Id
+  index: number
+  item: Id
+  to: Id
+
+[./dnd] BoardOptions
+interface BoardOptions
+  onMove: (move: BoardMove) => unknown
+
+[./dnd] DropTargets
+class DropTargets
+  new <Item extends Id = Id, Target extends Id = Id>(options: DropTargetsOptions<Item, Target>): DropTargets<Item, Target>
+  #arm: (id: Item, event: PointerEvent) => void
+  #drag: Drag<Item> | null
+  #drop: (item: Item, target: Target) => Promise<void>
+  #dropping: boolean
+  #end: (drop: boolean) => void
+  #follow: (drag: Drag<Item>) => void
+  #items: Map<Item, HTMLElement>
+  #options: DropTargetsOptions<Item, Target>
+  #start: (id: Item, origin: Point) => void
+  #targetAt: (drag: Drag<Item>) => Target | null
+  #targets: WeakMap<Element, Target>
+  #tick: () => void
+  dragging: Signal<Item | null>
+  item: (id: Item) => (el: HTMLElement) => void
+  over: Signal<Target | null>
+  target: (id: Target) => (el: HTMLElement) => void
+
+[./dnd] DropTargetsOptions
+interface DropTargetsOptions<Item extends Id, Target extends Id>
+  accepts?: (item: Item, target: Target) => boolean
+  onDrop: (item: Item, target: Target) => unknown
+  onLinger?: (target: Target) => unknown
+
+[./dnd] Sortable
+class Sortable
+  new (options: SortableOptions): Sortable
+  #arm: (id: Id, event: PointerEvent) => void
+  #drag: Drag | null
+  #end: (drop: boolean) => void
+  #handles: Map<Id, HTMLElement>
+  #items: Map<Id, HTMLElement>
+  #layout: (drag: Drag) => void
+  #move: (id: Id, from: number, to: number, kept?: number | undefined) => Promise<void>
+  #moving: boolean
+  #onReorder: (from: number, to: number) => unknown
+  #ordered: () => HTMLElement[]
+  #start: (id: Id, originY: number) => void
+  #step: (id: Id, event: KeyboardEvent) => void
+  #tick: () => void
+  handle: (id: Id) => (el: HTMLElement) => void
+  item: (id: Id) => (el: HTMLElement) => void
+
+[./dnd] SortableOptions
+interface SortableOptions
+  onReorder: (from: number, to: number) => unknown
+
+[./empty-state.kay] default
+component default
+  actions?: Element
+  class?: string | { root?: string; title?: string; description?: string; actions?: string; } | undefined
+  description?: string | undefined
+  level?: 2 | 1 | 3 | 4 | 5 | 6 | undefined
+  title: string
+
+[./extension] ui
+function ui(): KayExtension<AnyElysia>
+
+[./field-look] CHECKBOX
+const CHECKBOX: { root: string; input: string; label: string; hint: string; }
+
+[./field-look] FIELD_MESSAGE
+const FIELD_MESSAGE: { hint: string; issues: string; issue: string; }
+
+[./field-look] LABEL_TEXT
+const LABEL_TEXT: "text-xs [font-weight:var(--font-weight-normal)] tracking-label text-muted [font-family:var(--font-label,inherit)] [text-transform:var(--label-case)]"
+
+[./file-drop.kay] default
+component default
+  accept?: string | undefined
+  class?: string | { root?: string; input?: string; } | undefined
+  content: (zone: { open: () => void; dragging: () => boolean; }) => Element
+  disabled?: boolean | undefined
+  multiple?: boolean | undefined
+  onFiles: (files: File[]) => unknown
+  onReject?: ((files: File[]) => unknown) | undefined
+  paste?: boolean | undefined
+  size?: "sm" | "md" | undefined
+
+[./form-dialog.kay] default
+component default
+  action: Action<never, Output, never>
+  cancelLabel?: string | undefined
+  children?: Element
+  class?: string | { root?: string | { root?: string; title?: string; body?: string; footer?: string; } | undefined; footer?: string; actions?: string; form?: string; } | undefined
+  extra?: Element
+  failure: string
+  id?: string | undefined
+  onOpenChange: (open: boolean) => unknown
+  onSaved?: ((result: Answer<Exclude<Output, Failure<unknown>>>) => unknown) | undefined
+  open: boolean
+  refused?: ((data: FailureData<Output>) => string | Record<string, string> | undefined) | undefined
+  savingLabel?: string | undefined
+  submitLabel: string
+  title: string
+
+[./form-field.kay] default
+component default
+  action?: Element
+  children?: Element
+  class?: string | { root?: string; head?: string; text?: string; required?: string; action?: string; hint?: string; issues?: string; issue?: string; label?: string; } | undefined
+  group?: boolean | undefined
+  hint?: string | undefined
+  issue?: string | undefined
+  label: string
+  name?: string | undefined
+  required?: boolean | undefined
+  size?: "sm" | "md" | undefined
+
+[./hover-card.kay] default
+component default
+  anchor?: Element | null | undefined
+  children?: Element
+  class?: string | { root?: string; stand?: string; } | undefined
+  id?: string | undefined
+  placement?: HoverCardPlacement | undefined
+  style?: string | undefined
+
+[./icon-button.kay] default
+component default
+  class?: string | { root?: string | { root?: string; } | undefined; } | undefined
+  href?: string | undefined
+  icon: string | number | bigint | boolean | IconProps | Node | Range | Html | readonly Element[] | (() => Element) | null | undefined
+  label: string
+  size?: "xs" | "sm" | "md" | "lg" | undefined
+  tone?: "neutral" | "danger" | "accent" | undefined
+  type?: "reset" | "submit" | "button" | undefined
+  variant?: "solid" | "ghost" | "inline" | undefined
+
+[./icon-picker.kay] default
+component default
+  class?: string | { root?: string; search?: string; grid?: string; item?: string; option?: string; empty?: string; bar?: string; selection?: string; clear?: string | { root?: string | { root?: string; } | undefined; } | undefined; error?: string; more?: string; } | undefined
+  clearLabel?: string | undefined
+  emptyLabel?: string | undefined
+  errorLabel?: string | undefined
+  gridLabel?: string | undefined
+  moreLabel?: string | undefined
+  name?: string | undefined
+  onChange?: ((name: string) => unknown) | undefined
+  placeholder?: string | undefined
+  search: (query: string, limit: number, offset: number) => Promise<IconChoice[]>
+  searchLabel?: string | undefined
+  searchingLabel?: string | undefined
+  value?: string | undefined
+
+[./icon.kay] default
+component default
+  class?: string | { root?: string; } | undefined
+  icon: IconProps | IconSlot
+  label?: string | undefined
+
+[./image-cropper.kay] default
+component default
+  alt?: string | undefined
+  class?: string | { root?: string; stage?: string; image?: string; crop?: string; gridCols?: string; gridRows?: string; handle?: string; } | undefined
+  cropLabel?: string | undefined
+  cropText?: string | undefined
+  footer?: ((reset: () => void) => Element) | undefined
+  grid?: boolean | undefined
+  minSize?: number | undefined
+  onCrop?: ((crop: CropRect) => unknown) | undefined
+  onLoad?: (EventHandler<HTMLDivElement, Event> & ((size: ImageSize) => unknown)) | undefined
+  ratio?: number | undefined
+  src: string
+
+[./lib/accept] acceptsFile
+function acceptsFile(accept: string | undefined, file: Pick<File, "name" | "type">): boolean
+
+[./lib/add] default
+const default: { description: string; extension: { import: string; expression: string; }; notes: string[]; }
+
+[./lib/added-icons] addedIcons
+const addedIcons: Record<AddedSlot, IconProps>
+
+[./lib/announce] announce
+function announce(message: string, from?: Element | null): void
+
+[./lib/app-switcher] SwitcherApp
+interface SwitcherApp
+  description?: string | undefined
+  href: string
+  icon?: IconProps | IconSlot | undefined
+  id: string
+  label: string
+  newTab?: boolean | undefined
+  rel?: string | undefined
+
+[./lib/audio] AudioChapter
+interface AudioChapter
+  start: number
+  title: string
+  url?: string | undefined
+
+[./lib/audio] AudioCue
+interface AudioCue
+  end: number
+  start: number
+  text: string
+
+[./lib/audio] chapterAt
+function chapterAt(chapters: readonly AudioChapter[], seconds: number): number
+
+[./lib/audio] clock
+function clock(seconds: number): string
+
+[./lib/audio] cueAt
+function cueAt(cues: readonly AudioCue[], seconds: number): number
+
+[./lib/audio] cuesByChapter
+function cuesByChapter(chapters: readonly AudioChapter[], cues: readonly AudioCue[]): { chapter: number; first: number; cues: AudioCue[]; }[]
+
+[./lib/audio] lockScreen
+const lockScreen: { owner: object | undefined; }
+
+[./lib/audio] previousStart
+function previousStart(chapters: readonly AudioChapter[], seconds: number): number
+
+[./lib/audio] RESTART_CHAPTER_SECONDS
+const RESTART_CHAPTER_SECONDS: 3
+
+[./lib/button-props] AsButton
+type AsButton = Omit<JSX.IntrinsicElements['button'], 'type' | 'class'> & Look & { href?: undefined type?: 'button' | 'submit' | 'reset' | undefined // Whether the disclosure the button opens is showing, for a popover or a panel it toggles. expanded?: boolean | undefined // For a toggle button: whet ...#8c9613d0
+
+[./lib/button-props] AsLink
+type AsLink = Omit<JSX.IntrinsicElements['a'], 'class'> & Look & { href: string }
+
+[./lib/button-props] buttonOf
+function buttonOf(attributes: TagAttributes): { disabled: undefined; 'aria-expanded': string | undefined; 'aria-pressed': string | undefined; command?: "close" | "show-modal" | "request-close" | "show-popover" | "hide-popover" | "toggle-popover" | `--${string}` | undefined; form?: Value; slot?: Value; style?: StyleV ...#37fe6c32
+
+[./lib/button-props] ButtonProps
+type ButtonProps = AsButton | AsLink
+
+[./lib/button-props] linkOf
+function linkOf(attributes: TagAttributes): Omit<AsLink, keyof Look> | undefined
+
+[./lib/button-props] lockedWithTooltip
+function lockedWithTooltip(attributes: TagAttributes): boolean
+
+[./lib/button-props] Look
+interface Look
+  busy?: boolean | undefined
+  icon?: IconProps | IconSlot | undefined
+  label?: string | undefined
+  size?: "xs" | "sm" | "md" | "lg" | undefined
+  spinner?: boolean | undefined
+  tone?: "success" | "neutral" | "danger" | "accent" | undefined
+  variant?: "solid" | "ghost" | "inline" | undefined
+
+[./lib/button-props] TagAttributes
+type TagAttributes = Omit<AsButton, keyof Look> | Omit<AsLink, keyof Look>
+
+[./lib/change] changeAccepted
+function changeAccepted(control: string, run: () => unknown, busy: (pending: boolean) => void): Promise<boolean>
+
+[./lib/change] isPromiseLike
+function isPromiseLike(value: unknown): value is PromiseLike<unknown>
+
+[./lib/chart-axis] chartData
+function chartData(labels: string[], series: (number | null)[][], times: number[] | null): LineChartData
+
+[./lib/chart-axis] headings
+function headings(labels: string[], times: number[] | null, format?: LabelFormat | undefined): string[]
+
+[./lib/chart-axis] indexAt
+function indexAt(position: number, count: number, times: number[] | null): number
+
+[./lib/chart-axis] LabelContext
+interface LabelContext
+  index: number
+  place: "tick" | "tooltip"
+  seconds: boolean
+  span: number
+
+[./lib/chart-axis] LabelFormat
+type LabelFormat = (label: string, context: LabelContext) => string
+
+[./lib/chart-axis] labelTimes
+function labelTimes(labels: string[]): number[] | null
+
+[./lib/chart-axis] positionOf
+function positionOf(index: number, count: number, times: number[] | null): number
+
+[./lib/chart-axis] secondsApart
+function secondsApart(labels: string[]): boolean
+
+[./lib/chart-axis] spanOf
+function spanOf(times: number[] | null): number
+
+[./lib/chart-axis] stackValues
+function stackValues(series: (number | null)[][]): number[][]
+
+[./lib/chart-axis] tickIndices
+function tickIndices(total: number): number[]
+
+[./lib/chart-axis] tickTexts
+function tickTexts(labels: string[], times: number[] | null, format?: LabelFormat | undefined): string[]
+
+[./lib/chart-axis] totalAt
+function totalAt(series: { values: (number | null)[]; }[], index: number): number
+
+[./lib/chart-axis] xAxisOptions
+function xAxisOptions(labels: string[], times: number[] | null, showLabels: boolean, fixedScale: typeof FixedScaleAxis, format?: LabelFormat | undefined): AxisOptions
+
+[./lib/claim] claim
+function claim(job: "toaster" | "tooltips"): () => boolean
+
+[./lib/claim] Job
+type Job = keyof typeof claimants
+
+[./lib/combobox] ComboboxOption
+interface ComboboxOption<Value extends string = string>
+  disabled?: boolean | undefined
+  label: string
+  value: Value
+
+[./lib/combobox] ComboboxOptions
+type ComboboxOptions<Value extends string = string> = readonly ComboboxOption<Value>[] | ((input: ComboboxQuery) => PromiseLike<readonly ComboboxOption<Value>[]>)
+
+[./lib/combobox] ComboboxQuery
+interface ComboboxQuery
+  q: string
+
+[./lib/combobox] enabledIndex
+function enabledIndex(disabled: readonly boolean[], from: number, step: 1 | -1): number
+
+[./lib/combobox] exactOption
+function exactOption<Value extends string>(options: readonly ComboboxOption<Value>[], text: string): ComboboxOption<Value> | undefined
+
+[./lib/combobox] matchingOptions
+function matchingOptions<Value extends string>(options: readonly ComboboxOption<Value>[], text: string): readonly ComboboxOption<Value>[]
+
+[./lib/combobox] offersCreate
+function offersCreate(options: readonly ComboboxOption<string>[], text: string): boolean
+
+[./lib/context] default
+const default: ContextDefinition<{ inbox: boolean; }>
+
+[./lib/contribution] ContributionDay
+interface ContributionDay
+  day: string
+  description?: string | undefined
+  intensity: number
+
+[./lib/contribution] monthStarts
+function monthStarts(days: readonly string[]): { column: number; label: string; }[]
+
+[./lib/contribution] steppedCell
+function steppedCell(key: string, index: number, count: number): number | undefined
+
+[./lib/controlled-checkbox] controlledCheckbox
+function controlledCheckbox({ control, checked, onChange, start, settled, appRef }: Options): { on: () => boolean; busy: () => boolean; ref: (element: HTMLInputElement) => void; change: (input: HTMLInputElement) => Promise<void>; }
+
+[./lib/controlled-input] controlledInput
+function controlledInput<Value extends boolean | number | string, Box extends HTMLInputElement = HTMLInputElement>({ control, value, onChange, read, write, defaultOf, setDefault, start, settled: afterChange, restored, appRef }: Options<Value, Box>): { shown: () => Value; busy: () => boolean; ref: (element: Box) => void; mo ...#661b8c4d
+
+[./lib/controlled-radios] controlledRadios
+function controlledRadios({ control, input, options, value, name, onChange, appRef }: Options): { group: string; picked: () => Held; busy: () => boolean; ref: (element: HTMLElement) => void; pick: (next: Held) => Promise<void>; }
+
+[./lib/controlled-value] controlledValue
+function controlledValue<Box extends Element & { value: string; }>({ box, value, report, reads, writable, write }: Options<Box>): { heard: (text: string) => void; sync: (left?: boolean | undefined) => void; }
+
+[./lib/cycle] stepIndex
+function stepIndex(index: number, delta: number, count: number): number
+
+[./lib/date] addDays
+function addDays(iso: string, days: number): string
+
+[./lib/date] addMonths
+function addMonths(iso: string, months: number): string
+
+[./lib/date] clampDate
+function clampDate(iso: string, min?: string | undefined, max?: string | undefined): string
+
+[./lib/date] DateRange
+type DateRange = [string | null, string | null]
+
+[./lib/date] dateRangeFrom
+function dateRangeFrom(from: string, to: string): DateRange
+
+[./lib/date] dayName
+function dayName(iso: string, locale: string): string
+
+[./lib/date] firstDayOf
+function firstDayOf(locale: string): number
+
+[./lib/date] isDate
+function isDate(text: string | null | undefined): text is string
+
+[./lib/date] localDateTime
+function localDateTime(instant: string | Date | null | undefined): string
+
+[./lib/date] monthTitle
+function monthTitle(iso: string, locale: string): string
+
+[./lib/date] monthWeeks
+function monthWeeks(iso: string, firstDay: number): string[][]
+
+[./lib/date] sameInstant
+function sameInstant(a: string, b: string): boolean
+
+[./lib/date] sameMonth
+function sameMonth(a: string, b: string): boolean
+
+[./lib/date] today
+function today(): string
+
+[./lib/date] weekdays
+function weekdays(locale: string, firstDay: number): { short: string; long: string; }[]
+
+[./lib/date] weekEdge
+function weekEdge(iso: string, firstDay: number, end: boolean): string
+
+[./lib/date] withinBounds
+function withinBounds(iso: string, min?: string | undefined, max?: string | undefined): boolean
+
+[./lib/date] zonedInstant
+function zonedInstant(text: string): string
+
+[./lib/defaults] AddedSlot
+type AddedSlot = 'apps' | 'bell' | 'calendar' | 'pause' | 'chat' | 'send' | 'stop' | 'expand' | 'collapse' | 'edit' | 'external' | 'microphone' | 'refresh' | 'trendDown' | 'trendFlat' | 'trendUp'
+
+[./lib/defaults] default
+const default: UiSettings
+
+[./lib/defaults] IconSlot
+type IconSlot = 'alert' | 'apps' | 'back' | 'bell' | 'calendar' | 'chat' | 'chevron' | 'close' | 'collapse' | 'delete' | 'edit' | 'expand' | 'external' | 'globe' | 'info' | 'menu' | 'microphone' | 'pause' | 'play' | 'plus' | 'refresh' | 'search' | 'send' | 'spinner' | 'star' | 'stop' | 'success' | ' ...#a61d87e6
+
+[./lib/defaults] NavLink
+interface NavLink
+  href: string
+  icon?: IconProps | IconSlot | undefined
+  label: string
+
+[./lib/defaults] UiSettings
+interface UiSettings
+  icons: Record<"alert" | "back" | "chevron" | "close" | "delete" | "globe" | "info" | "menu" | "play" | "plus" | "search" | "spinner" | "star" | "success" | "zoomFit" | "zoomIn" | "zoomOut", IconProps> & Partial<Record<AddedSlot, IconProps>>
+
+[./lib/description-list] DescriptionItem
+interface DescriptionItem
+  key?: string | undefined
+  label: string
+  value?: string | number | undefined
+
+[./lib/diff-command] default
+const default: KayCommand
+
+[./lib/dnd] Bar
+interface Bar
+  height: number
+  left: number
+  top: number
+
+[./lib/dnd] Board
+class Board
+  new (options: BoardOptions): Board
+  #arm: (id: Id, event: PointerEvent) => void
+  #containers: Map<Id, HTMLElement>
+  #drag: Drag | null
+  #end: (drop: boolean) => void
+  #follow: (drag: Drag) => void
+  #items: Map<Id, { el: HTMLElement; container: Id; }>
+  #layout: () => Placed[]
+  #measure: () => Measured
+  #move: (move: BoardMove, kept?: number | undefined) => Promise<void>
+  #moving: boolean
+  #onMove: (move: BoardMove) => unknown
+  #start: (id: Id, origin: Point) => void
+  #step: (id: Id, event: KeyboardEvent) => void
+  #tick: () => void
+  container: (id: Id) => (el: HTMLElement) => void
+  dragging: Signal<Id | null>
+  drop: Signal<BoardDrop | null>
+  item: (id: Id, container: Id) => (el: HTMLElement) => void
+
+[./lib/dnd] BoardDrop
+interface BoardDrop
+  bar: Bar
+  container: Id
+  index: number
+
+[./lib/dnd] BoardMove
+interface BoardMove
+  from: Id
+  index: number
+  item: Id
+  to: Id
+
+[./lib/dnd] BoardOptions
+interface BoardOptions
+  onMove: (move: BoardMove) => unknown
+
+[./lib/dnd] DropTargets
+class DropTargets
+  new <Item extends Id = Id, Target extends Id = Id>(options: DropTargetsOptions<Item, Target>): DropTargets<Item, Target>
+  #arm: (id: Item, event: PointerEvent) => void
+  #drag: Drag<Item> | null
+  #drop: (item: Item, target: Target) => Promise<void>
+  #dropping: boolean
+  #end: (drop: boolean) => void
+  #follow: (drag: Drag<Item>) => void
+  #items: Map<Item, HTMLElement>
+  #options: DropTargetsOptions<Item, Target>
+  #start: (id: Item, origin: Point) => void
+  #targetAt: (drag: Drag<Item>) => Target | null
+  #targets: WeakMap<Element, Target>
+  #tick: () => void
+  dragging: Signal<Item | null>
+  item: (id: Item) => (el: HTMLElement) => void
+  over: Signal<Target | null>
+  target: (id: Target) => (el: HTMLElement) => void
+
+[./lib/dnd] DropTargetsOptions
+interface DropTargetsOptions<Item extends Id, Target extends Id>
+  accepts?: (item: Item, target: Target) => boolean
+  onDrop: (item: Item, target: Target) => unknown
+  onLinger?: (target: Target) => unknown
+
+[./lib/dnd] Sortable
+class Sortable
+  new (options: SortableOptions): Sortable
+  #arm: (id: Id, event: PointerEvent) => void
+  #drag: Drag | null
+  #end: (drop: boolean) => void
+  #handles: Map<Id, HTMLElement>
+  #items: Map<Id, HTMLElement>
+  #layout: (drag: Drag) => void
+  #move: (id: Id, from: number, to: number, kept?: number | undefined) => Promise<void>
+  #moving: boolean
+  #onReorder: (from: number, to: number) => unknown
+  #ordered: () => HTMLElement[]
+  #start: (id: Id, originY: number) => void
+  #step: (id: Id, event: KeyboardEvent) => void
+  #tick: () => void
+  handle: (id: Id) => (el: HTMLElement) => void
+  item: (id: Id) => (el: HTMLElement) => void
+
+[./lib/dnd] SortableOptions
+interface SortableOptions
+  onReorder: (from: number, to: number) => unknown
+
+[./lib/editing] editing
+function editing<Row, Draft = void>(): Editing<Row, Draft>
+
+[./lib/editing] Editing
+interface Editing<Row, Draft = void>
+  close: () => void
+  create: (draft: Draft) => void
+  draft: () => Draft | undefined
+  edit: (row: Row) => void
+  open: () => boolean
+  row: () => Row | undefined
+
+[./lib/eject] Changes
+interface Changes
+  notes: string[]
+  rewritten: string[]
+  writes: Map<string, string>
+
+[./lib/eject] changesFor
+function changesFor(root: string, ejection: Ejection): Promise<Changes | { exists: string[]; }>
+
+[./lib/eject] componentFile
+function componentFile(name: string): string | undefined
+
+[./lib/eject] Ejected
+interface Ejected
+  files: string[]
+  helpers?: Record<string, string>
+  version: string
+
+[./lib/eject] EJECTED_DIR
+const EJECTED_DIR: "components/ui"
+
+[./lib/eject] Ejection
+interface Ejection
+  file: string
+  files: string[]
+  users: string[]
+
+[./lib/eject] guarded
+function guarded(name: string, run: () => Promise<number>): Promise<number>
+
+[./lib/eject] hashOf
+function hashOf(text: string): string
+
+[./lib/eject] libraryFile
+function libraryFile(path: string): string
+
+[./lib/eject] libraryVersion
+function libraryVersion(): Promise<string>
+
+[./lib/eject] Manifest
+type Manifest = Record<string, Ejected | undefined>
+
+[./lib/eject] MANIFEST
+const MANIFEST: "ejected.json"
+
+[./lib/eject] plan
+function plan(file: string): Promise<Ejection>
+
+[./lib/eject] readManifest
+function readManifest(root: string): Promise<Manifest>
+
+[./lib/eject] unifiedDiff
+function unifiedDiff(before: string, after: string, label: string): string
+
+[./lib/eject] UPSTREAM_DIR
+const UPSTREAM_DIR: ".upstream"
+
+[./lib/eject] upstreamBase
+function upstreamBase(root: string, path: string): Promise<string>
+
+[./lib/eject] UpstreamError
+class UpstreamError
+  new (message?: string | undefined): UpstreamError
+  new (message?: string | undefined, options?: ErrorOptions | undefined): UpstreamError
+  new (message?: string | undefined, options?: ErrorOptions | undefined): UpstreamError
+
+[./lib/eject] upstreamPath
+function upstreamPath(root: string, path: string): string
+
+[./lib/eject] writeAll
+function writeAll(writes: Map<string, string>): Promise<void>
+
+[./lib/eject-command] default
+const default: KayCommand
+
+[./lib/extension] ui
+function ui(): KayExtension<AnyElysia>
+
+[./lib/field-look] CHECKBOX
+const CHECKBOX: { root: string; input: string; label: string; hint: string; }
+
+[./lib/field-look] FIELD_MESSAGE
+const FIELD_MESSAGE: { hint: string; issues: string; issue: string; }
+
+[./lib/field-look] LABEL_TEXT
+const LABEL_TEXT: "text-xs [font-weight:var(--font-weight-normal)] tracking-label text-muted [font-family:var(--font-label,inherit)] [text-transform:var(--label-case)]"
+
+[./lib/form-reset] defaultKept
+function defaultKept<Value>(element: () => Element | undefined, current: () => Value, start: Value): () => Value
+
+[./lib/form-reset] holdDefaults
+function holdDefaults(form: HTMLFormElement): () => void
+
+[./lib/form-reset] onFormDefaults
+function onFormDefaults(element: () => Element | undefined, hold: () => () => void): void
+
+[./lib/form-reset] onFormReset
+function onFormReset(element: () => Element | undefined, after: () => void, last?: boolean): void
+
+[./lib/form-reset] resetWhenIdle
+function resetWhenIdle(busy: () => boolean, restore: () => void): { reset: () => void; idle: () => void; waiting: () => boolean; }
+
+[./lib/form-reset] startRef
+function startRef<Target extends Element>(first: (element: Target) => void, app?: unknown): (element: Target) => void
+
+[./lib/forms] callAction
+function callAction<Output>(form: HTMLFormElement, action: Action<never, Output, never>, issues: Signal<Record<string, string>>, failure: string, refused?: ((data: FailureData<Output>) => string | Record<string, string> | undefined) | undefined): Promise<{ result: Answer<Success<Output>>; } | undefined>
+
+[./lib/forms] fieldLinks
+function fieldLinks(group: boolean, hint: boolean, messages: () => readonly unknown[], required?: boolean): FieldLinks
+
+[./lib/forms] FieldLinks
+interface FieldLinks
+  described: () => string[]
+  frame: string
+  hint: string
+  issues: string
+
+[./lib/forms] formIssues
+const formIssues: Context<(() => Record<string, string>) | undefined>
+
+[./lib/hover-card] HoverCardPlacement
+type HoverCardPlacement = PopoverPlacement | 'top' | 'bottom' | 'left' | 'right'
+
+[./lib/icon-picker] IconChoice
+interface IconChoice
+  icon: IconProps
+  name: string
+
+[./lib/icon-picker] nameOf
+function nameOf(icon: string): string
+
+[./lib/index] ActionSource
+type ActionSource<Row, Target extends Action<never, unknown>> = { action: Target // The fields of the call besides the paging: with an object, `offset` and `limit` (the page size) are added, so an action declaring both reads them from `pageFields`. A function gets where the page starts and answers t ...#4c6d0e5f
+
+[./lib/index] attempt
+function attempt<T, Data = unknown>(run: () => Promise<T>, failure: string | AttemptOptions<Data>, refused?: ((data: Data) => string | undefined) | undefined): Promise<Attempted<T> | undefined>
+
+[./lib/index] Attempted
+type Attempted<T> = T extends void ? true : T
+
+[./lib/index] AttemptOptions
+interface AttemptOptions<Data = unknown>
+  failure: string
+  onRefused?: ((data: Data) => unknown) | undefined
+  refused?: ((data: Data) => string | undefined) | undefined
+  success?: string | undefined
+
+[./lib/index] AudioChapter
+interface AudioChapter
+  start: number
+  title: string
+  url?: string | undefined
+
+[./lib/index] AudioCue
+interface AudioCue
+  end: number
+  start: number
+  text: string
+
+[./lib/index] AxisScale
+type AxisScale = 'linear' | 'log'
+
+[./lib/index] AxisTick
+interface AxisTick
+  label: string
+  value: number
+
+[./lib/index] BarListRow
+interface BarListRow
+  display?: string
+  href?: string
+  key: string | number
+  label: string
+  value: number
+
+[./lib/index] BarSeries
+interface BarSeries extends ChartSeries
+  color?: string
+  colors?: (string | null | undefined)[]
+  name: string
+  notes?: (string | null | undefined)[]
+  values: (number | null)[]
+
+[./lib/index] ChartSeries
+interface ChartSeries
+  color?: string
+  name: string
+  values: (number | null)[]
+
+[./lib/index] Column
+interface Column<Row>
+  align?: "start" | "center" | "end"
+  cell?: boolean
+  defaultDirection?: SortDirection
+  header: string
+  key: string
+  numeric?: true
+  sortValue?: true | ((row: Row) => string | number)
+
+[./lib/index] ComboboxOption
+interface ComboboxOption<Value extends string = string>
+  disabled?: boolean | undefined
+  label: string
+  value: Value
+
+[./lib/index] ComboboxOptions
+type ComboboxOptions<Value extends string = string> = readonly ComboboxOption<Value>[] | ((input: ComboboxQuery) => PromiseLike<readonly ComboboxOption<Value>[]>)
+
+[./lib/index] ComboboxQuery
+interface ComboboxQuery
+  q: string
+
+[./lib/index] ContributionDay
+interface ContributionDay
+  day: string
+  description?: string | undefined
+  intensity: number
+
+[./lib/index] currentStep
+function currentStep<Key extends string>(url: string | URL, keys: readonly Key[], done?: readonly string[], param?: string): Key
+
+[./lib/index] DateRange
+type DateRange = [string | null, string | null]
+
+[./lib/index] dateRangeFrom
+function dateRangeFrom(from: string, to: string): DateRange
+
+[./lib/index] DescriptionItem
+interface DescriptionItem
+  key?: string | undefined
+  label: string
+  value?: string | number | undefined
+
+[./lib/index] dismissToast
+function dismissToast(id: number): void
+
+[./lib/index] editing
+function editing<Row, Draft = void>(): Editing<Row, Draft>
+
+[./lib/index] Editing
+interface Editing<Row, Draft = void>
+  close: () => void
+  create: (draft: Draft) => void
+  draft: () => Draft | undefined
+  edit: (row: Row) => void
+  open: () => boolean
+  row: () => Row | undefined
+
+[./lib/index] FilterField
+interface FilterField
+  key: string
+  label: string
+  options?: readonly { value: string; label: string; }[] | undefined
+
+[./lib/index] formIssues
+const formIssues: Context<(() => Record<string, string>) | undefined>
+
+[./lib/index] holdToasts
+function holdToasts(hold: ToastHold, on: boolean): void
+
+[./lib/index] HoverCardPlacement
+type HoverCardPlacement = PopoverPlacement | 'top' | 'bottom' | 'left' | 'right'
+
+[./lib/index] IconChoice
+interface IconChoice
+  icon: IconProps
+  name: string
+
+[./lib/index] IconSlot
+type IconSlot = 'alert' | 'apps' | 'back' | 'bell' | 'calendar' | 'chat' | 'chevron' | 'close' | 'collapse' | 'delete' | 'edit' | 'expand' | 'external' | 'globe' | 'info' | 'menu' | 'microphone' | 'pause' | 'play' | 'plus' | 'refresh' | 'search' | 'send' | 'spinner' | 'star' | 'stop' | 'success' | ' ...#a61d87e6
+
+[./lib/index] infiniteList
+function infiniteList<Row, Target extends Action<never, unknown> = never>(first: Row[], options: InfiniteListOptions<Row, Target>): InfiniteList<Row>
+
+[./lib/index] InfiniteList
+interface InfiniteList<Row>
+  ended: () => boolean
+  failed: () => boolean
+  filter: () => ListFilter
+  filterBy: (filter: Partial<ListFilter>) => Promise<void>
+  more: () => Promise<void>
+  patch: (id: unknown, change: RowChange<Row> | undefined) => boolean
+  pending: () => boolean
+  restart: (change: { sort?: SortState | undefined; filter?: Partial<ListFilter>; }) => Promise<void>
+  retry: () => Promise<void>
+  rows: () => Row[]
+  sort: () => SortState | undefined
+  sortBy: (sort: SortState | undefined) => Promise<void>
+
+[./lib/index] InfiniteListOptions
+type InfiniteListOptions<Row, Target extends Action<never, unknown> = never> = InfiniteListBase<Row> & (LoadSource<Row> | ActionSource<Row, Target>)
+
+[./lib/index] InfinitePage
+type InfinitePage<Row> = Row[] | undefined
+
+[./lib/index] ListFilter
+interface ListFilter
+  fields: Record<string, string>
+  text: string
+
+[./lib/index] LoadSource
+interface LoadSource<Row>
+  action?: undefined
+  load: (at: PageAt<Row>) => InfinitePage<Row> | Promise<InfinitePage<Row>>
+
+[./lib/index] MapMarker
+interface MapMarker
+  at: MapPoint
+  label?: string | undefined
+  popup?: string | undefined
+
+[./lib/index] MapPoint
+type MapPoint = readonly number[]
+
+[./lib/index] MediaItem
+interface MediaItem
+  captions?: string
+  full?: string
+  key: string | number
+  kind: "image" | "video"
+  preview: string
+  src?: string
+  thumb: string
+  title?: string
+
+[./lib/index] MenuAction
+interface MenuAction
+  danger?: boolean
+  disabled?: boolean
+  icon?: IconProps | IconSlot
+  label: string
+  onSelect: () => unknown
+  tone?: "neutral" | "danger" | undefined
+
+[./lib/index] MenuEntry
+type MenuEntry = MenuAction | 'separator'
+
+[./lib/index] messageOf
+function messageOf(error: unknown, fallback: string): string
+
+[./lib/index] MultiSelectOption
+interface MultiSelectOption<Value extends string = string>
+  disabled?: boolean | undefined
+  icon?: IconProps | IconSlot | undefined
+  label: string
+  value: Value
+
+[./lib/index] NavLink
+interface NavLink
+  href: string
+  icon?: IconProps | IconSlot | undefined
+  label: string
+
+[./lib/index] PageAt
+interface PageAt<Row>
+  filter: ListFilter
+  last: Row | undefined
+  offset: number
+  sort: SortState | undefined
+
+[./lib/index] pageFields
+function pageFields(max?: number): { offset: TOptional<TInteger>; limit: TOptional<TInteger>; }
+
+[./lib/index] PageInput
+interface PageInput
+  limit?: number | undefined
+  offset?: number | undefined
+
+[./lib/index] pageOf
+function pageOf<Row>(rows: Row[], { offset, limit }?: PageInput): { rows: Row[]; total: number; }
+
+[./lib/index] PaletteAction
+interface PaletteAction extends PaletteBase
+  group: string
+  icon?: IconProps | IconSlot | undefined
+  keywords?: string | undefined
+  label: string
+  onSelect: () => unknown
+
+[./lib/index] PaletteEntry
+type PaletteEntry = PaletteLink | PaletteAction
+
+[./lib/index] PaletteLink
+interface PaletteLink extends PaletteBase
+  external?: boolean | undefined
+  group: string
+  href: string
+  icon?: IconProps | IconSlot | undefined
+  keywords?: string | undefined
+  label: string
+
+[./lib/index] Plate
+interface Plate
+  scale: number
+  x: number
+  y: number
+
+[./lib/index] PopoverPlacement
+type PopoverPlacement = 'bottom-start' | 'bottom-end' | 'top-start' | 'top-end'
+
+[./lib/index] PopoverTriggerProps
+interface PopoverTriggerProps
+  aria-expanded: "true" | "false"
+  popovertarget: string
+  style: string
+
+[./lib/index] rangeFrom
+function rangeFrom(low: string, high: string): RangeValue
+
+[./lib/index] RangeValue
+type RangeValue = [number | null, number | null]
+
+[./lib/index] RowChange
+type RowChange<Row> = Partial<Row> | ((row: Row) => Row)
+
+[./lib/index] RowFilter
+type RowFilter<Row> = readonly (keyof Row & string)[] | ((row: Row) => (string | number | null | undefined)[])
+
+[./lib/index] RowKey
+type RowKey<Row> = (keyof Row & string) | ((row: Row) => string | number)
+
+[./lib/index] RowKeyValue
+type RowKeyValue<Row, Key extends RowKey<Row>> = Key extends keyof Row ? Row[Key] : Key extends (row: Row) => infer Value ? Value : never
+
+[./lib/index] ScatterAxis
+interface ScatterAxis
+  domain?: readonly [number, number]
+  label?: string
+  scale?: AxisScale
+  ticks?: readonly AxisTick[]
+
+[./lib/index] ScatterPoint
+interface ScatterPoint
+  key: string | number
+  label: string
+  tooltip?: string
+  weight?: number
+  x: number
+  y: number
+
+[./lib/index] SortDirection
+type SortDirection = 'asc' | 'desc'
+
+[./lib/index] SortState
+interface SortState
+  direction: SortDirection
+  key: string
+
+[./lib/index] SparkTone
+type SparkTone = 'muted' | 'accent' | 'success' | 'warning' | 'danger' | 'info'
+
+[./lib/index] StatDelta
+interface StatDelta
+  direction?: "up" | "down" | "flat" | undefined
+  label?: string | undefined
+  tone?: "info" | "success" | "neutral" | "danger" | "warning" | undefined
+  value: string
+
+[./lib/index] StepCookies
+interface StepCookies
+  delete: (name: string, options?: { path?: string; } | undefined) => void
+  get: (name: string) => string | null | undefined
+  set: (name: string, value: string, options?: { path?: string; httpOnly?: boolean; sameSite?: "lax" | "strict" | "none"; maxAge?: number; secure?: boolean; } | undefined) => void
+
+[./lib/index] stepDraft
+function stepDraft(cookies: StepCookies, name: string, { check, maxAge, path, request, secure }: StepDraftOptions): StepDraft
+
+[./lib/index] StepDraft
+interface StepDraft
+  clear: () => void
+  done: () => string[]
+  merged: () => Values
+  save: (step: string, values: Values) => void
+  values: () => Record<string, Values>
+
+[./lib/index] StepDraftOptions
+interface StepDraftOptions
+  check: (step: string, values: Values) => boolean
+  maxAge?: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w` | undefined
+  path?: string | undefined
+  request?: Request | undefined
+  secure?: boolean | undefined
+
+[./lib/index] stepHref
+function stepHref(url: string | URL, key: string, param?: string): string
+
+[./lib/index] StepItem
+interface StepItem<Key extends string = string>
+  key: Key
+  label: string
+
+[./lib/index] SwitcherApp
+interface SwitcherApp
+  description?: string | undefined
+  href: string
+  icon?: IconProps | IconSlot | undefined
+  id: string
+  label: string
+  newTab?: boolean | undefined
+  rel?: string | undefined
+
+[./lib/index] TimelineEntry
+interface TimelineEntry<Key extends string | number = string>
+  icon?: IconProps | IconSlot | undefined
+  key: Key
+  pickable?: boolean | undefined
+  text: string
+  time: string
+  tone?: "info" | "success" | "danger" | "warning" | "muted" | "accent" | undefined
+
+[./lib/index] toast
+const toast: { error: (message: string, options?: ToastOptions) => number; success: (message: string, options?: ToastOptions) => number; info: (message: string, options?: ToastOptions) => number; }
+
+[./lib/index] Toast
+interface Toast
+  id: number
+  message: string
+  tone?: ToastTone | undefined
+  type: ToastType
+
+[./lib/index] ToastHold
+type ToastHold = 'pointer' | 'focus'
+
+[./lib/index] ToastOptions
+interface ToastOptions
+  duration?: false | `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w` | undefined
+
+[./lib/index] toasts
+function toasts(): Toast[]
+
+[./lib/index] ToastTone
+type ToastTone = 'danger' | 'success' | 'info'
+
+[./lib/index] ToastType
+type ToastType = 'error' | 'success' | 'info'
+
+[./lib/index] toCsv
+function toCsv<Row>(rows: Row[], columns: Column<Row>[]): string
+
+[./lib/index] TOOLBAR_ACTIONS
+const TOOLBAR_ACTIONS: readonly ["bold", "italic", "heading", "bulletList", "numberedList", "link", "image"]
+
+[./lib/index] ToolbarAction
+type ToolbarAction = typeof TOOLBAR_ACTIONS[number]
+
+[./lib/index] TreeId
+type TreeId = string | number
+
+[./lib/index] TreeNode
+interface TreeNode<Id extends TreeId = string>
+  children?: readonly TreeNode<Id>[] | undefined
+  icon?: IconProps | IconSlot | undefined
+  id: Id
+  label: string
+
+[./lib/index] uiDefaults
+const uiDefaults: UiSettings
+
+[./lib/index] UiSettings
+interface UiSettings
+  icons: Record<"alert" | "back" | "chevron" | "close" | "delete" | "globe" | "info" | "menu" | "play" | "plus" | "search" | "spinner" | "star" | "success" | "zoomFit" | "zoomIn" | "zoomOut", IconProps> & Partial<Record<AddedSlot, IconProps>>
+
+[./lib/infinite-list] ActionSource
+type ActionSource<Row, Target extends Action<never, unknown>> = { action: Target // The fields of the call besides the paging: with an object, `offset` and `limit` (the page size) are added, so an action declaring both reads them from `pageFields`. A function gets where the page starts and answers t ...#4c6d0e5f
+
+[./lib/infinite-list] infiniteList
+function infiniteList<Row, Target extends Action<never, unknown> = never>(first: Row[], options: InfiniteListOptions<Row, Target>): InfiniteList<Row>
+
+[./lib/infinite-list] InfiniteList
+interface InfiniteList<Row>
+  ended: () => boolean
+  failed: () => boolean
+  filter: () => ListFilter
+  filterBy: (filter: Partial<ListFilter>) => Promise<void>
+  more: () => Promise<void>
+  patch: (id: unknown, change: RowChange<Row> | undefined) => boolean
+  pending: () => boolean
+  restart: (change: { sort?: SortState | undefined; filter?: Partial<ListFilter>; }) => Promise<void>
+  retry: () => Promise<void>
+  rows: () => Row[]
+  sort: () => SortState | undefined
+  sortBy: (sort: SortState | undefined) => Promise<void>
+
+[./lib/infinite-list] InfiniteListOptions
+type InfiniteListOptions<Row, Target extends Action<never, unknown> = never> = InfiniteListBase<Row> & (LoadSource<Row> | ActionSource<Row, Target>)
+
+[./lib/infinite-list] InfinitePage
+type InfinitePage<Row> = Row[] | undefined
+
+[./lib/infinite-list] ListFilter
+interface ListFilter
+  fields: Record<string, string>
+  text: string
+
+[./lib/infinite-list] LoadSource
+interface LoadSource<Row>
+  action?: undefined
+  load: (at: PageAt<Row>) => InfinitePage<Row> | Promise<InfinitePage<Row>>
+
+[./lib/infinite-list] PageAt
+interface PageAt<Row>
+  filter: ListFilter
+  last: Row | undefined
+  offset: number
+  sort: SortState | undefined
+
+[./lib/infinite-list] RowChange
+type RowChange<Row> = Partial<Row> | ((row: Row) => Row)
+
+[./lib/locked-button] lockedButton
+function lockedButton<T extends object>(attributes: T): T & { "type": "button"; "aria-disabled": "true"; }
+
+[./lib/map-view] drawnPoints
+function drawnPoints(lines: readonly (readonly MapPoint[])[], markers: readonly MapMarker[]): MapPoint[]
+
+[./lib/map-view] LeafletApi
+interface LeafletApi
+  DomUtil: { create: (tag: string) => HTMLElement; }
+  circleMarker: (at: MapPoint, options: { radius: number; weight: number; className: string; interactive: boolean; }) => LeafletPath
+  control: { attribution: (options: { prefix: false; }) => unknown; }
+  latLngBounds: (points: MapPoint[]) => unknown
+  layerGroup: () => LeafletGroup
+  map: (element: HTMLElement, options: { zoomSnap: number; attributionControl: boolean; zoomAnimation: boolean; fadeAnimation: boolean; markerZoomAnimation: boolean; }) => LeafletView
+  polyline: (path: MapPoint[], options: { weight: number; className: string; interactive?: boolean; }) => LeafletPath
+  tileLayer: (url: string, options: { maxZoom: number; attribution: string; }) => LeafletLayer
+
+[./lib/map-view] LeafletGroup
+interface LeafletGroup extends LeafletLayer
+  addTo: (target: LeafletView | LeafletGroup) => LeafletGroup
+  clearLayers: () => LeafletGroup
+  remove: () => LeafletGroup
+
+[./lib/map-view] LeafletLayer
+interface LeafletLayer
+  addTo: (target: LeafletView | LeafletGroup) => LeafletLayer
+  remove: () => LeafletLayer
+
+[./lib/map-view] LeafletPath
+interface LeafletPath extends LeafletLayer
+  addTo: (target: LeafletView | LeafletGroup) => LeafletPath
+  bindPopup: (content: HTMLElement) => LeafletPath
+  bindTooltip: (content: HTMLElement) => LeafletPath
+  closePopup: () => LeafletPath
+  getElement: () => SVGElement | undefined
+  remove: () => LeafletPath
+  togglePopup: () => LeafletPath
+
+[./lib/map-view] LeafletView
+interface LeafletView
+  addControl: (control: unknown) => LeafletView
+  fitBounds: (bounds: unknown, options: { padding: [number, number]; maxZoom: number; animate: boolean; }) => LeafletView
+  getSize: () => { x: number; y: number; }
+  invalidateSize: (options: { animate: boolean; }) => LeafletView
+  on: (events: string, handler: () => void) => LeafletView
+  panInside: (at: MapPoint, options: { padding: [number, number]; animate: boolean; }) => LeafletView
+  remove: () => LeafletView
+  setView: (center: MapPoint, zoom: number, options: { animate: boolean; }) => LeafletView
+
+[./lib/map-view] MapMarker
+interface MapMarker
+  at: MapPoint
+  label?: string | undefined
+  popup?: string | undefined
+
+[./lib/map-view] MapPoint
+type MapPoint = readonly number[]
+
+[./lib/map-view] OSM_ATTRIBUTION
+const OSM_ATTRIBUTION: "&copy; <a href=\"https://www.openstreetmap.org/copyright\" target=\"_blank\" rel=\"noopener\">OpenStreetMap</a>"
+
+[./lib/map-view] OSM_TILES
+const OSM_TILES: "https://tile.openstreetmap.org/{z}/{x}/{y}.png"
+
+[./lib/map-view] validPoint
+function validPoint(point: MapPoint): boolean
+
+[./lib/markdown-edit] enterEdit
+function enterEdit(value: string, start: number, end: number): TextEdit | null
+
+[./lib/markdown-edit] escaped
+function escaped(url: string): string
+
+[./lib/markdown-edit] headingEdit
+function headingEdit(value: string, start: number, end: number): TextEdit
+
+[./lib/markdown-edit] imageEdit
+function imageEdit(value: string, start: number, end: number): TextEdit
+
+[./lib/markdown-edit] indentEdit
+function indentEdit(value: string, start: number, end: number, outdent: boolean): TextEdit | null
+
+[./lib/markdown-edit] linkEdit
+function linkEdit(value: string, start: number, end: number): TextEdit
+
+[./lib/markdown-edit] listContinuation
+function listContinuation(line: string): { next: string; clear: boolean; } | null
+
+[./lib/markdown-edit] listEdit
+function listEdit(value: string, start: number, end: number, ordered: boolean): TextEdit
+
+[./lib/markdown-edit] MARKDOWN_INDENT
+const MARKDOWN_INDENT: "  "
+
+[./lib/markdown-edit] TextEdit
+interface TextEdit
+  end: number
+  selectionEnd: number
+  selectionStart: number
+  start: number
+  text: string
+
+[./lib/markdown-edit] TOOLBAR_ACTIONS
+const TOOLBAR_ACTIONS: readonly ["bold", "italic", "heading", "bulletList", "numberedList", "link", "image"]
+
+[./lib/markdown-edit] ToolbarAction
+type ToolbarAction = typeof TOOLBAR_ACTIONS[number]
+
+[./lib/markdown-edit] wrapEdit
+function wrapEdit(value: string, start: number, end: number, marker: string): TextEdit
+
+[./lib/masonry] laneCount
+function laneCount(width: number, minWidth: number, gap: number): number
+
+[./lib/masonry] MASONRY_TOLERANCE
+const MASONRY_TOLERANCE: 16
+
+[./lib/masonry] masonryLayout
+function masonryLayout(heights: readonly (number | undefined)[], lanes: number, gap: number, tolerance?: number): MasonryLayout
+
+[./lib/masonry] MasonryLayout
+interface MasonryLayout
+  height: number
+  places: MasonryPlace[]
+
+[./lib/masonry] MasonryPlace
+interface MasonryPlace
+  lane: number
+  top: number
+
+[./lib/media] isPlayable
+function isPlayable(item: MediaItem): item is MediaItem & { src: string; }
+
+[./lib/media] MediaItem
+interface MediaItem
+  captions?: string
+  full?: string
+  key: string | number
+  kind: "image" | "video"
+  preview: string
+  src?: string
+  thumb: string
+  title?: string
+
+[./lib/media] playSource
+function playSource(video: HTMLVideoElement, src: string): () => void
+
+[./lib/menu] MenuAction
+interface MenuAction
+  danger?: boolean
+  disabled?: boolean
+  icon?: IconProps | IconSlot
+  label: string
+  onSelect: () => unknown
+  tone?: "neutral" | "danger" | undefined
+
+[./lib/menu] MenuEntry
+type MenuEntry = MenuAction | 'separator'
+
+[./lib/menu-look] MENU_FOOTER
+const MENU_FOOTER: "flex w-full cursor-pointer items-center gap-2 px-2 py-1.5 text-left text-sm outline-none hover:bg-hover focus:bg-hover focus-visible:[box-shadow:inset_2px_0_0_var(--color-accent)] focus-visible:[outline-offset:-2px] focus-visible:[outline:2px_solid_transparent] border-0 border-t border-solid border ...#acb28f9c
+
+[./lib/menu-look] MENU_ITEM
+const MENU_ITEM: "flex w-full cursor-pointer items-center gap-2 px-2 py-1.5 text-left text-sm outline-none hover:bg-hover focus:bg-hover text-foreground focus-visible:[box-shadow:inset_2px_0_0_var(--color-accent)] focus-visible:[outline-offset:-2px] focus-visible:[outline:2px_solid_transparent]"
+
+[./lib/menu-look] MENU_LIST
+const MENU_LIST: "flex flex-col gap-px p-1 outline-none"
+
+[./lib/multi-select] MultiSelectOption
+interface MultiSelectOption<Value extends string = string>
+  disabled?: boolean | undefined
+  icon?: IconProps | IconSlot | undefined
+  label: string
+  value: Value
+
+[./lib/multi-select] pickedLabels
+function pickedLabels<Value extends string>(options: readonly MultiSelectOption<Value>[], value: readonly Value[]): string[]
+
+[./lib/multi-select] pickedShown
+function pickedShown<Value extends string>(options: readonly MultiSelectOption<Value>[], value: readonly Value[], shown: readonly MultiSelectOption<Value>[], pick: boolean): Value[]
+
+[./lib/multi-select] selectionSummary
+function selectionSummary<Value extends string>(options: readonly MultiSelectOption<Value>[], value: readonly Value[], placeholder: string, counted?: (count: number) => string): string
+
+[./lib/multi-select] toggledValue
+function toggledValue<Value extends string>(options: readonly MultiSelectOption<Value>[], value: readonly Value[], option: Value): Value[]
+
+[./lib/null-option] NullOption
+type NullOption<Value, Held> = null extends Value ? null extends Held ? '' extends Value ? string extends Value ? unknown : { 'a null option and an option of "" post the same empty string': never } : unknown : { 'a null option needs a value typed to allow null': never } : unknown
+
+[./lib/outside] OUTSIDE
+const OUTSIDE: { readonly target: "_blank"; readonly rel: "noopener noreferrer"; readonly 'data-new-tab': ""; }
+
+[./lib/pagination] currentPage
+function currentPage(page: number, pages: number): number
+
+[./lib/pagination] offsetHref
+function offsetHref(url: string | URL, offset: number, param?: string): string
+
+[./lib/pagination] OpenPosition
+type OpenPosition = { page: number, offset?: never, limit?: never } | { page?: never, offset: number, limit: number }
+
+[./lib/pagination] openSteps
+function openSteps(position: OpenPosition, more: boolean, url: string | URL, param?: string | undefined): { previous: string | undefined; next: string | undefined; }
+
+[./lib/pagination] PagedList
+interface PagedList
+  href: (page: number) => string
+  page: number
+  pages: number
+
+[./lib/pagination] PageGap
+type PageGap = 'gap'
+
+[./lib/pagination] pageHref
+function pageHref(url: string | URL, page: number, param?: string): string
+
+[./lib/pagination] pageItems
+function pageItems(page: number, pages: number, siblings?: number): (number | "gap")[]
+
+[./lib/paging] pageFields
+function pageFields(max?: number): { offset: TOptional<TInteger>; limit: TOptional<TInteger>; }
+
+[./lib/paging] PageInput
+interface PageInput
+  limit?: number | undefined
+  offset?: number | undefined
+
+[./lib/paging] pageOf
+function pageOf<Row>(rows: Row[], { offset, limit }?: PageInput): { rows: Row[]; total: number; }
+
+[./lib/palette] isPaletteLink
+function isPaletteLink(entry: PaletteEntry): entry is PaletteLink
+
+[./lib/palette] PaletteAction
+interface PaletteAction extends PaletteBase
+  group: string
+  icon?: IconProps | IconSlot | undefined
+  keywords?: string | undefined
+  label: string
+  onSelect: () => unknown
+
+[./lib/palette] PaletteEntry
+type PaletteEntry = PaletteLink | PaletteAction
+
+[./lib/palette] PaletteHit
+interface PaletteHit
+  labelParts?: SearchPart[] | undefined
+  link: PaletteLink
+  more: number
+  snippet: SearchPart[]
+
+[./lib/palette] paletteHits
+function paletteHits(hits: SearchHit[], matches: PaletteEntry[]): PaletteHit[]
+
+[./lib/palette] PaletteLink
+interface PaletteLink extends PaletteBase
+  external?: boolean | undefined
+  group: string
+  href: string
+  icon?: IconProps | IconSlot | undefined
+  keywords?: string | undefined
+  label: string
+
+[./lib/palette] paletteMatches
+function paletteMatches(entries: PaletteEntry[], query: string, groups?: string[]): PaletteEntry[]
+
+[./lib/palette] paletteScore
+function paletteScore(entry: Pick<PaletteBase, "label" | "group" | "keywords">, query: string): number
+
+[./lib/palette] PaletteSection
+interface PaletteSection
+  entries: PaletteEntry[]
+  group: string
+
+[./lib/palette] paletteSections
+function paletteSections(entries: PaletteEntry[], recent?: string[], groups?: string[], recentGroup?: string): PaletteSection[]
+
+[./lib/palette] RECENT_GROUP
+const RECENT_GROUP: "Recent"
+
+[./lib/palette] splitMatches
+function splitMatches(matches: PaletteEntry[], query: string): { strong: PaletteEntry[]; loose: PaletteEntry[]; }
+
+[./lib/palette] withRecent
+function withRecent(recent: string[], href: string, limit?: number): string[]
+
+[./lib/param-change] paramChange
+function paramChange<Value extends string | number | null>(param: string | undefined, paramDefault: string | number | undefined, onChange: ((value: Value) => unknown) | undefined): ((value: Value) => unknown) | undefined
+
+[./lib/plot] axisExtent
+function axisExtent(values: readonly number[], axis: ScatterAxis): [number, number]
+
+[./lib/plot] axisPercent
+function axisPercent(value: number, extent: readonly [number, number], scale?: AxisScale): number
+
+[./lib/plot] AxisScale
+type AxisScale = 'linear' | 'log'
+
+[./lib/plot] AxisTick
+interface AxisTick
+  label: string
+  value: number
+
+[./lib/plot] BarListRow
+interface BarListRow
+  display?: string
+  href?: string
+  key: string | number
+  label: string
+  value: number
+
+[./lib/plot] barRatios
+function barRatios(values: readonly (readonly (number | null)[])[], stacked: boolean, count: number): { heights: number[][]; top: number; }
+
+[./lib/plot] BarSeries
+interface BarSeries extends ChartSeries
+  color?: string
+  colors?: (string | null | undefined)[]
+  name: string
+  notes?: (string | null | undefined)[]
+  values: (number | null)[]
+
+[./lib/plot] ChartSeries
+interface ChartSeries
+  color?: string
+  name: string
+  values: (number | null)[]
+
+[./lib/plot] dashSample
+function dashSample(color: string, dash: string): string
+
+[./lib/plot] dotSize
+function dotSize(weight: number, heaviest: number): number
+
+[./lib/plot] PALETTE
+const PALETTE: string[]
+
+[./lib/plot] ScatterAxis
+interface ScatterAxis
+  domain?: readonly [number, number]
+  label?: string
+  scale?: AxisScale
+  ticks?: readonly AxisTick[]
+
+[./lib/plot] ScatterPoint
+interface ScatterPoint
+  key: string | number
+  label: string
+  tooltip?: string
+  weight?: number
+  x: number
+  y: number
+
+[./lib/plot] SERIES_DASHES
+const SERIES_DASHES: readonly ["", "6 3", "2 3", "10 3 2 3", "2 6", "8 2 2 2"]
+
+[./lib/plot] steppedPoint
+function steppedPoint(key: string, index: number, count: number): number | undefined
+
+[./lib/plot] valueTicks
+function valueTicks(top: number): { ratio: number; }[]
+
+[./lib/popover] PopoverPlacement
+type PopoverPlacement = 'bottom-start' | 'bottom-end' | 'top-start' | 'top-end'
+
+[./lib/popover] PopoverTriggerProps
+interface PopoverTriggerProps
+  aria-expanded: "true" | "false"
+  popovertarget: string
+  style: string
+
+[./lib/range] rangeFrom
+function rangeFrom(low: string, high: string): RangeValue
+
+[./lib/range] RangeValue
+type RangeValue = [number | null, number | null]
+
+[./lib/range-track] rangeTrack
+const rangeTrack: "h-4 w-full cursor-pointer appearance-none bg-transparent [&::-webkit-slider-runnable-track]:h-1 [&::-webkit-slider-runnable-track]:bg-input [&::-moz-range-track]:h-1 [&::-moz-range-track]:bg-input [&::-webkit-slider-thumb]:size-4 [&::-webkit-slider-thumb]:-mt-1.5 [&::-webkit-slider-thumb]:appearanc ...#5c2a9a5d
+
+[./lib/record] elapsed
+function elapsed(total: number): string
+
+[./lib/record] RECORD_LIMIT
+const RECORD_LIMIT: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w`
+
+[./lib/record] recorder
+function recorder(options: RecorderOptions): Recorder
+
+[./lib/record] Recorder
+interface Recorder
+  cancel: () => boolean
+  press: () => Promise<void>
+  problem: Signal<string | undefined>
+  said: Signal<string>
+  seconds: Signal<number>
+  state: Signal<"idle" | "asking" | "recording" | "sending">
+
+[./lib/record] RecorderOptions
+interface RecorderOptions
+  failure: string
+  maxMs: number
+  onAudio: (audio: File) => unknown
+  sending?: string | undefined
+  words: RecordWords
+
+[./lib/record] RecordProblem
+type RecordProblem = 'insecure' | 'unsupported' | 'denied' | 'missing' | 'taken' | 'failed' | 'lost' | 'empty'
+
+[./lib/record] recordWords
+function recordWords(): RecordWords
+
+[./lib/record] RecordWords
+type RecordWords = Record<RecordProblem | 'recording' | 'stopped' | 'cancelled', string>
+
+[./lib/recording] Recording
+interface Recording
+  cancel: () => boolean
+  stop: () => void
+
+[./lib/recording] RecordOptions
+interface RecordOptions
+  maxMs: number
+  onEnd: (result: File | RecordProblem) => void
+
+[./lib/recording] RecordProblem
+type RecordProblem = 'insecure' | 'unsupported' | 'denied' | 'missing' | 'taken' | 'failed' | 'lost' | 'empty'
+
+[./lib/recording] startRecording
+function startRecording(options: RecordOptions): Promise<RecordProblem | Recording>
+
+[./lib/settings] default
+const default: UiSettings
+
+[./lib/shade] shade
+function shade(color: string, value: number): string | undefined
+
+[./lib/sparkline] SparkTone
+type SparkTone = 'muted' | 'accent' | 'success' | 'warning' | 'danger' | 'info'
+
+[./lib/stat] deltaIcon
+function deltaIcon({ value, direction }: StatDelta): IconSlot
+
+[./lib/stat] StatDelta
+interface StatDelta
+  direction?: "up" | "down" | "flat" | undefined
+  label?: string | undefined
+  tone?: "info" | "success" | "neutral" | "danger" | "warning" | undefined
+  value: string
+
+[./lib/steps] currentStep
+function currentStep<Key extends string>(url: string | URL, keys: readonly Key[], done?: readonly string[], param?: string): Key
+
+[./lib/steps] StepCookies
+interface StepCookies
+  delete: (name: string, options?: { path?: string; } | undefined) => void
+  get: (name: string) => string | null | undefined
+  set: (name: string, value: string, options?: { path?: string; httpOnly?: boolean; sameSite?: "lax" | "strict" | "none"; maxAge?: number; secure?: boolean; } | undefined) => void
+
+[./lib/steps] stepDraft
+function stepDraft(cookies: StepCookies, name: string, { check, maxAge, path, request, secure }: StepDraftOptions): StepDraft
+
+[./lib/steps] StepDraft
+interface StepDraft
+  clear: () => void
+  done: () => string[]
+  merged: () => Values
+  save: (step: string, values: Values) => void
+  values: () => Record<string, Values>
+
+[./lib/steps] StepDraftOptions
+interface StepDraftOptions
+  check: (step: string, values: Values) => boolean
+  maxAge?: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w` | undefined
+  path?: string | undefined
+  request?: Request | undefined
+  secure?: boolean | undefined
+
+[./lib/steps] stepHref
+function stepHref(url: string | URL, key: string, param?: string): string
+
+[./lib/steps] StepItem
+interface StepItem<Key extends string = string>
+  key: Key
+  label: string
+
+[./lib/tab-nav] currentTab
+function currentTab(links: readonly TabLink[], current: string | URL): string | undefined
+
+[./lib/tab-nav] keptHref
+function keptHref(href: string, current: string | URL, keep: readonly string[]): string
+
+[./lib/tab-nav] TabLink
+interface TabLink
+  also?: readonly string[] | undefined
+  href: string
+  prefix?: boolean | undefined
+
+[./lib/table] cellText
+function cellText<Row>(row: Row, column: Column<Row>): string
+
+[./lib/table] Column
+interface Column<Row>
+  align?: "start" | "center" | "end"
+  cell?: boolean
+  defaultDirection?: SortDirection
+  header: string
+  key: string
+  numeric?: true
+  sortValue?: true | ((row: Row) => string | number)
+
+[./lib/table] compareValues
+function compareValues(a: string | number, b: string | number): number
+
+[./lib/table] csvField
+function csvField(value: unknown): string
+
+[./lib/table] drawnByBlock
+function drawnByBlock<Row>(column: Column<Row>, columns: Column<Row>[]): boolean
+
+[./lib/table] exportHref
+function exportHref(href: string, sort: SortState | undefined, param: string, text: string, fields?: Record<string, string>): string
+
+[./lib/table] FilterField
+interface FilterField
+  key: string
+  label: string
+  options?: readonly { value: string; label: string; }[] | undefined
+
+[./lib/table] nextSort
+function nextSort<Row>(sort: SortState | undefined, column: Column<Row>): SortState
+
+[./lib/table] resolvedColumn
+function resolvedColumn<Row>(column: Column<Row>, sortable?: boolean): Column<Row>
+
+[./lib/table] restoredSort
+function restoredSort<Row>(columns: Column<Row>[], key: string | undefined, direction: string | undefined): SortState | undefined
+
+[./lib/table] RowFilter
+type RowFilter<Row> = readonly (keyof Row & string)[] | ((row: Row) => (string | number | null | undefined)[])
+
+[./lib/table] RowKey
+type RowKey<Row> = (keyof Row & string) | ((row: Row) => string | number)
+
+[./lib/table] rowKeyOf
+function rowKeyOf<Row, Key extends RowKey<Row>>(row: Row, key: Key): RowKeyValue<Row, Key>
+
+[./lib/table] RowKeyValue
+type RowKeyValue<Row, Key extends RowKey<Row>> = Key extends keyof Row ? Row[Key] : Key extends (row: Row) => infer Value ? Value : never
+
+[./lib/table] rowLabel
+function rowLabel<Row>(row: Row, columns: Column<Row>[], key: RowKey<Row>): string
+
+[./lib/table] rowsMatching
+function rowsMatching<Row>(rows: Row[], filter: RowFilter<Row>, text: string): Row[]
+
+[./lib/table] sameFields
+function sameFields(a: Record<string, string>, b: Record<string, string>): boolean
+
+[./lib/table] SortDirection
+type SortDirection = 'asc' | 'desc'
+
+[./lib/table] sortedRows
+function sortedRows<Row>(rows: Row[], columns: Column<Row>[], sort: SortState | undefined): Row[]
+
+[./lib/table] SortState
+interface SortState
+  direction: SortDirection
+  key: string
+
+[./lib/table] toCsv
+function toCsv<Row>(rows: Row[], columns: Column<Row>[]): string
+
+[./lib/timeline] TimelineEntry
+interface TimelineEntry<Key extends string | number = string>
+  icon?: IconProps | IconSlot | undefined
+  key: Key
+  pickable?: boolean | undefined
+  text: string
+  time: string
+  tone?: "info" | "success" | "danger" | "warning" | "muted" | "accent" | undefined
+
+[./lib/toast] attempt
+function attempt<T, Data = unknown>(run: () => Promise<T>, failure: string | AttemptOptions<Data>, refused?: ((data: Data) => string | undefined) | undefined): Promise<Attempted<T> | undefined>
+
+[./lib/toast] Attempted
+type Attempted<T> = T extends void ? true : T
+
+[./lib/toast] AttemptOptions
+interface AttemptOptions<Data = unknown>
+  failure: string
+  onRefused?: ((data: Data) => unknown) | undefined
+  refused?: ((data: Data) => string | undefined) | undefined
+  success?: string | undefined
+
+[./lib/toast] dismissToast
+function dismissToast(id: number): void
+
+[./lib/toast] holdToasts
+function holdToasts(hold: ToastHold, on: boolean): void
+
+[./lib/toast] messageOf
+function messageOf(error: unknown, fallback: string): string
+
+[./lib/toast] toast
+const toast: { error: (message: string, options?: ToastOptions) => number; success: (message: string, options?: ToastOptions) => number; info: (message: string, options?: ToastOptions) => number; }
+
+[./lib/toast] Toast
+interface Toast
+  id: number
+  message: string
+  tone?: ToastTone | undefined
+  type: ToastType
+
+[./lib/toast] ToastHold
+type ToastHold = 'pointer' | 'focus'
+
+[./lib/toast] ToastOptions
+interface ToastOptions
+  duration?: false | `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w` | undefined
+
+[./lib/toast] toasts
+function toasts(): Toast[]
+
+[./lib/toast] ToastTone
+type ToastTone = 'danger' | 'success' | 'info'
+
+[./lib/toast] ToastType
+type ToastType = 'error' | 'success' | 'info'
+
+[./lib/tree] TreeId
+type TreeId = string | number
+
+[./lib/tree] treeKey
+function treeKey<Id extends TreeId>(rows: readonly TreeRow<Id>[], focused: TreeId, key: string, open: ReadonlySet<TreeId>): TreeMove<Id>
+
+[./lib/tree] TreeMove
+type TreeMove<Id extends TreeId> = { focus: Id } | { open: Id } | { close: Id } | undefined
+
+[./lib/tree] TreeNode
+interface TreeNode<Id extends TreeId = string>
+  children?: readonly TreeNode<Id>[] | undefined
+  icon?: IconProps | IconSlot | undefined
+  id: Id
+  label: string
+
+[./lib/tree] treePath
+function treePath<Id extends TreeId>(nodes: readonly TreeNode<Id>[], id: TreeId): Id[] | undefined
+
+[./lib/tree] TreeRow
+interface TreeRow<Id extends TreeId = string>
+  level: number
+  node: TreeNode<Id>
+  parent: Id | undefined
+  position: number
+  size: number
+
+[./lib/tree] treeRows
+function treeRows<Id extends TreeId>(nodes: readonly TreeNode<Id>[], open: ReadonlySet<TreeId>, level?: number, parent?: Id | undefined): TreeRow<Id>[]
+
+[./lib/virtual] INITIAL_VIEWPORT
+const INITIAL_VIEWPORT: 640
+
+[./lib/virtual] offsetsOf
+function offsetsOf(count: number, sizeAt: (index: number) => number): Float64Array<ArrayBufferLike>
+
+[./lib/virtual] VirtualOptions
+interface VirtualOptions<Item>
+  estimate: number
+  items: () => Item[]
+  keyOf: (item: Item, index: number) => unknown
+  overscan: number
+
+[./lib/virtual] virtualRows
+function virtualRows<Item>(options: VirtualOptions<Item>): { rows: () => Item[]; start: () => number; before: () => number; after: () => number; count: () => number; attach: (box: HTMLElement, content: HTMLElement) => () => void; }
+
+[./lib/virtual] windowOf
+function windowOf(offsets: Float64Array<ArrayBufferLike>, top: number, viewport: number, overscan: number): { start: number; end: number; }
+
+[./lib/words] dayMonth
+function dayMonth(date: Date): string
+
+[./lib/words] fullDate
+function fullDate(date: Date, time: false | "minutes" | "seconds"): string
+
+[./lib/words] monthShort
+function monthShort(date: Date): string
+
+[./lib/words] timeOfDay
+function timeOfDay(date: Date, seconds: boolean): string
+
+[./lib/zoom] fitted
+function fitted(): Plate
+
+[./lib/zoom] Frame
+interface Frame
+  height: number
+  width: number
+
+[./lib/zoom] held
+function held(plate: Plate, frame: Frame): Plate
+
+[./lib/zoom] MOST
+const MOST: 8
+
+[./lib/zoom] movedBy
+function movedBy(plate: Plate, dx: number, dy: number): Plate
+
+[./lib/zoom] NOTCH_ZOOM
+const NOTCH_ZOOM: 1.15
+
+[./lib/zoom] Plate
+interface Plate
+  scale: number
+  x: number
+  y: number
+
+[./lib/zoom] wheelZoom
+function wheelZoom(deltaY: number, deltaMode?: number, notch?: number): number
+
+[./lib/zoom] zoomedAt
+function zoomedAt(plate: Plate, at: { x: number; y: number; }, by: number, most?: number, least?: number): Plate
+
+[./line-chart.kay] default
+component default
+  class?: string | { root?: string; frame?: string; plot?: string; cursor?: string; dot?: string; band?: string; overlay?: string; tooltip?: string; tooltipLabel?: string; tooltipRow?: string; swatch?: string; tooltipName?: string; tooltipValue?: string; data?: string; hint?: string; legend?: string; legendIt ...#adaba0ca
+  formatLabel?: ((label: string, context: LabelContext) => string) | undefined
+  formatValue?: ((value: number) => string) | undefined
+  label: string
+  labels: string[]
+  legend?: boolean | undefined
+  onRange?: ((from: number, to: number) => unknown) | undefined
+  options?: LineChartOptions<AxisOptions, AxisOptions> | undefined
+  rangeHint?: string | undefined
+  series: ChartSeries[]
+  stacked?: boolean | undefined
+  totalLabel?: string | undefined
+  xLabels?: boolean | undefined
+
+[./load-more.kay] default
+component default
+  button?: boolean | undefined
+  class?: string | { root?: string; failed?: string; message?: string; loading?: string; text?: string; announced?: string; } | undefined
+  failureLabel?: string | undefined
+  list: InfiniteList<unknown>
+  loadedLabel?: ((count: number) => string) | undefined
+  loadingLabel?: string | undefined
+  margin?: number | undefined
+  moreLabel?: string | undefined
+  retryLabel?: string | undefined
+
+[./map-view.kay] default
+component default
+  attribution?: string | undefined
+  center?: MapPoint | undefined
+  class?: string | { root?: string; canvas?: string; surface?: string; list?: string; item?: string; } | undefined
+  darkAttribution?: string | undefined
+  darkTiles?: string | undefined
+  highlight?: readonly MapPoint[] | undefined
+  label: string
+  lines?: readonly (readonly MapPoint[])[] | undefined
+  markers?: readonly MapMarker[] | undefined
+  maxZoom?: number | undefined
+  tiles?: string | undefined
+  zoom?: number | undefined
+
+[./markdown-editor.kay] default
+component default
+  class?: string | { root?: string; wrap?: string; grid?: string; bar?: string; barFailed?: string; } | undefined
+  keysHint?: string | undefined
+  onImage?: ((file: File) => Promise<string>) | undefined
+  onInput?: ((value: string) => unknown) | undefined
+  preview?: ((markdown: string) => Promise<string>) | undefined
+  previewClass?: string | undefined
+  previewTrusted?: boolean | undefined
+  toolbar?: boolean | readonly ("image" | "bold" | "italic" | "heading" | "bulletList" | "numberedList" | "link")[] | undefined
+  uploadFailure?: string | undefined
+  value?: string | undefined
+
+[./masonry.kay] default
+component default
+  class?: string | { root?: string; tile?: string; } | undefined
+  gap?: number | undefined
+  items: readonly Item[]
+  key: (item: Item) => Key
+  minWidth?: number | undefined
+  style?: string | undefined
+  tile: (item: Item) => Element
+
+[./media-gallery.kay] default
+component default
+  class?: string | { root?: string; stage?: string; frame?: string; zoom?: string; step?: string | { root?: string | { root?: string; } | undefined; } | undefined; counter?: string; caption?: string; strip?: string; thumb?: string; thumbImage?: string; play?: string | { root?: string; } | undefined; lightbox? ...#480703e0
+  closeLabel?: string | undefined
+  emptyLabel?: string | undefined
+  index?: number | undefined
+  itemLabel?: string | undefined
+  items: MediaItem[]
+  nextLabel?: string | undefined
+  onIndexChange?: ((index: number) => unknown) | undefined
+  openLabel?: string | undefined
+  previousLabel?: string | undefined
+  ratio?: string | undefined
+
+[./menu.kay] default
+component default
+  at?: { x: number; y: number; } | undefined
+  class?: string | { root?: string | { root?: string | { root?: string; } | undefined; } | undefined; menu?: string | { root?: string; anchor?: string; } | undefined; list?: string; separator?: string; item?: string; icon?: string | { root?: string; } | undefined; } | undefined
+  icon?: IconProps | IconSlot | undefined
+  id?: string | undefined
+  items: MenuEntry[]
+  label: string
+  onOpenChange?: ((open: boolean) => unknown) | undefined
+  open?: boolean | undefined
+  placement?: PopoverPlacement | undefined
+  size?: "xs" | "sm" | "md" | "lg" | undefined
+  tone?: "neutral" | "danger" | "accent" | undefined
+  variant?: "solid" | "ghost" | "inline" | undefined
+
+[./meter.kay] default
+component default
+  class?: string | { root?: string; fill?: string; } | undefined
+  fillClass?: string | undefined
+  label: string
+  max?: number | undefined
+  value: number
+
+[./multi-select.kay] default
+component default
+  allLabel?: string | undefined
+  class?: string | { root?: string; panel?: string | { root?: string; anchor?: string; } | undefined; trigger?: string; summary?: string; chevron?: string | { root?: string; } | undefined; search?: string; bar?: string; action?: string; options?: string; option?: string; checkbox?: string; icon?: string | { r ...#f5b82ca3
+  disabled?: boolean | undefined
+  emptyLabel?: string | undefined
+  id?: string | undefined
+  label: string
+  name?: string | undefined
+  noneLabel?: string | undefined
+  onChange?: ((value: Value[]) => unknown) | undefined
+  options: readonly MultiSelectOption<Value>[]
+  placeholder?: string | undefined
+  placement?: PopoverPlacement | undefined
+  search?: boolean | undefined
+  searchLabel?: string | undefined
+  selectedLabel?: ((count: number) => string) | undefined
+  value?: readonly Value[] | undefined
+
+[./notice.kay] default
+component default
+  children?: Element
+  class?: string | { root?: string; } | undefined
+  label?: string | undefined
+  size?: "sm" | "md" | undefined
+  tone?: "info" | "success" | "danger" | "warning" | undefined
+
+[./page-header.kay] default
+component default
+  actions?: Element
+  children?: Element
+  class?: string | { root?: string; head?: string; title?: string; meta?: string; actions?: string; description?: string; } | undefined
+  description?: string | undefined
+  meta?: Element
+  title: string
+
+[./page-section.kay] default
+component default
+  actions?: Element
+  children?: Element
+  class?: string | { root?: string; head?: string; heading?: string; title?: string; subtitle?: string; } | undefined
+  level?: 2 | 1 | 3 | 4 | 5 | 6 | undefined
+  sticky?: boolean | undefined
+  subtitle?: string | undefined
+  title: string
+
+[./pagination.kay] default
+component default
+  | { class?: string | { root?: string; step?: string; gap?: string; page?: string; } | undefined; label?: string | undefined; limit?: never; more?: never; nextLabel?: string | undefined; of: PagedList; offset?: never; page?: never; pages?: never; param?: string | undefined; previousLabel?: string | undefined; siblings?: number | undefined; url?: never }
+  | { class?: string | { root?: string; step?: string; gap?: string; page?: string; } | undefined; label?: string | undefined; limit?: never; more?: never; nextLabel?: string | undefined; of?: never; offset?: never; page: number; pages: number; param?: string | undefined; previousLabel?: string | undefined; siblings?: number | undefined; url: string | URL }
+  | { class?: string | { root?: string; step?: string; gap?: string; page?: string; } | undefined; label?: string | undefined; limit?: never; more: boolean; nextLabel?: string | undefined; of?: never; offset?: never; page: number; pages?: never; param?: string | undefined; previousLabel?: string | undefined; siblings?: number | undefined; url: string | URL }
+  | { class?: string | { root?: string; step?: string; gap?: string; page?: string; } | undefined; label?: string | undefined; limit: number; more: boolean; nextLabel?: string | undefined; of?: never; offset: number; page?: never; pages?: never; param?: string | undefined; previousLabel?: string | undefined; siblings?: number | undefined; url: string | URL }
+
+[./popover.kay] default
+component default
+  at?: { x: number; y: number; } | undefined
+  children?: Element
+  class?: string | { root?: string; anchor?: string; } | undefined
+  id?: string | undefined
+  onOpenChange?: ((open: boolean) => unknown) | undefined
+  open?: boolean | undefined
+  placement?: PopoverPlacement | undefined
+  style?: string | undefined
+  trigger?: ((attributes: PopoverTriggerProps) => Element) | undefined
+
+[./progress.kay] default
+component default
+  class?: string | { root?: string; fill?: string; } | undefined
+  label: string
+  max?: number | undefined
+  value?: number | undefined
+
+[./qr-code.kay] default
+component default
+  class?: string | { root?: string; } | undefined
+  inline?: boolean | undefined
+  label?: string | undefined
+  options?: Omit<QrCodeSvgOptions, "title" | "ariaLabel" | "size"> | undefined
+  pixels?: number | undefined
+  style?: string | undefined
+  value: string
+
+[./radio-group.kay] default
+component default
+  class?: string | { root?: string; radio?: string; choice?: string; input?: string; label?: string; description?: string; } | undefined
+  disabled?: boolean | undefined
+  label?: string | undefined
+  name?: string | undefined
+  onChange?: ((value: Value | (null extends Held ? Held & null : never)) => unknown) | undefined
+  options: readonly { value: Value; label: string; description?: string | undefined; disabled?: boolean | undefined; }[] & NullOption<Value, Held>
+  value: Held
+
+[./range-input.kay] default
+component default
+  class?: string | { root?: string; box?: string; separator?: string; unit?: string; } | undefined
+  fromLabel?: string | undefined
+  label: string
+  max?: number | undefined
+  min?: number | undefined
+  onChange?: ((value: RangeValue) => unknown) | undefined
+  step?: number | undefined
+  toLabel?: string | undefined
+  unit?: string | undefined
+  value?: RangeValue | undefined
+
+[./rating.kay] default
+component default
+  class?: string | { root?: string; stars?: string; fill?: string; } | undefined
+  label?: string | undefined
+  max?: number | undefined
+  value: number
+
+[./record-button.kay] default
+component default
+  class?: string | { root?: string; button?: string | { root?: any; spinner?: any; } | undefined; time?: string; live?: string; problem?: string | { root?: string; } | undefined; } | undefined
+  failure?: string | undefined
+  label?: string | undefined
+  maxDuration?: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w` | undefined
+  onRecord: (audio: File) => unknown
+  size?: "xs" | "sm" | "md" | "lg" | undefined
+  tone?: "success" | "neutral" | "danger" | "accent" | undefined
+  variant?: "solid" | "ghost" | "inline" | undefined
+
+[./relative-time.kay] default
+component default
+  class?: string | { root?: string; } | undefined
+  date: string | number | Date
+  dateOptions?: DateTimeFormatOptions | undefined
+  options?: RelativeTimeFormatOptions | undefined
+
+[./rows-field.kay] default
+component default
+  addLabel?: string | undefined
+  class?: string | { root?: string; head?: string; heading?: string; row?: string; input?: string | { root?: string; } | undefined; remove?: string | { root?: string | { root?: string; } | undefined; } | undefined; add?: string | { root?: any; spinner?: any; } | undefined; } | undefined
+  columns: readonly { key: string; label: string; placeholder?: string | undefined; type?: "search" | "text" | "email" | "tel" | "url" | undefined; name?: string | undefined; }[]
+  label: string
+  max?: number | undefined
+  min?: number | undefined
+  name?: string | undefined
+  onChange?: ((rows: Row[]) => unknown) | undefined
+  removeLabel?: ((index: number) => string) | undefined
+  rows?: readonly Row[] | undefined
+  style?: string | undefined
+
+[./save-form.kay] default
+component default
+  action?: Action<never, Output, never> | undefined
+  cancelHref?: string | undefined
+  cancelLabel?: string | undefined
+  children?: Element
+  class?: string | { root?: string; grid?: string; bar?: string; status?: string; actions?: string; confirm?: string; } | undefined
+  cleanLabel?: string | undefined
+  confirm?: string | undefined
+  confirmLabel?: string | undefined
+  dirty?: boolean | undefined
+  dirtyLabel?: string | undefined
+  discardLabel?: string | undefined
+  failure?: string | undefined
+  onDiscard?: (() => unknown) | undefined
+  onSave?: (() => Promise<unknown>) | undefined
+  onSaved?: ((result: Answer<Exclude<Output, Failure<unknown>>>) => unknown) | undefined
+  refused?: ((data: FailureData<Output>) => string | Record<string, string> | undefined) | undefined
+  saveDisabled?: string | boolean | undefined
+  saveLabel?: string | undefined
+  saved?: string | undefined
+  savingLabel?: string | undefined
+  shortcut?: string | false | undefined
+  status?: string | undefined
+
+[./scatter-chart.kay] default
+component default
+  class?: string | { root?: string; axisLabel?: string; plot?: string; grid?: string; tick?: string; guide?: string; corner?: string; dot?: string; } | undefined
+  corners?: { topLeft?: string; topRight?: string; bottomLeft?: string; bottomRight?: string; } | undefined
+  emptyLabel?: string | undefined
+  label: string
+  onSelect?: ((point: Point) => unknown) | undefined
+  points: Point[]
+  quadrant?: { x: number; y: number; } | undefined
+  x?: ScatterAxis | undefined
+  y?: ScatterAxis | undefined
+
+[./segmented.kay] default
+component default
+  class?: string | { root?: string; option?: string; input?: string; label?: string; icon?: string | { root?: string; } | undefined; field?: string; heading?: string; } | undefined
+  disabled?: boolean | undefined
+  label: string
+  name?: string | undefined
+  onChange?: ((value: Value | (null extends Held ? Held & null : never)) => unknown) | undefined
+  options: readonly { value: Value; label: string; icon?: IconProps | IconSlot | undefined; disabled?: boolean | undefined; }[] & NullOption<Value, Held>
+  orientation?: "horizontal" | "vertical" | undefined
+  param?: string | undefined
+  paramDefault?: string | number | undefined
+  showLabel?: boolean | undefined
+  value: Held
+
+[./select.kay] default
+component default
+  busy?: boolean | undefined
+  class?: string | { root?: string; } | undefined
+  emptyOption?: Empty
+  loadingLabel?: string | undefined
+  onChange?: ((value: Value | (Empty extends string | true ? "" : never)) => unknown) | undefined
+  options: readonly { value: Value; label: string; disabled?: boolean | undefined; }[]
+  param?: string | undefined
+  paramDefault?: string | number | undefined
+  submit?: boolean | undefined
+  value: Value | (Empty extends string | true ? "" : never)
+
+[./side-panel.kay] default
+component default
+  | { actions?: Element; children?: Element; class?: string | { root?: string; grip?: string; line?: string; head?: string; title?: string; body?: string; footer?: string; launcher?: string | { root?: string | { root?: string; } | undefined; } | undefined; } | undefined; closeHref: string; closeLabel?: string | undefined; dock?: "bottom" | "right" | undefined; footer?: Element; launcher?: undefined; launcherHref?: undefined; launcherLayer?: number | undefined; modal?: boolean | undefined; onOpenChange?: undefined; onSizeChange?: ((size: number, settled: boolean) => unknown) | undefined; open: boolean; resizeLabel?: string | undefined; size?: number | undefined; style?: string | undefined; title: string }
+  | { actions?: Element; children?: Element; class?: string | { root?: string; grip?: string; line?: string; head?: string; title?: string; body?: string; footer?: string; launcher?: string | { root?: string | { root?: string; } | undefined; } | undefined; } | undefined; closeHref: string; closeLabel?: string | undefined; dock?: "bottom" | "right" | undefined; footer?: Element; launcher: string; launcherHref: string; launcherLayer?: number | undefined; modal?: boolean | undefined; onOpenChange?: undefined; onSizeChange?: ((size: number, settled: boolean) => unknown) | undefined; open: boolean; resizeLabel?: string | undefined; size?: number | undefined; style?: string | undefined; title: string }
+  | { actions?: Element; children?: Element; class?: string | { root?: string; grip?: string; line?: string; head?: string; title?: string; body?: string; footer?: string; launcher?: string | { root?: string | { root?: string; } | undefined; } | undefined; } | undefined; closeHref?: string | undefined; closeLabel?: string | undefined; dock?: "bottom" | "right" | undefined; footer?: Element; launcher?: string | undefined; launcherHref?: string | undefined; launcherLayer?: number | undefined; modal?: boolean | undefined; onOpenChange: (open: boolean) => unknown; onSizeChange?: ((size: number, settled: boolean) => unknown) | undefined; open: boolean; resizeLabel?: string | undefined; size?: number | undefined; style?: string | undefined; title: string }
+
+[./site-favicon.kay] default
+component default
+  class?: string | { root?: string; img?: string; icon?: string | { root?: string; } | undefined; } | undefined
+  name: string
+  src?: string | null | undefined
+
+[./site-nav.kay] default
+component default
+  class?: string | { root?: string; toggle?: string; menuIcon?: string | { root?: string; } | undefined; closeIcon?: string | { root?: string; } | undefined; list?: string; item?: string; link?: string; icon?: string | { root?: string; } | undefined; } | undefined
+  current: string | URL
+  id?: string | undefined
+  label: string
+  links: readonly NavLink[]
+  menuLabel?: string | undefined
+
+[./skeleton.kay] default
+component default
+  class?: string | { root?: string; block?: string; label?: string; } | undefined
+  height?: string | undefined
+  label?: string | undefined
+  lines?: number | undefined
+  shape?: "text" | "avatar" | "card" | undefined
+  style?: string | undefined
+  width?: string | undefined
+
+[./slider.kay] default
+component default
+  class?: string | { root?: string; label?: string; input?: string; value?: string; } | undefined
+  formatValue?: ((value: number) => string) | undefined
+  label: string
+  max?: number | undefined
+  min?: number | undefined
+  onChange?: ((value: number) => unknown) | undefined
+  onInput?: ((value: number) => unknown) | undefined
+  showValue?: boolean | undefined
+  step?: number | undefined
+  value: number
+
+[./sparkline.kay] default
+component default
+  class?: string | { root?: string; item?: string; bar?: string; } | undefined
+  hints?: readonly (string | undefined)[] | undefined
+  label: string
+  tone?: SparkTone | undefined
+  tones?: readonly (SparkTone | undefined)[] | undefined
+  values: readonly (number | null)[]
+
+[./split-layout.kay] default
+component default
+  backLabel?: string | undefined
+  class?: string | { root?: string; sidebar?: string; sidebarHead?: string; sidebarTitle?: string; sidebarBody?: string; list?: string; listHead?: string; resizer?: string; detail?: string; detailHead?: string; } | undefined
+  detail: Element
+  detailHead?: Element
+  detailOpen?: boolean | undefined
+  list: Element
+  listHead?: Element
+  listWidthKey?: string | undefined
+  onSidebarOpenChange?: ((open: boolean) => unknown) | undefined
+  resizableList?: boolean | undefined
+  resizeLabel?: string | undefined
+  sidebar?: Element
+  sidebarOpen?: boolean | undefined
+  sidebarTitle?: string | undefined
+  style?: string | undefined
+
+[./stat.kay] default
+component default
+  class?: string | { root?: string; icon?: string | { root?: string; } | undefined; value?: string; label?: string; delta?: string; deltaIcon?: string | { root?: string; } | undefined; deltaValue?: string; deltaLabel?: string; } | undefined
+  delta?: StatDelta | undefined
+  href?: string | undefined
+  icon?: IconProps | IconSlot | undefined
+  label?: string | undefined
+  tone?: "info" | "success" | "neutral" | "danger" | "warning" | "accent" | undefined
+  value: string | number
+  variant?: "tile" | "inline" | undefined
+
+[./status-strip.kay] default
+component default
+  cells: readonly (SparkTone | undefined)[]
+  class?: string | { root?: string; cell?: string; } | undefined
+  hints?: readonly (string | undefined)[] | undefined
+  label: string
+
+[./steps.kay] default
+component default
+  class?: string | { root?: string; list?: string; item?: string; link?: string; marker?: string; label?: string; state?: string; } | undefined
+  current: string
+  done?: readonly string[] | undefined
+  doneLabel?: string | undefined
+  label: string
+  param?: string | undefined
+  steps: readonly StepItem<string>[]
+  url: string | URL
+
+[./subscribe-form.kay] default
+component default
+  action: Action<never, unknown, never>
+  class?: string | { root?: string; notice?: string; link?: string; } | undefined
+  label?: string | undefined
+  noticeText?: string | undefined
+  privacy?: string | undefined
+  privacyLabel?: string | undefined
+  sentLabel?: string | undefined
+  submitLabel?: string | undefined
+  wordingId?: string | undefined
+
+[./tab-nav.kay] default
+component default
+  | { class?: string | { root?: string; link?: string; } | undefined; current: string | URL; keep?: readonly string[] | undefined; label: string; links: readonly ({ href: string; label: string; } & Omit<TabLink, "href">)[]; param?: undefined; paramDefault?: undefined; tabs?: undefined }
+  | { class?: string | { root?: string; link?: string; } | undefined; current?: undefined; keep?: undefined; label: string; links?: undefined; param: string; paramDefault?: string | number | undefined; tabs: readonly { value: string | number; label: string; }[] }
+
+[./table.kay] default
+component default
+  | { bulk?: ((keys: RowKeyValue<Row, Key>[], clear: () => void) => Element) | undefined; cell?: ((row: Row, column: Column<Row>) => Element) | undefined; class?: string | { root?: string; filter?: string; field?: string; filterLabel?: string; filterInput?: string; count?: string; selection?: string; selected?: string; bulk?: string; table?: string; head?: string; headRow?: string; selectHead?: string; selectText?: string; headCell?: string; sortButton?: stri ...#d06d9fe5; columns: Column<Row>[]; countLabel?: ((count: number) => string) | undefined; empty?: Element; exportLabel?: string | undefined; exportName?: string | undefined; exportable?: string | boolean | undefined; fields?: readonly FilterField[] | undefined; filter?: RowFilter<Row> | undefined; filterLabel?: string | undefined; filterParam?: string | undefined; filterPlaceholder?: string | undefined; list?: undefined; narrow?: "scroll" | "stack" | undefined; noMatch?: Element; onSelect?: ((keys: RowKeyValue<Row, Key>[], rows: Row[]) => unknown) | undefined; onSort?: ((sort: SortState) => unknown) | undefined; rowKey: Key; rows: Row[]; selectAllLabel?: string | undefined; selectRowLabel?: ((row: Row) => string) | undefined; selectable?: boolean | undefined; selected?: RowKeyValue<Row, Key>[] | undefined; selectedLabel?: ((count: number) => string) | undefined; serverSort?: boolean | undefined; sort?: SortState | undefined; sortParam?: string | undefined; sortable?: boolean | undefined; virtual?: boolean | undefined }
+  | { bulk?: ((keys: RowKeyValue<Row, Key>[], clear: () => void) => Element) | undefined; cell?: ((row: Row, column: Column<Row>) => Element) | undefined; class?: string | { root?: string; filter?: string; field?: string; filterLabel?: string; filterInput?: string; count?: string; selection?: string; selected?: string; bulk?: string; table?: string; head?: string; headRow?: string; selectHead?: string; selectText?: string; headCell?: string; sortButton?: stri ...#d06d9fe5; columns: Column<Row>[]; countLabel?: ((count: number) => string) | undefined; empty?: Element; exportLabel?: string | undefined; exportName?: string | undefined; exportable?: string | boolean | undefined; fields?: readonly FilterField[] | undefined; filter?: RowFilter<Row> | undefined; filterLabel?: string | undefined; filterParam?: string | undefined; filterPlaceholder?: string | undefined; list: InfiniteList<Row>; narrow?: "scroll" | "stack" | undefined; noMatch?: Element; onSelect?: ((keys: RowKeyValue<Row, Key>[], rows: Row[]) => unknown) | undefined; onSort?: ((sort: SortState) => unknown) | undefined; rowKey: Key; rows?: undefined; selectAllLabel?: string | undefined; selectRowLabel?: ((row: Row) => string) | undefined; selectable?: boolean | undefined; selected?: RowKeyValue<Row, Key>[] | undefined; selectedLabel?: ((count: number) => string) | undefined; serverSort?: boolean | undefined; sort?: SortState | undefined; sortParam?: string | undefined; sortable?: boolean | undefined; virtual?: boolean | undefined }
+
+[./tabs.kay] default
+component default
+  class?: string | { root?: string; list?: string; tab?: string; icon?: string | { root?: string; } | undefined; panel?: string; } | undefined
+  label: string
+  onChange?: ((value: Value) => unknown) | undefined
+  panel: (value: Value) => Element
+  tabs: readonly { value: Value; label: string; icon?: IconProps | IconSlot | undefined; disabled?: boolean | undefined; }[]
+  value: Value
+
+[./text-input.kay] default
+component default
+  | { class?: string | { root?: string; } | undefined; onChange?: ((value: string) => unknown) | undefined; onInput?: ((value: string) => unknown) | undefined; type?: "search" | "time" | "text" | "password" | "email" | "tel" | "month" | "url" | "date" | "datetime-local" | "week" | undefined; value?: string | undefined }
+  | { class?: string | { root?: string; } | undefined; onChange?: ((value: number | null) => unknown) | undefined; onInput?: ((value: number | null) => unknown) | undefined; type: "number"; value?: string | number | null | undefined }
+
+[./textarea.kay] default
+component default
+  class?: string | { root?: string; } | undefined
+  onChange?: ((value: string) => unknown) | undefined
+  onInput?: ((value: string) => unknown) | undefined
+  value?: string | undefined
+  writeFocused?: boolean | undefined
+
+[./time-input.kay] default
+component default
+  class?: string | { root?: string | { root?: string; } | undefined; } | undefined
+  onChange?: ((value: string) => unknown) | undefined
+  value?: string | undefined
+
+[./timeline.kay] default
+component default
+  class?: string | { root?: string; item?: string; entry?: string; time?: string; icon?: string | { root?: string; } | undefined; text?: string; } | undefined
+  entries: readonly TimelineEntry<Key>[]
+  label: string
+  onSelect?: ((key: Key | undefined, entry: TimelineEntry<Key>) => unknown) | undefined
+  selected?: Key | undefined
+
+[./toaster.kay] default
+component default
+  class?: string | { root?: string; live?: string; toast?: string; icon?: string | { root?: string; } | undefined; message?: string; dismiss?: string | { root?: string | { root?: string; } | undefined; } | undefined; } | undefined
+  dismissLabel?: string | undefined
+  hotkey?: string | null | undefined
+
+[./toggle.kay] default
+component default
+  checked?: boolean | undefined
+  class?: string | { root?: string; input?: string; track?: string; label?: string; } | undefined
+  label?: string | undefined
+  onChange?: ((checked: boolean) => unknown) | undefined
+
+[./toolbar.kay] default
+component default
+  caption?: string | undefined
+  children?: Element
+  class?: string | { root?: string; caption?: string; } | undefined
+  floating?: boolean | undefined
+  label: string
+  role?: "group" | "toolbar" | undefined
+
+[./tooltip-host.kay] default
+component default
+  class?: string | { root?: string; } | undefined
+  hideDelay?: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w` | undefined
+  showDelay?: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w` | undefined
+
+[./tooltip.kay] default
+component default
+  children?: Element
+  class?: string | { root?: string; } | undefined
+  placement?: string | undefined
+  text?: string | undefined
+
+[./tree-view.kay] default
+component default
+  class?: string | { root?: string; item?: string; toggle?: string; icon?: string | { root?: string; } | undefined; label?: string; } | undefined
+  expanded?: readonly Id[] | undefined
+  label: string
+  nodes: readonly TreeNode<Id>[]
+  onSelect?: ((id: Id, node: TreeNode<Id>) => unknown) | undefined
+  selected?: Id | undefined
+
+[./virtual-list.kay] default
+component default
+  class?: string | { root?: string; content?: string; item?: string; } | undefined
+  estimate?: number | undefined
+  item: (args_0: Item, args_1: number) => Element
+  itemKey?: ((item: Item, index: number) => unknown) | undefined
+  items: Item[]
+  label: string
+  overscan?: number | undefined
+
+[./when-visible.kay] default
+component default
+  class?: string | { root?: string; } | undefined
+  margin?: number | undefined
+  onVisible: () => unknown
+
+[./widget.kay] default
+component default
+  actions?: Element
+  children?: Element
+  class?: string | { root?: string; head?: string; title?: string; } | undefined
+  empty?: Element
+  icon?: IconProps | IconSlot | undefined
+  isEmpty?: boolean | undefined
+  title?: string | undefined
+
+[./zoom-pane.kay] default
+component default
+  children?: Element
+  class?: string | { root?: string; plate?: string; tools?: string; } | undefined
+  fitLabel?: string | undefined
+  label: string
+  least?: number | undefined
+  most?: number | undefined
+  onChange?: ((plate: Plate) => unknown) | undefined
+  style?: string | undefined
+  tools?: boolean | undefined
+  zoomInLabel?: string | undefined
+  zoomOutLabel?: string | undefined

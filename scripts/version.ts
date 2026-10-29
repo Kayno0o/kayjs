@@ -18,6 +18,13 @@ if (level === -1)
 if ((await $`git status --porcelain`.text()).trim() !== '')
   throw new Error('the working tree has changes: commit them first')
 
+// Named here rather than imported from scripts/api.ts, which loads the TypeScript compiler. `bun scripts/api.ts --update --breaking` records the exports a change removed or narrowed, which only a major release ships and then clears.
+const BREAKING_FILE = 'api/breaking.txt'
+const breaking = (await Bun.file(BREAKING_FILE).exists()) ? (await Bun.file(BREAKING_FILE).text()).trim() : ''
+
+if (breaking !== '' && LEVELS[level] !== 'major')
+  throw new Error(`${BREAKING_FILE} lists breaking changes, which only a major release ships:\n${breaking}`)
+
 const current = ((await Bun.file('package.json').json()) as { version: string }).version
 const parts = current.split('.').map((part, index) => {
   if (index < level)
@@ -65,6 +72,10 @@ try {
   await Promise.all(texts.map(async ({ path, text }) => Bun.write(path, text.replace(VERSION, () => `"version": "${version}"`).replace(KAY_PEER, (_, head: string) => `${head}"${peer}"`))))
   await Promise.all([...pages].map(async ([path, text]) => Bun.write(path, text)))
   await Bun.write(ZED_MANIFEST, zedRelease(zed, version))
+
+  if (breaking !== '')
+    await $`git rm -q -f ${BREAKING_FILE}`
+
   // bun.lock records each workspace's version and ranges, which the CI's frozen install compares against.
   await $`${process.execPath} install`.quiet()
   await $`git add bun.lock ${manifests} ${ZED_MANIFEST} ${[...pages.keys()]}`

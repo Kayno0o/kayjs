@@ -1,0 +1,580 @@
+[.] Address
+type Address = string | { name: string, address: string }
+
+[.] Attachment
+interface Attachment
+  cid?: string | undefined
+  content: string | Uint8Array<ArrayBufferLike>
+  contentType?: string | undefined
+  filename: string
+
+[.] AuthKind
+type AuthKind = AuthMailKind
+
+[.] AuthLinkKind
+type AuthLinkKind = typeof AUTH_LINK_KINDS[number]
+
+[.] AuthMail
+interface AuthMail extends Omit<AuthMailData, 'email'>
+  html: string
+  kind: string
+  subject: string
+  text: string
+  to: string
+
+[.] authMailer
+function authMailer<R>(send: Send<R>, options?: AuthMailerOptions): { send: (mail: AuthMail) => Promise<R>; }
+
+[.] AuthMailerOptions
+interface AuthMailerOptions
+  views?: Partial<Record<AuthMailKind, () => Promise<{ default: AuthView; }>>> | undefined
+
+[.] AuthNoticeKind
+type AuthNoticeKind = typeof AUTH_NOTICE_KINDS[number]
+
+[.] AuthView
+type AuthView = (props: { mail: AuthMail }) => JSX.Element
+
+[.] authWords
+function authWords(mail: AuthMail): AuthWords
+
+[.] AuthWords
+interface AuthWords
+  button: string
+  codeLead: string
+  ending: string
+  lead: string
+  orPaste: string
+  review: string
+  subject: string
+
+[.] Broadcast
+interface Broadcast
+  createdAt: number
+  finishedAt: number | undefined
+  id: string
+  list: string
+  message: string
+
+[.] BroadcastProgress
+interface BroadcastProgress
+  failed: number
+  retrying: number
+  sent: number
+  unsure: number
+  waiting: number
+
+[.] BroadcastStatus
+interface BroadcastStatus extends BroadcastProgress
+  done: boolean
+  failed: number
+  id: string
+  retrying: number
+  sent: number
+  unsure: number
+  waiting: number
+
+[.] contactForm
+function contactForm<const Extra extends Record<string, TSchema> = Record<never, TSchema>, const Honeypot extends string = "website", const Consent extends boolean = false>(mail: Pick<Mailer, "enqueue">, options?: ContactOptions<Extra, Honeypot, Consent>): [schema: ContactSchema<Extra, Consent>, handler: (input: Contac ...#a897a1af
+
+[.] ContactInput
+type ContactInput<Extra extends Record<string, TSchema> = Record<never, TSchema>, Consent extends boolean = false> = { name: string, email: string, message: string } & (Consent extends true ? { consent: true } : unknown) & Static<ReturnType<typeof s.Object<Extra>>>
+
+[.] ContactMailProps
+interface ContactMailProps
+  email: string
+  fields: MailField[]
+  message: string
+  name: string
+  site: string
+  subject: string
+
+[.] ContactOptions
+interface ContactOptions<Extra extends Record<string, TSchema> = Record<never, TSchema>, Honeypot extends string = 'website', Consent extends boolean = false>
+  consent?: Consent | undefined
+  errors?: Partial<Record<"email" | "name" | "message" | "consent", string | (() => string)>> | undefined
+  fields?: Extra | undefined
+  honeypot?: Honeypot | undefined
+  labels?: Partial<Record<keyof Extra & string, string>> | undefined
+  maxLength?: number | undefined
+  maxLinks?: number | undefined
+  protection?: (Omit<ActionProtect<Honeypot>, "honeypot"> & Pick<ActionProtection<never>, "tool" | "maxSize">) | undefined
+  reach?: string | undefined
+  subject?: ((input: ContactInput<Extra, Consent>) => string) | undefined
+  to?: Address | Address[] | undefined
+  view?: ((props: ContactMailProps) => Element) | undefined
+
+[.] createMailListTables
+function createMailListTables(source: PgJobsSource): Promise<void>
+
+[.] createMailSuppressionTable
+function createMailSuppressionTable(source: PgJobsSource): Promise<void>
+
+[.] cssColours
+function cssColours(stylesheet: string | URL, name?: string): (property: string) => string
+
+[.] darkPalette
+function darkPalette(settings: MailSettings): Palette
+
+[.] Delivery
+interface Delivery
+  accepted: string[]
+  messageId?: string | undefined
+  rejected: string[]
+  response?: string | undefined
+
+[.] Envelope
+interface Envelope
+  attachments?: Attachment[] | undefined
+  bcc?: Address | Address[] | undefined
+  cc?: Address | Address[] | undefined
+  from?: Address | undefined
+  headers?: Record<string, string> | undefined
+  locale?: string | undefined
+  replyTo?: Address | undefined
+  subject: string
+  to?: Address | Address[] | undefined
+  unsubscribe?: string | { url: string; address: string; } | undefined
+
+[.] EventSecrets
+interface EventSecrets
+  inbound?: string | undefined
+  mailgun?: string | undefined
+  postmark?: string | undefined
+  resend?: string | undefined
+  sendgrid?: string | undefined
+  ses?: string | undefined
+
+[.] HtmlContent
+interface HtmlContent
+  html: string
+  text?: string | undefined
+  view?: undefined
+
+[.] htmlToText
+function htmlToText(html: string): string
+
+[.] ListConfirmProps
+interface ListConfirmProps
+  list?: string | undefined
+  privacy?: string | undefined
+  site: string
+  url: string
+
+[.] ListMessage
+type ListMessage<P extends object = object> = MailMessage<P> extends infer M ? M extends unknown ? Omit<M, 'to' | 'cc' | 'bcc' | 'unsubscribe' | 'attachments'> : never : never
+
+[.] ListOptions
+interface ListOptions
+  file?: string | undefined
+  honeypot?: string | undefined
+  pace?: { batch?: number | undefined; every?: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w` | undefined; } | undefined
+  privacy?: string | undefined
+  protection?: (Omit<ActionProtect<string>, "honeypot"> & Pick<ActionProtection<never>, "tool" | "maxSize">) | undefined
+  store?: ListStore | undefined
+  title?: string | undefined
+  view?: ((props: ListConfirmProps) => Element) | undefined
+
+[.] ListStore
+interface ListStore
+  addBroadcast: (id: string, list: string, message: string, now?: number | undefined) => Maybe<void>
+  ask: (list: string, email: string, id: string, locale: string, now?: number | undefined, proof?: Proof | undefined) => Maybe<Subscriber>
+  broadcast: (id: string) => Maybe<Broadcast | undefined>
+  claim: (broadcast: string, subscriber: string, now?: number | undefined) => Maybe<boolean>
+  closed?: boolean
+  confirm: (list: string, id: string, now?: number | undefined, issuedAt?: number | undefined) => Maybe<boolean>
+  count: (list: string) => Maybe<number>
+  erase: (email: string) => Maybe<number>
+  finish: (id: string, now?: number | undefined) => unknown
+  forEmail: (email: string) => Maybe<Subscriber[]>
+  lift?: ((email: string) => Maybe<boolean>) | undefined
+  next: (broadcast: Broadcast, limit: number) => Maybe<Subscriber[]>
+  progress: (broadcast: Broadcast) => Maybe<BroadcastProgress>
+  release: (broadcast: string, subscriber: string, now?: number | undefined) => unknown
+  remove: (list: string, id: string) => Maybe<boolean>
+  removeEmail: (list: string, email: string) => Maybe<boolean>
+  sent: (broadcast: string, subscriber: string, now?: number | undefined) => unknown
+  subscribers: (list: string) => Maybe<Subscriber[]>
+  suppress?: ((email: string, reason: SuppressionReason, source: string, now?: number | undefined) => Maybe<void>) | undefined
+  suppressed?: ((emails: string[]) => Maybe<Suppression[]>) | undefined
+  sweep: (now?: number | undefined) => Maybe<void>
+
+[.] Logo
+interface Logo
+
+[.] mail
+function mail(options: MailExtensionOptions): KayExtension<Mailer>
+
+[.] Mail
+interface Mail
+  attachments: Attachment[]
+  bcc: Address[]
+  cc: Address[]
+  from: Address
+  headers: Record<string, string>
+  html?: string | undefined
+  replyTo?: Address | undefined
+  subject: string
+  text: string
+  to: Address[]
+
+[.] mailDefaults
+const mailDefaults: MailSettings
+
+[.] mailer
+function mailer(options?: MailerOptions): Mailer
+
+[.] Mailer
+type Mailer = Elysia & { // False for an `optional` mailer lacking its settings, whose sends throw `MailNotConfiguredError`. configured: boolean // Renders the message and sends it now, throwing when the server refuses it or cannot be reached. send: <P extends object>(message: MailMessage<P>) => Pro ...#cb231200
+
+[.] MailerOptions
+interface MailerOptions
+  events?: EventSecrets | undefined
+  from?: Address | undefined
+  fromName?: string | undefined
+  inbound?: ((reply: Reply) => void | Promise<void>) | undefined
+  listStore?: ListStore | undefined
+  locale?: string | undefined
+  logRecipients?: boolean | undefined
+  logSubjects?: boolean | undefined
+  optional?: boolean | undefined
+  queue?: (QueueOptions<Mail> & { name?: string | undefined; }) | undefined
+  smtp?: SmtpOverrides | undefined
+  suppressionStore?: SuppressionStore | undefined
+  to?: Address | Address[] | undefined
+  transport?: Transport | undefined
+
+[.] MailExtensionOptions
+interface MailExtensionOptions
+  module?: string | undefined
+  server?: (() => Promise<Mailer>) | undefined
+
+[.] MailField
+interface MailField
+  href?: string | undefined
+  label: string
+  value?: string | undefined
+
+[.] MailingList
+interface MailingList
+  count: () => Promise<number>
+  form: () => [schema: SubscribeSchema, handler: (input: { email: string; wording?: string | undefined; }, ctx: ActionContext<Readonly<Record<string, unknown>>>) => Promise<Failure<string> | undefined>, protection: ActionProtection<string>]
+  name: string
+  preview: <P extends object>(message: ListMessage<P>) => Promise<{ subject: string; html: string | undefined; text: string; }>
+  send: <P extends object>(message: ListMessage<P>) => Promise<{ id: string; recipients: number; }>
+  status: (id: string) => Promise<BroadcastStatus | undefined>
+  subscribers: () => Promise<{ email: string; confirmedAt: Date; source: string | undefined; wording: string | undefined; }[]>
+  test: <P extends object>(message: ListMessage<P>, to: Address) => Promise<void>
+  unsubscribe: (address: string) => Promise<boolean>
+
+[.] mailListTables
+const mailListTables: readonly ["kay_mail_subscribers", "kay_mail_broadcasts", "kay_mail_deliveries", "kay_mail_suppressions"]
+
+[.] MailMessage
+type MailMessage<P extends object = object> = Envelope & (ViewContent<P> | HtmlContent | TextContent)
+
+[.] MailNotConfiguredError
+class MailNotConfiguredError
+  new (missing: string[]): MailNotConfiguredError
+  code: "mail-not-configured"
+  missing: string[]
+  name: "MailNotConfiguredError"
+
+[.] MailSettings
+interface MailSettings extends Palette
+  accent: string
+  background: string
+  border: string
+  dark?: Partial<Palette> | undefined
+  font: string
+  logo?: Logo | undefined
+  mono: string
+  muted: string
+  onAccent: string
+  radius: string
+  surface: string
+  text: string
+  width: number
+
+[.] outbox
+const outbox: Outbox
+
+[.] Outbox
+interface Outbox extends Transport
+  clear: () => void
+  find: (id: string) => SentMail | undefined
+  keep: (mail: Mail, relayed?: Relayed | undefined) => Promise<Delivery>
+  last: () => SentMail | undefined
+  link: (mail: Mail, match?: string | RegExp | undefined) => string
+  links: (mail: Mail) => string[]
+  mails: readonly SentMail[]
+  send: (mail: Mail, signal?: AbortSignal | undefined) => Promise<Delivery>
+  to: (address: string) => SentMail[]
+  token: (mail: Mail, match?: string | RegExp | undefined) => string
+  verify?: (() => Promise<void>) | undefined
+  waitFor: (address: string, options?: WaitOptions | undefined) => Promise<SentMail>
+  watch: (listener: (mail: SentMail) => void) => () => void
+
+[.] Palette
+interface Palette
+  accent: string
+  background: string
+  border: string
+  muted: string
+  onAccent: string
+  surface: string
+  text: string
+
+[.] pgLists
+function pgLists(source: PgJobsSource): ListStore & { close: () => Promise<void>; }
+
+[.] pgSuppressions
+function pgSuppressions(source: PgJobsSource): SuppressionStore & { close: () => Promise<void>; }
+
+[.] Reply
+interface Reply
+  attachments: Attachment[]
+  date: Date | undefined
+  from: string
+  fromName: string
+  headers: Record<string, string>
+  html: string | undefined
+  inReplyTo: string | undefined
+  messageId: string | undefined
+  references: string[]
+  subject: string
+  text: string
+  to: string[]
+
+[.] ReplyAttachment
+interface ReplyAttachment
+  content: Uint8Array<ArrayBufferLike>
+  contentType: string
+  filename: string
+
+[.] SentMail
+interface SentMail extends Mail
+  attachments: Attachment[]
+  bcc: Address[]
+  cc: Address[]
+  from: Address
+  headers: Record<string, string>
+  html?: string | undefined
+  id: string
+  relayed?: Relayed | undefined
+  replyTo?: Address | undefined
+  sentAt: Date
+  subject: string
+  text: string
+  to: Address[]
+
+[.] smtp
+function smtp(settings: SmtpSettings): Transport
+
+[.] SmtpSettings
+interface SmtpSettings
+  dkim?: DkimSettings | undefined
+  host: string
+  insecure?: boolean | undefined
+  maxConnections?: number | undefined
+  name?: string | undefined
+  pass?: string | undefined
+  port?: number | undefined
+  rateLimit?: { max: number; window: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w`; } | undefined
+  secure?: boolean | undefined
+  timeout?: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w` | undefined
+  user?: string | undefined
+
+[.] sqliteSuppressions
+function sqliteSuppressions(path: string): SuppressionStore
+
+[.] Subscriber
+interface Subscriber
+  confirmedAt: number | undefined
+  createdAt: number
+  email: string
+  id: string
+  list: string
+  locale: string
+  source: string | undefined
+  status: "pending" | "confirmed"
+  wording: string | undefined
+
+[.] Subscription
+interface Subscription
+  askedAt: Date
+  confirmedAt: Date | null
+  list: string
+  status: "pending" | "confirmed"
+
+[.] Suppression
+interface Suppression
+  at: number
+  email: string
+  reason: SuppressionReason
+  source: string
+
+[.] SuppressionReason
+type SuppressionReason = 'bounce' | 'complaint'
+
+[.] SuppressionStore
+interface SuppressionStore
+  lift: (email: string) => Maybe<boolean>
+  suppress: (email: string, reason: SuppressionReason, source: string, now?: number | undefined) => Maybe<void>
+  suppressed: (emails: string[]) => Maybe<Suppression[]>
+
+[.] TextContent
+interface TextContent
+  html?: undefined
+  text: string
+  view?: undefined
+
+[.] Transport
+interface Transport
+  send: (mail: Mail, signal?: AbortSignal | undefined) => Promise<Delivery>
+  verify?: (() => Promise<void>) | undefined
+
+[.] ViewContent
+type ViewContent<P extends object> = { view: (props: P) => JSX.Element, text?: string, html?: never } & (object extends P ? { props?: P } : { props: P })
+
+[.] WaitOptions
+interface WaitOptions
+  find?: ((mail: SentMail) => boolean) | undefined
+  site?: { runJobs: () => Promise<number>; } | undefined
+  timeout?: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w` | undefined
+
+[./add] default
+const default: { description: string; files: { 'src/mail.ts': string; }; extension: { import: string; expression: string; }; notes: string[]; }
+
+[./auth-link.kay] default
+component default
+  button?: string | undefined
+  children?: Element
+  ending?: string | undefined
+  heading?: string | undefined
+  lead?: string | undefined
+  mail: AuthMail
+
+[./auth-notice.kay] default
+component default
+  children?: Element
+  ending?: string | undefined
+  heading?: string | undefined
+  lead?: string | undefined
+  mail: AuthMail
+  review?: string | undefined
+
+[./auth-subject.kay] default
+component default
+  mail: AuthMail
+
+[./button.kay] default
+component default
+  children?: Element
+  href: string
+
+[./code.kay] default
+component default
+  children?: Element
+
+[./column.kay] default
+component default
+  children?: Element
+  share?: number | undefined
+
+[./contact-mail.kay] default
+component default
+  email: string
+  fields: MailField[]
+  message: string
+  name: string
+  site: string
+  subject: string
+
+[./divider.kay] default
+component default
+
+[./fields.kay] default
+component default
+  empty?: string | undefined
+  fields: MailField[]
+
+[./heading.kay] default
+component default
+  children?: Element
+  level?: 3 | 1 | 2 | undefined
+
+[./image.kay] default
+component default
+  alt: string
+  height?: number | undefined
+  src: string
+  width?: number | undefined
+
+[./layout.kay] default
+component default
+  children?: Element
+  footer?: Element
+  header?: Element
+  preheader?: string | undefined
+
+[./link.kay] default
+component default
+  children?: Element
+  href: string
+
+[./list-confirm.kay] default
+component default
+  list?: string | undefined
+  privacy?: string | undefined
+  site: string
+  url: string
+
+[./list-footer.kay] default
+component default
+  site: string
+  url: string
+
+[./list-page.kay] default
+component default
+  action?: string | undefined
+  kind: "confirmed" | "invalid" | "expired" | "later" | "ask" | "askConfirm" | "unsubscribed"
+  part?: "title" | "body"
+
+[./paragraph.kay] default
+component default
+  children?: Element
+  muted?: boolean | undefined
+
+[./quote.kay] default
+component default
+  text: string
+
+[./row.kay] default
+component default
+  children?: Element
+
+[./subscribe-form.kay] default
+component default
+  action: Action<never, unknown, never>
+  label?: string | undefined
+  noticeText?: string | undefined
+  privacy?: string | undefined
+  privacyLabel?: string | undefined
+  sentLabel?: string | undefined
+  submitLabel?: string | undefined
+  wordingId?: string | undefined
+
+[./test] mailTest
+function mailTest(site: Pick<TestSite, "runJobs">): MailTest
+
+[./test] MailTest
+interface MailTest extends Pick<Outbox, 'last' | 'to' | 'find' | 'links' | 'link' | 'token'>
+  find: (id: string) => SentMail | undefined
+  last: () => SentMail | undefined
+  link: (mail: Mail, match?: string | RegExp | undefined) => string
+  links: (mail: Mail) => string[]
+  mails: readonly SentMail[]
+  to: (address: string) => SentMail[]
+  token: (mail: Mail, match?: string | RegExp | undefined) => string
+  waitFor: (address: string, options?: Omit<WaitOptions, "site"> | undefined) => Promise<SentMail>

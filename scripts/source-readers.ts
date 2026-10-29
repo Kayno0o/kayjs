@@ -6,6 +6,7 @@ export const SOURCE_CHANGE = /^(?:src|packages\/[^/]+\/src)\/.*\.(?:ts|kay)$/
 
 // Tests scanning the kay and library sources as files, which an import graph does not show. Every one of them reads each source file, so they are the cost of a source change; `tests/land.test.ts` fails for a test scanning the sources that is not listed here.
 export const SOURCE_READERS = [
+  'tests/api.test.ts',
   'tests/browsers.test.ts',
   'tests/docs.test.ts',
   'tests/errors.test.ts',

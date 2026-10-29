@@ -1,0 +1,718 @@
+[.] Action
+type Action = typeof ACTIONS[number]
+
+[.] BODY
+const BODY: typeof BODY
+
+[.] browserKeeper
+function browserKeeper(get?: () => Storage | undefined, now?: () => number, who?: (() => string | undefined) | undefined): DraftKeeper
+
+[.] Choice
+interface Choice
+  label: string
+  raw: unknown
+  value: string
+
+[.] cms
+function cms(options?: CmsOptions): KayExtension<AnyElysia>
+
+[.] CmsOptions
+interface CmsOptions
+  author?: ((ctx: GuardContext) => Identity | Promise<Identity | undefined> | undefined) | undefined
+  collections?: Record<string, GivenLayout> | undefined
+  files?: FileSaver | undefined
+  fourEyes?: boolean | undefined
+  guard?: Guard | LazyGuard | undefined
+  history?: false | { revisions?: number | undefined; trash?: false | `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w` | undefined; maxAge?: false | `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w` | undefined; } | undefined
+  member?: ((ctx: GuardContext) => MemberInfo | Promise<MemberInfo | undefined> | undefined) | undefined
+  newsletter?: Record<string, NewsletterOptions> | undefined
+  onSave?: ((event: SaveEvent) => void | Promise<void>) | undefined
+  pageLink?: false | undefined
+  pageSize?: number | undefined
+  prefix?: string | undefined
+  rawHtml?: string[] | undefined
+  role?: string | undefined
+  roles?: Record<string, readonly ("publish" | "review" | "delete" | "upload" | "redirects")[]> | undefined
+  uploads?: string[] | UploadOptions | undefined
+
+[.] CollectionInfo
+interface CollectionInfo
+
+[.] CollectionLayout
+interface CollectionLayout
+  form?: FormLayout | undefined
+  group?: string | undefined
+  list?: ListLayout | undefined
+  order?: number | undefined
+
+[.] collectionScreen
+function collectionScreen(name: string): Promise<{ prefix: string; collection: ScreenCollection; } | undefined>
+
+[.] Commit
+interface Commit
+  sha: string
+  url?: string | undefined
+
+[.] createDrafts
+function createDrafts({ show, delay, keep }: DraftsOptions): { open(entry: DraftEntry, version?: string | undefined): void; entry(ref: EntryRef): DraftEntry | undefined; kept(ref: EntryRef): boolean; version(ref: EntryRef): string | undefined; value(ref: EntryRef, path: FieldPath): unknown; set(ref: EntryRef, path: Fiel ...#22b0751f
+
+[.] CustomFieldProps
+interface CustomFieldProps
+  hint?: string | undefined
+  issue?: string | undefined
+  label: string
+  onChange: (next: unknown) => void
+  required: boolean
+  value: unknown
+
+[.] defaults
+const defaults: Settings
+
+[.] DraftEntry
+interface DraftEntry extends EntryRef
+  body?: string | undefined
+  collection: string
+  data: Record<string, unknown>
+  locale?: string | undefined
+  slug: string
+
+[.] DraftKeeper
+interface DraftKeeper
+  clear: () => void
+  now: () => number
+  read: (key: string) => KeptDraft | undefined
+  remove: (key: string) => void
+  write: (key: string, kept: KeptDraft) => void
+
+[.] DraftResult
+interface DraftResult
+  issues?: Issue[] | undefined
+
+[.] Drafts
+type Drafts = ReturnType<typeof createDrafts>
+
+[.] DraftsOptions
+interface DraftsOptions
+  delay?: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w` | undefined
+  keep?: DraftKeeper | undefined
+  show: (entries: DraftEntry[]) => Promise<DraftResult>
+
+[.] emptyValue
+function emptyValue(field: Field): unknown
+
+[.] EntryForm
+interface EntryForm extends FormScope
+  approve: () => Promise<boolean>
+  askReferrers: () => Promise<void>
+  canSave: () => boolean
+  clearEnd: () => Promise<void>
+  collection: ScreenCollection
+  denied?: Partial<Record<"publish" | "review" | "delete" | "upload" | "redirects", string>> | undefined
+  dirty: () => boolean
+  drafts: { open(entry: DraftEntry, version?: string | undefined): void; entry(ref: EntryRef): DraftEntry | undefined; kept(ref: EntryRef): boolean; version(ref: EntryRef): string | undefined; value(ref: EntryRef, path: FieldPath): unknown; set(ref: EntryRef, path: FieldPath, value: unknown): void; changed(re ...#8ed3f0ff
+  ended: () => boolean
+  ends: () => string | undefined
+  entry: EntryRef
+  isDraft: () => boolean
+  name: string
+  newLocale: Signal<string>
+  prefix: string
+  problem?: string | undefined
+  publish: () => Promise<void>
+  publishNow: () => Promise<void>
+  readSlugs: () => Promise<void>
+  referrers: () => string[]
+  remove: () => Promise<void>
+  rename: (slug: string, onRefused?: ((message: string) => void) | undefined) => Promise<boolean>
+  reset: () => void
+  review: () => ReviewView | undefined
+  reviewing: () => boolean
+  save: () => Promise<void>
+  saveAndAdd: () => Promise<void>
+  savedAt: () => SavedState | undefined
+  saving: Signal<boolean>
+  scheduled: () => string | undefined
+  sendBack: (note: string) => Promise<boolean>
+  shown: Shown
+  slug: Signal<string>
+  slugNeedsTyping: () => boolean
+  slugReport: (typed?: string | undefined) => SlugReport | undefined
+  source?: PairedEntry | undefined
+  stored: StoredEntry | undefined
+  stranded: Signal<Stranded | undefined>
+  submit: () => Promise<boolean>
+  subtitle: string | undefined
+  suggestsSlug: Signal<boolean>
+  typeSlug: (text: string) => void
+  unpublish: () => Promise<void>
+  unschedule: () => Promise<void>
+
+[.] entryKey
+function entryKey({ collection, slug, locale }: EntryRef): string
+
+[.] EntryRef
+interface EntryRef
+  collection: string
+  locale?: string | undefined
+  slug: string
+
+[.] EntryRow
+interface EntryRow
+  author?: string | undefined
+  cells?: Record<string, string> | undefined
+  draft: boolean
+  endsAt?: number | undefined
+  locale?: string | undefined
+  missing?: string[] | undefined
+  modifiedAt?: number | undefined
+  move?: { up: boolean; down: boolean; } | undefined
+  problem?: string | undefined
+  review?: "review" | "sent-back" | undefined
+  scheduledAt?: number | undefined
+  slug: string
+  title: string
+  url?: string | undefined
+  version?: string | undefined
+
+[.] entryScreen
+function entryScreen(ref: EntryRef, viewer?: Viewer | undefined): Promise<EntryScreen | undefined>
+
+[.] EntryScreen
+interface EntryScreen
+  collection: ScreenCollection
+  entry: StoredEntry | undefined
+  prefix: string
+  review?: ReviewView | undefined
+
+[.] eraseHistory
+function eraseHistory(ref: EntryRef): Promise<number>
+
+[.] Field
+type Field = | FieldBase & { kind: 'text' | 'textarea' | 'markdown' | 'number' | 'integer' | 'boolean' | 'date' | 'datetime' | 'json' } // A hex colour, a list of words and an icon of the set a server registered, which `colorField`, `tagsField` and `iconField` report. | FieldBase & { kind: 'color' | ...#d83d12ab
+
+[.] FieldMarker
+interface FieldMarker extends EntryRef
+  collection: string
+  locale?: string | undefined
+  path: FieldPath
+  slug: string
+
+[.] fieldOf
+function fieldOf(key: string | number, schema: JsonSchema, required: boolean): Field
+
+[.] FieldPath
+type FieldPath = string | typeof BODY
+
+[.] fieldsAt
+function fieldsAt(node: Node): MarkedField[]
+
+[.] fieldsOf
+function fieldsOf(schema: JsonSchema): Field[]
+
+[.] FileChange
+interface FileChange
+  absolute: string
+  author?: Identity | undefined
+  base?: string | null | undefined
+  message: string
+  repoPath: string
+  text: string | undefined
+
+[.] FileMove
+interface FileMove
+  also?: (FileChange & { text: string; })[] | undefined
+  author?: Identity | undefined
+  base?: string | undefined
+  from: { repoPath: string; absolute: string; }
+  message: string
+  text: string
+  to: { repoPath: string; absolute: string; }
+
+[.] FileSaver
+interface FileSaver
+  move?: ((move: FileMove) => Promise<Commit | undefined>) | undefined
+  save: (change: FileChange) => Promise<Commit | undefined>
+  together?: boolean | undefined
+
+[.] fileVersion
+function fileVersion(bytes: string | Uint8Array<ArrayBufferLike>): string
+
+[.] ForgeError
+class ForgeError
+  new (status: number, message: string, options?: ErrorOptions | undefined): ForgeError
+  code: "forge-refused"
+  name: "ForgeError"
+  status: number
+
+[.] forgejo
+function forgejo({ baseUrl, repo, branch, token, timeout: wait, fetch: request }: ForgejoOptions): FileSaver
+
+[.] ForgejoOptions
+interface ForgejoOptions extends ForgejoSettings
+  baseUrl: string
+  branch?: string | undefined
+  fetch?: typeof fetch | undefined
+  repo: string
+  timeout?: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w` | undefined
+  token: string
+
+[.] forgetEditor
+function forgetEditor(name: string): Promise<number>
+
+[.] formatMarker
+function formatMarker(marker: FieldMarker): string
+
+[.] FormLayout
+interface FormLayout
+  body?: { label?: string | undefined; hint?: string | undefined; } | undefined
+  fields?: (string | string[])[] | undefined
+  hide?: string[] | undefined
+  previewClass?: string | undefined
+  toolbar?: boolean | ToolbarAction[] | undefined
+
+[.] FormScope
+interface FormScope
+  collection: ScreenCollection
+  denied?: Partial<Record<"publish" | "review" | "delete" | "upload" | "redirects", string>> | undefined
+  drafts: { open(entry: DraftEntry, version?: string | undefined): void; entry(ref: EntryRef): DraftEntry | undefined; kept(ref: EntryRef): boolean; version(ref: EntryRef): string | undefined; value(ref: EntryRef, path: FieldPath): unknown; set(ref: EntryRef, path: FieldPath, value: unknown): void; changed(re ...#8ed3f0ff
+  entry: EntryRef
+  problem?: string | undefined
+  shown: Shown
+  source?: PairedEntry | undefined
+
+[.] GivenLayout
+type GivenLayout = CollectionLayout & { icon?: IconProps | undefined, history?: false | undefined }
+
+[.] humanize
+function humanize(key: string): string
+
+[.] Identity
+interface Identity
+  email: string
+  name: string
+
+[.] Issue
+interface Issue extends EntryRef
+  body?: true | undefined
+  collection: string
+  key?: "locale" | "slug" | undefined
+  locale?: string | undefined
+  message: string
+  path: string
+  slug: string
+
+[.] joinPath
+function joinPath(parent: string, key: string | number): string
+
+[.] JsonSchema
+interface JsonSchema
+
+[.] KeptDraft
+interface KeptDraft
+  at: number
+  base?: string | undefined
+  entry: DraftEntry
+  version: string | undefined
+
+[.] LazyGuard
+interface LazyGuard
+
+[.] ListLayout
+interface ListLayout
+  actions?: RowAction[] | undefined
+  columns?: string[] | undefined
+
+[.] listScreen
+function listScreen({ collection: name, q, page, status, sort, dir }: { collection: string; q?: string | undefined; page?: number | undefined; status?: EntryStatus | undefined; sort?: string | undefined; dir?: "asc" | "desc" | undefined; }): Promise<ListScreen | undefined>
+
+[.] ListScreen
+interface ListScreen
+  collection: ScreenCollection
+  page: number
+  pages: number
+  prefix: string
+  rows: EntryRow[]
+  total: number
+
+[.] Logo
+interface Logo
+
+[.] MarkedField
+interface MarkedField
+  attribute?: string | undefined
+  element: Element
+  marker: FieldMarker
+  start?: Comment | undefined
+
+[.] MemberInfo
+interface MemberInfo
+  email?: string | undefined
+  name?: string | undefined
+  roles: readonly string[]
+
+[.] parseMarker
+function parseMarker(value: string, body?: boolean): FieldMarker | undefined
+
+[.] passwordGuard
+function passwordGuard(passwords: string | Record<string, string>, { maxAge, secret, store }?: PasswordOptions): Guard
+
+[.] PasswordOptions
+interface PasswordOptions
+  maxAge?: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w` | undefined
+  secret?: string | undefined
+  store?: RateStore | undefined
+
+[.] Recovery
+interface Recovery
+  at: number
+  restored: boolean
+
+[.] Refusal
+interface Refusal
+  conflict?: { version: string | null; } | undefined
+  message: string
+
+[.] RowAction
+type RowAction = 'move' | 'publish' | 'unpublish' | 'duplicate' | 'rename' | 'editOnPage' | 'delete'
+
+[.] SaveConflictError
+class SaveConflictError
+  new (current?: string | null | undefined, creating?: boolean, at?: string | undefined): SaveConflictError
+  at?: string | undefined
+  code: "save-conflict"
+  creating: boolean
+  current?: string | null | undefined
+  name: "SaveConflictError"
+
+[.] SaveEvent
+interface SaveEvent
+  author?: Identity | undefined
+  collection: string
+  commit?: Commit | undefined
+  from?: string | undefined
+  locale?: string | undefined
+  slug: string
+  verb: "publish" | "delete" | "move" | "unpublish" | "duplicate" | "rename" | "add" | "update" | "restore"
+
+[.] ScreenCollection
+type ScreenCollection = CollectionInfo & { layout?: CollectionLayout | undefined, history?: true | undefined, trash?: true | undefined, newsletter?: true | undefined, review?: true | undefined }
+
+[.] Settings
+interface Settings
+  logo?: Logo | undefined
+
+[.] StoredEntry
+interface StoredEntry extends SourceEntry
+  version?: string | undefined
+
+[.] UploadOptions
+interface UploadOptions
+  maxSize?: ByteSize | undefined
+  types?: string[] | undefined
+
+[.] valueAt
+function valueAt(data: unknown, path: string): unknown
+
+[.] withValueAt
+function withValueAt<T>(data: T, path: string, value: unknown): T
+
+[.] workingTree
+function workingTree(): FileSaver
+
+[./add] default
+const default: { description: string; extension: { import: string; expression: string; }; notes: string[]; }
+
+[./entry-actions.kay] default
+component default
+  denied?: Partial<Record<"publish" | "review" | "delete" | "upload" | "redirects", string>>
+  form: EntryForm
+
+[./entry-body.kay] default
+component default
+  form: FormScope
+
+[./entry-editor.kay] default
+component default
+  collection: ScreenCollection
+  copy?: PairedEntry | undefined
+  denied?: Partial<Record<"publish" | "review" | "delete" | "upload" | "redirects", string>> | undefined
+  entry?: StoredEntry | undefined
+  locale?: string | undefined
+  prefix: string
+  presence?: EntryPresence | undefined
+  review?: ReviewView | undefined
+  source?: PairedEntry | undefined
+  translations?: EntryTranslations | undefined
+
+[./entry-field.kay] default
+component default
+  field?: Field | undefined
+  form: FormScope
+  name: string
+
+[./entry-fields.kay] default
+component default
+  form: FormScope
+  only?: string | undefined
+
+[./entry-header.kay] default
+component default
+  children?: Element
+  collection: CollectionInfo
+  prefix: string
+  subtitle?: string | undefined
+  title: string
+
+[./entry-identity.kay] default
+component default
+  form: EntryForm
+
+[./entry-notices.kay] default
+component default
+  form: FormScope
+
+[./entry-presence.kay] default
+component default
+  member: Member
+  room: string
+
+[./entry-table.kay] default
+component default
+  collection: ScreenCollection
+  denied?: Partial<Record<"publish" | "review" | "delete" | "upload" | "redirects", string>>
+  prefix: string
+  rows: EntryRow[]
+  searched: boolean
+  sort?: SortState | undefined
+
+[./entry-watch.kay] default
+component default
+  collection: string
+  entry: EntryRef
+
+[./field-input.kay] default
+component default
+  drafts: { open(entry: DraftEntry, version?: string | undefined): void; entry(ref: EntryRef): DraftEntry | undefined; kept(ref: EntryRef): boolean; version(ref: EntryRef): string | undefined; value(ref: EntryRef, path: FieldPath): unknown; set(ref: EntryRef, path: FieldPath, value: unknown): void; changed(re ...#8ed3f0ff
+  entry: EntryRef
+  field: Field
+  note?: string | undefined
+  path: string
+
+[./file-input.kay] default
+component default
+  alt?: { id: string; value: string; issue?: string | undefined; required: boolean; } | undefined
+  collection: string
+  disabled?: boolean
+  image: boolean
+  many?: boolean
+  onAlt?: (text: string) => void
+  onChange: (path: string, size?: Size) => void
+  sizeIssues?: { id: string; message: string; }[]
+  upload?: UploadHints
+  value: string
+
+[./form] createEntryForm
+function createEntryForm({ prefix, collection, entry, locale, copy, source, denied, review: reviewed }: { review?: ReviewView | undefined; denied?: Partial<Record<"publish" | "review" | "delete" | "upload" | "redirects", string>> | undefined; prefix: string; collection: ScreenCollection; entry?: StoredEntry | (() => Stored ...#bc1ba21e
+
+[./form] createShown
+function createShown(): Shown
+
+[./form] EntryForm
+interface EntryForm extends FormScope
+  approve: () => Promise<boolean>
+  askReferrers: () => Promise<void>
+  canSave: () => boolean
+  clearEnd: () => Promise<void>
+  collection: ScreenCollection
+  denied?: Partial<Record<"publish" | "review" | "delete" | "upload" | "redirects", string>> | undefined
+  dirty: () => boolean
+  drafts: { open(entry: DraftEntry, version?: string | undefined): void; entry(ref: EntryRef): DraftEntry | undefined; kept(ref: EntryRef): boolean; version(ref: EntryRef): string | undefined; value(ref: EntryRef, path: FieldPath): unknown; set(ref: EntryRef, path: FieldPath, value: unknown): void; changed(re ...#8ed3f0ff
+  ended: () => boolean
+  ends: () => string | undefined
+  entry: EntryRef
+  isDraft: () => boolean
+  name: string
+  newLocale: Signal<string>
+  prefix: string
+  problem?: string | undefined
+  publish: () => Promise<void>
+  publishNow: () => Promise<void>
+  readSlugs: () => Promise<void>
+  referrers: () => string[]
+  remove: () => Promise<void>
+  rename: (slug: string, onRefused?: ((message: string) => void) | undefined) => Promise<boolean>
+  reset: () => void
+  review: () => ReviewView | undefined
+  reviewing: () => boolean
+  save: () => Promise<void>
+  saveAndAdd: () => Promise<void>
+  savedAt: () => SavedState | undefined
+  saving: Signal<boolean>
+  scheduled: () => string | undefined
+  sendBack: (note: string) => Promise<boolean>
+  shown: Shown
+  slug: Signal<string>
+  slugNeedsTyping: () => boolean
+  slugReport: (typed?: string | undefined) => SlugReport | undefined
+  source?: PairedEntry | undefined
+  stored: StoredEntry | undefined
+  stranded: Signal<Stranded | undefined>
+  submit: () => Promise<boolean>
+  subtitle: string | undefined
+  suggestsSlug: Signal<boolean>
+  typeSlug: (text: string) => void
+  unpublish: () => Promise<void>
+  unschedule: () => Promise<void>
+
+[./form] formScope
+function formScope(drafts: { open(entry: DraftEntry, version?: string | undefined): void; entry(ref: EntryRef): DraftEntry | undefined; kept(ref: EntryRef): boolean; version(ref: EntryRef): string | undefined; value(ref: EntryRef, path: FieldPath): unknown; set(ref: EntryRef, path: FieldPath, value: unknown): void; c ...#99496158
+
+[./form] FormScope
+interface FormScope
+  collection: ScreenCollection
+  denied?: Partial<Record<"publish" | "review" | "delete" | "upload" | "redirects", string>> | undefined
+  drafts: { open(entry: DraftEntry, version?: string | undefined): void; entry(ref: EntryRef): DraftEntry | undefined; kept(ref: EntryRef): boolean; version(ref: EntryRef): string | undefined; value(ref: EntryRef, path: FieldPath): unknown; set(ref: EntryRef, path: FieldPath, value: unknown): void; changed(re ...#8ed3f0ff
+  entry: EntryRef
+  problem?: string | undefined
+  shown: Shown
+  source?: PairedEntry | undefined
+
+[./form] Shown
+interface Shown
+  add: (id: string) => () => void
+  has: (id: string) => boolean
+
+[./form] Stranded
+interface Stranded
+  kind: "deleted" | "renamed" | "created"
+  to: string
+
+[./pg] LoaderOptions
+interface LoaderOptions
+  name: string
+  seed?: readonly SeedEntry[] | (() => readonly SeedEntry[] | Promise<readonly SeedEntry[]>) | undefined
+  table?: string | undefined
+  ttl?: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w` | undefined
+  watch?: false | `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w` | undefined
+
+[./pg] pgLoader
+function pgLoader(options: PgLoaderOptions): ContentLoader<unknown>
+
+[./pg] PgLoaderOptions
+interface PgLoaderOptions extends LoaderOptions
+  name: string
+  seed?: readonly SeedEntry[] | (() => readonly SeedEntry[] | Promise<readonly SeedEntry[]>) | undefined
+  sql: string | SQL
+  table?: string | undefined
+  ttl?: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w` | undefined
+  watch?: false | `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w` | undefined
+
+[./pg] SeedEntry
+interface SeedEntry
+  body?: string | undefined
+  data: Record<string, unknown>
+  locale?: string | undefined
+  slug: string
+
+[./presence] entryPresence
+function entryPresence(ctx: GuardContext, collection: string, entry: { slug: string; locale?: string | undefined; }): Promise<EntryPresence>
+
+[./presence] EntryPresence
+interface EntryPresence
+  member: Member
+  room: string
+
+[./room] editorsOf
+function editorsOf(others: readonly Member[], count: number, own: Member): { names: string[]; unnamed: number; }
+
+[./room] entryRoom
+function entryRoom(collection: string, entry: { slug: string; locale?: string | undefined; }, listed: Member): { room: string; member: Member; }
+
+[./room] hashOf
+function hashOf(text: string): string
+
+[./room] Member
+interface Member
+  name: string
+  page?: true | undefined
+  watching?: true | undefined
+
+[./room] openRoom
+function openRoom(room: string): string
+
+[./room] WATCHED_ROWS
+const WATCHED_ROWS: 50
+
+[./room] watchRoom
+function watchRoom(room: string): string
+
+[./sqlite] LoaderOptions
+interface LoaderOptions
+  name: string
+  seed?: readonly SeedEntry[] | (() => readonly SeedEntry[] | Promise<readonly SeedEntry[]>) | undefined
+  table?: string | undefined
+  ttl?: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w` | undefined
+  watch?: false | `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w` | undefined
+
+[./sqlite] SeedEntry
+interface SeedEntry
+  body?: string | undefined
+  data: Record<string, unknown>
+  locale?: string | undefined
+  slug: string
+
+[./sqlite] sqliteLoader
+function sqliteLoader(options: SqliteLoaderOptions): ContentLoader<unknown>
+
+[./sqlite] SqliteLoaderOptions
+interface SqliteLoaderOptions extends LoaderOptions
+  database: string | Database
+  name: string
+  seed?: readonly SeedEntry[] | (() => readonly SeedEntry[] | Promise<readonly SeedEntry[]>) | undefined
+  table?: string | undefined
+  ttl?: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w` | undefined
+  watch?: false | `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w` | undefined
+
+[./test] CmsEntryOptions
+interface CmsEntryOptions
+  locale?: string | undefined
+  version?: string | undefined
+
+[./test] CmsSaveOptions
+interface CmsSaveOptions
+  body?: string | undefined
+  create?: boolean | undefined
+  locale?: string | undefined
+  version?: string | undefined
+
+[./test] CmsSaveOutcome
+type CmsSaveOutcome = SaveOutcome
+
+[./test] cmsSignInAs
+function cmsSignInAs(site: Pick<TestSite, "cookies" | "fetch">, role?: string | undefined): Promise<string>
+
+[./test] cmsSignInWith
+function cmsSignInWith(site: Pick<TestSite, "cookies" | "fetch" | "submit">, password: string): Promise<Visit>
+
+[./test] cmsSignOut
+function cmsSignOut(site: CookieSite): void
+
+[./test] cmsTest
+function cmsTest(site: Pick<TestSite, "cookies" | "fetch">): CmsTest
+
+[./test] CmsTest
+interface CmsTest
+  delete: (collection: string, slug: string, options?: CmsEntryOptions | undefined) => Promise<SaveOutcome>
+  entry: (collection: string, slug: string, options?: Pick<EntryRef, "locale"> | undefined) => Promise<StoredEntry | undefined>
+  move: (collection: string, slug: string, direction: "up" | "down", options?: Pick<EntryRef, "locale"> | undefined) => Promise<SaveOutcome>
+  rename: (collection: string, slug: string, to: string, options?: CmsEntryOptions | undefined) => Promise<SaveOutcome & { slug?: string; }>
+  save: (collection: string, slug: string, data: Record<string, unknown>, options?: CmsSaveOptions | undefined) => Promise<SaveOutcome>
+  signInAs: (role?: string | undefined) => Promise<string>
+  signOut: () => void
+  upload: (collection: string, file: File) => Promise<CmsUpload>
+
+[./test] CmsUpload
+interface CmsUpload
+  height?: number | undefined
+  path: string
+  width?: number | undefined

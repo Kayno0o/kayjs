@@ -1,0 +1,4510 @@
+[.] action
+function action<Output, const Honeypot extends string = never>(handler: (ctx: ActionContext<Readonly<Record<string, unknown>>>) => Output | Promise<Output>, protection?: ActionProtection<Honeypot> | undefined): NoInputAction<Settled<Output>, Honeypot>
+function action<Schema extends TSchema, Output, const Honeypot extends string = never>(schema: Schema, handler: (input: (Schema & { params: []; })["static"], ctx: ActionContext<Readonly<Record<string, unknown>>>) => Output | Promise<Output>, protection?: ActionProtection<Honeypot> | undefined): ServerAction<Schema ...#afbc8db6
+
+[.] Action
+interface Action<Input, Output, Honeypot extends string = never>
+  error: (field?: "" | Honeypot | Extract<keyof Input, string> | undefined) => string | undefined
+  failed: () => FormFailure<Input, FailureData<Output>, Honeypot> | undefined
+  pending: () => boolean
+  progress: () => number | undefined
+  refused: (error: unknown) => error is ActionError<FailureData<Output>>
+  settled: () => Promise<void>
+  succeeded: () => FormSuccess<Final<Exclude<Output, Failure<unknown>>>> | undefined
+  track: () => TrackedCall<Input, CallResult<Answer<Exclude<Output, Failure<unknown>>>, FailureData<Output>>>
+  url: string
+  with: (fields: Partial<Input>) => Action<Input, Output, Honeypot>
+
+[.] ActionContext
+interface ActionContext<Params extends Readonly<Record<string, unknown>> = RouteParams> extends RequestContext<Params>
+  cookies: CookieMap
+  deny: (status?: number | undefined, message?: string | undefined) => never
+  fail: <const Data = undefined, const Status extends number = number>(status: Status & ErrorStatus<Status>, data?: Data | undefined) => Failure<Data>
+  headers: Headers
+  locale: string
+  locals: object
+  notFound: () => never
+  params: Params
+  redirect: Redirect
+  request: Request
+  status: (code: number) => void
+  url: URL
+
+[.] ActionError
+class ActionError
+  new <Data = unknown>(status: number, body: string, errors?: Record<string, string>, data?: Data | undefined, message?: string): ActionError<Data>
+  answer?: unknown
+  body: string
+  data?: Data | undefined
+  errors: Record<string, string>
+  name: string
+  status: number
+
+[.] ActionFor
+interface ActionFor<Params extends Readonly<Record<string, unknown>>>
+
+[.] ActionProtect
+interface ActionProtect<Field extends string = never>
+  honeypot?: Field | HoneypotOptions<Field> | undefined
+  minTime?: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w` | MinTimeOptions | undefined
+  proofOfWork?: number | boolean | ProofOfWorkOptions | undefined
+  rateLimit?: ActionRateLimit | ActionRateLimit[] | undefined
+
+[.] ActionProtection
+interface ActionProtection<Field extends string = never>
+  maxSize?: ByteSize | undefined
+  messages?: ProtectionMessages | undefined
+  protect?: ActionProtect<Field> | undefined
+  tool?: string | boolean | ActionTool | undefined
+
+[.] ActionRateLimit
+interface ActionRateLimit extends RateLimit
+  count?: "succeeded" | undefined
+  key?: RateKey | undefined
+  max: number
+  store?: RateStore | undefined
+  window: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w`
+
+[.] ActionRedirectError
+class ActionRedirectError
+  new (status: number, location: string): ActionRedirectError
+  answer?: unknown
+  body: string
+  data?: unknown
+  errors: Record<string, string>
+  location: string
+  name: string
+  status: number
+
+[.] ActionStream
+interface ActionStream<T> extends EventReader<T>
+  close: () => void
+  ended: () => Promise<T | undefined>
+  last: () => T | undefined
+  on: (listener: (value: T) => void) => () => void
+  status: () => StreamStatus
+
+[.] Answer
+type Answer<Output> = Output extends AsyncIterable<infer Value> ? ActionStream<Value> : Output
+
+[.] Answered
+type Answered<Value> = unknown extends Value ? unknown : Value extends EventStream<unknown> ? never : Value extends Response ? unknown : Value extends Blob ? Blob | string : Value extends string ? Value : Value extends number | boolean | bigint ? string : Value extends null | undefined | void ? '' : ...#cf817a8e
+
+[.] ApiAnswer
+type ApiAnswer<Module, Path, M> = Answered<Received<MethodRoute<Module, Path, Chosen<M>>>>
+
+[.] ApiCallOptions
+type ApiCallOptions<Module, Path, M> = ApiRequest<Module, Path, M> & { // Aborts the call, which rejects with the signal's reason. signal?: AbortSignal | undefined // Called as a body carrying files uploads, with how much of it went, from 0 to 1. progress?: ((sent: number) => void) | undefined }
+
+[.] ApiError
+class ApiError
+  new (status: number, message: string, answer?: unknown): ApiError
+  answer?: unknown
+  name: string
+  status: number
+
+[.] ApiRoutesOf
+type ApiRoutesOf<Module> = Module extends { default: infer Exported } ? RoutesOfInstance<Exported extends (...args: never[]) => infer Built ? Awaited<Built> : Exported> : Record<never, never>
+
+[.] apiUrl
+function apiUrl(module: unknown, path?: string, options?: UrlInput): string
+
+[.] AwaitProps
+interface AwaitProps<T>
+  failed?: ((error: unknown) => Element) | undefined
+  fallback?: ((error: unknown) => Element) | undefined
+  pending?: (() => Element) | undefined
+  ready: (value: Settled<T>) => Element
+  value: T
+
+[.] batch
+function batch<T>(fn: () => T): T
+
+[.] Bindable
+type Bindable<T> = (T & BindableMark) | Extract<T, null | undefined>
+
+[.] BindableMark
+interface BindableMark
+
+[.] BoundProp
+type BoundProp<Tag, Key> = Key extends BindableKeys<Tag> ? unknown : { kayError: 'bind: needs a prop typed Bindable<T> in the component' }
+
+[.] BoundValue
+type BoundValue<Tag, Key> = Key extends keyof PropsOfComponent<Tag> ? Required<PropsOfComponent<Tag>>[Key] : never
+
+[.] call
+function call<Module, const Path extends CallPath<Module>, const M extends CallMethod<NodeAt<Module, Path>> = never>(module: Module, path: Path, ...[options]: Optional<ApiCallOptions<Module, Path, M>>): Promise<Answered<Received<MethodRoute<Module, Path, Chosen<M>>>>>
+
+[.] CallMethod
+type CallMethod<Node> = Exclude<RouteKey<Node>, 'subscribe'>
+
+[.] CallOptions
+interface CallOptions
+  headers?: Record<string, string> | undefined
+  optimistic?: (() => void) | undefined
+  refresh?: boolean | undefined
+  signal?: AbortSignal | undefined
+
+[.] CallPath
+type CallPath<Module> = Nodes<RoutesOf<Module>> extends infer Found ? Found extends { path: infer Path, node: infer Node } ? [CallMethod<Node>] extends [never] ? never : Path : never : never
+
+[.] CallResult
+type CallResult<Data, Failed> = | { ok: true, data: Data } | { ok: false, status: number, errors: Record<string, string>, data: Failed | undefined }
+
+[.] CardPageContext
+interface CardPageContext<Params extends Record<string, unknown> = Record<string, string>> extends PageContext<Params>
+  card: { title: string; image?: string | undefined; name?: string | undefined; }
+  cookies: CookieMap
+  deny: (status?: number | undefined, message?: string | undefined) => never
+  headers: Headers
+  locale: string
+  locals: object
+  notFound: () => never
+  params: Params
+  query: Readonly<Record<string, unknown>>
+  redirect: Redirect
+  request: Request
+  status: (code: number) => void
+  url: URL
+
+[.] CheckedHref
+type CheckedHref<Href extends string> = string extends Href ? unknown : Href extends `//${string}` | `/_kay/${string}` ? unknown : Href extends `/${string}` ? IsRoute<PathOf<Href>> extends true ? unknown : { kayError: `${typeof UNSERVED_MESSAGE} ${PathOf<Href>}` } : unknown
+
+[.] CheckedHtml
+type CheckedHtml<Markup> = [UnsafeHtml<Markup>] extends [never] ? unknown : { kayError: 'This string would render as markup: pass sanitizeHtml(value) for markup a user wrote, or trustHtml(value) for markup the app made' }
+
+[.] Component
+type Component<Props = object> = (props: Props) => JSX.Element
+
+[.] context
+function context<T>(fallback: T): Context<T>
+
+[.] Context
+interface Context<T>
+  provide: (value: T) => void
+  use: () => T
+
+[.] ContextOfModule
+type ContextOfModule<Module> = Module extends { default: ContextDefinition<infer Values> } ? Values : object
+
+[.] ctx
+const ctx: object
+
+[.] debounced
+function debounced<T>(source: () => T, delay: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w`): Memo<T>
+
+[.] defer
+function defer<T>(value: T | PromiseLike<T>): Deferred<T>
+
+[.] Deferred
+type Deferred<T> = Promise<T>
+
+[.] defineUi
+function defineUi(config: Readonly<Record<string, UiEntry>>): Readonly<Record<string, UiEntry>>
+
+[.] describeField
+function describeField(ids: string, options?: DescribeOptions): void
+
+[.] DescribeOptions
+interface DescribeOptions
+  required?: boolean | "all" | undefined
+
+[.] dispatch
+function dispatch<Message extends { type: string; }, Handlers extends { [Type in Message["type"]]: (message: Extract<Message, { type: Type; }>) => unknown; }>(message: Message, handlers: Handlers): ReturnType<Handlers[Message["type"]]>
+
+[.] Duration
+type Duration = `${number}${'ms' | keyof typeof UNIT_SECONDS}`
+
+[.] durationMs
+function durationMs(value: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w`): number
+
+[.] editing
+function editing(): boolean
+
+[.] effect
+function effect(fn: () => void): void
+
+[.] elementSize
+function elementSize(): ElementSize
+
+[.] ElementSize
+interface ElementSize
+  height: () => number
+  ref: (element: Element) => void
+  width: () => number
+
+[.] EndpointBody
+type EndpointBody = string | Blob | Response
+
+[.] EndpointContext
+type EndpointContext<Params extends Record<string, unknown> = Record<string, string>> = RequestContext<Params>
+
+[.] ErrorPageContext
+interface ErrorPageContext<Params extends Record<string, unknown> = Record<string, string>> extends PageContext<Params>
+  cookies: CookieMap
+  deny: (status?: number | undefined, message?: string | undefined) => never
+  error: PageError
+  headers: Headers
+  locale: string
+  locals: object
+  notFound: () => never
+  params: Params
+  query: Readonly<Record<string, unknown>>
+  redirect: Redirect
+  request: Request
+  status: (code: number) => void
+  url: URL
+
+[.] EventHandler
+type EventHandler<Target, E extends Event> = (event: E & { currentTarget: Target, target: globalThis.Element }) => void
+
+[.] EventReader
+interface EventReader<T>
+  close: () => void
+  last: () => T | undefined
+  on: (listener: (value: T) => void) => () => void
+  status: () => StreamStatus
+
+[.] EventStream
+type EventStream<T> = Response & { readonly [EVENTS]: T }
+
+[.] every
+function every(interval: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w`, run: () => unknown, options?: EveryOptions | undefined): void
+
+[.] EveryOptions
+interface EveryOptions
+  background?: boolean | undefined
+  immediate?: boolean | undefined
+  while?: (() => boolean) | undefined
+
+[.] ExtensionServersOf
+type ExtensionServersOf<Config> = Config extends { extensions?: readonly (infer Extension)[] | undefined } ? ServersOf<Extension> : never
+
+[.] Failure
+interface Failure<Data>
+  data: Data
+  status: number
+
+[.] FailureData
+type FailureData<Output> = unknown extends Output ? unknown : [Extract<Output, Failure<unknown>>] extends [never] ? unknown : Output extends Failure<infer Data> ? Data : never
+
+[.] FailureOf
+type FailureOf<Target> = Target extends Action<infer Input, unknown> ? FormFailure<Input, FailuresOf<Target>, Extract<HoneypotOf<Target>, string>> : never
+
+[.] FieldName
+type FieldName<Target> = Target extends Action<infer Input, unknown> ? Extract<keyof Input, string> | HoneypotOf<Target> : string
+
+[.] flush
+function flush(): void
+
+[.] focusInvalid
+function focusInvalid(root?: ParentNode | undefined): Promise<boolean>
+
+[.] followLog
+function followLog(container: Element | (() => Element | null | undefined), options?: FollowLogOptions): FollowLog
+
+[.] FollowLog
+interface FollowLog
+  toBottom: () => void
+
+[.] FollowLogOptions
+interface FollowLogOptions
+  items?: string | undefined
+  threshold?: number | undefined
+
+[.] FormFailure
+interface FormFailure<Input, Data, Honeypot extends string = never>
+  data?: Data
+  errors: Partial<Record<"" | Honeypot | Extract<keyof Input, string>, string>>
+  status: number
+  values: Partial<Record<Extract<keyof Input, string>, string>>
+
+[.] FormSuccess
+interface FormSuccess<Output>
+  data: Output
+
+[.] FunctionProp
+type FunctionProp<Component> = Component extends IslandBrand ? { kayError: 'A layout, or a page with a server fence, sends an island its props serialized: plain objects, arrays, Dates, Maps, Sets, bigints, URLs and RegExps, but no functions, symbols or class instances; a component of its own passing ...#2815b3c5
+
+[.] guard
+function guard<Own extends object = object>(check: (ctx: GuardContext<Own>) => void | Promise<void>): Guard
+
+[.] Guard
+type Guard = (ctx: GuardContext) => void | Promise<void>
+
+[.] GuardContext
+type GuardContext<Own extends object = object> = Omit<RequestContext<RouteParams>, 'locals'> & { locals: Locals & Own }
+
+[.] guardLeave
+function guardLeave(dirty: () => boolean, options?: LeaveGuardOptions): void
+
+[.] HandedPart
+type HandedPart<Component, Name extends string> = PartClass<Component> extends infer Class ? Class extends object ? Name extends keyof Class ? Class[Name] : never : never : never
+
+[.] HandedSignal
+type HandedSignal<Parameter> = 0 extends 1 & Parameter ? { kayLint: 'uncalled-signal' } : [Parameter] extends [UnresolvedParameter] ? unknown : unknown extends Parameter ? { kayLint: 'uncalled-signal' } : unknown
+
+[.] HandsPart
+type HandsPart<Component, Name extends string> = 0 extends 1 & Component ? unknown : [HandedPart<Component, Name>] extends [never] ? { kayError: `The called component has no part ${Name}` } : unknown
+
+[.] HoneypotOptions
+interface HoneypotOptions<Field extends string = string>
+  field: Field
+  pretend?: boolean | undefined
+
+[.] HydrateWhen
+type HydrateWhen = 'load' | 'idle' | 'visible' | 'client'
+
+[.] Inferred
+interface Inferred
+
+[.] InputOf
+type InputOf<Target> = Target extends Action<infer Input, unknown> ? Input : never
+
+[.] InstallOutcome
+type InstallOutcome = 'accepted' | 'dismissed' | 'unavailable'
+
+[.] installPrompt
+const installPrompt: { available: () => boolean; show(): Promise<InstallOutcome>; }
+
+[.] IslandBrand
+interface IslandBrand
+
+[.] IslandComponent
+type IslandComponent<Props> = ((props: Props & IslandOptions) => JSX.Element) & IslandBrand
+
+[.] IslandOptions
+interface IslandOptions
+  hydrate?: HydrateWhen | undefined
+  persist?: string | boolean | undefined
+
+[.] IslandProp
+type IslandProp<Component, Value> = Component extends IslandBrand ? [IsSerializable<Value>] extends [true] ? SecretProp<Value> & ActionProp<Component, Value> : NotSerializable<Value> : unknown
+
+[.] jobs
+function jobs<Payload = unknown, Progress = unknown>(queue: string): QueuedJob<Payload, Progress>[]
+
+[.] Jsonified
+type Jsonified<T> = T extends Date | bigint ? string : T extends readonly (infer Item)[] ? Jsonified<Item>[] : T extends object ? { [Key in keyof T]: Jsonified<T[Key]> } : T
+
+[.] Lastmod
+type Lastmod = Date | string | number
+
+[.] LeaveGuardOptions
+interface LeaveGuardOptions
+  confirm?: ((to: URL) => boolean | Promise<boolean>) | undefined
+
+[.] linked
+function linked<T>(source: () => T): Signal<T>
+
+[.] listen
+function listen<T extends EventTarget, K extends keyof EventMapOf<T> & string>(target: T | (() => T | null | undefined), type: K, handler: (event: EventMapOf<T>[K]) => void, options?: boolean | AddEventListenerOptions | undefined): void
+
+[.] live
+function live<T, const Ttl extends Duration = `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w`>(initial: PlainValue<T>, options: LiveOptions<Ttl> & { user: true; }): LiveOwn<T>
+function live<T, const Ttl extends Duration = `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w`>(initial: PlainValue<T>, options?: LiveOptions<Ttl> | undefined): Live<T>
+function live<K extends LiveKey, T, const Ttl extends Duration = `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w`>(initial: (key: K) => PlainValue<T>, options?: LiveOptions<Ttl> | undefined): LiveByKey<K, T>
+
+[.] Live
+interface Live<T>
+  set: Setter<T>
+
+[.] LiveByKey
+interface LiveByKey<K extends LiveKey, T>
+  delete: (key: K) => void
+  set: (key: K, next: T | ((current: T) => T)) => void
+
+[.] LiveKey
+type LiveKey = string
+
+[.] LiveOptions
+interface LiveOptions<Ttl extends Duration = Duration>
+  ttl?: Ttl & PositiveDuration<Ttl>
+  user?: boolean
+
+[.] LiveOwn
+interface LiveOwn<T>
+  delete: (user: string) => void
+  set: (user: string, next: T | ((current: T) => T)) => void
+
+[.] local
+function local<Row extends object, const Key extends keyof Row & string>(options: LocalOptions<Row, Key>): Local<Row, Key>
+
+[.] Local
+interface Local<Row, Key extends keyof Row>
+  clear: () => Promise<void>
+  dismiss: (id: number) => Promise<void>
+  get: (key: Row[Key]) => Row | undefined
+  issues: () => readonly LocalIssue<Row>[]
+  pending: () => number
+  put: (row: Row) => Promise<void>
+  remove: (key: Row[Key]) => Promise<void>
+  rows: () => readonly Row[]
+  status: () => LocalStatus
+  sync: () => Promise<void>
+
+[.] LocalConflict
+interface LocalConflict<Row>
+  base: Row | undefined
+  key: string
+  mine: Row | undefined
+  theirs: Row
+
+[.] LocalIssue
+interface LocalIssue<Row>
+  at: number
+  data?: unknown
+  errors?: Record<string, string> | undefined
+  id: number
+  kept?: Row | undefined
+  key: string
+  kind: "rejected" | "conflict"
+  mine?: Row | undefined
+  op: "put" | "remove"
+  status?: number | undefined
+  theirs?: Row | undefined
+
+[.] LocalOptions
+interface LocalOptions<Row extends object, Key extends keyof Row & string>
+  conflict?: ((conflict: LocalConflict<Row>) => Row | undefined) | undefined
+  key: Key
+  put: Action<Row, unknown, never>
+  read: (signal: AbortSignal) => readonly Row[] | Promise<readonly Row[]>
+  remove?: Action<Pick<Row, Key>, unknown, never> | undefined
+  version?: number | undefined
+
+[.] localPath
+function localPath<const Fallback extends string>(value: unknown, fallback: Fallback & CheckedHref<Fallback>): string
+
+[.] Locals
+type Locals = (Register extends { locals: infer Values extends object } ? Values : Inferred extends { locals: infer Values extends object } ? Values : object) & ([ExtensionServers] extends [never] ? unknown : Intersected<ServerLocals<ExtensionServers>>)
+
+[.] LocalsOf
+type LocalsOf<App extends Pick<Elysia, '~Singleton' | '~Ephemeral' | '~Volatile'>> = App['~Singleton']['decorator'] & App['~Singleton']['derive'] & App['~Singleton']['resolve'] & App['~Ephemeral']['derive'] & App['~Ephemeral']['resolve'] & App['~Volatile']['derive'] & App['~Volatile']['resolve']
+
+[.] LocalStatus
+type LocalStatus = 'loading' | 'synced' | 'pending' | 'offline' | 'signed-out' | 'unavailable'
+
+[.] Log
+type Log = Record<LogLevel, (message: string, error?: unknown) => void>
+
+[.] logFrom
+function logFrom(from: string): Log
+
+[.] markInvalid
+function markInvalid(element: Element, by: unknown, invalid: boolean): void
+
+[.] mediaQuery
+function mediaQuery(query: string, fallback?: boolean): () => boolean
+
+[.] memo
+function memo<T>(fn: () => T, options?: SignalOptions<T> | undefined): () => T
+
+[.] Memo
+type Memo<T> = () => T
+
+[.] MinTimeOptions
+interface MinTimeOptions
+  after: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w`
+  maxAge?: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w` | undefined
+  plain?: boolean | undefined
+  pretend?: boolean | undefined
+
+[.] MinTimeRefusal
+type MinTimeRefusal = 'early' | 'expired'
+
+[.] navigate
+function navigate(to: { query: Readonly<Record<string, string | number | null | undefined>>; }, options?: NavigateOptions | undefined): Promise<boolean>
+function navigate<const Href extends string>(href: Href & CheckedHref<Href>, options?: NavigateOptions | undefined): Promise<boolean>
+
+[.] NavigateOptions
+interface NavigateOptions
+  replace?: boolean | undefined
+  scroll?: "top" | "keep" | undefined
+  transition?: boolean | undefined
+
+[.] NoInputAction
+type NoInputAction<Output, Honeypot extends string = never> = ServerAction<EmptySchema, Output, Honeypot> & ((input?: undefined, options?: CallOptions) => Promise<Answer<Success<Output>>>)
+
+[.] onCleanup
+function onCleanup(fn: () => void): void
+
+[.] onMount
+function onMount(fn: () => void): void
+
+[.] PageContext
+interface PageContext<Params extends Record<string, unknown> = Record<string, string>, Query = Readonly<Record<string, unknown>>> extends RequestContext<Params>
+  cookies: CookieMap
+  deny: (status?: number | undefined, message?: string | undefined) => never
+  headers: Headers
+  locale: string
+  locals: object
+  notFound: () => never
+  params: Params
+  query: Query
+  redirect: Redirect
+  request: Request
+  status: (code: number) => void
+  url: URL
+
+[.] PageData
+type PageData<Load extends (...args: never[]) => unknown> = Awaited<ReturnType<Load>>
+
+[.] PageError
+interface PageError
+  message: string
+  stack?: string | undefined
+  status: number
+
+[.] PageSearch
+type PageSearch = false | { weight?: number }
+
+[.] PageSecurity
+interface PageSecurity
+  csp?: false | Record<string, false | string[]>
+  headers?: Record<string, string | false>
+
+[.] PageSettings
+interface PageSettings
+  guards?: false
+  keep?: true
+  lastmod?: Lastmod | ((params: Record<string, string>) => Lastmod | Promise<Lastmod | undefined> | undefined)
+  layouts?: false
+  noindex?: boolean
+  prerender?: boolean | object
+  query?: TSchema
+  reload?: true
+  revalidate?: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w`
+  search?: PageSearch | ((params: Record<string, string>) => PageSearch | Promise<PageSearch | undefined> | undefined)
+  security?: PageSecurity
+  sitemap?: boolean | object
+
+[.] PartClass
+type PartClass<Component> = Component extends (props: infer Props) => unknown ? 'class' extends keyof Props ? Props['class' & keyof Props] : never : never
+
+[.] persisted
+function persisted<T = string>(name: string, value: NoInfer<PlainValue<T>>, options: Omit<PersistedOptions<NoInfer<T>>, "maxAge" | "values"> & { storage: "query"; }): Signal<T>
+function persisted<const T extends string | number | boolean>(name: string, value: NoInfer<T>, options: Omit<PersistedOptions<T>, "maxAge"> & { storage: "query"; values: readonly T[]; }): Signal<T>
+function persisted<const T extends string | number | boolean>(name: string, value: NoInfer<T>, options: (PersistedOptions<T> & { storage?: "cookie" | undefined; values: readonly T[]; }) | (Omit<PersistedOptions<T>, "maxAge"> & { storage: "local"; values: readonly T[]; })): Signal<T>
+function persisted<T>(name: string, value: PlainValue<T>, options?: (Omit<PersistedOptions<T>, "values"> & { storage?: "cookie" | undefined; }) | (Omit<PersistedOptions<T>, "maxAge" | "values"> & { storage: "local"; }) | undefined): Signal<T>
+
+[.] PersistedOptions
+interface PersistedOptions<T> extends SignalOptions<T>
+  equals?: Equals<T> | undefined
+  maxAge?: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w` | undefined
+  storage?: PersistStorage | undefined
+  values?: readonly T[] | undefined
+
+[.] PersistStorage
+type PersistStorage = 'cookie' | 'local' | 'query'
+
+[.] PlainIslandProp
+type PlainIslandProp<Component, Value> = Component extends IslandBrand ? SecretProp<Value> & ActionProp<Component, Value> : unknown
+
+[.] PrerenderedContext
+type PrerenderedContext<Flag, Context> = [Flag] extends [false | null | undefined] ? Context : boolean extends Flag ? Context : Omit<Context, 'cookies' | 'query' | 'locals'> & { cookies: { kayError: 'A prerendered page renders once, at build time, with no ctx.cookies; drop prerender from export cons ...#25ed448b
+
+[.] presence
+function presence(): Presence<null>
+function presence<Member = null>(room: string, member?: Member | undefined): Presence<Member>
+
+[.] Presence
+interface Presence<Member>
+  count: () => number
+  others: () => Member[]
+
+[.] previewing
+function previewing(): boolean
+
+[.] ProofOfWorkOptions
+interface ProofOfWorkOptions
+  difficulty?: number | undefined
+  maxAge?: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w` | undefined
+  pretend?: boolean | undefined
+  store?: RateStore | undefined
+
+[.] ProofOfWorkRefusal
+type ProofOfWorkRefusal = 'missing' | 'expired' | 'wrong'
+
+[.] ProtectionMessages
+interface ProtectionMessages
+  honeypot?: string | undefined
+  maxSize?: string | ((bytes: number) => string) | undefined
+  minTime?: string | ((reason: MinTimeRefusal) => string) | undefined
+  proofOfWork?: string | ((reason: ProofOfWorkRefusal) => string) | undefined
+  rateLimit?: string | ((wait: number) => string) | undefined
+  serverError?: string | ((error: unknown, ctx: ActionContext<Readonly<Record<string, unknown>>>) => string | Promise<string>) | undefined
+
+[.] publicEnv
+const publicEnv: Readonly<Record<never, never>>
+
+[.] PublicEnv
+type PublicEnv = Register extends { publicEnv: infer Values extends object } ? Readonly<Values> : Readonly<Record<never, never>>
+
+[.] PublicFieldsOf
+type PublicFieldsOf<Schema extends TSchema> = Schema extends { properties: infer Fields extends Record<string, TSchema> } ? { [Name in keyof Static<Schema> as Name extends keyof Fields ? Fields[Name] extends { public: true } ? Name : never : never]: Static<Schema>[Name] } : Record<never, never>
+
+[.] PublicFieldsOfModule
+type PublicFieldsOfModule<Module> = Intersection<{ [Name in keyof Module]: Module[Name] extends { readonly [PUBLIC_FIELDS]: infer Fields } ? Fields : never }[keyof Module]>
+
+[.] PushState
+type PushState = 'unsupported' | 'denied' | 'subscribed' | 'off'
+
+[.] PushSubscribeResult
+type PushSubscribeResult = PushState | 'needs-gesture' | 'signed-out' | 'failed'
+
+[.] QueryChanges
+type QueryChanges = Readonly<Record<string, string | number | null | undefined>>
+
+[.] QueryOf
+type QueryOf<Schema> = Schema extends TSchema ? Static<Schema> : never
+
+[.] queryParam
+function queryParam<T = string | undefined>(name: string): Signal<T>
+
+[.] QueuedJob
+interface QueuedJob<Payload = unknown, Progress = unknown>
+  attempts: number
+  error?: string
+  id: string
+  key?: string
+  payload: Payload
+  progress?: Progress
+  runAt: number
+  status: "waiting" | "running"
+
+[.] RateKey
+type RateKey = (ctx: RateKeyContext) => string | undefined | Promise<string | undefined>
+
+[.] RateKeyContext
+type RateKeyContext = Pick<RequestContext, 'request' | 'locale' | 'cookies' | 'locals'> & { client: string }
+
+[.] RateLimit
+interface RateLimit
+  max: number
+  store?: RateStore | undefined
+  window: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w`
+
+[.] RateStore
+interface RateStore
+  hit: (key: string, window: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w`, weight?: number | undefined) => RateWindow | Promise<RateWindow>
+  peek?: (key: string) => RateWindow | Promise<RateWindow | undefined> | undefined
+  refund?: (key: string, resetAt: number) => void | Promise<void>
+  reset?: (key: string) => void | Promise<void>
+
+[.] RateWindow
+interface RateWindow
+  count: number
+  resetAt: number
+
+[.] recipe
+function recipe<const Variants extends VariantTable = Record<never, never>>(config: RecipeConfig<Variants>): Recipe<Variants>
+
+[.] Recipe
+interface Recipe<Variants extends VariantTable>
+  defaults: VariantValues<Variants>
+  variants: readonly (keyof Variants & string)[]
+
+[.] RecipeConfig
+interface RecipeConfig<Variants extends VariantTable>
+  defaults?: VariantValues<NoInfer<Variants>>
+  parts?: string | Readonly<Record<string, string>>
+  variants?: Variants
+
+[.] RecipeProps
+type RecipeProps<Recipe> = Recipe extends (values?: infer Values, part?: string) => string ? NonNullable<Values> : never
+
+[.] Redirect
+type Redirect = <const Location extends string>(location: Location & CheckedHref<Location> & CheckedTarget<Location>, status?: 301 | 302 | 303 | 307 | 308) => never
+
+[.] reducedMotion
+function reducedMotion(fallback?: boolean): () => boolean
+
+[.] refresh
+function refresh(): Promise<void>
+
+[.] refusalMessage
+function refusalMessage(error: unknown, fallback: string): string
+
+[.] Register
+interface Register
+
+[.] RequestContext
+interface RequestContext<Params extends Record<string, unknown> = Record<string, string>>
+  cookies: CookieMap
+  deny: (status?: number | undefined, message?: string | undefined) => never
+  headers: Headers
+  locale: string
+  locals: object
+  notFound: () => never
+  params: Params
+  redirect: Redirect
+  request: Request
+  url: URL
+
+[.] ResolvedProtection
+interface ResolvedProtection
+  honeypot?: string | HoneypotOptions<string> | undefined
+  maxSize?: ByteSize | undefined
+  messages?: ProtectionMessages | undefined
+  minTime?: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w` | MinTimeOptions | undefined
+  proofOfWork?: number | boolean | ProofOfWorkOptions | undefined
+  rateLimit?: ActionRateLimit | ActionRateLimit[] | undefined
+  tool?: string | boolean | ActionTool | undefined
+
+[.] resource
+function resource<Module, const Path extends ResourcePath<Module>>(module: Module, path: Path, ...[options]: Optional<ResourceOptions<Module, Path> | (() => ResourceOptions<Module, Path>)>): ResourceOf<Module, Path>
+function resource<T>(load: (signal: AbortSignal) => T | PromiseLike<T>): Resource<Awaited<T>>
+
+[.] Resource
+interface Resource<T>
+  error: () => ResourceFailure | undefined
+  refresh: () => void
+  status: () => ResourceStatus
+  value: () => T | undefined
+
+[.] ResourceFailure
+interface ResourceFailure
+  message: string
+  status: number
+
+[.] ResourcePath
+type ResourcePath<Module> = Nodes<RoutesOf<Module>> extends infer Found ? Found extends { path: infer Path, node: { get: infer Route } } ? Route extends { response: { 200: infer Value } } ? Readable<Value> extends true ? Path : never : Path : never : never
+
+[.] ResourceStatus
+type ResourceStatus = 'loading' | 'ready' | 'failed'
+
+[.] root
+function root<T>(fn: (dispose: () => void) => T): T
+
+[.] route
+function route<const Pattern extends RoutePattern>(pattern: Pattern, ...args: RouteArgs<Pattern>): string
+
+[.] RouteArgs
+type RouteArgs<Pattern extends string> = string extends Pattern ? [params?: Readonly<Record<string, unknown>>, options?: RouteOptions] : [keyof ParamsOf<Pattern>] extends [never] ? [options?: RouteOptions] : Record<never, never> extends Flat<ParamsOf<Pattern>> ? [params?: Flat<ParamsOf<Pattern>>, op ...#838c976b
+
+[.] RouteOptions
+interface RouteOptions
+  hash?: string | undefined
+  query?: Readonly<Record<string, boolean | Value | readonly (boolean | Value)[] | null | undefined>> | undefined
+
+[.] RouteParams
+type RouteParams = Readonly<Record<string, unknown>>
+
+[.] RoutePattern
+type RoutePattern = Register extends { patterns: infer Patterns extends string } ? Patterns : string
+
+[.] s
+const s: Omit<Omit<JavaScriptTypeBuilder, "String" | "Transform"> & { String: (property?: ElysiaStringOptions | undefined) => TString; Numeric: (property?: NumberOptions | undefined) => TNumber; NumericEnum<T extends AssertNumericEnum<T>>(item: T, property?: SchemaOptions | undefined): TEnum<T>; Integer: (pr ...#4aa8442d
+
+[.] SafeHtml
+type SafeHtml = string & { readonly [SAFE_HTML]: true }
+
+[.] sanitizeHtml
+function sanitizeHtml(markup: string, options?: SanitizeOptions | undefined): SafeHtml
+
+[.] SanitizeOptions
+interface SanitizeOptions
+  attributes?: Record<string, string[]> | undefined
+  base?: string | undefined
+  relativeUrls?: boolean | undefined
+  tags?: string[] | undefined
+
+[.] SearchHit
+interface SearchHit
+  heading?: string | undefined
+  headingParts?: SearchPart[] | undefined
+  href: string
+  more: number
+  page: string
+  score: number
+  snippet: SearchPart[]
+
+[.] SearchOptions
+interface SearchOptions
+  lang?: string | undefined
+  limit?: number | undefined
+
+[.] SearchPart
+interface SearchPart
+  hit: boolean
+  text: string
+
+[.] searchResults
+function searchResults(query: () => string, options?: SearchOptions | undefined): SearchResults
+
+[.] SearchResults
+interface SearchResults
+  error: () => Error | undefined
+  hits: () => SearchHit[]
+  loading: () => boolean
+
+[.] searchSite
+function searchSite(query: string, options?: SearchOptions | undefined): Promise<SearchHit[]>
+
+[.] selection
+function selection<Key extends string | number>(initial?: Key | undefined): Selection<Key>
+
+[.] Selection
+interface Selection<Key>
+  is: (key: Key) => boolean
+  set: (key: Key | ((current: Key | undefined) => Key | undefined) | undefined) => void
+
+[.] ServerAction
+interface ServerAction<Schema extends TSchema, Output, Honeypot extends string = never> extends Action<Sendable<Static<Schema>>, Output, Honeypot>
+  error: (field?: "" | Honeypot | Extract<keyof Sendable<(Schema & { params: []; })["static"]>, string> | undefined) => string | undefined
+  failed: () => FormFailure<Sendable<(Schema & { params: []; })["static"]>, FailureData<Output>, Honeypot> | undefined
+  handler: (input: (Schema & { params: []; })["static"], ctx: ActionContext<Readonly<Record<string, unknown>>>) => Output | Promise<Output>
+  pending: () => boolean
+  progress: () => number | undefined
+  protection?: ResolvedProtection
+  refused: (error: unknown) => error is ActionError<FailureData<Output>>
+  schema: Schema
+  settled: () => Promise<void>
+  succeeded: () => FormSuccess<Final<Exclude<Output, Failure<unknown>>>> | undefined
+  track: () => TrackedCall<Sendable<(Schema & { params: []; })["static"]>, CallResult<Answer<Exclude<Output, Failure<unknown>>>, FailureData<Output>>>
+  url: string
+  with: (fields: Partial<Sendable<(Schema & { params: []; })["static"]>>) => Action<Sendable<(Schema & { params: []; })["static"]>, Output, Honeypot>
+
+[.] ServerOfModule
+type ServerOfModule<Module, Name extends string> = Module extends Record<Name, infer Value> ? Typed<Carried<Value extends (...args: never[]) => infer Built ? Awaited<Built> : Value>> : never
+
+[.] Setter
+type Setter<T> = (next: T | ((current: T) => T)) => void
+
+[.] shortcut
+function shortcut(keys: string | (() => string | null | undefined), handler: (event: KeyboardEvent) => void, options?: ShortcutOptions): void
+
+[.] ShortcutOptions
+interface ShortcutOptions
+  inputs?: boolean | undefined
+  on?: Element | (() => Element | null | undefined) | undefined
+  preventDefault?: boolean | undefined
+  repeat?: boolean | undefined
+
+[.] signal
+function signal<T>(): Signal<T | undefined>
+function signal<T>(value: PlainValue<T>, options?: SignalOptions<T> | undefined): Signal<T>
+
+[.] Signal
+interface Signal<T>
+  set: Setter<T>
+
+[.] SignalOptions
+interface SignalOptions<T>
+  equals?: Equals<T> | undefined
+
+[.] snapshot
+function snapshot<T>(value: T): T
+
+[.] Snippet
+type Snippet<Args extends unknown[] = []> = Args extends [] ? JSX.Element : (...args: Args) => JSX.Element
+
+[.] socket
+function socket<Module, const Path extends SocketPath<Module>>(module: Module, path: Path, ...[options]: Optional<SocketOptions<Module, Path>>): SocketOf<Module, Path>
+
+[.] Socket
+interface Socket<Send, Receive>
+  close: () => void
+  last: () => Receive | undefined
+  on: (listener: (message: Receive) => void) => () => void
+  onOpen: (listener: () => void) => () => void
+  send: (message: Send) => void
+  status: () => SocketStatus
+
+[.] SocketPath
+type SocketPath<Module> = Extract<Nodes<RoutesOf<Module>>, { node: { subscribe: unknown } }>['path']
+
+[.] SocketStatus
+type SocketStatus = 'connecting' | 'open' | 'closed'
+
+[.] Static
+type Static<Type extends TSchema, Params extends unknown[] = [], Result = (Type & {
+    params: Params;
+})['static']> = Result
+
+[.] store
+function store<T extends object>(value: T): T
+
+[.] stream
+function stream<Module, const Path extends StreamPath<Module>, const M extends StreamMethod<NodeAt<Module, Path>> = never>(module: Module, path: Path, options: MethodOption<NodeAt<Module, Path>, M> & { start: false; }): StreamRun<StreamValue<MethodRoute<Module, Path, Chosen<M>>>, StreamStartOptions<Module, Path, M ...#99db259b
+function stream<Module, const Path extends StreamPath<Module>, const M extends StreamMethod<NodeAt<Module, Path>> = never>(module: Module, path: Path, ...[options]: Optional<StreamOptions<Module, Path, M>>): StreamOf<Module, Path, M>
+function stream<T>(source: (signal: AbortSignal) => AsyncIterable<T>): EventReader<T>
+
+[.] StreamPath
+type StreamPath<Module> = Nodes<RoutesOf<Module>> extends infer Found ? Found extends { path: infer Path, node: infer Node } ? [StreamMethod<Node>] extends [never] ? never : Path : never : never
+
+[.] StreamRun
+interface StreamRun<T, Options> extends EventReader<T>
+  close: () => void
+  last: () => T | undefined
+  on: (listener: (value: T) => void) => () => void
+  start: (...[options]: Optional<Options>) => void
+  status: () => StreamStatus
+
+[.] StreamStartOptions
+type StreamStartOptions<Module, Path, M> = UrlOptions<MethodRoute<Module, Path, Chosen<M>>> & CallBody<MethodRoute<Module, Path, Chosen<M>>>
+
+[.] StreamStatus
+type StreamStatus = 'idle' | 'connecting' | 'open' | 'done' | 'failed' | 'closed'
+
+[.] Success
+type Success<Output> = Exclude<Output, Failure<unknown>>
+
+[.] SuccessOf
+type SuccessOf<Target> = Target extends Action<never, unknown> ? FormSuccess<Final<Success<ResultOf<Target>>>> : never
+
+[.] TemplateContext
+type TemplateContext = TemplateValues extends { values: infer Values extends object } ? Values : object
+
+[.] TemplateHelpers
+interface TemplateHelpers
+  Await: <T>(props: { value: T; pending?: Element; ready?: Element; failed?: Element; }) => Element
+  Dynamic: <Tag>(props: { component: Tag; } & PropsOf<Tag>) => Element
+  For: { <T>(props: { each: false | readonly T[] | null | undefined; keyed: (item: T) => unknown; fallback?: Element; children: Element; }): Element; <T>(props: { each: false | readonly T[] | null | undefined; keyed: false; fallback?: Element; children: Element; }): Element; }
+  Try: (props: { block: Element; failed?: Element; }) => Element
+  awaited: <T>(value: T) => Settled<T>
+  componentClass: <List extends readonly unknown[]>(list: List) => ComponentClass<List>
+  head: (tags: { tag: string; props: Record<string, unknown>; }[]) => void
+  omit: <Props extends object, Key extends keyof Props>(props: Props, ...keys: Key[]) => Omit<Props, Key>
+  partClass: (props: unknown, part: string) => unknown
+  partHanded: (part: string, list: readonly unknown[]) => unknown
+  partsClass: (list: readonly unknown[]) => unknown
+  staticFor: <T>(each: false | readonly T[] | null | undefined, rendered: Element, fallback?: Element) => Element
+
+[.] TemplateValues
+interface TemplateValues
+
+[.] TrackedApi
+interface TrackedApi<Module, Path>
+  pending: () => boolean
+  settled: () => Promise<void>
+
+[.] TrackedCall
+interface TrackedCall<Input, Result>
+  pending: () => boolean
+  settled: () => Promise<void>
+
+[.] TransitionClasses
+interface TransitionClasses
+  enter?: string | undefined
+  enterFrom?: string | undefined
+  enterTo?: string | undefined
+  leave?: string | undefined
+  leaveFrom?: string | undefined
+  leaveTo?: string | undefined
+
+[.] trustHtml
+function trustHtml(markup: string): SafeHtml
+
+[.] Truthy
+type Truthy<T> = Exclude<T, false | 0 | 0n | '' | null | undefined>
+
+[.] UiComponents
+interface UiComponents
+
+[.] UiConfig
+type UiConfig = [keyof UiComponents] extends [never] ? Readonly<Record<string, UiEntry>> : { readonly [Key in keyof UiComponents]?: UiEntryOf<UiComponents[Key]> }
+
+[.] uid
+function uid(): string
+
+[.] UiEntry
+type UiEntry = Omit<RecipeConfig<VariantTable>, 'defaults'>
+
+[.] Unmatched
+type Unmatched<Rest> = [Rest] extends [never] ? unknown : false extends Finite<Rest> ? unknown : IncompleteMatch<Rest>
+
+[.] UnresolvedParameter
+interface UnresolvedParameter
+  kayUnresolved: true
+
+[.] untrack
+function untrack<T>(fn: () => T): T
+
+[.] watch
+function watch<T>(source: () => T, run: (next: T, previous: T) => unknown, options?: (WatchOptions & { immediate?: false | undefined; }) | undefined): void
+function watch<T>(source: () => T, run: (next: T, previous: T | undefined) => unknown, options?: WatchOptions | undefined): void
+
+[.] WatchOptions
+interface WatchOptions
+  immediate?: boolean | undefined
+
+[.] webPush
+const webPush: { state: () => PushState; subscribe(): Promise<PushSubscribeResult>; unsubscribe(): Promise<boolean>; }
+
+[.] WidenedProps
+type WidenedProps<Props, Added> = Props extends unknown ? Without<Props, keyof Added> & { [Name in keyof Pick<Props, keyof Added & KnownKeys<Props>>]: Pick<Props, keyof Added & KnownKeys<Props>>[Name] | VariantValue<Record<Added[Name & keyof Added] & string, unknown>> } & { [Name in Exclude<keyof Ad ...#189c05e0
+
+[.] withBase
+function withBase(path: string): string
+
+[.] WithPublicFields
+interface WithPublicFields<Schema extends TSchema>
+
+[.] withQuery
+function withQuery(changes: Readonly<Record<string, string | number | null | undefined>>): string
+
+[./analytics] analytics
+function analytics(options: AnalyticsOptions): KayExtension<AnyElysia>
+
+[./analytics] ANALYTICS_PATH
+const ANALYTICS_PATH: "/_kay/analytics"
+
+[./analytics] ANALYTICS_PROVIDERS
+const ANALYTICS_PROVIDERS: ReadonlySet<string>
+
+[./analytics] ANALYTICS_SCRIPT_PATH
+const ANALYTICS_SCRIPT_PATH: "/_kay/analytics.js"
+
+[./analytics] AnalyticsConsent
+interface AnalyticsConsent
+  agree?: AnalyticsText | undefined
+  maxAge?: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w` | undefined
+  notice?: boolean | undefined
+  policy?: AnalyticsText | undefined
+  refuse?: AnalyticsText | undefined
+  text?: AnalyticsText | undefined
+
+[./analytics] AnalyticsInfo
+interface AnalyticsInfo
+  ok?: AnalyticsText | undefined
+  optOut?: AnalyticsText | undefined
+  policy?: AnalyticsText | undefined
+  text?: AnalyticsText | undefined
+
+[./analytics] AnalyticsOptions
+type AnalyticsOptions = PlausibleOptions | UmamiOptions | SimpleAnalyticsOptions | MatomoOptions | Ga4Options | FathomOptions | CloudflareOptions | CustomOptions
+
+[./analytics] AnalyticsText
+type AnalyticsText = string | Record<string, string>
+
+[./analytics] CloudflareOptions
+interface CloudflareOptions extends Common
+  consent?: boolean | AnalyticsConsent | undefined
+  exclude?: undefined
+  hosts?: string[] | undefined
+  info?: false | AnalyticsInfo | undefined
+  policyUrl?: string | undefined
+  provider: "cloudflare"
+  titles?: undefined
+  token: string
+
+[./analytics] consent
+function consent(): Consent
+
+[./analytics] Consent
+type Consent = 'yes' | 'no' | ''
+
+[./analytics] CUSTOM_COLLECT_PATH
+const CUSTOM_COLLECT_PATH: "/_kay/analytics/collect"
+
+[./analytics] CUSTOM_SCRIPT_PATH
+const CUSTOM_SCRIPT_PATH: "/_kay/analytics/script.js"
+
+[./analytics] CustomOptions
+interface CustomOptions extends Common
+  address?: boolean | undefined
+  consent?: boolean | AnalyticsConsent | undefined
+  endpoint: string
+  exclude?: undefined
+  hosts?: string[] | undefined
+  info?: false | AnalyticsInfo | undefined
+  integrity?: string | undefined
+  policyUrl?: string | undefined
+  provider: "custom"
+  script: string
+  titles?: undefined
+
+[./analytics] FathomOptions
+interface FathomOptions extends Common
+  consent?: boolean | AnalyticsConsent | undefined
+  exclude?: undefined
+  hosts?: string[] | undefined
+  info?: false | AnalyticsInfo | undefined
+  policyUrl?: string | undefined
+  provider: "fathom"
+  siteId: string
+  spa?: "auto" | "history" | "hash" | undefined
+  titles?: undefined
+
+[./analytics] Ga4Options
+interface Ga4Options extends Counted
+  address?: boolean | undefined
+  apiSecret: string
+  consent?: boolean | AnalyticsConsent | undefined
+  exclude?: string[] | undefined
+  host?: string | undefined
+  hosts?: string[] | undefined
+  info?: false | AnalyticsInfo | undefined
+  measurementId: string
+  policyUrl?: string | undefined
+  provider: "ga4"
+  titles?: boolean | undefined
+
+[./analytics] INTEGRITY
+const INTEGRITY: RegExp
+
+[./analytics] isGated
+function isGated(options: AnalyticsOptions): boolean
+
+[./analytics] LazyGuard
+interface LazyGuard
+  load: () => Guard | Promise<Guard>
+
+[./analytics] MatomoOptions
+interface MatomoOptions extends Counted
+  consent?: boolean | AnalyticsConsent | undefined
+  exclude?: string[] | undefined
+  host: string
+  hosts?: string[] | undefined
+  info?: false | AnalyticsInfo | undefined
+  policyUrl?: string | undefined
+  provider: "matomo"
+  siteId: string | number
+  titles?: boolean | undefined
+  tokenAuth?: string | undefined
+
+[./analytics] NOTICE_SCRIPT_PATH
+const NOTICE_SCRIPT_PATH: "/_kay/analytics/notice.js"
+
+[./analytics] PlausibleOptions
+interface PlausibleOptions extends Counted
+  consent?: boolean | AnalyticsConsent | undefined
+  domain?: string | undefined
+  exclude?: string[] | undefined
+  host?: string | undefined
+  hosts?: string[] | undefined
+  info?: false | AnalyticsInfo | undefined
+  policyUrl?: string | undefined
+  provider: "plausible"
+  titles?: boolean | undefined
+
+[./analytics] RouteVitals
+interface RouteVitals
+  cls?: VitalSummary | undefined
+  inp?: VitalSummary | undefined
+  lcp?: VitalSummary | undefined
+  route: string
+
+[./analytics] SimpleAnalyticsOptions
+interface SimpleAnalyticsOptions extends Counted
+  consent?: boolean | AnalyticsConsent | undefined
+  exclude?: string[] | undefined
+  host?: string | undefined
+  hostname?: string | undefined
+  hosts?: string[] | undefined
+  info?: false | AnalyticsInfo | undefined
+  policyUrl?: string | undefined
+  provider: "simpleanalytics"
+  titles?: boolean | undefined
+
+[./analytics] TRACKER_TAGS
+const TRACKER_TAGS: WeakSet<HeadTag>
+
+[./analytics] UmamiOptions
+interface UmamiOptions extends Counted
+  consent?: boolean | AnalyticsConsent | undefined
+  exclude?: string[] | undefined
+  host?: string | undefined
+  hosts?: string[] | undefined
+  info?: false | AnalyticsInfo | undefined
+  policyUrl?: string | undefined
+  provider: "umami"
+  titles?: boolean | undefined
+  websiteId: string
+
+[./analytics] VisitOptions
+type VisitOptions = Exclude<AnalyticsOptions, FathomOptions | CloudflareOptions | CustomOptions>
+
+[./analytics] vitals
+function vitals(options?: VitalsOptions): KayExtension<AnyElysia>
+
+[./analytics] VitalsOptions
+interface VitalsOptions
+  consent?: boolean | undefined
+  guard?: Guard | LazyGuard | undefined
+  prefix?: string | undefined
+
+[./analytics] vitalsReport
+function vitalsReport(now?: number): Promise<RouteVitals[]>
+
+[./analytics] VitalsStore
+interface VitalsStore
+  add: (route: string, readings: VitalReading[], day: number) => void | Promise<void>
+  close?: () => void
+  counts: (since: number) => VitalCount[] | Promise<VitalCount[]>
+
+[./analytics] VitalSummary
+interface VitalSummary
+  rating: Rating
+  value: number
+  views: number
+
+[./arrival] ARRIVAL_HIGHLIGHT
+const ARRIVAL_HIGHLIGHT: "kay-search"
+
+[./arrival] ARRIVAL_PARAM
+const ARRIVAL_PARAM: "kay_q"
+
+[./arrival] arrive
+function arrive(search: string, from: number): Promise<void>
+
+[./arrival] arrives
+function arrives(search: string): boolean
+
+[./await] Await
+function Await<T>(props: AwaitProps<T>): Element
+
+[./await] collectDeferred
+function collectDeferred<T>(render: () => T, within?: string | undefined): { result: T; deferred: PendingBlock[]; }
+
+[./await] earlyRejections
+const earlyRejections: Pick<EarlyRejections, "graceMs">
+
+[./await] PendingBlock
+interface PendingBlock
+  failed?: ((error: unknown) => unknown) | undefined
+  fallback?: ((error: unknown) => unknown) | undefined
+  id: string
+  ready: (value: never) => unknown
+  site?: Error | undefined
+  value: Promise<unknown> | AsyncIterable<unknown>
+
+[./await] rejectedAt
+function rejectedAt(block: PendingBlock, reason: unknown): unknown
+
+[./bun] default
+const default: BunPlugin
+
+[./bun] kay
+function kay(options?: KayBunOptions): BunPlugin
+
+[./bun] KayBunOptions
+interface KayBunOptions
+  root?: string | undefined
+  settings?: Record<string, string> | undefined
+
+[./cache] cache
+function cache<A extends unknown[], T, const Ttl extends Duration = `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w`>(load: (...args: A) => T | Promise<T>, options: CacheFunctionOptions<Ttl, T>): CachedFunction<A, T>
+
+[./cache] cached
+function cached<T, const Ttl extends Duration = `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w`>(key: string, ttl: Ttl & PositiveDuration<Ttl>, load: () => T | Promise<T>, options?: CacheOptions<T>): Promise<T>
+
+[./cache] CachedFunction
+interface CachedFunction<A extends unknown[], T>
+  invalidate: (...args: [] | A) => void
+
+[./cache] CacheFunctionOptions
+interface CacheFunctionOptions<Ttl extends Duration = Duration, T = unknown> extends CacheOptions<T>
+  fallback?: T | undefined
+  live?: boolean | undefined
+  stale?: boolean | undefined
+  store?: false | CacheStore | undefined
+  tags?: CacheTag[] | undefined
+  ttl: Ttl & PositiveDuration<Ttl>
+
+[./cache] CacheOptions
+interface CacheOptions<T = unknown>
+  fallback?: T | undefined
+  live?: boolean | undefined
+  stale?: boolean | undefined
+  store?: false | CacheStore | undefined
+
+[./cache] CacheStore
+interface CacheStore
+  delete: (key: string) => void | Promise<void>
+  dependencies?: () => Map<string, string[]> | Promise<Map<string, string[]>>
+  get: (key: string) => StoredValue | Promise<StoredValue | undefined> | undefined
+  keys: () => string[] | Promise<string[]>
+  publish?: (message: string) => void | Promise<void>
+  set: (key: string, text: string, freshUntil: number) => void | Promise<void>
+  subscribe?: (listener: (message: string) => void) => void
+
+[./cache] cacheTag
+function cacheTag(): CacheTag
+
+[./cache] CacheTag
+interface CacheTag
+  invalidate: () => void
+
+[./cache] invalidate
+function invalidate(key: string | ((key: string) => boolean)): void
+
+[./cache] invalidatePage
+function invalidatePage(path: string | ((path: string) => boolean)): void
+
+[./cache] sqliteCache
+function sqliteCache(path: string): SyncCacheStore
+
+[./cache] StoredValue
+interface StoredValue
+  freshUntil: number
+  text: string
+
+[./cache] SyncCacheStore
+interface SyncCacheStore extends CacheStore
+  delete: (key: string) => void
+  dependencies: () => Map<string, string[]>
+  get: (key: string) => StoredValue | undefined
+  keys: () => string[]
+  publish: (message: string) => void
+  set: (key: string, text: string, freshUntil: number) => void
+  subscribe?: (listener: (message: string) => void) => void
+
+[./client] disposeIslands
+function disposeIslands(root: ParentNode): void
+
+[./client] enableHotSwap
+function enableHotSwap(registry: IslandRegistry): void
+
+[./client] HotSwap
+interface HotSwap
+  entry?: string | undefined
+  fresh: string[]
+  from: number
+  islands: Record<string, string[]>
+
+[./client] hydrateIslands
+function hydrateIslands(registry: IslandRegistry, root?: ParentNode): Promise<void>
+
+[./client] IslandRegistry
+type IslandRegistry = Record<string, () => Promise<{ default: (props: object) => unknown }>>
+
+[./client] refreshForEdit
+function refreshForEdit(): Promise<void>
+
+[./client] startNavigation
+function startNavigation(given: NavigationHooks): void
+
+[./compiler] compileKay
+function compileKay(original: string, filename: string, options?: CompileOptions): CompileResult
+
+[./compiler] CompileOptions
+interface CompileOptions
+  check?: boolean | undefined
+  classMerge?: boolean | undefined
+  classTable?: ClassTable | undefined
+  clientOnly?: boolean | undefined
+  contextModule?: string | undefined
+  hydratable?: boolean | undefined
+  importedSignals?: ImportedSignals | undefined
+  includeServer?: boolean | undefined
+  insideIsland?: boolean | undefined
+  inspect?: boolean | undefined
+  lints?: Partial<Record<"code" | "unread-name" | "a11y" | "forms" | "islands" | "performance" | "seo" | "security" | "i18n" | "deprecated" | "missing-alt" | "missing-title" | "unreachable-click" | "missing-label" | "empty-control" | "skipped-heading" | "unknown-aria" | "unknown-role" | "missing-state" | "hid ...#611b5e97
+  outerQueries?: string[] | undefined
+  output?: "html" | "dom" | undefined
+  page?: boolean | undefined
+  paramTypes?: Record<string, string> | undefined
+  params?: string[] | undefined
+  relocateImport?: ((specifier: string) => string | undefined) | undefined
+  root?: string | undefined
+  twinBuild?: boolean | undefined
+  typesOnly?: boolean | undefined
+  ui?: UiEntry | undefined
+
+[./compiler] CompileResult
+interface CompileResult
+  actionForm: boolean
+  bodyLines: number[]
+  classes: string[]
+  diagnostics: Diagnostic[]
+  island?: string | undefined
+  map: SourceMap
+  moduleLines: number[]
+  promote?: string | undefined
+  tsx: string
+  why?: string | undefined
+
+[./compiler] Diagnostic
+interface Diagnostic extends Span
+  checkOnly?: boolean | undefined
+  code?: string | undefined
+  end: number
+  fixes?: Fix[] | undefined
+  help?: string | undefined
+  label?: string | undefined
+  message: string
+  note?: string | undefined
+  related?: Labelled[] | undefined
+  severity?: "error" | "warning" | undefined
+  start: number
+
+[./compiler] formatDiagnostic
+function formatDiagnostic(source: string, filename: string, diagnostic: Diagnostic, paint?: Paint | undefined): string
+
+[./content] blocks
+function blocks<const Types extends Record<string, AnyObject>>(types: Types, options?: Omit<ArrayOptions, "x-kay"> | undefined): TArray<TUnion<BlockVariants<Types>[]>>
+
+[./content] bodyHtml
+function bodyHtml(body: string): Promise<string>
+
+[./content] collection
+function collection<Schema extends TSchema, Components extends Record<string, Component<never>> = Record<never, never>, const FeedPath extends string = string, Seed extends Static<Schema> | undefined = undefined, const Route extends string = never>(source: string | ContentLoader<Stored<(Schema & { params: []; })["stat ...#6446439f
+
+[./content] Collection
+interface Collection<Data, Components extends Record<string, Component<never>> = Record<string, Component<never>>, FeedPath extends string = string, Seeded extends boolean = boolean, Routed extends boolean = boolean>
+  all: (locale?: string | undefined) => Promise<EntryOf<Data, Routed>[]>
+  components: Components
+  dir: string | undefined
+  get: (slug: string, locale?: string | undefined) => Promise<EntryOf<Data, Routed> | undefined>
+  invalidate: () => void
+  loader: ContentLoader<unknown> | undefined
+  name: string
+  one: <Fallback extends Data | undefined = undefined>(fallback?: Fallback | undefined) => Promise<Fallback extends undefined ? Seeded extends true ? Data : Data | undefined : Data>
+  options: CollectionOptions<TSchema, boolean>
+  translation: (entry: { slug: string; data: unknown; }, locale: string) => Promise<EntryOf<Data, Routed> | undefined>
+
+[./content] COLLECTION
+const COLLECTION: typeof COLLECTION
+
+[./content] collectionInfo
+function collectionInfo(name: string, { counts }?: { counts?: boolean | undefined; }): Promise<CollectionInfo | undefined>
+
+[./content] CollectionInfo
+interface CollectionInfo
+  body?: { kind: "markdown"; } | undefined
+  components: string[]
+  count?: number | undefined
+  defaultLocale?: string | undefined
+  description?: string | undefined
+  dir?: string | undefined
+  draftField?: string | undefined
+  kind: "folder" | "loaded"
+  locales?: string[] | undefined
+  localized: boolean
+  name: string
+  orderField?: string | undefined
+  problem?: string | undefined
+  publishField?: string | undefined
+  schema: JsonSchema
+  seed?: Record<string, DataValue> | undefined
+  single?: true | undefined
+  title?: string | undefined
+  trusted?: true | undefined
+  unpublishField?: string | undefined
+
+[./content] collectionLoader
+function collectionLoader(name: string): ContentLoader<unknown> | undefined
+
+[./content] CollectionOptions
+interface CollectionOptions<Schema extends TSchema, Routed extends boolean = boolean>
+  components?: Record<string, Component<never>> | undefined
+  description?: string | undefined
+  draft?: ((entry: Entry<(Schema & { params: []; })["static"]>) => boolean) | BooleanField<(Schema & { params: []; })["static"]> | undefined
+  feed?: FeedOptions<(Schema & { params: []; })["static"], Routed> | undefined
+  headingLinks?: boolean | undefined
+  highlight?: Highlighter | undefined
+  imageSizes?: string | undefined
+  live?: boolean | undefined
+  localized?: boolean | undefined
+  migrations?: Migration[] | undefined
+  order?: NumberField<(Schema & { params: []; })["static"]> | undefined
+  publishAt?: DateField<(Schema & { params: []; })["static"]> | undefined
+  readingSpeed?: number | undefined
+  route?: string | undefined
+  schema: Schema
+  seed?: (Schema & { params: []; })["static"] | undefined
+  single?: boolean | undefined
+  sort?: ((a: Entry<(Schema & { params: []; })["static"]>, b: Entry<(Schema & { params: []; })["static"]>) => number) | undefined
+  title?: string | undefined
+  trusted?: boolean | undefined
+  unpublishAt?: DateField<(Schema & { params: []; })["static"]> | undefined
+  url?: ((entry: { slug: string; locale?: string | undefined; data: (Schema & { params: []; })["static"]; }) => string) | undefined
+
+[./content] collections
+function collections({ counts }?: { counts?: boolean | undefined; }): Promise<CollectionInfo[]>
+
+[./content] colorField
+function colorField(options?: ElysiaStringOptions | undefined): TString
+
+[./content] ContentChangedError
+class ContentChangedError
+  new (message?: string | undefined): ContentChangedError
+  new (message?: string | undefined, options?: ErrorOptions | undefined): ContentChangedError
+  new (message?: string | undefined, options?: ErrorOptions | undefined): ContentChangedError
+  name: string
+
+[./content] contentKey
+function contentKey(name: string): string
+
+[./content] ContentLoader
+interface ContentLoader<Data = unknown>
+  body?: boolean | undefined
+  count?: ((context: { preview: boolean; }) => number | Promise<number>) | undefined
+  get?: ((place: string, context: { preview: boolean; }) => LoadedEntry | Promise<LoadedEntry | undefined> | undefined) | undefined
+  load: (context: { preview: boolean; }) => LoadedEntry[] | Promise<LoadedEntry[]>
+  name: string
+  remove?: ((entry: { slug: string; locale?: string | undefined; }) => void | Promise<void>) | undefined
+  save?: ((entry: { slug: string; locale?: string | undefined; data: Data; body?: string | undefined; create?: true; }) => void | Promise<void>) | undefined
+  saveMany?: ((entries: { slug: string; locale?: string | undefined; data: Data; body?: string | undefined; expect?: { field: string; was: number | undefined; } | undefined; }[]) => void | Promise<void>) | undefined
+  sibling?: ((kind: string) => ContentLoader<unknown>) | undefined
+  store?: CacheStore | undefined
+  ttl?: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w` | undefined
+
+[./content] convertField
+function convertField(name: string, convert: (value: unknown, data: Record<string, unknown>) => unknown): Migration
+
+[./content] customField
+function customField<Schema extends TSchema>(kind: string, schema: Schema): Schema
+
+[./content] DataValue
+type DataValue = string | number | boolean | bigint | null | undefined | Date | DataValue[] | { [key: string]: DataValue }
+
+[./content] entries
+function entries(name: string, filter?: EntryFilter): Promise<SourceEntry[]>
+
+[./content] Entry
+interface Entry<Data>
+  Content: Component
+  data: Data
+  file: string
+  headings: Heading[]
+  locale?: string | undefined
+  readingTime: number
+  slug: string
+  translations?: readonly string[] | undefined
+  url?: string | undefined
+  words: number
+
+[./content] entryFile
+function entryFile(name: string, slug: string, options?: { locale?: string | undefined; }): Promise<{ file: EntryPath; } | { issues: DraftIssue[]; }>
+
+[./content] EntryFile
+interface EntryFile extends EntryPath
+  absolute: string
+  path: string
+  repoPath: string
+  text: string
+
+[./content] EntryFilter
+interface EntryFilter
+  limit?: number | undefined
+  locale?: string | undefined
+  offset?: number | undefined
+  slug?: string | undefined
+
+[./content] EntryOf
+type EntryOf<Data, Routed extends boolean> = Routed extends true ? RoutedEntry<Data> : Entry<Data>
+
+[./content] entryPage
+function entryPage(name: string, entry: { slug: string; locale?: string | undefined; data: unknown; }): Promise<string | undefined>
+
+[./content] EntryPath
+interface EntryPath
+  absolute: string
+  path: string
+  repoPath: string
+
+[./content] entrySource
+function entrySource(name: string, slug: string, data: unknown, options?: { locale?: string | undefined; body?: string | undefined; create?: boolean | undefined; replacing?: string | undefined; }): Promise<{ file: EntryFile; } | { issues: DraftIssue[]; }>
+
+[./content] FeedItem
+interface FeedItem
+  author?: string | undefined
+  date: Date
+  description?: string | undefined
+  path?: string | undefined
+  title: string
+
+[./content] FeedOptions
+interface FeedOptions<Data, Routed extends boolean = boolean>
+  author?: string | undefined
+  description?: string | undefined
+  format?: "rss" | "atom" | undefined
+  item: (entry: Entry<Data>) => FeedItemOf<Routed> | undefined
+  limit?: number | undefined
+  path: string
+  title: string
+
+[./content] FeedPathsOf
+type FeedPathsOf<Module> = { [Name in keyof Module]: Module[Name] extends Collection<unknown, Record<string, Component<never>>, infer Path> ? string extends Path ? never : Path : never }[keyof Module]
+
+[./content] FieldHint
+interface FieldHint
+  accept?: string[] | undefined
+  alt?: string | undefined
+  collection?: string | undefined
+  height?: string | undefined
+  kind: string
+  maxSize?: number | undefined
+  minHeight?: number | undefined
+  minWidth?: number | undefined
+  set?: string | undefined
+  width?: string | undefined
+
+[./content] fieldInput
+function fieldInput<Schema extends TSchema>(schema: Schema, options: FieldInputOptions): Schema
+
+[./content] FieldInputOptions
+interface FieldInputOptions
+  labels?: Record<string, string> | undefined
+  lines?: boolean | undefined
+  placeholder?: string | undefined
+  prefix?: string | undefined
+  rows?: number | undefined
+  suffix?: string | undefined
+  titleField?: string | undefined
+  type?: "search" | "url" | "text" | "email" | "tel" | undefined
+  when?: string | undefined
+
+[./content] FieldKind
+type FieldKind = 'image' | 'file' | 'markdown' | 'reference' | 'hex-color' | 'tag-list' | 'icon-name' | 'blocks'
+
+[./content] fileField
+function fileField(options?: UploadStringOptions<UploadFieldOptions> | undefined): TString
+
+[./content] findIcons
+function findIcons(prefix: string, query: string, limit: number, offset: number): { name: string; icon: IconProps; }[]
+
+[./content] geoField
+function geoField(options?: ObjectOptions | undefined): TObject<{ lat: TNumber; lng: TNumber; }>
+
+[./content] Heading
+interface Heading
+  depth: number
+  id: string
+  text: string
+
+[./content] highlightCode
+function highlightCode(code: string, language?: string | undefined, options?: { highlight?: Highlighter | undefined; }): Promise<SafeHtml>
+
+[./content] Highlighter
+type Highlighter = (code: string, language: string | undefined) => string | Promise<string>
+
+[./content] iconField
+function iconField(set: IconSet, options?: ElysiaStringOptions | undefined): TString
+
+[./content] imageField
+function imageField(options?: UploadStringOptions<ImageFieldOptions> | undefined): TString
+
+[./content] ImageFieldOptions
+interface ImageFieldOptions extends UploadFieldOptions
+  accept?: string[] | undefined
+  alt?: string | undefined
+  height?: string | undefined
+  maxSize?: ByteSize | undefined
+  minHeight?: number | undefined
+  minWidth?: number | undefined
+  width?: string | undefined
+
+[./content] isCollection
+function isCollection(value: unknown): value is Collection<unknown, Record<string, Component<never>>, string, boolean, boolean>
+
+[./content] isPaginated
+function isPaginated(value: unknown): value is Paginated<unknown>
+
+[./content] JsonSchema
+interface JsonSchema
+  anyOf?: JsonSchema[] | undefined
+  const?: DataValue
+  default?: DataValue
+  description?: string | undefined
+  enum?: DataValue[] | undefined
+  format?: string | undefined
+  items?: JsonSchema | JsonSchema[] | undefined
+  properties?: Record<string, JsonSchema> | undefined
+  required?: string[] | undefined
+  title?: string | undefined
+  type?: string | string[] | undefined
+  x-kay-input?: FieldInputOptions | undefined
+  x-kay?: FieldHint | undefined
+
+[./content] linkField
+function linkField(options?: ObjectOptions | undefined): TObject<{ label: TString; href: TString; }>
+
+[./content] LOADED_HTML
+const LOADED_HTML: SanitizeOptions
+
+[./content] LoadedEntry
+interface LoadedEntry
+  body?: string | undefined
+  data: unknown
+  html?: string | undefined
+  slug: string
+
+[./content] MarkdownError
+class MarkdownError
+  new (message: string, line: number): MarkdownError
+  code: "markdown-invalid"
+  line: number
+
+[./content] markdownField
+function markdownField(options?: ElysiaStringOptions | undefined): TString
+
+[./content] Migration
+type Migration = (data: Record<string, unknown>) => Record<string, unknown>
+
+[./content] moneyField
+function moneyField(options?: MoneyFieldOptions | undefined): TNumber
+
+[./content] Page
+interface Page<Item>
+  href: (page: number) => string
+  items: Item[]
+  next: string | undefined
+  page: number
+  pages: number
+  prev: string | undefined
+
+[./content] paginate
+function paginate<Data, Routed extends boolean>(source: Collection<Data, Record<string, Component<never>>, string, boolean, Routed>, size: number): Paginated<EntryOf<Data, Routed>>
+function paginate<Item>(source: Items<Item>, size: number): Paginated<Item>
+
+[./content] Paginated
+interface Paginated<Item>
+  page: (param: string | number | undefined) => Promise<Page<Item> | undefined>
+  pageCounts: (settings?: LocaleSettings | undefined) => Promise<Map<string | undefined, number>>
+  pageSize: number
+
+[./content] PUBLISH_TIMES
+const PUBLISH_TIMES: typeof PUBLISH_TIMES
+
+[./content] reference
+function reference(collection: string, options?: ElysiaStringOptions | undefined): TString
+
+[./content] removeEntry
+function removeEntry(name: string, slug: string, locale?: string | undefined): Promise<{ issues?: DraftIssue[]; }>
+
+[./content] renameField
+function renameField(from: string, to: string): Migration
+
+[./content] RenderedMarkdown
+interface RenderedMarkdown
+  headings: Heading[]
+  html: string
+
+[./content] renderMarkdown
+function renderMarkdown(markdown: string, options?: { highlight?: Highlighter | undefined; headingLinks?: boolean | undefined; }): Promise<RenderedMarkdown>
+
+[./content] repositoryRoot
+function repositoryRoot(): string
+
+[./content] RoutedEntry
+type RoutedEntry<Data> = Entry<Data> & { url: string }
+
+[./content] saveEntries
+function saveEntries(name: string, written: WrittenEntry[]): Promise<{ issues?: DraftIssue[]; changed?: true; }>
+
+[./content] saveEntry
+function saveEntry(name: string, entry: WrittenEntry, options?: { create?: boolean | undefined; replacing?: string | undefined; }): Promise<{ issues?: DraftIssue[]; }>
+
+[./content] setField
+function setField(name: string, value: unknown): Migration
+
+[./content] SourceEntry
+interface SourceEntry
+  body?: string | undefined
+  data: Record<string, DataValue> | undefined
+  draft: boolean
+  locale?: string | undefined
+  path?: string | undefined
+  problem?: string | undefined
+  slug: string
+  url?: string | undefined
+
+[./content] Stored
+type Stored<Data> = Data extends Date ? string : Data extends readonly (infer Item)[] ? Stored<Item>[] : Data extends object ? { [Field in keyof Data]: Stored<Data[Field]> } : Data
+
+[./content] tagsField
+function tagsField(options?: ArrayOptions | undefined): TArray<TString>
+
+[./content] TranslationIndex
+type TranslationIndex = ReadonlyMap<string, ReadonlyMap<string, string>>
+
+[./content] translations
+function translations(name: string): Promise<TranslationIndex>
+
+[./content] unique
+function unique<Schema extends TSchema>(schema: Schema): Schema
+
+[./content] untranslated
+function untranslated<Schema extends TSchema>(schema: Schema): Schema
+
+[./content] UploadFieldOptions
+interface UploadFieldOptions
+  accept?: string[] | undefined
+  maxSize?: ByteSize | undefined
+
+[./content] WrittenEntry
+type WrittenEntry = Omit<DraftEntry, 'collection'> & { expect?: { field: string, was: number | undefined } | undefined }
+
+[./dev-tool] DevIconName
+type DevIconName = keyof typeof ICONS
+
+[./dev-tool] DevTab
+interface DevTab
+  count: (count: number, tone?: "warn" | "error" | undefined, note?: string | undefined) => void
+  panel: HTMLElement
+
+[./dev-tool] DevTabOptions
+interface DevTabOptions
+  announce?: boolean
+  hidden?: () => void
+  icon?: "search" | "copy" | "image" | "circle-x" | "triangle-alert" | "database" | "list-checks" | "server" | "list-ordered" | "scan-search" | "key-round" | "gauge" | "route" | "languages" | "boxes" | "mail" | "network" | "crosshair" | "maximize-2" | "minimize-2" | "panel-right" | "panel-left" | "panel-bott ...#309410b9
+  id: string
+  label: string
+  shown?: () => void
+  summary?: (count: number) => string
+
+[./dev-tool] DevTool
+type DevTool = Pick<Tool, 'make' | 'icon' | 'tab' | 'button' | 'outline' | 'hideOutline' | 'open'>
+
+[./dom] animated
+function animated(unit: Unit | null): boolean
+
+[./dom] append
+function append(parent: Node, node: Node): void
+
+[./dom] attribute
+function attribute(element: Element, name: string, value: unknown, written?: boolean): void
+
+[./dom] Block
+interface Block
+  dispose: (() => void) | undefined
+  region: Region
+  rendered: boolean
+  units: Unit[]
+
+[./dom] blockIn
+function blockIn(region: Region): Block
+
+[./dom] branches
+function branches(element: Node | null, start: Node | null, end: Node | null, list: [test: (() => unknown) | null, render: (value: () => unknown) => unknown][]): void
+
+[./dom] choose
+function choose(element: Node | null, start: Node | null, end: Node | null, list: [test: (() => unknown) | null, render: () => unknown][]): void
+
+[./dom] claiming
+function claiming(): boolean
+
+[./dom] claimNode
+function claimNode(): Node
+
+[./dom] close
+function close(start: Node): Node
+
+[./dom] component
+function component<P>(fn: (props: P) => unknown, props: P): unknown
+
+[./dom] componentClass
+function componentClass(list: readonly unknown[]): string | undefined
+
+[./dom] createElement
+function createElement(tag: string): Element
+
+[./dom] dispatch
+function dispatch(event: Event): void
+
+[./dom] effect
+function effect(fn: () => void): void
+
+[./dom] entered
+function entered(unit: Unit | null): void
+
+[./dom] errorParagraph
+function errorParagraph(message: string | undefined, id: string, classes: string): Element | undefined
+
+[./dom] firstOf
+function firstOf(unit: Unit): Node
+
+[./dom] fragment
+function fragment(build: (parent: Node) => void): Unit | null
+
+[./dom] fresh
+function fresh<T>(render: () => T): T
+
+[./dom] holdSubmits
+function holdSubmits(): void
+
+[./dom] hydrate
+function hydrate<T>(render: () => T, container: Node): T
+
+[./dom] HydrationMismatchError
+class HydrationMismatchError
+  new (message?: string | undefined): HydrationMismatchError
+  new (message?: string | undefined, options?: ErrorOptions | undefined): HydrationMismatchError
+  new (message?: string | undefined, options?: ErrorOptions | undefined): HydrationMismatchError
+  name: string
+
+[./dom] insert
+function insert(element: Node | null, start: Node | null, end: Node | null, fn: () => unknown, reactive?: boolean): void
+
+[./dom] insertUnit
+function insertUnit(parent: Node, unit: Unit, before: Node | null): void
+
+[./dom] islandHost
+function islandHost(): Element | undefined
+
+[./dom] islandOf
+function islandOf(node: Node): string | undefined
+
+[./dom] keepServerMarkup
+function keepServerMarkup(keeps: (element: Element, value: unknown) => boolean): void
+
+[./dom] lastOf
+function lastOf(unit: Unit): Node
+
+[./dom] leavesInBrowser
+function leavesInBrowser(href: unknown): boolean
+
+[./dom] listen
+function listen(element: Element, name: string, handler: (event: Event) => void): void
+
+[./dom] listenSubmit
+function listenSubmit(element: Element, name: string, handler: (event: Event) => void): void
+
+[./dom] localizeLinks
+function localizeLinks(given: (href: string) => string): void
+
+[./dom] markers
+function markers(parent: Node): [start: Node, end: Node]
+
+[./dom] memo
+function memo<T>(fn: () => T, options?: SignalOptions<T> | undefined): () => T
+
+[./dom] merge
+function merge(...sources: readonly object[]): Record<string, unknown>
+
+[./dom] omit
+function omit(props: object, ...keys: string[]): Record<string, unknown>
+
+[./dom] outside
+function outside<T>(element: Element, href: T, ownRel?: boolean): T
+
+[./dom] partClass
+function partClass(props: unknown, part: string): unknown
+
+[./dom] partHanded
+function partHanded(part: string, list: readonly unknown[]): unknown
+
+[./dom] partsClass
+function partsClass(list: readonly unknown[]): unknown
+
+[./dom] playTransitions
+function playTransitions(given: Transitions): void
+
+[./dom] property
+function property(element: Element, name: string, value: unknown, written?: boolean): void
+
+[./dom] Range
+class Range
+  new (first: Node, last: Node): Range
+  first: Node
+  held?: DocumentFragment | undefined
+  last: Node
+  nodes?: Node[] | undefined
+
+[./dom] ref
+function ref(element: Element, target: unknown): void
+
+[./dom] Region
+class Region
+  new (element: Node | null, start: Node | null, end: Node | null): Region
+  claim: <T>(fn: () => T) => T
+  clear: () => void
+  element: Node | null
+  end: Node | null
+  insert: (unit: Unit, before?: Node | null) => void
+  parent: Node
+  start: Node | null
+
+[./dom] release
+function release(block: Block): void
+
+[./dom] removeUnit
+function removeUnit(unit: Unit): void
+
+[./dom] render
+function render(fn: () => unknown, container: Element): () => void
+
+[./dom] renderAppended
+function renderAppended(fn: () => unknown, container: Element): () => void
+
+[./dom] rowUnit
+function rowUnit(made: Unit[]): Unit | null
+
+[./dom] setClass
+function setClass(element: Element, value: unknown): void
+
+[./dom] setStyle
+function setStyle(element: Element, value: unknown, props?: readonly (readonly [string, unknown])[] | undefined): void
+
+[./dom] spreadAttributes
+function spreadAttributes<T>(source: T): T
+
+[./dom] spreadWith
+function spreadWith(sources: readonly object[], styles?: readonly (readonly [string, unknown])[] | undefined, binds?: readonly (readonly [name: string | undefined, read: () => unknown, event: string, write: (event: Event) => void])[] | undefined): object[]
+
+[./dom] submits
+const submits: { listen?: (element: Element, name: string, handler: (event: Event) => void) => void; }
+
+[./dom] swap
+function swap(block: Block, render: () => unknown, owned?: boolean): void
+
+[./dom] template
+function template(html: string): () => Element
+
+[./dom] text
+function text(parent: Node, data: string): void
+
+[./dom] transition
+function transition(element: Element, part: string, value: unknown): void
+
+[./dom] Transitions
+interface Transitions
+  back: (nodes: Node[]) => void
+  enter: (node: Node) => void
+  has: (node: Node) => node is Element
+  leave: (node: Node) => void
+  leaving: ReadonlySet<Node>
+
+[./dom] Unit
+type Unit = Node | Range
+
+[./dom] units
+function units(value: unknown): Unit[]
+
+[./dom] unlisten
+function unlisten(element: Element, name: string): void
+
+[./dom] untrack
+function untrack<T>(fn: () => T): T
+
+[./dom] within
+function within<T>(parent: Node, value: T): T
+
+[./dom-await] awaited
+function awaited(element: Node | null, start: Node | null, end: Node | null, value: () => unknown, pending: (() => unknown) | undefined, ready: (value: unknown) => unknown, failed: ((error: unknown) => unknown) | undefined, fallback?: ((error: unknown) => unknown) | undefined): void
+
+[./dom-image] image
+function image(element: Element, src: unknown, sized: boolean, sizes?: unknown): void
+
+[./dom-loop] loop
+function loop<T>(element: Node | null, start: Node | null, end: Node | null, each: () => false | readonly T[] | null | undefined, key: false | ((item: T) => unknown), render: (item: () => T, index: number | (() => number)) => unknown, fallback?: (() => unknown) | undefined): void
+
+[./dom-loop] rowKey
+function rowKey(item: unknown): unknown
+
+[./dom-spread] dynamic
+function dynamic(tag: unknown, props: Record<string, unknown>): unknown
+
+[./dom-spread] spread
+function spread(element: Element, sources: () => readonly object[], content?: boolean, link?: boolean): void
+
+[./dom-try] attempt
+function attempt(element: Node | null, start: Node | null, end: Node | null, render: (caught: (error: unknown) => unknown) => unknown, fallback: ((error: unknown) => unknown) | undefined): void
+
+[./edit] DraftEntry
+interface DraftEntry
+  body?: string | undefined
+  collection: string
+  data: unknown
+  locale?: string | undefined
+  slug: string
+
+[./edit] DraftIssue
+interface DraftIssue
+  body?: true
+  collection: string
+  key?: "locale" | "slug"
+  locale?: string
+  message: string
+  path: string
+  slug: string
+
+[./edit] EditorProps
+interface EditorProps
+  entries: EntryRef[]
+  unclickable: Unclickable[]
+
+[./edit] EntryRef
+interface EntryRef
+  collection: string
+  locale?: string
+  slug: string
+
+[./edit] showDraft
+function showDraft(entries: DraftEntry[]): Promise<{ issues?: DraftIssue[]; }>
+
+[./edit] Unclickable
+interface Unclickable extends EntryRef
+  collection: string
+  frozen?: true
+  locale?: string
+  path: string
+  slug: string
+
+[./html] attempt
+function attempt(render: (caught: (error: unknown) => string) => string, fallback?: ((error: unknown) => string) | undefined): string
+
+[./html] attribute
+function attribute(name: string, value: unknown, literal?: boolean): string
+
+[./html] AwaitNote
+interface AwaitNote
+  pending: boolean
+  settled?: number | undefined
+  stack: string
+  started: number
+
+[./html] awaitNotes
+function awaitNotes(): AwaitNote[] | undefined
+
+[./html] child
+function child(value: unknown): string
+
+[./html] className
+function className(value: unknown): string
+
+[./html] component
+function component<P>(fn: (props: P) => unknown, props: P): unknown
+
+[./html] componentClass
+function componentClass(list: readonly unknown[]): string | undefined
+
+[./html] currentPage
+function currentPage(href: unknown, section?: boolean | undefined): string
+
+[./html] dynamic
+function dynamic(tag: unknown, props: object): unknown
+
+[./html] element
+function element(written: string, sources: readonly object[], content?: (() => string) | undefined): Html
+
+[./html] errorParagraph
+function errorParagraph(message: string | undefined, id: string, classes: string): string
+
+[./html] escape
+function escape(text: string): string
+
+[./html] escapeAttribute
+function escapeAttribute(text: string): string
+
+[./html] FAILED_MARKER
+const FAILED_MARKER: "<!--kay-failed-->"
+
+[./html] fieldDescribed
+function fieldDescribed(own?: unknown, type?: unknown, ownRequired?: unknown): string
+
+[./html] formConstraints
+function formConstraints(target: unknown, name: string, written: readonly string[]): string
+
+[./html] head
+function head(tags: HeadTag[]): void
+
+[./html] html
+function html(markup: string): Html
+
+[./html] Html
+interface Html
+  t: string
+
+[./html] imageAttributes
+function imageAttributes(src: unknown, sized: boolean, sizes?: unknown, placeholder?: boolean | undefined): string
+
+[./html] innerMarkup
+function innerMarkup(value: unknown): string
+
+[./html] isRendered
+function isRendered(value: object): value is Html
+
+[./html] leadingNewline
+function leadingNewline(markup: string): string
+
+[./html] linkHref
+function linkHref(href: unknown, localize: boolean, ownRel: boolean): string
+
+[./html] localHref
+function localHref(href: unknown): unknown
+
+[./html] localLinks
+function localLinks(markup: string): string
+
+[./html] loop
+function loop<T>(each: false | readonly T[] | null | undefined, render: (item: T | (() => T), index: number | (() => number)) => string, fallback?: (() => string) | undefined, accessors?: "keyed" | "positional" | undefined): string
+
+[./html] memo
+function memo<T>(fn: () => T, options?: SignalOptions<T> | undefined): () => T
+
+[./html] merge
+function merge(...sources: readonly object[]): Record<string, unknown>
+
+[./html] newServerIslands
+function newServerIslands(scanning: boolean, path?: Set<unknown>, skip?: ServerIslandMode | undefined): ServerIslands
+
+[./html] nonEmptyAttribute
+function nonEmptyAttribute(name: string, text: string): string
+
+[./html] omit
+function omit(props: object, ...keys: string[]): Record<string, unknown>
+
+[./html] outsideLink
+function outsideLink(href: unknown, ownRel?: boolean): string
+
+[./html] outsideLinks
+function outsideLinks(markup: string): string
+
+[./html] partClass
+function partClass(props: unknown, part: string): unknown
+
+[./html] partHanded
+function partHanded(part: string, list: readonly unknown[]): unknown
+
+[./html] partsClass
+function partsClass(list: readonly unknown[]): unknown
+
+[./html] prerendering
+function prerendering(): boolean
+
+[./html] raw
+function raw(value: unknown): string
+
+[./html] rawData
+function rawData(value: unknown): string
+
+[./html] rawTyped
+function rawTyped(type: unknown, value: unknown): string
+
+[./html] refillOptions
+function refillOptions(posted: string | undefined, markup: string, value?: (() => unknown) | undefined): string
+
+[./html] reportRenderFailure
+function reportRenderFailure(error: unknown): void
+
+[./html] selectOptions
+function selectOptions(value: unknown, markup: string, only?: boolean): string
+
+[./html] SERVER_ISLAND
+const SERVER_ISLAND: RegExp
+
+[./html] serverIsland
+function serverIsland<P>(fn: (props: P) => unknown, props: P, mode: ServerIslandMode, noscript?: unknown): unknown
+
+[./html] ServerIslandMode
+type ServerIslandMode = 'inline' | 'defer'
+
+[./html] ServerIslands
+interface ServerIslands
+  awaits?: AwaitNote[] | undefined
+  html: string[]
+  inside: number
+  modes: ServerIslandMode[]
+  path: Set<unknown>
+  scanning: boolean
+  skip?: ServerIslandMode | undefined
+  stack: unknown[]
+
+[./html] show
+function show<T>(value: T, render: (value: () => Truthy<T>) => string, fallback?: (() => string) | undefined): string
+
+[./html] spreadAttributes
+function spreadAttributes<T>(source: T): T
+
+[./html] spreadWith
+function spreadWith(sources: readonly object[], styles?: readonly (readonly [string, unknown])[] | undefined, binds?: readonly (readonly [name: string | undefined, read: () => unknown, event: string, write: (event: Event) => void])[] | undefined): object[]
+
+[./html] style
+function style(value: unknown, props?: readonly (readonly [string, unknown])[] | undefined): string
+
+[./html] UNDESCRIBED_TYPES
+const UNDESCRIBED_TYPES: Set<string>
+
+[./html] UNREQUIRABLE_TYPES
+const UNREQUIRABLE_TYPES: Set<string>
+
+[./html] untrack
+function untrack<T>(fn: () => T): T
+
+[./html] withServerIslands
+function withServerIslands<T>(state: ServerIslands, render: () => T): T
+
+[./i18n] alternate
+function alternate(target: string): string
+
+[./i18n] defineMessages
+function defineMessages<const Tree extends MessageTree>(messages: Tree): Tree
+
+[./i18n] direction
+function direction(of?: string | undefined): Direction
+
+[./i18n] Direction
+type Direction = 'ltr' | 'rtl'
+
+[./i18n] formatBytes
+function formatBytes(bytes: number, options?: NumberFormatOptions | undefined): string
+
+[./i18n] formatDate
+function formatDate(value: number | Date, options?: DateFormatOptions | undefined): string
+
+[./i18n] formatDuration
+function formatDuration(milliseconds: number, options?: DurationFormatOptions | undefined): string
+
+[./i18n] formatList
+function formatList(items: Iterable<string>, options?: ListFormatOptions | undefined): string
+
+[./i18n] formatNumber
+function formatNumber(value: number, options?: NumberFormatOptions | undefined): string
+
+[./i18n] formatRelativeTime
+function formatRelativeTime(value: number | Date, options?: RelativeTimeOptions | undefined): string
+function formatRelativeTime(value: number, unit: RelativeTimeFormatUnit, options?: RelativeFormatOptions | undefined): string
+
+[./i18n] locale
+function locale(): string
+
+[./i18n] Locale
+type Locale = Register extends { locales: infer Names extends string } ? Names : string
+
+[./i18n] localeName
+function localeName(target: string): string
+
+[./i18n] locales
+function locales(): string[]
+
+[./i18n] LocaleSettings
+interface LocaleSettings
+  defaultLocale: string
+  entryFiles?: readonly string[] | undefined
+  entryRoutes?: readonly string[] | undefined
+  feeds?: readonly string[] | undefined
+  hosts?: Readonly<Record<string, string>> | undefined
+  locales: readonly string[]
+  pages?: readonly string[] | undefined
+  paths?: Readonly<Record<string, Readonly<Record<string, string>>>> | undefined
+  prefixDefault: boolean
+
+[./i18n] localize
+function localize<const Href extends string>(href: Href & CheckedHref<Href>, locale?: string | undefined): string
+
+[./i18n] MergeMessages
+type MergeMessages<A, B> = { readonly [Key in keyof A | keyof B]: Key extends keyof B ? Key extends keyof A ? IsGroup<A[Key]> extends true ? IsGroup<B[Key]> extends true ? MergeMessages<A[Key], B[Key]> : B[Key] : B[Key] : B[Key] : Key extends keyof A ? A[Key] : never }
+
+[./i18n] Message
+type Message = string | Plural
+
+[./i18n] MessageKey
+type MessageKey = [Messages] extends [never] ? string : KeysOf<Messages>
+
+[./i18n] MessageTree
+interface MessageTree
+
+[./i18n] MessageValue
+type MessageValue = string | number | Date
+
+[./i18n] Plural
+type Plural = { readonly other: string } & Readonly<Partial<Record<Exclude<PluralCategory, 'other'>, string>>>
+
+[./i18n] PluralCategory
+type PluralCategory = 'zero' | 'one' | 'two' | 'few' | 'many' | 'other'
+
+[./i18n] relativeTime
+function relativeTime(value: () => number | Date, options?: RelativeFormatOptions | undefined): () => string
+
+[./i18n] RelativeTimeOptions
+interface RelativeTimeOptions extends Intl.RelativeTimeFormatOptions, LocaleOption
+  locale?: string | undefined
+  now?: number | Date | undefined
+
+[./i18n] RichText
+type RichText = [Messages] extends [never] ? (props: { key: string } & Record<string, MessageValue | Block>) => JSX.Element : <Key extends KeysOf<Messages>>(props: { key: Key } & Params<At<Messages, Key>> & Record<TagsOf<At<Messages, Key>>, Block>) => JSX.Element
+
+[./i18n] t
+function t(key: string, params?: Record<string, MessageValue> | undefined): string
+
+[./i18n] T
+function T(props: { key: string; } & Record<string, MessageValue | Block>): Element
+
+[./i18n] timeZone
+function timeZone(): string | undefined
+
+[./i18n-links] localizedHref
+function localizedHref(href: string): string
+
+[./i18n-links] noteLinkPayload
+function noteLinkPayload(payload: LinkPayload): void
+
+[./icons] iconNames
+function iconNames(set: IconSet): string[]
+
+[./icons] iconProps
+function iconProps(set: IconSet, name: string): IconProps | undefined
+
+[./icons] IconProps
+interface IconProps
+  aria-hidden: "true"
+  height: string
+  innerHTML: SafeHtml
+  viewBox: string
+  width: string
+
+[./icons] IconSet
+interface IconSet
+  aliases?: Record<string, IconifyIcon> | undefined
+  height?: number | undefined
+  icons: Record<string, IconifyIcon>
+  prefix: string
+  width?: number | undefined
+
+[./image] image
+function image(src: string, options?: ImageOptions): ImageProps
+
+[./image] ImageOptions
+interface ImageOptions
+  aspect?: string | undefined
+  height?: number | undefined
+  placeholder?: boolean | undefined
+  quality?: number | undefined
+  sizes?: string | undefined
+  width?: number | undefined
+
+[./image] ImageProps
+interface ImageProps
+  height?: number | undefined
+  sizes?: string | undefined
+  src: string
+  srcset?: string | undefined
+  style?: string | undefined
+  width?: number | undefined
+
+[./image] shareCard
+function shareCard(card: ShareCardOptions): string
+
+[./image] ShareCardOptions
+interface ShareCardOptions
+  image?: string | undefined
+  title: string
+
+[./image] shareImage
+function shareImage(src: string): string
+
+[./internal] actionStub
+function actionStub(url: string): Action<unknown, unknown, never>
+
+[./internal] autoDefer
+function autoDefer<T>(value: T): T
+
+[./internal] bindable
+function bindable<Props extends object>(props: Props, keys: readonly string[]): Props
+
+[./internal] formAction
+function formAction(target: string | Action<never, unknown, never>): string
+
+[./internal] formChecked
+function formChecked(target: unknown, name: string, value: unknown): boolean | undefined
+
+[./internal] formDescribed
+function formDescribed(element: Element, target: unknown, field: string, id: string): void
+
+[./internal] formError
+function formError(target: unknown, field: string): string | undefined
+
+[./internal] formInvalid
+function formInvalid(target: unknown, name: string): "true" | undefined
+
+[./internal] formMarked
+function formMarked(element: Element, target: unknown, field: string): void
+
+[./internal] formProtection
+function formProtection(target: unknown): string
+
+[./internal] formValue
+function formValue(target: unknown, name: string): string | undefined
+
+[./internal] isAction
+function isAction(value: unknown): value is ServerAction<TSchema, unknown, never>
+
+[./internal] loadTemplateContext
+function loadTemplateContext({ request }: { request: Request; }): Promise<void>
+
+[./internal] registerActions
+function registerActions(moduleId: string, exports: Record<string, unknown>): void
+
+[./internal] registerImage
+function registerImage(url: string, width: number, height: number): string
+
+[./internal] registerPlaceholder
+function registerPlaceholder(url: string, color: string): string
+
+[./internal] reviveActions
+function reviveActions(): void
+
+[./internal] uiRecipe
+function uiRecipe(config: RecipeConfig<Readonly<Record<string, Readonly<Record<string, VariantClasses>>>>>, base?: Pick<Recipe<Readonly<Record<string, Readonly<Record<string, VariantClasses>>>>>, "defaults"> | undefined): Recipe<Readonly<Record<string, Readonly<Record<string, VariantClasses>>>>>
+
+[./internal] updateBack
+function updateBack<Current, Next = Current | Written<Current>>(current: Current, update: (current: Written<Current>) => Next): Kept<Current, Next>
+
+[./internal] updateTo
+function updateTo<Target, Key extends keyof Target, Next extends Written<Target[Key]> | Target[Key] = Written<Target[Key]>>(object: Target, key: Key, update: (current: Written<Target[Key]>) => Next, form?: "post" | "logical" | undefined, _probe?: Probe<Target, Key> | undefined): Next
+
+[./internal] writeBack
+function writeBack<Current, Value extends BackValue<Current> = Current | Written<Current>>(current: Current, value: Value): Kept<Current, Value>
+
+[./internal] writeTo
+function writeTo<Target, Key extends keyof Target, Value extends Written<Target[Key]> | Target[Key]>(object: Target, key: Key, value: Value, _probe?: Probe<Target, Key> | undefined): Value
+
+[./internal/server] buildingWithoutEnv
+function buildingWithoutEnv(): void
+
+[./internal/server] Bundle
+interface Bundle
+  api?: ApiModule[]
+  clientDir: string
+  config: KayConfig
+  editor?: string
+  endpoints?: Endpoint[]
+  extensionMessages?: Record<string, string[]>
+  fallback: SpecialPages
+  modules: Record<string, unknown>
+  name?: string | undefined
+  plugins?: string[]
+  publicDir: string
+  publicModules?: string[]
+  root: string
+  routes: Route[]
+
+[./internal/server] listenIdleApps
+function listenIdleApps(): void
+
+[./internal/server] loadingWithoutEnv
+function loadingWithoutEnv(): void
+
+[./internal/server] probeHealth
+function probeHealth(config: false | HealthConfig | undefined, port?: string, host?: string | undefined): Promise<number>
+
+[./internal/server] registerBundle
+function registerBundle(value: Bundle): void
+
+[./internal/server] registerEmbeddedMap
+function registerEmbeddedMap(name: string, blob: string): void
+
+[./internal/server] runAsPrimary
+function runAsPrimary(argv: string[], env: Record<string, string | undefined>): Promise<number | undefined>
+
+[./internal/title] pageTitle
+function pageTitle(read: () => string, raw: boolean): void
+
+[./island] collectIslands
+function collectIslands<T>(render: () => T, salt?: string | undefined, chunks?: Record<string, string> | undefined): { result: T; islands: RenderedIslands; }
+
+[./island] insideIsland
+function insideIsland(): boolean
+
+[./island] island
+function island<P extends object>(id: string, component: ((props: P) => Element) | undefined, messages?: readonly string[], client?: boolean, why?: string, lives?: readonly unknown[], takesActions?: boolean): IslandComponent<P>
+
+[./island] islandCheckpoint
+function islandCheckpoint(): (() => void) | undefined
+
+[./island] IslandPropsError
+class IslandPropsError
+  new (message?: string | undefined): IslandPropsError
+  new (message?: string | undefined, options?: ErrorOptions | undefined): IslandPropsError
+  new (message?: string | undefined, options?: ErrorOptions | undefined): IslandPropsError
+  name: string
+
+[./island] noteMessage
+function noteMessage(key: string): void
+
+[./island] promote
+function promote<P extends object>(id: string, render: (props: P) => Element, hydrated: (props: P) => Element, messages?: readonly string[], takesActions?: boolean): (props: P) => Element
+
+[./island] RenderedIslands
+interface RenderedIslands
+  chunks?: Record<string, string> | undefined
+  count: number
+  eager: Set<string>
+  immediate: Set<string>
+  lazy: number
+  messages: Set<string>
+  used: Set<string>
+  waiting: Set<string>
+
+[./library] acceptedLocales
+function acceptedLocales(header: string): string[]
+
+[./library] actionTool
+function actionTool(action: ServerAction<TSchema, unknown, string>, taken?: Set<string> | undefined): LibraryTool | undefined
+
+[./library] addRuntimeRedirect
+function addRuntimeRedirect(from: string, to: string, options?: { status?: RuntimeStatus | undefined; file?: string | undefined; }): RuntimeRedirect
+
+[./library] admitEditSession
+function admitEditSession(ctx: { cookies: CookieMap; request: Request; }, given?: string | undefined): void
+
+[./library] AnswerIssue
+interface AnswerIssue
+  message: string
+  path: string
+
+[./library] appModules
+function appModules(root: string, { name, appFiles }: Pick<KayExtension<AnyElysia>, "name" | "appFiles">): Promise<Record<string, Record<string, unknown> | undefined>>
+
+[./library] appSecrets
+function appSecrets(): string[] | undefined
+
+[./library] appStore
+function appStore(): AppStore | undefined
+
+[./library] asConfigError
+function asConfigError<T>(read: () => T): T
+
+[./library] byteSize
+function byteSize(value: unknown, what: string): number
+
+[./library] ByteSize
+type ByteSize = number | `${number}${'b' | 'kb' | 'mb'}`
+
+[./library] checkAnswer
+function checkAnswer(schema: TSchema, value: unknown): CheckedAnswer
+
+[./library] CheckedAnswer
+type CheckedAnswer = { value: unknown } | { issues: AnswerIssue[] }
+
+[./library] clearMissing
+function clearMissing(file?: string | undefined): number
+
+[./library] configError
+function configError(message: string, options?: ErrorOptions | undefined): KayError
+function configError(option: string, value: unknown, takes: string): KayError
+
+[./library] configuredHighlighter
+function configuredHighlighter(): Promise<Highlighter | undefined>
+
+[./library] configuredRedirects
+function configuredRedirects(): { from: string; to: string; status: RedirectStatus; }[]
+
+[./library] configuredSite
+function configuredSite(): { origin: string; slashed: boolean; } | undefined
+
+[./library] connectionOf
+function connectionOf(source: PgJobsSource): SQL
+
+[./library] ContextDefinition
+interface ContextDefinition<Values extends object = object>
+  load?: ((request: Request) => Values | Promise<Values>) | undefined
+  loaders?: Record<string, (request: Request) => unknown> | undefined
+  values?: Values | undefined
+
+[./library] currentRequest
+function currentRequest(): Request | undefined
+
+[./library] DataValue
+type DataValue = string | number | boolean | bigint | null | undefined | Date | DataValue[] | { [key: string]: DataValue }
+
+[./library] defineContext
+function defineContext<Values extends object>(load: (request: Request) => Values | Promise<Values>): ContextDefinition<Values>
+function defineContext<Loaders extends Record<string, (request: Request) => unknown>>(loaders: Loaders): ContextDefinition<{ [Key in keyof Loaders]: Awaited<ReturnType<Loaders[Key]>>; }>
+
+[./library] dismissMissing
+function dismissMissing(path: string, file?: string | undefined): boolean
+function dismissMissing(paths: readonly string[], file?: string | undefined): number
+
+[./library] drainQueues
+function drainQueues(): Promise<number>
+
+[./library] durationSeconds
+function durationSeconds(value: unknown, what: string): number
+
+[./library] durationWords
+function durationWords(seconds: number, locale: string): string
+
+[./library] editSessionAdmitted
+function editSessionAdmitted(request: Request): boolean
+
+[./library] escapeHtml
+function escapeHtml(text: string): string
+
+[./library] FallbackMemory
+interface FallbackMemory
+  hit: (key: string, window: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w`, weight?: number | undefined) => RateWindow
+  peek: (key: string) => RateWindow | undefined
+  refund?: ((key: string, resetAt: number) => void) | undefined
+  reset?: ((key: string) => void) | undefined
+
+[./library] GENERATE_SECRET
+const GENERATE_SECRET: "`bun -e \"console.log(crypto.randomUUID() + crypto.randomUUID())\"`"
+
+[./library] Highlighter
+type Highlighter = (code: string, language: string | undefined) => string | Promise<string>
+
+[./library] inFlightWork
+function inFlightWork<T>(work: () => Promise<T>): Promise<T>
+
+[./library] invalidateLocally
+function invalidateLocally(key: string): void
+
+[./library] isUrlAttribute
+function isUrlAttribute(name: string): boolean
+
+[./library] JsonSchema
+interface JsonSchema
+  anyOf?: JsonSchema[] | undefined
+  const?: DataValue
+  default?: DataValue
+  description?: string | undefined
+  enum?: DataValue[] | undefined
+  format?: string | undefined
+  items?: JsonSchema | JsonSchema[] | undefined
+  properties?: Record<string, JsonSchema> | undefined
+  required?: string[] | undefined
+  title?: string | undefined
+  type?: string | string[] | undefined
+  x-kay-input?: FieldInputOptions | undefined
+  x-kay?: FieldHint | undefined
+
+[./library] jsonSchemaOf
+function jsonSchemaOf(schema: unknown): unknown
+
+[./library] KAY_DIR
+const KAY_DIR: ".kay"
+
+[./library] KayCommand
+interface KayCommand extends Omit<Command, 'run'>
+  normalize?: (args: string[]) => string[]
+  options: ParseArgsOptionsConfig
+  positionals: number
+  run: (parsed: Parsed, refuse: (reason?: string | undefined) => number, project: { root: string; config: KayConfig; }) => number | Promise<number>
+  usage: string
+
+[./library] keyedDigest
+function keyedDigest(use: string, text: string): string
+
+[./library] knownAddress
+function knownAddress(request: Request, server: Server<unknown> | null | undefined, setting?: number | boolean | ProxyConfig | undefined): string | undefined
+
+[./library] lazily
+function lazily(guard: Guard | LazyGuard): Guard
+
+[./library] LazyGuard
+interface LazyGuard
+  load: () => Guard | Promise<Guard>
+
+[./library] LibraryTool
+interface LibraryTool
+  call: (args: Record<string, unknown>, request?: Request | undefined) => Promise<ToolResult>
+  description: string
+  inputSchema: object
+  label?: string | undefined
+  name: string
+  readOnly?: boolean | undefined
+
+[./library] localizedEntry
+function localizedEntry(root: string, config: Pick<KayConfig, "i18n" | "content">, collection: string, slug: string): Promise<LocalizedEntry>
+
+[./library] LocalizedEntry
+interface LocalizedEntry
+  body: string | undefined
+  data: Record<string, DataValue>
+  mark: "field" | "comment" | undefined
+  schema: JsonSchema
+
+[./library] Logo
+interface Logo
+  alt: string
+  height?: number | undefined
+  href?: string | undefined
+  src: string
+  width?: number | undefined
+
+[./library] matchLocale
+function matchLocale(locales: readonly string[], wanted: readonly string[]): string | undefined
+
+[./library] memoryRates
+function memoryRates(): SyncRates
+
+[./library] MIN_SECRET_LENGTH
+const MIN_SECRET_LENGTH: 32
+
+[./library] MissingPath
+interface MissingPath
+  firstAt: number
+  hits: number
+  lastAt: number
+  path: string
+  reason?: Reason | undefined
+  referrers: { host: string; page?: string | undefined; hits: number; }[]
+  target?: string | undefined
+
+[./library] missingTranslations
+function missingTranslations(root: string, config: Pick<KayConfig, "i18n" | "content" | "extensions">): Promise<Record<string, MissingTranslations>>
+
+[./library] MissingTranslations
+interface MissingTranslations
+  entries: Record<string, string[]>
+  messages: Record<string, Message>
+
+[./library] nameUser
+function nameUser(request: Request, name: Namer): void
+
+[./library] onKeysInvalidated
+function onKeysInvalidated(listener: KeyListener): () => void
+
+[./library] openSqlite
+function openSqlite(path: string): Database
+
+[./library] openWith
+function openWith(keys: Uint8Array<ArrayBufferLike>[], value: string, context?: string | undefined): { text: string; key: number; } | undefined
+
+[./library] optionMs
+function optionMs(value: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w`, what: string): number
+
+[./library] overHttps
+function overHttps(request: Request): boolean
+
+[./library] Parsed
+interface Parsed
+  positionals: string[]
+  values: Record<string, string | boolean | string[] | undefined>
+
+[./library] parseEvents
+function parseEvents<End>(body: ReadableStream<Uint8Array<ArrayBufferLike>>, signal: AbortSignal, onEvent: (event: string, data: string) => End | undefined): Promise<End | undefined>
+
+[./library] PgJobsSource
+type PgJobsSource = SQL | { sql: SQL } | string
+
+[./library] PresenceView
+type PresenceView = (request: Request | undefined, room: string, members: string[], member: string) => string[]
+
+[./library] privilegeRefused
+function privilegeRefused(error: unknown): boolean
+
+[./library] ratesFallingBack
+function ratesFallingBack<Store extends RateStore>(name: string, store: Store, memory?: FallbackMemory): RateStore & Sure<Store>
+
+[./library] READ_METHODS
+const READ_METHODS: Set<string>
+
+[./library] redirectMovedPage
+function redirectMovedPage(from: string | undefined, to: string | undefined): void
+
+[./library] RedirectRefusedError
+class RedirectRefusedError
+  new (message?: string | undefined): RedirectRefusedError
+  new (message?: string | undefined, options?: ErrorOptions | undefined): RedirectRefusedError
+  new (message?: string | undefined, options?: ErrorOptions | undefined): RedirectRefusedError
+
+[./library] refundRateLimit
+function refundRateLimit(request: Request | undefined): Promise<void>
+
+[./library] relationsMissing
+function relationsMissing(db: SQL, names: readonly string[]): Promise<boolean>
+
+[./library] removeRuntimeRedirect
+function removeRuntimeRedirect(from: string, file?: string | undefined): boolean
+
+[./library] requestOfContext
+function requestOfContext(): Request | undefined
+
+[./library] RESTART_RELOAD
+const RESTART_RELOAD: string
+
+[./library] RuntimeRedirect
+interface RuntimeRedirect
+  addedAt: number
+  from: string
+  status: RuntimeStatus
+  to: string
+
+[./library] runtimeRedirects
+function runtimeRedirects(file?: string | undefined): RuntimeRedirect[]
+
+[./library] safeCode
+function safeCode(markup: string): string
+
+[./library] sameText
+function sameText(given: string, expected: string): boolean
+
+[./library] sealWith
+function sealWith(key: Uint8Array<ArrayBufferLike>, text: string, context?: string | undefined): string
+
+[./library] serverRoot
+function serverRoot(): Promise<string>
+
+[./library] setSite
+function setSite(origin: string | undefined, trailingSlash?: "never" | "always" | "ignore" | undefined, prerendering?: boolean, keepSameTab?: boolean): void
+
+[./library] sitePaths
+function sitePaths(): string[]
+
+[./library] siteWithBase
+function siteWithBase(site: string | undefined, base: string | undefined): string | undefined
+
+[./library] sourceHash
+function sourceHash(text: string): string
+
+[./library] stoppers
+function stoppers(request: Request): Pick<RequestContext<Record<string, string>>, "redirect" | "notFound" | "deny">
+
+[./library] ToolResult
+interface ToolResult
+  content: Content[]
+  isError?: boolean
+  structuredContent?: object
+
+[./library] trackDetached
+function trackDetached(work: Promise<unknown>): void
+
+[./library] TSchema
+interface TSchema extends TKind, SchemaOptions
+
+[./library] uiConfigEntries
+function uiConfigEntries(text: string): Promise<UiConfigEntry[] | undefined>
+
+[./library] UiConfigEntry
+interface UiConfigEntry
+  key: string
+  keySpan: Span
+  value: Span
+
+[./library] unansweredPaths
+function unansweredPaths(file?: string | undefined): MissingPath[]
+
+[./library] underKayDev
+function underKayDev(): boolean
+
+[./library] UNSAFE_ATTRIBUTE
+const UNSAFE_ATTRIBUTE: RegExp
+
+[./library] UNSAFE_TAGS
+const UNSAFE_TAGS: ReadonlySet<string>
+
+[./library] userOf
+function userOf(request: Request): Promise<string | undefined>
+
+[./library] validLocale
+function validLocale(tag: string): boolean
+
+[./library] viewPresenceWith
+function viewPresenceWith(next: PresenceView): () => void
+
+[./library] weakSecrets
+function weakSecrets(secrets: string[]): boolean
+
+[./library] writeDraftEntry
+function writeDraftEntry(root: string, config: Pick<KayConfig, "i18n" | "content">, collection: string, locale: string, slug: string, entry: { data: Record<string, DataValue>; body?: string | undefined; }): Promise<string>
+
+[./library] writeDraftMessages
+function writeDraftMessages(root: string, config: Pick<KayConfig, "i18n">, locale: string, messages: Record<string, Message>): Promise<string[]>
+
+[./library/auth-mails] AUTH_LINK_KINDS
+const AUTH_LINK_KINDS: readonly ["verify-email", "reset-password", "magic-link", "change-email", "invitation", "account-exists"]
+
+[./library/auth-mails] AUTH_MAIL_ENGLISH
+const AUTH_MAIL_ENGLISH: { readonly link: "link"; readonly code: "code"; readonly orPaste: "Or paste this into your browser:"; readonly yourCode: "Your code:"; readonly orTypeCode: "Or type this code where you asked for it:"; readonly linkWorks: "The link works for {duration}."; readonly codeWorks: "The code works for {dura ...#d006173e
+
+[./library/auth-mails] AUTH_MAIL_FRENCH
+const AUTH_MAIL_FRENCH: { readonly link: "lien"; readonly code: "code"; readonly orPaste: "Ou collez ceci dans votre navigateur :"; readonly yourCode: "Votre code :"; readonly orTypeCode: "Ou saisissez ce code là où vous l'avez demandé :"; readonly linkWorks: "Le lien est valable {duration}."; readonly codeWorks: "Le code  ...#5a6b12e0
+
+[./library/auth-mails] AUTH_MAIL_SAMPLES
+const AUTH_MAIL_SAMPLES: Readonly<Record<AuthMailKind, Pick<AuthMailData, "url" | "code" | "detail">>>
+
+[./library/auth-mails] AUTH_MAIL_WORDING
+const AUTH_MAIL_WORDING: Readonly<Record<string, AuthMailWording>>
+
+[./library/auth-mails] AUTH_NOTICE_KINDS
+const AUTH_NOTICE_KINDS: readonly ["new-sign-in", "sign-in-locked", "password-changed", "email-changed", "two-factor-enabled", "two-factor-disabled", "recovery-code-used", "recovery-codes-regenerated", "provider-linked", "provider-unlinked", "passkey-added", "passkey-removed", "token-created", "signed-out-everywhere", "acco ...#88c650a0
+
+[./library/auth-mails] AuthLinkKind
+type AuthLinkKind = typeof AUTH_LINK_KINDS[number]
+
+[./library/auth-mails] AuthLinkLines
+interface AuthLinkLines
+  button: string
+  ending: string
+  lasts: string
+  lead: string
+  subject: string
+
+[./library/auth-mails] AuthMailData
+interface AuthMailData
+  code?: string | undefined
+  detail?: string | undefined
+  email: string
+  locale: string
+  maxAge?: { link?: number; code?: number; } | undefined
+  name: string
+  url?: string | undefined
+
+[./library/auth-mails] AuthMailKind
+type AuthMailKind = AuthLinkKind | AuthNoticeKind
+
+[./library/auth-mails] AuthMailWording
+type AuthMailWording = { link: string code: string orPaste: string yourCode: string orTypeCode: string linkWorks: string codeWorks: string codeLasts: string once: string review: string } & Record<AuthLinkKind, AuthLinkLines> & Record<AuthNoticeKind, AuthNoticeLines>
+
+[./library/auth-mails] AuthNoticeKind
+type AuthNoticeKind = typeof AUTH_NOTICE_KINDS[number]
+
+[./library/auth-mails] AuthNoticeLines
+interface AuthNoticeLines
+  ending: string
+  lead: string
+  subject: string
+
+[./markdown] isHeldMarkdown
+function isHeldMarkdown(_html: string): boolean
+
+[./markdown] markdownHtml
+function markdownHtml(markdown: string): SafeHtml
+
+[./markdown] markdownLoaded
+function markdownLoaded(): boolean
+
+[./markdown] markdownReady
+function markdownReady(): Promise<void>
+
+[./mount] mount
+function mount<P extends object>(component: (props: P) => unknown, element: Element, ...[props]: PropsOf<P>): () => void
+
+[./params] integer
+function integer(value: string): number | undefined
+
+[./params] slug
+function slug(value: string): string | undefined
+
+[./params] uuid
+function uuid(value: string): string | undefined
+
+[./pending] pendingBlock
+function pendingBlock(block: Element, source: PendingSource, on: boolean): void
+
+[./pending] pendingBlocks
+function pendingBlocks(form: Element, source: PendingSource, on: boolean): void
+
+[./pending] pendingCall
+function pendingCall(block: Element, action: unknown): void
+
+[./pending] PendingSource
+type PendingSource = 'post' | 'hold' | 'call'
+
+[./pg-orm] jobTables
+const jobTables: readonly [TableDef<"kay_jobs", ExtractColumns<{ id: ColumnBuilder<string, NotNullable, NoDefault, IsPrimaryKey, NotGenerated>; queue: ColumnBuilder<string, NotNullable, NoDefault, NotPrimaryKey, NotGenerated>; payload: ColumnBuilder<string, NotNullable, NoDefault, NotPrimaryKey, NotGenerated>; attem ...#9bcfdbdc
+
+[./pg-orm] KayJobs
+const KayJobs: TableDef<"kay_jobs", ExtractColumns<{ id: ColumnBuilder<string, NotNullable, NoDefault, IsPrimaryKey, NotGenerated>; queue: ColumnBuilder<string, NotNullable, NoDefault, NotPrimaryKey, NotGenerated>; payload: ColumnBuilder<string, NotNullable, NoDefault, NotPrimaryKey, NotGenerated>; attempts: Colum ...#b4319fa2
+
+[./pg-orm] KayLocks
+const KayLocks: TableDef<"kay_locks", ExtractColumns<{ name: ColumnBuilder<string, NotNullable, NoDefault, IsPrimaryKey, NotGenerated>; slot: ColumnBuilder<bigint, NotNullable, NoDefault, IsPrimaryKey, NotGenerated>; }>, {}, {}>
+
+[./seo] breadcrumbList
+function breadcrumbList(trail: Crumb[]): JsonLd
+
+[./seo] Crumb
+interface Crumb
+  name: string
+  path: string
+
+[./seo] jsonLd
+function jsonLd(data: JsonLd | JsonLd[]): string
+
+[./seo] JsonLd
+interface JsonLd
+  @context?: string | undefined
+  @id?: string | undefined
+  @type: string | string[]
+
+[./seo] siteOrigin
+function siteOrigin(): string
+
+[./seo] siteUrl
+function siteUrl(path?: string): string
+
+[./server] api
+function api(options?: ApiOptions): Elysia<"", { decorator: Empty; store: Empty; derive: Empty; resolve: ApiLocals; }, { typebox: {}; error: {}; }, { schema: {}; standaloneSchema: {}; macro: {}; macroFn: {}; parser: {}; response: {}; }, {}, { derive: {}; resolve: {}; schema: {}; standaloneSchema: {}; response:  ...#7302437d
+
+[./server] ApiModule
+interface ApiModule
+  extension?: string | undefined
+  file: string
+  guards: ApiGuard[]
+  mount: string
+  open?: true | undefined
+
+[./server] ApiOptions
+interface ApiOptions
+  cors?: false | CorsOptions | undefined
+  guards?: false | undefined
+  maxSize?: ByteSize | (() => ByteSize) | undefined
+  rateLimit?: ApiRateLimit | ApiRateLimit[] | undefined
+
+[./server] ApiRateLimit
+interface ApiRateLimit extends RateLimit
+  key?: RateKey | undefined
+  max: number
+  store?: RateStore | undefined
+  window: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w`
+
+[./server] AppStore
+interface AppStore
+  cache?: CacheStore | undefined
+  database?: string | undefined
+  jobs?: JobStore | undefined
+  live?: LiveStore | undefined
+  notifications?: NotificationStore | undefined
+  push?: PushStore | undefined
+  rates?: RateStore | undefined
+  rooms?: RoomStore | AsyncRoomStore | undefined
+  sessions?: SessionStore | undefined
+  vitals?: VitalsStore | undefined
+
+[./server] AsyncRooms
+interface AsyncRooms<Message, Member = undefined, State = undefined> extends RoomsBase<Message, Member>
+  coalesce: (read: (room: string) => Message | Promise<Message>, options?: CoalesceOptions | undefined) => (room: string) => void
+  join: (ws: RoomConnection, room: string, ...member: undefined extends Member ? [member?: Member] : [member: Member]) => void
+  leave: (ws: RoomConnection, room?: string | undefined) => void
+  memberOf: (ws: RoomConnection, room: string) => Member | undefined
+  members: (room: string) => Member[]
+  publish: (room: string, message: Message, options?: { except?: RoomConnection; to?: Member; } | undefined) => void
+  response: TUnsafe<Message>
+  roomsOf: (ws: RoomConnection) => string[]
+  state: (room: string) => Promise<State>
+  update: (room: string, change: (state: State) => State) => Promise<State>
+
+[./server] AsyncRoomStore
+interface AsyncRoomStore extends RoomStoreBase
+  add: (room: string, connection: string, member: string) => void
+  close: () => unknown
+  members: (room: string) => string[]
+  publish: (room: string, text: string, recipients: RoomRecipients) => void
+  remove: (room: string, connection: string) => void
+  state?: (room: string) => Promise<string | undefined>
+  subscribe: (listener: RoomListener) => () => void
+  update?: (room: string, change: (current: string | undefined) => string) => Promise<string>
+
+[./server] background
+function background(work: (signal: AbortSignal) => unknown, options?: BackgroundOptions): Elysia<"", { decorator: {}; store: {}; derive: {}; resolve: {}; }, { typebox: {}; error: {}; }, { schema: {}; standaloneSchema: {}; macro: {}; macroFn: {}; parser: {}; response: {}; }, {}, { derive: {}; resolve: {}; schema: {}; s ...#e4ede4b6
+
+[./server] BackgroundOptions
+interface BackgroundOptions
+  enabled?: boolean | undefined
+
+[./server] basicAuth
+function basicAuth(options: BasicAuthOptions): Guard
+
+[./server] BasicAuthOptions
+interface BasicAuthOptions
+  password: string | undefined
+  realm?: string | undefined
+  user: string | undefined
+
+[./server] BrowserError
+class BrowserError
+  new (kind: string, message: string, url: string, stack: string | undefined, island?: string | undefined): BrowserError
+  island?: string | undefined
+  kind: string
+  name: string
+  url: string
+
+[./server] clientAddress
+function clientAddress(request: Request, server: Server<unknown> | null | undefined, setting?: number | boolean | ProxyConfig | undefined): string
+
+[./server] CoalesceOptions
+interface CoalesceOptions
+  wait?: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w` | undefined
+
+[./server] CorsOptions
+type CorsOptions = CorsCommon & ({ origins: '*', credentials?: false | undefined } | { origins: readonly string[], credentials?: boolean | undefined })
+
+[./server] createDataTables
+function createDataTables(source: PgJobsSource): Promise<void>
+
+[./server] createJobTables
+function createJobTables(source: PgJobsSource): Promise<void>
+
+[./server] crossOriginPaths
+function crossOriginPaths(plugin: object, paths: readonly string[], options: CorsOptions): void
+
+[./server] crossSiteRefused
+function crossSiteRefused(request: Request, site?: string | undefined): boolean
+
+[./server] crossSiteResponse
+function crossSiteResponse(request: Request, what: "request" | "action", site?: string | undefined): Response
+
+[./server] CspViolationError
+class CspViolationError
+  new (directive: string, blocked: string, url: string, disposition: "enforce" | "report", source?: string | undefined, sample?: string | undefined): CspViolationError
+  blocked: string
+  directive: string
+  disposition: "enforce" | "report"
+  name: string
+  sample?: string | undefined
+  source?: string | undefined
+  url: string
+
+[./server] dataTables
+const dataTables: readonly string[]
+
+[./server] defineConfig
+function defineConfig<Config extends KayConfig>(config: Config & { publicEnv?: never; }): Config
+
+[./server] defineEnv
+function defineEnv<Schema extends EnvSchema>(declared: Schema, source?: Record<string, string | undefined>): (Schema & { params: []; })["static"] & (keyof PublicFieldsOf<Schema> extends never ? unknown : WithPublicFields<Schema>)
+
+[./server] DeletableSessionStore
+type DeletableSessionStore = SessionStore & { deleteWhere: (match: SessionMatch) => number | Promise<number> }
+
+[./server] diskFiles
+function diskFiles(dir?: string): FileStore
+
+[./server] editedEntry
+function editedEntry(request: Request, collection: string, slug: string): boolean
+
+[./server] editRequested
+function editRequested(request: Request): boolean
+
+[./server] editSessionOf
+function editSessionOf(request: Request): string | undefined
+
+[./server] EnqueueOptions
+interface EnqueueOptions
+  delay?: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w` | undefined
+  key?: string | undefined
+
+[./server] enterPreview
+function enterPreview(ctx: { cookies: CookieMap; request: Request; }, options?: { edit?: boolean; }): string
+
+[./server] eventStream
+function eventStream<T>(source: Source<T>): EventStream<T>
+
+[./server] EveryOptions
+type EveryOptions = Omit<ScheduleOptions, 'tz'>
+
+[./server] exitPreview
+function exitPreview(ctx: { cookies: CookieMap; }): void
+
+[./server] ExtensionApp
+interface ExtensionApp
+  database?: string | undefined
+  exporting?: boolean | undefined
+  extensions: string[]
+  modules: Record<string, Record<string, unknown> | undefined>
+  root: string
+  testCookies?: CookieMap | undefined
+
+[./server] ExtensionProblem
+interface ExtensionProblem
+  file?: string | undefined
+  help?: string | undefined
+  message: string
+  severity?: "error" | "warning" | undefined
+
+[./server] FailedJob
+interface FailedJob<Payload>
+  attempts: number
+  error: string
+  id: string
+  payload: Payload
+
+[./server] files
+const files: { put(data: Blob, options?: PutOptions): Promise<string>; get(key: string): Promise<Blob | undefined>; delete(key: string): Promise<void>; list(options?: { folder?: string | undefined; }): Promise<StoredFile[]>; variants(keys: string[]): Promise<Map<string, string[]>>; url(key: string, options?: Url ...#477294da
+
+[./server] FileStore
+interface FileStore
+  delete: (key: string) => Promise<void>
+  list?: ((prefix?: string | undefined) => Promise<StoredFile[]>) | undefined
+  path?: ((key: string) => string) | undefined
+  publicUrl?: string | undefined
+  read: (key: string) => Promise<Blob | undefined>
+  write: (key: string, data: Blob) => Promise<void>
+
+[./server] forgetLocalMirrors
+function forgetLocalMirrors(request: Request): string
+
+[./server] forgetPushDevice
+function forgetPushDevice(request: Request, user: string): Promise<void>
+
+[./server] holdsType
+function holdsType(bytes: Uint8Array<ArrayBufferLike>, type: string): boolean
+
+[./server] imageSize
+function imageSize(input: Blob | ArrayBuffer | Uint8Array<ArrayBufferLike>, options?: { maxPixels?: number | undefined; }): Promise<{ width: number; height: number; format: string; }>
+
+[./server] Inbox
+interface Inbox
+  items: Notification[]
+  unread: number
+
+[./server] inlineScriptHashes
+function inlineScriptHashes(options?: ScriptHashOptions): string[]
+
+[./server] JobContext
+interface JobContext<Progress>
+  attempts: number
+  id: string
+  progress: (value: Progress) => void
+
+[./server] JobState
+interface JobState<Progress>
+  attempts: number
+  error?: string
+  id: string
+  progress?: Progress
+  status: "failed" | "waiting" | "running"
+
+[./server] JobStore
+interface JobStore
+  add: (job: StoredJob) => Maybe<string | void>
+  claim: (queue: string, now: number, until: number) => Maybe<StoredJob | undefined>
+  complete: (id: string, until?: number | undefined) => Maybe<void>
+  fail: (id: string, error: string, payload?: string | undefined, until?: number | undefined) => Maybe<boolean | void>
+  failed: (queue: string, limit?: number | undefined) => Maybe<StoredJob[]>
+  jobs?: ((queue: string, options?: { limit?: number; failed?: boolean; } | undefined) => Maybe<StoredJob[]>) | undefined
+  live?: ((queue: string, now: number, limit?: number | undefined) => Maybe<StoredJobState[]>) | undefined
+  lock: (name: string, slot: number) => Maybe<boolean>
+  nextRunAt: (queue: string) => Maybe<number | undefined>
+  progress?: ((id: string, until: number, progress: string) => Maybe<void>) | undefined
+  purge?: ((queue: string, before: number) => Maybe<number>) | undefined
+  release?: ((id: string, until: number, runAt?: number | undefined) => Maybe<void>) | undefined
+  retry: (id: string, runAt: number, error: string, until?: number | undefined) => Maybe<boolean | void>
+  revive?: ((id: string, runAt: number) => Maybe<boolean>) | undefined
+  state?: ((queue: string, ref: { key: string; } | { id: string; }, now: number) => Maybe<StoredJobState | undefined>) | undefined
+  update?: ((id: string, change: { payload: string; runAt?: number | undefined; }, guard: { until: number; } | { payload: string; now: number; }) => Maybe<boolean>) | undefined
+
+[./server] jobTables
+const jobTables: readonly ["kay_jobs", "kay_locks"]
+
+[./server] KayConfig
+interface KayConfig
+  api?: string | undefined
+  apiPath?: string | undefined
+  base?: string | undefined
+  budget?: BudgetConfig | undefined
+  checks?: ProjectCheck[] | undefined
+  compress?: boolean | undefined
+  compressionDictionary?: boolean | undefined
+  content?: string | undefined
+  cors?: CorsOptions | undefined
+  entry?: string | undefined
+  env?: false | { compose?: string | string[] | undefined; example?: string | undefined; } | undefined
+  extensions?: KayExtension<AnyElysia>[] | undefined
+  favicon?: string | false | FaviconConfig | undefined
+  fonts?: (FontConfig | FontsourceConfig)[] | undefined
+  head?: HeadTag[] | undefined
+  health?: false | HealthConfig | undefined
+  hydration?: { visible?: string | undefined; serverIslands?: string | undefined; } | undefined
+  i18n?: I18nConfig | undefined
+  images?: ImagesConfig | undefined
+  inlineStyles?: boolean | undefined
+  jobs?: JobsConfig | undefined
+  lang?: string | undefined
+  lateStyles?: boolean | undefined
+  links?: { outside?: "new-tab" | "same-tab" | undefined; } | undefined
+  lints?: Partial<Record<"code" | "unread-name" | "a11y" | "forms" | "islands" | "performance" | "seo" | "security" | "i18n" | "deprecated" | "missing-alt" | "missing-title" | "unreachable-click" | "missing-label" | "empty-control" | "skipped-heading" | "unknown-aria" | "unknown-role" | "missing-state" | "hid ...#611b5e97
+  live?: LiveConfig | undefined
+  log?: Logger | undefined
+  manifest?: ManifestConfig | undefined
+  markdown?: MarkdownConfig | undefined
+  maxSize?: ByteSize | undefined
+  maxSizes?: Record<string, ByteSize> | undefined
+  mcp?: boolean | McpConfig | undefined
+  metrics?: boolean | MetricsConfig | undefined
+  minify?: boolean | undefined
+  navigation?: boolean | undefined
+  offline?: boolean | OfflineConfig | undefined
+  onError?: ((event: { error: unknown; request: Request | undefined; }) => void | Promise<void>) | undefined
+  openapi?: boolean | OpenApiConfig | undefined
+  plugins?: BunPlugin[] | undefined
+  prefetch?: Prefetch | undefined
+  preview?: false | PreviewConfig | undefined
+  proxy?: number | boolean | ProxyConfig | undefined
+  publicCache?: Record<string, `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w`> | undefined
+  publicDir?: string | undefined
+  publicEnv?: boolean | undefined
+  redirects?: Redirects | undefined
+  requestIdHeader?: string | undefined
+  requireGuards?: boolean | undefined
+  rewrite?: Rewrite | undefined
+  robots?: false | RobotsConfig | undefined
+  routes?: string | undefined
+  runtimeRedirects?: { hosts?: string[] | undefined; } | undefined
+  saveData?: boolean | undefined
+  search?: boolean | undefined
+  secret?: string | string[] | undefined
+  security?: false | SecurityConfig | undefined
+  seo?: SeoConfig | undefined
+  serverTiming?: boolean | undefined
+  settings?: Record<string, string> | undefined
+  shutdownTimeout?: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w` | undefined
+  site?: string | undefined
+  storage?: FileStore | undefined
+  store?: AppStore | undefined
+  timeZone?: string | undefined
+  tracer?: Tracer | undefined
+  trailingSlash?: TrailingSlash | undefined
+  typography?: boolean | undefined
+
+[./server] KayExtension
+interface KayExtension<Server extends AnyElysia = AnyElysia>
+  api?: { dir: string; prefix?: string | undefined; former?: string | undefined; } | undefined
+  appFiles?: Record<string, string> | undefined
+  asksConsent?: boolean | undefined
+  check?: (() => ExtensionProblem[] | Promise<ExtensionProblem[]>) | undefined
+  commands?: Record<string, string> | undefined
+  config?: Omit<KayConfig, "extensions" | "publicEnv"> | undefined
+  context?: string | undefined
+  devTool?: { module: string; } | undefined
+  editor?: string | undefined
+  env?: EnvSchema | undefined
+  layout?: string | { file: string; reaching: string[]; } | undefined
+  maxSize?: Record<string, ByteSize> | undefined
+  messages?: string | undefined
+  name: string
+  needsServer?: boolean | undefined
+  references?: string[] | undefined
+  routes?: { dir: string; prefix?: string | undefined; } | undefined
+  server?: Server | ((app: ExtensionApp) => Server | Promise<Server>) | undefined
+  serverModule?: { path: string; export?: string | undefined; prepare?: ((exported: unknown) => void | Promise<void>) | undefined; } | undefined
+  staticFiles?: Record<string, string> | undefined
+  transformPage?: PageHook | undefined
+
+[./server] LiveEntry
+type LiveEntry = [id: string, key: string, text: string] | [id: string, key: string, text: string, expiresAt: number]
+
+[./server] LiveStore
+interface LiveStore
+  delete: (id: string, key: string) => void | Promise<void>
+  end?: (id: string, key: string, expiresAt: number) => void | Promise<void>
+  endAll?: (id: string, ttl: number) => void | Promise<void>
+  entries: () => Entries | Promise<Entries>
+  hold?: (held: boolean) => void
+  set: (id: string, key: string, text: string, expiresAt?: number | undefined) => void | Promise<void>
+  stop?: () => void
+  subscribe: (listener: (id: string, key: string, text: string | undefined, expiresAt?: number | undefined) => void) => void
+
+[./server] LogEntry
+type LogEntry = RequestEntry | MessageEntry
+
+[./server] Logger
+type Logger = boolean | 'json' | ((entry: LogEntry) => void)
+
+[./server] memoryFiles
+function memoryFiles(): FileStore
+
+[./server] memoryJobs
+function memoryJobs(): JobStore
+
+[./server] memoryNotifications
+function memoryNotifications(): NotificationStore
+
+[./server] memoryPush
+function memoryPush(): PushStore
+
+[./server] memoryRates
+function memoryRates(): SyncRates
+
+[./server] memoryRooms
+function memoryRooms(): RoomStore
+
+[./server] memoryStore
+function memoryStore(): DeletableSessionStore
+
+[./server] MessageEntry
+interface MessageEntry
+  error?: { name: string; message: string; stack?: string; }
+  from: string
+  level: LogLevel
+  message: string
+  request?: { method: string; path: string; id: string; }
+  time: string
+  type: "message"
+
+[./server] Notification
+interface Notification
+  at: number
+  id: string
+  read: boolean
+  title: string
+  url?: string | undefined
+
+[./server] notifications
+const notifications: { list(user: string, { limit }?: { limit?: number | undefined; }): Promise<Notification[]>; inbox(user: string): Promise<Inbox>; unread(user: string): Promise<number>; markRead(user: string, id: string): Promise<boolean>; markAllRead(user: string): Promise<number>; erase(user: string): Promise<numbe ...#c1b02dd0
+
+[./server] NotificationStore
+interface NotificationStore
+  add: (user: string, note: StoredNotification, most: number) => void | Promise<void>
+  close?: () => void
+  erase: (user: string) => number | Promise<number>
+  list: (user: string, limit: number, now: number) => Notification[] | Promise<Notification[]>
+  markAllRead: (user: string, now: number) => number | Promise<number>
+  markRead: (user: string, id: string, now: number) => boolean | Promise<boolean>
+  prune: (now: number) => number | Promise<number>
+  unread: (user: string, now: number) => number | Promise<number>
+
+[./server] notify
+function notify(user: string, { title, url, keep, push }: NotifyOptions): Promise<Notification>
+
+[./server] NotifyOptions
+interface NotifyOptions
+  keep?: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w` | undefined
+  push?: boolean | undefined
+  title: string
+  url?: string | undefined
+
+[./server] PageHook
+type PageHook = (page: RenderedPage) => string | Promise<string>
+
+[./server] pages
+function pages(options?: PagesOptions): Promise<Elysia<"", { decorator: {}; store: {}; derive: {}; resolve: {}; }, { typebox: {}; error: {}; }, { schema: {}; standaloneSchema: {}; macro: {}; macroFn: {}; parser: {}; response: {}; }, {}, { derive: {}; resolve: {}; schema: {}; standaloneSchema: {}; response: {}; }, ...#29343348
+
+[./server] PagesOptions
+interface PagesOptions extends KayConfig
+  api?: string | undefined
+  apiPath?: string | undefined
+  base?: string | undefined
+  budget?: BudgetConfig | undefined
+  checks?: ProjectCheck[] | undefined
+  compress?: boolean | undefined
+  compressionDictionary?: boolean | undefined
+  content?: string | undefined
+  cors?: CorsOptions | undefined
+  dev?: boolean | undefined
+  entry?: string | undefined
+  env?: false | { compose?: string | string[] | undefined; example?: string | undefined; } | undefined
+  extensions?: KayExtension<AnyElysia>[] | undefined
+  favicon?: string | false | FaviconConfig | undefined
+  fonts?: (FontConfig | FontsourceConfig)[] | undefined
+  head?: HeadTag[] | undefined
+  health?: false | HealthConfig | undefined
+  hydration?: { visible?: string | undefined; serverIslands?: string | undefined; } | undefined
+  i18n?: I18nConfig | undefined
+  images?: ImagesConfig | undefined
+  inlineStyles?: boolean | undefined
+  jobs?: JobsConfig | undefined
+  lang?: string | undefined
+  lateStyles?: boolean | undefined
+  links?: { outside?: "new-tab" | "same-tab" | undefined; } | undefined
+  lints?: Partial<Record<"code" | "unread-name" | "a11y" | "forms" | "islands" | "performance" | "seo" | "security" | "i18n" | "deprecated" | "missing-alt" | "missing-title" | "unreachable-click" | "missing-label" | "empty-control" | "skipped-heading" | "unknown-aria" | "unknown-role" | "missing-state" | "hid ...#611b5e97
+  live?: LiveConfig | undefined
+  log?: Logger | undefined
+  manifest?: ManifestConfig | undefined
+  markdown?: MarkdownConfig | undefined
+  maxSize?: ByteSize | undefined
+  maxSizes?: Record<string, ByteSize> | undefined
+  mcp?: boolean | McpConfig | undefined
+  metrics?: boolean | MetricsConfig | undefined
+  minify?: boolean | undefined
+  navigation?: boolean | undefined
+  offline?: boolean | OfflineConfig | undefined
+  onError?: ((event: { error: unknown; request: Request | undefined; }) => void | Promise<void>) | undefined
+  openapi?: boolean | OpenApiConfig | undefined
+  plugins?: BunPlugin[] | undefined
+  prebuilt?: boolean | undefined
+  prefetch?: Prefetch | undefined
+  preview?: false | PreviewConfig | undefined
+  proxy?: number | boolean | ProxyConfig | undefined
+  publicCache?: Record<string, `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w`> | undefined
+  publicDir?: string | undefined
+  publicEnv?: boolean | undefined
+  redirects?: Redirects | undefined
+  requestIdHeader?: string | undefined
+  requireGuards?: boolean | undefined
+  rewrite?: Rewrite | undefined
+  robots?: false | RobotsConfig | undefined
+  root?: string | undefined
+  routes?: string | undefined
+  runtimeRedirects?: { hosts?: string[] | undefined; } | undefined
+  saveData?: boolean | undefined
+  search?: boolean | undefined
+  secret?: string | string[] | undefined
+  security?: false | SecurityConfig | undefined
+  seo?: SeoConfig | undefined
+  serverTiming?: boolean | undefined
+  settings?: Record<string, string> | undefined
+  shutdownTimeout?: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w` | undefined
+  site?: string | undefined
+  storage?: FileStore | undefined
+  store?: AppStore | undefined
+  timeZone?: string | undefined
+  tracer?: Tracer | undefined
+  trailingSlash?: TrailingSlash | undefined
+  typography?: boolean | undefined
+
+[./server] pgData
+function pgData(source: PgJobsSource): { close: () => Promise<void>; [Symbol.asyncDispose]: () => Promise<void>; notifications: NotificationStore; push: PushStore; database?: string; sessions: DeletableSessionStore; cache: CacheStore; jobs: JobStore; rates: RateStore; rooms: AsyncRoomStore; vitals: VitalsStore; li ...#4f6a2630
+
+[./server] pgJobs
+function pgJobs(source: PgJobsSource): JobStore
+
+[./server] PgJobsSource
+type PgJobsSource = SQL | { sql: SQL } | string
+
+[./server] Prefetch
+type Prefetch = 'conservative' | 'moderate' | 'eager' | false
+
+[./server] PreviewScope
+interface PreviewScope
+  collection: string
+  locale?: string | undefined
+  slug: string
+
+[./server] previewUrl
+function previewUrl(path: string, options?: { ttl?: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w`; edit?: boolean; entry?: PreviewScope; }): string
+
+[./server] ProcessedImage
+interface ProcessedImage
+  bytes: Uint8Array<ArrayBufferLike>
+  height: number
+  type: string
+  width: number
+
+[./server] processImage
+function processImage(input: Blob | ArrayBuffer | Uint8Array<ArrayBufferLike>, options?: ProcessImageOptions): Promise<ProcessedImage>
+
+[./server] ProcessImageOptions
+interface ProcessImageOptions
+  fit?: "inside" | "cover" | undefined
+  format?: "webp" | "jpeg" | "png" | undefined
+  height?: number | undefined
+  maxPixels?: number | undefined
+  quality?: number | undefined
+  width?: number | undefined
+
+[./server] push
+function push(options?: PushOptions): KayExtension<AnyElysia>
+
+[./server] PushMessage
+interface PushMessage
+  body?: string | undefined
+  icon?: string | undefined
+  tag?: string | undefined
+  title: string
+  url?: string | undefined
+
+[./server] PushOptions
+interface PushOptions
+  subject?: string | undefined
+
+[./server] PushResult
+interface PushResult
+  dropped: number
+  failed: number
+  sent: number
+
+[./server] PushSendOptions
+interface PushSendOptions
+  topic?: string | undefined
+  ttl?: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w` | undefined
+  urgency?: "very-low" | "low" | "normal" | "high" | undefined
+
+[./server] PushStore
+interface PushStore
+  add: (user: string, subscription: PushSubscriptionRecord, most: number) => void | Promise<void>
+  close?: () => void
+  erase: (user: string) => number | Promise<number>
+  list: (user: string) => PushSubscriptionRecord[] | Promise<PushSubscriptionRecord[]>
+  remove: (endpoint: string, user?: string | undefined) => boolean | Promise<boolean>
+
+[./server] PushSubscriptionRecord
+interface PushSubscriptionRecord
+  at: number
+  auth: string
+  endpoint: string
+  p256dh: string
+
+[./server] pushSubscriptions
+const pushSubscriptions: { list(user: string): Promise<{ endpoint: string; at: number; }[]>; erase(user: string): Promise<number>; }
+
+[./server] PutOptions
+interface PutOptions
+  folder?: string | undefined
+  id?: string | undefined
+  keepMetadata?: boolean | undefined
+  private?: boolean | undefined
+  replace?: string | undefined
+
+[./server] queue
+function queue<Payload, Progress = unknown>(name: string, handler: (payload: Payload, signal: AbortSignal, job: JobContext<Progress>) => unknown, options?: QueueOptions<Payload>): Queue<Payload, Progress>
+
+[./server] Queue
+type Queue<Payload, Progress = unknown> = Elysia & { // Keeps the job for a worker to run, surviving a restart; resolves with its id once stored. enqueue: (payload: Payload, options?: EnqueueOptions) => Promise<string> // The waiting or running job with that key, else the last one with it that faile ...#bc073abf
+
+[./server] QueueOptions
+interface QueueOptions<Payload>
+  attempts?: number | undefined
+  backoff?: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w` | undefined
+  concurrency?: number | undefined
+  idlePoll?: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w` | undefined
+  keepFailed?: false | `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w` | undefined
+  lazy?: boolean | undefined
+  live?: boolean | ((payload: Payload, job: LiveJob) => unknown) | undefined
+  lostAfter?: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w` | undefined
+  onFailed?: ((event: { payload: Payload; error: unknown; }) => unknown) | undefined
+  redact?: ((payload: Payload) => Payload) | undefined
+  store?: JobStore | undefined
+
+[./server] rateKey
+function rateKey(address: string): string
+
+[./server] rateLimit
+function rateLimit(name: string, limit: RateLimit): RateLimiter
+
+[./server] RateLimiter
+interface RateLimiter
+  hit: (from: string | Request, server?: Server<unknown> | null | undefined, weight?: number | undefined) => Promise<number | undefined>
+
+[./server] RenderedPage
+interface RenderedPage
+  file: (url: string) => Promise<string | undefined>
+  fileSize: (url: string) => Promise<number | undefined>
+  html: string
+  htmlSize: (html: string) => Promise<number>
+  locale: string
+  path: string
+
+[./server] renderLocale
+function renderLocale(locale?: string | undefined): Promise<string>
+
+[./server] renderToString
+function renderToString<P extends object>(view: (props: P) => Element, ...[props, options]: RenderArguments<P>): Promise<string>
+
+[./server] RenderToStringOptions
+interface RenderToStringOptions
+  locale?: string | undefined
+
+[./server] RequestEntry
+interface RequestEntry
+  duration: number
+  id: string
+  level: "info"
+  method: string
+  path: string
+  status: number
+  time: string
+  type: "request"
+
+[./server] requestId
+function requestId(request: Request): string
+
+[./server] retryLater
+function retryLater(wait: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w`, reason?: string): Error
+
+[./server] RoomConnection
+interface RoomConnection
+  raw: object & { sendText: (text: string) => unknown; }
+
+[./server] RoomRecipients
+interface RoomRecipients
+  except?: string
+  to?: string
+
+[./server] rooms
+function rooms<Message, Member = undefined, State = undefined>(...[options]: undefined extends State ? [options?: RoomsOptions<Message, State, RoomStore>] : [options: RoomsOptions<Message, State, RoomStore> & { state: () => State; }]): Rooms<Message, Member, State>
+function rooms<Message, Member = undefined, State = undefined>(...[options]: undefined extends State ? [options: RoomsOptions<Message, State, AsyncRoomStore> & { store: AsyncRoomStore; }] : [options: RoomsOptions<Message, State, AsyncRoomStore> & { store: AsyncRoomStore; state: () => State; }]): AsyncRooms<Messag ...#ee5d2df8
+function rooms<Message, Member = undefined, State = undefined>(...[options]: undefined extends State ? [options?: RoomsOptions<Message, State, RoomStore | AsyncRoomStore>] : [options: RoomsOptions<Message, State, RoomStore | AsyncRoomStore> & { state: () => State; }]): StoreRooms<Message, Member, State>
+
+[./server] Rooms
+interface Rooms<Message, Member = undefined, State = undefined> extends RoomsBase<Message, Member>
+  coalesce: (read: (room: string) => Message | Promise<Message>, options?: CoalesceOptions | undefined) => (room: string) => void
+  join: (ws: RoomConnection, room: string, ...member: undefined extends Member ? [member?: Member] : [member: Member]) => void
+  leave: (ws: RoomConnection, room?: string | undefined) => void
+  memberOf: (ws: RoomConnection, room: string) => Member | undefined
+  members: (room: string) => Member[]
+  publish: (room: string, message: Message, options?: { except?: RoomConnection; to?: Member; } | undefined) => void
+  response: TUnsafe<Message>
+  roomsOf: (ws: RoomConnection) => string[]
+  state: (room: string) => State
+  update: (room: string, change: (state: State) => State) => State
+
+[./server] RoomsOptions
+interface RoomsOptions<Message = never, State = undefined, Store = RoomStore>
+  snapshot?: ((state: State, room: string) => Message) | undefined
+  state?: (() => State) | undefined
+  store?: Store | undefined
+
+[./server] RoomStore
+interface RoomStore extends RoomStoreBase
+  add: (room: string, connection: string, member: string) => void
+  close: () => unknown
+  members: (room: string) => string[]
+  publish: (room: string, text: string, recipients: RoomRecipients) => void
+  remove: (room: string, connection: string) => void
+  state?: (room: string) => string | undefined
+  subscribe: (listener: RoomListener) => () => void
+  update?: (room: string, change: (current: string | undefined) => string) => string
+
+[./server] Route
+interface Route
+  actionAccess?: LayoutAccess<GuardFile>[] | undefined
+  actionModules?: string[] | undefined
+  catchAll?: string | undefined
+  contextKeys?: string[] | undefined
+  editorOwn?: true | undefined
+  file: string
+  guards: GuardFile[]
+  layoutAccess?: LayoutAccess<GuardFile>[] | undefined
+  layouts: string[]
+  matchers?: Record<string, string> | undefined
+  open?: true | undefined
+  optional?: string[] | undefined
+  params: string[]
+  pattern: string
+  special: SpecialPages
+
+[./server] s
+const s: Omit<Omit<JavaScriptTypeBuilder, "String" | "Transform"> & { String: (property?: ElysiaStringOptions | undefined) => TString; Numeric: (property?: NumberOptions | undefined) => TNumber; NumericEnum<T extends AssertNumericEnum<T>>(item: T, property?: SchemaOptions | undefined): TEnum<T>; Integer: (pr ...#4aa8442d
+
+[./server] s3Files
+function s3Files(options?: S3Options & { publicUrl?: string | undefined; }): FileStore
+
+[./server] safePath
+function safePath(root: string, name: string): string | undefined
+
+[./server] schedule
+function schedule<const Every extends Duration>(every: Every & PositiveDuration<Every>, jobs: Jobs, options?: EveryOptions | undefined): Elysia<"", { decorator: {}; store: {}; derive: {}; resolve: {}; }, { typebox: {}; error: {}; }, { schema: {}; standaloneSchema: {}; macro: {}; macroFn: {}; parser: {}; response: {} ...#778cf68d
+function schedule<const Cron extends string>(cron: Cron & CronSchedule<Cron>, jobs: Jobs, options?: ScheduleOptions | undefined): Elysia<"", { decorator: {}; store: {}; derive: {}; resolve: {}; }, { typebox: {}; error: {}; }, { schema: {}; standaloneSchema: {}; macro: {}; macroFn: {}; parser: {}; response: {}; }, {} ...#76140ad8
+function schedule<const Table extends Record<string, Jobs>>(table: Table & { readonly [Key in keyof Table & string]: WhenOf<Key>; }, options?: ScheduleOptions | undefined): Elysia<"", { decorator: {}; store: {}; derive: {}; resolve: {}; }, { typebox: {}; error: {}; }, { schema: {}; standaloneSchema: {}; macro: {}; m ...#91e6acdc
+
+[./server] ScheduleOptions
+interface ScheduleOptions
+  boot?: boolean | undefined
+  enabled?: boolean | undefined
+  lock?: string | false | undefined
+  store?: JobStore | undefined
+  timeout?: false | `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w` | undefined
+  tz?: string | undefined
+
+[./server] ScriptHashOptions
+interface ScriptHashOptions
+  apiPath?: string | undefined
+  base?: string | undefined
+  dev?: boolean | undefined
+  installOffer?: boolean | undefined
+  lateStyles?: boolean | undefined
+  offline?: boolean | undefined
+  prefetch?: Prefetch | undefined
+
+[./server] sendPush
+function sendPush(user: string, message: PushMessage, options?: PushSendOptions): Promise<PushResult>
+
+[./server] session
+function session<Data extends object = SessionData>(options?: SessionOptions): Elysia<"", { decorator: {}; store: {}; derive: {}; resolve: {}; }, { typebox: {}; error: {}; }, { schema: {}; standaloneSchema: {}; macro: {}; macroFn: {}; parser: {}; response: {}; }, {}, { derive: { readonly session: RequestSession<Dat ...#33f240cf
+
+[./server] Session
+interface Session<Data extends object>
+  destroy: () => Promise<void>
+  get: <Key extends keyof Data>(key: Key) => Promise<Data[Key] | undefined>
+  maxAge: (maxAge: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w` | "browser") => Promise<void>
+  regenerate: () => Promise<void>
+  set: <Key extends keyof Data>(key: Key, value: Data[Key]) => Promise<void>
+  settings: SessionSettings
+  unset: (key: keyof Data) => Promise<void>
+
+[./server] SessionData
+type SessionData = Record<string, unknown>
+
+[./server] SessionMatch
+type SessionMatch = ((data: SessionData) => boolean) | Readonly<Record<string, string | number | boolean | null>>
+
+[./server] SessionOptions
+interface SessionOptions
+  absoluteMaxAge?: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w` | undefined
+  browserMaxAge?: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w` | undefined
+  cookie?: string | undefined
+  domain?: string | undefined
+  maxAge?: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w` | undefined
+  sameSite?: SameSite | undefined
+  secret?: string | string[] | undefined
+  store?: SessionStore | undefined
+
+[./server] SessionSettings
+interface SessionSettings
+  absoluteMaxAge: number
+  browserMaxAge: number
+  maxAge: number
+
+[./server] SessionStore
+interface SessionStore
+  delete: (id: string) => void | Promise<void>
+  deleteWhere?: ((match: (data: SessionData) => boolean) => number | Promise<number>) | undefined
+  get: (id: string) => SessionData | Promise<SessionData | undefined> | undefined
+  set: (id: string, data: SessionData, maxAge: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w`) => void | Promise<void>
+
+[./server] shutdown
+function shutdown(app: AnyElysia, force?: boolean): Promise<void>
+
+[./server] signed
+const signed: { sign(use: string, value: string, options?: SignOptions): string; verify(use: string, value: string, token: unknown): boolean; }
+
+[./server] SignOptions
+interface SignOptions
+  maxAge?: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w` | undefined
+
+[./server] SNIFFED_BYTES
+const SNIFFED_BYTES: 4096
+
+[./server] sqliteData
+function sqliteData(path: string): { notifications: NotificationStore; push: PushStore; database?: string; sessions: DeletableSessionStore; cache: SyncCacheStore; jobs: JobStore; rates: SyncRates; live: LiveStore; rooms: RoomStore; vitals: VitalsStore; }
+
+[./server] sqliteJobs
+function sqliteJobs(path: string): JobStore
+
+[./server] sqliteLive
+function sqliteLive(path: string): LiveStore
+
+[./server] sqliteNotifications
+function sqliteNotifications(path: string): NotificationStore
+
+[./server] sqlitePush
+function sqlitePush(path: string): PushStore
+
+[./server] sqliteRates
+function sqliteRates(path: string): SyncRates
+
+[./server] sqliteRooms
+function sqliteRooms(path: string, { poll }?: { poll?: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w`; }): RoomStore
+
+[./server] sqliteStore
+function sqliteStore(path: string): DeletableSessionStore
+
+[./server] StartOptions
+interface StartOptions
+  delay?: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w` | undefined
+  id?: string | undefined
+
+[./server] StoredFile
+interface StoredFile
+  key: string
+  modified?: Date | undefined
+
+[./server] StoredJob
+interface StoredJob
+  attempts: number
+  error?: string
+  heldUntil?: number
+  id: string
+  key?: string
+  payload: string
+  progress?: string
+  queue: string
+  runAt: number
+
+[./server] StoredJobState
+interface StoredJobState extends StoredJob
+  attempts: number
+  error?: string
+  heldUntil?: number
+  id: string
+  key?: string
+  payload: string
+  progress?: string
+  queue: string
+  runAt: number
+  status: "failed" | "waiting" | "running"
+
+[./server] StoredNotification
+interface StoredNotification
+  at: number
+  expires: number
+  id: string
+  title: string
+  url?: string | undefined
+
+[./server] StoreRooms
+interface StoreRooms<Message, Member = undefined, State = undefined> extends RoomsBase<Message, Member>
+  coalesce: (read: (room: string) => Message | Promise<Message>, options?: CoalesceOptions | undefined) => (room: string) => void
+  join: (ws: RoomConnection, room: string, ...member: undefined extends Member ? [member?: Member] : [member: Member]) => void
+  leave: (ws: RoomConnection, room?: string | undefined) => void
+  memberOf: (ws: RoomConnection, room: string) => Member | undefined
+  members: (room: string) => Member[]
+  publish: (room: string, message: Message, options?: { except?: RoomConnection; to?: Member; } | undefined) => void
+  response: TUnsafe<Message>
+  roomsOf: (ws: RoomConnection) => string[]
+  state: (room: string) => State | Promise<State>
+  update: (room: string, change: (state: State) => State) => State | Promise<State>
+
+[./server] toolCall
+function toolCall(request: Request): ToolCall | undefined
+
+[./server] ToolCall
+interface ToolCall
+  client: string
+  from: string
+  tool: string
+
+[./server] typeOfName
+function typeOfName(name: string): string
+
+[./server] UrlOptions
+interface UrlOptions
+  maxAge?: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w` | undefined
+
+[./server] verifyWork
+function verifyWork(solution: string | null | undefined, scope: string, options?: VerifyWorkOptions): Promise<ProofOfWorkRefusal | undefined>
+
+[./server] VerifyWorkOptions
+interface VerifyWorkOptions
+  difficulty?: number | undefined
+  store?: RateStore | undefined
+
+[./server] WaitResult
+type WaitResult<Data> = { timedOut: false, data: Data } | { timedOut: true, data?: undefined }
+
+[./server] workChallenge
+function workChallenge(scope: string, options?: WorkChallengeOptions): string
+
+[./server] WorkChallengeOptions
+interface WorkChallengeOptions
+  difficulty?: number | undefined
+  maxAge?: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w` | undefined
+
+[./server] workflow
+function workflow<Input = undefined, Known extends Events = Events>(name: string, flow: (run: WorkflowRun<Input, Known>) => unknown, options?: WorkflowOptions<Input>): Workflow<Input, Known>
+
+[./server] Workflow
+type Workflow<Input, Known extends Events> = Elysia & { // Starts a run, which the server's workers carry out, surviving restarts; resolves with its id once stored. start: (...args: undefined extends Input ? [input?: Input, options?: StartOptions] : [input: Input, options?: StartOptions]) => Promise ...#f29f15b3
+
+[./server] WorkflowOptions
+interface WorkflowOptions<Input> extends Pick<QueueOptions<never>, 'store' | 'attempts' | 'backoff' | 'concurrency' | 'lostAfter' | 'idlePoll' | 'keepFailed'>
+  attempts?: number | undefined
+  backoff?: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w` | undefined
+  concurrency?: number | undefined
+  idlePoll?: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w` | undefined
+  keepFailed?: false | `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w` | undefined
+  lostAfter?: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w` | undefined
+  onFailed?: ((event: { id: string; input: Input; error: unknown; }) => unknown) | undefined
+  store?: JobStore | undefined
+
+[./server] WorkflowRun
+interface WorkflowRun<Input, Known extends Events>
+  id: string
+  input: Input
+  step: WorkflowStep<Known>
+
+[./server] WorkflowStatus
+interface WorkflowStatus
+  error?: string
+  event?: string
+  status: "failed" | "waiting" | "running" | "sleeping"
+  steps: number
+
+[./server] WorkflowStep
+interface WorkflowStep<Known extends Events>
+  run: <Result>(name: string, work: (signal: AbortSignal) => Result | Promise<Result>) => Promise<Awaited<Result>>
+  sleep: (wait: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w`) => Promise<void>
+  waitFor: { <Event extends keyof Known & string>(event: Event): Promise<Known[Event]>; <Event extends keyof Known & string>(event: Event, options: { timeout: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w`; }): Promise<WaitResult<Known[Event]>>; }
+
+[./test] A11yViolation
+interface A11yViolation
+  help: string
+  helpUrl: string
+  id: string
+  impact: "moderate" | "minor" | "serious" | "critical" | null
+  nodes: { target: string; html: string; }[]
+  tags: string[]
+
+[./test] ApiResult
+type ApiResult<Answer> = { ok: true, status: number, headers: Headers, body: Answer } | { ok: false, status: number, headers: Headers, body: unknown }
+
+[./test] browse
+function browse(url: string, options?: BrowserOptions): Promise<TestPage>
+
+[./test] BrowserOptions
+interface BrowserOptions
+  colorScheme?: "light" | "dark" | undefined
+  cookies?: string | { name: string; value: string; }[] | undefined
+  height?: number | undefined
+  javaScript?: boolean | undefined
+  lenient?: boolean | undefined
+  path?: string | undefined
+  reducedMotion?: "reduce" | "no-preference" | undefined
+  strict?: boolean | undefined
+  timeout?: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w` | undefined
+  viewport?: "phone" | "tablet" | { width: number; height: number; deviceScaleFactor?: number | undefined; mobile?: boolean | undefined; } | undefined
+  width?: number | undefined
+
+[./test] browserPath
+function browserPath(path?: string | undefined): string | undefined
+
+[./test] ClickOptions
+interface ClickOptions extends PointerOptions
+  at?: { x: number; y: number; } | undefined
+  modifiers?: Modifier[] | undefined
+  timeout?: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w` | undefined
+
+[./test] ContentSeed
+type ContentSeed = Record<string, SeedEntry[]>
+
+[./test] cookieJar
+function cookieJar(): CookieJar
+
+[./test] CookieJar
+interface CookieJar
+  cookies: CookieMap
+  header: (path?: string | undefined) => string
+  keep: (response: Response) => void
+  send: (handle: (request: Request) => Response | Promise<Response>, request: Request, path?: string | undefined) => Promise<Response>
+
+[./test] DialogHandler
+type DialogHandler = (dialog: PageDialog) => boolean | string | Promise<boolean | string>
+
+[./test] EnvOverride
+type EnvOverride<Env extends object> = { [Name in keyof Env]?: Env[Name] | undefined }
+
+[./test] EnvRestore
+interface EnvRestore
+  restore: () => void
+
+[./test] fakeService
+function fakeService(routes: ServiceRoutes): FakeService
+
+[./test] FakeService
+interface FakeService
+  errors: unknown[]
+  fail: (status: number, body?: string | undefined) => void
+  requests: ServiceRequest[]
+  stall: () => void
+  stop: () => Promise<void>
+  url: string
+
+[./test] FetchedResponse
+interface FetchedResponse
+  body: Uint8Array<ArrayBufferLike>
+  headers: Record<string, string>
+  status: number
+  text: () => string
+
+[./test] FormValue
+type FormValue = string | Blob
+
+[./test] Found
+interface Found
+  attributes: Record<string, string>
+  html: string
+  tag: string
+  text: string
+
+[./test] FulfillOptions
+interface FulfillOptions
+  body?: string | Uint8Array<ArrayBufferLike> | undefined
+  headers?: Record<string, string> | undefined
+  json?: unknown
+  status?: number | undefined
+
+[./test] Interactions
+interface Interactions
+  click: (selector: string) => Promise<void>
+  press: (key: string) => Promise<void>
+  type: (selector: string, text: string) => Promise<void>
+
+[./test] McpCall
+interface McpCall
+  data: Record<string, unknown> | undefined
+  isError: boolean
+  status: number
+  text: string
+
+[./test] McpTool
+interface McpTool
+  description: string
+  inputSchema: Record<string, unknown>
+  name: string
+
+[./test] mountComponent
+function mountComponent<Component extends (props: never) => unknown>(component: Component, ...props: MountArguments<Component>): Promise<Mounted<PropsOf<Component>>>
+
+[./test] Mounted
+interface Mounted<Props = Record<string, unknown>> extends Interactions
+  click: (selector: string) => Promise<void>
+  press: (key: string) => Promise<void>
+  root: HTMLElement
+  setProps: (props: Partial<Props>) => Promise<void>
+  type: (selector: string, text: string) => Promise<void>
+  unmount: () => void
+
+[./test] overrideEnv
+function overrideEnv<Env extends object>(env: Env, values: EnvOverride<Env>): EnvRestore
+
+[./test] PageDialog
+interface PageDialog
+  defaultPrompt: string
+  message: string
+  type: "alert" | "confirm" | "prompt" | "beforeunload"
+
+[./test] PageReading
+interface PageReading
+  canonical: () => string | undefined
+  find: (selector: string) => Found[]
+  jsonLd: () => unknown[]
+  links: () => string[]
+  meta: (key: string) => string | undefined
+  text: (selector?: string | undefined) => string | undefined
+  title: () => string | undefined
+
+[./test] PageRequest
+interface PageRequest
+  abort: (reason?: string | undefined) => Promise<void>
+  body: string | undefined
+  continue: (options?: { headers?: Record<string, string> | undefined; } | undefined) => Promise<void>
+  fetch: () => Promise<FetchedResponse>
+  fulfill: (options?: FulfillOptions | undefined) => Promise<void>
+  headers: Record<string, string>
+  method: string
+  type: string
+  url: string
+
+[./test] PageResponse
+interface PageResponse
+  complete: boolean
+  method: string
+  requestHeaders: Record<string, string>
+  responseHeaders: Record<string, string>
+  status: number
+  type: string
+  url: string
+
+[./test] persistedCookie
+function persistedCookie(name: string, value: unknown): string
+
+[./test] PointerOptions
+interface PointerOptions extends WaitOptions
+  at?: { x: number; y: number; } | undefined
+  timeout?: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w` | undefined
+
+[./test] readPersisted
+function readPersisted(key: string): unknown
+
+[./test] RouteHandler
+type RouteHandler = (request: PageRequest) => void | Promise<void>
+
+[./test] RouteMatch
+type RouteMatch = string | RegExp | ((url: URL) => boolean)
+
+[./test] scratchDir
+function scratchDir(prefix?: string, root?: string): Promise<string>
+
+[./test] SeedEntry
+interface SeedEntry
+  body?: string | undefined
+  data: Record<string, unknown>
+  html?: string | undefined
+  locale?: string | undefined
+  slug: string
+
+[./test] ServiceAnswer
+type ServiceAnswer = Response | string | object | number | boolean | null | undefined
+
+[./test] ServiceHandler
+type ServiceHandler = (request: ServiceRequest) => ServiceAnswer | Promise<ServiceAnswer>
+
+[./test] ServiceRequest
+interface ServiceRequest
+  bytes: Uint8Array<ArrayBufferLike>
+  headers: Headers
+  json: () => unknown
+  method: string
+  path: string
+  query: URLSearchParams
+  text: string
+
+[./test] ServiceRoutes
+type ServiceRoutes = Record<string, ServiceAnswer | ServiceHandler> | ServiceHandler
+
+[./test] settle
+function settle(): Promise<void>
+
+[./test] solveWork
+function solveWork(challenge: string): string | undefined
+
+[./test] TestContent
+interface TestContent
+  reset: (seed?: ContentSeed | undefined) => Promise<void>
+  seed: (name: string, entries: SeedEntry[]) => Promise<void>
+  write: (name: string, file: string, text: string) => Promise<void>
+
+[./test] TestOptions
+interface TestOptions extends PagesOptions
+  api?: string | undefined
+  apiPath?: string | undefined
+  base?: string | undefined
+  browser?: boolean | BrowserOptions | undefined
+  budget?: BudgetConfig | undefined
+  checks?: ProjectCheck[] | undefined
+  compress?: boolean | undefined
+  compressionDictionary?: boolean | undefined
+  content?: string | undefined
+  cors?: CorsOptions | undefined
+  dev?: boolean | undefined
+  entry?: string | undefined
+  env?: false | { compose?: string | string[] | undefined; example?: string | undefined; } | undefined
+  extensions?: KayExtension<AnyElysia>[] | undefined
+  favicon?: string | false | FaviconConfig | undefined
+  fonts?: (FontConfig | FontsourceConfig)[] | undefined
+  head?: HeadTag[] | undefined
+  headers?: Record<string, string> | undefined
+  health?: false | HealthConfig | undefined
+  hydration?: { visible?: string | undefined; serverIslands?: string | undefined; } | undefined
+  i18n?: I18nConfig | undefined
+  images?: ImagesConfig | undefined
+  inlineStyles?: boolean | undefined
+  islands?: boolean | undefined
+  jobs?: JobsConfig | undefined
+  lang?: string | undefined
+  lateStyles?: boolean | undefined
+  links?: { outside?: "new-tab" | "same-tab" | undefined; } | undefined
+  lints?: Partial<Record<"code" | "unread-name" | "a11y" | "forms" | "islands" | "performance" | "seo" | "security" | "i18n" | "deprecated" | "missing-alt" | "missing-title" | "unreachable-click" | "missing-label" | "empty-control" | "skipped-heading" | "unknown-aria" | "unknown-role" | "missing-state" | "hid ...#611b5e97
+  live?: LiveConfig | undefined
+  locals?: ((request: Request) => Record<string, unknown> | Promise<Record<string, unknown>>) | undefined
+  log?: Logger | undefined
+  manifest?: ManifestConfig | undefined
+  markdown?: MarkdownConfig | undefined
+  maxSize?: ByteSize | undefined
+  maxSizes?: Record<string, ByteSize> | undefined
+  mcp?: boolean | McpConfig | undefined
+  mcpKey?: string | undefined
+  metrics?: boolean | MetricsConfig | undefined
+  minify?: boolean | undefined
+  navigation?: boolean | undefined
+  offline?: boolean | OfflineConfig | undefined
+  onError?: ((event: { error: unknown; request: Request | undefined; }) => void | Promise<void>) | undefined
+  openapi?: boolean | OpenApiConfig | undefined
+  plugins?: BunPlugin[] | undefined
+  prebuilt?: boolean | undefined
+  prefetch?: Prefetch | undefined
+  preview?: false | PreviewConfig | undefined
+  proxy?: number | boolean | ProxyConfig | undefined
+  proxyKey?: string | undefined
+  publicCache?: Record<string, `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w`> | undefined
+  publicDir?: string | undefined
+  publicEnv?: boolean | undefined
+  redirects?: Redirects | undefined
+  requestIdHeader?: string | undefined
+  requireGuards?: boolean | undefined
+  rewrite?: Rewrite | undefined
+  robots?: false | RobotsConfig | undefined
+  root?: string | undefined
+  routes?: string | undefined
+  runtimeRedirects?: { hosts?: string[] | undefined; } | undefined
+  saveData?: boolean | undefined
+  search?: boolean | undefined
+  secret?: string | string[] | undefined
+  security?: false | SecurityConfig | undefined
+  seo?: SeoConfig | undefined
+  serverTiming?: boolean | undefined
+  settings?: Record<string, string> | undefined
+  shutdownTimeout?: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w` | undefined
+  site?: string | undefined
+  storage?: FileStore | undefined
+  store?: AppStore | undefined
+  timeZone?: string | undefined
+  tracer?: Tracer | undefined
+  trailingSlash?: TrailingSlash | undefined
+  typography?: boolean | undefined
+  use?: AnyElysia[] | undefined
+
+[./test] TestPage
+interface TestPage
+  a11y: (selector?: string | undefined) => Promise<A11yViolation[]>
+  advance: (duration: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w`) => Promise<void>
+  back: () => Promise<void>
+  cdp: <T = unknown>(method: string, params?: Record<string, unknown> | undefined) => Promise<T>
+  click: (selector: string, options?: ClickOptions | undefined) => Promise<void>
+  close: () => void
+  count: (selector: string) => Promise<number>
+  errors: string[]
+  evaluate: <Args extends unknown[], Result>(run: (...args: Args) => Result | Promise<Result>, ...args: Args) => Promise<Result>
+  fill: (selector: string, text: string) => Promise<void>
+  forward: () => Promise<void>
+  goto: (path: string) => Promise<void>
+  hover: (selector: string, options?: PointerOptions | undefined) => Promise<void>
+  initScript: <Args extends unknown[]>(run: (...args: Args) => unknown, ...args: Args) => Promise<void>
+  offline: () => Promise<void>
+  onDialog: (handler: DialogHandler) => Promise<void>
+  online: () => Promise<void>
+  path: () => Promise<string>
+  press: (key: VirtualKey | (string & {}), options?: PressOptions | undefined) => Promise<void>
+  reload: () => Promise<void>
+  responses: PageResponse[]
+  route: (match: RouteMatch, handler: RouteHandler) => Promise<void>
+  text: (selector: string) => Promise<string | null>
+  type: (text: string) => Promise<void>
+  unroute: (match?: RouteMatch | undefined) => Promise<void>
+  upload: (selector: string, files: string | string[]) => Promise<void>
+  value: (selector: string) => Promise<string | null>
+  view: WebView
+  waitFor: (selector: string, options?: WaitForOptions | undefined) => Promise<void>
+  waitForResponse: (match: RouteMatch, options?: { timeout?: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w` | undefined; complete?: boolean | undefined; } | undefined) => Promise<PageResponse>
+  waitUntil: <Args extends unknown[]>(condition: (...args: Args) => unknown, options?: WaitUntilOptions | undefined, ...args: Args) => Promise<void>
+  warnings: string[]
+
+[./test] testSite
+function testSite(options?: TestOptions): Promise<TestSite>
+
+[./test] TestSite
+interface TestSite
+  api: <Module, const Path extends CallPath<Module>, const M extends CallMethod<NodeAt<Module, Path>> = never>(module: Module, path: Path, ...[options]: Optional<MethodOption<NodeAt<Module, Path>, M> & (MethodRoute<Module, Path, Chosen<M>> extends { params: infer Params; } ? Record<never, never> extends Pa ...#4e3387ab
+  as: (who: string | Record<string, string>) => TestSite
+  call: <Target extends Action<never, unknown>>(action: Target, ...call: CallArguments<Target>) => Promise<Tested<ResultOf<Target>>>
+  close: () => Promise<void>
+  content: TestContent
+  cookies: CookieMap
+  fetch: (path: string, init?: (Omit<RequestInit, "headers"> & VisitInit) | undefined) => Promise<Response>
+  handle: (request: Request) => Promise<Response>
+  logs: readonly LogEntry[]
+  mcp: { tools: (init?: VisitInit | undefined) => Promise<McpTool[]>; call: (name: string, args?: object | undefined, init?: VisitInit | undefined) => Promise<McpCall>; }
+  open: (path: string, options?: BrowserOptions | undefined) => Promise<TestPage>
+  refusal: <Target extends Action<never, unknown>>(action: Target, input: FormData | InputOf<Target>, init?: (VisitInit & { from?: string; }) | undefined) => Promise<ActionError<FailuresOf<Target>>>
+  runJobs: () => Promise<number>
+  sitemap: (path?: string | undefined) => Promise<string[]>
+  socket: <Module, const Path extends SocketPath<Module>>(module: Module, path: Path, ...[options]: Optional<(SocketRoute<Module, Path> extends { params: infer Params; } ? Record<never, never> extends Params ? { params?: Params; } : { params: Params; } : { params?: Record<string, unknown>; }) & (SocketRoute<M ...#b7839178
+  socketRefusal: <Module, const Path extends SocketPath<Module>>(module: Module, path: Path, ...[options]: Optional<(SocketRoute<Module, Path> extends { params: infer Params; } ? Record<never, never> extends Params ? { params?: Params; } : { params: Params; } : { params?: Record<string, unknown>; }) & (SocketRoute<M ...#9dfc99cc
+  stream: <Module, const Path extends StreamPath<Module>, const M extends StreamMethod<NodeAt<Module, Path>> = never>(module: Module, path: Path, ...[options]: Optional<MethodOption<NodeAt<Module, Path>, M> & (MethodRoute<Module, Path, Chosen<M>> extends { params: infer Params; } ? Record<never, never> extend ...#29b0f810
+  submit: <Input, Honeypot extends string = never>(action: Action<Input, unknown, Honeypot>, fields: Partial<Record<Honeypot | Extract<keyof Input, string> | "kay_since", FormValue | FormValue[] | undefined>>, init?: (VisitInit & { from?: string | Visit; openedFor?: 0 | `${number}ms` | `${number}s` | `${numbe ...#bf9b8d88
+  visit: (path: string, init?: VisitInit | undefined) => Promise<Visit>
+
+[./test] TestSocket
+type TestSocket<Client> = Client & { // Every message received so far, in order. received: Received<Client>[] // The oldest message `next()` has not returned yet, waiting for one when there is none. next: () => Promise<Received<Client>> }
+
+[./test] TestStream
+type TestStream<Client> = Client & { received: Received<Client>[] next: () => Promise<Received<Client>> // Every value, once the stream ended, failed or was closed. finished: () => Promise<Received<Client>[]> }
+
+[./test] Visit
+interface Visit extends PageReading
+  canonical: () => string | undefined
+  find: (selector: string) => Found[]
+  headers: Headers
+  html: string
+  jsonLd: () => unknown[]
+  links: () => string[]
+  meta: (key: string) => string | undefined
+  settled: PageReading & { html: string; }
+  stamp: (action: Pick<Action<never, unknown, never>, "url">) => string | undefined
+  status: number
+  text: (selector?: string | undefined) => string | undefined
+  title: () => string | undefined
+  url: string
+
+[./test] VisitInit
+interface VisitInit
+  headers?: Record<string, string> | undefined
+
+[./test] WaitForOptions
+interface WaitForOptions extends WaitOptions
+  gone?: boolean | undefined
+  text?: string | undefined
+  timeout?: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w` | undefined
+
+[./test] WaitOptions
+interface WaitOptions
+  timeout?: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w` | undefined
+
+[./test] waitUntil
+function waitUntil<T>(condition: () => T | Promise<T>, options?: WaitUntilOptions): Promise<Exclude<Awaited<T>, false | "" | 0 | null | undefined>>
+
+[./test] WaitUntilOptions
+interface WaitUntilOptions
+  timeout?: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w` | undefined
+  what?: string | undefined
+
+[./test] writePersisted
+function writePersisted(key: string, value: unknown): void
+
+[./words] pageLocale
+function pageLocale(): string
+
+[./words] sizeText
+function sizeText(bytes: number, locale?: string): string
+
+[./words] wording
+function wording(key: string, english: string, params?: Record<string, MessageValue>): string

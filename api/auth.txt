@@ -1,0 +1,1828 @@
+[.] AcceptResult
+type AcceptResult<Role extends string = string> = { ok: true, membership: Membership<Role> } | { ok: false, error: 'signed-out' | 'not-found' | 'wrong-account' | 'unverified' | 'member' }
+
+[.] ActivityEvent
+type ActivityEvent = 'signed-in' | 'signed-out' | 'sign-in-failed' | 'role-granted' | 'role-revoked' | 'banned' | 'unbanned' | 'impersonation-started' | 'impersonation-ended' | 'organization-created' | 'organization-deleted' | 'member-joined' | 'member-left' | 'member-removed' | 'member-roles-change ...#17dbf887
+
+[.] AdminAuditLogResult
+type AdminAuditLogResult = { ok: true, entries: AuditEntry[] } | { ok: false, error: 'forbidden' }
+
+[.] AdminChangeFailure
+type AdminChangeFailure = AdminFailure | 'stale'
+
+[.] AdminFailure
+type AdminFailure = 'forbidden' | 'not-found'
+
+[.] appleProvider
+function appleProvider(opts: Pick<ProviderOptions, "scopes" | "params"> & { teamId: string; keyId: string; privateKey: string; }): OAuthProvider<OpenIdClaims, OAuthUser>
+
+[.] ApprovedClient
+interface ApprovedClient
+  createdAt: Date
+  id: string
+  lastUsedAt: Date | null
+  name: string
+  scopes: string[] | null
+
+[.] AuditCursor
+type AuditCursor = Date | Pick<AuditRecord, 'at' | 'id'>
+
+[.] AuditEntry
+interface AuditEntry
+  actorId: string | null
+  at: Date
+  detail: string | null
+  event: AuthEvent
+  id: string
+  ip: string
+  userAgent: string
+  userId: string
+
+[.] AuditPhrase
+type AuditPhrase = string | ((detail: string | null) => string)
+
+[.] AuditRecord
+interface AuditRecord
+  actorId: string | null
+  at: Date
+  detail: string | null
+  event: string
+  id: string
+  ip: string
+  userAgent: string
+  userId: string
+
+[.] auditWording
+const auditWording: Record<string, AuditWording>
+
+[.] AuditWording
+type AuditWording = Record<AuthEvent, AuditPhrase>
+
+[.] auth
+function auth<Role extends string = string, Prefix extends string = "/auth", const Scope extends string = never, OrgRole extends string = never, UserData extends object = Record<string, never>>(options?: OwnOptions<Role, Prefix, Scope, OrgRole, UserData> | undefined): AuthPages<Elysia<"", { decorator: {}; store: ...#a5dfaf9e
+function auth(options: AuthExtensionOptions): AuthPages<AnyElysia>
+
+[.] Auth
+class Auth
+  new <Scope extends string = string, Role extends string = string, OrgRole extends string = string, UserData extends object = Record<string, unknown>>(session: Session<AuthSessionData>, core: Core, request: Request, client: string, address: string): Auth<Scope, Role, OrgRole, UserData>
+  acceptInvitation: (invitationId: string) => Promise<AcceptResult<OrgRole>>
+  admin: AdminMethods<Role>
+  adminRoles: () => string[]
+  banUser: (userId: string, options?: { reason?: string; until?: Date; } | undefined) => Promise<BanResult>
+  bareUser: () => Promise<BareUser<UserData> | null>
+  captchaChallenge: (action: CaptchaAction) => Promise<string | null>
+  captchaRequired: (action: CaptchaAction) => Promise<boolean>
+  changeEmail: (proof: Proof, email: string) => Promise<ChangeEmailResult>
+  changePassword: (proof: Proof, password: string) => Promise<Off | ChangePasswordResult>
+  changeUsername: (username: string) => Promise<ChangeUsernameResult>
+  confirmEmailChange: (token: string) => Promise<LinkResult>
+  cookies: string[]
+  core: Core
+  createOrganization: (input: { name: string; slug?: string | null | undefined; }) => Promise<CreateOrganizationResult<OrgRole>>
+  createToken: (proof: Proof, label: string, options?: TokenOptions<Scope> | undefined) => Promise<CreateTokenResult>
+  deleteAccount: (proof: Proof) => Promise<DeleteAccountResult>
+  deleteMember: (ref: string, userId: string) => Promise<MemberResult>
+  deleteOrganization: (ref: string) => Promise<DeleteOrganizationResult>
+  deleteUser: (userId: string) => Promise<DeleteResult>
+  deletionImpact: () => Promise<DeletionImpact>
+  disableTwoFactor: (proof: Proof) => Promise<DisableTwoFactorResult>
+  email: EmailMethods
+  emailCodePending: () => Promise<PendingEmailCode>
+  enableTwoFactor: (code: string) => Promise<Off | EnableTwoFactorResult>
+  establish: (record: UserRecord, method: string) => Promise<void>
+  exportData: () => Promise<ExportResult>
+  features: () => AuthFeatures
+  genuine: (signedIn: SignedIn) => Promise<boolean>
+  getInvitation: (invitationId: string) => Promise<Invitation<OrgRole> | null>
+  getOrganization: (ref: string) => Promise<Membership<OrgRole> | null>
+  getUser: (userId: string) => Promise<GetUserResult>
+  grantRole: (userId: string, role: Role) => Promise<RoleResult>
+  groups: Partial<Groups<Scope, Role, OrgRole>>
+  guarded: (ctx: GuardContext, options: { redirect?: string | undefined; require?: Requirement<BareUser<Record<string, unknown>>, string> | undefined; scope?: string | false | string[] | undefined; }) => Promise<void>
+  hasScope: (scope: Scope) => Promise<boolean>
+  impersonate: (userId: string) => Promise<ImpersonateResult>
+  impersonator: () => Promise<User<Record<string, unknown>> | null>
+  invite: (ref: string, email: string, roles?: OrgRole[] | undefined) => Promise<InviteResult<OrgRole>>
+  isMember: (ref: string, role?: OrgRole | undefined) => Promise<boolean>
+  known?: { record: Promise<UserRecord | null>; at: number; } | undefined
+  leave: () => Promise<void>
+  leaveOrganization: (ref: string) => Promise<MemberResult>
+  linkProvider: (provider: string, proof: Proof, options?: { redirect?: string; }) => Promise<LinkProviderResult>
+  linked: WeakMap<UserRecord, Promise<Record<string, { id: string; }>>>
+  listAdminAuditLog: (query?: { userId?: string; before?: AuditCursorInput; limit?: number; } | undefined) => Promise<AdminAuditLogResult>
+  listAuditLog: (options?: { before?: AuditCursorInput; limit?: number; }) => Promise<AuditEntry[]>
+  listIdentities: () => Promise<string[]>
+  listInvitations: (ref: string) => Promise<ListInvitationsResult<OrgRole>>
+  listMembers: (ref: string) => Promise<ListMembersResult<OrgRole>>
+  listMyInvitations: () => Promise<Invitation<OrgRole>[]>
+  listOAuthClients: () => Promise<ApprovedClient[]>
+  listOrganizations: () => Promise<Membership<OrgRole>[]>
+  listPasskeys: () => Promise<Passkey[]>
+  listSessions: () => Promise<UserSession[]>
+  listTokens: () => Promise<BearerToken[]>
+  listUsers: (query?: { search?: string; offset?: number; limit?: number; } | undefined) => Promise<ListUsersResult>
+  live: (signedIn: SignedIn, record: UserRecord, stored: SessionRecord | undefined) => Promise<boolean>
+  magicLink: MagicLinkMethods
+  markBrowser: (signedIn: boolean, maxAge?: number | undefined) => void
+  oauthAuthorize: (params: AuthorizeParams) => Promise<AuthorizeOutcome>
+  oauthDecide: (fields: AuthorizeParams, allow: boolean) => Promise<DecideResult>
+  oauthFixed: () => boolean
+  oauthOrigin: () => string | undefined
+  oauthResource: (path: string, name: string) => Record<string, unknown> | null
+  oauthServer: OAuthServerMethods
+  organizations: OrganizationMethods<OrgRole>
+  passkeyProofOptions: () => Promise<PasskeyOptionsResult<PublicKeyCredentialRequestOptionsJSON>>
+  passkeyRegistrationOptions: (proof: Proof) => Promise<PasskeyOptionsResult<PublicKeyCredentialCreationOptionsJSON, "off" | ProofFailure>>
+  passkeySignInOptions: () => Promise<PublicKeyCredentialRequestOptionsJSON>
+  passkeys: PasskeyMethods
+  password: PasswordMethods
+  profile: (locale?: string | undefined) => Promise<ProfileFieldView[] | null>
+  provedLately: () => Promise<boolean>
+  providerToken: (provider: string) => Promise<string | null>
+  providersOf: (record: UserRecord) => Promise<Record<string, { id: string; }>>
+  record: () => Promise<UserRecord | null>
+  recoveryCodesLeft: () => Promise<number>
+  regenerateRecoveryCodes: (proof: Proof) => Promise<RecoveryCodesResult>
+  register: (input: RegisterInput, options?: Pick<SignInOptions, "redirect" | "remember" | "captcha"> | undefined) => Promise<RegisterResult | Off>
+  registerPasskey: (response: RegistrationResponseJSON, name?: string | undefined) => Promise<Off | RegisterPasskeyResult>
+  rejectInvitation: (invitationId: string) => Promise<RejectInvitationResult>
+  reprove: (proof: Proof) => Promise<ReproveResult>
+  request: Request
+  requestMagicLink: (email: string, options?: SignInOptions | undefined) => Promise<Off | MailRequestResult>
+  requestPasswordReset: (email: string, options?: Pick<SignInOptions, "redirect" | "captcha"> | undefined) => Promise<Off | MailRequestResult>
+  requireAdmin: () => Promise<User<UserData>>
+  requireUser: { (options: RequireUserOptions<Scope, Role> & { bare: true; }): Promise<BareUser<UserData>>; (options?: (RequireUserOptions<Scope, Role> & { bare?: undefined; }) | undefined): Promise<User<UserData>>; }
+  resetPassword: (token: string, password: string) => Promise<Off | ResetPasswordResult>
+  resolve: () => Promise<UserRecord | null>
+  resolving: Promise<UserRecord | null> | undefined
+  revokeBearerToken: (id: string) => Promise<RevokeTokenResult>
+  revokeInvitation: (ref: string, invitationId: string) => Promise<RevokeInvitationResult>
+  revokeOAuthGrant: (clientId: string) => Promise<RevokeGrantResult>
+  revokePasskey: (id: string, proof: Proof) => Promise<RevokePasskeyResult>
+  revokeRole: (userId: string, role: Role) => Promise<RoleResult>
+  revokeSession: (id: string) => Promise<RevokeSessionResult>
+  saveProfile: (values: Record<string, unknown>) => Promise<SaveProfileResult>
+  scopes: () => Promise<string[] | null>
+  sendVerification: () => Promise<SendVerificationResult>
+  session: Session<AuthSessionData>
+  sessions: SessionMethods
+  setMemberRoles: (ref: string, userId: string, roles: OrgRole[]) => Promise<MemberResult>
+  setUpTwoFactor: (proof: Proof) => Promise<Off | SetUpTwoFactorResult>
+  signIn: (user: Pick<User<Record<string, unknown>>, "id">, options?: { remember?: boolean | undefined; }) => Promise<void>
+  signInAsGuest: (options?: { captcha?: string | undefined; }) => Promise<GuestSignInResult>
+  signInLink: (page: string, back?: string | undefined) => string
+  signInUrl: (back?: string | undefined) => string
+  signInWithEmailCode: (code: string) => Promise<Off | CodeResult>
+  signInWithMagicLink: (token: string) => Promise<Off | LinkResult>
+  signInWithPasskey: (response: AuthenticationResponseJSON, options?: Pick<SignInOptions, "redirect" | "remember"> | undefined) => Promise<Off | PasskeySignInResult>
+  signInWithPassword: (input: PasswordSignInInput, options?: SignInOptions | undefined) => Promise<Off | PasswordSignInResult>
+  signOut: () => Promise<void>
+  signOutEverywhere: (options?: { keepThisOne?: boolean; }) => Promise<void>
+  source: "session" | "bearer" | null
+  stopImpersonating: () => Promise<boolean>
+  tokenScopes: string[] | null
+  tokens: TokenMethods<Scope>
+  twoFactor: TwoFactorMethods
+  twoFactorPasskeyOptions: () => Promise<PasskeyOptionsResult<PublicKeyCredentialRequestOptionsJSON>>
+  twoFactorPending: () => Promise<boolean>
+  unbanUser: (userId: string) => Promise<UnbanResult>
+  unlink: (provider: string, proof: Proof) => Promise<UnlinkResult>
+  updateLocale: (locale: string) => Promise<UpdateLocaleResult>
+  updateOrganization: (ref: string, patch: { name?: string | undefined; slug?: string | null | undefined; }) => Promise<UpdateOrganizationResult>
+  updatePasskeyName: (id: string, name: string) => Promise<RenamePasskeyResult>
+  user: () => Promise<User<UserData> | null>
+  userIdsHolding: (role: string) => Promise<string[]>
+  verifyEmail: (token: string, password?: string | undefined) => Promise<VerifyEmailResult>
+  verifyEmailCode: (code: string) => Promise<CodeResult>
+  verifyTwoFactor: (code: string) => Promise<TwoFactorResult>
+  verifyTwoFactorPasskey: (response: AuthenticationResponseJSON) => Promise<Off | TwoFactorResult>
+  via: () => Promise<"session" | "bearer" | null>
+
+[.] AuthEvent
+type AuthEvent = SecurityEvent | ActivityEvent
+
+[.] AuthEventInfo
+type AuthEventInfo = { [Event in AuthEvent]: { event: Event, user: User, context: EventContext } & EventFields[Event] }[AuthEvent]
+
+[.] AuthExtensionOptions
+interface AuthExtensionOptions extends AuthPagesOptions
+  home?: string | undefined
+  module?: string | undefined
+  pages?: boolean | undefined
+  plugin?: false | undefined
+  prefix?: string | undefined
+  server?: (() => AnyElysia | Promise<AnyElysia>) | undefined
+  viewer?: boolean | undefined
+
+[.] AuthFeatures
+interface AuthFeatures
+  admin: boolean
+  audit: boolean
+  captcha: CaptchaWidget | "proof-of-work" | null
+  codes: Record<CodedLink, CodeMode> | null
+  email: boolean
+  magicLink: boolean
+  oauthServer: boolean
+  organizations: { roles: string[]; owner: string; manage: string; grants: Record<string, string[]>; } | null
+  pages: { prefix: string; home: string; remember: RememberMode; } | null
+  passkeys: boolean
+  password: boolean
+  prefix: string
+  providers: { name: string; label: string; }[]
+  requireVerified: boolean
+  rules: { password: { min: number; max: number; }; username: { min: number; max: number; }; }
+  scopes: string[]
+  signInPage: string
+  signUp: boolean
+  twoFactor: boolean
+
+[.] AuthHooks
+type AuthHooks = Partial<Pick<AuthOptions<AuthSessionData, string>, 'allow' | 'authorize' | 'exportData' | 'locate' | 'onAuthEvent' | 'onDelete' | 'onSignUp' | 'profileFields'>>
+
+[.] AuthMailer
+interface AuthMailer
+  erase?: ((address: string) => unknown) | undefined
+  send: (mail: AuthMailMessage) => unknown
+  subscriptions?: ((address: string) => Promise<MailingSubscription[]>) | undefined
+
+[.] AuthMailMessage
+interface AuthMailMessage extends MailContent
+  code?: string
+  detail?: string
+  html: string
+  kind: AuthMailKind
+  locale: string
+  maxAge?: { link?: number; code?: number; } | undefined
+  name: string
+  subject: string
+  text: string
+  to: string
+  url?: string
+
+[.] AuthModule
+type AuthModule = { auth: { plugin: AnyElysia } } | { default: { plugin: AnyElysia } }
+
+[.] AuthOptions
+interface AuthOptions<Data extends AuthSessionData, Role extends string, Prefix extends string = '/auth', Scope extends string = never, OrgRole extends string = never, UserData extends object = Record<string, never>>
+  admin?: AuthRequirement<NoInfer<Role>> | undefined
+  allow?: ((profile: Profile) => boolean | Promise<boolean>) | undefined
+  audit?: boolean | { maxAge?: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w`; ip?: "full" | "truncated"; } | undefined
+  authorize?: ((user: BareUser<Record<string, unknown>> | null, requirement: AuthRequirement<Role>, level: Level, ctx: PolicyContext) => Promise<boolean>) | undefined
+  breachedPasswords?: boolean | ((password: string) => boolean | Promise<boolean>) | undefined
+  captcha?: false | CaptchaOptions | undefined
+  defaultRoles?: NoInfer<Role>[] | undefined
+  email?: EmailOptions | undefined
+  exportData?: ((event: { user: User<Record<string, unknown>>; }) => unknown) | undefined
+  failurePage?: string | undefined
+  forwardAuth?: ForwardDomains | ForwardAuthOptions | undefined
+  guests?: { maxAge: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w`; } | undefined
+  locate?: ((ip: string) => string | Promise<string | null | undefined> | null | undefined) | undefined
+  magicLink?: boolean | undefined
+  name?: string | undefined
+  oauth?: Record<string, OAuthApp> | undefined
+  oauthServer?: boolean | { fetch?: ((url: string) => Promise<Response>) | undefined; defaultScopes?: readonly Scope[] | undefined; } | undefined
+  onAuthEvent?: ((info: AuthEventInfo) => void | Promise<void>) | undefined
+  onDelete?: ((event: { user: User<Record<string, unknown>>; }) => void | Promise<void>) | undefined
+  onSignUp?: ((event: { user: User<Record<string, unknown>>; profile: Profile | undefined; }) => void | Promise<void>) | undefined
+  organizations?: OrganizationsOptions<OrgRole, NoInfer<Role>> | undefined
+  pages?: boolean | AuthPagesConfig | undefined
+  passkeys?: false | { rpId?: string; origins?: string[]; rpName?: string; userVerification?: "required" | "preferred" | "discouraged"; } | undefined
+  password?: boolean | undefined
+  prefix?: Prefix | undefined
+  profileFields?: ((event: { user: User<UserData>; profile: Profile; }) => void | { [Field in keyof UserData]?: UserData[Field] | undefined; } | Promise<void | { [Field in keyof UserData]?: UserData[Field] | undefined; }>) | undefined
+  proxy?: number | boolean | ProxyConfig | undefined
+  rateLimit?: Partial<Record<"signIn" | "signInAccount" | "signInAccountAll" | "register" | "resend" | "resendAccount" | "forgot" | "forgotAccount" | "magicLink" | "magicLinkAccount" | "emailChange" | "emailChangeAccount" | "twoFactor" | "twoFactorAccount" | "reprove" | "emailCode" | "emailCodeAccount" | "invite" ...#4289d195
+  remember?: { maxAge?: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w` | undefined; } | undefined
+  roles?: Record<Role, NoInfer<Role>[]> | undefined
+  rules?: CredentialRules | undefined
+  scopes?: readonly Scope[] | undefined
+  secret?: string | string[] | undefined
+  sessions: SessionPlugin<Data>
+  sessionsPage?: string | undefined
+  signInPage?: string | undefined
+  signUp?: boolean | undefined
+  site?: string | undefined
+  store: AuthStore
+  twoFactor?: boolean | undefined
+  twoFactorPage?: string | undefined
+  user?: (TSchema & { static: UserData; }) | undefined
+
+[.] AuthorizeOutcome
+type AuthorizeOutcome = | { kind: 'error', error: 'client' | 'redirect_uri' } // Back to the client, with the code or the error. | { kind: 'redirect', url: string } // The visitor signs in first. | { kind: 'sign-in' } | { kind: 'consent', client: { id: string, name: string, host: string | null }, re ...#cd8d8ceb
+
+[.] AuthorizeParams
+type AuthorizeParams = Partial<Record<'client_id' | 'redirect_uri' | 'response_type' | 'code_challenge' | 'code_challenge_method' | 'scope' | 'state' | 'prompt', string | undefined>> & { // An array when the request named the parameter more than once, which is refused as it is at the token endpoint. ...#22fcba62
+
+[.] AuthPages
+interface AuthPages<Server extends AnyElysia = AnyElysia> extends KayExtension<Server>
+  home: string
+  prefix: string
+
+[.] AuthPagesConfig
+interface AuthPagesConfig extends AuthPagesOptions
+  home?: string | undefined
+  prefix?: string | undefined
+  profile?: ProfileOptions<string> | undefined
+  remember?: RememberMode | undefined
+
+[.] AuthPagesOptions
+interface AuthPagesOptions
+  home?: string | undefined
+  prefix?: string | undefined
+
+[.] AuthRates
+type AuthRates = RateStore & Required<Pick<RateStore, 'peek' | 'reset'>>
+
+[.] AuthRequirement
+type AuthRequirement<Role extends string> = Requirement<BareUser, Role>
+
+[.] AuthSessionData
+interface AuthSessionData
+  auth?: SignedIn
+  authBack?: string
+  authChallenge?: Challenge
+  authEmailCode?: PendingCode
+  authHeld?: string
+  authOAuth?: OAuthFlow
+  authPasskey?: PasskeyChallenge
+  authRegistered?: string
+  authRemember?: boolean
+
+[.] AuthStore
+interface AuthStore
+  attempts?: LegacyAttempts | undefined
+  audit?: { add: (entry: AuditRecord) => MaybePromise<void>; list: (query: { userId?: string; before?: AuditCursor; limit: number; }) => MaybePromise<AuditRecord[]>; prune: (before: Date) => MaybePromise<void>; forget: (userId: string, pseudonym: string) => MaybePromise<void>; }
+  bearerTokens: { create: (token: BearerTokenRecord) => MaybePromise<void>; findByDigest: (digest: string) => MaybePromise<BearerTokenRecord | undefined>; findByDigestWithUser?: (digest: string) => MaybePromise<{ token: BearerTokenRecord; user: UserRecord; } | undefined>; listByUser: (userId: string) => MaybePromis ...#97c75ac6
+  identities: { find: (provider: string, providerId: string) => MaybePromise<IdentityRecord | undefined>; listByUser: (userId: string) => MaybePromise<IdentityRecord[]>; create: (identity: IdentityRecord) => MaybePromise<void>; update: (provider: string, providerId: string, patch: Partial<Pick<IdentityRecord, "ac ...#a243e7e3
+  invitations?: { create: (invitation: InvitationRecord) => MaybePromise<void>; get: (id: string) => MaybePromise<InvitationRecord | undefined>; listByOrganization: (organizationId: string) => MaybePromise<InvitationRecord[]>; listByEmail: (email: string) => MaybePromise<InvitationRecord[]>; delete: (id: string) => ...#c40589ca
+  members?: { add: (member: MemberRecord) => MaybePromise<void>; get: (organizationId: string, userId: string) => MaybePromise<MemberRecord | undefined>; listByOrganization: (organizationId: string) => MaybePromise<MemberRecord[]>; listByUser: (userId: string) => MaybePromise<MemberRecord[]>; update: (organizat ...#b9b08467
+  oauth?: { clients: { create: (client: OAuthClientRecord) => MaybePromise<void>; get: (id: string) => MaybePromise<OAuthClientRecord | undefined>; }; grants: { get: (userId: string, clientId: string) => MaybePromise<OAuthGrantRecord | undefined>; upsert: (grant: OAuthGrantRecord) => MaybePromise<void>; touch ...#439c206e
+  organizations?: { create: (organization: OrganizationRecord) => MaybePromise<void>; get: (id: string) => MaybePromise<OrganizationRecord | undefined>; getMany?: (ids: string[]) => MaybePromise<OrganizationRecord[]>; findBySlug: (slug: string) => MaybePromise<OrganizationRecord | undefined>; update: (id: string, pat ...#417f04b0
+  passkeys: { create: (passkey: PasskeyRecord) => MaybePromise<void>; get: (id: string) => MaybePromise<PasskeyRecord | undefined>; listByUser: (userId: string) => MaybePromise<PasskeyRecord[]>; update: (id: string, patch: Partial<Pick<PasskeyRecord, "name" | "counter" | "backedUp" | "userVerified" | "lastUsedA ...#e592cc0f
+  prune?: (limits: PruneLimits) => MaybePromise<void>
+  rates?: AuthRates | undefined
+  recoveryCodes: { replace: (userId: string, digests: string[]) => MaybePromise<void>; consume: (userId: string, digest: string) => MaybePromise<boolean>; count: (userId: string) => MaybePromise<number>; }
+  sessions: { create: (session: SessionRecord) => MaybePromise<void>; get: (id: string) => MaybePromise<SessionRecord | undefined>; listByUser: (userId: string) => MaybePromise<SessionRecord[]>; update: (id: string, patch: Partial<Pick<SessionRecord, "version" | "ip" | "lastSeenAt">>) => MaybePromise<void>; del ...#7cdc7536
+  tokens: { create: (token: TokenRecord) => MaybePromise<void>; consume: (digest: string, type: TokenType) => MaybePromise<TokenRecord | undefined>; deleteForUser: (userId: string, type?: TokenType | undefined) => MaybePromise<void>; }
+  users: { get: (id: string) => MaybePromise<UserRecord | undefined>; getMany?: (ids: string[]) => MaybePromise<UserRecord[]>; findByEmail: (email: string) => MaybePromise<UserRecord | undefined>; findByUsername: (username: string) => MaybePromise<UserRecord | undefined>; create: (user: UserRecord) => MaybeP ...#b7911848
+
+[.] BanResult
+type BanResult = { ok: true, user: ManagedUser } | { ok: false, error: AdminChangeFailure | 'self' | 'admin' | 'until' }
+
+[.] BareUser
+interface BareUser<Data extends object = Record<string, unknown>>
+  data: Data
+  email: string | null
+  emailVerified: boolean
+  guest: boolean
+  hasPassword: boolean
+  id: string
+  locale: string | null
+  roles: string[]
+  twoFactor: boolean
+  username: string | null
+
+[.] BearerToken
+interface BearerToken
+  createdAt: Date
+  expired: boolean
+  expiresAt: Date | null
+  id: string
+  label: string
+  lastUsedAt: Date | null
+  scopes: string[] | null
+
+[.] BearerTokenRecord
+interface BearerTokenRecord
+  createdAt: Date
+  digest: string
+  expiresAt: Date | null
+  id: string
+  label: string
+  lastUsedAt: Date | null
+  oauth?: { clientId: string; family: string; resource?: string | null | undefined; } | null | undefined
+  scopes: string[] | null
+  userId: string
+
+[.] CaptchaAction
+type CaptchaAction = 'register' | 'guest' | 'sign-in' | 'reset' | 'magic-link'
+
+[.] CaptchaCheck
+interface CaptchaCheck
+  on?: Partial<Record<CaptchaAction, number | false | "always">> | undefined
+  verify: (token: string, action: CaptchaAction, context?: CaptchaContext | undefined) => boolean | Promise<boolean>
+  widget?: CaptchaWidget | undefined
+
+[.] CaptchaContext
+interface CaptchaContext
+  hostname?: string | undefined
+
+[.] CaptchaOptions
+type CaptchaOptions = CaptchaCheck | ProofOfWorkCaptcha
+
+[.] CaptchaRules
+type CaptchaRules = Partial<Record<CaptchaAction, 'always' | number | false>>
+
+[.] CaptchaWidget
+interface CaptchaWidget
+  class: string
+  field: "cf-turnstile-response" | "h-captcha-response"
+  script: string
+  siteKey: string
+
+[.] challengeOf
+function challengeOf(verifier: string): Promise<string>
+
+[.] ChangeEmailResult
+type ChangeEmailResult = { ok: true } | { ok: false, error: ProofFailure | 'unavailable' } | { ok: false, errors: { email: EmailProblem | 'taken' | 'unchanged' } }
+
+[.] ChangePasswordResult
+type ChangePasswordResult = { ok: true } | { ok: false, error: ProofFailure } | { ok: false, errors: { password: PasswordProblem | 'breached' } }
+
+[.] ChangeUsernameResult
+type ChangeUsernameResult = { ok: true, user: BareUser } | { ok: false, error: 'signed-out' } | { ok: false, errors: { username: UsernameProblem | 'taken' | 'unchanged' } }
+
+[.] CodedLink
+type CodedLink = 'magic-link' | 'verify-email'
+
+[.] CodeMode
+type CodeMode = 'link' | 'code' | 'both'
+
+[.] CodeResult
+type CodeResult = { ok: true, redirect: string } | { ok: false, error: 'invalid' | 'expired' | 'limited' | 'banned' }
+
+[.] CodeType
+type CodeType = 'sign-in-code' | 'verify-code'
+
+[.] ConsentFields
+interface ConsentFields
+  client_id: string
+  code_challenge: string
+  redirect_uri: string
+  resource: string
+  scope: string
+  state: string
+
+[.] createAuth
+function createAuth<Data extends AuthSessionData, Role extends string = string, Prefix extends string = "/auth", const Scope extends string = never, OrgRole extends string = never, UserData extends object = Record<string, never>>(options: AuthOptions<Data, Role, Prefix, Scope, OrgRole, UserData>): { createUser(input:  ...#7287ac1d
+
+[.] createGate
+function createGate<P, G extends string, S extends string = string>(deps: GateDeps<P, G, S>): <Base extends string, Single extends SingletonBase, Defs extends DefinitionBase, Meta extends MetadataBase, Routes extends RouteBase, Eph extends EphemeralType, Vol extends EphemeralType>(app: Elysia<Base, Single, Defs, Meta, ...#87a544a8
+
+[.] createOAuthClient
+function createOAuthClient<Raw = unknown, User = unknown>(provider: OAuthProvider<Raw, User>, config: OAuthClientConfig): { authorizeUrl({ state, codeChallenge, nonce, extraParams }?: AuthorizeUrlOptions): Promise<string>; exchangeCode(code: string, opts?: { codeVerifier?: string; }): Promise<OAuthTokens>; refreshTokens(refr ...#8d08a83f
+
+[.] createOAuthTokenRefresher
+function createOAuthTokenRefresher<K, S>(deps: OAuthTokenRefresherDeps<K, S>): { getValidToken(subject: S): Promise<string | null>; }
+
+[.] CreateOrganizationResult
+type CreateOrganizationResult<Role extends string = string> = { ok: true, membership: Membership<Role> } | { ok: false, error: 'signed-out' | 'forbidden' | 'invalid-name' | 'invalid-slug' | 'slug-taken' | 'limited' }
+
+[.] createPkcePair
+function createPkcePair(): Promise<PkcePair>
+
+[.] createRoleHierarchy
+function createRoleHierarchy<P, R extends string>(hierarchy: RoleHierarchy<R>, getRoles: (principal: P) => R[]): { isGranted: (role: string, userRoles: string[]) => boolean; hasRole: (required: R) => Predicate<P>; }
+
+[.] createTokenRefresher
+function createTokenRefresher<K, S>(deps: TokenRefresherDeps<K, S>): { getValidToken(subject: S): Promise<string | null>; }
+
+[.] CreateTokenResult
+type CreateTokenResult = { ok: true, token: string, id: string } | { ok: false, error: ProofFailure | TokenProblem }
+
+[.] CreateUserInput
+interface CreateUserInput
+  email?: string | undefined
+  emailVerified?: boolean | undefined
+  locale?: string | undefined
+  password?: string | undefined
+  roles?: string[] | undefined
+  username?: string | undefined
+
+[.] CreateUserResult
+type CreateUserResult = { ok: true, user: BareUser } | { ok: false, errors: RegisterErrors }
+
+[.] createWsAuthStore
+function createWsAuthStore<T>(verify: (token: string, ws: Ws) => T | Promise<T | null> | null): { handleAuth(ws: Ws, token: string): Promise<void>; get(ws: Ws): Promise<T | undefined>; forget: (ws: Ws) => boolean; }
+
+[.] CredentialRules
+interface CredentialRules
+  password?: { min?: number | undefined; max?: number | undefined; check?: ((password: string) => string | undefined) | undefined; } | undefined
+  username?: { min?: number | undefined; max?: number | undefined; } | undefined
+
+[.] DataExport
+interface DataExport
+  app: unknown
+  audit: AuditEntry[]
+  ban: { at: Date; until: Date | null; reason: string | null; } | null
+  exportedAt: Date
+  grants: ApprovedClient[]
+  identities: { provider: string; providerId: string; createdAt: Date; }[]
+  invitations: { received: Invitation<string>[]; sent: Invitation<string>[]; }
+  mailingLists: MailingSubscription[]
+  notifications: Notification[]
+  organizations: Membership<string>[]
+  passkeys: Passkey[]
+  recoveryCodesLeft: number
+  sessions: UserSession[]
+  tokens: BearerToken[]
+  user: User<Record<string, unknown>> & { createdAt: Date; emailVerifiedAt: Date | null; twoFactorEnabledAt: Date | null; }
+
+[.] decide
+function decide<P, G extends string>(store: GrantStore<P, G>, principal: Principal<P>, requirement: Requirement<P, G>, level: Level, ctx?: PolicyContext): Promise<boolean>
+
+[.] DecideResult
+type DecideResult = { ok: true, redirect: string } | { ok: false, error: 'client' | 'redirect_uri' | 'signed-out' }
+
+[.] DEFAULT_LIMITS
+const DEFAULT_LIMITS: { signIn: { max: number; window: "15m"; }; signInAccount: { max: number; window: "15m"; }; signInAccountAll: { max: number; window: "15m"; }; register: { max: number; window: "1h"; }; resend: { max: number; window: "1h"; }; resendAccount: { max: number; window: "1h"; }; forgot: { max: number; window ...#f4a45dbb
+
+[.] DEFAULT_RULES
+const DEFAULT_RULES: ResolvedRules
+
+[.] defaultTemplates
+const defaultTemplates: Templates
+
+[.] DeleteAccountResult
+type DeleteAccountResult = { ok: true } | { ok: false, error: ProofFailure | 'last-admin' | 'last-owner' }
+
+[.] DeleteOrganizationResult
+type DeleteOrganizationResult = { ok: true } | { ok: false, error: OrganizationFailure | 'impersonating' }
+
+[.] DeleteResult
+type DeleteResult = { ok: true } | { ok: false, error: AdminChangeFailure | 'self' | 'admin' }
+
+[.] DeletionImpact
+interface DeletionImpact
+  blocked: string[]
+  deleted: string[]
+
+[.] describeAuditEntry
+function describeAuditEntry(entry: Pick<AuditEntry, "detail" | "event">, options?: { locale?: string | undefined; wording?: Partial<AuditWording> | undefined; }): string
+
+[.] Device
+interface Device
+  browser: string | null
+  mobile: boolean
+  os: string | null
+
+[.] DisableTwoFactorResult
+type DisableTwoFactorResult = { ok: true } | { ok: false, error: ProofFailure }
+
+[.] discordProvider
+function discordProvider(opts?: ProviderOptions): OAuthProvider<DiscordRawUser, OAuthUser>
+
+[.] EmailOptions
+interface EmailOptions
+  codes?: CodeMode | Partial<Record<CodedLink, CodeMode>> | undefined
+  links?: Partial<Record<LinkType, string>> | undefined
+  locales?: string[] | undefined
+  mailer: AuthMailer
+  maxAge?: Partial<Record<TokenType, `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w`>> | undefined
+  requireVerified?: boolean | undefined
+  templates?: Partial<Templates> | undefined
+  translations?: Record<string, Partial<Templates>> | undefined
+  unverifiedMaxAge?: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w` | undefined
+
+[.] emailProblem
+function emailProblem(email: string): "invalid" | undefined
+
+[.] EmailProblem
+type EmailProblem = 'invalid'
+
+[.] EnableTwoFactorResult
+type EnableTwoFactorResult = { ok: true, recoveryCodes: string[] } | { ok: false, error: 'signed-out' | 'not-set-up' | 'enabled' | 'invalid' | 'limited' }
+
+[.] EventContext
+interface EventContext
+  actor: User<Record<string, unknown>> | null
+  ip: string
+  userAgent: string
+
+[.] EventFields
+interface EventFields
+  account-deleted: Record<never, never>
+  banned: { reason?: string; }
+  email-changed: { email: string; }
+  impersonation-ended: Record<never, never>
+  impersonation-started: Record<never, never>
+  member-joined: { organizationId: string; roles: string[]; }
+  member-left: { organizationId: string; }
+  member-removed: { organizationId: string; }
+  member-roles-changed: { organizationId: string; roles: string[]; }
+  new-sign-in: Record<never, never>
+  oauth-client-approved: { client: string; }
+  oauth-client-revoked: { client: string; }
+  organization-created: { organizationId: string; }
+  organization-deleted: { organizationId: string; }
+  organization-handed-over: { organizationId: string; }
+  passkey-added: { name?: string; }
+  passkey-removed: { name?: string; }
+  password-changed: Record<never, never>
+  provider-linked: { provider: string; }
+  provider-unlinked: { provider: string; }
+  recovery-code-used: Record<never, never>
+  recovery-codes-regenerated: Record<never, never>
+  role-granted: { role: string; }
+  role-revoked: { role: string; }
+  sign-in-failed: { method: string; }
+  sign-in-locked: Record<never, never>
+  signed-in: { method: string; provider?: string; }
+  signed-out-everywhere: { keptThisOne: boolean; }
+  signed-out: Record<never, never>
+  token-created: { name?: string; }
+  two-factor-disabled: Record<never, never>
+  two-factor-enabled: Record<never, never>
+  unbanned: Record<never, never>
+
+[.] ExportResult
+type ExportResult = { ok: true, data: DataExport } | { ok: false, error: 'signed-out' | 'limited' | 'impersonating' | 'stale' }
+
+[.] frenchTemplates
+const frenchTemplates: Templates
+
+[.] GateDeps
+interface GateDeps<P, G extends string, S extends string = string>
+  authorize: (principal: P | null, requirement: Requirement<P, G>, level: Level, ctx: PolicyContext) => Promise<boolean>
+  defaultRequirement: Requirement<P, G>
+  defaultScope?: ScopeRequirement<S> | undefined
+  principal: (ctx: object) => Promise<P | null>
+  scopes?: ((ctx: object) => Promise<readonly string[] | null>) | undefined
+
+[.] GetUserResult
+type GetUserResult = { ok: true, user: ManagedUser, admin: boolean } | { ok: false, error: AdminFailure }
+
+[.] githubProvider
+function githubProvider(opts?: ProviderOptions): OAuthProvider<GithubRawUser, OAuthUser>
+
+[.] gitlabProvider
+function gitlabProvider(opts?: OpenIdOptions & { url?: string; }): OAuthProvider<OpenIdClaims, OAuthUser>
+
+[.] googleProvider
+function googleProvider(opts?: OpenIdOptions): OAuthProvider<OpenIdClaims, OAuthUser>
+
+[.] GrantStore
+interface GrantStore<P, G extends string>
+  getPermission: (subjectId: string, type: G, resourceId?: number | null | undefined) => Promise<Level | null>
+  hasCredential: (principal: P) => boolean
+  subjectId: (principal: P) => string
+
+[.] guard
+function guard(options?: GuardOptions): Guard
+
+[.] GuardOptions
+interface GuardOptions
+  redirect?: string | undefined
+  require?: AuthRequirement<string> | undefined
+  scope?: string | false | string[] | undefined
+
+[.] GuestSignInResult
+type GuestSignInResult = { ok: true, user: BareUser } | { ok: false, error: 'limited' | 'captcha' | 'signed-in' | 'closed' }
+
+[.] hcaptcha
+function hcaptcha(secret: string): (token: string, action: CaptchaAction, context?: CaptchaContext | undefined) => boolean | Promise<boolean>
+
+[.] hcaptchaWidget
+function hcaptchaWidget(siteKey: string): CaptchaWidget
+
+[.] IdentityRecord
+interface IdentityRecord
+  accessToken: string | null
+  createdAt: Date
+  provider: string
+  providerId: string
+  refreshToken: string | null
+  tokenExpiresAt: Date | null
+  userId: string
+
+[.] ImpersonateResult
+type ImpersonateResult = { ok: true } | { ok: false, error: AdminFailure | 'stale' | 'self' | 'admin' | 'banned' }
+
+[.] Invitation
+interface Invitation<Role extends string = string>
+  createdAt: Date
+  email: string
+  expiresAt: Date
+  id: string
+  invitedBy: string | null
+  organization: Organization
+  roles: Role[]
+
+[.] InvitationRecord
+interface InvitationRecord
+  createdAt: Date
+  email: string
+  expiresAt: Date
+  id: string
+  invitedBy: string | null
+  organizationId: string
+  roles: string[]
+
+[.] InviteResult
+type InviteResult<Role extends string = string> = { ok: true, invitation: Invitation<Role> } | { ok: false, error: OrganizationFailure | 'unverified' | 'unknown-role' | 'invalid-email' | 'member' | 'limited' | 'unavailable' }
+
+[.] IssueTokenResult
+type IssueTokenResult = { ok: true, token: string, id: string } | { ok: false, error: TokenProblem | 'token' | 'not-found' | 'banned' }
+
+[.] Level
+type Level = 'read' | 'write'
+
+[.] lifetime
+function lifetime(seconds: number, locale: string): string
+
+[.] Limit
+interface Limit
+  max: number
+  window: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w`
+
+[.] LimitOption
+type LimitOption = Limit
+
+[.] Limits
+type Limits = Record<keyof typeof DEFAULT_LIMITS, Limit> & { oauthRegisterAll?: Limit }
+
+[.] LimitsOption
+type LimitsOption = Partial<Record<keyof Limits, LimitOption>>
+
+[.] LinkProviderResult
+type LinkProviderResult = { ok: true, url: string } | { ok: false, error: ProofFailure | 'not-found' | 'unavailable' }
+
+[.] LinkResult
+type LinkResult = { ok: true, redirect: string } | { ok: false, error: 'invalid' | 'limited' | 'banned' }
+
+[.] LinkType
+type LinkType = 'verify-email' | 'reset-password' | 'magic-link' | 'change-email'
+
+[.] ListInvitationsResult
+type ListInvitationsResult<Role extends string = string> = { ok: true, invitations: Invitation<Role>[] } | { ok: false, error: OrganizationFailure }
+
+[.] ListMembersResult
+type ListMembersResult<Role extends string = string> = { ok: true, members: Member<Role>[] } | { ok: false, error: OrganizationFailure }
+
+[.] ListUsersResult
+type ListUsersResult = { ok: true, users: ManagedUser[], total: number } | { ok: false, error: 'forbidden' }
+
+[.] MailContent
+interface MailContent
+  html: string
+  subject: string
+  text: string
+
+[.] MailData
+type MailData = AuthMailData
+
+[.] MailingSubscription
+interface MailingSubscription
+  askedAt: Date
+  confirmedAt: Date | null
+  list: string
+  status: "pending" | "confirmed"
+
+[.] MailKind
+type MailKind = AuthMailKind
+
+[.] MailRequestResult
+type MailRequestResult = { ok: true } | { ok: false, error: 'limited' | 'captcha' | 'unavailable' }
+
+[.] ManagedUser
+interface ManagedUser extends BareUser
+  ban: { at: Date; until: Date | null; reason: string | null; } | null
+  createdAt: Date
+  data: Record<string, unknown>
+  email: string | null
+  emailVerified: boolean
+  guest: boolean
+  hasPassword: boolean
+  id: string
+  locale: string | null
+  roles: string[]
+  twoFactor: boolean
+  username: string | null
+
+[.] MaybePromise
+type MaybePromise<T> = T | Promise<T>
+
+[.] Member
+interface Member<Role extends string = string>
+  joinedAt: Date
+  roles: Role[]
+  user: { id: string; email: string | null; username: string | null; }
+
+[.] MemberRecord
+interface MemberRecord
+  createdAt: Date
+  organizationId: string
+  roles: string[]
+  userId: string
+
+[.] MemberResult
+type MemberResult = { ok: true } | { ok: false, error: OrganizationFailure | 'unknown-role' | 'last-owner' }
+
+[.] Membership
+interface Membership<Role extends string = string>
+  joinedAt: Date
+  organization: Organization
+  roles: Role[]
+
+[.] memoryAuthStore
+function memoryAuthStore(): AuthStore
+
+[.] microsoftProvider
+function microsoftProvider(opts?: OpenIdOptions & { tenant?: string; }): OAuthProvider<OpenIdClaims & { tid?: string; xms_edov?: string | number | boolean; }, OAuthUser>
+
+[.] mixesConfusableScripts
+function mixesConfusableScripts(value: string): boolean
+
+[.] normalizeEmail
+function normalizeEmail(email: string): string
+
+[.] normalizeUsername
+function normalizeUsername(username: string): string
+
+[.] OAuthApp
+interface OAuthApp
+  clientId: string
+  clientSecret?: string | undefined
+  keepTokens?: boolean | undefined
+  label?: string | undefined
+  provider: OAuthProvider<any, OAuthUser>
+
+[.] OAuthClientConfig
+interface OAuthClientConfig
+  clientId: string
+  clientSecret?: string | undefined
+  redirectUri: string
+
+[.] OAuthClientRecord
+interface OAuthClientRecord
+  createdAt: Date
+  id: string
+  name: string
+  redirectUris: string[]
+
+[.] OAuthCodeRecord
+interface OAuthCodeRecord
+  challenge: string
+  clientId: string
+  createdAt: Date
+  digest: string
+  expiresAt: Date
+  family: string
+  redirectUri: string
+  resource?: string | null | undefined
+  scopes: string[] | null
+  usedAt: Date | null
+  userId: string
+
+[.] OAuthEndpoints
+interface OAuthEndpoints
+  authorizeUrl?: string | undefined
+  discoveryBase?: string | undefined
+  openId?: OpenIdCheck | undefined
+  revokeUrl?: string | undefined
+  tokenUrl?: string | undefined
+  userUrl?: string | undefined
+
+[.] OAuthExchangeError
+class OAuthExchangeError
+  new (status: number, message: string): OAuthExchangeError
+  code: "oauth-exchange"
+  status: number
+
+[.] OAuthFailure
+type OAuthFailure = 'oauth' | 'cancelled' | 'refused' | 'taken' | 'unavailable' | 'signed-out' | 'banned'
+
+[.] OAuthGrantRecord
+interface OAuthGrantRecord
+  clientId: string
+  clientName: string
+  createdAt: Date
+  lastUsedAt: Date | null
+  scopes: string[] | null
+  userId: string
+
+[.] OAuthProvider
+interface OAuthProvider<Raw = any, User = OAuthUser> extends OAuthEndpoints
+  authHeaders?: (accessToken: string) => Record<string, string>
+  authorizeParams?: Record<string, string>
+  authorizeUrl?: string | undefined
+  clientSecret?: (clientId: string) => Promise<string>
+  completeUser?: (raw: Raw, token: { accessToken: string; scope: string | undefined; }) => Promise<Raw>
+  discover?: () => Promise<OAuthEndpoints>
+  discoveryBase?: string | undefined
+  label?: string
+  name: string
+  normalizeUser: (raw: Raw, callback?: Record<string, string> | undefined) => User
+  openId?: OpenIdCheck | undefined
+  parseTokens: (raw: any) => OAuthTokens
+  revokeUrl?: string | undefined
+  scopeSeparator?: string
+  scopes: string[]
+  tokenAccept?: "json" | "form"
+  tokenUrl?: string | undefined
+  userUrl?: string | undefined
+
+[.] OAuthRefreshRecord
+interface OAuthRefreshRecord
+  clientId: string
+  createdAt: Date
+  digest: string
+  expiresAt: Date
+  family: string
+  resource?: string | null | undefined
+  scopes: string[] | null
+  usedAt: Date | null
+  userId: string
+
+[.] OAuthTokenRefresherDeps
+interface OAuthTokenRefresherDeps<K, S>
+  key: (subject: S) => K
+  load: (subject: S) => StoredCredential
+  margin?: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w` | undefined
+  oauth: RefreshableOAuthClient
+  onError?: ((error: unknown, stage: RefreshStage) => void) | undefined
+  save: (subject: S, tokens: OAuthTokens | null) => Promise<void>
+
+[.] OAuthTokens
+interface OAuthTokens
+  accessToken: string
+  expiresAt?: number | undefined
+  idToken?: string | undefined
+  refreshToken?: string | undefined
+  scope?: string | undefined
+  tokenType?: string | undefined
+
+[.] OAuthUser
+interface OAuthUser
+  avatar?: string | null | undefined
+  banner?: string | null | undefined
+  displayName?: string | undefined
+  email?: string | null | undefined
+  providerId: string
+  username: string
+
+[.] Off
+interface Off
+  error: "off"
+  ok: false
+
+[.] oidcProvider
+function oidcProvider(opts: OpenIdOptions & { issuer: string; name?: string; }): OAuthProvider<OpenIdClaims, OAuthUser>
+
+[.] OpenIdCheck
+interface OpenIdCheck
+  algorithms?: string[] | undefined
+  issuer: string | string[] | ((claims: Record<string, unknown>) => boolean)
+  jwksUrl: string
+
+[.] OpenIdClaims
+interface OpenIdClaims
+  email?: string
+  email_verified?: string | boolean
+  name?: string
+  nickname?: string
+  picture?: string
+  preferred_username?: string
+  sub: string
+
+[.] OpenIdOptions
+interface OpenIdOptions
+  algorithms?: string[]
+  params?: Record<string, string>
+  scopes?: string[]
+
+[.] Organization
+interface Organization
+  createdAt: Date
+  id: string
+  name: string
+  slug: string | null
+
+[.] OrganizationFailure
+type OrganizationFailure = 'signed-out' | 'not-found' | 'forbidden'
+
+[.] OrganizationRecord
+interface OrganizationRecord
+  createdAt: Date
+  id: string
+  name: string
+  slug: string | null
+
+[.] OrganizationsOptions
+interface OrganizationsOptions<OrgRole extends string, Role extends string>
+  create?: Requirement<BareUser<Record<string, unknown>>, NoInfer<Role>> | undefined
+  defaultRoles?: NoInfer<OrgRole>[] | undefined
+  invitationPage?: string | undefined
+  invitations?: { maxAge?: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w` | undefined; } | undefined
+  manage?: NoInfer<OrgRole> | undefined
+  owner: NoInfer<OrgRole>
+  param?: string | undefined
+  roles: Record<OrgRole, NoInfer<OrgRole>[]>
+
+[.] OwnOptions
+interface OwnOptions<Role extends string = string, Prefix extends string = '/auth', Scope extends string = never, OrgRole extends string = never, UserData extends object = Record<string, never>> extends Omit<AuthOptions<AuthSessionData, Role, Prefix, Scope, OrgRole, UserData>, Inherited>, AuthPagesOptions
+  admin?: AuthRequirement<NoInfer<Role>> | undefined
+  allow?: ((profile: Profile) => boolean | Promise<boolean>) | undefined
+  audit?: boolean | { maxAge?: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w`; ip?: "full" | "truncated"; } | undefined
+  authorize?: ((user: BareUser<Record<string, unknown>> | null, requirement: AuthRequirement<Role>, level: Level, ctx: PolicyContext) => Promise<boolean>) | undefined
+  breachedPasswords?: boolean | ((password: string) => boolean | Promise<boolean>) | undefined
+  captcha?: false | CaptchaOptions | undefined
+  cookie?: string | undefined
+  defaultRoles?: NoInfer<Role>[] | undefined
+  email?: false | EmailOptions | undefined
+  exportData?: ((event: { user: User<Record<string, unknown>>; }) => unknown) | undefined
+  failurePage?: string | undefined
+  forwardAuth?: ForwardDomains | ForwardAuthOptions | undefined
+  guests?: { maxAge: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w`; } | undefined
+  home?: string | undefined
+  hooks?: (() => Promise<{ hooks: Partial<Pick<AuthOptions<AuthSessionData, string, "/auth", never, never, Record<string, never>>, "exportData" | "authorize" | "allow" | "onSignUp" | "profileFields" | "onDelete" | "onAuthEvent" | "locate">>; }>) | undefined
+  locate?: ((ip: string) => string | Promise<string | null | undefined> | null | undefined) | undefined
+  magicLink?: boolean | undefined
+  module?: undefined
+  name?: string | undefined
+  oauth?: Record<string, true | OAuthApp | PresetApp> | undefined
+  oauthServer?: boolean | { fetch?: ((url: string) => Promise<Response>) | undefined; defaultScopes?: readonly Scope[] | undefined; } | undefined
+  onAuthEvent?: ((info: AuthEventInfo) => void | Promise<void>) | undefined
+  onDelete?: ((event: { user: User<Record<string, unknown>>; }) => void | Promise<void>) | undefined
+  onSignUp?: ((event: { user: User<Record<string, unknown>>; profile: Profile | undefined; }) => void | Promise<void>) | undefined
+  organizations?: OrganizationsOptions<OrgRole, NoInfer<Role>> | undefined
+  pages?: boolean | Pick<AuthPagesConfig, "remember" | "profile"> | undefined
+  passkeys?: false | { rpId?: string; origins?: string[]; rpName?: string; userVerification?: "required" | "preferred" | "discouraged"; } | undefined
+  password?: boolean | undefined
+  plugin?: undefined
+  prefix?: Prefix | undefined
+  profileFields?: ((event: { user: User<UserData>; profile: Profile; }) => void | { [Field in keyof UserData]?: UserData[Field] | undefined; } | Promise<void | { [Field in keyof UserData]?: UserData[Field] | undefined; }>) | undefined
+  proxy?: number | boolean | ProxyConfig | undefined
+  rateLimit?: Partial<Record<"signIn" | "signInAccount" | "signInAccountAll" | "register" | "resend" | "resendAccount" | "forgot" | "forgotAccount" | "magicLink" | "magicLinkAccount" | "emailChange" | "emailChangeAccount" | "twoFactor" | "twoFactorAccount" | "reprove" | "emailCode" | "emailCodeAccount" | "invite" ...#4289d195
+  remember?: { maxAge?: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w` | undefined; } | undefined
+  roles?: Record<Role, NoInfer<Role>[]> | undefined
+  rules?: CredentialRules | undefined
+  scopes?: readonly Scope[] | undefined
+  secret?: string | string[] | undefined
+  server?: undefined
+  sessionsPage?: string | undefined
+  signInPage?: string | undefined
+  signUp?: boolean | undefined
+  site?: string | undefined
+  store?: StoreOption | undefined
+  twoFactor?: boolean | undefined
+  twoFactorPage?: string | undefined
+  user?: (TSchema & { static: UserData; }) | undefined
+  viewer?: boolean | undefined
+
+[.] Passkey
+interface Passkey
+  backedUp: boolean
+  createdAt: Date
+  id: string
+  lastUsedAt: Date | null
+  multiDevice: boolean
+  name: string
+  userVerified: boolean
+
+[.] passkeyAssertion
+const passkeyAssertion: TUnsafe<AuthenticationResponseJSON>
+
+[.] passkeyAttestation
+const passkeyAttestation: TUnsafe<RegistrationResponseJSON>
+
+[.] PasskeyOptionsResult
+type PasskeyOptionsResult<Options, Failure extends string = 'signed-out' | 'none' | 'expired' | 'off'> = { ok: true, options: Options } | { ok: false, error: Failure }
+
+[.] PasskeyRecord
+interface PasskeyRecord
+  backedUp: boolean
+  counter: number
+  createdAt: Date
+  id: string
+  lastUsedAt: Date | null
+  multiDevice: boolean
+  name: string
+  publicKey: string
+  transports: string[]
+  userId: string
+  userVerified: boolean
+
+[.] PasskeySignInResult
+type PasskeySignInResult = { ok: true, redirect: string } | { ok: false, error: 'expired' | 'invalid' | 'limited' | 'banned' }
+
+[.] PASSWORD_MAX_LENGTH
+const PASSWORD_MAX_LENGTH: 128
+
+[.] PASSWORD_MIN_LENGTH
+const PASSWORD_MIN_LENGTH: 10
+
+[.] passwordProblem
+function passwordProblem(password: string, rules?: CredentialRules): PasswordProblem | undefined
+
+[.] PasswordProblem
+type PasswordProblem = 'too-short' | 'too-long' | (string & {})
+
+[.] PasswordSignInInput
+interface PasswordSignInInput
+  identifier: string
+  password: string
+
+[.] PasswordSignInResult
+type PasswordSignInResult = { ok: true, redirect: string } | { ok: false, error: 'invalid' | 'limited' | 'captcha' | 'unverified' | 'banned' }
+
+[.] PendingEmailCode
+type PendingEmailCode = { type: 'sign-in' | 'verify', email: string } | null
+
+[.] PkcePair
+interface PkcePair
+  challenge: string
+  method: "S256"
+  verifier: string
+
+[.] PluginOf
+type PluginOf<Module> = Module extends { auth: { plugin: infer Plugin extends AnyElysia } } ? Plugin : Module extends { default: { plugin: infer Plugin extends AnyElysia } } ? Plugin : never
+
+[.] PolicyContext
+interface PolicyContext
+  body?: any
+  params?: Record<string, any> | undefined
+  query?: Record<string, string> | undefined
+
+[.] Predicate
+type Predicate<P> = (principal: Principal<P>, ctx: PolicyContext) => boolean | Promise<boolean>
+
+[.] PresetApp
+interface PresetApp extends ProviderOptions
+  clientId?: string | undefined
+  clientSecret?: string | undefined
+  keepTokens?: boolean | undefined
+  label?: string | undefined
+  params?: Record<string, string>
+  scopes?: string[]
+  url?: string
+
+[.] Principal
+type Principal<P> = P | null
+
+[.] Profile
+interface Profile extends OAuthUser
+  avatar?: string | null | undefined
+  banner?: string | null | undefined
+  displayName?: string | undefined
+  email?: string | null | undefined
+  provider: string
+  providerId: string
+  username: string
+
+[.] PROFILE_MAX_LENGTH
+const PROFILE_MAX_LENGTH: 500
+
+[.] ProfileField
+interface ProfileField
+  autocomplete?: string | undefined
+  label: string | Record<string, string>
+  maxLength?: number | undefined
+  required?: boolean | undefined
+  type?: "url" | "email" | "text" | "textarea" | "tel" | undefined
+
+[.] ProfileFieldView
+interface ProfileFieldView extends Omit<ProfileField, 'label'>
+  autocomplete?: string | undefined
+  label: string
+  maxLength: number
+  name: string
+  required?: boolean | undefined
+  type?: "url" | "email" | "text" | "textarea" | "tel" | undefined
+  value: string
+
+[.] ProfileOptions
+interface ProfileOptions<Field extends string = string>
+  fields: Record<Field, ProfileField>
+  load: (user: BareUser<Record<string, unknown>>) => Partial<Record<Field, string | null | undefined>> | Promise<Partial<Record<Field, string | null | undefined>>>
+  save: (user: BareUser<Record<string, unknown>>, values: Record<Field, string>) => void | { errors: Partial<Record<Field, string>>; } | Promise<void | { errors: Partial<Record<Field, string>>; }>
+
+[.] ProfileProblem
+type ProfileProblem = 'required' | 'too-long' | { message: string }
+
+[.] Proof
+interface Proof
+  code?: string
+  passkey?: AuthenticationResponseJSON
+  password?: string
+
+[.] ProofFailure
+type ProofFailure = 'signed-out' | 'proof' | 'stale' | 'limited' | 'impersonating'
+
+[.] proofOfWork
+function proofOfWork(options?: ProofOfWorkOptions): ProofOfWorkCaptcha
+
+[.] ProofOfWorkCaptcha
+interface ProofOfWorkCaptcha
+  on: Partial<Record<CaptchaAction, number | false | "always">>
+  proofOfWork: { difficulty: number; maxAge: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w`; store: RateStore | undefined; }
+
+[.] ProofOfWorkOptions
+interface ProofOfWorkOptions
+  difficulty?: number | undefined
+  maxAge?: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w` | undefined
+  on?: Partial<Record<CaptchaAction, number | false | "always">> | undefined
+  store?: RateStore | undefined
+
+[.] ProviderOptions
+interface ProviderOptions
+  params?: Record<string, string>
+  scopes?: string[]
+  url?: string
+
+[.] PruneLimits
+interface PruneLimits
+  bearerExpiredBefore: Date
+  now: Date
+  sessionAbsoluteMaxAge: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w`
+  sessionMaxAge: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w`
+
+[.] pwnedPassword
+function pwnedPassword(password: string): Promise<boolean>
+
+[.] RecoveryCodesResult
+type RecoveryCodesResult = { ok: true, recoveryCodes: string[] } | { ok: false, error: ProofFailure | 'disabled' }
+
+[.] RefreshableOAuthClient
+interface RefreshableOAuthClient
+  refreshTokens: (refreshToken: string) => Promise<OAuthTokens>
+
+[.] RefreshStage
+type RefreshStage = 'refresh' | 'persist' | 'revoke'
+
+[.] RegisterErrors
+interface RegisterErrors
+  email?: "taken" | "invalid" | undefined
+  password?: PasswordProblem | "breached" | undefined
+  username?: "taken" | UsernameProblem | undefined
+
+[.] RegisterInput
+interface RegisterInput
+  email: string
+  locale?: string | undefined
+  password: string
+  username?: string
+
+[.] RegisterPasskeyResult
+type RegisterPasskeyResult = { ok: true, passkey: Passkey } | { ok: false, error: 'signed-out' | 'expired' | 'invalid' }
+
+[.] RegisterResult
+type RegisterResult = { ok: true, user: BareUser, signedIn: true } | { ok: true, signedIn: false } | { ok: false, errors: RegisterErrors } | { ok: false, error: 'limited' | 'captcha' | 'closed' }
+
+[.] RejectInvitationResult
+type RejectInvitationResult = { ok: true } | { ok: false, error: 'signed-out' | 'not-found' }
+
+[.] RenamePasskeyResult
+type RenamePasskeyResult = { ok: true } | { ok: false, error: 'signed-out' | 'not-found' | 'invalid-name' }
+
+[.] ReproveResult
+type ReproveResult = { ok: true } | { ok: false, error: ProofFailure }
+
+[.] Requirement
+type Requirement<P, G extends string> = | G | { type: G, resourceId?: number | null } | Predicate<P> | Requirement<P, G>[]
+
+[.] RequireUserOptions
+interface RequireUserOptions<Scope extends string, Role extends string>
+  bare?: true | undefined
+  redirect?: string | undefined
+  require?: AuthRequirement<Role> | undefined
+  scope?: ScopeRequirement<Scope> | undefined
+
+[.] ResetPasswordResult
+type ResetPasswordResult = LinkResult | { ok: false, errors: { password: PasswordProblem | 'breached' } }
+
+[.] ResolvedRules
+interface ResolvedRules
+  password: { min: number; max: number; check?: ((password: string) => string | undefined) | undefined; }
+  username: { min: number; max: number; }
+
+[.] resolveRules
+function resolveRules(rules?: CredentialRules): ResolvedRules
+
+[.] RevokeGrantResult
+type RevokeGrantResult = { ok: true } | { ok: false, error: 'signed-out' | 'not-found' }
+
+[.] RevokeInvitationResult
+type RevokeInvitationResult = { ok: true } | { ok: false, error: OrganizationFailure }
+
+[.] RevokePasskeyResult
+type RevokePasskeyResult = { ok: true } | { ok: false, error: ProofFailure | 'not-found' | 'last-way-in' }
+
+[.] RevokeSessionResult
+type RevokeSessionResult = { ok: true } | { ok: false, error: 'signed-out' | 'not-found' }
+
+[.] RevokeTokenResult
+type RevokeTokenResult = { ok: true } | { ok: false, error: 'signed-out' | 'not-found' }
+
+[.] RoleHierarchy
+type RoleHierarchy<R extends string> = Record<R, R[]>
+
+[.] RoleResult
+type RoleResult = { ok: true, user: ManagedUser } | { ok: false, error: AdminChangeFailure | 'unknown-role' | 'self' | 'last-admin' }
+
+[.] safeRedirect
+function safeRedirect(path: string | null | undefined, fallback?: string): string
+
+[.] SaveProfileResult
+type SaveProfileResult = { ok: true } | { ok: false, error: 'signed-out' } | { ok: false, errors: Record<string, ProfileProblem> }
+
+[.] scopeAllows
+function scopeAllows(scopes: readonly string[] | null, wanted: ScopeRequirement<string> | undefined): boolean
+
+[.] ScopeRequirement
+type ScopeRequirement<S extends string> = S | S[] | false
+
+[.] sealTotpSecret
+function sealTotpSecret(secret: string | string[], userId: string, plain: string): string
+
+[.] SecurityEvent
+type SecurityEvent = AuthNoticeKind
+
+[.] SendVerificationResult
+type SendVerificationResult = MailRequestResult | { ok: false, error: 'signed-out' | 'verified' }
+
+[.] SessionPlugin
+interface SessionPlugin<Data extends AuthSessionData>
+  deriveSecret?: (purpose: string) => string[]
+  endsSessionsElsewhere?: () => void
+  sharesUnder?: (domains: string[]) => void
+  ~Ephemeral: { derive: { readonly session: Session<Data>; }; }
+
+[.] SessionRecord
+interface SessionRecord
+  createdAt: Date
+  id: string
+  ip: string
+  lastSeenAt: Date
+  maxAge: number | null
+  userAgent: string
+  userId: string
+  version: number
+
+[.] SetUpTwoFactorResult
+type SetUpTwoFactorResult = { ok: true, setup: TwoFactorSetup } | { ok: false, error: ProofFailure | 'enabled' }
+
+[.] SIGNED_IN_HINT
+const SIGNED_IN_HINT: "kay_user"
+
+[.] SignInOptions
+interface SignInOptions
+  captcha?: string | undefined
+  redirect?: string | undefined
+  remember?: boolean | undefined
+
+[.] StoredCredential
+interface StoredCredential
+  accessToken?: string | null | undefined
+  expiresAt?: number | null | undefined
+  refreshToken?: string | null | undefined
+
+[.] StoreUrl
+interface StoreUrl
+  url: string
+
+[.] Templates
+type Templates = Record<MailKind, (data: MailData) => MailContent>
+
+[.] TokenOptions
+interface TokenOptions<Scope extends string = string>
+  maxAge?: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w` | null | undefined
+  scopes?: Scope[] | undefined
+
+[.] TokenRecord
+interface TokenRecord
+  digest: string
+  email: string
+  expiresAt: Date
+  redirect: string | null
+  type: TokenType
+  userId: string
+
+[.] TokenRefresherDeps
+interface TokenRefresherDeps<K, S>
+  exchange: (subject: S) => Promise<{ accessToken: string; expiresAt?: number | undefined; } | null>
+  key: (subject: S) => K
+  load: (subject: S) => StoredCredential
+  margin?: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w` | undefined
+
+[.] TokenType
+type TokenType = LinkType | CodeType
+
+[.] TotpEnrolment
+interface TotpEnrolment
+  code: (offset?: number | undefined) => Promise<string>
+  recoveryCodes: string[]
+  secret: string
+
+[.] turnstile
+function turnstile(secret: string): (token: string, action: CaptchaAction, context?: CaptchaContext | undefined) => boolean | Promise<boolean>
+
+[.] turnstileWidget
+function turnstileWidget(siteKey: string): CaptchaWidget
+
+[.] TwoFactorResult
+type TwoFactorResult = { ok: true, redirect: string } | { ok: false, error: 'invalid' | 'expired' | 'limited' }
+
+[.] TwoFactorSetup
+interface TwoFactorSetup
+  secret: string
+  uri: string
+
+[.] UnbanResult
+type UnbanResult = { ok: true, user: ManagedUser } | { ok: false, error: AdminChangeFailure }
+
+[.] UnlinkResult
+type UnlinkResult = { ok: true } | { ok: false, error: ProofFailure | 'not-linked' | 'last-way-in' }
+
+[.] UpdateLocaleResult
+type UpdateLocaleResult = { ok: true } | { ok: false, error: 'signed-out' | 'invalid-locale' }
+
+[.] UpdateOrganizationResult
+type UpdateOrganizationResult = { ok: true, organization: Organization } | { ok: false, error: OrganizationFailure | 'invalid-name' | 'invalid-slug' | 'slug-taken' }
+
+[.] User
+interface User<Data extends object = Record<string, unknown>> extends BareUser<Data>
+  data: Data
+  email: string | null
+  emailVerified: boolean
+  guest: boolean
+  hasPassword: boolean
+  id: string
+  locale: string | null
+  providers: Record<string, { id: string; }>
+  roles: string[]
+  twoFactor: boolean
+  username: string | null
+
+[.] USERNAME_MAX_LENGTH
+const USERNAME_MAX_LENGTH: 32
+
+[.] USERNAME_MIN_LENGTH
+const USERNAME_MIN_LENGTH: 2
+
+[.] usernameProblem
+function usernameProblem(username: string, rules?: CredentialRules): UsernameProblem | undefined
+
+[.] UsernameProblem
+type UsernameProblem = 'length' | 'characters' | 'mixed-scripts'
+
+[.] UserRecord
+interface UserRecord
+  banReason: string | null
+  bannedAt: Date | null
+  bannedUntil: Date | null
+  createdAt: Date
+  data?: Record<string, unknown> | undefined
+  email: string | null
+  emailVerifiedAt: Date | null
+  guest: boolean
+  id: string
+  lastSignIn: string | null
+  locale: string | null
+  passwordHash: string | null
+  roles: string[]
+  sessionVersion: number
+  totpEnabledAt: Date | null
+  totpLastStep: number
+  totpSecret: string | null
+  username: string | null
+
+[.] UserSession
+interface UserSession
+  createdAt: Date
+  current: boolean
+  device: Device
+  id: string
+  ip: string
+  lastSeenAt: Date
+  place: string | null
+  userAgent: string
+
+[.] VerifyEmailResult
+type VerifyEmailResult = LinkResult | { ok: false, error: 'confirm' }
+
+[.] Ws
+interface Ws extends WsSender
+  close: () => void
+  id: string | number
+  send: (msg: string) => void
+
+[.] WsSender
+interface WsSender
+  close: () => void
+  send: (msg: string) => void
+
+[./add] default
+function default(project: Project): { description: string; files: { 'src/routes/_guard.ts': string; }; edits: { file: string; find: RegExp; replace: (_match: string, open: string, space: string, close: string) => string; done: string; import: string; }[]; example: string[]; ignore: string[]; extension: { import: st ...#c8707185
+
+[./browser] askPasskey
+function askPasskey(options: PublicKeyCredentialRequestOptionsJSON, { autofill, signal }?: { autofill?: boolean; signal?: AbortSignal; }): Promise<AuthenticationResponseJSON | null>
+
+[./browser] canAskPasskey
+function canAskPasskey(): boolean
+
+[./browser] canMakePasskey
+function canMakePasskey(): boolean
+
+[./browser] makePasskey
+function makePasskey(options: PublicKeyCredentialCreationOptionsJSON): Promise<RegistrationResponseJSON | null>
+
+[./browser] passkeyFailure
+function passkeyFailure(caught: unknown, errors: Record<string, string>, failed: string): string
+
+[./browser] rememberChoice
+function rememberChoice(): boolean | undefined
+
+[./components/impersonation-banner.kay] default
+component default
+
+[./components/signed-in.kay] default
+component default
+  children?: Element
+  role?: string | undefined
+
+[./components/signed-out.kay] default
+component default
+  children?: Element
+
+[./components/user-menu.kay] default
+component default
+  account?: boolean
+
+[./pages/confirm-email.kay] confirm
+function confirm(form: FormData, options?: CallOptions | undefined): Promise<never>
+function confirm(input: { token: string; }, options?: CallOptions | undefined): Promise<never>
+
+[./pages/confirm-email.kay] default
+component default
+
+[./pages/confirm-email.kay] load
+function load(ctx: PageContext<Record<string, string>, Readonly<Record<string, unknown>>>): Promise<{ token: string | undefined; error: any; }>
+
+[./pages/confirm-email.kay] page
+const page: { guards: false; security: { headers: { 'referrer-policy': string; }; }; }
+
+[./pages/invitation.kay] accept
+function accept(form: FormData, options?: CallOptions | undefined): Promise<never>
+function accept(input: { id: string; }, options?: CallOptions | undefined): Promise<never>
+
+[./pages/invitation.kay] default
+component default
+
+[./pages/invitation.kay] load
+function load(ctx: PageContext<Record<string, string>, Readonly<Record<string, unknown>>>): Promise<{ auth: any; features: any; prefix: any; requested: string; id: string; invitation: any; user: any; signedIn: boolean; mine: boolean; unverified: boolean; back: string; refused: any; }>
+
+[./pages/invitation.kay] page
+const page: { guards: false; security: { headers: { 'referrer-policy': string; }; }; }
+
+[./pages/invitation.kay] reject
+function reject(form: FormData, options?: CallOptions | undefined): Promise<never>
+function reject(input: { id: string; }, options?: CallOptions | undefined): Promise<never>
+
+[./pages/invitation.kay] switchAccount
+function switchAccount(form: FormData, options?: CallOptions | undefined): Promise<never>
+function switchAccount(input: { id: string; }, options?: CallOptions | undefined): Promise<never>
+
+[./pages/magic-link.kay] default
+component default
+
+[./pages/magic-link.kay] load
+function load(ctx: PageContext<Record<string, string>, Readonly<Record<string, unknown>>>): Promise<{ token: string | undefined; error: any; }>
+
+[./pages/magic-link.kay] page
+const page: { guards: false; security: { headers: { 'referrer-policy': string; }; }; }
+
+[./pages/magic-link.kay] spend
+function spend(form: FormData, options?: CallOptions | undefined): Promise<never>
+function spend(input: { token: string; }, options?: CallOptions | undefined): Promise<never>
+
+[./pages/register.kay] default
+component default
+
+[./pages/register.kay] load
+function load(ctx: PageContext<Record<string, string>, Readonly<Record<string, unknown>>>): Promise<{ auth: any; features: any; prefix: any; redirect: string; user: any; askRemember: boolean; providerLinks: { name: string; label: string; href: string; }[]; captcha: { shown: boolean; challenge: string | null; };  ...#77014f21
+
+[./pages/register.kay] page
+const page: { guards: false; }
+
+[./pages/register.kay] register
+function register(form: FormData, options?: CallOptions | undefined): Promise<"verify">
+function register(input: { redirect?: string | undefined; remember?: boolean | undefined; username?: string | undefined; 'cf-turnstile-response'?: string | undefined; 'h-captcha-response'?: string | undefined; 'kayjs-captcha'?: string | undefined; email: string; password: string; }, options?: CallOptions | undefined ...#2d33827e
+
+[./pages/reset-password.kay] default
+component default
+
+[./pages/reset-password.kay] load
+function load(ctx: PageContext<Record<string, string>, Readonly<Record<string, unknown>>>): Promise<{ auth: any; features: any; redirect: string; token: string | undefined; captcha: { shown: boolean; challenge: string | null; }; requestError: string | undefined; refused: { readonly password: any; readonly error? ...#ffb5fe32
+
+[./pages/reset-password.kay] page
+const page: { guards: false; security: { headers: { 'referrer-policy': string; }; }; }
+
+[./pages/reset-password.kay] request
+function request(form: FormData, options?: CallOptions | undefined): Promise<"sent">
+function request(input: { redirect?: string | undefined; 'cf-turnstile-response'?: string | undefined; 'h-captcha-response'?: string | undefined; 'kayjs-captcha'?: string | undefined; email: string; }, options?: CallOptions | undefined): Promise<"sent">
+
+[./pages/reset-password.kay] reset
+function reset(form: FormData, options?: CallOptions | undefined): Promise<never>
+function reset(input: { password: string; token: string; }, options?: CallOptions | undefined): Promise<never>
+
+[./pages/sign-in.kay] default
+component default
+
+[./pages/sign-in.kay] emailCode
+function emailCode(form: FormData, options?: CallOptions | undefined): Promise<never>
+function emailCode(input: { code: string; }, options?: CallOptions | undefined): Promise<never>
+
+[./pages/sign-in.kay] load
+function load(ctx: PageContext<Record<string, string>, Readonly<Record<string, unknown>>>): Promise<{ auth: any; features: any; prefix: any; redirect: string; user: any; captchaSignIn: { shown: boolean; challenge: string | null; }; captchaMagic: { shown: boolean; challenge: string | null; }; pending: any; oauthE ...#e9aa08c7
+
+[./pages/sign-in.kay] magicLink
+function magicLink(form: FormData, options?: CallOptions | undefined): Promise<string>
+function magicLink(input: { redirect?: string | undefined; remember?: boolean | undefined; 'cf-turnstile-response'?: string | undefined; 'h-captcha-response'?: string | undefined; 'kayjs-captcha'?: string | undefined; email: string; }, options?: CallOptions | undefined): Promise<string>
+
+[./pages/sign-in.kay] page
+const page: { guards: false; }
+
+[./pages/sign-in.kay] passkey
+function passkey(form: FormData, options?: CallOptions | undefined): Promise<never>
+function passkey(input: { redirect?: string | undefined; remember?: boolean | undefined; response: AuthenticationResponseJSON; }, options?: CallOptions | undefined): Promise<never>
+
+[./pages/sign-in.kay] passkeyOptions
+function passkeyOptions(form: FormData, options?: CallOptions | undefined): Promise<any>
+function passkeyOptions(input: {}, options?: CallOptions | undefined): Promise<any>
+function passkeyOptions(input?: undefined, options?: CallOptions | undefined): Promise<any>
+
+[./pages/sign-in.kay] password
+function password(form: FormData, options?: CallOptions | undefined): Promise<never>
+function password(input: { redirect?: string | undefined; remember?: boolean | undefined; 'cf-turnstile-response'?: string | undefined; 'h-captcha-response'?: string | undefined; 'kayjs-captcha'?: string | undefined; password: string; identifier: string; }, options?: CallOptions | undefined): Promise<never>
+
+[./pages/two-factor.kay] default
+component default
+
+[./pages/two-factor.kay] load
+function load(ctx: PageContext<Record<string, string>, Readonly<Record<string, unknown>>>): Promise<{ auth: any; features: any; pending: any; redirect: string; error: any; }>
+
+[./pages/two-factor.kay] page
+const page: { guards: false; }
+
+[./pages/two-factor.kay] passkey
+function passkey(form: FormData, options?: CallOptions | undefined): Promise<never>
+function passkey(input: { redirect?: string | undefined; remember?: boolean | undefined; response: AuthenticationResponseJSON; }, options?: CallOptions | undefined): Promise<never>
+
+[./pages/two-factor.kay] passkeyOptions
+function passkeyOptions(form: FormData, options?: CallOptions | undefined): Promise<any>
+function passkeyOptions(input: {}, options?: CallOptions | undefined): Promise<any>
+function passkeyOptions(input?: undefined, options?: CallOptions | undefined): Promise<any>
+
+[./pages/two-factor.kay] verify
+function verify(form: FormData, options?: CallOptions | undefined): Promise<never>
+function verify(input: { code: string; }, options?: CallOptions | undefined): Promise<never>
+
+[./pages/verify-email.kay] code
+function code(form: FormData, options?: CallOptions | undefined): Promise<never>
+function code(input: { code: string; }, options?: CallOptions | undefined): Promise<never>
+
+[./pages/verify-email.kay] default
+component default
+
+[./pages/verify-email.kay] load
+function load(ctx: PageContext<Record<string, string>, Readonly<Record<string, unknown>>>): Promise<{ auth: any; token: string | undefined; user: any; pending: any; refused: any; codeError: any; resendError: any; resent: boolean; }>
+
+[./pages/verify-email.kay] page
+const page: { guards: false; security: { headers: { 'referrer-policy': string; }; }; }
+
+[./pages/verify-email.kay] resend
+function resend(form: FormData, options?: CallOptions | undefined): Promise<"sent">
+function resend(input: {}, options?: CallOptions | undefined): Promise<"sent">
+function resend(input?: undefined, options?: CallOptions | undefined): Promise<"sent">
+
+[./pages/verify-email.kay] verify
+function verify(form: FormData, options?: CallOptions | undefined): Promise<never>
+function verify(input: { password?: string | undefined; token: string; }, options?: CallOptions | undefined): Promise<never>
+
+[./pg] AuthAttempts
+const AuthAttempts: TableDef<"kay_attempts", ExtractColumns<{ key: ColumnBuilder<string, NotNullable, NoDefault, IsPrimaryKey, NotGenerated>; count: ColumnBuilder<number, NotNullable, NoDefault, NotPrimaryKey, NotGenerated>; reset_at: ColumnBuilder<Date, NotNullable, NoDefault, NotPrimaryKey, NotGenerated>; }>, {}, {}>
+
+[./pg] AuthAudit
+const AuthAudit: TableDef<"kay_audits", ExtractColumns<{ id: ColumnBuilder<string, NotNullable, NoDefault, IsPrimaryKey, NotGenerated>; user_id: ColumnBuilder<string, NotNullable, NoDefault, NotPrimaryKey, NotGenerated>; event: ColumnBuilder<string, NotNullable, NoDefault, NotPrimaryKey, NotGenerated>; detail: Colum ...#e7cee26b
+
+[./pg] AuthBearerTokens
+const AuthBearerTokens: TableDef<"kay_bearer_tokens", ExtractColumns<{ id: ColumnBuilder<string, NotNullable, NoDefault, IsPrimaryKey, NotGenerated>; user_id: ColumnBuilder<string, NotNullable, NoDefault, NotPrimaryKey, NotGenerated>; label: ColumnBuilder<string, NotNullable, NoDefault, NotPrimaryKey, NotGenerated>; digest ...#36f8e918
+
+[./pg] AuthIdentities
+const AuthIdentities: TableDef<"kay_identities", ExtractColumns<{ id: ColumnBuilder<number, NotNullable, HasDefault, IsPrimaryKey, NotGenerated>; provider: ColumnBuilder<string, NotNullable, NoDefault, NotPrimaryKey, NotGenerated>; provider_id: ColumnBuilder<string, NotNullable, NoDefault, NotPrimaryKey, NotGenerated>; u ...#15a99c12
+
+[./pg] AuthInvitations
+const AuthInvitations: TableDef<"kay_invitations", ExtractColumns<{ id: ColumnBuilder<string, NotNullable, NoDefault, IsPrimaryKey, NotGenerated>; organization_id: ColumnBuilder<string, NotNullable, NoDefault, NotPrimaryKey, NotGenerated>; email: ColumnBuilder<string, NotNullable, NoDefault, NotPrimaryKey, NotGenerated>;  ...#14aec96a
+
+[./pg] AuthMembers
+const AuthMembers: TableDef<"kay_members", ExtractColumns<{ id: ColumnBuilder<number, NotNullable, HasDefault, IsPrimaryKey, NotGenerated>; organization_id: ColumnBuilder<string, NotNullable, NoDefault, NotPrimaryKey, NotGenerated>; user_id: ColumnBuilder<string, NotNullable, NoDefault, NotPrimaryKey, NotGenerated>; r ...#49edd118
+
+[./pg] AuthOAuthClients
+const AuthOAuthClients: TableDef<"kay_oauth_clients", ExtractColumns<{ id: ColumnBuilder<string, NotNullable, NoDefault, IsPrimaryKey, NotGenerated>; name: ColumnBuilder<string, NotNullable, NoDefault, NotPrimaryKey, NotGenerated>; redirect_uris: ColumnBuilder<string[], NotNullable, NoDefault, NotPrimaryKey, NotGenerated>; ...#29d1c55f
+
+[./pg] AuthOAuthCodes
+const AuthOAuthCodes: TableDef<"kay_oauth_codes", ExtractColumns<{ digest: ColumnBuilder<string, NotNullable, NoDefault, IsPrimaryKey, NotGenerated>; user_id: ColumnBuilder<string, NotNullable, NoDefault, NotPrimaryKey, NotGenerated>; client_id: ColumnBuilder<string, NotNullable, NoDefault, NotPrimaryKey, NotGenerated>;  ...#62a67990
+
+[./pg] AuthOAuthGrants
+const AuthOAuthGrants: TableDef<"kay_oauth_grants", ExtractColumns<{ id: ColumnBuilder<number, NotNullable, HasDefault, IsPrimaryKey, NotGenerated>; user_id: ColumnBuilder<string, NotNullable, NoDefault, NotPrimaryKey, NotGenerated>; client_id: ColumnBuilder<string, NotNullable, NoDefault, NotPrimaryKey, NotGenerated>; cl ...#6bc4f812
+
+[./pg] AuthOAuthRefresh
+const AuthOAuthRefresh: TableDef<"kay_oauth_refresh_tokens", ExtractColumns<{ digest: ColumnBuilder<string, NotNullable, NoDefault, IsPrimaryKey, NotGenerated>; user_id: ColumnBuilder<string, NotNullable, NoDefault, NotPrimaryKey, NotGenerated>; client_id: ColumnBuilder<string, NotNullable, NoDefault, NotPrimaryKey, NotGen ...#7b6572db
+
+[./pg] AuthOrganizations
+const AuthOrganizations: TableDef<"kay_organizations", ExtractColumns<{ id: ColumnBuilder<string, NotNullable, NoDefault, IsPrimaryKey, NotGenerated>; name: ColumnBuilder<string, NotNullable, NoDefault, NotPrimaryKey, NotGenerated>; slug: ColumnBuilder<string, IsNullable, NoDefault, NotPrimaryKey, NotGenerated>; created_at: ...#583de472
+
+[./pg] AuthPasskeys
+const AuthPasskeys: TableDef<"kay_passkeys", ExtractColumns<{ id: ColumnBuilder<string, NotNullable, NoDefault, IsPrimaryKey, NotGenerated>; user_id: ColumnBuilder<string, NotNullable, NoDefault, NotPrimaryKey, NotGenerated>; name: ColumnBuilder<string, NotNullable, NoDefault, NotPrimaryKey, NotGenerated>; public_key:  ...#75d490b2
+
+[./pg] AuthRecoveryCodes
+const AuthRecoveryCodes: TableDef<"kay_recovery_codes", ExtractColumns<{ id: ColumnBuilder<number, NotNullable, HasDefault, IsPrimaryKey, NotGenerated>; user_id: ColumnBuilder<string, NotNullable, NoDefault, NotPrimaryKey, NotGenerated>; digest: ColumnBuilder<string, NotNullable, NoDefault, NotPrimaryKey, NotGenerated>; }>, ...#a67895b2
+
+[./pg] AuthSessions
+const AuthSessions: TableDef<"kay_auth_sessions", ExtractColumns<{ id: ColumnBuilder<string, NotNullable, NoDefault, IsPrimaryKey, NotGenerated>; user_id: ColumnBuilder<string, NotNullable, NoDefault, NotPrimaryKey, NotGenerated>; version: ColumnBuilder<number, NotNullable, NoDefault, NotPrimaryKey, NotGenerated>; user ...#d93aa77b
+
+[./pg] authTables
+const authTables: readonly [TableDef<"kay_users", ExtractColumns<{ id: ColumnBuilder<string, NotNullable, NoDefault, IsPrimaryKey, NotGenerated>; email: ColumnBuilder<string, IsNullable, NoDefault, NotPrimaryKey, NotGenerated>; email_verified_at: ColumnBuilder<Date, IsNullable, NoDefault, NotPrimaryKey, NotGenerated> ...#5d6dc28c
+
+[./pg] AuthTokens
+const AuthTokens: TableDef<"kay_tokens", ExtractColumns<{ digest: ColumnBuilder<string, NotNullable, NoDefault, IsPrimaryKey, NotGenerated>; type: ColumnBuilder<string, NotNullable, NoDefault, NotPrimaryKey, NotGenerated>; user_id: ColumnBuilder<string, NotNullable, NoDefault, NotPrimaryKey, NotGenerated>; email: Col ...#dabe0e9f
+
+[./pg] AuthUsers
+const AuthUsers: TableDef<"kay_users", ExtractColumns<{ id: ColumnBuilder<string, NotNullable, NoDefault, IsPrimaryKey, NotGenerated>; email: ColumnBuilder<string, IsNullable, NoDefault, NotPrimaryKey, NotGenerated>; email_verified_at: ColumnBuilder<Date, IsNullable, NoDefault, NotPrimaryKey, NotGenerated>; username ...#69315b97
+
+[./pg] pgStore
+function pgStore(db: Database): AuthStore
+
+[./rules] CredentialRules
+interface CredentialRules
+  password?: { min?: number | undefined; max?: number | undefined; check?: ((password: string) => string | undefined) | undefined; } | undefined
+  username?: { min?: number | undefined; max?: number | undefined; } | undefined
+
+[./rules] DEFAULT_RULES
+const DEFAULT_RULES: ResolvedRules
+
+[./rules] emailProblem
+function emailProblem(email: string): "invalid" | undefined
+
+[./rules] EmailProblem
+type EmailProblem = 'invalid'
+
+[./rules] mixesConfusableScripts
+function mixesConfusableScripts(value: string): boolean
+
+[./rules] normalizeEmail
+function normalizeEmail(email: string): string
+
+[./rules] normalizeUsername
+function normalizeUsername(username: string): string
+
+[./rules] PASSWORD_MAX_LENGTH
+const PASSWORD_MAX_LENGTH: 128
+
+[./rules] PASSWORD_MIN_LENGTH
+const PASSWORD_MIN_LENGTH: 10
+
+[./rules] passwordProblem
+function passwordProblem(password: string, rules?: CredentialRules): PasswordProblem | undefined
+
+[./rules] PasswordProblem
+type PasswordProblem = 'too-short' | 'too-long' | (string & {})
+
+[./rules] PROFILE_MAX_LENGTH
+const PROFILE_MAX_LENGTH: 500
+
+[./rules] ResolvedRules
+interface ResolvedRules
+  password: { min: number; max: number; check?: ((password: string) => string | undefined) | undefined; }
+  username: { min: number; max: number; }
+
+[./rules] resolveRules
+function resolveRules(rules?: CredentialRules): ResolvedRules
+
+[./rules] USERNAME_MAX_LENGTH
+const USERNAME_MAX_LENGTH: 32
+
+[./rules] USERNAME_MIN_LENGTH
+const USERNAME_MIN_LENGTH: 2
+
+[./rules] usernameProblem
+function usernameProblem(username: string, rules?: CredentialRules): UsernameProblem | undefined
+
+[./rules] UsernameProblem
+type UsernameProblem = 'length' | 'characters' | 'mixed-scripts'
+
+[./test] authTest
+function authTest(site: OAuthSite): AuthTest
+
+[./test] AuthTest
+interface AuthTest
+  enrollTotp: (userId: string) => Promise<TotpEnrolment>
+  oauth: OAuthTest
+  sessionCookie: (userId: string, options?: { secure?: boolean; } | undefined) => Promise<string>
+  signInAs: (who: Omit<CreateUserInput, "roles"> & { roles?: string[] | undefined; data?: object | undefined; }) => Promise<BareUser<Record<string, unknown>>>
+  signOut: () => void
+
+[./test] OwnTest
+interface OwnTest
+  test: (site: OAuthSite) => AuthTest
