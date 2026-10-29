@@ -54,6 +54,32 @@ const outcome = await site.call(assistant, { messages })
 
 `fakeAi.asked[0].tools` is what was offered. A string `input` plays a model's invalid JSON and `name` one that does not exist. Use `testSite` from `kay/test`, which answers the call as a visitor whose headers you set (`{ headers: { authorization } }`).
 
+### Benching a prompt against the real model
+
+`mocked(action, run)` (from `@kaynooo/kayjs-ai`) makes a function tool of an action with the action's own name, description, label and input schema and a `run` of yours, so a script outside the server asks the real model with the tools the app offers, answered by mocks. It throws for an action that cannot be a tool (one taking a file, one of a page with params, `tool: false`). The input is checked against the action's schema before `run`, as for `tool()`.
+
+```ts
+import type { Message } from '@kaynooo/kayjs-ai'
+import { ask, mocked, openai } from '@kaynooo/kayjs-ai'
+import { systemPrompt } from '../src/assistant'
+import { forecast, route } from '../src/routes/_actions.kay'
+
+const provider = openai({ baseUrl: 'http://localhost:11434/v1', model: 'gemma4:12b' })
+const tools = [mocked(forecast, () => ({ days: [] })), mocked(route, ({ to }) => ({ to, km: 3.4, minutes: 21 }))]
+const history: Message[] = []
+
+for (const turn of [{ ask: 'Will it rain tomorrow?', expect: 'forecast' }, { ask: 'And by bike to the station?', expect: 'route' }]) {
+  const reply = ask([...history, { role: 'user', content: turn.ask }], { provider, system: systemPrompt(new Date()), tools })
+  const answer = await reply
+  const calls = await reply.calls
+
+  history.push({ role: 'user', content: turn.ask }, { role: 'assistant', content: answer })
+  console.log(turn.ask, calls.some(call => call.name === turn.expect && call.status === 'done') ? 'ok' : 'MISSED')
+}
+```
+
+Run it with `bun`, not `bun test`, where `ask` answers from the fake. The history is the text a Chat posts, so a bench of follow-ups meets what a visitor's model meets.
+
 ## Reference
 
 ### Offered actions

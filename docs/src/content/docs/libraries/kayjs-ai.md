@@ -417,6 +417,32 @@ A failed or stopped reply lists the requests that ended before it. A reply stopp
 
 <ReadMore href="/llms/kayjs-ai-tools">What the model is told for each kind of failure, the limits, and how to test it.</ReadMore>
 
+### Bench a prompt against the real model
+
+When you change a prompt or swap a model, you want to know the model still calls the right tool. A script outside the server can ask the real model with your own actions as tools, if their `run` is a mock. `mocked(action, run)` keeps the action's name, description and input schema, so nothing is copied by hand and nothing drifts:
+
+```ts
+import type { Message } from '@kaynooo/kayjs-ai'
+import { ask, mocked, openai } from '@kaynooo/kayjs-ai'
+import { systemPrompt } from '../src/assistant'
+import { forecast, route } from '../src/routes/_actions.kay'
+
+const provider = openai({ baseUrl: 'http://localhost:11434/v1', model: 'gemma4:12b' })
+const tools = [mocked(forecast, () => ({ days: [] })), mocked(route, ({ to }) => ({ to, km: 3.4, minutes: 21 }))]
+const history: Message[] = []
+
+for (const turn of [{ ask: 'Will it rain tomorrow?', expect: 'forecast' }, { ask: 'And by bike to the station?', expect: 'route' }]) {
+  const reply = ask([...history, { role: 'user', content: turn.ask }], { provider, system: systemPrompt(new Date()), tools })
+  const answer = await reply
+  const calls = await reply.calls
+
+  history.push({ role: 'user', content: turn.ask }, { role: 'assistant', content: answer })
+  console.log(turn.ask, calls.some(call => call.name === turn.expect && call.status === 'done') ? 'ok' : 'MISSED')
+}
+```
+
+Run it with `bun`, not `bun test`, where `ask` answers from the fake. The conversation is scripted, so each follow-up meets the text history a chat posts, and the calls are scored against what you expect.
+
 ## Limit what visitors spend
 
 A public chat lets anyone run up your bill, so in production kay limits it even when you set nothing: each visitor may ask 20 questions every 10 minutes and use 100,000 tokens a day, and all visitors together 2,000,000 tokens a day. Set your own limit and token budget in `kay.config.ts`, or write `rateLimit: false` or `budget: false` to lift one when something else counts, such as a gateway in front of the app. Development and tests have no default.

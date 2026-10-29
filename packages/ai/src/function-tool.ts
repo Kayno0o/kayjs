@@ -1,8 +1,9 @@
+import type { ServerAction } from 'kay'
 import type { TSchema } from 'kay/library'
 import type { Offered, Ran } from './loop'
 import type { FunctionTool, FunctionToolOptions } from './types'
 import { logFrom } from 'kay'
-import { checkAnswer, configError, jsonSchemaOf } from 'kay/library'
+import { actionTool, checkAnswer, configError, jsonSchemaOf } from 'kay/library'
 import { clip, MAX_RESULT } from './loop'
 
 const log = logFrom('kayjs-ai')
@@ -20,6 +21,16 @@ export function tool<const Schema extends TSchema>(options: FunctionToolOptions<
   built.add(made)
 
   return made
+}
+
+// An action as a function tool whose `run` is the one given: the name, description, label and input schema are the action's own, so an ask outside the app, such as a script benching a prompt against the real model, offers what the app does and nothing restated.
+export function mocked<const Schema extends TSchema, const Honeypot extends string = never>(action: ServerAction<Schema, unknown, Honeypot>, run: FunctionToolOptions<Schema>['run']): FunctionTool {
+  const offered = actionTool(action as unknown as Parameters<typeof actionTool>[0])
+
+  if (!offered)
+    throw configError('mocked takes an action that can be a tool, one a page module exports: not one taking a file, one of a page with params or one with `tool: false`')
+
+  return tool({ name: offered.name, description: offered.description, label: offered.label, input: action.schema, run })
 }
 
 export function isFunctionTool(value: unknown): value is FunctionTool {

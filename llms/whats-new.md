@@ -5,6 +5,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 ## Unreleased
 
 - kayjs-ai: a conversation a Chat keeps on the server (`keepOnServer`) keeps each reply's tool calls and results too, and the next ask replays them to the model, which no longer invents follow-up answers a tool already gave: [Conversations](../packages/ai/llms/chat-conversations.md).
+- kayjs-ai: `mocked(action, run)` makes a tool of an app's action with its own name, description and input schema and a `run` of yours, so a script benches a prompt against the real model with nothing restated: [Actions as tools](../packages/ai/llms/tools.md#benching-a-prompt-against-the-real-model).
 
 ## 1.83.0
 
