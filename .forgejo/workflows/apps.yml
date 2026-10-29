@@ -69,8 +69,6 @@ jobs:
       - name: Pack kay and its libraries
         id: pack
         run: bun scripts/apps-ci.ts pack
-        env:
-          KAY_APPS_TOKEN: ${{ secrets.KAY_APPS_TOKEN }}
 
       # A step per app, each run whatever the ones before it did, so a failure names its app and the others still report.
       - name: kaynooo.fr

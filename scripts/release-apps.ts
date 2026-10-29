@@ -21,11 +21,20 @@ if (process.env.KAY_SKIP_APPS_CI === '1') {
 
 const sha = (await $`git rev-parse HEAD`.text()).trim()
 
+// The dispatch runs main's tip, so a HEAD that is not it would never get a run of its own.
+await $`git fetch -q origin main`
+
+if ((await $`git rev-parse origin/main`.text()).trim() !== sha) {
+  console.error('HEAD is not origin/main: the Apps workflow runs the pushed main')
+  process.exit(1)
+}
+
 async function runs(): Promise<Run[]> {
   return JSON.parse(await $`ft runs --workflow ${WORKFLOW} --sha ${sha} --limit 10 --json`.text()) as Run[]
 }
 
-const finished = (candidate: Run) => candidate.status !== 'running' && candidate.status !== 'waiting' && candidate.status !== 'queued'
+const TERMINAL = new Set(['success', 'failure', 'cancelled', 'skipped'])
+const finished = (candidate: Run) => TERMINAL.has(candidate.status)
 // Runs from before the dispatch are ignored once it is made, so an earlier failure is not taken for its result.
 let ignored = new Set<number>()
 let run = (await runs()).find(candidate => candidate.status !== 'failure' && candidate.status !== 'cancelled')

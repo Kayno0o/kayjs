@@ -85,6 +85,13 @@ export function pointAtKay(manifest: Manifest, tarballs: Record<string, string>)
   return changed ? next : undefined
 }
 
+// Overrides in the root manifest, so the kay and kayjs-* a packed library depends on or peers on come from the tarballs too, not the registry.
+export function overrideKay(manifest: Manifest, tarballs: Record<string, string>): Manifest {
+  const overrides = Object.fromEntries([...Object.entries(tarballs).map(([name, tarball]) => [name, `file:${tarball}`]), ['kay', `file:${tarballs['@kaynooo/kayjs']}`]])
+
+  return { ...manifest, overrides: { ...(manifest.overrides as Record<string, string> | undefined), ...overrides } }
+}
+
 const root = resolve(import.meta.dir, '..')
 const workDir = resolve(process.env.KAY_APPS_DIR ?? join(root, '.kay/apps-ci'))
 const tarballDir = join(workDir, 'tarballs')
@@ -139,7 +146,7 @@ async function clone(app: App, directory: string) {
 
   const server = process.env.GITHUB_SERVER_URL ?? 'https://git.kevyn.fr'
   const branch = app.branch === undefined ? [] : ['--branch', app.branch]
-  const env = { ...process.env, GIT_CONFIG_COUNT: '1', GIT_CONFIG_KEY_0: 'http.extraheader', GIT_CONFIG_VALUE_0: `Authorization: token ${token}`, GIT_TERMINAL_PROMPT: '0' }
+  const env = { ...process.env, GIT_CONFIG_COUNT: '1', GIT_CONFIG_KEY_0: `http.${server}/.extraheader`, GIT_CONFIG_VALUE_0: `Authorization: token ${token}`, GIT_TERMINAL_PROMPT: '0' }
   const result = await $`git clone --quiet --depth 1 ${branch} ${`${server}/${app.repo}.git`} ${directory}`.env(env).quiet().nothrow()
 
   if (result.exitCode !== 0)
@@ -165,7 +172,8 @@ async function run(app: App) {
 
   for (const path of await manifestPaths(directory)) {
     const file = join(directory, path)
-    const next = pointAtKay(await Bun.file(file).json() as Manifest, tarballs)
+    const rewritten = pointAtKay(await Bun.file(file).json() as Manifest, tarballs)
+    const next = path === 'package.json' && rewritten !== undefined ? overrideKay(rewritten, tarballs) : rewritten
 
     if (next !== undefined) {
       await Bun.write(file, `${JSON.stringify(next, null, 2)}\n`)
@@ -177,6 +185,9 @@ async function run(app: App) {
     throw new Error(`${app.name}: no package.json depends on kay, nothing to test`)
 
   const env = { ...process.env, CI: 'true', HUSKY: '0' }
+
+  // The apps' scripts and their dependencies' install scripts have no use for the token.
+  delete env.KAY_APPS_TOKEN
   const filters = dirs.length > 1 || dirs[0] !== '.' ? dirs.flatMap(dir => ['--filter', dir]) : []
 
   console.log(`== ${app.name}: install`)

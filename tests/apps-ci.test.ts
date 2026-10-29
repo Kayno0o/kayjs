@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test'
-import { APPS, pointAtKay, SCRIPTS, tarballName } from '../scripts/apps-ci'
+import { APPS, overrideKay, pointAtKay, SCRIPTS, tarballName } from '../scripts/apps-ci'
 
 interface Step {
   name?: string
@@ -63,5 +63,13 @@ describe('APPS', () => {
       for (const script of Object.keys(app.skip ?? {}))
         expect(SCRIPTS as readonly string[]).toContain(script)
     }
+  })
+})
+
+describe('overrideKay', () => {
+  it('overrides every packed name and kay, keeping the app\'s own overrides', () => {
+    const next = overrideKay({ overrides: { left: '1.0.0' } }, { '@kaynooo/kayjs': '/t/kayjs.tgz', '@kaynooo/kayjs-ui': '/t/ui.tgz' })
+
+    expect(next.overrides).toEqual({ 'left': '1.0.0', '@kaynooo/kayjs': 'file:/t/kayjs.tgz', '@kaynooo/kayjs-ui': 'file:/t/ui.tgz', 'kay': 'file:/t/kayjs.tgz' })
   })
 })
