@@ -20,6 +20,7 @@ export interface ComponentPage {
 const ROOT = join(import.meta.dir, '../..')
 const PACKAGES = join(ROOT, 'node_modules/@kaynooo')
 const USAGE = join(import.meta.dir, 'content/ui')
+const PROPS_CACHE = join(import.meta.dir, '../.kay/cache/ui-props.json')
 const LIBRARIES = ['kayjs-ai', 'kayjs-auth', 'kayjs-cms', 'kayjs-mail', 'kayjs-ui']
 const TITLE = /^# (.+)\n+/
 // The summary under the title, a quote in llms.txt, is the page's first paragraph.
@@ -57,7 +58,7 @@ export async function loadLibraries(): Promise<LibraryReference[]> {
 export async function loadComponents({ withProps = true } = {}): Promise<ComponentPage[]> {
   const source = join(PACKAGES, 'kayjs-ui/src')
   const files = [...new Bun.Glob('*.kay').scanSync(source)].sort()
-  const props = withProps ? propsOf(files.map(file => join(source, file))) : new Map<string, Prop[]>()
+  const props = withProps ? propsOf(files.map(file => join(source, file)), PROPS_CACHE) : new Map<string, Prop[]>()
 
   return Promise.all(files.map(async (file, order) => {
     const slug = file.replace(KAY_FILE, '')

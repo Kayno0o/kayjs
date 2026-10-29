@@ -141,6 +141,40 @@ describe('the documentation site', () => {
     expect(propsOf([alone]).get(alone)!.map(prop => prop.name)).toEqual(['tone'])
   })
 
+  // A cache that served a stale answer would show wrong props on the site, so each thing the props come from must change what the next call gives.
+  it('reads props from its cache while the sources are as they were, and again once a script, a type it imports or a file it looked for changes', async () => {
+    const dir = await scratchDir('props-cache-')
+    const cache = join(dir, 'cache/ui-props.json')
+    const component = join(dir, 'box.kay')
+    const types = join(dir, 'shared.ts')
+    const script = (label: string) => `---\nimport type { Shared } from './shared'\nconst { ${label} } = props<{ ${label}?: Shared['size'] }>()\n---\n`
+    const shown = () => propsOf([component], cache).get(component)!.map(prop => `${prop.name}: ${prop.type}`)
+
+    await Bun.write(types, 'export interface Shared { size: \'a\' | \'b\' }\n')
+    await Bun.write(component, script('size'))
+    expect(shown()).toEqual(['size: "a" | "b"'])
+
+    const written = await Bun.file(cache).text()
+    const tampered = JSON.parse(written) as { props: [string, { type: string }[]][] }
+
+    // Served from the file: a cache holding other props is what comes back while its key and inputs hold.
+    tampered.props[0]![1][0]!.type = 'cached'
+    await Bun.write(cache, JSON.stringify(tampered))
+    expect(shown()).toEqual(['size: cached'])
+    await Bun.write(cache, written)
+
+    await Bun.write(component, script('gap'))
+    expect(shown()).toEqual(['gap: "a" | "b"'])
+
+    await Bun.write(types, 'export interface Shared { size: \'a\' | \'b\' | \'c\' }\n')
+    expect(shown()).toEqual(['gap: "a" | "b" | "c"'])
+
+    // A file the last program looked for and did not find, now there, changes what `./shared` is.
+    await Bun.write(join(dir, 'shared.d.ts'), 'export interface Shared { size: \'only\' }\n')
+    await rm(types)
+    expect(shown()).toEqual(['gap: "only"'])
+  })
+
   // The parts are read by the compiler; this reads `part="..."` again, so a page that lists others than its source writes fails.
   it('lists the parts each kayjs-ui component names in its source, root first', async () => {
     const components = await loadComponents()

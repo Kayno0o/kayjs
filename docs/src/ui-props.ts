@@ -1,4 +1,6 @@
-import { readFileSync } from 'node:fs'
+import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
+import { dirname } from 'node:path'
+import process from 'node:process'
 import ts from 'typescript'
 
 export interface Prop {
@@ -16,16 +18,64 @@ const NUMBER = /^\d+(?:\.\d+)?$/
 
 const options: ts.CompilerOptions = { strict: true, exactOptionalPropertyTypes: true, target: ts.ScriptTarget.ESNext, module: ts.ModuleKind.ESNext, moduleResolution: ts.ModuleResolutionKind.Bundler, jsx: ts.JsxEmit.Preserve, skipLibCheck: true, noEmit: true, types: [] }
 
-// The props each component declares itself, read with the checker from its `props<...>()` type in one program for all of them: attributes a component takes from an HTML element's type are left out, as it spreads those onto its root.
-export function propsOf(files: string[]): Map<string, Prop[]> {
-  const { program, checker } = programOf(files)
+// What a cache file holds: the key of the components' scripts and of this module, the files the program read (or found missing) with a hash of each, and the props.
+interface PropsCache {
+  key: string
+  seen: [string, string | null][]
+  props: [string, Prop[]][]
+}
 
-  return new Map(files.map(file => [file, declaredProps(checker, program.getSourceFile(`${file}.ts`)!)]))
+// The props each component declares itself, read with the checker from its `props<...>()` type in one program for all of them: attributes a component takes from an HTML element's type are left out, as it spreads those onto its root.
+// With a `cache` file, the program is skipped while the scripts, this module, TypeScript's version and every file the last program read or looked for are as they were.
+export function propsOf(files: string[], cache?: string): Map<string, Prop[]> {
+  const scripts = files.map(file => scriptOf(readFileSync(file, 'utf8')))
+  const key = cache === undefined ? '' : Bun.hash(JSON.stringify([ts.version, readFileSync(import.meta.path, 'utf8'), files, scripts])).toString(36)
+  const kept = cache === undefined ? undefined : readCache(cache)
+
+  if (kept?.key === key && kept.seen.every(([name, hash]) => hashOf(name) === hash))
+    return new Map(kept.props)
+
+  const seen = new Map<string, string | null>()
+  const { program, checker } = programOf(files, scripts, seen)
+  const props = new Map(files.map(file => [file, declaredProps(checker, program.getSourceFile(`${file}.ts`)!)]))
+
+  if (cache !== undefined)
+    writeCache(cache, { key, seen: [...seen.keys()].map(name => [name, hashOf(name)]), props: [...props] })
+
+  return props
+}
+
+function hashOf(file: string): string | null {
+  try {
+    return Bun.hash(readFileSync(file)).toString(36)
+  }
+  catch {
+    return null
+  }
+}
+
+function readCache(file: string): PropsCache | undefined {
+  try {
+    return JSON.parse(readFileSync(file, 'utf8')) as PropsCache
+  }
+  catch {
+    return undefined
+  }
+}
+
+// Written aside and renamed, so a build running beside this one never reads half of it; a read-only disk only loses the cache.
+function writeCache(file: string, cache: PropsCache): void {
+  try {
+    mkdirSync(dirname(file), { recursive: true })
+    writeFileSync(`${file}.${process.pid}`, JSON.stringify(cache))
+    renameSync(`${file}.${process.pid}`, file)
+  }
+  catch {}
 }
 
 // The variants a component declares in its `props<>` as well as in its recipe, by file: a variant is declared once, in the recipe, and the props take it from there.
 export function repeatedVariants(files: string[]): Map<string, string[]> {
-  const { program, checker } = programOf(files)
+  const { program, checker } = programOf(files, files.map(file => scriptOf(readFileSync(file, 'utf8'))))
 
   return new Map(files.map((file) => {
     const source = program.getSourceFile(`${file}.ts`)!
@@ -35,18 +85,33 @@ export function repeatedVariants(files: string[]): Map<string, string[]> {
   }))
 }
 
-function programOf(files: string[]) {
-  const sources = new Map(files.map(file => [`${file}.ts`, scriptOf(readFileSync(file, 'utf8'))]))
+// `seen` collects every file outside the components the program reads or looks for, which decide the props as much as the components do.
+function programOf(files: string[], scripts: string[], seen = new Map<string, string | null>()) {
+  const sources = new Map(files.map((file, index) => [`${file}.ts`, scripts[index]!]))
   const host = ts.createCompilerHost(options)
   const getSourceFile = host.getSourceFile.bind(host)
+  const note = (name: string) => {
+    if (!sources.has(name))
+      seen.set(name, null)
+  }
 
   host.getSourceFile = (name, language, ...rest) => {
     const text = sources.get(name)
 
+    note(name)
+
     return text === undefined ? getSourceFile(name, language, ...rest) : ts.createSourceFile(name, text, language, true)
   }
-  host.fileExists = name => sources.has(name) || ts.sys.fileExists(name)
-  host.readFile = name => sources.get(name) ?? ts.sys.readFile(name)
+  host.fileExists = (name) => {
+    note(name)
+
+    return sources.has(name) || ts.sys.fileExists(name)
+  }
+  host.readFile = (name) => {
+    note(name)
+
+    return sources.get(name) ?? ts.sys.readFile(name)
+  }
 
   const program = ts.createProgram([...sources.keys()], options, host)
 
