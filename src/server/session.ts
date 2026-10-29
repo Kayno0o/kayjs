@@ -143,8 +143,8 @@ export function session<Data extends object = SessionData>(options: SessionOptio
 
   warnLowEntropy(secrets, 'a session secret')
 
-  // The key of each secret is derived for the cookie; the bare digest an older kay sealed under still opens, and a session read with it is sealed again under the derived one.
-  const keys = [...secrets.map(secret => Buffer.from(nodeCrypto().hkdfSync('sha256', secret, '', 'kay session cookie', 32))), ...secrets.map(secret => nodeCrypto().createHash('sha256').update(secret).digest())]
+  // The key of each secret is derived for the cookie.
+  const keys = secrets.map(secret => Buffer.from(nodeCrypto().hkdfSync('sha256', secret, '', 'kay session cookie', 32)))
 
   useStampSecret(secrets, 'session')
   const domain = options.domain?.trim().toLowerCase().replace(LEADING_DOT, '')

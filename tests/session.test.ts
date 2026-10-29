@@ -1,5 +1,6 @@
 import type { Action, Duration } from '../src/runtime'
 import type { SessionData, SessionStore } from '../src/server'
+import { hkdfSync } from 'node:crypto'
 import { rename, rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import process from 'node:process'
@@ -487,19 +488,15 @@ describe('sessions', () => {
     }
   })
 
-  it('opens a cookie sealed under the bare digest of the secret, as an older kay did, and seals it again under a key derived for the cookie', async () => {
+  it('refuses a cookie sealed under the bare digest of the secret, as kay did before v1.72.0, and starts a new session', async () => {
     const digest = new Bun.CryptoHasher('sha256').update(SECRET).digest()
     const legacy = `kay_session=${sealWith(digest, stringify({ data: { count: 1 }, issued: Math.floor(Date.now() / 1000) }), 'kay_session')}`
-    const response = await counter().handle(new Request('http://localhost/peek', { headers: { cookie: legacy } }))
-    const resealed = COOKIE_VALUE.exec(response.headers.getSetCookie()[0]!)![1]!
 
-    expect(await response.text()).toBe('1')
-    expect(openWith([digest], resealed, 'kay_session')).toBeUndefined()
-    expect(await (await counter().handle(new Request('http://localhost/peek', { headers: { cookie: `kay_session=${resealed}` } }))).text()).toBe('1')
+    expect(await (await counter().handle(new Request('http://localhost/peek', { headers: { cookie: legacy } }))).text()).toBe('none')
   })
 
   it('reads a cookie from before kay counted a session\'s start, counting it from when it was written', async () => {
-    const key = new Bun.CryptoHasher('sha256').update(SECRET).digest()
+    const key = Buffer.from(hkdfSync('sha256', SECRET, '', 'kay session cookie', 32))
     const now = Math.floor(Date.now() / 1000)
     const legacy = (issued: number) => `kay_session=${sealWith(key, stringify({ data: { count: 1 }, issued }), 'kay_session')}`
     const app = counter({ maxAge: '200s', absoluteMaxAge: '150s' })
