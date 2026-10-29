@@ -10,4 +10,4 @@ description: A grey placeholder for content that is still loading, as text, an a
 
 Screen readers never see the shapes, which are hidden from them. `label` adds a visually hidden status, so the pending block announces what is loading.
 
-<Demo name="skeleton/pending" />
+<Demo name="skeleton/pending" server="defer" />

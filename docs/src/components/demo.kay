@@ -1,10 +1,14 @@
 ---
 import { demo } from '../demos'
 
-const { name } = props<{ name: string }>()
+// `server="defer"` renders the example per request, for one that has to run at the visit, such as a pending state.
+const { name, server } = props<{ name: string, server?: 'defer' }>()
 const { component: Example, html } = demo(name)
 ---
 .example
   .ui-stage
-    Example
+    if server
+      Example(server="defer")
+    else
+      Example
   div(innerHTML={html})
