@@ -39,6 +39,13 @@ export async function go(url: URL, swap: Swap): Promise<void> {
       return
   }
 
+  // Another click on the link of a page being fetched is the same visit: it joins the swap under way instead of fetching the page again.
+  if (inFlight.asked && inFlight.fetch?.key === pageKey(url) && inFlight.fetch.intent === swap.intent && (swap.intent === 'visit' || swap.intent === 'query')) {
+    await inFlight.asked
+
+    return
+  }
+
   const done = swapTo(url, swap)
 
   if (swap.intent === 'refresh') {
@@ -79,7 +86,9 @@ async function swapTo(url: URL, swap: Swap): Promise<void> {
   if (inFlight.fetch?.key !== key)
     inFlight.fetch?.controller.abort()
 
-  inFlight.fetch = { controller, key }
+  const flight = { controller, key, intent: swap.intent }
+
+  inFlight.fetch = flight
   void holding()
 
   // Another page only: the same one with another query, or a form sending it back to itself, is not left.
@@ -139,6 +148,10 @@ async function swapTo(url: URL, swap: Swap): Promise<void> {
   finally {
     if (isCurrent())
       document.documentElement.removeAttribute('aria-busy')
+
+    // Once the swap ends, a click on the page reloads it.
+    if (inFlight.fetch === flight)
+      inFlight.fetch = undefined
   }
 }
 

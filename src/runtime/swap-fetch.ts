@@ -1,6 +1,7 @@
 import type { FetchedPage } from './navigation'
 import { pageKey, prefetched } from './navigation'
 import { NAVIGATE_HEADER, RELOAD_HEADER } from './swap'
+import { inFlight } from './swap-flight'
 
 const PREFETCH_TTL_MS = 30_000
 
@@ -21,7 +22,8 @@ export function prefetch(url: URL, link: Element): void {
   const key = pageKey(url)
   const held = prefetched.get(key)
 
-  if (held && Date.now() - held.at < PREFETCH_TTL_MS)
+  // A navigation fetching the page is the one request for it.
+  if (inFlight.fetch?.key === key || (held && Date.now() - held.at < PREFETCH_TTL_MS))
     return
 
   // Pages past their time go now, as nothing else asks for them.
