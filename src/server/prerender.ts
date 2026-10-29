@@ -44,8 +44,9 @@ const PARTS = new Intl.ListFormat('en-GB')
 const KAY_IMPORT = /\bfrom\s+['"]([^'"]+\.kay)['"]/g
 // The pages of a route rendering at once: a render waiting on a database, a CMS or a file lets the next ones run, while each page is still judged and written in turn, as one at a time would. Bounded, so the build holds no more pages than this.
 const RENDERS_AT_ONCE = 8
-// A page waiting this long on one `await` block is named by the build.
+// Kay's runtime files, whose frames never say where an `await` block is written.
 const RUNTIME_FOLDER = `${resolve(import.meta.dir, '..', 'runtime')}/`
+// A page waiting this long on one `await` block is named by the build.
 const SLOW_AWAIT_MS = 1000
 
 // Whether the renders of the page being judged read the stand-in site, kept per page as several render at once.
@@ -382,9 +383,6 @@ export async function prerenderPages(project: Project, client: ClientBuild, opti
         if (unfollowed !== undefined)
           kayLog('warn', `${copy.path} reads ${unfollowed.keys.slice(0, 5).map(key => `'${key}'`).join(', ')}${unfollowed.keys.length > 5 ? ' and more' : ''} with \`live: true\` in its own render, which the build runs once: what the page shows of it itself goes stale and only its server islands follow, so drop \`prerender\` from \`export const page\` if the page shows it`)
 
-        for (const message of awaitWarnings(copy.path, awaits, root))
-          kayLog('warn', message)
-
         const name = `${copy.key === '/' ? 'index' : copy.key.slice(1)}.html`
         const taken = reserved.get(name) ?? paths.get(name)
 
@@ -401,6 +399,10 @@ export async function prerenderPages(project: Project, client: ClientBuild, opti
         }
 
         reserved.set(name, copy.key)
+
+        for (const message of awaitWarnings(copy.path, awaits, root))
+          kayLog('warn', message)
+
         pending.push(async () => {
           paths.set(name, copy.key)
 
@@ -538,7 +540,6 @@ export async function prerenderPages(project: Project, client: ClientBuild, opti
   return Object.keys(pages).length
 }
 
-// Whether a guard answers for the page, `requireGuards` refusing one no guard covers: its words stay out of the public search index.
 // A page's `await` blocks resolve at build: a pending branch no visitor sees, and a slow value the build waits for.
 function awaitWarnings(path: string, awaits: AwaitNote[], root: string): string[] {
   const warnings: string[] = []
@@ -561,6 +562,7 @@ function awaitWarnings(path: string, awaits: AwaitNote[], root: string): string[
   return warnings
 }
 
+// Whether a guard answers for the page, `requireGuards` refusing one no guard covers: its words stay out of the public search index.
 function guardedPage(route: Route, required: boolean | undefined): boolean {
   return route.guards.length > 0 || (required === true && route.open !== true)
 }
