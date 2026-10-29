@@ -2332,19 +2332,25 @@ describe.skipIf(!browserInstalled && (process.env.CI ?? '') === '')('page swap i
 
       // The earlier navigation's answer is held until the later one has shown its page.
       const { promise: held, resolve: release } = Promise.withResolvers<void>()
+      // The later navigation cancels the earlier fetch, so its answer may never reach the page: what counts is that it was let through.
+      const { promise: passed, resolve: pass } = Promise.withResolvers<void>()
 
       await fresh.route(`${origin}/second`, async (request) => {
         await held
-        await request.continue()
+
+        try {
+          await request.continue()
+        }
+        finally {
+          pass()
+        }
       })
       await fresh.click('a.second')
       await fresh.click('a.home')
       await fresh.waitFor('h1', { text: 'Home' })
 
-      const answered = fresh.waitForResponse(`${origin}/second`)
-
       release()
-      await answered
+      await passed
       await settled(fresh)
 
       expect(await fresh.evaluate(() => [location.pathname, document.querySelector('h1')!.textContent, history.length])).toEqual(['/', 'Home', entries + 1])
