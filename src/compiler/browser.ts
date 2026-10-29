@@ -181,7 +181,7 @@ export function browserReads(file: KayFile, island: boolean, serverNames: string
     const end = toSource(value.end)
 
     if (start !== undefined && end !== undefined && renders(value.chain))
-      diagnostics.push({ start, end, message: `\`${value.label}\` ${value.reason}`, note: MISMATCH, help: value.remedy, checkOnly: true })
+      diagnostics.push({ start, end, code: 'hydration-mismatch', message: `\`${value.label}\` ${value.reason}`, note: MISMATCH, help: `${value.remedy}, or allow a deliberate read with \`// kay-allow hydration-mismatch\``, checkOnly: true })
   }
 
   return diagnostics

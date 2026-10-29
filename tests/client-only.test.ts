@@ -274,7 +274,20 @@ describe('values an island renders differently on the server and in the browser'
       ['new Intl.DateTimeFormat(\'fr\', { hour: \'numeric\' })', '`Intl.DateTimeFormat` formats in the server\'s time zone there and in the visitor\'s in the browser'],
       ['Date()', '`Date()` reads the clock, which has moved on by the time the island hydrates'],
     ])
-    expect(compileKay(island('const now = Date.now()', '{now}'), join(process.cwd(), 'widget.kay'), { check: true }).diagnostics.map(diagnostic => [diagnostic.message, diagnostic.note, diagnostic.help])).toEqual([['`Date.now()` reads the clock, which has moved on by the time the island hydrates', 'what the island renders from it will not match the server\'s markup when it hydrates', 'read it in `effect` or `onMount`, or on the server and pass it as a prop']])
+    expect(compileKay(island('const now = Date.now()', '{now}'), join(process.cwd(), 'widget.kay'), { check: true }).diagnostics.map(diagnostic => [diagnostic.message, diagnostic.note, diagnostic.help])).toEqual([['`Date.now()` reads the clock, which has moved on by the time the island hydrates', 'what the island renders from it will not match the server\'s markup when it hydrates', 'read it in `effect` or `onMount`, or on the server and pass it as a prop, or allow a deliberate read with `// kay-allow hydration-mismatch`']])
+  })
+
+  it('is the hydration-mismatch lint, which a kay-allow comment and the lint level reach', () => {
+    const compile = (source: string, lints?: Record<string, 'allow' | 'warn'>) => compileKay(source, join(process.cwd(), 'widget.kay'), { check: true, lints }).diagnostics.map(diagnostic => [diagnostic.code, diagnostic.severity])
+    const year = island('const stamp = new Date().getFullYear()', '{stamp}')
+    const allowed = island('// kay-allow hydration-mismatch\nconst stamp = new Date().getFullYear()', '{stamp}')
+    const file = island('const stamp = new Date().getFullYear()', '{stamp}').replace('---\n', '---\n// kay-allow-file hydration-mismatch\n')
+
+    expect(compile(year)).toEqual([['hydration-mismatch', 'error']])
+    expect(compile(allowed)).toEqual([])
+    expect(compile(file)).toEqual([])
+    expect(compile(year, { 'hydration-mismatch': 'warn' })).toEqual([['hydration-mismatch', 'warning']])
+    expect(compile(year, { 'hydration-mismatch': 'allow' })).toEqual([])
   })
 
   it('leaves alone what both sides compute alike, what runs in the browser only, and a static component', () => {

@@ -40,6 +40,7 @@ onMount(() => drawMap(center))
 - The editor offers two fixes: wrap the statement in `effect`, offered for a statement that is a plain call or assignment, since a declaration would take its name out of reach, or turn the fence into `--- client`.
 - `typeof window` while an island renders is reported too: it is `'undefined'` on the server, so the island would render something else in the browser than the markup it hydrates.
 - A global reached through a module of the app or a package is not seen; in development, a server render failing on one names it, the `.kay` line reading it, and the same two fixes.
+- An island reading the clock (`Date.now()`, `new Date()`), `Math.random()`, or a `toLocale*String` or `Intl` format given no locale (no `timeZone` for dates) while it renders is the `hydration-mismatch` lint: the server and the browser compute it apart. It is a lint like any other, so a deliberate read (a copyright year, an id overwritten in `onMount`) is allowed with `// kay-allow hydration-mismatch` on or above its line, `kay-allow-file` or `lints: { 'hydration-mismatch': 'warn' }`. A coarse read such as `new Date().getFullYear()` is reported too, as the year differs between the server's time zone and the visitor's for hours around New Year.
 
 ### Server globals in the browser
 

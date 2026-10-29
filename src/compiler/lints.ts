@@ -411,6 +411,13 @@ export const LINTS = {
     wrong: '---\nimport Picker from \'./picker.kay\'\n\nfunction shout(value: string) {\n  return value.toUpperCase()\n}\n---\nPicker(format={shout})',
     right: '---\n// kay-island\nimport Picker from \'./picker.kay\'\n\nfunction shout(value: string) {\n  return value.toUpperCase()\n}\n---\nPicker(format={shout})',
   },
+  'hydration-mismatch': {
+    level: 'deny',
+    group: 'islands',
+    summary: 'An island reading the clock (`Date.now()`, `new Date()`, `Date()`), `Math.random()`, or a `toLocale*String` or `Intl` format given no locale, or for dates no `timeZone`, while it renders: the server and the browser compute it apart, so the markup the island hydrates onto differs from the server\'s. Read it in `effect` or `onMount`, or on the server as a prop; a deliberate read, such as a year that changes once a year or an id overwritten in `onMount`, is allowed with `// kay-allow hydration-mismatch` or `kay-allow-file`.',
+    wrong: '---\nimport { signal } from \'kay\'\n\nconst count = signal(0)\nconst year = new Date().getFullYear()\n---\nbutton(onClick={() => count++}) {count()} (c) {year}',
+    right: '---\nimport { signal } from \'kay\'\n\nconst count = signal(0)\n// kay-allow hydration-mismatch\nconst year = new Date().getFullYear()\n---\nbutton(onClick={() => count++}) {count()} (c) {year}',
+  },
   'draft-message': {
     level: 'warn',
     group: 'i18n',

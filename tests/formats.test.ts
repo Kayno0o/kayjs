@@ -550,7 +550,7 @@ describe('kay explain --format json', () => {
     expect(all.lints.map(lint => lint.name)).toEqual(Object.keys(LINTS))
     expect(all.lints[0]).toEqual({ name: 'unread-name', group: 'code', level: 'deny', summary: LINTS['unread-name'].summary })
     expect(islands.groups).toEqual({ islands: LINT_GROUPS.islands })
-    expect(islands.lints.map(lint => lint.name)).toEqual(['positional-key', 'uncalled-signal', 'constant-signal', 'signal-set-call', 'server-only-import', 'island-action', 'island-marker', 'promoted-island'])
+    expect(islands.lints.map(lint => lint.name)).toEqual(['positional-key', 'uncalled-signal', 'constant-signal', 'signal-set-call', 'server-only-import', 'island-action', 'island-marker', 'promoted-island', 'hydration-mismatch'])
   })
 
   it('explains one lint with its examples, and answers a name that is none with an error document', async () => {

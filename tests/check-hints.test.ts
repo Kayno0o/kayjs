@@ -70,4 +70,11 @@ describe('hints for the first template mistakes', () => {
 
     expect(found.map(d => [d.code, d.help])).toEqual([['template-syntax', '`title={3}`']])
   })
+
+  it('lets a kay-allow comment pass a deliberate clock read in an island and fails one without it', async () => {
+    const page = (above: string) => `---\nimport { signal } from "kay"\nconst n = signal(0)\n${above}const stamp = new Date().getFullYear()\n---\nbutton(onClick={() => n++}) {n()} {stamp}\n`
+
+    expect((await report(page('// kay-allow hydration-mismatch\n'))).map(d => d.code)).toEqual([])
+    expect((await report(page(''))).map(d => d.code)).toEqual(['hydration-mismatch'])
+  })
 })
