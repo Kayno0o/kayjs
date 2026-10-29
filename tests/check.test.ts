@@ -4782,6 +4782,19 @@ describe('kay check, deprecated-auth-methods', () => {
   })
 })
 
+describe('kay check, deprecated-session-stores', () => {
+  it('reports the old session store names with a fix renaming them', async () => {
+    const root = await scratchProject({ 'src/sessions.ts': 'import { memoryStore, session } from \'kay/server\'\n\nexport const sessions = session({ store: memoryStore() })\n' })
+
+    try {
+      expect((await check(root)).filter(d => d.code === 'deprecated-session-stores').map(d => d.fixes?.[0]?.title)).toEqual(['Rename it to `memorySessions`'])
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+})
+
 describe('kay check, missing-captcha', () => {
   const page = '--- server\nconst auth = { register: async (_input: unknown) => 1 }\n\nawait auth.register({})\n---\np x\n'
   const found = async (files: Record<string, string>, options?: Parameters<typeof check>[1]) => (await check(await scratchProject({ 'src/routes/index.kay': page, ...files }), options)).filter(d => d.code === 'missing-captcha').length

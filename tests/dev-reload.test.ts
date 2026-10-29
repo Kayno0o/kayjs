@@ -412,7 +412,7 @@ describe.concurrent('kay dev reloading', () => {
       const probes = ['previous.rooms.members(\'r\')', 'previous.store.get(\'x\')', 'await previous.pool`select 1`']
       const check = probes.map(probe => `try { ${probe}; state += 'open ' } catch { state += 'closed ' }`).join('\n')
 
-      await entryWith(project, `import { SQL } from 'bun'\nimport { sqliteRooms, sqliteStore } from 'kay/server'\nconst previous = (globalThis as any).kept\nlet state = 'none'\nconst used = <T extends { members?: (room: string) => unknown, peek?: (key: string) => unknown }>(store: T): T => { store.members?.('r'); store.peek?.('k'); return store }\n;(globalThis as any).kept = { rooms: used(sqliteRooms(${JSON.stringify(join(project.root, 'rooms.sqlite'))})), store: sqliteStore(':memory:'), pool: new SQL('sqlite://:memory:') }\nif (previous) {\nstate = ''\n${check}\n}\nappendFileSync(${JSON.stringify(states)}, state.trim() + '\\n')\n`)
+      await entryWith(project, `import { SQL } from 'bun'\nimport { sqliteRooms, sqliteSessions } from 'kay/server'\nconst previous = (globalThis as any).kept\nlet state = 'none'\nconst used = <T extends { members?: (room: string) => unknown, peek?: (key: string) => unknown }>(store: T): T => { store.members?.('r'); store.peek?.('k'); return store }\n;(globalThis as any).kept = { rooms: used(sqliteRooms(${JSON.stringify(join(project.root, 'rooms.sqlite'))})), store: sqliteSessions(':memory:'), pool: new SQL('sqlite://:memory:') }\nif (previous) {\nstate = ''\n${check}\n}\nappendFileSync(${JSON.stringify(states)}, state.trim() + '\\n')\n`)
 
       for (let edit = 1; edit <= 20; edit++) {
         await project.replace('src/routes/index.kay', `h1 Edit ${edit}\n`)

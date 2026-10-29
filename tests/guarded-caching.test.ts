@@ -30,7 +30,7 @@ describe('a guarded route is private', () => {
       Bun.write(join(dir, 'routes/open.txt.ts'), 'export function GET() {\n  return \'ok\'\n}\n'),
       Bun.write(join(dir, 'api/private/_guard.ts'), GUARD),
       Bun.write(join(dir, 'api/private/index.ts'), API),
-      Bun.write(join(dir, 'api/seen.ts'), 'import { api, memoryStore, session } from \'kay/server\'\n\nexport default api()\n  .use(session({ secret: \'a-secret-of-at-least-32-characters-long\', store: memoryStore() }))\n  .get(\'/\', async ({ session }) => String(await session.get(\'user\') ?? \'none\'))\n'),
+      Bun.write(join(dir, 'api/seen.ts'), 'import { api, memorySessions, session } from \'kay/server\'\n\nexport default api()\n  .use(session({ secret: \'a-secret-of-at-least-32-characters-long\', store: memorySessions() }))\n  .get(\'/\', async ({ session }) => String(await session.get(\'user\') ?? \'none\'))\n'),
       Bun.write(join(dir, 'documented/_guard.ts'), GUARD),
       Bun.write(join(dir, 'documented/index.ts'), 'import { api } from \'kay/server\'\n\nexport default api().get(\'/\', () => ({ ok: true }))\n'),
       Bun.write(join(dir, 'api/open.ts'), 'import { api } from \'kay/server\'\n\nexport default api().get(\'/\', () => ({ ok: true }))\n'),

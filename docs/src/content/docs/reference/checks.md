@@ -124,6 +124,7 @@ Each lint has a level. `deny` is an error, `warn` a warning, `allow` hides it. W
 | `redirect-chain` | warn | seo | A redirect whose target redirects again |
 | `deprecated-auth-attempts` | warn | deprecated | An `attempts` counter in a kayjs-auth store of the app's own, the contract before 1.81: the store counts in `rates`, or attempts count in the app's `store.rates`; the old counter works until 1.84 |
 | `deprecated-auth-methods` | warn | deprecated | A call of one of kayjs-auth's flat methods, the names before 1.82, such as `auth.listUsers()` for `auth.admin.listUsers()`; the flat names work until 1.85, and `kay upgrade` renames the calls |
+| `deprecated-session-stores` | warn | deprecated | An import of `memoryStore` or `sqliteStore` from `kay/server`, the session stores before 1.84, now `memorySessions` and `sqliteSessions`; the old names work until 1.87, and `kay upgrade` renames them |
 
 ## Errors
 

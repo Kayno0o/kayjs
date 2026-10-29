@@ -67,7 +67,7 @@ Types include `Component`, `Signal`, `Guard`, `Duration`, `PageContext`, `Endpoi
 | `pages` | The Elysia plugin serving the project's pages |
 | `defineConfig` | Types `kay.config.ts` |
 | `api`, `eventStream` | An API module under `src/api`, and server-sent events |
-| `session`, `memoryStore`, `sqliteStore` | Cookie sessions and their stores. See [Sessions and guards](/guides/sessions-and-guards) |
+| `session`, `memorySessions`, `sqliteSessions` | Cookie sessions and their stores. See [Sessions and guards](/guides/sessions-and-guards) |
 | `defineEnv` | Reads `process.env` once against a schema, typed |
 | `s` | The schema builder `kay` exports, for a server module that imports nothing else from `kay` |
 | `rateLimit`, `memoryRates`, `sqliteRates`, `clientAddress`, `rateKey` | Rate limiting, and the key a limit counts an address under |

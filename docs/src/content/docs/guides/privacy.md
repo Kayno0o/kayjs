@@ -57,7 +57,7 @@ The conversation of a `remember` chat is what the visitor wrote, so tell them.
 ## What the server keeps
 
 - **Request logs**: method, path without its query string, status, duration and request id. No address, user agent or cookie.
-- **Sessions** with a store: until they expire or the visitor signs out. `sqliteStore` drops expired ones every hour.
+- **Sessions** with a store: until they expire or the visitor signs out. `sqliteSessions` drops expired ones every hour.
 - **Rate limits**: counted by address in memory, or in `sqliteRates(path)` pseudonymised: each key is hashed under the app's secret once one is set, else under a random key kay keeps in a `.key` file beside the store, never in the store itself, so a copy of the store alone cannot be checked against a guessed address (a backup of the whole folder holds both, so set a secret to keep the key off the disk, and keep the `.key` file out of git). Windows are dropped once their window closes.
 - **Jobs**: a waiting job's payload until it runs, a failed one's for 30 days from when its last attempt was due, or what the queue's `keepFailed` says (7 days for kayjs-mail, without the body).
 - **Mailing lists** (kayjs-mail): a subscriber's address, language, the date of their confirmation and the proof of it (the page of the form and which notice it showed), in `data/mail-list.sqlite`, until they unsubscribe or you call `mail.erase`; an address nobody confirmed is dropped after 7 days. A broadcast and who it was sent to (by a random id, not the address) are kept 30 days after it finished.
@@ -75,12 +75,12 @@ Every SQLite file kay creates is readable by the server's user alone.
 Delete the app's own rows, then what kay keeps for them.
 
 ```ts
-import { files, notifications, queue, sqliteStore } from 'kay/server'
+import { files, notifications, queue, sqliteSessions } from 'kay/server'
 import { db } from './db'
 import { sendMail } from './mail'
 
 // The file store: sqliteData('data/app.sqlite') names in kay.config.ts.
-export const sessions = sqliteStore('data/app.sqlite')
+export const sessions = sqliteSessions('data/app.sqlite')
 export const mail = queue('mail', async (job: { userId: string, to: string, text: string }) => sendMail(job))
 
 export async function erase(userId: string) {

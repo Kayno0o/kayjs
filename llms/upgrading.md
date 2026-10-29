@@ -23,6 +23,10 @@ What each minor release breaks, and what an app changes to move to it. kay and i
 ### The `island-action` lint is gone
 
 - An island no longer needs `Action` imported to be handed an action, so `island-action` is removed: delete a `// kay-allow island-action` comment or a `lints` entry naming it, which `kay check` now reports as an unknown lint; no `deprecated` lint announces it, as an island still importing `Action` compiles and works as before. `island()` and `promote()` from `kay/island`, which compiled components call, lose their trailing `takesActions` argument, and the `PlainIslandProp` type lets an island's prop hold an action without a type for it.
+### The session stores are `memorySessions` and `sqliteSessions`
+
+- `memoryStore()` and `sqliteStore(path)` of `kay/server` are `memorySessions()` and `sqliteSessions(path)`, named for what they hold like `memoryJobs` and `sqliteRates`. The old names still work until 1.87; `kay upgrade` renames the imports and their uses (`deprecated-session-stores`).
+
 ### A session sealed before kay 1.72.0 signs its visitor out once
 
 - `session()` opens a cookie with the key derived for it only, no longer with the bare SHA-256 of the secret that kay sealed under before v1.72.0. A visitor whose cookie was last written by such a kay, and never since by a later one, is signed out once. Nothing changes in the app, and no lint can carry it as it is cookie data.

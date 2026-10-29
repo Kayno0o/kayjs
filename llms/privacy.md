@@ -11,12 +11,12 @@ kay sets no cookie and stores nothing of a visitor until the app uses a feature 
 Delete the app's own rows first, then the sessions and jobs kay keeps for them and the files they uploaded:
 
 ```ts
-import { files, notifications, queue, sqliteStore } from 'kay/server'
+import { files, notifications, queue, sqliteSessions } from 'kay/server'
 import { db } from './db'
 import { sendMail } from './mail'
 
-// The file `store: sqliteData('data/app.sqlite')` names in kay.config.ts: sqliteStore of it is the store its sessions are in.
-export const sessions = sqliteStore('data/app.sqlite')
+// The file `store: sqliteData('data/app.sqlite')` names in kay.config.ts: sqliteSessions of it is the store its sessions are in.
+export const sessions = sqliteSessions('data/app.sqlite')
 export const mail = queue('mail', async (job: { userId: string, to: string, text: string }) => sendMail(job))
 
 export async function erase(userId: string) {
@@ -132,8 +132,8 @@ export async function archive(scan: File) {
 - A `live()` value is the app's own data, kept in `store.live` for every visitor (the app must not put a person in it), and a presence `member` is whatever the page's server fence gave, a name say, kept in `store.rooms` while the tab is open and about 10 seconds after a crash.
 - Request logs carry the method, the path without its query string, the status, the duration and the request id: no address, no user agent, no cookie.
 - `onError` gets `{ error, request }`, the request whole, or `undefined` for an error met outside one; an error tracker is sent its path and id, not `request.url`, whose query may hold an address or a token.
-- Sessions with a store live in it until they expire or `destroy()`; `sqliteStore` drops expired ones every hour and every 1000 writes, `memoryStore` every 1000 writes.
-- `deleteWhere(match)` on `memoryStore()` and `sqliteStore(path)` deletes every session whose data `match` accepts (an object of fields held equal, `{ userId }`, which the SQLite and Postgres stores narrow in the database, or a function, read 500 sessions at a time; an empty object throws), resolving with how many went; an app's own store may offer it too, and sessions kept in the cookie alone cannot be listed, only waited out or ended for everyone by replacing the secret.
+- Sessions with a store live in it until they expire or `destroy()`; `sqliteSessions` drops expired ones every hour and every 1000 writes, `memorySessions` every 1000 writes.
+- `deleteWhere(match)` on `memorySessions()` and `sqliteSessions(path)` deletes every session whose data `match` accepts (an object of fields held equal, `{ userId }`, which the SQLite and Postgres stores narrow in the database, or a function, read 500 sessions at a time; an empty object throws), resolving with how many went; an app's own store may offer it too, and sessions kept in the cookie alone cannot be listed, only waited out or ended for everyone by replacing the secret.
 - Rate limits count by address in memory, or in `sqliteRates(path)`, which stores each key pseudonymised as an HMAC keyed by [the app secret](environment.md#the-app-secret) once one is set, else by a random key kept in `<path>.key` beside the store (the server's user alone, shared by every process opening it), never in the store, so a copy of the store file alone cannot be checked against a guessed address; a backup of the whole folder holds both, so set a secret to keep the key off the disk; a window is dropped once it closed.
 - A queue keeps a waiting job's payload until it runs and a failed one's for `keepFailed`, 30 days by default from when its last attempt was due, or for good with `false`.
 - `queue.remove(id)` removes one job, and `queue.remove(match)` every waiting or failed job whose payload `match` returns true for, resolving with how many went; an app's own `JobStore` takes a function only when it has `jobs(queue)`.
@@ -141,7 +141,7 @@ export async function archive(scan: File) {
 - Notifications (`notify()`, [Notifications](notifications.md)) live 90 days, or the `keep` given, in `store.notifications` (memory without a store), the newest 200 per user; `notifications.erase(userId)` deletes a person's, and the devices they subscribed to push in `store.push` (`push()`, [Notifications](notifications.md#push-to-a-persons-devices)).
 - The paths a production server counted 404s at (`data/not-found.sqlite`) are forgotten 90 days after the last visit, with their referrers, checked on opening and at most hourly; the redirects stored beside them stay.
 - `sqliteRooms` from `kay/server` keeps a room's messages 30 seconds, for the processes sharing it to read.
-- The SQLite files `sqliteStore`, `sqliteRates`, `sqliteJobs`, `sqliteRooms` and `sqliteCache` create are readable by the server's user alone, and `sqliteStore`, `sqliteRates` and `sqliteRooms` create theirs on first use, so loading a config that names one to build or check makes no file.
+- The SQLite files `sqliteSessions`, `sqliteRates`, `sqliteJobs`, `sqliteRooms` and `sqliteCache` create are readable by the server's user alone, and `sqliteSessions`, `sqliteRates` and `sqliteRooms` create theirs on first use, so loading a config that names one to build or check makes no file.
 
 ### Stored files
 

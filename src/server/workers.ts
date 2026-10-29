@@ -117,7 +117,7 @@ export async function runAsPrimary(argv: string[], env: Record<string, string | 
 }
 
 // The factories of the stores that keep their data in one process's memory, by the `store` key an app puts them under.
-const MEMORY_FACTORIES = { sessions: 'memoryStore', jobs: 'memoryJobs', rates: 'memoryRates', rooms: 'memoryRooms', vitals: 'memoryVitals', notifications: 'memoryNotifications', push: 'memoryPush' } as const
+const MEMORY_FACTORIES = { sessions: 'memorySessions', jobs: 'memoryJobs', rates: 'memoryRates', rooms: 'memoryRooms', vitals: 'memoryVitals', notifications: 'memoryNotifications', push: 'memoryPush' } as const
 
 // A store the app built in memory is kept, and splits per worker: said once, by the first worker.
 function warnOfMemoryStores(store: AppStore | undefined): void {

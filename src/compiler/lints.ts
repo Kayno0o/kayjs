@@ -662,6 +662,15 @@ export const LINTS = {
     wrong: '--- server\nconst users = await ctx.locals.auth.listUsers({ search: \'ada\' })\n---\np x',
     right: '--- server\nconst users = await ctx.locals.auth.admin.listUsers({ search: \'ada\' })\n---\np x',
   },
+  'deprecated-session-stores': {
+    level: 'warn',
+    group: 'deprecated',
+    since: '1.84',
+    site: true,
+    summary: 'An import of `memoryStore` or `sqliteStore` from `kay/server`, the session stores before 1.84, named for what every other store holds: `memorySessions` and `sqliteSessions`, like `memoryJobs` and `sqliteRates`. The old names are kept until 1.87. Found in the TypeScript files and `.kay` fences of the project; the fix renames the import and every use of it, or the member of an `import * as` namespace.',
+    wrong: '--- server\nimport { memoryStore, session } from \'kay/server\'\n\nexport const sessions = session({ store: memoryStore() })\n---\np x',
+    right: '--- server\nimport { memorySessions, session } from \'kay/server\'\n\nexport const sessions = session({ store: memorySessions() })\n---\np x',
+  },
 } as const satisfies Record<string, Lint>
 
 export type LintName = keyof typeof LINTS
@@ -708,6 +717,7 @@ export const DEPRECATION_MINORS: readonly { since: string, removedIn?: string }[
   { since: '1.74', removedIn: '1.77' },
   { since: '1.81' },
   { since: '1.82' },
+  { since: '1.84' },
 ]
 
 // The minor, as `[major, minor]`, a version or a `1.46` names, or undefined for what is neither.

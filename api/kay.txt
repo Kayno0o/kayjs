@@ -2609,6 +2609,9 @@ function memoryRates(): SyncRates
 [./server] memoryRooms
 function memoryRooms(): RoomStore
 
+[./server] memorySessions
+function memorySessions(): DeletableSessionStore
+
 [./server] memoryStore
 function memoryStore(): DeletableSessionStore
 
@@ -3295,6 +3298,9 @@ function sqliteRates(path: string): SyncRates
 
 [./server] sqliteRooms
 function sqliteRooms(path: string, { poll }?: { poll?: `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w`; }): RoomStore
+
+[./server] sqliteSessions
+function sqliteSessions(path: string): DeletableSessionStore
 
 [./server] sqliteStore
 function sqliteStore(path: string): DeletableSessionStore

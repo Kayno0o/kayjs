@@ -2,7 +2,7 @@ import type { Subprocess } from 'bun'
 import { join } from 'node:path'
 import process from 'node:process'
 import { afterAll, beforeAll, describe, expect, it, spyOn } from 'bun:test'
-import { memoryStore } from '../src/server'
+import { memorySessions } from '../src/server'
 import { sqliteRates } from '../src/server/protection'
 import { memoryRooms } from '../src/server/rooms'
 import { parseWorkers, requestedWorkers, sharedStores } from '../src/server/workers'
@@ -186,12 +186,12 @@ describe('what workers share', () => {
       expect(warn).not.toHaveBeenCalled()
 
       process.env.KAY_WORKER = '0'
-      await sharedStores({ rooms: memoryRooms(), sessions: memoryStore(), rates: sqliteRates(':memory:') })
+      await sharedStores({ rooms: memoryRooms(), sessions: memorySessions(), rates: sqliteRates(':memory:') })
 
       const said = warn.mock.calls.map(call => String(call[0]))
 
       expect(said).toHaveLength(2)
-      expect(said[0]).toContain('store.sessions is memoryStore()')
+      expect(said[0]).toContain('store.sessions is memorySessions()')
       expect(said[1]).toContain('store.rooms is memoryRooms()')
       expect(said[1]).toContain('sqliteData')
     }

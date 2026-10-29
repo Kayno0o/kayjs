@@ -60,10 +60,10 @@ An app that keeps session data of its own, or wires its store by hand, writes th
 ```ts
 import type { AuthSessionData } from '@kaynooo/kayjs-auth'
 import { createAuth, memoryAuthStore } from '@kaynooo/kayjs-auth'
-import { session, sqliteStore } from 'kay/server'
+import { session, sqliteSessions } from 'kay/server'
 
 export const auth = createAuth({
-  sessions: session<AuthSessionData>({ store: sqliteStore('data/sessions.sqlite') }),
+  sessions: session<AuthSessionData>({ store: sqliteSessions('data/sessions.sqlite') }),
   store: memoryAuthStore(),
   pages: true,
 })

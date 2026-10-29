@@ -11,11 +11,11 @@ import { Elysia } from 'elysia'
 import { buildClient } from '../src/build/client'
 import { durationSeconds } from '../src/runtime/duration'
 import { configuredSite, setSite } from '../src/runtime/site'
-import { memoryStore, session, sqliteStore } from '../src/server'
+import { memorySessions, session, sqliteSessions } from '../src/server'
 import { setupStore } from '../src/server/app-store'
 import { renderPage } from '../src/server/render'
 import { scanRoutes } from '../src/server/routes'
-import { openWith, sealWith } from '../src/server/seal'
+import { sealWith } from '../src/server/seal'
 import { sqliteStoreAt } from '../src/server/session'
 import { scratchDir } from './scratch'
 import { pages } from './shared-pages'
@@ -115,8 +115,8 @@ describe('sessions', () => {
       process.env.NODE_ENV = 'development'
       await plain({})
       process.env.NODE_ENV = 'production'
-      await plain({ store: memoryStore() })
-      setupStore({ sessions: memoryStore() })
+      await plain({ store: memorySessions() })
+      setupStore({ sessions: memorySessions() })
       await plain({})
       setupStore(undefined)
       expect(warnings).toEqual([])
@@ -171,7 +171,7 @@ describe('sessions', () => {
   describe('in the app store', () => {
     // A memory store telling what it was given, so a test sees where the data went.
     function recording() {
-      const store = memoryStore()
+      const store = memorySessions()
       const kept: SessionData[] = []
 
       return { kept, store: { ...store, set: async (id: string, data: SessionData, maxAge: Duration) => {
@@ -220,7 +220,7 @@ describe('sessions', () => {
       expect((await browser(counter({ maxAge }))('/count')).set).toMatch(new RegExp(`; Max-Age=${seconds};`, 'i'))
   })
 
-  for (const [name, store] of [['in the cookie', undefined], ['in memory', memoryStore()], ['in sqlite', sqliteStore(':memory:')]] as const) {
+  for (const [name, store] of [['in the cookie', undefined], ['in memory', memorySessions()], ['in sqlite', sqliteSessions(':memory:')]] as const) {
     it(`keeps data across requests ${name}, writing the cookie only when it changed`, async () => {
       const visit = browser(counter({ store }))
       const first = await visit('/count')
@@ -243,7 +243,7 @@ describe('sessions', () => {
   }
 
   it('caps the memory store, the oldest sessions going first and a session written again counting as new', async () => {
-    const store = memoryStore()
+    const store = memorySessions()
 
     await store.set('first', { n: 0 }, '60s')
 
@@ -383,7 +383,7 @@ describe('sessions', () => {
 
   it('ends a session 90 days after it started by default, a store told so', async () => {
     const lifetimes: number[] = []
-    const memory = memoryStore()
+    const memory = memorySessions()
     const visit = browser(counter({ store: { ...memory, async set(id, data, maxAge) {
       lifetimes.push(durationSeconds(maxAge, 'maxAge'))
       await memory.set(id, data, maxAge)
@@ -523,7 +523,7 @@ describe('sessions', () => {
 
   it('caps a browser session\'s lifetime in the store too', async () => {
     const lifetimes: number[] = []
-    const memory = memoryStore()
+    const memory = memorySessions()
     const visit = browser(counter({ absoluteMaxAge: '30s', browserMaxAge: '50s', store: { ...memory, async set(id, data, maxAge) {
       lifetimes.push(durationSeconds(maxAge, 'maxAge'))
       await memory.set(id, data, maxAge)
@@ -556,7 +556,7 @@ describe('sessions', () => {
 
   it('gives a browser session a cookie without Max-Age, kept browserMaxAge unused, a store told so', async () => {
     const lifetimes: number[] = []
-    const memory = memoryStore()
+    const memory = memorySessions()
     const visit = browser(counter({ maxAge: '30d', browserMaxAge: '50s', store: { ...memory, async set(id, data, maxAge) {
       lifetimes.push(durationSeconds(maxAge, 'maxAge'))
       await memory.set(id, data, maxAge)
@@ -605,7 +605,7 @@ describe('sessions', () => {
   })
 
   it('moves the data to a new id on regenerate, the old id worth nothing', async () => {
-    const store = memoryStore()
+    const store = memorySessions()
     const visit = browser(counter({ store }))
 
     await visit('/count')
@@ -616,7 +616,7 @@ describe('sessions', () => {
     expect(await (await counter({ store }).handle(new Request('http://localhost/peek', { headers: { cookie: planted } }))).text()).toBe('none')
   })
 
-  for (const [name, store] of [['in memory', memoryStore()], ['in sqlite', sqliteStore(':memory:')]] as const) {
+  for (const [name, store] of [['in memory', memorySessions()], ['in sqlite', sqliteSessions(':memory:')]] as const) {
     it(`erases the sessions ${name} whose data matches, and only those`, async () => {
       await store.set('a', { userId: 1 }, '60s')
       await store.set('b', { userId: 2 }, '60s')
@@ -627,7 +627,7 @@ describe('sessions', () => {
     })
   }
 
-  for (const [name, store] of [['in memory', memoryStore()], ['in sqlite', sqliteStore(':memory:')]] as const) {
+  for (const [name, store] of [['in memory', memorySessions()], ['in sqlite', sqliteSessions(':memory:')]] as const) {
     it(`erases one person's sessions ${name} out of many by an object match, equal values only`, async () => {
       for (let n = 0; n < 1200; n++)
         await store.set(`other${n}`, { userId: n % 2 === 0 ? 'u2' : 12 }, '60s')
@@ -736,7 +736,7 @@ describe('sessions', () => {
     expect(logged).toEqual(['warn: a stored session does not parse; deleteWhere skipped it'])
     db.close()
 
-    const memory = memoryStore()
+    const memory = memorySessions()
 
     await memory.set('old', { userId: 1 }, '1s')
     setSystemTime(Date.now() + 2000)
@@ -969,17 +969,17 @@ function readSessionIds(file: string): string[] {
   }
 }
 
-describe('sqliteStore under bun test', () => {
+describe('sqliteSessions under bun test', () => {
   it('keeps sessions in memory and creates no file, whatever path it is given', async () => {
     const dir = await scratchDir('sessions-')
     const file = join(dir, 'data', 'sessions.sqlite')
-    const store = sqliteStore(file)
+    const store = sqliteSessions(file)
 
     await store.set('a', { userId: 1 }, '60s')
 
     expect(await store.get('a')).toEqual({ userId: 1 })
     expect(await Bun.file(file).exists()).toBe(false)
-    expect(sqliteStore(file)).not.toBe(store)
-    expect(await sqliteStore(file).get('a')).toBeUndefined()
+    expect(sqliteSessions(file)).not.toBe(store)
+    expect(await sqliteSessions(file).get('a')).toBeUndefined()
   })
 })

@@ -57,13 +57,13 @@ Use it before the pages: `new Elysia().use(sessions).use(await pages())`.
 
 ### Choosing a store
 
-With a store, the cookie only carries an id. A session uses the app's store unless you give it one: `session({ store })`. `memoryStore()` is for development. `sqliteStore(path)` fits one machine. Any object with `get`, `set` and `delete` works as a store, as [Your own store](#your-own-store) shows.
+With a store, the cookie only carries an id. A session uses the app's store unless you give it one: `session({ store })`. `memorySessions()` is for development. `sqliteSessions(path)` fits one machine. Any object with `get`, `set` and `delete` works as a store, as [Your own store](#your-own-store) shows.
 
 Without a store, the data travels in the cookie. It is sealed, but limited to about 3.5 KB and impossible to revoke. Signing out clears only the browser's copy. In production the server logs a warning on the first request that says so.
 
 Adding a store signs everyone out once. A cookie sealed before holds its data, and a stolen copy of it could never be revoked, so kay no longer accepts it.
 
-To end every session of one person, call `deleteWhere` on `memoryStore()` or `sqliteStore()`. With `store: sqliteData(path)`, `sqliteStore(path)` of the same file gives the store the sessions are in. Use it when someone asks to be erased or changes their password.
+To end every session of one person, call `deleteWhere` on `memorySessions()` or `sqliteSessions()`. With `store: sqliteData(path)`, `sqliteSessions(path)` of the same file gives the store the sessions are in. Use it when someone asks to be erased or changes their password.
 
 ```ts
 await store.deleteWhere({ userId: id })
