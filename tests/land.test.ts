@@ -141,9 +141,12 @@ async function landings(...names: string[]) {
     await git(clones[name], 'commit', '-qm', name)
   }
 
+  // The environment of this run without the landing's own knobs, which a landing running this test sets for itself.
+  const { KAY_LAND_SHARDS: _shards, ...outerEnv } = process.env
+
   // Runs a landing in a clone, its output and exit code once it ends; its rebase commits, so it gets an identity CI's git has none of.
   const land = (name: string, env: Record<string, string> = {}) => {
-    const child = Bun.spawn([process.execPath, LAND], { cwd: clones[name]!, env: { ...process.env, ...IDENTITY, LAND_TRACE: trace, LAND_NAME: name, ...env }, stdout: 'pipe', stderr: 'pipe' })
+    const child = Bun.spawn([process.execPath, LAND], { cwd: clones[name]!, env: { ...outerEnv, ...IDENTITY, LAND_TRACE: trace, LAND_NAME: name, ...env }, stdout: 'pipe', stderr: 'pipe' })
 
     let out = ''
 
@@ -396,6 +399,21 @@ describe('landing a change to dependencies alone', () => {
     expect(code).toBe(0)
     expect(out).toContain('tests, the whole suite: ok')
     expect(out).not.toContain('left to CI')
+  }, 60_000)
+
+  it('runs the whole suite as several runs one after another with KAY_LAND_SHARDS', async () => {
+    const { clones, land } = await landings('a')
+    const work = clones.a!
+
+    await Bun.write(join(work, 'package.json'), (await Bun.file(join(work, 'package.json')).text()).replace('"landing"', '"landed"'))
+    await git(work, 'commit', '-qam', 'name')
+
+    const { code, out } = await land('a', { KAY_LAND_SHARDS: '2' }).done()
+
+    expect(code).toBe(0)
+    expect(out).toContain('tests, the whole suite, shard 1 of 2: ok')
+    expect(out).toContain('tests, the whole suite, shard 2 of 2: ok')
+    expect(await Bun.file(join(work, '..', 'trace')).text()).toMatch(/--shard=2\/2/)
   }, 60_000)
 })
 
