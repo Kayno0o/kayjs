@@ -1,4 +1,4 @@
-import type { KayConfig } from '../config'
+import type { InternalConfig, KayConfig } from '../config'
 import type { Project } from '../project'
 import type { ClientBuild } from './client'
 import type { ServedRoute } from './guards'
@@ -41,6 +41,9 @@ export interface PagesOptions extends KayConfig {
   prebuilt?: boolean | undefined
 }
 
+// The options once the project is loaded: what the caller gave and what kay added, `publicEnv` among it.
+export type ServedOptions = PagesOptions & InternalConfig
+
 // The routes with their guards loaded.
 async function servedRoutes(routes: Route[], pages: ServedRoute[], required: boolean | undefined): Promise<ServedRoute[]> {
   return Promise.all(pages.map(async (page, index) => Object.assign(page, await loadGuards(routes[index]!, required))))
@@ -72,7 +75,7 @@ interface Claimed {
 
 // What the server refuses once the routes, public files, endpoints and collections are read, which is all of it that needs no build, so a refused config starts none.
 // Claims run in the order the server makes them, which `kay check` keeps in `src/check/boot.ts` too; what the boot claims later (extensions' and API modules' routes, the favicon) is still refused after the build starts, as it needs them loaded.
-function refuseScanned({ root, config }: Project<PagesOptions>, { routes, files, endpoints, collections, i18n, site, base }: Scanned): Claimed {
+function refuseScanned({ root, config }: Project<ServedOptions>, { routes, files, endpoints, collections, i18n, site, base }: Scanned): Claimed {
   if (i18n)
     refuseLocaleClashes(i18n, routes)
 
@@ -109,7 +112,7 @@ function refuseScanned({ root, config }: Project<PagesOptions>, { routes, files,
 }
 
 // The Elysia app behind `pages()`, serving whatever browser build `loadClient` provides.
-export async function servePages(project: Project<PagesOptions>, loadClient: () => ClientBuild | Promise<ClientBuild>, skipBroken = false) {
+export async function servePages(project: Project<ServedOptions>, loadClient: () => ClientBuild | Promise<ClientBuild>, skipBroken = false) {
   return (await pagesApp(project, loadClient, false, skipBroken)).app
 }
 
@@ -140,7 +143,7 @@ async function loadPublicModules(root: string): Promise<string[]> {
 
 // The app, with every path it serves, each claimed as its feature registers it; `exported` when `kay build --static` reads the site from it, its check having reported a missing site.
 // Each stage registers its hooks and routes in turn, and the order is behaviour: `onRequest` hooks run in it, and a route runs only the other hooks registered before it. `tests/app-hooks.test.ts` pins it.
-export async function pagesApp(project: Project<PagesOptions>, loadClient: () => ClientBuild | Promise<ClientBuild>, exported = false, skipBroken = false) {
+export async function pagesApp(project: Project<ServedOptions>, loadClient: () => ClientBuild | Promise<ClientBuild>, exported = false, skipBroken = false) {
   const { root, config: options, mode } = project
   const late = lateApp()
 

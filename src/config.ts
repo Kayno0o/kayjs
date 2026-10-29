@@ -136,8 +136,6 @@ export interface KayConfig {
   plugins?: BunPlugin[] | undefined
   // The app's own module for a kay library's settings, by the library's name: `{ '@kaynooo/kayjs-ui': './src/ui-settings.ts' }`. It replaces the module the library's package.json names as `"kay": { "settings" }`, on the server and in islands alike.
   settings?: Record<string, string> | undefined
-  // Set by kay itself when `src` holds an `s.Public` field, which sends the browser its environment; kay.config.ts refuses it.
-  publicEnv?: boolean | undefined
   // The level of each lint `kay check`, `kay build`, `kay dev` and the editor report, or of each lint in a group, over its default: `{ 'positional-key': 'deny', 'seo': 'deny', 'unread-name': 'warn' }`. `kay explain` lists them.
   lints?: LintLevels | undefined
   // The app's one secret, at least 32 random characters: it seals `session()`'s cookie, signs form stamps, links to private files and the flash cookie, and gives `preview` its key, each under a key derived for its use. `KAY_SECRET` alone does the same, so this is for a secret kept elsewhere than the environment. A list, or commas in `KAY_SECRET`, rotates it: the first seals and signs, every one opens and verifies: sessions, kayjs-auth's sealed data, stamps, private-file links, the flash cookie and preview links, so a rotation breaks none of them. A `session()` called as a module loads reads `KAY_SECRET` only, as the config is not read yet, so a secret meant for sessions goes in `KAY_SECRET`. Development and tests derive one for the checkout; production without any refuses to boot a `session()`, and a production server using none refuses to start, as it would sign with a key of the process, which a restart changes and other replicas do not share; `KAY_EPHEMERAL_SECRET=1` starts it anyway, for a single throwaway server.
@@ -454,7 +452,7 @@ export interface KayExtension<Server extends AnyElysia = AnyElysia> {
   // The server plugin named by the module that exports it, `{ path: './src/auth', export: 'auth' }` for `export const auth` (`default` by default): imported only as `pages()` builds the app, and baked into an executable `kay build --compile` makes, which a path built at run time inside a library could not be. The export is the plugin, a function building it, or an object carrying it as `plugin`, as a library's `createAuth` result does. `kay check` types the locals off the module itself, and off the extension's `Server` argument when it has one; used beside `server`, the module wins. A path is relative to the project root. `prepare` runs with the export before the plugin is taken from it, for a library to hand the app's module what the extension was given; a throw stops the server.
   serverModule?: { path: string, export?: string | undefined, prepare?: ((exported: unknown) => void | Promise<void>) | undefined } | undefined
   // Config laid under the app's `kay.config.ts`: objects merged key by key, arrays joined with the extension's items first, any other value the app sets winning. Bun plugins the library's files need go in its `plugins`.
-  config?: Omit<KayConfig, 'extensions' | 'publicEnv'> | undefined
+  config?: Omit<KayConfig, 'extensions'> | undefined
   // A directory of `.kay` pages, layouts and guards laid over the app's routes under `prefix`, the root by default: a file of the app at the same path replaces the library's.
   // Its directories are absolute, as a library gives them from `import.meta.dir`, or relative to the project root.
   routes?: { dir: string, prefix?: string | undefined } | undefined
@@ -488,10 +486,18 @@ export interface KayExtension<Server extends AnyElysia = AnyElysia> {
   transformServedPage?: PageHook | undefined
 }
 
+// What kay sets on the config it loads, never the app: `publicEnv` is set when `src` holds an `s.Public` field, which sends the browser its environment.
+export interface InternalConfig {
+  publicEnv?: boolean | undefined
+}
+
+// The config as kay reads it once loaded: what `kay.config.ts` wrote and what kay added.
+export type LoadedConfig = KayConfig & InternalConfig
+
 export const CONFIG_FILE = 'kay.config.ts'
 
 // Gives the config back as written, so `kay check` reads the types of what it declares off it.
-export function defineConfig<Config extends KayConfig>(config: Config & { publicEnv?: never }): Config {
+export function defineConfig<Config extends KayConfig>(config: Config): Config {
   return config
 }
 

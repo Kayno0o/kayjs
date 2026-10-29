@@ -1,4 +1,4 @@
-import type { KayConfig } from './config'
+import type { InternalConfig, KayConfig, LoadedConfig } from './config'
 import { existsSync, realpathSync } from 'node:fs'
 import { join } from 'node:path'
 import process from 'node:process'
@@ -8,7 +8,7 @@ import { CONFIG_FILE } from './config'
 import { publicEnvFiles } from './server/env-state'
 
 // `fresh` reads the file again as it is now, as `kay dev` does once it changed, rather than the module this process imported first.
-export async function loadConfig(root: string, fresh = false): Promise<KayConfig> {
+export async function loadConfig(root: string, fresh = false): Promise<LoadedConfig> {
   return withSiteUrl(withPublicFields(root, withExtensions(withLibraryMessages(root, await importConfig(root, fresh)))))
 }
 
@@ -125,7 +125,7 @@ async function importedConfig(file: string, fresh: boolean): Promise<{ default?:
 }
 
 // The keys `kay check` and `kay env` read in their own way, refused when they are not the shape they take.
-function checkedConfig({ checks, env, publicEnv }: KayConfig, where = CONFIG_FILE): void {
+function checkedConfig({ checks, env, publicEnv }: LoadedConfig, where = CONFIG_FILE): void {
   if (publicEnv !== undefined)
     throw new KayError('config-invalid', `kay: \`publicEnv\` in ${where} is gone: mark the fields an island reads \`s.Public\` in \`defineEnv\` instead`)
 
@@ -212,7 +212,7 @@ export function siteFromEnv(): string | undefined {
 }
 
 // A project with a `s.Public` field in `src` sends the browser an environment: `publicEnv` stands for it, as the fields themselves register as `defineEnv` reads them.
-function withPublicFields<Config extends KayConfig>(root: string, config: Config): Config {
+function withPublicFields<Config extends KayConfig>(root: string, config: Config): Config & InternalConfig {
   return typeof Bun === 'undefined' || publicEnvFiles(root).length === 0 ? config : { ...config, publicEnv: true }
 }
 

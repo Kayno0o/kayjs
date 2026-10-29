@@ -1,4 +1,4 @@
-import type { PagesOptions } from '../src/server/app'
+import type { ServedOptions } from '../src/server/app'
 import type { ClientBuild } from '../src/server/client'
 import { rm } from 'node:fs/promises'
 import { describe, expect, it } from 'bun:test'
@@ -14,7 +14,7 @@ const cards = { routes: 'tests/fixtures/cards/src/routes', fonts: [{ family: 'Ar
 const i18n = { locales: ['fr', 'en'], defaultLocale: 'fr', messages: 'tests/fixtures/i18n/src/messages' }
 
 // Serves `options` with a client loader that only counts, answering how many builds the server started and what it refused with.
-async function refusal(options: PagesOptions, root = process.cwd()): Promise<{ builds: number, message: string }> {
+async function refusal(options: ServedOptions, root = process.cwd()): Promise<{ builds: number, message: string }> {
   let builds = 0
   const project = resolveProject(root, { routes, prebuilt: false, security: false, ...options }, { dev: false, prebuilt: false, underKayDev: false, devRoutes: false })
   const loadClient = (): ClientBuild => {
@@ -53,7 +53,7 @@ describe('a refused config', () => {
     ['images.card.background', { ...cards, images: { card: { background: 'white' } } }, 'images.card.background is white'],
     ['images.card.font', { ...cards, images: { card: { font: { family: 'Inter' } } } }, 'images.card.font names Inter'],
     ['images.card.logo', { ...cards, images: { card: { logo: 'tests/fixtures/cards/src/none.svg' } } }, 'which does not exist'],
-  ] as [string, PagesOptions, string][])('starts no client build: %s', async (_, options, message) => {
+  ] as [string, ServedOptions, string][])('starts no client build: %s', async (_, options, message) => {
     const refused = await refusal(options)
 
     expect(refused.message).toContain(message)

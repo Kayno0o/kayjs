@@ -3,7 +3,7 @@ import type { TrailingSlash } from '../config'
 import type { Mode, Project } from '../project'
 import type { GuardContext } from '../runtime'
 import type { ActionOptions } from './actions'
-import type { PagesOptions } from './app'
+import type { ServedOptions } from './app'
 import type { ClientBuild } from './client'
 import type { OwnRoutes } from './dev'
 import type { ServedRoute } from './guards'
@@ -151,7 +151,7 @@ export type LateApp = ReturnType<typeof lateApp>
 interface BootInput {
   app: App
   env: ServerEnv
-  project: Project<PagesOptions>
+  project: Project<ServedOptions>
   setup: PageSetup
   served: ServedPaths
   routes: ServedRoute[]

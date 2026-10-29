@@ -1,5 +1,5 @@
 import type { AnyElysia } from 'elysia'
-import type { KayConfig } from '../src/config'
+import type { LoadedConfig } from '../src/config'
 import type { DevRoutes } from '../src/server/dev'
 import { resolve } from 'node:path'
 import { describe, expect, it } from 'bun:test'
@@ -141,7 +141,7 @@ function recorder(app: AnyElysia) {
 }
 
 // The app `kay build --static` reads the site from, with the options `exportStatic` gives it (`src/build/static.ts`): no extension server, log, health check, security headers or compression.
-async function exportedApp(options: KayConfig) {
+async function exportedApp(options: LoadedConfig) {
   const mode = modeOf({ dev: false, prebuilt: true })
   const config = await withConfig(fixture, options)
   const client = await sharedClient(fixture, clientOptionsOf(config, mode, { exported: true }))
@@ -229,7 +229,7 @@ describe('the hooks pagesApp registers', () => {
   })
 
   it('runs with hosts, the jobs page, previews, kept pages, the public env, a proxy key, offline and locale hosts, in the order pinned', async () => {
-    const options: KayConfig = { site: 'https://x.example', i18n: { locales: ['en', 'fr'], defaultLocale: 'en', domains: { en: 'x.example', fr: 'fr.x.example' } }, security: { hosts: ['www.x.example'] }, jobs: { guard: () => undefined }, preview: {}, publicEnv: true, proxy: { key: 'x-upstream-key' }, offline: true, log: quiet, extensions }
+    const options: LoadedConfig = { site: 'https://x.example', i18n: { locales: ['en', 'fr'], defaultLocale: 'en', domains: { en: 'x.example', fr: 'fr.x.example' } }, security: { hosts: ['www.x.example'] }, jobs: { guard: () => undefined }, preview: {}, publicEnv: true, proxy: { key: 'x-upstream-key' }, offline: true, log: quiet, extensions }
     // Built with its pages prerendered, which keeps the about page, a page reading nothing of its request.
     const build = await scratchBuild(options, false, fixture)
 

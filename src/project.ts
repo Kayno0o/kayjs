@@ -1,5 +1,5 @@
 import type { ClientOptions } from './build/client'
-import type { KayConfig } from './config'
+import type { KayConfig, LoadedConfig } from './config'
 import type { RenderOptions } from './server/render'
 import type { SeoHead } from './server/seo'
 import { existsSync, readFileSync } from 'node:fs'
@@ -209,7 +209,7 @@ export function writesFrench(config: Pick<KayConfig, 'lang' | 'i18n' | 'typograp
 }
 
 // The browser build a config asks for. `kay build`'s (`build` given) minifies unless the config says not to; one a server or a test makes on demand does only when the config says so.
-export function clientOptionsOf(config: KayConfig, mode: Pick<Mode, 'dev' | 'underKayDev'>, build?: Pick<ClientOptions, 'exported' | 'report'>): ClientOptions {
+export function clientOptionsOf(config: LoadedConfig, mode: Pick<Mode, 'dev' | 'underKayDev'>, build?: Pick<ClientOptions, 'exported' | 'report'>): ClientOptions {
   return {
     ...pickConfig(config, CLIENT_CONFIG),
     minify: config.minify ?? build !== undefined,

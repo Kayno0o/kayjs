@@ -1,4 +1,5 @@
 import type { ClientOptions } from '../src/build/client'
+import type { InternalConfig } from '../src/config'
 import type { ClientBuild } from '../src/server/client'
 import { inOutput, testWorker } from '../src/build/assets'
 import { buildClient } from '../src/build/client'
@@ -7,7 +8,7 @@ import { pages as bundlingPages } from '../src/server'
 import { servePages } from '../src/server/app'
 import { projectSource } from '../src/server/source'
 
-type PagesOptions = NonNullable<Parameters<typeof bundlingPages>[0]>
+type PagesOptions = NonNullable<Parameters<typeof bundlingPages>[0]> & InternalConfig
 
 const builds = new Map<string, Promise<ClientBuild>>()
 

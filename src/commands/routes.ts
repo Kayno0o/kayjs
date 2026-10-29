@@ -1,4 +1,4 @@
-import type { ExtensionApp, KayConfig } from '../config'
+import type { ExtensionApp, KayConfig, LoadedConfig } from '../config'
 import type { LocaleSettings } from '../runtime/i18n'
 import type { GuardFile, Route } from '../server/routes'
 import type { Command } from './command'
@@ -199,7 +199,7 @@ async function feedRoutes(root: string, config: KayConfig): Promise<Listed[]> {
 }
 
 // What kay serves itself in production, as the config turns each on.
-function kayRoutes(root: string, config: KayConfig): Listed[] {
+function kayRoutes(root: string, config: LoadedConfig): Listed[] {
   const kay = (path: string, by: string, methods = 'GET'): Listed => ({ methods, path, kind: 'kay', by })
   const favicon = faviconSource(root, config.favicon, config.manifest)
   const enabled = config.openapi === false ? undefined : config.openapi

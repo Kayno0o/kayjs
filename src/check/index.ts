@@ -1,6 +1,6 @@
 import type { Diagnostic } from '../compiler/ast'
 import type { Paint } from '../compiler/frame'
-import type { KayConfig } from '../config'
+import type { InternalConfig, KayConfig } from '../config'
 import type { TypeScope } from './diagnose'
 import type { ProbeMemory } from './project'
 import type { ShadowFile } from './shadow'
@@ -70,7 +70,6 @@ export const CHECK_CONFIG = [
   'manifest',
   // Where `images.card.logo` is checked as the boot draws it.
   'images',
-  'publicEnv',
   // Reports each route of the app no guard covers, which the server refuses.
   'requireGuards',
   // Reports the actions offered as tools that bot protection alone stands before.
@@ -79,7 +78,7 @@ export const CHECK_CONFIG = [
   'openapi',
 ] as const satisfies readonly (keyof KayConfig)[]
 
-export interface CheckOptions extends Pick<KayConfig, (typeof CHECK_CONFIG)[number]> {
+export interface CheckOptions extends Pick<KayConfig, (typeof CHECK_CONFIG)[number]>, InternalConfig {
   tsconfig?: string | undefined
   // The tree alone is wanted, as `kay dev` writes it: the diagnostics only `kay check` reports are not looked for.
   typesOnly?: boolean | undefined

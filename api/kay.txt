@@ -2321,7 +2321,7 @@ class CspViolationError
 const dataTables: readonly string[]
 
 [./server] defineConfig
-function defineConfig<Config extends KayConfig>(config: Config & { publicEnv?: never; }): Config
+function defineConfig<Config extends KayConfig>(config: Config): Config
 
 [./server] defineEnv
 function defineEnv<Schema extends EnvSchema>(declared: Schema, source?: Record<string, string | undefined>): (Schema & {
@@ -2521,7 +2521,6 @@ interface KayConfig
   proxy?: number | boolean | ProxyConfig | undefined
   publicCache?: Record<string, `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w`> | undefined
   publicDir?: string | undefined
-  publicEnv?: boolean | undefined
   redirects?: Redirects | undefined
   requestIdHeader?: string | undefined
   requireGuards?: boolean | undefined
@@ -2552,7 +2551,7 @@ interface KayExtension<Server extends AnyElysia = AnyElysia>
   asksConsent?: boolean | undefined
   check?: (() => ExtensionProblem[] | Promise<ExtensionProblem[]>) | undefined
   commands?: Record<string, string> | undefined
-  config?: Omit<KayConfig, "extensions" | "publicEnv"> | undefined
+  config?: Omit<KayConfig, "extensions"> | undefined
   context?: string | undefined
   devTool?: { module: string; } | undefined
   editor?: string | undefined
@@ -2749,7 +2748,6 @@ interface PagesOptions extends KayConfig
   proxy?: number | boolean | ProxyConfig | undefined
   publicCache?: Record<string, `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w`> | undefined
   publicDir?: string | undefined
-  publicEnv?: boolean | undefined
   redirects?: Redirects | undefined
   requestIdHeader?: string | undefined
   requireGuards?: boolean | undefined
@@ -3720,7 +3718,6 @@ interface TestOptions extends PagesOptions
   proxyKey?: string | undefined
   publicCache?: Record<string, `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w`> | undefined
   publicDir?: string | undefined
-  publicEnv?: boolean | undefined
   redirects?: Redirects | undefined
   requestIdHeader?: string | undefined
   requireGuards?: boolean | undefined
