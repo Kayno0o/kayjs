@@ -15,10 +15,15 @@ interface Received {
 
 const received: Received[] = []
 let answer: (request: Request) => Response | Promise<Response> = () => new Response(null, { status: 500 })
+const { promise: never } = Promise.withResolvers<Response>()
 
 const server = Bun.serve({
   port: 0,
   async fetch(request) {
+    // A call that gives up may still reach the server once a later test runs, so the tests that give up go here, held and left unrecorded.
+    if (new URL(request.url).pathname.startsWith('/stalled/'))
+      return never
+
     const multipart = (request.headers.get('content-type') ?? '').startsWith('multipart/')
 
     received.push({ path: new URL(request.url).pathname, headers: request.headers, form: multipart ? await request.clone().formData() : undefined, json: multipart ? undefined : await request.clone().json() as Record<string, unknown> })
@@ -28,6 +33,7 @@ const server = Bun.serve({
 })
 
 const voices = openai({ baseUrl: `http://localhost:${server.port}/v1/`, apiKey: 'sk-test-key' })
+const stalled = openai({ baseUrl: `http://localhost:${server.port}/stalled/v1/`, apiKey: 'sk-test-key' })
 
 afterEach(() => {
   received.length = 0
@@ -100,20 +106,12 @@ describe('transcribe', () => {
   })
 
   it('fails with a timeout when the server does not answer in time', async () => {
-    const { promise: never } = Promise.withResolvers<Response>()
-
-    answer = async () => never
-
-    expect((await failure(transcribe(recording, { provider: voices, model: 'whisper-1', timeout: '50ms' }))).kind).toBe('timeout')
+    expect((await failure(transcribe(recording, { provider: stalled, model: 'whisper-1', timeout: '50ms' }))).kind).toBe('timeout')
   })
 
   it('stops when its signal aborts', async () => {
-    const { promise: never } = Promise.withResolvers<Response>()
     const stop = new AbortController()
-
-    answer = async () => never
-
-    const call = transcribe(recording, { provider: voices, model: 'whisper-1', signal: stop.signal })
+    const call = transcribe(recording, { provider: stalled, model: 'whisper-1', signal: stop.signal })
 
     stop.abort(new Error('left'))
 
