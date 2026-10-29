@@ -590,6 +590,15 @@ describe('diagnostics', () => {
     expect(file.source.slice(diagnostic.start, diagnostic.end)).toBe('class=')
   })
 
+  it('reports a bare attribute value once, with the braces it needs', () => {
+    const file = parse('Card(title=3 open=true)\n')
+
+    expect(file.diagnostics.map(d => [d.message, d.help])).toEqual([
+      ['An attribute value is a quoted string or a `{expression}`', '`title={3}`'],
+      ['An attribute value is a quoted string or a `{expression}`', '`open={true}`'],
+    ])
+  })
+
   it('keeps node spans on the source they came from', () => {
     const file = parse('---\nconst x = 1\n---\nsection\n  p {x}\n')
     const section = element(file.template[0])

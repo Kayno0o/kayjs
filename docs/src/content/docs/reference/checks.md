@@ -22,6 +22,7 @@ The editor shows each problem of an open file with the same message, note and he
 ## What it verifies
 
 - Expressions, props and server data, as TypeScript does.
+- The first template mistakes, with a help and the attribute at fault: a handler written as a call (`onClick={bump()}`), `bind:value` on a signal that is not a string, `elif` for `else if`, `className` and `htmlFor` for `class` and `for`, and a bare attribute value such as `title=3`.
 - Links to pages, public files, API routes and the sources of your redirects, including `ctx.redirect`, `navigate()` and form `action`s.
 - Form field names against the action's schema.
 - Content collection entries against their schema.

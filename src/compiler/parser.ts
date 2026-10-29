@@ -16,6 +16,8 @@ const ID_NAME = /[\w-]+/y
 // What separates the words of a class value: not `\s`, whose non-breaking space is part of a word.
 const WHITESPACE_RUN = /[ \t\r\n]+/g
 // A `class="` that ends its line, which opens a value over several lines.
+// A number, a name or a dotted path written where an attribute's value goes, without quotes or braces.
+const BARE_VALUE = /^-?[\w$]+(?:\.[\w$]+)*(?![\w$.([])/
 const LINE_BREAK_AFTER = /[ \t]*\r?\n/y
 const ATTRIBUTE_NAME = /[A-Z_@:][\w\-:.@]*/iy
 const MODIFIERS = /(?:\|[\w-]*)+/y
@@ -1254,7 +1256,12 @@ class TemplateParser {
       return { kind: 'expression', name, expression }
     }
 
-    this.error(name.start, this.pos, 'An attribute value is a quoted string or a `{expression}`', { help: `\`${this.src.slice(name.start, name.end)}={...}\`` })
+    // A bare word (`title=3`, `open=true`) is taken whole, so the one mistake is reported once, with the braces it needs.
+    const bare = BARE_VALUE.exec(this.src.slice(this.pos, this.pos + 80))?.[0]
+    const written = this.src.slice(name.start, name.end)
+
+    this.error(name.start, this.pos, 'An attribute value is a quoted string or a `{expression}`', { help: `\`${written}={${bare ?? '...'}}\`` })
+    this.pos += bare?.length ?? 0
 
     return { kind: 'boolean', name }
   }

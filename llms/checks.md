@@ -33,6 +33,7 @@ kay lint --cache
 ### What `kay check` verifies
 
 - Every expression, prop and server name, as TypeScript does.
+- The first template mistakes keep TypeScript's error but add a `help` and are reported at the attribute at fault: a handler written as a call (`onClick={bump()}`), `bind:value` on a signal that is not a string (a checkbox takes `bind:checked`), `elif` or `elseif` for `else if`, and `className` or `htmlFor` for `class` and `for`; a bare attribute value such as `title=3` is one error whose help gives `title={3}`.
 - `a(href="/todos/1")` and template literals such as `` `/todos/${id}` `` against the pages, the files in `public/`, the GET routes of the modules under `src/api/` and those of the app's Elysia instance once it is registered (see [Project setup](project.md#project-setup)).
 - The paths given to `ctx.redirect` in pages and actions, to a guard's `redirect` and to `navigate()` are checked the same way.
 - So are an `img` `src`, a `link` `href` and a `form` `action` written out as text.
