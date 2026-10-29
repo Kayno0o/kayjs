@@ -272,7 +272,7 @@ function guarded(path: Path, code: string, names: ReadonlySet<string>): boolean 
 function functionChain(path: Path): t.Node[] {
   const chain: t.Node[] = []
 
-  for (let fn = path.getFunctionParent(); fn; fn = fn.getFunctionParent())
+  for (let fn = path.getFunctionParent(); fn; fn = fn.parentPath?.getFunctionParent() ?? null)
     chain.push(fn.node)
 
   return chain

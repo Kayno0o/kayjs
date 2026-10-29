@@ -369,7 +369,7 @@ class Analysis {
     let holder = parentPath
 
     // A method's key and a `switch`'s subject, are read outside the scope of the node holding them.
-    if (holder && ((path.key === 'key' && METHOD_TYPES.has(holder.node.type)) || (path.key === 'discriminant' && holder.node.type === 'SwitchStatement')))
+    if (holder && (((path.key === 'key' || path.listKey === 'decorators') && METHOD_TYPES.has(holder.node.type)) || (path.key === 'discriminant' && holder.node.type === 'SwitchStatement')))
       holder = holder.parentPath
 
     return !makesScope(node, parent) ? holder!.scope : new Scope(path, enclosingScope(path))
@@ -567,7 +567,7 @@ function enclosingScope(path: Path): Scope | null {
   let current: Path | null = path
 
   while (current) {
-    const skip = current.key === 'key'
+    const skip = current.key === 'key' || current.listKey === 'decorators'
 
     current = current.parentPath
 
