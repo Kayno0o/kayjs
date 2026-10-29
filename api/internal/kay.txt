@@ -910,7 +910,7 @@ interface LibraryTool
   readOnly?: boolean | undefined
 
 [./library] localizedEntry
-function localizedEntry(root: string, config: Pick<KayConfig, "i18n" | "content">, collection: string, slug: string): Promise<LocalizedEntry>
+function localizedEntry(root: string, config: Pick<KayConfig, "i18n" | "contentConfig">, collection: string, slug: string): Promise<LocalizedEntry>
 
 [./library] LocalizedEntry
 interface LocalizedEntry
@@ -947,7 +947,7 @@ interface MissingPath
   target?: string | undefined
 
 [./library] missingTranslations
-function missingTranslations(root: string, config: Pick<KayConfig, "i18n" | "content" | "extensions">): Promise<Record<string, MissingTranslations>>
+function missingTranslations(root: string, config: Pick<KayConfig, "i18n" | "contentConfig" | "extensions">): Promise<Record<string, MissingTranslations>>
 
 [./library] MissingTranslations
 interface MissingTranslations
@@ -1108,7 +1108,7 @@ function weakSecrets(secrets: string[]): boolean
 function writeCacheEntry(slot: CacheSlot, value: unknown): Promise<void>
 
 [./library] writeDraftEntry
-function writeDraftEntry(root: string, config: Pick<KayConfig, "i18n" | "content">, collection: string, locale: string, slug: string, entry: {
+function writeDraftEntry(root: string, config: Pick<KayConfig, "i18n" | "contentConfig">, collection: string, locale: string, slug: string, entry: {
   data: Record<string, DataValue>;
   body?: string | undefined;
 }): Promise<string>

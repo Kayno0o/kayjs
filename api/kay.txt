@@ -2321,7 +2321,14 @@ class CspViolationError
 const dataTables: readonly string[]
 
 [./server] defineConfig
-function defineConfig<Config extends KayConfig>(config: Config & UnknownKeys<Config, KayConfig> & { [Key in keyof NestedBags & keyof Config]?: UnknownKeys<Config[Key], NestedBags[Key]>; }): Config
+function defineConfig<Config extends KayConfig>(config: Config & UnknownKeys<Config, KayConfig> & {
+  security?: UnknownKeys<"security" extends keyof Config ? Config[keyof Config & "security"] : unknown, SecurityConfig>;
+  i18n?: UnknownKeys<"i18n" extends keyof Config ? Config[keyof Config & "i18n"] : unknown, I18nConfig>;
+  seo?: UnknownKeys<"seo" extends keyof Config ? Config[keyof Config & "seo"] : unknown, SeoConfig>;
+  offline?: UnknownKeys<"offline" extends keyof Config ? Config[keyof Config & "offline"] : unknown, OfflineConfig>;
+  health?: UnknownKeys<"health" extends keyof Config ? Config[keyof Config & "health"] : unknown, HealthConfig>;
+  proxy?: UnknownKeys<"proxy" extends keyof Config ? Config[keyof Config & "proxy"] : unknown, ProxyConfig>;
+}): Config
 
 [./server] defineEnv
 function defineEnv<Schema extends EnvSchema>(declared: Schema, source?: Record<string, string | undefined>): (Schema & {
@@ -2478,6 +2485,7 @@ const jobTables: readonly ["kay_jobs", "kay_locks"]
 [./server] KayConfig
 interface KayConfig
   api?: string | undefined
+  apiDir?: string | undefined
   apiPath?: string | undefined
   base?: string | undefined
   budget?: BudgetConfig | undefined
@@ -2485,11 +2493,13 @@ interface KayConfig
   compress?: boolean | undefined
   compressionDictionary?: boolean | undefined
   content?: string | undefined
+  contentConfig?: string | undefined
   cors?: CorsOptions | undefined
   entry?: string | undefined
   env?: false | { compose?: string | string[] | undefined; example?: string | undefined; } | undefined
   extensions?: KayExtension<AnyElysia>[] | undefined
   favicon?: string | false | FaviconConfig | undefined
+  fileStore?: FileStore | undefined
   fonts?: (FontConfig | FontsourceConfig)[] | undefined
   head?: HeadTag[] | undefined
   health?: false | HealthConfig | undefined
@@ -2500,6 +2510,7 @@ interface KayConfig
   jobs?: JobsConfig | undefined
   lang?: string | undefined
   lateStyles?: boolean | undefined
+  librarySettings?: Record<string, string> | undefined
   links?: { outside?: "new-tab" | "same-tab" | undefined; schemes?: string[] | undefined; } | undefined
   lints?: LintLevels | undefined
   live?: LiveConfig | undefined
@@ -2507,6 +2518,7 @@ interface KayConfig
   manifest?: ManifestConfig | undefined
   markdown?: MarkdownConfig | undefined
   maxSize?: ByteSize | undefined
+  maxSizeByPath?: Record<string, ByteSize> | undefined
   maxSizes?: Record<string, ByteSize> | undefined
   mcp?: boolean | McpConfig | undefined
   metrics?: boolean | MetricsConfig | undefined
@@ -2527,6 +2539,7 @@ interface KayConfig
   rewrite?: Rewrite | undefined
   robots?: false | RobotsConfig | undefined
   routes?: string | undefined
+  routesDir?: string | undefined
   runtimeRedirects?: { hosts?: string[] | undefined; } | undefined
   saveData?: boolean | undefined
   search?: boolean | undefined
@@ -2703,6 +2716,7 @@ function pages(options?: PagesOptions): Promise<Elysia<"", {
 [./server] PagesOptions
 interface PagesOptions extends KayConfig
   api?: string | undefined
+  apiDir?: string | undefined
   apiPath?: string | undefined
   base?: string | undefined
   budget?: BudgetConfig | undefined
@@ -2710,12 +2724,14 @@ interface PagesOptions extends KayConfig
   compress?: boolean | undefined
   compressionDictionary?: boolean | undefined
   content?: string | undefined
+  contentConfig?: string | undefined
   cors?: CorsOptions | undefined
   dev?: boolean | undefined
   entry?: string | undefined
   env?: false | { compose?: string | string[] | undefined; example?: string | undefined; } | undefined
   extensions?: KayExtension<AnyElysia>[] | undefined
   favicon?: string | false | FaviconConfig | undefined
+  fileStore?: FileStore | undefined
   fonts?: (FontConfig | FontsourceConfig)[] | undefined
   head?: HeadTag[] | undefined
   health?: false | HealthConfig | undefined
@@ -2726,6 +2742,7 @@ interface PagesOptions extends KayConfig
   jobs?: JobsConfig | undefined
   lang?: string | undefined
   lateStyles?: boolean | undefined
+  librarySettings?: Record<string, string> | undefined
   links?: { outside?: "new-tab" | "same-tab" | undefined; schemes?: string[] | undefined; } | undefined
   lints?: LintLevels | undefined
   live?: LiveConfig | undefined
@@ -2733,6 +2750,7 @@ interface PagesOptions extends KayConfig
   manifest?: ManifestConfig | undefined
   markdown?: MarkdownConfig | undefined
   maxSize?: ByteSize | undefined
+  maxSizeByPath?: Record<string, ByteSize> | undefined
   maxSizes?: Record<string, ByteSize> | undefined
   mcp?: boolean | McpConfig | undefined
   metrics?: boolean | MetricsConfig | undefined
@@ -2755,6 +2773,7 @@ interface PagesOptions extends KayConfig
   robots?: false | RobotsConfig | undefined
   root?: string | undefined
   routes?: string | undefined
+  routesDir?: string | undefined
   runtimeRedirects?: { hosts?: string[] | undefined; } | undefined
   saveData?: boolean | undefined
   search?: boolean | undefined
@@ -3667,6 +3686,7 @@ interface TestContent
 [./test] TestOptions
 interface TestOptions extends PagesOptions
   api?: string | undefined
+  apiDir?: string | undefined
   apiPath?: string | undefined
   base?: string | undefined
   browser?: boolean | BrowserOptions | undefined
@@ -3675,12 +3695,14 @@ interface TestOptions extends PagesOptions
   compress?: boolean | undefined
   compressionDictionary?: boolean | undefined
   content?: string | undefined
+  contentConfig?: string | undefined
   cors?: CorsOptions | undefined
   dev?: boolean | undefined
   entry?: string | undefined
   env?: false | { compose?: string | string[] | undefined; example?: string | undefined; } | undefined
   extensions?: KayExtension<AnyElysia>[] | undefined
   favicon?: string | false | FaviconConfig | undefined
+  fileStore?: FileStore | undefined
   fonts?: (FontConfig | FontsourceConfig)[] | undefined
   head?: HeadTag[] | undefined
   headers?: Record<string, string> | undefined
@@ -3693,6 +3715,7 @@ interface TestOptions extends PagesOptions
   jobs?: JobsConfig | undefined
   lang?: string | undefined
   lateStyles?: boolean | undefined
+  librarySettings?: Record<string, string> | undefined
   links?: { outside?: "new-tab" | "same-tab" | undefined; schemes?: string[] | undefined; } | undefined
   lints?: LintLevels | undefined
   live?: LiveConfig | undefined
@@ -3701,6 +3724,7 @@ interface TestOptions extends PagesOptions
   manifest?: ManifestConfig | undefined
   markdown?: MarkdownConfig | undefined
   maxSize?: ByteSize | undefined
+  maxSizeByPath?: Record<string, ByteSize> | undefined
   maxSizes?: Record<string, ByteSize> | undefined
   mcp?: boolean | McpConfig | undefined
   mcpKey?: string | undefined
@@ -3725,6 +3749,7 @@ interface TestOptions extends PagesOptions
   robots?: false | RobotsConfig | undefined
   root?: string | undefined
   routes?: string | undefined
+  routesDir?: string | undefined
   runtimeRedirects?: { hosts?: string[] | undefined; } | undefined
   saveData?: boolean | undefined
   search?: boolean | undefined
