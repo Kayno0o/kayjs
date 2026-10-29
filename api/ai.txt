@@ -23,18 +23,19 @@ type AiLimit = 'asks' | 'budget' | 'total'
 interface AiOptions
   budget?: false | BudgetOptions | undefined
   conversations?: ConversationStore | undefined
-  imageAlt?: boolean | undefined
+  imageAlt?: boolean | { reviewed?: string[] | undefined; } | undefined
   key?: ((request: Request) => string | Promise<string | undefined> | undefined) | undefined
   rateLimit?: false | LimitOptions | undefined
 
 [.] anthropic
-function anthropic({ apiKey, baseUrl, model, body: fields }: AnthropicOptions): Provider
+function anthropic({ apiKey, baseUrl, insecure, model, body: fields }: AnthropicOptions): Provider
 
 [.] AnthropicOptions
 interface AnthropicOptions
   apiKey: string
   baseUrl?: string | undefined
   body?: Record<string, unknown> | undefined
+  insecure?: boolean | undefined
   model?: string | undefined
 
 [.] ask
@@ -282,13 +283,14 @@ interface Message
 function mocked<const Schema extends TSchema, const Honeypot extends string = never>(action: ServerAction<Schema, unknown, Honeypot>, run: (input: (Schema & { params: []; })["static"], context: FunctionToolContext) => unknown): FunctionTool
 
 [.] openai
-function openai({ baseUrl, apiKey, model, body: fields, pdf }?: OpenAiOptions): Provider
+function openai({ baseUrl, apiKey, insecure, model, body: fields, pdf }?: OpenAiOptions): Provider
 
 [.] OpenAiOptions
 interface OpenAiOptions
   apiKey?: string | undefined
   baseUrl?: string | undefined
   body?: Record<string, unknown> | undefined
+  insecure?: boolean | undefined
   model?: string | undefined
   pdf?: Documents | undefined
 

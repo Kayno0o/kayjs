@@ -3,7 +3,7 @@ import { afterAll, afterEach, beforeEach, describe, expect, it } from 'bun:test'
 import { ai, embed, fakeAi, speak, transcribe } from '../src'
 import { choose } from '../src/config'
 
-const NAMES = ['NODE_ENV', 'ANTHROPIC_API_KEY', 'OPENAI_API_KEY', 'AI_BASE_URL', 'AI_MODEL', 'AI_PROVIDER', 'AI_AUDIO_URL', 'AI_AUDIO_KEY', 'AI_TRANSCRIBE_MODEL', 'AI_SPEECH_MODEL', 'AI_VOICE', 'AI_EMBED_URL', 'AI_EMBED_KEY', 'AI_EMBED_MODEL']
+const NAMES = ['NODE_ENV', 'ANTHROPIC_API_KEY', 'OPENAI_API_KEY', 'AI_BASE_URL', 'AI_INSECURE', 'AI_MODEL', 'AI_PROVIDER', 'AI_AUDIO_URL', 'AI_AUDIO_KEY', 'AI_TRANSCRIBE_MODEL', 'AI_SPEECH_MODEL', 'AI_VOICE', 'AI_EMBED_URL', 'AI_EMBED_KEY', 'AI_EMBED_MODEL']
 const saved = Object.fromEntries(NAMES.map(name => [name, process.env[name]]))
 
 beforeEach(() => {
@@ -24,6 +24,14 @@ function configure(env: Record<string, string>) {
   Object.assign(process.env, env)
 
   return choose()
+}
+
+// Like `configure` on a clean environment, for a case that must not meet what an earlier one left set.
+function fresh(env: Record<string, string>) {
+  for (const name of NAMES)
+    delete process.env[name]
+
+  return configure(env)
 }
 
 describe('the provider the environment names', () => {
@@ -59,13 +67,62 @@ describe('the provider the environment names', () => {
   it('stops AI_PROVIDER=anthropic without its key', () => {
     expect(() => configure({ NODE_ENV: 'production', AI_PROVIDER: 'anthropic', OPENAI_API_KEY: 'o' })).toThrow('ANTHROPIC_API_KEY is not set')
   })
+
+  it('stops AI_PROVIDER=openai without a key unless a compatible server is named', () => {
+    expect(() => fresh({ NODE_ENV: 'production', AI_PROVIDER: 'openai', ANTHROPIC_API_KEY: 'a' })).toThrow('AI_PROVIDER is openai and OPENAI_API_KEY is not set')
+    expect(() => fresh({ NODE_ENV: 'production', AI_PROVIDER: 'openai' })).toThrow('OPENAI_API_KEY is not set')
+    expect(fresh({ NODE_ENV: 'production', AI_PROVIDER: 'openai', AI_BASE_URL: 'http://localhost:11434/v1' }).provider.name).toBe('openai')
+    expect(fresh({ NODE_ENV: 'production', OPENAI_API_KEY: 'o' }).provider.name).toBe('openai')
+    expect(fresh({ NODE_ENV: 'development' }).provider.name).toBe('fake')
+  })
+})
+
+describe('the base URLs', () => {
+  it('name the variable for a value that is not an http(s) URL', () => {
+    expect(() => fresh({ NODE_ENV: 'production', AI_BASE_URL: 'localhost:11434/v1' })).toThrow('AI_BASE_URL')
+    expect(() => fresh({ NODE_ENV: 'production', AI_BASE_URL: 'ftp://host/v1' })).toThrow('AI_BASE_URL must be an http or https URL')
+    expect(() => fresh({ NODE_ENV: 'production', ANTHROPIC_API_KEY: 'a', AI_BASE_URL: 'proxy.example.com' })).toThrow('AI_BASE_URL')
+  })
+
+  it('take plain http for a loopback host, with or without a key', () => {
+    for (const base of ['http://localhost:11434/v1', 'http://127.0.0.1', 'http://[::1]:11434/v1']) {
+      expect(fresh({ NODE_ENV: 'production', AI_BASE_URL: base }).provider.name).toBe('openai')
+      expect(fresh({ NODE_ENV: 'production', AI_BASE_URL: base, OPENAI_API_KEY: 'k' }).provider.name).toBe('openai')
+    }
+  })
+
+  it('refuse a key over plain http elsewhere unless AI_INSECURE says the network is trusted', () => {
+    const env = { NODE_ENV: 'production', AI_BASE_URL: 'http://host.docker.internal/v1', OPENAI_API_KEY: 'k' }
+
+    expect(() => fresh(env)).toThrow('AI_INSECURE')
+    expect(fresh({ ...env, AI_INSECURE: 'true' }).provider.name).toBe('openai')
+    expect(fresh({ NODE_ENV: 'production', AI_BASE_URL: env.AI_BASE_URL }).provider.name).toBe('openai')
+  })
+
+  it('hold for the audio and embedding servers, and for the key an ask forwards to them', async () => {
+    for (const name of NAMES)
+      delete process.env[name]
+
+    Object.assign(process.env, { NODE_ENV: 'production', AI_EMBED_URL: 'http://lan.example/v1', AI_EMBED_KEY: 'k', AI_EMBED_MODEL: 'm' })
+
+    await expect(embed('a')).rejects.toThrow('AI_EMBED_URL is plain http')
+
+    delete process.env.AI_EMBED_KEY
+    Object.assign(process.env, { AI_AUDIO_URL: 'nonsense', AI_TRANSCRIBE_MODEL: 'w' })
+
+    await expect(transcribe(new Blob(['x']))).rejects.toThrow('AI_AUDIO_URL is not a URL')
+
+    Object.assign(process.env, { AI_BASE_URL: 'http://lan.example/v1', OPENAI_API_KEY: 'o', AI_AUDIO_URL: 'http://lan.example/audio' })
+
+    await expect(transcribe(new Blob(['x']))).rejects.toThrow('AI_AUDIO_URL is plain http')
+  })
 })
 
 describe('the extension', () => {
   it('lists the variables for kay env, the model required in production', () => {
     const { env } = ai()
 
-    expect(Object.keys(env!.properties)).toEqual(['ANTHROPIC_API_KEY', 'OPENAI_API_KEY', 'AI_BASE_URL', 'AI_MODEL', 'AI_PROVIDER', 'AI_AUDIO_URL', 'AI_AUDIO_KEY', 'AI_TRANSCRIBE_MODEL', 'AI_SPEECH_MODEL', 'AI_VOICE', 'AI_EMBED_URL', 'AI_EMBED_KEY', 'AI_EMBED_MODEL'])
+    expect(Object.keys(env!.properties)).toEqual(['ANTHROPIC_API_KEY', 'OPENAI_API_KEY', 'AI_BASE_URL', 'AI_MODEL', 'AI_INSECURE', 'AI_PROVIDER', 'AI_AUDIO_URL', 'AI_AUDIO_KEY', 'AI_TRANSCRIBE_MODEL', 'AI_SPEECH_MODEL', 'AI_VOICE', 'AI_EMBED_URL', 'AI_EMBED_KEY', 'AI_EMBED_MODEL'])
     expect(env!.properties.AI_MODEL).toMatchObject({ requiredInProduction: true })
     expect(env!.properties.ANTHROPIC_API_KEY).not.toMatchObject({ requiredInProduction: true })
   })

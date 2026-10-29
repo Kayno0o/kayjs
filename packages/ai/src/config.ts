@@ -9,6 +9,7 @@ import { anthropic } from './anthropic'
 import { AiError } from './errors'
 import { fakeAi } from './fake'
 import { openai, OPENAI_URL } from './openai'
+import { checkedRoot } from './root'
 
 // The variables, shared by what `ai()` lists for `kay env` and what `ask` reads: `listed` marks the model as the one production needs.
 export function aiEnv(listed = false) {
@@ -17,6 +18,7 @@ export function aiEnv(listed = false) {
     OPENAI_API_KEY: s.Optional(s.String({ description: 'the key of OpenAI, or of an OpenAI-compatible server that wants one' })),
     AI_BASE_URL: s.Optional(s.String({ description: 'an OpenAI-compatible server\'s API root, such as http://localhost:11434/v1 for Ollama' })),
     AI_MODEL: s.Optional(s.String(listed ? { description: 'the model asked unless `ask` names one', requiredInProduction: true } : {})),
+    AI_INSECURE: s.Optional(s.Boolean({ description: 'lets a key go over plain http to a host that is not loopback, for a network you trust such as a compose network' })),
     AI_PROVIDER: s.Optional(s.String({ pattern: '^(?:anthropic|openai)$', description: 'anthropic or openai: only needed when both keys are set' })),
     AI_AUDIO_URL: s.Optional(s.String({ description: 'the API root of an OpenAI-compatible server for transcribe() and speak(), when it is not the one ask() uses' })),
     AI_AUDIO_KEY: s.Optional(s.String({ description: 'the key of the AI_AUDIO_URL server, when it wants one other than OPENAI_API_KEY' })),
@@ -83,12 +85,16 @@ export function choose(): Chosen {
     if (anthropicKey === undefined)
       throw configError('AI_PROVIDER is anthropic and ANTHROPIC_API_KEY is not set')
 
-    const options: AnthropicOptions = { apiKey: anthropicKey, ...base === undefined ? {} : { baseUrl: base } }
+    const options: AnthropicOptions = { apiKey: anthropicKey, insecure: env.AI_INSECURE, ...base === undefined ? {} : { baseUrl: checkedRoot(base, 'AI_BASE_URL', anthropicKey, env.AI_INSECURE) } }
 
     return { provider: anthropic(options), model: env.AI_MODEL }
   }
 
-  return { provider: openai({ baseUrl: base ?? OPENAI_URL, apiKey: openaiKey }), model: env.AI_MODEL }
+  // A key is optional only for an OpenAI-compatible server named by AI_BASE_URL.
+  if (openaiKey === undefined && base === undefined)
+    throw configError('AI_PROVIDER is openai and OPENAI_API_KEY is not set')
+
+  return { provider: openai({ baseUrl: base === undefined ? OPENAI_URL : checkedRoot(base, 'AI_BASE_URL', openaiKey, env.AI_INSECURE), apiKey: openaiKey, insecure: env.AI_INSECURE }), model: env.AI_MODEL }
 }
 
 const CALLS = {
@@ -123,8 +129,11 @@ function chooseFor(call: Call): Chosen & { voice: string | undefined } {
   const root = env[url]
 
   // `OPENAI_API_KEY` belongs to the server `ask` uses, so it goes to another only when that server shares its origin.
-  if (root !== undefined)
-    return { provider: openai({ baseUrl: root, apiKey: env[key] ?? (sameOrigin(root, env.AI_BASE_URL ?? OPENAI_URL) ? env.OPENAI_API_KEY : undefined) }), model: env[model], voice: env.AI_VOICE }
+  if (root !== undefined) {
+    const apiKey = env[key] ?? (sameOrigin(root, env.AI_BASE_URL ?? OPENAI_URL) ? env.OPENAI_API_KEY : undefined)
+
+    return { provider: openai({ baseUrl: checkedRoot(root, url, apiKey, env.AI_INSECURE), apiKey, insecure: env.AI_INSECURE }), model: env[model], voice: env.AI_VOICE }
+  }
 
   if (process.env.NODE_ENV !== 'development' && env.ANTHROPIC_API_KEY === undefined && env.OPENAI_API_KEY === undefined && env.AI_BASE_URL === undefined)
     throw configError(`no server for ${call}(); set ${url} to an OpenAI-compatible server, or OPENAI_API_KEY or AI_BASE_URL for the one ask() uses`)

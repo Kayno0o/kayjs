@@ -5,6 +5,7 @@ import { extraBody } from './extra'
 import { json, postEvents } from './http'
 import { openaiCalls } from './openai-calls'
 import { allRequired, outputSchema } from './output-schema'
+import { checkedRoot } from './root'
 import { MAX_ARGUMENTS, MAX_NAME_LENGTH, MAX_STREAMED_CALLS } from './tool-limits'
 
 export interface OpenAiOptions {
@@ -12,6 +13,8 @@ export interface OpenAiOptions {
   baseUrl?: string | undefined
   // Sent as a bearer token; a local server wanting none leaves it out.
   apiKey?: string | undefined
+  // Lets the key go over plain http to a host that is not loopback, for a network you trust such as a compose network; `AI_INSECURE=true` sets it from the environment.
+  insecure?: boolean | undefined
   model?: string | undefined
   // Fields added to the body of every request of this provider, such as `{ top_p: 0.9 }` or OpenRouter's `provider`; an ask's own `body` wins, and what kayjs-ai settles itself wins over both.
   body?: Record<string, unknown> | undefined
@@ -156,9 +159,9 @@ function documentsAt(root: string): Documents {
 }
 
 // An OpenAI chat completions server: OpenAI itself, Ollama, and the many that speak its API.
-export function openai({ baseUrl = OPENAI_URL, apiKey, model, body: fields, pdf }: OpenAiOptions = {}): Provider {
+export function openai({ baseUrl = OPENAI_URL, apiKey, insecure, model, body: fields, pdf }: OpenAiOptions = {}): Provider {
   const extra = extraBody(fields, 'openai({ body })')
-  const root = baseUrl.replace(TRAILING_SLASHES, '')
+  const root = checkedRoot(baseUrl, 'openai({ baseUrl })', apiKey, insecure).replace(TRAILING_SLASHES, '')
   const official = root === OPENAI_URL
   const documents: Documents = pdf ?? documentsAt(root)
 

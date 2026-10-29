@@ -4,10 +4,13 @@ import { AiError } from './errors'
 import { extraBody } from './extra'
 import { json, postEvents } from './http'
 import { outputSchema } from './output-schema'
+import { checkedRoot } from './root'
 import { MAX_ARGUMENTS, MAX_NAME_LENGTH, MAX_STREAMED_CALLS } from './tool-limits'
 
 export interface AnthropicOptions {
   apiKey: string
+  // Lets the key go over plain http to a host that is not loopback, for a network you trust; `AI_INSECURE=true` sets it from the environment.
+  insecure?: boolean | undefined
   // The API root, `https://api.anthropic.com` by default, for a proxy.
   baseUrl?: string | undefined
   model?: string | undefined
@@ -146,9 +149,9 @@ function inputOf(raw: string): Record<string, unknown> {
 }
 
 // Anthropic's Messages API.
-export function anthropic({ apiKey, baseUrl = ANTHROPIC_URL, model, body: fields }: AnthropicOptions): Provider {
+export function anthropic({ apiKey, baseUrl = ANTHROPIC_URL, insecure, model, body: fields }: AnthropicOptions): Provider {
   const extra = extraBody(fields, 'anthropic({ body })')
-  const root = baseUrl.replace(TRAILING_SLASHES, '')
+  const root = checkedRoot(baseUrl, 'anthropic({ baseUrl })', apiKey, insecure).replace(TRAILING_SLASHES, '')
 
   return {
     name: 'anthropic',

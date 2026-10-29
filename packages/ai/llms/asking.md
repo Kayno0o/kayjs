@@ -84,6 +84,8 @@ Mistral: `AI_BASE_URL=https://api.mistral.ai/v1`, its key in `OPENAI_API_KEY`, `
 
 `transcribe()`, `speak()` and `embed()` read their own variables (`AI_AUDIO_URL`, `AI_EMBED_URL`, a model each, `AI_VOICE`): [Speech and embeddings](speech-and-embeddings.md).
 
+`AI_INSECURE=true`: every API root (`AI_BASE_URL`, `AI_AUDIO_URL`, `AI_EMBED_URL`, `baseUrl`) must be an http(s) URL, and a key goes over plain http only to a loopback host (`localhost`, `127.0.0.1`, `[::1]`); a network you trust, such as a compose network, needs this (`insecure: true` on `openai()` and `anthropic()`). A root that does not parse or has no scheme throws at boot naming the variable. `AI_PROVIDER=openai` without `OPENAI_API_KEY` throws too, unless `AI_BASE_URL` names a compatible server.
+
 The provider is `AI_BASE_URL` when set, else the one key set. Nothing is read at import: a missing variable throws at the `ask()` call, naming what to set, and never while `kay build` runs.
 
 ### ask options
