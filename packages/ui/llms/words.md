@@ -24,7 +24,7 @@ ui: { sidePanel: { close: 'Fermer' } }
 - `kay check` leaves `ui.*` keys out of its comparison between locales, so a French block needs no English twin; a key a locale lacks reads the English.
 - CommandPalette's `recentLabel` names the heading the recently followed links sit under.
 - ContributionGraph's month names and the day and month a LineChart draws on its axis follow the page's locale; `en` keeps `5 Jan`.
-- Rating's `{value}` and `{max}` and RangeInput's and DateRangeInput's `{label}` fill the messages of the same name.
+- RangeInput's and DateRangeInput's `{label}` fill the messages of the same name.
 - ContactForm's labels read `ui.contactForm.*`, then kayjs-mail's `mail.contact.form.*` messages (English and French) before the English, SubscribeForm's `ui.subscribeForm.*`, then kayjs-mail's `mail.list.form.*`, and MarkdownEditor's `Uploading name…` marker, a placeholder in the text until the upload ends, stays English.
 - Texts the app's data owns, a `failure`, a `message` or a `label` it passes, are the app's to word.
 - Messages about the app's data are its own, passed as props (`failure`, `message`, `label`). The library's own words (`Close`, `Cancel`, `Loading…`...) are looked up in the app's catalogs under `ui.<component>.<prop>` keys, `ui.sidePanel.close`, before their English, and a prop given to the component replaces both. The French of every key ships with the library and is read on a French page with no setup.
@@ -56,7 +56,6 @@ ui: { sidePanel: { close: 'Fermer' } }
 - `ui.multiSelect.*`: `all` (`All`), `empty` (`No match`), `none` (`None`), `placeholder` (`Any`), `search` (`Search`), `selected` (`{count} selected`)
 - `ui.pagination.*`: `label` (`Pagination`), `next` (`Next`), `previous` (`Previous`)
 - `ui.rangeInput.*`: `from` (`{label} from`), `to` (`{label} to`)
-- `ui.rating.*`: `label` (`{value} out of {max}`)
 - `ui.recordButton.*`: `label` (`Record`), `failure` (`The recording could not be sent.`), `recording` (`Recording`), `stopped` (`Recording stopped`), `cancelled` (`Recording cancelled`), `insecure` (`The microphone needs the page opened over https.`), `unsupported` (`This browser cannot record sound.`), `denied` (`The microphone is blocked: allow it for this site in the browser's settings.`), `missing` (`No microphone was found.`), `taken` (`The microphone is in use by another application.`), `failed` (`The microphone could not be opened.`), `lost` (`The microphone was disconnected, so the recording was dropped.`), `empty` (`Nothing was recorded.`); Chat's microphone (kayjs-ai) says the same
 - `ui.rowsField.*`: `add` (`Add row`), `added` (`Row {n} added`), `remove` (`Remove row {n}`), `removed` (`Row {n} removed`)
 - `ui.saveForm.*`: `cancel` (`Cancel`), `clean` (`No unsaved change.`), `dirty` (`Unsaved changes.`), `discard` (`Discard`), `failure` (`Could not save.`), `save` (`Save`), `saving` (`Saving…`)

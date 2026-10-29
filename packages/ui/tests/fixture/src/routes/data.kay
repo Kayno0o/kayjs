@@ -53,12 +53,12 @@ main
   article#copy-accent
     CopyButton(text="https://kaynooo.fr" label="Copy link" tone="accent")
   article#rating
-    Rating(value={4.6})
+    Rating(value={4.6} label="4.6 out of 5")
   article#rating-out
     Rating(value={9} max={4} label="Top marks")
   article#rating-below
-    Rating(value={-1})
+    Rating(value={-1} label="-1 out of 5")
   article#rating-nan
-    Rating(value={Number.NaN})
+    Rating(value={Number.NaN} label="No rating")
   article#rating-none
-    Rating(value={3} max={0})
+    Rating(value={3} max={0} label="3 out of 0")

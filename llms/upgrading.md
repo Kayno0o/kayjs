@@ -2,6 +2,12 @@
 
 What each minor release breaks, and what an app changes to move to it. kay and its libraries share one version, so one section covers them all; a patch breaks nothing, and a minor missing here broke nothing.
 
+## 1.84.0
+
+### A kayjs-ui `Rating` needs its `label`
+
+- `Rating(value={4.6})` fails `kay check`: give it the text screen readers read, as `Meter` and `Progress` already need, `Rating(value={4.6} label="Rated 4.6 out of 5")`. The `ui.rating.label` message (`{value} out of {max}`) that stood in for a missing one is gone.
+
 ## 1.82.0
 
 ### An `ActionStream` has `ended()`

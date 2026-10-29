@@ -2931,7 +2931,7 @@ component default
 [./rating.kay] default
 component default
   class?: string | { root?: string; stars?: string; fill?: string; } | undefined
-  label?: string | undefined
+  label: string
   max?: number | undefined
   value: number
 
@@ -3155,12 +3155,8 @@ component default
 
 [./tabs.kay] default
 component default
-  class?: string | { root?: string; list?: string; tab?: string; icon?: string | { root?: string; } | undefined; panel?: string; } | undefined
-  label: string
-  onChange?: ((value: Value) => unknown) | undefined
-  panel: (value: Value) => Element
-  tabs: readonly { value: Value; label: string; icon?: IconProps | IconSlot | undefined; disabled?: boolean | undefined; }[]
-  value: Value
+  | { class?: string | { root?: string; list?: string; tab?: string; icon?: string | { root?: string; } | undefined; panel?: string; } | undefined; label: string; onChange?: ((value: Value) => unknown) | undefined; panel: (value: Value) => Element; param?: undefined; paramDefault?: undefined; tabs: readonly { value: Value; label: string; icon?: IconProps | IconSlot | undefined; disabled?: boolean | undefined; }[]; value: Value }
+  | { class?: string | { root?: string; list?: string; tab?: string; icon?: string | { root?: string; } | undefined; panel?: string; } | undefined; label: string; onChange?: ((value: Value) => unknown) | undefined; panel: (value: Value) => Element; param: string; paramDefault?: Value | undefined; tabs: readonly { value: Value; label: string; icon?: IconProps | IconSlot | undefined; disabled?: boolean | undefined; }[]; value?: undefined }
 
 [./text-input.kay] default
 component default

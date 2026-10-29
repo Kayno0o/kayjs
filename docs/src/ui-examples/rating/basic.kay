@@ -2,5 +2,5 @@
 import Rating from '@kaynooo/kayjs-ui/rating.kay'
 ---
 .flex.flex-col.gap-2
-  Rating(value={4.6})
+  Rating(value={4.6} label="Rated 4.6 out of 5")
   Rating(value={2} max={3} label="2 stars out of 3")

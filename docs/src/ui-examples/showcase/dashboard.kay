@@ -27,7 +27,7 @@ const replies = signal(true)
   Card(title="Settings")
     .flex.flex-col.items-start.gap-4
       Toggle(label="Email me on replies" checked={replies()} onChange={replies.set})
-      Rating(value={4.6})
+      Rating(value={4.6} label="Rated 4.6 out of 5")
       .flex.flex-wrap.gap-2
         Button(label="Save" tone="accent" icon="success")
         Button(label="Delete" tone="danger" icon="delete")

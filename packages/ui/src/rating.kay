@@ -2,7 +2,6 @@
 import type { JSX } from 'kay'
 import { recipe } from 'kay'
 import Icon from './icon.kay'
-import { wording } from 'kay/words'
 
 const look = recipe({
   parts: {
@@ -16,15 +15,15 @@ const { value, max = 5, label, ...rest } = props<Omit<JSX.IntrinsicElements['spa
   // Any number from 0 to `max`, so an average such as 4.6 fills part of its fifth star.
   value: number
   max?: number | undefined
-  // What screen readers read; `4 out of 5` by default.
-  label?: string | undefined
+  // What screen readers read, such as `Rated 4 out of 5`; required as Meter's and Progress's are, since the stars alone name nothing.
+  label: string
 }>()
 
 // One place per star; a value that is no number fills none.
 const places = () => Array.from({ length: Math.max(Math.floor(max), 0) }, (_, place) => place)
 const filled = () => max > 0 && Number.isFinite(value) ? Math.min(Math.max(value / max, 0), 1) * 100 : 0
 ---
-span(part="root" {...rest} role="img" aria-label={label ?? wording('ui.rating.label', '{value} out of {max}', { value: String(value), max: String(max) })})
+span(part="root" {...rest} role="img" aria-label={label})
   span(part="stars")
     for place of places() key={place}
       Icon(icon="star")
