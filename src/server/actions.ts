@@ -38,7 +38,7 @@ import { countSucceeded, isAgentCall, markChallenge, PRETEND, protectionRefusal,
 import { sharedContext } from './render'
 import { reportServerError } from './report'
 import { recordOf, requestRecord } from './request-record'
-import { overHttps, requestUrl } from './request-url'
+import { LOCAL_HOST, overHttps, requestUrl } from './request-url'
 import { guardUrl } from './routes'
 import { fieldOf } from './schema-check'
 import { readPersonally } from './scope'
@@ -645,12 +645,16 @@ function configuredHost(): string | undefined {
   return siteHost.host
 }
 
-// Hosts rather than origins: behind a TLS-terminating proxy the browser says https while the request arrives as http. The host of `site` in kay.config.ts counts too, for a proxy that does not pass the browser's `Host` on.
+// Hosts rather than origins, but for a plain `http:` origin on an https site: behind a TLS-terminating proxy the browser says https while the request arrives as http. The host of `site` in kay.config.ts counts too, for a proxy that does not pass the browser's `Host` on.
 function sameHost(request: Request, url: URL | null, appUrl?: string): url is URL {
   if (url === null)
     return false
 
   const { host } = url
+
+  // An `http:` origin on an https site is a downgrade only a network attacker makes, so it is no match; a machine tried locally may run either.
+  if (url.protocol === 'http:' && !LOCAL_HOST.test(url.hostname) && (overHttps(request) || appUrl?.startsWith('https:') === true))
+    return false
 
   return host === requestUrl(request).host || host === configuredHost() || (appUrl !== undefined && host === URL.parse(appUrl)?.host)
 }

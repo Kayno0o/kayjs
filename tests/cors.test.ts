@@ -1,5 +1,6 @@
 import { rm } from 'node:fs/promises'
 import { join, relative } from 'node:path'
+import process from 'node:process'
 import { brotliDecompressSync } from 'node:zlib'
 import { afterAll, describe, expect, it, spyOn } from 'bun:test'
 import { check } from '../src/check'
@@ -287,6 +288,36 @@ describe('crossSiteRefused', () => {
     expect(crossSiteRefused(post({}))).toBe(false)
     expect(crossSiteRefused(post({ origin: 'http://app.test' }))).toBe(false)
     expect(crossSiteRefused(post({ origin: 'https://public.example' }), 'https://public.example')).toBe(false)
+  })
+
+  it('refuses an http origin of the site\'s own host once the site is https, not one on a machine tried locally nor on an http site', () => {
+    const secure = (origin: string, headers: Record<string, string> = {}) => new Request('https://app.test/x', { method: 'POST', headers: { origin, ...headers } })
+    const before = configuredSite()
+
+    expect(crossSiteRefused(secure('http://app.test'))).toBe(true)
+    expect(crossSiteRefused(secure('https://app.test'))).toBe(false)
+    // Behind a TLS-terminating proxy the request is http and X-Forwarded-Proto says https.
+    expect(crossSiteRefused(post({ 'origin': 'http://app.test', 'x-forwarded-proto': 'https' }))).toBe(true)
+    expect(crossSiteRefused(post({ 'origin': 'https://app.test', 'x-forwarded-proto': 'https' }))).toBe(false)
+    // The app's public URL being https counts too, for a proxy passing neither.
+    expect(crossSiteRefused(post({ origin: 'http://public.example' }), 'https://public.example')).toBe(true)
+    expect(crossSiteRefused(post({ origin: 'http://app.test' }))).toBe(false)
+    expect(crossSiteRefused(new Request('https://localhost:3000/x', { method: 'POST', headers: { origin: 'http://localhost:3000' } }))).toBe(false)
+
+    // A site set to https stands in for a proxy that passes nothing on in production, and says nothing of how a dev server is reached.
+    const mode = process.env.NODE_ENV
+
+    setSite('https://app.test')
+
+    try {
+      expect(crossSiteRefused(post({ origin: 'http://app.test' }))).toBe(false)
+      process.env.NODE_ENV = 'production'
+      expect(crossSiteRefused(post({ origin: 'http://app.test' }))).toBe(true)
+    }
+    finally {
+      process.env.NODE_ENV = mode
+      setSite(before?.origin, before?.slashed ? 'always' : undefined)
+    }
   })
 
   it('names the origin it saw and the ones it takes for the site, with the request or action word', async () => {

@@ -5,8 +5,9 @@ import { requestRecord } from './request-record'
 
 // The first proxy's `X-Forwarded-Proto` saying the browser came over https.
 const FORWARDED_HTTPS = /^\s*https\s*(?:,|$)/i
+
 // A server tried on this machine, which may well run over plain http.
-const LOCAL_HOST = /^(?:localhost|127\.\d+\.\d+\.\d+|\[::1\])$/
+export const LOCAL_HOST = /^(?:localhost|127\.\d+\.\d+\.\d+|\[::1\])$/
 let warnedScheme = false
 
 // The request's URL, parsed once however many of kay's routes, hooks and scopes read it; shared, so never changed.

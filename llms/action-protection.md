@@ -35,6 +35,7 @@ See [Rate limits](rate-limits.md#limit-attempts-in-a-guard-or-an-api-route).
 ### Cross-site posts
 
 - A post another site sends, as its `Origin` or `Sec-Fetch-Site` header shows, is refused with 403.
+- On a site served over https (the request itself, `X-Forwarded-Proto: https`, or an https `site` in production), an `http:` `Origin` of the site's own host is refused too, as a downgrade; `localhost`, `127.x` and `[::1]` are exempt, so `kay dev` and a production build tried locally keep working.
 - The 403 is `text/plain` and says what it saw: `Cross-site action refused: Origin http://localhost:4701 is not this site (http://127.0.0.1:4701; set or fix site in kay.config.ts if a proxy changes the host)`, or `Sec-Fetch-Site is cross-site and the request has no Origin, not same-origin or none`; the echoed header is stripped of control and bidi characters and cut at 100 without splitting a character, and an empty `Sec-Fetch-Site` with no `Origin` reads `the request sent an empty Sec-Fetch-Site and no Origin`. The same text, `request` for `action`, refuses an api route.
 - A post from the host of `site` in kay.config.ts is the site's own, so a proxy that does not pass the browser's `Host` on, and nginx leaves it out unless told `proxy_set_header Host $host`, refuses none.
 
