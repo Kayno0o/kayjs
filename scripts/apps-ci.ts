@@ -24,7 +24,7 @@ export type Script = typeof SCRIPTS[number]
 export const SCRIPTS = ['check', 'lint', 'test'] as const
 
 const COMPOSE = 'needs the compose stack of its own test database'
-const ORBIT_DIRS = ['atlas', 'aurora', 'hubble', 'relay', 'selene']
+const ORBIT_DIRS = ['atlas', 'aurora', 'hubble', 'pallas', 'pulsar', 'relay', 'selene', 'shell', 'shell/tests/fixture', 'voyager', 'vulcan']
 const ORBIT_DATABASE = 'needs a database and services only its compose files start'
 
 // The apps of the `kay-sites` memory that have a remote (kay-mail-test has none), with enshrouded's dashboard and mc-stats, which pin kay too; relay/auth is not an orbit workspace, so it installs on its own.
