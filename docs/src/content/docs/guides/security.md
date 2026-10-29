@@ -350,6 +350,8 @@ A module without `cors` refuses every other origin. The module's rule is the onl
 
 A URL bound to an `href`, `src`, `action`, `formaction`, `xlink:href`, `poster` or `data` keeps its scheme only when it is `http`, `https`, `mailto`, `tel`, `sms` or `blob`, a `data:` image, audio or video that is not SVG, or a `data:` plain text, CSV, PDF or JSON file, or has none, as a path does. Any other, `javascript:` first, goes out as `unsafe:javascript:...`, which a browser does nothing with, on the server and in islands alike.
 
+A scheme the app trusts on purpose, such as `webcal:`, `geo:` or its own `myapp:`, goes in `links: { schemes: ['webcal', 'geo'] }` in `kay.config.ts`; `javascript`, `vbscript` and `data` are refused there. `kay dev` logs each bound URL rewritten to `unsafe:` once, with its attribute, scheme and page.
+
 An SVG `data:` image passes on `src` and `poster` only, where the browser draws it as a picture and runs none of its scripts.
 
 ## Answer only to your own host
@@ -368,7 +370,9 @@ export default defineConfig({
 ## A post from another site
 
 An action and an API route refuse a post another site sends, from its `Origin` or `Sec-Fetch-Site` header. The refusal is a 403 that says what it saw.
- On a site served over https, an `http:` origin of the site's own host is refused too, except on `localhost`.
+
+
+On a site served over https, an `http:` origin of the site's own host is refused too, except on `localhost`.
 Code on a plain Elysia route that kay does not reach asks for itself. `crossSiteRefused(request)` from `kay/server` is true for a browser's cross-site POST or websocket upgrade. `crossSiteResponse(request, 'request')` is the 403 to answer with, saying what the request sent and what kay took for the site. Pass `'action'` as the second argument for a form post.
 
 ```ts

@@ -11,6 +11,7 @@ import { pickConfig } from './config'
 import { isFrench } from './runtime/french'
 import { IMAGE_WIDTHS, parseWidths } from './runtime/image'
 import { basePath } from './server/base'
+import { linkSchemes } from './server/link-schemes'
 
 // The content collections' config, when `content` names no other file.
 export const CONTENT_CONFIG = 'src/content.config.ts'
@@ -187,7 +188,7 @@ function customWidths(widths: number[] | undefined): number[] | undefined {
 
 // How every page renders, served or prerendered alike.
 export function renderOptionsOf(config: KayConfig, mode: Pick<Mode, 'dev' | 'devRoutes'>, built: { head: SeoHead | undefined, maxDensity: number, editor?: string | undefined, contexts?: string[] | undefined, fontCss?: string | undefined, islandPreloads?: RenderOptions['islandPreloads'] }): RenderOptions {
-  return { ...pickConfig(config, RENDER_CONFIG), dev: mode.dev, devTools: mode.devRoutes, serverTiming: config.serverTiming ?? mode.dev, sameTabLinks: config.links?.outside === 'same-tab', fontCss: config.saveData === false ? undefined : built.fontCss, islandPreloads: config.saveData === false ? undefined : built.islandPreloads, head: built.head, base: basePath(config.base), maxDensity: built.maxDensity, imageWidths: customWidths(config.images?.widths), resolvedImages: config.images?.resolve !== undefined, offline: registersWorker(config, mode), installOffer: pushListed(config), editor: built.editor, contexts: built.contexts }
+  return { ...pickConfig(config, RENDER_CONFIG), dev: mode.dev, devTools: mode.devRoutes, serverTiming: config.serverTiming ?? mode.dev, sameTabLinks: config.links?.outside === 'same-tab', linkSchemes: linkSchemes(config), fontCss: config.saveData === false ? undefined : built.fontCss, islandPreloads: config.saveData === false ? undefined : built.islandPreloads, head: built.head, base: basePath(config.base), maxDensity: built.maxDensity, imageWidths: customWidths(config.images?.widths), resolvedImages: config.images?.resolve !== undefined, offline: registersWorker(config, mode), installOffer: pushListed(config), editor: built.editor, contexts: built.contexts }
 }
 
 // A project as every entry point takes it: where it is, its config, where it keeps each part and how it runs.

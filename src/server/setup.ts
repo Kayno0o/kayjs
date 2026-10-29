@@ -20,6 +20,7 @@ import { setTimeZone } from '../runtime/i18n'
 import { liveStoreReady } from '../runtime/live-value'
 import { runInLocale } from '../runtime/locale-state'
 import { setSite } from '../runtime/site'
+import { trustSchemes } from '../runtime/url'
 import { setAppRoot } from './app-identity'
 import { setupStore } from './app-store'
 import { basePath } from './base'
@@ -28,6 +29,7 @@ import { chooseInlineStyles } from './client'
 import { appServesManifest } from './favicon'
 import { entryFilePaths, followEntryFiles, implicitI18n, linkedSettings, loadI18n, routedSettings, serveLocales, stateFor } from './i18n'
 import { applyImageConfig } from './image'
+import { linkSchemes } from './link-schemes'
 import { loadMatchers } from './params'
 import { setupPreview } from './preview'
 import { dropOpenCache, privateDir } from './private-dir'
@@ -41,6 +43,7 @@ import { projectSource } from './source'
 import { setupStampSecret, warnOnStampKey } from './stamp'
 import { setupStorage } from './storage'
 import { setTracer } from './trace'
+import { reportUnsafeUrls } from './unsafe-urls'
 import { sharedStores } from './workers'
 
 // What the config's refusals that need the scanned project read, handed to the check a server passes before any client build starts.
@@ -148,6 +151,11 @@ async function setupWith<Claimed>(project: Project, loadClient: () => Promise<Cl
     await dropOpenCache()
 
   setSite(site, config.trailingSlash, prerendering, config.links?.outside === 'same-tab')
+  trustSchemes(linkSchemes(config))
+
+  if (mode.dev)
+    reportUnsafeUrls()
+
   setContentMode(mode, paths.output)
 
   // A build may run without the server's secrets, the preview one included.

@@ -162,6 +162,7 @@ export default defineConfig({
 - A static export has no server to send them: `kay build --static` writes the page without its `security` and `reload`, which the host's own headers stand in for.
 - `inlineScriptHashes({ prefetch, dev, base, offline })` from `kay/server` gives the hashes, for a policy written elsewhere, such as by a proxy.
 - Whatever the policy, a URL with any scheme but `http`, `https`, `mailto`, `tel`, `sms` and `blob` (and `data:` image, audio and video but not SVG, which passes only on `src` and `poster`, plain text, CSV, PDF and JSON), such as `javascript:`, bound to an `href`, `src`, `action`, `formaction`, `xlink:href`, `poster` or `data`, as a user-supplied link would be, goes out prefixed with `unsafe:`, on the server and in islands, so following it does nothing. A relative URL has no scheme and is kept.
+- `links: { schemes: ['webcal', 'geo'] }` in `kay.config.ts` lists the other schemes the app trusts in a bound URL (`whatsapp`, `webcal`, `geo`, `spotify`, its own `myapp`), on the server and in islands, which read the list from a `kay-link-schemes` meta; a name is lowercase with no colon, and `javascript`, `vbscript` and `data` are refused when the config loads. A literal `a(href="webcal://...")` was never rewritten. `kay dev` logs, once per attribute, URL and page, each bound URL rewritten to `unsafe:`, naming the scheme and this option; an island's own rewrite is not logged.
 - One written out as text in the template is left as it is.
 
 ### Compression

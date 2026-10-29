@@ -100,7 +100,7 @@ export default defineConfig({
 - `lang`, the `<html lang>` of every page when `i18n` is not set, defaults to `en`.
 - `timeZone: 'Europe/Paris'` is the zone `formatDate` and message dates write in, on the server and in islands alike, instead of the server's and the visitor's ([Locales](locales.md)).
 - `typography: false` leaves a French page's spaces before `: ; ! ?` and inside `« »` as typed instead of making them non-breaking ([Locales](locales.md#french-typography)).
-- `links: { outside: 'same-tab' }` keeps a link to another origin in the same tab, where it opens in a new one by default ([Navigation](navigation.md#navigation)).
+- `links: { outside: 'same-tab' }` keeps a link to another origin in the same tab, where it opens in a new one by default ([Navigation](navigation.md#navigation)); `links: { schemes: ['webcal'] }` lets a bound URL keep a scheme beyond the web's, mail, phone and sms ([Security](proxy-and-security.md)).
 
 - A page without kay's script carries speculation rules, and one shipping it a `kay-prefetch` meta naming the setting alone, as the swap prefetches its links itself (see [Navigation](navigation.md#navigation)): Chromium, or the swap, prefetches the page a link points at once it is hovered (`prefetch: 'moderate'`), on press with `'conservative'`, as soon as it can with `'eager'`, never with `false`.
 - Links under `/_kay/` or `/api/`, with `download` or with `rel="nofollow"` are never prefetched; any other link that changes something on GET, such as a logout, takes `data-no-prefetch`.

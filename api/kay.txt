@@ -3408,7 +3408,7 @@ interface KayConfig
   jobs?: JobsConfig | undefined
   lang?: string | undefined
   lateStyles?: boolean | undefined
-  links?: { outside?: "new-tab" | "same-tab" | undefined; } | undefined
+  links?: { outside?: "new-tab" | "same-tab" | undefined; schemes?: string[] | undefined; } | undefined
   lints?: LintLevels | undefined
   live?: LiveConfig | undefined
   log?: Logger | undefined
@@ -3594,7 +3594,7 @@ interface PagesOptions extends KayConfig
   jobs?: JobsConfig | undefined
   lang?: string | undefined
   lateStyles?: boolean | undefined
-  links?: { outside?: "new-tab" | "same-tab" | undefined; } | undefined
+  links?: { outside?: "new-tab" | "same-tab" | undefined; schemes?: string[] | undefined; } | undefined
   lints?: LintLevels | undefined
   live?: LiveConfig | undefined
   log?: Logger | undefined
@@ -4362,7 +4362,7 @@ interface TestOptions extends PagesOptions
   jobs?: JobsConfig | undefined
   lang?: string | undefined
   lateStyles?: boolean | undefined
-  links?: { outside?: "new-tab" | "same-tab" | undefined; } | undefined
+  links?: { outside?: "new-tab" | "same-tab" | undefined; schemes?: string[] | undefined; } | undefined
   lints?: LintLevels | undefined
   live?: LiveConfig | undefined
   locals?: ((request: Request) => Record<string, unknown> | Promise<Record<string, unknown>>) | undefined

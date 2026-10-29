@@ -1,0 +1,16 @@
+---
+const calendar = 'webcal://example.com/events.ics'
+const place = 'GEO:48.85,2.35'
+const spaced = ' \twebcal://example.com/spaced'
+const script = 'javascript:alert(1)'
+const markup = 'data:text/html,<p>x</p>'
+const other = 'spotify:track:1'
+---
+main
+  a.calendar(href={calendar}) Calendar
+  a.place(href={place}) Place
+  a.spaced(href={spaced}) Spaced
+  a.script(href={script}) Script
+  a.markup(href={markup}) Markup
+  a.other(href={other}) Other
+  a.mail(href="mailto:me@example.com") Mail
