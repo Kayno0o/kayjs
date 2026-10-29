@@ -142,7 +142,7 @@ async function landings(...names: string[]) {
   }
 
   // The environment of this run without the landing's own knobs, which a landing running this test sets for itself.
-  const { KAY_LAND_SHARDS: _shards, ...outerEnv } = process.env
+  const outerEnv = Object.fromEntries(Object.entries(process.env).filter(([key]) => key !== 'KAY_LAND_SHARDS'))
 
   // Runs a landing in a clone, its output and exit code once it ends; its rebase commits, so it gets an identity CI's git has none of.
   const land = (name: string, env: Record<string, string> = {}) => {
