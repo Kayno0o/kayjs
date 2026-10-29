@@ -57,3 +57,44 @@ describe('deprecated-session-stores', () => {
     }
   })
 })
+
+describe('deprecated-session-stores, fixes that would change the code', () => {
+  const report = async (source: string, kind = 'ts') => {
+    const root = await project({ [`src/a.${kind}`]: source })
+
+    try {
+      const found = await sessionStores(root, {})
+
+      await applySafeFixes(root, found)
+
+      return { count: found.length, fixed: found.filter(diagnostic => diagnostic.fixes).length, text: await Bun.file(join(root, `src/a.${kind}`)).text() }
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  }
+
+  it('reports with no fix an export, an annotated declaration, a taken new name and a template read', async () => {
+    for (const source of [
+      'import { memoryStore } from \'kay/server\'\n\nexport { memoryStore }\n',
+      'import { memoryStore } from \'kay/server\'\n\nexport const f = (memoryStore: number) => memoryStore\n',
+      'import { memoryStore } from \'kay/server\'\n\nconst { memoryStore: x } = { memoryStore }\nexport const y = x\n',
+      'import { memoryStore } from \'kay/server\'\n\nconst memorySessions = 1\nexport const z = [memoryStore(), memorySessions]\n',
+    ]) {
+      const result = await report(source)
+
+      expect([result.count, result.fixed, result.text]).toEqual([1, 0, source])
+    }
+
+    const page = '--- server\nimport { memoryStore } from \'kay/server\'\n\nconst store = memoryStore()\n---\np= String(memoryStore)\n'
+
+    expect(await report(page, 'kay')).toEqual({ count: 1, fixed: 0, text: page })
+  })
+
+  it('leaves the members and keys of that name, and types, as they are', async () => {
+    const source = 'import { memoryStore } from \'kay/server\'\n\nclass K { memoryStore() { return 1 } }\ninterface I { memoryStore: number }\nexport const a = [new K().memoryStore(), memoryStore(), ({ memoryStore: 1 }).memoryStore] as unknown as I\n'
+    const result = await report(source)
+
+    expect(result.text).toBe(source.replace('{ memoryStore }', '{ memorySessions }').replace('memoryStore(), (', 'memorySessions(), (').replace('import { memoryStore }', 'import { memorySessions }'))
+  })
+})

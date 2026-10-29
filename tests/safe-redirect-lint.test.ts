@@ -25,7 +25,7 @@ describe('deprecated-safe-redirect', () => {
 
       expect(found).toHaveLength(4)
       await applySafeFixes(root, found)
-      expect(await Bun.file(join(root, 'src/routes/index.kay')).text()).toBe('--- server\nimport { localPath } from \'kay\'\n\nconst next = localPath(ctx.query.next, \'/\')\nconst home = localPath(ctx.query.next, \'/home\')\n---\np= next\n')
+      expect(await Bun.file(join(root, 'src/routes/index.kay')).text()).toBe('--- server\n\nconst next = localPath(ctx.query.next, \'/\')\nconst home = localPath(ctx.query.next, \'/home\')\n---\np= next\n')
       expect(await Bun.file(join(root, 'src/kept.ts')).text()).toBe('import { localPath } from \'kay\'\nimport { createAuth } from \'@kaynooo/kayjs-auth\'\n\nexport const a = (value: unknown) => localPath(value, \'/\',)\n')
       expect(await Bun.file(join(root, 'src/already.ts')).text()).toBe('import { localPath } from \'kay\'\n\nexport const b = (value: unknown) => [localPath(value, \'/\'), localPath(value, \'/\')]\n')
       expect(await safeRedirects(root, {})).toEqual([])
@@ -50,5 +50,37 @@ describe('deprecated-safe-redirect', () => {
     finally {
       await rm(root, { recursive: true, force: true })
     }
+  })
+})
+
+describe('deprecated-safe-redirect, fixes that would break the code', () => {
+  const report = async (files: Record<string, string>) => {
+    const root = await project(files)
+
+    try {
+      const found = await safeRedirects(root, {})
+
+      await applySafeFixes(root, found)
+
+      return { count: found.length, fixed: found.filter(diagnostic => diagnostic.fixes).length, files: Object.fromEntries(await Promise.all(Object.keys(files).map(async path => [path, await Bun.file(join(root, path)).text()]))) as Record<string, string> }
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  }
+
+  it('reports with no fix a template read, a taken localPath and a namespace call', async () => {
+    const page = '--- server\nimport { safeRedirect } from \'@kaynooo/kayjs-auth\'\n\nconst next = safeRedirect(ctx.query.next)\n---\na(href=safeRedirect(ctx.query.back)) back\n'
+    const taken = 'import { safeRedirect } from \'@kaynooo/kayjs-auth\'\n\nexport const a = (localPath: string) => safeRedirect(localPath)\n'
+    const namespace = 'import * as auth from \'@kaynooo/kayjs-auth\'\n\nexport const b = (value: unknown) => auth.safeRedirect(value)\n'
+    const result = await report({ 'src/routes/index.kay': page, 'src/taken.ts': taken, 'src/namespace.ts': namespace })
+
+    expect([result.count, result.fixed, result.files]).toEqual([3, 0, { 'src/routes/index.kay': page, 'src/taken.ts': taken, 'src/namespace.ts': namespace }])
+  })
+
+  it('adds no import of localPath to a fence, which reads it without one', async () => {
+    const result = await report({ 'src/routes/index.kay': '--- server\nimport { safeRedirect } from \'@kaynooo/kayjs-auth\'\n\nconst next = safeRedirect(ctx.query.next)\n---\np= next\n' })
+
+    expect(result.files['src/routes/index.kay']).toBe('--- server\n\nconst next = localPath(ctx.query.next, \'/\')\n---\np= next\n')
   })
 })

@@ -3,22 +3,29 @@ import type { CheckDiagnostic, CheckOptions } from '.'
 import type { Edit } from './renamed-exports'
 import { lintLevel } from '../compiler/lints'
 import { importedName, walk } from './ast'
-import { scan } from './renamed-exports'
+import { mentions, scan } from './renamed-exports'
 
 const AUTH_PACKAGE = '@kaynooo/kayjs-auth'
 const NEWLINE = /^\r?\n/
-const SAFE_REDIRECT = /safeRedirect/
+const SAFE_REDIRECT = /\bsafeRedirect\b/
 
 // `safeRedirect(path, fallback?)` of kayjs-auth, kay's `localPath(path, fallback)` with `/` as the default: the fix calls `localPath` and imports it from kay.
 export async function safeRedirects(root: string, options: CheckOptions): Promise<CheckDiagnostic[]> {
   if (lintLevel('deprecated-safe-redirect', options.lints) === 'allow')
     return []
 
-  return scan(root, options, 'deprecated-safe-redirect', SAFE_REDIRECT, ({ parsed, report }) => {
+  return scan(root, options, 'deprecated-safe-redirect', SAFE_REDIRECT, ({ file, parsed, unparsed, report }) => {
     for (const { ast, base, text } of parsed) {
       const imports = ast.program.body.filter((statement): statement is t.ImportDeclaration => statement.type === 'ImportDeclaration' && statement.importKind !== 'type')
       const library = imports.filter(statement => statement.source.value === AUTH_PACKAGE)
       const specifier = library.flatMap(statement => statement.specifiers).find((one): one is t.ImportSpecifier => one.type === 'ImportSpecifier' && one.importKind !== 'type' && importedName(one) === 'safeRedirect')
+
+      const namespaces = new Set(library.flatMap(statement => statement.specifiers).flatMap(one => one.type === 'ImportNamespaceSpecifier' ? [one.local.name] : []))
+
+      walk(ast, (node) => {
+        if (node.type === 'MemberExpression' && !node.computed && node.object.type === 'Identifier' && namespaces.has(node.object.name) && node.property.type === 'Identifier' && node.property.name === 'safeRedirect')
+          report(base + node.property.start!, base + node.property.end!, '`safeRedirect` is kay\'s `localPath` under another name: kayjs-auth keeps it until 1.87', 'call `localPath(path, \'/\')` from kay', null)
+      })
 
       if (!specifier)
         continue
@@ -42,8 +49,12 @@ export async function safeRedirects(root: string, options: CheckOptions): Promis
       }
 
       // Each call has its callee as one read of the name; any other read is the function used as a value, which no call rewrite covers.
-      const rewritable = others === calls.length && calls.every(call => call.arguments.length === 1 || call.arguments[1]!.type === 'StringLiteral')
-      const importEdits = rewritable ? [dropSpecifier(declaration, specifier, text), ...kay ? [] : [{ start: declaration.start!, end: declaration.start!, text: 'import { localPath } from \'kay\'\n' }]] : []
+      // A template, another span or a file where `localPath` is already some other name is left to the app.
+      const elsewhere = SAFE_REDIRECT.test(unparsed) || parsed.some(other => other.text !== text && SAFE_REDIRECT.test(other.text))
+      const taken = !kay && mentions(parsed.map(one => one.ast), 'localPath')
+      const rewritable = !elsewhere && !taken && others === calls.length && calls.every(call => call.arguments.length === 1 || call.arguments[1]!.type === 'StringLiteral')
+      // A fence needs no import of `localPath`, which the compiler adds when it reads it.
+      const importEdits = rewritable ? [dropSpecifier(declaration, specifier, text), ...kay || file.endsWith('.kay') ? [] : [{ start: declaration.start!, end: declaration.start!, text: 'import { localPath } from \'kay\'\n' }]] : []
 
       for (const [index, call] of calls.entries()) {
         const callee = call.callee as t.Identifier
