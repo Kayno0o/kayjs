@@ -1,5 +1,6 @@
 import type { FetchedPage, Swap } from './navigation'
 import type { Policy } from './swap-flight'
+import { reviveActionsOf } from './action-revive'
 import { historyState, leave, leaving, navigation, pageKey, restoreScroll, saveScroll } from './navigation'
 import { NAVIGATION_ENTRY } from './navigation-entry'
 import { forgetPageData } from './page-data'
@@ -225,7 +226,7 @@ export async function show(page: FetchedPage, hash: string, swap: Swap, isCurren
   const head = mergeHead(next)
   const holds = holding()
 
-  await head.loaded
+  await Promise.all([head.loaded, reviveActionsOf(next)])
 
   // A chunk that never answers is given up on as one that failed: the next page's copy of the island shows, inert until fetched.
   const kept = holds && await bounded(holds, CHUNK_TIMEOUT_MS)

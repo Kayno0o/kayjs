@@ -5,7 +5,7 @@ import { afterAll, describe, expect, it } from 'bun:test'
 import { actionStub, reviveActions } from '../src/runtime/action'
 import { child } from '../src/runtime/html'
 import { island, IslandPropsError } from '../src/runtime/island.server'
-import { decodeValue, encodeValue, noActionReviver, serverWritten, unflattenValue } from '../src/runtime/wire'
+import { decodeValue, encodeValue, serverWritten, unflattenValue } from '../src/runtime/wire'
 import { browserPath, testSite } from '../src/test'
 
 const site = await testSite({ root: 'tests/fixtures/island-action', browser: true })
@@ -74,11 +74,6 @@ describe('the wire of an action', () => {
     expect(encodeValue({ run: greet }, true)).toContain(`"Action"`)
   })
 
-  it('names the fix when props carrying an action reach an island that does not type a prop as one', () => {
-    serverWritten.Action = noActionReviver
-    expect(() => decodeValue(encodeValue({ run: greet }, true), serverWritten)).toThrow('import `Action` from \'kay\'')
-  })
-
   it('revives only a URL under the actions\' own path', () => {
     reviveActions()
 
@@ -98,25 +93,23 @@ describe('the wire of an action', () => {
     expect(() => child(Dialog({ run: (greet as unknown as { with: (fields: object) => unknown }).with({ name: 'Ann' }) }))).toThrow('with()')
   })
 
-  it('names the fix at render, in production, for an island passed an action it does not type a prop as', async () => {
-    const response = await site.fetch('/untyped')
+  it('renders an island passed an action whatever its props are typed as, in production and in dev, a promoted one included', async () => {
+    for (const rendered of [site, developed]) {
+      expect((await rendered.fetch('/untyped')).status).toBe(200)
+      expect((await rendered.fetch('/promoted-untyped')).status).toBe(200)
+      expect(await (await rendered.fetch('/promoted-untyped')).text()).toContain('"/_kay/action/src/routes/promoted-untyped.kay/hello"')
+    }
 
-    expect(response.status).toBe(500)
-    expect((await site.fetch('/browser-only')).status).toBe(200)
-    expect(() => child(island('untyped.kay', (_props: { run: unknown }) => null)({ run: greet }))).toThrow('import `Action` from \'kay\'')
-    expect(() => child(island('typed.kay', (_props: { run: unknown }) => null, [], false, undefined, [], true)({ run: greet }))).not.toThrow()
+    expect(() => child(island('untyped.kay', (_props: { run: unknown }) => null)({ run: greet }))).not.toThrow()
   })
 
-  it('has a promoted component typing a prop as an action take one, in production and in dev, and refuses one that does not naming the fix', async () => {
+  it('has a promoted component typing a prop as an action take one, in production and in dev', async () => {
     for (const rendered of [site, developed]) {
       const html = await (await rendered.fetch('/promoted')).text()
 
       expect(html).toContain(`"${hello.url}"`)
       expect(html).toContain('<slot')
-      expect((await rendered.fetch('/promoted-untyped')).status).toBe(500)
     }
-
-    expect(await (await developed.fetch('/promoted-untyped')).text()).toContain('import `Action` from')
   })
 
   it('does not take any function for an action', () => {
@@ -148,6 +141,16 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('an island 
 
     await page.click('button.count')
     await page.waitFor('p.last', { text: '3' })
+    expect(page.errors).toEqual([])
+  })
+})
+
+describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('an island typing its prop as a plain function', () => {
+  it('calls the action it was passed, the reviver loading with the props', async () => {
+    const page = await site.open('/untyped', { path })
+
+    await page.click('button.show')
+    await page.waitFor('p.untyped', { text: 'Zoe' })
     expect(page.errors).toEqual([])
   })
 })

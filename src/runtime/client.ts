@@ -1,4 +1,5 @@
 import type { DevProblems } from './dev-boot'
+import { reviveActionsIn } from './action-revive'
 import { withBase } from './base'
 import { skew } from './build'
 import { dispatch, hydrate, render } from './dom'
@@ -189,10 +190,10 @@ async function hydrateIsland(registry: IslandRegistry, element: HTMLElement): Pr
     return
   }
 
-  let loaded: [Awaited<ReturnType<IslandRegistry[string]>>, Awaited<ReturnType<typeof staticSlots>>, Awaited<ReturnType<typeof livePropsOf>>]
+  let loaded: [Awaited<ReturnType<IslandRegistry[string]>>, Awaited<ReturnType<typeof staticSlots>>, Awaited<ReturnType<typeof livePropsOf>>, void]
 
   try {
-    loaded = await Promise.all([load(), staticSlots(registry, element), livePropsOf(element)])
+    loaded = await Promise.all([load(), staticSlots(registry, element), livePropsOf(element), reviveActionsIn(element.dataset.props)])
   }
   catch (error) {
     // A chunk that failed to load is dropped like a missing one.
@@ -360,6 +361,8 @@ async function hotSwap(registry: IslandRegistry, swap: HotSwap): Promise<boolean
         // Not hydrated yet: it loads the new chunk when it does.
         continue
       }
+
+      await reviveActionsIn(element.dataset.props)
 
       const values = signalsOf.get(element)?.()
       const props = { ...element.dataset.props === undefined ? {} : decodeServerValue(element.dataset.props) as object, ...await staticSlots(registry, element) }

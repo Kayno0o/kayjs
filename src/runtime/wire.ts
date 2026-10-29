@@ -29,14 +29,6 @@ export const serverWritten: Record<string, Reviver> = {
   [SAFE_HTML]: (text: string) => vouch(text.substring(1)),
 }
 
-// The action reviver until an island typing a prop as an action installs the one building stubs (`reviveActions`, action.ts), so the core chunk carries none.
-export function noActionReviver(): never {
-  throw new TypeError('kay: an island was passed an action but does not type a prop as one: import `Action` from \'kay\' in its script, as the type of that prop')
-}
-
-if (process.env.NODE_ENV !== 'production')
-  serverWritten[ACTION_TYPE] = noActionReviver
-
 export function decodeServerValue(text: string): unknown {
   return decodeValue(text, serverWritten)
 }

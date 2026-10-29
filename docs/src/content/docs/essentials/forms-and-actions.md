@@ -294,7 +294,7 @@ form(action={signOut})
 
  The action must be exported by a page or endpoint, in this page or another one. An action fixed with `.with()` cannot be passed: pass the plain action and give the fields as its input.
 
-An island that does not type the prop with an action type fails the render, in production too, and the error names the fix. A static component that kay turns into an island because it passes a function to one follows the same rule.
+An island needs no import for the prop: typed as a plain function, `(input: { name: string }) => Promise<string>`, it is handed the action all the same, the code reviving it loading in the browser only for a page that passes an island one.
 
 In a `catch`, `add.refused(error)` tells a refusal from `ctx.fail` apart from any other error, and types `error.data`.
 

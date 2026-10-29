@@ -94,7 +94,6 @@ Each lint has a level. `deny` is an error, `warn` a warning, `allow` hides it. W
 | `unkept-page` | warn | code | A page saying `keep: true` that `kay build` does not keep |
 | `unguarded-route` | deny | security | With `requireGuards`, a route no guard covers that does not set `guards: false` |
 | `unguarded-tool` | warn | security | With `mcp`, a tool action with bot protection that no guard covers |
-| `island-action` | deny | islands | An action handed to an island that never types a prop with `Action` from `kay`, which its chunk needs to revive it |
 | `island-marker` | deny | islands | A `// kay-island` or `// kay-static` comment the component contradicts |
 | `promoted-island` | warn | islands | A static component that renders as an island for the function it passes one, unless `// kay-island` says it is meant |
 | `hydration-mismatch` | deny | islands | An island reading the clock, `Math.random()` or a locale-less `Intl` or `toLocale*String` while it renders, which the server and the browser compute apart; allow a deliberate read with `// kay-allow hydration-mismatch` |

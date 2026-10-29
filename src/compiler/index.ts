@@ -9,7 +9,7 @@ import type { ParsedFence, ScriptAnalysis, ServerAnalysis } from './script'
 import { basename, relative } from 'node:path'
 import { drawIcons, elementsIn, templateFacts, visitNodes } from './ast'
 import { browserReads } from './browser'
-import { generate, isInteractive, islandCause, islandMessages, promotionCause, promotionSite, typesAction } from './codegen'
+import { generate, isInteractive, islandCause, islandMessages, promotionCause, promotionSite } from './codegen'
 import { asyncReplies, cssImportsWithoutText, missingCaptchas, openRedirects, separatePageSettings, serverOnlyImports, unboundedFields } from './fence-checks'
 import { cwd, iconSetsOf } from './host'
 import { islandMarker, markerMismatch } from './island-marker'
@@ -264,7 +264,7 @@ export function compileKay(original: string, filename: string, options: CompileO
     const lives = liveBindings(script, options.importedSignals)
     const imports = lives.map(binding => `import { ${binding.imported} as ${binding.local} } from ${JSON.stringify(binding.source)}\n`).join('')
 
-    return { tsx: `import { island as KayIsland } from 'kay/island'\n${imports}\nexport default KayIsland(${JSON.stringify(island)}, undefined${islandMessages(source, true, lives.map(binding => binding.local), typesAction(script))})\n`, map: new SourceMap([], []), bodyLines: [], moduleLines: [], island, why, classes, actionForm: facts.actionForm, diagnostics: reported }
+    return { tsx: `import { island as KayIsland } from 'kay/island'\n${imports}\nexport default KayIsland(${JSON.stringify(island)}, undefined${islandMessages(source, true, lives.map(binding => binding.local))})\n`, map: new SourceMap([], []), bodyLines: [], moduleLines: [], island, why, classes, actionForm: facts.actionForm, diagnostics: reported }
   }
 
   return {

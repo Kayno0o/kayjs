@@ -24,6 +24,8 @@ const NAMED = /\{([^}]*)\}/
 const ALIAS = /\s+as\s+/
 const KAY_SPECIFIER = /^kay(?:\/|$)/
 // Entries of the runtime that bundle a package, or that few pages use, which stay in the chunks of the islands importing them rather than weigh on every page: the `for`, `await` and `try` blocks, the spread and the localizing of the links an island writes, which most islands do without.
+// Lazy modules whose imports of the runtime stay with them rather than join the chunk a page loads: the code reviving an action, which only a page passing an island one loads, carries the action runtime along.
+const STANDALONE = new Set([resolve(RUNTIME_DIR, 'action-reviver.ts')])
 const OWN_CHUNK = new Set(['kay/markdown', 'kay/internal/title', 'kay/dom-loop', 'kay/dom-await', 'kay/dom-try', 'kay/dom-spread', 'kay/i18n-links'])
 const RELATIVE = /^\.\.?\//
 const EXTENSIONS = ['.ts', '.tsx', '/index.ts']
@@ -246,6 +248,7 @@ async function searchRuntime(entry: string, options: { plugins: BunPlugin[], def
           })
         },
       }],
+      metafile: true,
       throw: false,
     })
 
@@ -253,8 +256,14 @@ async function searchRuntime(entry: string, options: { plugins: BunPlugin[], def
       return undefined
 
     // What a lazy module takes from one loaded up front goes in the chunk with the rest; the rest of what it takes stays lazy with it.
-    for (const output of inner.outputs)
+    for (const output of inner.outputs) {
+      const entryPoint = inner.metafile!.outputs[output.path]?.entryPoint
+
+      if (entryPoint !== undefined && STANDALONE.has(resolve(entryPoint)))
+        continue
+
       importedNames(await output.text(), shared, specifier => eager.has(specifier))
+    }
   }
 
   // The files of the output directory, the entry's and its boot module, are written again by every build: the key holds what they say.

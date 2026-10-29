@@ -111,14 +111,6 @@ const PRERENDER: PageSettingName = 'prerender'
 const QUERY: PageSettingName = 'query'
 // `t('nav.home')`, `wording('ui.close', 'Close')` or `T(key="intro")`: a message key an island's source names as it is written.
 const MESSAGE_KEY = /(?:\b(?:t|wording)\(\s*|\bT\([^)]*?\bkey=)(['"`])([\w.-]+)\1/g
-// The types of `kay` an island types a prop with when a page may pass it an action.
-const ACTION_TYPES = new Set(['Action', 'ServerAction', 'NoInputAction'])
-
-// Whether the script types a prop as an action, so the page may pass the island one.
-export function typesAction(script: ScriptAnalysis): boolean {
-  return script.imports.some(binding => binding.source === 'kay' && ACTION_TYPES.has(binding.imported))
-}
-
 // The server exports that are no actions: the page's settings, and each under its own name as they were exported before.
 const NOT_ACTIONS = new Set<string>([PAGE, ...PAGE_SETTINGS])
 // A type parameter's name, past the `const`, `in` and `out` modifiers it may carry.
@@ -183,7 +175,6 @@ class ModuleShell {
   private readonly b: CodeBuilder
   private readonly sites: Sites = { rows: new Set(), consts: new Map(), loopItems: new Set(), snippets: new Set(), props: new Map() }
   // Whether the island types a prop as an action, so the server lets it be passed one.
-  private takesActions = false
   private readonly src: string
   private readonly mode: OutputMode
   private readonly kind: IslandKind
@@ -430,22 +421,11 @@ class ModuleShell {
     if (fence ? fence.exportNames.length > 0 : actions.length > 0)
       kayHelpers.push(fence ? 'registerActions' : 'actionStub')
 
-    // An island typing a prop as an action may be passed one by a page, which arrives as its URL: the island's chunk is what brings the code building the stub, so an app without one ships none.
-    this.takesActions = (this.kind === 'island' || this.kind === 'promotable' || this.kind === 'promotable twin') && typesAction(script)
-
-    const takesActions = mode === 'dom' && this.takesActions
-
-    if (takesActions)
-      kayHelpers.push('reviveActions')
-
     if (this.styled)
       kayHelpers.push('uiRecipe')
 
     if (kayHelpers.length > 0)
       b.add(`import { ${kayHelpers.map(helper => `${helper} as ${helperName(helper)}`).join(', ')} } from 'kay/internal'\n`)
-
-    if (takesActions)
-      b.add(`${helperName('reviveActions')}()\n`)
 
     if (server && !fence) {
       for (const name of actions)
@@ -656,15 +636,15 @@ class ModuleShell {
     const widened = this.widening() !== undefined
 
     if (this.kind === 'promotable twin')
-      b.add(`\nexport default KayPromote(${JSON.stringify(this.options.promote)}, ${name} as never, KayHydrated as never${this.takesActions ? `, ${JSON.stringify(messageKeys(src))}, true` : islandMessages(src)}) as typeof ${name}${widened ? this.widenedCall(`typeof ${name}`) : ''}\n`)
+      b.add(`\nexport default KayPromote(${JSON.stringify(this.options.promote)}, ${name} as never, KayHydrated as never${islandMessages(src)}) as typeof ${name}${widened ? this.widenedCall(`typeof ${name}`) : ''}\n`)
     else if (this.kind === 'twin')
       b.add(`\nexport default ((props: never) => KayInsideIsland() ? KayHydrated(props) : ${name}(props)) as typeof ${name}${widened ? this.widenedCall(`typeof ${name}`) : ''}\n`)
     else if (this.kind === 'island' && widened && !this.genericComponent)
-      b.add(`\nexport default KayIsland(${JSON.stringify(this.options.island)}, ${name}${islandMessages(src, this.options.client, this.options.output === 'html' ? this.options.lives : undefined, this.options.output === 'html' && this.takesActions)}) as unknown as ReturnType<typeof KayIsland<Parameters<typeof ${name}>[0]>>${this.widenedCall(`ReturnType<typeof KayIsland<Parameters<typeof ${name}>[0]>>`)}\n`)
+      b.add(`\nexport default KayIsland(${JSON.stringify(this.options.island)}, ${name}${islandMessages(src, this.options.client, this.options.output === 'html' ? this.options.lives : undefined)}) as unknown as ReturnType<typeof KayIsland<Parameters<typeof ${name}>[0]>>${this.widenedCall(`ReturnType<typeof KayIsland<Parameters<typeof ${name}>[0]>>`)}\n`)
     else if (widened && this.kind !== 'island')
       b.add(`\nexport default ${name} as typeof ${name}${this.widenedCall(`typeof ${name}`)}\n`)
     else if (this.kind === 'island')
-      b.add(`\nexport default KayIsland(${JSON.stringify(this.options.island)}, ${name}${this.genericComponent ? ' as never' : ''}${islandMessages(src, this.options.client, this.options.output === 'html' ? this.options.lives : undefined, this.options.output === 'html' && this.takesActions)})${this.genericIslandType()}${widened ? this.widenedCall(`typeof ${name}`) : ''}\n`)
+      b.add(`\nexport default KayIsland(${JSON.stringify(this.options.island)}, ${name}${this.genericComponent ? ' as never' : ''}${islandMessages(src, this.options.client, this.options.output === 'html' ? this.options.lives : undefined)})${this.genericIslandType()}${widened ? this.widenedCall(`typeof ${name}`) : ''}\n`)
   }
 
   private get wrapped(): boolean {
@@ -1182,7 +1162,7 @@ function lineOf(source: string, offset: number): number {
   return line
 }
 
-type KayHelper = 'uiRecipe' | 'formAction' | 'formValue' | 'formChecked' | 'formDescribed' | 'formInvalid' | 'formMarked' | 'formError' | 'formProtection' | 'registerActions' | 'actionStub' | 'reviveActions' | 'autoDefer' | 'writeTo' | 'updateTo' | 'writeBack' | 'updateBack' | 'bindable'
+type KayHelper = 'uiRecipe' | 'formAction' | 'formValue' | 'formChecked' | 'formDescribed' | 'formInvalid' | 'formMarked' | 'formError' | 'formProtection' | 'registerActions' | 'actionStub' | 'autoDefer' | 'writeTo' | 'updateTo' | 'writeBack' | 'updateBack' | 'bindable'
 
 type Helper = TemplateHelper | 'omit'
 
@@ -1222,11 +1202,8 @@ function messageKeys(source: string): string[] {
 }
 
 // The message keys an island's source names, as the third argument to `island()`, or nothing for an island naming none; the live values it imports go last.
-export function islandMessages(source: string, client = false, lives: string[] = [], takesActions = false): string {
+export function islandMessages(source: string, client = false, lives: string[] = []): string {
   const keys = messageKeys(source)
-
-  if (takesActions)
-    return `, ${JSON.stringify(keys)}, ${client}, undefined, [${lives.join(', ')}], true`
 
   if (lives.length > 0)
     return `, ${JSON.stringify(keys)}, ${client}, undefined, [${lives.join(', ')}]`
