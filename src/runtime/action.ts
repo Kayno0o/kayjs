@@ -6,7 +6,7 @@ import { ACTION, isAction } from './action-shared'
 import { durationSeconds } from './duration'
 import { ACTION_PREFIX } from './wire'
 
-export { actionStub, OUTCOME_SCRIPT, readActionResponse, reviveActions, setRequestOutcome } from './action-call'
+export { actionStub, OUTCOME_SCRIPT, readActionResponse, setRequestOutcome } from './action-call'
 export { decodeCall, encodeCall, FILE_MARK, FORM_CALL, INPUT_PART } from './action-encode'
 export type { EncodedCall } from './action-encode'
 export { ActionError, ActionRedirectError, failure, isFailure } from './action-error'

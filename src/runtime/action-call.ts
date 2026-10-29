@@ -41,7 +41,7 @@ export function actionStub(url: string): Action<unknown, unknown> {
   }) as unknown as Action<unknown, unknown>
 }
 
-// Called by the chunk of an island that types a prop as an action, so the props a page passes it revive as callable stubs: only a URL under the actions' own path is one, whatever the text says.
+// Called by the lazy chunk a page handing an island an action loads, so the props revive as callable stubs: only a URL under the actions' own path is one, whatever the text says.
 export function reviveActions(): void {
   serverWritten[ACTION_TYPE] = (url: string) => typeof url === 'string' && url.startsWith(ACTION_PREFIX) ? actionStub(url) : malformed(url, ACTION_TYPE)
 }

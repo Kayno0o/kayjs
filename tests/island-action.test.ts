@@ -2,7 +2,8 @@ import type { Action } from '../src/runtime'
 import { join, resolve } from 'node:path'
 import process from 'node:process'
 import { afterAll, describe, expect, it } from 'bun:test'
-import { actionStub, reviveActions } from '../src/runtime/action'
+import { actionStub } from '../src/runtime/action'
+import { reviveActions } from '../src/runtime/action-call'
 import { child } from '../src/runtime/html'
 import { island, IslandPropsError } from '../src/runtime/island.server'
 import { decodeValue, encodeValue, serverWritten, unflattenValue } from '../src/runtime/wire'
@@ -151,6 +152,18 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('an island 
 
     await page.click('button.show')
     await page.waitFor('p.untyped', { text: 'Zoe' })
+    expect(page.errors).toEqual([])
+  })
+})
+
+describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('a persistent island handed its first action by the next page', () => {
+  it('revives it as the page swaps in, before the island reads its new props', async () => {
+    const page = await site.open('/q1', { path })
+
+    await page.click('a.next')
+    await page.waitFor('h1', { text: 'Two' })
+    await page.click('button.show')
+    await page.waitFor('p.untyped', { text: 'HEY Zoe' })
     expect(page.errors).toEqual([])
   })
 })

@@ -1,0 +1,7 @@
+--- server
+import { shout } from './other.kay'
+--- script
+import Untyped from '../components/untyped.kay'
+---
+h1 Two
+Untyped(persist run={shout})

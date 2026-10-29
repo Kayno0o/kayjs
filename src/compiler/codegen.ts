@@ -174,7 +174,6 @@ export function generate(file: KayFile, script: ScriptAnalysis, server: ServerAn
 class ModuleShell {
   private readonly b: CodeBuilder
   private readonly sites: Sites = { rows: new Set(), consts: new Map(), loopItems: new Set(), snippets: new Set(), props: new Map() }
-  // Whether the island types a prop as an action, so the server lets it be passed one.
   private readonly src: string
   private readonly mode: OutputMode
   private readonly kind: IslandKind

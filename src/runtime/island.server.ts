@@ -91,8 +91,6 @@ export function insideIsland(): boolean {
   return depth > 0
 }
 
-// How devalue writes an action in props: a node of its own type.
-
 export class IslandPropsError extends Error {
   override name = 'IslandPropsError'
 }

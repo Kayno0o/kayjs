@@ -1,6 +1,7 @@
 import { GlobalRegistrator } from '@happy-dom/global-registrator'
 import { afterAll, beforeAll, expect, it } from 'bun:test'
-import { actionStub, reviveActions } from '../src/runtime/action'
+import { actionStub } from '../src/runtime/action'
+import { reviveActions } from '../src/runtime/action-call'
 import { decodeValue, serverWritten } from '../src/runtime/wire'
 
 const original = globalThis.fetch

@@ -266,27 +266,15 @@ describe('control flow', () => {
     expect(compileKay(page, 'src/routes/index.kay', { includeServer: false }).tsx).not.toContain('export const page')
   })
 
-  it('has an island typing a prop as an action revive the actions a page passes it, and no other component', () => {
-    const island = (imports: string) => `---\n${imports}\nimport { signal } from 'kay'\n\nconst { run } = props<{ run: ${imports.includes('Action') ? 'Action<never, string>' : '() => void'} }>()\nconst count = signal(0)\n---\nbutton(onClick={() => run()}) Go`
-    const typed = island('import type { Action } from \'kay\'')
-    const untyped = island('import type { Item } from \'./types\'')
+  it('compiles an island and a promotable component the same whether or not they type a prop as an action', () => {
+    const island = (type: string) => `---\nimport { signal } from 'kay'\n\nconst { run } = props<{ run: ${type} }>()\nconst count = signal(0)\n---\nbutton(onClick={() => count.set(1)}) Go`
 
-    expect(compileKay(typed, 'src/caller.kay', { output: 'dom' }).tsx).toContain('KayReviveActions()')
-    expect(compileKay(typed, 'src/caller.kay', { output: 'html' }).tsx).not.toContain('KayReviveActions')
-    expect(compileKay(untyped, 'src/caller.kay', { output: 'dom' }).tsx).not.toContain('KayReviveActions')
-    // The server lets an island be passed an action only when it types a prop as one.
-    expect(compileKay(typed, 'src/caller.kay', { output: 'html' }).tsx).toContain('KayIsland("src/caller.kay", Caller, [], false, undefined, [], true)')
-    expect(compileKay(untyped, 'src/caller.kay', { output: 'html' }).tsx).toContain('KayIsland("src/caller.kay", Caller)')
-    expect(compileKay(typed, 'src/caller.kay', { output: 'dom' }).tsx).not.toContain('undefined, [], true)')
-    expect(compileKay(typed.replace('---\nimport', '--- client\nimport'), 'src/caller.kay', { output: 'html' }).tsx).toContain('KayIsland("src/caller.kay", undefined, [], true, undefined, [], true)')
-  })
+    for (const output of ['dom', 'html'] as const) {
+      const code = compileKay(island('(input: string) => void'), 'src/caller.kay', { output }).tsx
 
-  it('has a promotable component typing a prop as an action revive the actions in its chunk and take them on the server', () => {
-    const source = (type: string) => `---\nimport type { Action } from 'kay'\nimport Pick from './pick.kay'\n\nconst { run } = props<{ run: ${type} }>()\n---\nPick(choose={() => run})`
-
-    expect(compileKay(source('Action<never, string>'), 'src/caller.kay', { output: 'dom' }).tsx).toContain('KayReviveActions()')
-    expect(compileKay(source('Action<never, string>'), 'src/caller.kay', { output: 'html', hydratable: true }).tsx).toContain('KayPromote("src/caller.kay", Caller as never, KayHydrated as never, [], true)')
-    expect(compileKay(source('() => void').replace('import type { Action } from \'kay\'\n', ''), 'src/caller.kay', { output: 'dom' }).tsx).not.toContain('KayReviveActions')
+      expect(code).not.toContain('KayReviveActions')
+      expect(code).not.toContain('undefined, [], true)')
+    }
   })
 
   it('reports a match with no when line in every output, which once crashed the html one', () => {

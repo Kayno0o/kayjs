@@ -1,0 +1,5 @@
+--- script
+import Untyped from '../components/untyped.kay'
+---
+a.next(href="/q2") Next
+Untyped(persist)
