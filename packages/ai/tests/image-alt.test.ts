@@ -3,10 +3,11 @@ import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import process from 'node:process'
-import { afterEach, describe, expect, it } from 'bun:test'
+import { afterEach, describe, expect, it, spyOn } from 'bun:test'
 import { serverRoot } from 'kay/library'
+import { applyPageHooks, assetFiles, pageSizes } from '../../../src/server/page-hook'
 import { ai, AiError, describeImage, fakeAi } from '../src'
-import { draftProblems, writeImageAlts } from '../src/image-alt'
+import { draftProblems, forgetDrafts, turn, writeImageAlts, writeKeptImageAlts } from '../src/image-alt'
 
 const PNG = Uint8Array.fromBase64('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGP4z8DwHwAFAAH/iZk9HQAAAABJRU5ErkJggg==')
 const ASSET = '/_kay/assets/team-abc.png'
@@ -32,6 +33,7 @@ async function page(html: string, files: Record<string, string>, locale = 'en'):
 
 afterEach(async () => {
   fakeAi.clear()
+  forgetDrafts()
   await rm(join(await serverRoot(), '.kay/cache/libraries/kayjs-ai'), { recursive: true, force: true })
 
   if (folder !== undefined)
@@ -97,14 +99,85 @@ describe('imageAlt', () => {
     expect(fakeAi.asked).toHaveLength(2)
   })
 
-  it('leaves the page as it is when the model fails, and tries again on the next render', async () => {
+  it('leaves the page as it is when the model fails, logging once and not asking again for that image', async () => {
     fakeAi.fail(new AiError('unavailable', 'down'))
 
+    const warn = spyOn(console, 'warn').mockImplementation(() => undefined)
     const path = await image('team-abc.png')
 
-    expect(await page(IMG, { [ASSET]: path })).toBe(IMG)
+    try {
+      expect(await page(IMG, { [ASSET]: path })).toBe(IMG)
+      expect(await page(`<p>${IMG}</p>`, { [ASSET]: path })).toBe(`<p>${IMG}</p>`)
+      expect(fakeAi.asked).toHaveLength(1)
+      expect(warn.mock.calls.filter(([line]) => String(line).includes('team-abc.png'))).toHaveLength(1)
+    }
+    finally {
+      warn.mockRestore()
+    }
+  })
+
+  it('sends neither an SVG nor an AVIF to the model', async () => {
+    const svg = await image('logo-abc.svg')
+    const avif = await image('photo-abc.avif')
+    const html = '<img src="/_kay/assets/logo-abc.svg"><img src="/_kay/assets/photo-abc.avif">'
+
+    expect(await page(html, { '/_kay/assets/logo-abc.svg': svg, '/_kay/assets/photo-abc.avif': avif })).toBe(html)
+    expect(fakeAi.asked).toHaveLength(0)
+  })
+
+  it('runs at most three descriptions at once, the rest waiting their turn', async () => {
+    let running = 0
+    let most = 0
+
+    await Promise.all(Array.from({ length: 8 }, async () => turn(async () => {
+      running++
+      most = Math.max(most, running)
+      await Bun.sleep(5)
+      running--
+    })))
+
+    expect(most).toBe(3)
+  })
+
+  it('skips an img inside nested islands, however deep, and takes the one after them', async () => {
+    const path = await image('team-abc.png')
+    const html = `<slot data-component="a"><slot data-component="b"><img src="${ASSET}"></slot><img src="${ASSET}"></slot>${IMG}`
+
+    expect(await page(html, { [ASSET]: path })).toBe(`<slot data-component="a"><slot data-component="b"><img src="${ASSET}"></slot><img src="${ASSET}"></slot><img src="${ASSET}" width="1" height="1" alt="A fake">`.replace('A fake', 'fake'))
+  })
+
+  it('goes through the hook runner of a build with the files it resolves, as ai() carries it', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'image-alt-client-'))
+
+    try {
+      await Bun.write(join(dir, 'assets/team-abc.png'), PNG)
+      fakeAi.reply({ data: { alt: 'A team' } })
+
+      const file = assetFiles({ clientDir: dir, publicDir: join(dir, 'public'), base: '' })
+      const html = await applyPageHooks([ai({ imageAlt: true }).transformPage!], '/', 'en', IMG, file, pageSizes(file))
+
+      expect(html).toContain('alt="A team"')
+    }
+    finally {
+      await rm(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('writes the drafts kept into a page rendered per request, never waiting on the model, and drafts the missing ones for the next render', async () => {
     fakeAi.reply({ data: { alt: 'A team' } })
-    expect(await page(IMG, { [ASSET]: path })).toContain('alt="A team"')
+
+    const path = await image('team-abc.png')
+    const live = async () => writeKeptImageAlts({ path: '/', locale: 'en', html: IMG, file: async () => Promise.resolve(path) } as unknown as RenderedPage)
+
+    expect(await live()).toBe(IMG)
+
+    for (let tries = 0; tries < 50 && (await live()) === IMG; tries++)
+      await Bun.sleep(10)
+
+    expect(await live()).toBe(`<img src="${ASSET}" width="1" height="1" alt="A team">`)
+    expect(fakeAi.asked).toHaveLength(1)
+    expect(ai({ imageAlt: true }).transformServedPage).toBe(writeKeptImageAlts)
+    expect(ai().transformServedPage).toBeUndefined()
   })
 
   it('leaves the page as it is with no model configured, asking nothing', async () => {

@@ -153,6 +153,18 @@ export async function hookPrerendered(root: string, hooks: PageHook[], dirs: Ass
   await writeManifest(root, manifest, base)
 }
 
+// A page rendered for a request, through the hooks made for it; anything but an HTML page is returned as it is.
+export async function hookedServed(response: Response, hooks: PageHook[], path: string, locale: string, file: RenderedPage['file'], sizes: PageSizes): Promise<Response> {
+  if (!response.headers.get('content-type')?.startsWith('text/html'))
+    return response
+
+  const headers = new Headers(response.headers)
+
+  headers.delete('content-length')
+
+  return new Response(await applyPageHooks(hooks, path, locale, await response.text(), file, sizes), { status: response.status, headers })
+}
+
 // A page the server renders again in place of a prerendered one, through the same hooks.
 export async function hookedResponse(response: Response, hooks: PageHook[], path: string, locale: string, file: RenderedPage['file'], sizes: PageSizes): Promise<Response> {
   if (hooks.length === 0)

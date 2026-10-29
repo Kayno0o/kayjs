@@ -5,7 +5,7 @@ import { api } from 'kay/server'
 import { aiEnv, choose } from './config'
 import { useConversations } from './conversation-store'
 import { recordedAsks } from './dev-log'
-import { draftProblems, noModelProblems, writeImageAlts } from './image-alt'
+import { draftProblems, noModelProblems, writeImageAlts, writeKeptImageAlts } from './image-alt'
 import { configureLimits, limitsInEffect } from './limits'
 
 // The provider and model an ask would use now, or why none can be chosen.
@@ -33,6 +33,7 @@ export function ai(options: AiOptions = {}): KayExtension {
     ...options.imageAlt === true && {
       satisfies: ['missing-alt' as const],
       transformPage: writeImageAlts,
+      transformServedPage: writeKeptImageAlts,
       check: async () => [...noModelProblems(), ...await draftProblems()],
     },
     // What the tab reads, answered under `kay dev` alone.

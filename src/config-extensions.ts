@@ -159,6 +159,11 @@ async function serverFromModule(name: string, { path, export: exported = 'defaul
   return server as AnyElysia
 }
 
+// The hooks of the extensions for a page rendered per request, in their order.
+export function servedPageHooks(extensions: KayExtension[] | undefined): PageHook[] {
+  return (extensions ?? []).flatMap(extension => extension.transformServedPage === undefined ? [] : [extension.transformServedPage])
+}
+
 // The page hooks the extensions carry, in their order.
 export function pageHooks(extensions: KayExtension[] | undefined): PageHook[] {
   return (extensions ?? []).flatMap(extension => extension.transformPage === undefined ? [] : [extension.transformPage])

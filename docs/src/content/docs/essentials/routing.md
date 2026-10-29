@@ -212,7 +212,7 @@ export default defineConfig({
 
 The hook is given `path`, `locale` and `html`. It also has `file(url)`, which resolves the file behind a root-relative URL the page links, such as a stylesheet or an image variant. `fileSize(url)` gives the bytes a browser downloads for that file, and `htmlSize(html)` the same for HTML you hold. In a build, `fileSize` reads the compressed copies kay writes anyway for the files it builds, so a hook weighing pages does not compress those files twice.
 
-It runs in `kay build`, `--static` included, and again each time the server renders a page afresh, so a page never loses what it added. `kay dev` calls none. Several hooks run in their order, each given the HTML the one before returned.
+It runs in `kay build`, `--static` included, and again each time the server renders a page afresh, so a page never loses what it added. `kay dev` calls none. `transformServedPage` is the same hook for a page rendered per request, `kay dev` included: it buffers each such page, so keep it quick. Several hooks run in their order, each given the HTML the one before returned.
 
 <ReadMore href="/llms/prerendering#page-hooks">A hook measuring page weight, when it runs and how pages run in parallel.</ReadMore>
 

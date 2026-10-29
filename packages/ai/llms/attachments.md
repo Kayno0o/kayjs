@@ -42,10 +42,10 @@ export const read = action(s.Object({ scan: s.File({ type: 'application/pdf' }) 
 
 ### Draft the alt of imported images
 
-`ai({ imageAlt: true })` in `extensions` writes an `alt` on each `img` whose `src` is an imported image and that has none, on the pages `kay build` prerenders and when the server renders them again (the `transformPage` hook: a page rendered afresh for each request, as in `kay dev`, is not reached), and makes `kay check` skip `missing-alt` for those images.
+`ai({ imageAlt: true })` in `extensions` writes an `alt` on each `img` whose `src` is an imported image and that has none, on the pages `kay build` prerenders, and on a page rendered per request (`kay dev`, `prerender: false`, guarded pages) from the drafts already kept, drafting the missing ones in the background for the next render, and makes `kay check` skip `missing-alt` for those images.
 
 - Each image is described once per locale (`page.locale`, in that language) by `describeImage(image, { language?, signal? })`, which you can call yourself: it asks with a `schema` for one short sentence and gives the trimmed text, empty for a decorative image (kept so it is not asked again, never written).
-- The drafts live in `.kay/cache/libraries/kayjs-ai`, one file per image content and locale, so an unchanged image is never sent again; deleting the folder drafts again. A failing model (a PNG, JPEG, GIF or WebP only: an AVIF or SVG is refused) leaves the img without an `alt` and is tried again on the next render.
+- The drafts live in `.kay/cache/libraries/kayjs-ai`, one file per image content and locale, so an unchanged image is never sent again; deleting the folder drafts again. Only PNG, JPEG, GIF and WebP are sent: an AVIF or SVG keeps the lint's `alt` to write. A failing model logs once for that image, leaves it without an `alt` and is tried again after a restart; at most three images are described at once.
 - An `alt` the author wrote, even `alt=""`, wins, and so do `aria-hidden="true"` and `role="presentation"` or `none`. An img inside an island is left to the `missing-alt` lint, as it renders in the browser.
 - `kay check` lists each kept draft as a warning, read from the cache and never calling the model, with a warning more when `imageAlt` is on and no model is configured (development's fake is none). Under `bun test` the fake answers, so script it with `fakeAi.reply({ data: { alt } })`.
 - Drafts count against the limits like any `ask`: in `kay build` there is no visitor, and a render that is refused keeps the img as it is.

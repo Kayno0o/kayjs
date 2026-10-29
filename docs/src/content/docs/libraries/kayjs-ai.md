@@ -342,7 +342,7 @@ An `img` of an imported image with no `alt` can get one from the model. Turn it 
 ai({ imageAlt: true })
 ```
 
-`kay build` then writes a drafted `alt` on each imported image a prerendered page shows with none. Each image is described once, kept in `.kay/cache`, and never sent again while it is unchanged.
+`kay build` then writes a drafted `alt` on each imported image a page shows with none. In `kay dev` and on pages rendered per request, the first render shows the drafts already kept and drafts the others in the background, so the next one has them. Each image is described once, kept in `.kay/cache`, and never sent again while it is unchanged.
 
 An `alt` you write, even an empty one, always wins. `kay check` stops reporting `missing-alt` for such an image and lists each draft instead, so you can review it. With no model configured, pages stay as they are. Images inside islands are drawn in the browser, so they keep the `missing-alt` lint.
 

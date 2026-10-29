@@ -483,6 +483,8 @@ export interface KayExtension<Server extends AnyElysia = AnyElysia> {
   satisfies?: 'missing-alt'[] | undefined
   // Called with each page `kay build` prerenders, once the files it links are written and before it is compressed, and again when the server renders it afresh: returns the HTML to write.
   transformPage?: PageHook | undefined
+  // Called with each page the server renders for a request and no prerendered copy answers, in `kay dev` too: a page of `prerender: false`, a guarded page, a params page `kay build` did not render. It returns the HTML to send, and a page whose HTML is not served as `text/html` is left alone. A site whose extensions carry none pays nothing; one that does buffers each such page, so a hook must be quick and never wait on slow work, such as a model's reply.
+  transformServedPage?: PageHook | undefined
 }
 
 export const CONFIG_FILE = 'kay.config.ts'

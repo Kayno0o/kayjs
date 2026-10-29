@@ -1,11 +1,12 @@
-import type { ExtensionProblem, PageHook } from 'kay/server'
+import type { CacheSlot } from 'kay/library'
+import type { ExtensionProblem, PageHook, RenderedPage } from 'kay/server'
 // Alt text drafted for the imported images of a page: one model call per image content, kept under `.kay/cache`, written into the HTML as a page is built or served.
 import type { Attachment, Message } from './types'
 import { readdir } from 'node:fs/promises'
 import { basename, dirname } from 'node:path'
 import process from 'node:process'
-import { s } from 'kay'
-import { libraryCacheSlot, readCacheEntry, serverRoot, writeCacheEntry } from 'kay/library'
+import { logFrom, s } from 'kay'
+import { IMPORTED, libraryCacheSlot, readCacheEntry, serverRoot, writeCacheEntry } from 'kay/library'
 import { ask } from './ask'
 import { choose } from './config'
 import { fakeAi } from './fake'
@@ -13,7 +14,6 @@ import { fakeAi } from './fake'
 const LIBRARY = 'kayjs-ai'
 // Part of what a draft is made from, so a changed prompt drafts again.
 const PROMPT_VERSION = '1'
-const ASSETS = '/_kay/assets/'
 const MAX_ALT_CHARS = 200
 
 const ALT = s.Object({ alt: s.String({ maxLength: MAX_ALT_CHARS }) })
@@ -53,57 +53,112 @@ function modelConfigured(): boolean {
   }
 }
 
-// What a draft for an image is made once for, however many pages show it and however many renders: in flight or done, by its cache file.
-const drafts = new Map<string, Promise<string | undefined>>()
+// The files a model is shown: an SVG, an AVIF or anything else is left as it is, without a call.
+const SHOWN = /\.(?:png|jpe?g|gif|webp)(?:\?.*)?$/i
+// How many images are described at once, so a site of many images does not meet a provider's rate limit.
+const AT_ONCE = 3
 
-async function draft(root: string, path: string, locale: string): Promise<string | undefined> {
-  const name = basename(path)
-  const slot = libraryCacheSlot(root, LIBRARY, Bun.hash(`${name}\0${locale}`).toString(36), PROMPT_VERSION)
-  const kept = await readCacheEntry<Draft>(slot)
+const log = logFrom('kayjs-ai')
 
-  if (kept !== undefined)
-    return kept.alt === '' ? undefined : kept.alt
-
-  if (!modelConfigured())
-    return undefined
-
-  const alt = await describeImage(Bun.file(path), { language: locale })
-
-  await writeCacheEntry(slot, { alt, name, locale } satisfies Draft)
-
-  return alt === '' ? undefined : alt
+// What a draft is made for: the folder of its project, its file's name, and the locale it is written in.
+interface Place {
+  root: string
+  path: string
+  locale: string
 }
 
-async function draftOnce(root: string, path: string, locale: string): Promise<string | undefined> {
-  const id = `${root}\0${path}\0${locale}`
-  let drafting = drafts.get(id)
+function slotOf({ root, path, locale }: Place): { slot: CacheSlot, id: string } {
+  const id = Bun.hash(`${root}\0${basename(path)}\0${locale}`).toString(36)
 
-  if (drafting === undefined) {
-    drafting = safeDraft(root, path, locale, id)
-    drafts.set(id, drafting)
-  }
-
-  return drafting
+  return { id, slot: libraryCacheSlot(root, LIBRARY, id, PROMPT_VERSION) }
 }
 
-// A call that fails leaves the image as it is and is tried again by the next render.
-async function safeDraft(root: string, path: string, locale: string, id: string): Promise<string | undefined> {
+// What was found kept or made, by draft: an empty text is an image with nothing to say.
+const known = new Map<string, string>()
+// Each draft is made once per process, in flight or done; one that failed stays here, logged once, and is tried again after a restart.
+const drafting = new Map<string, Promise<string | undefined>>()
+const waiting: (() => void)[] = []
+let running = 0
+
+// Runs `task` when fewer than `AT_ONCE` run, handing its place to the next one waiting when it ends.
+export async function turn<Value>(task: () => Promise<Value>): Promise<Value> {
+  if (running >= AT_ONCE)
+    await new Promise<void>(resolve => waiting.push(resolve))
+  else
+    running++
+
   try {
-    return await draft(root, path, locale)
+    return await task()
   }
-  catch {
-    drafts.delete(id)
+  finally {
+    const next = waiting.shift()
+
+    if (next === undefined)
+      running--
+    else
+      next()
+  }
+}
+
+// Drops what this process remembers of the drafts, for a test that clears the cache folder.
+export function forgetDrafts(): void {
+  known.clear()
+  drafting.clear()
+}
+
+// The kept draft of an image: its text, empty for an image with none to give, undefined when it was not drafted yet.
+async function kept(place: Place): Promise<string | undefined> {
+  const { id, slot } = slotOf(place)
+  const remembered = known.get(id)
+
+  if (remembered !== undefined)
+    return remembered
+
+  const entry = await readCacheEntry<Draft>(slot)
+
+  if (entry !== undefined)
+    known.set(id, entry.alt)
+
+  return entry?.alt
+}
+
+async function make(place: Place): Promise<string | undefined> {
+  const { id, slot } = slotOf(place)
+  const name = basename(place.path)
+
+  try {
+    const alt = await turn(async () => describeImage(Bun.file(place.path), { language: place.locale }))
+
+    known.set(id, alt)
+    await writeCacheEntry(slot, { alt, name, locale: place.locale } satisfies Draft)
+
+    return alt
+  }
+  catch (error) {
+    log.warn(`imageAlt could not draft the alt of ${name}: ${error instanceof Error ? error.message : String(error)}`)
 
     return undefined
   }
 }
 
-// The `src` of each `img` outside an island with no `alt` of its own, no `aria-hidden` and no presentational role, that is an imported image.
-async function candidates(html: string): Promise<string[]> {
-  const found: string[] = []
+// Starts the draft of an image unless it is under way or done; never rejects.
+async function draftOnce(place: Place): Promise<string | undefined> {
+  const { id } = slotOf(place)
+  let pending = drafting.get(id)
+
+  if (pending === undefined) {
+    pending = make(place)
+    drafting.set(id, pending)
+  }
+
+  return pending
+}
+
+// The `img` outside an island, which the browser draws again and hydration must find as the server wrote it.
+function serverImages(onImage: (img: HTMLRewriterTypes.Element) => void): HTMLRewriter {
   let islands = 0
 
-  const rewriter = new HTMLRewriter()
+  return new HTMLRewriter()
     .on('slot[data-component]', {
       element(slot) {
         islands++
@@ -114,12 +169,22 @@ async function candidates(html: string): Promise<string[]> {
     })
     .on('img', {
       element(img) {
-        const src = img.getAttribute('src')
-
-        if (islands === 0 && src?.includes(ASSETS) && !img.hasAttribute('alt') && img.getAttribute('aria-hidden') !== 'true' && !['presentation', 'none'].includes(img.getAttribute('role') ?? ''))
-          found.push(src)
+        if (islands === 0)
+          onImage(img)
       },
     })
+}
+
+// The `src` of each `img` outside an island with no `alt` of its own, no `aria-hidden` and no presentational role, that is an imported image a model is shown.
+async function candidates(html: string): Promise<string[]> {
+  const found: string[] = []
+
+  const rewriter = serverImages((img) => {
+    const src = img.getAttribute('src')
+
+    if (src?.includes(IMPORTED) && SHOWN.test(src) && !img.hasAttribute('alt') && img.getAttribute('aria-hidden') !== 'true' && !['presentation', 'none'].includes(img.getAttribute('role') ?? ''))
+      found.push(src)
+  })
 
   await rewriter.transform(new Response(html)).text()
 
@@ -127,32 +192,19 @@ async function candidates(html: string): Promise<string[]> {
 }
 
 async function withAlts(html: string, alts: ReadonlyMap<string, string>): Promise<string> {
-  let islands = 0
+  const rewriter = serverImages((img) => {
+    const alt = alts.get(img.getAttribute('src') ?? '')
 
-  const rewriter = new HTMLRewriter()
-    .on('slot[data-component]', {
-      element(slot) {
-        islands++
-        slot.onEndTag(() => {
-          islands--
-        })
-      },
-    })
-    .on('img', {
-      element(img) {
-        const alt = alts.get(img.getAttribute('src') ?? '')
-
-        if (islands === 0 && alt !== undefined && !img.hasAttribute('alt'))
-          img.setAttribute('alt', alt)
-      },
-    })
+    if (alt !== undefined && !img.hasAttribute('alt'))
+      img.setAttribute('alt', alt)
+  })
 
   return rewriter.transform(new Response(html)).text()
 }
 
-// The page with a drafted `alt` on each server-rendered `img` of an imported image that has none; a page without such an image is returned as it is, and one with no model configured gets the drafts already kept.
-export const writeImageAlts: PageHook = async (page) => {
-  if (!page.html.includes(ASSETS))
+// The page with the alt each candidate image has, found by `altOf`; an image with none is left as it is.
+async function filled(page: RenderedPage, altOf: (place: Place) => Promise<string | undefined>): Promise<string> {
+  if (!page.html.includes(IMPORTED))
     return page.html
 
   const sources = [...new Set(await candidates(page.html))]
@@ -165,14 +217,27 @@ export const writeImageAlts: PageHook = async (page) => {
 
   await Promise.all(sources.map(async (src) => {
     const path = await page.file(src)
-    const alt = path === undefined ? undefined : await draftOnce(root, path, page.locale)
+    const alt = path === undefined ? undefined : await altOf({ root, path, locale: page.locale })
 
-    if (alt !== undefined)
+    if (alt !== undefined && alt !== '')
       alts.set(src, alt)
   }))
 
   return alts.size === 0 ? page.html : withAlts(page.html, alts)
 }
+
+// For a prerendered page: waits for the model to describe each image not kept yet, unless no model is configured.
+export const writeImageAlts: PageHook = async page => filled(page, async place => await kept(place) ?? (modelConfigured() ? draftOnce(place) : undefined))
+
+// For a page rendered per request, which never waits on the model: it takes the drafts kept and starts those missing in the background, for the next render.
+export const writeKeptImageAlts: PageHook = async page => filled(page, async (place) => {
+  const alt = await kept(place)
+
+  if (alt === undefined && modelConfigured())
+    void draftOnce(place)
+
+  return alt
+})
 
 // The drafts kept so far, for a person to review: none is sent to the model again, and an author's own `alt` replaces one.
 export async function draftProblems(): Promise<ExtensionProblem[]> {

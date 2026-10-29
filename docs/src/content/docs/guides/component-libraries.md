@@ -108,6 +108,7 @@ An extension may set these fields. Only `name` is required.
 - `env`: the variables the library reads, as a `defineEnv` schema. `kay env` lists them with the app's.
 - `satisfies`: lints the extension answers for the places it fills in by itself. `['missing-alt']` makes `kay check` skip an `img` on a server-rendered page whose `src` is an imported image, for an extension that writes its `alt`. An `img` inside an island is still reported.
 - `transformPage`: rewrites each prerendered page before it is written.
+- `transformServedPage`: rewrites each page the server renders for a request, in `kay dev` too. It buffers the page, so keep it quick.
 - `needsServer`: set it when the extension does nothing without a running server, as a tracker posting to a route of its own. `kay build --static` warns about it.
 - `maxSize`: the most a request to a route of the extension may send, by path, for a route that takes more than the app's `maxSize`, such as an upload.
 - `staticFiles`: files a static export writes into the site, by path, for what the extension's server would otherwise serve, such as a script every page loads.

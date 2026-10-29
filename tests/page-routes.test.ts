@@ -70,7 +70,7 @@ describe('pageResponder', () => {
     // Boots the site, which builds the browser bundle the responder reads.
     await pages({ routes: 'tests/fixtures/site/src/routes', prebuilt: false })
     const about = { ...(await scanRoutes(join(root, 'tests/fixtures/site/src/routes'))).find(route => route.pattern === '/about')!, guards: [] }
-    const respond = pageResponder({ client: (await readClient(root))!, renderOptions: {}, prerendered: new Map([['/about', built('/about')]]), settings: undefined, transforms: [], pageFile: async () => undefined, pageSizes: pageSizes(async () => undefined), writes: { count: 0 } })
+    const respond = pageResponder({ client: (await readClient(root))!, renderOptions: {}, prerendered: new Map([['/about', built('/about')]]), settings: undefined, transforms: [], served: [], pageFile: async () => undefined, pageSizes: pageSizes(async () => undefined), writes: { count: 0 } })
     const visit = async (path: string, headers: Record<string, string> = {}) => {
       const response = await respond(about, {}, { request: new Request(`http://localhost${path}`, { headers }) }, new URL(`http://localhost${path}`))
 
@@ -82,6 +82,23 @@ describe('pageResponder', () => {
     // A path the build did not render renders per request, as any cache may keep it.
     expect(await visit('/about/')).toMatchObject({ html: '<p>Built</p>' })
     expect(await visit('/elsewhere')).toMatchObject({ html: expect.stringContaining('<h1>About</h1>'), cache: null })
+  })
+
+  it('runs the served-page hooks on a page rendered per request alone, HTML only, and leaves the prerendered copy to transformPage', async () => {
+    await pages({ routes: 'tests/fixtures/site/src/routes', prebuilt: false })
+    const about = { ...(await scanRoutes(join(root, 'tests/fixtures/site/src/routes'))).find(route => route.pattern === '/about')!, guards: [] }
+    const seen: string[] = []
+    const hook = ({ path, html }: { path: string, html: string }) => {
+      seen.push(path)
+
+      return html.replace('<h1>', '<h1 data-hooked>')
+    }
+    const respond = pageResponder({ client: (await readClient(root))!, renderOptions: {}, prerendered: new Map([['/about', built('/about')]]), settings: undefined, transforms: [], served: [hook], pageFile: async () => undefined, pageSizes: pageSizes(async () => undefined), writes: { count: 0 } })
+    const visit = async (path: string) => respond(about, {}, { request: new Request(`http://localhost${path}`) }, new URL(`http://localhost${path}`))
+
+    expect(await (await visit('/about')).text()).toBe('<p>Built</p>')
+    expect(await (await visit('/elsewhere')).text()).toContain('<h1 data-hooked>About</h1>')
+    expect(seen).toEqual(['/elsewhere'])
   })
 
   it('keeps a kept page after a refused write and renders it live after one that went through', async () => {
@@ -103,7 +120,7 @@ describe('pageResponder', () => {
     })
     app.post('/saved', () => 'ok')
 
-    const respond = pageResponder({ client: (await readClient(root))!, renderOptions: {}, prerendered: new Map([['/about', copies]]), settings: undefined, transforms: [], pageFile: async () => undefined, pageSizes: pageSizes(async () => undefined), writes })
+    const respond = pageResponder({ client: (await readClient(root))!, renderOptions: {}, prerendered: new Map([['/about', copies]]), settings: undefined, transforms: [], served: [], pageFile: async () => undefined, pageSizes: pageSizes(async () => undefined), writes })
     const visit = async () => (await respond(about, {}, { request: new Request('http://localhost/about') }, new URL('http://localhost/about'))).text()
     const post = async (path: string) => app.handle(new Request(`http://localhost${path}`, { method: 'POST' }))
 
@@ -134,7 +151,7 @@ describe('pageResponder', () => {
     const client = (await readClient(root))!
     const routes = await Promise.all((await scanRoutes(dir)).map(async route => loadGuards(route)))
     const { head } = await configHead(root, {}, client.dir)
-    const respond = pageResponder({ client, renderOptions: { base: '/b', head }, prerendered: new Map([['/vip', built('/vip')], ['/gone', built('/gone')]]), settings: undefined, transforms: [], pageFile: async () => undefined, pageSizes: pageSizes(async () => undefined), writes: { count: 0 } })
+    const respond = pageResponder({ client, renderOptions: { base: '/b', head }, prerendered: new Map([['/vip', built('/vip')], ['/gone', built('/gone')]]), settings: undefined, transforms: [], served: [], pageFile: async () => undefined, pageSizes: pageSizes(async () => undefined), writes: { count: 0 } })
 
     for (const [path, status] of [['/vip', 403], ['/gone', 404]] as const) {
       const response = await respond(routes.find(route => route.pattern === path)!, {}, { request: new Request(`http://localhost${path}`) }, new URL(`http://localhost${path}`))

@@ -22,7 +22,7 @@ import type { PageSetup } from './setup'
 import { join, resolve } from 'node:path'
 import process from 'node:process'
 import { MAPS_DIR } from '../build/assets'
-import { pageHooks } from '../config-extensions'
+import { pageHooks, servedPageHooks } from '../config-extensions'
 import { clearEditSite, registerEditSite } from '../content/edit'
 import { clearContentMode } from '../content/load'
 import { serveFeeds } from '../content/server'
@@ -726,7 +726,7 @@ export async function pageRoutes(boot: Boot, { redirects, publicServed, redirect
   await servePublic(app, served, publicServed, env.dev ? undefined : publicCache, compressing && !env.dev, pageFor)
 
   const pageFile = assetFiles({ clientDir: client.dir, publicDir: project.paths.public, base: env.base, aspects: options.images?.aspects })
-  const respond = withPageHeaders(withSavedData(pageResponder({ client, renderOptions, prerendered, writes, settings: i18n?.settings, transforms: pageHooks(options.extensions), pageFile, pageSizes: pageSizes(pageFile) }), renderOptions), securityOptions, security)
+  const respond = withPageHeaders(withSavedData(pageResponder({ client, renderOptions, prerendered, writes, settings: i18n?.settings, transforms: pageHooks(options.extensions), served: servedPageHooks(options.extensions), pageFile, pageSizes: pageSizes(pageFile) }), renderOptions), securityOptions, security)
 
   const fallback = await source.fallback(project, mounts)
 
