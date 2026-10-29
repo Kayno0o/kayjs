@@ -57,6 +57,8 @@ function modelConfigured(): boolean {
 const SHOWN = /\.(?:png|jpe?g|gif|webp)(?:\?.*)?$/i
 // How many images are described at once, so a site of many images does not meet a provider's rate limit.
 const AT_ONCE = 3
+// How long after a failed draft the image is tried again.
+const RETRY_MS = 10 * 60 * 1000
 
 const log = logFrom('kayjs-ai')
 
@@ -67,88 +69,106 @@ interface Place {
   locale: string
 }
 
-function slotOf({ root, path, locale }: Place): { slot: CacheSlot, id: string } {
-  const id = Bun.hash(`${root}\0${basename(path)}\0${locale}`).toString(36)
-
-  return { id, slot: libraryCacheSlot(root, LIBRARY, id, PROMPT_VERSION) }
+function slotOf({ root, path, locale }: Place): CacheSlot {
+  return libraryCacheSlot(root, LIBRARY, Bun.hash(`${basename(path)}\0${locale}`).toString(36), PROMPT_VERSION)
 }
 
-// What was found kept or made, by draft: an empty text is an image with nothing to say.
+// What was found kept or made, by cache file: an empty text is an image with nothing to say.
 const known = new Map<string, string>()
-// Each draft is made once per process, in flight or done; one that failed stays here, logged once, and is tried again after a restart.
+// Each draft is asked once at a time, in flight or done; one that failed is forgotten after `RETRY_MS`, so a blip does not leave an image bare until a restart.
 const drafting = new Map<string, Promise<string | undefined>>()
-const waiting: (() => void)[] = []
-let running = 0
+// The images a failure was logged for, so a retry stays quiet.
+const reported = new Set<string>()
+const queue: { place: Place, done: (alt: string | undefined) => void }[] = []
+const sleeping: (() => void)[] = []
+let started = false
 
-// Runs `task` when fewer than `AT_ONCE` run, handing its place to the next one waiting when it ends.
-export async function turn<Value>(task: () => Promise<Value>): Promise<Value> {
-  if (running >= AT_ONCE)
-    await new Promise<void>(resolve => waiting.push(resolve))
-  else
-    running++
+// The workers describing the queued images, `AT_ONCE` of them. They run outside any request, started where the config is read, so a draft is charged to no visitor's limits and no request's abort stops it.
+export function startDrafting(): void {
+  if (started)
+    return
 
-  try {
-    return await task()
-  }
-  finally {
-    const next = waiting.shift()
+  started = true
 
-    if (next === undefined)
-      running--
+  for (let count = 0; count < AT_ONCE; count++)
+    void work()
+}
+
+async function work(): Promise<void> {
+  for (;;) {
+    const job = queue.shift()
+
+    if (job === undefined)
+      await new Promise<void>(resolve => sleeping.push(resolve))
     else
-      next()
+      job.done(await make(job.place))
   }
+}
+
+// Ends the wait before a failed draft is tried again, for a test.
+export function forgetRetry(): void {
+  drafting.clear()
 }
 
 // Drops what this process remembers of the drafts, for a test that clears the cache folder.
 export function forgetDrafts(): void {
   known.clear()
   drafting.clear()
+  reported.clear()
 }
 
-// The kept draft of an image: its text, empty for an image with none to give, undefined when it was not drafted yet.
+// The kept draft of an image: its text, empty for an image with none to give, undefined when it was not drafted yet or is being.
 async function kept(place: Place): Promise<string | undefined> {
-  const { id, slot } = slotOf(place)
-  const remembered = known.get(id)
+  const slot = slotOf(place)
+  const remembered = known.get(slot.file)
 
-  if (remembered !== undefined)
+  if (remembered !== undefined || drafting.has(slot.file))
     return remembered
 
   const entry = await readCacheEntry<Draft>(slot)
 
   if (entry !== undefined)
-    known.set(id, entry.alt)
+    known.set(slot.file, entry.alt)
 
   return entry?.alt
 }
 
 async function make(place: Place): Promise<string | undefined> {
-  const { id, slot } = slotOf(place)
+  const slot = slotOf(place)
   const name = basename(place.path)
 
   try {
-    const alt = await turn(async () => describeImage(Bun.file(place.path), { language: place.locale }))
+    const alt = await describeImage(Bun.file(place.path), { language: place.locale })
 
-    known.set(id, alt)
+    known.set(slot.file, alt)
     await writeCacheEntry(slot, { alt, name, locale: place.locale } satisfies Draft)
 
     return alt
   }
   catch (error) {
-    log.warn(`imageAlt could not draft the alt of ${name}: ${error instanceof Error ? error.message : String(error)}`)
+    if (!reported.has(slot.file)) {
+      reported.add(slot.file)
+      log.warn(`imageAlt could not draft the alt of ${name}: ${error instanceof Error ? error.message : String(error)}`)
+    }
+
+    setTimeout(() => drafting.delete(slot.file), RETRY_MS).unref()
 
     return undefined
   }
 }
 
-// Starts the draft of an image unless it is under way or done; never rejects.
+// Queues the draft of an image unless it is under way or done; never rejects.
 async function draftOnce(place: Place): Promise<string | undefined> {
-  const { id } = slotOf(place)
-  let pending = drafting.get(id)
+  const { file } = slotOf(place)
+  let pending = drafting.get(file)
 
   if (pending === undefined) {
-    pending = make(place)
-    drafting.set(id, pending)
+    startDrafting()
+    pending = new Promise<string | undefined>((done) => {
+      queue.push({ place, done })
+      sleeping.shift()?.()
+    })
+    drafting.set(file, pending)
   }
 
   return pending

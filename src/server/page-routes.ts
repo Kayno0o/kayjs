@@ -111,7 +111,7 @@ export function pageResponder({ client, renderOptions, prerendered, settings, tr
   return async (route, params, context, url) => {
     const render = servedHooks.length === 0
       ? async () => renderPage(route, context, params, client, renderOptions)
-      : async () => hookedServed(await renderPage(route, context, params, client, renderOptions), servedHooks, url.pathname.slice((renderOptions.base ?? '').length), localeState()?.locale ?? settings?.defaultLocale ?? '', pageFile, pageSizes)
+      : async () => hookedServed(await renderPage(route, context, params, client, renderOptions), servedHooks, url.pathname, localeState()?.locale ?? settings?.defaultLocale ?? '', pageFile, pageSizes)
 
     const preview = previewRequested(context.request)
 

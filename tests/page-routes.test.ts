@@ -99,6 +99,11 @@ describe('pageResponder', () => {
     expect(await (await visit('/about')).text()).toBe('<p>Built</p>')
     expect(await (await visit('/elsewhere')).text()).toContain('<h1 data-hooked>About</h1>')
     expect(seen).toEqual(['/elsewhere'])
+
+    const based = pageResponder({ client: (await readClient(root))!, renderOptions: { base: '/b' }, prerendered: new Map(), settings: undefined, transforms: [], served: [hook], pageFile: async () => undefined, pageSizes: pageSizes(async () => undefined), writes: { count: 0 } })
+
+    await based(about, {}, { request: new Request('http://localhost/about') }, new URL('http://localhost/about'))
+    expect(seen).toEqual(['/elsewhere', '/about'])
   })
 
   it('keeps a kept page after a refused write and renders it live after one that went through', async () => {

@@ -10,7 +10,7 @@ import { outputDir } from '../src/build/assets'
 import { cachedCopies } from '../src/build/compressed'
 import { PRERENDERED_DIR, readManifest, writeManifest } from '../src/server/client'
 import { strongestCopies } from '../src/server/compress'
-import { applyPageHooks, assetFiles, hookPrerendered, pageSizes } from '../src/server/page-hook'
+import { applyPageHooks, assetFiles, hookedServed, hookPrerendered, pageSizes } from '../src/server/page-hook'
 import { pageEtag } from '../src/server/prerendered'
 
 const scratch = await mkdtemp(join(tmpdir(), 'kay-page-hook-'))
@@ -192,5 +192,42 @@ describe('page hooks', () => {
 
       expect(seen).toEqual([3, 3])
     })
+  })
+})
+
+describe('hookedServed', () => {
+  const sizes = pageSizes(async () => undefined)
+  const none = async () => Promise.resolve(undefined)
+  const page = (body: string | null, init: ResponseInit) => new Response(body, init)
+
+  it('rewrites an HTML page keeping its status and headers, without the length of the old body', async () => {
+    const headers = new Headers({ 'content-type': 'text/html; charset=utf-8', 'content-length': '3' })
+
+    headers.append('set-cookie', 'a=1')
+    headers.append('set-cookie', 'b=2')
+
+    const response = await hookedServed(page('old', { status: 404, headers }), [({ html, path, locale }) => `${html}:${path}:${locale}`], '/x', 'fr', none, sizes)
+
+    expect(await response.text()).toBe('old:/x:fr')
+    expect(response.status).toBe(404)
+    expect(response.headers.getSetCookie()).toEqual(['a=1', 'b=2'])
+    expect(response.headers.get('content-length')).not.toBe('3')
+  })
+
+  it('leaves a redirect, JSON and a body-less answer as they are', async () => {
+    const hook = () => 'changed'
+    const json = page('{}', { headers: { 'content-type': 'application/json' } })
+    const redirect = page(null, { status: 308, headers: { 'content-type': 'text/html', 'location': '/y' } })
+
+    expect(await (await hookedServed(json, [hook], '/', '', none, sizes)).text()).toBe('{}')
+    expect((await hookedServed(redirect, [hook], '/', '', none, sizes)).status).toBe(308)
+  })
+
+  it('serves the page as it was rendered when a hook throws', async () => {
+    const response = await hookedServed(page('kept', { headers: { 'content-type': 'text/html' } }), [() => {
+      throw new Error('boom')
+    }], '/', '', none, sizes)
+
+    expect(await response.text()).toBe('kept')
   })
 })

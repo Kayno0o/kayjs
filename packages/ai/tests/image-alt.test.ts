@@ -7,7 +7,7 @@ import { afterEach, describe, expect, it, spyOn } from 'bun:test'
 import { serverRoot } from 'kay/library'
 import { applyPageHooks, assetFiles, pageSizes } from '../../../src/server/page-hook'
 import { ai, AiError, describeImage, fakeAi } from '../src'
-import { draftProblems, forgetDrafts, turn, writeImageAlts, writeKeptImageAlts } from '../src/image-alt'
+import { draftProblems, forgetDrafts, forgetRetry, writeImageAlts, writeKeptImageAlts } from '../src/image-alt'
 
 const PNG = Uint8Array.fromBase64('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGP4z8DwHwAFAAH/iZk9HQAAAABJRU5ErkJggg==')
 const ASSET = '/_kay/assets/team-abc.png'
@@ -125,25 +125,44 @@ describe('imageAlt', () => {
     expect(fakeAi.asked).toHaveLength(0)
   })
 
-  it('runs at most three descriptions at once, the rest waiting their turn', async () => {
-    let running = 0
-    let most = 0
+  it('describes more images than it runs at once, each one after the others', async () => {
+    const files: Record<string, string> = {}
+    let html = ''
 
-    await Promise.all(Array.from({ length: 8 }, async () => turn(async () => {
-      running++
-      most = Math.max(most, running)
-      await Bun.sleep(5)
-      running--
-    })))
+    for (let index = 0; index < 8; index++) {
+      const url = `/_kay/assets/p${index}-abc.png`
 
-    expect(most).toBe(3)
+      files[url] = await image(`p${index}-abc.png`)
+      html += `<img src="${url}">`
+    }
+
+    expect((await page(html, files)).match(/alt="fake"/g)).toHaveLength(8)
+    expect(fakeAi.asked).toHaveLength(8)
+  })
+
+  it('tries a failed image again once the retry delay has passed', async () => {
+    fakeAi.fail(new AiError('unavailable', 'down'))
+
+    const warn = spyOn(console, 'warn').mockImplementation(() => undefined)
+    const path = await image('team-abc.png')
+
+    try {
+      expect(await page(IMG, { [ASSET]: path })).toBe(IMG)
+      forgetRetry()
+      fakeAi.reply({ data: { alt: 'A team' } })
+      expect(await page(IMG, { [ASSET]: path })).toContain('alt="A team"')
+      expect(warn.mock.calls.filter(([line]) => String(line).includes('team-abc.png'))).toHaveLength(1)
+    }
+    finally {
+      warn.mockRestore()
+    }
   })
 
   it('skips an img inside nested islands, however deep, and takes the one after them', async () => {
     const path = await image('team-abc.png')
     const html = `<slot data-component="a"><slot data-component="b"><img src="${ASSET}"></slot><img src="${ASSET}"></slot>${IMG}`
 
-    expect(await page(html, { [ASSET]: path })).toBe(`<slot data-component="a"><slot data-component="b"><img src="${ASSET}"></slot><img src="${ASSET}"></slot><img src="${ASSET}" width="1" height="1" alt="A fake">`.replace('A fake', 'fake'))
+    expect(await page(html, { [ASSET]: path })).toBe(`<slot data-component="a"><slot data-component="b"><img src="${ASSET}"></slot><img src="${ASSET}"></slot><img src="${ASSET}" width="1" height="1" alt="fake">`)
   })
 
   it('goes through the hook runner of a build with the files it resolves, as ai() carries it', async () => {

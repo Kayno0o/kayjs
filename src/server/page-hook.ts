@@ -3,7 +3,7 @@ import { join, normalize, resolve, sep } from 'node:path'
 import { ASSET_PREFIX, outputDir } from '../build/assets'
 import { IMAGE_ROUTE } from '../runtime/image'
 import { PRERENDERED_DIR, readManifest, writeManifest } from './client'
-import { servedSize } from './compress'
+import { servedSize, wholeResponse } from './compress'
 import { FAVICON_DIR, FAVICON_PATHS } from './favicon'
 import { builtVariant } from './image'
 import { limiter } from './limit'
@@ -155,14 +155,22 @@ export async function hookPrerendered(root: string, hooks: PageHook[], dirs: Ass
 
 // A page rendered for a request, through the hooks made for it; anything but an HTML page is returned as it is.
 export async function hookedServed(response: Response, hooks: PageHook[], path: string, locale: string, file: RenderedPage['file'], sizes: PageSizes): Promise<Response> {
-  if (!response.headers.get('content-type')?.startsWith('text/html'))
+  if (response.body === null || !response.headers.get('content-type')?.startsWith('text/html'))
     return response
 
   const headers = new Headers(response.headers)
 
   headers.delete('content-length')
 
-  return new Response(await applyPageHooks(hooks, path, locale, await response.text(), file, sizes), { status: response.status, headers })
+  const html = await response.text()
+
+  // A hook that throws leaves the page as it was rendered, rather than turning it into a 500 that skips the error page.
+  try {
+    return wholeResponse(await applyPageHooks(hooks, path, locale, html, file, sizes), { status: response.status, headers })
+  }
+  catch {
+    return wholeResponse(html, { status: response.status, headers })
+  }
 }
 
 // A page the server renders again in place of a prerendered one, through the same hooks.
