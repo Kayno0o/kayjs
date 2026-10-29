@@ -124,11 +124,14 @@ jobs:
           bun --version
           bun run check
 
-      # For the tests driving pages through `kay/test` in a real browser, which Bun.WebView finds through BUN_CHROME_PATH.
+      # For the tests driving pages through `kay/test` in a real browser: the headless shell kay's suite runs on, which holds less memory than full Chrome, and full Chromium beside it for the step below.
+      # Alpine ships the shell as chromium-headless-shell from 3.23 (edge too); an older image falls back to full Chromium for both.
       - name: Install Chromium
         run: |
           apk info -e chromium ttf-freefont >/dev/null || apk add --no-cache chromium ttf-freefont
-          echo "BUN_CHROME_PATH=$(command -v chromium || command -v chromium-browser)" >> "$GITHUB_ENV"
+          apk info -e chromium-headless-shell >/dev/null || apk add --no-cache chromium-headless-shell || true
+          echo "KAY_FULL_CHROME=$(command -v chromium || command -v chromium-browser)" >> "$GITHUB_ENV"
+          echo "BUN_CHROME_PATH=$(command -v chromium-headless-shell || command -v chromium || command -v chromium-browser)" >> "$GITHUB_ENV"
 
       # The app template's own tests copy a database per test file, here on the cluster the runner image holds, started as pg-orm's CI starts it.
       # The suite runs files side by side, each with its own pools, which outgrow the default 100 connections.
@@ -147,6 +150,10 @@ jobs:
       # A run stuck past its time is interrupted before the job limit, so bun prints the files still running, which the limit cuts off with the log.
       - name: Tests
         run: timeout -s INT -k 30 720 bun run test --parallel=6 --update-timings
+
+      # The files whose point is the browser itself, on full Chrome, which has a browser UI and keeps the renderer of every closed page: a difference from the shell the suite ran on shows here.
+      - name: Browser tests on full Chrome
+        run: BUN_CHROME_PATH="$KAY_FULL_CHROME" timeout -s INT -k 30 600 bun test --parallel=2 tests/browser.test.ts tests/docs-contrast.test.ts tests/local-collection.test.ts
 
       - name: Slowest test files
         if: ${{ !cancelled() }}

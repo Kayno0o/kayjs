@@ -495,7 +495,7 @@ Each rule has an `id` such as `color-contrast`, an `impact`, `help`, a `helpUrl`
 
 A page that does not settle in time fails `open()`, naming the files it could not load, such as an island's chunk answering 404. A page whose renderer crashes fails its next call at once, not at the test's timeout.
 
-The browser is `Bun.WebView` on Chrome. Kay finds Chrome on the `PATH`, or reads `BUN_CHROME_PATH`. Use `describe.skipIf(browserPath() === undefined)` to skip a suite when there is none.
+The browser is `Bun.WebView` on Chrome. Kay reads `BUN_CHROME_PATH`, else prefers a `chrome-headless-shell` on the `PATH` or in Playwright's cache, which runs the same Blink and V8 with no browser UI and holds far less memory, else finds Chrome or Chromium on the `PATH`. Install the shell with `bunx playwright install chromium-headless-shell`, or `apk add chromium-headless-shell` on Alpine 3.23 and edge. Use `describe.skipIf(browserPath() === undefined)` to skip a suite when there is none.
 
 Chrome's profile lives in the temp directory while the browser runs. Chrome stays open for five minutes after the last page closes, so a file pausing between pages starts it once, and kay closes it after the run, when `kay/test/preload` kills every process Chrome started. Chrome keeps the memory of each page it closes until it quits, so after three pages the next one, with none open, starts a fresh Chrome.
 

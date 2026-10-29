@@ -294,7 +294,8 @@ describe.skipIf(path === undefined)('a local() collection in the browser', () =>
     expect((await server()).saves).toBe(0)
   }, 60_000)
 
-  it('has the worker send a write queued with the page offline, and the page settles it from that answer', async () => {
+  // Full Chrome's offline emulation cuts the page off and leaves its service worker online; chrome-headless-shell's cuts the worker off too, so the worker cannot send the write. The CI job on full Chrome runs it.
+  it.skipIf((/headless-shell/).test(path ?? ''))('has the worker send a write queued with the page offline, and the page settles it from that answer', async () => {
     const page = await worker!.open('/')
 
     await page.waitUntil(() => document.querySelector('.status')?.textContent === 'synced')

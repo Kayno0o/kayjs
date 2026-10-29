@@ -1036,9 +1036,11 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the browse
 
     return name.startsWith('org.chromium.') ? 'chrome' : name
   }
+  // The browser processes of the kay-chrome profiles in the script's temp directory, by their command line as /proc has it: Chrome keeps its lock beside the profile and chrome-headless-shell does not, and the shell joins its arguments with spaces.
+  const BROWSER_PIDS = `const browserPids = (skip = '') => readdirSync('/proc').filter(name => { try { const line = readFileSync(\`/proc/\${name}/cmdline\`, 'utf8').split('\\0').join(' '); return line.includes(\`--user-data-dir=\${tmpdir()}/kay-chrome-\`) && !(skip && line.includes(skip)) && !line.includes('--type=') && !line.includes('crashpad') } catch { return false } }).map(Number)`
   const kinds = (names: string[]) => names.filter(name => name !== LOCKED).map(kindOf).sort()
-  // The directory some Chrome makes of its own as it runs, Alpine's among them.
-  const running = (kinds: string[]) => kinds.filter(kind => kind !== 'fetcher')
+  // The directories some Chrome makes of its own as it runs, Alpine's and the lock of Chrome's among them, which chrome-headless-shell makes none of.
+  const running = (kinds: string[]) => kinds.filter(kind => kind !== 'fetcher' && kind !== 'chrome')
   // A temp directory of its own, short as Chrome's socket path must be, which macOS's own is not.
   const shortTemp = async () => mkdtemp(join(process.platform === 'darwin' ? '/tmp' : tmpdir(), 'kt-'))
   const server = 'const server = Bun.serve({ port: 0, fetch: () => new Response(\'<p>Hi</p>\', { headers: { \'content-type\': \'text/html\' } }) })\n'
@@ -1051,13 +1053,14 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the browse
     // A killed run's directory kay cannot remove, which leaves the browser to start.
     await Bun.write(join(temp, LOCKED, 'profile/f'), '')
     await chmod(join(temp, LOCKED, 'profile'), 0o500)
-    await Bun.write(script, `import { readdirSync, readlinkSync } from 'node:fs'
+    await Bun.write(script, `import { readdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import process from 'node:process'
 import { browse } from ${JSON.stringify(resolve('src/test/browser.ts'))}
 
-${server}const chrome = () => readdirSync(tmpdir()).filter(name => name.startsWith('kay-chrome-') && name !== ${JSON.stringify(LOCKED)}).flatMap(name => { try { return [readlinkSync(join(tmpdir(), name, 'profile', 'SingletonLock'))] } catch { return [] } })
+${server}${BROWSER_PIDS}
+const chrome = () => browserPids(${JSON.stringify(LOCKED)})
 const open = async () => browse(\`http://localhost:\${server.port}/\`, { path: process.argv[2] })
 const pages = [await open(), await open()]
 const listed = () => console.log(JSON.stringify(readdirSync(tmpdir())))
@@ -1087,9 +1090,9 @@ process.exit(0)
 
       expect({ code, errors }).toEqual({ code: 0, errors: '' })
       // One owned directory, the killed run's gone; Bun's profile stays empty, Chrome running on kay's.
-      expect(running(opened!)).toEqual(['bun', 'chrome', 'kay'])
-      expect(running(closed!)).toEqual(['bun', 'chrome', 'kay'])
-      expect(running(paused!)).toEqual(['bun', 'chrome', 'kay'])
+      expect(running(opened!)).toEqual(['bun', 'kay'])
+      expect(running(closed!)).toEqual(['bun', 'kay'])
+      expect(running(paused!)).toEqual(['bun', 'kay'])
       // The same Chrome served the page after the pause.
       expect(lines[3]).toEqual({ same: true, count: 1 })
       // The page opened last, left open, goes at exit.
@@ -1108,13 +1111,14 @@ process.exit(0)
     const temp = await shortTemp()
     const script = join(await scratchDir('recycle-'), 'run.ts')
 
-    await Bun.write(script, `import { readdirSync, readlinkSync } from 'node:fs'
+    await Bun.write(script, `import { readdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import process from 'node:process'
 import { browse } from ${JSON.stringify(resolve('src/test/browser.ts'))}
 
-${server}const chrome = () => readdirSync(tmpdir()).filter(name => name.startsWith('kay-chrome-')).flatMap(name => { try { return [Number(readlinkSync(join(tmpdir(), name, 'profile', 'SingletonLock')).split('-').pop())] } catch { return [] } })
+${server}${BROWSER_PIDS}
+const chrome = () => browserPids()
 const alive = (pid) => { try { process.kill(pid, 0); return true } catch { return false } }
 const pids = []
 let kept
@@ -1198,7 +1202,8 @@ import { browse } from ${JSON.stringify(resolve('src/test/browser.ts'))}
 
 const server = Bun.serve({ port: 0, fetch: () => new Response('<p>Hi</p>', { headers: { 'content-type': 'text/html' } }) })
 const page = await browse(\`http://localhost:\${server.port}/\`, { path: process.argv[2], timeout: '20s' })
-const renderers = readdirSync('/proc').filter(name => readCmdline(name).includes(\`kay-chrome-\${process.pid}-\`) && readCmdline(name).includes('--type=renderer'))
+const main = readdirSync('/proc').find(name => readCmdline(name).includes(\`kay-chrome-\${process.pid}-\`) && !readCmdline(name).includes('--type='))
+const renderers = readdirSync('/proc').filter(name => readCmdline(name).includes('--type=renderer') && descends(name, main))
 const outcome = async (call: Promise<unknown>) => {
   const started = Date.now()
 
@@ -1211,9 +1216,19 @@ const outcome = async (call: Promise<unknown>) => {
   }
 }
 
+// Whether a process descends from the browser's: a renderer of chrome-headless-shell names no profile.
+function descends(name: string, ancestor: string | undefined): boolean {
+  for (let pid = name; pid !== '' && pid !== '0' && pid !== '1'; pid = /^\\S+ \\(.*\\) \\S (\\d+)/.exec(readFileSync(\`/proc/\${pid}/stat\`, 'utf8'))?.[1] ?? '') {
+    if (pid === ancestor)
+      return true
+  }
+
+  return false
+}
+
 function readCmdline(name: string): string {
   try {
-    return readFileSync(\`/proc/\${name}/cmdline\`, 'utf8')
+    return readFileSync(\`/proc/\${name}/cmdline\`, 'utf8').split('\\0').join(' ')
   }
   catch {
     return ''

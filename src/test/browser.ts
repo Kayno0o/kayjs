@@ -3,7 +3,7 @@ import type { Duration } from '../runtime/duration'
 import type { Network, PageResponse } from './network'
 import type { WaitUntilOptions } from './wait'
 import { existsSync, mkdtempSync, readdirSync, readFileSync, readlinkSync, realpathSync, rmdirSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { homedir, tmpdir } from 'node:os'
 import { basename, dirname, join, resolve as resolvePath } from 'node:path'
 import process from 'node:process'
 import { fileURLToPath } from 'node:url'
@@ -15,7 +15,7 @@ import { installClock } from './clock'
 import { createNetwork } from './network'
 
 export interface BrowserOptions {
-  // The Chrome or Chromium executable, else `BUN_CHROME_PATH`, else the first one found on the PATH or where it usually installs.
+  // The Chrome or Chromium executable, else `BUN_CHROME_PATH`, else a chrome-headless-shell on the PATH or in Playwright's cache, else the first Chrome or Chromium found on the PATH or where it usually installs.
   path?: string | undefined
   width?: number | undefined
   height?: number | undefined
@@ -166,6 +166,8 @@ export interface TestPage {
 
 // What kay logs in the browser for a problem it recovers from.
 const KAY_PROBLEM = '[kay]'
+// The headless shell is preferred: the same Blink and V8 with no browser UI, which holds far less memory than full Chrome.
+const SHELLS = ['chrome-headless-shell', 'chromium-headless-shell']
 const EXECUTABLES = ['chromium', 'chromium-browser', 'google-chrome', 'google-chrome-stable', 'chrome']
 const INSTALLED = [
   '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
@@ -185,6 +187,9 @@ const VIEWPORTS = {
   phone: { width: 390, height: 844, deviceScaleFactor: 2, mobile: true },
   tablet: { width: 820, height: 1180, deviceScaleFactor: 2, mobile: true },
 }
+
+// What Bun says of a Chrome that did not start or exited under it.
+const START_FAILED = /Chrome process|spawn|ENOENT|EACCES/i
 
 // How long one try of a click waits for its element to be actionable before the page scrolls it into place again, and what Bun's message for running out of it ends with.
 const CLICK_WAIT_MS = 1000
@@ -267,6 +272,18 @@ export function browserPath(path?: string): string | undefined {
   if (given !== undefined && given !== '')
     return existsSync(given) ? given : Bun.which(given) ?? undefined
 
+  for (const name of SHELLS) {
+    const found = Bun.which(name)
+
+    if (found !== null && found !== '')
+      return found
+  }
+
+  const shell = playwrightShell()
+
+  if (shell !== undefined)
+    return shell
+
   for (const name of EXECUTABLES) {
     const found = Bun.which(name)
 
@@ -275,6 +292,31 @@ export function browserPath(path?: string): string | undefined {
   }
 
   return INSTALLED.find(file => existsSync(file))
+}
+
+// The newest chrome-headless-shell in Playwright's browser cache (`bunx playwright install chromium-headless-shell`), where it keeps one on each system.
+function playwrightShell(): string | undefined {
+  const home = homedir()
+  const roots = [
+    process.env.PLAYWRIGHT_BROWSERS_PATH,
+    join(home, '.cache', 'ms-playwright'),
+    join(home, 'Library', 'Caches', 'ms-playwright'),
+    process.env.LOCALAPPDATA === undefined ? undefined : join(process.env.LOCALAPPDATA, 'ms-playwright'),
+  ]
+  const glob = new Bun.Glob('chromium_headless_shell-*/chrome-headless-shell-*/chrome-headless-shell{,.exe}')
+
+  for (const root of roots) {
+    if (root === undefined || root === '' || !existsSync(root))
+      continue
+
+    // The highest build number first.
+    const found = [...attempt(() => [...glob.scanSync({ cwd: root, absolute: true })]) ?? []].sort((a, b) => b.localeCompare(a, undefined, { numeric: true }))[0]
+
+    if (found !== undefined)
+      return found
+  }
+
+  return undefined
 }
 
 // Opens `url` of a server already running in a headless Chrome, as a visitor with no cookies or storage for the site yet.
@@ -297,7 +339,8 @@ export async function browse(url: string, options: BrowserOptions = {}): Promise
   const rootArgv = process.getuid?.() === 0 ? ['--no-sandbox', '--disable-dev-shm-usage'] : []
   const { dir, first } = await claimBrowser()
   // `--enable-automation` lets Chrome tell its command line, which names the profile Bun made.
-  const argv = [...rootArgv, `--user-data-dir=${join(dir, 'profile')}`, '--enable-automation']
+  // `--site-per-process` gives chrome-headless-shell the out-of-process iframes desktop Chrome has, so a sandboxed frame stuck in a loop leaves its page answering.
+  const argv = [...rootArgv, `--user-data-dir=${join(dir, 'profile')}`, '--enable-automation', '--site-per-process']
   let view: Bun.WebView
 
   try {
@@ -316,7 +359,7 @@ export async function browse(url: string, options: BrowserOptions = {}): Promise
   catch (error) {
     releaseBrowser()
 
-    throw error
+    throw startFailure(error, executable)
   }
 
   let closed = false
@@ -879,10 +922,18 @@ export async function browse(url: string, options: BrowserOptions = {}): Promise
 
     page.close()
 
-    throw error
+    throw first ? startFailure(error, executable) : error
   }
 
   return page
+}
+
+// A browser that did not start, or exited as it did, names the executable kay chose, as the cause is often that build rather than the page.
+function startFailure(error: unknown, executable: string): unknown {
+  if (!(error instanceof Error) || !START_FAILED.test(error.message))
+    return error
+
+  return new Error(`${error.message} (browser: ${executable})`, { cause: error })
 }
 
 // What a load that stalls says of the pages left open: a browser holds six connections to a host, and a page following a live value keeps one open for as long as the page lives, so the seventh page waits for a connection none will give.
@@ -946,7 +997,7 @@ function closeBrowser() {
     return
 
   const { dir, idle } = browser
-  const pid = LOCK_PID.exec(attempt(() => readlinkSync(join(dir, 'profile', 'SingletonLock'))) ?? '')?.[1]
+  const pid = LOCK_PID.exec(attempt(() => readlinkSync(join(dir, 'profile', 'SingletonLock'))) ?? '')?.[1] ?? browserProcess(join(dir, 'profile'))
   // Read before Chrome is killed, which hands what it started to another parent.
   const tree = pid === undefined ? [] : chromeTree(Number(pid), join(dir, 'profile'))
 
@@ -981,7 +1032,7 @@ function removeProfile(dir: string) {
 
 // Chrome's process and every one it started, read from /proc, none where there is no /proc or the process does not name the profile kay gave it: a process that took the number of one that crashed is left alone.
 export function chromeTree(pid: number, profile: string): number[] {
-  if (attempt(() => readFileSync(`/proc/${pid}/cmdline`, 'utf8'))?.split('\0').includes(`--user-data-dir=${profile}`) !== true)
+  if (argvOf(pid)?.includes(`--user-data-dir=${profile}`) !== true)
     return []
 
   const tree = [pid]
@@ -1004,11 +1055,29 @@ export function chromeTree(pid: number, profile: string): number[] {
   return tree
 }
 
+// A process's command line from /proc, the arguments apart. chrome-headless-shell rewrites its own into one entry of arguments joined by spaces, which a profile in the temp directory and Chrome's flags never contain.
+function argvOf(pid: number | string): string[] | undefined {
+  const argv = attempt(() => readFileSync(`/proc/${pid}/cmdline`, 'utf8'))?.split('\0')
+
+  return argv?.length === 2 && argv[1] === '' ? argv[0]?.split(' ') : argv
+}
+
+// The browser process of a Chrome that writes no lock, as chrome-headless-shell does: the one running on the profile that is not a crash handler or a child (`--type=`). Bun spawns another Chrome only once the killed one is reaped, which `killed` tells it.
+function browserProcess(profile: string): string | undefined {
+  const flag = `--user-data-dir=${profile}`
+
+  return (attempt(() => readdirSync('/proc')) ?? []).find((name) => {
+    const argv = argvOf(name)
+
+    return argv?.[0] !== undefined && CHROME.test(basename(argv[0])) && !CRASH_HANDLER.test(basename(argv[0])) && argv.includes(flag) && !argv.some(arg => arg.startsWith('--type='))
+  })
+}
+
 // The processes running on the profile, read from /proc: Chrome passes its profile to every process it starts.
 function naming(profile: string): number[] {
   const flag = `--user-data-dir=${profile}`
 
-  return (attempt(() => readdirSync('/proc')) ?? []).filter(name => attempt(() => readFileSync(`/proc/${name}/cmdline`, 'utf8'))?.split('\0').includes(flag) === true).map(Number)
+  return (attempt(() => readdirSync('/proc')) ?? []).filter(name => argvOf(name)?.includes(flag) === true).map(Number)
 }
 
 // Kills the processes, waiting a moment for them to be gone.
@@ -1045,7 +1114,7 @@ export function removeFetcherDirs(): void {
 // Whether the browser process of a Chrome runs with this temp directory; another user's tells nothing, its directories not this one's to remove.
 function chromeRunsIn(temp: string): boolean {
   return (attempt(() => readdirSync('/proc')) ?? []).some((name) => {
-    const argv = attempt(() => readFileSync(`/proc/${name}/cmdline`, 'utf8'))?.split('\0')
+    const argv = argvOf(name)
 
     if (argv?.[0] === undefined || !CHROME.test(basename(argv[0])) || CRASH_HANDLER.test(basename(argv[0])) || argv.some(arg => arg.startsWith('--type=')) || !running(Number(name)))
       return false

@@ -24,7 +24,8 @@ describe.skipIf(browserPath() === undefined && (process.env.CI ?? '') === '')('t
     await page.hover('#c', { at: { x: 40, y: 2500 } })
 
     expect(await page.evaluate(() => window.scrollY)).toBeGreaterThan(0)
-    expect(await page.evaluate(() => (window as unknown as { log: unknown[][] }).log.filter(row => row[0] !== 'move' || row[1] === true))).toEqual([['over', true], ['move', true, 40, 2500]])
+    // The headless shell moves its pointer to the page's corner as the scroll lands, a move at 0,0 that full Chrome does not report.
+    expect(await page.evaluate(() => (window as unknown as { log: unknown[][] }).log.filter(row => row[0] !== 'move' || (row[1] === true && (row[2] !== 0 || row[3] !== 0))))).toEqual([['over', true], ['move', true, 40, 2500]])
 
     await page.click('#c', { at: { x: 100, y: 10 } })
 

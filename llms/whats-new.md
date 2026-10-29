@@ -4,6 +4,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 
 ## Unreleased
 
+- Browser tests prefer a `chrome-headless-shell` (on the `PATH` or in Playwright's cache) over full Chrome when no `path` or `BUN_CHROME_PATH` is given: same Blink and V8, far less memory, and a start failure names the executable; the shell also leaves no lock file, which kay's browser cleanup now follows through `/proc`. See [the browser itself](testing-browser.md).
 - kay parses scripts, fences and templates with oxc-parser in place of `@babel/parser` and `@babel/traverse`: compiling a `.kay` file takes about 40% less CPU and a dev or LSP start compiles its first file faster, an install carries oxc's native binding in place of `@babel/*`, and a syntax error in a script reads in oxc's words. A compiled executable still carries no compiler.
 - `links: { schemes: ['webcal', 'geo'] }` lets a bound `href`, `src` or `action` keep a scheme the app trusts instead of going out as `unsafe:`, on the server and in islands (`javascript`, `vbscript` and `data` are refused), and `kay dev` logs once per URL each bound URL it rewrote: [security](proxy-and-security.md).
 - An action, an API route and a websocket upgrade refuse a request whose `Origin` is `http:` on the site's own host once the site is served over https (the request itself, `X-Forwarded-Proto`, or an https `site` in production), where only the host was compared; `kay dev` and a server tried on `localhost` over http keep working: [action protection](action-protection.md).

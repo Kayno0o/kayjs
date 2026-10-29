@@ -182,7 +182,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the dev to
   }, 60_000)
 
   it('counts the Head and Images warnings on their tabs before either is opened, and follows a page swap', async () => {
-    const view = await dev.open('/flagged', { height: 900 })
+    const view = await dev.open('/flagged', { height: 800 })
     const counts = async () => view.evaluate(() => {
       const shadow = document.querySelector('kay-dev')!.shadowRoot!
       const count = (id: string) => shadow.querySelector<HTMLElement>(`#kay-dev-tab-${id} .count`)!
