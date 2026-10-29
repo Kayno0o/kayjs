@@ -557,7 +557,7 @@ A `process.env.X` or `Bun.env.X` read in `src` that nothing declares is a warnin
 
 `kay check --fix` declares those variables for you. It adds them to your `defineEnv` schema, or writes `src/env.ts` when you have none, turns a `?? 'default'` into the variable's `default`, and rewrites each read to `env.X` with the import.
 
-A file that reads the environment on its own is left alone, with no warning: the entry of a standalone binary (a file a `bun build` script of `package.json` names, in `src` or elsewhere) and the files it imports by relative path, the content config (`src/content.config.ts`, or the `content` of `kay.config.ts`), and any file with a `// kay-env: raw` line. A module the entry shares with the app is left alone for the whole app.
+A file that reads the environment on its own is left alone, with no warning: the entry of a standalone binary (a file a `bun build` script of `package.json` names, in `src` or elsewhere) and the files it imports by relative path, the content config (`src/content.config.ts`, or the `contentConfig` of `kay.config.ts`), and any file with a `// kay-env: raw` line. A module the entry shares with the app is left alone for the whole app.
 
 A variable is left with its warning when a read assigns it, destructures it, sits in a `.kay` file or in a file that already has an `env`. Two things change. An empty value now takes the default, as `defineEnv` treats it as unset. And the files you read from now import the schema, which reads and checks the environment as it loads. `kay upgrade` does not do this.
 

@@ -173,7 +173,7 @@ div(innerHTML={markdownHtml(text())})
 
 A collection is a folder of Markdown files, or of JSON and YAML data files, read against a schema.
 
-The project declares its collections in `src/content.config.ts`, or the module `content` names in kay.config.ts, each folder relative to that module:
+The project declares its collections in `src/content.config.ts`, or the module `contentConfig` names in kay.config.ts, each folder relative to that module:
 
 ```ts
 import { s } from 'kay'

@@ -236,7 +236,6 @@ export function baseFromEnv(): string | undefined {
   return SITE_BASE.startsWith('/') ? SITE_BASE : `/${SITE_BASE}`
 }
 
-// The config with `site` and `base` read from `SITE_URL` and `SITE_BASE` where it sets none: a deployment names where the site is public, so the config declares neither.
 const TAILWIND = 'bun-plugin-tailwind'
 
 // The plugins kay added itself, which no line of `kay.config.ts` lists: an executable build has none to strip from the config's source.
@@ -265,6 +264,7 @@ async function withTailwind<Config extends KayConfig>(root: string, config: Conf
   return { ...config, plugins: [...config.plugins ?? [], tailwind] }
 }
 
+// The config with `site` and `base` read from `SITE_URL` and `SITE_BASE` where it sets none: a deployment names where the site is public, so the config declares neither.
 function withSiteUrl<Config extends KayConfig>(config: Config): Config {
   const site = siteFromEnv()
   const base = baseFromEnv()

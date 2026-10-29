@@ -1,6 +1,6 @@
 import type { Diagnostic } from '../compiler/ast'
 import type { Paint } from '../compiler/frame'
-import type { InternalConfig, KayConfig } from '../config'
+import type { InternalConfig, KayConfig, LoadedConfig } from '../config'
 import type { TypeScope } from './diagnose'
 import type { ProbeMemory } from './project'
 import type { ShadowFile } from './shadow'
@@ -107,8 +107,9 @@ function helped({ message, help }: CheckDiagnostic): Pick<CheckDiagnostic, 'help
   return found === undefined ? {} : { help: found }
 }
 
-export function configCheckOptions(config: KayConfig): CheckOptions {
-  return pickConfig(config, CHECK_CONFIG)
+// The loaded config's `publicEnv` goes along, as no app key: `kay check` claims `/_kay/env.js` when it is set.
+export function configCheckOptions(config: LoadedConfig): CheckOptions {
+  return { ...pickConfig(config, CHECK_CONFIG), ...config.publicEnv !== undefined && { publicEnv: config.publicEnv } }
 }
 
 // Type-checks a project, .kay components included, and reports every error at the line and column the user wrote.

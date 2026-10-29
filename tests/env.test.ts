@@ -4,6 +4,7 @@ import { join } from 'node:path'
 import process from 'node:process'
 import { afterAll, describe, expect, it, setDefaultTimeout } from 'bun:test'
 import { t } from 'elysia'
+import { configCheckOptions } from '../src/check'
 import { defineConfig } from '../src/config'
 import { loadConfig } from '../src/config-loader'
 import { s } from '../src/runtime/schema'
@@ -245,6 +246,15 @@ describe('kay env', () => {
     'src/env.ts': 'import { s } from \'kay\'\nimport { defineEnv } from \'kay/server\'\n\nconsole.log(\'loading the env\')\n\nexport const env = defineEnv(s.Object({\n  DATABASE_URL: s.String(),\n  SESSION_SECRET: s.String({ default: \'dev\', requiredInProduction: true }),\n  PORT: s.Integer({ default: 8080 }),\n  DEBUG: s.Optional(s.Boolean()),\n}))\n',
     'src/broken.ts': 'import { defineEnv } from \'kay/server\'\nimport \'./missing\'\n\nexport const env = defineEnv({} as never)\n',
   }
+
+  it('hands kay check the publicEnv the loaded config carries', async () => {
+    const root = await project({
+      'kay.config.ts': 'export default { favicon: false }\n',
+      'src/env.ts': 'import { s } from \'kay\'\nimport { defineEnv } from \'kay/server\'\n\nexport const env = defineEnv(s.Object({ MAP_KEY: s.Public(s.String()) }))\n',
+    })
+
+    expect(configCheckOptions(await loadConfig(root)).publicEnv).toBe(true)
+  })
 
   it('lists an s.Public field as public, and sends the browser an environment', async () => {
     const root = await project({
