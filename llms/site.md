@@ -315,7 +315,7 @@ export function checkComment({ name, text }: Comment): CommentErrors {
 ```
 
 - The handler checks them, `src/routes/guestbook.kay`.
-- `kay check` asks each string field of the schema for a `maxLength` (`unbounded-string`):
+- A string field with no `maxLength` is refused past 10,000 characters, and `kay check` asks a name, an email or a title for a tighter one (`unbounded-string`):
 
 ```kay
 --- server

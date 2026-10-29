@@ -55,7 +55,7 @@ Each lint has a level. `deny` is an error, `warn` a warning, `allow` hides it. W
 | `nested-control` | deny | a11y | A link, button or field inside a link or a button |
 | `duplicate-id` | deny | a11y | An id two elements share, or one written out in a `for` or a `snippet` called more than once |
 | `invalid-autocomplete` | deny | forms | An `autocomplete` value HTML does not define |
-| `unbounded-string` | deny | forms | A string field of an action with no `maxLength`, unless an `enum`, `const` or anchored bounded `pattern` bounds it |
+| `unbounded-string` | warn | forms | A string field of an action named like a short value (`name`, `email`, `title`...) with no `maxLength` of its own, which takes the default bound of 10,000 characters, unless an `enum`, `const` or anchored bounded `pattern` bounds it |
 | `positional-key` | warn | islands | A `for` keyed by position whose rows read `item.id` |
 | `incomplete-match` | warn | code | A `match` with no `else` that leaves members of a union out |
 | `missing-label` | warn | a11y | A form field with no label |

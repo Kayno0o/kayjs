@@ -79,7 +79,7 @@ export function declare(schema: TSchema, handler: (input: unknown, ctx: ActionCo
   return Object.defineProperties(call, {
     ...reads,
     url: { get: () => state.url, set: (url: string) => void (state.url = url), enumerable: true },
-    schema: { value: schema, enumerable: true },
+    schema: { value: schema, enumerable: true, writable: true },
     handler: { value: handler, enumerable: true },
     protection: { value: protection, enumerable: true },
     [ACTION]: { value: true },

@@ -18,6 +18,7 @@ import { joinBase } from '../runtime/base'
 import { escapeAttribute } from '../runtime/escape'
 import { formInput } from '../runtime/form'
 import { localeState, runInLocale } from '../runtime/locale-state'
+import { withDefaultBounds } from '../runtime/schema-bounds'
 import { configuredSite } from '../runtime/site'
 import { sizeText } from '../runtime/size-text'
 import { FAILURE_HEADER, NAVIGATE_HEADER, PAGE_HEADER, REDIRECT_HEADER } from '../runtime/swap'
@@ -162,6 +163,9 @@ export async function registerActionRoutes(app: Elysia, routes: ServedRoute[], m
     for (const [name, value] of Object.entries(module)) {
       if (!isAction(value))
         continue
+
+      // Every string field with no bound of its own takes the default, for the route's validation, the form's `maxlength` and the tool's schema alike.
+      Object.assign(value, { schema: withDefaultBounds(value.schema) })
 
       const taken = served.get(value.url)
 

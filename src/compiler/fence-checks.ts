@@ -146,7 +146,10 @@ function isBoundedByValue(property: NodeOfType<'Property'>): boolean {
   return key === 'pattern' && property.value.type === 'Literal' && typeof property.value.value === 'string' && isBoundedPattern(property.value.value)
 }
 
-// A string field of an action's schema with no `maxLength` takes whatever a visitor posts into it, up to the request body limit, unless its `enum`, `const` or anchored `pattern` already bounds it. A secret, such as a password, is checked or hashed rather than kept or shown, so it needs none.
+// The fields that hold a short value whatever the app, which the default bound of 10,000 characters leaves far too long.
+const SHORT_FIELD = /^(?:(?:first|last|full|user|display|nick|company|project|team|file)?name|email|title|subject|label|slug|handle|login|phone|tel|city|country|zip|postcode|postalcode|code|sku|isbn|iban|siret|siren)$/i
+
+// A string field of an action's schema that is a name, an email or a title, with no `maxLength` of its own, which takes the default bound of 10,000 characters: it likely needs a tighter one. Any other string field takes the default and is left alone, as is a secret.
 export function unboundedFields(server: ServerAnalysis | undefined): Diagnostic[] {
   const fence = server?.fence
 
@@ -165,7 +168,7 @@ export function unboundedFields(server: ServerAnalysis | undefined): Diagnostic[
       const options = call.arguments[0]
       const known = options === undefined || (options.type === 'ObjectExpression' && options.properties.every(property => property.type !== 'SpreadElement'))
 
-      if (!known || (options?.type === 'ObjectExpression' && options.properties.some(property => property.type !== 'SpreadElement' && (propertyKey(property) === 'maxLength' || isBoundedByValue(property)))) || (field !== undefined && isSecret(field)))
+      if (!known || (options?.type === 'ObjectExpression' && options.properties.some(property => property.type !== 'SpreadElement' && (propertyKey(property) === 'maxLength' || isBoundedByValue(property)))) || field === undefined || isSecret(field) || !SHORT_FIELD.test(field))
         return
 
       const edit = maxLengthEdit(call, options)
@@ -174,9 +177,9 @@ export function unboundedFields(server: ServerAnalysis | undefined): Diagnostic[
       diagnostics.push({
         ...fence.shift(call.callee),
         code: 'unbounded-string',
-        message: `${field === undefined ? 'This string field' : `The string field ${field}`} has no maxLength`,
-        note: 'it takes whatever a visitor posts, up to the request body limit',
-        help: 'give it one',
+        message: `The string field ${field} has no maxLength of its own`,
+        note: 'it takes the default bound of 10,000 characters, which is a lot for a value of its kind',
+        help: 'give it a tighter one',
         fixes: [{ title: `Give it a maxLength of ${SUGGESTED_MAX_LENGTH}`, edits: [{ start: at, end: at, text: edit.text }] }],
         checkOnly: true,
       })

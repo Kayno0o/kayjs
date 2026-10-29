@@ -38,7 +38,7 @@ describe('an action as a tool', () => {
     expect(await site.call(shape, { name: 'addNote' })).toEqual({
       name: 'add_note',
       description: 'Add note',
-      inputSchema: { type: 'object', properties: { title: { type: 'string', minLength: 3, error: 'Too short' }, pinned: { type: 'boolean' } }, required: ['title'] },
+      inputSchema: { type: 'object', properties: { title: { type: 'string', minLength: 3, maxLength: 10_000, error: 'Too short' }, pinned: { type: 'boolean' } }, required: ['title'] },
     })
   })
 

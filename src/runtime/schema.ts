@@ -2,8 +2,16 @@ import type { TSchema } from 'elysia'
 import type { ByteSize } from './byte-size'
 import { t as schema } from 'elysia'
 import { byteSize } from './byte-size'
+import { DEFAULT_MAX_LENGTH } from './schema-bounds'
 
 type Builder = typeof schema
+
+// `s.String`, bounded to `DEFAULT_MAX_LENGTH` unless the options bound it with a `maxLength`, an `enum` or a `const`.
+function BoundedString(options: Parameters<Builder['String']>[0] = {}): ReturnType<Builder['String']> {
+  const bounded = 'maxLength' in options || 'enum' in options || 'const' in options
+
+  return schema.String(bounded ? options : { ...options, maxLength: DEFAULT_MAX_LENGTH })
+}
 
 // A string of at least 32 characters that production must set, and development and tests derive from the project path, so a secret needs no placeholder in the app: read it with `defineEnv`.
 function Secret(options: Parameters<Builder['String']>[0] = {}): ReturnType<Builder['String']> {
@@ -57,4 +65,4 @@ const Files = (options?: FilesOptions): ReturnType<Builder['Files']> => schema.F
 
 // Elysia's schema builder, re-exported so an action's schema needs no import of its own, with `Secret` and `Public` for `defineEnv`, `UnionKeys`, and `File` and `Files` taking a size as an action's `maxSize` does.
 // kept: free
-export const s: Omit<Builder, 'File' | 'Files'> & { File: typeof File, Files: typeof Files, Secret: typeof Secret, Public: typeof Public, UnionKeys: typeof UnionKeys } = { ...schema, UnionEnum, File, Files, Secret, Public, UnionKeys }
+export const s: Omit<Builder, 'File' | 'Files'> & { File: typeof File, Files: typeof Files, Secret: typeof Secret, Public: typeof Public, UnionKeys: typeof UnionKeys } = { ...schema, String: BoundedString, UnionEnum, File, Files, Secret, Public, UnionKeys }

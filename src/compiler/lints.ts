@@ -273,9 +273,9 @@ export const LINTS = {
     right: 'input(name="email" aria-label="Email" autocomplete="email")',
   },
   'unbounded-string': {
-    level: 'deny',
+    level: 'warn',
     group: 'forms',
-    summary: 'A string field of an action\'s schema with no `maxLength`, which takes whatever a visitor posts, up to the request body limit. A secret such as a password is left alone.',
+    summary: 'A string field of an action\'s schema named like a short value (`name`, `email`, `title`, `subject`, `slug`, `phone`, `code`...) with no `maxLength` of its own: every string field is refused past 10,000 characters by default, which is far too long for these. Any other field keeps the default, and a secret such as a password is left alone.',
     wrong: '--- server\nimport { action, s } from \'kay\'\n\nexport const add = action(s.Object({ title: s.String() }), async ({ title }) => create(title))\n---\nform(action={add})\n  input(name="title")',
     right: '--- server\nimport { action, s } from \'kay\'\n\nexport const add = action(s.Object({ title: s.String({ maxLength: 200 }) }), async ({ title }) => create(title))\n---\nform(action={add})\n  input(name="title")',
   },

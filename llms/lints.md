@@ -97,7 +97,7 @@ kay check --only seo
 | `nested-control` | deny | a11y | A link, button or field inside a link or a button. |
 | `duplicate-id` | deny | a11y | An id two elements of a template share, or one written out inside a `for` or a `snippet` called more than once. |
 | `invalid-autocomplete` | deny | forms | An `autocomplete` value HTML does not define. |
-| `unbounded-string` | deny | forms | A string field of an action's schema with no `maxLength`, unless its `enum`, `const` or anchored bounded `pattern` already bounds it. |
+| `unbounded-string` | warn | forms | A string field of an action's schema named like a short value (`name`, `email`, `title`, `subject`, `slug`...) with no `maxLength` of its own, which takes the default bound of 10,000 characters, unless its `enum`, `const` or anchored bounded `pattern` already bounds it. |
 | `positional-key` | warn | islands | `for todo, i of todos key={i}` whose rows read `todo.id`: keyed by position, a row added before others hands their markup and state to the wrong rows. The quick fix drops the key, so they are matched by `todo.id`. |
 | `incomplete-match` | warn | code | A `match` with no `else` over a finite union (literals, an enum, a boolean, `null`, `undefined`) whose `when` lines leave members out, naming them: it renders nothing for them. Found by the type check, so by `kay check` and the editor. A `match` with an `else`, over `string`, `number` or an object type, over `typeof` or `true`, or with a `when` value that is not a literal or an enum member, is not reported. |
 | `missing-label` | warn | a11y | An `input`, `select`, `textarea`, `meter`, `role="slider"` or `role="meter"` with no `label`, `aria-label`, `aria-labelledby` or `title`; a `placeholder` is no label. |

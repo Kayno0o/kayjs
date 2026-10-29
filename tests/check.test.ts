@@ -3272,11 +3272,10 @@ describe('kay check, string fields an action leaves unbounded', () => {
     return compileKay(source, join(process.cwd(), 'page.kay'), { check: true }).diagnostics.map(diagnostic => ({ text: source.slice(diagnostic.start, diagnostic.end), message: diagnostic.message, checkOnly: diagnostic.checkOnly, fixed: diagnostic.fixes?.map(fix => fix.edits.reduce((text, edit) => text.slice(0, edit.start) + edit.text + text.slice(edit.end), source).split('\n')[4]) }))
   }
 
-  it('reports a string field with no maxLength, offering one, nested or optional ones included', () => {
+  it('reports a string field named like a short value with no maxLength, offering one, optional ones included, and leaves the others to the default', () => {
     expect(fields('export const add = action(t.Object({ title: t.String(), tags: t.Array(t.String({})), email: t.Optional(t.String({ format: \'email\' })) }), () => 1)')).toEqual([
-      { text: 't.String', message: 'The string field title has no maxLength', checkOnly: true, fixed: ['export const add = action(t.Object({ title: t.String({ maxLength: 200 }), tags: t.Array(t.String({})), email: t.Optional(t.String({ format: \'email\' })) }), () => 1)'] },
-      { text: 't.String', message: 'The string field tags has no maxLength', checkOnly: true, fixed: ['export const add = action(t.Object({ title: t.String(), tags: t.Array(t.String({ maxLength: 200 })), email: t.Optional(t.String({ format: \'email\' })) }), () => 1)'] },
-      { text: 't.String', message: 'The string field email has no maxLength', checkOnly: true, fixed: ['export const add = action(t.Object({ title: t.String(), tags: t.Array(t.String({})), email: t.Optional(t.String({ maxLength: 200, format: \'email\' })) }), () => 1)'] },
+      { text: 't.String', message: 'The string field title has no maxLength of its own', checkOnly: true, fixed: ['export const add = action(t.Object({ title: t.String({ maxLength: 200 }), tags: t.Array(t.String({})), email: t.Optional(t.String({ format: \'email\' })) }), () => 1)'] },
+      { text: 't.String', message: 'The string field email has no maxLength of its own', checkOnly: true, fixed: ['export const add = action(t.Object({ title: t.String(), tags: t.Array(t.String({})), email: t.Optional(t.String({ maxLength: 200, format: \'email\' })) }), () => 1)'] },
     ])
   })
 
@@ -3288,7 +3287,7 @@ describe('kay check, string fields an action leaves unbounded', () => {
     const open = ['^a*$', '^a+$', '^a{2,}$', '^(ab)+$', 'a$', '^a', '^a\\\\$', '^a|b$', '^[a-z]\\\\d*$']
 
     for (const pattern of open)
-      expect(fields(`export const add = action(t.Object({ name: t.String({ pattern: '${pattern}' }) }), () => 1)`).map(found => found.message), pattern).toEqual(['The string field name has no maxLength'])
+      expect(fields(`export const add = action(t.Object({ name: t.String({ pattern: '${pattern}' }) }), () => 1)`).map(found => found.message), pattern).toEqual(['The string field name has no maxLength of its own'])
   })
 
   it('leaves a handler of an action with no schema alone, whatever strings it builds', () => {

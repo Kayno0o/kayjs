@@ -61,6 +61,8 @@ form(action={contact})
 
 Adding a key to the record adds the option and the accepted value together. A record with no key is refused when the server starts.
 
+A string field with no `maxLength` is refused past 10,000 characters, with the same error as a declared one, and the bound reaches the form's `maxlength` attribute and the tool's schema. Give a name, an email or a title a tighter one, which `kay check` warns of, and a field that takes more text a longer one.
+
 ## An action with no input
 
 An action that takes nothing, such as a sign-out, leaves the schema out and gives its handler alone. The handler gets the context.
