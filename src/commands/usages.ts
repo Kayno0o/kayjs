@@ -5,7 +5,7 @@ export const USAGES = {
   'generate': 'generate <page|component|island|action|api|guard|resource> <name> [field:type...] [dir] [--dir <dir>] [--plural <name>] [--dry-run] [--format text|json] [--quiet]',
   'dev': 'dev [dir] [--entry <file>] [--port <port>] [--host[=<address>]] [--inspect[=<address>]] [--open] [--format text|json] [--quiet] [--no-types]',
   'build': 'build [dir] [--compile <executable> [--verify | --verify-load]] [--entry <file>] [--static] [--outdir <dir>] [--no-check] [--no-cache] [--analyze] [--deny-warnings] [-p tsconfig.json] [--format text|github|json] [--quiet]',
-  'start': 'start [dir] [--entry <file>] [--port <port>] [--workers <n|auto>] [--quiet]',
+  'start': 'start [dir] [--entry <file>] [--port <port>] [--host <address>] [--workers <n|auto>] [--quiet]',
   'render': 'render <url> [dir] [--entry <file>] [--method <method>] [--body <text>] [--header <name: value>]... [--cookie <name=value>]... [-i|--include] [--quiet]',
   'screenshot': 'screenshot <path> [dir] [--width <px>]... [--height <px>] [--scheme light|dark] [--full-page] [--cookie <name=value>]... [--format text|json]',
   'a11y': 'a11y [dir] [--standard rgaa|wcag] [--declaration <file>] [--dry-run] [--format text|json] [--quiet]',

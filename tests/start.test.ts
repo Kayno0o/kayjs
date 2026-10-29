@@ -21,7 +21,7 @@ import { eventStream, pages } from 'kay/server'
 
 let slow = 0
 
-const app = new Elysia().get('/mode', () => \`\${process.env.NODE_ENV} \${process.env.FROM_DOTENV}\`).get('/inflight', () => String(slow)).get('/slow', async () => {
+const app = new Elysia().get('/mode', () => \`\${process.env.NODE_ENV} \${process.env.FROM_DOTENV}\`).get('/host', () => process.env.HOST ?? 'unset').get('/inflight', () => String(slow)).get('/slow', async () => {
   slow++
   await Bun.sleep(30_000)
 
@@ -233,6 +233,19 @@ describe('kay start', () => {
 
     await utimes(join(dir, 'src/routes/index.kay'), later, later)
     expect((await listening(start(dir))).warned).toContain('the build is older than .kay/scratch/')
+  }, 60_000)
+
+  it('sets HOST from --host over the shell\'s', async () => {
+    await build()
+    await rm(join(outputDir(dir), 'executable'), { force: true })
+
+    for (const [args, expected] of [[['--host', '127.0.0.1'], '127.0.0.1'], [['--host=127.0.0.1'], '127.0.0.1'], [[], 'unset']] as const) {
+      const port = String(freePort())
+
+      await listening(start(dir, '--port', port, ...args), async () => {
+        expect(await (await fetch(`http://127.0.0.1:${port}/host`)).text()).toBe(expected)
+      })
+    }
   }, 60_000)
 
   it('stops on SIGTERM with a stream and a websocket open: the stop hooks run and the exit is 0', async () => {

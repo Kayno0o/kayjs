@@ -14,9 +14,9 @@ import { USAGES } from './usages'
 // Serves the last build as the deployed server would: the executable `kay build --compile` made, else the server entry, in production.
 export const start: Command = {
   usage: USAGES.start,
-  options: { entry: { type: 'string' }, port: { type: 'string' }, workers: { type: 'string' }, quiet: { type: 'boolean' } },
+  options: { entry: { type: 'string' }, port: { type: 'string' }, host: { type: 'string' }, workers: { type: 'string' }, quiet: { type: 'boolean' } },
   positionals: 1,
-  run: async ({ values: { entry: option, port, workers, quiet }, positionals: [path] }, refuse) => {
+  run: async ({ values: { entry: option, port, host, workers, quiet }, positionals: [path] }, refuse) => {
     if (typeof port === 'string' && !isPort(port))
       return refuse(`--port takes a port number, not ${port}`)
 
@@ -48,7 +48,7 @@ export const start: Command = {
     const serving = platformWorkers(asked, 'kay start')
 
     if (serving > 1)
-      return superviseWorkers({ command, cwd: root, env: { ...env, NODE_ENV: 'production', ...typeof port === 'string' && { PORT: port } }, count: serving, name: 'kay start' })
+      return superviseWorkers({ command, cwd: root, env: { ...env, NODE_ENV: 'production', ...typeof port === 'string' && { PORT: port }, ...typeof host === 'string' && { HOST: host } }, count: serving, name: 'kay start' })
 
     // A server that is not one of several must not take itself for one, as an executable would from `KAY_WORKERS`.
     delete env.KAY_WORKERS
@@ -65,7 +65,7 @@ export const start: Command = {
     }
 
     try {
-      server = Bun.spawn(command, { cwd: root, env: { ...env, NODE_ENV: 'production', [START_PARENT]: String(process.pid), ...typeof port === 'string' && { PORT: port } }, stdio: ['inherit', 'inherit', 'inherit'], detached: true })
+      server = Bun.spawn(command, { cwd: root, env: { ...env, NODE_ENV: 'production', [START_PARENT]: String(process.pid), ...typeof port === 'string' && { PORT: port }, ...typeof host === 'string' && { HOST: host } }, stdio: ['inherit', 'inherit', 'inherit'], detached: true })
     }
     catch (error) {
       console.error(`kay start: cannot run ${relative(process.cwd(), command.at(-1)!)}: ${error instanceof Error ? error.message : String(error)}`)

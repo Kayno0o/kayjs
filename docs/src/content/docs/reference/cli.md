@@ -339,6 +339,7 @@ See [Prove the executable starts](/guides/deployment#prove-the-executable-starts
 ```sh
 kay start              # the last build, as the deployed server runs it
 kay start --port 8080
+kay start --host 127.0.0.1   # behind a proxy on this machine
 kay start --workers auto   # one server per core
 ```
 
@@ -350,6 +351,7 @@ It reads `.env.production` and `.env` as Bun does under `NODE_ENV=production`. A
 | --- | --- |
 | `--entry <file>` | Runs that server entry instead, relative to the current directory |
 | `--port <port>` | The port to listen on: `--port`, else the shell's `PORT`, else the env files', else 3000 |
+| `--host <address>` | The address to listen on: `--host`, else the shell's `HOST`, else the env files', else every address |
 | `--workers <n\|auto>` | Serves from that many processes on one port, `auto` for one per core; `KAY_WORKERS` does the same. Linux only, one process elsewhere |
 
 Ctrl-C, `SIGTERM` and `SIGHUP` reach the server once, and `kay start` waits for it to drain and exit. A second Ctrl-C stops it at once. `kay start` exits with the server's code. With `--workers`, the signals reach every worker, a worker that dies is started again, and the exit is 0 once they all drained.
