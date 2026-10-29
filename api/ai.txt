@@ -23,6 +23,7 @@ type AiLimit = 'asks' | 'budget' | 'total'
 interface AiOptions
   budget?: false | BudgetOptions | undefined
   conversations?: ConversationStore | undefined
+  imageAlt?: boolean | undefined
   key?: ((request: Request) => string | Promise<string | undefined> | undefined) | undefined
   rateLimit?: false | LimitOptions | undefined
 
@@ -154,6 +155,14 @@ type DeepPartial<Value> = Value extends string ? string : Value extends readonly
 [.] DeltasOptions
 interface DeltasOptions
   onRestart?: (() => void) | undefined
+
+[.] describeImage
+function describeImage(image: Attachment, options?: DescribeImageOptions): Promise<string>
+
+[.] DescribeImageOptions
+interface DescribeImageOptions
+  language?: string | undefined
+  signal?: AbortSignal | undefined
 
 [.] embed
 function embed(text: string, options?: EmbedOptions | undefined): Promise<number[]>

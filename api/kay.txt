@@ -1392,7 +1392,7 @@ interface CompileOptions
   includeServer?: boolean | undefined
   insideIsland?: boolean | undefined
   inspect?: boolean | undefined
-  lints?: Partial<Record<"code" | "unread-name" | "a11y" | "forms" | "islands" | "performance" | "seo" | "security" | "i18n" | "deprecated" | "missing-alt" | "missing-title" | "unreachable-click" | "missing-label" | "empty-control" | "skipped-heading" | "unknown-aria" | "unknown-role" | "missing-state" | "hid ...#611b5e97
+  lints?: LintLevels | undefined
   outerQueries?: string[] | undefined
   output?: "html" | "dom" | undefined
   page?: boolean | undefined
@@ -1428,6 +1428,7 @@ interface Diagnostic extends Span
   message: string
   note?: string | undefined
   related?: Labelled[] | undefined
+  satisfiable?: boolean | undefined
   severity?: "error" | "warning" | undefined
   start: number
 
@@ -2657,6 +2658,11 @@ function byteSize(value: unknown, what: string): number
 [./library] ByteSize
 type ByteSize = number | `${number}${'b' | 'kb' | 'mb'}`
 
+[./library] CacheSlot
+interface CacheSlot
+  file: string
+  key: string
+
 [./library] checkAnswer
 function checkAnswer(schema: TSchema, value: unknown): CheckedAnswer
 
@@ -2730,6 +2736,9 @@ const GENERATE_SECRET: "`bun -e \"console.log(crypto.randomUUID() + crypto.rando
 [./library] Highlighter
 type Highlighter = (code: string, language: string | undefined) => string | Promise<string>
 
+[./library] IMPORTED
+const IMPORTED: "/_kay/assets/"
+
 [./library] inFlightWork
 function inFlightWork<T>(work: () => Promise<T>): Promise<T>
 
@@ -2781,6 +2790,9 @@ function lazily(guard: Guard | LazyGuard): Guard
 [./library] LazyGuard
 interface LazyGuard
   load: () => Guard | Promise<Guard>
+
+[./library] libraryCacheSlot
+function libraryCacheSlot(root: string, library: string, id: string, inputs: string): CacheSlot
 
 [./library] LibraryTool
 interface LibraryTool
@@ -2876,6 +2888,9 @@ function ratesFallingBack<Store extends RateStore>(name: string, store: Store, m
 
 [./library] READ_METHODS
 const READ_METHODS: Set<string>
+
+[./library] readCacheEntry
+function readCacheEntry<Value>(slot: CacheSlot): Promise<Value | undefined>
 
 [./library] redirectMovedPage
 function redirectMovedPage(from: string | undefined, to: string | undefined): void
@@ -2982,6 +2997,9 @@ function viewPresenceWith(next: PresenceView): () => void
 
 [./library] weakSecrets
 function weakSecrets(secrets: string[]): boolean
+
+[./library] writeCacheEntry
+function writeCacheEntry(slot: CacheSlot, value: unknown): Promise<void>
 
 [./library] writeDraftEntry
 function writeDraftEntry(root: string, config: Pick<KayConfig, "i18n" | "content">, collection: string, locale: string, slug: string, entry: { data: Record<string, DataValue>; body?: string | undefined; }): Promise<string>
@@ -3391,7 +3409,7 @@ interface KayConfig
   lang?: string | undefined
   lateStyles?: boolean | undefined
   links?: { outside?: "new-tab" | "same-tab" | undefined; } | undefined
-  lints?: Partial<Record<"code" | "unread-name" | "a11y" | "forms" | "islands" | "performance" | "seo" | "security" | "i18n" | "deprecated" | "missing-alt" | "missing-title" | "unreachable-click" | "missing-label" | "empty-control" | "skipped-heading" | "unknown-aria" | "unknown-role" | "missing-state" | "hid ...#611b5e97
+  lints?: LintLevels | undefined
   live?: LiveConfig | undefined
   log?: Logger | undefined
   manifest?: ManifestConfig | undefined
@@ -3454,10 +3472,12 @@ interface KayExtension<Server extends AnyElysia = AnyElysia>
   needsServer?: boolean | undefined
   references?: string[] | undefined
   routes?: { dir: string; prefix?: string | undefined; } | undefined
+  satisfies?: "missing-alt"[] | undefined
   server?: Server | ((app: ExtensionApp) => Server | Promise<Server>) | undefined
   serverModule?: { path: string; export?: string | undefined; prepare?: ((exported: unknown) => void | Promise<void>) | undefined; } | undefined
   staticFiles?: Record<string, string> | undefined
   transformPage?: PageHook | undefined
+  transformServedPage?: PageHook | undefined
 
 [./server] LiveEntry
 type LiveEntry = [id: string, key: string, text: string] | [id: string, key: string, text: string, expiresAt: number]
@@ -3575,7 +3595,7 @@ interface PagesOptions extends KayConfig
   lang?: string | undefined
   lateStyles?: boolean | undefined
   links?: { outside?: "new-tab" | "same-tab" | undefined; } | undefined
-  lints?: Partial<Record<"code" | "unread-name" | "a11y" | "forms" | "islands" | "performance" | "seo" | "security" | "i18n" | "deprecated" | "missing-alt" | "missing-title" | "unreachable-click" | "missing-label" | "empty-control" | "skipped-heading" | "unknown-aria" | "unknown-role" | "missing-state" | "hid ...#611b5e97
+  lints?: LintLevels | undefined
   live?: LiveConfig | undefined
   log?: Logger | undefined
   manifest?: ManifestConfig | undefined
@@ -4343,7 +4363,7 @@ interface TestOptions extends PagesOptions
   lang?: string | undefined
   lateStyles?: boolean | undefined
   links?: { outside?: "new-tab" | "same-tab" | undefined; } | undefined
-  lints?: Partial<Record<"code" | "unread-name" | "a11y" | "forms" | "islands" | "performance" | "seo" | "security" | "i18n" | "deprecated" | "missing-alt" | "missing-title" | "unreachable-click" | "missing-label" | "empty-control" | "skipped-heading" | "unknown-aria" | "unknown-role" | "missing-state" | "hid ...#611b5e97
+  lints?: LintLevels | undefined
   live?: LiveConfig | undefined
   locals?: ((request: Request) => Record<string, unknown> | Promise<Record<string, unknown>>) | undefined
   log?: Logger | undefined
