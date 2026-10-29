@@ -107,6 +107,8 @@ export interface ClientSources {
   libraries: KayLibrary[]
   // Whether a component renders a form posting to an action: without one, no page loads the navigation-only entry.
   actionForms: boolean
+  // Whether the app may hand an island an action: it declares one or uses a kay library. Without it the browser carries no code to revive one.
+  actionProps: boolean
 }
 
 // What each module imports, kept by the builds of this process: a module whose content is unchanged is not read for its imports again, as an incremental session does across its builds. Bun's resolver keeps a project's tsconfig.json and package.json for the process too, so a change to them is not seen by a process that built the project before.
@@ -201,13 +203,13 @@ export function clientSession(root: string, options: ClientOptions, settings: Se
 
     const classTableText = JSON.stringify([classTable, islandTable])
     // `src/ui.ts` is written into the components it restyles, none of which imports it, so no chunk lists it among its inputs.
-    const islandsAgain = !previous || !sameEntries(previous.sources.islands, sources.islands) || files.some(file => previous.islandInputs.has(file) || file === join(realRoot, UI_FILE)) || previous.classTable !== classTableText || (!options.hot && previous.sources.actionForms !== sources.actionForms)
+    const islandsAgain = !previous || !sameEntries(previous.sources.islands, sources.islands) || files.some(file => previous.islandInputs.has(file) || file === join(realRoot, UI_FILE)) || previous.classTable !== classTableText || (!options.hot && (previous.sources.actionForms !== sources.actionForms || previous.sources.actionProps !== sources.actionProps))
     const stylesAgain = !previous || await increments!.stylesChanged(previous, sources, texts)
 
     if (previous && islandsAgain)
       await increments!.stopMaps(false)
 
-    const [scripts, styles] = await bothBundles(islandsAgain ? bundleIslands(root, sources.islands, sources.actionForms, options, classTable, islandTable) : undefined, stylesAgain ? bundleStyles(root, sources, options) : undefined)
+    const [scripts, styles] = await bothBundles(islandsAgain ? bundleIslands(root, sources.islands, sources.actionForms, sources.actionProps, options, classTable, islandTable) : undefined, stylesAgain ? bundleStyles(root, sources, options) : undefined)
     const styleUses = styles ? styles.uses : previous!.styleUses
     const manifest: ClientManifest = { ...scripts?.manifest ?? previous!.islands, styles: styles?.styles ?? previous!.styles, ...classTable && { classTable }, ...styleUses && { styleUses }, ...options.hot && { problems: sources.problems }, ...key !== undefined && { options: key } }
 
@@ -399,7 +401,7 @@ export async function readClientSources(root: string, options: ClientOptions = {
   const routesDir = projectPaths(root, options).routes
 
   // The editor gathers its stylesheet as a page does, an app's own file or not.
-  return { islands, why, classes, words, shorthand, problems, pages: [...new Set([...existsSync(routesDir) ? await findKayFiles(routesDir) : [], ...mounted, ...editor === undefined ? [] : [editor]])], libraries, actionForms }
+  return { islands, why, classes, words, shorthand, problems, pages: [...new Set([...existsSync(routesDir) ? await findKayFiles(routesDir) : [], ...mounted, ...editor === undefined ? [] : [editor]])], libraries, actionForms, actionProps: libraries.length > 0 || await declaresActions(root, sources.slice(0, own.length)) }
 }
 
 // A failed build must not leave the previous manifest pointing at files that are gone.
@@ -447,6 +449,19 @@ async function markupFiles(root: string, sources: object): Promise<string[]> {
   return found
 }
 
+const ACTION_CALL = /\baction\s*\(/
+const SCRIPT_FILE = /\.[cm]?[jt]s$/
+
+// Whether an own module of the app calls `action(`: the `.kay` sources already read, and the scripts beside them.
+async function declaresActions(root: string, kaySources: string[]): Promise<boolean> {
+  if (kaySources.some(source => ACTION_CALL.test(source)))
+    return true
+
+  const scripts = await findProjectFiles(root, SCRIPT_FILE, { project: true, ownKayOnly: true })
+
+  return (await Promise.all(scripts.map(async file => ACTION_CALL.test(await readText(file) ?? '')))).some(Boolean)
+}
+
 // The table the islands ship: the app-wide one cut to the classes a merge in the browser can meet, those written in a module an island bundles or in one that renders an island and hands it a class.
 // The server keeps the whole table; none is sent when no island has two classes to merge, nor when the app has no island or no Tailwind.
 export async function islandClassTableOf(root: string, sources: Pick<ClientSources, 'islands' | 'libraries' | 'shorthand'>, references: string[], graph?: ImportGraph): Promise<ClassTable | undefined> {
@@ -476,7 +491,7 @@ export async function islandClassTableOf(root: string, sources: Pick<ClientSourc
 }
 
 // `inputs` holds the modules of each chunk, `maps` the source maps written.
-async function bundleIslands(root: string, islands: Map<string, string>, actionForms: boolean, options: ClientOptions, classTable?: ClassTable, islandTable?: ClassTable): Promise<{ manifest: Omit<ClientManifest, 'styles'>, inputs: ChunkInputs, maps: string[] }> {
+async function bundleIslands(root: string, islands: Map<string, string>, actionForms: boolean, actionProps: boolean, options: ClientOptions, classTable?: ClassTable, islandTable?: ClassTable): Promise<{ manifest: Omit<ClientManifest, 'styles'>, inputs: ChunkInputs, maps: string[] }> {
   const navigation = options.navigation ?? true
 
   if (islands.size === 0 && !navigation)
@@ -526,7 +541,7 @@ async function bundleIslands(root: string, islands: Map<string, string>, actionF
   ].join('\n'))
 
   // Bun resolves packages' `development` export condition unless NODE_ENV is defined as production, which would ship a package's dev build; a build for development, not NODE_ENV, asks for theirs.
-  const define: Record<string, string> = { 'KAY_BROWSER': 'true', 'process.env.NODE_ENV': JSON.stringify(options.hot === true ? 'development' : 'production'), 'KAY_STATIC_EXPORT': options.exported === true ? 'true' : 'undefined', 'KAY_NAV_ENTRY': 'undefined', 'KAY_FRENCH': options.french === true ? 'true' : 'undefined', 'KAY_I18N': options.i18n === true ? 'true' : 'undefined', 'KAY_VISIBLE_MARGIN': JSON.stringify(rootMargin(options.hydration?.visible, '200px', 'visible')), 'KAY_NEAR_MARGIN': JSON.stringify(rootMargin(options.hydration?.serverIslands, '100% 0px', 'serverIslands')) }
+  const define: Record<string, string> = { 'KAY_BROWSER': 'true', 'process.env.NODE_ENV': JSON.stringify(options.hot === true ? 'development' : 'production'), 'KAY_STATIC_EXPORT': options.exported === true ? 'true' : 'undefined', 'KAY_NAV_ENTRY': 'undefined', 'KAY_FRENCH': options.french === true ? 'true' : 'undefined', 'KAY_I18N': options.i18n === true ? 'true' : 'undefined', 'KAY_NO_ACTION_PROPS': options.hot !== true && !actionProps ? 'true' : 'undefined', 'KAY_VISIBLE_MARGIN': JSON.stringify(rootMargin(options.hydration?.visible, '200px', 'visible')), 'KAY_NEAR_MARGIN': JSON.stringify(rootMargin(options.hydration?.serverIslands, '100% 0px', 'serverIslands')) }
   const external = publicEnv !== undefined ? [publicEnv] : []
   const plugins = (anchor?: string, anchored?: ReadonlySet<string>, direct?: boolean) => [withoutStyles(), api, kay({ target: 'dom', root, cacheDir: projectPaths(root).cache, settings: options.settings, anchor, anchored, direct, inspect: options.inspect, api: trees, external, classTable }), ...options.plugins ?? []]
 

@@ -232,9 +232,11 @@ async function searchRuntime(entry: string, options: { plugins: BunPlugin[], def
   const roots = (await Promise.all([...used.keys()].map(specifierFile))).filter(file => file !== undefined)
   const { eager, lazy } = await reach(roots)
 
-  if (lazy.size > 0) {
+  const adopting = [...lazy].filter(file => !STANDALONE.has(file))
+
+  if (adopting.length > 0) {
     const inner = await Bun.build({
-      entrypoints: [...lazy],
+      entrypoints: adopting,
       target: 'browser',
       splitting: true,
       define: options.define,
@@ -248,7 +250,6 @@ async function searchRuntime(entry: string, options: { plugins: BunPlugin[], def
           })
         },
       }],
-      metafile: true,
       throw: false,
     })
 
@@ -256,14 +257,8 @@ async function searchRuntime(entry: string, options: { plugins: BunPlugin[], def
       return undefined
 
     // What a lazy module takes from one loaded up front goes in the chunk with the rest; the rest of what it takes stays lazy with it.
-    for (const output of inner.outputs) {
-      const entryPoint = inner.metafile!.outputs[output.path]?.entryPoint
-
-      if (entryPoint !== undefined && STANDALONE.has(resolve(entryPoint)))
-        continue
-
+    for (const output of inner.outputs)
       importedNames(await output.text(), shared, specifier => eager.has(specifier))
-    }
   }
 
   // The files of the output directory, the entry's and its boot module, are written again by every build: the key holds what they say.

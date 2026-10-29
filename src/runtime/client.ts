@@ -190,7 +190,7 @@ async function hydrateIsland(registry: IslandRegistry, element: HTMLElement): Pr
     return
   }
 
-  let loaded: [Awaited<ReturnType<IslandRegistry[string]>>, Awaited<ReturnType<typeof staticSlots>>, Awaited<ReturnType<typeof livePropsOf>>, void]
+  let loaded: [Awaited<ReturnType<IslandRegistry[string]>>, Awaited<ReturnType<typeof staticSlots>>, Awaited<ReturnType<typeof livePropsOf>>, void | undefined]
 
   try {
     loaded = await Promise.all([load(), staticSlots(registry, element), livePropsOf(element), reviveActionsIn(element.dataset.props)])

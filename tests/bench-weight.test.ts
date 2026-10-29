@@ -9,7 +9,7 @@ const COPY = join(ROOT, '.kay/scratch/bench-weight/bench')
 const APP = join(COPY, 'apps/kay')
 const DIST = join(APP, '.kay/client/dist')
 // The chunks the bench pages can load on demand: a new one is checked not to be asked for on every page, such as on idle, before it is listed. The sizes are held by scripts/sizes.ts.
-const LAZY = ['action-reviver', 'fetch-island', 'form-submits', 'hydrate-when', 'live-cache', 'live-props', 'page-swap', 'prefetch', 'report-error', 'static-slots']
+const LAZY = ['fetch-island', 'form-submits', 'hydrate-when', 'live-cache', 'live-props', 'page-swap', 'prefetch', 'report-error', 'static-slots']
 
 interface Manifest { entry: string, entryImports: string[], islands: Record<string, string[]> }
 

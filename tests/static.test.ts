@@ -11,7 +11,7 @@ import { fixtureCopy } from './scratch'
 
 const FIXTURE = resolve('tests/fixtures/static')
 const BASE = '/repo'
-const LAZY_CHUNKS = ['action-reviver', 'fetch-island', 'form-submits', 'hydrate-when', 'live-cache', 'live-props', 'page-swap', 'prefetch', 'static-slots']
+const LAZY_CHUNKS = ['fetch-island', 'form-submits', 'hydrate-when', 'live-cache', 'live-props', 'page-swap', 'prefetch', 'static-slots']
 const SCRIPT_URL = /<(?:script type="module" src|link rel="modulepreload" href)="([^"]+)"/g
 
 let out: string
@@ -244,6 +244,14 @@ describe('kay build --static', () => {
     // The default reporter only logs, so a closure logging an error and installed beside it is the page's own reporter.
     expect(eager.filter(code => (/\(\w+,\w+\)=>\{console\.error\(\w+\)\}/).test(code))).toEqual([])
     expect(eager.filter(code => code.includes('unsaved changes'))).toEqual([])
+  })
+
+  it('ships no code reviving an action for an app that declares none and uses no library', async () => {
+    const chunks = await Array.fromAsync(new Bun.Glob('_kay/*.js').scan(out))
+    const texts = await Promise.all(chunks.map(async chunk => Bun.file(join(out, chunk)).text()))
+
+    expect(chunks.filter(chunk => chunk.includes('action-reviver'))).toEqual([])
+    expect(texts.filter(text => text.includes('"Action"'))).toEqual([])
   })
 
   it('keeps what reloads a tab opened before a deploy in the files loaded up front, and in no chunk loaded after idle', async () => {
