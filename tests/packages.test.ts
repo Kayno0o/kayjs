@@ -68,6 +68,17 @@ describe('kay\'s libraries', () => {
     expect(importers.sort()).toEqual(['src/server/pg-orm.ts', 'src/test/database.ts'])
   })
 
+  // CI installs pg-orm 8 alone, so nothing else would notice a peer range dropping the 7 that apps still run (#2604).
+  it('peer on pg-orm 7 as well as 8, wherever they ask for it', () => {
+    const peers = [root, ...libraries.map(({ manifest }) => manifest)].flatMap(({ name, peerDependencies }) => {
+      const range = peerDependencies?.['@kaynooo/pg-orm']
+
+      return range === undefined ? [] : [{ name, range }]
+    })
+
+    expect(peers.filter(({ range }) => !['7.2.0', '8.0.0'].every(version => Bun.semver.satisfies(version, range)))).toEqual([])
+  })
+
   it.each(libraries)('$path asks for the Bun kay asks for', ({ manifest }) => {
     expect(manifest.engines?.bun).toBe(root.engines!.bun)
   })
