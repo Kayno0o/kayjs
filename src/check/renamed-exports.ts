@@ -1,8 +1,8 @@
-import type * as t from '@babel/types'
 import type { CheckDiagnostic, CheckOptions } from '.'
+import type { Node, Program } from '../compiler/estree'
 import type { LintName } from '../compiler/lints'
-import { parse } from '@babel/parser'
 import { findProjectFiles } from '../build/files'
+import { parseProgram } from '../compiler/estree'
 import { lintLevel, lintLevels } from '../compiler/lints'
 import { positionAt } from '../compiler/mapping'
 import { parseKay } from '../compiler/parser'
@@ -14,7 +14,7 @@ const SOURCE_FILE = /(?:(?<!\.d)\.tsx?|\.kay)$/
 export interface Edit { start: number, end: number, text: string }
 
 export interface Parsed {
-  ast: t.File
+  ast: Program
   text: string
   base: number
 }
@@ -48,12 +48,9 @@ export async function scan(root: string, options: CheckOptions, lint: LintName, 
     const parsed = spans.flatMap(({ start: base, end }) => {
       const text = source.slice(base, end)
 
-      try {
-        return [{ base, text, ast: parse(text, { sourceType: 'module', plugins: file.endsWith('.ts') ? ['typescript'] : ['typescript', 'jsx'], errorRecovery: true }) }]
-      }
-      catch {
-        return []
-      }
+      const { program } = parseProgram(text, { lang: file.endsWith('.ts') ? 'ts' : 'tsx', recover: true })
+
+      return [{ base, text, ast: program }]
     })
 
     let unparsed = source
@@ -80,7 +77,7 @@ export async function scan(root: string, options: CheckOptions, lint: LintName, 
 }
 
 // Whether `name` is an identifier anywhere under the nodes, as a binding, an import, a key or a read.
-export function mentions(nodes: t.Node[], name: string): boolean {
+export function mentions(nodes: Node[], name: string): boolean {
   let seen = false
 
   for (const root of nodes) {
@@ -103,7 +100,7 @@ export async function sessionStores(root: string, options: CheckOptions): Promis
     for (const { ast, base } of parsed) {
       const namespaces = new Set<string>()
 
-      for (const statement of ast.program.body) {
+      for (const statement of ast.body) {
         if (statement.type !== 'ImportDeclaration' || statement.importKind === 'type' || statement.source.value !== 'kay/server')
           continue
 
@@ -122,7 +119,7 @@ export async function sessionStores(root: string, options: CheckOptions): Promis
           const aliased = specifier.local.name !== old || specifier.imported.start !== specifier.local.start
           const message = `\`${old}\` is the session store's name before 1.84, kept until 1.87: it is \`${next}\``
           const help = `rename it to \`${next}\``
-          const importEdit = { start: base + specifier.imported.start!, end: base + specifier.imported.start! + old.length, text: next }
+          const importEdit = { start: base + specifier.imported.start, end: base + specifier.imported.start + old.length, text: next }
 
           if (aliased) {
             report(importEdit.start, importEdit.end, message, help, [importEdit])
@@ -144,7 +141,7 @@ export async function sessionStores(root: string, options: CheckOptions): Promis
           return
 
         const next = SESSION_STORES[node.property.name]!
-        const start = base + node.property.start!
+        const start = base + node.property.start
 
         report(start, start + node.property.name.length, `\`${node.property.name}\` is the session store's name before 1.84, kept until 1.87: it is \`${next}\``, `rename it to \`${next}\``, [{ start, end: start + node.property.name.length, text: next }])
       })
@@ -152,25 +149,25 @@ export async function sessionStores(root: string, options: CheckOptions): Promis
   })
 }
 
-const FUNCTIONS = new Set(['FunctionDeclaration', 'FunctionExpression', 'ArrowFunctionExpression', 'ObjectMethod', 'ClassMethod', 'ClassPrivateMethod', 'TSDeclareFunction'])
-const KEYED = new Set(['ObjectMethod', 'ClassMethod', 'ClassPrivateMethod', 'ClassProperty', 'ClassAccessorProperty', 'TSPropertySignature', 'TSMethodSignature', 'TSAbstractMethodDefinition', 'TSEnumMember'])
+const FUNCTIONS = new Set(['FunctionDeclaration', 'FunctionExpression', 'ArrowFunctionExpression', 'TSDeclareFunction', 'TSEmptyBodyFunctionExpression'])
+const KEYED = new Set(['MethodDefinition', 'PropertyDefinition', 'AccessorProperty', 'TSAbstractMethodDefinition', 'TSAbstractPropertyDefinition', 'TSAbstractAccessorProperty', 'TSPropertySignature', 'TSMethodSignature', 'TSEnumMember'])
 
 // The edits renaming the reads of an imported name, or undefined when one is not a plain read: a declaration of the name again, an export, an annotated identifier or a label, which the rename would change or break.
 // A member or key of that name is another name and is left, a shorthand property keeps its key.
-function uses(ast: t.File, from: string, to: string): Edit[] | undefined {
+function uses(ast: Program, from: string, to: string): Edit[] | undefined {
   const edits: Edit[] = []
   let plain = true
 
-  const visit = (node: t.Node, parent: t.Node | undefined, key: string): void => {
+  const visit = (node: Node, parent: Node | undefined, key: string): void => {
     if (node.type === 'Identifier' && node.name === from) {
       if ((parent && isBinding(parent, key)) || node.typeAnnotation || node.optional)
         plain = false
       else if (parent && isName(parent, key))
         return
-      else if (parent?.type === 'ObjectProperty' && parent.shorthand)
-        edits.push({ start: node.start!, end: node.end!, text: `${from}: ${to}` })
+      else if (parent?.type === 'Property' && parent.shorthand)
+        edits.push({ start: node.start, end: node.end, text: `${from}: ${to}` })
       else
-        edits.push({ start: node.start!, end: node.start! + from.length, text: to })
+        edits.push({ start: node.start, end: node.start + from.length, text: to })
 
       return
     }
@@ -184,12 +181,12 @@ function uses(ast: t.File, from: string, to: string): Edit[] | undefined {
 
       for (const child of Array.isArray(value) ? value : [value]) {
         if (child !== null && typeof child === 'object' && typeof (child as { type?: unknown }).type === 'string')
-          visit(child as t.Node, node, childKey)
+          visit(child as Node, node, childKey)
       }
     }
   }
 
-  for (const statement of ast.program.body) {
+  for (const statement of ast.body) {
     if (statement.type !== 'ImportDeclaration')
       visit(statement, undefined, '')
   }
@@ -203,7 +200,7 @@ function dedupe(edits: Edit[]): Edit[] {
 }
 
 // An identifier that declares, exports or labels a name rather than reading it.
-function isBinding(parent: t.Node, key: string): boolean {
+function isBinding(parent: Node, key: string): boolean {
   if (parent.type === 'ExportSpecifier' || parent.type === 'LabeledStatement' || parent.type === 'BreakStatement' || parent.type === 'ContinueStatement' || parent.type === 'TSEnumDeclaration' || parent.type === 'TSTypeAliasDeclaration' || parent.type === 'TSInterfaceDeclaration' || parent.type === 'TSModuleDeclaration')
     return true
 
@@ -226,11 +223,11 @@ function isBinding(parent: t.Node, key: string): boolean {
 }
 
 // An identifier that is a member name or a key, not a read of the import.
-function isName(parent: t.Node, key: string): boolean {
-  if ((parent.type === 'MemberExpression' || parent.type === 'OptionalMemberExpression') && key === 'property')
+function isName(parent: Node, key: string): boolean {
+  if ((parent.type === 'MemberExpression') && key === 'property')
     return !parent.computed
 
-  if (parent.type === 'ObjectProperty' && key === 'key')
+  if (parent.type === 'Property' && key === 'key')
     return !parent.computed && !parent.shorthand
 
   if (KEYED.has(parent.type) && key === 'key')
