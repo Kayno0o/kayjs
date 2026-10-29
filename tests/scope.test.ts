@@ -17,7 +17,7 @@ const PARTS = 24
 const SOURCES = ['src/**/*.ts', 'tests/**/*.ts', 'packages/*/src/**/*.ts', 'docs/src/**/*.ts'].flatMap(pattern => [...new Bun.Glob(pattern).scanSync({ cwd: ROOT })]).filter(file => !file.includes('node_modules') && !file.includes('/fixtures/') && !file.includes('/.kay/'))
 
 // Error recovery lets the parser pass what the scope refuses; a `.ts` source may hold the generic arrow `<T>(x) => x`, which a `.tsx` one reads as markup.
-const parseOptions = (lang: Lang) => ({ sourceType: 'module', attachComment: false, errorRecovery: true, plugins: lang === 'tsx' ? ['typescript', 'jsx'] : ['typescript'] }) as ParserOptions
+const parseOptions = (lang: Lang) => ({ sourceType: 'module', attachComment: false, errorRecovery: true, plugins: lang === 'tsx' ? ['typescript', 'jsx', 'decorators'] : ['typescript', 'decorators'] }) as ParserOptions
 
 // What the rewrites ask of the scope pass, spelled the same for Babel's and kay's, which parse the same text into different trees: facts are keyed by the position of an identifier and so are the bindings, never by a node type.
 interface Facts {
@@ -151,6 +151,32 @@ function compare(code: string, label: string, lang: Lang = 'tsx') {
   return true
 }
 
+function expectSameOrder(source: string, code: string, lang: Lang = 'ts') {
+  const babel: string[] = []
+  const kay: string[] = []
+
+  traverse(parse(code, parseOptions(lang)), { noScope: true, Identifier: (path) => {
+    // The name inside a `#private` is an identifier for Babel and a node of its own for oxc.
+    if (path.parent.type !== 'PrivateName')
+      babel.push(`${path.node.name}@${path.node.start}`)
+  } })
+
+  const { program: tree } = parseProgram(code, { lang, recover: true })
+
+  eachDescendant(tree, (node) => {
+    if (node.type === 'Identifier')
+      kay.push(`${node.name}@${node.start}`)
+  })
+
+  // oxc names a few more identifiers than Babel does (a type parameter, a method's key position), so Babel's must be in order within kay's.
+  let at = 0
+
+  for (const name of babel) {
+    at = kay.indexOf(name, at)
+    expect({ source, name, at: at >= 0 }).toEqual({ source, name, at: true })
+  }
+}
+
 describe('scope pass', () => {
   // The sources are compared in parts, each a share of the files, so a slow machine keeps every test inside its timeout.
   for (let part = 0; part < PARTS; part++) {
@@ -192,6 +218,24 @@ describe('scope pass', () => {
       expect(compare(code, `case ${index}`)).toBe(true)
   })
 
+  it('follows Babel on decorators and on functions nested in one another', () => {
+    const cases = [
+      'function dec(t) { return t } @dec class A { @dec x = 1; @dec(1, a) m(p) { return p } @dec static s = dec; @dec get g() { return a } } var a',
+      'const d = (x) => x; export default @d class { @d m() {} }; export @d class B { @d m() {} }',
+      'class C { @(a.b) m() {} @(() => a)() n() {} @a.b.c o() {} } let a',
+      'function f() { @d class Inner { @d(() => f) m() { return d } } return Inner } const d = 1',
+      'function a(p) { function b(q) { function c(r) { return () => p + q + r + s } return c } var s; return b }',
+      'const f = (x) => (y) => (z) => { const w = x; return class { m() { return () => w + y + z } } }',
+      'async function* g() { for await (const x of y) { yield async () => { await x; return function inner() { return x + arguments.length } } } } var y',
+      'function outer() { var v = 1; { let v = 2; (() => { var v = 3; function deep() { return v } return deep })() } return v }',
+      'const o = { m() { return { n() { return { p: () => this } } } }, get q() { return () => () => o } }',
+      'function a(x = function b() { return (c = () => x) => c }, y = (z) => z) { return [x, y] }',
+    ]
+
+    for (const [index, code] of cases.entries())
+      expect(compare(code, `decorated or nested ${index}`)).toBe(true)
+  })
+
   it('throws what Babel throws for a name declared twice', () => {
     expect(babelFacts('let a; let a').error).toContain('Duplicate declaration')
 
@@ -210,31 +254,26 @@ describe('scope pass', () => {
     } })).toBe(true)
     expect(seen).toEqual(['f', 'a'])
 
-    for (const source of SOURCES.slice(0, 40)) {
-      const code = readFileSync(join(ROOT, source), 'utf8')
-      const babel: string[] = []
-      const kay: string[] = []
-
-      traverse(parse(code, parseOptions('ts')), { noScope: true, Identifier: (path) => {
-        babel.push(`${path.node.name}@${path.node.start}`)
-      } })
-
-      const { program: tree } = parseProgram(code, { lang: 'ts', recover: true })
-
-      eachDescendant(tree, (node) => {
-        if (node.type === 'Identifier')
-          kay.push(`${node.name}@${node.start}`)
-      })
-
-      // oxc names a few more identifiers than Babel does (a type parameter, a method's key position), so Babel's must be in order within kay's.
-      let at = 0
-
-      for (const name of babel) {
-        at = kay.indexOf(name, at)
-        expect({ source, name, at: at >= 0 }).toEqual({ source, name, at: true })
-      }
-    }
+    for (const source of SOURCES.slice(0, 40))
+      expectSameOrder(source, readFileSync(join(ROOT, source), 'utf8'), source.endsWith('.tsx') ? 'tsx' : 'ts')
   })
+
+  it('visits a deeply nested source in the order of the source', () => {
+    expectSameOrder('nesting', `${'(() => '.repeat(300)}x${')()'.repeat(300)}`)
+    expectSameOrder('decorators', '@d(a) class A extends B { @d x = 1; @d(() => a) m(@d p) {} } export default @d class {}; var a, d, B')
+  })
+
+  // Past the first 40 files the order is held in parts, so the sources that sort late (packages, docs) are covered too.
+  for (let part = 0; part < 4; part++) {
+    it(`visits the other sources in the order of the source, part ${part + 1} of 4`, () => {
+      const files = SOURCES.slice(40).filter((_, index) => index % 4 === part)
+
+      expect(files.length).toBeGreaterThan(0)
+
+      for (const source of files)
+        expectSameOrder(source, readFileSync(join(ROOT, source), 'utf8'), source.endsWith('.tsx') ? 'tsx' : 'ts')
+    })
+  }
 
   it('keeps the node groups to types oxc has, and the globals in step with Babel', () => {
     expect([...shapes.BUILTIN_GLOBALS].toSorted()).toEqual([...new Set([...BabelScope.globals, ...BabelScope.contextVariables])].toSorted())

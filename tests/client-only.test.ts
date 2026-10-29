@@ -188,6 +188,18 @@ describe('browser-only globals read while rendering', () => {
     ])
   })
 
+  it('follows a read through functions nested several levels, only while each one runs as the component renders', () => {
+    const source = '---\nimport { memo } from \'kay\'\n\nconst a = () => (() => (() => document.title)())()\nconst b = () => memo(() => (() => window.name)())\nconst c = () => () => () => localStorage.length\nconst d = () => { const inner = () => sessionStorage.length; return inner }\n---\np {a()} {b()} {c()} {d()}\n'
+
+    expect(reads(source).map(read => read.text)).toEqual(['document', 'window'])
+  })
+
+  it('reads a decorator while the class is defined, but not the body of what it decorates', () => {
+    const source = '---\nfunction dec(value: unknown) { return (target: unknown) => target }\n\nclass Box {\n  @dec(document.title)\n  method() { return window.name }\n}\n---\np {new Box().method.name}\n'
+
+    expect(reads(source).map(read => read.text)).toEqual(['document'])
+  })
+
   it('turns a `--- script` fence into `--- client`', () => {
     const source = '--- script\nconst title = document.title\n---\np {title}\n'
 
