@@ -153,7 +153,7 @@ async function clone(app: App, directory: string) {
   if (token === undefined || token === '')
     throw new Error('KAY_APPS_TOKEN is not set: store a read-only Forgejo token with the read:repository scope as the Actions secret KAY_APPS_TOKEN of the kayjs repository')
 
-  const server = process.env.GITHUB_SERVER_URL ?? 'https://git.kevyn.fr'
+  const server = process.env.GITHUB_SERVER_URL ?? 'https://git.kaynooo.fr'
   const branch = app.branch === undefined ? [] : ['--branch', app.branch]
   const env = { ...process.env, GIT_CONFIG_COUNT: '1', GIT_CONFIG_KEY_0: `http.${server}/.extraheader`, GIT_CONFIG_VALUE_0: `Authorization: token ${token}`, GIT_TERMINAL_PROMPT: '0' }
   const result = await $`git clone --quiet --depth 1 ${branch} ${`${server}/${app.repo}.git`} ${directory}`.env(env).quiet().nothrow()
