@@ -1,13 +1,14 @@
 import type traverseModule from '@babel/traverse'
-import type { Binding, NodePath, Scope } from '@babel/traverse'
 import type * as t from '@babel/types'
 import type { Diagnostic, Span } from './ast'
 import type { Rewrite, SourceMap } from './mapping'
 import type { SignalKind } from './module-signals'
+import type { Binding, Path, Scope } from './scope'
 import type { PropsBinding } from './script'
 import { parse } from '@babel/parser'
 import { loadTraverse } from './host'
 import { CURRENT, DEFAULTED, defaultName, HANDED, LOAD, PROBE, PROPS, VALUES, WRITABLE, WRITE_HELPERS } from './names'
+import { analyze } from './scope'
 
 const LIVE_WRITES = new Set(['set', 'delete'])
 
@@ -52,10 +53,6 @@ export function walkScope(ast: t.Node, visitor: Parameters<typeof traverseModule
 
     return false
   }
-}
-
-function traverse(...args: Parameters<typeof traverseModule>): void {
-  loadTraverse()(...args)
 }
 
 export type Rewrites = Map<number, Rewrite & { end: number }>
@@ -158,13 +155,13 @@ const SIGNATURES = new Set(['TSFunctionType', 'TSConstructorType', 'TSMethodSign
 const TYPE_HOLDERS = new Set(['TSTypeAnnotation', 'TSTypeParameterInstantiation', 'TSTypeParameterDeclaration', 'TSInterfaceDeclaration', 'TSTypeAliasDeclaration', 'TSExpressionWithTypeArguments', 'TSInterfaceHeritage', 'TSClassImplements'])
 
 // Whether an identifier names a type rather than reading a value; `typeof name` reads the value.
-function namesType(path: NodePath): boolean {
+function namesType(path: Path): boolean {
   for (let child = path, parent = path.parentPath; parent; child = parent, parent = parent.parentPath) {
-    if (parent.isTSTypeQuery())
+    if (parent.is('TSTypeQuery'))
       return false
 
     // A computed key of a type literal holds an expression, read as a value.
-    if ((parent.isTSPropertySignature() || parent.isTSMethodSignature()) && parent.node.computed && parent.node.key === child.node)
+    if ((parent.is('TSPropertySignature') || parent.is('TSMethodSignature')) && parent.node.computed && parent.node.key === child.node)
       return false
 
     if (parent.isTSType() || TYPE_HOLDERS.has(parent.node.type))
@@ -178,7 +175,7 @@ function namesType(path: NodePath): boolean {
 }
 
 // The references to a binding that read its value, leaving out a name written in a type, such as a function type's parameter, which the scope analysis resolves to the binding of the same name.
-function valueReferences(binding: Binding): NodePath[] {
+function valueReferences(binding: Binding): Path[] {
   return binding.referencePaths.filter(reference => !namesType(reference))
 }
 
@@ -193,42 +190,26 @@ class RewriteFinder {
   // The names whose writes are handled: written as signals, or reported as read-only.
   private readonly known = new Set<Binding>()
   // Writes to a constant or an import, handled once every name kay knows is found.
-  private readonly assigned: { binding: Binding, path: NodePath<t.AssignmentExpression | t.UpdateExpression> }[] = []
+  private readonly assigned: { binding: Binding, path: Path<t.AssignmentExpression | t.UpdateExpression> }[] = []
   // Writes to a property, an element or a `let` that may hold a signal, which only the runtime can tell from a plain write.
-  private readonly mayWrite: NodePath<t.AssignmentExpression | t.UpdateExpression>[] = []
+  private readonly mayWrite: Path<t.AssignmentExpression | t.UpdateExpression>[] = []
   private readonly writes = new Set<keyof typeof WRITE_HELPERS>()
   // The source offsets of the writes already dispatched: the code of a fence may be generated twice, and its rewrites keyed by source apply to both copies.
   private readonly dispatched = new Set<number>()
   private translates = false
   private readonly values = new Map<string, string>()
   // The names nothing in the module declares, of which `globalReads` keeps those read as values.
-  private globals: Record<string, unknown> = {}
+  private globals = new Set<string>()
   // How each binding kay rewrites is read, for the `typeof` queries Babel leaves out of its references.
-  private readonly readers = new Map<Binding, { name: string, rewrite: (reference: NodePath) => Read | undefined, typeOf: string | undefined }>()
+  private readonly readers = new Map<Binding, { name: string, rewrite: (reference: Path) => Read | undefined, typeOf: string | undefined }>()
   // The root names of every `typeof` query: one inside a function type's parameter or a type literal's member is no reference of its binding to Babel.
-  private readonly typeQueries: NodePath<t.Identifier>[] = []
+  private readonly typeQueries: Path<t.Identifier>[] = []
 
   constructor(private readonly input: RewriteInput) {}
 
   run(ast: t.File): FoundRewrites {
-    traverse(ast, {
-      Program: path => this.program(path),
-      Identifier: path => this.globalRead(path),
-      CallExpression: path => this.listenTarget(path),
-      ArrowFunctionExpression: path => this.rows(path),
-      VariableDeclarator: (path) => {
-        if (this.input.sites.consts.has(path.node.id.start!))
-          this.templateConst(path, this.input.sites.consts.get(path.node.id.start!)!, this.input.sites.loopItems.has(path.node.id.start!))
-        else if (this.input.sites.snippets.has(path.node.id.start!))
-          this.templateConst(path, false, false, 'snippet')
-        else
-          this.declaration(path)
-      },
-      AssignmentExpression: path => this.assignment(path),
-      UpdateExpression: path => this.assignment(path),
-      FunctionDeclaration: path => this.loadReads(path),
-      TSTypeQuery: path => this.typeQuery(path),
-    })
+    for (const path of analyze(ast).events)
+      this.visit(path)
 
     this.unlistedTypeQueries()
     this.constantWrites()
@@ -241,9 +222,46 @@ class RewriteFinder {
     }
   }
 
-  private program(path: NodePath<t.Program>) {
+  // What the walk does at each kind of node, in the order the nodes come.
+  private visit(path: Path) {
+    const { node } = path
+
+    if (node.type === 'Program') {
+      this.program(path as Path<t.Program>)
+    }
+    else if (node.type === 'Identifier') {
+      this.globalRead(path as Path<t.Identifier>)
+    }
+    else if (node.type === 'CallExpression') {
+      this.listenTarget(path as Path<t.CallExpression>)
+    }
+    else if (node.type === 'ArrowFunctionExpression') {
+      this.rows(path as Path<t.ArrowFunctionExpression>)
+    }
+    else if (node.type === 'VariableDeclarator') {
+      const at = node.id.start!
+
+      if (this.input.sites.consts.has(at))
+        this.templateConst(path as Path<t.VariableDeclarator>, this.input.sites.consts.get(at)!, this.input.sites.loopItems.has(at))
+      else if (this.input.sites.snippets.has(at))
+        this.templateConst(path as Path<t.VariableDeclarator>, false, false, 'snippet')
+      else
+        this.declaration(path as Path<t.VariableDeclarator>)
+    }
+    else if (node.type === 'AssignmentExpression' || node.type === 'UpdateExpression') {
+      this.assignment(path as Path<t.AssignmentExpression | t.UpdateExpression>)
+    }
+    else if (node.type === 'FunctionDeclaration') {
+      this.loadReads(path as Path<t.FunctionDeclaration>)
+    }
+    else if (node.type === 'TSTypeQuery') {
+      this.typeQuery(path as Path<t.TSTypeQuery>)
+    }
+  }
+
+  private program(path: Path<t.Program>) {
     this.globals = path.scope.globals
-    this.translates = Object.hasOwn(this.globals, 't')
+    this.translates = this.globals.has('t')
 
     for (const [name, kind] of this.input.imported ?? []) {
       const binding = path.scope.getBinding(name)
@@ -253,7 +271,7 @@ class RewriteFinder {
     }
 
     if (this.input.check) {
-      for (const binding of Object.values(path.scope.bindings))
+      for (const binding of path.scope.bindings.values())
         this.reportKaySignalSet(binding)
     }
   }
@@ -273,16 +291,16 @@ class RewriteFinder {
   }
 
   // A tag is a JSX identifier, so a component rendering itself by its name is no read of it, and neither is a type of that name.
-  private globalRead(path: NodePath<t.Identifier>) {
+  private globalRead(path: Path<t.Identifier>) {
     const { name } = path.node
 
-    if (Object.hasOwn(this.globals, name) && path.isReferencedIdentifier() && !path.scope.getBinding(name) && !namesType(path))
+    if (this.globals.has(name) && path.isReferencedIdentifier() && !path.scope.getBinding(name) && !namesType(path))
       this.globalReads.add(name)
   }
 
   // `typeOf` spells the type of the value the name stands for, when `typeof name` cannot read it through the rewritten name.
   // `rewrite` gives what a read becomes, or nothing to leave it as written; `readOnly` reports a write, left out when the caller writes it.
-  private visitBinding(scope: Scope, name: string, rewrite: (reference: NodePath) => Read | undefined, readOnly: ReadOnly | undefined, typeOf?: string) {
+  private visitBinding(scope: Scope, name: string, rewrite: (reference: Path) => Read | undefined, readOnly: ReadOnly | undefined, typeOf?: string) {
     const binding = scope.getBinding(name)
     const { input: { map } } = this
 
@@ -304,7 +322,7 @@ class RewriteFinder {
     }
   }
 
-  private visitReference(reference: NodePath, name: string, rewrite: (reference: NodePath) => Read | undefined, typeOf: string | undefined) {
+  private visitReference(reference: Path, name: string, rewrite: (reference: Path) => Read | undefined, typeOf: string | undefined) {
     const { input: { map }, rewrites } = this
     const node = reference.node
     const query = typeOf === undefined ? undefined : typeQueryOf(reference)
@@ -337,13 +355,13 @@ class RewriteFinder {
     rewrites.set(source, { ...found, end: source + length, dynamic })
   }
 
-  private typeQuery(path: NodePath<t.TSTypeQuery>) {
-    let root: NodePath = path.get('exprName')
+  private typeQuery(path: Path<t.TSTypeQuery>) {
+    let root: Path = path.get('exprName')
 
-    while (root.isTSQualifiedName())
+    while (root.is('TSQualifiedName'))
       root = root.get('left')
 
-    if (root.isIdentifier())
+    if (root.is('Identifier'))
       this.typeQueries.push(root)
   }
 
@@ -361,7 +379,7 @@ class RewriteFinder {
   // A signal or memo the template names uncalled where only its value fits, as in `{count}` or `count > 1`: kay still reads it there, reported as `uncalled-signal` until it is written `count()`.
   // A call, `.set`, `bind:`, and the signal handed on whole, as a component's prop or a function's argument, take the signal itself.
   // Gives the source offset of such a name, undefined for any other reference.
-  private readonly uncalled = (reference: NodePath): number | undefined => {
+  private readonly uncalled = (reference: Path): number | undefined => {
     const { node, parent } = reference
     const source = this.input.map.isExact(node.start!) ? this.input.map.toSource(node.start!) : undefined
 
@@ -380,7 +398,7 @@ class RewriteFinder {
 
   // The signal the template hands on whole, as a function's argument or a component's prop, when type checking: the source offset of its name.
   // The types decide whether the parameter takes a signal, `KayHanded` reporting one that takes anything.
-  private handed(reference: NodePath): number | undefined {
+  private handed(reference: Path): number | undefined {
     const { node, parent } = reference
     const source = this.input.map.isExact(node.start!) ? this.input.map.toSource(node.start!) : undefined
 
@@ -396,7 +414,7 @@ class RewriteFinder {
   }
 
   // Reports a signal read uncalled, its fix calling it, when type checking.
-  private reportUncalled(reference: NodePath, source: number, name: string, kind: SignalKind) {
+  private reportUncalled(reference: Path, source: number, name: string, kind: SignalKind) {
     if (!this.input.values)
       return
 
@@ -408,15 +426,15 @@ class RewriteFinder {
 
   // Reports `count.set(value)` standing as a statement or an arrow's body when checking a project, its fix assigning `count = value`, which compiles to the same call.
   // An updater written inline, `count.set(c => c + 1)`, stays a call.
-  private reportSetCall(reference: NodePath, name: string) {
+  private reportSetCall(reference: Path, name: string) {
     const { input: { map, check } } = this
     const member = reference.parentPath
     const call = member?.parentPath
 
-    if (!check || !member?.isMemberExpression() || member.node.object !== reference.node || member.node.computed || member.node.property.type !== 'Identifier' || member.node.property.name !== 'set')
+    if (!check || !member?.is('MemberExpression') || member.node.object !== reference.node || member.node.computed || member.node.property.type !== 'Identifier' || member.node.property.name !== 'set')
       return
 
-    if (!call?.isCallExpression() || call.node.callee !== member.node || call.node.arguments.length !== 1)
+    if (!call?.is('CallExpression') || call.node.callee !== member.node || call.node.arguments.length !== 1)
       return
 
     const [value] = call.node.arguments as [t.Node]
@@ -461,7 +479,7 @@ class RewriteFinder {
 
   // An assignment to a signal writes it: `count = 1` through `count.set(1)`, `count += 1` and `count++` through an updater, so an effect writing it does not track it too.
   // `access` spells the signal itself, as a prop's is read off the props object.
-  private signalWrite(violation: NodePath, name: string, kind: SignalKind, access: Rewrite) {
+  private signalWrite(violation: Path, name: string, kind: SignalKind, access: Rewrite) {
     const { input: { map }, rewrites } = this
     const { node } = violation
     const identifier = assignedIdentifier(node, name)
@@ -511,7 +529,7 @@ class RewriteFinder {
   }
 
   // An assignment to a `Bindable` prop writes the property of the props object it is read from.
-  private bindableWrite(violation: NodePath, name: string, target: Rewrite) {
+  private bindableWrite(violation: Path, name: string, target: Rewrite) {
     const { node } = violation
     const identifier = assignedIdentifier(node, name)
     const at = identifier && this.input.map.isExact(identifier.start!) ? this.input.map.toSource(identifier.start!) : undefined
@@ -535,7 +553,7 @@ class RewriteFinder {
   }
 
   // A call reading a signal in the template, `count()`, which type checking reads as the name alone: the source offset of the name.
-  private templateCall(reference: NodePath): number | undefined {
+  private templateCall(reference: Path): number | undefined {
     const { node, parent } = reference
     const source = this.input.map.isExact(node.start!) ? this.input.map.toSource(node.start!) : undefined
 
@@ -554,7 +572,7 @@ class RewriteFinder {
   }
 
   // Whether a function the template writes, a handler or a `.map` callback, holds the read: it runs later, so no narrowing around it holds there.
-  private deferred(reference: NodePath): boolean {
+  private deferred(reference: Path): boolean {
     for (let path = reference.getFunctionParent(); path !== null; path = path.parentPath?.getFunctionParent() ?? null) {
       const start = path.node.start!
       const source = this.input.map.isExact(start) ? this.input.map.toSource(start) : undefined
@@ -610,7 +628,7 @@ class RewriteFinder {
   }
 
   // A live value read in the template of a page that renders once keeps the value it rendered with.
-  private reportFixedRead(reference: NodePath, name: string) {
+  private reportFixedRead(reference: Path, name: string) {
     const start = this.input.map.isExact(reference.node.start!) ? this.input.map.toSource(reference.node.start!) : undefined
 
     if (this.input.fixedPage && start !== undefined && start >= this.input.templateStart)
@@ -618,13 +636,13 @@ class RewriteFinder {
   }
 
   // A live value is written on the server: its `set` and `delete` are reported anywhere but the server fence, which a browser or a template would run.
-  private reportLiveWrite(reference: NodePath, name: string) {
+  private reportLiveWrite(reference: Path, name: string) {
     const member = reference.parentPath
 
-    if (!member?.isMemberExpression() || member.node.object !== reference.node || member.node.computed || member.node.property.type !== 'Identifier' || !LIVE_WRITES.has(member.node.property.name))
+    if (!member?.is('MemberExpression') || member.node.object !== reference.node || member.node.computed || member.node.property.type !== 'Identifier' || !LIVE_WRITES.has(member.node.property.name))
       return
 
-    if (reference.findParent(parent => parent.isFunctionDeclaration() && parent.node.id?.name === LOAD && (parent.parentPath.isProgram() || parent.parentPath.parentPath?.isProgram() === true)))
+    if (reference.findParent(parent => parent.is('FunctionDeclaration') && parent.node.id?.name === LOAD && (parent.parentPath?.is('Program') === true || parent.parentPath?.parentPath?.is('Program') === true)))
       return
 
     const start = this.input.map.isExact(reference.node.start!) ? this.input.map.toSource(reference.node.start!) : undefined
@@ -634,7 +652,7 @@ class RewriteFinder {
   }
 
   // A template `const`: each name it declares is new to the template, never reassigned, and, as `accessor`, read through the memo it is.
-  private templateConst(path: NodePath<t.VariableDeclarator>, accessor: boolean, loopItem: boolean, noun = 'template `const`') {
+  private templateConst(path: Path<t.VariableDeclarator>, accessor: boolean, loopItem: boolean, noun = 'template `const`') {
     for (const [name, identifier] of Object.entries(path.getBindingIdentifiers())) {
       const source = this.input.map.toSource(identifier.start!)
       const binding = path.scope.getBinding(name)
@@ -659,7 +677,7 @@ class RewriteFinder {
   }
 
   // A loop's row and index and an `if`'s alias track the current value, so code that runs reads them through a call.
-  private rows(path: NodePath<t.ArrowFunctionExpression>) {
+  private rows(path: Path<t.ArrowFunctionExpression>) {
     for (const [index, param] of path.node.params.entries()) {
       if (param.type !== 'Identifier' || !this.input.sites.rows.has(param.start!))
         continue
@@ -676,7 +694,7 @@ class RewriteFinder {
   }
 
   // A script declaration: a signal or memo made by `kay`, or the names destructured off the props object.
-  private declaration(path: NodePath<t.VariableDeclarator>) {
+  private declaration(path: Path<t.VariableDeclarator>) {
     const { id, init } = path.node
 
     if (id.type === 'Identifier' && init?.type === 'CallExpression')
@@ -691,7 +709,7 @@ class RewriteFinder {
     }
   }
 
-  private madeSignal(path: NodePath<t.VariableDeclarator>, id: t.Identifier, init: t.CallExpression) {
+  private madeSignal(path: Path<t.VariableDeclarator>, id: t.Identifier, init: t.CallExpression) {
     // `relativeTime` from `kay/i18n` makes a memo too.
     const made = importedFromKay(path.scope, init.callee) ?? (importedFromKay(path.scope, init.callee, 'kay/i18n') === 'relativeTime' ? 'memo' : undefined)
     const binding = path.scope.getBinding(id.name)
@@ -703,12 +721,12 @@ class RewriteFinder {
       this.signalBinding(binding, id.name, kind)
 
     // An exported signal may be written by an importer.
-    if (start !== undefined && made === 'signal' && !path.parentPath.parentPath?.isExportNamedDeclaration() && onlyRead(binding, this.uncalled))
+    if (start !== undefined && made === 'signal' && !path.parentPath?.parentPath?.is('ExportNamedDeclaration') && onlyRead(binding, this.uncalled))
       this.constantSignals.set(start, { name: { start, end: start + id.name.length }, value: sourceSpan(this.input.map, init.arguments[0]) })
   }
 
   // A prop or a server value is read off the props object wherever its name is read.
-  private prop(path: NodePath<t.VariableDeclarator>, local: t.Identifier) {
+  private prop(path: Path<t.VariableDeclarator>, local: t.Identifier) {
     const prop = this.input.sites.props.get(local.start!)
 
     if (!prop)
@@ -735,7 +753,7 @@ class RewriteFinder {
   }
 
   // `listen(window, ...)` takes its target as a function, so a server render never reads `window`.
-  private listenTarget(path: NodePath<t.CallExpression>) {
+  private listenTarget(path: Path<t.CallExpression>) {
     const { map } = this.input
     const target = path.node.arguments[0]
 
@@ -752,7 +770,7 @@ class RewriteFinder {
     this.insert(last + 1, ')')
   }
 
-  private assignment(path: NodePath<t.AssignmentExpression | t.UpdateExpression>) {
+  private assignment(path: Path<t.AssignmentExpression | t.UpdateExpression>) {
     const target = path.node.type === 'AssignmentExpression' ? path.node.left : path.node.argument
     const binding = target.type === 'Identifier' ? path.scope.getBinding(target.name) : undefined
 
@@ -763,7 +781,7 @@ class RewriteFinder {
   }
 
   // `load` ends handing the fence's names to the template; any other read of one is the fence's own.
-  private loadReads(path: NodePath<t.FunctionDeclaration>) {
+  private loadReads(path: Path<t.FunctionDeclaration>) {
     const handOver = this.input.sites.handOver
     const { start, end } = path.node
 
@@ -831,7 +849,7 @@ class RewriteFinder {
     return { start: at(node.start!), last: at(node.end! - 1), rightFrom: at(rightFrom) }
   }
 
-  private dispatchMember(path: NodePath<t.AssignmentExpression | t.UpdateExpression>, node: t.AssignmentExpression | t.UpdateExpression, target: t.MemberExpression) {
+  private dispatchMember(path: Path<t.AssignmentExpression | t.UpdateExpression>, node: t.AssignmentExpression | t.UpdateExpression, target: t.MemberExpression) {
     const { object, property, computed } = target
     const { code } = this.input
     const { rewrites, writes } = this
@@ -915,7 +933,7 @@ class RewriteFinder {
     writes.add(compound ? 'update' : 'to')
   }
 
-  private dispatchBinding(path: NodePath<t.AssignmentExpression | t.UpdateExpression>, node: t.AssignmentExpression | t.UpdateExpression, target: t.Identifier) {
+  private dispatchBinding(path: Path<t.AssignmentExpression | t.UpdateExpression>, node: t.AssignmentExpression | t.UpdateExpression, target: t.Identifier) {
     const binding = path.scope.getBinding(target.name)
     const declarator = binding?.path.node
 
@@ -1017,7 +1035,7 @@ function plainLiteral(node: t.Node | null | undefined, typed = false): boolean {
 }
 
 // Whether the root of a target, `box` in `box.list[0].count`, is a binding set to a literal holding no signal, so none of its properties can be one.
-function holdsNoSignalRoot(path: NodePath, object: t.Node): boolean {
+function holdsNoSignalRoot(path: Path, object: t.Node): boolean {
   let root = object
 
   while (root.type === 'MemberExpression' || root.type === 'TSNonNullExpression' || root.type === 'TSAsExpression' || root.type === 'ParenthesizedExpression')
@@ -1062,7 +1080,7 @@ function plainType(type: t.TSType): boolean {
 }
 
 // Whether an update's value is dropped: a statement, a `for` loop's last part or the body of an event handler. Any other arrow's body is returned, and may be read.
-function valueUnused(path: NodePath): boolean {
+function valueUnused(path: Path): boolean {
   const { parent, node } = path
 
   if (parent.type === 'ExpressionStatement' || (parent.type === 'ForStatement' && parent.update === node))
@@ -1122,12 +1140,17 @@ function sourceSpan(map: SourceMap, node: t.Node | undefined): Span | undefined 
   return start === undefined ? undefined : { start, end: start + node!.end! - node!.start! }
 }
 
+// What a scope gives of a name, which Babel's scope and kay's both do.
+interface NamedScope {
+  getBinding: (name: string) => { path: { node: t.Node, parent: t.Node } } | undefined
+}
+
 // The name `kay`, or the kay module given, exports that `callee` imports, such as `signal`.
-export function importedFromKay(scope: Scope, callee: t.Node, module = 'kay'): string | undefined {
+export function importedFromKay(scope: NamedScope, callee: t.Node, module = 'kay'): string | undefined {
   const specifier = callee.type === 'Identifier' ? scope.getBinding(callee.name)?.path : undefined
   const declaration = specifier?.parent
 
-  if (!specifier?.isImportSpecifier() || declaration?.type !== 'ImportDeclaration' || declaration.source.value !== module)
+  if (specifier?.node.type !== 'ImportSpecifier' || declaration?.type !== 'ImportDeclaration' || declaration.source.value !== module)
     return undefined
 
   const imported = specifier.node.imported
@@ -1136,7 +1159,7 @@ export function importedFromKay(scope: Scope, callee: t.Node, module = 'kay'): s
 }
 
 // Whether every use of the binding reads the signal, a call with no arguments or its name left uncalled in the template: a `.set`, or the signal handed on, may write it.
-function onlyRead(binding: Binding | undefined, uncalled: (reference: NodePath) => number | undefined): boolean {
+function onlyRead(binding: Binding | undefined, uncalled: (reference: Path) => number | undefined): boolean {
   return binding !== undefined && binding.constant && valueReferences(binding).length > 0 && valueReferences(binding).every(reference => (reference.parent.type === 'CallExpression' && reference.parent.callee === reference.node && reference.parent.arguments.length === 0) || uncalled(reference) !== undefined)
 }
 
@@ -1151,7 +1174,7 @@ function compilerCall(callee: t.Node): boolean {
 }
 
 // Whether the name is the whole value of a component's prop, `Toggle(open={open})`, which hands the signal itself to it; the compiler's own tags, such as `KayLoopFor`, read values.
-function handedToComponent(reference: NodePath): boolean {
+function handedToComponent(reference: Path): boolean {
   const container = reference.parentPath
   const attribute = container?.parentPath
   const element = attribute?.parent
@@ -1174,16 +1197,16 @@ function syntaxError(error: unknown, map: SourceMap): Diagnostic {
 }
 
 // Whether the reference names a component being opened or closed, which JSX spells differently from a read.
-function tagPosition(reference: NodePath): 'opening' | 'closing' | undefined {
+function tagPosition(reference: Path): 'opening' | 'closing' | undefined {
   let node = reference
 
-  while (node.parentPath?.isJSXMemberExpression() && node.parentPath.node.object === node.node)
+  while (node.parentPath?.is('JSXMemberExpression') && node.parentPath.node.object === node.node)
     node = node.parentPath
 
-  if (node.parentPath?.isJSXOpeningElement() && node.parentPath.node.name === node.node)
+  if (node.parentPath?.is('JSXOpeningElement') && node.parentPath.node.name === node.node)
     return 'opening'
 
-  return node.parentPath?.isJSXClosingElement() ? 'closing' : undefined
+  return node.parentPath?.is('JSXClosingElement') ? 'closing' : undefined
 }
 
 // `<__props.Icon>` is a tag; anything else a read produces is not.
@@ -1258,7 +1281,7 @@ function propType(binding: PropsBinding): string | undefined {
 }
 
 // Whether a function type or a signature around `path` has a parameter `name`, which `typeof name` inside it reads instead: Babel gives such a parameter no binding.
-function signatureNames(path: NodePath, name: string): boolean {
+function signatureNames(path: Path, name: string): boolean {
   for (let parent = path.parentPath; parent && !parent.isStatement(); parent = parent.parentPath) {
     const node = parent.node as { parameters?: t.Node[], params?: t.Node[] }
     const params = SIGNATURES.has(parent.node.type) ? node.parameters ?? node.params ?? [] : []
@@ -1271,13 +1294,13 @@ function signatureNames(path: NodePath, name: string): boolean {
 }
 
 // The `typeof` query a reference is the root of: `typeof row` or `typeof row.id`.
-function typeQueryOf(reference: NodePath): t.TSTypeQuery | undefined {
+function typeQueryOf(reference: Path): t.TSTypeQuery | undefined {
   let path = reference
 
-  while (path.parentPath?.isTSQualifiedName() && path.parentPath.node.left === path.node)
+  while (path.parentPath?.is('TSQualifiedName') && path.parentPath.node.left === path.node)
     path = path.parentPath
 
-  return path.parentPath?.isTSTypeQuery() && path.parentPath.node.exprName === path.node ? path.parentPath.node : undefined
+  return path.parentPath?.is('TSTypeQuery') && path.parentPath.node.exprName === path.node ? path.parentPath.node : undefined
 }
 
 // `.id.name` after the root of a `typeof` query, as indexed access types.
@@ -1287,8 +1310,8 @@ function memberTypes(name: t.TSTypeQuery['exprName']): string {
 
 // `{ todo }` cannot become `{ todo() }`, so a shorthand property spells its key out first.
 // The members a keyed loop's `keyed={(item) => item.a.b}` reads off its item, when `row` is that loop's row: none for a key that is the item itself.
-function loopKey(row: NodePath<t.ArrowFunctionExpression>, name: string): string[] | undefined {
-  const loop = row.parentPath.parentPath?.node
+function loopKey(row: Path<t.ArrowFunctionExpression>, name: string): string[] | undefined {
+  const loop = row.parentPath?.parentPath?.node
 
   if (loop?.type !== 'JSXElement' || loop.openingElement.name.type !== 'JSXIdentifier' || loop.openingElement.name.name !== 'KayLoopFor')
     return undefined
@@ -1312,7 +1335,7 @@ function loopKey(row: NodePath<t.ArrowFunctionExpression>, name: string): string
 
 // A row keeps the key it was matched by, so a read of exactly its key tracks nothing: a copy of the item under the same key then leaves what reads only the key alone.
 // A write, a delete or a method call through it is left to the item itself.
-function keyRead(reference: NodePath, name: string, key: string[] | undefined, code: string): Read | undefined {
+function keyRead(reference: Path, name: string, key: string[] | undefined, code: string): Read | undefined {
   if (!key || tagPosition(reference) !== undefined)
     return undefined
 
@@ -1321,7 +1344,7 @@ function keyRead(reference: NodePath, name: string, key: string[] | undefined, c
   for (const member of key) {
     const parent = read.parentPath
 
-    if (!parent?.isMemberExpression() || parent.node.object !== read.node || parent.node.computed || parent.node.property.type !== 'Identifier' || parent.node.property.name !== member)
+    if (!parent?.is('MemberExpression') || parent.node.object !== read.node || parent.node.computed || parent.node.property.type !== 'Identifier' || parent.node.property.name !== member)
       return undefined
 
     read = parent
@@ -1340,7 +1363,7 @@ function keyRead(reference: NodePath, name: string, key: string[] | undefined, c
   return { ...withShorthand(reference, name, { replace: `KayUntrack(() => ${name}()${members})` }), length: node.end! - reference.node.start! }
 }
 
-function withShorthand(reference: NodePath, name: string, rewrite: Rewrite): Rewrite {
+function withShorthand(reference: Path, name: string, rewrite: Rewrite): Rewrite {
   const parent = reference.parent
 
   if (parent.type === 'ObjectProperty' && parent.shorthand && parent.value === reference.node)
