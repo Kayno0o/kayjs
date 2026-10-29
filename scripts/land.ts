@@ -24,6 +24,8 @@ const FIXTURE = /^tests\/fixtures\/([^/]+)\//
 const MANIFEST = /(?:^|\/)(?:package\.json|bun\.lock)$/
 // Half the host's cores, as CI runs them, so a landing leaves the machine to the rest; fewer with KAY_LAND_WORKERS, for a session short of memory beside other test runs.
 const WORKERS = `--parallel=${Number(process.env.KAY_LAND_WORKERS) || 6}`
+// The whole suite as that many runs one after another, each balanced by the timings: a worker keeps the global of every file that loaded a native addon (oven-sh/bun#46561), so a run in a few GB of memory ends each run before its workers outgrow it.
+const SHARDS = Number(process.env.KAY_LAND_SHARDS) || 1
 // How long a step may run before it counts as hung and is killed with every process it started: the whole suite takes minutes, a test stuck on a killed browser or child took hours.
 const STEP_LIMIT_MS = Number(process.env.KAY_LAND_STEP_LIMIT_MS) || 30 * 60_000
 // How long the output of a step that ended may stay open, as a process it started outside its group can hold it.
@@ -222,8 +224,12 @@ async function verify(): Promise<string> {
   if (!whole && changed.some(path => WHOLE_SUITE.test(path)))
     console.log('tests, the whole suite: left to CI, as only dependencies changed')
 
-  if (whole) {
+  if (whole && SHARDS === 1) {
     await step('tests, the whole suite', [BUN, 'run', 'test', WORKERS])
+  }
+  else if (whole) {
+    for (let shard = 1; shard <= SHARDS; shard++)
+      await step(`tests, the whole suite, shard ${shard} of ${SHARDS}`, [BUN, 'run', 'test', WORKERS, `--shard=${shard}/${SHARDS}`])
   }
   else {
     // `bun test --changed` reads a manifest change as reaching nearly every file, so one changing dependencies alone runs only the tests named below.
