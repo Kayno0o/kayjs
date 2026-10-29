@@ -1,0 +1,134 @@
+name: Apps
+
+# The apps on kay under ~/Workspace, cloned from Forgejo and run (check, lint, test) against the kay and kayjs-* packed from this commit, as an app installing the release would have them. On demand and from `just minor` / `just patch` before a release, never on a push: it installs and tests a dozen apps on the host CI shares with the sessions.
+on:
+  workflow_dispatch:
+    inputs:
+      apps:
+        description: Space-separated apps to run, all by default
+        required: false
+        default: ''
+
+permissions:
+  contents: read
+
+# Pinned so the cache step and bun agree on one folder, whatever HOME the runner image sets.
+env:
+  BUN_INSTALL_CACHE_DIR: /tmp/bun-cache
+  CI: 'true'
+
+# One run at a time, queued rather than cancelled, as a release waits on it.
+concurrency:
+  group: apps
+  cancel-in-progress: false
+
+jobs:
+  apps:
+    runs-on: alpine
+    timeout-minutes: 60
+
+    steps:
+      - name: Check the token
+        run: |
+          [ -n "$KAY_APPS_TOKEN" ] || { echo "::error::the secret KAY_APPS_TOKEN is not set: store a read-only Forgejo token (scope read:repository) as the Actions secret KAY_APPS_TOKEN of the kayjs repository"; exit 1; }
+        env:
+          KAY_APPS_TOKEN: ${{ secrets.KAY_APPS_TOKEN }}
+
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      # actions/cache archives with GNU tar's --posix, which the image's BusyBox tar refuses, so the cache was never saved.
+      - name: Install GNU tar
+        run: apk info -e tar >/dev/null || apk add --no-cache tar
+
+      - name: Cache bun packages
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: ${{ env.BUN_INSTALL_CACHE_DIR }}
+          key: bun-${{ runner.os }}-${{ hashFiles('bun.lock') }}
+          restore-keys: bun-${{ runner.os }}-
+
+      - name: Install dependencies
+        run: bun install --silent --frozen-lockfile
+
+      # For the apps' browser tests, which Bun.WebView finds through BUN_CHROME_PATH.
+      - name: Install Chromium
+        run: |
+          apk info -e chromium ttf-freefont >/dev/null || apk add --no-cache chromium ttf-freefont
+          echo "BUN_CHROME_PATH=$(command -v chromium || command -v chromium-browser)" >> "$GITHUB_ENV"
+
+      # The apps whose tests read a TEST_DATABASE_URL, on the cluster the runner image holds, started as the Tests workflow starts it.
+      - name: Start PostgreSQL
+        run: |
+          mkdir -p /run/postgresql
+          chown postgres:postgres /run/postgresql
+          su postgres -c "pg_ctl -D /var/lib/postgresql/data -o '-c listen_addresses=127.0.0.1 -c unix_socket_directories=/run/postgresql' -w start"
+          su postgres -c "psql -c \"CREATE USER test WITH PASSWORD 'test' SUPERUSER;\""
+          echo "TEST_DATABASE_URL=postgres://test:test@127.0.0.1:5432/kay_app_test" >> "$GITHUB_ENV"
+
+      # prepack writes the declarations and the Node build of kay/eslint the packages' exports point at.
+      - name: Pack kay and its libraries
+        id: pack
+        run: bun scripts/apps-ci.ts pack
+        env:
+          KAY_APPS_TOKEN: ${{ secrets.KAY_APPS_TOKEN }}
+
+      # A step per app, each run whatever the ones before it did, so a failure names its app and the others still report.
+      - name: kaynooo.fr
+        if: ${{ !cancelled() && steps.pack.outcome == 'success' && (inputs.apps == '' || contains(format(' {0} ', inputs.apps), ' kaynooo.fr ')) }}
+        run: bun scripts/apps-ci.ts kaynooo.fr
+        env:
+          KAY_APPS_TOKEN: ${{ secrets.KAY_APPS_TOKEN }}
+
+      - name: kloe-couture
+        if: ${{ !cancelled() && steps.pack.outcome == 'success' && (inputs.apps == '' || contains(format(' {0} ', inputs.apps), ' kloe-couture ')) }}
+        run: bun scripts/apps-ci.ts kloe-couture
+        env:
+          KAY_APPS_TOKEN: ${{ secrets.KAY_APPS_TOKEN }}
+
+      - name: jb-peinture
+        if: ${{ !cancelled() && steps.pack.outcome == 'success' && (inputs.apps == '' || contains(format(' {0} ', inputs.apps), ' jb-peinture ')) }}
+        run: bun scripts/apps-ci.ts jb-peinture
+        env:
+          KAY_APPS_TOKEN: ${{ secrets.KAY_APPS_TOKEN }}
+
+      - name: cromignon24
+        if: ${{ !cancelled() && steps.pack.outcome == 'success' && (inputs.apps == '' || contains(format(' {0} ', inputs.apps), ' cromignon24 ')) }}
+        run: bun scripts/apps-ci.ts cromignon24
+        env:
+          KAY_APPS_TOKEN: ${{ secrets.KAY_APPS_TOKEN }}
+
+      - name: devlog
+        if: ${{ !cancelled() && steps.pack.outcome == 'success' && (inputs.apps == '' || contains(format(' {0} ', inputs.apps), ' devlog ')) }}
+        run: bun scripts/apps-ci.ts devlog
+        env:
+          KAY_APPS_TOKEN: ${{ secrets.KAY_APPS_TOKEN }}
+
+      - name: babelraid
+        if: ${{ !cancelled() && steps.pack.outcome == 'success' && (inputs.apps == '' || contains(format(' {0} ', inputs.apps), ' babelraid ')) }}
+        run: bun scripts/apps-ci.ts babelraid
+        env:
+          KAY_APPS_TOKEN: ${{ secrets.KAY_APPS_TOKEN }}
+
+      - name: kayjs-playground
+        if: ${{ !cancelled() && steps.pack.outcome == 'success' && (inputs.apps == '' || contains(format(' {0} ', inputs.apps), ' kayjs-playground ')) }}
+        run: bun scripts/apps-ci.ts kayjs-playground
+        env:
+          KAY_APPS_TOKEN: ${{ secrets.KAY_APPS_TOKEN }}
+
+      - name: assemblee
+        if: ${{ !cancelled() && steps.pack.outcome == 'success' && (inputs.apps == '' || contains(format(' {0} ', inputs.apps), ' assemblee ')) }}
+        run: bun scripts/apps-ci.ts assemblee
+        env:
+          KAY_APPS_TOKEN: ${{ secrets.KAY_APPS_TOKEN }}
+
+      - name: azael-kaynooo
+        if: ${{ !cancelled() && steps.pack.outcome == 'success' && (inputs.apps == '' || contains(format(' {0} ', inputs.apps), ' azael-kaynooo ')) }}
+        run: bun scripts/apps-ci.ts azael-kaynooo
+        env:
+          KAY_APPS_TOKEN: ${{ secrets.KAY_APPS_TOKEN }}
+
+      - name: orbit
+        if: ${{ !cancelled() && steps.pack.outcome == 'success' && (inputs.apps == '' || contains(format(' {0} ', inputs.apps), ' orbit ')) }}
+        run: bun scripts/apps-ci.ts orbit
+        env:
+          KAY_APPS_TOKEN: ${{ secrets.KAY_APPS_TOKEN }}

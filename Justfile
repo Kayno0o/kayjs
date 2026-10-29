@@ -15,6 +15,8 @@ release level:
 	[ "$(git branch --show-current)" = main ] || { echo "release runs on main, not $(git branch --show-current)" >&2; exit 1; }
 	git fetch -q origin main
 	[ "$(git rev-parse HEAD)" = "$(git rev-parse origin/main)" ] || { echo "main differs from origin/main: pull or land first" >&2; exit 1; }
+	# The apps on kay run against this commit first, dispatching the Apps workflow when no run covers it; KAY_SKIP_APPS_CI=1 skips it.
+	bun scripts/release-apps.ts
 	# The tag version.ts made, named by its output, so a failure below deletes that one and no other tag on HEAD.
 	tag=$(bun scripts/version.ts {{level}} | tail -n 1)
 	# A deprecation past its three minors fails only once the version moves, so it is caught here rather than on the tag's CI.
