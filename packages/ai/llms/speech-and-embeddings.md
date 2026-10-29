@@ -65,7 +65,7 @@ export async function nearest(question: string) {
 }
 ```
 
-The `embedding()` trait and `nearest()` need pg-orm 8. The trait embeds the `source` text of every insert, and of an update that changed it, in one `embed` call per write, and the column is `nullable` as it is filled just after the row. `nearest()` returns the closest rows, each with its `distance`, cosine by default.
+The `embedding()` trait and `nearest()` need pg-orm 8. The trait embeds the `source` text of every insert, and of an update that changed it, in one `embed` call per write, and the column is `nullable` as it is filled just after the row. The trait also adds a nullable `embeddingHash` column, so the table needs a migration. `nearest()` returns the closest rows, each with its `distance`, cosine by default.
 
 The passages found go to `ask({ sources })`, which a `Chat` cites: [Chat sources](chat-sources.md).
 
