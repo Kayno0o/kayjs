@@ -187,6 +187,8 @@ Stop, Escape and New conversation end that reply on the server too, with one mor
 
 With `keepOnServer`, the server keeps the conversation and your action stays the same `({ messages }) => ask(messages)`. Each send posts the new message alone, `ask` adds the turns it stored before it and stores the new exchange once the reply ends, and the page's `?conversation=` param names the conversation, so a reload, a bookmark or Back shows it again. Regenerate and edit drop the turns they replace on the server too.
 
+The server also keeps the tool calls of each reply and their results, and replays them to the model on the next ask, so a follow-up like "and from Bordeaux?" can build on what a tool already gave. The chat shows the text alone, and when the history outgrows `maxInputChars` the oldest results shrink before any turn is dropped.
+
 ```kay
 Chat(action={reply} conversations fill)
 ```

@@ -1,7 +1,7 @@
-import type { ConversationKey, StoredTurn } from './conversation-store'
+import type { ConversationKey, StoredCall, StoredTurn } from './conversation-store'
 import type { ConversationAnswer } from './conversation-title'
 import type { ConversationCall } from './resume'
-import type { AskOptions, Message, Reply } from './types'
+import type { AskOptions, Message, ProviderMessage, Reply, ToolCall } from './types'
 import { logFrom } from 'kay'
 import { currentRequest, refundRateLimit } from 'kay/library'
 import { estimatedChars } from './attachments'
@@ -11,6 +11,7 @@ import { renamedTitle, titleOf } from './conversation-title'
 import { deferredReply } from './deferred'
 import { AiError } from './errors'
 import { namedVisitor } from './limits'
+import { toolChars } from './loop'
 import { createReply } from './reply'
 import { conversationCallOf, replacesOf, replyCallOf } from './resume'
 
@@ -72,33 +73,59 @@ function mayRefund(reader: string, now: number): boolean {
 // A conversation belongs to the action that holds it, so two chats of one visitor keep apart.
 const scopeOf = (request: Request) => new URL(request.url).pathname
 
-// A text-only turn of no text, a reply that only called tools or a message of files alone, is kept so the turns line up with the Chat's, and left out of what the model reads, as a provider refuses an empty message.
-// Two turns of one role in a row, left once an empty turn between them is, are read as one, as a provider takes the roles in turn.
-function fitted(kept: readonly StoredTurn[], posted: readonly Message[], maxInputChars: number): Message[] {
-  let room = maxInputChars - posted.reduce((sum, message) => sum + message.content.length + estimatedChars(message), 0)
-  const earlier: Message[] = []
+// What a replayed result is shortened to once the conversation outgrows what the ask takes.
+const LEFT_OUT = '(left out)'
+// What stands for the answer of a reply that called tools and said nothing, as a provider needs an assistant turn after the results.
+const NO_ANSWER = '(no answer was given)'
 
-  // The newest turns are the ones kept when the conversation outgrows what the ask takes.
-  for (const { role, content } of kept.toReversed()) {
-    if (content === '')
-      continue
+type Replayed = Message & Pick<ProviderMessage, 'calls' | 'results'>
 
-    room -= content.length
+// A turn as the model read it: the user's text, or for a reply each request's calls and their results, then its text.
+// A turn of no text and no calls, a message of files alone, is kept so the turns line up with the Chat's, and left out of what the model reads, as a provider refuses an empty message.
+function replayed({ role, content, steps }: StoredTurn, shortened: boolean): Replayed[] {
+  if (role === 'user' || steps === undefined || steps.length === 0)
+    return content === '' ? [] : [{ role, content }]
 
-    if (room < 0)
-      break
+  return [
+    ...steps.flatMap(calls => [
+      { role: 'assistant' as const, content: '', calls: calls.map(({ id, name, arguments: input }) => ({ id, name, arguments: input })) },
+      { role: 'user' as const, content: '', results: calls.map(({ id, result, ok }) => ({ id, content: shortened && result.length > LEFT_OUT.length ? LEFT_OUT : result, ok })) },
+    ]),
+    { role, content: content === '' ? NO_ANSWER : content },
+  ]
+}
 
-    earlier.unshift({ role, content })
+const charsOf = (messages: readonly Replayed[]) => messages.reduce((sum, message) => sum + message.content.length + toolChars(message), 0)
+
+// Two turns of one role in a row, left once an empty turn between them is, are read as one, as a provider takes the roles in turn; a message of calls or results stands alone.
+function fitted(kept: readonly StoredTurn[], posted: readonly Message[], maxInputChars: number): Replayed[] {
+  const room = maxInputChars - posted.reduce((sum, message) => sum + message.content.length + estimatedChars(message), 0)
+  const turns = kept.filter(turn => replayed(turn, false).length > 0)
+  const cost = (turn: StoredTurn, shortened: boolean) => charsOf(replayed(turn, shortened))
+  let total = turns.reduce((sum, turn) => sum + cost(turn, false), 0)
+  let shortened = 0
+  let dropped = 0
+
+  // The results of the oldest turns go first, then the oldest turns whole: the newest are the ones kept when the conversation outgrows what the ask takes.
+  while (total > room && shortened < turns.length) {
+    total += cost(turns[shortened]!, true) - cost(turns[shortened]!, false)
+    shortened++
   }
 
-  const first = earlier.findIndex(({ role }) => role === 'user')
-  const messages: Message[] = []
+  while (total > room && dropped < turns.length) {
+    total -= cost(turns[dropped]!, dropped < shortened)
+    dropped++
+  }
 
-  for (const message of [...first === -1 ? [] : earlier.slice(first), ...posted]) {
+  const earlier = turns.slice(dropped).map((turn, index) => ({ turn, shortened: dropped + index < shortened }))
+  const first = earlier.findIndex(({ turn }) => turn.role === 'user')
+  const messages: Replayed[] = []
+
+  for (const message of [...first === -1 ? [] : earlier.slice(first).flatMap(({ turn, shortened: short }) => replayed(turn, short)), ...posted]) {
     const before = messages.at(-1)
 
     // The later one keeps its files, and the earlier text comes first.
-    if (before?.role === message.role)
+    if (before?.role === message.role && before.calls === undefined && before.results === undefined)
       messages[messages.length - 1] = { ...message, content: message.content === '' ? before.content : `${before.content}\n\n${message.content}` }
     else
       messages.push(message)
@@ -206,13 +233,20 @@ export function heldReply(call: HeldCall, prompt: Message[], options: AskOptions
   return deferredReply(target, { ended: async reply => write?.(reply) })
 }
 
-// The calls a reply made and how it finished, none for one that broke off before telling.
-async function ending(reply: Reply): Promise<[calls: readonly unknown[], finish: unknown]> {
+// A call still running when the reply ended has no result to replay.
+const isAnswered = (call: ToolCall) => call.status !== 'running' && call.result !== undefined
+
+const storedCall = ({ id, name, input, result, status }: ToolCall): StoredCall => ({ id, name, arguments: JSON.stringify(input), result: result ?? '', ok: status === 'done' })
+
+// The calls a reply made, request by request, and how it finished, none for one that broke off before telling.
+async function ending(reply: Reply): Promise<[calls: readonly unknown[], finish: unknown, steps: StoredCall[][]]> {
   try {
-    return await Promise.all([reply.calls, reply.finish])
+    const [calls, finish, steps] = await Promise.all([reply.calls, reply.finish, reply.steps])
+
+    return [calls, finish, steps.map(step => step.calls.filter(isAnswered).map(storedCall)).filter(step => step.length > 0)]
   }
   catch {
-    return [[], undefined]
+    return [[], undefined, []]
   }
 }
 
@@ -231,13 +265,13 @@ async function kept(reply: Reply, key: ConversationKey, revision: number, drop: 
     failed = true
   }
 
-  const [calls, finish] = await ending(reply)
+  const [calls, finish, steps] = await ending(reply)
 
   if (text === '' && calls.length === 0 && (failed || finish === undefined))
     return
 
   const sources = text === '' ? [] : usableSources(options.sources)
-  const answer: StoredTurn[] = text === '' && calls.length === 0 ? [] : [{ role: 'assistant', content: text, ...sources.length > 0 && { sources }, ...(failed || finish === undefined) && { stopped: true } }]
+  const answer: StoredTurn[] = text === '' && calls.length === 0 ? [] : [{ role: 'assistant', content: text, ...steps.length > 0 && { steps }, ...sources.length > 0 && { sources }, ...(failed || finish === undefined) && { stopped: true } }]
   const add: StoredTurn[] = [...prompt.map(({ role, content }) => ({ role, content })), ...answer].map(turn => writer === undefined ? turn : { ...turn, reply: writer })
 
   try {

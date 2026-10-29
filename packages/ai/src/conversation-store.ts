@@ -4,10 +4,22 @@ import type { Source } from './types'
 import process from 'node:process'
 import { openSqlite } from 'kay/library'
 
-// A turn as a conversation keeps it: its text, the sources a reply cites and whether it was stopped, never its files nor its tool calls.
+// A tool call a reply made and what the model was told of it, as the next ask replays them.
+export interface StoredCall {
+  id: string
+  name: string
+  // The arguments as the JSON object the provider was sent back.
+  arguments: string
+  result: string
+  ok: boolean
+}
+
+// A turn as a conversation keeps it: its text, the sources a reply cites, whether it was stopped and the tool calls of a reply, never its files.
 export interface StoredTurn {
   role: 'user' | 'assistant'
   content: string
+  // The calls of each request a reply made to the model, in order, which are left out of what a Chat shows.
+  steps?: StoredCall[][] | undefined
   sources?: Source[] | undefined
   stopped?: boolean | undefined
   // The id of the Chat's reply whose write added it, which a store keeps with the turn: a tab whose write lost to another's is then refused its next send.

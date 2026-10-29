@@ -34,21 +34,22 @@ function failed(result: string): Ran {
   return { status: 'failed', result }
 }
 
-// The characters a step sends: every message with its calls and results.
-function charsSent(messages: ProviderMessage[], system: string | undefined): number {
-  let chars = system?.length ?? 0
+// The characters of a message's calls and results.
+export function toolChars(message: Pick<ProviderMessage, 'calls' | 'results'>): number {
+  let chars = 0
 
-  for (const message of messages) {
-    chars += message.content.length + mediaChars(message)
+  for (const call of message.calls ?? [])
+    chars += call.name.length + call.arguments.length
 
-    for (const call of message.calls ?? [])
-      chars += call.name.length + call.arguments.length
-
-    for (const result of message.results ?? [])
-      chars += result.content.length
-  }
+  for (const result of message.results ?? [])
+    chars += result.content.length
 
   return chars
+}
+
+// The characters a step sends: every message with its calls and results.
+function charsSent(messages: ProviderMessage[], system: string | undefined): number {
+  return messages.reduce((chars, message) => chars + message.content.length + mediaChars(message) + toolChars(message), system?.length ?? 0)
 }
 
 export function clip(text: string, max: number): string {

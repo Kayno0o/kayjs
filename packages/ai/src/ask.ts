@@ -13,7 +13,7 @@ import { extraBody } from './extra'
 import { isFunctionTool, plainTool } from './function-tool'
 import { keep, keptFor, markEnded, stopKept } from './kept'
 import { guarded, visitorOf } from './limits'
-import { converse, single } from './loop'
+import { converse, single, toolChars } from './loop'
 import { outputSchema } from './output-schema'
 import { createReply } from './reply'
 import { conversationCallOf, replacesOf, replyCallOf } from './resume'
@@ -26,7 +26,8 @@ const DEFAULT_CONNECT_TIMEOUT = '30s'
 const DEFAULT_IDLE_TIMEOUT = '60s'
 const ROLES = new Set(['user', 'assistant'])
 
-function messagesOf(prompt: string | Message[]): Message[] {
+// `replayed` keeps the calls and results of messages the library built from a stored conversation; a prompt the app gives holds none.
+function messagesOf(prompt: string | Message[], replayed = false): Message[] {
   if (typeof prompt === 'string')
     return [{ role: 'user', content: prompt }]
 
@@ -42,7 +43,9 @@ function messagesOf(prompt: string | Message[]): Message[] {
     if (attachments.length > 0 && message.role !== 'user')
       throw new AiError('unsupported', 'only a user message holds attachments')
 
-    return { role: message.role, content: message.content, ...attachments.length > 0 && { attachments } }
+    const { calls, results } = message as ProviderMessage
+
+    return { role: message.role, content: message.content, ...attachments.length > 0 && { attachments }, ...replayed && calls !== undefined && { calls }, ...replayed && results !== undefined && { results } }
   })
 }
 
@@ -191,7 +194,7 @@ function asked(prompt: string | Message[], options: AskOptions, schema: TSchema 
   if (held === undefined)
     return reply(prompt, options, schema, call)
 
-  return heldReply(held, messagesOf(prompt), options, options.maxInputChars ?? DEFAULT_MAX_INPUT_CHARS, messages => reply(messages, options, schema, call))
+  return heldReply(held, messagesOf(prompt), options, options.maxInputChars ?? DEFAULT_MAX_INPUT_CHARS, messages => reply(messages, options, schema, call, true))
 }
 
 // True when the request being answered is a Chat's resume or stop of a reply that outlived its page, or its read or change of a conversation it keeps on the server, which runs the action again: an action skips what only a start needs, such as loading context for a model call that will not be made.
@@ -276,8 +279,8 @@ function remembered(made: Reply, options: AskOptions, call: ReplyCall | undefine
   return made
 }
 
-function reply(prompt: string | Message[], options: AskOptions, answer: TSchema | undefined, call: ReplyCall | undefined): Reply {
-  const messages = messagesOf(prompt)
+function reply(prompt: string | Message[], options: AskOptions, answer: TSchema | undefined, call: ReplyCall | undefined, replayed = false): Reply {
+  const messages = messagesOf(prompt, replayed)
   const { provider, model: configured } = options.provider === undefined ? choose() : { provider: given(options.provider), model: options.provider.model }
   const model = options.model ?? configured ?? options.provider?.model
 
@@ -291,7 +294,7 @@ function reply(prompt: string | Message[], options: AskOptions, answer: TSchema 
   const attached = messages.some(message => message.attachments !== undefined)
   // Without attachments the messages are a provider's as they are; with them the request is completed once they are read.
   const request: ProviderRequest = { messages: attached ? [] : messages as ProviderMessage[], system: options.system, model, maxTokens, temperature: options.temperature, reasoning: options.reasoning, cache: options.cache, body: extraBody(options.body, 'ask({ body })'), timeouts: timeoutsOf(options.timeout), schema }
-  const messageChars = messages.reduce((sum, message) => sum + message.content.length + estimatedChars(message), 0)
+  const messageChars = messages.reduce((sum, message) => sum + message.content.length + estimatedChars(message) + toolChars(message as ProviderMessage), 0)
   const maxInputChars = options.maxInputChars ?? DEFAULT_MAX_INPUT_CHARS
   const maxAttachmentBytes = options.maxAttachmentBytes ?? DEFAULT_MAX_ATTACHMENT_BYTES
 

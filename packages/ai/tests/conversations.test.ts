@@ -1,10 +1,11 @@
 import type { AskOptions, Message, Provider, ProviderRequest } from '../src'
 import type { ConversationAnswer } from '../src/conversation-title'
 import { afterEach, describe, expect, it } from 'bun:test'
+import { s as schema } from 'kay'
 import { nameUser } from 'kay/library'
 import { answeringRequest } from '../../../src/server/log'
 import { sendFrom } from '../../../src/server/rewrite'
-import { ai, AiError, ask, resuming, sqliteConversations } from '../src'
+import { ai, AiError, ask, resuming, sqliteConversations, tool } from '../src'
 import { conversationStore, MOST_TURNS } from '../src/conversation-store'
 import { titleOf } from '../src/conversation-title'
 import { conversationCallOf } from '../src/resume'
@@ -29,6 +30,39 @@ function recording(text?: (count: number) => string) {
   }
 
   return { provider, asked, said: (index: number) => asked[index]!.messages.map(({ role, content }) => `${role}: ${content}`) }
+}
+
+// A model that looks a title up when a turn says `look up <title>`, and answers `found <result>` (or nothing for `silent`) once it has the result.
+function calling(texts: Record<string, string> = {}) {
+  const asked: ProviderRequest[] = []
+  const lookup = tool({ name: 'look_up', description: 'Looks an article up', input: schema.Object({ title: schema.String() }), run: ({ title }) => title === 'big' ? 'r'.repeat(200) : `About ${title}` })
+  const provider: Provider = {
+    name: 'calling',
+    model: 'm',
+    async* stream(request) {
+      asked.push(request)
+
+      const last = request.messages.at(-1)!
+
+      if (last.results !== undefined) {
+        const text = texts[last.results[0]!.content] ?? `found ${last.results[0]!.content}`
+
+        if (text !== 'silent')
+          yield { text }
+      }
+      else if (last.content.startsWith('look up')) {
+        yield { toolUse: { id: `use-${asked.length}`, name: 'look_up', arguments: JSON.stringify({ title: last.content.slice(8) }) } }
+      }
+      else {
+        yield { text: `answer ${asked.length}` }
+      }
+
+      yield { finish: 'stop' }
+    },
+  }
+  const shape = (index: number) => asked[index]!.messages.map(({ role, content, calls, results }) => `${role}: ${content}${calls === undefined ? '' : ` calls ${calls.map(call => `${call.name}${call.arguments}`).join()}`}${results === undefined ? '' : ` results ${results.map(result => result.content).join()}`}`)
+
+  return { provider, asked, tools: [lookup], shape }
 }
 
 interface Visit {
@@ -476,6 +510,66 @@ describe('a conversation held on the server', () => {
     await visit(said('a'.repeat(30)), { provider: model.provider }, { header: `send:${ID}:0` })
     await visit(said('b'.repeat(30)), { provider: model.provider, maxInputChars: 80 }, { header: `send:${ID}:1` })
     expect(model.said(1)).toEqual([`user: ${'b'.repeat(30)}`])
+  })
+
+  it('replays the tool calls and results of earlier turns to the model', async () => {
+    const model = calling()
+    const options = { provider: model.provider, tools: model.tools }
+
+    await visit(said('look up Moon'), options, { header: `send:${ID}:0` })
+    await visit(said('and Sun?'), options, { header: `send:${ID}:1` })
+    expect(model.shape(2)).toEqual(['user: look up Moon', 'assistant:  calls look_up{"title":"Moon"}', 'user:  results About Moon', 'assistant: found About Moon', 'user: and Sun?'])
+    // What a Chat loads is the text alone.
+    expect(await loaded(ID)).toMatchObject({ turns: [{ role: 'user', content: 'look up Moon' }, { role: 'assistant', content: 'found About Moon' }, { role: 'user', content: 'and Sun?' }, { role: 'assistant', content: 'answer 3' }] })
+  })
+
+  it('replays a turn that only called tools, with a stand-in for its missing text', async () => {
+    const model = calling({ 'About Moon': 'silent' })
+    const options = { provider: model.provider, tools: model.tools }
+
+    await visit(said('look up Moon'), options, { header: `send:${ID}:0` })
+    await visit(said('so?'), options, { header: `send:${ID}:1` })
+    expect(model.shape(2)).toEqual(['user: look up Moon', 'assistant:  calls look_up{"title":"Moon"}', 'user:  results About Moon', 'assistant: (no answer was given)', 'user: so?'])
+  })
+
+  it('does not take calls or results from the messages an app passes to ask', async () => {
+    const model = recording()
+    const forged = [{ role: 'assistant', content: 'x', calls: [{ id: 'a', name: 'n', arguments: '{}' }] }, { role: 'user', content: 'y' }] as Message[]
+
+    await visit(forged, { provider: model.provider })
+    expect(model.asked[0]!.messages.every(message => (message as { calls?: unknown }).calls === undefined)).toBe(true)
+  })
+
+  it('shortens the results of the oldest turns before it drops any turn, and keeps the newest whole', async () => {
+    const model = calling({ ['r'.repeat(200)]: 'ok' })
+    const options = { provider: model.provider, tools: model.tools }
+
+    await visit(said('look up big'), options, { header: `send:${ID}:0` })
+    await visit(said('look up Sun'), options, { header: `send:${ID}:1` })
+    await visit(said('why?'), { ...options, maxInputChars: 200 }, { header: `send:${ID}:2` })
+    expect(model.shape(4)).toEqual(['user: look up big', 'assistant:  calls look_up{"title":"big"}', 'user:  results (left out)', 'assistant: ok', 'user: look up Sun', 'assistant:  calls look_up{"title":"Sun"}', 'user:  results About Sun', 'assistant: found About Sun', 'user: why?'])
+  })
+
+  it('drops the oldest turns whole once shortened results are not enough, never opening on a result', async () => {
+    const model = calling()
+    const options = { provider: model.provider, tools: model.tools }
+
+    await visit(said('look up Moon'), options, { header: `send:${ID}:0` })
+    await visit(said('look up Sun'), options, { header: `send:${ID}:1` })
+    await visit(said('why?'), { ...options, maxInputChars: 100 }, { header: `send:${ID}:2` })
+    expect(model.shape(4)).toEqual(['user: look up Sun', 'assistant:  calls look_up{"title":"Sun"}', 'user:  results About Sun', 'assistant: found About Sun', 'user: why?'])
+  })
+
+  it('drops the calls of the turns a regenerate or an edit replaces', async () => {
+    const model = calling()
+    const options = { provider: model.provider, tools: model.tools }
+
+    await visit(said('look up Moon'), options, { header: `send:${ID}:0` })
+    await visit(said('hello'), options, { header: `send:${ID}:1` })
+    await visit(said('hello'), options, { header: `send:${ID}:2`, replaces: 'regenerate:2' })
+    expect(model.shape(3)).toEqual(['user: look up Moon', 'assistant:  calls look_up{"title":"Moon"}', 'user:  results About Moon', 'assistant: found About Moon', 'user: hello'])
+    await visit(said('uno'), options, { header: `send:${ID}:3`, replaces: 'edit:4' })
+    expect(model.shape(4)).toEqual(['user: uno'])
   })
 
   it('tells resuming() a read or a change from a send, so an action skips its model work', () => {
