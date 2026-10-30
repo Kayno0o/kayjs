@@ -127,16 +127,20 @@ export class BuildStamps {
   // What the build writes for itself: the entries it bundles and the lists it hands the stylesheets.
   private readonly generated: string
 
-  // `kay dev` gives the output its record goes beside and the key of its options; `kay/test` keeps the stamps in memory only.
-  constructor(private readonly root: string, recorded?: { output: string, options: string }) {
+  // Whether the record holds every source by its stamp, as `kay dev`'s does; `kay/test`'s holds the ones the build did not read by their presence only.
+  private readonly everySource: boolean
+
+  // `kay dev` gives the output its record goes beside and the key of its options, and so does `kay/test` for a site loading no browser, with `testRecord`, so the files of a run check the islands once between them.
+  constructor(private readonly root: string, recorded?: { output: string, options: string }, testRecord = false) {
     this.realRoot = realpathSync(root)
     this.record = recorded && { ...recorded, file: join(recorded.output, FINGERPRINT) }
+    this.everySource = recorded !== undefined && !testRecord
     this.generated = join(this.realRoot, KAY_DIR) + sep
   }
 
   // `kay dev`'s record holds every source, as a gitignored `.env.local` can feed what a build inlines; `kay/test`, whose process reads its environment once, leaves out what `.gitignore` does.
   private async sources(): Promise<{ files: string[], directories: Map<string, string> }> {
-    return sourceTree(this.root, this.record === undefined)
+    return sourceTree(this.root, !this.everySource)
   }
 
   // By the path the bundler names a file: the real one.
@@ -174,11 +178,11 @@ export class BuildStamps {
     if (outputs.some(([name, size]) => Bun.file(join(clientDir(this.root), name)).size !== size))
       return false
 
-    if (Object.entries(saved.stamps).some(([file, stamp]) => stamp === RACY || (fileStamp(file) ?? '') !== stamp))
+    if (Object.entries(saved.stamps).some(([file, stamp]) => stamp === RACY || moved(file, stamp)))
       return false
 
     // A source the build never saw, written while `kay dev` was down.
-    if ((await sourceFiles(this.root)).some(file => saved.stamps[this.canon(file)] === undefined))
+    if ((await this.sources()).files.some(file => saved.stamps[this.canon(file)] === undefined))
       return false
 
     this.known = new Map(Object.entries(saved.stamps))
@@ -277,7 +281,7 @@ export class BuildStamps {
     const { files, directories } = await this.sources()
 
     for (const path of files)
-      take(this.canon(path), this.record !== undefined)
+      take(this.canon(path), this.everySource)
 
     this.known = stamps
     this.racy = racy

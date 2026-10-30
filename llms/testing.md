@@ -175,7 +175,7 @@ it('opens its panel on a click', async () => {
 
 ### Test site
 
-`kay/test` serves the project's pages and actions inside the test process, with no server and no browser; its islands are built for the browser as a check, never loaded, and a `.kay` file that does not compile makes only the visit of a page importing it answer 500 and log the error naming the file, not every site, and a file no page imports goes unreported (a `browser` site needs the build and fails whole):
+`kay/test` serves the project's pages and actions inside the test process, with no server and no browser; its islands are built for the browser as a check, never loaded, once for a run (a file whose sources match the check an earlier file of the run, or an earlier run, passed builds nothing; the first file of a project with islands pays the build, about 1.5 s of CPU and 170 MB on the docs site), and a `.kay` file that does not compile makes only the visit of a page importing it answer 500 and log the error naming the file, not every site, and a file no page imports goes unreported (a `browser` site needs the build and fails whole):
 
 ```ts
 import { expect, it } from 'bun:test'

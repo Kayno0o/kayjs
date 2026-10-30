@@ -227,3 +227,39 @@ describe('testSite keeps the islands it built', () => {
     }
   })
 })
+
+describe('testSite keeps its check between processes', () => {
+  const visit = async (): Promise<void> => {
+    const code = `import { testSite } from ${JSON.stringify(join(import.meta.dir, '../src/test'))}\nawait testSite({ root: ${JSON.stringify(root)} })\nprocess.exit(0)\n`
+    const child = Bun.spawn([process.execPath, '-e', code], { cwd: root, stdout: 'ignore', stderr: 'pipe', env: { ...process.env, KAY_ROOT: root } })
+    const [error, exit] = await Promise.all([new Response(child.stderr).text(), child.exited])
+
+    if (exit !== 0)
+      throw new Error(error)
+  }
+  const recorded = (): string => join(root, `.kay/test-client${testWorker()}/fingerprint.json`)
+
+  it('builds the islands once for the files of a run, and again once a source changed', async () => {
+    await Bun.write(greeting, FINE)
+    await testSite({ root })
+    // The record is written once the build settles.
+    for (let wait = 0; wait < 100 && !existsSync(recorded()); wait++)
+      await Bun.sleep(20)
+
+    settleDirectories(root)
+    // A first process meets the files the others just wrote within two seconds, which a record cannot trust: one more build leaves a settled one.
+    await Bun.sleep(2100)
+    await visit()
+    await Bun.sleep(100)
+
+    const first = Bun.file(manifest()).lastModified
+
+    await Bun.sleep(20)
+    await visit()
+    expect(Bun.file(manifest()).lastModified).toBe(first)
+
+    await Bun.write(greeting, `${FINE}// changed\n`)
+    await visit()
+    expect(Bun.file(manifest()).lastModified).toBeGreaterThan(first)
+  })
+})

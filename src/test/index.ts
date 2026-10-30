@@ -5,11 +5,11 @@ import type { LogEntry } from '../server/log'
 import type { TestPage } from './browser'
 import type { SiteScope } from './site-scope'
 import type { TestOptions, TestSite, Visit, VisitInit } from './site-types'
-import { relative } from 'node:path'
+import { join, relative } from 'node:path'
 import process from 'node:process'
 import { afterAll, beforeEach } from 'bun:test'
 import { Elysia } from 'elysia'
-import { clientDir, inOutput, testWorker } from '../build/assets'
+import { clientDir, inOutput, KAY_DIR, testWorker } from '../build/assets'
 import { buildClient } from '../build/client'
 import { KayCompileError } from '../build/transform'
 import { buildingTestSite } from '../config-extensions'
@@ -84,6 +84,9 @@ function nextClient(): string {
   return `10.${clients >> 16 & 255}.${clients >> 8 & 255}.${clients & 255}`
 }
 
+// What a site loading no browser holds of a check that found nothing to build again: its islands are never read.
+const CHECKED: ClientBuild = { entryImports: [], islands: {}, styles: new Map(), pages: new Map(), dir: '' }
+
 const builds = new Map<string, { key: string, stamps: BuildStamps, running: () => boolean, build: Promise<ClientBuild> }>()
 
 // The options that tell two builds apart, as far as they can be written down.
@@ -107,7 +110,9 @@ async function islandsBuilt(root: string, options: ClientOptions, inBrowser: boo
   if (latest !== held && latest?.key === key)
     return latest.build
 
-  const stamps = new BuildStamps(root)
+  const output = `test-client${testWorker()}`
+  // A check build leaves its record in the output, so a later file of the run, or a later run, whose sources are the same builds nothing again.
+  const stamps = inBrowser ? new BuildStamps(root) : new BuildStamps(root, { output: join(root, KAY_DIR, output), options: key }, true)
   let running = true
   const build = (async () => {
     try {
@@ -116,7 +121,7 @@ async function islandsBuilt(root: string, options: ClientOptions, inBrowser: boo
     catch {}
 
     try {
-      return await (inBrowser ? buildClient(root, options, stamps) : inOutput(`test-client${testWorker()}`, async () => buildClient(root, options, stamps)))
+      return await (inBrowser ? buildClient(root, options, stamps) : inOutput(output, async () => await stamps.fresh() ? CHECKED : buildClient(root, options, stamps)))
     }
     finally {
       running = false
