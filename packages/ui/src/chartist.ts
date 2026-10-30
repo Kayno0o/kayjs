@@ -3,7 +3,7 @@ interface Loaders {
   compat: () => Promise<typeof import('chartist/compat')>
 }
 
-// How LineChart reaches the parts of chartist it loads on demand. A dom test replaces what a load does with `mock.module('chartist/live', ...)`, which `mountComponent` lets reach this module's imports.
+// How LineChart reaches the parts of chartist it loads on demand. A dom test assigns to it (`loaders.live = ...`) to hold a load open or make it fail, which `mock.module()` cannot: it runs its factory when called, and the module it replaces is loaded once.
 export const loaders: Loaders = {
   live: async () => import('chartist/live'),
   compat: loadCompat,

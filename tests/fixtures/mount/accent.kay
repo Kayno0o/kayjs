@@ -1,4 +1,6 @@
 ---
-import { accent } from './accent'
+import { persisted } from 'kay'
+
+const accent = persisted('accent', 'blue', { storage: 'local', values: ['blue', 'green'] })
 ---
 p.accent {accent()}

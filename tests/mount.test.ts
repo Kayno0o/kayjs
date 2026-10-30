@@ -198,7 +198,7 @@ describe('mount', () => {
     unmount()
   })
 
-  it('runs every mount on modules of its own, as a page load does, a persisted signal reading storage as it is then, which a test writes and reads as it keeps it', async () => {
+  it('runs every mount on the component\'s own file afresh, as a page load does, a persisted signal declared in it reading storage as it is then, which a test writes and reads as it keeps it', async () => {
     try {
       writePersisted('favorites', ['first'])
 

@@ -487,18 +487,21 @@ test('the alt text of a paired field is written to the field beside the image, a
 })
 
 test('a typed path in the storage\'s naming gives the size beside it, any other path none', async () => {
-  const { drafts, root } = await openImage({ tags: '', width: 9, height: 9 }, { width: sibling('width'), height: sibling('height') })
-  const typed = root.querySelector<HTMLInputElement>('.kcms-file-path input')!
-  const type = async (text: string) => {
+  // The field follows the draft as in the browser, so a path the storage named swaps the box for its link: each path is typed into a field of its own.
+  const typedSize = async (text: string) => {
+    const { drafts, root } = await openImage({ tags: '', width: 9, height: 9 }, { width: sibling('width'), height: sibling('height') })
+    const typed = root.querySelector<HTMLInputElement>('.kcms-file-path input')!
+
     typed.value = text
     typed.dispatchEvent(new Event('input', { bubbles: true }))
     await settle()
+    mounted?.unmount()
+
+    return [drafts.value(ENTRY, 'width'), drafts.value(ENTRY, 'height')]
   }
 
-  await type('/_kay/files/posts/zzz.640x480.webp')
-  expect([drafts.value(ENTRY, 'width'), drafts.value(ENTRY, 'height')]).toEqual([640, 480])
-  await type('https://example.com/a.png')
-  expect([drafts.value(ENTRY, 'width'), drafts.value(ENTRY, 'height')]).toEqual([undefined, undefined])
+  expect(await typedSize('/_kay/files/posts/zzz.640x480.webp')).toEqual([640, 480])
+  expect(await typedSize('https://example.com/a.png')).toEqual([undefined, undefined])
 })
 
 // An XMLHttpRequest that goes nowhere until the test says so.

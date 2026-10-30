@@ -1,0 +1,4 @@
+---
+const { read } = props<{ read: () => number }>()
+---
+p.read {read()}

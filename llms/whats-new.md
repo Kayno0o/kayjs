@@ -8,7 +8,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 - A component call merging a shorthand class, a `class` attribute or a spread with a condition object (`Plain.mt-4(class={{ on: true }})`) passes `kay check` under `exactOptionalPropertyTypes` on a component typing `class?: string`: [styles and assets](styles-and-assets.md).
 - kayjs-ui's `LineChart` fed by a signal or a store updates in place on each change instead of redrawing, through chartist 2.2's `chartist/live` (peer `^2.2.0`) loaded on the first change of the data; `pointKey` follows a rolling series' points by label or position, and `animate` moves them from the old data to the new, off under reduced motion: [charts](../packages/ui/llms/charts-drag-and-media.md).
 - kayjs-ui's `LineChart` no longer sets a global `Chartist`, which importing `chartist/compat` did.
-- A dom test and the component it mounts share the plain modules the component imports: `mock.module()` reaches its static and dynamic imports, and a value the test imports from one of the project's files is the component's: [testing](testing.md).
+- A dom test and the component it mounts share the modules the component imports from the project and from packages, a signal store included: `mock.module()` reaches its static and dynamic imports, and a value the test sets, or imports from one of the project's files, is the component's: [testing](testing.md).
 
 ## 1.84.0
 

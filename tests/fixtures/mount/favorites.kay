@@ -1,5 +1,7 @@
 ---
-import { favorites } from './favorites'
+import { persisted } from 'kay'
+
+const favorites = persisted<string[]>('favorites', [], { storage: 'local' })
 ---
 p.favorites {favorites().join(', ')}
 button(onClick={() => favorites = [...favorites(), 'added']}) Add

@@ -4,6 +4,10 @@ What each minor release breaks, and what an app changes to move to it. kay and i
 
 ## 1.85.0
 
+### A module a mounted component imports is the test's own instance
+
+- `mountComponent` no longer runs the project's modules afresh on every mount: a module of the project or a package, a signal store or a `persisted()` signal declared in a module included, is the one the test imports, so its state carries over to the next mount and test. A test that relied on a store starting empty resets it in `afterEach` (`count.set(0)`), and one that wrote `writePersisted` before each mount of a module-level `persisted()` sets the signal instead after the first. A signal declared in the component's own `.kay` file starts fresh as before. `kay check` cannot recognise a test, so there is no deprecated lint.
+
 ### kayjs-ui's `LineChart` needs chartist 2.2
 
 - The `chartist` peer is `^2.2.0` (was `^2.0.0`): `bun update chartist` before upgrading kayjs-ui. `kay check` cannot recognise a chartist version, so there is no deprecated lint.

@@ -1,0 +1,7 @@
+---
+import { addNote } from '../lib/notes-client'
+
+const added = signal('')
+---
+button(onClick={async () => added = JSON.stringify(await addNote())}) Add
+p.added {added()}

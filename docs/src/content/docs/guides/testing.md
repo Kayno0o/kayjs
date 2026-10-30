@@ -194,7 +194,7 @@ if (created.ok)
 
 Install `@happy-dom/global-registrator` as a dev dependency. The first `mountComponent` of a file registers happy-dom's DOM, and a file that mounts nothing never loads it. The popover API happy-dom lacks comes with it.
 
-A module the component imports that needs no kay, such as a plain TypeScript file of your project or a package like `chartist`, is shared with the test. What you import in the test and what the component imports is the same instance, and `mock.module()` replaces it for the component's static and dynamic imports alike, as long as you call it before the mount:
+The modules a component imports from your project and from packages are the test's own, not copies. A plain TypeScript file, a package like `chartist` and a signal store are all the same instance in the test and in the component. `mock.module()` replaces one for the component's static and dynamic imports alike, as long as you call it before the mount:
 
 ```ts
 import { mock } from 'bun:test'
@@ -204,7 +204,30 @@ await mock.module('../src/payments', () => ({ charge: async () => 'ok' }))
 const { root } = await mountComponent(Checkout)
 ```
 
-A module that imports `kay` or a `.kay` file, such as a signal store, stays inside the component's browser build and starts fresh with each mount. Pass what it holds as a prop instead.
+A store works the same way. A value the test sets is what the component shows, and a value the component sets is what the test reads:
+
+```ts
+import { count } from '../src/store'
+
+count.set(10)
+
+const { root, click } = await mountComponent(Counter)
+
+click('button')
+expect(count()).toBe(11)
+```
+
+One instance also means the state outlives the mount. It carries over to the next mount of the file, to the next test and to the next file the same worker runs, so a test resets what it changed, in `afterEach` for example. `mock.module()` lasts for the whole process too, and `mock.restore()` does not undo it. Keep the real exports before mocking and mock them back when the test is done:
+
+```ts
+const real = { ...await import('../src/payments') }
+
+afterEach(() => mock.module('../src/payments', () => real))
+```
+
+A persisted signal in such a module reads storage the first time it is read. Call `writePersisted` before the first mount, and set the signal after that. The DOM has to exist when the module loads, or the signal behaves as it does on the server, so import `kay/test/dom` first. For the same reason, a module that keeps `document` or `localStorage` from the moment it loads holds on to the DOM of the first file that loaded it.
+
+Some code stays inside the component's browser build and starts fresh with each mount: the component's own `.kay` file, any module that reaches a `.kay` file (a `.ts` file re-exporting a component too), an API module, a package that picks its entry by the `browser` condition, and kay's libraries such as kayjs-ui, whose toasts begin empty. A persisted signal you declare in the component itself reads storage as it is at each mount.
 
 `fetch`, `Request`, `Response`, `Headers`, `Blob`, `File`, `URL`, `URLSearchParams`, `AbortController`, `AbortSignal` and `WebSocket` stay Bun's, and `FormData` stays Bun's class while reading a form element as in a browser, so a test serving with `Bun.serve` still works beside it.
 
