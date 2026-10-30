@@ -5,18 +5,17 @@ import type { TypeScope } from './diagnose'
 import type { ProbeMemory } from './project'
 import type { ShadowFile } from './shadow'
 import type { ExtensionProgram } from './shadow-types'
-import { join, relative, resolve, sep } from 'node:path'
+import { relative, resolve, sep } from 'node:path'
 import process from 'node:process'
-import { inWalkScope, readText } from '../build/files'
+import { inWalkScope } from '../build/files'
 import { inAnalysisScope } from '../compiler'
 import { formatReport } from '../compiler/frame'
 import { lintLevels } from '../compiler/lints'
 import { offsetAt, positionAt } from '../compiler/mapping'
 import { pickConfig } from '../config'
-import { projectPaths } from '../project'
 import { diagnoseShadow, reportsTypeErrors, servedByTheApp, shownOutsideKay, unusedCodesOf } from './diagnose'
 import { unknownNameHelp } from './export-homes'
-import { CONTENT_CHECK, generatedProblem } from './generated'
+import { generatedProblem } from './generated'
 import { configProblems, contentChecks, lintConfigTypeError, projectProblems, withoutMissingCaptcha } from './project'
 import { writeShadowTypes } from './shadow-types'
 import { parseTscOutput, resolvedConfig, tsgoCode, tsgoDiagnostic, typecheck } from './tsgo'
@@ -123,16 +122,13 @@ async function runCheck(root: string, given: CheckOptions, probes?: ProbeMemory)
   const tsconfig = options.tsconfig ?? 'tsconfig.json'
   // The props entries give their components are typed with the rest, so the collections are read before the type check; their probe does not wait for the shadow tree, which leaves the file it writes alone.
   // The tsconfig includes the shadow tree, so its files are listed once the tree is written.
-  const contentFile = join(projectPaths(root).types, CONTENT_CHECK)
-  const props = await readText(contentFile)
   const reading = contentChecks(root, options, probes)
   const shadowing = shadowedConfig(root, tsconfig, options)
-  // Where the last run left the props check, tsgo types the project while the collections are read, and again once they have changed it, which costs a second run after the first ends.
-  const speculative = props === undefined ? undefined : (async () => typecheck(root, tsconfig, (await shadowing)[1]))()
+  // The type check waits for the probe rather than running beside it: measured on the docs site and in tests/extensions.test.ts starting tsgo beside the probe saved no wall time and no peak memory (#2702).
   // Everything but the feeds waits for nothing the probe reads.
   const problemsRun = (async () => projectProblems(root, options, reading, probes, (await shadowing)[0].served))()
-  // Settled, so neither ends in a rejection nothing awaits.
-  const started = Promise.allSettled([speculative, problemsRun])
+  // Settled, so it does not end in a rejection nothing awaits.
+  const started = Promise.allSettled([problemsRun])
   let content: Awaited<typeof reading>
   let types: Awaited<typeof shadowing>[0]
   let shown: Awaited<typeof shadowing>[1]
@@ -149,20 +145,8 @@ async function runCheck(root: string, given: CheckOptions, probes?: ProbeMemory)
 
   const { files, diagnostics, unreached, libraries, mounts, locales, programs } = types
   const projectUnused = unusedCodesOf(shown)
-  const typed = async () => {
-    if (speculative === undefined)
-      return typecheck(root, tsconfig, shown)
-
-    if (await readText(contentFile) === props)
-      return speculative
-
-    // Typed against the props check the collections replaced, so it ends before the second run uses the same state.
-    await Promise.allSettled([speculative])
-
-    return typecheck(root, tsconfig, shown)
-  }
   // An extension whose options differ from the app's is checked apart, so its pages are typed as it is written for.
-  const [{ output, errors, code }, problems, ...apart] = await Promise.all([typed(), problemsRun, ...programs.map(async program => runProgram(root, program))])
+  const [{ output, errors, code }, problems, ...apart] = await Promise.all([typecheck(root, tsconfig, shown), problemsRun, ...programs.map(async program => runProgram(root, program))])
   const config = resolve(root, tsconfig)
   const inProgram = (file: string) => programs.some(({ dir }) => file.startsWith(dir + sep))
   const printed = parseTscOutput(output, config, root)
