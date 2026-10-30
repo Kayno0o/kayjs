@@ -9,7 +9,7 @@ const real: Loaders = {
 }
 
 // How LineChart reaches the parts of chartist it loads on demand, in one object so a test can replace what a load does. `mountComponent` bundles the component into a copy of this module of its own, which a test cannot import, so under a test run (kay/test's preload sets `KAY_TEST_PARENT`) a load goes through what a test planted on the global object under this key, and a page never reads it.
-const LOADERS_KEY = Symbol.for('kayjs-ui.chartist-loaders')
+const LOADERS_KEY = Symbol.for('kayjs-ui.chartist-loaders') // kaynooo/kayjs#2701
 
 const planted = (): Partial<Loaders> => (globalThis as { [LOADERS_KEY]?: Partial<Loaders> })[LOADERS_KEY] ?? {}
 
