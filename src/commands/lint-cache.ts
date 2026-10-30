@@ -1,4 +1,4 @@
-import { existsSync } from 'node:fs'
+import { existsSync, statSync } from 'node:fs'
 import { mkdir, rm } from 'node:fs/promises'
 import { dirname, join, resolve } from 'node:path'
 
@@ -26,18 +26,18 @@ export async function dropStaleLintCache(root: string, args: readonly string[], 
   if (await readIfAny(keyFile) === key)
     return false
 
-  await mkdir(dirname(keyFile), { recursive: true })
-  await Bun.write(keyFile, key)
-
   // A cache location that is a folder holds one file per project, named by ESLint: left alone.
   const location = cacheLocation(args, cwd)
 
-  if (location.endsWith('/'))
-    return false
+  const dropped = !location.endsWith('/') && !(existsSync(location) && statSync(location).isDirectory())
 
-  await rm(location, { force: true })
+  if (dropped)
+    await rm(location, { force: true })
 
-  return true
+  await mkdir(dirname(keyFile), { recursive: true })
+  await Bun.write(keyFile, key)
+
+  return dropped
 }
 
 async function readIfAny(file: string): Promise<string> {
