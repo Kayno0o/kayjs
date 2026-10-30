@@ -6,13 +6,12 @@ import type { LintLevels } from './lints'
 import type { ImportedSignals, SignalKind } from './module-signals'
 import type { NameFindings } from './rewrite'
 import type { ParsedFence, ScriptAnalysis, ServerAnalysis } from './script'
-import { AsyncLocalStorage } from 'node:async_hooks'
 import { basename, relative } from 'node:path'
 import { drawIcons, elementsIn, templateFacts, visitNodes } from './ast'
 import { browserReads } from './browser'
 import { generate, isInteractive, islandCause, islandMessages, promotionCause, promotionSite } from './codegen'
 import { asyncReplies, cssImportsWithoutText, missingCaptchas, openRedirects, separatePageSettings, serverOnlyImports, unboundedFields } from './fence-checks'
-import { cwd, iconSetsOf } from './host'
+import { cwd, iconSetsOf, scopeStorage } from './host'
 import { islandMarker, markerMismatch } from './island-marker'
 import { applyLints, templateLints } from './lints'
 import { SourceMap } from './mapping'
@@ -139,7 +138,7 @@ interface Role {
   server: boolean
 }
 
-const roles = new AsyncLocalStorage<Map<string, Map<string, Role>>>()
+const roles = scopeStorage<Map<string, Map<string, Role>>>()
 
 // Runs a check, in which a component's role is analysed once whoever asks for it, `rendersAsIsland` and `browserRole` alike, kept by the text it was read from.
 // Outside one every call analyses again, as the language server and a server compiling on a request need.
