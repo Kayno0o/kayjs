@@ -560,8 +560,14 @@ export async function browse(url: string, options: BrowserOptions = {}): Promise
   const traverse = async (step: string) => {
     const entry = await inView<string>('navigation.currentEntry.key')
 
-    // `history`, not the view's own back and forward, which wait for a load a swapped page never fires.
-    await inView(`void ${step}`)
+    // `history`, not the view's own back and forward, which wait for a load a swapped page never fires. A page with JavaScript off loads the entry as a new document, which may end the script's own evaluation.
+    try {
+      await inView(`void ${step}`)
+    }
+    catch (error) {
+      if (gone || !RETRIED.test(error instanceof Error ? error.message : String(error)))
+        throw error
+    }
     await settle(`navigation.currentEntry.key !== ${JSON.stringify(entry)} && ${ready}`, 'the page to settle')
   }
 

@@ -4,6 +4,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 
 ## Unreleased
 
+- `page.back()` and `page.forward()` on a page opened with `javaScript: false` no longer fail now and then with `Inspected target navigated or closed` when the browser loads the entry as a new document: [testing in a browser](testing-browser.md).
 - A string in an API route's `body` with no `maxLength` takes the same 10,000 character default as an action's: [API routes](api-routes.md).
 - Browser tests prefer a `chrome-headless-shell` (on the `PATH` or in Playwright's cache) over full Chrome when no `path` or `BUN_CHROME_PATH` is given: same Blink and V8, far less memory, and a start failure names the executable; the shell also leaves no lock file, which kay's browser cleanup now follows through `/proc`. See [the browser itself](testing-browser.md).
 - A relative `mcp: { key: { file } }` is resolved against the working directory in a compiled server, where it was the folder the executable was built in, so `data/mcp-key` lands next to where the executable runs and `KAY_MCP_KEY_FILE` is no longer needed to point it there (a compiled server that ran outside its build folder makes a new key at the new place): [API routes](api-routes.md).
