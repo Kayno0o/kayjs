@@ -30,6 +30,7 @@ import { claimRedirects, readRedirects } from './redirects'
 import { routeTable } from './route-table'
 import { ServedPaths } from './served-paths'
 import { setupPages } from './setup'
+import { projectSource } from './source'
 
 // Options given here win over the project's `kay.config.ts`.
 export interface PagesOptions extends KayConfig {
@@ -152,7 +153,7 @@ export async function pagesApp(project: Project<ServedOptions>, loadClient: () =
   const running = serverMode(mode, exported)
   // Before anything is built, so a production server without the key it asks for stops at once; a static export serves no endpoint.
   const keySetting = exported ? undefined : mcpKeySetting(options.mcp)
-  const mcpKey = keySetting === undefined ? undefined : resolveMcpKey(keySetting, { root, production: !running.dev && running.production, compiled: bundled() !== undefined }) ?? false
+  const mcpKey = keySetting === undefined ? undefined : resolveMcpKey(keySetting, { root: projectSource().runtimeRoot(root), production: !running.dev && running.production }) ?? false
 
   const publicModules = options.publicEnv ? await loadPublicModules(root) : []
   const setup = await setupPages(project, loadClient, false, late.spell, scanned => refuseScanned(project, scanned), exported)

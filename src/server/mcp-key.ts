@@ -30,10 +30,10 @@ export function mcpKeySetting(value: boolean | McpConfig | undefined): McpKeySet
   throw new KayError('config-invalid', 'kay: mcp.key is `true` (read KAY_MCP_KEY or KAY_MCP_KEY_FILE), the key as a string, or `{ file }` naming the file that holds it and is made on first use')
 }
 
-// A relative `{ file }` is read against the project root, or against the working directory in a compiled server, whose root is the folder it was built in and which finds its data where it runs, as a relative database path does.
 // The key every request to the endpoint must carry as a bearer token, or undefined when `mcp.key` is set and no key was given, which refuses every request.
 // Read once, at boot: a rotated key takes effect on the next start.
-export function resolveMcpKey(setting: McpKeySetting, options: { root: string, production: boolean, compiled?: boolean }): string | undefined {
+// A relative `{ file }` resolves against `options.root`, which the caller sets to where the server runs: the working directory for a compiled one.
+export function resolveMcpKey(setting: McpKeySetting, options: { root: string, production: boolean }): string | undefined {
   if (typeof setting === 'string')
     return checked(setting.trim(), 'mcp.key')
 
@@ -43,7 +43,7 @@ export function resolveMcpKey(setting: McpKeySetting, options: { root: string, p
     return given
 
   if (typeof setting === 'object')
-    return checked(readOrMake(resolve(options.compiled === true ? process.cwd() : options.root, setting.file)), `the file ${setting.file}`)
+    return checked(readOrMake(resolve(options.root, setting.file)), `the file ${setting.file}`)
 
   if (options.production)
     throw new KayError('config-invalid', `kay: mcp.key is set, which asks for a key read from ${KEY_VARIABLE} or from the file ${KEY_FILE_VARIABLE} names, and neither gives one`)

@@ -13,8 +13,8 @@ import { importsOf, walk } from './ast'
 const SOURCE_FILE = /(?<!\.d)\.tsx?$/
 const OLD_KEY = new RegExp(`\\b(?:${Object.keys(RENAMED_KEYS).join('|')})\\b`)
 // The options of `pages()` and `testSite()` are the config's own, so they carry the same keys, as the `config` of an extension does.
-// A file that can hold options of the config: it imports one of the functions below or writes an extension's `config:`.
-const CONFIG_HOLDER = /kay\/(?:server|test)|\bconfig\s*:/
+// A file that can hold options of the config or an extension's: it imports kay or one of its libraries.
+const CONFIG_HOLDER = /\bfrom\s+['"](?:kay|kayjs-[\w-]+)(?:\/[^'"]*)?['"]/
 const OPTION_FUNCTIONS: Record<string, string> = { pages: 'kay/server', testSite: 'kay/test' }
 
 // A `key: value` or shorthand property with a name written out: not a spread, a method, an accessor or a computed key.
@@ -36,7 +36,12 @@ function isOptionCall(callee: CallExpression['callee'], callees: Set<string>, im
   if (callee.type === 'Identifier')
     return callees.has(callee.name)
 
-  return callee.type === 'MemberExpression' && !callee.computed && callee.object.type === 'Identifier' && callee.property.type === 'Identifier' && imported.some(({ name, namespaces }) => name === callee.property.name && namespaces.has((callee.object as { name: string }).name))
+  if (callee.type !== 'MemberExpression' || callee.computed || callee.object.type !== 'Identifier' || callee.property.type !== 'Identifier')
+    return false
+
+  const { object, property } = callee
+
+  return imported.some(({ name, namespaces }) => name === property.name && namespaces.has(object.name))
 }
 
 const renamed = (name: string): string | undefined => Object.hasOwn(RENAMED_KEYS, name) ? RENAMED_KEYS[name as keyof typeof RENAMED_KEYS] : undefined

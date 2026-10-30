@@ -1,5 +1,5 @@
 import { existsSync } from 'node:fs'
-import { mkdir, readFile, rm } from 'node:fs/promises'
+import { readFile, rm } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
 import process from 'node:process'
 import { afterAll, describe, expect, it } from 'bun:test'
@@ -34,12 +34,9 @@ async function compile(key: string, base?: string): Promise<{ root: string, exec
 
 // The test run's environment without the variables that would give the key.
 function environment(): Record<string, string> {
-  const { KAY_MCP_KEY, KAY_MCP_KEY_FILE, ...rest } = process.env as Record<string, string>
+  const kept = Object.entries(process.env).filter((entry): entry is [string, string] => entry[1] !== undefined && entry[0] !== 'KAY_MCP_KEY' && entry[0] !== 'KAY_MCP_KEY_FILE')
 
-  void KAY_MCP_KEY
-  void KAY_MCP_KEY_FILE
-
-  return { ...rest, NODE_ENV: 'production', PORT: '0', KAY_EPHEMERAL_SECRET: '1' }
+  return { ...Object.fromEntries(kept), NODE_ENV: 'production', PORT: '0', KAY_EPHEMERAL_SECRET: '1' }
 }
 
 // Runs the executable from `cwd`, asks the endpoint for its tools with `key`, and answers the status.
@@ -92,7 +89,6 @@ describe('mcp.key { file } in a compiled server', () => {
 
     const { executable } = await compile(`{ file: ${JSON.stringify(file)} }`)
 
-    await mkdir(cwd, { recursive: true })
     await ask(executable, cwd, undefined, '/mcp')
 
     expect(existsSync(file)).toBe(true)

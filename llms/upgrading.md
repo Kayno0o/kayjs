@@ -47,7 +47,7 @@ What each minor release breaks, and what an app changes to move to it. kay and i
 
 ### Config keys are named by what they hold
 
-- `routes`, `api`, `content`, `storage`, `maxSizes` and `settings` in `kay.config.ts`, and in the options of `pages()` and `testSite()`, are `routesDir`, `apiDir`, `contentConfig`, `fileStore`, `maxSizeByPath` and `librarySettings`: a key naming a directory ends in `Dir`, one naming a file or module is `...Config`, and no two keys are a letter apart. The old names work until 1.87 and `kay check` reports them as `deprecated-config-keys`; `kay upgrade` renames them.
+- `routes`, `api`, `content`, `storage`, `maxSizes` and `settings` in `kay.config.ts`, in the options of `pages()` and `testSite()` and in an extension's `config`, are `routesDir`, `apiDir`, `contentConfig`, `fileStore`, `maxSizeByPath` and `librarySettings`: a key naming a directory ends in `Dir`, one naming a file or module is `...Config`, and no two keys are a letter apart. The old names work until 1.87 and `kay check` reports them as `deprecated-config-keys`; `kay upgrade` renames them.
 
 ## 1.82.0
 
