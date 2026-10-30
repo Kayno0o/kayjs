@@ -109,4 +109,26 @@ export const greet = act(t.Object({ name: t.String() }), ({ name }) => \`Hello \
 
     expect((await readClientSources(root)).actionProps).toBe(false)
   })
+
+  it('counts action<T>(), a re-export of action and a barrel over kay as ones the app declares', async () => {
+    for (const code of [
+      `import { action } from 'kay'\nexport const save = action<{ name: string }>(schema, run)`,
+      `export { action } from 'kay'`,
+      `export { action as act } from 'kay'`,
+      `export * from 'kay'`,
+      `import * as k from 'kay'\nexport const save = k.action(schema, run)`,
+    ]) {
+      const root = await app({ 'src/routes/index.kay': PAGE(`import { greet as inner } from '../actions'\nexport const greet = inner`), 'src/actions.ts': code })
+
+      expect([code, (await readClientSources(root)).actionProps]).toEqual([code, true])
+    }
+  })
+
+  it('does not count a comment, a string or another function holding action( as an action', async () => {
+    for (const code of [`// action(schema, run)\nexport const a = 1`, `export const a = 'action(x)'`, `export const a = reaction(1)`, `export * from './other'`]) {
+      const root = await app({ 'src/routes/index.kay': '--- script\nimport Caller from \'../components/caller.kay\'\n---\np action(x)\n', 'src/actions.ts': code })
+
+      expect([code, (await readClientSources(root)).actionProps]).toEqual([code, false])
+    }
+  })
 })

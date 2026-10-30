@@ -25,6 +25,7 @@ import { rebaseCss } from '../server/base'
 import { BUILD_FAILURE, fromManifest, MANIFEST, PRERENDERED_DIR, writeManifest } from '../server/client'
 import { PUBLIC_ENV_PATH } from '../server/env-state'
 import { fontFallbacks, withFontFallbacks } from '../server/fonts'
+import { declaresAction } from './action-calls'
 import { ASSET_PREFIX, clientDir, DEV_MAPS_DIR, MAPS_DIR, outputDir } from './assets'
 import { pruneNodes } from './class-rules'
 import { buildClassTable } from './class-table'
@@ -449,18 +450,16 @@ async function markupFiles(root: string, sources: object): Promise<string[]> {
   return found
 }
 
-// A call of `action`, or the import of it under another name.
-const ACTION_CALL = /\baction\s*\(|\baction\s+as\b/
 const SCRIPT_FILE = /\.[cm]?[jt]s$/
 
-// Whether an own module of the app calls `action(`: the `.kay` sources already read, and the scripts beside them.
+// Whether an own module of the app calls `action`, imports it under another name or re-exports it: the `.kay` sources already read, and the scripts beside them.
 async function declaresActions(root: string, kaySources: string[]): Promise<boolean> {
-  if (kaySources.some(source => ACTION_CALL.test(source)))
+  if (kaySources.some(source => declaresAction(source, true)))
     return true
 
   const scripts = await findProjectFiles(root, SCRIPT_FILE, { project: true, ownKayOnly: true })
 
-  return (await Promise.all(scripts.map(async file => ACTION_CALL.test(await readText(file) ?? '')))).some(Boolean)
+  return (await Promise.all(scripts.map(async file => declaresAction(await readText(file) ?? '', false)))).some(Boolean)
 }
 
 // The table the islands ship: the app-wide one cut to the classes a merge in the browser can meet, those written in a module an island bundles or in one that renders an island and hands it a class.
