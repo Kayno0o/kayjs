@@ -110,6 +110,20 @@ describe('compile errors', () => {
     expect(codes('--- client\nconst n = 1\n---\np {n}\n', 'src/routes/_layout.kay')).toContain('client-route-fence')
   })
 
+  it('name --- script for a bare fence after a named one, and fix it by naming the closing line', () => {
+    const source = '--- server\nconst a = 1\n---\nimport { route } from \'kay\'\n---\nh1 x\n'
+    const [found] = compileKay(source, 'src/a.kay').diagnostics
+
+    expect(found?.help).toContain('--- script')
+    expect(found?.fixes?.[0]?.safe).toBe(true)
+
+    const [edit] = found!.fixes![0]!.edits
+    const fixed = source.slice(0, edit!.start) + edit!.text + source.slice(edit!.end)
+
+    expect(fixed).toBe('--- server\nconst a = 1\n--- script\nimport { route } from \'kay\'\n---\nh1 x\n')
+    expect(compileKay(fixed, 'src/a.kay').diagnostics).toEqual([])
+  })
+
   it('refuse a server fence never closed, but in an _actions.kay, which holds no template', () => {
     const unclosed = '--- server\nexport const a = 1\np hi\n'
 

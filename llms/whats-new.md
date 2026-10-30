@@ -5,6 +5,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 ## Unreleased
 
 - The Forgejo CI workflow `kay new` and `kay add ci` write runs on an Alpine runner image with bun and git baked in, as on `debian`: its install step adds only the missing `git` and `unzip` (with `apt-get` or `apk`) and Setup Bun is skipped when bun is already there: [project new and add](project-new-and-add.md).
+- A bare `---` after a `--- server` or `--- module` fence that was meant as the script fence is reported with the fix, `--- script` on the line closing the first fence, which `kay check --fix` applies: [checks](checks.md).
 - A dom test and the component it mounts share the modules the component imports from the project and from packages, a signal store included: `mock.module()` reaches its static and dynamic imports, and a value the test sets, or imports from one of the project's files, is the component's: [testing](testing.md).
 - `testSite()` boots an app with `offline` before `kay build` has written `.kay/client`, so `bun run test` runs on a fresh clone and in CI: `/sw.js` answers with a worker listing no build files: [testing](testing.md).
 

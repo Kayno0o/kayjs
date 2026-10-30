@@ -7,6 +7,7 @@ import { Scanner } from './scanner'
 // `--- server`, `--- client`, `--- script`, `--- module`, or `--- <T extends Row>` making the component generic, its type parameters in the third or fourth group: `--- client <T>` takes both.
 const FENCE = /---(?:([ \t]*)([a-z]+)(?:[ \t]+<(.*)>)?|[ \t]*<(.*)>)?[ \t]*\r?\n/diy
 const CLOSING_FENCE = /^---(?:[ \t]*$|[ \t]*[a-z<])/gm
+const BARE_LINE = /^---[ \t]*$/
 const CLOSING_LINE = /---[ \t]*(?=\r?\n|$)/y
 // A labeled fence line, which closes the fence before it and opens its own.
 const NEXT_FENCE_LINE = /---[ \t]*[a-z<]/y
@@ -92,6 +93,8 @@ export function parseKay(source: string): KayFile {
   let client: Span | undefined
   let templateStart = 0
   let unclosedServer: Diagnostic | undefined
+  // The bare `---` closing a named fence while no script fence is open yet, which a later bare `---` was meant to be the script fence of.
+  let bareClosing: Span | undefined
 
   // Fences come first, in any order: `---` or `--- script` holds the component script, `--- client` one rendering in the browser only, `--- server` the code that runs on the server only, `--- module` the module-level code, which exports values.
   // A labeled fence line also closes the fence before it, so `--- server` code can run straight into `--- script`.
@@ -112,6 +115,7 @@ export function parseKay(source: string): KayFile {
     const span = { start: bodyStart, end: closing ? closing.start : source.length }
 
     templateStart = closing ? closing.end : source.length
+    bareClosing = closing && spaced && !fences.script && kind !== 'script' && closing.end > closing.start ? closing : undefined
 
     if (!closing) {
       const unclosed: Diagnostic = { start: fence.index, end: fence.index + 3, code: 'fence-invalid', message: 'This fence is never closed with a `---` line' }
@@ -144,8 +148,24 @@ export function parseKay(source: string): KayFile {
   }
 
   const parser = new TemplateParser(source, templateStart, diagnostics)
+  const template = parser.parseTemplate()
 
-  return { source, script: fences.script, server: fences.server, module: fences.module, style: fences.style, typeParameters, client, templateStart, template: parser.parseTemplate(), diagnostics, unclosedServer }
+  if (bareClosing)
+    explainSecondFence(source, bareClosing, diagnostics)
+
+  return { source, script: fences.script, server: fences.server, module: fences.module, style: fences.style, typeParameters, client, templateStart, template, diagnostics, unclosedServer }
+}
+
+// A bare `---` in the template after a named fence closed by a bare `---`: the first bare line closed that fence, so the author meant the second fence as the script, which takes `--- script` once a named fence is there.
+// The fix names the closing line instead of the second fence, which keeps the code between them as the script.
+function explainSecondFence(source: string, closing: Span, diagnostics: Diagnostic[]) {
+  const stray = diagnostics.find(diagnostic => diagnostic.code === undefined && diagnostic.start >= closing.end && BARE_LINE.test(source.slice(diagnostic.start, diagnostic.end)) && source[diagnostic.start - 1] === '\n')
+
+  if (!stray)
+    return
+
+  stray.help = 'a second fence takes a name once a `--- server` or `--- module` fence is there: write the one closing it as `--- script` (or `--- client`)'
+  stray.fixes = [{ title: 'Name the script fence', edits: [{ start: closing.start, end: closing.end, text: '--- script' }], safe: true }]
 }
 
 // The line closing a fence, past any inside a template literal or a comment, such as a markdown front matter the code holds: a `---` line, consumed, or a labeled one opening the next fence, left to it.
