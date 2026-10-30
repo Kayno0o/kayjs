@@ -1,7 +1,8 @@
 import { safeUrl } from './url'
 
-// The characters a browser drops from a URL, and the scheme before the first colon.
+// The characters a browser drops from a URL; not shared with `url.ts`, whose island bundle grows when it exports it.
 const SKIPPED = /^[\0-\x20]+|[\t\n\r]/g
+
 let reporter: ((attribute: string, url: string, scheme: string) => void) | undefined
 
 // Told of each bound URL rewritten to `unsafe:`, which `kay dev` logs.

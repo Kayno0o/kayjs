@@ -117,8 +117,8 @@ export async function serveApi(app: Elysia, modules: ApiModule[], options: Actio
 
       const hooks = route.hooks as { body?: unknown, error?: unknown, beforeHandle?: unknown, detail?: { messages?: SocketLimits } } | undefined
 
-      // A string in a route's body takes the default bound an action's does; a model named by a string is left as registered.
-      if (hooks && typeof hooks.body === 'object' && hooks.body !== null)
+      // A string in a route's body takes the default bound an action's does; a model named by a string, another library's validator and a websocket's messages, which have limits of their own, are left as written.
+      if (hooks && route.method !== 'WS' && typeof hooks.body === 'object' && hooks.body !== null && !('~standard' in hooks.body))
         hooks.body = withDefaultBounds(hooks.body as TSchema)
 
       // Whichever way the module chains its `.ws()` (in a group, a guard or a used plugin), every websocket route is held to its limits.
