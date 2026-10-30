@@ -1365,6 +1365,13 @@
     @apply opacity-100;
   }
 
+  /* Out of the tab order too while hidden, so the tree stays one stop and only the focused row's controls are reachable. */
+  @media (hover: hover) {
+    .kui-tree-view-item:not(:hover, :focus-within) > .kui-tree-view-trailing {
+      @apply invisible;
+    }
+  }
+
   /* The window a plate is looked at through: it clips whatever runs past its edge, and the plate inside it carries the transform. */
   .kui-zoom-pane {
     @apply relative overflow-hidden select-none;

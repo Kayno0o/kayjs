@@ -18,11 +18,13 @@ A node with an `href` is a real link: a middle click or Ctrl+click opens it in a
 
 Without `selected`, the node whose `href` is the page's address is the selected one, on the server's HTML too, and it follows the page as it changes. A trailing slash and the hash are ignored, and an `href` with a query matches only an address with that query, which wins over an `href` without one. The link of the selected node carries `aria-current="page"`.
 
+The address is compared with the `href` as you wrote it, so on a site with a locale prefix, and on a page rendered once at build time, pass `selected` yourself. A query in an `href` must match the address's query exactly. A click that opens a new tab leaves the selection where it is.
+
 <Demo name="tree-view/links" />
 
 ## Row controls
 
-A `@trailing(node)` block draws controls at the end of each row, such as a star or a count. They are hidden until the row is hovered or holds focus, and always shown on a touch screen. A click or a key on them never selects the row or moves in the tree.
+A `@trailing(node)` block draws controls at the end of each row, such as a star or a count. They are hidden until the row is hovered or holds focus, and always shown on a touch screen. While hidden they are out of the tab order, so Tab reaches the controls of the focused row only. A click or a key on them never selects the row or moves in the tree.
 
 ## Context menu
 

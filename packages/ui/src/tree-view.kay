@@ -92,12 +92,16 @@ function pick(row: TreeRow<Id>) {
 
 // A branch's chevron opens or closes it, the rest of the row selects it, the row's own controls excepted; the keyboard does both through the row itself.
 function click(event: MouseEvent, row: TreeRow<Id>) {
-  const target = event.target as Element
+  const element = event.target as Element
 
-  if (target.closest('.kui-tree-view-trailing'))
+  if (element.closest('.kui-tree-view-trailing'))
     return
 
-  if (row.node.children && target.closest('.kui-tree-view-toggle'))
+  // A new-tab click on a link row leaves the page where it is, so the row stays unselected.
+  if (row.node.href !== undefined && (event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) && !element.closest('.kui-tree-view-toggle'))
+    return
+
+  if (row.node.children && element.closest('.kui-tree-view-toggle'))
     toggle(row.node.id)
   else
     pick(row)

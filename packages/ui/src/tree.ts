@@ -73,7 +73,7 @@ export function treeHere<Id extends TreeId>(nodes: readonly TreeNode<Id>[], addr
     for (const node of list) {
       const [own = '', ownQuery = ''] = node.href?.split('?') ?? []
 
-      if (node.href !== undefined && trimmed(own) === trimmed(path)) {
+      if (node.href?.startsWith('/') && trimmed(own) === trimmed(path)) {
         if (ownQuery.replace(HASH, '') === query)
           return node.id
 

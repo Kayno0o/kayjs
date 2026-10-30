@@ -70,6 +70,19 @@ test('a link row stays one tab stop with the link out of the tab order, and Ente
   expect([followed, picks]).toEqual(['/projects/alpha', ['alpha']])
 })
 
+test('a new-tab click on a link row leaves it unselected, a plain click selects', async () => {
+  const root = await tree()
+  const link = items(root)[1]!.querySelector('a')!
+
+  link.addEventListener('click', event => event.preventDefault())
+  link.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, ctrlKey: true }))
+  link.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, button: 1 }))
+  expect([picks, items(root)[1]!.getAttribute('aria-selected')]).toEqual([[], 'false'])
+
+  link.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }))
+  expect(picks).toEqual(['alpha'])
+})
+
 test('the arrow keys walk link rows as they walk any other', async () => {
   const root = await tree()
 
