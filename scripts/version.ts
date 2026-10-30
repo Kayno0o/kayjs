@@ -2,7 +2,7 @@ import process from 'node:process'
 import { $, Glob } from 'bun'
 import { BREAKING_FILE, breakingRefused } from './breaking'
 import { brokenLinks } from './links'
-import { ARCHIVES, failedPageTests, INDEX, LINKING, MAX_PAGE_BYTES, oversizedPages, releasePages, WHATS_NEW } from './whats-new'
+import { ARCHIVES, failedPageTests, INDEX, LINKING, MAX_PAGE_BYTES, oversizedPages, releasePages, restoreTree, WHATS_NEW } from './whats-new'
 import { ZED_MANIFEST, zedReleasable, zedRelease } from './zed-release'
 
 // `bun scripts/version.ts patch|minor|major`: kay and every library under packages/ move to one version, committed as `v<version>` and tagged, as `bun pm version` does for one package.
@@ -67,7 +67,7 @@ if (oversized.length > 0)
 const start = (await $`git rev-parse HEAD`.text()).trim()
 const tag = `v${version}`
 
-// The tree was clean, so a failure anywhere goes back to the commit it started from; the tag, made last, is never left behind.
+// The tree was clean, so a failure anywhere goes back to the commit it started from, files the release created included; the tag, made last, is never left behind.
 try {
   await Promise.all(texts.map(async ({ path, text }) => Bun.write(path, text.replace(VERSION, () => `"version": "${version}"`).replace(KAY_PEER, (_, head: string) => `${head}"${peer}"`))))
   await Promise.all([...pages].map(async ([path, text]) => Bun.write(path, text)))
@@ -89,7 +89,7 @@ try {
   await $`git tag ${tag}`
 }
 catch (error) {
-  await $`git reset -q --hard ${start}`
+  await restoreTree(start)
 
   throw error
 }

@@ -5,7 +5,7 @@ import type { LogEntry } from '../server/log'
 import type { TestPage } from './browser'
 import type { SiteScope } from './site-scope'
 import type { TestOptions, TestSite, Visit, VisitInit } from './site-types'
-import { readdirSync, readFileSync, rmSync, statSync, utimesSync } from 'node:fs'
+import { readdirSync, readFileSync } from 'node:fs'
 import { join, relative } from 'node:path'
 import process from 'node:process'
 import { afterAll, beforeEach } from 'bun:test'
@@ -46,6 +46,7 @@ import { testContent } from './content'
 import { cookieJar, withKept } from './cookies'
 import { checkOnly, lazyNativePlugins } from './lazy-plugins'
 import { NativeRequest, NativeURL, withNatives } from './natives'
+import { pruneTestOutputs, touchOutput, touchOutputIfOld } from './outputs'
 import { readPage, settledHtml, sitemapUrls } from './page'
 import { testRoot } from './root'
 import { actionsOf, formUrl, renderedStamp } from './site-actions'
@@ -114,45 +115,6 @@ async function recordFresh(stamps: BuildStamps): Promise<boolean> {
   }
 }
 
-// Decisions: a check build's output folder is named by its options key, so options that change per run (a random port, a temp root) leave one folder each. A folder not used for a day is removed; every use touches its mtime, so a folder a live worker of `bun test --parallel` still builds into or reads is never a day old, whichever worker prunes. Pruning runs once per root and process, and a race with a worker starting on a folder just past the day only rebuilds it.
-const STALE_OUTPUT_MS = 24 * 60 * 60 * 1000
-const TEST_OUTPUT = /^test-client(?:-\d+)?\.[0-9a-z]+$/
-const prunedRoots = new Set<string>()
-
-function touchOutput(root: string, output: string): void {
-  try {
-    const now = new Date()
-
-    utimesSync(join(root, KAY_DIR, output), now, now)
-  }
-  catch {}
-}
-
-function pruneTestOutputs(root: string, keep: string): void {
-  if (prunedRoots.has(root))
-    return
-
-  prunedRoots.add(root)
-
-  try {
-    const dir = join(root, KAY_DIR)
-
-    for (const name of readdirSync(dir)) {
-      if (name === keep || !TEST_OUTPUT.test(name))
-        continue
-
-      // Gone already when another worker pruned it first.
-      const used = statSync(join(dir, name), { throwIfNoEntry: false })
-
-      if (used === undefined || Date.now() - used.mtimeMs < STALE_OUTPUT_MS)
-        continue
-
-      rmSync(join(dir, name), { recursive: true, force: true })
-    }
-  }
-  catch {}
-}
-
 const builds = new Map<string, { key: string, stamps: BuildStamps, running: () => boolean, build: Promise<ClientBuild> }>()
 
 // One build per root and output, rebuilt when its options changed or a file it read did, as `kay dev`'s stamps tell, and one at a time: every build clears and rewrites its output, which the sites of a process share.
@@ -161,18 +123,21 @@ async function islandsBuilt(root: string, options: ClientOptions, inBrowser: boo
   const key = clientOptionsKey(options)
   const slot = `${root}\0${inBrowser}`
   const held = builds.get(slot)
+  // One output, and so one record, per options key: files alternating options each find the check they left.
+  const output = `test-client${testWorker()}.${Bun.hash(key).toString(36)}`
 
-  if (held?.key === key && (held.running() || await held.stamps.current()))
+  if (held?.key === key && (held.running() || await held.stamps.current())) {
+    if (!inBrowser)
+      touchOutputIfOld(root, output)
+
     return held.build
+  }
 
   // Another site asked for one while the stamps were compared.
   const latest = builds.get(slot)
 
   if (latest !== held && latest?.key === key)
     return latest.build
-
-  // One output, and so one record, per options key: files alternating options each find the check they left.
-  const output = `test-client${testWorker()}.${Bun.hash(key).toString(36)}`
 
   // A check build leaves its record in the output, so a later file of the run, or a later run, whose sources are the same builds nothing again.
   if (!inBrowser) {

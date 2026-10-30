@@ -264,6 +264,17 @@ export async function failedPageTests(tests: readonly string[] = ['tests/llms.te
   return code === 0 ? undefined : `${out}${err}`
 }
 
+// Puts a release's tree back to the commit it started from: `git reset --hard` restores the tracked files, and the untracked files the release created (a page split into a new file) go with `git clean`, which leaves ignored files alone. The tree was clean when the release began, so nothing of the user's is among them.
+export async function restoreTree(start: string, cwd = process.cwd()): Promise<void> {
+  for (const args of [['reset', '-q', '--hard', start], ['clean', '-q', '-f', '-d']]) {
+    const run = Bun.spawn(['git', ...args], { cwd, stdout: 'ignore', stderr: 'pipe' })
+    const [err, code] = await Promise.all([new Response(run.stderr).text(), run.exited])
+
+    if (code !== 0)
+      throw new Error(`git ${args[0]} failed: ${err}`)
+  }
+}
+
 // `bun scripts/whats-new.ts --cap` cuts `## Unreleased` of What's new and the newest minor of Upgrading to their caps, moving their oldest lines to the top of each archive as "continued", whose own oldest releases are dropped to stay under the 25,000 bytes (`--check` only reports, exiting 1, which `just land` runs as it never writes to the branch it lands).
 if (import.meta.main) {
   const check = process.argv.includes('--check')

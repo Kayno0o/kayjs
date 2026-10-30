@@ -1,7 +1,7 @@
 import { Glob } from 'bun'
 import { describe, expect, it } from 'bun:test'
 import { breakingRefused } from '../scripts/breaking'
-import { archiveOldest, capNewest, capUnreleased, failedPageTests, indexArchive, MAX_PAGE_BYTES, NEWEST_CAP, oversizedPages, releasePages, relinkMoved, stampUnreleased, trimArchive } from '../scripts/whats-new'
+import { archiveOldest, capNewest, capUnreleased, failedPageTests, indexArchive, MAX_PAGE_BYTES, NEWEST_CAP, oversizedPages, releasePages, relinkMoved, restoreTree, stampUnreleased, trimArchive } from '../scripts/whats-new'
 import { scratchDir } from './scratch'
 
 interface Manifest {
@@ -581,5 +581,43 @@ describe('the release\'s page tests', () => {
 
     expect(await failedPageTests([`${dir}/green.test.ts`])).toBeUndefined()
     expect(await failedPageTests([`${dir}/red.test.ts`])).toContain('says where markdownLoaded is imported from')
+  })
+})
+
+describe('the release\'s failure path', () => {
+  it('goes back to the starting commit when a page test fails, removing the files the release created and keeping ignored ones', async () => {
+    const dir = await scratchDir('release-restore-')
+    const git = async (...args: string[]) => {
+      const run = Bun.spawn(['git', '-c', 'user.name=t', '-c', 'user.email=t@t', ...args], { cwd: dir, stdout: 'pipe', stderr: 'pipe' })
+
+      await run.exited
+
+      return (await new Response(run.stdout).text()).trim()
+    }
+
+    await git('init', '-q')
+    await Bun.write(`${dir}/page.md`, 'old\n')
+    await Bun.write(`${dir}/.gitignore`, 'ignored.txt\n')
+    await git('add', '.')
+    await git('commit', '-q', '-m', 'start')
+
+    const start = await git('rev-parse', 'HEAD')
+
+    await Bun.write(`${dir}/page.md`, 'new\n')
+    await Bun.write(`${dir}/page-split.md`, 'a page split into a new file\n')
+    await Bun.write(`${dir}/ignored.txt`, 'kept\n')
+    await Bun.write(`${dir}/red.test.ts`, 'import { expect, it } from \'bun:test\'\nit(\'fails on the written pages\', () => expect(1).toBe(2))\n')
+
+    const failure = await failedPageTests([`${dir}/red.test.ts`])
+
+    expect(failure).toContain('fails on the written pages')
+
+    await restoreTree(start, dir)
+
+    expect(await Bun.file(`${dir}/page.md`).text()).toBe('old\n')
+    expect(await Bun.file(`${dir}/page-split.md`).exists()).toBe(false)
+    expect(await Bun.file(`${dir}/red.test.ts`).exists()).toBe(false)
+    expect(await Bun.file(`${dir}/ignored.txt`).exists()).toBe(true)
+    expect(await git('status', '--porcelain')).toBe('')
   })
 })
