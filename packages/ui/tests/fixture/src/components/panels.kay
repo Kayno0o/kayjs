@@ -15,6 +15,7 @@ const detailOpen = signal(true)
 const dockOpen = signal(true)
 const dockEdge = signal<'right' | 'bottom'>('right')
 const dockSize = signal<number | undefined>(undefined)
+const scrollKey = signal('mercury')
 const lateEdge = signal<'right' | 'bottom' | undefined>(undefined)
 ---
 button#open(onClick={() => open = true}) Open
@@ -45,6 +46,10 @@ SplitLayout#split(sidebarOpen={sidebarOpen()} onSidebarOpenChange={() => sidebar
     button#edit Edit
 SidePanel#docked(open={dockOpen()} modal={false} dock={dockEdge()} size={dockSize()} sizeKey={sizeKey} onSizeChange={(size, settled) => { dockSize = size; if (settled) onSettled?.(size) }} title="Jupiter" launcher="Open Jupiter" launcherLayer={41} style="z-index: 77; opacity: 0.9" onOpenChange={shown => dockOpen = shown})
   p#docked-body Fifth planet
+SidePanel#scrolled(open={true} modal={false} title="Venus" scrollKey={scrollKey()} onOpenChange={() => undefined})
+  p#scrolled-body Second planet
+button#next-scroll(onClick={() => scrollKey = 'venus'}) Next
+button#same-scroll(onClick={() => scrollKey = scrollKey()}) Same
 button#show-launched(onClick={() => launched = true}) Show launched
 if launched()
   SidePanel#launched(open={false} modal={false} dock="right" closeHref="/list" title="Saturn" launcher="Open Saturn" launcherHref="/saturn")

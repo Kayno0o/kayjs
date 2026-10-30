@@ -119,6 +119,27 @@ describe('SidePanel with modal={false}', () => {
   })
 })
 
+describe('SidePanel with a scrollKey', () => {
+  test('brings its body back to the top when the key changes, and leaves it when the key is set to the same value', async () => {
+    const root = await panels()
+    const body = root.querySelector<HTMLElement>('#scrolled [data-part=body]')!
+    const scrolls: number[] = []
+
+    body.scrollTo = ((_x: number, y: number) => void scrolls.push(y)) as typeof body.scrollTo
+    await settle()
+
+    click(root.querySelector('#same-scroll'))
+    await settle()
+
+    expect(scrolls).toEqual([])
+
+    click(root.querySelector('#next-scroll'))
+    await settle()
+
+    expect(scrolls).toEqual([0])
+  })
+})
+
 describe('SidePanel with a closeHref and no onOpenChange', () => {
   test('follows closeHref on Escape with no handler from the page', async () => {
     const root = await panels()

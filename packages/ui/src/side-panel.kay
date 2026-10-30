@@ -1,6 +1,6 @@
 ---
 import type { JSX, Snippet } from 'kay'
-import { effect, listen, navigate, onCleanup, persisted, recipe, signal } from 'kay'
+import { effect, listen, navigate, onCleanup, persisted, recipe, signal, untrack } from 'kay'
 import IconButton from './icon-button.kay'
 import { wording } from 'kay/words'
 
@@ -20,7 +20,7 @@ const look = recipe({
   },
 })
 
-const { open, title, actions, footer, modal = true, closeHref, launcher, launcherHref, launcherLayer, onOpenChange, closeLabel = wording('ui.sidePanel.close', 'Close'), dock, size, sizeKey, onSizeChange, resizeLabel = wording('ui.sidePanel.resize', 'Resize'), style, ...rest } = props<Omit<JSX.IntrinsicElements['dialog'], 'open' | 'class' | 'title' | 'onClose' | 'closedby' | 'closedBy' | 'style'> & {
+const { open, title, actions, footer, modal = true, closeHref, launcher, launcherHref, launcherLayer, onOpenChange, closeLabel = wording('ui.sidePanel.close', 'Close'), dock, size, sizeKey, onSizeChange, scrollKey, resizeLabel = wording('ui.sidePanel.resize', 'Resize'), style, ...rest } = props<Omit<JSX.IntrinsicElements['dialog'], 'open' | 'class' | 'title' | 'onClose' | 'closedby' | 'closedBy' | 'style'> & {
   // Shows the panel along the edge, as a modal unless `modal` is false; the parent sets it back to false in `onOpenChange`.
   open: boolean
   title: string
@@ -45,6 +45,8 @@ const { open, title, actions, footer, modal = true, closeHref, launcher, launche
   // Called with the size the grip reached: `settled` is false while a drag is under way and true once it ends or a key moved it, so a parent keeps it then.
   onSizeChange?: ((size: number, settled: boolean) => unknown) | undefined
   resizeLabel?: string | undefined
+  // When this value changes the body scrolls back to the top, for a panel kept in place (a `persist` island) while its content changes under it, as the next item of a list.
+  scrollKey?: string | number | undefined
 } & (
   // Makes the close control a link to this URL, for a panel open on the server whose close needs no JavaScript; the link navigates and `onOpenChange(false)` is called as well, so its handler need not navigate. Without an `onOpenChange`, Escape follows it too, so a server page renders the panel with no island of its own. Such a panel's `launcher` is a link to `launcherHref`, which the types ask for, as nothing else could open it.
   | { closeHref: string, onOpenChange?: undefined, launcher?: undefined, launcherHref?: undefined }
@@ -74,6 +76,7 @@ const reached = signal<number>()
 const launching = signal<HTMLElement>()
 // 0 stands for no size kept yet.
 const kept = sizeKey === undefined ? undefined : persisted<number>(sizeKey, 0)
+let body: HTMLElement | undefined
 const dragging = signal(false)
 let panel: HTMLDialogElement | undefined
 let frame = 0
@@ -265,6 +268,19 @@ effect(() => {
   onCleanup(() => root.style.getPropertyValue('--kay-panel-right') === px && root.style.removeProperty('--kay-panel-right'))
 })
 
+// The first value is the one the panel opens on.
+let seenKey = untrack(() => scrollKey)
+
+effect(() => {
+  const next = scrollKey
+
+  if (next === seenKey)
+    return
+
+  seenKey = next
+  body?.scrollTo(0, 0)
+})
+
 listen(() => window, 'resize', measureSoon)
 
 effect(() => {
@@ -306,7 +322,7 @@ dialog(part="root" aria-label={title} {...rest} open={renderedOpen} data-modal={
       h2(part="title") {title}
       | {actions}
       IconButton(icon="close" label={closeLabel} variant="ghost" href={closeHref} onClick={() => follows() || panel?.close()})
-    div(part="body")
+    div(part="body" ref={element => body = element})
       slot
     if footer
       div(part="footer")

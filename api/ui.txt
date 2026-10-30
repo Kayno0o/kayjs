@@ -1769,7 +1769,7 @@ component default
       root?: string | undefined;
     } | undefined;
   } | undefined;
-} | undefined; closeHref: string; closeLabel?: string | undefined; dock?: "bottom" | "right" | undefined; footer?: Element; launcher?: undefined; launcherHref?: undefined; launcherLayer?: number | undefined; modal?: boolean | undefined; onOpenChange?: undefined; onSizeChange?: ((size: number, settled: boolean) => unknown) | undefined; open: boolean; resizeLabel?: string | undefined; size?: number | undefined; sizeKey?: string | undefined; style?: string | undefined; title: string }
+} | undefined; closeHref: string; closeLabel?: string | undefined; dock?: "bottom" | "right" | undefined; footer?: Element; launcher?: undefined; launcherHref?: undefined; launcherLayer?: number | undefined; modal?: boolean | undefined; onOpenChange?: undefined; onSizeChange?: ((size: number, settled: boolean) => unknown) | undefined; open: boolean; resizeLabel?: string | undefined; scrollKey?: string | number | undefined; size?: number | undefined; sizeKey?: string | undefined; style?: string | undefined; title: string }
   | { actions?: Element; children?: Element; class?: string | {
   root?: string | undefined;
   grip?: string | undefined;
@@ -1783,7 +1783,7 @@ component default
       root?: string | undefined;
     } | undefined;
   } | undefined;
-} | undefined; closeHref: string; closeLabel?: string | undefined; dock?: "bottom" | "right" | undefined; footer?: Element; launcher: string; launcherHref: string; launcherLayer?: number | undefined; modal?: boolean | undefined; onOpenChange?: undefined; onSizeChange?: ((size: number, settled: boolean) => unknown) | undefined; open: boolean; resizeLabel?: string | undefined; size?: number | undefined; sizeKey?: string | undefined; style?: string | undefined; title: string }
+} | undefined; closeHref: string; closeLabel?: string | undefined; dock?: "bottom" | "right" | undefined; footer?: Element; launcher: string; launcherHref: string; launcherLayer?: number | undefined; modal?: boolean | undefined; onOpenChange?: undefined; onSizeChange?: ((size: number, settled: boolean) => unknown) | undefined; open: boolean; resizeLabel?: string | undefined; scrollKey?: string | number | undefined; size?: number | undefined; sizeKey?: string | undefined; style?: string | undefined; title: string }
   | { actions?: Element; children?: Element; class?: string | {
   root?: string | undefined;
   grip?: string | undefined;
@@ -1797,7 +1797,7 @@ component default
       root?: string | undefined;
     } | undefined;
   } | undefined;
-} | undefined; closeHref?: string | undefined; closeLabel?: string | undefined; dock?: "bottom" | "right" | undefined; footer?: Element; launcher?: string | undefined; launcherHref?: string | undefined; launcherLayer?: number | undefined; modal?: boolean | undefined; onOpenChange: (open: boolean) => unknown; onSizeChange?: ((size: number, settled: boolean) => unknown) | undefined; open: boolean; resizeLabel?: string | undefined; size?: number | undefined; sizeKey?: string | undefined; style?: string | undefined; title: string }
+} | undefined; closeHref?: string | undefined; closeLabel?: string | undefined; dock?: "bottom" | "right" | undefined; footer?: Element; launcher?: string | undefined; launcherHref?: string | undefined; launcherLayer?: number | undefined; modal?: boolean | undefined; onOpenChange: (open: boolean) => unknown; onSizeChange?: ((size: number, settled: boolean) => unknown) | undefined; open: boolean; resizeLabel?: string | undefined; scrollKey?: string | number | undefined; size?: number | undefined; sizeKey?: string | undefined; style?: string | undefined; title: string }
 
 [./site-favicon.kay] default
 component default

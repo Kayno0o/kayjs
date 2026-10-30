@@ -8,6 +8,10 @@ description: A panel along the edge of the screen, with a head, a body and an op
 
 `open` shows the panel and `onOpenChange(false)` is called however it closes: its close button, a click outside or Escape. Set `open` back to `false` there.
 
+## Scroll position
+
+A panel kept in place while its content changes, such as one in a `persist` island that shows the next item of a list, keeps the scroll of its body. Give `scrollKey` a value that names the content, an id for instance, and the body goes back to the top whenever it changes.
+
 ## Head actions
 
 `@actions` adds controls to the head line, before the close button, such as previous and next.
