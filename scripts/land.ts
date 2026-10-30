@@ -6,9 +6,10 @@ import { $, Glob } from 'bun'
 import { dependenciesOnly } from './dependency-change'
 import { librariesToTest, libraryDependencies } from './library-dependents'
 import { addedMarkers } from './merge-markers'
+import { describeScope, scopeMemory } from './scope-memory'
 import { readersOf, WHOLE_SUITE } from './source-readers'
 import { subprocessTests } from './subprocess-tests'
-import { failedTests } from './test-failures'
+import { crashedWorkers, failedTests } from './test-failures'
 
 // `just land`: this branch rebased on origin's main, linted, checked and run through the tests its changes reach, then pushed as main, and the main checkout moved to it. The full suite is CI's, on every push, which `just ci` follows.
 // Landings verify side by side and queue only for the push: the one that finds origin's main where its rebase left it pushes at once under the landing lock, one that finds it moved rebases and verifies again under the lock.
@@ -140,7 +141,7 @@ async function step(label: string, argv: string[], cwd = '.') {
   await settledWithin(drained, DRAIN_MS)
   // A process left holding the pipe would otherwise keep the landing alive once it is done.
   await reader.cancel()
-  await appendFile(LOG, '\n')
+  await appendFile(LOG, `\n(${describeScope(scopeMemory())})\n\n`)
 
   const seconds = Math.round((performance.now() - started) / 1000)
 
@@ -154,8 +155,12 @@ async function step(label: string, argv: string[], cwd = '.') {
   const lines = output.trimEnd().split('\n')
 
   const failures = failedTests(lines)
+  const crashed = crashedWorkers(lines).map(({ file, signal }) => `${file}: its worker was killed (${signal}) while it ran, which ${signal === 'SIGKILL' ? 'is the kernel stopping it for memory unless something else sent it, so not that file\'s own failure' : 'is not a failed test'}`)
 
-  console.error([...failures, lines.slice(failures.length > 0 ? -SUMMARY : -TAIL).join('\n')].join('\n\n'))
+  if (crashed.length > 0 || exitCode === 137)
+    crashed.push(describeScope(scopeMemory()))
+
+  console.error([...failures, ...crashed, lines.slice(failures.length > 0 ? -SUMMARY : -TAIL).join('\n')].filter(Boolean).join('\n\n'))
   fail(hung ? `${label} ran past ${STEP_LIMIT_MS / 1000} s, so it was killed with what it started: its output up to then is in ${LOG}` : `${label} exited with ${exitCode}: its whole output is in ${LOG}`, EXIT.step)
 }
 

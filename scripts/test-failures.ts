@@ -26,3 +26,14 @@ export function failedTests(lines: string[]): string[] {
 
   return blocks
 }
+
+const CRASH = /^✗ (\S+) \(worker crashed: (\w+)\)/
+
+// The files whose bun test worker was killed rather than failed, with the signal: a SIGKILL while the session's memory ran out is the scope's, not that file's.
+export function crashedWorkers(lines: string[]): { file: string, signal: string }[] {
+  return lines.flatMap((line) => {
+    const found = CRASH.exec(line)
+
+    return found ? [{ file: found[1]!, signal: found[2]! }] : []
+  })
+}

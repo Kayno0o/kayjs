@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test'
-import { failedTests } from '../scripts/test-failures'
+import { crashedWorkers, failedTests } from '../scripts/test-failures'
 
 const ERROR = ['270 |     expect(lifetimes).toEqual([30 * DAY, 90 * DAY])', 'error: expect(received).toEqual(expected)', '      at <anonymous> (tests/session.test.ts:270:23)']
 
@@ -20,5 +20,14 @@ describe('failed tests in a bun test run', () => {
     const lines = Array.from({ length: 12 }, (_, index) => `(fail) test ${index}`)
 
     expect(failedTests(lines)).toEqual([...lines.slice(0, 10), 'and 2 more failed tests'])
+  })
+})
+
+describe('crashed workers in a bun test run', () => {
+  it('names the file whose worker was killed and the signal', () => {
+    const lines = ['a.test.ts:', '✗ tests/markdown.test.ts (worker crashed: SIGKILL)', '(pass) other', '✗ tests/x.test.ts (worker crashed: SIGSEGV)']
+
+    expect(crashedWorkers(lines)).toEqual([{ file: 'tests/markdown.test.ts', signal: 'SIGKILL' }, { file: 'tests/x.test.ts', signal: 'SIGSEGV' }])
+    expect(crashedWorkers(['(fail) a test'])).toEqual([])
   })
 })

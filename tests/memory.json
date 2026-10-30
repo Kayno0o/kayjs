@@ -1,0 +1,26 @@
+{
+  "version": 1,
+  "files": {
+    "tests/new.test.ts": 2029,
+    "tests/forms.test.ts": 1249,
+    "tests/check.test.ts": 1210,
+    "tests/docs.test.ts": 1137,
+    "tests/browser.test.ts": 1056,
+    "tests/docs-contrast.test.ts": 1047,
+    "tests/formats.test.ts": 918,
+    "tests/screenshot.test.ts": 844,
+    "tests/build.test.ts": 702,
+    "tests/production.test.ts": 697,
+    "tests/extensions.test.ts": 688,
+    "tests/live-presence.test.ts": 617,
+    "tests/images.test.ts": 542,
+    "tests/lsp.test.ts": 504,
+    "tests/dev.test.ts": 449,
+    "tests/kept-image.test.ts": 449,
+    "tests/kept-pages.test.ts": 406,
+    "tests/scope.test.ts": 266,
+    "tests/dev-start.test.ts": 177,
+    "tests/markdown.test.ts": 153,
+    "tests/test-site-close.test.ts": 131
+  }
+}
