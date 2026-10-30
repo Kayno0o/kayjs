@@ -1,5 +1,6 @@
 ---
-import type { Axis, ChartRect, FixedScaleAxis, LineChart as LineChartClass, LineChartOptions } from 'chartist'
+import type { Axis, AxisFactory, ChartRect, LineChartData, LineChartPresetOptions } from 'chartist'
+import type { DrawEvent, LineChartCreatedEvent } from 'chartist/compat'
 import type { JSX } from 'kay'
 import type { ChartSeries } from './plot'
 import { effect, memo, onCleanup, onMount, recipe, signal, uid } from 'kay'
@@ -7,6 +8,17 @@ import type { LabelContext } from './chart-axis'
 import { chartData, headings, indexAt, labelTimes, positionOf, stackValues, totalAt, xAxisOptions } from './chart-axis'
 import { dashSample, PALETTE, SERIES_DASHES, steppedPoint } from './plot'
 import { wording } from 'kay/words'
+
+// What kayjs-ui uses of the 1.x chart object chartist 2 hands to a legacy plugin.
+interface LegacyChart {
+  on: {
+    (event: 'created', listener: (event: LineChartCreatedEvent) => void): unknown
+    (event: 'data', listener: () => void): unknown
+    (event: 'draw', listener: (event: DrawEvent) => void): unknown
+  }
+  update: (data: LineChartData, options: LineChartPresetOptions, override: boolean) => unknown
+  detach: () => unknown
+}
 
 // Which attribute of each drawn part takes its series' colour.
 const PAINT: Record<string, string> = { line: 'stroke', point: 'stroke', area: 'fill' }
@@ -54,7 +66,7 @@ const { labels, series, formatValue = (value: number) => value.toLocaleString(),
   // Names each series under the chart; shown by default once there is more than one.
   legend?: boolean | undefined
   // Merged over the defaults, for what the props do not cover.
-  options?: LineChartOptions | undefined
+  options?: LineChartPresetOptions | undefined
   // Lets a drag across the plot, or Shift with the arrow keys then Enter, pick a span, handed over as the indices of its first and last points, such as to zoom in on it.
   onRange?: ((from: number, to: number) => unknown) | undefined
   // Tells screen readers how to pick a span from the keyboard, once the chart takes `onRange`.
@@ -75,7 +87,7 @@ const dashes = memo(() => series.map((_, index) => stacked ? '' : SERIES_DASHES[
 // The room the y labels measured for themselves: the widest one, which chartist would wrap at its default 30 px, and their height, which the top tick's label rises above the plot by.
 const fit = signal({ width: 0, height: 0 })
 
-const settings = (fixedScale: typeof FixedScaleAxis): LineChartOptions => {
+const settings = (fixedScale: AxisFactory): LineChartPresetOptions => {
   const padding = typeof options?.chartPadding === 'object' ? options.chartPadding : {}
 
   return {
@@ -200,15 +212,16 @@ onMount(() => {
     tipSize = { width, height, wide: document.documentElement.clientWidth, high: document.documentElement.clientHeight }
   })
 
-  const drawing = signal<{ chart: InstanceType<typeof LineChartClass>, fixedScale: typeof FixedScaleAxis } | null>(null)
+  const drawing = signal<{ chart: LegacyChart, fixedScale: AxisFactory } | null>(null)
   let gone = false
-  let chart: InstanceType<typeof LineChartClass> | undefined
+  let chart: LegacyChart | undefined
 
   void (async () => {
     let loaded: typeof import('chartist')
+    let compat: typeof import('chartist/compat')
 
     try {
-      loaded = await import('chartist')
+      ;[loaded, compat] = await Promise.all([import('chartist'), import('chartist/compat')])
     }
     catch (error) {
       console.error('kayjs-ui: LineChart draws with chartist, which could not be loaded; install it with `bun add chartist`', error)
@@ -216,12 +229,19 @@ onMount(() => {
       return
     }
 
-    const { LineChart, FixedScaleAxis: fixedScale } = loaded
-
     if (gone)
       return
 
-    chart = new LineChart(canvas!, { series: [] }, {})
+    // Chartist 2 hands a legacy plugin the 1.x chart object (`on`, `update`, `detach`) whose `draw`, `created` and `data` events carry the drawn elements and the plot.
+    const plugin = compat.fromLegacyPlugin((legacy: LegacyChart) => {
+      chart = legacy
+    })
+
+    loaded.lineChart(canvas!, { series: [] }, { plugins: [plugin] })
+
+    if (!chart)
+      return
+
     chart.on('created', (event) => {
       plot = { rect: event.chartRect, axisY: event.axisY }
       fitLabels()
@@ -252,7 +272,7 @@ onMount(() => {
 
       event.element.attr({ style: `${paint}: ${colors()[event.seriesIndex]}${dash ? `; stroke-dasharray: ${dash}` : ''}` })
     })
-    drawing = { chart, fixedScale }
+    drawing = { chart, fixedScale: loaded.fixedScaleAxis() }
   })()
 
   effect(() => {

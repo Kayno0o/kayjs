@@ -1243,7 +1243,7 @@ component default
   labels: string[]
   legend?: boolean | undefined
   onRange?: ((from: number, to: number) => unknown) | undefined
-  options?: LineChartOptions<AxisOptions, AxisOptions> | undefined
+  options?: LineChartPresetOptions | undefined
   rangeHint?: string | undefined
   series: ChartSeries[]
   stacked?: boolean | undefined

@@ -1,6 +1,6 @@
 import type { LabelContext } from '../src/chart-axis'
 import { describe, expect, test } from 'bun:test'
-import { FixedScaleAxis } from 'chartist'
+import { fixedScaleAxis } from 'chartist'
 import { chartData, headings, indexAt, labelTimes, positionOf, stackValues, tickIndices, tickTexts, totalAt, xAxisOptions } from '../src/chart-axis'
 
 const DAYS = ['2026-01-01', '2026-01-02', '2026-01-11']
@@ -45,15 +45,15 @@ describe('chart axis', () => {
   })
 
   test('labels only the ticks, as dates on a time axis and as written otherwise', () => {
-    expect(xAxisOptions(DAYS, labelTimes(DAYS), false, FixedScaleAxis)).toEqual({ showLabel: false, showGrid: false })
+    expect(xAxisOptions(DAYS, labelTimes(DAYS), false, fixedScaleAxis())).toEqual({ showLabel: false, showGrid: false })
 
-    const timed = xAxisOptions(DAYS, labelTimes(DAYS), true, FixedScaleAxis)
+    const timed = xAxisOptions(DAYS, labelTimes(DAYS), true, fixedScaleAxis())
 
     expect(timed.ticks).toEqual(labelTimes(DAYS)!)
     expect(timed.labelInterpolationFnc?.(labelTimes(DAYS)![2]!, 2)).toBe('11 Jan')
 
     const labels = ['10:00', '10:05', '10:10', '10:15', '10:20', '10:25']
-    const plain = xAxisOptions(labels, null, true, FixedScaleAxis)
+    const plain = xAxisOptions(labels, null, true, fixedScaleAxis())
 
     expect(labels.map((label, index) => plain.labelInterpolationFnc?.(label, index))).toEqual(['10:00', '10:05', null, '10:15', '10:20', '10:25'])
   })
@@ -64,7 +64,7 @@ describe('chart axis', () => {
 
     expect(positionOf(1, 3, times)).toBeCloseTo(0.25)
 
-    const axis = xAxisOptions(hours, times, true, FixedScaleAxis)
+    const axis = xAxisOptions(hours, times, true, fixedScaleAxis())
 
     expect(times.map((time, index) => axis.labelInterpolationFnc?.(time, index))).toEqual(['10:00', '10:30', '12:00'])
   })
@@ -72,7 +72,7 @@ describe('chart axis', () => {
   test('labels the ticks of a span under a day with times, and a longer one with days', () => {
     const day = ['2026-10-21T00:00:00', '2026-10-21T23:59:00']
     const days = ['2026-10-21T00:00:00', '2026-10-22T00:00:00']
-    const label = (labels: string[]) => xAxisOptions(labels, labelTimes(labels), true, FixedScaleAxis).labelInterpolationFnc?.(labelTimes(labels)![0]!, 0)
+    const label = (labels: string[]) => xAxisOptions(labels, labelTimes(labels), true, fixedScaleAxis()).labelInterpolationFnc?.(labelTimes(labels)![0]!, 0)
 
     expect(label(day)).toBe('00:00')
     expect(label(days)).toBe('21 Oct')
@@ -99,12 +99,12 @@ describe('chart axis', () => {
 
     expect(headings(labels, times, format)).toEqual(['<2026-10-21T10:00:00>', '<2026-10-21T10:00:30>', '<2026-10-21T10:01:00>'])
 
-    const axis = xAxisOptions(labels, times, true, FixedScaleAxis, format)
+    const axis = xAxisOptions(labels, times, true, fixedScaleAxis(), format)
 
     expect(times.map((time, index) => axis.labelInterpolationFnc?.(time, index))).toEqual(['<2026-10-21T10:00:00>', '<2026-10-21T10:00:30>', '<2026-10-21T10:01:00>'])
     expect(seen).toEqual(['tooltip:0:60000:true', 'tooltip:1:60000:true', 'tooltip:2:60000:true', 'tick:0:60000:true', 'tick:1:60000:true', 'tick:2:60000:true'])
 
-    const plain = xAxisOptions(['a', 'b', 'c', 'd', 'e', 'f'], null, true, FixedScaleAxis, (label, { place }) => `${place}-${label}`)
+    const plain = xAxisOptions(['a', 'b', 'c', 'd', 'e', 'f'], null, true, fixedScaleAxis(), (label, { place }) => `${place}-${label}`)
 
     expect(plain.labelInterpolationFnc?.('a', 0)).toBe('tick-a')
     expect(plain.labelInterpolationFnc?.('c', 2)).toBeNull()

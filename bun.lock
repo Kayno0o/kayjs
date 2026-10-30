@@ -148,7 +148,7 @@
         "@iconify-json/tabler": "^1.2.42",
         "@kaynooo/eslint": "^7.1.4",
         "@types/bun": "^1.4.4",
-        "chartist": "^1.5.0",
+        "chartist": "2.0.0",
         "elysia": "^1.4.30",
         "hls.js": "^1.7.0",
         "leaflet": "^1.9.4",
@@ -157,7 +157,7 @@
       },
       "peerDependencies": {
         "@iconify-json/tabler": "^1.2.42",
-        "chartist": "^1.5.0",
+        "chartist": "^2.0.0",
         "hls.js": "^1.7.0",
         "kay": "~1.83.0",
         "leaflet": "^1.9.4",
@@ -585,7 +585,7 @@
 
     "character-entities-legacy": ["character-entities-legacy@3.0.0", "", {}, "sha512-RpPp0asT/6ufRm//AJVwpViZbGM/MkjQFxJccQRHmISF/22NBtsHqAWmL+/pmkPWoIUJdWyeVleTl1wydHATVQ=="],
 
-    "chartist": ["chartist@1.5.0", "", {}, "sha512-mcCJuWHpNqkJucuWEeHxymQCQEeAOkamGypqCV5+C+uI2NF4I3BOn/tjIuZaowJVNAcrY9BG3janLaCWSNVPDw=="],
+    "chartist": ["chartist@2.0.0", "", {}, "sha512-lFGQaf0BGchzjpKuzuONYuBGivUVLLRT7r50ZOElf1YfzMWm3aDErQNGVjeg91kig2b6cg0fTM2FDc1Li+ulCw=="],
 
     "ci-info": ["ci-info@4.4.0", "", {}, "sha512-77PSwercCZU2Fc4sX94eF8k8Pxte6JAwL4/ICZLFjJLqegs7kCuAsqqj/70NQF6TvDpgFjkubQB2FW2ZZddvQg=="],
 

@@ -1,3 +1,4 @@
 kay [./server] SessionSettings
 kay [.] IslandProp
+ui [./line-chart.kay] default
 ui [./rating.kay] default

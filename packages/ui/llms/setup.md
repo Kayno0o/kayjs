@@ -12,7 +12,7 @@ kay add ui
 
 It installs the package and `@iconify-json/tabler` (needing Tailwind in the app) and lists `ui()` from `@kaynooo/kayjs-ui/extension` in `extensions` in kay.config.ts. That one line brings the theme, a `Toaster` and a `TooltipHost` on every page, outside the app's layouts, so no layout or stylesheet names them. Doing it by hand, `bun add @kaynooo/kayjs-ui @iconify-json/tabler` and add `ui()`. The extension's stylesheet comes before the app's, so the app's own `@theme` overrides win.
 
-Three peers are optional, installed only when used: `chartist` for `LineChart`, `leaflet` for `MapView`, `hls.js` for an `.m3u8` video in a browser without native HLS.
+Three peers are optional, installed only when used: `chartist` (2.x) for `LineChart`, `leaflet` for `MapView`, `hls.js` for an `.m3u8` video in a browser without native HLS.
 
 `ui()` is the whole setup. An app writing the theme itself, as before, still works: `src/app.css`, imported by the root `_layout.kay`, imports it right after Tailwind. kay collects the classes of the library's templates along with the app's own, so no `@source` line has to point into `node_modules`:
 

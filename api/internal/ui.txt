@@ -512,7 +512,9 @@ function tickTexts(labels: string[], times: number[] | null, format?: LabelForma
 function totalAt(series: { values: (number | null)[]; }[], index: number): number
 
 [./lib/chart-axis] xAxisOptions
-function xAxisOptions(labels: string[], times: number[] | null, showLabels: boolean, fixedScale: typeof FixedScaleAxis, format?: LabelFormat | undefined): AxisOptions
+function xAxisOptions(labels: string[], times: number[] | null, showLabels: boolean, fixedScale: AxisFactory, format?: LabelFormat | undefined): Omit<AxisOptions, "type"> & {
+  readonly type?: AxisFactory | LegacyAxisClass;
+}
 
 [./lib/claim] claim
 function claim(job: "toaster" | "tooltips"): () => boolean
