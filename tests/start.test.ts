@@ -38,6 +38,13 @@ function start(dir: string, ...args: string[]): Subprocess<'ignore', 'pipe', 'pi
   return Bun.spawn([process.execPath, cli, 'start', dir, ...args], { stdin: 'ignore', stdout: 'pipe', stderr: 'pipe' })
 }
 
+// With the shell's HOST set to `host`, or deleted for undefined, whatever the machine running the test exports.
+function startWithHost(dir: string, host: string | undefined, ...args: string[]): Subprocess<'ignore', 'pipe', 'pipe'> {
+  const { HOST: _, ...env } = process.env
+
+  return Bun.spawn([process.execPath, cli, 'start', dir, ...args], { stdin: 'ignore', stdout: 'pipe', stderr: 'pipe', env: host === undefined ? env : { ...env, HOST: host } })
+}
+
 // In a process group of its own, as a shell runs a command, for the test to signal the group as Ctrl-C does.
 function startGroup(dir: string, ...args: string[]): Subprocess<'ignore', 'pipe', 'pipe'> {
   return Bun.spawn([process.execPath, cli, 'start', dir, ...args], { stdin: 'ignore', stdout: 'pipe', stderr: 'pipe', detached: true })
@@ -235,15 +242,18 @@ describe('kay start', () => {
     expect((await listening(start(dir))).warned).toContain('the build is older than .kay/scratch/')
   }, 60_000)
 
-  it('sets HOST from --host over the shell\'s', async () => {
+  it('sets HOST from --host over the shell\'s, with one worker or several', async () => {
     await build()
     await rm(join(outputDir(dir), 'executable'), { force: true })
 
-    for (const [args, expected] of [[['--host', '127.0.0.1'], '127.0.0.1'], [['--host=127.0.0.1'], '127.0.0.1'], [[], 'unset']] as const) {
+    // The shell's HOST is 'shell' except in the last case, where there is none.
+    for (const [args, shell, expected] of [[['--host', '127.0.0.1'], 'shell', '127.0.0.1'], [['--host=127.0.0.1'], 'shell', '127.0.0.1'], [['--workers', '2', '--host', '127.0.0.1'], 'shell', '127.0.0.1'], [[], 'shell', 'shell'], [[], undefined, 'unset']] as const) {
       const port = String(freePort())
 
-      await listening(start(dir, '--port', port, ...args), async () => {
-        expect(await (await fetch(`http://127.0.0.1:${port}/host`)).text()).toBe(expected)
+      await listening(startWithHost(dir, shell, '--port', port, ...args), async () => {
+        const reached = await fetch(`http://127.0.0.1:${port}/host`)
+
+        expect(await reached.text()).toBe(expected)
       })
     }
   }, 60_000)
