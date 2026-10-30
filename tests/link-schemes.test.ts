@@ -4,6 +4,7 @@ import { attribute } from '../src/runtime/html'
 import { trustSchemes } from '../src/runtime/url'
 import { onUnsafeUrl } from '../src/runtime/url-report'
 import { linkSchemes } from '../src/server/link-schemes'
+import { answeringRequest } from '../src/server/log'
 import { reportUnsafeUrls } from '../src/server/unsafe-urls'
 import { pages } from './shared-pages'
 
@@ -153,6 +154,22 @@ describe('links: { schemes }', () => {
       expect(lines.find(line => line.includes('webcal://example.com/events.ics'))).toContain('the bound href "webcal://example.com/events.ics"')
       expect(lines.find(line => line.includes('javascript:alert(1)'))).toContain('none may')
       expect(lines.every(line => line.includes('/'))).toBe(true)
+    }
+    finally {
+      warn.mockRestore()
+    }
+  })
+
+  it('cuts a long page path in the report, as it cuts a long URL', async () => {
+    const warn = spyOn(console, 'warn').mockImplementation(() => undefined)
+    const path = `/${'p'.repeat(150)}`
+
+    try {
+      reportUnsafeUrls()
+      await answeringRequest(new Request(`http://localhost${path}`), async () => attribute('href', 'webcal://x'))
+      const line = warn.mock.calls.map(call => call.join(' ')).find(text => text.includes('rewritten to unsafe:'))!
+
+      expect(line).toContain(`${path.slice(0, 100)}...: the bound href`)
     }
     finally {
       warn.mockRestore()

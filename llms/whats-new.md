@@ -2,6 +2,10 @@
 
 What each release of kay and its libraries adds, newest first, each feature with where it is documented. kay and its libraries share one version, so one section covers them all; what a release breaks is in [Upgrading](upgrading.md).
 
+## Unreleased
+
+- A string with a `date-time`, `date` or `time` format no longer takes the 10,000 character default, so the OpenAPI document and the tool schemas show a date as its format alone: [API routes](api-routes.md).
+
 ## 1.84.0
 
 - `page.back()` and `page.forward()` on a page opened with `javaScript: false` no longer fail now and then with `Inspected target navigated or closed` when the browser loads the entry as a new document: [testing in a browser](testing-browser.md).

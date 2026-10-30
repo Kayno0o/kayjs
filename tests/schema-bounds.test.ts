@@ -24,6 +24,14 @@ describe('the default bound of an action\'s strings', () => {
     expect((fields.either as unknown as { anyOf: { maxLength?: number }[] }).anyOf[0]!.maxLength).toBe(DEFAULT_MAX_LENGTH)
   })
 
+  it('leaves a date string without a bound, as its format already limits it', () => {
+    const fields = fieldsOf(bounded(t.Object({ at: t.String({ format: 'date-time' }), day: t.String({ format: 'date' }), when: t.Date() })))
+
+    expect(fields.at!.maxLength).toBeUndefined()
+    expect(fields.day!.maxLength).toBeUndefined()
+    expect(JSON.stringify(fields.when)).not.toContain('maxLength')
+  })
+
   it('keeps a bound the schema declares, an enum, a const, and a secret', () => {
     const fields = fieldsOf(bounded(t.Object({ title: t.String({ maxLength: 40 }), kind: t.String({ enum: ['a'] }), fixed: t.String({ const: 'x' }), password: t.String() })))
 

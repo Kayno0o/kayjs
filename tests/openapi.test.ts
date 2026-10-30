@@ -51,7 +51,7 @@ describe('the OpenAPI document', () => {
   it('gives a body as JSON, a Date as its text, and a body holding a file as multipart', async () => {
     const { paths } = await documented()
 
-    expect(paths['/api/items']!.post!.requestBody).toEqual({ required: true, content: { 'application/json': { schema: { type: 'object', required: ['name', 'added'], properties: { name: { maxLength: 10000, type: 'string' }, added: { anyOf: [{ format: 'date-time', maxLength: 10000, type: 'string' }, { format: 'date', maxLength: 10000, type: 'string' }, { type: 'number' }] } } } } } })
+    expect(paths['/api/items']!.post!.requestBody).toEqual({ required: true, content: { 'application/json': { schema: { type: 'object', required: ['name', 'added'], properties: { name: { maxLength: 10000, type: 'string' }, added: { anyOf: [{ format: 'date-time', type: 'string' }, { format: 'date', type: 'string' }, { type: 'number' }] } } } } } })
     expect(paths['/api/items']!.post!.tags).toEqual(['items'])
     expect(Object.keys((paths['/api/items/photo']!.post!.requestBody as { content: object }).content)).toEqual(['multipart/form-data'])
   })

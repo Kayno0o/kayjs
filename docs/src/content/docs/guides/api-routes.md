@@ -134,6 +134,8 @@ export default api({ rateLimit: { max: 60, window: '1m' } })
 
 A route sets its own limit and its own `maxSize` in its `detail`. The module's limit applies to it as well.
 
+A string in a route's `body` is refused past 10,000 characters, with Elysia's usual 422, unless its schema sets a `maxLength`, an `enum` or a `const`, or it is a date. A field that takes more text sets its own: `s.String({ maxLength: 100_000 })`. The request body limit still applies on top, so raise `maxSize` too when a body can be larger than the module's.
+
 `key` counts a person instead of an address, as it does for an action. The limit counts after the guards, so a caller they refuse costs no allowance. Stores and the other options are in [Rate limits](/guides/security#rate-limits).
 
 <ReadMore href="/llms/api-routes#limits">Lists of limits, shared stores, params and the order they count in.</ReadMore>

@@ -4,6 +4,8 @@ import { isSecret } from './form'
 // The longest a string field of an action takes when its schema declares no bound of its own: room for a long message, under the request body limit.
 export const DEFAULT_MAX_LENGTH = 10_000
 
+// A string of these formats is as long as its format allows, so a bound beside it only adds noise to the document, as `t.Date`'s `date-time` shows.
+const FORMATTED = new Set(['date-time', 'date', 'time'])
 const WRAPPERS = ['anyOf', 'oneOf', 'allOf'] as const
 const NESTED = ['items', 'additionalProperties', 'not'] as const
 
@@ -15,7 +17,7 @@ function bounded(value: unknown, field: string | undefined): unknown {
   return isSchema(value) ? withDefaultBounds(value, field) : value
 }
 
-// A copy of an action's schema in which every string field with no `maxLength`, `enum` or `const` of its own takes `DEFAULT_MAX_LENGTH`, so a schema written with Elysia's `t` is bounded too and the server, the form's `maxlength` and the tool's schema read one bound. A field named like a secret, which is checked or hashed rather than kept, is left alone.
+// A copy of an action's schema in which every string field with no `maxLength`, `enum`, `const` or date format of its own takes `DEFAULT_MAX_LENGTH`, so a schema written with Elysia's `t` is bounded too and the server, the form's `maxlength` and the tool's schema read one bound. A field named like a secret, which is checked or hashed rather than kept, is left alone.
 export function withDefaultBounds<Schema extends TSchema>(schema: Schema, field?: string): Schema {
   const node = schema as Record<string, unknown>
 
@@ -24,7 +26,7 @@ export function withDefaultBounds<Schema extends TSchema>(schema: Schema, field?
 
   const copy: Record<PropertyKey, unknown> = { ...node }
 
-  if (node.type === 'string' && node.maxLength === undefined && !('enum' in node) && !('const' in node))
+  if (node.type === 'string' && node.maxLength === undefined && !('enum' in node) && !('const' in node) && !FORMATTED.has(node.format as string))
     copy.maxLength = DEFAULT_MAX_LENGTH
 
   for (const keyword of ['properties', 'patternProperties'] as const) {
