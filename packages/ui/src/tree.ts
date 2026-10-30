@@ -1,6 +1,7 @@
 import type { IconProps } from 'kay/icons'
 import type { IconSlot } from './defaults'
 import type { MenuEntry } from './menu'
+import { currentTab } from './tab-nav'
 
 export type TreeId = string | number
 
@@ -54,43 +55,30 @@ export function treePath<Id extends TreeId>(nodes: readonly TreeNode<Id>[], id: 
   return undefined
 }
 
-const HASH = /#.*$/
-const TRAILING_SLASHES = /\/+$/
-
-const trimmed = (path: string) => path.replace(HASH, '').replace(TRAILING_SLASHES, '') || '/'
-
 // Whether any node, at any depth, has a context menu to open.
 export function treeHasMenu<Id extends TreeId>(nodes: readonly TreeNode<Id>[]): boolean {
   return nodes.some(node => (node.menu?.length ?? 0) > 0 || (node.children !== undefined && treeHasMenu(node.children)))
 }
 
-// The node whose `href` is the page's address: the one naming its query too when there is one, else the first with its path.
-export function treeHere<Id extends TreeId>(nodes: readonly TreeNode<Id>[], address: string): Id | undefined {
-  const [path = '', query = ''] = address.split('?')
-  let samePath: Id | undefined
+// The first node whose `href` is the page `current` names, by the rule of TabNav's current tab: the same path with every param the link sets matching, the link setting the most params winning.
+export function treeHere<Id extends TreeId>(nodes: readonly TreeNode<Id>[], current: URL): Id | undefined {
+  const linked: TreeNode<Id>[] = []
 
-  const search = (list: readonly TreeNode<Id>[]): Id | undefined => {
+  const collect = (list: readonly TreeNode<Id>[]) => {
     for (const node of list) {
-      const [own = '', ownQuery = ''] = node.href?.split('?') ?? []
+      if (node.href?.startsWith('/'))
+        linked.push(node)
 
-      if (node.href?.startsWith('/') && trimmed(own) === trimmed(path)) {
-        if (ownQuery.replace(HASH, '') === query)
-          return node.id
-
-        if (ownQuery === '')
-          samePath ??= node.id
-      }
-
-      const below = node.children && search(node.children)
-
-      if (below !== undefined)
-        return below
+      if (node.children)
+        collect(node.children)
     }
-
-    return undefined
   }
 
-  return search(nodes) ?? samePath
+  collect(nodes)
+
+  const href = currentTab(linked.map(node => ({ href: node.href! })), current)
+
+  return linked.find(node => node.href === href)?.id
 }
 
 // What a key does on the focused row, as the ARIA tree pattern has it: the row to focus, or a branch to open or close.

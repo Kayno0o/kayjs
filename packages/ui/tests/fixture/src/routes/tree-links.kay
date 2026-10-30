@@ -1,0 +1,10 @@
+---
+import type { TreeNode } from '@kaynooo/kayjs-ui'
+import TreeView from '@kaynooo/kayjs-ui/tree-view.kay'
+
+const nodes: TreeNode[] = [
+  { id: 'group', label: 'Group', children: [{ id: 'here', label: 'Here', href: '/tree-links' }, { id: 'other', label: 'Other', href: '/tree-links?view=b' }] },
+]
+---
+main
+  TreeView#links(nodes={nodes} label="Links")

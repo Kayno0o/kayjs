@@ -2085,7 +2085,7 @@ type ToastType = 'error' | 'success' | 'info'
 function treeHasMenu<Id extends TreeId>(nodes: readonly TreeNode<Id>[]): boolean
 
 [./lib/tree] treeHere
-function treeHere<Id extends TreeId>(nodes: readonly TreeNode<Id>[], address: string): Id | undefined
+function treeHere<Id extends TreeId>(nodes: readonly TreeNode<Id>[], current: URL): Id | undefined
 
 [./lib/tree] TreeId
 type TreeId = string | number

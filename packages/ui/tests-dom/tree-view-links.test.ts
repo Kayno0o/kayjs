@@ -43,7 +43,7 @@ test('a node with an href is a real link, the one for the current address select
   expect(items(root).map(row => [row.querySelector('a')?.getAttribute('href') ?? null, row.getAttribute('aria-selected'), row.querySelector('a')?.getAttribute('aria-current') ?? null])).toEqual([
     [null, 'false', null],
     ['/projects/alpha', 'false', null],
-    ['/projects/beta/', 'true', 'page'],
+    ['/projects/beta', 'true', 'page'],
     ['/projects/beta?view=list', 'false', null],
     [null, 'false', null],
   ])

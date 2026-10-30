@@ -40,7 +40,7 @@ function target() {
 
   const here = address()
 
-  return here === undefined ? undefined : treeHere(nodes, here)
+  return here === undefined ? undefined : treeHere(nodes, new URL(here, 'http://kay.invalid'))
 }
 
 const path = (id: TreeId | undefined) => id === undefined ? undefined : treePath(nodes, id)

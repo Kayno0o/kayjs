@@ -1251,3 +1251,20 @@ test('SplitLayout and SidePanel draw the width a visitor kept in a cookie from t
   expect(attr((await find('/kept-sizes', '#split'))[0]!, 'style')).toContain('--_split-list-width: 260px')
   expect(attr((await find('/kept-sizes', '#panel'))[0]!, 'style')).toContain('width: 384px')
 })
+
+describe('TreeView link rows', () => {
+  const selected = async (path: string) => (await attributes(path, '#links [role=treeitem]', ['aria-selected', 'aria-expanded'])).map(row => `${row['aria-selected']} ${row['aria-expanded']}`)
+
+  test('the server marks the node whose href is the page and opens the branch holding it', async () => {
+    expect(await selected('/tree-links')).toEqual(['false true', 'true null', 'false null'])
+    expect(await selected('/tree-links?view=b')).toEqual(['false true', 'false null', 'true null'])
+  })
+
+  test('the link of the selected node is the current page', async () => {
+    expect(await attributes('/tree-links', '#links a', ['href', 'aria-current'])).toEqual([{ 'href': '/tree-links', 'aria-current': 'page' }, { 'href': '/tree-links?view=b', 'aria-current': null }])
+  })
+
+  test('on a page of another locale the address is not compared with the hrefs as the site prefixes them, so nothing is selected', async () => {
+    expect(await selected('/fr/tree-links')).toEqual(['false false'])
+  })
+})

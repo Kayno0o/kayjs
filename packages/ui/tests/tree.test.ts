@@ -65,20 +65,21 @@ test('takes numbers as ids, 0 included', () => {
 describe('treeHere', () => {
   const linked: TreeNode[] = [
     { id: 'all', label: 'All', href: '/projects' },
-    { id: 'group', label: 'Group', children: [{ id: 'beta', label: 'Beta', href: '/projects/beta/' }, { id: 'list', label: 'List', href: '/projects/beta?view=list#top' }] },
+    { id: 'group', label: 'Group', children: [{ id: 'beta', label: 'Beta', href: '/projects/beta' }, { id: 'list', label: 'List', href: '/projects/beta?view=list' }, { id: 'anchor', label: 'Anchor', href: '#top' }] },
     { id: 'home', label: 'Home', href: '/' },
   ]
+  const at = (address: string) => treeHere(linked, new URL(address, 'http://kay.invalid'))
 
-  test('gives the node whose href is the address, ignoring a trailing slash and the hash', () => {
-    expect([treeHere(linked, '/projects'), treeHere(linked, '/projects/beta'), treeHere(linked, '/')]).toEqual(['all', 'beta', 'home'])
+  test('gives the node whose href is the page, as TabNav marks its current tab', () => {
+    expect([at('/projects'), at('/projects/beta'), at('/')]).toEqual(['all', 'beta', 'home'])
   })
 
-  test('prefers the node naming the query, else falls back to the one with the path alone', () => {
-    expect([treeHere(linked, '/projects/beta?view=list'), treeHere(linked, '/projects/beta?view=grid'), treeHere(linked, '/projects/beta?page=2')]).toEqual(['list', 'beta', 'beta'])
+  test('prefers the node setting the most params the page has, else the one with the path alone', () => {
+    expect([at('/projects/beta?view=list'), at('/projects/beta?view=grid'), at('/projects/beta?page=2&view=list')]).toEqual(['list', 'beta', 'list'])
   })
 
-  test('gives nothing for an address no href names, and a path is not matched by a prefix of it', () => {
-    expect([treeHere(linked, '/elsewhere'), treeHere(linked, '/projects/be')]).toEqual([undefined, undefined])
+  test('gives nothing for a page no href names, a hash-only href never naming one', () => {
+    expect([at('/elsewhere'), at('/projects/be'), at('/projects/beta/')]).toEqual([undefined, undefined, undefined])
   })
 })
 

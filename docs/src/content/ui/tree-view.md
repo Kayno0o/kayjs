@@ -18,7 +18,7 @@ A node with an `href` is a real link: a middle click or Ctrl+click opens it in a
 
 Without `selected`, the node whose `href` is the page's address is the selected one, on the server's HTML too, and it follows the page as it changes. A trailing slash and the hash are ignored, and an `href` with a query matches only an address with that query, which wins over an `href` without one. The link of the selected node carries `aria-current="page"`.
 
-The address is compared with the `href` as you wrote it, so on a site with a locale prefix, and on a page rendered once at build time, pass `selected` yourself. A query in an `href` must match the address's query exactly. A click that opens a new tab leaves the selection where it is.
+The address is compared with the `href` as you wrote it, so on a site with a locale prefix, and on a page rendered once at build time, pass `selected` yourself. The match is TabNav's: the same path, every param the `href` sets present in the address, the `href` setting the most params winning. A click that opens a new tab leaves the selection where it is.
 
 <Demo name="tree-view/links" />
 
