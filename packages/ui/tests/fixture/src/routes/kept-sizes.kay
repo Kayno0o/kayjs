@@ -1,0 +1,13 @@
+---
+import SplitLayout from '@kaynooo/kayjs-ui/split-layout.kay'
+import SidePanel from '@kaynooo/kayjs-ui/side-panel.kay'
+import '../app.css'
+---
+main
+  SplitLayout#split(resizableList listWidthKey="kept-list")
+    @list
+      p List
+    @detail
+      p Detail
+  SidePanel#panel(open modal={false} dock="right" sizeKey="kept-pane" title="Kept" closeHref="/")
+    p Body

@@ -8,7 +8,7 @@ The `@list` and `@detail` blocks fill the two panes. Below the `md` breakpoint o
 
 ## Resizable list
 
-`resizableList` adds a handle on the list's right edge, dragged or moved with the arrow keys. `listWidthKey` keeps the width in `localStorage` from one visit to the next.
+`resizableList` adds a handle on the list's right edge, dragged or moved with the arrow keys. `listWidthKey` keeps the width in a cookie of that name from one visit to the next. The server reads the cookie too, so the list is drawn at the saved width from the first paint, with no jump on load. A width an earlier version kept in `localStorage` under the same key moves to the cookie once.
 
 <Demo name="split-layout/resizable" />
 

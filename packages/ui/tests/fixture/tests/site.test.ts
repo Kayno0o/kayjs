@@ -2,7 +2,7 @@ import type { Found } from 'kay/test'
 import { readdir } from 'node:fs/promises'
 import { join } from 'node:path'
 import { describe, expect, test } from 'bun:test'
-import { testSite } from 'kay/test'
+import { persistedCookie, testSite } from 'kay/test'
 import { testWorker } from '../../../../../src/build/assets'
 import { resolveClasses } from '../../../../../src/runtime/class-table'
 
@@ -1240,4 +1240,14 @@ test('TabNav of a query param renders on the server with the other params kept a
 
   expect(links).toEqual([{ 'href': '/tab-nav-param?tab=findings&period=7d', 'aria-current': null }, { 'href': '/tab-nav-param?tab=hosts&period=7d', 'aria-current': 'page' }, { 'href': '/tab-nav-param?tab=ports&period=7d', 'aria-current': null }])
   expect((await attributes('/tab-nav-param', '#tabs a', ['aria-current'])).map(link => link['aria-current'])).toEqual(['page', null, null])
+})
+
+test('SplitLayout and SidePanel draw the width a visitor kept in a cookie from the first paint', async () => {
+  const kept = await site.as(`${persistedCookie('kept-list', 340)}; ${persistedCookie('kept-pane', 500)}`).visit('/kept-sizes')
+  const style = (page: { find: (selector: string) => Found[] }, selector: string) => attr(page.find(selector)[0]!, 'style')
+
+  expect(style(kept, '#split')).toContain('--_split-list-width: 340px')
+  expect(style(kept, '#panel')).toContain('width: 500px')
+  expect(attr((await find('/kept-sizes', '#split'))[0]!, 'style')).toContain('--_split-list-width: 260px')
+  expect(attr((await find('/kept-sizes', '#panel'))[0]!, 'style')).toContain('width: 384px')
 })

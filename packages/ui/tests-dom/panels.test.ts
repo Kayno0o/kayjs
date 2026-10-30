@@ -12,6 +12,13 @@ afterEach(() => {
   mounted?.unmount()
   closes = 0
   localStorage.clear()
+
+  for (const cookie of document.cookie.split('; ')) {
+    const name = cookie.slice(0, Math.max(0, cookie.indexOf('=')))
+
+    if (name !== '')
+      document.cookie = `${name}=; max-age=0; path=/`
+  }
 })
 
 async function panels(listWidthKey?: string) {
@@ -467,6 +474,24 @@ describe('SplitLayout', () => {
     root = await panels('planets-width')
 
     expect(width()).toEqual(['200px', '200'])
+  })
+
+  test('moves a width an earlier version kept in localStorage to the cookie, once', async () => {
+    localStorage.setItem('planets-old', '340')
+
+    const root = await panels('planets-old')
+    const width = () => root.querySelector<HTMLElement>('#split')!.style.getPropertyValue('--_split-list-width')
+
+    await settle()
+
+    expect(width()).toBe('340px')
+    expect(document.cookie).toContain('planets-old=')
+
+    localStorage.setItem('planets-old', '500')
+    mounted!.unmount()
+    mounted = await mountComponent(Panels, { onClose: () => closes++, listWidthKey: 'planets-old' })
+
+    expect(mounted.root.querySelector<HTMLElement>('#split')!.style.getPropertyValue('--_split-list-width')).toBe('340px')
   })
 
   test('resizes the list by dragging its separator, a cancelled drag keeping the width it reached', async () => {

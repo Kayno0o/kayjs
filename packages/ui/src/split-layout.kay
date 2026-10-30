@@ -1,6 +1,6 @@
 ---
 import type { JSX, Snippet } from 'kay'
-import { effect, mediaQuery, onMount, recipe, signal, untrack } from 'kay'
+import { effect, mediaQuery, onMount, persisted, recipe, signal, untrack } from 'kay'
 import IconButton from './icon-button.kay'
 import { wording } from 'kay/words'
 
@@ -27,14 +27,16 @@ const { list, detail, listHead, detailHead, sidebar, sidebarTitle = '', detailOp
   onSidebarOpenChange?: ((open: boolean) => unknown) | undefined
   // A handle on the list's right edge, from `md` up, dragged or moved with the arrow keys.
   resizableList?: boolean | undefined
-  // The `localStorage` key the list's width is kept under, from one visit to the next.
+  // The name of the cookie the list's width is kept in, from one visit to the next, which the server reads, so the saved width is drawn from the first paint with no jump.
   listWidthKey?: string | undefined
   resizeLabel?: string | undefined
   backLabel?: string | undefined
   style?: string | undefined
 }>()
 
-const listWidth = signal(WIDTH.default)
+// 0 stands for no width kept yet.
+const kept = listWidthKey ? persisted<number>(listWidthKey, 0) : undefined
+const listWidth = signal(clampWidth(untrack(() => kept?.()) || WIDTH.default))
 const narrow = mediaQuery(NARROW)
 let sidebarPane: HTMLElement | undefined
 let detailPane: HTMLElement | undefined
@@ -97,16 +99,18 @@ function clampWidth(px: number): number {
   return Math.min(WIDTH.max, Math.max(WIDTH.min, px))
 }
 
-// Read once mounted, since the server has no storage: the page renders at the default width, then takes the kept one.
+// A width an earlier version kept in localStorage moves to the cookie once.
 onMount(() => {
-  if (!listWidthKey)
+  if (!listWidthKey || !kept || kept())
     return
 
   try {
     const stored = Number(localStorage.getItem(listWidthKey))
 
-    if (stored)
+    if (stored) {
       listWidth = clampWidth(stored)
+      kept = listWidth()
+    }
   }
   catch {
     // Storage can be blocked; the default width stands.
@@ -114,15 +118,8 @@ onMount(() => {
 })
 
 function remember() {
-  if (!listWidthKey)
-    return
-
-  try {
-    localStorage.setItem(listWidthKey, String(listWidth()))
-  }
-  catch {
-    // Storage can be blocked; the width just lasts the visit.
-  }
+  if (kept)
+    kept = listWidth()
 }
 
 function startResize(event: PointerEvent) {
