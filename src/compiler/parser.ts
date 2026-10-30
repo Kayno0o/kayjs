@@ -15,8 +15,8 @@ const TAG_NAME = /[A-Z][\w-]*/iy
 const ID_NAME = /[\w-]+/y
 // What separates the words of a class value: not `\s`, whose non-breaking space is part of a word.
 const WHITESPACE_RUN = /[ \t\r\n]+/g
-// A number, a name or a dotted path written where an attribute's value goes, without quotes or braces, followed by the end of the attributes, a comma or the next attribute.
-const BARE_VALUE = /^(?:-?\d+(?:\.\d+)?|[a-z_$][\w$]*(?:\.[a-z_$][\w$]*)*)(?=\s*(?:[,)\n]|$)|\s+[\w@:])/i
+// A number, a name or a dotted path written where an attribute's value goes, without quotes or braces, a keyword starting an expression (`typeof x`, `new Foo`) left out, followed by the end of the attributes, a comma or the next attribute.
+const BARE_VALUE = /^(?!(?:typeof|new|void|delete|await|yield|function|class|async)\b)(?:-?\d+(?:\.\d+)?|[a-z_$][\w$]*(?:\.[a-z_$][\w$]*)*)(?=\s*(?:[,)\n]|$)|\s+[\w@:])/i
 // A `class="` that ends its line, which opens a value over several lines.
 const LINE_BREAK_AFTER = /[ \t]*\r?\n/y
 const ATTRIBUTE_NAME = /[A-Z_@:][\w\-:.@]*/iy

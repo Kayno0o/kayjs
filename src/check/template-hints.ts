@@ -31,22 +31,95 @@ const TAG_NAME = /^[\w$.:-]+$/
 const NAME_CHAR = /[\w:$-]/
 const CHECKBOX = /\btype\s*=\s*["']checkbox["']/
 
-// The end of the group opened at `open`, a bracket of `pair`, past strings and nested brackets.
+// What may stand before a `/` that starts a regular expression rather than divides.
+const REGEX_BEFORE = /[(,=:[!&|?{};+\-*%<>~^]$/
+const REGEX_KEYWORD = /(?:^|[^\w$])(?:return|typeof|case|of|in|void|delete|throw|yield|await)$/
+
+// The index after the string, template, comment or regular expression starting at `at`, or `at` when none does.
+function literalEnd(source: string, at: number): number {
+  const char = source[at]
+
+  if (char === '"' || char === '\'') {
+    for (let index = at + 1; index < source.length; index++) {
+      if (source[index] === '\\')
+        index++
+      else if (source[index] === char)
+        return index + 1
+    }
+
+    return source.length
+  }
+
+  if (char === '`')
+    return templateEnd(source, at)
+
+  if (char !== '/')
+    return at
+
+  if (source[at + 1] === '/') {
+    const lineEnd = source.indexOf('\n', at)
+
+    return lineEnd === -1 ? source.length : lineEnd
+  }
+
+  if (source[at + 1] === '*') {
+    const end = source.indexOf('*/', at + 2)
+
+    return end === -1 ? source.length : end + 2
+  }
+
+  const before = source.slice(Math.max(0, at - 12), at).trimEnd()
+
+  if (before !== '' && !REGEX_BEFORE.test(before) && !REGEX_KEYWORD.test(before))
+    return at
+
+  let inClass = false
+
+  for (let index = at + 1; index < source.length && source[index] !== '\n'; index++) {
+    const next = source[index]
+
+    if (next === '\\')
+      index++
+    else if (next === '[')
+      inClass = true
+    else if (next === ']')
+      inClass = false
+    else if (next === '/' && !inClass)
+      return index + 1
+  }
+
+  return at
+}
+
+// The index after the template literal opened at `open`, its `${}` holes read as code.
+function templateEnd(source: string, open: number): number {
+  for (let index = open + 1; index < source.length; index++) {
+    const char = source[index]
+
+    if (char === '\\') {
+      index++
+    }
+    else if (char === '`') {
+      return index + 1
+    }
+    else if (char === '$' && source[index + 1] === '{') {
+      index = closing(source, index + 1, '{}') - 1
+    }
+  }
+
+  return source.length
+}
+
+// The end of the group opened at `open`, a bracket of `pair`, past strings, templates, comments, regular expressions and nested brackets.
 function closing(source: string, open: number, pair: '()' | '{}'): number {
   let depth = 0
-  let quote = ''
 
   for (let index = open; index < source.length; index++) {
     const char = source[index]!
+    const end = literalEnd(source, index)
 
-    if (quote !== '') {
-      if (char === '\\')
-        index++
-      else if (char === quote)
-        quote = ''
-    }
-    else if (char === '"' || char === '\'' || char === '`') {
-      quote = char
+    if (end > index) {
+      index = end - 1
     }
     else if (char === pair[0]) {
       depth++
@@ -155,7 +228,7 @@ const elseIf: Row = (diagnostic, source, _span, tsx) => {
     return 'duplicate'
 
   // The source maps the tag loosely, so it is the nth line opening on the name that stands for the nth such tag of the generated code.
-  const ordinal = tsx.slice(0, diagnostic.start).split(`<${name}`).length - 1
+  const ordinal = [...tsx.slice(0, diagnostic.start).matchAll(new RegExp(`<${name}(?![\\w$-])`, 'g'))].length
   const token = [...source.matchAll(new RegExp(`^[ \\t]*${name}(?![\\w$-])`, 'gm'))][ordinal]
 
   if (!token)

@@ -607,6 +607,10 @@ describe('diagnostics', () => {
     expect(helps('Card(a=3px)\n')[0]).toBe('`a={...}`')
     expect(helps('Card(a=b?.c)\n')[0]).toBe('`a={...}`')
     expect(helps('Card(a=foo(1))\n')[0]).toBe('`a={...}`')
+    expect(helps('Card(a=typeof x)\n')[0]).toBe('`a={...}`')
+    expect(helps('Card(a=new Foo)\n')[0]).toBe('`a={...}`')
+    expect(helps('Card(a=await x)\n')[0]).toBe('`a={...}`')
+    expect(helps('Card(a=newest b=typeofx)\n')).toEqual(['`a={newest}`', '`b={typeofx}`'])
   })
 
   it('keeps node spans on the source they came from', () => {

@@ -75,6 +75,18 @@ describe('hints for the first template mistakes', () => {
     expect(nested.map(error => [error[0], error[3]])).toEqual([[7, 'kay writes it as two words, `else if condition`'], [9, 'kay writes it as two words, `else if condition`']])
   })
 
+  it('counts an elif tag by its whole name, a longer tag opening the same way not shifting the ordinal', async () => {
+    const found = errors(await report('---\nconst a = true\n---\ndiv\n  elifx\n  if a\n    p a\n  elif a\n    p b\n'))
+
+    expect(found.filter(error => error[3] !== undefined).map(error => error[0])).toEqual([8])
+  })
+
+  it('ends a handler\'s braces past a regular expression, a comment and a template holding a quote or a brace', async () => {
+    const found = await report('---\nconst bump = (value: unknown) => {}\n---\nbutton(onClick={bump(/\'/)}) go\nbutton(onClick={bump(`a ${\'}\'} b`)}) go\nbutton(onClick={bump(1 /* \' */)}) go\n')
+
+    expect(found.filter(d => d.help !== undefined).map(d => [d.line, d.help!.slice(0, d.help!.indexOf(' runs as'))])).toEqual([[4, '`bump(/\'/)`'], [5, '`bump(`a ${\'}\'} b`)`'], [6, '`bump(1 /* \' */)`']])
+  })
+
   it('adds no help to valid handlers and binds', async () => {
     const found = await report('---\nimport { signal } from "kay"\nconst text = signal("")\nconst bump = () => {}\n---\nbutton(onClick={() => bump()}) go\nbutton(onClick={bump}) go\nlabel Name\n  input(type="text" bind:value={text})\n')
 
@@ -92,5 +104,15 @@ describe('hints for the first template mistakes', () => {
 
     expect((await report(page('// kay-allow hydration-mismatch\n'))).map(d => d.code)).toEqual([])
     expect((await report(page(''))).map(d => d.code)).toEqual(['hydration-mismatch'])
+  })
+
+  it('lets a kay-allow comment above a clock read chained over several lines cover it, and one inside a template expression', async () => {
+    const chained = (above: string) => `---\nimport { signal } from "kay"\nconst n = signal(0)\n${above}const stamp = new Date()\n  .toLocaleDateString()\n---\nbutton(onClick={() => n++}) {n()} {stamp}\n`
+    const inline = (above: string) => `---\nimport { signal } from "kay"\nconst n = signal(0)\n---\n${above}button(onClick={() => n++}) {n()} {new Date().getFullYear()}\n`
+
+    expect((await report(chained('// kay-allow hydration-mismatch\n'))).map(d => d.code)).toEqual([])
+    expect((await report(chained(''))).map(d => d.code).toSorted()).toEqual(['hydration-mismatch', 'hydration-mismatch'])
+    expect((await report(inline('// kay-allow hydration-mismatch\n'))).map(d => d.code)).toEqual([])
+    expect((await report(inline(''))).map(d => d.code)).toEqual(['hydration-mismatch'])
   })
 })

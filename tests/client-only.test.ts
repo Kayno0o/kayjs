@@ -300,6 +300,8 @@ describe('values an island renders differently on the server and in the browser'
     expect(compile(file)).toEqual([])
     expect(compile(year, { 'hydration-mismatch': 'warn' })).toEqual([['hydration-mismatch', 'warning']])
     expect(compile(year, { 'hydration-mismatch': 'allow' })).toEqual([])
+    expect(compile(year, { islands: 'warn' })).toEqual([['hydration-mismatch', 'warning']])
+    expect(compile(year, { islands: 'allow' })).toEqual([])
   })
 
   it('leaves alone what both sides compute alike, what runs in the browser only, and a static component', () => {
