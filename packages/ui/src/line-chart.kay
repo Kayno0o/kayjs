@@ -5,6 +5,7 @@ import type { JSX } from 'kay'
 import type { ChartSeries } from './plot'
 import { effect, memo, onCleanup, onMount, recipe, signal, uid } from 'kay'
 import type { LabelContext } from './chart-axis'
+import { loadCompat } from './chartist'
 import { chartData, headings, indexAt, labelTimes, positionOf, stackValues, totalAt, xAxisOptions } from './chart-axis'
 import { dashSample, PALETTE, SERIES_DASHES, steppedPoint } from './plot'
 import { wording } from 'kay/words'
@@ -222,7 +223,7 @@ onMount(() => {
     let compat: typeof import('chartist/compat')
 
     try {
-      ;[loaded, compat] = await Promise.all([import('chartist'), import('chartist/compat')])
+      ;[loaded, compat] = await Promise.all([import('chartist'), loadCompat()])
     }
     catch (error) {
       console.error('kayjs-ui: LineChart draws with chartist, which could not be loaded; install chartist 2 with `bun add chartist@^2`', error)
