@@ -1773,6 +1773,40 @@ describe.concurrent('kay check, edge cases', () => {
     }
   })
 
+  it('replays a failed bun check while nothing it read has changed, runs it for an edited file, and never keeps an unresolved import', async () => {
+    const root = await scratchProject({ 'src/a.ts': 'export const a: number = \'a\'\n', 'src/routes/index.kay': 'p hi\n' })
+    const stamp = async () => (await Bun.file(join(root, '.kay/cache/check/clean.json')).json() as { value: { started: number } }).value.started
+
+    try {
+      const fresh = await check(root)
+
+      expect(fresh.map(d => [basename(d.file), d.code])).toEqual([['a.ts', 'TS2322']])
+      await startedLater(root, 3_600_000)
+
+      const kept = await stamp()
+
+      expect(await check(root)).toEqual(fresh)
+      expect(await stamp()).toBe(kept)
+
+      await startedLater(root, -3_600_000)
+      await Bun.write(join(root, 'src/a.ts'), 'export const a: number = 1\nexport const b: string = 2\n')
+      expect((await check(root)).map(d => [basename(d.file), d.line, d.code])).toEqual([['a.ts', 2, 'TS2322']])
+      expect(await stamp()).not.toBe(kept)
+
+      await Bun.write(join(root, 'src/a.ts'), 'import { x } from \'./missing\'\nexport const a = x\n')
+      expect((await check(root)).map(d => d.code)).toEqual(['TS2307'])
+
+      const after = await stamp()
+
+      await Bun.write(join(root, 'src/missing.ts'), 'export const x = 1\n')
+      expect(await check(root)).toEqual([])
+      expect(await stamp()).not.toBe(after)
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
   it('runs bun check again when a package.json appears above a file it read, or a lock file does', async () => {
     const root = await scratchProject({ 'src/a.ts': 'export const a: number = 1\n' })
 

@@ -24,6 +24,8 @@ const CLOCK_SLACK = 1000
 const SUMMARY_LINE = /^(?:Found \d+ errors?\b|✓ No type errors |note: | +\d+ +\S.*:\d+$|$)/
 const LISTED_FILE = /^(?:bundled:|\/|[A-Za-z]:[\\/])/
 const LINE_BREAK = /\r?\n/
+// Cannot find a module, a type definition file or a file: the one that would answer is not among the files read, so a run that printed one is never kept.
+const UNRESOLVED = /\b(?:TS2307|TS2688|TS2792|TS6053|TS5083|TS18003)\b/
 const LOCK_FILES = ['bun.lock', 'bun.lockb']
 
 // What tsgo or `bun check` printed, one diagnostic a line, the lines after one that start no other added to its message.
@@ -144,7 +146,7 @@ function extendedConfig(dir: string, name: string): string | undefined {
   return undefined
 }
 
-// Runs `bun check`, or not at all when its last run was clean and nothing it read has changed since: a warm run is then a handful of `stat` calls.
+// Runs `bun check`, or not at all when its last run ended as it did (clean, or failing with what it printed, replayed) and nothing it read has changed since: a warm run is then a handful of `stat` calls.
 // `program` names the run among the several of one project, each keeping its own state.
 export async function typecheck(root: string, tsconfig: string, shown: string | undefined, program = '', timeout = CHECK_TIMEOUT): Promise<{ output: string, errors: string, code: number }> {
   const { cache, types: shadowDir } = projectPaths(root)
@@ -157,7 +159,7 @@ export async function typecheck(root: string, tsconfig: string, shown: string | 
   const checked = last && await stillClean(last, shadowDir)
 
   if (checked?.clean)
-    return { output: '', errors: '', code: 0 }
+    return last.result ?? { output: '', errors: '', code: 0 }
 
   const obsolete = dropObsoleteState(state)
   const generated = checked?.hashes ?? await contentHashes(shadowDir)
@@ -181,8 +183,9 @@ export async function typecheck(root: string, tsconfig: string, shown: string | 
   if (stopped)
     return { output, errors: `kay: bun check did not finish within ${timeout / 1000} s and was stopped`, code: 1 }
 
-  if (slot && code === 0 && output === '' && errors === '')
-    await writeCacheEntry(slot, { started, ...filesRead(root, listed.filter(file => !Object.hasOwn(generated, file))), generated } satisfies CleanRun)
+  // A failed run is kept too, replayed while nothing it read has changed, unless it failed on something the listed files cannot show would change: a file or module that was not found.
+  if (slot && errors === '' && (code === 0 ? output === '' : !UNRESOLVED.test(output)))
+    await writeCacheEntry(slot, { started, ...filesRead(root, listed.filter(file => !Object.hasOwn(generated, file))), generated, ...code === 0 ? {} : { result: { output, errors, code } } } satisfies CleanRun)
 
   return { output, errors, code }
 }
@@ -219,6 +222,8 @@ interface CleanRun {
   missing: string[]
   // What kay wrote to the shadow tree just before the run, by content: it rewrites a file there on every check that changes it, too close to the run for its times to tell.
   generated: Record<string, string>
+  // What a failed run printed, replayed as it is; absent for a clean one.
+  result?: { output: string, errors: string, code: number }
 }
 
 // `bun check` lists the files it read but not the package.json files that decide how each is read, so the ones in the folders above them are added, with the lock files above the project, which an install changes.
