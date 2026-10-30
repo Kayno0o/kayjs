@@ -28,8 +28,8 @@ import { fixtureCopy, scratchDir } from './scratch'
 const fixtures = join(import.meta.dir, 'fixtures')
 // Inside the checkout too, but where `bun pm pack` never looks, so a folder a test holds unreadable there does not fail the pack of kay `kay new` runs beside it.
 const UNPACKED = join(import.meta.dir, '../node_modules/.cache')
-// Tests on a scratch project of their own run together, but four checks at most at a time, as `bun check` is multithreaded itself; a test's wait for its turn counts in its timeout. Every test of a file waits at once, so the last one waits for all the others, which a host busy with other suites stretches past 30 s.
-const turn = limiter(4)
+// Tests on a scratch project of their own run together, but two checks at most at a time, as `bun check` is multithreaded itself; a test's wait for its turn counts in its timeout. Every test of a file waits at once, so the last one waits for all the others, which a host busy with other suites stretches past 30 s.
+const turn = limiter(2)
 
 setDefaultTimeout(90_000)
 

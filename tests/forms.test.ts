@@ -377,7 +377,7 @@ describe('a form naming its fields with field and showing their messages with er
 
 describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('an island form posting to an action', () => {
   it('hydrates the page a refused post renders as the server drew it, the field filled in and marked', async () => {
-    const page = await site.open('/', { path })
+    await using page = await site.open('/', { path })
 
     await page.fill('form.signup input', 'nope')
     await page.click('button.post')
@@ -390,7 +390,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('an island 
   })
 
   it('shows the page again once a call went through, unless the call says not to', async () => {
-    const page = await site.open('/', { path })
+    await using page = await site.open('/', { path })
     const before = Number(await page.text('p.tally'))
 
     await page.click('button.bump')
@@ -420,7 +420,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('an island 
   })
 
   it('shows a form\'s pending block while that form posts, and no other\'s, hiding it with the answer', async () => {
-    const page = await site.open('/pending', { path })
+    await using page = await site.open('/pending', { path })
 
     // The reset Tailwind's preflight writes for `hidden`, which a rule of the page's own must beat.
     await page.evaluate(() => {
@@ -441,7 +441,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('an island 
   })
 
   it('hides it again once the post was refused', async () => {
-    const page = await site.open('/pending', { path })
+    await using page = await site.open('/pending', { path })
 
     await page.click('form.refused button')
     await page.waitFor('form.refused[aria-busy]')
@@ -455,7 +455,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('an island 
   })
 
   it('shows it while a post that redirects is in flight, the page it leads to replacing it', async () => {
-    const page = await site.open('/pending', { path })
+    await using page = await site.open('/pending', { path })
 
     await page.click('form.leaves button')
     await page.waitFor('form.leaves[aria-busy]')
@@ -467,7 +467,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('an island 
   })
 
   it('shows the block of an island\'s form while its submit handler awaits a call', async () => {
-    const page = await site.open('/pending', { path })
+    await using page = await site.open('/pending', { path })
 
     await page.click('form.island button')
     await page.waitFor('form.island[aria-busy]')
@@ -481,7 +481,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('an island 
   })
 
   it('keeps it shown until the page a redirect leads to is in, not only while the post is in flight', async () => {
-    const page = await site.open('/pending', { path })
+    await using page = await site.open('/pending', { path })
 
     await page.click('form.late button')
     await page.waitFor('form.late[aria-busy]')
@@ -537,7 +537,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('an island 
   }
 
   it('keeps it shown while a redirect to another origin loads, and hides it again when the page comes back from the cache', async () => {
-    const page = await site.open('/pending', { path })
+    await using page = await site.open('/pending', { path })
 
     await slowAway(async (url) => {
       process.env.KAY_PENDING_AWAY = url
@@ -556,7 +556,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('an island 
   })
 
   it('hides it again after the grace when the load it was kept shown for is a file the browser saves, not a page', async () => {
-    const page = await site.open('/pending', { path })
+    await using page = await site.open('/pending', { path })
 
     // The ten-second grace is cut to a moment for the test.
     await page.evaluate(() => {
@@ -574,7 +574,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('an island 
   })
 
   it('keeps it shown while the page reloads after an answer that was lost', async () => {
-    const page = await site.open('/pending', { path })
+    await using page = await site.open('/pending', { path })
 
     // The upload went whole, then the connection failed: the action has run, so the page loads rather than the form posting again.
     await page.evaluate(() => {
@@ -601,7 +601,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('an island 
   })
 
   it('follows a form whose action is written with `with`, as the action itself', async () => {
-    const page = await site.open('/pending', { path })
+    await using page = await site.open('/pending', { path })
 
     await page.click('form.with button')
     await page.waitUntil(() => document.querySelector('form.with [data-kay-pending] > *')?.checkVisibility() === true)
@@ -610,7 +610,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('an island 
   })
 
   it('shows an island form\'s block while its action has a call in flight, whichever way the handler or a button made it', async () => {
-    const page = await site.open('/pending', { path })
+    await using page = await site.open('/pending', { path })
 
     for (const name of ['fire', 'click']) {
       expect((await shown(page, name))[name]).toBe(false)
@@ -628,7 +628,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('an island 
   })
 
   it('announces from inside the modal dialog a form sits in, as the rest of the page is inert then', async () => {
-    const page = await site.open('/pending', { path })
+    await using page = await site.open('/pending', { path })
 
     await page.evaluate(() => document.querySelector<HTMLDialogElement>('dialog.box')!.showModal())
     await page.click('dialog.box button')
@@ -637,7 +637,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('an island 
   })
 
   it('announces a shown block from a region outside the form', async () => {
-    const page = await site.open('/pending', { path })
+    await using page = await site.open('/pending', { path })
 
     await page.click('form.slow button')
     await page.waitUntil(() => [...document.querySelectorAll('body > [aria-live=polite]')].some(region => region.textContent === 'Saving slow'))
@@ -646,7 +646,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('an island 
   })
 
   it('lets a navigation the caller starts once a call went through win over the refresh', async () => {
-    const page = await site.open('/', { path })
+    await using page = await site.open('/', { path })
 
     await page.click('button.away')
     await page.waitFor('h1', { text: 'Other' })
@@ -656,7 +656,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('an island 
   })
 
   it('keeps the page the visitor went to while a form was posting, the answer dropped', async () => {
-    const page = await site.open('/', { path })
+    await using page = await site.open('/', { path })
 
     await page.click('form.slow button')
     await page.waitFor('form.slow[aria-busy]')
@@ -669,7 +669,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('an island 
   })
 
   it('leaves what a call was refused for on the page that made it', async () => {
-    const page = await site.open('/', { path })
+    await using page = await site.open('/', { path })
 
     await page.click('button.call')
     await page.waitFor('p.signup-error', { text: 'Not an email' })
@@ -683,7 +683,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('an island 
   })
 
   it('takes the forms posting to an action from the browser\'s own check, so the schema\'s messages show', async () => {
-    const page = await site.open('/', { path })
+    await using page = await site.open('/', { path })
 
     expect(await page.evaluate(() => [...document.forms].map(form => form.noValidate))).toEqual([true, true, true, true, true, true])
 
@@ -697,7 +697,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('an island 
   })
 
   it('checks, posts and refuses a form holding controls named after its members as one without them', async () => {
-    const page = await site.open('/clobbered', { path })
+    await using page = await site.open('/clobbered', { path })
 
     await page.fill('form.sign input[name="title"]', 'ab')
     await page.click('form.sign button')
@@ -715,7 +715,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('an island 
   })
 
   it('shows what a call was refused for, reactively', async () => {
-    const page = await site.open('/', { path })
+    await using page = await site.open('/', { path })
 
     expect(await page.text('p.signup-error')).toBeNull()
 
@@ -731,7 +731,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('an island 
   })
 
   it('keeps the ids a component handed a refused field once the island hydrates, and as the field turns valid and refused again', async () => {
-    const page = await site.open('/described-island', { path })
+    await using page = await site.open('/described-island', { path })
     const described = async () => page.evaluate(() => [...document.querySelectorAll('form.described input')].map(input => [input.getAttribute('aria-describedby'), input.getAttribute('aria-invalid')]))
 
     await page.fill('form.described input[name="first"]', 'ab')
@@ -778,7 +778,7 @@ describe('a pending block under a strict style-src', () => {
   afterAll(async () => strict?.close())
 
   it('shows, announces and hides it with no policy violation, the policy holding', async () => {
-    const page = await strict.open('/pending', { path })
+    await using page = await strict.open('/pending', { path })
 
     // The policy holds: a style attribute the page adds is refused.
     const refused = await page.evaluate(async () => {
@@ -806,7 +806,7 @@ describe('a pending block under a strict style-src', () => {
   })
 
   it('exposes the announcement to assistive technology as a polite live region outside the busy form', async () => {
-    const page = await strict.open('/pending', { path })
+    await using page = await strict.open('/pending', { path })
 
     await page.view.cdp('Accessibility.enable')
     await page.click('form.slow button')

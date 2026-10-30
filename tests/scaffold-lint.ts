@@ -1,4 +1,5 @@
 import { builtinModules } from 'node:module'
+import { clearCaches } from '@typescript-eslint/parser'
 import { configCheckOptions, writeShadowTypes } from '../src/check'
 import { loadConfig } from '../src/config-loader'
 
@@ -33,6 +34,11 @@ export async function lintInProcess(dir: string, paths: string | string[]): Prom
 
   const { ESLint } = await import('eslint')
   const results = await withoutBunBuiltins(async () => new ESLint({ cwd: dir }).lintFiles([paths].flat()))
+
+  // The TypeScript programs a typed lint builds are kept per project, so each scaffold would keep its own for the rest of the run.
+  clearCaches()
+  // Collected now, as the programs of a lint are large and the engine would let those of each scaffold pile up.
+  Bun.gc(true)
 
   if (results.length === 0)
     throw new Error(`lintInProcess: ${[paths].flat().join(', ')} of ${dir} matched no file`)

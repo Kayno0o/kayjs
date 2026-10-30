@@ -239,7 +239,7 @@ async function packKay(vendor: string): Promise<string> {
     await Bun.write(join(stage, 'package.json'), JSON.stringify(manifest, null, 2))
     await Promise.all(manifest.files.filter(entry => entry !== 'types' && entry !== 'dist').map(async entry => cp(join(KAY_ROOT, entry), join(stage, entry), { recursive: true })))
 
-    const types = Bun.spawn([nativeExe(), '-p', join(KAY_ROOT, 'tsconfig.build.json'), '--outDir', join(stage, 'types')], { stdout: 'pipe', stderr: 'pipe' })
+    const types = Bun.spawn([nativeExe(), '-p', join(KAY_ROOT, 'tsconfig.build.json'), '--outDir', join(stage, 'types'), '--noCheck'], { stdout: 'pipe', stderr: 'pipe' })
     const [typeErrors, typeWarnings, typesCode, processor] = await Promise.all([new Response(types.stdout).text(), new Response(types.stderr).text(), types.exited, Bun.build({ entrypoints: [join(KAY_ROOT, 'src/eslint/index.ts')], target: 'node', packages: 'external', outdir: join(stage, 'dist'), naming: 'eslint.js' })])
 
     if (typesCode !== 0 || !processor.success)

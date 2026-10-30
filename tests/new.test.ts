@@ -105,7 +105,12 @@ const LINTED = /\.(?:kay|[cm]?[jt]sx?)$/
 
 // What `kay check` reports of the project, kay.config.ts read as it reads it: a warning fails the `check` script a scaffold writes.
 async function checked(dir: string) {
-  return check(dir, configCheckOptions(await loadConfig(dir)))
+  // The program of each check is garbage once it returns, which the engine would otherwise let pile up over the scaffolds that follow.
+  const problems = await check(dir, configCheckOptions(await loadConfig(dir)))
+
+  Bun.gc(true)
+
+  return problems
 }
 
 // What `prepack` emits, the declarations and the ESLint processor, made once for every scaffold of the run, as it is the same for each.
@@ -674,7 +679,7 @@ describe('kay new', () => {
     }
   }, SCAFFOLD_MS)
 
-  it.concurrent('scaffolds a static site that type-checks and exports to dist, with a Pages workflow and a container beside it', async () => {
+  it('scaffolds a static site that type-checks and exports to dist, with a Pages workflow and a container beside it', async () => {
     const dir = join(await mkdtemp(join(tmpdir(), 'kay-new-')), 'my-site')
 
     try {
@@ -734,7 +739,7 @@ describe('kay new', () => {
     }
   }, SCAFFOLD_MS)
 
-  it.concurrent('scaffolds an app on kayjs-auth with its users in a SQLite file, guarded pages and a websocket island, which runs its tests with Bun alone', async () => {
+  it('scaffolds an app on kayjs-auth with its users in a SQLite file, guarded pages and a websocket island, which runs its tests with Bun alone', async () => {
     const dir = join(await mkdtemp(join(tmpdir(), 'kay-new-')), 'my-app')
 
     try {
@@ -785,7 +790,7 @@ describe('kay new', () => {
     }
   }, SCAFFOLD_MS)
 
-  it.concurrent('scaffolds an app with kayjs-auth in Postgres behind the postgres feature, which checks and builds as it is and generates its first migration', async () => {
+  it('scaffolds an app with kayjs-auth in Postgres behind the postgres feature, which checks and builds as it is and generates its first migration', async () => {
     const dir = join(await mkdtemp(join(tmpdir(), 'kay-new-')), 'my-app')
 
     try {
@@ -889,7 +894,7 @@ describe('kay new', () => {
     expect(pg['src/db/tables.ts']).toContain('...authTables')
   })
 
-  it.concurrent('scaffolds a blank project of one bare page, which checks and builds as a static site', async () => {
+  it('scaffolds a blank project of one bare page, which checks and builds as a static site', async () => {
     const dir = join(await mkdtemp(join(tmpdir(), 'kay-new-')), 'my-app')
 
     try {
@@ -1004,7 +1009,7 @@ describe('kay new', () => {
   }
 
   for (const [label, variant] of INSTALLED) {
-    it.concurrent(`scaffolds ${label} as a project that checks, lints and passes its tests`, async () => {
+    it(`scaffolds ${label} as a project that checks, lints and passes its tests`, async () => {
       const features = [...variant]
       const dir = join(await mkdtemp(join(tmpdir(), 'kay-new-')), 'my-app')
 

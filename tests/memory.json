@@ -1,10 +1,10 @@
 {
   "version": 1,
   "files": {
-    "tests/new.test.ts": 2029,
-    "tests/forms.test.ts": 1249,
-    "tests/check.test.ts": 1210,
-    "tests/formats.test.ts": 918,
+    "tests/new.test.ts": 1316,
+    "tests/forms.test.ts": 548,
+    "tests/check.test.ts": 1033,
+    "tests/formats.test.ts": 548,
     "tests/docs-contrast.test.ts": 891,
     "tests/docs.test.ts": 797,
     "tests/screenshot.test.ts": 708,
