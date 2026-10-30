@@ -2,7 +2,7 @@ import process from 'node:process'
 import { $, Glob } from 'bun'
 import { BREAKING_FILE, breakingRefused } from './breaking'
 import { brokenLinks } from './links'
-import { ARCHIVES, INDEX, LINKING, MAX_PAGE_BYTES, oversizedPages, releasePages, WHATS_NEW } from './whats-new'
+import { ARCHIVES, failedPageTests, INDEX, LINKING, MAX_PAGE_BYTES, oversizedPages, releasePages, WHATS_NEW } from './whats-new'
 import { ZED_MANIFEST, zedReleasable, zedRelease } from './zed-release'
 
 // `bun scripts/version.ts patch|minor|major`: kay and every library under packages/ move to one version, committed as `v<version>` and tagged, as `bun pm version` does for one package.
@@ -78,6 +78,12 @@ try {
 
   // bun.lock records each workspace's version and ranges, which the CI's frozen install compares against.
   await $`${process.execPath} install`.quiet()
+  // The pages are on disk as the tag will have them: a test reading them that now fails stops the release before the commit and the tag, and the reset below restores the tree.
+  const failure = await failedPageTests()
+
+  if (failure !== undefined)
+    throw new Error(`tests/llms.test.ts fails on the pages this release writes, so nothing is committed or tagged:\n${failure}`)
+
   await $`git add bun.lock ${manifests} ${ZED_MANIFEST} ${[...pages.keys()]}`
   await $`git commit -q -m ${tag}`
   await $`git tag ${tag}`

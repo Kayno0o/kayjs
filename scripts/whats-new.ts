@@ -256,6 +256,14 @@ export async function releasePages(read: (path: string) => string, version: stri
   return pages
 }
 
+// Runs the tests a release's rewritten pages must keep green, returning their output when one fails: moving and trimming releases can drop a line a test reads, which only a run after the move shows.
+export async function failedPageTests(tests: readonly string[] = ['tests/llms.test.ts']): Promise<string | undefined> {
+  const run = Bun.spawn([process.execPath, 'test', ...tests], { stdout: 'pipe', stderr: 'pipe' })
+  const [out, err, code] = await Promise.all([new Response(run.stdout).text(), new Response(run.stderr).text(), run.exited])
+
+  return code === 0 ? undefined : `${out}${err}`
+}
+
 // `bun scripts/whats-new.ts --cap` cuts `## Unreleased` of What's new and the newest minor of Upgrading to their caps, moving their oldest lines to the top of each archive as "continued", whose own oldest releases are dropped to stay under the 25,000 bytes (`--check` only reports, exiting 1, which `just land` runs as it never writes to the branch it lands).
 if (import.meta.main) {
   const check = process.argv.includes('--check')

@@ -1,7 +1,8 @@
 import { Glob } from 'bun'
 import { describe, expect, it } from 'bun:test'
 import { breakingRefused } from '../scripts/breaking'
-import { archiveOldest, capNewest, capUnreleased, indexArchive, MAX_PAGE_BYTES, NEWEST_CAP, oversizedPages, releasePages, relinkMoved, stampUnreleased, trimArchive } from '../scripts/whats-new'
+import { archiveOldest, capNewest, capUnreleased, failedPageTests, indexArchive, MAX_PAGE_BYTES, NEWEST_CAP, oversizedPages, releasePages, relinkMoved, stampUnreleased, trimArchive } from '../scripts/whats-new'
+import { scratchDir } from './scratch'
 
 interface Manifest {
   name: string
@@ -568,5 +569,17 @@ describe('the breaking gate of a release', () => {
 
   it('has nothing to refuse for an empty list', () => {
     expect(breakingRefused('patch', '2.0.0', '')).toBe(false)
+  })
+})
+
+describe('the release\'s page tests', () => {
+  it('returns the output of a test that fails and nothing for one that passes', async () => {
+    const dir = await scratchDir('release-page-tests-')
+
+    await Bun.write(`${dir}/green.test.ts`, 'import { expect, it } from \'bun:test\'\nit(\'holds\', () => expect(1).toBe(1))\n')
+    await Bun.write(`${dir}/red.test.ts`, 'import { expect, it } from \'bun:test\'\nit(\'says where markdownLoaded is imported from\', () => expect(1).toBe(2))\n')
+
+    expect(await failedPageTests([`${dir}/green.test.ts`])).toBeUndefined()
+    expect(await failedPageTests([`${dir}/red.test.ts`])).toContain('says where markdownLoaded is imported from')
   })
 })
