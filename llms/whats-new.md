@@ -5,6 +5,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 ## Unreleased
 
 - A string with a `date-time`, `date` or `time` format no longer takes the 10,000 character default, so the OpenAPI document and the tool schemas show a date as its format alone: [API routes](api-routes.md).
+- A component call merging a shorthand class, a `class` attribute or a spread with a condition object (`Plain.mt-4(class={{ on: true }})`) passes `kay check` under `exactOptionalPropertyTypes` on a component typing `class?: string`: [styles and assets](styles-and-assets.md).
 
 ## 1.84.0
 

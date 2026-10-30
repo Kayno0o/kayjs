@@ -11,6 +11,8 @@ const tsconfig = JSON.stringify({ compilerOptions, include: ['src', '.kay/types'
 const COMPONENTS = {
   'src/card.kay': 'section.card\n  header(part="head") a\n  div(part="body")\n    slot\n',
   'src/plain.kay': '---\nconst { class: className } = props<{ class?: string }>()\n---\ndiv(class={className}) a\n',
+  'src/strict.kay': '---\nconst { class: className } = props<{ class: string }>()\n---\ndiv(class={className}) a\n',
+  'src/bare.kay': 'div a\n',
   'src/pair.kay': 'header(part="top") a\nfooter(part="bottom") b\n',
   'src/busy.kay': 'button(part="root")\n  span(part="spinner") a\n',
   'src/hands.kay': '---\nimport Busy from \'./busy.kay\'\n---\nBusy(part="root spinner")\n',
@@ -71,6 +73,37 @@ describe('kay check on a component with parts', () => {
     expect(await problems(`${IMPORTS}Card.mt-4(class={{ head: 'p-6' }}) a\n`)).toEqual([expect.stringContaining('cannot be merged')])
     expect(await problems(`${IMPORTS}Card({...rest} class={{ head: 'p-6' }}) a\n`)).toEqual([expect.stringContaining('cannot be merged')])
     expect(await problems(`${IMPORTS}Plain.mt-4(class={{ on: true }})\nPlain({...rest} class={{ on: true }})\n`)).toEqual([])
+  })
+
+  describe('a merged class on a component typing its class prop, under exactOptionalPropertyTypes', () => {
+    const exact = JSON.stringify({ compilerOptions: { ...compilerOptions, exactOptionalPropertyTypes: true }, include: ['src', '.kay/types'] })
+    const withExtra = async (page: string, config: string) => problems(page, 'src/routes/index.kay', config)
+
+    it('passes a shorthand beside a condition object, an attribute string or a spread', async () => {
+      for (const config of [tsconfig, exact]) {
+        expect(await withExtra(`${IMPORTS}Plain.mt-4(class={{ on: true }})\nPlain.mt-4(class="p-2")\nPlain.mt-4(class={{ on: rest.id === 'x' }})\nPlain.mt-4({...rest} class={{ on: true }})\nPlain.mt-4({...rest})\n`, config)).toEqual([])
+      }
+    })
+
+    it('passes a spread beside a condition object', async () => {
+      for (const config of [tsconfig, exact]) {
+        expect(await withExtra(`${IMPORTS}Plain({...rest} class={{ on: true }})\nPlain({...rest} class="a")\n`, config)).toEqual([])
+      }
+    })
+
+    it('passes a class prop that is required when the class merges', async () => {
+      const head = '---\nimport Strict from \'../strict.kay\'\nconst rest = { id: \'x\' }\n---\n'
+
+      expect(await withExtra(`${head}Strict.mt-4(class={{ on: true }})\n`, exact)).toEqual([])
+      expect(await withExtra(`${head}Strict.mt-4(class={{ on: true }})\n`, tsconfig)).toEqual([])
+    })
+
+    it('leaves a component with no class prop and a plain element alone', async () => {
+      const head = '---\nimport Bare from \'../bare.kay\'\n---\n'
+
+      expect(await withExtra(`${head}div.mt-4(class={{ on: true }}) a\n`, exact)).toEqual([])
+      expect(await withExtra(`${head}Bare.mt-4(class={{ on: true }})\n`, exact)).toEqual([])
+    })
   })
 
   it('reads a condition object with a string-typed value beside a shorthand as a parts object, which the docs say', async () => {

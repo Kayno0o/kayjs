@@ -317,7 +317,8 @@ export type HandsPart<Component, Name extends string> = 0 extends 1 & Component 
 type PartsObject<Item> = 0 extends 1 & Item ? never : Item extends readonly unknown[] ? never : Item extends object ? [Extract<Item[keyof Item], string>] extends [never] ? never : Item : never
 
 // The `class` a component call gets from its shorthand, `class` and spreads merged, which cannot hold the parts object of a component with parts.
-export type ComponentClass<List extends readonly unknown[]> = [PartsObject<List[number]>] extends [never] ? string | undefined : { kayError: 'A parts object cannot be merged with a shorthand or a spread: write the root\'s classes as root, class={{ root: "mt-4", head: "p-6" }}' }
+// Typed `string` though an empty merge leaves the prop unset at runtime, as `class?: string` under `exactOptionalPropertyTypes` takes no `undefined` and the shorthand makes it a string in the common case.
+export type ComponentClass<List extends readonly unknown[]> = [PartsObject<List[number]>] extends [never] ? string : { kayError: 'A parts object cannot be merged with a shorthand or a spread: write the root\'s classes as root, class={{ root: "mt-4", head: "p-6" }}' }
 
 // What the template's control flow and dynamic tags read as in the code the type checker reads: a `for` block is called on the spot with a row of its list, so TypeScript narrows it where the browser build hands accessors.
 export interface TemplateHelpers {
