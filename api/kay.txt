@@ -3762,6 +3762,7 @@ interface TestOptions extends PagesOptions
   site?: string | undefined
   storage?: FileStore | undefined
   store?: AppStore | undefined
+  styles?: boolean | undefined
   timeZone?: string | undefined
   tracer?: Tracer | undefined
   trailingSlash?: TrailingSlash | undefined
@@ -3924,6 +3925,7 @@ type TestStream<Client> = Client & {
 [./test] Visit
 interface Visit extends PageReading
   canonical: () => string | undefined
+  css: () => Promise<string>
   find: (selector: string) => Found[]
   headers: Headers
   html: string

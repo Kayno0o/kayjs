@@ -21,6 +21,8 @@ export interface TestOptions extends PagesOptions {
   browser?: boolean | BrowserOptions | undefined
   // Builds the islands for the browser, unminified, into `.kay/test-client`, or `.kay/client` with `browser`, so one a browser cannot build, such as a server module reaching it, fails `testSite()` here and not only under `kay dev`; no browser needed. On unless `false`, built again only when the files it read or the project's sources change, once for the files of a run.
   islands?: boolean | undefined
+  // Builds the client for real, as `kay build` does and without Chrome: pages link the stylesheets the app's Tailwind builds and its island bundles, `site.fetch` answers them and `visit.css()` reads them. Off by default, as it loads Tailwind's native addon and builds into `.kay/client`; on with `browser`.
+  styles?: boolean | undefined
   // The key the app's `proxy.key` header carries, turning the check on for this site alone, the environment left as it is: `fetch`, `visit`, `call`, `mcp` and `socket` send it by default, a call's own header of that name wins, and an empty one sends none; not with `dev: true` or `browser`, which skip the check or send no key.
   proxyKey?: string | undefined
 }
@@ -34,6 +36,8 @@ export interface Visit extends PageReading {
   html: string
   // The page as the visitor ends up seeing it: each streamed `await` block replaced by its last part, read as the page is, and its `html` without the templates and the swap script.
   settled: PageReading & { html: string }
+  // The CSS the page carries: its inline `<style>` blocks and every stylesheet it links, fetched from the site, as the app builds it. Needs `testSite({ styles: true })` or `browser`, else it throws.
+  css: () => Promise<string>
   // The stamp the form posting to `action` rendered with, which `submit` takes as its `stamp`; `undefined` for a page with no such form or a form with no stamp.
   stamp: (action: Pick<Action<never, unknown>, 'url'>) => string | undefined
 }

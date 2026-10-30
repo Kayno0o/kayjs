@@ -203,6 +203,8 @@ export async function testSite(options: TestOptions = {}): Promise<TestSite> {
   const config = { ...loaded, ...mcpKey !== undefined && loaded.mcp !== undefined && loaded.mcp !== false && { mcp: { ...loaded.mcp === true ? {} : loaded.mcp, key: mcpKey } }, site: loaded.site ?? ORIGIN, fileStore: options.fileStore ?? options.storage ?? memoryFiles(), store: options.store === undefined && loaded.store !== undefined ? { ...loaded.store.sessions && { sessions: memorySessions() }, jobs: memoryJobs(), rates: memoryRates(), rooms: memoryRooms(), vitals: memoryVitals(), notifications: memoryNotifications() } : loaded.store }
   const project = resolveProject(root, config, { dev: config.dev === true, prebuilt: false, underKayDev: false, devRoutes: config.dev === true })
   const inBrowser = options.browser !== undefined && options.browser !== false
+  // The client as a browser loads it, built for real: the stylesheets and island bundles pages link.
+  const realClient = inBrowser || options.styles === true
   const proxyKey = options.proxyKey?.trim()
   const keyHeader = proxyKey === undefined ? undefined : checkProxy(config.proxy)?.key
 
@@ -220,12 +222,12 @@ export async function testSite(options: TestOptions = {}): Promise<TestSite> {
       throw new Error('kay: testSite({ proxyKey }) does not reach `open()`, whose browser sends no proxy key header; test the key check without `browser`')
   }
 
-  if (inBrowser || options.islands !== false)
+  if (realClient || options.islands !== false)
     assertKayWritable(root)
 
-  const wanted = inBrowser || options.islands !== false ? await islandsChecked(root, inBrowser ? clientOptionsOf(config, PRODUCTION) : checkOnly(clientOptionsOf(config, PRODUCTION)), inBrowser) : undefined
-  // Without a browser the pages render their islands' markup and load no script, so the build was only a check.
-  const client: ClientBuild = inBrowser && wanted ? wanted : { entryImports: [], islands: {}, styles: new Map(), pages: new Map(), dir: clientDir(root) }
+  const wanted = realClient || options.islands !== false ? await islandsChecked(root, realClient ? clientOptionsOf(config, PRODUCTION) : checkOnly(clientOptionsOf(config, PRODUCTION)), realClient) : undefined
+  // Without a browser or `styles` the pages render their islands' markup and load no script or stylesheet, so the build was only a check.
+  const client: ClientBuild = realClient && wanted ? wanted : { entryImports: [], islands: {}, styles: new Map(), pages: new Map(), dir: clientDir(root) }
   const browser = typeof options.browser === 'object' ? options.browser : {}
   const jar = cookieJar()
   const boot = async (): Promise<Awaited<ReturnType<typeof servePages>>> => buildingTestSite(jar.cookies, async () => servePages(project, () => client, true))
@@ -334,6 +336,23 @@ export async function testSite(options: TestOptions = {}): Promise<TestSite> {
         headers: current.headers,
         html,
         ...reading,
+        css: async () => {
+          if (!realClient)
+            throw new Error('kay: css() reads the stylesheets the app builds, which a site loads with testSite({ styles: true }) or testSite({ browser: true })')
+
+          const sheets = reading.find('style').map(style => style.html)
+
+          for (const link of reading.find('link[rel~=stylesheet]')) {
+            const response = await send(link.attributes.href ?? '', {})
+
+            if (response.status !== 200)
+              throw new Error(`kay: the stylesheet ${link.attributes.href} answered ${response.status}`)
+
+            sheets.push(await withNatives(async () => response.text()))
+          }
+
+          return sheets.join('\n')
+        },
         stamp: (action) => {
           const url = formUrl(reading, action)
 

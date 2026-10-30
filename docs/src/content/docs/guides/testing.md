@@ -39,6 +39,21 @@ Assert on text through these, not on `page.html`. An island's markup holds hydra
 expect(await site.sitemap()).toContain('https://example.com/about')
 ```
 
+### Reading the stylesheet
+
+A visit leaves out what a browser loads: the stylesheets and the island scripts. So a page from `site.visit()` has no `link[rel=stylesheet]`.
+
+To test the CSS the app ships, build it with `styles: true`. This needs no browser. It builds the client as `kay build` does, so it loads Tailwind and writes into `.kay/client`, which is why it is off by default.
+
+```ts
+const site = await testSite({ styles: true })
+const page = await site.visit('/')
+
+expect(await page.css()).toContain('--color-brand')
+```
+
+`page.css()` is the CSS the page carries: its inline `<style>` blocks and every stylesheet it links, fetched from the site. On a site made without `styles` or `browser` it throws.
+
 ## Posting an action
 
 Import the action from its page and `submit` it as a form post without JavaScript. It follows the redirect back, or reads the page a refused post renders.
