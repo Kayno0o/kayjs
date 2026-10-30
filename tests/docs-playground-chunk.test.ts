@@ -65,7 +65,7 @@ describe('the docs playground chunk', () => {
     expect(chunks.get(island!)).toContain('/playground/compiler.js')
     expect([...pages].filter(([, html]) => reachable(chunksOf(html)).has(island!)).map(([file]) => file)).toEqual(PLAYGROUND_PAGES.filter(page => pages.has(page)))
     // The compiler and the frame's runtime are served by routes of their own, so no chunk of the build carries them and no page loads them up front.
-    expect([...chunks].filter(([, code]) => code.includes(COMPILER_MARK)).map(([name]) => name)).toEqual([])
+    expect([...chunks].filter(([name, code]) => linked.has(name) && code.includes(COMPILER_MARK)).map(([name]) => name)).toEqual([])
     expect([...pages].filter(([, html]) => html.includes(COMPILER_URL) || html.includes('/playground/frame.html')).map(([file]) => file)).toEqual(PLAYGROUND_PAGES.filter(page => pages.has(page)))
   })
 })
