@@ -589,7 +589,16 @@ component default
   approvalLabel: string
   argumentsLabel: string
   calls: ToolCall[]
-  class?: string | { root?: string; summary?: string; list?: string; call?: string; name?: string; status?: string; title?: string; code?: string; } | undefined
+  class?: string | {
+  root?: string | undefined;
+  summary?: string | undefined;
+  list?: string | undefined;
+  call?: string | undefined;
+  name?: string | undefined;
+  status?: string | undefined;
+  title?: string | undefined;
+  code?: string | undefined;
+} | undefined
   details: boolean
   doneLabel: string
   failedLabel: string
@@ -692,16 +701,16 @@ component default
 component default
   children?: Element
   class?: string | {
-  root?: string;
-  panel?: string;
-  head?: string;
-  title?: string;
-  actions?: string;
-  action?: string;
-  expand?: string;
-  body?: string;
-  button?: string;
-  glyph?: string;
+  root?: string | undefined;
+  panel?: string | undefined;
+  head?: string | undefined;
+  title?: string | undefined;
+  actions?: string | undefined;
+  action?: string | undefined;
+  expand?: string | undefined;
+  body?: string | undefined;
+  button?: string | undefined;
+  glyph?: string | undefined;
 } | undefined
   closeIcon: Element
   closeLabel?: string | undefined
@@ -717,7 +726,7 @@ component default
 
 [./chat-sources.kay] default
 component default
-  class?: string | { root?: string; label?: string; list?: string; item?: string; link?: string; } | undefined
+  class?: string | { root?: string | undefined; label?: string | undefined; list?: string | undefined; item?: string | undefined; link?: string | undefined; } | undefined
   here: boolean
   label: string
   sources: Source[]
@@ -739,45 +748,45 @@ component default
   cancelLabel?: string | undefined
   changeFailedLabel?: string | undefined
   class?: string | {
-  root?: string;
-  conversations?: string;
-  newConversation?: string;
-  conversationList?: string;
-  conversation?: string;
+  root?: string | undefined;
+  conversations?: string | undefined;
+  newConversation?: string | undefined;
+  conversationList?: string | undefined;
+  conversation?: string | undefined;
   renameField?: any;
-  deleteConfirm?: string;
-  confirm?: string;
-  cancel?: string;
-  conversationLink?: string;
+  deleteConfirm?: string | undefined;
+  confirm?: string | undefined;
+  cancel?: string | undefined;
+  conversationLink?: string | undefined;
   rename?: any;
   delete?: any;
-  empty?: string;
-  greeting?: string;
-  suggestions?: string;
-  suggestion?: string;
-  log?: string;
-  turn?: string;
+  empty?: string | undefined;
+  greeting?: string | undefined;
+  suggestions?: string | undefined;
+  suggestion?: string | undefined;
+  log?: string | undefined;
+  turn?: string | undefined;
   editField?: any;
-  text?: string;
-  files?: string;
-  file?: string;
-  actions?: string;
-  save?: string;
+  text?: string | undefined;
+  files?: string | undefined;
+  file?: string | undefined;
+  actions?: string | undefined;
+  save?: string | undefined;
   edit?: any;
-  reasoning?: string;
-  reasoningText?: string;
-  approval?: string;
-  approvalText?: string;
-  allow?: string;
-  deny?: string;
-  note?: string;
+  reasoning?: string | undefined;
+  reasoningText?: string | undefined;
+  approval?: string | undefined;
+  approvalText?: string | undefined;
+  allow?: string | undefined;
+  deny?: string | undefined;
+  note?: string | undefined;
   regenerate?: any;
-  thinking?: string;
-  status?: string;
-  retry?: string;
-  disclosure?: string;
+  thinking?: string | undefined;
+  status?: string | undefined;
+  retry?: string | undefined;
+  disclosure?: string | undefined;
   remove?: any;
-  form?: string;
+  form?: string | undefined;
   new?: any;
   attach?: any;
   field?: any;
