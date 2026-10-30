@@ -578,6 +578,9 @@ const UNREQUIRABLE_TYPES: Set<string>
 [./html] untrack
 function untrack<T>(fn: () => T): T
 
+[./html] withinComponent
+function withinComponent<T>(fn: unknown, render: () => T): T
+
 [./html] withServerIslands
 function withServerIslands<T>(state: ServerIslands, render: () => T): T
 
