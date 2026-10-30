@@ -252,7 +252,17 @@ const reactNames: Row = (diagnostic, source, span) => {
   return attribute && { span: attribute, help: `kay writes the HTML attribute, \`${html}\`, not \`${name}\`` }
 }
 
-const ROWS: Row[] = [calledHandler, mistypedBind, elseIf, reactNames]
+// `tooltip` on an element: the tooltip attributes are `data-tooltip` and `data-hint`.
+const tooltipName: Row = (diagnostic, source, span) => {
+  if (diagnostic.code !== ASSIGNABILITY || UNKNOWN_ATTRIBUTE.exec(diagnostic.message)?.[1] !== 'tooltip')
+    return undefined
+
+  const attribute = attributeNamed(source, attributeList(source, span), 'tooltip')
+
+  return attribute && { span: attribute, help: 'a tooltip is `data-tooltip="..."` on an element the keyboard reaches (a `button`, a link, or one with `tabindex="0"`), or `data-hint="..."` for text only the pointer adds' }
+}
+
+const ROWS: Row[] = [calledHandler, mistypedBind, elseIf, reactNames, tooltipName]
 
 export function templateHint(diagnostic: TsgoDiagnostic, source: string, span: Span | undefined, tsx: string): TemplateHint | 'duplicate' | undefined {
   if (span === undefined)

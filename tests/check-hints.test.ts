@@ -65,6 +65,12 @@ describe('hints for the first template mistakes', () => {
     expect(errors(found).map(error => error[3])).toEqual(['kay writes the HTML attribute, `class`, not `className`', 'kay writes the HTML attribute, `for`, not `htmlFor`'])
   })
 
+  it('names data-tooltip for a tooltip attribute', async () => {
+    const found = await report('---\n---\na(href="/" tooltip="Home") go\n')
+
+    expect(errors(found).map(error => error[3])).toEqual([expect.stringContaining('`data-tooltip="..."`')])
+  })
+
   it('keeps every unknown element and reports each elif once, nested or beside siblings', async () => {
     const typos = errors(await report('---\n---\ndiv\n  p a\n  lii b\n  p c\n  spann d\n'))
 
