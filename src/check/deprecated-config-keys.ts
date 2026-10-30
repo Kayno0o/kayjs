@@ -1,4 +1,4 @@
-import type { ObjectExpression, ObjectProperty } from 'oxc-parser'
+import type { CallExpression, ObjectExpression, ObjectProperty } from 'oxc-parser'
 import type { CheckDiagnostic, CheckOptions } from '.'
 import { join } from 'node:path'
 import { findProjectFiles } from '../build/files'
@@ -12,12 +12,31 @@ import { importsOf, walk } from './ast'
 
 const SOURCE_FILE = /(?<!\.d)\.tsx?$/
 const OLD_KEY = new RegExp(`\\b(?:${Object.keys(RENAMED_KEYS).join('|')})\\b`)
-// The options of `pages()` and `testSite()` are the config's own, so they carry the same keys.
+// The options of `pages()` and `testSite()` are the config's own, so they carry the same keys, as the `config` of an extension does.
+// A file that can hold options of the config: it imports one of the functions below or writes an extension's `config:`.
+const CONFIG_HOLDER = /kay\/(?:server|test)|\bconfig\s*:/
 const OPTION_FUNCTIONS: Record<string, string> = { pages: 'kay/server', testSite: 'kay/test' }
 
 // A `key: value` or shorthand property with a name written out: not a spread, a method, an accessor or a computed key.
 function isPlain(property: ObjectExpression['properties'][number]): property is ObjectProperty {
   return property.type === 'Property' && property.kind === 'init' && !property.method && !property.computed
+}
+
+// The `config` object of an extension written out: an object with a `name` and a `config`, as `KayExtension` has.
+function extensionConfig(object: ObjectExpression): ObjectExpression | undefined {
+  const plain = object.properties.filter(isPlain)
+  const config = plain.find(property => keyName(property) === 'config')
+  const value = config && unwrapped(config.value)
+
+  return value?.type === 'ObjectExpression' && plain.some(property => keyName(property) === 'name') ? value : undefined
+}
+
+// A call of an option function by its imported name, or through a namespace import (`server.pages(...)`).
+function isOptionCall(callee: CallExpression['callee'], callees: Set<string>, imported: { name: string, namespaces: Set<string> }[]): boolean {
+  if (callee.type === 'Identifier')
+    return callees.has(callee.name)
+
+  return callee.type === 'MemberExpression' && !callee.computed && callee.object.type === 'Identifier' && callee.property.type === 'Identifier' && imported.some(({ name, namespaces }) => name === callee.property.name && namespaces.has((callee.object as { name: string }).name))
 }
 
 const renamed = (name: string): string | undefined => Object.hasOwn(RENAMED_KEYS, name) ? RENAMED_KEYS[name as keyof typeof RENAMED_KEYS] : undefined
@@ -35,7 +54,7 @@ export async function deprecatedConfigKeys(root: string, options: CheckOptions):
     const isConfig = file === configFile
     const source = await Bun.file(file).text()
 
-    if (!OLD_KEY.test(source) || (!isConfig && !source.includes('pages(') && !source.includes('testSite(')))
+    if (!OLD_KEY.test(source) || (!isConfig && !CONFIG_HOLDER.test(source)))
       continue
 
     const { program: ast } = parseProgram(source, { lang: file.endsWith('.tsx') ? 'tsx' : 'ts', recover: true })
@@ -50,10 +69,20 @@ export async function deprecatedConfigKeys(root: string, options: CheckOptions):
         objects.push(exported)
     }
 
-    const callees = new Set(Object.entries(OPTION_FUNCTIONS).flatMap(([name, from]) => [...importsOf(ast, source => source === from, name).locals]))
+    const imported = Object.entries(OPTION_FUNCTIONS).map(([name, from]) => ({ name, ...importsOf(ast, source => source === from, name) }))
+    const callees = new Set(imported.flatMap(({ locals }) => [...locals]))
 
     walk(ast, (node) => {
-      if (node.type !== 'CallExpression' || node.callee.type !== 'Identifier' || !callees.has(node.callee.name))
+      if (node.type === 'ObjectExpression') {
+        const extension = extensionConfig(node)
+
+        if (extension)
+          objects.push(extension)
+
+        return
+      }
+
+      if (node.type !== 'CallExpression' || !isOptionCall(node.callee, callees, imported))
         return
 
       const argument = node.arguments[0] && unwrapped(node.arguments[0])

@@ -45,7 +45,9 @@ export function unknownConfigKeys(config: object): string[] {
       if (Object.hasOwn(known, key))
         continue
 
-      const near = nearest(key, Object.keys(known).filter(name => !Object.hasOwn(RENAMED_KEYS, name)))
+      // An old name is offered as the name that replaced it.
+      const found = nearest(key, Object.keys(known))
+      const near = found !== undefined && known === CONFIG && Object.hasOwn(RENAMED_KEYS, found) ? RENAMED_KEYS[found as keyof typeof RENAMED_KEYS] : found
 
       problems.push(`\`${path}${key}\`${near === undefined ? '' : `, did you mean \`${path}${near}\`?`}`)
     }

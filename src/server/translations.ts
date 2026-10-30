@@ -2,6 +2,7 @@
 import type { KayConfig } from '../config'
 import type { Message } from '../runtime/i18n'
 import { missingMessages } from '../check/messages'
+import { renamedKeys } from '../config-shape'
 import { localizedSlugs } from '../content/server'
 
 // What a locale lacks against the default locale: the keys of its messages, with the default locale's message for each, and the slugs each localized collection has in the default locale and not in it, an entry counting as present when a translation shares its slug or its `translationKey`.
@@ -17,7 +18,7 @@ export async function missingTranslations(root: string, config: Pick<KayConfig, 
   if (!i18n)
     return {}
 
-  const [messages, slugs] = await Promise.all([missingMessages(root, i18n, config.extensions), localizedSlugs(root, config.contentConfig)])
+  const [messages, slugs] = await Promise.all([missingMessages(root, i18n, config.extensions), localizedSlugs(root, renamedKeys(config).contentConfig)])
   const missing: Record<string, MissingTranslations> = {}
 
   for (const locale of i18n.locales.filter(code => code !== i18n.defaultLocale)) {

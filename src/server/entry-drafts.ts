@@ -5,6 +5,7 @@ import { link, mkdir, rm, writeFile } from 'node:fs/promises'
 import { dirname, extname } from 'node:path'
 import process from 'node:process'
 import { KayError } from '../compiler/errors'
+import { renamedKeys } from '../config-shape'
 import { collectionInfo, entries, entrySource } from '../content/edit'
 import { parseEntry } from '../content/load'
 import { namedCollections } from '../content/server'
@@ -28,7 +29,7 @@ async function localizedCollection(root: string, config: Pick<KayConfig, 'i18n' 
   if (!i18n)
     throw new KayError('locales-invalid', 'kay: a draft entry is written in a locale, and kay.config.ts sets no i18n')
 
-  const found = (await namedCollections(root, config.contentConfig)).find(([name]) => name === collection)
+  const found = (await namedCollections(root, renamedKeys(config).contentConfig)).find(([name]) => name === collection)
 
   if (!found)
     throw new KayError('content-api-misuse', `kay: the content config exports no collection ${JSON.stringify(collection)}`)

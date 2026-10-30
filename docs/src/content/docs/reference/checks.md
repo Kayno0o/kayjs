@@ -126,7 +126,7 @@ Each lint has a level. `deny` is an error, `warn` a warning, `allow` hides it. W
 | `deprecated-auth-methods` | warn | deprecated | A call of one of kayjs-auth's flat methods, the names before 1.82, such as `auth.listUsers()` for `auth.admin.listUsers()`; the flat names work until 1.85, and `kay upgrade` renames the calls |
 | `deprecated-safe-redirect` | warn | deprecated | A call of kayjs-auth's `safeRedirect(path, fallback?)`, now kay's `localPath(path, fallback)`; the old name works until 1.87, and `kay upgrade` calls `localPath` |
 | `deprecated-session-stores` | warn | deprecated | An import of `memoryStore` or `sqliteStore` from `kay/server`, the session stores before 1.84, now `memorySessions` and `sqliteSessions`; the old names work until 1.87, and `kay upgrade` renames them |
-| `deprecated-config-keys` | warn | deprecated | A config key under its name before 1.84 (`routes`, `api`, `content`, `storage`, `maxSizes`, `settings`), in `kay.config.ts` or in the options of `pages()` and `testSite()`; the old names work until 1.87, and `kay upgrade` renames them |
+| `deprecated-config-keys` | warn | deprecated | A config key under its name before 1.84 (`routes`, `api`, `content`, `storage`, `maxSizes`, `settings`), in `kay.config.ts`, in the options of `pages()` and `testSite()` or in an extension's `config`; the old names work until 1.87, and `kay upgrade` renames them |
 
 ## Errors
 

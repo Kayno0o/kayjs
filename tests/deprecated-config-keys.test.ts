@@ -4,6 +4,8 @@ import { describe, expect, it } from 'bun:test'
 import { deprecatedConfigKeys } from '../src/check/deprecated-config-keys'
 import { applySafeFixes } from '../src/check/fixes'
 import { RENAMED_KEYS, renamedKeys, unknownConfigKeys } from '../src/config-shape'
+import { localizedEntry, writeDraftEntry } from '../src/server/entry-drafts'
+import { missingTranslations } from '../src/server/translations'
 import { scratchDir } from './scratch'
 
 async function project(files: Record<string, string>): Promise<string> {
@@ -27,7 +29,8 @@ describe('the renamed config keys', () => {
 
   it('knows the old names as keys, and suggests the new ones only', () => {
     expect(unknownConfigKeys({ routes: 'a', apiDir: 'b' })).toEqual([])
-    expect(unknownConfigKeys({ routsDir: 'a', storag: 'b' })).toEqual(['`routsDir`, did you mean `routesDir`?', '`storag`, did you mean `store`?'])
+    expect(unknownConfigKeys({ routsDir: 'a', storag: 'b' })).toEqual(['`routsDir`, did you mean `routesDir`?', '`storag`, did you mean `fileStore`?'])
+    expect(unknownConfigKeys({ routs: 'a', setting: {}, maxSize: 1, contnt: 'x' })).toEqual(['`routs`, did you mean `routesDir`?', '`setting`, did you mean `librarySettings`?', '`contnt`, did you mean `contentConfig`?'])
     expect(Object.values(RENAMED_KEYS).every(name => !Object.hasOwn(RENAMED_KEYS, name))).toBe(true)
   })
 })
@@ -61,6 +64,47 @@ describe('deprecated-config-keys', () => {
       expect(await Bun.file(join(root, 'src/other.ts')).text()).toBe(other)
       expect((await deprecatedConfigKeys(root, {})).map(diagnostic => diagnostic.file.slice(root.length + 1))).toEqual(['src/site.ts'])
       expect(await deprecatedConfigKeys(root, { lints: { 'deprecated-config-keys': 'allow' } })).toEqual([])
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+})
+
+describe('the library functions taking the config', () => {
+  const i18n = { locales: ['en', 'fr'], defaultLocale: 'en' }
+
+  it('read the content config under its old name', async () => {
+    const messages = 'import { defineMessages } from \'kay\'\n\nexport default defineMessages({})\n'
+    const root = await project({ 'src/messages/en.ts': messages, 'src/messages/fr.ts': messages })
+
+    try {
+      await expect(missingTranslations(root, { i18n, content: 'src/nope.ts' } as never)).rejects.toThrow('names src/nope.ts as the content config')
+      await expect(localizedEntry(root, { i18n, content: 'src/nope.ts' } as never, 'news', 'a')).rejects.toThrow('names src/nope.ts as the content config')
+      await expect(writeDraftEntry(root, { i18n, content: 'src/nope.ts' } as never, 'news', 'fr', 'a', { data: {} })).rejects.toThrow('names src/nope.ts as the content config')
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+})
+
+describe('deprecated-config-keys beyond pages() and testSite() by name', () => {
+  it('follows an import under another name or a namespace, and reads an extension\'s config', async () => {
+    const aliased = 'import { pages as serve } from \'kay/server\'\n\nexport const a = serve({ routes: \'x\' })\n'
+    const namespaced = 'import * as kay from \'kay/server\'\n\nexport const b = kay.pages({ settings: {} })\n'
+    const extension = 'export const lib = { name: \'lib\', config: { storage: undefined, lang: \'en\' } }\n'
+    const unrelated = 'export const c = { config: { routes: 1 } }\nexport const d = { name: \'x\', other: { routes: 1 } }\n'
+    const root = await project({ 'src/a.ts': aliased, 'src/b.ts': namespaced, 'src/lib.ts': extension, 'src/c.ts': unrelated })
+
+    try {
+      const found = await deprecatedConfigKeys(root, {})
+
+      expect(found.map(diagnostic => [diagnostic.file.slice(root.length + 1), diagnostic.message.slice(0, diagnostic.message.indexOf(' '))]).sort()).toEqual([['src/a.ts', '`routes`'], ['src/b.ts', '`settings`'], ['src/lib.ts', '`storage`']])
+
+      await applySafeFixes(root, found)
+      expect(await Bun.file(join(root, 'src/a.ts')).text()).toBe(aliased.replace('routes', 'routesDir'))
+      expect(await Bun.file(join(root, 'src/lib.ts')).text()).toBe(extension.replace('storage', 'fileStore'))
     }
     finally {
       await rm(root, { recursive: true, force: true })
