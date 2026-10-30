@@ -17,6 +17,7 @@ main
   Avatar#avatar(name="Mars" size="lg" class="size-16")
   Stat#stat(value={3} label="moons" variant="tile" tone="danger" class="px-9")
   Meter#meter(value={40} label="Disk" fillClass="bg-danger")
+  Meter#meter-part(value={40} label="Disk" class={{ fill: 'bg-danger' }})
   Meter#meter-rounded(value={40} label="Disk" fillClass="rounded-full")
   Progress#progress(value={30} label="Upload" class="h-3")
   Skeleton#skeleton(shape="avatar")

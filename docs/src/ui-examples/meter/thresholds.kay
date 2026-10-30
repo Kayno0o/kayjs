@@ -10,7 +10,7 @@ function fill() {
 }
 ---
 .flex.max-w-sm.flex-col.gap-3
-  Meter(value={usage()} label="Disk" fillClass={fill()})
+  Meter(value={usage()} label="Disk" class={{ fill: fill() }})
   input(
     type="range"
     min="0"

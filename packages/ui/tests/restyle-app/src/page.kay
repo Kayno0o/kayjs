@@ -143,7 +143,7 @@ CollapsibleSection#section-fold(title="More")
   p body
 Widget#widget(title="Orders" icon="info")
   p body
-Meter#meter(label="Disk" value={40} fillClass="bg-red-500")
+Meter#meter(label="Disk" value={40} class={{ fill: 'bg-red-500' }})
 Popover#popover(open={false})
   @trigger(attributes)
     button({...attributes}) Open

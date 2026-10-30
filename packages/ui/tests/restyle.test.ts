@@ -447,8 +447,9 @@ describe('the display components whose recipe holds their look', () => {
     expect(html).not.toMatch(REMOVED_CLASS)
   })
 
-  test('a Meter\'s fillClass comes after the accent it replaces', () => {
-    expect(classesOfPart('meter', 'fill').slice(0, 2)).toEqual(['bg-accent', 'bg-red-500'])
+  test('a Meter\'s fill part replaces the accent', () => {
+    expect(classesOfPart('meter', 'fill')).toContain('bg-red-500')
+    expect(classesOfPart('meter', 'fill')).not.toContain('bg-accent')
   })
 })
 

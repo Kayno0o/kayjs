@@ -11,12 +11,12 @@ const { value, max = 100, label, fillClass, ...rest } = props<Omit<JSX.Intrinsic
   max?: number | undefined
   // Names the meter for screen readers.
   label: string
-  // Classes for the fill alone, such as a colour picked by threshold; the track always looks like `kui-meter`.
+  /** @deprecated Use `class={{ fill: '...' }}`, which replaces the accent the same way. Removed in 2.0.0. */
   fillClass?: string | undefined
 }>()
 
 const percent = () => max > 0 ? Math.min(100, Math.max(0, value / max * 100)) : 0
 ---
 div(part="root" {...rest} role="meter" aria-valuenow={percent()} aria-valuemin={0} aria-valuemax={100} aria-label={label})
-  // The accent is the fill's own class beside `fillClass`, not the recipe's, so `fillClass` replaces it instead of meeting it after the base.
+  // The accent is the fill's own class, not the recipe's, so `fillClass` and the caller's `class={{ fill }}` both replace it.
   div(part="fill" class={['bg-accent', fillClass]} style={`width: ${percent()}%`})

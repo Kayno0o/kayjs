@@ -412,6 +412,8 @@ describe('the display components whose recipe holds their look, under Tailwind',
   test('a fillClass replaces the accent of the Meter\'s fill, and one that sets no colour keeps it', async () => {
     expect(await classes('#meter [data-part=fill]')).toContain('bg-danger')
     expect(await classes('#meter [data-part=fill]')).not.toContain('bg-accent')
+    expect(await classes('#meter-part [data-part=fill]')).toContain('bg-danger')
+    expect(await classes('#meter-part [data-part=fill]')).not.toContain('bg-accent')
     expect(await classes('#meter-rounded [data-part=fill]')).toEqual(expect.arrayContaining(['bg-accent', 'rounded-full']))
   })
 
