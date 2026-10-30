@@ -17,5 +17,5 @@
     "noEmit": true,
     "skipLibCheck": true
   },
-  "include": ["${configDir}/src", "${configDir}/tests", "${configDir}/*.config.ts", "${configDir}/.kay/types"]
+  "include": ["${configDir}/src", "${configDir}/tests", "${configDir}/scripts", "${configDir}/*.config.ts", "${configDir}/.kay/types"]
 }

@@ -11,7 +11,7 @@ path: tsconfig.json
 { "extends": "kay/tsconfig.json" }
 ```
 
-It includes `src`, `tests`, the `*.config.ts` files beside it, such as `kay.config.ts`, and `.kay/types`.
+It includes `src`, `tests`, `scripts`, the `*.config.ts` files beside it, such as `kay.config.ts`, and `.kay/types`.
 
 A project adds its own `compilerOptions` beside `extends`. An `include` of its own replaces kay's, so it lists `.kay/types` again.
 
