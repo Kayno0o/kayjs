@@ -587,8 +587,23 @@ function scannedImports(file: string, source: string): string[] {
   }
 }
 
-export function fences(source: string): string {
-  const { script, server, module } = parseKay(source)
+// A check or a build asks for the fences of one file for its imports, its signals and the islands it reaches, so the last answers are kept by the source's text.
+const KEPT_FENCES = 2048
+const keptFences = new Map<string, string>()
 
-  return [script, server, module].map(span => span ? source.slice(span.start, span.end) : '').join('\n')
+export function fences(source: string): string {
+  const kept = keptFences.get(source)
+
+  if (kept !== undefined)
+    return kept
+
+  const { script, server, module } = parseKay(source)
+  const text = [script, server, module].map(span => span ? source.slice(span.start, span.end) : '').join('\n')
+
+  if (keptFences.size >= KEPT_FENCES)
+    keptFences.clear()
+
+  keptFences.set(source, text)
+
+  return text
 }
