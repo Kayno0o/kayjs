@@ -39,11 +39,17 @@ function identity(): string {
   return `${version}\0${compilerFingerprint()}\0${Bun.version}`
 }
 
-// The modules of kay that shape the build, which a kay run from a checkout may change under the same version.
+// The modules of kay that shape the build or end up in the client, which a kay run from a checkout may change under the same version.
 function kayModules(): string[] {
-  const build = join(import.meta.dir, '../build')
+  const modules = [join(import.meta.dir, 'builder.ts')]
 
-  return [...readdirSync(build).filter(name => TS_FILE.test(name)).map(name => join(build, name)), join(import.meta.dir, 'builder.ts')]
+  for (const dir of ['../build', '../runtime']) {
+    const folder = join(import.meta.dir, dir)
+
+    modules.push(...readdirSync(folder).filter(name => TS_FILE.test(name)).map(name => join(folder, name)))
+  }
+
+  return modules
 }
 
 // Every file the project's server or build reads, as the walk the build already made finds them.
@@ -130,11 +136,11 @@ export class BuildStamps {
   // Whether the record holds every source by its stamp, as `kay dev`'s does; `kay/test`'s holds the ones the build did not read by their presence only.
   private readonly everySource: boolean
 
-  // `kay dev` gives the output its record goes beside and the key of its options, and so does `kay/test` for a site loading no browser, with `testRecord`, so the files of a run check the islands once between them.
-  constructor(private readonly root: string, recorded?: { output: string, options: string }, testRecord = false) {
+  // `kay dev` gives the output its record goes beside and the key of its options, and so does `kay/test` for a site loading no browser, with `testRecord: true`, so the files of a run check the islands once between them.
+  constructor(private readonly root: string, recorded?: { output: string, options: string, testRecord?: boolean }) {
     this.realRoot = realpathSync(root)
-    this.record = recorded && { ...recorded, file: join(recorded.output, FINGERPRINT) }
-    this.everySource = recorded !== undefined && !testRecord
+    this.record = recorded && { file: join(recorded.output, FINGERPRINT), output: recorded.output, options: recorded.options }
+    this.everySource = recorded !== undefined && recorded.testRecord !== true
     this.generated = join(this.realRoot, KAY_DIR) + sep
   }
 

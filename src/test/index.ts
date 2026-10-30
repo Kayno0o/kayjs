@@ -23,6 +23,7 @@ import { solveWork } from '../runtime/work'
 import { MCP_PATH, mcpPath } from '../server/api-modules'
 import { servePages } from '../server/app'
 import { basePath, routerPath } from '../server/base'
+import { clientOptionsKey } from '../server/client'
 import { shutdown } from '../server/lifecycle'
 import { forgetStamps } from '../server/live'
 import { loaderRoot } from '../server/loader'
@@ -115,15 +116,10 @@ async function recordFresh(stamps: BuildStamps): Promise<boolean> {
 
 const builds = new Map<string, { key: string, stamps: BuildStamps, running: () => boolean, build: Promise<ClientBuild> }>()
 
-// The options that tell two builds apart, as far as they can be written down.
-function optionsKey(options: ClientOptions): string {
-  return JSON.stringify(options, (_, value: unknown) => typeof value === 'bigint' ? String(value) : value)
-}
-
 // One build per root and output, rebuilt when its options changed or a file it read did, as `kay dev`'s stamps tell, and one at a time: every build clears and rewrites its output, which the sites of a process share.
 // A build still running is the one asked for, and one that failed stays failed until a source changes. A site not loaded in a browser builds into `.kay/test-client`, so `kay build`'s output stays as it was.
 async function islandsBuilt(root: string, options: ClientOptions, inBrowser: boolean): Promise<ClientBuild> {
-  const key = optionsKey(options)
+  const key = clientOptionsKey(options)
   const slot = `${root}\0${inBrowser}`
   const held = builds.get(slot)
 
@@ -136,9 +132,10 @@ async function islandsBuilt(root: string, options: ClientOptions, inBrowser: boo
   if (latest !== held && latest?.key === key)
     return latest.build
 
-  const output = `test-client${testWorker()}`
+  // One output, and so one record, per options key: files alternating options each find the check they left.
+  const output = `test-client${testWorker()}.${Bun.hash(key).toString(36)}`
   // A check build leaves its record in the output, so a later file of the run, or a later run, whose sources are the same builds nothing again.
-  const stamps = inBrowser ? new BuildStamps(root) : new BuildStamps(root, { output: join(root, KAY_DIR, output), options: recordKey(root, key) }, true)
+  const stamps = inBrowser ? new BuildStamps(root) : new BuildStamps(root, { output: join(root, KAY_DIR, output), options: recordKey(root, key), testRecord: true })
   let running = true
   const build = (async () => {
     try {

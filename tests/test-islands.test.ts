@@ -15,7 +15,15 @@ const FINE = 'export const hello = () => \'hi\'\n'
 let root = ''
 let greeting = ''
 
-const manifest = (): string => join(root, `.kay/test-client${testWorker()}/manifest.json`)
+// The folder of the newest check build, as each options key has one of its own.
+function checkDir(): string {
+  const dirs = readdirSync(join(root, '.kay')).filter(name => name.startsWith(`test-client${testWorker()}.`) && existsSync(join(root, '.kay', name, 'manifest.json')))
+  const time = (name: string): number => Bun.file(join(root, '.kay', name, 'manifest.json')).lastModified
+
+  return join(root, '.kay', dirs.sort((a, b) => time(b) - time(a))[0] ?? 'missing')
+}
+
+const manifest = (): string => join(checkDir(), 'manifest.json')
 
 beforeAll(async () => {
   root = await scratchDir('test-islands-')
@@ -69,7 +77,7 @@ describe('testSite builds the islands', () => {
     const assets = (dir: string): string[] => existsSync(dir) ? readdirSync(dir) : []
 
     expect(assets(join(root, '.kay/client/dist/assets')).some(name => name.startsWith('echo-'))).toBe(false)
-    expect(assets(join(root, `.kay/test-client${testWorker()}/dist/assets`)).some(name => name.startsWith('echo-'))).toBe(true)
+    expect(assets(join(checkDir(), 'dist/assets')).some(name => name.startsWith('echo-'))).toBe(true)
     expect(await Bun.file(manifest()).exists()).toBe(true)
     expect(await inOutput('elsewhere', async () => Promise.resolve(outputDir('/p')))).toBe('/p/.kay/elsewhere')
   })
@@ -229,17 +237,23 @@ describe('testSite keeps the islands it built', () => {
 })
 
 describe('testSite keeps its check between processes', () => {
-  const visit = async (): Promise<void> => {
-    const code = `import { testSite } from ${JSON.stringify(join(import.meta.dir, '../src/test'))}\nawait testSite({ root: ${JSON.stringify(root)} })\nawait Bun.sleep(300)\nprocess.exit(0)\n`
+  const visit = async (options: { base?: string } = {}): Promise<void> => {
+    const code = `import { testSite } from ${JSON.stringify(join(import.meta.dir, '../src/test'))}\nawait testSite({ root: ${JSON.stringify(root)}, ...${JSON.stringify(options)} })\nawait Bun.sleep(300)\nprocess.exit(0)\n`
     const child = Bun.spawn([process.execPath, '-e', code], { cwd: root, stdout: 'ignore', stderr: 'pipe', env: { ...process.env, KAY_ROOT: root } })
     const [error, exit] = await Promise.all([new Response(child.stderr).text(), child.exited])
 
     if (exit !== 0)
       throw new Error(error)
   }
-  const recorded = (): string => join(root, `.kay/test-client${testWorker()}/fingerprint.json`)
+  const recorded = (): string => join(checkDir(), 'fingerprint.json')
+
+  // The check builds the process leaves, by folder and the time their manifest was written.
+  const manifests = (): Record<string, number> => Object.fromEntries(readdirSync(join(root, '.kay')).filter(name => name.startsWith(`test-client${testWorker()}.`)).map(name => [name, Bun.file(join(root, '.kay', name, 'manifest.json')).lastModified]))
 
   it('builds the islands once for the files of a run, and again once a source changed', async () => {
+    for (const name of Object.keys(manifests()))
+      rmSync(join(root, '.kay', name), { recursive: true, force: true })
+
     await Bun.write(greeting, FINE)
     await testSite({ root })
     // The record is written once the build settles.
@@ -254,6 +268,10 @@ describe('testSite keeps its check between processes', () => {
 
     const first = Bun.file(manifest()).lastModified
 
+    // The record holds kay's own runtime, which a checkout may edit under one version.
+    const saved = await Bun.file(recorded()).json() as { stamps: Record<string, string> }
+
+    expect(Object.keys(saved.stamps).some(file => file.endsWith(join('src', 'runtime', 'core.ts')))).toBe(true)
     await Bun.sleep(20)
     await visit()
     expect(Bun.file(manifest()).lastModified).toBe(first)
@@ -274,5 +292,67 @@ describe('testSite keeps its check between processes', () => {
     await Bun.write(join(root, 'package.json'), '{ "name": "scratch", "version": "2.0.0" }\n')
     await visit()
     expect(Bun.file(manifest()).lastModified).toBeGreaterThan(second)
+  })
+
+  it('keeps one record per options key, so files alternating `base` build nothing again', async () => {
+    await Bun.sleep(2100)
+    await visit({ base: '/one' })
+    await visit({ base: '/two' })
+    await Bun.sleep(2100)
+    await visit({ base: '/one' })
+    await visit({ base: '/two' })
+
+    const kept = manifests()
+
+    expect(Object.keys(kept)).toHaveLength(3)
+    await Bun.sleep(20)
+    await visit({ base: '/one' })
+    await visit()
+    await visit({ base: '/two' })
+    expect(manifests()).toEqual(kept)
+  })
+
+  it('builds again for a source added or deleted between processes, and once for each', async () => {
+    const extra = join(root, 'src/extra.ts')
+    const before = manifests()
+
+    await Bun.write(extra, 'export const extra = 1\n')
+    await visit()
+    await Bun.sleep(2100)
+    await visit()
+
+    const added = manifests()
+
+    expect(Object.values(added).some((time, index) => time > Object.values(before)[index]!)).toBe(true)
+    await Bun.sleep(20)
+    await visit()
+    expect(manifests()).toEqual(added)
+
+    rmSync(extra)
+    await Bun.sleep(2100)
+    await visit()
+    await Bun.sleep(20)
+
+    const removed = manifests()
+
+    expect(Object.values(removed).some((time, index) => time > Object.values(added)[index]!)).toBe(true)
+    await visit()
+    expect(manifests()).toEqual(removed)
+  })
+
+  it('keeps no record of a .kay that does not compile, and a record again once it is gone', async () => {
+    const index = join(root, 'src/routes/index.kay')
+    const source = await Bun.file(index).text()
+
+    await Bun.write(index, '---\nconst = \n---\nbutton {\n')
+    await visit()
+    expect(existsSync(recorded())).toBe(false)
+
+    await Bun.write(index, source)
+    await Bun.sleep(2100)
+    await visit()
+    await Bun.sleep(2100)
+    await visit()
+    expect(existsSync(recorded())).toBe(true)
   })
 })

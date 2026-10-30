@@ -347,7 +347,7 @@ Every `testSite()` call checks that the islands build for the browser. The build
 
 A `.kay` file that does not compile is the exception: only the visit of a page importing it answers 500 and logs the error naming the file, so the tests of other pages stay green; a file no page imports goes unreported. A site opened with `browser` needs the whole build and throws it.
 
-The build goes to `.kay/test-client`, so what `kay build` wrote stays as it was. It runs again only when a file it read changed or a source of your project was added or removed, and the record it keeps in that folder lets the next test file, process or run skip it: the components, scripts, stylesheets and content it read, and the library files it bundled.
+The build goes to a folder of `.kay` named `test-client` and the options it was built with (one per set of options, as `base` makes), so what `kay build` wrote stays as it was. It runs again only when a file it read changed or a source of your project was added or removed, and the record it keeps in that folder lets the next test file, process or run skip it: the components, scripts, stylesheets and content it read, and the library files it bundled.
 
 The record also follows `package.json`, the lockfile, `tsconfig*.json` and `kay.config.*`. A file it did not read, such as a database your tests write under `data/`, can change without building it again. A file your root `.gitignore` leaves out, by a glob such as `data/*.sqlite*` too, can also be created or removed without building it again.
 
