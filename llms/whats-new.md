@@ -2,7 +2,7 @@
 
 What each release of kay and its libraries adds, newest first, each feature with where it is documented. kay and its libraries share one version, so one section covers them all; what a release breaks is in [Upgrading](upgrading.md).
 
-## Unreleased
+## 1.85.0
 
 - A string with a `date-time`, `date` or `time` format no longer takes the 10,000 character default, so the OpenAPI document and the tool schemas show a date as its format alone: [API routes](api-routes.md).
 - A component call merging a shorthand class, a `class` attribute or a spread with a condition object (`Plain.mt-4(class={{ on: true }})`) passes `kay check` under `exactOptionalPropertyTypes` on a component typing `class?: string`: [styles and assets](styles-and-assets.md).
@@ -45,18 +45,4 @@ What each release of kay and its libraries adds, newest first, each feature with
 - kayjs-ai: `ai({ imageAlt: true })` drafts the `alt` of each imported image a server-rendered page shows with none, once per image content and kept in `.kay/cache`, `kay check` lists the drafts for review and no longer reports `missing-alt` for those images, and `describeImage()` asks the model for one: [Images and PDFs](../packages/ai/llms/attachments.md#draft-the-alt-of-imported-images).
 - An extension can carry `transformServedPage`, the page hook for a page rendered per request, and declare `satisfies: ['missing-alt']`, which makes `kay check` skip an `img` of a server-rendered page whose `src` is an imported image, and `kay/library` exports `libraryCacheSlot`, `readCacheEntry` and `writeCacheEntry` for a library's own entries under `.kay/cache`: [Component libraries](component-libraries.md).
 
-## 1.83.0
-
-- kayjs-ai: `ground(found, read)` turns the rows pg-orm 8's `nearest()` found into the `system` and `sources` of an `ask`, so a chat answers from the app's own documents and cites them, and the fake answers it all under `bun test`: [Speech and embeddings](../packages/ai/llms/speech-and-embeddings.md).
-- kay and its libraries accept `@kaynooo/pg-orm` 7 or 8 as their peer, and `kay new` and `kay add` scaffold an app on 8, where a call that matched every row (an empty WHERE on an update or delete, an object as a key) throws `ValidationError`: [pg-orm 8's guide](https://git.kaynooo.fr/kaynooo/pg-orm/src/branch/main/MIGRATION_v8.0.0.md). kayjs-ai's embeddings example uses 8's `embedding()` trait and `repo.read.nearest()`.
-- Re-clicking or re-hovering a link whose page is still loading no longer fetches it again: a repeated click joins the load under way and a prefetch is skipped, so a slow page costs one request.
-- `kay build` warns of an `await` block with a pending branch on a prerendered page outside an island, which the build resolves so its pending content never shows, and names a page that waited 1 s or more on one: [prerendering](prerendering.md#prerendering).
-- Going back or forward to a page already being fetched takes that fetch instead of starting a second one, and two refreshes of a page leave one request running.
-- kayjs-ai: `transcribe(audio)`, `speak(text)` and `embed(texts)` call an OpenAI-compatible server's audio and embeddings API (a local Whisper or Kokoro server, Ollama, OpenAI) from `AI_AUDIO_URL`, `AI_EMBED_URL` or the server `ask` uses, and the fake answers them under `bun test`, embeddings as stable vectors from the words: [Speech and embeddings](../packages/ai/llms/speech-and-embeddings.md).
-- `kay check` reports an island whose imports reach a builtin a browser build refuses, `async_hooks` through a database library or `bun:sqlite` say, as `browser-builtin-import` at the island's import with the chain the build prints, where only `kay build` refused it: [Browser-only code](browser-only.md).
-- `kay check` reports a refused builtin behind a `sideEffects: false` package or a child `.kay` component an island renders as `browser-builtin-import` too, keeps the other islands' reports when one import fails to bundle, and reports one chain once per island: [Browser-only code](browser-only.md).
-- `kay build` writes the navigation-only entry and its chunks only when a component renders a form posting to an action, so an app with none deploys no `nav-*` file: [building](build-and-start.md).
-- A content collection with a `load` function keeps its compiled Markdown bodies in `.kay/cache/content` as a folder collection does, so a build compiles only the bodies that changed: [Content](content-markdown-to-caching.md).
-- kayjs-auth: `organizations.update(id, {})` and an empty update of a user answer the row as it is on the pg store, where it threw and the organization update reported `slug-taken`; `slug-taken` now means a slug another organization holds.
-
-Releases before 1.83 are in [What's new, older releases](whats-new-archive.md).
+Releases before 1.84 are in [What's new, older releases](whats-new-archive.md).

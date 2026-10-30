@@ -1,6 +1,20 @@
 # What's new, older releases
 
-What each release before 1.83 added, and the end of a newest release that was cut short (`(continued)`), newest first, each feature with where it is documented. The newer releases are in [What's new](whats-new.md); what a release breaks is in [Upgrading](upgrading.md).
+What each release before 1.84 added, and the end of a newest release that was cut short (`(continued)`), newest first, each feature with where it is documented. The newer releases are in [What's new](whats-new.md); what a release breaks is in [Upgrading](upgrading.md).
+
+## 1.83.0
+
+- kayjs-ai: `ground(found, read)` turns the rows pg-orm 8's `nearest()` found into the `system` and `sources` of an `ask`, so a chat answers from the app's own documents and cites them, and the fake answers it all under `bun test`: [Speech and embeddings](../packages/ai/llms/speech-and-embeddings.md).
+- kay and its libraries accept `@kaynooo/pg-orm` 7 or 8 as their peer, and `kay new` and `kay add` scaffold an app on 8, where a call that matched every row (an empty WHERE on an update or delete, an object as a key) throws `ValidationError`: [pg-orm 8's guide](https://git.kaynooo.fr/kaynooo/pg-orm/src/branch/main/MIGRATION_v8.0.0.md). kayjs-ai's embeddings example uses 8's `embedding()` trait and `repo.read.nearest()`.
+- Re-clicking or re-hovering a link whose page is still loading no longer fetches it again: a repeated click joins the load under way and a prefetch is skipped, so a slow page costs one request.
+- `kay build` warns of an `await` block with a pending branch on a prerendered page outside an island, which the build resolves so its pending content never shows, and names a page that waited 1 s or more on one: [prerendering](prerendering.md#prerendering).
+- Going back or forward to a page already being fetched takes that fetch instead of starting a second one, and two refreshes of a page leave one request running.
+- kayjs-ai: `transcribe(audio)`, `speak(text)` and `embed(texts)` call an OpenAI-compatible server's audio and embeddings API (a local Whisper or Kokoro server, Ollama, OpenAI) from `AI_AUDIO_URL`, `AI_EMBED_URL` or the server `ask` uses, and the fake answers them under `bun test`, embeddings as stable vectors from the words: [Speech and embeddings](../packages/ai/llms/speech-and-embeddings.md).
+- `kay check` reports an island whose imports reach a builtin a browser build refuses, `async_hooks` through a database library or `bun:sqlite` say, as `browser-builtin-import` at the island's import with the chain the build prints, where only `kay build` refused it: [Browser-only code](browser-only.md).
+- `kay check` reports a refused builtin behind a `sideEffects: false` package or a child `.kay` component an island renders as `browser-builtin-import` too, keeps the other islands' reports when one import fails to bundle, and reports one chain once per island: [Browser-only code](browser-only.md).
+- `kay build` writes the navigation-only entry and its chunks only when a component renders a form posting to an action, so an app with none deploys no `nav-*` file: [building](build-and-start.md).
+- A content collection with a `load` function keeps its compiled Markdown bodies in `.kay/cache/content` as a folder collection does, so a build compiles only the bodies that changed: [Content](content-markdown-to-caching.md).
+- kayjs-auth: `organizations.update(id, {})` and an empty update of a user answer the row as it is on the pg store, where it threw and the organization update reported `slug-taken`; `slug-taken` now means a slug another organization holds.
 
 ## 1.82.0
 
