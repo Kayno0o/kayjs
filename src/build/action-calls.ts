@@ -85,7 +85,8 @@ function namespacesOf(program: Program, names = new Set<string>()): Set<string> 
 
     if (statement.type === 'VariableDeclaration') {
       for (const { id, init } of statement.declarations) {
-        const value = init ? unwrap(init.type === 'AwaitExpression' ? init.argument : init) : undefined
+        const awaited = init ? unwrap(init) : undefined
+        const value = awaited?.type === 'AwaitExpression' ? unwrap(awaited.argument) : awaited
 
         if (id.type === 'Identifier' && value?.type === 'ImportExpression' && value.source.type === 'Literal' && value.source.value === 'kay')
           names.add(id.name)
@@ -152,7 +153,12 @@ export function declaresAction(source: string, kay: boolean): boolean {
     }
 
     // A `markdown` block is lowered to template lines first, so its `{...}` are read like any other.
-    const { file } = parseExpanded(source)
+    const { file, problems } = parseExpanded(source)
+
+    // A block the lowering refused, such as a `{` never closed, may hide the use: the reviver stays.
+    if (problems.length > 0)
+      return true
+
     const programs = [file.script, file.server, file.module].flatMap(span => span === undefined ? [] : [parse(file.source.slice(span.start, span.end))])
     const namespaces = new Set<string>()
 

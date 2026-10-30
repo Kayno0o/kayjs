@@ -1,6 +1,7 @@
 import { mkdir } from 'node:fs/promises'
 import { join } from 'node:path'
 import { describe, expect, it, spyOn } from 'bun:test'
+import { declaresAction } from '../src/build/action-calls'
 import { readClientSources } from '../src/build/client'
 import { scratchDir } from './scratch'
 import { pages, sharedClient } from './shared-pages'
@@ -196,6 +197,7 @@ export const greet = act(t.Object({ name: t.String() }), ({ name }) => \`Hello \
       `import * as kay from 'kay'\nexport const { 'action': act } = kay`,
       `export const { action: act } = await import('kay')`,
       `const k = await import('kay')\nexport const a = k.action`,
+      `const k = (await import('kay')) as typeof import('kay')\nexport const a = k.action`,
       `import * as k from 'kay'\nexport const a = k!.action`,
       `import * as k from 'kay'\nexport const a = (k as unknown as { action: unknown }).action`,
     ]) {
@@ -203,6 +205,10 @@ export const greet = act(t.Object({ name: t.String() }), ({ name }) => \`Hello \
 
       expect([code, (await readClientSources(root)).actionProps]).toEqual([code, true])
     }
+  })
+
+  it('keeps the reviver for a markdown block whose hole is never closed', () => {
+    expect(declaresAction('---\nimport Caller from \'../components/caller.kay\'\n---\nmarkdown\n  Hello {action(a, b there\n', true)).toBe(true)
   })
 
   it('does not count a type member or an enum member named action, and keeps counting a parameter named so as the safe side', async () => {
