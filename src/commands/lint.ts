@@ -5,6 +5,7 @@ import { configCheckOptions, writeShadowTypes } from '../check'
 import { loadConfig } from '../config-loader'
 import { buildingWithoutEnv } from '../server/env-state'
 import { printFailure, projectRoot } from './command'
+import { dropStaleLintCache } from './lint-cache'
 import { USAGES } from './usages'
 
 // Writes the types the lint of .kay files reads, then runs the project's `keslint` on the arguments, so linting needs no `kay check` before it.
@@ -38,6 +39,8 @@ export const lint: Command = {
 
       return 1
     }
+
+    await dropStaleLintCache(root, positionals)
 
     return Bun.spawn([keslint, ...positionals], { stdio: ['inherit', 'inherit', 'inherit'] }).exited
   },

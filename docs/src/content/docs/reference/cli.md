@@ -638,7 +638,7 @@ kay fmt --from-html card.html   # print HTML as a .kay template
 kay lint --fix --cache       # ESLint, with the types it reads written first
 ```
 
-`kay lint` writes the types ESLint reads for `.kay` files, then runs the project's `keslint` with the arguments you give it. The `lint` script of a new project is `kay lint --cache`.
+`kay lint` writes the types ESLint reads for `.kay` files, then runs the project's `keslint` with the arguments you give it. The `lint` script of a new project is `kay lint --cache`. With `--cache`, `kay lint` drops ESLint's cache first when `tsconfig.json` or the types it wrote changed, so a result from before the change is not kept.
 
 `kay test` runs `bun test` with every file in modules of its own and `kay/test/preload` loaded, and passes its arguments on, so `kay test --watch` and `kay test tests/cart.test.ts` work. A project needs no `bunfig.toml` for it. A failure is reported at the line of the `.kay` file. The `test` script of a new project is `kay test`.
 
