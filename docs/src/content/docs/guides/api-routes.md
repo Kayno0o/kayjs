@@ -176,6 +176,8 @@ export default defineConfig({
 
 With `{ file }`, kay makes a random key in that file the first time the server starts, readable by its owner alone, and the environment still wins when it is set. A string is the key itself, for one your own code reads from somewhere else. A key is at least 16 characters and is read when the server starts, so a new key takes a restart.
 
+A relative `{ file }` is read from the project folder, and from the folder the server runs in when it is a compiled executable, so `data/mcp-key` sits next to the app's other data. An absolute path is used as it is.
+
 A production server with `key: true` and no key does not start. Elsewhere it refuses every request and logs a warning that names the variables. Behind `proxy.key`, the endpoint needs no entry in `proxy.open`, because the bearer is its credential. The tool a call runs does not receive the key as its `Authorization`.
 
 The key is the only way in: with `mcp.key` set, an OAuth token from kayjs-auth is refused at the endpoint. Prefer a generated key, which `{ file }` makes, over a short one you choose, because a caller on your own network can retry as often as the rate limit lets it.
