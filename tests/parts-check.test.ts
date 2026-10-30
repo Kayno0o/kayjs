@@ -8,6 +8,7 @@ setDefaultTimeout(90_000)
 
 const compilerOptions = { target: 'ESNext', jsx: 'preserve', jsxImportSource: 'kay', lib: ['ESNext', 'DOM'], rootDirs: ['.', '.kay/types'], module: 'Preserve', moduleResolution: 'bundler', strict: true, noEmit: true, skipLibCheck: true }
 const tsconfig = JSON.stringify({ compilerOptions, include: ['src', '.kay/types'] })
+const exact = JSON.stringify({ compilerOptions: { ...compilerOptions, exactOptionalPropertyTypes: true }, include: ['src', '.kay/types'] })
 const COMPONENTS = {
   'src/card.kay': 'section.card\n  header(part="head") a\n  div(part="body")\n    slot\n',
   'src/plain.kay': '---\nconst { class: className } = props<{ class?: string }>()\n---\ndiv(class={className}) a\n',
@@ -55,8 +56,6 @@ describe('kay check on a component with parts', () => {
   })
 
   it('takes a part class that may be undefined under exactOptionalPropertyTypes', async () => {
-    const exact = JSON.stringify({ compilerOptions: { ...compilerOptions, exactOptionalPropertyTypes: true }, include: ['src', '.kay/types'] })
-
     expect(await problems(`${IMPORTS}Card(class={{ head: rest.id === 'x' ? 'p-6' : undefined }}) a\n`, undefined, exact)).toEqual([])
   })
 
@@ -76,7 +75,6 @@ describe('kay check on a component with parts', () => {
   })
 
   describe('a merged class on a component typing its class prop, under exactOptionalPropertyTypes', () => {
-    const exact = JSON.stringify({ compilerOptions: { ...compilerOptions, exactOptionalPropertyTypes: true }, include: ['src', '.kay/types'] })
     const withExtra = async (page: string, config: string) => problems(page, 'src/routes/index.kay', config)
 
     it('passes a shorthand beside a condition object, an attribute string or a spread', async () => {
@@ -96,6 +94,13 @@ describe('kay check on a component with parts', () => {
 
       expect(await withExtra(`${head}Strict.mt-4(class={{ on: true }})\n`, exact)).toEqual([])
       expect(await withExtra(`${head}Strict.mt-4(class={{ on: true }})\n`, tsconfig)).toEqual([])
+    })
+
+    it('refuses a required class prop when the merge can be empty', async () => {
+      const head = '---\nimport Strict from \'../strict.kay\'\nconst rest = { id: \'x\' }\n---\n'
+
+      for (const config of [tsconfig, exact])
+        expect(await withExtra(`${head}Strict({...rest} class={{ on: rest.id === 'x' }})\n`, config)).toEqual([expect.stringContaining('class')])
     })
 
     it('leaves a component with no class prop and a plain element alone', async () => {

@@ -777,9 +777,13 @@ export class JsxTemplate {
     }
 
     if (attribute.kind === 'expression') {
-      const [open, close] = element.component ? [`${helperName('componentClass')}([`, '])'] : ['[', ']']
+      if (element.component) {
+        b.wrap(attribute.name, () => b.add(`{...${helperName('componentClass')}([`)).add(`${JSON.stringify(shorthand)}, (`).addSource(attribute.expression).add(')])}')
 
-      this.attributeName(attribute).add(`={${open}${JSON.stringify(shorthand)}, (`).addSource(attribute.expression).add(`)${close}}`)
+        return
+      }
+
+      this.attributeName(attribute).add(`={[${JSON.stringify(shorthand)}, (`).addSource(attribute.expression).add(')]}')
     }
   }
 
@@ -789,8 +793,7 @@ export class JsxTemplate {
     const shorthand = element.classes.length > 0 ? { start: element.classes[0]!.start, end: element.classes.at(-1)!.end } : undefined
 
     b.add(' ')
-    b.wrap(classAttribute && (classAttribute.kind === 'expression' || !shorthand) ? classAttribute.name : shorthand!, () => b.add('class'))
-    b.add(element.component ? `={${helperName('componentClass')}([` : '={[')
+    b.wrap(classAttribute && (classAttribute.kind === 'expression' || !shorthand) ? classAttribute.name : shorthand!, () => b.add(element.component ? `{...${helperName('componentClass')}([` : 'class={['))
 
     if (shorthand)
       b.add(JSON.stringify(element.classes.map(span => this.text(span)).join(' ')))

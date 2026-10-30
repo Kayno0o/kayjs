@@ -69,7 +69,7 @@ interface TemplateHelpers
 }
   Try: (props: { block: Element; failed?: Element; }) => Element
   awaited: <T>(value: T) => Settled<T>
-  componentClass: <List extends readonly unknown[]>(list: List) => ComponentClass<List>
+  componentClass: <const List extends readonly unknown[]>(list: List) => ComponentClass<List>
   head: (tags: { tag: string; props: Record<string, unknown>; }[]) => void
   omit: <Props extends object, Key extends keyof Props>(props: Props, ...keys: Key[]) => Omit<Props, Key>
   partClass: (props: unknown, part: string) => unknown
