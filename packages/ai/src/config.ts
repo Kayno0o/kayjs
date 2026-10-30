@@ -8,7 +8,7 @@ import { defineEnv } from 'kay/server'
 import { anthropicAt } from './anthropic'
 import { AiError } from './errors'
 import { fakeAi } from './fake'
-import { openaiAt, OPENAI_URL } from './openai'
+import { OPENAI_URL, openaiAt } from './openai'
 
 // The variables, shared by what `ai()` lists for `kay env` and what `ask` reads: `listed` marks the model as the one production needs.
 export function aiEnv(listed = false) {
