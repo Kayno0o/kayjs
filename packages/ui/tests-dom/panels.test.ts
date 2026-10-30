@@ -203,6 +203,23 @@ describe('SidePanel with a dock', () => {
     expect(settled.at(-1)).toBe(280)
   })
 
+  test('sizeKey keeps the settled size in a cookie, which a panel mounted later opens on', async () => {
+    const name = 'pane-width'
+    const first = await mountComponent(Panels, { onClose: () => closes++, sizeKey: name })
+
+    key(grip(first.root), 'ArrowLeft')
+    await settle()
+
+    expect(grip(first.root).getAttribute('aria-valuenow')).toBe('408')
+    expect(document.cookie).toContain(`${name}=`)
+    first.unmount()
+
+    mounted = await mountComponent(Panels, { onClose: () => closes++, sizeKey: name })
+
+    expect(grip(mounted.root).getAttribute('aria-valuenow')).toBe('408')
+    document.cookie = `${name}=; max-age=0; path=/`
+  })
+
   test('resizes by dragging its grip, a cancelled drag keeping the size it reached', async () => {
     const settled: number[] = []
 

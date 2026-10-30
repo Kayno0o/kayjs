@@ -4,7 +4,7 @@ import SidePanel from '@kaynooo/kayjs-ui/side-panel.kay'
 import SplitLayout from '@kaynooo/kayjs-ui/split-layout.kay'
 
 // What the test reads back: how often the panel closed.
-const { onClose, listWidthKey, onSettled } = props<{ onClose: () => void, listWidthKey?: string, onSettled?: (size: number) => void }>()
+const { onClose, listWidthKey, onSettled, sizeKey } = props<{ onClose: () => void, listWidthKey?: string, onSettled?: (size: number) => void, sizeKey?: string }>()
 
 const open = signal(false)
 const beside = signal(false)
@@ -43,7 +43,7 @@ SplitLayout#split(sidebarOpen={sidebarOpen()} onSidebarOpenChange={() => sidebar
   @detail
     p#detail Mars
     button#edit Edit
-SidePanel#docked(open={dockOpen()} modal={false} dock={dockEdge()} size={dockSize()} onSizeChange={(size, settled) => { dockSize = size; if (settled) onSettled?.(size) }} title="Jupiter" launcher="Open Jupiter" launcherLayer={41} style="z-index: 77; opacity: 0.9" onOpenChange={shown => dockOpen = shown})
+SidePanel#docked(open={dockOpen()} modal={false} dock={dockEdge()} size={dockSize()} sizeKey={sizeKey} onSizeChange={(size, settled) => { dockSize = size; if (settled) onSettled?.(size) }} title="Jupiter" launcher="Open Jupiter" launcherLayer={41} style="z-index: 77; opacity: 0.9" onOpenChange={shown => dockOpen = shown})
   p#docked-body Fifth planet
 button#show-launched(onClick={() => launched = true}) Show launched
 if launched()

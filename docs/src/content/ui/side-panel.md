@@ -32,6 +32,8 @@ Escape and the close button still close it through `onOpenChange(false)`. It ren
 
 `size` is the width, or the height at the bottom, in pixels, and `onSizeChange(size, settled)` tells the parent each size the grip reached: `settled` is false while a drag is under way and true when it ends or a key moved it, so keep it then. Only the close control closes a docked panel, Escape does not.
 
+`sizeKey="pane"` keeps the size the grip settled on in a cookie of that name, with no handler and no signal of your own. The server reads the cookie too, so the panel is drawn at the saved width from the first paint, with no jump on load. A `size` you give wins over it.
+
 The panel publishes its size on `html` as `--kui-dock-right` or `--kui-dock-bottom`, and as `--kay-panel-right` or `--kay-panel-bottom` for the dev tool's bar to keep out of. A fixed header across the top is cleared by setting `--kui-dock-top` on `html`, and a `style` sets the panel's `z-index`. `resizeLabel` names the grip, `Resize` by default.
 
 `launcher` is the label of a button the closed panel leaves in the window's bottom right corner, off the dev tool's drawer, which opens it through `onOpenChange(true)`; `launcherLayer` sets its `z-index`, the one thing of it a parent sets, as the panel's `style` does not reach it. It names the panel it opens through `aria-controls`, the panel's `id`, and publishes its room as `--kay-panel-right`.

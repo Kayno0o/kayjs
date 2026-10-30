@@ -1,6 +1,6 @@
 ---
 import type { JSX, Snippet } from 'kay'
-import { effect, listen, navigate, onCleanup, recipe, signal } from 'kay'
+import { effect, listen, navigate, onCleanup, persisted, recipe, signal } from 'kay'
 import IconButton from './icon-button.kay'
 import { wording } from 'kay/words'
 
@@ -20,7 +20,7 @@ const look = recipe({
   },
 })
 
-const { open, title, actions, footer, modal = true, closeHref, launcher, launcherHref, launcherLayer, onOpenChange, closeLabel = wording('ui.sidePanel.close', 'Close'), dock, size, onSizeChange, resizeLabel = wording('ui.sidePanel.resize', 'Resize'), style, ...rest } = props<Omit<JSX.IntrinsicElements['dialog'], 'open' | 'class' | 'title' | 'onClose' | 'closedby' | 'closedBy' | 'style'> & {
+const { open, title, actions, footer, modal = true, closeHref, launcher, launcherHref, launcherLayer, onOpenChange, closeLabel = wording('ui.sidePanel.close', 'Close'), dock, size, sizeKey, onSizeChange, resizeLabel = wording('ui.sidePanel.resize', 'Resize'), style, ...rest } = props<Omit<JSX.IntrinsicElements['dialog'], 'open' | 'class' | 'title' | 'onClose' | 'closedby' | 'closedBy' | 'style'> & {
   // Shows the panel along the edge, as a modal unless `modal` is false; the parent sets it back to false in `onOpenChange`.
   open: boolean
   title: string
@@ -40,6 +40,8 @@ const { open, title, actions, footer, modal = true, closeHref, launcher, launche
   dock?: 'right' | 'bottom' | undefined
   // The docked panel's width (right) or height (bottom) in px, kept within what the page and the panel need; 24rem or half the window when not given.
   size?: number | undefined
+  // Keeps the size the grip settled on in a cookie of this name, from one visit to the next, and draws it on the server, so the saved width shows from the first paint with no jump. A `size` given wins over it.
+  sizeKey?: string | undefined
   // Called with the size the grip reached: `settled` is false while a drag is under way and true once it ends or a key moved it, so a parent keeps it then.
   onSizeChange?: ((size: number, settled: boolean) => unknown) | undefined
   resizeLabel?: string | undefined
@@ -70,6 +72,8 @@ const docked = () => !modal && dock !== undefined
 const room = signal({ width: 0, height: 0, right: 0, bottom: 0 })
 const reached = signal<number>()
 const launching = signal<HTMLElement>()
+// 0 stands for no size kept yet.
+const kept = sizeKey === undefined ? undefined : persisted<number>(sizeKey, 0)
 const dragging = signal(false)
 let panel: HTMLDialogElement | undefined
 let frame = 0
@@ -110,17 +114,21 @@ function clamp(edge: 'right' | 'bottom', value: number) {
 
 // The size on show: the parent's, else the one the grip reached, else the edge's own default.
 function shownSize() {
-  return dock === undefined ? 0 : clamp(dock, (dragging() ? reached() : undefined) ?? size ?? reached() ?? (dock === 'right' ? DOCKS.right.fallback : room().height / 2))
+  return dock === undefined ? 0 : clamp(dock, (dragging() ? reached() : undefined) ?? size ?? (kept?.() || undefined) ?? reached() ?? (dock === 'right' ? DOCKS.right.fallback : room().height / 2))
 }
 
 function resizeTo(next: number, settled: boolean) {
   if (dock === undefined)
     return
 
-  const kept = clamp(dock, next)
+  const clamped = clamp(dock, next)
 
-  reached = kept
-  onSizeChange?.(kept, settled)
+  reached = clamped
+
+  if (settled && kept)
+    kept = clamped
+
+  onSizeChange?.(clamped, settled)
 }
 
 // Dragging the inner edge toward the page grows the panel.
@@ -149,13 +157,13 @@ function startResize(event: PointerEvent) {
     handle.removeEventListener('pointermove', move)
     handle.removeEventListener('pointerup', end)
     handle.removeEventListener('pointercancel', end)
-    const kept = shownSize()
+    const reachedSize = shownSize()
 
     dragging = false
 
     // A bare click on the grip settles nothing.
     if (moved)
-      resizeTo(kept, true)
+      resizeTo(reachedSize, true)
   }
 
   event.preventDefault()
