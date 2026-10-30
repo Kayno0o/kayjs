@@ -15,6 +15,7 @@ export const HEAVY_MB = 500
 // A measurement past the kept one by this share and this many MB counts as a regression.
 const GROWTH = 1.25
 const GROWTH_MB = 50
+const PID = /^\d+$/
 const TEST_FILES = new Glob('tests/**/*.test.{ts,tsx,js,jsx}')
 
 interface Kept { version: number, files: Record<string, number> }
@@ -24,7 +25,7 @@ function parents(): Map<number, number> {
   const parentOf = new Map<number, number>()
 
   for (const name of readdirSync('/proc')) {
-    if (!(/^\d+$/).test(name))
+    if (!PID.test(name))
       continue
 
     try {
@@ -53,7 +54,6 @@ export function descendants(root: number, parentOf: ReadonlyMap<number, number>)
   return found
 }
 
-const PID = /^\d+$/
 const PSS = /^Pss:\s+(\d+) kB$/m
 
 function pssKb(pid: number): number {
