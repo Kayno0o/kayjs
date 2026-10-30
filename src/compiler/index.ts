@@ -141,7 +141,7 @@ interface Role {
 
 const roles = new AsyncLocalStorage<Map<string, Map<string, Role>>>()
 
-// Runs a check, in which a component's role is analysed once whoever asks for it, `rendersAsIsland` and `browserRole` alike: its files do not change meanwhile.
+// Runs a check, in which a component's role is analysed once whoever asks for it, `rendersAsIsland` and `browserRole` alike, kept by the text it was read from.
 // Outside one every call analyses again, as the language server and a server compiling on a request need.
 export async function inAnalysisScope<T>(run: () => Promise<T>): Promise<T> {
   return roles.getStore() ? run() : roles.run(new Map(), run)

@@ -21,6 +21,14 @@ describe('the analysis scope of a check', () => {
     expect(outside.map(row => row[1])).toEqual([undefined, 'island', 'island', 'promotable', 'island', undefined])
   })
 
+  it('answers the same with a project root and an icon import as without', async () => {
+    const icon = '---\nimport Home from \'~icons/tabler/home\'\n---\nHome\n'
+    const root = process.cwd()
+
+    expect(rendersAsIsland(icon, undefined, root)).toBe(rendersAsIsland(icon))
+    expect(await inAnalysisScope(async () => browserRole(icon, 'icon.kay', undefined, root))).toBe(browserRole(icon, 'icon.kay', undefined, root))
+  })
+
   it('parses a component once for every question about it with the same signals, and again outside the scope', async () => {
     const spy = spyOn(markdown, 'parseExpanded')
     const [, file, text] = SOURCES[1]!
