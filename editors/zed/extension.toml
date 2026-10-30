@@ -1,14 +1,14 @@
 id = "kay"
 name = "Kay"
 description = "Highlighting and the kay language server for .kay components"
-version = "1.83.0"
+version = "1.84.0"
 schema_version = 1
 authors = [ "Kaynooo" ]
 repository = "https://github.com/Kayno0o/kayjs"
 
 [grammars.kay]
 repository = "https://github.com/Kayno0o/kayjs"
-rev = "v1.83.0"
+rev = "v1.84.0"
 path = "editors/tree-sitter-kay"
 
 [language_servers.kay]

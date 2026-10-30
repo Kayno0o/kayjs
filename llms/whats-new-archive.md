@@ -1,6 +1,23 @@
 # What's new, older releases
 
-What each release before 1.82 added, and the end of a newest release that was cut short (`(continued)`), newest first, each feature with where it is documented. The newer releases are in [What's new](whats-new.md); what a release breaks is in [Upgrading](upgrading.md).
+What each release before 1.83 added, and the end of a newest release that was cut short (`(continued)`), newest first, each feature with where it is documented. The newer releases are in [What's new](whats-new.md); what a release breaks is in [Upgrading](upgrading.md).
+
+## 1.82.0
+
+- An extension's API module may default-export a function of the `ExtensionApp`, called with the `appFiles` modules as a `server` function is, so a library serves the app's data file, `api({ cors })` included, and the app writes no module only forwarding it; an island hands such a module to `call()`, `socket()`, `stream()` or `resource()`, typed off the routes it builds: [Component libraries](component-libraries.md).
+- An action's stream is read to its end with `await answer.ended()`, resolving with its last value and rejecting when it failed or was closed, with no polling of `status()`: [streaming actions](actions-from-islands.md).
+- A production page that posts forms and holds no island loads the navigation-only entry alone, which `kay build`'s route sizes and size report weigh it with, and an island page loads the forms' listener only once it shows a form: [building](build-and-start.md#build-and-start-commands).
+- A form posted before the forms' listener loaded is held only when the swap would take it and posted once, a post the swap leaves out going to the browser untouched, and a form holding a control named `enctype`, `elements`, `style`, `noValidate`, `requestSubmit` or `reportValidity` is checked, posted and refused as one without it, a multipart one posting multipart again.
+- `site.open()` serves a `testSite()` with a `base` under it, so a browser test needs no front of its own, and `kay screenshot` and `kay a11y` pipe a page's websockets under a base too; `testSite()` rebuilds its islands when any file the build read changes (`kay.config.ts`, `public/`, content, libraries) and keeps them when one it did not read changes, a file the root `.gitignore` leaves out included: [Testing in a browser](testing-browser.md), [testing](testing-setup.md).
+- A page reading `window['scrollTo']`, or a parameter or import named like `Date` or `fetch`, is now kept, and one reading an exported constant is no longer refused because a string, a comment, an object key or a template's tag shares its name: [prerendering](prerendering.md).
+- A rate limit whose store throws, rejects or hangs counts in memory instead, logged once, for an action's limits, API routes, `rateLimit()` and proof of work as for kay's own routes, and the MCP endpoint's 429 says how long to wait: [Rate limits](rate-limits.md#reference).
+- kayjs-ui: `RecordButton` records the microphone into a File, owning permissions, busy state and device release, and kayjs-ai's `Chat(transcribe={transcribe})` adds a microphone beside the field that sends what the action writes down: [RecordButton](../packages/ui/llms/basics.md#recordbutton), [Chat](../packages/ai/llms/chat.md#speaking-a-message).
+- kayjs-ui: a `SaveForm`, `FormDialog` or submitting `Select` whose form holds a control named `elements`, `requestSubmit` or `reset` saves, submits and discards instead of throwing.
+- kayjs-auth: the methods of a feature are grouped under it, `auth.admin.listUsers()`, `auth.password.signIn(input)`, so an editor lists one feature's methods at a time; the flat names work until 1.85, and `kay upgrade` renames the calls: [Grouped methods](../packages/auth/llms/grouped-methods.md).
+- kayjs-auth: attempts count in memory, logged once, while the store's `rates` throws, rejects or takes over 8 s, so a sign-in still answers and still locks out: [Limits](../packages/auth/llms/hardening-and-testing.md#limits).
+- kayjs-ai: `Chat`'s `keepOnServer` has the server keep the conversation through the action's own `ask`, a reload or Back showing it again under `?conversation=`, `conversations` lists the visitor's with rename and delete, a reply of an `outlive` ask is picked back up after a reload, and a tab whose reply lost its write to another tab is refused with 409: [Conversations kept on the server](../packages/ai/llms/chat-conversations.md).
+- kayjs-ai: `ChatLauncher` takes `keepOnServer` and `conversations`, the panel's conversation named by this browser through `Chat`'s new `conversationIn="browser"`, so a reload, another page or a new tab shows it again: [A chat on every page](../packages/ai/llms/chat-conversations.md#a-chat-on-every-page).
+- kayjs-ai: an approval ticket whose store fails or takes over 5 s runs no call, where a hanging store held the reply: [Actions as tools](../packages/ai/llms/tools.md).
 
 ## 1.81.0
 
@@ -64,56 +81,4 @@ What each release before 1.82 added, and the end of a newest release that was cu
 - kayjs-ai: `Chat(fill)` takes the height of its container, the log (or the greeting) taking the space and the form staying at the bottom, for a chat that is a page's main content: [chat](../packages/ai/llms/chat.md#props).
 - `kay check` reports `signal-set-call`, a signal written `count.set(value)` where assigning it, `count = value`, does the same, and `--fix` assigns it: [Signals](components.md#signals).
 
-## 1.81.0 (continued)
-
-- kayjs-ui: `Stat(href)` links the whole stat and `Stat(delta)` shows the change from the previous period with a `trendUp`, `trendDown` or `trendFlat` arrow, read after its label: [basics](../packages/ui/llms/basics.md#stat-meter-progress-skeleton-barlist-sitefavicon-copybutton-rating).
-- kayjs-ui: `Sparkline(values, label)` draws axis-free bars and `StatusStrip(cells, label)` coloured cells read as one sentence: [charts](../packages/ui/llms/charts-drag-and-media.md#linechart-barchart-scatterchart-contributiongraph-sparkline-statusstrip).
-- kayjs-ui: `DescriptionList(items)` is a `dl` of labels and values, an `@value(item)` block drawing the rich ones and a dash the empty ones: [page layout](../packages/ui/llms/page-layout-palette-and-trees.md#descriptionlist).
-- kayjs-ui: a `BarList` row takes `href`, making its label a real link: [basics](../packages/ui/llms/basics.md).
-- kayjs-ui: `MapView` markers are one tab stop the arrows walk, its tiles darken in a dark scheme (`darkTiles`, `--map-tiles-dark`), and a change to `lines` or `markers` keeps a view the visitor moved: [MapView](../packages/ui/llms/charts-drag-and-media.md#mapview).
-- kayjs-ui: `Segmented(showLabel)` and `ChipGroup(showLabel)` write their label above the group and name the group by it: [tables](../packages/ui/llms/tables-navigation-and-layout.md).
-- kayjs-ui: a narrow `Table`'s stacked cards keep their own top line when the app drops the `row` part's border: [tables](../packages/ui/llms/tables-navigation-and-layout.md).
-- kayjs-ui: a long word with no break point breaks inside `PageHeader`, `Card`, `Notice` and `Table` instead of widening a phone's page: [PageHeader](../packages/ui/llms/page-layout-palette-and-trees.md#pageheader-pagesection-collapsiblesection-accordion-widget-cardrow-sidepanel-toolbar-splitlayout).
-- kayjs-ui: a `required` `TimeInput` never calls `onChange` with `''`: [forms](../packages/ui/llms/forms.md).
-- kayjs-ui: the `AudioPlayer` cue arrows follow the reading direction and its next button keeps the focus at the last chapter: [media](../packages/ui/llms/charts-drag-and-media.md).
-- kayjs-ui: a disabled `IconButton` or `BareIconButton` stays a tab stop with its label as the tooltip, and a locked button's `popovertarget` or `command` opens nothing: [Button](../packages/ui/llms/basics.md#icon-button-iconbutton).
-- kayjs-ui: the `external` icon slot, drawn by the `AudioPlayer` chapter links, is replaced through the settings like the others: [setup](../packages/ui/llms/setup.md#settings).
-- kayjs-ai: a `Chat` renders each turn once and hydrates an `initial` turn with sources without a flash, citing nothing inside code and naming its sources list for screen readers: [Chat sources](../packages/ai/llms/chat-sources.md).
-- kayjs-ai: an open `Chat` edit survives a message sent from outside and an Allow or Deny, Escape and Cancel return the focus to its edit button, and `editEmptyLabel` and `editBusyLabel` say why a Save or Enter does nothing: [Chat](../packages/ai/llms/chat.md).
-- kayjs-ai: `ChatLauncher` takes `Chat`'s `regenerateIcon` and `editIcon` blocks, and spreading markup props onto an island no longer hits TS2589 in `kay check`: [Chat](../packages/ai/llms/chat.md).
-- kayjs-ai: a `Chat` without `attach` no longer ships `FileDrop`, and with it resends the earlier messages' files up to 8 MB: [Chat](../packages/ai/llms/chat.md#attaching-files).
-- kayjs-ai: `reply.resumed` and `resuming()` tell an action a Chat resumed or stopped an `outlive` reply, so it reads the reply on the server once: [asking](../packages/ai/llms/asking.md#a-reply-that-outlives-the-visitor).
-- kayjs-ai: under `bun test` an `ask` given its own `provider` is answered by the fake too, `aiTest().last()` naming its `provider` and `model`, and `KAYJS_AI_REAL_PROVIDERS=1` sends it to the provider: [The fake](../packages/ai/llms/testing-and-errors.md#the-fake).
-- kayjs-ai: `aiTest().reply(script, asked => boolean)` and `fail` script the reply of the ask they accept, and `aiTest().clear()` drops the scripts not read: [The fake](../packages/ai/llms/testing-and-errors.md#the-fake).
-- kayjs-auth: `authTest(site).oauth.stub(provider, { id, email })` makes an OAuth provider answer a stated account or `{ error }`, and `oauth.signIn(provider)` signs the test site in through it: [Testing](../packages/auth/llms/hardening-and-testing.md).
-- kayjs-auth: `authTest(site).enrollTotp(userId)` turns two-factor on for a member in a test, answering its `secret`, a `code()` and the recovery codes: [Testing](../packages/auth/llms/hardening-and-testing.md).
-- kayjs-auth: a passkey ceremony run in a frame of another origin is refused: [Passkey rules](../packages/auth/llms/oauth-passkeys-two-factor.md#passkey-rules).
-- kayjs-cms: a collection's list no longer waits on a slow git for its Last modified and Author columns unless sorted by them: [Screens](../packages/cms/llms/screens.md).
-- An island showing Markdown the server drew loads marked only once the text changes, saving 15 KB gzip, `markdownLoaded()` from `kay/markdown` telling whether it arrived and `isHeldMarkdown(html)` the stand-in shown meanwhile: [Render Markdown a user writes](content.md#render-markdown-a-user-writes).
-- With `i18n`, only the islands writing a link or reading `kay/i18n` load the code localizing their links, saving about 2 KB gzip elsewhere: [Helpers](locales.md#helpers).
-- `followLog` returns `{ toBottom }`, which takes a reader who scrolled up back to the bottom and follows again: [Follow a log](navigation.md#follow-a-log).
-- A focused element keeps the `tabindex` a script gave it through a refresh or a CMS draft's render, so the focus no longer falls to the body: [Islands kept across pages](navigation.md#islands-kept-across-pages).
-- A page swap waiting on code that never arrives gives up after 4.5 seconds, loading the streamed page in full or showing the deferred island's inert copy: [Navigating from code](navigation-from-code.md#navigating-from-code).
-- A form post's `succeeded()` outcome waits in its cookie for the page the post goes back to, so a prefetch or another tab no longer takes it: [Privacy](privacy.md).
-- `sanitizeHtml` adds `noopener` to a kept link opening another window: [Templates](templates-elements-slots-snippets.md).
-- `schedule` and `background` take `enabled: false`, and `KAY_LOCK_SCHEDULES=false` stops a one-process server locking its schedules: [Background jobs](production.md#background-jobs).
-- `memoryJobs()` lists failed jobs oldest first, as `sqliteJobs` and `pgJobs` do: [Queues](queues.md#reference).
-- A browser test's `page.waitUntil(fn, { what })` names its wait in its timeout error, which carries the stack of the test's own call: [Browser tests](testing-browser.md).
-- `kay check` under `noUnusedParameters` counts a loop item read only by its `key` as read: [What `kay check` verifies](checks.md#what-kay-check-verifies).
-- `kay check` reports `server-only-in-island` once per island, in a component with a `--- server` fence and a `.ts` module with an angle-bracket cast too: [Browser-only code](browser-only.md).
-- `kay check` names the parameters a block lacks, as `@value(item)`, where it only said TS2322: [Slots and snippets](templates-elements-slots-snippets.md).
-- `kay lint` reads an imported signal and an `~icons/` icon as `kay check` does, and lints a component with a `--- style` fence: [Lint with ESLint](checks.md#lint-the-script-fences-and-template-expressions-with-eslint).
-- `signal-set-call` also reports `consent.set('yes')` on the `consent` signal of `kay/analytics`, and `--fix` assigns it: [Signals](components.md#signals).
-
-## 1.79.0
-
-- The `kay` preset of `@kaynooo/eslint` (7.1.4) turns `ts/await-thenable` off in an app's test files, so `await expect(...).rejects...` lints clean with no override: [Lint with ESLint](checks.md#lint-the-script-fences-and-template-expressions-with-eslint).
-- `kay check` reports `server-only-in-island` for an island, or a module it imports, that builds schemas with `s` or reads `process` or `Bun` as it loads, at the island's import line, where the build used to be the first to refuse it: [Server globals in the browser](browser-only.md#server-globals-in-the-browser).
-- `kay docs <words>` prints the section of kay's or an installed library's llms files that words or a name match, with the labels of the next matches and, for a component, its props read from its installed source, `kay mcp` has it as its `docs` tool and `kay explain` of a name that is no lint points at it, so an agent finds a topic in one call: [Find a topic in the docs](editor-and-agent-commands.md#find-a-topic-in-the-docs).
-- kay's manifest link carries `crossorigin="use-credentials"`, so an app behind a cookie login proxy loads its manifest and installs: [Favicon and web manifest](sitemap-search-fonts.md#favicon-and-web-manifest).
-- kayjs-ui has a `Timeline`, a vertical list of time-stamped entries with an optional icon or muted tone, each pickable through a bindable `selected` key ([Page layout](../packages/ui/llms/page-layout-palette-and-trees.md)).
-- kayjs-ui's `MapView` draws polylines and markers over raster tiles with Leaflet, loaded only on pages using it, fitted to what it draws, with a `highlight` path brought into view, OpenStreetMap's tiles by default and the skin's colours: [kayjs-ui](../packages/ui/llms/charts-drag-and-media.md).
-- kayjs-ai: a resume or stop of a reply the server kept gives back the attempt the action's `protect.rateLimit` counted, so reloading a page does not spend the limit; a `RateStore` takes an optional `refund(key, resetAt)` for it: [Asking](../packages/ai/llms/asking.md#a-reply-that-outlives-the-visitor), [Rate limits](rate-limits.md).
-- kayjs-ai: `ask(messages, { outlive: true })` lets a reply finish on the server, tool loop and readers included, after the visitor reloaded or left, and a `Chat` with `remember` shows the finished turn after the reload or picks the stream back up, with no app code; an action call takes `{ headers }`: [Asking](../packages/ai/llms/asking.md#a-reply-that-outlives-the-visitor), [Chat](../packages/ai/llms/chat.md#a-reply-that-outlives-the-page).
-
-Releases before 1.79 are in the notes of their releases, at https://git.kaynooo.fr/kaynooo/kayjs/releases.
+Releases before 1.80 are in the notes of their releases, at https://git.kaynooo.fr/kaynooo/kayjs/releases.

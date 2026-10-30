@@ -2,7 +2,7 @@
 
 What each release of kay and its libraries adds, newest first, each feature with where it is documented. kay and its libraries share one version, so one section covers them all; what a release breaks is in [Upgrading](upgrading.md).
 
-## Unreleased
+## 1.84.0
 
 - `page.back()` and `page.forward()` on a page opened with `javaScript: false` no longer fail now and then with `Inspected target navigated or closed` when the browser loads the entry as a new document: [testing in a browser](testing-browser.md).
 - A string in an API route's `body` with no `maxLength` takes the same 10,000 character default as an action's: [API routes](api-routes.md).
@@ -52,21 +52,4 @@ What each release of kay and its libraries adds, newest first, each feature with
 - A content collection with a `load` function keeps its compiled Markdown bodies in `.kay/cache/content` as a folder collection does, so a build compiles only the bodies that changed: [Content](content-markdown-to-caching.md).
 - kayjs-auth: `organizations.update(id, {})` and an empty update of a user answer the row as it is on the pg store, where it threw and the organization update reported `slug-taken`; `slug-taken` now means a slug another organization holds.
 
-## 1.82.0
-
-- An extension's API module may default-export a function of the `ExtensionApp`, called with the `appFiles` modules as a `server` function is, so a library serves the app's data file, `api({ cors })` included, and the app writes no module only forwarding it; an island hands such a module to `call()`, `socket()`, `stream()` or `resource()`, typed off the routes it builds: [Component libraries](component-libraries.md).
-- An action's stream is read to its end with `await answer.ended()`, resolving with its last value and rejecting when it failed or was closed, with no polling of `status()`: [streaming actions](actions-from-islands.md).
-- A production page that posts forms and holds no island loads the navigation-only entry alone, which `kay build`'s route sizes and size report weigh it with, and an island page loads the forms' listener only once it shows a form: [building](build-and-start.md#build-and-start-commands).
-- A form posted before the forms' listener loaded is held only when the swap would take it and posted once, a post the swap leaves out going to the browser untouched, and a form holding a control named `enctype`, `elements`, `style`, `noValidate`, `requestSubmit` or `reportValidity` is checked, posted and refused as one without it, a multipart one posting multipart again.
-- `site.open()` serves a `testSite()` with a `base` under it, so a browser test needs no front of its own, and `kay screenshot` and `kay a11y` pipe a page's websockets under a base too; `testSite()` rebuilds its islands when any file the build read changes (`kay.config.ts`, `public/`, content, libraries) and keeps them when one it did not read changes, a file the root `.gitignore` leaves out included: [Testing in a browser](testing-browser.md), [testing](testing-setup.md).
-- A page reading `window['scrollTo']`, or a parameter or import named like `Date` or `fetch`, is now kept, and one reading an exported constant is no longer refused because a string, a comment, an object key or a template's tag shares its name: [prerendering](prerendering.md).
-- A rate limit whose store throws, rejects or hangs counts in memory instead, logged once, for an action's limits, API routes, `rateLimit()` and proof of work as for kay's own routes, and the MCP endpoint's 429 says how long to wait: [Rate limits](rate-limits.md#reference).
-- kayjs-ui: `RecordButton` records the microphone into a File, owning permissions, busy state and device release, and kayjs-ai's `Chat(transcribe={transcribe})` adds a microphone beside the field that sends what the action writes down: [RecordButton](../packages/ui/llms/basics.md#recordbutton), [Chat](../packages/ai/llms/chat.md#speaking-a-message).
-- kayjs-ui: a `SaveForm`, `FormDialog` or submitting `Select` whose form holds a control named `elements`, `requestSubmit` or `reset` saves, submits and discards instead of throwing.
-- kayjs-auth: the methods of a feature are grouped under it, `auth.admin.listUsers()`, `auth.password.signIn(input)`, so an editor lists one feature's methods at a time; the flat names work until 1.85, and `kay upgrade` renames the calls: [Grouped methods](../packages/auth/llms/grouped-methods.md).
-- kayjs-auth: attempts count in memory, logged once, while the store's `rates` throws, rejects or takes over 8 s, so a sign-in still answers and still locks out: [Limits](../packages/auth/llms/hardening-and-testing.md#limits).
-- kayjs-ai: `Chat`'s `keepOnServer` has the server keep the conversation through the action's own `ask`, a reload or Back showing it again under `?conversation=`, `conversations` lists the visitor's with rename and delete, a reply of an `outlive` ask is picked back up after a reload, and a tab whose reply lost its write to another tab is refused with 409: [Conversations kept on the server](../packages/ai/llms/chat-conversations.md).
-- kayjs-ai: `ChatLauncher` takes `keepOnServer` and `conversations`, the panel's conversation named by this browser through `Chat`'s new `conversationIn="browser"`, so a reload, another page or a new tab shows it again: [A chat on every page](../packages/ai/llms/chat-conversations.md#a-chat-on-every-page).
-- kayjs-ai: an approval ticket whose store fails or takes over 5 s runs no call, where a hanging store held the reply: [Actions as tools](../packages/ai/llms/tools.md).
-
-Releases before 1.82 are in [What's new, older releases](whats-new-archive.md).
+Releases before 1.83 are in [What's new, older releases](whats-new-archive.md).
