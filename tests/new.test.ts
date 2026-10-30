@@ -432,6 +432,62 @@ describe('kay command line', () => {
     }
   })
 
+  it('writes a Forgejo install step that runs on a Debian image and on an Alpine one with bun and git baked in', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'kay-new-'))
+
+    try {
+      await createProject(join(root, 'app'), { kay: '^1.0.0', features: PRESETS.server.features, runner: 'alpine' })
+
+      const workflow = Bun.YAML.parse(await Bun.file(join(root, 'app/.forgejo/workflows/test.yml')).text()) as { jobs: Record<string, { steps: { id?: string, if?: string, run?: string, uses?: string }[] }> }
+      const steps = Object.values(workflow.jobs)[0]!.steps
+      const install = steps.find(step => step.id === 'tools')!
+      const setupBun = steps.find(step => step.uses?.startsWith('oven-sh/setup-bun'))!
+
+      expect(setupBun.if).toBe('steps.tools.outputs.bun != \'true\'')
+
+      // Each image is a PATH of stubs: the tools it ships and the package manager it has.
+      const run = async (shipped: string[], manager: 'apt-get' | 'apk') => {
+        const bin = join(root, `bin-${shipped.join('-')}-${manager}`)
+        const log = join(bin, 'log')
+        const output = join(bin, 'output')
+
+        await mkdir(bin, { recursive: true })
+        await Bun.write(output, '')
+
+        for (const tool of [...shipped, manager]) {
+          await Bun.write(join(bin, tool), `#!/bin/sh\necho "${tool} $*" >> "${log}"\n`)
+          await chmod(join(bin, tool), 0o755)
+        }
+
+        const proc = Bun.spawn(['/bin/sh', '-ec', install.run!], { env: { PATH: bin, GITHUB_OUTPUT: output }, stdout: 'pipe', stderr: 'pipe' })
+        const code = await proc.exited
+        const logged = await Bun.file(log).exists() ? await Bun.file(log).text() : ''
+
+        return { code, logged, output: await Bun.file(output).text() }
+      }
+
+      const debian = await run([], 'apt-get')
+
+      expect(debian.code).toBe(0)
+      expect(debian.logged).toContain('apt-get install -y git unzip')
+      expect(debian.output).toBe('')
+
+      const alpine = await run(['bun', 'git'], 'apk')
+
+      expect(alpine.code).toBe(0)
+      expect(alpine.logged).toBe('')
+      expect(alpine.output).toBe('bun=true\n')
+
+      const bare = await run([], 'apk')
+
+      expect(bare.code).toBe(0)
+      expect(bare.logged).toContain('apk add --no-cache git unzip')
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
   it('runs the CI on the runner --runner names, the host\'s own image otherwise', async () => {
     const root = await mkdtemp(join(tmpdir(), 'kay-new-'))
 

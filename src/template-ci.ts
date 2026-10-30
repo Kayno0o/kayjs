@@ -2,18 +2,25 @@ import type { Host, Setup } from './template-shared'
 import { CHECKOUT, DEPLOY_PAGES, GH_PAGES, POSTGRES_IMAGE, SETUP_BUN_V1, SETUP_BUN_V2, UPLOAD_PAGES_ARTIFACT } from './template-pins'
 import { blocks } from './template-shared'
 
-// The Forgejo runner image carries neither unzip nor git, which GitHub's hosted runners do.
+// A Forgejo runner image may be Debian without unzip or git, or Alpine with bun and git baked in: the step installs only what is missing, with whichever package manager the image has, and tells the Setup Bun step when bun is already there.
 function workflowSetup(host: Host): string {
   return `${host === 'forgejo'
     ? `      - name: Install unzip and git
-        run: apt-get update && apt-get install -y unzip git
+        id: tools
+        run: |
+          if command -v bun >/dev/null; then echo "bun=true" >> "$GITHUB_OUTPUT"; fi
+          missing=""
+          command -v git >/dev/null || missing="$missing git"
+          command -v bun >/dev/null || command -v unzip >/dev/null || missing="$missing unzip"
+          if [ -z "$missing" ]; then exit 0; fi
+          if command -v apt-get >/dev/null; then apt-get update && apt-get install -y $missing; else apk add --no-cache $missing; fi
 
 `
     : ''}      - name: Checkout
         uses: actions/checkout@${CHECKOUT}
 
       - name: Setup Bun
-        uses: oven-sh/setup-bun@${host === 'forgejo' ? SETUP_BUN_V1 : SETUP_BUN_V2}
+${host === 'forgejo' ? '        if: steps.tools.outputs.bun != \'true\'\n' : ''}        uses: oven-sh/setup-bun@${host === 'forgejo' ? SETUP_BUN_V1 : SETUP_BUN_V2}
         with:
           bun-version: ${Bun.version}
 

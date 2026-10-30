@@ -56,7 +56,7 @@ kay new my-app --template app --without docker
 | `--with <features>` | Adds comma-separated [features](#features) to the preset, such as `tailwind,tests` |
 | `--without <features>` | Drops features from the preset |
 | `--forge forgejo\|github` | Where the repository lives, which decides the CI workflow |
-| `--runner <label>` | The runner label the CI jobs run on: `debian` on Forgejo and `ubuntu-latest` on GitHub by default |
+| `--runner <label>` | The runner label the CI jobs run on: `debian` on Forgejo and `ubuntu-latest` on GitHub by default. The Forgejo workflow installs only the `git` and `unzip` the image lacks, and skips the Bun setup when the image already has bun, so an Alpine image with bun and git runs it as written |
 | `--kay <dependency>` | The `kay` dependency the project installs, such as a path to a packed copy. By default the minor of the kay running the command |
 | `-y` | Takes the `server` preset without asking |
 | `--dry-run` | Lists the files it would write, and writes none |
