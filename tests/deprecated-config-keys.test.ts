@@ -93,7 +93,7 @@ describe('deprecated-config-keys beyond pages() and testSite() by name', () => {
   it('follows an import under another name or a namespace, and reads an extension\'s config', async () => {
     const aliased = 'import { pages as serve } from \'kay/server\'\n\nexport const a = serve({ routes: \'x\' })\n'
     const namespaced = 'import * as kay from \'kay/server\'\n\nexport const b = kay.pages({ settings: {} })\n'
-    const extension = 'export const lib = { name: \'lib\', config: { storage: undefined, lang: \'en\' } }\n'
+    const extension = 'import type { KayExtension } from \'kay/server\'\n\nexport const lib: KayExtension = { name: \'lib\', config: { storage: undefined, lang: \'en\' } }\n'
     const unrelated = 'export const c = { config: { routes: 1 } }\nexport const d = { name: \'x\', other: { routes: 1 } }\nexport const e = { name: \'job\', config: { settings: {}, routes: 1 } }\n'
     const root = await project({ 'src/a.ts': aliased, 'src/b.ts': namespaced, 'src/lib.ts': extension, 'src/c.ts': unrelated })
 
