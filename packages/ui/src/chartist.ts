@@ -3,19 +3,11 @@ interface Loaders {
   compat: () => Promise<typeof import('chartist/compat')>
 }
 
-const real: Loaders = {
+// How LineChart reaches the parts of chartist it loads on demand. A dom test replaces what a load does with `mock.module('chartist/live', ...)`, which `mountComponent` lets reach this module's imports.
+export const loaders: Loaders = {
   live: async () => import('chartist/live'),
   compat: loadCompat,
 }
-
-// How LineChart reaches the parts of chartist it loads on demand, in one object so a test can replace what a load does. `mountComponent` bundles the component into a copy of this module of its own, which a test cannot import, so under a test run (kay/test's preload sets `KAY_TEST_PARENT`) a load goes through what a test planted on the global object under this key, and a page never reads it.
-const LOADERS_KEY = Symbol.for('kayjs-ui.chartist-loaders') // kaynooo/kayjs#2701
-
-const planted = (): Partial<Loaders> => (globalThis as { [LOADERS_KEY]?: Partial<Loaders> })[LOADERS_KEY] ?? {}
-
-export const loaders: Loaders = typeof process !== 'undefined' && process.env.KAY_TEST_PARENT !== undefined
-  ? { live: async () => (planted().live ?? real.live)(), compat: async () => (planted().compat ?? real.compat)() }
-  : real
 
 let compatLoad: Promise<typeof import('chartist/compat')> | undefined
 

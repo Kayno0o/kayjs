@@ -1,0 +1,7 @@
+---
+import { signal } from 'kay'
+
+const loaded = signal('none')
+---
+button.load(onClick={async () => { const module = await import('./lazy'); loaded.set(module.name) }}) Load
+p.loaded {loaded()}

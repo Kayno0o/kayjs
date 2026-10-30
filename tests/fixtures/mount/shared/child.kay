@@ -1,0 +1,4 @@
+---
+import { registry } from './registry'
+---
+p.child {registry.clicks}

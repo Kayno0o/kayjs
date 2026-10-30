@@ -1,0 +1,5 @@
+---
+import Child from './child.kay'
+---
+div.parent
+  Child

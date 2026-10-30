@@ -1,0 +1,8 @@
+---
+import { signal } from 'kay'
+import { registry } from './registry'
+
+const shown = signal(registry.clicks)
+---
+button.bump(onClick={() => { registry.clicks += 1; shown.set(registry.clicks) }}) Bump
+p.clicks {shown()}

@@ -14,6 +14,7 @@ import { apiStubs, apiTrees } from '../server/api-modules'
 import { interactions } from './interact'
 import { lazyNativePlugins } from './lazy-plugins'
 import { testRoot } from './root'
+import { sharedModules } from './shared-modules'
 
 export interface Mounted<Props = Record<string, unknown>> extends Interactions {
   // The element the component rendered into, last in `document.body`.
@@ -167,7 +168,7 @@ async function bundle(root: string, file: string): Promise<string> {
 
     const loaded = await loadConfig(root)
     const trees = apiTrees(root, loaded)
-    const config = { entrypoints: [join(work, 'entry.ts')], target: 'browser', metafile: true, define: { KAY_FRENCH: writesFrench(loaded) ? 'true' : 'undefined', KAY_I18N: loaded.i18n === undefined ? 'undefined' : 'true' }, plugins: [apiStubs(trees), kay({ root, settings: loaded.librarySettings, api: trees }), sharedMarks], throw: false } satisfies Bun.BuildConfig
+    const config = { entrypoints: [join(work, 'entry.ts')], target: 'browser', metafile: true, define: { KAY_FRENCH: writesFrench(loaded) ? 'true' : 'undefined', KAY_I18N: loaded.i18n === undefined ? 'undefined' : 'true' }, plugins: [apiStubs(trees), kay({ root, settings: loaded.librarySettings, api: trees }), sharedMarks, sharedModules(trees.map(({ dir }) => dir))], throw: false } satisfies Bun.BuildConfig
     const build = await Bun.build({ ...config, outdir: join(work, 'out') })
 
     if (!build.success) {

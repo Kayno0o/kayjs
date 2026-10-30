@@ -1,0 +1,5 @@
+---
+import { count } from './store'
+---
+button.inc(onClick={() => count.set(count() + 1)}) Inc
+p.count {count()}

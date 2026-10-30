@@ -2,21 +2,19 @@ import type { Mounted } from 'kay/test'
 import { afterEach, expect, spyOn, test } from 'bun:test'
 import { FixedScaleAxis } from 'chartist'
 import { mountComponent } from 'kay/test'
+import { loaders } from '../src/chartist'
 import LiveChart from '../tests/fixture/src/components/live-chart.kay'
 import { untilHolds } from '../tests/until'
 import { library } from './dom'
 
 let mounted: Mounted | undefined
 
-// The loaders a mounted chart goes through are read from here, as `mountComponent` bundles the component with a copy of src/chartist.ts of its own.
-const loaders: { live?: () => Promise<typeof import('chartist/live')>, compat?: () => Promise<typeof import('chartist/compat')> } = {}
-
-;(globalThis as Record<symbol, unknown>)[Symbol.for('kayjs-ui.chartist-loaders')] = loaders
-const realLive = async () => import('chartist/live')
+// The loaders are the ones the mounted chart goes through, as `mountComponent` shares src/chartist.ts with the test.
+const original = { ...loaders }
+const realLive = original.live
 
 afterEach(() => {
-  delete loaders.live
-  delete loaders.compat
+  Object.assign(loaders, original)
   mounted?.unmount()
   mounted = undefined
 })

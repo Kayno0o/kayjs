@@ -194,6 +194,18 @@ if (created.ok)
 
 Install `@happy-dom/global-registrator` as a dev dependency. The first `mountComponent` of a file registers happy-dom's DOM, and a file that mounts nothing never loads it. The popover API happy-dom lacks comes with it.
 
+A module the component imports that needs no kay, such as a plain TypeScript file of your project or a package like `chartist`, is shared with the test. What you import in the test and what the component imports is the same instance, and `mock.module()` replaces it for the component's static and dynamic imports alike, as long as you call it before the mount:
+
+```ts
+import { mock } from 'bun:test'
+
+await mock.module('../src/payments', () => ({ charge: async () => 'ok' }))
+
+const { root } = await mountComponent(Checkout)
+```
+
+A module that imports `kay` or a `.kay` file, such as a signal store, stays inside the component's browser build and starts fresh with each mount. Pass what it holds as a prop instead.
+
 `fetch`, `Request`, `Response`, `Headers`, `Blob`, `File`, `URL`, `URLSearchParams`, `AbortController`, `AbortSignal` and `WebSocket` stay Bun's, and `FormData` stays Bun's class while reading a form element as in a browser, so a test serving with `Bun.serve` still works beside it.
 
 A mounted component also has `type(selector, text)`, `click(selector)` and `press(key)`, which fire the events a browser would and then settle, so a test types into a field, picks an option and presses Enter without dispatching events itself. `type` puts the text in an input, textarea or select, and a text field's `change` follows when the test presses Enter or moves to another element, as it does for a user. A disabled element ignores `click`.

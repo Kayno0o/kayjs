@@ -1,0 +1,4 @@
+---
+import ms from 'ms'
+---
+p.ms {ms(1000)}
