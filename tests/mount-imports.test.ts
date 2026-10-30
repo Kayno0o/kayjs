@@ -292,3 +292,18 @@ describe('a mounted component and the modules it imports', () => {
     unmount()
   })
 })
+
+// oven-sh/bun#15997: once this fails, Bun keeps the import behind `export * from` an external module, and the rewrite in `sharedModules` can go (#2703).
+it('still drops the import of an external module behind export * when bundling, on this Bun', async () => {
+  const at = await project({
+    'core.ts': 'export const answer = 42\n',
+    'barrel.ts': 'export * from \'./core\'\n',
+    'entry.ts': 'import { answer } from \'./barrel\'\nexport const read = answer\n',
+  })
+  const external: Bun.BunPlugin = { name: 'external-core', setup: build => void build.onResolve({ filter: /\/core$/ }, () => ({ path: at('core.ts'), external: true })) }
+  const result = await Bun.build({ entrypoints: [at('entry.ts')], target: 'browser', format: 'esm', plugins: [external] })
+  const out = at('out.mjs')
+
+  await Bun.write(out, await result.outputs[0]!.text())
+  await expect(import(out)).rejects.toThrow('core is not defined')
+})

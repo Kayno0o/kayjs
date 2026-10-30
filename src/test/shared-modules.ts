@@ -292,7 +292,7 @@ export function sharedModules(apiDirs: string[]): Bun.BunPlugin {
         return shared === undefined ? undefined : { path: shared, external: true }
       })
 
-      // Bun drops the import of an external module behind `export * from`, so the star names what the test process holds for the file.
+      // Bun drops the import of an external module behind `export * from`, so the star names what the test process holds for the file: oven-sh/bun#15997, kaynooo/kayjs#2703.
       build.onLoad({ filter: SCRIPT, namespace: 'file' }, async ({ path }) => {
         if (path.includes(NODE_MODULES))
           return undefined
