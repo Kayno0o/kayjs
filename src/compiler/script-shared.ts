@@ -1,6 +1,7 @@
 import type { Comment, Node, Program, Statement, TSInterfaceDeclaration, TSTypeAliasDeclaration } from 'oxc-parser'
 import type { Diagnostic, Span } from './ast'
 import type { NodeOfType } from './estree'
+import { isPlainProperty } from './estree'
 import { KAY_VALUES } from './kay-exports'
 
 export const WHITESPACE = /\s/
@@ -108,7 +109,7 @@ function isPlainData(value: Node): boolean {
     return value.elements.length > 0 && value.elements.every(element => element !== null && element.type !== 'SpreadElement' && isPlainData(element))
 
   if (value.type === 'ObjectExpression')
-    return value.properties.length > 0 && value.properties.every(property => property.type === 'Property' && property.kind === 'init' && !property.method && !property.computed && isPlainData(property.value))
+    return value.properties.length > 0 && value.properties.every(property => isPlainProperty(property) && !property.computed && isPlainData(property.value))
 
   if (value.type === 'TemplateLiteral')
     return value.expressions.length === 0

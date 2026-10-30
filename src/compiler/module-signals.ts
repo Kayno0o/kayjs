@@ -1,5 +1,5 @@
 import type { Node, NodeOfType, Program } from './estree'
-import { parseProgram } from './estree'
+import { isPlainProperty, parseProgram } from './estree'
 
 // A signal is written by assigning its name; a memo is only read; a live value is only read in the browser, the server changing it.
 export type SignalKind = 'signal' | 'memo' | 'live'
@@ -125,7 +125,7 @@ function isDataLiteral(node: Node, icons: ReadonlySet<string>): boolean {
   if (node.type === 'ArrayExpression')
     return node.elements.every(element => element !== null && isDataLiteral(element, icons))
 
-  return node.type === 'ObjectExpression' && node.properties.every(property => property.type === 'Property' && !property.method && property.kind === 'init' && (!property.computed || (property.key.type === 'Literal' && (typeof property.key.value === 'string' || typeof property.key.value === 'number'))) && isDataLiteral(property.value, icons))
+  return node.type === 'ObjectExpression' && node.properties.every(property => isPlainProperty(property) && (!property.computed || (property.key.type === 'Literal' && (typeof property.key.value === 'string' || typeof property.key.value === 'number'))) && isDataLiteral(property.value, icons))
 }
 
 // The names a module's default imports of `~icons/` bind, for the sets in `iconSets` or, unset, all of them.
@@ -221,7 +221,7 @@ function ownExports(ast: Program): Set<string> {
       for (const specifier of statement.specifiers)
         own.add(exportedName(specifier.exported))
     }
-    // `export * as name from` exports a name, where Babel made it a named export with a namespace specifier.
+    // `export * as name from` exports a name, where `@babel/parser` made it a named export with a namespace specifier.
     else if (statement.type === 'ExportAllDeclaration' && statement.exported) {
       own.add(exportedName(statement.exported))
     }

@@ -5,6 +5,7 @@ import type { PageSettingName } from './page-settings'
 import type { Path } from './scope'
 import type { ImportBinding, ParsedFence } from './script-shared'
 import { eachNode } from './each-node'
+import { isPlainProperty } from './estree'
 import { PAGE, PAGE_SETTINGS, unreadSettingReport } from './page-settings'
 import { declaredIdentifiers, keyName, LITERAL_SETTING, plainNames } from './script-shared'
 import { splitFence } from './script-split'
@@ -172,7 +173,7 @@ function pageSettings(ast: Program, statement: Statement, declaration: NodeOfTyp
       const settings = new Map<string, PageSetting>()
 
       for (const property of object.properties) {
-        const key = property.type === 'Property' && !property.method && property.kind === 'init' && !property.computed ? keyName(property.key) : undefined
+        const key = isPlainProperty(property) && !property.computed ? keyName(property.key) : undefined
 
         if (property.type !== 'Property' || key === undefined) {
           analysis.diagnostics.push({ ...shift(property), message: 'kay reads each setting of `page` as written', help: 'write it `key: value`, with no spread, method or computed key' })
@@ -246,7 +247,7 @@ function toolOptions(args: NodeOfType<'CallExpression'>['arguments']): { botProt
     if (arg.type !== 'ObjectExpression')
       continue
 
-    const keys = new Map(arg.properties.flatMap(property => property.type === 'Property' && !property.method && property.kind === 'init' && !property.computed ? [[keyName(property.key), property.value] as const] : []))
+    const keys = new Map(arg.properties.flatMap(property => isPlainProperty(property) && !property.computed ? [[keyName(property.key), property.value] as const] : []))
     const tool = keys.get('tool')
 
     // A spread may bring any of them, so it counts as one; options that are not an object literal cannot be read, and the action is not taken for a tool.
@@ -268,11 +269,11 @@ function protectsBots(protect: Node | undefined): boolean {
   return protect.properties.some(property => property.type === 'SpreadElement' || property.computed || (keyName(property.key) !== undefined && BOT_PROTECTIONS.has(keyName(property.key)!)))
 }
 
-// How often the rest of the fence reads what `statement` declares as `name`: Babel counts the export itself as a read.
+// How often the rest of the fence reads what `statement` declares as `name`: the scope pass counts the export itself as a read.
 function referenceCount(ast: Program, statement: Statement, name: string): number {
   let count = 1
 
-  // Babel refuses a fence declaring a name twice, which the fence reports itself.
+  // The scope pass refuses a fence declaring a name twice, which the fence reports itself.
   walkScope(ast, {
     Program(path) {
       const binding = path.scope.getBinding(name)
@@ -330,7 +331,7 @@ function sharedWithExports(ast: Program, exported: Statement[], perRequest: Stat
     })
   }
 
-  // Most fences have no export reading their names, and Babel's scope analysis is worth loading only when one may.
+  // Most fences have no export reading their names, and the scope analysis is worth loading only when one may.
   if (![...named].some(name => declaredBy.has(name)))
     return shared
 

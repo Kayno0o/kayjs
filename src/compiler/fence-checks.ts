@@ -6,6 +6,7 @@ import type { Scope as BindingScope } from './scope'
 import type { PageSettings, ParsedFence, SeparateSetting, ServerAnalysis } from './script'
 import { isSecret } from '../runtime/form'
 import { eachNode } from './each-node'
+import { isPlainProperty } from './estree'
 import { PAGE } from './page-settings'
 import { patternNames } from './pattern-names'
 import { parseFence } from './script'
@@ -205,7 +206,7 @@ function memberName(key: Node, computed: boolean): string | undefined {
 interface Named { name: string }
 
 // The names a namespace import hands out that moved, read off it (`server.invalidatePage`, `server['invalidatePage']`) or destructured from it (`const { invalidatePage } = server`), as the node writing the name.
-// Babel's scopes tell the namespace from an inner binding of the same name; a fence giving it none, a name declared twice, is read by name alone.
+// The scopes tell the namespace from an inner binding of the same name; a fence giving it none, a name declared twice, is read by name alone.
 function namespaceReads<Entry extends Named>(fence: ParsedFence, namespaces: Map<NodeOfType<'ImportNamespaceSpecifier'>, Entry[]>): { key: Node, moved: Entry }[] {
   if (namespaces.size === 0)
     return []
@@ -340,12 +341,7 @@ function schemaStrings(node: Node | null | undefined, field: string | undefined,
   })
 }
 
-// A `key: value` property, which Babel told from a method, a getter and a setter by their own node types.
-function isPlainProperty(node: Node): node is NodeOfType<'Property'> {
-  return node.type === 'Property' && !node.method && node.kind === 'init'
-}
-
-// Tells the calls and members of an optional chain, `a?.b.c()`, which Babel typed as optional ones its checks did not match: a node is one when its parent is the chain, or a chain part it is the callee or object of.
+// Tells the calls and members of an optional chain, `a?.b.c()`, which the checks do not match: a node is one when its parent is the chain, or a chain part it is the callee or object of.
 function optionalParts(): (node: Node, parent: Node | undefined) => boolean {
   const parts = new Set<Node>()
 
@@ -558,7 +554,7 @@ export function missingCaptchas(fence: ParsedFence): Diagnostic[] {
       return
 
     const options = node.arguments[at]
-    const lacking = options?.type === 'ObjectExpression' && !options.properties.some(property => property.type === 'SpreadElement') && !options.properties.some(property => property.type === 'Property' && !property.method && property.kind === 'init' && ((property.key.type === 'Identifier' && !property.computed && property.key.name === 'captcha') || (property.key.type === 'Literal' && property.key.value === 'captcha')))
+    const lacking = options?.type === 'ObjectExpression' && !options.properties.some(property => property.type === 'SpreadElement') && !options.properties.some(property => isPlainProperty(property) && ((property.key.type === 'Identifier' && !property.computed && property.key.name === 'captcha') || (property.key.type === 'Literal' && property.key.value === 'captcha')))
 
     if (options !== undefined && !lacking)
       return
@@ -840,7 +836,7 @@ function readsRequest(node: Node, constants: Scope, seen: Set<readonly Node[]>, 
       let base: Node = inner
       let first: NodeOfType<'MemberExpression'> = inner
 
-      // A parenthesized chain, `(ctx?.query).page`, is looked through as Babel's optional members were.
+      // A parenthesized chain, `(ctx?.query).page`, is looked through as the optional members of a chain are.
       while (base.type === 'MemberExpression' || base.type === 'ChainExpression') {
         if (base.type === 'MemberExpression') {
           first = base

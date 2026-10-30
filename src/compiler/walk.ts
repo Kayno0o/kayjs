@@ -4,10 +4,10 @@ import { VISITOR_KEYS } from './estree'
 import { FUNCTION_TYPES } from './estree-shapes'
 import { analyze } from './scope'
 
-// A handler that returns `'stop'` ends the walk, as `path.stop()` does in Babel.
+// A handler that returns `'stop'` ends the walk, as `path.stop()` does in `@babel/traverse`.
 type Handler<N extends Node> = (path: Path<N>) => void | 'stop'
 
-// What a walk calls for a node: `enter` for every node, then the handler of its type, then `Function` and `ReferencedIdentifier`, the aliases of Babel's visitors that kay's passes use.
+// What a walk calls for a node: `enter` for every node, then the handler of its type, then `Function` and `ReferencedIdentifier`, the aliases of the `@babel/traverse` visitors that kay's passes use.
 export type Visitor = { [Type in Node['type']]?: Handler<NodeOfType<Type>> } & {
   enter?: Handler<Node>
   Function?: Handler<NodeOfType<'FunctionDeclaration' | 'FunctionExpression' | 'ArrowFunctionExpression'>>
@@ -55,7 +55,7 @@ export function walkScope(ast: Program, visitor: Visitor): boolean {
   }
 }
 
-// Visits every node under `node`, parents first, in the order Babel's traversal meets them and with no scope.
+// Visits every node under `node`, parents first, in the order `@babel/traverse` meets them and with no scope.
 export function eachDescendant(node: Node, visitNode: (node: Node, parent: Node) => void): void {
   for (const key of VISITOR_KEYS[node.type] ?? []) {
     const child = (node as unknown as Record<string, Node | (Node | null)[] | null>)[key]

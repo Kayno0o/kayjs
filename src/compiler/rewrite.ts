@@ -209,7 +209,7 @@ class RewriteFinder {
     }
   }
 
-  // The offsets of the opening parentheses just before `at`, the nearest first and none before `floor`: oxc leaves the parentheses of an expression out of its span, which Babel's `extra.parenStart` told.
+  // The offsets of the opening parentheses just before `at`, the nearest first and none before `floor`: oxc leaves the parentheses of an expression out of its span, as `@babel/parser`'s `extra.parenStart` did.
   private parensBefore(at: number, floor: number): number[] {
     const { code } = this.input
     const found: number[] = []

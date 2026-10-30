@@ -1,7 +1,8 @@
 import type { CompileOptions } from '../src/compiler'
 import { join } from 'node:path'
 import process from 'node:process'
-import { describe, expect, it } from 'bun:test'
+import { describe, expect, it, spyOn } from 'bun:test'
+import * as parser from 'oxc-parser'
 import { compileKay } from '../src/compiler'
 import { moduleChecks } from '../src/compiler/fence-checks'
 import { explainLint, isLint, LINT_GROUPS, lintList, LINTS, typeLint } from '../src/compiler/lints'
@@ -416,10 +417,32 @@ describe('the checks that read a module', () => {
 
   it('reads a module whose statement does not parse again with it blanked, so the checks of the others still run', () => {
     const module = 'export const a = 1 foo\nimport theme from \'./theme.css\'\n'
-    const found = moduleChecks(module)
+    const parse = spyOn(parser, 'parseSync')
 
-    expect(found.map(d => d.code)).toEqual(['css-import-without-text'])
-    expect(found[0]!.message).toContain('./theme.css')
+    try {
+      const found = moduleChecks(module)
+
+      expect(found.map(d => d.code)).toEqual(['css-import-without-text'])
+      expect(found[0]!.message).toContain('./theme.css')
+      // The whole module, the same text again to blank its broken statement, the JSX probe of that parse, and the blanked text.
+      expect(parse).toHaveBeenCalledTimes(4)
+    }
+    finally {
+      parse.mockRestore()
+    }
+  })
+
+  it('reads a module that parses once, whatever the number of checks that look at it', () => {
+    const module = 'import theme from \'./theme.css\'\nexport const a = (email: string) => ctx.locals.auth.requestPasswordReset(email)\nexport default guard(({ redirect, url }) => redirect(url.searchParams.get(\'r\')))\n'
+    const parse = spyOn(parser, 'parseSync')
+
+    try {
+      expect(moduleChecks(module).length).toBeGreaterThan(1)
+      expect(parse).toHaveBeenCalledTimes(1)
+    }
+    finally {
+      parse.mockRestore()
+    }
   })
 })
 

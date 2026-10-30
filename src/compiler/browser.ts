@@ -2,7 +2,7 @@ import type { Diagnostic, Fix, KayFile, Span } from './ast'
 import type { Node, NodeOfType, Program } from './estree'
 import type { Path } from './scope'
 import { visitNodes } from './ast'
-import { parseProgram } from './estree'
+import { isPlainProperty, parseProgram } from './estree'
 import { browserGlobals } from './host'
 import { parameterNames } from './items'
 import { importedFromKay } from './rewrite'
@@ -226,10 +226,10 @@ function varyingValue(path: Path<NodeOfType<'CallExpression' | 'NewExpression'>>
 
 // Options written out without the key; computed ones are taken as setting it.
 function lacksOption(options: Node | undefined, key: string): boolean {
-  return options === undefined || (options.type === 'ObjectExpression' && options.properties.every(property => property.type === 'Property' && !property.method && property.kind === 'init' && !property.computed && !(property.key.type === 'Identifier' && property.key.name === key) && !(property.key.type === 'Literal' && property.key.value === key)))
+  return options === undefined || (options.type === 'ObjectExpression' && options.properties.every(property => isPlainProperty(property) && !property.computed && !(property.key.type === 'Identifier' && property.key.name === key) && !(property.key.type === 'Literal' && property.key.value === key)))
 }
 
-// Whether a call or member is part of an optional chain, which Babel called an optional call or member and its visitors for a call skipped.
+// Whether a call or member is part of an optional chain, which oxc types as plain calls and members under a `ChainExpression`, so the visitors for a call must skip them.
 function inChain(path: Path): boolean {
   let at = path
 

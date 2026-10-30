@@ -9,6 +9,11 @@ export type NodeOfType<T extends Node['type']> = Node extends infer N ? N extend
 // The keys holding child nodes, by node type, in the order a traversal visits them.
 export const VISITOR_KEYS: Readonly<Record<string, readonly string[]>> = visitorKeys
 
+// A `key: value` property, as opposed to a method, a getter or a setter, which oxc types as a `Property` of its own.
+export function isPlainProperty(node: Node): node is NodeOfType<'Property'> {
+  return node.type === 'Property' && node.kind === 'init' && !node.method
+}
+
 export type Lang = 'ts' | 'tsx' | 'jsx' | 'js'
 
 // A syntax error: where it is in the text parsed (shifted by the parse's `offset`) and what is wrong.
@@ -107,7 +112,7 @@ function shift(node: Node, by: number): void {
   }
 }
 
-// The line (from 1) and column (from 0) of an offset in a text, as Babel's `loc` gave them.
+// The line (from 1) and column (from 0) of an offset in a text, as a `loc` gives them.
 export function positionOf(code: string, offset: number): { line: number, column: number } {
   let line = 1
   let lineStart = 0

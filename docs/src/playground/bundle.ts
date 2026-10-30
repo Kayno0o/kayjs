@@ -5,7 +5,7 @@ import { brotliCompress } from 'node:zlib'
 const compress = promisify(brotliCompress)
 
 export interface Bundled {
-  text: string
+  text: string | Uint8Array<ArrayBuffer>
   brotli: Uint8Array<ArrayBuffer>
   // One validator per encoding, as the plain and the brotli body are different representations.
   etag: string
@@ -54,6 +54,31 @@ const wasmParser: Bun.BunPlugin = {
   setup(build) {
     build.onResolve({ filter: OXC_PARSER }, () => ({ path: Bun.resolveSync('@oxc-parser/binding-wasm32-wasip1/package.json', import.meta.dir).replace('package.json', 'browser-bundle.js') }))
   },
+}
+
+// The WebAssembly build of the parser as the browser fetches it, read and compressed once, under validators that change with its bytes: the playground revalidates it as it does the bundles, so a second open costs a 304.
+export function parserWasm(): () => Promise<Bundled> {
+  let kept: Promise<Bundled> | undefined
+
+  async function read(): Promise<Bundled> {
+    const text = new Uint8Array(await Bun.file(Bun.resolveSync('@oxc-parser/binding-wasm32-wasip1/wasm', import.meta.dir)).arrayBuffer())
+    const hash = Bun.hash(text).toString(36)
+
+    return { text, brotli: new Uint8Array(await compress(text)), etag: `"${hash}"`, brotliEtag: `"${hash}-br"` }
+  }
+
+  return async () => {
+    kept ??= read()
+
+    try {
+      return await kept
+    }
+    catch (error) {
+      kept = undefined
+
+      throw error
+    }
+  }
 }
 
 // What a browser lacks of the Node a library written for both reads: the parser asks `process.env` and `process.emitWarning`, which would throw as its chunk evaluates, so they are defined away rather than shimmed.

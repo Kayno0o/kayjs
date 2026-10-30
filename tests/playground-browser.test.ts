@@ -151,6 +151,21 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the docs p
     expect((await asked('"other"', 'br')).status).toBe(200)
   })
 
+  it('revalidates the parser wasm with an ETag per encoding, so a second open costs a 304', async () => {
+    const url = `${origin}playground/parser.wasm32-wasip1.wasm`
+    const brotli = await fetch(url, { headers: { 'accept-encoding': 'br' } })
+    const plain = await fetch(url, { headers: { 'accept-encoding': 'identity' } })
+    const brotliTag = brotli.headers.get('etag') ?? ''
+    const again = await fetch(url, { headers: { 'accept-encoding': 'br', 'if-none-match': brotliTag } })
+
+    expect(brotliTag).toMatch(/^"[0-9a-z]+-br"$/)
+    expect(plain.headers.get('etag')).toMatch(/^"[0-9a-z]+"$/)
+    expect(brotli.headers.get('content-type')).toBe('application/wasm')
+    expect(new Uint8Array(await plain.arrayBuffer()).slice(0, 4)).toEqual(new Uint8Array([0, 0x61, 0x73, 0x6D]))
+    expect(again.status).toBe(304)
+    expect((await again.arrayBuffer()).byteLength).toBe(0)
+  })
+
   it('keeps code in the frame from reaching the docs page: its document, storage, cookies and state', async () => {
     await page.goto('/getting-started/introduction')
     await page.evaluate(() => {

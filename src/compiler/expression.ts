@@ -123,7 +123,7 @@ export function mayHoldFunction(code: string, names: ReadonlySet<string>): boole
 
     const node = value as Node
 
-    // A chain's calls and members, the spine from the expression down its callees and objects, were Babel's optional ones, which the checks below leave out.
+    // A chain's calls and members, the spine from the expression down its callees and objects, are the optional ones, which the checks below leave out.
     if (node.type === 'ChainExpression')
       return visit(node.expression, true)
 
@@ -155,7 +155,7 @@ export function mayHoldFunction(code: string, names: ReadonlySet<string>): boole
     if (node.type === 'Identifier')
       return names.has(node.name)
 
-    // A method, getter or setter is a function value in oxc's tree, which Babel walked into rather than counting as a function.
+    // A method, getter or setter is a function value in oxc's tree, which is walked into rather than counted as a function.
     if (node.type === 'Property' && (node.method || node.kind !== 'init'))
       return visit(node.key) || Object.values(node.value).some(child => visit(child))
 

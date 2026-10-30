@@ -62,7 +62,7 @@ export class Path<N extends Node = Node> {
   // Set by the pass for the paths it walks, as a scope can be made only once its path exists.
   scope!: Scope
 
-  // The paths of the children, in the order Babel visits them; empty for a path made on the side.
+  // The paths of the children, in the order `@babel/traverse` visits them; empty for a path made on the side.
   readonly children: Path[] = []
 
   is<T extends Node['type']>(type: T): this is Path<NodeOfType<T>> {
@@ -268,10 +268,10 @@ export interface ScopeAnalysis {
 // The node types the rewrites visit, whose paths `analyze` hands back.
 const EVENT_TYPES = new Set(['Program', 'Identifier', 'CallExpression', 'ArrowFunctionExpression', 'VariableDeclarator', 'AssignmentExpression', 'UpdateExpression', 'FunctionDeclaration', 'TSTypeQuery'])
 
-// Kept per file, as Babel keeps the scopes of a tree it has crawled, so the passes over one fence share it.
+// Kept per file, as `@babel/traverse` keeps the scopes of a tree it has crawled, so the passes over one fence share it.
 const analyses = new WeakMap<Program, ScopeAnalysis>()
 
-// Throws the `TypeError` Babel does for a name declared twice where it cannot be.
+// Throws the `TypeError` `@babel/traverse` does for a name declared twice where it cannot be.
 export function analyze(program: Program): ScopeAnalysis {
   let found = analyses.get(program)
 
@@ -600,7 +600,7 @@ function assignedNames(node: Node): string[] {
   return [...names]
 }
 
-// Gives each identifier a declaration declares, in the order Babel's `getBindingIdentifiers` finds them; `outerOnly` stops at the function expressions inside it.
+// Gives each identifier a declaration declares, in the order `getBindingIdentifiers` of `@babel/types` finds them; `outerOnly` stops at the function expressions inside it.
 function bindingIdentifiers(root: Node, outerOnly: boolean, add: (name: string, identifier: Identifier) => void) {
   const search: (Node | null | undefined)[] = [root]
 

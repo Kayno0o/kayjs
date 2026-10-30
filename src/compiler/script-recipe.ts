@@ -1,17 +1,12 @@
 import type { Node, Program, Statement } from 'oxc-parser'
 import type { Diagnostic, Span } from './ast'
 import type { NodeOfType } from './estree'
+import { isPlainProperty } from './estree'
 import { importedName, keyName } from './script-shared'
 import { traverse, walkScope } from './walk'
 
 type CallExpression = NodeOfType<'CallExpression'>
 type ObjectExpression = NodeOfType<'ObjectExpression'>
-type Property = NodeOfType<'Property'>
-
-// What `{ key: value }` is, as opposed to a method, a getter or a setter.
-function isValueProperty(property: Node): property is Property {
-  return property.type === 'Property' && property.kind === 'init' && !property.method
-}
 
 // The names `recipe` goes by in the fence: imported from `kay`, as it is no global of a script.
 export function recipeNames(body: Statement[]): Set<string> {
@@ -69,9 +64,9 @@ function recipeCall(init: Node | null | undefined, calls: ReadonlySet<string>): 
 }
 
 function propertyValue(object: ObjectExpression, key: string): Node | undefined {
-  const property = object.properties.find(item => isValueProperty(item) && !item.computed && keyName(item.key) === key)
+  const property = object.properties.find(item => isPlainProperty(item) && !item.computed && keyName(item.key) === key)
 
-  return property && isValueProperty(property) ? property.value : undefined
+  return property && isPlainProperty(property) ? property.value : undefined
 }
 
 function isClasses(node: Node | undefined): boolean {
@@ -101,7 +96,7 @@ function variantNames(call: CallExpression): Record<string, string[]> | undefine
   const found: Record<string, string[]> = {}
 
   for (const variant of variants.properties) {
-    if (!isValueProperty(variant) || variant.computed || variant.value.type !== 'ObjectExpression')
+    if (!isPlainProperty(variant) || variant.computed || variant.value.type !== 'ObjectExpression')
       return undefined
 
     const name = keyName(variant.key)
@@ -109,7 +104,7 @@ function variantNames(call: CallExpression): Record<string, string[]> | undefine
     if (name === undefined)
       return undefined
 
-    found[name] = variant.value.properties.flatMap(value => isValueProperty(value) && !value.computed ? valueName(value.key) ?? [] : [])
+    found[name] = variant.value.properties.flatMap(value => isPlainProperty(value) && !value.computed ? valueName(value.key) ?? [] : [])
   }
 
   return found
@@ -132,7 +127,7 @@ function stylesRoot(call: CallExpression): boolean {
   if (variants?.type !== 'ObjectExpression')
     return false
 
-  return variants.properties.some(variant => isValueProperty(variant) && variant.value.type === 'ObjectExpression' && variant.value.properties.some(value => isValueProperty(value) && rooted(value.value)))
+  return variants.properties.some(variant => isPlainProperty(variant) && variant.value.type === 'ObjectExpression' && variant.value.properties.some(value => isPlainProperty(value) && rooted(value.value)))
 }
 
 // The names the fence declares that a recipe at module level reads, which exist only once the component runs.

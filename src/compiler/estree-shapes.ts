@@ -1,5 +1,5 @@
 // The node-type groups kay's scope pass reads, named as the oxc AST (ESTree with TypeScript nodes) names the types.
-// They follow the groups Babel's scope rules were written against.
+// They follow the groups of the scope rules of `@babel/traverse`, which the scope pass reproduces.
 
 const group = (...types: string[]): ReadonlySet<string> => new Set(types)
 

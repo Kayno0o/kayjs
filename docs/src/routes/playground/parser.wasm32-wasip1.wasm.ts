@@ -1,4 +1,8 @@
+import { parserWasm, respond } from '../../playground/bundle'
+
+const wasm = parserWasm()
+
 // The WebAssembly build of the parser the compiler bundle loads from beside itself, as the browser has no native binding.
-export function GET() {
-  return new Response(Bun.file(Bun.resolveSync('@oxc-parser/binding-wasm32-wasip1/wasm', import.meta.dir)), { headers: { 'content-type': 'application/wasm', 'cache-control': 'no-cache' } })
+export async function GET({ request }: { request: Request }) {
+  return respond(request, await wasm(), { 'content-type': 'application/wasm', 'cache-control': 'no-cache' })
 }

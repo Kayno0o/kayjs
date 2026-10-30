@@ -46,7 +46,7 @@ function parameters(code: string): Set<string> | undefined {
     return undefined
   }
 
-  // `plain` marks the function of a method, getter or setter, whose parameters Babel's tree left out as it had no function node there.
+  // `plain` marks the function of a method, getter or setter, whose parameters the tree of `@babel/parser` left out as it had no function node there.
   const walk = (value: unknown, inParameters: boolean, plain = false): void => {
     if (Array.isArray(value)) {
       for (const child of value)
