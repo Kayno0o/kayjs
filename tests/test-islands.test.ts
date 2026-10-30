@@ -230,7 +230,7 @@ describe('testSite keeps the islands it built', () => {
 
 describe('testSite keeps its check between processes', () => {
   const visit = async (): Promise<void> => {
-    const code = `import { testSite } from ${JSON.stringify(join(import.meta.dir, '../src/test'))}\nawait testSite({ root: ${JSON.stringify(root)} })\nprocess.exit(0)\n`
+    const code = `import { testSite } from ${JSON.stringify(join(import.meta.dir, '../src/test'))}\nawait testSite({ root: ${JSON.stringify(root)} })\nawait Bun.sleep(300)\nprocess.exit(0)\n`
     const child = Bun.spawn([process.execPath, '-e', code], { cwd: root, stdout: 'ignore', stderr: 'pipe', env: { ...process.env, KAY_ROOT: root } })
     const [error, exit] = await Promise.all([new Response(child.stderr).text(), child.exited])
 
@@ -261,5 +261,18 @@ describe('testSite keeps its check between processes', () => {
     await Bun.write(greeting, `${FINE}// changed\n`)
     await visit()
     expect(Bun.file(manifest()).lastModified).toBeGreaterThan(first)
+
+    // A dependency bump shows only in the root manifests, which the build does not read; the edit above has to be settled first.
+    await Bun.sleep(2100)
+    await visit()
+
+    const second = Bun.file(manifest()).lastModified
+
+    await Bun.sleep(20)
+    await visit()
+    expect(Bun.file(manifest()).lastModified).toBe(second)
+    await Bun.write(join(root, 'package.json'), '{ "name": "scratch", "version": "2.0.0" }\n')
+    await visit()
+    expect(Bun.file(manifest()).lastModified).toBeGreaterThan(second)
   })
 })

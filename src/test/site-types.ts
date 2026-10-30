@@ -19,7 +19,7 @@ export interface TestOptions extends PagesOptions {
   mcpKey?: string | undefined
   // Loads pages in a headless Chrome with `open()`, served from the islands built for the browser.
   browser?: boolean | BrowserOptions | undefined
-  // Builds the islands for the browser, unminified, into `.kay/test-client`, or `.kay/client` with `browser`, so one a browser cannot build, such as a server module reaching it, fails `testSite()` here and not only under `kay dev`; no browser needed. On unless `false`, built again only when the files under `src`, the routes or the API change.
+  // Builds the islands for the browser, unminified, into `.kay/test-client`, or `.kay/client` with `browser`, so one a browser cannot build, such as a server module reaching it, fails `testSite()` here and not only under `kay dev`; no browser needed. On unless `false`, built again only when the files it read or the project's sources change, once for the files of a run.
   islands?: boolean | undefined
   // The key the app's `proxy.key` header carries, turning the check on for this site alone, the environment left as it is: `fetch`, `visit`, `call`, `mcp` and `socket` send it by default, a call's own header of that name wins, and an empty one sends none; not with `dev: true` or `browser`, which skip the check or send no key.
   proxyKey?: string | undefined

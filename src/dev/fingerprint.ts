@@ -113,7 +113,7 @@ async function outputsOf(root: string): Promise<Record<string, number>> {
 }
 
 // Tells whether a client build is still the one its sources would give: the stamps of what it read, those of the sources taken before it read them, compared again later.
-// `kay dev` keeps them in a record beside the manifest, so a start whose sources did not change builds nothing; `kay/test` compares them in the process that built. A file the record cannot trust, written within two seconds before the build began, makes the next start build again once.
+// `kay dev` keeps them in a record beside the manifest, so a start whose sources did not change builds nothing; `kay/test` keeps one too for a site that loads no browser, so the files of a run check the islands once. A file the record cannot trust, written within two seconds before the build began, makes the next start build again once.
 export class BuildStamps {
   private known = new Map<string, string>()
   // The files whose stamps the record cannot trust.
@@ -138,7 +138,7 @@ export class BuildStamps {
     this.generated = join(this.realRoot, KAY_DIR) + sep
   }
 
-  // `kay dev`'s record holds every source, as a gitignored `.env.local` can feed what a build inlines; `kay/test`, whose process reads its environment once, leaves out what `.gitignore` does.
+  // `kay dev`'s record holds every source, as a gitignored `.env.local` can feed what a build inlines; `kay/test`, whose tests write files under watched folders, leaves out what `.gitignore` does.
   private async sources(): Promise<{ files: string[], directories: Map<string, string> }> {
     return sourceTree(this.root, !this.everySource)
   }
