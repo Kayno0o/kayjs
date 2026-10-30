@@ -1,4 +1,4 @@
-import type { Context } from 'elysia'
+import type { Context, TSchema } from 'elysia'
 import type { ExtensionApp } from '../config'
 import type { Locals } from '../runtime'
 import type { ActionTool } from '../runtime/action'
@@ -18,6 +18,7 @@ import { TRAILING_SLASH } from '../runtime/base'
 import { API_MOUNT } from '../runtime/live'
 import { runInLocale } from '../runtime/locale-state'
 import { kayLog } from '../runtime/log'
+import { withDefaultBounds } from '../runtime/schema-bounds'
 import { admitCrossSite, contextLocale, crossSiteRefused, crossSiteResponse, guardsFirst, passGuards, requestState } from './actions'
 import { importModule } from './bundle'
 import { cookieJar } from './cookies'
@@ -114,7 +115,11 @@ export async function serveApi(app: Elysia, modules: ApiModule[], options: Actio
       if (typeof route.handler === 'function')
         route.handler = inRequestLocale(route.handler as Handler, options, route.method === 'GET')
 
-      const hooks = route.hooks as { error?: unknown, beforeHandle?: unknown, detail?: { messages?: SocketLimits } } | undefined
+      const hooks = route.hooks as { body?: unknown, error?: unknown, beforeHandle?: unknown, detail?: { messages?: SocketLimits } } | undefined
+
+      // A string in a route's body takes the default bound an action's does; a model named by a string is left as registered.
+      if (hooks && typeof hooks.body === 'object' && hooks.body !== null)
+        hooks.body = withDefaultBounds(hooks.body as TSchema)
 
       // Whichever way the module chains its `.ws()` (in a group, a guard or a used plugin), every websocket route is held to its limits.
       if (hooks && route.method === 'WS')

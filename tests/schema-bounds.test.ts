@@ -80,3 +80,19 @@ describe('an action a page exports', () => {
     expect(fieldsOf((local as unknown as { schema: unknown }).schema).name!.maxLength).toBe(DEFAULT_MAX_LENGTH)
   })
 })
+
+describe('a string in an API route\'s body', () => {
+  const site = testSite({ root: 'tests/fixtures/island-action', islands: false })
+
+  afterAll(async () => {
+    await (await site).close()
+  })
+
+  it('takes the same default bound as an action\'s', async () => {
+    const served = await site
+    const post = async (name: string) => served.fetch('/api/notes', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ text: name }) })
+
+    expect((await post('x'.repeat(DEFAULT_MAX_LENGTH))).status).toBe(200)
+    expect((await post('x'.repeat(DEFAULT_MAX_LENGTH + 1))).status).toBe(422)
+  })
+})
