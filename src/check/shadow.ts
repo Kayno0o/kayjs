@@ -120,7 +120,7 @@ export function compileShadow(root: string, file: string, source: string, { rout
     return relative(shadowDir, target)
   }
   const queries = layoutQueries(file, source, routesDir, mounts)
-  const { tsx, map, bodyLines, moduleLines, diagnostics } = compileKay(source, file, { root, params: route?.params, paramTypes: route && paramTypesOf(routesDir, shadowDir, route), outerQueries: moved ? layoutQueries(file, source, routesDir, mounts, { dir: shadowDir, of: shadowOf }) : queries, check: true, page: route !== undefined, typesOnly, insideIsland, relocateImport, lints, importedSignals: signals, ui: uiEntryOf(root, file), contextModule: contextSpecifier(file, shadowDir) })
+  const { tsx, map, bodyLines, moduleLines, diagnostics } = compileKay(source, file, { root, params: route?.params, paramTypes: route && paramTypesOf(routesDir, shadowDir, route), outerSlots: outerSlots(file, source, routesDir, mounts), outerQueries: moved ? layoutQueries(file, source, routesDir, mounts, { dir: shadowDir, of: shadowOf }) : queries, check: true, page: route !== undefined, typesOnly, insideIsland, relocateImport, lints, importedSignals: signals, ui: uiEntryOf(root, file), contextModule: contextSpecifier(file, shadowDir) })
   // Reported as the server reports it, rather than as a type error in the shadow file.
   const unknown = Object.values(route?.matchers ?? {}).filter(matcher => matcherSource(routesDir, matcher) === undefined)
 
@@ -154,6 +154,23 @@ function relativeSpecifier(from: string, target: string): string {
 
 // The type of each `query` schema declared by the layouts above `file` in the URL tree of the app's routes and its extensions', outermost first: a layout or page reads them through `ctx.query` as the server merges them.
 export function outerQueries(file: string, source: string, trees: RouteMount[], placed?: Placed): string[] {
+  return layoutsAbove(file, source, trees).filter(({ facts }) => facts.server?.page?.settings.has('query')).map(({ layout }) => {
+    const path = placed ? relativeSpecifier(placed.dir, placed.of(layout).slice(0, -'.tsx'.length)) : relativeSpecifier(dirname(file), layout)
+
+    return `(typeof import(${JSON.stringify(path)}))["page"]["query"]`
+  })
+}
+
+// The named slots the layouts above a page or a layout declare, which its `@name` blocks fill; undefined for a file that is neither.
+export function outerSlots(file: string, source: string, routesDir: string, mounts: RouteMount[]): string[] | undefined {
+  if (!pageRoute(file, routesDir, mounts) && basename(file) !== LAYOUT)
+    return undefined
+
+  return [...new Set(layoutsAbove(file, source, routeTrees(routesDir, mounts)).flatMap(({ facts }) => facts.slots))]
+}
+
+// The layouts above `file` in the URL tree of the app's routes and its extensions', outermost first, up to the innermost one that leaves its parents out.
+function layoutsAbove(file: string, source: string, trees: RouteMount[]): { layout: string, facts: ServerFacts }[] {
   if (!trees.some(({ dir }) => file.startsWith(dir + sep)) || falseKeys(source).has('layouts'))
     return []
 
@@ -176,11 +193,7 @@ export function outerQueries(file: string, source: string, trees: RouteMount[], 
   // The innermost layout that leaves its parents out starts the chain.
   const reset = above.findIndex(({ facts }) => facts.leavesLayoutsOut)
 
-  return (reset === -1 ? above : above.slice(0, reset + 1)).reverse().filter(({ facts }) => facts.server?.page?.settings.has('query')).map(({ layout }) => {
-    const path = placed ? relativeSpecifier(placed.dir, placed.of(layout).slice(0, -'.tsx'.length)) : relativeSpecifier(dirname(file), layout)
-
-    return `(typeof import(${JSON.stringify(path)}))["page"]["query"]`
-  })
+  return (reset === -1 ? above : above.slice(0, reset + 1)).reverse()
 }
 
 // A generated span back in the source, where the mode allows it; an end that maps nowhere, or before the start, runs to the end of the word at the start.

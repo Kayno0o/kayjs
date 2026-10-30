@@ -1,0 +1,4 @@
+@sidebar
+  p.team Team nav
+.team
+  slot

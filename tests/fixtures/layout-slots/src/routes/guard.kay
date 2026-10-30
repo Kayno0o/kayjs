@@ -1,0 +1,7 @@
+--- server
+if (ctx.url.searchParams.has('boom'))
+  throw new Error('boom')
+---
+@sidebar
+  p.guarded Guarded
+h1 Guarded

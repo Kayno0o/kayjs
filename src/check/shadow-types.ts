@@ -45,7 +45,7 @@ import { publicEnvOutsideSrc } from './public-env-outside-src'
 import { removedUiTokens } from './removed-ui-tokens'
 import { sessionStores } from './renamed-exports'
 import { safeRedirects } from './safe-redirect'
-import { compileShadow, layoutQueries, matcherSource, pageRoute, serializeShadowSettings, SHADOW_SETTINGS, shadowOptionsFor, shadowPath } from './shadow'
+import { compileShadow, layoutQueries, matcherSource, outerSlots, pageRoute, serializeShadowSettings, SHADOW_SETTINGS, shadowOptionsFor, shadowPath } from './shadow'
 import { untypedSockets } from './socket-routes'
 import { unknownToolLabels } from './tool-labels'
 import { typingOptions } from './tsgo'
@@ -519,7 +519,7 @@ async function compileShadowCached(cacheDir: string, root: string, file: string,
   const matchers = Object.values(route?.matchers ?? {}).map(matcher => matcherSource(routesDir, matcher) ?? '')
   const signals = importedSignals(file, source)
   const queries = layoutQueries(file, source, routesDir, mounts)
-  const slot = cacheEntry(cacheDir, file, 'shadow', JSON.stringify([root, routesDir, mounts, insideIsland, lints ?? {}, matchers, signals, queries, shadowOf?.(file), uiKeyOf(root, file), packageContextModule(file), source]))
+  const slot = cacheEntry(cacheDir, file, 'shadow', JSON.stringify([root, routesDir, mounts, insideIsland, lints ?? {}, matchers, signals, queries, outerSlots(file, source, routesDir, mounts), shadowOf?.(file), uiKeyOf(root, file), packageContextModule(file), source]))
   const cached = await remembered(slot, async () => readCacheEntry<ShadowEntry>(slot))
 
   // An entry made for its types alone serves what wants no more, and is made again, whole, for what does.

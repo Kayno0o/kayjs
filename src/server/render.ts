@@ -26,6 +26,7 @@ import { browserOnlyHint, mappedStack } from '../build/sourcemap'
 import { collectForms, OUTCOME_SCRIPT } from '../runtime/action'
 import { escapeAttribute } from '../runtime/escape'
 import { editMarks, entriesInPageOrder, placeFieldMarks, unclickableFields, withFieldMarks } from '../runtime/fields'
+import { filledBy, inFillChain, newFillChain } from '../runtime/fills'
 import { collectHead, head as setHead } from '../runtime/head'
 import { child, component, html, newServerIslands, withServerIslands } from '../runtime/html'
 import { localePath, textDirection } from '../runtime/i18n'
@@ -83,6 +84,8 @@ import { workScript } from './work'
 
 interface PageModule {
   default: (props: Record<string, unknown>) => unknown
+  // The named slots a layout declares, `slot sidebar`, which a page below it fills.
+  slots?: readonly string[]
   load?: (ctx: PageContext<Record<string, unknown>>) => Promise<Record<string, unknown>>
 }
 
@@ -1023,11 +1026,16 @@ function renderDocument(files: string[], modules: PageModule[], data: Record<str
 }
 
 // The page inside its layouts, each through `component`, so what a layout provides reaches its page.
+// A layout's named slot is read off its page: reading one renders the page first, once, which hands the layout the blocks it wrote.
 function viewOf(modules: PageModule[], data: Record<string, unknown>[], entry?: HeadTag[]): () => unknown {
   const page = modules.length - 1
+  const chain = newFillChain(modules.length)
+  const declared = modules.map(module => module.slots)
 
   // Set after its layouts' heads and before its own, which each replace what the entry gave.
   let view = () => {
+    chain.at = page
+
     if (entry !== undefined)
       setHead(entry)
 
@@ -1036,13 +1044,31 @@ function viewOf(modules: PageModule[], data: Record<string, unknown>[], entry?: 
 
   for (let index = page - 1; index >= 0; index--) {
     const inner = view
+    let below: { value: unknown } | undefined
+    const rendered = () => (below ??= { value: inner() }).value
 
-    view = () => component(modules[index]!.default, { ...data[index], get children() {
-      return inner()
-    } })
+    view = () => {
+      const props = { ...data[index], get children() {
+        return rendered()
+      } }
+
+      for (const name of declared[index] ?? []) {
+        Object.defineProperty(props, name, { enumerable: true, get() {
+          rendered()
+
+          return filledBy(chain, declared, index, name)?.()
+        } })
+      }
+
+      chain.at = index
+
+      return component(modules[index]!.default, props)
+    }
   }
 
-  return view
+  const outer = view
+
+  return () => inFillChain(chain, outer)
 }
 
 // The entries the editor opens are the only ones its edit cookie may read through a CMS's API.

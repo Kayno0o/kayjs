@@ -50,7 +50,7 @@ export class JsxTemplate {
   emitRoot(nodes: Node[]): void {
     const visible = this.withoutSlots(nodes)
 
-    if (visible.length === 1 && visible[0]!.kind === 'element' && !isSlot(visible[0])) {
+    if (visible.length === 1 && visible[0]!.kind === 'element' && !isSlot(visible[0]) && !visible[0].fills) {
       this.emitElement(visible[0])
 
       return
@@ -584,6 +584,16 @@ export class JsxTemplate {
         }
 
         b.add('}')
+      })
+
+      return
+    }
+
+    if (element.fills) {
+      b.wrap(element, () => {
+        b.add(`{${helperName('fill')}(${JSON.stringify(this.text(element.fills!))}, () => (`)
+        this.emitRoot(element.children)
+        b.add('))}')
       })
 
       return

@@ -1,6 +1,6 @@
 import type { ClassTable } from '../runtime/class-table'
 import type { UiEntry } from '../runtime/ui'
-import type { ConstNode, ElementNode, ErrorMessages, KayFile, Node, Span, TemplateFacts, TemplateHelper } from './ast'
+import type { ConstNode, ElementNode, ErrorMessages, KayFile, Node, SlotNode, Span, TemplateFacts, TemplateHelper } from './ast'
 import type { Rewrite } from './mapping'
 import type { ImportedSignals } from './module-signals'
 import type { WRITE_HELPERS } from './names'
@@ -51,6 +51,8 @@ export interface GenerateOptions {
   inspect?: boolean | undefined
   // The file as written when the template was expanded from it, so the positions the inspector shows are the file's.
   inspectSource?: { text: string, real: (offset: number) => number } | undefined
+  // Type checking knows this file is a component, not a page or a layout: a block at the root of its template has no layout to fill a slot of.
+  component?: boolean | undefined
   // A page, a layout or a special page: it has no `class` prop for its parts to take.
   pageFile?: boolean | undefined
   // Type checking a page, a layout or a special page, which render once on the server, whether or not they carry a server fence.
@@ -72,6 +74,10 @@ export interface GenerateOptions {
   special?: boolean | undefined
   // The type of each `query` schema the layouts above this file declare, outermost first.
   outerQueries?: string[] | undefined
+  // A layout, whose `slot name` lines are slots the page below fills, and the module lists them.
+  layoutFile?: boolean | undefined
+  // The slots the layouts above this file declare, which its `@name` blocks fill: a block naming none is reported when type checking.
+  outerSlots?: string[] | undefined
   // Server output without hydration markers for a static component: inside an island it renders through this hydratable build of itself instead.
   twin?: string | undefined
   // Set for a static component that may pass an island what only an island sends: the id it renders as an island by when it does.
@@ -393,6 +399,10 @@ class ModuleShell {
       b.add(`import type { ${this.pageContextType()} as KayPageContext, PageData as KayPageData${this.declaresQuery() !== undefined ? ', QueryOf as KayQueryOf' : ''}${this.settingType(PRERENDER) !== undefined ? ', PrerenderedContext as KayPrerenderedContext' : ''}${mode === 'check' && server.page ? ', PageSettings as KayPageSettings' : ''}${this.actionsTyped ? ', ActionFor as KayActionFor' : ''} } from 'kay'\n`)
 
     const kayHelpers: KayHelper[] = facts.actionForm ? ['formAction'] : []
+
+    if (this.rootBlocks().length > 0)
+      kayHelpers.push('fill')
+
     const actions = server?.exportNames.filter(name => !NOT_ACTIONS.has(name)) ?? []
     const runs = this.runs
     const used: Helper[] = [...script.props?.rest ? ['omit' as const] : [], ...facts.helpers]
@@ -431,7 +441,7 @@ class ModuleShell {
         b.add(`export const ${name} = KayActionStub(${JSON.stringify(actionUrl(this.options.moduleId, name))})\n`)
     }
 
-    if (facts.childrenSlot || facts.snippet)
+    if (facts.childrenSlot || facts.snippet || this.outlets().length > 0)
       b.add(`import type { JSX as KayJSX } from 'kay'\n`)
 
     if (mode === 'html')
@@ -545,8 +555,9 @@ class ModuleShell {
   // The component function's head: its type parameters and props, read off `__props`.
   private signature(): void {
     const { b, script, server } = this
-    const { childrenSlot } = this.facts
-    const childrenType = ' & { children?: KayJSX.Element }'
+    const outlets = this.outlets()
+    const childrenSlot = this.facts.childrenSlot || outlets.length > 0
+    const childrenType = ` & { ${[...this.facts.childrenSlot ? ['children'] : [], ...outlets].map(name => `${name}?: KayJSX.Element`).join('; ')} }`
     const parts = this.partsType().type
     const typed = parts !== undefined
 
@@ -575,7 +586,7 @@ class ModuleShell {
       b.add(`${PROPS}: ${parts}${childrenSlot ? childrenType : ''}`)
     }
     else if (childrenSlot) {
-      b.add(`${PROPS}: { children?: KayJSX.Element }`)
+      b.add(`${PROPS}: {${childrenType.slice(' & {'.length, -1)}}`)
     }
     else if (this.facts.slot) {
       b.add(`${PROPS}: {}`)
@@ -587,7 +598,8 @@ class ModuleShell {
   // What the component returns, through the writer of the mode, closing its function.
   private template(nodes: Node[], errors: ErrorMessages | undefined): void {
     const { b, src, mode } = this
-    const visible = nodes.filter(node => node.kind !== 'slot')
+    const rooted = this.writesBlocks() ? nodes.map(node => node.kind === 'slot' ? fillElement(node) : node) : nodes
+    const visible = rooted.filter(node => node.kind !== 'slot')
     const located = this.options.inspect === true ? sourceLocator(this.options.inspectSource?.text ?? src, this.options.moduleId, this.options.inspectSource?.real) : undefined
 
     if (mode === 'html') {
@@ -602,9 +614,34 @@ class ModuleShell {
       b.add(dom.declarations())
     }
     else {
-      this.jsx.emitRoot(nodes)
+      this.jsx.emitRoot(rooted)
       b.add('\n}\n')
     }
+  }
+
+  // Whether the `@name` blocks at the root of the template stand for the calls keeping them: only a page or a layout writes them, which a compile of one file alone cannot tell, so type checking says which files are not and reports them.
+  private writesBlocks(): boolean {
+    return this.mode !== 'dom' && this.options.component !== true
+  }
+
+  // The `@name` blocks at the root of the template.
+  private rootBlocks(): SlotNode[] {
+    return this.writesBlocks() ? this.file.template.filter((node): node is SlotNode => node.kind === 'slot') : []
+  }
+
+  // The named slots a layout declares with `slot name`, in the order they are written; a slot called with arguments is a component's block prop, which a page cannot fill.
+  private outlets(): string[] {
+    if (this.options.layoutFile !== true)
+      return []
+
+    const names = new Set<string>()
+
+    visitNodes(this.file.template, (node) => {
+      if (node.kind === 'element' && node.outlet && !node.outlet.args)
+        names.add(this.text(node.outlet.name))
+    })
+
+    return [...names]
   }
 
   // The values `src/ui.ts` adds to the variants of a component's props, as a type: a call accepts them, while the component's own body keeps the props it declares, so a library component forwarding a variant to a child that lacks the value does not fail in its own file.
@@ -633,6 +670,11 @@ class ModuleShell {
     const { b, src } = this
     const { name } = this.options
     const widened = this.widening() !== undefined
+    const outlets = this.outlets()
+
+    // The server reads the slots a layout declares off its module, to hand it the blocks of the page below.
+    if (this.mode === 'html' && outlets.length > 0)
+      b.add(`\nexport const slots = ${JSON.stringify(outlets)}\n`)
 
     if (this.kind === 'promotable twin')
       b.add(`\nexport default KayPromote(${JSON.stringify(this.options.promote)}, ${name} as never, KayHydrated as never${islandMessages(src)}) as typeof ${name}${widened ? this.widenedCall(`typeof ${name}`) : ''}\n`)
@@ -1161,7 +1203,12 @@ function lineOf(source: string, offset: number): number {
   return line
 }
 
-type KayHelper = 'uiRecipe' | 'formAction' | 'formValue' | 'formChecked' | 'formDescribed' | 'formInvalid' | 'formMarked' | 'formError' | 'formProtection' | 'registerActions' | 'actionStub' | 'autoDefer' | 'writeTo' | 'updateTo' | 'writeBack' | 'updateBack' | 'bindable'
+// A block at the root of a page's template, written as the call keeping it for the layout: the name is a span of the source, so the check reads it where it was written.
+function fillElement(block: SlotNode): ElementNode {
+  return { kind: 'element', start: block.start, end: block.end, tag: { start: block.start, end: block.start }, name: 'KayFill', component: true, classes: [], attributes: [], children: block.children, fills: block.name }
+}
+
+type KayHelper = 'fill' | 'uiRecipe' | 'formAction' | 'formValue' | 'formChecked' | 'formDescribed' | 'formInvalid' | 'formMarked' | 'formError' | 'formProtection' | 'registerActions' | 'actionStub' | 'autoDefer' | 'writeTo' | 'updateTo' | 'writeBack' | 'updateBack' | 'bindable'
 
 type Helper = TemplateHelper | 'omit'
 

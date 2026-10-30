@@ -103,6 +103,37 @@ export const page = { layouts: false }
 h1 No site header here
 ```
 
+### Fill a slot of the layout
+
+A layout declares a named slot with `slot sidebar`, the lines under it showing when a page fills nothing, and a page fills it with a `@sidebar` block at the root of its template. The block renders in the layout, in place, and swaps with the page on navigation, so an app shell's sidebar can change per page while each page keeps its data in its own fence. In `src/routes/_layout.kay`:
+
+```kay
+.shell
+  aside
+    slot sidebar
+      p No branches
+  main
+    slot
+```
+
+And in `src/routes/p/[project].kay`:
+
+```kay
+--- server
+const branches = await listBranches(ctx.params.project)
+---
+@sidebar
+  ul
+    for branch of branches
+      li {branch}
+h1 {ctx.params.project}
+```
+
+- The block reads the page's own names, the server fence's, the script's and the template's `const`s above it, and a layout cannot read its page's data: that stays the page's.
+- `kay check` reports a block naming a slot none of the layouts above declares (a `layouts: false` page has none), a block written twice, or taking parameters, or not at the root of the template. The layout's `slot sidebar` is typed as a slot, and a plain component declaring a root block is an error.
+- Nested layouts: a block goes to the slot of the nearest layout above the file writing it that declares the name. A layout not declaring it passes the page's block through, a layout may write `@sidebar` itself as the default of the pages under it (a page's own block wins), and a layout declaring `slot sidebar` again takes the page's block and puts its own block in the outer slot, to wrap it.
+- A page filling nothing shows the slot's lines, and an empty `@sidebar` shows nothing. The page swap replaces the slot's content with the page's, keeping a `persist` island that both pages' blocks render; a static export and prerendering write the block in the page. Special pages (`_404.kay`, `_error.kay`) may fill a slot too, unchecked.
+
 ### Serve a JSON or text file
 
 A `.ts` file in `src/routes/` with an extension before `.ts` serves that path with what its `GET` returns:

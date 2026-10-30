@@ -1,0 +1,9 @@
+--- server
+const branches = ['main', 'next']
+const only = ctx.url.searchParams.get('only') ?? 'all'
+---
+@sidebar
+  ul.branches
+    for branch of branches
+      li {branch} ({only})
+h1 Project

@@ -1,5 +1,7 @@
+import type { Node } from '../compiler/ast'
 import type { ServerAnalysis } from '../compiler/script'
 import { createHash } from 'node:crypto'
+import { visitNodes } from '../compiler/ast'
 import { parseKay } from '../compiler/parser'
 import { analyzeServer } from '../compiler/script'
 import { falseKeys } from '../server/routes'
@@ -9,6 +11,8 @@ export interface ServerFacts {
   server: ServerAnalysis | undefined
   // Whether the `page` settings leave the layouts above out, `layouts: false`.
   leavesLayoutsOut: boolean
+  // The named slots the file declares with `slot name`, which a page below fills with `@name`.
+  slots: string[]
 }
 
 // More files than any app has; a cache past it drops its oldest entry rather than growing with every file an editor session ever opened.
@@ -25,7 +29,8 @@ export function serverFacts(file: string, text: string): ServerFacts {
   if (known?.hash === hash)
     return known.facts
 
-  const found = { server: analyzeServer(text, parseKay(text).server), leavesLayoutsOut: falseKeys(text).has('layouts') }
+  const parsed = parseKay(text)
+  const found = { server: analyzeServer(text, parsed.server), leavesLayoutsOut: falseKeys(text).has('layouts'), slots: slotNames(text, parsed.template) }
 
   // Deleted first so a file read again is the newest.
   facts.delete(file)
@@ -36,4 +41,15 @@ export function serverFacts(file: string, text: string): ServerFacts {
   facts.set(file, { hash, facts: found })
 
   return found
+}
+
+function slotNames(text: string, template: Node[]): string[] {
+  const names = new Set<string>()
+
+  visitNodes(template, (node) => {
+    if (node.kind === 'element' && node.outlet && !node.outlet.args)
+      names.add(text.slice(node.outlet.name.start, node.outlet.name.end))
+  })
+
+  return [...names]
 }

@@ -596,6 +596,9 @@ function autoDefer<T>(value: T): T
 [./internal] bindable
 function bindable<Props extends object>(props: Props, keys: readonly string[]): Props
 
+[./internal] fill
+function fill(name: string, block: () => unknown): string
+
 [./internal] formAction
 function formAction(target: string | Action<never, unknown, never>): string
 

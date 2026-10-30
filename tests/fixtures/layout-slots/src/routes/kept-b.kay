@@ -1,0 +1,7 @@
+---
+import Counter from '../components/counter.kay'
+---
+@sidebar
+  p.from From B
+  Counter(persist)
+h1 B

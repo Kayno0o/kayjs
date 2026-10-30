@@ -1367,6 +1367,7 @@ interface CompileOptions
   inspect?: boolean | undefined
   lints?: LintLevels | undefined
   outerQueries?: string[] | undefined
+  outerSlots?: string[] | undefined
   output?: "html" | "dom" | undefined
   page?: boolean | undefined
   paramTypes?: Record<string, string> | undefined

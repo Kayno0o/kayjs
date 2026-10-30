@@ -7,7 +7,7 @@ import { RESIZABLE } from '../runtime/image'
 import { WIDGET_ROLES } from './aria'
 import { childBlocks, EVENT_MODIFIERS, FIELD_ATTRIBUTE, FIELD_ELEMENTS, isHead, isSlot, modifiersOf, nodeExpressions, serverIslandOf, templateFacts, visitNodes } from './ast'
 
-type ValidateOptions = Pick<GenerateOptions, 'island' | 'insideIsland' | 'check' | 'client' | 'special' | 'includeServer' | 'pageFile'>
+type ValidateOptions = Pick<GenerateOptions, 'island' | 'insideIsland' | 'check' | 'client' | 'special' | 'includeServer' | 'pageFile' | 'layoutFile' | 'outerSlots' | 'component'>
 
 // The elements each property of an element can be bound to; `group` and `files` also need an input of a type, `radio` or `checkbox` and `file`.
 const BINDABLE: ReadonlyMap<string, ReadonlySet<string>> = new Map([['value', new Set(['input', 'textarea', 'select'])], ['checked', new Set(['input', 'textarea', 'select'])], ['group', new Set(['input'])], ['files', new Set(['input'])], ['open', new Set(['details', 'dialog'])]])
@@ -246,7 +246,10 @@ class Validator {
     }
 
     this.nodes(tags ?? [])
-    this.nodes(this.file.template.filter(node => !isHead(node)))
+    const rest = this.file.template.filter(node => !isHead(node))
+
+    this.blocks(rest)
+    this.nodes(this.rooted() ? rest.filter(node => node.kind !== 'slot') : rest)
 
     return this.diagnostics
   }
@@ -296,6 +299,41 @@ class Validator {
     }
 
     return head
+  }
+
+  // Whether the blocks at the root of the template are allowed: in a page or a layout, which only type checking knows of a file compiled alone.
+  private rooted(): boolean {
+    return this.options.component !== true
+  }
+
+  // The `@name` blocks at the root of a page or a layout, which fill a `slot name` of the layout above: one per name, taking no parameters, and a name some layout above declares once type checking knows them.
+  private blocks(nodes: Node[]): void {
+    if (!this.rooted())
+      return
+
+    const seen = new Set<string>()
+    const above = this.options.outerSlots
+    const kind = this.options.layoutFile === true ? 'layout' : 'page'
+
+    for (const node of nodes) {
+      if (node.kind !== 'slot')
+        continue
+
+      const name = this.text(node.name)
+
+      if (node.params)
+        this.error(node.params, `\`@${name}\` fills a slot, which takes no parameters`, { help: `write \`@${name}\` alone` })
+
+      if (seen.has(name))
+        this.error(node.name, `\`@${name}\` is written twice in this ${kind}`, { help: 'a slot takes one block' })
+
+      seen.add(name)
+
+      if (above !== undefined && this.options.check === true && !above.includes(name))
+        this.error(node.name, `No layout above this ${kind} has a \`slot ${name}\``, { note: above.length > 0 ? `the slots of its layouts: ${above.map(slot => `\`${slot}\``).join(', ')}` : 'none of its layouts declares a named slot', help: `write \`slot ${name}\` in the layout that renders it` })
+
+      this.nodes(node.children)
+    }
   }
 
   private nodes(nodes: Node[]): void {

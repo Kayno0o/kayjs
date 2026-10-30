@@ -88,6 +88,8 @@ The lines under a `slot` render when it gets nothing to show.
 
 `kay check` reports a `slot name` naming no prop, as a call with the wrong arguments.
 
+In a layout, `slot name` is a slot the page below fills with a `@name` block at the root of its template: see [Fill a slot of the layout](routing.md#fill-a-slot-of-the-layout).
+
 ```kay
 ---
 import Card from './card.kay'

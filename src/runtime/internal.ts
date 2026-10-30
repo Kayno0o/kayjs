@@ -3,6 +3,7 @@ import { createSignal, getOwner, isSignal, liveOwner, renderEffect, runWithOwner
 
 // The compiler's output contract, not API: what generated code imports, free to change with any release.
 export { actionStub, formAction, formChecked, formDescribed, formError, formInvalid, formMarked, formProtection, formValue, isAction, registerActions } from './action'
+export { fill } from './fills'
 export { registerImage } from './image'
 export { registerPlaceholder } from './placeholder'
 export { uiRecipe } from './recipe'

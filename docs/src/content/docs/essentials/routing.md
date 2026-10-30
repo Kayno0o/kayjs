@@ -86,6 +86,34 @@ main
 
 Layouts nest, so `blog/_layout.kay` renders inside the root one. A folder in parentheses groups pages under a layout without changing their URL: `(marketing)/pricing.kay` is `/pricing`.
 
+A layout can leave a place for a page to fill, such as a sidebar that changes from page to page. Declare it with a named `slot`, and put the lines it shows when a page has nothing for it under it:
+
+```kay
+.shell
+  aside
+    slot sidebar
+      p No branches
+  main
+    slot
+```
+
+A page fills it with a `@sidebar` block at the top of its template. The block can use everything the page knows, its server data included, so the layout never has to load it again:
+
+```kay
+--- server
+const branches = await listBranches(ctx.params.project)
+---
+@sidebar
+  ul
+    for branch of branches
+      li {branch}
+h1 {ctx.params.project}
+```
+
+On a page change the sidebar is replaced together with the page, and a page that fills nothing brings the fallback back. `kay check` reports a block whose name no layout above the page declares.
+
+With nested layouts, the block goes to the nearest layout above the page that declares the slot, so a layout between the two passes it through, or writes its own `@sidebar` as the default for its pages. A page's block wins over a layout's.
+
 A link to the page being shown gets `aria-current="page"`. Add `section` to a link to a section, `a(href="/blog" section)`, and it also gets `aria-current="true"` on the pages below it, `/blog/hello` included, so a header can light it with no path passed down. `section={open}` takes a boolean, for a link that is a section only sometimes.
 
 The home link is never marked that way, and a link without `section`, such as a pagination `prev`, is lit on its own page only. Style them with `aria-[current=page]:font-bold` and `aria-[current=true]:font-bold` in Tailwind, or `[aria-current]` in CSS.

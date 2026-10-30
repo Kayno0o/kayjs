@@ -1,0 +1,7 @@
+@sidebar
+  nav.wrapped
+    p.own Wrap
+    slot sidebar
+      p.inner-fallback No inner
+.wrap
+  slot

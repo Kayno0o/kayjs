@@ -175,12 +175,15 @@ export class HtmlTemplate extends TemplateWriter {
         this.element(item.node, markup)
       }
       else {
-        if (markers)
+        // A block written for the layout above renders nothing here, so hydration has no part to find.
+        const marked = markers && !(item.kind === 'component' && item.node.fills)
+
+        if (marked)
           markup.text(START_MARKER)
 
         markup.dynamic(() => this.dynamic(item, raw))
 
-        if (markers)
+        if (marked)
           markup.text(END_MARKER)
       }
     }
@@ -937,6 +940,16 @@ export class HtmlTemplate extends TemplateWriter {
 
   private component(element: ElementNode): void {
     const { b } = this
+
+    // A block at the root of a page, kept for the layout above and rendering nothing where it stands.
+    if (element.fills) {
+      b.add(`${helperName('fill')}(${JSON.stringify(this.source(element.fills))}, () => (`)
+      this.childrenValue(element.children)
+      b.add('))')
+
+      return
+    }
+
     const dynamic = b.isDynamicTag(element.tag)
     // What renders in the browser too renders whole: an island hydrates as one.
     const island = dynamic || this.options.hydratable === true ? undefined : serverIslandOf(element, this.src)

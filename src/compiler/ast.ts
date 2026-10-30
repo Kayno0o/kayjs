@@ -71,6 +71,8 @@ export interface ElementNode extends Span {
   fixed?: string | undefined
   // The `pending` block this element stands for, whose form's action an island follows.
   pendingOf?: PendingNode | undefined
+  // The `@sidebar` block a page or a layout writes at the root of its template, for the layout above it to render: the name, and `children` its lines. Codegen stands it in for the block, as a call keeping it.
+  fills?: Span | undefined
 }
 
 export interface TextChunk extends Span {

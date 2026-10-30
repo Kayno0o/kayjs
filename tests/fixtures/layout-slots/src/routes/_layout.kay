@@ -1,0 +1,16 @@
+--- server
+const path = ctx.url.pathname
+---
+nav
+  a.home(href="/") Home
+  a.project(href="/project") Project
+  a.empty(href="/empty") Empty
+  a.kept-a(href="/kept-a") A
+  a.kept-b(href="/kept-b") B
+.shell
+  aside.side
+    slot sidebar
+      p.fallback Nothing here
+  main
+    p.path {path}
+    slot
