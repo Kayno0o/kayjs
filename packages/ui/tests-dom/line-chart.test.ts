@@ -2,17 +2,21 @@ import type { Mounted } from 'kay/test'
 import { afterEach, expect, spyOn, test } from 'bun:test'
 import { FixedScaleAxis } from 'chartist'
 import { mountComponent } from 'kay/test'
-import { loaders } from '../src/chartist'
 import LiveChart from '../tests/fixture/src/components/live-chart.kay'
 import { untilHolds } from '../tests/until'
 import { library } from './dom'
 
 let mounted: Mounted | undefined
 
-const realLive = loaders.live
+// The loaders a mounted chart goes through are read from here, as `mountComponent` bundles the component with a copy of src/chartist.ts of its own.
+const loaders: { live?: () => Promise<typeof import('chartist/live')>, compat?: () => Promise<typeof import('chartist/compat')> } = {}
+
+;(globalThis as Record<symbol, unknown>)[Symbol.for('kayjs-ui.chartist-loaders')] = loaders
+const realLive = async () => import('chartist/live')
 
 afterEach(() => {
-  loaders.live = realLive
+  delete loaders.live
+  delete loaders.compat
   mounted?.unmount()
   mounted = undefined
 })
@@ -317,4 +321,31 @@ test('runs the 1.x draw handler and the legacy plugin function an app passes, wi
   await Bun.sleep(150)
   expect(gate.calls).toBe(0)
   expect('Chartist' in globalThis).toBe(false)
+})
+
+test('says chartist/compat failed and draws without the legacy parts when it cannot be loaded', async () => {
+  const error = spyOn(console, 'error').mockImplementation(() => undefined)
+
+  loaders.compat = async () => {
+    throw new Error('offline')
+  }
+
+  try {
+    const drawn: string[] = []
+    const root = await chart({ options: { on: { draw: (event: { type: string }) => void drawn.push(event.type) }, plugins: [() => undefined] } })
+
+    await untilHolds(() => error.mock.calls.length > 0)
+    expect(String(error.mock.calls[0]![0])).toContain('chartist/compat')
+    await untilHolds(() => root.querySelector('.ct-line') !== null)
+    expect(drawn).toEqual([])
+  }
+  finally {
+    error.mockRestore()
+  }
+})
+
+test('draws with a plugins option that is not an array', async () => {
+  const root = await chart({ options: { plugins: 'nope' } })
+
+  await untilHolds(() => root.querySelector('.ct-line') !== null)
 })
