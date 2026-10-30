@@ -22,6 +22,14 @@ With Tailwind, registered in [`kay.config.ts`](/structure/kay-config), it needs 
 
 `@import`, nesting and relative `url()` assets work in it, as in any stylesheet a component imports. kayjs-ui's theme is imported right after Tailwind, and an `@theme` block below overrides its tokens.
 
+Tailwind writes only the `@theme` variables that something uses. A utility class uses one, and so does a `var(--color-accent)` written out in a file. A variable read only through a name built at runtime is dropped, with no warning:
+
+```kay
+circle(style={`stroke: var(--color-lane-${n})`})
+```
+
+Declare such variables in `@theme static { }`, which always writes them, or in `:root`.
+
 kay leaves out the rules of a library's stylesheet that no file of your app uses. A rule stays when its classes are written whole somewhere kay reads. That is a template, a script, a Markdown file, a stylesheet, even a comment.
 
 A class you build at runtime is not seen, nor one written only in a database or in files outside your app's folder. Write it whole in a comment of `app.css` to keep its rules.

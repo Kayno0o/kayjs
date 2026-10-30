@@ -40,6 +40,8 @@ An app on a `^0.x` range moves to kay's version by hand, as a caret on 0.x never
 }
 ```
 
+A token you read only through a name built at runtime, such as `var(--color-lane-${n})`, needs `@theme static { }` or `:root`, as Tailwind drops a `@theme` variable nothing uses.
+
 To use a theme utility in `@apply`, such as `@apply border border-border bg-popover`, write it in `src/app.css`, with nothing else: `ui()` gives that stylesheet the tokens and writes no rule, so the theme is not loaded a second time. An `@reference '@kaynooo/kayjs-ui/theme.css';` you already wrote keeps working. Without `ui()`, start the stylesheet with that line, or the build fails with `Cannot apply unknown utility class`.
 
 Your stylesheet ships only the rules of the components you render. kay drops every `kui-` rule whose class no file of your app, and no component it renders, writes whole.
