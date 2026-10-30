@@ -37,8 +37,9 @@ function endWithTestParent(): void {
     try {
       process.kill(parent, 0)
     }
-    catch {
-      process.exit(1)
+    catch (error) {
+      if ((error as NodeJS.ErrnoException).code === 'ESRCH')
+        process.exit(1)
     }
   }, 1000).unref()
 }

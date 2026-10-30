@@ -217,11 +217,11 @@ const BUN_DIR = /^\.[\w-]+\.bun-chrome$/
 // Chrome's lock, beside the profile, which a killed Chrome leaves.
 const SINGLETON = /^org\.chromium\.Chromium\./
 const FETCHER = /^org\.chromium\.Chromium\.chromium_chrome_url_fetcher_\./
-// A Chrome or Chromium executable, as /proc names it.
 // Where a rewritten command line goes from one argument to the next: a space before a flag.
 const JOINED_FLAG = / (?=--)/
 // How many times a browser process is looked for, a poll apart, when Bun launched Chrome and /proc may not list it yet.
 const LAUNCH_LOOKS = 10
+// A Chrome or Chromium executable, as /proc names it.
 const CHROME = /chrom/i
 // Chrome's crash handler, which outlives it on the temp directory it started with, Alpine's among them, but makes nothing there.
 const CRASH_HANDLER = /crashpad/
