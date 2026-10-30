@@ -792,10 +792,7 @@ export class JsxTemplate {
     // A merge with a shorthand or a non-empty class string is always a string: it goes as the `class` attribute, where its errors are reported. One that can be empty goes as a spread, an optional property.
     const asProperty = element.component && !shorthand && !(classAttribute?.kind === 'static' && classAttribute.text.trim() !== '')
 
-    let [open, close] = ['class={[', ']}']
-
-    if (element.component)
-      [open, close] = asProperty ? [`{...${helperName('componentClass')}([`, '])}'] : [`class={${helperName('componentClass')}([`, ']).class}']
+    const [open, close] = mergedClassBrackets(element.component, asProperty)
 
     b.add(' ')
     b.wrap(classAttribute && (classAttribute.kind === 'expression' || !shorthand) ? classAttribute.name : shorthand!, () => b.add(open))
@@ -1070,6 +1067,14 @@ export class JsxTemplate {
   private text(span: Span): string {
     return this.src.slice(span.start, span.end)
   }
+}
+
+// What wraps a merged class list: an array on an element, the class of `componentClass` on a component, or its spread when the merge can be empty.
+function mergedClassBrackets(component: boolean, asProperty: boolean): [string, string] {
+  if (!component)
+    return ['class={[', ']}']
+
+  return asProperty ? [`{...${helperName('componentClass')}([`, '])}'] : [`class={${helperName('componentClass')}([`, ']).class}']
 }
 
 // JSX attribute strings have no escapes, so pick a quote the value does not contain, or fall back to an expression.
