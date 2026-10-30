@@ -34,6 +34,26 @@ async function problems(page: string, route = 'src/routes/index.kay', config = t
   }
 }
 
+// Where each problem of a page is reported, as `line:column`, for the line count of IMPORTS.
+async function positions(page: string, config = tsconfig): Promise<string[]> {
+  const root = await scratchDir('parts-check-')
+
+  try {
+    await Promise.all(Object.entries({ 'tsconfig.json': config, ...COMPONENTS, 'src/routes/index.kay': page }).map(async ([path, content]) => Bun.write(join(root, path), content)))
+
+    return (await check(root)).filter(diagnostic => !diagnostic.message.includes('is declared but')).map(diagnostic => `${diagnostic.line}:${diagnostic.column}`)
+  }
+  finally {
+    await rm(root, { recursive: true, force: true })
+  }
+}
+
+// The `line:column` of the first `needle` on the line of a call, which follows IMPORTS.
+function at(call: string, needle: string): string {
+  return `${IMPORTS.split('\n').length}:${call.indexOf(needle) + 1}`
+}
+
+const STRICT = '---\nimport Strict from \'../strict.kay\'\nimport Card from \'../card.kay\'\nconst rest = { id: \'x\' }\n---\n'
 const HANDS = '---\nimport Busy from \'./busy.kay\'\nimport Plain from \'./plain.kay\'\n---\n'
 const CALLER = 'src/caller.kay'
 
@@ -109,6 +129,24 @@ describe('kay check on a component with parts', () => {
       expect(await withExtra(`${head}div.mt-4(class={{ on: true }}) a\n`, exact)).toEqual([])
       expect(await withExtra(`${head}Bare.mt-4(class={{ on: true }})\n`, exact)).toEqual([])
     })
+  })
+
+  it('reports a class error on the class attribute', async () => {
+    const parts = 'Card.mt-4(class={{ head: \'p-6\' }}) a'
+    const spread = 'Card.mt-4({...rest} class={{ head: \'p-6\' }}) a'
+
+    expect(await positions(`${IMPORTS}${parts}\n`)).toEqual([at(parts, 'class')])
+    expect(await positions(`${IMPORTS}${spread}\n`)).toEqual([at(spread, 'class')])
+  })
+
+  it('refuses a required class prop with a spread after the class and with an empty class string, at the tag', async () => {
+    for (const config of [tsconfig, exact]) {
+      for (const call of ['Strict(class={{ on: rest.id === \'x\' }} {...rest})', 'Strict(class="" {...rest})', 'Strict({...rest} class={{ on: true }})']) {
+        const found = await positions(`${STRICT}${call}\n`, config)
+
+        expect(found).toEqual([`${STRICT.split('\n').length}:1`])
+      }
+    }
   })
 
   it('reads a condition object with a string-typed value beside a shorthand as a parts object, which the docs say', async () => {

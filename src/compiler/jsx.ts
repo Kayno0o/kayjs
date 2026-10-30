@@ -777,13 +777,10 @@ export class JsxTemplate {
     }
 
     if (attribute.kind === 'expression') {
-      if (element.component) {
-        b.wrap(attribute.name, () => b.add(`{...${helperName('componentClass')}([`)).add(`${JSON.stringify(shorthand)}, (`).addSource(attribute.expression).add(')])}')
+      // A shorthand makes the merge a non-empty string, so the `class` attribute carries it and its errors land there.
+      const [open, close] = element.component ? [`${helperName('componentClass')}([`, ']).class'] : ['[', ']']
 
-        return
-      }
-
-      this.attributeName(attribute).add(`={[${JSON.stringify(shorthand)}, (`).addSource(attribute.expression).add(')]}')
+      this.attributeName(attribute).add(`={${open}${JSON.stringify(shorthand)}, (`).addSource(attribute.expression).add(`)${close}}`)
     }
   }
 
@@ -792,8 +789,16 @@ export class JsxTemplate {
     const { b } = this
     const shorthand = element.classes.length > 0 ? { start: element.classes[0]!.start, end: element.classes.at(-1)!.end } : undefined
 
+    // A merge with a shorthand or a non-empty class string is always a string: it goes as the `class` attribute, where its errors are reported. One that can be empty goes as a spread, an optional property.
+    const asProperty = element.component && !shorthand && !(classAttribute?.kind === 'static' && classAttribute.text.trim() !== '')
+
+    let [open, close] = ['class={[', ']}']
+
+    if (element.component)
+      [open, close] = asProperty ? [`{...${helperName('componentClass')}([`, '])}'] : [`class={${helperName('componentClass')}([`, ']).class}']
+
     b.add(' ')
-    b.wrap(classAttribute && (classAttribute.kind === 'expression' || !shorthand) ? classAttribute.name : shorthand!, () => b.add(element.component ? `{...${helperName('componentClass')}([` : 'class={['))
+    b.wrap(classAttribute && (classAttribute.kind === 'expression' || !shorthand) ? classAttribute.name : shorthand!, () => b.add(open))
 
     if (shorthand)
       b.add(JSON.stringify(element.classes.map(span => this.text(span)).join(' ')))
@@ -819,7 +824,7 @@ export class JsxTemplate {
       separator = ', '
     }
 
-    b.add(element.component ? '])}' : ']}')
+    b.add(close)
   }
 
   private emitAttribute(element: ElementNode, attribute: Attribute) {
