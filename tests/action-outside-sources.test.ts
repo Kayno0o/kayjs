@@ -124,6 +124,57 @@ export const greet = act(t.Object({ name: t.String() }), ({ name }) => \`Hello \
     }
   })
 
+  it('counts action read as a value, in a module of the app or in a template expression, as one the app declares', async () => {
+    for (const code of [
+      `import { action } from 'kay'\nconst a = action\nexport const save = a(schema, run)`,
+      `import action from 'kay'\nexport default action`,
+      `import * as kay from 'kay'\nexport const { action } = kay`,
+      `import * as kay from 'kay'\nconst { action } = kay\nexport const save = action(schema, run)`,
+      `import * as k from 'kay'\nconst a = k.action\nexport const save = a(schema, run)`,
+      `import { action } from 'kay'\nexport const make = [action]`,
+      `import { action } from 'kay'\nexport const make = { action }`,
+      `import { action } from 'kay'\nexport const make = { run: action }`,
+      `import { action as act } from 'kay'\nconst a = act\nexport const save = a(schema, run)`,
+    ]) {
+      const root = await app({ 'src/routes/index.kay': PAGE(`import { greet as inner } from '../actions'\nexport const greet = inner`), 'src/actions.ts': code })
+
+      expect([code, (await readClientSources(root)).actionProps]).toEqual([code, true])
+    }
+
+    for (const template of [
+      'p {action(schema, run)}',
+      'p(title={action(schema, run) ? "a" : "b"}) Hi',
+      'if action(schema, run)\n  p Yes',
+      'for item of [action(schema, run)]\n  p {item}',
+      'const a = action\np {a}',
+      'p {k.action}',
+      'p(title={action}) Hi',
+    ]) {
+      const root = await app({ 'src/routes/index.kay': `--- script\nimport Caller from '../components/caller.kay'\nimport * as k from 'kay'\n---\n${template}\n` })
+
+      expect([template, (await readClientSources(root)).actionProps]).toEqual([template, true])
+    }
+  })
+
+  it('does not count a text, a member of another object or a binding named action', async () => {
+    for (const code of [
+      `export const a = event.action`,
+      `export const a = { action: 1 }`,
+      `export const a = (reaction) => reaction`,
+      `export function action() {}`,
+      `export const a = 'action'`,
+      `// action\nexport const a = 1`,
+    ]) {
+      const root = await app({ 'src/routes/index.kay': '--- script\nimport Caller from \'../components/caller.kay\'\n---\np action\n', 'src/actions.ts': code })
+
+      expect([code, (await readClientSources(root)).actionProps]).toEqual([code, false])
+    }
+
+    const root = await app({ 'src/routes/index.kay': '--- script\nimport Caller from \'../components/caller.kay\'\nconst form = { action: 1 }\n---\nform(action="/x")\n  p {form.action} action(x) "action"\n' })
+
+    expect((await readClientSources(root)).actionProps).toBe(false)
+  })
+
   it('does not count a comment, a string or another function holding action( as an action', async () => {
     for (const code of [`// action(schema, run)\nexport const a = 1`, `export const a = 'action(x)'`, `export const a = reaction(1)`, `export * from './other'`]) {
       const root = await app({ 'src/routes/index.kay': '--- script\nimport Caller from \'../components/caller.kay\'\n---\np action(x)\n', 'src/actions.ts': code })
