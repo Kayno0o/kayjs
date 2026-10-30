@@ -588,7 +588,7 @@ function scannedImports(file: string, source: string): string[] {
 }
 
 // A check or a build asks for the fences of one file for its imports, its signals and the islands it reaches, so the last answers are kept by the source's text.
-const KEPT_FENCES = 2048
+const KEPT_FENCES = 1024
 const keptFences = new Map<string, string>()
 
 export function fences(source: string): string {

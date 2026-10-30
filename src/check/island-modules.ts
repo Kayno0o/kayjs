@@ -20,7 +20,7 @@ const DECLARATION_FILE = /\.d\.[cm]?ts$/
 const OUTSIDE = /^(?:node:|bun:|kay(?:\/|$))/
 
 // The browser-side checks read the imports of one component several times, so the last answers are kept by the source's text.
-const KEPT_IMPORTS = 2048
+const KEPT_IMPORTS = 1024
 const keptImports = new Map<string, string[]>()
 
 export function scriptImportsOf(source: string): string[] {
