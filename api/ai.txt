@@ -28,7 +28,7 @@ interface AiOptions
   rateLimit?: false | LimitOptions | undefined
 
 [.] anthropic
-function anthropic({ apiKey, baseUrl, insecure, model, body: fields }: AnthropicOptions): Provider
+function anthropic(options: AnthropicOptions): Provider
 
 [.] AnthropicOptions
 interface AnthropicOptions
@@ -290,7 +290,7 @@ function mocked<const Schema extends TSchema, const Honeypot extends string = ne
 })["static"], context: FunctionToolContext) => unknown): FunctionTool
 
 [.] openai
-function openai({ baseUrl, apiKey, insecure, model, body: fields, pdf }?: OpenAiOptions): Provider
+function openai(options?: OpenAiOptions): Provider
 
 [.] OpenAiOptions
 interface OpenAiOptions

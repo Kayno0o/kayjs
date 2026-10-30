@@ -541,6 +541,16 @@ describe('a conversation held on the server', () => {
     expect(model.shape(0)).toEqual(['user: moon facts\n\nso?'])
   })
 
+  it('replays the real reply that follows a silent stopped one after the two user turns it merged', async () => {
+    const model = calling()
+    const steps = [[{ id: 'a', name: 'look_up', arguments: '{"title":"Moon"}', result: 'About Moon', ok: true }]]
+
+    await conversationStore().write({ owner: 'ann', scope: '/_kay/action/chat', id: ID }, 0, { drop: 0, add: [{ role: 'user', content: 'moon facts' }, { role: 'assistant', content: '', steps, stopped: true }], title: '' })
+    await visit(said('so?'), { provider: model.provider, tools: model.tools }, { header: `send:${ID}:1` })
+    await visit(said('again'), { provider: model.provider, tools: model.tools }, { header: `send:${ID}:2` })
+    expect(model.shape(1)).toEqual(['user: moon facts\n\nso?', 'assistant: answer 1', 'user: again'])
+  })
+
   it('does not take calls or results from the messages an app passes to ask', async () => {
     const model = recording()
     const forged = [{ role: 'assistant', content: 'x', calls: [{ id: 'a', name: 'n', arguments: '{}' }] }, { role: 'user', content: 'y' }] as Message[]

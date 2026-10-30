@@ -149,9 +149,14 @@ function inputOf(raw: string): Record<string, unknown> {
 }
 
 // Anthropic's Messages API.
-export function anthropic({ apiKey, baseUrl = ANTHROPIC_URL, insecure, model, body: fields }: AnthropicOptions): Provider {
+export function anthropic(options: AnthropicOptions): Provider {
+  return anthropicAt(options, 'anthropic({ baseUrl })')
+}
+
+// `anthropic()` with the root's name a refused one is reported under: the environment variable when the root comes from it.
+export function anthropicAt({ apiKey, baseUrl = ANTHROPIC_URL, insecure, model, body: fields }: AnthropicOptions, rootName: string): Provider {
   const extra = extraBody(fields, 'anthropic({ body })')
-  const root = checkedRoot(baseUrl, 'anthropic({ baseUrl })', apiKey, insecure).replace(TRAILING_SLASHES, '')
+  const root = checkedRoot(baseUrl, rootName, apiKey, insecure).replace(TRAILING_SLASHES, '')
 
   return {
     name: 'anthropic',

@@ -5,11 +5,10 @@ import process from 'node:process'
 import { s } from 'kay'
 import { configError, currentRequest, durationSeconds } from 'kay/library'
 import { defineEnv } from 'kay/server'
-import { anthropic } from './anthropic'
+import { anthropicAt } from './anthropic'
 import { AiError } from './errors'
 import { fakeAi } from './fake'
-import { openai, OPENAI_URL } from './openai'
-import { checkedRoot } from './root'
+import { openaiAt, OPENAI_URL } from './openai'
 
 // The variables, shared by what `ai()` lists for `kay env` and what `ask` reads: `listed` marks the model as the one production needs.
 export function aiEnv(listed = false) {
@@ -85,16 +84,16 @@ export function choose(): Chosen {
     if (anthropicKey === undefined)
       throw configError('AI_PROVIDER is anthropic and ANTHROPIC_API_KEY is not set')
 
-    const options: AnthropicOptions = { apiKey: anthropicKey, insecure: env.AI_INSECURE, ...base === undefined ? {} : { baseUrl: checkedRoot(base, 'AI_BASE_URL', anthropicKey, env.AI_INSECURE) } }
+    const options: AnthropicOptions = { apiKey: anthropicKey, insecure: env.AI_INSECURE, ...base === undefined ? {} : { baseUrl: base } }
 
-    return { provider: anthropic(options), model: env.AI_MODEL }
+    return { provider: anthropicAt(options, 'AI_BASE_URL'), model: env.AI_MODEL }
   }
 
   // A key is optional only for an OpenAI-compatible server named by AI_BASE_URL.
   if (openaiKey === undefined && base === undefined)
     throw configError('AI_PROVIDER is openai and OPENAI_API_KEY is not set')
 
-  return { provider: openai({ baseUrl: base === undefined ? OPENAI_URL : checkedRoot(base, 'AI_BASE_URL', openaiKey, env.AI_INSECURE), apiKey: openaiKey, insecure: env.AI_INSECURE }), model: env.AI_MODEL }
+  return { provider: openaiAt({ baseUrl: base ?? OPENAI_URL, apiKey: openaiKey, insecure: env.AI_INSECURE }, 'AI_BASE_URL'), model: env.AI_MODEL }
 }
 
 const CALLS = {
@@ -132,7 +131,7 @@ function chooseFor(call: Call): Chosen & { voice: string | undefined } {
   if (root !== undefined) {
     const apiKey = env[key] ?? (sameOrigin(root, env.AI_BASE_URL ?? OPENAI_URL) ? env.OPENAI_API_KEY : undefined)
 
-    return { provider: openai({ baseUrl: checkedRoot(root, url, apiKey, env.AI_INSECURE), apiKey, insecure: env.AI_INSECURE }), model: env[model], voice: env.AI_VOICE }
+    return { provider: openaiAt({ baseUrl: root, apiKey, insecure: env.AI_INSECURE }, url), model: env[model], voice: env.AI_VOICE }
   }
 
   if (process.env.NODE_ENV !== 'development' && env.ANTHROPIC_API_KEY === undefined && env.OPENAI_API_KEY === undefined && env.AI_BASE_URL === undefined)

@@ -159,9 +159,14 @@ function documentsAt(root: string): Documents {
 }
 
 // An OpenAI chat completions server: OpenAI itself, Ollama, and the many that speak its API.
-export function openai({ baseUrl = OPENAI_URL, apiKey, insecure, model, body: fields, pdf }: OpenAiOptions = {}): Provider {
+export function openai(options: OpenAiOptions = {}): Provider {
+  return openaiAt(options, 'openai({ baseUrl })')
+}
+
+// `openai()` with the root's name a refused one is reported under: the environment variable when the root comes from it.
+export function openaiAt({ baseUrl = OPENAI_URL, apiKey, insecure, model, body: fields, pdf }: OpenAiOptions, rootName: string): Provider {
   const extra = extraBody(fields, 'openai({ body })')
-  const root = checkedRoot(baseUrl, 'openai({ baseUrl })', apiKey, insecure).replace(TRAILING_SLASHES, '')
+  const root = checkedRoot(baseUrl, rootName, apiKey, insecure).replace(TRAILING_SLASHES, '')
   const official = root === OPENAI_URL
   const documents: Documents = pdf ?? documentsAt(root)
 

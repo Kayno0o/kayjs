@@ -6,7 +6,7 @@ function loopback(hostname: string): boolean {
   return hostname === 'localhost' || hostname === '[::1]' || LOOPBACK_V4.test(hostname)
 }
 
-// A server's API root, checked as the provider is built: it parses and is http(s), and plain http is for a loopback host or a network `insecure` says is trusted whenever a key goes with it. `name` is what the message points at, the variable or the option.
+// A server's API root, checked once by the provider that uses it, when `openai()` or `anthropic()` is called or, for a root from the environment, when an ask first chooses it: it parses and is http(s), and plain http is for a loopback host or a network `insecure` says is trusted whenever a key goes with it. `name` is what the message points at, the variable or the option.
 export function checkedRoot(root: string, name: string, key: string | undefined, insecure: boolean | undefined): string {
   if (!URL.canParse(root))
     throw configError(`${name} is not a URL; write it with its scheme, such as https://api.example.com/v1 or http://localhost:11434/v1`)

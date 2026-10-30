@@ -249,4 +249,30 @@ describe('hookedServed', () => {
       warn.mockRestore()
     }
   })
+
+  // Last, as it fills the set of messages the process remembers.
+  it('stops logging new messages at a cap, says so once, and keys a long message by its start', async () => {
+    const warn = spyOn(console, 'warn').mockImplementation(() => undefined)
+    const failWith = async (message: string) => hookedServed(page('kept', { headers: { 'content-type': 'text/html' } }), [() => {
+      throw new Error(message)
+    }], '/a', '', none, sizes)
+    const logged = (needle: string) => warn.mock.calls.filter(([line]) => String(line).includes(needle)).length
+
+    try {
+      const long = `${'x'.repeat(200)}-`
+
+      await failWith(`${long}one`)
+      await failWith(`${long}two`)
+      expect(logged('xxxxxxxxxx')).toBe(1)
+
+      for (let index = 0; index < 150; index++)
+        await failWith(`distinct failure ${index}`)
+
+      expect(logged('distinct failure')).toBe(97)
+      expect(logged('further new ones are not')).toBe(1)
+    }
+    finally {
+      warn.mockRestore()
+    }
+  })
 })
