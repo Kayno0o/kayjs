@@ -29,6 +29,7 @@ What each minor release breaks, and what an app changes to move to it. kay and i
 
 ### A string field of an action is bounded to 10,000 characters
 
+- A string in the `body` of an API route takes the same bound: declare a `maxLength` on one that takes more.
 - A string field of an action's schema with no `maxLength` is now refused past 10,000 characters: declare a `maxLength` on a field that takes more, a long text or a pasted document say. `unbounded-string` is a warning now, so a `// kay-allow` or a level it was given stays valid.
 
 ### The `island-action` lint is gone

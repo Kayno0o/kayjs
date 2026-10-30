@@ -40,7 +40,9 @@ function start(dir: string, ...args: string[]): Subprocess<'ignore', 'pipe', 'pi
 
 // With the shell's HOST set to `host`, or deleted for undefined, whatever the machine running the test exports.
 function startWithHost(dir: string, host: string | undefined, ...args: string[]): Subprocess<'ignore', 'pipe', 'pipe'> {
-  const { HOST: _, ...env } = process.env
+  const env = { ...process.env }
+
+  delete env.HOST
 
   return Bun.spawn([process.execPath, cli, 'start', dir, ...args], { stdin: 'ignore', stdout: 'pipe', stderr: 'pipe', env: host === undefined ? env : { ...env, HOST: host } })
 }

@@ -33,8 +33,5 @@ export function safeUrl(name: string, value: string): string {
   trusted ??= `,${globalThis.document?.querySelector(`meta[name="${LINK_SCHEMES_META}"]`)?.getAttribute('content') ?? ''},`
 
   // Checked here as well as when the server lists them, as the meta an island reads could be forged by a page's own content.
-  if (trusted.includes(`,${scheme},`) && !NEVER_SCHEMES.test(scheme))
-    return value
-
-  return `unsafe:${value}`
+  return trusted.includes(`,${scheme},`) && !NEVER_SCHEMES.test(scheme) ? value : `unsafe:${value}`
 }

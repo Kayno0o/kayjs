@@ -45,7 +45,7 @@ const markdown = api({ maxSize: MAX_MARKDOWN })
 
       throw error
     }
-  }, { body: s.Object({ markdown: s.String(), collection: s.Optional(s.String()), slug: s.Optional(s.String()), locale: s.Optional(s.String()) }) })
+  }, { body: s.Object({ markdown: s.String({ maxLength: 5_000_000 }), collection: s.Optional(s.String()), slug: s.Optional(s.String()), locale: s.Optional(s.String()) }) })
   // An image the preview's text names by a path in the entry's folder, read from there: only a PNG, JPEG, WebP, GIF or AVIF inside the collection's folder.
   // The browser keeps it but asks again each time (`no-cache`), and an unchanged file answers 304: a re-rendered preview refetches nothing, an edited image shows at once.
   .get('/image', async ({ query, request, status }) => {

@@ -42,7 +42,8 @@ export default api()
     body: s.Object({
       locale: s.Optional(s.String()),
       data: s.Record(s.String(), s.Unknown()),
-      body: s.Optional(s.String()),
+      // An entry's text is long: past the default bound of a string, under any request limit an app raises.
+      body: s.Optional(s.String({ maxLength: 5_000_000 })),
       create: s.Optional(s.Boolean()),
       version: s.Optional(s.String()),
     }),
