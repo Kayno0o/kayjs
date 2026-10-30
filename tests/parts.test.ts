@@ -342,8 +342,8 @@ describe('kay check on parts', () => {
     const several = compileKay('header(part="top") a\nfooter(part="bottom") b\n', 'src/two.kay', { check: true }).tsx
     const nested = compileKay('---\nimport Card from \'./card.kay\'\n---\nsection\n  Card(part="card") a\n', 'src/panel.kay', { check: true }).tsx
 
-    expect(one).toContain('class?: string | { "root"?: string; "head"?: string } | undefined')
-    expect(several).toContain('class?: { "top"?: string; "bottom"?: string } | { kayError:')
-    expect(nested).toContain('"card"?: KayPartOf<typeof Card>')
+    expect(one).toContain('class?: string | { "root"?: string | undefined; "head"?: string | undefined } | undefined')
+    expect(several).toContain('class?: { "top"?: string | undefined; "bottom"?: string | undefined } | { kayError:')
+    expect(nested).toContain('"card"?: KayPartOf<typeof Card> | undefined')
   })
 })

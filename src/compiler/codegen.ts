@@ -531,7 +531,7 @@ class ModuleShell {
         }),
       ])
 
-      return `${JSON.stringify(name)}?: ${[...types].join(' | ')}`
+      return `${JSON.stringify(name)}?: ${[...types, 'undefined'].join(' | ')}`
     })
     const object = `{ ${entries.join('; ')} }`
 

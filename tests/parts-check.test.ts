@@ -6,10 +6,8 @@ import { scratchDir } from './scratch'
 
 setDefaultTimeout(90_000)
 
-const tsconfig = JSON.stringify({
-  compilerOptions: { target: 'ESNext', jsx: 'preserve', jsxImportSource: 'kay', lib: ['ESNext', 'DOM'], rootDirs: ['.', '.kay/types'], module: 'Preserve', moduleResolution: 'bundler', strict: true, noEmit: true, skipLibCheck: true },
-  include: ['src', '.kay/types'],
-})
+const compilerOptions = { target: 'ESNext', jsx: 'preserve', jsxImportSource: 'kay', lib: ['ESNext', 'DOM'], rootDirs: ['.', '.kay/types'], module: 'Preserve', moduleResolution: 'bundler', strict: true, noEmit: true, skipLibCheck: true }
+const tsconfig = JSON.stringify({ compilerOptions, include: ['src', '.kay/types'] })
 const COMPONENTS = {
   'src/card.kay': 'section.card\n  header(part="head") a\n  div(part="body")\n    slot\n',
   'src/plain.kay': '---\nconst { class: className } = props<{ class?: string }>()\n---\ndiv(class={className}) a\n',
@@ -20,11 +18,11 @@ const COMPONENTS = {
 }
 const IMPORTS = '---\nimport Card from \'../card.kay\'\nimport Pair from \'../pair.kay\'\nimport Panel from \'../panel.kay\'\nimport Plain from \'../plain.kay\'\nconst rest = { id: \'x\' }\n---\n'
 
-async function problems(page: string, route = 'src/routes/index.kay'): Promise<string[]> {
+async function problems(page: string, route = 'src/routes/index.kay', config = tsconfig): Promise<string[]> {
   const root = await scratchDir('parts-check-')
 
   try {
-    await Promise.all(Object.entries({ 'tsconfig.json': tsconfig, ...COMPONENTS, [route]: page }).map(async ([path, content]) => Bun.write(join(root, path), content)))
+    await Promise.all(Object.entries({ 'tsconfig.json': config, ...COMPONENTS, [route]: page }).map(async ([path, content]) => Bun.write(join(root, path), content)))
 
     return (await check(root)).map(diagnostic => diagnostic.message.slice(0, diagnostic.message.includes('\n') ? diagnostic.message.indexOf('\n') : undefined)).filter(message => !message.includes('is declared but'))
   }
@@ -52,6 +50,12 @@ describe('kay check on a part handed to a called component', () => {
 describe('kay check on a component with parts', () => {
   it('passes a string for the root, an object of parts, and a nested object for a part that is a component', async () => {
     expect(await problems(`${IMPORTS}Card(class="mt-4") a\nCard(class={{ root: 'mt-4', head: 'p-6' }}) b\nPair(class={{ top: 'a', bottom: 'b' }})\nPanel(class={{ card: { head: 'p-2' }, root: 'x' }})\nPanel(class={{ card: 'mt-2' }})\n`)).toEqual([])
+  })
+
+  it('takes a part class that may be undefined under exactOptionalPropertyTypes', async () => {
+    const exact = JSON.stringify({ compilerOptions: { ...compilerOptions, exactOptionalPropertyTypes: true }, include: ['src', '.kay/types'] })
+
+    expect(await problems(`${IMPORTS}Card(class={{ head: rest.id === 'x' ? 'p-6' : undefined }}) a\n`, undefined, exact)).toEqual([])
   })
 
   it('reports a part the component does not have, at the call', async () => {
