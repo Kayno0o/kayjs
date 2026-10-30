@@ -235,7 +235,7 @@ async function ownShadows(root: string, options: CheckOptions, tree: ShadowTree,
   const { routes: routesDir, cache: cacheDir } = projectPaths(root, options)
   const files = await findKayFiles(root, { project: true, ownOnly: true, ownKayOnly: true })
   const sources = new Map(await Promise.all(files.map(async file => [file, await Bun.file(file).text()] as const)))
-  const islands = new Set((await Promise.all(files.map(async file => await rendersAsIslandCached(cacheDir, file, sources.get(file)!) ? [file] : []))).flat())
+  const islands = new Set((await Promise.all(files.map(async file => await rendersAsIslandCached(cacheDir, root, file, sources.get(file)!) ? [file] : []))).flat())
   // What every component compiles with, written beside the tree for eslint, which compiles one file at a time.
   const settings: ShadowSettings = { routesDir, mounts, islandOnly: await islandOnlyComponents(root, routesDir, files, sources, file => islands.has(file)), publicDir: projectPaths(root, options).public, lints: options.lints }
   const diagnostics: CheckDiagnostic[] = []
@@ -499,7 +499,7 @@ async function remembered<Value>(slot: CacheSlot, read: () => Promise<Value | un
 }
 
 // Whether a component renders as an island, through the build's cache of compiles.
-async function rendersAsIslandCached(cacheDir: string, file: string, source: string): Promise<boolean> {
+async function rendersAsIslandCached(cacheDir: string, root: string, file: string, source: string): Promise<boolean> {
   const signals = importedSignals(file, source)
   const slot = cacheEntry(cacheDir, file, 'renders-island', JSON.stringify([signals, source]))
   const cached = await remembered(slot, async () => readCacheEntry<boolean>(slot))
@@ -507,7 +507,7 @@ async function rendersAsIslandCached(cacheDir: string, file: string, source: str
   if (cached !== undefined)
     return cached
 
-  const island = rendersAsIsland(source, signals)
+  const island = rendersAsIsland(source, signals, root)
 
   memory.set(slot.file, { key: slot.key, value: island })
   await writeCacheEntry(slot, island)

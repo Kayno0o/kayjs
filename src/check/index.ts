@@ -8,6 +8,7 @@ import type { ExtensionProgram } from './shadow-types'
 import { join, relative, resolve, sep } from 'node:path'
 import process from 'node:process'
 import { inWalkScope, readText } from '../build/files'
+import { inAnalysisScope } from '../compiler'
 import { formatReport } from '../compiler/frame'
 import { lintLevels } from '../compiler/lints'
 import { offsetAt, positionAt } from '../compiler/mapping'
@@ -114,7 +115,7 @@ export function configCheckOptions(config: LoadedConfig): CheckOptions {
 
 // Type-checks a project, .kay components included, and reports every error at the line and column the user wrote.
 export async function check(root: string, options: CheckOptions = {}, probes?: ProbeMemory): Promise<CheckDiagnostic[]> {
-  return inWalkScope(async () => runCheck(root, options, probes))
+  return inWalkScope(async () => inAnalysisScope(async () => runCheck(root, options, probes)))
 }
 
 async function runCheck(root: string, given: CheckOptions, probes?: ProbeMemory): Promise<CheckDiagnostic[]> {

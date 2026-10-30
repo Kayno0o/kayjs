@@ -6,6 +6,7 @@ import type { LintLevels } from './lints'
 import type { ImportedSignals, SignalKind } from './module-signals'
 import type { NameFindings } from './rewrite'
 import type { ParsedFence, ScriptAnalysis, ServerAnalysis } from './script'
+import { AsyncLocalStorage } from 'node:async_hooks'
 import { basename, relative } from 'node:path'
 import { drawIcons, elementsIn, templateFacts, visitNodes } from './ast'
 import { browserReads } from './browser'
@@ -127,29 +128,67 @@ function serverNames(server: ServerAnalysis | undefined): string[] | undefined {
   return server && [...server.data.map(data => data.name), ...server.exportNames]
 }
 
-// Whether a component renders as an island of its own, as compileKay decides it, without generating its code.
-export function rendersAsIsland(original: string, imported?: ImportedSignals): boolean {
+// What a component's script and template say of its role in the browser, from one analysis.
+interface Role {
+  // A `--- client` component or an interactive one, an island whatever its file.
+  always: boolean
+  // It imports a live value, which makes a component that is not a route file an island.
+  live: boolean
+  // A static component that may be promoted to an island by what it passes.
+  promotable: boolean
+  server: boolean
+}
+
+const roles = new AsyncLocalStorage<Map<string, Map<string, Role>>>()
+
+// Runs a check, in which a component's role is analysed once whoever asks for it, `rendersAsIsland` and `browserRole` alike: its files do not change meanwhile.
+// Outside one every call analyses again, as the language server and a server compiling on a request need.
+export async function inAnalysisScope<T>(run: () => Promise<T>): Promise<T> {
+  return roles.getStore() ? run() : roles.run(new Map(), run)
+}
+
+function roleOf(original: string, imported: ImportedSignals | undefined, root: string | undefined): Role {
+  const kept = roles.getStore()
+  const key = JSON.stringify([root, imported])
+  const known = kept?.get(original)?.get(key)
+
+  if (known)
+    return known
+
   const { file } = parseExpanded(original)
   const source = file.source
   const server = analyzeServer(source, file.server)
-  const script = analyzeScript(source, file.script, serverNames(server), templateReads(file), file.module)
+  const script = analyzeScript(source, file.script, serverNames(server), templateReads(file), file.module, iconSetsOf(source, root), imported)
+  const always = file.client !== undefined || isInteractive(file, script)
+  const role = { always, live: liveImport(script, imported) !== undefined, promotable: !always && promotionCause(file, script, imported) !== undefined, server: file.server !== undefined }
 
-  return file.client !== undefined || isInteractive(file, script) || (file.server === undefined && liveImport(script, imported) !== undefined)
+  if (kept) {
+    const inner = kept.get(original) ?? new Map<string, Role>()
+
+    kept.set(original, inner)
+    inner.set(key, role)
+  }
+
+  return role
+}
+
+// Whether a component renders as an island of its own, as compileKay decides it, without generating its code.
+export function rendersAsIsland(original: string, imported?: ImportedSignals, root?: string): boolean {
+  const { always, live, server } = roleOf(original, imported, root)
+
+  return always || (!server && live)
 }
 
 // Whether a component is an island, as `compileKay` decides it, or a static component that may be promoted to one by what it passes, which the build does only when its imports reach an island.
 // A file with a server fence, a layout and a special page are islands only by their own handlers or `client`, never by a package's live value, and never promoted.
 export function browserRole(original: string, filename: string, imported?: ImportedSignals, root?: string): 'island' | 'promotable' | undefined {
-  const { file } = parseExpanded(original)
-  const source = file.source
-  const server = analyzeServer(source, file.server)
-  const script = analyzeScript(source, file.script, serverNames(server), templateReads(file), file.module, iconSetsOf(source, root), imported)
-  const routeFile = file.server !== undefined || ROUTE_FILES.has(basename(filename))
+  const { always, live, promotable, server } = roleOf(original, imported, root)
+  const routeFile = server || ROUTE_FILES.has(basename(filename))
 
-  if (file.client !== undefined || isInteractive(file, script) || (!routeFile && liveImport(script, imported) !== undefined))
+  if (always || (!routeFile && live))
     return 'island'
 
-  return routeFile || promotionCause(file, script, imported) === undefined ? undefined : 'promotable'
+  return routeFile || !promotable ? undefined : 'promotable'
 }
 
 // The fences of the script and of the module that the browser reads.
