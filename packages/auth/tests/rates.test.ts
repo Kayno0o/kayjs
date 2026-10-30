@@ -83,38 +83,6 @@ describe('where attempts are counted', () => {
     await signIn(browser, WRONG)
     expect(hit).not.toHaveBeenCalled()
   })
-
-  test('a store giving the attempts counter of before 1.81 is still counted and cleared through it, over the rates of the store it spreads', async () => {
-    const memory = memoryAuthRates()
-    const calls: string[] = []
-    const store: AuthStore = {
-      ...memoryAuthStore(),
-      attempts: {
-        count: async (key) => {
-          calls.push('count')
-
-          return (await memory.peek(key))?.count ?? 0
-        },
-        hit: async (key, window) => {
-          calls.push('hit')
-
-          return memory.hit(key, window).count
-        },
-        reset: (key) => {
-          calls.push('reset')
-          memory.reset(key)
-        },
-      },
-    }
-    const { browser } = await registered(store)
-
-    await signIn(browser, WRONG)
-    expect(await signIn(browser, PASSWORD)).toMatchObject({ ok: true })
-    await signIn(browser, WRONG)
-    await signIn(browser, WRONG)
-    expect(await signIn(browser, PASSWORD)).toEqual({ ok: false, error: 'limited' })
-    expect(new Set(calls)).toEqual(new Set(['count', 'hit', 'reset']))
-  })
 })
 
 describe('a rates store that fails', () => {
@@ -142,18 +110,16 @@ describe('a rates store that fails', () => {
     }
   })
 
-  test('counts in memory when the auth store\'s own rates or its attempts of before 1.81 reject', async () => {
+  test('counts in memory when the auth store\'s own rates reject', async () => {
     const warned = spyOn(console, 'warn').mockReturnValue()
     const rejected = async () => Promise.reject(new Error('the database went away'))
 
     try {
-      for (const store of [{ ...memoryAuthStore(), rates: { hit: rejected, peek: rejected, reset: rejected } }, { ...memoryAuthStore(), attempts: { count: rejected, hit: rejected, reset: rejected } }]) {
-        const { browser } = await registered(store)
+      const { browser } = await registered({ ...memoryAuthStore(), rates: { hit: rejected, peek: rejected, reset: rejected } })
 
-        await signIn(browser, WRONG)
-        await signIn(browser, WRONG)
-        expect(await signIn(browser, PASSWORD)).toEqual({ ok: false, error: 'limited' })
-      }
+      await signIn(browser, WRONG)
+      await signIn(browser, WRONG)
+      expect(await signIn(browser, PASSWORD)).toEqual({ ok: false, error: 'limited' })
     }
     finally {
       warned.mockRestore()

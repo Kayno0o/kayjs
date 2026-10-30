@@ -479,7 +479,6 @@ interface AuthSessionData
 
 [.] AuthStore
 interface AuthStore
-  attempts?: LegacyAttempts | undefined
   audit?: {
   add: (entry: AuditRecord) => MaybePromise<void>;
   list: (query: {

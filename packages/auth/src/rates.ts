@@ -1,5 +1,5 @@
 import type { Duration, RateStore, RateWindow } from 'kay'
-import type { AuthStore, MaybePromise } from './store'
+import type { AuthStore } from './store'
 import { appStore, durationSeconds, ratesFallingBack } from 'kay/library'
 import { log } from './log'
 
@@ -11,13 +11,6 @@ const COUNTING = 'kayjs-auth attempts'
 
 // Where kayjs-auth counts attempts: kay's `RateStore`, reading a count without adding to it (`peek`) and clearing one once the attempt it guards succeeds (`reset`).
 export type AuthRates = RateStore & Required<Pick<RateStore, 'peek' | 'reset'>>
-
-// The counter of a store before 1.81, which answered a hit with the count alone.
-export interface LegacyAttempts {
-  count: (key: string) => MaybePromise<number>
-  hit: (key: string, window: Duration) => MaybePromise<number>
-  reset: (key: string) => MaybePromise<void>
-}
 
 // Answered at once, as memory needs no promise; `sweep` drops the windows ended by `now`.
 export interface MemoryAuthRates {
@@ -64,32 +57,17 @@ export function memoryAuthRates(): MemoryAuthRates {
   }
 }
 
-// A pre-1.81 `attempts` counter read as a `RateStore`; kayjs-auth reads no window's end, so none is given.
-function legacyRates(attempts: LegacyAttempts): AuthRates {
-  return {
-    hit: async (key, window) => ({ count: await attempts.hit(key, window), resetAt: Number.NaN }),
-    async peek(key) {
-      const count = await attempts.count(key)
-
-      return count > 0 ? { count, resetAt: Number.NaN } : undefined
-    },
-    reset: async key => attempts.reset(key),
-  }
-}
-
 function counts(store: RateStore): store is AuthRates {
   return typeof store.peek === 'function' && typeof store.reset === 'function'
 }
 
-// The store's pre-1.81 `attempts`, else its own `rates`, else the app's `store.rates` from kay.config.ts when it can peek and reset, else this auth's memory.
-// `attempts` comes first: the built-in stores give `rates` and no `attempts`, so a store holding both spread one and gave the counter shared by its processes.
+// The store's own `rates`, else the app's `store.rates` from kay.config.ts when it can peek and reset, else this auth's memory.
 // The app's store is read on each count, as kay sets it up after `createAuth` may have run. A store that fails or hangs counts in this auth's memory meanwhile, as kay's own limits do.
 export function authRates(store: AuthStore): AuthRates {
   const memory = memoryAuthRates()
-  const own = store.attempts ? legacyRates(store.attempts) : store.rates
 
-  if (own)
-    return ratesFallingBack(COUNTING, own, memory)
+  if (store.rates)
+    return ratesFallingBack(COUNTING, store.rates, memory)
 
   let warned: RateStore | undefined
   let standIn: { of: AuthRates, rates: AuthRates } | undefined

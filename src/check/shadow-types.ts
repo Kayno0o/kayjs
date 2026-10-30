@@ -31,7 +31,6 @@ import { htmlFallbacks, publicFiles } from '../server/public'
 import { redirectProblems } from '../server/redirects'
 import { extensionEditor, patternShapes, routeMounts, scanEndpoints, scanRoutes, servedPaths } from '../server/routes'
 import { readRuntimeRedirects } from '../server/runtime-redirects'
-import { authAttempts } from './auth-attempts'
 import { authMethods } from './auth-methods'
 import { deprecatedConfigKeys } from './deprecated-config-keys'
 import { ownFile } from './diagnose'
@@ -139,7 +138,6 @@ const PROJECT_CHECKS: ((input: ProjectCheckInput) => CheckDiagnostic[] | Promise
   async ({ root, options }) => removedUiTokens(root, options),
   async ({ root, options }) => unknownToolLabels(root, options),
   async ({ root, options }) => publicEnvOutsideSrc(root, options),
-  async ({ root, options }) => authAttempts(root, options),
   async ({ root, options }) => authMethods(root, options),
   async ({ root, options }) => sessionStores(root, options),
   async ({ root, options }) => safeRedirects(root, options),

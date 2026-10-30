@@ -644,15 +644,6 @@ export const LINTS = {
     wrong: '// common/env.ts\nexport const env = defineEnv({ MAP_KEY: s.Public\u0028s.String()) })',
     right: '// src/env.ts\nexport const env = defineEnv({ MAP_KEY: s.Public\u0028s.String()) })',
   },
-  'deprecated-auth-attempts': {
-    level: 'warn',
-    group: 'deprecated',
-    since: '1.81',
-    site: true,
-    summary: 'An `attempts` counter in a kayjs-auth store the app writes, the contract before 1.81: a store counts in `rates`, a kay `RateStore` with `peek` and `reset`, or leaves it out, attempts then counting in the app\'s `store.rates`, else memory. The counter is still read until 1.84. A store is an object literal holding `users`, `identities` and `tokens`, in the project\'s TypeScript files and `.kay` fences importing from `@kaynooo/kayjs-auth`. The fix drops `attempts: memoryAuthStore().attempts`, and the import it leaves unread; another counter is reported with no fix, as it may be the only count the app\'s processes share.',
-    wrong: 'const store: AuthStore = { users, identities, tokens, ...rest, attempts: memoryAuthStore().attempts }',
-    right: 'const store: AuthStore = { users, identities, tokens, ...rest }',
-  },
   'deprecated-config-keys': {
     level: 'warn',
     group: 'deprecated',
@@ -733,7 +724,7 @@ export const DEPRECATION_MINORS: readonly { since: string, removedIn?: string }[
   { since: '1.71', removedIn: '1.74' },
   { since: '1.72', removedIn: '1.75' },
   { since: '1.74', removedIn: '1.77' },
-  { since: '1.81' },
+  { since: '1.81', removedIn: '1.85' },
   { since: '1.82' },
   { since: '1.84' },
 ]

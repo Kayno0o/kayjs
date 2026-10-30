@@ -8,6 +8,10 @@ What each minor release breaks, and what an app changes to move to it. kay and i
 
 - The `chartist` peer is `^2.2.0` (was `^2.0.0`): `bun update chartist` before upgrading kayjs-ui. `kay check` cannot recognise a chartist version, so there is no deprecated lint.
 
+### kayjs-auth reads no `attempts` counter
+
+- The `attempts` counter a store gave before 1.81 is no longer read, and `deprecated-auth-attempts` is gone with it: a store literal typed `AuthStore` still holding one gets a type error from `kay check`. Drop it, attempts then counting in the app's `store.rates`, else in memory, or give `rates`, a kay `RateStore` with `peek` and `reset` over the store's own database. `kay upgrade` on 1.84 drops `attempts: memoryAuthStore().attempts`.
+
 ## 1.84.0
 
 ### kayjs-ui's `LineChart` needs chartist 2

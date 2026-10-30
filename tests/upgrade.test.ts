@@ -525,7 +525,8 @@ describe('kay upgrade across removed deprecations', () => {
         const removed = minorOf(removedIn)!
 
         expect(removed[0] === minor[0] ? removed[1] > minor[1] : removed[0] > minor[0]).toBe(true)
-        expect(removed[0] < current[0] || removed[1] <= current[1]).toBe(true)
+        // The release dropping them may be the next minor: the removal lands before `just minor` bumps the version.
+        expect(removed[0] < current[0] || removed[1] <= current[1] + 1).toBe(true)
       }
     }
   })
