@@ -1,7 +1,7 @@
 import { resolveClasses } from './class-table'
 import { escape, escapeAttribute } from './escape'
 import { LOCALE_ATTRIBUTES, ROOT_ATTRIBUTES } from './root'
-import { safeUrl } from './url'
+import { reportedUrl } from './url-report'
 import { attributeName, classText, handlerName } from './values'
 
 // A tag a template's `head` block sets, its text as `children`.
@@ -390,7 +390,7 @@ function attributesOf(props: Record<string, unknown>): Map<string, string | true
     if (name === 'children' || name === 'ref' || handlerName(name) || !attributeName(name) || value == null || value === false || typeof value === 'function')
       continue
 
-    attributes.set(name.toLowerCase(), value === true ? true : safeUrl(name, String(value)))
+    attributes.set(name.toLowerCase(), value === true ? true : reportedUrl(name, String(value)))
   }
 
   return attributes

@@ -23,7 +23,7 @@ import { isRendered, html as renderedHtml } from './rendered'
 import { ISLAND_PARAM } from './server-islands'
 import { configuredSite, keepsSameTab } from './site'
 import { failedIds, idMark } from './uid'
-import { safeUrl } from './url'
+import { reportedUrl } from './url-report'
 import { attributeName, attributeValue, classText, eachChild, elementName, handlerName, spreadAttributes as keepAttributes, styleText } from './values'
 
 export { escape, escapeAttribute } from './escape'
@@ -155,7 +155,7 @@ export function attribute(name: string, value: unknown, literal = false): string
   if (given === false)
     return ''
 
-  const markup = given === true ? ` ${name}` : ` ${name}="${escapeAttribute(safeUrl(name, given))}"`
+  const markup = given === true ? ` ${name}` : ` ${name}="${escapeAttribute(reportedUrl(name, given))}"`
 
   return fieldMarks.marking === undefined ? markup : markup + markedAttribute(name, value, literal)
 }

@@ -14,16 +14,10 @@ export const NEVER_SCHEMES = /^(?:javascript|vbscript|data)$/
 export const LINK_SCHEMES_META = 'kay-link-schemes'
 // The trusted schemes between commas, set by the server as it boots, else read once from the page's meta in a browser.
 let trusted: string | undefined
-let reporter: ((attribute: string, url: string, scheme: string) => void) | undefined
 
 // The schemes `links: { schemes }` lets through, such as `webcal` or `geo`; one list per process.
 export function trustSchemes(schemes: readonly string[] | undefined): void {
-  trusted = schemes && `,${schemes.filter(scheme => !NEVER_SCHEMES.test(scheme)).join(',')},`
-}
-
-// Told of each bound URL rewritten to `unsafe:`, which `kay dev` logs.
-export function onUnsafeUrl(report: typeof reporter): void {
-  reporter = report
+  trusted = schemes && `,${schemes.join(',')},`
 }
 
 // A bound URL with any other scheme, unless the app trusts it in `links: { schemes }`, such as a user's `javascript:alert(1)` link, goes out as `unsafe:javascript:alert(1)`, which a browser does nothing with, whatever the CSP says. A relative URL has none, so it is kept.
@@ -36,12 +30,11 @@ export function safeUrl(name: string, value: string): string {
 
   const scheme = url.slice(0, url.indexOf(':')).toLowerCase()
 
-  trusted ??= `,${typeof document === 'undefined' ? '' : document.querySelector(`meta[name="${LINK_SCHEMES_META}"]`)?.getAttribute('content') ?? ''},`
+  trusted ??= `,${globalThis.document?.querySelector(`meta[name="${LINK_SCHEMES_META}"]`)?.getAttribute('content') ?? ''},`
 
-  if (trusted.includes(`,${scheme},`))
+  // Checked here as well as when the server lists them, as the meta an island reads could be forged by a page's own content.
+  if (trusted.includes(`,${scheme},`) && !NEVER_SCHEMES.test(scheme))
     return value
-
-  reporter?.(attribute, url, scheme)
 
   return `unsafe:${value}`
 }

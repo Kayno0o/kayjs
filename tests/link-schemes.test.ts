@@ -1,8 +1,10 @@
 import { afterEach, describe, expect, it, spyOn } from 'bun:test'
 import { Elysia } from 'elysia'
 import { attribute } from '../src/runtime/html'
-import { onUnsafeUrl, trustSchemes } from '../src/runtime/url'
+import { trustSchemes } from '../src/runtime/url'
+import { onUnsafeUrl } from '../src/runtime/url-report'
 import { linkSchemes } from '../src/server/link-schemes'
+import { reportUnsafeUrls } from '../src/server/unsafe-urls'
 import { pages } from './shared-pages'
 
 const LINK = /<a\b[^>]*>/g
@@ -71,6 +73,23 @@ describe('links: { schemes }', () => {
     }
   })
 
+  it('ignores javascript, vbscript and data in a forged meta in the browser, as the server does', () => {
+    const page = globalThis as { document?: unknown }
+    const before = page.document
+
+    page.document = { querySelector: () => ({ getAttribute: () => 'javascript,vbscript,data,geo' }) }
+
+    try {
+      expect(attribute('href', 'javascript:alert(1)')).toBe(' href="unsafe:javascript:alert(1)"')
+      expect(attribute('href', 'VBScript:x')).toBe(' href="unsafe:VBScript:x"')
+      expect(attribute('src', 'data:text/html,<p>')).toBe(' src="unsafe:data:text/html,&lt;p>"')
+      expect(attribute('href', 'geo:1,2')).toBe(' href="geo:1,2"')
+    }
+    finally {
+      page.document = before
+    }
+  })
+
   it('takes names as a browser spells them and refuses what is no scheme or may run script', () => {
     expect(linkSchemes({ links: { schemes: ['WebCal', ' geo:', 'x-app+v1.2'] } })).toEqual(['webcal', 'geo', 'x-app+v1.2'])
     expect(linkSchemes({})).toEqual([])
@@ -100,6 +119,24 @@ describe('links: { schemes }', () => {
     expect(tags.calendar).toContain('href="unsafe:webcal://example.com/events.ics"')
     expect(tags.mail).toContain('href="mailto:me@example.com"')
     expect(html).not.toContain('kay-link-schemes')
+  })
+
+  it('logs again after a dev config reload', async () => {
+    const warn = spyOn(console, 'warn').mockImplementation(() => undefined)
+    const lines = () => warn.mock.calls.map(call => call.join(' ')).filter(line => line.includes('rewritten to unsafe:'))
+
+    try {
+      reportUnsafeUrls()
+      attribute('href', 'webcal://x')
+      attribute('href', 'webcal://x')
+      expect(lines()).toHaveLength(1)
+      reportUnsafeUrls()
+      attribute('href', 'webcal://x')
+      expect(lines()).toHaveLength(2)
+    }
+    finally {
+      warn.mockRestore()
+    }
   })
 
   it('logs once per attribute, URL and page in dev, naming the scheme and the option', async () => {
