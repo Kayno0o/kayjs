@@ -184,7 +184,7 @@ export async function typecheck(root: string, tsconfig: string, shown: string | 
     return { output, errors: `kay: bun check did not finish within ${timeout / 1000} s and was stopped`, code: 1 }
 
   // A failed run is kept too, replayed while nothing it read has changed, unless it failed on something the listed files cannot show would change: a file or module that was not found.
-  if (slot && errors === '' && (code === 0 ? output === '' : !UNRESOLVED.test(output)))
+  if (slot && errors === '' && (code === 0 ? output === '' : output !== '' && !UNRESOLVED.test(output)))
     await writeCacheEntry(slot, { started, ...filesRead(root, listed.filter(file => !Object.hasOwn(generated, file))), generated, ...code === 0 ? {} : { result: { output, errors, code } } } satisfies CleanRun)
 
   return { output, errors, code }
