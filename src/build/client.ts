@@ -452,7 +452,7 @@ async function markupFiles(root: string, sources: object): Promise<string[]> {
 
 const SCRIPT_FILE = /\.[cm]?[jt]s$/
 
-// Whether an own module of the app calls `action`, imports it under another name or re-exports it: the `.kay` sources already read, and the scripts beside them.
+// Whether an own module of the app calls `action`, reads it as a value, imports it under another name or re-exports it: the `.kay` sources already read, and the scripts beside them.
 async function declaresActions(root: string, kaySources: string[]): Promise<boolean> {
   if (kaySources.some(source => declaresAction(source, true)))
     return true
