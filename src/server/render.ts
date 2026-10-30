@@ -30,6 +30,7 @@ import { collectHead, head as setHead } from '../runtime/head'
 import { child, component, html, newServerIslands, withServerIslands } from '../runtime/html'
 import { localePath, textDirection } from '../runtime/i18n'
 import { DEFAULT_MAX_DENSITY, RESOLVED_META } from '../runtime/image'
+import { IslandPropsError } from '../runtime/island.server'
 import { localeState } from '../runtime/locale-state'
 import { kayLog } from '../runtime/log'
 import { NAVIGATION_ENTRY } from '../runtime/navigation-entry'
@@ -1073,6 +1074,10 @@ function documentOf(files: string[], modules: PageModule[], data: Record<string,
     noteProbedEntries(rendering.ctx.request, marks.entries.values())
 
   const hasIslands = client.entry !== undefined && islands.count > 0
+
+  if (client.actionless && islands.actions)
+    throw new IslandPropsError(`kay: a page hands an island an action, but this build carries no code to revive one in the browser: no \`.kay\` or script of the app calls \`action(\` or imports it as another name, and no kay library is used, so the action comes from a package outside the app; call \`action(\` in one of the app's own files, or use a kay library`)
+
   // A page posting forms to actions loads the entry too, which sends them without a reload; a page with neither ships only `historyScript`, and links from it load pages, losing no state.
   const posts = client.entry !== undefined && client.navigation === true && forms.size > 0
   // The entry fetches a deferred server island as it nears the viewport.

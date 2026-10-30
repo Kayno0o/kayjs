@@ -47,6 +47,8 @@ export interface ClientManifest {
   site?: string | undefined
   // The dictionary the pages are served against to a browser holding it: the build's 404 page, by file name in the build and the hash it is named by.
   dictionary?: DictionaryRef | undefined
+  // Production: the build carries no code reviving an action an island is handed, as the app's own sources declare none and it uses no kay library; a page handing an island one fails.
+  actionless?: boolean
   // Whether the entry swaps pages in place, which ships it to pages posting forms to actions too.
   navigation?: boolean
   // In development, the source files each chunk of an island holds, by chunk URL and relative to the root: an edited island swaps in everywhere its code runs.

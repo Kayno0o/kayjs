@@ -718,6 +718,7 @@ function promote<P extends object>(id: string, render: (props: P) => Element, hy
 
 [./island] RenderedIslands
 interface RenderedIslands
+  actions?: true
   chunks?: Record<string, string> | undefined
   count: number
   eager: Set<string>

@@ -36,6 +36,8 @@ export interface RenderedIslands {
   chunks?: Record<string, string> | undefined
   // The message keys the islands use, which go to the browser with them.
   messages: Set<string>
+  // Set once an island is handed an action, which a build that left out the code reviving one cannot serve.
+  actions?: true
 }
 
 // Gives the page's island list back to where it stands now, for a block that failed: the islands it rendered are not in the page.
@@ -266,6 +268,9 @@ function serializeProps(what: string, props: object, slots: [string, string][]):
 
       if (reason !== undefined || !isAction(value))
         throw new IslandPropsError(`${what}, so it renders as an island: its \`${key}\` prop is ${reason ?? `a ${typeof value}`} and cannot reach the browser; pass it from a component of its own, which then renders as an island in its place`)
+
+      if (rendered)
+        rendered.actions = true
     }
 
     if (holdsMarkup(value))

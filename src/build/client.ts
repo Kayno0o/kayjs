@@ -449,7 +449,8 @@ async function markupFiles(root: string, sources: object): Promise<string[]> {
   return found
 }
 
-const ACTION_CALL = /\baction\s*\(/
+// A call of `action`, or the import of it under another name.
+const ACTION_CALL = /\baction\s*\(|\baction\s+as\b/
 const SCRIPT_FILE = /\.[cm]?[jt]s$/
 
 // Whether an own module of the app calls `action(`: the `.kay` sources already read, and the scripts beside them.
@@ -610,7 +611,7 @@ async function bundleIslands(root: string, islands: Map<string, string>, actionF
   // The names carry the content hashes, so the id changes with the code of the entry, the runtime or any island.
   const buildId = options.hot ? undefined : Bun.hash(outputs.filter(output => JS_OUTPUT.test(output.path)).map(output => basename(output.path)).sort().join('\n')).toString(36).slice(0, 8)
 
-  return { manifest: { ...manifest, navigation, ...buildId !== undefined && { build: buildId }, ...directives && { directives } }, inputs, maps: outputs.filter(output => output.kind === 'sourcemap').map(output => output.path) }
+  return { manifest: { ...manifest, navigation, ...define.KAY_NO_ACTION_PROPS === 'true' && { actionless: true }, ...buildId !== undefined && { build: buildId }, ...directives && { directives } }, inputs, maps: outputs.filter(output => output.kind === 'sourcemap').map(output => output.path) }
 }
 
 // The entry of a page posting forms to actions and holding no island: navigation alone, its swap and form posting loaded as they are needed, with no island runtime. It never hydrates, as a page holding islands loads the islands' entry, which a swap from here loads in full.
