@@ -2,7 +2,7 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, sym
 import { mkdir, rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import process from 'node:process'
-import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
+import { afterAll, afterEach, beforeAll, describe, expect, it } from 'bun:test'
 import { dev } from '../src/dev'
 import { devAddressFile, readDevAddress, removeDevAddress, writeDevAddress } from '../src/dev/address'
 import { mountedAt } from '../src/dev/base-proxy'
@@ -12,6 +12,7 @@ import { McpServer } from '../src/mcp/protocol'
 import { projectCapabilities } from '../src/mcp/tools'
 import { encodePng } from '../src/server/png'
 import { browserPath } from '../src/test'
+import { releaseIdleBrowser } from '../src/test/browser'
 import { freePort } from './free-port'
 import { scratchDir } from './scratch'
 
@@ -615,6 +616,11 @@ describe.skipIf(skipBrowser)('kay screenshot on a running kay dev', () => {
     for (let waited = 0; readDevAddress(root) === undefined && waited < 60_000; waited += 100)
       await Bun.sleep(100)
   }, 90_000)
+
+  // The browser a shot started stays up for minutes, which the next shot's own, or a command line's, would run beside.
+  afterEach(() => {
+    releaseIdleBrowser()
+  })
 
   afterAll(async () => {
     await stop?.()

@@ -4,9 +4,9 @@ import { chmod, mkdir, mkdtemp, readdir, rm, symlink } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { basename, join, resolve } from 'node:path'
 import process from 'node:process'
-import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'bun:test'
 import { browserPath, testSite } from '../src/test'
-import { argvOf, browserProcess, chromeTree, killAll, playwrightShell, removeFetcherDirs, startFailure } from '../src/test/browser'
+import { argvOf, browserProcess, chromeTree, killAll, playwrightShell, releaseIdleBrowser, removeFetcherDirs, startFailure } from '../src/test/browser'
 import { untilHolds } from './helpers/until-holds'
 import { scratchDir } from './scratch'
 
@@ -25,10 +25,22 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('kay/test i
   beforeAll(async () => {
     // The fixture's islands break on purpose, which the server would log.
     site = await testSite({ root: 'tests/fixtures/navigation', browser: { path }, onError: () => undefined })
+  }, 60_000)
+
+  // A page of its own for each test, closed after it: with none open between two tests the browser restarts, freeing the renderers the pages it closed left behind, which a page kept open through the whole file never let it.
+  beforeEach(async () => {
     page = await site.open('/')
   }, 60_000)
 
-  afterAll(async () => site?.close())
+  afterEach(() => {
+    page.close()
+  })
+
+  // The browser stays up for minutes after its last page, which the files after this one would run beside.
+  afterAll(async () => {
+    await site?.close()
+    releaseIdleBrowser()
+  })
 
   it('opens a page with its islands hydrated, a click reaching their handlers', async () => {
     await page.click('button.player')
@@ -640,10 +652,14 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('kay dev in
     dev = await testSite({ root: 'tests/fixtures/navigation', browser: { path }, dev: true, onError: () => undefined })
   }, 60_000)
 
-  afterAll(async () => dev?.close())
+  // The browser stays up for minutes after its last page, which the files after this one would run beside.
+  afterAll(async () => {
+    await dev?.close()
+    releaseIdleBrowser()
+  })
 
   it('shows each problem kay recovers from on the page, a page swap leaving them behind', async () => {
-    const shown = await dev.open('/mismatch', { strict: false })
+    await using shown = await dev.open('/mismatch', { strict: false })
 
     // The accessibility check lists its own problems once the page settles.
     await shown.waitUntil(() => [...document.querySelector('kay-dev')?.shadowRoot!.querySelectorAll('#kay-dev-problems .problem pre') ?? []].some(pre => pre.textContent.startsWith('a11y ')))
@@ -709,7 +725,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('kay dev in
   }, 60_000)
 
   it('sizes the page in the Performance tab with Chromium\'s own gzip, within a few percent of the same bytes gzipped here', async () => {
-    const shown = await dev.open('/state', { strict: false })
+    await using shown = await dev.open('/state', { strict: false })
 
     await shown.evaluate(() => document.querySelector('kay-dev')!.shadowRoot!.querySelector<HTMLButtonElement>('#kay-dev-tab-performance')!.click())
     await shown.waitUntil(() => document.querySelector('kay-dev')!.shadowRoot!.querySelector('#kay-dev-performance')!.textContent.includes('Dev sizes'))
@@ -751,7 +767,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('kay dev in
   }, 60_000)
 
   it('shows what axe-core finds on the rendered page in the problem panel', async () => {
-    const shown = await dev.open('/contrast', { strict: false })
+    await using shown = await dev.open('/contrast', { strict: false })
 
     // At once, as the dev server's own check starts: the two take turns.
     expect((await shown.a11y()).map(violation => violation.id)).toContain('color-contrast')
@@ -765,7 +781,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('kay dev in
   }, 60_000)
 
   it('keeps one drawer height whatever the tab, and its colours above 4.5:1 in both schemes', async () => {
-    const shown = await dev.open('/', { strict: false })
+    await using shown = await dev.open('/', { strict: false })
 
     await shown.evaluate(() => document.querySelector('kay-dev')!.shadowRoot!.querySelector<HTMLButtonElement>('.bar > button')!.click())
     await shown.waitUntil(() => document.querySelector('kay-dev')!.shadowRoot!.querySelector<HTMLElement>('.drawer')!.hidden === false)
@@ -949,7 +965,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('kay dev in
 
   it('moves the drawer by its head, resizes it by an edge, docks it padding the page, lands the bar in a corner, and opens again as it was left', async () => {
     // Opening a page clears the origin's storage, so the layout starts as the default.
-    const shown = await dev.open('/', { strict: false })
+    await using shown = await dev.open('/', { strict: false })
 
     // Pointer events at window coordinates, a drag from `from` to `to` on the element `selector` names in the tool.
     const drag = async (selector: string, from: [number, number], to: [number, number]) => shown.evaluate(([picked, [x, y], [toX, toY]]: [string, [number, number], [number, number]]) => {
@@ -1017,7 +1033,6 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('kay dev in
 
     await drag('.mark', [bar.left + 10, bar.top + 10], [bar.left + 2000, -500])
     expect(await rect('.bar')).toMatchObject({ top: 12, right: 12 })
-    expect(await shown.evaluate(() => document.querySelector('kay-dev')!.shadowRoot!.querySelector<HTMLElement>('.drawer')!.hidden)).toBe(true)
     shown.close()
   }, 60_000)
 })

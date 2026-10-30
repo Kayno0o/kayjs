@@ -25,8 +25,12 @@ async function reachable(url: string): Promise<boolean> {
 
 let server: Bun.Subprocess
 let origin: string
-let page: TestPage
 let release: (() => Promise<void>) | undefined
+
+// A page of its own for each docs page: a tab that went through them all kept a renderer of hundreds of MB, where a closed one gives its memory back. Wide enough for the sidebar and the table of contents to show.
+async function visit(): Promise<TestPage> {
+  return browse(origin, { path, width: 1440, height: 900 })
+}
 
 // The contrast tests in docs.test.ts read the palettes' values, so this one reads the colours the built pages render, served by `kay start` as the docs are, whatever the build made of them.
 describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the docs as built', () => {
@@ -44,13 +48,9 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the docs a
 
     if (!await reachable(origin))
       throw new Error('kay start did not serve the docs')
-
-    // Wide enough for the sidebar and the table of contents to show.
-    page = await browse(origin, { path, width: 1440, height: 900 })
   }, 300_000)
 
   afterAll(async () => {
-    page?.close()
     await stopSuiteServer(server)
     await release?.()
   })
@@ -60,6 +60,8 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the docs a
       const found: string[] = []
 
       for (const at of PAGES) {
+        await using page = await visit()
+
         await page.goto(at)
         await page.evaluate((picked: string) => {
           document.documentElement.dataset.theme = picked
@@ -71,16 +73,19 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the docs a
           if (violation.id === 'color-contrast')
             found.push(...violation.nodes.map(node => `${at} ${node.target}`))
         }
-      }
 
-      // The chat panel, opened: its field is the chat's own once the panel's first opening hydrated it.
-      await page.click('.kai-launcher-button')
-      await page.waitFor('.kai-launcher-panel:not([hidden]) .kai-chat-form')
-      await page.waitUntil(() => document.getAnimations().every(animation => animation.playState !== 'running'))
+        // The chat panel, opened on the last page: its field is the chat's own once the panel's first opening hydrated it.
+        if (at !== PAGES.at(-1))
+          continue
 
-      for (const violation of await page.a11y()) {
-        if (violation.id === 'color-contrast')
-          found.push(...violation.nodes.map(node => `chat ${node.target}`))
+        await page.click('.kai-launcher-button')
+        await page.waitFor('.kai-launcher-panel:not([hidden]) .kai-chat-form')
+        await page.waitUntil(() => document.getAnimations().every(animation => animation.playState !== 'running'))
+
+        for (const violation of await page.a11y()) {
+          if (violation.id === 'color-contrast')
+            found.push(...violation.nodes.map(node => `chat ${node.target}`))
+        }
       }
 
       expect(found).toEqual([])
@@ -89,6 +94,8 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the docs a
 
   // At 1440px the table of contents has its column: the home page, which has none, stays one column, and a docs page's footer stays under its text.
   it('lays the home page out as one column and a docs page beside its table of contents', async () => {
+    await using page = await visit()
+
     await page.goto('/')
     const home = await page.evaluate(() => {
       const box = (selector: string) => document.querySelector(selector)!.getBoundingClientRect()
@@ -116,6 +123,8 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('the docs a
 
   // The demo scrolls with its page, so its header is moved to the top of the body, where its `sticky` is what holds it.
   it('keeps an AppHeader at the top of the page on scroll, and folds its links behind the menu button on a narrow screen', async () => {
+    await using page = await visit()
+
     await page.goto('/ui/app-header')
 
     const wide = await page.evaluate(() => {

@@ -4,7 +4,7 @@ import { mkdtemp, readdir, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { brotliCompressSync } from 'node:zlib'
-import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
+import { afterAll, afterEach, beforeAll, describe, expect, it } from 'bun:test'
 import releaseNotes from '../changelogitea.config'
 import { fileTree, pathTree } from '../docs/src/file-tree'
 import { loadComponents, loadLibraries } from '../docs/src/libraries'
@@ -68,6 +68,11 @@ describe('the documentation site\'s pages', () => {
 })
 
 describe('the documentation site', () => {
+  // The tests that run a TypeScript program (the props, the variants) each leave a few hundred MB for the next to stack on: collecting after every test keeps the file's peak at the largest program instead of their sum.
+  afterEach(() => {
+    Bun.gc(true)
+  })
+
   it('serves llms.txt and each doc it lists as the full reference under /llms, links between them made links between pages', async () => {
     const pages = await loadReference()
 
