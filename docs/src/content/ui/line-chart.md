@@ -6,7 +6,7 @@ description: A multi-series line chart with a hover tooltip, drawn by chartist.
 
 <Callout type="note">
 
-The chart is drawn by chartist, which the app installs with `bun add chartist` (version 2 or later). The server renders its frame, the keyboard slider, the table screen readers read and the legend, and the drawing happens once the island mounts.
+The chart is drawn by chartist, which the app installs with `bun add chartist` (version 2). The server renders its frame, the keyboard slider, the table screen readers read and the legend, and the drawing happens once the island mounts.
 
 </Callout>
 

@@ -215,6 +215,7 @@ onMount(() => {
   const drawing = signal<{ chart: LegacyChart, fixedScale: AxisFactory } | null>(null)
   let gone = false
   let chart: LegacyChart | undefined
+  let handle: { destroy: () => void } | undefined
 
   void (async () => {
     let loaded: typeof import('chartist')
@@ -224,7 +225,7 @@ onMount(() => {
       ;[loaded, compat] = await Promise.all([import('chartist'), import('chartist/compat')])
     }
     catch (error) {
-      console.error('kayjs-ui: LineChart draws with chartist, which could not be loaded; install it with `bun add chartist`', error)
+      console.error('kayjs-ui: LineChart draws with chartist, which could not be loaded; install chartist 2 with `bun add chartist@^2`', error)
 
       return
     }
@@ -237,7 +238,8 @@ onMount(() => {
       chart = legacy
     })
 
-    loaded.lineChart(canvas!, { series: [] }, { plugins: [plugin] })
+    // `plugins`, `on` and `renderer` are read once, when the chart is created, so the app's own go in here.
+    handle = loaded.lineChart(canvas!, { series: [] }, { plugins: [plugin, ...options?.plugins ?? []], ...options?.on ? { on: options.on } : {}, ...options?.renderer ? { renderer: options.renderer } : {} })
 
     if (!chart)
       return
@@ -297,7 +299,7 @@ onMount(() => {
   onCleanup(() => {
     gone = true
     tipObserver?.disconnect()
-    chart?.detach()
+    handle?.destroy()
   })
 })
 
