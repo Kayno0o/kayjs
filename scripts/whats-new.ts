@@ -1,3 +1,4 @@
+import { join } from 'node:path'
 import process from 'node:process'
 import { renderMarkdown } from '../src/content/markdown'
 // The page listing what each release adds, which the docs site renders too, keeping what is not released yet under `## Unreleased`.
@@ -264,8 +265,8 @@ export async function failedPageTests(tests: readonly string[] = ['tests/llms.te
   return code === 0 ? undefined : `${out}${err}`
 }
 
-// Puts a release's tree back to the commit it started from: `git reset --hard` restores the tracked files, and the untracked files the release created (a page split into a new file) go with `git clean`, which leaves ignored files alone. The tree was clean when the release began, so nothing of the user's is among them.
-export async function restoreTree(start: string, cwd = process.cwd()): Promise<void> {
+// Puts a release's tree back to the commit it started from: `git reset --hard` restores the tracked files, and the untracked files the release created (a page split into a new file) go with `git clean`, which leaves ignored files alone. The tree was clean when the release began, so nothing of the user's is among them; it runs at the repo root, so a release started from a subfolder cleans the whole tree.
+export async function restoreTree(start: string, cwd = join(import.meta.dir, '..')): Promise<void> {
   for (const args of [['reset', '-q', '--hard', start], ['clean', '-q', '-f', '-d']]) {
     const run = Bun.spawn(['git', ...args], { cwd, stdout: 'ignore', stderr: 'pipe' })
     const [err, code] = await Promise.all([new Response(run.stderr).text(), run.exited])

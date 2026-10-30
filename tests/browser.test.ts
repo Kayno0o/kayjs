@@ -1033,7 +1033,7 @@ describe.skipIf(path === undefined && (process.env.CI ?? '') === '')('kay dev in
 
     await drag('.mark', [bar.left + 10, bar.top + 10], [bar.left + 2000, -500])
     expect(await rect('.bar')).toMatchObject({ top: 12, right: 12 })
-    shown.close()
+    expect(await shown.evaluate(() => document.querySelector('kay-dev')!.shadowRoot!.querySelector<HTMLElement>('.drawer')!.hidden)).toBe(true)
   }, 60_000)
 })
 
