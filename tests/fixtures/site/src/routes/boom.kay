@@ -2,8 +2,6 @@
 import { t } from 'elysia'
 import { action, defer } from 'kay'
 
-export const forget = action(async () => 'Forgotten')
-
 export const explode = action(t.Object({}), () => {
   throw new Error('Kaboom in an action')
 })
@@ -24,6 +22,8 @@ const later = defer(ctx.url.searchParams.has('later') ? Promise.reject(new Error
 export const send = action(t.Object({ message: t.String({ maxLength: 1000 }) }), () => {
   throw new Error('Mail server down')
 }, { messages: { serverError: 'Not sent; write to hello@example.com instead' } })
+
+export const forget = action(async () => 'Forgotten')
 ---
 form(action={send})
   textarea(name="message" aria-label="Message")
