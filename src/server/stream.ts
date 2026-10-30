@@ -84,6 +84,7 @@ export function streamDocument(shell: string, deferred: PendingBlock[], client: 
   const formsShipped = new Set(sent.forms)
   // A page without navigation has no entry to send a form with.
   const posts = client.entry !== undefined && client.navigation === true
+  const unrevivableShown = new Set<string>()
   let swapShipped = false
   const chunks = islandChunks(client)
   const render = (view: () => unknown, salt?: string) => renderBlock(view, salt, chunks)
@@ -99,13 +100,17 @@ export function streamDocument(shell: string, deferred: PendingBlock[], client: 
       keepAlive = setInterval(() => controller.enqueue(KEEP_ALIVE), KEEP_ALIVE_MS)
 
       // A part sent while more may come keeps its markers around it, for the next part to replace.
-      const write = (id: string, rendered: Rendered, more: boolean): void => {
+      // Returns whether the part was sent: one handing an island an action the build cannot revive is skipped, and reported once per stream for each way it fails.
+      const write = (id: string, rendered: Rendered, more: boolean): boolean => {
         const unrevivable = unrevivableAction(rendered.islands, client)
 
         if (unrevivable) {
-          report(unrevivable)
+          if (!unrevivableShown.has(unrevivable.message)) {
+            unrevivableShown.add(unrevivable.message)
+            report(unrevivable)
+          }
 
-          return
+          return false
         }
 
         let scripts = swapShipped ? '' : `<script>${SWAP_SCRIPT}</script>`
@@ -152,6 +157,8 @@ export function streamDocument(shell: string, deferred: PendingBlock[], client: 
         const html = more ? `<!--kay-await:${id}-->${markup}<!--/kay-await:${id}-->` : markup
 
         controller.enqueue(encoder.encode(`<template data-kay-await="${id}">${html}</template>${scripts}<script>${SWAP_CALL}</script>`))
+
+        return true
       }
 
       const send = async (block: PendingBlock): Promise<void> => {
@@ -184,8 +191,7 @@ export function streamDocument(shell: string, deferred: PendingBlock[], client: 
           }
 
           drop(rendered.deferred)
-          write(block.id, rendered, !broken)
-          shown = true
+          shown = write(block.id, rendered, !broken) || shown
         })
         let last: { value: unknown } | undefined
 

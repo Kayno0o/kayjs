@@ -131,4 +131,40 @@ export const greet = act(t.Object({ name: t.String() }), ({ name }) => \`Hello \
       expect([code, (await readClientSources(root)).actionProps]).toEqual([code, false])
     }
   })
+
+  it('logs the action a streamed iterable cannot revive once per stream, however many parts hand it on', async () => {
+    const root = await app({
+      'src/routes/parts.kay': `--- server
+import { greet as outside } from 'extern'
+
+export const shout = outside
+
+async function* names() {
+  for (const name of ['Ann', 'Bob', 'Cara']) {
+    await Bun.sleep(120)
+    yield name
+  }
+}
+
+const later = names()
+--- script
+import Caller from '../components/caller.kay'
+---
+await later then value
+  Caller(run={shout} label={value})
+`,
+    }, OUTSIDE)
+    const logged = spyOn(console, 'error').mockImplementation(() => undefined)
+
+    try {
+      const built = await pages({ root, prebuilt: false, security: false })
+      const streamed = await (await built.handle(new Request('http://localhost/parts'))).text()
+
+      expect(streamed).not.toContain('Action')
+      expect(logged.mock.calls.filter(call => String(call[0]).includes('this build carries no code to revive one'))).toHaveLength(1)
+    }
+    finally {
+      logged.mockRestore()
+    }
+  })
 })
