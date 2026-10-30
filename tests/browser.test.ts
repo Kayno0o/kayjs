@@ -6,7 +6,7 @@ import { join, resolve } from 'node:path'
 import process from 'node:process'
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
 import { browserPath, testSite } from '../src/test'
-import { chromeTree, killAll, removeFetcherDirs } from '../src/test/browser'
+import { argvOf, browserProcess, chromeTree, killAll, playwrightShell, removeFetcherDirs, startFailure } from '../src/test/browser'
 import { untilHolds } from './helpers/until-holds'
 import { scratchDir } from './scratch'
 
@@ -1348,3 +1348,70 @@ async function printed(child: { stdout: ReadableStream<Uint8Array>, stderr: Read
 
   return [stdout + stderr, code]
 }
+
+// What the headless shell's rewritten command line and Bun's start errors leave kay to read, played by processes of this test's own.
+describe('the browser process lookup', () => {
+  // A process whose command line is one string of arguments joined by spaces, as chrome-headless-shell rewrites its own; `cat` takes no argument of its own and waits on its pipe.
+  const shell = (profile: string, executable = '/opt/chrome headless/chrome-headless-shell') => Bun.spawn(['cat'], { argv0: `${executable} --headless --user-data-dir=${profile} --enable-automation`, stdin: 'pipe', stdout: 'ignore', stderr: 'ignore' })
+
+  it.skipIf(!existsSync('/proc'))('finds a shell and its tree when the executable and the profile paths hold a space', async () => {
+    const scratch = await scratchDir('spaced dir-')
+    const profile = join(scratch, 'kay-chrome-1 2', 'profile')
+    const chrome = shell(profile)
+
+    try {
+      // The new command line shows once the process has run its exec.
+      await untilHolds(() => argvOf(chrome.pid)?.length === 4)
+      expect(argvOf(chrome.pid)).toEqual(['/opt/chrome headless/chrome-headless-shell', '--headless', `--user-data-dir=${profile}`, '--enable-automation'])
+      expect(browserProcess(profile)).toBe(String(chrome.pid))
+      expect(chromeTree(chrome.pid, profile)).toContain(chrome.pid)
+    }
+    finally {
+      chrome.kill('SIGKILL')
+      await rm(scratch, { recursive: true, force: true })
+    }
+  })
+
+  it.skipIf(!existsSync('/proc'))('finds a shell /proc lists only after the first look', async () => {
+    const profile = join(await scratchDir('late-'), 'profile')
+    // Started by a process of its own after a delay, as looking for it blocks this one.
+    const launcher = Bun.spawn(['bash', '-c', 'sleep 0.15; exec -a "$0" cat', `/opt/chrome-headless-shell --headless --user-data-dir=${profile}`], { stdin: 'pipe', stdout: 'ignore', stderr: 'ignore' })
+
+    try {
+      expect(browserProcess(profile)).toBeUndefined()
+      expect(browserProcess(profile, 100)).toBe(String(launcher.pid))
+    }
+    finally {
+      launcher.kill('SIGKILL')
+    }
+  })
+
+  it('names the executable for Bun\'s start failures only, not for a page error that mentions a spawn', () => {
+    const page = new Error('spawn failed in the app: EACCES')
+    const bun = new Error('Failed to spawn Chrome (set BUN_CHROME_PATH, backend.path, or install Chrome/Chromium)')
+
+    expect(startFailure(page, '/usr/bin/chrome')).toBe(page)
+    expect((startFailure(bun, '/usr/bin/chrome') as Error).message).toEndWith('(browser: /usr/bin/chrome)')
+    expect((startFailure(new Error('Chrome exited'), '/usr/bin/chrome') as Error).message).toContain('(browser: /usr/bin/chrome)')
+  })
+
+  it('reads PLAYWRIGHT_BROWSERS_PATH=0 as the browsers inside the playwright package, not a directory named 0', async () => {
+    const project = await scratchDir('playwright-zero-')
+    const shellFile = join(project, 'node_modules/playwright-core/.local-browsers/chromium_headless_shell-1200/chrome-headless-shell-linux64/chrome-headless-shell')
+    const saved = process.env.PLAYWRIGHT_BROWSERS_PATH
+
+    await Bun.write(join(project, 'node_modules/playwright-core/package.json'), '{ "name": "playwright-core", "version": "1.0.0" }')
+    await Bun.write(shellFile, '')
+    process.env.PLAYWRIGHT_BROWSERS_PATH = '0'
+
+    try {
+      expect(playwrightShell(project)).toBe(shellFile)
+    }
+    finally {
+      if (saved === undefined)
+        delete process.env.PLAYWRIGHT_BROWSERS_PATH
+      else
+        process.env.PLAYWRIGHT_BROWSERS_PATH = saved
+    }
+  })
+})

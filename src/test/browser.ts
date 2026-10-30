@@ -188,8 +188,8 @@ const VIEWPORTS = {
   tablet: { width: 820, height: 1180, deviceScaleFactor: 2, mobile: true },
 }
 
-// What Bun says of a Chrome that did not start or exited under it.
-const START_FAILED = /Chrome process|spawn|ENOENT|EACCES/i
+// What Bun says of a Chrome that did not start or exited under it, which a page's own errors never begin with.
+const START_FAILED = /^(?:Failed to spawn Chrome|Chrome process |Chrome exited)/
 
 // How long one try of a click waits for its element to be actionable before the page scrolls it into place again, and what Bun's message for running out of it ends with.
 const CLICK_WAIT_MS = 1000
@@ -218,6 +218,10 @@ const BUN_DIR = /^\.[\w-]+\.bun-chrome$/
 const SINGLETON = /^org\.chromium\.Chromium\./
 const FETCHER = /^org\.chromium\.Chromium\.chromium_chrome_url_fetcher_\./
 // A Chrome or Chromium executable, as /proc names it.
+// Where a rewritten command line goes from one argument to the next: a space before a flag.
+const JOINED_FLAG = / (?=--)/
+// How many times a browser process is looked for, a poll apart, when Bun launched Chrome and /proc may not list it yet.
+const LAUNCH_LOOKS = 10
 const CHROME = /chrom/i
 // Chrome's crash handler, which outlives it on the temp directory it started with, Alpine's among them, but makes nothing there.
 const CRASH_HANDLER = /crashpad/
@@ -241,7 +245,7 @@ const MAX_HOST_CONNECTIONS = 6
 const STORAGE_TYPES = 'cookies,local_storage,indexeddb,cache_storage,service_workers,file_systems,shared_storage,storage_buckets'
 
 // The browser of this process's pages. Bun runs one Chrome for every view and leaves the profile it gives it in the temp directory, so kay gives it one of its own and removes it once the browser closes.
-let browser: { dir: string, pages: number, views: number, ready: Promise<void>, idle?: Timer } | undefined
+let browser: { dir: string, pages: number, views: number, ready: Promise<void>, idle?: Timer, launched?: boolean } | undefined
 // The process of the Chrome the last close killed: Bun spawns another only once it reaped that one, and fails a view made sooner.
 let killed: number | undefined
 let exitHooked = false
@@ -294,11 +298,28 @@ export function browserPath(path?: string): string | undefined {
   return INSTALLED.find(file => existsSync(file))
 }
 
+// `PLAYWRIGHT_BROWSERS_PATH`, where `0` is Playwright's own word for the browsers it installed inside its package in `node_modules`.
+function playwrightBrowsers(from: string): string | undefined {
+  const given = process.env.PLAYWRIGHT_BROWSERS_PATH
+
+  if (given !== '0')
+    return given
+
+  for (const name of ['playwright-core', '@playwright/test', 'playwright']) {
+    const manifest = attempt(() => Bun.resolveSync(`${name}/package.json`, from))
+
+    if (manifest !== undefined)
+      return join(dirname(manifest), '.local-browsers')
+  }
+
+  return undefined
+}
+
 // The newest chrome-headless-shell in Playwright's browser cache (`bunx playwright install chromium-headless-shell`), where it keeps one on each system.
-function playwrightShell(): string | undefined {
+export function playwrightShell(from = process.cwd()): string | undefined {
   const home = homedir()
   const roots = [
-    process.env.PLAYWRIGHT_BROWSERS_PATH,
+    playwrightBrowsers(from),
     join(home, '.cache', 'ms-playwright'),
     join(home, 'Library', 'Caches', 'ms-playwright'),
     process.env.LOCALAPPDATA === undefined ? undefined : join(process.env.LOCALAPPDATA, 'ms-playwright'),
@@ -355,6 +376,9 @@ export async function browse(url: string, options: BrowserOptions = {}): Promise
           warnings.push(args.map(consoleText).join(' '))
       },
     })
+
+    if (browser)
+      browser.launched = true
   }
   catch (error) {
     releaseBrowser()
@@ -929,7 +953,7 @@ export async function browse(url: string, options: BrowserOptions = {}): Promise
 }
 
 // A browser that did not start, or exited as it did, names the executable kay chose, as the cause is often that build rather than the page.
-function startFailure(error: unknown, executable: string): unknown {
+export function startFailure(error: unknown, executable: string): unknown {
   if (!(error instanceof Error) || !START_FAILED.test(error.message))
     return error
 
@@ -996,8 +1020,8 @@ function closeBrowser() {
   if (!browser)
     return
 
-  const { dir, idle } = browser
-  const pid = LOCK_PID.exec(attempt(() => readlinkSync(join(dir, 'profile', 'SingletonLock'))) ?? '')?.[1] ?? browserProcess(join(dir, 'profile'))
+  const { dir, idle, launched } = browser
+  const pid = LOCK_PID.exec(attempt(() => readlinkSync(join(dir, 'profile', 'SingletonLock'))) ?? '')?.[1] ?? browserProcess(join(dir, 'profile'), launched ? LAUNCH_LOOKS : 1)
   // Read before Chrome is killed, which hands what it started to another parent.
   const tree = pid === undefined ? [] : chromeTree(Number(pid), join(dir, 'profile'))
 
@@ -1055,22 +1079,33 @@ export function chromeTree(pid: number, profile: string): number[] {
   return tree
 }
 
-// A process's command line from /proc, the arguments apart. chrome-headless-shell rewrites its own into one entry of arguments joined by spaces, which a profile in the temp directory and Chrome's flags never contain.
-function argvOf(pid: number | string): string[] | undefined {
+// A process's command line from /proc, the arguments apart. chrome-headless-shell rewrites its own into one entry of arguments joined by spaces, which is cut before each flag, so an executable or a profile whose path holds a space stays one argument.
+export function argvOf(pid: number | string): string[] | undefined {
   const argv = attempt(() => readFileSync(`/proc/${pid}/cmdline`, 'utf8'))?.split('\0')
 
-  return argv?.length === 2 && argv[1] === '' ? argv[0]?.split(' ') : argv
+  return argv?.length === 2 && argv[1] === '' ? argv[0]?.split(JOINED_FLAG) : argv
 }
 
 // The browser process of a Chrome that writes no lock, as chrome-headless-shell does: the one running on the profile that is not a crash handler or a child (`--type=`). Bun spawns another Chrome only once the killed one is reaped, which `killed` tells it.
-function browserProcess(profile: string): string | undefined {
+// A Chrome Bun just launched may not be listed yet, so `looks` tries, a poll apart, to find it.
+export function browserProcess(profile: string, looks = 1): string | undefined {
   const flag = `--user-data-dir=${profile}`
 
-  return (attempt(() => readdirSync('/proc')) ?? []).find((name) => {
-    const argv = argvOf(name)
+  for (let look = 0; look < looks; look++) {
+    if (look > 0)
+      Bun.sleepSync(POLL_MS)
 
-    return argv?.[0] !== undefined && CHROME.test(basename(argv[0])) && !CRASH_HANDLER.test(basename(argv[0])) && argv.includes(flag) && !argv.some(arg => arg.startsWith('--type='))
-  })
+    const found = (attempt(() => readdirSync('/proc')) ?? []).find((name) => {
+      const argv = argvOf(name)
+
+      return argv?.[0] !== undefined && CHROME.test(basename(argv[0])) && !CRASH_HANDLER.test(basename(argv[0])) && argv.includes(flag) && !argv.some(arg => arg.startsWith('--type='))
+    })
+
+    if (found !== undefined)
+      return found
+  }
+
+  return undefined
 }
 
 // The processes running on the profile, read from /proc: Chrome passes its profile to every process it starts.
