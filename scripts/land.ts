@@ -159,6 +159,15 @@ async function step(label: string, argv: string[], cwd = '.') {
   fail(hung ? `${label} ran past ${STEP_LIMIT_MS / 1000} s, so it was killed with what it started: its output up to then is in ${LOG}` : `${label} exited with ${exitCode}: its whole output is in ${LOG}`, EXIT.step)
 }
 
+// A test step, as KAY_LAND_SHARDS runs one after another when the suite outgrows the session's memory (a worker keeps the global of each file that loaded a native addon, oven-sh/bun#46561).
+async function sharded(label: string, argv: string[]) {
+  if (SHARDS === 1)
+    return step(label, argv)
+
+  for (let shard = 1; shard <= SHARDS; shard++)
+    await step(`${label}, shard ${shard} of ${SHARDS}`, [...argv, `--shard=${shard}/${SHARDS}`])
+}
+
 if ((await $`git status --porcelain`.text()).trim() !== '')
   fail('the working tree has changes: commit them first', EXIT.unlandable)
 
@@ -224,17 +233,13 @@ async function verify(): Promise<string> {
   if (!whole && changed.some(path => WHOLE_SUITE.test(path)))
     console.log('tests, the whole suite: left to CI, as only dependencies changed')
 
-  if (whole && SHARDS === 1) {
-    await step('tests, the whole suite', [BUN, 'run', 'test', WORKERS])
-  }
-  else if (whole) {
-    for (let shard = 1; shard <= SHARDS; shard++)
-      await step(`tests, the whole suite, shard ${shard} of ${SHARDS}`, [BUN, 'run', 'test', WORKERS, `--shard=${shard}/${SHARDS}`])
+  if (whole) {
+    await sharded('tests, the whole suite', [BUN, 'run', 'test', WORKERS])
   }
   else {
     // `bun test --changed` reads a manifest change as reaching nearly every file, so one changing dependencies alone runs only the tests named below.
     if (!dependencies || manifests.length < changed.length)
-      await step('tests the changes reach', [BUN, 'run', 'test', `--changed=${base}`, WORKERS])
+      await sharded('tests the changes reach', [BUN, 'run', 'test', `--changed=${base}`, WORKERS])
 
     const readers = new Set(changed.flatMap(readersOf))
 

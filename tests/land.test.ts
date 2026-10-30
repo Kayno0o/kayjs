@@ -441,6 +441,19 @@ describe('landing a change to a library', () => {
     expect(await tree()).toContain('packages')
   }, 60_000)
 
+  it('runs the tests the changes reach as several runs one after another with KAY_LAND_SHARDS', async () => {
+    const { clones, dir, land } = await landings('a')
+
+    await library(clones.a!)
+
+    const { code, out } = await land('a', { KAY_LAND_SHARDS: '2' }).done()
+
+    expect(code).toBe(0)
+    expect(out).toContain('tests the changes reach, shard 1 of 2: ok')
+    expect(out).toContain('tests the changes reach, shard 2 of 2: ok')
+    expect(await Bun.file(join(dir, 'trace')).text()).toMatch(/--changed=\S+ .*--shard=2\/2/)
+  }, 60_000)
+
   it('stops on the library\'s failing suite, exiting 4', async () => {
     const { clones, land, tree } = await landings('a')
 
