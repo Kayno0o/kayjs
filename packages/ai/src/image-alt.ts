@@ -150,8 +150,13 @@ async function make(place: Place): Promise<string | undefined> {
   try {
     const alt = await describeImage(Bun.file(place.path), { language: place.locale })
 
-    known.set(slot.file, alt)
-    await writeCacheEntry(slot, { alt, name, locale: place.locale } satisfies Draft)
+    // Kept on disk before a render may write it, so a page never shows a draft the cache lacks; a failed write still keeps it for this process.
+    try {
+      await writeCacheEntry(slot, { alt, name, locale: place.locale } satisfies Draft)
+    }
+    finally {
+      known.set(slot.file, alt)
+    }
 
     return alt
   }
