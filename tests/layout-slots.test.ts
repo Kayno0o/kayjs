@@ -80,6 +80,11 @@ describe('a page filling its layout\'s named slot', () => {
     expect((await get(app, '/team/member')).side).toBe('<p class="member">Member nav</p>')
   })
 
+  it('keeps a page\'s block over a layout\'s written after its slot', async () => {
+    expect((await get(app, '/late')).side).toBe('<p class="late">Late default</p>')
+    expect((await get(app, '/late/own')).side).toBe('<p class="own-page">Own page</p>')
+  })
+
   it('gives a layout declaring the slot again the page\'s block, and the outer slot that layout\'s', async () => {
     expect((await get(app, '/wrap')).side).toBe('<nav class="wrapped"><p class="own">Wrap</p><p class="page">Page nav</p></nav>')
     expect((await get(app, '/wrap/bare')).side).toBe('<nav class="wrapped"><p class="own">Wrap</p><p class="inner-fallback">No inner</p></nav>')
@@ -120,6 +125,12 @@ describe('what kay check reports of a block', () => {
     expect(compileKay('@a\n  p x\n@a\n  p y\n', 'src/routes/page.kay', { page: true }).diagnostics.map(diagnostic => diagnostic.message)).toEqual(['`@a` is written twice in this page'])
     expect(compileKay('@a(x)\n  p y\n', 'src/routes/page.kay', { page: true }).diagnostics.map(diagnostic => diagnostic.message)).toEqual(['`@a` fills a slot, which takes no parameters'])
     expect(compileKay('.box\n  @a\n    p y\n', 'src/routes/page.kay', { page: true }).diagnostics.map(diagnostic => diagnostic.message)).toEqual(['`@a` must sit directly under a component, to pass it as that component\'s `a` prop'])
+  })
+
+  it('refuses a block in a file that is an island', () => {
+    const source = '---\nimport { signal } from \'kay\'\n\nconst n = signal(0)\n---\n@a\n  p y\nbutton(onClick={() => n.set(1)}) {n()}\n'
+
+    expect(compileKay(source, 'src/routes/page.kay', { page: true }).diagnostics.map(diagnostic => diagnostic.message)).toEqual(['`@a` cannot sit in a page that is an island'])
   })
 
   it('still refuses a block at the root of a component', () => {

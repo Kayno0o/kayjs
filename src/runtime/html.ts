@@ -393,6 +393,21 @@ export function component<P>(fn: (props: P) => unknown, props: P): unknown {
   return islands ? throughServerIslands(islands, fn, props) : scope(() => fn(props))
 }
 
+// Runs `render` as part of `fn`'s render for the server islands a prerendered page looks for: a block a page keeps for its layout renders after the page returned, and its islands belong to the page's path.
+export function withinComponent<T>(fn: unknown, render: () => T): T {
+  if (!islands?.scanning || islands.inside > 0)
+    return render()
+
+  islands.stack.push(fn)
+
+  try {
+    return render()
+  }
+  finally {
+    islands.stack.pop()
+  }
+}
+
 export function newServerIslands(scanning: boolean, path = new Set<unknown>(), skip?: ServerIslandMode): ServerIslands {
   return { scanning, path, html: [], modes: [], stack: [], inside: 0, skip }
 }

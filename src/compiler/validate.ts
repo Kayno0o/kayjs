@@ -321,6 +321,9 @@ class Validator {
 
       const name = this.text(node.name)
 
+      if (this.options.island !== undefined)
+        this.error(node.name, `\`@${name}\` cannot sit in a ${kind} that is an island`, { note: 'the block renders once on the server, in the layout, so nothing in it would hydrate', help: 'move what is interactive into a component the block renders' })
+
       if (node.params)
         this.error(node.params, `\`@${name}\` fills a slot, which takes no parameters`, { help: `write \`@${name}\` alone` })
 

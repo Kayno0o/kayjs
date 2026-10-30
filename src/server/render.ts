@@ -28,7 +28,7 @@ import { escapeAttribute } from '../runtime/escape'
 import { editMarks, entriesInPageOrder, placeFieldMarks, unclickableFields, withFieldMarks } from '../runtime/fields'
 import { filledBy, inFillChain, newFillChain } from '../runtime/fills'
 import { collectHead, head as setHead } from '../runtime/head'
-import { child, component, html, newServerIslands, withServerIslands } from '../runtime/html'
+import { child, component, html, newServerIslands, withinComponent, withServerIslands } from '../runtime/html'
 import { localePath, textDirection } from '../runtime/i18n'
 import { DEFAULT_MAX_DENSITY, RESOLVED_META } from '../runtime/image'
 import { unrevivableAction } from '../runtime/island.server'
@@ -1044,10 +1044,18 @@ function viewOf(modules: PageModule[], data: Record<string, unknown>[], entry?: 
 
   for (let index = page - 1; index >= 0; index--) {
     const inner = view
-    let below: { value: unknown } | undefined
-    const rendered = () => (below ??= { value: inner() }).value
 
     view = () => {
+      let below: { value: unknown } | undefined
+      // The page and the layouts under this one register their blocks as they render, each as the module it is.
+      const rendered = () => {
+        if (below === undefined) {
+          below = { value: inner() }
+          chain.at = index
+        }
+
+        return below.value
+      }
       const props = { ...data[index], get children() {
         return rendered()
       } }
@@ -1056,7 +1064,9 @@ function viewOf(modules: PageModule[], data: Record<string, unknown>[], entry?: 
         Object.defineProperty(props, name, { enumerable: true, get() {
           rendered()
 
-          return filledBy(chain, declared, index, name)?.()
+          const found = filledBy(chain, declared, index, name)
+
+          return found && withinComponent(modules[found.at]!.default, found.block)
         } })
       }
 

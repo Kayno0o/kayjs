@@ -33,14 +33,14 @@ export function fill(name: string, block: () => unknown): string {
 }
 
 // The block the `slot name` of the layout at `layout` renders: the deepest one written below it, down to the first layout under it declaring the same slot, which takes the blocks written below itself.
-export function filledBy(chain: FillChain, declared: readonly (readonly string[] | undefined)[], layout: number, name: string): (() => unknown) | undefined {
+export function filledBy(chain: FillChain, declared: readonly (readonly string[] | undefined)[], layout: number, name: string): { block: () => unknown, at: number } | undefined {
   const end = declared.findIndex((names, index) => index > layout && names?.includes(name) === true)
 
   for (let index = end === -1 ? chain.blocks.length - 1 : end; index > layout; index--) {
     const block = chain.blocks[index]?.get(name)
 
     if (block !== undefined)
-      return block
+      return { block, at: index }
   }
 
   return undefined
