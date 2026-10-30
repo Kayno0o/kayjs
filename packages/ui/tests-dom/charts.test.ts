@@ -38,7 +38,7 @@ describe('LineChart', () => {
     const root = await charts()
     const lines = [...root.querySelectorAll('#line .ct-line')].map(line => line.getAttribute('style'))
 
-    expect(lines).toEqual(['stroke: var(--color-chart-1)', 'stroke: red; stroke-dasharray: 6 3'])
+    expect(lines).toEqual(['stroke: var(--color-chart-1);', 'stroke: red; stroke-dasharray: 6 3;'])
   })
 
   test('walks the points from the keyboard, announcing each one\'s readings, and picks a span with Shift then Enter', async () => {
