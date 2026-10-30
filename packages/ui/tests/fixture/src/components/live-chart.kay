@@ -3,8 +3,9 @@ import LineChart from '@kaynooo/kayjs-ui/line-chart.kay'
 import { onMount, signal } from 'kay'
 
 // A rolling series fed by a signal: `roll` adds a point on the right and drops the one on the left, `recolor` changes the series' colour, and nothing else calls the chart.
-const { bind, animate, pointKey, xLabels, showPoints } = props<{ xLabels?: boolean, showPoints?: boolean, bind: (api: { roll: () => void, recolor: () => void }) => void, animate?: boolean, pointKey?: 'index' | 'label' | ((point: { series: number, index: number, label: string }) => string | number) }>()
-const days = signal(['Mon', 'Tue', 'Wed', 'Thu'])
+const { bind, animate, pointKey, xLabels, showPoints, first, extra } = props<{ xLabels?: boolean, showPoints?: boolean, first?: string[], extra?: Record<string, unknown>, bind: (api: { roll: () => void, recolor: () => void, labels: (on: boolean) => void }) => void, animate?: boolean, pointKey?: 'index' | 'label' | ((point: { series: number, index: number, label: string }) => string | number) }>()
+const days = signal(first ?? ['Mon', 'Tue', 'Wed', 'Thu'])
+const named = signal(xLabels === true)
 const values = signal([4, 6, 5, 8])
 const color = signal('red')
 const counter = { next: 0 }
@@ -17,7 +18,8 @@ onMount(() => {
       values = [...values().slice(1), counter.next]
     },
     recolor: () => color = 'blue',
+    labels: (on: boolean) => named = on,
   })
 })
 ---
-LineChart#live(label="Rolling" labels={days()} series={[{ name: 'Visits', values: values(), color: color() }]} xLabels={xLabels} options={{ showPoint: showPoints === true }} animate={animate} pointKey={pointKey})
+LineChart#live(label="Rolling" labels={days()} series={[{ name: 'Visits', values: values(), color: color() }]} xLabels={named()} options={{ showPoint: showPoints === true, ...extra }} animate={animate} pointKey={pointKey})

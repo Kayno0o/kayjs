@@ -516,6 +516,9 @@ function xAxisOptions(labels: string[], times: number[] | null, showLabels: bool
   readonly type?: AxisFactory | LegacyAxisClass;
 }
 
+[./lib/chartist] loaders
+const loaders: Loaders
+
 [./lib/claim] claim
 function claim(job: "toaster" | "tooltips"): () => boolean
 
