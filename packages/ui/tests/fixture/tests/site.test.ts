@@ -316,9 +316,12 @@ describe('layout', () => {
   })
 })
 
-// The island bundle the test site built, in the folder of this test worker: what an island carries of a recipe and of the class table its merge reads.
+// The island bundle the test site built, in the newest folder of this test worker (one per options key): what an island carries of a recipe and of the class table its merge reads.
 async function islandBundle() {
-  const dist = join(ROOT, `.kay/test-client${testWorker()}/dist`)
+  const kay = join(ROOT, '.kay')
+  const built = (await readdir(kay)).filter(name => name.startsWith(`test-client${testWorker()}.`))
+  const newest = built.sort((a, b) => Bun.file(join(kay, b, 'manifest.json')).lastModified - Bun.file(join(kay, a, 'manifest.json')).lastModified)[0] ?? 'missing'
+  const dist = join(kay, newest, 'dist')
   const files = (await readdir(dist, { recursive: true })).filter(file => file.endsWith('.js'))
   const text = (await Promise.all(files.map(async file => Bun.file(join(dist, file)).text()))).join('\n')
   const table = (/Symbol\.for\("kay\.classTable"\)\] = (\{.*\});$/m).exec(text)?.[1]
