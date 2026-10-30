@@ -1,4 +1,5 @@
 import type { Elysia } from 'elysia'
+import type { Dirent } from 'node:fs'
 import type { OfflineConfig, TrailingSlash } from '../config'
 import type { ClientBuild } from './client'
 import type { I18n } from './i18n'
@@ -472,10 +473,20 @@ function pushOnlyScript(base: string): string {
   return `const KAY = ${JSON.stringify({ base })}\nself.addEventListener('install', () => self.skipWaiting())\nself.addEventListener('activate', event => event.waitUntil((async () => {\n  for (const name of await caches.keys()) {\n    if (name.startsWith('kay-'))\n      await caches.delete(name)\n  }\n\n  await self.clients.claim()\n})()))\n${PUSH_WORKER}${LOCAL_WORKER}`
 }
 
+// A test site is not built, so its client folder may not exist: the worker then lists no build files.
+async function buildEntries(dir: string): Promise<Dirent[]> {
+  try {
+    return await readdir(dir, { recursive: true, withFileTypes: true })
+  }
+  catch {
+    return []
+  }
+}
+
 async function workerScript(options: ServiceWorkerOptions, offline: true | OfflineConfig): Promise<string> {
   const { base, client, apiPath = '/api' } = options
   const config = offline === true ? {} : offline
-  const found = (await readdir(client.dir, { recursive: true, withFileTypes: true }))
+  const found = (await buildEntries(client.dir))
     // The notices file is read once in a while, online, and never worth a copy on every visitor's device.
     .filter(entry => entry.isFile() && !SKIPPED.test(entry.name) && entry.name !== NOTICES_FILE)
     .map((entry) => {

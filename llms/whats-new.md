@@ -5,6 +5,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 ## Unreleased
 
 - A dom test and the component it mounts share the modules the component imports from the project and from packages, a signal store included: `mock.module()` reaches its static and dynamic imports, and a value the test sets, or imports from one of the project's files, is the component's: [testing](testing.md).
+- `testSite()` boots an app with `offline` before `kay build` has written `.kay/client`, so `bun run test` runs on a fresh clone and in CI: `/sw.js` answers with a worker listing no build files: [testing](testing.md).
 
 ## 1.85.0
 

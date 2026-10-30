@@ -361,3 +361,29 @@ describe('service worker', () => {
     })
   })
 })
+
+describe('service worker of a test site with no client build', () => {
+  const MISSING = join(tmpdir(), 'kay-sw-missing', 'dist')
+
+  it('answers with a worker listing no build files, for offline true and for pages with a fallback', async () => {
+    for (const offline of [true as const, { pages: ['/'], fallback: '/' }]) {
+      const app = new Elysia()
+      const client = { dir: MISSING, pages: new Map() } as unknown as ClientBuild
+
+      await serveServiceWorker(app, new ServedPaths(), { client, offline, base: '', publicPages: ['/'] })
+
+      const { settings } = await worker(app)
+
+      expect(settings!.files).toEqual([])
+      expect(settings!.pages).toEqual(['/'])
+    }
+  })
+
+  it('keeps answering a push-only worker without a build', async () => {
+    const app = new Elysia()
+    const client = { dir: MISSING, pages: new Map() } as unknown as ClientBuild
+
+    await serveServiceWorker(app, new ServedPaths(), { client, offline: undefined, push: true, base: '', publicPages: [] })
+    expect((await worker(app)).text).toContain('skipWaiting')
+  })
+})
