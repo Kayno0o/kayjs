@@ -2,7 +2,7 @@ import type { KayExtension } from '../config'
 import type { RouteMount } from '../server/routes'
 import { realpathSync } from 'node:fs'
 import { sep } from 'node:path'
-import { resolveFrom, transpilerFor } from '../build/files'
+import { resolveFrom, scoped, transpilerFor } from '../build/files'
 import { importsOf } from '../build/libraries'
 import { buildFiles, promotedFiles } from '../build/promotion'
 import { isBuiltinSpecifier } from '../build/server-only'
@@ -19,20 +19,15 @@ const DECLARATION_FILE = /\.d\.[cm]?ts$/
 // Imports that name no module of the project.
 const OUTSIDE = /^(?:node:|bun:|kay(?:\/|$))/
 
-// The browser-side checks read the imports of one component several times, so the last answers are kept by the source's text.
-const KEPT_IMPORTS = 1024
-const keptImports = new Map<string, string[]>()
-
+// The browser-side checks read the imports of one component several times, so the check's walk scope keeps them by the source's text.
 export function scriptImportsOf(source: string): string[] {
+  const keptImports = scoped('script imports', () => new Map<string, string[]>())
   const kept = keptImports.get(source)
 
   if (kept !== undefined)
     return [...kept]
 
   const found = scanScriptImports(source)
-
-  if (keptImports.size >= KEPT_IMPORTS)
-    keptImports.clear()
 
   keptImports.set(source, found)
 

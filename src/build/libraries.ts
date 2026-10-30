@@ -4,7 +4,7 @@ import { isBuiltin } from 'node:module'
 import { dirname, join, relative, resolve, sep } from 'node:path'
 import { KayError } from '../compiler/errors'
 import { parseKay } from '../compiler/parser'
-import { findKayFiles, KAY_FILE, readSource, SCRIPT_FILE, scriptLoader, transpilerFor } from './files'
+import { findKayFiles, KAY_FILE, readSource, scoped, SCRIPT_FILE, scriptLoader, transpilerFor } from './files'
 import { GLOB_CALL, globbedFiles } from './glob'
 import { APP_DEPENDENCIES, dependencyNames, packageDir, readManifest } from './manifests'
 
@@ -587,11 +587,9 @@ function scannedImports(file: string, source: string): string[] {
   }
 }
 
-// A check or a build asks for the fences of one file for its imports, its signals and the islands it reaches, so the last answers are kept by the source's text.
-const KEPT_FENCES = 1024
-const keptFences = new Map<string, string>()
-
+// A check or a build asks for the fences of one file for its imports, its signals and the islands it reaches, so its walk scope keeps them by the source's text, and the next scope (a dev edit) drops the old versions.
 export function fences(source: string): string {
+  const keptFences = scoped('fences', () => new Map<string, string>())
   const kept = keptFences.get(source)
 
   if (kept !== undefined)
@@ -599,9 +597,6 @@ export function fences(source: string): string {
 
   const { script, server, module } = parseKay(source)
   const text = [script, server, module].map(span => span ? source.slice(span.start, span.end) : '').join('\n')
-
-  if (keptFences.size >= KEPT_FENCES)
-    keptFences.clear()
 
   keptFences.set(source, text)
 
