@@ -71,6 +71,7 @@ interface Column<Row>
 
 [.] ComboboxOption
 interface ComboboxOption<Value extends string = string>
+  description?: string | undefined
   disabled?: boolean | undefined
   label: string
   value: Value
@@ -798,6 +799,8 @@ component default
   input?: string | undefined;
   list?: string | undefined;
   option?: string | undefined;
+  optionLabel?: string | undefined;
+  optionDescription?: string | undefined;
   status?: string | undefined;
 } | undefined
   create?: boolean | undefined
@@ -812,6 +815,7 @@ component default
   name?: string | undefined
   onChange?: ((value: "" | Value, option: ComboboxOption<Value> | undefined) => unknown) | undefined
   onCreate?: ((text: string) => unknown) | undefined
+  option?: ((option: ComboboxOption<Value>) => Element) | undefined
   options: ComboboxOptions<Value>
   value?: "" | Value | undefined
   valueLabel?: string | undefined

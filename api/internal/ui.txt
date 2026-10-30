@@ -527,6 +527,7 @@ type Job = keyof typeof claimants
 
 [./lib/combobox] ComboboxOption
 interface ComboboxOption<Value extends string = string>
+  description?: string | undefined
   disabled?: boolean | undefined
   label: string
   value: Value
@@ -1005,6 +1006,7 @@ interface Column<Row>
 
 [./lib/index] ComboboxOption
 interface ComboboxOption<Value extends string = string>
+  description?: string | undefined
   disabled?: boolean | undefined
   label: string
   value: Value

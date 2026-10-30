@@ -1,5 +1,5 @@
 --- <Value extends string>
-import type { JSX } from 'kay'
+import type { JSX, Snippet } from 'kay'
 import type { ComboboxOption, ComboboxOptions } from './combobox'
 import { effect, onCleanup, recipe, signal, uid, untrack } from 'kay'
 import { enabledIndex, exactOption, matchingOptions, offersCreate } from './combobox'
@@ -13,6 +13,8 @@ const look = recipe({
     input: 'kui-field-input',
     list: 'absolute inset-x-0 top-full z-20 m-0 mt-1 max-h-64 list-none overflow-y-auto border-solid border-[length:var(--border-width)] border-border-strong bg-popover p-1 text-sm text-foreground [&[hidden]]:hidden',
     option: 'cursor-pointer px-2 py-1.5 hover:bg-hover aria-selected:bg-hover aria-selected:outline-2 aria-selected:-outline-offset-2 aria-selected:outline-transparent aria-selected:[box-shadow:inset_2px_0_0_var(--color-accent)] aria-disabled:cursor-not-allowed aria-disabled:opacity-50 data-create:italic data-picked:font-medium data-picked:text-accent',
+    optionLabel: 'block',
+    optionDescription: 'block text-xs text-muted',
     status: 'sr-only',
   },
 })
@@ -20,7 +22,7 @@ const look = recipe({
 // A remote search waits this long after the last key.
 const DEBOUNCE_MS = 200
 
-const { id, options, value = '', valueLabel, label, name, minLength = 1, create = false, createLabel = (text: string) => wording('ui.combobox.create', 'Create "{text}"', { text }), loadingLabel = wording('ui.combobox.loading', 'Loading…'), emptyLabel = wording('ui.combobox.empty', 'No match'), failureLabel = wording('ui.combobox.failure', 'Could not load the options'), disabled = false, onChange, onCreate, ...rest } = props<Omit<JSX.IntrinsicElements['input'], 'id' | 'value' | 'name' | 'class' | 'children' | 'onChange' | 'disabled' | 'role' | 'minLength'> & {
+const { id, options, value = '', valueLabel, label, name, minLength = 1, create = false, createLabel = (text: string) => wording('ui.combobox.create', 'Create "{text}"', { text }), loadingLabel = wording('ui.combobox.loading', 'Loading…'), emptyLabel = wording('ui.combobox.empty', 'No match'), failureLabel = wording('ui.combobox.failure', 'Could not load the options'), disabled = false, onChange, onCreate, option: row, ...rest } = props<Omit<JSX.IntrinsicElements['input'], 'id' | 'value' | 'name' | 'class' | 'children' | 'onChange' | 'disabled' | 'role' | 'minLength'> & {
   // The listbox's id, unique on the page; one is drawn when none is given.
   id?: string | undefined
   // A list, filtered as the visitor types, or a function handed `{ q }` that answers the options for it: an action, or an API call wrapped in one. Only the latest answer is shown.
@@ -45,6 +47,8 @@ const { id, options, value = '', valueLabel, label, name, minLength = 1, create 
   onChange?: ((value: Value | '', option: ComboboxOption<Value> | undefined) => unknown) | undefined
   // Called with the text of a created option, once it is picked.
   onCreate?: ((text: string) => unknown) | undefined
+  // Draws each row in place of its label and description: `@option(option)`. The row stays named by the option's `label`, and the input shows the label once it is picked.
+  option?: Snippet<[option: ComboboxOption<Value>]> | undefined
 }>()
 
 const listId = id ?? uid()
@@ -362,7 +366,14 @@ div(part="root")
   // Pressing the list, its scrollbar included, keeps focus in the input.
   ul(part="list" id={listId} role="listbox" aria-label={label} aria-busy={waiting() ? 'true' : undefined} hidden={!shown()} onMouseDown={event => event.preventDefault()})
     for option, index of rows() key={option.value}
-      li(part="option" id={optionId(index)} role="option" aria-selected={active() === index ? 'true' : 'false'} aria-disabled={option.disabled ? 'true' : undefined} data-picked={picked()?.value === option.value ? '' : undefined} onClick={() => pick(index)}) {option.label}
+      li(part="option" id={optionId(index)} role="option" aria-selected={active() === index ? 'true' : 'false'} aria-disabled={option.disabled ? 'true' : undefined} aria-label={row ? option.label : undefined} aria-labelledby={!row && option.description ? `${optionId(index)}-label` : undefined} aria-describedby={!row && option.description ? `${optionId(index)}-description` : undefined} data-picked={picked()?.value === option.value ? '' : undefined} onClick={() => pick(index)})
+        if row
+          | {row(option)}
+        else if option.description
+          span(part="optionLabel" id={`${optionId(index)}-label`}) {option.label}
+          span(part="optionDescription" id={`${optionId(index)}-description`}) {option.description}
+        else
+          | {option.label}
     if offered()
       li(part="option" id={optionId(rows().length)} role="option" aria-selected={active() === rows().length ? 'true' : 'false'} data-create="" onClick={() => pick(rows().length)}) {createLabel(text().trim())}
   // Read out as the list loads and settles, which otherwise changes in silence.

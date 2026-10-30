@@ -1,6 +1,8 @@
 export interface ComboboxOption<Value extends string = string> {
   value: Value
   label: string
+  // A quieter second line under the label in the list. The label alone is what the input shows once picked and names the row, the description read after it.
+  description?: string | undefined
   // Keeps the option from being picked; the arrow keys skip it.
   disabled?: boolean | undefined
 }

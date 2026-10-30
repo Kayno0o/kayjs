@@ -433,3 +433,42 @@ test('ArrowDown on a remote value without a label opens the list and loads it', 
 
   expect([event.defaultPrevented, asked, input.getAttribute('aria-expanded'), rows(), root.querySelector('[role="status"]')?.textContent]).toEqual([true, [''], 'true', ['Ada', 'Grace'], '2 results'])
 })
+
+test('a description is a second line, read after the label, and the label alone fills the input', async () => {
+  const { root, input, rows } = await combobox([{ value: 'a1', label: 'Fix login', description: 'Ada · 1a2b3c4' }, { value: 'b2', label: 'Add search' }])
+
+  input.focus()
+  await settle()
+
+  const [described, plain] = [...root.querySelectorAll('[role="option"]')] as HTMLElement[]
+  const label = described!.querySelector('[data-part="optionLabel"]')!
+  const description = described!.querySelector('[data-part="optionDescription"]')!
+
+  expect([label.textContent, description.textContent, described!.getAttribute('aria-labelledby') === label.id, described!.getAttribute('aria-describedby') === description.id, plain!.getAttribute('aria-labelledby'), plain!.getAttribute('aria-describedby'), plain!.textContent]).toEqual(['Fix login', 'Ada · 1a2b3c4', true, true, null, null, 'Add search'])
+  expect(rows()).toHaveLength(2)
+
+  click(described!)
+  await settle()
+
+  expect([input.value, changes]).toEqual(['Fix login', ['a1']])
+})
+
+test('typing filters on the label alone, not the description', async () => {
+  const { input, rows } = await combobox([{ value: 'a1', label: 'Fix login', description: 'Ada' }, { value: 'b2', label: 'Add search', description: 'Grace' }], undefined, false)
+
+  type(input, 'ada')
+  await settle()
+
+  expect(rows()).toEqual([])
+})
+
+test('a remote answer keeps its descriptions, which are plain data an action can return', async () => {
+  const { root, input } = await combobox(async () => JSON.parse(JSON.stringify([{ value: 'a1', label: 'Fix login', description: 'Ada · 1a2b3c4' }])) as unknown[], 0, false)
+
+  clock.start()
+  input.focus()
+  await clock.elapse(260)
+  await clock.settle()
+
+  expect(root.querySelector('[data-part="optionDescription"]')?.textContent).toBe('Ada · 1a2b3c4')
+})

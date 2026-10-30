@@ -4,7 +4,7 @@ description: A text input with a listbox of options, filtered from a list or loa
 
 <Demo name="combobox/basic" />
 
-`options` is a list of `{ value, label, disabled? }`, filtered by what is typed. `value` is the value picked, empty while nothing is, and `onChange(value, option)` runs when one is picked or the pick is dropped by typing again. With `create`, the text typed is offered as a last row, `Create "text"`, unless an option already bears it; picking it hands the text as the value and to `onCreate(text)`.
+`options` is a list of `{ value, label, description?, disabled? }`, filtered by what is typed. `value` is the value picked, empty while nothing is, and `onChange(value, option)` runs when one is picked or the pick is dropped by typing again. With `create`, the text typed is offered as a last row, `Create "text"`, unless an option already bears it; picking it hands the text as the value and to `onCreate(text)`.
 
 A label typed whole, with no row chosen, counts as a pick of that option once the input loses focus or Enter is pressed. That Enter only adopts the option, so a form around the input is not submitted by it; the next Enter submits.
 
@@ -20,6 +20,19 @@ Combobox(label="Customer" options={searchCustomers} value={customer()} valueLabe
 
 A `value` a remote list holds no label for yet, such as the saved id of a customer, leaves the input empty while the value is still posted. Give `valueLabel` the text to show, and the loader is not asked for it when the input takes focus. A fixed list shows the value itself.
 
+## Rows with more than a label
+
+An option can carry a `description`, drawn as a quieter second line under its label. It is plain data, so an action can answer it, such as a commit's author and date. The input shows the label alone once the option is picked, typing filters on the label alone, and a screen reader hears the label first and the description after it.
+
+To draw each row yourself, give the Combobox an `@option(option)` block. It replaces the label and description, and the row stays named by the option's label.
+
+```kay
+Combobox(label="Commit" options={findCommits})
+  @option(commit)
+    strong {commit.label}
+    code {commit.description}
+```
+
 ## Forms
 
 `name` submits the value picked in a hidden field, or the text typed while nothing is. Without JavaScript the input is a plain text field posting its text, with a list of options offered through the browser's own suggestions. When the browser runs, kayjs-ui's listbox replaces them. A form reset puts the text and the pick back.
@@ -32,4 +45,6 @@ Enter picks the active row, Escape closes the list, even one with no rows, and, 
 
 ## Props and labels
 
-`label` names the input for screen readers, unless a FormField labels it, in which case the FormField's label text alone names it, not the status line nor the rows. `id` is the listbox's id. `createLabel(text)`, `loadingLabel`, `emptyLabel` and `failureLabel` replace the texts, which read `Create "text"`, `Loading…`, `No match` and `Could not load the options`. The other attributes land on the input, and `class` on the wrapper or, as an object, on its parts: `list`, `option` and `status`.
+`label` names the input for screen readers, unless a FormField labels it, in which case the FormField's label text alone names it, not the status line nor the rows. 
+
+`id` is the listbox's id. `createLabel(text)`, `loadingLabel`, `emptyLabel` and `failureLabel` replace the texts, which read `Create "text"`, `Loading…`, `No match` and `Could not load the options`. The other attributes land on the input, and `class` on the wrapper or, as an object, on its parts: `list`, `option`, `optionLabel`, `optionDescription` and `status`.

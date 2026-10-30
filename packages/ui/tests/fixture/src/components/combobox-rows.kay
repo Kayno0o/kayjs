@@ -1,0 +1,11 @@
+---
+// kay-island
+import Combobox from '@kaynooo/kayjs-ui/combobox.kay'
+
+// Commits drawn by the `@option` snippet: the title, then the author and a monospace sha.
+const commits = [{ value: 'a1', label: 'Fix login', description: 'Ada · 1a2b3c4' }, { value: 'b2', label: 'Add search', description: 'Grace · 9f8e7d6' }]
+---
+Combobox(label="Commit" options={commits})
+  @option(commit)
+    strong {commit.label}
+    code {commit.description}
