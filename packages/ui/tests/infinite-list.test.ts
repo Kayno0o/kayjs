@@ -1,5 +1,6 @@
 import type { InfinitePage, PageAt } from '../src/infinite-list'
 import { describe, expect, test } from 'bun:test'
+import { flush, signal } from 'kay'
 import { infiniteList } from '../src/infinite-list'
 
 interface Ban {
@@ -324,5 +325,48 @@ describe('infiniteList', () => {
     expect(list.rows()[4]).toBeInstanceOf(Planet)
     expect([list.rows()[4]?.seen, list.rows()[4]?.label]).toEqual([true, 'planet 5'])
     expect(list.rows().filter((_, at) => at !== 4).every((row, at) => row === before.filter((_, index) => index !== 4)[at])).toBe(true)
+  })
+})
+
+describe('infiniteList following its island', () => {
+  test('first rows given as a function start the list over when they change', async () => {
+    const { asked, load } = source(bans(4, 3))
+    const given = signal(bans(1, 3))
+    const list = infiniteList(() => given(), { pageSize: 3, key: row => row.id, load })
+
+    flush()
+    await list.more()
+    expect(list.rows()).toHaveLength(6)
+
+    given.set(bans(10, 3))
+    flush()
+
+    expect(list.rows().map(row => row.id)).toEqual([10, 11, 12])
+    expect(list.ended()).toBe(false)
+
+    await list.more()
+
+    expect(asked.at(-1)).toEqual({ offset: 3, last: { id: 12 }, sort: undefined, filter: NONE })
+  })
+
+  test('an action input reading a signal restarts the list from its first page', async () => {
+    const repo = signal('a')
+    const calls: object[] = []
+    const action = (async (input: object) => {
+      calls.push(input)
+
+      return bans(100, 3)
+    }) as never
+    const list = infiniteList(bans(1, 3), { pageSize: 3, action, failure: 'no', input: (() => ({ repo: repo() })) as never })
+
+    flush()
+    expect(list.rows()).toHaveLength(3)
+
+    repo.set('b')
+    flush()
+    await new Promise(resolve => setTimeout(resolve, 0))
+
+    expect(calls).toEqual([{ repo: 'b', offset: 0, limit: 3 }])
+    expect(list.rows().map(row => row.id)).toEqual([100, 101, 102])
   })
 })

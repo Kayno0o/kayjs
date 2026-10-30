@@ -1076,7 +1076,7 @@ interface IconChoice
 type IconSlot = 'alert' | 'apps' | 'back' | 'bell' | 'calendar' | 'chat' | 'chevron' | 'close' | 'collapse' | 'delete' | 'edit' | 'expand' | 'external' | 'globe' | 'info' | 'menu' | 'microphone' | 'pause' | 'play' | 'plus' | 'refresh' | 'search' | 'send' | 'spinner' | 'star' | 'stop' | 'success' | 'trendDown' | 'trendFlat' | 'trendUp' | 'zoomFit' | 'zoomIn' | 'zoomOut'
 
 [./lib/index] infiniteList
-function infiniteList<Row, Target extends Action<never, unknown> = never>(first: Row[], options: InfiniteListOptions<Row, Target>): InfiniteList<Row>
+function infiniteList<Row, Target extends Action<never, unknown> = never>(given: Row[] | (() => Row[]), options: InfiniteListOptions<Row, Target>): InfiniteList<Row>
 
 [./lib/index] InfiniteList
 interface InfiniteList<Row>
@@ -1383,7 +1383,7 @@ type ActionSource<Row, Target extends Action<never, unknown>> = {
 } & RowsOf<Row, Target>
 
 [./lib/infinite-list] infiniteList
-function infiniteList<Row, Target extends Action<never, unknown> = never>(first: Row[], options: InfiniteListOptions<Row, Target>): InfiniteList<Row>
+function infiniteList<Row, Target extends Action<never, unknown> = never>(given: Row[] | (() => Row[]), options: InfiniteListOptions<Row, Target>): InfiniteList<Row>
 
 [./lib/infinite-list] InfiniteList
 interface InfiniteList<Row>

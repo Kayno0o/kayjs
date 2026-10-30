@@ -78,6 +78,7 @@ form(ref={element => form = element} onSubmit={event => event.preventDefault()})
 
 - An island marked `persist` lives on from page to page, its state and its element kept, when the next page renders it too: `Player(persist)` in a layout keeps a song playing.
 - A browser with `Element.moveBefore` (Chrome 133, Firefox 144) moves it in place, so an iframe in it stays loaded, a video keeps playing and the focus stays in it; elsewhere it is taken out and put back, and the swap gives the focus and the selection back; a popover open in it closes either way. The scroll of every element inside it, nested ones and horizontal scroll too, is kept either way.
+- `persist` takes a static or a dynamic value, a string computed from props or state (`Graph(persist={`${repo}:${scope}`})`): another value is another island, ended and hydrated afresh, while the same value keeps it.
 - A bare `persist` matches the same component on the next page; `persist="left"` names one use, for two uses of a component to be told apart.
 - Only an island takes `persist`, and only from a static parent.
 - The props the next page gives a kept island reach it as a component inside an island gets new props: what reads them in the template or an effect shows the new values, while a value the script computed from them once keeps the old one.

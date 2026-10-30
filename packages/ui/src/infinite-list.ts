@@ -1,7 +1,7 @@
 import type { Action, CallOptions, InputOf } from 'kay'
 import type { SortState } from './table'
 import type { AttemptOptions } from './toast'
-import { signal, untrack } from 'kay'
+import { effect, signal, untrack } from 'kay'
 import { attempt } from './toast'
 
 // What a source resolves to: the rows of the next page, or `undefined` for a page that failed, such as the result of an `attempt` that toasted. A throw fails the page too.
@@ -121,8 +121,10 @@ function loadFromAction<Row, Target extends Action<never, unknown>>(source: Acti
 }
 
 // The rows of a list that loads its next page as it scrolls, with `LoadMore` after the list drawing the sentinel and the failed state. The first page comes from the server; a page shorter than `pageSize` ends the list, one call runs at a time and a failed page loads no other until `retry`.
-export function infiniteList<Row, Target extends Action<never, unknown> = never>(first: Row[], options: InfiniteListOptions<Row, Target>): InfiniteList<Row> {
+// In an island marked `persist`, the list starts over when the next page changes what it was made from: the first rows when they are given as a function (`() => rows`, which reads the props), and what an action source's `input` function reads, which starts it over from the first page that input asks for.
+export function infiniteList<Row, Target extends Action<never, unknown> = never>(given: Row[] | (() => Row[]), options: InfiniteListOptions<Row, Target>): InfiniteList<Row> {
   const { key, pageSize: size } = options
+  const first = typeof given === 'function' ? untrack(given) : given
   const load = options.load === undefined ? loadFromAction(options, size) : options.load
   let sort = options.sort
   let filter = filterOf(options.filter)
@@ -242,6 +244,64 @@ export function infiniteList<Row, Target extends Action<never, unknown> = never>
     rows.set(current => current.map((row, at) => at === index ? after : row))
 
     return true
+  }
+
+  // Starts over from rows the page brought, as a list made from them.
+  function reset(next: Row[]): void {
+    order += 1
+    running = false
+    replacing = false
+    fetched = next.length
+    lastFetched = next.at(-1)
+    shown.clear()
+
+    if (key !== undefined) {
+      for (const row of next)
+        shown.add(key(row))
+    }
+
+    ended.set(next.length < size)
+    failed.set(false)
+    pending.set(false)
+    rows.set(next)
+  }
+
+  const watched = options.action === undefined ? undefined : (options as ActionSource<Row, Target>).input
+  const follows = typeof watched === 'function' ? watched : undefined
+  let current = first
+  let watching = false
+
+  if (typeof given === 'function' || follows !== undefined) {
+    effect(() => {
+      // Reads what the list follows, so a change to any of it runs this again.
+      const next = typeof given === 'function' ? given() : first
+
+      if (follows !== undefined) {
+        try {
+          follows({ offset: 0, last: undefined, sort, filter })
+        }
+        catch {
+          // A throwing input fails the page that asks for it, not the watch.
+        }
+      }
+
+      // The first run only learns what to follow.
+      if (!watching) {
+        watching = true
+
+        return
+      }
+
+      untrack(() => {
+        if (next !== current) {
+          current = next
+          reset(next)
+        }
+        else {
+          void restart({})
+        }
+      })
+    })
   }
 
   const more = async () => failed() ? undefined : loadPage()
