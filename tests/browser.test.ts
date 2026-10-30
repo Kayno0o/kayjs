@@ -1,8 +1,8 @@
 import type { TestPage, TestSite } from '../src/test'
-import { existsSync, readFileSync } from 'node:fs'
+import { existsSync, readFileSync, realpathSync } from 'node:fs'
 import { chmod, mkdir, mkdtemp, readdir, rm, symlink } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { join, resolve } from 'node:path'
+import { basename, join, resolve } from 'node:path'
 import process from 'node:process'
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
 import { browserPath, testSite } from '../src/test'
@@ -1352,9 +1352,11 @@ async function printed(child: { stdout: ReadableStream<Uint8Array>, stderr: Read
 // What the headless shell's rewritten command line and Bun's start errors leave kay to read, played by processes of this test's own.
 describe('the browser process lookup', () => {
   // A process whose command line is one string of arguments joined by spaces, as chrome-headless-shell rewrites its own; `cat` takes no argument of its own and waits on its pipe.
+  // Busybox (Alpine, CI) picks its applet from argv0, so a renamed `cat` is no cat there.
+  const renamable = existsSync('/proc') && basename(realpathSync(Bun.which('cat') ?? '/bin/cat')) !== 'busybox'
   const shell = (profile: string, executable = '/opt/chrome headless/chrome-headless-shell') => Bun.spawn(['cat'], { argv0: `${executable} --headless --user-data-dir=${profile} --enable-automation`, stdin: 'pipe', stdout: 'ignore', stderr: 'ignore' })
 
-  it.skipIf(!existsSync('/proc'))('finds a shell and its tree when the executable and the profile paths hold a space', async () => {
+  it.skipIf(!renamable)('finds a shell and its tree when the executable and the profile paths hold a space', async () => {
     const scratch = await scratchDir('spaced dir-')
     const profile = join(scratch, 'kay-chrome-1 2', 'profile')
     const chrome = shell(profile)
@@ -1372,7 +1374,7 @@ describe('the browser process lookup', () => {
     }
   })
 
-  it.skipIf(!existsSync('/proc'))('finds a shell /proc lists only after the first look', async () => {
+  it.skipIf(!renamable)('finds a shell /proc lists only after the first look', async () => {
     const profile = join(await scratchDir('late-'), 'profile')
     // Started by a process of its own after a delay, as looking for it blocks this one.
     const launcher = Bun.spawn(['bash', '-c', 'sleep 0.15; exec -a "$0" cat', `/opt/chrome-headless-shell --headless --user-data-dir=${profile}`], { stdin: 'pipe', stdout: 'ignore', stderr: 'ignore' })

@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import process from 'node:process'
 import { expect, it } from 'bun:test'
@@ -5,14 +6,22 @@ import { scratchDir } from './scratch'
 
 const listen = join(import.meta.dir, '../src/server/auto-listen')
 
+const ZOMBIE = /^\d+ \(.*\) Z/s
+
+// An orphan that exited stays a zombie where nothing reaps it (pid 1 of a CI container), which `kill(pid, 0)` still finds.
 function alive(pid: number): boolean {
   try {
     process.kill(pid, 0)
-
-    return true
   }
   catch {
     return false
+  }
+
+  try {
+    return !ZOMBIE.test(readFileSync(`/proc/${pid}/stat`, 'utf8'))
+  }
+  catch {
+    return true
   }
 }
 
