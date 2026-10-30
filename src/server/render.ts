@@ -30,7 +30,7 @@ import { collectHead, head as setHead } from '../runtime/head'
 import { child, component, html, newServerIslands, withServerIslands } from '../runtime/html'
 import { localePath, textDirection } from '../runtime/i18n'
 import { DEFAULT_MAX_DENSITY, RESOLVED_META } from '../runtime/image'
-import { IslandPropsError } from '../runtime/island.server'
+import { unrevivableAction } from '../runtime/island.server'
 import { localeState } from '../runtime/locale-state'
 import { kayLog } from '../runtime/log'
 import { NAVIGATION_ENTRY } from '../runtime/navigation-entry'
@@ -664,7 +664,12 @@ export async function renderServerIslands(route: ServedRoute, context: RequestCo
         }
       }, () => rendering.headers.append('vary', 'cookie'), rules)
       const chunks = islandChunks(client)
-      const { deferred } = inScope(() => withServerIslands(islands, () => renderStatic(viewOf(page.modules, page.data), undefined, chunks)))
+      const { deferred, islands: shell } = inScope(() => withServerIslands(islands, () => renderStatic(viewOf(page.modules, page.data), undefined, chunks)))
+      const unrevivable = unrevivableAction(shell, client)
+
+      if (unrevivable)
+        throw unrevivable
+
       // What a block inside an island renders is the island's own, every component of it included.
       const within = (view: () => unknown) => inScope(() => withServerIslands({ ...islands, inside: 1 }, () => renderBlock(view, undefined, chunks)))
       // The prerendered page holds the checks of the forms it rendered, not of those in a block that settles per request.
@@ -673,6 +678,11 @@ export async function renderServerIslands(route: ServedRoute, context: RequestCo
       const settled = await Promise.all(islands.html.map(async (html) => {
         const forms = new Set<Action<never, unknown>>()
         const markup = await settleBlocks(html, deferred, within, (rendered) => {
+          const unrevivable = unrevivableAction(rendered.islands, client)
+
+          if (unrevivable)
+            throw unrevivable
+
           for (const form of rendered.forms ?? [])
             forms.add(form)
         }, report)
@@ -1075,8 +1085,10 @@ function documentOf(files: string[], modules: PageModule[], data: Record<string,
 
   const hasIslands = client.entry !== undefined && islands.count > 0
 
-  if (client.actionless && islands.actions)
-    throw new IslandPropsError(`kay: a page hands an island an action, but this build carries no code to revive one in the browser: no \`.kay\` or script of the app calls \`action(\` or imports it as another name, and no kay library is used, so the action comes from a package outside the app; call \`action(\` in one of the app's own files, or use a kay library`)
+  const unrevivable = unrevivableAction(islands, client)
+
+  if (unrevivable)
+    throw unrevivable
 
   // A page posting forms to actions loads the entry too, which sends them without a reload; a page with neither ships only `historyScript`, and links from it load pages, losing no state.
   const posts = client.entry !== undefined && client.navigation === true && forms.size > 0

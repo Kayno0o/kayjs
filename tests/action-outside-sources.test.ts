@@ -1,9 +1,9 @@
 import { mkdir } from 'node:fs/promises'
 import { join } from 'node:path'
-import { describe, expect, it } from 'bun:test'
+import { describe, expect, it, spyOn } from 'bun:test'
 import { readClientSources } from '../src/build/client'
 import { scratchDir } from './scratch'
-import { pages } from './shared-pages'
+import { pages, sharedClient } from './shared-pages'
 
 const TSCONFIG = await Bun.file('tests/fixtures/island-action/tsconfig.json').text()
 const CALLER = await Bun.file('tests/fixtures/island-action/src/components/caller.kay').text()
@@ -47,13 +47,41 @@ export const greet = action(t.Object({ name: t.String() }), ({ name }) => \`Hell
 
 describe('an action the app does not declare in its own sources', () => {
   it('fails the page that hands it to an island in a production build, naming the cause, and not in development', async () => {
-    const root = await app({ 'src/routes/index.kay': PAGE(`import { greet as outside } from 'extern'\nexport const greet = outside`) }, OUTSIDE)
-    const built = await pages({ root, prebuilt: false, security: false })
-    const developed = await pages({ root, dev: true, security: false })
-    const refused = await built.handle(new Request('http://localhost/'))
+    const root = await app({
+      'src/routes/index.kay': PAGE(`import { greet as outside } from 'extern'\nexport const greet = outside`),
+      'src/routes/later.kay': `--- server
+import { defer } from 'kay'
+import { greet as outside } from 'extern'
 
-    expect(refused.status).toBe(500)
-    expect((await developed.handle(new Request('http://localhost/'))).status).toBe(200)
+export const shout = outside
+
+const later = defer(Promise.resolve('Ann'))
+--- script
+import Caller from '../components/caller.kay'
+---
+await later then value
+  Caller(run={shout} label={value})
+`,
+    }, OUTSIDE)
+    const logged = spyOn(console, 'error').mockImplementation(() => undefined)
+
+    try {
+      const built = await pages({ root, prebuilt: false, security: false })
+      const developed = await pages({ root, dev: true, security: false })
+      const refused = await built.handle(new Request('http://localhost/'))
+      const streamed = await (await built.handle(new Request('http://localhost/later'))).text()
+
+      expect(refused.status).toBe(500)
+      expect((await sharedClient(root, {})).actionless).toBe(true)
+      expect(streamed).not.toContain('Action')
+      expect(logged.mock.calls.map(call => String(call[0]))).toEqual(expect.arrayContaining([expect.stringContaining('this build carries no code to revive one')]))
+      expect(logged.mock.calls.filter(call => String(call[0]).includes('this build carries no code to revive one'))).toHaveLength(2)
+      expect((await developed.handle(new Request('http://localhost/'))).status).toBe(200)
+      expect((await (await developed.handle(new Request('http://localhost/later'))).text())).toContain('Action')
+    }
+    finally {
+      logged.mockRestore()
+    }
   })
 
   it('counts an action created under another name as one the app declares', async () => {
@@ -67,6 +95,13 @@ export const greet = act(t.Object({ name: t.String() }), ({ name }) => \`Hello \
     })
 
     expect((await readClientSources(root)).actionProps).toBe(true)
+  })
+
+  it('leaves the manifest of a build with an action in the app\'s own sources without the flag', async () => {
+    const root = await app({ 'src/routes/index.kay': PAGE(`import { t } from 'elysia'\nimport { action } from 'kay'\nexport const greet = action(t.Object({ name: t.String() }), ({ name }) => name)`) })
+    const built = await sharedClient(root, {})
+
+    expect(built.actionless).toBeUndefined()
   })
 
   it('still builds no reviver for an app with no action', async () => {

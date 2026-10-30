@@ -36,8 +36,8 @@ export interface RenderedIslands {
   chunks?: Record<string, string> | undefined
   // The message keys the islands use, which go to the browser with them.
   messages: Set<string>
-  // Set once an island is handed an action, which a build that left out the code reviving one cannot serve.
-  actions?: true
+  // Set to what the first island handed an action says of it, which a build that left out the code reviving one cannot serve.
+  actions?: string | undefined
 }
 
 // Gives the page's island list back to where it stands now, for a block that failed: the islands it rendered are not in the page.
@@ -53,8 +53,10 @@ export function islandCheckpoint(): (() => void) | undefined {
   const immediate = islands.immediate.size
   const waiting = islands.waiting.size
   const messages = islands.messages.size
+  const actions = islands.actions
 
   return () => {
+    islands.actions = actions
     islands.count = count
     islands.lazy = lazy
     trim(islands.used, used)
@@ -63,6 +65,13 @@ export function islandCheckpoint(): (() => void) | undefined {
     trim(islands.waiting, waiting)
     trim(islands.messages, messages)
   }
+}
+
+// What a page handing an island an action fails with when its build carries no code to revive one, undefined otherwise.
+export function unrevivableAction(islands: RenderedIslands, client: { actionless?: boolean | undefined }): IslandPropsError | undefined {
+  return client.actionless && islands.actions !== undefined
+    ? new IslandPropsError(`${islands.actions}, but this build carries no code to revive one in the browser: no \`.kay\` file or script of the app calls \`action(\` or imports it under another name, and no kay library is used, so the action comes from a package outside the app; call \`action(\` in one of the app's own files, or use a kay library`)
+    : undefined
 }
 
 // A set keeps the order it was filled in, so what came after the first `size` entries is what to drop.
@@ -270,7 +279,7 @@ function serializeProps(what: string, props: object, slots: [string, string][]):
         throw new IslandPropsError(`${what}, so it renders as an island: its \`${key}\` prop is ${reason ?? `a ${typeof value}`} and cannot reach the browser; pass it from a component of its own, which then renders as an island in its place`)
 
       if (rendered)
-        rendered.actions = true
+        rendered.actions ??= `${what}, so it renders as an island: its \`${key}\` prop is an action`
     }
 
     if (holdsMarkup(value))

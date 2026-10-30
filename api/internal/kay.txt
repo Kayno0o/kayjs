@@ -718,7 +718,7 @@ function promote<P extends object>(id: string, render: (props: P) => Element, hy
 
 [./island] RenderedIslands
 interface RenderedIslands
-  actions?: true
+  actions?: string | undefined
   chunks?: Record<string, string> | undefined
   count: number
   eager: Set<string>
@@ -727,6 +727,9 @@ interface RenderedIslands
   messages: Set<string>
   used: Set<string>
   waiting: Set<string>
+
+[./island] unrevivableAction
+function unrevivableAction(islands: RenderedIslands, client: { actionless?: boolean | undefined; }): IslandPropsError | undefined
 
 [./library] acceptedLocales
 function acceptedLocales(header: string): string[]

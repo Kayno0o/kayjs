@@ -6,7 +6,7 @@ import type { ClientBuild } from './client'
 import { collectForms } from '../runtime/action'
 import { collectDeferred, rejectedAt } from '../runtime/await.server'
 import { child } from '../runtime/html'
-import { collectIslands } from '../runtime/island.server'
+import { collectIslands, unrevivableAction } from '../runtime/island.server'
 import { isSnapshots, lastSnapshot, readSnapshots } from '../runtime/snapshots'
 import { islandChunks } from './client'
 import { formsScript } from './forms'
@@ -100,6 +100,14 @@ export function streamDocument(shell: string, deferred: PendingBlock[], client: 
 
       // A part sent while more may come keeps its markers around it, for the next part to replace.
       const write = (id: string, rendered: Rendered, more: boolean): void => {
+        const unrevivable = unrevivableAction(rendered.islands, client)
+
+        if (unrevivable) {
+          report(unrevivable)
+
+          return
+        }
+
         let scripts = swapShipped ? '' : `<script>${SWAP_SCRIPT}</script>`
 
         swapShipped = true
