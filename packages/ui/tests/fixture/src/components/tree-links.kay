@@ -1,0 +1,19 @@
+---
+import type { TreeNode } from '@kaynooo/kayjs-ui'
+import TreeView from '@kaynooo/kayjs-ui/tree-view.kay'
+
+// What the test reads back: the menu entries run, the stars clicked, and the selection and rows the tree reports.
+const { onAction, onStar, onSelect } = props<{ onAction: (label: string) => void, onStar: (id: string) => void, onSelect: (id: string) => void }>()
+
+const nodes: TreeNode[] = [
+  { id: 'group', label: 'Group', children: [
+    { id: 'alpha', label: 'Alpha', href: '/projects/alpha', menu: [{ label: 'Rename', onSelect: () => onAction('rename alpha') }, 'separator', { label: 'Delete', tone: 'danger', onSelect: () => onAction('delete alpha') }] },
+    { id: 'beta', label: 'Beta', href: '/projects/beta/' },
+  ] },
+  { id: 'list', label: 'List', href: '/projects/beta?view=list' },
+  { id: 'plain', label: 'Plain' },
+]
+---
+TreeView#tree(nodes={nodes} label="Projects" onSelect={onSelect})
+  @trailing(node)
+    button.star(type="button" data-id={node.id} onClick={() => onStar(node.id)}) Star

@@ -1,47 +1,72 @@
 --- <Id extends TreeId>
-import type { JSX } from 'kay'
+import type { JSX, Snippet } from 'kay'
+import type { MenuEntry } from './menu'
 import type { TreeId, TreeNode, TreeRow } from './tree'
-import { effect, memo, recipe, signal, untrack } from 'kay'
+import { effect, memo, recipe, signal, untrack, withQuery } from 'kay'
 import Icon from './icon.kay'
-import { treeKey, treePath, treeRows } from './tree'
+import Menu from './menu.kay'
+import { treeHasMenu, treeHere, treeKey, treePath, treeRows } from './tree'
 
-const look = recipe({ parts: { root: 'kui-tree-view', item: 'kui-tree-view-item', toggle: 'kui-tree-view-toggle', icon: 'kui-tree-view-icon', label: 'kui-tree-view-label' } })
+const look = recipe({ parts: { root: 'kui-tree-view', item: 'kui-tree-view-item', toggle: 'kui-tree-view-toggle', icon: 'kui-tree-view-icon', label: 'kui-tree-view-label', link: 'kui-tree-view-link', trailing: 'kui-tree-view-trailing' } })
 
-const { nodes, label, selected, expanded = [], onSelect, ...rest } = props<Omit<JSX.IntrinsicElements['ul'], 'class' | 'children' | 'role' | 'onKeyDown' | 'onSelect'> & {
+const { nodes, label, selected, expanded = [], onSelect, trailing, ...rest } = props<Omit<JSX.IntrinsicElements['ul'], 'class' | 'children' | 'role' | 'onKeyDown' | 'onSelect'> & {
   nodes: readonly TreeNode<Id>[]
   // Names the tree for screen readers.
   label: string
-  // The node picked; a tree whose parent passes another follows it, opening the branches holding it.
+  // The node picked; a tree whose parent passes another follows it, opening the branches holding it. Left out, the node whose `href` is the page's address is the selected one, on the server's HTML too.
   selected?: Id | undefined
   // The branches open to start with.
   expanded?: readonly Id[] | undefined
   // Runs on a click on a row, or Enter or Space on the focused one, with the id `selected` takes and the node picked.
   onSelect?: ((id: Id, node: TreeNode<Id>) => unknown) | undefined
+  // Controls at the end of a row, such as a star or a count, dimmed away until the row is hovered or holds focus: `@trailing(node)`.
+  trailing?: Snippet<[TreeNode<Id>]> | undefined
 }>()
+
+// The page's address, which a page rendered once at build time does not have.
+function address() {
+  try {
+    return withQuery({})
+  }
+  catch {
+    return undefined
+  }
+}
+
+// The node picked by the parent, else the one whose `href` is the page's address.
+function target() {
+  if (selected !== undefined)
+    return selected
+
+  const here = address()
+
+  return here === undefined ? undefined : treeHere(nodes, here)
+}
 
 const path = (id: TreeId | undefined) => id === undefined ? undefined : treePath(nodes, id)
 // Held as the wider type: a signal cannot take a type parameter.
 // Opened to the selected node from the start, so the server's HTML shows it too.
-const open = signal<ReadonlySet<TreeId>>(new Set<TreeId>([...expanded, ...path(selected) ?? []]))
-const current = signal<TreeId | undefined>(selected)
+const open = signal<ReadonlySet<TreeId>>(new Set<TreeId>([...expanded, ...path(target()) ?? []]))
+const current = signal<TreeId | undefined>(target())
 // The row in the page's tab order, as a tree is one stop the arrows move inside.
-const focused = signal<TreeId | undefined>(selected)
+const focused = signal<TreeId | undefined>(target())
 const rows = memo(() => treeRows(nodes, open()))
 // The selected node whose branches were last opened, so new nodes never reopen a branch closed since.
-let reached = path(selected) ? selected : undefined
+let reached = path(target()) ? target() : undefined
 let list: HTMLUListElement | undefined
 
-effect(() => current = selected)
+effect(() => current = target())
 
 // Waits for the nodes holding the selected one when they come later.
 effect(() => {
-  const holding = path(selected)
+  const picked = target()
+  const holding = path(picked)
 
-  if (!holding || selected === reached)
+  if (!holding || picked === reached)
     return
 
-  reached = selected
-  focused = selected
+  reached = picked
+  focused = picked
 
   // Untracked, so closing a branch never brings the prop back over a pick made since.
   if (holding.some(id => !untrack(open).has(id)))
@@ -65,12 +90,45 @@ function pick(row: TreeRow<Id>) {
   onSelect?.(row.node.id, row.node)
 }
 
-// A branch's chevron opens or closes it, the rest of the row selects it; the keyboard does both through the row itself.
+// A branch's chevron opens or closes it, the rest of the row selects it, the row's own controls excepted; the keyboard does both through the row itself.
 function click(event: MouseEvent, row: TreeRow<Id>) {
-  if (row.node.children && (event.target as Element).closest('.kui-tree-view-toggle'))
+  const target = event.target as Element
+
+  if (target.closest('.kui-tree-view-trailing'))
+    return
+
+  if (row.node.children && target.closest('.kui-tree-view-toggle'))
     toggle(row.node.id)
   else
     pick(row)
+}
+
+// The context menu of the node, drawn once for the tree and moved to the row asking for it.
+const menu = signal<{ name: string, items: MenuEntry[], at: { x: number, y: number } } | undefined>(undefined)
+const hasMenu = memo(() => treeHasMenu(nodes))
+
+function rowElement(id: TreeId) {
+  return list?.querySelectorAll<HTMLElement>('.kui-tree-view-item')[rows().findIndex(row => row.node.id === id)]
+}
+
+function showMenu(node: TreeNode<Id>, x: number, y: number) {
+  if (!node.menu?.length)
+    return false
+
+  menu = { name: node.label, items: [...node.menu], at: { x, y } }
+
+  return true
+}
+
+function contextMenu(event: MouseEvent, row: TreeRow<Id>) {
+  if ((event.target as Element).closest('.kui-tree-view-trailing'))
+    return
+
+  // Focus goes back to the row when the menu closes.
+  if (showMenu(row.node, event.clientX, event.clientY)) {
+    event.preventDefault()
+    focusRow(row.node.id)
+  }
 }
 
 function focusRow(id: TreeId) {
@@ -81,6 +139,21 @@ function focusRow(id: TreeId) {
 }
 
 function keyDown(event: KeyboardEvent) {
+  // The row's own controls keep their keys.
+  if ((event.target as Element).closest('.kui-tree-view-trailing'))
+    return
+
+  // Shift+F10 and the Menu key open the focused row's context menu below it, as a right click would at the pointer.
+  if (event.key === 'ContextMenu' || (event.key === 'F10' && event.shiftKey && !event.altKey && !event.ctrlKey && !event.metaKey)) {
+    const box = stop() === undefined ? undefined : rowElement(stop()!)?.getBoundingClientRect()
+    const row = rows().find(one => one.node.id === stop())
+
+    if (box && row && showMenu(row.node, box.left, box.bottom))
+      event.preventDefault()
+
+    return
+  }
+
   // A chord, such as Alt+Left going back a page, stays the browser's; Shift only types a capital.
   if (event.altKey || event.ctrlKey || event.metaKey || (event.shiftKey && (event.key.length > 1 || event.key === ' ')))
     return
@@ -93,7 +166,12 @@ function keyDown(event: KeyboardEvent) {
 
   if (event.key === 'Enter' || event.key === ' ') {
     event.preventDefault()
-    pick(row)
+
+    // The link's own click selects the row too, as it bubbles to it.
+    if (row.node.href === undefined)
+      pick(row)
+    else
+      rowElement(at)?.querySelector('a')?.click()
 
     return
   }
@@ -114,7 +192,7 @@ function keyDown(event: KeyboardEvent) {
 // The rows of every open branch in one list, each saying its depth and place for screen readers, so the arrows walk them in reading order.
 ul(part="root" {...rest} ref={element => list = element} role="tree" aria-label={label} onKeyDown={keyDown})
   for row of rows() key={row.node.id}
-    li(part="item" role="treeitem" aria-level={row.level} aria-posinset={row.position} aria-setsize={row.size} aria-expanded={row.node.children ? String(open().has(row.node.id)) : undefined} aria-selected={row.node.id === current() ? 'true' : 'false'} tabindex={row.node.id === stop() ? 0 : -1} style={`--_tree-level: ${row.level - 1}`} onFocus={() => focused = row.node.id} onClick={event => click(event, row)})
+    li(part="item" role="treeitem" aria-level={row.level} aria-posinset={row.position} aria-setsize={row.size} aria-expanded={row.node.children ? String(open().has(row.node.id)) : undefined} aria-selected={row.node.id === current() ? 'true' : 'false'} tabindex={row.node.id === stop() ? 0 : -1} style={`--_tree-level: ${row.level - 1}`} onFocus={() => focused = row.node.id} onClick={event => click(event, row)} onContextMenu={event => contextMenu(event, row)})
       if row.node.children
         span(part="toggle" aria-hidden="true")
           Icon(icon="chevron")
@@ -122,4 +200,12 @@ ul(part="root" {...rest} ref={element => list = element} role="tree" aria-label=
         span(part="toggle")
       if row.node.icon
         Icon(icon={row.node.icon} part="icon")
-      span(part="label") {row.node.label}
+      if row.node.href !== undefined
+        a(part="link" href={row.node.href} tabindex="-1" aria-current={row.node.id === current() ? 'page' : undefined}) {row.node.label}
+      else
+        span(part="label") {row.node.label}
+      if trailing
+        span(part="trailing")
+          | {trailing(row.node)}
+if hasMenu()
+  Menu(items={menu()?.items ?? []} label={menu()?.name ?? label} at={menu()?.at ?? { x: 0, y: 0 }} open={menu() !== undefined} onOpenChange={shown => { if (!shown) menu = undefined }})

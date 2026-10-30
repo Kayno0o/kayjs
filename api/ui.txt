@@ -432,9 +432,11 @@ type TreeId = string | number
 [.] TreeNode
 interface TreeNode<Id extends TreeId = string>
   children?: readonly TreeNode<Id>[] | undefined
+  href?: string | undefined
   icon?: IconProps | IconSlot | undefined
   id: Id
   label: string
+  menu?: readonly MenuEntry[] | undefined
 
 [.] uiDefaults
 const uiDefaults: UiSettings
@@ -2136,13 +2138,16 @@ component default
   icon?: string | {
     root?: string | undefined;
   } | undefined;
+  link?: string | undefined;
   label?: string | undefined;
+  trailing?: string | undefined;
 } | undefined
   expanded?: readonly Id[] | undefined
   label: string
   nodes: readonly TreeNode<Id>[]
   onSelect?: ((id: Id, node: TreeNode<Id>) => unknown) | undefined
   selected?: Id | undefined
+  trailing?: ((args_0: TreeNode<Id>) => Element) | undefined
 
 [./virtual-list.kay] default
 component default

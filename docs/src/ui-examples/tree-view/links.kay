@@ -1,0 +1,20 @@
+---
+import type { TreeNode } from '@kaynooo/kayjs-ui'
+import TreeView from '@kaynooo/kayjs-ui/tree-view.kay'
+
+const starred = signal<string[]>([])
+const nodes: TreeNode[] = [
+  { id: 'apps', label: 'Apps', children: [
+    { id: 'kay', label: 'kay', href: '#kay', menu: [{ label: 'Copy link', onSelect: () => undefined }, 'separator', { label: 'Remove', tone: 'danger', onSelect: () => undefined }] },
+    { id: 'blog', label: 'Blog', href: '#blog' },
+  ] },
+]
+
+const toggle = (id: string) => starred.set(list => list.includes(id) ? list.filter(one => one !== id) : [...list, id])
+---
+.flex.flex-col.gap-2.max-w-xs
+  TreeView(nodes={nodes} label="Projects" selected="blog" expanded={['apps']})
+    @trailing(node)
+      if node.href
+        button.cursor-pointer(type="button" aria-label={`Star ${node.label}`} aria-pressed={starred().includes(node.id) ? 'true' : 'false'} onClick={() => toggle(node.id)}) {starred().includes(node.id) ? '*' : '+'}
+  p Right click a project for its menu.

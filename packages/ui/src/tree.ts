@@ -1,5 +1,6 @@
 import type { IconProps } from 'kay/icons'
 import type { IconSlot } from './defaults'
+import type { MenuEntry } from './menu'
 
 export type TreeId = string | number
 
@@ -9,6 +10,10 @@ export interface TreeNode<Id extends TreeId = string> {
   label: string
   icon?: IconSlot | IconProps | undefined
   children?: readonly TreeNode<Id>[] | undefined
+  // A site path or URL: the row is then a real link to it, and the node is the selected one while the page is on that address.
+  href?: string | undefined
+  // The row's context menu, opened by a right click, Shift+F10 or the Menu key on the focused row.
+  menu?: readonly MenuEntry[] | undefined
 }
 
 // A node as the tree shows it: its depth from 1, its place among its siblings, and the branch holding it.
@@ -47,6 +52,45 @@ export function treePath<Id extends TreeId>(nodes: readonly TreeNode<Id>[], id: 
   }
 
   return undefined
+}
+
+const HASH = /#.*$/
+const TRAILING_SLASHES = /\/+$/
+
+const trimmed = (path: string) => path.replace(HASH, '').replace(TRAILING_SLASHES, '') || '/'
+
+// Whether any node, at any depth, has a context menu to open.
+export function treeHasMenu<Id extends TreeId>(nodes: readonly TreeNode<Id>[]): boolean {
+  return nodes.some(node => (node.menu?.length ?? 0) > 0 || (node.children !== undefined && treeHasMenu(node.children)))
+}
+
+// The node whose `href` is the page's address: the one naming its query too when there is one, else the first with its path.
+export function treeHere<Id extends TreeId>(nodes: readonly TreeNode<Id>[], address: string): Id | undefined {
+  const [path = '', query = ''] = address.split('?')
+  let samePath: Id | undefined
+
+  const search = (list: readonly TreeNode<Id>[]): Id | undefined => {
+    for (const node of list) {
+      const [own = '', ownQuery = ''] = node.href?.split('?') ?? []
+
+      if (node.href !== undefined && trimmed(own) === trimmed(path)) {
+        if (ownQuery.replace(HASH, '') === query)
+          return node.id
+
+        if (ownQuery === '')
+          samePath ??= node.id
+      }
+
+      const below = node.children && search(node.children)
+
+      if (below !== undefined)
+        return below
+    }
+
+    return undefined
+  }
+
+  return search(nodes) ?? samePath
 }
 
 // What a key does on the focused row, as the ARIA tree pattern has it: the row to focus, or a branch to open or close.

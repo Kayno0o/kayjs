@@ -1367,9 +1367,11 @@ type TreeId = string | number
 [./lib/index] TreeNode
 interface TreeNode<Id extends TreeId = string>
   children?: readonly TreeNode<Id>[] | undefined
+  href?: string | undefined
   icon?: IconProps | IconSlot | undefined
   id: Id
   label: string
+  menu?: readonly MenuEntry[] | undefined
 
 [./lib/index] uiDefaults
 const uiDefaults: UiSettings
@@ -2079,6 +2081,12 @@ type ToastTone = 'danger' | 'success' | 'info'
 [./lib/toast] ToastType
 type ToastType = 'error' | 'success' | 'info'
 
+[./lib/tree] treeHasMenu
+function treeHasMenu<Id extends TreeId>(nodes: readonly TreeNode<Id>[]): boolean
+
+[./lib/tree] treeHere
+function treeHere<Id extends TreeId>(nodes: readonly TreeNode<Id>[], address: string): Id | undefined
+
 [./lib/tree] TreeId
 type TreeId = string | number
 
@@ -2091,9 +2099,11 @@ type TreeMove<Id extends TreeId> = { focus: Id } | { open: Id } | { close: Id } 
 [./lib/tree] TreeNode
 interface TreeNode<Id extends TreeId = string>
   children?: readonly TreeNode<Id>[] | undefined
+  href?: string | undefined
   icon?: IconProps | IconSlot | undefined
   id: Id
   label: string
+  menu?: readonly MenuEntry[] | undefined
 
 [./lib/tree] treePath
 function treePath<Id extends TreeId>(nodes: readonly TreeNode<Id>[], id: TreeId): Id[] | undefined

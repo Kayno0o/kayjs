@@ -1339,6 +1339,32 @@
     @apply min-w-0 truncate;
   }
 
+  /* A link row is one link: the anchor stretches over the whole row, under the chevron and the row's own controls, so a click anywhere on it follows the link. */
+  .kui-tree-view-item:has(> .kui-tree-view-link) {
+    @apply relative;
+  }
+
+  .kui-tree-view-link {
+    @apply min-w-0 truncate text-inherit no-underline;
+
+    &::after {
+      @apply absolute inset-0 content-[''];
+    }
+  }
+
+  .kui-tree-view-item:has(> .kui-tree-view-link) > :is(.kui-tree-view-toggle, .kui-tree-view-trailing) {
+    @apply relative z-10;
+  }
+
+  /* Dimmed away until the row is hovered or holds focus, always there where nothing hovers. */
+  .kui-tree-view-trailing {
+    @apply ml-auto flex shrink-0 items-center gap-1 opacity-0 transition-opacity pointer-coarse:opacity-100;
+  }
+
+  .kui-tree-view-item:is(:hover, :focus-within) > .kui-tree-view-trailing {
+    @apply opacity-100;
+  }
+
   /* The window a plate is looked at through: it clips whatever runs past its edge, and the plate inside it carries the transform. */
   .kui-zoom-pane {
     @apply relative overflow-hidden select-none;

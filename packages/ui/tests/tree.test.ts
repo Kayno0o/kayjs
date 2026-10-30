@@ -1,6 +1,6 @@
 import type { TreeNode } from '../src/tree'
 import { describe, expect, test } from 'bun:test'
-import { treeKey, treePath, treeRows } from '../src/tree'
+import { treeHasMenu, treeHere, treeKey, treePath, treeRows } from '../src/tree'
 
 const nodes: TreeNode[] = [
   { id: 'work', label: 'Work', children: [{ id: 'specs', label: 'Specs', children: [{ id: 'api', label: 'API' }] }, { id: 'notes', label: 'Notes' }] },
@@ -60,4 +60,32 @@ test('takes numbers as ids, 0 included', () => {
   const open = new Set([0])
 
   expect([treePath(numbered, 1), treeKey(treeRows(numbered, open), 1, 'ArrowLeft', open), treeKey(treeRows(numbered, open), 0, 'ArrowLeft', open)]).toEqual([[0], { focus: 0 }, { close: 0 }])
+})
+
+describe('treeHere', () => {
+  const linked: TreeNode[] = [
+    { id: 'all', label: 'All', href: '/projects' },
+    { id: 'group', label: 'Group', children: [{ id: 'beta', label: 'Beta', href: '/projects/beta/' }, { id: 'list', label: 'List', href: '/projects/beta?view=list#top' }] },
+    { id: 'home', label: 'Home', href: '/' },
+  ]
+
+  test('gives the node whose href is the address, ignoring a trailing slash and the hash', () => {
+    expect([treeHere(linked, '/projects'), treeHere(linked, '/projects/beta'), treeHere(linked, '/')]).toEqual(['all', 'beta', 'home'])
+  })
+
+  test('prefers the node naming the query, else falls back to the one with the path alone', () => {
+    expect([treeHere(linked, '/projects/beta?view=list'), treeHere(linked, '/projects/beta?view=grid'), treeHere(linked, '/projects/beta?page=2')]).toEqual(['list', 'beta', 'beta'])
+  })
+
+  test('gives nothing for an address no href names, and a path is not matched by a prefix of it', () => {
+    expect([treeHere(linked, '/elsewhere'), treeHere(linked, '/projects/be')]).toEqual([undefined, undefined])
+  })
+})
+
+describe('treeHasMenu', () => {
+  test('finds a menu at any depth, an empty one counting for none', () => {
+    const item = { label: 'Rename', onSelect: () => undefined }
+
+    expect([treeHasMenu(nodes), treeHasMenu([{ id: 'a', label: 'A', menu: [] }]), treeHasMenu([{ id: 'a', label: 'A', children: [{ id: 'b', label: 'B', menu: [item] }] }])]).toEqual([false, false, true])
+  })
 })
