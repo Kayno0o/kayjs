@@ -2,6 +2,8 @@
 import { t } from 'elysia'
 import { action, defer } from 'kay'
 
+export const forget = action(async () => 'Forgotten')
+
 export const explode = action(t.Object({}), () => {
   throw new Error('Kaboom in an action')
 })
@@ -28,6 +30,8 @@ form(action={send})
   button Send
 if send.error()
   p.error {send.error()}
+form(action={forget})
+  button Forget
 form(action={explode})
   button Explode
 if explode.error()

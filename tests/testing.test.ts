@@ -1,4 +1,4 @@
-import type { Action, Failure, s, ServerAction } from '../src/runtime'
+import type { Action, Failure, NoInputAction, s, ServerAction } from '../src/runtime'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -97,6 +97,17 @@ describe('kay/test', () => {
 
   it('says how to test a second project, which a process already serving one cannot', async () => {
     await expect(testSite({ root: 'tests/fixtures/islands' })).rejects.toThrow('`bun test --parallel` runs each file apart, or run its tests on their own as `KAY_ROOT=tests/fixtures/islands bun test <its test files>`')
+  })
+
+  it('submits a form to an action with no input, with no fields or an empty object', async () => {
+    const { forget } = await import(join(import.meta.dir, 'fixtures/site/src/routes/boom.kay')) as { forget: NoInputAction<string> }
+    const empty = await site.submit(forget, {}, { from: '/boom' })
+    const bare = await site.submit(forget, undefined, { from: '/boom' })
+    const none = await site.submit(forget)
+
+    expect(empty.status).toBe(200)
+    expect(bare.status).toBe(200)
+    expect(none.status).toBe(200)
   })
 
   it('submits a form without JavaScript and lands back on the page with its failure', async () => {

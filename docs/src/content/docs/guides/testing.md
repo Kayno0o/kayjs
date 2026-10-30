@@ -53,6 +53,8 @@ it('shows why a book was refused', async () => {
 })
 ```
 
+An action with no input, such as a sign-out button, takes no fields: `site.submit(signOut, {}, { from: '/' })`.
+
 `site.call(action, input)` calls an action as an island does, and throws `ActionError` when it fails. An action with no input takes no second argument: `site.call(signOut)`.
 
 `site.refusal(action, input)` makes a call that you expect to be refused. It resolves with the `ActionError`, its `status`, `errors`, `message` and `data` typed from the handler. It fails the test when the call goes through.

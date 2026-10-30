@@ -1,5 +1,5 @@
 import type { AnyElysia } from 'elysia'
-import type { Action, ActionError, FailuresOf, ResultOf, STAMP_FIELD, Success } from '../runtime/action'
+import type { Action, ActionError, FailuresOf, NoInputAction, ResultOf, STAMP_FIELD, Success } from '../runtime/action'
 import type { Duration } from '../runtime/duration'
 import type { ApiAnswer, ApiRequest, CallMethod, CallPath, NodeAt, Optional, SocketOf, SocketOptions, SocketPath, StreamMethod, StreamOf, StreamOptions, StreamPath } from '../runtime/live'
 import type { PagesOptions } from '../server/app'
@@ -55,12 +55,19 @@ export type InputOf<Target> = Target extends Action<infer Input, unknown> ? Inpu
 // A call to an action whose fields are all optional, or that takes none, may leave its input out.
 export type CallArguments<Target> = object extends InputOf<Target> ? [input?: InputOf<Target> | FormData, init?: VisitInit & { from?: string }] : [input: InputOf<Target> | FormData, init?: VisitInit & { from?: string }]
 
+// What `submit` takes besides the action and its fields.
+export type SubmitInit = VisitInit & { from?: string | Visit, openedFor?: Duration | 0, stamp?: string | undefined }
+
 export interface TestSite {
   // A GET as a browser makes it: earlier cookies sent, redirects followed.
   visit: (path: string, init?: VisitInit) => Promise<Visit>
   // A plain form post from the page at `from`, multipart as kay's forms send it, followed back to wherever the action sends the browser. A `Visit` as `from` posts where its form does, with the stamp `minTime` reads, from the URL the browser shows it at, the action's own for a page a refused post answered.
   // A post to an action with `minTime` goes through as if its form had been open long enough; `openedFor` sends one as if open that long instead, `0` as if just opened, and `stamp` posts the stamp it is given as it is, such as the one `visit.stamp(action)` read or a forged one.
-  submit: <Input, Honeypot extends string = never>(action: Action<Input, unknown, Honeypot>, fields: Partial<Record<Extract<keyof Input, string> | Honeypot | typeof STAMP_FIELD, FormValue | FormValue[] | undefined>>, init?: VisitInit & { from?: string | Visit, openedFor?: Duration | 0, stamp?: string | undefined }) => Promise<Visit>
+  submit: {
+    // An action with no input takes `{}` or no fields at all, `site.submit(forget, {}, { from })`.
+    <Honeypot extends string = never>(action: NoInputAction<unknown, Honeypot>, fields?: Partial<Record<Honeypot | typeof STAMP_FIELD, FormValue | FormValue[] | undefined>>, init?: SubmitInit): Promise<Visit>
+    <Input, Honeypot extends string = never>(action: Action<Input, unknown, Honeypot>, fields: Partial<Record<Extract<keyof Input, string> | Honeypot | typeof STAMP_FIELD, FormValue | FormValue[] | undefined>>, init?: SubmitInit): Promise<Visit>
+  }
   // The call an island makes, with its input or a form's fields: the result, an `ActionError` thrown, or an `ActionRedirectError` when it redirects. `from` names the page it is made on, whose params the action reads.
   // A handler returning an async iterable gives every value once the stream ended, and throws when it failed.
   call: <Target extends Action<never, unknown>>(action: Target, ...call: CallArguments<Target>) => Promise<Tested<ResultOf<Target>>>

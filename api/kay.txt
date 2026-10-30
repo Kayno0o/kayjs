@@ -3905,11 +3905,10 @@ interface TestSite
 } : {
   query?: Record<string, unknown>;
 }) & Body<MethodRoute<Module, Path, Chosen<M>>> & VisitInit>) => TestStream<StreamOf<Module, Path, M>>
-  submit: <Input, Honeypot extends string = never>(action: Action<Input, unknown, Honeypot>, fields: Partial<Record<Honeypot | Extract<keyof Input, string> | "kay_since", FormValue | FormValue[] | undefined>>, init?: (VisitInit & {
-  from?: string | Visit;
-  openedFor?: 0 | `${number}ms` | `${number}s` | `${number}m` | `${number}h` | `${number}d` | `${number}w`;
-  stamp?: string | undefined;
-}) | undefined) => Promise<Visit>
+  submit: {
+  <Honeypot extends string = never>(action: NoInputAction<unknown, Honeypot>, fields?: Partial<Record<Honeypot | "kay_since", FormValue | FormValue[] | undefined>> | undefined, init?: SubmitInit | undefined): Promise<Visit>;
+  <Input, Honeypot extends string = never>(action: Action<Input, unknown, Honeypot>, fields: Partial<Record<Honeypot | "kay_since" | Extract<keyof Input, string>, FormValue | FormValue[] | undefined>>, init?: SubmitInit | undefined): Promise<Visit>;
+}
   visit: (path: string, init?: VisitInit | undefined) => Promise<Visit>
 
 [./test] TestSocket

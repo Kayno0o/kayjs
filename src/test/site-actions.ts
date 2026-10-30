@@ -3,7 +3,7 @@ import type { Duration } from '../runtime/duration'
 import type { EventReader, StreamStatus } from '../runtime/live'
 import type { PageReading } from './page'
 import type { SiteScope } from './site-scope'
-import type { CallArguments, FormValue, Tested, TestSite } from './site-types'
+import type { CallArguments, FormValue, SubmitInit, Tested, TestSite } from './site-types'
 import { encodeCall, minTimeOf, readActionResponse, SETTLED, STAMP_FIELD } from '../runtime/action'
 import { durationSeconds } from '../runtime/duration'
 import { PAGE_HEADER, WORK_HEADER, WORK_SCRIPT } from '../runtime/swap'
@@ -81,7 +81,7 @@ export function actionsOf({ send, shown, follow, answeredAt }: SiteScope): Pick<
 
   return {
     call,
-    submit: async (action, fields, init = {}) => {
+    submit: async (action: Action<never, unknown>, fields: Record<string, FormValue | FormValue[] | undefined> = {}, init: SubmitInit = {}) => {
       const page = typeof init.from === 'object' ? init.from : undefined
       const from = typeof init.from === 'object' ? init.from.url : init.from ?? '/'
       const url = page && formUrl(page, action)
@@ -105,7 +105,7 @@ export function actionsOf({ send, shown, follow, answeredAt }: SiteScope): Pick<
           form.set(name, solveWork(challenge) ?? '')
       }
 
-      for (const [name, value] of Object.entries(fields as Record<string, FormValue | FormValue[] | undefined>)) {
+      for (const [name, value] of Object.entries(fields)) {
         for (const item of Array.isArray(value) ? value : [value]) {
           if (item !== undefined)
             form.append(name, item)
