@@ -1,0 +1,23 @@
+---
+import LineChart from '@kaynooo/kayjs-ui/line-chart.kay'
+import { onMount, signal } from 'kay'
+
+// A rolling series fed by a signal: `roll` adds a point on the right and drops the one on the left, `recolor` changes the series' colour, and nothing else calls the chart.
+const { bind, animate, pointKey, xLabels, showPoints } = props<{ xLabels?: boolean, showPoints?: boolean, bind: (api: { roll: () => void, recolor: () => void }) => void, animate?: boolean, pointKey?: 'index' | 'label' | ((point: { series: number, index: number, label: string }) => string | number) }>()
+const days = signal(['Mon', 'Tue', 'Wed', 'Thu'])
+const values = signal([4, 6, 5, 8])
+const color = signal('red')
+const counter = { next: 0 }
+
+onMount(() => {
+  bind({
+    roll: () => {
+      counter.next += 1
+      days = [...days().slice(1), `Day ${counter.next}`]
+      values = [...values().slice(1), counter.next]
+    },
+    recolor: () => color = 'blue',
+  })
+})
+---
+LineChart#live(label="Rolling" labels={days()} series={[{ name: 'Visits', values: values(), color: color() }]} xLabels={xLabels} options={{ showPoint: showPoints === true }} animate={animate} pointKey={pointKey})

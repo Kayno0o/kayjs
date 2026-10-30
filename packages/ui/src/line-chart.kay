@@ -1,25 +1,12 @@
 ---
-import type { Axis, AxisFactory, ChartRect, LineChartData, LineChartPresetOptions } from 'chartist'
-import type { DrawEvent, LineChartCreatedEvent } from 'chartist/compat'
+import type { AxisFactory, ChartPlugin, DomRenderOutput, Layer, LineChartPresetOptions, LinePresetState, Renderer } from 'chartist'
 import type { JSX } from 'kay'
 import type { ChartSeries } from './plot'
 import { effect, memo, onCleanup, onMount, recipe, signal, uid } from 'kay'
 import type { LabelContext } from './chart-axis'
-import { loadCompat } from './chartist'
 import { chartData, headings, indexAt, labelTimes, positionOf, stackValues, totalAt, xAxisOptions } from './chart-axis'
 import { dashSample, PALETTE, SERIES_DASHES, steppedPoint } from './plot'
 import { wording } from 'kay/words'
-
-// What kayjs-ui uses of the 1.x chart object chartist 2 hands to a legacy plugin.
-interface LegacyChart {
-  on: {
-    (event: 'created', listener: (event: LineChartCreatedEvent) => void): unknown
-    (event: 'data', listener: () => void): unknown
-    (event: 'draw', listener: (event: DrawEvent) => void): unknown
-  }
-  update: (data: LineChartData, options: LineChartPresetOptions, override: boolean) => unknown
-  detach: () => unknown
-}
 
 // Which attribute of each drawn part takes its series' colour.
 const PAINT: Record<string, string> = { line: 'stroke', point: 'stroke', area: 'fill' }
@@ -51,7 +38,7 @@ const look = recipe({
   },
 })
 
-const { labels, series, formatValue = (value: number) => value.toLocaleString(), formatLabel, xLabels = false, stacked = false, totalLabel = wording('ui.lineChart.total', 'Total'), legend, options, onRange, rangeHint = wording('ui.lineChart.rangeHint', 'Shift with the arrow keys picks a span, Enter applies it, Escape drops it'), label, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'role'> & {
+const { labels, series, formatValue = (value: number) => value.toLocaleString(), formatLabel, xLabels = false, stacked = false, totalLabel = wording('ui.lineChart.total', 'Total'), legend, pointKey, animate = false, options, onRange, rangeHint = wording('ui.lineChart.rangeHint', 'Shift with the arrow keys picks a span, Enter applies it, Escape drops it'), label, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'role'> & {
   labels: string[]
   series: ChartSeries[]
   // Formats the y-axis labels, the tooltip's values and the readings screen readers hear.
@@ -66,6 +53,10 @@ const { labels, series, formatValue = (value: number) => value.toLocaleString(),
   totalLabel?: string | undefined
   // Names each series under the chart; shown by default once there is more than one.
   legend?: boolean | undefined
+  // What identifies a point across updates, so a series that gains points on the right and loses them on the left moves its points instead of redrawing them: `'label'` follows each point by its label, `'index'` by its position, and a function by what it returns. Labels that are all different identify by label by default, others by position.
+  pointKey?: 'index' | 'label' | ((point: { series: number, index: number, label: string }) => string | number) | undefined
+  // Moves the points and lines from the old data to the new on each update, unless the visitor's system asks for reduced motion.
+  animate?: boolean | undefined
   // Merged over the defaults, for what the props do not cover.
   options?: LineChartPresetOptions | undefined
   // Lets a drag across the plot, or Shift with the arrow keys then Enter, pick a span, handed over as the indices of its first and last points, such as to zoom in on it.
@@ -77,6 +68,7 @@ const { labels, series, formatValue = (value: number) => value.toLocaleString(),
 }>()
 
 const id = uid()
+const distinct = memo(() => new Set(labels).size === labels.length)
 const times = memo(() => labelTimes(labels))
 const headingTexts = memo(() => headings(labels, times(), formatLabel))
 // The heights the series are drawn at: their own values, or each laid on the ones before it when stacked.
@@ -88,6 +80,59 @@ const dashes = memo(() => series.map((_, index) => stacked ? '' : SERIES_DASHES[
 // The room the y labels measured for themselves: the widest one, which chartist would wrap at its default 30 px, and their height, which the top tick's label rises above the plot by.
 const fit = signal({ width: 0, height: 0 })
 
+// Where chartist drew the plot, in px from the top left of the drawing, and where it puts a value up the y-axis.
+interface Plot {
+  x1: number
+  y1: number
+  y2: number
+  width: number
+  height: number
+  project: (value: number) => number
+}
+
+// Where chartist last drew the plot, which the hover cursor and dots are placed against.
+const plot = signal<Plot | null>(null)
+
+// The path of each stacked series' area as drawn, so the next series' area can cut it out.
+const areas: (string | undefined)[] = []
+
+// A layer that draws nothing: it reads where the plot is and the y-axis from each render, and gives every drawn part its series' colour and dash, so any number of series takes any colour with no stylesheet per chart.
+// A stacked area is the band between its line and the one below: its own area and the one below it, filled with the even-odd rule, leave only the band.
+const probe: Layer = {
+  type: 'kui-line-chart',
+  coordinates: ['cartesian'],
+  series: [],
+  compose: ({ area, axes }) => {
+    const axis = axes.y
+
+    areas.length = 0
+    plot = axis ? { x1: area.x1, y1: area.y1, y2: area.y2, width: area.width, height: area.height, project: value => axis.project(value) } : null
+
+    return []
+  },
+  refine: (part) => {
+    const paint = part.role === undefined ? undefined : PAINT[part.role]
+    const index = part.ctx?.seriesIndex
+
+    if (!paint || index === undefined)
+      return undefined
+
+    let painted = part
+
+    if (part.role === 'area' && stacked) {
+      const own = part.attrs.d
+      const below = areas.slice(0, index).findLast(Boolean)
+
+      areas[index] = own
+      painted = part.attr({ 'd': below ? `${own} ${below}` : own, 'fill-rule': 'evenodd' })
+    }
+
+    const dash = part.role === 'line' ? dashes()[index] : ''
+
+    return painted.attr({ style: `${paint}: ${colors()[index]}${dash ? `; stroke-dasharray: ${dash}` : ''}` })
+  },
+}
+
 const settings = (fixedScale: AxisFactory): LineChartPresetOptions => {
   const padding = typeof options?.chartPadding === 'object' ? options.chartPadding : {}
 
@@ -97,14 +142,13 @@ const settings = (fixedScale: AxisFactory): LineChartPresetOptions => {
     showPoint: false,
     ...stacked ? { low: heights().flat().reduce<number>((lowest, height) => Math.min(lowest, height ?? 0), 0) } : {},
     ...options,
+    layers: { ...options?.layers, above: [probe, ...options?.layers?.above ?? []] },
     chartPadding: { top: Math.max(8, fit().height), right: xLabels ? 24 : 8, bottom: 0, left: 0, ...padding },
     axisX: { ...xAxisOptions(labels, times(), xLabels, fixedScale, formatLabel), ...options?.axisX },
     axisY: { showLabel: true, showGrid: true, offset: Math.max(40, fit().width + 10), labelInterpolationFnc: (value: string | number) => formatValue(Number(value)), ...options?.axisY },
   }
 }
 
-// Where chartist last drew the plot, which the hover cursor and dots are placed against.
-const plot = signal<{ rect: ChartRect, axisY: Axis } | null>(null)
 const hovered = signal<{ index: number, clientX: number, clientY: number } | null>(null)
 // The points a drag or a keyboard pick under way started and stands at.
 const dragged = signal<{ from: number, to: number } | null>(null)
@@ -136,7 +180,7 @@ const cursor = () => {
   const drawn = plot()
   const at = hovered()
 
-  return drawn && at ? drawn.rect.x1 + positionOf(at.index, labels.length, times()) * drawn.rect.width() : null
+  return drawn && at ? drawn.x1 + positionOf(at.index, labels.length, times()) * drawn.width : null
 }
 
 // The dot of a series at the hovered point, placed on its line, or nothing where it has no reading.
@@ -146,7 +190,7 @@ const dot = (index: number) => {
   const own = at ? series[index]!.values[at.index] : undefined
   const height = at ? heights()[index]![at.index] : undefined
 
-  return drawn && typeof own === 'number' && typeof height === 'number' ? `left: ${cursor()}px; top: ${drawn.rect.y1 - drawn.axisY.projectValue(height)}px; background-color: ${colors()[index]}` : undefined
+  return drawn && typeof own === 'number' && typeof height === 'number' ? `left: ${cursor()}px; top: ${drawn.y1 - drawn.project(height)}px; background-color: ${colors()[index]}` : undefined
 }
 
 const valueText = (item: ChartSeries, index: number) => {
@@ -213,17 +257,19 @@ onMount(() => {
     tipSize = { width, height, wide: document.documentElement.clientWidth, high: document.documentElement.clientHeight }
   })
 
-  const drawing = signal<{ chart: LegacyChart, fixedScale: AxisFactory } | null>(null)
+  const drawing = signal<{ state: LinePresetState, fixedScale: AxisFactory } | null>(null)
   let gone = false
-  let chart: LegacyChart | undefined
   let handle: { destroy: () => void } | undefined
+  let state: LinePresetState | undefined
+  // The renderer that patches the drawing in place, loaded by the first update of the data: a chart that never changes never loads it. It is `undefined` until then, and the chart draws with the plain one.
+  let live: Renderer<DomRenderOutput> | undefined
+  let liveState: 'unused' | 'loading' | 'failed' | 'ready' = options?.renderer ? 'failed' : 'unused'
 
   void (async () => {
     let loaded: typeof import('chartist')
-    let compat: typeof import('chartist/compat')
 
     try {
-      ;[loaded, compat] = await Promise.all([import('chartist'), loadCompat()])
+      loaded = await import('chartist')
     }
     catch (error) {
       console.error('kayjs-ui: LineChart draws with chartist, which could not be loaded; install chartist 2 with `bun add chartist@^2`', error)
@@ -234,55 +280,83 @@ onMount(() => {
     if (gone)
       return
 
-    // Chartist 2 hands a legacy plugin the 1.x chart object (`on`, `update`, `detach`) whose `draw`, `created` and `data` events carry the drawn elements and the plot.
-    const plugin = compat.fromLegacyPlugin((legacy: LegacyChart) => {
-      chart = legacy
-    })
+    // What the chart does around each render: it keeps the preset's state, whose update takes the data and the options in one render, and gives the y labels the room they measure once they are on the page.
+    const plugin: ChartPlugin = {
+      name: 'kui-line-chart',
+      install: (chart) => {
+        chart.on('resolve', ({ config }) => {
+          if (config.preset?.kind === 'line')
+            state = config.preset
+        })
+        chart.on('mount', () => {
+          fitLabels()
+        })
+      },
+    }
 
-    // `plugins`, `on` and `renderer` are read once, when the chart is created, so the app's own go in here.
-    handle = loaded.lineChart(canvas!, { series: [] }, { plugins: [plugin, ...options?.plugins ?? []], ...options?.on ? { on: options.on } : {}, ...options?.renderer ? { renderer: options.renderer } : {} })
+    // `plugins`, `on` and `renderer` are read once, when the chart is created, so the app's own go in here. The renderer hands over to the live one once it is loaded, which patches what the plain one drew.
+    const plain = loaded.domRenderer()
+    const renderer: Renderer<DomRenderOutput> = { ...plain, render: (scene, target, update) => (live ?? plain).render(scene, target, update) }
 
-    if (!chart)
-      return
+    handle = loaded.lineChart(canvas!, { series: [] }, { plugins: [plugin, ...options?.plugins ?? []], ...options?.on ? { on: options.on } : {}, renderer: options?.renderer ?? renderer })
 
-    chart.on('created', (event) => {
-      plot = { rect: event.chartRect, axisY: event.axisY }
-      fitLabels()
-    })
-    // Colours and dashes go on each drawn part, so any number of series takes any colour with no stylesheet per chart.
-    // A stacked area is the band between its line and the one below: its own area and the one below it, filled with the even-odd rule, leave only the band.
-    let areas: (string | undefined)[] = []
-
-    chart.on('data', () => {
-      areas = []
-    })
-
-    chart.on('draw', (event) => {
-      const paint = PAINT[event.type]
-
-      if (!paint || !('seriesIndex' in event))
-        return
-
-      if (event.type === 'area' && stacked) {
-        const own = event.element.attr('d') as string
-        const below = areas.slice(0, event.seriesIndex).findLast(Boolean)
-
-        areas[event.seriesIndex] = own
-        event.element.attr({ 'd': below ? `${own} ${below}` : own, 'fill-rule': 'evenodd' })
-      }
-
-      const dash = event.type === 'line' ? dashes()[event.seriesIndex] : ''
-
-      event.element.attr({ style: `${paint}: ${colors()[event.seriesIndex]}${dash ? `; stroke-dasharray: ${dash}` : ''}` })
-    })
-    drawing = { chart, fixedScale: loaded.fixedScaleAxis() }
+    if (state)
+      drawing = { state, fixedScale: loaded.fixedScaleAxis() }
   })()
+
+  const identify = (point: { seriesIndex: number, valueIndex: number, label: unknown }) => {
+    const rule = pointKey ?? (distinct() ? 'label' : 'index')
+
+    if (typeof rule === 'function')
+      return rule({ series: point.seriesIndex, index: point.valueIndex, label: String(point.label) })
+
+    return rule === 'label' ? String(point.label) : point.valueIndex
+  }
+
+  const redraw = (ready: { state: LinePresetState, fixedScale: AxisFactory }) => ready.state.update(chartData(labels, heights(), times()), settings(ready.fixedScale), true)
+
+  // Loads the live renderer for the first update of the data, then draws it, so what the chart shows is patched from then on.
+  async function goLive(ready: { state: LinePresetState, fixedScale: AxisFactory }) {
+    liveState = 'loading'
+
+    try {
+      const module = await import('chartist/live')
+      const animations = module.smilAnimations()
+
+      live = module.liveDomRenderer({ key: identify, animations: { animate: context => animate ? animations.animate(context) : undefined } })
+      liveState = 'ready'
+    }
+    catch (error) {
+      console.error('kayjs-ui: LineChart could not load chartist/live, so an update redraws the chart; install chartist 2.2 or later with `bun add chartist@^2.2`', error)
+      liveState = 'failed'
+    }
+
+    if (!gone)
+      redraw(ready)
+  }
+
+  // The data an update drew last, to tell new points from a label measuring itself.
+  let drawn: { labels: string[], heights: (number | null)[][] } | undefined
 
   effect(() => {
     const ready = drawing()
 
-    if (ready)
-      ready.chart.update(chartData(labels, heights(), times()), settings(ready.fixedScale), true)
+    if (!ready)
+      return
+
+    const now = { labels, heights: heights() }
+    const moved = drawn !== undefined && (drawn.labels !== now.labels || drawn.heights !== now.heights)
+
+    drawn = now
+
+    if (liveState === 'loading' || (liveState === 'unused' && moved)) {
+      if (liveState === 'unused')
+        void goLive(ready)
+
+      return
+    }
+
+    redraw(ready)
   })
 
   // New points, such as a span the app zoomed in on, leave nothing picked on the old ones, whose indices may not exist any more.
@@ -311,8 +385,8 @@ function pointAt(event: PointerEvent): number | null {
   if (!drawn || labels.length === 0)
     return null
 
-  const width = drawn.rect.width()
-  const x = event.clientX - (event.currentTarget as HTMLElement).getBoundingClientRect().left - drawn.rect.x1
+  const width = drawn.width
+  const x = event.clientX - (event.currentTarget as HTMLElement).getBoundingClientRect().left - drawn.x1
 
   return indexAt(width > 0 ? x / width : 0, labels.length, times())
 }
@@ -325,9 +399,9 @@ const band = () => {
   if (!drawn || !span || span.from === span.to)
     return null
 
-  const [left, right] = [span.from, span.to].map(index => drawn.rect.x1 + positionOf(index, labels.length, times()) * drawn.rect.width()).sort((a, b) => a - b)
+  const [left, right] = [span.from, span.to].map(index => drawn.x1 + positionOf(index, labels.length, times()) * drawn.width).sort((a, b) => a - b)
 
-  return `left: ${left}px; width: ${right! - left!}px; top: ${drawn.rect.y2}px; height: ${drawn.rect.height()}px`
+  return `left: ${left}px; width: ${right! - left!}px; top: ${drawn.y2}px; height: ${drawn.height}px`
 }
 
 function pointerMove(event: PointerEvent) {
@@ -368,9 +442,9 @@ function finishSpan() {
 function show(index: number, overlay: HTMLElement) {
   const drawn = plot()
   const box = overlay.getBoundingClientRect()
-  const x = drawn ? drawn.rect.x1 + positionOf(index, labels.length, times()) * drawn.rect.width() : 0
+  const x = drawn ? drawn.x1 + positionOf(index, labels.length, times()) * drawn.width : 0
 
-  hovered = { index, clientX: box.left + x, clientY: box.top + (drawn?.rect.y2 ?? 0) }
+  hovered = { index, clientX: box.left + x, clientY: box.top + (drawn?.y2 ?? 0) }
 }
 
 function keyDown(event: KeyboardEvent) {
@@ -425,7 +499,7 @@ div(part="root" {...rest} role="figure" aria-label={label})
   div(part="frame")
     div(part="plot" ref={element => canvas = element} aria-hidden="true")
     if cursor() !== null
-      div(part="cursor" style={`left: ${cursor()}px; top: ${plot()!.rect.y2}px; height: ${plot()!.rect.height()}px`})
+      div(part="cursor" style={`left: ${cursor()}px; top: ${plot()!.y2}px; height: ${plot()!.height}px`})
       for item, index of series key={item.name}
         if dot(index)
           div(part="dot" style={dot(index)})

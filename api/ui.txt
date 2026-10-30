@@ -1262,6 +1262,7 @@ component default
 
 [./line-chart.kay] default
 component default
+  animate?: boolean | undefined
   class?: string | {
   root?: string | undefined;
   frame?: string | undefined;
@@ -1289,6 +1290,7 @@ component default
   legend?: boolean | undefined
   onRange?: ((from: number, to: number) => unknown) | undefined
   options?: LineChartPresetOptions | undefined
+  pointKey?: "label" | "index" | ((point: { series: number; index: number; label: string; }) => string | number) | undefined
   rangeHint?: string | undefined
   series: ChartSeries[]
   stacked?: boolean | undefined

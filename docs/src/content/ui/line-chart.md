@@ -6,7 +6,7 @@ description: A multi-series line chart with a hover tooltip, drawn by chartist.
 
 <Callout type="note">
 
-The chart is drawn by chartist, which the app installs with `bun add chartist` (version 2). The server renders its frame, the keyboard slider, the table screen readers read and the legend, and the drawing happens once the island mounts.
+The chart is drawn by chartist, which the app installs with `bun add chartist` (version 2.2 or later). The server renders its frame, the keyboard slider, the table screen readers read and the legend, and the drawing happens once the island mounts.
 
 </Callout>
 
@@ -33,6 +33,16 @@ The tooltip, the keyboard announcements and the table for screen readers still r
 `onRange(from, to)` lets a drag across the plot, or Shift with the arrow keys then Enter, pick a span and hands over the indices of its first and last points, such as to zoom in on them; Escape drops a span under way, and `rangeHint` is what screen readers are told about the keys. A `null` value in a series leaves a gap in the line.
 
 <Demo name="line-chart/range" />
+
+## Live data
+
+Give the chart a signal or a store and it updates in place on each change. The SVG, its lines and its labels stay, and only what changed is patched, so nothing flashes and no code calls an update. The code that does this loads on the first change of the data, so a chart that never changes never downloads it.
+
+`pointKey` says what identifies a point from one update to the next. A series that gains points on the right and loses them on the left moves its points when they are followed by `'label'`, which is the default while every label is different, and redraws them when followed by `'index'`. A function gets `{ series, index, label }` and returns what identifies the point.
+
+`animate` moves the lines and points from the old data to the new on each update. It is off by default, and stays off for visitors whose system asks for reduced motion.
+
+<Demo name="line-chart/live" />
 
 ## Keyboard and screen readers
 

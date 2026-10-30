@@ -1,0 +1,19 @@
+---
+// kay-island
+import Button from '@kaynooo/kayjs-ui/button.kay'
+import LineChart from '@kaynooo/kayjs-ui/line-chart.kay'
+
+const days = signal(['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'])
+const visits = signal([120, 180, 150, 210, 260, 190, 240])
+const counter = { day: 0 }
+
+// A point added on the right and one dropped on the left, as a feed would.
+function roll() {
+  counter.day += 1
+  days = [...days().slice(1), `Day ${counter.day}`]
+  visits = [...visits().slice(1), 100 + Math.round(Math.random() * 160)]
+}
+---
+.flex.max-w-xl.flex-col.gap-2
+  LineChart(label="Visits, a point at a time" labels={days()} series={[{ name: 'Visits', values: visits() }]} xLabels animate)
+  Button(label="Add a point" onClick={roll})

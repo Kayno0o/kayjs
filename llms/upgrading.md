@@ -2,6 +2,13 @@
 
 What each minor release breaks, and what an app changes to move to it. kay and its libraries share one version, so one section covers them all; a patch breaks nothing, and a minor missing here broke nothing.
 
+## 1.85.0
+
+### kayjs-ui's `LineChart` needs chartist 2.2
+
+- The `chartist` peer is `^2.2.0` (was `^2.0.0`): `bun update chartist` before upgrading kayjs-ui. `LineChart` updates in place through `chartist/live`, which 2.0 and 2.1 lack. `kay check` cannot recognise a chartist version, so there is no deprecated lint.
+- A 1.x plugin in a `LineChart`'s `options.plugins` still goes through `fromLegacyPlugin` from `chartist/compat`, which makes that chart redraw on each update, as chartist replaces the output of a chart with a legacy plugin.
+
 ## 1.84.0
 
 ### kayjs-ui's `LineChart` needs chartist 2
