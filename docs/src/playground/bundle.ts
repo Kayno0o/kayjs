@@ -4,8 +4,8 @@ import { brotliCompress } from 'node:zlib'
 
 const compress = promisify(brotliCompress)
 
-export interface Bundled {
-  text: string | Uint8Array<ArrayBuffer>
+export interface Bundled<Body extends string | Uint8Array<ArrayBuffer> = string> {
+  text: Body
   brotli: Uint8Array<ArrayBuffer>
   // One validator per encoding, as the plain and the brotli body are different representations.
   etag: string
@@ -57,10 +57,10 @@ const wasmParser: Bun.BunPlugin = {
 }
 
 // The WebAssembly build of the parser as the browser fetches it, read and compressed once, under validators that change with its bytes: the playground revalidates it as it does the bundles, so a second open costs a 304.
-export function parserWasm(): () => Promise<Bundled> {
-  let kept: Promise<Bundled> | undefined
+export function parserWasm(): () => Promise<Bundled<Uint8Array<ArrayBuffer>>> {
+  let kept: Promise<Bundled<Uint8Array<ArrayBuffer>>> | undefined
 
-  async function read(): Promise<Bundled> {
+  async function read(): Promise<Bundled<Uint8Array<ArrayBuffer>>> {
     const text = new Uint8Array(await Bun.file(Bun.resolveSync('@oxc-parser/binding-wasm32-wasip1/wasm', import.meta.dir)).arrayBuffer())
     const hash = Bun.hash(text).toString(36)
 
@@ -131,7 +131,7 @@ function listed(header: string | null, etag: string): boolean {
 }
 
 // The body in the form the request accepts, brotli when it does, under the validator of that form.
-export function respond(request: Request, built: Bundled, headers: Record<string, string>): Response {
+export function respond(request: Request, built: Bundled<string | Uint8Array<ArrayBuffer>>, headers: Record<string, string>): Response {
   const accepted = request.headers.get('accept-encoding') ?? ''
   const brotli = BROTLI_TOKEN.test(accepted) && !BROTLI_REFUSED.test(accepted)
   const etag = brotli ? built.brotliEtag : built.etag
