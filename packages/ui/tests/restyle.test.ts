@@ -426,7 +426,7 @@ describe('the display components whose recipe holds their look', () => {
     ['widget', 'head', 'flex', 'pb-2'],
     ['widget', 'title', 'min-w-0', 'text-sm'],
     ['meter', undefined, 'bg-surface', undefined],
-    ['meter', 'fill', 'bg-red-500', 'rounded-full'],
+    ['meter', 'fill', 'rounded-full', 'bg-red-500'],
     ['skeleton', undefined, 'flex', 'opacity-60'],
     ['skeleton', 'block', 'animate-pulse', 'rounded-full'],
     ['progress', undefined, 'overflow-hidden', 'h-3'],
@@ -447,9 +447,9 @@ describe('the display components whose recipe holds their look', () => {
     expect(html).not.toMatch(REMOVED_CLASS)
   })
 
-  test('a Meter\'s fill part replaces the accent', () => {
-    expect(classesOfPart('meter', 'fill')).toContain('bg-red-500')
-    expect(classesOfPart('meter', 'fill')).not.toContain('bg-accent')
+  test('a Meter\'s fill class comes after the accent and what src/ui.ts sets', () => {
+    expect(classesOfPart('meter', 'fill').at(-1)).toBe('bg-red-500')
+    expect(classesOfPart('meter', 'fill')[0]).toBe('bg-accent')
   })
 })
 
