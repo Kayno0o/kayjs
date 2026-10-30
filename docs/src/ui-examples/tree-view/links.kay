@@ -18,5 +18,5 @@ const toggle = (id: string) => starred.set(list => list.includes(id) ? list.filt
     @trailing(node)
       if node.href
         button.cursor-pointer(type="button" aria-label={`Star ${node.label}`} aria-pressed={starred().includes(node.id) ? 'true' : 'false'} onClick={() => toggle(node.id)})
-          Icon(icon={starred().includes(node.id) ? 'check' : 'plus'})
+          Icon(icon={starred().includes(node.id) ? 'star' : 'plus'})
   p Right click a project for its menu.
