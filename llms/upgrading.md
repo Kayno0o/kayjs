@@ -10,7 +10,7 @@ What each minor release breaks, and what an app changes to move to it. kay and i
 
 ### kayjs-ui: `Meter`'s `fillClass` is deprecated
 
-- `Meter(fillClass="bg-warning")` becomes `Meter(class={{ fill: 'bg-warning' }})`, which replaces the fill's accent the same way, like the `fill` part of `Progress`. `fillClass` still works until 2.0.0, and the editor strikes it out (`@deprecated`).
+- `Meter(fillClass="bg-warning")` becomes `Meter(class={{ fill: 'bg-warning' }})`, which replaces the fill's accent the same way. `fillClass` still works until 2.0.0 (`@deprecated`). No lint carries it: `kay check` does not resolve a library component's props in a template.
 
 ### kayjs-ui: `MenuAction.danger` and `Toast.type` are deprecated
 
