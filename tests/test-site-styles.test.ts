@@ -31,6 +31,15 @@ it('a theme variable only a built name reads ships from @theme static', async ()
   await site.close()
 }, 60_000)
 
+it('css() skips a stylesheet of another site', async () => {
+  await Bun.write(`${root}/src/routes/_layout.kay`, `---\nimport '../app.css'\n---\nhead\n  link(rel="stylesheet" href="https://fonts.example/x.css")\nslot\n`)
+
+  const site = await testSite({ root, styles: true })
+
+  expect(await (await site.visit('/')).css()).toContain('--color-used')
+  await site.close()
+}, 60_000)
+
 it('css() of a site without styles says how to ask for it', async () => {
   const site = await testSite({ root })
   const page = await site.visit('/')

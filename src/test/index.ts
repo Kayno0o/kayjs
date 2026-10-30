@@ -343,7 +343,13 @@ export async function testSite(options: TestOptions = {}): Promise<TestSite> {
           const sheets = reading.find('style').map(style => style.html)
 
           for (const link of reading.find('link[rel~=stylesheet]')) {
-            const response = await send(link.attributes.href ?? '', {})
+            const href = new URL(link.attributes.href ?? '', new URL(path, ORIGIN))
+
+            // A stylesheet of another site is not this app's to answer.
+            if (href.origin !== ORIGIN)
+              continue
+
+            const response = await send(href.pathname + href.search, {})
 
             if (response.status !== 200)
               throw new Error(`kay: the stylesheet ${link.attributes.href} answered ${response.status}`)
