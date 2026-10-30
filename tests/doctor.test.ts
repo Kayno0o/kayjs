@@ -6,6 +6,7 @@ import { afterAll, describe, expect, it } from 'bun:test'
 import { version } from '../package.json'
 import { manifestOf } from '../src/commands/doctor'
 import { readManifest, writeManifest } from '../src/server/client'
+import { freePort } from './free-port'
 import { scratchDir } from './scratch'
 
 const cli = join(import.meta.dir, '../src/cli.ts')
@@ -68,13 +69,15 @@ function hasIpv6(): boolean {
 describe('kay doctor', () => {
   it('passes a healthy project, one check per line in the same order in text and JSON, exiting 0', async () => {
     const root = await project()
-    const result = await doctor(root)
+    // The port is a free one rather than 3000, which a developer's own app may hold.
+    const port = String(freePort())
+    const result = await doctor(root, [], { PORT: port })
 
     expect(result.code, result.stderr).toBe(0)
     expect(result.checks.map(check => check.name)).toEqual(['bun', 'versions', 'config', 'env', 'port', 'build'])
     expect(result.checks.every(check => check.ok)).toBe(true)
 
-    const text = Bun.spawnSync([process.execPath, cli, 'doctor'], { cwd: root, env: { PATH: process.env.PATH! } })
+    const text = Bun.spawnSync([process.execPath, cli, 'doctor'], { cwd: root, env: { PATH: process.env.PATH!, PORT: port } })
     const lines = text.stdout.toString().trimEnd().split('\n')
 
     expect(text.exitCode).toBe(0)

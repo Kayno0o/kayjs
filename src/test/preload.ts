@@ -1,3 +1,4 @@
+import process from 'node:process'
 import { copyTestDatabase } from './database'
 import { isolateEnv } from './env'
 import { testRoot } from './root'
@@ -13,6 +14,8 @@ import './timeout'
 // The developer's own `.env` is dropped first, and kay's server code imported after, so no module reads it.
 // The project is the working directory, or `KAY_ROOT` when it is nested, such as a library's fixture app.
 isolateEnv()
+// The servers this process spawns end with it, as `kay/server` reads from this.
+process.env.KAY_TEST_PARENT = String(process.pid)
 
 const { registerLoader } = await import('../server/loader')
 const { lazyNativePlugins } = await import('./lazy-plugins')

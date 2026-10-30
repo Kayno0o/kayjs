@@ -26,6 +26,23 @@ function pending(): Map<AnyElysia, number> {
   return (globalThis as Holder)[PENDING] ??= new Map()
 }
 
+// A server a test run started ends with the test process that started it, even when it was killed outright (the OOM killer, SIGKILL) and could stop nothing: `kay/test`'s preload names its process in `KAY_TEST_PARENT`, which the processes it spawns inherit.
+function endWithTestParent(): void {
+  const parent = Number(process.env.KAY_TEST_PARENT)
+
+  if (!Number.isInteger(parent) || parent <= 0 || parent === process.pid)
+    return
+
+  setInterval(() => {
+    try {
+      process.kill(parent, 0)
+    }
+    catch {
+      process.exit(1)
+    }
+  }, 1000).unref()
+}
+
 // Records the servers started through `Bun.serve`, which Elysia's `listen` goes through too.
 function serves(): Served[] {
   const holder = globalThis as Holder
@@ -35,6 +52,7 @@ function serves(): Served[] {
     const started: Served[] = []
 
     holder[SERVES] = started
+    endWithTestParent()
     Bun.serve = ((...args: Parameters<typeof Bun.serve>) => {
       const options = args[0] as { fetch?: unknown, port?: unknown }
 
