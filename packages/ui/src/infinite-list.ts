@@ -285,19 +285,17 @@ export function infiniteList<Row, Target extends Action<never, unknown> = never>
         }
       }
 
-      // The first run only learns what to follow.
-      if (!watching) {
-        watching = true
+      // The first run restarts nothing, but a page that gave other rows before it ran still replaces them.
+      const initial = !watching
 
-        return
-      }
+      watching = true
 
       untrack(() => {
         if (next !== current) {
           current = next
           reset(next)
         }
-        else {
+        else if (!initial && follows !== undefined) {
           void restart({})
         }
       })

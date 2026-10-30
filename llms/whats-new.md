@@ -10,6 +10,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 - Kay's tsconfig includes `scripts`, so a script run with `bun scripts/x.ts` is type checked and linted with no `include` in the app: [project](project.md).
 - `kay lint --cache` drops ESLint's cache when `tsconfig.json` or a file under `.kay/types` changed, so a parsing error does not outlive the tsconfig that caused it: [checks](checks.md).
 - `infiniteList` in a `persist` island starts over when the next page changes what it follows: the props an action source's function `input` reads, or first rows given as a function (`infiniteList(() => rows, ...)`): [kayjs-ui infinite lists](../packages/ui/llms/infinite-list.md).
+- `infiniteList` starts over when what it follows changes, as the props a `persist` island gets from the next page: the props an action source's function `input` reads, or first rows given as a function (`infiniteList(() => rows, ...)`): [kayjs-ui infinite lists](../packages/ui/llms/infinite-list.md).
 - A dom test and the component it mounts share the modules the component imports from the project and from packages, a signal store included: `mock.module()` reaches its static and dynamic imports, and a value the test sets, or imports from one of the project's files, is the component's: [testing](testing.md).
 - `testSite()` boots an app with `offline` before `kay build` has written `.kay/client`, so `bun run test` runs on a fresh clone and in CI: `/sw.js` answers with a worker listing no build files: [testing](testing.md).
 

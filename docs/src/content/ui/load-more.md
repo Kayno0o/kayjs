@@ -30,7 +30,9 @@ The table's `sort` and the URL's `sortParam` sort reach the list too, and a sort
 
 ## Over an action
 
-In an island marked `persist`, the list follows the props the next page gives it. An action source whose `input` is a function reading them starts the list over from the first page that input asks for. Pass the first rows as a function, `infiniteList(() => rows, ...)`, to start the list over from new rows when the `rows` prop changes. A list made from a plain array and an `input` that reads no prop keeps its rows: give the island another `persist` value for each input.
+A list follows what it reads, which the props a `persist` island gets from the next page change. An action source whose `input` is a function reading a signal or a prop starts over from the first page that input asks for.
+
+Pass the first rows as a function, `infiniteList(() => rows, ...)`, to start over from new rows when the `rows` prop changes. A plain array and an `input` that reads nothing keep the rows: give the island another `persist` value for each input.
 
 An action loading the pages replaces `load`: `infiniteList(first, { pageSize, key, action: listPeople, input: { team }, failure: 'Could not load people.' })`. Each page calls it with `{ refresh: false }` through `attempt`, so a failed call toasts `failure` and fails the page. `input` holds the call's other fields; `offset` and `limit` are added from the page.
 

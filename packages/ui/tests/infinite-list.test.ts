@@ -369,4 +369,31 @@ describe('infiniteList following its island', () => {
     expect(calls).toEqual([{ repo: 'b', offset: 0, limit: 3 }])
     expect(list.rows().map(row => row.id)).toEqual([100, 101, 102])
   })
+
+  test('rows changed before the effect first ran still replace the first ones', () => {
+    const given = signal(bans(1, 3))
+    const list = infiniteList(() => given(), { pageSize: 3, load: source().load })
+
+    given.set(bans(10, 3))
+    flush()
+
+    expect(list.rows().map(row => row.id)).toEqual([10, 11, 12])
+  })
+
+  test('function rows that stay the same keep the loaded pages', async () => {
+    const other = signal(0)
+    const rows = bans(1, 3)
+    const list = infiniteList(() => {
+      other()
+
+      return rows
+    }, { pageSize: 3, load: source(bans(4, 3)).load })
+
+    flush()
+    await list.more()
+    other.set(1)
+    flush()
+
+    expect(list.rows()).toHaveLength(6)
+  })
 })
