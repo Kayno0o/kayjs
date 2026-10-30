@@ -1,0 +1,5 @@
+---
+import { tone } from './cookie'
+---
+button.mauve(onClick={() => tone.set('mauve')}) Mauve
+p.tone {tone()}

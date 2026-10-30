@@ -291,6 +291,29 @@ describe('a mounted component and the modules it imports', () => {
     expect(root.querySelector('.kind')!.textContent).toBe('undefined')
     unmount()
   })
+
+  it('writes the cookie of a module-level persisted signal made before the DOM existed', async () => {
+    await GlobalRegistrator.unregister()
+
+    const { tone } = await import('./fixtures/mount/shared/cookie')
+
+    GlobalRegistrator.register({ url: 'http://localhost/' })
+
+    try {
+      const { root, unmount } = await mountComponent(await imported('cookie.kay'))
+
+      root.querySelector<HTMLButtonElement>('.mauve')!.click()
+      await settle()
+      expect(tone()).toBe('mauve')
+      expect(root.querySelector('.tone')!.textContent).toBe('mauve')
+      expect(document.cookie).toContain('shared-tone=')
+      unmount()
+    }
+    finally {
+      await GlobalRegistrator.unregister()
+      GlobalRegistrator.register()
+    }
+  })
 })
 
 // oven-sh/bun#15997: once this fails, Bun keeps the import behind `export * from` an external module, and the rewrite in `sharedModules` can go (#2703).

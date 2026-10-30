@@ -51,9 +51,18 @@ export function keepValue<T>(key: string, storage: Exclude<PersistStorage, 'quer
 
 // A signal kept in `store`, around its own `read` and `write`: the browser writes what the store holds into it as it starts, or on its first read once hydrated, then keeps each value written.
 export function keep<T>(store: Store<T>, read: () => T, write: (value: T) => void): Persisted<T> {
-  if (typeof KAY_BROWSER === 'undefined' && typeof document === 'undefined')
-    return serverSide(store.request, read)
+  if (typeof KAY_BROWSER !== 'undefined')
+    return inBrowser(store, read, write)
 
+  // Outside a browser build the page is told apart on use, not on creation: a module made before a test registers its DOM keeps its signal then.
+  const server = serverSide(store.request, read)
+  let browser: Persisted<T> | undefined
+  const current = () => typeof document === 'undefined' ? server : browser ??= inBrowser(store, read, write)
+
+  return { read: () => current().read(), save: value => current().save(value) }
+}
+
+function inBrowser<T>(store: Store<T>, read: () => T, write: (value: T) => void): Persisted<T> {
   const load = () => {
     const stored = store.stored()
 
