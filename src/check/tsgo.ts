@@ -159,7 +159,7 @@ export async function typecheck(root: string, tsconfig: string, shown: string | 
   const checked = last && await stillClean(last, shadowDir)
 
   if (checked?.clean)
-    return last.result ?? { output: '', errors: '', code: 0 }
+    return last?.result ?? { output: '', errors: '', code: 0 }
 
   const obsolete = dropObsoleteState(state)
   const generated = checked?.hashes ?? await contentHashes(shadowDir)
