@@ -81,6 +81,22 @@ describe('an action a page exports', () => {
   })
 })
 
+describe('an action an _actions module exports', () => {
+  const site = testSite({ root: 'tests/fixtures/island-action', islands: false })
+
+  afterAll(async () => {
+    await (await site).close()
+  })
+
+  it('is bounded as the ones a page exports are', async () => {
+    const { shared } = await import(join(import.meta.dir, 'fixtures/island-action/src/routes/_actions.kay')) as { shared: Action<{ note: string }, string> }
+    const served = await site
+
+    expect(await served.call(shared, { note: 'x'.repeat(DEFAULT_MAX_LENGTH) })).toHaveLength(DEFAULT_MAX_LENGTH)
+    await expect(served.call(shared, { note: 'x'.repeat(DEFAULT_MAX_LENGTH + 1) })).rejects.toThrow()
+  })
+})
+
 describe('a string in an API route\'s body', () => {
   const site = testSite({ root: 'tests/fixtures/island-action', islands: false })
 

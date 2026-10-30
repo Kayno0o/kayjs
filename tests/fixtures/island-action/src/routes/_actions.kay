@@ -1,0 +1,4 @@
+--- server
+import { action, s } from 'kay'
+
+export const shared = action(s.Object({ note: s.String() }), ({ note }) => note)
