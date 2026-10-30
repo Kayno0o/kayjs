@@ -24,7 +24,9 @@ A `value` a remote list holds no label for yet, such as the saved id of a custom
 
 An option can carry a `description`, drawn as a quieter second line under its label. It is plain data, so an action can answer it, such as a commit's author and date. The input shows the label alone once the option is picked, typing filters on the label alone, and a screen reader hears the label first and the description after it.
 
-To draw each row yourself, give the Combobox an `@option(option)` block. It replaces the label and description, and the row stays named by the option's label.
+To draw each row yourself, give the Combobox an `@option(option)` block. It replaces the label and description, and the row stays named by the option's label alone, so a screen reader does not read the rest of the block.
+
+A block cannot be sent to the browser as data, so a Combobox given one renders as an island: write `// kay-island` in the component using it.
 
 ```kay
 Combobox(label="Commit" options={findCommits})
@@ -45,6 +47,6 @@ Enter picks the active row, Escape closes the list, even one with no rows, and, 
 
 ## Props and labels
 
-`label` names the input for screen readers, unless a FormField labels it, in which case the FormField's label text alone names it, not the status line nor the rows. 
+`label` names the input for screen readers, unless a FormField labels it, in which case the FormField's label text alone names it, not the status line nor the rows.
 
 `id` is the listbox's id. `createLabel(text)`, `loadingLabel`, `emptyLabel` and `failureLabel` replace the texts, which read `Create "text"`, `Loading…`, `No match` and `Could not load the options`. The other attributes land on the input, and `class` on the wrapper or, as an object, on its parts: `list`, `option`, `optionLabel`, `optionDescription` and `status`.
