@@ -104,6 +104,7 @@ async function settledWithin(work: Promise<void>, ms: number) {
 // Runs one step in a process group of its own, its output going to the log as it comes, and fails the landing on its failed tests and last lines, or on where it stood once it ran past STEP_LIMIT_MS.
 async function step(label: string, argv: string[], cwd = '.') {
   const started = performance.now()
+  const before = scopeMemory()
 
   process.stdout.write(`${label}: `)
   await appendFile(LOG, `$ ${label}\n`)
@@ -141,7 +142,7 @@ async function step(label: string, argv: string[], cwd = '.') {
   await settledWithin(drained, DRAIN_MS)
   // A process left holding the pipe would otherwise keep the landing alive once it is done.
   await reader.cancel()
-  await appendFile(LOG, `\n(${describeScope(scopeMemory())})\n\n`)
+  await appendFile(LOG, `\n(${describeScope(scopeMemory(), before)})\n\n`)
 
   const seconds = Math.round((performance.now() - started) / 1000)
 
@@ -158,7 +159,7 @@ async function step(label: string, argv: string[], cwd = '.') {
   const crashed = crashedWorkers(lines).map(({ file, signal }) => `${file}: its worker was killed (${signal}) while it ran, which ${signal === 'SIGKILL' ? 'is the kernel stopping it for memory unless something else sent it, so not that file\'s own failure' : 'is not a failed test'}`)
 
   if (crashed.length > 0 || exitCode === 137)
-    crashed.push(describeScope(scopeMemory()))
+    crashed.push(describeScope(scopeMemory(), before))
 
   console.error([...failures, ...crashed, lines.slice(failures.length > 0 ? -SUMMARY : -TAIL).join('\n')].filter(Boolean).join('\n\n'))
   fail(hung ? `${label} ran past ${STEP_LIMIT_MS / 1000} s, so it was killed with what it started: its output up to then is in ${LOG}` : `${label} exited with ${exitCode}: its whole output is in ${LOG}`, EXIT.step)

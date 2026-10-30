@@ -31,6 +31,12 @@ export function scopeMemory(): ScopeMemory | undefined {
 
 const MB = 1024 * 1024
 
-export function describeScope(memory: ScopeMemory | undefined): string {
-  return memory === undefined ? 'the scope\'s memory is not readable here' : `the scope's memory.peak is ${Math.round(memory.peak / MB)} MB and the kernel has killed ${memory.oomKills} of its processes for the limit`
+// The peak and the kills count the whole scope since it started, a session's other work included, so a step names the kills it saw itself.
+export function describeScope(memory: ScopeMemory | undefined, before?: ScopeMemory): string {
+  if (memory === undefined)
+    return 'the scope\'s memory is not readable here'
+
+  const during = before === undefined ? '' : `, ${memory.oomKills - before.oomKills} of them during this step`
+
+  return `the scope's memory.peak is ${Math.round(memory.peak / MB)} MB and the kernel has killed ${memory.oomKills} of its processes for the limit${during}`
 }
