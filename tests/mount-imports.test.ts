@@ -330,3 +330,24 @@ it('still drops the import of an external module behind export * when bundling, 
   await Bun.write(out, await result.outputs[0]!.text())
   await expect(import(out)).rejects.toThrow('core is not defined')
 })
+
+describe('a package whose package.json cannot be read', () => {
+  it('bundles a package whose package.json cannot be read, with a note', async () => {
+    const at = await project({
+      'node_modules/bare/index.js': 'export const n = 1\n',
+      'page.kay': '---\nimport { n } from \'bare\'\n---\np.n {n}\n',
+    })
+    const warn = spyOn(console, 'warn').mockImplementation(() => undefined)
+
+    try {
+      const { root, unmount } = await mountComponent(await componentAt(at('page.kay')))
+
+      expect(root.querySelector('.n')!.textContent).toBe('1')
+      unmount()
+      expect(warn.mock.calls.flat().join('\n')).toContain(`cannot read ${at('node_modules/bare/package.json')}`)
+    }
+    finally {
+      warn.mockRestore()
+    }
+  })
+})

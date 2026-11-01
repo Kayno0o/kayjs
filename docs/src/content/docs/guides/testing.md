@@ -240,7 +240,7 @@ const real = { ...await import('../src/payments') }
 afterEach(() => mock.module('../src/payments', () => real))
 ```
 
-A persisted signal in such a module reads storage the first time it is read. Call `writePersisted` before the first mount, and set the signal after that. The DOM has to exist when the module loads, or the signal behaves as it does on the server, so import `kay/test/dom` first. For the same reason, a module that keeps `document` or `localStorage` from the moment it loads holds on to the DOM of the first file that loaded it.
+A persisted signal in such a module reads storage the first time it is read. Call `writePersisted` before the first mount, and set the signal after that. The DOM has to exist when the module loads, or the signal behaves as it does on the server, so import `kay/test/dom` first. For the same reason, one of your modules reading `document` or `localStorage` when it loads is shared like any other, so it holds on to the DOM of the first test file that loaded it. Read them inside a function instead.
 
 Some code stays inside the component's browser build and starts fresh with each mount: the component's own `.kay` file, any module that reaches a `.kay` file (a `.ts` file re-exporting a component too), an API module, a package that picks its entry by the `browser` condition, and kay's libraries such as kayjs-ui, whose toasts begin empty. A persisted signal you declare in the component itself reads storage as it is at each mount.
 

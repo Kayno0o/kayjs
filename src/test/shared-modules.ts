@@ -12,7 +12,7 @@ const LIBRARY_FOLDER = /[\\/]node_modules[\\/](?:@kaynooo[\\/])?kayjs-/
 // The names `mountComponent` defines for the bundle: a file of kay reading one is built for the app's settings, so the bundle keeps its own copy of it.
 const DEFINED = /\bKAY_(?:FRENCH|I18N)\b/
 // A file of kay reading the page keeps it per mount: what it holds of the document it first met, a listener or the tab's visibility, restarts as it does on a page load. The reactive core and the modules built on it alone are what the test and the bundle share.
-const READS_PAGE = /\b(?:document|window|localStorage|sessionStorage|navigator|location|history|matchMedia|requestAnimationFrame|IntersectionObserver|MutationObserver|ResizeObserver|getComputedStyle|addEventListener|HTMLElement|Element|Node)\b/
+const READS_PAGE = /\b(?:document|window|localStorage|sessionStorage|navigator|location|history|matchMedia|requestAnimationFrame|IntersectionObserver|MutationObserver|ResizeObserver|getComputedStyle|addEventListener|HTML\w*Element|Element|Node)\b/
 const LINE_COMMENT = /^\s*(?:\/\/|\*|\/\*).*$/gm
 // Bun words its refusal of a builtin in a browser build only when no plugin saw the import.
 const NOT_BUILTIN = /^(?!(?:node|bun):)/
@@ -89,6 +89,7 @@ function selectsByBrowser(resolved: string): boolean {
     }
     catch {
       known = true
+      console.warn(`kay/test: cannot read ${resolve(dir, 'package.json')}, so the bundle carries ${dir} instead of sharing it with the test`)
     }
 
     packages.set(dir, known)
@@ -216,6 +217,11 @@ function reach(specifier: string, from: string, fromKay: boolean, fromLibrary: b
     return selectsByBrowser(resolved) ? false : undefined
 
   return resolved
+}
+
+// Whether a file of kay passes its own scan, before what it imports: the test reading READS_PAGE over kay's real files asks it.
+export function kayFileIsShared(path: string): boolean {
+  return scan(path).ok
 }
 
 // Whether a file, and every file of the project or of kay's runtime it imports, may be the test process's own instance in place of a copy in the bundle. Checking each file alone keeps a cycle from being judged half-walked.
