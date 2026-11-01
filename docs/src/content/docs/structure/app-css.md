@@ -22,7 +22,7 @@ With Tailwind, registered in [`kay.config.ts`](/structure/kay-config), it needs 
 
 `@import`, nesting and relative `url()` assets work in it, as in any stylesheet a component imports. kayjs-ui's theme is imported right after Tailwind, and an `@theme` block below overrides its tokens.
 
-Tailwind writes only the `@theme` variables that something uses. A utility class uses one, and so does a `var(--color-accent)` written out in a file. A variable read only through a name built at runtime is dropped, with no warning:
+Tailwind writes only the `@theme` variables that something uses. A utility class uses one, and so does a `var(--color-accent)` written out in a file. A variable read only through a name built at runtime is dropped, and the build warns of it, naming the file and line:
 
 ```kay
 circle(style={`stroke: var(--color-lane-${n})`})

@@ -47,6 +47,7 @@ import { forgetBundleMaps, keepBundleMap } from './sourcemap'
 import { styleUses } from './style-uses'
 import { styleImports, withoutStyles } from './styles'
 import { mergingSupports } from './supports'
+import { warnBuiltThemeVariables } from './theme-vars'
 import { analyzeKayCached, KayCompileError, keepAnalyses } from './transform'
 import { UI_FILE } from './ui'
 
@@ -705,6 +706,10 @@ async function bundleStyles(root: string, { pages, libraries, classes, shorthand
   const server: UnresolvedClass[] = []
   const markup = reached.open.size > 0 ? await findProjectFiles(root, MARKUP_FILE, { project: true, ownKayOnly: true }) : []
   const cssOutputs = await Promise.all(build.outputs.filter(output => CSS_FILE.test(output.path)).map(async output => ({ path: output.path, text: await Bun.file(output.path).text() })))
+
+  if (options.hot !== true)
+    await warnBuiltThemeVariables(root, cssOutputs.map(output => output.text))
+
   const uses = styleUses(root, pages, cssOutputs.map(output => output.text), reached, shorthand, markup, {
     // kay's own runtime sets the classes of the pages it swaps in, which the pages name.
     own: file => !file.startsWith(KAY_SOURCE) && !file.includes(`${sep}node_modules${sep}`) && !libraries.some(library => file.startsWith(`${library.dir}${sep}`) || file.startsWith(`${library.realDir}${sep}`)),

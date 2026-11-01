@@ -20,7 +20,7 @@ article.card
 
 `src/app.css`, imported by the root `_layout.kay`, needs nothing more than `@import 'tailwindcss';`.
 
-Tailwind 4 writes only the `@theme` variables a utility or a literal `var(--x)` in a scanned file uses, so a variable read only by a name built at runtime (`style={`stroke: var(--color-lane-${n})`}`) is dropped from the CSS with no warning: declare it in `@theme static { }`, or in `:root`, which are always written. A test sees the built CSS with `testSite({ styles: true })` and `await page.css()` ([testing](testing.md)).
+Tailwind 4 writes only the `@theme` variables a utility or a literal `var(--x)` in a scanned file uses, so a variable read only by a name built at runtime (`style={`stroke: var(--color-lane-${n})`}`) is dropped from the CSS, and the build warns of it: declare it in `@theme static { }`, or in `:root`, which are always written. A test sees the built CSS with `testSite({ styles: true })` and `await page.css()` ([testing](testing.md)).
 
 ### Override a class a component sets
 
