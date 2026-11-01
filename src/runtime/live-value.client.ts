@@ -299,6 +299,19 @@ function apply(updates: LiveUpdate[]): void {
   }
 }
 
+const warned = new Set<string>()
+
+// A keyed value read in an effect or a handler is not in the page's proof, since only the render's reads are, so no connection follows it.
+function warnUnnoted(id: string, key: string): void {
+  const at = `${id}\0${key}`
+
+  if (warned.has(at))
+    return
+
+  warned.add(at)
+  console.warn(`[kay] the keyed live value ${id} is read for ${key} in the browser, but the page's render never read it, so it is not followed. Read it in the template, such as a \`data-stamp\` attribute, for the page to follow it.`)
+}
+
 export function browserLive(id: string, initial: unknown): Handle {
   const keyed = typeof initial === 'function'
   const known = browserSlots.get(id)
@@ -314,8 +327,12 @@ export function browserLive(id: string, initial: unknown): Handle {
   const read = (key: string): unknown => {
     const entry = entryOf(slot, key)
 
-    if (tracking())
+    if (tracking()) {
       watch(slot, key, entry)
+
+      if (process.env.NODE_ENV !== 'production' && keyed && !entry.rendered)
+        warnUnnoted(id, key)
+    }
 
     if (isHydrating() && entry.rendered) {
       entry.hydrated()

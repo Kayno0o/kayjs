@@ -4,6 +4,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 
 ## Unreleased
 
+- `kay dev` warns in the browser console of a keyed live value an island reads only in an effect, which the page's render never noted and so no connection follows: [live values](live-values.md).
 - kayjs-ui's Menu and Popover opened `at` a point wait for the release of a pointer button held at that moment, so a context menu opened by Linux's `contextmenu` on the right press stays open: [tabs and navigation](../packages/ui/llms/tables-navigation-and-layout.md).
 - kayjs-ui's SiteNav, TabNav and TreeView compare the page's address with each link as the site renders it, so the current link is marked on a page of a prefixed locale, with a trailing slash on the address ignored: [tabs and navigation](../packages/ui/llms/tables-navigation-and-layout.md).
 - The Forgejo CI workflow `kay new` and `kay add ci` write runs on an Alpine runner image with bun and git baked in, as on `debian`: its install step adds only the missing `git` and `unzip` (with `apt-get` or `apk`) and Setup Bun is skipped when bun is already there: [project new and add](project-new-and-add.md).

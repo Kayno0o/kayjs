@@ -31,7 +31,7 @@ visitors.set(n => n + 1)
 room.set('lobby', { id: 'lobby', users: 3 })
 ```
 
-- Read by calling it, in a template or an island, as a signal is; `room(id)` reads one key. A component reading one is an island, so a page reading none ships no JS and opens no connection.
+- Read by calling it, in a template or an island, as a signal is; `room(id)` reads one key. A keyed value is followed only for the keys the island's render read: one read only in an effect, which the server does not run, is not followed, and `kay dev` warns in the browser console; show it in the template, such as a `data-stamp` attribute, for the page to follow it. A component reading one is an island, so a page reading none ships no JS and opens no connection.
 - Written with `set` on the server only: a `.set` or `.delete` outside a server fence is a compile error, an assignment too, and in a browser it throws.
 - Declare it as `export const name = live(...)` at the top of a module; the build names it from its path, so the server and the browser agree.
 
