@@ -3,6 +3,9 @@ import type { IconSlot } from './defaults'
 import type { MenuEntry } from './menu'
 import { currentTab } from './tab-nav'
 
+// A path of the site: one slash, not two, which would name another host.
+const LOCAL_PATH = /^\/(?!\/)/
+
 export type TreeId = string | number
 
 // A node of a TreeView, a branch when it has children, even an empty list of them.
@@ -66,7 +69,7 @@ export function treeHere<Id extends TreeId>(nodes: readonly TreeNode<Id>[], curr
 
   const collect = (list: readonly TreeNode<Id>[]) => {
     for (const node of list) {
-      if (node.href?.startsWith('/'))
+      if (node.href !== undefined && LOCAL_PATH.test(node.href))
         linked.push(node)
 
       if (node.children)

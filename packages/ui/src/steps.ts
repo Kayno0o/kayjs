@@ -2,6 +2,7 @@
 
 import type { Duration } from 'kay'
 import { durationMs } from 'kay'
+import { ORIGIN } from './tab-nav'
 
 export interface StepItem<Key extends string = string> {
   key: Key
@@ -43,7 +44,7 @@ const UNSAFE_KEYS = new Set(['__proto__', 'constructor', 'prototype'])
 
 // The page at `url` with its `step` param set to `key`, every other param kept and the hash dropped.
 export function stepHref(url: string | URL, key: string, param: string = STEP_PARAM): string {
-  const next = new URL(url, 'http://kay.invalid')
+  const next = new URL(url, ORIGIN)
 
   next.searchParams.set(param, key)
 
@@ -54,7 +55,7 @@ export function stepHref(url: string | URL, key: string, param: string = STEP_PA
 export function currentStep<Key extends string>(url: string | URL, keys: readonly Key[], done: readonly string[] = [], param: string = STEP_PARAM): Key {
   const open = keys.findIndex(key => !done.includes(key))
   const furthest = open === -1 ? keys.length - 1 : open
-  const asked = keys.indexOf(new URL(url, 'http://kay.invalid').searchParams.get(param) as Key)
+  const asked = keys.indexOf(new URL(url, ORIGIN).searchParams.get(param) as Key)
 
   return keys[asked === -1 || asked > furthest ? furthest : asked]!
 }

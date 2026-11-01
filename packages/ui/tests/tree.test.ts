@@ -67,6 +67,8 @@ describe('treeHere', () => {
     { id: 'all', label: 'All', href: '/projects' },
     { id: 'group', label: 'Group', children: [{ id: 'beta', label: 'Beta', href: '/projects/beta' }, { id: 'list', label: 'List', href: '/projects/beta?view=list' }, { id: 'anchor', label: 'Anchor', href: '#top' }] },
     { id: 'home', label: 'Home', href: '/' },
+    { id: 'slashed', label: 'Slashed', href: '/docs/' },
+    { id: 'outside', label: 'Outside', href: '//example.com/outside' },
   ]
   const at = (address: string) => treeHere(linked, new URL(address, 'http://kay.invalid'))
 
@@ -78,8 +80,12 @@ describe('treeHere', () => {
     expect([at('/projects/beta?view=list'), at('/projects/beta?view=grid'), at('/projects/beta?page=2&view=list')]).toEqual(['list', 'beta', 'list'])
   })
 
-  test('reads a trailing slash on the page as the same page', () => {
-    expect(at('/projects/beta/')).toBe('beta')
+  test('reads a trailing slash on the page, or on the href, as the same page', () => {
+    expect([at('/projects/beta/'), at('/docs'), at('/docs/')]).toEqual(['beta', 'slashed', 'slashed'])
+  })
+
+  test('never matches a protocol-relative href, which names another host', () => {
+    expect(at('//example.com/outside')).toBeUndefined()
   })
 
   test('gives nothing for a page no href names, a hash-only href never naming one', () => {

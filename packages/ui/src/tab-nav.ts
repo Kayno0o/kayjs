@@ -1,8 +1,8 @@
 import { withBase } from 'kay'
 import { localize } from 'kay/i18n'
 
-// Stands in for the origin while a relative `current` is read as a URL; nothing outside this file sees it.
-const ORIGIN = 'http://kay.invalid'
+// Stands in for the origin while a relative address is read as a URL.
+export const ORIGIN = 'http://kay.invalid'
 
 const TRAILING_SLASH = /\/$/
 

@@ -1948,6 +1948,9 @@ function currentTab(links: readonly TabLink[], current: string | URL): string | 
 [./lib/tab-nav] keptHref
 function keptHref(href: string, current: string | URL, keep: readonly string[]): string
 
+[./lib/tab-nav] ORIGIN
+const ORIGIN: "http://kay.invalid"
+
 [./lib/tab-nav] TabLink
 interface TabLink
   also?: readonly string[] | undefined
