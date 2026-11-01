@@ -78,8 +78,12 @@ describe('treeHere', () => {
     expect([at('/projects/beta?view=list'), at('/projects/beta?view=grid'), at('/projects/beta?page=2&view=list')]).toEqual(['list', 'beta', 'list'])
   })
 
+  test('reads a trailing slash on the page as the same page', () => {
+    expect(at('/projects/beta/')).toBe('beta')
+  })
+
   test('gives nothing for a page no href names, a hash-only href never naming one', () => {
-    expect([at('/elsewhere'), at('/projects/be'), at('/projects/beta/')]).toEqual([undefined, undefined, undefined])
+    expect([at('/elsewhere'), at('/projects/be')]).toEqual([undefined, undefined])
   })
 })
 

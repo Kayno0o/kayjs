@@ -1264,7 +1264,23 @@ describe('TreeView link rows', () => {
     expect(await attributes('/tree-links', '#links a', ['href', 'aria-current'])).toEqual([{ 'href': '/tree-links', 'aria-current': 'page' }, { 'href': '/tree-links?view=b', 'aria-current': null }])
   })
 
-  test('on a page of another locale the address is not compared with the hrefs as the site prefixes them, so nothing is selected', async () => {
-    expect(await selected('/fr/tree-links')).toEqual(['false false'])
+  test('on a page of another locale the address is compared with the hrefs as the site prefixes them', async () => {
+    expect(await selected('/fr/tree-links')).toEqual(['false true', 'true null', 'false null'])
+  })
+})
+
+describe('the current link of a nav on a page of another locale', () => {
+  const marked = async (path: string, selector: string) => (await attributes(path, selector, ['href', 'aria-current'])).map(link => `${link.href} ${link['aria-current']}`)
+
+  test('every nav compares the page with the hrefs as the site renders them', async () => {
+    for (const [path, prefix] of [['/nav-locale', ''], ['/fr/nav-locale', '/fr']] as const) {
+      expect(await marked(path, '#site a')).toEqual([`${prefix}/nav-locale page`, `${prefix}/nav-locale-sub null`])
+      expect(await marked(path, '#tabs a')).toEqual([`${prefix}/nav-locale page`, `${prefix}/nav-locale-sub null`])
+      expect(await marked(path, '#tabs-string a')).toEqual([`${prefix}/nav-locale page`, `${prefix}/nav-locale-sub null`])
+      expect(await marked(path, '#tree a')).toEqual([`${prefix}/nav-locale page`, `${prefix}/nav-locale-sub null`])
+    }
+  })
+  test('the other page is the current one on its own address', async () => {
+    expect(await marked('/fr/nav-locale-sub', '#tabs a')).toEqual(['/fr/nav-locale null', '/fr/nav-locale-sub page'])
   })
 })

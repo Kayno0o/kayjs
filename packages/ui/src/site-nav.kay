@@ -3,6 +3,7 @@ import type { JSX } from 'kay'
 import { recipe, uid } from 'kay'
 import type { NavLink } from './defaults'
 import Icon from './icon.kay'
+import { addressHref } from './tab-nav'
 import { wording } from 'kay/words'
 
 const TRAILING_SLASHES = /\/+$/
@@ -41,7 +42,7 @@ const trimmed = (path: string) => path.length > 1 ? path.replace(TRAILING_SLASHE
 
 // The home page holds every path, so only an exact match marks it.
 function marked(href: string) {
-  const own = trimmed(href)
+  const own = trimmed(addressHref(href))
   const here = trimmed(typeof current === 'string' ? current : current.pathname)
 
   if (own === here)

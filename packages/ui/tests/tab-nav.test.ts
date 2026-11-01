@@ -27,6 +27,10 @@ describe('currentTab', () => {
     expect(currentTab(links('/settings'), '/settings?tab=1')).toBeUndefined()
   })
 
+  test('reads a trailing slash on the address as the same page', () => {
+    expect(currentTab(links('/settings', '/settings/keys'), new URL('https://example.com/settings/keys/'))).toBe('/settings/keys')
+  })
+
   test('matches a URL by its path and the params the link sets, the link setting the most winning', () => {
     const current = new URL('https://example.com/traffic?period=7d&view=table')
 

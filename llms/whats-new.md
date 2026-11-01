@@ -4,6 +4,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 
 ## Unreleased
 
+- kayjs-ui's SiteNav, TabNav and TreeView compare the page's address with each link as the site renders it, so the current link is marked on a page of a prefixed locale, with a trailing slash on the address ignored: [tabs and navigation](../packages/ui/llms/tables-navigation-and-layout.md).
 - The Forgejo CI workflow `kay new` and `kay add ci` write runs on an Alpine runner image with bun and git baked in, as on `debian`: its install step adds only the missing `git` and `unzip` (with `apt-get` or `apk`) and Setup Bun is skipped when bun is already there: [project new and add](project-new-and-add.md).
 - A bare `---` after a `--- server` or `--- module` fence that was meant as the script fence is reported with the fix, `--- script` on the line closing the first fence, which `kay check --fix` applies: [checks](checks.md).
 - An unknown `tooltip` attribute on an element names `data-tooltip` and `data-hint` in `kay check`: [checks](checks.md).

@@ -1,0 +1,16 @@
+--- server
+const here = ctx.url
+---
+---
+import SiteNav from '@kaynooo/kayjs-ui/site-nav.kay'
+import TabNav from '@kaynooo/kayjs-ui/tab-nav.kay'
+import TreeView from '@kaynooo/kayjs-ui/tree-view.kay'
+
+const links = [{ href: '/nav-locale', label: 'Here' }, { href: '/nav-locale-sub', label: 'Sub' }]
+const nodes = [{ id: 'here', label: 'Here', href: '/nav-locale' }, { id: 'sub', label: 'Sub', href: '/nav-locale-sub' }]
+---
+main
+  SiteNav#site(links={links} current={here} label="Site")
+  TabNav#tabs(links={links} current={here} label="Tabs")
+  TabNav#tabs-string(links={links} current={here.pathname} label="Tabs string")
+  TreeView#tree(nodes={nodes} label="Tree")
