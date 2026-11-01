@@ -1312,3 +1312,21 @@ describe('Combobox described rows on the server', () => {
     }
   })
 })
+
+describe('TreeView link rows under base and trailingSlash', () => {
+  test('the server marks the node whose href is the page, the base on its links and a slash ending the address', async () => {
+    const mounted = await testSite({ root: ROOT, base: '/app', trailingSlash: 'always' })
+
+    try {
+      const page = await mounted.visit('/app/tree-links/?view=b')
+      const rows = page.find('#links [role=treeitem]').map(row => attr(row, 'aria-selected'))
+      const links = page.find('#links a').map(link => `${attr(link, 'href')} ${attr(link, 'aria-current')}`)
+
+      expect(rows).toEqual(['false', 'false', 'true'])
+      expect(links).toEqual(['/app/tree-links/ null', '/app/tree-links/?view=b page'])
+    }
+    finally {
+      await mounted.close()
+    }
+  })
+})
