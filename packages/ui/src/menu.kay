@@ -45,7 +45,7 @@ const { id, items, label, icon, size = 'md', variant = 'ghost', tone, placement,
   tone?: 'neutral' | 'accent' | 'danger' | undefined
   // `bottom-end` from a trigger, `bottom-start` from a point.
   placement?: PopoverPlacement | undefined
-  // Opens the menu at this point of the window with no trigger of its own, such as the click of a context menu; the page shows it with `open` and learns of its closing in `onOpenChange`. The browser flips it to stay inside the window, and focus goes back to where it was when it closes.
+  // Opens the menu at this point of the window with no trigger of its own, such as the click of a context menu; the page shows it with `open` and learns of its closing in `onOpenChange`. The browser flips it to stay inside the window, and focus goes back to where it was when it closes. A button still held when `open` is set, the right one on Linux where `contextmenu` fires on the press, delays the opening to its release.
   at?: { x: number, y: number } | undefined
   open?: boolean | undefined
   onOpenChange?: ((open: boolean) => unknown) | undefined

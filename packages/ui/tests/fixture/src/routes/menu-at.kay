@@ -1,0 +1,11 @@
+---
+// kay-island
+import { signal } from 'kay'
+import Menu from '@kaynooo/kayjs-ui/menu.kay'
+
+const at = signal({ x: 0, y: 0 })
+const pointOpen = signal(false)
+---
+main
+  Menu(id="at-point" items={[{ label: 'First', onSelect: () => undefined }]} label="At a point" at={at()} open={pointOpen()} onOpenChange={open => pointOpen = open})
+  button#ask(onClick={() => { at = { x: 40, y: 60 }; pointOpen = true }}) Ask

@@ -1803,6 +1803,12 @@ function steppedPoint(key: string, index: number, count: number): number | undef
 [./lib/plot] valueTicks
 function valueTicks(top: number): { ratio: number; }[]
 
+[./lib/pointer-held] trackPointer
+function trackPointer(): void
+
+[./lib/pointer-held] whenReleased
+function whenReleased(show: () => void): void
+
 [./lib/popover] PopoverPlacement
 type PopoverPlacement = 'bottom-start' | 'bottom-end' | 'top-start' | 'top-end'
 

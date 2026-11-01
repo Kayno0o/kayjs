@@ -426,6 +426,38 @@ inBrowser('HoverCard and ZoomPane', () => {
   }, 120_000)
 })
 
+inBrowser('Menu opened at a point', () => {
+  test('waits for the release of a button held when it was asked to open, which would otherwise dismiss it', async () => {
+    const site = await shared()
+
+    await using page = await site.open('/menu-at')
+    const shown = () => page.evaluate(() => document.getElementById('at-point')!.matches(':popover-open'))
+    const frames = () => page.evaluate((async () => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve(true))))) as never)
+
+    await page.waitFor('#ask')
+    await page.evaluate(() => document.dispatchEvent(new PointerEvent('pointerdown', { buttons: 2 })))
+    await page.evaluate(() => document.getElementById('ask')!.click())
+    await frames()
+    expect(await shown()).toBe(false)
+    await page.evaluate(() => document.dispatchEvent(new PointerEvent('pointerup', { buttons: 0 })))
+    await frames()
+    expect(await shown()).toBe(true)
+    expect(page.errors).toEqual([])
+  }, 120_000)
+
+  test('opens at once when no button is down', async () => {
+    const site = await shared()
+
+    await using page = await site.open('/menu-at')
+
+    await page.waitFor('#ask')
+    await page.evaluate(() => document.getElementById('ask')!.click())
+    await page.evaluate((async () => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve(true))))) as never)
+    expect(await page.evaluate(() => document.getElementById('at-point')!.matches(':popover-open'))).toBe(true)
+    expect(page.errors).toEqual([])
+  }, 120_000)
+})
+
 inBrowser('LineChart tooltip', () => {
   // Hovers a chart at a pointer position and reads the tooltip's box, heading and the viewport it sits in.
   const hover = async (page: { evaluate: (...args: never[]) => Promise<unknown>, waitFor: (selector: string) => Promise<void> }, id: string, at: { x: number | 'left' | 'right', y?: number }) => {

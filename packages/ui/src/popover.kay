@@ -2,6 +2,7 @@
 import type { JSX, Snippet } from 'kay'
 import type { PopoverPlacement, PopoverTriggerProps } from './popover'
 import { effect, recipe, signal, uid } from 'kay'
+import { trackPointer, whenReleased } from './pointer-held'
 
 // 'kui-popover' stays as the component's name for an app's CSS and the always-hidden guard.
 const look = recipe({ parts: { anchor: '', root: 'kui-popover inset-auto mx-0 my-1 [position-try-fallbacks:flip-block,flip-inline] rounded-lg border-solid border-[length:var(--border-width)] border-border-strong bg-popover p-0 text-foreground data-[placement=bottom-start]:[position-area:block-end_span-inline-end] data-[placement=bottom-end]:[position-area:block-end_span-inline-start] data-[placement=top-start]:[position-area:block-start_span-inline-end] data-[placement=top-end]:[position-area:block-start_span-inline-start]' } })
@@ -23,6 +24,8 @@ const { id, open = false, placement = 'bottom-start', trigger, at, onOpenChange,
   onOpenChange?: ((open: boolean) => unknown) | undefined
 }>()
 
+trackPointer()
+
 const panelId = id ?? uid()
 const anchor = `--_popover-${panelId}`
 const shown = signal(open)
@@ -37,10 +40,18 @@ effect(() => {
 
   const now = panel.matches(':popover-open')
 
-  if (wanted && !now)
-    panel.showPopover()
-  else if (!wanted && now)
+  if (wanted && !now) {
+    const element = panel
+
+    // Opened at a point is a context menu, whose press may still be down.
+    if (at)
+      whenReleased(() => { if (open && !element.matches(':popover-open')) element.showPopover() })
+    else
+      element.showPopover()
+  }
+  else if (!wanted && now) {
     panel.hidePopover()
+  }
 })
 
 // A getter, so the snippet's spread reads `shown` itself and updates `aria-expanded` in place instead of drawing the trigger again.
