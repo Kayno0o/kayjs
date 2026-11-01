@@ -1933,6 +1933,9 @@ interface StepItem<Key extends string = string>
   key: Key
   label: string
 
+[./lib/tab-nav] addressHref
+function addressHref(href: string): string
+
 [./lib/tab-nav] currentTab
 function currentTab(links: readonly TabLink[], current: string | URL): string | undefined
 
