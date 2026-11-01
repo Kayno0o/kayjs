@@ -1323,7 +1323,7 @@ describe('TreeView link rows under base and trailingSlash', () => {
       const links = page.find('#links a').map(link => `${attr(link, 'href')} ${attr(link, 'aria-current')}`)
 
       expect(rows).toEqual(['false', 'false', 'true'])
-      expect(links).toEqual(['/app/tree-links/ null', '/app/tree-links/?view=b page'])
+      expect(links).toEqual(['/app/tree-links null', '/app/tree-links?view=b page'])
     }
     finally {
       await mounted.close()
