@@ -118,6 +118,9 @@ const waiting = () => remote && text().trim().length >= minLength && answered() 
 const offered = () => create && !waiting() && offersCreate(remote ? found() : known(), text())
 const shown = () => open() && count() > 0
 const count = () => rows().length + (offered() ? 1 : 0)
+// The description, none when it is only whitespace.
+const described = (option: ComboboxOption<Value>) => option.description?.trim() || undefined
+
 const optionId = (index: number) => `${listId}-option-${index}`
 const flags = () => [...rows().map(option => option.disabled === true), ...offered() ? [false] : []]
 
@@ -366,12 +369,12 @@ div(part="root")
   // Pressing the list, its scrollbar included, keeps focus in the input.
   ul(part="list" id={listId} role="listbox" aria-label={label} aria-busy={waiting() ? 'true' : undefined} hidden={!shown()} onMouseDown={event => event.preventDefault()})
     for option, index of rows() key={option.value}
-      li(part="option" id={optionId(index)} role="option" aria-selected={active() === index ? 'true' : 'false'} aria-disabled={option.disabled ? 'true' : undefined} aria-label={drawRow ? option.label : undefined} aria-labelledby={!drawRow && option.description ? `${optionId(index)}-label` : undefined} aria-describedby={!drawRow && option.description ? `${optionId(index)}-description` : undefined} data-picked={picked()?.value === option.value ? '' : undefined} onClick={() => pick(index)})
+      li(part="option" id={optionId(index)} role="option" aria-selected={active() === index ? 'true' : 'false'} aria-disabled={option.disabled ? 'true' : undefined} aria-label={drawRow ? option.label : undefined} aria-labelledby={!drawRow && described(option) ? `${optionId(index)}-label` : undefined} aria-describedby={!drawRow && described(option) ? `${optionId(index)}-description` : undefined} data-picked={picked()?.value === option.value ? '' : undefined} onClick={() => pick(index)})
         if drawRow
           | {drawRow(option)}
-        else if option.description
+        else if described(option)
           span(part="optionLabel" id={`${optionId(index)}-label`}) {option.label}
-          span(part="optionDescription" id={`${optionId(index)}-description`}) {option.description}
+          span(part="optionDescription" id={`${optionId(index)}-description`}) {described(option)}
         else
           | {option.label}
     if offered()

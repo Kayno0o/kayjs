@@ -1284,3 +1284,31 @@ describe('the current link of a nav on a page of another locale', () => {
     expect(await marked('/fr/nav-locale-sub', '#tabs a')).toEqual(['/fr/nav-locale null', '/fr/nav-locale-sub page'])
   })
 })
+
+describe('Combobox described rows on the server', () => {
+  test('a row with a description names itself by its label and is described by the second line', async () => {
+    const rows = await find('/combobox-described', '[role=option]')
+    const first = rows[0]!
+
+    expect(rows).toHaveLength(3)
+    expect([attr(first, 'aria-labelledby'), attr(first, 'aria-describedby')]).toEqual([`${attr(first, 'id')}-label`, `${attr(first, 'id')}-description`])
+    expect(first.html).toContain('data-part="optionLabel"')
+    expect(first.html).toContain('data-part="optionDescription"')
+  })
+
+  test('HTML in a description is escaped', async () => {
+    const html = (await visit('/combobox-described')).html
+
+    expect(html).toContain('First &lt;b>letter&lt;/b>')
+    expect(html).not.toContain('<b>letter</b>')
+  })
+
+  test('a whitespace-only description draws no second line', async () => {
+    const rows = await find('/combobox-described', '[role=option]')
+
+    for (const row of [rows[1]!, rows[2]!]) {
+      expect(row.html).not.toContain('optionDescription')
+      expect(attr(row, 'aria-describedby')).toBeNull()
+    }
+  })
+})

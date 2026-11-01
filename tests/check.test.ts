@@ -931,6 +931,23 @@ describe.concurrent('kay check, edge cases', () => {
     }
   })
 
+  it('reports a static component passing an island an `@option` block, which the island cannot take from the server', async () => {
+    const root = await scratchProject({
+      'src/routes/index.kay': '---\nimport Parent from \'../components/parent.kay\'\n---\nParent\n',
+      'src/components/parent.kay': '---\nimport Picker from \'./picker.kay\'\n---\nPicker\n  @option(item)\n    strong {item}\n',
+      'src/components/picker.kay': '---\nimport type { Snippet } from \'kay\'\nimport { signal } from \'kay\'\n\nconst count = signal(0)\nconst { option } = props<{ option: Snippet<[string]> }>()\n---\nbutton(onClick={() => count++}) {count()}\n| {option(\'a\')}\n',
+    })
+
+    try {
+      const found = (await check(root)).filter(d => d.code === 'promoted-island')
+
+      expect(found.map(d => [d.file.slice(root.length + 1), d.message.slice(0, 35)])).toEqual([['src/components/parent.kay', 'This component renders as an island']])
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
   it('reports a component passing an island what a call may return as a function, and none passing data built by a call, an icon import or a predicate callback', async () => {
     const data: Record<string, [script: string, call: string]> = {
       mapped: ['const links = [\'a\', \'b\'].map(name => ({ href: `/${name}`, label: name }))', 'Child(format={links})'],
