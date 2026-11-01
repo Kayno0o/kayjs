@@ -152,12 +152,12 @@ export async function embeddedMapCached(source: string, filename: string, code: 
   return map
 }
 
-// The island, class names and diagnostics of a component, through the same cache; only a file without errors is kept. `check` adds the problems only `kay check` reports otherwise, flagged `checkOnly`.
-export async function analyzeKayCached(source: string, filename: string, root: string, cacheDir: string, check = false, lints?: LintLevels): Promise<Analysis> {
+// The island, class names and diagnostics of a component, through the same cache; only a file without errors is kept. `component` says the file sits outside the routes, so a root `@block` in it is refused though nothing here checks types. `check` adds the problems only `kay check` reports otherwise, flagged `checkOnly`.
+export async function analyzeKayCached(source: string, filename: string, root: string, cacheDir: string, check = false, lints?: LintLevels, component = false): Promise<Analysis> {
   // The id the file goes by is part of what it compiles to, and a link may change it.
   const signals = importedSignals(filename, source)
   const kind = check ? 'analysis-check' : 'analysis'
-  const inputs = `${root}\0${throughLinks(root, filename)}\0${JSON.stringify(check ? lints ?? {} : {})}\0${JSON.stringify(signals)}\0${iconSetsKey(source, root)}\0${source}`
+  const inputs = `${root}\0${throughLinks(root, filename)}\0${JSON.stringify(check ? lints ?? {} : {})}\0${JSON.stringify(signals)}\0${iconSetsKey(source, root)}\0${component}\0${source}`
   const slot = `${kind}\0${filename}`
   const entry = cacheEntry(cacheDir, filename, kind, inputs)
   const last = analyzed.get(slot)
@@ -175,7 +175,7 @@ export async function analyzeKayCached(source: string, filename: string, root: s
     return cached
   }
 
-  const { island, promote, why, classes, actionForm, diagnostics } = compileKay(source, throughLinks(root, filename), { root, check, lints, importedSignals: signals })
+  const { island, promote, why, classes, actionForm, diagnostics } = compileKay(source, throughLinks(root, filename), { root, check, lints, importedSignals: signals, page: component ? false : undefined })
   const analysis = { island, promote, why, classes, actionForm, diagnostics }
 
   if (diagnostics.every(diagnostic => diagnostic.checkOnly)) {

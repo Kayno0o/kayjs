@@ -13,7 +13,7 @@ import { importedSignals } from '../build/signals'
 import { configCheckOptions, stopProbes, writeShadowTypes } from '../check'
 import { servedLocales } from '../check/diagnose'
 import { withoutMissingCaptcha } from '../check/project'
-import { compileShadow, layoutQueries, shadowOptionsFor } from '../check/shadow'
+import { compileShadow, layoutQueries, outerSlots, shadowOptionsFor } from '../check/shadow'
 import { programShadows } from '../check/shadow-types'
 import { formatKay } from '../compiler/format'
 import { nativeExe } from '../compiler/native-typescript'
@@ -308,7 +308,7 @@ export class KayLanguageServer implements LspHost {
     const layoutsChanged = changes.some(({ uri }) => uri.endsWith(LAYOUT_SHADOW_SUFFIX))
 
     this.server.notify('workspace/didChangeWatchedFiles', { changes })
-    // An open component that came to be rendered only by islands, or stopped being, whose project read its config again, or that takes as signals those a changed module now exports, or stops, or whose layouts above gain or drop a `query`, compiles again before the files are checked.
+    // An open component that came to be rendered only by islands, or stopped being, whose project read its config again, or that takes as signals those a changed module now exports, or stops, or whose layouts above gain or drop a `query` or a named slot, compiles again before the files are checked.
     for (const previous of this.documents.values()) {
       if (this.needsCompile(previous, options, modulesChanged, layoutsChanged))
         this.refresh(previous)
@@ -324,7 +324,7 @@ export class KayLanguageServer implements LspHost {
     return (project?.islandOnly.has(file) ?? false) !== previous.insideIsland
       || (project !== undefined && project.options !== options.get(project.root))
       || (modulesChanged && JSON.stringify(importedSignals(file, previous.source)) !== previous.signals)
-      || (layoutsChanged && project !== undefined && JSON.stringify(layoutQueries(file, previous.source, project.routesDir, project.mounts)) !== previous.queries)
+      || (layoutsChanged && project !== undefined && (JSON.stringify(layoutQueries(file, previous.source, project.routesDir, project.mounts)) !== previous.queries || JSON.stringify(outerSlots(file, previous.source, project.routesDir, project.mounts)) !== previous.slots))
   }
 
   // Writes the shadow tree of every project holding a .kay file, and returns the shadow files that came, changed and went.
@@ -427,8 +427,8 @@ export class KayLanguageServer implements LspHost {
     const { insideIsland } = compiling
     const signals = importedSignals(file, source)
     const placed = this.placed(project, file)
-    const { shadow, diagnostics, queries } = compileShadow(project.root, placed.file, source, { ...compiling, signals, shadowOf: placed.shadowOf })
-    const document = { ...shadow, uri, shadowUri: pathToFileURL(placed.shadowOf(placed.file)).href, version, diagnostics, insideIsland, signals: JSON.stringify(signals), queries: JSON.stringify(queries) }
+    const { shadow, diagnostics, queries, slots } = compileShadow(project.root, placed.file, source, { ...compiling, signals, shadowOf: placed.shadowOf })
+    const document = { ...shadow, uri, shadowUri: pathToFileURL(placed.shadowOf(placed.file)).href, version, diagnostics, insideIsland, signals: JSON.stringify(signals), queries: JSON.stringify(queries), slots: JSON.stringify(slots) }
 
     this.documents.set(uri, document)
 

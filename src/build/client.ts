@@ -25,6 +25,7 @@ import { rebaseCss } from '../server/base'
 import { BUILD_FAILURE, fromManifest, MANIFEST, PRERENDERED_DIR, writeManifest } from '../server/client'
 import { PUBLIC_ENV_PATH } from '../server/env-state'
 import { fontFallbacks, withFontFallbacks } from '../server/fonts'
+import { routeMounts } from '../server/routes'
 import { declaresAction } from './action-calls'
 import { ASSET_PREFIX, clientDir, DEV_MAPS_DIR, MAPS_DIR, outputDir } from './assets'
 import { pruneNodes } from './class-rules'
@@ -331,7 +332,9 @@ export async function readClientSources(root: string, options: ClientOptions = {
   const sources = files.map(file => readSource(file).text)
 
   const cacheDir = projectPaths(root).cache
-  const analyses = await Promise.all(files.map(async (file, index) => analyzeKayCached(sources[index]!, file, root, cacheDir, options.hot, options.lints)))
+  // A file outside the routes and the mounted pages is a component, where a root `@block` has no layout to fill a slot of.
+  const pageDirs = [projectPaths(root, options).routes, ...routeMounts(root, options.extensions).map(mount => mount.dir)]
+  const analyses = await Promise.all(files.map(async (file, index) => analyzeKayCached(sources[index]!, file, root, cacheDir, options.hot, options.lints, !pageDirs.some(dir => file.startsWith(dir + sep)) && file !== editor && !mounted.includes(file))))
 
   // What the files gone held, kept no longer.
   keepAnalyses(new Set(files))

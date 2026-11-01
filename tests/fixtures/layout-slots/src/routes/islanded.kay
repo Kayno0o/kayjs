@@ -1,0 +1,11 @@
+--- server
+import { stamp } from '../stamp'
+
+const current = stamp()
+---
+--- script
+import Stamped from '../components/stamped.kay'
+---
+@sidebar
+  Stamped(server stamp={current})
+h1 Islanded

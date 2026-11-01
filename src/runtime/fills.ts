@@ -1,3 +1,5 @@
+import { getOwner, runWithOwner } from './reactive'
+
 // The blocks a page, or a layout, writes at the root of its template (`@sidebar`) for the layout above it to render at its `slot sidebar`, collected while one route renders.
 export interface FillChain {
   // The module of the route being entered, layouts outermost first and the page last: the one a `fill` call belongs to.
@@ -26,8 +28,11 @@ export function inFillChain<T>(chain: FillChain, render: () => T): T {
 }
 
 // What the generated code calls where the template writes `@name`: it keeps the block for the layout, and renders nothing where it stands. Outside a route's render there is no layout to take it.
+// The block renders after its page returned, under the page's owner, so it reads what the page provides.
 export function fill(name: string, block: () => unknown): string {
-  active?.blocks[active.at]?.set(name, block)
+  const owner = getOwner()
+
+  active?.blocks[active.at]?.set(name, () => runWithOwner(owner, block))
 
   return ''
 }

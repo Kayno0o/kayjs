@@ -1,7 +1,6 @@
-import type { Node } from '../compiler/ast'
 import type { ServerAnalysis } from '../compiler/script'
 import { createHash } from 'node:crypto'
-import { visitNodes } from '../compiler/ast'
+import { slotNames } from '../compiler/ast'
 import { parseKay } from '../compiler/parser'
 import { analyzeServer } from '../compiler/script'
 import { falseKeys } from '../server/routes'
@@ -30,7 +29,7 @@ export function serverFacts(file: string, text: string): ServerFacts {
     return known.facts
 
   const parsed = parseKay(text)
-  const found = { server: analyzeServer(text, parsed.server), leavesLayoutsOut: falseKeys(text).has('layouts'), slots: slotNames(text, parsed.template) }
+  const found = { server: analyzeServer(text, parsed.server), leavesLayoutsOut: falseKeys(text).has('layouts'), slots: slotNames(parsed.template, text) }
 
   // Deleted first so a file read again is the newest.
   facts.delete(file)
@@ -41,15 +40,4 @@ export function serverFacts(file: string, text: string): ServerFacts {
   facts.set(file, { hash, facts: found })
 
   return found
-}
-
-function slotNames(text: string, template: Node[]): string[] {
-  const names = new Set<string>()
-
-  visitNodes(template, (node) => {
-    if (node.kind === 'element' && node.outlet && !node.outlet.args)
-      names.add(text.slice(node.outlet.name.start, node.outlet.name.end))
-  })
-
-  return [...names]
 }

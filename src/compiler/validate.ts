@@ -249,6 +249,7 @@ class Validator {
     const rest = this.file.template.filter(node => !isHead(node))
 
     this.blocks(rest)
+    this.outlets(server)
     this.nodes(this.rooted() ? rest.filter(node => node.kind !== 'slot') : rest)
 
     return this.diagnostics
@@ -304,6 +305,26 @@ class Validator {
   // Whether the blocks at the root of the template are allowed: in a page or a layout, which only type checking knows of a file compiled alone.
   private rooted(): boolean {
     return this.options.component !== true
+  }
+
+  // A layout's `slot name` is a prop of its component beside its server data and `children`, so a name one of those holds would replace it.
+  private outlets(server: ServerAnalysis | undefined): void {
+    if (this.options.layoutFile !== true)
+      return
+
+    const data = new Set(server?.data.map(entry => entry.name))
+
+    visitNodes(this.file.template, (node) => {
+      if (node.kind !== 'element' || !node.outlet || node.outlet.args)
+        return
+
+      const name = this.text(node.outlet.name)
+
+      if (name === 'children')
+        this.error(node.outlet.name, '`slot children` is the layout\'s default slot', { help: 'write `slot` alone for the page, or give the named slot another name' })
+      else if (data.has(name))
+        this.error(node.outlet.name, `The slot \`${name}\` has the name of the layout's server data`, { note: 'the slot would replace the data in the layout, which could no longer read it', help: 'rename the slot or the data' })
+    })
   }
 
   // The `@name` blocks at the root of a page or a layout, which fill a `slot name` of the layout above: one per name, taking no parameters, and a name some layout above declares once type checking knows them.

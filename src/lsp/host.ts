@@ -55,6 +55,8 @@ export interface Document extends ShadowFile {
   signals: string
   // The `query` types of the layouts above it, as compiled with: a layout gaining or dropping one compiles the file again.
   queries: string
+  // The named slots of the layouts above it, as compiled with: a layout declaring or dropping one compiles the file again.
+  slots: string
 }
 
 // What the modules of the server read of it: the editor's and tsgo's connections, the open documents and the projects.

@@ -1,0 +1,9 @@
+---
+import { Theme } from '../theme'
+import Themed from '../components/themed.kay'
+
+Theme.provide('dark')
+---
+@sidebar
+  Themed
+h1 Themed

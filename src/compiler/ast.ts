@@ -608,6 +608,18 @@ export function childBlocks(node: Node): Node[][] {
   }
 }
 
+// The named slots a layout declares with `slot name`, in the order they are written; a slot called with arguments is a component's block prop, which a page cannot fill.
+export function slotNames(template: readonly Node[], source: string): string[] {
+  const names = new Set<string>()
+
+  visitNodes(template, (node) => {
+    if (node.kind === 'element' && node.outlet && !node.outlet.args)
+      names.add(source.slice(node.outlet.name.start, node.outlet.name.end))
+  })
+
+  return [...names]
+}
+
 // Calls `each` on every node of a template, nested ones included, in source order.
 export function visitNodes(nodes: readonly Node[], each: (node: Node) => void): void {
   walkNodes(nodes, undefined, each)

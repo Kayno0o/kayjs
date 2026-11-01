@@ -1,0 +1,6 @@
+--- server
+const { status } = ctx.error
+---
+@sidebar
+  p.error-nav Error {status}
+h1.error Error {status}

@@ -110,7 +110,7 @@ const branches = await listBranches(ctx.params.project)
 h1 {ctx.params.project}
 ```
 
-On a page change the sidebar is replaced together with the page, and a page that fills nothing brings the fallback back. `kay check` reports a block whose name no layout above the page declares.
+On a page change the sidebar is replaced together with the page, and a page that fills nothing brings the fallback back. `kay check` reports a block whose name no layout above the page declares. A component in the block can read what the page provides with `context`, and a slot cannot be named `children` or like one of the layout's server data, which it would replace.
 
 With nested layouts, the block goes to the nearest layout above the page that declares the slot, so a layout between the two passes it through, or writes its own `@sidebar` as the default for its pages. A page's block wins over a layout's.
 

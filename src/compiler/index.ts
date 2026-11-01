@@ -56,7 +56,7 @@ export interface CompileOptions {
   hydratable?: boolean | undefined
   // Server output of a static component's `?island` twin, which carries markers like an island.
   twinBuild?: boolean | undefined
-  // Type checking only: the file is a page of a routes directory, which nothing renders inside an island, so a page without a server fence reads its loops as static as the build does.
+  // Whether the file is a page of a routes directory, which nothing renders inside an island, so a page without a server fence reads its loops as static as the build does; `false` says it is a component, where a root `@block` is refused.
   page?: boolean | undefined
   // Type checking only: the level of each lint, over its default.
   lints?: LintLevels | undefined

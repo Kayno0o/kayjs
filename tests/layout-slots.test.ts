@@ -3,7 +3,9 @@ import { rm } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
 import { describe, expect, it } from 'bun:test'
 import { compileKay } from '../src/compiler'
+import { readManifest } from '../src/server/client'
 import { kayBuildSpawned, kayCheck } from './check-helper'
+import { scratchBuild } from './prerendered'
 import { fixtureCopy } from './scratch'
 import { pages } from './shared-pages'
 
@@ -96,6 +98,73 @@ describe('a page filling its layout\'s named slot', () => {
     expect(failed.status).toBe(500)
     expect(failed.side).not.toContain('Guarded')
   })
+
+  it('renders the error page around the layout, filling its slot with the error page\'s own block', async () => {
+    const failed = await get(app, '/guard?boom')
+
+    expect(failed.side).toBe('<p class="error-nav">Error 500</p>')
+    expect(failed.main).toContain('<h1 class="error">Error 500</h1>')
+    expect(failed.main).toContain('<p class="path">/guard</p>')
+    expect((await get(app, '/guard')).side).toBe('<p class="guarded">Guarded</p>')
+  })
+
+  it('lets a block read what its page provides', async () => {
+    expect((await get(app, '/themed')).side).toBe('<p class="theme">dark</p>')
+  })
+
+  it('streams a page\'s await blocks around a block, and one inside the block', async () => {
+    const page = await get(app, '/streamed')
+
+    expect(page.side).toBe('<p class="nav">Streamed nav</p>')
+    expect(page.main).toContain('<p class="waiting">Waiting</p>')
+    expect(page.html).toContain('<p class="later">arrived</p>')
+
+    const block = await get(app, '/streamed-block')
+
+    expect(block.side).toContain('<p class="waiting">Waiting</p>')
+    expect(block.html).toContain('<p class="later">arrived</p>')
+    expect(block.html.indexOf('arrived')).toBeGreaterThan(block.html.indexOf('</aside>'))
+  })
+})
+
+describe('a block holding a server island', () => {
+  const STAMPED = /<p class="stamp">(stamp-\d+)<\/p>/
+
+  it('scans the island on the page\'s path and renders it per request in the layout\'s slot', async () => {
+    const root = resolve(ROOT)
+    const build = await scratchBuild({}, false, root)
+
+    try {
+      await build.prerender({})
+
+      const written = (await readManifest(root, build.dir))!.pages!
+      const built = await Bun.file(join(build.pages, 'islanded.html')).text()
+
+      expect(written['/islanded']!.islands).toEqual(['inline'])
+      expect(SIDE.exec(built)![1]).toBe('<!--kay-server:0--><!--/kay-server:0-->')
+
+      const served = await build.serve({ root: ROOT, security: false })
+      const visit = async () => (await served.handle(new Request('http://localhost/islanded'))).text()
+      const first = await visit()
+      const second = await visit()
+
+      expect(SIDE.exec(first)![1]).toMatch(STAMPED)
+      expect(SIDE.exec(second)![1]).toMatch(STAMPED)
+      expect(STAMPED.exec(first)![1]).not.toBe(STAMPED.exec(second)![1])
+      expect(STAMPED.exec(first)![1]).not.toBe(STAMPED.exec(built)?.[1])
+      expect(MAIN.exec(first)![1]).toContain('<h1>Islanded</h1>')
+    }
+    finally {
+      await build.remove()
+    }
+  }, 120_000)
+
+  it('renders the island in place on a server that renders every request', async () => {
+    const first = await get(app, '/islanded')
+
+    expect(first.side).toMatch(STAMPED)
+    expect(first.main).toContain('<h1>Islanded</h1>')
+  })
 })
 
 describe('what kay check reports of a block', () => {
@@ -133,9 +202,44 @@ describe('what kay check reports of a block', () => {
     expect(compileKay(source, 'src/routes/page.kay', { page: true }).diagnostics.map(diagnostic => diagnostic.message)).toEqual(['`@a` cannot sit in a page that is an island'])
   })
 
+  it('refuses a block in a layout that is an island, as in a page', () => {
+    const source = '---\nimport { signal } from \'kay\'\n\nconst n = signal(0)\n---\n@a\n  p y\nbutton(onClick={() => n.set(1)}) {n()}\nslot\n'
+
+    expect(compileKay(source, 'src/routes/_layout.kay', { outerSlots: ['a'] }).diagnostics.map(diagnostic => diagnostic.message)).toEqual(['`@a` cannot sit in a layout that is an island'])
+  })
+
+  it('refuses a slot named `children`, or like the layout\'s server data, which it would replace', () => {
+    const named = (name: string, fence = '') => compileKay(`${fence}.x\n  slot ${name}\n  slot\n`, 'src/routes/_layout.kay', {}).diagnostics.map(diagnostic => diagnostic.message)
+
+    expect(named('children')).toEqual(['`slot children` is the layout\'s default slot'])
+    expect(named('path', '--- server\nconst path = ctx.url.pathname\n---\n')).toEqual(['The slot `path` has the name of the layout\'s server data'])
+    expect(named('sidebar', '--- server\nconst path = ctx.url.pathname\n---\n')).toEqual([])
+    expect(compileKay('--- server\nconst path = 1\n---\n.x\n  slot path(1)\n', 'src/routes/_layout.kay', {}).diagnostics).toEqual([])
+  })
+
   it('still refuses a block at the root of a component', () => {
     expect(compileKay('@a\n  p y\n', 'src/components/box.kay', { check: true, page: false }).diagnostics.map(diagnostic => diagnostic.message)).toEqual(['`@a` must sit directly under a component, to pass it as that component\'s `a` prop'])
   })
+})
+
+describe('a block at the root of a component', () => {
+  it('fails a build that does not type check too, where a page or a layout accepts it', async () => {
+    const root = resolve(await fixtureCopy('layout-slots'))
+
+    try {
+      await Bun.write(join(root, 'src/components/box.kay'), '@aside\n  p Hi\n.box\n  slot\n')
+      await Bun.write(join(root, 'src/routes/box.kay'), '--- script\nimport Box from \'../components/box.kay\'\n---\nBox\n  p Inside\n')
+
+      const { code, output } = await kayBuildSpawned([root, '--no-check'])
+
+      expect(code).toBe(1)
+      expect(output).toContain('`@aside` must sit directly under a component')
+      expect(output).toContain('components/box.kay')
+    }
+    finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  }, 120_000)
 })
 
 describe('kay check on a route tree with slots', () => {
@@ -169,6 +273,9 @@ describe('a static export of pages filling a slot', () => {
     const root = resolve(await fixtureCopy('layout-slots'))
 
     try {
+      // These pages stream or hold a server island, which only a server answers for.
+      await Promise.all(['streamed', 'streamed-block', 'islanded'].map(async page => rm(join(root, `src/routes/${page}.kay`))))
+
       const { code, output } = await kayBuildSpawned([root, '--no-check', '--static', '--outdir', join(root, 'out')])
 
       expect({ code, output }).toEqual({ code: 0, output: '' })

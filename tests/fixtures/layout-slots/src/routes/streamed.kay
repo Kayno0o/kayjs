@@ -1,0 +1,12 @@
+--- server
+const later = new Promise<string>(resolve => setTimeout(resolve, 30, 'arrived'))
+---
+@sidebar
+  p.nav Streamed nav
+h1 Streamed
+await later
+  p.waiting Waiting
+then text
+  p.later {text}
+catch error
+  p.failed {String(error)}

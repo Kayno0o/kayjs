@@ -1273,6 +1273,19 @@ describe('kay lsp on a save', () => {
     }
   })
 
+  it('compiles an open page again when a layout above it declares a named slot or drops it, and not for a change of its markup', async () => {
+    const dir = await scratchDir('lsp-layout-slot-')
+
+    try {
+      const { compiled } = await compiledAfter(dir, { page: 'src/routes/a.kay', layout: join(dir, 'src/routes/_layout.kay'), saves: ['.x\n  slot side\n  slot\n', '.y\n  slot side\n  slot\n', 'slot\n'] })
+
+      expect(compiled).toHaveLength(2)
+    }
+    finally {
+      await rm(dir, { recursive: true, force: true })
+    }
+  })
+
   it('compiles an open page again when a layout an extension mounts above it gains or drops a query', async () => {
     const dir = await scratchDir('lsp-layout-mounted-')
     const app = join(dir, 'app')

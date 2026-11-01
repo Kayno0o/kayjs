@@ -130,7 +130,8 @@ h1 {ctx.params.project}
 ```
 
 - The block reads the page's own names, the server fence's, the script's and the template's `const`s above it, and a layout cannot read its page's data: that stays the page's.
-- `kay check` reports a block naming a slot none of the layouts above declares (a `layouts: false` page has none), a block written twice, or taking parameters, or not at the root of the template. The layout's `slot sidebar` is typed as a slot, and a plain component declaring a root block is an error.
+- `kay check` reports a block naming a slot none of the layouts above declares (a `layouts: false` page has none), a block written twice, or taking parameters, or not at the root of the template. The layout's `slot sidebar` is typed as a slot, and a plain component declaring a root block is an error, in `kay build --no-check` too. A slot named `children` or like a key of the layout's server data is an error, as it would replace that value.
+- A component in the block reads what the page provides with `context`, as one in the page does.
 - Nested layouts: a block goes to the slot of the nearest layout above the file writing it that declares the name. A layout not declaring it passes the page's block through, a layout may write `@sidebar` itself as the default of the pages under it (a page's own block wins), and a layout declaring `slot sidebar` again takes the page's block and puts its own block in the outer slot, to wrap it.
 - A page filling nothing shows the slot's lines, and an empty `@sidebar` shows nothing. The page swap replaces the slot's content with the page's, keeping a `persist` island that both pages' blocks render; a static export and prerendering write the block in the page. Special pages (`_404.kay`, `_error.kay`) may fill a slot too, unchecked.
 

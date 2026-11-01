@@ -8,7 +8,7 @@ import type { PageSettingName } from './page-settings'
 import type { Sites } from './rewrite'
 import type { ImportBinding, PropsDeclaration, ScriptAnalysis, ServerAnalysis } from './script'
 import { actionUrl } from '../runtime/action'
-import { childBlocks, errorMessages, INTERACTIVE_ATTRIBUTE, isHead, nameDestructuredRows, someNode, templateFacts, uiHasVariants, visitNodes } from './ast'
+import { childBlocks, errorMessages, INTERACTIVE_ATTRIBUTE, isHead, nameDestructuredRows, slotNames, someNode, templateFacts, uiHasVariants, visitNodes } from './ast'
 import { domHelperImport, DomTemplate } from './dom'
 import { mayHoldFunction } from './expression'
 import { htmlHelperImport, HtmlTemplate } from './html'
@@ -631,17 +631,7 @@ class ModuleShell {
 
   // The named slots a layout declares with `slot name`, in the order they are written; a slot called with arguments is a component's block prop, which a page cannot fill.
   private outlets(): string[] {
-    if (this.options.layoutFile !== true)
-      return []
-
-    const names = new Set<string>()
-
-    visitNodes(this.file.template, (node) => {
-      if (node.kind === 'element' && node.outlet && !node.outlet.args)
-        names.add(this.text(node.outlet.name))
-    })
-
-    return [...names]
+    return this.options.layoutFile !== true ? [] : slotNames(this.file.template, this.src)
   }
 
   // The values `src/ui.ts` adds to the variants of a component's props, as a type: a call accepts them, while the component's own body keeps the props it declares, so a library component forwarding a variant to a child that lacks the value does not fail in its own file.

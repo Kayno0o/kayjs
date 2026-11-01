@@ -1,0 +1,6 @@
+---
+import { Theme } from '../theme'
+
+const theme = Theme.use()
+---
+p.theme {theme}
