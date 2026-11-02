@@ -67,12 +67,29 @@ test('a Combobox reports its own opening on focus', async () => {
 
 test('a DateRangeInput names the box whose calendar shows', async () => {
   const { root, calls } = await picker()
-  const panels = root.querySelectorAll<HTMLElement>('[role=group] [role=dialog][popover]')
+  const panels = root.querySelectorAll<HTMLElement>('[role=group][aria-label=Stay] [role=dialog][popover]')
 
   panels[1]!.showPopover()
   await clock.settle()
 
   expect(calls).toEqual(['range to true'])
+})
+
+test('a DateRangeInput given open shows the calendar of that box, hears the light dismiss, and is left alone without it', async () => {
+  const { root, calls } = await picker()
+  const panels = root.querySelectorAll<HTMLElement>('[role=group][aria-label=Held] [role=dialog][popover]')
+
+  click(root.querySelector('#open-range-to'))
+  await clock.settle()
+
+  expect(panels[0]!.matches(':popover-open')).toBe(false)
+  expect(panels[1]!.matches(':popover-open')).toBe(true)
+
+  panels[1]!.hidePopover()
+  await clock.settle()
+
+  expect(panels[1]!.matches(':popover-open')).toBe(false)
+  expect(calls).toContain('held to false')
 })
 
 test('a HoverCard tells the app it closed on Escape, and shows again once the app re-anchors', async () => {

@@ -710,6 +710,7 @@ component default
   fill?: boolean | undefined
   footer?: Element
   greeting?: string | undefined
+  hash?: string | false | undefined
   icon?: Element
   images?: string | string[] | undefined
   initial?: ChatTurn[] | undefined
@@ -793,6 +794,7 @@ component default
   collapseLabel?: string | undefined
   expandIcon: Element
   expandLabel?: string | undefined
+  hash?: string | false | undefined
   icon: Element
   label?: string | undefined
   newIcon: Element

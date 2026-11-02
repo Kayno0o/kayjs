@@ -1026,6 +1026,7 @@ component default
   min?: string | undefined
   onChange?: ((value: DateRange) => unknown) | undefined
   onOpenChange?: ((open: boolean, box: "from" | "to") => unknown) | undefined
+  open?: false | "from" | "to" | undefined
   toLabel?: string | undefined
   toName?: string | undefined
   value?: DateRange | undefined

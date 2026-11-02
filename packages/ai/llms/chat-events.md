@@ -32,10 +32,18 @@ ChatLauncher(action={reply} open={open()} onOpenChange={value => { open = value 
 
 ### Start a question from outside
 
-Two events on the `.kai-chat` element, with the text as `detail`: `kai-chat-send` sends it as the next message (as a voice transcript is), and `kai-chat-draft` puts it in front of what the visitor typed and moves the cursor into the field, to read and send. Both ignore blank text, and `kai-chat-send` is ignored while a reply is under way. The element of a `ChatLauncher` exists once the panel has been opened, which loads the chat.
+Two events with the text as `detail`: `kai-chat-send` sends it as the next message (as a voice transcript is), and `kai-chat-draft` puts it in front of what the visitor typed and moves the cursor into the field, to read and send. Both ignore blank text, and `kai-chat-send` is ignored while a reply is under way. Dispatch them on `window` when the page has a `ChatLauncher`: it opens the panel first, waits for the chat inside to load, then hands the text over. A `Chat` of its own hears them on its `.kai-chat` element.
 
 ```ts
-document.querySelector('.kai-chat')?.dispatchEvent(new CustomEvent('kai-chat-draft', { detail: 'Tell me about this page' }))
+window.dispatchEvent(new CustomEvent('kai-chat-draft', { detail: 'Tell me about this page' }))
+```
+
+### Open the launcher from a link
+
+The launcher opens whenever the address fragment is its `hash` (`#chat` by default), on load and on every change to it, so `a(href="#chat")` needs no script; `hash={false}` turns it off. A `kai-chat-open` event on `window` opens it too. All of these count as the visitor opening it: `onOpenChange(true)` is called, unless the panel was open already.
+
+```ts
+window.dispatchEvent(new CustomEvent('kai-chat-open'))
 ```
 
 ### Suggestions per page or visitor

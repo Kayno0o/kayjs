@@ -1,0 +1,4 @@
+---
+import Linking from '../components/linking.kay'
+---
+Linking

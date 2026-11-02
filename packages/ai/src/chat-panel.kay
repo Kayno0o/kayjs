@@ -1,11 +1,11 @@
 ---
 import type { Snippet } from 'kay'
-import { effect, recipe, signal, uid, untrack } from 'kay'
+import { effect, onCleanup, recipe, signal, uid, untrack } from 'kay'
 import { wording } from 'kay/words'
 
 const look = recipe({ parts: { root: 'kai-launcher', panel: 'kai-launcher-panel', head: 'kai-launcher-head', title: 'kai-launcher-title', actions: 'kai-launcher-actions', action: 'kui-icon-btn', expand: 'kui-icon-btn kai-launcher-expand', body: 'kai-launcher-body', button: 'kui-icon-btn kai-launcher-button', glyph: 'kai-launcher-glyph' } })
 
-const { label = wording('ai.chat.label', 'Chat'), openLabel = wording('ai.chat.open', 'Open the chat'), closeLabel = wording('ai.chat.close', 'Close the chat'), icon, closeIcon, newIcon, expandIcon, collapseIcon, newLabel = wording('ai.chat.new', 'New conversation'), expandLabel = wording('ai.chat.expand', 'Enlarge the chat'), collapseLabel = wording('ai.chat.collapse', 'Shrink the chat'), open: wanted, onOpenChange } = props<{
+const { label = wording('ai.chat.label', 'Chat'), openLabel = wording('ai.chat.open', 'Open the chat'), closeLabel = wording('ai.chat.close', 'Close the chat'), icon, closeIcon, newIcon, expandIcon, collapseIcon, newLabel = wording('ai.chat.new', 'New conversation'), expandLabel = wording('ai.chat.expand', 'Enlarge the chat'), collapseLabel = wording('ai.chat.collapse', 'Shrink the chat'), open: wanted, onOpenChange, hash = '#chat' } = props<{
   // Names the panel for screen readers and heads it.
   label?: string | undefined
   // Name and tooltip of the button while the panel is closed, and while it is open.
@@ -25,6 +25,8 @@ const { label = wording('ai.chat.label', 'Chat'), openLabel = wording('ai.chat.o
   open?: boolean | undefined
   // Called with the new state when the visitor opens or closes the panel, not when the page sets `open`.
   onOpenChange?: ((open: boolean) => unknown) | undefined
+  // The address fragment that opens the panel, on load and whenever it changes to it; `false` for none.
+  hash?: string | false | undefined
 }>()
 
 const open = signal(wanted === true)
@@ -85,6 +87,58 @@ function startOver() {
   panel?.querySelector('.kai-chat')?.dispatchEvent(new CustomEvent('kai-chat-new'))
   queueMicrotask(() => panel?.querySelector('textarea')?.focus())
 }
+
+// The visitor opening the panel from a link, the address or an event of the page: the same as pressing the button, if it is not open already.
+function visitorOpens() {
+  if (!open())
+    toggle(true)
+}
+
+function hashMatches() {
+  if (hash !== false && hash !== '' && location.hash === hash)
+    visitorOpens()
+}
+
+const RETRY_MS = 50
+const RETRY_LIMIT = 200
+
+// Hands the text to the chat once it is there to hear it: the chat loads when the panel first opens, and a listener cancels the event it takes.
+function forward(type: string, text: unknown, tries = 0) {
+  const chat = panel?.querySelector('.kai-chat')
+  const handled = chat !== null && chat !== undefined && !chat.dispatchEvent(new CustomEvent(type, { detail: text, cancelable: true }))
+
+  if (!handled && tries < RETRY_LIMIT)
+    setTimeout(forward, RETRY_MS, type, text, tries + 1)
+}
+
+function relay(event: Event) {
+  // Only the page's own events, not the ones the chat sends up from inside the panel.
+  if (event.target instanceof Node && panel?.contains(event.target))
+    return
+
+  const text = (event as CustomEvent<unknown>).detail
+
+  if (typeof text !== 'string' || text.trim() === '')
+    return
+
+  visitorOpens()
+  forward(event.type, text)
+}
+
+effect(() => {
+  hashMatches()
+  window.addEventListener('hashchange', hashMatches)
+  window.addEventListener('kai-chat-open', visitorOpens)
+  window.addEventListener('kai-chat-send', relay)
+  window.addEventListener('kai-chat-draft', relay)
+
+  onCleanup(() => {
+    window.removeEventListener('hashchange', hashMatches)
+    window.removeEventListener('kai-chat-open', visitorOpens)
+    window.removeEventListener('kai-chat-send', relay)
+    window.removeEventListener('kai-chat-draft', relay)
+  })
+})
 
 function keyDown(event: KeyboardEvent) {
   // A reply under way stops on Escape first, which the chat marks by preventing the event's default.

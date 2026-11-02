@@ -353,6 +353,9 @@ effect(() => {
 
 // Text from outside the field, such as a voice transcript, is sent as a suggestion is: the draft stays, and a reply under way or blank text ignores it.
 function sendFrom(event: Event) {
+  // Cancelled to tell the sender the chat heard it, which a launcher waits for while the chat loads.
+  event.preventDefault()
+
   const text = (event as CustomEvent<unknown>).detail
 
   if (typeof text === 'string' && text.trim() !== '')
@@ -588,6 +591,8 @@ onMount(() => {
 
 // Text from outside the field puts the cursor in it with the text in front of what was typed: a link's "Ask about this page" without sending it.
 function draftFrom(event: Event) {
+  event.preventDefault()
+
   const text = (event as CustomEvent<unknown>).detail
 
   if (typeof text !== 'string' || text.trim() === '')

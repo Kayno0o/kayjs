@@ -20,12 +20,14 @@ const apps = [{ id: 'atlas', href: '/atlas', label: 'Atlas' }]
 const multi = signal(false)
 const date = signal(false)
 const combo = signal(false)
+const range = signal<'from' | 'to' | false>(false)
 const switcher = signal(false)
 
 const anchor = signal<Element | null>(null)
 ---
 button#open-multi(onClick={() => multi = true}) Open multi
 button#open-date(onClick={() => date = true}) Open date
+button#open-range-to(onClick={() => range = 'to'}) Open range to
 button#open-combo(onClick={() => combo = true}) Open combo
 button#open-switcher(onClick={() => switcher = true}) Open switcher
 
@@ -34,6 +36,7 @@ button#clear(onClick={() => anchor = null}) Clear
 MultiSelect(id="multi" label="Planets" options={planets} open={multi()} onOpenChange={shown => { calls.push(`multi ${shown}`); multi = shown }})
 DateInput(id="date" aria-label="Day" open={date()} onOpenChange={shown => { calls.push(`date ${shown}`); date = shown }})
 DateRangeInput(label="Stay" onOpenChange={(shown, box) => calls.push(`range ${box} ${shown}`)})
+DateRangeInput(label="Held" open={range()} onOpenChange={(shown, box) => { calls.push(`held ${box} ${shown}`); if (!shown) range = false }})
 Combobox(label="Planet" options={planets} open={combo()} onOpenChange={shown => { calls.push(`combo ${shown}`); combo = shown }})
 AppSwitcher(id="switcher" apps={apps} open={switcher()} onOpenChange={shown => { calls.push(`switcher ${shown}`); switcher = shown }} data-testid="switch" aria-describedby="hint" style="color: red")
 
