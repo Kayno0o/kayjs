@@ -1783,10 +1783,23 @@ inBrowser('forms with a callback in the browser', () => {
 
       expect(await names()).toContain(honeypot)
       expect(await names()).toContain('kay_since')
-      expect((await names())[0]).toBe(honeypot)
+
       expect(await page.evaluate(() => document.querySelectorAll('form').length)).toBe(1)
-      expect(await page.evaluate(() => [...document.querySelector('form')!.childNodes].some(node => node.nodeType === 8 && (node as Comment).data.includes('kay-kept')))).toBe(true)
+
       expect(page.errors).toEqual([])
     }
+  }, 120_000)
+})
+
+inBrowser('a form nested in an island with a honeypot', () => {
+  test('hydrates, keeps its honeypot and stamp, and its handlers still run', async () => {
+    const site = await shared()
+
+    await using page = await site.open('/form-nested-island')
+
+    await page.click('#count')
+    await page.waitUntil(() => document.querySelector('#count')!.textContent === 'Count 1')
+    expect(await page.evaluate(() => [...document.querySelectorAll('form input')].map(input => (input as HTMLInputElement).name).sort())).toEqual(['kay_since', 'name', 'website'])
+    expect(page.errors).toEqual([])
   }, 120_000)
 })

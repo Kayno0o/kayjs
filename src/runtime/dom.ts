@@ -105,6 +105,10 @@ export function hydrate<T>(render: () => T, container: Node): T {
 
   claim = { parent: container, next: container.firstChild }
   setAside = []
+
+  for (const form of (container as Element).querySelectorAll?.('form') ?? [])
+    setAsideKept(form)
+
   hydrationStarted()
 
   try {
@@ -170,29 +174,30 @@ function claimText(data: string): Text {
   return text
 }
 
-// Takes a form's leading server-only markup, its honeypot, out of the form until the island hydrated: the template knows nothing of it.
-function setAsideKept(form: Node): void {
+// Takes a form's leading server-only markup, its honeypot, out of the form until the island hydrated: the templates know nothing of it, and a form nested in one is reached by its place among its siblings.
+// It goes back at the end of the form, out of the way of a dynamic part that fills the form's content.
+function setAsideKept(form: Element): void {
   const first = form.firstChild
 
   if (first?.nodeType !== 8 || (first as Comment).data !== KEPT_START)
     return
 
-  const kept = document.createDocumentFragment()
-  let node: ChildNode | null = first
+  let last: ChildNode | null = first
 
-  while (node) {
-    const next: ChildNode | null = node.nextSibling
-    const last = node.nodeType === 8 && (node as Comment).data === KEPT_END
+  while (last && !(last.nodeType === 8 && (last as Comment).data === KEPT_END))
+    last = last.nextSibling
 
-    kept.appendChild(node)
+  if (!last)
+    return
 
-    if (last)
-      break
+  const range = document.createRange()
 
-    node = next
-  }
+  range.setStartBefore(first)
+  range.setEndAfter(last)
 
-  setAside.push(() => form.insertBefore(kept, form.firstChild))
+  const kept = range.extractContents()
+
+  setAside.push(() => form.appendChild(kept))
 }
 
 // The `]` closing the `[` given, past any dynamic part nested between them: the server leaves a part's content between its markers.
@@ -227,9 +232,6 @@ export function template(html: string): () => Element {
 
       if (claimed.nodeName.toUpperCase() !== tag)
         throw new HydrationMismatchError(`expected <${tag.toLowerCase()}> where the server markup holds ${claimed.nodeName.toLowerCase()}`)
-
-      if (tag === 'FORM')
-        setAsideKept(claimed)
 
       return claimed as Element
     }
