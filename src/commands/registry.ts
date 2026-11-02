@@ -55,7 +55,8 @@ const SPACES = / /
 
 // The entries as the kit dispatches them: the first word of several a group of subcommands, in the order met.
 export function tree(entries: Entry[]): Record<string, CliCommand> {
-  const commands: Record<string, CliCommand> = {}
+  // No prototype, so `kay constructor` is an unknown command.
+  const commands: Record<string, CliCommand> = Object.create(null)
 
   for (const { name, summary, run, group } of entries) {
     const words = name.split(SPACES)
@@ -68,7 +69,7 @@ export function tree(entries: Entry[]): Record<string, CliCommand> {
         level = next.commands
       }
       else {
-        const created: Record<string, CliCommand> = {}
+        const created: Record<string, CliCommand> = Object.create(null)
 
         level[word] = { summary: GROUP_SUMMARIES[word] ?? `commands of kay ${word}`, commands: created, ...group !== undefined && level === commands ? { group } : {} }
         level = created

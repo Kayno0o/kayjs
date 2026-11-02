@@ -204,4 +204,20 @@ describe('usage on a refusal', () => {
     expect(unknown.code).toBe(2)
     expect(unknown.stderr).toBe('error: kay: no command bogus\n  hint: run kay --help for its commands\n')
   })
+
+  it('prints the version, names a mistyped command, and completes commands and options', async () => {
+    const root = await project({ 'kay.config.ts': 'throw new Error(\'config broke\')\n' })
+    const version = await kay(['--version'], root)
+    const typo = await kay(['buidl'], await project({}))
+    const commands = await kay(['__complete', 'bu'], root)
+    const options = await kay(['__complete', 'build', '--'], root)
+
+    expect(version.stdout).toMatch(/^\d+\.\d+\.\d+/)
+    expect([version.code, version.stderr]).toEqual([0, ''])
+    expect(typo.code).toBe(2)
+    expect(typo.stderr).toContain('did you mean build?')
+    expect(commands.stdout).toContain('build\t')
+    expect(commands.stderr).toBe('')
+    expect(options.stdout).toContain('--no-check\t')
+  })
 })

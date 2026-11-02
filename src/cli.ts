@@ -28,12 +28,17 @@ async function main(args: string[]): Promise<number> {
 }
 
 const HELP_FLAGS = new Set(['--help', '-h', 'help'])
+const OUTPUT_FLAGS = new Set(['--plain', '--color'])
+const OWN_NAMES = new Set(NAMES)
 
 // The commands an extension of the project in the current directory adds (kaynooo/agent-tools#74), unless the command named is one of kay's own. A clash or a config that does not load stops a command being run, and is a warning for the help.
 async function extensionEntries(args: string[]): Promise<{ entries: Entry[], stop?: number }> {
-  const named = args[0] === COMPLETE ? args[1] : args[0]
+  const completing = args[0] === COMPLETE
+  const typed = (completing ? args.slice(1) : args).filter((word, index, all) => !OUTPUT_FLAGS.has(word) && all[index - 1] !== '--color' && !word.startsWith('--color='))
+  const named = typed[0]
 
-  if (named !== undefined && LEAVES.has(named))
+  // Nothing of the project is needed to print the version, and kay's own commands, a group's subcommand included, run on their own.
+  if (named === '--version' || named === '-v' || (named !== undefined && (LEAVES.has(named) || OWN_NAMES.has(`${named} ${typed[1]}`))))
     return { entries: [] }
 
   const asked = named !== undefined && !HELP_FLAGS.has(named)
@@ -44,6 +49,9 @@ async function extensionEntries(args: string[]): Promise<{ entries: Entry[], sto
     found = await extensionCommands(process.cwd(), NAMES)
   }
   catch (error) {
+    if (completing)
+      return { entries: [] }
+
     if (!asked) {
       console.error(`kay: kay.config.ts did not load, so the commands its extensions add are not listed: ${error instanceof Error ? error.message : String(error)}`)
 
@@ -54,6 +62,9 @@ async function extensionEntries(args: string[]): Promise<{ entries: Entry[], sto
 
     return { entries: [], stop: 1 }
   }
+
+  if (completing)
+    return { entries: found?.clashes.length === 0 ? (found.commands.map(command => ({ name: command.name, summary: command.extension, run: async () => Promise.resolve(0) }))) : [] }
 
   for (const clash of found?.clashes ?? [])
     console.error(`kay: ${clash}`)

@@ -427,3 +427,11 @@ describe('commands an extension adds', () => {
     expect(stderr).toContain('kay.config.ts did not load, so the commands its extensions add are not listed: config broke')
   })
 })
+
+describe('commands an extension adds, nested', () => {
+  it('stop at a command that begins with the words of another', async () => {
+    const root = await project({ ...library, 'kay.config.ts': 'export default { favicon: false, extensions: [{ name: \'kay-lib\', commands: { \'db\': \'./lib/hello.ts\', \'db migrate\': \'./lib/translate.ts\' } }] }\n' })
+
+    expect((await kay(['db'], root)).stderr).toContain('adds the command `kay db migrate`, which the command `kay db` of kay-lib takes as its arguments or as a group')
+  })
+})
