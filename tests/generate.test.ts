@@ -212,7 +212,7 @@ it('runs as kay generate', async () => {
 
   expect(again.code).toBe(1)
   expect(again.stderr).toContain('nothing was written')
-  expect((await run(dir, 'generate', 'page')).code).toBe(1)
+  expect((await run(dir, 'generate', 'page')).code).toBe(2)
 })
 
 // What it writes passes kay check and runs under bun test, in a project of the server preset.
@@ -374,7 +374,7 @@ it('runs as kay generate resource, every argument a field and the folder `--dir`
 
   expect(document).toMatchObject({ kind: 'resource', name: 'post', dryRun: true })
   expect(document.written).toContain('src/routes/posts/_actions.kay')
-  expect((await run(dir, 'generate', 'page', 'x', 'app', 'extra')).code).toBe(1)
+  expect((await run(dir, 'generate', 'page', 'x', 'app', 'extra')).code).toBe(2)
 
   // A field without its type is named, not taken for the folder, whether or not a folder of that name exists.
   const untyped = await run(dir, 'generate', 'resource', 'post', 'title', '--dry-run')
@@ -399,7 +399,7 @@ it('runs as kay generate resource, every argument a field and the folder `--dir`
   expect(absent.code).toBe(1)
   expect(absent.stderr).toContain('newapp')
   expect(absent.stderr).toContain('no package.json')
-  expect((await run(dirname(dir), 'generate', 'page', 'x', 'app', '--dir', 'app', '--dry-run')).code).toBe(1)
+  expect((await run(dirname(dir), 'generate', 'page', 'x', 'app', '--dir', 'app', '--dry-run')).code).toBe(2)
   expect((await run(dirname(dir), 'generate', 'page', 'x', '--dir', 'app', '--dry-run')).code).toBe(0)
   expect((await run(dir, 'generate', 'resource', 'post', 'title:string', '--dry-run')).code).toBe(0)
 
@@ -407,7 +407,7 @@ it('runs as kay generate resource, every argument a field and the folder `--dir`
   const plural = JSON.parse((await run(dir, 'generate', 'resource', 'goose', 'title:string', '--plural', 'geese', '--dry-run', '--format', 'json')).stdout) as { written: string[] }
 
   expect(plural.written).toContain('src/routes/geese/_actions.kay')
-  expect((await run(dir, 'generate', 'page', 'x', '--plural', 'xs', '--dry-run')).code).toBe(1)
+  expect((await run(dir, 'generate', 'page', 'x', '--plural', 'xs', '--dry-run')).code).toBe(2)
 })
 
 // What a resource writes passes kay check and the project's lint, and its test passes on a migrated database, with kayjs-ui and without.

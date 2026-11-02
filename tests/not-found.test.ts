@@ -552,7 +552,7 @@ describe('kay not-found', () => {
 
     expect((await run(['not-found', '--redirect', '/done', '--to', '/x', '--runtime'], root)).stderr).toContain('kay.config.ts')
     expect((await run(['not-found', '--redirect', '/other', '--to', '/nothing-serves-this', '--runtime'], root)).stderr).toContain('nothing on the site serves')
-    expect((await run(['not-found', '--runtime'], root)).code).toBe(1)
+    expect((await run(['not-found', '--runtime'], root)).code).toBe(2)
     expect(readRuntimeRedirects(join(root, 'data/not-found.sqlite'))).toHaveLength(1)
   })
 
@@ -615,7 +615,7 @@ describe('kay not-found', () => {
     expect((await run(['not-found', '--redirect', '/other'], root)).stderr).toContain('/other has no suggested target')
     expect((await run(['not-found', '--redirect', '/other', '--to', 'about'], root)).code).toBe(1)
     expect((await run(['not-found', '--redirect', '/done', '--to', '/x'], root)).stderr).toContain('is a redirect already')
-    expect((await run(['not-found', '--to', '/x'], root)).code).toBe(1)
+    expect((await run(['not-found', '--to', '/x'], root)).code).toBe(2)
     expect(await Bun.file(join(root, 'kay.config.ts')).text()).not.toContain('/other')
   })
 

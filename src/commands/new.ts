@@ -4,10 +4,9 @@ import process from 'node:process'
 import { colors } from '@kaynooo/utils/tools/colors'
 import { createProject, detectHost, FEATURE_NAMES, HOSTS, pickFeatures, PRESET_NAMES, PRESETS, refuseTarget } from '../new'
 import { count, done, formatOption, printDocument, reportFailure, shellQuote } from './command'
-import { USAGES } from './usages'
 
 export const scaffold: Command = {
-  usage: USAGES.new,
+  usage: 'new <dir> [--kay <dependency>] [--template blank|server|site|app] [--with <features>] [--without <features>] [--forge forgejo|github] [--runner <label>] [-y] [--dry-run] [--format text|json] [--quiet]',
   options: { 'kay': { type: 'string' }, 'template': { type: 'string' }, 'with': { type: 'string' }, 'forge': { type: 'string' }, 'runner': { type: 'string' }, 'without': { type: 'string' }, 'yes': { type: 'boolean', short: 'y' }, 'dry-run': { type: 'boolean' }, 'format': { type: 'string' }, 'quiet': { type: 'boolean' } },
   positionals: 1,
   run: async ({ values, positionals: [dir] }, refuse) => {

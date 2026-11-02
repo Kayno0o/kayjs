@@ -4,8 +4,8 @@ import { cp, mkdir, mkdtemp, readdir, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { basename, dirname, join, relative, resolve } from 'node:path'
 import process from 'node:process'
+import { checklist, select } from '@kaynooo/cli-kit/prompt'
 import { nativeExe } from './compiler/native-typescript'
-import { checklist, select } from './prompt'
 import { agentsFile, templateFiles } from './templates'
 
 // The kay this command runs from: a git checkout, which a new project depends on a packed copy of, or the published package.
@@ -97,12 +97,12 @@ export function toggle(features: ReadonlySet<Feature>, feature: Feature): Readon
 
 // Asks on the terminal for a preset, then for its features one by one; undefined once the user cancels.
 export async function pickFeatures(): Promise<Feature[] | undefined> {
-  const preset = await select('Start from', PRESET_NAMES.map(name => ({ value: name, label: name, hint: PRESETS[name].description })), PRESET_NAMES.indexOf('server'))
+  const preset = await select('Start from', PRESET_NAMES.map(name => ({ value: name, label: name, hint: PRESETS[name].description })), { initial: PRESET_NAMES.indexOf('server') })
 
   if (preset === undefined)
     return undefined
 
-  const features = await checklist('Features', FEATURE_NAMES.map(name => ({ value: name, label: name, hint: FEATURES[name].description })), new Set(PRESETS[preset].features), toggle)
+  const features = await checklist('Features', FEATURE_NAMES.map(name => ({ value: name, label: name, hint: FEATURES[name].description })), { initial: new Set(PRESETS[preset].features), toggle })
 
   return features && FEATURE_NAMES.filter(name => features.has(name))
 }

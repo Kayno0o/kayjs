@@ -5,7 +5,6 @@ import { screenshot } from '../dev/screenshot'
 import { checkSize, MAX_HEIGHT, MAX_WIDTH, ShotRefusedError } from '../dev/screenshot-limits'
 import { basePath } from '../server/base'
 import { formatOption, printDocument, projectRoot } from './command'
-import { USAGES } from './usages'
 
 const WIDTH = /^\d+$/
 // eslint-disable-next-line no-control-regex -- control characters are what it finds
@@ -13,7 +12,7 @@ const UNSAFE_COOKIE = /[;\s\u0000-\u001F\u007F]/
 
 // Shoots a page of the running `kay dev` in a headless Chrome, for what the page's HTML does not tell: how it lays out at phone width, in the dark.
 export const screenshotCommand: Command = {
-  usage: USAGES.screenshot,
+  usage: 'screenshot <path> [dir] [--width <px>]... [--height <px>] [--scheme light|dark] [--full-page] [--cookie <name=value>]... [--format text|json]',
   options: { 'width': { type: 'string', multiple: true }, 'height': { type: 'string' }, 'scheme': { type: 'string' }, 'full-page': { type: 'boolean' }, 'cookie': { type: 'string', multiple: true }, 'format': { type: 'string' } },
   positionals: 2,
   run: async ({ values, positionals: [path, dir] }, refuse) => {

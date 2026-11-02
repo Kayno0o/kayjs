@@ -8,7 +8,6 @@ import { build } from '../src/commands/build'
 import { check } from '../src/commands/check'
 import { runCommand } from '../src/commands/command'
 import { env as envCommand } from '../src/commands/env'
-import { USAGES } from '../src/commands/usages'
 import { loaderLoaded } from '../src/server/loader'
 
 interface Capture {
@@ -76,18 +75,18 @@ interface Run {
 }
 
 // `kay <name> <args>` run in this process: its exit code, what it printed on stderr (`output`) and on stdout (`report`), as the CLI's child process gave them.
-async function kayRun(command: Command, name: 'check' | 'build' | 'env', args: string[]): Promise<Run> {
+async function kayRun(command: Command, args: string[]): Promise<Run> {
   install()
 
   const capture: Capture = { stdout: [], stderr: [] }
-  const code = await capturing.run(capture, async () => runCommand(command, args, `Usage: kay ${USAGES[name]}`))
+  const code = await capturing.run(capture, async () => runCommand(command, args))
 
   return { code, output: capture.stderr.join(''), report: capture.stdout.join('') }
 }
 
 // For a test of what a check reports; the few that are about the command as a program (the working directory, the environment, exit and signals) spawn it.
 export async function kayCheck(args: string[]): Promise<Run> {
-  return kayRun(check, 'check', args)
+  return kayRun(check, args)
 }
 
 const CLI = join(import.meta.dir, '../src/cli.ts')
@@ -139,7 +138,7 @@ export async function kayBuild(args: string[], env: Record<string, string> = { N
   Object.assign(process.env, env)
 
   try {
-    return await kayRun(build, 'build', args)
+    return await kayRun(build, args)
   }
   finally {
     for (const [name, value] of Object.entries(previous)) {
@@ -170,7 +169,7 @@ export async function kayInProject(name: keyof typeof IN_PROJECT, args: string[]
   process.chdir(root)
 
   try {
-    return await kayRun(IN_PROJECT[name], name, args)
+    return await kayRun(IN_PROJECT[name], args)
   }
   finally {
     process.chdir(origin)

@@ -9,11 +9,10 @@ import { ENTRY_RECORD, EXECUTABLE_RECORD, MANIFEST } from '../server/client'
 import { START_PARENT } from '../server/parent'
 import { exitCode, FORWARDED, MAX_WORKERS, parseWorkers, platformWorkers, superviseWorkers } from '../server/workers'
 import { count, isPort, projectRoot } from './command'
-import { USAGES } from './usages'
 
 // Serves the last build as the deployed server would: the executable `kay build --compile` made, else the server entry, in production.
 export const start: Command = {
-  usage: USAGES.start,
+  usage: 'start [dir] [--entry <file>] [--port <port>] [--host <address>] [--workers <n|auto>] [--quiet]',
   options: { entry: { type: 'string' }, port: { type: 'string' }, host: { type: 'string' }, workers: { type: 'string' }, quiet: { type: 'boolean' } },
   positionals: 1,
   run: async ({ values: { entry: option, port, host, workers, quiet }, positionals: [path] }, refuse) => {

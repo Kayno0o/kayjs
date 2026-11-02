@@ -6,7 +6,6 @@ import process from 'node:process'
 import { engines } from '../../package.json'
 import { DEPRECATION_MINORS, minorAfter, minorOf, UPGRADE_FROM } from '../compiler/lints'
 import { done, printFailure, projectRoot } from './command'
-import { USAGES } from './usages'
 
 // What an upgrade asks of the outside: the registry, the package manager and the project's own kay, which a test replaces so none of them is reached.
 export interface UpgradeDeps {
@@ -96,7 +95,7 @@ async function staleBun(root: string): Promise<boolean> {
 
 // Moves kay and the kay libraries an app lists to their latest version, installs, then has that kay rewrite the old forms the minors crossed deprecated, one minor at a time, and report what is left to do by hand.
 export const upgrade: Command = {
-  usage: USAGES.upgrade,
+  usage: 'upgrade [dir] [--dry-run] [--quiet]',
   options: { 'dry-run': { type: 'boolean' }, 'quiet': { type: 'boolean' } },
   positionals: 1,
   run: async ({ values, positionals: [dir] }) => {

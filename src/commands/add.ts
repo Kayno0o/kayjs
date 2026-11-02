@@ -2,10 +2,9 @@ import type { Command } from './command'
 import { resolve } from 'node:path'
 import { addFeatures } from '../add'
 import { count, done, formatOption, printDocument, reportFailure } from './command'
-import { USAGES } from './usages'
 
 export const add: Command = {
-  usage: USAGES.add,
+  usage: 'add <features> [dir] [--no-install] [--dry-run] [--format text|json] [--quiet]',
   options: { 'no-install': { type: 'boolean' }, 'dry-run': { type: 'boolean' }, 'format': { type: 'string' }, 'quiet': { type: 'boolean' } },
   positionals: 2,
   run: async ({ values, positionals: [features, dir = '.'] }, refuse) => {

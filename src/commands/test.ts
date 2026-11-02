@@ -4,7 +4,6 @@ import process from 'node:process'
 import { mapPosition } from '../build/sourcemap'
 import { transformKay } from '../build/transform'
 import { projectRoot } from './command'
-import { USAGES } from './usages'
 
 // A `.kay` position in Bun's report, the path absolute.
 const KAY_POSITION = /(\/[^\s()]+\.kay):(\d+):(\d+)/g
@@ -17,7 +16,7 @@ const WATCHING = new Set(['--watch', '--hot'])
 
 // Runs `bun test` in the project with what a kay project's tests need, so nothing but a test script is written: each file in modules of its own (`--isolate`, which gives each file its own test database), `kay/test/preload` loaded, and the `.kay` positions Bun reports pointed at the lines of the source.
 export const test: Command = {
-  usage: USAGES.test,
+  usage: 'test [bun test arguments]...',
   options: {},
   positionals: Infinity,
   // Every argument is `bun test`'s, `--watch`, `--changed` and `--help` included.

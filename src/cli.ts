@@ -1,49 +1,16 @@
 #!/usr/bin/env bun
-import type { Command, KayCommand } from './commands/command'
+import type { KayCommand } from './commands/command'
 import type { ExtensionCommand, ExtensionCommands } from './commands/extensions'
+import type { Entry } from './commands/registry'
+import { relative } from 'node:path'
 import process from 'node:process'
+import { COMPLETE, fail, runCli } from '@kaynooo/cli-kit'
+import { version } from '../package.json'
 import { bunProblem } from './bun'
 import { runCommand } from './commands/command'
-import { USAGES } from './commands/usages'
-
-// In the order the usage lists them, each loaded when it is the one run; a name of two words is a subcommand.
-const COMMANDS: Record<keyof typeof USAGES, () => Promise<Command>> = {
-  'new': async () => (await import('./commands/new')).scaffold,
-  'add': async () => (await import('./commands/add')).add,
-  'generate': async () => (await import('./commands/generate')).generateCommand,
-  'dev': async () => (await import('./commands/dev')).dev,
-  'build': async () => (await import('./commands/build')).build,
-  'start': async () => (await import('./commands/start')).start,
-  'render': async () => (await import('./commands/render')).render,
-  'screenshot': async () => (await import('./commands/screenshot')).screenshotCommand,
-  'a11y': async () => (await import('./commands/a11y')).a11y,
-  'check': async () => (await import('./commands/check')).check,
-  'upgrade': async () => (await import('./commands/upgrade')).upgrade,
-  'routes': async () => (await import('./commands/routes')).routes,
-  'not-found': async () => (await import('./commands/not-found')).notFound,
-  'env': async () => (await import('./commands/env')).env,
-  'doctor': async () => (await import('./commands/doctor')).doctor,
-  'explain': async () => (await import('./commands/explain')).explain,
-  'docs': async () => (await import('./commands/docs')).docs,
-  'types': async () => (await import('./commands/types')).types,
-  'fmt': async () => (await import('./commands/fmt')).fmt,
-  'lint': async () => (await import('./commands/lint')).lint,
-  'test': async () => (await import('./commands/test')).test,
-  'i18n missing': async () => (await import('./commands/i18n')).i18nMissing,
-  'i18n accept': async () => (await import('./commands/i18n')).i18nAccept,
-  'migrate': async () => (await import('./commands/migrate')).migrate,
-  'lsp': async () => (await import('./commands/lsp')).lsp,
-  'mcp': async () => (await import('./commands/mcp')).mcp,
-}
-const NAMES = Object.keys(COMMANDS)
-const USAGE = usageOf(Object.values(USAGES))
-
-function usageOf(lines: string[]): string {
-  return lines.map((line, index) => `${index === 0 ? 'Usage: ' : '       '}kay ${line}`).join('\n')
-}
+import { COMMANDS, LEAVES, NAMES, tree } from './commands/registry'
 
 async function main(args: string[]): Promise<number> {
-  const [name] = args
   const problem = bunProblem()
 
   if (problem !== undefined) {
@@ -52,111 +19,24 @@ async function main(args: string[]): Promise<number> {
     return 1
   }
 
-  if (name === '--help' || name === '-h') {
-    console.log(await fullUsage())
+  const { entries, stop } = await extensionEntries(args)
 
-    return 0
-  }
+  if (stop !== undefined)
+    return stop
 
-  const own = ownCommand(args)
-
-  if (own !== undefined)
-    return runCommand(await COMMANDS[own](), args.slice(own.split(' ').length), usageOf([USAGES[own]]))
-
-  return runExtensionCommand(args)
+  return runCli({ name: 'kay', version, about: 'a Bun web framework', commands: tree([...COMMANDS, ...entries]) }, args)
 }
 
-// kay's own command `args` name, a subcommand before the command it is under.
-function ownCommand(args: string[]): keyof typeof COMMANDS | undefined {
-  const two = args.slice(0, 2).join(' ')
+const HELP_FLAGS = new Set(['--help', '-h', 'help'])
 
-  if (args.length > 1 && Object.hasOwn(COMMANDS, two))
-    return two as keyof typeof COMMANDS
+// The commands an extension of the project in the current directory adds (kaynooo/agent-tools#74), unless the command named is one of kay's own. A clash or a config that does not load stops a command being run, and is a warning for the help.
+async function extensionEntries(args: string[]): Promise<{ entries: Entry[], stop?: number }> {
+  const named = args[0] === COMPLETE ? args[1] : args[0]
 
-  return args[0] !== undefined && Object.hasOwn(COMMANDS, args[0]) ? args[0] as keyof typeof COMMANDS : undefined
-}
+  if (named !== undefined && LEAVES.has(named))
+    return { entries: [] }
 
-// A command an extension of the project in the current directory adds; or, for the first word of several commands, as `kay i18n`, their usage.
-async function runExtensionCommand(args: string[]): Promise<number> {
-  const { extensionCommands, loadCommand, matchCommand } = await import('./commands/extensions')
-  let found: ExtensionCommands | undefined
-
-  try {
-    found = args[0] === undefined ? undefined : await extensionCommands(process.cwd(), NAMES)
-  }
-  catch (error) {
-    console.error(error)
-    console.error(USAGE)
-
-    return 1
-  }
-
-  if (found && found.clashes.length > 0) {
-    for (const clash of found.clashes)
-      console.error(`kay: ${clash}`)
-
-    return 1
-  }
-
-  const command = found && matchCommand(found.commands, args)
-
-  if (!found || !command)
-    return groupUsage(args, found?.commands ?? [], loadCommand)
-
-  let loaded: KayCommand
-
-  try {
-    loaded = await loadCommand(command)
-  }
-  catch (error) {
-    console.error(error instanceof Error ? error.message : String(error))
-
-    return 1
-  }
-
-  const { root, config } = found
-
-  return runCommand({ ...loaded, run: async (parsed, refuse) => loaded.run(parsed, refuse, { root, config }) }, args.slice(command.words.length), usageOf([loaded.usage]))
-}
-
-// The usage of the commands under the first word of `args`, kay's and the extensions', on stdout when asked for, on stderr with a failure for anything else.
-async function groupUsage(args: string[], commands: ExtensionCommand[], load: (command: ExtensionCommand) => Promise<{ usage: string }>): Promise<number> {
-  const [group, next] = args
-  const own = Object.entries(USAGES).filter(([name]) => name.startsWith(`${group} `)).map(([, line]) => line)
-  const added = await Promise.all(commands.filter(command => command.words.length > 1 && command.words[0] === group).map(async command => usageLine(command, load)))
-  const lines = [...own, ...added]
-
-  if (lines.length === 0) {
-    console.error(USAGE)
-
-    return 1
-  }
-
-  if (next === undefined || next === '--help' || next === '-h') {
-    console.log(usageOf(lines))
-
-    return 0
-  }
-
-  console.error(`kay: ${group} has no command ${next}\n${usageOf(lines)}`)
-
-  return 1
-}
-
-// A command's usage line, or its name once said on stderr why its module gives none.
-async function usageLine(command: ExtensionCommand, load: (command: ExtensionCommand) => Promise<{ usage: string }>): Promise<string> {
-  try {
-    return (await load(command)).usage
-  }
-  catch (error) {
-    console.error(error instanceof Error ? error.message : String(error))
-
-    return command.name
-  }
-}
-
-// kay's usage, then each extension's commands under its name, when the current directory is a project whose config loads.
-async function fullUsage(): Promise<string> {
+  const asked = named !== undefined && !HELP_FLAGS.has(named)
   const { extensionCommands, loadCommand } = await import('./commands/extensions')
   let found: ExtensionCommands | undefined
 
@@ -164,22 +44,63 @@ async function fullUsage(): Promise<string> {
     found = await extensionCommands(process.cwd(), NAMES)
   }
   catch (error) {
-    console.error(`kay: kay.config.ts did not load, so the commands its extensions add are not listed: ${error instanceof Error ? error.message : String(error)}`)
+    if (!asked) {
+      console.error(`kay: kay.config.ts did not load, so the commands its extensions add are not listed: ${error instanceof Error ? error.message : String(error)}`)
 
-    return USAGE
+      return { entries: [] }
+    }
+
+    console.error(error)
+
+    return { entries: [], stop: 1 }
   }
 
   for (const clash of found?.clashes ?? [])
     console.error(`kay: ${clash}`)
 
-  const sections = Object.entries(Object.groupBy(found?.commands ?? [], command => command.extension))
-  const listed = await Promise.all(sections.map(async ([extension, commands]) => {
-    const lines = await Promise.all(commands!.map(async command => usageLine(command, loadCommand)))
+  if (asked && found !== undefined && found.clashes.length > 0)
+    return { entries: [], stop: 1 }
 
-    return `\n\nFrom ${extension}:\n${lines.map(line => `       kay ${line}`).join('\n')}`
-  }))
+  // A help lists each command by its usage, which takes reading its module; running one reads that one alone, and so does a word that names no group.
+  const names = [...NAMES, ...found?.commands.map(command => command.name) ?? []]
+  const listing = !asked || (args.length <= 2 && (args[1] === undefined || HELP_FLAGS.has(args[1])) && names.some(name => name.startsWith(`${named} `)))
 
-  return USAGE + listed.join('')
+  return { entries: await Promise.all((found?.commands ?? []).map(async command => extensionEntry(command, found!, loadCommand, listing))) }
+}
+
+// The arguments of the command's usage, or its module's path once said on stderr why the module gives none.
+async function usageOf(command: ExtensionCommand, root: string, load: (command: ExtensionCommand) => Promise<KayCommand>): Promise<string> {
+  try {
+    const { usage } = await load(command)
+
+    return usage.startsWith(command.name) && usage.length > command.name.length ? usage.slice(command.name.length).trim() : usage
+  }
+  catch (error) {
+    console.error(error instanceof Error ? error.message : String(error))
+
+    return relative(root, command.module)
+  }
+}
+
+// An extension's command, its module read when it is the one run.
+async function extensionEntry(command: ExtensionCommand, { root, config }: ExtensionCommands, load: (command: ExtensionCommand) => Promise<KayCommand>, listing: boolean): Promise<Entry> {
+  return {
+    name: command.name,
+    summary: listing ? await usageOf(command, root, load) : relative(root, command.module),
+    group: `From ${command.extension}`,
+    run: async (args) => {
+      let loaded: KayCommand
+
+      try {
+        loaded = await load(command)
+      }
+      catch (error) {
+        return fail(error instanceof Error ? error.message : String(error), 1)
+      }
+
+      return runCommand({ ...loaded, run: async (parsed, refuse) => loaded.run(parsed, refuse, { root, config }) }, args)
+    },
+  }
 }
 
 process.exit(await main(process.argv.slice(2)))

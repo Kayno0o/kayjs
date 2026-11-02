@@ -279,7 +279,7 @@ describe('kay start --workers', () => {
     const child = start(dir, String(freePort()), '--workers', 'many')
 
     expect(await new Response(child.stderr).text()).toContain('--workers takes a number')
-    expect(await child.exited).toBe(1)
+    expect(await child.exited).toBe(2)
   })
 
   it('serves from every worker on one port, shares what lived in memory, restarts a killed worker and drains them all', async () => {

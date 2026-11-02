@@ -9,14 +9,13 @@ import { buildingWithoutEnv } from '../server/env-state'
 import { answeredBy, missingStore, NOT_FOUND_FILE } from '../server/not-found'
 import { addRedirect, checkRedirect, redirectEntry, withRedirect } from '../server/not-found-config'
 import { formatOption, printDocument, printFailure, projectRoot, shellQuote, withStdoutOnStderr } from './command'
-import { USAGES } from './usages'
 
 const REFERRER_LIMIT = 3
 
 // The paths visitors asked for and found nothing at, most hit first, read from the file the production server keeps.
 // `--redirect <path>` turns one into a redirect in kay.config.ts, to `--to` or to the suggested target; with `--runtime` it goes in the file instead, which the running site reads with no deploy, answering 307.
 export const notFound: Command = {
-  usage: USAGES['not-found'],
+  usage: 'not-found [dir] [--redirect <path> [--to <target>] [--runtime] [--dry-run]] [--file <database>] [--format text|json]',
   options: { 'format': { type: 'string' }, 'redirect': { type: 'string' }, 'to': { type: 'string' }, 'file': { type: 'string' }, 'runtime': { type: 'boolean' }, 'dry-run': { type: 'boolean' } },
   positionals: 1,
   run: async ({ values, positionals: [path] }, refuse) => {

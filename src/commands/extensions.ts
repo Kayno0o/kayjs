@@ -42,6 +42,8 @@ export async function extensionCommands(root: string, own: string[]): Promise<Ex
       const words = given.trim().split(SPACES)
       const name = words.join(' ')
       const taken = commands.find(command => command.name === name)
+      // A command and another that begins with its words cannot both be reached, as the shorter one would be a group of the longer.
+      const nested = commands.find(command => isPrefix(command.words, words) || isPrefix(words, command.words))
       // A kay command its first words name would take the rest as its arguments.
       const under = words.slice(0, -1).map((_, index) => words.slice(0, index + 1).join(' ')).find(prefix => own.includes(prefix))
 
@@ -53,6 +55,8 @@ export async function extensionCommands(root: string, own: string[]): Promise<Ex
         clashes.push(`the extension ${extension.name} adds the command \`kay ${name}\`, which kay's \`kay ${under}\` takes as its arguments`)
       else if (taken)
         clashes.push(`the extensions ${taken.extension} and ${extension.name} both add the command \`kay ${name}\``)
+      else if (nested)
+        clashes.push(`the extension ${extension.name} adds the command \`kay ${name}\`, which the command \`kay ${nested.name}\` of ${nested.extension} takes as its arguments or as a group`)
       else
         commands.push({ name, words, extension: extension.name, module: resolve(root, module) })
     }
@@ -61,9 +65,8 @@ export async function extensionCommands(root: string, own: string[]): Promise<Ex
   return { root, config, commands, clashes }
 }
 
-// The command whose words begin `args`, the one with the most words when several do.
-export function matchCommand(commands: ExtensionCommand[], args: string[]): ExtensionCommand | undefined {
-  return commands.filter(command => command.words.every((word, index) => args[index] === word)).toSorted((a, b) => b.words.length - a.words.length)[0]
+function isPrefix(start: string[], words: string[]): boolean {
+  return start.length < words.length && start.every((word, index) => words[index] === word)
 }
 
 // The module's command, or an error naming the module and the extension giving it.

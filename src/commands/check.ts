@@ -6,6 +6,7 @@ import type { Command, ProblemFormat } from './command'
 import { existsSync, realpathSync, statSync } from 'node:fs'
 import { isAbsolute, join, relative, resolve, sep } from 'node:path'
 import process from 'node:process'
+import { takesControlCodes } from '@kaynooo/cli-kit'
 import { KAY_FILE, realPath } from '../build/files'
 import { pruneCheckCache } from '../build/transform'
 import { applySafeFixes, check as checkTypes, configCheckOptions } from '../check'
@@ -15,9 +16,8 @@ import { loadConfig, loadConfigWithin } from '../config-loader'
 import { watchProject } from '../dev/sources'
 import { cacheDir } from '../project'
 import { buildingWithoutEnv } from '../server/env-state'
-import { count, done, formatOption, printFailure, printProblems, PROBLEM_FORMATS, projectRoot, takesControlCodes } from './command'
+import { count, done, formatOption, printFailure, printProblems, PROBLEM_FORMATS, projectRoot } from './command'
 import { runProjectChecks } from './project-checks'
-import { USAGES } from './usages'
 
 const CLI = join(import.meta.dir, '../cli.ts')
 // What makes a directory given first the project rather than a path to report on.
@@ -31,7 +31,7 @@ const WATCH_DEBOUNCE_MS = 50
 
 // `--format github` annotates a CI diff and `--format json` gives tools one document; the exit code is the same in every format.
 export const check: Command = {
-  usage: USAGES.check,
+  usage: 'check [dir] [paths...] [-p tsconfig.json] [--entry <file>] [--deny-warnings] [--fix] [--dry-run] [--only <group>] [--since <minor>] [--format text|github|json] [--watch] [--quiet]',
   options: { 'project': { type: 'string', short: 'p' }, 'entry': { type: 'string' }, 'deny-warnings': { type: 'boolean' }, 'fix': { type: 'boolean' }, 'dry-run': { type: 'boolean' }, 'only': { type: 'string' }, 'since': { type: 'string' }, 'format': { type: 'string' }, 'watch': { type: 'boolean' }, 'quiet': { type: 'boolean' } },
   positionals: Infinity,
   run: async ({ values, positionals }) => {

@@ -3,7 +3,7 @@ title: CLI
 order: 1
 description: The kay commands to scaffold, run, check, build and format a project.
 ---
-Every command takes an optional project directory, the current one by default, and prints its usage for `--help`. An option or argument a command does not take prints that command's usage alone, and names the nearest option for a typo. `kay --help` lists every command.
+Every command takes an optional project directory, the current one by default, and prints its usage and options for `--help`. An unknown command, or an option or argument a command does not take, prints the error with a hint, the nearest command or option for a typo, and exits 2; a command that ran and failed exits 1. `kay --help` lists every command, `kay --version` prints the version, and `--plain` or `--color never` turns the colour off.
 
 ```sh
 bunx -p @kaynooo/kayjs kay new my-app
@@ -588,7 +588,7 @@ A message whose line ends on `// draft` is a draft, written by a machine and wai
 
 `kay i18n translate fr` comes from the kayjs-ai library. It fills what `fr` lacks with a model and saves it as drafts. See [kayjs-ai](/libraries/kayjs-ai#translate-what-is-missing).
 
-A library can add commands of its own. `kay i18n` alone lists every `i18n` command, and `kay --help` lists each library's under its name.
+A library can add commands of its own. `kay i18n --help` lists every `i18n` command, and `kay --help` lists each library's under its name.
 
 ## kay not-found
 

@@ -7,11 +7,10 @@ import { colors } from '@kaynooo/utils/tools/colors'
 import { migrateAstroProject } from '../migrate/project'
 import { buildingWithoutEnv } from '../server/env-state'
 import { count, done, formatOption, printDocument, printFailure, shellQuote } from './command'
-import { USAGES } from './usages'
 
 // `kay migrate astro` translates an Astro project's `.astro` files and content config, in place or into `--outdir`, a directory with no package.json getting the kay project around them, and lists what is left to do by hand; `kay migrate content` rewrites the entry files of the folder collections whose `migrations` carried them to the schema's shape.
 export const migrate: Command = {
-  usage: USAGES.migrate,
+  usage: 'migrate astro [dir] [--outdir <dir>] [--dry-run] [--format text|json] [--quiet] | migrate content [dir] [--dry-run] [--format text|json] [--quiet]',
   options: { 'outdir': { type: 'string' }, 'dry-run': { type: 'boolean' }, 'format': { type: 'string' }, 'quiet': { type: 'boolean' } },
   positionals: 2,
   run: async ({ values, positionals }) => {

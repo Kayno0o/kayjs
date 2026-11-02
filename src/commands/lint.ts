@@ -6,11 +6,10 @@ import { loadConfig } from '../config-loader'
 import { buildingWithoutEnv } from '../server/env-state'
 import { printFailure, projectRoot } from './command'
 import { dropStaleLintCache } from './lint-cache'
-import { USAGES } from './usages'
 
 // Writes the types the lint of .kay files reads, then runs the project's `keslint` on the arguments, so linting needs no `kay check` before it.
 export const lint: Command = {
-  usage: USAGES.lint,
+  usage: 'lint [keslint arguments]...',
   options: {},
   positionals: Infinity,
   // Every argument is keslint's, `--fix` and `--help` included.

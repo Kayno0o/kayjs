@@ -4,6 +4,7 @@ What each release of kay and its libraries adds, newest first, each feature with
 
 ## Unreleased
 
+- `kay` runs on `@kaynooo/cli-kit`: `kay --version`, shell completion through `kay __complete`, `--plain` and `--color`, a typo naming the command or option it likely meant, and a usage error (unknown command or option, a missing argument, a `refuse(reason)`) exiting 2 where it exited 1; `kay <command> --help` lists the options with a line each: [project](project.md#commands).
 - kayjs-ui's Combobox draws no second line for an option whose `description` is only whitespace: [tables, tabs and navigation](../packages/ui/llms/tables-navigation-and-layout.md).
 - `kay dev` warns in the browser console of a keyed live value an island reads only in an effect, which the page's render never noted and so no connection follows: [live values](live-values.md).
 - kayjs-ui's Menu and Popover opened `at` a point wait for the release of a pointer button held at that moment, so a context menu opened by Linux's `contextmenu` on the right press stays open: [tabs and navigation](../packages/ui/llms/tables-navigation-and-layout.md).

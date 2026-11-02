@@ -2,10 +2,9 @@ import type { Command } from './command'
 import process from 'node:process'
 import { startServer } from '../lsp/server'
 import { buildingWithoutEnv } from '../server/env-state'
-import { USAGES } from './usages'
 
 export const lsp: Command = {
-  usage: USAGES.lsp,
+  usage: 'lsp --stdio',
   options: { stdio: { type: 'boolean' } },
   positionals: 0,
   run: async () => {

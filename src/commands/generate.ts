@@ -2,10 +2,9 @@ import type { Command } from './command'
 import { resolve } from 'node:path'
 import { generate } from '../generate'
 import { count, done, formatOption, printDocument, reportFailure } from './command'
-import { USAGES } from './usages'
 
 export const generateCommand: Command = {
-  usage: USAGES.generate,
+  usage: 'generate <page|component|island|action|api|guard|resource> <name> [field:type...] [dir] [--dir <dir>] [--plural <name>] [--dry-run] [--format text|json] [--quiet]',
   options: { 'dir': { type: 'string' }, 'dry-run': { type: 'boolean' }, 'format': { type: 'string' }, 'plural': { type: 'string' }, 'quiet': { type: 'boolean' } },
   positionals: Infinity,
   run: async ({ values, positionals: [kind, name, ...rest] }, refuse) => {

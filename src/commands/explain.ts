@@ -6,11 +6,10 @@ import { ERROR_GROUPS, errorList, ERRORS, explainError, isErrorCode, isErrorGrou
 import { explainLint, isLint, isLintGroup, LINT_GROUPS, lintList, LINTS } from '../compiler/lints'
 import { docFiles, searchDocs } from '../docs-search'
 import { formatOption, printDocument, printFailure } from './command'
-import { USAGES } from './usages'
 
 // Lists the lints and the errors, or a group's, or explains the lint or error named.
 export const explain: Command = {
-  usage: USAGES.explain,
+  usage: 'explain [lint|error|group] [--format text|json]',
   options: { format: { type: 'string' } },
   positionals: 1,
   run: ({ values, positionals: [name] }) => {

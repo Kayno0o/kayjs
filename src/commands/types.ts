@@ -3,11 +3,10 @@ import { configCheckOptions, writeShadowTypes } from '../check'
 import { loadConfig } from '../config-loader'
 import { buildingWithoutEnv } from '../server/env-state'
 import { count, done, formatOption, printDocument, printFailure, projectRoot } from './command'
-import { USAGES } from './usages'
 
 // Writes `.kay/types`, which the language server, `kay lint` and the editor's ESLint read, without checking anything.
 export const types: Command = {
-  usage: USAGES.types,
+  usage: 'types [dir] [--format text|json] [--quiet]',
   options: { format: { type: 'string' }, quiet: { type: 'boolean' } },
   positionals: 1,
   run: async ({ values, positionals: [dir] }) => {

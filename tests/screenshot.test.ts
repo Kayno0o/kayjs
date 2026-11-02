@@ -552,12 +552,12 @@ describe('kay screenshot refusing before any browser starts', () => {
     expect(stderr).toContain('screenshot')
   })
 
-  it.each([['--width', '100'], ['--width', '9999'], ['--height', '99999'], ['--width', 'wide'], ['--scheme', 'sepia']])('refuses %s %s', async (flag, value) => {
+  it.each([['--width', '100', 1], ['--width', '9999', 1], ['--height', '99999', 1], ['--width', 'wide', 2], ['--scheme', 'sepia', 2]] as const)('refuses %s %s', async (flag, value, exit) => {
     writeDevAddress(root, 'http://localhost:1')
 
     const { code, stderr } = await run(root, ['screenshot', '/', flag, value], noBrowser)
 
-    expect(code).toBe(1)
+    expect(code).toBe(exit)
     expect(stderr).not.toContain('BUN_CHROME_PATH')
   })
 

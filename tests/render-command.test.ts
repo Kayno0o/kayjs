@@ -150,12 +150,12 @@ describe('kay render', () => {
   })
 
   it('refuses what is no path or http URL, and a header without a colon', async () => {
-    expect(await render('about', bare)).toMatchObject({ code: 1, err: expect.stringContaining('kay: kay render takes a path such as /about or an http URL, not about') })
-    expect(await render('/', bare, '--header', 'nocolon')).toMatchObject({ code: 1, err: expect.stringContaining('kay: --header takes "name: value", not nocolon') })
-    expect(await render()).toMatchObject({ code: 1, err: expect.stringContaining('kay: kay render takes the URL to render') })
-    expect(await render('//elsewhere/about', bare)).toMatchObject({ code: 1, err: expect.stringContaining('not //elsewhere/about') })
-    expect(await render('/', bare, '--method', 'get', '--body', 'a=1')).toMatchObject({ code: 1, err: expect.stringContaining('kay: a GET request has no body, so --body needs another --method, such as POST') })
-    expect(await render('/', bare, '--method', 'not a method')).toMatchObject({ code: 1, err: expect.stringContaining('kay: --method takes an HTTP method, not not a method') })
+    expect(await render('about', bare)).toMatchObject({ code: 2, err: expect.stringContaining('kay render takes a path such as /about or an http URL, not about') })
+    expect(await render('/', bare, '--header', 'nocolon')).toMatchObject({ code: 2, err: expect.stringContaining('--header takes "name: value", not nocolon') })
+    expect(await render()).toMatchObject({ code: 2, err: expect.stringContaining('kay render takes the URL to render') })
+    expect(await render('//elsewhere/about', bare)).toMatchObject({ code: 2, err: expect.stringContaining('not //elsewhere/about') })
+    expect(await render('/', bare, '--method', 'get', '--body', 'a=1')).toMatchObject({ code: 2, err: expect.stringContaining('a GET request has no body, so --body needs another --method, such as POST') })
+    expect(await render('/', bare, '--method', 'not a method')).toMatchObject({ code: 2, err: expect.stringContaining('--method takes an HTTP method, not not a method') })
   })
 })
 

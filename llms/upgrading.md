@@ -4,6 +4,11 @@ What each minor release breaks, and what an app changes to move to it. kay and i
 
 ## 1.86.0
 
+### A usage error exits 2
+
+- A command line `kay` cannot take (an unknown command, an unknown option, an argument too many or missing, a `refuse(reason)` of an extension command) exits 2 and prints `error: kay <command>: <reason>` with a `hint:` line, where it exited 1 and printed the reason and the usage. A script or CI step testing for exit 1 on a bad command line tests for 2; a command that ran and failed still exits 1. `kay <command> --help` prints the options with a line each after the usage, and `kay i18n` alone, a group with no command named, is the same error, `kay i18n --help` lists the group. No lint recognises a command line, so none ships with this.
+- An extension command that begins with the words of another extension's (`db` and `db migrate`) stops the command, as the shorter would be a group of the longer: rename one.
+
 ### A module a mounted component imports is the test's own instance
 
 - `mountComponent` no longer runs the project's modules afresh on every mount: a module of the project or a package, a signal store or a `persisted()` signal declared in a module included, is the one the test imports, so its state carries over to the next mount and test. A test that relied on a store starting empty resets it in `afterEach` (`count.set(0)`), and one that wrote `writePersisted` before each mount of a module-level `persisted()` sets the signal instead after the first. A signal declared in the component's own `.kay` file starts fresh as before. `kay check` cannot recognise a test, so there is no deprecated lint.

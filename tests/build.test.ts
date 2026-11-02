@@ -1368,8 +1368,8 @@ describe('kay build checks the project first', () => {
 
     const refused = await build(root, '-p', 'tsconfig.app.json', '--no-check')
 
-    expect(refused.report).toContain('kay: -p names the tsconfig the build checks with, so it does not go with --no-check')
-    expect(refused.code).toBe(1)
+    expect(refused.report).toContain('error: kay build: -p names the tsconfig the build checks with, so it does not go with --no-check')
+    expect(refused.code).toBe(2)
   }, 60_000)
 })
 

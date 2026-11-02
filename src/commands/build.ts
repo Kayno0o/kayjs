@@ -3,6 +3,7 @@ import type { Command, FailureProblem, ProblemFormat } from './command'
 import { writeSync } from 'node:fs'
 import { join, relative, resolve } from 'node:path'
 import process from 'node:process'
+import { progressLine } from '@kaynooo/cli-kit/progress'
 import { buildProject } from '../build/pipeline'
 import { formatBuildReport } from '../build/report'
 import { KayCompileError } from '../build/transform'
@@ -13,12 +14,10 @@ import { ContentError } from '../content/validate'
 import { buildingWithoutEnv } from '../server/env-state'
 import { ExportError } from '../server/prerender'
 import { count, done, explainHint, failureProblem, formatOption, printDocument, printedProblems, printFailure, printProblems, PROBLEM_FORMATS, problemCounts, projectRoot, withStdoutOnStderr, workflowCommand } from './command'
-import { progressLine } from './progress'
-import { USAGES } from './usages'
 
 // With `--compile`, also bundles the server and all of it into one executable; with `--static`, writes the whole site to `--outdir`, `dist` by default, for a host with no server. `--no-check` builds without checking, `--no-cache` without what earlier builds left in `.kay/cache`.
 export const build: Command = {
-  usage: USAGES.build,
+  usage: 'build [dir] [--compile <executable> [--verify | --verify-load]] [--entry <file>] [--static] [--outdir <dir>] [--no-check] [--no-cache] [--analyze] [--deny-warnings] [-p tsconfig.json] [--format text|github|json] [--quiet]',
   options: { 'compile': { type: 'string' }, 'verify': { type: 'boolean' }, 'verify-load': { type: 'boolean' }, 'entry': { type: 'string' }, 'static': { type: 'boolean' }, 'outdir': { type: 'string' }, 'no-check': { type: 'boolean' }, 'no-cache': { type: 'boolean' }, 'analyze': { type: 'boolean' }, 'deny-warnings': { type: 'boolean' }, 'project': { type: 'string', short: 'p' }, 'format': { type: 'string' }, 'quiet': { type: 'boolean' } },
   positionals: 1,
   run: async ({ values, positionals }, refuseUsage) => {

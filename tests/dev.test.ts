@@ -859,17 +859,17 @@ describe.concurrent('kay dev', () => {
 
       const refused = Bun.spawn([process.execPath, cli, 'dev', join(root, 'src/server.ts'), '--entry', 'src/other.ts'], { stdout: 'ignore', stderr: 'pipe' })
 
-      expect(await refused.exited).toBe(1)
+      expect(await refused.exited).toBe(2)
       expect(await new Response(refused.stderr).text()).toContain('is not a directory, and --entry names the server entry already')
 
       const notPort = Bun.spawn([process.execPath, cli, 'dev', root, '--port', '70000'], { stdout: 'ignore', stderr: 'pipe' })
 
-      expect(await notPort.exited).toBe(1)
+      expect(await notPort.exited).toBe(2)
       expect(await new Response(notPort.stderr).text()).toContain('--port takes a port number, not 70000')
 
       const exposed = Bun.spawn([process.execPath, cli, 'dev', root, '--inspect=0.0.0.0:0'], { stdout: 'ignore', stderr: 'pipe' })
 
-      expect(await exposed.exited).toBe(1)
+      expect(await exposed.exited).toBe(2)
       expect(await new Response(exposed.stderr).text()).toContain('--inspect=0.0.0.0:0 opens the debugger past this machine')
 
       const missing = Bun.spawn([process.execPath, cli, 'dev', join(root, 'typo')], { stdout: 'ignore', stderr: 'pipe' })

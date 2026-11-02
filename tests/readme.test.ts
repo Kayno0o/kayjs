@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test'
-import { USAGES } from '../src/commands/usages'
+import { NAMES } from '../src/commands/registry'
 import { compileKay, formatDiagnostic } from '../src/compiler'
 import { formatKay } from '../src/format'
 
@@ -12,7 +12,7 @@ describe('README', () => {
   it('lists exactly the commands of the CLI', () => {
     const listed = [...readme.matchAll(COMMAND_ROW)].map(match => match[1]!)
 
-    expect(listed.toSorted()).toEqual(Object.keys(USAGES).toSorted())
+    expect(listed.toSorted()).toEqual(NAMES.toSorted())
   })
 
   it('links the release notes and the upgrade notes it ships beside', () => {

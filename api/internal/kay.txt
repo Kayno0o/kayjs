@@ -889,7 +889,7 @@ const KAY_DIR: ".kay"
 [./library] KayCommand
 interface KayCommand extends Omit<Command, 'run'>
   normalize?: (args: string[]) => string[]
-  options: ParseArgsOptionsConfig
+  options: CommandOptions
   positionals: number
   run: (parsed: Parsed, refuse: (reason?: string | undefined) => number, project: { root: string; config: KayConfig; }) => number | Promise<number>
   usage: string

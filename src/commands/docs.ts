@@ -8,7 +8,6 @@ import { explainLint, isLint } from '../compiler/lints'
 import { componentPlace, componentProps } from '../docs-props'
 import { docFiles, excerpt, findLabel, isLabel, labelPath, looksLikeLabel, searchDocs } from '../docs-search'
 import { formatOption, printDocument, printFailure } from './command'
-import { USAGES } from './usages'
 
 // The other matches a search lists after the one it prints.
 const OTHERS = 5
@@ -25,7 +24,7 @@ interface Shown {
 
 // Lists the llms files of kay and the installed libraries, prints a file's headings or one section, or the section words match best.
 export const docs: Command = {
-  usage: USAGES.docs,
+  usage: 'docs [words...|<package>/<file>[#<heading>]] [--format text|json]',
   options: { format: { type: 'string' } },
   positionals: Number.POSITIVE_INFINITY,
   run: ({ values, positionals }) => {

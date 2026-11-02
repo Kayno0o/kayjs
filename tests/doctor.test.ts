@@ -89,7 +89,7 @@ describe('kay doctor', () => {
     const root = await project()
 
     expect((await doctor(root, ['nothing-here'])).code).toBe(1)
-    expect((await doctor(root, ['--nope'])).code).toBe(1)
+    expect((await doctor(root, ['--nope'])).code).toBe(2)
   })
 
   it('compares each installed library with the kay beside it by minor, not by patch', async () => {
@@ -289,7 +289,7 @@ describe('kay doctor', () => {
 
     it('fails a port that is no number', async () => {
       expect((await doctor(await project(), [], { PORT: 'http' })).check('port').ok).toBe(false)
-      expect((await doctor(await project(), ['--port', '70000'])).code).toBe(1)
+      expect((await doctor(await project(), ['--port', '70000'])).code).toBe(2)
     })
   })
 

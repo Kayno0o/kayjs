@@ -9,14 +9,13 @@ import { KAY_DIR } from '../build/assets'
 import { loadConfig } from '../config-loader'
 import { buildingWithoutEnv } from '../server/env-state'
 import { count, formatOption, printDocument, printFailure, projectRoot, withStdoutOnStderr } from './command'
-import { USAGES } from './usages'
 
 const STANDARDS = new Set(['rgaa', 'wcag'])
 const FRENCH = /^fr(?:-|$)/i
 
 // Opens every page of the site in a headless Chrome, runs axe-core on it, and drafts the accessibility statement from what it found. Exits 1 on any finding, for CI.
 export const a11y: Command = {
-  usage: USAGES.a11y,
+  usage: 'a11y [dir] [--standard rgaa|wcag] [--declaration <file>] [--dry-run] [--format text|json] [--quiet]',
   options: { 'standard': { type: 'string' }, 'declaration': { type: 'string' }, 'dry-run': { type: 'boolean' }, 'format': { type: 'string' }, 'quiet': { type: 'boolean' } },
   positionals: 1,
   run: async ({ values, positionals: [path] }, refuse) => {

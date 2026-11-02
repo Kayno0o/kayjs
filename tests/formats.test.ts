@@ -192,7 +192,7 @@ describe('kay build --format json', () => {
 
     const alone = await kay(['build', working, '--no-check', '--verify'])
 
-    expect(alone.code).toBe(1)
+    expect(alone.code).toBe(2)
     expect(alone.stderr).toContain('--verify starts the executable --compile writes')
   }, 120_000)
 
@@ -243,9 +243,9 @@ describe('kay build --format json', () => {
     const alone = await kay(['build', '.', '--no-check', '--verify-load'])
     const both = await kay(['build', '.', '--no-check', '--compile', 'server', '--verify', '--verify-load'])
 
-    expect(alone.code).toBe(1)
+    expect(alone.code).toBe(2)
     expect(alone.stderr).toContain('--verify-load loads the modules of the executable --compile writes, so it goes with --compile')
-    expect(both.code).toBe(1)
+    expect(both.code).toBe(2)
     expect(both.stderr).toContain('pick one')
   })
 

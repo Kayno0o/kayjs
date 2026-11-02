@@ -4,7 +4,6 @@ import { loadConfig } from '../config-loader'
 import { startRenderServer } from '../dev/render-server'
 import { basePath, routerPath } from '../server/base'
 import { projectRoot } from './command'
-import { USAGES } from './usages'
 
 const SCHEME = /^https?:\/\//
 // An HTTP method is a token, as RFC 9110 writes it.
@@ -14,7 +13,7 @@ const REDIRECT_STATUS = new Set([301, 302, 303, 307, 308])
 
 // Answers one request as `kay dev` would serve it, the server entry and its plugins included, and prints the body: a server listening on a Unix socket of its own, gone once it answered.
 export const render: Command = {
-  usage: USAGES.render,
+  usage: 'render <url> [dir] [--entry <file>] [--method <method>] [--body <text>] [--header <name: value>]... [--cookie <name=value>]... [-i|--include] [--quiet]',
   options: { entry: { type: 'string' }, method: { type: 'string' }, body: { type: 'string' }, header: { type: 'string', multiple: true }, cookie: { type: 'string', multiple: true }, include: { type: 'boolean', short: 'i' }, quiet: { type: 'boolean' } },
   positionals: 2,
   run: async ({ values, positionals: [url, path] }, refuse) => {

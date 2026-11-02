@@ -10,7 +10,6 @@ import { buildClient } from '../src/build/client'
 import { NOTICES_FILE } from '../src/build/licenses'
 import { check, configCheckOptions } from '../src/check'
 import { runCommand } from '../src/commands/command'
-import { USAGES } from '../src/commands/usages'
 import { nativeExe } from '../src/compiler/native-typescript'
 import { loadConfig } from '../src/config-loader'
 import { formatFiles } from '../src/format'
@@ -326,7 +325,7 @@ async function inProcess(name: keyof typeof COMMANDS, args: string[]): Promise<{
   const error = spyOn(console, 'error').mockImplementation((...parts: unknown[]) => void err.push(parts.join(' ')))
 
   try {
-    const code = await runCommand(await COMMANDS[name](), args, `Usage: kay ${USAGES[name]}`)
+    const code = await runCommand(await COMMANDS[name](), args)
 
     return { stdout: out.map(line => `${line}\n`).join(''), stderr: err.map(line => `${line}\n`).join(''), code }
   }
@@ -352,18 +351,18 @@ describe('kay command line', () => {
     const runs = [...await Promise.all([['--help'], ['-h']].map(async args => ({ args, ...await kay(args) }))), ...await inEach([['build', '--help'], ['check', '-h'], ['new', '--help'], ['fmt', '--help'], ['dev', '--help'], ['lsp', '--help']])]
 
     for (const { args, stdout, stderr, code } of runs)
-      expect({ args, stdout: stdout.startsWith(`Usage: kay ${args[0] === '--help' || args[0] === '-h' ? 'new' : args[0]}`), stderr, code }).toEqual({ args, stdout: true, stderr: '', code: 0 })
+      expect({ args, stdout: stdout.includes(args[0] === '--help' || args[0] === '-h' ? 'Usage: kay <command>' : `Usage: kay ${args[0]}`), stderr, code }).toEqual({ args, stdout: true, stderr: '', code: 0 })
 
-    expect(runs.find(run => run.args[0] === '--help')!.stdout).toContain('kay lsp --stdio')
-    expect(runs.find(run => run.args[0] === 'build')!.stdout.trimEnd().split('\n')).toHaveLength(1)
+    expect(runs.find(run => run.args[0] === '--help')!.stdout).toContain('  lsp ')
+    expect(runs.find(run => run.args[0] === 'build')!.stdout).not.toContain('kay start')
   })
 
-  it('refuses an option or an argument a command does not take, with the usage', async () => {
+  it('refuses an option or an argument a command does not take, as a usage error', async () => {
     // Refused while the arguments are read, before the command runs: nothing is written.
     const runs = await inEach([['new', '--bogus', 'app'], ['fmt', '--bogus'], ['build', '--bogus'], ['check', '--bogus'], ['dev', '--bogus'], ['build', 'a', 'b'], ['check', '-p'], ['new', 'a', 'b']])
 
     for (const { args, stdout, stderr, code } of runs)
-      expect({ args, stdout, usage: stderr.includes(`Usage: kay ${args[0]}`), code }).toEqual({ args, stdout: '', usage: true, code: 1 })
+      expect({ args, stdout, named: stderr.startsWith(`error: kay ${args[0]}: `), code }).toEqual({ args, stdout: '', named: true, code: 2 })
   })
 
   it('refuses kay lint in a project with no keslint, writing nothing', async () => {

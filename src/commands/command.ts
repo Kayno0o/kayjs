@@ -1,13 +1,13 @@
 // What every command of the command line shares: how it is declared and parsed, and how it prints what it did and found.
-import type { ParseArgsOptionsConfig } from 'node:util'
+import type { ParseArgsOptionDescriptor } from 'node:util'
 import type { CheckDiagnostic } from '../check'
 import type { Paint } from '../compiler/frame'
 import type { KayConfig } from '../config'
 import { Console } from 'node:console'
-import { existsSync, realpathSync, statSync } from 'node:fs'
-import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path'
+import { realpathSync, statSync } from 'node:fs'
+import { isAbsolute, join, relative, resolve, sep } from 'node:path'
 import process from 'node:process'
-import { parseArgs } from 'node:util'
+import { badUsage, findUp, HelpShown, parse, printError, UsageError } from '@kaynooo/cli-kit'
 import { colors, createColors } from '@kaynooo/utils/tools/colors'
 import { errorCodeOf } from '../compiler/errors'
 import { offsetAt, positionAt } from '../compiler/mapping'
@@ -19,8 +19,8 @@ const COMMAND_DATA = /[%\r\n]/g
 const COMMAND_PROPERTY = /[%\r\n:,]/g
 const PORT = /^\d{1,5}$/
 const LEADING_DASHES = /^-+/
-const UNKNOWN_OPTION = /^Unknown option '(-[^'=]*)(?:=[^']*)?'/
 const COMMAND_WORDS = /^[a-z][\w-]*(?: [a-z][\w-]*(?= [<[-]|$))*/
+const UNKNOWN_OPTION = /^unknown option '(-[^'=]*)(?:=[^']*)?'/
 // What the console writes to stdout.
 const STDOUT_METHODS = ['log', 'info', 'debug', 'dir', 'dirxml', 'table', 'group', 'groupCollapsed', 'groupEnd', 'count', 'countReset', 'time', 'timeEnd', 'timeLog']
 // Colours a report as rustc does when stderr is a terminal that takes colours, and leaves it plain otherwise.
@@ -34,14 +34,77 @@ export interface Parsed {
   positionals: string[]
 }
 
+// What `parseArgs` takes for an option, with the line the command's `--help` and the shell completion show beside it.
+export type CommandOptions = Record<string, ParseArgsOptionDescriptor & { description?: string }>
+
+// What an option of kay's own commands shows in `--help` and the shell completion when the command gives none; the line is the option's meaning wherever kay takes it.
+const OPTION_HELP: Record<string, string> = {
+  'analyze': 'print what each file weighs in the bundles',
+  'body': 'the request body',
+  'check': 'check without writing',
+  'compile': 'also bundle the server into one executable',
+  'compose': 'a compose file whose variables are read, repeatable',
+  'cookie': 'a cookie to send, repeatable',
+  'declaration': 'the accessibility declaration to write',
+  'deny-warnings': 'fail on warnings too',
+  'dir': 'the project folder',
+  'dry-run': 'print what would change and write nothing',
+  'entry': 'the server entry, when it is not the project\'s own',
+  'example': 'the example file to compare with',
+  'file': 'the database file',
+  'fix': 'apply the safe fixes',
+  'forge': 'the Git host the CI files are written for',
+  'format': 'how to print: text, json or github where the command has it',
+  'from-html': 'convert HTML to kay',
+  'full-page': 'capture the whole page',
+  'header': 'a header to send, repeatable',
+  'height': 'the viewport height in pixels',
+  'host': 'the address to listen on',
+  'include': 'print the response headers too',
+  'inspect': 'start the inspector, on this address when given',
+  'kay': 'the dependency line for kay',
+  'method': 'the request method',
+  'no-cache': 'build without what earlier builds left in .kay/cache',
+  'no-check': 'build without checking',
+  'no-install': 'write the files and install nothing',
+  'no-types': 'do not write the types of the project',
+  'only': 'only the lints of this group',
+  'open': 'open the app in the browser',
+  'outdir': 'where the static site is written',
+  'plural': 'the plural of the name',
+  'port': 'the port to listen on',
+  'project': 'the tsconfig to check with',
+  'quiet': 'print only what fails',
+  'redirect': 'the path to redirect',
+  'runner': 'the label of the CI runner',
+  'runtime': 'redirect while the server runs instead of writing the rule',
+  'scheme': 'light or dark',
+  'since': 'only the lints deprecated since this minor',
+  'standard': 'rgaa or wcag',
+  'static': 'write the whole site, for a host with no server',
+  'stdin': 'read the source from stdin',
+  'stdio': 'talk over stdin and stdout',
+  'template': 'blank, server, site or app',
+  'to': 'where the path is redirected to',
+  'verify': 'start the executable to check it answers',
+  'verify-load': 'load the modules of the executable to check they resolve',
+  'watch': 'check again on every change',
+  'width': 'the viewport width in pixels, repeatable',
+  'with': 'features to add to the template, comma separated',
+  'without': 'features to drop from the template, comma separated',
+  'workers': 'how many workers to serve with, or auto',
+  'write': 'write the result',
+  'yes': 'take the defaults and ask nothing',
+}
+
 export interface Command {
   // Its line of the usage, after `kay `.
   usage: string
-  options: ParseArgsOptionsConfig
+  options: CommandOptions
   positionals: number
   // The arguments as `parseArgs` should read them.
   normalize?: (args: string[]) => string[]
-  // `refuse` prints why the arguments do not go together, then the usage, and answers the exit code.
+  // `refuse` prints why the arguments do not go together, with a hint at `--help`, and answers the exit code, 2.
   run: (parsed: Parsed, refuse: (reason?: string) => number) => Promise<number> | number
 }
 
@@ -50,48 +113,53 @@ export interface KayCommand extends Omit<Command, 'run'> {
   run: (parsed: Parsed, refuse: (reason?: string) => number, project: { root: string, config: KayConfig }) => Promise<number> | number
 }
 
-// Runs a command on its arguments, or prints its `usage`: to stdout for `--help`, to stderr for an option or argument the command does not take.
-export async function runCommand(command: Command, args: string[], usage: string): Promise<number> {
-  const fail = (message?: string) => {
-    console.error(message === undefined ? usage : `${message}\n${usage}`)
+// Runs a command on its arguments: `--help` prints its usage and options, and an option or argument it does not take is a usage error, printed as the kit prints them and answered with exit 2.
+export async function runCommand(command: Command, args: string[]): Promise<number> {
+  const prefix = `kay ${COMMAND_WORDS.exec(command.usage)?.[0] ?? command.usage}`
+  // Printed rather than thrown, so a command's own `try` never takes it for a failure of its work.
+  const refuse = (reason = 'missing argument') => {
+    printError(prefix, reason, `run ${prefix} --help for its options`)
 
-    return 1
+    return 2
   }
-  const refuse = (reason?: string) => fail(reason === undefined ? undefined : `kay: ${reason}`)
   let parsed: Parsed
 
   try {
-    const { values, positionals } = parseArgs({ args: command.normalize?.(args) ?? args, options: { ...command.options, help: { type: 'boolean', short: 'h' } }, allowPositionals: true })
-
-    if (values.help) {
-      console.log(usage)
-
-      return 0
-    }
+    // The kit asks for a description of every option (kaynooo/agent-tools#73).
+    const options = Object.fromEntries(Object.entries(command.options).map(([option, descriptor]) => [option, { description: OPTION_HELP[option] ?? '', ...descriptor }]))
+    const { values, positionals } = parse(command.normalize?.(args) ?? args, `kay ${command.usage}`, options)
 
     if (positionals.length > command.positionals)
-      throw new Error(`unexpected argument ${positionals[command.positionals]}`)
+      badUsage(`unexpected argument ${positionals[command.positionals]}`)
 
-    parsed = { values, positionals }
+    parsed = { values: values as Parsed['values'], positionals }
   }
   catch (error) {
-    return unknownOption(error, command, fail) ?? refuse(error instanceof Error ? error.message : String(error))
+    if (error instanceof HelpShown)
+      return 0
+
+    if (error instanceof UsageError) {
+      printError(prefix, error.message, nearOption(error, command) ?? `run ${prefix} --help for its options`)
+
+      return 2
+    }
+
+    throw error
   }
 
   return command.run(parsed, refuse)
 }
 
-// An option the command does not take, as `kay build: unknown option --no-cache` without `parseArgs`'s hint about `--`, naming the option the command has nearest to a mistyped one.
-function unknownOption(error: unknown, command: Command, fail: (message: string) => number): number | undefined {
-  const unknown = error instanceof Error ? UNKNOWN_OPTION.exec(error.message)?.[1] : undefined
+// The hint for an option the command does not take: the option it has nearest to a mistyped one, which the kit does not name yet (kaynooo/agent-tools#73).
+function nearOption(error: UsageError, command: Command): string | undefined {
+  const unknown = UNKNOWN_OPTION.exec(error.message)?.[1]
 
-  if (unknown === undefined)
+  if (unknown === undefined || !unknown.startsWith('--'))
     return undefined
 
-  const typed = unknown.replace(LEADING_DASHES, '')
-  const near = nearest(typed, [...Object.keys(command.options), 'help'])
+  const near = nearest(unknown.replace(LEADING_DASHES, ''), [...Object.keys(command.options), 'help'])
 
-  return fail(`kay ${COMMAND_WORDS.exec(command.usage)?.[0] ?? command.usage}: unknown option ${unknown}${near === undefined || !unknown.startsWith('--') ? '' : `, did you mean --${near}?`}`)
+  return near === undefined ? undefined : `did you mean --${near}?`
 }
 
 // The directory a command works on, or nothing once it said, in `format`, that the path is none.
@@ -114,7 +182,7 @@ export function warnOtherKay(command: string, root: string): void {
   let imported: string
 
   // Without a `node_modules` above it, Bun would install npm's own `kay`, another package, to resolve it: seconds of network for every command.
-  if (!kayInstalledAbove(root))
+  if (findUp('node_modules/kay', root) === undefined)
     return
 
   try {
@@ -132,16 +200,6 @@ export function warnOtherKay(command: string, root: string): void {
   const own = resolve(imported, '../../..')
 
   console.warn(`kay ${command}: this is the kay at ${resolve(running, '../../..')}, but the project imports the one at ${own}; run the project's own, \`bun ${relative(realpathSync(root), join(own, 'src/cli.ts'))}\`, or reinstall if its node_modules/.bin/kay links elsewhere`)
-}
-
-function kayInstalledAbove(root: string): boolean {
-  for (let dir = root; ; dir = dirname(dir)) {
-    if (existsSync(join(dir, 'node_modules', 'kay')))
-      return true
-
-    if (dir === dirname(dir))
-      return false
-  }
 }
 
 // What a command did, on stdout so a terminal does not take it for an error: the verb in green, how long it took dimmed.

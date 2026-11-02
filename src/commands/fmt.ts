@@ -5,7 +5,6 @@ import { fromCompile } from '../check/shadow-types'
 import { formatDiagnostic } from '../compiler'
 import { formatFiles, formatSource } from '../format'
 import { count, done, formatOption, printDocument, printedProblems, printFailure, problemCounts, toStderr } from './command'
-import { USAGES } from './usages'
 
 // `--from-html`: the HTML in a file, or on stdin, printed as a `.kay` template, what could not be translated listed on stderr.
 async function fromHtml(paths: string[], check: boolean, format: ProblemFormat): Promise<number> {
@@ -84,7 +83,7 @@ function stdinClash(values: { 'check'?: boolean, 'from-html'?: boolean }, format
 
 // Formats in place; with `--check` lists the files that are not formatted and fails, with `--dry-run` lists them and succeeds.
 export const fmt: Command = {
-  usage: USAGES.fmt,
+  usage: 'fmt [paths...] [--check | --dry-run] [--format text|json] [--quiet] | fmt --stdin [path] | fmt --from-html [file] [--format text|json]',
   options: { 'check': { type: 'boolean' }, 'dry-run': { type: 'boolean' }, 'from-html': { type: 'boolean' }, 'stdin': { type: 'boolean' }, 'format': { type: 'string' }, 'quiet': { type: 'boolean' } },
   positionals: Infinity,
   run: async ({ values, positionals: paths }, refuse) => {

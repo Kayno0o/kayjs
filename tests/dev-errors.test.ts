@@ -249,7 +249,7 @@ describe('kay dev --format json', () => {
     const said = spyOn(console, 'error').mockImplementation(() => undefined)
 
     try {
-      expect(await runCommand(devCommand, [project, '--format', 'json', `--inspect=127.0.0.1:${held.port}`], 'usage')).toBe(1)
+      expect(await runCommand(devCommand, [project, '--format', 'json', `--inspect=127.0.0.1:${held.port}`])).toBe(1)
       expect(said).toHaveBeenCalledWith(expect.stringContaining('in use'))
       expect(console.log).toBe(log)
     }
@@ -269,10 +269,10 @@ describe('kay dev --format json', () => {
     await Bun.write(join(project, 'src/routes/index.kay'), 'p Home\n')
 
     try {
-      expect(await runCommand(devCommand, [project, '--format', 'json', `--inspect=127.0.0.1:${held.port}`], 'usage')).toBe(1)
+      expect(await runCommand(devCommand, [project, '--format', 'json', `--inspect=127.0.0.1:${held.port}`])).toBe(1)
       expect(signals()).toEqual(before)
 
-      const running = runCommand(devCommand, [project, '--port', '0', '--format', 'json'], 'usage')
+      const running = runCommand(devCommand, [project, '--port', '0', '--format', 'json'])
 
       await until(() => process.listenerCount('SIGTERM') > before[1]!, 20_000)
       process.emit('SIGTERM')
@@ -288,7 +288,7 @@ describe('kay dev --format json', () => {
   it('refuses another format', async () => {
     const child = Bun.spawn([process.execPath, CLI, 'dev', '--format', 'yaml'], { stdout: 'ignore', stderr: 'pipe' })
 
-    expect(await child.exited).toBe(1)
-    expect(await new Response(child.stderr).text()).toStartWith('kay: --format takes `text` or `json`, not `yaml`\n')
+    expect(await child.exited).toBe(2)
+    expect(await new Response(child.stderr).text()).toStartWith('error: kay dev: --format takes `text` or `json`, not `yaml`\n')
   })
 })

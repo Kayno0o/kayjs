@@ -9,11 +9,10 @@ import { messagesFile } from '../server/i18n'
 import { acceptDrafts } from '../server/message-drafts'
 import { missingTranslations } from '../server/translations'
 import { count, done, formatOption, printDocument, printFailure, projectRoot, withStdoutOnStderr } from './command'
-import { USAGES } from './usages'
 
 // What each locale lacks against the default locale: message keys, its extensions' included, and the entries of its localized collections.
 export const i18nMissing: Command = {
-  usage: USAGES['i18n missing'],
+  usage: 'i18n missing [locale] [dir] [--format text|json]',
   options: { format: { type: 'string' } },
   positionals: 2,
   run: async ({ values, positionals: [wanted, path] }) => {
@@ -67,7 +66,7 @@ export const i18nMissing: Command = {
 
 // Deletes the `// draft` comment of every message of a locale's file, a person having checked them.
 export const i18nAccept: Command = {
-  usage: USAGES['i18n accept'],
+  usage: 'i18n accept <locale> [dir] [--dry-run]',
   options: { 'dry-run': { type: 'boolean' } },
   positionals: 2,
   run: async ({ values, positionals: [locale, path] }, refuse) => {

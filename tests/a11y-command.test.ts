@@ -172,7 +172,7 @@ describe('kay a11y refusing before it builds anything', () => {
   it('refuses a standard it does not know', async () => {
     const { code, stderr } = await run('.', ['--standard', 'section508'])
 
-    expect(code).toBe(1)
+    expect(code).toBe(2)
     expect(stderr).toContain('--standard takes rgaa or wcag')
   })
 })

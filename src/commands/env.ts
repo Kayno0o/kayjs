@@ -12,7 +12,6 @@ import { registerLoader } from '../server/loader'
 import { formatOption, printDocument, printedProblems, printFailure, printProblems, projectRoot, withStdoutOnStderr } from './command'
 import { compareEnv, defaultEnvFiles, withDeclaredVariables } from './env-compare'
 import { importApi } from './import-module'
-import { USAGES } from './usages'
 
 // A variable with the place that declares it.
 export interface Listed extends EnvVariable {
@@ -49,7 +48,7 @@ const METRICS_VARIABLES: EnvVariable[] = [
 
 // Every variable the project's `defineEnv` schemas and its extensions declare, with whether each is required, in production only or always, and its default. The server entry is not run: the modules under `src` that call `defineEnv` are imported without the server's environment.
 export const env: Command = {
-  usage: USAGES.env,
+  usage: 'env [dir] [--compose <file>]... [--example <file>] [--write] [--format text|json]',
   options: { format: { type: 'string' }, compose: { type: 'string', multiple: true }, example: { type: 'string' }, write: { type: 'boolean' } },
   positionals: 1,
   run: async ({ values, positionals: [path] }) => {

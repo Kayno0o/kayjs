@@ -2,14 +2,13 @@ import type { Command } from './command'
 import process from 'node:process'
 import { McpServer } from '../mcp/protocol'
 import { projectCapabilities, stopChildren } from '../mcp/tools'
-import { USAGES } from './usages'
 
 // How long calls in flight get to answer once the client closed its input.
 const SHUTDOWN_GRACE_MS = 10_000
 
 // Serves the project at the current directory to an agent as MCP tools and resources, over stdio: the agent's client starts it, from the project's root.
 export const mcp: Command = {
-  usage: USAGES.mcp,
+  usage: 'mcp [--stdio]',
   options: { stdio: { type: 'boolean' } },
   positionals: 0,
   run: async () => {

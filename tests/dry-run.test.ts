@@ -105,7 +105,7 @@ describe('--dry-run', () => {
   it('fmt refuses --check beside --dry-run', async () => {
     const { stderr, code } = await kay(['fmt', '--check', '--dry-run'], await project({}))
 
-    expect(code).toBe(1)
+    expect(code).toBe(2)
     expect(stderr).toContain('--check fails on an unformatted file')
   })
 
@@ -149,7 +149,7 @@ describe('--format json', () => {
   it('refuses the flags of before 1.74 as unknown options', async () => {
     const root = await project({})
 
-    expect((await kay(['new', 'app', '--host', 'github', '--dry-run'], root)).stderr).toContain('unknown option --host')
-    expect((await kay(['migrate', 'astro', '--out', 'out', '--dry-run'], root)).stderr).toContain('unknown option --out')
+    expect((await kay(['new', 'app', '--host', 'github', '--dry-run'], root)).stderr).toContain('unknown option \'--host\'')
+    expect((await kay(['migrate', 'astro', '--out', 'out', '--dry-run'], root)).stderr).toContain('unknown option \'--out\'')
   })
 })

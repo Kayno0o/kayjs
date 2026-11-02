@@ -278,7 +278,7 @@ describe('kay i18n', () => {
     expect((await kay(['i18n', 'accept', 'fr'], root)).stdout).toBe('src/messages/fr.ts holds no draft\n')
     expect((await kay(['i18n', 'accept', 'de'], root)).stderr).toContain('src/messages/de.ts does not exist')
     expect((await kay(['i18n', 'accept', 'it'], root)).stderr).toContain('it is not one of the locales i18n lists: en, fr, de')
-    expect((await kay(['i18n', 'accept'], root)).code).toBe(1)
+    expect((await kay(['i18n', 'accept'], root)).code).toBe(2)
   })
 
   it('accept --dry-run counts the drafts and leaves the file as it was', async () => {
@@ -335,26 +335,29 @@ describe('kay i18n', () => {
 
   it('alone lists every i18n command, the libraries\' included', async () => {
     const root = await project(site)
-    const { stdout, code } = await kay(['i18n'], root)
+    const { stdout, code } = await kay(['i18n', '--help'], root)
 
     expect(code).toBe(0)
-    expect(stdout).toContain('Usage: kay i18n missing')
-    expect(stdout).toContain('kay i18n accept <locale> [dir]')
-    expect(stdout).toContain('kay i18n translate <locale>')
+    expect(stdout).toContain('Usage: kay i18n <command> [options]')
+    expect(stdout).toContain('missing    list the translations a locale lacks')
+    expect(stdout).toContain('accept     accept the translations of a locale as they are')
+    expect(stdout).toContain('translate  <locale>')
 
+    const alone = await kay(['i18n'], root)
     const wrong = await kay(['i18n', 'nope'], root)
 
-    expect(wrong.code).toBe(1)
-    expect(wrong.stderr).toContain('kay: i18n has no command nope')
+    expect([alone.code, wrong.code]).toEqual([2, 2])
+    expect(alone.stderr).toContain('translate')
+    expect(wrong.stderr).toBe('error: kay i18n: no command nope\n  hint: run kay i18n --help for its commands\n')
   })
 
   it('names a library\'s command module that does not load in one line, and lists the rest', async () => {
     const root = await project({ ...site, 'lib/translate.ts': 'throw new Error(\'broken module\')\n' })
-    const { stdout, stderr, code } = await kay(['i18n'], root)
+    const { stdout, stderr, code } = await kay(['i18n', '--help'], root)
 
     expect(code).toBe(0)
-    expect(stdout).toContain('kay i18n accept <locale> [dir]')
-    expect(stdout).toContain('       kay i18n translate\n')
+    expect(stdout).toContain('accept     accept the translations of a locale as they are')
+    expect(stdout).toContain('translate  lib/translate.ts\n')
     expect(stderr.trim().split('\n')).toHaveLength(1)
     expect(stderr).toContain('which the extension kay-lib gives as `kay i18n translate`, does not load: broken module')
   })
@@ -371,9 +374,9 @@ describe('commands an extension adds', () => {
 
     const refused = await kay(['hello', 'world'], root)
 
-    expect(refused.code).toBe(1)
-    expect(refused.stderr).toBe('kay: hello world needs someone to greet\nUsage: kay hello world <who>\n')
-    expect((await kay(['hello', 'world', '--help'], root)).stdout).toBe('Usage: kay hello world <who>\n')
+    expect(refused.code).toBe(2)
+    expect(refused.stderr).toBe('error: kay hello world: hello world needs someone to greet\n  hint: run kay hello world --help for its options\n')
+    expect((await kay(['hello', 'world', '--help'], root)).stdout).toStartWith('Usage: kay hello world <who>\n')
   })
 
   it('are listed by kay --help under the library\'s name', async () => {
@@ -381,8 +384,8 @@ describe('commands an extension adds', () => {
     const { stdout, code } = await kay(['--help'], root)
 
     expect(code).toBe(0)
-    expect(stdout).toContain('Usage: kay new <dir>')
-    expect(stdout).toContain('\n\nFrom kay-lib:\n       kay hello world <who>\n       kay i18n translate <locale>\n')
+    expect(stdout).toContain('  new ')
+    expect(stdout).toContain('\nFrom kay-lib:\n  hello       commands of kay hello\n')
   })
 
   it('stop at a name kay has, one under a kay command, or one two extensions give, naming both', async () => {
@@ -405,8 +408,8 @@ describe('commands an extension adds', () => {
     const root = await project({ ...library, 'lib/bad.ts': 'export const nothing = 1\n', 'kay.config.ts': 'export default { favicon: false, extensions: [{ name: \'kay-lib\', commands: { bad: \'./lib/bad.ts\' } }] }\n' })
     const unknown = await kay(['nope'], root)
 
-    expect(unknown.code).toBe(1)
-    expect(unknown.stderr).toStartWith('Usage: kay new')
+    expect(unknown.code).toBe(2)
+    expect(unknown.stderr).toStartWith('error: kay: no command nope')
 
     const bad = await kay(['bad'], root)
 
@@ -419,7 +422,7 @@ describe('commands an extension adds', () => {
     const { stdout, stderr, code } = await kay(['--help'], root)
 
     expect(code).toBe(0)
-    expect(stdout).toStartWith('Usage: kay new')
+    expect(stdout).toContain('  new ')
     expect(stderr.trim().split('\n')).toHaveLength(1)
     expect(stderr).toContain('kay.config.ts did not load, so the commands its extensions add are not listed: config broke')
   })

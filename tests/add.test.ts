@@ -323,7 +323,7 @@ it('runs as kay add, printing what it wrote', async () => {
 
     const bare = Bun.spawn([process.execPath, join(repo, 'src/cli.ts'), 'add'], { stdout: 'pipe', stderr: 'pipe' })
 
-    expect(await bare.exited).toBe(1)
+    expect(await bare.exited).toBe(2)
   }
   finally {
     await rm(join(dir, '..'), { recursive: true, force: true })

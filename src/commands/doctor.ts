@@ -1,7 +1,8 @@
 import type { Command } from './command'
 import { existsSync, readFileSync } from 'node:fs'
-import { dirname, join } from 'node:path'
+import { join } from 'node:path'
 import process from 'node:process'
+import { findUp } from '@kaynooo/cli-kit'
 import { version as runningVersion } from '../../package.json'
 import { KAY_DIR } from '../build/assets'
 import { bunProblem } from '../bun'
@@ -12,7 +13,6 @@ import { readManifest } from '../server/client'
 import { buildingWithoutEnv } from '../server/env-state'
 import { formatOption, isPort, printDocument, projectRoot, withStdoutOnStderr } from './command'
 import { listEnv } from './env'
-import { USAGES } from './usages'
 
 export interface Check {
   name: string
@@ -38,7 +38,7 @@ const QUOTED = /^(['"`])(.*)\1$/
 
 // Everything that can keep a project from running, one check each: a fault is reported with what to do about it, and the others still run.
 export const doctor: Command = {
-  usage: USAGES.doctor,
+  usage: 'doctor [dir] [--port <port>] [--format text|json]',
   options: { format: { type: 'string' }, port: { type: 'string' } },
   positionals: 1,
   run: async ({ values, positionals: [path] }, refuse) => {
@@ -98,14 +98,13 @@ function bunCheck(root: string): Check {
 
 // The version installed in the project's node_modules or in one above it, where a workspace hoists it.
 function installedVersion(root: string, name: string): string | undefined {
-  for (let dir = root; ; dir = dirname(dir)) {
-    try {
-      return (JSON.parse(readFileSync(join(dir, 'node_modules', name, 'package.json'), 'utf8')) as { version?: string }).version
-    }
-    catch {}
+  const manifest = findUp(join('node_modules', name, 'package.json'), root)
 
-    if (dirname(dir) === dir)
-      return undefined
+  try {
+    return manifest === undefined ? undefined : (JSON.parse(readFileSync(manifest, 'utf8')) as { version?: string }).version
+  }
+  catch {
+    return undefined
   }
 }
 
