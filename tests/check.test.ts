@@ -4150,6 +4150,8 @@ describe.concurrent('kay check, unused code', () => {
       'export interface Account { name: string, session?: { token: string } | null }',
       'export interface Tree { name: string, apiKey?: string, children: Tree[] }',
       'export type Deep = { l1: { l2: { l3: { l4: { l5: { l6: { l7: { l8: { l9: { l10: { password: string } } } } } } } } } } }',
+      'export interface Span { content: string, color?: string }',
+      'export const spans: { tokens: Span[] } = { tokens: [] }',
       'export const row: Row = { id: 1, email: \'a@b.c\', emailVerified: true }',
       'export const account: Account = { name: \'a\' }',
       'export const tree: Tree = { name: \'a\', children: [] }',
@@ -4158,7 +4160,7 @@ describe.concurrent('kay check, unused code', () => {
     ].join('\n')
 
     async function secrets(page: string): Promise<[number, string | undefined, string][]> {
-      const root = await scratchProject({ 'src/types.ts': types, 'src/components/island.kay': island, 'src/routes/index.kay': `--- server\nimport Island from '../components/island.kay'\nimport { signal } from 'kay'\nimport { account, dated, deep, row, tree } from '../types'\nimport type { Row } from '../types'\n\nconst rows: Row[] = [row]\nconst byId = new Map<number, Row>()\nconst api = { API_KEY: 'x', name: 'n' }\nconst open = signal(0)\n---\n${page}\n` })
+      const root = await scratchProject({ 'src/types.ts': types, 'src/components/island.kay': island, 'src/routes/index.kay': `--- server\nimport Island from '../components/island.kay'\nimport { signal } from 'kay'\nimport { account, dated, deep, row, spans, tree } from '../types'\nimport type { Row } from '../types'\n\nconst rows: Row[] = [row]\nconst byId = new Map<number, Row>()\nconst api = { API_KEY: 'x', name: 'n' }\nconst open = signal(0)\n---\n${page}\n` })
 
       try {
         return (await check(root, { lints: { 'unread-name': 'allow' } })).filter(d => d.file.endsWith('index.kay') && d.code !== undefined).map(d => [d.line, d.code, d.message])
@@ -4192,8 +4194,8 @@ describe.concurrent('kay check, unused code', () => {
       }
     })
 
-    it('stays silent once the fields are picked, flags and counts, dates, a type deeper than eight levels, and an allowed line', async () => {
-      const found = await secrets('Island(data={{ id: rows[0]!.id, name: \'a\' }})\nIsland(data={{ emailVerified: true, tokenCount: 3 }})\nIsland(data={deep})\nIsland(data={dated})\n// kay-allow secret-prop\nIsland(data={row})')
+    it('stays silent once the fields are picked, flags and counts, a list of objects, dates, a type deeper than eight levels, and an allowed line', async () => {
+      const found = await secrets('Island(data={{ id: rows[0]!.id, name: \'a\' }})\nIsland(data={{ emailVerified: true, tokenCount: 3 }})\nIsland(data={deep})\nIsland(data={dated})\nIsland(data={spans})\n// kay-allow secret-prop\nIsland(data={row})')
 
       expect(found).toEqual([])
     })
