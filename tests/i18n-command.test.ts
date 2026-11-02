@@ -388,20 +388,31 @@ describe('commands an extension adds', () => {
     expect(stdout).toContain('\nFrom kay-lib:\n  hello       commands of kay hello\n')
   })
 
+  it('list a multi-word command by its usage under its first word, reading only the modules that help lists', async () => {
+    const root = await project({ ...site, 'lib/bad.ts': 'throw new Error(\'broken module\')\n', 'kay.config.ts': `export default { favicon: false, extensions: [{ name: 'kay-lib', commands: { 'hello world': './lib/hello.ts', 'other thing': './lib/bad.ts' } }] }\n` })
+    const group = await kay(['hello', '--help'], root)
+    const top = await kay(['--help'], root)
+
+    expect(group.code).toBe(0)
+    expect(group.stdout).toContain('world  <who>')
+    expect(group.stderr).toBe('')
+    expect(top.stdout).toContain('  other       commands of kay other\n')
+  })
+
   it('stop at a name kay has, one under a kay command, or one two extensions give, naming both', async () => {
     const clash = async (commands: string, more = '') => project({ ...library, 'kay.config.ts': `export default { favicon: false, extensions: [{ name: 'kay-lib', commands: ${commands} }${more}] }\n` })
 
-    expect((await kay(['hello', 'world'], await clash('{ check: \'./lib/hello.ts\' }'))).stderr).toBe('kay: the extension kay-lib adds the command `kay check`, which kay has\n')
-    expect((await kay(['hello', 'world'], await clash('{ \'i18n missing\': \'./lib/hello.ts\' }'))).stderr).toBe('kay: the extension kay-lib adds the command `kay i18n missing`, which kay has\n')
-    expect((await kay(['hello', 'world'], await clash('{ \'check  foo\': \'./lib/hello.ts\' }'))).stderr).toBe('kay: the extension kay-lib adds the command `kay check foo`, which kay\'s `kay check` takes as its arguments\n')
-    expect((await kay(['hello', 'world'], await clash('{ \'i18n missing foo\': \'./lib/hello.ts\' }'))).stderr).toBe('kay: the extension kay-lib adds the command `kay i18n missing foo`, which kay\'s `kay i18n missing` takes as its arguments\n')
-    expect((await kay(['hello', 'world'], await clash('{ \' \': \'./lib/hello.ts\' }'))).stderr).toBe('kay: the extension kay-lib adds a command with no name\n')
-    expect((await kay(['hello', 'world'], await clash('{ i18n: \'./lib/hello.ts\' }'))).stderr).toBe('kay: the extension kay-lib adds the command `kay i18n`, which kay has\n')
+    expect((await kay(['hello', 'world'], await clash('{ check: \'./lib/hello.ts\' }'))).stderr).toBe('error: kay: the extension kay-lib adds the command `kay check`, which kay has\n')
+    expect((await kay(['hello', 'world'], await clash('{ \'i18n missing\': \'./lib/hello.ts\' }'))).stderr).toBe('error: kay: the extension kay-lib adds the command `kay i18n missing`, which kay has\n')
+    expect((await kay(['hello', 'world'], await clash('{ \'check  foo\': \'./lib/hello.ts\' }'))).stderr).toBe('error: kay: the extension kay-lib adds the command `kay check foo`, which kay\'s `kay check` takes as its arguments\n')
+    expect((await kay(['hello', 'world'], await clash('{ \'i18n missing foo\': \'./lib/hello.ts\' }'))).stderr).toBe('error: kay: the extension kay-lib adds the command `kay i18n missing foo`, which kay\'s `kay i18n missing` takes as its arguments\n')
+    expect((await kay(['hello', 'world'], await clash('{ \' \': \'./lib/hello.ts\' }'))).stderr).toBe('error: kay: the extension kay-lib adds a command with no name\n')
+    expect((await kay(['hello', 'world'], await clash('{ i18n: \'./lib/hello.ts\' }'))).stderr).toBe('error: kay: the extension kay-lib adds the command `kay i18n`, which kay has\n')
 
     const twice = await kay(['hello', 'world', 'Ada'], await clash('{ \'hello world\': \'./lib/hello.ts\' }', ', { name: \'other-lib\', commands: { \'hello world\': \'./lib/translate.ts\' } }'))
 
     expect(twice.code).toBe(1)
-    expect(twice.stderr).toBe('kay: the extensions kay-lib and other-lib both add the command `kay hello world`\n')
+    expect(twice.stderr).toBe('error: kay: the extensions kay-lib and other-lib both add the command `kay hello world`\n')
   })
 
   it('leave a name no one has to the usage, and a module exporting no command said', async () => {

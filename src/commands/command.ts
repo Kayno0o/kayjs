@@ -7,20 +7,17 @@ import { Console } from 'node:console'
 import { realpathSync, statSync } from 'node:fs'
 import { isAbsolute, join, relative, resolve, sep } from 'node:path'
 import process from 'node:process'
-import { badUsage, findUp, HelpShown, parse, printError, UsageError } from '@kaynooo/cli-kit'
+import { badUsage, findUp, parse, printError } from '@kaynooo/cli-kit'
 import { colors, createColors } from '@kaynooo/utils/tools/colors'
 import { errorCodeOf } from '../compiler/errors'
 import { offsetAt, positionAt } from '../compiler/mapping'
-import { nearest } from '../nearest'
 
 const SHELL_SAFE = /^[\w@%+=:,./-]+$/
 // What a workflow command's message and properties escape.
 const COMMAND_DATA = /[%\r\n]/g
 const COMMAND_PROPERTY = /[%\r\n:,]/g
 const PORT = /^\d{1,5}$/
-const LEADING_DASHES = /^-+/
 const COMMAND_WORDS = /^[a-z][\w-]*(?: [a-z][\w-]*(?= [<[-]|$))*/
-const UNKNOWN_OPTION = /^unknown option '(-[^'=]*)(?:=[^']*)?'/
 // What the console writes to stdout.
 const STDOUT_METHODS = ['log', 'info', 'debug', 'dir', 'dirxml', 'table', 'group', 'groupCollapsed', 'groupEnd', 'count', 'countReset', 'time', 'timeEnd', 'timeLog']
 // Colours a report as rustc does when stderr is a terminal that takes colours, and leaves it plain otherwise.
@@ -113,7 +110,7 @@ export interface KayCommand extends Omit<Command, 'run'> {
   run: (parsed: Parsed, refuse: (reason?: string) => number, project: { root: string, config: KayConfig }) => Promise<number> | number
 }
 
-// Runs a command on its arguments: `--help` prints its usage and options, and an option or argument it does not take is a usage error, printed as the kit prints them and answered with exit 2.
+// Runs a command on its arguments: `--help` prints its usage and options, and an option or argument it does not take throws the kit's usage error, which `runCli` prints, with a hint at the option meant, and answers with exit 2.
 export async function runCommand(command: Command, args: string[]): Promise<number> {
   const prefix = `kay ${COMMAND_WORDS.exec(command.usage)?.[0] ?? command.usage}`
   // Printed rather than thrown, so a command's own `try` never takes it for a failure of its work.
@@ -122,44 +119,13 @@ export async function runCommand(command: Command, args: string[]): Promise<numb
 
     return 2
   }
-  let parsed: Parsed
+  const options = Object.fromEntries(Object.entries(command.options).map(([option, descriptor]) => [option, OPTION_HELP[option] === undefined ? descriptor : { description: OPTION_HELP[option], ...descriptor }]))
+  const { values, positionals } = parse(command.normalize?.(args) ?? args, `kay ${command.usage}`, options)
 
-  try {
-    // The kit asks for a description of every option (kaynooo/agent-tools#73).
-    const options = Object.fromEntries(Object.entries(command.options).map(([option, descriptor]) => [option, { description: OPTION_HELP[option] ?? '', ...descriptor }]))
-    const { values, positionals } = parse(command.normalize?.(args) ?? args, `kay ${command.usage}`, options)
+  if (positionals.length > command.positionals)
+    badUsage(`unexpected argument ${positionals[command.positionals]}`)
 
-    if (positionals.length > command.positionals)
-      badUsage(`unexpected argument ${positionals[command.positionals]}`)
-
-    parsed = { values: values as Parsed['values'], positionals }
-  }
-  catch (error) {
-    if (error instanceof HelpShown)
-      return 0
-
-    if (error instanceof UsageError) {
-      printError(prefix, error.message, nearOption(error, command) ?? `run ${prefix} --help for its options`)
-
-      return 2
-    }
-
-    throw error
-  }
-
-  return command.run(parsed, refuse)
-}
-
-// The hint for an option the command does not take: the option it has nearest to a mistyped one, which the kit does not name yet (kaynooo/agent-tools#73).
-function nearOption(error: UsageError, command: Command): string | undefined {
-  const unknown = UNKNOWN_OPTION.exec(error.message)?.[1]
-
-  if (unknown === undefined || !unknown.startsWith('--'))
-    return undefined
-
-  const near = nearest(unknown.replace(LEADING_DASHES, ''), [...Object.keys(command.options), 'help'])
-
-  return near === undefined ? undefined : `did you mean --${near}?`
+  return command.run({ values: values as Parsed['values'], positionals }, refuse)
 }
 
 // The directory a command works on, or nothing once it said, in `format`, that the path is none.

@@ -186,6 +186,7 @@ describe('usage on a refusal', () => {
     const help = await kay(['build', '--help'], root)
 
     expect(typo.stderr).toBe('error: kay build: unknown option \'--no-chek\'\n  hint: did you mean --no-check?\n')
+    expect((await kay(['check', '--onyl'], root)).stderr).toBe('error: kay check: unknown option \'--onyl\'\n  hint: did you mean --only?\n')
     expect(help.code).toBe(0)
     expect(help.stdout).toStartWith('Usage: kay build [dir]')
     expect(help.stdout).toContain('[--no-cache]')

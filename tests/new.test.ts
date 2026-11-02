@@ -3,6 +3,7 @@ import { chmod, cp, mkdir, mkdtemp, readdir, rm, stat, symlink } from 'node:fs/p
 import { tmpdir } from 'node:os'
 import { basename, join, posix, relative } from 'node:path'
 import process from 'node:process'
+import { runCli } from '@kaynooo/cli-kit'
 import { afterAll, describe, expect, it, spyOn } from 'bun:test'
 import { parse, stringify } from 'devalue'
 import { ASSET_PREFIX, clientDir, outputDir } from '../src/build/assets'
@@ -317,7 +318,7 @@ const COMMANDS = {
   new: async () => (await import('../src/commands/new')).scaffold,
 }
 
-// What `kay <name> <args>` prints and answers, through `runCommand` as the CLI runs it, for a command that stops at its usage or a refusal.
+// What `kay <name> <args>` prints and answers, through `runCli` as the CLI runs it, for a command that stops at its usage or a refusal.
 async function inProcess(name: keyof typeof COMMANDS, args: string[]): Promise<{ stdout: string, stderr: string, code: number }> {
   const out: string[] = []
   const err: string[] = []
@@ -325,7 +326,7 @@ async function inProcess(name: keyof typeof COMMANDS, args: string[]): Promise<{
   const error = spyOn(console, 'error').mockImplementation((...parts: unknown[]) => void err.push(parts.join(' ')))
 
   try {
-    const code = await runCommand(await COMMANDS[name](), args)
+    const code = await runCli({ name: 'kay', version: '0.0.0', about: 'test', commands: { [name]: { summary: name, run: async rest => runCommand(await COMMANDS[name](), rest) } } }, [name, ...args])
 
     return { stdout: out.map(line => `${line}\n`).join(''), stderr: err.map(line => `${line}\n`).join(''), code }
   }

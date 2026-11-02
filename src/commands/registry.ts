@@ -1,12 +1,13 @@
 // kay's own commands, each loaded when it is the one run, and how they and an extension's are laid out for the CLI.
-import type { Command as CliCommand } from '@kaynooo/cli-kit'
+import type { Command as CliCommand, Summary } from '@kaynooo/cli-kit'
 import type { Command } from './command'
 import { runCommand } from './command'
 
 // A command as a name of one word or two (a subcommand), what the help says of it, and how it runs.
 export interface Entry {
   name: string
-  summary: string
+  // Read only where a help or a completion lists the command, when it is a function.
+  summary: Summary
   run: (args: string[]) => Promise<number>
   // The heading the command is listed under in `kay --help`.
   group?: string
@@ -49,8 +50,6 @@ export const COMMANDS: Entry[] = [
   own('mcp', 'serve the project to an agent as MCP tools', async () => (await import('./mcp')).mcp),
 ]
 export const NAMES = COMMANDS.map(command => command.name)
-// What `kay <word>` runs on its own, so no extension is read for it.
-export const LEAVES = new Set(NAMES.filter(name => !NAMES.some(other => other.startsWith(`${name} `))))
 const SPACES = / /
 
 // The entries as the kit dispatches them: the first word of several a group of subcommands, in the order met.
@@ -65,7 +64,7 @@ export function tree(entries: Entry[]): Record<string, CliCommand> {
     for (const word of words.slice(0, -1)) {
       const next = level[word]
 
-      if (next && 'commands' in next) {
+      if (next && 'commands' in next && typeof next.commands !== 'function') {
         level = next.commands
       }
       else {
