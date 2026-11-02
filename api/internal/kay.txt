@@ -621,7 +621,7 @@ function formInvalid(target: unknown, name: string): "true" | undefined
 function formMarked(element: Element, target: unknown, field: string): void
 
 [./internal] formProtection
-function formProtection(target: unknown): string
+function formProtection(target: unknown, kept?: boolean): string
 
 [./internal] formValue
 function formValue(target: unknown, name: string): string | undefined
