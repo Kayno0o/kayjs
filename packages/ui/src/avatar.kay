@@ -7,7 +7,7 @@ import { effect, signal } from 'kay'
 // 'kui-avatar' is the component's name for an app's CSS and tests, and carries no rule of its own that the utilities do not.
 const look = recipe({
   parts: {
-    root: 'kui-avatar inline-grid size-8 shrink-0 place-items-center overflow-hidden rounded-[calc(infinity*1px)] border-solid border-[var(--color-border)] bg-surface-strong [border-width:var(--border-width)]',
+    root: 'kui-avatar inline-grid size-8 shrink-0 [&:is(a)]:no-underline place-items-center overflow-hidden rounded-[calc(infinity*1px)] border-solid border-[var(--color-border)] bg-surface-strong [border-width:var(--border-width)]',
     image: 'size-full object-cover',
     // Its colours are set inline, seeded by the name.
     initial: 'grid size-full place-items-center text-xs [font-weight:var(--font-weight-semibold)] uppercase',
@@ -16,7 +16,7 @@ const look = recipe({
   defaults: { size: 'md' },
 })
 
-const { src, name, size = 'md', label, fallback, onLoad, onError, ...rest } = props<Omit<JSX.IntrinsicElements['span'], 'class' | 'children' | 'role' | 'onLoad' | 'onError'> & {
+const { src, name, size = 'md', label, href, fallback, onLoad, onError, ...rest } = props<Omit<JSX.IntrinsicElements['span'], 'class' | 'children' | 'role' | 'onLoad' | 'onError'> & {
   src?: string | null | undefined
   // Seeds the fallback's colour and gives its initial.
   name: string
@@ -28,6 +28,8 @@ const { src, name, size = 'md', label, fallback, onLoad, onError, ...rest } = pr
   onLoad?: ((event: Event) => unknown) | undefined
   // Called when the picture fails to load, as the fallback takes its place.
   onError?: ((event: Event) => unknown) | undefined
+  // Makes the avatar a link, to the person's page: the `label`, else the name, names it.
+  href?: string | undefined
 }>()
 
 const failed = signal(false)
@@ -40,8 +42,7 @@ effect(() => {
 
 const ground = () => stringToHexColor(name)
 ---
-// The picture, or the name's initial on a colour seeded by the name when there is none or it fails to load.
-span({...rest} data-size={size} role={label ? 'img' : undefined} aria-label={label})
+snippet face()
   if src && !failed()
     // kay-allow unsized-image
     img(part="image" src={src} alt="" onLoad={event => onLoad?.(event)} onError={event => { failed = true; onError?.(event) }})
@@ -49,3 +50,11 @@ span({...rest} data-size={size} role={label ? 'img' : undefined} aria-label={lab
     | {fallback}
   else
     span(part="initial" aria-hidden="true" style={`background-color: ${ground()}; color: ${isDark(ground()) ? '#fff' : '#000'}`}) {[...name.trim()][0]}
+
+// The picture, or the name's initial on a colour seeded by the name when there is none or it fails to load.
+if href !== undefined
+  a(part="root" {...rest} href={href} data-size={size} aria-label={label ?? name})
+    {face()}
+else
+  span(part="root" {...rest} data-size={size} role={label ? 'img' : undefined} aria-label={label})
+    {face()}

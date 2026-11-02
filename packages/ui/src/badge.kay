@@ -7,7 +7,7 @@ import Icon from './icon.kay'
 
 const look = recipe({
   parts: {
-    root: 'kui-badge inline-flex items-center gap-1 border-solid bg-surface px-1.5 py-px text-xs tracking-normal whitespace-nowrap [border-color:var(--_badge-color,var(--color-border))] [border-width:var(--border-width)] [color:var(--_badge-color,var(--color-muted))] [font-family:inherit] [text-transform:none] data-stamp:bg-[var(--color-background)] data-stamp:px-2.5 data-stamp:py-1 data-stamp:font-mono data-stamp:text-[0.625rem]/[1.4] data-stamp:font-normal data-stamp:tracking-[0.14em] data-stamp:uppercase data-stamp:transition-colors data-stamp:duration-150 data-stamp:[border-color:var(--_badge-color,var(--color-foreground))] data-stamp:[border-width:var(--border-width)] data-stamp:[color:var(--_badge-color,var(--color-foreground))] group-hover:data-stamp:bg-[var(--color-surface-strong)] data-solid:[background-color:var(--_badge-color,var(--color-muted))] data-solid:[border-color:var(--_badge-color,var(--color-muted))] data-solid:[color:var(--color-accent-foreground)]',
+    root: 'kui-badge inline-flex items-center gap-1 border-solid bg-surface px-1.5 py-px text-xs tracking-normal whitespace-nowrap [border-color:var(--_badge-color,var(--color-border))] [border-width:var(--border-width)] [color:var(--_badge-color,var(--color-muted))] [font-family:inherit] [text-transform:none] [&:is(a)]:no-underline data-stamp:bg-[var(--color-background)] data-stamp:px-2.5 data-stamp:py-1 data-stamp:font-mono data-stamp:text-[0.625rem]/[1.4] data-stamp:font-normal data-stamp:tracking-[0.14em] data-stamp:uppercase data-stamp:transition-colors data-stamp:duration-150 data-stamp:[border-color:var(--_badge-color,var(--color-foreground))] data-stamp:[border-width:var(--border-width)] data-stamp:[color:var(--_badge-color,var(--color-foreground))] group-hover:data-stamp:bg-[var(--color-surface-strong)] data-solid:[background-color:var(--_badge-color,var(--color-muted))] data-solid:[border-color:var(--_badge-color,var(--color-muted))] data-solid:[color:var(--color-accent-foreground)]',
     icon: 'size-3',
   },
   // A tone sets one variable that the base colours read, so no tone class has to beat a neutral colour of the base.
@@ -24,9 +24,11 @@ const look = recipe({
   defaults: { tone: 'neutral' },
 })
 
-const { tone = 'neutral', variant, icon, label, ...rest } = props<Omit<JSX.IntrinsicElements['span'], 'class'> & {
+const { tone = 'neutral', variant, icon, label, href, ...rest } = props<Omit<JSX.IntrinsicElements['span'], 'class'> & {
   icon?: IconSlot | IconProps | undefined
   label?: string | number | undefined
+  // Makes the badge a link, such as a tag leading to the list it names.
+  href?: string | undefined
   // `outline` is a hairline in the tone. `solid` is filled with the tone, its text in `--color-accent-foreground`. `stamp` is a rubber stamp: a hairline in its text colour, small spaced capitals, filled again while a `.group` holding it is hovered.
   variant?: 'outline' | 'solid' | 'stamp' | undefined
 }>()
@@ -34,9 +36,16 @@ const { tone = 'neutral', variant, icon, label, ...rest } = props<Omit<JSX.Intri
 const stamped = () => variant === 'stamp'
 const filled = () => variant === 'solid'
 ---
-// A label that does nothing: a count, a status, a tag.
-span({...rest} data-tone={tone} data-stamp={stamped() ? '' : undefined} data-solid={filled() && !stamped() ? '' : undefined})
+snippet content()
   if icon
     Icon(icon={icon} part="icon")
   | {label}
   slot
+
+// A label that does nothing: a count, a status, a tag; with `href`, a link.
+if href !== undefined
+  a(part="root" {...rest} href={href} data-tone={tone} data-stamp={stamped() ? '' : undefined} data-solid={filled() && !stamped() ? '' : undefined})
+    {content()}
+else
+  span(part="root" {...rest} data-tone={tone} data-stamp={stamped() ? '' : undefined} data-solid={filled() && !stamped() ? '' : undefined})
+    {content()}

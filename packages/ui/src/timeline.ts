@@ -12,4 +12,6 @@ export interface TimelineEntry<Key extends string | number = string> {
   tone?: 'muted' | 'accent' | 'success' | 'warning' | 'danger' | 'info' | undefined
   // False keeps the entry plain text when the timeline is selectable; true by default.
   pickable?: boolean | undefined
+  // Makes the entry a link, to the page it stands for. It is no button then: `onSelect` is not called, and `selected` marks it `aria-current` in place of `aria-pressed`.
+  href?: string | undefined
 }

@@ -5,15 +5,17 @@ import { recipe } from 'kay'
 // 'kui-card' stays as the component's name for an app's CSS and tests.
 const look = recipe({
   parts: {
-    root: 'kui-card flex flex-col [overflow-wrap:anywhere] rounded-lg border-[length:var(--border-width)] border-solid border-border bg-surface [box-shadow:var(--shadow-raised)]',
+    root: 'kui-card flex flex-col [overflow-wrap:anywhere] rounded-lg border-[length:var(--border-width)] border-solid border-border bg-surface [box-shadow:var(--shadow-raised)] data-linked:relative data-linked:[&_:is(a,button,input,select,textarea,summary):not([data-part=link])]:relative data-linked:[&_:is(a,button,input,select,textarea,summary):not([data-part=link])]:z-10',
     head: 'flex items-center gap-3 border-b-[length:var(--border-width)] border-solid border-border px-3 py-2',
     // mr-auto rather than ml-auto on what follows: a head that is all control and no title reads from the left, like the body under it.
     title: 'mr-auto text-2xs [font-weight:var(--font-weight-normal)] [letter-spacing:var(--tracking-label)] text-muted [font-family:var(--font-label,inherit)] [text-transform:var(--label-case)]',
     body: 'p-[calc(var(--spacing)*2.5*var(--density))]',
+    // The link covers the card through its `::after`, so a click anywhere on the card follows it, and every control in the card is lifted above it.
+    link: 'text-inherit no-underline after:absolute after:inset-0 after:content-[""] hover:underline focus-visible:outline-none focus-visible:after:outline-2 focus-visible:after:outline-offset-2 focus-visible:after:outline-accent focus-visible:after:rounded-lg',
   },
 })
 
-const { title, level = 3, head, bare = false, ...rest } = props<Omit<JSX.IntrinsicElements['section'], 'class' | 'title'> & {
+const { title, level = 3, head, bare = false, href, ...rest } = props<Omit<JSX.IntrinsicElements['section'], 'class' | 'title'> & {
   // Engraved along the top, on a rule of its own. A `@title` block draws markup inside the heading instead of the string: an icon, a link, a badge.
   title?: string | Snippet | undefined
   // The title's heading level, under the page's outline; `1` for a card that is the whole page, such as a sign-in panel.
@@ -22,25 +24,34 @@ const { title, level = 3, head, bare = false, ...rest } = props<Omit<JSX.Intrins
   head?: Snippet
   // No inset body, for content that runs to the card's edge: a chart, a table, a console.
   bare?: boolean | undefined
-}>()
+} & (
+  | { href?: undefined }
+  // Makes the whole card a link, to the page it stands for: the title is the link's text, which is why one is needed, and the controls in the card, `head` included, stay clickable.
+  | { href: string, title: string | Snippet }
+)>()
 ---
+snippet label()
+  if href !== undefined
+    a(part="link" href={href}) {title}
+  else
+    | {title}
 // The frame a page's content is written on; every part of it is optional, so a card with no title is the frame alone.
-section({...rest})
+section({...rest} data-linked={href === undefined ? undefined : ''})
   if title !== undefined || head
     div(part="head")
       if title !== undefined
         if level === 1
-          h1(part="title") {title}
+          h1(part="title") {label()}
         else if level === 2
-          h2(part="title") {title}
+          h2(part="title") {label()}
         else if level === 3
-          h3(part="title") {title}
+          h3(part="title") {label()}
         else if level === 4
-          h4(part="title") {title}
+          h4(part="title") {label()}
         else if level === 5
-          h5(part="title") {title}
+          h5(part="title") {label()}
         else
-          h6(part="title") {title}
+          h6(part="title") {label()}
       | {head}
   if bare
     slot

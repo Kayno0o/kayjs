@@ -9,7 +9,7 @@ const look = recipe({
   parts: {
     root: 'kui-timeline m-0 flex list-none flex-col gap-1 p-0',
     item: 'group/entry text-sm data-[tone=muted]:text-muted',
-    entry: 'flex w-full items-baseline gap-3 rounded-md px-3 py-2 text-start [&:is(button)]:cursor-pointer [&:is(button)]:hover:bg-surface-strong [&:is(button)]:aria-pressed:bg-accent/15',
+    entry: 'flex w-full items-baseline gap-3 rounded-md px-3 py-2 text-start [&:is(button,a)]:cursor-pointer [&:is(button,a)]:hover:bg-surface-strong [&:is(button)]:aria-pressed:bg-accent/15 [&:is(a)]:text-inherit [&:is(a)]:no-underline [&:is(a)]:aria-current:bg-accent/15',
     time: 'w-28 shrink-0 tabular-nums text-muted',
     icon: 'size-4 shrink-0 self-center group-data-[tone=accent]/entry:text-accent group-data-[tone=success]/entry:text-success group-data-[tone=warning]/entry:text-warning group-data-[tone=danger]/entry:text-danger group-data-[tone=info]/entry:text-info',
     text: 'min-w-0',
@@ -45,7 +45,13 @@ function pick(entry: TimelineEntry<Key>) {
 ol(part="root" {...rest} aria-label={label})
   for entry of entries key={entry.key}
     li(part="item" data-tone={entry.tone})
-      if selectable() && entry.pickable !== false
+      if entry.href !== undefined
+        a(part="entry" href={entry.href} aria-current={picked() === entry.key ? 'true' : undefined})
+          span(part="time") {entry.time}
+          if entry.icon
+            Icon(icon={entry.icon} part="icon")
+          span(part="text") {entry.text}
+      else if selectable() && entry.pickable !== false
         button(part="entry" type="button" aria-pressed={picked() === entry.key} onClick={() => pick(entry)})
           span(part="time") {entry.time}
           if entry.icon
