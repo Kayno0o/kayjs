@@ -154,14 +154,14 @@ describe('FormDialog', () => {
     expect(root.querySelector<HTMLDialogElement>('dialog')?.open).toBe(true)
   })
 
-  test('toasts failure for a handler\'s refusal when no refused reads it', async () => {
+  test('toasts the words of a handler\'s refusal when no refused reads it', async () => {
     const root = await formDialog(async () => ({ fail: { error: 'You already filed that slug', field: 'name' } }), true)
 
     submit(root)
     await settle()
 
     expect(root.querySelector('[data-part="issue"]')).toBeNull()
-    expect([...root.querySelectorAll('.kui-toast [data-part=message]')].at(-1)?.textContent).toBe('Could not rename')
+    expect([...root.querySelectorAll('.kui-toast [data-part=message]')].at(-1)?.textContent).toBe('You already filed that slug')
   })
 
   test('submits on Ctrl+Enter from a textarea, which keeps a plain Enter for new lines, on a form holding a control named requestSubmit too', async () => {
