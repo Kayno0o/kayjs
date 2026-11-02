@@ -759,6 +759,7 @@ export async function browse(url: string, options: BrowserOptions = {}): Promise
       await send('down', x, y)
 
       let released = false
+      let last = [x, y]
 
       try {
         if (touch)
@@ -769,8 +770,10 @@ export async function browse(url: string, options: BrowserOptions = {}): Promise
 
         const [tx, ty] = toAt === undefined ? await center(to) : await pointAt(to, toAt)
 
-        for (let step = 1; step <= steps; step++)
-          await send('move', x + ((tx - x) * step / steps), y + ((ty - y) * step / steps))
+        for (let step = 1; step <= steps; step++) {
+          last = [x + ((tx - x) * step / steps), y + ((ty - y) * step / steps)]
+          await send('move', last[0]!, last[1]!)
+        }
 
         released = true
         await send('up', tx, ty)
@@ -779,7 +782,7 @@ export async function browse(url: string, options: BrowserOptions = {}): Promise
         // A drag that failed on the way leaves no button held down.
         if (!released) {
           try {
-            await send('up', x, y)
+            await send('up', last[0]!, last[1]!)
           }
           catch {
             // The failure that ended the drag is the one reported.
