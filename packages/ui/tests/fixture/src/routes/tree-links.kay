@@ -1,10 +1,12 @@
 ---
+import { navigate } from 'kay'
 import type { TreeNode } from '@kaynooo/kayjs-ui'
 import TreeView from '@kaynooo/kayjs-ui/tree-view.kay'
 
 const nodes: TreeNode[] = [
-  { id: 'group', label: 'Group', children: [{ id: 'here', label: 'Here', href: '/tree-links' }, { id: 'other', label: 'Other', href: '/tree-links?view=b' }] },
+  { id: 'group', label: 'Group', children: [{ id: 'here', label: 'Here', href: '/tree-links', menu: [{ label: 'Rename', onSelect: () => undefined }] }, { id: 'other', label: 'Other', href: '/tree-links?view=b' }] },
 ]
 ---
 main
   TreeView#links(nodes={nodes} label="Links")
+  button#go(type="button" onClick={() => navigate({ query: { view: 'b' } })}) Other view

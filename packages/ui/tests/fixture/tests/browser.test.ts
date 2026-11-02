@@ -1702,3 +1702,37 @@ inBrowser('the states of a Combobox option and a FileDrop', () => {
     expect(page.errors).toEqual([])
   }, 120_000)
 })
+
+inBrowser('TreeView link rows in the browser', () => {
+  const selected = (page: Awaited<ReturnType<Awaited<ReturnType<typeof shared>>['open']>>) => page.evaluate(() => [...document.querySelectorAll('#links [role=treeitem]')].filter(row => row.getAttribute('aria-selected') === 'true').map(row => row.querySelector('a')?.getAttribute('href')))
+
+  test('the selection follows a query written after the mount and a step back', async () => {
+    const site = await shared()
+
+    await using page = await site.open('/tree-links')
+
+    expect(await selected(page)).toEqual(['/tree-links'])
+    await page.click('#go')
+    await page.waitUntil((() => document.querySelector('#links [aria-selected=true] a')?.getAttribute('href') === '/tree-links?view=b') as never)
+    expect(await selected(page)).toEqual(['/tree-links?view=b'])
+    await page.back()
+    await page.waitUntil((() => document.querySelector('#links [aria-selected=true] a')?.getAttribute('href') === '/tree-links') as never)
+    expect(await selected(page)).toEqual(['/tree-links'])
+    expect(page.errors).toEqual([])
+  }, 120_000)
+
+  test('focus returns to the row when its context menu closes', async () => {
+    const site = await shared()
+
+    await using page = await site.open('/tree-links')
+    const focusedRow = () => page.evaluate(() => document.activeElement?.closest('[role=treeitem]')?.textContent?.trim())
+
+    await page.evaluate(() => document.querySelector('#links [role=treeitem] a[href="/tree-links"]')!.closest('[role=treeitem]')!.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: 40, clientY: 40 })))
+    await page.waitFor('[role=menuitem]')
+    expect(await focusedRow()).not.toBe('Here')
+    await page.press('Escape')
+    await page.waitUntil((() => !document.querySelector('[popover]:popover-open')) as never)
+    expect(await focusedRow()).toBe('Here')
+    expect(page.errors).toEqual([])
+  }, 120_000)
+})
