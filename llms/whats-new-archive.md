@@ -2,6 +2,12 @@
 
 What each release before 1.84 added, and the end of a newest release that was cut short (`(continued)`), newest first, each feature with where it is documented. The newer releases are in [What's new](whats-new.md); what a release breaks is in [Upgrading](upgrading.md).
 
+## Unreleased (continued)
+
+- A page fills a named slot of its layout: `slot sidebar` in the layout (the lines under it show when a page fills nothing) and a `@sidebar` block at the root of the page, rendered in place on the server and swapped with the page, nested layouts passing it through or filling it themselves, and `kay check` reporting a block no layout above declares, `kay` refusing a slot named `children` or like the layout's server data, and a component in the block reading what its page provides: [routing](routing.md#fill-a-slot-of-the-layout).
+- A dom test and the component it mounts share the modules the component imports from the project and from packages, a signal store included: `mock.module()` reaches its static and dynamic imports, and a value the test sets, or imports from one of the project's files, is the component's: [testing](testing.md).
+- `testSite()` boots an app with `offline` before `kay build` has written `.kay/client`, so `bun run test` runs on a fresh clone and in CI: `/sw.js` answers with a worker listing no build files: [testing](testing.md).
+
 ## 1.83.0
 
 - kayjs-ai: `ground(found, read)` turns the rows pg-orm 8's `nearest()` found into the `system` and `sources` of an `ask`, so a chat answers from the app's own documents and cites them, and the fake answers it all under `bun test`: [Speech and embeddings](../packages/ai/llms/speech-and-embeddings.md).
