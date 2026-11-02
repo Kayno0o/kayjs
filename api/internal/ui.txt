@@ -1136,9 +1136,10 @@ interface MediaItem
 interface MenuAction
   danger?: boolean
   disabled?: boolean
+  href?: string | undefined
   icon?: IconProps | IconSlot
   label: string
-  onSelect: () => unknown
+  onSelect?: (() => unknown) | undefined
   tone?: "neutral" | "danger" | undefined
 
 [./lib/index] MenuEntry
@@ -1589,13 +1590,17 @@ function playSource(video: HTMLVideoElement, src: string): () => void
 interface MenuAction
   danger?: boolean
   disabled?: boolean
+  href?: string | undefined
   icon?: IconProps | IconSlot
   label: string
-  onSelect: () => unknown
+  onSelect?: (() => unknown) | undefined
   tone?: "neutral" | "danger" | undefined
 
 [./lib/menu] MenuEntry
 type MenuEntry = MenuAction | 'separator'
+
+[./lib/menu] opensOutside
+function opensOutside(href: string): boolean
 
 [./lib/menu-look] MENU_FOOTER
 const MENU_FOOTER: "flex w-full cursor-pointer items-center gap-2 px-2 py-1.5 text-left text-sm outline-none hover:bg-hover focus:bg-hover focus-visible:[box-shadow:inset_2px_0_0_var(--color-accent)] focus-visible:[outline-offset:-2px] focus-visible:[outline:2px_solid_transparent] border-0 border-t border-solid border-border font-medium text-accent"

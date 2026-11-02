@@ -85,3 +85,57 @@ test('a Menu at a point runs the entry picked after it closes, and a light dismi
 
   expect(menu.matches(':popover-open')).toBe(true)
 })
+
+test('a Menu entry with an href is a link, new-tab with noopener when it leaves the origin, and a disabled one stays a button', async () => {
+  mounted = await mountComponent(Menus)
+
+  const items = [...mounted.root.querySelectorAll('#links [data-part=item]')]
+  const [same, away, off, plain] = items as HTMLElement[]
+
+  expect(items.map(item => item.tagName)).toEqual(['A', 'A', 'BUTTON', 'BUTTON'])
+  expect(same!.getAttribute('role')).toBe('menuitem')
+  expect(same!.getAttribute('href')).toBe('/here')
+  expect(same!.hasAttribute('target')).toBe(false)
+  expect([away!.getAttribute('target'), away!.getAttribute('rel')]).toEqual(['_blank', 'noopener noreferrer'])
+  expect(off!.hasAttribute('disabled')).toBe(true)
+  expect(plain!.getAttribute('type')).toBe('button')
+})
+
+test('a Menu link closes the menu and runs its onSelect when followed', async () => {
+  mounted = await mountComponent(Menus)
+
+  const root = mounted.root
+  const menu = root.querySelector<HTMLElement>('#links')!
+  const same = menu.querySelector<HTMLAnchorElement>('[data-part=item]')!
+
+  same.addEventListener('click', event => event.preventDefault())
+  menu.showPopover()
+  await settle()
+  click(same)
+  await settle()
+
+  expect(root.querySelector('#picked')?.textContent).toBe('Same')
+  expect(menu.matches(':popover-open')).toBe(false)
+})
+
+test('a Menu link takes Space as Enter, and arrows move across links and buttons', async () => {
+  mounted = await mountComponent(Menus)
+
+  const menu = mounted.root.querySelector<HTMLElement>('#links')!
+  const list = menu.querySelector<HTMLElement>('[role=menu]')!
+  const [same, away] = [...menu.querySelectorAll<HTMLElement>('[data-part=item]')]
+  let clicks = 0
+
+  same!.addEventListener('click', (event) => {
+    clicks++
+    event.preventDefault()
+  })
+  menu.showPopover()
+  await settle()
+  same!.focus()
+  list.dispatchEvent(new KeyboardEvent('keydown', { key: ' ', bubbles: true }))
+  list.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }))
+
+  expect(clicks).toBe(1)
+  expect(document.activeElement).toBe(away!)
+})

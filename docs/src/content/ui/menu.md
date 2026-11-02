@@ -14,6 +14,10 @@ A menu fits at the end of a row. `disabled` greys an entry out, and the arrows, 
 
 <Demo name="menu/rows" />
 
+## Links
+
+An entry with an `href` is drawn as a link, so a middle-click, Ctrl+click or "copy link" works on it, and `onSelect` is optional. The menu closes as the link is followed. An address of another origin opens in a new tab with `rel="noopener noreferrer"`. A `disabled` entry stays a disabled button.
+
 ## At a point
 
 `at={{ x, y }}` opens the menu at a point of the window, such as the `clientX` and `clientY` of a click, with no trigger of its own and no `icon`. `open` shows it and `onOpenChange(open)` runs however it closed. It opens at `bottom-start` of the point, the browser flips it to stay inside the window, and Escape or a click outside closes it and gives focus back.

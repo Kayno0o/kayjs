@@ -201,9 +201,10 @@ interface MediaItem
 interface MenuAction
   danger?: boolean
   disabled?: boolean
+  href?: string | undefined
   icon?: IconProps | IconSlot
   label: string
-  onSelect: () => unknown
+  onSelect?: (() => unknown) | undefined
   tone?: "neutral" | "danger" | undefined
 
 [.] MenuEntry

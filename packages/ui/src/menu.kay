@@ -8,6 +8,8 @@ import { stepIndex } from './cycle'
 import Icon from './icon.kay'
 import IconButton from './icon-button.kay'
 import { MENU_ITEM, MENU_LIST } from './menu-look'
+import { opensOutside } from './menu'
+import { OUTSIDE } from './outside'
 import Popover from './popover.kay'
 
 // The class given to a Menu goes to its trigger, as it always did: `root` is the trigger and the popover is `menu`.
@@ -19,7 +21,7 @@ const look = recipe({
     list: MENU_LIST,
     separator: 'my-1 border-0 border-t border-border',
     icon: 'size-4 shrink-0',
-    item: `${MENU_ITEM} pointer-coarse:min-h-11 data-danger:text-danger disabled:cursor-default disabled:opacity-50`,
+    item: `${MENU_ITEM} no-underline pointer-coarse:min-h-11 data-danger:text-danger disabled:cursor-default disabled:opacity-50`,
   },
 })
 
@@ -54,8 +56,8 @@ const { id, items, label, icon, size = 'md', variant = 'ghost', tone, placement,
 const menuId = id ?? uid()
 let list: HTMLElement | undefined
 
-function entries(): HTMLButtonElement[] {
-  return [...list?.querySelectorAll<HTMLButtonElement>('[data-part=item]:not(:disabled)') ?? []]
+function entries(): HTMLElement[] {
+  return [...list?.querySelectorAll<HTMLElement>('[data-part=item]:not(:disabled)') ?? []]
 }
 
 // Hidden at once rather than through a signal, so the browser has given focus back to the trigger before an action runs.
@@ -66,6 +68,14 @@ function close() {
 function keyDown(event: KeyboardEvent) {
   const move = MOVES[event.key]
   const buttons = entries()
+
+  // Enter follows a link natively, a menu item takes Space as well.
+  if (event.key === ' ' && document.activeElement instanceof HTMLAnchorElement && buttons.includes(document.activeElement)) {
+    event.preventDefault()
+    document.activeElement.click()
+
+    return
+  }
 
   // A menu is one stop: Tab leaves it, closed, rather than walking its entries.
   if (event.key === 'Tab') {
@@ -78,7 +88,7 @@ function keyDown(event: KeyboardEvent) {
     return
 
   event.preventDefault()
-  buttons[move(buttons.indexOf(document.activeElement as HTMLButtonElement), buttons.length)]?.focus()
+  buttons[move(buttons.indexOf(document.activeElement as HTMLElement), buttons.length)]?.focus()
 }
 
 // A `tone` has the last word over the `danger` flag it replaces.
@@ -88,7 +98,7 @@ function isDanger(action: MenuAction) {
 
 function select(action: MenuAction) {
   close()
-  action.onSelect()
+  action.onSelect?.()
 }
 ---
 Popover(id={menuId} placement={placement ?? (at ? 'bottom-start' : 'bottom-end')} at={at} open={open} part="menu" onOpenChange={shown => { if (shown) entries()[0]?.focus(); onOpenChange?.(shown) }})
@@ -99,7 +109,13 @@ Popover(id={menuId} placement={placement ?? (at ? 'bottom-start' : 'bottom-end')
       if item === 'separator'
         hr(part="separator")
       else
-        button(part="item" type="button" role="menuitem" tabindex="-1" disabled={item.disabled} data-danger={isDanger(item) || undefined} onClick={() => select(item)})
-          if item.icon
-            Icon(icon={item.icon} part="icon")
-          | {item.label}
+        if item.href !== undefined && !item.disabled
+          a(part="item" href={item.href} {...opensOutside(item.href) ? OUTSIDE : {}} role="menuitem" tabindex="-1" data-danger={isDanger(item) || undefined} onClick={() => select(item)})
+            if item.icon
+              Icon(icon={item.icon} part="icon")
+            | {item.label}
+        else
+          button(part="item" type="button" role="menuitem" tabindex="-1" disabled={item.disabled} data-danger={isDanger(item) || undefined} onClick={() => select(item)})
+            if item.icon
+              Icon(icon={item.icon} part="icon")
+            | {item.label}
