@@ -324,3 +324,85 @@ test('onStop says press for the press that stopped a recording, then onRecord fo
 
   expect(events).toEqual(['start', 'stop:press', 'record'])
 })
+
+test('onRecordingChange says true as a press asks for the microphone and false once the recording ends, however it ended', async () => {
+  const changes: boolean[] = []
+  const { button } = await mount({ onRecordingChange: (recording: boolean) => changes.push(recording) })
+
+  click(button)
+  await settle()
+
+  expect(changes).toEqual([true])
+
+  click(button)
+  await settle()
+
+  expect(changes).toEqual([true, false])
+
+  click(button)
+  await settle()
+  button.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }))
+  await settle()
+
+  expect(changes).toEqual([true, false, true, false])
+
+  microphone(async () => Promise.reject(new DOMException('no', 'NotAllowedError')))
+  click(button)
+  await settle()
+
+  expect(changes).toEqual([true, false, true, false, true, false])
+
+  microphone(async () => stream())
+  click(button)
+  await settle()
+  tracks.at(-1)!.stop()
+  tracks.at(-1)!.dispatchEvent(new Event('ended'))
+  await settle()
+
+  expect(changes.slice(6)).toEqual([true, false])
+})
+
+test('a controlled recording starts as a press would, stops and hands over when set false, and a recording that ended on its own is not started again', async () => {
+  const changes: boolean[] = []
+  const { given, look } = await mount({ recording: false, onRecordingChange: (recording: boolean) => changes.push(recording) })
+
+  expect(recorders.length).toBe(0)
+
+  await mounted!.setProps({ recording: true })
+  await settle()
+
+  expect([look().pressed, look().status, recorders.length, changes]).toEqual(['true', 'Recording', 1, [true]])
+
+  await mounted!.setProps({ recording: false })
+  await settle()
+
+  expect([given.length, look().pressed, changes]).toEqual([1, 'false', [true, false]])
+
+  await mounted!.setProps({ recording: true })
+  await settle()
+  button(mounted!).dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }))
+  await settle()
+
+  expect([look().pressed, recorders.length, changes]).toEqual(['false', 2, [true, false, true, false]])
+})
+
+test('a recording set false while the microphone is still being asked for stops once it opens', async () => {
+  const opened = later()
+  const { given } = await mount({ recording: false })
+
+  microphone(async () => {
+    await opened.promise
+
+    return stream()
+  })
+  await mounted!.setProps({ recording: true })
+  await mounted!.setProps({ recording: false })
+  opened.settle()
+  await settle()
+
+  expect(given.length).toBe(1)
+})
+
+function button(target: Mounted) {
+  return target.root.querySelector('button')!
+}

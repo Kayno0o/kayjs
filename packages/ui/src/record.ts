@@ -44,6 +44,8 @@ export interface RecorderOptions {
   onCancel?: (() => unknown) | undefined
   // Called with why nothing was recorded (the microphone's problem), or `send` and the rejection when `onAudio` rejected.
   onError?: ((problem: RecordProblem | 'send', cause?: unknown) => unknown) | undefined
+  // Called with `true` when a press (or `start`) begins asking for the microphone, and with `false` once the recording is over however it ended: stopped, cancelled, out of time, refused or lost. Once per change.
+  onRecordingChange?: ((recording: boolean) => unknown) | undefined
 }
 
 // What ended a recording that was handed over.
@@ -62,6 +64,10 @@ export interface Recorder {
   press: () => Promise<void>
   // Drops the recording under way, telling whether there was one: what Escape does.
   cancel: () => boolean
+  // Starts a recording as a press would, doing nothing while one runs, is asked for or is being handed over.
+  start: () => Promise<void>
+  // Stops the recording as a press would, handing it over; one still asking for the microphone stops as soon as it opens.
+  stop: () => void
 }
 
 // The state of a microphone button, which RecordButton and kayjs-ai's Chat both draw: created in the component's script, it releases the microphone when the component goes.
@@ -77,6 +83,18 @@ export function recorder(options: RecorderOptions): Recorder {
   let gone = false
   // Set by the press that stops a recording, which tells it from one the time limit ended.
   let pressed = false
+  // Whether a recording is asked for or under way, as `onRecordingChange` last said.
+  let live = false
+  // Set when a stop is asked while the microphone is still being asked for.
+  let stopAsked = false
+
+  function report(next: boolean) {
+    if (live === next)
+      return
+
+    live = next
+    options.onRecordingChange?.(next)
+  }
 
   // Fetched as the component mounts, so the first press does not wait on it.
   const load = async () => loading ??= import('./recording')
@@ -111,6 +129,7 @@ export function recorder(options: RecorderOptions): Recorder {
 
   async function ended(result: File | RecordProblem) {
     finish()
+    report(false)
 
     if (typeof result === 'string') {
       state.set('idle')
@@ -143,7 +162,9 @@ export function recorder(options: RecorderOptions): Recorder {
     problem.set(undefined)
     said.set('')
     pressed = false
+    stopAsked = false
     state.set('asking')
+    report(true)
 
     let started: Recording | RecordProblem
 
@@ -168,6 +189,7 @@ export function recorder(options: RecorderOptions): Recorder {
     if (typeof started === 'string') {
       state.set('idle')
       problem.set(words[started])
+      report(false)
       options.onError?.(started)
 
       return
@@ -179,12 +201,16 @@ export function recorder(options: RecorderOptions): Recorder {
     state.set('recording')
     said.set(words.recording)
     options.onStart?.()
+
+    if (stopAsked)
+      await press()
   }
 
   async function press() {
     if (state() === 'recording') {
       pressed = true
       state.set('sending')
+      report(false)
       finish()?.stop()
 
       return
@@ -202,12 +228,25 @@ export function recorder(options: RecorderOptions): Recorder {
     finish()
     state.set('idle')
     said.set(words.cancelled)
+    report(false)
     options.onCancel?.()
 
     return true
   }
 
-  return { state, problem, said, seconds, press, cancel }
+  async function begin() {
+    if (state() === 'idle')
+      await start()
+  }
+
+  function stop() {
+    if (state() === 'asking')
+      stopAsked = true
+    else if (state() === 'recording')
+      void press()
+  }
+
+  return { state, problem, said, seconds, press, cancel, start: begin, stop }
 }
 
 // `1:05`, the time a recording has run.

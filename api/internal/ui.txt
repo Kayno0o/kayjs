@@ -1880,7 +1880,9 @@ interface Recorder
   problem: Signal<string | undefined>
   said: Signal<string>
   seconds: Signal<number>
+  start: () => Promise<void>
   state: Signal<"idle" | "asking" | "recording" | "sending">
+  stop: () => void
 
 [./lib/record] RecorderOptions
 interface RecorderOptions
@@ -1889,6 +1891,7 @@ interface RecorderOptions
   onAudio: (audio: File) => unknown
   onCancel?: (() => unknown) | undefined
   onError?: ((problem: "send" | RecordProblem, cause?: unknown) => unknown) | undefined
+  onRecordingChange?: ((recording: boolean) => unknown) | undefined
   onStart?: (() => unknown) | undefined
   onStop?: ((reason: RecordStop) => unknown) | undefined
   sending?: string | undefined

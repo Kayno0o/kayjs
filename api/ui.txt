@@ -1680,8 +1680,10 @@ component default
   onCancel?: (() => unknown) | undefined
   onError?: ((problem: "send" | RecordProblem, cause?: unknown) => unknown) | undefined
   onRecord: (audio: File) => unknown
+  onRecordingChange?: ((recording: boolean) => unknown) | undefined
   onStart?: (() => unknown) | undefined
   onStop?: ((reason: RecordStop) => unknown) | undefined
+  recording?: boolean | undefined
   size?: "xs" | "sm" | "md" | "lg" | undefined
   tone?: "success" | "neutral" | "danger" | "accent" | undefined
   variant?: "solid" | "ghost" | "inline" | undefined

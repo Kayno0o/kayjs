@@ -1,6 +1,6 @@
 ---
 import type { Duration } from 'kay'
-import { durationMs, recipe } from 'kay'
+import { durationMs, effect, recipe, untrack } from 'kay'
 import { wording } from 'kay/words'
 import Button from './button.kay'
 import Notice from './notice.kay'
@@ -26,7 +26,7 @@ const look = recipe({
   defaults: { variant: 'solid', tone: 'neutral', size: 'md' },
 })
 
-const { onRecord, onStart, onStop, onCancel, onError, label = wording('ui.recordButton.label', 'Record'), failure = wording('ui.recordButton.failure', 'The recording could not be sent.'), maxDuration = RECORD_LIMIT, variant = 'solid', tone = 'neutral', size = 'md' } = props<{
+const { onRecord, onStart, onStop, onCancel, onError, recording, onRecordingChange, label = wording('ui.recordButton.label', 'Record'), failure = wording('ui.recordButton.failure', 'The recording could not be sent.'), maxDuration = RECORD_LIMIT, variant = 'solid', tone = 'neutral', size = 'md' } = props<{
   // Takes what was said as a `File`, `recording.webm` (`recording.m4a` in Safari), which an action's `s.File()` field takes as it is. A promise it returns holds the button busy until it settles, and a rejection says `failure`.
   onRecord: (audio: File) => unknown
   // Called once the microphone is open and the recording runs: to dim the page, stop a player.
@@ -37,6 +37,10 @@ const { onRecord, onStart, onStop, onCancel, onError, label = wording('ui.record
   onCancel?: (() => unknown) | undefined
   // Called with why nothing was recorded, the code of the Notice shown (`denied`, `missing`, `taken`, `insecure`, `unsupported`, `failed`, `lost`, `empty`), or `send` and the rejection when `onRecord` rejected. The Notice still shows.
   onError?: ((problem: RecordProblem | 'send', cause?: unknown) => unknown) | undefined
+  // Whether it records, set by the app: `true` starts a recording as a press would (and asks for the microphone), `false` stops it and hands it over. Left out, the button keeps it itself.
+  recording?: boolean | undefined
+  // Called with `true` as a recording starts (the microphone is asked for) and `false` once it is over, however it ended: stopped, cancelled, out of time, refused or lost.
+  onRecordingChange?: ((recording: boolean) => unknown) | undefined
   // Names the button, which stays pressed while it records: a press starts, the next stops and hands the recording over, and Escape drops it.
   label?: string | undefined
   // Said when the promise of `onRecord` rejects.
@@ -45,7 +49,22 @@ const { onRecord, onStart, onStop, onCancel, onError, label = wording('ui.record
   maxDuration?: Duration | undefined
 }>()
 
-const voice = recorder({ onAudio: audio => onRecord(audio), words: recordWords(), failure, maxMs: durationMs(maxDuration), onStart, onStop, onCancel, onError })
+const voice = recorder({ onAudio: audio => onRecord(audio), words: recordWords(), failure, maxMs: durationMs(maxDuration), onStart, onStop, onCancel, onError, onRecordingChange })
+
+// Follows `recording` when the app sets it; only its changes act, so a recording that ended on its own is not started again.
+effect(() => {
+  const wanted = recording
+
+  if (wanted === undefined)
+    return
+
+  untrack(() => {
+    if (wanted)
+      void voice.start()
+    else
+      voice.stop()
+  })
+})
 
 function key(event: KeyboardEvent) {
   // Drops the recording and nothing else, such as a dialog around the button closing.
