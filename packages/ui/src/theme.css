@@ -418,6 +418,10 @@
     &::-webkit-details-marker {
       display: none;
     }
+
+    &[aria-disabled='true'] {
+      @apply pointer-events-none cursor-not-allowed opacity-50;
+    }
   }
 
   /* The band and the body take the card's own padding, so a boxed section and a card side by side line their titles up. */

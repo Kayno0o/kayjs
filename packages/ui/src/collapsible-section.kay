@@ -2,26 +2,35 @@
 import { recipe } from 'kay'
 import type { JSX, Snippet } from 'kay'
 import Icon from './icon.kay'
+import ToggleWatch from './internal/toggle-watch.kay'
 
 const look = recipe({ parts: { root: 'kui-collapsible-section', summary: 'kui-collapsible-section-summary', title: 'kui-collapsible-section-title', meta: 'kui-collapsible-section-meta', chevron: 'kui-collapsible-section-chevron', body: 'kui-collapsible-section-body' } })
 
-const { title, open = true, boxed = false, meta, ...rest } = props<Omit<JSX.IntrinsicElements['details'], 'class' | 'title' | 'open' | 'children'> & {
-  title: string
-  // Whether it starts unfolded; the reader folds and unfolds it from then on.
+const { title, open = true, boxed = false, disabled = false, meta, onOpenChange, ...rest } = props<Omit<JSX.IntrinsicElements['details'], 'class' | 'title' | 'open' | 'children'> & {
+  // The heading: a string, or a block to draw it, as `meta` is.
+  title: string | Snippet
+  // Whether it is unfolded; the reader folds and unfolds it, and the section follows the app when it changes this.
   open?: boolean | undefined
   // Draws the section as a card: the title becomes a band over a padded body, so a stack of them reads as separate blocks.
   boxed?: boolean | undefined
+  // Keeps the section as it is: the heading no longer folds or unfolds it, with the mouse or the keys.
+  disabled?: boolean | undefined
   // Sits in the band before the chevron, for a count or a state the folded section would otherwise hide.
   meta?: Snippet
+  // Called with the new state whenever the section folds or unfolds, however it did. Passing it makes the section an island, as any handler does.
+  onOpenChange?: ((open: boolean) => unknown) | undefined
 }>()
 ---
 // A native disclosure, so it folds without script and a static page can hold it.
 details(part="root" {...rest} open={open} data-boxed={boxed || undefined})
-  summary(part="summary")
-    span.kui-heading-section(part="title") {title}
+  summary(part="summary" aria-disabled={disabled ? 'true' : undefined} tabindex={disabled ? -1 : undefined})
+    span.kui-heading-section(part="title")
+      | {title}
     if meta
       span(part="meta")
         | {meta}
     Icon(icon="chevron" part="chevron")
   div(part="body")
     slot
+  if onOpenChange
+    ToggleWatch(onOpenChange={onOpenChange})

@@ -1,0 +1,20 @@
+---
+// kay-island
+import Accordion from '@kaynooo/kayjs-ui/accordion.kay'
+import CollapsibleSection from '@kaynooo/kayjs-ui/collapsible-section.kay'
+import { signal } from 'kay'
+
+const { calls, multiple = false, controlled = false } = props<{ calls: string[], multiple?: boolean, controlled?: boolean }>()
+const open = signal(false)
+const value = signal<string[]>(['venus'])
+const items = [{ value: 'mars', title: 'Mars', meta: '2 moons' }, { value: 'venus', title: 'Venus' }, { value: 'earth', title: 'Earth', disabled: true }]
+---
+button#open(type="button" onClick={() => open.set(true)}) Open
+button#pick(type="button" onClick={() => value.set(['mars'])}) Pick
+CollapsibleSection#section(title="Older" open={open()} onOpenChange={now => { calls.push(`toggle ${now}`); open.set(now) }})
+  p Deimos
+Accordion#accordion(items={items} multiple={multiple} value={controlled ? value() : undefined} onChange={next => { calls.push(`change ${next.join(',')}`); if (controlled) value.set(next) }})
+  @panel(name)
+    p {name}
+  @title(name)
+    b {name.toUpperCase()}

@@ -13,3 +13,9 @@ description: A group of collapsible sections where opening one closes the others
 <Demo name="accordion/multiple" />
 
 `boxed` is on by default and draws each section as a card, with neighbours sharing their border. `boxed={false}` draws plain headings.
+
+## Keeping which sections are open
+
+`value` is the value open, or an array of them with `multiple`, and the accordion follows it when the page passes a new one. `onChange(values)` is called with the values open whenever the reader opens or closes a section, so a page can keep them in a URL or a cookie. Closing a section as another opens reports only the opening. `value` left out, the reader alone decides after the first draw.
+
+An item can be `disabled`, which keeps its section as it is, and can carry a `meta` text in its band. `@title(value)` and `@meta(value)` draw the heading and the band in place of an item's `title` and `meta`.

@@ -1,0 +1,29 @@
+---
+import { onCleanup, onMount } from 'kay'
+
+const { onOpenChange } = props<{ onOpenChange: (open: boolean) => unknown }>()
+
+let mark: HTMLElement | undefined
+
+// Listens on the `details` holding it, so the section stays static on a page where nobody asks to hear it.
+onMount(() => {
+  const details = mark?.closest('details')
+
+  if (!details)
+    return
+
+  // The state last reported, so the toggle event a browser queues for a section drawn open says nothing.
+  let shown = details.open
+  const listener = () => {
+    if (details.open === shown)
+      return
+
+    shown = details.open
+    onOpenChange(shown)
+  }
+
+  details.addEventListener('toggle', listener)
+  onCleanup(() => details.removeEventListener('toggle', listener))
+})
+---
+span(hidden ref={element => mark = element})

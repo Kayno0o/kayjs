@@ -1,6 +1,6 @@
 ---
 import type { JSX, Snippet } from 'kay'
-import { recipe, uid, untrack } from 'kay'
+import { effect, recipe, signal, uid, untrack } from 'kay'
 import { stepIndex } from './cycle'
 import CollapsibleSection from './collapsible-section.kay'
 
@@ -13,20 +13,57 @@ const MOVES: Partial<Record<string, (index: number, count: number) => number>> =
 
 const look = recipe({ parts: { root: 'kui-accordion' } })
 
-const { items, multiple = false, boxed = true, panel, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children'> & {
-  // `open` starts a section unfolded; with one open at a time, the first one flagged wins.
-  items: readonly { value: string, title: string, open?: boolean | undefined }[]
+const { items, multiple = false, boxed = true, value, onChange, panel, title, meta, ...rest } = props<Omit<JSX.IntrinsicElements['div'], 'class' | 'children' | 'title' | 'onChange'> & {
+  // `open` starts a section unfolded; with one open at a time, the first one flagged wins. `disabled` keeps a section as it is, and `meta` draws a count or a state in its band, as CollapsibleSection's does.
+  items: readonly { value: string, title: string, open?: boolean | undefined, disabled?: boolean | undefined, meta?: string | undefined }[]
+  // The values open, which the accordion follows when the app passes a new one: a string, or an array with `multiple`. Left out, the reader alone decides after the first draw.
+  value?: string | readonly string[] | undefined
+  // Called with the values open (at most one without `multiple`) whenever the reader opens or closes a section.
+  onChange?: ((value: string[]) => unknown) | undefined
   // Lets several sections stay open; by default opening one closes the others.
   multiple?: boolean | undefined
   // Draws each section as a card, as CollapsibleSection does.
   boxed?: boolean | undefined
   // Draws each section's body: `@panel(value)`, given the item's value.
   panel: Snippet<[value: string]>
+  // Draws a section's heading in place of its `title`: `@title(value)`.
+  title?: Snippet<[value: string]> | undefined
+  // Draws a section's band content before the chevron, in place of its `meta`: `@meta(value)`.
+  meta?: Snippet<[value: string]> | undefined
 }>()
 
 const group = uid()
 const firstOpen = () => items.findIndex(item => item.open)
+const asked = () => value === undefined ? undefined : new Set(typeof value === 'string' ? [value] : value)
 let root: HTMLElement | undefined
+
+// The sections open: the app's `value` when given, else the flagged items, and the reader's clicks from then on.
+const opened = signal<ReadonlySet<string>>(asked() ?? new Set(items.filter((item, index) => multiple ? item.open === true : index === firstOpen()).map(item => item.value)))
+
+effect(() => {
+  const wanted = asked()
+
+  if (wanted)
+    opened.set(multiple ? wanted : new Set([...wanted].slice(0, 1)))
+})
+
+// Without `multiple`, a section closing as another opens reports only the opening, so the value is never briefly empty.
+function toggled(item: string, now: boolean) {
+  const shown = untrack(opened)
+
+  if (shown.has(item) === now || (!now && !multiple && root?.querySelector(':scope > details[open]')))
+    return
+
+  const next = new Set(multiple ? shown : [])
+
+  if (now)
+    next.add(item)
+  else
+    next.delete(item)
+
+  opened.set(next)
+  onChange?.([...next])
+}
 
 // Arrow, Home and End keys move between the headers, which are the summaries of the sections.
 function keyDown(event: KeyboardEvent) {
@@ -47,6 +84,6 @@ function keyDown(event: KeyboardEvent) {
 ---
 // Native details sharing a `name` close one another without script; the keys need an island.
 div(part="root" {...rest} ref={element => root = element} onKeyDown={keyDown})
-  for item, index of items key={item.value}
-    CollapsibleSection(title={item.title} name={multiple ? undefined : group} open={multiple ? item.open === true : index === firstOpen()} boxed={boxed})
+  for item of items key={item.value}
+    CollapsibleSection(title={untrack(() => title?.(item.value)) ?? item.title} meta={untrack(() => meta?.(item.value)) ?? item.meta} name={multiple ? undefined : group} open={opened().has(item.value)} boxed={boxed} disabled={item.disabled} onOpenChange={now => toggled(item.value, now)})
       | {untrack(() => panel(item.value))}
